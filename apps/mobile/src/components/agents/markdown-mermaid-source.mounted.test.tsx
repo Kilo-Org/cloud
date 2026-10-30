@@ -3,10 +3,10 @@ import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  CodeBlockType,
   containerHeight,
   countOf,
   deliver,
+  FenceType,
   injected,
   loadPage,
   mount,
@@ -56,7 +56,7 @@ vi.mock('react-native-webview', () => {
   });
   return { WebView };
 });
-vi.mock('./code-block', () => ({ CodeBlock: 'CodeBlock' }));
+vi.mock('./markdown-code-fence', () => ({ MarkdownCodeFence: 'MarkdownCodeFence' }));
 vi.mock('expo-asset', () => ({
   Asset: {
     fromModule: () => ({
@@ -85,15 +85,15 @@ describe('MarkdownMermaid source changes', () => {
   it('renders the new source again after the previous diagram failed', async () => {
     const renderer = await mount('flowchart TD\n  a --> b');
     expect(countOf(renderer.root, WebViewType)).toBe(1);
-    expect(countOf(renderer.root, CodeBlockType)).toBe(0);
+    expect(countOf(renderer.root, FenceType)).toBe(0);
     await loadPage(renderer);
 
     await deliver(renderer, { kind: 'error', source: 'flowchart TD\n  a --> b' });
     expect(countOf(renderer.root, WebViewType)).toBe(0);
-    expect(countOf(renderer.root, CodeBlockType)).toBe(1);
+    expect(countOf(renderer.root, FenceType)).toBe(1);
 
     await rerender(renderer, 'flowchart TD\n  c --> d');
-    expect(countOf(renderer.root, CodeBlockType)).toBe(0);
+    expect(countOf(renderer.root, FenceType)).toBe(0);
     expect(countOf(renderer.root, WebViewType)).toBe(1);
     await loadPage(renderer);
     expect(injected(webViewMock.injectJavaScript).at(-1)).toEqual({
@@ -124,12 +124,12 @@ describe('MarkdownMermaid source changes', () => {
   it('retries a failed host copy for the new source', async () => {
     hostMock.downloadAsync.mockRejectedValueOnce(new Error('copy failed'));
     const renderer = await mount('flowchart TD\n  a --> b');
-    expect(countOf(renderer.root, CodeBlockType)).toBe(1);
+    expect(countOf(renderer.root, FenceType)).toBe(1);
     expect(countOf(renderer.root, WebViewType)).toBe(0);
 
     await rerender(renderer, 'flowchart TD\n  c --> d');
     expect(countOf(renderer.root, WebViewType)).toBe(1);
-    expect(countOf(renderer.root, CodeBlockType)).toBe(0);
+    expect(countOf(renderer.root, FenceType)).toBe(0);
     expect(hostMock.downloadAsync).toHaveBeenCalledTimes(2);
 
     act(() => {
@@ -147,7 +147,7 @@ describe('MarkdownMermaid source changes', () => {
     await deliver(renderer, { kind: 'error', source: 'flowchart TD\n  a --> b' });
 
     expect(countOf(renderer.root, WebViewType)).toBe(1);
-    expect(countOf(renderer.root, CodeBlockType)).toBe(0);
+    expect(countOf(renderer.root, FenceType)).toBe(0);
 
     act(() => {
       renderer.unmount();
@@ -158,12 +158,12 @@ describe('MarkdownMermaid source changes', () => {
     const renderer = await mount('flowchart TD\n  a --> b');
     await loadPage(renderer);
     await deliver(renderer, { kind: 'error', source: 'flowchart TD\n  a --> b' });
-    expect(countOf(renderer.root, CodeBlockType)).toBe(1);
+    expect(countOf(renderer.root, FenceType)).toBe(1);
 
     await rerender(renderer, 'flowchart TD\n  c --> d');
     await rerender(renderer, 'flowchart TD\n  a --> b');
 
-    expect(countOf(renderer.root, CodeBlockType)).toBe(0);
+    expect(countOf(renderer.root, FenceType)).toBe(0);
     expect(countOf(renderer.root, WebViewType)).toBe(1);
     await loadPage(renderer);
     expect(injected(webViewMock.injectJavaScript).at(-1)).toEqual({

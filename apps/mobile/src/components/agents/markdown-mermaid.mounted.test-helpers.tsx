@@ -23,7 +23,7 @@ type HostProps = {
 };
 
 export const WebViewType = 'WebView' as never;
-export const CodeBlockType = 'CodeBlock' as never;
+export const FenceType = 'MarkdownCodeFence' as never;
 
 // Host preparation crosses several awaits, so let the task queue drain before
 // asserting what the effect settled on.
@@ -50,7 +50,9 @@ export async function mount(source: string, theme = palette) {
   const { MarkdownMermaid } = await import('./markdown-mermaid');
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
-    ref.current = TestRenderer.create(createElement(MarkdownMermaid, { source, palette: theme }));
+    ref.current = TestRenderer.create(
+      createElement(MarkdownMermaid, { source, palette: theme, selectable: true })
+    );
     await flush();
   });
   const renderer = ref.current;
@@ -67,7 +69,7 @@ export async function rerender(
 ) {
   const { MarkdownMermaid } = await import('./markdown-mermaid');
   await act(async () => {
-    renderer.update(createElement(MarkdownMermaid, { source, palette: theme }));
+    renderer.update(createElement(MarkdownMermaid, { source, palette: theme, selectable: true }));
     await flush();
   });
 }

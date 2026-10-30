@@ -63,7 +63,7 @@ vi.mock('react-native-webview', () => {
   });
   return { WebView };
 });
-vi.mock('./code-block', () => ({ CodeBlock: 'CodeBlock' }));
+vi.mock('./markdown-code-fence', () => ({ MarkdownCodeFence: 'MarkdownCodeFence' }));
 vi.mock('expo-asset', () => ({
   Asset: {
     fromModule: () => ({

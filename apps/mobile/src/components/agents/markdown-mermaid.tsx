@@ -7,7 +7,8 @@ import { z } from 'zod';
 
 import MERMAID_SCRIPT_ASSET from '@/../assets/vendor/mermaid-11.12.0.min.txt';
 
-import { CodeBlock } from './code-block';
+import { MarkdownCodeFence } from './markdown-code-fence';
+import { type MarkdownCopyCodeHandler } from './markdown-handlers';
 import { HOST_PAGE, MERMAID_VERSION, SCRIPT_FILE_NAME } from './markdown-mermaid-host';
 import { type MarkdownPalette } from './markdown-palette';
 
@@ -62,6 +63,8 @@ const MIN_HEIGHT = 48;
 type MarkdownMermaidProps = {
   source: string;
   palette: MarkdownPalette;
+  selectable: boolean;
+  onCopyCode?: MarkdownCopyCodeHandler;
 };
 
 const DiagramMessageSchema = z.discriminatedUnion('kind', [
@@ -90,7 +93,12 @@ function parseDiagramMessage(data: string) {
  * A ```mermaid fence drawn as a diagram in a WebView. A load or parse failure
  * falls back to the fence's source as a code block, so the text never disappears.
  */
-export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidProps>) {
+export function MarkdownMermaid({
+  source,
+  palette,
+  selectable,
+  onCopyCode,
+}: Readonly<MarkdownMermaidProps>) {
   const dark = useColorScheme() === 'dark';
   // The page's imperative surface: `injectJavaScript` redraws the diagram in the
   // loaded page. `ComponentRef` is how this package's ref is typed, because its
@@ -166,12 +174,16 @@ export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidPro
   }, [source, dark, palette.codeBackground, injectWantedRender]);
 
   if (failed) {
+    // The fence's source is drawn on the same card as every other code fence,
+    // so a diagram that will not render reads as code rather than as loose
+    // paragraph text.
     return (
-      <CodeBlock
+      <MarkdownCodeFence
         code={source}
         language="mermaid"
-        baseColor={palette.textColor}
-        tokenScheme={palette.codeTokenScheme}
+        palette={palette}
+        selectable={selectable}
+        onCopyCode={onCopyCode}
       />
     );
   }

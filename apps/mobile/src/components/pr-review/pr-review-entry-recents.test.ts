@@ -59,10 +59,9 @@ describe('recents identity across providers', () => {
 
   it("row presses navigate to the row's own provider route", async () => {
     const tree = await renderLoaded();
-    const rowPressables = findAll(tree, 'Pressable').filter(
-      p => p.props?.accessibilityLabel == null
-    );
-    expect(rowPressables).toHaveLength(3);
+    const rowPressables = findAll(tree, 'View')
+      .filter(row => row.props?.testID === 'recent-row')
+      .map(row => find(row, 'Pressable', p => !String(p.accessibilityLabel).startsWith('Remove')));
     const pushes: unknown[] = [];
     for (const row of rowPressables) {
       mocks.push.mockClear();
@@ -81,7 +80,7 @@ describe('recents identity across providers', () => {
     const tree = await renderLoaded();
     const removeGitLab = find(
       tree,
-      'Button',
+      'Pressable',
       p => p.accessibilityLabel === 'Remove acme/api!7 from recents'
     );
     (propsOf(removeGitLab).onPress as () => void)();

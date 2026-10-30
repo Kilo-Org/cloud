@@ -324,6 +324,25 @@ Require a remote iOS build without permitting a local compilation fallback:
 KILO_REMOTE_NATIVE=required pnpm dev:mobile:ios build <udid>
 ```
 
+### Mobile PR review entry
+
+The PR review entry screen keeps the account picker beside the title.
+Recent reviews use separate cards with wrapping titles and repository details.
+The remove icon opens a confirmation; failed reviews retain Retry.
+
+Use an isolated backend, a loopback mobile API URL, and `SKIP_STRIPE_API=true` for the native fixture:
+
+```bash
+pnpm dev:seed app:mobile-pr-entry
+```
+
+Sign in with the returned fake account, then open its `deepLink`.
+The fixture seeds local recent reviews and renders the real entry screen.
+The seed provides short and long organization names without connecting providers.
+Use `emptyDeepLink` for empty history.
+The fixture requires a development build and refuses non-loopback API URLs or accounts outside the reserved example domain.
+Keep optional analytics off and avoid billing surfaces; the seed creates no Stripe customer.
+
 ## Common Development Commands
 
 | Command | Description |

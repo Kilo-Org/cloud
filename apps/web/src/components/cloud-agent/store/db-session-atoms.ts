@@ -48,7 +48,6 @@ export type StoredResumeConfig = {
 };
 
 export type IndexedDbSessionData = {
-  /** Local session ID (UUID) - used as the key in IndexedDB */
   sessionId: string;
 
   /** Cloud agent session ID (agent_xxx format) - set when connected to cloud */
@@ -377,7 +376,6 @@ export const createNewSessionInIndexedDbAtom = atom(
 
     set(currentIndexedDbSessionAtom, sessionData);
 
-    // Add new session to the sessions list for immediate sidebar display
     const nowDate = new Date();
     const newDbSession: DbSession = {
       session_id: kiloSessionId,
@@ -394,7 +392,6 @@ export const createNewSessionInIndexedDbAtom = atom(
       organization_id: orgContext?.organizationId ?? null,
     };
 
-    // Prepend to existing sessions (most recent first)
     set(dbSessionsAtom, prev => [newDbSession, ...prev]);
   }
 );
@@ -580,7 +577,6 @@ export const checkStalenessWithHighWaterMarkAtom = atom(
         return false;
       }
 
-      // Convert DB's updated_at to milliseconds for comparison
       const dbUpdatedAtMs = new Date(dbUpdatedAt).getTime();
 
       // Use a 2-second tolerance to handle timestamp precision differences
@@ -787,7 +783,6 @@ export const processIncomingMessageAtom = atom(null, async (get, set, message: C
 
       let updatedMessages: CloudMessage[];
       if (existingIndex !== -1) {
-        // Update existing message (for partial messages)
         updatedMessages = [...currentData.messages];
         updatedMessages[existingIndex] = message;
       } else {
@@ -839,7 +834,6 @@ export const appendMessageToSessionAtom = atom(
 
       let updatedMessages: CloudMessage[];
       if (existingIndex !== -1) {
-        // Update existing message (for partial messages)
         updatedMessages = [...currentData.messages];
         updatedMessages[existingIndex] = message;
       } else {

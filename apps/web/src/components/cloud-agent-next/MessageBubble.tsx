@@ -299,7 +299,7 @@ function RetryFailureFooter({
   failure: MessageFailure;
   message: StoredMessage;
   retryTargetMessage?: StoredMessage;
-  onRetryMessage?: (message: StoredMessage) => void;
+  onRetryMessage?: (message: StoredMessage, failedMessage: StoredMessage) => void;
   onCopyToComposer?: (text: string) => void;
 }) {
   const [retried, setRetried] = useState(false);
@@ -308,6 +308,13 @@ function RetryFailureFooter({
     failure.kind === 'delivery'
       ? onRetryMessage !== undefined || onCopyToComposer !== undefined
       : onRetryMessage !== undefined;
+  // An assistant failure retries the prompt above it. With no preceding user
+  // row there is nothing to re-send, so the control stays hidden instead of
+  // passing the assistant row to a handler that rejects it.
+  const canRetry =
+    failure.canRetry &&
+    onRetryMessage !== undefined &&
+    (failure.kind === 'delivery' || retryTargetMessage !== undefined);
   if (!relevantHandlerWired) return null;
   return (
     <div className="mt-1 flex flex-col gap-1">
@@ -325,13 +332,13 @@ function RetryFailureFooter({
         ) : null}
       </div>
       <div className="flex items-center gap-2">
-        {failure.canRetry && onRetryMessage ? (
+        {canRetry ? (
           <button
             type="button"
             disabled={retried}
             onClick={() => {
               setRetried(true);
-              void Promise.resolve(onRetryMessage(retryTargetMessage ?? message))
+              void Promise.resolve(onRetryMessage?.(retryTargetMessage ?? message, message))
                 .catch(() => {})
                 .finally(() => {
                   setRetried(false);
@@ -375,7 +382,7 @@ type MessageBubbleProps = {
    * newest preceding user row. `null` when no retryable prompt exists, which
    * suppresses the control (same as mobile).
    */
-  onRetryMessage?: (message: StoredMessage) => void;
+  onRetryMessage?: (message: StoredMessage, failedMessage: StoredMessage) => void;
   /**
    * The user row an assistant failure retries: the newest preceding user
    * message. A user failure retries its own row.

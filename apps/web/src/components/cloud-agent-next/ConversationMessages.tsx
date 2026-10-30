@@ -26,7 +26,7 @@ type ConversationMessageGroupProps = {
   commits?: readonly SessionCommit[];
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
-  onRetryMessage?: (message: StoredMessage) => void;
+  onRetryMessage?: (message: StoredMessage, failedMessage: StoredMessage) => void;
   retryTargetMessage?: StoredMessage;
   onCopyToComposer?: (text: string) => void;
   onOpenPreparationDetails: (attemptId: string) => void;
@@ -109,7 +109,7 @@ type ConversationMessagesProps = {
   commitsAfterMessage?: ReadonlyMap<string, readonly SessionCommit[]>;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
-  onRetryMessage?: (message: StoredMessage) => void;
+  onRetryMessage?: (message: StoredMessage, failedMessage: StoredMessage) => void;
   onCopyToComposer?: (text: string) => void;
   onOpenPreparationDetails: (attemptId: string) => void;
 };

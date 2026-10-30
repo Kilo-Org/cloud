@@ -303,6 +303,51 @@ describe('MessageBubble', () => {
       expect(html).not.toContain('aria-label="Retry"');
     });
 
+    function assistantFailure(): StoredMessage {
+      const info: AssistantMessage = {
+        id: 'msg-assistant',
+        sessionID: 'ses-1',
+        role: 'assistant',
+        time: { created: 1, completed: 2 },
+        parentID: 'msg-parent',
+        modelID: 'test-model',
+        providerID: 'test-provider',
+        mode: 'code',
+        agent: 'test-agent',
+        path: { cwd: '/', root: '/' },
+        cost: 0,
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      };
+      Object.defineProperty(info, 'error', {
+        value: { name: 'APIError', message: 'upstream failed' },
+        enumerable: true,
+      });
+      return { info, parts: [] };
+    }
+
+    it('suppresses retry on an assistant failure with no preceding prompt', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(MessageBubble, {
+          message: assistantFailure(),
+          onRetryMessage: () => {},
+        })
+      );
+
+      expect(html).not.toContain('aria-label="Retry"');
+    });
+
+    it('retries an assistant failure against the preceding user row', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(MessageBubble, {
+          message: assistantFailure(),
+          retryTargetMessage: userMessage('Ship the release notes.'),
+          onRetryMessage: () => {},
+        })
+      );
+
+      expect(html).toContain('aria-label="Retry"');
+    });
+
     it('offers retry without copy when only the retry handler is wired', () => {
       const html = renderFailed(failed, { onCopyToComposer: undefined });
 

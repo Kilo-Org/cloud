@@ -1006,7 +1006,7 @@ export default function CloudChatPage({
   );
 
   const handleRetryFailedMessage = useCallback(
-    async (message: StoredMessage) => {
+    async (message: StoredMessage, failedMessage: StoredMessage) => {
       if (!isUserMessage(message.info)) return;
       const prompt = getUserTextContent(message.parts);
       if (prompt === '') return;
@@ -1017,14 +1017,20 @@ export default function CloudChatPage({
       const ownerSessionId =
         sessionIdFromParams && isCurrentSession ? (sessionIdFromParams as KiloSessionId) : null;
       if (!ownerSessionId) return;
-      const messageId = message.info.id;
+      // A retried assistant response is superseded together with the user row
+      // whose prompt it re-sends; leaving either behind would show the prompt
+      // or the failed response twice. A user delivery failure replaces itself.
+      const messageIds =
+        failedMessage.info.id === message.info.id
+          ? [message.info.id]
+          : [failedMessage.info.id, message.info.id];
       // A failed slash-command row re-sends through the command payload, the
       // same path the composer uses at submit time. Plain text falls back to
       // the prompt payload: unknown slash-looking text was sent as plain text
       // originally, so retrying it as a command would change the send.
       const commandRow = parseFailedCommandRow(prompt, availableCommands);
       await retryFailedMessage({
-        messageId,
+        messageIds,
         ownerSessionId,
         recovery: manager,
         send: onOptimisticSend =>

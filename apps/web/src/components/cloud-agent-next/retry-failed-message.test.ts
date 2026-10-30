@@ -48,7 +48,7 @@ describe('retryFailedMessage', () => {
     const order: string[] = [];
 
     const accepted = await retryFailedMessage({
-      messageId: 'msg-1',
+      messageIds: ['msg-1'],
       ownerSessionId: owner,
       recovery,
       send: async onOptimisticSend => {
@@ -67,7 +67,7 @@ describe('retryFailedMessage', () => {
     const recovery = fakeRecovery();
 
     const accepted = await retryFailedMessage({
-      messageId: 'msg-2',
+      messageIds: ['msg-2'],
       ownerSessionId: owner,
       recovery,
       send: async onOptimisticSend => {
@@ -85,7 +85,7 @@ describe('retryFailedMessage', () => {
 
     await expect(
       retryFailedMessage({
-        messageId: 'msg-3',
+        messageIds: ['msg-3'],
         ownerSessionId: owner,
         recovery,
         send: async onOptimisticSend => {
@@ -98,11 +98,32 @@ describe('retryFailedMessage', () => {
     expect(recovery.calls).toEqual([`mark:msg-3:${owner}`, `unmark:msg-3:${owner}`]);
   });
 
+  it('supersedes and clears every replaced row of an assistant retry', async () => {
+    const recovery = fakeRecovery();
+
+    await retryFailedMessage({
+      messageIds: ['msg-assistant', 'msg-prompt'],
+      ownerSessionId: owner,
+      recovery,
+      send: async onOptimisticSend => {
+        onOptimisticSend();
+        return true;
+      },
+    });
+
+    expect(recovery.calls).toEqual([
+      `mark:msg-assistant:${owner}`,
+      `mark:msg-prompt:${owner}`,
+      `clear:msg-assistant:${owner}`,
+      `clear:msg-prompt:${owner}`,
+    ]);
+  });
+
   it('records the resolution against the owning session, not the active one', async () => {
     const recovery = fakeRecovery();
 
     await retryFailedMessage({
-      messageId: 'msg-4',
+      messageIds: ['msg-4'],
       ownerSessionId: other,
       recovery,
       send: async () => true,

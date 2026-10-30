@@ -28,7 +28,8 @@ export function parseFailedCommandRow(
 }
 
 export async function retryFailedMessage(input: {
-  messageId: string;
+  /** Every row the re-send replaces: the failed row first, then the answered prompt. */
+  messageIds: readonly string[];
   ownerSessionId: KiloSessionId;
   recovery: FailureRecovery;
   /**
@@ -37,24 +38,34 @@ export async function retryFailedMessage(input: {
    */
   send: (onOptimisticSend: () => void) => Promise<boolean>;
 }): Promise<boolean> {
-  const { messageId, ownerSessionId, recovery, send } = input;
-  // The original is superseded in the same tap as the retry: waiting for the
+  const { messageIds, ownerSessionId, recovery, send } = input;
+  // The originals are superseded in the same tap as the retry: waiting for the
   // transport round-trip would render the prompt twice for its duration.
   let accepted: boolean;
   try {
-    accepted = await send(() => recovery.markMessageSuperseded(messageId, ownerSessionId));
+    accepted = await send(() => {
+      for (const messageId of messageIds) {
+        recovery.markMessageSuperseded(messageId, ownerSessionId);
+      }
+    });
   } catch (error) {
-    // A throw delivers nothing, so the original must come back with its retry
+    // A throw delivers nothing, so the originals must come back with their retry
     // control rather than stay hidden with no way to recover.
-    recovery.unmarkMessageSuperseded(messageId, ownerSessionId);
+    for (const messageId of messageIds) {
+      recovery.unmarkMessageSuperseded(messageId, ownerSessionId);
+    }
     throw error;
   }
   if (!accepted) {
-    recovery.unmarkMessageSuperseded(messageId, ownerSessionId);
+    for (const messageId of messageIds) {
+      recovery.unmarkMessageSuperseded(messageId, ownerSessionId);
+    }
     return false;
   }
   // Records the resolution against the owning session, so a replayed
-  // `cloud.message.failed` cannot bring the row back on the next open.
-  recovery.clearFailedMessage(messageId, ownerSessionId);
+  // `cloud.message.failed` cannot bring the rows back on the next open.
+  for (const messageId of messageIds) {
+    recovery.clearFailedMessage(messageId, ownerSessionId);
+  }
   return true;
 }

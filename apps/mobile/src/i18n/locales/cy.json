@@ -2043,6 +2043,7 @@
     },
     "settingsSave": {
       "saveChanges": "Cadw newidiadau",
+      "saved": "Gosodiadau wedi'u cadw",
       "unsavedTitle": "Newidiadau heb eu cadw",
       "unsavedMessage": "Cadw eich newidiadau cyn gadael y sgrin hon?",
       "unsavedInvalidMessage": "Ni ellir cadw'r newidiadau hyn eto. Trwsiwch nhw i gadw, neu eu gwaredu i adael."

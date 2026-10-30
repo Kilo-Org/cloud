@@ -1965,6 +1965,7 @@
     },
     "settingsSave": {
       "saveChanges": "Spremi izmjene",
+      "saved": "Postavke spremljene",
       "unsavedTitle": "Nespremljene izmjene",
       "unsavedMessage": "Želiš li spremiti izmjene prije izlaska s ovog zaslona?",
       "unsavedInvalidMessage": "Ove izmjene još nije moguće spremiti. Ispravi ih da bi ih spremio ili ih odbaci da bi izašao."

@@ -1939,6 +1939,7 @@
     },
     "settingsSave": {
       "saveChanges": "Stoor veranderinge",
+      "saved": "Instellings gestoor",
       "unsavedTitle": "Ongestoorde veranderinge",
       "unsavedMessage": "Stoor jou veranderinge voordat jy hierdie skerm verlaat?",
       "unsavedInvalidMessage": "Hierdie veranderinge kan nog nie gestoor word nie. Maak dit reg om te stoor, of gooi dit weg om te verlaat."

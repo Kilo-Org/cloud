@@ -1939,6 +1939,7 @@
     },
     "settingsSave": {
       "saveChanges": "ለውጦችን ያስቀምጡ",
+      "saved": "ቅንብሮች ተቀምጠዋል",
       "unsavedTitle": "ያልተቀመጡ ለውጦች",
       "unsavedMessage": "ከዚህ ማያ ገጽ ከመውጣትዎ በፊት ለውጦችዎ ይቀመጡ?",
       "unsavedInvalidMessage": "እነዚህ ለውጦች እስካሁን ሊቀመጡ አይችሉም። ለመቀመጥ ያስተካክሏቸው፣ ወይም ለመውጣት አስወግዷቸው።"

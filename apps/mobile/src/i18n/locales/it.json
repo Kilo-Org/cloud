@@ -1447,6 +1447,7 @@
     },
     "settingsSave": {
       "saveChanges": "Salva le modifiche",
+      "saved": "Impostazioni salvate",
       "unsavedMessage": "Salvare le modifiche prima di uscire da questa schermata?",
       "unsavedInvalidMessage": "Queste modifiche non possono ancora essere salvate. Correggile per salvare o scartale per uscire.",
       "unsavedTitle": "Modifiche non salvate"

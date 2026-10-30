@@ -2017,6 +2017,7 @@
     },
     "settingsSave": {
       "saveChanges": "Issejvja l-bidliet",
+      "saved": "L-issettjar issejvjat",
       "unsavedTitle": "Bidliet mhux issejvjati",
       "unsavedMessage": "Trid tissejvja l-bidliet tiegħek qabel ma titlaq minn dan l-iskrin?",
       "unsavedInvalidMessage": "Dawn il-bidliet għadhom ma jistgħux jiġu ssejvjati. Sejjibhom biex tissejvja, jew warrabhom biex titlaq."

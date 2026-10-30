@@ -1939,6 +1939,7 @@
     },
     "settingsSave": {
       "saveChanges": "Simpan perubahan",
+      "saved": "Tetapan disimpan",
       "unsavedTitle": "Perubahan belum disimpan",
       "unsavedMessage": "Simpan perubahan anda sebelum meninggalkan skrin ini?",
       "unsavedInvalidMessage": "Perubahan ini belum boleh disimpan. Betulkan untuk menyimpan, atau buang untuk meninggalkan."

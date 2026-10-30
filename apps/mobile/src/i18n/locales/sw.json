@@ -1939,6 +1939,7 @@
     },
     "settingsSave": {
       "saveChanges": "Hifadhi mabadiliko",
+      "saved": "Mipangilio imehifadhiwa",
       "unsavedTitle": "Mabadiliko ambayo hayajahifadhiwa",
       "unsavedMessage": "Ungependa kuhifadhi mabadiliko yako kabla ya kuondoka kwenye skrini hii?",
       "unsavedInvalidMessage": "Mabadiliko haya bado hayawezi kuhifadhiwa. Yarekebishe ili kuhifadhi, au yatupe ili kuondoka."

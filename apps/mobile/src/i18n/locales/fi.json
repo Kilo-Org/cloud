@@ -1939,6 +1939,7 @@
     },
     "settingsSave": {
       "saveChanges": "Tallenna muutokset",
+      "saved": "Asetukset tallennettu",
       "unsavedTitle": "Tallentamattomia muutoksia",
       "unsavedMessage": "Tallennetaanko muutokset ennen tältä näytöltä poistumista?",
       "unsavedInvalidMessage": "Näitä muutoksia ei voi vielä tallentaa. Korjaa ne tallentaaksesi tai hylkää ne poistuaksesi."

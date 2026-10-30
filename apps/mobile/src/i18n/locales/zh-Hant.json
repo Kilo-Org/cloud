@@ -1471,6 +1471,7 @@
     },
     "settingsSave": {
       "saveChanges": "儲存變更",
+      "saved": "設定已儲存",
       "unsavedMessage": "離開此畫面前，要儲存變更嗎？",
       "unsavedInvalidMessage": "這些變更尚無法儲存。請修正後再儲存，或捨棄變更以離開。",
       "unsavedTitle": "未儲存的變更"

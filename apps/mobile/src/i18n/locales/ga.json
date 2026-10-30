@@ -2017,6 +2017,7 @@
     },
     "settingsSave": {
       "saveChanges": "Sábháil athruithe",
+      "saved": "Socruithe sábháilte",
       "unsavedTitle": "Athruithe gan sábháil",
       "unsavedMessage": "Ar mhaith leat d'athruithe a shábháil sula bhfágann tú an scáileán seo?",
       "unsavedInvalidMessage": "Ní féidir na hathruithe seo a shábháil fós. Ceartaigh iad le sábháil, nó caith uait iad le fágáil."

@@ -1939,6 +1939,7 @@
     },
     "settingsSave": {
       "saveChanges": "Jijjiiramoota olkaa'i",
+      "saved": "Qindaa'inni olkaa'ame",
       "unsavedTitle": "Jijjiiramoota hin olkaa'amne",
       "unsavedMessage": "Fuula kana keessaa ba'uu dura jijjiiramoota kee olkaa'uu?",
       "unsavedInvalidMessage": "Jijjiiramoonni kunniin ammattiin olkaa'amuu hin danda'an. Olkaa'uuf isaan sirreessi, yookaan ba'uuf isaan dhiisi."

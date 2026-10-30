@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { parseTimestamp } from './utils';
+import { formatShortModelDisplayName, parseTimestamp } from './utils';
 
 function inTimeZone<T>(timeZone: string, run: () => T): T {
   vi.stubEnv('TZ', timeZone);
@@ -73,5 +73,23 @@ describe('parseTimestamp', () => {
   it('returns an invalid date for a missing timestamp instead of throwing', () => {
     expect(Number.isNaN(parseTimestamp(null).getTime())).toBe(true);
     expect(Number.isNaN(parseTimestamp(undefined).getTime())).toBe(true);
+  });
+});
+
+describe('formatShortModelDisplayName', () => {
+  it('strips the vendor prefix from a catalog display name', () => {
+    expect(formatShortModelDisplayName('Anthropic: Claude Opus 4.6')).toBe('Claude Opus 4.6');
+  });
+
+  it('keeps a name without a vendor prefix', () => {
+    expect(formatShortModelDisplayName('GPT-4o')).toBe('GPT-4o');
+  });
+
+  it('keeps an empty name empty', () => {
+    expect(formatShortModelDisplayName('')).toBe('');
+  });
+
+  it('keeps a colon without a following space', () => {
+    expect(formatShortModelDisplayName('Model:v2')).toBe('Model:v2');
   });
 });

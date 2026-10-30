@@ -41,6 +41,7 @@ export const egressPolicySchema = z
     egressAllowlist: egressAllowlistSchema
       .optional()
       .describe('Additional exact DNS hostnames; requires explicit allowlist mode.'),
+    egressAudit: z.boolean().optional().describe('Opt in to egress auditing in any egress mode.'),
   })
   .refine(data => data.egressAllowlist === undefined || data.egressMode === 'allowlist', {
     message: 'egressAllowlist requires egressMode to be allowlist',

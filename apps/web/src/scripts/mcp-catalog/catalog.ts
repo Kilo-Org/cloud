@@ -282,10 +282,10 @@ function topSchemaKeys(inputSchema: Record<string, unknown>): string[] {
   if (isRecord(properties)) {
     for (const key of Object.keys(properties)) if (!keys.includes(key)) keys.push(key);
   }
-  // A chain that falls back to a top-level `allOf` keeps its field keys in the
-  // subschemas; surface them so tags and the search blob stay complete.
-  if (Array.isArray(inputSchema.allOf)) {
-    for (const sub of inputSchema.allOf) {
+  for (const keyword of ['allOf', 'anyOf', 'oneOf']) {
+    const alternatives = inputSchema[keyword];
+    if (!Array.isArray(alternatives)) continue;
+    for (const sub of alternatives) {
       if (isRecord(sub)) {
         for (const key of topSchemaKeys(sub)) if (!keys.includes(key)) keys.push(key);
       }

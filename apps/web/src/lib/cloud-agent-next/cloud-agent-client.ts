@@ -7,6 +7,11 @@ import * as z from 'zod';
 import type { AgentConfig } from '@kilocode/db/schema-types';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import {
+  GetEgressAuditResponseSchema,
+  type GetEgressAuditInput as EgressAuditPagination,
+  type GetEgressAuditResponse,
+} from '@kilocode/worker-utils/egress-audit';
+import {
   sandboxSelectionCapabilitiesSchema,
   type SandboxAllocationInput,
   type SandboxSelectionCapabilities,
@@ -158,6 +163,7 @@ type PrepareSessionSharedFields = {
   sandboxAllocation?: SandboxAllocationInput;
   egressMode?: EgressMode;
   egressAllowlist?: string[];
+  egressAudit?: boolean;
 };
 
 /** Non-clone prepare input: required `prompt` and the current optional initial fields. */
@@ -315,6 +321,8 @@ export type GetPendingInteractionsOutput = {
 };
 
 export type GetWorktreeFileInput = GetSessionInput & WorktreeFileQuery;
+
+export type GetEgressAuditInput = GetSessionInput & EgressAuditPagination;
 
 /** Execution status for getSession response */
 export type ExecutionStatus = {
@@ -608,6 +616,9 @@ type CloudAgentNextTRPCClient = {
   };
   getPreparationAttempts: {
     query: (input: GetSessionInput) => Promise<PreparationAttempt[]>;
+  };
+  getEgressAudit: {
+    query: (input: GetEgressAuditInput) => Promise<unknown>;
   };
   getPendingInteractions: {
     query: (input: GetSessionInput) => Promise<GetPendingInteractionsOutput>;
@@ -909,6 +920,14 @@ export class CloudAgentNextClient {
     return getWorktreeChangesOutputSchema.parse(
       await this.client.getWorktreeChanges.query({ cloudAgentSessionId })
     );
+  }
+
+  async getEgressAudit(input: GetEgressAuditInput): Promise<GetEgressAuditResponse> {
+    try {
+      return GetEgressAuditResponseSchema.parse(await this.client.getEgressAudit.query(input));
+    } catch (error) {
+      rethrowCloudAgentError(error);
+    }
   }
 
   async refreshWorktreeChanges(cloudAgentSessionId: string): Promise<RefreshWorktreeChangesOutput> {

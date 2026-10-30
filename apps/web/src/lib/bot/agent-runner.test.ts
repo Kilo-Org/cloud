@@ -247,8 +247,6 @@ beforeEach(() => {
   jest.mocked(validateGitLabRepoAccessForUser).mockResolvedValue(true);
   jest.mocked(getGitLabTokenForOrganization).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabTokenForUser).mockResolvedValue('gitlab-token');
-  jest.mocked(validateGitLabRepoAccessForOrganization).mockResolvedValue(true);
-  jest.mocked(validateGitLabRepoAccessForUser).mockResolvedValue(true);
   jest.mocked(getGitLabInstanceUrlForOrganization).mockResolvedValue('https://gitlab.com');
   jest.mocked(buildGitLabCloneUrl).mockReturnValue(`https://gitlab.com/${gitlabProject}.git`);
 });
@@ -442,6 +440,12 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
           })
         );
       } else {
+        expect(validateGitLabRepoAccessForOrganization).toHaveBeenCalledWith(
+          'org-1',
+          'bot-user-1',
+          gitlabProject
+        );
+        expect(getGitLabTokenForOrganization).toHaveBeenCalledWith('org-1', 'bot-user-1');
         expect(mockPrepareSession).toHaveBeenCalledWith(
           expect.objectContaining({
             gitUrl: `https://gitlab.com/${gitlabProject}.git`,
@@ -452,4 +456,22 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
       }
     }
   );
+
+  it('rejects inaccessible GitLab projects before looking up a token or preparing a session', async () => {
+    jest.mocked(validateGitLabRepoAccessForOrganization).mockResolvedValue(false);
+    toolInput = { ...toolInput, gitlabProject };
+
+    const result = await runBotAgent(runParams(platform));
+
+    expect(result.startedCloudAgentSession).toBe(false);
+    expect(result.finalText).toContain('not available');
+    expect(validateGitLabRepoAccessForOrganization).toHaveBeenCalledWith(
+      'org-1',
+      'bot-user-1',
+      gitlabProject
+    );
+    expect(getGitLabTokenForOrganization).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+    expect(createCloudAgentNextClient).not.toHaveBeenCalled();
+  });
 });

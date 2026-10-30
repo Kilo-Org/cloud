@@ -861,14 +861,14 @@
       "chat": "ચેટના સંદેશા",
       "kiloclaw": "KiloClawની પ્રવૃત્તિ",
       "balance": "બેલેન્સ અંગેની ચેતવણીઓ",
-      "security": "સુરક્ષા તપાસનાં તારણો",
+      "security": "સુરક્ષા તારણો",
       "spend": "ખર્ચની ચેતવણીઓ",
-      "followedSessions": "ફોલો કરેલ સેશન્સ"
+      "followedSessions": "અનુસરેલાં સત્રો"
     },
     "category": {
       "chatMessagesSubtitle": "તમારી વાતચીતમાં જવાબો",
       "agentAttentionTitle": "એજન્ટને તમારી જરૂર છે",
-      "agentAttentionSubtitle": "પ્રશ્નોના જવાબ, પરવાનગી કે માહિતીની જરૂર",
+      "agentAttentionSubtitle": "પ્રશ્નો, પરવાનગી કે માહિતીની જરૂર",
       "agentUpdatesTitle": "એજન્ટ અપડેટ્સ",
       "agentUpdatesSubtitle": "એજન્ટ તરફથી કાર્ય દરમિયાનના સંદેશાઓ",
       "sessionStatusTitle": "સત્રની સ્થિતિ",

@@ -17,7 +17,17 @@ export const MODELS_BY_PROVIDER_SNAPSHOT_TTL_MS = 600_000;
  * organization-filtered catalog, must never be written here.
  */
 export const getModelsByProviderSnapshot = createCachedFetch<NormalizedOpenRouterResponse | null>(
-  async () => (await fetchLatestModelsByProviderSnapshotFromDb()) ?? null,
+  async () => {
+    const snapshot = await fetchLatestModelsByProviderSnapshotFromDb();
+    if (!snapshot) {
+      // Throwing is how an absent row stays out of the TTL: `createCachedFetch`
+      // reports the refresh, serves the default, and retries after its failure
+      // backoff, so a catalog written moments later becomes visible within that
+      // window instead of being pinned as `null` for the whole TTL.
+      throw new Error('No models_by_provider snapshot row');
+    }
+    return snapshot;
+  },
   MODELS_BY_PROVIDER_SNAPSHOT_TTL_MS,
   null,
   { name: 'modelsByProviderSnapshot' }

@@ -1,15 +1,21 @@
-import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import {
-  fetchLatestModelsByProviderSnapshotFromDb,
-  getProviderSlugsForModel,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import {
-  resolveOrganizationMemberModelPolicy,
-  type EffectiveOrganizationModelPolicy,
-} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
-import { handleModelsByProviderRequest } from './models-by-provider';
+import { beforeEach, describe, expect, jest, test } from '@jest/globals';
+import type { EffectiveOrganizationModelPolicy } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+
+// The snapshot cache belongs to the handler module, so every test loads its own
+// instance through `loadHandler` and starts from a cold cache. The factories
+// reference these module-scope mocks, which stay the same across reloads.
+const mockReadDb = { select: jest.fn() };
+const mockFetchSnapshot = jest.fn<() => Promise<unknown>>();
+const mockGetUserFromAuth = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+const mockProviderLookup = jest.fn<(modelId: string) => Promise<ReadonlySet<string>>>();
+const mockResolvePolicy =
+  jest.fn<
+    (args: {
+      organizationId: string;
+      kiloUserId: string;
+      fromDb: unknown;
+    }) => Promise<EffectiveOrganizationModelPolicy>
+  >();
 
 jest.mock('next/server', () => {
   return {
@@ -17,11 +23,8 @@ jest.mock('next/server', () => {
     connection: jest.fn(async () => undefined),
   };
 });
-jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
-  readDb: { select: jest.fn() },
-  db: {},
-}));
-jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: mockReadDb, db: {} }));
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: mockGetUserFromAuth }));
 jest.mock('@kilocode/web-shared/lib/model-allow.server', () => ({
   isModelRestrictionExempt: jest.fn(async () => false),
   getModelInferenceProviders: jest.fn(async () => undefined),
@@ -29,21 +32,21 @@ jest.mock('@kilocode/web-shared/lib/model-allow.server', () => ({
 jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
   () => ({
-    fetchLatestModelsByProviderSnapshotFromDb: jest.fn(),
-    getProviderSlugsForModel: jest.fn(),
+    fetchLatestModelsByProviderSnapshotFromDb: mockFetchSnapshot,
+    getProviderSlugsForModel: mockProviderLookup,
   })
 );
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   ...(jest.requireActual(
     '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server'
   ) as Record<string, unknown>),
-  resolveOrganizationMemberModelPolicy: jest.fn(),
+  resolveOrganizationMemberModelPolicy: mockResolvePolicy,
 }));
 
-const mockedFetchSnapshot = jest.mocked(fetchLatestModelsByProviderSnapshotFromDb);
-const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
-const mockedProviderLookup = jest.mocked(getProviderSlugsForModel);
-const mockedResolvePolicy = jest.mocked(resolveOrganizationMemberModelPolicy);
+async function loadHandler() {
+  jest.resetModules();
+  return import('./models-by-provider');
+}
 
 function model(slug: string, variant = 'standard') {
   return { slug, endpoint: { variant } };
@@ -86,50 +89,42 @@ const policy: EffectiveOrganizationModelPolicy = {
   customLlmGrantee: { organizationId: 'org-1', groupIds: [] },
 };
 
-// The snapshot cache belongs to the handler module and outlives a single test,
-// so each test starts beyond the previous one's TTL instead of draining it.
-let clockMs = 0;
-
 describe('handleModelsByProviderRequest', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    clockMs += 10 * 600_000;
-    jest.spyOn(Date, 'now').mockReturnValue(clockMs);
-    mockedFetchSnapshot.mockResolvedValue(snapshot as never);
-    mockedProviderLookup.mockImplementation(
+    mockFetchSnapshot.mockResolvedValue(snapshot);
+    mockProviderLookup.mockImplementation(
       async modelId => new Set(providersByModel[modelId] ?? [])
     );
-    mockedResolvePolicy.mockImplementation(async () => policy);
-  });
-
-  afterEach(() => {
-    jest.restoreAllMocks();
+    mockResolvePolicy.mockImplementation(async () => policy);
   });
 
   test('returns the shared catalog for callers without an organization', async () => {
-    mockedGetUserFromAuth.mockRejectedValue(new Error('unauthenticated'));
+    mockGetUserFromAuth.mockRejectedValue(new Error('unauthenticated'));
+    const { handleModelsByProviderRequest } = await loadHandler();
 
     const response = await handleModelsByProviderRequest();
 
     expect(response.headers.get('Cache-Control')).toBe('private, max-age=0, must-revalidate');
     await expect(response.json()).resolves.toEqual(snapshot);
-    expect(mockedResolvePolicy).not.toHaveBeenCalled();
+    expect(mockResolvePolicy).not.toHaveBeenCalled();
   });
 
   test('filters organization callers to allowed provider routes', async () => {
-    mockedGetUserFromAuth.mockResolvedValue({
+    mockGetUserFromAuth.mockResolvedValue({
       user: { id: 'user-1' },
       organizationId: 'org-1',
-    } as never);
+    });
+    const { handleModelsByProviderRequest } = await loadHandler();
 
     const response = await handleModelsByProviderRequest();
 
     expect(response.headers.get('Cache-Control')).toBe('private, no-store');
-    expect(mockedResolvePolicy).toHaveBeenCalledTimes(1);
-    const [policyArgs] = mockedResolvePolicy.mock.calls[0] ?? [];
+    expect(mockResolvePolicy).toHaveBeenCalledTimes(1);
+    const [policyArgs] = mockResolvePolicy.mock.calls[0] ?? [];
     expect(policyArgs?.organizationId).toBe('org-1');
     expect(policyArgs?.kiloUserId).toBe('user-1');
-    expect(policyArgs?.fromDb).toBe(readDb);
+    expect(policyArgs?.fromDb).toBe(mockReadDb);
     await expect(response.json()).resolves.toEqual({
       providers: [
         { slug: 'alpha', models: [model('open/model'), model('routed/model')] },
@@ -139,22 +134,24 @@ describe('handleModelsByProviderRequest', () => {
       total_providers: 3,
       total_models: 4,
     });
-    expect(mockedProviderLookup).toHaveBeenCalledWith('free/model:free');
-    expect(mockedProviderLookup).not.toHaveBeenCalledWith('free/model');
+    expect(mockProviderLookup).toHaveBeenCalledWith('free/model:free');
+    expect(mockProviderLookup).not.toHaveBeenCalledWith('free/model');
   });
 
   test('reads the catalog snapshot once across repeated requests', async () => {
-    mockedGetUserFromAuth.mockRejectedValue(new Error('unauthenticated'));
+    mockGetUserFromAuth.mockRejectedValue(new Error('unauthenticated'));
+    const { handleModelsByProviderRequest } = await loadHandler();
 
     await handleModelsByProviderRequest();
     await handleModelsByProviderRequest();
 
-    expect(mockedFetchSnapshot).toHaveBeenCalledTimes(1);
+    expect(mockFetchSnapshot).toHaveBeenCalledTimes(1);
   });
 
   test('throws the admin-panel error when no snapshot row exists', async () => {
-    mockedFetchSnapshot.mockResolvedValue(undefined);
-    mockedGetUserFromAuth.mockRejectedValue(new Error('unauthenticated'));
+    mockFetchSnapshot.mockResolvedValue(undefined);
+    mockGetUserFromAuth.mockRejectedValue(new Error('unauthenticated'));
+    const { handleModelsByProviderRequest } = await loadHandler();
 
     await expect(handleModelsByProviderRequest()).rejects.toThrow(/No models data found/);
   });

@@ -38,7 +38,7 @@ export function OrganizationFeaturesContent() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery(
+  const { data, isLoading, error, refetch } = useQuery(
     trpc.admin.gatewayConfig.getOrganizationFeatures.queryOptions()
   );
 
@@ -67,8 +67,21 @@ export function OrganizationFeaturesContent() {
     })
   );
 
-  if (isLoading || !values) {
+  if (isLoading || (data && !values)) {
     return <div className="text-muted-foreground py-8 text-sm">Loading...</div>;
+  }
+
+  if (!values) {
+    return (
+      <div className="flex flex-col items-start gap-2 py-8 text-sm" role="alert">
+        <p className="text-destructive">
+          Could not load organization features{error ? `: ${error.message}` : '.'}
+        </p>
+        <Button variant="outline" size="sm" onClick={() => void refetch()}>
+          Try again
+        </Button>
+      </div>
+    );
   }
 
   function handleSave() {

@@ -24,6 +24,7 @@ import {
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
 const ANALYSIS_MODE_KEYS = {
@@ -66,6 +67,7 @@ export function SettingsOverviewScreen({
   permissionError?: boolean;
 }>) {
   const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const config = useSecurityAgentConfig(scope);
   const capability = useSecurityAgentCapability(scope);
@@ -268,7 +270,7 @@ export function SettingsOverviewScreen({
                   title={t('common.selectRepositories')}
                   subtitle={t('securityAgent.settingsOverview.selectRepositoriesSubtitle')}
                   onPress={() => {
-                    router.push(getSecurityAgentPath(scope, 'settings/repositories'));
+                    pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
                   }}
                 />
               ) : null}
@@ -282,7 +284,7 @@ export function SettingsOverviewScreen({
                 title={t('common.repositories')}
                 subtitle={repoCountLabel}
                 onPress={() => {
-                  router.push(getSecurityAgentPath(scope, 'settings/repositories'));
+                  pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
                 }}
               />
               <ConfigureRow
@@ -292,7 +294,7 @@ export function SettingsOverviewScreen({
                   mode: analysisModeLabel,
                 })}
                 onPress={() => {
-                  router.push(getSecurityAgentPath(scope, 'settings/analysis'));
+                  pushOnce(getSecurityAgentPath(scope, 'settings/analysis'));
                 }}
               />
               <ConfigureRow
@@ -307,7 +309,7 @@ export function SettingsOverviewScreen({
                       })
                 }
                 onPress={() => {
-                  router.push(getSecurityAgentPath(scope, 'settings/automation'));
+                  pushOnce(getSecurityAgentPath(scope, 'settings/automation'));
                 }}
               />
               <ConfigureRow
@@ -322,7 +324,7 @@ export function SettingsOverviewScreen({
                       })
                 }
                 onPress={() => {
-                  router.push(getSecurityAgentPath(scope, 'settings/notifications'));
+                  pushOnce(getSecurityAgentPath(scope, 'settings/notifications'));
                 }}
               />
               <ConfigureRow
@@ -333,7 +335,7 @@ export function SettingsOverviewScreen({
                 }
                 last
                 onPress={() => {
-                  router.push(getSecurityAgentPath(scope, 'settings/sla'));
+                  pushOnce(getSecurityAgentPath(scope, 'settings/sla'));
                 }}
               />
             </View>

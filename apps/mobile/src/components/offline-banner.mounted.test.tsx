@@ -76,7 +76,10 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   },
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useFocusEffect: () => undefined,
+}));
 vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
   useSetSecurityAgentEnabled: () => ({ mutate: vi.fn(), isPending: false }),
   useTrackSecurityAgentInteraction: () => ({ mutate: vi.fn() }),

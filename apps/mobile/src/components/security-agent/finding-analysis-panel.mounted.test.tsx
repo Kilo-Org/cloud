@@ -50,6 +50,7 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
+  useFocusEffect: () => undefined,
 }));
 vi.mock('@/components/ui/icons', () => ({
   ExternalLink: 'ExternalLink',

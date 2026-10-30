@@ -42,6 +42,34 @@ function useInstanceHint(platform: ProviderPrPlatform): string | undefined {
 }
 
 /**
+ * The one line under the Bitbucket organization-only explanation. It names the
+ * account switch only when the memberships answer says there is somewhere to
+ * switch to, and says so plainly when the account belongs to no organization.
+ * A failed read gets no line of its own: the context line above already reports
+ * the failure with a retry, and neither wording is true of an unknown list.
+ */
+function OrgOnlyDescription({
+  membershipsError,
+  organizationCount,
+}: Readonly<{
+  membershipsError: boolean;
+  /** Undefined until the memberships answer lands. */
+  organizationCount: number | undefined;
+}>) {
+  const { t } = useTranslation();
+  if (membershipsError) {
+    return null;
+  }
+  return (
+    <Text variant="muted" className="text-center">
+      {organizationCount === 0
+        ? t('prReview.connect.bitbucketOrgOnlyNoOrganizationDescription')
+        : t('prReview.connect.bitbucketOrgOnlyDescription')}
+    </Text>
+  );
+}
+
+/**
  * GitLab / Bitbucket arm. The status query is the s4 integration status the
  * connect flow updates; a Bitbucket personal scope disables it entirely
  * because there is nothing to check — the selector renders the terminal
@@ -153,11 +181,9 @@ export function ProviderConnectGate({
   if (view === 'org-only') {
     // Only claim there is nowhere to go once the memberships answer says so;
     // until it lands, keep the guidance the common case with an organization
-    // can act on.
-    const orgOnlyDescription =
-      memberships.data?.length === 0
-        ? t('prReview.connect.bitbucketOrgOnlyNoOrganizationDescription')
-        : t('prReview.connect.bitbucketOrgOnlyDescription');
+    // can act on. A failed read is neither case: the context line already
+    // reports it with a retry, and neither wording is true, so the gate adds
+    // no second description over an account line it cannot vouch for.
     return (
       <View className="flex-1 bg-background">
         <PrReviewGateHeader />
@@ -167,9 +193,10 @@ export function ProviderConnectGate({
           description={
             <>
               <PrReviewContextLine />
-              <Text variant="muted" className="text-center">
-                {orgOnlyDescription}
-              </Text>
+              <OrgOnlyDescription
+                membershipsError={memberships.isError}
+                organizationCount={memberships.data?.length}
+              />
             </>
           }
         />

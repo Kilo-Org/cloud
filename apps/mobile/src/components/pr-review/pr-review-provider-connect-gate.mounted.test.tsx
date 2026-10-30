@@ -11,9 +11,14 @@ const scopeState = vi.hoisted(() => ({
 }));
 // Mutable so each test answers the provider status and the memberships list.
 const queryState = vi.hoisted(
-  (): { status: Record<string, unknown>; memberships?: { organizationId: string }[] } => ({
+  (): {
+    status: Record<string, unknown>;
+    memberships?: { organizationId: string }[];
+    membershipsError?: boolean;
+  } => ({
     status: { connected: false, revoked: false },
     memberships: undefined,
+    membershipsError: false,
   })
 );
 vi.mock('@/lib/pr-review/provider-pr-ref', async importOriginal => {
@@ -24,7 +29,10 @@ vi.mock('@/lib/pr-review/provider-pr-ref', async importOriginal => {
   };
 });
 vi.mock('@/lib/hooks/use-organizations-list', () => ({
-  useOrganizationsList: () => ({ data: queryState.memberships }),
+  useOrganizationsList: () => ({
+    data: queryState.memberships,
+    isError: queryState.membershipsError === true,
+  }),
 }));
 vi.mock('@tanstack/react-query', () => ({
   useQuery: () => ({
@@ -126,6 +134,7 @@ beforeEach(() => {
   scopeState.value = null;
   queryState.status = { connected: false, revoked: false };
   queryState.memberships = undefined;
+  queryState.membershipsError = false;
 });
 
 describe('provider gate instance hint', () => {
@@ -203,5 +212,18 @@ describe('Bitbucket org-only guidance', () => {
     const renderer = mount('bitbucket');
     expect(renderedText(renderer)).toContain(SWITCH_COPY);
     expect(renderedText(renderer)).not.toContain(NO_ORGANIZATION_COPY);
+  });
+
+  it('adds no guidance of its own when the memberships read failed', () => {
+    // The context line reports the failure and offers a retry; neither the
+    // switch copy nor "no organizations" is true, so the gate says neither.
+    queryState.memberships = undefined;
+    queryState.membershipsError = true;
+    const renderer = mount('bitbucket');
+    expect(renderedText(renderer)).not.toContain(SWITCH_COPY);
+    expect(renderedText(renderer)).not.toContain(NO_ORGANIZATION_COPY);
+    expect(renderer.root.findByType('EmptyState').props.title).toBe(
+      'Bitbucket is available for organizations only.'
+    );
   });
 });

@@ -287,10 +287,7 @@ describe('combined and live refresh callers', () => {
     // `initialPageParam` and leaves the retained pages on screen until that
     // page arrives, so the just-loaded next page is still painted.
     expect(state.stored.mock.calls[1]?.[0]).toMatchObject({ pageParam: null });
-    expect(combined().storedSessions.map(row => row.title)).toEqual([
-      'Old history',
-      'Next page',
-    ]);
+    expect(combined().storedSessions.map(row => row.title)).toEqual(['Old history', 'Next page']);
     await act(async () => {
       firstPage.resolve(history('New history'));
       await refresh;

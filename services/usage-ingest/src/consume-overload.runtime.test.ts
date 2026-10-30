@@ -97,7 +97,7 @@ it.each([undefined, 'all'])(
       const runtime = worker.raw.runtimes.find(runtime => runtime.mf)?.mf;
       if (!runtime) throw new Error('Expected local workerd runtime');
       const entrypoint = await runtime.getWorker();
-      const events = Array.from({ length: 4 }, (_, index) => ({
+      const events = Array.from({ length: 6 }, (_, index) => ({
         ...usage,
         core: { ...usage.core, id: `4f2504e0-4f89-41d3-9a0c-0305e82c330${index}` },
       }));
@@ -107,8 +107,8 @@ it.each([undefined, 'all'])(
         attempts: 2,
         body,
       }));
-      // Hold both writer slots: the other two items must wait inside this full batch.
-      statuses = ['recorded', 'duplicate', 'recorded', 'duplicate'];
+      // Hold both writer slots: the other four items must wait inside this full batch.
+      statuses = ['recorded', 'duplicate', 'recorded', 'duplicate', 'recorded', 'duplicate'];
       heldFirst = Promise.withResolvers<void>();
       heldSecond = Promise.withResolvers<void>();
       let succeeded = false;
@@ -131,6 +131,8 @@ it.each([undefined, 'all'])(
         'queue-1',
         'queue-2',
         'queue-3',
+        'queue-4',
+        'queue-5',
       ]);
       expect(successfulResult.retryMessages).toEqual([]);
       expect(calls).toEqual(events);
@@ -159,7 +161,7 @@ it.each([undefined, 'all'])(
       }
       mixedStatus = undefined;
       for (const status of [429, 503]) {
-        statuses = ['recorded', status, 400, 'duplicate'];
+        statuses = ['recorded', status, 400, 'duplicate', 'recorded', 'duplicate'];
         heldFirst = Promise.withResolvers<void>();
         const priorCalls = calls.length;
         let finished = false;
@@ -167,7 +169,7 @@ it.each([undefined, 'all'])(
           finished = true;
           return result;
         });
-        await vi.waitFor(() => expect(calls).toHaveLength(priorCalls + 4));
+        await vi.waitFor(() => expect(calls).toHaveLength(priorCalls + 6));
         expect(finished).toBe(false);
         expect(peak).toBe(2);
         heldFirst.resolve();
@@ -175,9 +177,14 @@ it.each([undefined, 'all'])(
         const result = await work;
         expect(result.outcome).toBe('exception');
         expect(result.ackAll).toBe(false);
-        expect(result.explicitAcks.toSorted()).toEqual(['queue-0', 'queue-3']);
+        expect(result.explicitAcks.toSorted()).toEqual([
+          'queue-0',
+          'queue-3',
+          'queue-4',
+          'queue-5',
+        ]);
         expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-1', 'queue-2']);
-        expect(calls.slice(-4)).toEqual(events);
+        expect(calls.slice(-6)).toEqual(events);
         expect(statuses).toEqual([]);
         // A later delivery retains the usage identity and can settle as a duplicate.
         statuses = ['duplicate'];
@@ -194,7 +201,7 @@ it.each([undefined, 'all'])(
         expect(result.explicitAcks).toEqual([]);
         expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-0']);
       }
-      expect(calls).toHaveLength(26);
+      expect(calls).toHaveLength(32);
       const serialized = JSON.stringify(logs);
       expect(serialized).toContain('usage_ingest_processing');
       expect(serialized).toContain('writer_overloaded');

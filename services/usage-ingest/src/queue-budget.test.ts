@@ -4,7 +4,7 @@ import { unstable_readConfig } from 'wrangler';
 
 const config = fileURLToPath(new URL('../wrangler.jsonc', import.meta.url).href);
 
-it('bounds production EU processing to 400 direct Frankfurt writer calls', () => {
+it('bounds production EU processing to 600 direct Frankfurt writer calls', () => {
   const production = unstable_readConfig({ config });
   expect(production.services).toEqual([]);
   expect(production.queues.producers).toEqual([
@@ -12,7 +12,7 @@ it('bounds production EU processing to 400 direct Frankfurt writer calls', () =>
     { binding: 'USAGE_INGEST_DLQ', queue: 'usage-ingest-processing-dlq-eu' },
   ]);
   expect(production.vars.USAGE_WRITER_URL).toBe('https://app.kilo.ai/api/internal/usage/record');
-  expect(production.vars.USAGE_INGEST_PARALLELISM).toBe('2');
+  expect(production.vars.USAGE_INGEST_PARALLELISM).toBe('3');
   expect(production.vars.USAGE_INGEST_DIAGNOSTICS).toBeUndefined();
   expect(production.vars.USAGE_WRITER_SECRET).toBeUndefined();
   expect(production.queues.consumers).toEqual([
@@ -28,7 +28,7 @@ it('bounds production EU processing to 400 direct Frankfurt writer calls', () =>
   ]);
   const cap = production.queues.consumers[0].max_concurrency;
   if (typeof cap !== 'number') throw new Error('Missing production queue cap');
-  expect(cap * Number(production.vars.USAGE_INGEST_PARALLELISM)).toBe(400);
+  expect(cap * Number(production.vars.USAGE_INGEST_PARALLELISM)).toBe(600);
 });
 
 it('keeps staging on one EU queue with at most 400 concurrent writer calls', () => {

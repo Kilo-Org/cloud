@@ -315,7 +315,7 @@ describe('usage consumer', () => {
 
   it.each(
     [undefined, 'all'].flatMap(diagnostics =>
-      ['1', '2'].map(parallelism => ({ diagnostics, parallelism }))
+      ['1', '2', '3'].map(parallelism => ({ diagnostics, parallelism }))
     )
   )(
     'keeps ACKs on logging failure with diagnostics $diagnostics and parallelism $parallelism',
@@ -351,25 +351,36 @@ describe('bounded parallel usage processing', () => {
   }
   const parallelEnv = { ...env, USAGE_INGEST_PARALLELISM: '2' };
 
-  it.each([undefined, '1', '', '0', '-1', '3', '200', '2.0', 'unexpected'])(
-    'defaults parallelism %s to one outstanding write',
-    async parallelism => {
-      const { fetch } = setup();
-      const first = Promise.withResolvers<Response>();
-      fetch.mockReturnValueOnce(first.promise).mockResolvedValue(acknowledgement());
-      const messages = [message(), message()];
-      const work = worker.queue(batch(messages), { ...env, USAGE_INGEST_PARALLELISM: parallelism });
-      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-      expect(messages[0].ack).not.toHaveBeenCalled();
-      first.resolve(acknowledgement());
-      await work;
-      expect(fetch).toHaveBeenCalledTimes(2);
-      for (const msg of messages) {
-        expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
-        expect(msg.retry).not.toHaveBeenCalled();
-      }
+  it.each([
+    undefined,
+    '1',
+    '',
+    '0',
+    '-1',
+    '4',
+    '03',
+    '3.0',
+    ' 3',
+    '3 ',
+    '200',
+    '2.0',
+    'unexpected',
+  ])('defaults parallelism %s to one outstanding write', async parallelism => {
+    const { fetch } = setup();
+    const first = Promise.withResolvers<Response>();
+    fetch.mockReturnValueOnce(first.promise).mockResolvedValue(acknowledgement());
+    const messages = [message(), message()];
+    const work = worker.queue(batch(messages), { ...env, USAGE_INGEST_PARALLELISM: parallelism });
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(messages[0].ack).not.toHaveBeenCalled();
+    first.resolve(acknowledgement());
+    await work;
+    expect(fetch).toHaveBeenCalledTimes(2);
+    for (const msg of messages) {
+      expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
+      expect(msg.retry).not.toHaveBeenCalled();
     }
-  );
+  });
 
   it.each([undefined, 'all'])(
     'caps outstanding writes at two with diagnostics %s and out-of-order completion',
@@ -794,26 +805,32 @@ describe('native retry classification and launch budget', () => {
     }
   });
 
-  it('keeps six slow successes in three parallel waves with no retries or local extra calls', async () => {
-    const { fetch } = setup();
-    let now = 0;
-    vi.spyOn(performance, 'now').mockImplementation(() => now);
-    const pending = Array.from({ length: 6 }, () => Promise.withResolvers<Response>());
-    pending.forEach(item => fetch.mockReturnValueOnce(item.promise));
-    const messages = Array.from({ length: 6 }, () => message());
-    const work = worker.queue(batch(messages), { ...env, USAGE_INGEST_PARALLELISM: '2' });
-    for (let wave = 0; wave < 3; wave++) {
-      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes((wave + 1) * 2));
-      now = (wave + 1) * 160_000;
-      pending[wave * 2].resolve(acknowledgement());
-      pending[wave * 2 + 1].resolve(acknowledgement());
+  it.each([2, 3])(
+    'keeps six slow successes in %s slots with no retries or local extra calls',
+    async parallelism => {
+      const { fetch } = setup();
+      let now = 0;
+      vi.spyOn(performance, 'now').mockImplementation(() => now);
+      const pending = Array.from({ length: 6 }, () => Promise.withResolvers<Response>());
+      pending.forEach(item => fetch.mockReturnValueOnce(item.promise));
+      const messages = Array.from({ length: 6 }, () => message());
+      const work = worker.queue(batch(messages), {
+        ...env,
+        USAGE_INGEST_PARALLELISM: String(parallelism),
+      });
+      for (let wave = 0; wave < 6 / parallelism; wave++) {
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes((wave + 1) * parallelism));
+        now = (wave + 1) * 160_000;
+        for (let slot = 0; slot < parallelism; slot++)
+          pending[wave * parallelism + slot].resolve(acknowledgement());
+      }
+      await work;
+      expect(now).toBe((6 / parallelism) * 160_000);
+      expect(fetch).toHaveBeenCalledTimes(6);
+      for (const msg of messages) {
+        expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
+        expect(msg.retry).not.toHaveBeenCalled();
+      }
     }
-    await work;
-    expect(now).toBe(480_000);
-    expect(fetch).toHaveBeenCalledTimes(6);
-    for (const msg of messages) {
-      expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
-      expect(msg.retry).not.toHaveBeenCalled();
-    }
-  });
+  );
 });

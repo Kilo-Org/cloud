@@ -31,7 +31,8 @@ async function processQueue(
   const lastLaunchAtMs = startedAtMs + INVOCATION_BUDGET_MS - MIN_LAUNCH_REMAINING_MS;
   const diagnostics = diagnosticFields(env, entryAtMs, batch);
   const batchId = diagnostics === undefined ? undefined : crypto.randomUUID();
-  const parallelism = env.USAGE_INGEST_PARALLELISM === '2' ? 2 : 1;
+  const parallelism =
+    env.USAGE_INGEST_PARALLELISM === '3' ? 3 : env.USAGE_INGEST_PARALLELISM === '2' ? 2 : 1;
   let nextIndex = 0;
   let writerOverloaded = false;
   const unexpectedErrors: unknown[] = [];

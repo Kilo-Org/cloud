@@ -91,10 +91,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61' }),
 }));
 vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({
-    organizationId: inboxState.organizationId,
-    setOrganizationId: vi.fn(),
-  }),
+  useOrganization: () => ({ organizationId: inboxState.organizationId }),
 }));
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getPrReviewPath: (owner: string, repo: string, number: number) => `/${owner}/${repo}/${number}`,
@@ -116,7 +113,7 @@ vi.mock('@/lib/pr-review/use-provider-inbox', () => ({
     firstPageErrorState: inboxState.firstPageErrorState,
     firstPageErrorPlatform: inboxState.firstPageErrorPlatform,
     laterPageError: inboxState.laterPageError,
-    organizationScopeAccess: 'granted',
+    organizationScopeAccess: 'granted' as const,
   }),
 }));
 // `@/lib/utils` initializes real i18n; the row only needs timestamp shaping.
@@ -249,10 +246,7 @@ describe('PrReviewInboxList side insets (landscape)', () => {
 // row — the same fix as `PrRefsRow` in pr-review-overview-parts.tsx.
 describe('InboxRow meta line (a long ref keeps the chip inside the row)', () => {
   beforeEach(() => {
-    insetsState.top = 0;
-    insetsState.bottom = 0;
-    insetsState.left = 0;
-    insetsState.right = 0;
+    Object.assign(insetsState, { top: 0, bottom: 0, left: 0, right: 0 });
     inboxState.query.isPending = false;
     inboxState.query.isFetching = false;
     inboxState.query.hasNextPage = false;

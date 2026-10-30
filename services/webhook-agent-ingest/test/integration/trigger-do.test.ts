@@ -1541,7 +1541,7 @@ describe('standard JSON Schema patterns', () => {
     expect((await stub.getConfig())?.bodySchema).toBeNull();
   });
 
-  it('keeps a schema stored under the previous policy loadable and captures without its pattern', async () => {
+  it('keeps a schema stored under the previous policy loadable and captures without applying it', async () => {
     const legacySchema = {
       type: 'object',
       properties: { event: { type: 'string', pattern: '^(a+)+$' } },
@@ -1577,8 +1577,11 @@ describe('standard JSON Schema patterns', () => {
       success: true,
     });
     expect(Date.now() - started).toBeLessThan(5_000);
-    expect(await capture('{"event":"a"}')).toMatchObject({ success: true });
-    expect(await capture('{}')).toMatchObject({ success: false, error: 'Body validation failed' });
+    expect(await capture('{}')).toMatchObject({ success: true });
+    expect(await capture('not json')).toMatchObject({
+      success: false,
+      error: 'Body validation failed',
+    });
     await runInDurableObject(stub, async instance => {
       await expect(instance.updateConfig({ bodySchema: legacySchema })).rejects.toThrow(
         'Pattern must not nest quantifiers'

@@ -225,7 +225,7 @@ const storedSchemaParser: z.ZodType<WebhookBodySchema> = boundedSchema
 
 /**
  * Parses a schema read back from storage. Schemas written before a pattern policy change stay
- * loadable; `validateWebhookBody` leaves out a pattern that policy no longer accepts.
+ * loadable; `validateWebhookBody` reports the patterns that policy no longer accepts.
  */
 export function parseStoredWebhookBodySchema(value: unknown): WebhookBodySchema {
   return storedSchemaParser.parse(value);
@@ -240,20 +240,6 @@ function isSchemaObject(value: unknown): value is Record<string, unknown> {
 
 function isUnknownArray(value: unknown): value is unknown[] {
   return Array.isArray(value);
-}
-
-function copySchemaNode(node: Record<string, unknown>): Record<string, unknown> {
-  const copy: Record<string, unknown> = {};
-  Object.setPrototypeOf(copy, null);
-  for (const [key, value] of Object.entries(node)) {
-    Object.defineProperty(copy, key, {
-      value,
-      enumerable: true,
-      configurable: true,
-      writable: true,
-    });
-  }
-  return copy;
 }
 
 function childSchemas(node: Record<string, unknown>): [string, Record<string, unknown>][] {
@@ -278,10 +264,7 @@ function childSchemas(node: Record<string, unknown>): [string, Record<string, un
   return children;
 }
 
-/**
- * Schema locations of `pattern` keywords that the write path no longer accepts. A stored schema
- * keeps loading, and the delivery check omits these patterns instead of evaluating them.
- */
+/** Schema locations of `pattern` keywords that the write path does not accept. */
 export function unsupportedPatternPaths(schema: WebhookBodySchema): string[] {
   const paths: string[] = [];
   const walk = (node: Record<string, unknown>, pointer: string) => {
@@ -295,69 +278,14 @@ export function unsupportedPatternPaths(schema: WebhookBodySchema): string[] {
   return paths;
 }
 
-function withoutUnsupportedPatterns(node: Record<string, unknown>): Record<string, unknown> | null {
-  let copy: Record<string, unknown> | null = null;
-  const editable = (): Record<string, unknown> => {
-    copy ??= copySchemaNode(node);
-    return copy;
-  };
-  const put = (keyword: string, value: unknown): void => {
-    Object.defineProperty(editable(), keyword, {
-      value,
-      enumerable: true,
-      configurable: true,
-      writable: true,
-    });
-  };
-
-  const source = node['pattern'];
-  if (typeof source === 'string' && patternSafetyIssue(source) !== null) {
-    delete editable()['pattern'];
-  }
-  for (const keyword of SUBSCHEMA_KEYWORDS) {
-    const child = node[keyword];
-    if (!isSchemaObject(child)) continue;
-    const replacement = withoutUnsupportedPatterns(child);
-    if (replacement) put(keyword, replacement);
-  }
-  for (const keyword of SUBSCHEMA_LIST_KEYWORDS) {
-    const list = node[keyword];
-    if (!isUnknownArray(list)) continue;
-    let replaced: unknown[] | null = null;
-    list.forEach((child, index) => {
-      if (!isSchemaObject(child)) return;
-      const replacement = withoutUnsupportedPatterns(child);
-      if (!replacement) return;
-      replaced ??= [...list];
-      replaced[index] = replacement;
-    });
-    if (replaced) put(keyword, replaced);
-  }
-  const properties = node['properties'];
-  if (isSchemaObject(properties)) {
-    let replaced: Record<string, unknown> | null = null;
-    for (const [name, child] of Object.entries(properties)) {
-      if (!isSchemaObject(child)) continue;
-      const replacement = withoutUnsupportedPatterns(child);
-      if (!replacement) continue;
-      replaced ??= copySchemaNode(properties);
-      Object.defineProperty(replaced, name, {
-        value: replacement,
-        enumerable: true,
-        configurable: true,
-        writable: true,
-      });
-    }
-    if (replaced) put('properties', replaced);
-  }
-  return copy;
-}
-
 export type WebhookBodyIssue = { path: string; message: string };
+export type WebhookBodyValidation =
+  | { valid: true; unsupportedPatterns?: string[] }
+  | { valid: false; issues: WebhookBodyIssue[] };
 export function validateWebhookBody(
   schema: WebhookBodySchema,
   rawBody: string
-): { valid: true } | { valid: false; issues: WebhookBodyIssue[] } {
+): WebhookBodyValidation {
   let body: unknown;
   try {
     body = normalizeJsonObjects(JSON.parse(rawBody));
@@ -365,10 +293,12 @@ export function validateWebhookBody(
     return { valid: false, issues: [{ path: '/', message: 'Body must be valid JSON' }] };
   }
   const normalized = normalizeJsonObjects(schema);
-  // A stored schema keeps loading; a pattern the write path refuses is left out of the match.
-  const evaluated = withoutUnsupportedPatterns(normalized) ?? normalized;
+  // A schema stored before the current writer accepted it is not applied as a filter, because
+  // dropping a keyword can change what its `not`, `anyOf` or `oneOf` parent means.
+  const unsupportedPatterns = unsupportedPatternPaths(normalized);
+  if (unsupportedPatterns.length > 0) return { valid: true, unsupportedPatterns };
   // Short circuit bounds diagnostics and never include payload values in errors.
-  const result = new Validator(evaluated satisfies Schema, '2020-12', true).validate(body);
+  const result = new Validator(normalized satisfies Schema, '2020-12', true).validate(body);
   return result.valid
     ? { valid: true }
     : {

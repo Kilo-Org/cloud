@@ -32,8 +32,10 @@ type PatternNode =
 
 function charsInRange(from: string, to: string): string[] {
   const chars: string[] = [];
-  for (let code = from.charCodeAt(0); code <= to.charCodeAt(0); code++) {
-    chars.push(String.fromCharCode(code));
+  const start = from.codePointAt(0) ?? 0;
+  const end = to.codePointAt(0) ?? 0;
+  for (let code = start; code <= end; code++) {
+    chars.push(String.fromCodePoint(code));
   }
   return chars;
 }
@@ -156,10 +158,21 @@ class PatternParser {
         return { kind: 'zero' };
       case '\\':
         return this.escape(false);
-      default:
+      default: {
         if ('*+?{}]|)'.includes(char)) throw new Error('Unexpected quantifier or bracket');
-        return { kind: 'atom', first: new Set([char]) };
+        const literal = this.codePointAt(this.index - 1);
+        this.index = this.index - 1 + literal.length;
+        return { kind: 'atom', first: new Set([literal.char]) };
+      }
     }
+  }
+
+  /** The code point starting at `index`, so astral characters stay one atom. */
+  private codePointAt(index: number): { char: string; length: number } {
+    const code = this.source.codePointAt(index);
+    if (code === undefined) throw new Error('Unexpected end of pattern');
+    const char = String.fromCodePoint(code);
+    return { char, length: char.length };
   }
 
   private group(): PatternNode {
@@ -315,31 +328,40 @@ class PatternParser {
       if (chars.size > MAX_CLASS_EXPANSION) chars = 'any';
     };
     for (;;) {
-      const char = this.source[this.index];
-      if (char === undefined) throw new Error('Unterminated class');
-      if (char === ']') {
+      const unit = this.source[this.index];
+      if (unit === undefined) throw new Error('Unterminated class');
+      if (unit === ']') {
         this.index++;
         return { kind: 'atom', first: negated ? 'any' : chars };
       }
-      this.index++;
-      if (char === '\\') {
+      if (unit === '\\') {
+        this.index++;
         add(this.classEscape());
         continue;
       }
+      const start = this.codePointAt(this.index);
+      this.index += start.length;
       const rangeEnd = this.source[this.index + 1];
       if (
-        char !== '-' &&
+        start.char !== '-' &&
         this.source[this.index] === '-' &&
         rangeEnd !== undefined &&
         rangeEnd !== ']' &&
         rangeEnd !== '\\'
       ) {
-        this.index += 2;
-        if (rangeEnd.charCodeAt(0) < char.charCodeAt(0)) throw new Error('Invalid range');
-        add(new Set(charsInRange(char, rangeEnd)));
+        const end = this.codePointAt(this.index + 1);
+        this.index += 1 + end.length;
+        const from = start.char.codePointAt(0) ?? 0;
+        const to = end.char.codePointAt(0) ?? 0;
+        if (to < from) throw new Error('Invalid range');
+        if (to - from > MAX_CLASS_EXPANSION) {
+          chars = 'any';
+          continue;
+        }
+        add(new Set(charsInRange(start.char, end.char)));
         continue;
       }
-      add(new Set([char]));
+      add(new Set([start.char]));
     }
   }
 }
@@ -421,11 +443,21 @@ function ambiguityIssue(node: PatternNode): string | null {
           if (overlaps(current, other)) return PATTERN_ISSUE_MESSAGES.ambiguous;
         }
       }
-      return firstIssue(node);
+      for (const branch of node.branches) {
+        const issue = ambiguityIssue(branch);
+        if (issue) return issue;
+      }
+      return null;
     }
-    case 'sequence':
+    case 'sequence': {
+      for (const item of node.items) {
+        const issue = ambiguityIssue(item);
+        if (issue) return issue;
+      }
+      return null;
+    }
     case 'repeat':
-      return firstIssue(node);
+      return ambiguityIssue(node.body);
     case 'lookaround':
       return ambiguityIssue(node.body);
     default:

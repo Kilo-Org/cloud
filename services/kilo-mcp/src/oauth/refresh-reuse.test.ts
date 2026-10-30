@@ -6,7 +6,7 @@ import {
   detectRefreshTokenReuse,
   hashRefreshToken,
   parseRefreshToken,
-  readTokenFormBody,
+  readTokenBody,
   rememberIssuedRefreshToken,
   type IssuedRefreshToken,
   type RefreshReuseDeps,
@@ -82,7 +82,7 @@ function refreshRequest(refreshToken: string, origin?: string): Request {
 
 /** The handler's steps in order: read the body, then decide. */
 async function guard(request: Request, deps: RefreshReuseDeps): Promise<Response | null> {
-  const body = await readTokenFormBody(request);
+  const body = await readTokenBody(request);
   return body.kind === 'form' ? detectRefreshTokenReuse(request, body.params, deps) : null;
 }
 

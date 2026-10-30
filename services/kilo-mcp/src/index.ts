@@ -29,7 +29,7 @@ import {
   createRefreshReuseHandler,
   forwardable,
   isTokenRequest,
-  readTokenFormBody,
+  readTokenBody,
 } from './oauth/refresh-reuse';
 import {
   CLIENT_REGISTRATION_TTL_SECONDS,
@@ -1143,9 +1143,8 @@ export class KiloMcpOAuthStore extends OAuthStore {
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     if (!isTokenRequest(request)) return fetchWithProvider(request, env, ctx);
-    const body = await readTokenFormBody(request);
+    const body = await readTokenBody(request);
     if (body.kind === 'too_large') return bodyTooLargeResponse(request);
-    const bounded = body.kind === 'form' ? forwardable(request, body.body) : request;
-    return getKiloMcpOAuthStoreStub(env).fetch(bounded);
+    return getKiloMcpOAuthStoreStub(env).fetch(forwardable(request, body.body));
   },
 } satisfies ExportedHandler<Env>;

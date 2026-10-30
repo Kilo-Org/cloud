@@ -45,38 +45,39 @@ export type RefreshReuseDeps = {
 const tokenPartsSchema = z.tuple([z.string().min(1), z.string().min(1), z.string().min(1)]);
 const issuedResponseSchema = z.object({ refresh_token: z.string().min(1) });
 
-type TokenFormBody =
-  | { kind: 'skip' }
+type TokenBody =
   | { kind: 'too_large' }
-  | { kind: 'form'; params: URLSearchParams; body: Uint8Array };
+  | { kind: 'form'; params: URLSearchParams; body: Uint8Array }
+  | { kind: 'other'; body: Uint8Array };
+
+const isFormEncoded = (request: Request): boolean =>
+  (request.headers.get('Content-Type') ?? '').split(';')[0]?.trim().toLowerCase() ===
+  'application/x-www-form-urlencoded';
 
 /**
- * Reads a form-encoded token body under `TOKEN_REQUEST_MAX_BYTES`. The bytes come
- * from the request itself; `forwardable` rebuilds the request from them.
+ * Reads a token request body under `TOKEN_REQUEST_MAX_BYTES`. The bytes come from
+ * the request itself; `forwardable` rebuilds the request from them.
  */
-export async function readTokenFormBody(request: Request): Promise<TokenFormBody> {
-  const contentType = request.headers.get('Content-Type') ?? '';
-  if (contentType.split(';')[0]?.trim().toLowerCase() !== 'application/x-www-form-urlencoded') {
-    return { kind: 'skip' };
-  }
+export async function readTokenBody(request: Request): Promise<TokenBody> {
   const declared = request.headers.get('Content-Length');
   if (declared !== null && Number(declared) > TOKEN_REQUEST_MAX_BYTES) {
     await request.body?.cancel().catch(() => {});
     return { kind: 'too_large' };
   }
   const reader = request.body?.getReader() as ReadableStreamDefaultReader<Uint8Array> | undefined;
-  if (!reader) return { kind: 'form', params: new URLSearchParams(), body: new Uint8Array() };
   const chunks: Uint8Array[] = [];
   let bytes = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    bytes += value.byteLength;
-    if (bytes > TOKEN_REQUEST_MAX_BYTES) {
-      await reader.cancel().catch(() => {});
-      return { kind: 'too_large' };
+  if (reader) {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > TOKEN_REQUEST_MAX_BYTES) {
+        await reader.cancel().catch(() => {});
+        return { kind: 'too_large' };
+      }
+      chunks.push(value);
     }
-    chunks.push(value);
   }
   const body = new Uint8Array(bytes);
   let offset = 0;
@@ -84,10 +85,12 @@ export async function readTokenFormBody(request: Request): Promise<TokenFormBody
     body.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return { kind: 'form', params: new URLSearchParams(new TextDecoder().decode(body)), body };
+  return isFormEncoded(request)
+    ? { kind: 'form', params: new URLSearchParams(new TextDecoder().decode(body)), body }
+    : { kind: 'other', body };
 }
 
-/** The request to hand on after `readTokenFormBody` took its body. */
+/** The request to hand on after `readTokenBody` took its body. */
 export function forwardable(request: Request, body: Uint8Array): Request {
   return new Request(request, { body });
 }
@@ -224,9 +227,9 @@ export function createRefreshReuseHandler(deps: RefreshReuseDeps) {
     forward: (request: Request) => Promise<Response>
   ): Promise<Response> => {
     if (!isTokenRequest(request)) return forward(request);
-    const body = await readTokenFormBody(request);
+    const body = await readTokenBody(request);
     if (body.kind === 'too_large') return bodyTooLargeResponse(request);
-    const forwarded = body.kind === 'form' ? forwardable(request, body.body) : request;
+    const forwarded = forwardable(request, body.body);
     const response = pending.then(async () => {
       if (body.kind === 'form') {
         const rejected = await detectRefreshTokenReuse(request, body.params, deps);

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   TOKEN_REQUEST_MAX_BYTES,
   createRefreshReuseHandler,
-  readTokenFormBody,
+  readTokenBody,
   rememberIssuedRefreshToken,
   type RefreshReuseStore,
 } from './refresh-reuse';
@@ -78,37 +78,49 @@ function makeRevokingDeps() {
   return { store, revokeGrant: vi.fn(async () => {}) };
 }
 
-describe('readTokenFormBody', () => {
+describe('readTokenBody', () => {
   it('enforces the size limit from a declared length', async () => {
     const request = streamedRequest(endlessChunks(1, 4096), {
       'Content-Length': String(TOKEN_REQUEST_MAX_BYTES + 1),
     });
-    expect(await readTokenFormBody(request)).toEqual({ kind: 'too_large' });
+    expect(await readTokenBody(request)).toEqual({ kind: 'too_large' });
   });
 
   it('enforces the size limit while reading the body', async () => {
     const request = streamedRequest(endlessChunks(5, 4096));
-    expect(await readTokenFormBody(request)).toEqual({ kind: 'too_large' });
+    expect(await readTokenBody(request)).toEqual({ kind: 'too_large' });
   });
 
   it('accepts a form body within the limit', async () => {
     const prefix = 'grant_type=refresh_token&refresh_token=u:g:x&pad=';
     const atBound = prefix + 'a'.repeat(TOKEN_REQUEST_MAX_BYTES - prefix.length);
     expect(atBound.length).toBe(TOKEN_REQUEST_MAX_BYTES);
-    expect(await readTokenFormBody(formRequest(atBound))).toEqual({
+    expect(await readTokenBody(formRequest(atBound))).toEqual({
       kind: 'form',
       params: expect.any(URLSearchParams),
       body: expect.any(Uint8Array),
     });
-    expect(await readTokenFormBody(formRequest(`${atBound}a`))).toEqual({ kind: 'too_large' });
+    expect(await readTokenBody(formRequest(`${atBound}a`))).toEqual({ kind: 'too_large' });
   });
 
-  it('leaves another media type to the library', async () => {
-    const request = streamedRequest(endlessChunks(1, 4096), {
-      'Content-Type': 'application/json',
-      'Content-Length': String(1024 * 1024),
-    });
-    expect(await readTokenFormBody(request)).toEqual({ kind: 'skip' });
+  it('bounds another media type and keeps its bytes', async () => {
+    const payload = '{"grant_type":"refresh_token"}';
+    const kept = await readTokenBody(
+      new Request(TOKEN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+      })
+    );
+    expect(kept.kind).toBe('other');
+    expect(new TextDecoder().decode(kept.kind === 'other' ? kept.body : new Uint8Array())).toBe(
+      payload
+    );
+    expect(
+      await readTokenBody(
+        streamedRequest(endlessChunks(5, 4096), { 'Content-Type': 'application/json' })
+      )
+    ).toEqual({ kind: 'too_large' });
   });
 });
 

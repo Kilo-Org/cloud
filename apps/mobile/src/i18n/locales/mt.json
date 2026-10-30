@@ -729,6 +729,7 @@
       "gitlabDescription": "Ikkonnettja l-kont GitLab tiegħek biex tirrevedi l-merge requests fuq il-mowbajl.",
       "bitbucketDescription": "Ikkonnettja Bitbucket ma' din l-organizzazzjoni biex tirrevedi l-PRs fuq il-mowbajl.",
       "bitbucketOrgOnlyDescription": "Ibdel il-kont ta' fuq għal organizzazzjoni biex tirrevedi l-PRs Bitbucket tagħha.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Dan il-kont m'għandux organizzazzjonijiet għadu. Tista' tirrevedi l-PRs Bitbucket ladarba toħloq organizzazzjoni jew tingħaqad ma' waħda.",
       "contextLine": "Għal {{organization}}",
       "contextLinePersonal": "Għall-kont personali tiegħek"
     },
@@ -755,10 +756,9 @@
     },
     "reconnectNotice": {
       "title": "Il-konnessjoni ma' GitHub skadiet.",
-      "message": "Il-konnessjoni tiegħek ma' GitHub m'għadhiex valida. Erġa' ċċekkja l-konnessjoni — jekk ikun hemm bżonn, tintalab terġa' tikkonnettja.",
+      "message": "Erġa' ċċekkja l-konnessjoni — jekk ikun hemm bżonn, tintalab terġa' tikkonnettja.",
       "gitlabTitle": "Il-konnessjoni ma' GitLab skadiet.",
-      "bitbucketTitle": "Il-konnessjoni ma' Bitbucket skadiet.",
-      "providerMessage": "Il-konnessjoni tiegħek ma' {{provider}} m'għadhiex valida. Erġa' ċċekkja l-konnessjoni — jekk ikun hemm bżonn, tintalab terġa' tikkonnettja."
+      "bitbucketTitle": "Il-konnessjoni ma' Bitbucket skadiet."
     },
     "eventChips": {
       "comment": "Kumment",

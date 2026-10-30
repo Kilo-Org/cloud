@@ -2699,6 +2699,7 @@
       "gitlabDescription": "连接你的 GitLab 账户，即可在手机上审查合并请求。",
       "bitbucketDescription": "将 Bitbucket 连接到此组织，以便在手机上审查拉取请求。",
       "bitbucketOrgOnlyDescription": "将上方的账户切换为某个组织，以便审查其 Bitbucket 拉取请求。",
+      "bitbucketOrgOnlyNoOrganizationDescription": "此账户尚未加入任何组织。创建或加入组织后，即可审查 Bitbucket 拉取请求。",
       "contextLine": "适用于 {{organization}}",
       "contextLinePersonal": "适用于个人账户"
     },
@@ -3065,10 +3066,9 @@
     "pullRequestUnavailableDescription": "无法打开此 PR。可能是 PR 已被删除、仓库为私有仓库，或仓库尚未安装 Kilo GitHub 应用。",
     "reconnectNotice": {
       "title": "GitHub 连接已过期",
-      "message": "GitHub 连接已失效。请重新检查连接；如需重新连接，系统会提示你。",
+      "message": "请重新检查连接；如需重新连接，系统会提示你。",
       "gitlabTitle": "GitLab 连接已过期",
-      "bitbucketTitle": "Bitbucket 连接已过期",
-      "providerMessage": "{{provider}} 连接已失效。请重新检查连接；如需重新连接，系统会提示你。"
+      "bitbucketTitle": "Bitbucket 连接已过期"
     },
     "review": "审查",
     "reviewPullRequest": "审查拉取请求",

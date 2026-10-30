@@ -2699,6 +2699,7 @@
       "gitlabDescription": "連結你的 GitLab 帳戶，以便在行動裝置上審查合併請求。",
       "bitbucketDescription": "將 Bitbucket 連結到此組織，以便在行動裝置上審查提取請求。",
       "bitbucketOrgOnlyDescription": "將上方的帳戶切換為某個組織，以便審查其 Bitbucket 提取請求。",
+      "bitbucketOrgOnlyNoOrganizationDescription": "此帳戶尚無任何組織。建立或加入組織後，即可審查 Bitbucket 提取請求。",
       "contextLine": "適用於 {{organization}}",
       "contextLinePersonal": "適用於您的個人帳戶"
     },
@@ -3065,10 +3066,9 @@
     "pullRequestUnavailableDescription": "無法開啟此 PR。可能是 PR 已刪除、存放庫設為私人，或存放庫尚未安裝 Kilo GitHub App。",
     "reconnectNotice": {
       "title": "GitHub 連線已過期。",
-      "message": "你的 GitHub 連線已失效。請重新檢查連線；如有需要，系統會提示你重新連線。",
+      "message": "請重新檢查連線；如有需要，系統會提示你重新連線。",
       "gitlabTitle": "GitLab 連線已過期。",
-      "bitbucketTitle": "Bitbucket 連線已過期。",
-      "providerMessage": "你的 {{provider}} 連線已失效。請重新檢查連線；如有需要，系統會提示你重新連線。"
+      "bitbucketTitle": "Bitbucket 連線已過期。"
     },
     "review": "審查",
     "reviewPullRequest": "審查提取請求",

@@ -684,6 +684,7 @@
       "gitlabDescription": "Sambungkan akaun GitLab anda untuk menyemak permintaan gabungan pada mudah alih.",
       "bitbucketDescription": "Sambungkan Bitbucket ke organisasi ini untuk menyemak permintaan tarik pada mudah alih.",
       "bitbucketOrgOnlyDescription": "Tukar akaun di atas kepada organisasi untuk menyemak permintaan tarik Bitbucket-nya.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Akaun ini belum mempunyai sebarang organisasi. Permintaan tarik Bitbucket boleh disemak setelah anda mencipta atau menyertai sebuah organisasi.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akaun peribadi anda"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Sambungan GitHub telah tamat tempoh.",
-      "message": "Sambungan GitHub anda tidak lagi sah. Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu.",
+      "message": "Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu.",
       "gitlabTitle": "Sambungan GitLab telah tamat tempoh.",
-      "bitbucketTitle": "Sambungan Bitbucket telah tamat tempoh.",
-      "providerMessage": "Sambungan {{provider}} anda tidak lagi sah. Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu."
+      "bitbucketTitle": "Sambungan Bitbucket telah tamat tempoh."
     },
     "eventChips": {
       "comment": "Komen",

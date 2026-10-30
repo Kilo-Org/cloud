@@ -2699,6 +2699,7 @@
       "gitlabDescription": "모바일에서 머지 요청을 검토하려면 GitLab 계정을 연결하세요.",
       "bitbucketDescription": "모바일에서 풀 리퀘스트를 검토하려면 이 조직을 Bitbucket에 연결하세요.",
       "bitbucketOrgOnlyDescription": "Bitbucket 풀 리퀘스트를 검토하려면 위의 계정을 조직으로 전환하세요.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "이 계정에는 아직 조직이 없습니다. 조직을 만들거나 참여하면 Bitbucket 풀 리퀘스트를 검토할 수 있습니다.",
       "contextLine": "{{organization}}용",
       "contextLinePersonal": "개인용"
     },
@@ -3065,10 +3066,9 @@
     "pullRequestUnavailableDescription": "이 PR을 열 수 없습니다. PR이 삭제되었거나 저장소가 비공개이거나 해당 저장소에 Kilo GitHub 앱이 설치되지 않았을 수 있습니다.",
     "reconnectNotice": {
       "title": "GitHub 연결이 만료되었습니다.",
-      "message": "GitHub 연결이 더 이상 유효하지 않습니다. 연결을 다시 확인하세요. 필요한 경우 다시 연결하라는 안내가 표시됩니다.",
+      "message": "연결을 다시 확인하세요. 필요한 경우 다시 연결하라는 안내가 표시됩니다.",
       "gitlabTitle": "GitLab 연결이 만료되었습니다.",
-      "bitbucketTitle": "Bitbucket 연결이 만료되었습니다.",
-      "providerMessage": "{{provider}} 연결이 더 이상 유효하지 않습니다. 연결을 다시 확인하세요. 필요한 경우 다시 연결하라는 안내가 표시됩니다."
+      "bitbucketTitle": "Bitbucket 연결이 만료되었습니다."
     },
     "review": "리뷰",
     "reviewPullRequest": "풀 리퀘스트 리뷰",

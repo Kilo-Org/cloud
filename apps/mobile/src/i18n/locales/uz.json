@@ -684,6 +684,7 @@
       "gitlabDescription": "Telefonda merge so‘rovlarini ko‘rib chiqish uchun GitLab hisobingizni ulang.",
       "bitbucketDescription": "Telefonda PRlarni ko‘rib chiqish uchun Bitbucketni ushbu tashkilotga ulang.",
       "bitbucketOrgOnlyDescription": "Yuqoridagi hisobni tashkilotga oʻtkazing, uning Bitbucket PRlarini koʻrib chiqish uchun.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Bu hisobda hozircha hech qanday tashkilot yo‘q. Tashkilot yaratganingizdan yoki unga qo‘shilganingizdan so‘ng Bitbucket PRlarini ko‘rib chiqish mumkin.",
       "contextLine": "{{organization}} uchun",
       "contextLinePersonal": "Shaxsiy hisob uchun"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub bilan ulanish muddati tugadi.",
-      "message": "GitHub ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi.",
+      "message": "Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi.",
       "gitlabTitle": "GitLab bilan ulanish muddati tugadi.",
-      "bitbucketTitle": "Bitbucket bilan ulanish muddati tugadi.",
-      "providerMessage": "{{provider}} ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi."
+      "bitbucketTitle": "Bitbucket bilan ulanish muddati tugadi."
     },
     "eventChips": {
       "comment": "Izoh",

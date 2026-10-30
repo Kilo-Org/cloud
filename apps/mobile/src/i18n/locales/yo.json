@@ -684,6 +684,7 @@
       "gitlabDescription": "So àkọọ́lẹ̀ GitLab rẹ pọ̀ láti ṣàtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan lórí fónù.",
       "bitbucketDescription": "So Bitbucket pọ̀ mọ́ àjọ yìí láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ lórí fónù.",
       "bitbucketOrgOnlyDescription": "Yí àkọọ́lẹ̀ tí ó wà lókè padà sí àjọ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket rẹ̀.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Àkọọ́lẹ̀ yìí kò tíì ní àjọ rárá. A ó lè ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket nígbà tí o bá dá àjọ sílẹ̀ tàbí darapọ̀ mọ́ àjọ kan.",
       "contextLine": "Fún {{organization}}",
       "contextLinePersonal": "Fún ti ara ẹni"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Àkókò ìsopọ̀ GitHub ti parí.",
-      "message": "Àsopọ̀ GitHub rẹ kò wúlò mọ́. Tún ṣàyẹ̀wò àsopọ̀ rẹ — a ó ní kí o tún sopọ̀ bí ó bá yẹ.",
+      "message": "Tún ṣàyẹ̀wò àsopọ̀ rẹ — a ó ní kí o tún sopọ̀ bí ó bá yẹ.",
       "gitlabTitle": "Àkókò ìsopọ̀ GitLab ti parí.",
-      "bitbucketTitle": "Àkókò ìsopọ̀ Bitbucket ti parí.",
-      "providerMessage": "Àsopọ̀ {{provider}} rẹ kò wúlò mọ́. Tún ṣàyẹ̀wò àsopọ̀ rẹ — a ó ní kí o tún sopọ̀ bí ó bá yẹ."
+      "bitbucketTitle": "Àkókò ìsopọ̀ Bitbucket ti parí."
     },
     "eventChips": {
       "comment": "Àsọyé",

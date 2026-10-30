@@ -684,6 +684,7 @@
       "gitlabDescription": "Haɗa asusun GitLab ɗinka don bita buƙatun haɗawa a wayar hannu.",
       "bitbucketDescription": "Haɗa Bitbucket da wannan ƙungiya don bita buƙatun haɗa canje-canje a wayar hannu.",
       "bitbucketOrgOnlyDescription": "Canja asusun da ke sama zuwa ƙungiya don bita buƙatun haɗa canje-canje na Bitbucket na ƙungiyar.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Wannan asusu ba shi da ƙungiyoyi har yanzu. Za a iya bita buƙatun haɗa canje-canje na Bitbucket idan ka ƙirƙiri ƙungiya ko ka shiga cikin wata.",
       "contextLine": "Don {{organization}}",
       "contextLinePersonal": "Don kashin kanka"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Wa'adin haɗin GitHub ya ƙare.",
-      "message": "Haɗinka na GitHub ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata.",
+      "message": "Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata.",
       "gitlabTitle": "Wa'adin haɗin GitLab ya ƙare.",
-      "bitbucketTitle": "Wa'adin haɗin Bitbucket ya ƙare.",
-      "providerMessage": "Haɗinka na {{provider}} ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata."
+      "bitbucketTitle": "Wa'adin haɗin Bitbucket ya ƙare."
     },
     "eventChips": {
       "comment": "Yi tsokaci",

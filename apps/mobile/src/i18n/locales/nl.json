@@ -2699,6 +2699,7 @@
       "gitlabDescription": "Koppel je GitLab-account om merge requests op je telefoon te beoordelen.",
       "bitbucketDescription": "Koppel Bitbucket aan deze organisatie om PR's op je telefoon te beoordelen.",
       "bitbucketOrgOnlyDescription": "Wissel het account hierboven naar een organisatie om diens Bitbucket-PR's te beoordelen.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Dit account heeft nog geen organisaties. Je kunt Bitbucket-PR's beoordelen zodra je een organisatie aanmaakt of er lid van wordt.",
       "contextLine": "Voor {{organization}}",
       "contextLinePersonal": "Voor je persoonlijke account"
     },
@@ -3065,10 +3066,9 @@
     "pullRequestUnavailableDescription": "Deze PR kan niet worden geopend. Mogelijk is de PR verwijderd, is de repository privé of is de Kilo GitHub-app niet voor deze repository geïnstalleerd.",
     "reconnectNotice": {
       "title": "De GitHub-koppeling is verlopen.",
-      "message": "Je GitHub-verbinding is niet meer geldig. Controleer de verbinding opnieuw. Als dat nodig is, krijg je de vraag om opnieuw verbinding te maken.",
+      "message": "Controleer de verbinding opnieuw. Als dat nodig is, krijg je de vraag om opnieuw verbinding te maken.",
       "gitlabTitle": "De GitLab-koppeling is verlopen.",
-      "bitbucketTitle": "De Bitbucket-koppeling is verlopen.",
-      "providerMessage": "Je {{provider}}-verbinding is niet meer geldig. Controleer de verbinding opnieuw. Als dat nodig is, krijg je de vraag om opnieuw verbinding te maken."
+      "bitbucketTitle": "De Bitbucket-koppeling is verlopen."
     },
     "review": "Beoordeling",
     "reviewPullRequest": "PR beoordelen",

@@ -714,6 +714,7 @@
       "gitlabDescription": "Poveži svoj račun GitLab, da lahko pregleduješ merge requeste na mobilni napravi.",
       "bitbucketDescription": "Poveži Bitbucket s to organizacijo, da lahko pregleduješ zahtevke za združitev na mobilni napravi.",
       "bitbucketOrgOnlyDescription": "Preklopi zgornji račun na organizacijo, da lahko pregleduješ njene zahtevke za združitev na Bitbucktu.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Ta račun še nima nobenih organizacij. Zahtevke za združitev na Bitbucktu boš lahko pregledoval, ko ustvariš organizacijo ali se ji pridružiš.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za osebni račun"
     },
@@ -739,10 +740,9 @@
     },
     "reconnectNotice": {
       "title": "Povezava z računom GitHub je potekla.",
-      "message": "Tvoja povezava z GitHubom ni več veljavna. Znova jo preveri. Po potrebi te bomo pozvali k ponovni povezavi.",
+      "message": "Znova jo preveri. Po potrebi te bomo pozvali k ponovni povezavi.",
       "gitlabTitle": "Povezava z računom GitLab je potekla.",
-      "bitbucketTitle": "Povezava z računom Bitbucket je potekla.",
-      "providerMessage": "Tvoja povezava z {{provider}}om ni več veljavna. Znova jo preveri. Po potrebi te bomo pozvali k ponovni povezavi."
+      "bitbucketTitle": "Povezava z računom Bitbucket je potekla."
     },
     "eventChips": {
       "comment": "Komentar",

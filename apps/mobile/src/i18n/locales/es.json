@@ -2727,6 +2727,7 @@
       "gitlabDescription": "Conecta tu cuenta de GitLab para revisar merge requests en el móvil.",
       "bitbucketDescription": "Conecta Bitbucket a esta organización para revisar PR en el móvil.",
       "bitbucketOrgOnlyDescription": "Cambia la cuenta de arriba a una organización para revisar sus PR en Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Esta cuenta todavía no tiene organizaciones. Podrás revisar los PR de Bitbucket cuando crees una organización o te unas a una.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para tu cuenta personal"
     },
@@ -3106,10 +3107,9 @@
     "pullRequestUnavailableDescription": "No se puede abrir esta PR. Puede que se haya eliminado, que el repositorio sea privado o que la aplicación de Kilo para GitHub no esté instalada en él.",
     "reconnectNotice": {
       "title": "La conexión con GitHub ha caducado.",
-      "message": "Tu conexión con GitHub ya no es válida. Vuelve a comprobarla. Si es necesario, se te pedirá que conectes tu cuenta de nuevo.",
+      "message": "Vuelve a comprobarla. Si es necesario, se te pedirá que conectes tu cuenta de nuevo.",
       "gitlabTitle": "La conexión con GitLab ha caducado.",
-      "bitbucketTitle": "La conexión con Bitbucket ha caducado.",
-      "providerMessage": "Tu conexión con {{provider}} ya no es válida. Vuelve a comprobarla. Si es necesario, se te pedirá que conectes tu cuenta de nuevo."
+      "bitbucketTitle": "La conexión con Bitbucket ha caducado."
     },
     "review": "Revisión",
     "reviewPullRequest": "Revisar PR",

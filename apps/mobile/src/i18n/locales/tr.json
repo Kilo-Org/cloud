@@ -2699,6 +2699,7 @@
       "gitlabDescription": "Mobilde birleştirme isteklerini gözden geçirmek için GitLab hesabını bağla.",
       "bitbucketDescription": "Mobilde çekme isteklerini gözden geçirmek için Bitbucket'ı bu kuruluşla bağla.",
       "bitbucketOrgOnlyDescription": "Yukarıdaki hesabı bir kuruluşa geçir, onun Bitbucket çekme isteklerini gözden geçirmek için.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabın henüz bir kuruluşu yok. Bitbucket çekme isteklerini, bir kuruluş oluşturduktan ya da birine katıldıktan sonra gözden geçirebilirsin.",
       "contextLine": "{{organization}} için",
       "contextLinePersonal": "Kişisel hesabınız için"
     },
@@ -3065,10 +3066,9 @@
     "pullRequestUnavailableDescription": "Bu PR açılamıyor. Silinmiş olabilir, depo özel olabilir veya depoda Kilo GitHub uygulaması kurulu olmayabilir.",
     "reconnectNotice": {
       "title": "GitHub bağlantısının süresi doldu.",
-      "message": "GitHub bağlantın artık geçerli değil. Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek.",
+      "message": "Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek.",
       "gitlabTitle": "GitLab bağlantısının süresi doldu.",
-      "bitbucketTitle": "Bitbucket bağlantısının süresi doldu.",
-      "providerMessage": "{{provider}} bağlantın artık geçerli değil. Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek."
+      "bitbucketTitle": "Bitbucket bağlantısının süresi doldu."
     },
     "review": "İnceleme",
     "reviewPullRequest": "Çekme isteğini incele",

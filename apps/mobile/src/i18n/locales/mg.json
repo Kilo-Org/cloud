@@ -684,6 +684,7 @@
       "gitlabDescription": "Ampifandraiso ny kaonty GitLab-nao mba hijerena ny fangatahana fampiraisana amin'ny finday.",
       "bitbucketDescription": "Ampifandraiso amin'ity fikambanana ity ny Bitbucket mba hijerena ny fangatahana fampiraisana amin'ny finday.",
       "bitbucketOrgOnlyDescription": "Ampifandraiso amin'ny fikambanana ny kaonty etsy ambony mba hijerena ny fangatahana fampiraisana Bitbucket'ny.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Mbola tsy manana fikambanana ity kaonty ity. Azonao jerena ny fangatahana fampiraisana Bitbucket rehefa mamorona na miditra fikambanana.",
       "contextLine": "Ho an'ny {{organization}}",
       "contextLinePersonal": "Ho an'ny kaontinao manokana"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Lany daty ny fifandraisana amin'ny GitHub.",
-      "message": "Tsy manan-kery intsony ny fifandraisanao amin'ny GitHub. Hamarino indray izany — hasaina hampifandray indray ianao raha ilaina.",
+      "message": "Hamarino indray izany — hasaina hampifandray indray ianao raha ilaina.",
       "gitlabTitle": "Lany daty ny fifandraisana amin'ny GitLab.",
-      "bitbucketTitle": "Lany daty ny fifandraisana amin'ny Bitbucket.",
-      "providerMessage": "Tsy manan-kery intsony ny fifandraisanao amin'ny {{provider}}. Hamarino indray izany — hasaina hampifandray indray ianao raha ilaina."
+      "bitbucketTitle": "Lany daty ny fifandraisana amin'ny Bitbucket."
     },
     "eventChips": {
       "comment": "Fanehoan-kevitra",

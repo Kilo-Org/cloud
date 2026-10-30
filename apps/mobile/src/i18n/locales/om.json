@@ -684,6 +684,7 @@
       "gitlabDescription": "Gaaffiiwwan walitti makuu simbirroo harkaan gamaaggamuuf herrega GitLab kee walqabsiisi.",
       "bitbucketDescription": "Gaaffiiwwan walitti makuu simbirroo harkaan gamaaggamuuf Bitbucket dhaabbata kana waliin walqabsiisi.",
       "bitbucketOrgOnlyDescription": "Herrega gubbaa jiru gara dhaabbataatti jijjiiri, dhaabbata sanaa gaaffiiwwan walitti makuu Bitbucket ilaaluuf.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Herrega kun dhaabbilee ammas hin qabu. Dhaabbata uumtee yookiin dhaabbataatti seeteen, gaaffiiwwan walitti makuu Bitbucket ilaaluu ni dandeessa.",
       "contextLine": "{{organization}}iif",
       "contextLinePersonal": "Dhuunfaa'iif"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Yeroon walitti hidhamiinsa GitHub darbeera.",
-      "message": "Walqunnamtiin GitHub kee kana booda hin hojjetu. Irra deebi'ii ilaali — yoo barbaachise akka irra deebi'ii walqabsiiftu gaafatamta.",
+      "message": "Irra deebi'ii ilaali — yoo barbaachise akka irra deebi'ii walqabsiiftu gaafatamta.",
       "gitlabTitle": "Yeroon walitti hidhamiinsa GitLab darbeera.",
-      "bitbucketTitle": "Yeroon walitti hidhamiinsa Bitbucket darbeera.",
-      "providerMessage": "Walqunnamtiin {{provider}} kee kana booda hin hojjetu. Irra deebi'ii ilaali — yoo barbaachise akka irra deebi'ii walqabsiiftu gaafatamta."
+      "bitbucketTitle": "Yeroon walitti hidhamiinsa Bitbucket darbeera."
     },
     "eventChips": {
       "comment": "Yaada kenni",

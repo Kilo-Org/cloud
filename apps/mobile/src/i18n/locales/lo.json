@@ -684,6 +684,7 @@
       "gitlabDescription": "ເຊື່ອມຕໍ່ບັນຊີ GitLab ຂອງທ່ານເພື່ອກວດທານ merge request ເທິງມືຖື",
       "bitbucketDescription": "ເຊື່ອມຕໍ່ Bitbucket ກັບອົງກອນນີ້ເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດເທິງມືຖື",
       "bitbucketOrgOnlyDescription": "ປ່ຽນບັນຊີຂ້າງເທິງໄປຫາອົງກອນເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ຂອງມັນ.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "ບັນຊີນີ້ຍັງບໍ່ມີອົງກອນ. ທ່ານສາມາດກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ໄດ້ເມື່ອທ່ານສ້າງ ຫຼື ເຂົ້າຮ່ວມອົງກອນ.",
       "contextLine": "ສຳລັບ {{organization}}",
       "contextLinePersonal": "ສຳລັບບັນຊີສ່ວນຕົວຂອງທ່ານ"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "ການເຊື່ອມຕໍ່ GitHub ໝົດອາຍຸແລ້ວ.",
-      "message": "ການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານໃຊ້ບໍ່ໄດ້ແລ້ວ. ກວດສອບການເຊື່ອມຕໍ່ອີກຄັ້ງ — ລະບົບຈະຂໍໃຫ້ເຊື່ອມຕໍ່ໃໝ່ຖ້າຈຳເປັນ.",
+      "message": "ກວດສອບການເຊື່ອມຕໍ່ອີກຄັ້ງ — ລະບົບຈະຂໍໃຫ້ເຊື່ອມຕໍ່ໃໝ່ຖ້າຈຳເປັນ.",
       "gitlabTitle": "ການເຊື່ອມຕໍ່ GitLab ໝົດອາຍຸແລ້ວ.",
-      "bitbucketTitle": "ການເຊື່ອມຕໍ່ Bitbucket ໝົດອາຍຸແລ້ວ.",
-      "providerMessage": "ການເຊື່ອມຕໍ່ {{provider}} ຂອງທ່ານໃຊ້ບໍ່ໄດ້ແລ້ວ. ກວດສອບການເຊື່ອມຕໍ່ອີກຄັ້ງ — ລະບົບຈະຂໍໃຫ້ເຊື່ອມຕໍ່ໃໝ່ຖ້າຈຳເປັນ."
+      "bitbucketTitle": "ການເຊື່ອມຕໍ່ Bitbucket ໝົດອາຍຸແລ້ວ."
     },
     "eventChips": {
       "comment": "ສະແດງຄຳເຫັນ",

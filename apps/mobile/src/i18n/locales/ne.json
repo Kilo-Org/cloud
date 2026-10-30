@@ -684,6 +684,7 @@
       "gitlabDescription": "मोबाइलमा मर्ज रिक्वेस्टहरू समीक्षा गर्न आफ्नो GitLab खाता जडान गर्नुहोस्।",
       "bitbucketDescription": "मोबाइलमा पुल रिक्वेस्टहरू समीक्षा गर्न यो संस्थालाई Bitbucket सँग जडान गर्नुहोस्।",
       "bitbucketOrgOnlyDescription": "यसको Bitbucket पुल रिक्वेस्टहरू समीक्षा गर्न माथिको खाता एउटा संस्थामा स्विच गर्नुहोस्।",
+      "bitbucketOrgOnlyNoOrganizationDescription": "यो खातामा हालसम्म कुनै संस्था छैन। तपाईंले संस्था सिर्जना गर्नुभएको वा सामेल हुनुभएपछि Bitbucket पुल रिक्वेस्टहरू समीक्षा गर्न सकिन्छ।",
       "contextLine": "{{organization}} का लागि",
       "contextLinePersonal": "तपाईंको व्यक्तिगत खाताका लागि"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub जडानको म्याद सकियो।",
-      "message": "तपाईंको GitHub जडान अब मान्य छैन। तपाईंको जडान फेरि जाँच्नुहोस् — आवश्यक परेमा फेरि जडान गर्न भनिनेछ।",
+      "message": "तपाईंको जडान फेरि जाँच्नुहोस् — आवश्यक परेमा फेरि जडान गर्न भनिनेछ।",
       "gitlabTitle": "GitLab जडानको म्याद सकियो।",
-      "bitbucketTitle": "Bitbucket जडानको म्याद सकियो।",
-      "providerMessage": "तपाईंको {{provider}} जडान अब मान्य छैन। तपाईंको जडान फेरि जाँच्नुहोस् — आवश्यक परेमा फेरि जडान गर्न भनिनेछ।"
+      "bitbucketTitle": "Bitbucket जडानको म्याद सकियो।"
     },
     "eventChips": {
       "comment": "टिप्पणी",

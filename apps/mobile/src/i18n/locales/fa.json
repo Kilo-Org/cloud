@@ -684,6 +684,7 @@
       "gitlabDescription": "حساب GitLab خود را وصل کنید تا درخواست‌های ادغام را در موبایل بازبینی کنید.",
       "bitbucketDescription": "Bitbucket را به این سازمان وصل کنید تا پول ریکوئست‌ها را در موبایل بازبینی کنید.",
       "bitbucketOrgOnlyDescription": "حساب بالا را به یک سازمان تغییر دهید تا پول ریکوئست‌های Bitbucket آن را بازبینی کنید.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "این حساب هنوز سازمانی ندارد. پول ریکوئست‌های Bitbucket را می‌توانید پس از ایجاد یک سازمان یا پیوستن به آن بازبینی کنید.",
       "contextLine": "برای {{organization}}",
       "contextLinePersonal": "برای حساب شخصی شما"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "اعتبار اتصال به GitHub تمام شده است.",
-      "message": "اتصال شما به GitHub دیگر معتبر نیست. آن را دوباره بررسی کنید. در صورت نیاز، از شما خواسته می‌شود دوباره متصل شوید.",
+      "message": "آن را دوباره بررسی کنید. در صورت نیاز، از شما خواسته می‌شود دوباره متصل شوید.",
       "gitlabTitle": "اعتبار اتصال به GitLab تمام شده است.",
-      "bitbucketTitle": "اعتبار اتصال به Bitbucket تمام شده است.",
-      "providerMessage": "اتصال شما به {{provider}} دیگر معتبر نیست. آن را دوباره بررسی کنید. در صورت نیاز، از شما خواسته می‌شود دوباره متصل شوید."
+      "bitbucketTitle": "اعتبار اتصال به Bitbucket تمام شده است."
     },
     "eventChips": {
       "comment": "نظر",

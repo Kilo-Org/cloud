@@ -2727,6 +2727,7 @@
       "gitlabDescription": "Connectez votre compte GitLab pour examiner des merge requests sur mobile.",
       "bitbucketDescription": "Connectez Bitbucket à cette organisation pour examiner des PR sur mobile.",
       "bitbucketOrgOnlyDescription": "Basculez le compte ci-dessus vers une organisation pour examiner ses PR Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Ce compte n'a encore aucune organisation. Les PR Bitbucket peuvent être examinées une fois que vous créez ou rejoignez une organisation.",
       "contextLine": "Pour {{organization}}",
       "contextLinePersonal": "Pour votre compte personnel"
     },
@@ -3106,10 +3107,9 @@
     "pullRequestUnavailableDescription": "Impossible d'ouvrir cette PR. Elle a peut-être été supprimée, le dépôt est privé ou l'application GitHub de Kilo n'y est pas installée.",
     "reconnectNotice": {
       "title": "La connexion à GitHub a expiré.",
-      "message": "Votre connexion GitHub n'est plus valide. Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter.",
+      "message": "Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter.",
       "gitlabTitle": "La connexion à GitLab a expiré.",
-      "bitbucketTitle": "La connexion à Bitbucket a expiré.",
-      "providerMessage": "Votre connexion {{provider}} n'est plus valide. Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter."
+      "bitbucketTitle": "La connexion à Bitbucket a expiré."
     },
     "review": "Revue",
     "reviewPullRequest": "Examiner la demande de fusion",

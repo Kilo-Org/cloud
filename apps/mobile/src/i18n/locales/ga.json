@@ -729,6 +729,7 @@
       "gitlabDescription": "Ceangail do chuntas GitLab chun iarratais chumaisc a athbhreithniú ar an ngléas soghluaiste.",
       "bitbucketDescription": "Ceangail Bitbucket leis an eagraíocht seo chun iarratais tharraingthe a athbhreithniú ar an ngléas soghluaiste.",
       "bitbucketOrgOnlyDescription": "Athraigh an cuntas thuas go heagraíocht chun iarratais tharraingthe Bitbucket na heagraíochta sin a athbhreithniú.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Níl aon eagraíocht ag an gcuntas seo fós. Is féidir iarratais tharraingthe Bitbucket a athbhreithniú nuair a chruthaíonn tú eagraíocht nó nuair a thagann tú isteach i gceann acu.",
       "contextLine": "Do {{organization}}",
       "contextLinePersonal": "Do do chuntas pearsanta"
     },
@@ -755,10 +756,9 @@
     },
     "reconnectNotice": {
       "title": "Tá an nasc GitHub imithe in éag.",
-      "message": "Níl do nasc GitHub bailí a thuilleadh. Seiceáil do nasc arís — iarrfar ort athnascadh más gá.",
+      "message": "Seiceáil do nasc arís — iarrfar ort athnascadh más gá.",
       "gitlabTitle": "Tá an nasc GitLab imithe in éag.",
-      "bitbucketTitle": "Tá an nasc Bitbucket imithe in éag.",
-      "providerMessage": "Níl do nasc {{provider}} bailí a thuilleadh. Seiceáil do nasc arís — iarrfar ort athnascadh más gá."
+      "bitbucketTitle": "Tá an nasc Bitbucket imithe in éag."
     },
     "eventChips": {
       "comment": "Trácht",

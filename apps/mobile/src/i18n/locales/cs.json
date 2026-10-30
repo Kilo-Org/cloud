@@ -714,6 +714,7 @@
       "gitlabDescription": "Připoj svůj účet GitLab a kontroluj merge requesty na mobilu.",
       "bitbucketDescription": "Připoj Bitbucket k této organizaci a kontroluj PR na mobilu.",
       "bitbucketOrgOnlyDescription": "Přepni účet nahoře na organizaci a kontroluj její PR na Bitbucketu.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatím nemá žádnou organizaci. PR na Bitbucketu půjde kontrolovat, jakmile nějakou vytvoříš nebo se k ní přidáš.",
       "contextLine": "Pro {{organization}}",
       "contextLinePersonal": "Pro osobní účet"
     },
@@ -739,10 +740,9 @@
     },
     "reconnectNotice": {
       "title": "Platnost připojení ke službě GitHub vypršela.",
-      "message": "Tvé připojení ke GitHubu už není platné. Znovu ho ověř. V případě potřeby tě aplikace vyzve k opětovnému připojení.",
+      "message": "Znovu ho ověř. V případě potřeby tě aplikace vyzve k opětovnému připojení.",
       "gitlabTitle": "Platnost připojení ke službě GitLab vypršela.",
-      "bitbucketTitle": "Platnost připojení ke službě Bitbucket vypršela.",
-      "providerMessage": "Tvé připojení ke {{provider}}u už není platné. Znovu ho ověř. V případě potřeby tě aplikace vyzve k opětovnému připojení."
+      "bitbucketTitle": "Platnost připojení ke službě Bitbucket vypršela."
     },
     "eventChips": {
       "comment": "Komentovat",

@@ -684,6 +684,7 @@
       "gitlabDescription": "Yhdistä GitLab-tilisi, niin voit katselmoida yhdistämispyyntöjä mobiililaitteella.",
       "bitbucketDescription": "Yhdistä Bitbucket tähän organisaatioon, niin voit katselmoida muutospyyntöjä mobiililaitteella.",
       "bitbucketOrgOnlyDescription": "Vaihda yllä oleva tili organisaatioon, niin voit katselmoida sen Bitbucket-muutospyyntöjä.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Tällä tilillä ei ole vielä organisaatioita. Voit katselmoida Bitbucket-muutospyyntöjä, kun luot organisaation tai liityt sellaiseen.",
       "contextLine": "{{organization}}-organisaatiolle",
       "contextLinePersonal": "Henkilökohtaiselle tilillesi"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub-yhteys on vanhentunut",
-      "message": "GitHub-yhteytesi ei ole enää voimassa. Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen.",
+      "message": "Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen.",
       "gitlabTitle": "GitLab-yhteys on vanhentunut",
-      "bitbucketTitle": "Bitbucket-yhteys on vanhentunut",
-      "providerMessage": "{{provider}}-yhteytesi ei ole enää voimassa. Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen."
+      "bitbucketTitle": "Bitbucket-yhteys on vanhentunut"
     },
     "eventChips": {
       "comment": "Kommentoi",

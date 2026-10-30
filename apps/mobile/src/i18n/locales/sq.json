@@ -684,6 +684,7 @@
       "gitlabDescription": "Lidho llogarinë tënde GitLab për të rishikuar kërkesat e integrimit në celular.",
       "bitbucketDescription": "Lidho Bitbucket me këtë organizatë për të rishikuar kërkesat për bashkim në celular.",
       "bitbucketOrgOnlyDescription": "Ndrysho llogarinë e mësipërme në një organizatë për të rishikuar kërkesat për bashkim në Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Kjo llogari nuk ka ende organizata. Kërkesat për bashkim në Bitbucket mund të rishikohen sapo të krijosh ose të bëhesh pjesë e një organizate.",
       "contextLine": "Për {{organization}}",
       "contextLinePersonal": "Për llogarinë personale"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Lidhja me GitHub skadoi.",
-      "message": "Lidhja jote me GitHub nuk është më e vlefshme. Rikontrollo lidhjen — do të të kërkohet të rilidhesh nëse është e nevojshme.",
+      "message": "Rikontrollo lidhjen — do të të kërkohet të rilidhesh nëse është e nevojshme.",
       "gitlabTitle": "Lidhja me GitLab skadoi.",
-      "bitbucketTitle": "Lidhja me Bitbucket skadoi.",
-      "providerMessage": "Lidhja jote me {{provider}} nuk është më e vlefshme. Rikontrollo lidhjen — do të të kërkohet të rilidhesh nëse është e nevojshme."
+      "bitbucketTitle": "Lidhja me Bitbucket skadoi."
     },
     "eventChips": {
       "comment": "Koment",

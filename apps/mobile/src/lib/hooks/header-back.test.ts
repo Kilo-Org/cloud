@@ -37,6 +37,16 @@ describe('claimHeaderBack', () => {
     expect(claimHeaderBack(state, T0 + HEADER_BACK_GUARD_MS - 1)).toBe(false);
     expect(claimHeaderBack(state, T0 + HEADER_BACK_GUARD_MS)).toBe(true);
   });
+
+  it('opens a new window when the clock steps backwards', () => {
+    const state = freshState();
+    claimHeaderBack(state, T0);
+
+    // A wall clock that stepped back must not hold every press out until the
+    // clock catches up with the recorded time.
+    expect(claimHeaderBack(state, T0 - 3_600_000)).toBe(true);
+    expect(state.lastBackAt).toBe(T0 - 3_600_000);
+  });
 });
 
 describe('resolveHeaderBack', () => {

@@ -7,6 +7,13 @@ import {
   resolveHeaderBack,
 } from '@/lib/hooks/header-back';
 
+/** What a header declares about its Back press. */
+export type HeaderBackOptions = Readonly<{
+  onBack?: () => void;
+  backFallback?: Href;
+  canGoBack: boolean;
+}>;
+
 /**
  * The header's Back press, at most once per press burst and never when the
  * navigator has nowhere to pop.
@@ -21,27 +28,21 @@ import {
  * the only claim that outlives its press is one the screen walked back through
  * a confirmation, and 500 ms outlasts that press.
  */
-export function useHeaderBack({
-  onBack,
-  backFallback,
-  canGoBack,
-}: Readonly<{
-  onBack?: () => void;
-  backFallback?: Href;
-  canGoBack: boolean;
-}>): () => void {
+export function useHeaderBack({ onBack, backFallback, canGoBack }: HeaderBackOptions): () => void {
   const router = useRouter();
   const guardRef = useRef<HeaderBackGuardState>({ lastBackAt: 0 });
 
   return useCallback(() => {
-    if (!claimHeaderBack(guardRef.current, Date.now())) {
-      return;
-    }
     const decision = resolveHeaderBack({
       hasHandler: onBack !== undefined,
       hasFallback: backFallback !== undefined,
       canGoBack,
     });
+    // A press with nothing to run leaves the burst window untouched: it
+    // dispatched no back, so the next press is still the first of its gesture.
+    if (decision === 'none' || !claimHeaderBack(guardRef.current, Date.now())) {
+      return;
+    }
     if (decision === 'handler') {
       onBack?.();
       return;
@@ -50,7 +51,8 @@ export function useHeaderBack({
       router.back();
       return;
     }
-    if (decision === 'fallback' && backFallback !== undefined) {
+    // Only 'fallback' reaches here: a press with nothing to run returned above.
+    if (backFallback !== undefined) {
       // POP_TO keeps the fallback's contract (land on this destination) while
       // truncating any routes the app left above it; with no history it still
       // creates the destination.

@@ -6,6 +6,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import {
+  _flushGlanceableMirrorForTests,
   _resetGlanceablePersistForTests,
   _setGlanceableRestoreUnavailableForTests,
   _setLastGlanceableSnapshotForTests,
@@ -27,15 +28,21 @@ const store = new Map<string, string>();
 
 // Fake SecureStore surface backed by an in-memory Map, injected through the
 // test-only setter so the durable mirror never loads the real native module.
+// The defaults are re-installed per case: a case that holds a write open must
+// not leak its implementation into the next one.
+const defaultSetItem = async (key: string, value: string) => {
+  store.set(key, value);
+  await Promise.resolve();
+};
+
+const defaultGetItem = async (key: string): Promise<string | null> => {
+  await Promise.resolve();
+  return store.get(key) ?? null;
+};
+
 const secureStoreMock = {
-  setItemAsync: vi.fn(async (key: string, value: string) => {
-    store.set(key, value);
-    await Promise.resolve();
-  }),
-  getItemAsync: vi.fn(async (key: string) => {
-    await Promise.resolve();
-    return store.get(key) ?? null;
-  }),
+  setItemAsync: vi.fn(defaultSetItem),
+  getItemAsync: vi.fn(defaultGetItem),
 };
 
 function snapshotFor(sessions: { status: string }[]): GlanceableAgentsSnapshot {
@@ -60,14 +67,31 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
   };
 }
 
+/**
+ * A JS restart: a fresh module instance with no in-memory state reads the
+ * SecureStore the previous process wrote. The dynamic import is the point:
+ * a static import would keep the instance the test already published through,
+ * so only a re-import after `resetModules` starts from an empty module state.
+ */
+async function restartPersistModule() {
+  vi.resetModules();
+  const fresh = await import('./persist');
+  fresh._setSecureStoreForTests(secureStoreMock);
+  return fresh;
+}
+
 beforeEach(() => {
   _resetGlanceablePersistForTests();
   _setSecureStoreForTests(secureStoreMock);
   store.clear();
   vi.clearAllMocks();
+  secureStoreMock.setItemAsync.mockImplementation(defaultSetItem);
+  secureStoreMock.getItemAsync.mockImplementation(defaultGetItem);
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // Let a queued mirror write land before the next case clears the map.
+  await _flushGlanceableMirrorForTests();
   _resetGlanceablePersistForTests();
   store.clear();
 });
@@ -275,5 +299,101 @@ describe('restorePersistedGlanceable', () => {
       newestResultAt: null,
     });
     expect(getLocalScopeKey()).toBe(stored.scopeKey);
+  });
+
+  // The previous release stored the snapshot and the scope key as two records.
+  // An install that upgrades with that pair on disk must still restore, and the
+  // record's own scope key is what a restart uses from then on.
+  it('restores a record the previous release wrote as two keys', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stored));
+    store.set(SCOPE_KEY, stored.scopeKey);
+
+    const restarted = await restartPersistModule();
+    await restarted.restorePersistedGlanceable();
+
+    expect(restarted.getLastGlanceableSnapshot()).toEqual(stored);
+    expect(restarted.getLocalScopeKey()).toBe(stored.scopeKey);
+  });
+
+  it('fills the scope from a key the previous release left without a snapshot', async () => {
+    store.set(SCOPE_KEY, 'legacy-scope');
+
+    const restarted = await restartPersistModule();
+    await restarted.restorePersistedGlanceable();
+
+    expect(restarted.getLastGlanceableSnapshot()).toBeNull();
+    expect(restarted.getLocalScopeKey()).toBe('legacy-scope');
+  });
+});
+
+describe('mirror writes', () => {
+  // A publish is fire-and-forget, so without a chain the slow happy frame can
+  // reach SecureStore after the terminal blank that replaced it, and the next
+  // JS restart brings back a state the user already left.
+  it('leaves the later blank on disk when an earlier publish is still writing', async () => {
+    const gate = deferred();
+    let writes = 0;
+    secureStoreMock.setItemAsync.mockImplementation(async (key: string, value: string) => {
+      writes += 1;
+      if (writes === 1) {
+        // The happy frame's write is slow: it settles only after the terminal
+        // blank has been published.
+        await gate.promise;
+      }
+      store.set(key, value);
+    });
+
+    const happy = snapshotFor([{ status: 'busy' }]);
+    const blank = buildGlanceableSnapshot({
+      sessions: [],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW + 1,
+      status: 'signed_out',
+    });
+
+    persistGlanceableSink.publish(happy);
+    persistGlanceableSink.publish(blank);
+    gate.resolve();
+    await _flushGlanceableMirrorForTests();
+
+    expect(JSON.parse(store.get(SNAPSHOT_KEY) ?? 'null')).toMatchObject({
+      status: 'signed_out',
+    });
+
+    const restarted = await restartPersistModule();
+    await restarted.restorePersistedGlanceable();
+
+    expect(restarted.getLastGlanceableSnapshot()).toEqual(blank);
+    expect(restarted.getLocalScopeKey()).toBe(blank.scopeKey);
+  });
+
+  // One record per publish carries both facts, so a restart can never pair one
+  // publish's snapshot with another publish's scope key.
+  it('restores the snapshot and the scope key of the same publish', async () => {
+    const first = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }],
+      userId: 'u1',
+      organizationId: 'org-1',
+      now: NOW,
+    });
+    const second = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }],
+      userId: 'u1',
+      organizationId: 'org-2',
+      now: NOW + 1,
+    });
+    expect(second.scopeKey).not.toBe(first.scopeKey);
+
+    persistGlanceableSink.publish(first);
+    persistGlanceableSink.publish(second);
+    await _flushGlanceableMirrorForTests();
+
+    const restarted = await restartPersistModule();
+    await restarted.restorePersistedGlanceable();
+
+    expect(restarted.getLastGlanceableSnapshot()).toEqual(second);
+    expect(restarted.getLocalScopeKey()).toBe(second.scopeKey);
   });
 });

@@ -42,7 +42,7 @@
     "mergeRequest": "merge барање",
     "notConnected": "Неповрзано",
     "notifications": "Известувања",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Репозиториуми",
     "securityAgent": "Безбедносен агент",
     "unknown": "Непознато",
@@ -743,7 +743,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Уреди го застарениот коментар на чекање за {{location}}",
       "editA11y": "Уреди го коментарот на чекање за {{location}}",
-      "staleHint": "pR е ажуриран откако го напиша ова.",
+      "staleHint": "PR е ажуриран откако го напиша ова.",
       "deleteA11y": "Избриши го коментарот на чекање за {{location}}",
       "deletedAnnouncement": "Коментарот на чекање е избришан",
       "noCommentsQueued": "Нема коментари за испраќање. Прегледот ќе се испрати само со дејството избрано погоре.",
@@ -2873,7 +2873,7 @@
       "open": "отворен PR",
       "closed": "затворено барање за спојување",
       "merged": "споено барање за спојување",
-      "draft": "pR во нацрт",
+      "draft": "PR во нацрт",
       "updating": "Се ажурира, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },

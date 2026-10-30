@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Não conectado",
     "notifications": "Notificações",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repositórios",
     "securityAgent": "Agente de segurança",
     "unknown": "Desconhecido",
@@ -1637,7 +1637,7 @@
       "dollar_many": "dólares",
       "costSpoken": "custo de {{cost}}",
       "costSpokenWithTime": "custo {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "e"
     },
     "githubInstall": {
@@ -2337,9 +2337,9 @@
     },
     "prBadge": {
       "open": "abrir PR",
-      "closed": "pR fechado",
-      "merged": "pR mesclado",
-      "draft": "pR em rascunho",
+      "closed": "PR fechado",
+      "merged": "PR mesclado",
+      "draft": "PR em rascunho",
       "updating": "Atualizando, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },

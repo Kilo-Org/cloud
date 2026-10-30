@@ -1669,7 +1669,7 @@
       "dollar_many": "dólares",
       "costSpoken": "coste de {{cost}}",
       "costSpokenWithTime": "coste {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "y"
     },
     "githubInstall": {
@@ -2368,10 +2368,10 @@
       "unavailable": "Esta sesión no puede recibir solicitudes de permiso."
     },
     "prBadge": {
-      "open": "pR abierta",
+      "open": "PR abierta",
       "closed": "solicitud de incorporación de cambios cerrada",
       "merged": "solicitud de incorporación de cambios fusionada",
-      "draft": "pR en borrador",
+      "draft": "PR en borrador",
       "updating": "Actualizando, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },

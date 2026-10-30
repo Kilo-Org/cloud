@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Nepřipojeno",
     "notifications": "Oznámení",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repozitáře",
     "securityAgent": "Bezpečnostní agent",
     "unknown": "Neznámé",
@@ -2243,7 +2243,7 @@
       "dollar_many": "dolaru",
       "costSpoken": "náklady {{cost}}",
       "costSpokenWithTime": "náklady {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "a"
     },
     "githubInstall": {

@@ -743,7 +743,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Hariri maoni yaliyopitwa na wakati yanayosubiri kutumwa kwenye {{location}}",
       "editA11y": "Hariri maoni yanayosubiri kutumwa kwenye {{location}}",
-      "staleHint": "pR imebadilika tangu ulipoandika maoni haya.",
+      "staleHint": "PR imebadilika tangu ulipoandika maoni haya.",
       "deleteA11y": "Futa maoni yanayosubiri kutumwa kwenye {{location}}",
       "deletedAnnouncement": "Maoni yanayosubiri kutumwa yamefutwa",
       "noCommentsQueued": "Hakuna maoni kwenye foleni. Ukaguzi utawasilishwa pamoja na tukio lililo hapo juu pekee.",

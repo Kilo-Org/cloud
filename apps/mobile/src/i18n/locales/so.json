@@ -743,7 +743,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Wax ka beddel faallada duugoobay ee sugaysa dirista kuna taal {{location}}",
       "editA11y": "Wax ka beddel faallada sugaysa dirista ee ku taal {{location}}",
-      "staleHint": "pR-ka waa la beddelay tan iyo markii aad tan qortay.",
+      "staleHint": "PR-ka waa la beddelay tan iyo markii aad tan qortay.",
       "deleteA11y": "Tirtir faallada sugaysa dirista ee ku taal {{location}}",
       "deletedAnnouncement": "Faalladii sugaysay dirista waa la tirtiray",
       "noCommentsQueued": "Ma jiraan faallooyin safka ku jira. Dib-u-eegista waxaa lagu gudbin doonaa oo keliya falka kor ku xusan.",

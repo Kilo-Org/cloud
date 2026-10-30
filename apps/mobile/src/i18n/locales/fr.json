@@ -2271,9 +2271,9 @@
     },
     "prBadge": {
       "open": "ouverture de la PR",
-      "closed": "pR fermée",
-      "merged": "pR fusionnée",
-      "draft": "pR en brouillon",
+      "closed": "PR fermée",
+      "merged": "PR fusionnée",
+      "draft": "PR en brouillon",
       "updating": "Mise à jour en cours, {{label}} n° {{number}}",
       "label": "{{label}} n° {{number}}"
     },

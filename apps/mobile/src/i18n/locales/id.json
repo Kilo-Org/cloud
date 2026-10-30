@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Tidak terhubung",
     "notifications": "Notifikasi",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repositori",
     "securityAgent": "Agen keamanan",
     "unknown": "Tidak diketahui",
@@ -1657,7 +1657,7 @@
       "dollar_other": "dolar",
       "costSpoken": "biaya {{cost}}",
       "costSpokenWithTime": "biaya {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": ", dan"
     },
     "githubInstall": {
@@ -2347,8 +2347,8 @@
     },
     "prBadge": {
       "open": "buka PR",
-      "closed": "pR yang ditutup",
-      "merged": "pR yang digabungkan",
+      "closed": "PR yang ditutup",
+      "merged": "PR yang digabungkan",
       "draft": "draf PR",
       "updating": "Memperbarui, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
@@ -3047,7 +3047,7 @@
       "editA11y": "Ubah komentar dalam antrean di {{location}}",
       "editOutdatedA11y": "Ubah komentar dalam antrean yang sudah tidak sesuai di {{location}}",
       "noCommentsQueued": "Tidak ada komentar dalam antrean. Tinjauan akan dikirim hanya dengan jenis tinjauan yang dipilih di atas.",
-      "staleHint": "pR sudah berubah sejak kamu menulis komentar ini.",
+      "staleHint": "PR sudah berubah sejak kamu menulis komentar ini.",
       "staleQueueHint": "Komentar yang merujuk ke commit lama tidak dikirim. Komentar tersebut tetap ada di antreanmu agar bisa kamu ubah atau hapus.",
       "summaryA11y": "Ringkasan tinjauan",
       "summaryPlaceholder": "Ringkasan opsional untuk tinjauan"

@@ -779,7 +779,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Uredi zastareli čakajoči komentar na {{location}}",
       "editA11y": "Uredi čakajoči komentar na {{location}}",
-      "staleHint": "pR se je od nastanka tega komentarja spremenil.",
+      "staleHint": "PR se je od nastanka tega komentarja spremenil.",
       "deleteA11y": "Izbriši čakajoči komentar na {{location}}",
       "deletedAnnouncement": "Čakajoči komentar izbrisan",
       "noCommentsQueued": "Ni čakajočih komentarjev. Pregled bo oddan samo z zgoraj izbrano vrsto pregleda.",

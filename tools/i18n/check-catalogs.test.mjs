@@ -664,3 +664,46 @@ test('rejects a catalog that translates the sampling parameter label', context =
     /mobile\/ru: "profiles\.agents\.topP" must read "Top P" in every catalog/
   );
 });
+
+const PULL_REQUEST_TERM = {
+  agents: { title: 'Agents' },
+  manualReview: { startNotFound: 'Could not read that PR from GitHub.' },
+};
+const PULL_REQUEST_TERM_SOURCE =
+  "t('agents.title');\nt('manualReview.startNotFound');";
+
+test('accepts the pull-request term capitalized in a catalog', context => {
+  const result = runChecker(context, {
+    english: PULL_REQUEST_TERM,
+    translated: {
+      agents: { title: 'Агенты' },
+      manualReview: { startNotFound: 'Не удалось прочитать этот PR из GitHub.' },
+    },
+    source: PULL_REQUEST_TERM_SOURCE,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+for (const [miscased, name] of [
+  ['pR', 'the acronym with a lower-case first letter'],
+  ['pull-Request', 'the hyphenated term with a lower-case first letter'],
+]) {
+  test(`rejects ${name}`, context => {
+    const result = runChecker(context, {
+      english: PULL_REQUEST_TERM,
+      translated: {
+        agents: { title: 'Агенты' },
+        manualReview: { startNotFound: `Не удалось прочитать этот ${miscased} из GitHub.` },
+      },
+      source: PULL_REQUEST_TERM_SOURCE,
+    });
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(
+      result.stderr,
+      new RegExp(
+        `mobile/ru: "manualReview\\.startNotFound" writes the pull-request term "${miscased}"; write "PR" or "Pull-Request"`
+      )
+    );
+  });
+}

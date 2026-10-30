@@ -743,7 +743,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Dezie okwu ochie na-eche iziga na {{location}}",
       "editA11y": "Dezie okwu na-eche iziga na {{location}}",
-      "staleHint": "pR ahụ agbanweela kemgbe ị dere nke a.",
+      "staleHint": "PR ahụ agbanweela kemgbe ị dere nke a.",
       "deleteA11y": "Hichapụ okwu na-eche iziga na {{location}}",
       "deletedAnnouncement": "Ehichapụla okwu na-eche iziga",
       "noCommentsQueued": "Enweghị okwu na-eche iziga. A ga-eziga nyocha ahụ naanị na omume dị n'elu.",

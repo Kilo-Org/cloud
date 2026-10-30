@@ -42,7 +42,7 @@
     "mergeRequest": "fangatahana fampiraisana",
     "notConnected": "Tsy mifandray",
     "notifications": "Fampandrenesana",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Tahirin-kaody",
     "securityAgent": "Mpanampy amin'ny fiarovana",
     "unknown": "Tsy fantatra",
@@ -2873,7 +2873,7 @@
       "open": "sokafy ny PR",
       "closed": "fangatahana fampidirana kaody nakatona",
       "merged": "fangatahana fampidirana kaody natambatra",
-      "draft": "pR mbola volavola",
+      "draft": "PR mbola volavola",
       "updating": "Manavao, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },

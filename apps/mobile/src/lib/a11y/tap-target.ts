@@ -255,10 +255,11 @@ export const INLINE_LINK_ROW_CLASS = 'my-[5px] gap-y-[8px]';
 export const INLINE_LINK_CONNECTOR_CLASS = 'min-w-[10px] text-center';
 
 /**
- * The box a legal link renders — the two store links under the credit packs,
- * and the privacy-policy link each consent sentence ends with — rather than a
- * word inside a sentence with a neighbour {@link INLINE_LINK_BOX_CLASS} has to
- * stay clear of.
+ * The box a legal link renders — the two store links under the credit packs —
+ * rather than a word inside a sentence with a neighbour
+ * {@link INLINE_LINK_BOX_CLASS} has to stay clear of. A link that ends a
+ * sentence uses {@link INLINE_LINK_BOX_CLASS} instead: it sits in the prose, so
+ * it takes the audit floor and the slop rather than a standalone box.
  *
  * The whole target is the box, {@link ICON_TARGET_DP} 48dp tall and wide, the
  * size the control-size audit reads from a node's own rect (Android's

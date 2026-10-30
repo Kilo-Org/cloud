@@ -1,4 +1,4 @@
-import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { isDeepseekModel } from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';

@@ -675,7 +675,12 @@
       "loading": "Įkeliamos gautos užklausos",
       "noReviewRequests": "Nėra prašymų peržiūrėti",
       "noReviewRequestsDescription": "Čia rodomos tavo peržiūros laukiančios pakeitimų užklausos. Viršuje taip pat gali įklijuoti bet kurio PR nuorodą.",
-      "couldNotLoad": "Nepavyko įkelti gautų užklausų."
+      "couldNotLoad": "Nepavyko įkelti gautų užklausų.",
+      "accessLostTitle": "Nėra prieigos prie šios organizacijos",
+      "accessLostDescription": "Tu nebesi šios organizacijos narys, todėl jos peržiūros prašymų įkelti nepavyks. Tęsk savo asmeninėje paskyroje ir toliau peržiūrėk.",
+      "organizationUnavailableTitle": "Šios organizacijos nebėra",
+      "organizationUnavailableDescription": "Ši organizacija buvo ištrinta, todėl jos peržiūros prašymų įkelti nepavyks. Tęsk savo asmeninėje paskyroje ir toliau peržiūrėk.",
+      "continueInPersonal": "Tęsti asmeninėje paskyroje"
     },
     "composer": {
       "commentBodyPlaceholder": "Komentaras",
@@ -1991,6 +1996,7 @@
     },
     "settingsSave": {
       "saveChanges": "Išsaugoti pakeitimus",
+      "saved": "Nustatymai išsaugoti",
       "unsavedTitle": "Neišsaugoti pakeitimai",
       "unsavedMessage": "Išsaugoti pakeitimus prieš išeinant iš šio ekrano?",
       "unsavedInvalidMessage": "Šių pakeitimų dar negalima išsaugoti. Ištaisykite juos, kad išsaugotumėte, arba atmeskite juos, kad išeitumėte."
@@ -3064,7 +3070,9 @@
     "permissionDescription": "Neturi teisės peržiūrėti šio turinio.",
     "notFoundDescription": "Galbūt šis turinys pašalintas arba nebepasiekiamas.",
     "serverTitle": "Nepavyko įkelti.",
-    "serverDescription": "Mūsų sistemoje įvyko klaida. Bandyk dar kartą."
+    "serverDescription": "Mūsų sistemoje įvyko klaida. Bandyk dar kartą.",
+    "timeoutTitle": "Serveris per ilgai neatsako",
+    "timeoutDescription": "Užklausa nebuvo atlikta per skirtąjį laiką. Bandyk dar kartą."
   },
   "screenHeader": {
     "openMenu": "Atidaryti meniu",

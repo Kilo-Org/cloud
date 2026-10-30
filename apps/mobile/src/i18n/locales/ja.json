@@ -1471,6 +1471,7 @@
     },
     "settingsSave": {
       "saveChanges": "変更を保存",
+      "saved": "設定を保存しました",
       "unsavedMessage": "この画面を離れる前に変更を保存しますか？",
       "unsavedInvalidMessage": "これらの変更はまだ保存できません。保存するには修正し、離れるには破棄してください。",
       "unsavedTitle": "未保存の変更"
@@ -2456,7 +2457,9 @@
     "permissionDescription": "この内容を表示する権限がありません。",
     "notFoundDescription": "この項目は削除されたか、利用できなくなった可能性があります。",
     "serverTitle": "読み込めませんでした。",
-    "serverDescription": "サービス側で問題が発生しました。もう一度お試しください。"
+    "serverDescription": "サービス側で問題が発生しました。もう一度お試しください。",
+    "timeoutTitle": "サーバーの応答に時間がかかっています",
+    "timeoutDescription": "リクエストが完了する前にタイムアウトしました。もう一度お試しください。"
   },
   "screenHeader": {
     "openMenu": "メニューを開く",
@@ -2914,6 +2917,11 @@
     },
     "inbox": {
       "couldNotLoad": "受信トレイを読み込めませんでした。",
+      "accessLostTitle": "この組織にアクセスできません",
+      "accessLostDescription": "この組織のメンバーではなくなったため、レビュー依頼を読み込めません。個人アカウントで続行して、レビューを続けましょう。",
+      "organizationUnavailableTitle": "この組織は存在しなくなりました",
+      "organizationUnavailableDescription": "この組織が削除されたため、レビュー依頼を読み込めません。個人アカウントで続行して、レビューを続けましょう。",
+      "continueInPersonal": "個人アカウントで続行",
       "loading": "受信トレイを読み込み中",
       "noReviewRequests": "レビュー依頼はありません",
       "noReviewRequestsDescription": "レビューを依頼されたプルリクエストがここに表示されます。上の欄に任意のPRのリンクを貼り付けることもできます。",

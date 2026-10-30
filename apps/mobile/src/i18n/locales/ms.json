@@ -42,7 +42,7 @@
     "mergeRequest": "permintaan gabungan",
     "notConnected": "Tidak disambungkan",
     "notifications": "Pemberitahuan",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repositori",
     "securityAgent": "Ejen keselamatan",
     "unknown": "Tidak diketahui",
@@ -645,7 +645,12 @@
       "loading": "Memuatkan peti masuk",
       "noReviewRequests": "Tiada permintaan semakan",
       "noReviewRequestsDescription": "Permintaan tarik yang menunggu semakan anda akan muncul di sini. Anda juga boleh menampal sebarang pautan PR di atas.",
-      "couldNotLoad": "Tidak dapat memuatkan peti masuk."
+      "couldNotLoad": "Tidak dapat memuatkan peti masuk.",
+      "accessLostTitle": "Tiada akses kepada organisasi ini",
+      "accessLostDescription": "Anda tidak lagi menjadi ahli organisasi ini, jadi permintaan semakannya tidak dapat dimuatkan. Teruskan dalam akaun peribadi anda untuk terus menyemak.",
+      "organizationUnavailableTitle": "Organisasi ini tidak lagi wujud",
+      "organizationUnavailableDescription": "Organisasi ini telah dipadamkan, jadi permintaan semakannya tidak dapat dimuatkan. Teruskan dalam akaun peribadi anda untuk terus menyemak.",
+      "continueInPersonal": "Teruskan dalam akaun peribadi"
     },
     "composer": {
       "commentBodyPlaceholder": "Komen anda",
@@ -743,7 +748,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Sunting komen belum dihantar yang merujuk kepada komit lama pada {{location}}",
       "editA11y": "Sunting komen belum dihantar pada {{location}}",
-      "staleHint": "pR telah dikemas kini sejak anda menulis komen ini.",
+      "staleHint": "PR telah dikemas kini sejak anda menulis komen ini.",
       "deleteA11y": "Padam komen belum dihantar pada {{location}}",
       "deletedAnnouncement": "Komen belum dihantar telah dipadam",
       "noCommentsQueued": "Tiada komen dalam senarai menunggu. Semakan akan dihantar dengan jenis semakan yang dipilih di atas sahaja.",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Simpan perubahan",
+      "saved": "Tetapan disimpan",
       "unsavedTitle": "Perubahan belum disimpan",
       "unsavedMessage": "Simpan perubahan anda sebelum meninggalkan skrin ini?",
       "unsavedInvalidMessage": "Perubahan ini belum boleh disimpan. Betulkan untuk menyimpan, atau buang untuk meninggalkan."
@@ -2873,7 +2879,7 @@
       "open": "buka PR",
       "closed": "permintaan tarik yang ditutup",
       "merged": "permintaan tarik yang digabungkan",
-      "draft": "pR draf",
+      "draft": "PR draf",
       "updating": "Mengemas kini, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2980,7 +2986,9 @@
     "permissionDescription": "Anda tidak mempunyai kebenaran untuk melihat ini.",
     "notFoundDescription": "Item ini mungkin telah dibuang atau tidak lagi tersedia.",
     "serverTitle": "Tidak dapat memuatkan data.",
-    "serverDescription": "Ralat berlaku pada sistem kami. Sila cuba lagi."
+    "serverDescription": "Ralat berlaku pada sistem kami. Sila cuba lagi.",
+    "timeoutTitle": "Pelayan terlalu lambat bertindak balas",
+    "timeoutDescription": "Permintaan tamat masa sebelum selesai. Sila cuba lagi."
   },
   "screenHeader": {
     "openMenu": "Buka menu",

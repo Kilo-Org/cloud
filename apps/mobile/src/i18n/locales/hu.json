@@ -645,7 +645,12 @@
       "loading": "Beérkezett kérelmek betöltése",
       "noReviewRequests": "Nincs kódellenőrzési felkérés",
       "noReviewRequestsDescription": "Itt jelennek meg a kódellenőrzésedre váró módosítási kérelmek. Fent továbbra is beilleszthetsz bármilyen PR-hivatkozást.",
-      "couldNotLoad": "Nem sikerült betölteni a beérkezett kérelmeket."
+      "couldNotLoad": "Nem sikerült betölteni a beérkezett kérelmeket.",
+      "accessLostTitle": "Nincs hozzáférésed ehhez a szervezethez",
+      "accessLostDescription": "Már nem vagy tagja ennek a szervezetnek, ezért a kérelmei nem tölthetők be. A folytatáshoz válts át a személyes fiókodra.",
+      "organizationUnavailableTitle": "Ez a szervezet már nem létezik",
+      "organizationUnavailableDescription": "Ez a szervezet törölve lett, ezért a kérelmei nem tölthetők be. A folytatáshoz válts át a személyes fiókodra.",
+      "continueInPersonal": "Folytatás személyes fiókkal"
     },
     "composer": {
       "commentBodyPlaceholder": "Írj hozzászólást",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Változtatások mentése",
+      "saved": "Beállítások mentve",
       "unsavedTitle": "El nem mentett változtatások",
       "unsavedMessage": "Mented a változtatásokat, mielőtt elhagyod ezt a képernyőt?",
       "unsavedInvalidMessage": "Ezek a változtatások még nem menthetők. Javítsd ki őket a mentéshez, vagy vesd el őket az elhagyáshoz."
@@ -2980,7 +2986,9 @@
     "permissionDescription": "Nincs jogosultságod ennek a megtekintéséhez.",
     "notFoundDescription": "Lehet, hogy ezt az elemet eltávolították, vagy már nem érhető el.",
     "serverTitle": "Nem sikerült betölteni",
-    "serverDescription": "Nálunk hiba történt. Próbáld újra."
+    "serverDescription": "Nálunk hiba történt. Próbáld újra.",
+    "timeoutTitle": "A szerver túl sokáig tart",
+    "timeoutDescription": "A kérés túllépte az időkorlátot, mielőtt befejeződött volna. Próbáld újra."
   },
   "screenHeader": {
     "openMenu": "Menü megnyitása",

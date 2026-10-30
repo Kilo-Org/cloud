@@ -116,7 +116,10 @@ describe('parseAwsBedrockCredentials', () => {
 });
 
 describe('awsBedrock definition', () => {
-  function createContext(request: GatewayRequest): TransformRequestContext {
+  function createContext(
+    request: GatewayRequest,
+    model = 'bedrock-byok/global.anthropic.claude-sonnet-4-6'
+  ): TransformRequestContext {
     return {
       provider: {
         id: 'direct-byok',
@@ -129,7 +132,7 @@ describe('awsBedrock definition', () => {
         responseTransforms: null,
         async transformRequest() {},
       },
-      model: 'bedrock-byok/global.anthropic.claude-sonnet-4-6',
+      model,
       request,
       originalHeaders: EmptyFraudDetectionHeaders,
       extraHeaders: {},
@@ -154,6 +157,32 @@ describe('awsBedrock definition', () => {
     });
     awsBedrock.transformRequest(chat);
     expect(chat.extraHeaders).toEqual({});
+  });
+
+  it('drops mismatched Claude thinking blocks', () => {
+    const context = createContext(
+      {
+        kind: 'messages',
+        body: {
+          model: 'global.anthropic.claude-sonnet-5-5',
+          messages: [],
+          max_tokens: 10,
+          thinking: { type: 'adaptive' },
+        },
+      },
+      'bedrock-byok/global.anthropic.claude-sonnet-5-5'
+    );
+
+    awsBedrock.transformRequest(context);
+
+    expect(context.request.body).toMatchObject({
+      thinking: { type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } },
+    });
+    expect(context.extraHeaders).toEqual({
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'thinking-binding-controls-2026-08-01',
+      'x-anthropic-beta': 'thinking-binding-controls-2026-08-01',
+    });
   });
 
   it('tells clients which API each model uses', () => {

@@ -645,7 +645,12 @@
       "loading": "Postkasti laadimine",
       "noReviewRequests": "Ülevaatustaotlusi pole",
       "noReviewRequestsDescription": "Siin kuvatakse sinu ülevaatust ootavad tõmbetaotlused. Ülalolevale väljale saad endiselt kleepida mis tahes PR-i lingi.",
-      "couldNotLoad": "Postkasti ei õnnestunud laadida."
+      "couldNotLoad": "Postkasti ei õnnestunud laadida.",
+      "accessLostTitle": "Sul pole enam juurdepääsu sellele organisatsioonile",
+      "accessLostDescription": "Sa pole enam selle organisatsiooni liige, seega ei saa selle ülevaatustaotlusi laadida. Ülevaatamise jätkamiseks mine üle isiklikule kontole.",
+      "organizationUnavailableTitle": "See organisatsioon pole enam olemas",
+      "organizationUnavailableDescription": "See organisatsioon kustutati, seega ei saa selle ülevaatustaotlusi laadida. Ülevaatamise jätkamiseks mine üle isiklikule kontole.",
+      "continueInPersonal": "Jätka isikliku kontoga"
     },
     "composer": {
       "commentBodyPlaceholder": "Kommentaar",
@@ -743,7 +748,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Muuda aegunud ootel kommentaari asukohas {{location}}",
       "editA11y": "Muuda ootel kommentaari asukohas {{location}}",
-      "staleHint": "pR on pärast selle kommentaari kirjutamist muutunud.",
+      "staleHint": "PR on pärast selle kommentaari kirjutamist muutunud.",
       "deleteA11y": "Kustuta ootel kommentaar asukohas {{location}}",
       "deletedAnnouncement": "Ootel kommentaar kustutati",
       "noCommentsQueued": "Järjekorras pole kommentaare. Ülevaatus esitatakse ainult ülal valitud toiminguga.",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Salvesta muudatused",
+      "saved": "Seaded salvestatud",
       "unsavedTitle": "Salvestamata muudatused",
       "unsavedMessage": "Kas salvestada muudatused enne sellelt ekraanilt lahkumist?",
       "unsavedInvalidMessage": "Neid muudatusi ei saa veel salvestada. Paranda need salvestamiseks või loobu neist lahkumiseks."
@@ -2980,7 +2986,9 @@
     "permissionDescription": "Sul pole õigust seda vaadata.",
     "notFoundDescription": "See on kas eemaldatud või pole enam saadaval.",
     "serverTitle": "Laadimine ei õnnestunud.",
-    "serverDescription": "Meie poolel tekkis viga. Proovi uuesti."
+    "serverDescription": "Meie poolel tekkis viga. Proovi uuesti.",
+    "timeoutTitle": "Server vastab liiga aeglaselt",
+    "timeoutDescription": "Päring ei jõudnud õigeaegselt lõpule. Proovi uuesti."
   },
   "screenHeader": {
     "openMenu": "Ava menüü",

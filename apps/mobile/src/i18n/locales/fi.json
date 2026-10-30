@@ -645,7 +645,12 @@
       "loading": "Ladataan saapuneita",
       "noReviewRequests": "Ei katselmointipyyntöjä",
       "noReviewRequestsDescription": "Katselmointiasi odottavat muutospyynnöt näkyvät tässä. Voit myös liittää minkä tahansa PR-linkin yllä olevaan kenttään.",
-      "couldNotLoad": "Saapuneita ei voitu ladata"
+      "couldNotLoad": "Saapuneita ei voitu ladata",
+      "accessLostTitle": "Ei pääsyä tähän organisaatioon",
+      "accessLostDescription": "Et ole enää tämän organisaation jäsen, joten sen katselmointipyyntöjä ei voi ladata. Jatka henkilökohtaisessa tilissäsi jatkaaksesi katselmointia.",
+      "organizationUnavailableTitle": "Tämä organisaatio ei ole enää olemassa",
+      "organizationUnavailableDescription": "Tämä organisaatio poistettiin, joten sen katselmointipyyntöjä ei voi ladata. Jatka henkilökohtaisessa tilissäsi jatkaaksesi katselmointia.",
+      "continueInPersonal": "Jatka henkilökohtaisessa tilissä"
     },
     "composer": {
       "commentBodyPlaceholder": "Jätä kommentti",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Tallenna muutokset",
+      "saved": "Asetukset tallennettu",
       "unsavedTitle": "Tallentamattomia muutoksia",
       "unsavedMessage": "Tallennetaanko muutokset ennen tältä näytöltä poistumista?",
       "unsavedInvalidMessage": "Näitä muutoksia ei voi vielä tallentaa. Korjaa ne tallentaaksesi tai hylkää ne poistuaksesi."
@@ -2980,7 +2986,9 @@
     "permissionDescription": "Sinulla ei ole oikeutta tarkastella tätä.",
     "notFoundDescription": "Tämä kohde on saatettu poistaa tai se ei ole enää käytettävissä.",
     "serverTitle": "Lataaminen ei onnistunut",
-    "serverDescription": "Palvelussamme tapahtui virhe. Yritä uudelleen."
+    "serverDescription": "Palvelussamme tapahtui virhe. Yritä uudelleen.",
+    "timeoutTitle": "Palvelin vastaa hitaasti",
+    "timeoutDescription": "Pyyntö ei valmistunut ajassa. Yritä uudelleen."
   },
   "screenHeader": {
     "openMenu": "Avaa valikko",

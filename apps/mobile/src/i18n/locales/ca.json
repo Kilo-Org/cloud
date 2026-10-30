@@ -42,7 +42,7 @@
     "mergeRequest": "sol·licitud de fusió",
     "notConnected": "No connectat",
     "notifications": "Notificacions",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repositoris",
     "securityAgent": "Agent de seguretat",
     "unknown": "Desconegut",
@@ -660,7 +660,12 @@
       "loading": "S'està carregant la safata d'entrada",
       "noReviewRequests": "Cap sol·licitud de revisió",
       "noReviewRequestsDescription": "Aquí apareixen les sol·licituds d'integració que has de revisar. També pots enganxar qualsevol enllaç de PR al camp de dalt.",
-      "couldNotLoad": "No s'ha pogut carregar la safata d'entrada."
+      "couldNotLoad": "No s'ha pogut carregar la safata d'entrada.",
+      "accessLostTitle": "No tens accés a aquesta organització",
+      "accessLostDescription": "Ja no ets membre d'aquesta organització, així que no es poden carregar les seves sol·licituds de revisió. Continua al teu compte d'ús personal per seguir revisant.",
+      "organizationUnavailableTitle": "Aquesta organització ja no existeix",
+      "organizationUnavailableDescription": "Aquesta organització s'ha suprimit, així que no es poden carregar les seves sol·licituds de revisió. Continua al teu compte d'ús personal per seguir revisant.",
+      "continueInPersonal": "Continua al compte d'ús personal"
     },
     "composer": {
       "commentBodyPlaceholder": "El teu comentari",
@@ -1965,6 +1970,7 @@
     },
     "settingsSave": {
       "saveChanges": "Desa els canvis",
+      "saved": "Configuració desada",
       "unsavedTitle": "Canvis sense desar",
       "unsavedMessage": "Vols desar els canvis abans de sortir d'aquesta pantalla?",
       "unsavedInvalidMessage": "Aquests canvis encara no es poden desar. Corregeix-los per desar-los o descarta'ls per sortir."
@@ -2911,10 +2917,10 @@
       "unavailable": "Aquesta sessió no pot rebre sol·licituds de permís."
     },
     "prBadge": {
-      "open": "pR oberta",
+      "open": "PR oberta",
       "closed": "sol·licitud d'integració tancada",
       "merged": "sol·licitud d'integració fusionada",
-      "draft": "pR en esborrany",
+      "draft": "PR en esborrany",
       "updating": "Actualitzant, {{label}} #{{number}}",
       "label": "{{label}} núm. {{number}}"
     },
@@ -3022,7 +3028,9 @@
     "permissionDescription": "No tens permís per veure aquest contingut.",
     "notFoundDescription": "Pot ser que s'hagi eliminat aquest element o que ja no estigui disponible.",
     "serverTitle": "No s'ha pogut carregar.",
-    "serverDescription": "S'ha produït un error al nostre sistema. Torna-ho a provar."
+    "serverDescription": "S'ha produït un error al nostre sistema. Torna-ho a provar.",
+    "timeoutTitle": "El servidor triga massa",
+    "timeoutDescription": "La sol·licitud ha esgotat el temps d'espera. Torna-ho a provar."
   },
   "screenHeader": {
     "openMenu": "Obre el menú",

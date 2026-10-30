@@ -18,7 +18,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
-import { type PrInboxView, selectPrInboxView } from '@/components/pr-review/pr-review-inbox-view';
+import {
+  isOrganizationAccessView,
+  type PrInboxView,
+  selectPrInboxView,
+} from '@/components/pr-review/pr-review-inbox-view';
 import { Button } from '@/components/ui/button';
 import { Clock, GitPullRequest, Inbox } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
@@ -50,7 +54,7 @@ type PrReviewInboxListProps = {
 
 export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxListProps>) {
   const inbox = useProviderInbox(true);
-  const { organizationId } = useOrganization();
+  const { organizationId, setOrganizationId } = useOrganization();
   // Two different retries, because they recover two different failures: the
   // empty-state CTA re-runs the inbox from scratch, while the footer CTA must
   // load only the page (or the provider) that failed — re-fetching pages the
@@ -61,13 +65,20 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
   const handleRetryMore = () => {
     inbox.retryFailedPages();
   };
+  // The refused organization's own reads cannot succeed, so the escape is the
+  // personal scope: the same selection the account picker makes.
+  const handleContinueInPersonal = () => {
+    setOrganizationId(null);
+  };
   const reconnectOnly = inbox.githubNeedsReconnect && !inbox.isPending && inbox.items.length === 0;
   const view = selectPrInboxView({
-    isLoading: inbox.isPending,
+    isPending: inbox.isPending,
+    isFetching: inbox.isFetching,
     itemCount: inbox.items.length,
     firstPageErrorState:
       inbox.firstPageErrorState ?? (reconnectOnly ? { kind: 'reconnect' } : null),
     laterPageError: inbox.laterPageError,
+    organizationScopeAccess: inbox.organizationScopeAccess,
   });
   // A provider outage that left the merged list empty is the retryable view
   // itself (`selectPrInboxView`), so the empty state can no longer sit beside
@@ -103,11 +114,14 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
           isRetrying={inbox.isFetching}
           reconnectPlatform={inbox.firstPageErrorPlatform}
           organizationId={organizationId}
+          onContinueInPersonal={handleContinueInPersonal}
         />
       }
       ListFooterComponent={
         <View className="gap-6 px-6 pb-12 pt-4">
-          {inbox.githubNeedsReconnect && view.kind !== 'reconnect' ? (
+          {inbox.githubNeedsReconnect &&
+          view.kind !== 'reconnect' &&
+          !isOrganizationAccessView(view) ? (
             <PrReviewReconnectNotice />
           ) : null}
           {showLoadMoreRetry ? <LoadMoreRetry onRetry={handleRetryMore} /> : null}
@@ -216,6 +230,7 @@ function InboxEmpty({
   isRetrying,
   reconnectPlatform,
   organizationId,
+  onContinueInPersonal,
 }: Readonly<{
   view: PrInboxView;
   onRetry: () => void;
@@ -224,6 +239,8 @@ function InboxEmpty({
   reconnectPlatform: ProviderPrPlatform | null;
   /** The organization scope the inbox read failed in; null for personal. */
   organizationId: string | null;
+  /** Leaves a refused organization for the personal scope. */
+  onContinueInPersonal: () => void;
 }>) {
   const { t } = useTranslation();
   if (view.kind === 'loading') {
@@ -257,6 +274,39 @@ function InboxEmpty({
 
   if (view.kind === 'not-found') {
     return <QueryError variant="not-found" placement="top" />;
+  }
+
+  if (view.kind === 'access-denied' || view.kind === 'organization-unavailable') {
+    const unavailable = view.kind === 'organization-unavailable';
+    return (
+      <QueryError
+        variant={unavailable ? 'not-found' : 'permission'}
+        title={t(
+          unavailable
+            ? 'prReview.inbox.organizationUnavailableTitle'
+            : 'prReview.inbox.accessLostTitle'
+        )}
+        message={t(
+          unavailable
+            ? 'prReview.inbox.organizationUnavailableDescription'
+            : 'prReview.inbox.accessLostDescription'
+        )}
+        placement="top"
+        action={
+          // No retry here: the server refuses this organization, so repeating
+          // the same read can only be refused again. The way out is the
+          // personal scope, which needs no organization membership.
+          <Button
+            className={STATE_ACTION_CLASS}
+            variant="outline"
+            onPress={onContinueInPersonal}
+            accessibilityLabel={t('prReview.inbox.continueInPersonal')}
+          >
+            <Text>{t('prReview.inbox.continueInPersonal')}</Text>
+          </Button>
+        }
+      />
+    );
   }
 
   if (view.kind === 'reconnect') {

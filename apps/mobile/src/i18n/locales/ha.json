@@ -645,7 +645,12 @@
       "loading": "Ana loda saƙonnin shiga",
       "noReviewRequests": "Babu buƙatun bita",
       "noReviewRequestsDescription": "Buƙatun haɗawa da ke jiran bitarka suna bayyana a nan. Har yanzu za ka iya manna kowane mahaɗin PR a sama.",
-      "couldNotLoad": "Ba a iya loda saƙonnin shiga ba."
+      "couldNotLoad": "Ba a iya loda saƙonnin shiga ba.",
+      "accessLostTitle": "Ba ka da damar wannan ƙungiya",
+      "accessLostDescription": "Ba ka zama memba na wannan ƙungiya ba, don haka ba za a iya loda buƙatun bitanta ba. Ci gaba da bita a asusunka na kashin kai.",
+      "organizationUnavailableTitle": "Wannan ƙungiya ta daina kasancewa",
+      "organizationUnavailableDescription": "An goge wannan ƙungiya, don haka ba za a iya loda buƙatun bitanta ba. Ci gaba da bita a asusunka na kashin kai.",
+      "continueInPersonal": "Ci gaba a asusun na kashin kai"
     },
     "composer": {
       "commentBodyPlaceholder": "Tsokacinka",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Ajiye canje-canje",
+      "saved": "An ajiye saitunan",
       "unsavedTitle": "Canje-canjen da ba a ajiye ba",
       "unsavedMessage": "A ajiye canje-canjenka kafin barin wannan allon?",
       "unsavedInvalidMessage": "Ba za a iya ajiye waɗannan canje-canje ba tukuna. Gyara su don ajiyewa, ko yi watsi da su don barin."
@@ -2980,7 +2986,9 @@
     "permissionDescription": "Ba ka da izinin ganin wannan.",
     "notFoundDescription": "Wataƙila an cire wannan abu ko kuma ba a samunsa yanzu.",
     "serverTitle": "An kasa loda bayanai.",
-    "serverDescription": "An sami matsala daga ɓangarenmu. Sake gwadawa."
+    "serverDescription": "An sami matsala daga ɓangarenmu. Sake gwadawa.",
+    "timeoutTitle": "Sabar uwar garka na ɗaukar lokaci mai tsawo",
+    "timeoutDescription": "An ƙare lokacin buƙatar kafin ta kammala. Sake gwadawa."
   },
   "screenHeader": {
     "openMenu": "Buɗe jerin zaɓuɓɓuka",

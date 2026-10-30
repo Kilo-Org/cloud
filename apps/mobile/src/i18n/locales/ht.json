@@ -645,7 +645,12 @@
       "loading": "Ap chaje bwat resepsyon an",
       "noReviewRequests": "Pa gen demann revizyon",
       "noReviewRequestsDescription": "Demann fizyon k ap tann revizyon ou yo parèt isit la. Ou ka toujou kole nenpòt lyen PR pi wo a.",
-      "couldNotLoad": "Pa t ka chaje bwat resepsyon an."
+      "couldNotLoad": "Pa t ka chaje bwat resepsyon an.",
+      "accessLostTitle": "Pa gen aksè nan òganizasyon sa a ankò",
+      "accessLostDescription": "Ou pa yon manb òganizasyon sa a ankò, kidonk demann revizyon li yo pa ka chaje. Kontinye nan kont pèsonèl ou pou w ka kontinye revize.",
+      "organizationUnavailableTitle": "Òganizasyon sa a pa egziste ankò",
+      "organizationUnavailableDescription": "Òganizasyon sa a efase, kidonk demann revizyon li yo pa ka chaje. Kontinye nan kont pèsonèl ou pou w ka kontinye revize.",
+      "continueInPersonal": "Kontinye nan kont pèsonèl la"
     },
     "composer": {
       "commentBodyPlaceholder": "Kòmantè ou",
@@ -743,7 +748,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Modifye kòmantè ki poko voye e ki pa ajou sou {{location}}",
       "editA11y": "Modifye kòmantè ki poko voye sou {{location}}",
-      "staleHint": "pR a chanje depi ou te ekri sa a.",
+      "staleHint": "PR a chanje depi ou te ekri sa a.",
       "deleteA11y": "Efase kòmantè ki poko voye sou {{location}}",
       "deletedAnnouncement": "Kòmantè ki t ap tann pou voye a efase",
       "noCommentsQueued": "Pa gen kòmantè nan lis atant lan. Revizyon an ap soumèt avèk sèlman aksyon revizyon ki pi wo a.",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Anrejistre chanjman yo",
+      "saved": "Paramèt anrejistre",
       "unsavedTitle": "Chanjman ki pa anrejistre",
       "unsavedMessage": "Anrejistre chanjman ou yo anvan ou kite ekran sa a?",
       "unsavedInvalidMessage": "Chanjman sa yo poko ka anrejistre. Korije yo pou anrejistre, oswa jete yo pou kite."
@@ -2980,7 +2986,9 @@
     "permissionDescription": "Ou pa gen pèmisyon pou wè sa.",
     "notFoundDescription": "Yo ka retire eleman sa a, oswa li pa disponib ankò.",
     "serverTitle": "Nou pa t ka chaje done yo.",
-    "serverDescription": "Gen yon pwoblèm bò kote nou. Tanpri eseye ankò."
+    "serverDescription": "Gen yon pwoblèm bò kote nou. Tanpri eseye ankò.",
+    "timeoutTitle": "Sèvè a pran twò tan",
+    "timeoutDescription": "Demann lan te depase delè li. Tanpri eseye ankò."
   },
   "screenHeader": {
     "openMenu": "Louvri meni an",

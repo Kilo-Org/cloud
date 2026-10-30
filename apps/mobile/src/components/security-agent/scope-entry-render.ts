@@ -20,12 +20,12 @@ export type SelectScopeEntryViewInput = {
    */
   isDenied: boolean;
   /**
-   * The GitHub status read (permission status) failed, so `hasIntegration` and
-   * `hasPermissions` below carry no information. With `isEnabled` resolved the
-   * destination is already known — the dashboard reports its own GitHub state —
-   * so an unreadable status must not hold the entry on an error screen.
+   * Whether the GitHub status read produced a value. An enabled agent's
+   * destination is already known from the config, and the dashboard reports
+   * its own GitHub state, so a status that is still unread — pending, paused
+   * or failed — must not hold the entry on a setup gate or an error screen.
    */
-  isGithubStatusUnknown: boolean;
+  isGithubStatusResolved: boolean;
   hasIntegration: boolean;
   hasPermissions: boolean;
   isEnabled: boolean;
@@ -34,15 +34,15 @@ export type SelectScopeEntryViewInput = {
 /**
  * Pure selector deciding which view the Security Agent scope entry should
  * render. Mirrors the precedence in ScopeEntryScreen: loading first, then
- * access, then error, then the enabled destination when the GitHub status is
- * unreadable, then the missing-integration / missing-permission gates, then
+ * access, then error, then the enabled destination while the GitHub status is
+ * still unread, then the missing-integration / missing-permission gates, then
  * the connected-but-disabled state, and finally the enabled dashboard.
  */
 export function selectScopeEntryView({
   isLoading,
   isError,
   isDenied,
-  isGithubStatusUnknown,
+  isGithubStatusResolved,
   hasIntegration,
   hasPermissions,
   isEnabled,
@@ -56,7 +56,7 @@ export function selectScopeEntryView({
   if (isError) {
     return 'error';
   }
-  if (isGithubStatusUnknown && isEnabled) {
+  if (isEnabled && !isGithubStatusResolved) {
     return 'dashboard';
   }
   if (!hasIntegration) {

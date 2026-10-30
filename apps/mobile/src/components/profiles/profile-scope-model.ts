@@ -66,8 +66,8 @@ export type StaleProfileScopeExit = 'profiles-list' | 'back' | 'push-list';
  *
  * POP_TO with no matching route rewrites the stack in one commit — the vendored
  * `StackRouter` keeps `activeRoutes.slice(0, currentIndex)` and appends the
- * list — which is the remove-and-insert shape that crashes the Android native
- * stack (`stack-safe-replace.ts`, KILO-APP-25). So when the list is not beneath,
+ * list — the remove-and-insert shape that crashes the Android native stack
+ * (`stack-safe-replace.ts`). So when the list is not beneath,
  * the screen goes back to the route that opened it. A detail with nothing
  * beneath it — restored or deep-linked as the only route of its stack — has
  * neither a pop to make nor a list to reuse: it pushes the list and retires

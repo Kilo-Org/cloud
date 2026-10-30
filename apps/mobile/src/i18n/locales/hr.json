@@ -660,7 +660,12 @@
       "loading": "Učitavanje primljenih zahtjeva",
       "noReviewRequests": "Nema zahtjeva za pregled koda",
       "noReviewRequestsDescription": "Ovdje se prikazuju zahtjevi za spajanje koji čekaju tvoj pregled koda. I dalje možeš zalijepiti bilo koju poveznicu na PR iznad.",
-      "couldNotLoad": "Nije moguće učitati primljene zahtjeve."
+      "couldNotLoad": "Nije moguće učitati primljene zahtjeve.",
+      "accessLostTitle": "Nemaš pristup ovoj organizaciji",
+      "accessLostDescription": "Više nisi član/ica ove organizacije, pa se njezini zahtjevi za pregled koda ne mogu učitati. Prebaci se na osobni račun da i dalje pregledavaš kod.",
+      "organizationUnavailableTitle": "Ova organizacija više ne postoji",
+      "organizationUnavailableDescription": "Ova organizacija je izbrisana, pa se njezini zahtjevi za pregled koda ne mogu učitati. Prebaci se na osobni račun da i dalje pregledavaš kod.",
+      "continueInPersonal": "Nastavi u osobnom računu"
     },
     "composer": {
       "commentBodyPlaceholder": "Tvoj komentar",
@@ -761,7 +766,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Uredi zastarjeli komentar na čekanju na lokaciji {{location}}",
       "editA11y": "Uredi komentar na čekanju na lokaciji {{location}}",
-      "staleHint": "pR je ažuriran nakon pisanja ovog komentara.",
+      "staleHint": "PR je ažuriran nakon pisanja ovog komentara.",
       "deleteA11y": "Izbriši komentar na čekanju na lokaciji {{location}}",
       "deletedAnnouncement": "Komentar na čekanju je izbrisan",
       "noCommentsQueued": "Nema komentara na čekanju. Pregled koda poslat će se samo s gore odabranom vrstom.",
@@ -1965,6 +1970,7 @@
     },
     "settingsSave": {
       "saveChanges": "Spremi izmjene",
+      "saved": "Postavke spremljene",
       "unsavedTitle": "Nespremljene izmjene",
       "unsavedMessage": "Želiš li spremiti izmjene prije izlaska s ovog zaslona?",
       "unsavedInvalidMessage": "Ove izmjene još nije moguće spremiti. Ispravi ih da bi ih spremio ili ih odbaci da bi izašao."
@@ -3022,7 +3028,9 @@
     "permissionDescription": "Nemaš dopuštenje za pregled ovog sadržaja.",
     "notFoundDescription": "Ova je stavka možda uklonjena ili više nije dostupna.",
     "serverTitle": "Učitavanje nije moguće.",
-    "serverDescription": "Došlo je do pogreške na našoj strani. Pokušaj ponovno."
+    "serverDescription": "Došlo je do pogreške na našoj strani. Pokušaj ponovno.",
+    "timeoutTitle": "Poslužitelj predugo odgovara",
+    "timeoutDescription": "Zahtjev je istekao prije nego što je završio. Pokušaj ponovo."
   },
   "screenHeader": {
     "openMenu": "Otvori izbornik",

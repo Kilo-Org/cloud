@@ -48,6 +48,7 @@ import {
 import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-clone';
 import { NewSessionPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
+import { hasVisibleComposerText } from '@/lib/composer-text';
 import { QueryError } from '@/components/query-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSharePrefill } from '@/lib/share-prefill';
@@ -387,7 +388,7 @@ export function NewSessionPrompt({
   // composer shows for a failed attachment. Voice settlement and the host's
   // model/repository/profile gates run inside `onStartSession` itself.
   function handleReturnSubmit() {
-    if (control.createDisabled || promptRef.current.trim().length === 0) {
+    if (control.createDisabled || !hasVisibleComposerText(promptRef.current)) {
       return;
     }
     if (hasAnyFailedAttachment(attachments)) {

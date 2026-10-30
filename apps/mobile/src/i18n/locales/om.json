@@ -645,7 +645,12 @@
       "loading": "Sanduuqni ergaa fe'amaa jira",
       "noReviewRequests": "Gaaffiin gamaaggamaa hin jiru",
       "noReviewRequestsDescription": "Gaaffiiwwan walitti makuu gamaaggama kee eegan asitti mul'atu. Liinkii PR kamiyyuu bakka armaan oliitti maxxansuu dandeessa.",
-      "couldNotLoad": "Sanduuqa ergaa fe'uu hin danda'amne."
+      "couldNotLoad": "Sanduuqa ergaa fe'uu hin danda'amne.",
+      "accessLostTitle": "Dhaabbata kana bira ga'uu hin danda'amne",
+      "accessLostDescription": "Miseensa dhaabbata kanaa hin taane, kanaafuu gaaffiin gamaaggamaa isaa fe'uu hin danda'u. Gamaaggamu itti fufuuf herrega dhuunfaa kee keessatti itti fufi.",
+      "organizationUnavailableTitle": "Dhaabbanni kun kana booda hin argamu",
+      "organizationUnavailableDescription": "Dhaabbanni kun haqameera, kanaafuu gaaffiin gamaaggamaa isaa fe'uu hin danda'u. Gamaaggamu itti fufuuf herrega dhuunfaa kee keessatti itti fufi.",
+      "continueInPersonal": "Herrega dhuunfaa kee keessatti itti fufi"
     },
     "composer": {
       "commentBodyPlaceholder": "Yaada kee",
@@ -743,7 +748,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Yaada yeroon darbee fi erguuf eegamaa jiru {{location}} irratti gulaali",
       "editA11y": "Yaada erguuf eegamaa jiru {{location}} irratti gulaali",
-      "staleHint": "pR kun erga kana barreessitee booda jijjiirameera.",
+      "staleHint": "PR kun erga kana barreessitee booda jijjiirameera.",
       "deleteA11y": "Yaada erguuf eegamaa jiru {{location}} irratti haqi",
       "deletedAnnouncement": "Yaadni erguuf eegamaa ture haqameera",
       "noCommentsQueued": "Yaadni tarree keessa hin jiru. Gamaaggamni gocha armaan olii qofa waliin dhiheeffama.",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Jijjiiramoota olkaa'i",
+      "saved": "Qindaa'inni olkaa'ame",
       "unsavedTitle": "Jijjiiramoota hin olkaa'amne",
       "unsavedMessage": "Fuula kana keessaa ba'uu dura jijjiiramoota kee olkaa'uu?",
       "unsavedInvalidMessage": "Jijjiiramoonni kunniin ammattiin olkaa'amuu hin danda'an. Olkaa'uuf isaan sirreessi, yookaan ba'uuf isaan dhiisi."
@@ -2980,7 +2986,9 @@
     "permissionDescription": "Kana ilaaluuf hayyama hin qabdu.",
     "notFoundDescription": "Wantichi haqamee ta'uu danda'a yookaan kana booda hin argamu.",
     "serverTitle": "Fe'uun hin danda'amne.",
-    "serverDescription": "Gama keenyaan dogoggorri uumameera. Irra deebi'ii yaali."
+    "serverDescription": "Gama keenyaan dogoggorri uumameera. Irra deebi'ii yaali.",
+    "timeoutTitle": "Fe'uun yeroo dheeraa fudhachaa jira",
+    "timeoutDescription": "Kallattiin yeroo dheeraa waadaa'ee xumurutti hin gahine. Irra deebi'ii yaali."
   },
   "screenHeader": {
     "openMenu": "Baafata bani",

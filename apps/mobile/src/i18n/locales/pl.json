@@ -1487,6 +1487,7 @@
     },
     "settingsSave": {
       "saveChanges": "Zapisz zmiany",
+      "saved": "Ustawienia zapisane",
       "unsavedMessage": "Zapisać zmiany przed opuszczeniem tego ekranu?",
       "unsavedInvalidMessage": "Tych zmian nie można jeszcze zapisać. Popraw je, aby zapisać, lub odrzuć je, aby wyjść.",
       "unsavedTitle": "Niezapisane zmiany"
@@ -2502,7 +2503,9 @@
     "permissionDescription": "Nie masz uprawnień, aby to wyświetlić.",
     "notFoundDescription": "Ten element mógł zostać usunięty lub nie jest już dostępny.",
     "serverTitle": "Nie udało się wczytać danych.",
-    "serverDescription": "Wystąpił błąd po naszej stronie. Spróbuj ponownie."
+    "serverDescription": "Wystąpił błąd po naszej stronie. Spróbuj ponownie.",
+    "timeoutTitle": "Serwer zbyt długo odpowiada",
+    "timeoutDescription": "Serwer nie odpowiada wystarczająco szybko. Spróbuj ponownie."
   },
   "screenHeader": {
     "openMenu": "Otwórz menu",
@@ -2990,6 +2993,11 @@
     },
     "inbox": {
       "couldNotLoad": "Nie udało się wczytać skrzynki.",
+      "accessLostTitle": "Brak dostępu do tej organizacji",
+      "accessLostDescription": "Nie jesteś już członkiem tej organizacji, więc nie udało się wczytać jej próśb o przegląd. Przejdź na konto osobiste, aby dalej przeglądać.",
+      "organizationUnavailableTitle": "Ta organizacja już nie istnieje",
+      "organizationUnavailableDescription": "Ta organizacja została usunięta, więc nie udało się wczytać jej próśb o przegląd. Przejdź na konto osobiste, aby dalej przeglądać.",
+      "continueInPersonal": "Przejdź na konto osobiste",
       "loading": "Wczytywanie skrzynki",
       "noReviewRequests": "Brak próśb o przegląd",
       "noReviewRequestsDescription": "Tutaj pojawią się PR oczekujące na twój przegląd. Powyżej możesz też wkleić odnośnik do dowolnego PR.",

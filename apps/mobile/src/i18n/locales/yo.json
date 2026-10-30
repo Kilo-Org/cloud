@@ -645,7 +645,12 @@
       "loading": "Ń ṣàkójọ àpótí ìwọlé",
       "noReviewRequests": "Kò sí ìbéèrè àtúnyẹ̀wò",
       "noReviewRequestsDescription": "Àwọn ìbéèrè ìṣọ̀kan tó ń dúró de àtúnyẹ̀wò rẹ yóò hàn níbí. O ṣì lè lẹ ọ̀nà àsopọ̀ PR èyíkéyìí mọ́ lókè.",
-      "couldNotLoad": "A kò lè ṣàkójọ àpótí ìwọlé."
+      "couldNotLoad": "A kò lè ṣàkójọ àpótí ìwọlé.",
+      "accessLostTitle": "Kò sí àṣẹ sí àjọ yìí mọ́",
+      "accessLostDescription": "O kò ṣe ọmọ ẹgbẹ́ àjọ yìí mọ́, nítorí náà a kò lè ṣàkójọ àwọn ìbéèrè àtúnyẹ̀wò rẹ̀. Tẹ̀síwájú nínú àkáńtì ti ara rẹ láti tẹ̀síwájú pẹ̀lú àtúnyẹ̀wò.",
+      "organizationUnavailableTitle": "Àjọ yìí kò sí mọ́",
+      "organizationUnavailableDescription": "A ti pa àjọ yìí rẹ́, nítorí náà a kò lè ṣàkójọ àwọn ìbéèrè àtúnyẹ̀wò rẹ̀. Tẹ̀síwájú nínú àkáńtì ti ara rẹ láti tẹ̀síwájú pẹ̀lú àtúnyẹ̀wò.",
+      "continueInPersonal": "Tẹ̀síwájú nínú àkáńtì ti ara ẹni"
     },
     "composer": {
       "commentBodyPlaceholder": "Àsọyé rẹ",
@@ -743,7 +748,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Ṣàtúnṣe àsọyé àtijọ́ tó ń dúró lórí {{location}}",
       "editA11y": "Ṣàtúnṣe àsọyé tó ń dúró lórí {{location}}",
-      "staleHint": "pR ti yí padà láti ìgbà tí o ti kọ èyí.",
+      "staleHint": "PR ti yí padà láti ìgbà tí o ti kọ èyí.",
       "deleteA11y": "Pa àsọyé tó ń dúró lórí {{location}} rẹ́",
       "deletedAnnouncement": "A ti pa àsọyé tó ń dúró rẹ́",
       "noCommentsQueued": "Kò sí àsọyé tó ń dúró. A ó fi àtúnyẹ̀wò ránṣẹ́ pẹ̀lú ìgbésẹ̀ tó wà lókè nìkan.",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Fi àwọn àyípadà pamọ́",
+      "saved": "A ti fi àwọn ètò pamọ́",
       "unsavedTitle": "Àwọn àyípadà tí a kò tíì fi pamọ́",
       "unsavedMessage": "Ṣé o fẹ́ fi àwọn àyípadà rẹ pamọ́ kí o tó kúrò lójú ìbòjú yìí?",
       "unsavedInvalidMessage": "Àwọn àyípadà yìí kò tíì lè fi pamọ́. Tún wọn ṣe láti fi pamọ́, tàbí jù wọ́n sílẹ̀ láti kúrò."
@@ -2980,7 +2986,9 @@
     "permissionDescription": "O kò ní àṣẹ láti wo èyí.",
     "notFoundDescription": "Ó ṣeé ṣe kí a ti yọ ohun yìí kúrò tàbí kí ó má sí mọ́.",
     "serverTitle": "A kò lè gbé dátà wọlé.",
-    "serverDescription": "Ìṣòro kan wáyé ní ọ̀dọ̀ wa. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
+    "serverDescription": "Ìṣòro kan wáyé ní ọ̀dọ̀ wa. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
+    "timeoutTitle": "Ìdáhùn náà ń gbà jù",
+    "timeoutDescription": "Ìbéèrè náà kò parí rí kí àkókò rẹ̀ tó tán. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
   },
   "screenHeader": {
     "openMenu": "Ṣí àkójọ àṣàyàn",

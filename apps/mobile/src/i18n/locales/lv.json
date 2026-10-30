@@ -660,7 +660,12 @@
       "loading": "Tiek ielādēta iesūtne",
       "noReviewRequests": "Nav pārskatīšanas pieprasījumu",
       "noReviewRequestsDescription": "Šeit būs redzami izmaiņu pieprasījumi, kas gaida tavu vērtējumu. Arī augstāk vari ielīmēt jebkuru PR saiti.",
-      "couldNotLoad": "Neizdevās ielādēt iesūtni."
+      "couldNotLoad": "Neizdevās ielādēt iesūtni.",
+      "accessLostTitle": "Nav piekļuves šai organizācijai",
+      "accessLostDescription": "Tu vairs neesi šīs organizācijas dalībnieks, tāpēc tās pārskatīšanas pieprasījumus nevar ielādēt. Turpini savā personīgajā kontā, lai varētu turpināt vērtēt.",
+      "organizationUnavailableTitle": "Šī organizācija vairs neeksistē",
+      "organizationUnavailableDescription": "Šī organizācija tika izdzēsta, tāpēc tās pārskatīšanas pieprasījumus nevar ielādēt. Turpini savā personīgajā kontā, lai varētu turpināt vērtēt.",
+      "continueInPersonal": "Turpini personīgajā kontā"
     },
     "composer": {
       "commentBodyPlaceholder": "Komentārs",
@@ -1965,6 +1970,7 @@
     },
     "settingsSave": {
       "saveChanges": "Saglabāt izmaiņas",
+      "saved": "Iestatījumi saglabāti",
       "unsavedTitle": "Nesaglabātas izmaiņas",
       "unsavedMessage": "Saglabāt izmaiņas pirms šī ekrāna aizvēršanas?",
       "unsavedInvalidMessage": "Šīs izmaiņas vēl nevar saglabāt. Izlabojiet tās, lai saglabātu, vai atmetiet, lai aizietu."
@@ -3022,7 +3028,9 @@
     "permissionDescription": "Tev nav atļaujas to skatīt.",
     "notFoundDescription": "Iespējams, šis vienums ir noņemts vai vairs nav pieejams.",
     "serverTitle": "Neizdevās ielādēt.",
-    "serverDescription": "Mūsu pusē radās kļūda. Lūdzu, mēģini vēlreiz."
+    "serverDescription": "Mūsu pusē radās kļūda. Lūdzu, mēģini vēlreiz.",
+    "timeoutTitle": "Serveris pārāk ilgi neatbild",
+    "timeoutDescription": "Pieprasījums tika pārtraukts, jo netika pabeigts laikā. Lūdzu, mēģini vēlreiz."
   },
   "screenHeader": {
     "openMenu": "Atvērt izvēlni",

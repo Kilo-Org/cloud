@@ -14,6 +14,10 @@ import { View } from 'react-native';
 import { PickerSheet } from '@/components/picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { FindingFilterModal } from '@/components/security-agent/finding-filter-modal';
+import {
+  InvalidSecurityScopeRoute,
+  useSecurityAgentScope,
+} from '@/components/security-agent/security-agent-scope-route';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -47,10 +51,23 @@ function FilterOptionsSkeleton() {
 // repository options come from the queries the findings screen already holds
 // (same cache keys), so a normal open renders them immediately and a cold open
 // shows rows while they arrive instead of a control-less placeholder.
+// The sheet's queries are keyed by the scope, so an impossible segment must
+// resolve before they mount: the guard owns that decision and the sheet body
+// only ever runs with a scope that can name an owner.
 export default function SecurityAgentFilterFindingsRoute() {
+  const scope = useSecurityAgentScope();
+
+  if (!scope) {
+    return <InvalidSecurityScopeRoute />;
+  }
+
+  return <FilterFindingsSheet scope={scope} />;
+}
+
+function FilterFindingsSheet({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
-  const { scope, ...routeParams } = useLocalSearchParams<
+  const { scope: _scope, ...routeParams } = useLocalSearchParams<
     { scope: string } & SecurityFindingRouteParams
   >();
   // Seeded once, deliberately: the route params describe the filters the list

@@ -660,7 +660,12 @@
       "loading": "Učitavanje pristiglih poruka",
       "noReviewRequests": "Nema zahteva za pregled",
       "noReviewRequestsDescription": "Ovde se pojavljuju zahtevi za spajanje koji čekaju tvoj pregled. I dalje možeš da nalepiš bilo koju vezu do PR-a iznad.",
-      "couldNotLoad": "Nije moguće učitati pristigle poruke."
+      "couldNotLoad": "Nije moguće učitati pristigle poruke.",
+      "accessLostTitle": "Nemaš više pristup ovoj organizaciji",
+      "accessLostDescription": "Više nisi član ove organizacije, pa se njeni zahtevi za pregled ne mogu učitati. Nastavi u ličnom nalogu da bi nastavio sa pregledanjem.",
+      "organizationUnavailableTitle": "Ova organizacija više ne postoji",
+      "organizationUnavailableDescription": "Ova organizacija je obrisana, pa se njeni zahtevi za pregled ne mogu učitati. Nastavi u ličnom nalogu da bi nastavio sa pregledanjem.",
+      "continueInPersonal": "Nastavi u ličnom nalogu"
     },
     "composer": {
       "commentBodyPlaceholder": "Tvoj komentar",
@@ -1965,6 +1970,7 @@
     },
     "settingsSave": {
       "saveChanges": "Sačuvaj promene",
+      "saved": "Podešavanja su sačuvana",
       "unsavedTitle": "Nesačuvane promene",
       "unsavedMessage": "Sačuvati promene pre napuštanja ovog ekrana?",
       "unsavedInvalidMessage": "Ove promene još ne mogu da se sačuvaju. Ispravi ih da bi ih sačuvao ili ih odbaci da bi otišao."
@@ -3022,7 +3028,9 @@
     "permissionDescription": "Nemaš dozvolu za prikaz ovog sadržaja.",
     "notFoundDescription": "Ova stavka je možda uklonjena ili više nije dostupna.",
     "serverTitle": "Nije moguće učitati podatke.",
-    "serverDescription": "Došlo je do greške na našoj strani. Pokušaj ponovo."
+    "serverDescription": "Došlo je do greške na našoj strani. Pokušaj ponovo.",
+    "timeoutTitle": "Server ne odgovara na vreme",
+    "timeoutDescription": "Zahtev nije završen na vreme. Pokušaj ponovo."
   },
   "screenHeader": {
     "openMenu": "Otvori meni",

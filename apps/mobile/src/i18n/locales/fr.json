@@ -1447,6 +1447,7 @@
     },
     "settingsSave": {
       "saveChanges": "Enregistrer les modifications",
+      "saved": "Paramètres enregistrés",
       "unsavedMessage": "Enregistrer vos modifications avant de quitter cet écran ?",
       "unsavedInvalidMessage": "Ces modifications ne peuvent pas encore être enregistrées. Corrigez-les pour enregistrer ou abandonnez-les pour quitter.",
       "unsavedTitle": "Modifications non enregistrées"
@@ -2271,9 +2272,9 @@
     },
     "prBadge": {
       "open": "ouverture de la PR",
-      "closed": "pR fermée",
-      "merged": "pR fusionnée",
-      "draft": "pR en brouillon",
+      "closed": "PR fermée",
+      "merged": "PR fusionnée",
+      "draft": "PR en brouillon",
       "updating": "Mise à jour en cours, {{label}} n° {{number}}",
       "label": "{{label}} n° {{number}}"
     },
@@ -2409,7 +2410,9 @@
     "permissionDescription": "Vous n'avez pas l'autorisation de consulter ce contenu.",
     "notFoundDescription": "Cet élément a peut-être été supprimé ou n'est plus disponible.",
     "serverTitle": "Impossible de charger les données.",
-    "serverDescription": "Une erreur s'est produite de notre côté. Réessayez."
+    "serverDescription": "Une erreur s'est produite de notre côté. Réessayez.",
+    "timeoutTitle": "Le serveur met trop de temps à répondre",
+    "timeoutDescription": "La demande a mis trop de temps à aboutir. Réessayez."
   },
   "screenHeader": {
     "openMenu": "Ouvrir le menu",
@@ -2952,6 +2955,11 @@
     },
     "inbox": {
       "couldNotLoad": "Impossible de charger la boîte de réception.",
+      "accessLostTitle": "Accès à cette organisation perdu",
+      "accessLostDescription": "Vous n'êtes plus membre de cette organisation, ses demandes de revue ne peuvent donc pas être chargées. Continuez dans votre compte personnel pour continuer à faire des revues.",
+      "organizationUnavailableTitle": "Cette organisation n'existe plus",
+      "organizationUnavailableDescription": "Cette organisation a été supprimée, ses demandes de revue ne peuvent donc pas être chargées. Continuez dans votre compte personnel pour continuer à faire des revues.",
+      "continueInPersonal": "Continuer dans le compte personnel",
       "loading": "Chargement de la boîte de réception",
       "noReviewRequests": "Aucune demande de revue",
       "noReviewRequestsDescription": "Les demandes de fusion en attente de votre revue apparaissent ici. Vous pouvez aussi coller n'importe quel lien de PR ci-dessus.",

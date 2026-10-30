@@ -1471,6 +1471,7 @@
     },
     "settingsSave": {
       "saveChanges": "Lưu thay đổi",
+      "saved": "Đã lưu cài đặt",
       "unsavedMessage": "Bạn có muốn lưu thay đổi trước khi rời màn hình này không?",
       "unsavedInvalidMessage": "Những thay đổi này chưa thể lưu. Hãy sửa chúng để lưu, hoặc hủy bỏ chúng để rời đi.",
       "unsavedTitle": "Thay đổi chưa lưu"
@@ -1657,7 +1658,7 @@
       "dollar_other": "đô la",
       "costSpoken": "chi phí {{cost}}",
       "costSpokenWithTime": "chi phí {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "và"
     },
     "githubInstall": {
@@ -2456,7 +2457,9 @@
     "permissionDescription": "Bạn không có quyền xem nội dung này.",
     "notFoundDescription": "Mục này có thể đã bị xóa hoặc không còn truy cập được.",
     "serverTitle": "Không thể tải dữ liệu.",
-    "serverDescription": "Hệ thống của chúng tôi gặp lỗi. Vui lòng thử lại."
+    "serverDescription": "Hệ thống của chúng tôi gặp lỗi. Vui lòng thử lại.",
+    "timeoutTitle": "Máy chủ phản hồi quá chậm",
+    "timeoutDescription": "Yêu cầu đã quá thời gian chờ. Vui lòng thử lại."
   },
   "screenHeader": {
     "openMenu": "Mở trình đơn",
@@ -2914,6 +2917,11 @@
     },
     "inbox": {
       "couldNotLoad": "Không thể tải hộp thư đến.",
+      "accessLostTitle": "Bạn không còn quyền truy cập vào tổ chức này",
+      "accessLostDescription": "Bạn không còn là thành viên của tổ chức này nên không thể tải các yêu cầu đánh giá. Hãy tiếp tục với tài khoản cá nhân để đánh giá tiếp.",
+      "organizationUnavailableTitle": "Tổ chức này không còn tồn tại",
+      "organizationUnavailableDescription": "Tổ chức này đã bị xóa nên không thể tải các yêu cầu đánh giá. Hãy tiếp tục với tài khoản cá nhân để đánh giá tiếp.",
+      "continueInPersonal": "Tiếp tục với tài khoản cá nhân",
       "loading": "Đang tải hộp thư đến",
       "noReviewRequests": "Chưa có yêu cầu đánh giá",
       "noReviewRequestsDescription": "Các PR đang chờ bạn đánh giá sẽ xuất hiện ở đây. Bạn vẫn có thể dán liên kết của bất kỳ PR nào ở trên.",
@@ -3047,7 +3055,7 @@
       "editA11y": "Chỉnh sửa bình luận chờ gửi tại {{location}}",
       "editOutdatedA11y": "Chỉnh sửa bình luận chờ gửi không còn cập nhật tại {{location}}",
       "noCommentsQueued": "Không có bình luận nào chờ gửi. Bản đánh giá sẽ được gửi theo hình thức đã chọn ở trên mà không kèm bình luận.",
-      "staleHint": "pR đã thay đổi kể từ khi bạn viết bình luận này.",
+      "staleHint": "PR đã thay đổi kể từ khi bạn viết bình luận này.",
       "staleQueueHint": "Các bình luận gắn với bản ghi cũ hơn sẽ không được gửi. Chúng vẫn nằm trong danh sách chờ gửi để bạn chỉnh sửa hoặc xóa.",
       "summaryA11y": "Tóm tắt đánh giá",
       "summaryPlaceholder": "Tóm tắt đánh giá (không bắt buộc)"

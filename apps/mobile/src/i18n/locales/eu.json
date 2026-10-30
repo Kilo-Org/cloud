@@ -645,7 +645,12 @@
       "loading": "Sarrera-ontzia kargatzen",
       "noReviewRequests": "Ez dago berrikuspen-eskaerarik",
       "noReviewRequestsDescription": "Zure berrikuspenaren zain dauden bateratze-eskaerak hemen agertzen dira. Nahi duzun PR esteka ere itsats dezakezu goian.",
-      "couldNotLoad": "Ezin izan da sarrera-ontzia kargatu."
+      "couldNotLoad": "Ezin izan da sarrera-ontzia kargatu.",
+      "accessLostTitle": "Ez duzu jada erakunde honetarako sarbiderik",
+      "accessLostDescription": "Jada ez zara erakunde honetako kidea, beraz haren berrikuspen-eskaerak ezin dira kargatu. Jarraitu zure kontu pertsonalean berrikusten jarraitzeko.",
+      "organizationUnavailableTitle": "Erakunde hau jada ez da existitzen",
+      "organizationUnavailableDescription": "Erakunde hau ezabatu egin da, beraz haren berrikuspen-eskaerak ezin dira kargatu. Jarraitu zure kontu pertsonalean berrikusten jarraitzeko.",
+      "continueInPersonal": "Jarraitu kontu pertsonalean"
     },
     "composer": {
       "commentBodyPlaceholder": "Zure iruzkina",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Gorde aldaketak",
+      "saved": "Ezarpenak gorde dira",
       "unsavedTitle": "Gorde gabeko aldaketak",
       "unsavedMessage": "Aldaketak gorde nahi dituzu pantaila honetatik irten aurretik?",
       "unsavedInvalidMessage": "Aldaketa hauek ezin dira oraindik gorde. Zuzendu itzazu gordetzeko, edo baztertu irteteko."
@@ -2980,7 +2986,9 @@
     "permissionDescription": "Ez duzu baimenik hau ikusteko.",
     "notFoundDescription": "Baliteke elementu hau kendu izana edo jada eskuragarri ez egotea.",
     "serverTitle": "Ezin izan da kargatu.",
-    "serverDescription": "Errore bat gertatu da gure sisteman. Saiatu berriro."
+    "serverDescription": "Errore bat gertatu da gure sisteman. Saiatu berriro.",
+    "timeoutTitle": "Zerbitzariak denbora gehiegi behar du",
+    "timeoutDescription": "Eskaera amaitu aurretik iraungi da. Saiatu berriro."
   },
   "screenHeader": {
     "openMenu": "Ireki menua",

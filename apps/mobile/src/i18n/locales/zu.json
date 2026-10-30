@@ -645,7 +645,12 @@
       "loading": "Kulayishwa ibhokisi lokungenayo",
       "noReviewRequests": "Azikho izicelo zokubuyekeza",
       "noReviewRequestsDescription": "Izicelo zokuhlanganisa ezilinde ukubuyekezwa nguwe zivela lapha. Usengakwazi ukunamathisela noma yisiphi isixhumanisi se-PR ngenhla.",
-      "couldNotLoad": "Asikwazanga ukulayisha ibhokisi lokungenayo."
+      "couldNotLoad": "Asikwazanga ukulayisha ibhokisi lokungenayo.",
+      "accessLostTitle": "Awunakho ukufinyelela kule nhlangano",
+      "accessLostDescription": "Awusaseyilungu le nhlangano, ngakho-ke izicelo zokubuyekeza zayo azikwazi ukulayisha. Qhubeka ku-akhawunti yakho oyisisebenzisi siqu ukuze uqhubeke nokubuyekeza.",
+      "organizationUnavailableTitle": "Le nhlangano ayisasikhona",
+      "organizationUnavailableDescription": "Le nhlangano isuswe, ngakho-ke izicelo zokubuyekeza zayo azikwazi ukulayisha. Qhubeka ku-akhawunti yakho oyisisebenzisi siqu ukuze uqhubeke nokubuyekeza.",
+      "continueInPersonal": "Qhubeka ku-akhawunti oyisisebenzisi siqu"
     },
     "composer": {
       "commentBodyPlaceholder": "Amazwana akho",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Londoloza izinguquko",
+      "saved": "Izilungiselelo zilondoloziwe",
       "unsavedTitle": "Izinguquko ezingalondoloziwe",
       "unsavedMessage": "Ulondoloze izinguquko zakho ngaphambi kokuphuma kulesi sikrini?",
       "unsavedInvalidMessage": "Lezi zinguquko azikakwazi ukulondolozwa. Zilungise ukuze zilondolozwe, noma uzilahe ukuze uphume."
@@ -2980,7 +2986,9 @@
     "permissionDescription": "Awunayo imvume yokubuka lokhu.",
     "notFoundDescription": "Le nto kungenzeka isusiwe noma ayisatholakali.",
     "serverTitle": "Asikwazanga ukulayisha.",
-    "serverDescription": "Kukhona okungahambanga kahle kithi. Sicela uzame futhi."
+    "serverDescription": "Kukhona okungahambanga kahle kithi. Sicela uzame futhi.",
+    "timeoutTitle": "Isiphakeli sithatha isikhathi eside",
+    "timeoutDescription": "Isicelo siphelelwe yisikhathi ngaphambi kokuqedwa. Sicela uzame futhi."
   },
   "screenHeader": {
     "openMenu": "Vula imenyu",

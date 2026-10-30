@@ -42,7 +42,7 @@
     "mergeRequest": "בקשת מיזוג",
     "notConnected": "לא מחובר",
     "notifications": "התראות",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "מאגרים",
     "securityAgent": "סוכן אבטחה",
     "unknown": "לא ידוע",
@@ -1479,6 +1479,7 @@
     },
     "settingsSave": {
       "saveChanges": "שמירת שינויים",
+      "saved": "ההגדרות נשמרו",
       "unsavedMessage": "לשמור את השינויים לפני היציאה מהמסך?",
       "unsavedInvalidMessage": "לא ניתן עדיין לשמור את השינויים האלה. תקן אותם כדי לשמור, או ויתר עליהם כדי לצאת.",
       "unsavedTitle": "שינויים שלא נשמרו"
@@ -2368,7 +2369,7 @@
       "unavailable": "הפעלה זו אינה יכולה לקבל בקשות הרשאה."
     },
     "prBadge": {
-      "open": "pR פתוח",
+      "open": "PR פתוח",
       "closed": "בקשת משיכה שנסגרה",
       "merged": "בקשת משיכה שמוזגה",
       "draft": "טיוטת PR",
@@ -2479,7 +2480,9 @@
     "permissionDescription": "אין לך הרשאה לצפות בזה.",
     "notFoundDescription": "ייתכן שהפריט הזה הוסר או שאינו זמין עוד.",
     "serverTitle": "לא ניתן לטעון את הנתונים.",
-    "serverDescription": "משהו השתבש אצלנו. נסה שוב."
+    "serverDescription": "משהו השתבש אצלנו. נסה שוב.",
+    "timeoutTitle": "השרת לוקח זמן רב מדי",
+    "timeoutDescription": "הבקשה לא הספיקה להסתיים בזמן. נסה שוב."
   },
   "screenHeader": {
     "openMenu": "פתיחת התפריט",
@@ -2952,6 +2955,11 @@
     },
     "inbox": {
       "couldNotLoad": "לא ניתן היה לטעון את הבקשות הנכנסות.",
+      "accessLostTitle": "אין גישה לארגון זה",
+      "accessLostDescription": "אתה כבר לא חבר בארגון הזה, ולכן לא ניתן לטעון את בקשות הסקירה שלו. אפשר להמשיך בחשבון האישי כדי להמשיך ולסקור.",
+      "organizationUnavailableTitle": "הארגון הזה כבר לא קיים",
+      "organizationUnavailableDescription": "הארגון הזה נמחק, ולכן לא ניתן לטעון את בקשות הסקירה שלו. אפשר להמשיך בחשבון האישי כדי להמשיך ולסקור.",
+      "continueInPersonal": "המשך בחשבון האישי",
       "loading": "הבקשות הנכנסות נטענות",
       "noReviewRequests": "אין בקשות לסקירה",
       "noReviewRequestsDescription": "כאן יופיעו בקשות משיכה שממתינות לסקירה שלך. אפשר גם להדביק למעלה קישור לכל PR.",

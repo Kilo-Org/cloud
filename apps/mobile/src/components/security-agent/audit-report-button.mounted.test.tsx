@@ -1,7 +1,7 @@
 // A fast double tap on the audit-report header action used to push the report
 // twice, so one Back press returned to an identical report. The action now
-// claims one push per press burst, which these cases pin: the burst pushes
-// once, and a press on a different destination in the same burst still opens.
+// claims one push per press burst, and the guard clears when the screen regains
+// focus so the press after a return still navigates.
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -10,11 +10,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuditReportButton } from './audit-report-button';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
-const mocks = vi.hoisted(() => ({ push: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  push: vi.fn(),
+  focusEffect: { current: undefined as (() => void) | undefined },
+}));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: mocks.push }),
-  useFocusEffect: () => undefined,
+  // The screen is always mounted here, so the focus event is simulated by
+  // running the callback the hook registered with `useFocusEffect`.
+  useFocusEffect: (effect: () => void) => {
+    mocks.focusEffect.current = effect;
+  },
 }));
 vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
 vi.mock('@/components/ui/icons', () => ({ MoreHorizontal: 'MoreHorizontal' }));
@@ -55,15 +62,7 @@ function pressTwiceInOneBurst(tree: R): void {
 describe('AuditReportButton navigation', () => {
   beforeEach(() => {
     mocks.push.mockClear();
-  });
-
-  it('opens the audit report once on a fast double tap', () => {
-    const tree = renderButton('personal');
-
-    pressTwiceInOneBurst(tree);
-
-    expect(mocks.push).toHaveBeenCalledTimes(1);
-    expect(mocks.push).toHaveBeenCalledWith(getSecurityAgentPath('personal', 'audit-report'));
+    mocks.focusEffect.current = undefined;
   });
 
   it('opens the audit report on a single tap', () => {
@@ -75,11 +74,26 @@ describe('AuditReportButton navigation', () => {
     expect(mocks.push).toHaveBeenCalledWith(getSecurityAgentPath('org_123', 'audit-report'));
   });
 
-  it('still navigates when the mount is new after a return', () => {
-    press(renderButton('personal'));
-    // A return unmounts the report and remounts the scope entry, so the guard
-    // state is new: the next press must navigate again.
-    press(renderButton('personal'));
+  it('opens the audit report once on a fast double tap', () => {
+    const tree = renderButton('personal');
+
+    pressTwiceInOneBurst(tree);
+
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+    expect(mocks.push).toHaveBeenCalledWith(getSecurityAgentPath('personal', 'audit-report'));
+  });
+
+  it('opens the report again after the screen regains focus', () => {
+    const tree = renderButton('personal');
+
+    press(tree);
+    press(tree);
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      mocks.focusEffect.current?.();
+    });
+    press(tree);
 
     expect(mocks.push).toHaveBeenCalledTimes(2);
   });

@@ -51,6 +51,9 @@ vi.mock('react', async () => {
     useEffect: vi.fn((fn: React.EffectCallback) => {
       fn();
     }),
+    // Without a renderer a previous value cannot be cached, so every call
+    // recomputes — the same result, just uncached.
+    useMemo: vi.fn(<T>(factory: () => T) => factory()),
     useRef: vi.fn(<T>(initial: T) => {
       const ref: React.RefObject<T> = { current: initial };
       return ref;

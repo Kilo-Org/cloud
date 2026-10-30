@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- cohesive mounted suite: chip a11y contract and tappable-open paths share one strip harness */
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -156,27 +156,28 @@ function makeAttachment(overrides: Partial<AgentAttachment>): AgentAttachment {
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
-async function mount(
-  attachments: AgentAttachment[],
-  handlers: {
-    onRemove?: () => void;
-    onRetry?: () => void;
-    onMove?: (id: string, direction: 'left' | 'right') => void;
-    onReorder?: (fromIndex: number, toIndex: number) => void;
-  } = {}
-): Promise<Renderer> {
+type Handlers = {
+  onRemove?: () => void;
+  onRetry?: () => void;
+  onMove?: (id: string, direction: 'left' | 'right') => void;
+  onReorder?: (fromIndex: number, toIndex: number) => void;
+};
+
+function stripElement(attachments: AgentAttachment[], handlers: Handlers = {}): ReactElement {
+  return createElement(AttachmentPreviewStrip, {
+    attachments,
+    onRemove: handlers.onRemove ?? (() => undefined),
+    onRetry: handlers.onRetry ?? (() => undefined),
+    onMove: handlers.onMove ?? (() => undefined),
+    onReorder: handlers.onReorder ?? (() => undefined),
+  });
+}
+
+async function mount(attachments: AgentAttachment[], handlers: Handlers = {}): Promise<Renderer> {
   const ref: { current: Renderer | undefined } = { current: undefined };
   await act(async () => {
     await Promise.resolve();
-    ref.current = TestRenderer.create(
-      createElement(AttachmentPreviewStrip, {
-        attachments,
-        onRemove: handlers.onRemove ?? (() => undefined),
-        onRetry: handlers.onRetry ?? (() => undefined),
-        onMove: handlers.onMove ?? (() => undefined),
-        onReorder: handlers.onReorder ?? (() => undefined),
-      })
-    );
+    ref.current = TestRenderer.create(stripElement(attachments, handlers));
   });
   const renderer = ref.current;
   if (!renderer) {
@@ -1143,6 +1144,82 @@ describe('AttachmentPreviewStrip — control hit targets', () => {
     const hitSlop = removeHitSlop(renderer.root);
     expect(28 + hitSlop.top + hitSlop.bottom).toBeGreaterThanOrEqual(48);
     expect(28 + hitSlop.left + hitSlop.right).toBeGreaterThanOrEqual(48);
+
+    renderer.unmount();
+  });
+});
+
+describe('AttachmentPreviewStrip — chip render stability', () => {
+  it("keeps an unchanged chip's pan gesture across another chip's upload tick", async () => {
+    const first = makeAttachment({ id: 'a1', filename: 'a.pdf' });
+    // The strip re-renders for this chip's upload progress; the upload hook
+    // replaces only the changed chip's object, so the other two keep identity.
+    const uploading = makeAttachment({
+      id: 'a2',
+      filename: 'b.pdf',
+      status: 'uploading',
+      progress: 0.3,
+    });
+    const third = makeAttachment({ id: 'a3', filename: 'c.pdf' });
+    const renderer = await mount([first, uploading, third]);
+    // The gesture mock records one entry per `Gesture.Pan()` call, i.e. one per
+    // gesture build.
+    expect(gestureHandlerMock.gestures).toHaveLength(3);
+    const mounted = [...gestureHandlerMock.gestures];
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(stripElement([first, { ...uploading, progress: 0.6 }, third]));
+    });
+
+    // No chip rebuilds its gesture for a progress tick: before the memoized
+    // chip and gesture, one tick rebuilt all three.
+    expect(gestureHandlerMock.gestures).toHaveLength(3);
+    // Every chip keeps the gesture object it mounted with, so no gesture
+    // detector was handed a new prop either.
+    expect(gestureHandlerMock.gestures).toEqual(mounted);
+    // The tick still reached its own chip: its progress is the new value.
+    const uploadingChip = chipBodies(renderer.root)[1];
+    if (!uploadingChip) {
+      throw new Error('the uploading chip was not rendered');
+    }
+    expect(uploadingChip.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 60 });
+
+    renderer.unmount();
+  });
+
+  it('dispatches a chip control to the render-current handler', async () => {
+    const first = vi.fn<() => void>();
+    const second = vi.fn<() => void>();
+    const renderer = await mount(
+      [makeAttachment({ status: 'error', terminal: false, progress: null })],
+      {
+        onRetry: first,
+      }
+    );
+
+    // The hook rebuilds its controls on every attachment change; a memoized chip
+    // must not keep calling the handler it mounted with.
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(
+        stripElement([makeAttachment({ status: 'error', terminal: false, progress: null })], {
+          onRetry: second,
+        })
+      );
+    });
+
+    const retry = pressableByLabel(renderer.root, 'Retry uploading doc.pdf');
+    if (!retry) {
+      throw new Error('Retry button missing');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (retry.props.onPress as () => void)();
+    });
+
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(first).not.toHaveBeenCalled();
 
     renderer.unmount();
   });

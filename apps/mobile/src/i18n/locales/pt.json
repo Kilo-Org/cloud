@@ -1462,6 +1462,7 @@
       "retryMessage": "A revisão de código será executada novamente.",
       "retryReview": "Repetir revisão",
       "retryNeedsSettings": "O Revisor de código está desativado ou as respetivas definições precisam de atenção. Corrija as definições e, em seguida, repita esta revisão.",
+      "retryNotStarted": "Não foi possível iniciar a repetição. A revisão mantém-se inalterada.",
       "fixSettings": "Corrigir definições",
       "couldNotLoad": "Não foi possível carregar a revisão.",
       "couldNotGetLatest": "Não foi possível obter os dados mais recentes.",

@@ -981,6 +981,7 @@
       "retryMessage": "Thao tác này sẽ chạy lại lượt rà soát mã.",
       "retryReview": "Rà soát lại",
       "retryNeedsSettings": "Trợ lý rà soát mã đang tắt hoặc cài đặt của trợ lý cần được xử lý. Hãy sửa cài đặt, sau đó rà soát lại.",
+      "retryNotStarted": "Không thể bắt đầu rà soát lại. Kết quả rà soát không thay đổi.",
       "fixSettings": "Sửa cài đặt",
       "retryTitle": "Rà soát lại?",
       "showMore": "Xem thêm",

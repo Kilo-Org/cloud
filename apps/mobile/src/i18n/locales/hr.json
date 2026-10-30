@@ -1462,6 +1462,7 @@
       "retryMessage": "To će ponovno pokrenuti pregled koda.",
       "retryReview": "Ponovi pregled",
       "retryNeedsSettings": "Agent za pregled koda je isključen ili njegove postavke zahtijevaju pažnju. Popravite postavke, a zatim ponovite ovaj pregled.",
+      "retryNotStarted": "Ponovni pokušaj nije započeo. Pregled je ostao nepromijenjen.",
       "fixSettings": "Popravi postavke",
       "couldNotLoad": "Nije moguće učitati pregled.",
       "couldNotGetLatest": "Nije moguće dohvatiti najnovije podatke.",

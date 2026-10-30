@@ -1440,6 +1440,7 @@
       "retryMessage": "Lokhu kuzophinda kuqalise ukuhlolwa kwekhodi.",
       "retryReview": "Phinda uzame ukuhlola",
       "retryNeedsSettings": "Umhloli wekhodi uvaliwe noma izilungiselelo zakhe zidinga ukunakwa. Lungisa izilungiselelo, bese uphinda uzame lokhu kuhlola.",
+      "retryNotStarted": "Ukuzama kwakhona akuzange kuqale. Ukuhlola akukashintshi.",
       "fixSettings": "Lungisa izilungiselelo",
       "couldNotLoad": "Asikwazanga ukulayisha ukuhlolwa.",
       "couldNotGetLatest": "Asikwazanga ukuthola imininingwane yakamuva.",

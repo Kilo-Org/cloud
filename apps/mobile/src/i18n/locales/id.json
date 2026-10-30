@@ -981,6 +981,7 @@
       "retryMessage": "Ini akan menjalankan ulang tinjauan kode.",
       "retryReview": "Coba tinjauan lagi",
       "retryNeedsSettings": "Peninjau kode nonaktif atau pengaturannya perlu diperhatikan. Perbaiki pengaturan, lalu coba tinjauan ini lagi.",
+      "retryNotStarted": "Percobaan ulang tidak dimulai. Tinjauan tidak berubah.",
       "fixSettings": "Perbaiki pengaturan",
       "retryTitle": "Coba tinjauan lagi?",
       "showMore": "Tampilkan lebih banyak",

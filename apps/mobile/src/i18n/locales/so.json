@@ -1440,6 +1440,7 @@
       "retryMessage": "Tani waxay mar kale socodsiin doontaa dib-u-eegista koodhka.",
       "retryReview": "Mar kale isku day dib-u-eegista",
       "retryNeedsSettings": "Dib-u-eegaha koodhka waa dansan yahay ama dejintiisu waxay u baahan tahay fiiro. Hagaaji dejinta, kadibna mar kale isku day dib-u-eegistan.",
+      "retryNotStarted": "Isku dayga dib-u-eegista lama bilaabin. Dib-u-eegistu isma beddelin.",
       "fixSettings": "Hagaaji dejinta",
       "couldNotLoad": "Dib-u-eegista lama soo dejin karin.",
       "couldNotGetLatest": "Xogta ugu dambaysa lama heli karin.",

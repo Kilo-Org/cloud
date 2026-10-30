@@ -1440,6 +1440,7 @@
       "retryMessage": "Èyí yóò tún ṣe àtúnyẹ̀wò kóòdù.",
       "retryReview": "Tún gbìyànjú àtúnyẹ̀wò",
       "retryNeedsSettings": "Olùṣàyẹ̀wò kóòdù ti wà ní pípa tàbí àwọn ètò rẹ̀ nílò àfiyèsí. Ṣàtúnṣe àwọn ètò náà, lẹ́yìn náà tún gbìyànjú àtúnyẹ̀wò yìí.",
+      "retryNotStarted": "Àtún gbìyànjú náà kò bẹ̀rẹ̀. Àtúnyẹ̀wò náà kò yí padà.",
       "fixSettings": "Ṣàtúnṣe àwọn ètò",
       "couldNotLoad": "A kò lè gbé àtúnyẹ̀wò wọlé.",
       "couldNotGetLatest": "A kò lè gba dátà tuntun.",

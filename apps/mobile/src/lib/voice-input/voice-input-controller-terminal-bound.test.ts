@@ -139,6 +139,45 @@ describe('createVoiceInputController - bounded terminal wait', () => {
     }
   });
 
+  it('gives a long, silent session a full window when the user stops it', async () => {
+    vi.useFakeTimers();
+    try {
+      const { harness, controller } = build();
+      const { feedback, onFeedback } = recordFeedback();
+      const drafts: string[] = [];
+      await controller.start(
+        makeStartOptions({
+          owner: 'A',
+          onDraftChange: draft => {
+            drafts.push(draft);
+          },
+          onFeedback,
+        })
+      );
+      harness.emit('start', null);
+
+      // A minute and a half of listening with only an interim transcript: the
+      // session's last advance is older than the bound, but the stop just
+      // arrived, so it must still get a full silence window rather than being
+      // abandoned on its first tick.
+      await vi.advanceTimersByTimeAsync(90_000);
+      harness.emitResult('interim words', false);
+
+      const stopped = controller.stop('A');
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(harness.mocks.abort).not.toHaveBeenCalled();
+
+      harness.emitResult('final words', true);
+      harness.emit('end', null);
+      await expect(stopped).resolves.toBe(true);
+      expect(harness.mocks.abort).not.toHaveBeenCalled();
+      expect(feedback).toEqual([]);
+      expect(drafts.at(-1)).toBe('final words');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('settles the bound after the last progress, not from the stop', async () => {
     vi.useFakeTimers();
     try {

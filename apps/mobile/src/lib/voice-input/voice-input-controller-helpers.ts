@@ -83,6 +83,12 @@ type TerminalWaitTarget = { progressAt: number; terminalPromise: Promise<boolean
  * segment moves `progressAt` forward and pushes the deadline out. Only a
  * binding that answers nothing for `timeoutMs` expires the wait, and a timeout
  * tells the caller to abandon the session itself.
+ *
+ * The measurement starts now, not at the session's last advance. A session can
+ * legitimately be silent for longer than the bound before anyone waits on it —
+ * a long unbroken dictation that produced no final transcript, or a slow
+ * `start` — and the caller that just asked for the session to stop still
+ * deserves a full window before its work is abandoned.
  */
 export function waitForTerminalOutcome(
   current: TerminalWaitTarget,
@@ -97,28 +103,41 @@ export function waitForTerminalOutcome(
       return { kind: 'settled' as const, ok: false };
     }
   })();
-  return waitForSilence(terminal, current, timeoutMs);
+  return waitForSilence({
+    terminal,
+    target: current,
+    // The later of the session's last advance and the moment waiting began, so
+    // the first window is never empty.
+    baseline: Math.max(current.progressAt, Date.now()),
+    timeoutMs,
+  });
 }
 
+/** One bounded wait: the session, when its window starts, and how long it lasts. */
+type SilenceWait = {
+  terminal: Promise<TerminalOutcome>;
+  target: TerminalWaitTarget;
+  baseline: number;
+  timeoutMs: number;
+};
+
 /** Wait out successive silence windows until the session settles or one expires. */
-async function waitForSilence(
-  terminal: Promise<TerminalOutcome>,
-  current: TerminalWaitTarget,
-  timeoutMs: number
-): Promise<TerminalOutcome> {
-  const outcome = await waitOneSilenceWindow(terminal, current, timeoutMs);
-  if (outcome.kind === 'settled' || Date.now() - current.progressAt >= timeoutMs) {
+async function waitForSilence(wait: SilenceWait): Promise<TerminalOutcome> {
+  const lastAdvance = Math.max(wait.target.progressAt, wait.baseline);
+  const outcome = await waitOneSilenceWindow(wait.terminal, lastAdvance, wait.timeoutMs);
+  const silentFor = Date.now() - Math.max(wait.target.progressAt, wait.baseline);
+  if (outcome.kind === 'settled' || silentFor >= wait.timeoutMs) {
     return outcome;
   }
   // The session advanced while the timer was pending: wait out the new
   // silence window instead of abandoning work that is still progressing.
-  return waitForSilence(terminal, current, timeoutMs);
+  return waitForSilence(wait);
 }
 
-/** Race one silence window against the session's terminal outcome. */
+/** Race one silence window, measured from `lastAdvance`, against the terminal outcome. */
 async function waitOneSilenceWindow(
   terminal: Promise<TerminalOutcome>,
-  current: TerminalWaitTarget,
+  lastAdvance: number,
   timeoutMs: number
 ): Promise<TerminalOutcome> {
   const expired = Promise.withResolvers<TerminalOutcome>();
@@ -126,7 +145,7 @@ async function waitOneSilenceWindow(
     () => {
       expired.resolve({ kind: 'timeout' });
     },
-    Math.max(0, current.progressAt + timeoutMs - Date.now())
+    Math.max(0, lastAdvance + timeoutMs - Date.now())
   );
   try {
     return await Promise.race([terminal, expired.promise]);

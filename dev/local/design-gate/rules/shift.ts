@@ -25,41 +25,15 @@ type Shift = {
   animated: boolean;
 };
 
-// A transition moves a whole subtree by one vector, so the element has not moved within its parent.
-function movedWithAncestor(
-  to: LayoutNode,
-  dx: number,
-  dy: number,
-  geometry: readonly ReadonlyMap<string, Rect>[],
-  from: number,
-  sample: number
-): boolean {
-  const previous = geometry[from];
-  const current = geometry[sample];
-  if (previous === undefined || current === undefined) return false;
-  for (let parent = to.parent; parent !== undefined; parent = parent.parent) {
-    const before = previous.get(parent.structuralPath);
-    const after = current.get(parent.structuralPath);
-    if (before === undefined || after === undefined) continue;
-    const shared =
-      Math.abs(after[0] - before[0] - dx) <= TOLERANCE_DP &&
-      Math.abs(after[1] - before[1] - dy) <= TOLERANCE_DP;
-    if (!shared) continue;
-    // A rigid translation leaves every box the same size; content that appears or leaves resizes one.
-    const resized =
-      Math.abs(after[2] - before[2]) > TOLERANCE_DP ||
-      Math.abs(after[3] - before[3]) > TOLERANCE_DP;
-    return !resized;
-  }
-  return false;
+function layoutRect(node: LayoutNode): Rect {
+  return node.probe.layoutRect ?? node.rect;
 }
 
 function largestShift(
   byKey: readonly ReadonlyMap<string, LayoutNode>[],
   routes: readonly string[],
   key: string,
-  intervalMs: number,
-  geometry: readonly ReadonlyMap<string, Rect>[]
+  intervalMs: number
 ) {
   let rest: { node: LayoutNode; sample: number; end: number } | undefined;
   let run = 0;
@@ -73,20 +47,19 @@ function largestShift(
       run = 0;
     }
     if (!node) continue;
-    run = previous && same(previous.rect, node.rect) ? run + 1 : 1;
+    run = previous && same(layoutRect(previous), layoutRect(node)) ? run + 1 : 1;
     previous = node;
-    if (rest && same(node.rect, rest.node.rect) && rest.end === sample - 1) rest.end = sample;
+    if (rest && same(layoutRect(node), layoutRect(rest.node)) && rest.end === sample - 1)
+      rest.end = sample;
     if (run !== REST_SAMPLES) continue;
     if (rest) {
-      const [x0, y0, w0, h0] = rest.node.rect;
-      const [x1, y1, w1, h1] = node.rect;
+      const [x0, y0, w0, h0] = layoutRect(rest.node);
+      const [x1, y1, w1, h1] = layoutRect(node);
       const dx = x1 - x0;
       const dy = y1 - y0;
       const delta = Math.max(Math.abs(dx), Math.abs(dy));
       const resized = Math.abs(w1 - w0) > TOLERANCE_DP || Math.abs(h1 - h0) > TOLERANCE_DP;
-      // An out-of-flow overlay moves on purpose, and motion shared with an ancestor is a transition.
-      const ignored = node.absolute || movedWithAncestor(node, dx, dy, geometry, rest.end, sample);
-      if (!ignored && !resized && delta > TOLERANCE_DP && (!worst || delta > worst.delta)) {
+      if (!resized && delta > TOLERANCE_DP && (!worst || delta > worst.delta)) {
         const arrival = sample - 1;
         const transitionMs = (arrival - (rest.end + 1)) * intervalMs;
         worst = {
@@ -129,30 +102,12 @@ export function checkShift(timeline: readonly LayoutTree[], intervalMs: number):
     });
     return new Map(unique);
   });
-  // Only ancestors of tracked elements are compared, so the per-sample map stays small.
-  const ancestorPaths = new Set<string>();
-  for (const nodes of byKey) {
-    for (const node of nodes.values()) {
-      const segments = node.structuralPath.split('/');
-      for (let end = 1; end < segments.length; end += 1) {
-        ancestorPaths.add(segments.slice(0, end).join('/'));
-      }
-    }
-  }
-  const geometry = timeline.map(tree => {
-    const rects = new Map<string, Rect>();
-    for (const node of tree.nodes) {
-      if (ancestorPaths.has(node.structuralPath)) rects.set(node.structuralPath, node.rect);
-    }
-    return rects;
-  });
   const shifts = [...new Set(byKey.flatMap(nodes => [...nodes.keys()]))].flatMap(key => {
     const shift = largestShift(
       byKey,
       timeline.map(tree => tree.env.route),
       key,
-      intervalMs,
-      geometry
+      intervalMs
     );
     return shift ? [shift] : [];
   });

@@ -7,7 +7,7 @@
 
 type Layout = Readonly<{
   env: Readonly<{ route: string }>;
-  nodes: readonly Readonly<{ rect: readonly number[] }>[];
+  nodes: readonly Readonly<{ rect: readonly number[]; layoutRect?: readonly number[] }>[];
 }>;
 
 export type Sample<T> = Readonly<{ t: number; repeat: number; dump: T }>;
@@ -33,7 +33,7 @@ export function createSampler<T extends Layout>(snapshot: () => T) {
     let last = '';
     const tick = () => {
       const dump = snapshot();
-      const key = `${dump.env.route}|${dump.nodes.map(node => node.rect.join(',')).join(';')}`;
+      const key = `${dump.env.route}|${dump.nodes.map(node => `${node.rect.join(',')}/${node.layoutRect?.join(',') ?? ''}`).join(';')}`;
       const previous = samples.at(-1);
       if (previous !== undefined && key === last) {
         samples[samples.length - 1] = { ...previous, repeat: previous.repeat + 1 };

@@ -127,76 +127,42 @@ test('layout-shift: text-only identities repeated within a sample are not tracke
   );
 });
 
-test('layout-shift: an overlay or motion shared with an ancestor is not a layout shift', () => {
-  // A push transition moves the container and its child by the same vector.
-  const moving = (y: number) => [
-    { parent: 0, tag: 'View', rect: [0, y, 400, 200] as Rect },
-    {
-      parent: 1,
-      tag: 'Paragraph',
-      rect: [0, y + 10, 100, 20] as Rect,
-      text: 'Title',
-      testID: 'title',
-    },
-  ];
+test('layout-shift: transforms do not hide late content moving a fixed-size wrapper', () => {
+  const sample = (visualY: number, layoutY: number, absolute = false) =>
+    tree([
+      {
+        parent: 0,
+        tag: 'View',
+        rect: [0, visualY, 400, 200],
+        layoutRect: [0, layoutY, 400, 200],
+      },
+      {
+        parent: 1,
+        tag: 'Paragraph',
+        rect: [0, visualY + 10, 100, 20],
+        layoutRect: [0, layoutY + 10, 100, 20],
+        text: 'Title',
+        testID: 'title',
+        style: absolute ? { position: 'absolute' } : undefined,
+      },
+    ]);
   assert.deepEqual(
-    checkShift(
-      [moving(0), moving(0), moving(300), moving(300)].map(nodes => tree(nodes)),
-      120
-    ),
+    checkShift([sample(0, 0), sample(0, 0), sample(300, 0), sample(300, 0)], 120),
     []
   );
-  // The child moves inside a container that stays put, which is a real shift.
-  const inside = (y: number) => [
-    { parent: 0, tag: 'View', rect: [0, 0, 400, 200] as Rect },
-    { parent: 1, tag: 'Paragraph', rect: [0, y, 100, 20] as Rect, text: 'Title', testID: 'title' },
-  ];
-  assert.equal(
-    checkShift(
-      [inside(10), inside(10), inside(40), inside(40)].map(nodes => tree(nodes)),
+  for (const absolute of [false, true]) {
+    const findings = checkShift(
+      [
+        sample(0, 0, absolute),
+        sample(0, 0, absolute),
+        sample(300, 30, absolute),
+        sample(300, 30, absolute),
+      ],
       120
-    ).length,
-    1
-  );
-  // An out-of-flow overlay moves on purpose.
-  const overlay = (y: number) => [
-    {
-      parent: 0,
-      tag: 'View',
-      rect: [0, y, 300, 60] as Rect,
-      text: 'Footer',
-      testID: 'footer',
-      style: { position: 'absolute' },
-    },
-  ];
-  assert.deepEqual(
-    checkShift(
-      [overlay(10), overlay(10), overlay(200), overlay(200)].map(nodes => tree(nodes)),
-      120
-    ),
-    []
-  );
-  // An ancestor that also changes size means content arrived, so the child still reports.
-  const growing = (y: number, height: number) => [
-    { parent: 0, tag: 'View', rect: [0, y, 400, height] as Rect },
-    {
-      parent: 1,
-      tag: 'Paragraph',
-      rect: [0, y + 10, 100, 20] as Rect,
-      text: 'Title',
-      testID: 'title',
-    },
-  ];
-  const series = (height: number) =>
-    [growing(0, 200), growing(0, 200), growing(30, height), growing(30, height)].map(nodes =>
-      tree(nodes)
     );
-  // Same motion, ancestor keeps its size: suppressed as a transition.
-  assert.deepEqual(checkShift(series(200), 120), []);
-  // Same motion, ancestor grew: reported.
-  const reported = checkShift(series(260), 120);
-  assert.equal(reported.length, 1);
-  assert.equal(reported[0]?.measured, 30);
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].measured, 30);
+  }
 });
 
 test('layout-shift: a route change starts a new rest', () => {

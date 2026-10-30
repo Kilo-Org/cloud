@@ -20,6 +20,17 @@ vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/lib/utils', () => ({
   cn: (...classes: (string | undefined)[]) => classes.filter(Boolean).join(' '),
 }));
+// The switch's colors come from the theme tokens; the row reads them through
+// the hook, so the test pins the two ends of the ladder the control uses.
+const theme = vi.hoisted(() => ({
+  colors: {
+    mutedForeground: '#6F6A61',
+    background: '#FBFAF5',
+    primary: '#4F5A10',
+    primaryForeground: '#FFFFFF',
+  },
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => theme.colors }));
 
 type RowProps = Parameters<typeof ToggleRow>[0];
 
@@ -120,6 +131,21 @@ describe('<ToggleRow>', () => {
     // name carries the title and the hint carries the subtitle.
     expect(props.accessibilityLabel).toBe('Enable auto-analysis');
     expect(props.accessibilityHint).toBe('Analyze findings as they are synced.');
+  });
+
+  it('paints both switch states from theme tokens so the control stays visible', () => {
+    const off = switchProps(renderRow({ value: false, disabled: false }));
+    const on = switchProps(renderRow({ value: true, disabled: false }));
+
+    // The platform's own off state is pale grey on the card surface; the off
+    // track is the muted foreground so the control can be seen at all.
+    expect(off.trackColor).toEqual({
+      false: theme.colors.mutedForeground,
+      true: theme.colors.primary,
+    });
+    expect(off.ios_backgroundColor).toBe(theme.colors.mutedForeground);
+    expect(off.thumbColor).toBe(theme.colors.background);
+    expect(on.thumbColor).toBe(theme.colors.primaryForeground);
   });
 
   it('leaves the visual switch inert and out of the accessibility tree', () => {

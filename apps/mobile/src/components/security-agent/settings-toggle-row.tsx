@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 /**
@@ -38,6 +39,7 @@ export function ToggleRow({
   disabled: boolean;
   onValueChange: (value: boolean) => void;
 }>) {
+  const colors = useThemeColors();
   const toggle = () => {
     if (disabled) {
       return;
@@ -76,7 +78,21 @@ export function ToggleRow({
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
-        <Switch accessible={false} value={value} disabled={disabled} />
+        {/* The platform's own off state is a pale grey track with a pale grey
+            thumb, which disappeared on the beige and near-black card surfaces
+            this row paints on. Both states come from theme tokens instead:
+            the off track is the muted foreground, and each thumb is the
+            opposite end of the surface ladder, so the control reads as a
+            control in either scheme. The thumb keeps the platform's elevation
+            shadow, which is what separates it from the track. */}
+        <Switch
+          accessible={false}
+          value={value}
+          disabled={disabled}
+          ios_backgroundColor={colors.mutedForeground}
+          trackColor={{ false: colors.mutedForeground, true: colors.primary }}
+          thumbColor={value ? colors.primaryForeground : colors.background}
+        />
       </View>
     </Pressable>
   );

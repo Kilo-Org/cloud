@@ -19,6 +19,7 @@ import { toast } from 'sonner-native';
 import { QueryError } from '@/components/query-error';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardSections } from '@/components/security-agent/dashboard-sections';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
@@ -29,7 +30,7 @@ import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber, formatPercent } from '@/lib/format';
 import {
   useRetrySecurityAgentSettings,
@@ -63,6 +64,10 @@ const METRIC_TONE_CLASS = {
   warning: 'text-warn',
   neutral: 'text-muted-foreground',
 } satisfies Record<DashboardMetricTone, string>;
+
+// A metric with no measured value: the app's dash placeholder, shared with the
+// session-context pill and the usage tiles.
+const NO_VALUE_DASH = '—';
 
 export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean) {
   const metrics = buildSecurityDashboardMetrics(data, slaEnabled);
@@ -118,10 +123,11 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
           : null;
         return Object.assign(metric, {
           label: i18n.t('securityAgent.dashboardMetrics.slaCompliance'),
-          value:
-            compliance === null
-              ? i18n.t('securityAgent.dashboard.notMeasured')
-              : formatPercent(compliance, i18n.language),
+          // The tile's value slot is the monospace figure style: a sentence
+          // there reads as code and outweighs the counts beside it. An
+          // unmeasured SLA shows the standard no-value dash, and the caption
+          // carries what the dash means.
+          value: compliance === null ? NO_VALUE_DASH : formatPercent(compliance, i18n.language),
           detail: measured
             ? i18n.t('securityAgent.dashboardMetrics.withinDeadlineDetail', {
                 within: number(data.sla.overall.withinSla),
@@ -221,6 +227,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const metrics = data ? buildLocalizedMetrics(data, slaEnabled) : [];
 
   const lastSyncTime = lastSync.data?.lastSyncTime;
+  // A read that succeeded and reports no sync time is the only proof that this
+  // scope has never synced: a failed read keeps its own retry surface, and a
+  // pending one still paints the skeleton.
+  const neverSynced = lastSync.data !== undefined && !lastSyncTime;
   const now = useRelativeTimeNow();
   let lastSyncLabel = t('securityAgent.dashboard.notYetSynced');
   if (lastSync.isError) {
@@ -477,81 +487,6 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           />
         ))}
 
-        {/* `isPending` rather than `isLoading`: a NetInfo-paused read is pending
-            without fetching, and it must show this skeleton instead of an empty
-            metrics row. */}
-        {dashboardStats.isPending ? (
-          <View className="flex-row flex-wrap gap-3">
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-          </View>
-        ) : (
-          <View className="flex-row flex-wrap gap-3">
-            {metrics.map(metric => (
-              <View key={metric.label} className="w-[47%] gap-1 rounded-lg bg-secondary p-3">
-                <Text variant="muted" className="text-xs">
-                  {metric.label}
-                </Text>
-                <Text
-                  className={cn('font-mono text-xl font-semibold', METRIC_TONE_CLASS[metric.tone])}
-                >
-                  {metric.value}
-                </Text>
-                <Text variant="muted" className="text-[11px]">
-                  {metric.detail}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {slaEnabled && data && data.sla.overall.total === 0 ? (
-          <View className="flex-row items-center gap-4">
-            {/* Both actions take the shared row frame: `min-h-11` measured
-                38.5 dp here (NativeWind's rem is 14 pt), under the touch
-                floor, and the row only grows to the frame the header's icon
-                buttons already use. */}
-            <Pressable
-              onPress={() => {
-                startSync({ repoFullName });
-              }}
-              disabled={syncDisabled}
-              accessibilityRole="button"
-              accessibilityLabel={t('securityAgent.dashboard.syncFindings')}
-              accessibilityState={{
-                disabled: syncDisabled,
-                busy: triggerSync.isPending,
-              }}
-              className={cn(
-                ROW_TARGET_CLASS,
-                'flex-row items-center gap-1.5 active:opacity-70',
-                syncBlocked && 'opacity-50'
-              )}
-            >
-              {triggerSync.isPending && (
-                <SpinningIcon icon={RefreshCw} size={12} color={colors.mutedForeground} spinning />
-              )}
-              <Text className="text-xs font-medium text-primary">
-                {t('securityAgent.dashboard.syncFindings')}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
-              className={cn(ROW_TARGET_CLASS, 'justify-center active:opacity-70')}
-            >
-              <Text className="text-xs font-medium text-primary">
-                {t('securityAgent.dashboard.manageRepositories')}
-              </Text>
-            </Pressable>
-          </View>
-        ) : null}
-
         {dashboardStats.isError && !data ? (
           <QueryError
             variant="server"
@@ -562,14 +497,94 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           />
         ) : null}
 
-        {data ? (
-          <DashboardSections
-            scope={scope}
-            data={data}
-            slaEnabled={slaEnabled}
-            repoFullName={repoFullName}
+        {neverSynced ? (
+          // Every count reads 0 before the first sync finishes, so the KPI grid
+          // and the posture sections looked like a clean result. Until a sync
+          // has completed the screen offers the sync itself instead.
+          <EmptyState
+            icon={ShieldAlert}
+            placement="top"
+            className="py-6"
+            title={t('securityAgent.dashboard.notYetSynced')}
+            action={
+              <Button
+                className={STATE_ACTION_CLASS}
+                disabled={syncDisabled}
+                loading={triggerSync.isPending}
+                accessibilityLabel={t('securityAgent.dashboard.syncFindings')}
+                onPress={() => {
+                  startSync({ repoFullName });
+                }}
+              >
+                <Text>{t('securityAgent.dashboard.syncFindings')}</Text>
+              </Button>
+            }
           />
-        ) : null}
+        ) : (
+          <>
+            {/* `isPending` rather than `isLoading`: a NetInfo-paused read is
+                pending without fetching, and it must show this skeleton instead
+                of an empty metrics row. */}
+            {dashboardStats.isPending ? (
+              <View className="flex-row flex-wrap gap-3">
+                <Skeleton className="h-24 w-[47%] rounded-lg" />
+                <Skeleton className="h-24 w-[47%] rounded-lg" />
+                <Skeleton className="h-24 w-[47%] rounded-lg" />
+                <Skeleton className="h-24 w-[47%] rounded-lg" />
+              </View>
+            ) : (
+              <View className="flex-row flex-wrap gap-3">
+                {metrics.map(metric => (
+                  <View key={metric.label} className="w-[47%] gap-1 rounded-lg bg-secondary p-3">
+                    <Text variant="muted" className="text-xs">
+                      {metric.label}
+                    </Text>
+                    <Text
+                      className={cn(
+                        'font-mono text-xl font-semibold',
+                        METRIC_TONE_CLASS[metric.tone]
+                      )}
+                    >
+                      {metric.value}
+                    </Text>
+                    <Text variant="muted" className="text-[11px]">
+                      {metric.detail}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {slaEnabled && data && data.sla.overall.total === 0 ? (
+              // One row, one link: the header's refresh control already starts
+              // a sync, so a second "Sync findings" text action beside the
+              // first-sync prompt would offer the same action twice.
+              <View className="flex-row items-center">
+                <Pressable
+                  onPress={() => {
+                    pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
+                  className={cn(ROW_TARGET_CLASS, 'justify-center active:opacity-70')}
+                >
+                  <Text className="text-xs font-medium text-primary dark:text-info">
+                    {t('securityAgent.dashboard.manageRepositories')}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {data ? (
+              <DashboardSections
+                scope={scope}
+                data={data}
+                slaEnabled={slaEnabled}
+                repoFullName={repoFullName}
+              />
+            ) : null}
+          </>
+        )}
       </TabScreenScrollView>
     </View>
   );

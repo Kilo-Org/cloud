@@ -60,6 +60,7 @@ vi.mock('react-native', () => ({
   View: 'View',
   Switch: 'Switch',
   Pressable: 'Pressable',
+  useColorScheme: () => 'light',
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },

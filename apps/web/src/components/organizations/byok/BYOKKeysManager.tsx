@@ -237,7 +237,7 @@ function CatalogModeSetting({
       ) : null}
       {enabled && isOrganizationKey ? (
         <p className="text-muted-foreground text-xs">
-          Organization model restrictions apply to requests through this key.
+          Organization model and provider restrictions apply to requests through this key.
         </p>
       ) : null}
       {!canChange && isOrganizationKey ? (
@@ -1085,7 +1085,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                           {organizationId ? (
                             <p className="mt-2">
                               Models with the <strong>{directProvider.name}</strong> prefix are not
-                              subject to organization model restrictions.
+                              subject to organization model or provider restrictions.
                               {catalogModeSupportedModels?.[directProvider.id]?.length
                                 ? ' Owners and admins can switch this key to Kilo catalog model IDs in the key list, so these restrictions apply.'
                                 : ''}

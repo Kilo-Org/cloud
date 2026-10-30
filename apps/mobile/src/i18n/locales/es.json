@@ -163,7 +163,7 @@
     "allLanguages": "Todos los idiomas"
   },
   "login": {
-    "welcome": "Te damos la bienvenida a Kilo",
+    "welcome": "Te damos la bienvenida",
     "retrySignIn": "Reintentar inicio de sesión",
     "logo": "Logotipo de Kilo",
     "continuingSignIn": "Se está completando el inicio de sesión.",
@@ -1776,9 +1776,9 @@
       "couldNotLoadGithubRepositories": "No se pudieron cargar los repositorios de GitHub.",
       "couldNotLoadGitlabRepositories": "No se pudieron cargar los repositorios de GitLab.",
       "couldNotLoadBitbucketRepositories": "No se pudieron cargar los repositorios de Bitbucket.",
-      "connectGithubDescription": "Conecta GitHub en tu navegador y vuelve aquí para elegir un repositorio.",
-      "connectGitlabDescription": "Conecta GitLab en tu navegador y vuelve aquí para elegir un repositorio.",
-      "connectBitbucketDescription": "Conecta Bitbucket en tu navegador y vuelve aquí para elegir un repositorio.",
+      "connectGithubDescription": "Inicia sesión desde tu navegador y vuelve aquí para elegir un repositorio de GitHub.",
+      "connectGitlabDescription": "Inicia sesión desde tu navegador y vuelve aquí para elegir un repositorio de GitLab.",
+      "connectBitbucketDescription": "Inicia sesión desde tu navegador y vuelve aquí para elegir un repositorio de Bitbucket.",
       "openGithub": "Abrir GitHub",
       "openGitlab": "Abrir GitLab",
       "openBitbucket": "Abrir Bitbucket",
@@ -2727,6 +2727,7 @@
       "gitlabDescription": "Conecta tu cuenta de GitLab para revisar merge requests en el móvil.",
       "bitbucketDescription": "Conecta Bitbucket a esta organización para revisar PR en el móvil.",
       "bitbucketOrgOnlyDescription": "Cambia la cuenta de arriba a una organización para revisar sus PR en Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Esta cuenta todavía no tiene organizaciones. Podrás revisar los PR de Bitbucket cuando crees una organización o te unas a una.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para tu cuenta personal"
     },
@@ -3106,10 +3107,9 @@
     "pullRequestUnavailableDescription": "No se puede abrir esta PR. Puede que se haya eliminado, que el repositorio sea privado o que la aplicación de Kilo para GitHub no esté instalada en él.",
     "reconnectNotice": {
       "title": "La conexión con GitHub ha caducado.",
-      "message": "Tu conexión con GitHub ya no es válida. Vuelve a comprobarla. Si es necesario, se te pedirá que conectes tu cuenta de nuevo.",
+      "message": "Vuelve a comprobarla. Si es necesario, se te pedirá que conectes tu cuenta de nuevo.",
       "gitlabTitle": "La conexión con GitLab ha caducado.",
-      "bitbucketTitle": "La conexión con Bitbucket ha caducado.",
-      "providerMessage": "Tu conexión con {{provider}} ya no es válida. Vuelve a comprobarla. Si es necesario, se te pedirá que conectes tu cuenta de nuevo."
+      "bitbucketTitle": "La conexión con Bitbucket ha caducado."
     },
     "review": "Revisión",
     "reviewPullRequest": "Revisar PR",
@@ -3199,7 +3199,7 @@
     "terms": {
       "pullRequest": "Solicitud de cambios",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Compartir el merge request",
       "viewOnProvider": "Ver en {{provider}}",
       "mergeRequestUnavailable": "Merge request no disponible",
@@ -3897,8 +3897,6 @@
     "commandAtLimit": "El comando está limitado a {{max}} caracteres",
     "commandsEmpty": "Aún no hay comandos de configuración",
     "commandsSaveFailed": "No se pudieron guardar los comandos de configuración",
-    "moveUp": "Subir",
-    "moveDown": "Bajar",
     "moveCommandUp": "Mover el comando {{position}} hacia arriba",
     "moveCommandDown": "Mover el comando {{position}} hacia abajo",
     "skillsTitle": "Habilidades",
@@ -3909,7 +3907,10 @@
     "skillNameRequired": "Ingrese un nombre de habilidad",
     "skillNameInvalid": "El nombre de la habilidad debe comenzar con una letra o un dígito y usar solo letras minúsculas, dígitos y guiones.",
     "skillContentRequired": "Se requiere contenido de habilidad",
-    "skillSaveFailed": "No se pudo guardar la habilidad",
+    "skillSaveFailed": "No se pudo guardar la habilidad. Inténtalo de nuevo.",
+    "skillDeleteFailed": "No se pudo eliminar la habilidad. Inténtalo de nuevo.",
+    "skillToggleFailed": "No se pudo actualizar la habilidad. Inténtalo de nuevo.",
+    "skillLimitReached": "Un perfil puede tener hasta {{max}} habilidades. Elimina una para agregar otra.",
     "skillSourceCustom": "Personalizada",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

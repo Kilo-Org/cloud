@@ -406,9 +406,9 @@ describe('AdvancedConfigPanel', () => {
     press(byLabel(renderer, 'Advanced Configuration'));
     press(buttonByText(renderer, 'Add command'));
     expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
-    typeInto(renderer, 'Command', '   ');
+    typeInto(renderer, 'Command 1', '   ');
     expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
-    typeInto(renderer, 'Command', 'pnpm install');
+    typeInto(renderer, 'Command 1', 'pnpm install');
     expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
     typeInto(renderer, 'Command 1', '');
     expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
@@ -418,23 +418,25 @@ describe('AdvancedConfigPanel', () => {
     const renderer = mount();
     press(byLabel(renderer, 'Advanced Configuration'));
     press(buttonByText(renderer, 'Add command'));
+    typeInto(renderer, 'Command 1', 'pnpm install');
+    press(buttonByText(renderer, 'Add command'));
 
-    // A blank draft row is not a command, so its controls keep the plain names.
-    expect(
-      renderer.root
-        .findAll(node => typeof node.props.onPress === 'function')
-        .map(node => node.props.accessibilityLabel)
-    ).toEqual(expect.arrayContaining(['Move up', 'Move down', 'Delete']));
-
-    typeInto(renderer, 'Command', 'pnpm install');
-
-    expect(field(renderer, 'Command 1')).toBeDefined();
+    // The blank draft row is the second slot in the list, so its controls name
+    // command 2 instead of falling back to a context-free "Move up"/"Delete".
+    expect(field(renderer, 'Command 2')).toBeDefined();
     expect(
       renderer.root
         .findAll(node => typeof node.props.onPress === 'function')
         .map(node => node.props.accessibilityLabel)
     ).toEqual(
-      expect.arrayContaining(['Move command 1 up', 'Move command 1 down', 'Delete command 1'])
+      expect.arrayContaining([
+        'Move command 1 up',
+        'Move command 1 down',
+        'Delete command 1',
+        'Move command 2 up',
+        'Move command 2 down',
+        'Delete command 2',
+      ])
     );
   });
 
@@ -486,7 +488,7 @@ describe('AdvancedConfigPanel', () => {
     press(byLabel(renderer, 'Advanced Configuration'));
 
     press(buttonByText(renderer, 'Add command'));
-    expect(field(renderer, 'Command').props.maxLength).toBe(500);
+    expect(field(renderer, 'Command 1').props.maxLength).toBe(500);
 
     for (let index = 1; index < MAX_SETUP_COMMANDS; index += 1) {
       press(buttonByText(renderer, 'Add command'));
@@ -494,7 +496,7 @@ describe('AdvancedConfigPanel', () => {
     const commandFields = () =>
       renderer.root
         .findAllByType('FormField' as never)
-        .filter(node => node.props.label === 'Command');
+        .filter(node => /^Command \d+$/.test(String(node.props.label)));
     expect(commandFields()).toHaveLength(MAX_SETUP_COMMANDS);
     expect(buttonByText(renderer, 'Add command')?.props.disabled).toBe(true);
 
@@ -508,7 +510,7 @@ describe('AdvancedConfigPanel', () => {
     press(byLabel(renderer, 'Advanced Configuration'));
 
     press(buttonByText(renderer, 'Add command'));
-    typeInto(renderer, 'Command', 'a'.repeat(470));
+    typeInto(renderer, 'Command 1', 'a'.repeat(470));
     expect(counterTexts(renderer).map(node => node.props.children)).toEqual([30]);
     expect(texts(renderer)).not.toContain('The command is limited to 500 characters');
 
@@ -552,7 +554,7 @@ describe('AdvancedConfigPanel', () => {
     addVariable(renderer, 'API_KEY', 'abc');
     // A setup command.
     press(buttonByText(renderer, 'Add command'));
-    typeInto(renderer, 'Command', 'pnpm install');
+    typeInto(renderer, 'Command 1', 'pnpm install');
     press(buttonByText(renderer, 'Save as Profile'));
 
     typeInto(renderer, 'Profile name', 'My Setup');

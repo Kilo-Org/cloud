@@ -323,7 +323,9 @@
     "pr opened",
     "remediation blocked",
     "remediation failed",
-    "superseded"
+    "superseded",
+    "{{count}} open",
+    "{{loaded}} of {{total}} files loaded"
   ],
   "he": [
     "completed",

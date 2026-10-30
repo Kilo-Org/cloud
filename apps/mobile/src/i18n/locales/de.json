@@ -163,7 +163,7 @@
     "allLanguages": "Alle Sprachen"
   },
   "login": {
-    "welcome": "Willkommen bei Kilo",
+    "welcome": "Willkommen",
     "retrySignIn": "Anmeldung erneut versuchen",
     "logo": "Kilo-Logo",
     "continuingSignIn": "Deine Anmeldung wird fortgesetzt.",
@@ -1764,9 +1764,9 @@
       "couldNotLoadGithubRepositories": "Die GitHub-Repositorys konnten nicht geladen werden.",
       "couldNotLoadGitlabRepositories": "Die GitLab-Repositorys konnten nicht geladen werden.",
       "couldNotLoadBitbucketRepositories": "Die Bitbucket-Repositorys konnten nicht geladen werden.",
-      "connectGithubDescription": "Verbinde GitHub in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",
-      "connectGitlabDescription": "Verbinde GitLab in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",
-      "connectBitbucketDescription": "Verbinde Bitbucket in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",
+      "connectGithubDescription": "Melde dich in deinem Browser an und kehre dann hierher zurück, um ein GitHub-Repository auszuwählen.",
+      "connectGitlabDescription": "Melde dich in deinem Browser an und kehre dann hierher zurück, um ein GitLab-Repository auszuwählen.",
+      "connectBitbucketDescription": "Melde dich in deinem Browser an und kehre dann hierher zurück, um ein Bitbucket-Repository auszuwählen.",
       "openGithub": "GitHub öffnen",
       "openGitlab": "GitLab öffnen",
       "openBitbucket": "Bitbucket öffnen",
@@ -2699,6 +2699,7 @@
       "gitlabDescription": "Verbinde dein GitLab-Konto, um Merge-Requests in der App zu prüfen.",
       "bitbucketDescription": "Verbinde Bitbucket mit dieser Organisation, um Pull-Requests in der App zu prüfen.",
       "bitbucketOrgOnlyDescription": "Wechsle das Konto oben zu einer Organisation, um deren Pull-Requests in Bitbucket zu prüfen.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Diesem Konto ist noch keine Organisation zugeordnet. Du kannst Bitbucket-Pull-Requests prüfen, sobald du eine Organisation erstellst oder einer beitrittst.",
       "contextLine": "Für {{organization}}",
       "contextLinePersonal": "Für den persönlichen Bereich"
     },
@@ -3065,10 +3066,9 @@
     "pullRequestUnavailableDescription": "Dieser PR kann nicht geöffnet werden. Möglicherweise wurde er gelöscht, das Repository ist privat oder die GitHub-App von Kilo ist dort nicht installiert.",
     "reconnectNotice": {
       "title": "Die GitHub-Verbindung ist abgelaufen.",
-      "message": "Deine GitHub-Verbindung ist nicht mehr gültig. Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen.",
+      "message": "Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen.",
       "gitlabTitle": "Die GitLab-Verbindung ist abgelaufen.",
-      "bitbucketTitle": "Die Bitbucket-Verbindung ist abgelaufen.",
-      "providerMessage": "Deine {{provider}}-Verbindung ist nicht mehr gültig. Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen."
+      "bitbucketTitle": "Die Bitbucket-Verbindung ist abgelaufen."
     },
     "review": "Prüfung",
     "reviewPullRequest": "Pull-Request prüfen",
@@ -3156,7 +3156,7 @@
     "terms": {
       "pullRequest": "Pull-Request",
       "mergeRequest": "Merge-Request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge-Request !{{number}}",
       "shareMergeRequest": "Merge-Request teilen",
       "viewOnProvider": "Auf {{provider}} ansehen",
       "mergeRequestUnavailable": "Merge-Request nicht verfügbar",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Der Befehl ist auf {{max}} Zeichen beschränkt",
     "commandsEmpty": "Noch keine Setup-Befehle",
     "commandsSaveFailed": "Setup-Befehle konnten nicht gespeichert werden",
-    "moveUp": "Nach oben verschieben",
-    "moveDown": "Nach unten verschieben",
     "moveCommandUp": "Befehl {{position}} nach oben verschieben",
     "moveCommandDown": "Befehl {{position}} nach unten verschieben",
     "skillsTitle": "Fähigkeiten",
@@ -3859,7 +3857,10 @@
     "skillNameRequired": "Gib einen Skill-Namen ein",
     "skillNameInvalid": "Der Fertigkeitsname muss mit einem Buchstaben oder einer Ziffer beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten",
     "skillContentRequired": "Kompetenzinhalte sind erforderlich",
-    "skillSaveFailed": "Fertigkeit konnte nicht gespeichert werden",
+    "skillSaveFailed": "Fertigkeit konnte nicht gespeichert werden. Versuche es erneut.",
+    "skillDeleteFailed": "Fertigkeit konnte nicht gelöscht werden. Versuche es erneut.",
+    "skillToggleFailed": "Fertigkeit konnte nicht aktualisiert werden. Versuche es erneut.",
+    "skillLimitReached": "Ein Profil kann bis zu {{max}} Fähigkeiten enthalten. Lösche eine, um eine weitere hinzuzufügen.",
     "skillSourceCustom": "Benutzerdefiniert",
     "skillSourceMarketplace": "Marktplatz",
     "skillSourceSkillsSh": "skills.sh",

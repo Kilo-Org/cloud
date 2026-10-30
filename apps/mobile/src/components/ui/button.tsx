@@ -14,7 +14,12 @@ const buttonVariants = cva(
       variant: {
         default: 'bg-primary active:opacity-80 shadow-sm shadow-[#0000000D]',
         destructive: 'bg-destructive-solid active:opacity-80 shadow-sm shadow-[#0000000D]',
-        outline: 'border-border bg-card active:opacity-80 border shadow-sm shadow-[#0000000D]',
+        // The dark card surface sits a step above the near-black background, and
+        // the default hairline (7% white) is too faint to separate the control
+        // from it, so an outlined control would read as unpainted black-on-black
+        // in dark mode. Same surface/border pair the app's other dark cards use.
+        outline:
+          'border-border bg-card dark:border-neutral-700 dark:bg-secondary active:opacity-80 border shadow-sm shadow-[#0000000D]',
         secondary: 'bg-secondary active:opacity-80 shadow-sm shadow-[#0000000D]',
         ghost: 'active:opacity-60',
         link: '',

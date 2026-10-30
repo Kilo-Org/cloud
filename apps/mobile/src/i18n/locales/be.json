@@ -163,7 +163,7 @@
     "allLanguages": "Усе мовы"
   },
   "login": {
-    "welcome": "Сардэчна запрашаем у Kilo",
+    "welcome": "Сардэчна запрашаем",
     "retrySignIn": "Паўтарыць уваход",
     "logo": "Лагатып Kilo",
     "continuingSignIn": "Працягваем уваход.",
@@ -714,6 +714,7 @@
       "gitlabDescription": "Падключыце ўліковы запіс GitLab, каб разглядаць merge-запыты з мабільнай прылады.",
       "bitbucketDescription": "Падключыце Bitbucket да гэтай арганізацыі, каб разглядаць запыты на зліццё з мабільнай прылады.",
       "bitbucketOrgOnlyDescription": "Пераключыце ўліковы запіс, указаны вышэй, на арганізацыю, каб разглядаць яе запыты на зліццё ў Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Гэты ўліковы запіс пакуль не мае арганізацый. Запыты на зліццё ў Bitbucket можна будзе разглядаць пасля таго, як вы створыце арганізацыю або далучыцеся да яе.",
       "contextLine": "Для {{organization}}",
       "contextLinePersonal": "Для асабістага ўліковага запісу"
     },
@@ -739,10 +740,9 @@
     },
     "reconnectNotice": {
       "title": "Тэрмін дзеяння падключэння да GitHub скончыўся.",
-      "message": "Тваё падключэнне да GitHub больш не дзейнічае. Правер яго яшчэ раз — пры патрэбе табе прапануюць падключыцца зноў.",
+      "message": "Праверце падключэнне яшчэ раз — пры неабходнасці вам прапануюць падключыцца зноў.",
       "gitlabTitle": "Тэрмін дзеяння падключэння да GitLab скончыўся",
-      "bitbucketTitle": "Тэрмін дзеяння падключэння да Bitbucket скончыўся",
-      "providerMessage": "Вашае падключэнне да {{provider}} больш не сапраўднае. Праверце падключэнне яшчэ раз — пры неабходнасці вам прапануюць падключыцца зноў."
+      "bitbucketTitle": "Тэрмін дзеяння падключэння да Bitbucket скончыўся"
     },
     "eventChips": {
       "comment": "Каментаваць",
@@ -853,7 +853,7 @@
     "terms": {
       "pullRequest": "Запыт на зліццё",
       "mergeRequest": "Merge-запыт",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge-запыт !{{number}}",
       "shareMergeRequest": "Падзяліцца merge-запытам",
       "viewOnProvider": "Адкрыць у {{provider}}",
       "mergeRequestUnavailable": "Merge-запыт недаступны",
@@ -2355,9 +2355,9 @@
       "couldNotLoadGithubRepositories": "Не ўдалося загрузіць рэпазіторыі GitHub.",
       "couldNotLoadGitlabRepositories": "Не ўдалося загрузіць рэпазіторыі GitLab.",
       "couldNotLoadBitbucketRepositories": "Не ўдалося загрузіць рэпазіторыі Bitbucket.",
-      "connectGithubDescription": "Падключыце GitHub у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
-      "connectGitlabDescription": "Падключыце GitLab у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
-      "connectBitbucketDescription": "Падключыце Bitbucket у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
+      "connectGithubDescription": "Увайдзіце ў браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторы GitHub.",
+      "connectGitlabDescription": "Увайдзіце ў браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторы GitLab.",
+      "connectBitbucketDescription": "Увайдзіце ў браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторы Bitbucket.",
       "openGithub": "Адкрыць GitHub",
       "openGitlab": "Адкрыць GitLab",
       "openBitbucket": "Адкрыць Bitbucket",
@@ -3947,8 +3947,6 @@
     "commandAtLimit": "Каманда абмежавана {{max}} сімваламі",
     "commandsEmpty": "Пакуль няма каманд наладкі",
     "commandsSaveFailed": "Не ўдалося захаваць каманды наладкі",
-    "moveUp": "Рухайцеся ўверх",
-    "moveDown": "Рухайцеся ўніз",
     "moveCommandUp": "Перамясціць каманду {{position}} уверх",
     "moveCommandDown": "Перамясціць каманду {{position}} уніз",
     "skillsTitle": "Навыкі",
@@ -3959,7 +3957,10 @@
     "skillNameRequired": "Увядзіце назву навыку",
     "skillNameInvalid": "Назва навыку павінна пачынацца з літары або лічбы і выкарыстоўваць толькі малыя літары, лічбы і працяжнікі",
     "skillContentRequired": "Змест навыкаў патрабуецца",
-    "skillSaveFailed": "Не ўдалося захаваць навык",
+    "skillSaveFailed": "Не ўдалося захаваць навык. Паспрабуйце яшчэ раз.",
+    "skillDeleteFailed": "Не ўдалося выдаліць навык. Паспрабуйце яшчэ раз.",
+    "skillToggleFailed": "Не ўдалося абнавіць навык. Паспрабуйце яшчэ раз.",
+    "skillLimitReached": "У профілі можа быць да {{max}} навыкаў. Выдаліце адзін, каб дадаць яшчэ адзін.",
     "skillSourceCustom": "Карыстацкі",
     "skillSourceMarketplace": "Маркетплэйс",
     "skillSourceSkillsSh": "skills.sh",

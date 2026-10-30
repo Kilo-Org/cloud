@@ -163,7 +163,7 @@
     "allLanguages": "Wszystkie języki"
   },
   "login": {
-    "welcome": "Witamy w Kilo",
+    "welcome": "Witamy",
     "retrySignIn": "Spróbuj ponownie się zalogować",
     "logo": "Logo Kilo",
     "continuingSignIn": "Trwa logowanie.",
@@ -1788,9 +1788,9 @@
       "couldNotLoadGithubRepositories": "Nie udało się wczytać repozytoriów z GitHub.",
       "couldNotLoadGitlabRepositories": "Nie udało się wczytać repozytoriów z GitLab.",
       "couldNotLoadBitbucketRepositories": "Nie udało się wczytać repozytoriów z Bitbucket.",
-      "connectGithubDescription": "Połącz konto GitHub w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium.",
-      "connectGitlabDescription": "Połącz konto GitLab w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium.",
-      "connectBitbucketDescription": "Połącz konto Bitbucket w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium.",
+      "connectGithubDescription": "Zaloguj się w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium GitHub.",
+      "connectGitlabDescription": "Zaloguj się w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium GitLab.",
+      "connectBitbucketDescription": "Zaloguj się w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium Bitbucket.",
       "openGithub": "Otwórz GitHub",
       "openGitlab": "Otwórz GitLab",
       "openBitbucket": "Otwórz Bitbucket",
@@ -2755,6 +2755,7 @@
       "gitlabDescription": "Połącz konto GitLab, aby przeglądać merge requesty na telefonie.",
       "bitbucketDescription": "Połącz Bitbucket z tą organizacją, aby przeglądać PR-y na telefonie.",
       "bitbucketOrgOnlyDescription": "Przełącz konto powyżej na organizację, aby przeglądać jej PR-y na Bitbucketu.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "To konto nie ma jeszcze żadnych organizacji. PR-y na Bitbucketu będzie można przeglądać po utworzeniu organizacji lub dołączeniu do niej.",
       "contextLine": "Dla {{organization}}",
       "contextLinePersonal": "Dla konta osobistego"
     },
@@ -3147,10 +3148,9 @@
     "pullRequestUnavailableDescription": "Nie można otworzyć tego PR. Być może został usunięty, repozytorium jest prywatne lub nie zainstalowano w nim aplikacji Kilo dla GitHub.",
     "reconnectNotice": {
       "title": "Połączenie z serwisem GitHub wygasło.",
-      "message": "Połączenie z kontem GitHub wygasło. Sprawdź je ponownie — w razie potrzeby aplikacja poprosi o ponowne połączenie.",
+      "message": "Sprawdź je ponownie — w razie potrzeby aplikacja poprosi o ponowne połączenie.",
       "gitlabTitle": "Połączenie z serwisem GitLab wygasło.",
-      "bitbucketTitle": "Połączenie z serwisem Bitbucket wygasło.",
-      "providerMessage": "Połączenie z kontem {{provider}} wygasło. Sprawdź je ponownie — w razie potrzeby aplikacja poprosi o ponowne połączenie."
+      "bitbucketTitle": "Połączenie z serwisem Bitbucket wygasło."
     },
     "review": "Przegląd",
     "reviewPullRequest": "Przejrzyj PR",
@@ -3242,7 +3242,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Udostępnij merge request",
       "viewOnProvider": "Zobacz w {{provider}}",
       "mergeRequestUnavailable": "Merge request niedostępny",
@@ -3947,8 +3947,6 @@
     "commandAtLimit": "Polecenie może mieć maksymalnie {{max}} znaków",
     "commandsEmpty": "Nie ma jeszcze żadnych poleceń konfiguracyjnych",
     "commandsSaveFailed": "Nie udało się zapisać poleceń konfiguracyjnych",
-    "moveUp": "Podnieść",
-    "moveDown": "Opuszczać",
     "moveCommandUp": "Przenieś polecenie {{position}} w górę",
     "moveCommandDown": "Przenieś polecenie {{position}} w dół",
     "skillsTitle": "Umiejętności",
@@ -3959,7 +3957,10 @@
     "skillNameRequired": "Wpisz nazwę umiejętności",
     "skillNameInvalid": "Nazwa umiejętności musi zaczynać się od litery lub cyfry i zawierać wyłącznie małe litery, cyfry i myślniki",
     "skillContentRequired": "Wymagane są umiejętności",
-    "skillSaveFailed": "Nie udało się zapisać umiejętności",
+    "skillSaveFailed": "Nie udało się zapisać umiejętności. Spróbuj ponownie.",
+    "skillDeleteFailed": "Nie udało się usunąć umiejętności. Spróbuj ponownie.",
+    "skillToggleFailed": "Nie udało się zaktualizować umiejętności. Spróbuj ponownie.",
+    "skillLimitReached": "Profil może zawierać maksymalnie {{max}} umiejętności. Usuń jedną, aby dodać kolejną.",
     "skillSourceCustom": "Własne",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

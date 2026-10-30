@@ -163,7 +163,7 @@
     "allLanguages": "تمام زبانیں"
   },
   "login": {
-    "welcome": "Kilo میں خوش آمدید",
+    "welcome": "خوش آمدید",
     "retrySignIn": "دوبارہ سائن ان کریں",
     "logo": "Kilo کا لوگو",
     "continuingSignIn": "آپ کا سائن ان جاری ہے۔",
@@ -684,6 +684,7 @@
       "gitlabDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لینے کے لیے اپنا GitLab اکاؤنٹ منسلک کریں۔",
       "bitbucketDescription": "موبائل پر پل ریکویسٹس کا جائزہ لینے کے لیے Bitbucket کو اس تنظیم سے منسلک کریں۔",
       "bitbucketOrgOnlyDescription": "اس کی Bitbucket پل ریکویسٹس کا جائزہ لینے کے لیے اوپر موجود اکاؤنٹ کو ایک تنظیم پر تبدیل کریں۔",
+      "bitbucketOrgOnlyNoOrganizationDescription": "اس اکاؤنٹ کی ابھی تک کوئی تنظیم نہیں ہے۔ ایک تنظیم بنانے یا اس میں شامل ہونے پر آپ Bitbucket پل ریکویسٹس کا جائزہ لے سکتے ہیں۔",
       "contextLine": "{{organization}} کے لیے",
       "contextLinePersonal": "ذاتی اکاؤنٹ کے لیے"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub سے کنکشن کی مدت ختم ہو گئی۔",
-      "message": "آپ کا GitHub کنکشن اب قابل استعمال نہیں ہے۔ کنکشن دوبارہ چیک کریں — ضرورت پڑی تو آپ سے دوبارہ منسلک کرنے کو کہا جائے گا۔",
+      "message": "کنکشن دوبارہ چیک کریں — ضرورت پڑی تو آپ سے دوبارہ منسلک کرنے کو کہا جائے گا۔",
       "gitlabTitle": "GitLab سے کنکشن کی مدت ختم ہو گئی۔",
-      "bitbucketTitle": "Bitbucket سے کنکشن کی مدت ختم ہو گئی۔",
-      "providerMessage": "آپ کا {{provider}} کنکشن اب قابل استعمال نہیں ہے۔ کنکشن دوبارہ چیک کریں — ضرورت پڑی تو آپ سے دوبارہ منسلک کرنے کو کہا جائے گا۔"
+      "bitbucketTitle": "Bitbucket سے کنکشن کی مدت ختم ہو گئی۔"
     },
     "eventChips": {
       "comment": "تبصرہ",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "پل ریکویسٹ",
       "mergeRequest": "مرج ریکویسٹ",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "مرج ریکویسٹ !{{number}}",
       "shareMergeRequest": "مرج ریکویسٹ شیئر کریں",
       "viewOnProvider": "{{provider}} پر دیکھیں",
       "mergeRequestUnavailable": "مرج ریکویسٹ دستیاب نہیں",
@@ -2293,9 +2293,9 @@
       "couldNotLoadGithubRepositories": "GitHub کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",
       "couldNotLoadGitlabRepositories": "GitLab کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",
       "couldNotLoadBitbucketRepositories": "Bitbucket کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",
-      "connectGithubDescription": "اپنے براؤزر میں GitHub کو منسلک کریں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
-      "connectGitlabDescription": "اپنے براؤزر میں GitLab کو منسلک کریں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
-      "connectBitbucketDescription": "اپنے براؤزر میں Bitbucket کو منسلک کریں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
+      "connectGithubDescription": "اپنے براؤزر میں سائن ان کریں، پھر GitHub ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
+      "connectGitlabDescription": "اپنے براؤزر میں سائن ان کریں، پھر GitLab ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
+      "connectBitbucketDescription": "اپنے براؤزر میں سائن ان کریں، پھر Bitbucket ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
       "openGithub": "GitHub کھولیں",
       "openGitlab": "GitLab کھولیں",
       "openBitbucket": "Bitbucket کھولیں",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "کمانڈ {{max}} حروف تک محدود ہے۔",
     "commandsEmpty": "ابھی تک کوئی سیٹ اپ کمانڈ نہیں ہے۔",
     "commandsSaveFailed": "سیٹ اپ کمانڈز کو محفوظ نہیں کیا جا سکا",
-    "moveUp": "اوپر بڑھیں۔",
-    "moveDown": "نیچے کی طرف بڑھیں۔",
     "moveCommandUp": "کمانڈ {{position}} کو اوپر منتقل کریں",
     "moveCommandDown": "کمانڈ {{position}} کو نیچے منتقل کریں",
     "skillsTitle": "ہنر",
@@ -3859,7 +3857,10 @@
     "skillNameRequired": "مہارت کا نام درج کریں۔",
     "skillNameInvalid": "ہنر کا نام ایک حرف یا ہندسے سے شروع ہونا چاہیے اور صرف چھوٹے حروف، ہندسوں اور ڈیشز کا استعمال کریں",
     "skillContentRequired": "مہارت کا مواد درکار ہے۔",
-    "skillSaveFailed": "مہارت نہیں بچا سکا",
+    "skillSaveFailed": "مہارت نہیں بچا سکا۔ دوبارہ کوشش کریں۔",
+    "skillDeleteFailed": "مہارت حذف نہیں کر سکا۔ دوبارہ کوشش کریں۔",
+    "skillToggleFailed": "مہارت اپ ڈیٹ نہیں کر سکا۔ دوبارہ کوشش کریں۔",
+    "skillLimitReached": "ایک پروفائل میں زیادہ سے زیادہ {{max}} مہارتیں رکھی جا سکتی ہیں۔ ایک کو حذف کریں تاکہ دوسری شامل کریں۔",
     "skillSourceCustom": "حسبِ ضرورت",
     "skillSourceMarketplace": "مارکیٹ پلیس",
     "skillSourceSkillsSh": "skills.sh",

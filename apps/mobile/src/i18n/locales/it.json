@@ -163,7 +163,7 @@
     "allLanguages": "Tutte le lingue"
   },
   "login": {
-    "welcome": "Benvenuto su Kilo",
+    "welcome": "Benvenuto",
     "retrySignIn": "Riprova ad accedere",
     "logo": "Logo di Kilo",
     "continuingSignIn": "L'accesso è in fase di completamento.",
@@ -1744,9 +1744,9 @@
       "couldNotLoadGithubRepositories": "Impossibile caricare i repository GitHub.",
       "couldNotLoadGitlabRepositories": "Impossibile caricare i repository GitLab.",
       "couldNotLoadBitbucketRepositories": "Impossibile caricare i repository Bitbucket.",
-      "connectGithubDescription": "Collega GitHub nel browser, poi torna qui per scegliere un repository.",
-      "connectGitlabDescription": "Collega GitLab nel browser, poi torna qui per scegliere un repository.",
-      "connectBitbucketDescription": "Collega Bitbucket nel browser, poi torna qui per scegliere un repository.",
+      "connectGithubDescription": "Accedi dal browser, poi torna qui per scegliere un repository GitHub.",
+      "connectGitlabDescription": "Accedi dal browser, poi torna qui per scegliere un repository GitLab.",
+      "connectBitbucketDescription": "Accedi dal browser, poi torna qui per scegliere un repository Bitbucket.",
       "openGithub": "Apri GitHub",
       "openGitlab": "Apri GitLab",
       "openBitbucket": "Apri Bitbucket",
@@ -2727,6 +2727,7 @@
       "gitlabDescription": "Connetti il tuo account GitLab per revisionare le merge request dall'app.",
       "bitbucketDescription": "Connetti Bitbucket a questa organizzazione per revisionare le pull request dall'app.",
       "bitbucketOrgOnlyDescription": "Passa l'account qui sopra a un'organizzazione per revisionarne le pull request Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Questo account non ha ancora nessuna organizzazione. Le pull request Bitbucket possono essere revisionate una volta che crei un'organizzazione o ne entri a far parte.",
       "contextLine": "Per {{organization}}",
       "contextLinePersonal": "Per il tuo account personale"
     },
@@ -3106,10 +3107,9 @@
     "pullRequestUnavailableDescription": "Impossibile aprire questa PR. Potrebbe essere stata eliminata, il repository potrebbe essere privato oppure l'app Kilo per GitHub potrebbe non essere installata nel repository.",
     "reconnectNotice": {
       "title": "La connessione a GitHub è scaduta.",
-      "message": "La tua connessione a GitHub non è più valida. Ricontrolla la connessione: ti verrà chiesto di riconnetterti se necessario.",
+      "message": "Ricontrolla la connessione: ti verrà chiesto di riconnetterti se necessario.",
       "gitlabTitle": "La connessione a GitLab è scaduta.",
-      "bitbucketTitle": "La connessione a Bitbucket è scaduta.",
-      "providerMessage": "La tua connessione a {{provider}} non è più valida. Ricontrolla la connessione: ti verrà chiesto di riconnetterti se necessario."
+      "bitbucketTitle": "La connessione a Bitbucket è scaduta."
     },
     "review": "Revisione",
     "reviewPullRequest": "Revisiona la pull request",
@@ -3199,7 +3199,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Condividi il merge request",
       "viewOnProvider": "Visualizza su {{provider}}",
       "mergeRequestUnavailable": "Merge request non disponibile",
@@ -3897,8 +3897,6 @@
     "commandAtLimit": "Il comando è limitato a {{max}} caratteri",
     "commandsEmpty": "Nessun comando di configurazione ancora",
     "commandsSaveFailed": "Impossibile salvare i comandi di configurazione",
-    "moveUp": "Vai su",
-    "moveDown": "Spostati giù",
     "moveCommandUp": "Sposta il comando {{position}} in alto",
     "moveCommandDown": "Sposta il comando {{position}} in basso",
     "skillsTitle": "Competenze",
@@ -3909,7 +3907,10 @@
     "skillNameRequired": "Inserisci un nome per la competenza",
     "skillNameInvalid": "Il nome della competenza deve iniziare con una lettera o un numero e utilizzare solo lettere minuscole, numeri e trattini",
     "skillContentRequired": "È richiesto il contenuto delle competenze",
-    "skillSaveFailed": "Impossibile salvare l'abilità",
+    "skillSaveFailed": "Impossibile salvare l'abilità. Riprova.",
+    "skillDeleteFailed": "Impossibile eliminare l'abilità. Riprova.",
+    "skillToggleFailed": "Impossibile aggiornare l'abilità. Riprova.",
+    "skillLimitReached": "Un profilo può contenere fino a {{max}} abilità. Eliminane una per aggiungerne un'altra.",
     "skillSourceCustom": "Personalizzata",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

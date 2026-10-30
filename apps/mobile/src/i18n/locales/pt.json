@@ -163,7 +163,7 @@
     "allLanguages": "Todos os idiomas"
   },
   "login": {
-    "welcome": "Bem-vindo ao Kilo",
+    "welcome": "Bem-vindo",
     "retrySignIn": "Tentar iniciar sessão novamente",
     "logo": "Logótipo do Kilo",
     "continuingSignIn": "O início de sessão está a prosseguir.",
@@ -699,6 +699,7 @@
       "gitlabDescription": "Liga a tua conta do GitLab para rever merge requests no telemóvel.",
       "bitbucketDescription": "Liga o Bitbucket a esta organização para rever PRs no telemóvel.",
       "bitbucketOrgOnlyDescription": "Muda a conta acima para uma organização para rever os respetivos PRs no Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Esta conta ainda não tem organizações. Os PRs do Bitbucket podem ser revistos depois de criares ou aderires a uma organização.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para a sua conta pessoal"
     },
@@ -723,10 +724,9 @@
     },
     "reconnectNotice": {
       "title": "A ligação ao GitHub expirou.",
-      "message": "A tua ligação ao GitHub já não é válida. Verifica-a novamente. Se for necessário, ser-te-á pedido que voltes a ligar a conta.",
+      "message": "Verifica-a novamente. Se for necessário, ser-te-á pedido que voltes a ligar a conta.",
       "gitlabTitle": "A ligação ao GitLab expirou.",
-      "bitbucketTitle": "A ligação ao Bitbucket expirou.",
-      "providerMessage": "A tua ligação ao {{provider}} já não é válida. Verifica-a novamente. Se for necessário, ser-te-á pedido que voltes a ligar a conta."
+      "bitbucketTitle": "A ligação ao Bitbucket expirou."
     },
     "eventChips": {
       "comment": "Comentar",
@@ -834,7 +834,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Partilhar merge request",
       "viewOnProvider": "Ver em {{provider}}",
       "mergeRequestUnavailable": "Merge request indisponível",
@@ -2324,9 +2324,9 @@
       "couldNotLoadGithubRepositories": "Não foi possível carregar os repositórios do GitHub.",
       "couldNotLoadGitlabRepositories": "Não foi possível carregar os repositórios do GitLab.",
       "couldNotLoadBitbucketRepositories": "Não foi possível carregar os repositórios do Bitbucket.",
-      "connectGithubDescription": "Ligue a sua conta do GitHub no navegador e volte aqui para escolher um repositório.",
-      "connectGitlabDescription": "Ligue a sua conta do GitLab no navegador e volte aqui para escolher um repositório.",
-      "connectBitbucketDescription": "Ligue a sua conta do Bitbucket no navegador e volte aqui para escolher um repositório.",
+      "connectGithubDescription": "Inicie sessão no navegador e volte aqui para escolher um repositório do GitHub.",
+      "connectGitlabDescription": "Inicie sessão no navegador e volte aqui para escolher um repositório do GitLab.",
+      "connectBitbucketDescription": "Inicie sessão no navegador e volte aqui para escolher um repositório do Bitbucket.",
       "openGithub": "Abrir o GitHub",
       "openGitlab": "Abrir o GitLab",
       "openBitbucket": "Abrir o Bitbucket",
@@ -3897,8 +3897,6 @@
     "commandAtLimit": "O comando está limitado a {{max}} caracteres",
     "commandsEmpty": "Ainda não há comandos de configuração",
     "commandsSaveFailed": "Não foi possível guardar os comandos de configuração",
-    "moveUp": "Mover para cima",
-    "moveDown": "Mover para baixo",
     "moveCommandUp": "Mover o comando {{position}} para cima",
     "moveCommandDown": "Mover o comando {{position}} para baixo",
     "skillsTitle": "Competências",
@@ -3909,7 +3907,10 @@
     "skillNameRequired": "Introduza um nome de competência",
     "skillNameInvalid": "O nome da competência deve começar por uma letra ou dígito e usar apenas letras minúsculas, dígitos e hífenes",
     "skillContentRequired": "O conteúdo da competência é obrigatório",
-    "skillSaveFailed": "Não foi possível guardar a competência",
+    "skillSaveFailed": "Não foi possível guardar a competência. Tente novamente.",
+    "skillDeleteFailed": "Não foi possível eliminar a competência. Tente novamente.",
+    "skillToggleFailed": "Não foi possível atualizar a competência. Tente novamente.",
+    "skillLimitReached": "Um perfil pode conter até {{max}} competências. Elimine uma para adicionar outra.",
     "skillSourceCustom": "Personalizado",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

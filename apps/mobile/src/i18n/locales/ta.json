@@ -163,7 +163,7 @@
     "allLanguages": "அனைத்து மொழிகளும்"
   },
   "login": {
-    "welcome": "Kilo-வுக்கு வரவேற்கிறோம்",
+    "welcome": "வரவேற்கிறோம்",
     "retrySignIn": "மீண்டும் உள்நுழைய முயற்சிக்கவும்",
     "logo": "Kilo சின்னம்",
     "continuingSignIn": "உங்கள் உள்நுழைவு தொடர்கிறது.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "மொபைலில் இணைப்புக் கோரிக்கைகளை மதிப்பாய்வு செய்ய உங்கள் GitLab கணக்கை இணைக்கவும்.",
       "bitbucketDescription": "மொபைலில் இணைப்புக் கோரிக்கைகளை மதிப்பாய்வு செய்ய Bitbucket-ஐ இந்த நிறுவனத்துடன் இணைக்கவும்.",
       "bitbucketOrgOnlyDescription": "அதன் Bitbucket இணைப்புக் கோரிக்கைகளை மதிப்பாய்வு செய்ய மேலே உள்ள கணக்கை ஒரு நிறுவனத்திற்கு மாற்றவும்.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "இந்தக் கணக்கில் இன்னும் எந்த நிறுவனமும் இல்லை. ஒரு நிறுவனத்தை உருவாக்கியதும் அல்லது அதில் இணைந்ததும், Bitbucket இணைப்புக் கோரிக்கைகளை மதிப்பாய்வு செய்யலாம்.",
       "contextLine": "{{organization}}-க்கு",
       "contextLinePersonal": "உங்கள் தனிப்பட்ட கணக்கிற்கு"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub இணைப்பு காலாவதியானது.",
-      "message": "உங்கள் GitHub இணைப்பு இனி செல்லுபடியாகாது. இணைப்பை மீண்டும் சரிபார்க்கவும் — தேவைப்பட்டால் மீண்டும் இணைக்கும்படி கேட்கப்படும்.",
+      "message": "இணைப்பை மீண்டும் சரிபார்க்கவும் — தேவைப்பட்டால் மீண்டும் இணைக்கும்படி கேட்கப்படும்.",
       "gitlabTitle": "GitLab இணைப்பு காலாவதியானது.",
-      "bitbucketTitle": "Bitbucket இணைப்பு காலாவதியானது.",
-      "providerMessage": "உங்கள் {{provider}} இணைப்பு இனி செல்லுபடியாகாது. இணைப்பை மீண்டும் சரிபார்க்கவும் — தேவைப்பட்டால் மீண்டும் இணைக்கும்படி கேட்கப்படும்."
+      "bitbucketTitle": "Bitbucket இணைப்பு காலாவதியானது."
     },
     "eventChips": {
       "comment": "கருத்து",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "இணைப்புக் கோரிக்கை",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "இணைப்புக் கோரிக்கை !{{number}}",
       "shareMergeRequest": "இணைப்புக் கோரிக்கையைப் பகிரவும்",
       "viewOnProvider": "{{provider}}-இல் காண்க",
       "mergeRequestUnavailable": "இணைப்புக் கோரிக்கை கிடைக்கவில்லை",
@@ -2293,9 +2293,9 @@
       "couldNotLoadGithubRepositories": "GitHub களஞ்சியங்களை ஏற்ற முடியவில்லை.",
       "couldNotLoadGitlabRepositories": "GitLab களஞ்சியங்களை ஏற்ற முடியவில்லை.",
       "couldNotLoadBitbucketRepositories": "Bitbucket களஞ்சியங்களை ஏற்ற முடியவில்லை.",
-      "connectGithubDescription": "உலாவியில் GitHub-ஐ இணைக்கவும். பின்னர் களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கே திரும்பவும்.",
-      "connectGitlabDescription": "உலாவியில் GitLab-ஐ இணைக்கவும். பின்னர் களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கே திரும்பவும்.",
-      "connectBitbucketDescription": "உலாவியில் Bitbucket-ஐ இணைக்கவும். பின்னர் களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கே திரும்பவும்.",
+      "connectGithubDescription": "உலாவியில் உள்நுழையவும். பின்னர் GitHub களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கே திரும்பவும்.",
+      "connectGitlabDescription": "உலாவியில் உள்நுழையவும். பின்னர் GitLab களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கே திரும்பவும்.",
+      "connectBitbucketDescription": "உலாவியில் உள்நுழையவும். பின்னர் Bitbucket களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கே திரும்பவும்.",
       "openGithub": "GitHub-ஐத் திறக்கவும்",
       "openGitlab": "GitLab-ஐத் திறக்கவும்",
       "openBitbucket": "Bitbucket-ஐத் திறக்கவும்",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "கட்டளை {{max}} எழுத்துகள் வரை மட்டுப்படுத்தப்பட்டுள்ளது",
     "commandsEmpty": "இதுவரை அமைவு கட்டளைகள் இல்லை",
     "commandsSaveFailed": "அமைவு கட்டளைகளைச் சேமிக்க முடியவில்லை",
-    "moveUp": "மேலே செல்லவும்",
-    "moveDown": "கீழே நகர்த்தவும்",
     "moveCommandUp": "{{position}} கட்டளையை மேலே நகர்த்து",
     "moveCommandDown": "{{position}} கட்டளையை கீழே நகர்த்து",
     "skillsTitle": "திறன்கள்",
@@ -3859,7 +3857,10 @@
     "skillNameRequired": "திறன் பெயரை உள்ளிடவும்",
     "skillNameInvalid": "திறன் பெயர் ஒரு எழுத்து அல்லது இலக்கத்துடன் தொடங்க வேண்டும் மற்றும் சிறிய எழுத்துக்கள், இலக்கங்கள் மற்றும் கோடுகளை மட்டுமே பயன்படுத்த வேண்டும்",
     "skillContentRequired": "திறன் உள்ளடக்கம் தேவை",
-    "skillSaveFailed": "திறமையைச் சேமிக்க முடியவில்லை",
+    "skillSaveFailed": "திறமையைச் சேமிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
+    "skillDeleteFailed": "திறமையை நீக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
+    "skillToggleFailed": "திறமையைப் புதுப்பிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
+    "skillLimitReached": "ஒரு சுயவிவரத்தில் அதிகபட்சம் {{max}} திறன்கள் இருக்க முடியும். மற்றொன்றைச் சேர்க்க ஒன்றை நீக்கவும்.",
     "skillSourceCustom": "தனிப்பயன்",
     "skillSourceMarketplace": "சந்தை",
     "skillSourceSkillsSh": "skills.sh",

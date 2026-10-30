@@ -262,23 +262,25 @@ export function NewSessionScreenBody() {
     },
     [stackSafeRouter, searchParams, userId, isCloneEntry]
   );
-  // One line, label left and control right: the organization is a value the
-  // user changes in place, not a section with a control under its title.
+  // Stacked like the Run on and Repository sections below it: one label above
+  // one full-width picker, so the form's label-value relation keeps one shape.
   const organizationSection = (
-    <View className="mt-5 min-h-11 flex-row items-center justify-between gap-3">
-      <Text className="shrink-0 text-sm font-medium text-muted-foreground">
+    <View className="mt-5">
+      <Text className="mb-2 text-sm font-medium text-muted-foreground">
         {t('common.organization')}
       </Text>
-      <View className="min-w-0 shrink flex-row items-center justify-end">
-        {isCloneEntry ? (
-          <ContextControl scope={{ organizationId: organizationId ?? null, isResolved: true }} />
-        ) : (
-          <ContextControl
-            value={organizationId ?? null}
-            onSelectionChange={handleOrganizationSwitch}
-          />
-        )}
-      </View>
+      {isCloneEntry ? (
+        <ContextControl
+          scope={{ organizationId: organizationId ?? null, isResolved: true }}
+          variant="field"
+        />
+      ) : (
+        <ContextControl
+          value={organizationId ?? null}
+          onSelectionChange={handleOrganizationSwitch}
+          variant="field"
+        />
+      )}
     </View>
   );
 

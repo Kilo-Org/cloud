@@ -163,7 +163,7 @@
     "allLanguages": "ਸਾਰੀਆਂ ਭਾਸ਼ਾਵਾਂ"
   },
   "login": {
-    "welcome": "Kilo ਵਿੱਚ ਤੁਹਾਡਾ ਸੁਆਗਤ ਹੈ",
+    "welcome": "ਜੀ ਆਇਆਂ ਨੂੰ",
     "retrySignIn": "ਦੁਬਾਰਾ ਸਾਈਨ ਇਨ ਕਰੋ",
     "logo": "Kilo ਦਾ ਲੋਗੋ",
     "continuingSignIn": "ਤੁਹਾਡਾ ਸਾਈਨ-ਇਨ ਜਾਰੀ ਹੈ।",
@@ -684,6 +684,7 @@
       "gitlabDescription": "ਮੋਬਾਈਲ ਉੱਤੇ ਮਰਜ਼ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਆਪਣਾ GitLab ਖਾਤਾ ਕਨੈਕਟ ਕਰੋ।",
       "bitbucketDescription": "ਮੋਬਾਈਲ ਉੱਤੇ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਇਸ ਸੰਗਠਨ ਨੂੰ Bitbucket ਨਾਲ ਕਨੈਕਟ ਕਰੋ।",
       "bitbucketOrgOnlyDescription": "ਇਸ ਦੇ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਉੱਪਰ ਦਿੱਤੇ ਖਾਤੇ ਨੂੰ ਇੱਕ ਸੰਗਠਨ ਵਿੱਚ ਬਦਲੋ।",
+      "bitbucketOrgOnlyNoOrganizationDescription": "ਇਸ ਖਾਤੇ ਵਿੱਚ ਹਾਲੇ ਕੋਈ ਸੰਗਠਨ ਨਹੀਂ ਹੈ। ਇੱਕ ਸੰਗਠਨ ਬਣਾਉਣ ਜਾਂ ਉਸ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਣ ਤੋਂ ਬਾਅਦ ਹੀ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕੀਤੀ ਜਾ ਸਕਦੀ ਹੈ।",
       "contextLine": "{{organization}} ਲਈ",
       "contextLinePersonal": "ਤੁਹਾਡੇ ਨਿੱਜੀ ਖਾਤੇ ਲਈ"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।",
-      "message": "ਤੁਹਾਡਾ GitHub ਕਨੈਕਸ਼ਨ ਹੁਣ ਵੈਧ ਨਹੀਂ ਹੈ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ — ਲੋੜ ਹੋਣ 'ਤੇ ਤੁਹਾਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਿਹਾ ਜਾਵੇਗਾ।",
+      "message": "ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ — ਲੋੜ ਹੋਣ 'ਤੇ ਤੁਹਾਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਿਹਾ ਜਾਵੇਗਾ।",
       "gitlabTitle": "GitLab ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।",
-      "bitbucketTitle": "Bitbucket ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।",
-      "providerMessage": "ਤੁਹਾਡਾ {{provider}} ਕਨੈਕਸ਼ਨ ਹੁਣ ਵੈਧ ਨਹੀਂ ਹੈ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ — ਲੋੜ ਹੋਣ 'ਤੇ ਤੁਹਾਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਿਹਾ ਜਾਵੇਗਾ।"
+      "bitbucketTitle": "Bitbucket ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।"
     },
     "eventChips": {
       "comment": "ਟਿੱਪਣੀ",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ",
       "mergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "ਮਰਜ਼ ਰਿਕਵੈਸਟ !{{number}}",
       "shareMergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਸਾਂਝੀ ਕਰੋ",
       "viewOnProvider": "{{provider}} ਉੱਤੇ ਵੇਖੋ",
       "mergeRequestUnavailable": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ",
@@ -2293,9 +2293,9 @@
       "couldNotLoadGithubRepositories": "GitHub ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
       "couldNotLoadGitlabRepositories": "GitLab ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
       "couldNotLoadBitbucketRepositories": "Bitbucket ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
-      "connectGithubDescription": "ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ GitHub ਨੂੰ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
-      "connectGitlabDescription": "GitLab ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
-      "connectBitbucketDescription": "Bitbucket ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
+      "connectGithubDescription": "ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਤੋਂ ਸਾਈਨ ਇਨ ਕਰੋ, ਫਿਰ GitHub ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
+      "connectGitlabDescription": "ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਤੋਂ ਸਾਈਨ ਇਨ ਕਰੋ, ਫਿਰ GitLab ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
+      "connectBitbucketDescription": "ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਤੋਂ ਸਾਈਨ ਇਨ ਕਰੋ, ਫਿਰ Bitbucket ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
       "openGithub": "GitHub ਖੋਲ੍ਹੋ",
       "openGitlab": "GitLab ਖੋਲ੍ਹੋ",
       "openBitbucket": "Bitbucket ਖੋਲ੍ਹੋ",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "ਹੁਕਮ {{max}} ਅੱਖਰਾਂ ਤੱਕ ਸੀਮਿਤ ਹੈ",
     "commandsEmpty": "ਹਾਲੇ ਤੱਕ ਕੋਈ ਸੈੱਟਅੱਪ ਕਮਾਂਡ ਨਹੀਂ ਹੈ",
     "commandsSaveFailed": "ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਨੂੰ ਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
-    "moveUp": "ਉੱਪਰ ਜਾਓ",
-    "moveDown": "ਹੇਠਾਂ ਚਲੇ ਜਾਓ",
     "moveCommandUp": "ਕਮਾਂਡ {{position}} ਉੱਪਰ ਭੇਜੋ",
     "moveCommandDown": "ਕਮਾਂਡ {{position}} ਹੇਠਾਂ ਭੇਜੋ",
     "skillsTitle": "ਹੁਨਰ",
@@ -3859,7 +3857,10 @@
     "skillNameRequired": "ਇੱਕ ਹੁਨਰ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ",
     "skillNameInvalid": "ਹੁਨਰ ਦਾ ਨਾਮ ਇੱਕ ਅੱਖਰ ਜਾਂ ਅੰਕ ਨਾਲ ਸ਼ੁਰੂ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ ਅਤੇ ਸਿਰਫ ਛੋਟੇ ਅੱਖਰਾਂ, ਅੰਕਾਂ ਅਤੇ ਡੈਸ਼ਾਂ ਦੀ ਵਰਤੋਂ ਕਰਨਾ ਚਾਹੀਦਾ ਹੈ",
     "skillContentRequired": "ਹੁਨਰ ਸਮੱਗਰੀ ਦੀ ਲੋੜ ਹੈ",
-    "skillSaveFailed": "ਹੁਨਰ ਨੂੰ ਬਚਾ ਨਹੀਂ ਸਕਿਆ",
+    "skillSaveFailed": "ਹੁਨਰ ਨੂੰ ਬਚਾ ਨਹੀਂ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "skillDeleteFailed": "ਹੁਨਰ ਨੂੰ ਮਿਟਾ ਨਹੀਂ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "skillToggleFailed": "ਹੁਨਰ ਨੂੰ ਅੱਪਡੇਟ ਨਹੀਂ ਕਰ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "skillLimitReached": "ਇੱਕ ਪ੍ਰੋਫ਼ਾਈਲ ਵਿੱਚ ਵੱਧ ਤੋਂ ਵੱਧ {{max}} ਹੁਨਰ ਹੋ ਸਕਦੇ ਹਨ। ਇੱਕ ਹੋਰ ਸ਼ਾਮਲ ਕਰਨ ਲਈ ਇੱਕ ਹਟਾਓ।",
     "skillSourceCustom": "ਕਸਟਮ",
     "skillSourceMarketplace": "ਮਾਰਕੀਟਪਲੇਸ",
     "skillSourceSkillsSh": "skills.sh",

@@ -6,7 +6,6 @@ import { Pressable, View } from 'react-native';
 import { EmptyState } from '@/components/empty-state';
 import {
   addCommand,
-  commandPosition,
   commandRowA11yLabel,
   MAX_SETUP_COMMANDS,
   moveCommand,
@@ -174,24 +173,20 @@ export function ProfileCommandsScreen({
   const controlClass = (disabled: boolean) =>
     cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70', disabled && 'opacity-40');
 
-  const commandTotal = nonBlankCommands(commands).length;
   const renderCommandRow = (command: string, index: number) => {
     const isFirst = index === 0;
     const isLast = index === commands.length - 1;
-    const position = commandPosition(commands, index);
-    const upLabel =
-      position === null ? t('profiles.moveUp') : t('profiles.moveCommandUp', { position });
-    const downLabel =
-      position === null ? t('profiles.moveDown') : t('profiles.moveCommandDown', { position });
-    const deleteLabel =
-      position === null ? t('common.delete') : t('profiles.deleteCommand', { position });
+    // Every row is a command slot, so a blank draft row keeps the position it
+    // occupies in the list and its controls name that command, as the saved
+    // rows around it do.
+    const position = index + 1;
+    const upLabel = t('profiles.moveCommandUp', { position });
+    const downLabel = t('profiles.moveCommandDown', { position });
+    const deleteLabel = t('profiles.deleteCommand', { position });
     // The field's label is also its accessible name, so it carries the same
     // position the row's move and delete controls announce.
-    const commandLabel =
-      position === null
-        ? t('profiles.commandLabel')
-        : t('profiles.commandLabelPosition', { position });
-    const rowHint = position === null ? undefined : commandRowA11yLabel(position - 1, commandTotal);
+    const commandLabel = t('profiles.commandLabelPosition', { position });
+    const rowHint = commandRowA11yLabel(index, commands.length);
     return (
       <View key={`${generation}-${index}`} className="gap-3 rounded-lg bg-secondary p-3">
         <SetupCommandField

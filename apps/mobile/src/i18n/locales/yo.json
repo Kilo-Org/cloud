@@ -163,7 +163,7 @@
     "allLanguages": "Gbogbo èdè"
   },
   "login": {
-    "welcome": "Káàbọ̀ sí Kilo",
+    "welcome": "Káàbọ̀",
     "retrySignIn": "Tún gbìyànjú láti wọlé",
     "logo": "Àmì Kilo",
     "continuingSignIn": "A ń tẹ̀síwájú pẹ̀lú ìwọlé rẹ.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "So àkọọ́lẹ̀ GitLab rẹ pọ̀ láti ṣàtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan lórí fónù.",
       "bitbucketDescription": "So Bitbucket pọ̀ mọ́ àjọ yìí láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ lórí fónù.",
       "bitbucketOrgOnlyDescription": "Yí àkọọ́lẹ̀ tí ó wà lókè padà sí àjọ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket rẹ̀.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Àkọọ́lẹ̀ yìí kò tíì ní àjọ rárá. A ó lè ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket nígbà tí o bá dá àjọ sílẹ̀ tàbí darapọ̀ mọ́ àjọ kan.",
       "contextLine": "Fún {{organization}}",
       "contextLinePersonal": "Fún ti ara ẹni"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Àkókò ìsopọ̀ GitHub ti parí.",
-      "message": "Àsopọ̀ GitHub rẹ kò wúlò mọ́. Tún ṣàyẹ̀wò àsopọ̀ rẹ — a ó ní kí o tún sopọ̀ bí ó bá yẹ.",
+      "message": "Tún ṣàyẹ̀wò àsopọ̀ rẹ — a ó ní kí o tún sopọ̀ bí ó bá yẹ.",
       "gitlabTitle": "Àkókò ìsopọ̀ GitLab ti parí.",
-      "bitbucketTitle": "Àkókò ìsopọ̀ Bitbucket ti parí.",
-      "providerMessage": "Àsopọ̀ {{provider}} rẹ kò wúlò mọ́. Tún ṣàyẹ̀wò àsopọ̀ rẹ — a ó ní kí o tún sopọ̀ bí ó bá yẹ."
+      "bitbucketTitle": "Àkókò ìsopọ̀ Bitbucket ti parí."
     },
     "eventChips": {
       "comment": "Àsọyé",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Ìbéèrè àkópọ̀",
       "mergeRequest": "Ìbéèrè ìṣọ̀kan",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Ìbéèrè ìṣọ̀kan !{{number}}",
       "shareMergeRequest": "Pín ìbéèrè ìṣọ̀kan",
       "viewOnProvider": "Wò ó lórí {{provider}}",
       "mergeRequestUnavailable": "Ìbéèrè ìṣọ̀kan kò sí",
@@ -2293,9 +2293,9 @@
       "couldNotLoadGithubRepositories": "A kò lè gbé àwọn ibi ìpamọ́ kóòdù GitHub wọlé.",
       "couldNotLoadGitlabRepositories": "A kò lè gbé àwọn ibi ìpamọ́ kóòdù GitLab wọlé.",
       "couldNotLoadBitbucketRepositories": "A kò lè gbé àwọn ibi ìpamọ́ kóòdù Bitbucket wọlé.",
-      "connectGithubDescription": "So GitHub pọ̀ nínú aṣàwákiri rẹ, lẹ́yìn náà padà síbí láti yan ibi ìpamọ́ kóòdù.",
-      "connectGitlabDescription": "So GitLab pọ̀ nínú aṣàwákiri rẹ, lẹ́yìn náà padà síbí láti yan ibi ìpamọ́ kóòdù.",
-      "connectBitbucketDescription": "So Bitbucket pọ̀ nínú aṣàwákiri rẹ, lẹ́yìn náà padà síbí láti yan ibi ìpamọ́ kóòdù.",
+      "connectGithubDescription": "Forúkọsíwọ́ nínú aṣàwákiri rẹ, lẹ́yìn náà padà síbí láti yan ibi ìpamọ́ kóòdù GitHub.",
+      "connectGitlabDescription": "Forúkọsíwọ́ nínú aṣàwákiri rẹ, lẹ́yìn náà padà síbí láti yan ibi ìpamọ́ kóòdù GitLab.",
+      "connectBitbucketDescription": "Forúkọsíwọ́ nínú aṣàwákiri rẹ, lẹ́yìn náà padà síbí láti yan ibi ìpamọ́ kóòdù Bitbucket.",
       "openGithub": "Ṣí GitHub",
       "openGitlab": "Ṣí GitLab",
       "openBitbucket": "Ṣí Bitbucket",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Pipaṣẹ naa ní ààlà {{max}} àmì",
     "commandsEmpty": "Ko si awọn pipaṣẹ iṣeto sibẹsibẹ",
     "commandsSaveFailed": "Ko le fi awọn pipaṣẹ iṣeto pamọ",
-    "moveUp": "Gbe soke",
-    "moveDown": "Yi lọ si isalẹ",
     "moveCommandUp": "Gbe aṣẹ {{position}} sókè",
     "moveCommandDown": "Gbe aṣẹ {{position}} sílẹ̀",
     "skillsTitle": "Awọn ogbon",
@@ -3859,7 +3857,10 @@
     "skillNameRequired": "Tẹ a olorijori orukọ",
     "skillNameInvalid": "Orukọ ogbon gbọdọ bẹrẹ pẹlu lẹta tabi nọmba ati lo awọn lẹta kekere nikan, awọn nọmba, ati dashes",
     "skillContentRequired": "Akoonu ogbon ni a nilo",
-    "skillSaveFailed": "Ko le fi ogbon pamọ",
+    "skillSaveFailed": "Ko le fi ogbon pamọ. Gbiyanju lẹẹkansi.",
+    "skillDeleteFailed": "Ko le pa ogbon rẹ. Gbiyanju lẹẹkansi.",
+    "skillToggleFailed": "Ko le ṣe imudojuiwọn ogbon. Gbiyanju lẹẹkansi.",
+    "skillLimitReached": "Profaili le gba awọn ogbon to {{max}}. Paarẹ ọkan lati fi omiran kun.",
     "skillSourceCustom": "Ti ara rẹ",
     "skillSourceMarketplace": "Ọjà",
     "skillSourceSkillsSh": "skills.sh",

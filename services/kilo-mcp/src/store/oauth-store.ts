@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { AuthRequest } from '@cloudflare/workers-oauth-provider';
-import { and, desc, eq, gt, isNotNull, isNull, lt, notInArray, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, notInArray, sql } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
@@ -42,6 +42,19 @@ const STORE_INSTANCE_NAME = 'kilo-mcp-oauth';
 
 /** Interval between expired-row purges (DO alarm). */
 const PURGE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+/** Interval for the early housekeeping run that `alarm` schedules. */
+const PURGE_RETRY_INTERVAL_MS = 5 * 60 * 1000;
+
+/** Rows one housekeeping delete statement removes. */
+export const PENDING_PURGE_BATCH_SIZE = 90;
+
+/**
+ * Batches one housekeeping run removes. A run stays short enough to leave the
+ * single store Durable Object responsive to the rest of the OAuth traffic; an
+ * expired set larger than this is finished by the early follow-up run.
+ */
+export const PENDING_PURGE_BATCHES_PER_RUN = 10;
 
 /**
  * Newest refresh-token hashes kept per grant. The provider accepts the current
@@ -343,6 +356,19 @@ export class KiloMcpOAuthStore
   }
 
   async purgeExpired(nowIso: string): Promise<number> {
+    const progress = await this.purgeExpiredWithProgress(nowIso, Number.POSITIVE_INFINITY);
+    return progress.deleted;
+  }
+
+  /**
+   * Every expired-row delete housekeeping performs, in at most `maxBatches`
+   * batches for the pending records. Reports whether expired pending rows are
+   * left, so a caller can keep its run short and finish the rest later.
+   */
+  private async purgeExpiredWithProgress(
+    nowIso: string,
+    maxBatches: number
+  ): Promise<{ deleted: number; moreRemaining: boolean }> {
     this.db
       .delete(oauthRefreshTokenHistory)
       .where(lt(oauthRefreshTokenHistory.expires_at, nowIso))
@@ -351,12 +377,43 @@ export class KiloMcpOAuthStore
     // retains it. Authenticator rows are long-lived and never purged: the
     // recorded single-use step must outlive the requests it guarded.
     this.db.delete(mcpProtectedRequests).where(lt(mcpProtectedRequests.expires_at, nowIso)).run();
-    const expiredPendingAuthorizations = this.db
-      .delete(oauthPendingAuthorizations)
+    return this.drainExpiredPending(nowIso, maxBatches);
+  }
+
+  /** Delete expired pending-authorization rows in at most `maxBatches` batches. */
+  private async drainExpiredPending(
+    nowIso: string,
+    maxBatches: number
+  ): Promise<{ deleted: number; moreRemaining: boolean }> {
+    let deleted = 0;
+    for (let batch = 0; batch < maxBatches; batch += 1) {
+      const expiredIds = this.db
+        .select({ id: oauthPendingAuthorizations.id })
+        .from(oauthPendingAuthorizations)
+        .where(lt(oauthPendingAuthorizations.expires_at, nowIso))
+        .limit(PENDING_PURGE_BATCH_SIZE)
+        .all()
+        .map(row => row.id);
+      if (expiredIds.length === 0) return { deleted, moreRemaining: false };
+      this.db
+        .delete(oauthPendingAuthorizations)
+        .where(
+          and(
+            lt(oauthPendingAuthorizations.expires_at, nowIso),
+            inArray(oauthPendingAuthorizations.id, expiredIds)
+          )
+        )
+        .run();
+      deleted += expiredIds.length;
+      if (expiredIds.length < PENDING_PURGE_BATCH_SIZE) return { deleted, moreRemaining: false };
+    }
+    const next = this.db
+      .select({ id: oauthPendingAuthorizations.id })
+      .from(oauthPendingAuthorizations)
       .where(lt(oauthPendingAuthorizations.expires_at, nowIso))
-      .returning({ id: oauthPendingAuthorizations.id })
-      .all().length;
-    return expiredPendingAuthorizations;
+      .limit(1)
+      .all();
+    return { deleted, moreRemaining: next.length > 0 };
   }
 
   /**
@@ -767,10 +824,31 @@ export class KiloMcpOAuthStore
       .run();
   }
 
-  /** One alarm per DO: purge rows past their own expiry, then reschedule. */
+  /**
+   * One alarm per DO: purge rows past their own expiry, then reschedule. The
+   * next run is scheduled on every path: the periodic interval once no expired
+   * row is left, the early interval while more remain or the purge did not
+   * finish.
+   */
   async alarm(): Promise<void> {
-    await this.purgeExpired(new Date().toISOString());
-    await this.ctx.storage.setAlarm(Date.now() + PURGE_INTERVAL_MS);
+    let moreRemaining: boolean;
+    try {
+      const progress = await this.purgeExpiredWithProgress(
+        new Date().toISOString(),
+        PENDING_PURGE_BATCHES_PER_RUN
+      );
+      moreRemaining = progress.moreRemaining;
+    } catch (error) {
+      console.warn(
+        `[kilo-mcp] oauth store housekeeping incomplete; next run scheduled shortly: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      moreRemaining = true;
+    }
+    await this.ctx.storage.setAlarm(
+      Date.now() + (moreRemaining ? PURGE_RETRY_INTERVAL_MS : PURGE_INTERVAL_MS)
+    );
   }
 }
 

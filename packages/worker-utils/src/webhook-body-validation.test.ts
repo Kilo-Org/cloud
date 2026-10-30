@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   webhookBodySchema,
+  parseStoredWebhookBodySchema,
+  unsupportedPatternPaths,
   validateWebhookBody,
   WEBHOOK_BODY_SCHEMA_EXAMPLE,
 } from './webhook-body-validation';
@@ -121,6 +123,64 @@ describe('webhook body validation', () => {
     expect(
       webhookBodySchema.safeParse({ enum: Array.from({ length: 513 }, (_, i) => i) }).success
     ).toBe(false);
+  });
+
+  it('refuses patterns outside the accepted subset', () => {
+    const unsupported = '^(a+)+$';
+    const root = webhookBodySchema.safeParse({ type: 'string', pattern: unsupported });
+    expect(root.success).toBe(false);
+    expect(root.error?.issues.map(issue => issue.message)).toEqual([
+      'Pattern must not nest quantifiers that exceed 64 combined repetitions',
+    ]);
+    expect(webhookBodySchema.safeParse({ pattern: '(a)\\1' }).error?.issues[0]?.message).toBe(
+      'Pattern must not use backreferences'
+    );
+    const nested = webhookBodySchema.safeParse({
+      type: 'object',
+      properties: { event: { type: 'string', pattern: '(a|a)+' } },
+    });
+    expect(nested.success).toBe(false);
+    expect(nested.error?.issues.map(issue => [issue.path, issue.message])).toEqual([
+      [
+        ['properties', 'event', 'pattern'],
+        'Pattern must not repeat alternatives that can match the same characters',
+      ],
+    ]);
+    expect(webhookBodySchema.safeParse({ pattern: '[' }).error?.issues[0]?.message).toBe(
+      'Pattern must be a valid regular expression'
+    );
+  });
+
+  it('keeps a stored schema loadable and reports the patterns it cannot apply', () => {
+    const stored = {
+      type: 'object',
+      properties: {
+        event: { type: 'string', pattern: '^(a+)+$' },
+        keep: { type: 'string', pattern: '^ok$' },
+      },
+      required: ['event', 'keep'],
+      additionalProperties: false,
+    };
+    expect(webhookBodySchema.safeParse(stored).success).toBe(false);
+    const loaded = parseStoredWebhookBodySchema(stored);
+    expect(loaded).toEqual(stored);
+    expect(unsupportedPatternPaths(loaded)).toEqual(['/properties/event/pattern']);
+    expect(validateWebhookBody(loaded, JSON.stringify({ event: 'anything' }))).toEqual({
+      valid: true,
+      unsupportedPatterns: ['/properties/event/pattern'],
+    });
+    expect(validateWebhookBody(loaded, '{').valid).toBe(false);
+  });
+
+  it('reports an unsupported pattern nested under a negation', () => {
+    const stored = parseStoredWebhookBodySchema({
+      type: 'object',
+      properties: { event: { not: { pattern: '^(a+)+$' } } },
+    });
+    expect(validateWebhookBody(stored, '{"event":"value"}')).toEqual({
+      valid: true,
+      unsupportedPatterns: ['/properties/event/not/pattern'],
+    });
   });
 
   it('provides an accepted example', () => {

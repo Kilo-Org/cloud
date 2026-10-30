@@ -19,8 +19,8 @@ jest.mock('next/navigation', () => ({
 
 type LinkedomParseHtml = (html: string) => { window: typeof globalThis; document: Document };
 
-const requireFromHere = createRequire(__filename);
-const { parseHTML } = requireFromHere('linkedom') as { parseHTML: LinkedomParseHtml };
+const requireFromNext = createRequire(createRequire(__filename).resolve('next/package.json'));
+const { parseHTML } = requireFromNext('linkedom') as { parseHTML: LinkedomParseHtml };
 const { window: domWindow, document: domDocument } = parseHTML(
   '<!doctype html><html><body><div id="root"></div></body></html>'
 );

@@ -2727,6 +2727,7 @@
       "gitlabDescription": "Connetti il tuo account GitLab per revisionare le merge request dall'app.",
       "bitbucketDescription": "Connetti Bitbucket a questa organizzazione per revisionare le pull request dall'app.",
       "bitbucketOrgOnlyDescription": "Passa l'account qui sopra a un'organizzazione per revisionarne le pull request Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Questo account non ha ancora nessuna organizzazione. Le pull request Bitbucket possono essere revisionate una volta che crei un'organizzazione o ne entri a far parte.",
       "contextLine": "Per {{organization}}",
       "contextLinePersonal": "Per il tuo account personale"
     },

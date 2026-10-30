@@ -684,6 +684,7 @@
       "gitlabDescription": "በሞባይል ላይ የማዋሃድ ጥያቄዎችን ለመገምገም የGitLab መለያዎን ያገናኙ።",
       "bitbucketDescription": "Bitbucketን ከዚህ ድርጅት ጋር ያገናኙ የማዋሃድ ጥያቄዎችን በሞባይል ለመገምገም።",
       "bitbucketOrgOnlyDescription": "ከላይ ያለውን መለያ ወደ ድርጅት ይቀይሩ፣ የዚህ ድርጅት የBitbucket የማዋሃድ ጥያቄዎችን ለመገምገም።",
+      "bitbucketOrgOnlyNoOrganizationDescription": "ይህ መለያ እስካሁን ድርጅቶች የለውም። ድርጅት ሲፈጥሩ ወይም ሲቀላቀሉ የBitbucket የማዋሃድ ጥያቄዎችን ማገምገም ይቻላል።",
       "contextLine": "ለ{{organization}}",
       "contextLinePersonal": "ለግል መለያዎ"
     },

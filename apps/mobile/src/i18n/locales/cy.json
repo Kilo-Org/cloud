@@ -744,6 +744,7 @@
       "gitlabDescription": "Cysylltwch eich cyfrif GitLab i adolygu ceisiadau uno ar y dyfais symudol.",
       "bitbucketDescription": "Cysylltwch Bitbucket â'r sefydliad hwn i adolygu ceisiadau tynnu ar y dyfais symudol.",
       "bitbucketOrgOnlyDescription": "Newidiwch y cyfrif uchod i sefydliad i adolygu ei geisiadau tynnu ar Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Nid oes unrhyw sefydliadau gyda'r cyfrif hwn eto. Gallwch adolygu ceisiadau tynnu Bitbucket unwaith y byddwch yn creu sefydliad neu'n ymuno ag un.",
       "contextLine": "Ar gyfer {{organization}}",
       "contextLinePersonal": "Ar gyfer eich cyfrif personol"
     },

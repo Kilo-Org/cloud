@@ -2699,6 +2699,7 @@
       "gitlabDescription": "Verbinde dein GitLab-Konto, um Merge-Requests in der App zu prüfen.",
       "bitbucketDescription": "Verbinde Bitbucket mit dieser Organisation, um Pull-Requests in der App zu prüfen.",
       "bitbucketOrgOnlyDescription": "Wechsle das Konto oben zu einer Organisation, um deren Pull-Requests in Bitbucket zu prüfen.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Diesem Konto ist noch keine Organisation zugeordnet. Du kannst Bitbucket-Pull-Requests prüfen, sobald du eine Organisation erstellst oder einer beitrittst.",
       "contextLine": "Für {{organization}}",
       "contextLinePersonal": "Für den persönlichen Bereich"
     },

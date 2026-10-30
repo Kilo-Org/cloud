@@ -2699,6 +2699,7 @@
       "gitlabDescription": "Mobilde birleştirme isteklerini gözden geçirmek için GitLab hesabını bağla.",
       "bitbucketDescription": "Mobilde çekme isteklerini gözden geçirmek için Bitbucket'ı bu kuruluşla bağla.",
       "bitbucketOrgOnlyDescription": "Yukarıdaki hesabı bir kuruluşa geçir, onun Bitbucket çekme isteklerini gözden geçirmek için.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabın henüz bir kuruluşu yok. Bitbucket çekme isteklerini, bir kuruluş oluşturduktan ya da birine katıldıktan sonra gözden geçirebilirsin.",
       "contextLine": "{{organization}} için",
       "contextLinePersonal": "Kişisel hesabınız için"
     },

@@ -684,6 +684,7 @@
       "gitlabDescription": "Tilslut din GitLab-konto for at gennemgå merge requests på mobilen.",
       "bitbucketDescription": "Tilslut Bitbucket til denne organisation for at gennemgå pull requests på mobilen.",
       "bitbucketOrgOnlyDescription": "Skift kontoen ovenfor til en organisation for at gennemgå dens pull requests i Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Denne konto har endnu ingen organisationer. Bitbucket pull requests kan gennemgås, når du opretter eller tilslutter dig en organisation.",
       "contextLine": "Til {{organization}}",
       "contextLinePersonal": "Til din personlige konto"
     },

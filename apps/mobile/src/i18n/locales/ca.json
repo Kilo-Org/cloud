@@ -699,6 +699,7 @@
       "gitlabDescription": "Connecta el teu compte de GitLab per revisar sol·licituds de fusió des del mòbil.",
       "bitbucketDescription": "Connecta Bitbucket a aquesta organització per revisar sol·licituds d'integració des del mòbil.",
       "bitbucketOrgOnlyDescription": "Canvia el compte de dalt a una organització per revisar-ne les sol·licituds d'integració a Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Aquest compte encara no té cap organització. Les sol·licituds d'integració de Bitbucket es poden revisar quan creeu o us uniu a una organització.",
       "contextLine": "Per a {{organization}}",
       "contextLinePersonal": "Per a ús personal"
     },

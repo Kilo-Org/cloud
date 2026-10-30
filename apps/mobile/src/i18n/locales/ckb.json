@@ -684,6 +684,7 @@
       "gitlabDescription": "هەژمارەی GitLabەکەت بچەلەاندن بۆ پێداچوونەوەی داواکارییەکانی تێکەڵکردن لە مۆبایلدا.",
       "bitbucketDescription": "Bitbucket بەم ڕێکخراوە بچەلەێنە بۆ پێداچوونەوەی داواکارییەکانی ڕاکێشان لە مۆبایلدا.",
       "bitbucketOrgOnlyDescription": "هەژمارەی سەرەوە بگۆڕە بۆ ڕێکخراوێک بۆ پێداچوونەوەی داواکارییەکانی ڕاکێشانی Bitbucketی.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "ئەم هەژمارە هێشتا هیچ ڕێکخراوێکی نییە. دوای دروستکردن یان بەشداریکردن لە ڕێکخراوێکدا، دەتوانیت پێداچوونەوەی داواکارییەکانی ڕاکێشانی Bitbucket بکەیت.",
       "contextLine": "بۆ {{organization}}",
       "contextLinePersonal": "بۆ هەژماری کەسی"
     },

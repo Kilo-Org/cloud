@@ -714,6 +714,7 @@
       "gitlabDescription": "Pripoj svoj účet GitLab a kontroluj merge requesty v mobile.",
       "bitbucketDescription": "Pripoj Bitbucket k tejto organizácii a kontroluj žiadosti o zlúčenie v mobile.",
       "bitbucketOrgOnlyDescription": "Prepni účet hore na organizáciu a kontroluj jej žiadosti o zlúčenie na Bitbucku.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatiaľ nemá žiadne organizácie. Žiadosti o zlúčenie na Bitbucku môžeš kontrolovať po vytvorení organizácie alebo vstúpení do nej.",
       "contextLine": "Pre {{organization}}",
       "contextLinePersonal": "Pre osobný účet"
     },

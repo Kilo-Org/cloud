@@ -2727,6 +2727,7 @@
       "gitlabDescription": "חברו את חשבון GitLab שלכם כדי לסקור בקשות מיזוג בנייד.",
       "bitbucketDescription": "חברו את Bitbucket לארגון הזה כדי לסקור בקשות משיכה בנייד.",
       "bitbucketOrgOnlyDescription": "החליפו את החשבון שלמעלה לארגון כדי לסקור את בקשות המשיכה שלו ב-Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "לחשבון הזה אין עדיין ארגונים. אפשר לסקור בקשות משיכה ב-Bitbucket לאחר שתיצרו או תצטרפו לארגון.",
       "contextLine": "עבור {{organization}}",
       "contextLinePersonal": "עבור החשבון האישי"
     },

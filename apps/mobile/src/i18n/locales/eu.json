@@ -684,6 +684,7 @@
       "gitlabDescription": "Konektatu zure GitLab kontua merge-eskaerak mugikorrean berrikusteko.",
       "bitbucketDescription": "Konektatu Bitbucket erakunde honetara bateratze-eskaerak mugikorrean berrikusteko.",
       "bitbucketOrgOnlyDescription": "Aldatu goiko kontua erakunde batera haren Bitbucket bateratze-eskaerak berrikusteko.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Kontu honek ez du oraindik erakunderik. Erakunde bat sortu edo batekin bat egiten duzunean, haren Bitbucket bateratze-eskaerak berrikus ditzakezu.",
       "contextLine": "{{organization}}-rako",
       "contextLinePersonal": "Zure kontu pertsonalerako"
     },

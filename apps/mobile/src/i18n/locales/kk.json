@@ -684,6 +684,7 @@
       "gitlabDescription": "Мобильдіде біріктіру сұрауларын қарау үшін GitLab тіркелгіңізді қосыңыз.",
       "bitbucketDescription": "Мобильдіде тарту сұрауларын қарау үшін Bitbucket-ты осы ұйымға қосыңыз.",
       "bitbucketOrgOnlyDescription": "Жоғарыдағы тіркелгіні ұйымға ауыстырыңыз, оның Bitbucket тарту сұрауларын қарау үшін.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Бұл тіркелгіде әзірге ешбір ұйым жоқ. Ұйым құрғаннан немесе оған қосылғаннан кейін Bitbucket тарту сұрауларын қарауға болады.",
       "contextLine": "{{organization}} үшін",
       "contextLinePersonal": "Жеке аккаунтыңыз үшін"
     },

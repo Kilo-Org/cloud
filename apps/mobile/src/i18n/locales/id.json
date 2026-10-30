@@ -2699,6 +2699,7 @@
       "gitlabDescription": "Hubungkan akun GitLab kamu untuk meninjau merge request di ponsel.",
       "bitbucketDescription": "Hubungkan Bitbucket ke organisasi ini untuk meninjau PR di ponsel.",
       "bitbucketOrgOnlyDescription": "Ganti akun di atas ke sebuah organisasi untuk meninjau PR Bitbucket-nya.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Akun ini belum memiliki organisasi. PR Bitbucket dapat ditinjau setelah Anda membuat atau bergabung dengan organisasi.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akun pribadi Anda"
     },

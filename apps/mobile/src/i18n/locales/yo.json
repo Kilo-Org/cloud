@@ -684,6 +684,7 @@
       "gitlabDescription": "So àkọọ́lẹ̀ GitLab rẹ pọ̀ láti ṣàtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan lórí fónù.",
       "bitbucketDescription": "So Bitbucket pọ̀ mọ́ àjọ yìí láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ lórí fónù.",
       "bitbucketOrgOnlyDescription": "Yí àkọọ́lẹ̀ tí ó wà lókè padà sí àjọ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket rẹ̀.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Àkọọ́lẹ̀ yìí kò tíì ní àjọ rárá. A ó lè ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket nígbà tí o bá dá àjọ sílẹ̀ tàbí darapọ̀ mọ́ àjọ kan.",
       "contextLine": "Fún {{organization}}",
       "contextLinePersonal": "Fún ti ara ẹni"
     },

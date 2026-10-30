@@ -729,6 +729,7 @@
       "gitlabDescription": "Ikkonnettja l-kont GitLab tiegħek biex tirrevedi l-merge requests fuq il-mowbajl.",
       "bitbucketDescription": "Ikkonnettja Bitbucket ma' din l-organizzazzjoni biex tirrevedi l-PRs fuq il-mowbajl.",
       "bitbucketOrgOnlyDescription": "Ibdel il-kont ta' fuq għal organizzazzjoni biex tirrevedi l-PRs Bitbucket tagħha.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Dan il-kont m'għandux organizzazzjonijiet għadu. Tista' tirrevedi l-PRs Bitbucket ladarba toħloq organizzazzjoni jew tingħaqad ma' waħda.",
       "contextLine": "Għal {{organization}}",
       "contextLinePersonal": "Għall-kont personali tiegħek"
     },

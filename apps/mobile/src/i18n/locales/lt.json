@@ -714,6 +714,7 @@
       "gitlabDescription": "Prijunk savo GitLab paskyrą, kad galėtum peržiūrėti merge requests mobiliajame įrenginyje.",
       "bitbucketDescription": "Prijunk Bitbucket prie šios organizacijos, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
       "bitbucketOrgOnlyDescription": "Perjunk aukščiau esančią paskyrą į organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Ši paskyra dar neturi jokių organizacijų. Sukūręs arba prisijungęs prie organizacijos galėsi peržiūrėti Bitbucket pakeitimų užklausas.",
       "contextLine": "Skirta {{organization}}",
       "contextLinePersonal": "Skirta asmeninei paskyrai"
     },

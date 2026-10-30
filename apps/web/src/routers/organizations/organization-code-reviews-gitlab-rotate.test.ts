@@ -52,7 +52,8 @@ async function makeOrgAndOwner() {
 
 async function seedGitLabIntegration(
   organizationId: string,
-  metadata: Record<string, unknown>
+  metadata: Record<string, unknown>,
+  integrationStatus: 'active' | 'suspended' = 'active'
 ): Promise<{ id: string; secret: string | undefined }> {
   const oldSecret = 'old-secret-do-not-leak';
   const [integration] = await db
@@ -61,7 +62,7 @@ async function seedGitLabIntegration(
       owned_by_organization_id: organizationId,
       platform: 'gitlab',
       integration_type: 'oauth',
-      integration_status: 'active',
+      integration_status: integrationStatus,
       platform_installation_id: `inst-${crypto.randomUUID()}`,
       metadata: { ...metadata, webhook_secret: oldSecret },
     })
@@ -218,7 +219,65 @@ describe('P1-D-32 GitLab webhook secret (rotation + status)', () => {
         organizationId: organization.id,
       });
 
-      expect(status).toEqual({ connected: false, integration: null });
+      // A row the organization already authorized must ask for a
+      // re-authorization, not a first-time connect.
+      expect(status).toEqual({
+        connected: false,
+        reconnectRequired: true,
+        integration: null,
+      });
+    });
+
+    it('reports no reconnect for an organization that never connected GitLab', async () => {
+      const { owner, organization } = await makeOrgAndOwner();
+
+      const caller = await createCallerForUser(owner.id);
+      const status = await caller.organizations.reviewAgent.getGitLabStatus({
+        organizationId: organization.id,
+      });
+
+      expect(status).toEqual({
+        connected: false,
+        reconnectRequired: false,
+        integration: null,
+      });
+    });
+
+    it('reports reconnect for an existing row that is no longer active', async () => {
+      const { owner, organization } = await makeOrgAndOwner();
+      await seedGitLabIntegration(
+        organization.id,
+        { gitlab_instance_url: 'https://gitlab.example.com' },
+        'suspended'
+      );
+
+      const caller = await createCallerForUser(owner.id);
+      const status = await caller.organizations.reviewAgent.getGitLabStatus({
+        organizationId: organization.id,
+      });
+
+      expect(status).toEqual({
+        connected: false,
+        reconnectRequired: true,
+        integration: null,
+      });
+      // A row that cannot serve a review never reaches the credential broker.
+      expect(mockIsGitLabCredentialConnected).not.toHaveBeenCalled();
+    });
+
+    it('reports a healthy organization connection without a reconnect marker', async () => {
+      const { owner, organization } = await makeOrgAndOwner();
+      await seedGitLabIntegration(organization.id, {
+        gitlab_instance_url: 'https://gitlab.example.com',
+      });
+
+      const caller = await createCallerForUser(owner.id);
+      const status = await caller.organizations.reviewAgent.getGitLabStatus({
+        organizationId: organization.id,
+      });
+
+      expect(status.connected).toBe(true);
+      expect(status.reconnectRequired).toBe(false);
     });
 
     it('keeps the row-based answer for a Kilo admin, whom the broker cannot authorize', async () => {

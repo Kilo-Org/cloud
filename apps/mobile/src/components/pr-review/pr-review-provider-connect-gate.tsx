@@ -16,6 +16,7 @@ import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { WEB_BASE_URL } from '@/lib/config';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
 import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
@@ -59,6 +60,11 @@ export function ProviderConnectGate({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const instanceHint = useInstanceHint(platform);
+  // The org-only arm sends a personal reader to the account switch above. That
+  // switch is the context line's, and it exists only when the reader has a
+  // membership — so the memberships answer decides which copy is true. One
+  // cache entry serves this and the context line; nothing refetches.
+  const memberships = useOrganizationsList();
 
   // The providers — and the two GitLab scopes, whose payloads now differ by
   // the personal reconnect marker — answer with different status shapes, so
@@ -136,16 +142,22 @@ export function ProviderConnectGate({
     isError: status.isError,
     isLoading: status.isPending,
     connected: status.data?.connected === true,
-    // Only the personal GitLab status distinguishes an existing connection
-    // that needs re-authorizing from a first-time connect.
+    // Both GitLab scopes distinguish an existing connection that needs
+    // re-authorizing from a first-time connect: the personal and the
+    // organization status reads each report the marker for their own row.
     reconnectRequired:
-      platform === 'gitlab' && organizationId === null
-        ? personalGitlabStatus.data?.reconnectRequired === true
-        : false,
+      platform === 'gitlab' ? gitlabStatus.data?.reconnectRequired === true : false,
     organizationId,
   });
 
   if (view === 'org-only') {
+    // Only claim there is nowhere to go once the memberships answer says so;
+    // until it lands, keep the guidance the common case with an organization
+    // can act on.
+    const orgOnlyDescription =
+      memberships.data?.length === 0
+        ? t('prReview.connect.bitbucketOrgOnlyNoOrganizationDescription')
+        : t('prReview.connect.bitbucketOrgOnlyDescription');
     return (
       <View className="flex-1 bg-background">
         <PrReviewGateHeader />
@@ -156,7 +168,7 @@ export function ProviderConnectGate({
             <>
               <PrReviewContextLine />
               <Text variant="muted" className="text-center">
-                {t('prReview.connect.bitbucketOrgOnlyDescription')}
+                {orgOnlyDescription}
               </Text>
             </>
           }

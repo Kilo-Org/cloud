@@ -2755,6 +2755,7 @@
       "gitlabDescription": "Połącz konto GitLab, aby przeglądać merge requesty na telefonie.",
       "bitbucketDescription": "Połącz Bitbucket z tą organizacją, aby przeglądać PR-y na telefonie.",
       "bitbucketOrgOnlyDescription": "Przełącz konto powyżej na organizację, aby przeglądać jej PR-y na Bitbucketu.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "To konto nie ma jeszcze żadnych organizacji. PR-y na Bitbucketu będzie można przeglądać po utworzeniu organizacji lub dołączeniu do niej.",
       "contextLine": "Dla {{organization}}",
       "contextLinePersonal": "Dla konta osobistego"
     },

@@ -684,6 +684,7 @@
       "gitlabDescription": "Haɗa asusun GitLab ɗinka don bita buƙatun haɗawa a wayar hannu.",
       "bitbucketDescription": "Haɗa Bitbucket da wannan ƙungiya don bita buƙatun haɗa canje-canje a wayar hannu.",
       "bitbucketOrgOnlyDescription": "Canja asusun da ke sama zuwa ƙungiya don bita buƙatun haɗa canje-canje na Bitbucket na ƙungiyar.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Wannan asusu ba shi da ƙungiyoyi har yanzu. Za a iya bita buƙatun haɗa canje-canje na Bitbucket idan ka ƙirƙiri ƙungiya ko ka shiga cikin wata.",
       "contextLine": "Don {{organization}}",
       "contextLinePersonal": "Don kashin kanka"
     },

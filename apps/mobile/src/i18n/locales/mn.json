@@ -684,6 +684,7 @@
       "gitlabDescription": "Гар утаснаас нэгтгэх хүсэлтүүдийг шалгахын тулд GitLab бүртгэлээ холбоно уу.",
       "bitbucketDescription": "Гар утаснаас татах хүсэлтүүдийг шалгахын тулд Bitbucket-ийг энэ байгууллагад холбоно уу.",
       "bitbucketOrgOnlyDescription": "Түүний Bitbucket татах хүсэлтүүдийг шалгахын тулд дээрх бүртгэлийг байгууллагад шилжүүлнэ үү.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Энэ бүртгэлд одоогоор ямар ч байгууллага алга. Байгууллага үүсгэсэн эсвэл нэгэнд нэгдсэний дараа Bitbucket татах хүсэлтийг шалгах боломжтой болно.",
       "contextLine": "{{organization}}-ийн хувьд",
       "contextLinePersonal": "Хувийн дансны хувьд"
     },

@@ -699,6 +699,7 @@
       "gitlabDescription": "Poveži svoj GitLab nalog da pregledaš merge requeste na telefonu.",
       "bitbucketDescription": "Poveži Bitbucket sa ovom organizacijom da pregledaš zahteve za spajanje na telefonu.",
       "bitbucketOrgOnlyDescription": "Prebaci nalog gore na organizaciju da pregledaš njene zahteve za spajanje na Bitbucktu.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj nalog još nema organizacije. Zahteve za spajanje na Bitbucktu možeš pregledati kada kreiraš ili se pridružiš organizaciji.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za lični nalog"
     },

@@ -684,6 +684,7 @@
       "gitlabDescription": "ମୋବାଇଲରେ ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକୁ ସମୀକ୍ଷା କରିବାକୁ ଆପଣଙ୍କ GitLab ଖାତା ସଂଯୋଗ କରନ୍ତୁ।",
       "bitbucketDescription": "ମୋବାଇଲରେ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକୁ ସମୀକ୍ଷା କରିବାକୁ ଏହି ସଂଗଠନକୁ Bitbucket ସହ ସଂଯୋଗ କରନ୍ତୁ।",
       "bitbucketOrgOnlyDescription": "ଏହାର Bitbucket ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକୁ ସମୀକ୍ଷା କରିବାକୁ ଉପର ଖାତାକୁ ଏକ ସଂଗଠନକୁ ବଦଳାନ୍ତୁ।",
+      "bitbucketOrgOnlyNoOrganizationDescription": "ଏହି ଖାତାରେ ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସଂଗଠନ ନାହିଁ। ଆପଣ ଏକ ସଂଗଠନ ସୃଷ୍ଟି କଲାପରେ କିମ୍ବା ଯୋଗ ଦେଲାପରେ Bitbucket ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକ ସମୀକ୍ଷା କରାଯାଇପାରିବ।",
       "contextLine": "{{organization}} ପାଇଁ",
       "contextLinePersonal": "ଆପଣଙ୍କ ବ୍ୟକ୍ତିଗତ ଖାତା ପାଇଁ"
     },

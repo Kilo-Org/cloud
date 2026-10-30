@@ -684,6 +684,7 @@
       "gitlabDescription": "Tengdu GitLab-reikninginn þinn til að yfirfara merge requests í símanum.",
       "bitbucketDescription": "Tengdu Bitbucket við þessa stofnun til að yfirfara sameiningarbeiðnir í símanum.",
       "bitbucketOrgOnlyDescription": "Skiptu reikningnum hér að ofan yfir í stofnun til að yfirfara sameiningarbeiðnir hennar á Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Þessi reikningur er ekki með neinar stofnanir ennþá. Hægt er að yfirfara sameiningarbeiðnir á Bitbucket um leið og þú býrð til eða þiggur boð um aðild að stofnun.",
       "contextLine": "Fyrir {{organization}}",
       "contextLinePersonal": "Fyrir persónulegan reikning"
     },

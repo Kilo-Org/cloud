@@ -2755,6 +2755,7 @@
       "gitlabDescription": "Підключіть обліковий запис GitLab, щоб переглядати merge-запити з мобільного.",
       "bitbucketDescription": "Підключіть Bitbucket до цієї організації, щоб переглядати запити на злиття з мобільного.",
       "bitbucketOrgOnlyDescription": "Перемкніть обліковий запис, вказаний вище, на організацію, щоб переглядати її запити на злиття в Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Цей обліковий запис ще не має організацій. Запити на злиття Bitbucket можна переглядати після того, як ви створите організацію або приєднаєтеся до неї.",
       "contextLine": "Для {{organization}}",
       "contextLinePersonal": "Для особистого простору"
     },

@@ -684,6 +684,7 @@
       "gitlabDescription": "เชื่อมต่อบัญชี GitLab ของคุณเพื่อรีวิว merge request บนมือถือ",
       "bitbucketDescription": "เชื่อมต่อ Bitbucket กับองค์กรนี้เพื่อรีวิวพูลรีเควสต์บนมือถือ",
       "bitbucketOrgOnlyDescription": "สลับบัญชีด้านบนไปที่องค์กรเพื่อรีวิวพูลรีเควสต์บน Bitbucket ขององค์กรนั้น",
+      "bitbucketOrgOnlyNoOrganizationDescription": "บัญชีนี้ยังไม่มีองค์กร คุณจะสามารถรีวิวพูลรีเควสต์บน Bitbucket ได้เมื่อสร้างหรือเข้าร่วมองค์กร",
       "contextLine": "สำหรับ {{organization}}",
       "contextLinePersonal": "สำหรับบัญชีส่วนตัวของคุณ"
     },

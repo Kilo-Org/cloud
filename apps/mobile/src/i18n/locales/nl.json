@@ -2699,6 +2699,7 @@
       "gitlabDescription": "Koppel je GitLab-account om merge requests op je telefoon te beoordelen.",
       "bitbucketDescription": "Koppel Bitbucket aan deze organisatie om PR's op je telefoon te beoordelen.",
       "bitbucketOrgOnlyDescription": "Wissel het account hierboven naar een organisatie om diens Bitbucket-PR's te beoordelen.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Dit account heeft nog geen organisaties. Je kunt Bitbucket-PR's beoordelen zodra je een organisatie aanmaakt of er lid van wordt.",
       "contextLine": "Voor {{organization}}",
       "contextLinePersonal": "Voor je persoonlijke account"
     },

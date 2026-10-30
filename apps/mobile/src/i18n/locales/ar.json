@@ -2811,6 +2811,7 @@
       "gitlabDescription": "اربط حسابك في GitLab لمراجعة طلبات الدمج على الجوال.",
       "bitbucketDescription": "اربط Bitbucket بهذه المؤسسة لمراجعة طلبات السحب على الجوال.",
       "bitbucketOrgOnlyDescription": "بدّل الحساب أعلاه إلى مؤسسة لمراجعة طلبات السحب الخاصة بها على Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "لا توجد مؤسسات في هذا الحساب بعد. يمكنك مراجعة طلبات السحب على Bitbucket بعد إنشاء مؤسسة أو الانضمام إلى واحدة.",
       "contextLine": "لـ{{organization}}",
       "contextLinePersonal": "لحسابك الشخصي"
     },

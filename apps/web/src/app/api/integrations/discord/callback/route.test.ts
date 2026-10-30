@@ -10,6 +10,7 @@ import {
   exchangeDiscordCode,
   upsertDiscordInstallation,
 } from '@/lib/integrations/discord-service';
+import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 import { handleDiscordOAuthCallback } from '@/lib/integrations/oauth/platforms/discord-callback';
 import { createSignedToken } from '@/lib/signed-token';
@@ -28,6 +29,16 @@ jest.mock('@/lib/integrations/discord-service', () => {
     upsertDiscordInstallation: jest.fn(),
   };
 });
+jest.mock('@/lib/integrations/oauth/workspace-installation-lock', () => ({
+  withWorkspaceInstallationLock: jest.fn(
+    async (
+      _platform: string,
+      _owner: unknown,
+      _installationId: string,
+      operation: (tx: unknown) => Promise<unknown>
+    ) => operation({})
+  ),
+}));
 jest.mock('@/lib/integrations/provider-oauth-attempts', () => ({
   consumeProviderOAuthAttempt: jest.fn(async () => true),
   cancelProviderOAuthAttempt: jest.fn(async () => true),
@@ -49,6 +60,9 @@ const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
 const mockedExchangeDiscordCode = jest.mocked(exchangeDiscordCode);
 const mockedUpsertDiscordInstallation = jest.mocked(upsertDiscordInstallation);
 const mockedConsumeProviderOAuthAttempt = jest.mocked(consumeProviderOAuthAttempt);
+const mockedWithWorkspaceInstallationLock = jest.mocked(withWorkspaceInstallationLock);
+
+const GUILD_ID = '123456789012345678';
 
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
 const ORGANIZATION_ID = '9a1f56f0-6a52-4c1f-9f5d-0b0f7f2e6ad4';
@@ -84,6 +98,7 @@ describe('handleDiscordOAuthCallback', () => {
       expires_in: 604800,
       refresh_token: 'refresh-token',
       scope: 'bot applications.commands',
+      guild: { id: GUILD_ID, name: 'Test Server', icon: null },
     });
     mockedUpsertDiscordInstallation.mockResolvedValue(undefined as never);
   });
@@ -102,7 +117,14 @@ describe('handleDiscordOAuthCallback', () => {
     expect(mockedUpsertDiscordInstallation).toHaveBeenCalledWith(
       { type: 'user', id: USER_ID },
       expect.objectContaining({ access_token: 'access-token' }),
-      { allowGuildRebind: false }
+      { allowGuildRebind: false },
+      expect.anything()
+    );
+    expect(mockedWithWorkspaceInstallationLock).toHaveBeenCalledWith(
+      'discord',
+      { type: 'user', id: USER_ID },
+      GUILD_ID,
+      expect.any(Function)
     );
     expect(mockedEnsureOrganizationAccess).not.toHaveBeenCalled();
   });
@@ -171,7 +193,8 @@ describe('handleDiscordOAuthCallback', () => {
     expect(mockedUpsertDiscordInstallation).toHaveBeenCalledWith(
       { type: 'org', id: ORGANIZATION_ID },
       expect.objectContaining({ access_token: 'access-token' }),
-      { allowGuildRebind: true }
+      { allowGuildRebind: true },
+      expect.anything()
     );
   });
 

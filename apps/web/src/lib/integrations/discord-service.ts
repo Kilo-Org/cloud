@@ -1,5 +1,5 @@
 import 'server-only';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
@@ -142,8 +142,11 @@ export async function exchangeDiscordCode(code: string): Promise<DiscordOAuth2Re
 /**
  * Get Discord installation for an owner
  */
-export async function getInstallation(owner: Owner): Promise<PlatformIntegration | null> {
-  const [integration] = await db
+export async function getInstallation(
+  owner: Owner,
+  database: typeof db | DrizzleTransaction = db
+): Promise<PlatformIntegration | null> {
+  const [integration] = await database
     .select()
     .from(platform_integrations)
     .where(
@@ -182,9 +185,10 @@ export async function getInstallationByGuildId(
  */
 export async function getConflictingDiscordInstallation(
   owner: Owner,
-  guildId: string
+  guildId: string,
+  database: typeof db | DrizzleTransaction = db
 ): Promise<PlatformIntegration | null> {
-  const integrations = await db
+  const integrations = await database
     .select()
     .from(platform_integrations)
     .where(
@@ -228,7 +232,8 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 export async function upsertDiscordInstallation(
   owner: Owner,
   oauthResponse: DiscordOAuth2Response,
-  { allowGuildRebind = false }: { allowGuildRebind?: boolean } = {}
+  { allowGuildRebind = false }: { allowGuildRebind?: boolean } = {},
+  database: typeof db | DrizzleTransaction = db
 ): Promise<PlatformIntegration> {
   if (!oauthResponse.guild?.id) {
     throw new Error(
@@ -239,12 +244,12 @@ export async function upsertDiscordInstallation(
   const guildId = parseDiscordSnowflake(oauthResponse.guild.id, 'guild ID');
   const guildName = oauthResponse.guild.name || 'Unknown Server';
 
-  const conflicting = await getConflictingDiscordInstallation(owner, guildId);
+  const conflicting = await getConflictingDiscordInstallation(owner, guildId, database);
   if (conflicting) {
     throw new DiscordGuildAlreadyConnectedError(guildName);
   }
 
-  const existing = await getInstallation(owner);
+  const existing = await getInstallation(owner, database);
 
   // Rows created before 80a295f26 recorded the server only in `platform_account_id`.
   const boundGuildId = existing?.platform_installation_id ?? existing?.platform_account_id ?? null;
@@ -273,7 +278,7 @@ export async function upsertDiscordInstallation(
       guild_icon: oauthResponse.guild.icon,
     };
 
-    const [updated] = await db
+    const [updated] = await database
       .update(platform_integrations)
       .set({
         platform_installation_id: guildId,
@@ -304,7 +309,7 @@ export async function upsertDiscordInstallation(
     ...(defaultModel ? { model_slug: defaultModel } : {}),
   };
 
-  const [created] = await db
+  const [created] = await database
     .insert(platform_integrations)
     .values({
       owned_by_user_id: owner.type === 'user' ? owner.id : null,

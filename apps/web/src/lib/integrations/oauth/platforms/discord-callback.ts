@@ -10,6 +10,9 @@ import {
   exchangeDiscordCode,
   upsertDiscordInstallation,
 } from '@/lib/integrations/discord-service';
+import { parseDiscordSnowflake } from '@/lib/discord-bot/discord-id';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -147,11 +150,25 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
 
     // 8. Store installation in database. The organization path is the only caller
     // allowed to move an existing organization connection to another server, and
-    // only after the organization role check above.
+    // only after the organization role check above. The per-server lock keeps two
+    // concurrent connections of one server from each passing the ownership check.
+    const guildId = oauthData.guild?.id
+      ? parseDiscordSnowflake(oauthData.guild.id, 'guild ID')
+      : null;
     try {
-      await upsertDiscordInstallation(owner, oauthData, {
-        allowGuildRebind: owner.type === 'org',
-      });
+      const store = (database?: DrizzleTransaction) =>
+        upsertDiscordInstallation(
+          owner,
+          oauthData,
+          { allowGuildRebind: owner.type === 'org' },
+          database
+        );
+
+      if (guildId) {
+        await withWorkspaceInstallationLock(PLATFORM.DISCORD, owner, guildId, store);
+      } else {
+        await store();
+      }
     } catch (error) {
       if (error instanceof DiscordGuildAlreadyConnectedError) {
         return NextResponse.redirect(

@@ -3,6 +3,7 @@ import { kilocode_users, organizations, platform_integrations } from '@kilocode/
 import { and, eq } from 'drizzle-orm';
 import type { Owner } from './core/types';
 import { PLATFORM } from './core/constants';
+import { withWorkspaceInstallationLock } from './oauth/workspace-installation-lock';
 import {
   DiscordGuildAlreadyConnectedError,
   DiscordGuildRebindNotAllowedError,
@@ -154,6 +155,53 @@ describe('Discord installation lifecycle', () => {
           )
         );
       expect(rows).toHaveLength(0);
+    } finally {
+      await db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, otherOrgId));
+      await db.delete(organizations).where(eq(organizations.id, otherOrgId));
+    }
+  });
+
+  it('serializes two owners connecting the same server', async () => {
+    const otherOrgId = crypto.randomUUID();
+    await db.insert(organizations).values({ id: otherOrgId, name: 'Discord Contender' });
+    const guild = { id: '678901234567890123', name: 'Contended Server', icon: null };
+    const response = {
+      access_token: 'test-access',
+      refresh_token: 'test-refresh',
+      token_type: 'Bearer',
+      expires_in: 3600,
+      scope: 'bot guilds',
+      guild,
+    };
+
+    try {
+      const results = await Promise.allSettled([
+        withWorkspaceInstallationLock('discord', { type: 'org', id: orgId }, guild.id, tx =>
+          upsertDiscordInstallation({ type: 'org', id: orgId }, response, {}, tx)
+        ),
+        withWorkspaceInstallationLock('discord', { type: 'org', id: otherOrgId }, guild.id, tx =>
+          upsertDiscordInstallation({ type: 'org', id: otherOrgId }, response, {}, tx)
+        ),
+      ]);
+
+      const rejected = results.filter(result => result.status === 'rejected');
+      expect(rejected).toHaveLength(1);
+      expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(
+        DiscordGuildAlreadyConnectedError
+      );
+
+      const rows = await db
+        .select()
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.DISCORD),
+            eq(platform_integrations.platform_installation_id, guild.id)
+          )
+        );
+      expect(rows).toHaveLength(1);
     } finally {
       await db
         .delete(platform_integrations)

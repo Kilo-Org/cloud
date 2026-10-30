@@ -32,12 +32,15 @@ let configHold: Promise<boolean> | undefined = undefined;
 let deniedProcedures = new Set<string>();
 let sessionAuthRequired = false;
 let failingProcedures = new Set<string>();
+let unreachableProcedures = new Set<string>();
 let heldProcedures = new Set<string>();
+let connectivity: 'online' | 'offline' | 'unknown' = 'online';
 let releaseHeld: (() => void) | undefined = undefined;
 const DENIAL_MESSAGE = 'You do not have access to this organization';
 const SERVER_ERROR_MESSAGE = 'Internal server error';
 const RETRY_FAILED_COPY =
   'Still could not load Security Agent. Check your connection and try again.';
+const CONNECTION_COPY = 'Check your connection and try again.';
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
@@ -79,7 +82,7 @@ vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
   useTrackSecurityAgentInteraction: () => ({ mutate: vi.fn() }),
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
-  useCommittedConnectivityStatus: () => 'online',
+  useCommittedConnectivityStatus: () => connectivity,
 }));
 vi.mock('@/components/security-agent/audit-report-button', () => ({
   AuditReportButton: 'AuditReportButton',
@@ -150,7 +153,9 @@ beforeEach(() => {
   deniedProcedures = new Set();
   sessionAuthRequired = false;
   failingProcedures = new Set();
+  unreachableProcedures = new Set();
   heldProcedures = new Set();
+  connectivity = 'online';
   releaseHeld = undefined;
   repositoriesData = [{ id: 1 }];
   roles = [{ organizationId: 'org_123', role: 'owner' }];
@@ -166,6 +171,10 @@ beforeEach(() => {
       await new Promise<void>(resolve => {
         releaseHeld = resolve;
       });
+    }
+    if (unreachableProcedures.has(procedureFor(input))) {
+      // A request that never reaches the server: no tRPC code on the error.
+      throw new TypeError('Network request failed');
     }
     if (failingProcedures.has(procedureFor(input))) {
       return Response.json(
@@ -524,8 +533,14 @@ describe.each([
     queryClient.setQueryData(configKey, configData);
     const root = await mount('org_123', Screen);
     const error = host(root, 'PlatformErrorScreen')[0];
+    // The inline entry shows its own load-failure surface, and a paused read
+    // is an offline one: the description names the connection on the first
+    // screen. The standalone settings screen names the failed read.
+    expect(error?.props.errorTitle).toBe(
+      presentation === 'inline' ? 'Could not load Security Agent' : undefined
+    );
     expect(error?.props.message ?? error?.props.errorTitle).toBe(
-      presentation === 'inline' ? 'Could not load Security Agent' : 'Could not load permissions'
+      presentation === 'inline' ? CONNECTION_COPY : 'Could not load permissions'
     );
     await retry(root);
     expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
@@ -541,10 +556,10 @@ describe.each([
 
 describe('ScopeEntryScreen retry recovery', () => {
   it('shows progress while a retry runs and a fresh message when it fails again', async () => {
-    failingProcedures = new Set(['getConfig']);
+    unreachableProcedures = new Set(['getConfig']);
     const root = await mount('personal');
     expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
-    expect(host(root, 'PlatformErrorScreen')[0]?.props.message).toBeUndefined();
+    expect(host(root, 'PlatformErrorScreen')[0]?.props.message).toBe(CONNECTION_COPY);
 
     // Hold one refetch open so the in-flight attempt is observable.
     heldProcedures = new Set(['getConfig']);
@@ -560,6 +575,30 @@ describe('ScopeEntryScreen retry recovery', () => {
     expect(host(root, 'Skeleton')).toHaveLength(0);
     expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
     expect(host(root, 'PlatformErrorScreen')[0]?.props.message).toBe(RETRY_FAILED_COPY);
+  });
+
+  it('keeps the server wording when a retry of a server failure fails again', async () => {
+    // "Check your connection" is the wrong thing to tell a reader whose 500
+    // came from the server, also one retry later.
+    failingProcedures = new Set(['getConfig']);
+    const root = await mount('personal');
+    expect(host(root, 'PlatformErrorScreen')[0]?.props.variant).toBe('server');
+    expect(
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'getConfig')
+    ).toHaveLength(1);
+
+    await retry(root);
+    await advanceBy();
+    await advanceBy();
+
+    // The retried read really ran and rejected, so the frame below is the
+    // failed-retry frame and not the one the tap started from.
+    expect(
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'getConfig')
+    ).toHaveLength(2);
+    const error = host(root, 'PlatformErrorScreen')[0];
+    expect(error?.props.variant).toBe('server');
+    expect(error?.props.message).toBeUndefined();
   });
 
   it('leaves the error screen for the resolved destination when the retry succeeds', async () => {
@@ -620,5 +659,41 @@ describe('ScopeEntryScreen retry recovery', () => {
     expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(1);
     expect(host(root, 'DashboardScreen')).toHaveLength(0);
     expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+  });
+});
+
+describe('ScopeEntryScreen load failure cause', () => {
+  it.each([
+    ['personal', 'getConfig'],
+    ['personal', 'getPermissionStatus'],
+    ['org_123', 'getConfig'],
+    ['org_123', 'list'],
+  ] as const)('names the connection on the first failure of %s / %s', async (scope, procedure) => {
+    configData.isEnabled = false;
+    unreachableProcedures = new Set([procedure]);
+    const root = await mount(scope);
+
+    const error = host(root, 'PlatformErrorScreen')[0];
+    expect(error?.props.variant).toBe('offline');
+    expect(error?.props.message).toBe(CONNECTION_COPY);
+  });
+
+  it('keeps the server wording on the first failure of a coded 500', async () => {
+    failingProcedures = new Set(['getConfig']);
+    const root = await mount('personal');
+
+    const error = host(root, 'PlatformErrorScreen')[0];
+    expect(error?.props.variant).toBe('server');
+    expect(error?.props.message).toBeUndefined();
+  });
+
+  it('names the connection for reads paused by a confirmed-offline device', async () => {
+    connectivity = 'offline';
+    onlineManager.setOnline(false);
+    const root = await mount('personal');
+
+    const error = host(root, 'PlatformErrorScreen')[0];
+    expect(error?.props.variant).toBe('offline');
+    expect(error?.props.message).toBe(CONNECTION_COPY);
   });
 });

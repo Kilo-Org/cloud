@@ -16,6 +16,7 @@ import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { WEB_BASE_URL } from '@/lib/config';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
 import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
@@ -41,6 +42,34 @@ function useInstanceHint(platform: ProviderPrPlatform): string | undefined {
 }
 
 /**
+ * The one line under the Bitbucket organization-only explanation. It names the
+ * account switch only when the memberships answer says there is somewhere to
+ * switch to, and says so plainly when the account belongs to no organization.
+ * A failed read gets no line of its own: the context line above already reports
+ * the failure with a retry, and neither wording is true of an unknown list.
+ */
+function OrgOnlyDescription({
+  membershipsError,
+  organizationCount,
+}: Readonly<{
+  membershipsError: boolean;
+  /** Undefined until the memberships answer lands. */
+  organizationCount: number | undefined;
+}>) {
+  const { t } = useTranslation();
+  if (membershipsError) {
+    return null;
+  }
+  return (
+    <Text variant="muted" className="text-center">
+      {organizationCount === 0
+        ? t('prReview.connect.bitbucketOrgOnlyNoOrganizationDescription')
+        : t('prReview.connect.bitbucketOrgOnlyDescription')}
+    </Text>
+  );
+}
+
+/**
  * GitLab / Bitbucket arm. The status query is the s4 integration status the
  * connect flow updates; a Bitbucket personal scope disables it entirely
  * because there is nothing to check — the selector renders the terminal
@@ -59,6 +88,11 @@ export function ProviderConnectGate({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const instanceHint = useInstanceHint(platform);
+  // The org-only arm sends a personal reader to the account switch above. That
+  // switch is the context line's, and it exists only when the reader has a
+  // membership — so the memberships answer decides which copy is true. One
+  // cache entry serves this and the context line; nothing refetches.
+  const memberships = useOrganizationsList();
 
   // The providers — and the two GitLab scopes, whose payloads now differ by
   // the personal reconnect marker — answer with different status shapes, so
@@ -136,16 +170,20 @@ export function ProviderConnectGate({
     isError: status.isError,
     isLoading: status.isPending,
     connected: status.data?.connected === true,
-    // Only the personal GitLab status distinguishes an existing connection
-    // that needs re-authorizing from a first-time connect.
+    // Both GitLab scopes distinguish an existing connection that needs
+    // re-authorizing from a first-time connect: the personal and the
+    // organization status reads each report the marker for their own row.
     reconnectRequired:
-      platform === 'gitlab' && organizationId === null
-        ? personalGitlabStatus.data?.reconnectRequired === true
-        : false,
+      platform === 'gitlab' ? gitlabStatus.data?.reconnectRequired === true : false,
     organizationId,
   });
 
   if (view === 'org-only') {
+    // Only claim there is nowhere to go once the memberships answer says so;
+    // until it lands, keep the guidance the common case with an organization
+    // can act on. A failed read is neither case: the context line already
+    // reports it with a retry, and neither wording is true, so the gate adds
+    // no second description over an account line it cannot vouch for.
     return (
       <View className="flex-1 bg-background">
         <PrReviewGateHeader />
@@ -155,9 +193,10 @@ export function ProviderConnectGate({
           description={
             <>
               <PrReviewContextLine />
-              <Text variant="muted" className="text-center">
-                {t('prReview.connect.bitbucketOrgOnlyDescription')}
-              </Text>
+              <OrgOnlyDescription
+                membershipsError={memberships.isError}
+                organizationCount={memberships.data?.length}
+              />
             </>
           }
         />
@@ -199,11 +238,11 @@ export function ProviderConnectGate({
 
   if (view === 'connect' || view === 'reconnect') {
     const reconnect = view === 'reconnect';
-    // Reused translated copy: the mid-session reconnect notice already names
-    // the expired provider connection and asks the reader to re-check it, so
-    // the gate needs no new catalog keys.
-    const provider =
-      platform === 'gitlab' ? t('common.gitlab') : t('agentChat.repoPicker.platformBitbucket');
+    // Reused translated copy: the title above already names the expired
+    // provider connection, so the description carries only the re-check
+    // instruction and never restates the title. One key serves both the
+    // provider gate and the mid-session notice, so the two surfaces cannot
+    // drift apart.
     const connectTitle =
       platform === 'gitlab' ? t('common.connectGitlab') : t('common.connectBitbucket');
     const connectDescription =
@@ -215,9 +254,7 @@ export function ProviderConnectGate({
         ? t('prReview.reconnectNotice.gitlabTitle')
         : t('prReview.reconnectNotice.bitbucketTitle');
     const title = reconnect ? reconnectTitle : connectTitle;
-    const description = reconnect
-      ? t('prReview.reconnectNotice.providerMessage', { provider })
-      : connectDescription;
+    const description = reconnect ? t('prReview.reconnectNotice.message') : connectDescription;
     return (
       <View className="flex-1 bg-background">
         <PrReviewGateHeader />

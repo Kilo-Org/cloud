@@ -323,7 +323,8 @@
     "pr opened",
     "remediation blocked",
     "remediation failed",
-    "superseded"
+    "superseded",
+    "{{count}} open"
   ],
   "he": [
     "completed",

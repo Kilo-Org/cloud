@@ -154,8 +154,12 @@ export function CollapsibleSection({
       className={cn('gap-2 rounded-lg bg-secondary p-3', className)}
       animateLayout={animateLayout}
     >
+      {/* The header's only visible content is a text line, so the pressable's
+          own box is what assistive technology and the design gate measure: it
+          must reach the 28 dp floor itself, not lean on hitSlop. Explicit
+          pixels, because native rem is 14 points. */}
       <Pressable
-        className="flex-row items-center justify-between gap-2"
+        className="min-h-[28px] flex-row items-center justify-between gap-2"
         hitSlop={12}
         onPress={() => {
           onToggle?.();

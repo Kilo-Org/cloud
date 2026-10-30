@@ -9,6 +9,18 @@ import { PrReviewConnectGate } from './pr-review-connect-gate';
 const scopeState = vi.hoisted(() => ({
   value: null as { ref: unknown } | null,
 }));
+// Mutable so each test answers the provider status and the memberships list.
+const queryState = vi.hoisted(
+  (): {
+    status: Record<string, unknown>;
+    memberships?: { organizationId: string }[];
+    membershipsError?: boolean;
+  } => ({
+    status: { connected: false, revoked: false },
+    memberships: undefined,
+    membershipsError: false,
+  })
+);
 vi.mock('@/lib/pr-review/provider-pr-ref', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
@@ -16,9 +28,15 @@ vi.mock('@/lib/pr-review/provider-pr-ref', async importOriginal => {
     useProviderPrScopeOrNull: () => scopeState.value,
   };
 });
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => ({
+    data: queryState.memberships,
+    isError: queryState.membershipsError === true,
+  }),
+}));
 vi.mock('@tanstack/react-query', () => ({
   useQuery: () => ({
-    data: { connected: false, revoked: false },
+    data: queryState.status,
     isPending: false,
     isLoading: false,
     isError: false,
@@ -89,10 +107,10 @@ vi.mock('react-native', () => ({
 
 let mounted: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function mount(platform: 'gitlab' | 'bitbucket') {
+function mount(platform: 'gitlab' | 'bitbucket', organizationId: string | null = null) {
   act(() => {
     mounted = TestRenderer.create(
-      <PrReviewConnectGate platform={platform} organizationId={null}>
+      <PrReviewConnectGate platform={platform} organizationId={organizationId}>
         {React.createElement('ReviewContent')}
       </PrReviewConnectGate>
     );
@@ -103,9 +121,20 @@ function mount(platform: 'gitlab' | 'bitbucket') {
   return mounted;
 }
 
+/** Every string the gate rendered, so a test can assert on the visible copy. */
+function renderedText(renderer: TestRenderer.ReactTestRenderer): string {
+  return renderer.root
+    .findAllByType('Text')
+    .flatMap(node => node.children.filter(child => typeof child === 'string'))
+    .join(' ');
+}
+
 beforeEach(() => {
   vi.resetAllMocks();
   scopeState.value = null;
+  queryState.status = { connected: false, revoked: false };
+  queryState.memberships = undefined;
+  queryState.membershipsError = false;
 });
 
 describe('provider gate instance hint', () => {
@@ -139,5 +168,67 @@ describe('provider gate instance hint', () => {
     scopeState.value = { ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 3 } };
     const bare = mount('gitlab');
     expect(bare.root.findByType('PrReviewContextLine').props.instanceHint).toBeUndefined();
+  });
+});
+
+describe('organization GitLab reconnect state', () => {
+  it('offers re-authorization when the organization connection cannot be used', () => {
+    queryState.status = { connected: false, reconnectRequired: true };
+    const renderer = mount('gitlab', 'org-1');
+    expect(renderer.root.findByType('EmptyState').props.title).toBe('GitLab connection expired');
+    expect(renderedText(renderer)).toContain(
+      "Re-check your connection — you'll be prompted to reconnect if needed."
+    );
+    // The title above already names the provider, so the description never
+    // restates the expiry.
+    expect(renderedText(renderer)).not.toContain('no longer valid');
+    // The CTA is the integration-page action, not a second connect attempt.
+    expect(renderedText(renderer)).toContain('Connect GitLab');
+  });
+
+  it('keeps the first-time connect copy for an organization with no connection', () => {
+    queryState.status = { connected: false, reconnectRequired: false };
+    const renderer = mount('gitlab', 'org-1');
+    expect(renderer.root.findByType('EmptyState').props.title).toBe('Connect GitLab');
+    expect(renderedText(renderer)).not.toContain('GitLab connection expired');
+  });
+});
+
+describe('Bitbucket org-only guidance', () => {
+  const SWITCH_COPY = 'Switch the account above to an organization';
+  const NO_ORGANIZATION_COPY = 'This account has no organizations yet';
+
+  it('points at the account switch when the reader has an organization', () => {
+    queryState.memberships = [{ organizationId: 'org-1' }];
+    const renderer = mount('bitbucket');
+    expect(renderedText(renderer)).toContain(SWITCH_COPY);
+    expect(renderedText(renderer)).not.toContain(NO_ORGANIZATION_COPY);
+  });
+
+  it('says no organization is available when the reader has none', () => {
+    queryState.memberships = [];
+    const renderer = mount('bitbucket');
+    expect(renderedText(renderer)).toContain(NO_ORGANIZATION_COPY);
+    expect(renderedText(renderer)).not.toContain(SWITCH_COPY);
+  });
+
+  it('keeps the switch guidance while the memberships list is unresolved', () => {
+    queryState.memberships = undefined;
+    const renderer = mount('bitbucket');
+    expect(renderedText(renderer)).toContain(SWITCH_COPY);
+    expect(renderedText(renderer)).not.toContain(NO_ORGANIZATION_COPY);
+  });
+
+  it('adds no guidance of its own when the memberships read failed', () => {
+    // The context line reports the failure and offers a retry; neither the
+    // switch copy nor "no organizations" is true, so the gate says neither.
+    queryState.memberships = undefined;
+    queryState.membershipsError = true;
+    const renderer = mount('bitbucket');
+    expect(renderedText(renderer)).not.toContain(SWITCH_COPY);
+    expect(renderedText(renderer)).not.toContain(NO_ORGANIZATION_COPY);
+    expect(renderer.root.findByType('EmptyState').props.title).toBe(
+      'Bitbucket is available for organizations only.'
+    );
   });
 });

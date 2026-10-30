@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 import { skillErrorKey } from '@/components/profiles/skill-markdown';
 import { SheetHeader } from '@/components/sheet-header';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
@@ -33,6 +34,13 @@ type SkillFormSheetProps = Readonly<{
    * the sheet on success; on failure it returns with the sheet still open.
    */
   onSave: (submission: SkillFormSubmission) => void;
+  /** A refused save, shown inside the sheet instead of only a toast it covers. */
+  saveFailure?: string | null;
+  /**
+   * Whether that failure is an error or an expected limit. A limit is a
+   * warning, not a failure, so the two read differently on screen.
+   */
+  saveFailureTone?: 'error' | 'warn';
 }>;
 
 /**
@@ -45,13 +53,17 @@ type SkillFormSheetProps = Readonly<{
  *
  * Save validates through `validateSkillInput`; a refused input shows the
  * matching `profiles.skill*` message under the field at fault and persists
- * nothing.
+ * nothing. A save the server refused arrives as `saveFailure` and renders one
+ * line at the top of the form, scrolled into view, so the open sheet never
+ * swallows the reason.
  */
 export function SkillFormSheet({
   skill,
   isSaving,
   onClose,
   onSave,
+  saveFailure = null,
+  saveFailureTone = 'error',
 }: Readonly<SkillFormSheetProps>) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -60,7 +72,9 @@ export function SkillFormSheet({
   const nameEditedRef = useRef(false);
   const [prefill, setPrefill] = useState(skill?.name ?? '');
   const [error, setError] = useState<SkillInputError | null>(null);
-  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<'name' | 'content'>();
+  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
+    'status' | 'name' | 'content'
+  >();
 
   const nameError = error === 'empty' || error === 'bad-name' ? t(skillErrorKey(error)) : undefined;
   const contentError = error === 'no-content' ? t(skillErrorKey(error)) : undefined;
@@ -79,6 +93,11 @@ export function SkillFormSheet({
       return;
     }
     setError(null);
+    // A refusal that is already on screen stays mounted, so its layout does not
+    // fire again; scroll it back into view for this attempt.
+    if (saveFailure !== null) {
+      scrollToField('status');
+    }
     onSave({
       name: nameRef.current.trim(),
       rawMarkdown: contentRef.current,
@@ -104,6 +123,16 @@ export function SkillFormSheet({
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
+        {saveFailure === null ? null : (
+          <View
+            onLayout={event => {
+              fieldLayout('status')(event);
+              scrollToField('status');
+            }}
+          >
+            <AccessibleStatus message={saveFailure} tone={saveFailureTone} className="text-sm" />
+          </View>
+        )}
         <Text variant="muted">{t('profiles.skillsHint')}</Text>
         <FormField
           key={`skill-name-${prefill}`}

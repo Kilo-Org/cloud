@@ -61,6 +61,31 @@ export const STATE_ACTION_CLASS = 'min-h-[48px]';
 export const ROW_TARGET_CLASS = 'min-h-[48px]';
 
 /**
+ * The frame a dense interactive row renders when it keeps the group's own
+ * rhythm instead of {@link ROW_TARGET_CLASS}: `py-3` top and bottom plus the
+ * row's 13px value line. Measured on the Android emulator at font scale 1, a
+ * `KvRow` reads 38.9–39.6 dp tall — the rhythm every `KvRow` group already
+ * uses. A list of counts reads as one column, so its rows keep that rhythm
+ * rather than the taller interactive frame.
+ */
+export const DENSE_ROW_FRAME_DP = 39;
+
+/**
+ * Per-side vertical `hitSlop` of a row on {@link DENSE_ROW_FRAME_DP}:
+ * `39 + 3 + 3 = 45 dp`, past `DESIGN.md:364`'s 44pt design target, so even the
+ * shortest measured frame (38.9 dp) reaches 44.9 dp. Stacked rows share the
+ * boundary between them, so two neighbours' reaches meet instead of leaving a
+ * dead strip, and neither reaches another control.
+ */
+export const DENSE_ROW_HIT_SLOP_DP = 3;
+
+/** The `hitSlop` a row on {@link DENSE_ROW_FRAME_DP} renders, as {@link DENSE_ROW_HIT_SLOP_DP}. */
+export const DENSE_ROW_HIT_SLOP = {
+  top: DENSE_ROW_HIT_SLOP_DP,
+  bottom: DENSE_ROW_HIT_SLOP_DP,
+} as const;
+
+/**
  * The box every icon-only control renders. Its own node carries the target, as
  * a control-size audit measures, and 32pt clears the audit's
  * {@link MIN_TAP_TARGET_DP} floor while fitting the agents header row's

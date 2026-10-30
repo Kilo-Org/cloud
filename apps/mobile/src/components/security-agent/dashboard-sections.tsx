@@ -12,7 +12,7 @@ import { severityCountPhrase } from '@/components/security-agent/severity-count-
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { DENSE_ROW_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { formatNumber, formatPercent } from '@/lib/format';
 import { type useSecurityAgentDashboardStats } from '@/lib/hooks/use-security-agent';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
@@ -135,38 +135,13 @@ function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
 
 function PostureSection({ data, slaEnabled }: SectionProps) {
   const { t } = useTranslation();
+  // With SLA deadlines on, the metric tiles above already carry this breakdown:
+  // the compliance tile captions how many findings are within their deadline and
+  // the deadline tile captions the same severity buckets. A second copy here read
+  // the same figures twice, so the section only adds the analysis posture the
+  // tiles leave out.
   if (slaEnabled) {
-    const { overall, bySeverity } = data.sla;
-    return (
-      <SectionCard title={t('securityAgent.dashboard.slaPosture')}>
-        <KvRow
-          label={t('securityAgent.dashboard.withinDeadline')}
-          value={`${formatNumber(overall.withinSla, i18n.language)} / ${formatNumber(
-            overall.total,
-            i18n.language
-          )}`}
-        />
-        <KvRow
-          label={t('securityAgent.dashboard.criticalOverdue')}
-          value={formatNumber(bySeverity.critical.overdue, i18n.language)}
-          valueTone="muted"
-          dotTone={bySeverity.critical.overdue > 0 ? 'danger' : 'muted'}
-        />
-        <KvRow
-          label={t('securityAgent.dashboard.highOverdue')}
-          value={formatNumber(bySeverity.high.overdue, i18n.language)}
-          valueTone="muted"
-          dotTone={bySeverity.high.overdue > 0 ? 'danger' : 'muted'}
-        />
-        <KvRow
-          label={t('securityAgent.dashboard.mediumLowOverdue')}
-          value={formatNumber(bySeverity.medium.overdue + bySeverity.low.overdue, i18n.language)}
-          valueTone="muted"
-          dotTone={bySeverity.medium.overdue + bySeverity.low.overdue > 0 ? 'danger' : 'muted'}
-          last
-        />
-      </SectionCard>
-    );
+    return null;
   }
 
   const analysisIncomplete = getAnalysisIncompleteCount(data.analysis);
@@ -181,24 +156,28 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
         label={t('securityAgent.dashboard.confirmedExploitable')}
         value={formatNumber(data.analysis.exploitable, i18n.language)}
         valueTone="muted"
+        valueNumeric
         dotTone="danger"
       />
       <KvRow
         label={t('securityAgent.dashboard.needsEvidenceReview')}
         value={formatNumber(data.analysis.needsReview, i18n.language)}
         valueTone="muted"
+        valueNumeric
         dotTone="warn"
       />
       <KvRow
         label={t('securityAgent.dashboard.analysisNotComplete')}
         value={formatNumber(analysisIncomplete, i18n.language)}
         valueTone="muted"
+        valueNumeric
         dotTone="muted"
       />
       <KvRow
         label={t('securityAgent.dashboard.noImmediateAction')}
         value={formatNumber(noImmediateAction, i18n.language)}
         valueTone="muted"
+        valueNumeric
         dotTone="good"
         last
       />
@@ -259,19 +238,18 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
           onPress={() => {
             pushOnce(row.href);
           }}
+          // The row keeps `KvRow`'s own `py-3` rhythm, so its counts read as one
+          // column at the pitch every other `KvRow` group uses instead of the
+          // taller interactive-row frame. The slop carries the touch region past
+          // the design target without moving the frame the divider sits on.
+          hitSlop={DENSE_ROW_HIT_SLOP}
           className="active:opacity-70"
         >
-          {/* The frame sits on KvRow's own box, not on the wrapper: the
-              divider is that box's bottom edge, so a frame around it would
-              hold the rule above the row's bottom while the next row's
-              padding stacked below — visibly lopsided. With the frame on the
-              row, the padding above and below the label stays even and the
-              pressable still measures the full 48 dp target. */}
           <KvRow
-            className={ROW_TARGET_CLASS}
             label={row.label}
             value={formatNumber(row.value, i18n.language)}
             valueTone="muted"
+            valueNumeric
             dotTone={row.tone}
             last={index === rows.length - 1}
           />

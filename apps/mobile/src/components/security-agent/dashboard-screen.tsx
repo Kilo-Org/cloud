@@ -319,6 +319,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
       <ScreenHeader
         className="px-6"
         title={t('common.securityAgent')}
+        // Two lines at a narrow width: the three 44dp actions leave the title
+        // about half a phone's content width on a 360dp screen, and a one-line
+        // cap dropped the word that tells this agent apart from the others
+        // ("Agente de se…"). The title is a constant two-word label, so the
+        // wrap costs a line only while it cannot fit one — it never moves the
+        // body twice.
+        titleNumberOfLines={2}
         // Size-11 (44dp) icon buttons: findings and settings, plus the audit
         // overflow when the viewer can manage the agent. Declaring exactly the
         // buttons this viewer renders drops the actions onto their own row
@@ -499,7 +506,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                   {metric.label}
                 </Text>
                 <Text
-                  className={cn('font-mono text-xl font-semibold', METRIC_TONE_CLASS[metric.tone])}
+                  className={cn(
+                    'text-xl font-semibold tabular-nums',
+                    METRIC_TONE_CLASS[metric.tone]
+                  )}
                 >
                   {metric.value}
                 </Text>

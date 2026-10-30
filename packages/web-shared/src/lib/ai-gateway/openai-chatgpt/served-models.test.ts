@@ -50,10 +50,13 @@ describe('isOpenAiModelServed', () => {
     await isOpenAiModelServed('partner-key', 'gpt-5-nano');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    // The lookup is not stored by the framework: a stored copy would keep
+    // answering with an unusable body past the short failure window.
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.openai.com/v1/models',
-      expect.objectContaining({ cache: 'force-cache', next: { revalidate: 3600 } })
+      expect.objectContaining({ cache: 'no-store' })
     );
+    expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty('next');
   });
 
   it('keeps the route when the list cannot be read', async () => {

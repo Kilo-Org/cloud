@@ -57,9 +57,12 @@ function readServedModelIds(body: unknown): Set<string> | null {
 async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> {
   try {
     const response = await fetch(MODELS_URL, {
-      cache: 'force-cache',
+      // The module cache below is the only cache for this lookup. Next's data
+      // cache would otherwise keep answering with the body it already stored for
+      // `CACHE_TTL_SECONDS`, so the short failure window could only repeat an
+      // unusable answer instead of asking the project again.
+      cache: 'no-store',
       headers: { authorization: `Bearer ${apiKey}` },
-      next: { revalidate: CACHE_TTL_SECONDS },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (!response.ok) return null;
@@ -77,8 +80,9 @@ async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> 
  * body returns true: a transient problem must not hide the route, and the
  * upstream then answers exactly as it does today. A failure is remembered for
  * `FAILURE_TTL_MS` so a burst of eligible requests does not each pay the lookup
- * and its timeout, and the lookup is retried long before the hour a good list is
- * reused for.
+ * and its timeout. The next lookup after that window asks the project again
+ * rather than reusing a stored answer, so a bad answer costs the short window
+ * and never the hour a good list is reused for.
  */
 export async function isOpenAiModelServed(apiKey: string, modelId: string): Promise<boolean> {
   if (apiKey.trim().length === 0) return true;

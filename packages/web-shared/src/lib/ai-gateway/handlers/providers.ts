@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import { modelsByProvider } from '@kilocode/db';
-import { desc } from 'drizzle-orm';
 import type * as z from 'zod';
 import { OpenRouterProvidersResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
-import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { getModelsByProviderSnapshot } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-snapshot.server';
 import { getDirectByokProviderListings } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 
 type ProviderListEntry = z.infer<typeof OpenRouterProvidersResponseSchema>['data'][number];
@@ -24,22 +21,13 @@ export function withDirectByokProviders(
   );
 }
 
-const getProviders = createCachedFetch(
-  async () => {
-    const [row] = await readDb
-      .select({ data: modelsByProvider.data })
-      .from(modelsByProvider)
-      .orderBy(desc(modelsByProvider.id))
-      .limit(1);
-    if (!row) return null;
-    return withDirectByokProviders(
-      OpenRouterProvidersResponseSchema.shape.data.parse(row.data.providers)
-    );
-  },
-  600_000,
-  null,
-  { name: 'openRouterProviders' }
-);
+const getProviders = async (): Promise<ProviderListEntry[] | null> => {
+  const snapshot = await getModelsByProviderSnapshot();
+  if (snapshot === null) return null;
+  return withDirectByokProviders(
+    OpenRouterProvidersResponseSchema.shape.data.parse(snapshot.providers)
+  );
+};
 
 /**
  * Test using:

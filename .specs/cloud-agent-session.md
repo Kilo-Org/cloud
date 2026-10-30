@@ -189,6 +189,9 @@ repository.
 5. A cold start MAY prefer its own compatible session snapshot over an
    environment snapshot or base image. Selection MUST use the Sandbox DO's
    local metadata and MUST NOT consume the snapshot before work is delivered.
+   Runtime release changes MUST NOT disqualify a checkpoint with compatible
+   startup mode and image. Downloaded startup MUST install the currently selected
+   Kilo and wrapper runtime over the restored disk.
 6. Restore MUST preserve local branches, unpushed commits, the Git index,
    dirty, untracked and ignored files, and session home state. It MUST NOT run
    environment-template adoption, checkout, setup replay, or older file recovery

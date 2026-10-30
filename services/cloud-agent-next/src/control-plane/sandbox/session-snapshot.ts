@@ -35,6 +35,10 @@ const allocationSchema = z.object({
   attemptedIdleAt: z.number().optional(),
   restore: z.object({ sourceAllocationId: z.string().min(1), confirmed: z.boolean() }).optional(),
 });
+const runtimeIdentitySchema = z.object({
+  mode: z.enum(['preinstalled', 'downloaded']),
+  image: z.enum(['all-in-one', 'runtime-free']),
+});
 type Storage = DurableObjectStorage['kv'];
 type Identity = z.infer<typeof identitySchema>;
 
@@ -75,6 +79,16 @@ export function readSessionSnapshotAllocation(storage: Storage) {
   return parsed.success ? parsed.data : undefined;
 }
 
+function compatibleRuntimeIdentity(captured: string, selected: string): boolean {
+  try {
+    const left = runtimeIdentitySchema.parse(JSON.parse(captured));
+    const right = runtimeIdentitySchema.parse(JSON.parse(selected));
+    return left.mode === right.mode && left.image === right.image;
+  } catch {
+    return false;
+  }
+}
+
 export function selectSessionSnapshot(
   storage: Storage,
   identity: Identity,
@@ -83,7 +97,7 @@ export function selectSessionSnapshot(
   const parsed = descriptorSchema.safeParse(storage.get(SESSION_SNAPSHOT_KEY));
   return parsed.success &&
     sameSessionSnapshotIdentity(parsed.data, identity) &&
-    parsed.data.runtimeIdentity === runtimeIdentity
+    compatibleRuntimeIdentity(parsed.data.runtimeIdentity, runtimeIdentity)
     ? parsed.data
     : null;
 }

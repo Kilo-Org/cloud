@@ -13,6 +13,7 @@ import {
   SESSION_SNAPSHOT_KEY,
   SESSION_SNAPSHOT_ALLOCATION_KEY,
   SESSION_SNAPSHOT_IDLE_MS,
+  selectSessionSnapshot,
 } from '../../src/control-plane/sandbox/session-snapshot.js';
 import {
   createFakeCredentialBroker,
@@ -486,6 +487,86 @@ describe('idle session disk checkpoint', () => {
       const { frame } = await test.connect(1);
       expect(test.launchOptions[1]?.snapshot).toBeUndefined();
       expect(frame && 'spec' in frame && frame.spec.sessionSnapshot).toBeUndefined();
+      test.wrappers.forEach(wrapper => wrapper.close());
+    }
+  );
+
+  it.each([
+    {
+      capturedMode: 'downloaded',
+      selectedMode: 'downloaded',
+      capturedImage: 'runtime-free',
+      selectedImage: 'runtime-free',
+      restores: true,
+    },
+    {
+      capturedMode: 'downloaded',
+      selectedMode: 'downloaded',
+      capturedImage: 'all-in-one',
+      selectedImage: 'all-in-one',
+      restores: true,
+    },
+    {
+      capturedMode: 'preinstalled',
+      selectedMode: 'preinstalled',
+      capturedImage: 'all-in-one',
+      selectedImage: 'all-in-one',
+      restores: true,
+    },
+    {
+      capturedMode: 'downloaded',
+      selectedMode: 'preinstalled',
+      capturedImage: 'all-in-one',
+      selectedImage: 'all-in-one',
+      restores: false,
+    },
+    {
+      capturedMode: 'preinstalled',
+      selectedMode: 'downloaded',
+      capturedImage: 'all-in-one',
+      selectedImage: 'all-in-one',
+      restores: false,
+    },
+    {
+      capturedMode: 'downloaded',
+      selectedMode: 'downloaded',
+      capturedImage: 'runtime-free',
+      selectedImage: 'all-in-one',
+      restores: false,
+    },
+    {
+      capturedMode: 'downloaded',
+      selectedMode: 'downloaded',
+      capturedImage: 'all-in-one',
+      selectedImage: 'runtime-free',
+      restores: false,
+    },
+  ])(
+    'checks startup mode and image but not the runtime release: %j',
+    async ({ capturedMode, selectedMode, capturedImage, selectedImage, restores }) => {
+      const test = await setup();
+      await test.checkpoint();
+      const selected = await runInDurableObject(test.sandbox, (_instance, state) => {
+        const disk = state.storage.kv.get<{ owner: Parameters<typeof selectSessionSnapshot>[1] }>(
+          SESSION_SNAPSHOT_ALLOCATION_KEY
+        );
+        if (disk === undefined) throw new Error('Missing snapshot allocation');
+        const snapshot = state.storage.kv.get<Record<string, unknown>>(SESSION_SNAPSHOT_KEY);
+        state.storage.kv.put(SESSION_SNAPSHOT_KEY, {
+          ...snapshot,
+          runtimeIdentity: JSON.stringify({
+            mode: capturedMode,
+            image: capturedImage,
+            descriptor: 'old-release',
+          }),
+        });
+        return selectSessionSnapshot(
+          state.storage.kv,
+          disk.owner,
+          JSON.stringify({ mode: selectedMode, image: selectedImage, descriptor: 'new-release' })
+        );
+      });
+      expect(selected?.snapshotId).toBe(restores ? 'session-snapshot' : undefined);
       test.wrappers.forEach(wrapper => wrapper.close());
     }
   );

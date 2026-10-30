@@ -581,9 +581,11 @@ providers retain their current recovery behavior.
   delivery, Stop and release invalidate the checkpoint. A container that hosted a second session
   is ineligible even after that route leaves. Capture failure never fails a user turn.
 - **Cold start.** Selection prefers a compatible private session checkpoint, then the existing
-  environment lookup, then the image. Selection reads local metadata without an RPC. Runtime
-  selection and base-image compatibility are checked. Only a confirmed physical
-  snapshot start adds frame-only `spec.sessionSnapshot: { sourceAllocationId }`; early wrapper
+  environment lookup, then the image. Selection reads local metadata without an RPC. Startup
+  mode, image selection and base-image compatibility are checked, not the runtime release.
+  Downloaded startup installs the currently selected Kilo and wrapper over the restored disk.
+  Only a confirmed physical snapshot start adds frame-only
+  `spec.sessionSnapshot: { sourceAllocationId }`; early wrapper
   hello cannot race this decision. Registration rejects client-supplied provenance. An incompatible
   wrapper or failed restore/preparation takes the bounded fresh-start fallback, retaining the
   queued turn and existing ingest/worktree recovery.

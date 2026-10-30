@@ -2980,7 +2980,9 @@
     "permissionDescription": "Þú hefur ekki heimild til að skoða þetta.",
     "notFoundDescription": "Efnið hefur hugsanlega verið fjarlægt eða er ekki lengur tiltækt.",
     "serverTitle": "Ekki tókst að sækja gögn.",
-    "serverDescription": "Eitthvað fór úrskeiðis hjá okkur. Reyndu aftur."
+    "serverDescription": "Eitthvað fór úrskeiðis hjá okkur. Reyndu aftur.",
+    "timeoutTitle": "Netþjónninn er að taka of langan tíma",
+    "timeoutDescription": "Beiðnin rann út á tíma áður en hún kláraðist. Reyndu aftur."
   },
   "screenHeader": {
     "openMenu": "Opna valmynd",

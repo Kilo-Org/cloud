@@ -2980,7 +2980,9 @@
     "permissionDescription": "Nincs jogosultságod ennek a megtekintéséhez.",
     "notFoundDescription": "Lehet, hogy ezt az elemet eltávolították, vagy már nem érhető el.",
     "serverTitle": "Nem sikerült betölteni",
-    "serverDescription": "Nálunk hiba történt. Próbáld újra."
+    "serverDescription": "Nálunk hiba történt. Próbáld újra.",
+    "timeoutTitle": "A szerver túl sokáig tart",
+    "timeoutDescription": "A kérés túllépte az időkorlátot, mielőtt befejeződött volna. Próbáld újra."
   },
   "screenHeader": {
     "openMenu": "Menü megnyitása",

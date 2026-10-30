@@ -2980,7 +2980,9 @@
     "permissionDescription": "Wala kang pahintulot na tingnan ito.",
     "notFoundDescription": "Maaaring inalis na ito o hindi na ito makuha.",
     "serverTitle": "Hindi ma-load ang data.",
-    "serverDescription": "Nagkaproblema sa aming system. Pakisubukang muli."
+    "serverDescription": "Nagkaproblema sa aming system. Pakisubukang muli.",
+    "timeoutTitle": "Masyadong matagal ang tugon ng server",
+    "timeoutDescription": "Nag-timeout ang kahilingan bago ito natapos. Pakisubukang muli."
   },
   "screenHeader": {
     "openMenu": "Buksan ang menu",

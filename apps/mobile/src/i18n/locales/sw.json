@@ -2980,7 +2980,9 @@
     "permissionDescription": "Huna ruhusa ya kuona maudhui haya.",
     "notFoundDescription": "Kipengele hiki huenda kiliondolewa au hakipatikani tena.",
     "serverTitle": "Imeshindikana kupakia.",
-    "serverDescription": "Hitilafu imetokea upande wetu. Tafadhali jaribu tena."
+    "serverDescription": "Hitilafu imetokea upande wetu. Tafadhali jaribu tena.",
+    "timeoutTitle": "Seva inachukua muda mrefu sana",
+    "timeoutDescription": "Ombi limeisha muda kabla ya kutimizwa. Tafadhali jaribu tena."
   },
   "screenHeader": {
     "openMenu": "Fungua menyu",

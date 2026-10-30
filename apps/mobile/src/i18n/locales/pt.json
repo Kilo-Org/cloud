@@ -3022,7 +3022,9 @@
     "permissionDescription": "Não tens permissão para ver este conteúdo.",
     "notFoundDescription": "Este item pode ter sido removido ou já não está disponível.",
     "serverTitle": "Não foi possível carregar os dados.",
-    "serverDescription": "Ocorreu um problema do nosso lado. Tenta novamente."
+    "serverDescription": "Ocorreu um problema do nosso lado. Tenta novamente.",
+    "timeoutTitle": "O servidor está muito lento",
+    "timeoutDescription": "O pedido não terminou a tempo. Tenta novamente."
   },
   "screenHeader": {
     "openMenu": "Abrir menu",

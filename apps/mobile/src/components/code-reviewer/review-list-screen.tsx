@@ -23,6 +23,7 @@ import { useReviewList } from '@/lib/hooks/use-code-reviews';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { dedupeById } from '@/lib/query/dedupe-by-id';
+import { readTrpcErrorField, trpcErrorVariant } from '@/lib/trpc-error';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
@@ -141,16 +142,12 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
 
   // A thrown NOT_FOUND/FORBIDDEN/UNAUTHORIZED can't be fixed by retrying — mirror
   // the review-detail screen and show a permanent state with no retry. Any other
-  // thrown error (or the resolved success:false shape below) stays transient.
-  const errorCode = isError
-    ? (error as { data?: { code?: string } } | null)?.data?.code
-    : undefined;
+  // thrown error (or the resolved success:false shape below) stays transient,
+  // and a request that ran out its deadline keeps its own slow-response state.
+  const errorCode = isError ? readTrpcErrorField(error, 'code') : undefined;
   const isPermanentError =
     errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED';
-  let errorVariant: 'server' | 'not-found' | 'permission' = 'server';
-  if (isPermanentError) {
-    errorVariant = errorCode === 'NOT_FOUND' ? 'not-found' : 'permission';
-  }
+  const errorVariant = trpcErrorVariant(error);
 
   let body: ReactNode = null;
   if (!isLoading && firstPage?.success && reviews.length === 0) {

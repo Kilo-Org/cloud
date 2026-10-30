@@ -2409,7 +2409,9 @@
     "permissionDescription": "Vous n'avez pas l'autorisation de consulter ce contenu.",
     "notFoundDescription": "Cet élément a peut-être été supprimé ou n'est plus disponible.",
     "serverTitle": "Impossible de charger les données.",
-    "serverDescription": "Une erreur s'est produite de notre côté. Réessayez."
+    "serverDescription": "Une erreur s'est produite de notre côté. Réessayez.",
+    "timeoutTitle": "Le serveur met trop de temps à répondre",
+    "timeoutDescription": "La demande a mis trop de temps à aboutir. Réessayez."
   },
   "screenHeader": {
     "openMenu": "Ouvrir le menu",

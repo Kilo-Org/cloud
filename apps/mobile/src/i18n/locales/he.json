@@ -2479,7 +2479,9 @@
     "permissionDescription": "אין לך הרשאה לצפות בזה.",
     "notFoundDescription": "ייתכן שהפריט הזה הוסר או שאינו זמין עוד.",
     "serverTitle": "לא ניתן לטעון את הנתונים.",
-    "serverDescription": "משהו השתבש אצלנו. נסה שוב."
+    "serverDescription": "משהו השתבש אצלנו. נסה שוב.",
+    "timeoutTitle": "השרת לוקח זמן רב מדי",
+    "timeoutDescription": "הבקשה לא הספיקה להסתיים בזמן. נסה שוב."
   },
   "screenHeader": {
     "openMenu": "פתיחת התפריט",

@@ -3064,7 +3064,9 @@
     "permissionDescription": "Za ogled te vsebine nimaš dovoljenja.",
     "notFoundDescription": "Ta element je bil morda odstranjen ali ni več na voljo.",
     "serverTitle": "Podatkov ni bilo mogoče naložiti.",
-    "serverDescription": "Na naši strani je prišlo do napake. Poskusi znova."
+    "serverDescription": "Na naši strani je prišlo do napake. Poskusi znova.",
+    "timeoutTitle": "Strežnik se odziva predolgo",
+    "timeoutDescription": "Odgovora strežnika nismo prejeli pravočasno. Poskusi znova."
   },
   "screenHeader": {
     "openMenu": "Odpri meni",

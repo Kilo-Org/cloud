@@ -2980,7 +2980,9 @@
     "permissionDescription": "Ba ka da izinin ganin wannan.",
     "notFoundDescription": "Wataƙila an cire wannan abu ko kuma ba a samunsa yanzu.",
     "serverTitle": "An kasa loda bayanai.",
-    "serverDescription": "An sami matsala daga ɓangarenmu. Sake gwadawa."
+    "serverDescription": "An sami matsala daga ɓangarenmu. Sake gwadawa.",
+    "timeoutTitle": "Sabar uwar garka na ɗaukar lokaci mai tsawo",
+    "timeoutDescription": "An ƙare lokacin buƙatar kafin ta kammala. Sake gwadawa."
   },
   "screenHeader": {
     "openMenu": "Buɗe jerin zaɓuɓɓuka",

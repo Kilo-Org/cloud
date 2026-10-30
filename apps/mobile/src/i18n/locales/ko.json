@@ -2456,7 +2456,9 @@
     "permissionDescription": "이 항목을 볼 권한이 없습니다.",
     "notFoundDescription": "이 항목이 삭제되었거나 더 이상 제공되지 않을 수 있습니다.",
     "serverTitle": "불러올 수 없습니다.",
-    "serverDescription": "서비스에 문제가 발생했습니다. 다시 시도하세요."
+    "serverDescription": "서비스에 문제가 발생했습니다. 다시 시도하세요.",
+    "timeoutTitle": "서버 응답이 지연되고 있습니다",
+    "timeoutDescription": "요청 시간이 초과되었습니다. 다시 시도하세요."
   },
   "screenHeader": {
     "openMenu": "메뉴 열기",

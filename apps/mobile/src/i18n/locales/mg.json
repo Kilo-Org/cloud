@@ -2980,7 +2980,9 @@
     "permissionDescription": "Tsy manana alalana hijery an'ity ianao.",
     "notFoundDescription": "Mety nesorina ity zavatra ity na tsy misy intsony.",
     "serverTitle": "Tsy nety nampidirina ny angona.",
-    "serverDescription": "Nisy olana avy aty aminay. Andramo indray azafady."
+    "serverDescription": "Nisy olana avy aty aminay. Andramo indray azafady.",
+    "timeoutTitle": "Miadana loatra ny mpizara",
+    "timeoutDescription": "Nitsahatra ny fangatahana alohan'ny hahavita azy. Andramo indray azafady."
   },
   "screenHeader": {
     "openMenu": "Sokafy ny menio",

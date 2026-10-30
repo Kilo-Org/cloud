@@ -40,6 +40,7 @@ import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 import { getBitbucketIntegrationUrl } from '@/lib/integration-urls';
+import { trpcErrorVariant } from '@/lib/trpc-error';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 export default function ReposRoute() {
@@ -73,41 +74,27 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
       : [];
   const reposByPlatform = {
     github: {
-      isLoading: githubRepos.isLoading,
-      isError: githubRepos.isError,
-      isFetching: githubRepos.isFetching,
-      refetch: () => void githubRepos.refetch(),
-      // The cached snapshot's sync time still answers the "how old is this
-      // list" question, so a read that did not force a provider call shows it.
+      query: githubRepos,
       syncedAt: githubRepos.data?.syncedAt ?? null,
       rows: githubRepos.data?.repositories ?? [],
     },
     gitlab: {
-      isLoading: gitlabRepos.isLoading,
-      isError: gitlabRepos.isError,
-      isFetching: gitlabRepos.isFetching,
-      refetch: () => void gitlabRepos.refetch(),
+      query: gitlabRepos,
       syncedAt: gitlabRepos.data?.syncedAt ?? null,
       rows: gitlabRepos.data?.repositories ?? [],
     },
     bitbucket: {
-      isLoading: bitbucketReadiness.isLoading,
-      isError: bitbucketReadiness.isError,
-      isFetching: bitbucketReadiness.isFetching,
-      refetch: () => void bitbucketReadiness.refetch(),
-      // Bitbucket's workspace snapshot carries no sync timestamp.
+      query: bitbucketReadiness,
       syncedAt: null,
       rows: bitbucketRepos,
     },
   };
-  const {
-    isLoading: reposLoading,
-    isError: reposError,
-    isFetching: reposFetching,
-    refetch: refetchRepos,
-    rows: repoRows,
-    syncedAt,
-  } = reposByPlatform[platform];
+  const { query: reposQuery, rows: repoRows, syncedAt } = reposByPlatform[platform];
+  const reposLoading = reposQuery.isLoading;
+  const reposError = reposQuery.isError;
+  const reposFetching = reposQuery.isFetching;
+  const refetchRepos = () => void reposQuery.refetch();
+
   const selectedIds = data?.selectedRepositoryIds ?? [];
   const configDisabled = data == null;
   const bitbucketNotReady =
@@ -139,9 +126,9 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
   const refreshRepositories = () => {
     if (platform === 'bitbucket') {
       refetchRepos();
-      return;
+    } else {
+      void resync();
     }
-    void resync();
   };
   // The label is relative, so it must be derived from a clock the render
   // traces: a live `Date.now()` read inside render is memoized with unchanged
@@ -170,9 +157,8 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     save.mutate({ repositorySelectionMode: nextMode });
   };
 
-  // The repository selection this screen draws is unusable without the
-  // config read, so its failure owns the whole body; the repositories query
-  // keeps its own error state below.
+  // The config read owns the body: without it the selection is unusable, so
+  // its failure paints the whole surface and the repositories read stays below.
   const fullBodyState =
     configFailure != null ||
     (!capabilities.selectionModePicker && !reposLoading && repoRows.length === 0);
@@ -190,7 +176,7 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
   } else if (!reposLoading && reposError) {
     repoState = (
       <QueryError
-        variant="server"
+        variant={trpcErrorVariant(reposQuery.error)}
         placement={fullBodyState ? 'center' : 'top'}
         title={t('common.couldNotLoadRepositories')}
         onRetry={refetchRepos}

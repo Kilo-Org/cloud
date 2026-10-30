@@ -3022,7 +3022,9 @@
     "permissionDescription": "Tev nav atļaujas to skatīt.",
     "notFoundDescription": "Iespējams, šis vienums ir noņemts vai vairs nav pieejams.",
     "serverTitle": "Neizdevās ielādēt.",
-    "serverDescription": "Mūsu pusē radās kļūda. Lūdzu, mēģini vēlreiz."
+    "serverDescription": "Mūsu pusē radās kļūda. Lūdzu, mēģini vēlreiz.",
+    "timeoutTitle": "Serveris pārāk ilgi neatbild",
+    "timeoutDescription": "Pieprasījums tika pārtraukts, jo netika pabeigts laikā. Lūdzu, mēģini vēlreiz."
   },
   "screenHeader": {
     "openMenu": "Atvērt izvēlni",

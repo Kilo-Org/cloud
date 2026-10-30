@@ -2479,7 +2479,9 @@
     "permissionDescription": "Non hai il permesso di visualizzare questo contenuto.",
     "notFoundDescription": "Questo elemento potrebbe essere stato rimosso o non essere più disponibile.",
     "serverTitle": "Impossibile caricare i dati.",
-    "serverDescription": "Si è verificato un problema nel nostro sistema. Riprova."
+    "serverDescription": "Si è verificato un problema nel nostro sistema. Riprova.",
+    "timeoutTitle": "Il server sta impiegando troppo tempo",
+    "timeoutDescription": "La richiesta è scaduta prima di essere completata. Riprova."
   },
   "screenHeader": {
     "openMenu": "Apri il menu",

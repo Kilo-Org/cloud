@@ -2980,7 +2980,9 @@
     "permissionDescription": "Awunayo imvume yokubuka lokhu.",
     "notFoundDescription": "Le nto kungenzeka isusiwe noma ayisatholakali.",
     "serverTitle": "Asikwazanga ukulayisha.",
-    "serverDescription": "Kukhona okungahambanga kahle kithi. Sicela uzame futhi."
+    "serverDescription": "Kukhona okungahambanga kahle kithi. Sicela uzame futhi.",
+    "timeoutTitle": "Isiphakeli sithatha isikhathi eside",
+    "timeoutDescription": "Isicelo siphelelwe yisikhathi ngaphambi kokuqedwa. Sicela uzame futhi."
   },
   "screenHeader": {
     "openMenu": "Vula imenyu",

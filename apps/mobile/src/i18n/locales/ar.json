@@ -2548,7 +2548,9 @@
     "permissionDescription": "لا تملك صلاحية عرض هذا المحتوى.",
     "notFoundDescription": "ربما تمت إزالة هذا العنصر أو لم يعد متاحًا.",
     "serverTitle": "تعذّر التحميل.",
-    "serverDescription": "حدث خطأ من جانبنا. حاول مرة أخرى."
+    "serverDescription": "حدث خطأ من جانبنا. حاول مرة أخرى.",
+    "timeoutTitle": "يستغرق الخادم وقتًا طويلًا",
+    "timeoutDescription": "انتهت مهلة الطلب قبل اكتماله. أعد المحاولة."
   },
   "screenHeader": {
     "openMenu": "فتح القائمة",

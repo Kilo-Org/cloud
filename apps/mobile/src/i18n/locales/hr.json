@@ -3022,7 +3022,9 @@
     "permissionDescription": "Nemaš dopuštenje za pregled ovog sadržaja.",
     "notFoundDescription": "Ova je stavka možda uklonjena ili više nije dostupna.",
     "serverTitle": "Učitavanje nije moguće.",
-    "serverDescription": "Došlo je do pogreške na našoj strani. Pokušaj ponovno."
+    "serverDescription": "Došlo je do pogreške na našoj strani. Pokušaj ponovno.",
+    "timeoutTitle": "Poslužitelj predugo odgovara",
+    "timeoutDescription": "Zahtjev je istekao prije nego što je završio. Pokušaj ponovo."
   },
   "screenHeader": {
     "openMenu": "Otvori izbornik",

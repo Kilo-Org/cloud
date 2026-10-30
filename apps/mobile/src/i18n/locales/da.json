@@ -2980,7 +2980,9 @@
     "permissionDescription": "Du har ikke tilladelse til at se dette.",
     "notFoundDescription": "Indholdet er muligvis fjernet eller ikke længere tilgængeligt.",
     "serverTitle": "Indholdet kunne ikke indlæses.",
-    "serverDescription": "Der opstod en fejl hos os. Prøv igen."
+    "serverDescription": "Der opstod en fejl hos os. Prøv igen.",
+    "timeoutTitle": "Serveren svarer for langsomt",
+    "timeoutDescription": "Anmodningen fik timeout, før den blev gennemført. Prøv igen."
   },
   "screenHeader": {
     "openMenu": "Åbn menu",

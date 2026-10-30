@@ -44,6 +44,7 @@ import { formatMoney, formatNumber } from '@/lib/format';
 import { isPersonal, useReviewConfig } from '@/lib/hooks/use-code-reviewer';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
+import { trpcErrorVariant } from '@/lib/trpc-error';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 const FINDINGS_PAGE_SIZE = 20;
@@ -156,7 +157,7 @@ export function ReviewDetailScreen({
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
         <QueryError
-          variant="server"
+          variant={trpcErrorVariant(error)}
           title={t('codeReviewer.reviewDetail.couldNotLoad')}
           onRetry={() => void refetch()}
           isRetrying={isFetching}

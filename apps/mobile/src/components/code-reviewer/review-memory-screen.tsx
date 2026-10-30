@@ -26,6 +26,7 @@ import {
   type ReviewMemoryProposal,
 } from '@/lib/review-memory-proposals';
 import { useTRPC } from '@/lib/trpc';
+import { trpcErrorVariant } from '@/lib/trpc-error';
 
 const PAGE_SIZE = 20;
 
@@ -117,7 +118,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   } else if (summaryError) {
     body = (
       <QueryError
-        variant="server"
+        variant={trpcErrorVariant(summaryQuery.error)}
         title={t('codeReviewer.reviewMemory.couldNotLoad')}
         onRetry={() => void summaryQuery.refetch()}
         isRetrying={summaryQuery.isFetching}
@@ -154,7 +155,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   } else if (firstPageError) {
     body = (
       <QueryError
-        variant="server"
+        variant={trpcErrorVariant(proposalsQuery.error)}
         title={t('codeReviewer.reviewMemory.couldNotLoadProposals')}
         onRetry={() => void proposalsQuery.refetch()}
         isRetrying={proposalsQuery.isFetching}

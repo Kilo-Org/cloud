@@ -69,10 +69,9 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   // unread, or while the setup gates genuinely depend on them (agent disabled).
   const configSettled = config.data !== undefined;
   const isEnabledResolved = config.data?.isEnabled ?? false;
-  // The GitHub status read fails without data, it is unknown; once it has a
-  // value its owner is known, so only the unread case can be fatal.
-  const isGithubStatusUnknown = !permission.data && permission.isError;
   const isGithubStatusResolved = permission.data !== undefined;
+  // Only a status read that failed without a value is a failure of this screen.
+  const isGithubStatusUnknown = !isGithubStatusResolved && permission.isError;
   const isConfigUnread = !config.data && config.isError;
   const isLoading =
     config.isPending ||

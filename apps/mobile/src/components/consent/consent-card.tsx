@@ -226,11 +226,17 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
         showsVerticalScrollIndicator={false}
       >
         <View className="px-6">
-          <View className="flex-row items-center gap-3">
-            <View className="h-10 w-10 items-center justify-center rounded-lg bg-secondary">
-              <Shield size={20} color={colors.foreground} />
-            </View>
-            <Text className="text-base font-semibold text-foreground">{t('consent.kilo')}</Text>
+          {/* The badge alone carries the brand: the title below already states
+              what the screen is about, and repeating the product name beside
+              the mark said nothing a reader did not already see. The mark keeps
+              the name for assistive tech, which cannot read the glyph. */}
+          <View
+            accessible
+            accessibilityRole="image"
+            accessibilityLabel={t('consent.kilo')}
+            className="h-10 w-10 items-center justify-center rounded-lg bg-secondary"
+          >
+            <Shield size={20} color={colors.foreground} />
           </View>
 
           <Text className="mt-6 text-2xl font-bold text-foreground">
@@ -350,7 +356,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           <Text>{actions.primaryLabel}</Text>
         </Button>
         <Button
-          variant={mode === 'review' ? 'destructive' : 'outline'}
+          variant={mode === 'review' ? 'outline-destructive' : 'outline'}
           size="lg"
           onPress={handleSecondaryAction}
           accessibilityLabel={actions.secondaryLabel}

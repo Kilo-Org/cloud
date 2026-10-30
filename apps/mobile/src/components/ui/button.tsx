@@ -20,6 +20,12 @@ const buttonVariants = cva(
         // in dark mode. Same surface/border pair the app's other dark cards use.
         outline:
           'border-border bg-card dark:border-neutral-700 dark:bg-secondary active:opacity-80 border shadow-sm shadow-[#0000000D]',
+        // A destructive action that shares a footer with a filled primary must
+        // not compete with it for attention: the fill stays with the safe,
+        // forward action, so the destructive one keeps its warning ink and
+        // outline and paints no fill of its own.
+        'outline-destructive':
+          'border-destructive bg-card dark:bg-secondary active:opacity-80 border shadow-sm shadow-[#0000000D]',
         secondary: 'bg-secondary active:opacity-80 shadow-sm shadow-[#0000000D]',
         ghost: 'active:opacity-60',
         link: '',
@@ -123,6 +129,9 @@ function spinnerColor(variant: ButtonProps['variant'], colors: ThemeColors): str
   if (variant === 'destructive') {
     return colors.destructiveSolidForeground;
   }
+  if (variant === 'outline-destructive') {
+    return colors.destructive;
+  }
   // default
   return colors.primaryForeground;
 }
@@ -133,6 +142,7 @@ const buttonTextVariants = cva('text-foreground text-center text-sm font-semibol
       default: 'text-primary-foreground',
       destructive: 'text-destructive-solid-foreground',
       outline: 'text-foreground',
+      'outline-destructive': 'text-destructive',
       secondary: 'text-secondary-foreground',
       ghost: 'text-foreground',
       link: 'text-primary group-active:underline',

@@ -1496,10 +1496,10 @@ export async function fetchMRInlineComments(
   let retainedNoteBytes = 0;
   let discussionsRead = 0;
   let reachedByteLimit = false;
-  let page = 1;
+  let totalPages = 1;
   const perPage = 100;
 
-  while (true) {
+  async function readDiscussionPage(page: number): Promise<GitLabDiscussion[]> {
     const response = await fetchGitLab(
       buildGitLabUrl(
         instanceUrl,
@@ -1523,7 +1523,14 @@ export async function fetchMRInlineComments(
     }
 
     const data = (await response.json()) as GitLabDiscussion[];
+    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+    return data;
+  }
+
+  function retainDiscussions(data: GitLabDiscussion[]): void {
     discussionsRead += data.length;
+    checkGitLabPaginationBounds(totalPages, discussionsRead, 'MR discussion listing');
 
     for (const discussion of data) {
       if (discussion.individual_note) continue;
@@ -1553,13 +1560,19 @@ export async function fetchMRInlineComments(
 
       if (reachedByteLimit) break;
     }
+  }
 
-    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
-    const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
-    checkGitLabPaginationBounds(totalPages, discussionsRead, 'MR discussion listing');
-    if (reachedByteLimit) break;
-    if (page >= totalPages) break;
-    page++;
+  // GitLab lists merge-request discussions oldest first and accepts no ordering parameter, so the
+  // read starts at the last page and walks back. That keeps the newest comments when the budget
+  // ends the read, as the GitHub adapter does with its newest-first request.
+  const oldestPage = await readDiscussionPage(1);
+  checkGitLabPaginationBounds(totalPages, oldestPage.length, 'MR discussion listing');
+  for (let page = totalPages; page >= 2 && !reachedByteLimit; page--) {
+    const data = await readDiscussionPage(page);
+    retainDiscussions([...data].reverse());
+  }
+  if (!reachedByteLimit) {
+    retainDiscussions(oldestPage);
   }
 
   // Attribution is best-effort: a failed lookup leaves the comments unattributed for this

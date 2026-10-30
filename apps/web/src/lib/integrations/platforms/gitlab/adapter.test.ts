@@ -1680,6 +1680,13 @@ function discussionFetchCount() {
   return mockFetch.mock.calls.filter(([url]) => String(url).includes('/discussions')).length;
 }
 
+function requestedDiscussionPages() {
+  return mockFetch.mock.calls
+    .map(([url]) => String(url))
+    .filter(url => url.includes('/discussions'))
+    .map(url => Number(new URL(url).searchParams.get('page') ?? '1'));
+}
+
 describe('merge request note reads', () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -1689,14 +1696,19 @@ describe('merge request note reads', () => {
     const body = 'y'.repeat(200);
     mockEndlessDiscussionPages(body, 100);
     const expectedNotes = Math.ceil(MAX_MR_NOTE_BODY_BYTES / Buffer.byteLength(body));
+    const pagesRead = Math.ceil(expectedNotes / 100);
 
     const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
 
     const totalBytes = comments.reduce((sum, c) => sum + Buffer.byteLength(c.body), 0);
     expect(comments).toHaveLength(expectedNotes);
     expect(totalBytes).toBeGreaterThanOrEqual(MAX_MR_NOTE_BODY_BYTES);
-    expect(discussionFetchCount()).toBe(Math.ceil(expectedNotes / 100));
-    expect(discussionFetchCount()).toBeLessThan(100);
+    // One page reports the page count, then the read walks back from the newest page.
+    expect(discussionFetchCount()).toBe(pagesRead + 1);
+    expect(requestedDiscussionPages()).toEqual([
+      1,
+      ...Array.from({ length: pagesRead }, (_, index) => 100 - index),
+    ]);
   });
 
   it('ends a multi-byte inline note read before the page bound', async () => {
@@ -1709,8 +1721,25 @@ describe('merge request note reads', () => {
     const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
 
     expect(comments).toHaveLength(expectedNotes);
-    expect(discussionFetchCount()).toBe(Math.ceil(expectedNotes / 100));
+    expect(discussionFetchCount()).toBe(Math.ceil(expectedNotes / 100) + 1);
     expect(comments.every(c => c.body.length === MAX_INLINE_COMMENT_BODY_CHARS)).toBe(true);
+  });
+
+  it('keeps the newest inline notes when the budget ends the read', async () => {
+    const body = 'y'.repeat(MAX_INLINE_COMMENT_BODY_CHARS);
+    const bytesPerPage = 100 * Buffer.byteLength(body);
+    const totalPages = 12;
+    const pagesConsumed = Math.ceil(MAX_MR_NOTE_BODY_BYTES / bytesPerPage);
+    const oldestKeptPage = totalPages - pagesConsumed + 1;
+    expect(oldestKeptPage).toBeGreaterThan(1);
+    mockEndlessDiscussionPages(body, totalPages);
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments[0].id).toBe(totalPages * 100 + 99);
+    expect(comments.every(c => c.id >= oldestKeptPage * 100)).toBe(true);
+    // The oldest pages are dropped, and the read never walks back into them.
+    expect(requestedDiscussionPages().slice(1)).not.toContain(oldestKeptPage - 1);
   });
 
   it('stores each inline note body at the rendered length', async () => {

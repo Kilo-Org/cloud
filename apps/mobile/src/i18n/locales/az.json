@@ -2980,7 +2980,9 @@
     "permissionDescription": "Buna baxmağa icazən yoxdur.",
     "notFoundDescription": "Bu element silinmiş ola bilər və ya artıq əlçatan deyil.",
     "serverTitle": "Yükləmək mümkün olmadı.",
-    "serverDescription": "Bizim tərəfdə xəta baş verdi. Yenidən cəhd et."
+    "serverDescription": "Bizim tərəfdə xəta baş verdi. Yenidən cəhd et.",
+    "timeoutTitle": "Server çox gec cavab verir",
+    "timeoutDescription": "Sorğu tamamlanmazdan əvvəl vaxtı bitdi. Yenidən cəhd et."
   },
   "screenHeader": {
     "openMenu": "Menyunu aç",

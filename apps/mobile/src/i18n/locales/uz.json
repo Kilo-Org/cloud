@@ -2980,7 +2980,9 @@
     "permissionDescription": "Buni ko‘rishga ruxsatingiz yo‘q.",
     "notFoundDescription": "Bu element olib tashlangan yoki undan endi foydalanib bo‘lmaydigan bo‘lishi mumkin.",
     "serverTitle": "Yuklab bo'lmadi.",
-    "serverDescription": "Tizimimizda xato yuz berdi. Iltimos, qayta urinib ko'ring."
+    "serverDescription": "Tizimimizda xato yuz berdi. Iltimos, qayta urinib ko'ring.",
+    "timeoutTitle": "Server juda uzoq javob bermoqda",
+    "timeoutDescription": "So'rov tugashidan oldin vaqt tugadi. Iltimos, qayta urinib ko'ring."
   },
   "screenHeader": {
     "openMenu": "Menyuni ochish",

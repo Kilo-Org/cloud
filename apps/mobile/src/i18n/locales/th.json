@@ -2980,7 +2980,9 @@
     "permissionDescription": "คุณไม่มีสิทธิ์ดูข้อมูลนี้",
     "notFoundDescription": "รายการนี้อาจถูกลบหรือใช้งานไม่ได้แล้ว",
     "serverTitle": "โหลดไม่สำเร็จ",
-    "serverDescription": "ระบบของเราเกิดข้อผิดพลาด กรุณาลองอีกครั้ง"
+    "serverDescription": "ระบบของเราเกิดข้อผิดพลาด กรุณาลองอีกครั้ง",
+    "timeoutTitle": "ระบบตอบสนองช้าเกินไป",
+    "timeoutDescription": "คำขอใช้เวลานานเกินกำหนด กรุณาลองอีกครั้ง"
   },
   "screenHeader": {
     "openMenu": "เปิดเมนู",

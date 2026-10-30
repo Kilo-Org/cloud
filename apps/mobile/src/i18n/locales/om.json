@@ -2980,7 +2980,9 @@
     "permissionDescription": "Kana ilaaluuf hayyama hin qabdu.",
     "notFoundDescription": "Wantichi haqamee ta'uu danda'a yookaan kana booda hin argamu.",
     "serverTitle": "Fe'uun hin danda'amne.",
-    "serverDescription": "Gama keenyaan dogoggorri uumameera. Irra deebi'ii yaali."
+    "serverDescription": "Gama keenyaan dogoggorri uumameera. Irra deebi'ii yaali.",
+    "timeoutTitle": "Fe'uun yeroo dheeraa fudhachaa jira",
+    "timeoutDescription": "Kallattiin yeroo dheeraa waadaa'ee xumurutti hin gahine. Irra deebi'ii yaali."
   },
   "screenHeader": {
     "openMenu": "Baafata bani",

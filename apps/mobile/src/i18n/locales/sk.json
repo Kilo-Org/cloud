@@ -3064,7 +3064,9 @@
     "permissionDescription": "Na zobrazenie nemáš oprávnenie.",
     "notFoundDescription": "Táto položka mohla byť odstránená alebo už nie je dostupná.",
     "serverTitle": "Údaje sa nepodarilo načítať.",
-    "serverDescription": "Na našej strane sa vyskytla chyba. Skúste to znova."
+    "serverDescription": "Na našej strane sa vyskytla chyba. Skúste to znova.",
+    "timeoutTitle": "Server odpovedá príliš pomaly",
+    "timeoutDescription": "Požiadavka trvala príliš dlho. Skúste to znova."
   },
   "screenHeader": {
     "openMenu": "Otvoriť ponuku",

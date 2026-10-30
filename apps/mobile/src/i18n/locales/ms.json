@@ -2980,7 +2980,9 @@
     "permissionDescription": "Anda tidak mempunyai kebenaran untuk melihat ini.",
     "notFoundDescription": "Item ini mungkin telah dibuang atau tidak lagi tersedia.",
     "serverTitle": "Tidak dapat memuatkan data.",
-    "serverDescription": "Ralat berlaku pada sistem kami. Sila cuba lagi."
+    "serverDescription": "Ralat berlaku pada sistem kami. Sila cuba lagi.",
+    "timeoutTitle": "Pelayan terlalu lambat bertindak balas",
+    "timeoutDescription": "Permintaan tamat masa sebelum selesai. Sila cuba lagi."
   },
   "screenHeader": {
     "openMenu": "Buka menu",

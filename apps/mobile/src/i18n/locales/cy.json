@@ -3148,7 +3148,9 @@
     "permissionDescription": "Nid oes gen ti ganiatâd i weld hyn.",
     "notFoundDescription": "Efallai bod yr eitem hon wedi'i thynnu neu nad yw ar gael mwyach.",
     "serverTitle": "Ni ellid llwytho'r data.",
-    "serverDescription": "Aeth rhywbeth o'i le ar ein hochr ni. Ceisiwch eto."
+    "serverDescription": "Aeth rhywbeth o'i le ar ein hochr ni. Ceisiwch eto.",
+    "timeoutTitle": "Mae'r gweinydd yn cymryd gormod o amser",
+    "timeoutDescription": "Daeth amser y cais i ben cyn iddo orffen. Ceisiwch eto."
   },
   "screenHeader": {
     "openMenu": "Agor y ddewislen",

@@ -2502,7 +2502,9 @@
     "permissionDescription": "Nie masz uprawnień, aby to wyświetlić.",
     "notFoundDescription": "Ten element mógł zostać usunięty lub nie jest już dostępny.",
     "serverTitle": "Nie udało się wczytać danych.",
-    "serverDescription": "Wystąpił błąd po naszej stronie. Spróbuj ponownie."
+    "serverDescription": "Wystąpił błąd po naszej stronie. Spróbuj ponownie.",
+    "timeoutTitle": "Serwer zbyt długo odpowiada",
+    "timeoutDescription": "Serwer nie odpowiada wystarczająco szybko. Spróbuj ponownie."
   },
   "screenHeader": {
     "openMenu": "Otwórz menu",

@@ -2479,7 +2479,9 @@
     "permissionDescription": "No tienes permiso para ver esto.",
     "notFoundDescription": "Es posible que este elemento se haya eliminado o ya no esté disponible.",
     "serverTitle": "No se pudo cargar el contenido.",
-    "serverDescription": "Se produjo un error en nuestro sistema. Inténtalo de nuevo."
+    "serverDescription": "Se produjo un error en nuestro sistema. Inténtalo de nuevo.",
+    "timeoutTitle": "El servidor está tardando demasiado",
+    "timeoutDescription": "La solicitud se agotó antes de completarse. Inténtalo de nuevo."
   },
   "screenHeader": {
     "openMenu": "Abrir menú",

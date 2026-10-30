@@ -3059,7 +3059,9 @@
     "permissionDescription": "You don't have permission to view this.",
     "notFoundDescription": "This item may have been removed or is no longer available.",
     "serverTitle": "Could not load",
-    "serverDescription": "Something went wrong on our end. Please try again."
+    "serverDescription": "Something went wrong on our end. Please try again.",
+    "timeoutTitle": "The server is taking too long",
+    "timeoutDescription": "The request timed out before it finished. Try again."
   },
   "screenHeader": {
     "openMenu": "Open menu",

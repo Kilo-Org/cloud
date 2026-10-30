@@ -3106,7 +3106,9 @@
     "permissionDescription": "M'għandekx permess biex tara dan.",
     "notFoundDescription": "Dan l-oġġett seta' tneħħa jew m'għadux disponibbli.",
     "serverTitle": "Ma setax jitgħabba l-kontenut.",
-    "serverDescription": "Xi ħaġa marret ħażin min-naħa tagħna. Jekk jogħġbok erġa' pprova."
+    "serverDescription": "Xi ħaġa marret ħażin min-naħa tagħna. Jekk jogħġbok erġa' pprova.",
+    "timeoutTitle": "Is-server qed jieħu żmien wisq",
+    "timeoutDescription": "It-talba ma tlestietx fiż-żmien tagħha. Jekk jogħġbok erġa' pprova."
   },
   "screenHeader": {
     "openMenu": "Iftaħ il-menu",

@@ -3106,7 +3106,9 @@
     "permissionDescription": "Níl cead agat é seo a fheiceáil.",
     "notFoundDescription": "Seans gur baineadh an mhír seo nó nach bhfuil sí ar fáil a thuilleadh.",
     "serverTitle": "Níorbh fhéidir an t-ábhar a lódáil.",
-    "serverDescription": "Tharla fadhb ar ár dtaobh féin. Bain triail as arís."
+    "serverDescription": "Tharla fadhb ar ár dtaobh féin. Bain triail as arís.",
+    "timeoutTitle": "Tá an freastalaí ag glacadh rófhada",
+    "timeoutDescription": "Níor chríochnaigh an t-iarratas in am. Bain triail as arís."
   },
   "screenHeader": {
     "openMenu": "Oscail roghchlár",

@@ -234,8 +234,9 @@ export function OrganizationInvoicesScreen() {
 
   // NOT_FOUND maps to the not-found state; FORBIDDEN/UNAUTHORIZED map to the
   // permission state. A read that settled by failing on a confirmed-offline
-  // device is a connectivity failure; `unknown` keeps the retryable neutral.
-  const errorVariant = selectInvoiceErrorVariant(errorCode, committedConnectivity);
+  // device is a connectivity failure, a request that ran out its deadline is a
+  // slow response, and `unknown` keeps the retryable neutral copy.
+  const errorVariant = selectInvoiceErrorVariant(query.error, committedConnectivity);
 
   // A later-page failure must keep the already-loaded rows and offer an inline
   // retry instead of replacing the list. Read `isFetchNextPageError`, not

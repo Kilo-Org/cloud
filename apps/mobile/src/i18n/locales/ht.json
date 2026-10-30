@@ -2980,7 +2980,9 @@
     "permissionDescription": "Ou pa gen pèmisyon pou wè sa.",
     "notFoundDescription": "Yo ka retire eleman sa a, oswa li pa disponib ankò.",
     "serverTitle": "Nou pa t ka chaje done yo.",
-    "serverDescription": "Gen yon pwoblèm bò kote nou. Tanpri eseye ankò."
+    "serverDescription": "Gen yon pwoblèm bò kote nou. Tanpri eseye ankò.",
+    "timeoutTitle": "Sèvè a pran twò tan",
+    "timeoutDescription": "Demann lan te depase delè li. Tanpri eseye ankò."
   },
   "screenHeader": {
     "openMenu": "Louvri meni an",

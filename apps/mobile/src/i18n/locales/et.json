@@ -2980,7 +2980,9 @@
     "permissionDescription": "Sul pole õigust seda vaadata.",
     "notFoundDescription": "See on kas eemaldatud või pole enam saadaval.",
     "serverTitle": "Laadimine ei õnnestunud.",
-    "serverDescription": "Meie poolel tekkis viga. Proovi uuesti."
+    "serverDescription": "Meie poolel tekkis viga. Proovi uuesti.",
+    "timeoutTitle": "Server vastab liiga aeglaselt",
+    "timeoutDescription": "Päring ei jõudnud õigeaegselt lõpule. Proovi uuesti."
   },
   "screenHeader": {
     "openMenu": "Ava menüü",

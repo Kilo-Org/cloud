@@ -2980,7 +2980,9 @@
     "permissionDescription": "Nuk ke leje për ta parë këtë.",
     "notFoundDescription": "Ky element mund të jetë hequr ose të mos jetë më i disponueshëm.",
     "serverTitle": "Nuk u krye ngarkimi.",
-    "serverDescription": "Ndodhi një gabim nga ana jonë. Provo përsëri."
+    "serverDescription": "Ndodhi një gabim nga ana jonë. Provo përsëri.",
+    "timeoutTitle": "Serveri po vonon shumë",
+    "timeoutDescription": "Kërkesa skadoi përpara se të përfundonte. Provo përsëri."
   },
   "screenHeader": {
     "openMenu": "Hap menunë",

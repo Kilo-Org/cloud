@@ -2980,7 +2980,9 @@
     "permissionDescription": "Ị nweghị ikike ile nke a.",
     "notFoundDescription": "O nwere ike ịbụ na ewepụla ihe a ma ọ bụ na ọ dịkwaghị.",
     "serverTitle": "Enweghị ike ibudata ya.",
-    "serverDescription": "Enwere nsogbu n'akụkụ anyị. Biko nwaa ọzọ."
+    "serverDescription": "Enwere nsogbu n'akụkụ anyị. Biko nwaa ọzọ.",
+    "timeoutTitle": "Ọ na-ewe oge karịa akarị",
+    "timeoutDescription": "Arịrịọ ahụ enweghị ike imecha tupu oge ya agwụ. Biko nwaa ọzọ."
   },
   "screenHeader": {
     "openMenu": "Mepee ndepụta nhọrọ",

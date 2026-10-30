@@ -12,8 +12,6 @@ type Layout = Readonly<{
 
 export type Sample<T> = Readonly<{ t: number; repeat: number; dump: T }>;
 
-const MAX_SAMPLES = 400;
-
 export function createSampler<T extends Layout>(snapshot: () => T) {
   let samples: Sample<T>[] = [];
   let stopTimers: (() => void) | undefined = undefined;
@@ -35,7 +33,7 @@ export function createSampler<T extends Layout>(snapshot: () => T) {
       const previous = samples.at(-1);
       if (previous !== undefined && key === last) {
         samples[samples.length - 1] = { ...previous, repeat: previous.repeat + 1 };
-      } else if (samples.length < MAX_SAMPLES) {
+      } else {
         last = key;
         samples.push({ t: Date.now(), repeat: 1, dump });
       }

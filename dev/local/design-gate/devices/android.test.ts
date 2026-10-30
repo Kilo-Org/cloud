@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 
 import { matrixCells } from '../matrix';
@@ -111,4 +113,43 @@ test('android tap, landscape and null-setting restore commands', () => {
     'adb -s s shell cmd uimode night yes',
     'adb -s s shell settings delete system user_rotation',
   ]);
+});
+
+test('recording stop signals only its remote PID, is idempotent, and cleans up after pull failure', async () => {
+  const exited = Promise.withResolvers<number | null>();
+  const calls: string[][] = [];
+  const responses: Record<string, string> = {
+    'shell wm density': 'Physical density: 420',
+    'shell wm size': 'Physical size: 1080x2400',
+    'shell cmd uimode night': 'Night mode: no',
+  };
+  const device = createAndroidDevice({
+    serial: 'owned-device',
+    exec: (binary, args) => {
+      calls.push([binary, ...args]);
+      if (args[2] === 'pull') throw new Error('pull failed');
+      if (args[3]?.startsWith('touch ')) exited.resolve(0);
+      return Buffer.from(responses[args.slice(2).join(' ')] ?? '');
+    },
+    spawn: (binary, args) => {
+      calls.push([binary, ...args]);
+      return { signal: () => assert.fail('must signal the remote PID, not adb'), exited: exited.promise };
+    },
+  });
+  const recording = device.record(path.join(os.tmpdir(), 'design-gate-recorder-test', 'video.mp4'), 180);
+  const first = recording.stop();
+  assert.equal(recording.stop(), first);
+  await assert.rejects(first, /pull failed/);
+  const start = calls.find(call => call[4]?.includes('screenrecord --bit-rate'));
+  const stop = calls.find(call => call[4]?.startsWith('touch '));
+  assert.ok(start && stop);
+  const video = start[4]?.match(/\/sdcard\/design-gate-motion-[a-f0-9-]+\.mp4/)?.[0];
+  assert.ok(video);
+  assert.ok(stop[4]?.includes(video));
+  assert.ok(stop[4]?.includes('/proc/$pid/cmdline'));
+  assert.ok(stop[4]?.includes('kill -INT "$pid"'));
+  assert.equal(calls.filter(call => call[4]?.startsWith('touch ')).length, 1);
+  const cleanup = calls.at(-1);
+  assert.deepEqual(cleanup?.slice(0, 6), ['adb', '-s', 'owned-device', 'shell', 'rm', '-f']);
+  assert.ok(cleanup?.includes(video));
 });

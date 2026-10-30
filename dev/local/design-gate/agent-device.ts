@@ -2,7 +2,7 @@ import { InfraError } from './capture';
 import { TAP_TARGET } from './matrix';
 import { APP_ID } from './report';
 import type { ProbeDump, ProbeNode } from './tree';
-import { uiautomatorTag } from './uiautomator';
+import { snapshotScrollAxes, uiautomatorTag } from './uiautomator';
 
 type Writable<T> = { -readonly [K in keyof T]: T[K] };
 
@@ -51,6 +51,39 @@ function isAgentNode(value: unknown): value is AgentNode {
   );
 }
 
+export function snapshotInsets(
+  nodes: readonly AgentNode[],
+  width: number,
+  height: number,
+  density: number
+) {
+  const insets = { top: 0, right: 0, bottom: 0, left: 0 };
+  let known = false;
+  for (const node of nodes) {
+    if (!node.systemBar) continue;
+    const { x, y, width: w, height: h } = node.rect;
+    if (w <= 0 || h <= 0) continue;
+    if (w >= width / 2 && h < height / 2) {
+      if (y <= 0) {
+        insets.top = Math.max(insets.top, round((y + h) / density));
+        known = true;
+      } else if (y + h >= height) {
+        insets.bottom = Math.max(insets.bottom, round((height - y) / density));
+        known = true;
+      }
+    } else if (h >= height / 2 && w < width / 2) {
+      if (x <= 0) {
+        insets.left = Math.max(insets.left, round((x + w) / density));
+        known = true;
+      } else if (x + w >= width) {
+        insets.right = Math.max(insets.right, round((width - x) / density));
+        known = true;
+      }
+    }
+  }
+  return { insets, known };
+}
+
 export function agentDeviceToProbeDump(json: string): ProbeDump {
   const data = (JSON.parse(json) as { data?: AgentSnapshot } | null)?.data;
   const density = data?.androidSnapshot?.pixelDensity;
@@ -66,6 +99,7 @@ export function agentDeviceToProbeDump(json: string): ProbeDump {
     throw new InfraError('agent-device snapshot has no Android pixelDensity, viewport, or nodes');
   }
   const all = data.nodes.filter(isAgentNode);
+  const safeArea = snapshotInsets(all, width, height, density);
   const byIndex = new Map(all.map(node => [node.index, node]));
   const kept = all.filter(node => node.bundleId === APP_ID && !node.systemBar);
   const newIndex = new Map(kept.map((node, position) => [node.index, position + 1]));
@@ -95,6 +129,7 @@ export function agentDeviceToProbeDump(json: string): ProbeDump {
       converted.testID = node.identifier;
     }
     if (node.hittable === true && node.kind !== 'scroll-area') converted.pressable = true;
+    if (node.kind === 'scroll-area') converted.scrollAxes = snapshotScrollAxes(converted.tag);
     nodes.push(converted);
   }
   return {
@@ -111,7 +146,8 @@ export function agentDeviceToProbeDump(json: string): ProbeDump {
       isRTL: false,
       language: 'unknown',
       languagePreference: 'unknown',
-      safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
+      safeArea: safeArea.insets,
+      safeAreaKnown: safeArea.known,
       tapTarget: TAP_TARGET,
     },
     nodes,

@@ -171,6 +171,19 @@ export function summarize(findings: readonly Finding[]): { errors: number; warni
   return { errors, warnings: findings.length - errors };
 }
 
+export function skippedRules(cells: readonly CellRun[]) {
+  return cells.flatMap(cell =>
+    cell.screens
+      .filter(screen => screen.env.safeAreaKnown === false)
+      .map(screen => ({
+        cell: cell.id,
+        target: screen.target,
+        rule: 'safe-area',
+        reason: 'snapshot has no system-bar inset evidence',
+      }))
+  );
+}
+
 export function renderReport(
   meta: RunMeta,
   cells: readonly CellRun[],
@@ -206,6 +219,13 @@ export function renderReport(
       lines.push(
         `| ${cell.id} | ${screen.target} | \`${screen.env.route}\` | ${counts.errors} | ${counts.warnings} |`
       );
+    }
+  }
+  const skipped = skippedRules(cells);
+  if (skipped.length > 0) {
+    lines.push('', '## Skipped rules', '');
+    for (const entry of skipped) {
+      lines.push(`- ${entry.cell} · ${entry.target} · ${entry.rule}: ${entry.reason}.`);
     }
   }
   lines.push('', '## Findings', '');
@@ -273,7 +293,7 @@ export function writeArtifacts(args: {
   }
   writeJson(path.join(out, 'findings.json'), {
     version: 1,
-    run: { ...meta, sheets },
+    run: { ...meta, sheets, skippedRules: skippedRules(outcome.cells) },
     cells: outcome.cells.map(cell => ({
       id: cell.id,
       config: cell.config,

@@ -66,3 +66,26 @@ test('uiautomator XML converts to a ProbeDump in dp with DFS parents', () => {
   });
   assert.equal(dump.nodes[5]?.pressable, true);
 });
+
+test('scrollable attributes convey known axes or conservative unknown axes', () => {
+  const dump = uiautomatorToProbeDump({
+    xml: `<hierarchy>
+      <node class="androidx.recyclerview.widget.RecyclerView" scrollable="true" bounds="[0,0][800,1600]" />
+      <node class="androidx.compose.ui.platform.ComposeView" scrollable="true" bounds="[0,0][800,1600]" />
+      <node class="android.widget.HorizontalScrollView" scrollable="true" bounds="[0,0][800,1600]" />
+      <node class="android.widget.ScrollView" scrollable="true" bounds="[0,0][800,1600]" />
+    </hierarchy>`,
+    densityDpi: 320,
+    fontScale: 1,
+    colorScheme: 'light',
+    language: 'en',
+    osVersion: '15',
+  });
+  assert.deepEqual(dump.nodes.slice(1).map(node => node.scrollAxes), [
+    { x: true, y: true },
+    { x: true, y: true },
+    { x: true, y: false },
+    { x: false, y: true },
+  ]);
+  assert.equal(dump.env.safeAreaKnown, false);
+});

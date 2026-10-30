@@ -25,6 +25,8 @@ export type MotionSegment = {
   frames: number;
   peakShare: number;
   abrupt: boolean;
+  nativeFrames?: number;
+  samplingAmbiguous?: boolean;
 };
 
 export const MOTION_FPS = 60;
@@ -97,6 +99,24 @@ export function motionFrameRate(
 
 export function unreliableNote(fps: number): string {
   return `the recording ran at ${fps} fps; motion cannot be judged on this device; use the iOS simulator or a device`;
+}
+
+export function motionEvidence(times: readonly number[], detected: readonly MotionSegment[]) {
+  const segments = detected.map(segment => {
+    const nativeFrames = times.filter(
+      time => time >= segment.startMs - FRAME_MS && time <= segment.endMs + FRAME_MS
+    ).length;
+    return { ...segment, nativeFrames, samplingAmbiguous: nativeFrames < MIN_SEGMENT_FRAMES };
+  });
+  const rate = motionFrameRate(times, detected);
+  const note = [
+    ...(rate.reliable ? [] : [unreliableNote(rate.fps)]),
+    ...(segments.some(segment => segment.samplingAmbiguous)
+      ? ['A segment has fewer than 3 source frames: an instantaneous jump and undersampling cannot be distinguished.']
+      : []),
+    'Abrupt segments are frame-difference candidates, not proven visual jank; layout-shift findings are primary evidence.',
+  ].join(' ');
+  return { ...rate, segments, note };
 }
 
 export function motionFilterArgs(video: string): string[] {
@@ -281,11 +301,7 @@ export async function runMotion(
     parseSignalstats(ctx.exec('ffmpeg', motionFilterArgs(video)).toString())
   );
   const times = parseFrameTimes(ctx.exec('ffprobe', frameTimesArgs(video)).toString());
-  const { fps, clipFps, reliable } = motionFrameRate(times, detected);
-  const segments = detected.map(segment => ({
-    ...segment,
-    abrupt: reliable && segment.abrupt,
-  }));
+  const { fps, clipFps, reliable, segments, note } = motionEvidence(times, detected);
   ctx.exec('ffmpeg', frameStripArgs(video, strip, options.seconds));
   const result: MotionResult = {
     link: options.link,
@@ -297,7 +313,7 @@ export async function runMotion(
     fps,
     clipFps,
     reliable,
-    note: reliable ? undefined : unreliableNote(fps),
+    note,
     segments,
     findings,
   };

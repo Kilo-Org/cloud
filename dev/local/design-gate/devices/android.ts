@@ -1,10 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
 import { InfraError, type Device, type Exec, type Spawn } from '../capture';
 import { compactSize, type CellConfig } from '../matrix';
 
-const REMOTE_VIDEO = '/sdcard/design-gate-motion.mp4';
 const REMOTE_UI_XML = '/sdcard/design-gate-ui.xml';
 
 type WmValue = { physical: string; override?: string };
@@ -130,23 +130,40 @@ export function createAndroidDevice(options: { exec: Exec; spawn: Spawn; serial:
       fs.writeFileSync(file, adb(['exec-out', 'screencap', '-p']));
     },
     record: (file, seconds) => {
-      const recorder = spawn('adb', [
-        '-s',
-        serial,
-        'shell',
-        'screenrecord',
-        '--bit-rate',
-        '8000000',
-        '--time-limit',
-        String(seconds),
-        REMOTE_VIDEO,
-      ]);
+      const remote = `/sdcard/design-gate-motion-${randomUUID()}`;
+      const video = `${remote}.mp4`;
+      const pidFile = `${remote}.pid`;
+      const stopFile = `${remote}.stop`;
+      // Own the remote PID, not adb's local PID; another session may also be recording.
+      const script = [
+        `screenrecord --bit-rate 8000000 --time-limit ${seconds} ${video} &`,
+        'child=$!;',
+        `echo "$child" > ${pidFile};`,
+        `trap 'kill -INT "$child" 2>/dev/null' INT TERM;`,
+        `if [ -f ${stopFile} ]; then kill -INT "$child"; fi;`,
+        'wait "$child"',
+      ].join(' ');
+      const recorder = spawn('adb', ['-s', serial, 'shell', script]);
+      let stopped: Promise<void> | undefined;
       return {
-        stop: async () => {
-          await recorder.exited;
-          fs.mkdirSync(path.dirname(file), { recursive: true });
-          adb(['pull', REMOTE_VIDEO, file]);
-          optionalShell('rm', '-f', REMOTE_VIDEO);
+        stop: () => {
+          stopped ??= (async () => {
+            try {
+              // The marker closes the race where stop precedes the remote PID write.
+              shell(
+                `touch ${stopFile}; if [ -f ${pidFile} ]; then ` +
+                  `pid=$(cat ${pidFile}); ` +
+                  `case "$(tr '\\000' ' ' < /proc/$pid/cmdline 2>/dev/null)" in ` +
+                  `*screenrecord*${video}*) kill -INT "$pid";; esac; fi`
+              );
+              await recorder.exited;
+              fs.mkdirSync(path.dirname(file), { recursive: true });
+              adb(['pull', video, file]);
+            } finally {
+              optionalShell('rm', '-f', video, pidFile, stopFile);
+            }
+          })();
+          return stopped;
         },
       };
     },

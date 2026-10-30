@@ -291,6 +291,7 @@ export function checkTouchTargets(tree: LayoutTree): Finding[] {
 }
 
 export function checkSafeArea(tree: LayoutTree): Finding[] {
+  if (tree.env.safeAreaKnown === false) return [];
   const findings: Finding[] = [];
   const flagged = new Set<LayoutNode>();
   const { safeArea, window } = tree.env;

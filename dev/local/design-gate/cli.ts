@@ -57,7 +57,7 @@ export type CliArgs =
     });
 
 export const USAGE = `Usage: pnpm dev:mobile:design-gate <command> [flags]
-  run    --link <deeplink> [--link ...] [--targets <json>] [--matrix base|standard|full] [--observe-ms ${DEFAULT_OBSERVE_MS}]
+  run    --link <deeplink> [--link ...] [--targets <file>] [--matrix base|standard|full] [--observe-ms ${DEFAULT_OBSERVE_MS}]
   scan   [--source probe|uiautomator|agent-device] [--session <agent-device session>]
   motion --link <deeplink> [--tap <text|testID|label>] [--seconds 3] [--observe-ms ${DEFAULT_OBSERVE_MS}]   exit 1 on an interaction layout shift
   help   print this text
@@ -198,7 +198,7 @@ export function resolveTargets(
       typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) && 'targets' in parsed
         ? parsed.targets
         : parsed;
-    if (!Array.isArray(list)) throw new UsageError('--targets must be a JSON array of {id, link}');
+    if (!Array.isArray(list)) throw new UsageError('--targets file must contain a JSON array of {id, link}');
     for (const entry of list) {
       if (typeof entry === 'string') {
         entries.push({ link: entry });
@@ -236,7 +236,7 @@ export type CliDeps = {
 };
 
 const SIGNAL_EXIT_CODES: Record<AbortSignalName, number> = { SIGINT: 130, SIGTERM: 143 };
-const ABORT_RESTORE_TIMEOUT_MS = 20_000;
+const ABORT_RESTORE_TIMEOUT_MS = 180_000;
 
 export function installAbortRestore(deps: Pick<CliDeps, 'onSignal' | 'exit' | 'warn' | 'clock'>) {
   const cleanups = new Set<() => Promise<void>>();
@@ -245,10 +245,13 @@ export function installAbortRestore(deps: Pick<CliDeps, 'onSignal' | 'exit' | 'w
     if (aborting) return;
     aborting = true;
     deps.warn(`design-gate: ${signal}: restoring device state before exit`);
-    await Promise.race([
-      Promise.allSettled([...cleanups].map(cleanup => cleanup())),
-      deps.clock.sleep(ABORT_RESTORE_TIMEOUT_MS),
+    const restored = await Promise.race([
+      Promise.allSettled([...cleanups].map(cleanup => cleanup())).then(() => true),
+      deps.clock.sleep(ABORT_RESTORE_TIMEOUT_MS).then(() => false),
     ]);
+    if (!restored) {
+      deps.warn(`design-gate: restore exceeded ${ABORT_RESTORE_TIMEOUT_MS} ms; language restoration may be incomplete`);
+    }
     deps.exit(SIGNAL_EXIT_CODES[signal]);
   };
   const removers = (['SIGINT', 'SIGTERM'] as const).map(signal =>
@@ -417,7 +420,7 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
       const counts = summarize(result.findings);
       deps.log(`design-gate: ${path.join(out, 'motion.json')}`);
       deps.log(
-        `design-gate: ${result.segments.length} motion segments, ${abrupt} abrupt at ${result.fps} fps; strip ${result.strip}`
+        `design-gate: ${result.segments.length} motion segments, ${abrupt} abrupt candidates at ${result.fps} fps; strip ${result.strip}`
       );
       if (result.note !== undefined) deps.log(`design-gate: ${result.note}`);
       deps.log(
@@ -466,6 +469,8 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
       if (result.restoreError !== undefined) {
         deps.warn(`design-gate: warning: device state restore failed: ${result.restoreError}`);
         recordRestoreError(out, result.restoreError);
+        deps.log(`design-gate: ${reportPath}`);
+        return 2;
       }
       outcome = result;
     } else {

@@ -48,7 +48,6 @@ test('parseCliArgs parses run with repeated links and defaults', () => {
 test('parseCliArgs parses scan and motion', () => {
   const scan = parseCliArgs(['scan', '--source', 'uiautomator']);
   assert.equal(scan.command === 'scan' && scan.source, 'uiautomator');
-  assert.equal(parseCliArgs(['scan']).command === 'scan' && 'probe', 'probe');
   const agentScan = parseCliArgs(['scan', '--source', 'agent-device', '--session', 's1']);
   assert.deepEqual(agentScan.command === 'scan' && [agentScan.source, agentScan.session], [
     'agent-device',
@@ -159,6 +158,7 @@ test('help prints usage with the app and probe requirement and exits 0', async (
 test('SIGINT runs registered restores once, then exits 130; disposal removes handlers', async () => {
   const handlers = new Map<string, () => void>();
   const events: string[] = [];
+  let timeoutMs = 0;
   const exited = Promise.withResolvers<number>();
   const abort = installAbortRestore({
     onSignal: (signal, handler) => {
@@ -167,7 +167,13 @@ test('SIGINT runs registered restores once, then exits 130; disposal removes han
     },
     exit: code => exited.resolve(code),
     warn: line => events.push(line),
-    clock: { now: () => 0, sleep: () => new Promise(() => undefined) },
+    clock: {
+      now: () => 0,
+      sleep: ms => {
+        timeoutMs = ms;
+        return Promise.withResolvers<void>().promise;
+      },
+    },
   });
   abort.register(async () => {
     events.push('restore device');
@@ -180,6 +186,7 @@ test('SIGINT runs registered restores once, then exits 130; disposal removes han
   handlers.get('SIGTERM')?.();
   assert.equal(await exited.promise, 130);
   assert.deepEqual(events.slice(1), ['restore device']);
+  assert.equal(timeoutMs, 180_000);
   abort.dispose();
   assert.equal(handlers.size, 0);
 });

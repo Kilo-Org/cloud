@@ -27,13 +27,17 @@ export function DesignGateProbe() {
     safeArea.current = insets;
   }, [pathname, insets]);
   useEffect(() => {
-    globalThis.__kiloDesignGate = createDesignGateApi({
+    const api = createDesignGateApi({
       document: () => anchor.current?.ownerDocument ?? null,
       route: () => route.current,
       safeArea: () => safeArea.current,
     });
+    globalThis.__kiloDesignGate = api;
     return () => {
-      globalThis.__kiloDesignGate = undefined;
+      api.dispose();
+      if (globalThis.__kiloDesignGate === api) {
+        globalThis.__kiloDesignGate = undefined;
+      }
     };
   }, []);
   return (

@@ -25,6 +25,7 @@ const ProbeNodeSchema = z.object({
   hitSlop: InsetsSchema.optional(),
   lines: z.number().optional(),
   screenState: z.number().optional(),
+  scrollAxes: z.object({ x: z.boolean(), y: z.boolean() }).optional(),
   style: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
 });
 
@@ -40,6 +41,7 @@ const ProbeEnvSchema = z.object({
   language: z.string(),
   languagePreference: z.string(),
   safeArea: InsetsSchema,
+  safeAreaKnown: z.boolean().optional(),
   tapTarget: z.object({ min: z.number(), touch: z.number() }),
   source: z.enum(['probe', 'uiautomator', 'agent-device']).optional(),
 });
@@ -206,15 +208,15 @@ export function contentBox(node: LayoutNode, isRTL: boolean): Rect {
   const border = numeric(style, 'borderWidth');
   const top =
     border +
-    numeric(style, 'paddingTop', 'paddingBlockStart', 'paddingVertical', 'paddingBlock', 'padding');
+    numeric(style, 'paddingTop', 'paddingBlockStart', 'paddingBlock', 'paddingVertical', 'padding');
   const bottomInset =
     border +
     numeric(
       style,
       'paddingBottom',
       'paddingBlockEnd',
-      'paddingVertical',
       'paddingBlock',
+      'paddingVertical',
       'padding'
     );
   const leftEdge = isRTL ? 'End' : 'Start';
@@ -223,22 +225,22 @@ export function contentBox(node: LayoutNode, isRTL: boolean): Rect {
     border +
     numeric(
       style,
-      'paddingLeft',
-      `padding${leftEdge}`,
       `paddingInline${leftEdge}`,
-      'paddingHorizontal',
+      `padding${leftEdge}`,
+      'paddingLeft',
       'paddingInline',
+      'paddingHorizontal',
       'padding'
     );
   const rightInset =
     border +
     numeric(
       style,
-      'paddingRight',
-      `padding${rightEdge}`,
       `paddingInline${rightEdge}`,
-      'paddingHorizontal',
+      `padding${rightEdge}`,
+      'paddingRight',
       'paddingInline',
+      'paddingHorizontal',
       'padding'
     );
   const [x, y, width, height] = node.rect;
@@ -300,6 +302,7 @@ function ownerPath(node: LayoutNode): string {
 }
 
 function scrollAxes(node: ProbeNode, children: readonly ProbeNode[]): { x: boolean; y: boolean } {
+  if (node.scrollAxes) return node.scrollAxes;
   const scrolls = tags.isScroll(node.tag) || (node.owners ?? []).slice(0, 1).some(tags.isListOwner);
   if (!scrolls) return { x: false, y: false };
   const horizontal =

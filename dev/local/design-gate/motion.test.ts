@@ -10,6 +10,7 @@ import {
   findTapTarget,
   frameStripArgs,
   frameTimesArgs,
+  motionEvidence,
   motionFilterArgs,
   motionFrameRate,
   motionSegments,
@@ -320,4 +321,15 @@ test('findTapTarget lists up to three matched paths when none is pressable', () 
       error.message.split(', ').length === 3
   );
   assert.throws(() => findTapTarget(dump, 'Missing'), /No element with testID, label, or text/);
+});
+
+test('sparse segments preserve abrupt evidence without claiming proven visual jank', () => {
+  const detected = motionSegments([{ timeMs: 1_000, yavg: 20 }]);
+  const evidence = motionEvidence([0, 1_000, 2_000], detected);
+  assert.equal(evidence.reliable, false);
+  assert.equal(evidence.segments[0]?.abrupt, true);
+  assert.equal(evidence.segments[0]?.nativeFrames, 1);
+  assert.equal(evidence.segments[0]?.samplingAmbiguous, true);
+  assert.match(evidence.note, /instantaneous jump and undersampling cannot be distinguished/);
+  assert.match(evidence.note, /not proven visual jank; layout-shift findings are primary/);
 });

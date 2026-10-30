@@ -46,6 +46,12 @@ export function uiautomatorTag(className: string): string {
 
 const round = (value: number) => Math.round(value * 100) / 100;
 
+export function snapshotScrollAxes(tag: string): { x: boolean; y: boolean } {
+  if (tag.includes('HorizontalScrollView')) return { x: true, y: false };
+  if (tag.endsWith('ScrollView')) return { x: false, y: true };
+  return { x: true, y: true };
+}
+
 export function uiautomatorToProbeDump(snapshot: UiSnapshot): ProbeDump {
   const scale = snapshot.densityDpi / 160;
   const nodes: Writable<ProbeNode>[] = [{ parent: -1, tag: 'View', rect: [0, 0, 0, 0] }];
@@ -81,6 +87,7 @@ export function uiautomatorToProbeDump(snapshot: UiSnapshot): ProbeDump {
     if (resourceId) node.testID = resourceId.replace(/^.*:id\//, '');
     if (attrs.get('clickable') === 'true' || attrs.get('long-clickable') === 'true')
       node.pressable = true;
+    if (attrs.get('scrollable') === 'true') node.scrollAxes = snapshotScrollAxes(node.tag);
     nodes.push(node);
     if (selfClosing !== '/') stack.push(nodes.length - 1);
   }
@@ -102,6 +109,7 @@ export function uiautomatorToProbeDump(snapshot: UiSnapshot): ProbeDump {
       language,
       languagePreference: language,
       safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
+      safeAreaKnown: false,
       tapTarget: TAP_TARGET,
     },
     nodes,

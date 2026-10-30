@@ -77,6 +77,7 @@ export type DesignGateApi = Readonly<{
   dump: () => string;
   startSampling: (intervalMs: number, maxMs: number) => void;
   stopSampling: () => string;
+  dispose: () => void;
   setLanguage: (preference: LanguagePreference, resolved: SupportedLanguage) => void;
   resolvedLanguage: () => string;
   openLink: (url: string) => void;
@@ -111,6 +112,9 @@ export function createDesignGateApi(source: ProbeSource): DesignGateApi {
       sampler.start(intervalMs, maxMs);
     },
     stopSampling: () => JSON.stringify({ samples: sampler.stop() }),
+    dispose: () => {
+      sampler.stop();
+    },
     setLanguage: (preference, resolved) => {
       void record(`setLanguage ${preference}`, async () => {
         const outcome = await applyLanguagePreference(preference, resolved);

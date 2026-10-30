@@ -212,7 +212,7 @@ test('writeArtifacts writes one sheet per target in matrix order and lists it', 
     commands.push([command, ...args]);
     return Buffer.from('');
   };
-  const env = { route: '/', pixelRatio: 1 } as CellRun['screens'][number]['env'];
+  const env = { route: '/', pixelRatio: 1, safeAreaKnown: false } as CellRun['screens'][number]['env'];
   const screen = (cell: string, target: string) => ({
     target,
     link: `kiloapp://${target}`,
@@ -243,10 +243,16 @@ test('writeArtifacts writes one sheet per target in matrix order and lists it', 
   ]);
   assert.ok(homeSheet.includes('2x1') && homeSheet.includes('540x+12+12'));
   const findings = JSON.parse(fs.readFileSync(path.join(out, 'findings.json'), 'utf8')) as {
-    run: { sheets: unknown };
+    run: { sheets: unknown; skippedRules: { cell: string; target: string; rule: string; reason: string }[] };
   };
   assert.deepEqual(findings.run.sheets, [
     { target: 'home', file: 'sheets/home.png' },
     { target: 'chat', file: 'sheets/chat.png' },
   ]);
+  assert.equal(findings.run.skippedRules.length, 4);
+  assert.ok(findings.run.skippedRules.every(entry => entry.rule === 'safe-area'));
+  assert.match(
+    fs.readFileSync(path.join(out, 'report.md'), 'utf8'),
+    /base · home · safe-area: snapshot has no system-bar inset evidence/
+  );
 });

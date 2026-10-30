@@ -25,6 +25,10 @@ type Shift = {
   animated: boolean;
 };
 
+function layoutRect(node: LayoutNode): Rect {
+  return node.probe.layoutRect ?? node.rect;
+}
+
 function largestShift(
   byKey: readonly ReadonlyMap<string, LayoutNode>[],
   routes: readonly string[],
@@ -43,13 +47,14 @@ function largestShift(
       run = 0;
     }
     if (!node) continue;
-    run = previous && same(previous.rect, node.rect) ? run + 1 : 1;
+    run = previous && same(layoutRect(previous), layoutRect(node)) ? run + 1 : 1;
     previous = node;
-    if (rest && same(node.rect, rest.node.rect) && rest.end === sample - 1) rest.end = sample;
+    if (rest && same(layoutRect(node), layoutRect(rest.node)) && rest.end === sample - 1)
+      rest.end = sample;
     if (run !== REST_SAMPLES) continue;
     if (rest) {
-      const [x0, y0, w0, h0] = rest.node.rect;
-      const [x1, y1, w1, h1] = node.rect;
+      const [x0, y0, w0, h0] = layoutRect(rest.node);
+      const [x1, y1, w1, h1] = layoutRect(node);
       const dx = x1 - x0;
       const dy = y1 - y0;
       const delta = Math.max(Math.abs(dx), Math.abs(dy));

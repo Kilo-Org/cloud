@@ -111,7 +111,7 @@ export function createDesignGateApi(source: ProbeSource): DesignGateApi {
     startSampling: (intervalMs, maxMs) => {
       sampler.start(intervalMs, maxMs);
     },
-    stopSampling: () => JSON.stringify({ samples: sampler.stop() }),
+    stopSampling: () => JSON.stringify({ samples: sampler.stop(), truncated: sampler.truncated() }),
     dispose: () => {
       sampler.stop();
     },

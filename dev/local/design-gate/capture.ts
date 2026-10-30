@@ -274,11 +274,16 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target) 
     settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
     if (!opened(settled.dump)) unopened = await ctx.probe.lastOutcome();
   }
-  const samples = await ctx.probe.stopSampling();
+  const { samples, truncated } = await ctx.probe.stopSampling();
+  if (truncated) {
+    ctx.log(
+      `design-gate: ${target.id} retained only the newest layouts; older samples were dropped`
+    );
+  }
   const sampled: Sampled = { ...settled, timeline: expandSamples(samples) };
   const files = captureFiles(ctx.out, cell, target.id);
   writeJson(files.absolute(files.dump), sampled.dump);
-  writeJson(files.absolute(files.timeline), { samples });
+  writeJson(files.absolute(files.timeline), { samples, truncated });
   ctx.device.screenshot(files.absolute(files.screenshot));
   const screen: Screen = {
     target: target.id,

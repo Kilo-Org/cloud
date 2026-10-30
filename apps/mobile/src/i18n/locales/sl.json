@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Spremembe",
-    "organizationTrialEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Lastnik organizacije lahko posodobi obračun na kilo.ai, nato poskusi znova."
+    "organizationTrialEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Lastnik organizacije lahko posodobi obračun na kilo.ai, nato poskusi znova.",
+    "privateRepositoryA11y": "{{name}}, zasebno skladišče"
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",
@@ -1557,7 +1558,13 @@
         "change_request_failed": "PR ni uspel",
         "superseded": "Že obstaja"
       },
-      "noProposalsDescription": "Predlogi pomnjenja pregledov se prikažejo tukaj, ko Kilo analizira odgovore vzdrževalcev."
+      "noProposalsDescription": "Predlogi pomnjenja pregledov se prikažejo tukaj, ko Kilo analizira odgovore vzdrževalcev.",
+      "changeRequestInProgress": "Kilo že odpira zahtevek za združitev za ta predlog. Poskusite znova čez trenutek.",
+      "changeRequestNotActionable": "Tega predloga ni več mogoče odobriti. Zaprite ga in osvežite seznam.",
+      "changeRequestNoGitHubAccess": "Nobena povezava z GitHub nima dostopa do tega repozitorija. Ponovno povežite GitHub z dostopom do njega in poskusite znova.",
+      "changeRequestMissingPermissions": "Kiloova aplikacija GitHub ne more odpirati zahtevkov za združitev v tem repozitoriju. Lastnik repozitorija mora aplikaciji dati pravico pisanja do vsebine in zahtevkov za združitev, nato poskusite znova.",
+      "changeRequestFailed": "Kilu ni uspelo odpreti zahtevka za združitev. Poskusite znova čez trenutek.",
+      "offAction": "Pomnjenje pregledov je izklopljeno. Vklopi ga, nato poskusi znova."
     },
     "manualReview": {
       "title": "Ročni pregled",
@@ -2372,6 +2379,8 @@
       "couldNotLoadEnvironment": "Tvojega okolja ni bilo mogoče naložiti.",
       "retryLoadingEnvironment": "Poskusi znova naložiti okolje",
       "defaultEnvironment": "Privzeto okolje",
+      "environmentAccessibility": "Izberite profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Izberite profil: {{label}}. {{attention}}",
       "leaveChanges": "Pusti spremembe",
       "commitAndPush": "Uveljavi in potisni",
       "startSession": "Začni sejo",
@@ -3925,7 +3934,9 @@
     "commandsTitle": "Ukazi za nastavitev",
     "addCommand": "Dodaj ukaz",
     "commandLabel": "Ukaz",
+    "commandLabelPosition": "Ukaz {{position}}",
     "commandPlaceholder": "npr. pnpm install",
+    "commandAtLimit": "Ukaz je omejen na {{max}} znakov",
     "commandsEmpty": "Ni še nobenih ukazov za nastavitev",
     "commandsSaveFailed": "Nastavitvenih ukazov ni bilo mogoče shraniti",
     "moveUp": "Premakni se navzgor",
@@ -3943,6 +3954,7 @@
     "skillSaveFailed": "Spretnosti ni bilo mogoče shraniti",
     "skillSourceCustom": "Po meri",
     "skillSourceMarketplace": "Tržnica",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Prilepite SKILL.md in njegovo ime se izpolni; dodajte veščino iz telefona brez povleci in spusti.",
     "skillEditTitle": "Spretnost urejanja",
     "skillEdit": "Uredi spretnost {{name}}",
@@ -3971,6 +3983,7 @@
       "headersHint": "Vrednosti, prikazane kot ••••, obdržijo shranjeno skrivnost; zamenjajte vrednost, da jo rotirate. Sprememba URL-ja znova zahteva vse vrednosti",
       "nameRequired": "Vnesite ime strežnika",
       "nameInvalid": "Ime lahko uporablja samo ASCII črke, številke, podčrtaje in pomišljaje, največ 100 znakov",
+      "nameConflict": "Strežnik s tem imenom že obstaja",
       "commandRequired": "Vnesite ukaz",
       "commandTooLong": "Uporabite največ 50 argumentov po 500 znakov",
       "urlRequired": "Vnesite URL",
@@ -3990,7 +4003,7 @@
       "add": "Dodaj agenta",
       "empty": "Zastopnikov še ni",
       "name": "Ime agenta",
-      "slug": "Agent polž",
+      "slug": "Slug agenta",
       "description": "Opis agenta",
       "model": "Preglasitev modela",
       "modelPlaceholder": "Uporabi privzeto sejo",
@@ -4015,8 +4028,8 @@
       "saveFailed": "Agenta ni bilo mogoče shraniti",
       "deleteFailed": "Agenta ni bilo mogoče izbrisati",
       "nameRequired": "Vnesite ime agenta",
-      "slugRequired": "Vnesite polža agenta",
-      "slugInvalid": "Polž se mora začeti z malo ASCII črko in uporabljati samo male ASCII črke, številke in pomišljaje, največ 50 znakov",
+      "slugRequired": "Vnesite slug agenta",
+      "slugInvalid": "Slug agenta se mora začeti z malo ASCII črko in uporabljati samo male ASCII črke, številke in pomišljaje, največ 50 znakov",
       "slugConflict": "Ta slug že uporablja vgrajeni agent ali drug agent v tem profilu",
       "edit": "Uredi agenta {{name}}",
       "delete": "Izbriši agenta {{name}}"
@@ -4051,7 +4064,6 @@
       "repo": "Izberite repozitorij ...",
       "profile": "Izberite profil",
       "remove": "Odveži",
-      "private": "Zasebno",
       "search": "Iskanje po skladiščih ...",
       "addedToast": "Privzeti profil nastavljen za \"{{repo}}\"",
       "addFailed": "Privzetega profila ni bilo mogoče nastaviti",

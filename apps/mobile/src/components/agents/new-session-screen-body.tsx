@@ -45,6 +45,7 @@ import {
   readForkPrefillText,
   readForkSourceIsCloudAgent,
 } from '@/components/agents/new-session-prefill';
+import { shouldAutoFocusNewSessionPrompt } from '@/components/agents/new-session-prompt-focus';
 import { useNewSessionOrganization } from '@/components/agents/use-new-session-organization';
 import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-create';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
@@ -294,7 +295,12 @@ export function NewSessionScreenBody() {
   // prompt's own `useSharePrefill` still delivers the shared files and
   // re-applies the same text idempotently. A to-do's Start carries its prompt
   // the same way, so it also beats a stored draft.
-  const { prompt: routePrefillPrompt, todoId, todoTitle } = useNewSessionPrefill();
+  const {
+    prompt: routePrefillPrompt,
+    todoId,
+    todoTitle,
+    repo: routePrefillRepo,
+  } = useNewSessionPrefill();
   const [sharePrefillText] = useState<string | null>(() =>
     shareId ? (peekSharePayload(shareId)?.text ?? null) : (routePrefillPrompt ?? null)
   );
@@ -942,6 +948,20 @@ export function NewSessionScreenBody() {
   );
 
   const isRemoteTargetSelected = runOnInstance !== null || computerTargetSelected;
+  // The composer only takes focus on arrival when the form already has its
+  // repository. Focusing raises the keyboard, which shrinks the scroll frame past
+  // the repository picker, Changes, Environment and Advanced Configuration while
+  // Start is still waiting on that selection — the form then looks like it lost
+  // its configuration until the keyboard comes down. The rule itself lives in
+  // `shouldAutoFocusNewSessionPrompt`, including the prefill gate the screen
+  // applies a prefill under.
+  const autoFocusPrompt = shouldAutoFocusNewSessionPrompt({
+    sharePrefilled: Boolean(shareId),
+    hasSelectedRepository: selectedRepo !== '',
+    reposSettled,
+    repositories,
+    prefill: { mode, repo: routePrefillRepo },
+  });
   // Clone CLI-capability gate: a full clone is optimistic (only an explicit
   // `sessionClone: false` refuses it); a fork cut needs
   // `sessionCloneAtMessage: true`. A refused CLI shows its inline reason
@@ -1249,6 +1269,7 @@ export function NewSessionScreenBody() {
         onChangeFolderPath={setFolderPath}
         runOnInlineNote={runOnInlineNote}
         isCloneEntry={isCloneEntry}
+        autoFocusPrompt={autoFocusPrompt}
         groups={groups}
         isRetrying={isRetrying}
         onChangeRepo={setSelectedRepo}

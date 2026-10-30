@@ -214,7 +214,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Changes",
-    "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again."
+    "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.",
+    "privateRepositoryA11y": "{{name}}, private repository"
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -1579,7 +1580,13 @@
         "change_request_failed": "PR failed",
         "superseded": "Already present"
       },
-      "noProposalsDescription": "Review memory proposals appear here after Kilo analyzes maintainer replies."
+      "noProposalsDescription": "Review memory proposals appear here after Kilo analyzes maintainer replies.",
+      "changeRequestInProgress": "Kilo is already opening a pull request for this proposal. Try again in a moment.",
+      "changeRequestNotActionable": "This proposal can no longer be approved. Close it and refresh the list.",
+      "changeRequestNoGitHubAccess": "No GitHub connection has access to this repository. Reconnect GitHub with access to it, then try again.",
+      "changeRequestMissingPermissions": "Kilo's GitHub App cannot open pull requests in this repository. A repository owner must give the app write access to contents and pull requests, then try again.",
+      "changeRequestFailed": "Kilo could not open the pull request. Try again in a moment.",
+      "offAction": "Review memory is off. Turn it on, then try again."
     },
     "manualReview": {
       "title": "Manual review",
@@ -2376,6 +2383,8 @@
       "couldNotLoadEnvironment": "Couldn't load your environment",
       "retryLoadingEnvironment": "Retry loading environment",
       "defaultEnvironment": "Default environment",
+      "environmentAccessibility": "Pick a profile: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Pick a profile: {{label}}. {{attention}}",
       "leaveChanges": "Leave changes",
       "commitAndPush": "Commit and push",
       "startSession": "Start session",
@@ -3891,7 +3900,9 @@
     "commandsTitle": "Setup commands",
     "addCommand": "Add command",
     "commandLabel": "Command",
+    "commandLabelPosition": "Command {{position}}",
     "commandPlaceholder": "e.g. pnpm install",
+    "commandAtLimit": "The command is limited to {{max}} characters",
     "commandsEmpty": "No setup commands yet",
     "commandsSaveFailed": "Couldn't save setup commands",
     "moveUp": "Move up",
@@ -3909,6 +3920,7 @@
     "skillSaveFailed": "Couldn't save skill",
     "skillSourceCustom": "Custom",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Paste a SKILL.md and its name fills in; add a skill from your phone without drag and drop.",
     "skillEditTitle": "Edit skill",
     "skillEdit": "Edit skill {{name}}",
@@ -3935,6 +3947,7 @@
       "headersHint": "Values shown as •••• keep their stored secret; replace a value to rotate it. Changing the URL requires every value again",
       "nameRequired": "Enter a server name",
       "nameInvalid": "Name can use only ASCII letters, numbers, underscores, and dashes, up to 100 characters",
+      "nameConflict": "A server with this name already exists",
       "commandRequired": "Enter a command",
       "commandTooLong": "Use at most 50 arguments of 500 characters each",
       "urlRequired": "Enter a URL",
@@ -4015,7 +4028,6 @@
       "repo": "Select repository…",
       "profile": "Select profile",
       "remove": "Unbind",
-      "private": "Private",
       "search": "Search repositories…",
       "addedToast": "Default profile set for \"{{repo}}\"",
       "addFailed": "Couldn't set default profile",

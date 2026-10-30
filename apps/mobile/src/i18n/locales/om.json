@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Jijjiiramoota",
-    "organizationTrialEnded": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Abbaan dhaabbataa kaffaltii kilo.ai irratti haaromsuu danda'a, sana booda irra deebi'ii yaali."
+    "organizationTrialEnded": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Abbaan dhaabbataa kaffaltii kilo.ai irratti haaromsuu danda'a, sana booda irra deebi'ii yaali.",
+    "privateRepositoryA11y": "{{name}}, kuusaa koodii dhuunfaa"
   },
   "language": {
     "restarting": "Afaan filatame fayyadamuuf irra deebi'ee jalqabaa jira",
@@ -1513,7 +1514,13 @@
         "change_request_failed": "PR hin milkoofne",
         "superseded": "Duraanuu jira"
       },
-      "noProposalsDescription": "Kilo deebii kunuunsitootaa erga xiinxalee booda yaadonni yaadannoo sakatta'aa irraa dhihaatan asitti mul'atu."
+      "noProposalsDescription": "Kilo deebii kunuunsitootaa erga xiinxalee booda yaadonni yaadannoo sakatta'aa irraa dhihaatan asitti mul'atu.",
+      "changeRequestInProgress": "Kilo duraanuu yaadota kanaaf pull request banaa jira. Yeroo gabaabaa booda irra deebi'ii yaali.",
+      "changeRequestNotActionable": "Yaadni kun amma mirkanaa'uu hin danda'u. Isa cufi tarree haaromsi.",
+      "changeRequestNoGitHubAccess": "Walitti hidhinnni GitHub tokko illee repository kanaaf dhaqqabama hin qabu. GitHub repository kanaaf dhaqqabamaan walitti deebi'ii hidhi, sana booda irra deebi'ii yaali.",
+      "changeRequestMissingPermissions": "Appiin GitHub Kilo repository kana keessatti pull request banuu hin danda'u. Abbaan repository appii sanatti qabeenyaa fi pull request irratti afoomicha barreessuu kennuu qaba, sana booda irra deebi'ii yaali.",
+      "changeRequestFailed": "Kilo pull request banuu hin dandeenye. Yeroo gabaabaa booda irra deebi'ii yaali.",
+      "offAction": "Yaadannoon sakatta'aa cufameera. Isa bani, sana booda irra deebi'ii yaali."
     },
     "manualReview": {
       "title": "Sakatta'a harkaa",
@@ -2310,6 +2317,8 @@
       "couldNotLoadEnvironment": "Naannoo kee fe'uu hin danda'amne.",
       "retryLoadingEnvironment": "Naannoo fe'uuf deebi'ii yaali",
       "defaultEnvironment": "Naannoo durtii",
+      "environmentAccessibility": "Profaayila tokko filadhu: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Profaayila tokko filadhu: {{label}}. {{attention}}",
       "leaveChanges": "Jijjiiramoota dhiisi",
       "commitAndPush": "Galmeessiitii ol ergi",
       "startSession": "Turtii jalqabi",
@@ -3825,7 +3834,9 @@
     "commandsTitle": "Ajajoota saaguu",
     "addCommand": "Ajaja itti dabali",
     "commandLabel": "Ajaja",
+    "commandLabelPosition": "Ajaja {{position}}",
     "commandPlaceholder": "fakkeenyaaf pnpm install",
+    "commandAtLimit": "Ajajni arfiilee {{max}}tti daangeffama",
     "commandsEmpty": "Ajajni setup hanga ammaatti hin jiru",
     "commandsSaveFailed": "Ajajoota saaguu qusachuu hin dandeenye",
     "moveUp": "Ol socho'aa",
@@ -3843,6 +3854,7 @@
     "skillSaveFailed": "Ogummaa qusachuu hin dandeenye",
     "skillSourceCustom": "Dhuunfaa",
     "skillSourceMarketplace": "Gabaa",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md tokko maxxansi maqaan isaa ni guuta; bilbila keessan irraa ogummaa tokko osoo harkisuu fi hin gadi dhiisin itti dabalaa.",
     "skillEditTitle": "Dandeettii gulaaluu",
     "skillEdit": "Dandeettii {{name}} gulaali",
@@ -3857,7 +3869,7 @@
       "remoteType": "Fagoo",
       "command": "Sarara ajajaa",
       "url": "URL",
-      "environment": "Naannoo (JSON) .",
+      "environment": "Naannoo (JSON)",
       "headers": "Mata dureewwan (JSON) .",
       "timeout": "Yeroon xumuraa",
       "secretCount_one": "{{count}} icciti",
@@ -3869,6 +3881,7 @@
       "headersHint": "Gatiwwan akka •••• agarsiifaman icciita isaanii kuufame qabu; isa jijjiiruuf gatii tokko bakka buusi. Yeroo URL jijjiiramu, gatiin hundi barbaachisaadha",
       "nameRequired": "Maqaa sarvarii galchi",
       "nameInvalid": "Maqaan qubee ASCII, lakkoofsota, sarara jalaa fi daash qofa fayyadamuu danda'a, arfiilee 100 ykn isaa gadi",
+      "nameConflict": "Sarvarrii maqaa kana qabu caalaa jira",
       "commandRequired": "Ajaja galchi",
       "commandTooLong": "Arguumentii 50 ol fayyadami, tokkoon tokkoon isaanii arfii 500",
       "urlRequired": "URL galchi",
@@ -3949,7 +3962,6 @@
       "repo": "Kuusaa filadhu...",
       "profile": "Profaayilii filadhu",
       "remove": "Hidhaa hiikaa",
-      "private": "Dhuunfaa",
       "search": "Kuusaawwan barbaadi...",
       "addedToast": "Profaayilii durtii \"{{repo}}\" tiif saagame.",
       "addFailed": "Profaayilii durtii saaguu hin dandeenye",

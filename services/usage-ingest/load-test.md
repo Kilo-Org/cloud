@@ -28,15 +28,19 @@ uses separate `USAGE_QUEUE_SFO_EXPOSURE` (`0`–`1`) and optional
 and is not activated here. Disabling queue-only
 keeps new events on direct accounting. Background shadow publication has been
 removed; reconcile and drain any historically accepted shadow events before
-switching a consumer to processing. Queue-only never falls back to a gateway billing writer. Count
+switching a consumer to processing. After attempting publication, queue-only never falls back to a gateway billing
+writer. Missing publisher configuration and failed lifetime registration retain
+the existing direct fallback before any publication attempt. Count
 `usage accounting publication failed` errors
 and report their usage IDs and categories with the run. These return null
 accounting results after the bounded retries, not queued or recorded success.
 `usage enqueue retrying` counts failed attempts, not distinct events: retries
 reuse the same event and may create duplicate deliveries after ambiguous acceptance.
-Include the publisher retry/backoff budget (up to seven seconds plus runtime
-scheduling overhead, excluding subsequent Bouncer reporting) in accounting
-completion deadlines. There is no durable recovery
+Include the retry-enabled Cloudflare publisher's 25-second elapsed budget
+(four attempts of up to five seconds plus full-jitter waits, clipped to remaining
+budget) and runtime scheduling overhead, excluding subsequent Bouncer reporting,
+in accounting completion deadlines. Non-retry HTTP publication remains one
+two-second attempt; Vercel queue transport is unchanged. There is no durable recovery
 for unaccepted events in this path; an ambiguous failure such as a timeout may
 still be followed by consumer persistence, so reconcile those IDs separately.
 

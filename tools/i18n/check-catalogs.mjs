@@ -172,6 +172,9 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'profiles.agents.topP',
   'profiles.slashCommands.namePlaceholder',
   'profiles.slashCommands.agentPlaceholder',
+  // The skills.sh source label. It names the published site the skill is
+  // installed from, so every catalog keeps the site's own spelling.
+  'profiles.skillSourceSkillsSh',
   // The MCP count label. `MCP` is the protocol's own acronym, so every catalog
   // keeps the same "{{count}} MCP" the MCP-server rows use.
   'profiles.counts.mcp',

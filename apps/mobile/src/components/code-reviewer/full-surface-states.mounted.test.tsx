@@ -139,6 +139,7 @@ vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.test' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: state.openExternalUrl }));
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
   openAuthorizationAndWaitForReturn: (url: string) => state.openExternalUrl(url),
+  reportLateLaunchFailure: vi.fn(),
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -166,6 +167,9 @@ vi.mock('@/lib/trpc', () => ({
       mintInstallState: { mutate: state.mintInstallState },
     },
   },
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   isPersonal: (scope: string) => scope === 'personal',

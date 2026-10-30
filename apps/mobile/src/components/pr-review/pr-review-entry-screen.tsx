@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { providerPrRefLabel, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import {
@@ -202,6 +202,7 @@ export function PrReviewEntryScreen() {
                     <Button
                       size="sm"
                       variant="outline"
+                      className={STATE_ACTION_CLASS}
                       onPress={() => {
                         handleRecentPress(entry);
                       }}

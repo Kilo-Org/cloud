@@ -1,3 +1,6 @@
+import { type BannerState } from '@/lib/offline-banner-state';
+import { readTrpcErrorField } from '@/lib/trpc-error';
+
 export type ScopeEntryView =
   | 'loading'
   | 'error'
@@ -66,4 +69,66 @@ export function selectScopeEntryView({
     return 'disabled-settings';
   }
   return 'dashboard';
+}
+
+/** The cause-named description the failure screen shows, or null for the variant's own copy. */
+type ScopeEntryLoadFailureDescriptionKey =
+  | 'organization.boundary.loadErrorMessage'
+  | 'securityAgent.scopeEntry.retryFailed';
+
+export type ScopeEntryLoadFailure = {
+  /**
+   * `offline` when the connection is the cause: the WifiOff icon and the same
+   * state the rest of the app paints for an unreachable read.
+   */
+  variant: 'offline' | 'server';
+  /** Description override; null keeps the variant's own description. */
+  descriptionKey: ScopeEntryLoadFailureDescriptionKey | null;
+};
+
+export type SelectScopeEntryLoadFailureInput = {
+  /** Errors of the reads whose failure produced the error view. */
+  errors: readonly unknown[];
+  /** A read paused by the online manager; only an offline online-manager pauses. */
+  isPaused: boolean;
+  /** Committed connectivity — the state the offline banner paints. */
+  connectivity: BannerState;
+  /** The reader's last Retry ran and failed again. */
+  lastAttemptFailed: boolean;
+};
+
+/**
+ * Pure selector naming the cause of the scope entry's load failure.
+ *
+ * The entry paints one error screen for three fatal reads (permission status,
+ * config, capability) and used to paint it with no cause at all: the default
+ * server wording told the reader the app's own system had a problem even when
+ * the request never reached it, and only a failed retry named the connection.
+ * The cause is the one the rest of the app already classifies:
+ *
+ * - a paused read, or confirmed-offline connectivity, is the connection;
+ * - a failed read that carries a tRPC code is a server answer, so the system
+ *   wording stays even after a failed retry (naming the connection there would
+ *   blame the wrong party);
+ * - any other failed read never reached the server at all — a transport
+ *   rejection carries no code — which is the connection too.
+ */
+export function selectScopeEntryLoadFailure({
+  errors,
+  isPaused,
+  connectivity,
+  lastAttemptFailed,
+}: SelectScopeEntryLoadFailureInput): ScopeEntryLoadFailure {
+  const serverAnswered = errors.some(error => readTrpcErrorField(error, 'code') !== undefined);
+  const isConnection =
+    isPaused || connectivity === 'offline' || (errors.length > 0 && !serverAnswered);
+  if (!isConnection) {
+    return { variant: 'server', descriptionKey: null };
+  }
+  return {
+    variant: 'offline',
+    descriptionKey: lastAttemptFailed
+      ? 'securityAgent.scopeEntry.retryFailed'
+      : 'organization.boundary.loadErrorMessage',
+  };
 }

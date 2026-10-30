@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Alterações",
-    "organizationTrialEnded": "O período de teste da organização terminou e esta não tem um plano ativo. O proprietário da organização pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente."
+    "organizationTrialEnded": "O período de teste da organização terminou e esta não tem um plano ativo. O proprietário da organização pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente.",
+    "privateRepositoryA11y": "{{name}}, repositório privado"
   },
   "language": {
     "restarting": "A reiniciar para aplicar o idioma",
@@ -1535,7 +1536,13 @@
         "change_request_failed": "Falha ao abrir PR",
         "superseded": "Já existe"
       },
-      "noProposalsDescription": "As propostas da memória de revisão aparecem aqui depois de o Kilo analisar as respostas dos responsáveis pelo projeto."
+      "noProposalsDescription": "As propostas da memória de revisão aparecem aqui depois de o Kilo analisar as respostas dos responsáveis pelo projeto.",
+      "changeRequestInProgress": "O Kilo já está a abrir um pull request para esta proposta. Tenta novamente dentro de momentos.",
+      "changeRequestNotActionable": "Esta proposta já não pode ser aprovada. Fecha-a e atualiza a lista.",
+      "changeRequestNoGitHubAccess": "Nenhuma ligação ao GitHub tem acesso a este repositório. Volta a ligar o GitHub com acesso ao mesmo e tenta novamente.",
+      "changeRequestMissingPermissions": "A aplicação GitHub do Kilo não consegue abrir pull requests neste repositório. Um proprietário do repositório tem de conceder à aplicação acesso de escrita a conteúdos e pull requests; depois, tenta novamente.",
+      "changeRequestFailed": "O Kilo não conseguiu abrir o pull request. Tenta novamente dentro de momentos.",
+      "offAction": "A memória de revisão está desativada. Ativa-a e tenta novamente."
     },
     "manualReview": {
       "title": "Revisão manual",
@@ -2341,6 +2348,8 @@
       "couldNotLoadEnvironment": "Não foi possível carregar o seu ambiente.",
       "retryLoadingEnvironment": "Tentar carregar o ambiente novamente",
       "defaultEnvironment": "Ambiente predefinido",
+      "environmentAccessibility": "Escolha um perfil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Escolha um perfil: {{label}}. {{attention}}",
       "leaveChanges": "Manter alterações",
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sessão",
@@ -3875,7 +3884,9 @@
     "commandsTitle": "Comandos de configuração",
     "addCommand": "Adicionar comando",
     "commandLabel": "Comando",
+    "commandLabelPosition": "Comando {{position}}",
     "commandPlaceholder": "p. ex. pnpm install",
+    "commandAtLimit": "O comando está limitado a {{max}} caracteres",
     "commandsEmpty": "Ainda não há comandos de configuração",
     "commandsSaveFailed": "Não foi possível guardar os comandos de configuração",
     "moveUp": "Mover para cima",
@@ -3893,6 +3904,7 @@
     "skillSaveFailed": "Não foi possível guardar a competência",
     "skillSourceCustom": "Personalizado",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Cole um SKILL.md e o nome é preenchido automaticamente; adicione uma competência a partir do telemóvel, sem arrastar e largar.",
     "skillEditTitle": "Editar competência",
     "skillEdit": "Editar competência {{name}}",
@@ -3920,6 +3932,7 @@
       "headersHint": "Os valores apresentados como •••• mantêm o segredo armazenado; substitua um valor para o renovar. Alterar o URL exige novamente todos os valores",
       "nameRequired": "Introduza um nome de servidor",
       "nameInvalid": "O nome pode usar apenas letras ASCII, números, sublinhados e hífenes, até 100 caracteres",
+      "nameConflict": "Já existe um servidor com este nome",
       "commandRequired": "Introduza um comando",
       "commandTooLong": "Utilize no máximo 50 argumentos de 500 caracteres cada",
       "urlRequired": "Introduza um URL",
@@ -4000,7 +4013,6 @@
       "repo": "Selecione o repositório…",
       "profile": "Selecione o perfil",
       "remove": "Desvincular",
-      "private": "Privado",
       "search": "Pesquisar repositórios…",
       "addedToast": "Perfil predefinido definido para \"{{repo}}\"",
       "addFailed": "Não foi possível definir o perfil predefinido",

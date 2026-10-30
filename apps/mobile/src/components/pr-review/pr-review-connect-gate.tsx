@@ -108,6 +108,9 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
   useEffect(() => () => connectAbort.current?.abort(), []);
 
   const handleConnect = async () => {
+    // A retry supersedes the attempt still waiting: abort it first, so its late
+    // report cannot speak for this one.
+    connectAbort.current?.abort();
     const controller = new AbortController();
     connectAbort.current = controller;
     setConnecting(true);

@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- The selector and picker row share model disclosure behavior. */
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { type Href, type ImperativeRouter, useRouter } from 'expo-router';
 import {
   BookOpenCheck,
@@ -366,7 +366,7 @@ export function ModelPickerOptionRow({
         </View>
         <Pressable
           onPress={() => {
-            void Haptics.selectionAsync();
+            selectionHaptic();
             onToggleFavorite(option);
           }}
           hitSlop={12}

@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 
 import { planProfileTabPress, type TabPressNavigation } from '@/lib/tab-press';
 import {
@@ -26,7 +26,7 @@ export function tabPressListeners({ navigation }: { navigation: TabFocus }) {
   return {
     tabPress: () => {
       settleFocusedTabPress(navigation);
-      void Haptics.selectionAsync();
+      selectionHaptic();
     },
   };
 }
@@ -42,7 +42,7 @@ export function profileTabPressListeners(segments: readonly string[]) {
   return ({ navigation }: { navigation: TabFocus & TabPressNavigation }) => ({
     tabPress: (event: TabPressEvent) => {
       settleFocusedTabPress(navigation);
-      void Haptics.selectionAsync();
+      selectionHaptic();
       const profileStack = navigation
         .getState()
         ?.routes.find(route => route.name === '(3_profile)')?.state;

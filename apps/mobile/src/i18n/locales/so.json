@@ -148,7 +148,8 @@
     "durationMinuteShort": "daq",
     "durationHourShort": "saac",
     "changes": "Isbeddellada",
-    "organizationTrialEnded": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Milkiilaha ururku wuxuu cusboonaysiin karaa biilasha kilo.ai, ka dibna isku day mar kale."
+    "organizationTrialEnded": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Milkiilaha ururku wuxuu cusboonaysiin karaa biilasha kilo.ai, ka dibna isku day mar kale.",
+    "privateRepositoryA11y": "{{name}}, kaydka gaar ah"
   },
   "language": {
     "restarting": "Dib ayaa loo bilaabayaa si luqadda loo adeegsado",
@@ -1513,7 +1514,13 @@
         "change_request_failed": "PR wuu fashilmay",
         "superseded": "Hore ayuu u jiraa"
       },
-      "noProposalsDescription": "Soo-jeedinnada xusuusta dib-u-eegista ayaa halkan ka soo muuqanaya marka Kilo uu falanqeeyo jawaabaha daryeelayaasha mashruuca."
+      "noProposalsDescription": "Soo-jeedinnada xusuusta dib-u-eegista ayaa halkan ka soo muuqanaya marka Kilo uu falanqeeyo jawaabaha daryeelayaasha mashruuca.",
+      "changeRequestInProgress": "Kilo hore ayay u furayaal pull request soo-jeedintan. Isku day mar kale wax yar kadib.",
+      "changeRequestNotActionable": "Soo-jeedintan mar dambe lama ansixin karo. Xir oo cusboonaysii liiska.",
+      "changeRequestNoGitHubAccess": "Ma jiro xiriir GitHub oo heli kara kaydkan. Dib u xiri GitHub oo leh helitaanka kaydka, kadibna isku day mar kale.",
+      "changeRequestMissingPermissions": "App-ka GitHub ee Kilo ma furi karo pull request-yo kaydkan. Milkiilaha kaydku waa inuu app-ka siiyo helitaan qoraal ah oo ku saabsan waxa ku jira iyo pull request-yada, kadibna isku day mar kale.",
+      "changeRequestFailed": "Kilo ma furi karin pull request-ka. Isku day mar kale wax yar kadib.",
+      "offAction": "Xusuusta dib-u-eegistu way dansan tahay. Shid, ka dibna isku day mar kale."
     },
     "manualReview": {
       "title": "Dib-u-eegis gacmeed",
@@ -2310,6 +2317,8 @@
       "couldNotLoadEnvironment": "Deegaankaaga lama soo shubi karin.",
       "retryLoadingEnvironment": "Mar kale isku day inaad soo shubto deegaanka",
       "defaultEnvironment": "Deegaanka caadiga ah",
+      "environmentAccessibility": "Dooro profile: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Dooro profile: {{label}}. {{attention}}",
       "leaveChanges": "Ka tag isbeddellada",
       "commitAndPush": "Diiwaangeli oo dir",
       "startSession": "Bilow kalfadhiga",
@@ -3825,7 +3834,9 @@
     "commandsTitle": "Dejinta amarrada",
     "addCommand": "Ku dar amar",
     "commandLabel": "Taliska",
+    "commandLabelPosition": "Taliska {{position}}",
     "commandPlaceholder": "tus. pnpm install",
+    "commandAtLimit": "Amarku wuxuu ku xaddidan yahay {{max}} xaraf",
     "commandsEmpty": "Ma jiro amar dejin weli",
     "commandsSaveFailed": "Ma kaydin kari waayay amarrada dejinta",
     "moveUp": "Kor u dhaqaaq",
@@ -3843,6 +3854,7 @@
     "skillSaveFailed": "Ma badbaadin karin xirfad",
     "skillSourceCustom": "Gaar ah",
     "skillSourceMarketplace": "Suuqa",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Ku dheji SKILL.md oo magaciisa ayaa buuxiya; ku dar xirfad taleefankaaga adigoon jiidin oo tuurin.",
     "skillEditTitle": "Xirfadda wax ka beddel",
     "skillEdit": "Wax ka beddel xirfadda {{name}}",
@@ -3869,6 +3881,7 @@
       "headersHint": "Qiimayaasha lagu muujiyay •••• waxay sii hayaan sirta kaydsan; beddel qiime si aad u rogto. Beddelidda URL-ka waxay u baahan tahay qiimayaasha oo dhan mar kale",
       "nameRequired": "Geli magaca adeegaha",
       "nameInvalid": "Magaca wuxuu isticmaali karaa kaliya xarfo ASCII, lambaro, hoosta, iyo xariijimaha, ugu badnaan 100 xaraf",
+      "nameConflict": "Adeeg magacaan leh horey ayaa jira",
       "commandRequired": "Gali amar",
       "commandTooLong": "Isticmaal ugu badnaan 50 doodood oo mid kastaa 500 xaraf",
       "urlRequired": "Gali URL",
@@ -3876,7 +3889,7 @@
       "urlTooLong": "URL waa inuu noqdaa 2048 xaraf ama ka yar",
       "jsonInvalid": "Geli JSON sax ah - waa shay qiimayaal xadhig ah",
       "jsonTooLarge": "Isticmaal ugu badnaan 50 gelin, furaha ilaa 128 iyo qiimaha ilaa 4096 xaraf",
-      "timeoutInvalid": "Wakhtiga kama dambaysta ahi waa inuu noqdaa tiro dhan oo millise seconds",
+      "timeoutInvalid": "Waqtigu waa inuu noqdaa tiro dhan oo millisecond ah.",
       "edit": "Wax ka beddel seerfarka MCP {{name}}",
       "delete": "Tirtir seerfarka MCP {{name}}",
       "saveFailed": "Waa la kaydin kari waayay seerfarka MCP",
@@ -3949,7 +3962,6 @@
       "repo": "Dooro kaydka…",
       "profile": "Dooro astaanta",
       "remove": "Ka fur",
-      "private": "Gaar ah",
       "search": "Raadi meelaha kaydka ah…",
       "addedToast": "Astaanta asalka ah waxaa loo dejiyay \"{{repo}}\"",
       "addFailed": "Waa la dejin kari waayay astaanta guud",

@@ -4,6 +4,8 @@
  * is not expressed as a unit test.
  */
 import * as Haptics from 'expo-haptics';
+import { impactHaptic } from '@/lib/haptics';
+import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import {
   type SlashCommandCatalogStatus,
@@ -262,6 +264,22 @@ type ChatComposerProps = {
   /** Imperative handle the host binds to call `setText`. */
   controlRef?: Ref<ChatComposerControl>;
 };
+
+/**
+ * Runs the send path the composer launches without awaiting it. A failure
+ * escaping `submit` is reported, never left as an unhandled rejection.
+ */
+async function runSubmit(submit: () => Promise<void>): Promise<void> {
+  try {
+    await submit();
+  } catch (error) {
+    captureTelemetry({
+      level: 'error',
+      error,
+      tags: { 'error.subsystem': 'agent-chat', 'error.operation': 'submit' },
+    });
+  }
+}
 
 export function ChatComposer({
   onSend,
@@ -1087,7 +1105,7 @@ export function ChatComposer({
     // executes the submission without re-acquiring/releasing the lock or
     // toggling pending state. That keeps one authority and lets the lock
     // protect the entire asynchronous send.
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     try {
       // Upload pending attachments on the prompt branch only. Slash commands
       // and session controls never carry chips (`parseChatComposerSubmission`
@@ -1240,11 +1258,11 @@ export function ChatComposer({
       return;
     }
     autoSendFiredRef.current = true;
-    void submitRef.current();
+    void runSubmit(submitRef.current);
   }, [autoSendArmed, shareDelivered, hasText, attachmentsEnabled, control.canSend, upload]);
 
   function handleStop() {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Medium);
     // Arm the remount restore; the remount effect reads the live text, so
     // a transcript that lands between this tap and the remount is kept (the
     // gateway upload resolves after Stop).
@@ -1507,7 +1525,7 @@ export function ChatComposer({
               onSelectionChange={handleSelectionChange}
               onStop={handleStop}
               onSubmit={() => {
-                void submit();
+                void runSubmit(submit);
               }}
               onToggleVoice={() => {
                 void voiceInput.toggle();

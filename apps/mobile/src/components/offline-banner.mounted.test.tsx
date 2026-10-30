@@ -30,7 +30,12 @@ vi.mock('@/lib/trpc', async () => {
   const { createTRPCContext } = await import('@trpc/tanstack-react-query');
   return createTRPCContext<MobileRouter>();
 });
-vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, View: 'View', Switch: 'Switch' }));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  View: 'View',
+  Switch: 'Switch',
+  Pressable: 'Pressable',
+}));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: () => ({}) },
@@ -71,7 +76,10 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   },
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useFocusEffect: () => undefined,
+}));
 vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
   useSetSecurityAgentEnabled: () => ({ mutate: vi.fn(), isPending: false }),
   useTrackSecurityAgentInteraction: () => ({ mutate: vi.fn() }),

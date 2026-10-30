@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Endringer",
-    "organizationTrialEnded": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. En organisasjonseier kan oppdatere faktureringen på kilo.ai og deretter prøve igjen."
+    "organizationTrialEnded": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. En organisasjonseier kan oppdatere faktureringen på kilo.ai og deretter prøve igjen.",
+    "privateRepositoryA11y": "{{name}}, privat repository"
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -1513,7 +1514,13 @@
         "change_request_failed": "PR mislyktes",
         "superseded": "Finnes allerede"
       },
-      "noProposalsDescription": "Forslag fra minnet for kodegjennomganger vises her etter at Kilo har analysert svar fra vedlikeholderne."
+      "noProposalsDescription": "Forslag fra minnet for kodegjennomganger vises her etter at Kilo har analysert svar fra vedlikeholderne.",
+      "changeRequestInProgress": "Kilo åpner allerede en pull request for dette forslaget. Prøv igjen om et øyeblikk.",
+      "changeRequestNotActionable": "Dette forslaget kan ikke lenger godkjennes. Lukk det og oppdater listen.",
+      "changeRequestNoGitHubAccess": "Ingen GitHub-tilkobling har tilgang til dette repositoriet. Koble til GitHub på nytt med tilgang til det, og prøv igjen.",
+      "changeRequestMissingPermissions": "Kilos GitHub App kan ikke åpne pull requests i dette repositoriet. En eier av repositoriet må gi appen skrivetilgang til innhold og pull requests, og deretter prøve igjen.",
+      "changeRequestFailed": "Kilo kunne ikke åpne pull requesten. Prøv igjen om et øyeblikk.",
+      "offAction": "Minnet for kodegjennomganger er deaktivert. Aktiver det, og prøv igjen."
     },
     "manualReview": {
       "title": "Manuell gjennomgang",
@@ -2310,6 +2317,8 @@
       "couldNotLoadEnvironment": "Kunne ikke laste inn miljøet ditt.",
       "retryLoadingEnvironment": "Prøv å laste inn miljøet på nytt",
       "defaultEnvironment": "Standardmiljø",
+      "environmentAccessibility": "Velg en profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Velg en profil: {{label}}. {{attention}}",
       "leaveChanges": "Behold endringer",
       "commitAndPush": "Lagre og send",
       "startSession": "Start økt",
@@ -3825,7 +3834,9 @@
     "commandsTitle": "Oppsettkommandoer",
     "addCommand": "Legg til kommando",
     "commandLabel": "Kommando",
+    "commandLabelPosition": "Kommando {{position}}",
     "commandPlaceholder": "f.eks. pnpm install",
+    "commandAtLimit": "Kommandoen er begrenset til {{max}} tegn",
     "commandsEmpty": "Ingen oppsettkommandoer ennå",
     "commandsSaveFailed": "Kunne ikke lagre oppsettkommandoer",
     "moveUp": "Flytt opp",
@@ -3843,6 +3854,7 @@
     "skillSaveFailed": "Kunne ikke lagre ferdigheter",
     "skillSourceCustom": "Egendefinert",
     "skillSourceMarketplace": "Markedsplass",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Lim inn en SKILL.md og navnet fylles ut; legg til en ferdighet fra telefonen din uten å dra og slipp.",
     "skillEditTitle": "Rediger ferdighet",
     "skillEdit": "Rediger ferdighet {{name}}",
@@ -3869,6 +3881,7 @@
       "headersHint": "Verdier som vises som •••• beholder den lagrede hemmeligheten; erstatt en verdi for å rotere den. Hvis du endrer URL-en, må alle verdier angis på nytt",
       "nameRequired": "Skriv inn et servernavn",
       "nameInvalid": "Navn kan bare bruke ASCII-bokstaver, tall, understreker og bindestreker, med høyst 100 tegn",
+      "nameConflict": "En server med dette navnet finnes allerede",
       "commandRequired": "Skriv inn en kommando",
       "commandTooLong": "Bruk maks 50 argumenter på 500 tegn hver",
       "urlRequired": "Skriv inn en URL",
@@ -3888,7 +3901,7 @@
       "add": "Legg til agent",
       "empty": "Ingen agenter ennå",
       "name": "Agentnavn",
-      "slug": "Agentsnegl",
+      "slug": "Agentslug",
       "description": "Agentbeskrivelse",
       "model": "Modelloverstyring",
       "modelPlaceholder": "Bruk standard sesjon",
@@ -3913,9 +3926,9 @@
       "saveFailed": "Kunne ikke lagre agenten",
       "deleteFailed": "Kunne ikke slette agenten",
       "nameRequired": "Skriv inn et agentnavn",
-      "slugRequired": "Skriv inn en agentsnegl",
+      "slugRequired": "Skriv inn en agentslug",
       "slugInvalid": "Slug må starte med en liten ASCII-bokstav og kun bruke små ASCII-bokstaver, sifre og bindestreker, med høyst 50 tegn",
-      "slugConflict": "Det sluget er allerede i bruk av en innebygd agent eller en annen agent i denne profilen",
+      "slugConflict": "Den agentsluggen er allerede i bruk av en innebygd agent eller en annen agent i denne profilen",
       "edit": "Rediger agent {{name}}",
       "delete": "Slett agent {{name}}"
     },
@@ -3949,7 +3962,6 @@
       "repo": "Velg depot...",
       "profile": "Velg profil",
       "remove": "Avbind",
-      "private": "Privat",
       "search": "Søk i depoter...",
       "addedToast": "Standard profil satt for «{{repo}}»",
       "addFailed": "Kunne ikke angi standardprofil",

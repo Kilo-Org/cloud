@@ -164,48 +164,45 @@ export function PrReviewEntryScreen() {
               testID="recent-row"
               className="rounded-xl border border-border bg-card"
             >
-              <View className="flex-row items-center pe-1">
-                <Pressable
-                  onPress={() => {
-                    handleRecentPress(entry);
-                  }}
-                  accessibilityRole="button"
-                  className="min-w-0 flex-1 flex-row items-center gap-3 p-3 active:opacity-70"
-                >
-                  <View className="min-w-0 flex-1 gap-1">
-                    <Text
-                      variant="small"
-                      className="text-[10px] uppercase tracking-wide text-muted-foreground"
-                    >
-                      {rowState.provider}
-                    </Text>
-                    <Text className="text-sm font-medium" numberOfLines={2}>
-                      {rowState.primary}
-                    </Text>
-                    {rowState.secondary ? (
-                      <Text
-                        variant="muted"
-                        className="text-xs"
-                        numberOfLines={1}
-                        ellipsizeMode="middle"
-                      >
-                        {rowState.secondary}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <DirectionalChevronRight size={16} color={colors.mutedForeground} />
-                </Pressable>
-                <Pressable
-                  onPress={() => {
+              <Pressable
+                onPress={() => {
+                  handleRecentPress(entry);
+                }}
+                onLongPress={() => {
+                  handleRemoveRecent(entry);
+                }}
+                accessibilityRole="button"
+                accessibilityActions={[{ name: 'remove', label: removeLabel }]}
+                onAccessibilityAction={event => {
+                  if (event.nativeEvent.actionName === 'remove') {
                     handleRemoveRecent(entry);
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={removeLabel}
-                  className={`${ICON_TARGET_BOX_CLASS} active:opacity-70`}
-                >
-                  <X size={16} color={colors.mutedForeground} />
-                </Pressable>
-              </View>
+                  }
+                }}
+                className="flex-row items-center gap-3 p-3 active:opacity-70"
+              >
+                <View className="min-w-0 flex-1 gap-1">
+                  <Text
+                    variant="small"
+                    className="text-[10px] uppercase tracking-wide text-muted-foreground"
+                  >
+                    {rowState.provider}
+                  </Text>
+                  <Text className="text-sm font-medium" numberOfLines={2}>
+                    {rowState.primary}
+                  </Text>
+                  {rowState.secondary ? (
+                    <Text
+                      variant="muted"
+                      className="text-xs"
+                      numberOfLines={1}
+                      ellipsizeMode="middle"
+                    >
+                      {rowState.secondary}
+                    </Text>
+                  ) : null}
+                </View>
+                <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+              </Pressable>
               {rowState.failed ? (
                 <View className="flex-row items-center justify-between gap-3 border-t border-hair-soft px-3 py-2">
                   <Text variant="muted" className="min-w-0 flex-1 text-xs">

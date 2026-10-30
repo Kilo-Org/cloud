@@ -328,7 +328,8 @@ KILO_REMOTE_NATIVE=required pnpm dev:mobile:ios build <udid>
 
 The PR review entry screen keeps the account picker beside the title.
 Recent reviews use separate cards with wrapping titles and repository details.
-The remove icon opens a confirmation; failed reviews retain Retry.
+Long-press a recent card to open its removal confirmation; failed reviews retain Retry.
+Screen readers expose the same Remove action without requiring the gesture.
 
 Use an isolated backend, a loopback mobile API URL, and `SKIP_STRIPE_API=true` for the native fixture:
 

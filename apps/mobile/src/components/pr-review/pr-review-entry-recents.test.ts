@@ -61,7 +61,7 @@ describe('recents identity across providers', () => {
     const tree = await renderLoaded();
     const rowPressables = findAll(tree, 'View')
       .filter(row => row.props?.testID === 'recent-row')
-      .map(row => find(row, 'Pressable', p => !String(p.accessibilityLabel).startsWith('Remove')));
+      .map(row => find(row, 'Pressable', () => true));
     const pushes: unknown[] = [];
     for (const row of rowPressables) {
       mocks.push.mockClear();
@@ -76,14 +76,12 @@ describe('recents identity across providers', () => {
     ]);
   });
 
-  it('remove confirms with provider-neutral copy and deletes only the targeted row', async () => {
+  it('long press confirms removal without opening the review and deletes only the targeted row', async () => {
     const tree = await renderLoaded();
-    const removeGitLab = find(
-      tree,
-      'Pressable',
-      p => p.accessibilityLabel === 'Remove acme/api!7 from recents'
-    );
-    (propsOf(removeGitLab).onPress as () => void)();
+    const rows = findAll(tree, 'View').filter(row => row.props?.testID === 'recent-row');
+    const gitlab = find(rows[1], 'Pressable', () => true);
+    (propsOf(gitlab).onLongPress as () => void)();
+    expect(mocks.push).not.toHaveBeenCalled();
     expect(mocks.confirm).toHaveBeenCalledWith({
       title: 'Remove from recents?',
       message: 'This review will be removed from your recents.',
@@ -100,6 +98,22 @@ describe('recents identity across providers', () => {
       'github||acme/api#7',
       'bitbucket||acme/api#7',
     ]);
+  });
+
+  it('the accessibility Remove action confirms removal without opening the review', async () => {
+    const tree = await renderLoaded();
+    const row = findAll(tree, 'View').find(candidate => candidate.props?.testID === 'recent-row');
+    const github = find(row, 'Pressable', () => true);
+    const action = propsOf(github).onAccessibilityAction as (event: {
+      nativeEvent: { actionName: string };
+    }) => void;
+    action({ nativeEvent: { actionName: 'remove' } });
+    expect(mocks.push).not.toHaveBeenCalled();
+    const request = mocks.confirm.mock.calls.at(0)?.at(0) as ConfirmDialogRequest | undefined;
+    expect(request).toBeDefined();
+    request?.onConfirm();
+    await flush();
+    expect(storedRecents().map(entry => entry.platform)).toEqual(['gitlab', 'bitbucket']);
   });
 
   it('a failed row keeps the retry CTA and provider label', async () => {

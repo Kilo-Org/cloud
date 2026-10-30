@@ -62,6 +62,8 @@ function ToolCardImageAttachment({
       return (
         <View
           className="w-full overflow-hidden rounded-md bg-neutral-100 dark:bg-neutral-900"
+          accessible
+          accessibilityState={{ busy: true }}
           accessibilityLabel={t('agentChat.filePart.loadingImage')}
           // eslint-disable-next-line react-native/no-inline-styles -- measured aspect ratio cannot be a Tailwind class
           style={{ aspectRatio: IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO }}

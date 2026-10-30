@@ -211,6 +211,54 @@ describe('ToolCardFileAttachments mounted', () => {
     await unmount(renderer);
   });
 
+  it('reserves the share slot and reports busy while the cache write is pending', async () => {
+    const write = Promise.withResolvers<undefined>();
+    expoFileSystemMock.File.mockImplementationOnce(function FilePending(
+      directory: { name?: string },
+      filename: string
+    ) {
+      const instance = {
+        exists: false,
+        uri: `file:///cache/tool-card-images/${filename}`,
+        write: vi.fn(() => write.promise),
+        filename,
+        directory,
+      };
+      fileInstances.push(instance);
+      return instance;
+    });
+    seedFileCache();
+    const renderer = await mount(makeToolPart('send_file', [reportPdf]));
+    const root = renderer.root;
+
+    expect(texts(root)).toContain('report.pdf');
+    expect(texts(root)).not.toContain('File unavailable in this session.');
+    expect(shareButtons(root)).toHaveLength(0);
+    expect(
+      root.findAll(
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as string) === 'View' &&
+          (node.props.accessibilityState as { busy?: boolean } | undefined)?.busy === true
+      )
+    ).toHaveLength(1);
+    expect(texts(root)).toContain('application/pdf');
+    // The hidden control keeps its box, so the filename cannot re-truncate when
+    // the write lands.
+    expect(root.findAll(node => (node.type as string) === 'Share2')).toHaveLength(1);
+
+    write.resolve(undefined);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(shareButtons(root)).toHaveLength(1);
+    expect(root.findAll(node => (node.type as string) === 'Share2')).toHaveLength(1);
+
+    await unmount(renderer);
+  });
+
   it('shows one unavailable row and no share action when the cache is empty', async () => {
     const renderer = await mount(makeToolPart('send_file', [reportPdf, notesTxt]));
     const root = renderer.root;

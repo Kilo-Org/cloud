@@ -15,9 +15,7 @@ export function ReviewSpectatorSheet({
   visible,
   onClose,
   ...props
-}: Readonly<
-  { visible: boolean; onClose: () => void } & ComponentProps<typeof ReviewSpectator>
->) {
+}: Readonly<{ visible: boolean; onClose: () => void } & ComponentProps<typeof ReviewSpectator>>) {
   const { t } = useTranslation();
   return (
     <SessionPageSheet visible={visible} onClose={onClose}>

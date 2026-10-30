@@ -60,6 +60,19 @@ export type BotPlatform = {
     platformIntegration: PlatformIntegration;
     state: StateAdapter;
   }): Promise<void>;
+  /**
+   * Start the identity proof for a link started from the generic
+   * `/api/chat/link-account` page, and return the URL to redirect the browser
+   * to. The proof must end at a callback that compares the platform identity it
+   * obtained from the provider with the identity the pending link named, and
+   * only then writes the mapping. Platforms that use the generic route must
+   * implement this; the route refuses to link otherwise.
+   */
+  beginLinkAccountProof?(params: {
+    identity: PlatformIdentity;
+    contextKey: string;
+    user: { id: string };
+  }): string;
   withAuthContext<T>(params: {
     platformIntegration: PlatformIntegration;
     fn: () => Promise<T>;

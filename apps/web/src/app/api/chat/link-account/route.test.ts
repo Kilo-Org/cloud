@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { bot } from '@/lib/bot';
-import { consumeLinkAccountContext, verifyLinkToken, linkKiloUser } from '@/lib/bot-identity';
+import { verifyLinkToken } from '@/lib/bot-identity';
 import type { PlatformIdentity } from '@/lib/bot-identity';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import {
@@ -9,7 +9,7 @@ import {
   getPlatformIntegration,
 } from '@/lib/bot/platform-helpers';
 import { botPlatforms } from '@/lib/bot/platforms';
-import { processLinkedMessage } from '@/lib/bot/run';
+import { verifySlackBotLinkState } from '@/lib/bot/slack-link-state';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { GET, POST } from './route';
@@ -17,16 +17,10 @@ import type { SerializedMessage } from 'chat';
 
 const APP_ORIGIN = new URL(APP_URL).origin;
 const LINK_PATH = '/api/chat/link-account';
+const PROOF_URL = 'https://slack.com/openid/connect/authorize?state=signed-proof-state';
 
-const mockedAfter = jest.fn();
+const mockedBeginLinkAccountProof = jest.fn((_params: unknown) => PROOF_URL);
 
-jest.mock('next/server', () => {
-  const actual = jest.requireActual('next/server');
-  return {
-    ...actual,
-    after: (fn: () => Promise<void> | void) => mockedAfter(fn),
-  };
-});
 jest.mock('@/lib/bot', () => ({
   bot: {
     initialize: jest.fn(async () => undefined),
@@ -35,53 +29,35 @@ jest.mock('@/lib/bot', () => ({
 }));
 jest.mock('@/lib/bot-identity', () => ({
   verifyLinkToken: jest.fn(),
-  linkKiloUser: jest.fn(async () => undefined),
+  loadLinkAccountContext: jest.fn(),
   consumeLinkAccountContext: jest.fn(),
+  linkKiloUser: jest.fn(),
 }));
+jest.mock('@/lib/bot/link-account-completion', () => ({
+  completeLinkAccount: jest.fn(),
+  reprocessLinkedContext: jest.fn(async () => undefined),
+}));
+jest.mock('@/lib/bot/slack-link-state');
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@/lib/bot/platform-helpers');
 jest.mock('@/lib/bot/platforms', () => ({
   botPlatforms: {
-    require: jest.fn(() => ({
-      usesGenericLinkAccountRoute: true,
-      withAuthContext: async ({ fn }: { fn: () => Promise<unknown> }) => await fn(),
-    })),
+    require: jest.fn(),
   },
 }));
-jest.mock('@kilocode/worker-utils/account-access', () => ({
-  ...jest.requireActual('@kilocode/worker-utils/account-access'),
-  isOrganizationMember: jest.fn(async () => true),
-}));
-jest.mock('@/lib/bot/run', () => ({
-  processLinkedMessage: jest.fn(async () => undefined),
-}));
-jest.mock(
-  'chat',
-  () => ({
-    Message: {
-      fromJSON: jest.fn(value => value),
-    },
-    ThreadImpl: {
-      fromJSON: jest.fn(value => value),
-    },
-  }),
-  { virtual: true }
-);
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
 const mockedBot = jest.mocked(bot);
 const mockedVerifyLinkToken = jest.mocked(verifyLinkToken);
-const mockedLinkKiloUser = jest.mocked(linkKiloUser);
-const mockedConsumeLinkAccountContext = jest.mocked(consumeLinkAccountContext);
+const mockedVerifySlackBotLinkState = jest.mocked(verifySlackBotLinkState);
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetPlatformIntegration = jest.mocked(getPlatformIntegration);
 const mockedCanKiloUserAccessPlatformIntegration = jest.mocked(
   canKiloUserAccessPlatformIntegration
 );
 const mockedBotPlatforms = jest.mocked(botPlatforms);
-const mockedProcessLinkedMessage = jest.mocked(processLinkedMessage);
 
 const slackIdentity: PlatformIdentity = {
   platform: PLATFORM.SLACK,
@@ -101,7 +77,7 @@ function verifiedToken(identity: PlatformIdentity = slackIdentity) {
       isDM: false,
     },
     message: {
-      _type: 'chat:Message',
+      _type: 'chat:Message' as const,
       attachments: [],
       author: {
         fullName: 'User',
@@ -123,22 +99,15 @@ function verifiedToken(identity: PlatformIdentity = slackIdentity) {
   };
 }
 
-function getRequest(pathAndQuery: string) {
-  return new NextRequest(`${APP_ORIGIN}${pathAndQuery}`);
-}
-
 function postRequest({
   token = 'signed',
   origin = APP_ORIGIN,
-  secFetchSite,
 }: {
   token?: string | null;
   origin?: string | null;
-  secFetchSite?: string;
 } = {}) {
   const headers = new Headers();
   if (origin !== null) headers.set('origin', origin);
-  if (secFetchSite) headers.set('sec-fetch-site', secFetchSite);
 
   const body = new URLSearchParams();
   if (token !== null) body.set('token', token);
@@ -151,8 +120,16 @@ beforeEach(() => {
 
   mockedBotPlatforms.require.mockReturnValue({
     usesGenericLinkAccountRoute: true,
+    beginLinkAccountProof: mockedBeginLinkAccountProof,
     withAuthContext: async ({ fn }: { fn: () => Promise<unknown> }) => await fn(),
   } as never);
+
+  mockedVerifySlackBotLinkState.mockReturnValue({
+    userId: 'kilo-user-id',
+    slackTeamId: 'T123',
+    slackUserId: 'U123',
+    contextKey: 'context-key',
+  });
 
   mockedGetUserFromAuth.mockResolvedValue({
     user: { id: 'kilo-user-id', google_user_email: 'kilo@example.com' },
@@ -163,14 +140,13 @@ beforeEach(() => {
     owned_by_organization_id: null,
   } as never);
   mockedCanKiloUserAccessPlatformIntegration.mockResolvedValue(true);
-  mockedConsumeLinkAccountContext.mockResolvedValue(true);
 });
 
 describe('GET /api/chat/link-account', () => {
-  test('renders the confirmation page', async () => {
+  test('renders the confirmation page and writes nothing', async () => {
     mockedVerifyLinkToken.mockResolvedValue(verifiedToken());
 
-    const response = await GET(getRequest(`${LINK_PATH}?token=signed`) as never);
+    const response = await GET(new NextRequest(`${APP_ORIGIN}${LINK_PATH}?token=signed`) as never);
 
     expect(response.status).toBe(200);
     const html = await response.text();
@@ -180,55 +156,42 @@ describe('GET /api/chat/link-account', () => {
     expect(html).toContain('U123');
     expect(html).toContain('T123');
     expect(html).toContain('kilo@example.com');
+    // The page states that the next step signs in to Slack as the named user.
+    expect(html).toContain('sign in to slack as the slack user named above');
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(response.headers.get('x-frame-options')).toBe('DENY');
-
-    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
-    expect(mockedConsumeLinkAccountContext).not.toHaveBeenCalled();
-    expect(mockedAfter).not.toHaveBeenCalled();
+    expect(mockedBeginLinkAccountProof).not.toHaveBeenCalled();
   });
 
-  test('rejects GitHub link token payloads before linking', async () => {
+  test('rejects platforms without the generic route', async () => {
     mockedBotPlatforms.require.mockReturnValue({
       usesGenericLinkAccountRoute: false,
-      withAuthContext: async ({ fn }: { fn: () => Promise<unknown> }) => await fn(),
     } as never);
     mockedVerifyLinkToken.mockResolvedValue(
       verifiedToken({ platform: PLATFORM.GITHUB, teamId: '98765', userId: '12345' })
     );
 
-    const response = await GET(getRequest(`${LINK_PATH}?token=signed`) as never);
+    const response = await GET(new NextRequest(`${APP_ORIGIN}${LINK_PATH}?token=signed`) as never);
 
     expect(response.status).toBe(400);
     await expect(response.text()).resolves.toContain(
       'github account links must be created from the platform-specific link page'
     );
-    expect(mockedBot.initialize).toHaveBeenCalled();
     expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
-    expect(mockedGetPlatformIntegration).not.toHaveBeenCalled();
-    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
-    expect(mockedAfter).not.toHaveBeenCalled();
+    expect(mockedBeginLinkAccountProof).not.toHaveBeenCalled();
   });
 
-  test('rejects link requests when the user cannot access the integration owner', async () => {
-    const integration = {
-      owned_by_user_id: null,
-      owned_by_organization_id: 'org-1',
-    };
+  test('refuses a user who cannot access the integration owner', async () => {
+    const integration = { owned_by_user_id: null, owned_by_organization_id: 'org-1' };
     mockedVerifyLinkToken.mockResolvedValue(verifiedToken());
     mockedGetPlatformIntegration.mockResolvedValue(integration as never);
     mockedCanKiloUserAccessPlatformIntegration.mockResolvedValue(false);
 
-    const response = await GET(getRequest(`${LINK_PATH}?token=signed`) as never);
+    const response = await GET(new NextRequest(`${APP_ORIGIN}${LINK_PATH}?token=signed`) as never);
 
     expect(response.status).toBe(403);
     await expect(response.text()).resolves.toContain('Access Denied');
-    expect(mockedCanKiloUserAccessPlatformIntegration).toHaveBeenCalledWith(
-      expect.objectContaining(integration),
-      'kilo-user-id'
-    );
-    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
-    expect(mockedAfter).not.toHaveBeenCalled();
+    expect(mockedBeginLinkAccountProof).not.toHaveBeenCalled();
   });
 
   test('sends the user to sign-in when there is no session', async () => {
@@ -238,85 +201,53 @@ describe('GET /api/chat/link-account', () => {
       authFailedResponse: new Response(null, { status: 401 }),
     } as never);
 
-    const response = await GET(getRequest(`${LINK_PATH}?token=signed`) as never);
+    const response = await GET(new NextRequest(`${APP_ORIGIN}${LINK_PATH}?token=signed`) as never);
 
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toContain('/users/sign_in');
     expect(response.headers.get('location')).toContain('callbackPath');
-    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
-    expect(mockedConsumeLinkAccountContext).not.toHaveBeenCalled();
+    expect(mockedBeginLinkAccountProof).not.toHaveBeenCalled();
   });
 });
 
 describe('POST /api/chat/link-account', () => {
-  test('writes the link for a confirmation from the app origin', async () => {
+  test('redirects to the platform identity proof instead of writing the mapping', async () => {
     mockedVerifyLinkToken.mockResolvedValue(verifiedToken());
 
-    const response = await POST(postRequest({ secFetchSite: 'same-origin' }) as never);
+    const response = await POST(postRequest() as never);
 
-    expect(response.status).toBe(200);
-    await expect(response.text()).resolves.toContain('Account linked');
-
-    expect(mockedConsumeLinkAccountContext).toHaveBeenCalledWith(expect.anything(), 'context-key');
-    expect(mockedLinkKiloUser).toHaveBeenCalledWith(
-      expect.anything(),
-      slackIdentity,
-      'kilo-user-id'
-    );
-    expect(mockedConsumeLinkAccountContext.mock.invocationCallOrder[0]).toBeLessThan(
-      mockedLinkKiloUser.mock.invocationCallOrder[0]!
-    );
-
-    expect(mockedAfter).toHaveBeenCalledTimes(1);
-    await mockedAfter.mock.calls[0]![0]();
-    expect(mockedProcessLinkedMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        platformIntegration: expect.objectContaining({ owned_by_user_id: 'kilo-user-id' }),
-        user: expect.objectContaining({ id: 'kilo-user-id' }),
-      })
-    );
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toBe(PROOF_URL);
+    expect(mockedBot.initialize).toHaveBeenCalled();
+    expect(mockedBeginLinkAccountProof).toHaveBeenCalledWith({
+      identity: slackIdentity,
+      contextKey: 'context-key',
+      user: expect.objectContaining({ id: 'kilo-user-id' }),
+    });
   });
 
   test('requires a submission from the app origin', async () => {
     mockedVerifyLinkToken.mockResolvedValue(verifiedToken());
 
-    const crossSite = await POST(
-      postRequest({ origin: 'https://evil.example', secFetchSite: 'cross-site' }) as never
-    );
+    const response = await POST(postRequest({ origin: 'https://evil.example' }) as never);
     const noOrigin = await POST(postRequest({ origin: null }) as never);
 
-    expect(crossSite.status).toBe(403);
-    await expect(crossSite.text()).resolves.toContain('Invalid Request');
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toContain('Invalid Request');
     expect(noOrigin.status).toBe(403);
-
     expect(mockedVerifyLinkToken).not.toHaveBeenCalled();
-    expect(mockedConsumeLinkAccountContext).not.toHaveBeenCalled();
-    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
-    expect(mockedAfter).not.toHaveBeenCalled();
-  });
-
-  test('completes a link at most once', async () => {
-    mockedVerifyLinkToken.mockResolvedValue(verifiedToken());
-    mockedConsumeLinkAccountContext.mockResolvedValue(false);
-
-    const response = await POST(postRequest({ secFetchSite: 'same-origin' }) as never);
-
-    expect(response.status).toBe(400);
-    await expect(response.text()).resolves.toContain('Link Already Used');
-    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
-    expect(mockedAfter).not.toHaveBeenCalled();
+    expect(mockedBeginLinkAccountProof).not.toHaveBeenCalled();
   });
 
   test('writes nothing when the user cannot access the integration owner', async () => {
     mockedVerifyLinkToken.mockResolvedValue(verifiedToken());
     mockedCanKiloUserAccessPlatformIntegration.mockResolvedValue(false);
 
-    const response = await POST(postRequest({ secFetchSite: 'same-origin' }) as never);
+    const response = await POST(postRequest() as never);
 
     expect(response.status).toBe(403);
     await expect(response.text()).resolves.toContain('Access Denied');
-    expect(mockedConsumeLinkAccountContext).not.toHaveBeenCalled();
-    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
+    expect(mockedBeginLinkAccountProof).not.toHaveBeenCalled();
   });
 
   test('requires the token in the form body', async () => {
@@ -325,7 +256,6 @@ describe('POST /api/chat/link-account', () => {
     expect(response.status).toBe(400);
     await expect(response.text()).resolves.toContain('Missing token parameter');
     expect(mockedVerifyLinkToken).not.toHaveBeenCalled();
-    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
   });
 
   test('sends the user to sign-in when there is no session', async () => {
@@ -335,11 +265,22 @@ describe('POST /api/chat/link-account', () => {
       authFailedResponse: new Response(null, { status: 401 }),
     } as never);
 
-    const response = await POST(postRequest({ secFetchSite: 'same-origin' }) as never);
+    const response = await POST(postRequest() as never);
 
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toContain('/users/sign_in');
-    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
-    expect(mockedConsumeLinkAccountContext).not.toHaveBeenCalled();
+    expect(mockedBeginLinkAccountProof).not.toHaveBeenCalled();
+  });
+
+  test('refuses linking when the platform has no identity proof', async () => {
+    mockedBotPlatforms.require.mockReturnValue({
+      usesGenericLinkAccountRoute: true,
+    } as never);
+    mockedVerifyLinkToken.mockResolvedValue(verifiedToken());
+
+    const response = await POST(postRequest() as never);
+
+    expect(response.status).toBe(400);
+    await expect(response.text()).resolves.toContain('Link Not Supported');
   });
 });

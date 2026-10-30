@@ -16,7 +16,7 @@ import {
 } from '@/components/code-reviewer/platform-overview-rows';
 import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
-import { PlatformErrorScreen } from '@/components/platform-error-screen';
+import { ReviewerErrorScreen } from '@/components/code-reviewer/reviewer-error-screen';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
@@ -70,9 +70,8 @@ export function PlatformOverviewScreen({
 
   if (permission.status === 'error') {
     return (
-      <PlatformErrorScreen
+      <ReviewerErrorScreen
         title={capabilities.label}
-        eyebrow={t('common.codeReviewer')}
         onRetry={() => {
           permission.refetch();
         }}
@@ -106,9 +105,8 @@ export function PlatformOverviewScreen({
 
   if (providerState.status === 'error') {
     return (
-      <PlatformErrorScreen
+      <ReviewerErrorScreen
         title={capabilities.label}
-        eyebrow={t('common.codeReviewer')}
         variant={providerState.variant}
         // A permission/not-found error can't be fixed by retrying — hide retry.
         onRetry={
@@ -132,9 +130,8 @@ export function PlatformOverviewScreen({
   // failure, and an unsettled connectivity still waits on the skeleton.
   if (!isLoading && connected && (configBody.body.status === 'error' || configBody.exhausted)) {
     return (
-      <PlatformErrorScreen
+      <ReviewerErrorScreen
         title={capabilities.label}
-        eyebrow={t('common.codeReviewer')}
         variant={configBody.body.status === 'error' ? configBody.body.variant : 'server'}
         onRetry={configBody.body.status === 'error' ? configBody.body.refetch : configBody.retry}
         isRetrying={config.isFetching}

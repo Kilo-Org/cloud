@@ -19,6 +19,7 @@ import {
   useGitLabStatus,
 } from '@/lib/hooks/use-code-reviewer';
 import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
+import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
 import { useTRPC } from '@/lib/trpc';
 
 const PLATFORM_ICONS = {
@@ -90,6 +91,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
       <ScopeAccessDeniedScreen
         title={scopeTitle}
         eyebrow={t('common.codeReviewer')}
+        backFallback={CODE_REVIEWER_HOME_PATH}
         kind={access}
         onRetry={() => void retryAccess()}
         isRetrying={

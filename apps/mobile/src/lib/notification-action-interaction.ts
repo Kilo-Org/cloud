@@ -51,6 +51,7 @@ import { createUserWebConnection } from '@kilocode/cloud-agent-sdk/user-web-conn
 
 import { createMobileAgentSessionManager } from '@/components/agents/mobile-session-manager';
 import { readStoredValue } from '@/lib/auth/secure-store-value';
+import { hasVisibleComposerText } from '@/lib/composer-text';
 import { SESSION_INGEST_WS_URL } from '@/lib/config';
 import { ackSessionAttention } from '@/lib/session-attention';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
@@ -176,8 +177,10 @@ export async function runNeedsInputInteraction({
   const replyText = text ?? '';
   // A reply with no answer text has nothing to send. Nothing is created and
   // the raise is untouched: the notification keeps its actions so the user can
-  // tap Reply again with text, so the outcome is retryable, not gone.
-  if (action === 'reply' && replyText.trim() === '') {
+  // tap Reply again with text, so the outcome is retryable, not gone. The same
+  // predicate the composer sends on decides this, so a reply of only invisible
+  // characters is no answer here either.
+  if (action === 'reply' && !hasVisibleComposerText(replyText)) {
     return 'retryable';
   }
 

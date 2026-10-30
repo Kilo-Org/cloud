@@ -108,6 +108,7 @@ import {
 import { type LocalImage } from '@/lib/agent-attachments/local-image';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
+import { composerPromptText, hasVisibleComposerText } from '@/lib/composer-text';
 import {
   clipboardPasteEmptyMessage,
   useClipboardPaste,
@@ -496,12 +497,16 @@ export function ChatComposer({
   // paths) goes through it, and each setter fires only when the value the
   // composer renders actually changed.
   const publishDerivedState = useCallback((value: string, slashCandidate: string | null) => {
-    const nextHasText = value.trim().length > 0;
-    if (nextHasText !== publishedHasTextRef.current) {
-      publishedHasTextRef.current = nextHasText;
-      setHasText(nextHasText);
+    const hasVisible = hasVisibleComposerText(value);
+    if (hasVisible !== publishedHasTextRef.current) {
+      publishedHasTextRef.current = hasVisible;
+      setHasText(hasVisible);
     }
-    const nextInputEmpty = value.length === 0;
+    // The placeholder follows the same reading: a draft that draws nothing is
+    // an empty composer to look at, so it must show the hint an empty one
+    // shows. Deriving it from `value.length` left such a draft with no glyph,
+    // no hint and a disabled Send — an empty state that reads as broken.
+    const nextInputEmpty = !hasVisible;
     if (nextInputEmpty !== publishedInputEmptyRef.current) {
       publishedInputEmptyRef.current = nextInputEmpty;
       setInputEmpty(nextInputEmpty);
@@ -663,9 +668,10 @@ export function ChatComposer({
   // Imperative occupancy check: the host asks whether the composer holds any
   // text or attachment so a queued-message cancel can pick restore vs drop.
   const hasContentRef = useRef(
-    () => textRef.current.trim().length > 0 || upload.attachments.length > 0
+    () => hasVisibleComposerText(textRef.current) || upload.attachments.length > 0
   );
-  hasContentRef.current = () => textRef.current.trim().length > 0 || upload.attachments.length > 0;
+  hasContentRef.current = () =>
+    hasVisibleComposerText(textRef.current) || upload.attachments.length > 0;
 
   const restoreFilePartsRef = useRef(upload.restoreFileParts);
   restoreFilePartsRef.current = upload.restoreFileParts;
@@ -1037,7 +1043,10 @@ export function ChatComposer({
   }
 
   async function handleSend() {
-    const trimmed = textRef.current.trim();
+    // Trim alone keeps zero-width and control characters, which draw nothing:
+    // a draft of them must send exactly what an empty one sends, so the prompt
+    // below is empty even though the input still holds them.
+    const trimmed = composerPromptText(textRef.current);
     // Decide admission from live values, not render-time `control.canSend`,
     // which can lag behind a same-frame edit. An empty prompt with no sendable
     // attachment is never sent. "Sendable" counts non-terminal chips: upload is
@@ -1152,7 +1161,7 @@ export function ChatComposer({
                   // keyboard is left exactly where the person had it — dismissing
                   // it here took the focused input away on every send (video V1
                   // ~4.4s and ~18.9s).
-                  if (textRef.current.trim() === trimmed) {
+                  if (composerPromptText(textRef.current) === trimmed) {
                     clearDraft();
                   }
                   upload.clearOptimistic();

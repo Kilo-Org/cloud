@@ -56,8 +56,8 @@ export function GatewaysTab({ organizationId, canEdit, settings }: Props) {
           <CardHeader>
             <CardTitle>Gateways</CardTitle>
             <CardDescription>
-              Kilo routes requests through OpenRouter or the Vercel AI Gateway. Requests that would
-              be routed through a disabled gateway fail with an error.
+              Kilo routes model requests through OpenRouter or the Vercel AI Gateway. Chat requests
+              that would be routed through a disabled gateway fail with an error.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -92,8 +92,8 @@ export function GatewaysTab({ organizationId, canEdit, settings }: Props) {
           <CardHeader>
             <CardTitle>Data region</CardTitle>
             <CardDescription>
-              Keeps inference for OpenRouter and Vercel AI Gateway requests in the selected region.
-              Requests for a model that is not available in the region fail with an error.
+              Pins chat requests routed through OpenRouter or the Vercel AI Gateway to the selected
+              region. Requests for a model that is not available in the region fail with an error.
             </CardDescription>
           </CardHeader>
           <CardContent>

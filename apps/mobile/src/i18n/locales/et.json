@@ -3853,7 +3853,7 @@
     "skillSaveFailed": "Oskust ei õnnestunud salvestada. Proovi uuesti.",
     "skillDeleteFailed": "Oskust ei õnnestunud kustutada. Proovi uuesti.",
     "skillToggleFailed": "Oskust ei õnnestunud uuendada. Proovi uuesti.",
-    "skillLimitReached": "Profiil mahutab kuni {{max}} oskust. Teise lisamiseks kustutage üks.",
+    "skillLimitReached": "Profiil mahutab kuni {{max}} oskust. Teise lisamiseks kustuta üks.",
     "skillSourceCustom": "Kohandatud",
     "skillSourceMarketplace": "Turg",
     "skillSourceSkillsSh": "skills.sh",

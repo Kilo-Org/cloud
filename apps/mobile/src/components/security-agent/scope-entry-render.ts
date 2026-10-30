@@ -72,7 +72,7 @@ export function selectScopeEntryView({
 }
 
 /** The cause-named description the failure screen shows, or null for the variant's own copy. */
-export type ScopeEntryLoadFailureDescriptionKey =
+type ScopeEntryLoadFailureDescriptionKey =
   | 'organization.boundary.loadErrorMessage'
   | 'securityAgent.scopeEntry.retryFailed';
 

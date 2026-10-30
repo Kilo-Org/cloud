@@ -118,9 +118,7 @@ function serverError(code: string): Error {
 const CONNECTION_DESCRIPTION = 'organization.boundary.loadErrorMessage';
 const RETRY_DESCRIPTION = 'securityAgent.scopeEntry.retryFailed';
 
-function failureFor(
-  patch: Partial<SelectScopeEntryLoadFailureInput>
-): ScopeEntryLoadFailure {
+function failureFor(patch: Partial<SelectScopeEntryLoadFailureInput>): ScopeEntryLoadFailure {
   return selectScopeEntryLoadFailure({
     errors: [],
     isPaused: false,

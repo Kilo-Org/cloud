@@ -72,7 +72,9 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const isEnabledResolved = config.data?.isEnabled ?? false;
   const isConfigUnread = !config.data && config.isError;
   const isError =
-    isConfigUnread || capability.status === 'error' || (isGithubStatusUnknown && !isEnabledResolved);
+    isConfigUnread ||
+    capability.status === 'error' ||
+    (isGithubStatusUnknown && !isEnabledResolved);
   const isPaused =
     permission.fetchStatus === 'paused' ||
     config.fetchStatus === 'paused' ||

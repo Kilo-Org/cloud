@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Muudatused",
-    "organizationTrialEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Organisatsiooni omanik saab arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida."
+    "organizationTrialEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Organisatsiooni omanik saab arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida.",
+    "privateRepositoryA11y": "{{name}}, privaatne repositoorium"
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -644,7 +645,12 @@
       "loading": "Postkasti laadimine",
       "noReviewRequests": "Ülevaatustaotlusi pole",
       "noReviewRequestsDescription": "Siin kuvatakse sinu ülevaatust ootavad tõmbetaotlused. Ülalolevale väljale saad endiselt kleepida mis tahes PR-i lingi.",
-      "couldNotLoad": "Postkasti ei õnnestunud laadida."
+      "couldNotLoad": "Postkasti ei õnnestunud laadida.",
+      "accessLostTitle": "Sul pole enam juurdepääsu sellele organisatsioonile",
+      "accessLostDescription": "Sa pole enam selle organisatsiooni liige, seega ei saa selle ülevaatustaotlusi laadida. Ülevaatamise jätkamiseks mine üle isiklikule kontole.",
+      "organizationUnavailableTitle": "See organisatsioon pole enam olemas",
+      "organizationUnavailableDescription": "See organisatsioon kustutati, seega ei saa selle ülevaatustaotlusi laadida. Ülevaatamise jätkamiseks mine üle isiklikule kontole.",
+      "continueInPersonal": "Jätka isikliku kontoga"
     },
     "composer": {
       "commentBodyPlaceholder": "Kommentaar",
@@ -742,7 +748,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Muuda aegunud ootel kommentaari asukohas {{location}}",
       "editA11y": "Muuda ootel kommentaari asukohas {{location}}",
-      "staleHint": "pR on pärast selle kommentaari kirjutamist muutunud.",
+      "staleHint": "PR on pärast selle kommentaari kirjutamist muutunud.",
       "deleteA11y": "Kustuta ootel kommentaar asukohas {{location}}",
       "deletedAnnouncement": "Ootel kommentaar kustutati",
       "noCommentsQueued": "Järjekorras pole kommentaare. Ülevaatus esitatakse ainult ülal valitud toiminguga.",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "PR ebaõnnestus",
         "superseded": "Juba olemas"
       },
-      "noProposalsDescription": "Ülevaatuste mälu ettepanekud ilmuvad siia pärast seda, kui Kilo on hooldajate vastuseid analüüsinud."
+      "noProposalsDescription": "Ülevaatuste mälu ettepanekud ilmuvad siia pärast seda, kui Kilo on hooldajate vastuseid analüüsinud.",
+      "changeRequestInProgress": "Kilo avab selle ettepaneku jaoks juba tõmbetaotlust. Proovi hetke pärast uuesti.",
+      "changeRequestNotActionable": "Seda ettepanekut ei saa enam kinnitada. Sulge see ja värskenda loendit.",
+      "changeRequestNoGitHubAccess": "Ühelgi GitHubi ühendusel ei ole sellele hoidlale juurdepääsu. Ühenda GitHub uuesti nii, et sellel on juurdepääs sellele hoidlale, ja proovi seejärel uuesti.",
+      "changeRequestMissingPermissions": "Kilo GitHubi rakendus ei saa selles hoidlas tõmbetaotlusi avada. Hoidla omanik peab andma rakendusele kirjutamisõiguse sisule ja tõmbetaotlustele, seejärel proovi uuesti.",
+      "changeRequestFailed": "Kilol ei õnnestunud tõmbetaotlust avada. Proovi hetke pärast uuesti.",
+      "offAction": "Ülevaatuste mälu on välja lülitatud. Lülita see sisse ja proovi uuesti."
     },
     "manualReview": {
       "title": "Käsitsi käivitatav ülevaatus",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Salvesta muudatused",
+      "saved": "Seaded salvestatud",
       "unsavedTitle": "Salvestamata muudatused",
       "unsavedMessage": "Kas salvestada muudatused enne sellelt ekraanilt lahkumist?",
       "unsavedInvalidMessage": "Neid muudatusi ei saa veel salvestada. Paranda need salvestamiseks või loobu neist lahkumiseks."
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "Sinu keskkonna laadimine ebaõnnestus.",
       "retryLoadingEnvironment": "Proovi keskkonna laadimist uuesti",
       "defaultEnvironment": "Vaikekeskkond",
+      "environmentAccessibility": "Valige profiil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Valige profiil: {{label}}. {{attention}}",
       "leaveChanges": "Jäta alles",
       "commitAndPush": "Kinnista ja saada",
       "startSession": "Alusta seanssi",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "Profiilide haldamine",
       "noProfiles": "Profiilid veel puuduvad. Looge see keskkonnamuutujate, MCP-serverite ja oskuste lisamiseks.",
       "advancedConfig": "Täpsem konfiguratsioon",
-      "advancedConfigDescription": "Valige salvestatud konfiguratsioonide laadimiseks profiil ja konfigureerige käsitsi täiendavaid keskkonnamuutujaid ja häälestuskäske",
+      "advancedConfigDescription": "Kehtib selle seansi kohta. Profiilina salvestamine jätab selle järgmiseks korraks alles.",
       "saveAsProfile": "Salvesta profiilina",
       "saveProfileDescription": "Salvestage praegused keskkonnamuutujad ja häälestuskäsud korduvkasutatava profiilina.",
       "profileSummary": "{{vars}} keskkonnamuutujad · {{commands}} häälestuskäsud",
@@ -2971,7 +2986,9 @@
     "permissionDescription": "Sul pole õigust seda vaadata.",
     "notFoundDescription": "See on kas eemaldatud või pole enam saadaval.",
     "serverTitle": "Laadimine ei õnnestunud.",
-    "serverDescription": "Meie poolel tekkis viga. Proovi uuesti."
+    "serverDescription": "Meie poolel tekkis viga. Proovi uuesti.",
+    "timeoutTitle": "Server vastab liiga aeglaselt",
+    "timeoutDescription": "Päring ei jõudnud õigeaegselt lõpule. Proovi uuesti."
   },
   "screenHeader": {
     "openMenu": "Ava menüü",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "Seadistuskäsud",
     "addCommand": "Lisa käsk",
     "commandLabel": "Käsk",
+    "commandLabelPosition": "Käsk {{position}}",
     "commandPlaceholder": "nt pnpm install",
+    "commandAtLimit": "Käsu pikkus on piiratud {{max}} tähemärgiga",
     "commandsEmpty": "Seadistuskäske pole veel",
     "commandsSaveFailed": "Seadistuskäske ei saanud salvestada",
     "moveUp": "Liigu üles",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "Oskust ei õnnestunud salvestada",
     "skillSourceCustom": "Kohandatud",
     "skillSourceMarketplace": "Turg",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Kleepige fail SKILL.md ja selle nimi täidetakse; lisage oma telefonist oskusi ilma lohistamata.",
     "skillEditTitle": "Muuda oskusi",
     "skillEdit": "Muuda oskust {{name}}",
@@ -3868,6 +3888,7 @@
       "headersHint": "Väärtused, mis on kuvatud kujul ••••, säilitavad oma salvestatud saladuse; väärtuse asendamisega saab selle vahetada. URL-i muutmine nõuab kõiki väärtusi uuesti",
       "nameRequired": "Sisestage serveri nimi",
       "nameInvalid": "Nimes võib kasutada ainult ASCII tähti, numbreid, allkriipse ja sidekriipse, kuni 100 tähemärki",
+      "nameConflict": "Sellise nimega MCP-server on juba olemas",
       "commandRequired": "Sisestage käsk",
       "commandTooLong": "Kasuta kõige rohkem 50 argumenti, igaüks kuni 500 tähemärki",
       "urlRequired": "Sisestage URL",
@@ -3887,7 +3908,7 @@
       "add": "Lisa agent",
       "empty": "Agente veel pole",
       "name": "Agendi nimi",
-      "slug": "Agent nälkjas",
+      "slug": "Agendi slug",
       "description": "Agendi kirjeldus",
       "model": "Mudeli alistamine",
       "modelPlaceholder": "Kasuta seansi vaikeseadet",
@@ -3912,7 +3933,7 @@
       "saveFailed": "Agenti ei õnnestunud salvestada",
       "deleteFailed": "Agenti ei õnnestunud kustutada",
       "nameRequired": "Sisestage agendi nimi",
-      "slugRequired": "Sisestage agent nälkjas",
+      "slugRequired": "Sisestage agendi slug",
       "slugInvalid": "Slug peab algama ASCII väiketähega ja kasutama ainult ASCII väiketähti, numbreid ja sidekriipse, kuni 50 tähemärki",
       "slugConflict": "Seda slugi kasutab juba sisseehitatud agent või muu agent selles profiilis",
       "edit": "Muuda agenti {{name}}",
@@ -3948,7 +3969,6 @@
       "repo": "Valige hoidla…",
       "profile": "Valige profiil",
       "remove": "Vabasta sidumine",
-      "private": "Privaatne",
       "search": "Otsi hoidlaid…",
       "addedToast": "Vaikeprofiil on seatud \"{{repo}}\" jaoks",
       "addFailed": "Vaikeprofiili ei saanud määrata",

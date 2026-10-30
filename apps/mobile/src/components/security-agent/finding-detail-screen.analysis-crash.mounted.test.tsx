@@ -61,6 +61,7 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('expo-router', () => ({
+  useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useRouter: () => ({
     push: (href: string) => navigation.history.push(href),
     back: () => navigation.history.pop(),

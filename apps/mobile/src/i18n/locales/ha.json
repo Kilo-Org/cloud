@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Canje-canje",
-    "organizationTrialEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai, sannan ya sake gwadawa."
+    "organizationTrialEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai, sannan ya sake gwadawa.",
+    "privateRepositoryA11y": "{{name}}, ma'ajiya na sirri"
   },
   "language": {
     "restarting": "Ana sake kunnawa don amfani da harshen da aka zaɓa",
@@ -644,7 +645,12 @@
       "loading": "Ana loda saƙonnin shiga",
       "noReviewRequests": "Babu buƙatun bita",
       "noReviewRequestsDescription": "Buƙatun haɗawa da ke jiran bitarka suna bayyana a nan. Har yanzu za ka iya manna kowane mahaɗin PR a sama.",
-      "couldNotLoad": "Ba a iya loda saƙonnin shiga ba."
+      "couldNotLoad": "Ba a iya loda saƙonnin shiga ba.",
+      "accessLostTitle": "Ba ka da damar wannan ƙungiya",
+      "accessLostDescription": "Ba ka zama memba na wannan ƙungiya ba, don haka ba za a iya loda buƙatun bitanta ba. Ci gaba da bita a asusunka na kashin kai.",
+      "organizationUnavailableTitle": "Wannan ƙungiya ta daina kasancewa",
+      "organizationUnavailableDescription": "An goge wannan ƙungiya, don haka ba za a iya loda buƙatun bitanta ba. Ci gaba da bita a asusunka na kashin kai.",
+      "continueInPersonal": "Ci gaba a asusun na kashin kai"
     },
     "composer": {
       "commentBodyPlaceholder": "Tsokacinka",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "An kasa buɗe PR",
         "superseded": "Ya riga ya kasance"
       },
-      "noProposalsDescription": "Shawarwarin ƙwaƙwalwar bita suna bayyana a nan bayan Kilo ya nazarci amsoshin masu kula da shirin."
+      "noProposalsDescription": "Shawarwarin ƙwaƙwalwar bita suna bayyana a nan bayan Kilo ya nazarci amsoshin masu kula da shirin.",
+      "changeRequestInProgress": "Kilo yana buɗe pull request don wannan shawara. Sake gwadawa nan da ɗan lokaci.",
+      "changeRequestNotActionable": "Ba za a iya amincewa da wannan shawara ba kuma. Rufe ta ka sabunta jerin.",
+      "changeRequestNoGitHubAccess": "Babu haɗin GitHub da ke da damar shiga wannan ajiya. Sake haɗa GitHub da ke da damar shiga ta, sannan sake gwadawa.",
+      "changeRequestMissingPermissions": "Aplikashin GitHub na Kilo ba zai iya buɗe pull request a cikin wannan ajiya ba. Dole mai ajiyar ya ba app ɗin damar rubutu ga abubuwan ciki da pull request, sannan sake gwadawa.",
+      "changeRequestFailed": "Kilo ya kasa buɗe pull request ɗin. Sake gwadawa nan da ɗan lokaci.",
+      "offAction": "An kashe ƙwaƙwalwar bita. Kunna ta, sannan sake gwadawa."
     },
     "manualReview": {
       "title": "Bita da hannu",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Ajiye canje-canje",
+      "saved": "An ajiye saitunan",
       "unsavedTitle": "Canje-canjen da ba a ajiye ba",
       "unsavedMessage": "A ajiye canje-canjenka kafin barin wannan allon?",
       "unsavedInvalidMessage": "Ba za a iya ajiye waɗannan canje-canje ba tukuna. Gyara su don ajiyewa, ko yi watsi da su don barin."
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "An kasa loda muhallin aikinka.",
       "retryLoadingEnvironment": "Sake gwada loda muhallin aiki",
       "defaultEnvironment": "Muhallin aiki na asali",
+      "environmentAccessibility": "Zaɓi bayanin martaba: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Zaɓi bayanin martaba: {{label}}. {{attention}}",
       "leaveChanges": "Bar canje-canje",
       "commitAndPush": "Adana ka tura",
       "startSession": "Fara zama",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "Sarrafa bayanan martaba",
       "noProfiles": "Babu bayanan martaba tukuna. Ƙirƙiri ɗaya don ƙara masu canjin yanayi, sabar MCP, da ƙwarewa.",
       "advancedConfig": "Babban Kanfigareshan",
-      "advancedConfigDescription": "Zaɓi bayanin martaba don loda ajiyayyun saituna, kuma da hannu saita ƙarin masu canjin yanayi da umarnin saitin",
+      "advancedConfigDescription": "Ya shafi wannan zaman. Ajiye shi azaman bayanan martaba yana kiyaye shi don gaba.",
       "saveAsProfile": "Ajiye azaman Bayanan martaba",
       "saveProfileDescription": "Ajiye masu canjin yanayi na yanzu da saitin umarni azaman bayanin martaba mai sake amfani da shi.",
       "profileSummary": "{{vars}} masu canjin yanayi · {{commands}} umarnin saitin",
@@ -2971,7 +2986,9 @@
     "permissionDescription": "Ba ka da izinin ganin wannan.",
     "notFoundDescription": "Wataƙila an cire wannan abu ko kuma ba a samunsa yanzu.",
     "serverTitle": "An kasa loda bayanai.",
-    "serverDescription": "An sami matsala daga ɓangarenmu. Sake gwadawa."
+    "serverDescription": "An sami matsala daga ɓangarenmu. Sake gwadawa.",
+    "timeoutTitle": "Sabar uwar garka na ɗaukar lokaci mai tsawo",
+    "timeoutDescription": "An ƙare lokacin buƙatar kafin ta kammala. Sake gwadawa."
   },
   "screenHeader": {
     "openMenu": "Buɗe jerin zaɓuɓɓuka",
@@ -3823,8 +3840,10 @@
     "variablesSaveFailed": "An kasa ajiye canji",
     "commandsTitle": "Saita umarni",
     "addCommand": "Ƙara umarni",
-    "commandLabel": "Umurni",
+    "commandLabel": "Umarni",
+    "commandLabelPosition": "Umarni {{position}}",
     "commandPlaceholder": "misali pnpm install",
+    "commandAtLimit": "An iyakance umurnin zuwa haruffa {{max}}",
     "commandsEmpty": "Babu umarnin saitin tukuna",
     "commandsSaveFailed": "An kasa ajiye umarnin saitin",
     "moveUp": "Matsa sama",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "An kasa ajiye fasaha",
     "skillSourceCustom": "Al'ada",
     "skillSourceMarketplace": "Kasuwa",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Manna SKILL.md kuma sunansa ya cika; ƙara fasaha daga wayarka ba tare da ja da sauke ba.",
     "skillEditTitle": "Gyara fasaha",
     "skillEdit": "Gyara fasaha {{name}}",
@@ -3858,7 +3878,7 @@
       "url": "URL",
       "environment": "Muhalli (JSON)",
       "headers": "Shugabanni (JSON)",
-      "timeout": "Lokaci ya ƙare",
+      "timeout": "Ƙayyadaddun lokaci",
       "secretCount_one": "{{count}} sirri",
       "secretCount_other": "{{count}} sirri",
       "namePlaceholder": "my-server",
@@ -3868,6 +3888,7 @@
       "headersHint": "Ƙimomin da aka nuna a matsayin •••• suna riƙe sirrin da aka adana; maye gurbin ƙima don canza sirrin. Canza URL yana buƙatar sake shigar da kowane ƙima",
       "nameRequired": "Shigar da sunan uwar garke",
       "nameInvalid": "Sunan zai iya amfani da haruffan ASCII kawai, lambobi, ƙararraki, da dashes, har zuwa haruffa 100",
+      "nameConflict": "Uwar garken da wannan sunan ta riga ta kasance",
       "commandRequired": "Shigar da umarni",
       "commandTooLong": "Yi amfani da bai fi hujjoji 50 ba, kowanne haruffa 500",
       "urlRequired": "Shigar da URL",
@@ -3948,7 +3969,6 @@
       "repo": "Zaɓi wurin ajiya…",
       "profile": "Zaɓi bayanin martaba",
       "remove": "Cire daurin",
-      "private": "Na sirri",
       "search": "Bincika wuraren ajiya…",
       "addedToast": "An saita tsoffin bayanan martaba don \"{{repo}}\"",
       "addFailed": "An kasa saita bayanan martaba na asali",

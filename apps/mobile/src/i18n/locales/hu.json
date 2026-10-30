@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Változtatások",
-    "organizationTrialEnded": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. A szervezet tulajdonosa frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra."
+    "organizationTrialEnded": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. A szervezet tulajdonosa frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra.",
+    "privateRepositoryA11y": "{{name}}, magán adattár"
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",
@@ -644,7 +645,12 @@
       "loading": "Beérkezett kérelmek betöltése",
       "noReviewRequests": "Nincs kódellenőrzési felkérés",
       "noReviewRequestsDescription": "Itt jelennek meg a kódellenőrzésedre váró módosítási kérelmek. Fent továbbra is beilleszthetsz bármilyen PR-hivatkozást.",
-      "couldNotLoad": "Nem sikerült betölteni a beérkezett kérelmeket."
+      "couldNotLoad": "Nem sikerült betölteni a beérkezett kérelmeket.",
+      "accessLostTitle": "Nincs hozzáférésed ehhez a szervezethez",
+      "accessLostDescription": "Már nem vagy tagja ennek a szervezetnek, ezért a kérelmei nem tölthetők be. A folytatáshoz válts át a személyes fiókodra.",
+      "organizationUnavailableTitle": "Ez a szervezet már nem létezik",
+      "organizationUnavailableDescription": "Ez a szervezet törölve lett, ezért a kérelmei nem tölthetők be. A folytatáshoz válts át a személyes fiókodra.",
+      "continueInPersonal": "Folytatás személyes fiókkal"
     },
     "composer": {
       "commentBodyPlaceholder": "Írj hozzászólást",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "PR megnyitása sikertelen",
         "superseded": "Már szerepel"
       },
-      "noProposalsDescription": "A kódellenőrzési memória javaslatai itt jelennek meg, miután a Kilo elemzi a karbantartók válaszait."
+      "noProposalsDescription": "A kódellenőrzési memória javaslatai itt jelennek meg, miután a Kilo elemzi a karbantartók válaszait.",
+      "changeRequestInProgress": "A Kilo már nyit egy pull requestet ehhez a javaslathoz. Próbáld újra egy pillanat múlva.",
+      "changeRequestNotActionable": "Ez a javaslat már nem hagyható jóvá. Zárd be, és frissítsd a listát.",
+      "changeRequestNoGitHubAccess": "Egyetlen GitHub-kapcsolatnak sincs hozzáférése ehhez a tárolóhoz. Kapcsold újra a GitHubot úgy, hogy hozzáférjen ehhez a tárolóhoz, majd próbáld újra.",
+      "changeRequestMissingPermissions": "A Kilo GitHub-alkalmazása nem tud pull requesteket nyitni ebben a tárolóban. A tároló tulajdonosának írási hozzáférést kell adnia az alkalmazásnak a tartalmakhoz és a pull requestekhez, majd próbáld újra.",
+      "changeRequestFailed": "A Kilo nem tudta megnyitni a pull requestet. Próbáld újra egy pillanat múlva.",
+      "offAction": "A kódellenőrzési memória ki van kapcsolva. Kapcsold be, majd próbáld újra."
     },
     "manualReview": {
       "title": "Kézi kódellenőrzés",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Változtatások mentése",
+      "saved": "Beállítások mentve",
       "unsavedTitle": "El nem mentett változtatások",
       "unsavedMessage": "Mented a változtatásokat, mielőtt elhagyod ezt a képernyőt?",
       "unsavedInvalidMessage": "Ezek a változtatások még nem menthetők. Javítsd ki őket a mentéshez, vagy vesd el őket az elhagyáshoz."
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "Nem sikerült betölteni a környezetedet.",
       "retryLoadingEnvironment": "Környezet betöltésének újrapróbálása",
       "defaultEnvironment": "Alapértelmezett környezet",
+      "environmentAccessibility": "Válassz egy profilt: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Válassz egy profilt: {{label}}. {{attention}}",
       "leaveChanges": "Változtatások megtartása",
       "commitAndPush": "Véglegesítés és feltöltés",
       "startSession": "Munkamenet indítása",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "Profilok kezelése",
       "noProfiles": "Még nincsenek profilok. Hozz létre egyet a környezeti változók, MCP-kiszolgálók és készségek hozzáadásához.",
       "advancedConfig": "Speciális konfiguráció",
-      "advancedConfigDescription": "Válassz egy profilt a mentett konfigurációk betöltéséhez, és manuálisan konfiguráld a további környezeti változókat és beállítási parancsokat",
+      "advancedConfigDescription": "Erre a munkamenetre érvényes. Profilként mentve a következő alkalomra is megmarad.",
       "saveAsProfile": "Mentés profilként",
       "saveProfileDescription": "Mentsd el az aktuális környezeti változókat és a beállítási parancsokat újrafelhasználható profilként.",
       "profileSummary": "{{vars}} környezeti változó · {{commands}} beállítási parancs",
@@ -2971,7 +2986,9 @@
     "permissionDescription": "Nincs jogosultságod ennek a megtekintéséhez.",
     "notFoundDescription": "Lehet, hogy ezt az elemet eltávolították, vagy már nem érhető el.",
     "serverTitle": "Nem sikerült betölteni",
-    "serverDescription": "Nálunk hiba történt. Próbáld újra."
+    "serverDescription": "Nálunk hiba történt. Próbáld újra.",
+    "timeoutTitle": "A szerver túl sokáig tart",
+    "timeoutDescription": "A kérés túllépte az időkorlátot, mielőtt befejeződött volna. Próbáld újra."
   },
   "screenHeader": {
     "openMenu": "Menü megnyitása",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "Beállítási parancsok",
     "addCommand": "Parancs hozzáadása",
     "commandLabel": "Parancs",
+    "commandLabelPosition": "{{position}}. parancs",
     "commandPlaceholder": "pl. pnpm install",
+    "commandAtLimit": "A parancs legfeljebb {{max}} karakter lehet",
     "commandsEmpty": "Még nincsenek beállítási parancsok",
     "commandsSaveFailed": "Nem sikerült menteni a beállítási parancsokat",
     "moveUp": "Mozgassa fel",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "Nem sikerült elmenteni a készséget",
     "skillSourceCustom": "Egyéni",
     "skillSourceMarketplace": "Piactér",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Illesszen be egy SKILL.md fájlt, és a neve automatikusan kitöltődik; töltsön fel egy készséget a telefonjáról húzás nélkül.",
     "skillEditTitle": "Készség szerkesztése",
     "skillEdit": "{{name}} készség szerkesztése",
@@ -3868,6 +3888,7 @@
       "headersHint": "A ••••-ként megjelenő értékek megőrzik a tárolt titkot; egy érték cseréjével rotálhatja azt. Az URL módosítása minden érték ismételt megadását igényli",
       "nameRequired": "Adja meg a szerver nevét",
       "nameInvalid": "A név csak ASCII betűket, számokat, aláhúzásjeleket és kötőjeleket tartalmazhat, legfeljebb 100 karakter lehet",
+      "nameConflict": "Már létezik ilyen nevű szerver",
       "commandRequired": "Írjon be egy parancsot",
       "commandTooLong": "Legfeljebb 50 argumentumot használjon, egyenként 500 karakterrel",
       "urlRequired": "Adjon meg egy URL-t",
@@ -3948,7 +3969,6 @@
       "repo": "Adattár kiválasztása…",
       "profile": "Profil kiválasztása",
       "remove": "Kötés feloldása",
-      "private": "Magán",
       "search": "Adattárak keresése…",
       "addedToast": "Alapértelmezett profil beállítva az adattárhoz: „{{repo}}”",
       "addFailed": "Nem sikerült beállítani az alapértelmezett profilt",

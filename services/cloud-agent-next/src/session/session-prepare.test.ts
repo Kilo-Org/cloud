@@ -2208,6 +2208,23 @@ describe('createSessionWithLedger admission ladder', () => {
     }
   );
 
+  it('refuses an admission stored in another organization scope without any effect', async () => {
+    admitOperationMock.mockResolvedValueOnce({ admission: 'organization_mismatch' });
+    const doStub = makeDoStub();
+
+    await expect(runCreate(makeContext(doStub))).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.getMetadata).not.toHaveBeenCalled();
+    expect(doStub.getMessageResult).not.toHaveBeenCalled();
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(recordOperationProgressMock).not.toHaveBeenCalled();
+    expect(settleOperationMock).not.toHaveBeenCalled();
+  });
+
   it.each([
     { autoCommit: true, condenseOnComplete: true },
     { autoCommit: false, condenseOnComplete: true },

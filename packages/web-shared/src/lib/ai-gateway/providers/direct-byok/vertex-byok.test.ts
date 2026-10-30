@@ -194,7 +194,10 @@ describe('resolveGcpVertexUpstream', () => {
 });
 
 describe('vertexByok definition', () => {
-  function createContext(request: GatewayRequest): TransformRequestContext {
+  function createContext(
+    request: GatewayRequest,
+    model = 'vertex-byok/model'
+  ): TransformRequestContext {
     return {
       provider: {
         id: 'direct-byok',
@@ -207,7 +210,7 @@ describe('vertexByok definition', () => {
         responseTransforms: null,
         async transformRequest() {},
       },
-      model: 'vertex-byok/model',
+      model,
       request,
       originalHeaders: EmptyFraudDetectionHeaders,
       extraHeaders: {},
@@ -231,6 +234,31 @@ describe('vertexByok definition', () => {
       max_tokens: 10,
       anthropic_version: 'vertex-2023-10-16',
     });
+  });
+
+  it('drops mismatched Claude thinking blocks', () => {
+    const context = createContext(
+      {
+        kind: 'messages',
+        body: {
+          model: 'claude-sonnet-5-5',
+          messages: [],
+          max_tokens: 10,
+          thinking: { type: 'adaptive' },
+        },
+      },
+      'vertex-byok/claude-sonnet-5-5'
+    );
+
+    vertexByok.transformRequest(context);
+
+    expect(context.request.body).toEqual({
+      messages: [],
+      max_tokens: 10,
+      thinking: { type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } },
+      anthropic_version: 'vertex-2023-10-16',
+    });
+    expect(context.extraHeaders['anthropic-beta']).toBe('thinking-binding-controls-2026-08-01');
   });
 
   it('reduces Mistral requests to the fields Mistral accepts', () => {

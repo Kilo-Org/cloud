@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Athruithe",
-    "organizationTrialEnded": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir le húinéir eagraíochta an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís."
+    "organizationTrialEnded": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir le húinéir eagraíochta an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís.",
+    "privateRepositoryA11y": "{{name}}, stór príobháideach"
   },
   "language": {
     "restarting": "Ag atosú chun an teanga a chur i bhfeidhm",
@@ -689,7 +690,12 @@
       "loading": "Ag lódáil an bhosca ionphoist",
       "noReviewRequests": "Gan aon iarratas athbhreithnithe",
       "noReviewRequestsDescription": "Taispeántar anseo na hiarratais tarraingthe atá ag fanacht le d'athbhreithniú. Is féidir leat nasc PR ar bith a ghreamú thuas fós.",
-      "couldNotLoad": "Níorbh fhéidir an bosca ionphoist a lódáil."
+      "couldNotLoad": "Níorbh fhéidir an bosca ionphoist a lódáil.",
+      "accessLostTitle": "Gan rochtain ar an eagraíocht seo",
+      "accessLostDescription": "Ní ball den eagraíocht seo a thuilleadh, mar sin ní féidir na hiarratais athbhreithnithe a lódáil. Lean ar aghaidh i do chuntas pearsanta chun athbhreithniú a dhéanamh fós.",
+      "organizationUnavailableTitle": "Níl an eagraíocht seo ann a thuilleadh",
+      "organizationUnavailableDescription": "Scriosadh an eagraíocht seo, mar sin ní féidir na hiarratais athbhreithnithe a lódáil. Lean ar aghaidh i do chuntas pearsanta chun athbhreithniú a dhéanamh fós.",
+      "continueInPersonal": "Lean ar aghaidh sa chuntas pearsanta"
     },
     "composer": {
       "commentBodyPlaceholder": "Do thrácht…",
@@ -1579,7 +1585,13 @@
         "change_request_failed": "Theip ar an PR",
         "superseded": "Ann cheana féin"
       },
-      "noProposalsDescription": "Beidh moltaí ón gcuimhne athbhreithnithe le feiceáil anseo tar éis do Kilo anailís a dhéanamh ar fhreagraí na gcothaitheoirí."
+      "noProposalsDescription": "Beidh moltaí ón gcuimhne athbhreithnithe le feiceáil anseo tar éis do Kilo anailís a dhéanamh ar fhreagraí na gcothaitheoirí.",
+      "changeRequestInProgress": "Tá Kilo cheana féin ag oscailt iarratas tarraingthe don togra seo. Bain triail eile as ar ball.",
+      "changeRequestNotActionable": "Ní féidir ceadú a thabhairt don togra seo a thuilleadh. Dún é agus athnuaigh an liosta.",
+      "changeRequestNoGitHubAccess": "Níl aon nasc GitHub a bhfuil rochtain aige ar an stór seo. Athnasc GitHub le rochtain air, ansin bain triail eile as.",
+      "changeRequestMissingPermissions": "Ní féidir le hAip GitHub Kilo iarratais tarraingthe a oscailt sa stór seo. Caithfidh úinéir an stóir rochtain scríofa ar ábhair agus ar iarratais tarraingthe a thabhairt don aip, ansin bain triail eile as.",
+      "changeRequestFailed": "Níorbh fhéidir le Kilo an t-iarratas tarraingthe a oscailt. Bain triail eile as ar ball.",
+      "offAction": "Tá cuimhne athbhreithnithe múchta. Cumasaigh í, ansin bain triail eile as."
     },
     "manualReview": {
       "title": "Athbhreithniú de láimh",
@@ -2010,6 +2022,7 @@
     },
     "settingsSave": {
       "saveChanges": "Sábháil athruithe",
+      "saved": "Socruithe sábháilte",
       "unsavedTitle": "Athruithe gan sábháil",
       "unsavedMessage": "Ar mhaith leat d'athruithe a shábháil sula bhfágann tú an scáileán seo?",
       "unsavedInvalidMessage": "Ní féidir na hathruithe seo a shábháil fós. Ceartaigh iad le sábháil, nó caith uait iad le fágáil."
@@ -2402,6 +2415,8 @@
       "couldNotLoadEnvironment": "Níorbh fhéidir do thimpeallacht a lódáil.",
       "retryLoadingEnvironment": "Bain triail as an timpeallacht a lódáil arís",
       "defaultEnvironment": "Timpeallacht réamhshocraithe",
+      "environmentAccessibility": "Roghnaigh próifíl: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Roghnaigh próifíl: {{label}}. {{attention}}",
       "leaveChanges": "Fág athruithe",
       "commitAndPush": "Taifead agus brúigh",
       "startSession": "Tosaigh seisiún",
@@ -2436,7 +2451,7 @@
       "manageProfiles": "Bainistigh próifílí",
       "noProfiles": "Níl próifílí ann fós. Cruthaigh ceann chun athróga timpeallachta, freastalaithe MCP, agus scileanna a chur leis.",
       "advancedConfig": "Cumraíocht Casta",
-      "advancedConfigDescription": "Roghnaigh próifíl chun cumraíochtaí sábháilte a luchtú, agus de láimh athróga timpeallachta breise agus orduithe socraithe a chumrú",
+      "advancedConfigDescription": "Baineann sé leis an seisiún seo. Má shábháiltear mar phróifíl é, fanann sé don chéad uair eile.",
       "saveAsProfile": "Sábháil mar Phróifíl",
       "saveProfileDescription": "Sábháil na hathróga timpeallachta reatha agus na horduithe socraithe mar phróifíl ath-inúsáidte.",
       "profileSummary": "{{vars}} athróga timpeallachta · {{commands}} orduithe socraithe",
@@ -3097,7 +3112,9 @@
     "permissionDescription": "Níl cead agat é seo a fheiceáil.",
     "notFoundDescription": "Seans gur baineadh an mhír seo nó nach bhfuil sí ar fáil a thuilleadh.",
     "serverTitle": "Níorbh fhéidir an t-ábhar a lódáil.",
-    "serverDescription": "Tharla fadhb ar ár dtaobh féin. Bain triail as arís."
+    "serverDescription": "Tharla fadhb ar ár dtaobh féin. Bain triail as arís.",
+    "timeoutTitle": "Tá an freastalaí ag glacadh rófhada",
+    "timeoutDescription": "Níor chríochnaigh an t-iarratas in am. Bain triail as arís."
   },
   "screenHeader": {
     "openMenu": "Oscail roghchlár",
@@ -3974,7 +3991,9 @@
     "commandsTitle": "Orduithe socraithe",
     "addCommand": "Cuir ordú leis",
     "commandLabel": "Ordú",
+    "commandLabelPosition": "Ordú {{position}}",
     "commandPlaceholder": "m.sh. pnpm install",
+    "commandAtLimit": "Tá an t-ordú teoranta do {{max}} carachtar",
     "commandsEmpty": "Níl aon orduithe socraithe fós",
     "commandsSaveFailed": "Níorbh fhéidir na horduithe socraithe a shábháil",
     "moveUp": "Bog suas",
@@ -3992,6 +4011,7 @@
     "skillSaveFailed": "Níorbh fhéidir an scil a shábháil",
     "skillSourceCustom": "Saincheaptha",
     "skillSourceMarketplace": "Margadh",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Greamaigh SKILL.md agus líonann a ainm isteach; cuir scil ó do ghuthán gan tarraing agus scaoil.",
     "skillEditTitle": "Cuir scil in eagar",
     "skillEdit": "Cuir scil {{name}} in eagar",
@@ -4006,7 +4026,7 @@
       "remoteType": "cianda",
       "command": "Líne ordaithe",
       "url": "URL",
-      "environment": "Comhshaol (JSON)",
+      "environment": "Timpeallacht (JSON)",
       "headers": "Ceanntásca (JSON)",
       "timeout": "Teorainn Ama",
       "secretCount_one": "{{count}} rún",
@@ -4021,6 +4041,7 @@
       "headersHint": "Coinníonn luachanna a thaispeántar mar •••• a rún stóráilte; athchuir luach chun é a rothlú. Teastaíonn gach luach arís nuair a athraítear an URL",
       "nameRequired": "Cuir isteach ainm freastalaí",
       "nameInvalid": "Ní féidir le hainm ach litreacha ASCII, uimhreacha, béimeanna agus daiseanna a úsáid, suas le 100 carachtar",
+      "nameConflict": "Tá freastalaí leis an ainm seo ann cheana",
       "commandRequired": "Cuir isteach ordú",
       "commandTooLong": "Úsáid 50 argóint ar a mhéad, 500 carachtar sa cheann",
       "urlRequired": "Cuir isteach URL",
@@ -4040,7 +4061,7 @@
       "add": "Cuir gníomhaire leis",
       "empty": "Níl gníomhairí fós",
       "name": "Ainm gníomhaire",
-      "slug": "Seilide gníomhaire",
+      "slug": "Slug gníomhaire",
       "description": "Cur síos ar an ngníomhaire",
       "model": "Sárú múnla",
       "modelPlaceholder": "Úsáid réamhshocrú seisiúin",
@@ -4065,7 +4086,7 @@
       "saveFailed": "Níorbh fhéidir an gníomhaire a shábháil",
       "deleteFailed": "Níorbh fhéidir an gníomhaire a scriosadh",
       "nameRequired": "Cuir isteach ainm gníomhaire",
-      "slugRequired": "Cuir isteach seilide gníomhaire",
+      "slugRequired": "Cuir isteach slug gníomhaire",
       "slugInvalid": "Caithfidh sluga tosú le litir bheag ASCII agus gan ach litreacha beaga ASCII, digití agus daiseanna a úsáid, suas le 50 carachtar",
       "slugConflict": "Tá an slug sin in úsáid cheana ag gníomhaire ionsuite nó ag gníomhaire eile sa phróifíl seo",
       "edit": "Cuir gníomhaire {{name}} in eagar",
@@ -4101,7 +4122,6 @@
       "repo": "Roghnaigh stór…",
       "profile": "Roghnaigh próifíl",
       "remove": "Dícheangail",
-      "private": "Príobháideach",
       "search": "Cuardaigh stórtha…",
       "addedToast": "Socraíodh próifíl réamhshocraithe do \"{{repo}}\"",
       "addFailed": "Níorbh fhéidir an phróifíl réamhshocraithe a shocrú",

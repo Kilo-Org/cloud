@@ -42,7 +42,7 @@
     "mergeRequest": "sol·licitud de fusió",
     "notConnected": "No connectat",
     "notifications": "Notificacions",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repositoris",
     "securityAgent": "Agent de seguretat",
     "unknown": "Desconegut",
@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Canvis",
-    "organizationTrialEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. El propietari de l'organització pot actualitzar la facturació a kilo.ai i tornar-ho a provar."
+    "organizationTrialEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. El propietari de l'organització pot actualitzar la facturació a kilo.ai i tornar-ho a provar.",
+    "privateRepositoryA11y": "{{name}}, repositori privat"
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -659,7 +660,12 @@
       "loading": "S'està carregant la safata d'entrada",
       "noReviewRequests": "Cap sol·licitud de revisió",
       "noReviewRequestsDescription": "Aquí apareixen les sol·licituds d'integració que has de revisar. També pots enganxar qualsevol enllaç de PR al camp de dalt.",
-      "couldNotLoad": "No s'ha pogut carregar la safata d'entrada."
+      "couldNotLoad": "No s'ha pogut carregar la safata d'entrada.",
+      "accessLostTitle": "No tens accés a aquesta organització",
+      "accessLostDescription": "Ja no ets membre d'aquesta organització, així que no es poden carregar les seves sol·licituds de revisió. Continua al teu compte d'ús personal per seguir revisant.",
+      "organizationUnavailableTitle": "Aquesta organització ja no existeix",
+      "organizationUnavailableDescription": "Aquesta organització s'ha suprimit, així que no es poden carregar les seves sol·licituds de revisió. Continua al teu compte d'ús personal per seguir revisant.",
+      "continueInPersonal": "Continua al compte d'ús personal"
     },
     "composer": {
       "commentBodyPlaceholder": "El teu comentari",
@@ -1535,7 +1541,13 @@
         "change_request_failed": "La PR ha fallat",
         "superseded": "Ja hi és"
       },
-      "noProposalsDescription": "Les propostes de la memòria de revisió apareixeran aquí quan Kilo hagi analitzat les respostes dels mantenidors."
+      "noProposalsDescription": "Les propostes de la memòria de revisió apareixeran aquí quan Kilo hagi analitzat les respostes dels mantenidors.",
+      "changeRequestInProgress": "Kilo ja està obrint una pull request per a aquesta proposta. Torna-ho a provar d'aquí a un moment.",
+      "changeRequestNotActionable": "Aquesta proposta ja no es pot aprovar. Tanca-la i actualitza la llista.",
+      "changeRequestNoGitHubAccess": "Cap connexió de GitHub té accés a aquest repositori. Torna a connectar GitHub amb accés a aquest repositori i torna-ho a provar.",
+      "changeRequestMissingPermissions": "L'aplicació GitHub de Kilo no pot obrir pull requests en aquest repositori. Un propietari del repositori ha de donar a l'aplicació accés d'escriptura als continguts i a les pull requests, i després tornar-ho a provar.",
+      "changeRequestFailed": "Kilo no ha pogut obrir la pull request. Torna-ho a provar d'aquí a un moment.",
+      "offAction": "La memòria de revisió està desactivada. Activa-la i torna-ho a provar."
     },
     "manualReview": {
       "title": "Revisió manual",
@@ -1958,6 +1970,7 @@
     },
     "settingsSave": {
       "saveChanges": "Desa els canvis",
+      "saved": "Configuració desada",
       "unsavedTitle": "Canvis sense desar",
       "unsavedMessage": "Vols desar els canvis abans de sortir d'aquesta pantalla?",
       "unsavedInvalidMessage": "Aquests canvis encara no es poden desar. Corregeix-los per desar-los o descarta'ls per sortir."
@@ -2340,6 +2353,8 @@
       "couldNotLoadEnvironment": "No s'ha pogut carregar el teu entorn.",
       "retryLoadingEnvironment": "Torna a provar de carregar l'entorn",
       "defaultEnvironment": "Entorn predeterminat",
+      "environmentAccessibility": "Tria un perfil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Tria un perfil: {{label}}. {{attention}}",
       "leaveChanges": "Deixa els canvis",
       "commitAndPush": "Consigna i envia",
       "startSession": "Inicia la sessió",
@@ -2374,7 +2389,7 @@
       "manageProfiles": "Gestionar perfils",
       "noProfiles": "Encara no hi ha perfils. Creeu-ne un per afegir variables d'entorn, servidors MCP i habilitats.",
       "advancedConfig": "Configuració avançada",
-      "advancedConfigDescription": "Seleccioneu un perfil per carregar configuracions desades i configureu manualment variables d'entorn addicionals i ordres de configuració",
+      "advancedConfigDescription": "S’aplica a aquesta sessió. Desar-ho com a perfil ho conserva per a la propera vegada.",
       "saveAsProfile": "Desa com a perfil",
       "saveProfileDescription": "Deseu les variables d'entorn actuals i configureu les ordres com a perfil reutilitzable.",
       "profileSummary": "{{vars}} variables d'entorn · {{commands}} ordres de configuració",
@@ -2902,10 +2917,10 @@
       "unavailable": "Aquesta sessió no pot rebre sol·licituds de permís."
     },
     "prBadge": {
-      "open": "pR oberta",
+      "open": "PR oberta",
       "closed": "sol·licitud d'integració tancada",
       "merged": "sol·licitud d'integració fusionada",
-      "draft": "pR en esborrany",
+      "draft": "PR en esborrany",
       "updating": "Actualitzant, {{label}} #{{number}}",
       "label": "{{label}} núm. {{number}}"
     },
@@ -3013,7 +3028,9 @@
     "permissionDescription": "No tens permís per veure aquest contingut.",
     "notFoundDescription": "Pot ser que s'hagi eliminat aquest element o que ja no estigui disponible.",
     "serverTitle": "No s'ha pogut carregar.",
-    "serverDescription": "S'ha produït un error al nostre sistema. Torna-ho a provar."
+    "serverDescription": "S'ha produït un error al nostre sistema. Torna-ho a provar.",
+    "timeoutTitle": "El servidor triga massa",
+    "timeoutDescription": "La sol·licitud ha esgotat el temps d'espera. Torna-ho a provar."
   },
   "screenHeader": {
     "openMenu": "Obre el menú",
@@ -3874,7 +3891,9 @@
     "commandsTitle": "Configurar ordres",
     "addCommand": "Afegeix l'ordre",
     "commandLabel": "Comandament",
+    "commandLabelPosition": "Comandament {{position}}",
     "commandPlaceholder": "p. ex. pnpm install",
+    "commandAtLimit": "El comandament està limitat a {{max}} caràcters",
     "commandsEmpty": "Encara no hi ha ordres de configuració",
     "commandsSaveFailed": "No s'han pogut desar les ordres de configuració",
     "moveUp": "Mou cap amunt",
@@ -3892,6 +3911,7 @@
     "skillSaveFailed": "No s'ha pogut estalviar l'habilitat",
     "skillSourceCustom": "Personalitzada",
     "skillSourceMarketplace": "Mercat",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Enganxeu un SKILL.md i el seu nom s'omple; afegeix una habilitat des del teu telèfon sense arrossegar i deixar anar.",
     "skillEditTitle": "Edita l'habilitat",
     "skillEdit": "Edita l'habilitat {{name}}",
@@ -3908,7 +3928,7 @@
       "url": "URL",
       "environment": "Entorn (JSON)",
       "headers": "Capçaleres (JSON)",
-      "timeout": "Temps mort",
+      "timeout": "Temps d'espera",
       "secretCount_one": "{{count}} secret",
       "secretCount_many": "{{count}} secrets",
       "secretCount_other": "{{count}} secrets",
@@ -3919,6 +3939,7 @@
       "headersHint": "Els valors mostrats com a •••• mantenen el seu secret desat; substituïu un valor per rotar-lo. Canviar l'URL requereix tots els valors de nou",
       "nameRequired": "Introduïu un nom de servidor",
       "nameInvalid": "El nom només pot utilitzar lletres ASCII, números, guions baixos i guions, fins a 100 caràcters",
+      "nameConflict": "Ja existeix un servidor amb aquest nom",
       "commandRequired": "Introduïu una ordre",
       "commandTooLong": "Utilitzeu com a màxim 50 arguments de 500 caràcters cadascun",
       "urlRequired": "Introduïu un URL",
@@ -3938,7 +3959,7 @@
       "add": "Afegeix un agent",
       "empty": "Encara no hi ha agents",
       "name": "Nom de l'agent",
-      "slug": "Agent llimac",
+      "slug": "Slug de l'agent",
       "description": "Descripció de l'agent",
       "model": "Anul·lació del model",
       "modelPlaceholder": "Utilitza la sessió predeterminada",
@@ -3963,7 +3984,7 @@
       "saveFailed": "No s'ha pogut desar l'agent",
       "deleteFailed": "No s'ha pogut suprimir l'agent",
       "nameRequired": "Introduïu un nom d'agent",
-      "slugRequired": "Introduïu un llimac d'agent",
+      "slugRequired": "Introduïu un slug d'agent",
       "slugInvalid": "Slug ha de començar amb una lletra ASCII minúscula i utilitzar només lletres ASCII minúscules, dígits i guions, fins a 50 caràcters",
       "slugConflict": "Aquest slug ja l'utilitza un agent integrat o un altre agent d'aquest perfil",
       "edit": "Edita l'agent {{name}}",
@@ -3999,7 +4020,6 @@
       "repo": "Seleccioneu el repositori...",
       "profile": "Seleccioneu el perfil",
       "remove": "Desvincular",
-      "private": "Privat",
       "search": "Cerca repositoris...",
       "addedToast": "Perfil predeterminat definit per a \"{{repo}}\"",
       "addFailed": "No s'ha pogut establir el perfil predeterminat",

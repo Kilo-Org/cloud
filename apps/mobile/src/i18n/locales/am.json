@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "ለውጦች",
-    "organizationTrialEnded": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የድርጅት ባለቤት በkilo.ai ላይ የክፍያ መረጃን ማዘመን ይችላል፣ ከዚያ እንደገና ይሞክሩ።"
+    "organizationTrialEnded": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የድርጅት ባለቤት በkilo.ai ላይ የክፍያ መረጃን ማዘመን ይችላል፣ ከዚያ እንደገና ይሞክሩ።",
+    "privateRepositoryA11y": "{{name}}፣ የግል ማኅደር"
   },
   "language": {
     "restarting": "ቋንቋውን ለመቀየር እንደገና በመጀመር ላይ",
@@ -644,7 +645,12 @@
       "loading": "ገቢ መልእክቶችን በመጫን ላይ",
       "noReviewRequests": "ምንም የግምገማ ጥያቄዎች የሉም",
       "noReviewRequestsDescription": "ግምገማህን የሚጠብቁ የማዋሃድ ጥያቄዎች እዚህ ይታያሉ። ማንኛውንም የPR አገናኝ ከላይ መለጠፍም ትችላለህ።",
-      "couldNotLoad": "ገቢ መልእክቶችን መጫን አልተቻለም።"
+      "couldNotLoad": "ገቢ መልእክቶችን መጫን አልተቻለም።",
+      "accessLostTitle": "ለዚህ ድርጅት የመድረስ ፈቃድ የለህም",
+      "accessLostDescription": "ከዚህ ድርጅት አባል አይደለህም፣ ስለዚህ የግምገማ ጥያቄዎቹን መጫን አይቻልም። ግምገማህን ለመቀጠል በየግል መለያህ ቀጥል።",
+      "organizationUnavailableTitle": "ይህ ድርጅት ከእንግዲህ አይኖርም",
+      "organizationUnavailableDescription": "ይህ ድርጅት ተሰርዟል፣ ስለዚህ የግምገማ ጥያቄዎቹን መጫን አይቻልም። ግምገማህን ለመቀጠል በየግል መለያህ ቀጥል።",
+      "continueInPersonal": "በየግል መለያ ቀጥል"
     },
     "composer": {
       "commentBodyPlaceholder": "አስተያየትህ…",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "PR አልተሳካም",
         "superseded": "አስቀድሞ አለ"
       },
-      "noProposalsDescription": "Kilo የፕሮጀክት ተንከባካቢዎችን ምላሾች ከተነተነ በኋላ የግምገማ ትውስታ ያቀረባቸው ሐሳቦች እዚህ ይታያሉ።"
+      "noProposalsDescription": "Kilo የፕሮጀክት ተንከባካቢዎችን ምላሾች ከተነተነ በኋላ የግምገማ ትውስታ ያቀረባቸው ሐሳቦች እዚህ ይታያሉ።",
+      "changeRequestInProgress": "Kilo ለዚህ ሐሳብ አስቀድሞ pull request በመክፈት ላይ ነው። ከጥቂት ጊዜ በኋላ እንደገና ይሞክሩ።",
+      "changeRequestNotActionable": "ይህ ሐሳብ ከእንግዲህ ማጽደቅ አይቻልም። ይዘጉት እና ዝርዝሩን ያድሱ።",
+      "changeRequestNoGitHubAccess": "ማንኛውም የGitHub ግንኙነት ይህን ማከማቻ ማግኘት አይችልም። GitHubን የዚህ ማከማቻ መዳረሻ ይኖረው ዘንድ እንደገና ያገናኙ፣ ከዚያ እንደገና ይሞክሩ።",
+      "changeRequestMissingPermissions": "የKilo GitHub App በዚህ ማከማቻ ውስጥ pull request መክፈት አይችልም። የማከማቻ ባለቤት ለመተግበሪያው የይዘት እና pull request የመጻፍ መዳረሻ መስጠት አለበት፣ ከዚያ እንደገና ይሞክሩ።",
+      "changeRequestFailed": "Kilo pull request መክፈት አልቻለም። ከጥቂት ጊዜ በኋላ እንደገና ይሞክሩ።",
+      "offAction": "የግምገማ ትውስታ ተሰናክሏል። ያንቁት፣ ከዚያ እንደገና ይሞክሩ።"
     },
     "manualReview": {
       "title": "በተጠቃሚ የሚጀመር ግምገማ",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "ለውጦችን ያስቀምጡ",
+      "saved": "ቅንብሮች ተቀምጠዋል",
       "unsavedTitle": "ያልተቀመጡ ለውጦች",
       "unsavedMessage": "ከዚህ ማያ ገጽ ከመውጣትዎ በፊት ለውጦችዎ ይቀመጡ?",
       "unsavedInvalidMessage": "እነዚህ ለውጦች እስካሁን ሊቀመጡ አይችሉም። ለመቀመጥ ያስተካክሏቸው፣ ወይም ለመውጣት አስወግዷቸው።"
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "የሥራ አካባቢዎን መጫን አልተቻለም።",
       "retryLoadingEnvironment": "የሥራ አካባቢውን ለመጫን እንደገና ይሞክሩ",
       "defaultEnvironment": "ነባሪ የሥራ አካባቢ",
+      "environmentAccessibility": "መገለጫ ይምረጡ፦ {{label}}",
+      "environmentAccessibilityNeedsAttention": "መገለጫ ይምረጡ፦ {{label}}። {{attention}}",
       "leaveChanges": "ለውጦችን ይተዉ",
       "commitAndPush": "መዝግበው ይላኩ",
       "startSession": "ክፍለ ጊዜውን ያስጀምሩ",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "መገለጫዎችን ያስተዳድሩ",
       "noProfiles": "እስካሁን ምንም መገለጫዎች የሉም። የአካባቢ ተለዋዋጮችን፣ MCP አገልጋዮችን እና ክህሎቶችን ለመጨመር አንድ ይፍጠሩ።",
       "advancedConfig": "የላቀ ውቅር",
-      "advancedConfigDescription": "የተቀመጡ ውቅሮችን ለመጫን መገለጫ ይምረጡ እና ተጨማሪ የአካባቢ ተለዋዋጮችን እና የማዋቀር ትዕዛዞችን በእጅ ያዋቅሩ",
+      "advancedConfigDescription": "ለዚህ ክፍለ ጊዜ ብቻ ነው። እንደ መገለጫ ካስቀመጥከው ለሚቀጥለው ጊዜ ይቆያል።",
       "saveAsProfile": "እንደ መገለጫ አስቀምጥ",
       "saveProfileDescription": "የአሁኑን የአካባቢ ተለዋዋጮች እና የማዋቀር ትዕዛዞችን እንደ እንደገና ጥቅም ላይ ሊውል የሚችል መገለጫ ያስቀምጡ።",
       "profileSummary": "{{vars}} የአካባቢ ተለዋዋጮች · {{commands}} የማዋቀር ትዕዛዞች",
@@ -2971,7 +2986,9 @@
     "permissionDescription": "ይህን ለማየት ፈቃድ የለህም።",
     "notFoundDescription": "ይህ ንጥል ተወግዶ ሊሆን ይችላል፣ ወይም ከእንግዲህ አይገኝም።",
     "serverTitle": "መጫን አልተቻለም።",
-    "serverDescription": "በእኛ በኩል የሆነ ችግር ተከስቷል። እባክዎ እንደገና ይሞክሩ።"
+    "serverDescription": "በእኛ በኩል የሆነ ችግር ተከስቷል። እባክዎ እንደገና ይሞክሩ።",
+    "timeoutTitle": "ሰርቨሩ በጣም እየዘገየ ነው",
+    "timeoutDescription": "ጥያቄው ከመጠናቀቁ በፊት ጊዜው አልቋል። እባክዎ እንደገና ይሞክሩ።"
   },
   "screenHeader": {
     "openMenu": "ምናሌ ይክፈቱ",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "ማዋቀር ትዕዛዞች",
     "addCommand": "ትዕዛዝ ጨምር",
     "commandLabel": "ትዕዛዝ",
+    "commandLabelPosition": "ትዕዛዝ {{position}}",
     "commandPlaceholder": "ለምሳሌ pnpm install",
+    "commandAtLimit": "ትዕዛዙ በ{{max}} ቁምፊዎች የተገደበ ነው",
     "commandsEmpty": "እስካሁን ምንም የማዋቀር ትዕዛዞች የሉም",
     "commandsSaveFailed": "የማዋቀር ትዕዛዞችን ማስቀመጥ አልተቻለም",
     "moveUp": "ወደ ላይ ተንቀሳቀስ",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "ችሎታ ማዳን አልተቻለም",
     "skillSourceCustom": "ብጁ",
     "skillSourceMarketplace": "መደብር",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md ይለጥፉ እና ስሙ ይሞላል; ሳይጎትቱ እና መጣል ሳይኖር ከስልክዎ ላይ ችሎታ ይጨምሩ።",
     "skillEditTitle": "ችሎታን ያርትዑ",
     "skillEdit": "ችሎታ {{name}} ያርትዑ",
@@ -3856,9 +3876,9 @@
       "remoteType": "የርቀት",
       "command": "የትእዛዝ መስመር",
       "url": "URL",
-      "environment": "አካባቢ (JSON)",
+      "environment": "የአካባቢ ተለዋዋጮች (JSON)",
       "headers": "ራስጌዎች (JSON)",
-      "timeout": "ጊዜው አልቋል",
+      "timeout": "የጊዜ ገደብ",
       "secretCount_one": "{{count}} ሚስጥር",
       "secretCount_other": "{{count}} ሚስጥሮች",
       "namePlaceholder": "my-server",
@@ -3868,6 +3888,7 @@
       "headersHint": "እንደ •••• የሚታዩ እሴቶች የተከማቸውን ሚስጥራቸውን ይይዛሉ፤ ሚስጥሩን ለማሽከረከር እሴቱን በአዲስ ይተኩ። URLን መቀየር ሁሉንም እሴቶች እንደገና ያስፈልጋል",
       "nameRequired": "የአገልጋይ ስም አስገባ",
       "nameInvalid": "ስም የASCII ፊደላትን፣ አሃዞችን፣ የስር መስመሮችን እና ሰረዞችን ብቻ መጠቀም ይችላል፣ እስከ 100 ቁምፊዎች።",
+      "nameConflict": "በዚህ ስም የተሰየመ አገልጋይ አስቀድሞ አለ",
       "commandRequired": "ትእዛዝ አስገባ",
       "commandTooLong": "ቢበዛ 50 አርጉመንቶችን ይጠቀሙ፣ እያንዳንዱ 500 ቁምፊ",
       "urlRequired": "URL አስገባ",
@@ -3875,7 +3896,7 @@
       "urlTooLong": "URL 2048 ቁምፊ ወይም ከዚያ ያነሰ መሆን አለበት",
       "jsonInvalid": "የሚሰራ JSON ያስገቡ - የሕብረቁምፊ እሴቶች ነገር",
       "jsonTooLarge": "ቢበዛ 50 ግቤቶችን ይጠቀሙ፣ ቁልፎች እስከ 128 እና እሴቶች እስከ 4096 ቁምፊ",
-      "timeoutInvalid": "ጊዜው ያለፈበት ሙሉ የሚሊሰከንዶች ቁጥር መሆን አለበት።",
+      "timeoutInvalid": "የጊዜ ገደቡ ሙሉ የሚሊሰከንዶች ቁጥር መሆን አለበት።",
       "edit": "MCP አገልጋይ {{name}} ያርትዑ",
       "delete": "MCP አገልጋይ {{name}} ሰርዝ",
       "saveFailed": "የMCP አገልጋይን ማስቀመጥ አልተቻለም",
@@ -3887,7 +3908,7 @@
       "add": "ወኪል ያክሉ",
       "empty": "እስካሁን ምንም ወኪሎች የሉም",
       "name": "የወኪል ስም",
-      "slug": "ወኪል ስሉክ",
+      "slug": "ወኪል ስሉግ",
       "description": "የወኪል መግለጫ",
       "model": "ሞዴል መሻር",
       "modelPlaceholder": "የክፍለ ጊዜ ነባሪ ተጠቀም",
@@ -3912,7 +3933,7 @@
       "saveFailed": "ወኪል ማስቀመጥ አልተቻለም",
       "deleteFailed": "ወኪል ማጥፋት አልተቻለም",
       "nameRequired": "የወኪል ስም አስገባ",
-      "slugRequired": "የወኪል ማሰሪያ አስገባ",
+      "slugRequired": "ወኪል ስሉግ አስገባ",
       "slugInvalid": "ስሉግ በትንንሽ ASCII ፊደል መጀመር እና በትንንሽ ASCII ሆሄያት፣ አሃዞች እና ሰረዞች ብቻ መጠቀም አለበት፣ እስከ 50 ቁምፊዎች።",
       "slugConflict": "ያ ስሉግ በአንድ አብሮ በተሰራ ወኪል ወይም በሌላ ወኪል በዚህ መገለጫ ውስጥ ጥቅም ላይ ውሏል።",
       "edit": "ወኪል {{name}} ያርትዑ",
@@ -3948,7 +3969,6 @@
       "repo": "ማከማቻ ምረጥ…",
       "profile": "መገለጫ ይምረጡ",
       "remove": "ንቀል",
-      "private": "የግል",
       "search": "ማከማቻዎችን ፈልግ…",
       "addedToast": "ለ\"{{repo}}\" ነባሪ መገለጫ ተቀናብሯል",
       "addFailed": "ነባሪ መገለጫ ማዘጋጀት አልተቻለም",

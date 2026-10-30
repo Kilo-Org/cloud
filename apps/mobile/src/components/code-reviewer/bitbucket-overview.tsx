@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -11,7 +11,7 @@ import {
   buildOverviewRows,
   resolveRowOnPress,
 } from '@/components/code-reviewer/platform-overview-rows';
-import { useSinglePushRoute } from '@/components/code-reviewer/use-single-push-route';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -209,7 +209,7 @@ export function BitbucketOverview({
                       (!canEnableAutoReview && !config.data.isEnabled)
                     }
                     onValueChange={value => {
-                      void Haptics.selectionAsync();
+                      selectionHaptic();
                       toggle.mutate({ isEnabled: value });
                     }}
                   />

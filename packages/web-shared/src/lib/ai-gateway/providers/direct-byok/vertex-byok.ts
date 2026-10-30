@@ -1,7 +1,8 @@
 import type * as z from 'zod';
 import { DirectByokModelEndpointSchema } from '@kilocode/db/schema-types';
-import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/thinking-block-binding';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import { DirectVertexCredentialsSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type {
@@ -244,6 +245,7 @@ export default {
   transformRequest(context) {
     const { request } = context;
     if (request.kind === 'messages') {
+      dropThinkingBlocksOnPrefixMismatch(context);
       // rawPredict takes the model from the URL and the API version from the body.
       Reflect.deleteProperty(request.body, 'model');
       Reflect.set(request.body, 'anthropic_version', VERTEX_ANTHROPIC_VERSION);

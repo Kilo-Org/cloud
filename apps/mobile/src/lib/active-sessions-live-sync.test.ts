@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  acceptScope,
   ActiveSessionsLiveSync,
   deferred,
   makeCached,
@@ -76,6 +77,7 @@ describe('ActiveSessionsLiveSync — attach / detach', () => {
       queryFn: makeQueryFn(),
     });
     const detach = sync.attach();
+    await acceptScope(qc, sync, { sessions: [current] });
     const published: string[][] = [];
     qc.getQueryCache().subscribe(event => {
       if (event.type === 'updated' && event.action.type === 'success') {
@@ -103,7 +105,7 @@ describe('ActiveSessionsLiveSync — attach / detach', () => {
     await new Promise<void>(resolve => {
       setTimeout(resolve, 0);
     });
-    expect(qc.cancelQueriesCalls).toBe(1);
+    expect(qc.cancelQueriesCalls).toBe(2);
 
     detach();
     sync.attach();

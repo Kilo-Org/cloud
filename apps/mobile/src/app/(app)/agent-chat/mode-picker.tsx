@@ -1,5 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Check } from '@/components/ui/icons';
 import { useState } from 'react';
@@ -43,7 +43,7 @@ export default function ModePickerScreen() {
   const [bridge] = useState(() => modePickerSlot.get(routeKey));
 
   function handleSelect(mode: AgentMode) {
-    void Haptics.selectionAsync();
+    selectionHaptic();
     bridge?.onSelect(mode);
     modePickerSlot.clear(routeKey);
     router.back();

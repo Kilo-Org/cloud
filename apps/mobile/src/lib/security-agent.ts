@@ -1,10 +1,16 @@
-import { isActiveSecurityCommand } from '@kilocode/app-shared/security-agent';
+import {
+  isActiveSecurityCommand,
+  isPersonalSecurityScope,
+} from '@kilocode/app-shared/security-agent';
 import {
   type inferRouterInputs,
   type inferRouterOutputs,
   type MobileRouter,
 } from '@kilocode/trpc/mobile';
 import { type Href } from 'expo-router';
+import { z } from 'zod';
+
+import { parseParam } from '@/lib/route-params';
 
 type RouterInputs = inferRouterInputs<MobileRouter>;
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
@@ -27,6 +33,30 @@ export type SecurityCommandBatch = RouterOutputs['securityAgent']['getCommandSta
 export function getSecurityAgentPath(scope: string, suffix = ''): Href {
   const path = `/(app)/security-agent/${scope}`;
   return (suffix ? `${path}/${suffix}` : path) as Href;
+}
+
+const ORGANIZATION_SCOPE_SCHEMA = z.uuid();
+
+/**
+ * Runtime validation for the `[scope]` segment shared by every Security Agent
+ * route. `parseParam` alone accepts any non-empty segment, and every read
+ * branches on `isPersonalSecurityScope`, so an unrecognized segment falls
+ * through to the organization procedures carrying a non-uuid owner id: the
+ * server rejects it, and the screens render a load failure whose Retry can
+ * never succeed. That state is reachable without a hand-built link — a
+ * navigation that lost its param serializes it as the literal `undefined`.
+ *
+ * A scope is the personal scope or an organization id.
+ */
+export function parseSecurityScope(rawScope: string | string[] | undefined): string | null {
+  const scope = parseParam(rawScope);
+  if (scope === null) {
+    return null;
+  }
+  if (isPersonalSecurityScope(scope)) {
+    return scope;
+  }
+  return ORGANIZATION_SCOPE_SCHEMA.safeParse(scope).success ? scope : null;
 }
 
 // The server batch procedure is bounded to 100 ids. The recovery source is

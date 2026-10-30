@@ -16,6 +16,7 @@ import { Brain } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useReviewerPermission, useSetReviewMemoryEnabled } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { reviewMemoryOwnerInput } from '@/lib/hooks/use-review-memory';
@@ -25,6 +26,7 @@ import {
   type ReviewMemoryProposal,
 } from '@/lib/review-memory-proposals';
 import { useTRPC } from '@/lib/trpc';
+import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 
 const PAGE_SIZE = 20;
 
@@ -81,6 +83,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
         <Button
           size="sm"
           variant="outline"
+          className={STATE_ACTION_CLASS}
           onPress={() => void proposalsQuery.fetchNextPage()}
           accessibilityLabel={t('common.retryLoadingMore')}
         >
@@ -115,9 +118,11 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   } else if (summaryError) {
     body = (
       <QueryError
-        variant="server"
+        variant={trpcErrorVariant(summaryQuery.error)}
         title={t('codeReviewer.reviewMemory.couldNotLoad')}
-        onRetry={() => void summaryQuery.refetch()}
+        onRetry={
+          isRetryableTrpcError(summaryQuery.error) ? () => void summaryQuery.refetch() : undefined
+        }
         isRetrying={summaryQuery.isFetching}
       />
     );
@@ -152,9 +157,13 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   } else if (firstPageError) {
     body = (
       <QueryError
-        variant="server"
+        variant={trpcErrorVariant(proposalsQuery.error)}
         title={t('codeReviewer.reviewMemory.couldNotLoadProposals')}
-        onRetry={() => void proposalsQuery.refetch()}
+        onRetry={
+          isRetryableTrpcError(proposalsQuery.error)
+            ? () => void proposalsQuery.refetch()
+            : undefined
+        }
         isRetrying={proposalsQuery.isFetching}
       />
     );

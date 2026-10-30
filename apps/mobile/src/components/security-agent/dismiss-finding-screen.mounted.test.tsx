@@ -40,6 +40,10 @@ const SERVICE_UNAVAILABLE_COPY = vi.hoisted(
 );
 
 const routerBack = vi.hoisted(() => vi.fn());
+type MockedFinding = Pick<
+  SecurityFinding,
+  'status' | 'title' | 'repo_full_name' | 'package_name' | 'package_ecosystem'
+>;
 const dismiss = vi.hoisted(() => ({
   mutate: vi.fn(),
   isPending: false,
@@ -59,7 +63,7 @@ const finding = vi.hoisted(() => ({
   isFetching: false,
   isError: false,
   error: null as unknown,
-  data: undefined as Pick<SecurityFinding, 'status'> | undefined,
+  data: undefined as MockedFinding | undefined,
   refetch: vi.fn(),
 }));
 const pillGroup = vi.hoisted(() => ({
@@ -116,6 +120,15 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
 
+// The identity the sheet must name: one title, one repository, one package, so
+// a user can tell this dismissal from the next.
+const FINDING_IDENTITY = {
+  title: 'ReDoS in payments SDK',
+  repo_full_name: 'acme/payments-sdk',
+  package_name: 'payments-sdk',
+  package_ecosystem: 'npm',
+} as const;
+
 function renderScreen(): R {
   const ref: { current: R | undefined } = { current: undefined };
   act(() => {
@@ -154,13 +167,13 @@ function buttonDisabled(root: I): boolean | undefined {
 
 function renderedTexts(root: I): string[] {
   return root
-    .findAll(
-      n =>
-        typeof n.type === 'string' &&
-        (n.type as string) === 'Text' &&
-        typeof n.props.children === 'string'
-    )
-    .map(n => n.props.children as string);
+    .findAll(n => typeof n.type === 'string' && (n.type as string) === 'Text')
+    .map(n => {
+      const children: unknown = n.props.children;
+      const parts = Array.isArray(children) ? (children as unknown[]) : [children];
+      return parts.every(part => typeof part === 'string') ? (parts as string[]).join('') : null;
+    })
+    .filter((text): text is string => text !== null);
 }
 
 function findCommentInput(root: I): I {
@@ -188,12 +201,22 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     finding.isFetching = false;
     finding.isError = false;
     finding.error = null;
-    finding.data = { status: 'open' };
+    finding.data = { status: 'open', ...FINDING_IDENTITY };
     finding.refetch.mockReset();
     dismissDraft.draft = null;
     dismissDraft.hydrated = true;
     dismissDraft.persist.mockClear();
     dismissDraft.clear.mockClear();
+  });
+
+  it('names the finding it dismisses above the reason group', () => {
+    const tree = renderScreen();
+    const texts = renderedTexts(tree.root);
+    expect(texts).toContain(FINDING_IDENTITY.title);
+    expect(texts).toContain(FINDING_IDENTITY.repo_full_name);
+    expect(texts).toContain(
+      `${FINDING_IDENTITY.package_name} (${FINDING_IDENTITY.package_ecosystem})`
+    );
   });
 
   it.each(['finding', 'permissions'] as const)(
@@ -273,7 +296,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       capability.status = status;
       capability.canManage = status === 'allowed';
       capability.isError = true;
-      finding.data = { status: findingStatus };
+      finding.data = { status: findingStatus, ...FINDING_IDENTITY };
       finding.isError = true;
       finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
       const tree = renderScreen();

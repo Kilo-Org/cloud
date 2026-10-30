@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { KeyRound } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
-import { useAgentProfile, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
+import { useAgentProfileMutations, useAgentProfileVars } from '@/lib/hooks/use-agent-profiles';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 
@@ -59,12 +59,11 @@ export function ProfileVariablesScreen({
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
-  const profileQuery = useAgentProfile(profileId, organizationId);
+  const varsQuery = useAgentProfileVars(profileId, organizationId);
   const { setVar, deleteVar } = useAgentProfileMutations(organizationId);
   const canManage = useCanManageOrganizationProfiles(organizationId);
 
-  const profile = profileQuery.data;
-  const serverVars: readonly ProfileVarSource[] = profile?.vars ?? NO_VARS;
+  const serverVars: readonly ProfileVarSource[] = varsQuery.data ?? NO_VARS;
   // The screen owns the list so a saved edit shows immediately; the sync below
   // swaps in the server's copy whenever a refetch lands, so the list never
   // blanks and never drifts from server truth.
@@ -151,17 +150,17 @@ export function ProfileVariablesScreen({
   );
 
   let content: ReactNode = null;
-  if (profileQuery.isError) {
+  if (varsQuery.isError) {
     content = (
       <QueryError
         variant="server"
         placement="top"
         title={t('profiles.loadFailed')}
-        onRetry={() => void profileQuery.refetch()}
-        isRetrying={profileQuery.isRefetching}
+        onRetry={() => void varsQuery.refetch()}
+        isRetrying={varsQuery.isRefetching}
       />
     );
-  } else if (profileQuery.isPending) {
+  } else if (varsQuery.isPending) {
     content = <VariablesSkeleton />;
   } else if (rows.length === 0 && !isAdding) {
     content = (

@@ -1,6 +1,5 @@
 import { PERSONAL_SECURITY_SCOPE } from '@kilocode/app-shared/security-agent';
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
 import { Building2, User } from '@/components/ui/icons';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -10,13 +9,14 @@ import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
 // Diverges from the Code Reviewer scope list: current server policy allows
 // org members to operate Security Agent, so members are not labeled "View only".
 export function ScopeListScreen() {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const trpc = useTRPC();
   const { t } = useTranslation();
   const {
@@ -28,7 +28,7 @@ export function ScopeListScreen() {
   } = useQuery(trpc.organizations.list.queryOptions());
 
   const openScope = (scope: string) => {
-    router.push(getSecurityAgentPath(scope));
+    pushOnce(getSecurityAgentPath(scope));
   };
 
   // An org-list failure only degrades the organization section — the

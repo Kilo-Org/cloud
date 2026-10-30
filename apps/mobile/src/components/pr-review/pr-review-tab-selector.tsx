@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -63,7 +63,7 @@ export function PrReviewTabSelector({
               if (active) {
                 return;
               }
-              void Haptics.selectionAsync();
+              selectionHaptic();
               onChange(tab.id);
             }}
             className={cn(

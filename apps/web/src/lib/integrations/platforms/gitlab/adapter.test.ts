@@ -13,6 +13,7 @@ import { lookup } from 'dns/promises';
 import { EventEmitter } from 'events';
 import * as https from 'https';
 import { PassThrough } from 'stream';
+import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants';
 import {
   buildGitLabOAuthUrl,
   exchangeGitLabOAuthCode,
@@ -40,6 +41,7 @@ import {
   revokeProjectAccessToken,
   updateProjectWebhook,
   fetchMRInlineComments,
+  MAX_MR_NOTE_BODY_BYTES,
 } from './adapter';
 
 // Mock fetch globally
@@ -1579,7 +1581,12 @@ describe('fetchMRInlineComments authorship', () => {
 
     const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
 
-    expect(comments.map(c => [c.id, c.authoredByKilo, c.user.username])).toEqual([
+    // Comments come back newest first, so compare by note id rather than arrival order.
+    expect(
+      comments
+        .map(c => [c.id, c.authoredByKilo, c.user.username] as [number, boolean, string])
+        .sort((left, right) => left[0] - right[0])
+    ).toEqual([
       [1, true, 'project_42_bot'],
       [2, false, 'contributor'],
     ]);
@@ -1633,5 +1640,253 @@ describe('fetchMRInlineComments authorship', () => {
         user: { username: 'project_42_bot' },
       }),
     ]);
+  });
+});
+
+const TOKEN_USER_ID = 42;
+
+function discussionPage(page: number, body: string) {
+  return Array.from({ length: 100 }, (_, index) =>
+    discussionWithNote({
+      discussionId: `d${page}-${index}`,
+      noteId: page * 100 + index,
+      authorId: 300,
+      authorUsername: 'contributor',
+      body,
+    })
+  );
+}
+
+/**
+ * Answers every merge-request discussion page with a full page of one body and reports
+ * `totalPages`, so only the retained-byte budget can end the read.
+ */
+function mockEndlessDiscussionPages(body: string, totalPages: number) {
+  mockFetch.mockImplementation(async (url: string) => {
+    if (url.endsWith('/api/v4/user')) {
+      return {
+        ok: true,
+        json: async () => ({ id: TOKEN_USER_ID, username: 'project_42_bot' }),
+        headers: { get: () => null },
+      };
+    }
+    const page = Number(new URL(url).searchParams.get('page') ?? '1');
+    return {
+      ok: true,
+      json: async () => discussionPage(page, body),
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'x-total-pages' ? String(totalPages) : null),
+      },
+    };
+  });
+}
+
+function discussionFetchCount() {
+  return mockFetch.mock.calls.filter(([url]) => String(url).includes('/discussions')).length;
+}
+
+function requestedDiscussionPages() {
+  return mockFetch.mock.calls
+    .map(([url]) => String(url))
+    .filter(url => url.includes('/discussions'))
+    .map(url => Number(new URL(url).searchParams.get('page') ?? '1'));
+}
+
+describe('merge request note reads', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('keeps the retained inline note text within the read budget', async () => {
+    const body = 'y'.repeat(200);
+    mockEndlessDiscussionPages(body, 100);
+    const expectedNotes = Math.ceil(MAX_MR_NOTE_BODY_BYTES / Buffer.byteLength(body));
+    const pagesRead = Math.ceil(expectedNotes / 100);
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    const totalBytes = comments.reduce((sum, c) => sum + Buffer.byteLength(c.body), 0);
+    expect(comments).toHaveLength(expectedNotes);
+    expect(totalBytes).toBeGreaterThanOrEqual(MAX_MR_NOTE_BODY_BYTES);
+    // One page reports the page count, then the read walks back from the newest page.
+    expect(discussionFetchCount()).toBe(pagesRead + 1);
+    expect(requestedDiscussionPages()).toEqual([
+      1,
+      ...Array.from({ length: pagesRead }, (_, index) => 100 - index),
+    ]);
+  });
+
+  it('ends a multi-byte inline note read before the page bound', async () => {
+    const body = '漢'.repeat(MAX_INLINE_COMMENT_BODY_CHARS + 100);
+    const bytesPerStoredBody = Buffer.byteLength(body.slice(0, MAX_INLINE_COMMENT_BODY_CHARS));
+    expect(bytesPerStoredBody).toBe(MAX_INLINE_COMMENT_BODY_CHARS * 3);
+    mockEndlessDiscussionPages(body, 100);
+    const expectedNotes = Math.ceil(MAX_MR_NOTE_BODY_BYTES / bytesPerStoredBody);
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments).toHaveLength(expectedNotes);
+    expect(discussionFetchCount()).toBe(Math.ceil(expectedNotes / 100) + 1);
+    expect(comments.every(c => c.body.length === MAX_INLINE_COMMENT_BODY_CHARS)).toBe(true);
+  });
+
+  it('keeps the newest inline notes when the budget ends the read', async () => {
+    const body = 'y'.repeat(MAX_INLINE_COMMENT_BODY_CHARS);
+    const bytesPerPage = 100 * Buffer.byteLength(body);
+    const totalPages = 12;
+    const pagesConsumed = Math.ceil(MAX_MR_NOTE_BODY_BYTES / bytesPerPage);
+    const oldestKeptPage = totalPages - pagesConsumed + 1;
+    expect(oldestKeptPage).toBeGreaterThan(1);
+    mockEndlessDiscussionPages(body, totalPages);
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments[0].id).toBe(totalPages * 100 + 99);
+    expect(comments.every(c => c.id >= oldestKeptPage * 100)).toBe(true);
+    // The oldest pages are dropped, and the read never walks back into them.
+    expect(requestedDiscussionPages().slice(1)).not.toContain(oldestKeptPage - 1);
+  });
+
+  it('returns inline comments newest first', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          discussionWithNote({
+            discussionId: 'd1',
+            noteId: 1,
+            authorId: 300,
+            authorUsername: 'contributor',
+            body: 'oldest comment',
+          }),
+          discussionWithNote({
+            discussionId: 'd2',
+            noteId: 2,
+            authorId: 300,
+            authorUsername: 'contributor',
+            body: 'middle comment',
+          }),
+          discussionWithNote({
+            discussionId: 'd3',
+            noteId: 3,
+            authorId: 300,
+            authorUsername: 'contributor',
+            body: 'newest comment',
+          }),
+        ],
+        headers: { get: () => null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: TOKEN_USER_ID, username: 'project_42_bot' }),
+        headers: { get: () => null },
+      });
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments.map(c => c.body)).toEqual([
+      'newest comment',
+      'middle comment',
+      'oldest comment',
+    ]);
+  });
+
+  it('stores each inline note body at the rendered length', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          discussionWithNote({
+            discussionId: 'd1',
+            noteId: 5,
+            authorId: 300,
+            authorUsername: 'contributor',
+            body: 'z'.repeat(MAX_INLINE_COMMENT_BODY_CHARS + 40) + '\nsecond line',
+          }),
+        ],
+        headers: { get: () => null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: TOKEN_USER_ID, username: 'project_42_bot' }),
+        headers: { get: () => null },
+      });
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments[0].body).toBe('z'.repeat(MAX_INLINE_COMMENT_BODY_CHARS));
+  });
+
+  it('does not count other accounts note text against the read budget', async () => {
+    mockTokenUser();
+    mockNotePageOf(
+      Array.from({ length: 100 }, (_, index) =>
+        makeNote({ id: 1000 + index, body: 'w'.repeat(10_000), authorId: 77 })
+      ),
+      2
+    );
+    mockNotePage([makeNote({ id: 2000, body: 'summary <!-- kilo-review -->', authorId: 42 })]);
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toEqual({ noteId: 2000, body: 'summary <!-- kilo-review -->' });
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns the summary note body whole for the provider update', async () => {
+    const body = `${'s'.repeat(MAX_INLINE_COMMENT_BODY_CHARS * 2)}<!-- kilo-review -->`;
+    mockTokenUser();
+    mockNotePage([makeNote({ id: 3000, body, authorId: 42 })]);
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toEqual({ noteId: 3000, body });
+  });
+
+  it('stops a summary note read once the retained bodies reach the budget', async () => {
+    const body = `${'s'.repeat(6000)}<!-- kilo-review -->`;
+    const keptNotes = Math.ceil(MAX_MR_NOTE_BODY_BYTES / Buffer.byteLength(body));
+    mockTokenUser();
+    mockNotePageOf(
+      Array.from({ length: 100 }, (_, index) =>
+        makeNote({
+          id: 4000 + index,
+          body,
+          authorId: 42,
+          updated_at: `2026-02-01T00:${String(Math.floor(index / 60)).padStart(2, '0')}:${String(
+            index % 60
+          ).padStart(2, '0')}Z`,
+        })
+      ),
+      2
+    );
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toEqual({ noteId: 4000 + keptNotes - 1, body });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('still refuses a note listing beyond the page bound', async () => {
+    mockTokenUser();
+    mockNotePageOf([makeNote({ id: 5000, body: 'note', authorId: 77 })], 101);
+
+    await expect(findKiloReviewNote('test-token', 'group/project', 7)).rejects.toThrow(
+      'GitLab pagination limit exceeded: MR note listing returned more than 100 pages'
+    );
+  });
+
+  it('still refuses a discussion listing beyond the page bound', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => discussionPage(1, 'comment body'),
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'x-total-pages' ? '101' : null),
+      },
+    });
+
+    await expect(fetchMRInlineComments('prat-token', 'group/project', 10)).rejects.toThrow(
+      'GitLab pagination limit exceeded: MR discussion listing returned more than 100 pages'
+    );
   });
 });

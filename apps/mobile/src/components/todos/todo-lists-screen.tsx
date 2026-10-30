@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -94,7 +95,7 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
           .query(trpc.todos.items.list.queryOptions({ listId: list.id }))
           .catch(() => null);
         const deleteList = () => {
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          notificationHaptic(Haptics.NotificationFeedbackType.Success);
           remove.mutate({ id: list.id });
         };
         if (items?.length === 0) {
@@ -165,7 +166,7 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
             if (fromIndex === toIndex) {
               return;
             }
-            void Haptics.selectionAsync();
+            selectionHaptic();
             move.mutate({
               id: key,
               beforeId: data[toIndex - 1]?.id ?? null,

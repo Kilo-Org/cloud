@@ -3,7 +3,7 @@ import type {
   GatewayRequest,
   GatewayResponsesRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { applyAnthropicModelSettings } from './anthropic';
+import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/model-settings';
 
 const VALID_ID = /^[a-zA-Z0-9_-]{1,128}$/;
 

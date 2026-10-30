@@ -172,6 +172,9 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'profiles.agents.topP',
   'profiles.slashCommands.namePlaceholder',
   'profiles.slashCommands.agentPlaceholder',
+  // The skills.sh source label. It names the published site the skill is
+  // installed from, so every catalog keeps the site's own spelling.
+  'profiles.skillSourceSkillsSh',
   // The MCP count label. `MCP` is the protocol's own acronym, so every catalog
   // keeps the same "{{count}} MCP" the MCP-server rows use.
   'profiles.counts.mcp',
@@ -297,6 +300,29 @@ function checkVisibilitySeparators(values, label) {
 function checkAgentEditorCopy(values, english, label) {
   checkVisibilitySeparators(values, label);
   checkVerbatimLabels(values, english, label);
+}
+
+/**
+ * The pull-request term keeps its capital: the acronym is `PR` in any
+ * position, and a hyphenating language writes it `Pull-Request`. A translation
+ * batch lowercased the first letter of both, so 42 catalogs read "pR" or
+ * "pull-Request" wherever the term reaches a sentence. `common.pullRequest`
+ * supplies `{{requestNoun}}` in the manual-review start failures, so the
+ * damage surfaces inside an otherwise translated sentence.
+ */
+const MISCASED_PULL_REQUEST_TERM =
+  /(?<![A-Za-zÀ-ÿ])pR(?![A-Za-zÀ-ÿ])|(?<![A-Za-zÀ-ÿ])pull-Request(?![A-Za-zÀ-ÿ])/;
+
+/** Reject the miscased pull-request term, in English and in every locale. */
+function checkPullRequestTerm(values, label) {
+  for (const [key, value] of values) {
+    const miscased = MISCASED_PULL_REQUEST_TERM.exec(value);
+    if (miscased) {
+      fail(
+        `${label}: "${key}" writes the pull-request term "${miscased[0]}"; write "PR" or "Pull-Request"`
+      );
+    }
+  }
 }
 
 /** The `{{token}}` set of one string, as a sorted, counted signature. */
@@ -700,6 +726,7 @@ for (const catalog of CATALOGS) {
   }
 
   checkAgentEditorCopy(english, english, `${catalog.name}/en`);
+  checkPullRequestTerm(english, `${catalog.name}/en`);
 
   const localeValues = new Map();
 
@@ -711,6 +738,7 @@ for (const catalog of CATALOGS) {
     const translated = flatten(parseCatalog(join(catalog.dir, `${tag}.json`), label));
     localeValues.set(tag, translated);
     checkAgentEditorCopy(translated, english, label);
+    checkPullRequestTerm(translated, label);
     const ownValues = new Set(translated.values());
 
     // A locale-driven plural family: the English base interpolates {{count}}

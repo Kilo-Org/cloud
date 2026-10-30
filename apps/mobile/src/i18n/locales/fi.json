@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Muutokset",
-    "organizationTrialEnded": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Organisaation omistaja voi päivittää laskutuksen osoitteessa kilo.ai ja yrittää sitten uudelleen."
+    "organizationTrialEnded": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Organisaation omistaja voi päivittää laskutuksen osoitteessa kilo.ai ja yrittää sitten uudelleen.",
+    "privateRepositoryA11y": "{{name}}, yksityinen tietovarasto"
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -644,7 +645,12 @@
       "loading": "Ladataan saapuneita",
       "noReviewRequests": "Ei katselmointipyyntöjä",
       "noReviewRequestsDescription": "Katselmointiasi odottavat muutospyynnöt näkyvät tässä. Voit myös liittää minkä tahansa PR-linkin yllä olevaan kenttään.",
-      "couldNotLoad": "Saapuneita ei voitu ladata"
+      "couldNotLoad": "Saapuneita ei voitu ladata",
+      "accessLostTitle": "Ei pääsyä tähän organisaatioon",
+      "accessLostDescription": "Et ole enää tämän organisaation jäsen, joten sen katselmointipyyntöjä ei voi ladata. Jatka henkilökohtaisessa tilissäsi jatkaaksesi katselmointia.",
+      "organizationUnavailableTitle": "Tämä organisaatio ei ole enää olemassa",
+      "organizationUnavailableDescription": "Tämä organisaatio poistettiin, joten sen katselmointipyyntöjä ei voi ladata. Jatka henkilökohtaisessa tilissäsi jatkaaksesi katselmointia.",
+      "continueInPersonal": "Jatka henkilökohtaisessa tilissä"
     },
     "composer": {
       "commentBodyPlaceholder": "Jätä kommentti",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "PR:n avaaminen epäonnistui",
         "superseded": "Jo olemassa"
       },
-      "noProposalsDescription": "Katselmointimuistin ehdotukset näkyvät tässä, kun Kilo on analysoinut ylläpitäjien vastaukset."
+      "noProposalsDescription": "Katselmointimuistin ehdotukset näkyvät tässä, kun Kilo on analysoinut ylläpitäjien vastaukset.",
+      "changeRequestInProgress": "Kilo on jo avaamassa pull requestia tälle ehdotukselle. Yritä uudelleen hetken kuluttua.",
+      "changeRequestNotActionable": "Tätä ehdotusta ei voi enää hyväksyä. Sulje se ja päivitä lista.",
+      "changeRequestNoGitHubAccess": "Yhdelläkään GitHub-yhteydellä ei ole pääsyä tähän repositorioon. Yhdistä GitHub uudelleen niin, että sillä on pääsy siihen, ja yritä sitten uudelleen.",
+      "changeRequestMissingPermissions": "Kilon GitHub-sovellus ei voi avata pull requesteja tässä repositoriossa. Repositorion omistajan on myönnettävä sovellukselle kirjoitusoikeus sisältöihin ja pull requesteihin, ja yritä sitten uudelleen.",
+      "changeRequestFailed": "Kilo ei voinut avata pull requestia. Yritä uudelleen hetken kuluttua.",
+      "offAction": "Katselmointimuisti on pois käytöstä. Ota se käyttöön ja yritä uudelleen."
     },
     "manualReview": {
       "title": "Manuaalinen katselmointi",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Tallenna muutokset",
+      "saved": "Asetukset tallennettu",
       "unsavedTitle": "Tallentamattomia muutoksia",
       "unsavedMessage": "Tallennetaanko muutokset ennen tältä näytöltä poistumista?",
       "unsavedInvalidMessage": "Näitä muutoksia ei voi vielä tallentaa. Korjaa ne tallentaaksesi tai hylkää ne poistuaksesi."
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "Ympäristöäsi ei voitu ladata.",
       "retryLoadingEnvironment": "Yritä ladata ympäristö uudelleen",
       "defaultEnvironment": "Oletusympäristö",
+      "environmentAccessibility": "Valitse profiili: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Valitse profiili: {{label}}. {{attention}}",
       "leaveChanges": "Jätä muutokset ennalleen",
       "commitAndPush": "Tee muutostallennus ja pushaa",
       "startSession": "Aloita istunto",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "Hallitse profiileja",
       "noProfiles": "Ei vielä profiileja. Luo sellainen, jonka avulla voit lisätä ympäristömuuttujia, MCP-palvelimia ja taitoja.",
       "advancedConfig": "Lisäasetukset",
-      "advancedConfigDescription": "Valitse profiili ladataksesi tallennetut kokoonpanot ja määritä manuaalisesti lisäympäristömuuttujat ja asennuskomennot",
+      "advancedConfigDescription": "Koskee tätä istuntoa. Profiilina tallentaminen säilyttää sen seuraavaa kertaa varten.",
       "saveAsProfile": "Tallenna profiilina",
       "saveProfileDescription": "Tallenna nykyiset ympäristömuuttujat ja asetuskomennot uudelleen käytettäväksi profiiliksi.",
       "profileSummary": "{{vars}} ympäristömuuttujat · {{commands}} asennuskomennot",
@@ -2971,7 +2986,9 @@
     "permissionDescription": "Sinulla ei ole oikeutta tarkastella tätä.",
     "notFoundDescription": "Tämä kohde on saatettu poistaa tai se ei ole enää käytettävissä.",
     "serverTitle": "Lataaminen ei onnistunut",
-    "serverDescription": "Palvelussamme tapahtui virhe. Yritä uudelleen."
+    "serverDescription": "Palvelussamme tapahtui virhe. Yritä uudelleen.",
+    "timeoutTitle": "Palvelin vastaa hitaasti",
+    "timeoutDescription": "Pyyntö ei valmistunut ajassa. Yritä uudelleen."
   },
   "screenHeader": {
     "openMenu": "Avaa valikko",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "Asennuskomennot",
     "addCommand": "Lisää komento",
     "commandLabel": "Komento",
+    "commandLabelPosition": "Komento {{position}}",
     "commandPlaceholder": "esim. pnpm install",
+    "commandAtLimit": "Komento saa olla enintään {{max}} merkkiä",
     "commandsEmpty": "Ei vielä asennuskomentoja",
     "commandsSaveFailed": "Asennuskomentoja ei voitu tallentaa",
     "moveUp": "Siirrä ylös",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "Taitoa ei voitu tallentaa",
     "skillSourceCustom": "Mukautettu",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Liitä SKILL.md ja sen nimi täyttyy; lisää taito puhelimestasi ilman vetämistä ja pudotusta.",
     "skillEditTitle": "Muokkaa taitoa",
     "skillEdit": "Muokkaa taitoa {{name}}",
@@ -3868,6 +3888,7 @@
       "headersHint": "Arvot, jotka näkyvät muodossa ••••, säilyttävät tallennetun salaisuutensa; korvaa arvo vaihtaaksesi sen. URL-osoitteen muuttaminen edellyttää kaikkien arvojen antamista uudelleen",
       "nameRequired": "Anna palvelimen nimi",
       "nameInvalid": "Nimessä voi käyttää vain ASCII-kirjaimia, numeroita, alaviivoja ja väliviivoja, enintään 100 merkkiä",
+      "nameConflict": "Palvelin tällä nimellä on jo olemassa",
       "commandRequired": "Anna komento",
       "commandTooLong": "Käytä enintään 50 argumenttia, kukin 500 merkkiä",
       "urlRequired": "Anna URL-osoite",
@@ -3948,7 +3969,6 @@
       "repo": "Valitse koodivarasto…",
       "profile": "Valitse profiili",
       "remove": "Pura sidonta",
-      "private": "Yksityinen",
       "search": "Hae koodivarastoja…",
       "addedToast": "Oletusprofiili asetettu kohteelle \"{{repo}}\"",
       "addFailed": "Oletusprofiilia ei voitu asettaa",

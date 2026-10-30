@@ -21,6 +21,7 @@ import { FindingRemediationPanel } from './finding-remediation-panel';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 
 const texts = vi.hoisted(() => ({ items: [] as string[] }));
+const kvRows = vi.hoisted(() => ({ rows: [] as { label: string; value: unknown }[] }));
 const mocks = vi.hoisted(() => ({
   routerPush: vi.fn(),
   openExternalUrl: vi.fn(),
@@ -58,7 +59,12 @@ vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrol
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/kv-row', () => ({ KvRow: () => null }));
+vi.mock('@/components/ui/kv-row', () => ({
+  KvRow: (props: { label: string; value: unknown }) => {
+    kvRows.rows.push({ label: props.label, value: props.value });
+    return null;
+  },
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 vi.mock('@/components/ui/text', () => ({
   Text: (props: { children?: unknown }) => {
@@ -401,4 +407,34 @@ describe('FindingRemediationPanel stale analysis action', () => {
 
     expect(tree.root.findAllByType(AnalysisRerunAction)).toHaveLength(1);
   });
+});
+
+describe('FindingRemediationPanel stored payload tolerance', () => {
+  const attempt = {
+    id: 'attempt-1',
+    status: 'failed',
+    attemptNumber: 1,
+    remediationModelSlug: 'kilo-auto/balanced',
+    branchName: 'security-remediation/fix-1',
+    updatedAt: '2026-04-29T02:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    texts.items = [];
+    kvRows.rows = [];
+  });
+
+  // The attempt row reads the origin off a stored record, so a record written
+  // before the field existed reaches the panel without it.
+  it.each([{ origin: undefined }, { origin: null }, { origin: 7 }])(
+    'labels an unusable attempt origin (%j) as unknown',
+    origin => {
+      const tree = renderPanel(
+        analysisFixture({ remediationAttempts: [{ ...attempt, ...origin }] })
+      );
+
+      expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(1);
+      expect(kvRows.rows.find(row => row.label === 'Started by')?.value).toBe('Unknown');
+    }
+  );
 });

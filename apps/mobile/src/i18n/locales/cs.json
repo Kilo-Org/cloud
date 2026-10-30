@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Nepřipojeno",
     "notifications": "Oznámení",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repozitáře",
     "securityAgent": "Bezpečnostní agent",
     "unknown": "Neznámé",
@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Změny",
-    "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu."
+    "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu.",
+    "privateRepositoryA11y": "{{name}}, soukromý repozitář"
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -674,7 +675,12 @@
       "loading": "Načítání doručených žádostí",
       "noReviewRequests": "Žádné žádosti o revizi",
       "noReviewRequestsDescription": "Tady se zobrazí PR, které čekají na tvou revizi. Do pole výše můžeš vložit odkaz na libovolný PR.",
-      "couldNotLoad": "Doručené žádosti se nepodařilo načíst."
+      "couldNotLoad": "Doručené žádosti se nepodařilo načíst.",
+      "accessLostTitle": "K této organizaci už nemáš přístup",
+      "accessLostDescription": "Už nejsi členem této organizace, takže její žádosti o revizi se nedají načíst. Přepni se na osobní účet a pokračuj v revizích.",
+      "organizationUnavailableTitle": "Tato organizace už neexistuje",
+      "organizationUnavailableDescription": "Tato organizace byla smazána, takže její žádosti o revizi se nedají načíst. Přepni se na osobní účet a pokračuj v revizích.",
+      "continueInPersonal": "Pokračovat v osobním účtu"
     },
     "composer": {
       "commentBodyPlaceholder": "Tvůj komentář",
@@ -1557,7 +1563,13 @@
         "change_request_failed": "PR selhal",
         "superseded": "Již existuje"
       },
-      "noProposalsDescription": "Návrhy z paměti kontrol se zde zobrazí, jakmile Kilo analyzuje odpovědi správců."
+      "noProposalsDescription": "Návrhy z paměti kontrol se zde zobrazí, jakmile Kilo analyzuje odpovědi správců.",
+      "changeRequestInProgress": "Kilo již otevírá pull request pro tento návrh. Zkuste to znovu za chvíli.",
+      "changeRequestNotActionable": "Tento návrh již nelze schválit. Zavřete ho a obnovte seznam.",
+      "changeRequestNoGitHubAccess": "Žádné připojení k GitHubu nemá přístup k tomuto repozitáři. Znovu připojte GitHub s přístupem k tomuto repozitáři a poté to zkuste znovu.",
+      "changeRequestMissingPermissions": "GitHub App od Kilo nemůže v tomto repozitáři otevírat pull requesty. Vlastník repozitáře musí aplikaci udělit přístup pro zápis k obsahu a pull requestům. Poté to zkuste znovu.",
+      "changeRequestFailed": "Kilo nedokázalo otevřít pull request. Zkuste to znovu za chvíli.",
+      "offAction": "Paměť kontrol je vypnutá. Zapněte ji a zkuste to znovu."
     },
     "manualReview": {
       "title": "Ruční kontrola",
@@ -1984,6 +1996,7 @@
     },
     "settingsSave": {
       "saveChanges": "Uložit změny",
+      "saved": "Nastavení uloženo",
       "unsavedTitle": "Neuložené změny",
       "unsavedMessage": "Uložit změny před opuštěním této obrazovky?",
       "unsavedInvalidMessage": "Tyto změny zatím nelze uložit. Oprav je, abys je mohl uložit, nebo je zahoď, abys mohl odejít."
@@ -2236,7 +2249,7 @@
       "dollar_many": "dolaru",
       "costSpoken": "náklady {{cost}}",
       "costSpokenWithTime": "náklady {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "a"
     },
     "githubInstall": {
@@ -2371,6 +2384,8 @@
       "couldNotLoadEnvironment": "Vaše prostředí se nepodařilo načíst.",
       "retryLoadingEnvironment": "Znovu načíst prostředí",
       "defaultEnvironment": "Výchozí prostředí",
+      "environmentAccessibility": "Vyberte profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Vyberte profil: {{label}}. {{attention}}",
       "leaveChanges": "Ponechat změny",
       "commitAndPush": "Vytvořit commit a odeslat",
       "startSession": "Spustit relaci",
@@ -2405,7 +2420,7 @@
       "manageProfiles": "Správa profilů",
       "noProfiles": "Zatím žádné profily. Vytvořte jeden a přidejte proměnné prostředí, servery MCP a dovednosti.",
       "advancedConfig": "Pokročilá konfigurace",
-      "advancedConfigDescription": "Vyberte profil pro načtení uložených konfigurací a ručně nakonfigurujte další proměnné prostředí a příkazy nastavení",
+      "advancedConfigDescription": "Platí pro toto sezení. Uložením jako profil zůstane i pro příště.",
       "saveAsProfile": "Uložit jako profil",
       "saveProfileDescription": "Uložte aktuální proměnné prostředí a příkazy nastavení jako opakovaně použitelný profil.",
       "profileSummary": "Proměnné prostředí {{vars}} · Příkazy nastavení {{commands}}",
@@ -3055,7 +3070,9 @@
     "permissionDescription": "Nemáš oprávnění k zobrazení tohoto obsahu.",
     "notFoundDescription": "Tato položka mohla být odebrána nebo již není k dispozici.",
     "serverTitle": "Načtení se nepodařilo.",
-    "serverDescription": "Na naší straně se něco pokazilo. Zkuste to prosím znovu."
+    "serverDescription": "Na naší straně se něco pokazilo. Zkuste to prosím znovu.",
+    "timeoutTitle": "Server odpovídá příliš dlouho",
+    "timeoutDescription": "Požadavek vypršel dříve, než se dokončil. Zkuste to prosím znovu."
   },
   "screenHeader": {
     "openMenu": "Otevřít nabídku",
@@ -3924,7 +3941,9 @@
     "commandsTitle": "Nastavení příkazů",
     "addCommand": "Přidat příkaz",
     "commandLabel": "Příkaz",
+    "commandLabelPosition": "Příkaz {{position}}",
     "commandPlaceholder": "např. pnpm install",
+    "commandAtLimit": "Příkaz je omezen na {{max}} znaků",
     "commandsEmpty": "Zatím žádné příkazy k nastavení",
     "commandsSaveFailed": "Příkazy nastavení se nepodařilo uložit",
     "moveUp": "Posuňte se nahoru",
@@ -3942,6 +3961,7 @@
     "skillSaveFailed": "Nepodařilo se zachránit dovednost",
     "skillSourceCustom": "Vlastní",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Vložte SKILL.md a jeho název se vyplní; přidejte dovednost z telefonu bez přetahování.",
     "skillEditTitle": "Upravit dovednost",
     "skillEdit": "Upravit dovednost {{name}}",
@@ -3970,6 +3990,7 @@
       "headersHint": "Hodnoty zobrazené jako •••• si ponechávají své uložené tajemství; nahrazením hodnoty ji obměníte. Změna URL vyžaduje znovu všechny hodnoty",
       "nameRequired": "Zadejte název serveru",
       "nameInvalid": "Název může používat pouze písmena ASCII, číslice, podtržítka a pomlčky, maximálně 100 znaků",
+      "nameConflict": "Server MCP s tímto názvem již existuje",
       "commandRequired": "Zadejte příkaz",
       "commandTooLong": "Použijte nejvýše 50 argumentů o 500 znacích",
       "urlRequired": "Zadejte adresu URL",
@@ -3989,7 +4010,7 @@
       "add": "Přidat agenta",
       "empty": "Zatím žádní agenti",
       "name": "Jméno agenta",
-      "slug": "Agent slimák",
+      "slug": "Slug agenta",
       "description": "Popis agenta",
       "model": "Přepsání modelu",
       "modelPlaceholder": "Použít výchozí nastavení relace",
@@ -4014,7 +4035,7 @@
       "saveFailed": "Agenta se nepodařilo uložit",
       "deleteFailed": "Agenta se nepodařilo smazat",
       "nameRequired": "Zadejte jméno agenta",
-      "slugRequired": "Zadejte agenta slimáka",
+      "slugRequired": "Zadejte slug agenta",
       "slugInvalid": "Slug musí začínat malým písmenem ASCII a používat pouze malá písmena ASCII, číslice a pomlčky, maximálně 50 znaků",
       "slugConflict": "Tento slug už používá vestavěný agent nebo jiný agent v tomto profilu",
       "edit": "Upravit agenta {{name}}",
@@ -4050,7 +4071,6 @@
       "repo": "Vyberte úložiště…",
       "profile": "Vyberte profil",
       "remove": "Zrušit vazbu",
-      "private": "Soukromé",
       "search": "Prohledat úložiště…",
       "addedToast": "Výchozí profil nastavený pro „{{repo}}“",
       "addFailed": "Nepodařilo se nastavit výchozí profil",

@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { type ManageRepositoryAccess } from '@/lib/hooks/use-code-reviewer-manage-access';
 
 /**
  * What a non-empty repository list offers below its rows: how old the shown
@@ -20,7 +21,7 @@ export function RepositorySyncFooter({
   syncedLabel: string | null;
   refreshing: boolean;
   onRefresh: () => void;
-  manageAccess?: (() => void) | undefined;
+  manageAccess?: ManageRepositoryAccess | undefined;
 }>) {
   const { t } = useTranslation();
   return (
@@ -34,7 +35,12 @@ export function RepositorySyncFooter({
         <Text>{t('common.refresh')}</Text>
       </Button>
       {manageAccess && (
-        <Button variant="outline" onPress={manageAccess}>
+        <Button
+          variant="outline"
+          loading={manageAccess.pending}
+          disabled={manageAccess.pending}
+          onPress={manageAccess.handlePress}
+        >
           <Text>{t('codeReviewer.repos.manageAccess')}</Text>
         </Button>
       )}

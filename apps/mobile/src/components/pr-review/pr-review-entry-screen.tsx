@@ -7,9 +7,9 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
+import { ContextControl } from '@/components/context-control';
 import { EmptyState } from '@/components/empty-state';
 import { PrLinkPlaceholder } from '@/components/pr-review/pr-link-placeholder';
-import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
 import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
 import { selectRecentPrRowState } from '@/lib/pr-review/recent-pr-row-state';
 import { ScreenHeader } from '@/components/screen-header';
@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { providerPrRefLabel, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import {
@@ -123,7 +123,7 @@ export function PrReviewEntryScreen() {
   const handleRemoveRecent = (entry: RecentPr) => {
     confirm({
       title: t('prReview.entry.removeFromRecentsTitle'),
-      message: t('prReview.entry.removeFromRecentsMessage'),
+      message: `${providerPrRefLabel(providerRefFromRecentPr(entry))}\n${t('prReview.entry.removeFromRecentsMessage')}`,
       confirmLabel: t('common.remove'),
       onConfirm: () => {
         void (async () => {
@@ -152,9 +152,8 @@ export function PrReviewEntryScreen() {
     );
   } else {
     recentsBody = (
-      <View className="rounded-lg bg-secondary">
-        {recent.map((entry, index) => {
-          const isLast = index === recent.length - 1;
+      <View className="gap-3">
+        {recent.map(entry => {
           const rowState = selectRecentPrRowState(entry);
           const removeLabel = t('prReview.entry.removeRecentAccessibility', {
             repo: providerPrRefLabel(providerRefFromRecentPr(entry)),
@@ -163,65 +162,65 @@ export function PrReviewEntryScreen() {
             <View
               key={recentPrKey(entry)}
               testID="recent-row"
-              className={isLast ? '' : 'border-b-[0.5px] border-hair-soft'}
+              className="rounded-xl border border-border bg-card"
             >
               <Pressable
                 onPress={() => {
                   handleRecentPress(entry);
                 }}
-                className="flex-row items-center gap-3 px-3 py-3 active:opacity-70"
+                onLongPress={() => {
+                  handleRemoveRecent(entry);
+                }}
+                accessibilityRole="button"
+                accessibilityActions={[{ name: 'remove', label: removeLabel }]}
+                onAccessibilityAction={event => {
+                  if (event.nativeEvent.actionName === 'remove') {
+                    handleRemoveRecent(entry);
+                  }
+                }}
+                className="flex-row items-center gap-3 p-3 active:opacity-70"
               >
-                <View className="flex-1 gap-1">
+                <View className="min-w-0 flex-1 gap-1">
                   <Text
                     variant="small"
                     className="text-[10px] uppercase tracking-wide text-muted-foreground"
                   >
                     {rowState.provider}
                   </Text>
-                  <Text className="text-sm font-medium" numberOfLines={1}>
+                  <Text className="text-sm font-medium" numberOfLines={2}>
                     {rowState.primary}
                   </Text>
                   {rowState.secondary ? (
-                    <Text variant="muted" className="text-xs">
+                    <Text
+                      variant="muted"
+                      className="text-xs"
+                      numberOfLines={1}
+                      ellipsizeMode="middle"
+                    >
                       {rowState.secondary}
                     </Text>
                   ) : null}
                 </View>
                 <DirectionalChevronRight size={16} color={colors.mutedForeground} />
               </Pressable>
-              <View className="flex-row items-center justify-between gap-2 px-3 pb-3">
-                {rowState.failed ? (
-                  <Text variant="muted" className="text-xs">
+              {rowState.failed ? (
+                <View className="flex-row items-center justify-between gap-3 border-t border-hair-soft px-3 py-2">
+                  <Text variant="muted" className="min-w-0 flex-1 text-xs">
                     {t('prReview.entry.couldNotLoad')}
                   </Text>
-                ) : (
-                  <View />
-                )}
-                <View className="flex-row items-center gap-2">
-                  {rowState.failed ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onPress={() => {
-                        handleRecentPress(entry);
-                      }}
-                      accessibilityLabel={t('common.retry')}
-                    >
-                      <Text>{t('common.retry')}</Text>
-                    </Button>
-                  ) : null}
                   <Button
                     size="sm"
                     variant="outline"
+                    className={STATE_ACTION_CLASS}
                     onPress={() => {
-                      handleRemoveRecent(entry);
+                      handleRecentPress(entry);
                     }}
-                    accessibilityLabel={removeLabel}
+                    accessibilityLabel={t('common.retry')}
                   >
-                    <Text>{t('common.remove')}</Text>
+                    <Text>{t('common.retry')}</Text>
                   </Button>
                 </View>
-              </View>
+              ) : null}
             </View>
           );
         })}
@@ -315,8 +314,12 @@ export function PrReviewEntryScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.prReview')} />
-      <PrReviewContextLine />
+      <ScreenHeader
+        title={t('common.prReview')}
+        headerRight={<ContextControl />}
+        headerRightShrinks
+        allowHeaderRightStacking={false}
+      />
       <PrReviewInboxList header={pasteBlock} recents={recentsBody} />
       {dialog}
     </View>

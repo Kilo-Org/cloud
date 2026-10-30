@@ -5,8 +5,8 @@ import { agentProfilesRouter } from '@/routers/agent-profiles-router';
 /**
  * Mobile-scoped agent profiles router. Exposes the profile-management
  * procedures the mobile profiles screens call — the read-side helpers
- * (`list`, `listCombined`, `get`, plus the narrower `overview` and `agents`
- * reads the Overview and the role picker use) plus the mutations for creating,
+ * (`list`, `listCombined`, `get`, plus the narrower `overview`, `agents`, and per-section
+ * `vars`/`commands`/`mcpServers`/`skills`/`kiloCommands` reads the profile-editor screens use) plus the mutations for creating,
  * editing, deleting, and configuring profiles. Every procedure keeps the
  * server-side `baseProcedure` auth and the per-call `ensureOrganizationAccess`
  * check inside `agentProfilesRouter`; this mount only re-exposes them to the
@@ -18,6 +18,11 @@ export const agentProfilesMobileRouter = createTRPCRouter({
   get: agentProfilesRouter.get,
   overview: agentProfilesRouter.overview,
   agents: agentProfilesRouter.agents,
+  vars: agentProfilesRouter.vars,
+  commands: agentProfilesRouter.commands,
+  mcpServers: agentProfilesRouter.mcpServers,
+  skills: agentProfilesRouter.skills,
+  kiloCommands: agentProfilesRouter.kiloCommands,
   create: agentProfilesRouter.create,
   update: agentProfilesRouter.update,
   delete: agentProfilesRouter.delete,

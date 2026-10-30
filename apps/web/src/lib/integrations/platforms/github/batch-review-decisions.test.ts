@@ -211,6 +211,35 @@ describe('batch-review-decisions', () => {
       expect(row?.review_decision_fetching_at).toBeNull();
     });
 
+    it('clears pending on rows whose stored repository reference cannot name a GitHub repository', async () => {
+      const branch = 'batch/unusable-reference';
+      await seedSession(branch);
+      // A row carrying something that is not a GitHub owner/repo cannot be
+      // batched: it must settle to "no decision" instead of keeping the client
+      // polling, and it must never reach the GraphQL batch.
+      await db.insert(github_branch_pull_requests).values({
+        git_url: 'https://github.com/acme.corp/batch-test',
+        git_branch: branch,
+        owned_by_user_id: testUserId,
+        pr_number: 12,
+        pr_state: 'open',
+        review_decision_pending: true,
+      });
+
+      mockGetIntegration.mockResolvedValue(fakeIntegration());
+
+      await executeBatchReviewDecisionFetch(testOwner);
+
+      expect(mockFetchBatch).not.toHaveBeenCalled();
+      const rows = await db
+        .select()
+        .from(github_branch_pull_requests)
+        .where(eq(github_branch_pull_requests.git_branch, branch));
+      expect(rows).toHaveLength(1);
+      expect(rows[0].review_decision_pending).toBe(false);
+      expect(rows[0].review_decision_fetching_at).toBeNull();
+    });
+
     it('concurrent claim: second call within 2 minutes claims nothing', async () => {
       const branch = 'batch/dedup-claim';
       await seedSession(branch);

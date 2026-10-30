@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Dəyişikliklər",
-    "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə və sonra yenidən cəhd edə bilər."
+    "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə və sonra yenidən cəhd edə bilər.",
+    "privateRepositoryA11y": "{{name}}, şəxsi repozitoriya"
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -644,7 +645,12 @@
       "loading": "Gələnlər yüklənir",
       "noReviewRequests": "Kod baxışı sorğusu yoxdur",
       "noReviewRequestsDescription": "Nəzərdən keçirməyini gözləyən birləşdirmə sorğuları burada görünür. Yuxarıdakı sahəyə istənilən PR keçidini də yapışdıra bilərsən.",
-      "couldNotLoad": "Gələnləri yükləmək mümkün olmadı."
+      "couldNotLoad": "Gələnləri yükləmək mümkün olmadı.",
+      "accessLostTitle": "Bu təşkilata giriş itirildi",
+      "accessLostDescription": "Artıq bu təşkilatın üzvü deyilsən, ona görə də onun baxış sorğularını yükləmək mümkün deyil. Nəzərdən keçirməyə davam etmək üçün şəxsi hesabına keç.",
+      "organizationUnavailableTitle": "Bu təşkilat artıq mövcud deyil",
+      "organizationUnavailableDescription": "Bu təşkilat silindi, ona görə də onun baxış sorğularını yükləmək mümkün deyil. Nəzərdən keçirməyə davam etmək üçün şəxsi hesabına keç.",
+      "continueInPersonal": "Şəxsi hesabda davam et"
     },
     "composer": {
       "commentBodyPlaceholder": "Şərh mətni",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "PR uğursuz oldu",
         "superseded": "Artıq mövcuddur"
       },
-      "noProposalsDescription": "Kilo layihəyə cavabdeh şəxslərin cavablarını təhlil etdikdən sonra kod yoxlaması yaddaşının təklifləri burada görünəcək."
+      "noProposalsDescription": "Kilo layihəyə cavabdeh şəxslərin cavablarını təhlil etdikdən sonra kod yoxlaması yaddaşının təklifləri burada görünəcək.",
+      "changeRequestInProgress": "Kilo bu təklif üçün artıq pull sorğusu açır. Bir azdan yenidən cəhd et.",
+      "changeRequestNotActionable": "Bu təklifi artıq təsdiqləmək mümkün deyil. Onu bağla və siyahını yenilə.",
+      "changeRequestNoGitHubAccess": "Heç bir GitHub bağlantısının bu repozitoriyaya girişi yoxdur. GitHub-u ona girişlə yenidən qoş, sonra yenidən cəhd et.",
+      "changeRequestMissingPermissions": "Kilo-nun GitHub Tətbiqi bu repozitoriyada pull sorğusu aça bilmir. Repozitoriya sahibi tətbiqə məzmun və pull sorğuları üçün yazma icazəsi verməlidir, sonra yenidən cəhd et.",
+      "changeRequestFailed": "Kilo pull sorğusunu aça bilmədi. Bir azdan yenidən cəhd et.",
+      "offAction": "Kod yoxlaması yaddaşı deaktivdir. Onu aktivləşdir, sonra yenidən cəhd et."
     },
     "manualReview": {
       "title": "Əl ilə kod yoxlaması",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Dəyişiklikləri yadda saxla",
+      "saved": "Parametrlər yadda saxlanıldı",
       "unsavedTitle": "Yadda saxlanılmamış dəyişikliklər",
       "unsavedMessage": "Bu ekrandan çıxmazdan əvvəl dəyişikliklər yadda saxlanılsın?",
       "unsavedInvalidMessage": "Bu dəyişiklikləri hələ yadda saxlamaq olmaz. Yadda saxlamaq üçün onları düzəlt və ya çıxmaq üçün ləğv et."
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "Mühitini yükləmək mümkün olmadı.",
       "retryLoadingEnvironment": "Mühiti yenidən yüklə",
       "defaultEnvironment": "Standart mühit",
+      "environmentAccessibility": "Profil seçin: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Profil seçin: {{label}}. {{attention}}",
       "leaveChanges": "Dəyişiklikləri saxla",
       "commitAndPush": "Təsdiqlə və göndər",
       "startSession": "Sessiyanı başlat",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "Profilləri idarə edin",
       "noProfiles": "Hələ profil yoxdur. Ətraf mühit dəyişənləri, MCP serverləri və bacarıqları əlavə etmək üçün birini yaradın.",
       "advancedConfig": "Qabaqcıl Konfiqurasiya",
-      "advancedConfigDescription": "Saxlanmış konfiqurasiyaları yükləmək üçün profil seçin və əlavə mühit dəyişənlərini və quraşdırma əmrlərini əl ilə konfiqurasiya edin",
+      "advancedConfigDescription": "Bu sessiya üçün keçərlidir. Profil kimi yadda saxlasanız, növbəti dəfə üçün qalır.",
       "saveAsProfile": "Profil kimi yadda saxlayın",
       "saveProfileDescription": "Cari mühit dəyişənlərini və quraşdırma əmrlərini təkrar istifadə edilə bilən profil kimi yadda saxlayın.",
       "profileSummary": "{{vars}} mühit dəyişənləri · {{commands}} quraşdırma əmrləri",
@@ -2971,7 +2986,9 @@
     "permissionDescription": "Buna baxmağa icazən yoxdur.",
     "notFoundDescription": "Bu element silinmiş ola bilər və ya artıq əlçatan deyil.",
     "serverTitle": "Yükləmək mümkün olmadı.",
-    "serverDescription": "Bizim tərəfdə xəta baş verdi. Yenidən cəhd et."
+    "serverDescription": "Bizim tərəfdə xəta baş verdi. Yenidən cəhd et.",
+    "timeoutTitle": "Server çox gec cavab verir",
+    "timeoutDescription": "Sorğu tamamlanmazdan əvvəl vaxtı bitdi. Yenidən cəhd et."
   },
   "screenHeader": {
     "openMenu": "Menyunu aç",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "Quraşdırma əmrləri",
     "addCommand": "Komanda əlavə edin",
     "commandLabel": "Əmr",
+    "commandLabelPosition": "Əmr {{position}}",
     "commandPlaceholder": "məs. pnpm install",
+    "commandAtLimit": "Əmr {{max}} simvolla məhduddur",
     "commandsEmpty": "Hələ quraşdırma əmrləri yoxdur",
     "commandsSaveFailed": "Quraşdırma əmrlərini saxlamaq mümkün olmadı",
     "moveUp": "Yuxarı hərəkət edin",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "Bacarıq saxlamaq mümkün olmadı",
     "skillSourceCustom": "Fərdi",
     "skillSourceMarketplace": "Marketpleys",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md yapışdırın və onun adı doldurulur; sürükləyib buraxmadan telefonunuzdan bacarıq əlavə edin.",
     "skillEditTitle": "Bacarıqları redaktə edin",
     "skillEdit": "{{name}} bacarığını redaktə edin",
@@ -3856,7 +3876,7 @@
       "remoteType": "Uzaqdan",
       "command": "Komanda xətti",
       "url": "URL",
-      "environment": "Ətraf mühit (JSON)",
+      "environment": "Mühit (JSON)",
       "headers": "Başlıqlar (JSON)",
       "timeout": "Taymout",
       "secretCount_one": "{{count}} gizli",
@@ -3868,6 +3888,7 @@
       "headersHint": "•••• kimi göstərilən dəyərlər öz saxlanılan gizlisini qoruyur; yeniləmək üçün dəyəri dəyişin. URL-i dəyişdikdə bütün dəyərlər yenidən tələb olunur",
       "nameRequired": "Server adını daxil edin",
       "nameInvalid": "Ad yalnız ASCII hərflərindən, rəqəmlərdən, alt xəttlərindən və tirelərdən istifadə edə bilər, maksimum 100 simvol",
+      "nameConflict": "Bu adda server artıq mövcuddur",
       "commandRequired": "Komanda daxil edin",
       "commandTooLong": "Ən çoxu 500 simvoldan ibarət 50 arqumentdən istifadə edin",
       "urlRequired": "URL daxil edin",
@@ -3887,7 +3908,7 @@
       "add": "Agent əlavə edin",
       "empty": "Hələ agent yoxdur",
       "name": "Agent adı",
-      "slug": "Agent şlak",
+      "slug": "Agent slug",
       "description": "Agentin təsviri",
       "model": "Modelin ləğvi",
       "modelPlaceholder": "Defolt sessiyadan istifadə edin",
@@ -3914,7 +3935,7 @@
       "nameRequired": "Agent adını daxil edin",
       "slugRequired": "Agent slug daxil edin",
       "slugInvalid": "Slug kiçik ASCII hərfi ilə başlamalı və yalnız kiçik ASCII hərflərindən, rəqəmlərdən və tirelərdən istifadə etməlidir, maksimum 50 simvol",
-      "slugConflict": "Bu şlak daxili agent və ya bu profildəki başqa bir agent tərəfindən istifadə olunur",
+      "slugConflict": "Bu slug daxili agent və ya bu profildəki başqa bir agent tərəfindən istifadə olunur",
       "edit": "{{name}} agentini redaktə edin",
       "delete": "{{name}} agentini sil"
     },
@@ -3948,7 +3969,6 @@
       "repo": "Repozitoru seçin...",
       "profile": "Profil seçin",
       "remove": "Açın",
-      "private": "Şəxsi",
       "search": "Repozitoriyaları axtarın...",
       "addedToast": "\"{{repo}}\" üçün defolt profil ayarlandı",
       "addFailed": "Defolt profili qurmaq mümkün olmadı",

@@ -206,10 +206,23 @@ export async function handleEmbeddingsRequest(
   // Extract fraud/project headers
   const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
 
+  const organizationDecision =
+    !isAnonymousContext(user) && organizationId
+      ? (
+          await resolveOrganizationMemberModelDecision({
+            organizationId,
+            kiloUserId: user.id,
+            modelId: requestedModelLowerCased,
+            fromDb: readDb,
+          })
+        ).decision
+      : undefined;
+
   const { provider, userByok, isFree } = await getEmbeddingProvider(
     requestedModelLowerCased,
     user,
-    organizationId
+    organizationId,
+    organizationDecision?.eligibleProviderRoutes
   );
 
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || 'embeddings');
@@ -303,13 +316,8 @@ export async function handleEmbeddingsRequest(
 
     const providerConfig = getOrganizationProviderPrivacy(settings);
 
-    if (organizationId) {
-      const { decision } = await resolveOrganizationMemberModelDecision({
-        organizationId,
-        kiloUserId: user.id,
-        modelId: requestedModelLowerCased,
-        fromDb: readDb,
-      });
+    if (organizationDecision) {
+      const decision = organizationDecision;
       if (!decision.allowed) return modelNotAllowedResponse();
       if (decision.eligibleProviderRoutes) {
         const only = withoutVirtualProvider([...decision.eligibleProviderRoutes]);

@@ -4,6 +4,7 @@ import { ByokApiKeySettingsSchema } from '@kilocode/db/schema-types';
 import { and, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { BYOKApiKeyEnvelope, EncryptedData } from '@kilocode/db/schema-types';
+import { claimFailureReport } from '@kilocode/web-shared/lib/ai-gateway/byok/failure-reports';
 import {
   decryptByokEnvelope,
   getByokKmsClientConfig,
@@ -16,6 +17,7 @@ import {
   UserByokProviderIdSchema,
   getVercelUserByokProviderIdForEndpoint,
   isGatewayUserByokProviderId,
+  isVercelUserByokProviderAllowed,
   type GatewayUserByokProviderId,
   type UserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -50,7 +52,6 @@ async function deriveModelInferenceUserByokProviders(
     ),
   ];
   if (providers.length === 0) {
-    console.debug(`[getModelUserByokProviders] no user byok providers for ${modelId}`);
     return [];
   }
   if (isCodestralModel(modelId)) {
@@ -94,14 +95,32 @@ async function getVercelModelMetadata(caller: string): Promise<StoredModelMap | 
   return vercelModelMetadata;
 }
 
-/** The inference providers routed through Vercel whose key can serve `modelId`. */
-export async function getModelInferenceUserByokProviders(
+/** The inference providers for `modelId`, or null when the Vercel metadata is unavailable. */
+async function lookupInferenceUserByokProviders(
   modelId: string
-): Promise<UserByokProviderId[]> {
+): Promise<UserByokProviderId[] | null> {
   const vercelModelMetadata = await getVercelModelMetadata('getModelInferenceUserByokProviders');
   return vercelModelMetadata
     ? deriveModelInferenceUserByokProviders(modelId, vercelModelMetadata)
-    : [];
+    : null;
+}
+
+/**
+ * The inference providers routed through Vercel whose key can serve `modelId`.
+ * This is the single-model lookup the routing path uses, so it keeps one record
+ * per call; catalog passes aggregate their own counts instead.
+ */
+export async function getModelInferenceUserByokProviders(
+  modelId: string
+): Promise<UserByokProviderId[]> {
+  const providers = await lookupInferenceUserByokProviders(modelId);
+  if (!providers) {
+    return [];
+  }
+  if (providers.length === 0) {
+    console.debug(`[getModelUserByokProviders] no user byok providers for ${modelId}`);
+  }
+  return providers;
 }
 
 /**
@@ -240,7 +259,8 @@ export async function addUserByokAvailability(
     ? await getVercelModelMetadata('addUserByokAvailability')
     : null;
   const hasGatewayKey = enabled.some(isGatewayUserByokProviderId);
-  return Promise.all(
+  const derived = { examined: 0, withoutInferenceProviders: 0 };
+  const modelsWithAvailability = await Promise.all(
     models.map(async model => {
       if (
         enabledProviders.size === 0 ||
@@ -249,10 +269,17 @@ export async function addUserByokAvailability(
       ) {
         return { ...model, hasUserByokAvailable: false };
       }
+      const inferenceProviders = vercelModelMetadata
+        ? await deriveModelInferenceUserByokProviders(model.id, vercelModelMetadata)
+        : [];
+      if (vercelModelMetadata) {
+        derived.examined += 1;
+        if (inferenceProviders.length === 0) {
+          derived.withoutInferenceProviders += 1;
+        }
+      }
       const modelProviders = [
-        ...(vercelModelMetadata
-          ? await deriveModelInferenceUserByokProviders(model.id, vercelModelMetadata)
-          : []),
+        ...inferenceProviders,
         ...(hasGatewayKey ? await getModelGatewayUserByokProviders(model.id) : []),
       ];
       const hasUserByokAvailable = await hasEnabledUserByokForModel({
@@ -264,13 +291,26 @@ export async function addUserByokAvailability(
       return { ...model, hasUserByokAvailable };
     })
   );
+  // One record per pass: the availability pass touches every catalog model, so a
+  // per-model record would grow with the catalog rather than with the request.
+  if (derived.withoutInferenceProviders > 0) {
+    console.debug(
+      `[getModelUserByokProviders] no user byok providers for ${derived.withoutInferenceProviders} of ${derived.examined} models`
+    );
+  }
+  return modelsWithAvailability;
 }
 
+const NO_ALLOWED_PROVIDERS: ReadonlySet<string> = new Set();
+
 /**
- * Whether an inference provider key among `enabledProviderIds` serves `modelId`, as `getProvider`
- * routes it: a direct BYOK key in catalog mode (`directByokCatalogModelIds`), or a provider key
- * sent through Vercel. Gateway keys leave the choice of provider to the gateway, so they do not
- * count, and neither does any key for an id a custom LLM owns, which `getProvider` serves first.
+ * Whether an inference provider key among `enabledProviderIds` serves `modelId` although the
+ * organization provider allow-list admits none of its providers, as `getProvider` routes it: a
+ * direct BYOK key in catalog mode (`directByokCatalogModelIds`), or a provider key sent through
+ * Vercel whose provider the allow-list cannot name (see `isVercelUserByokProviderAllowed`).
+ * Gateway keys leave the choice of provider to the gateway, so they do not count, and neither does
+ * any key for an id a custom LLM owns, which `getProvider` serves first.
+ * Catalog passes call this once per model, so it reads the lookup without writing a record.
  */
 export async function hasInferenceProviderUserByokForModel(
   modelId: string,
@@ -282,8 +322,12 @@ export async function hasInferenceProviderUserByokForModel(
   if (isKiloExclusiveModel(modelId) || enabledProviderIds.every(isGatewayUserByokProviderId)) {
     return false;
   }
-  const modelProviders = await getModelInferenceUserByokProviders(modelId);
-  return modelProviders.some(providerId => enabledProviderIds.includes(providerId));
+  const modelProviders = (await lookupInferenceUserByokProviders(modelId)) ?? [];
+  return modelProviders.some(
+    providerId =>
+      enabledProviderIds.includes(providerId) &&
+      isVercelUserByokProviderAllowed(providerId, NO_ALLOWED_PROVIDERS)
+  );
 }
 
 /** Whether `userByok` are inference provider keys rather than a gateway key. */
@@ -422,11 +466,17 @@ async function queryByokCredentials(
 
   const credentials: ByokCredential[] = [];
   const failures: unknown[] = [];
-  for (const result of results) {
-    if (result.status === 'fulfilled') credentials.push(result.value);
-    else failures.push(result.reason);
+  for (const [index, result] of results.entries()) {
+    if (result.status === 'fulfilled') {
+      credentials.push(result.value);
+      continue;
+    }
+    failures.push(result.reason);
+    // A key that stays undecryptable reports once per window instead of once per lookup.
+    if (claimFailureReport(rows[index].id, Date.now())) {
+      captureException(result.reason, { tags: { source: 'byok_decrypt' } });
+    }
   }
-  for (const failure of failures) captureException(failure);
 
   // Fail closed when no key could be decrypted so the request never falls back to Kilo-paid routing.
   if (credentials.length === 0 && failures.length > 0) throw failures[0];

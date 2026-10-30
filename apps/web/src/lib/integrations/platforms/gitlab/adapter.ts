@@ -1,4 +1,5 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { PlatformRepository } from '@/lib/integrations/core/types';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
@@ -36,6 +37,13 @@ function providerErrorExcerpt(body: string): string {
 }
 const MAX_GITLAB_PAGINATION_PAGES = 100;
 const MAX_GITLAB_PAGINATION_ITEMS = 10_000;
+
+/**
+ * Upper bound on the merge-request note text one read keeps, matching the GitHub
+ * adapter's stored review-comment budget. Pagination stops once a read reaches it,
+ * so the result is a partial review state rather than a full provider history.
+ */
+export const MAX_MR_NOTE_BODY_BYTES = 512 * 1024;
 
 /**
  * Enforces the server-side pagination bounds for every paginating helper in this
@@ -1198,6 +1206,10 @@ export async function fetchGitLabMergeRequest(params: {
  * project token is replaced, the next lookup matches notes from the new
  * identity and the pipeline composes a fresh summary note; later lookups
  * update that note as usual.
+ *
+ * The read keeps only the candidate notes and stops paging at
+ * MAX_MR_NOTE_BODY_BYTES, so a note history cannot make one lookup hold more
+ * than that budget. A note found before the stop is still returned.
  */
 export async function findKiloReviewNote(
   accessToken: string,
@@ -1209,7 +1221,12 @@ export async function findKiloReviewNote(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const notes: GitLabNote[] = [];
+  // Only candidate notes are kept: the provider's other note text is never retained, and the
+  // retained bytes are bounded by MAX_MR_NOTE_BODY_BYTES across pages.
+  const candidateNotes: Array<{ id: number; body: string; updated_at: string }> = [];
+  let retainedNoteBytes = 0;
+  let notesRead = 0;
+  let reachedByteLimit = false;
   let page = 1;
   const perPage = 100;
 
@@ -1234,11 +1251,26 @@ export async function findKiloReviewNote(
     }
 
     const data = (await response.json()) as GitLabNote[];
-    notes.push(...data);
+    notesRead += data.length;
+
+    for (const note of data) {
+      if (note.system || note.author.id !== tokenUser.id) continue;
+      if (!note.body?.includes('<!-- kilo-review -->')) continue;
+
+      // The body is written back to this note when Kilo updates the summary, so it stays
+      // whole; only its size counts against the read budget.
+      retainedNoteBytes += Buffer.byteLength(note.body);
+      candidateNotes.push({ id: note.id, body: note.body, updated_at: note.updated_at });
+      if (retainedNoteBytes >= MAX_MR_NOTE_BODY_BYTES) {
+        reachedByteLimit = true;
+        break;
+      }
+    }
 
     const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
     const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
-    checkGitLabPaginationBounds(totalPages, notes.length, 'MR note listing');
+    checkGitLabPaginationBounds(totalPages, notesRead, 'MR note listing');
+    if (reachedByteLimit) break;
     if (page >= totalPages) break;
     page++;
   }
@@ -1246,15 +1278,13 @@ export async function findKiloReviewNote(
   logExceptInTest('[findKiloReviewNote] Fetched notes', {
     projectId,
     mrIid,
-    totalNotes: notes.length,
+    totalNotes: notesRead,
+    candidateNotes: candidateNotes.length,
+    reachedByteLimit,
   });
 
-  const markedNotes = notes.filter(
-    n => n.body?.includes('<!-- kilo-review -->') && !n.system && n.author.id === tokenUser.id
-  );
-
-  if (markedNotes.length > 0) {
-    const latestNote = markedNotes.sort((a, b) => {
+  if (candidateNotes.length > 0) {
+    const latestNote = candidateNotes.sort((a, b) => {
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
     })[0];
 
@@ -1262,7 +1292,7 @@ export async function findKiloReviewNote(
       projectId,
       mrIid,
       noteId: latestNote.id,
-      markedNotesCount: markedNotes.length,
+      markedNotesCount: candidateNotes.length,
     });
 
     return { noteId: latestNote.id, body: latestNote.body };
@@ -1271,7 +1301,7 @@ export async function findKiloReviewNote(
   logExceptInTest('[findKiloReviewNote] No existing Kilo review note found', {
     projectId,
     mrIid,
-    totalNotes: notes.length,
+    totalNotes: notesRead,
   });
 
   return null;
@@ -1426,6 +1456,11 @@ export async function hasMRNoteWithMarker(
  *
  * `authoredByKilo` reports whether the user behind the access token that reads the MR wrote
  * the note (the Project Access Token bot user).
+ *
+ * Each retained body is sliced to the rendered length and counted against
+ * MAX_MR_NOTE_BODY_BYTES; paging stops when that budget is reached, so the
+ * result is the newest comments within the budget rather than the full history,
+ * ordered newest first like the GitHub adapter.
  */
 export async function fetchMRInlineComments(
   accessToken: string,
@@ -1447,11 +1482,25 @@ export async function fetchMRInlineComments(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const discussions: GitLabDiscussion[] = [];
-  let page = 1;
+  // Positioned notes are retained as each page arrives, with each body sliced to the rendered
+  // length, and paging stops once the retained bytes reach MAX_MR_NOTE_BODY_BYTES.
+  const positionedNotes: Array<{
+    id: number;
+    discussionId: string;
+    path: string;
+    line: number | null;
+    body: string;
+    isOutdated: boolean;
+    authorId: number;
+    authorUsername: string;
+  }> = [];
+  let retainedNoteBytes = 0;
+  let discussionsRead = 0;
+  let reachedByteLimit = false;
+  let totalPages = 1;
   const perPage = 100;
 
-  while (true) {
+  async function readDiscussionPage(page: number): Promise<GitLabDiscussion[]> {
     const response = await fetchGitLab(
       buildGitLabUrl(
         instanceUrl,
@@ -1475,44 +1524,57 @@ export async function fetchMRInlineComments(
     }
 
     const data = (await response.json()) as GitLabDiscussion[];
-    discussions.push(...data);
-
     const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
-    const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
-    checkGitLabPaginationBounds(totalPages, discussions.length, 'MR discussion listing');
-    if (page >= totalPages) break;
-    page++;
+    totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+    return data;
   }
 
-  const positionedNotes: Array<{
-    id: number;
-    discussionId: string;
-    path: string;
-    line: number | null;
-    body: string;
-    isOutdated: boolean;
-    authorId: number;
-    authorUsername: string;
-  }> = [];
+  function retainDiscussions(data: GitLabDiscussion[]): void {
+    discussionsRead += data.length;
+    checkGitLabPaginationBounds(totalPages, discussionsRead, 'MR discussion listing');
 
-  for (const discussion of discussions) {
-    if (discussion.individual_note) continue;
+    for (const discussion of data) {
+      if (discussion.individual_note) continue;
 
-    for (const note of discussion.notes) {
-      if (!note.position) continue;
+      for (const note of discussion.notes) {
+        if (!note.position) continue;
 
-      positionedNotes.push({
-        id: note.id,
-        discussionId: discussion.id,
-        path: note.position.new_path || note.position.old_path,
-        line: note.position.new_line ?? note.position.old_line,
-        body: note.body,
-        // In GitLab, resolved discussions are considered "outdated" for our purposes
-        isOutdated: note.resolved === true,
-        authorId: note.author.id,
-        authorUsername: note.author.username,
-      });
+        const body = note.body.slice(0, MAX_INLINE_COMMENT_BODY_CHARS);
+        retainedNoteBytes += Buffer.byteLength(body);
+        positionedNotes.push({
+          id: note.id,
+          discussionId: discussion.id,
+          path: note.position.new_path || note.position.old_path,
+          line: note.position.new_line ?? note.position.old_line,
+          body,
+          // In GitLab, resolved discussions are considered "outdated" for our purposes
+          isOutdated: note.resolved === true,
+          authorId: note.author.id,
+          authorUsername: note.author.username,
+        });
+
+        if (retainedNoteBytes >= MAX_MR_NOTE_BODY_BYTES) {
+          reachedByteLimit = true;
+          break;
+        }
+      }
+
+      if (reachedByteLimit) break;
     }
+  }
+
+  // GitLab lists merge-request discussions oldest first and accepts no ordering parameter, so the
+  // read starts at the last page and walks back, consuming each page newest first. That keeps the
+  // newest comments when the budget ends the read, as the GitHub adapter does with its
+  // newest-first request, and the returned comments are ordered newest first.
+  const oldestPage = await readDiscussionPage(1);
+  checkGitLabPaginationBounds(totalPages, oldestPage.length, 'MR discussion listing');
+  for (let page = totalPages; page >= 2 && !reachedByteLimit; page--) {
+    const data = await readDiscussionPage(page);
+    retainDiscussions([...data].reverse());
+  }
+  if (!reachedByteLimit) {
+    retainDiscussions([...oldestPage].reverse());
   }
 
   // Attribution is best-effort: a failed lookup leaves the comments unattributed for this
@@ -1541,8 +1603,9 @@ export async function fetchMRInlineComments(
   logExceptInTest('[fetchMRInlineComments] Fetched inline comments', {
     projectId,
     mrIid,
-    totalDiscussions: discussions.length,
+    totalDiscussions: discussionsRead,
     inlineComments: inlineComments.length,
+    reachedByteLimit,
   });
 
   return inlineComments;

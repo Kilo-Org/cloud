@@ -138,6 +138,19 @@ function refusalStatus(error: unknown): unknown {
   return (error as { status?: unknown } | null)?.status;
 }
 
+/**
+ * A GitHub rate limit, primary or secondary, is transient: it is never a
+ * statement about an installation's access, so it may not be read as a
+ * permanent refusal.
+ */
+function githubRateLimitTrpcError(error: unknown): TRPCError {
+  return new TRPCError({
+    code: 'BAD_GATEWAY',
+    message: 'GitHub is limiting requests. Try again in a moment.',
+    cause: error,
+  });
+}
+
 /** A refusal meaning "this installation cannot see that repository" — try the next one. */
 function isRepositoryUnreachable(error: unknown): boolean {
   if (error instanceof TRPCError) return error.code === 'NOT_FOUND' || error.code === 'FORBIDDEN';
@@ -179,6 +192,7 @@ async function listOrganizationGitHubBranches(
     ...healthy.filter(integration => !cachesRepository(integration, repositoryFullName)),
   ];
   let lastError: unknown;
+  let rateLimitError: unknown;
   for (const integration of candidates) {
     try {
       const { branches } = await githubAppsService.listBranches(
@@ -189,10 +203,23 @@ async function listOrganizationGitHubBranches(
       );
       return toListing(branches);
     } catch (error) {
+      // Overloaded 403/429 answers arrive here too. Each installation has its
+      // own quota, so a rate limit says nothing about the remaining candidates
+      // and never ends the walk; it is remembered for the final refusal, which
+      // then stays retryable instead of claiming no installation can see the
+      // repository.
+      if (isGitHubRateLimitError(error)) {
+        rateLimitError ??= error;
+        continue;
+      }
       if (!isRepositoryUnreachable(error)) throw error;
       lastError = error;
     }
   }
+  // A transient refusal outranks a permission one: the caller must retry
+  // rather than show the install message for a repository a limited
+  // installation may well list once the limit clears.
+  if (rateLimitError) throw githubRateLimitTrpcError(rateLimitError);
   throw new TRPCError({
     code: 'NOT_FOUND',
     message:
@@ -219,16 +246,11 @@ async function listGitHubBranches(
   } catch (error) {
     // A blocked or missing repository is GitHub's own refusal, not a server
     // fault: surface it as 403/404 so the caller stops retrying a 500. 403 is
-    // overloaded — a rate-limited request is transient and stays retryable.
+    // overloaded — a rate-limited request is transient and stays retryable,
+    // whether GitHub answers 403 or 429.
+    if (isGitHubRateLimitError(error)) throw githubRateLimitTrpcError(error);
     const status = refusalStatus(error);
     if (status === 403) {
-      if (isGitHubRateLimitError(error)) {
-        throw new TRPCError({
-          code: 'BAD_GATEWAY',
-          message: 'GitHub is limiting requests. Try again in a moment.',
-          cause: error,
-        });
-      }
       throw new TRPCError({
         code: 'FORBIDDEN',
         message: githubRepositoryForbiddenMessage,

@@ -217,43 +217,71 @@ export function LiveSessionFeedback({
     }
   }
 
-  const feedback = (
+  // The band is one child of the column that spaces it against the content it
+  // introduces, and a child that paints nothing still costs one gap: on Home
+  // the header then stood twice as far from its card as `EXPLORE` stands from
+  // its first row. The screen-reader statuses are out of flow, so they cost no
+  // layout and mount on their own; the band exists only while it paints.
+  const offlineLine = internet === 'offline' && inlineNotices;
+  const connectionLine = connectionLabel !== null && inlineNotices && reconnectExhausted;
+  const reconnectRetry =
+    inlineNotices && context.isReady && !isConnected && reconnectExhausted && !failureOwnsRetry;
+  const refreshLine = refresh != null && content === 'rows';
+  const bandPaints =
+    failure !== null || offlineLine || connectionLine || reconnectRetry || refreshLine;
+
+  const announcements = (
+    <>
+      {/* The app-wide OfflineBanner owns the offline announcement. */}
+      {internet !== 'offline' && !connectionLine && (
+        <AccessibleStatus
+          message={connectionLabel}
+          tone="status"
+          className="absolute size-px overflow-hidden"
+        />
+      )}
+      {!refreshLine && (
+        <AccessibleStatus
+          message={content === 'pending' ? t('common.loading') : null}
+          tone="status"
+          className="absolute size-px overflow-hidden"
+        />
+      )}
+      {content === 'rows' && sessions.isFetching && !sessions.isPaused && !refresh?.busy && (
+        <AccessibleStatus
+          message={t('agents.sessionList.updating')}
+          tone="status"
+          className="absolute size-px overflow-hidden"
+        />
+      )}
+    </>
+  );
+
+  const band = (
     <View className={cn(compactSpacing ? 'gap-0' : 'gap-2', centered && 'px-6')}>
       <View className="flex-row items-center gap-2">
-        {/* The app-wide OfflineBanner owns the offline announcement. */}
-        {internet === 'offline' ? (
-          inlineNotices && (
-            <Text className="flex-1 text-xs text-muted-foreground">{t('offline.noInternet')}</Text>
-          )
+        {offlineLine ? (
+          <Text className="flex-1 text-xs text-muted-foreground">{t('offline.noInternet')}</Text>
         ) : (
-          <AccessibleStatus
-            message={connectionLabel}
-            tone="status"
-            className={cn(
-              'flex-1 text-xs',
-              (!reconnectExhausted || !inlineNotices) && 'absolute size-px overflow-hidden'
-            )}
-          />
+          connectionLine && (
+            <AccessibleStatus message={connectionLabel} tone="status" className="flex-1 text-xs" />
+          )
         )}
-        {inlineNotices &&
-          context.isReady &&
-          !isConnected &&
-          reconnectExhausted &&
-          !failureOwnsRetry && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className={STATE_ACTION_CLASS}
-              accessibilityLabel={t('agentChat.sessionConnection.retryConnection')}
-              onPress={() => {
-                connection.retryConnection();
-              }}
-            >
-              <Text>{t('common.retry')}</Text>
-            </Button>
-          )}
+        {reconnectRetry && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className={STATE_ACTION_CLASS}
+            accessibilityLabel={t('agentChat.sessionConnection.retryConnection')}
+            onPress={() => {
+              connection.retryConnection();
+            }}
+          >
+            <Text>{t('common.retry')}</Text>
+          </Button>
+        )}
       </View>
-      {refresh && content === 'rows' ? (
+      {refreshLine ? (
         // The live tab's reserved status line: screen-reader Updating while
         // the pull is in flight, visible "Couldn't refresh" + Retry when it
         // failed. It takes the slot of the (layout-free) loading status so the
@@ -268,22 +296,15 @@ export function LiveSessionFeedback({
             progressInBody={refresh.progressInBody}
           />
         </View>
-      ) : (
-        <AccessibleStatus
-          message={content === 'pending' ? t('common.loading') : null}
-          tone="status"
-          className="absolute size-px overflow-hidden"
-        />
-      )}
-      {content === 'rows' && sessions.isFetching && !sessions.isPaused && !refresh?.busy && (
-        <AccessibleStatus
-          message={t('agents.sessionList.updating')}
-          tone="status"
-          className="absolute size-px overflow-hidden"
-        />
-      )}
+      ) : null}
       {failure}
     </View>
+  );
+  const feedback = (
+    <>
+      {announcements}
+      {bandPaints && band}
+    </>
   );
   return centered ? (
     <CenteredState refreshControl={refreshControl}>{feedback}</CenteredState>

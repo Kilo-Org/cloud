@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { AgentSessionsSection } from '@/components/home/home-agent-sessions-section';
+import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 
@@ -333,5 +334,47 @@ describe('Home live section', () => {
         candidate.children.includes('No internet connection')
       )
     ).not.toHaveLength(0);
+  });
+});
+
+describe('Live session feedback band', () => {
+  // The band is one child of the column that spaces it against the content it
+  // introduces: a band that paints nothing still takes a gap, which stood the
+  // section header twice as far from its card as the sibling section stands
+  // from its first row. It must exist only while it paints.
+  async function bandJson(
+    sessions: Props['sessions'] = settled,
+    contextOverride: Props['context'] = context,
+    inlineNotices = false
+  ) {
+    const holder: { tree?: TestRenderer.ReactTestRenderer } = {};
+    await act(async () => {
+      holder.tree = TestRenderer.create(
+        createElement(LiveSessionFeedback, {
+          context: contextOverride,
+          sessions,
+          failureLabel: i18n.t('home.couldNotLoadActiveSessions'),
+          inlineNotices,
+        })
+      );
+      await Promise.resolve();
+    });
+    const json = holder.tree?.toJSON() ?? null;
+    act(() => holder.tree?.unmount());
+    return json;
+  }
+
+  it('paints no band while it has nothing to report', async () => {
+    expect(await bandJson()).toBeNull();
+    // The loading fact is announced, not painted, so the pending card keeps
+    // that same one gap.
+    expect(
+      await bandJson({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true })
+    ).toBeNull();
+  });
+
+  it('draws the offline notice on a surface that carries the notice itself', async () => {
+    connectivity.offline = true;
+    expect(await bandJson(settled, context, true)).not.toBeNull();
   });
 });

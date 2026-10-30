@@ -118,10 +118,9 @@ const CHALLENGE_RATE_LIMIT_ID = 'native-admission-challenge';
  * Issue a server-side challenge for native admission.
  *
  * Uses the shared `@vercel/firewall` check per client IP, matching the email
- * sign-in rate-limit pattern. A limited caller is refused. Every other limiter
- * answer, including one that carries an error, is reported through the shared
- * throttled reporter so the limiter keeps a complete telemetry record, and the
- * challenge is still issued.
+ * sign-in rate-limit pattern. A limited caller is refused. A non-limited answer
+ * that carries an error is reported through the shared throttled reporter, so
+ * the limiter keeps a complete telemetry record, and the challenge is issued.
  */
 export async function issueAdmissionChallenge(
   request: NextRequest,

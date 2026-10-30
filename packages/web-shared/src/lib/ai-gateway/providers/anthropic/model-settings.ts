@@ -1,4 +1,4 @@
-import { appendAnthropicBetaHeader } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { appendAnthropicBetaHeader } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/beta-header';
 import { addCacheBreakpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { normalizeToolCallIds } from '@kilocode/web-shared/lib/ai-gateway/tool-calling';

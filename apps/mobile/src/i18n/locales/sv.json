@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Ändringar",
-    "organizationTrialEnded": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. En organisationsägare kan uppdatera faktureringen på kilo.ai och sedan försöka igen."
+    "organizationTrialEnded": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. En organisationsägare kan uppdatera faktureringen på kilo.ai och sedan försöka igen.",
+    "privateRepositoryA11y": "{{name}}, privat kodarkiv"
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -644,7 +645,12 @@
       "loading": "Läser in inkorgen",
       "noReviewRequests": "Inga granskningsförfrågningar",
       "noReviewRequestsDescription": "PR:er som väntar på din granskning visas här. Du kan också klistra in valfri PR-länk ovan.",
-      "couldNotLoad": "Kunde inte läsa in inkorgen"
+      "couldNotLoad": "Kunde inte läsa in inkorgen",
+      "accessLostTitle": "Ingen åtkomst till den här organisationen",
+      "accessLostDescription": "Du är inte längre medlem i den här organisationen, så dess granskningsförfrågningar kan inte läsas in. Fortsätt i ditt personliga konto för att fortsätta granska.",
+      "organizationUnavailableTitle": "Den här organisationen finns inte längre",
+      "organizationUnavailableDescription": "Den här organisationen har tagits bort, så dess granskningsförfrågningar kan inte läsas in. Fortsätt i ditt personliga konto för att fortsätta granska.",
+      "continueInPersonal": "Fortsätt i personligt konto"
     },
     "composer": {
       "commentBodyPlaceholder": "Din kommentar",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "PR misslyckades",
         "superseded": "Finns redan"
       },
-      "noProposalsDescription": "Förslag från granskningsminnet visas här när Kilo har analyserat de projektansvarigas svar."
+      "noProposalsDescription": "Förslag från granskningsminnet visas här när Kilo har analyserat de projektansvarigas svar.",
+      "changeRequestInProgress": "Kilo öppnar redan en pull request för det här förslaget. Försök igen om en stund.",
+      "changeRequestNotActionable": "Det här förslaget kan inte längre godkännas. Stäng det och uppdatera listan.",
+      "changeRequestNoGitHubAccess": "Ingen GitHub-anslutning har åtkomst till det här arkivet. Anslut GitHub igen med åtkomst till det och försök sedan igen.",
+      "changeRequestMissingPermissions": "Kilos GitHub-app kan inte öppna pull requests i det här arkivet. En arkivägare måste ge appen skrivåtkomst till innehåll och pull requests och sedan försöka igen.",
+      "changeRequestFailed": "Kilo kunde inte öppna pull requesten. Försök igen om en stund.",
+      "offAction": "Granskningsminnet är avstängt. Aktivera det och försök igen."
     },
     "manualReview": {
       "title": "Manuell granskning",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Spara ändringar",
+      "saved": "Inställningarna sparade",
       "unsavedTitle": "Osparade ändringar",
       "unsavedMessage": "Vill du spara ändringarna innan du lämnar den här vyn?",
       "unsavedInvalidMessage": "De här ändringarna kan inte sparas än. Åtgärda dem för att spara, eller kassera dem för att lämna."
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "Det gick inte att läsa in din miljö.",
       "retryLoadingEnvironment": "Försök läsa in miljön igen",
       "defaultEnvironment": "Standardmiljö",
+      "environmentAccessibility": "Välj en profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Välj en profil: {{label}}. {{attention}}",
       "leaveChanges": "Behåll ändringar",
       "commitAndPush": "Committa och pusha",
       "startSession": "Starta session",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "Hantera profiler",
       "noProfiles": "Inga profiler än. Skapa en för att lägga till miljövariabler, MCP-servrar och färdigheter.",
       "advancedConfig": "Avancerad konfiguration",
-      "advancedConfigDescription": "Välj en profil för att ladda sparade konfigurationer och manuellt konfigurera ytterligare miljövariabler och inställningskommandon",
+      "advancedConfigDescription": "Gäller för den här sessionen. Sparas den som profil finns den kvar nästa gång.",
       "saveAsProfile": "Spara som profil",
       "saveProfileDescription": "Spara de aktuella miljövariablerna och inställningskommandona som en återanvändbar profil.",
       "profileSummary": "{{vars}} miljövariabler · {{commands}} inställningskommandon",
@@ -2971,7 +2986,9 @@
     "permissionDescription": "Du har inte behörighet att se det här.",
     "notFoundDescription": "Det här objektet kan ha tagits bort eller är inte längre tillgängligt.",
     "serverTitle": "Kunde inte läsa in innehållet.",
-    "serverDescription": "Något gick fel hos oss. Försök igen."
+    "serverDescription": "Något gick fel hos oss. Försök igen.",
+    "timeoutTitle": "Servern tar för lång tid",
+    "timeoutDescription": "Begäran tog för lång tid att slutföras. Försök igen."
   },
   "screenHeader": {
     "openMenu": "Öppna menyn",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "Installationskommandon",
     "addCommand": "Lägg till kommando",
     "commandLabel": "Kommando",
+    "commandLabelPosition": "Kommando {{position}}",
     "commandPlaceholder": "t.ex. pnpm install",
+    "commandAtLimit": "Kommandot är begränsat till {{max}} tecken",
     "commandsEmpty": "Inga installationskommandon ännu",
     "commandsSaveFailed": "Det gick inte att spara installationskommandon",
     "moveUp": "Flytta upp",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "Det gick inte att spara färdigheten",
     "skillSourceCustom": "Anpassad",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Klistra in en SKILL.md och dess namn fylls i; lägg till en färdighet från din telefon utan att dra och släppa.",
     "skillEditTitle": "Redigera färdighet",
     "skillEdit": "Redigera färdighet {{name}}",
@@ -3868,6 +3888,7 @@
       "headersHint": "Värden som visas som •••• behåller sin lagrade hemlighet; ersätt ett värde för att rotera det. Om URL:en ändras krävs alla värden igen",
       "nameRequired": "Ange ett servernamn",
       "nameInvalid": "Namn kan endast använda ASCII-bokstäver, siffror, understreck och bindestreck, upp till 100 tecken",
+      "nameConflict": "En server med det namnet finns redan",
       "commandRequired": "Ange ett kommando",
       "commandTooLong": "Använd högst 50 argument med 500 tecken vardera",
       "urlRequired": "Ange en URL",
@@ -3948,7 +3969,6 @@
       "repo": "Välj kodarkiv…",
       "profile": "Välj profil",
       "remove": "Koppla från",
-      "private": "Privat",
       "search": "Sök kodarkiv…",
       "addedToast": "Standardprofil inställd för \"{{repo}}\"",
       "addFailed": "Det gick inte att ange standardprofil",

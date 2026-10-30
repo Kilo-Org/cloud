@@ -1,21 +1,31 @@
 import { type Href, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { InputAccessoryView, Keyboard, Pressable, TextInput, View } from 'react-native';
+import {
+  InputAccessoryView,
+  Keyboard,
+  Pressable,
+  TextInput,
+  type TextInputInstance,
+  View,
+} from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import { instructionsFieldOverflows } from '@/lib/code-reviewer-instructions-field';
 import {
   type SaveReviewConfigMutation,
   useReviewConfig,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
+import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import {
   type SettingsBackGuardResult,
   useSettingsBackGuard,
@@ -46,6 +56,37 @@ function InstructionsEditor({
   draftRef: { current: string };
 }>) {
   const { t } = useTranslation();
+  // A stored value taller than the capped field opens at the platform caret,
+  // which sits at its end: the value's first line is then out of sight, the
+  // symptom #7892 removed for a field that grew with its value. Once the field
+  // and its content have both been measured, put the caret on the first line
+  // for a value that overflows. A value that fits keeps the platform caret.
+  //
+  // This is the stored value's opening state only: once the reader has edited
+  // the draft, a content measurement must never move their caret. Both
+  // platforms report a content size for the empty field at mount, so the
+  // alignment is normally spent before any edit; the edit guard keeps a mount
+  // that reports none (a recycled view) from yanking the caret mid-paste.
+  const fieldRef = useRef<TextInputInstance | null>(null);
+  const fieldHeightRef = useRef(0);
+  const contentHeightRef = useRef<number | null>(null);
+  const alignedRef = useRef(false);
+  const editedRef = useRef(false);
+  const alignFirstLineIfOverflowing = () => {
+    const contentHeight = contentHeightRef.current;
+    if (
+      alignedRef.current ||
+      editedRef.current ||
+      contentHeight == null ||
+      fieldHeightRef.current === 0
+    ) {
+      return;
+    }
+    alignedRef.current = true;
+    if (instructionsFieldOverflows(contentHeight, fieldHeightRef.current)) {
+      fieldRef.current?.setSelection(0, 0);
+    }
+  };
 
   return (
     <Animated.View entering={FadeIn.duration(200)} className="gap-4">
@@ -53,9 +94,26 @@ function InstructionsEditor({
         {t('codeReviewer.instructions.deprecation')}
       </Text>
       {/* A multiline field takes the platform's generic text-view name on iOS,
-          so the accessible name is the localized heading this screen renders. */}
+          so the accessible name is the localized heading this screen renders.
+          `max-h-[196px]` is the `p-3` padding (2 × 10.5) plus ten
+          `leading-[1.25rem]` line boxes (10 × 17.5, native rem is 14): a cap
+          that is not a whole number of lines paints the top visible line cut
+          when the field scrolls to the caret. Past the cap the field scrolls
+          its own text, so a multi-thousand-character draft no longer turns the
+          page into one oversized text view that pushes the note and Save out
+          of the viewport; the min height still grows the field with a short
+          stored value. */}
       <TextInput
-        className="min-h-32 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
+        ref={fieldRef}
+        onLayout={event => {
+          fieldHeightRef.current = event.nativeEvent.layout.height;
+          alignFirstLineIfOverflowing();
+        }}
+        onContentSizeChange={event => {
+          contentHeightRef.current = event.nativeEvent.contentSize.height;
+          alignFirstLineIfOverflowing();
+        }}
+        className="min-h-32 max-h-[196px] rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
         accessibilityLabel={t('codeReviewer.instructions.title')}
         multiline
         textAlignVertical="top"
@@ -63,6 +121,7 @@ function InstructionsEditor({
         placeholder={t('codeReviewer.instructions.placeholder')}
         defaultValue={initial}
         onChangeText={text => {
+          editedRef.current = true;
           draftRef.current = text;
           onDirty(text);
         }}
@@ -118,7 +177,10 @@ function InstructionsScreen({
   platform,
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const router = useRouter();
-  const { data } = useReviewConfig(scope, platform);
+  const config = useReviewConfig(scope, platform);
+  const configBody = useReviewConfigBody(config);
+  const { data } = config;
+  const failure = reviewConfigFailure(configBody, config.isFetching);
   const save = useSaveReviewConfig(scope, platform);
   const { t } = useTranslation();
 
@@ -155,37 +217,50 @@ function InstructionsScreen({
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('codeReviewer.instructions.title')} onBack={onBack} />
       {dialog}
-      <TabScreenScrollView
-        // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
-        automaticallyAdjustKeyboardInsets
-        className="flex-1"
-        contentContainerClassName="px-6 pt-4"
-        keyboardShouldPersistTaps="handled"
-      >
-        <Animated.View layout={LinearTransition} className="gap-4">
-          {data == null && (
-            <Animated.View exiting={FadeOut.duration(150)} className="gap-4">
-              <Skeleton className="h-32 w-full rounded-lg" />
-              <Skeleton className="h-10 w-full rounded-md" />
-            </Animated.View>
-          )}
+      {failure ? (
+        // A config read that failed, or one that stayed pending with nothing
+        // in flight even after its automatic restart, gets the action that can
+        // resolve it instead of a skeleton that never ends.
+        <QueryError
+          variant={failure.variant}
+          onRetry={() => {
+            failure.onRetry();
+          }}
+          isRetrying={failure.isRetrying}
+        />
+      ) : (
+        <TabScreenScrollView
+          // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
+          automaticallyAdjustKeyboardInsets
+          className="flex-1"
+          contentContainerClassName="px-6 pt-4"
+          keyboardShouldPersistTaps="handled"
+        >
+          <Animated.View layout={LinearTransition} className="gap-4">
+            {configBody.body.status === 'loading' && (
+              <Animated.View exiting={FadeOut.duration(150)} className="gap-4">
+                <Skeleton className="h-32 w-full rounded-lg" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </Animated.View>
+            )}
 
-          {data != null && (
-            <InstructionsEditor
-              initial={data.customInstructions ?? ''}
-              onDirty={text => {
-                setDirty(text.trim() !== initialRef.current.trim());
-              }}
-              save={save}
-              onSaved={() => {
-                router.back();
-              }}
-              skipNextGuardRef={skipNextGuardRef}
-              draftRef={draftRef}
-            />
-          )}
-        </Animated.View>
-      </TabScreenScrollView>
+            {configBody.body.status === 'ready' && data != null && (
+              <InstructionsEditor
+                initial={data.customInstructions ?? ''}
+                onDirty={text => {
+                  setDirty(text.trim() !== initialRef.current.trim());
+                }}
+                save={save}
+                onSaved={() => {
+                  router.back();
+                }}
+                skipNextGuardRef={skipNextGuardRef}
+                draftRef={draftRef}
+              />
+            )}
+          </Animated.View>
+        </TabScreenScrollView>
+      )}
     </View>
   );
 }

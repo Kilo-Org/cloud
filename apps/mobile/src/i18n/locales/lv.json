@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Izmaiņas",
-    "organizationTrialEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz."
+    "organizationTrialEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
+    "privateRepositoryA11y": "{{name}}, privāts repozitorijs"
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -659,7 +660,12 @@
       "loading": "Tiek ielādēta iesūtne",
       "noReviewRequests": "Nav pārskatīšanas pieprasījumu",
       "noReviewRequestsDescription": "Šeit būs redzami izmaiņu pieprasījumi, kas gaida tavu vērtējumu. Arī augstāk vari ielīmēt jebkuru PR saiti.",
-      "couldNotLoad": "Neizdevās ielādēt iesūtni."
+      "couldNotLoad": "Neizdevās ielādēt iesūtni.",
+      "accessLostTitle": "Nav piekļuves šai organizācijai",
+      "accessLostDescription": "Tu vairs neesi šīs organizācijas dalībnieks, tāpēc tās pārskatīšanas pieprasījumus nevar ielādēt. Turpini savā personīgajā kontā, lai varētu turpināt vērtēt.",
+      "organizationUnavailableTitle": "Šī organizācija vairs neeksistē",
+      "organizationUnavailableDescription": "Šī organizācija tika izdzēsta, tāpēc tās pārskatīšanas pieprasījumus nevar ielādēt. Turpini savā personīgajā kontā, lai varētu turpināt vērtēt.",
+      "continueInPersonal": "Turpini personīgajā kontā"
     },
     "composer": {
       "commentBodyPlaceholder": "Komentārs",
@@ -1535,7 +1541,13 @@
         "change_request_failed": "Neizdevās atvērt PR",
         "superseded": "Jau ir pievienots"
       },
-      "noProposalsDescription": "Koda pārskatīšanas atmiņas priekšlikumi būs redzami šeit pēc tam, kad Kilo būs analizējis uzturētāju atbildes."
+      "noProposalsDescription": "Koda pārskatīšanas atmiņas priekšlikumi būs redzami šeit pēc tam, kad Kilo būs analizējis uzturētāju atbildes.",
+      "changeRequestInProgress": "Kilo jau atver PR šim priekšlikumam. Mēģini vēlreiz pēc brīža.",
+      "changeRequestNotActionable": "Šo priekšlikumu vairs nevar apstiprināt. Aizver to un atjauno sarakstu.",
+      "changeRequestNoGitHubAccess": "Nevienam GitHub savienojumam nav piekļuves šim repozitorijam. Pievieno GitHub no jauna ar piekļuvi tam un mēģini vēlreiz.",
+      "changeRequestMissingPermissions": "Kilo GitHub lietotne nevar atvērt PR šajā repozitorijā. Repozitorija īpašniekam ir jāpiešķir lietotnei rakstīšanas piekļuve saturam un PR, pēc tam mēģini vēlreiz.",
+      "changeRequestFailed": "Kilo neizdevās atvērt PR. Mēģini vēlreiz pēc brīža.",
+      "offAction": "Koda pārskatīšanas atmiņa ir izslēgta. Ieslēdz to, tad mēģini vēlreiz."
     },
     "manualReview": {
       "title": "Manuāla koda pārskatīšana",
@@ -1958,6 +1970,7 @@
     },
     "settingsSave": {
       "saveChanges": "Saglabāt izmaiņas",
+      "saved": "Iestatījumi saglabāti",
       "unsavedTitle": "Nesaglabātas izmaiņas",
       "unsavedMessage": "Saglabāt izmaiņas pirms šī ekrāna aizvēršanas?",
       "unsavedInvalidMessage": "Šīs izmaiņas vēl nevar saglabāt. Izlabojiet tās, lai saglabātu, vai atmetiet, lai aizietu."
@@ -2340,6 +2353,8 @@
       "couldNotLoadEnvironment": "Neizdevās ielādēt tavu vidi.",
       "retryLoadingEnvironment": "Mēģināt ielādēt vidi vēlreiz",
       "defaultEnvironment": "Noklusējuma vide",
+      "environmentAccessibility": "Izvēlieties profilu: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Izvēlieties profilu: {{label}}. {{attention}}",
       "leaveChanges": "Atstāt izmaiņas",
       "commitAndPush": "Fiksēt un nosūtīt",
       "startSession": "Sākt sesiju",
@@ -2374,7 +2389,7 @@
       "manageProfiles": "Pārvaldīt profilus",
       "noProfiles": "Vēl nav neviena profila. Izveidojiet vienu, lai pievienotu vides mainīgos, MCP serverus un prasmes.",
       "advancedConfig": "Papildu konfigurācija",
-      "advancedConfigDescription": "Atlasiet profilu, lai ielādētu saglabātās konfigurācijas, un manuāli konfigurējiet papildu vides mainīgos un iestatīšanas komandas",
+      "advancedConfigDescription": "Attiecas uz šo sesiju. Saglabājot kā profilu, tas paliks nākamajai reizei.",
       "saveAsProfile": "Saglabāt kā profilu",
       "saveProfileDescription": "Saglabājiet pašreizējos vides mainīgos un iestatīšanas komandas kā atkārtoti lietojamu profilu.",
       "profileSummary": "{{vars}} vides mainīgie · {{commands}} iestatīšanas komandas",
@@ -3013,7 +3028,9 @@
     "permissionDescription": "Tev nav atļaujas to skatīt.",
     "notFoundDescription": "Iespējams, šis vienums ir noņemts vai vairs nav pieejams.",
     "serverTitle": "Neizdevās ielādēt.",
-    "serverDescription": "Mūsu pusē radās kļūda. Lūdzu, mēģini vēlreiz."
+    "serverDescription": "Mūsu pusē radās kļūda. Lūdzu, mēģini vēlreiz.",
+    "timeoutTitle": "Serveris pārāk ilgi neatbild",
+    "timeoutDescription": "Pieprasījums tika pārtraukts, jo netika pabeigts laikā. Lūdzu, mēģini vēlreiz."
   },
   "screenHeader": {
     "openMenu": "Atvērt izvēlni",
@@ -3873,8 +3890,10 @@
     "variablesSaveFailed": "Nevarēja saglabāt mainīgo",
     "commandsTitle": "Iestatīšanas komandas",
     "addCommand": "Pievienot komandu",
-    "commandLabel": "Pavēli",
+    "commandLabel": "Komanda",
+    "commandLabelPosition": "Komanda {{position}}",
     "commandPlaceholder": "piem. pnpm install",
+    "commandAtLimit": "Komanda ir ierobežota līdz {{max}} rakstzīmēm",
     "commandsEmpty": "Vēl nav nevienas iestatīšanas komandas",
     "commandsSaveFailed": "Nevarēja saglabāt iestatīšanas komandas",
     "moveUp": "Pārvietojieties uz augšu",
@@ -3892,6 +3911,7 @@
     "skillSaveFailed": "Nevarēja saglabāt prasmi",
     "skillSourceCustom": "Pielāgots",
     "skillSourceMarketplace": "Tirgus",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Ielīmējiet failu SKILL.md, un tā nosaukums tiks aizpildīts; pievienojiet prasmi no sava tālruņa bez vilkšanas un nomešanas.",
     "skillEditTitle": "Rediģēt prasmi",
     "skillEdit": "Rediģēt prasmi {{name}}",
@@ -3919,6 +3939,7 @@
       "headersHint": "Vērtības, kas parādītas kā ••••, saglabā savu esošo noslēpumu; aizstājiet vērtību, lai to nomainītu. Mainot URL, atkal ir nepieciešamas visas vērtības",
       "nameRequired": "Ievadiet servera nosaukumu",
       "nameInvalid": "Nosaukumā var izmantot tikai ASCII burtus, ciparus, pasvītras un domuzīmes, līdz 100 rakstzīmēm",
+      "nameConflict": "Serveris ar šādu nosaukumu jau eksistē",
       "commandRequired": "Ievadiet komandu",
       "commandTooLong": "Izmantojiet ne vairāk kā 50 argumentus, katrs 500 rakstzīmes",
       "urlRequired": "Ievadiet URL",
@@ -3938,7 +3959,7 @@
       "add": "Pievienojiet aģentu",
       "empty": "Vēl nav aģentu",
       "name": "Aģenta vārds",
-      "slug": "Aģentu gliemežnīca",
+      "slug": "Aģenta slug",
       "description": "Aģenta apraksts",
       "model": "Modeļa ignorēšana",
       "modelPlaceholder": "Izmantot sesijas noklusējumu",
@@ -3963,7 +3984,7 @@
       "saveFailed": "Nevarēja saglabāt aģentu",
       "deleteFailed": "Nevarēja izdzēst aģentu",
       "nameRequired": "Ievadiet aģenta nosaukumu",
-      "slugRequired": "Ievadiet aģenta lodes",
+      "slugRequired": "Ievadiet aģenta slug",
       "slugInvalid": "Slug jāsākas ar mazo ASCII burtu un jāizmanto tikai mazie ASCII burti, cipari un domuzīmes, līdz 50 rakstzīmēm",
       "slugConflict": "Šo slug jau izmanto iebūvēts aģents vai cits aģents šajā profilā",
       "edit": "Rediģēt aģentu {{name}}",
@@ -3999,7 +4020,6 @@
       "repo": "Atlasīt repozitoriju…",
       "profile": "Izvēlieties profilu",
       "remove": "Atsaistīt",
-      "private": "Privāts",
       "search": "Meklēt repozitorijās…",
       "addedToast": "Noklusējuma profils iestatīts uz \"{{repo}}\"",
       "addFailed": "Nevarēja iestatīt noklusējuma profilu",

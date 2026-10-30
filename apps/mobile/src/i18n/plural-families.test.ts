@@ -96,6 +96,28 @@ describe('plural families', () => {
     }
   });
 
+  it('collects a counted key whose arguments carry comments', () => {
+    const root = mkdtempSync(join(tmpdir(), 'check-plurals-'));
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(
+      join(root, 'src', 'fixture.ts'),
+      [
+        `t('fixture.blockCommentBeforeComma' /* one, two */, { count: 1 });`,
+        `t('fixture.blockCommentAfterComma', /* one, two */ { count: 2 });`,
+        "t('fixture.lineCommentAfterComma', // one, two\n  { count: 3 });",
+      ].join('\n')
+    );
+    try {
+      expect(collectCountedKeys(root)).toEqual([
+        'fixture.blockCommentAfterComma',
+        'fixture.blockCommentBeforeComma',
+        'fixture.lineCommentAfterComma',
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('reviews every dynamic counted call and checks its possible keys', () => {
     expect(findUnlistedDynamicCalls()).toEqual([]);
     // `findCountlessFamilies` above walks the allowlist's keys too, so a stale

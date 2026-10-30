@@ -4,6 +4,8 @@
  * is not expressed as a unit test.
  */
 import * as Haptics from 'expo-haptics';
+import { impactHaptic } from '@/lib/haptics';
+import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import {
   type SlashCommandCatalogStatus,
@@ -106,6 +108,7 @@ import {
 import { type LocalImage } from '@/lib/agent-attachments/local-image';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
+import { composerPromptText, hasVisibleComposerText } from '@/lib/composer-text';
 import {
   clipboardPasteEmptyMessage,
   useClipboardPaste,
@@ -262,6 +265,22 @@ type ChatComposerProps = {
   /** Imperative handle the host binds to call `setText`. */
   controlRef?: Ref<ChatComposerControl>;
 };
+
+/**
+ * Runs the send path the composer launches without awaiting it. A failure
+ * escaping `submit` is reported, never left as an unhandled rejection.
+ */
+async function runSubmit(submit: () => Promise<void>): Promise<void> {
+  try {
+    await submit();
+  } catch (error) {
+    captureTelemetry({
+      level: 'error',
+      error,
+      tags: { 'error.subsystem': 'agent-chat', 'error.operation': 'submit' },
+    });
+  }
+}
 
 export function ChatComposer({
   onSend,
@@ -478,12 +497,16 @@ export function ChatComposer({
   // paths) goes through it, and each setter fires only when the value the
   // composer renders actually changed.
   const publishDerivedState = useCallback((value: string, slashCandidate: string | null) => {
-    const nextHasText = value.trim().length > 0;
-    if (nextHasText !== publishedHasTextRef.current) {
-      publishedHasTextRef.current = nextHasText;
-      setHasText(nextHasText);
+    const hasVisible = hasVisibleComposerText(value);
+    if (hasVisible !== publishedHasTextRef.current) {
+      publishedHasTextRef.current = hasVisible;
+      setHasText(hasVisible);
     }
-    const nextInputEmpty = value.length === 0;
+    // The placeholder follows the same reading: a draft that draws nothing is
+    // an empty composer to look at, so it must show the hint an empty one
+    // shows. Deriving it from `value.length` left such a draft with no glyph,
+    // no hint and a disabled Send — an empty state that reads as broken.
+    const nextInputEmpty = !hasVisible;
     if (nextInputEmpty !== publishedInputEmptyRef.current) {
       publishedInputEmptyRef.current = nextInputEmpty;
       setInputEmpty(nextInputEmpty);
@@ -645,9 +668,10 @@ export function ChatComposer({
   // Imperative occupancy check: the host asks whether the composer holds any
   // text or attachment so a queued-message cancel can pick restore vs drop.
   const hasContentRef = useRef(
-    () => textRef.current.trim().length > 0 || upload.attachments.length > 0
+    () => hasVisibleComposerText(textRef.current) || upload.attachments.length > 0
   );
-  hasContentRef.current = () => textRef.current.trim().length > 0 || upload.attachments.length > 0;
+  hasContentRef.current = () =>
+    hasVisibleComposerText(textRef.current) || upload.attachments.length > 0;
 
   const restoreFilePartsRef = useRef(upload.restoreFileParts);
   restoreFilePartsRef.current = upload.restoreFileParts;
@@ -1019,7 +1043,10 @@ export function ChatComposer({
   }
 
   async function handleSend() {
-    const trimmed = textRef.current.trim();
+    // Trim alone keeps zero-width and control characters, which draw nothing:
+    // a draft of them must send exactly what an empty one sends, so the prompt
+    // below is empty even though the input still holds them.
+    const trimmed = composerPromptText(textRef.current);
     // Decide admission from live values, not render-time `control.canSend`,
     // which can lag behind a same-frame edit. An empty prompt with no sendable
     // attachment is never sent. "Sendable" counts non-terminal chips: upload is
@@ -1087,7 +1114,7 @@ export function ChatComposer({
     // executes the submission without re-acquiring/releasing the lock or
     // toggling pending state. That keeps one authority and lets the lock
     // protect the entire asynchronous send.
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     try {
       // Upload pending attachments on the prompt branch only. Slash commands
       // and session controls never carry chips (`parseChatComposerSubmission`
@@ -1134,7 +1161,7 @@ export function ChatComposer({
                   // keyboard is left exactly where the person had it — dismissing
                   // it here took the focused input away on every send (video V1
                   // ~4.4s and ~18.9s).
-                  if (textRef.current.trim() === trimmed) {
+                  if (composerPromptText(textRef.current) === trimmed) {
                     clearDraft();
                   }
                   upload.clearOptimistic();
@@ -1240,11 +1267,11 @@ export function ChatComposer({
       return;
     }
     autoSendFiredRef.current = true;
-    void submitRef.current();
+    void runSubmit(submitRef.current);
   }, [autoSendArmed, shareDelivered, hasText, attachmentsEnabled, control.canSend, upload]);
 
   function handleStop() {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Medium);
     // Arm the remount restore; the remount effect reads the live text, so
     // a transcript that lands between this tap and the remount is kept (the
     // gateway upload resolves after Stop).
@@ -1507,7 +1534,7 @@ export function ChatComposer({
               onSelectionChange={handleSelectionChange}
               onStop={handleStop}
               onSubmit={() => {
-                void submit();
+                void runSubmit(submit);
               }}
               onToggleVoice={() => {
                 void voiceInput.toggle();

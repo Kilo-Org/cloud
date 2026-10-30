@@ -38,6 +38,7 @@ import {
 } from './native-admission';
 import { captureMessage } from '@sentry/nextjs';
 import { checkRateLimit } from '@vercel/firewall';
+import { __test__ as rateLimitTest } from './firewall-rate-limit';
 import { verifyAppleAttestation, verifyAppleAssertion } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -388,6 +389,7 @@ describe('requireAdmissionPayload', () => {
 describe('issueAdmissionChallenge', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    rateLimitTest.resetReportThrottle();
   });
 
   test('returns challenge and expiresIn in seconds', async () => {
@@ -411,6 +413,43 @@ describe('issueAdmissionChallenge', () => {
     await expect(issueAdmissionChallenge(makeRequest(), '127.0.0.1')).rejects.toThrow(
       ChallengeRateLimitError
     );
+  });
+
+  test('reports an errored limiter answer once per interval and still issues challenges', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
+
+    const first = await issueAdmissionChallenge(makeRequest(), '127.0.0.1');
+    const second = await issueAdmissionChallenge(makeRequest(), '127.0.0.1');
+
+    expect(first.challenge).not.toBe(second.challenge);
+    expect(mockCheckRateLimit).toHaveBeenCalledTimes(2);
+    expect(db.insert).toHaveBeenCalledTimes(2);
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "Firewall rate limit 'native-admission-challenge' is not configured",
+      { level: 'error', tags: { source: 'native_admission_challenge' } }
+    );
+  });
+
+  test('refuses a request whose limiter answer is a block', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: true, error: 'blocked' });
+
+    await expect(issueAdmissionChallenge(makeRequest(), '127.0.0.1')).rejects.toThrow(
+      ChallengeRateLimitError
+    );
+    expect(db.insert).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+  });
+
+  test('propagates a limiter failure instead of issuing a challenge', async () => {
+    mockCheckRateLimit.mockRejectedValue(
+      new Error("Unexpected rate-limit API response status 'native-admission-challenge': 500")
+    );
+
+    await expect(issueAdmissionChallenge(makeRequest(), '127.0.0.1')).rejects.toThrow(
+      'Unexpected rate-limit API response status'
+    );
+    expect(db.insert).not.toHaveBeenCalled();
   });
 });
 

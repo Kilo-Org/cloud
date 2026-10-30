@@ -1,6 +1,7 @@
 import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { createElement, type ReactNode, useCallback, useState } from 'react';
 import { Alert } from 'react-native';
 import { toast } from 'sonner-native';
@@ -31,7 +32,7 @@ export function useSessionDeleteConfirm(): SessionDeleteConfirm {
   const [pendingDelete, setPendingDelete] = useState<{ run: () => void } | null>(null);
 
   const confirmDelete = useCallback((onDelete: () => void) => {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    notificationHaptic(Haptics.NotificationFeedbackType.Warning);
     setPendingDelete({ run: onDelete });
   }, []);
 
@@ -95,7 +96,7 @@ export async function copySessionId(sessionId: string): Promise<boolean> {
     if (!copied) {
       throw new Error('Clipboard rejected session ID');
     }
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    notificationHaptic(Haptics.NotificationFeedbackType.Success);
     toast.success(i18n.t('agents.sessionRow.idCopied'));
     return true;
   } catch {
@@ -120,7 +121,7 @@ export async function copySessionLink(
     if (!copied) {
       throw new Error('Clipboard rejected session link');
     }
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    notificationHaptic(Haptics.NotificationFeedbackType.Success);
     return true;
   } catch {
     return false;

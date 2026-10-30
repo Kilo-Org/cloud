@@ -23,6 +23,11 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { TRPCError } from '@trpc/server';
+import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
+import {
+  evaluateEffectiveModelAccessPolicy,
+  getEffectiveModelDecision,
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 export {
   getOrganizationAutoRoute,
   hasOrganizationAutoRoute,
@@ -92,23 +97,52 @@ export function getOrganizationAutoSettings(
 }
 
 /**
+ * Whether the organization's default model access policy grants `modelId`, using the organization
+ * settings being validated. An explicit grant in a selected default policy admits a model outside
+ * the provider allow-list, as it does for requests.
+ */
+async function isGrantedByDefaultPolicy(
+  organization: OrganizationAutoPolicyOrganization,
+  modelId: string,
+  dbClient: typeof readDb | DrizzleTransaction
+): Promise<boolean> {
+  const context = await getOrganizationGroupPolicyContext({
+    organizationId: organization.id,
+    subject: { type: 'defaultAccess' },
+    ...('rollback' in dbClient ? { tx: dbClient } : { fromDb: dbClient }),
+  });
+  const policy = evaluateEffectiveModelAccessPolicy({
+    ...context,
+    organization: {
+      ...context.organization,
+      plan: organization.plan,
+      settings: organization.settings,
+    },
+  });
+  return (await getEffectiveModelDecision(policy, modelId)).allowed;
+}
+
+/**
  * Like the organization model list, the provider allow-list does not exclude a model that one of
- * the organization's inference provider keys serves (see `allowsInferenceProviderUserByok`).
+ * the organization's inference provider keys exempt from it serves (see
+ * `allowsInferenceProviderUserByok`).
  */
 async function isAllowedAutoTarget(
-  organizationId: string,
+  organization: OrganizationAutoPolicyOrganization,
   restrictions: ModelRestrictions,
-  modelId: string
+  modelId: string,
+  dbClient: typeof readDb | DrizzleTransaction
 ): Promise<boolean> {
   if (await createAllowPredicateFromRestrictions(restrictions)(modelId)) return true;
   if (!restrictions.providerAllowList) return false;
+  if (await isGrantedByDefaultPolicy(organization, modelId, dbClient)) return true;
   const isAllowedWithoutProviderAllowList = createAllowPredicateFromRestrictions({
     ...restrictions,
     providerAllowList: undefined,
   });
   return (
     (await isAllowedWithoutProviderAllowList(modelId)) &&
-    (await modelsServedByOrganizationInferenceProviderUserByok(organizationId, [modelId])).length >
+    (await modelsServedByOrganizationInferenceProviderUserByok(organization.id, [modelId])).length >
       0
   );
 }
@@ -260,7 +294,14 @@ export async function validateOrganizationAutoTarget(
     };
   }
 
-  if (!(await isAllowedAutoTarget(organization.id, restrictions, catalogModel.id))) {
+  if (
+    !(await isAllowedAutoTarget(
+      organization,
+      restrictions,
+      catalogModel.id,
+      options.dbClient ?? readDb
+    ))
+  ) {
     return {
       kind: 'error',
       message: `Organization Auto route target '${targetModelId}' is not allowed by the organization's model policy.`,

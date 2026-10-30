@@ -175,6 +175,7 @@ vi.mock('@/components/agents/chat-markdown-text', () => ({
 
 vi.mock('expo-router', () => ({
   useLocalSearchParams: useLocalSearchParamsMock,
+  useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useRouter: useRouterMock,
 }));
 

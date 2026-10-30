@@ -1,4 +1,5 @@
 import { Lock } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
@@ -23,6 +24,7 @@ export function RepoToggleRow({
   className?: string;
 }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   return (
     <ChoiceRow
@@ -31,9 +33,23 @@ export function RepoToggleRow({
       disabled={disabled}
       onPress={onPress}
       className={className}
+      // The lock is decorative, so privacy reaches the name instead: a
+      // screen-reader user must be able to tell a private repository from a
+      // public one before picking scope. Public rows keep the plain name.
+      accessibleName={
+        repo.private ? t('common.privateRepositoryA11y', { name: repo.fullName }) : undefined
+      }
     >
       <View className="flex-1 flex-row items-center gap-2 pr-3">
-        {repo.private ? <Lock size={12} color={colors.mutedForeground} /> : null}
+        {repo.private ? (
+          <View
+            className="shrink-0"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Lock size={12} color={colors.mutedForeground} />
+          </View>
+        ) : null}
         {/* Middle ellipsis keeps the owner tail and the distinguishing repo
             suffix visible; a tail cut left every long row looking identical
             (explorer finding, 2026-10-18). The min-w-0 box makes the name

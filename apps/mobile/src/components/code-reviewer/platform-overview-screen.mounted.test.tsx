@@ -92,6 +92,7 @@ vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.kilo.ai' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: openExternal }));
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
   openAuthorizationAndWaitForReturn: launchBrowser,
+  reportLateLaunchFailure: vi.fn(),
 }));
 vi.mock('@/lib/trpc', () => ({
   trpcClient: { githubApps: { mintInstallState: { mutate: mintInstallState } } },

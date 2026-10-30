@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 /**
  * The retained failure of an idle chat, in fixed copy.
@@ -28,7 +29,7 @@ export function ChatFailureRow({
         </Button>
       ) : null}
       {onRetry ? (
-        <Button variant="outline" size="sm" onPress={onRetry}>
+        <Button variant="outline" size="sm" className={STATE_ACTION_CLASS} onPress={onRetry}>
           <Text>{t('common.retry')}</Text>
         </Button>
       ) : null}

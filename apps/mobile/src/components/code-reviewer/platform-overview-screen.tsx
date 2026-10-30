@@ -72,6 +72,7 @@ export function PlatformOverviewScreen({
     return (
       <ReviewerErrorScreen
         title={capabilities.label}
+        eyebrow={t('common.codeReviewer')}
         onRetry={() => {
           permission.refetch();
         }}
@@ -107,6 +108,7 @@ export function PlatformOverviewScreen({
     return (
       <ReviewerErrorScreen
         title={capabilities.label}
+        eyebrow={t('common.codeReviewer')}
         variant={providerState.variant}
         // A permission/not-found error can't be fixed by retrying — hide retry.
         onRetry={
@@ -132,6 +134,7 @@ export function PlatformOverviewScreen({
     return (
       <ReviewerErrorScreen
         title={capabilities.label}
+        eyebrow={t('common.codeReviewer')}
         variant={configBody.body.status === 'error' ? configBody.body.variant : 'server'}
         onRetry={configBody.body.status === 'error' ? configBody.body.refetch : configBody.retry}
         isRetrying={config.isFetching}

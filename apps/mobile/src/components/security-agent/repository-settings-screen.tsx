@@ -38,6 +38,7 @@ import {
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
 import { type FlattenedSecurityAgentConfig, type SecurityAgentConfig } from '@/lib/security-agent';
+import { cn } from '@/lib/utils';
 
 type RepositorySelectionMode = SecurityAgentConfig['repositorySelectionMode'];
 
@@ -182,6 +183,9 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // it is neither loading nor errored and `data` is still undefined, which is
   // not the settled "No repositories" state the Manage access CTA is for.
   const repositoriesEmpty = repositories.data?.length === 0;
+  // Only a settled read says the grant has nothing to select.
+  const repositoriesSettledEmpty =
+    repositoriesEmpty && !repositories.isLoading && !repositories.isError;
   // An empty grant is the one repository state that is not about the mode: with
   // nothing accessible there is nothing to select and nothing to sync whichever
   // mode is stored, and widening the app's access is the only way out. Naming it
@@ -190,8 +194,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // Only a settled read qualifies: a `[]` left over from before a failed
   // refetch (which the return edge below can hit) must not render the grant
   // state, which would leave the section with a label and no control.
-  const showRepositorySection =
-    showRepositoryStates || (repositoriesEmpty && !repositories.isLoading && !repositories.isError);
+  const showRepositorySection = showRepositoryStates || repositoriesSettledEmpty;
 
   // The GitHub settings page is where installation access is widened on the
   // web, and `openExternalUrl` resolves when that page closes — on both
@@ -265,9 +268,13 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
 
       {showRepositorySection && (
         <View className="mt-6">
-          <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
-            {t('common.repositories')}
-          </Text>
+          {/* The empty state's own title already says "No repositories", so a
+              section label above it only repeats the screen title. */}
+          {repositoriesSettledEmpty ? null : (
+            <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
+              {t('common.repositories')}
+            </Text>
+          )}
           {showRepositoryStates && repositories.isLoading && (
             <View className="gap-3 pt-2">
               <Skeleton className="h-12 w-full rounded-lg" />
@@ -283,15 +290,21 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               isRetrying={repositories.isFetching}
             />
           )}
-          {!repositories.isLoading && !repositories.isError && repositoriesEmpty ? (
+          {repositoriesSettledEmpty ? (
             <EmptyState
               placement="top"
               icon={FolderGit2}
               title={t('securityAgent.repositories.noRepositories')}
               description={t('securityAgent.repositories.noRepositoriesDescription')}
+              // The card surface and its 7%-white border vanish against the
+              // dark page, which left the state's only action and its tile
+              // outlined in near-black. Dark mode takes the raised neutral
+              // surface and the visible input border, the same pair the
+              // settings rows and the session search field use.
+              iconContainerClassName="h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card dark:border-input dark:bg-secondary"
               action={
                 <Button
-                  className={STATE_ACTION_CLASS}
+                  className={cn(STATE_ACTION_CLASS, 'dark:border-input dark:bg-secondary')}
                   variant="outline"
                   onPress={() => {
                     void manageAccess();

@@ -434,6 +434,18 @@ describe('RepositorySettingsScreen repository picker', () => {
     expect(textContents(renderer)).not.toContain(validation);
   });
 
+  // The section label repeated the screen title above a state that already
+  // says "No repositories", so it is only worth its line when rows follow it.
+  it('leaves the section label off the empty state and keeps it above the rows', async () => {
+    repositories.data = [];
+    const empty = await mount();
+    expect(textContents(empty.renderer)).not.toContain(i18n.t('common.repositories'));
+
+    repositories.data = THREE_REPOS;
+    const filled = await mount();
+    expect(textContents(filled.renderer)).toContain(i18n.t('common.repositories'));
+  });
+
   it('mounts no repository rows outside selected mode', async () => {
     config.data = configData('all');
     const { renderer } = await mount();

@@ -7,6 +7,7 @@ import { View } from 'react-native';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
+import { SettingsOverviewSkeleton } from '@/components/security-agent/settings-overview-skeleton';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -33,19 +34,8 @@ const ANALYSIS_MODE_KEYS = {
   deep: 'securityAgent.analysisMode.deep',
 };
 
-function SettingsOverviewSkeleton() {
-  const { t } = useTranslation();
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={t('securityAgent.dashboard.settings')} />
-      <View className="gap-3 px-6 pt-4">
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
-      </View>
-    </View>
-  );
-}
+// The loading state lives in its own module (`settings-overview-skeleton`) so
+// the settled screen keeps under the file-length cap.
 
 function getDisabledCopy(canManage: boolean, hasEffectiveRepo: boolean): string {
   if (!canManage) {
@@ -126,7 +116,7 @@ export function SettingsOverviewScreen({
     );
   }
   if (config.isLoading || !config.data || capability.status === 'loading') {
-    return <SettingsOverviewSkeleton />;
+    return <SettingsOverviewSkeleton scope={scope} />;
   }
 
   const data = config.data;

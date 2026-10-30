@@ -403,4 +403,21 @@ describe.each([
       );
     }
   });
+
+  // The header is not part of the body's loading state: a ⋯ that appeared only
+  // once the queries answered changed the header between the two states.
+  it('keeps the header action while the settings load', async () => {
+    gates.set('getConfig', Promise.withResolvers<undefined>().promise);
+    const root = await mount('personal');
+    if (presentation !== 'standalone') {
+      return;
+    }
+    expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
+    expect(host(root, 'Switch')).toHaveLength(0);
+    const header = host(root, 'ScreenHeader');
+    expect(header).toHaveLength(1);
+    expect((header[0]?.props.headerRight as { type?: unknown } | undefined)?.type).toBe(
+      'AuditReportButton'
+    );
+  });
 });

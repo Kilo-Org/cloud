@@ -3966,6 +3966,17 @@
     ],
     "searchBlob": "byok.listCatalogModeSupportedModels List which AI models each direct BYOK provider supports when running in catalog mode, grouped by provider and returned as model names with catalog ids. Use to discover available catalog-mode models per provider. byok listcatalogmodesupportedmodels"
   },
+  "byok.listPolicyProviders": {
+    "path": "byok.listPolicyProviders",
+    "kind": "query",
+    "summary": "List the AI model providers that are available for bring-your-own-key (BYOK) policy configuration, so you can see which providers support using your own API key.",
+    "inputSchema": {},
+    "tags": [
+      "byok",
+      "listpolicyproviders"
+    ],
+    "searchBlob": "byok.listPolicyProviders List the AI model providers that are available for bring-your-own-key (BYOK) policy configuration, so you can see which providers support using your own API key. byok listpolicyproviders"
+  },
   "byok.listSupportedModels": {
     "path": "byok.listSupportedModels",
     "kind": "query",

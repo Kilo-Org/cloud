@@ -1,9 +1,11 @@
 import {
+  buildOpaqueScopeKey,
   type GlanceableAgentsSnapshot,
   glanceableAgentsSnapshotSchema,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
+import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
   _resetHomeWidgetDataForTests,
   _setHomeWidgetStoreForTests,
@@ -175,6 +177,26 @@ function parseStoredSnapshot(raw: string): GlanceableAgentsSnapshot | null {
 }
 
 /**
+ * The scope the signed-in account derives, read from the same store the auth
+ * hints live in. The restored Home-widget record is adopted for this scope
+ * only, never for the scope its own content names. A failed read is
+ * "unknown", never a match.
+ */
+export async function getAuthenticatedGlanceableScopeKey(): Promise<string | null> {
+  try {
+    const { getItemAsync } = getSecureStore();
+    const [userId, organizationId] = await Promise.all([
+      getItemAsync(ACTIVE_USER_ID_KEY),
+      getItemAsync(ORGANIZATION_STORAGE_KEY),
+    ]);
+    return userId === null ? null : buildOpaqueScopeKey({ userId, organizationId });
+  } catch (error) {
+    reportSecureStoreFailure('read', error);
+    return null;
+  }
+}
+
+/**
  * Restore the in-memory state from SecureStore after a JS restart. Best
  * effort: a failed read keeps the null in-memory state. A live write during
  * the read owns the state, so the stale persisted record is skipped. An
@@ -209,7 +231,8 @@ export async function restorePersistedGlanceable(): Promise<void> {
       // restored scope always come from the same publish.
       localScopeKey ??= stored.scopeKey;
     }
-    await restoreHomeWidgetData(localScopeKey);
+    const authenticatedScopeKey = await getAuthenticatedGlanceableScopeKey();
+    await restoreHomeWidgetData(authenticatedScopeKey);
   } catch (error) {
     // A malformed mirror is treated as absent; the publisher repopulates it.
     // A read failure is different: the record may be there and own a card, so

@@ -11,6 +11,8 @@ import {
   upsertDiscordInstallation,
 } from '@/lib/integrations/discord-service';
 import { parseDiscordSnowflake } from '@/lib/discord-bot/discord-id';
+import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
+import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
@@ -155,12 +157,16 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
     const guildId = oauthData.guild?.id
       ? parseDiscordSnowflake(oauthData.guild.id, 'guild ID')
       : null;
+    // Resolve the owner's model policy before the lock, so the transaction only
+    // performs the ownership check and the installation write.
+    const defaultModel =
+      owner.type === 'org' ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL) : undefined;
     try {
       const store = (database?: DrizzleTransaction) =>
         upsertDiscordInstallation(
           owner,
           oauthData,
-          { allowGuildRebind: owner.type === 'org' },
+          { allowGuildRebind: owner.type === 'org', defaultModel },
           database
         );
 

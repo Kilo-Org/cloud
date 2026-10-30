@@ -232,7 +232,10 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 export async function upsertDiscordInstallation(
   owner: Owner,
   oauthResponse: DiscordOAuth2Response,
-  { allowGuildRebind = false }: { allowGuildRebind?: boolean } = {},
+  {
+    allowGuildRebind = false,
+    defaultModel,
+  }: { allowGuildRebind?: boolean; defaultModel?: string | null } = {},
   database: typeof db | DrizzleTransaction = db
 ): Promise<PlatformIntegration> {
   if (!oauthResponse.guild?.id) {
@@ -295,18 +298,21 @@ export async function upsertDiscordInstallation(
     return updated;
   }
 
-  // For org integrations, get a model that respects org access policy. A null
+  // For org integrations, use a model that respects org access policy. A null
   // result means the policy allows none of the candidates, so the installation
-  // stores no model and the bot reports that no model is configured.
+  // stores no model and the bot reports that no model is configured. Callers
+  // inside a lock resolve it beforehand; without one it is resolved here.
   // For user integrations, use the shared bot default model.
-  const defaultModel =
-    owner.type === 'org'
-      ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
-      : DEFAULT_BOT_MODEL;
+  const resolvedModel =
+    owner.type === 'user'
+      ? DEFAULT_BOT_MODEL
+      : defaultModel !== undefined
+        ? defaultModel
+        : await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL);
 
   const metadata = {
     guild_icon: oauthResponse.guild.icon,
-    ...(defaultModel ? { model_slug: defaultModel } : {}),
+    ...(resolvedModel ? { model_slug: resolvedModel } : {}),
   };
 
   const [created] = await database

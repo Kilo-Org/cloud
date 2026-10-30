@@ -44,6 +44,9 @@ jest.mock('@/lib/integrations/provider-oauth-attempts', () => ({
   cancelProviderOAuthAttempt: jest.fn(async () => true),
   beginProviderOAuthAttempt: jest.fn(async () => undefined),
 }));
+jest.mock('@/lib/slack-bot/model-allow-list', () => ({
+  getDefaultAllowedModel: jest.fn(async () => 'test/default-model'),
+}));
 jest.mock('@/lib/bot', () => ({
   bot: { initialize: jest.fn(async () => undefined), getAdapter: jest.fn() },
 }));
@@ -117,7 +120,7 @@ describe('handleDiscordOAuthCallback', () => {
     expect(mockedUpsertDiscordInstallation).toHaveBeenCalledWith(
       { type: 'user', id: USER_ID },
       expect.objectContaining({ access_token: 'access-token' }),
-      { allowGuildRebind: false },
+      { allowGuildRebind: false, defaultModel: undefined },
       expect.anything()
     );
     expect(mockedWithWorkspaceInstallationLock).toHaveBeenCalledWith(
@@ -193,7 +196,7 @@ describe('handleDiscordOAuthCallback', () => {
     expect(mockedUpsertDiscordInstallation).toHaveBeenCalledWith(
       { type: 'org', id: ORGANIZATION_ID },
       expect.objectContaining({ access_token: 'access-token' }),
-      { allowGuildRebind: true },
+      { allowGuildRebind: true, defaultModel: 'test/default-model' },
       expect.anything()
     );
   });

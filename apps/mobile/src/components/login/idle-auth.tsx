@@ -34,8 +34,23 @@ import { cn } from '@/lib/utils';
 // of the mark or the inline spinner the row holds, so swapping an 18pt mark for
 // the spinner moves nothing. All three rows draw a mark in the slot (the
 // passkey row included), so the provider options read as one group.
+//
+// The slot is inset from the rounded edge by the same 16pt the row insets its
+// content: flush at the edge the mark read as cut by the corner, with far less
+// inset than the centered label has from the sides (design review, 2026-10-30).
+// `start` is the leading edge, so in the right-to-left layout the mark takes the
+// same inset from the right edge and clears both corners. Both values are px
+// because native rem is 14pt here, so a spacing step would land off the design's
+// 16pt.
 export const PROVIDER_GLYPH_SLOT_CLASS =
-  'absolute start-0 top-0 bottom-0 w-[18px] items-center justify-center';
+  'absolute start-[16px] top-0 bottom-0 w-[18px] items-center justify-center';
+
+// The mark's 16pt inset plus its own 18pt width: the row's content box starts
+// where the mark ends, so the centered label can never run under the mark
+// however long the translation is, and the equal start and end insets keep it
+// centered on the button.
+const PROVIDER_ROW_CLASS =
+  'relative min-h-[44px] w-full flex-row justify-center rounded-[8px] px-[34px] py-2.5';
 
 /** The two links the legal sentence exposes as custom accessibility actions. */
 const LEGAL_LINK_ACTIONS = [
@@ -295,7 +310,7 @@ export function IdleAuth({
           // the mark is out of flow at the leading edge, so the label centers
           // on the button's own width at the shared 44pt floor and all three
           // provider rows keep one height.
-          className="relative min-h-[44px] w-full flex-row justify-center rounded-[8px] py-2.5"
+          className={PROVIDER_ROW_CLASS}
           disabled={authBusy}
           onPress={() => {
             onSignInStart?.();
@@ -327,7 +342,7 @@ export function IdleAuth({
           // taller than the Google button above it (2026-09-20 device finding).
           // The label takes the whole content width, so it centers on the
           // button rather than on the space the mark leaves over.
-          className="relative min-h-[44px] w-full flex-row justify-center rounded-[8px] py-2.5"
+          className={PROVIDER_ROW_CLASS}
           disabled={authBusy}
           onPress={() => {
             onSignInStart?.();
@@ -360,7 +375,7 @@ export function IdleAuth({
             // directly above it; the flex-1 label box gives the copy the whole
             // content width and centers it on the button, so the stack keeps one
             // row height.
-            className="relative min-h-[44px] w-full flex-row justify-center rounded-[8px] py-2.5"
+            className={PROVIDER_ROW_CLASS}
             disabled={authBusy}
             onPress={() => {
               onSignInStart?.();

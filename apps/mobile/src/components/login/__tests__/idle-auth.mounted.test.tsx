@@ -430,6 +430,22 @@ describe('IdleAuth provider chrome parity', () => {
     expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'top')).toBe(0);
     expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'bottom')).toBe(0);
 
+    // The mark is inset off the rounded edge, on the leading edge in either
+    // direction, and the row's content box starts where the mark ends: the
+    // centered copy can never run under the mark, and the two insets being equal
+    // is what keeps the label on the button's own axis.
+    const markInset = await compiledNumber(PROVIDER_GLYPH_SLOT_CLASS, 'insetInlineStart');
+    const markWidth = await compiledNumber(PROVIDER_GLYPH_SLOT_CLASS, 'width');
+    expect(markInset).toBe(16);
+    expect(markWidth).toBe(18);
+    const rowPaddings = await Promise.all(
+      providerRows(renderer.root).map(button =>
+        compiledNumber(String(button.props.className), 'paddingInline')
+      )
+    );
+    expect(rowPaddings).toHaveLength(3);
+    expect(rowPaddings.every(padding => padding === (markInset ?? 0) + (markWidth ?? 0))).toBe(true);
+
     act(() => {
       renderer.unmount();
     });

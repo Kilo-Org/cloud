@@ -22,7 +22,7 @@ const requestSchema = z.object({
  * For EXISTING users (sign-in), these restrictions are NOT enforced.
  */
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  const body: unknown = await request.json().catch(() => undefined);
   const validation = requestSchema.safeParse(body);
 
   if (!validation.success) {

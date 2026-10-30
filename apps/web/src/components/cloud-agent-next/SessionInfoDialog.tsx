@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ChevronDown, Share2 } from 'lucide-react';
 import { ShareSessionDialog } from './ShareSessionDialog';
+import { SessionFailureHistory } from './SessionFailureHistory';
 import {
   formatSessionCost,
   formatSessionTotalCost,
@@ -202,6 +203,7 @@ export function SessionInfoDialog({
                 </dd>
               </div>
             </dl>
+            <SessionFailureHistory cloudAgentSessionId={sessionId} />
           </div>
           <DialogFooter>
             <Button

@@ -12,7 +12,7 @@ export default async function CloudAgentLayout({ children }: { children: React.R
   const preferences = await readSidebarPreferences(user.id);
 
   return (
-    <CloudAgentProvider>
+    <CloudAgentProvider userId={user.id}>
       <PrefetchedCloudSidebar
         userId={user.id}
         organizationId={null}

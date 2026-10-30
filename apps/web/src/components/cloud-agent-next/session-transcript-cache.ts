@@ -4,13 +4,24 @@ import type { CachedSessionSnapshotPage, KiloSessionId } from '@kilocode/cloud-a
 const TRANSCRIPT_CACHE_ROOT = 'cloud-agent-transcript';
 const CACHED_MESSAGE_LIMIT = 50;
 
-/** One cache per account context, so personal and organization chats stay apart. */
-export function transcriptCacheScope(organizationId: string | null): string {
-  return organizationId ?? 'personal';
+/** The signed-in user and the account context the chat is read in. */
+export type TranscriptCacheScope = { userId: string; organizationId: string | null };
+
+/** One cache per user and account context, so another user's chats never show. */
+export function transcriptCacheScope(
+  userId: string,
+  organizationId: string | null
+): TranscriptCacheScope {
+  return { userId, organizationId };
 }
 
-export function transcriptCacheKey(scope: string, sessionId: string) {
-  return [TRANSCRIPT_CACHE_ROOT, scope, sessionId] as const;
+/** The cached pages of one user and account context, oldest evicted first. */
+function transcriptScopePrefix(scope: TranscriptCacheScope) {
+  return [TRANSCRIPT_CACHE_ROOT, scope.userId, scope.organizationId ?? 'personal'] as const;
+}
+
+export function transcriptCacheKey(scope: TranscriptCacheScope, sessionId: string) {
+  return [...transcriptScopePrefix(scope), sessionId] as const;
 }
 
 /** The recent tail of a page; the live page restores pagination when it lands. */
@@ -23,8 +34,14 @@ export function toCachedTranscriptPage(page: CachedSessionSnapshotPage): CachedS
   };
 }
 
-export function createWebSessionTranscriptCache(queryClient: QueryClient, scope: string) {
-  const queryKey = [TRANSCRIPT_CACHE_ROOT, scope];
+/**
+ * The scope is read on every access: a session manager created before the
+ * signed-in user changed must not touch the previous user's pages.
+ */
+export function createWebSessionTranscriptCache(
+  queryClient: QueryClient,
+  currentScope: () => TranscriptCacheScope
+) {
   queryClient.setQueryDefaults([TRANSCRIPT_CACHE_ROOT], {
     gcTime: 5 * 60_000,
     structuralSharing: false,
@@ -33,13 +50,16 @@ export function createWebSessionTranscriptCache(queryClient: QueryClient, scope:
   return {
     // Synchronous, so a reopened session paints from its cached page in the first frame.
     read: (sessionId: KiloSessionId): CachedSessionSnapshotPage | null =>
-      queryClient.getQueryData<CachedSessionSnapshotPage>(transcriptCacheKey(scope, sessionId)) ??
-      null,
+      queryClient.getQueryData<CachedSessionSnapshotPage>(
+        transcriptCacheKey(currentScope(), sessionId)
+      ) ?? null,
     write: (page: CachedSessionSnapshotPage): void => {
       const snapshot = toCachedTranscriptPage(page);
       const updatedAt = Date.now();
       queueMicrotask(() => {
         try {
+          const scope = currentScope();
+          const queryKey = transcriptScopePrefix(scope);
           if (JSON.stringify(snapshot).length > 1_000_000) {
             queryClient.removeQueries({ queryKey: [...queryKey, page.info.id], exact: true });
             return;
@@ -64,7 +84,10 @@ export function createWebSessionTranscriptCache(queryClient: QueryClient, scope:
     // Drop this provider's page for a session the server answered as not
     // available.
     invalidate: (sessionId: KiloSessionId): void => {
-      queryClient.removeQueries({ queryKey: transcriptCacheKey(scope, sessionId), exact: true });
+      queryClient.removeQueries({
+        queryKey: transcriptCacheKey(currentScope(), sessionId),
+        exact: true,
+      });
     },
   };
 }

@@ -262,33 +262,36 @@ export const LEGAL_LINK_MIN_DP = 48;
 export const LEGAL_LINK_BOX_CLASS = 'min-h-[48px] min-w-[48px] items-center justify-center';
 
 /**
- * The `text-xs` line a legal link centres on, in dp: line-height
- * `calc(1 / 0.75)` of 10.5dp.
+ * The `text-sm` line a legal link centres on, in dp: `text-sm`'s 1.25rem
+ * line-height at NativeWind's 14dp rem.
  */
-export const LEGAL_LINK_LINE_DP = 14;
+export const LEGAL_LINK_LINE_DP = 17.5;
 
 /**
  * The vertical margin a legal link cancels inside a running sentence: the box's
- * overflow past the `text-xs` line it centres on, `(48 - 14) / 2`. A sentence
- * has no second link beside it, so the overflow only ever lands on prose, and
- * cancelling it keeps the sentence on its own line exactly as the sign-in
- * sentence's {@link INLINE_LINK_BOX_CLASS} does.
+ * overflow past the `text-sm` line it centres on, `(48 - 17.5) / 2 = 15.25`,
+ * rounded to the whole dp a class can carry. A sentence has no second link
+ * beside it, so the overflow only ever lands on prose, and cancelling it keeps
+ * the sentence on its own line exactly as the sign-in sentence's
+ * {@link INLINE_LINK_BOX_CLASS} does.
  *
  * The margin cancels the box in layout only: the frame still reaches
  * {@link LEGAL_LINK_SENTENCE_CANCEL_DP} above and below the line, so a sentence
  * that starts a container carries that frame past the container's own edge. A
  * pinned footer with `pt-3` above it (0.75rem, 10.5dp at this rem) leaves about
- * 6.5dp of the frame over the surface above it. Callers in that position render
+ * 4.5dp of the frame over the surface above it. Callers in that position render
  * {@link LEGAL_LINK_BOX_CLASS} — the whole target as the row's own line —
  * instead of this class.
  */
-export const LEGAL_LINK_SENTENCE_CANCEL_DP = (LEGAL_LINK_MIN_DP - LEGAL_LINK_LINE_DP) / 2;
+export const LEGAL_LINK_SENTENCE_CANCEL_DP = Math.round(
+  (LEGAL_LINK_MIN_DP - LEGAL_LINK_LINE_DP) / 2
+);
 
 /**
  * The box a legal link renders as the last word of a consent sentence that sits
  * in a flow with room above and below it.
  */
-export const LEGAL_LINK_SENTENCE_BOX_CLASS = `${LEGAL_LINK_BOX_CLASS} -my-[17px]`;
+export const LEGAL_LINK_SENTENCE_BOX_CLASS = `${LEGAL_LINK_BOX_CLASS} -my-[15px]`;
 
 /**
  * The row the two store legal links share: side by side when they fit, one per

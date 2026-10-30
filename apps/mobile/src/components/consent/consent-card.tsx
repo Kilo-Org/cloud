@@ -33,7 +33,7 @@ type ConsentCardProps = {
  * Maximum font scale honoured by the pinned privacy disclosure.
  *
  * The disclosure sits in the card's pinned footer with the reserved error
- * line and two `size="lg"` buttons. Uncapped, the `text-xs` sentence grows
+ * line and two `size="lg"` buttons. Uncapped, the `text-sm` sentence grows
  * with Dynamic Type to several lines at the largest system text size, and
  * that height comes out of the sheet, not the scroll region: the footer has
  * no room left and the second action clips at the sheet bottom. Capped at
@@ -325,8 +325,8 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE), and its
             policy link takes its 48dp target into the row
             (`reserveTargetHeight`): the cancelled box behind the details
-            screens leaves 17dp of frame above its line, and here that frame
-            started about 6.5dp above the footer's `pt-3` top edge, over the
+            screens leaves 15dp of frame above its line, and here that frame
+            started about 4.5dp above the footer's `pt-3` top edge, over the
             scroll region. */}
         <ConsentPolicySentence
           prefix={t('consent.privacyPolicyPrefix')}

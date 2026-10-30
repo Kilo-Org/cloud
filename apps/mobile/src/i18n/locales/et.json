@@ -3136,7 +3136,7 @@
     "couldNotSaveChoice": "Sinu valikut ei õnnestunud salvestada. Proovi uuesti.",
     "onlineAllowed": "Veebis, lubatud",
     "onlineNotAllowed": "Veebis, keelatud",
-    "optionalReview": "Valikuline – saad seda igal ajal seadetes muuta",
+    "optionalReview": "Valikuline",
     "optionalOnboarding": "Valikuline – lubatud, kuni selle välja lülitad",
     "aiProvidersWhat": "Sinu viibad, vestlusajalugu ja kõik lisatud failid.",
     "aiProvidersWhy": "AI-vastuste genereerimiseks.",

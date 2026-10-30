@@ -260,9 +260,11 @@ describe('standalone legal link geometry', () => {
     expect(LEGAL_LINK_ROW_CLASS).toContain('flex-wrap');
 
     // The sentence has no second link beside it, so its box cancels the
-    // overflow past the `text-xs` line and the sentence keeps its own height.
-    expect(LEGAL_LINK_LINE_DP).toBe(14);
-    expect(LEGAL_LINK_SENTENCE_CANCEL_DP).toBe((LEGAL_LINK_MIN_DP - LEGAL_LINK_LINE_DP) / 2);
+    // overflow past the `text-sm` line and the sentence keeps its own height.
+    expect(LEGAL_LINK_LINE_DP).toBe(17.5);
+    expect(LEGAL_LINK_SENTENCE_CANCEL_DP).toBe(
+      Math.round((LEGAL_LINK_MIN_DP - LEGAL_LINK_LINE_DP) / 2)
+    );
     expect(await compiledDp(LEGAL_LINK_SENTENCE_BOX_CLASS, 'marginBlock')).toBe(
       -LEGAL_LINK_SENTENCE_CANCEL_DP
     );

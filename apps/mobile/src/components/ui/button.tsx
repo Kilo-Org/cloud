@@ -13,7 +13,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: 'bg-primary active:opacity-80 shadow-sm shadow-[#0000000D]',
-        destructive: 'bg-destructive active:opacity-80 shadow-sm shadow-[#0000000D]',
+        destructive: 'bg-destructive-solid active:opacity-80 shadow-sm shadow-[#0000000D]',
         outline: 'border-border bg-card active:opacity-80 border shadow-sm shadow-[#0000000D]',
         secondary: 'bg-secondary active:opacity-80 shadow-sm shadow-[#0000000D]',
         ghost: 'active:opacity-60',
@@ -115,7 +115,10 @@ function spinnerColor(variant: ButtonProps['variant'], colors: ThemeColors): str
   if (variant === 'accent-soft') {
     return '#1A1A10';
   }
-  // default, destructive
+  if (variant === 'destructive') {
+    return colors.destructiveSolidForeground;
+  }
+  // default
   return colors.primaryForeground;
 }
 
@@ -123,7 +126,7 @@ const buttonTextVariants = cva('text-foreground text-center text-sm font-semibol
   variants: {
     variant: {
       default: 'text-primary-foreground',
-      destructive: 'text-destructive-foreground',
+      destructive: 'text-destructive-solid-foreground',
       outline: 'text-foreground',
       secondary: 'text-secondary-foreground',
       ghost: 'text-foreground',

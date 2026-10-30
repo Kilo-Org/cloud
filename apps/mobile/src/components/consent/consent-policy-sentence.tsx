@@ -16,11 +16,11 @@ type ConsentPolicySentenceProps = {
    * Reserves the link's whole 48dp target as the row's height, instead of
    * cancelling the box's vertical overflow.
    *
-   * The cancelled box keeps the sentence on its 14dp line, but the box itself
-   * still reaches 17dp above and below that line. That is invisible inside a
+   * The cancelled box keeps the sentence on its 17.5dp line, but the box itself
+   * still reaches 15dp above and below that line. That is invisible inside a
    * scroll body, where the overflow only lands on prose, and wrong where the
    * sentence starts a container: the consent card's pinned footer pads its top
-   * by `pt-3` (10.5dp), so the box's top ~6.5dp sat over the scroll region
+   * by `pt-3` (10.5dp), so the box's top ~4.5dp sat over the scroll region
    * above it. Pass this wherever the sentence is a container's first child.
    */
   readonly reserveTargetHeight?: boolean;
@@ -32,12 +32,14 @@ type ConsentPolicySentenceProps = {
  *
  * The sentence is a row of nodes rather than one `Text` with a nested handler,
  * because a nested link's press region is its glyphs: the whole target would be
- * the 14dp `text-xs` line. As a node of its own the link carries a real 48dp
- * target the control-size audit can read, whose overflow past the line is
- * cancelled so the sentence keeps its line and the glyphs keep their position,
- * or — for a caller that passes `reserveTargetHeight` — takes that height into
- * the row so nothing reaches past it. The prefix can wrap, so the row wraps
- * with it; the link and the closing period move together.
+ * the 17.5dp `text-sm` line it centres on. As a node of its own the link
+ * carries a real 48dp target the control-size audit can read, whose overflow
+ * past the line is cancelled so the sentence keeps its line and the glyphs keep
+ * their position, or — for a caller that passes `reserveTargetHeight` — takes
+ * that height into the row so nothing reaches past it. The prefix can wrap, so
+ * the row wraps with it; the link and the closing period move together. The
+ * sentence reads at the same `text-sm` size as the body copy around it, and its
+ * muted lead-in keeps it secondary.
  */
 export function ConsentPolicySentence({
   prefix,
@@ -50,7 +52,7 @@ export function ConsentPolicySentence({
 
   return (
     <View className="flex-row flex-wrap items-center">
-      <Text className="text-xs text-muted-foreground" maxFontSizeMultiplier={maxFontSizeMultiplier}>
+      <Text className="text-sm text-muted-foreground" maxFontSizeMultiplier={maxFontSizeMultiplier}>
         {prefix}{' '}
       </Text>
       <Pressable
@@ -60,13 +62,13 @@ export function ConsentPolicySentence({
         onPress={onOpenPolicy}
       >
         <Text
-          className="text-xs text-primary underline"
+          className="text-sm text-primary underline"
           maxFontSizeMultiplier={maxFontSizeMultiplier}
         >
           {linkLabel}
         </Text>
       </Pressable>
-      <Text className="text-xs text-muted-foreground" maxFontSizeMultiplier={maxFontSizeMultiplier}>
+      <Text className="text-sm text-muted-foreground" maxFontSizeMultiplier={maxFontSizeMultiplier}>
         .
       </Text>
     </View>

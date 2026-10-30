@@ -2607,7 +2607,7 @@
     "couldNotSaveChoice": "Je keuze kon niet worden opgeslagen. Probeer het opnieuw.",
     "onlineAllowed": "Online, toegestaan",
     "onlineNotAllowed": "Online, niet toegestaan",
-    "optionalReview": "Optioneel — je kunt dit op elk moment wijzigen in de instellingen",
+    "optionalReview": "Optioneel",
     "optionalOnboarding": "Optioneel — aan, tenzij je het uitschakelt",
     "aiProvidersWhat": "Je prompts, gespreksgeschiedenis en alle bestanden die je bijvoegt.",
     "aiProvidersWhy": "Om AI-antwoorden te genereren.",

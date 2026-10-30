@@ -15,10 +15,25 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
 }));
 
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({
+    mutedForeground: '#8A8680',
+    primary: '#FFDD00',
+    card: '#17171A',
+  }),
+}));
+
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
 
-function renderSwitch(props: { disabled?: boolean; accessibilityState?: { busy?: boolean } }) {
+type SwitchUnderTest = {
+  disabled?: boolean;
+  accessibilityState?: { busy?: boolean };
+  trackColor?: { false?: string; true?: string };
+  thumbColor?: string;
+};
+
+function renderSwitch(props: SwitchUnderTest) {
   const ref: { current: R | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(createElement(Switch, { value: false, ...props }));
@@ -33,6 +48,8 @@ function renderSwitch(props: { disabled?: boolean; accessibilityState?: { busy?:
 function nativeProps(root: I): {
   disabled?: boolean;
   accessibilityState?: { disabled?: boolean; busy?: boolean };
+  trackColor?: { false?: string; true?: string };
+  thumbColor?: string;
 } {
   const node = root.findAll(candidate => (candidate.type as string) === 'Switch')[0];
   if (!node) {
@@ -68,5 +85,31 @@ describe('Switch', () => {
     native.os = 'ios';
     const props = nativeProps(renderSwitch({ disabled: false }).root);
     expect(props.accessibilityState?.disabled).toBe(false);
+  });
+
+  // The platform draws its own track from a system colour, which in the dark
+  // scheme sits within 1.11:1 of the card, so an off switch lost its track.
+  it('themes the track in both states so it stays readable', () => {
+    native.os = 'android';
+    const props = nativeProps(renderSwitch({}).root);
+    expect(props.trackColor).toEqual({ false: '#8A8680', true: '#FFDD00' });
+  });
+
+  it('keeps the thumb on its own surface colour', () => {
+    native.os = 'android';
+    const props = nativeProps(renderSwitch({}).root);
+    expect(props.thumbColor).toBe('#17171A');
+  });
+
+  it('keeps the colours a caller passes', () => {
+    native.os = 'android';
+    const props = nativeProps(
+      renderSwitch({
+        trackColor: { false: '#111111', true: '#222222' },
+        thumbColor: '#333333',
+      }).root
+    );
+    expect(props.trackColor).toEqual({ false: '#111111', true: '#222222' });
+    expect(props.thumbColor).toBe('#333333');
   });
 });

@@ -2607,7 +2607,7 @@
     "couldNotSaveChoice": "Deine Auswahl konnte nicht gespeichert werden. Bitte versuche es erneut.",
     "onlineAllowed": "Online, erlaubt",
     "onlineNotAllowed": "Online, nicht erlaubt",
-    "optionalReview": "Freiwillig – jederzeit in den Einstellungen änderbar",
+    "optionalReview": "Freiwillig",
     "optionalOnboarding": "Freiwillig – aktiviert, solange du es nicht ausschaltest",
     "aiProvidersWhat": "Deine Prompts, dein Unterhaltungsverlauf und alle Dateien, die du anhängst.",
     "aiProvidersWhy": "Um KI-Antworten zu erstellen.",

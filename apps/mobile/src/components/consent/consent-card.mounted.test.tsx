@@ -211,7 +211,7 @@ describe('ConsentCard', () => {
     expect(t).toContain('Before we get started');
     expect(t).toContain('Optional — on unless you turn it off');
     expect(t).not.toContain('Data sharing preferences');
-    expect(t).not.toContain('Optional — you can change this any time in Settings');
+    expect(t).not.toContain('Optional');
     expect(t).toContain('Help improve Kilo');
     expect(t).toContain('Accept and continue');
     expect(t).toContain('Decline');
@@ -221,7 +221,10 @@ describe('ConsentCard', () => {
     const renderer = mountCard('review');
     const t = texts(renderer.root);
     expect(t).toContain('Data sharing preferences');
-    expect(t).toContain('Optional — you can change this any time in Settings');
+    // The optional section header is the headword alone: the toggle card's own
+    // description already says the choice can be changed in Settings.
+    expect(t).toContain('Optional');
+    expect(t).not.toContain('Optional — you can change this any time in Settings');
     expect(t).not.toContain('Before we get started');
     expect(t).not.toContain('Optional — on unless you turn it off');
   });

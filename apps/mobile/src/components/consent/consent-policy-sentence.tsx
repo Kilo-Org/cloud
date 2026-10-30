@@ -19,9 +19,9 @@ type ConsentPolicySentenceProps = {
    * The cancelled box keeps the sentence on its 14dp line, but the box itself
    * still reaches 17dp above and below that line. That is invisible inside a
    * scroll body, where the overflow only lands on prose, and wrong where the
-   * sentence starts a container: the consent card's pinned footer has 12dp of
-   * top padding, so the box's top 5dp sat over the scroll region above it.
-   * Pass this wherever the sentence is a container's first child.
+   * sentence starts a container: the consent card's pinned footer pads its top
+   * by `pt-3` (10.5dp), so the box's top ~6.5dp sat over the scroll region
+   * above it. Pass this wherever the sentence is a container's first child.
    */
   readonly reserveTargetHeight?: boolean;
 };

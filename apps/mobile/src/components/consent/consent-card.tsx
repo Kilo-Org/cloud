@@ -326,7 +326,8 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             policy link takes its 48dp target into the row
             (`reserveTargetHeight`): the cancelled box behind the details
             screens leaves 17dp of frame above its line, and here that frame
-            started 6dp above the footer's top edge, over the scroll region. */}
+            started about 6.5dp above the footer's `pt-3` top edge, over the
+            scroll region. */}
         <ConsentPolicySentence
           prefix={t('consent.privacyPolicyPrefix')}
           linkLabel={t('consent.privacyPolicy')}

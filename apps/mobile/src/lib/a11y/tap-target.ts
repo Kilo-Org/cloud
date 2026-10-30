@@ -277,8 +277,8 @@ export const LEGAL_LINK_LINE_DP = 14;
  * The margin cancels the box in layout only: the frame still reaches
  * {@link LEGAL_LINK_SENTENCE_CANCEL_DP} above and below the line, so a sentence
  * that starts a container carries that frame past the container's own edge. A
- * pinned footer with 12dp of top padding leaves 5dp of the frame over the
- * surface above it. Callers in that position render
+ * pinned footer with `pt-3` above it (0.75rem, 10.5dp at this rem) leaves about
+ * 6.5dp of the frame over the surface above it. Callers in that position render
  * {@link LEGAL_LINK_BOX_CLASS} — the whole target as the row's own line —
  * instead of this class.
  */

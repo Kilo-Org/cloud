@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Komanda është e kufizuar në {{max}} karaktere",
     "commandsEmpty": "Nuk ka ende komanda konfigurimi",
     "commandsSaveFailed": "Komandat e konfigurimit nuk mund të ruheshin",
-    "moveUp": "Lëvizni lart",
-    "moveDown": "Lëvizni poshtë",
     "moveCommandUp": "Zhvendos komandën {{position}} lart",
     "moveCommandDown": "Zhvendos komandën {{position}} poshtë",
     "skillsTitle": "Aftësitë",

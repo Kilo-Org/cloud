@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Komento saa olla enintään {{max}} merkkiä",
     "commandsEmpty": "Ei vielä asennuskomentoja",
     "commandsSaveFailed": "Asennuskomentoja ei voitu tallentaa",
-    "moveUp": "Siirrä ylös",
-    "moveDown": "Siirrä alas",
     "moveCommandUp": "Siirrä komento {{position}} ylös",
     "moveCommandDown": "Siirrä komento {{position}} alas",
     "skillsTitle": "Taidot",

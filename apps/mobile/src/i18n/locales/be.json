@@ -3947,8 +3947,6 @@
     "commandAtLimit": "Каманда абмежавана {{max}} сімваламі",
     "commandsEmpty": "Пакуль няма каманд наладкі",
     "commandsSaveFailed": "Не ўдалося захаваць каманды наладкі",
-    "moveUp": "Рухайцеся ўверх",
-    "moveDown": "Рухайцеся ўніз",
     "moveCommandUp": "Перамясціць каманду {{position}} уверх",
     "moveCommandDown": "Перамясціць каманду {{position}} уніз",
     "skillsTitle": "Навыкі",

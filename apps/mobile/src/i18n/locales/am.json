@@ -3847,8 +3847,6 @@
     "commandAtLimit": "ትዕዛዙ በ{{max}} ቁምፊዎች የተገደበ ነው",
     "commandsEmpty": "እስካሁን ምንም የማዋቀር ትዕዛዞች የሉም",
     "commandsSaveFailed": "የማዋቀር ትዕዛዞችን ማስቀመጥ አልተቻለም",
-    "moveUp": "ወደ ላይ ተንቀሳቀስ",
-    "moveDown": "ወደ ታች ውሰድ",
     "moveCommandUp": "ትዕዛዝ {{position}} ወደ ላይ አንቀሳቅስ",
     "moveCommandDown": "ትዕዛዝ {{position}} ወደ ታች አንቀሳቅስ",
     "skillsTitle": "ችሎታዎች",

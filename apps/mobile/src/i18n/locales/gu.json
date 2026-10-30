@@ -3847,8 +3847,6 @@
     "commandAtLimit": "આદેશ {{max}} અક્ષરો સુધી મર્યાદિત છે",
     "commandsEmpty": "હજુ સુધી કોઈ સેટઅપ આદેશો નથી",
     "commandsSaveFailed": "સેટઅપ આદેશો સાચવી શકાયા નથી",
-    "moveUp": "ઉપર ખસેડો",
-    "moveDown": "નીચે ખસેડો",
     "moveCommandUp": "આદેશ {{position}} ઉપર ખસેડો",
     "moveCommandDown": "આદેશ {{position}} નીચે ખસેડો",
     "skillsTitle": "કૌશલ્ય",

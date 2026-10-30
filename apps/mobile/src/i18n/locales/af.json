@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Die opdrag is beperk tot {{max}} karakters",
     "commandsEmpty": "Nog geen opstelopdragte nie",
     "commandsSaveFailed": "Kon nie opstellingopdragte stoor nie",
-    "moveUp": "Beweeg op",
-    "moveDown": "Beweeg af",
     "moveCommandUp": "Skuif bevel {{position}} op",
     "moveCommandDown": "Skuif bevel {{position}} af",
     "skillsTitle": "Vaardighede",

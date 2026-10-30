@@ -3847,8 +3847,6 @@
     "commandAtLimit": "کمانڈ {{max}} حروف تک محدود ہے۔",
     "commandsEmpty": "ابھی تک کوئی سیٹ اپ کمانڈ نہیں ہے۔",
     "commandsSaveFailed": "سیٹ اپ کمانڈز کو محفوظ نہیں کیا جا سکا",
-    "moveUp": "اوپر بڑھیں۔",
-    "moveDown": "نیچے کی طرف بڑھیں۔",
     "moveCommandUp": "کمانڈ {{position}} کو اوپر منتقل کریں",
     "moveCommandDown": "کمانڈ {{position}} کو نیچے منتقل کریں",
     "skillsTitle": "ہنر",

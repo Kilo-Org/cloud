@@ -3897,8 +3897,6 @@
     "commandAtLimit": "Komanda ir ierobežota līdz {{max}} rakstzīmēm",
     "commandsEmpty": "Vēl nav nevienas iestatīšanas komandas",
     "commandsSaveFailed": "Nevarēja saglabāt iestatīšanas komandas",
-    "moveUp": "Pārvietojieties uz augšu",
-    "moveDown": "Pārvietojieties uz leju",
     "moveCommandUp": "Pārvietot komandu {{position}} uz augšu",
     "moveCommandDown": "Pārvietot komandu {{position}} uz leju",
     "skillsTitle": "Prasmes",

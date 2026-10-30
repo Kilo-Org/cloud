@@ -3847,8 +3847,6 @@
     "commandAtLimit": "ਹੁਕਮ {{max}} ਅੱਖਰਾਂ ਤੱਕ ਸੀਮਿਤ ਹੈ",
     "commandsEmpty": "ਹਾਲੇ ਤੱਕ ਕੋਈ ਸੈੱਟਅੱਪ ਕਮਾਂਡ ਨਹੀਂ ਹੈ",
     "commandsSaveFailed": "ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਨੂੰ ਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
-    "moveUp": "ਉੱਪਰ ਜਾਓ",
-    "moveDown": "ਹੇਠਾਂ ਚਲੇ ਜਾਓ",
     "moveCommandUp": "ਕਮਾਂਡ {{position}} ਉੱਪਰ ਭੇਜੋ",
     "moveCommandDown": "ਕਮਾਂਡ {{position}} ਹੇਠਾਂ ਭੇਜੋ",
     "skillsTitle": "ਹੁਨਰ",

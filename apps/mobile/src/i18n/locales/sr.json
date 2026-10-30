@@ -3897,8 +3897,6 @@
     "commandAtLimit": "Komanda je ograničena na {{max}} znakova",
     "commandsEmpty": "Još nema komandi za podešavanje",
     "commandsSaveFailed": "Nije moguće sačuvati komande za podešavanje",
-    "moveUp": "Pomeri se gore",
-    "moveDown": "Pomeri se dole",
     "moveCommandUp": "Premesti komandu {{position}} gore",
     "moveCommandDown": "Premesti komandu {{position}} dole",
     "skillsTitle": "Veštine",

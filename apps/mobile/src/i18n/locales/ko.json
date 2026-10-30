@@ -3847,8 +3847,6 @@
     "commandAtLimit": "명령은 최대 {{max}}자로 제한됩니다",
     "commandsEmpty": "아직 설정 명령이 없습니다.",
     "commandsSaveFailed": "설정 명령을 저장할 수 없습니다.",
-    "moveUp": "위로 이동",
-    "moveDown": "아래로 이동",
     "moveCommandUp": "명령 {{position}}을(를) 위로 이동",
     "moveCommandDown": "명령 {{position}}을(를) 아래로 이동",
     "skillsTitle": "기술",

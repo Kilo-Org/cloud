@@ -3997,8 +3997,6 @@
     "commandAtLimit": "Il-kmand huwa limitat għal {{max}} karattru",
     "commandsEmpty": "S'issa l-ebda kmand tas-setup",
     "commandsSaveFailed": "Ma setgħetx tissejvja l-kmandi tas-setup",
-    "moveUp": "Nimxu 'l fuq",
-    "moveDown": "Nimxu 'l isfel",
     "moveCommandUp": "Mexxi l-kmand {{position}} 'l fuq",
     "moveCommandDown": "Mexxi l-kmand {{position}} 'l isfel",
     "skillsTitle": "Ħiliet",

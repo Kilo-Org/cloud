@@ -4047,8 +4047,6 @@
     "commandAtLimit": "Mae'r gorchymyn wedi'i gyfyngu i {{max}} nod",
     "commandsEmpty": "Dim gorchmynion gosod eto",
     "commandsSaveFailed": "Ni fu modd cadw'r gorchmynion gosod",
-    "moveUp": "Symud i fyny",
-    "moveDown": "Symud i lawr",
     "moveCommandUp": "Symud gorchymyn {{position}} i fyny",
     "moveCommandDown": "Symud gorchymyn {{position}} i lawr",
     "skillsTitle": "Sgiliau",

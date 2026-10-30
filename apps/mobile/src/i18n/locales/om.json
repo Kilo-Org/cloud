@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Ajajni arfiilee {{max}}tti daangeffama",
     "commandsEmpty": "Ajajni setup hanga ammaatti hin jiru",
     "commandsSaveFailed": "Ajajoota saaguu qusachuu hin dandeenye",
-    "moveUp": "Ol socho'aa",
-    "moveDown": "Gad bu'aa",
     "moveCommandUp": "Ajaja {{position}} ol sochoosi",
     "moveCommandDown": "Ajaja {{position}} gad sochoosi",
     "skillsTitle": "Dandeettiiwwan",

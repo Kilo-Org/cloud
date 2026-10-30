@@ -3897,8 +3897,6 @@
     "commandAtLimit": "הפקודה מוגבלת ל-{{max}} תווים",
     "commandsEmpty": "אין עדיין פקודות הגדרה",
     "commandsSaveFailed": "לא ניתן לשמור פקודות הגדרה",
-    "moveUp": "לזוז למעלה",
-    "moveDown": "לזוז למטה",
     "moveCommandUp": "העבר את הפקודה {{position}} למעלה",
     "moveCommandDown": "העבר את הפקודה {{position}} למטה",
     "skillsTitle": "מיומנויות",

@@ -3847,8 +3847,6 @@
     "commandAtLimit": "கட்டளை {{max}} எழுத்துகள் வரை மட்டுப்படுத்தப்பட்டுள்ளது",
     "commandsEmpty": "இதுவரை அமைவு கட்டளைகள் இல்லை",
     "commandsSaveFailed": "அமைவு கட்டளைகளைச் சேமிக்க முடியவில்லை",
-    "moveUp": "மேலே செல்லவும்",
-    "moveDown": "கீழே நகர்த்தவும்",
     "moveCommandUp": "{{position}} கட்டளையை மேலே நகர்த்து",
     "moveCommandDown": "{{position}} கட்டளையை கீழே நகர்த்து",
     "skillsTitle": "திறன்கள்",

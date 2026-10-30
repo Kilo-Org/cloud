@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Iwu ahụ nwere oke mkpụrụedemede {{max}}",
     "commandsEmpty": "Enweghị iwu ntọlite ka",
     "commandsSaveFailed": "Enweghị ike ichekwa iwu ntọala",
-    "moveUp": "Bulie elu",
-    "moveDown": "Budata ala",
     "moveCommandUp": "Bufee iwu {{position}} elu",
     "moveCommandDown": "Bufee iwu {{position}} ala",
     "skillsTitle": "Nkà",

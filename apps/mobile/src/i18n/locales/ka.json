@@ -3847,8 +3847,6 @@
     "commandAtLimit": "ბრძანება შემოიფარგლება {{max}} სიმბოლოთი",
     "commandsEmpty": "დაყენების ბრძანებები ჯერ არ არის",
     "commandsSaveFailed": "დაყენების ბრძანებების შენახვა ვერ მოხერხდა",
-    "moveUp": "ზევით გადაადგილება",
-    "moveDown": "ქვევით გადაადგილება",
     "moveCommandUp": "გადაიტანე ბრძანება {{position}} ზემოთ",
     "moveCommandDown": "გადაიტანე ბრძანება {{position}} ქვემოთ",
     "skillsTitle": "უნარები",

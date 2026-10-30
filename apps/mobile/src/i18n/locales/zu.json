@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Umyalo ulinganiselwe ezinhlamvini ezingu-{{max}}",
     "commandsEmpty": "Ayikho imiyalo yokusetha okwamanje",
     "commandsSaveFailed": "Ayikwazanga ukulondoloza imiyalo yokusetha",
-    "moveUp": "Hamba uyephezulu",
-    "moveDown": "Hamba phansi",
     "moveCommandUp": "Hambisa umyalo {{position}} phezulu",
     "moveCommandDown": "Hambisa umyalo {{position}} phansi",
     "skillsTitle": "Amakhono",

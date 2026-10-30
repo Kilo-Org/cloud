@@ -4047,8 +4047,6 @@
     "commandAtLimit": "يقتصر الأمر على {{max}} حرفًا",
     "commandsEmpty": "لا توجد أوامر الإعداد حتى الآن",
     "commandsSaveFailed": "تعذر حفظ أوامر الإعداد",
-    "moveUp": "تحرك للأعلى",
-    "moveDown": "تحرك للأسفل",
     "moveCommandUp": "انقل الأمر {{position}} لأعلى",
     "moveCommandDown": "انقل الأمر {{position}} لأسفل",
     "skillsTitle": "مهارات",

@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Kommandoen er begrænset til {{max}} tegn",
     "commandsEmpty": "Ingen opsætningskommandoer endnu",
     "commandsSaveFailed": "Opsætningskommandoer kunne ikke gemmes",
-    "moveUp": "Flyt op",
-    "moveDown": "Flyt ned",
     "moveCommandUp": "Flyt kommando {{position}} op",
     "moveCommandDown": "Flyt kommando {{position}} ned",
     "skillsTitle": "Færdigheder",

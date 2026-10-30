@@ -3847,8 +3847,6 @@
     "commandAtLimit": "命令最多為 {{max}} 個字元",
     "commandsEmpty": "還沒有設定命令",
     "commandsSaveFailed": "無法儲存設定命令",
-    "moveUp": "向上移動",
-    "moveDown": "下移",
     "moveCommandUp": "上移命令 {{position}}",
     "moveCommandDown": "下移命令 {{position}}",
     "skillsTitle": "技能",

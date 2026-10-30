@@ -3847,8 +3847,6 @@
     "commandAtLimit": "امر تر {{max}} توري پورې محدود دی",
     "commandsEmpty": "تر اوسه د تنظیم کولو امرونه ندي",
     "commandsSaveFailed": "د ترتیب کولو کمانډونه خوندي نشو کولی",
-    "moveUp": "پورته لاړ شه",
-    "moveDown": "لاندې حرکت وکړئ",
     "moveCommandUp": "{{position}} امر پورته کړئ",
     "moveCommandDown": "{{position}} امر لاندې کړئ",
     "skillsTitle": "مهارتونه",

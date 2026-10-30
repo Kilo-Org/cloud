@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Der Befehl ist auf {{max}} Zeichen beschränkt",
     "commandsEmpty": "Noch keine Setup-Befehle",
     "commandsSaveFailed": "Setup-Befehle konnten nicht gespeichert werden",
-    "moveUp": "Nach oben verschieben",
-    "moveDown": "Nach unten verschieben",
     "moveCommandUp": "Befehl {{position}} nach oben verschieben",
     "moveCommandDown": "Befehl {{position}} nach unten verschieben",
     "skillsTitle": "Fähigkeiten",

@@ -3847,8 +3847,6 @@
     "commandAtLimit": "ຄຳສັ່ງຈຳກັດບໍ່ເກີນ {{max}} ຕົວອັກສອນ",
     "commandsEmpty": "ບໍ່ມີຄຳສັ່ງຕັ້ງຄ່າເທື່ອ",
     "commandsSaveFailed": "ບໍ່ສາມາດບັນທຶກຄຳສັ່ງຕັ້ງຄ່າໄດ້",
-    "moveUp": "ຍ້າຍຂຶ້ນ",
-    "moveDown": "ຍ້າຍລົງ",
     "moveCommandUp": "ຍ້າຍຄໍາສັ່ງ {{position}} ຂຶ້ນ",
     "moveCommandDown": "ຍ້າຍຄໍາສັ່ງ {{position}} ລົງ",
     "skillsTitle": "ທັກສະ",

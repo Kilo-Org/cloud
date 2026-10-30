@@ -3847,8 +3847,6 @@
     "commandAtLimit": "आदेश {{max}} अक्षरों तक सीमित है",
     "commandsEmpty": "अभी तक कोई सेटअप आदेश नहीं",
     "commandsSaveFailed": "सेटअप आदेश सहेजे नहीं जा सके",
-    "moveUp": "बढ़ाना",
-    "moveDown": "नीचे की ओर",
     "moveCommandUp": "आदेश {{position}} को ऊपर ले जाएँ",
     "moveCommandDown": "आदेश {{position}} को नीचे ले जाएँ",
     "skillsTitle": "कौशल",

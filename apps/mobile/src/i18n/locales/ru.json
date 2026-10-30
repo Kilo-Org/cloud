@@ -3947,8 +3947,6 @@
     "commandAtLimit": "Команда ограничена {{max}} символами",
     "commandsEmpty": "Команд настройки пока нет",
     "commandsSaveFailed": "Не удалось сохранить команды настройки.",
-    "moveUp": "Вверх",
-    "moveDown": "Двигаться вниз",
     "moveCommandUp": "Переместить команду {{position}} вверх",
     "moveCommandDown": "Переместить команду {{position}} вниз",
     "skillsTitle": "Навыки",

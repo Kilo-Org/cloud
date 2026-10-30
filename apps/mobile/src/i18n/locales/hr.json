@@ -3897,8 +3897,6 @@
     "commandAtLimit": "Naredba je ograničena na {{max}} znakova",
     "commandsEmpty": "Još nema naredbi za postavljanje",
     "commandsSaveFailed": "Nije moguće spremiti naredbe za postavljanje",
-    "moveUp": "Pomakni se gore",
-    "moveDown": "Pomakni se dolje",
     "moveCommandUp": "Premjesti naredbu {{position}} gore",
     "moveCommandDown": "Premjesti naredbu {{position}} dolje",
     "skillsTitle": "Vještine",

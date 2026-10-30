@@ -3847,8 +3847,6 @@
     "commandAtLimit": "O comando está limitado a {{max}} caracteres",
     "commandsEmpty": "Aínda non hai comandos de configuración",
     "commandsSaveFailed": "Non se puideron gardar os comandos de configuración",
-    "moveUp": "Moverse cara arriba",
-    "moveDown": "Mover cara abaixo",
     "moveCommandUp": "Mover o comando {{position}} cara arriba",
     "moveCommandDown": "Mover o comando {{position}} cara abaixo",
     "skillsTitle": "Habilidades",

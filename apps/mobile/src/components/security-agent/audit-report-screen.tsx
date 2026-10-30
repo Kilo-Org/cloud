@@ -201,19 +201,24 @@ function AuditReportView({
     // empty state has is the window, so `periodUtc` states it once, with the
     // invariant UTC marker, at the same size the non-empty header uses. A
     // second sentence saying the same thing in words was removed: it restated
-    // the heading and pointed at this line.
+    // the heading and pointed at this line. The owner line is the header's
+    // first line, so an empty report identifies whose window it covers instead
+    // of leaving that to the screen the reader came from.
     return (
-      <TabScreenScrollView className="flex-1" contentContainerClassName="grow justify-center">
-        <EmptyState
-          placement="static"
-          icon={FileText}
-          title={t('securityAgent.auditReport.noActivity')}
-          description={
-            <Text variant="muted" className="text-xs text-center">
-              {t('securityAgent.auditReport.periodUtc', period)}
-            </Text>
-          }
-        />
+      <TabScreenScrollView className="flex-1" contentContainerClassName="grow">
+        <Text className="px-6 pt-4 text-sm font-medium">{report.owner.displayName}</Text>
+        <View className="grow justify-center">
+          <EmptyState
+            placement="static"
+            icon={FileText}
+            title={t('securityAgent.auditReport.noActivity')}
+            description={
+              <Text variant="muted" className="text-xs text-center">
+                {t('securityAgent.auditReport.periodUtc', period)}
+              </Text>
+            }
+          />
+        </View>
       </TabScreenScrollView>
     );
   }

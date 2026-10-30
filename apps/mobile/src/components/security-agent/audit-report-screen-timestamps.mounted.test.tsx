@@ -44,11 +44,17 @@ vi.mock('@/lib/utils', () => ({
   parseTimestamp: (value: unknown) => value,
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-// The real state renders its description node (string or node) below the title;
-// the mock renders the node too, so the empty report's copy is part of the tree.
+// The real state renders the title, then its description node (string or node),
+// below it; the mock renders both, so the empty report's whole copy is in the
+// tree and a heading assertion means what it says.
 vi.mock('@/components/empty-state', () => ({
-  EmptyState: (props: { description?: ReactNode }) =>
-    createElement('EmptyState', null, props.description),
+  EmptyState: (props: { title?: string; description?: ReactNode }) =>
+    createElement(
+      'EmptyState',
+      null,
+      createElement('Text', { key: 'title' }, props.title),
+      props.description
+    ),
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/security-agent/collapsible-section', () => ({
@@ -102,10 +108,20 @@ const FINDING = {
   events: [EVENT],
 };
 
-function makeReport(findings: unknown[] = [FINDING]) {
+const PERSONAL_OWNER = { type: 'user', id: 'u1', displayName: 'Personal owner' } as const;
+const ORGANIZATION_OWNER = {
+  type: 'organization',
+  id: 'o1',
+  displayName: 'Acme Operations',
+} as const;
+
+function makeReport(
+  findings: unknown[] = [FINDING],
+  owner: typeof PERSONAL_OWNER | typeof ORGANIZATION_OWNER = PERSONAL_OWNER
+) {
   return {
     reportVersion: 1,
-    owner: { type: 'user', id: 'u1', displayName: 'Personal owner' },
+    owner,
     period: {
       start: '2026-01-01T00:00:00.000Z',
       endExclusive: '2026-01-02T00:00:00.000Z',
@@ -129,7 +145,10 @@ function makeReport(findings: unknown[] = [FINDING]) {
 
 let mounted: R | undefined = undefined;
 
-function renderReport(findings: unknown[] = [FINDING]): I {
+function renderReport(
+  findings: unknown[] = [FINDING],
+  owner: typeof PERSONAL_OWNER | typeof ORGANIZATION_OWNER = PERSONAL_OWNER
+): I {
   useQuery.mockReturnValue({
     isLoading: false,
     isError: false,
@@ -137,7 +156,7 @@ function renderReport(findings: unknown[] = [FINDING]): I {
     isPaused: false,
     error: null,
     refetch: vi.fn(),
-    data: { status: 'ok', report: makeReport(findings) },
+    data: { status: 'ok', report: makeReport(findings, owner) },
   });
   act(() => {
     mounted = TestRenderer.create(createElement(AuditReportScreen, { scope: 'personal' }));
@@ -198,16 +217,21 @@ describe('AuditReportScreen timestamps and actor labels', () => {
     );
   });
 
-  it('labels the empty report period as UTC', () => {
-    const root = renderReport([]);
+  it('labels the empty report period as UTC under the owner it belongs to', () => {
+    const root = renderReport([], ORGANIZATION_OWNER);
     const period = { start: '2026-01-01T00:00:00.000Z', end: '2026-01-01' };
     const lines = renderedText(root);
 
-    // The heading carries the "no activity" statement; the period line is the
-    // only other copy, so the window is stated once and never in prose.
-    expect(lines).toEqual([i18n.t('securityAgent.auditReport.periodUtc', period)]);
-    expect(lines[0]).toMatch(/ · UTC$/);
-    expect(lines.join(' ')).not.toContain(i18n.t('securityAgent.auditReport.noActivity'));
+    // The owner line is the populated header's first line, so an empty report
+    // still says whose window it covers; the heading carries the "no activity"
+    // statement, so the period line states the window once and nothing repeats
+    // it in prose.
+    expect(lines).toEqual([
+      ORGANIZATION_OWNER.displayName,
+      i18n.t('securityAgent.auditReport.noActivity'),
+      i18n.t('securityAgent.auditReport.periodUtc', period),
+    ]);
+    expect(lines.at(-1)).toMatch(/ · UTC$/);
   });
 
   it.each(['en', 'de', 'ar'])('keeps the zone marker on the empty period in %s', async language => {

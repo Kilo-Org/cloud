@@ -3156,7 +3156,7 @@
     "terms": {
       "pullRequest": "풀 리퀘스트",
       "mergeRequest": "머지 요청",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "머지 요청 !{{number}}",
       "shareMergeRequest": "머지 요청 공유",
       "viewOnProvider": "{{provider}}에서 보기",
       "mergeRequestUnavailable": "머지 요청를 열 수 없음",

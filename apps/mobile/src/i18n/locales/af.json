@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Trekversoek",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Deel merge request",
       "viewOnProvider": "Bekyk op {{provider}}",
       "mergeRequestUnavailable": "Merge request onbeskikbaar",

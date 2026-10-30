@@ -853,7 +853,7 @@
     "terms": {
       "pullRequest": "Zahteva za združitev",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Deli merge request",
       "viewOnProvider": "Poglej na {{provider}}",
       "mergeRequestUnavailable": "Merge request ni na voljo",

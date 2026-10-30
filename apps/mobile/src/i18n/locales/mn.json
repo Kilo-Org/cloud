@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Нэгтгэх хүсэлт",
       "mergeRequest": "Нэгтгэх хүсэлт",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Нэгтгэх хүсэлт !{{number}}",
       "shareMergeRequest": "Нэгтгэх хүсэлтийг хуваалцах",
       "viewOnProvider": "{{provider}} дээр харах",
       "mergeRequestUnavailable": "Нэгтгэх хүсэлтийг нээх боломжгүй",

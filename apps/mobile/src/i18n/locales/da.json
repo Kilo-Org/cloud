@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Del merge request",
       "viewOnProvider": "Se på {{provider}}",
       "mergeRequestUnavailable": "Merge request ikke tilgængelig",

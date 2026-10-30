@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "പുൾ റിക്വസ്റ്റ്",
       "mergeRequest": "മെർജ് റിക്വസ്റ്റ്",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "മെർജ് റിക്വസ്റ്റ് !{{number}}",
       "shareMergeRequest": "മെർജ് റിക്വസ്റ്റ് പങ്കിടുക",
       "viewOnProvider": "{{provider}}-ൽ കാണുക",
       "mergeRequestUnavailable": "മെർജ് റിക്വസ്റ്റ് ലഭ്യമല്ല",

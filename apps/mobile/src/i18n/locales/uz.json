@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge so‘rovi",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge so‘rovi !{{number}}",
       "shareMergeRequest": "Merge so‘rovini ulashish",
       "viewOnProvider": "{{provider}}da ko'rish",
       "mergeRequestUnavailable": "Merge so‘rovi mavjud emas",

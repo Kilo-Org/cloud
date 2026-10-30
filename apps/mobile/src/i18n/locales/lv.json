@@ -834,7 +834,7 @@
     "terms": {
       "pullRequest": "Izmaiņu pieprasījums",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Kopīgot merge request",
       "viewOnProvider": "Skatīt {{provider}}",
       "mergeRequestUnavailable": "Merge request nav pieejams",

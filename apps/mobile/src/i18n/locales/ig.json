@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Arịrịọ ijikọ koodu",
       "mergeRequest": "Arịrịọ njikọta",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Arịrịọ njikọta !{{number}}",
       "shareMergeRequest": "Kekọrịta arịrịọ njikọta",
       "viewOnProvider": "Lelee na {{provider}}",
       "mergeRequestUnavailable": "Arịrịọ njikọta adịghị",

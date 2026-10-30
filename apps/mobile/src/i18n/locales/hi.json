@@ -3156,7 +3156,7 @@
     "terms": {
       "pullRequest": "पुल रिक्वेस्ट",
       "mergeRequest": "मर्ज रिक्वेस्ट",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "मर्ज रिक्वेस्ट !{{number}}",
       "shareMergeRequest": "मर्ज रिक्वेस्ट साझा करें",
       "viewOnProvider": "{{provider}} पर देखें",
       "mergeRequestUnavailable": "मर्ज रिक्वेस्ट अनुपलब्ध",

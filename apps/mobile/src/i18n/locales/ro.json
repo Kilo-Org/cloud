@@ -834,7 +834,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Distribuie merge request-ul",
       "viewOnProvider": "Vezi pe {{provider}}",
       "mergeRequestUnavailable": "Merge request indisponibil",

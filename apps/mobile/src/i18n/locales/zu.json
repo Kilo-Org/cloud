@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "I-PR",
       "mergeRequest": "Isicelo sokuhlanganisa",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Isicelo sokuhlanganisa !{{number}}",
       "shareMergeRequest": "Yabelana ngesicelo sokuhlanganisa",
       "viewOnProvider": "Buka ku-{{provider}}",
       "mergeRequestUnavailable": "Isicelo sokuhlanganisa asitholakali",

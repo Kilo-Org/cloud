@@ -3242,7 +3242,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Udostępnij merge request",
       "viewOnProvider": "Zobacz w {{provider}}",
       "mergeRequestUnavailable": "Merge request niedostępny",

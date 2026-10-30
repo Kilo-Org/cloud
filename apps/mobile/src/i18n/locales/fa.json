@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "پول ریکوئست",
       "mergeRequest": "درخواست ادغام",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "درخواست ادغام !{{number}}",
       "shareMergeRequest": "اشتراک‌گذاری درخواست ادغام",
       "viewOnProvider": "مشاهده در {{provider}}",
       "mergeRequestUnavailable": "درخواست ادغام در دسترس نیست",

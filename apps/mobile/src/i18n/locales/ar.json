@@ -3328,7 +3328,7 @@
     "terms": {
       "pullRequest": "طلب سحب",
       "mergeRequest": "طلب دمج",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "طلب دمج !{{number}}",
       "shareMergeRequest": "مشاركة طلب الدمج",
       "viewOnProvider": "عرض على {{provider}}",
       "mergeRequestUnavailable": "طلب الدمج غير متاح",

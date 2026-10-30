@@ -3156,7 +3156,7 @@
     "terms": {
       "pullRequest": "プルリクエスト",
       "mergeRequest": "マージリクエスト",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "マージリクエスト !{{number}}",
       "shareMergeRequest": "マージリクエストを共有",
       "viewOnProvider": "{{provider}}で表示",
       "mergeRequestUnavailable": "マージリクエストを開けません",

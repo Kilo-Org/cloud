@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Ombi la kuunganisha",
       "mergeRequest": "Ombi la kuunganisha",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Ombi la kuunganisha !{{number}}",
       "shareMergeRequest": "Shiriki ombi la kuunganisha",
       "viewOnProvider": "Tazama kwenye {{provider}}",
       "mergeRequestUnavailable": "Ombi la kuunganisha halipatikani",

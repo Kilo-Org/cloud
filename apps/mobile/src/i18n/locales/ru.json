@@ -3242,7 +3242,7 @@
     "terms": {
       "pullRequest": "Пул-реквест",
       "mergeRequest": "Запрос на слияние",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Запрос на слияние !{{number}}",
       "shareMergeRequest": "Поделиться запросом на слияние",
       "viewOnProvider": "Открыть в {{provider}}",
       "mergeRequestUnavailable": "Запрос на слияние недоступен",

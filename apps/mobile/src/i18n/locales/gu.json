@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "પુલ રિક્વેસ્ટ",
       "mergeRequest": "મર્જ રિક્વેસ્ટ",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "મર્જ રિક્વેસ્ટ !{{number}}",
       "shareMergeRequest": "મર્જ રિક્વેસ્ટ શેર કરો",
       "viewOnProvider": "{{provider}} પર જુઓ",
       "mergeRequestUnavailable": "મર્જ રિક્વેસ્ટ ઉપલબ્ધ નથી",

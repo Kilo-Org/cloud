@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Birləşdirmə sorğusu",
       "mergeRequest": "Merge sorğusu",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge sorğusu !{{number}}",
       "shareMergeRequest": "Merge sorğusunu paylaş",
       "viewOnProvider": "{{provider}} üzərində bax",
       "mergeRequestUnavailable": "Merge sorğusu əlçatan deyil",

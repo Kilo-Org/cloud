@@ -891,7 +891,7 @@
     "terms": {
       "pullRequest": "Cais tynnu",
       "mergeRequest": "Cais uno",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Cais uno !{{number}}",
       "shareMergeRequest": "Rhannu cais uno",
       "viewOnProvider": "Gweld ar {{provider}}",
       "mergeRequestUnavailable": "Cais uno ddim ar gael",

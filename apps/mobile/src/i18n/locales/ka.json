@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Შერწყმის მოთხოვნა",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Შერწყმის მოთხოვნა !{{number}}",
       "shareMergeRequest": "შერწყმის მოთხოვნის გაზიარება",
       "viewOnProvider": "ნახვა {{provider}}-ში",
       "mergeRequestUnavailable": "შერწყმის მოთხოვნა მიუწვდომელია",

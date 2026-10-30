@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Solicitude de cambios",
       "mergeRequest": "Solicitude de fusión",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Solicitude de fusión !{{number}}",
       "shareMergeRequest": "Compartir a solicitude de fusión",
       "viewOnProvider": "Ver en {{provider}}",
       "mergeRequestUnavailable": "Solicitude de fusión non dispoñible",

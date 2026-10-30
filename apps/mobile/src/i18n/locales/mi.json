@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Tono kume",
       "mergeRequest": "Tono whakakotahi",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Tono whakakotahi !{{number}}",
       "shareMergeRequest": "Tohaina te tono whakakotahi",
       "viewOnProvider": "Tirohia i {{provider}}",
       "mergeRequestUnavailable": "Kāore i te wātea te tono whakakotahi",

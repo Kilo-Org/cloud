@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Αίτημα ενσωμάτωσης",
       "mergeRequest": "Αίτημα συγχώνευσης",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Αίτημα συγχώνευσης !{{number}}",
       "shareMergeRequest": "Κοινοποίηση αιτήματος συγχώνευσης",
       "viewOnProvider": "Προβολή σε {{provider}}",
       "mergeRequestUnavailable": "Μη διαθέσιμο αίτημα συγχώνευσης",

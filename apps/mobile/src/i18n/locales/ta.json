@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "இணைப்புக் கோரிக்கை",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "இணைப்புக் கோரிக்கை !{{number}}",
       "shareMergeRequest": "இணைப்புக் கோரிக்கையைப் பகிரவும்",
       "viewOnProvider": "{{provider}}-இல் காண்க",
       "mergeRequestUnavailable": "இணைப்புக் கோரிக்கை கிடைக்கவில்லை",

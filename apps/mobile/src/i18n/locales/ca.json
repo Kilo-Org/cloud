@@ -834,7 +834,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Sol·licitud de fusió",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Sol·licitud de fusió !{{number}}",
       "shareMergeRequest": "Comparteix la sol·licitud de fusió",
       "viewOnProvider": "Mostra-ho a {{provider}}",
       "mergeRequestUnavailable": "Sol·licitud de fusió no disponible",

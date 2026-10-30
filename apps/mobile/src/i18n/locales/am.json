@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "የማዋሃድ ጥያቄ",
       "mergeRequest": "የማዋሃድ ጥያቄ",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "የማዋሃድ ጥያቄ !{{number}}",
       "shareMergeRequest": "የማዋሃድ ጥያቄውን አጋራ",
       "viewOnProvider": "በ{{provider}} ይመልከቱ",
       "mergeRequestUnavailable": "የማዋሃድ ጥያቄው አይገኝም",

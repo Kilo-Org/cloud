@@ -3156,7 +3156,7 @@
     "terms": {
       "pullRequest": "提取要求",
       "mergeRequest": "合併請求",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "合併請求 !{{number}}",
       "shareMergeRequest": "分享合併請求",
       "viewOnProvider": "在 {{provider}} 上檢視",
       "mergeRequestUnavailable": "無法開啟合併請求",

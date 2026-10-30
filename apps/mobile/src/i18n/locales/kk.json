@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Біріктіру сұрауы",
       "mergeRequest": "Біріктіру сұрауы",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Біріктіру сұрауы !{{number}}",
       "shareMergeRequest": "Біріктіру сұрауымен бөлісу",
       "viewOnProvider": "{{provider}}-да қарау",
       "mergeRequestUnavailable": "Біріктіру сұрауы қолжетімсіз",

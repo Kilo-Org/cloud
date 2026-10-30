@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Միավորման հարցում",
       "mergeRequest": "Միաձուլման հարցում",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Միաձուլման հարցում !{{number}}",
       "shareMergeRequest": "Կիսվել միաձուլման հարցմամբ",
       "viewOnProvider": "Դիտել {{provider}}-ում",
       "mergeRequestUnavailable": "Միաձուլման հարցումը հասանելի չէ",

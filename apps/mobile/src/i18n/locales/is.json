@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Samrunabeiðni",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Deila merge request",
       "viewOnProvider": "Skoða á {{provider}}",
       "mergeRequestUnavailable": "Merge request ekki tiltæk",

@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge барање",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge барање !{{number}}",
       "shareMergeRequest": "Сподели merge барање",
       "viewOnProvider": "Прикажи на {{provider}}",
       "mergeRequestUnavailable": "Merge барањето е недостапно",

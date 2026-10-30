@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "پل ریکویسٹ",
       "mergeRequest": "مرج ریکویسٹ",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "مرج ریکویسٹ !{{number}}",
       "shareMergeRequest": "مرج ریکویسٹ شیئر کریں",
       "viewOnProvider": "{{provider}} پر دیکھیں",
       "mergeRequestUnavailable": "مرج ریکویسٹ دستیاب نہیں",

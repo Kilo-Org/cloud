@@ -853,7 +853,7 @@
     "terms": {
       "pullRequest": "Pakeitimų užklausa",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Bendrinti merge request",
       "viewOnProvider": "Peržiūrėti {{provider}}",
       "mergeRequestUnavailable": "Merge request nepasiekiamas",

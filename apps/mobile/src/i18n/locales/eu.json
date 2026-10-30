@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Bateratze-eskaera",
       "mergeRequest": "Merge-eskaera",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge-eskaera !{{number}}",
       "shareMergeRequest": "Partekatu merge-eskaera",
       "viewOnProvider": "Ikusi {{provider}}(e)n",
       "mergeRequestUnavailable": "Merge-eskaera ez dago eskuragarri",

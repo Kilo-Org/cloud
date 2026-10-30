@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "پل ریکویسټ",
       "mergeRequest": "د یوځای کولو غوښتنه",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "د یوځای کولو غوښتنه !{{number}}",
       "shareMergeRequest": "د یوځای کولو غوښتنه شریک کړئ",
       "viewOnProvider": "په {{provider}} کې وګورئ",
       "mergeRequestUnavailable": "د یوځای کولو غوښتنه نشته",

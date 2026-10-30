@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Tõmbetaotlus",
       "mergeRequest": "Liitmistaotlus",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Liitmistaotlus !{{number}}",
       "shareMergeRequest": "Jaga liitmistaotlust",
       "viewOnProvider": "Kuva {{provider}}",
       "mergeRequestUnavailable": "Liitmistaotlus pole saadaval",

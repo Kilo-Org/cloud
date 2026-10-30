@@ -853,7 +853,7 @@
     "terms": {
       "pullRequest": "Запыт на зліццё",
       "mergeRequest": "Merge-запыт",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge-запыт !{{number}}",
       "shareMergeRequest": "Падзяліцца merge-запытам",
       "viewOnProvider": "Адкрыць у {{provider}}",
       "mergeRequestUnavailable": "Merge-запыт недаступны",

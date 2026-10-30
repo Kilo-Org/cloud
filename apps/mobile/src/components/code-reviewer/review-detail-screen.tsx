@@ -82,6 +82,10 @@ export function ReviewDetailScreen({
   // that the server rejects with BAD_REQUEST.
   const retryInFlight = useRef(false);
   const [visibleCount, setVisibleCount] = useState(FINDINGS_PAGE_SIZE);
+  // The review whose transcript is open, `null` while none is. Keying it by the
+  // review id closes an open transcript by itself when the route moves to another
+  // review, without an effect that would also fire on a plain re-render.
+  const [transcriptReviewId, setTranscriptReviewId] = useState<string | null>(null);
   const loadedReview = data?.success ? data.review : undefined;
   // Only a retriggerable automatic review needs the reviewer config. Bitbucket
   // is org-only, and a personal Bitbucket query would throw in toPersonalPlatform.
@@ -207,12 +211,29 @@ export function ReviewDetailScreen({
       <ScreenHeader title={t('codeReviewer.reviewDetail.title')} eyebrow={review.repo_full_name} />
       <ReviewSpectatorSheet
         key={reviewId}
+        visible={transcriptReviewId === reviewId}
+        onClose={() => {
+          setTranscriptReviewId(null);
+        }}
         reviewId={reviewId}
         status={review.status}
         prTitle={review.pr_title}
         statusLabel={meta.label}
       />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-4 pt-4">
+        {/* The transcript entry is the first row of the content, not a pinned band
+            above the list: a fixed trigger between the header and the scroll view
+            leaves a strip where a vertical drag never reaches the content. */}
+        <Button
+          variant="secondary"
+          accessibilityLabel={t('agentChat.session.transcriptAccessibility')}
+          onPress={() => {
+            setTranscriptReviewId(reviewId);
+          }}
+        >
+          <Text>{t('agentChat.session.transcriptAccessibility')}</Text>
+        </Button>
+
         {/* A background poll failure must not blank out an already-loaded review. */}
         {isError && (
           <Text variant="muted" className="text-center text-xs">

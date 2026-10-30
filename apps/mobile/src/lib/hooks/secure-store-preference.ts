@@ -58,16 +58,17 @@ export function createSecureStorePreference<T>(options: {
   let cleared = false;
   let loadStarted = false;
   /**
-   * Bumped by clear(). A write that started under an earlier epoch still lands
-   * (the delete queued behind it wins), but it must not repaint the value the
-   * clear just reset.
+   * Bumped by clear(), and by the `mergeOnLoad` reconcile that repaints the
+   * value. A write that started under an earlier epoch still lands (the delete
+   * queued behind it wins), but it must not repaint a value the store has
+   * already moved past: the cleared default, or the merged list its own target
+   * is part of.
    */
   let writeEpoch = 0;
   /**
-   * Bumped by clear() and by nothing else. `writeEpoch` also moves when a
-   * `mergeOnLoad` reconcile repaints the value, which is not a reset: a
-   * persist-then-apply write must not report its own choice as discarded
-   * because the disk and its pending edit were reconciled.
+   * Bumped by clear() and by nothing else, so a persist-then-apply write can
+   * tell a reset — which discards its choice — apart from a reconcile, which
+   * only repaints the value.
    */
   let clearEpoch = 0;
   let markLoaded = noop;
@@ -118,9 +119,10 @@ export function createSecureStorePreference<T>(options: {
     }
   };
 
-  /** Applies a value the disk now holds. Skipped once clear() superseded it. */
+  /** Applies a value the disk now holds. Skipped once clear() or a merge
+   *  reconcile superseded it. */
   const applyPersisted = (next: T, epoch: number) => {
-    if (epoch !== clearEpoch) {
+    if (epoch !== writeEpoch) {
       return;
     }
     value = next;
@@ -143,7 +145,7 @@ export function createSecureStorePreference<T>(options: {
         const target = requested;
         requested = undefined;
         inFlight = target;
-        const epoch = clearEpoch;
+        const epoch = writeEpoch;
         try {
           // eslint-disable-next-line no-await-in-loop -- one write at a time is the ordering guarantee
           await setAccountMetadata(key, serialize(target));

@@ -37,6 +37,8 @@ import {
   ChevronRight,
   FlaskConical,
   AlertTriangle,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -247,6 +249,74 @@ function CatalogModeSetting({
   );
 }
 
+type ReorderDirection = 'up' | 'down';
+
+function rank(keyIds: string[], id: string) {
+  const index = keyIds.indexOf(id);
+  return index < 0 ? Number.MAX_SAFE_INTEGER : index;
+}
+
+function reorderButtonId(keyId: string, direction: ReorderDirection) {
+  return `byok-priority-${direction}-${keyId}`;
+}
+
+function KeyPriorityControls({
+  keyId,
+  providerName,
+  position,
+  count,
+  saving,
+  onMove,
+}: {
+  keyId: string;
+  providerName: string;
+  position: number;
+  count: number;
+  /** Moves wait for the previous save. The buttons stay focusable so keyboard focus survives. */
+  saving: boolean;
+  onMove: (direction: ReorderDirection) => void;
+}) {
+  const label = apiKeyObjectLabel(providerName);
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-sm tabular-nums">
+        <span className="@2xl:sr-only">Priority </span>
+        {position}
+      </span>
+      <div className="flex gap-1">
+        <Button
+          id={reorderButtonId(keyId, 'up')}
+          variant="secondary"
+          size="sm"
+          className="size-9 p-0 aria-disabled:opacity-50 @2xl:size-8"
+          onClick={() => {
+            if (!saving) onMove('up');
+          }}
+          disabled={position === 1}
+          aria-disabled={saving || undefined}
+          aria-label={`Move ${label} up`}
+        >
+          <ArrowUp className="size-4" />
+        </Button>
+        <Button
+          id={reorderButtonId(keyId, 'down')}
+          variant="secondary"
+          size="sm"
+          className="size-9 p-0 aria-disabled:opacity-50 @2xl:size-8"
+          onClick={() => {
+            if (!saving) onMove('down');
+          }}
+          disabled={position === count}
+          aria-disabled={saving || undefined}
+          aria-label={`Move ${label} down`}
+        >
+          <ArrowDown className="size-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 type BYOKKeysManagerProps = {
   organizationId?: string;
 };
@@ -290,6 +360,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
+  const [reorderAnnouncement, setReorderAnnouncement] = useState('');
 
   // Build query options - only include organizationId if provided
   const listQueryInput = organizationId ? { organizationId } : {};
@@ -379,6 +450,31 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       },
       onError: (error: { message: string }) => {
         toast.error(`Failed to update catalog model IDs: ${error.message}`);
+      },
+    })
+  );
+
+  const listQueryKey = trpc.byok.list.queryKey(listQueryInput);
+  const reorderMutation = useMutation(
+    trpc.byok.reorder.mutationOptions({
+      onMutate: async ({ keyIds }) => {
+        await queryClient.cancelQueries({ queryKey: listQueryKey });
+        const previousKeys = queryClient.getQueryData(listQueryKey);
+        queryClient.setQueryData(listQueryKey, current =>
+          current?.toSorted((a, b) => rank(keyIds, a.id) - rank(keyIds, b.id))
+        );
+        return { previousKeys };
+      },
+      onSuccess: data => {
+        queryClient.setQueryData(listQueryKey, data);
+      },
+      onError: (error, _input, context) => {
+        queryClient.setQueryData(listQueryKey, context?.previousKeys);
+        setReorderAnnouncement('');
+        toast.error(`Failed to save key priority: ${error.message}`);
+      },
+      onSettled: () => {
+        invalidateKeys();
       },
     })
   );
@@ -522,6 +618,27 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     }
   };
 
+  const handleMove = (keyIds: string[], index: number, direction: ReorderDirection) => {
+    const target = direction === 'up' ? index - 1 : index + 1;
+    const movedId = keyIds[index];
+    const swappedId = keyIds[target];
+    if (!movedId || !swappedId) return;
+    const reordered = keyIds.with(index, swappedId).with(target, movedId);
+    const movedKey = keys?.find(key => key.id === movedId);
+    setReorderAnnouncement(
+      `${apiKeyObjectLabel(getProviderDisplayName(movedKey?.provider_id ?? ''))} moved to priority ${target + 1} of ${keyIds.length}.`
+    );
+    reorderMutation.mutate({ keyIds: reordered });
+    const isAtEdge = target === 0 || target === keyIds.length - 1;
+    requestAnimationFrame(() => {
+      document
+        .getElementById(
+          reorderButtonId(movedId, isAtEdge ? (direction === 'up' ? 'down' : 'up') : direction)
+        )
+        ?.focus();
+    });
+  };
+
   const handleToggleEnabled = (keyId: string, is_enabled: boolean) => {
     setEnabledMutation.mutate({
       ...(organizationId && { organizationId }),
@@ -555,6 +672,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   // provider id, but it is not a pasted key: the card above the list owns it, so
   // it never appears here with edit, toggle, test or delete controls.
   const listedKeys = keys?.filter(key => key.provider_id !== OPENAI_CHATGPT_PROVIDER_ID);
+  const listedKeyIds = listedKeys?.map(key => key.id) ?? [];
+  // Organization keys keep their default order; only personal keys can be prioritized.
+  const canReorder = !organizationId && listedKeyIds.length > 1;
 
   // A key in catalog mode serves catalog ids instead of the provider's prefixed ids.
   const getProviderModels = (providerId: string, serveCatalogModels = false): string[] => {
@@ -583,6 +703,17 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
           </Button>
         </CardHeader>
         <CardContent>
+          {canReorder ? (
+            <p className="text-muted-foreground mb-4 text-sm">
+              Priority 1 is tried first. Each request uses the highest key in this list that can
+              serve its model, skipping disabled keys and keys whose provider does not offer it. A
+              connected ChatGPT subscription serves eligible OpenAI requests first, unless a key
+              using Kilo catalog model IDs is ranked above the key that would otherwise serve.
+            </p>
+          ) : null}
+          <div aria-live="polite" className="sr-only">
+            {reorderAnnouncement}
+          </div>
           {listedKeys && listedKeys.length > 0 ? (
             // Narrow containers stack each key into a grid instead of table
             // columns. The explicit roles keep table semantics, which browsers
@@ -591,6 +722,11 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
               <table role="table" className="block w-full @2xl:table">
                 <thead role="rowgroup" className="sr-only @2xl:not-sr-only">
                   <tr role="row" className="bg-muted/50 border-b">
+                    {canReorder ? (
+                      <th role="columnheader" className="p-4 text-left font-medium">
+                        Priority
+                      </th>
+                    ) : null}
                     <th role="columnheader" className="p-4 text-left font-medium">
                       Provider
                     </th>
@@ -607,16 +743,19 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                 </thead>
                 <tbody role="rowgroup" className="block @2xl:table-row-group">
                   {listedKeys.map(
-                    (key: {
-                      id: string;
-                      provider_id: string;
-                      created_at: string;
-                      management_source: 'user' | 'coding_plan';
-                      is_enabled: boolean;
-                      serve_catalog_models: boolean;
-                      supports_catalog_mode: boolean;
-                      can_change_catalog_mode: boolean;
-                    }) => {
+                    (
+                      key: {
+                        id: string;
+                        provider_id: string;
+                        created_at: string;
+                        management_source: 'user' | 'coding_plan';
+                        is_enabled: boolean;
+                        serve_catalog_models: boolean;
+                        supports_catalog_mode: boolean;
+                        can_change_catalog_mode: boolean;
+                      },
+                      index: number
+                    ) => {
                       const isManaged = !organizationId && key.management_source === 'coding_plan';
                       return (
                         <tr
@@ -627,6 +766,18 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             !key.is_enabled && 'bg-muted/20'
                           )}
                         >
+                          {canReorder ? (
+                            <td role="cell" className="col-span-2 @2xl:table-cell @2xl:p-4">
+                              <KeyPriorityControls
+                                keyId={key.id}
+                                providerName={getProviderDisplayName(key.provider_id)}
+                                position={index + 1}
+                                count={listedKeyIds.length}
+                                saving={reorderMutation.isPending}
+                                onMove={direction => handleMove(listedKeyIds, index, direction)}
+                              />
+                            </td>
+                          ) : null}
                           <td
                             role="cell"
                             className={cn(
@@ -1117,8 +1268,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       <AlertDescription>
                         <p>
                           Once saved, your key will automatically be used whenever your client
-                          requests one of the supported models above. If multiple keys apply to the
-                          same model, they are tried in unspecified order until one succeeds.
+                          requests one of the supported models above. If several of your keys can
+                          serve the same model, the one highest in your key list is used.
                         </p>
                         {organizationId ? (
                           <p className="mt-2">

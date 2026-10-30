@@ -6,6 +6,7 @@ import {
   getBYOKforOrganization,
   getBYOKforUser,
   getByokCredentials,
+  getByokKeyStates,
   getCatalogModeByokCredentials,
   getEnabledByokProviders,
   getOrganizationByokProviderIds,
@@ -108,6 +109,34 @@ describe('getBYOKforUser', () => {
     expect(byok?.map(entry => entry.decryptedAPIKey)).toEqual([minimaxSecret, anthropicSecret]);
     expect((await getUserByokProviderIds(db, user.id)).sort()).toEqual(['anthropic', 'minimax']);
     expect(await getUserByokProviderIds(db, otherUser.id)).toEqual(['zai']);
+  });
+
+  test('returns prioritized keys first, then the rest in creation order', async () => {
+    const user = await createUser();
+    const owner = { type: 'user', id: user.id } as const;
+    await insertByokKey(owner, user.id, 'minimax', '2026-01-01T00:00:00.000Z');
+    await insertByokKey(owner, user.id, 'anthropic', '2026-01-02T00:00:00.000Z', {
+      settings: { priority: 1 },
+    });
+    await insertByokKey(owner, user.id, 'bedrock', '2026-01-03T00:00:00.000Z', {
+      settings: { priority: 0, serve_catalog_models: false },
+    });
+    await insertByokKey(owner, user.id, 'zai', '2026-01-04T00:00:00.000Z');
+
+    const byok = await getBYOKforUser(db, user.id, ['anthropic', 'bedrock', 'minimax', 'zai']);
+
+    expect(byok?.map(({ providerId, priority }) => [providerId, priority])).toEqual([
+      ['bedrock', 0],
+      ['anthropic', 1],
+      ['minimax', undefined],
+      ['zai', undefined],
+    ]);
+    expect((await getByokKeyStates(db, owner)).map(key => key.providerId)).toEqual([
+      'bedrock',
+      'anthropic',
+      'minimax',
+      'zai',
+    ]);
   });
 
   test('returns null for an empty provider list or a user without matching keys', async () => {

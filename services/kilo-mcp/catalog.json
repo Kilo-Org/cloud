@@ -4018,6 +4018,36 @@
     ],
     "searchBlob": "byok.previewRouting Preview which route and BYOK provider key a given model request would use before making it, showing the ordered routing steps and why each key is used or skipped. Use this to check or debug how a model resolves under your or your organization's bring-your-own-key setup. byok previewrouting organizationid modelid apikind organizationId modelId apiKind"
   },
+  "byok.reorder": {
+    "path": "byok.reorder",
+    "kind": "mutation",
+    "summary": "Reorder the user's saved bring-your-own API keys to change their priority or fallback order, returning the updated key list.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "keyIds": {
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        }
+      },
+      "required": [
+        "keyIds"
+      ]
+    },
+    "tags": [
+      "byok",
+      "reorder",
+      "keyids"
+    ],
+    "searchBlob": "byok.reorder Reorder the user's saved bring-your-own API keys to change their priority or fallback order, returning the updated key list. byok reorder keyids keyIds"
+  },
   "byok.setCatalogMode": {
     "path": "byok.setCatalogMode",
     "kind": "mutation",

@@ -8,14 +8,14 @@ import {
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   ByokRoutingPreviewSchema,
   previewByokRouting,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
-import { byok_api_keys, MODELS_BY_PROVIDER_ADMIN_URL } from '@kilocode/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { byok_api_keys, kilocode_users, MODELS_BY_PROVIDER_ADMIN_URL } from '@kilocode/db/schema';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
@@ -26,6 +26,7 @@ import {
   SetBYOKKeyEnabledInputSchema,
   SetBYOKKeyCatalogModeInputSchema,
   ListBYOKKeysInputSchema,
+  ReorderBYOKKeysInputSchema,
   TestBYOKKeyInputSchema,
   PreviewBYOKRoutingInputSchema,
   BYOKApiKeyResponseSchema,
@@ -51,7 +52,9 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { getVercelInferenceProviderConfigForUserByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
+  BYOK_KEY_ORDER,
   byokOwner,
+  getByokKeyPriority,
   decryptByokRow,
   getByokKmsContext,
   getModelGatewayUserByokProviders,
@@ -71,12 +74,18 @@ import {
 import { parseAwsBedrockCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/bedrock-byok';
 import { parseGcpVertexCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/vertex-byok';
 import { isExperimentalByokEnabled } from '@/lib/byok/experimental-byok';
+import {
+  getByokKeyDefaultRank,
+  sortByokKeysInRouteOrder,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/route-order';
+import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 
 const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
 const KEY_DECRYPTION_FAILURE_MESSAGE =
   'API key test failed: the stored key could not be read. Try again later.';
 const VERCEL_AI_GATEWAY_KEY_REJECTED_MESSAGE =
   'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.';
+const KEYS_CHANGED_MESSAGE = 'Your API keys changed. Reload the page and try again.';
 const MANAGED_KEY_READ_ONLY_MESSAGE =
   'This key is managed by your coding plan and is read-only. Cancel the coding plan to remove it.';
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
@@ -120,6 +129,79 @@ const BYOK_KEY_COLUMNS = {
   is_enabled: byok_api_keys.is_enabled,
   settings: byok_api_keys.settings,
 };
+
+function inRouteOrder<T extends { provider_id: string; settings: unknown }>(keys: T[]): T[] {
+  return sortByokKeysInRouteOrder(keys, key => ({
+    providerId: key.provider_id,
+    priority: getByokKeyPriority(key.settings),
+  }));
+}
+
+function ownedPersonalKeys(userId: string) {
+  return and(
+    eq(byok_api_keys.kilo_user_id, userId),
+    ne(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+  );
+}
+
+/**
+ * Serializes priority writes per user. Row locks on the keys alone miss a key another transaction
+ * is inserting, which would end up sharing a priority.
+ */
+async function lockPersonalKeyOrder(tx: DrizzleTransaction, userId: string) {
+  await tx
+    .select({ id: kilocode_users.id })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, userId))
+    // Not FOR UPDATE: inserting a key takes KEY SHARE on the user row, which FOR UPDATE would wait on.
+    .for('no key update');
+}
+
+async function writePersonalKeyPriorities(
+  tx: DrizzleTransaction,
+  userId: string,
+  keyIds: readonly string[]
+) {
+  for (const [priority, id] of keyIds.entries()) {
+    await tx
+      .update(byok_api_keys)
+      .set({ settings: sql`${byok_api_keys.settings} || ${JSON.stringify({ priority })}::jsonb` })
+      .where(and(eq(byok_api_keys.id, id), ownedPersonalKeys(userId)));
+  }
+}
+
+/**
+ * Once the owner has prioritized their keys, a new key joins after the last key that comes before
+ * it by default, so a new provider key is not ranked below the owner's gateway keys.
+ */
+async function placeNewPersonalKey(
+  tx: DrizzleTransaction,
+  userId: string,
+  newKey: { id: string; provider_id: string }
+) {
+  await lockPersonalKeyOrder(tx, userId);
+  const others = await tx
+    .select({
+      id: byok_api_keys.id,
+      provider_id: byok_api_keys.provider_id,
+      settings: byok_api_keys.settings,
+    })
+    .from(byok_api_keys)
+    .where(and(ownedPersonalKeys(userId), ne(byok_api_keys.id, newKey.id)))
+    .orderBy(...BYOK_KEY_ORDER)
+    .for('update');
+  if (!others.some(key => getByokKeyPriority(key.settings) !== undefined)) return;
+
+  const ordered = inRouteOrder(others);
+  const newRank = getByokKeyDefaultRank(newKey.provider_id);
+  const insertAt =
+    ordered.findLastIndex(key => getByokKeyDefaultRank(key.provider_id) <= newRank) + 1;
+  await writePersonalKeyPriorities(
+    tx,
+    userId,
+    ordered.map(key => key.id).toSpliced(insertAt, 0, newKey.id)
+  );
+}
 
 type BYOKKeyRow = Omit<
   BYOKApiKeyResponse,
@@ -291,10 +373,42 @@ export const byokRouter = createTRPCRouter({
           organizationId
             ? eq(byok_api_keys.organization_id, organizationId)
             : eq(byok_api_keys.kilo_user_id, ctx.user.id)
-        );
+        )
+        .orderBy(...BYOK_KEY_ORDER);
 
       // Map provider_id to provider_name (will be enhanced in UI with actual provider names)
-      return Promise.all(keys.map(key => toBYOKApiKeyResponse(key, organizationRole)));
+      return Promise.all(
+        inRouteOrder(keys).map(key => toBYOKApiKeyResponse(key, organizationRole))
+      );
+    }),
+
+  /**
+   * Sets the priority of every personal key: each request uses the first key in this order that can
+   * serve it. The ChatGPT connection is not a listed key and keeps its own step.
+   */
+  reorder: baseProcedure
+    .input(ReorderBYOKKeysInputSchema)
+    .output(z.array(BYOKApiKeyResponseSchema))
+    .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse[]> => {
+      const keys = await db.transaction(async tx => {
+        await lockPersonalKeyOrder(tx, ctx.user.id);
+        const owned = await tx
+          .select({ id: byok_api_keys.id })
+          .from(byok_api_keys)
+          .where(ownedPersonalKeys(ctx.user.id))
+          .for('update');
+        const ownedIds = new Set(owned.map(key => key.id));
+        if (owned.length !== input.keyIds.length || input.keyIds.some(id => !ownedIds.has(id))) {
+          throw new TRPCError({ code: 'CONFLICT', message: KEYS_CHANGED_MESSAGE });
+        }
+        await writePersonalKeyPriorities(tx, ctx.user.id, input.keyIds);
+        return tx
+          .select(BYOK_KEY_COLUMNS)
+          .from(byok_api_keys)
+          .where(eq(byok_api_keys.kilo_user_id, ctx.user.id))
+          .orderBy(...BYOK_KEY_ORDER);
+      });
+      return Promise.all(inRouteOrder(keys).map(key => toBYOKApiKeyResponse(key, null)));
     }),
 
   /**
@@ -346,18 +460,22 @@ export const byokRouter = createTRPCRouter({
       });
 
       // Insert into database - either org-owned or user-owned
-      const [newKey] = await db
-        .insert(byok_api_keys)
-        .values({
-          id: keyId,
-          organization_id: organizationId ?? null,
-          kilo_user_id: organizationId ? null : ctx.user.id,
-          provider_id,
-          encrypted_api_key: encrypted,
-          encrypted_api_key_envelope: envelope,
-          created_by: ctx.user.id,
-        })
-        .returning(BYOK_KEY_COLUMNS);
+      const newKey = await db.transaction(async tx => {
+        const [inserted] = await tx
+          .insert(byok_api_keys)
+          .values({
+            id: keyId,
+            organization_id: organizationId ?? null,
+            kilo_user_id: organizationId ? null : ctx.user.id,
+            provider_id,
+            encrypted_api_key: encrypted,
+            encrypted_api_key_envelope: envelope,
+            created_by: ctx.user.id,
+          })
+          .returning(BYOK_KEY_COLUMNS);
+        if (!organizationId) await placeNewPersonalKey(tx, ctx.user.id, inserted);
+        return inserted;
+      });
 
       // Create audit log only for organization keys
       if (organizationId) {

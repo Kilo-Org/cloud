@@ -22,6 +22,7 @@ const summary = vi.hoisted(() => ({
   isPending: false,
   isError: false,
   isFetching: false,
+  error: null as unknown,
   data: null as unknown,
   refetch: vi.fn(),
 }));
@@ -29,6 +30,7 @@ const summary = vi.hoisted(() => ({
 const proposals = vi.hoisted(() => ({
   isPending: false,
   isError: false,
+  error: null as unknown,
   isFetching: false,
   isFetchingNextPage: false,
   hasNextPage: false,
@@ -60,13 +62,17 @@ const switches = vi.hoisted(() => ({
   rendered: [] as {
     value?: boolean;
     disabled?: boolean;
-    accessible?: boolean;
+    accessibilityLabel?: string;
+    accessibilityHint?: string;
+    accessibilityState?: { disabled?: boolean; busy?: boolean; checked?: boolean };
     onValueChange?: (value: boolean) => void;
   }[],
 }));
 
 const pressables = vi.hoisted(() => ({
   rendered: [] as {
+    accessible?: boolean;
+    importantForAccessibility?: string;
     accessibilityRole?: string;
     accessibilityLabel?: string;
     accessibilityState?: { disabled?: boolean; busy?: boolean; checked?: boolean };
@@ -138,6 +144,8 @@ vi.mock('react-native', () => ({
   Pressable: (props: {
     children?: unknown;
     disabled?: boolean;
+    accessible?: boolean;
+    importantForAccessibility?: string;
     accessibilityRole?: string;
     accessibilityLabel?: string;
     accessibilityState?: { disabled?: boolean; busy?: boolean; checked?: boolean };
@@ -149,7 +157,9 @@ vi.mock('react-native', () => ({
   Switch: (props: {
     value?: boolean;
     disabled?: boolean;
-    accessible?: boolean;
+    accessibilityLabel?: string;
+    accessibilityHint?: string;
+    accessibilityState?: { disabled?: boolean; busy?: boolean; checked?: boolean };
     onValueChange?: (value: boolean) => void;
   }) => {
     switches.rendered.push(props);
@@ -229,11 +239,13 @@ beforeEach(() => {
   summary.isPending = false;
   summary.isError = false;
   summary.isFetching = false;
+  summary.error = null;
   summary.data = null;
   summary.refetch.mockClear();
   proposals.isPending = false;
   proposals.isError = false;
   proposals.isFetching = false;
+  proposals.error = null;
   proposals.isFetchingNextPage = false;
   proposals.hasNextPage = false;
   proposals.data = null;
@@ -273,6 +285,17 @@ describe('ReviewMemoryScreen retryable errors', () => {
     expect(queryErrors.errors).toHaveLength(1);
     expect(queryErrors.errors[0]?.variant).toBe('server');
     expect(queryErrors.errors[0]?.onRetry).toBeDefined();
+  });
+
+  it('names a lost membership and offers no Retry for the summary read', () => {
+    summary.isError = true;
+    summary.error = { data: { code: 'UNAUTHORIZED' } };
+
+    renderScreen();
+
+    expect(queryErrors.errors).toHaveLength(1);
+    expect(queryErrors.errors[0]?.variant).toBe('permission');
+    expect(queryErrors.errors[0]?.onRetry).toBeUndefined();
   });
 
   it('renders a retryable error with Retry when the first proposals page fails', () => {
@@ -358,20 +381,42 @@ describe('ReviewMemoryScreen enabled state', () => {
     expect(switches.rendered[0]?.disabled).toBe(false);
   });
 
-  it('turns review memory off from the on-state row', () => {
+  it('names the switch and takes the sentence out of the accessibility tree', () => {
     summary.data = { enabled: true, repositories: [], openProposalCount: 0 };
     permission.canEdit = true;
     proposals.data = { pages: [{ proposals: [], nextCursor: null }] };
 
     renderScreen();
 
-    const row = pressables.rendered.find(pressable => pressable.accessibilityRole === 'switch');
-    expect(row?.accessibilityLabel).toBe('Review memory');
-    expect(row?.accessibilityState).toMatchObject({ checked: true, disabled: false });
+    expect(switches.rendered).toHaveLength(1);
+    expect(switches.rendered[0]).toMatchObject({
+      accessibilityLabel: 'Review memory',
+      accessibilityState: { checked: true, disabled: false },
+    });
+    const row = pressables.rendered.find(pressable => pressable.accessible === false);
+    expect(row).toMatchObject({
+      importantForAccessibility: 'no-hide-descendants',
+    });
+    expect(row?.accessibilityRole).toBeUndefined();
+    expect(row?.accessibilityLabel).toBeUndefined();
+  });
+
+  it('turns review memory off from the row text and from the switch', () => {
+    summary.data = { enabled: true, repositories: [], openProposalCount: 0 };
+    permission.canEdit = true;
+    proposals.data = { pages: [{ proposals: [], nextCursor: null }] };
+
+    renderScreen();
+
+    const row = pressables.rendered.find(pressable => pressable.accessible === false);
     act(() => {
       row?.onPress?.();
     });
     expect(setEnabled.mutate).toHaveBeenCalledWith(false);
+    act(() => {
+      switches.rendered[0]?.onValueChange?.(false);
+    });
+    expect(setEnabled.mutate).toHaveBeenCalledTimes(2);
   });
 
   it('reserves the tab bar clearance after the last proposal row', () => {
@@ -401,10 +446,11 @@ describe('ReviewMemoryScreen enabled state', () => {
     renderScreen();
 
     expect(switches.rendered[0]?.disabled).toBe(true);
-    expect(
-      pressables.rendered.find(pressable => pressable.accessibilityRole === 'switch')
-        ?.accessibilityState
-    ).toMatchObject({ disabled: true, busy: true });
+    expect(switches.rendered[0]?.accessibilityState).toMatchObject({
+      disabled: true,
+      busy: true,
+      checked: true,
+    });
   });
 
   it('keeps the row visible and inert for a reader who cannot edit', () => {
@@ -416,8 +462,13 @@ describe('ReviewMemoryScreen enabled state', () => {
 
     expect(switches.rendered).toHaveLength(1);
     expect(switches.rendered[0]?.disabled).toBe(true);
-    const row = pressables.rendered.find(pressable => pressable.accessibilityRole === 'switch');
-    expect(row?.accessibilityState).toMatchObject({ checked: true, disabled: true });
+    expect(switches.rendered[0]?.accessibilityState).toMatchObject({
+      checked: true,
+      disabled: true,
+    });
+    expect(switches.rendered[0]?.accessibilityHint).toBe(
+      'Only organization owners, admins, and billing managers can change review memory.'
+    );
     expect(collectText(renderer.toJSON())).toContain(
       'Only organization owners, admins, and billing managers can change review memory.'
     );

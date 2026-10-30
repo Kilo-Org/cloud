@@ -642,8 +642,11 @@ async function ownerRouterSlugs(
 /**
  * Catalog I/O and benchmark admission stay outside the owner lock. The transaction serializes the
  * final validation and the write only, so queued saves never hold a pooled connection across an
- * outbound benchmark request. The one exception is in `updateCustomRouterResponse`, which admits the
- * locked definition inside the transaction when a concurrent save changed it after the pre-lock read.
+ * outbound benchmark request. `registerClientEntryResponse` looks a client entry's link up before
+ * the lock for the same reason, and refuses when the base router changed meanwhile, because a link
+ * for the new difficulty cannot be checked without that request. The other exception is
+ * `updateCustomRouterResponse`, which admits the locked definition inside the transaction when a
+ * concurrent save changed it after the pre-lock read.
  */
 export async function createCustomRouterResponse(
   context: CustomRouterRequestContext,
@@ -818,9 +821,24 @@ export async function registerClientEntryResponse(
   const key = customRouterEntryKey(incoming);
   const owner = await resolveEditableOwner(context, scope);
 
+  const planned = await findRouter(db, owner, slug);
+  // The link lookup runs before the owner lock, as in create and update, so a queued registration
+  // never holds a pooled connection across the outbound request. A registration that carries no
+  // new link validates nothing.
+  await validateLinkedEntries([incoming], planned.baseRouter, planned.entries);
+
   const router = await db.transaction(async tx => {
     await lockOwner(tx, owner);
     const current = await findRouter(tx, owner, slug);
+    if (incoming.measuredAs !== undefined && current.baseRouter !== planned.baseRouter) {
+      // The link was checked against the base router read before the lock, and a concurrent save
+      // changed it. No locked state proves the link for the new difficulty, and the lookup that
+      // would is the one that must stay outside this transaction, so the caller registers again.
+      throw new CustomRouterApiError(
+        'invalid_request',
+        'baseRouter: The benchmark difficulty changed while this request was in flight. Try again.'
+      );
+    }
     const index = current.entries.findIndex(existing => customRouterEntryKey(existing) === key);
     if (index === -1 && current.entries.length >= MAX_CUSTOM_ROUTER_ENTRIES) {
       throw new CustomRouterApiError(
@@ -839,7 +857,6 @@ export async function registerClientEntryResponse(
       index === -1
         ? [...current.entries, entry]
         : current.entries.map((existing, i) => (i === index ? entry : existing));
-    await validateLinkedEntries([entry], current.baseRouter, current.entries);
     return saveRouter(tx, { ...current, entries });
   });
 

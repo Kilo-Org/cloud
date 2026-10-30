@@ -15,6 +15,7 @@ import {
   type ReviewerPlatform,
   toPersonalPlatform,
 } from '@/lib/code-reviewer-config';
+import { reviewerSaveFailure } from '@/lib/code-reviewer-save-error';
 import {
   isLatestMutationGeneration,
   nextMutationGeneration,
@@ -174,6 +175,12 @@ export function useToggleReviewer(scope: string, platform: ReviewerPlatform) {
   // onError policy: roll back the onMutate snapshot (latest generation only)
   // and toast error.message.
   return useMutation({
+    // Same reason as the config save below: pausing while the connectivity
+    // manager reports offline hides the outcome (`mutateAsync` never settles, so
+    // the switch keeps the optimistic position with no rollback and no toast,
+    // and the queued toggle lands silently after reconnecting). Attempting the
+    // request fails through the normal path instead.
+    networkMode: 'always',
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: { isEnabled: boolean }) =>
       // The toggle joins the same chain key the config save uses, so a toggle
@@ -214,7 +221,11 @@ export function useToggleReviewer(scope: string, platform: ReviewerPlatform) {
           old ? { ...old, isEnabled: previous.isEnabled } : old
         );
       }
-      announcingToast.error(error.message);
+      // Same reason as the config save: the server's sentence is English and
+      // may name a refusal the app explains itself.
+      announcingToast.error(
+        reviewerSaveFailure(error, i18n.t('codeReviewer.updateFailed')).message
+      );
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     onSettled: () => queryClient.invalidateQueries({ queryKey }),
@@ -260,6 +271,15 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
   // onError policy: roll back the onMutate snapshot (latest generation only)
   // and toast error.message.
   return useMutation({
+    // Reachability is the save's outcome, not a precondition: the default
+    // `networkMode: 'online'` pauses the mutation while the connectivity
+    // manager reports the device offline, so the request is never sent, the
+    // caller's `mutateAsync` never settles (the option list keeps every row
+    // busy and disabled, with no failure surface), and the queued save lands
+    // silently once the connection returns. Attempting the request instead lets
+    // it fail through the normal path: onError restores the previous value and
+    // the rejection reaches the screen, which offers the inline Retry.
+    networkMode: 'always',
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (patch: ConfigPatch) =>
       // Rapid taps (e.g. toggling several focus areas in a row) each send a
@@ -371,7 +391,12 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
           old ? { ...old, ...restoredFields } : old
         );
       }
-      announcingToast.error(error.message);
+      // The server's sentence is English and may describe a refusal the app
+      // already explains (the organization trial gate); the toast shows that
+      // explanation, never the raw sentence.
+      announcingToast.error(
+        reviewerSaveFailure(error, i18n.t('codeReviewer.configSaveFailed')).message
+      );
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     onSettled: () => queryClient.invalidateQueries({ queryKey }),

@@ -3,18 +3,26 @@
 // goes through the shared external-link helper.
 
 import { createElement } from 'react';
+import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
+import { Text } from '@/components/ui/text';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FindingDetailsPanel } from './finding-details-panel';
 import { type SecurityFinding } from '@/lib/security-agent';
 
-const mocks = vi.hoisted(() => ({
-  routerPush: vi.fn(),
-  openBrowser: vi.fn(),
-  linkingOpenUrl: vi.fn(),
-  toastError: vi.fn(),
-}));
+const mocks = vi.hoisted(() => {
+  const deadlineState: Record<string, unknown> = { kind: 'no-deadline' };
+  const interpolations: { key: string; params: Record<string, unknown> }[] = [];
+  return {
+    deadlineState,
+    interpolations,
+    routerPush: vi.fn(),
+    openBrowser: vi.fn(),
+    linkingOpenUrl: vi.fn(),
+    toastError: vi.fn(),
+  };
+});
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -25,8 +33,18 @@ vi.mock('expo-web-browser', () => ({ openBrowserAsync: mocks.openBrowser }));
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: mocks.routerPush }),
+  useFocusEffect: () => undefined,
 }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, params?: Record<string, unknown>) => {
+      if (params) {
+        mocks.interpolations.push({ key, params });
+      }
+      return key;
+    },
+  }),
+}));
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
 vi.mock('@/components/ui/icons', () => ({
   ExternalLink: 'ExternalLink',
@@ -48,13 +66,16 @@ vi.mock('@/components/security-agent/collapsible-section', () => ({
   CollapsibleSection: (props: { children?: unknown }) => props.children ?? null,
 }));
 vi.mock('@/components/security-agent/finding-status-badge', () => ({
-  FindingStatusBadge: () => null,
+  FindingStatusBadge: 'FindingStatusBadge',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666' }),
 }));
 vi.mock('@/lib/security-agent-copy', () => ({
-  getDeadlineCopy: () => ({ label: '', detail: '' }),
+  getDeadlineCopy: (state: { kind: string }) => ({
+    label: `${state.kind} deadline`,
+    detail: `${state.kind} detail`,
+  }),
 }));
 vi.mock('@/lib/utils', () => ({
   cn: (...classes: unknown[]) => classes.join(' '),
@@ -65,7 +86,11 @@ vi.mock('@/lib/utils', () => ({
 vi.mock('@kilocode/app-shared/security-agent', () => ({
   getFindingLifecycleStatusPresentation: () => ({ tone: 'neutral' }),
   getFindingSeverityPresentation: () => ({ tone: 'danger' }),
-  getSecurityDeadlinePresentation: () => ({ state: 'none', tone: 'neutral', icon: 'clock' }),
+  getSecurityDeadlinePresentation: () => ({
+    state: mocks.deadlineState,
+    tone: 'neutral',
+    icon: 'clock',
+  }),
   getSupersedingFindingId: () => null,
 }));
 
@@ -163,4 +188,63 @@ describe('FindingDetailsPanel advisory link routing', () => {
     expect(mocks.openBrowser).not.toHaveBeenCalled();
     expect(mocks.linkingOpenUrl).not.toHaveBeenCalled();
   });
+});
+
+describe('FindingDetailsPanel chip row', () => {
+  it('drops the deadline chip that repeats a dismissed status', () => {
+    mocks.deadlineState = { kind: 'closed', superseded: false, at: new Date(0) };
+    const tree = renderPanel(findingFixture({ status: 'ignored' }));
+
+    expect(tree.root.findAllByType(FindingStatusBadge)).toHaveLength(0);
+    // The dismissal card still explains the reason; only the row lost a chip.
+    const rendered = tree.root.findAllByType(Text);
+    expect(
+      rendered.filter(
+        node => node.props.children === 'securityAgent.findingDetails.dismissedBecause'
+      )
+    ).toHaveLength(1);
+  });
+
+  it('drops the deadline chip that repeats a fixed status after the deadline', () => {
+    mocks.deadlineState = { kind: 'fixed', beforeDeadline: false, fixedAt: new Date(0) };
+    const tree = renderPanel(findingFixture({ status: 'fixed' }));
+
+    expect(tree.root.findAllByType(FindingStatusBadge)).toHaveLength(0);
+    const rendered = tree.root.findAllByType(Text);
+    expect(
+      rendered.filter(node => node.props.children === 'securityAgent.filter.fixed')
+    ).toHaveLength(1);
+  });
+
+  it.each([
+    { state: { kind: 'fixed', beforeDeadline: true, fixedAt: new Date(0) }, status: 'fixed' },
+    { state: { kind: 'due-in', days: 12, deadline: new Date(0) }, status: 'open' },
+    { state: { kind: 'no-deadline' }, status: 'open' },
+  ])('keeps the deadline chip a $state.kind finding carries', ({ state, status }) => {
+    mocks.deadlineState = state;
+    const tree = renderPanel(findingFixture({ status }));
+
+    expect(tree.root.findAllByType(FindingStatusBadge)).toHaveLength(1);
+  });
+});
+
+describe('FindingDetailsPanel stored dismissal values', () => {
+  beforeEach(() => {
+    mocks.deadlineState = { kind: 'closed', superseded: false, at: new Date(0) };
+    mocks.interpolations.length = 0;
+  });
+
+  // A dismissed row reads `ignored_reason` from the stored record, and the
+  // column's type does not guarantee it is still a string.
+  it.each([{ ignored_reason: 7 }, { ignored_reason: true }, { ignored_reason: '  ' }])(
+    'falls back to the review wording for an unusable reason (%j)',
+    override => {
+      renderPanel(findingFixture({ status: 'ignored', ...override }));
+
+      expect(mocks.interpolations).toContainEqual({
+        key: 'securityAgent.findingDetails.dismissedBecause',
+        params: { reason: 'securityAgent.findingDetails.reasonAfterReview' },
+      });
+    }
+  );
 });

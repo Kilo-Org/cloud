@@ -14,6 +14,7 @@ import {
   authorizeCloudAgentChild,
   issueCloudAgentMcpGrant,
   assertCloudAgentParentAuthority,
+  type WorkspaceMcpBinding,
 } from '../../cloud-agent-authority.js';
 import {
   CloudAgentAuthoritySchema,
@@ -136,13 +137,9 @@ import {
   type QueuedMessageSnapshot,
 } from '../../websocket/stream.js';
 import {
-  isDeliverableNativeEvent,
-  isMaterializedNativeEvent,
   NATIVE_DELIVERY_LIMITS,
   toNativePublicEvent,
-  type NativeEventSubscription,
 } from '../../kilo-facade/native-event-source.js';
-import { createNativeEventOutbox } from './native-outbox.js';
 import { sandboxControlPeerNamespace } from '../peer-bindings.js';
 import migrations from './drizzle/migrations';
 import {
@@ -229,7 +226,6 @@ const TRANSPORT_RECOVERY_KEY = 'control_plane_transport_recovery_at';
 const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
 const AVAILABLE_COMMANDS_KEY = 'available_commands';
 const ROOT_STATUS_KEY = 'session_root_status';
-const NATIVE_DELIVERY_GENERATION_KEY = 'native_delivery_generation';
 
 /**
  * Kilo's last root `session.status` type; `settled` once an accepted message settled after it,
@@ -428,6 +424,11 @@ export type NativeSnapshot = {
   sessionStatus?: SessionStatus;
   questions?: unknown[];
   permissions?: unknown[];
+  /**
+   * The requested root Kilo session is not this DO's registration. `fence: null`
+   * is also an empty log, so a stopped registration needs its own signal.
+   */
+  stopped?: boolean;
 };
 
 export type NativeSnapshotCursor = {
@@ -575,26 +576,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private transportRecoveryAt: number | null = null;
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
-  private nativeDeliveryGeneration = 0;
-  private readonly nativeOutbox = createNativeEventOutbox({
-    identity: () => {
-      const kiloUserId = this.metadata?.identity.userId;
-      const kiloSessionId = this.registration?.spec.kiloSessionId;
-      if (kiloUserId === undefined || kiloSessionId === undefined) return null;
-      return { kiloUserId, kiloSessionId, cloudAgentSessionId: this.sessionId };
-    },
-    generation: () => this.nativeDeliveryGeneration,
-    send: (batch, deadlineAt) =>
-      withDORetry(
-        () => this.env.USER_KILO_FACADE.get(this.env.USER_KILO_FACADE.idFromName(batch.kiloUserId)),
-        facade => facade.publishNativeEventBatch({ ...batch, deadlineAt }),
-        'publishNativeEventBatch',
-        { ...DEFAULT_DO_RETRY_CONFIG, scope: { deadlineAt } }
-      ),
-    waitUntil: work => this.ctx.waitUntil(work),
-    diagnostic: reason =>
-      logger.withFields({ sessionId: this.sessionId, reason }).warn('Native event continuity lost'),
-  });
   private rootStatus: RootStatus | undefined;
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
@@ -739,18 +720,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       await this.ctx.storage.deleteAll();
       await this.ctx.storage.put(GENERATION_KEY, GENERATION);
       await migrate(this.db, migrations);
-      this.nativeDeliveryGeneration = 1;
-      await this.ctx.storage.put(NATIVE_DELIVERY_GENERATION_KEY, this.nativeDeliveryGeneration);
       return;
     }
     await migrate(this.db, migrations);
-    const nativeGeneration = z
-      .number()
-      .int()
-      .nonnegative()
-      .safeParse(await this.ctx.storage.get<unknown>(NATIVE_DELIVERY_GENERATION_KEY));
-    this.nativeDeliveryGeneration = (nativeGeneration.success ? nativeGeneration.data : 0) + 1;
-    await this.ctx.storage.put(NATIVE_DELIVERY_GENERATION_KEY, this.nativeDeliveryGeneration);
     const raw = await this.ctx.storage.get<unknown>(REGISTRATION_KEY);
     const parsed = controlPlaneSessionRegistrationSchema.safeParse(raw);
     this.registration = parsed.success ? parsed.data : null;
@@ -980,14 +952,15 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
-  async issueCloudAgentMcpGrant(): Promise<
-    { url: string; token: string; expiresAt: number } | undefined
-  > {
+  async issueCloudAgentMcpGrant(
+    workspace?: WorkspaceMcpBinding
+  ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
     await this.initialized;
     if (this.metadata?.allowSubagentSessions !== true) return undefined;
     const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
     if (!secret) throw new Error('Authentication unavailable');
     return issueCloudAgentMcpGrant({
+      workspace,
       secret,
       connectionString: this.env.HYPERDRIVE.connectionString,
       metadata: () => this.getMetadata(),
@@ -1560,10 +1533,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    */
   async nativeSnapshot(input: {
     fromId?: number;
+    kiloSessionId: string;
     continuation?: NativeSnapshotCursor;
   }): Promise<NativeSnapshot> {
     await this.initialized;
-    if (this.registration === null) return { oversized: false, fence: null, events: [] };
+    if (this.registration === null || this.registration.spec.kiloSessionId !== input.kiloSessionId)
+      return { oversized: false, fence: null, events: [], stopped: true };
     const kiloSessionId = this.registration.spec.kiloSessionId;
     const fence =
       input.continuation === undefined
@@ -1629,63 +1604,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return detailsBytes + eventsBytes > NATIVE_DELIVERY_LIMITS.batchBytes
       ? { oversized: true, fence, events: [] }
       : snapshot;
-  }
-
-  /**
-   * The per-user Kilo facade subscribes to this session's native events. The
-   * fence is the delivery watermark at subscribe time: the facade's snapshot is
-   * complete through it, and later events arrive as pushes.
-   */
-  async subscribeNativeEvents(input: {
-    kiloSessionId: string;
-    attachmentId: string;
-  }): Promise<NativeEventSubscription> {
-    await this.initialized;
-    if (this.registration === null || this.registration.spec.kiloSessionId !== input.kiloSessionId)
-      return {
-        registered: false,
-        fence: null,
-        kiloSessionId: input.kiloSessionId,
-        continuity: { generation: this.nativeDeliveryGeneration, sequence: 0 },
-      };
-    const continuity = this.nativeOutbox.subscribe(input.attachmentId);
-    return {
-      registered: true,
-      fence: this.eventQueries.getLatestEventId(),
-      kiloSessionId: input.kiloSessionId,
-      continuity,
-    };
-  }
-
-  async refreshNativeEvents(input: {
-    kiloSessionId: string;
-    attachmentId: string;
-    generation: number;
-  }): Promise<boolean> {
-    await this.initialized;
-    return (
-      this.registration?.spec.kiloSessionId === input.kiloSessionId &&
-      this.nativeOutbox.refresh(input.attachmentId, input.generation)
-    );
-  }
-
-  async releaseNativeEvents(input: { attachmentId: string }): Promise<void> {
-    await this.initialized;
-    this.nativeOutbox.release(input.attachmentId);
-  }
-
-  private publishNativeEvent(stored: StoredEvent): void {
-    const kiloSessionId = this.registration?.spec.kiloSessionId;
-    if (kiloSessionId === undefined || this.metadata?.identity.userId === undefined) return;
-    const event = formatStreamEvent(stored, this.sessionId);
-    if (!isDeliverableNativeEvent(event, true)) return;
-    const native = toNativePublicEvent(event, kiloSessionId);
-    if (native === null) return;
-    this.nativeOutbox.enqueue({
-      eventId: stored.id,
-      materialized: isMaterializedNativeEvent(event),
-      event: native,
-    });
   }
 
   /** The pending questions and permissions this session waits on (C1 adapter). */
@@ -2386,7 +2304,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   private clearSessionInMemoryState(): void {
-    this.nativeOutbox.close();
     this.registration = null;
     this.metadata = null;
     this.wipeLocator = null;
@@ -2438,7 +2355,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   async fetch(request: Request): Promise<Response> {
     await this.initialized;
-    const pathname = new URL(request.url).pathname;
+    const url = new URL(request.url);
+    const pathname = url.pathname;
     if (pathname === '/terminal/browser') {
       return this.terminals.handleBrowserUpgrade(request);
     }
@@ -2447,7 +2365,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     if (pathname !== '/stream') return new Response('Not found', { status: 404 });
     if (this.registration === null) return new Response('Session not found', { status: 404 });
-    if (new URL(request.url).searchParams.get('sandboxStatus') === 'true') {
+    const requestedKiloSessionId = url.searchParams.get('kiloSessionId');
+    if (
+      requestedKiloSessionId !== null &&
+      requestedKiloSessionId !== this.registration.spec.kiloSessionId
+    )
+      return new Response('Session not found', { status: 404 });
+    if (url.searchParams.get('sandboxStatus') === 'true') {
       if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket')
         return new Response('Expected WebSocket upgrade', { status: 426 });
       const sandboxId = this.registration.sandboxId;
@@ -3240,7 +3164,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   private broadcast(event: StoredEvent): void {
     this.streamHandler().broadcastEvent(event);
-    this.publishNativeEvent(event);
   }
 
   private deriveCloudStatus(): {

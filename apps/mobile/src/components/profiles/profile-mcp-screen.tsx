@@ -21,13 +21,14 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
-  useAgentProfile,
+  useAgentProfileMcpServers,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_MCP_SERVERS: AgentProfileDetail['mcpServers'] = [];
@@ -106,7 +107,7 @@ function McpServerRowView({
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
-          accessibilityLabel={t('profiles.mcp.edit')}
+          accessibilityLabel={t('profiles.mcp.edit', { name: server.name })}
           onPress={onEdit}
         >
           <Pencil size={18} color={colors.mutedForeground} />
@@ -116,7 +117,7 @@ function McpServerRowView({
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
-          accessibilityLabel={t('common.delete')}
+          accessibilityLabel={t('profiles.mcp.delete', { name: server.name })}
           onPress={onDelete}
         >
           <Trash2 size={18} color={colors.destructive} />
@@ -143,18 +144,25 @@ export function ProfileMcpScreen({
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
-  const profileQuery = useAgentProfile(profileId, organizationId);
+  const profileQuery = useAgentProfileMcpServers(profileId, organizationId);
   const { createMcp, updateMcp, deleteMcp, setMcpEnabled } =
     useAgentProfileSectionMutations(organizationId);
   const canManage = useCanManageOrganizationProfiles(organizationId);
 
-  const servers = profileQuery.data?.mcpServers ?? NO_MCP_SERVERS;
+  const servers = profileQuery.data ?? NO_MCP_SERVERS;
   const rows = mcpServerRows(servers);
   // `null` = closed, `{ server: null }` = add, `{ server }` = edit that server.
   const [form, setForm] = useState<{ server: McpServerSource | null } | null>(null);
+  // A save the server refused on the name index shows the inline conflict
+  // instead of a toast the open sheet covers; any other refusal shows one line
+  // inside the sheet. Both reset when the form opens and each save starts.
+  const [serverNameConflict, setServerNameConflict] = useState(false);
+  const [saveFailure, setSaveFailure] = useState<string | null>(null);
 
   const startAdd = () => {
     setForm({ server: null });
+    setServerNameConflict(false);
+    setSaveFailure(null);
   };
 
   const closeForm = () => {
@@ -162,14 +170,18 @@ export function ProfileMcpScreen({
   };
 
   const saveServer = async (target: McpServerSource | null, payload: McpServerPayload) => {
+    setServerNameConflict(false);
+    setSaveFailure(null);
     try {
       await (target === null
         ? createMcp.mutateAsync({ profileId, server: payload })
         : updateMcp.mutateAsync({ profileId, mcpServerId: target.id, server: payload }));
     } catch (error) {
-      if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.mcp.saveFailed'));
+      if (readTrpcErrorField(error, 'code') === 'CONFLICT') {
+        setServerNameConflict(true);
+        return;
       }
+      setSaveFailure(t('profiles.mcp.saveFailed'));
       return;
     }
     closeForm();
@@ -259,6 +271,8 @@ export function ProfileMcpScreen({
                 canManage
                   ? () => {
                       setForm({ server });
+                      setServerNameConflict(false);
+                      setSaveFailure(null);
                     }
                   : undefined
               }
@@ -297,7 +311,12 @@ export function ProfileMcpScreen({
       {form !== null ? (
         <McpFormSheet
           server={form.server}
+          existingNames={servers
+            .filter(candidate => candidate.id !== form.server?.id)
+            .map(candidate => candidate.name)}
           isSaving={createMcp.isPending || updateMcp.isPending}
+          nameConflictFromServer={serverNameConflict}
+          saveFailure={saveFailure}
           onClose={closeForm}
           onSave={payload => {
             void saveServer(form.server, payload);

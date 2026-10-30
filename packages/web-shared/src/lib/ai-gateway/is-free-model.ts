@@ -1,8 +1,5 @@
 import { KILO_AUTO_FREE_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import {
-  findKiloExclusiveModel,
-  kiloExclusiveModels,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   isLocalFakeDeterministicModel,
   isLocalFakeLlmEnabled,
@@ -21,11 +18,8 @@ export async function isFreeModel(modelId: string): Promise<boolean> {
  */
 export function isFreeModelExcludingCustomLlms(model: string): boolean {
   const modelId = model ?? '';
-  const exclusiveModel = findKiloExclusiveModel(modelId);
-  if (exclusiveModel) {
-    return !exclusiveModel.pricing;
-  }
   return (
+    isKiloExclusiveModel(modelId) ||
     ((isLocalFakeDeterministicModel(modelId) || isLocalFakeTranscriptionModel(modelId)) &&
       isLocalFakeLlmEnabled()) ||
     modelId === KILO_AUTO_FREE_MODEL.id ||
@@ -37,11 +31,5 @@ export function isFreeModelExcludingCustomLlms(model: string): boolean {
 
 /** Free models, custom LLMs included, are assumed to train on prompts. */
 export async function hasBestEffortGuessDataCollectionRequirement(model: string): Promise<boolean> {
-  return (
-    (await isFreeModel(model)) ||
-    kiloExclusiveModels.some(
-      candidate =>
-        candidate.public_id === model && candidate.flags.includes('requires-data-collection')
-    )
-  );
+  return await isFreeModel(model);
 }

@@ -17,8 +17,8 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
-  useAgentProfile,
   useAgentProfileMutations,
+  useAgentProfileSkills,
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -77,7 +77,7 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
-          accessibilityLabel={t('profiles.skillEditTitle')}
+          accessibilityLabel={t('profiles.skillEdit', { name: skill.name })}
           onPress={onEdit}
         >
           <Pencil size={18} color={colors.mutedForeground} />
@@ -87,7 +87,7 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
-          accessibilityLabel={t('common.delete')}
+          accessibilityLabel={t('profiles.skillDelete', { name: skill.name })}
           onPress={onDelete}
         >
           <Trash2 size={18} color={colors.destructive} />
@@ -114,12 +114,12 @@ export function ProfileSkillsScreen({
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
-  const profileQuery = useAgentProfile(profileId, organizationId);
+  const profileQuery = useAgentProfileSkills(profileId, organizationId);
   const { createCustomSkill, updateSkill, deleteSkill, setSkillEnabled } =
     useAgentProfileMutations(organizationId);
   const canManage = useCanManageOrganizationProfiles(organizationId);
 
-  const skills = profileQuery.data?.skills ?? NO_SKILLS;
+  const skills = profileQuery.data ?? NO_SKILLS;
   // `null` = closed, `{ skill: null }` = add, `{ skill }` = edit that skill.
   const [form, setForm] = useState<{ skill: SkillTarget | null } | null>(null);
 

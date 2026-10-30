@@ -9,6 +9,7 @@
 // on iOS, so the mutation hook toasts onError AND the sheet shows inline.
 
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -124,7 +125,7 @@ function CapabilityReviewEventChips(props: {
               key={providerEvent}
               disabled={props.disabled}
               onPress={() => {
-                void Haptics.selectionAsync();
+                selectionHaptic();
                 props.onChange(event);
               }}
               {...radioItemA11y({
@@ -332,7 +333,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             })
       );
       pending.removeComments(fresh.map(item => item.id));
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      notificationHaptic(Haptics.NotificationFeedbackType.Success);
       if (stale.length > 0) {
         // Stale items stay queued: keep the sheet open and report the partial
         // result instead of dismissing, so the user can edit or delete them.

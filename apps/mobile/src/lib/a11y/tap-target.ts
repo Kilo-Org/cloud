@@ -49,6 +49,18 @@ export const STATE_ACTION_TARGET_DP = 48;
 export const STATE_ACTION_CLASS = 'min-h-[48px]';
 
 /**
+ * The frame an interactive row or segment renders on its own pressable node —
+ * a selection row, a menu row, a disclosure row, a picker row. A row sized by
+ * its content reports that content's height, and `hitSlop` widens the touch
+ * region without moving the rect a control-size audit reads, so the floor has
+ * to be the row's class. The same floor clears Android's button minimum and the
+ * design target on iOS, so one class serves both platforms and no `Platform`
+ * branch is needed. Explicit px, because NativeWind's rem shrinks the
+ * `min-h-11` scale step below both.
+ */
+export const ROW_TARGET_CLASS = 'min-h-[48px]';
+
+/**
  * The box every icon-only control renders. Its own node carries the target, as
  * a control-size audit measures, and 32pt clears the audit's
  * {@link MIN_TAP_TARGET_DP} floor while fitting the agents header row's

@@ -13,7 +13,9 @@ import { type ChatComposer } from './chat-composer';
 // `resolveChatComposerControlState` so `canSend` follows text and ready
 // attachments, and mocks `useAgentAttachmentUpload` with a controllable return.
 
-const onSendMock = vi.fn(async () => undefined);
+const onSendMock = vi.fn(
+  async (_prompt: string, _options?: { onOptimisticSend?: () => void }) => undefined
+);
 
 // ── React hooks (real useEffect needs rendering context, so mock all hooks) ──
 // `useRef` hands out slots in call order and keeps them across calls of the
@@ -246,6 +248,7 @@ vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
     reset: vi.fn(() => undefined),
     releaseUnclaimedUploads: leaveMock.releaseUnclaimedUploads,
     commitSent: vi.fn(() => undefined),
+    clearOptimistic: vi.fn(() => undefined),
     isUploading: uploadState.isUploading,
     hasFailedAttachments: uploadState.attachments.some(attachment => attachment.status === 'error'),
     hasUnclaimedAttachments: uploadState.attachments.some(
@@ -279,10 +282,12 @@ vi.mock('@/lib/agent-attachments/validate', () => ({
   describeClassificationFailure: vi.fn(),
 }));
 
+const clearDraftMock = vi.hoisted(() => vi.fn(async () => undefined));
+
 vi.mock('@/lib/persist/drafts', () => ({
   saveDraft: vi.fn(),
   flushDraft: vi.fn(async () => undefined),
-  clearDraft: vi.fn(async () => undefined),
+  clearDraft: clearDraftMock,
 }));
 
 vi.mock('@/lib/share-prefill', () => ({
@@ -396,6 +401,35 @@ describe('ChatComposer attachment-only send', () => {
       submission: undefined,
       onOptimisticSend: expect.any(Function),
     });
+  });
+
+  it('treats an invisible draft with a ready attachment as the empty prompt and clears it', async () => {
+    uploadState.attachments = [{ status: 'uploaded', remoteFilename: 'file.png' }];
+    uploadState.uploadPending = () => ({
+      ok: true,
+      wire: { path: 'path-1', files: ['file.png'] },
+      submission: undefined,
+    });
+
+    const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
+    // The live draft holds nothing a reader can see, which is what the composer
+    // sends as an empty prompt; the clear-after-send guard has to agree with
+    // that, or the invisible characters would survive the send.
+    const textRefSlot = refSlots.slots[0];
+    if (textRefSlot === undefined) {
+      throw new Error('ChatComposer did not create its live text ref');
+    }
+    textRefSlot.current = '\u200B\u200B';
+
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    expect(onSendMock).toHaveBeenCalledTimes(1);
+    const [prompt, options] = onSendMock.mock.calls[0] ?? [];
+    expect(prompt).toBe('');
+    options?.onOptimisticSend?.();
+
+    expect(clearDraftMock).toHaveBeenCalledWith('u1', 'agent-composer:sess-1');
   });
 
   it('does not send an empty draft with no attachments', async () => {

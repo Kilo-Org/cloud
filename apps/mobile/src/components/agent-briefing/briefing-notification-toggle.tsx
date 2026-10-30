@@ -9,6 +9,7 @@ import { Newspaper } from '@/components/ui/icons';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { type BriefingPreferences, useBriefingPreferences } from '@/lib/agent-briefing';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
@@ -17,7 +18,7 @@ import { cn } from '@/lib/utils';
 function useBriefingNotificationSwitch() {
   const trpc = useTRPC();
   const client = useQueryClient();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const offline = useOfflineBannerState();
   const preferences = useBriefingPreferences();
   const update = useMutation(
@@ -50,7 +51,18 @@ function useBriefingNotificationSwitch() {
     pending: update.isPending,
     unavailable: offline || !preferences.data || update.isPending,
     setEnabled: (notificationsEnabled: boolean) => {
-      update.mutate({ notificationsEnabled });
+      const current = preferences.data;
+      if (!current || offline || update.isPending) {
+        return;
+      }
+      update.mutate({
+        notificationsEnabled,
+        timezone: current.timezone,
+        nightStart: current.nightStart,
+        morningStart: current.morningStart,
+        morningEnd: current.morningEnd,
+        language: i18n.resolvedLanguage ?? i18n.language,
+      });
     },
   };
 }
@@ -121,7 +133,7 @@ export function BriefingNotificationCategoryRow({ disabled }: Readonly<{ disable
           <Button
             variant="ghost"
             size="sm"
-            className="self-start px-0"
+            className={cn(STATE_ACTION_CLASS, 'self-start px-0')}
             onPress={() => {
               void preferences.refetch();
             }}

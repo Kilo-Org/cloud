@@ -6,7 +6,8 @@
  * entry point: it re-exports the s2 list operations (`addCommand`,
  * `replaceCommand`, `removeCommand`, `moveCommand`) and the server's list/row
  * bounds (`MAX_SETUP_COMMANDS`, `MAX_SETUP_COMMAND_LENGTH`), and adds the
- * per-row position label plus the list comparison and payload helpers.
+ * per-row position label, the length-limit helpers, and the list comparison and
+ * payload helpers.
  */
 
 export {
@@ -17,6 +18,9 @@ export {
   removeCommand,
   replaceCommand,
 } from '@/lib/agent-profile-forms';
+
+/** Hide the remaining-characters counter until a command nears the bound. */
+export const COMMAND_COUNTER_VISIBLE_REMAINING = 50;
 
 /** Whether two lists hold the same commands in the same order. */
 export function sameCommands(a: readonly string[], b: readonly string[]): boolean {

@@ -16,6 +16,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { createSubmitLock } from '@/lib/submit-lock';
@@ -49,6 +50,7 @@ export function LiveSessionFeedback({
   refreshControl,
   refresh,
   inlineNotices = true,
+  compact: compactSpacing = false,
 }: LiveSessionProps & {
   failureLabel: string;
   centered?: boolean;
@@ -61,6 +63,7 @@ export function LiveSessionFeedback({
    * announcements stay here either way.
    */
   inlineNotices?: boolean;
+  compact?: boolean;
 }) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -215,7 +218,7 @@ export function LiveSessionFeedback({
   }
 
   const feedback = (
-    <View className={cn('gap-2', centered && 'px-6')}>
+    <View className={cn(compactSpacing ? 'gap-0' : 'gap-2', centered && 'px-6')}>
       <View className="flex-row items-center gap-2">
         {/* The app-wide OfflineBanner owns the offline announcement. */}
         {internet === 'offline' ? (
@@ -240,6 +243,7 @@ export function LiveSessionFeedback({
             <Button
               variant="ghost"
               size="sm"
+              className={STATE_ACTION_CLASS}
               accessibilityLabel={t('agentChat.sessionConnection.retryConnection')}
               onPress={() => {
                 connection.retryConnection();

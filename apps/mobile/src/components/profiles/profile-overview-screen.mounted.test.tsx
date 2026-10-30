@@ -46,7 +46,7 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
-  useAgentProfile: () => h.query,
+  useAgentProfileOverview: () => h.query,
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
@@ -169,9 +169,9 @@ describe('ProfileOverviewScreen', () => {
 
   it('happy: seeds the fields, lists the sections, and saves the metadata', async () => {
     h.query.data = testProfile({
-      vars: [{ key: 'A' }],
-      commands: ['pnpm install', 'pnpm build'],
-      skills: [{ id: 's1' }],
+      varCount: 1,
+      commandCount: 2,
+      skillCount: 1,
     });
     h.query.isPending = false;
     h.mutations.update.mutateAsync.mockResolvedValue({ success: true });
@@ -242,7 +242,7 @@ describe('ProfileOverviewScreen', () => {
     expect(h.error).toHaveBeenCalledTimes(1);
 
     // An unrelated profile refetch must not replace the failed draft.
-    h.query.data = testProfile({ vars: [{ key: 'NEW' }] });
+    h.query.data = testProfile({ varCount: 1 });
     rerenderScreen(renderer, queryClient);
     expect(findField(renderer.root, 'Profile name').props.defaultValue).toBe('Renamed');
     expect(findField(renderer.root, 'Profile description').props.defaultValue).toBe(

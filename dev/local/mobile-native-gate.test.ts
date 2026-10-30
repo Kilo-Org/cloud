@@ -10,23 +10,11 @@ import { fileURLToPath } from 'node:url';
 import { load } from 'js-yaml';
 
 import {
-  type ArtifactLookup,
   NATIVE_WORKFLOW_PATH,
   decideNativeBuildGate,
   pullRequestArtifactPrefix,
 } from './mobile-native-gate';
 import { artifactName } from './mobile-remote-native';
-
-// The `mobile-native-build` workflow only ran on a pull request that edited
-// the workflow file itself, so a PR that changed a native input (PR 6115's
-// react-native patch broke RCTComponentViewFactory.mm) reached main with the
-// app never compiled. This suite pins the fix: the native inputs are in the
-// pull_request trigger, a native-input run publishes the plain
-// mobile-native-<platform>-<nativeHash> artifact a host installs, a
-// workflow-file run keeps the PR-scoped prefix hosts never install, and a
-// platform whose artifact exists is skipped. A push run only skips on a
-// durable artifact: the one-day pull_request artifact must not stop main from
-// publishing its own build.
 
 type WorkflowStep = {
   id?: string;
@@ -118,47 +106,8 @@ test('a platform is skipped by the gate output it publishes', () => {
   const workflow = readWorkflow();
   assert.match(workflow.jobs.ios.if ?? '', /needs\.gate\.outputs\.need_ios == 'true'/);
   assert.match(workflow.jobs.android.if ?? '', /needs\.gate\.outputs\.need_android == 'true'/);
-  const iosUpload = workflow.jobs.ios.steps.find(item =>
-    (item.uses ?? '').startsWith('actions/upload-artifact')
-  );
-  assert.equal(
-    iosUpload?.with?.name,
-    '${{ needs.gate.outputs.prefix }}mobile-native-ios-${{ needs.gate.outputs.ios_hash }}'
-  );
-  const androidUpload = workflow.jobs.android.steps.find(item =>
-    (item.uses ?? '').startsWith('actions/upload-artifact')
-  );
-  assert.equal(
-    androidUpload?.with?.name,
-    '${{ needs.gate.outputs.prefix }}mobile-native-android-${{ needs.gate.outputs.android_hash }}'
-  );
 });
 
-test('the gate job exposes the promote outputs the workflow reads', () => {
-  const outputs = readWorkflow().jobs.gate.outputs ?? {};
-  for (const key of [
-    'promote_ios',
-    'promote_android',
-    'promote_ios_artifact_id',
-    'promote_android_artifact_id',
-    'promote_ios_name',
-    'promote_android_name',
-  ]) {
-    assert.ok(
-      outputs[key]?.includes(`steps.decide.outputs.${key}`),
-      `gate output ${key} is missing`
-    );
-  }
-});
-
-// One native build takes longer than the gap between two pushes of the same
-// native inputs, so the gate's artifact lookup cannot see the build in
-// flight. The job-level slot plus the re-check is what stops a duplicate.
-// A pull_request run owns its slot per ref: one slot per nativeHash made
-// sibling pull requests cancel each other's pending build, because GitHub keeps
-// a single pending job per group. A push build keeps the nativeHash slot,
-// keyed on the event as well, so it is never the pending job that a later
-// pull_request job cancels and main keeps its durable artifact.
 test('each heavy job takes its own pull_request slot, the nativeHash slot elsewhere, and re-checks its artifact', () => {
   const workflow = readWorkflow();
   for (const platform of ['ios', 'android'] as const) {
@@ -186,46 +135,6 @@ test('each heavy job takes its own pull_request slot, the nativeHash slot elsewh
   }
 });
 
-test('a promote job copies the short-lived artifact under the durable name', () => {
-  const workflow = readWorkflow();
-  for (const platform of ['ios', 'android'] as const) {
-    const promote = workflow.jobs[`promote_${platform}`];
-    assert.ok(promote, `promote_${platform} job is missing`);
-    assert.equal(promote.needs, 'gate');
-    assert.equal(promote.if, `needs.gate.outputs.promote_${platform} == 'true'`);
-    // A cancelled promote reports result == 'cancelled', which the build job
-    // reads as "not success" and answers with a full build. So the promote job
-    // must never take a slot that GitHub can cancel.
-    assert.equal(promote.concurrency, undefined, `promote_${platform} must not take a slot`);
-    const upload = promote.steps.find(item =>
-      (item.uses ?? '').startsWith('actions/upload-artifact')
-    );
-    assert.equal(upload?.with?.name, `\${{ needs.gate.outputs.promote_${platform}_name }}`);
-    assert.equal(upload?.with?.['retention-days'], 90);
-  }
-});
-
-test('a failed promote still builds the platform, and a skipped one does not disable it', () => {
-  const workflow = readWorkflow();
-  for (const platform of ['ios', 'android'] as const) {
-    const job = workflow.jobs[platform];
-    assert.deepEqual(job.needs, ['gate', `promote_${platform}`]);
-    // GitHub skips a job whose `needs` dependency was skipped unless the `if`
-    // calls a status function. promote_* is skipped on every run that does not
-    // promote, so without `always()` the workflow builds nothing at all. The
-    // `!cancelled()` keeps a superseded pull_request run from starting a macOS
-    // job after the run-level concurrency cancelled it.
-    assert.match(
-      job.if ?? '',
-      /^always\(\) && !cancelled\(\)/,
-      `${platform}: the if needs a status function and a cancellation guard`
-    );
-    assert.match(job.if ?? '', /needs\.gate\.result == 'success'/);
-    assert.match(job.if ?? '', new RegExp(`needs\\.gate\\.outputs\\.need_${platform} == 'true'`));
-    assert.match(job.if ?? '', new RegExp(`needs\\.promote_${platform}\\.result != 'success'`));
-  }
-});
-
 test('only a pull request that edits the workflow file gets the PR prefix', () => {
   assert.equal(
     pullRequestArtifactPrefix({
@@ -247,16 +156,6 @@ test('only a pull request that edits the workflow file gets the PR prefix', () =
   );
 });
 
-const MISSING: ArtifactLookup = { state: 'missing' };
-
-function durable(name: string): ArtifactLookup {
-  return { state: 'durable', artifact: { id: 7, name } };
-}
-
-function short(name: string): ArtifactLookup {
-  return { state: 'short', artifact: { id: 9, name } };
-}
-
 test('a pull request whose artifacts exist costs one gate job and no macOS runner', () => {
   const queried: string[] = [];
   const gate = decideNativeBuildGate({
@@ -269,7 +168,7 @@ test('a pull request whose artifacts exist costs one gate job and no macOS runne
     androidHash: 'androidhash',
     lookup: name => {
       queried.push(name);
-      return durable(name);
+      return true;
     },
   });
   assert.deepEqual(gate, {
@@ -294,7 +193,7 @@ test('a pull request that changes a native input builds under the plain name', (
     androidHash: 'androidhash',
     lookup: name => {
       queried.push(name);
-      return MISSING;
+      return false;
     },
   });
   assert.deepEqual(gate, {
@@ -319,7 +218,7 @@ test('a pull request that edits the workflow never publishes an installable name
     androidHash: 'androidhash',
     lookup: name => {
       queried.push(name);
-      return MISSING;
+      return false;
     },
   });
   assert.deepEqual(gate, {
@@ -341,7 +240,7 @@ test('a push always publishes the plain, installable name', () => {
     changedFiles: [NATIVE_WORKFLOW_PATH],
     iosHash: 'ioshash',
     androidHash: 'androidhash',
-    lookup: () => MISSING,
+    lookup: () => false,
   });
   assert.deepEqual(gate, {
     prefix: '',
@@ -349,10 +248,7 @@ test('a push always publishes the plain, installable name', () => {
   });
 });
 
-// The finding this pins: a one-day pull_request artifact is live but not
-// durable, so before the promote path a push rebuilt both platforms for a
-// nativeHash that was already compiled and published.
-test('a push run promotes the one-day pull_request artifact instead of rebuilding it', () => {
+test('a push run skips an existing trusted artifact', () => {
   const gate = decideNativeBuildGate({
     eventName: 'push',
     platform: 'all',
@@ -361,64 +257,7 @@ test('a push run promotes the one-day pull_request artifact instead of rebuildin
     changedFiles: [],
     iosHash: 'ioshash',
     androidHash: 'androidhash',
-    lookup: short,
-  });
-  assert.deepEqual(gate, {
-    prefix: '',
-    platforms: {
-      ios: { need: false, promote: { id: 9, name: artifactName('ios', 'ioshash') } },
-      android: { need: false, promote: { id: 9, name: artifactName('android', 'androidhash') } },
-    },
-  });
-});
-
-test('a workflow_dispatch run promotes the one-day artifact as well', () => {
-  const gate = decideNativeBuildGate({
-    eventName: 'workflow_dispatch',
-    platform: 'all',
-    prNumber: '',
-    workflowHash: '',
-    changedFiles: [],
-    iosHash: 'ioshash',
-    androidHash: 'androidhash',
-    lookup: short,
-  });
-  assert.deepEqual(gate, {
-    prefix: '',
-    platforms: {
-      ios: { need: false, promote: { id: 9, name: artifactName('ios', 'ioshash') } },
-      android: { need: false, promote: { id: 9, name: artifactName('android', 'androidhash') } },
-    },
-  });
-});
-
-test('a pull_request run accepts the artifact it publishes itself and promotes nothing', () => {
-  const gate = decideNativeBuildGate({
-    eventName: 'pull_request',
-    platform: 'all',
-    prNumber: '6115',
-    workflowHash: 'abc12345',
-    changedFiles: ['patches/react-native.patch'],
-    iosHash: 'ioshash',
-    androidHash: 'androidhash',
-    lookup: short,
-  });
-  assert.deepEqual(gate, {
-    prefix: '',
-    platforms: { ios: { need: false }, android: { need: false } },
-  });
-});
-
-test('a push run skips on the durable artifact main published', () => {
-  const gate = decideNativeBuildGate({
-    eventName: 'push',
-    platform: 'all',
-    prNumber: '',
-    workflowHash: '',
-    changedFiles: [],
-    iosHash: 'ioshash',
-    androidHash: 'androidhash',
-    lookup: durable,
+    lookup: () => true,
   });
   assert.deepEqual(gate, {
     prefix: '',
@@ -438,7 +277,7 @@ test('the platform input gates a single platform and skips its artifact lookup',
     androidHash: 'androidhash',
     lookup: name => {
       queried.push(name);
-      return MISSING;
+      return false;
     },
   });
   assert.deepEqual(gate, {
@@ -448,36 +287,44 @@ test('the platform input gates a single platform and skips its artifact lookup',
   assert.deepEqual(queried, [artifactName('ios', 'ioshash')]);
 });
 
-// Run the shipped gate CLI with a stub `gh` so the workflow wiring (env in,
-// GITHUB_OUTPUT out, artifact lookups) is exercised, not just the pure
-// decision.
-function artifact(createdDaysAgo: number, retentionDays: number, id: number): string {
-  const created = Date.now() - createdDaysAgo * 24 * 60 * 60 * 1000;
+function artifact(id: number, runOverrides: Record<string, unknown> = {}): string {
   return JSON.stringify({
     id,
     expired: false,
-    created_at: new Date(created).toISOString(),
-    expires_at: new Date(created + retentionDays * 24 * 60 * 60 * 1000).toISOString(),
+    created_at: '2026-10-27T00:00:00Z',
+    expires_at: '2099-01-25T00:00:00Z',
+    workflow_run: {
+      id: id + 1000,
+      repository_id: 101,
+      head_repository_id: 101,
+      head_sha: 'a'.repeat(40),
+    },
+    run: {
+      id: id + 1000,
+      workflow_id: 201,
+      path: NATIVE_WORKFLOW_PATH,
+      event: 'push',
+      status: 'completed',
+      conclusion: 'success',
+      head_sha: 'a'.repeat(40),
+      head_branch: 'main',
+      repository: { id: 101 },
+      head_repository: { id: 101 },
+      pull_requests: [{ number: 6115, head: { repo: { id: 101 } }, base: { repo: { id: 101 } } }],
+      ...runOverrides,
+    },
   });
 }
 
-// The gate's outputs as the workflow reads them. `promote` carries the
-// artifact the promote job copies. `plan[platform]` omitted means the platform
-// is skipped through the `platform` input.
 function gateOutputs(plan: {
   prefix?: string;
-  ios?: { need: boolean; promote?: { id: number; name: string } };
-  android?: { need: boolean; promote?: { id: number; name: string } };
+  ios?: { need: boolean };
+  android?: { need: boolean };
 }): Record<string, string> {
   const outputs: Record<string, string> = { prefix: plan.prefix ?? '' };
   for (const platform of ['ios', 'android'] as const) {
     const platformPlan = plan[platform] ?? { need: false };
     outputs[`need_${platform}`] = String(platformPlan.need);
-    outputs[`promote_${platform}`] = String(platformPlan.promote !== undefined);
-    outputs[`promote_${platform}_artifact_id`] = platformPlan.promote
-      ? String(platformPlan.promote.id)
-      : '';
-    outputs[`promote_${platform}_name`] = platformPlan.promote?.name ?? '';
   }
   return outputs;
 }
@@ -488,6 +335,10 @@ function runGateCli(options: {
   artifacts?: string[];
   published?: string;
   failLookups?: boolean;
+  eventScope?: unknown;
+  missingEventPath?: boolean;
+  eventContents?: string;
+  consumerSha?: string;
 }): {
   outputs: Record<string, string>;
   ghLog: string;
@@ -498,27 +349,56 @@ function runGateCli(options: {
   const ghLog = path.join(dir, 'gh.log');
   const output = path.join(dir, 'github_output');
   fs.writeFileSync(output, '');
-  const changed = (options.changedFiles ?? []).map(file => `'${file}'`).join(' ');
-  const artifacts = JSON.stringify({
-    artifacts: (options.artifacts ?? []).map(item => JSON.parse(item)),
-  });
+  const eventPath = path.join(dir, 'event.json');
+  fs.writeFileSync(
+    eventPath,
+    options.eventContents ??
+      JSON.stringify(
+        options.eventScope ?? { number: 6115, pull_request: { head: { repo: { id: 101 } } } }
+      )
+  );
+  const unexpected = path.join(dir, 'unexpected.log');
+  fs.writeFileSync(unexpected, '');
+  const artifacts = (options.artifacts ?? []).map(item => JSON.parse(item));
   fs.writeFileSync(
     path.join(bin, 'gh'),
-    [
-      '#!/usr/bin/env bash',
-      'set -euo pipefail',
-      `echo "$@" >> "${ghLog}"`,
-      'case "$*" in',
-      `  *"/pulls/"*) printf '%s\\n' ${changed} ;;`,
-      `  *"/actions/artifacts?name="*) ${
-        options.failLookups
-          ? 'echo "gh: API rate limit exceeded" >&2; exit 1'
-          : `printf '%s\\n' '${artifacts}'`
-      } ;;`,
-      '  *) echo "unexpected gh args: $*" >&2; exit 1 ;;',
-      'esac',
-      '',
-    ].join('\n'),
+    `#!${process.execPath}
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.appendFileSync(${JSON.stringify(ghLog)}, args.join(' ') + '\\n');
+const artifacts = ${JSON.stringify(artifacts)};
+const endpoint = args[1];
+const base = 'repos/Kilo-Org/kilocode';
+let result;
+if (args[0] === 'api' && (args.length === 2 || (endpoint === base + '/pulls/6115/files?per_page=100' && args.length === 5))) {
+  if (endpoint === base) result = {id: 101, default_branch: 'main'};
+  else if (endpoint === base + '/actions/workflows/mobile-native-build.yml') {
+    result = {id: 201, path: ${JSON.stringify(NATIVE_WORKFLOW_PATH)}, state: 'active'};
+  } else if (endpoint === base + '/pulls/6115/files?per_page=100' && JSON.stringify(args.slice(2)) === JSON.stringify(['--paginate', '--jq', '.[].filename'])) {
+    process.stdout.write(${JSON.stringify((options.changedFiles ?? []).join('\n'))});
+    process.exit(0);
+  } else if (endpoint.startsWith(base + '/actions/artifacts?name=')) {
+    if (${Boolean(options.failLookups)}) {
+      process.stderr.write('gh: API rate limit exceeded');
+      process.exit(1);
+    }
+    const query = new URLSearchParams(endpoint.split('?')[1]);
+    const name = query.get('name');
+    if (query.get('per_page') === '100' && name && /^(pr6115-[a-f0-9]{8}-)?mobile-native-(ios-ioshash|android-androidhash)$/.test(name)) {
+      result = {artifacts: artifacts.map(({run, ...item}) => ({...item, name}))};
+    }
+  } else if (endpoint.startsWith(base + '/actions/runs/')) {
+    const id = Number(endpoint.slice((base + '/actions/runs/').length));
+    result = artifacts.find(item => item.workflow_run.id === id)?.run;
+  }
+}
+if (result === undefined) {
+  fs.appendFileSync(${JSON.stringify(unexpected)}, JSON.stringify(args) + '\\n');
+  process.stderr.write('unexpected offline gh command: ' + JSON.stringify(args));
+  process.exit(91);
+}
+process.stdout.write(JSON.stringify(result));
+`,
     { mode: 0o755 }
   );
   const gateArgs = options.published
@@ -535,6 +415,8 @@ function runGateCli(options: {
           PATH: `${bin}:${process.env.PATH ?? ''}`,
           GITHUB_EVENT_NAME: options.eventName ?? 'pull_request',
           GITHUB_REPOSITORY: 'Kilo-Org/kilocode',
+          GITHUB_SHA: options.consumerSha ?? 'a'.repeat(40),
+          GITHUB_EVENT_PATH: options.missingEventPath ? '' : eventPath,
           PR_NUMBER: '6115',
           PLATFORM: 'all',
           GITHUB_OUTPUT: output,
@@ -552,6 +434,7 @@ function runGateCli(options: {
           return [line.slice(0, separator), line.slice(separator + 1)];
         })
     );
+    assert.equal(fs.readFileSync(unexpected, 'utf8'), '', 'all gh commands must stay offline');
     return { outputs, ghLog: fs.readFileSync(ghLog, 'utf8') };
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -561,60 +444,24 @@ function runGateCli(options: {
 test('the gate CLI skips both platforms and keeps the plain name when artifacts exist', () => {
   const { outputs, ghLog } = runGateCli({
     changedFiles: ['patches/react-native.patch', 'apps/mobile/app.config.ts'],
-    artifacts: [artifact(0, 1, 11)],
+    artifacts: [artifact(11)],
   });
   assert.deepEqual(outputs, gateOutputs({}));
   assert.ok(ghLog.includes('name=mobile-native-ios-ioshash'), ghLog);
   assert.ok(ghLog.includes('name=mobile-native-android-androidhash'), ghLog);
 });
 
-// The finding this pins: a push that runs while only the one-day pull_request
-// artifact exists used to rebuild both platforms. It now promotes the artifact
-// it finds, with the id the promote job downloads.
-test('a push run promotes the one-day pull_request artifact instead of rebuilding', () => {
-  const { outputs, ghLog } = runGateCli({
-    eventName: 'push',
-    artifacts: [artifact(0, 1, 11)],
-  });
-  assert.deepEqual(
-    outputs,
-    gateOutputs({
-      ios: { need: false, promote: { id: 11, name: 'mobile-native-ios-ioshash' } },
-      android: { need: false, promote: { id: 11, name: 'mobile-native-android-androidhash' } },
-    })
-  );
-  assert.ok(ghLog.includes('name=mobile-native-ios-ioshash'), ghLog);
-  assert.ok(ghLog.includes('name=mobile-native-android-androidhash'), ghLog);
-});
-
-test('a push run skips on the durable artifact main published', () => {
-  const { outputs } = runGateCli({
-    eventName: 'push',
-    artifacts: [artifact(0, 90, 12)],
-  });
+test('a push run reuses a trusted main-push artifact', () => {
+  const { outputs } = runGateCli({ eventName: 'push', artifacts: [artifact(11)] });
   assert.deepEqual(outputs, gateOutputs({}));
 });
 
-test('a push run skips when a durable artifact sits beside the one-day one', () => {
-  const { outputs } = runGateCli({
-    eventName: 'push',
-    artifacts: [artifact(0, 1, 11), artifact(0, 90, 12)],
-  });
-  assert.deepEqual(outputs, gateOutputs({}));
-});
-
-test('a workflow_dispatch run promotes the one-day pull_request artifact', () => {
+test('a workflow_dispatch run reuses a manual artifact from the consumer SHA', () => {
   const { outputs } = runGateCli({
     eventName: 'workflow_dispatch',
-    artifacts: [artifact(0, 1, 11)],
+    artifacts: [artifact(11, { event: 'workflow_dispatch', head_branch: 'feature/native' })],
   });
-  assert.deepEqual(
-    outputs,
-    gateOutputs({
-      ios: { need: false, promote: { id: 11, name: 'mobile-native-ios-ioshash' } },
-      android: { need: false, promote: { id: 11, name: 'mobile-native-android-androidhash' } },
-    })
-  );
+  assert.deepEqual(outputs, gateOutputs({}));
 });
 
 test('the gate CLI keeps an edited workflow out of the installed namespace', () => {
@@ -637,32 +484,20 @@ test('the gate CLI keeps an edited workflow out of the installed namespace', () 
   assert.doesNotMatch(ghLog, /artifacts\?name=mobile-native-ios-ioshash/);
 });
 
-// The heavy jobs re-check their own artifact once the hash's concurrency slot
-// frees. The check must agree with the gate: a pull_request job may take the
-// one-day artifact it would publish itself, a push job must not.
-test('the published check reports the durable artifact to a waiting job', () => {
+test('the published check reports a trusted artifact to a waiting job', () => {
   const { outputs } = runGateCli({
     eventName: 'push',
     published: 'mobile-native-ios-ioshash',
-    artifacts: [artifact(0, 90, 12)],
+    artifacts: [artifact(12)],
   });
   assert.deepEqual(outputs, { published: 'true' });
 });
 
-test('the published check refuses the one-day artifact to a push job', () => {
-  const { outputs } = runGateCli({
-    eventName: 'push',
-    published: 'mobile-native-ios-ioshash',
-    artifacts: [artifact(0, 1, 11)],
-  });
-  assert.deepEqual(outputs, { published: 'false' });
-});
-
-test('the published check accepts the one-day artifact to a pull_request job', () => {
+test('the published check accepts a trusted artifact for a pull_request job', () => {
   const { outputs } = runGateCli({
     eventName: 'pull_request',
     published: 'mobile-native-ios-ioshash',
-    artifacts: [artifact(0, 1, 11)],
+    artifacts: [artifact(11)],
   });
   assert.deepEqual(outputs, { published: 'true' });
 });
@@ -675,9 +510,6 @@ test('the published check reports missing when nothing is published', () => {
   assert.deepEqual(outputs, { published: 'false' });
 });
 
-// An artifact-listing failure must cost at most a duplicate build, never the
-// artifact itself: the heavy job falls back to building, and the gate falls
-// back to the same decision it makes for a name nobody published.
 test('a failing artifact lookup makes the heavy job build', () => {
   const { outputs } = runGateCli({
     eventName: 'push',
@@ -691,6 +523,152 @@ test('a failing artifact lookup makes the gate build', () => {
   const { outputs } = runGateCli({
     eventName: 'push',
     failLookups: true,
+  });
+  assert.deepEqual(outputs, gateOutputs({ ios: { need: true }, android: { need: true } }));
+});
+
+test('a push gate rejects a pull-request artifact', () => {
+  const { outputs } = runGateCli({
+    eventName: 'push',
+    artifacts: [artifact(11, { event: 'pull_request' })],
+  });
+  assert.deepEqual(outputs, gateOutputs({ ios: { need: true }, android: { need: true } }));
+});
+
+test('the published check refuses untrusted artifacts', () => {
+  for (const run of [
+    { event: 'pull_request' },
+    { head_repository: { id: 999 } },
+    { workflow_id: 999 },
+    { path: '.github/workflows/other.yml' },
+    { event: 'schedule' },
+    { status: 'in_progress' },
+    { head_sha: 'b'.repeat(40) },
+    { repository: null },
+  ]) {
+    const { outputs } = runGateCli({
+      eventName: 'push',
+      published: 'mobile-native-ios-ioshash',
+      artifacts: [artifact(12, run)],
+    });
+    assert.deepEqual(outputs, { published: 'false' }, JSON.stringify(run));
+  }
+});
+
+test('the gate CLI ignores a newer fork artifact and reuses the trusted manual candidate', () => {
+  const { outputs } = runGateCli({
+    eventName: 'push',
+    artifacts: [
+      artifact(12, { head_repository: { id: 999 } }),
+      artifact(11, { event: 'workflow_dispatch', head_branch: 'feature/native' }),
+    ],
+  });
+  assert.deepEqual(outputs, gateOutputs({}));
+});
+
+test('the published check skips an untrusted first artifact and finds a trusted main push', () => {
+  const { outputs } = runGateCli({
+    eventName: 'push',
+    published: 'mobile-native-ios-ioshash',
+    artifacts: [artifact(12, { event: 'pull_request' }), artifact(13)],
+  });
+  assert.deepEqual(outputs, { published: 'true' });
+});
+
+test('the published check refuses a manual artifact built from another consumer commit', () => {
+  const otherSha = 'b'.repeat(40);
+  const otherCommit = JSON.parse(
+    artifact(12, {
+      event: 'workflow_dispatch',
+      head_branch: 'feature/native',
+      head_sha: otherSha,
+    })
+  );
+  otherCommit.workflow_run.head_sha = otherSha;
+  const { outputs } = runGateCli({
+    eventName: 'push',
+    published: 'mobile-native-ios-ioshash',
+    artifacts: [JSON.stringify(otherCommit)],
+  });
+  assert.deepEqual(outputs, { published: 'false' });
+});
+
+test('the PR gate reuses its own nativeHash artifact across unrelated consumer commits', () => {
+  for (const changedFiles of [['apps/mobile/src/screen.tsx'], [NATIVE_WORKFLOW_PATH]]) {
+    const { outputs } = runGateCli({
+      changedFiles,
+      consumerSha: 'b'.repeat(40),
+      artifacts: [artifact(11, { event: 'pull_request', head_branch: 'feature/native' })],
+    });
+    assert.equal(outputs.need_ios, 'false');
+    assert.equal(outputs.need_android, 'false');
+    assert.deepEqual(Object.keys(outputs).sort(), ['need_android', 'need_ios', 'prefix']);
+  }
+});
+
+test('the PR gate rejects artifacts outside its PR and repository scope', () => {
+  for (const eventScope of [
+    { number: 6116, pull_request: { head: { repo: { id: 101 } } } },
+    { number: 6115, pull_request: { head: { repo: { id: 999 } } } },
+  ]) {
+    const { outputs } = runGateCli({
+      eventScope,
+      artifacts: [artifact(11, { event: 'pull_request' })],
+    });
+    assert.deepEqual(outputs, gateOutputs({ ios: { need: true }, android: { need: true } }));
+  }
+});
+
+test('the PR gate rejects incomplete or mismatched run validation metadata', () => {
+  for (const pullRequests of [
+    [],
+    null,
+    [{ number: 6116, head: { repo: { id: 101 } }, base: { repo: { id: 101 } } }],
+    [{ number: 6115, head: { repo: { id: 999 } }, base: { repo: { id: 101 } } }],
+    [{ number: 6115, head: { repo: { id: 101 } }, base: { repo: { id: 999 } } }],
+  ]) {
+    const { outputs } = runGateCli({
+      artifacts: [artifact(11, { event: 'pull_request', pull_requests: pullRequests })],
+    });
+    assert.deepEqual(outputs, gateOutputs({ ios: { need: true }, android: { need: true } }));
+  }
+});
+
+test('missing or malformed PR event scope fails closed for PR artifacts', () => {
+  for (const options of [
+    { missingEventPath: true },
+    { eventContents: '{invalid' },
+    { eventScope: {} },
+    { eventScope: { number: 0, pull_request: { head: { repo: { id: 101 } } } } },
+    { eventScope: { number: '6115', pull_request: { head: { repo: { id: 101 } } } } },
+    { eventScope: { number: 6115, pull_request: { head: { repo: { id: -1 } } } } },
+    { eventScope: { number: 6115, pull_request: { head: { repo: { id: 1.5 } } } } },
+  ]) {
+    const { outputs } = runGateCli({
+      ...options,
+      artifacts: [artifact(11, { event: 'pull_request' })],
+    });
+    assert.deepEqual(outputs, gateOutputs({ ios: { need: true }, android: { need: true } }));
+  }
+});
+
+test('the waiting PR job uses the same validation scope as the gate', () => {
+  for (const number of [6115, 6116]) {
+    const { outputs } = runGateCli({
+      published: 'mobile-native-ios-ioshash',
+      consumerSha: 'b'.repeat(40),
+      eventScope: { number, pull_request: { head: { repo: { id: 101 } } } },
+      artifacts: [artifact(11, { event: 'pull_request' })],
+    });
+    assert.deepEqual(outputs, { published: String(number === 6115) });
+  }
+});
+
+test('a manual gate with no consumer SHA rejects manual artifacts', () => {
+  const { outputs } = runGateCli({
+    eventName: 'workflow_dispatch',
+    consumerSha: '',
+    artifacts: [artifact(11, { event: 'workflow_dispatch', head_branch: 'feature/native' })],
   });
   assert.deepEqual(outputs, gateOutputs({ ios: { need: true }, android: { need: true } }));
 });

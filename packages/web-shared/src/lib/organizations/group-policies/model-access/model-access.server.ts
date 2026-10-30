@@ -230,6 +230,18 @@ export async function getEffectiveModelDecision(
   return { allowed: false, denialSource: 'no_grant' };
 }
 
+/**
+ * Whether `decision` admits a request served by one of the organization's own inference provider
+ * keys that the provider allow-list cannot restrict: a direct BYOK key in catalog mode, or a
+ * provider key sent through Vercel whose provider has no OpenRouter slug. Such a key names a
+ * provider the organization configured itself, so only the model restrictions and grants apply.
+ * Routing drops Vercel provider keys that the allow-list can name but does not admit (see
+ * `isVercelUserByokProviderAllowed`).
+ */
+export function allowsInferenceProviderUserByok(decision: EffectiveModelDecision): boolean {
+  return decision.allowed || decision.denialSource === 'organization_provider';
+}
+
 export async function isModelRouteAllowed(
   policy: EffectiveOrganizationModelPolicy,
   modelId: string,
@@ -252,12 +264,18 @@ export async function isModelRouteAllowed(
 export async function resolveOrganizationMemberModelPolicy(params: {
   organizationId: string;
   kiloUserId: string;
+  /** See `allowNonMember` on the member policy subject. */
+  allowNonMember?: boolean;
   fromDb?: typeof db;
 }): Promise<EffectiveOrganizationModelPolicy> {
   return evaluateEffectiveModelAccessPolicy(
     await getOrganizationGroupPolicyContext({
       organizationId: params.organizationId,
-      subject: { type: 'member', kiloUserId: params.kiloUserId },
+      subject: {
+        type: 'member',
+        kiloUserId: params.kiloUserId,
+        allowNonMember: params.allowNonMember,
+      },
       fromDb: params.fromDb,
     })
   );
@@ -282,6 +300,7 @@ export async function resolveOrganizationDefaultModelPolicy(params: {
 export async function resolveOrganizationMemberModelDecision(params: {
   organizationId: string;
   kiloUserId: string;
+  allowNonMember?: boolean;
   modelId: string;
   providerLookup?: ProviderLookup;
   fromDb?: typeof db;

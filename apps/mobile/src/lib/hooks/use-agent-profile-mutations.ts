@@ -1,4 +1,10 @@
-import { matchQuery, type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  matchQuery,
+  type Query,
+  type QueryKey,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import { withOrganization } from '@/lib/hooks/agent-profile-mutation-helpers';
@@ -6,6 +12,8 @@ import {
   type AgentProfileDetail,
   type AgentProfileListCombined,
   type AgentProfileListItem,
+  type AgentProfileOverview,
+  type AgentProfileSkillRow,
 } from '@/lib/hooks/agent-profile-types';
 import {
   isLatestMutationGeneration,
@@ -38,14 +46,11 @@ function withDefaultDetail<T extends { id: string; isDefault: boolean }>(
 }
 
 function withSkillEnabled(
-  profile: AgentProfileDetail,
+  skills: AgentProfileSkillRow[],
   skillId: string,
   enabled: boolean
-): AgentProfileDetail {
-  return {
-    ...profile,
-    skills: profile.skills.map(skill => (skill.id === skillId ? { ...skill, enabled } : skill)),
-  };
+): AgentProfileSkillRow[] {
+  return skills.map(skill => (skill.id === skillId ? { ...skill, enabled } : skill));
 }
 
 /**
@@ -68,9 +73,9 @@ export function useAgentProfileMutations(organizationId?: string) {
 
   const profilesFilter = trpc.agentProfiles.pathFilter();
   const combinedFilter = trpc.agentProfiles.listCombined.pathFilter();
-  const detailFilter = trpc.agentProfiles.get.pathFilter();
   const defaultListKey = trpc.agentProfiles.list.queryKey({ organizationId });
   const defaultDetailKey = trpc.agentProfiles.get.queryKey({ organizationId });
+  const defaultOverviewKey = trpc.agentProfiles.overview.queryKey({ organizationId });
   const defaultCombinedKey = organizationId
     ? trpc.agentProfiles.listCombined.queryKey({ organizationId })
     : combinedFilter.queryKey;
@@ -121,18 +126,27 @@ export function useAgentProfileMutations(organizationId?: string) {
     queryClient.setQueriesData<AgentProfileDetail>({ queryKey: defaultDetailKey }, old =>
       old ? withDefaultDetail(old, profileId, setDefault) : old
     );
+    // The Overview renders `isDefault` from the counts read; without this the
+    // switch would only move after the invalidation refetch lands.
+    queryClient.setQueriesData<AgentProfileOverview>(
+      { queryKey: defaultOverviewKey },
+      (old: AgentProfileOverview | undefined) =>
+        old ? withDefaultDetail(old, profileId, setDefault) : old
+    );
   };
 
   const snapshotProfiles = async () => {
     await queryClient.cancelQueries({ queryKey: defaultListKey });
     await queryClient.cancelQueries({ queryKey: defaultCombinedKey });
     await queryClient.cancelQueries({ queryKey: defaultDetailKey });
+    await queryClient.cancelQueries({ queryKey: defaultOverviewKey });
     const previous: [QueryKey, unknown][] = [
       ...queryClient.getQueriesData<AgentProfileListItem[]>({ queryKey: defaultListKey }),
       ...queryClient.getQueriesData<AgentProfileListCombined>({
         queryKey: defaultCombinedKey,
       }),
       ...queryClient.getQueriesData<AgentProfileDetail>({ queryKey: defaultDetailKey }),
+      ...queryClient.getQueriesData<AgentProfileOverview>({ queryKey: defaultOverviewKey }),
     ];
     return { generation: nextMutationGeneration(DEFAULT_MUTATION_KEY), previous };
   };
@@ -148,6 +162,18 @@ export function useAgentProfileMutations(organizationId?: string) {
     }
   };
 
+  const isPerProfileRead = (query: Query, profileId: string) =>
+    [
+      trpc.agentProfiles.get,
+      trpc.agentProfiles.overview,
+      trpc.agentProfiles.agents,
+      trpc.agentProfiles.vars,
+      trpc.agentProfiles.commands,
+      trpc.agentProfiles.mcpServers,
+      trpc.agentProfiles.skills,
+      trpc.agentProfiles.kiloCommands,
+    ].some(read => matchQuery(read.queryFilter({ profileId, organizationId }), query));
+
   const create = useMutation(
     withOrganization(trpc.agentProfiles.create.mutationOptions(callbacks), organizationId)
   );
@@ -159,12 +185,12 @@ export function useAgentProfileMutations(organizationId?: string) {
       trpc.agentProfiles.delete.mutationOptions({
         ...callbacks,
         // The deleted profile's screens stay mounted until navigation ends.
-        // Refetching its detail can only fail with NOT_FOUND, so skip it.
+        // Refetching any read of that one profile can only fail with NOT_FOUND,
+        // so the invalidation skips every one of them.
         onSuccess: (_data, { profileId }) => {
-          const deletedDetail = trpc.agentProfiles.get.queryFilter({ profileId });
           void queryClient.invalidateQueries({
             ...profilesFilter,
-            predicate: query => !matchQuery(deletedDetail, query),
+            predicate: query => !isPerProfileRead(query, profileId),
           });
         },
       }),
@@ -236,14 +262,15 @@ export function useAgentProfileMutations(organizationId?: string) {
       trpc.agentProfiles.setSkillEnabled.mutationOptions({
         ...callbacks,
         onMutate: async variables => {
-          await queryClient.cancelQueries({ queryKey: detailFilter.queryKey });
-          const generation = nextMutationGeneration(SKILL_MUTATION_KEY);
-          const previous = queryClient.getQueriesData<AgentProfileDetail>({
-            queryKey: detailFilter.queryKey,
+          const skillsFilter = trpc.agentProfiles.skills.queryFilter({
+            profileId: variables.profileId,
+            organizationId,
           });
-          queryClient.setQueriesData<AgentProfileDetail>(
-            { queryKey: detailFilter.queryKey },
-            old => (old ? withSkillEnabled(old, variables.skillId, variables.enabled) : old)
+          await queryClient.cancelQueries(skillsFilter);
+          const generation = nextMutationGeneration(SKILL_MUTATION_KEY);
+          const previous = queryClient.getQueriesData<AgentProfileSkillRow[]>(skillsFilter);
+          queryClient.setQueriesData<AgentProfileSkillRow[]>(skillsFilter, old =>
+            old ? withSkillEnabled(old, variables.skillId, variables.enabled) : old
           );
           return { generation, previous };
         },

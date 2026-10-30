@@ -113,10 +113,10 @@ export type DomainSignInEligibility =
 /**
  * Checks whether an email's domain is allowed to sign in at all: not
  * blacklisted, not a blocked TLD (new users only), and not subject to
- * mandatory SSO. This is the shared core enforced for EVERY sign-in path
- * (email code, magic link, and native Apple/Google) — mirrors the checks
- * inline in the NextAuth `signIn` callback (lib/user/server.ts) so that no
- * provider can bypass forced SSO or the domain blacklist.
+ * mandatory SSO. This is the shared core enforced for EVERY sign-in path —
+ * mirrors the checks inline in the NextAuth `signIn` callback
+ * (lib/user/next-auth-options.ts) so that no provider can bypass forced SSO or
+ * the domain blacklist.
  *
  * Does NOT rate limit and does NOT apply magic-link-specific signup email
  * rules (lowercase/no-plus) — those are the caller's concern.

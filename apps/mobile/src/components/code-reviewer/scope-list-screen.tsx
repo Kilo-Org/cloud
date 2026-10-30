@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { Building2, User } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -13,7 +14,7 @@ import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
 import { useTRPC } from '@/lib/trpc';
 
 export function ScopeListScreen() {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const trpc = useTRPC();
   const {
@@ -25,7 +26,7 @@ export function ScopeListScreen() {
   } = useQuery(trpc.organizations.list.queryOptions());
 
   const openScope = (scope: string) => {
-    router.push(`/(app)/code-reviewer/${scope}` as Href);
+    pushOnce(`/(app)/code-reviewer/${scope}` as Href);
   };
 
   return (

@@ -17,7 +17,13 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
-export type QueryErrorVariant = 'neutral' | 'offline' | 'permission' | 'not-found' | 'server';
+export type QueryErrorVariant =
+  | 'neutral'
+  | 'offline'
+  | 'permission'
+  | 'not-found'
+  | 'server'
+  | 'timeout';
 
 const VARIANT_ICONS = {
   neutral: AlertCircle,
@@ -25,6 +31,8 @@ const VARIANT_ICONS = {
   permission: Lock,
   'not-found': SearchX,
   server: ServerCrash,
+  // The slow-response state is named by its copy; it shares the generic icon.
+  timeout: AlertCircle,
 } satisfies Record<QueryErrorVariant, LucideIcon>;
 
 const VARIANT_META_KEYS = {
@@ -39,6 +47,10 @@ const VARIANT_META_KEYS = {
     description: 'queryError.notFoundDescription',
   },
   server: { title: 'queryError.serverTitle', description: 'queryError.serverDescription' },
+  timeout: {
+    title: 'queryError.timeoutTitle',
+    description: 'queryError.timeoutDescription',
+  },
 } as const;
 
 function variantMeta(t: TFunction, variant: QueryErrorVariant) {

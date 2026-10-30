@@ -4,16 +4,22 @@ import {
   getEnhancedOpenRouterModels,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import {
+  allowsInferenceProviderUserByok,
   getEffectiveModelDecision,
   evaluateEffectiveModelAccessPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { listAvailableCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
-import { getDirectByokModelsForOrganization } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  getDirectByokCatalogModelIds,
+  getDirectByokModelsForOrganization,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { isOrganizationAutoEnabled } from '@kilocode/web-shared/lib/organizations/organization-auto-model';
 import {
+  addDirectByokCatalogAvailability,
   addUserByokAvailability,
   getOrganizationByokProviderIds,
+  hasInferenceProviderUserByokForModel,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
@@ -66,19 +72,51 @@ export async function getAvailableModelsForOrganization(
   const organization = context.organization;
   const policy = evaluateEffectiveModelAccessPolicy(context);
 
-  const responseData = await getEnhancedOpenRouterModels({ countryCode });
+  const [responseData, byokProviderIds, directByokCatalogModelIds] = await Promise.all([
+    getEnhancedOpenRouterModels({ countryCode }),
+    getOrganizationByokProviderIds(readDb, organizationId),
+    getDirectByokCatalogModelIds({ type: 'organization', id: organizationId }),
+  ]);
   const restrictionCandidates = [...responseData.data];
 
   const filteredModels = [];
+  const allowedProvidersByModel = new Map<string, ReadonlySet<string>>();
+  const inferenceCheck = { checked: 0, withoutProviders: 0 };
   for (const model of restrictionCandidates) {
-    if ((await getEffectiveModelDecision(policy, model.id)).allowed) {
-      filteredModels.push(model);
+    const decision = await getEffectiveModelDecision(policy, model.id);
+    if (!decision.allowed) {
+      if (!allowsInferenceProviderUserByok(decision)) {
+        continue;
+      }
+      inferenceCheck.checked += 1;
+      const hasInferenceProviderByok = await hasInferenceProviderUserByokForModel(
+        model.id,
+        byokProviderIds,
+        directByokCatalogModelIds
+      );
+      if (!hasInferenceProviderByok) {
+        inferenceCheck.withoutProviders += 1;
+        continue;
+      }
+    }
+    filteredModels.push(model);
+    if (decision.eligibleProviderRoutes) {
+      allowedProvidersByModel.set(model.id, decision.eligibleProviderRoutes);
     }
   }
+  // One record per pass: this loop touches every catalog model, so a per-model
+  // record would grow with the catalog rather than with the request.
+  if (inferenceCheck.withoutProviders > 0) {
+    console.debug(
+      `[getModelUserByokProviders] no user byok providers for ${inferenceCheck.withoutProviders} of ${inferenceCheck.checked} models`
+    );
+  }
 
-  let availableModels = await addUserByokAvailability(
-    filteredModels,
-    await getOrganizationByokProviderIds(readDb, organizationId)
+  let availableModels = addDirectByokCatalogAvailability(
+    await addUserByokAvailability(filteredModels, byokProviderIds, modelId =>
+      allowedProvidersByModel.get(modelId)
+    ),
+    directByokCatalogModelIds
   );
 
   if (organization.plan === 'teams' && organization.settings.data_collection === 'deny') {

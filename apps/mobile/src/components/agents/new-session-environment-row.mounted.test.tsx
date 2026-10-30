@@ -4,7 +4,9 @@ import { TestRenderer } from '@/test/renderer';
 
 import { NewSessionProfileRow } from './new-session-environment-row';
 
-import '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+
+import { i18n } from '@/i18n';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -42,8 +44,7 @@ const EMPTY_PROFILE = {
   agentCount: 0,
 };
 
-const CARD_CHROME =
-  'min-h-11 flex-row items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5';
+const CARD_CHROME = `${ROW_TARGET_CLASS} flex-row items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5`;
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
@@ -76,6 +77,48 @@ function renderRow(overrides: Partial<RowProps> = {}) {
   }
   return renderer.root;
 }
+
+describe('new-session environment row accessible name', () => {
+  it('names the picked profile after its pick purpose', () => {
+    const control = renderRow({ profile: PROFILE }).findAllByType('Pressable')[0];
+
+    expect(control?.props.accessibilityLabel).toBe(
+      i18n.t('agentChat.newSession.environmentAccessibility', { label: 'Production' })
+    );
+    expect(control?.props.accessibilityHint).toBeUndefined();
+  });
+
+  it('keeps a non-Latin profile name in the accessible name', () => {
+    const name = 'Cliente عميل بيروت';
+    const control = renderRow({ profile: { ...PROFILE, name } }).findAllByType('Pressable')[0];
+
+    expect(control?.props.accessibilityLabel).toContain(name);
+    expect(control?.props.accessibilityLabel).not.toBe(i18n.t('agentChat.newSession.pickProfile'));
+  });
+
+  it('names the default environment when no profile resolves', () => {
+    const control = renderRow().findAllByType('Pressable')[0];
+
+    expect(control?.props.accessibilityLabel).toBe(
+      i18n.t('agentChat.newSession.environmentAccessibility', {
+        label: i18n.t('agentChat.newSession.defaultEnvironment'),
+      })
+    );
+  });
+
+  it('announces the attention line in the accessible name', () => {
+    const control = renderRow({ profile: PROFILE, overrideNeedsAttention: true }).findAllByType(
+      'Pressable'
+    )[0];
+
+    expect(control?.props.accessibilityLabel).toBe(
+      i18n.t('agentChat.newSession.environmentAccessibilityNeedsAttention', {
+        label: 'Production',
+        attention: i18n.t('agentChat.newSession.configNeedsAttention'),
+      })
+    );
+  });
+});
 
 describe('new-session environment row height', () => {
   it('renders a one-line summary at the placeholder height', () => {

@@ -221,6 +221,7 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => state.focused }),
+  useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useFocusEffect: (effect: () => void) => {
     state.focusCallbacks.add(effect);
   },
@@ -482,7 +483,7 @@ function applyFilters(projectFilter: string[], platformFilter: string[]) {
     (modal.props.onApply as (filters: unknown) => void)({ projectFilter, platformFilter });
     (modal.props.onClose as () => void)();
   });
-  expect(nodes('SessionFilterModal')).toHaveLength(0);
+  expect(modal.props.visible).toBe(false);
 }
 async function renderScreen() {
   await act(async () => {
@@ -515,16 +516,6 @@ function hideKeyboard() {
 }
 function surfaceBottomInset() {
   return root().findByType(StateSurfaceInsets).props.bottomInset as number;
-}
-/**
- * The band the composed app observes. The real `StateSurfaceInsets` resolves
- * `Math.max(parentReservation, bottomInset)` (`centered-state-surface.tsx:238`)
- * and the enclosing tabs layout reserves the bar's own height while the list is
- * shown (`(tabs)/_layout.tsx:130`), so a band below that floor is not an outcome
- * the screen can produce on its own.
- */
-function composedSurfaceBottomInset() {
-  return Math.max(state.tabBarHeight, surfaceBottomInset());
 }
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -1275,12 +1266,7 @@ describe('AgentSessionListScreen live presentation', () => {
   it('renders no history list, animated wrappers, or active-now section and keeps one history label without a plus icon', async () => {
     state.live.activeSessions = [row];
     await renderScreen();
-    for (const type of [
-      'SessionFilterModal',
-      'ActiveNowSection',
-      'AgentSessionListContent',
-      'AnimatedView',
-    ]) {
+    for (const type of ['ActiveNowSection', 'AgentSessionListContent', 'AnimatedView']) {
       expect(nodes(type)).toHaveLength(0);
     }
     expect(headerAction().type).toBe('Pressable');
@@ -1345,7 +1331,7 @@ describe('AgentSessionListScreen header and admission', () => {
 });
 
 describe('AgentSessionListScreen live filtering', () => {
-  it('opens search on demand and leaves it visible through a detail return until cleared', async () => {
+  it('keeps search visible through blur, detail return, and clearing', async () => {
     state.live.activeSessions = [row];
     await renderScreen();
     expect(nodes('SessionListSearchHeader')).toHaveLength(0);
@@ -1358,7 +1344,7 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(searchInput.focus).toHaveBeenCalledTimes(2);
     act(() => {
       (searchHeader.props.onChangeText as (text: string) => void)('bump');
-      (searchHeader.props.onBlur as () => void)();
+      (searchHeader.props.onBlur as (() => void) | undefined)?.();
     });
     state.focused = false;
     await renderScreen();
@@ -1371,18 +1357,21 @@ describe('AgentSessionListScreen live filtering', () => {
     act(() => {
       (searchHeader.props.onClearSearch as () => void)();
     });
-    expect(nodes('SessionListSearchHeader')).toHaveLength(0);
+    expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
     expect(nodes('FlashList')).toHaveLength(1);
   });
 
-  it('closes an empty search when it loses focus', async () => {
+  it('keeps an empty search mounted when the keyboard is dismissed', async () => {
     state.live.activeSessions = [row];
     await renderScreen();
     const searchHeader = openSearch();
+    const container = requireNode('KeyboardAvoidingView');
     act(() => {
-      (searchHeader.props.onBlur as () => void)();
+      (searchHeader.props.onBlur as (() => void) | undefined)?.();
     });
-    expect(nodes('SessionListSearchHeader')).toHaveLength(0);
+    expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
+    expect(requireNode('KeyboardAvoidingView')).toBe(container);
+    expect(searchHeader.props.hasText).toBe(false);
   });
 
   it.each(['field', 'search button'])(
@@ -1393,7 +1382,7 @@ describe('AgentSessionListScreen live filtering', () => {
       const searchHeader = openSearch();
       act(() => {
         (searchHeader.props.onChangeText as (text: string) => void)('bump');
-        (searchHeader.props.onBlur as () => void)();
+        (searchHeader.props.onBlur as (() => void) | undefined)?.();
       });
       act(() => {
         if (target === 'field') {
@@ -1479,7 +1468,7 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(nodes('FlashList')).toHaveLength(1);
     expect(nodes('CenteredState')).toHaveLength(0);
     expect(fab()).toBeDefined();
-    expect(nodes('SessionListSearchHeader')).toHaveLength(0);
+    expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
     expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
   });
 
@@ -1512,76 +1501,33 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(nodes('KeyboardAvoidingView')).toHaveLength(1);
   });
 
-  it('reserves the keyboard height for the no-match body so its second line stays readable', async () => {
-    // agents-list: the empty state's second line and its Clear search action
-    // drew behind the raised IME, because Android's edge-to-edge window does
-    // not resize for the keyboard.
+  it('lets the native container own keyboard clearance without changing the search surface', async () => {
     state.platform.OS = 'android';
-    state.live.activeSessions = [{ ...row, id: 'a1', organizationId: null, title: 'Ship it' }];
-    const renderer = await renderScreen();
-
-    const searchHeader = openSearch();
-    act(() => {
-      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
-    });
-    expect(renderer.root.findByType(EmptyState).props.description).toBe(
-      'Try a different search term.'
-    );
-    // Keyboard down: the band ends at the tab bar. The FAB's band is not
-    // reserved here — the no-match body owns the band and the FAB yields to it —
-    // so the state does not pay for the button's clearance.
-    expect(surfaceBottomInset()).toBe(state.tabBarHeight);
-
-    act(() => {
-      showKeyboard(320);
-    });
-    // The raised IME becomes the reserved band, so the centered copy and its
-    // action stay above the keyboard. Android reports the IME above the
-    // navigation bar and the harness's bottom inset is zero, so the reserve is
-    // the reported height alone.
-    expect(surfaceBottomInset()).toBe(320);
-
-    act(() => {
-      hideKeyboard();
-    });
-    expect(surfaceBottomInset()).toBe(state.tabBarHeight);
-  });
-
-  it('replaces the tab-bar band with the IME band while the keyboard is up', async () => {
-    // The raised keyboard hides the tab bar (`tabBarHideOnKeyboard`), so the
-    // bar's own height is not on screen and reserving its band on top of the
-    // IME's occlusion pushed the no-match copy's second line behind the
-    // keyboard on a short landscape window (explorer finding,
-    // agents-search-empty).
-    state.platform.OS = 'android';
-    state.live.activeSessions = [{ ...row, id: 'a1', organizationId: null, title: 'Ship it' }];
+    state.live.activeSessions = [row];
     await renderScreen();
     const searchHeader = openSearch();
     act(() => {
       (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
     });
-    // Keyboard down: the no-match body owns the band and hides the FAB, so the
-    // raise starts from the bar's own height.
-    expect(surfaceBottomInset()).toBe(state.tabBarHeight);
-
-    act(() => {
-      showKeyboard(100);
-    });
-    // A band shorter than the tab-bar/FAB band still wins: the bar is not on
-    // screen, so its height is not a band the body must clear. The composed tree
-    // floors the reserve at the enclosing tabs layout's own reservation (the tab
-    // bar's height), so 100 is the reachable band that distinguishes the replace
-    // rule from the max rule (which would have kept the 124px FAB band).
-    expect(composedSurfaceBottomInset()).toBe(100);
+    const container = requireNode('KeyboardAvoidingView');
+    const emptyState = root().findByType(EmptyState);
+    for (const height of [320, 100, 0]) {
+      act(() => {
+        if (height > 0) {
+          showKeyboard(height);
+        } else {
+          hideKeyboard();
+        }
+      });
+      expect(requireNode('KeyboardAvoidingView')).toBe(container);
+      expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
+      expect(root().findByType(EmptyState)).toBe(emptyState);
+      expect(surfaceBottomInset()).toBe(state.tabBarHeight);
+      expect(emptyState.props.description).toBe('Try a different search term.');
+    }
   });
 
   it('keeps the centered band above the FAB while the keyboard is down with the FAB admitted', async () => {
-    // The chrome hook resolves the centered states' keyboard-down reserve as the
-    // tab bar plus the FAB band, so a centered state's full-width action (the
-    // load failure's Retry, the boundary's back-to-profile) cannot reach under
-    // the corner overlay (device defect e3); the state compacts instead when
-    // that band is too short for it (landscape spot defect e8). While the
-    // keyboard is up the IME's occlusion replaces that band.
     state.platform.OS = 'android';
     state.live.activeSessions = [row];
     await renderScreen();
@@ -1596,9 +1542,7 @@ describe('AgentSessionListScreen live filtering', () => {
     act(() => {
       showKeyboard(100);
     });
-    // A raised IME shorter than the FAB band still replaces the tab-bar/FAB band
-    // for the centered states.
-    expect(surfaceBottomInset()).toBe(100);
+    expect(surfaceBottomInset()).toBe(fabBand);
   });
 
   it('insets the rows viewport by the IME band so a search never parks rows behind the keyboard', async () => {
@@ -1615,6 +1559,7 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(requireNode('KeyboardAvoidingView').props.behavior).toBe('padding');
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
 
+    openSearch();
     act(() => {
       showKeyboard(320);
     });
@@ -1643,12 +1588,11 @@ describe('AgentSessionListScreen live filtering', () => {
     const listStyle = () => nodes('FlashList')[0]?.props.style as { marginBottom: number };
     const fabBand = state.tabBarHeight + FAB_SIZE + FAB_MARGIN;
 
+    openSearch();
     act(() => {
       showKeyboard(100);
     });
-    // The centered states still take the shorter IME band, so their copy clears
-    // the keyboard rather than a phantom tab-bar band.
-    expect(surfaceBottomInset()).toBe(100);
+    expect(surfaceBottomInset()).toBe(fabBand);
     // The rows list cannot: the native container lifts the IME's 100 and the
     // frame adds the rest of the FAB band, so a shorter frame never parks rows
     // under the button.
@@ -1658,6 +1602,48 @@ describe('AgentSessionListScreen live filtering', () => {
     act(() => {
       hideKeyboard();
     });
+    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
+  });
+
+  it('ignores a keyboard another screen raised, so the rows and centered states stay put', async () => {
+    // A pushed screen's keyboard is still closing when the tab regains focus;
+    // reading it padded the body for the length of the close, and the centered
+    // empty state moved down once the keyboard finished hiding.
+    state.platform.OS = 'android';
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const listStyle = () => nodes('FlashList')[0]?.props.style as { marginBottom: number };
+
+    act(() => {
+      showKeyboard(320);
+    });
+    expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(false);
+    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
+
+    act(() => {
+      hideKeyboard();
+    });
+    openSearch();
+    act(() => {
+      showKeyboard(320);
+    });
+    expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(true);
+    expect(listStyle()).toEqual({ marginBottom: 0 });
+
+    // Android Back hides the IME while the field keeps focus; a tap on the
+    // field reopens it without a new focus event, and the lift must follow.
+    act(() => {
+      hideKeyboard();
+    });
+    act(() => {
+      showKeyboard(320);
+    });
+    expect(listStyle()).toEqual({ marginBottom: 0 });
+
+    act(() => {
+      (requireNode('SessionListSearchHeader').props.onBlur as () => void)();
+    });
+    expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(false);
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
   });
 

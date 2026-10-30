@@ -11,7 +11,7 @@ import {
 
 export default {
   id: 'kimi-coding',
-  resolveUpstream: apiKeyUpstream({
+  ...apiKeyUpstream({
     apiUrl: 'https://api.kimi.com/coding/v1',
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,

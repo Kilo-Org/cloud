@@ -77,4 +77,14 @@ export type NewSessionPromptProps = {
   belowCardHeight?: number;
   /** True for the Continue clone entry: hides the composer, paperclip, paste, and voice. */
   isCloneEntry?: boolean;
+  /**
+   * Whether the input takes focus when the screen opens, raising the keyboard.
+   * The host resolves it (`shouldAutoFocusNewSessionPrompt`): an entry that
+   * still needs a repository pick keeps the keyboard down so the repository,
+   * Changes, Environment and Advanced Configuration are on the first
+   * screenful, and an entry that is already configured keeps the prompt-first
+   * typing it always had. Omitted keeps focus, for hosts that have no
+   * configuration to hide.
+   */
+  autoFocusOnMount?: boolean;
 };

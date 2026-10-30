@@ -617,6 +617,23 @@ describe('providerReviewRouter ledger', () => {
     expect(mockSettleOperation).not.toHaveBeenCalled();
   });
 
+  it('refuses an admission stored in another organization scope with no effect', async () => {
+    mockAdmitOperation.mockResolvedValueOnce({ admission: 'organization_mismatch' });
+    await expect(
+      caller.addComment({
+        ...gitlabBase,
+        body: 'hello',
+        operationKey: 'key-1',
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+    expect(gitlabWrite.addComment).not.toHaveBeenCalled();
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+    expect(mockMarkReconcilePending).not.toHaveBeenCalled();
+  });
+
   it('never re-executes an in-flight duplicate', async () => {
     admittingOnce('duplicate_in_flight');
     await expect(

@@ -2,7 +2,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import { withOrganization } from '@/lib/hooks/agent-profile-mutation-helpers';
-import { type AgentProfileDetail } from '@/lib/hooks/agent-profile-types';
+import {
+  type AgentProfileKiloCommandRow,
+  type AgentProfileMcpServerRow,
+} from '@/lib/hooks/agent-profile-types';
 import {
   isLatestMutationGeneration,
   nextMutationGeneration,
@@ -15,29 +18,19 @@ const MCP_MUTATION_KEY = 'agentProfiles:mcp';
 const KILO_COMMAND_MUTATION_KEY = 'agentProfiles:kiloCommand';
 
 function withMcpEnabled(
-  profile: AgentProfileDetail,
+  servers: AgentProfileMcpServerRow[],
   mcpServerId: string,
   enabled: boolean
-): AgentProfileDetail {
-  return {
-    ...profile,
-    mcpServers: profile.mcpServers.map(server =>
-      server.id === mcpServerId ? { ...server, enabled } : server
-    ),
-  };
+): AgentProfileMcpServerRow[] {
+  return servers.map(server => (server.id === mcpServerId ? { ...server, enabled } : server));
 }
 
 function withKiloCommandEnabled(
-  profile: AgentProfileDetail,
+  commands: AgentProfileKiloCommandRow[],
   commandId: string,
   enabled: boolean
-): AgentProfileDetail {
-  return {
-    ...profile,
-    kiloCommands: profile.kiloCommands.map(command =>
-      command.id === commandId ? { ...command, enabled } : command
-    ),
-  };
+): AgentProfileKiloCommandRow[] {
+  return commands.map(command => (command.id === commandId ? { ...command, enabled } : command));
 }
 
 /**
@@ -46,10 +39,10 @@ function withKiloCommandEnabled(
  * can never drop a command from the cache.
  */
 function withKiloCommandOrder(
-  profile: AgentProfileDetail,
+  commands: readonly AgentProfileKiloCommandRow[],
   orderedIds: readonly string[]
-): AgentProfileDetail {
-  const byId = new Map(profile.kiloCommands.map(command => [command.id, command]));
+): AgentProfileKiloCommandRow[] {
+  const byId = new Map(commands.map(command => [command.id, command]));
   const next = orderedIds.flatMap(id => {
     const command = byId.get(id);
     if (command === undefined) {
@@ -58,25 +51,26 @@ function withKiloCommandOrder(
     byId.delete(id);
     return [command];
   });
-  return { ...profile, kiloCommands: [...next, ...byId.values()] };
+  return [...next, ...byId.values()];
 }
 
 /**
  * The MCP server, agent, and kilo (slash) command mutations. Each carries the
  * hook's organization context, toasts a failed server call exactly once, and
- * invalidates the `agentProfiles` namespace so the list and detail queries
+ * invalidates the `agentProfiles` namespace so the list and section queries
  * reconcile with server truth.
  *
- * The enabled toggles and the kilo-command reorder are optimistic: they snapshot
- * the detail cache in `onMutate`, roll back in `onError` (latest generation
- * only), and invalidate again in `onSettled` to reconcile.
+ * The enabled toggles and the kilo-command reorder are optimistic: they
+ * snapshot the section's own list in `onMutate`, roll back in `onError` (latest
+ * generation only), and invalidate again in `onSettled` to reconcile. They
+ * write the section query the screen renders, not the whole-profile read, so
+ * the control moves before the refetch lands.
  */
 export function useAgentProfileSectionMutations(organizationId?: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
   const profilesFilter = trpc.agentProfiles.pathFilter();
-  const detailFilter = trpc.agentProfiles.get.pathFilter();
 
   const invalidateProfiles = () => {
     void queryClient.invalidateQueries(profilesFilter);
@@ -137,14 +131,15 @@ export function useAgentProfileSectionMutations(organizationId?: string) {
       trpc.agentProfiles.setMcpEnabled.mutationOptions({
         ...callbacks,
         onMutate: async variables => {
-          await queryClient.cancelQueries({ queryKey: detailFilter.queryKey });
-          const generation = nextMutationGeneration(MCP_MUTATION_KEY);
-          const previous = queryClient.getQueriesData<AgentProfileDetail>({
-            queryKey: detailFilter.queryKey,
+          const serversFilter = trpc.agentProfiles.mcpServers.queryFilter({
+            profileId: variables.profileId,
+            organizationId,
           });
-          queryClient.setQueriesData<AgentProfileDetail>(
-            { queryKey: detailFilter.queryKey },
-            old => (old ? withMcpEnabled(old, variables.mcpServerId, variables.enabled) : old)
+          await queryClient.cancelQueries(serversFilter);
+          const generation = nextMutationGeneration(MCP_MUTATION_KEY);
+          const previous = queryClient.getQueriesData<AgentProfileMcpServerRow[]>(serversFilter);
+          queryClient.setQueriesData<AgentProfileMcpServerRow[]>(serversFilter, old =>
+            old ? withMcpEnabled(old, variables.mcpServerId, variables.enabled) : old
           );
           return { generation, previous };
         },
@@ -167,14 +162,15 @@ export function useAgentProfileSectionMutations(organizationId?: string) {
       trpc.agentProfiles.setKiloCommandEnabled.mutationOptions({
         ...callbacks,
         onMutate: async variables => {
-          await queryClient.cancelQueries({ queryKey: detailFilter.queryKey });
-          const generation = nextMutationGeneration(KILO_COMMAND_MUTATION_KEY);
-          const previous = queryClient.getQueriesData<AgentProfileDetail>({
-            queryKey: detailFilter.queryKey,
+          const commandsFilter = trpc.agentProfiles.kiloCommands.queryFilter({
+            profileId: variables.profileId,
+            organizationId,
           });
-          queryClient.setQueriesData<AgentProfileDetail>(
-            { queryKey: detailFilter.queryKey },
-            old => (old ? withKiloCommandEnabled(old, variables.commandId, variables.enabled) : old)
+          await queryClient.cancelQueries(commandsFilter);
+          const generation = nextMutationGeneration(KILO_COMMAND_MUTATION_KEY);
+          const previous = queryClient.getQueriesData<AgentProfileKiloCommandRow[]>(commandsFilter);
+          queryClient.setQueriesData<AgentProfileKiloCommandRow[]>(commandsFilter, old =>
+            old ? withKiloCommandEnabled(old, variables.commandId, variables.enabled) : old
           );
           return { generation, previous };
         },
@@ -200,14 +196,15 @@ export function useAgentProfileSectionMutations(organizationId?: string) {
       trpc.agentProfiles.reorderKiloCommands.mutationOptions({
         ...callbacks,
         onMutate: async variables => {
-          await queryClient.cancelQueries({ queryKey: detailFilter.queryKey });
-          const generation = nextMutationGeneration(KILO_COMMAND_MUTATION_KEY);
-          const previous = queryClient.getQueriesData<AgentProfileDetail>({
-            queryKey: detailFilter.queryKey,
+          const commandsFilter = trpc.agentProfiles.kiloCommands.queryFilter({
+            profileId: variables.profileId,
+            organizationId,
           });
-          queryClient.setQueriesData<AgentProfileDetail>(
-            { queryKey: detailFilter.queryKey },
-            old => (old ? withKiloCommandOrder(old, variables.orderedIds) : old)
+          await queryClient.cancelQueries(commandsFilter);
+          const generation = nextMutationGeneration(KILO_COMMAND_MUTATION_KEY);
+          const previous = queryClient.getQueriesData<AgentProfileKiloCommandRow[]>(commandsFilter);
+          queryClient.setQueriesData<AgentProfileKiloCommandRow[]>(commandsFilter, old =>
+            old ? withKiloCommandOrder(old, variables.orderedIds) : old
           );
           return { generation, previous };
         },

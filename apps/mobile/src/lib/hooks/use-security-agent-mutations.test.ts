@@ -31,6 +31,8 @@ import {
   SECURITY_LEDGER_SETTLE_FAILED_MESSAGE,
   SECURITY_OPERATION_REPLAY_FAILED_MESSAGE,
   SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
+  SECURITY_SERVICE_UNAVAILABLE_MESSAGE,
+  securityRetainsOperationKey,
   securitySyncIntentFingerprint,
 } from '@/lib/security-agent-ledger';
 import {
@@ -95,6 +97,7 @@ const setQueryDataMock = vi.fn();
 const cancelQueriesMock = vi.fn();
 const toastErrorMock = vi.fn();
 const trackCommandMock = vi.hoisted(() => vi.fn());
+const announcingSuccessMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@tanstack/react-query', () => ({
   useMutation: (opts: MutationOptions) => {
@@ -139,7 +142,7 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: {
     error: (msg: string) => toastErrorMock(msg),
-    success: vi.fn(),
+    success: (msg: string) => announcingSuccessMock(msg),
     warning: vi.fn(),
   },
 }));
@@ -241,6 +244,20 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
   });
 
+  it('regenerates the key when the Worker was unreachable, and still offers a retry', async () => {
+    personalTriggerSyncMutateMock.mockRejectedValueOnce(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+    useTriggerSecuritySync('personal');
+
+    await expect(
+      lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' })
+    ).rejects.toMatchObject({
+      message: 'The security service is unavailable. Try again.',
+    });
+    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+  });
+
   it('onError toasts the mapped message through the existing toast path', () => {
     useTriggerSecuritySync('personal');
     lastCapturedOptions?.onError?.(
@@ -335,6 +352,18 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     expect(outboxMock.remove).not.toHaveBeenCalled();
   });
 
+  it('removes the reconcile-first row when the Worker was unreachable', async () => {
+    personalTriggerSyncMutateMock.mockRejectedValueOnce(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+    useTriggerSecuritySync('personal');
+
+    await expect(
+      lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' })
+    ).rejects.toMatchObject({ message: 'The security service is unavailable. Try again.' });
+    expect(outboxMock.remove).toHaveBeenCalledTimes(1);
+  });
+
   it('removes the reconcile-first row on a terminal failure', async () => {
     const replayFailed = new Error('This action did not complete. Please try again.');
     Object.assign(replayFailed, { data: { code: 'BAD_REQUEST' } });
@@ -396,6 +425,29 @@ describe('useSaveSecurityAgentConfig (generation guard + scope)', () => {
     setQueryDataMock.mockReset();
     cancelQueriesMock.mockReset();
     toastErrorMock.mockReset();
+    announcingSuccessMock.mockReset();
+  });
+
+  it('confirms a successful save instead of relying on the screen it returns to', () => {
+    // The save pops the settings screen, and on a flaky connection that screen
+    // can fail to load. Without this confirmation a persisted save reads as a
+    // lost one.
+    useSaveSecurityAgentConfig('personal');
+    lastCapturedOptions?.onSuccess?.({}, { slaEnabled: false });
+
+    expect(announcingSuccessMock).toHaveBeenCalledTimes(1);
+    const announced = announcingSuccessMock.mock.calls[0]?.[0] as string;
+    expect(announced).toBeTruthy();
+    expect(announced).not.toBe('securityAgent.settingsSave.saved');
+  });
+
+  it('leaves the confirmation to a caller that has a more specific outcome', () => {
+    // Automation announces the queued count itself; two toasts for one save
+    // would read as two outcomes.
+    useSaveSecurityAgentConfig('personal', { announceSaved: false });
+    lastCapturedOptions?.onSuccess?.({ existingFindingsQueuedCount: 2 }, { slaEnabled: false });
+
+    expect(announcingSuccessMock).not.toHaveBeenCalled();
   });
 
   it('scopes the mutation to serialize against a toggle on the same config', () => {
@@ -564,6 +616,30 @@ describe('isSecuritySyncRetryable (P1-A-08e key-rotation policy)', () => {
     Object.assign(byCode, { data: { code: 'PRECONDITION_FAILED' } });
     expect(isSecuritySyncRetryable(byCode)).toBe(false);
   });
+
+  it('keeps a retry available when the Worker was unreachable but ends the intent', () => {
+    const unavailable = new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE);
+    // A later attempt can succeed, so the surface keeps its retry.
+    expect(isSecuritySyncRetryable(unavailable)).toBe(true);
+    // The server settled that intent's row, so its key can never be replayed.
+    expect(securityRetainsOperationKey(unavailable)).toBe(false);
+    expect(securityRetainsOperationKey(new Error(SECURITY_AMBIGUOUS_MESSAGE))).toBe(true);
+  });
+
+  it('keeps the key-retention decision on the mapped error, after its text is replaced', () => {
+    const mapped = mapSecurityDismissOperationError(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+
+    expect(mapped.message).toBe('The security service is unavailable. Try again.');
+    expect(isSecuritySyncRetryable(mapped)).toBe(true);
+    expect(securityRetainsOperationKey(mapped)).toBe(false);
+    expect(
+      securityRetainsOperationKey(
+        mapSecurityDismissOperationError(new Error(SECURITY_AMBIGUOUS_MESSAGE))
+      )
+    ).toBe(true);
+  });
 });
 
 describe('ledger marker copy per surface', () => {
@@ -597,6 +673,11 @@ describe('ledger marker copy per surface', () => {
         SECURITY_OPERATION_REPLAY_FAILED_MESSAGE,
         'This action did not complete. Please try again.',
         false,
+      ],
+      [
+        SECURITY_SERVICE_UNAVAILABLE_MESSAGE,
+        'The security service is unavailable. Try again.',
+        true,
       ],
     ] as const;
     for (const [marker, copy, retryable] of cases) {

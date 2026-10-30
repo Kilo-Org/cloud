@@ -1,7 +1,9 @@
 /* eslint-disable max-lines -- one form surface: platform choice, URL field with its validation, instructions, model choice, and the pinned action share the scroll body */
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { GitPullRequest } from '@/components/ui/icons';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, type ScrollViewInstance, TextInput, View } from 'react-native';
@@ -18,8 +20,14 @@ import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
-import { useGitHubStatus, useGitLabStatus, useReviewConfig } from '@/lib/hooks/use-code-reviewer';
+import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
+import { canConnectProvider, classifyProviderErrorCode } from '@/lib/code-reviewer-status';
+import {
+  useGitHubStatus,
+  useGitLabStatus,
+  useReviewConfig,
+  useReviewerPermission,
+} from '@/lib/hooks/use-code-reviewer';
 import { useCreateManualReview } from '@/lib/hooks/use-code-reviews';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -27,7 +35,8 @@ import { cn } from '@/lib/utils';
 
 import { ManualReviewActionFooter } from './manual-review-action-footer';
 import { ManualReviewPlatformPicker } from './manual-review-platform-picker';
-import { manualReviewStartFailureMessage } from './manual-review-start-error';
+import { connectNoticeKey } from './connect-notice-key';
+import { manualReviewStartFailure } from './manual-review-start-error';
 import { ManualReviewStartFeedback } from './manual-review-start-feedback';
 import { MANUAL_REVIEW_START_DEADLINE_MS, useDeadlineWatchedStart } from './deadline-watched-start';
 
@@ -83,6 +92,7 @@ const FORM_EDGE_GAP = 16;
 
 export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const githubStatus = useGitHubStatus(scope);
@@ -92,6 +102,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const statusesLoading = githubStatus.isLoading || gitlabStatus.isLoading;
   const statusesError = githubStatus.isError || gitlabStatus.isError;
   const firstConnected = MANUAL_REVIEW_PLATFORMS.find(option => isConnected(option));
+  const permission = useReviewerPermission(scope);
   const [platformChoice, setPlatformChoice] = useState<ManualReviewPlatform | null>(null);
   const platform = platformChoice ?? firstConnected ?? 'github';
   const urlRef = useRef('');
@@ -138,7 +149,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         {
           onSuccess: ({ reviewId }) => {
             settle(null);
-            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            notificationHaptic(Haptics.NotificationFeedbackType.Success);
             router.replace(`/(app)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
           },
           onError: error => {
@@ -150,10 +161,12 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             // server's own message is English and must not reach this
             // localized screen.
             if (isDeadlineStall(error)) {
-              settle(t('common.takingLonger'));
+              // A wait that ran out its budget is retryable: the same draft
+              // may still start.
+              settle({ message: t('common.takingLonger'), retryable: true });
               return;
             }
-            settle(manualReviewStartFailureMessage(error, platform));
+            settle(manualReviewStartFailure(error, platform));
           },
         }
       );
@@ -203,6 +216,15 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   }
 
   if (!statusesLoading && !statusesError && !isConnected('github') && !isConnected('gitlab')) {
+    // The only way out of this state is installing the provider's app for the
+    // scope, which the server restricts to an organization-manage role
+    // (`githubApps.mintInstallState` takes `ORGANIZATION_MANAGE_ROLES`). A
+    // narrower role gets the same read-only notice the provider overview shows
+    // instead of a button whose destination refuses them with no action of its
+    // own. An unresolved permission keeps the button — `review-memory-screen`
+    // treats an unsettled permission the same way, and the provider procedures
+    // stay server-authorized.
+    const canConnect = permission.status !== 'ready' || canConnectProvider('github', permission);
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
@@ -212,20 +234,26 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         <EmptyState
           icon={GitPullRequest}
           title={t('common.connectProvider')}
-          description={t('codeReviewer.manualReview.connectProviderDescription')}
+          description={
+            canConnect
+              ? t('codeReviewer.manualReview.connectProviderDescription')
+              : t(connectNoticeKey('github'), { platform: PLATFORM_CAPABILITIES.github.label })
+          }
           action={
-            // `mt-3 w-full` matches the near-identical PR-review connect gate
-            // (pr-review-connect-gate.tsx) and the Code Reviewer
-            // ProviderConnectCard, so the same Connect GitHub action is styled
-            // the same wherever it appears.
-            <Button
-              className={cn('mt-3 w-full', STATE_ACTION_CLASS)}
-              onPress={() => {
-                router.push(`/(app)/code-reviewer/${scope}/github` as Href);
-              }}
-            >
-              <Text>{t('common.connectGithub')}</Text>
-            </Button>
+            canConnect ? (
+              // `mt-3 w-full` matches the near-identical PR-review connect gate
+              // (pr-review-connect-gate.tsx) and the Code Reviewer
+              // ProviderConnectCard, so the same Connect GitHub action is styled
+              // the same wherever it appears.
+              <Button
+                className={cn('mt-3 w-full', STATE_ACTION_CLASS)}
+                onPress={() => {
+                  pushOnce(`/(app)/code-reviewer/${scope}/github` as Href);
+                }}
+              >
+                <Text>{t('common.connectGithub')}</Text>
+              </Button>
+            ) : undefined
           }
         />
       </View>
@@ -356,7 +384,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         <ManualReviewActionFooter>
           <ManualReviewStartFeedback
             stalled={start.stalled}
-            startError={start.failureMessage}
+            failure={start.failure}
             onRetry={onSubmit}
           />
           <Button

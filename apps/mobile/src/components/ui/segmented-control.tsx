@@ -1,8 +1,9 @@
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { Pressable } from 'react-native';
 
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 type SegmentedControlOption<T extends string> = { value: T; label: string };
@@ -17,7 +18,7 @@ type SegmentedControlProps<T extends string> = {
 
 /**
  * Horizontal segmented pill. Owns the selection haptic — callers must NOT
- * fire their own `Haptics.selectionAsync()` on press. The haptic only fires
+ * fire their own `selectionHaptic()` on press. The haptic only fires
  * on an actual change of selection, not when the current value is re-tapped.
  */
 export function SegmentedControl<T extends string>({
@@ -38,7 +39,7 @@ export function SegmentedControl<T extends string>({
               if (selected) {
                 return;
               }
-              void Haptics.selectionAsync();
+              selectionHaptic();
               onChange(option.value);
             }}
             className={cn(
@@ -47,10 +48,11 @@ export function SegmentedControl<T extends string>({
               // clipped instead of wrapping. Stretching the child to the segment
               // width is what lets the label wrap inside the pill.
               //
-              // `py-2` (with `min-h-11`) leaves a one-line segment at 44dp and a
-              // two-line segment at 56dp, so a wrapped label keeps its vertical
-              // insets instead of touching the edges.
-              'min-h-11 flex-1 justify-center rounded-md px-2 py-2 active:opacity-70',
+              // A one-line segment now fills the shared row floor. A
+              // wrapped label grows past it and keeps its vertical insets
+              // instead of touching the edges.
+              ROW_TARGET_CLASS,
+              'flex-1 justify-center rounded-md px-2 py-2 active:opacity-70',
               selected && 'bg-background'
             )}
           >

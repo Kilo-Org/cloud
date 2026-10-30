@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
 import { i18n } from '@/i18n';
 import {
   knownServerErrorMessage,
@@ -73,6 +74,29 @@ describe('knownServerErrorMessage', () => {
         makeError('FORBIDDEN', `Prefix ${ORGANIZATION_TRIAL_EXPIRED_MESSAGE}`)
       )
     ).toBeNull();
+  });
+
+  // The expected mapping is read from the shared table instead of a fixture, so
+  // a review-memory reason added there fails this test until the app maps it.
+  it.each(Object.entries(REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY))(
+    'explains the review memory rejection %s',
+    (_reason, sentence) => {
+      const copy = knownServerErrorMessage(makeError('BAD_REQUEST', sentence));
+      expect(copy).not.toBeNull();
+      expect(copy).not.toBe(i18n.t('common.somethingWentWrong'));
+      expect(copy).not.toBe(sentence);
+    }
+  );
+
+  // `assertEnabled` refuses save, reject and approve with this one sentence, so
+  // its copy must describe the gate and never one action's outcome.
+  it('describes only the gate for the shared disabled rejection', () => {
+    const copy = knownServerErrorMessage(
+      makeError('FORBIDDEN', REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.review_memory_disabled)
+    );
+    expect(copy).toBe(i18n.t('codeReviewer.reviewMemory.offAction'));
+    expect(copy).not.toContain(i18n.t('common.pullRequest'));
+    expect(copy).not.toContain('REVIEW.md');
   });
 });
 

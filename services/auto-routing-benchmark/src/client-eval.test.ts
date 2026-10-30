@@ -108,6 +108,7 @@ describe('client eval (real SQLite)', () => {
   let sqlite: DatabaseSync;
   let db: D1Database;
   let judge: Mock<DeciderJudge>;
+  let createJudge: Mock<ClientEvalDeps['createJudge']>;
   let writeUsage: Mock<ClientEvalDeps['writeUsage']>;
   let deps: ClientEvalDeps;
 
@@ -116,13 +117,14 @@ describe('client eval (real SQLite)', () => {
     applyBenchmarkMigrations(sqlite);
     db = sqliteD1(sqlite);
     judge = vi.fn<DeciderJudge>(async () => ({ probability: 0.75, costUsd: 0.0021 }));
+    createJudge = vi.fn<ClientEvalDeps['createJudge']>(async () => judge);
     writeUsage = vi.fn<ClientEvalDeps['writeUsage']>(async usage => ({
       kind: 'recorded',
       result: { usageId: usage.core.id } as never,
     }));
     deps = {
       source: { catalogEnv: { KILO_WEB_API_BASE_URL: 'https://app.test' } },
-      createJudge: async () => judge,
+      createJudge,
       writeUsage,
       now: () => new Date('2026-10-16T12:00:00.000Z'),
     };
@@ -266,6 +268,103 @@ describe('client eval (real SQLite)', () => {
       cost: 2100,
     });
     expect(usage.metadata.user_prompt_prefix).toBeNull();
+  });
+
+  it('grades a judged case once when parallel uploads race for it', async () => {
+    const judgedUpload = upload({ caseId: judgedCase.id });
+    const grading = Promise.withResolvers<void>();
+    const held = Promise.withResolvers<void>();
+    judge.mockImplementationOnce(async () => {
+      grading.resolve();
+      await held.promise;
+      return { probability: 0.75, costUsd: 0.0021 };
+    });
+
+    const winner = gradeClientEvalResult(db, CONFIG, judgedUpload, deps);
+    await grading.promise;
+    await expect(gradeClientEvalResult(db, CONFIG, judgedUpload, deps)).rejects.toMatchObject({
+      code: 'internal_error',
+    });
+    expect(createJudge).toHaveBeenCalledOnce();
+    expect(judge).toHaveBeenCalledOnce();
+
+    held.resolve();
+    await expect(winner).resolves.toEqual({ score: 0.75 });
+    expect(writeUsage).toHaveBeenCalledOnce();
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM client_case_results').get()).toEqual({ n: 1 });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM client_case_grading_claims').get()).toEqual({
+      n: 0,
+    });
+
+    await expect(gradeClientEvalResult(db, CONFIG, judgedUpload, deps)).resolves.toEqual({
+      score: 0.75,
+    });
+    expect(judge).toHaveBeenCalledOnce();
+    expect(writeUsage).toHaveBeenCalledOnce();
+  });
+
+  it('lets a retry grade a judged case again after its grading fails', async () => {
+    const judgedUpload = upload({ caseId: judgedCase.id });
+    judge.mockRejectedValueOnce(new Error('judge down'));
+    await expect(gradeClientEvalResult(db, CONFIG, judgedUpload, deps)).rejects.toMatchObject({
+      code: 'internal_error',
+    });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM client_case_grading_claims').get()).toEqual({
+      n: 0,
+    });
+
+    await expect(gradeClientEvalResult(db, CONFIG, judgedUpload, deps)).resolves.toEqual({
+      score: 0.75,
+    });
+    expect(judge).toHaveBeenCalledTimes(2);
+    expect(writeUsage).toHaveBeenCalledOnce();
+  });
+
+  it('takes over a grading claim whose holder stopped responding', async () => {
+    await gradeClientEvalResult(db, CONFIG, upload(), deps);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM client_case_grading_claims').get()).toEqual({
+      n: 0,
+    });
+    const [profile] = await listOwnerClientProfiles(db, context, 'efficient');
+    if (!profile) throw new Error('profile missing');
+    sqlite
+      .prepare(`INSERT INTO client_case_grading_claims
+        (profile_id, case_id, rep, token, lease_until, created_at)
+        VALUES (?, ?, 0, 'abandoned', ?, '2026-10-16T11:59:00.000Z')`)
+      .run(profile.id, judgedCase.id, Date.parse('2026-10-16T12:00:00.000Z') - 1);
+
+    await expect(
+      gradeClientEvalResult(db, CONFIG, upload({ caseId: judgedCase.id }), deps)
+    ).resolves.toEqual({ score: 0.75 });
+    expect(judge).toHaveBeenCalledOnce();
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM client_case_grading_claims').get()).toEqual({
+      n: 0,
+    });
+  });
+
+  it('keeps a graded case when releasing its claim fails', async () => {
+    const failingRelease = new Proxy(db, {
+      get(target, property) {
+        if (property === 'prepare') {
+          return (query: string) => {
+            if (/^delete from "client_case_grading_claims"/i.test(query)) {
+              throw new Error('delete failed');
+            }
+            return target.prepare(query);
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(
+      gradeClientEvalResult(failingRelease, CONFIG, upload({ caseId: judgedCase.id }), deps)
+    ).resolves.toEqual({ score: 0.75 });
+    expect(writeUsage).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
   });
 
   it('stores nothing when grader usage cannot be recorded', async () => {

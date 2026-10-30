@@ -40,4 +40,35 @@ describe('Security Agent copy', () => {
     }
     expect(found).toEqual([]);
   });
+
+  /**
+   * One name per language. `common.securityAgent` renders the screen header and
+   * the Home and Profile tiles, and the notification category points at the
+   * feature by the same name, so a string that still spells the English name
+   * shows the reader two names for one feature — the defect the German
+   * reauthorize screen carried. Every namespace is scanned, not just the
+   * feature's own: the name is the reader's word for the feature wherever it
+   * appears. English is the one catalog where the English name is its own.
+   */
+  it('uses the catalog name for the feature in every string of the catalog', () => {
+    const found: string[] = [];
+    for (const [language, load] of Object.entries(CATALOG_LOADERS)) {
+      const catalog = load() as
+        | (Record<string, unknown> & { common?: { securityAgent?: string } })
+        | undefined;
+      const name = catalog?.common?.securityAgent;
+      const strings: [string, string][] = [];
+      for (const [namespace, value] of Object.entries(catalog ?? {})) {
+        copyStrings(value, namespace, strings);
+      }
+      if (name && name !== 'Security Agent') {
+        for (const [path, value] of strings) {
+          if (value.includes('Security Agent')) {
+            found.push(`${language} ${path}: ${value}`);
+          }
+        }
+      }
+    }
+    expect(found).toEqual([]);
+  });
 });

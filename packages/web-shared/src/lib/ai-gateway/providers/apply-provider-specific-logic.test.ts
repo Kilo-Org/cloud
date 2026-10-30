@@ -3,6 +3,7 @@ import {
   createUserVercelAiGatewayProvider,
   VERCEL_AI_GATEWAY,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   applyPreferredProvider,
@@ -862,6 +863,53 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
       expect(request.body).toMatchObject(serverFeatures);
     }
   );
+});
+
+describe('applyProviderSpecificLogic thinking block binding', () => {
+  const model = 'anthropic/claude-opus-5.5';
+
+  async function apply(provider: Provider) {
+    const request = makeMessagesRequest(model);
+    request.body.thinking = { type: 'adaptive' };
+    const extraHeaders: Record<string, string> = {};
+    await applyProviderSpecificLogic(
+      provider,
+      model,
+      request,
+      extraHeaders,
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+    return { thinking: request.body.thinking, extraHeaders };
+  }
+
+  it.each([
+    { name: 'Vercel', provider: VERCEL_AI_GATEWAY },
+    { name: 'OpenRouter', provider: OPENROUTER },
+  ])('drops mismatched thinking blocks on $name', async ({ provider }) => {
+    const { thinking, extraHeaders } = await apply(provider);
+
+    expect(thinking).toEqual({
+      type: 'adaptive',
+      display: 'summarized',
+      block_binding: { prefix_mismatch_behavior: 'drop_block' },
+    });
+    expect(extraHeaders['anthropic-beta']).toBe(
+      'fine-grained-tool-streaming-2025-05-14,thinking-binding-controls-2026-08-01'
+    );
+  });
+
+  it('leaves upstreams without verified support untouched', async () => {
+    const { thinking, extraHeaders } = await apply({ ...makeProvider(null), id: 'custom' });
+
+    expect(thinking).toEqual({ type: 'adaptive', display: 'summarized' });
+    expect(extraHeaders['anthropic-beta']).toBe('fine-grained-tool-streaming-2025-05-14');
+  });
 });
 
 describe('applyProviderSpecificLogic paid server features', () => {

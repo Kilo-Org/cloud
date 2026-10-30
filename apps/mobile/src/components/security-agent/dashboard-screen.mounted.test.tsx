@@ -18,6 +18,7 @@ import { i18n } from '@/i18n';
 import {
   mapSecuritySyncOperationError,
   SECURITY_AMBIGUOUS_MESSAGE,
+  SECURITY_SERVICE_UNAVAILABLE_MESSAGE,
 } from '@/lib/security-agent-ledger';
 import { buildLocalizedMetrics, DashboardScreen } from './dashboard-screen';
 
@@ -69,9 +70,17 @@ const repositories = vi.hoisted(() => ({
 }));
 const capability = vi.hoisted(() => ({
   canManage: false,
+  status: 'allowed' as 'loading' | 'error' | 'denied' | 'allowed',
   isLoading: false,
   isError: false,
   refetch: vi.fn(),
+}));
+const settingsRecovery = vi.hoisted(() => ({
+  retry: vi.fn(),
+  isRetrying: false,
+}));
+const recoveryStatus = vi.hoisted(() => ({
+  renders: [] as { message?: string; isRetrying: boolean; onRetry: () => void }[],
 }));
 const dismissFailures = vi.hoisted(() => ({
   failures: [] as { findingId: string; lastError: string; retryable: boolean | null }[],
@@ -124,6 +133,12 @@ const retryCards = vi.hoisted(() => ({
   }[],
 }));
 
+// Captures the dashboard-sections props, so a test can assert the stats payload
+// a failure leaves on screen.
+const sectionsProps = vi.hoisted(() => ({
+  props: [] as { data?: unknown; slaEnabled?: boolean }[],
+}));
+
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
   View: 'View',
@@ -161,6 +176,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentLastSyncTime: () => lastSync,
   useSecurityAgentRepositories: () => repositories,
   useTriggerSecuritySync: () => triggerSync,
+  useRetrySecurityAgentSettings: () => settingsRecovery,
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissFailures: () => dismissFailures,
@@ -168,6 +184,16 @@ vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
 }));
 vi.mock('@/lib/persist/use-mutation-outbox', () => ({
   useMutationOutbox: () => outbox,
+}));
+vi.mock('@/components/security-agent/settings-recovery-status', () => ({
+  SettingsRecoveryStatus: (props: {
+    message?: string;
+    isRetrying: boolean;
+    onRetry: () => void;
+  }) => {
+    recoveryStatus.renders.push(props);
+    return null;
+  },
 }));
 vi.mock('@/components/security-agent/security-command-retry-card', () => ({
   SecurityCommandRetryCard: (props: {
@@ -205,8 +231,12 @@ vi.mock('@/components/security-agent/audit-report-button', () => ({
   AuditReportButton: () => null,
 }));
 vi.mock('@/components/security-agent/dashboard-sections', () => ({
-  DashboardSections: () => null,
+  DashboardSections: (props: { data?: unknown; slaEnabled?: boolean }) => {
+    sectionsProps.props.push(props);
+    return null;
+  },
 }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: () => null }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -270,6 +300,22 @@ function findFilterControl(root: I): I {
 
 function syncDisabledStates(root: I): boolean[] {
   return syncButtons(root).map(n => n.props.disabled as boolean);
+}
+
+// The one Button the dashboard renders on its own: the retry beside a failed
+// sync's copy. Every other failure renders through the shared retry card.
+function syncRetries(root: I): I[] {
+  return root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Button');
+}
+
+function pressSyncRetry(root: I): void {
+  const retry = syncRetries(root)[0];
+  if (!retry) {
+    throw new Error('no sync retry control rendered');
+  }
+  act(() => {
+    (retry.props.onPress as () => void)();
+  });
 }
 
 function renderedTexts(root: I): string[] {
@@ -374,6 +420,126 @@ describe('DashboardScreen sync control terminal states', () => {
     expect(syncDisabledStates(root.root)).toEqual([true, true]);
   });
 
+  it('offers a retry beside a retryable failure and resubmits the current intent', () => {
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+    const root = renderScreen();
+
+    expect(syncRetries(root.root)).toHaveLength(1);
+    expect(syncRetries(root.root)[0]?.props.loading).toBe(false);
+
+    pressSyncRetry(root.root);
+
+    expect(triggerSync.mutate).toHaveBeenCalledWith(
+      { repoFullName: undefined },
+      expect.objectContaining({ onSuccess: expect.any(Function) })
+    );
+  });
+
+  it('retries the intent that failed, not the filter selected since', () => {
+    outbox.needsReconcile = [
+      {
+        operationKey: 'kilo-repo-key',
+        fingerprint: 'sync:kilo/repo',
+        scope: 'personal',
+        input: { repoFullName: 'kilo/repo' },
+      },
+    ];
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+    const root = renderScreen();
+
+    act(() => {
+      retryCards.cards.find(card => card.lastError === RECONCILE_COPY)?.onRetry?.();
+    });
+    pressSyncRetry(root.root);
+
+    // The card's retry stored the reconcile intent; the inline retry replays it
+    // rather than the (unset) repository filter the screen shows now.
+    expect(triggerSync.mutate).toHaveBeenLastCalledWith(
+      { repoFullName: 'kilo/repo', operationKey: 'kilo-repo-key' },
+      expect.objectContaining({ onSuccess: expect.any(Function) })
+    );
+  });
+
+  it('keeps the failure and reports progress on the retry while it runs', () => {
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+    const root = renderScreen();
+    pressSyncRetry(root.root);
+    // A new attempt clears the mutation's error before it settles.
+    act(() => {
+      triggerSync.isError = false;
+      triggerSync.isPending = true;
+      triggerSync.error = null;
+      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+    });
+
+    expect(syncRetries(root.root)).toHaveLength(1);
+    expect(syncRetries(root.root)[0]?.props.loading).toBe(true);
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.mutations.serviceUnavailable')
+    );
+    // The pressed control keeps its own spinner visible, and the sentence it is
+    // retrying steps back so it does not read as a fresh failure.
+    expect(syncRetries(root.root)[0]?.props.className).toContain('opacity-100');
+    const message = root.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Text' &&
+        n.props.children === i18n.t('securityAgent.mutations.serviceUnavailable')
+    )[0];
+    expect(message?.props.className).toContain('text-warn');
+  });
+
+  it('drops the failure row once a retry succeeds', () => {
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+    const root = renderScreen();
+    pressSyncRetry(root.root);
+    const options = triggerSync.mutate.mock.calls.at(-1)?.[1] as { onSuccess: () => void };
+    act(() => {
+      triggerSync.isError = false;
+      triggerSync.isPending = false;
+      triggerSync.error = null;
+      options.onSuccess();
+      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+    });
+
+    expect(syncRetries(root.root)).toHaveLength(0);
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.mutations.serviceUnavailable')
+    );
+  });
+
+  it('offers no retry for a terminal failure', () => {
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(new Error(CONFIGURATION_ERROR_MESSAGE));
+    const root = renderScreen();
+
+    expect(syncRetries(root.root)).toHaveLength(0);
+  });
+
+  it('keeps the last risk breakdown on screen while a sync failure is shown', () => {
+    const stats = { sla: { overall: { total: 3, withinSla: 2, overdue: 1 } }, analysis: {} };
+    dashboardStats.data = stats;
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+    renderScreen();
+
+    expect(sectionsProps.props.at(-1)?.data).toBe(stats);
+  });
+
   it('submits the sync through the header control with the current repo filter', () => {
     const root = renderScreen();
     const syncNow = findSyncButton(root.root, 'securityAgent.dashboard.syncNow');
@@ -386,6 +552,35 @@ describe('DashboardScreen sync control terminal states', () => {
       { repoFullName: undefined },
       expect.objectContaining({ onSuccess: expect.any(Function) })
     );
+  });
+});
+
+describe('DashboardScreen capability recovery', () => {
+  beforeEach(() => {
+    capability.status = 'allowed';
+    settingsRecovery.isRetrying = false;
+    settingsRecovery.retry.mockClear();
+    recoveryStatus.renders = [];
+  });
+
+  it('surfaces a failed role read with Retry instead of only dropping the controls', () => {
+    // The entry renders this dashboard from the cached config without waiting for
+    // the role read, so a manager whose read failed must be told why the audit
+    // action is missing rather than reading it as lost access.
+    capability.status = 'error';
+    renderScreen();
+
+    expect(recoveryStatus.renders).toHaveLength(1);
+    expect(recoveryStatus.renders[0]?.message).toBe(
+      i18n.t('securityAgent.settingsOverview.couldNotLoadPermissions')
+    );
+    act(() => recoveryStatus.renders[0]?.onRetry());
+    expect(settingsRecovery.retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays silent once the role read resolves', () => {
+    renderScreen();
+    expect(recoveryStatus.renders).toHaveLength(0);
   });
 });
 

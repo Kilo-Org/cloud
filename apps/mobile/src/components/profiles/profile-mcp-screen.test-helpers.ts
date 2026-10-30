@@ -26,7 +26,7 @@ export type TestMcpServer = {
 };
 
 export function testProfile(mcpServers: TestMcpServer[] = []) {
-  return { id: 'profile-1', mcpServers };
+  return mcpServers;
 }
 
 export function testServer(overrides: Partial<TestMcpServer> = {}): TestMcpServer {
@@ -82,6 +82,19 @@ export function pressEmptyAction(renderer: ReactTestRenderer): void {
   };
   act(() => {
     action.props.onPress();
+  });
+}
+
+/** Press the list's Add MCP server button, the only one a populated list renders. */
+export function pressAddButton(renderer: ReactTestRenderer): void {
+  const onPress: unknown = findOne(renderer.root, 'Button').props.onPress;
+  if (typeof onPress !== 'function') {
+    throw new TypeError('the add button has no press handler');
+  }
+  // Checked to be a function above; the stub props carry no call signature.
+  const press = onPress as () => void;
+  act(() => {
+    press();
   });
 }
 

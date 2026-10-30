@@ -30,7 +30,10 @@ vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
   return {
     ...actual,
-    useTranslation: () => ({ t: (key: string) => (key === 'common.cancel' ? 'Cancel' : key) }),
+    useTranslation: () => ({
+      t: (key: string) => (key === 'common.cancel' ? 'Cancel' : key),
+      i18n: { language: 'en' },
+    }),
   };
 });
 

@@ -4,7 +4,7 @@ import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useAgentProfileMutations } from '@/lib/hooks/use-agent-profile-mutations';
-import { useAgentProfile, useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
+import { useAgentProfileList, useAgentProfileVars } from '@/lib/hooks/use-agent-profiles';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -27,7 +27,15 @@ vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 
 const responses: Record<string, unknown> = {
   'agentProfiles.list': [],
-  'agentProfiles.get': { id: 'profile-1', name: 'Backend' },
+  'agentProfiles.vars': [
+    {
+      key: 'API_BASE',
+      value: 'http://localhost:3000',
+      isSecret: false,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+  ],
   'agentProfiles.delete': { success: true },
 };
 
@@ -45,7 +53,7 @@ type DeleteProfile = (input: { profileId: string }) => Promise<unknown>;
 /** The profile Overview screen's queries: the list behind it, the detail, and its mutations. */
 function ProfileOverviewProbe({ holder }: { holder: { current: DeleteProfile | null } }) {
   useAgentProfileList();
-  useAgentProfile('profile-1');
+  useAgentProfileVars('profile-1');
   holder.current = useAgentProfileMutations().deleteProfile.mutateAsync;
   return null;
 }
@@ -69,14 +77,14 @@ describe('useAgentProfileMutations deleteProfile', () => {
         </TRPCProvider>
       ),
     });
-    await waitFor(() => callsTo('agentProfiles.get') === 1 && callsTo('agentProfiles.list') === 1);
+    await waitFor(() => callsTo('agentProfiles.vars') === 1 && callsTo('agentProfiles.list') === 1);
 
     await act(async () => {
       await holder.current?.({ profileId: 'profile-1' });
     });
 
     await waitFor(() => callsTo('agentProfiles.list') === 2);
-    expect(callsTo('agentProfiles.get')).toBe(1);
+    expect(callsTo('agentProfiles.vars')).toBe(1);
     unmount();
   });
 });

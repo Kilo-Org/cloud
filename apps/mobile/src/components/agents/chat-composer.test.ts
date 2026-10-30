@@ -1033,6 +1033,27 @@ describe('ChatComposer slash-command rejection feedback', () => {
   });
 });
 
+describe('ChatComposer placeholder visibility', () => {
+  // A draft of zero-width characters draws nothing and cannot be sent, so the
+  // composer must look like an empty one: hiding the hint while Send is dead
+  // left a field with no glyph, no hint and no action.
+  it('keeps the hint for a draft that draws nothing, and drops it once text does', async () => {
+    const props = makeProps({ placeholder: 'Message the agent' });
+    const mounted = await mount(props);
+    expect(findInputRowProps(mounted)?.inputEmpty).toBe(true);
+
+    requireInputRowOnChangeText(mounted)('\u200B\u200B');
+    await settle();
+    const invisible = await rerender(props);
+    expect(findInputRowProps(invisible)?.inputEmpty).toBe(true);
+
+    requireInputRowOnChangeText(invisible)('Ship it');
+    await settle();
+    const visible = await rerender(props);
+    expect(findInputRowProps(visible)?.inputEmpty).toBe(false);
+  });
+});
+
 // A caption row under the toolbar used to carry the voice status, so starting
 // speech grew the composer and shifted the transcript above it. The status now
 // rides in the input's placeholder slot, which keeps the composer's height.

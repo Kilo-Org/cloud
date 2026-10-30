@@ -13,7 +13,10 @@ import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
 import { getByokUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
-import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
+import {
+  openAuthorizationAndWaitForReturn,
+  reportLateLaunchFailure,
+} from '@/lib/pr-review/connect-gate-platform';
 import { trpcClient } from '@/lib/trpc';
 
 // Where each reason's recovery label takes the user. Every destination exists:
@@ -84,7 +87,14 @@ export function ActionRequiredBanner({
     setOpening(true);
     try {
       const url = await recoveryUrl();
-      await openAuthorizationAndWaitForReturn(url);
+      const wait = await openAuthorizationAndWaitForReturn(url);
+      // A launch that fails after the app's own return edge ended the wait never
+      // reaches the catch below, and the user saw no browser.
+      reportLateLaunchFailure(wait, {
+        onFailure: () => {
+          toast.error(t('authErrors.couldNotOpenBrowser'));
+        },
+      });
       // Back from the browser: the fix may be in place, so re-read the config.
       onRefreshConfig();
     } catch {

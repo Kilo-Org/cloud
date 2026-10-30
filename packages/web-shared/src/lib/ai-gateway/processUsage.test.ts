@@ -2058,6 +2058,12 @@ describe('logMicrodollarUsage', () => {
       where: eq(microdollar_usage_metadata.id, result.usageId),
     });
     expect(metadataRecord).toMatchObject({ non_inference_cost: 7000, market_cost: 12_316 });
+    const [usageViewRecord] = await db
+      .select({ non_inference_cost: microdollar_usage_view.non_inference_cost })
+      .from(microdollar_usage_view)
+      .where(eq(microdollar_usage_view.id, result.usageId))
+      .limit(1);
+    expect(usageViewRecord?.non_inference_cost).toBe(7000);
     expect((await findUserById(user.id))?.microdollars_used).toBe(userByok ? 1000 : 13_316);
   });
 

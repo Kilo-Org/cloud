@@ -1,4 +1,4 @@
-import { describe, expect, test } from '@jest/globals';
+import { describe, expect, jest, test } from '@jest/globals';
 import {
   addCacheBreakpoints,
   getReasoningEffort,
@@ -796,5 +796,54 @@ describe('addCacheBreakpoints', () => {
     expect(request.body.messages.at(0)?.content).toBe('You are helpful.');
     expect(content).toHaveLength(2);
     expect(content[0]).toEqual({ type: 'text', text: 'Latest prompt' });
+  });
+
+  test('emits one aggregated record naming the breakpoints it set', () => {
+    const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+    try {
+      const request: GatewayRequest = {
+        kind: 'chat_completions',
+        body: {
+          model: 'test-model',
+          messages: [
+            { role: 'system', content: 'You are helpful.' },
+            { role: 'user', content: 'First prompt' },
+            { role: 'tool', tool_call_id: 'call_1', content: 'Latest tool output' },
+          ],
+        },
+      };
+
+      addCacheBreakpoints(request);
+
+      expect(debug).toHaveBeenCalledTimes(1);
+      expect(debug.mock.calls[0]?.[0]).toBe(
+        '[addCacheBreakpoints] set 2 cache breakpoints for chat_completions: chat_completions.system, chat_completions.last.tool'
+      );
+    } finally {
+      debug.mockRestore();
+    }
+  });
+
+  test('emits nothing when every breakpoint is already present', () => {
+    const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+    try {
+      const request: GatewayRequest = {
+        kind: 'messages',
+        body: {
+          model: 'anthropic/claude-sonnet-4-5',
+          max_tokens: 1024,
+          system: [
+            { type: 'text', text: 'You are helpful.', cache_control: { type: 'ephemeral' } },
+          ],
+          messages: [{ role: 'user', content: 'Latest prompt' }],
+        },
+      };
+
+      addCacheBreakpoints(request);
+
+      expect(debug).not.toHaveBeenCalled();
+    } finally {
+      debug.mockRestore();
+    }
   });
 });

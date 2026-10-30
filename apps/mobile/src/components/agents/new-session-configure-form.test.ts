@@ -912,11 +912,13 @@ describe('NewSessionConfigureForm', () => {
 
     // The panel is controlled by the session, so it gets the same override the
     // Environment row shows and reports picks back through the same callback.
+    // `onRequestReveal` is how the panel scrolls the composer to its expansion.
     expect(findElementByType(element, 'AdvancedConfigPanel')).toMatchObject({
       organizationId: 'org-1',
       selectedProfileId: 'profile-1',
       onSelectProfile,
       disabled: false,
+      onRequestReveal: expect.any(Function),
     });
   });
 

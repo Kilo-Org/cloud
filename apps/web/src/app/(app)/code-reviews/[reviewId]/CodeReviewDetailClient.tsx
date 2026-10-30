@@ -326,7 +326,7 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
                   className="gap-2"
                 >
                   <RotateCcw
-                    className={`h-3 w-3 ${retriggerMutation.isPending ? 'animate-spin' : ''}`}
+                    className={`h-3 w-3 ${retriggerMutation.isPending ? 'animate-spin [animation-direction:reverse]' : ''}`}
                   />
                   {retriggerMutation.isPending ? 'Retrying...' : 'Retry'}
                 </Button>

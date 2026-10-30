@@ -14,7 +14,11 @@ import {
   type EnabledByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { getPrimaryCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/catalog-models';
-import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getOpenRouterModelsMetadataFromDatabase,
+  isValidOpenRouterModelId,
+  resolveOpenRouterModelAlias,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
@@ -165,20 +169,42 @@ export async function getDirectByokCatalogModelId(model: DirectByokModel): Promi
 
 export type DirectByokCatalogModel = { provider: DirectByokProvider; model: DirectByokModel };
 
-/** The primary model of each provider that serves `catalogModelId`, in provider order. */
+/**
+ * The primary model of each provider that serves `catalogModelId`, in provider order. A latest
+ * alias (`~vendor/family-latest`) is served by the models that serve its current target.
+ */
 export async function findDirectByokCatalogModels(
   catalogModelId: string
 ): Promise<DirectByokCatalogModel[]> {
+  const targetModelId = await resolveOpenRouterModelAlias(catalogModelId);
   const providers: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
   const candidates = await Promise.all(
     providers.map(async provider => {
       if (!provider.models_dev_id) return [];
-      const model = getPrimaryCatalogModels(await provider.models()).get(catalogModelId);
+      const model = getPrimaryCatalogModels(await provider.models()).get(targetModelId);
       return model ? [{ provider, model }] : [];
     })
   );
   const found = candidates.flat();
-  return found.length > 0 && (await isLiveCatalogModelId(catalogModelId)) ? found : [];
+  if (found.length === 0 || !(await isLiveCatalogModelId(catalogModelId))) return [];
+  if (targetModelId !== catalogModelId && !(await isLiveCatalogModelId(targetModelId))) return [];
+  return found;
+}
+
+async function addLatestAliasModelIds(modelIds: Set<string>): Promise<void> {
+  if (modelIds.size === 0) return;
+  const storedModels = await getOpenRouterModelsMetadataFromDatabase();
+  for (const [modelId, storedModel] of Object.entries(storedModels)) {
+    const targetModelId = storedModel.alias_target?.slug;
+    if (
+      modelId.startsWith('~') &&
+      targetModelId &&
+      modelIds.has(targetModelId) &&
+      (await isLiveCatalogModelId(modelId))
+    ) {
+      modelIds.add(modelId);
+    }
+  }
 }
 
 async function getCatalogModeModelIds(keys: EnabledByokProvider[]): Promise<ReadonlySet<string>> {
@@ -188,6 +214,7 @@ async function getCatalogModeModelIds(keys: EnabledByokProvider[]): Promise<Read
       modelIds.add(catalogModelId);
     }
   }
+  await addLatestAliasModelIds(modelIds);
   return modelIds;
 }
 

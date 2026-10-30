@@ -19,14 +19,14 @@
 import { createRequire } from 'node:module';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+import { endOfComment, endOfQuoted, endOfQuotedOrComment } from '../lib/js-scan.mjs';
 
 // Resolve from the app: react-native-css is the app's dependency, not the repo root's.
 const require = createRequire(new URL('../../apps/mobile/package.json', import.meta.url));
 const ROOT = new URL('../../', import.meta.url).pathname;
 const SOURCE_DIRS = [join(ROOT, 'apps/mobile/src'), join(ROOT, 'packages/app-shared/src')];
-
-const problems = [];
-const fail = message => problems.push(message);
 
 /** Utilities that take a colour, so `<utility>-black/<alpha>` can appear. */
 const COLOR_UTILITIES = [
@@ -56,54 +56,65 @@ const COLOR_UTILITIES = [
  * Tile tokens are kept on purpose: they pre-bake an alpha, and an `/opacity`
  * modifier on top of one is still a color-mix over a variable that NativeWind
  * drops.
+ *
+ * Read on first use, so importing this module reads no file.
  */
-const THEME_TOKENS = (() => {
-  const css = readFileSync(join(ROOT, 'apps/mobile/src/global.css'), 'utf8');
-  const block = css.match(/@theme inline \{([\s\S]*?)\n\}/)?.[1];
-  if (!block) {
-    throw new Error('check-classes: no @theme inline block in apps/mobile/src/global.css');
+let themeTokenCache;
+function themeTokens() {
+  if (themeTokenCache === undefined) {
+    const css = readFileSync(join(ROOT, 'apps/mobile/src/global.css'), 'utf8');
+    const block = css.match(/@theme inline \{([\s\S]*?)\n\}/)?.[1];
+    if (!block) {
+      throw new Error('check-classes: no @theme inline block in apps/mobile/src/global.css');
+    }
+    const tokens = [...block.matchAll(/--color-([a-z0-9-]+):\s*var\(--/g)].map(m => m[1]);
+    // Longest first so the alternation is unambiguous (`muted-soft` before `muted`).
+    tokens.sort((a, b) => b.length - a.length || a.localeCompare(b));
+    themeTokenCache = tokens;
   }
-  const tokens = [...block.matchAll(/--color-([a-z0-9-]+):\s*var\(--/g)].map(m => m[1]);
-  // Longest first so the alternation is unambiguous (`muted-soft` before `muted`).
-  tokens.sort((a, b) => b.length - a.length || a.localeCompare(b));
-  return tokens;
-})();
+  return themeTokenCache;
+}
 
-const RULES = [
-  {
-    // A `/opacity` modifier on a theme colour compiles to
-    // `color-mix(in oklab, var(--color-…) n%, transparent)`. NativeWind v5
-    // cannot decompose the variable, so the runtime drops the declaration and
-    // the element paints nothing, with no build error. The `*-tile-bg` /
-    // `*-tile-border` pairs pre-bake the alpha instead.
-    pattern: new RegExp(`\\b(?:${COLOR_UTILITIES})-(?:${THEME_TOKENS.join('|')})/\\d+\\b`, 'g'),
-    advice:
-      'the /opacity modifier is dropped on CSS-variable theme colours; use the paired *-tile-bg / *-tile-border token or a concrete colour',
-  },
-  {
-    // `text-align` only accepts auto/left/right/center/justify, so the
-    // logical keywords are dropped and the text keeps its default alignment.
-    pattern: /\btext-(?:start|end)\b/g,
-    advice: 'text-align: start/end is dropped; the shared Text handles RTL alignment already',
-  },
-  {
-    // react-native-css resolves a `dir` media condition as
-    // `(I18nManager.isRTL && value === 'rtl') || value === 'ltr'`, so an
-    // `ltr:` class matches in both directions and silently applies in RTL.
-    pattern: /\bltr:/g,
-    advice: 'the ltr: variant also matches in RTL; express the rule with rtl: instead',
-  },
-  {
-    // A numeric `leading-N` compiles to `calc(var(--spacing) * N)`, and the
-    // runtime's line-height resolver treats that resolved length as a unitless
-    // multiplier of the font size. `leading-9` on a 30px title paints a 945pt
-    // line box, which pushes everything below it off the screen. An explicit
-    // length is resolved as a length.
-    pattern: /(?<![\w-])leading-\d+(?:\.5)?(?![\w[.-])/g,
-    advice:
-      'a numeric leading-N is multiplied by the font size at runtime; use an explicit length, e.g. leading-[1.25rem]',
-  },
-];
+/** The ban list, built once from the app's theme tokens. */
+let ruleCache;
+function rules() {
+  ruleCache ??= [
+    {
+      // A `/opacity` modifier on a theme colour compiles to
+      // `color-mix(in oklab, var(--color-…) n%, transparent)`. NativeWind v5
+      // cannot decompose the variable, so the runtime drops the declaration and
+      // the element paints nothing, with no build error. The `*-tile-bg` /
+      // `*-tile-border` pairs pre-bake the alpha instead.
+      pattern: new RegExp(`\\b(?:${COLOR_UTILITIES})-(?:${themeTokens().join('|')})/\\d+\\b`, 'g'),
+      advice:
+        'the /opacity modifier is dropped on CSS-variable theme colours; use the paired *-tile-bg / *-tile-border token or a concrete colour',
+    },
+    {
+      // `text-align` only accepts auto/left/right/center/justify, so the
+      // logical keywords are dropped and the text keeps its default alignment.
+      pattern: /\btext-(?:start|end)\b/g,
+      advice: 'text-align: start/end is dropped; the shared Text handles RTL alignment already',
+    },
+    {
+      // react-native-css resolves a `dir` media condition as
+      // `(I18nManager.isRTL && value === 'rtl') || value === 'ltr'`, so an
+      // `ltr:` class matches in both directions and silently applies in RTL.
+      pattern: /\bltr:/g,
+      advice: 'the ltr: variant also matches in RTL; express the rule with rtl: instead',
+    },
+    {
+      // A numeric `leading-N` compiles to `calc(var(--spacing) * N)`, and the
+      // runtime's line-height resolver treats that resolved length as a unitless
+      // multiplier of the font size. `leading-9` on a 30px title paints a 945pt
+      // line box, which pushes everything below it off the screen. An explicit
+      // length is resolved as a length.
+      pattern: /(?<![\w-])leading-\d+(?:\.5)?(?![\w[.-])/g,
+      advice:
+        'a numeric leading-N is multiplied by the font size at runtime; use an explicit length, e.g. leading-[1.25rem]',
+    },
+  ];
+  return ruleCache;
+}
 
 /**
  * Horizontal padding on a scroll container's own `className` reaches the
@@ -117,43 +128,17 @@ const SCROLL_CONTAINERS =
 const SCROLL_TAG = new RegExp(`<(${SCROLL_CONTAINERS})\\b`, 'g');
 const HORIZONTAL_PADDING = /^-?(?:p|px|pl|pr|ps|pe)-/;
 
-/** Index just past the JS string or template literal starting at `start`. */
-function endOfQuoted(text, start) {
-  const quote = text[start];
-  let index = start + 1;
-  while (index < text.length && text[index] !== quote) {
-    index += text[index] === '\\' ? 2 : 1;
-  }
-  return index + 1;
-}
-
-/** Index just past the line or block comment at `start`, or -1 if none. */
-function endOfComment(text, start) {
-  if (text[start] !== '/') {
-    return -1;
-  }
-  if (text[start + 1] === '/') {
-    const end = text.indexOf('\n', start);
-    return end === -1 ? text.length : end;
-  }
-  if (text[start + 1] === '*') {
-    const end = text.indexOf('*/', start + 2);
-    return end === -1 ? text.length : end + 2;
-  }
-  return -1;
-}
-
-/** Index of the `}` matching the `{` at `start`, skipping quoted text. */
+/** Index of the `}` matching the `{` at `start`, skipping quoted text and comments. */
 function endOfBraces(text, start) {
   let depth = 0;
   for (let index = start; index < text.length; index++) {
+    const skipped = endOfQuotedOrComment(text, index);
+    if (skipped !== -1) {
+      index = skipped - 1;
+      continue;
+    }
     const char = text[index];
-    if (char === '"' || char === "'" || char === '`') {
-      index = endOfQuoted(text, index) - 1;
-    } else if (char === '/') {
-      const end = endOfComment(text, index);
-      index = end === -1 ? index : end - 1;
-    } else if (char === '{') {
+    if (char === '{') {
       depth++;
     } else if (char === '}' && --depth === 0) {
       return index;
@@ -170,13 +155,13 @@ function endOfBraces(text, start) {
 function endOfTypeArguments(text, start) {
   let depth = 0;
   for (let index = start; index < text.length; index++) {
+    const skipped = endOfQuotedOrComment(text, index);
+    if (skipped !== -1) {
+      index = skipped - 1;
+      continue;
+    }
     const char = text[index];
-    if (char === '"' || char === "'" || char === '`') {
-      index = endOfQuoted(text, index) - 1;
-    } else if (char === '/') {
-      const end = endOfComment(text, index);
-      index = end === -1 ? index : end - 1;
-    } else if (char === '<') {
+    if (char === '<') {
       depth++;
     } else if (char === '>' && text[index - 1] !== '=') {
       if (--depth === 0) {
@@ -196,13 +181,13 @@ function endOfTypeArguments(text, start) {
 function endOfTag(text, start) {
   let depth = 0;
   for (let index = start; index < text.length; index++) {
+    const skipped = endOfQuotedOrComment(text, index);
+    if (skipped !== -1) {
+      index = skipped - 1;
+      continue;
+    }
     const char = text[index];
-    if (char === '"' || char === "'" || char === '`') {
-      index = endOfQuoted(text, index) - 1;
-    } else if (char === '/') {
-      const end = endOfComment(text, index);
-      index = end === -1 ? index : end - 1;
-    } else if (char === '{') {
+    if (char === '{') {
       depth++;
     } else if (char === '}') {
       depth--;
@@ -318,7 +303,8 @@ function ownClassStrings(attributes) {
   return strings;
 }
 
-function checkScrollPadding(relative, text) {
+export function checkScrollPadding(relative, text) {
+  const problems = [];
   for (const match of text.matchAll(SCROLL_TAG)) {
     let attributesStart = match.index + match[0].length;
     if (text[attributesStart] === '<') {
@@ -336,11 +322,12 @@ function checkScrollPadding(relative, text) {
       .filter(classes => HORIZONTAL_PADDING.test(classes));
     if (padding.length > 0) {
       const line = text.slice(0, match.index).split('\n').length;
-      fail(
+      problems.push(
         `${relative}:${line}: <${match[1]}> carries "${padding.join(' ')}" on its own className; move it to contentContainerClassName or the RTL layout offsets by it`
       );
     }
   }
+  return problems;
 }
 
 /**
@@ -363,19 +350,21 @@ const RAW_TEXT_EXEMPT = new Set([
   'apps/mobile/src/components/agents/markdown-html-details.tsx',
 ]);
 
-function checkRawText(relative, text) {
+export function checkRawText(relative, text) {
+  const problems = [];
   if (RAW_TEXT_EXEMPT.has(relative) || relative.endsWith('components/ui/text.tsx')) {
-    return;
+    return problems;
   }
   for (const match of text.matchAll(RAW_TEXT_IMPORT)) {
     const bare = match[1].split(',').some(name => name.trim() === 'Text');
     if (bare) {
       const line = text.slice(0, match.index).split('\n').length;
-      fail(
+      problems.push(
         `${relative}:${line}: imports Text from 'react-native'; use @/components/ui/text so the copy follows the RTL paragraph direction`
       );
     }
   }
+  return problems;
 }
 
 /**
@@ -405,24 +394,26 @@ const WIDGET_PROCESS_LAYOUTS = new Set([
   'apps/mobile/src/glanceable-ios/session-live-activity.tsx',
 ]);
 
-function checkDirectIntl(relative, absolute, text) {
+export function checkDirectIntl(relative, absolute, text) {
+  const problems = [];
   if (
     !absolute.startsWith(DIRECT_INTL_DIR) ||
     relative.endsWith('lib/intl-cache.ts') ||
     WIDGET_PROCESS_LAYOUTS.has(relative.replace(/^\//, ''))
   ) {
-    return;
+    return problems;
   }
   for (const [index, line] of text.split('\n').entries()) {
     if (/^\s*(?:\/\/|\*|\/\*)/.test(line)) {
       continue;
     }
     for (const match of line.matchAll(DIRECT_INTL)) {
-      fail(
+      problems.push(
         `${relative}:${index + 1}: "${match[0]}" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once`
       );
     }
   }
+  return problems;
 }
 
 function sourceFiles(dir, out = []) {
@@ -439,26 +430,22 @@ function sourceFiles(dir, out = []) {
   return out;
 }
 
-for (const dir of SOURCE_DIRS) {
-  for (const file of sourceFiles(dir)) {
-    const text = readFileSync(file, 'utf8');
-    const relative = file.slice(ROOT.length);
-    checkScrollPadding(relative, text);
-    checkRawText(relative, text);
-    checkDirectIntl(relative, file, text);
-    const lines = text.split('\n');
-    for (const rule of RULES) {
-      for (const [index, line] of lines.entries()) {
-        // A rule's own explanatory comment must not trip it.
-        if (/^\s*(?:\/\/|\*|\/\*)/.test(line)) {
-          continue;
-        }
-        for (const match of line.matchAll(rule.pattern)) {
-          fail(`${relative}:${index + 1}: "${match[0]}" ${rule.advice}`);
-        }
+/** The ban list over one file's lines: every match of every rule. */
+export function checkRules(relative, text) {
+  const problems = [];
+  const lines = text.split('\n');
+  for (const rule of rules()) {
+    for (const [index, line] of lines.entries()) {
+      // A rule's own explanatory comment must not trip it.
+      if (/^\s*(?:\/\/|\*|\/\*)/.test(line)) {
+        continue;
+      }
+      for (const match of line.matchAll(rule.pattern)) {
+        problems.push(`${relative}:${index + 1}: "${match[0]}" ${rule.advice}`);
       }
     }
   }
+  return problems;
 }
 
 /**
@@ -466,16 +453,17 @@ for (const dir of SOURCE_DIRS) {
  * starts handling one of these, its assertion fails here and the rule above
  * can go — rather than the ban outliving the bug forever.
  */
-function checkCompilerStillDropsThese() {
+export function checkCompilerStillDropsThese() {
+  const problems = [];
   let compile;
   try {
     ({ compile } = require('react-native-css/compiler'));
   } catch (error) {
     const detail = error instanceof Error ? error.message.split('\n')[0] : String(error);
-    fail(
+    problems.push(
       `check-classes: react-native-css/compiler did not resolve (${detail}) — run pnpm install; the compiler pins cannot be verified without it`
     );
-    return;
+    return problems;
   }
   const firstValue = (css, options) => {
     const sheet = compile(css, options).stylesheet();
@@ -484,7 +472,9 @@ function checkCompilerStillDropsThese() {
 
   const alignment = compile('.x { text-align: start; }').warnings();
   if (!JSON.stringify(alignment).includes('text-align')) {
-    fail('check-classes: text-align: start is no longer dropped — drop the text-start/end rule');
+    problems.push(
+      'check-classes: text-align: start is no longer dropped — drop the text-start/end rule'
+    );
   }
 
   // A `/opacity` modifier on an `@theme inline` variable is emitted as a
@@ -497,7 +487,7 @@ function checkCompilerStillDropsThese() {
       '.x { background-color: color-mix(in oklab, var(--color-destructive) 10%, transparent); }'
   );
   if (!themeOpacity.includes('colorMix')) {
-    fail(
+    problems.push(
       `check-classes: color-mix over an @theme inline variable now compiles to ${themeOpacity} instead of a deferred colorMix — drop the theme-token opacity rule`
     );
   }
@@ -511,20 +501,50 @@ function checkCompilerStillDropsThese() {
     { inlineVariables: false }
   );
   if (!spacingLeading.includes('"lineHeight",[{},"calc"')) {
-    fail(
+    problems.push(
       `check-classes: a spacing-scale line height now compiles to ${spacingLeading} instead of a deferred calc — drop the numeric leading rule`
     );
   }
+  return problems;
 }
 
-checkCompilerStillDropsThese();
+/**
+ * Every problem one source file has, from every rule this checker owns. The
+ * problems are returned, not kept in module state, so one file's findings
+ * cannot leak into the next call.
+ */
+export function checkSourceFile(relative, absolute, text) {
+  return [
+    ...checkScrollPadding(relative, text),
+    ...checkRawText(relative, text),
+    ...checkDirectIntl(relative, absolute, text),
+    ...checkRules(relative, text),
+  ];
+}
 
-if (problems.length > 0) {
-  for (const problem of problems) {
-    console.error(problem);
+/** The whole audit: every source file, then the compiler pins, then the report. */
+function run() {
+  const problems = [];
+  for (const dir of SOURCE_DIRS) {
+    for (const file of sourceFiles(dir)) {
+      problems.push(...checkSourceFile(file.slice(ROOT.length), file, readFileSync(file, 'utf8')));
+    }
   }
-  console.error(`\ncheck-classes: ${problems.length} problem(s)`);
-  process.exit(1);
+  problems.push(...checkCompilerStillDropsThese());
+
+  if (problems.length > 0) {
+    for (const problem of problems) {
+      console.error(problem);
+    }
+    console.error(`\ncheck-classes: ${problems.length} problem(s)`);
+    process.exit(1);
+  }
+
+  console.log('check-classes: no dropped classes, stray raw Text or hand-built formatters');
 }
 
-console.log('check-classes: no dropped classes, stray raw Text or hand-built formatters');
+const invokedDirectly =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (invokedDirectly) {
+  run();
+}

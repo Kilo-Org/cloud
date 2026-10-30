@@ -25,7 +25,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
-  useAgentProfile,
+  useAgentProfileKiloCommands,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -56,7 +56,7 @@ export function ProfileKiloCommandsScreen({
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
-  const profileQuery = useAgentProfile(profileId, organizationId);
+  const profileQuery = useAgentProfileKiloCommands(profileId, organizationId);
   const {
     createKiloCommand,
     updateKiloCommand,
@@ -67,7 +67,7 @@ export function ProfileKiloCommandsScreen({
 
   const canManage = useCanManageOrganizationProfiles(organizationId);
 
-  const commands = profileQuery.data?.kiloCommands ?? NO_COMMANDS;
+  const commands = profileQuery.data ?? NO_COMMANDS;
   const rows = kiloCommandRows(commands);
   // `null` = closed, `{ source: null }` = add, `{ source }` = edit that command.
   const [form, setForm] = useState<{ source: KiloCommandSource | null } | null>(null);

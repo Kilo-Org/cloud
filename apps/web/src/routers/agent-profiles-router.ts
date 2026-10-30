@@ -399,6 +399,72 @@ export const agentProfilesRouter = createTRPCRouter({
     }),
 
   /**
+   * List a single profile's environment variables, secret values masked.
+   *
+   * Every profile-editor section screen renders one collection. It reads its
+   * own collection here rather than `get`, so a row outside a contract in a
+   * collection the screen never renders cannot take the whole screen down.
+   */
+  vars: baseProcedure
+    .input(ProfileIdSchema.extend({ organizationId: z.uuid().optional() }))
+    .output(z.array(ProfileVarResponseSchema))
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      return profileVarsService.listVars(db, input.profileId, owner);
+    }),
+
+  /** A single profile's setup commands, in sequence order. See `vars`. */
+  commands: baseProcedure
+    .input(ProfileIdSchema.extend({ organizationId: z.uuid().optional() }))
+    .output(z.array(ProfileCommandResponseSchema))
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      return profileCommandsService.listCommands(db, input.profileId, owner);
+    }),
+
+  /** A single profile's MCP servers, env/header values masked. See `vars`. */
+  mcpServers: baseProcedure
+    .input(ProfileIdSchema.extend({ organizationId: z.uuid().optional() }))
+    .output(z.array(ProfileMcpServerResponseSchema))
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      return profileMcpService.getProfileMcpServers(db, input.profileId, owner);
+    }),
+
+  /** A single profile's skills. See `vars`. */
+  skills: baseProcedure
+    .input(ProfileIdSchema.extend({ organizationId: z.uuid().optional() }))
+    .output(z.array(ProfileSkillResponseSchema))
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      return profileSkillsService.getProfileSkills(db, input.profileId, owner);
+    }),
+
+  /** A single profile's slash commands, in display order. See `vars`. */
+  kiloCommands: baseProcedure
+    .input(ProfileIdSchema.extend({ organizationId: z.uuid().optional() }))
+    .output(z.array(ProfileKiloCommandResponseSchema))
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      return profileKiloCommandsService.getProfileKiloCommands(db, input.profileId, owner);
+    }),
+
+  /**
    * Create a new profile.
    */
   create: baseProcedure
@@ -646,7 +712,25 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      return profileMcpService.createMcpServer(db, publicKey, input.profileId, input.server, owner);
+      try {
+        return await profileMcpService.createMcpServer(
+          db,
+          publicKey,
+          input.profileId,
+          input.server,
+          owner
+        );
+      } catch (error) {
+        // The per-profile name unique index: the mobile sheet turns CONFLICT
+        // into its inline duplicate-name message.
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'An MCP server with this name already exists in this profile',
+          });
+        }
+        throw error;
+      }
     }),
 
   /**
@@ -667,14 +751,24 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      await profileMcpService.updateMcpServer(
-        db,
-        publicKey,
-        input.profileId,
-        input.mcpServerId,
-        input.server,
-        owner
-      );
+      try {
+        await profileMcpService.updateMcpServer(
+          db,
+          publicKey,
+          input.profileId,
+          input.mcpServerId,
+          input.server,
+          owner
+        );
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'An MCP server with this name already exists in this profile',
+          });
+        }
+        throw error;
+      }
       return { success: true };
     }),
 

@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Pakeitimai",
-    "organizationTrialEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Organizacijos savininkas gali atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą."
+    "organizationTrialEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Organizacijos savininkas gali atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
+    "privateRepositoryA11y": "{{name}}, privati saugykla"
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -674,7 +675,12 @@
       "loading": "Įkeliamos gautos užklausos",
       "noReviewRequests": "Nėra prašymų peržiūrėti",
       "noReviewRequestsDescription": "Čia rodomos tavo peržiūros laukiančios pakeitimų užklausos. Viršuje taip pat gali įklijuoti bet kurio PR nuorodą.",
-      "couldNotLoad": "Nepavyko įkelti gautų užklausų."
+      "couldNotLoad": "Nepavyko įkelti gautų užklausų.",
+      "accessLostTitle": "Nėra prieigos prie šios organizacijos",
+      "accessLostDescription": "Tu nebesi šios organizacijos narys, todėl jos peržiūros prašymų įkelti nepavyks. Tęsk savo asmeninėje paskyroje ir toliau peržiūrėk.",
+      "organizationUnavailableTitle": "Šios organizacijos nebėra",
+      "organizationUnavailableDescription": "Ši organizacija buvo ištrinta, todėl jos peržiūros prašymų įkelti nepavyks. Tęsk savo asmeninėje paskyroje ir toliau peržiūrėk.",
+      "continueInPersonal": "Tęsti asmeninėje paskyroje"
     },
     "composer": {
       "commentBodyPlaceholder": "Komentaras",
@@ -1557,7 +1563,13 @@
         "change_request_failed": "Nepavyko atidaryti PR",
         "superseded": "Jau yra"
       },
-      "noProposalsDescription": "Peržiūros atminties pasiūlymai bus rodomi čia, kai Kilo išanalizuos prižiūrėtojų atsakymus."
+      "noProposalsDescription": "Peržiūros atminties pasiūlymai bus rodomi čia, kai Kilo išanalizuos prižiūrėtojų atsakymus.",
+      "changeRequestInProgress": "Kilo jau atidaro šio pasiūlymo PR. Bandyk dar kartą po akimirkos.",
+      "changeRequestNotActionable": "Šio pasiūlymo nebegalima patvirtinti. Uždaryk jį ir atnaujink sąrašą.",
+      "changeRequestNoGitHubAccess": "Nė vienas GitHub prisijungimas neturi prieigos prie šios saugyklos. Iš naujo prijunk GitHub, kad jis turėtų prieigą prie jos, tada bandyk dar kartą.",
+      "changeRequestMissingPermissions": "Kilo GitHub programėlė negali atidaryti PR šioje saugykloje. Saugyklos savininkas turi suteikti programėlei rašymo prieigą prie turinio ir PR, tada bandyk dar kartą.",
+      "changeRequestFailed": "Kilo nepavyko atidaryti PR. Bandyk dar kartą po akimirkos.",
+      "offAction": "Peržiūros atmintis išjungta. Įjunk ją, tada bandyk dar kartą."
     },
     "manualReview": {
       "title": "Rankinė peržiūra",
@@ -1984,6 +1996,7 @@
     },
     "settingsSave": {
       "saveChanges": "Išsaugoti pakeitimus",
+      "saved": "Nustatymai išsaugoti",
       "unsavedTitle": "Neišsaugoti pakeitimai",
       "unsavedMessage": "Išsaugoti pakeitimus prieš išeinant iš šio ekrano?",
       "unsavedInvalidMessage": "Šių pakeitimų dar negalima išsaugoti. Ištaisykite juos, kad išsaugotumėte, arba atmeskite juos, kad išeitumėte."
@@ -2371,6 +2384,8 @@
       "couldNotLoadEnvironment": "Nepavyko įkelti jūsų aplinkos.",
       "retryLoadingEnvironment": "Bandyti įkelti aplinką iš naujo",
       "defaultEnvironment": "Numatytoji aplinka",
+      "environmentAccessibility": "Pasirinkite profilį: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Pasirinkite profilį: {{label}}. {{attention}}",
       "leaveChanges": "Palikti pakeitimus",
       "commitAndPush": "Įrašyti ir išsiųsti",
       "startSession": "Pradėti sesiją",
@@ -2405,7 +2420,7 @@
       "manageProfiles": "Tvarkyti profilius",
       "noProfiles": "Dar nėra profilių. Sukurkite vieną, kad pridėtumėte aplinkos kintamuosius, MCP serverius ir įgūdžius.",
       "advancedConfig": "Išplėstinė konfigūracija",
-      "advancedConfigDescription": "Pasirinkite profilį, kad įkeltumėte išsaugotas konfigūracijas, ir rankiniu būdu sukonfigūruokite papildomus aplinkos kintamuosius bei sąrankos komandas",
+      "advancedConfigDescription": "Taikoma šiai sesijai. Išsaugojus kaip profilį, jis išliks kitam kartui.",
       "saveAsProfile": "Išsaugoti kaip profilį",
       "saveProfileDescription": "Išsaugokite esamus aplinkos kintamuosius ir sąrankos komandas kaip pakartotinai naudojamą profilį.",
       "profileSummary": "{{vars}} aplinkos kintamieji · {{commands}} sąrankos komandos",
@@ -3055,7 +3070,9 @@
     "permissionDescription": "Neturi teisės peržiūrėti šio turinio.",
     "notFoundDescription": "Galbūt šis turinys pašalintas arba nebepasiekiamas.",
     "serverTitle": "Nepavyko įkelti.",
-    "serverDescription": "Mūsų sistemoje įvyko klaida. Bandyk dar kartą."
+    "serverDescription": "Mūsų sistemoje įvyko klaida. Bandyk dar kartą.",
+    "timeoutTitle": "Serveris per ilgai neatsako",
+    "timeoutDescription": "Užklausa nebuvo atlikta per skirtąjį laiką. Bandyk dar kartą."
   },
   "screenHeader": {
     "openMenu": "Atidaryti meniu",
@@ -3923,8 +3940,10 @@
     "variablesSaveFailed": "Nepavyko išsaugoti kintamojo",
     "commandsTitle": "Sąrankos komandos",
     "addCommand": "Pridėti komandą",
-    "commandLabel": "komandą",
+    "commandLabel": "Komanda",
+    "commandLabelPosition": "Komanda {{position}}",
     "commandPlaceholder": "pvz. pnpm install",
+    "commandAtLimit": "Komandos ilgis ribojamas iki {{max}} simbolių",
     "commandsEmpty": "Dar nėra sąrankos komandų",
     "commandsSaveFailed": "Nepavyko išsaugoti sąrankos komandų",
     "moveUp": "Judėti aukštyn",
@@ -3942,6 +3961,7 @@
     "skillSaveFailed": "Nepavyko išsaugoti įgūdžių",
     "skillSourceCustom": "Pasirinktinis",
     "skillSourceMarketplace": "Parduotuvė",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Įklijuokite SKILL.md ir užpildysite jo pavadinimą; pridėkite įgūdžių iš savo telefono nevilkdami ir numesdami.",
     "skillEditTitle": "Redaguoti įgūdžius",
     "skillEdit": "Redaguoti įgūdį {{name}}",
@@ -3970,6 +3990,7 @@
       "headersHint": "Reikšmės, rodomos kaip ••••, išlaiko savo saugomą paslaptį; pakeiskite reikšmę, kad ją rotuotumėte. Pakeitus URL, visos reikšmės vėl yra būtinos",
       "nameRequired": "Įveskite serverio pavadinimą",
       "nameInvalid": "Varde gali būti naudojamos tik ASCII raidės, skaičiai, apatiniai brūkšniai ir brūkšniai, iki 100 simbolių",
+      "nameConflict": "Serveris tokiu pavadinimu jau egzistuoja",
       "commandRequired": "Įveskite komandą",
       "commandTooLong": "Naudokite ne daugiau kaip 50 argumentų, kurių kiekvienas 500 simbolių",
       "urlRequired": "Įveskite URL",
@@ -3989,7 +4010,7 @@
       "add": "Pridėti agentą",
       "empty": "Agentų dar nėra",
       "name": "Agento vardas",
-      "slug": "Agentinis šliužas",
+      "slug": "Agento slug",
       "description": "Agento aprašymas",
       "model": "Modelio nepaisymas",
       "modelPlaceholder": "Naudoti numatytuosius seansus",
@@ -4014,7 +4035,7 @@
       "saveFailed": "Nepavyko išsaugoti agento",
       "deleteFailed": "Nepavyko ištrinti agento",
       "nameRequired": "Įveskite agento pavadinimą",
-      "slugRequired": "Įveskite agento šliužą",
+      "slugRequired": "Įveskite agento slug",
       "slugInvalid": "Slug turi prasidėti mažąja ASCII raide ir naudoti tik mažąsias ASCII raides, skaitmenis ir brūkšnius, iki 50 simbolių",
       "slugConflict": "Tą slug jau naudoja įmontuotas agentas arba kitas agentas šiame profilyje",
       "edit": "Redaguoti agentą {{name}}",
@@ -4050,7 +4071,6 @@
       "repo": "Pasirinkite saugyklą…",
       "profile": "Pasirinkite profilį",
       "remove": "Atsieti",
-      "private": "Privatus",
       "search": "Ieškoti saugyklų…",
       "addedToast": "Numatytasis profilis nustatytas „{{repo}}“",
       "addFailed": "Nepavyko nustatyti numatytojo profilio",

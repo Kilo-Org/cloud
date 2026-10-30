@@ -25,9 +25,11 @@ export function ReviewerHeader({
   /** Raise the title's line cap for prose that may wrap; the default is one. */
   titleNumberOfLines?: number;
   /**
-   * The mono line above the title. Screens that name the product pass
-   * `t('common.codeReviewer')`; a screen whose title already is the product
-   * name leaves it out instead of repeating itself.
+   * The mono line above the title. This header carries every screen's own
+   * shape, so each one passes what its header already showed: the list and
+   * provider screens pass `t('common.codeReviewer')`, while the scope list
+   * (whose title is the product name) and the edit routes keep the title-only
+   * header they had.
    */
   eyebrow?: string;
   /** Where Back lands when the screen has no history to pop. */

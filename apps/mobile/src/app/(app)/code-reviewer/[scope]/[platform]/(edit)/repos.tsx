@@ -40,7 +40,7 @@ import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 import { getBitbucketIntegrationUrl } from '@/lib/integration-urls';
-import { trpcErrorVariant } from '@/lib/trpc-error';
+import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 export default function ReposRoute() {
@@ -179,7 +179,7 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
         variant={trpcErrorVariant(reposQuery.error)}
         placement={fullBodyState ? 'center' : 'top'}
         title={t('common.couldNotLoadRepositories')}
-        onRetry={refetchRepos}
+        onRetry={isRetryableTrpcError(reposQuery.error) ? refetchRepos : undefined}
         isRetrying={reposFetching}
       />
     );

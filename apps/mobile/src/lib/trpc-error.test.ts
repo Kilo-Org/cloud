@@ -21,7 +21,17 @@ function budgetTimeout(): unknown {
 }
 
 describe('isControlPlaneTimeout', () => {
-  it('recognizes the server budget answer', () => {
+  it('recognizes the budget message on a tRPC client error', () => {
+    // The production shape: the client keeps the code under data and the
+    // server's message as the error's own message.
+    const error = Object.assign(new Error(CONTROL_PLANE_TIMEOUT_MESSAGE), {
+      data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500, path: 'agentProfiles.list' },
+    });
+    expect(isControlPlaneTimeout(error)).toBe(true);
+    expect(trpcErrorVariant(error)).toBe('timeout');
+  });
+
+  it('recognizes a bare answer whose message sits under data', () => {
     expect(isControlPlaneTimeout(budgetTimeout())).toBe(true);
   });
 

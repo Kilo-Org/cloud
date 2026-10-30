@@ -59,6 +59,11 @@ export function isTerminalTrpcCode(code: string | undefined): boolean {
   return TERMINAL_TRPC_CODES.includes(code as (typeof TERMINAL_TRPC_CODES)[number]);
 }
 
+/** Whether asking the server again can plausibly succeed for this failure. */
+export function isRetryableTrpcError(error: unknown): boolean {
+  return !isTerminalTrpcCode(readTrpcErrorField(error, 'code'));
+}
+
 /** The user-facing state a tRPC call's failure maps to, shared by the screens. */
 export type TrpcErrorVariant = 'permission' | 'not-found' | 'server' | 'timeout';
 

@@ -67,32 +67,69 @@ export function createTerminal(): {
 /** How a bounded terminal wait ended: the session settled, or the bound expired. */
 type TerminalOutcome = { kind: 'settled'; ok: boolean } | { kind: 'timeout' };
 
+/** The session state a terminal wait observes: how it ended, and when it last advanced. */
+type TerminalWaitTarget = { progressAt: number; terminalPromise: Promise<boolean> };
+
 /**
- * Wait for a session's terminal outcome, but no longer than `timeoutMs`. A
- * caller that must always finish — releasing a compose lock, starting the next
- * session — cannot depend on the recognizer reporting `end`: only the native
- * binding resolves that promise, and a stalled bridge never does. A timeout
+ * Wait for a session's terminal outcome, but no longer than `timeoutMs` without
+ * progress. A caller that must always finish — releasing a compose lock,
+ * starting the next session — cannot depend on the recognizer reporting `end`:
+ * only the native binding resolves that promise, and a stalled bridge never
+ * does.
+ *
+ * The bound measures silence, not elapsed time. The gateway engine drains its
+ * queued segments one request at a time, so a slow network can legitimately
+ * spend minutes transcribing audio the user already recorded; each finished
+ * segment moves `progressAt` forward and pushes the deadline out. Only a
+ * binding that answers nothing for `timeoutMs` expires the wait, and a timeout
  * tells the caller to abandon the session itself.
  */
-export async function waitForTerminalOutcome(
-  current: { terminalPromise: Promise<boolean> },
+export function waitForTerminalOutcome(
+  current: TerminalWaitTarget,
   timeoutMs: number
 ): Promise<TerminalOutcome> {
-  const timeout = Promise.withResolvers<TerminalOutcome>();
-  const timer = setTimeout(() => {
-    timeout.resolve({ kind: 'timeout' });
-  }, timeoutMs);
-  const settled = async (): Promise<TerminalOutcome> => {
+  const terminal: Promise<TerminalOutcome> = (async () => {
     try {
       const ok = await current.terminalPromise;
-      return { kind: 'settled', ok };
+      return { kind: 'settled' as const, ok };
     } catch {
       // terminalPromise never rejects; a rejection is still a settled session.
-      return { kind: 'settled', ok: false };
+      return { kind: 'settled' as const, ok: false };
     }
-  };
+  })();
+  return waitForSilence(terminal, current, timeoutMs);
+}
+
+/** Wait out successive silence windows until the session settles or one expires. */
+async function waitForSilence(
+  terminal: Promise<TerminalOutcome>,
+  current: TerminalWaitTarget,
+  timeoutMs: number
+): Promise<TerminalOutcome> {
+  const outcome = await waitOneSilenceWindow(terminal, current, timeoutMs);
+  if (outcome.kind === 'settled' || Date.now() - current.progressAt >= timeoutMs) {
+    return outcome;
+  }
+  // The session advanced while the timer was pending: wait out the new
+  // silence window instead of abandoning work that is still progressing.
+  return waitForSilence(terminal, current, timeoutMs);
+}
+
+/** Race one silence window against the session's terminal outcome. */
+async function waitOneSilenceWindow(
+  terminal: Promise<TerminalOutcome>,
+  current: TerminalWaitTarget,
+  timeoutMs: number
+): Promise<TerminalOutcome> {
+  const expired = Promise.withResolvers<TerminalOutcome>();
+  const timer = setTimeout(
+    () => {
+      expired.resolve({ kind: 'timeout' });
+    },
+    Math.max(0, current.progressAt + timeoutMs - Date.now())
+  );
   try {
-    return await Promise.race([settled(), timeout.promise]);
+    return await Promise.race([terminal, expired.promise]);
   } finally {
     clearTimeout(timer);
   }

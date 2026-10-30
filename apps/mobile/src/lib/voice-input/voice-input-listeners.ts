@@ -15,6 +15,13 @@ export type VoiceInputSession = {
   onFeedback: (feedback: VoiceInputFeedback) => void;
   owner: string;
   /**
+   * When this session last advanced: it started, produced a final transcript,
+   * or finished one queued unit of work. The bounded terminal wait measures
+   * its silence from here, so a slow drain that keeps delivering is not cut
+   * short.
+   */
+  progressAt: number;
+  /**
    * True once this session received its own `start`. A recognizer cannot
    * report a transcript before it started, so anything that arrives earlier
    * belongs to a session the controller already abandoned.
@@ -62,6 +69,14 @@ export function installVoiceInputListeners(
     controller.notify();
   };
 
+  const onProgress: (event: VoiceInputNativeEvent['progress']) => void = () => {
+    const current = controller.getSession();
+    if (!current || current.terminalized) {
+      return;
+    }
+    current.progressAt = Date.now();
+  };
+
   const onResult: (event: VoiceInputNativeEvent['result']) => void = event => {
     const current = controller.getSession();
     if (!current || current.terminalized || current.expectedAbort || !current.started) {
@@ -81,11 +96,22 @@ export function installVoiceInputListeners(
     });
     const nextDraft = appendVoiceTranscript(current.baseDraft, current.transcriptState.transcript);
     current.onDraftChange(nextDraft);
+    if (event.isFinal) {
+      // A final transcript is a recognized word run: the session advanced, so
+      // an in-flight stop keeps waiting instead of abandoning it.
+      current.progressAt = Date.now();
+    }
   };
 
   const onNomatch: (event: VoiceInputNativeEvent['nomatch']) => void = () => {
     const current = controller.getSession();
-    if (!current || current.terminalized || current.expectedAbort || current.failed) {
+    if (
+      !current ||
+      current.terminalized ||
+      current.expectedAbort ||
+      current.failed ||
+      !current.started
+    ) {
       return;
     }
     current.failed = true;
@@ -118,6 +144,7 @@ export function installVoiceInputListeners(
   return [
     native.addListener('start', onStart),
     native.addListener('transcribing', onTranscribing),
+    native.addListener('progress', onProgress),
     native.addListener('result', onResult),
     native.addListener('nomatch', onNomatch),
     native.addListener('error', onError),

@@ -28,6 +28,13 @@ export type VoiceInputNativeEvent = {
   start: null;
   /** Emitted when the recording stopped and the upload/processing phase began. */
   transcribing: null;
+  /**
+   * Emitted when the session advanced its pending work without reporting a
+   * transcript: the gateway engine sends it once per finished segment upload,
+   * an empty segment included. The bounded terminal wait measures its silence
+   * from here, so a queue that keeps draining is never cut short.
+   */
+  progress: null;
   result: ExpoSpeechRecognitionResultEvent;
   nomatch: null;
   error: { code?: number; error: string; message: string };
@@ -79,12 +86,14 @@ export type VoiceInputStartOptions = {
 };
 
 /**
- * Bound on how long `stop`, `abort` and the next `start` wait for a session's
- * terminal `end`. A healthy session settles in well under a second; the
- * gateway engine serializes segment uploads and each request caps at 30 s, so
- * this also covers a stop that has one predecessor still uploading. Past the
- * bound the controller abandons the session itself: the compose lock and the
- * next start must never depend on a bridge that stopped answering.
+ * Bound on how long `stop`, `abort` and the next `start` wait for a session
+ * without progress. A healthy session settles in well under a second, and the
+ * gateway engine drains one queued segment per request, so the wait measures
+ * silence rather than elapsed time: every finished segment pushes the deadline
+ * out, and a bridge that stops answering releases the caller after this much
+ * no progress. Two transcription request timeouts
+ * (`TRANSCRIPTION_REQUEST_TIMEOUT_MS`) is the longest a healthy request can
+ * take without reporting anything.
  */
 const VOICE_INPUT_TERMINAL_TIMEOUT_MS = 60_000;
 
@@ -258,6 +267,7 @@ export function createVoiceInputController(native: VoiceInputNative) {
       onDraftChange: options.onDraftChange,
       onFeedback: options.onFeedback,
       owner: options.owner,
+      progressAt: Date.now(),
       started: false,
       terminalPromise: terminal.promise,
       terminalResolve: terminal.resolve,

@@ -73,9 +73,10 @@ function bindListener<K extends keyof VoiceInputNativeEvent>(
       listener as (event: ExpoSpeechRecognitionErrorEvent) => void
     );
   }
-  if (event === 'transcribing') {
-    // The OS recognizer has no transcribing phase; only the gateway engine
-    // emits it, and the selector registers listeners on the chosen engine.
+  if (event === 'transcribing' || event === 'progress') {
+    // The OS recognizer has neither a transcribing phase nor queued work of its
+    // own; only the gateway engine emits these, and the selector registers
+    // listeners on the chosen engine.
     return { remove: (): void => undefined };
   }
   return module.addListener('end', listener as (event: null) => void);

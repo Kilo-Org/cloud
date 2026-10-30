@@ -462,6 +462,11 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
       try {
         await previous;
         await uploadSegment(current, uri);
+        if (!stale(current)) {
+          // One finished segment: the queue advanced even when it produced no
+          // text. A stop waiting on the drain measures its silence from here.
+          emit('progress', null);
+        }
       } catch {
         // `uploadSegment` handles its own known failures, so reaching this
         // catch means an unexpected defect. Keep the chain alive for the next

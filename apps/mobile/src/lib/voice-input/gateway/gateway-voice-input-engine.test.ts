@@ -771,6 +771,32 @@ describe('progressive segment rotation', () => {
     }
   });
 
+  it('reports progress for every finished segment, including one without text', async () => {
+    vi.useFakeTimers();
+    try {
+      const { engine, upload } = buildEngine({ segmentDurationMs: 30 });
+      const progress: null[] = [];
+      engine.addListener('progress', payload => {
+        progress.push(payload);
+      });
+      upload.mockResolvedValue({ ok: true, text: '' });
+
+      engine.start(START_OPTIONS);
+      await settle();
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+      engine.stop();
+      await settle();
+
+      // Neither segment produced text, and the session still advanced twice:
+      // a stop that waits on this drain measures its silence from here rather
+      // than abandoning a queue that keeps finishing work.
+      expect(progress).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it.each(['', '   '])('emits no-speech for empty segments (%j) and allows retry', async text => {
     vi.useFakeTimers();
     try {

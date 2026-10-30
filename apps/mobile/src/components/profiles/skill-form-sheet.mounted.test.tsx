@@ -361,18 +361,14 @@ describe('SkillFormSheet save failure', () => {
     unmount();
   });
 
-  it('renders nothing and does not scroll when no save failed', async () => {
+  it('renders no block and does not scroll when no save failed', async () => {
     const { renderer, unmount } = await mountSheet();
 
-    const block = statusBlock(renderer.root);
-    expect(findAll(block, 'Text')).toHaveLength(0);
-    const onLayout = block.props.onLayout as ContainerLayout | undefined;
-    if (typeof onLayout !== 'function') {
-      throw new TypeError('the status block has no layout handler');
+    const [first] = findOne(renderer.root, 'ScrollView').children;
+    if (first === undefined || typeof first === 'string') {
+      throw new TypeError('the sheet rendered no content child');
     }
-    act(() => {
-      onLayout({ nativeEvent: { layout: { y: 150 } } });
-    });
+    expect(first.type).toBe('Text');
     expect(h.scrollTo).not.toHaveBeenCalled();
 
     unmount();

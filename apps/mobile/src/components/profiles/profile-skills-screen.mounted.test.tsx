@@ -11,6 +11,7 @@ import {
   pressAddButton,
   pressEmptyAction,
   pressPressable,
+  pressSheetCancel,
   pressSheetDone,
   rerenderScreen,
   type TestConfirmMock,
@@ -364,6 +365,68 @@ describe('ProfileSkillsScreen', () => {
     expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
       i18n.t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })
     );
+
+    unmount();
+  });
+
+  it('drops a save that settles after its sheet was replaced', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+    const pendingSave = Promise.withResolvers<unknown>();
+    h.mutations.createCustomSkill.mutateAsync.mockImplementation(() => pendingSave.promise);
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Skill name', 'slow-skill');
+    changeText(renderer.root, 'Skill content', 'Body');
+    pressSheetDone(renderer.root);
+    expect(h.mutations.createCustomSkill.mutateAsync).toHaveBeenCalledTimes(1);
+
+    pressSheetCancel(renderer.root);
+    await act(async () => {
+      confirmRequest(h.confirm as TestConfirmMock);
+      await Promise.resolve();
+    });
+    pressEmptyAction(renderer);
+
+    await act(async () => {
+      pendingSave.reject(new Error('late failure'));
+      await Promise.resolve();
+    });
+
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('profiles.skillSaveFailed')
+    );
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('does not close the form opened after a save whose own form was replaced', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+    const pendingSave = Promise.withResolvers<{ id: string }>();
+    h.mutations.createCustomSkill.mutateAsync.mockImplementation(() => pendingSave.promise);
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Skill name', 'slow-skill');
+    changeText(renderer.root, 'Skill content', 'Body');
+    pressSheetDone(renderer.root);
+
+    pressSheetCancel(renderer.root);
+    await act(async () => {
+      confirmRequest(h.confirm as TestConfirmMock);
+      await Promise.resolve();
+    });
+    pressEmptyAction(renderer);
+
+    await act(async () => {
+      pendingSave.resolve({ id: 'skill-2' });
+      await Promise.resolve();
+    });
+
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
 
     unmount();
   });

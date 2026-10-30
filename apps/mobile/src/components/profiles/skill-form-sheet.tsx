@@ -112,16 +112,16 @@ export function SkillFormSheet({
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
-        <View
-          onLayout={event => {
-            fieldLayout('status')(event);
-            if (saveFailure !== null) {
+        {saveFailure === null ? null : (
+          <View
+            onLayout={event => {
+              fieldLayout('status')(event);
               scrollToField('status');
-            }
-          }}
-        >
-          <AccessibleStatus message={saveFailure} className="text-sm" />
-        </View>
+            }}
+          >
+            <AccessibleStatus message={saveFailure} className="text-sm" />
+          </View>
+        )}
         <Text variant="muted">{t('profiles.skillsHint')}</Text>
         <FormField
           key={`skill-name-${prefill}`}

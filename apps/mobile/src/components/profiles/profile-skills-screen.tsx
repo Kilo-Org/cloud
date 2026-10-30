@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -126,19 +126,28 @@ export function ProfileSkillsScreen({
   const [form, setForm] = useState<{ skill: SkillTarget | null } | null>(null);
   // The message the open sheet shows for a refused save. The mutation hook's
   // toast sits behind the sheet, so the reason is rendered inside it instead.
-  // Reset when the form opens and each save starts.
   const [saveFailure, setSaveFailure] = useState<string | null>(null);
+  // Bumped by every open and close, so a save that settles after its own form is
+  // gone cannot write its message into, or close, the form opened since.
+  const formGeneration = useRef(0);
 
-  const startAdd = () => {
-    setForm({ skill: null });
+  const openForm = (skill: SkillTarget | null) => {
+    formGeneration.current += 1;
+    setForm({ skill });
     setSaveFailure(null);
   };
 
+  const startAdd = () => {
+    openForm(null);
+  };
+
   const closeForm = () => {
+    formGeneration.current += 1;
     setForm(null);
   };
 
   const saveSkill = async (target: SkillTarget | null, submission: SkillFormSubmission) => {
+    const generation = formGeneration.current;
     setSaveFailure(null);
     // The server counts every skill row of the profile, so a full list cannot
     // take another create: name the cap here instead of round-tripping for it.
@@ -156,6 +165,9 @@ export function ProfileSkillsScreen({
             description: submission.description ?? null,
           }));
     } catch (error) {
+      if (formGeneration.current !== generation) {
+        return;
+      }
       // A create the server refused at the cap, e.g. the list was stale; an
       // update never hits the cap, so its PRECONDITION_FAILED (an unmodifiable
       // skills.sh reference) keeps the generic message.
@@ -168,7 +180,9 @@ export function ProfileSkillsScreen({
       );
       return;
     }
-    closeForm();
+    if (formGeneration.current === generation) {
+      closeForm();
+    }
   };
 
   const runDelete = async (skillId: string) => {
@@ -247,10 +261,11 @@ export function ProfileSkillsScreen({
             onEdit={
               canManage
                 ? () => {
-                    setForm({
-                      skill: { id: skill.id, name: skill.name, rawMarkdown: skill.rawMarkdown },
+                    openForm({
+                      id: skill.id,
+                      name: skill.name,
+                      rawMarkdown: skill.rawMarkdown,
                     });
-                    setSaveFailure(null);
                   }
                 : undefined
             }

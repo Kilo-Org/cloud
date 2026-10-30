@@ -133,6 +133,10 @@ describe('mcp-catalog catalog', () => {
       // Native-only credential issuers are withheld by exact path.
       expect(isDenylistedPath('activeSessions.widgetCredential')).toBe(true);
       expect(isDenylistedPath('agentBriefing.updateContextPreferences')).toBe(true);
+      expect(isDenylistedPath('cliSessionsV2.startMergedWorktreeCleanup')).toBe(true);
+      expect(isDenylistedPath('cliSessionsV2.retryWorktreeCleanup')).toBe(true);
+      expect(isDenylistedPath('cliSessionsV2.mergedWorktreeCleanupPreview')).toBe(false);
+      expect(isDenylistedPath('cliSessionsV2.getWorktreeCleanup')).toBe(false);
       expect(isDenylistedPath('agentBriefing.estimateSummary')).toBe(false);
       expect(isDenylistedPath('agentBriefing.dismiss')).toBe(false);
       expect(isDenylistedPath('activeSessions.getToken')).toBe(false);

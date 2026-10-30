@@ -89,6 +89,8 @@ import {
   sendLocalSessionRequest,
 } from './local-sessions/local-session-request';
 import { localSessionsStorageKey } from './local-sessions/local-session-storage';
+import { useWorktreeCleanup } from './hooks/useWorktreeCleanup';
+import { MergedWorktreeCleanup } from './MergedWorktreeCleanup';
 
 // Context for children to toggle the mobile sidebar sheet
 type WorktreeChatTabs = {
@@ -830,6 +832,50 @@ function CloudSidebarLayoutContent({
     [organizationId, queryClient, renameWorktree, trpc]
   );
 
+  const handleWorktreeDeleted = useCallback(
+    async (worktreeId: string, deletedSessionIds: string[]) => {
+      await Promise.all(
+        deletedSessionIds.map(sessionId =>
+          removeDeletedSession({
+            sessionId,
+            queryClient,
+            trpc,
+            setDbSessions,
+            deleteSessionFromStore,
+          })
+        )
+      );
+      forgetWorktreeTabs(worktreeId, deletedSessionIds);
+      const redirect = getWorktreeDeletionRedirect(
+        new URL(window.location.href),
+        worktreeId,
+        deletedSessionIds,
+        organizationId
+      );
+      if (redirect) router.push(redirect);
+      void invalidateSessionQueries({ queryClient, trpc });
+      void queryClient.invalidateQueries(trpc.workspaceFolders.list.pathFilter());
+    },
+    [
+      deleteSessionFromStore,
+      forgetWorktreeTabs,
+      organizationId,
+      queryClient,
+      router,
+      setDbSessions,
+      trpc,
+    ]
+  );
+  const cleanup = useWorktreeCleanup({ organizationId, onDeleted: handleWorktreeDeleted });
+  const workspaceCleanup = (
+    <MergedWorktreeCleanup
+      organizationId={organizationId}
+      cleanup={cleanup.data}
+      statusError={cleanup.error}
+      statusLoading={cleanup.isPending}
+    />
+  );
+
   const handleConfirmWorktreeDelete = useCallback(() => {
     const worktreeId = worktreePendingDeletion;
     if (!worktreeId || deletingWorktreeIds.has(worktreeId)) return;
@@ -843,27 +889,7 @@ function CloudSidebarLayoutContent({
           worktreeId: cloudAgentWorktreeIdSchema.parse(worktreeId),
           organizationId: organizationId ?? null,
         });
-        await Promise.all(
-          deletedSessionIds.map(sessionId =>
-            removeDeletedSession({
-              sessionId,
-              queryClient,
-              trpc,
-              setDbSessions,
-              deleteSessionFromStore,
-            })
-          )
-        );
-        forgetWorktreeTabs(worktreeId, deletedSessionIds);
-        const redirect = getWorktreeDeletionRedirect(
-          new URL(window.location.href),
-          worktreeId,
-          deletedSessionIds,
-          organizationId
-        );
-        if (redirect) router.push(redirect);
-        void invalidateSessionQueries({ queryClient, trpc });
-        void queryClient.invalidateQueries(trpc.workspaceFolders.list.pathFilter());
+        await handleWorktreeDeleted(worktreeId, deletedSessionIds);
         toast.success('Worktree deleted');
       } catch (error) {
         toast.error('Failed to delete worktree', { description: formatSessionError(error) });
@@ -878,19 +904,24 @@ function CloudSidebarLayoutContent({
       }
     })();
   }, [
-    deleteSessionFromStore,
     deleteWorktree,
     deletingWorktreeIds,
-    forgetWorktreeTabs,
+    handleWorktreeDeleted,
     organizationId,
     queryClient,
-    router,
-    setDbSessions,
     trpc,
     worktreePendingDeletion,
   ]);
 
-  const deletingWorktreeIdList = useMemo(() => [...deletingWorktreeIds], [deletingWorktreeIds]);
+  const deletingWorktreeIdList = useMemo(
+    () => [
+      ...deletingWorktreeIds,
+      ...(cleanup.data?.items
+        .filter(item => item.status === 'pending' || item.status === 'deleting')
+        .map(item => item.worktreeId) ?? []),
+    ],
+    [cleanup.data, deletingWorktreeIds]
+  );
   const toggleMobileSidebar = useCallback(() => setMobileSheetOpen(prev => !prev), []);
   const sidebarContext = useMemo(
     () => ({
@@ -949,6 +980,7 @@ function CloudSidebarLayoutContent({
             <ChatSidebar
               key={`mobile:${currentUserId}:${organizationId ?? 'personal'}`}
               workspaceFolders={sidebarWorkspaceFolders}
+              workspaceCleanup={workspaceCleanup}
               sessions={sidebarSessions}
               currentSessionId={currentSessionId}
               selectedWorktreeId={selectedWorktreeId}
@@ -984,6 +1016,7 @@ function CloudSidebarLayoutContent({
           <ChatSidebar
             key={`desktop:${currentUserId}:${organizationId ?? 'personal'}`}
             workspaceFolders={sidebarWorkspaceFolders}
+            workspaceCleanup={workspaceCleanup}
             sessions={sidebarSessions}
             currentSessionId={currentSessionId}
             selectedWorktreeId={selectedWorktreeId}

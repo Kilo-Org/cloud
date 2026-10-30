@@ -50,6 +50,9 @@ const KEPT_DO_CLASSES = [
   'UserKiloFacade',
   'SandboxControl',
   'SandboxSession',
+  'EnvironmentBuild',
+  'VercelSnapshotBuild',
+  'WorktreeCleanupCoordinator',
 ];
 
 function readSourceConfig() {
@@ -117,9 +120,28 @@ describe('buildE2eWorkerConfig', () => {
     const migratedClasses = config.migrations.flatMap(
       (migration: { new_sqlite_classes: string[] }) => migration.new_sqlite_classes
     );
+    expect([...bindingClasses].sort()).toEqual(
+      ['Sandbox', 'E2eCallbackSink', ...KEPT_DO_CLASSES].sort()
+    );
     for (const className of KEPT_DO_CLASSES) {
       expect(bindingClasses).toContain(className);
       expect(migratedClasses).toContain(className);
+    }
+  });
+
+  it('exports every rendered Durable Object binding from the e2e entrypoint', () => {
+    const { config } = render();
+    const entrypoint = readFileSync(join(process.cwd(), 'src/e2e-entry.ts'), 'utf8');
+    const exportedNames = [...entrypoint.matchAll(/export\s*\{([^}]+)\}/g)].flatMap(match =>
+      match[1].split(',').map(name =>
+        name
+          .trim()
+          .split(/\s+as\s+/)
+          .at(-1)
+      )
+    );
+    for (const binding of config.durable_objects.bindings) {
+      expect(exportedNames).toContain(binding.class_name);
     }
   });
 

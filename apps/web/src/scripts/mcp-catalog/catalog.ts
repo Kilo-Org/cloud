@@ -44,6 +44,8 @@ export const ROOT_ROUTER_PATH = join(__dirname, '..', '..', 'routers', 'root-rou
  * `agentBriefing` generation and consent mutations spend the context's balance
  * behind a cost disclosure that only a person in the app can acknowledge; an MCP
  * agent could otherwise mint the estimate token itself and bypass that consent.
+ * Bulk worktree cleanup permanently deletes chats and files behind an in-app
+ * confirmation, so starting and retrying it stay out of MCP.
  */
 const NATIVE_ONLY_PATHS: Record<string, true> = {
   // Vercel connection uses raw credentials; teardown and builds require app confirmation.
@@ -70,6 +72,8 @@ const NATIVE_ONLY_PATHS: Record<string, true> = {
   'organizations.guardrails.update': true,
   'activeSessions.widgetCredential': true,
   'agentBriefing.updateContextPreferences': true,
+  'cliSessionsV2.startMergedWorktreeCleanup': true,
+  'cliSessionsV2.retryWorktreeCleanup': true,
 };
 
 /**

@@ -15,6 +15,7 @@ import { createSessionSendHandlers } from './router/handlers/session-send.js';
 import { createSessionWorktreeHandlers } from './router/handlers/session-worktree.js';
 import { createHostedWorkspaceMutationHandlers } from './router/handlers/hosted-workspace-mutations.js';
 import { deleteWorktree } from './router/handlers/worktree-deletion.js';
+import { startWorktreeCleanup, getWorktreeCleanup } from './router/handlers/worktree-cleanup.js';
 import { createSessionWorktreeChangesHandlers } from './router/handlers/session-worktree-changes.js';
 import { getSandboxSelectionOptions } from './router/handlers/sandbox-selection.js';
 import { getPreviewOptions } from './router/handlers/preview-options.js';
@@ -34,6 +35,8 @@ import {
 
 export const appRouter = router({
   deleteWorktree,
+  startWorktreeCleanup,
+  getWorktreeCleanup,
   getSandboxSelectionOptions,
   getPreviewOptions,
   listHostedSessions,

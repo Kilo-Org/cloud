@@ -28,6 +28,7 @@ export { SandboxSessionV2 as SandboxSession } from './control-plane/session/sess
 export { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
 export { EnvironmentBuild } from './environment-build/environment-build-do.js';
 export { VercelSnapshotBuild } from './persistence/VercelSnapshotBuild.js';
+export { WorktreeCleanupCoordinator } from './worktree-cleanup/WorktreeCleanupCoordinator.js';
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 export { E2eCallbackSink } from './persistence/E2eCallbackSink.js';
 

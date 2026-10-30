@@ -340,6 +340,10 @@
         "name": "STREAM_TICKET_NONCE_DO",
       },
       {
+        "class_name": "WorktreeCleanupCoordinator",
+        "name": "WORKTREE_CLEANUP",
+      },
+      {
         "class_name": "UserKiloFacade",
         "name": "USER_KILO_FACADE",
       },
@@ -421,6 +425,10 @@
     {
       "new_sqlite_classes": ["VercelSnapshotBuild"],
       "tag": "v13",
+    },
+    {
+      "new_sqlite_classes": ["WorktreeCleanupCoordinator"],
+      "tag": "v14",
     },
   ],
   /**
@@ -691,6 +699,10 @@
           {
             "class_name": "StreamTicketNonceDO",
             "name": "STREAM_TICKET_NONCE_DO",
+          },
+          {
+            "class_name": "WorktreeCleanupCoordinator",
+            "name": "WORKTREE_CLEANUP",
           },
           {
             "class_name": "UserKiloFacade",

@@ -46,8 +46,9 @@ const FIELD_FOR_ERROR = {
 
 /**
  * The message under Command name: the field's own refusal when validation
- * refused the name, otherwise a conflict the server reported for a name the
- * loaded list did not have.
+ * refused the name, otherwise a conflict the server reported and validation
+ * had nothing to say about — the same guard the MCP and agent sheets use, so a
+ * later `template-required` does not pin the previous conflict on this field.
  */
 function nameErrorMessage(
   t: (key: string) => string,
@@ -57,7 +58,7 @@ function nameErrorMessage(
   if (error !== null && FIELD_FOR_ERROR[error] === 'name') {
     return t(ERROR_KEYS[error]);
   }
-  if (serverConflict) {
+  if (error === null && serverConflict) {
     return t(ERROR_KEYS['duplicate-name']);
   }
   return undefined;

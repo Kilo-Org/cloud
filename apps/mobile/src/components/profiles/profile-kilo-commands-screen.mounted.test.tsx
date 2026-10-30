@@ -292,15 +292,28 @@ describe('ProfileKiloCommandsScreen save refusals', () => {
   it('lets an edit keep its own name and refuses one another command owns', async () => {
     h.query.data = [testCommand(), testCommand({ id: 'cmd-2', name: 'deploy' })];
     h.query.isPending = false;
+    h.mutations.updateKiloCommand.mutateAsync.mockResolvedValue({ success: true });
 
     const { renderer, unmount } = await mountScreen();
     pressPressable(renderer.root, 'Edit slash command release-notes');
-    expect(findField(renderer.root, 'Command name').props.error).toBeUndefined();
+    pressSheetDone(renderer.root);
 
+    // The edited command is left out of the duplicate check, so its own name
+    // reaches the server instead of being refused here.
+    await waitFor(() => h.mutations.updateKiloCommand.mutateAsync.mock.calls.length === 1);
+    expect(h.mutations.updateKiloCommand.mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: 'profile-1',
+        commandId: 'cmd-1',
+        name: 'release-notes',
+      })
+    );
+
+    pressPressable(renderer.root, 'Edit slash command release-notes');
     changeText(renderer.root, 'Command name', 'deploy');
     pressSheetDone(renderer.root);
 
-    expect(h.mutations.updateKiloCommand.mutateAsync).not.toHaveBeenCalled();
+    expect(h.mutations.updateKiloCommand.mutateAsync).toHaveBeenCalledTimes(1);
     expect(findField(renderer.root, 'Command name').props.error).toBe(
       i18n.t('profiles.slashCommands.duplicateName')
     );

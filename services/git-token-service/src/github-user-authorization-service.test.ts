@@ -358,6 +358,48 @@ describe('GitHubUserAuthorizationService disconnect', () => {
     );
   });
 
+  it('gives both disconnect provider requests a deadline', async () => {
+    const request = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', request);
+
+    await makeService().disconnectUserAuthorization('user_1');
+
+    expect(request).toHaveBeenCalledWith(
+      'https://api.github.com/applications/client-id/grant',
+      expect.objectContaining({ method: 'DELETE', signal: expect.any(AbortSignal) })
+    );
+
+    request.mockClear();
+    request.mockResolvedValue(
+      Response.json({
+        access_token: 'refreshed-access',
+        expires_in: 3600,
+        refresh_token: 'refreshed-refresh',
+        refresh_token_expires_in: 7200,
+      })
+    );
+    database.deleted = false;
+    database.updatedRow = {
+      ...makeRow(activePublicKey, 'active', {
+        access: 'refreshed-access',
+        refresh: 'refreshed-refresh',
+      }),
+      credential_version: 2,
+      access_token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+      refresh_token_expires_at: new Date(Date.now() + 7200 * 1000).toISOString(),
+    };
+    database.rows = [
+      { ...makeRow(), access_token_expires_at: new Date(Date.now() - 1000).toISOString() },
+    ];
+
+    await makeService().disconnectUserAuthorization('user_1');
+
+    expect(request).toHaveBeenCalledWith(
+      'https://github.com/login/oauth/access_token',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+  });
+
   it('deletes an authorization after its access and refresh tokens expire', async () => {
     database.rows = [
       {

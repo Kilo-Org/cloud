@@ -155,15 +155,19 @@ describe('web session transcript cache', () => {
     expect(other.read('ses-1' as KiloSessionId)).not.toBeNull();
   });
 
-  it('keeps a queued write in the scope that issued it', async () => {
-    const cache = cacheFor(alice);
-    cache.write(page('ses-1', 1, 'alice text'));
+  it('resolves the scope once for each write', async () => {
+    let scopesRead = 0;
+    const cache = createWebSessionTranscriptCache(queryClient, () => {
+      scopesRead += 1;
+      return alice;
+    });
+    cache.write(page('ses-1'));
     await Promise.resolve(); // writes land in a microtask
 
+    expect(scopesRead).toBe(1);
     expect(textOf(cacheFor(alice).read('ses-1' as KiloSessionId))).toMatchObject({
-      text: 'alice text',
+      text: 'cached text',
     });
-    expect(cacheFor(bob).read('ses-1' as KiloSessionId)).toBeNull();
   });
 
   it('follows the current user instead of the one it was created with', async () => {

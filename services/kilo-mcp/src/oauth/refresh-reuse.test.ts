@@ -6,8 +6,10 @@ import {
   detectRefreshTokenReuse,
   hashRefreshToken,
   parseRefreshToken,
+  readTokenFormBody,
   rememberIssuedRefreshToken,
   type IssuedRefreshToken,
+  type RefreshReuseDeps,
   type RefreshReuseStore,
 } from './refresh-reuse';
 
@@ -78,6 +80,12 @@ function refreshRequest(refreshToken: string, origin?: string): Request {
   });
 }
 
+/** The handler's steps in order: read the body, then decide. */
+async function guard(request: Request, deps: RefreshReuseDeps): Promise<Response | null> {
+  const body = await readTokenFormBody(request);
+  return body.kind === 'form' ? detectRefreshTokenReuse(request, body.params, deps) : null;
+}
+
 describe('parseRefreshToken', () => {
   it('splits the library token format into user and grant', () => {
     expect(parseRefreshToken('user-1:grant-1:secret')).toEqual({
@@ -96,14 +104,14 @@ describe('detectRefreshTokenReuse', () => {
   it('does not revoke a grant when only its public token parts match', async () => {
     const deps = makeDeps();
     await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:real' }), deps);
-    expect(await detectRefreshTokenReuse(refreshRequest('u:g:forged'), deps)).toBeNull();
+    expect(await guard(refreshRequest('u:g:forged'), deps)).toBeNull();
     expect(deps.revokeGrant).not.toHaveBeenCalled();
   });
 
   it('leaves unknown and malformed tokens to the library', async () => {
     const deps = makeDeps();
     for (const token of ['u:g:first', 'nope', 'u:g:']) {
-      expect(await detectRefreshTokenReuse(refreshRequest(token), deps)).toBeNull();
+      expect(await guard(refreshRequest(token), deps)).toBeNull();
     }
     expect(deps.revokeGrant).not.toHaveBeenCalled();
   });
@@ -112,11 +120,8 @@ describe('detectRefreshTokenReuse', () => {
     const deps = makeDeps();
     await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
     await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:second' }), deps);
-    expect(await detectRefreshTokenReuse(refreshRequest('u:g:second'), deps)).toBeNull();
-    const response = await detectRefreshTokenReuse(
-      refreshRequest('u:g:first', 'https://client.test'),
-      deps
-    );
+    expect(await guard(refreshRequest('u:g:second'), deps)).toBeNull();
+    const response = await guard(refreshRequest('u:g:first', 'https://client.test'), deps);
     expect(response?.status).toBe(400);
     expect(response?.headers.get('Cache-Control')).toBe('no-store');
     expect(response?.headers.get('Access-Control-Allow-Origin')).toBe('https://client.test');
@@ -133,7 +138,7 @@ describe('detectRefreshTokenReuse', () => {
     await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:second' }), deps);
     await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:other:live' }), deps);
 
-    expect(await detectRefreshTokenReuse(refreshRequest('u:g:first'), deps)).not.toBeNull();
+    expect(await guard(refreshRequest('u:g:first'), deps)).not.toBeNull();
 
     // A revoked grant's hashes can never authenticate another replay, so they
     // are dropped with the revocation instead of waiting for the history TTL.
@@ -149,7 +154,7 @@ describe('detectRefreshTokenReuse', () => {
       grantId: 'stored-grant',
       current: false,
     });
-    await detectRefreshTokenReuse(refreshRequest('not:trusted:parts'), deps);
+    await guard(refreshRequest('not:trusted:parts'), deps);
     expect(deps.revokeGrant).toHaveBeenCalledExactlyOnceWith('stored-grant', 'stored-user');
   });
 
@@ -167,7 +172,7 @@ describe('detectRefreshTokenReuse', () => {
       // the replay to the provider, and the provider would answer it. The
       // history must cover the whole session the provider serves.
       vi.setSystemTime(Date.UTC(2026, 0, 30, 12));
-      const response = await detectRefreshTokenReuse(refreshRequest('u:g:first'), deps);
+      const response = await guard(refreshRequest('u:g:first'), deps);
       expect(response?.status).toBe(400);
       expect(await response?.json()).toEqual({
         error: 'invalid_grant',
@@ -202,7 +207,7 @@ describe('detectRefreshTokenReuse', () => {
       }),
       refreshRequest(''),
     ]) {
-      expect(await detectRefreshTokenReuse(request, deps)).toBeNull();
+      expect(await guard(request, deps)).toBeNull();
     }
     expect(deps.revokeGrant).not.toHaveBeenCalled();
   });
@@ -213,7 +218,7 @@ describe('detectRefreshTokenReuse', () => {
     await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
     await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:second' }), deps);
 
-    expect(await detectRefreshTokenReuse(refreshRequest('u:g:first'), deps)).not.toBeNull();
+    expect(await guard(refreshRequest('u:g:first'), deps)).not.toBeNull();
     expect(oauthSignIn).toHaveBeenCalledExactlyOnceWith({
       phase: 'failed',
       identity: { kiloUserId: 'u', organizationId: null },
@@ -228,7 +233,7 @@ describe('detectRefreshTokenReuse', () => {
     await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
 
     for (const token of ['u:g:first', 'u:g:unknown']) {
-      expect(await detectRefreshTokenReuse(refreshRequest(token), deps)).toBeNull();
+      expect(await guard(refreshRequest(token), deps)).toBeNull();
     }
     expect(deps.revokeGrant).not.toHaveBeenCalled();
     expect(oauthSignIn).not.toHaveBeenCalled();

@@ -24,7 +24,13 @@ import {
 import { createDefaultHandler } from './oauth/consent';
 import { fetchUserIsAdmin } from './oauth/kilo-pairing';
 import { onError, tokenExchangeCallback } from './oauth/provider-hooks';
-import { createRefreshReuseHandler, isTokenRequest } from './oauth/refresh-reuse';
+import {
+  bodyTooLargeResponse,
+  createRefreshReuseHandler,
+  forwardable,
+  isTokenRequest,
+  readTokenFormBody,
+} from './oauth/refresh-reuse';
 import {
   CLIENT_REGISTRATION_TTL_SECONDS,
   REFRESH_TOKEN_TTL_SECONDS,
@@ -1135,8 +1141,11 @@ export class KiloMcpOAuthStore extends OAuthStore {
 }
 
 export default {
-  fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    if (isTokenRequest(request)) return getKiloMcpOAuthStoreStub(env).fetch(request);
-    return fetchWithProvider(request, env, ctx);
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    if (!isTokenRequest(request)) return fetchWithProvider(request, env, ctx);
+    const body = await readTokenFormBody(request);
+    if (body.kind === 'too_large') return bodyTooLargeResponse(request);
+    const bounded = body.kind === 'form' ? forwardable(request, body.body) : request;
+    return getKiloMcpOAuthStoreStub(env).fetch(bounded);
   },
 } satisfies ExportedHandler<Env>;

@@ -40,16 +40,7 @@ export const NOTIFICATION_HISTORY_DEFAULT_PAGE_SIZE = 30;
  * authority; this list mirrors it for callers and tests, which assert the two
  * agree over every kind in `pushDataSchema`.
  */
-export type RecordedNotificationPushType =
-  | 'chat.message'
-  | 'cloud_agent_session'
-  | 'low_balance'
-  | 'spend_alert'
-  | 'security_finding'
-  | 'security_lifecycle'
-  | 'agent_briefing';
-
-export const RECORDED_NOTIFICATION_PUSH_TYPES: readonly RecordedNotificationPushType[] = [
+export const RECORDED_NOTIFICATION_PUSH_TYPES = [
   'chat.message',
   'cloud_agent_session',
   'low_balance',
@@ -57,7 +48,9 @@ export const RECORDED_NOTIFICATION_PUSH_TYPES: readonly RecordedNotificationPush
   'security_finding',
   'security_lifecycle',
   'agent_briefing',
-];
+] as const;
+
+export type RecordedNotificationPushType = (typeof RECORDED_NOTIFICATION_PUSH_TYPES)[number];
 
 /** One history row's content, derived from the push it came from. */
 export type NotificationHistoryEntry = {

@@ -3865,7 +3865,7 @@
       "name": "सर्वर का नाम",
       "type": "सर्वर प्रकार",
       "localType": "स्थानीय",
-      "remoteType": "दूर",
+      "remoteType": "दूरस्थ",
       "command": "कमांड लाइन",
       "url": "यूआरएल",
       "environment": "पर्यावरण (JSON)",

@@ -496,7 +496,10 @@ export function IdleAuth({
             `text-xs` line, which the screen's `gap-3` gutter (10.5dp) cannot
             give it, so the row carries the extra 5dp margin: both regions then
             stay clear of the Continue button above and the ghost button
-            below. */}
+            below. A long locale wraps the sentence, and the cancelled 7dp then
+            leaves the box's rect inside the next line's prose, so the row also
+            keeps the shared wrapped-line gap (`INLINE_LINK_LINE_GAP_CLASS`); a
+            sentence that fits one line never sees it. */}
 
         <Text
           importantForAccessibility="no-hide-descendants"

@@ -3,7 +3,12 @@ import { createElement } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LEGAL_LINK_BOX_CLASS } from '@/lib/a11y/tap-target';
+import {
+  INLINE_LINK_BOX_CLASS,
+  MIN_TAP_TARGET_DP,
+  tapTargetReachDp,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
 import { CONSENT_DISCLOSURE_MAX_FONT_SCALE, ConsentCard } from './consent-card';
 import { i18n } from '@/i18n';
 
@@ -530,10 +535,17 @@ describe('ConsentCard', () => {
       if (!link) {
         throw new Error('privacy link not found');
       }
-      // A real 48dp box: the control-size audit reads the node's own rect, so
-      // the 14dp text line alone was reported as too small to tap.
-      expect(String((link.props as { className?: string }).className)).toContain(
-        LEGAL_LINK_BOX_CLASS
+      // A real 28dp box plus the vertical slop: the control-size audit reads
+      // the node's own rect, so the 14dp text line alone was reported as too
+      // small to tap, and the slop carries the 44pt region.
+      // Test renderer props are untyped; name the two reads once.
+      const props = link.props as {
+        className?: string;
+        hitSlop?: { top?: number; bottom?: number };
+      };
+      expect(String(props.className)).toContain(INLINE_LINK_BOX_CLASS);
+      expect(tapTargetReachDp(MIN_TAP_TARGET_DP, props.hitSlop?.top ?? 0)).toBeGreaterThanOrEqual(
+        TOUCH_TARGET_DP
       );
       return link;
     });

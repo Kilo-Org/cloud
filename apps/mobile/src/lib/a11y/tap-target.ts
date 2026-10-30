@@ -144,6 +144,11 @@ export function textActionTargetClass(): string {
  * node's own rect at the audit floor while the row keeps a plain text line and
  * one baseline. When the surrounding text is larger than `text-xs`, its line
  * wins over the shorter box outer, so the cancel is safe for either size.
+ *
+ * The cancel makes the rect overflow its own flex line by 7dp on each side, so
+ * a row that wraps needs {@link INLINE_LINK_LINE_GAP_CLASS} between its lines:
+ * wrapped lines have no gutter of their own, and without it the box on a line
+ * reaches into the prose of the line above it.
  */
 export const INLINE_LINK_BOX_CLASS =
   'min-h-[28px] min-w-[28px] -my-[7px] items-center justify-center';
@@ -202,6 +207,21 @@ export function inlineLinkHitSlop(edge: 'start' | 'end') {
 }
 
 /**
+ * The vertical gap a wrapping sentence row keeps between its lines, and its
+ * class. A sentence with an inline link row wraps in long locales, and a link
+ * box's `-my-[7px]` cancel makes its rect overflow its own flex line by
+ * `(28 - 14) / 2 = 7dp` on each side. Without a gap the wrapped lines sit
+ * exactly one `text-xs` line apart, so a box on the second line reaches 6.9dp
+ * up into the first line's prose (and a box on the first line reaches down into
+ * the second). The gap is the overflow plus 1dp of headroom, so a wrapped line
+ * never collides with the box on the line before it; a sentence that fits one
+ * line never sees it, because a flex row's `gap-y` only separates wrapped
+ * lines.
+ */
+export const INLINE_LINK_LINE_GAP_DP = 8;
+export const INLINE_LINK_LINE_GAP_CLASS = 'gap-y-[8px]';
+
+/**
  * The extra vertical margin the legal sentence row carries, and its class.
  *
  * A legal link's 44pt vertical region reaches
@@ -214,10 +234,12 @@ export function inlineLinkHitSlop(edge: 'start' | 'end') {
  * 10.5 + 5 = 15.5dp of free space each side, which holds the whole 44pt region
  * clear of both neighbours. The row itself still lays out on a `text-xs` line;
  * the margin is the extra gutter the target needs, and it is part of the row's
- * box, not its height.
+ * box, not its height. The wrapped-line gap
+ * ({@link INLINE_LINK_LINE_GAP_CLASS}) is separate from it: this margin is
+ * outside the row, that gap is between the row's own lines.
  */
 export const INLINE_LINK_ROW_MARGIN_DP = 5;
-export const INLINE_LINK_ROW_CLASS = 'my-[5px]';
+export const INLINE_LINK_ROW_CLASS = 'my-[5px] gap-y-[8px]';
 
 /**
  * The class an inline-link connector carries so the two links' facing reaches do
@@ -266,18 +288,6 @@ export const LEGAL_LINK_BOX_CLASS = 'min-h-[48px] min-w-[48px] items-center just
  * `calc(1 / 0.75)` of 10.5dp.
  */
 export const LEGAL_LINK_LINE_DP = 14;
-
-/**
- * The vertical margin a legal link cancels inside a running sentence: the box's
- * overflow past the `text-xs` line it centres on, `(48 - 14) / 2`. A sentence
- * has no second link beside it, so the overflow only ever lands on prose, and
- * cancelling it keeps the sentence on its own line exactly as the sign-in
- * sentence's {@link INLINE_LINK_BOX_CLASS} does.
- */
-export const LEGAL_LINK_SENTENCE_CANCEL_DP = (LEGAL_LINK_MIN_DP - LEGAL_LINK_LINE_DP) / 2;
-
-/** The box a legal link renders as the last word of a consent sentence. */
-export const LEGAL_LINK_SENTENCE_BOX_CLASS = `${LEGAL_LINK_BOX_CLASS} -my-[17px]`;
 
 /**
  * The row the two store legal links share: side by side when they fit, one per

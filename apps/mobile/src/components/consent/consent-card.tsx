@@ -301,7 +301,10 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={t('consent.seeFullDetails')}
-            className="mt-6 flex-row items-center gap-1 active:opacity-70"
+            // The row's own node carries the control-size floor: the link's
+            // text line is 17.5dp, below the audit's 28dp minimum, and the
+            // 8dp slop carries the 44pt region on top of it.
+            className="mt-6 min-h-[28px] flex-row items-center gap-1 active:opacity-70"
           >
             <Text className="text-sm font-semibold text-primary">
               {t('consent.seeFullDetails')}

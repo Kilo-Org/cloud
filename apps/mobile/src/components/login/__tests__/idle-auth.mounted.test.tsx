@@ -13,6 +13,8 @@ import {
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
   INLINE_LINK_FACING_HIT_SLOP_DP,
+  INLINE_LINK_LINE_GAP_CLASS,
+  INLINE_LINK_LINE_GAP_DP,
   INLINE_LINK_OUTER_HIT_SLOP_DP,
   INLINE_LINK_ROW_CLASS,
   INLINE_LINK_ROW_MARGIN_DP,
@@ -1309,8 +1311,14 @@ describe('IdleAuth layout repairs', () => {
     // 4.5dp inside the Continue button and a tap on the button's bottom strip
     // opened the link instead of sending the code (the earlier mis-routed-tap
     // finding).
-    expect(INLINE_LINK_ROW_CLASS).toBe(`my-[${INLINE_LINK_ROW_MARGIN_DP}px]`);
+    expect(INLINE_LINK_ROW_CLASS).toBe(
+      `my-[${INLINE_LINK_ROW_MARGIN_DP}px] ${INLINE_LINK_LINE_GAP_CLASS}`
+    );
+    // A wrapped sentence line gets more than the box's per-side overflow, or
+    // the box on the next line enters the prose above it (a pt-BR gate run
+    // measured 6.9dp of that collision).
     const overflowDp = (MIN_TAP_TARGET_DP - 14) / 2;
+    expect(INLINE_LINK_LINE_GAP_DP).toBeGreaterThan(overflowDp);
     const gutterDp = 10.5 + INLINE_LINK_ROW_MARGIN_DP;
     expect(overflowDp + INLINE_LINK_VERTICAL_HIT_SLOP_DP).toBeLessThanOrEqual(gutterDp);
     expect(overflowDp).toBe(7);

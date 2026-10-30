@@ -20,15 +20,16 @@ import {
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
   INLINE_LINK_FACING_HIT_SLOP_DP,
+  INLINE_LINK_LINE_GAP_CLASS,
+  INLINE_LINK_LINE_GAP_DP,
   INLINE_LINK_OUTER_HIT_SLOP_DP,
+  INLINE_LINK_ROW_CLASS,
   INLINE_LINK_VERTICAL_HIT_SLOP_DP,
   inlineLinkHitSlop,
   LEGAL_LINK_BOX_CLASS,
   LEGAL_LINK_LINE_DP,
   LEGAL_LINK_MIN_DP,
   LEGAL_LINK_ROW_CLASS,
-  LEGAL_LINK_SENTENCE_BOX_CLASS,
-  LEGAL_LINK_SENTENCE_CANCEL_DP,
   MIN_TAP_TARGET_DP,
   ROW_TARGET_CLASS,
   STATE_ACTION_CLASS,
@@ -181,6 +182,21 @@ describe('shared tap-target geometry', () => {
     );
   });
 
+  it('keeps a wrapped sentence line clear of the link box that follows it', async () => {
+    // The regression this guards: in a long locale the legal sentence wraps
+    // (pt-BR measured 6.9dp of collision), the link box's rect overflows its
+    // own flex line by (28 - 14) / 2 = 7dp on each side, and wrapped lines have
+    // no gutter of their own — so the box on the second line reached up into
+    // the first line's prose.
+    const overflowDp = (MIN_TAP_TARGET_DP - LEGAL_LINK_LINE_DP) / 2;
+    expect(LEGAL_LINK_LINE_DP).toBe(14);
+    expect(INLINE_LINK_LINE_GAP_DP).toBeGreaterThan(overflowDp);
+    expect(INLINE_LINK_LINE_GAP_CLASS).toBe(`gap-y-[${INLINE_LINK_LINE_GAP_DP}px]`);
+    expect(INLINE_LINK_ROW_CLASS).toContain(INLINE_LINK_LINE_GAP_CLASS);
+    // The compiled row gap is what the layout applies, not the constant.
+    expect(await compiledDp(INLINE_LINK_ROW_CLASS, 'rowGap')).toBe(INLINE_LINK_LINE_GAP_DP);
+  });
+
   it('reserves both facing inline-link reaches on the connector between the links', async () => {
     expect(INLINE_LINK_CONNECTOR_CLASS).toContain('min-w-[10px]');
     // Two inline links separated only by the connector: each reaches
@@ -234,38 +250,28 @@ describe('shared tap-target geometry', () => {
 
 describe('standalone legal link geometry', () => {
   it('renders the 48dp box from whole dp', async () => {
-    // The regression this guards: the store and consent legal links rendered as
-    // bare `text-xs` Text nodes, so their whole target was the 14dp line.
+    // The regression this guards: the store legal links rendered as bare
+    // `text-xs` Text nodes, so their whole target was the 14dp line.
     expect(LEGAL_LINK_MIN_DP).toBe(48);
     expect(await compiledDp(LEGAL_LINK_BOX_CLASS, 'minHeight')).toBe(LEGAL_LINK_MIN_DP);
     expect(await compiledDp(LEGAL_LINK_BOX_CLASS, 'minWidth')).toBe(LEGAL_LINK_MIN_DP);
-    expect(await compiledDp(LEGAL_LINK_SENTENCE_BOX_CLASS, 'minHeight')).toBe(LEGAL_LINK_MIN_DP);
     // The utilities are literal in the source so the class compiler can see
     // them; these hold the literals to the dp constants beside them.
     expect(LEGAL_LINK_BOX_CLASS).toContain(`min-h-[${LEGAL_LINK_MIN_DP}px]`);
     expect(LEGAL_LINK_BOX_CLASS).toContain(`min-w-[${LEGAL_LINK_MIN_DP}px]`);
-    expect(LEGAL_LINK_SENTENCE_BOX_CLASS).toContain(`-my-[${LEGAL_LINK_SENTENCE_CANCEL_DP}px]`);
   });
 
-  it('keeps the two store boxes apart when the row wraps', async () => {
+  it('keeps the two store boxes apart when the row wraps', () => {
     // Each store link keeps its full 48dp height in the flow, so a wrapped row
     // stacks two 48dp lines: the boxes sit a gutter apart and cannot overlap.
-    // Cancelling the height on the box instead (as the sentence's own box does)
-    // would leave each box reaching 17dp into the line below, where a tap
-    // between the lines would open the wrong document.
+    // Cancelling the height on the box instead would leave each box reaching
+    // 17dp into the line below, where a tap between the lines would open the
+    // wrong document.
     expect(LEGAL_LINK_BOX_CLASS).not.toContain('-my-');
     // Horizontally the two boxes sit side by side with no sideways slop, so the
     // row's `gap-x-4` is the whole separation (14dp at the app's 14pt rem).
     expect(LEGAL_LINK_ROW_CLASS).toContain('gap-x-4');
     expect(LEGAL_LINK_ROW_CLASS).toContain('flex-wrap');
-
-    // The sentence has no second link beside it, so its box cancels the
-    // overflow past the `text-xs` line and the sentence keeps its own height.
-    expect(LEGAL_LINK_LINE_DP).toBe(14);
-    expect(LEGAL_LINK_SENTENCE_CANCEL_DP).toBe((LEGAL_LINK_MIN_DP - LEGAL_LINK_LINE_DP) / 2);
-    expect(await compiledDp(LEGAL_LINK_SENTENCE_BOX_CLASS, 'marginBlock')).toBe(
-      -LEGAL_LINK_SENTENCE_CANCEL_DP
-    );
   });
 });
 

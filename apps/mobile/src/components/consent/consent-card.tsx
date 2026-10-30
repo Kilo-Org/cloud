@@ -16,12 +16,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { PRIVACY_URL } from '@/lib/config';
 import { acceptConsent, readConsent, revokeConsent, setOptionalConsent } from '@/lib/consent';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSideInsetStyle } from '@/lib/screen-insets';
+import { cn } from '@/lib/utils';
 
 type ConsentCardProps = {
   readonly mode?: ConsentMode;
@@ -301,7 +303,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={t('consent.seeFullDetails')}
-            className="mt-6 flex-row items-center gap-1 active:opacity-70"
+            className={cn('mt-6 flex-row items-center gap-1 active:opacity-70', ROW_TARGET_CLASS)}
           >
             <Text className="text-sm font-semibold text-primary">
               {t('consent.seeFullDetails')}
@@ -320,11 +322,16 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             moving the actions. The privacy disclosure is pinned here too,
             because at the foot of the scrolling body the footer edge cut the
             sentence in half. Its font scale is capped so the pinned height
-            stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE). */}
+            stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE), and its
+            policy link takes its 48dp target into the row
+            (`reserveTargetHeight`): the cancelled box behind the details
+            screens leaves 17dp of frame above its line, and here that frame
+            started 6dp above the footer's top edge, over the scroll region. */}
         <ConsentPolicySentence
           prefix={t('consent.privacyPolicyPrefix')}
           linkLabel={t('consent.privacyPolicy')}
           maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
+          reserveTargetHeight
           onOpenPolicy={handleOpenPrivacy}
         />
         <View className="min-h-5 justify-center">

@@ -273,10 +273,21 @@ export const LEGAL_LINK_LINE_DP = 14;
  * has no second link beside it, so the overflow only ever lands on prose, and
  * cancelling it keeps the sentence on its own line exactly as the sign-in
  * sentence's {@link INLINE_LINK_BOX_CLASS} does.
+ *
+ * The margin cancels the box in layout only: the frame still reaches
+ * {@link LEGAL_LINK_SENTENCE_CANCEL_DP} above and below the line, so a sentence
+ * that starts a container carries that frame past the container's own edge. A
+ * pinned footer with 12dp of top padding leaves 5dp of the frame over the
+ * surface above it. Callers in that position render
+ * {@link LEGAL_LINK_BOX_CLASS} — the whole target as the row's own line —
+ * instead of this class.
  */
 export const LEGAL_LINK_SENTENCE_CANCEL_DP = (LEGAL_LINK_MIN_DP - LEGAL_LINK_LINE_DP) / 2;
 
-/** The box a legal link renders as the last word of a consent sentence. */
+/**
+ * The box a legal link renders as the last word of a consent sentence that sits
+ * in a flow with room above and below it.
+ */
 export const LEGAL_LINK_SENTENCE_BOX_CLASS = `${LEGAL_LINK_BOX_CLASS} -my-[17px]`;
 
 /**

@@ -242,7 +242,10 @@ export async function upsertScopeProposal(input: {
         .where(
           and(
             eq(code_review_memory_proposals.id, existing.id),
-            inArray(code_review_memory_proposals.status, [...ACTIVE_PROPOSAL_STATUSES])
+            // The status that was read, not the whole active set: an approval
+            // that started in between must keep `opening_change_request`, or the
+            // PR it opens would never be recorded on the row.
+            eq(code_review_memory_proposals.status, existing.status)
           )
         )
         .returning();

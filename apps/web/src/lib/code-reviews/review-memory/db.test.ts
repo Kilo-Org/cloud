@@ -12,6 +12,7 @@ import {
   markProposalOpeningChangeRequest,
   updateProposal,
   upsertScopeProposal,
+  type ReviewMemoryDatabase,
   type ReviewMemoryOwner,
 } from './db';
 
@@ -133,7 +134,96 @@ describe('review memory proposals', () => {
     const stored = await db.select().from(code_review_memory_proposals);
     expect(stored).toHaveLength(1);
   });
+
+  // An approval can start between the analysis read and its write. The write
+  // must not undo it: `opening_change_request` has to survive so the approval
+  // records the pull-request URL on this row instead of opening a second one.
+  it('keeps an approval that started during the analysis', async () => {
+    const user = await insertTestUser();
+    const owner: ReviewMemoryOwner = { type: 'user', id: user.id };
+    const existing = await upsertScopeProposal({
+      owner,
+      platform: 'github',
+      repoFullName: 'acme/widgets',
+      title: 'First analysis',
+      rationale: 'First rationale.',
+      proposedMarkdown: 'First guidance.',
+      evidence: [],
+      positiveCount: 0,
+      negativeCount: 0,
+      neutralCount: 0,
+    });
+
+    const updated = await upsertScopeProposal({
+      owner,
+      platform: 'github',
+      repoFullName: 'acme/widgets',
+      title: 'Second analysis',
+      rationale: 'Second rationale.',
+      proposedMarkdown: 'Second guidance.',
+      evidence: [],
+      positiveCount: 0,
+      negativeCount: 0,
+      neutralCount: 0,
+      database: interleaveAfterRead(async () => {
+        await markProposalOpeningChangeRequest({ proposalId: existing.id });
+      }),
+    });
+
+    expect(updated).toEqual(
+      expect.objectContaining({ id: existing.id, status: 'opening_change_request' })
+    );
+    const stored = await db
+      .select()
+      .from(code_review_memory_proposals)
+      .where(eq(code_review_memory_proposals.id, existing.id));
+    expect(stored[0]?.status).toBe('opening_change_request');
+  });
 });
+
+/**
+ * The real database with `afterRead` run once between a SELECT finishing and the
+ * next statement, which is where a concurrent writer lands in production.
+ */
+function interleaveAfterRead(afterRead: () => Promise<void>): ReviewMemoryDatabase {
+  let fired = false;
+  const wrap = (value: object): object =>
+    new Proxy(value, {
+      get(target, property, receiver) {
+        const inner: unknown = Reflect.get(target, property, receiver);
+        if (property === 'then' && typeof inner === 'function') {
+          return (resolve: (rows: unknown) => unknown, reject: (error: unknown) => unknown) =>
+            (inner as (r: unknown, j: unknown) => unknown).call(
+              target,
+              async (rows: unknown) => {
+                if (!fired) {
+                  fired = true;
+                  await afterRead();
+                }
+                return resolve(rows);
+              },
+              reject
+            );
+        }
+        if (typeof inner !== 'function') return inner;
+        return (...args: unknown[]) => {
+          const result: unknown = (inner as (...rest: unknown[]) => unknown).apply(target, args);
+          return typeof result === 'object' && result !== null ? wrap(result) : result;
+        };
+      },
+    });
+
+  return new Proxy(db, {
+    get(target, property, receiver) {
+      const value: unknown = Reflect.get(target, property, receiver);
+      if (property !== 'select' || typeof value !== 'function') return value;
+      return (...args: unknown[]) => {
+        const builder: unknown = (value as (...rest: unknown[]) => unknown).apply(target, args);
+        return typeof builder === 'object' && builder !== null ? wrap(builder) : builder;
+      };
+    },
+  });
+}
 
 type ProposalScope =
   | { userId: string; organizationId?: undefined }

@@ -7,9 +7,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CodeBlock } from './code-block';
 import {
   chunkTokenLines,
+  clearFenceWalkCacheForTests,
   CODE_CHUNK_MOUNT_BATCH,
   CODE_CHUNK_TOKENS,
   CODE_FIRST_PAINT_CHUNKS,
+  fenceWalkCacheStatsForTests,
   tokenizeCodeLines,
 } from './code-block-model';
 import { type MonoScrollTextMode } from './mono-scroll-block-model';
@@ -740,6 +742,48 @@ describe('CodeBlock long-press pass-through', () => {
     const track = vi.fn(() => () => undefined);
     const renderer = await mount(withSheet('scroll', track, blockElement()));
     expect(pressables(renderer.root)).toHaveLength(0);
+    await unmount(renderer);
+  });
+});
+
+describe('CodeBlock fence walk lifetime', () => {
+  beforeEach(() => {
+    clearFenceWalkCacheForTests();
+  });
+
+  it('releases the fence walk when the block unmounts', async () => {
+    // Regression: a walk stayed in the module-level cache for the life of the
+    // process, so a transcript of long fences pinned highlighted copies of its
+    // code after the user scrolled past it.
+    const renderer = await mount(blockElement({ code: 'const kept = 1;', language: null }));
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+
+    await unmount(renderer);
+    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0 });
+  });
+
+  it('keeps the fence walk while the block is mounted', async () => {
+    const renderer = await mount(blockElement({ code: 'const kept = 1;', language: null }));
+    act(() => {
+      renderer.update(blockElement({ code: 'const kept = 1;', language: null }));
+    });
+
+    // A re-render of the same fence reuses the walk, so a FlashList remount and
+    // an unrelated prop change do not re-highlight the fence's lines.
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+    await unmount(renderer);
+  });
+
+  it('releases the previous fence walk when the fence text is replaced', async () => {
+    const renderer = await mount(blockElement({ code: 'const first = 1;', language: null }));
+    act(() => {
+      renderer.update(blockElement({ code: 'const second = 2;', language: null }));
+    });
+
+    const { entries } = fenceWalkCacheStatsForTests();
+    expect(entries).toBe(1);
+    // The one entry left is the fence now rendered, not the replaced one.
+    expect(fenceWalkCacheStatsForTests().weight).toBeGreaterThan(0);
     await unmount(renderer);
   });
 });

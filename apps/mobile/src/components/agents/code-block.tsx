@@ -23,6 +23,7 @@ import {
   CODE_CHUNK_MOUNT_BATCH,
   CODE_FIRST_PAINT_CHUNKS,
   nextChunkMountCount,
+  releaseFenceChunkWalk,
 } from './code-block-model';
 import { useMonoScrollSheet } from './mono-scroll-block';
 import {
@@ -174,6 +175,17 @@ function CodeBlockImpl({
   const { chunks: mountedChunks, hasMore: hasMoreChunks } = useMemo(
     () => chunkCodeLines(displayText, language, mountedChunkCount),
     [displayText, language, mountedChunkCount]
+  );
+  // Drop this fence's resumable walk when the fence unmounts or its text is
+  // replaced. A walk keeps every highlighted token it placed, so without this
+  // the fences a user scrolled past pinned their highlighted code for the life
+  // of the process. A fence still on screen keeps its walk, so a FlashList
+  // remount mounts without re-highlighting its lines.
+  useEffect(
+    () => () => {
+      releaseFenceChunkWalk(displayText, language);
+    },
+    [displayText, language]
   );
   // Add one batch per commit until the fence is fully mounted. Each batch is
   // CODE_CHUNK_MOUNT_BATCH chunks, so the spans applied in one frame stay

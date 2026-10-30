@@ -142,6 +142,11 @@ vi.mock('@/components/ui/icons', () => ({
 
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
 
+// The Kilo Pass row's unresolved state renders the UI skeleton, whose real
+// component reaches expo-linear-gradient and the reanimated worklets; neither
+// is loaded in this project.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 vi.mock('expo-haptics', () => ({

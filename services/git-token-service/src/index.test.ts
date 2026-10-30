@@ -1897,6 +1897,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
         signal: expect.any(AbortSignal),
         headers: expect.objectContaining({
           Authorization: 'Bearer installation-token',
+          'User-Agent': 'Kilo-Git-Token-Service',
         }),
       })
     );
@@ -1933,7 +1934,10 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.github.com/repos/acme/repo',
       expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: 'Bearer user-token' }),
+        headers: expect.objectContaining({
+          Authorization: 'Bearer user-token',
+          'User-Agent': 'Kilo-Git-Token-Service',
+        }),
       })
     );
     expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
@@ -1962,6 +1966,34 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
           requestUrl: userAttachmentUrl,
         })
       ).resolves.toEqual({ success: false, reason });
+    }
+  );
+
+  it.each([302, 403, 404, 429, 503])(
+    'cancels a rejected repository lookup body for status %s and fails closed even if cancellation rejects',
+    async status => {
+      const cancel = vi.fn(() =>
+        status === 503 ? Promise.reject(new Error('cancellation failed')) : Promise.resolve()
+      );
+      const response = new Response(new ReadableStream({ cancel }), { status });
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId,
+      });
+      if (!issued.success) throw new Error('Expected successful issuance');
+
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod: 'POST',
+          requestUrl: userAttachmentUrl,
+        })
+      ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
+      expect(cancel).toHaveBeenCalledOnce();
     }
   );
 

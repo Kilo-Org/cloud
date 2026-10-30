@@ -1278,6 +1278,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         headers: {
           Accept: 'application/vnd.github+json',
           Authorization: `Bearer ${token}`,
+          'User-Agent': 'Kilo-Git-Token-Service',
         },
         redirect: 'manual',
         signal: AbortSignal.timeout(GITHUB_REPOSITORY_METADATA_TIMEOUT_MS),
@@ -1285,10 +1286,12 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     } catch {
       return 'source_unavailable';
     }
-    if (response.status !== 200) return 'source_unavailable';
-
     let body: unknown;
     try {
+      if (response.status !== 200) {
+        await response.body?.cancel();
+        return 'source_unavailable';
+      }
       if (!response.body) return 'source_unavailable';
       body = await readBoundedJsonBody(response.body, GITHUB_REPOSITORY_METADATA_MAX_BYTES);
     } catch {

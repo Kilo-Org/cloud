@@ -143,7 +143,9 @@ describe('formatRemainingTokens', () => {
 
 describe('getHeaderPillContent', () => {
   it('keeps the label-free placeholder, non-interactive, with no info and no transcript', () => {
-    expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false })).toEqual(settledWithoutUsage);
+    expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false })).toEqual(
+      settledWithoutUsage
+    );
     expect(pill({ totalCostMicrodollars: 0, hasMessages: false })).toEqual(settledWithoutUsage);
     expect(pill({ totalCostMicrodollars: null, hasMessages: false })).toEqual(settledWithoutUsage);
   });

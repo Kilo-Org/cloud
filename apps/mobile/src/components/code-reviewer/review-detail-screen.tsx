@@ -3,6 +3,7 @@
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
 import { type Href } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
@@ -45,6 +46,7 @@ import { isPersonal, useReviewConfig } from '@/lib/hooks/use-code-reviewer';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
 import { trpcErrorVariant } from '@/lib/trpc-error';
+import { useTRPC } from '@/lib/trpc';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 const FINDINGS_PAGE_SIZE = 20;
@@ -97,6 +99,16 @@ export function ReviewDetailScreen({
     isRetriggerableReviewStatus(loadedReview.status) &&
     !(isPersonal(scope) && reviewPlatform === 'bitbucket');
   const reviewConfig = useReviewConfig(scope, reviewPlatform, { enabled: configQueryEnabled });
+
+  // The in-app pull-request reader is gated on the user's own GitHub
+  // authorization, and a Code Reviewer user can own a review without one. The
+  // read is the stored status, not a GitHub call, and only a personal GitHub
+  // review's in-app destination depends on it.
+  const trpc = useTRPC();
+  const githubAuthorization = useQuery({
+    ...trpc.githubApps.getUserAuthorization.queryOptions(),
+    enabled: isPersonal(scope) && reviewPlatform === 'github',
+  });
 
   function confirmCancel(onConfirm: () => void) {
     confirm({
@@ -367,8 +379,17 @@ export function ReviewDetailScreen({
               if (isPersonal(scope)) {
                 const destination = resolveCodeReviewerOpenPrDestination(review.pr_url);
                 if (destination.kind === 'in-app') {
-                  pushOnce(destination.href);
-                  return;
+                  // A github.com pull request reads in the app only with the
+                  // user's own GitHub authorization; without it that route is
+                  // the Connect wall, so the pull request opens in the browser
+                  // instead. A pending or failed read keeps that fallback.
+                  // Other providers keep their in-app route, whose own gate
+                  // owns their connection.
+                  const needsGitHubAuthorization = destination.platform === 'github';
+                  if (!needsGitHubAuthorization || githubAuthorization.data?.connected === true) {
+                    pushOnce(destination.href);
+                    return;
+                  }
                 }
               }
               void openExternalUrl(review.pr_url, {

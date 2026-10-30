@@ -73,6 +73,10 @@ const reviewConfig = vi.hoisted(() => ({
   calls: [] as { scope: string; platform: string; enabled: boolean | undefined }[],
 }));
 const routerMock = vi.hoisted(() => ({ push: vi.fn() }));
+const githubAuthorization = vi.hoisted(() => ({
+  data: undefined as { connected: boolean } | undefined,
+  enabled: [] as (boolean | undefined)[],
+}));
 const spectatorStream = vi.hoisted(() => ({
   createReviewSpectatorStream: vi.fn(),
 }));
@@ -175,6 +179,11 @@ vi.mock('@/lib/utils', () => ({
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
+    githubApps: {
+      getUserAuthorization: {
+        queryOptions: () => ({ queryKey: ['githubApps.getUserAuthorization'] }),
+      },
+    },
     codeReviews: {
       getReviewStreamInfo: {
         queryOptions: () => ({ queryKey: ['codeReviews.getReviewStreamInfo'] }),
@@ -188,6 +197,10 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@tanstack/react-query', () => ({
   useQuery: (options: { queryKey?: unknown[]; enabled?: boolean; refetchInterval?: unknown }) => {
     const key = options.queryKey?.[0];
+    if (key === 'githubApps.getUserAuthorization') {
+      githubAuthorization.enabled.push(options.enabled);
+      return { data: githubAuthorization.data };
+    }
     if (key === 'codeReviews.getReviewStreamInfo') {
       return spectatorQueries.streamInfo;
     }
@@ -313,6 +326,8 @@ beforeEach(() => {
   reviewConfig.query = { isPending: false, data: undefined };
   reviewConfig.calls = [];
   routerMock.push.mockClear();
+  githubAuthorization.data = undefined;
+  githubAuthorization.enabled = [];
   vi.mocked(openExternalUrl).mockClear();
   nativePlatform.OS = 'ios';
   sessionListRenders.list = [];
@@ -759,8 +774,9 @@ describe('ReviewDetailScreen pull request destination', () => {
     expect(routerMock.push).not.toHaveBeenCalled();
   });
 
-  it('keeps personal GitHub reviews in app', () => {
+  it('opens a personal GitHub review in app when the user connection is live', () => {
     detail.data = { success: true, review: makeReview(), tokenUsage: { input: 0, output: 0 } };
+    githubAuthorization.data = { connected: true };
     mountScreen();
     const button = buttons.rendered.find(
       candidate => buttonText(candidate) === i18n.t('common.openPullRequest')
@@ -769,6 +785,65 @@ describe('ReviewDetailScreen pull request destination', () => {
     act(() => button?.onPress?.());
     expect(routerMock.push).toHaveBeenCalledWith('/(app)/pr-review/org/repo/42');
     expect(openExternalUrl).not.toHaveBeenCalled();
+  });
+
+  it('opens a personal GitHub review in the browser when the user connection is missing', () => {
+    const prUrl = 'https://github.com/org/repo/pull/42';
+    detail.data = {
+      success: true,
+      review: makeReview({ pr_url: prUrl }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    githubAuthorization.data = { connected: false };
+    mountScreen();
+    const button = buttons.rendered.find(
+      candidate => buttonText(candidate) === i18n.t('common.openPullRequest')
+    );
+    expect(button?.onPress).toBeDefined();
+    act(() => button?.onPress?.());
+    expect(openExternalUrl).toHaveBeenCalledWith(prUrl, { label: i18n.t('common.pullRequest') });
+    expect(routerMock.push).not.toHaveBeenCalled();
+  });
+
+  it('opens a personal GitHub review in the browser before the connection read answers', () => {
+    const prUrl = 'https://github.com/org/repo/pull/42';
+    detail.data = {
+      success: true,
+      review: makeReview({ pr_url: prUrl }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    // No data: the read is pending or failed, neither of which answers
+    // `connected: true`, so the pull request opens in the browser.
+    githubAuthorization.data = undefined;
+    mountScreen();
+    const button = buttons.rendered.find(
+      candidate => buttonText(candidate) === i18n.t('common.openPullRequest')
+    );
+    act(() => button?.onPress?.());
+    expect(openExternalUrl).toHaveBeenCalledWith(prUrl, { label: i18n.t('common.pullRequest') });
+    expect(routerMock.push).not.toHaveBeenCalled();
+  });
+
+  it('reads the GitHub connection only for a personal GitHub review', () => {
+    detail.data = { success: true, review: makeReview(), tokenUsage: { input: 0, output: 0 } };
+    mountScreen();
+    expect(githubAuthorization.enabled).toContain(true);
+
+    githubAuthorization.enabled = [];
+    mountScreen(false, 'org-1');
+    expect(githubAuthorization.enabled).toContain(false);
+
+    githubAuthorization.enabled = [];
+    detail.data = {
+      success: true,
+      review: makeReview({
+        platform: 'gitlab',
+        pr_url: 'https://gitlab.com/org/repo/-/merge_requests/42',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    mountScreen();
+    expect(githubAuthorization.enabled).toContain(false);
   });
 
   it('keeps the personal browser fallback for unrecognized URLs', () => {

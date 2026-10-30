@@ -444,7 +444,9 @@ describe('IdleAuth provider chrome parity', () => {
       )
     );
     expect(rowPaddings).toHaveLength(3);
-    expect(rowPaddings.every(padding => padding === (markInset ?? 0) + (markWidth ?? 0))).toBe(true);
+    expect(rowPaddings.every(padding => padding === (markInset ?? 0) + (markWidth ?? 0))).toBe(
+      true
+    );
 
     act(() => {
       renderer.unmount();

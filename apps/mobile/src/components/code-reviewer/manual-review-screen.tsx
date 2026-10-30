@@ -341,6 +341,13 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               {t('codeReviewer.manualReview.instructions')}
             </Text>
             <TextInput
+              // The visible heading above is a separate `Text`, so without an
+              // explicit label a screen reader names this multiline field with
+              // the draft it contains. The name comes from the same catalog key
+              // the heading renders, like the URL field's does.
+              accessibilityLabel={formFieldA11y({
+                label: t('codeReviewer.manualReview.instructions'),
+              })}
               className="h-24 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
               multiline
               textAlignVertical="top"

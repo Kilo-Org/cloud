@@ -133,7 +133,6 @@ vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/form-field-a11y', () => ({ formFieldA11y: () => 'a11y' }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check', GitPullRequest: 'GitPullRequest' }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: 'RadioGroup',
@@ -741,6 +740,39 @@ describe('ManualReviewScreen URL validation', () => {
     const [statusText] = findVisibleStatusTexts(renderer.root);
     expect(statusText?.props.children).toBe(i18n.t('codeReviewer.manualReview.invalidUrl'));
     expect(String(findUrlField(renderer.root).props.className)).toContain('border-destructive');
+
+    unmount();
+  });
+});
+
+describe('ManualReviewScreen instructions field', () => {
+  it('names the field after the heading above it, not the draft it holds', async () => {
+    platformState.OS = 'android';
+    const { renderer, unmount } = await renderScreen();
+
+    // The heading is a sibling `Text`, not part of the field, so the field
+    // carried no name of its own: the native edit-text node was named after the
+    // draft. The name now comes from the same catalog key the heading renders.
+    const heading = i18n.t('codeReviewer.manualReview.instructions');
+    only(
+      renderer.root.findAll(node => String(node.type) === 'Text' && node.props.children === heading),
+      'instructions heading'
+    );
+    const instructions = only(
+      renderer.root.findAll(
+        node => String(node.type) === 'TextInput' && node.props.multiline === true
+      ),
+      'instructions field'
+    );
+    expect(instructions.props.accessibilityLabel).toBe(heading);
+
+    act(() => {
+      (instructions.props.onChangeText as (value: string) => void)('Check the retry budget');
+    });
+    // Uncontrolled: the draft goes to the ref and the mutation only, so the
+    // name stays the heading whether the field is empty or typed into.
+    expect(instructions.props.accessibilityLabel).toBe(heading);
+    expect(instructions.props.value).toBeUndefined();
 
     unmount();
   });

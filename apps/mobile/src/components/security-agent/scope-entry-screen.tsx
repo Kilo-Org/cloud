@@ -192,9 +192,11 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   if (isLoadFailureView) {
     // A retry in flight must be visible: the failure screen is swapped for the
     // loading skeleton, so progress does not depend on a text-less button
-    // spinner, and a failure returns to the error screen with fresh feedback
-    // instead of the identical frame the tap started from. A retry that
-    // resolves the other reads still lands on their own view, as before.
+    // spinner. The screen the retry returns to names the cause of the latest
+    // failure: a connection cause adds the retry-failed wording, while a server
+    // answer keeps the server wording, so that frame can repeat the one the tap
+    // started from. A retry that resolves the other reads still lands on their
+    // own view, as before.
     if (recovery.isRetrying) {
       return <ScopeEntrySkeleton />;
     }

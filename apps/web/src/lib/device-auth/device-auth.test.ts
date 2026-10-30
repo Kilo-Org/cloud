@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, gt, sql } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import {
   generateUserCode,
@@ -267,6 +267,40 @@ describe('Device Auth', () => {
       await expect(createDeviceAuthRequest({ ipAddress })).rejects.toThrow(
         DEVICE_AUTH_PENDING_LIMIT_MESSAGE
       );
+    });
+
+    test('keeps the live pending rows of one address within the limit under concurrent requests', async () => {
+      const ipAddress = `10.${(Date.now() * 13) % 254}.${(Date.now() * 17) % 254}.7`;
+      const concurrentRequests = 12;
+      const livePendingLimit = 5;
+
+      // Clean up any leftover rows.
+      await db.delete(device_auth_requests).where(eq(device_auth_requests.ip_address, ipAddress));
+
+      const results = await Promise.allSettled(
+        Array.from({ length: concurrentRequests }, () => createDeviceAuthRequest({ ipAddress }))
+      );
+
+      expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(
+        livePendingLimit
+      );
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          expect(result.reason).toBeInstanceOf(DeviceAuthPendingLimitError);
+        }
+      }
+
+      const [rows] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(device_auth_requests)
+        .where(
+          and(
+            eq(device_auth_requests.ip_address, ipAddress),
+            eq(device_auth_requests.status, 'pending'),
+            gt(device_auth_requests.expires_at, new Date().toISOString())
+          )
+        );
+      expect(rows?.count).toBe(livePendingLimit);
     });
   });
 

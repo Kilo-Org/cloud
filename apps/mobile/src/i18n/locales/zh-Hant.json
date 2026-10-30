@@ -2917,6 +2917,11 @@
     },
     "inbox": {
       "couldNotLoad": "無法載入收件匣。",
+      "accessLostTitle": "無法存取此組織",
+      "accessLostDescription": "你已不是此組織的成員，因此無法載入其審查請求。切換到個人帳號即可繼續審查。",
+      "organizationUnavailableTitle": "此組織已不存在",
+      "organizationUnavailableDescription": "此組織已遭刪除，因此無法載入其審查請求。切換到個人帳號即可繼續審查。",
+      "continueInPersonal": "繼續使用個人帳號",
       "loading": "正在載入收件匣",
       "noReviewRequests": "尚無審查請求",
       "noReviewRequestsDescription": "等待你審查的提取請求會顯示在這裡。你也可以在上方貼上任何 PR 連結。",

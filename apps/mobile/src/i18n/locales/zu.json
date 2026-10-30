@@ -645,7 +645,12 @@
       "loading": "Kulayishwa ibhokisi lokungenayo",
       "noReviewRequests": "Azikho izicelo zokubuyekeza",
       "noReviewRequestsDescription": "Izicelo zokuhlanganisa ezilinde ukubuyekezwa nguwe zivela lapha. Usengakwazi ukunamathisela noma yisiphi isixhumanisi se-PR ngenhla.",
-      "couldNotLoad": "Asikwazanga ukulayisha ibhokisi lokungenayo."
+      "couldNotLoad": "Asikwazanga ukulayisha ibhokisi lokungenayo.",
+      "accessLostTitle": "Awunakho ukufinyelela kule nhlangano",
+      "accessLostDescription": "Awusaseyilungu le nhlangano, ngakho-ke izicelo zokubuyekeza zayo azikwazi ukulayisha. Qhubeka ku-akhawunti yakho oyisisebenzisi siqu ukuze uqhubeke nokubuyekeza.",
+      "organizationUnavailableTitle": "Le nhlangano ayisasikhona",
+      "organizationUnavailableDescription": "Le nhlangano isuswe, ngakho-ke izicelo zokubuyekeza zayo azikwazi ukulayisha. Qhubeka ku-akhawunti yakho oyisisebenzisi siqu ukuze uqhubeke nokubuyekeza.",
+      "continueInPersonal": "Qhubeka ku-akhawunti oyisisebenzisi siqu"
     },
     "composer": {
       "commentBodyPlaceholder": "Amazwana akho",

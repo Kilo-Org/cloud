@@ -2917,6 +2917,11 @@
     },
     "inbox": {
       "couldNotLoad": "Gelen kutusu yüklenemedi.",
+      "accessLostTitle": "Bu kuruluşa erişimin yok",
+      "accessLostDescription": "Artık bu kuruluşun üyesi değilsin, bu yüzden inceleme istekleri yüklenemiyor. İncelemeye devam etmek için kişisel hesabına geç.",
+      "organizationUnavailableTitle": "Bu kuruluş artık mevcut değil",
+      "organizationUnavailableDescription": "Bu kuruluş silindi, bu yüzden inceleme istekleri yüklenemiyor. İncelemeye devam etmek için kişisel hesabına geç.",
+      "continueInPersonal": "Kişisel hesapla devam et",
       "loading": "Gelen kutusu yükleniyor",
       "noReviewRequests": "İnceleme isteği yok",
       "noReviewRequestsDescription": "İncelemeni bekleyen çekme istekleri burada görünür. Yukarıya herhangi bir PR bağlantısı da yapıştırabilirsin.",

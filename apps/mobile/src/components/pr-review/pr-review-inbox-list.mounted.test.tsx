@@ -113,6 +113,7 @@ vi.mock('@/lib/pr-review/use-provider-inbox', () => ({
     firstPageErrorState: inboxState.firstPageErrorState,
     firstPageErrorPlatform: inboxState.firstPageErrorPlatform,
     laterPageError: inboxState.laterPageError,
+    organizationScopeAccess: 'granted' as const,
   }),
 }));
 // `@/lib/utils` initializes real i18n; the row only needs timestamp shaping.
@@ -245,10 +246,7 @@ describe('PrReviewInboxList side insets (landscape)', () => {
 // row — the same fix as `PrRefsRow` in pr-review-overview-parts.tsx.
 describe('InboxRow meta line (a long ref keeps the chip inside the row)', () => {
   beforeEach(() => {
-    insetsState.top = 0;
-    insetsState.bottom = 0;
-    insetsState.left = 0;
-    insetsState.right = 0;
+    Object.assign(insetsState, { top: 0, bottom: 0, left: 0, right: 0 });
     inboxState.query.isPending = false;
     inboxState.query.isFetching = false;
     inboxState.query.hasNextPage = false;

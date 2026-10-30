@@ -645,7 +645,12 @@
       "loading": "Mampiditra ny voaray",
       "noReviewRequests": "Tsy misy fangatahana fandinihana",
       "noReviewRequestsDescription": "Hiseho eto ny fangatahana fampiraisana miandry ny fandinihanao. Mbola afaka mametaka rohy PR hafa etsy ambony ianao.",
-      "couldNotLoad": "Tsy tafiditra ny voaray."
+      "couldNotLoad": "Tsy tafiditra ny voaray.",
+      "accessLostTitle": "Tsy manana alalana intsony amin'ity fikambanana ity",
+      "accessLostDescription": "Tsy mpikambana ao amin'ity fikambanana ity intsony ianao, ka tsy tafiditra ny fangatahana fandinihana. Mandehana amin'ny kaonty manokanao mba hanohy ny fandinihana.",
+      "organizationUnavailableTitle": "Tsy misy intsony ity fikambanana ity",
+      "organizationUnavailableDescription": "Voafafa ity fikambanana ity, ka tsy tafiditra ny fangatahana fandinihana. Mandehana amin'ny kaonty manokanao mba hanohy ny fandinihana.",
+      "continueInPersonal": "Manohy amin'ny kaonty manokana"
     },
     "composer": {
       "commentBodyPlaceholder": "Ny hevitrao",

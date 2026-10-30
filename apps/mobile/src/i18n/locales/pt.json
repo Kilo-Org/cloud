@@ -660,7 +660,12 @@
       "loading": "A carregar a caixa de entrada",
       "noReviewRequests": "Sem pedidos de revisão",
       "noReviewRequestsDescription": "Os PRs que aguardam a tua revisão aparecem aqui. Também podes colar qualquer ligação de PR acima.",
-      "couldNotLoad": "Não foi possível carregar a caixa de entrada."
+      "couldNotLoad": "Não foi possível carregar a caixa de entrada.",
+      "accessLostTitle": "Sem acesso a esta organização",
+      "accessLostDescription": "Já não és membro desta organização, por isso não é possível carregar os seus pedidos de revisão. Continua na tua conta pessoal para continuares a rever.",
+      "organizationUnavailableTitle": "Esta organização já não existe",
+      "organizationUnavailableDescription": "Esta organização foi eliminada, por isso não é possível carregar os seus pedidos de revisão. Continua na tua conta pessoal para continuares a rever.",
+      "continueInPersonal": "Continuar na conta pessoal"
     },
     "composer": {
       "commentBodyPlaceholder": "O teu comentário",

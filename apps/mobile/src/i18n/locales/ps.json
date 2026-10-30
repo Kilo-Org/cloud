@@ -645,7 +645,12 @@
       "loading": "راغلې غوښتنې بارېږي",
       "noReviewRequests": "د بیاکتنې هېڅ غوښتنه نشته",
       "noReviewRequestsDescription": "هغه پل ریکویسټونه چې ستاسو بیاکتنې ته په تمه دي، دلته ښکاري. تاسو بیا هم پورته د هر PR لینک نښلولی شئ.",
-      "couldNotLoad": "راغلې غوښتنې بار نه شوې."
+      "couldNotLoad": "راغلې غوښتنې بار نه شوې.",
+      "accessLostTitle": "دې سازمان ته لاسرسی نشته",
+      "accessLostDescription": "تاسو نور د دې سازمان غړی نه یاست، نو د دې د بیاکتنې غوښتنې بار نه شوې. د بیاکتنې د دوام لپاره په خپل شخصي حساب کې دوام ورکړئ.",
+      "organizationUnavailableTitle": "دا سازمان نور شتون نه لري",
+      "organizationUnavailableDescription": "دا سازمان ړنګ شوی، نو د دې د بیاکتنې غوښتنې بار نه شوې. د بیاکتنې د دوام لپاره په خپل شخصي حساب کې دوام ورکړئ.",
+      "continueInPersonal": "په شخصي حساب کې دوام ورکړئ"
     },
     "composer": {
       "commentBodyPlaceholder": "د تبصرې متن",

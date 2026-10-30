@@ -645,7 +645,12 @@
       "loading": "Hleð innhólfi",
       "noReviewRequests": "Engar beiðnir um yfirferð",
       "noReviewRequestsDescription": "Hér birtast sameiningarbeiðnir sem bíða eftir yfirferð þinni. Þú getur líka límt hvaða PR-tengil sem er hér að ofan.",
-      "couldNotLoad": "Ekki tókst að hlaða innhólfinu."
+      "couldNotLoad": "Ekki tókst að hlaða innhólfinu.",
+      "accessLostTitle": "Enginn aðgangur að þessu félagi",
+      "accessLostDescription": "Þú ert ekki lengur meðlimi þessa félags, svo ekki er hægt að sækja beiðnir þess um yfirferð. Haltu áfram í persónulega reikningnum þínum til að halda áfram að yfirfara.",
+      "organizationUnavailableTitle": "Þetta félag er ekki lengur til",
+      "organizationUnavailableDescription": "Þetta félag var eytt, svo ekki er hægt að sækja beiðnir þess um yfirferð. Haltu áfram í persónulega reikningnum þínum til að halda áfram að yfirfara.",
+      "continueInPersonal": "Halda áfram í persónulegum reikningi"
     },
     "composer": {
       "commentBodyPlaceholder": "Athugasemd",

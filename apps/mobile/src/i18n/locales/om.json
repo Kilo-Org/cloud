@@ -645,7 +645,12 @@
       "loading": "Sanduuqni ergaa fe'amaa jira",
       "noReviewRequests": "Gaaffiin gamaaggamaa hin jiru",
       "noReviewRequestsDescription": "Gaaffiiwwan walitti makuu gamaaggama kee eegan asitti mul'atu. Liinkii PR kamiyyuu bakka armaan oliitti maxxansuu dandeessa.",
-      "couldNotLoad": "Sanduuqa ergaa fe'uu hin danda'amne."
+      "couldNotLoad": "Sanduuqa ergaa fe'uu hin danda'amne.",
+      "accessLostTitle": "Dhaabbata kana bira ga'uu hin danda'amne",
+      "accessLostDescription": "Miseensa dhaabbata kanaa hin taane, kanaafuu gaaffiin gamaaggamaa isaa fe'uu hin danda'u. Gamaaggamu itti fufuuf herrega dhuunfaa kee keessatti itti fufi.",
+      "organizationUnavailableTitle": "Dhaabbanni kun kana booda hin argamu",
+      "organizationUnavailableDescription": "Dhaabbanni kun haqameera, kanaafuu gaaffiin gamaaggamaa isaa fe'uu hin danda'u. Gamaaggamu itti fufuuf herrega dhuunfaa kee keessatti itti fufi.",
+      "continueInPersonal": "Herrega dhuunfaa kee keessatti itti fufi"
     },
     "composer": {
       "commentBodyPlaceholder": "Yaada kee",

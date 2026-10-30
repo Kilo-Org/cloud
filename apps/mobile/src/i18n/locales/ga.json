@@ -690,7 +690,12 @@
       "loading": "Ag lódáil an bhosca ionphoist",
       "noReviewRequests": "Gan aon iarratas athbhreithnithe",
       "noReviewRequestsDescription": "Taispeántar anseo na hiarratais tarraingthe atá ag fanacht le d'athbhreithniú. Is féidir leat nasc PR ar bith a ghreamú thuas fós.",
-      "couldNotLoad": "Níorbh fhéidir an bosca ionphoist a lódáil."
+      "couldNotLoad": "Níorbh fhéidir an bosca ionphoist a lódáil.",
+      "accessLostTitle": "Gan rochtain ar an eagraíocht seo",
+      "accessLostDescription": "Ní ball den eagraíocht seo a thuilleadh, mar sin ní féidir na hiarratais athbhreithnithe a lódáil. Lean ar aghaidh i do chuntas pearsanta chun athbhreithniú a dhéanamh fós.",
+      "organizationUnavailableTitle": "Níl an eagraíocht seo ann a thuilleadh",
+      "organizationUnavailableDescription": "Scriosadh an eagraíocht seo, mar sin ní féidir na hiarratais athbhreithnithe a lódáil. Lean ar aghaidh i do chuntas pearsanta chun athbhreithniú a dhéanamh fós.",
+      "continueInPersonal": "Lean ar aghaidh sa chuntas pearsanta"
     },
     "composer": {
       "commentBodyPlaceholder": "Do thrácht…",

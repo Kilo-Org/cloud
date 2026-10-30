@@ -645,7 +645,12 @@
       "loading": "Sanduuqa farriimaha waa la soo rarayaa",
       "noReviewRequests": "Ma jiraan codsiyo dib-u-eegis",
       "noReviewRequestsDescription": "Codsiyada isku-darka ee sugaya dib-u-eegistaada ayaa halkan ka soo muuqda. Weli waxaad kor ku dhejin kartaa xiriiriye PR kasta.",
-      "couldNotLoad": "Sanduuqa farriimaha lama soo rari karin."
+      "couldNotLoad": "Sanduuqa farriimaha lama soo rari karin.",
+      "accessLostTitle": "Oggolaansho ururkan lama helin",
+      "accessLostDescription": "Mar dambe ma tihid xubin ka mid ah ururkan, sidaas darteed codsiyada dib-u-eegista lama soo rari karo. Sii wad akoonkaaga shakhsiyeed si aad dib-u-eegista uga sii waddo.",
+      "organizationUnavailableTitle": "Ururkan mar dambe ma jiro",
+      "organizationUnavailableDescription": "Ururkan waa la tirtiray, sidaas darteed codsiyada dib-u-eegisa lama soo rari karo. Sii wad akoonkaaga shakhsiyeed si aad dib-u-eegista uga sii waddo.",
+      "continueInPersonal": "Sii wad akoonka shakhsiyeed"
     },
     "composer": {
       "commentBodyPlaceholder": "Faalladaada",

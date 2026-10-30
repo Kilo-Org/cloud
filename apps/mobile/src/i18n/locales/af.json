@@ -645,7 +645,12 @@
       "loading": "Laai inkas",
       "noReviewRequests": "Geen hersieningsversoeke nie",
       "noReviewRequestsDescription": "Trekversoeke wat op jou hersiening wag, verskyn hier. Jy kan steeds enige PR-skakel hierbo plak.",
-      "couldNotLoad": "Kon nie die inkas laai nie."
+      "couldNotLoad": "Kon nie die inkas laai nie.",
+      "accessLostTitle": "Geen toegang tot hierdie organisasie nie",
+      "accessLostDescription": "Jy is nie meer 'n lid van hierdie organisasie nie, so sy hersieningsversoeke kan nie laai nie. Gaan voort in jou persoonlike rekening om aan te gaan hersien.",
+      "organizationUnavailableTitle": "Hierdie organisasie bestaan nie meer nie",
+      "organizationUnavailableDescription": "Hierdie organisasie is geskrap, so sy hersieningsversoeke kan nie laai nie. Gaan voort in jou persoonlike rekening om aan te gaan hersien.",
+      "continueInPersonal": "Gaan voort in persoonlike rekening"
     },
     "composer": {
       "commentBodyPlaceholder": "Jou kommentaar…",

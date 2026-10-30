@@ -2993,6 +2993,11 @@
     },
     "inbox": {
       "couldNotLoad": "Nie udało się wczytać skrzynki.",
+      "accessLostTitle": "Brak dostępu do tej organizacji",
+      "accessLostDescription": "Nie jesteś już członkiem tej organizacji, więc nie udało się wczytać jej próśb o przegląd. Przejdź na konto osobiste, aby dalej przeglądać.",
+      "organizationUnavailableTitle": "Ta organizacja już nie istnieje",
+      "organizationUnavailableDescription": "Ta organizacja została usunięta, więc nie udało się wczytać jej próśb o przegląd. Przejdź na konto osobiste, aby dalej przeglądać.",
+      "continueInPersonal": "Przejdź na konto osobiste",
       "loading": "Wczytywanie skrzynki",
       "noReviewRequests": "Brak próśb o przegląd",
       "noReviewRequestsDescription": "Tutaj pojawią się PR oczekujące na twój przegląd. Powyżej możesz też wkleić odnośnik do dowolnego PR.",

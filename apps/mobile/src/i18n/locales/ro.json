@@ -660,7 +660,12 @@
       "loading": "Se încarcă cererile primite",
       "noReviewRequests": "Nicio cerere de revizuire",
       "noReviewRequestsDescription": "Aici apar PR-urile care așteaptă revizuirea ta. Poți lipi mai sus și o legătură către orice alt PR.",
-      "couldNotLoad": "Nu s-au putut încărca cererile primite."
+      "couldNotLoad": "Nu s-au putut încărca cererile primite.",
+      "accessLostTitle": "Nu ai acces la această organizație",
+      "accessLostDescription": "Nu mai ești membru al acestei organizații, așa că cererile sale de revizuire nu se pot încărca. Continuă în contul personal pentru a continua revizuirile.",
+      "organizationUnavailableTitle": "Această organizație nu mai există",
+      "organizationUnavailableDescription": "Această organizație a fost ștearsă, așa că cererile sale de revizuire nu se pot încărca. Continuă în contul personal pentru a continua revizuirile.",
+      "continueInPersonal": "Continuă în contul personal"
     },
     "composer": {
       "commentBodyPlaceholder": "Comentariul tău",

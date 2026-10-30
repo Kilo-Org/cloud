@@ -2955,6 +2955,11 @@
     },
     "inbox": {
       "couldNotLoad": "Impossibile caricare la posta in arrivo.",
+      "accessLostTitle": "Nessun accesso a questa organizzazione",
+      "accessLostDescription": "Non fai più parte di questa organizzazione, quindi non è possibile caricarne le richieste di revisione. Continua con il tuo account personale per continuare a revisionare.",
+      "organizationUnavailableTitle": "Questa organizzazione non esiste più",
+      "organizationUnavailableDescription": "Questa organizzazione è stata eliminata, quindi non è possibile caricarne le richieste di revisione. Continua con il tuo account personale per continuare a revisionare.",
+      "continueInPersonal": "Continua con l'account personale",
       "loading": "Caricamento della posta in arrivo",
       "noReviewRequests": "Nessuna richiesta di revisione",
       "noReviewRequestsDescription": "Qui trovi le pull request in attesa della tua revisione. Puoi comunque incollare qui sopra il collegamento a qualsiasi PR.",

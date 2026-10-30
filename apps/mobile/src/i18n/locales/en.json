@@ -711,7 +711,12 @@
       "loading": "Loading inbox",
       "noReviewRequests": "No review requests",
       "noReviewRequestsDescription": "Pull requests waiting on your review show up here. You can still paste any PR link above.",
-      "couldNotLoad": "Could not load inbox"
+      "couldNotLoad": "Could not load inbox",
+      "accessLostTitle": "No access to this organization",
+      "accessLostDescription": "You're no longer a member of this organization, so its review requests can't load. Continue in your personal account to keep reviewing.",
+      "organizationUnavailableTitle": "This organization no longer exists",
+      "organizationUnavailableDescription": "This organization was deleted, so its review requests can't load. Continue in your personal account to keep reviewing.",
+      "continueInPersonal": "Continue in personal account"
     },
     "composer": {
       "commentBodyPlaceholder": "Leave a comment",

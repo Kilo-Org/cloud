@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { selectPrInboxView } from './pr-review-inbox-view';
+import { isOrganizationAccessView, selectPrInboxView } from './pr-review-inbox-view';
 
 function state(kind: 'retryable' | 'permission' | 'not-found' | 'reconnect') {
   return { kind };
@@ -9,8 +9,14 @@ function state(kind: 'retryable' | 'permission' | 'not-found' | 'reconnect') {
 // The four-state matrix plus a later-page failure. `isPending` is "no rows and
 // no first-page failure", `isFetching` is "a first-page read is in flight";
 // every combination of the two has a state of its own, so no query state can
-// land outside the render tree.
-const idle = { itemCount: 0, firstPageErrorState: null, laterPageError: false } as const;
+// land outside the render tree. The organization scope is granted unless a test
+// says otherwise, so every case here asserts one axis at a time.
+const idle = {
+  itemCount: 0,
+  firstPageErrorState: null,
+  laterPageError: false,
+  organizationScopeAccess: 'granted',
+} as const;
 
 describe('selectPrInboxView', () => {
   it('selects loading when the first page is still in flight', () => {
@@ -22,7 +28,12 @@ describe('selectPrInboxView', () => {
 
   it('selects happy when rows are loaded', () => {
     expect(
-      selectPrInboxView({ ...idle, isPending: false, isFetching: false, itemCount: 3 })
+      selectPrInboxView({
+        ...idle,
+        isPending: false,
+        isFetching: false,
+        itemCount: 3,
+      })
     ).toEqual({ kind: 'happy', showLoadMoreRetry: false });
   });
 
@@ -55,7 +66,12 @@ describe('selectPrInboxView', () => {
     // A GitLab/Bitbucket outage beside an empty GitHub inbox must not render
     // "No review requests": the failure owns the surface and its retry CTA.
     expect(
-      selectPrInboxView({ ...idle, isPending: false, isFetching: false, laterPageError: true })
+      selectPrInboxView({
+        ...idle,
+        isPending: false,
+        isFetching: false,
+        laterPageError: true,
+      })
     ).toEqual({ kind: 'retryable', showLoadMoreRetry: false });
   });
 
@@ -131,7 +147,12 @@ describe('selectPrInboxView', () => {
 
   it('never flags the load-more retry row outside the happy state', () => {
     expect(
-      selectPrInboxView({ ...idle, isPending: true, isFetching: true, laterPageError: true })
+      selectPrInboxView({
+        ...idle,
+        isPending: true,
+        isFetching: true,
+        laterPageError: true,
+      })
     ).toEqual({ kind: 'loading', showLoadMoreRetry: false });
   });
 
@@ -140,7 +161,104 @@ describe('selectPrInboxView', () => {
     // back to skeletons; `isPending` already excludes that case, and the
     // selector must not reintroduce it through `isFetching`.
     expect(
-      selectPrInboxView({ ...idle, isPending: false, isFetching: true, itemCount: 2 })
+      selectPrInboxView({
+        ...idle,
+        isPending: false,
+        isFetching: true,
+        itemCount: 2,
+      })
     ).toEqual({ kind: 'happy', showLoadMoreRetry: false });
+  });
+});
+
+// A refused organization denies the reads every provider state describes, so it
+// outranks them: none of these provider facts may hide it.
+describe('selectPrInboxView organization access', () => {
+  it.each([
+    ['denied', 'access-denied'],
+    ['not-found', 'organization-unavailable'],
+  ] as const)('reports a %s organization as %s', (access, kind) => {
+    expect(
+      selectPrInboxView({
+        isPending: false,
+        isFetching: false,
+        itemCount: 0,
+        firstPageErrorState: null,
+        laterPageError: false,
+        organizationScopeAccess: access,
+      })
+    ).toEqual({ kind, showLoadMoreRetry: false });
+  });
+
+  it('outranks cached rows, a provider failure and the loading state', () => {
+    const rowsView = selectPrInboxView({
+      isPending: false,
+      isFetching: false,
+      itemCount: 4,
+      firstPageErrorState: null,
+      laterPageError: true,
+      organizationScopeAccess: 'denied',
+    });
+    expect(rowsView).toEqual({
+      kind: 'access-denied',
+      showLoadMoreRetry: false,
+    });
+
+    // A refused organization is not a transient outage: the retryable view (and
+    // its Retry CTA) must not replace it, whichever provider also failed.
+    expect(
+      selectPrInboxView({
+        isPending: false,
+        isFetching: false,
+        itemCount: 0,
+        firstPageErrorState: state('retryable'),
+        laterPageError: true,
+        organizationScopeAccess: 'denied',
+      })
+    ).toEqual({ kind: 'access-denied', showLoadMoreRetry: false });
+
+    // Nor is it "GitLab needs reconnecting": that asks for a credential fix the
+    // reader cannot perform for an organization they lost.
+    expect(
+      selectPrInboxView({
+        isPending: true,
+        isFetching: true,
+        itemCount: 0,
+        firstPageErrorState: state('reconnect'),
+        laterPageError: false,
+        organizationScopeAccess: 'denied',
+      })
+    ).toEqual({ kind: 'access-denied', showLoadMoreRetry: false });
+  });
+
+  it('outranks a first read that cannot progress', () => {
+    // The paused-read retryable body offers a Retry; a lost organization can
+    // never answer it, so the access state still owns the surface.
+    expect(
+      selectPrInboxView({
+        ...idle,
+        isPending: true,
+        isFetching: false,
+        organizationScopeAccess: 'denied',
+      })
+    ).toEqual({ kind: 'access-denied', showLoadMoreRetry: false });
+  });
+
+  it('marks only those two views as organization access states', () => {
+    expect(
+      isOrganizationAccessView({
+        kind: 'access-denied',
+        showLoadMoreRetry: false,
+      })
+    ).toBe(true);
+    expect(
+      isOrganizationAccessView({
+        kind: 'organization-unavailable',
+        showLoadMoreRetry: false,
+      })
+    ).toBe(true);
+    for (const kind of ['happy', 'empty', 'retryable', 'reconnect', 'not-found'] as const) {
+      expect(isOrganizationAccessView({ kind, showLoadMoreRetry: false })).toBe(false);
+    }
   });
 });

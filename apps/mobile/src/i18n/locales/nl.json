@@ -2917,6 +2917,11 @@
     },
     "inbox": {
       "couldNotLoad": "Het postvak IN kon niet worden geladen.",
+      "accessLostTitle": "Geen toegang tot deze organisatie",
+      "accessLostDescription": "Je bent geen lid meer van deze organisatie, dus de beoordelingsverzoeken kunnen niet worden geladen. Ga door in je persoonlijke account om verder te gaan met beoordelen.",
+      "organizationUnavailableTitle": "Deze organisatie bestaat niet meer",
+      "organizationUnavailableDescription": "Deze organisatie is verwijderd, dus de beoordelingsverzoeken kunnen niet worden geladen. Ga door in je persoonlijke account om verder te gaan met beoordelen.",
+      "continueInPersonal": "Doorgaan in persoonlijk account",
       "loading": "Postvak IN laden",
       "noReviewRequests": "Geen beoordelingsverzoeken",
       "noReviewRequestsDescription": "Hier verschijnen PR's die op je beoordeling wachten. Je kunt hierboven ook een andere PR-koppeling plakken.",

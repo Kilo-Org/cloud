@@ -660,7 +660,12 @@
       "loading": "Učitavanje primljenih zahtjeva",
       "noReviewRequests": "Nema zahtjeva za pregled koda",
       "noReviewRequestsDescription": "Ovdje se prikazuju zahtjevi za spajanje koji čekaju tvoj pregled koda. I dalje možeš zalijepiti bilo koju poveznicu na PR iznad.",
-      "couldNotLoad": "Nije moguće učitati primljene zahtjeve."
+      "couldNotLoad": "Nije moguće učitati primljene zahtjeve.",
+      "accessLostTitle": "Nemaš pristup ovoj organizaciji",
+      "accessLostDescription": "Više nisi član/ica ove organizacije, pa se njezini zahtjevi za pregled koda ne mogu učitati. Prebaci se na osobni račun da i dalje pregledavaš kod.",
+      "organizationUnavailableTitle": "Ova organizacija više ne postoji",
+      "organizationUnavailableDescription": "Ova organizacija je izbrisana, pa se njezini zahtjevi za pregled koda ne mogu učitati. Prebaci se na osobni račun da i dalje pregledavaš kod.",
+      "continueInPersonal": "Nastavi u osobnom računu"
     },
     "composer": {
       "commentBodyPlaceholder": "Tvoj komentar",

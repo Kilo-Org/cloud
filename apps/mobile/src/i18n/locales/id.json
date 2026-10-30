@@ -2917,6 +2917,11 @@
     },
     "inbox": {
       "couldNotLoad": "Tidak dapat memuat kotak masuk.",
+      "accessLostTitle": "Tidak ada akses ke organisasi ini",
+      "accessLostDescription": "Kamu bukan lagi anggota organisasi ini, jadi permintaan tinjauannya tidak dapat dimuat. Lanjutkan di akun pribadimu untuk terus meninjau.",
+      "organizationUnavailableTitle": "Organisasi ini tidak ada lagi",
+      "organizationUnavailableDescription": "Organisasi ini telah dihapus, jadi permintaan tinjauannya tidak dapat dimuat. Lanjutkan di akun pribadimu untuk terus meninjau.",
+      "continueInPersonal": "Lanjut di akun Pribadi",
       "loading": "Memuat kotak masuk",
       "noReviewRequests": "Tidak ada permintaan tinjauan",
       "noReviewRequestsDescription": "PR yang menunggu tinjauanmu muncul di sini. Kamu tetap dapat menempelkan tautan PR apa pun di atas.",

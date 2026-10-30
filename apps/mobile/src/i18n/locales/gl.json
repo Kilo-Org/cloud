@@ -645,7 +645,12 @@
       "loading": "Cargando a caixa de entrada",
       "noReviewRequests": "Non hai solicitudes de revisión",
       "noReviewRequestsDescription": "Aquí aparecen as solicitudes de integración que agardan pola túa revisión. Tamén podes pegar arriba unha ligazón a calquera PR.",
-      "couldNotLoad": "Non se puido cargar a caixa de entrada."
+      "couldNotLoad": "Non se puido cargar a caixa de entrada.",
+      "accessLostTitle": "Non tes acceso a esta organización",
+      "accessLostDescription": "Xa non es membro desta organización, polo que non se poden cargar as súas solicitudes de revisión. Continúa na túa conta persoal para seguir revisando.",
+      "organizationUnavailableTitle": "Esta organización xa non existe",
+      "organizationUnavailableDescription": "Esta organización foi eliminada, polo que non se poden cargar as súas solicitudes de revisión. Continúa na túa conta persoal para seguir revisando.",
+      "continueInPersonal": "Continuar na conta persoal"
     },
     "composer": {
       "commentBodyPlaceholder": "Comentario",

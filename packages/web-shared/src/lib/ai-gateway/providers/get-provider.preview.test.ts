@@ -318,6 +318,86 @@ describe('previewByokRouting', () => {
     }
   );
 
+  function permutations<T>(items: readonly T[]): T[][] {
+    if (items.length <= 1) return [[...items]];
+    return items.flatMap((item, index) =>
+      permutations(items.toSpliced(index, 1)).map(rest => [item, ...rest])
+    );
+  }
+
+  const PRIORITIZED_PROVIDERS = ['zai-coding', 'moonshotai', 'bedrock', 'openrouter'] as const;
+
+  function expectedRoute(
+    providerId: (typeof PRIORITIZED_PROVIDERS)[number],
+    apiKind: GatewayChatApiKind,
+    gatewayProviders: GatewayUserByokProviderId[]
+  ): RouteSignature | null {
+    switch (providerId) {
+      case 'zai-coding':
+        return apiKind === 'messages' ? null : { route: 'direct-byok', providerId };
+      case 'moonshotai':
+      case 'bedrock':
+        return { route: 'vercel-byok', providerIds: [providerId] };
+      case 'openrouter':
+        return gatewayProviders.includes(providerId) ? { route: 'gateway-byok', providerId } : null;
+    }
+  }
+
+  test.each(permutations(PRIORITIZED_PROVIDERS))(
+    'uses the first key that serves in the owner order %s',
+    async (...order) => {
+      const user = await insertTestUser();
+      await db.insert(byok_api_keys).values(
+        order.map((providerId, priority) => ({
+          kilo_user_id: user.id,
+          provider_id: providerId,
+          encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+          created_by: user.id,
+          settings: { serve_catalog_models: providerId === 'zai-coding', priority },
+        }))
+      );
+      jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['moonshotai', 'bedrock']);
+      jest.mocked(canRouteToVercel).mockResolvedValue(true);
+      jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+
+      for (const apiKind of ['chat_completions', 'messages'] as const) {
+        for (const gatewayProviders of [
+          ['openrouter'],
+          [],
+        ] satisfies GatewayUserByokProviderId[][]) {
+          jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue(gatewayProviders);
+          const expected = order
+            .map(providerId => expectedRoute(providerId, apiKind, gatewayProviders))
+            .find(route => route !== null);
+
+          const routed = await getProvider({
+            requestedModel: MODEL,
+            request: request(apiKind),
+            user,
+            organizationId: undefined,
+          });
+          const preview = await previewByokRouting({
+            fromDb: db,
+            owner: { type: 'user', id: user.id },
+            requestedModel: MODEL,
+            apiKind,
+          });
+
+          if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
+          const scenario = { apiKind, gatewayProviders };
+          expect({ scenario, route: routeOf(routed, apiKind) }).toEqual({
+            scenario,
+            route: expected,
+          });
+          expect({ scenario, route: previewRouteOf(preview.steps) }).toEqual({
+            scenario,
+            route: expected,
+          });
+        }
+      }
+    }
+  );
+
   test('marks the ChatGPT connection as not tried below a serving key', async () => {
     const user = await insertTestUser();
     await db.insert(byok_api_keys).values({
@@ -341,6 +421,37 @@ describe('previewByokRouting', () => {
     expect(preview.steps.map(({ route, outcome }) => ({ route, outcome }))).toEqual([
       { route: 'direct-byok', outcome: 'used' },
       { route: 'chatgpt', outcome: 'unreached' },
+      { route: 'kilo', outcome: 'unreached' },
+    ]);
+  });
+
+  test('puts the ChatGPT connection ahead of a gateway key the owner ranked above a catalog key', async () => {
+    const user = await insertTestUser();
+    await db.insert(byok_api_keys).values(
+      (['openrouter', 'zai-coding'] as const).map((providerId, priority) => ({
+        kilo_user_id: user.id,
+        provider_id: providerId,
+        encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+        created_by: user.id,
+        settings: { serve_catalog_models: providerId === 'zai-coding', priority },
+      }))
+    );
+    jest.mocked(getOpenAiChatGptCandidateModel).mockResolvedValueOnce('gpt-test');
+    jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue(['openrouter']);
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+
+    const preview = await previewByokRouting({
+      fromDb: db,
+      owner: { type: 'user', id: user.id },
+      requestedModel: MODEL,
+      apiKind: 'responses',
+    });
+
+    if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
+    expect(preview.steps.map(({ route, outcome }) => ({ route, outcome }))).toEqual([
+      { route: 'chatgpt', outcome: 'conditional' },
+      { route: 'gateway-byok', outcome: 'used' },
+      { route: 'direct-byok', outcome: 'unreached' },
       { route: 'kilo', outcome: 'unreached' },
     ]);
   });

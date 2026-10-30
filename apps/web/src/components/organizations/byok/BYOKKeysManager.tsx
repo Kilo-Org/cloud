@@ -705,11 +705,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
         <CardContent>
           {canReorder ? (
             <p className="text-muted-foreground mb-4 text-sm">
-              Priority 1 is tried first. When several provider keys can serve the same model,
-              requests use them from the top of this list. Keys using Kilo catalog model IDs still
-              serve their models before other provider keys, and OpenRouter or Vercel AI Gateway
-              keys only serve models that no provider key covers. A conversation already in progress
-              can stay on the provider that holds its prompt cache.
+              Priority 1 is tried first. Each request uses the highest key in this list that can
+              serve its model, skipping disabled keys and keys whose provider does not offer it. A
+              connected ChatGPT subscription serves eligible OpenAI requests first, unless a key
+              using Kilo catalog model IDs is ranked above the key that would otherwise serve.
             </p>
           ) : null}
           <div aria-live="polite" className="sr-only">
@@ -1269,8 +1268,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       <AlertDescription>
                         <p>
                           Once saved, your key will automatically be used whenever your client
-                          requests one of the supported models above. If multiple keys apply to the
-                          same model, they are tried in unspecified order until one succeeds.
+                          requests one of the supported models above. If several of your keys can
+                          serve the same model, the one highest in your key list is used.
                         </p>
                         {organizationId ? (
                           <p className="mt-2">

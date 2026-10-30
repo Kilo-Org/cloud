@@ -151,10 +151,8 @@ export function getByokKeyPriority(settings: unknown): number | undefined {
 
 const byokKeyPriority = sql`case when jsonb_typeof(${byok_api_keys.settings}->'priority') = 'number' then (${byok_api_keys.settings}->>'priority')::numeric end`;
 
-/**
- * Keys the owner prioritized come first, lowest priority first. The rest keep the original
- * oldest-first order, so owners who never reorder their keys see no change.
- */
+/** Prioritized keys first, the rest oldest first. `sortByokKeysInRouteOrder` gives the
+ * route order. */
 export const BYOK_KEY_ORDER = [
   sql`${byokKeyPriority} asc nulls last`,
   byok_api_keys.created_at,

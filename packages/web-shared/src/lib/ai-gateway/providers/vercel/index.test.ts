@@ -470,30 +470,6 @@ describe('applyVercelSettings BYOK pinning', () => {
     expect(request.body.provider).toBeUndefined();
   });
 
-  it('leaves the provider order to Vercel when the owner never reordered their keys', async () => {
-    const request = byokRequest([]);
-
-    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
-      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
-      { decryptedAPIKey: bedrockCredentials, providerId: 'bedrock' },
-    ]);
-
-    expect(request.body.providerOptions?.gateway?.order).toBeUndefined();
-  });
-
-  it("tries the providers in the owner's key order once they reordered their keys", async () => {
-    const request = byokRequest(['anthropic']);
-
-    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
-      { decryptedAPIKey: vertexCredentials, providerId: 'vertex', priority: 0 },
-      { decryptedAPIKey: bedrockCredentials, providerId: 'bedrock', priority: 1 },
-      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic', priority: 2 },
-    ]);
-
-    expect(request.body.providerOptions?.gateway?.only).toEqual(['vertex', 'bedrock']);
-    expect(request.body.providerOptions?.gateway?.order).toEqual(['vertex', 'bedrock']);
-  });
-
   it('keeps the same gateway options on BYOK and managed paths for identical provider preferences', async () => {
     const provider = {
       sort: 'latency' as const,

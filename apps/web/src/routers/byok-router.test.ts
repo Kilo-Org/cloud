@@ -19,6 +19,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
 });
 
 import { createCallerForUser } from '@/routers/test-utils';
+import { getByokKeyPriority } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   getOpenRouterModelsMetadataFromDatabase,
@@ -251,6 +252,56 @@ describe('BYOK Router', () => {
         .from(byok_api_keys)
         .where(eq(byok_api_keys.id, ids[0]));
       expect(catalogKey?.settings).toEqual({ serve_catalog_models: true, priority: 1 });
+    });
+
+    test('lists keys that were never reordered in the default route order', async () => {
+      const { caller, ids } = await createPersonalKeys(ownerUser.id, [
+        'openrouter',
+        'anthropic',
+        'vercel-ai-gateway',
+      ]);
+
+      expect((await caller.byok.list({})).map(key => key.id)).toEqual([ids[1], ids[2], ids[0]]);
+      const rows = await db
+        .select({ settings: byok_api_keys.settings })
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.kilo_user_id, ownerUser.id));
+      expect(rows.map(row => row.settings)).toEqual([{}, {}, {}]);
+    });
+
+    test('adds a new provider key above the gateway keys once the owner reordered', async () => {
+      const { caller, ids } = await createPersonalKeys(ownerUser.id, ['anthropic', 'openrouter']);
+      await caller.byok.reorder({ keyIds: ids });
+
+      const provider = await caller.byok.create({ provider_id: 'mistral', api_key: 'key-mistral' });
+      const gateway = await caller.byok.create({
+        provider_id: 'vercel-ai-gateway',
+        api_key: 'key-vercel',
+      });
+
+      expect((await caller.byok.list({})).map(key => key.id)).toEqual([
+        ids[0],
+        provider.id,
+        gateway.id,
+        ids[1],
+      ]);
+    });
+
+    test('gives keys created at the same time distinct priorities', async () => {
+      const { caller, ids } = await createPersonalKeys(ownerUser.id, ['anthropic']);
+      await caller.byok.reorder({ keyIds: ids });
+
+      await Promise.all(
+        (['mistral', 'openai', 'xai', 'deepseek'] as const).map(provider_id =>
+          caller.byok.create({ provider_id, api_key: `key-${provider_id}` })
+        )
+      );
+
+      const rows = await db
+        .select({ settings: byok_api_keys.settings })
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.kilo_user_id, ownerUser.id));
+      expect(rows.map(row => getByokKeyPriority(row.settings)).toSorted()).toEqual([0, 1, 2, 3, 4]);
     });
 
     test('rejects an order that leaves out one of the caller keys', async () => {

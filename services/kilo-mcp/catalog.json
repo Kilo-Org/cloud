@@ -7660,7 +7660,6 @@
       "kilosessionid",
       "clonefromkilosessionid",
       "cloneuptomessageid",
-      "allowsubagentsessions",
       "callbacktarget",
       "githubrepo",
       "githubintegrationid",
@@ -7681,7 +7680,7 @@
       "attachments",
       "devcontainer"
     ],
-    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid allowsubagentsessions callbacktarget githubrepo githubintegrationid gitlabproject bitbucketrepo publicrepourl mode model variant profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch autocommit attachments devcontainer egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId allowSubagentSessions callbackTarget githubRepo githubIntegrationId gitlabProject bitbucketRepo publicRepoUrl mode model variant profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch autoCommit attachments devcontainer"
+    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid callbacktarget githubrepo githubintegrationid gitlabproject bitbucketrepo publicrepourl mode model variant profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch autocommit attachments devcontainer egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId callbackTarget githubRepo githubIntegrationId gitlabProject bitbucketRepo publicRepoUrl mode model variant profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch autoCommit attachments devcontainer"
   },
   "cloudAgentNext.refreshTerminalTicket": {
     "path": "cloudAgentNext.refreshTerminalTicket",
@@ -18775,7 +18774,6 @@
       "kilosessionid",
       "clonefromkilosessionid",
       "cloneuptomessageid",
-      "allowsubagentsessions",
       "callbacktarget",
       "githubrepo",
       "githubintegrationid",
@@ -18796,7 +18794,7 @@
       "attachments",
       "devcontainer"
     ],
-    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid allowsubagentsessions callbacktarget githubrepo githubintegrationid gitlabproject bitbucketrepo publicrepourl mode model variant profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch autocommit attachments devcontainer organizationId egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId allowSubagentSessions callbackTarget githubRepo githubIntegrationId gitlabProject bitbucketRepo publicRepoUrl mode model variant profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch autoCommit attachments devcontainer"
+    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid callbacktarget githubrepo githubintegrationid gitlabproject bitbucketrepo publicrepourl mode model variant profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch autocommit attachments devcontainer organizationId egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId callbackTarget githubRepo githubIntegrationId gitlabProject bitbucketRepo publicRepoUrl mode model variant profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch autoCommit attachments devcontainer"
   },
   "organizations.cloudAgentNext.refreshTerminalTicket": {
     "path": "organizations.cloudAgentNext.refreshTerminalTicket",

@@ -1,6 +1,7 @@
 'use client';
 
 import ReactMarkdown from 'react-markdown';
+import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { memo } from 'react';
 import { Brain, Loader2 } from 'lucide-react';
@@ -103,7 +104,12 @@ function LinkRenderer({ href, children }: { href?: string; children?: ReactNode 
   );
 }
 
-const markdownComponents = { a: LinkRenderer };
+const markdownComponents: Components = {
+  a: LinkRenderer,
+  img: ({ src, alt }) => (
+    <LinkRenderer href={typeof src === 'string' ? src : undefined}>{alt || 'Image'}</LinkRenderer>
+  ),
+};
 const remarkPlugins = [remarkGfm];
 
 const TextPartRenderer = memo(function TextPartRenderer({
@@ -122,7 +128,11 @@ const TextPartRenderer = memo(function TextPartRenderer({
   return (
     <div className="prose prose-sm prose-invert prose-p:my-2 prose-headings:mt-4 prose-headings:mb-2 prose-headings:text-sm prose-headings:font-semibold prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-pre:my-2 prose-pre:text-xs max-w-none overflow-hidden px-2 leading-relaxed">
       {text ? (
-        <ReactMarkdown remarkPlugins={plugins} components={markdownComponents}>
+        <ReactMarkdown
+          remarkPlugins={plugins}
+          components={markdownComponents}
+          urlTransform={toSafeHttpUrl}
+        >
           {text}
         </ReactMarkdown>
       ) : null}

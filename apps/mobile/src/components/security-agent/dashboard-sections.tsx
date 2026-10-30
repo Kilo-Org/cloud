@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/empty-state';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber, formatPercent } from '@/lib/format';
 import { type useSecurityAgentDashboardStats } from '@/lib/hooks/use-security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -256,7 +257,10 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
           onPress={() => {
             router.push(row.href);
           }}
-          className="active:opacity-70"
+          // The row is a link to the findings list; without the shared row
+          // frame its node measured the KvRow content alone (~40 dp). The
+          // frame lifts it to the touch floor and centres that content.
+          className={cn(ROW_TARGET_CLASS, 'justify-center active:opacity-70')}
         >
           <KvRow
             label={row.label}

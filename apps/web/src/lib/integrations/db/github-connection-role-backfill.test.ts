@@ -63,7 +63,7 @@ describe('organization GitHub installation role backfill', () => {
 
   beforeEach(async () => {
     await cleanupDbForTest();
-    await insertTestUser({ id: ownerId, email: 'role-backfill@example.com' });
+    await insertTestUser({ id: ownerId, google_user_email: 'role-backfill@example.com' });
     organizationA = (await createTestOrganization('Role backfill A', ownerId, 0)).id;
     organizationB = (await createTestOrganization('Role backfill B', ownerId, 0)).id;
   });

@@ -36,7 +36,7 @@ import { cn } from '@/lib/utils';
 import { ManualReviewActionFooter } from './manual-review-action-footer';
 import { ManualReviewPlatformPicker } from './manual-review-platform-picker';
 import { connectNoticeKey } from './connect-notice-key';
-import { manualReviewStartFailureMessage } from './manual-review-start-error';
+import { manualReviewStartFailure } from './manual-review-start-error';
 import { ManualReviewStartFeedback } from './manual-review-start-feedback';
 import { MANUAL_REVIEW_START_DEADLINE_MS, useDeadlineWatchedStart } from './deadline-watched-start';
 
@@ -161,10 +161,12 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             // server's own message is English and must not reach this
             // localized screen.
             if (isDeadlineStall(error)) {
-              settle(t('common.takingLonger'));
+              // A wait that ran out its budget is retryable: the same draft
+              // may still start.
+              settle({ message: t('common.takingLonger'), retryable: true });
               return;
             }
-            settle(manualReviewStartFailureMessage(error, platform));
+            settle(manualReviewStartFailure(error, platform));
           },
         }
       );
@@ -382,7 +384,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         <ManualReviewActionFooter>
           <ManualReviewStartFeedback
             stalled={start.stalled}
-            startError={start.failureMessage}
+            failure={start.failure}
             onRetry={onSubmit}
           />
           <Button

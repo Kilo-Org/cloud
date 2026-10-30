@@ -45,7 +45,6 @@ function nowIso(): string {
 }
 
 export const adminShellSecurityContentRouter = createTRPCRouter({
-  // ---- Check catalog ----
   checkCatalog: createTRPCRouter({
     list: adminProcedure.query(async () => {
       const rows = await db
@@ -107,7 +106,6 @@ export const adminShellSecurityContentRouter = createTRPCRouter({
     }),
   }),
 
-  // ---- KiloClaw coverage ----
   kiloclawCoverage: createTRPCRouter({
     list: adminProcedure.query(async () => {
       const rows = await db

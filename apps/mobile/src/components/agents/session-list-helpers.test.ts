@@ -24,6 +24,7 @@ import {
   remoteMeta,
   remoteSessionEyebrowLabel,
   repoNameFromGitUrl,
+  sectionAwareTimeMeta,
   selectRemoteRowSpokenMeta,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
@@ -192,6 +193,71 @@ describe('formatMeta (moved helper, regression guard)', () => {
   });
   it('omits a missing restored timestamp', () => {
     expect(formatMeta(null)).toBe('');
+  });
+});
+
+describe('sectionAwareTimeMeta', () => {
+  // 2026-10-30T16:00Z is a Friday; the rows below land on the calendar days the
+  // Agents list buckets as Today/Yesterday/a weekday, so each heading is the one
+  // that section really renders above the row.
+  const NOW = new Date('2026-10-30T16:00:00.000Z').getTime();
+  const HOUR = 60 * 60 * 1000;
+
+  function clockOf(iso: string): string {
+    return new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(
+      new Date(iso)
+    );
+  }
+
+  it('shows the clock time of the row timestamp when the relative label restates the heading', () => {
+    const iso = new Date(NOW - 27 * HOUR).toISOString();
+    // The premise: the relative label is the section heading itself.
+    expect(formatMeta(iso, NOW)).toBe('YESTERDAY');
+
+    expect(sectionAwareTimeMeta(iso, 'Yesterday', NOW)).toEqual({
+      visible: clockOf(iso),
+      clock: clockOf(iso),
+    });
+  });
+
+  it('matches a heading already in the eyebrow casing, and every locale casing', async () => {
+    const iso = new Date(NOW - 27 * HOUR).toISOString();
+    expect(sectionAwareTimeMeta(iso, 'YESTERDAY', NOW).clock).toBe(clockOf(iso));
+
+    // German heads the section "Gestern" while RelativeTimeFormat says "gestern".
+    await i18n.changeLanguage('de');
+    expect(formatMeta(iso, NOW)).toBe('GESTERN');
+    expect(sectionAwareTimeMeta(iso, 'Gestern', NOW).clock).not.toBeNull();
+  });
+
+  it('keeps the relative label under a heading it does not repeat', () => {
+    const today = new Date(NOW - 3 * HOUR).toISOString();
+    expect(sectionAwareTimeMeta(today, 'Today', NOW)).toEqual({
+      visible: '3 HOURS AGO',
+      clock: null,
+    });
+
+    const midWeek = new Date(NOW - 51 * HOUR).toISOString();
+    expect(sectionAwareTimeMeta(midWeek, 'Wednesday', NOW)).toEqual({
+      visible: '2 DAYS AGO',
+      clock: null,
+    });
+  });
+
+  it('keeps the relative label on a row with no section (share sheet)', () => {
+    const iso = new Date(NOW - 27 * HOUR).toISOString();
+    expect(sectionAwareTimeMeta(iso, null, NOW)).toEqual({ visible: 'YESTERDAY', clock: null });
+    expect(sectionAwareTimeMeta(iso, undefined, NOW)).toEqual({
+      visible: 'YESTERDAY',
+      clock: null,
+    });
+  });
+
+  it('omits the meta for an unparseable timestamp instead of inventing a clock', () => {
+    expect(sectionAwareTimeMeta('not-a-timestamp', 'Yesterday', NOW)).toEqual({
+      visible: '',
+      clock: null,
+    });
   });
 });
 

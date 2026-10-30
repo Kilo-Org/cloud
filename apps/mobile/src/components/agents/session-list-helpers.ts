@@ -170,20 +170,72 @@ export function formatMeta(timestamp: string | null | undefined, nowMs?: number)
 }
 
 /**
- * Clock time of a scheduled session's wake, in the active language
- * (e.g. `"9:00 AM"`), for the `SCHEDULED · <wake>` eyebrow.
+ * Time of day of a row's own timestamp, in the active language
+ * (e.g. `"9:00 AM"`), for a label that carries no relative day.
  *
- * Returns `null` when the timestamp does not parse, so a missing or garbage
- * `scheduledAt` shows the `SCHEDULED` label with no time rather than an
- * `"Invalid Date"` or a midnight that the CLI never reported. The caller
- * appends the value only when it is non-null.
+ * Returns `null` when the timestamp does not parse, so a caller shows nothing
+ * rather than an `"Invalid Date"` or a midnight the record never held.
  */
-export function formatScheduledWake(at: string): string | null {
-  const date = parseTimestamp(at);
+function clockTime(timestamp: string | null | undefined): string | null {
+  const date = parseTimestamp(timestamp);
   if (Number.isNaN(date.getTime())) {
     return null;
   }
   return dateTimeFormat(i18n.language, { hour: 'numeric', minute: '2-digit' }).format(date);
+}
+
+/**
+ * Clock time of a scheduled session's wake, for the `SCHEDULED · <wake>`
+ * eyebrow. `null` when the timestamp does not parse, so a missing or garbage
+ * `scheduledAt` shows the `SCHEDULED` label with no time; the caller appends
+ * the value only when it is non-null.
+ */
+export function formatScheduledWake(at: string): string | null {
+  return clockTime(at);
+}
+
+/**
+ * Time meta for one session row: the label the row draws, plus the clock time
+ * when the relative label was replaced because it restated the row's section.
+ */
+type SessionRowTimeMeta = {
+  visible: string;
+  /** The clock time that replaced the relative label, or `null` when it stands. */
+  clock: string | null;
+};
+
+/**
+ * Time meta for a session row that sits under a date section heading.
+ *
+ * `formatMeta` renders the relative day word, and in the Yesterday section that
+ * word is the heading directly above the row (`YESTERDAY` under `YESTERDAY`),
+ * so the row restated its own section. When the two strings match — the same
+ * locale-folded text on screen, not a bucket rule — the row shows the clock
+ * time of its own timestamp instead. Every other heading (Today, a weekday,
+ * Older) never matches the relative label it renders, so those rows keep it.
+ *
+ * `clock` is the replacement when one was made, so the spoken label says the
+ * same clock time instead of repeating the section, and `null` when the
+ * relative label stands. `nowMs` is the caller's sampled clock, as in
+ * {@link formatMeta}.
+ */
+export function sectionAwareTimeMeta(
+  timestamp: string | null | undefined,
+  sectionTitle: string | null | undefined,
+  nowMs?: number
+): SessionRowTimeMeta {
+  const relative = formatMeta(timestamp, nowMs);
+  if (!sectionTitle || relative === '') {
+    return { visible: relative, clock: null };
+  }
+  if (
+    relative.toLocaleLowerCase(i18n.language) !==
+    sectionTitle.trim().toLocaleLowerCase(i18n.language)
+  ) {
+    return { visible: relative, clock: null };
+  }
+  const clock = clockTime(timestamp);
+  return clock === null ? { visible: relative, clock: null } : { visible: clock, clock };
 }
 
 /**

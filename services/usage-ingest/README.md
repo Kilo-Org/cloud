@@ -292,6 +292,48 @@ bounded writer-response classification. No new environment knob or worker bindin
 is introduced. This preparation does not claim a healthy-traffic p95 improvement
 or authorize a production rollout, capacity increase, or replay.
 
+### Writer admission protection
+
+The Frankfurt HTTP writer authenticates and validates the request before applying
+one immediate, nonwaiting admission guard to `queue` and `queue_vercel` callers.
+Both transports share a per-runtime active-call limit of
+`max(1, pool.options.max - 2)`, currently **8** with the unchanged pool maximum of
+10. The writer returns HTTP **429** before usage database work when that limit
+is occupied, when the primary pool has waiting clients, or when checked-out
+connections (`totalCount - idleCount`) reach the same limit. The response reason
+is bounded to `queue_limit`, `pool_waiting`, or `pool_busy`.
+
+A slot remains held until the awaited persistence call completes, including
+awaited post-commit work, and is released on success, duplicate, `not_recorded`,
+or an exception. Rejection never acknowledges the usage or triggers direct
+accounting fallback: the existing Cloudflare consumer individually retries failed
+messages using the native policy above, ACKs successful siblings, and rejects
+the invocation after all siblings settle. The staging Vercel consumer throws rather than returning an ACKable
+success. Direct gateway writes, region handoff, and missing/unknown source callers
+retain their existing behavior.
+
+The two connections of nominal headroom are a starting local policy, **not
+reserved connections** or a measured global capacity bound. Other traffic can
+compete after the snapshot, a writer may perform several database operations,
+background work can outlive the awaited call, and each runtime instance has its
+own counter/pool. An admitted call can still wait. The pool maximum stays at 10,
+consumer concurrency at 200, parallelism at 2, and batch size at 6 in production and
+2 in staging; retry settings also stay unchanged.
+There is no new environment knob; merging this change activates queue rejection
+when the normal automatic deployment reaches the writer.
+
+`usage_writer_admission` diagnostics sample admitted decisions at 1% and warn on
+all rejected decisions. Fields contain only the bounded caller/outcome/reason,
+active count/limit, pool gauges/max, and sample rate; diagnostic failures cannot
+change admission or persistence results.
+
+The source policy remains finite: initial delivery plus up to **20 retries**
+under the native congestion schedule above. Sustained overload can exhaust that
+budget and move events into the **DLQ**; this guard does not keep arbitrary bursts
+in the source queue indefinitely. PR #9248 must be confirmed deployed before this
+guard is merged/deployed; its merge alone does not verify deployment. Local tests
+do not establish hosted throughput, spare capacity, or latency improvements.
+
 ### Experiment control and verification
 
 Staging uses the single EU queue `usage-ingest-processing-staging-eu`

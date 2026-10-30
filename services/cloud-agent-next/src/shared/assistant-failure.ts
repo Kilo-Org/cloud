@@ -436,7 +436,14 @@ function classifyAssistantFailureText(message: string): CloudAgentAssistantFailu
   // signal and is checked first, so the unqualified pattern is only consulted
   // here, after it.
   if (/\btoo many tokens\b/.test(message)) return 'context_limit';
-  if (/\b(timed? out|timeout|deadline exceeded)\b/.test(message)) return 'timeout';
+  if (
+    /\b(timed? out|timeout|deadline exceeded)\b/.test(message) ||
+    /\breached the gateway's \d+-second duration limit and was stopped before it finished\b/.test(
+      message
+    )
+  ) {
+    return 'timeout';
+  }
   if (/\b(unauthorized|forbidden|authorization|authentication|401|403)\b/.test(message)) {
     return 'provider_authentication';
   }

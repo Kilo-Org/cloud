@@ -648,6 +648,45 @@ describe('classifyAssistantFailureMessage', () => {
 });
 
 describe('classifyAssistantFailure', () => {
+  it('classifies the gateway duration-limit JSON message stored as UnknownError as a timeout', () => {
+    const error = {
+      name: 'UnknownError',
+      data: {
+        message: JSON.stringify({
+          type: 'api_error',
+          message:
+            'The response reached the gateway\'s 600-second duration limit and was stopped before it finished. Try lowering the reasoning effort from "max" to "high" or lower to reduce the chance of timeouts. (request id: ...)',
+        }),
+      },
+    };
+
+    expect(classifyAssistantFailure(error)).toEqual({
+      reason: 'timeout',
+      safeMessage: 'Assistant request timed out',
+      providerOwnership: 'unknown',
+    });
+    expect(projectSafeAssistantError(error)).toBe('Assistant request timed out');
+  });
+
+  it('keeps an unrelated UnknownError JSON message mentioning timeouts generic', () => {
+    const error = {
+      name: 'UnknownError',
+      data: {
+        message: JSON.stringify({
+          type: 'api_error',
+          message: 'The provider stopped unexpectedly; retrying may help avoid timeouts.',
+        }),
+      },
+    };
+
+    expect(classifyAssistantFailure(error)).toEqual({
+      reason: 'unknown',
+      safeMessage: 'Assistant request failed',
+      providerOwnership: 'unknown',
+    });
+    expect(projectSafeAssistantError(error)).toBe('Assistant request failed');
+  });
+
   it.each([
     [
       400,

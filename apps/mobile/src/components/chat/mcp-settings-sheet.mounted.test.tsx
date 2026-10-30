@@ -140,6 +140,7 @@ vi.mock('@/lib/chat/web-search-setting', () => ({
 }));
 
 vi.mock('react-native', () => ({
+  useColorScheme: () => 'light',
   Platform: { OS: 'ios' },
   ScrollView: 'ScrollView',
   Switch: 'Switch',

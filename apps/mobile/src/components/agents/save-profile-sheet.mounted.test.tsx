@@ -6,6 +6,7 @@ import '@/i18n';
 import { SaveProfileSheet, type SaveProfileSheetProps } from './save-profile-sheet';
 
 vi.mock('react-native', () => ({
+  useColorScheme: () => 'light',
   Platform: { OS: 'ios' },
   ScrollView: 'ScrollView',
   Switch: 'Switch',

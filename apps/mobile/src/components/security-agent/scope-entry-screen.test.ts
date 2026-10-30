@@ -56,6 +56,7 @@ vi.mock('@/lib/trpc', async () => {
 });
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://settings.test' }));
 vi.mock('react-native', () => ({
+  useColorScheme: () => 'light',
   Platform: { OS: 'ios' },
   View: 'View',
   Switch: 'Switch',

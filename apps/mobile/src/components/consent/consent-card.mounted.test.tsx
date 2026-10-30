@@ -71,6 +71,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('react-native', () => ({
+  useColorScheme: () => 'light',
   Alert: { alert: vi.fn() },
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },

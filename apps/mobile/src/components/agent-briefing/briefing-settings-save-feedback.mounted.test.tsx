@@ -13,6 +13,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({
+  useColorScheme: () => 'light',
   Alert: { alert: vi.fn() },
   Platform: { OS: 'android' },
   Switch: 'Switch',

@@ -46,6 +46,7 @@ const organization = vi.hoisted(() => ({ organizationId: 'org-1' as string | nul
 const voiceLanguage = vi.hoisted(() => ({ chosen: null as string | null, loaded: true }));
 
 vi.mock('react-native', () => ({
+  useColorScheme: () => 'light',
   Platform: { OS: 'ios' },
   Switch: 'Switch',
   Pressable: 'Pressable',
@@ -238,11 +239,8 @@ describe('VoiceInputSettingsScreen', () => {
     if (!errorState) {
       throw new Error('QueryError not found');
     }
-    expect(errorState.props).toMatchObject({
-      variant: 'server',
-      placement: 'top',
-      title: "Couldn't load transcription models.",
-    });
+    expect(errorState.props).toMatchObject({ variant: 'server', placement: 'top' });
+    expect(errorState.props.title).toBe("Couldn't load transcription models.");
     act(() => {
       (errorState.props.onRetry as () => void)();
     });

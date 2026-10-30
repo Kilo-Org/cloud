@@ -40,6 +40,7 @@ const state = vi.hoisted(() => ({
 export { state };
 
 vi.mock('react-native', () => ({
+  useColorScheme: () => 'light',
   ScrollView: 'ScrollView',
   View: 'View',
   TextInput: 'TextInput',

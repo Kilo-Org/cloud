@@ -142,6 +142,7 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useOfflineBannerState: () => false,
 }));
 vi.mock('react-native', () => ({
+  useColorScheme: () => 'light',
   View: 'View',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',

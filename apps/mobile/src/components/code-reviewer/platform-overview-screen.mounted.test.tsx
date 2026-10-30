@@ -52,6 +52,7 @@ const openPicker = vi.hoisted(() => vi.fn());
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
+  useColorScheme: () => 'light',
   Platform: { OS: 'ios' },
   View: 'View',
   Switch: 'Switch',

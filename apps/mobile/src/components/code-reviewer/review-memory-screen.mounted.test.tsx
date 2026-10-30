@@ -134,6 +134,7 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
+  useColorScheme: () => 'light',
   View: (props: { children?: unknown; pointerEvents?: string; style?: { height?: number } }) => {
     views.rendered.push(props);
     return createElement('View', props);

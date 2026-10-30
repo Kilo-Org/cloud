@@ -31,6 +31,7 @@ vi.mock('@/lib/trpc', async () => {
   return createTRPCContext<MobileRouter>();
 });
 vi.mock('react-native', () => ({
+  useColorScheme: () => 'light',
   Platform: { OS: 'ios' },
   View: 'View',
   Switch: 'Switch',

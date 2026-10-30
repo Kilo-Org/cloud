@@ -42,6 +42,7 @@ const { openSettings, setLiveActivityEnabled, liveActivityEnabled, systemAllowsL
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
+  useColorScheme: () => 'light',
   View: 'View',
   Switch: 'Switch',
   Pressable: 'Pressable',

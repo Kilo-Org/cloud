@@ -1,10 +1,12 @@
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { darkColors } from '@/lib/hooks/theme-colors.generated';
 
 import { Switch } from './switch';
 
-const native = vi.hoisted(() => ({ os: 'ios' }));
+const native = vi.hoisted(() => ({ os: 'ios', scheme: 'light' }));
 
 vi.mock('react-native', () => ({
   Platform: {
@@ -12,13 +14,18 @@ vi.mock('react-native', () => ({
       return native.os;
     },
   },
+  useColorScheme: () => native.scheme,
   Switch: 'Switch',
 }));
 
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
 
-function renderSwitch(props: { disabled?: boolean; accessibilityState?: { busy?: boolean } }) {
+function renderSwitch(props: {
+  disabled?: boolean;
+  accessibilityState?: { busy?: boolean };
+  trackColor?: { false?: string; true?: string };
+}) {
   const ref: { current: R | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(createElement(Switch, { value: false, ...props }));
@@ -33,6 +40,7 @@ function renderSwitch(props: { disabled?: boolean; accessibilityState?: { busy?:
 function nativeProps(root: I): {
   disabled?: boolean;
   accessibilityState?: { disabled?: boolean; busy?: boolean };
+  trackColor?: { false?: string; true?: string };
 } {
   const node = root.findAll(candidate => (candidate.type as string) === 'Switch')[0];
   if (!node) {
@@ -42,6 +50,11 @@ function nativeProps(root: I): {
 }
 
 describe('Switch', () => {
+  beforeEach(() => {
+    native.os = 'ios';
+    native.scheme = 'light';
+  });
+
   it('mirrors disabled into the accessibility state on iOS', () => {
     native.os = 'ios';
     const props = nativeProps(renderSwitch({ disabled: true }).root);
@@ -68,5 +81,38 @@ describe('Switch', () => {
     native.os = 'ios';
     const props = nativeProps(renderSwitch({ disabled: false }).root);
     expect(props.accessibilityState?.disabled).toBe(false);
+  });
+
+  it('gives the off track a visible neutral in the Android dark theme', () => {
+    native.os = 'android';
+    native.scheme = 'dark';
+    const props = nativeProps(renderSwitch({ disabled: false }).root);
+    expect(props.trackColor).toEqual({ false: darkColors.mutedSoft });
+  });
+
+  it('keeps the on track and a caller track color beside the dark off track', () => {
+    native.os = 'android';
+    native.scheme = 'dark';
+    const props = nativeProps(
+      renderSwitch({ disabled: false, trackColor: { true: '#00FF00' } }).root
+    );
+    expect(props.trackColor).toEqual({
+      true: '#00FF00',
+      false: darkColors.mutedSoft,
+    });
+  });
+
+  it('keeps the platform track colors in the light theme', () => {
+    native.os = 'android';
+    native.scheme = 'light';
+    const props = nativeProps(renderSwitch({ disabled: false }).root);
+    expect(props.trackColor).toBeUndefined();
+  });
+
+  it('keeps the platform track colors on iOS in the dark theme', () => {
+    native.os = 'ios';
+    native.scheme = 'dark';
+    const props = nativeProps(renderSwitch({ disabled: false }).root);
+    expect(props.trackColor).toBeUndefined();
   });
 });

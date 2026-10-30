@@ -101,6 +101,13 @@ describe('Vercel environment builder', () => {
   it('creates from the pinned base, delivers the runner and starts the main process as root', async () => {
     const rest = client();
     const state = memoryState();
+    vi.mocked(rest.createSandbox).mockImplementation(async input => {
+      expect(await state.get()).toMatchObject({
+        createRequestedAt: now(),
+        createExpiresAt: now() + input.timeoutMs + DEADLINE_MS.createSettle,
+      });
+      return createEnvelope();
+    });
     await launchVercelBuilder({
       allocation,
       launch: { runner, deadlineAt: now() + 60_000 },

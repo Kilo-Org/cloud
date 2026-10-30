@@ -99,7 +99,7 @@ Do not reimplement:
 | Provider contract | `services/cloud-agent-next/src/sandbox-control/provider.ts` |
 | Kilo-paid Vercel adapter | `services/cloud-agent-next/src/sandbox-control/vercel-provider.ts` |
 | Vercel REST client and `inspectByName` recovery | `services/cloud-agent-next/src/agent-sandbox/vercel/vercel-sandbox-rest-client.ts` |
-| Snapshot build commands and validation sequence | `services/cloud-agent-next/scripts/vercel-snapshot.ts` |
+| Environment snapshot builder and runtime validation | `services/cloud-agent-next/src/environment-build/` and `services/cloud-agent-next/scripts/publish-runtime.ts` |
 | Physical lifecycle and deadlines | `services/cloud-agent-next/src/persistence/SandboxControl.ts` |
 | Per-session runtime owner | `services/cloud-agent-next/src/sandbox-session/SandboxSession.ts` |
 | Existing Cloud Agent server-to-server client | `apps/web/src/lib/cloud-agent-next/cloud-agent-client.ts` |
@@ -527,25 +527,17 @@ projecting their final safe status where applicable.
 
 ### 5.2 Runtime artifacts
 
-The DO cannot read the operator's local filesystem. For the MVP, ship the two
-existing generated artifacts with the Worker instead of adding an artifact
-registry:
+Vercel supports only split images. Compute setup creates a runtime-free base
+snapshot with system and Node dependencies, without baking in the Kilo CLI or
+control wrapper. There is no preinstalled Vercel runtime or legacy snapshot
+upgrade path.
 
-- `wrapper/dist/wrapper.js`;
-- `wrapper/dist/control-wrapper.js`.
-
-Add `services/cloud-agent-next/src/byoc/vercel-runtime-artifacts.ts` with static
-Data-module imports for those files and a narrow accessor returning bytes plus
-hashes/version. Add exact `Data` rules to `wrangler.jsonc`, an ambient module
-type if TypeScript requires it, and a `predeploy` script that runs the existing
-`build:wrapper`. Local dev already builds the wrapper through `predev`.
-
-The current generated artifacts are approximately 260 KiB and 480 KiB. This is
-small enough to try the direct approach, but Slice 4 must run a Wrangler
-`deploy --dry-run` and record compressed/uncompressed Worker size. If it would
-breach the account's Worker limit or materially harm startup, stop and move the
-same versioned artifacts to the already-bound R2 bucket; do not add R2 and
-embedded delivery simultaneously.
+Publish the versioned runtime through
+`services/cloud-agent-next/scripts/publish-runtime.ts`. Vercel startup and
+snapshot validation use downloaded startup with `RUNTIME_RELEASE_DESCRIPTOR`
+and `RUNTIME_RELEASE_BUCKET`, rather than embedding runtime artifacts in the
+Worker. Vercel-enabled deployments require those bindings even when the native
+Cloudflare startup mode remains preinstalled.
 
 ### 5.3 Build state machine
 
@@ -556,8 +548,6 @@ validating_access
   -> create_builder
   -> install_system_dependencies
   -> install_node_dependencies
-  -> upload_runtime_artifacts
-  -> verify_runtime_artifacts
   -> snapshot_builder
   -> create_validator
   -> launch_validator_wrapper
@@ -576,9 +566,9 @@ Every step:
 5. Projects safe status to PostgreSQL with the generation fence.
 6. Arms the next alarm.
 
-Do not run the full `scripts/vercel-snapshot.ts` sequence in one request. Extract
-and reuse its commands, validation rules, and REST primitives, but split them
-into alarm-sized operations.
+Do not run the full split runtime publication or environment-build sequence in
+one request. Reuse the builder's commands, validation rules, and REST
+primitives, but split them into alarm-sized operations.
 
 Alarms execute at least once and Cloudflare's automatic exception retries are
 finite. The handler therefore catches classified transient failures, persists
@@ -861,7 +851,7 @@ Files:
 - `services/cloud-agent-next/src/persistence/vercel-snapshot-build/*`
 - `services/cloud-agent-next/src/db/sqlite-schema.ts` and generated
   `services/cloud-agent-next/drizzle/*` artifacts;
-- `services/cloud-agent-next/src/byoc/vercel-runtime-artifacts.ts`
+- `services/cloud-agent-next/src/byoc/vercel-runtime-identity.ts`
 - `services/cloud-agent-next/src/server.ts`
 - `services/cloud-agent-next/src/index.ts`
 - `services/cloud-agent-next/src/types.ts`
@@ -872,9 +862,9 @@ Files:
 - `apps/web/src/lib/cloud-agent-next/cloud-agent-client.ts`
 - extracted/reused Vercel snapshot primitives
 
-Deliver the state machine and reconciliation rules from §5. The CLI snapshot
-script may be refactored to call shared primitives, but the DO must not spawn or
-depend on the CLI script.
+Deliver the state machine and reconciliation rules from §5. The DO builds a
+runtime-free base snapshot and validates it through downloaded startup. A
+separate baked-runtime CLI snapshot path is not supported.
 
 ### Slice 5 — Routing and enrollment
 

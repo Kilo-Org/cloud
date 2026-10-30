@@ -2,9 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Env } from '../types.js';
 import type * as vercelBuilder from './vercel-builder.js';
 import { ByocCredentialMissingError } from '../byoc/vercel-credential-resolver.js';
-import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import type { BuilderLifecycleState, VercelBuilderAllocation } from './builder-provider.js';
-import { BuilderRetryableError, BuilderTargetMismatchError } from './builder-errors.js';
+import {
+  BuilderRetryableError,
+  BuilderStateInvalidError,
+  BuilderTargetMismatchError,
+} from './builder-errors.js';
 
 const openVercelBuilder = vi.hoisted(() => vi.fn());
 vi.mock('./vercel-builder.js', async importOriginal => ({
@@ -33,9 +36,6 @@ const state = {
   set: async () => undefined,
   clear: async () => undefined,
 };
-
-const MAX_BUILDER_TIMEOUT_MS = 45 * 60_000;
-const CREATE_LANDING_MARGIN_MS = DEADLINE_MS.createSettle;
 
 function memoryState(initial: Record<string, unknown> = {}): BuilderLifecycleState {
   let value: unknown = initial;
@@ -99,8 +99,11 @@ describe('Vercel builder stop without a credential', () => {
     openVercelBuilder.mockClear();
     openVercelBuilder.mockRejectedValue(new ByocCredentialMissingError('credential-1'));
     const requestedAt = 1_000;
-    const expiresAt = requestedAt + MAX_BUILDER_TIMEOUT_MS + CREATE_LANDING_MARGIN_MS;
-    const lifecycle = memoryState({ createRequestedAt: requestedAt });
+    const expiresAt = 2_000;
+    const lifecycle = memoryState({
+      createRequestedAt: requestedAt,
+      createExpiresAt: expiresAt,
+    });
 
     await expect(provider(() => requestedAt).stop(allocation, lifecycle)).resolves.toBe(
       'retryable'
@@ -117,19 +120,15 @@ describe('Vercel builder stop without a credential', () => {
     expect(await lifecycle.get()).toBeUndefined();
   });
 
-  it('bounds an old post-create state with no timing from the moment stop is attempted', async () => {
+  it('rejects a missing create expiry instead of inventing a new cleanup deadline', async () => {
     openVercelBuilder.mockClear();
     openVercelBuilder.mockRejectedValue(new ByocCredentialMissingError('credential-1'));
-    const observedAt = 5_000;
-    const expiresAt = observedAt + MAX_BUILDER_TIMEOUT_MS + CREATE_LANDING_MARGIN_MS;
     const lifecycle = memoryState({ sessionId: 'session-1' });
 
-    await expect(provider(() => observedAt).stop(allocation, lifecycle)).resolves.toBe('retryable');
-    expect(await lifecycle.get()).toMatchObject({
-      sessionId: 'session-1',
-      createExpiresAt: expiresAt,
-    });
-    await expect(provider(() => expiresAt).stop(allocation, lifecycle)).resolves.toBe('terminal');
+    await expect(provider().stop(allocation, lifecycle)).rejects.toBeInstanceOf(
+      BuilderStateInvalidError
+    );
+    expect(await lifecycle.get()).toEqual({ sessionId: 'session-1' });
   });
 
   it('releases a created sandbox whose credential is gone once its expiry has passed', async () => {

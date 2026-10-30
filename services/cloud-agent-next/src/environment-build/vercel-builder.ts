@@ -146,19 +146,6 @@ function timeoutMsFor(initialTimeoutMs: number, deadlineAt: number, now: number)
   );
 }
 
-/**
- * A sandbox cannot outlive its create timeout. When the lifecycle state predates
- * the stored expiry, assume the longest possible create timeout and allow the
- * create request to land within its settle window.
- */
-function createExpiryBound(state: LifecycleState, now: number): number {
-  if (state.createExpiresAt !== undefined) return state.createExpiresAt;
-  if (state.createRequestedAt !== undefined) {
-    return state.createRequestedAt + MAX_BUILDER_TIMEOUT_MS + CREATE_LANDING_MARGIN_MS;
-  }
-  return now + MAX_BUILDER_TIMEOUT_MS + CREATE_LANDING_MARGIN_MS;
-}
-
 export async function openVercelBuilder(
   env: Env,
   allocation: VercelBuilderAllocation,
@@ -493,22 +480,6 @@ export async function captureVercelBuilder(input: {
   );
 }
 
-async function stopWithoutProviderCredential(input: {
-  state: BuilderLifecycleState;
-  lifecycle: LifecycleState;
-  now: number;
-}): Promise<'terminal' | 'retryable'> {
-  const expiresAt = createExpiryBound(input.lifecycle, input.now);
-  if (input.lifecycle.createExpiresAt === undefined) {
-    await writeState(input.state, { ...input.lifecycle, createExpiresAt: expiresAt });
-  }
-  if (input.now < expiresAt) return 'retryable';
-  // The create timeout is fixed, so the sandbox is gone even though its deleted
-  // credential can no longer confirm the stop.
-  await input.state.clear();
-  return 'terminal';
-}
-
 export async function stopVercelBuilder(input: {
   allocation: VercelBuilderAllocation;
   state: BuilderLifecycleState;
@@ -533,7 +504,10 @@ export async function stopVercelBuilder(input: {
     opened = await input.open();
   } catch (error) {
     if (error instanceof ByocCredentialMissingError) {
-      return stopWithoutProviderCredential({ state: input.state, lifecycle: state, now: now() });
+      if (state.createExpiresAt === undefined) throw new BuilderStateInvalidError();
+      if (now() < state.createExpiresAt) return 'retryable';
+      await input.state.clear();
+      return 'terminal';
     }
     if (error instanceof BuilderRetryableError) return 'retryable';
     throw error;

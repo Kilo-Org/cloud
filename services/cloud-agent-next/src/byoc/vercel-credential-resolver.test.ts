@@ -293,6 +293,49 @@ describe('BYOC Vercel credential encryption', () => {
   });
 });
 
+describe('BYOC Vercel setup step contract', () => {
+  it.each([
+    'install_system_dependencies',
+    'install_node_dependencies',
+    'snapshot_builder',
+  ] as const)('accepts current split setup step %s', async setupStep => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json(
+          credentialResponse(
+            { ...identity, tokenEncrypted: encryptCredentialToken() },
+            { setupStep }
+          )
+        )
+      )
+    );
+
+    await expect(fetchByocVercelCredential(env, identity)).resolves.toMatchObject({ setupStep });
+  });
+
+  it.each(['upload_runtime_artifacts', 'verify_runtime_artifacts'] as const)(
+    'rejects retired baked-runtime setup step %s',
+    async setupStep => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () =>
+          Response.json(
+            credentialResponse(
+              { ...identity, tokenEncrypted: encryptCredentialToken() },
+              { setupStep }
+            )
+          )
+        )
+      );
+
+      await expect(fetchByocVercelCredential(env, identity)).rejects.toBeInstanceOf(
+        ByocCredentialResolverError
+      );
+    }
+  );
+});
+
 describe('BYOC Vercel missing snapshot projection', () => {
   it('marks the exact ready generation failed without exposing credentials and normalizes PostgreSQL timestamps', async () => {
     const encrypted = encryptCredentialToken();

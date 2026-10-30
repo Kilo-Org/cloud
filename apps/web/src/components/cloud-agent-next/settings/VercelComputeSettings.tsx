@@ -40,8 +40,6 @@ const SETUP_STEPS = [
   ['create_builder', 'Create a temporary builder'],
   ['install_system_dependencies', 'Install system dependencies'],
   ['install_node_dependencies', 'Install runtime dependencies'],
-  ['upload_runtime_artifacts', 'Upload Kilo runtime'],
-  ['verify_runtime_artifacts', 'Verify runtime artifacts'],
   ['snapshot_builder', 'Create runtime snapshot'],
   ['create_validator', 'Create a validation sandbox'],
   ['launch_validator_wrapper', 'Launch call-home validation'],

@@ -600,18 +600,6 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
     config: VercelSandboxRuntimeConfig
   ): Promise<BuildRow | null> {
     const owner = ownerFromRow(state);
-    if (state.step === 'upload_runtime_artifacts' || state.step === 'verify_runtime_artifacts') {
-      return this.next(state, {
-        step: 'snapshot_builder',
-        snapshot_source_session_id: requiredBuildField(
-          state.builder_session_id,
-          'builder_session_missing'
-        ),
-        snapshot_baseline_json: null,
-        snapshot_requested: 0,
-        last_error: null,
-      });
-    }
     switch (BuildStepSchema.parse(state.step)) {
       case 'validating_access': {
         if (config.scope !== 'project' && !state.team_slug) {

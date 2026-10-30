@@ -74,6 +74,36 @@ export async function runLanguageStartupDirectionAsync(
 }
 
 /**
+ * Run the cold start's direction step and never reject.
+ *
+ * The step's effects are native calls, and one of them (the direction switch)
+ * is synchronous: a throw there, or any other rejection, would abort the
+ * caller's bootstrap before it reaches its ready gate, which leaves the app
+ * hidden behind the loading surface with no screen to recover from. A rejected
+ * step is therefore the same recoverable outcome as a direction that could not
+ * be applied — `retry`, the Retry/Continue screen — and `onFailure` receives
+ * the error once so the caller can report it.
+ */
+export async function runLanguageStartupDirectionGuardedAsync(
+  input: Readonly<{
+    language: SupportedLanguage;
+    /** The direction the running app reports. */
+    isRtl: boolean;
+    /** The direction the resolved language needs. */
+    shouldBeRtl: boolean;
+  }>,
+  deps: LanguageStartupDeps,
+  onFailure: (error: unknown) => void
+): Promise<LanguageStartupOutcome> {
+  try {
+    return await runLanguageStartupDirectionAsync(input, deps);
+  } catch (error) {
+    onFailure(error);
+    return 'retry';
+  }
+}
+
+/**
  * Run the retry control of the language retry screen.
  *
  * A retry is the user asking for another attempt, not the automatic relaunch

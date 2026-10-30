@@ -270,13 +270,28 @@ export function createSecureStorePreference<T>(options: {
      * updates memory and emits, returning true. On failure shows the existing
      * toast, leaves memory unchanged, and returns false. `toastLng` pins the
      * toast language when the caller already switched the active language.
+     *
+     * A `clear()` that runs during either wait supersedes the choice: it is
+     * not written to disk and not applied, and the call returns false without a
+     * toast, because nothing failed — the value was reset on purpose.
      */
     setAsync: async (next: T, toastLng?: string): Promise<boolean> => {
+      // The same fence `clear()` sets for a write already on its way to disk.
+      // A sign-out during either await below reset this preference, and this
+      // choice belongs to the account that just left: it must not land on disk
+      // and must not repaint memory afterwards.
+      const epoch = writeEpoch;
       await whenPersisted();
+      if (epoch !== writeEpoch) {
+        return false;
+      }
       try {
         await setAccountMetadata(key, serialize(next));
       } catch {
         toast.error(i18n.t('common.couldNotSaveSetting', toastLng ? { lng: toastLng } : undefined));
+        return false;
+      }
+      if (epoch !== writeEpoch) {
         return false;
       }
       value = next;

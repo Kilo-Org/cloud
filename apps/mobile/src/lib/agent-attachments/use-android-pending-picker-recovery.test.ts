@@ -2,6 +2,8 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
+
 import { type AttachmentSurface } from './picker-launch-context';
 import { useAndroidPendingPickerRecovery } from './use-android-pending-picker-recovery';
 
@@ -98,6 +100,7 @@ async function settle(): Promise<void> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  setTelemetrySink(null);
   appStateListener = undefined;
   mocks.userId = undefined;
   mocks.normalizeImageAsset.mockImplementation((asset: { uri: string }) => ({
@@ -206,5 +209,38 @@ describe('useAndroidPendingPickerRecovery', () => {
 
     expect(mocks.consumeAndroidPendingPickerResult).toHaveBeenCalledTimes(1);
     expect(mocks.addCandidates).toHaveBeenCalledTimes(1);
+  });
+
+  it('contains a failed clear, reports it once, and retries it on the next active edge', async () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    mocks.userId = 'user-1';
+    mocks.readPickerLaunchContext.mockResolvedValue(makeContext());
+    mocks.consumeAndroidPendingPickerResult.mockResolvedValue([{ uri: 'file:///photo.jpg' }]);
+    mocks.clearPickerLaunchContext.mockRejectedValueOnce(new Error('keychain unavailable'));
+
+    await mount();
+
+    // The rejection is contained instead of escaping the discarded promise,
+    // and it is reported once on the recovery operation.
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      level: 'warning',
+      tags: { 'error.subsystem': 'agent_attachments', 'error.operation': 'picker_recovery' },
+    });
+
+    // The stored context was never cleared, so the next app-active edge runs
+    // the recovery again and the clear lands.
+    mocks.readPickerLaunchContext.mockResolvedValue(makeContext());
+    mocks.consumeAndroidPendingPickerResult.mockResolvedValue([]);
+    await act(async () => {
+      appStateListener?.('active');
+      await settle();
+    });
+
+    expect(mocks.clearPickerLaunchContext).toHaveBeenCalledTimes(2);
+    expect(events).toHaveLength(1);
   });
 });

@@ -14,6 +14,7 @@ import {
 } from '@/lib/agent-attachments/pending-picker-result';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { captureTelemetry } from '@/lib/telemetry/error-sink';
 
 type UseAndroidPendingPickerRecoveryOptions = {
   surface: AttachmentSurface;
@@ -29,6 +30,10 @@ type UseAndroidPendingPickerRecoveryOptions = {
  * An expired context is discarded and cleared (no composer should attach it).
  * A non-expired mismatch (wrong account/surface/session) is left untouched so
  * the matching composer — multiple composers stay mounted — can still read it.
+ *
+ * Best effort: a failed storage read, clear, or candidate add is reported once
+ * and swallowed, and the stored context stays for the next app-active edge to
+ * retry. Both call sites fire this off without awaiting it.
  */
 export function useAndroidPendingPickerRecovery(
   options: UseAndroidPendingPickerRecoveryOptions
@@ -86,6 +91,18 @@ export function useAndroidPendingPickerRecovery(
       // Non-expired mismatch (wrong account/surface/session): another mounted
       // composer may still match this context. Leave both the context and the
       // native result for that composer.
+    } catch (error) {
+      // Best effort and self-contained: the call sites fire this off with
+      // `void recover()`, so a rejection must not escape as an unhandled one.
+      // The stored launch context is only removed after a successful read or
+      // clear, so a failure here leaves it for the next app-active edge to
+      // retry.
+      captureTelemetry({
+        error,
+        level: 'warning',
+        tags: { 'error.subsystem': 'agent_attachments', 'error.operation': 'picker_recovery' },
+        fingerprint: ['android-picker-recovery-failure'],
+      });
     } finally {
       inFlightRef.current = false;
     }

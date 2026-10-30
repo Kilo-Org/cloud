@@ -40,8 +40,6 @@ const AlertingBaselineResponseSchema = z.object({
   baseline: AlertingBaselineSchema.nullable(),
 });
 
-// --- TTFB alerting schemas ---
-
 const TtfbAlertingConfigSchema = z.object({
   model: z.string().min(1),
   enabled: z.boolean(),
@@ -143,8 +141,6 @@ export const adminAlertingRouter = createTRPCRouter({
         wrapO11yError(error, 'Failed to fetch baseline');
       }
     }),
-
-  // --- TTFB alerting procedures ---
 
   listTtfbConfigs: adminProcedure.query(async () => {
     try {

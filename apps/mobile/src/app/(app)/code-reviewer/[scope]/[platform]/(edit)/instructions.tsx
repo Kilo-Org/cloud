@@ -16,6 +16,7 @@ import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { AlertTriangle } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -28,6 +29,7 @@ import {
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 // The multiline editor's keyboard has no Done key on iOS (return inserts a
 // newline), so a covered Save left no keyboard-adjacent way out. The accessory
@@ -53,6 +55,7 @@ function InstructionsEditor({
   draftRef: { current: string };
 }>) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   // A stored value taller than the capped field opens at the platform caret,
   // which sits at its end: the value's first line is then out of sight, the
   // symptom #7892 removed for a field that grew with its value. Once the field
@@ -87,9 +90,15 @@ function InstructionsEditor({
 
   return (
     <Animated.View entering={FadeIn.duration(200)} className="gap-4">
-      <Text className="text-sm text-muted-foreground">
-        {t('codeReviewer.instructions.deprecation')}
-      </Text>
+      {/* The deprecation note asks the reader to move the guidelines elsewhere;
+          as body-coloured text it read as a field description. A tinted notice
+          with its own mark separates it from the field below. */}
+      <View className="flex-row items-start gap-2 rounded-xl border border-warn-tile-border bg-warn-tile-bg p-3">
+        <AlertTriangle size={16} color={colors.warn} />
+        <Text className="min-w-0 flex-1 text-sm text-warn">
+          {t('codeReviewer.instructions.deprecation')}
+        </Text>
+      </View>
       {/* A multiline field takes the platform's generic text-view name on iOS,
           so the accessible name is the localized heading this screen renders.
           `max-h-[196px]` is the `p-3` padding (2 × 10.5) plus ten

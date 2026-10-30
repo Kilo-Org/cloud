@@ -141,6 +141,10 @@ vi.mock('@/components/destructive-confirm-dialog', () => ({
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/icons', () => ({ AlertTriangle: 'AlertTriangle' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ warn: '#f2b05f' }),
+}));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: Record<string, unknown>): ReactNode => createElement('ScreenHeader', props),
@@ -626,6 +630,23 @@ describe('InstructionsRoute editor', () => {
     mount();
 
     expect(latestInput().accessibilityLabel).toBe(i18n.t('codeReviewer.instructions.title'));
+  });
+
+  // As body-coloured copy the deprecation note read as a description of the
+  // field under it. It is now a notice of its own: a tinted block with its
+  // warning mark, in the warning ink rather than the muted one.
+  it('renders the deprecation note as a warning notice of its own', () => {
+    config.data = { customInstructions: STORED };
+    const renderer = mount();
+
+    const noticeCopy = findByHostType(renderer, 'Text').filter(node => {
+      const props = node.props as { className?: string };
+      return props.className?.includes('text-warn') === true;
+    });
+    expect(noticeCopy).toHaveLength(1);
+    const copy = noticeCopy[0]?.props as { children?: string } | undefined;
+    expect(copy?.children).toBe(i18n.t('codeReviewer.instructions.deprecation'));
+    expect(findByHostType(renderer, 'AlertTriangle')).toHaveLength(1);
   });
 
   it('reads the editor name from the active catalog', async () => {

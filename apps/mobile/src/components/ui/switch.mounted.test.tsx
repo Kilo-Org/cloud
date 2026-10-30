@@ -6,7 +6,7 @@ import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
 
 import { Switch } from './switch';
 
-const native = vi.hoisted(() => ({ os: 'ios' }));
+const native = vi.hoisted(() => ({ os: 'ios', scheme: 'light' as 'light' | 'dark' }));
 
 // `vi.mock` factories are hoisted above the imports, so they cannot close over
 // the palette modules; the holder is declared inside `vi.hoisted` and each test
@@ -23,6 +23,7 @@ vi.mock('react-native', () => ({
     },
   },
   Switch: 'Switch',
+  useColorScheme: () => native.scheme,
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -88,8 +89,11 @@ describe('Switch', () => {
 
   // A switch that states no colours takes them from the Android theme, which
   // tinted the track with the framework accent and left the dark off thumb
-  // near-white. Both states therefore name a palette colour in each theme.
+  // near-white. Both states therefore name a palette colour in each theme, and
+  // the dark off track is the lighter secondary ink: the thumb is the palette's
+  // near-black primary ink in that theme, so a muted track would swallow it.
   it('draws the light palette in both states', () => {
+    native.scheme = 'light';
     Object.assign(theme.colors, lightColors);
     const props = nativeProps(renderSwitch({}).root);
     expect(props.trackColor).toEqual({
@@ -100,10 +104,11 @@ describe('Switch', () => {
   });
 
   it('draws the dark palette in both states', () => {
+    native.scheme = 'dark';
     Object.assign(theme.colors, darkColors);
     const props = nativeProps(renderSwitch({}).root);
     expect(props.trackColor).toEqual({
-      false: darkColors.mutedForeground,
+      false: darkColors.ink2,
       true: darkColors.primary,
     });
     expect(props.thumbColor).toBe(darkColors.primaryForeground);

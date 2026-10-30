@@ -1,6 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { AssistantMessage } from '@/types/opencode.gen';
+import type { MessageDeliveryState } from '@kilocode/cloud-agent-sdk';
 import type { StoredMessage } from './types';
 import { WORKTREE_REVIEW_PROMPT_INTRO, type WorktreeReviewComment } from './worktree-review';
 
@@ -233,5 +234,125 @@ describe('MessageBubble', () => {
     expect(malformedHtml).toContain('Please address the following worktree review feedback');
     expect(ordinaryHtml).not.toContain('Code review feedback');
     expect(ordinaryHtml).toContain('Please inspect this file.');
+  });
+
+  describe('failed delivery recovery', () => {
+    const failed: MessageDeliveryState = {
+      status: 'failed',
+      reason: 'exhausted',
+      error: 'Unauthorized: token expired',
+    };
+
+    function renderFailed(
+      deliveryState: MessageDeliveryState | undefined,
+      handlers: Partial<{
+        onRetryMessage: (message: StoredMessage) => void;
+        onCopyToComposer: (text: string) => void;
+      }> = {}
+    ): string {
+      return renderToStaticMarkup(
+        React.createElement(MessageBubble, {
+          message: userMessage('Ship the release notes.'),
+          deliveryState,
+          onRetryMessage: () => {},
+          onCopyToComposer: () => {},
+          ...handlers,
+        })
+      );
+    }
+
+    it('offers retry and copy on an exhausted delivery', () => {
+      const html = renderFailed(failed);
+
+      expect(html).toContain('Failed to deliver after retries');
+      expect(html).toContain('aria-label="Retry"');
+      expect(html).toContain('aria-label="Copy to composer"');
+    });
+
+    it('states an execution failure once, without a delivery-flavoured second line', () => {
+      const html = renderFailed({ status: 'failed', reason: 'execution', error: 'Aborted' });
+
+      expect(html).toContain('Response failed');
+      expect(html).not.toContain('Failed to deliver');
+      expect(html).toContain('aria-label="Retry"');
+    });
+
+    it('renders no recovery controls when no handler is wired', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(MessageBubble, {
+          message: userMessage('Ship the release notes.'),
+          deliveryState: failed,
+        })
+      );
+
+      expect(html).not.toContain('aria-label="Retry"');
+      expect(html).not.toContain('aria-label="Copy to composer"');
+    });
+
+    it('keeps a queued row free of recovery controls', () => {
+      const html = renderFailed({ status: 'queued' });
+
+      expect(html).not.toContain('aria-label="Retry"');
+      expect(html).not.toContain('aria-label="Copy to composer"');
+    });
+
+    it('offers copy without retry when only the copy handler is wired', () => {
+      const html = renderFailed(failed, { onRetryMessage: undefined });
+
+      expect(html).toContain('aria-label="Copy to composer"');
+      expect(html).not.toContain('aria-label="Retry"');
+    });
+
+    function assistantFailure(): StoredMessage {
+      const info: AssistantMessage = {
+        id: 'msg-assistant',
+        sessionID: 'ses-1',
+        role: 'assistant',
+        time: { created: 1, completed: 2 },
+        parentID: 'msg-parent',
+        modelID: 'test-model',
+        providerID: 'test-provider',
+        mode: 'code',
+        agent: 'test-agent',
+        path: { cwd: '/', root: '/' },
+        cost: 0,
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      };
+      Object.defineProperty(info, 'error', {
+        value: { name: 'APIError', message: 'upstream failed' },
+        enumerable: true,
+      });
+      return { info, parts: [] };
+    }
+
+    it('suppresses retry on an assistant failure with no preceding prompt', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(MessageBubble, {
+          message: assistantFailure(),
+          onRetryMessage: () => {},
+        })
+      );
+
+      expect(html).not.toContain('aria-label="Retry"');
+    });
+
+    it('retries an assistant failure against the preceding user row', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(MessageBubble, {
+          message: assistantFailure(),
+          retryTargetMessage: userMessage('Ship the release notes.'),
+          onRetryMessage: () => {},
+        })
+      );
+
+      expect(html).toContain('aria-label="Retry"');
+    });
+
+    it('offers retry without copy when only the retry handler is wired', () => {
+      const html = renderFailed(failed, { onCopyToComposer: undefined });
+
+      expect(html).toContain('aria-label="Retry"');
+      expect(html).not.toContain('aria-label="Copy to composer"');
+    });
   });
 });

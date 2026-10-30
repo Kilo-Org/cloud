@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
 
 import { Skeleton } from '@/components/ui/skeleton';
-import type { SessionCommit } from '@kilocode/cloud-agent-sdk';
+import type { KiloSessionId, SessionCommit } from '@kilocode/cloud-agent-sdk';
 import { useCloudAgent, useManager } from './CloudAgentProvider';
 import { useWorktreeChatCreation, useWorktreeChatTabs } from './CloudSidebarLayout';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
@@ -57,6 +57,9 @@ import { TranscriptStatusSlot } from './TranscriptStatusSlot';
 import { ComposerContextLine } from './ComposerContextLine';
 import { CurrentTaskList } from './CurrentTaskList';
 import { getCurrentTodos } from './current-todos';
+import { getUserTextContent } from './MessageBubble';
+import { parseFailedCommandRow, retryFailedMessage } from './retry-failed-message';
+import { isUserMessage } from './types';
 import { planResumeAttempt, resumeAnchorForTranscript, sendTakesOverResume } from './resume-anchor';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
 import type { ChildSessionDrawerEntry } from './ChildSessionSection';
@@ -304,6 +307,23 @@ export default function CloudChatPage({
   const dynamicMessages = useAtomValue(manager.atoms.dynamicMessages);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
   const sendingMessageIds = useAtomValue(manager.atoms.sendingMessageIds);
+  // A failed row the user retried stays out of the transcript: while the
+  // re-send is in flight it is superseded, and after acceptance it is a
+  // resolved delivery failure. Both records are session-scoped projections.
+  const resolvedDeliveryFailures = useAtomValue(manager.atoms.resolvedDeliveryFailures);
+  const supersededInFlightMessageIds = useAtomValue(manager.atoms.supersededInFlightMessageIds);
+  const hiddenMessageIds = useMemo(
+    () => new Set([...resolvedDeliveryFailures, ...supersededInFlightMessageIds]),
+    [resolvedDeliveryFailures, supersededInFlightMessageIds]
+  );
+  const visibleStaticMessages = useMemo(
+    () => staticMessages.filter(message => !hiddenMessageIds.has(message.info.id)),
+    [staticMessages, hiddenMessageIds]
+  );
+  const visibleDynamicMessages = useMemo(
+    () => dynamicMessages.filter(message => !hiddenMessageIds.has(message.info.id)),
+    [dynamicMessages, hiddenMessageIds]
+  );
   const liveTotalCostUsd = useAtomValue(manager.atoms.totalCost);
   const contextUsage = useAtomValue(manager.atoms.contextUsage);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
@@ -886,7 +906,7 @@ export default function CloudChatPage({
   }, [canCreateWorktreeChat, createWorktreeChat, newChatComposer, sessionIdFromParams]);
 
   const handleSendMessage = useCallback(
-    async (prompt: string, attachments?: CloudAgentAttachments) => {
+    async (prompt: string, attachments?: CloudAgentAttachments, onOptimisticSend?: () => void) => {
       // Sending takes the position over only once the send is accepted: end a
       // resume that is still looking for its anchor, or its effect re-pauses
       // follow and cancels this scroll when the message lands. A rejected send
@@ -915,6 +935,7 @@ export default function CloudChatPage({
             : (sessionConfig?.variant ?? undefined),
         },
         attachments: supportsAttachments ? attachments : undefined,
+        onOptimisticSend,
       });
       // Pins the tail when the list already follows. While a resume has the
       // follow off this is a no-op, so a refused send never moves the reader
@@ -945,7 +966,12 @@ export default function CloudChatPage({
   );
 
   const handleSendSlashCommand = useCallback(
-    async (command: string, args: string, attachments?: CloudAgentAttachments) => {
+    async (
+      command: string,
+      args: string,
+      attachments?: CloudAgentAttachments,
+      onOptimisticSend?: () => void
+    ) => {
       // A command send takes the position over exactly as a message send does,
       // and only once it is accepted: end a resume still looking for its anchor,
       // or the effect re-pauses follow and cancels the scroll for this
@@ -954,6 +980,7 @@ export default function CloudChatPage({
       const acceptedPromise = manager.send({
         payload: { type: 'command', command, arguments: args },
         attachments: supportsAttachments ? attachments : undefined,
+        onOptimisticSend,
       });
       // Pins the tail when the list already follows; a no-op under a resume.
       scheduleScrollToBottom();
@@ -977,6 +1004,77 @@ export default function CloudChatPage({
     },
     [manager, scheduleScrollToBottom, setChatUI, supportsAttachments]
   );
+
+  const handleRetryFailedMessage = useCallback(
+    async (message: StoredMessage, failedMessage: StoredMessage) => {
+      if (!isUserMessage(message.info)) return;
+      const prompt = getUserTextContent(message.parts);
+      if (prompt === '') return;
+      // The row belongs to the session this page opened. The re-send is
+      // awaited and the user can switch chats while it is in flight, so the
+      // owner is captured here: a resolution recorded after the switch would
+      // otherwise land on the session that was switched to.
+      const ownerSessionId =
+        sessionIdFromParams && isCurrentSession ? (sessionIdFromParams as KiloSessionId) : null;
+      if (!ownerSessionId) return;
+      // A retried assistant response is superseded together with the user row
+      // whose prompt it re-sends; leaving either behind would show the prompt
+      // or the failed response twice. A user delivery failure replaces itself.
+      const messageIds =
+        failedMessage.info.id === message.info.id
+          ? [message.info.id]
+          : [failedMessage.info.id, message.info.id];
+      // A failed slash-command row re-sends through the command payload, the
+      // same path the composer uses at submit time. Plain text falls back to
+      // the prompt payload: unknown slash-looking text was sent as plain text
+      // originally, so retrying it as a command would change the send.
+      const commandRow = parseFailedCommandRow(prompt, availableCommands);
+      await retryFailedMessage({
+        messageIds,
+        ownerSessionId,
+        recovery: manager,
+        send: onOptimisticSend =>
+          commandRow
+            ? handleSendSlashCommand(
+                commandRow.command,
+                commandRow.args,
+                undefined,
+                onOptimisticSend
+              )
+            : handleSendMessage(prompt, undefined, onOptimisticSend),
+      });
+    },
+    [
+      availableCommands,
+      handleSendMessage,
+      handleSendSlashCommand,
+      isCurrentSession,
+      manager,
+      sessionIdFromParams,
+    ]
+  );
+
+  const composerCopyTokenRef = useRef(0);
+  const [requestedComposerText, setRequestedComposerText] = useState<{
+    text: string;
+    token: number;
+  } | null>(null);
+  const handleCopyFailedToComposer = useCallback((text: string) => {
+    composerCopyTokenRef.current += 1;
+    setRequestedComposerText({ text, token: composerCopyTokenRef.current });
+  }, []);
+  const handleConsumeRequestedComposerText = useCallback((token: number) => {
+    setRequestedComposerText(current => (current?.token === token ? null : current));
+  }, []);
+
+  // A read-only session mounts no ChatInput, so nothing would consume a pending
+  // request. This page outlives a `?sessionId=` change, so dropping it here
+  // stops a copy from one session replaying into the next writable composer.
+  useEffect(() => {
+    if (isReadOnly) {
+      setRequestedComposerText(null);
+    }
+  }, [isReadOnly]);
 
   const handleStopExecution = useCallback(() => {
     void manager.interrupt();
@@ -1686,8 +1784,8 @@ export default function CloudChatPage({
     localSession,
     transcriptPhase,
     live: {
-      staticMessages,
-      dynamicMessages,
+      staticMessages: visibleStaticMessages,
+      dynamicMessages: visibleDynamicMessages,
       pendingMessages,
       sendingMessageIds,
       statusIndicator: visibleStatusIndicator,
@@ -2009,6 +2107,12 @@ export default function CloudChatPage({
                                     commitsAfterMessage={commitsAfterMessage}
                                     getChildMessages={getChildMessages}
                                     onOpenChildSession={handleOpenTopLevelChildSession}
+                                    onRetryMessage={
+                                      isCurrentSession ? handleRetryFailedMessage : undefined
+                                    }
+                                    onCopyToComposer={
+                                      isReadOnly ? undefined : handleCopyFailedToComposer
+                                    }
                                     onOpenPreparationDetails={handleOpenPreparationDetails}
                                   />
 
@@ -2155,6 +2259,8 @@ export default function CloudChatPage({
                                 availableVariants={displayAvailableVariants}
                                 showToolbar={Boolean(sessionIdFromParams)}
                                 initialValue={failedPrompt ?? undefined}
+                                requestedValue={requestedComposerText}
+                                onConsumeRequestedValue={handleConsumeRequestedComposerText}
                                 customModeOptions={customModeOptions}
                                 modelPickerDisabled={
                                   modelPickerLocked || sessionModels.modelPickerDisabled

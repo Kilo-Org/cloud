@@ -2,8 +2,16 @@
 
 import { cn } from '@/lib/utils';
 
-import React, { useCallback } from 'react';
-import { Scissors, Image, FileText, AlertCircle, Clock, LoaderCircle } from 'lucide-react';
+import React, { useCallback, useState } from 'react';
+import {
+  Scissors,
+  Image,
+  FileText,
+  AlertCircle,
+  Clock,
+  LoaderCircle,
+  RotateCcw,
+} from 'lucide-react';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import type { AssistantMessage } from '@/types/opencode.gen';
 import type { MessageDeliveryState } from '@kilocode/cloud-agent-sdk';
@@ -136,7 +144,7 @@ function InlineFileAttachment({ part }: { part: FilePart }) {
  * (optimistic placeholders) to avoid duplication when both coexist.
  * Only uses non-synthetic parts if they have non-empty text.
  */
-function getUserTextContent(parts: Part[]): string {
+export function getUserTextContent(parts: Part[]): string {
   const textParts = parts.filter(isTextPart);
   const nonSynthetic = textParts.filter(p => !p.synthetic && p.text.length > 0);
   const effective = nonSynthetic.length > 0 ? nonSynthetic : textParts;
@@ -216,6 +224,147 @@ function DeliveryStatusIcon({ badge }: { badge: DeliveryBadge }) {
   );
 }
 
+/**
+ * Fixed, safe copy for a failed row, keyed by kind. Mirrors mobile's
+ * `selectMessageFailure` so web and mobile state the same failure the same way;
+ * the catalog is in `en.json` under `agentChat.messageFailure.*` and is the
+ * single source of truth for both surfaces.
+ */
+type MessageFailure = {
+  kind: 'delivery' | 'assistant';
+  title: string;
+  detail: string | null;
+  canRetry: boolean;
+  canCopy: boolean;
+};
+
+const NON_RETRYABLE_ASSISTANT_ERRORS = [
+  'ProviderAuthError',
+  'MessageAbortedError',
+  'ContextOverflowError',
+] as const;
+
+const DELIVERY_DETAIL_BY_REASON = {
+  interrupted: 'Pending queued message interrupted by user',
+  exhausted: 'Failed to deliver after retries',
+  execution: 'Response failed',
+} as const;
+
+function selectMessageFailure(input: {
+  deliveryState?: MessageDeliveryState;
+  info: StoredMessage['info'];
+}): MessageFailure | null {
+  const { deliveryState, info } = input;
+  if (info.role === 'user' && deliveryState?.status === 'failed') {
+    if (deliveryState.reason === 'execution') {
+      return {
+        kind: 'delivery',
+        title: 'Response failed',
+        detail: null,
+        canRetry: true,
+        canCopy: true,
+      };
+    }
+    return {
+      kind: 'delivery',
+      title: 'Failed to deliver',
+      detail: DELIVERY_DETAIL_BY_REASON[deliveryState.reason],
+      canRetry: true,
+      canCopy: true,
+    };
+  }
+  if (info.role === 'assistant' && info.error) {
+    const errorName = info.error.name;
+    const interrupted = errorName === 'MessageAbortedError';
+    return {
+      kind: 'assistant',
+      title: interrupted ? 'Interrupted' : 'Failed',
+      detail: null,
+      canRetry:
+        !interrupted &&
+        !NON_RETRYABLE_ASSISTANT_ERRORS.some(name => name === errorName),
+      canCopy: false,
+    };
+  }
+  return null;
+}
+
+function RetryFailureFooter({
+  failure,
+  message,
+  retryTargetMessage,
+  onRetryMessage,
+  onCopyToComposer,
+}: {
+  failure: MessageFailure;
+  message: StoredMessage;
+  retryTargetMessage?: StoredMessage;
+  onRetryMessage?: (message: StoredMessage, failedMessage: StoredMessage) => void;
+  onCopyToComposer?: (text: string) => void;
+}) {
+  const [retried, setRetried] = useState(false);
+  const copyText = failure.canCopy ? getUserTextContent(message.parts) : '';
+  const relevantHandlerWired =
+    failure.kind === 'delivery'
+      ? onRetryMessage !== undefined || onCopyToComposer !== undefined
+      : onRetryMessage !== undefined;
+  // An assistant failure retries the prompt above it. With no preceding user
+  // row there is nothing to re-send, so the control stays hidden instead of
+  // passing the assistant row to a handler that rejects it.
+  const canRetry =
+    failure.canRetry &&
+    onRetryMessage !== undefined &&
+    (failure.kind === 'delivery' || retryTargetMessage !== undefined);
+  if (!relevantHandlerWired) return null;
+  return (
+    <div className="mt-1 flex flex-col gap-1">
+      <div className="flex items-center gap-1 text-xs">
+        <AlertCircle className="h-3 w-3" />
+        <span
+          className={
+            failure.canRetry ? 'text-muted-foreground' : 'text-destructive'
+          }
+        >
+          {failure.title}
+        </span>
+        {failure.detail !== null ? (
+          <span className="text-muted-foreground">{failure.detail}</span>
+        ) : null}
+      </div>
+      <div className="flex items-center gap-2">
+        {canRetry ? (
+          <button
+            type="button"
+            disabled={retried}
+            onClick={() => {
+              setRetried(true);
+              void Promise.resolve(onRetryMessage?.(retryTargetMessage ?? message, message))
+                .catch(() => {})
+                .finally(() => {
+                  setRetried(false);
+                });
+            }}
+            aria-label="Retry"
+            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring cursor-pointer rounded p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
+        {failure.canCopy && onCopyToComposer && copyText !== '' ? (
+          <button
+            type="button"
+            onClick={() => onCopyToComposer(copyText)}
+            aria-label="Copy to composer"
+            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring cursor-pointer rounded p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <span className="text-xs">Copy</span>
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 type MessageBubbleProps = {
   message: StoredMessage;
   displayTimestamp?: number;
@@ -227,6 +376,23 @@ type MessageBubbleProps = {
   /** Function to get messages for a child session ID */
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
+  /**
+   * Retry a failed row. Mirrors mobile's `onRetryMessage`: a user delivery
+   * failure re-sends the row's own text; an assistant failure re-sends the
+   * newest preceding user row. `null` when no retryable prompt exists, which
+   * suppresses the control (same as mobile).
+   */
+  onRetryMessage?: (message: StoredMessage, failedMessage: StoredMessage) => void;
+  /**
+   * The user row an assistant failure retries: the newest preceding user
+   * message. A user failure retries its own row.
+   */
+  retryTargetMessage?: StoredMessage;
+  /**
+   * Copy a failed user row's text into the composer. Wired only for delivery
+   * failures (an assistant failure has no preceding user row to copy from).
+   */
+  onCopyToComposer?: (text: string) => void;
 };
 
 /**
@@ -243,10 +409,14 @@ export function MessageBubble({
   isSending,
   getChildMessages,
   onOpenChildSession,
+  onRetryMessage,
+  retryTargetMessage,
+  onCopyToComposer,
 }: MessageBubbleProps) {
   const isStreaming = isStreamingProp ?? isMessageStreaming(message);
   const timestamp = displayTimestamp ?? message.info.time.created;
   const deliveryBadge = getDeliveryBadge(deliveryState, { sending: isSending });
+  const failure = selectMessageFailure({ deliveryState, info: message.info });
 
   const getTextForCopy = useCallback(
     () =>
@@ -306,6 +476,15 @@ export function MessageBubble({
           {userContent && <CopyMessageButton getText={getTextForCopy} />}
           <TimeAgo timestamp={timestamp} className="text-muted-foreground/70 text-xs" />
         </div>
+        {failure && !isStreaming && (
+          <RetryFailureFooter
+            failure={failure}
+            message={message}
+            retryTargetMessage={retryTargetMessage}
+            onRetryMessage={onRetryMessage}
+            onCopyToComposer={onCopyToComposer}
+          />
+        )}
       </div>
     );
   }
@@ -349,6 +528,15 @@ export function MessageBubble({
             <AlertCircle className="h-3 w-3" />
             {interrupted ? 'Interrupted' : 'Failed'}
           </span>
+        )}
+        {failure && !isStreaming && (
+          <RetryFailureFooter
+            failure={failure}
+            message={message}
+            retryTargetMessage={retryTargetMessage}
+            onRetryMessage={onRetryMessage}
+            onCopyToComposer={onCopyToComposer}
+          />
         )}
         {hasText && (
           <div

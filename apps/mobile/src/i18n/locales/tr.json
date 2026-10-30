@@ -3069,7 +3069,7 @@
       "message": "GitHub bağlantın artık geçerli değil. Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek.",
       "gitlabTitle": "GitLab bağlantısının süresi doldu.",
       "bitbucketTitle": "Bitbucket bağlantısının süresi doldu.",
-      "providerMessage": "{{provider}} bağlantın artık geçerli değil. Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek."
+      "providerMessage": "Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek."
     },
     "review": "İnceleme",
     "reviewPullRequest": "Çekme isteğini incele",

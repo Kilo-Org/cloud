@@ -3069,7 +3069,7 @@
       "message": "Kết nối GitHub của bạn không còn hợp lệ. Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần.",
       "gitlabTitle": "Kết nối GitLab đã hết hạn.",
       "bitbucketTitle": "Kết nối Bitbucket đã hết hạn.",
-      "providerMessage": "Kết nối {{provider}} của bạn không còn hợp lệ. Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần."
+      "providerMessage": "Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần."
     },
     "review": "Rà soát",
     "reviewPullRequest": "Đánh giá PR",

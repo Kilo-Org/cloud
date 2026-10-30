@@ -711,7 +711,7 @@
       "message": "Lidhja jote me GitHub nuk është më e vlefshme. Rikontrollo lidhjen — do të të kërkohet të rilidhesh nëse është e nevojshme.",
       "gitlabTitle": "Lidhja me GitLab skadoi.",
       "bitbucketTitle": "Lidhja me Bitbucket skadoi.",
-      "providerMessage": "Lidhja jote me {{provider}} nuk është më e vlefshme. Rikontrollo lidhjen — do të të kërkohet të rilidhesh nëse është e nevojshme."
+      "providerMessage": "Rikontrollo lidhjen — do të të kërkohet të rilidhesh nëse është e nevojshme."
     },
     "eventChips": {
       "comment": "Koment",

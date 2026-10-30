@@ -711,7 +711,7 @@
       "message": "GitHub bağlantın artıq etibarlı deyil. Bağlantını yenidən yoxla — lazım olsa, yenidən qoşulmaq təklif olunacaq.",
       "gitlabTitle": "GitLab bağlantısının müddəti bitdi.",
       "bitbucketTitle": "Bitbucket bağlantısının müddəti bitdi.",
-      "providerMessage": "{{provider}} bağlantın artıq etibarlı deyil. Bağlantını yenidən yoxla — lazım olsa, yenidən qoşulmaq təklif olunacaq."
+      "providerMessage": "Bağlantını yenidən yoxla — lazım olsa, yenidən qoşulmaq təklif olunacaq."
     },
     "eventChips": {
       "comment": "Şərh",

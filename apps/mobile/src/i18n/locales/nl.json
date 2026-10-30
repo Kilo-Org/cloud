@@ -3069,7 +3069,7 @@
       "message": "Je GitHub-verbinding is niet meer geldig. Controleer de verbinding opnieuw. Als dat nodig is, krijg je de vraag om opnieuw verbinding te maken.",
       "gitlabTitle": "De GitLab-koppeling is verlopen.",
       "bitbucketTitle": "De Bitbucket-koppeling is verlopen.",
-      "providerMessage": "Je {{provider}}-verbinding is niet meer geldig. Controleer de verbinding opnieuw. Als dat nodig is, krijg je de vraag om opnieuw verbinding te maken."
+      "providerMessage": "Controleer de verbinding opnieuw. Als dat nodig is, krijg je de vraag om opnieuw verbinding te maken."
     },
     "review": "Beoordeling",
     "reviewPullRequest": "PR beoordelen",

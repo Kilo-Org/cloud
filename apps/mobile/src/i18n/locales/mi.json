@@ -711,7 +711,7 @@
       "message": "Kua kore tō hononga GitHub e whai mana. Tirohia anō tō hononga — ka tonoa koe kia hono anō mēnā e hiahiatia ana.",
       "gitlabTitle": "Kua pau te wā o te hononga GitLab.",
       "bitbucketTitle": "Kua pau te wā o te hononga Bitbucket.",
-      "providerMessage": "Kua kore tō hononga {{provider}} e whai mana. Tirohia anō tō hononga — ka tonoa koe kia hono anō mēnā e hiahiatia ana."
+      "providerMessage": "Tirohia anō tō hononga — ka tonoa koe kia hono anō mēnā e hiahiatia ana."
     },
     "eventChips": {
       "comment": "Kōrero",

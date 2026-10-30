@@ -3069,7 +3069,7 @@
       "message": "你的 GitHub 連線已失效。請重新檢查連線；如有需要，系統會提示你重新連線。",
       "gitlabTitle": "GitLab 連線已過期。",
       "bitbucketTitle": "Bitbucket 連線已過期。",
-      "providerMessage": "你的 {{provider}} 連線已失效。請重新檢查連線；如有需要，系統會提示你重新連線。"
+      "providerMessage": "請重新檢查連線；如有需要，系統會提示你重新連線。"
     },
     "review": "審查",
     "reviewPullRequest": "審查提取請求",

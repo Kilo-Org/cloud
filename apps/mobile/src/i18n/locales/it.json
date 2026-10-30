@@ -3110,7 +3110,7 @@
       "message": "La tua connessione a GitHub non è più valida. Ricontrolla la connessione: ti verrà chiesto di riconnetterti se necessario.",
       "gitlabTitle": "La connessione a GitLab è scaduta.",
       "bitbucketTitle": "La connessione a Bitbucket è scaduta.",
-      "providerMessage": "La tua connessione a {{provider}} non è più valida. Ricontrolla la connessione: ti verrà chiesto di riconnetterti se necessario."
+      "providerMessage": "Ricontrolla la connessione: ti verrà chiesto di riconnetterti se necessario."
     },
     "review": "Revisione",
     "reviewPullRequest": "Revisiona la pull request",

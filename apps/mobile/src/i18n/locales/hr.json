@@ -727,7 +727,7 @@
       "message": "Tvoja veza s GitHubom više nije valjana. Ponovno provjeri vezu — po potrebi će se zatražiti ponovno povezivanje.",
       "gitlabTitle": "Veza s GitLabom je istekla.",
       "bitbucketTitle": "Veza s Bitbucketom je istekla.",
-      "providerMessage": "Tvoja veza s {{provider}}om više nije valjana. Ponovno provjeri vezu — po potrebi će se zatražiti ponovno povezivanje."
+      "providerMessage": "Ponovno provjeri vezu — po potrebi će se zatražiti ponovno povezivanje."
     },
     "eventChips": {
       "comment": "Komentiraj",

@@ -759,7 +759,7 @@
       "message": "Níl do nasc GitHub bailí a thuilleadh. Seiceáil do nasc arís — iarrfar ort athnascadh más gá.",
       "gitlabTitle": "Tá an nasc GitLab imithe in éag.",
       "bitbucketTitle": "Tá an nasc Bitbucket imithe in éag.",
-      "providerMessage": "Níl do nasc {{provider}} bailí a thuilleadh. Seiceáil do nasc arís — iarrfar ort athnascadh más gá."
+      "providerMessage": "Seiceáil do nasc arís — iarrfar ort athnascadh más gá."
     },
     "eventChips": {
       "comment": "Trácht",

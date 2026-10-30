@@ -711,7 +711,7 @@
       "message": "A túa conexión con GitHub xa non é válida. Volve comprobala. Se é necesario, pedirémosche que te conectes de novo.",
       "gitlabTitle": "A conexión con GitLab caducou.",
       "bitbucketTitle": "A conexión con Bitbucket caducou.",
-      "providerMessage": "A túa conexión con {{provider}} xa non é válida. Volve comprobala. Se é necesario, pedirémosche que te conectes de novo."
+      "providerMessage": "Volve comprobala. Se é necesario, pedirémosche que te conectes de novo."
     },
     "eventChips": {
       "comment": "Comentar",

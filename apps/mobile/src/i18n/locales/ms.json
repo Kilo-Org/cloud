@@ -711,7 +711,7 @@
       "message": "Sambungan GitHub anda tidak lagi sah. Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu.",
       "gitlabTitle": "Sambungan GitLab telah tamat tempoh.",
       "bitbucketTitle": "Sambungan Bitbucket telah tamat tempoh.",
-      "providerMessage": "Sambungan {{provider}} anda tidak lagi sah. Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu."
+      "providerMessage": "Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu."
     },
     "eventChips": {
       "comment": "Komen",

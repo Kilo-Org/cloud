@@ -711,7 +711,7 @@
       "message": "Din GitHub-forbindelse er ikke længere gyldig. Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt.",
       "gitlabTitle": "GitLab-forbindelsen er udløbet.",
       "bitbucketTitle": "Bitbucket-forbindelsen er udløbet.",
-      "providerMessage": "Din {{provider}}-forbindelse er ikke længere gyldig. Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt."
+      "providerMessage": "Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt."
     },
     "eventChips": {
       "comment": "Kommentar",

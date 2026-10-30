@@ -711,7 +711,7 @@
       "message": "Njikọ GitHub gị adịkwaghị irè. Lelee njikọ gị ọzọ — a ga-agwa gị ka ị jikọtaghachi ma ọ bụrụ na ọ dị mkpa.",
       "gitlabTitle": "Oge njikọ GitLab agwụla.",
       "bitbucketTitle": "Oge njikọ Bitbucket agwụla.",
-      "providerMessage": "Njikọ {{provider}} gị adịkwaghị irè. Lelee njikọ gị ọzọ — a ga-agwa gị ka ị jikọtaghachi ma ọ bụrụ na ọ dị mkpa."
+      "providerMessage": "Lelee njikọ gị ọzọ — a ga-agwa gị ka ị jikọtaghachi ma ọ bụrụ na ọ dị mkpa."
     },
     "eventChips": {
       "comment": "Nkwupụta",

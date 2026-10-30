@@ -3069,7 +3069,7 @@
       "message": "Deine GitHub-Verbindung ist nicht mehr gültig. Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen.",
       "gitlabTitle": "Die GitLab-Verbindung ist abgelaufen.",
       "bitbucketTitle": "Die Bitbucket-Verbindung ist abgelaufen.",
-      "providerMessage": "Deine {{provider}}-Verbindung ist nicht mehr gültig. Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen."
+      "providerMessage": "Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen."
     },
     "review": "Prüfung",
     "reviewPullRequest": "Pull-Request prüfen",

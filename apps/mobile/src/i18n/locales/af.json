@@ -711,7 +711,7 @@
       "message": "Jou GitHub-verbinding is nie meer geldig nie. Kontroleer jou verbinding weer — jy sal gevra word om weer te koppel indien nodig.",
       "gitlabTitle": "Die GitLab-verbinding het verval.",
       "bitbucketTitle": "Die Bitbucket-verbinding het verval.",
-      "providerMessage": "Jou {{provider}}-verbinding is nie meer geldig nie. Kontroleer jou verbinding weer — jy sal gevra word om weer te koppel indien nodig."
+      "providerMessage": "Kontroleer jou verbinding weer — jy sal gevra word om weer te koppel indien nodig."
     },
     "eventChips": {
       "comment": "Kommentaar",

@@ -176,7 +176,12 @@ describe('organization GitLab reconnect state', () => {
     queryState.status = { connected: false, reconnectRequired: true };
     const renderer = mount('gitlab', 'org-1');
     expect(renderer.root.findByType('EmptyState').props.title).toBe('GitLab connection expired');
-    expect(renderedText(renderer)).toContain('Your GitLab connection is no longer valid');
+    expect(renderedText(renderer)).toContain(
+      "Re-check your connection — you'll be prompted to reconnect if needed."
+    );
+    // The title above already names the provider, so the description never
+    // restates the expiry.
+    expect(renderedText(renderer)).not.toContain('no longer valid');
     // The CTA is the integration-page action, not a second connect attempt.
     expect(renderedText(renderer)).toContain('Connect GitLab');
   });

@@ -3151,7 +3151,7 @@
       "message": "Połączenie z kontem GitHub wygasło. Sprawdź je ponownie — w razie potrzeby aplikacja poprosi o ponowne połączenie.",
       "gitlabTitle": "Połączenie z serwisem GitLab wygasło.",
       "bitbucketTitle": "Połączenie z serwisem Bitbucket wygasło.",
-      "providerMessage": "Połączenie z kontem {{provider}} wygasło. Sprawdź je ponownie — w razie potrzeby aplikacja poprosi o ponowne połączenie."
+      "providerMessage": "Sprawdź je ponownie — w razie potrzeby aplikacja poprosi o ponowne połączenie."
     },
     "review": "Przegląd",
     "reviewPullRequest": "Przejrzyj PR",

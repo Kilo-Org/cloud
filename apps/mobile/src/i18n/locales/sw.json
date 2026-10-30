@@ -711,7 +711,7 @@
       "message": "Muunganisho wako wa GitHub si halali tena. Uangalie tena — utaombwa kuunganisha upya ikihitajika.",
       "gitlabTitle": "Muda wa muunganisho wa GitLab umeisha.",
       "bitbucketTitle": "Muda wa muunganisho wa Bitbucket umeisha.",
-      "providerMessage": "Muunganisho wako wa {{provider}} si halali tena. Uangalie tena — utaombwa kuunganisha upya ikihitajika."
+      "providerMessage": "Uangalie tena — utaombwa kuunganisha upya ikihitajika."
     },
     "eventChips": {
       "comment": "Toa maoni",

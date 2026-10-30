@@ -743,7 +743,7 @@
       "message": "Tvoje pripojenie k službe GitHub už nie je platné. Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie.",
       "gitlabTitle": "Platnosť pripojenia k službe GitLab vypršala.",
       "bitbucketTitle": "Platnosť pripojenia k službe Bitbucket vypršala.",
-      "providerMessage": "Tvoje pripojenie k službe {{provider}} už nie je platné. Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie."
+      "providerMessage": "Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie."
     },
     "eventChips": {
       "comment": "Komentár",

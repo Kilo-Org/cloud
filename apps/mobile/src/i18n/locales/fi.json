@@ -711,7 +711,7 @@
       "message": "GitHub-yhteytesi ei ole enää voimassa. Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen.",
       "gitlabTitle": "GitLab-yhteys on vanhentunut",
       "bitbucketTitle": "Bitbucket-yhteys on vanhentunut",
-      "providerMessage": "{{provider}}-yhteytesi ei ole enää voimassa. Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen."
+      "providerMessage": "Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen."
     },
     "eventChips": {
       "comment": "Kommentoi",

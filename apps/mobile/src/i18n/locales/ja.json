@@ -3069,7 +3069,7 @@
       "message": "GitHubとの接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。",
       "gitlabTitle": "GitLabとの連携が期限切れになりました。",
       "bitbucketTitle": "Bitbucketとの連携が期限切れになりました。",
-      "providerMessage": "{{provider}}との接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。"
+      "providerMessage": "接続を再確認してください。再接続が必要な場合は、案内が表示されます。"
     },
     "review": "レビュー",
     "reviewPullRequest": "プルリクエストをレビュー",

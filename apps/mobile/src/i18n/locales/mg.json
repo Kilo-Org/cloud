@@ -711,7 +711,7 @@
       "message": "Tsy manan-kery intsony ny fifandraisanao amin'ny GitHub. Hamarino indray izany — hasaina hampifandray indray ianao raha ilaina.",
       "gitlabTitle": "Lany daty ny fifandraisana amin'ny GitLab.",
       "bitbucketTitle": "Lany daty ny fifandraisana amin'ny Bitbucket.",
-      "providerMessage": "Tsy manan-kery intsony ny fifandraisanao amin'ny {{provider}}. Hamarino indray izany — hasaina hampifandray indray ianao raha ilaina."
+      "providerMessage": "Hamarino indray izany — hasaina hampifandray indray ianao raha ilaina."
     },
     "eventChips": {
       "comment": "Fanehoan-kevitra",

@@ -51,12 +51,7 @@ export function PrReviewReconnectNotice({
   const message =
     providerPlatform === null
       ? t('prReview.reconnectNotice.message')
-      : t('prReview.reconnectNotice.providerMessage', {
-          provider:
-            platform === 'gitlab'
-              ? t('common.gitlab')
-              : t('agentChat.repoPicker.platformBitbucket'),
-        });
+      : t('prReview.reconnectNotice.providerMessage');
 
   return (
     <View className="gap-3 rounded-lg bg-secondary p-4">

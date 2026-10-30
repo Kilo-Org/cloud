@@ -759,7 +759,7 @@
       "message": "Il-konnessjoni tiegħek ma' GitHub m'għadhiex valida. Erġa' ċċekkja l-konnessjoni — jekk ikun hemm bżonn, tintalab terġa' tikkonnettja.",
       "gitlabTitle": "Il-konnessjoni ma' GitLab skadiet.",
       "bitbucketTitle": "Il-konnessjoni ma' Bitbucket skadiet.",
-      "providerMessage": "Il-konnessjoni tiegħek ma' {{provider}} m'għadhiex valida. Erġa' ċċekkja l-konnessjoni — jekk ikun hemm bżonn, tintalab terġa' tikkonnettja."
+      "providerMessage": "Erġa' ċċekkja l-konnessjoni — jekk ikun hemm bżonn, tintalab terġa' tikkonnettja."
     },
     "eventChips": {
       "comment": "Kumment",

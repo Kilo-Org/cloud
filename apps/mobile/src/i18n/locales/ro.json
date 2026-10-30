@@ -727,7 +727,7 @@
       "message": "Conexiunea ta la GitHub nu mai este validă. Verifică din nou conexiunea — ți se va cere să te reconectezi dacă este necesar.",
       "gitlabTitle": "Conexiunea la GitLab a expirat.",
       "bitbucketTitle": "Conexiunea la Bitbucket a expirat.",
-      "providerMessage": "Conexiunea ta la {{provider}} nu mai este validă. Verifică din nou conexiunea — ți se va cere să te reconectezi dacă este necesar."
+      "providerMessage": "Verifică din nou conexiunea — ți se va cere să te reconectezi dacă este necesar."
     },
     "eventChips": {
       "comment": "Comentariu",

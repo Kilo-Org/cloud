@@ -711,7 +711,7 @@
       "message": "Sinu GitHubi ühendus ei kehti enam. Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada.",
       "gitlabTitle": "GitLabi ühendus aegus.",
       "bitbucketTitle": "Bitbucketi ühendus aegus.",
-      "providerMessage": "Sinu {{provider}}i ühendus ei kehti enam. Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada."
+      "providerMessage": "Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada."
     },
     "eventChips": {
       "comment": "Kommenteeri",

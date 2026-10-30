@@ -711,7 +711,7 @@
       "message": "GitHub-tengingin þín er ekki lengur gild. Athugaðu tenginguna aftur — þú færð beiðni um að tengjast aftur ef þörf er á.",
       "gitlabTitle": "Tengingin við GitLab er útrunnin.",
       "bitbucketTitle": "Tengingin við Bitbucket er útrunnin.",
-      "providerMessage": "{{provider}}-tengingin þín er ekki lengur gild. Athugaðu tenginguna aftur — þú færð beiðni um að tengjast aftur ef þörf er á."
+      "providerMessage": "Athugaðu tenginguna aftur — þú færð beiðni um að tengjast aftur ef þörf er á."
     },
     "eventChips": {
       "comment": "Gera athugasemd",

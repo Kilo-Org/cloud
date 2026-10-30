@@ -711,7 +711,7 @@
       "message": "Ukuxhumana kwakho kwe-GitHub akusavumelekile. Bheka kabusha ukuxhumana kwakho — uzocelwa ukuthi uxhumane kabusha uma kudingeka.",
       "gitlabTitle": "Ukuxhumana ne-GitLab kuphelelwe yisikhathi.",
       "bitbucketTitle": "Ukuxhumana ne-Bitbucket kuphelelwe yisikhathi.",
-      "providerMessage": "Ukuxhumana kwakho kwe-{{provider}} akusavumelekile. Bheka kabusha ukuxhumana kwakho — uzocelwa ukuthi uxhumane kabusha uma kudingeka."
+      "providerMessage": "Bheka kabusha ukuxhumana kwakho — uzocelwa ukuthi uxhumane kabusha uma kudingeka."
     },
     "eventChips": {
       "comment": "Phawula",

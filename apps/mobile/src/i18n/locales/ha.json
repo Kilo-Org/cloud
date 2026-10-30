@@ -711,7 +711,7 @@
       "message": "Haɗinka na GitHub ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata.",
       "gitlabTitle": "Wa'adin haɗin GitLab ya ƙare.",
       "bitbucketTitle": "Wa'adin haɗin Bitbucket ya ƙare.",
-      "providerMessage": "Haɗinka na {{provider}} ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata."
+      "providerMessage": "Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata."
     },
     "eventChips": {
       "comment": "Yi tsokaci",

@@ -711,7 +711,7 @@
       "message": "Din GitHub-anslutning är inte längre giltig. Kontrollera anslutningen igen. Du blir ombedd att ansluta på nytt om det behövs.",
       "gitlabTitle": "GitLab-anslutningen har upphört att gälla.",
       "bitbucketTitle": "Bitbucket-anslutningen har upphört att gälla.",
-      "providerMessage": "Din {{provider}}-anslutning är inte längre giltig. Kontrollera anslutningen igen. Du blir ombedd att ansluta på nytt om det behövs."
+      "providerMessage": "Kontrollera anslutningen igen. Du blir ombedd att ansluta på nytt om det behövs."
     },
     "eventChips": {
       "comment": "Kommentera",

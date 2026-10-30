@@ -743,7 +743,7 @@
       "message": "Tavo GitHub ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo.",
       "gitlabTitle": "Baigėsi GitLab prieigos galiojimas.",
       "bitbucketTitle": "Baigėsi Bitbucket prieigos galiojimas.",
-      "providerMessage": "Tavo {{provider}} ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo."
+      "providerMessage": "Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo."
     },
     "eventChips": {
       "comment": "Komentuoti",

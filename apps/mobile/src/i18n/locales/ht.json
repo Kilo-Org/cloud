@@ -711,7 +711,7 @@
       "message": "Koneksyon GitHub ou a pa valab ankò. Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè.",
       "gitlabTitle": "Koneksyon ak GitLab la ekspire.",
       "bitbucketTitle": "Koneksyon ak Bitbucket la ekspire.",
-      "providerMessage": "Koneksyon {{provider}} ou a pa valab ankò. Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè."
+      "providerMessage": "Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè."
     },
     "eventChips": {
       "comment": "Kòmantè",

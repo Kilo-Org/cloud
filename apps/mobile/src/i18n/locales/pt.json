@@ -727,7 +727,7 @@
       "message": "A tua ligação ao GitHub já não é válida. Verifica-a novamente. Se for necessário, ser-te-á pedido que voltes a ligar a conta.",
       "gitlabTitle": "A ligação ao GitLab expirou.",
       "bitbucketTitle": "A ligação ao Bitbucket expirou.",
-      "providerMessage": "A tua ligação ao {{provider}} já não é válida. Verifica-a novamente. Se for necessário, ser-te-á pedido que voltes a ligar a conta."
+      "providerMessage": "Verifica-a novamente. Se for necessário, ser-te-á pedido que voltes a ligar a conta."
     },
     "eventChips": {
       "comment": "Comentar",

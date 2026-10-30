@@ -711,7 +711,7 @@
       "message": "GitHub-tilkoblingen din er ikke lenger gyldig. Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov.",
       "gitlabTitle": "GitLab-tilkoblingen er utløpt.",
       "bitbucketTitle": "Bitbucket-tilkoblingen er utløpt.",
-      "providerMessage": "{{provider}}-tilkoblingen din er ikke lenger gyldig. Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov."
+      "providerMessage": "Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov."
     },
     "eventChips": {
       "comment": "Kommenter",

@@ -711,7 +711,7 @@
       "message": "GitHub ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi.",
       "gitlabTitle": "GitLab bilan ulanish muddati tugadi.",
       "bitbucketTitle": "Bitbucket bilan ulanish muddati tugadi.",
-      "providerMessage": "{{provider}} ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi."
+      "providerMessage": "Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi."
     },
     "eventChips": {
       "comment": "Izoh",

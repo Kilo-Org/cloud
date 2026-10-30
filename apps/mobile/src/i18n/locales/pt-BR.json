@@ -3110,7 +3110,7 @@
       "message": "Sua conexão com o GitHub não é mais válida. Verifique a conexão novamente. Se necessário, o app pedirá que você se reconecte.",
       "gitlabTitle": "A conexão com o GitLab expirou.",
       "bitbucketTitle": "A conexão com o Bitbucket expirou.",
-      "providerMessage": "Sua conexão com o {{provider}} não é mais válida. Verifique a conexão novamente. Se necessário, o app pedirá que você se reconecte."
+      "providerMessage": "Verifique a conexão novamente. Se necessário, o app pedirá que você se reconecte."
     },
     "review": "Revisão",
     "reviewPullRequest": "Revisar pull request",

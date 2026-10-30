@@ -3110,7 +3110,7 @@
       "message": "Votre connexion GitHub n'est plus valide. Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter.",
       "gitlabTitle": "La connexion à GitLab a expiré.",
       "bitbucketTitle": "La connexion à Bitbucket a expiré.",
-      "providerMessage": "Votre connexion {{provider}} n'est plus valide. Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter."
+      "providerMessage": "Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter."
     },
     "review": "Revue",
     "reviewPullRequest": "Examiner la demande de fusion",

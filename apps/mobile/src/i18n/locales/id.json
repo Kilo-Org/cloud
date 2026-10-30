@@ -3069,7 +3069,7 @@
       "message": "Koneksi GitHub kamu sudah tidak valid. Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu.",
       "gitlabTitle": "Koneksi GitLab kedaluwarsa.",
       "bitbucketTitle": "Koneksi Bitbucket kedaluwarsa.",
-      "providerMessage": "Koneksi {{provider}} kamu sudah tidak valid. Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu."
+      "providerMessage": "Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu."
     },
     "review": "Tinjauan",
     "reviewPullRequest": "Tinjau PR",

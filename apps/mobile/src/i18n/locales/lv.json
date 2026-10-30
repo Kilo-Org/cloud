@@ -727,7 +727,7 @@
       "message": "Tavs GitHub savienojums vairs nav derīgs. Pārbaudi savienojumu vēlreiz — ja vajadzēs, lietotne aicinās izveidot savienojumu no jauna.",
       "gitlabTitle": "GitLab savienojuma derīguma termiņš ir beidzies.",
       "bitbucketTitle": "Bitbucket savienojuma derīguma termiņš ir beidzies.",
-      "providerMessage": "Tavs {{provider}} savienojums vairs nav derīgs. Pārbaudi savienojumu vēlreiz — ja vajadzēs, lietotne aicinās izveidot savienojumu no jauna."
+      "providerMessage": "Pārbaudi savienojumu vēlreiz — ja vajadzēs, lietotne aicinās izveidot savienojumu no jauna."
     },
     "eventChips": {
       "comment": "Komentēt",

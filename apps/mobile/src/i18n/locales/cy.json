@@ -775,7 +775,7 @@
       "message": "Nid yw'ch cysylltiad GitHub yn ddilys mwyach. Gwiriwch eich cysylltiad eto — gofynnir i chi ailgysylltu os oes angen.",
       "gitlabTitle": "Mae'r cysylltiad â GitLab wedi dod i ben.",
       "bitbucketTitle": "Mae'r cysylltiad â Bitbucket wedi dod i ben.",
-      "providerMessage": "Nid yw'ch cysylltiad {{provider}} yn ddilys mwyach. Gwiriwch eich cysylltiad eto — gofynnir i chi ailgysylltu os oes angen."
+      "providerMessage": "Gwiriwch eich cysylltiad eto — gofynnir i chi ailgysylltu os oes angen."
     },
     "eventChips": {
       "comment": "Sylwadu",

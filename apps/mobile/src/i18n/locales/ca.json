@@ -727,7 +727,7 @@
       "message": "La teva connexió amb GitHub ja no és vàlida. Torna a comprovar-la. Si cal, se't demanarà que et tornis a connectar.",
       "gitlabTitle": "La connexió amb GitLab ha caducat.",
       "bitbucketTitle": "La connexió amb Bitbucket ha caducat.",
-      "providerMessage": "La teva connexió amb {{provider}} ja no és vàlida. Torna a comprovar-la. Si cal, se't demanarà que et tornis a connectar."
+      "providerMessage": "Torna a comprovar-la. Si cal, se't demanarà que et tornis a connectar."
     },
     "eventChips": {
       "comment": "Comentari",

@@ -3069,7 +3069,7 @@
       "message": "GitHub 연결이 더 이상 유효하지 않습니다. 연결을 다시 확인하세요. 필요한 경우 다시 연결하라는 안내가 표시됩니다.",
       "gitlabTitle": "GitLab 연결이 만료되었습니다.",
       "bitbucketTitle": "Bitbucket 연결이 만료되었습니다.",
-      "providerMessage": "{{provider}} 연결이 더 이상 유효하지 않습니다. 연결을 다시 확인하세요. 필요한 경우 다시 연결하라는 안내가 표시됩니다."
+      "providerMessage": "연결을 다시 확인하세요. 필요한 경우 다시 연결하라는 안내가 표시됩니다."
     },
     "review": "리뷰",
     "reviewPullRequest": "풀 리퀘스트 리뷰",

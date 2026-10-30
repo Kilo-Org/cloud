@@ -1030,7 +1030,7 @@ export function CodeReviewJobsCard({
                             className="gap-2"
                           >
                             <RotateCcw
-                              className={`h-3 w-3 ${actionInProgressId === review.id && retriggerMutation.isPending ? 'animate-spin' : ''}`}
+                              className={`h-3 w-3 ${actionInProgressId === review.id && retriggerMutation.isPending ? 'animate-spin [animation-direction:reverse]' : ''}`}
                             />
                             {actionInProgressId === review.id && retriggerMutation.isPending
                               ? 'Retrying...'

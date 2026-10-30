@@ -18,6 +18,7 @@
     "./cloud-agent": "./src/cloud-agent.ts",
     "./analytics": "./src/analytics/index.ts",
     "./app-version": "./src/app-version.ts",
+    "./control-plane": "./src/control-plane.ts",
     "./pr-review": "./src/pr-review/index.ts",
     "./provider-review": "./src/provider-review/index.ts",
     "./commerce": "./src/commerce/index.ts",

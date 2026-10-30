@@ -221,25 +221,29 @@ async function renderScreen(scope = 'personal') {
 
 const PR_URL_PLACEHOLDER = 'https://github.com/owner/repo/pull/123';
 const GITHUB_PR_URL = 'https://github.com/drain-e2e-labs/notes/pull/42';
-const SERVER_NOT_FOUND = 'GitHub could not find that pull request.';
+const SERVER_RATE_LIMITED = 'GitHub is rate limiting this installation.';
 
 /**
- * The sentence the screen renders for a NOT_FOUND start failure. Read from the
- * catalog at call time, because this suite asserts where and for how long the
- * failure stays on screen; the code-to-copy mapping has its own suite
- * (`manual-review-start-failure.mounted.test.tsx`).
+ * The sentence the screen renders for a retryable (TOO_MANY_REQUESTS) start
+ * failure. Read from the catalog at call time, because this suite asserts where
+ * and for how long the failure and its retry stay on screen; the code-to-copy
+ * mapping has its own suite (`manual-review-start-failure.mounted.test.tsx`).
  */
 function startFailureText(): string {
-  return i18n.t('codeReviewer.manualReview.startNotFound', {
+  return i18n.t('codeReviewer.manualReview.startRateLimited', {
     provider: 'GitHub',
     requestNoun: i18n.t('common.pullRequest'),
   });
 }
 
-/** A failed call as the tRPC client reports it: a code plus the server's message. */
+/**
+ * A failed call as the tRPC client reports it: a code plus the server's
+ * message. Rate limiting is the retryable case, so the recovery control these
+ * tests follow is on screen.
+ */
 function startFailure() {
-  return Object.assign(new Error(SERVER_NOT_FOUND), {
-    data: { code: 'NOT_FOUND', message: SERVER_NOT_FOUND },
+  return Object.assign(new Error(SERVER_RATE_LIMITED), {
+    data: { code: 'TOO_MANY_REQUESTS', message: SERVER_RATE_LIMITED },
   });
 }
 
@@ -538,7 +542,7 @@ describe('ManualReviewScreen failed start', () => {
     expect(findAllOfType(renderer.root, 'TextInput')).toHaveLength(2);
     expect(findAllOfType(renderer.root, 'ModelSelector')).toHaveLength(1);
     expect(renderedTexts(renderer.root)).toContain(startFailureText());
-    expect(renderedTexts(renderer.root)).not.toContain(SERVER_NOT_FOUND);
+    expect(renderedTexts(renderer.root)).not.toContain(SERVER_RATE_LIMITED);
     expect(findAllOfType(renderer.root, 'Button').map(node => propOf(node, 'variant'))).toContain(
       'outline'
     );

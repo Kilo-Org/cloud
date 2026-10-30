@@ -14,6 +14,7 @@ import {
   verifyAppleAssertion,
 } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
+import { reportFirewallRateLimitIssue } from './firewall-rate-limit';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 // ── Expected-condition telemetry ───────────────────────────────────────────
@@ -116,17 +117,27 @@ const CHALLENGE_RATE_LIMIT_ID = 'native-admission-challenge';
 /**
  * Issue a server-side challenge for native admission.
  *
- * Uses @vercel/firewall checkRateLimit per client IP, matching the email
- * sign-in rate-limit pattern.
+ * Uses the shared `@vercel/firewall` check per client IP, matching the email
+ * sign-in rate-limit pattern. A limited caller is refused. A non-limited answer
+ * that carries an error is reported through the shared throttled reporter, so
+ * the limiter keeps a complete telemetry record, and the challenge is issued.
  */
 export async function issueAdmissionChallenge(
   request: NextRequest,
   ipAddress: string
 ): Promise<{ challenge: string; expiresIn: number }> {
-  const { rateLimited } = await checkRateLimit(CHALLENGE_RATE_LIMIT_ID, {
+  const { rateLimited, error } = await checkRateLimit(CHALLENGE_RATE_LIMIT_ID, {
     request,
     rateLimitKey: `native-challenge:${ipAddress}`,
   });
+
+  if (error === 'not-found') {
+    reportFirewallRateLimitIssue(
+      CHALLENGE_RATE_LIMIT_ID,
+      'native_admission_challenge',
+      `Firewall rate limit '${CHALLENGE_RATE_LIMIT_ID}' is not configured`
+    );
+  }
 
   if (rateLimited) {
     throw new ChallengeRateLimitError();
@@ -160,19 +171,12 @@ export function validateAdmissionPayload(raw: unknown): AdmissionPayload | undef
   if (typeof raw !== 'object' || raw === null) return undefined;
   const obj = raw as Record<string, unknown>;
 
-  // platform: 'ios' | 'android'
   if (obj['platform'] !== 'ios' && obj['platform'] !== 'android') return undefined;
-
-  // kind: 'attestation' | 'assertion'
   if (obj['kind'] !== 'attestation' && obj['kind'] !== 'assertion') return undefined;
-
-  // challenge: non-empty string
   if (typeof obj['challenge'] !== 'string' || !obj['challenge']) return undefined;
-
   // payload: non-empty string (base64)
   if (typeof obj['payload'] !== 'string' || !obj['payload']) return undefined;
 
-  // keyId: optional string (required for iOS assertion)
   const kind = obj['kind'] as AdmissionKind;
   const platform = obj['platform'] as AdmissionPlatform;
   const keyId = obj['keyId'];

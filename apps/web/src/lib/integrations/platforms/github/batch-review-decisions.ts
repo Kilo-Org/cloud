@@ -4,6 +4,7 @@ import { captureException } from '@sentry/nextjs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { github_branch_pull_requests } from '@kilocode/db/schema';
 import { fetchBatchedReviewDecisions } from '@/lib/integrations/platforms/github/adapter';
+import { parseGitHubOwnerRepo } from '@/lib/integrations/platforms/github/repository-coordinates';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -12,16 +13,6 @@ export type TenantOwner = {
   userId: string;
   organizationId: string | null;
 };
-
-function parseGitHubOwnerRepo(gitUrl: string): { owner: string; repo: string } | null {
-  const httpsMatch = gitUrl.match(
-    /^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/i
-  );
-  if (httpsMatch?.[1] && httpsMatch[2]) return { owner: httpsMatch[1], repo: httpsMatch[2] };
-  const sshMatch = gitUrl.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/i);
-  if (sshMatch?.[1] && sshMatch[2]) return { owner: sshMatch[1], repo: sshMatch[2] };
-  return null;
-}
 
 type ClaimedRow = {
   git_url: string;

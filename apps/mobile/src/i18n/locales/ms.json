@@ -42,7 +42,7 @@
     "mergeRequest": "permintaan gabungan",
     "notConnected": "Tidak disambungkan",
     "notifications": "Pemberitahuan",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repositori",
     "securityAgent": "Ejen keselamatan",
     "unknown": "Tidak diketahui",
@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Perubahan",
-    "organizationTrialEnded": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Pemilik organisasi boleh mengemas kini bil di kilo.ai, kemudian cuba lagi."
+    "organizationTrialEnded": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Pemilik organisasi boleh mengemas kini bil di kilo.ai, kemudian cuba lagi.",
+    "privateRepositoryA11y": "{{name}}, repositori persendirian"
   },
   "language": {
     "restarting": "Memulakan semula apl untuk menukar bahasa",
@@ -644,7 +645,12 @@
       "loading": "Memuatkan peti masuk",
       "noReviewRequests": "Tiada permintaan semakan",
       "noReviewRequestsDescription": "Permintaan tarik yang menunggu semakan anda akan muncul di sini. Anda juga boleh menampal sebarang pautan PR di atas.",
-      "couldNotLoad": "Tidak dapat memuatkan peti masuk."
+      "couldNotLoad": "Tidak dapat memuatkan peti masuk.",
+      "accessLostTitle": "Tiada akses kepada organisasi ini",
+      "accessLostDescription": "Anda tidak lagi menjadi ahli organisasi ini, jadi permintaan semakannya tidak dapat dimuatkan. Teruskan dalam akaun peribadi anda untuk terus menyemak.",
+      "organizationUnavailableTitle": "Organisasi ini tidak lagi wujud",
+      "organizationUnavailableDescription": "Organisasi ini telah dipadamkan, jadi permintaan semakannya tidak dapat dimuatkan. Teruskan dalam akaun peribadi anda untuk terus menyemak.",
+      "continueInPersonal": "Teruskan dalam akaun peribadi"
     },
     "composer": {
       "commentBodyPlaceholder": "Komen anda",
@@ -742,7 +748,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Sunting komen belum dihantar yang merujuk kepada komit lama pada {{location}}",
       "editA11y": "Sunting komen belum dihantar pada {{location}}",
-      "staleHint": "pR telah dikemas kini sejak anda menulis komen ini.",
+      "staleHint": "PR telah dikemas kini sejak anda menulis komen ini.",
       "deleteA11y": "Padam komen belum dihantar pada {{location}}",
       "deletedAnnouncement": "Komen belum dihantar telah dipadam",
       "noCommentsQueued": "Tiada komen dalam senarai menunggu. Semakan akan dihantar dengan jenis semakan yang dipilih di atas sahaja.",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "PR gagal",
         "superseded": "Sudah ada"
       },
-      "noProposalsDescription": "Cadangan memori semakan muncul di sini selepas Kilo menganalisis balasan penyelenggara."
+      "noProposalsDescription": "Cadangan memori semakan muncul di sini selepas Kilo menganalisis balasan penyelenggara.",
+      "changeRequestInProgress": "Kilo sedang membuka pull request untuk cadangan ini. Cuba lagi sebentar.",
+      "changeRequestNotActionable": "Cadangan ini tidak lagi boleh diluluskan. Tutupnya dan muat semula senarai.",
+      "changeRequestNoGitHubAccess": "Tiada sambungan GitHub yang mempunyai akses kepada repositori ini. Sambung semula GitHub dengan akses kepadanya, kemudian cuba lagi.",
+      "changeRequestMissingPermissions": "Aplikasi GitHub Kilo tidak boleh membuka pull request dalam repositori ini. Pemilik repositori mesti memberikan aplikasi akses tulis kepada kandungan dan pull request, kemudian cuba lagi.",
+      "changeRequestFailed": "Kilo tidak dapat membuka pull request. Cuba lagi sebentar.",
+      "offAction": "Memori semakan dinyahdayakan. Dayakannya, kemudian cuba lagi."
     },
     "manualReview": {
       "title": "Semakan manual",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Simpan perubahan",
+      "saved": "Tetapan disimpan",
       "unsavedTitle": "Perubahan belum disimpan",
       "unsavedMessage": "Simpan perubahan anda sebelum meninggalkan skrin ini?",
       "unsavedInvalidMessage": "Perubahan ini belum boleh disimpan. Betulkan untuk menyimpan, atau buang untuk meninggalkan."
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "Tidak dapat memuatkan persekitaran anda.",
       "retryLoadingEnvironment": "Cuba muatkan semula persekitaran",
       "defaultEnvironment": "Persekitaran lalai",
+      "environmentAccessibility": "Pilih profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Pilih profil: {{label}}. {{attention}}",
       "leaveChanges": "Biarkan perubahan",
       "commitAndPush": "Komit dan hantar",
       "startSession": "Mulakan sesi",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "Urus profil",
       "noProfiles": "Tiada profil lagi. Buat satu untuk menambah pembolehubah persekitaran, pelayan MCP dan kemahiran.",
       "advancedConfig": "Konfigurasi Lanjutan",
-      "advancedConfigDescription": "Pilih profil untuk memuatkan konfigurasi yang disimpan dan konfigurasikan pembolehubah persekitaran tambahan dan arahan persediaan secara manual",
+      "advancedConfigDescription": "Terpakai untuk sesi ini. Menyimpannya sebagai profil mengekalkannya untuk kali seterusnya.",
       "saveAsProfile": "Simpan sebagai Profil",
       "saveProfileDescription": "Simpan pembolehubah persekitaran semasa dan arahan persediaan sebagai profil boleh guna semula.",
       "profileSummary": "{{vars}} pembolehubah persekitaran · {{commands}} arahan persediaan",
@@ -2864,7 +2879,7 @@
       "open": "buka PR",
       "closed": "permintaan tarik yang ditutup",
       "merged": "permintaan tarik yang digabungkan",
-      "draft": "pR draf",
+      "draft": "PR draf",
       "updating": "Mengemas kini, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2971,7 +2986,9 @@
     "permissionDescription": "Anda tidak mempunyai kebenaran untuk melihat ini.",
     "notFoundDescription": "Item ini mungkin telah dibuang atau tidak lagi tersedia.",
     "serverTitle": "Tidak dapat memuatkan data.",
-    "serverDescription": "Ralat berlaku pada sistem kami. Sila cuba lagi."
+    "serverDescription": "Ralat berlaku pada sistem kami. Sila cuba lagi.",
+    "timeoutTitle": "Pelayan terlalu lambat bertindak balas",
+    "timeoutDescription": "Permintaan tamat masa sebelum selesai. Sila cuba lagi."
   },
   "screenHeader": {
     "openMenu": "Buka menu",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "Perintah persediaan",
     "addCommand": "Tambah arahan",
     "commandLabel": "Perintah",
+    "commandLabelPosition": "Perintah {{position}}",
     "commandPlaceholder": "cth. pnpm install",
+    "commandAtLimit": "Perintah dihadkan kepada {{max}} aksara",
     "commandsEmpty": "Tiada arahan persediaan lagi",
     "commandsSaveFailed": "Tidak dapat menyimpan arahan persediaan",
     "moveUp": "Bergerak ke atas",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "Tidak dapat menyelamatkan kemahiran",
     "skillSourceCustom": "Tersuai",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Tampal SKILL.md dan namanya diisi; tambah kemahiran daripada telefon anda tanpa seret dan lepas.",
     "skillEditTitle": "Kemahiran mengedit",
     "skillEdit": "Edit kemahiran {{name}}",
@@ -3868,6 +3888,7 @@
       "headersHint": "Nilai yang dipaparkan sebagai •••• mengekalkan rahsia tersimpan; gantikan nilai untuk memutarkannya. Menukar URL memerlukan setiap nilai sekali lagi",
       "nameRequired": "Masukkan nama pelayan",
       "nameInvalid": "Nama hanya boleh menggunakan huruf ASCII, nombor, garis bawah dan sempang, sehingga 100 aksara",
+      "nameConflict": "Pelayan dengan nama ini sudah wujud",
       "commandRequired": "Masukkan arahan",
       "commandTooLong": "Gunakan paling banyak 50 argumen yang setiap satu 500 aksara",
       "urlRequired": "Masukkan URL",
@@ -3887,7 +3908,7 @@
       "add": "Tambah ejen",
       "empty": "Belum ada ejen",
       "name": "Nama ejen",
-      "slug": "Siput ejen",
+      "slug": "Slug ejen",
       "description": "Penerangan ejen",
       "model": "Model menimpa",
       "modelPlaceholder": "Gunakan lalai sesi",
@@ -3948,7 +3969,6 @@
       "repo": "Pilih repositori…",
       "profile": "Pilih profil",
       "remove": "Buka ikatan",
-      "private": "Persendirian",
       "search": "Cari repositori…",
       "addedToast": "Profil lalai ditetapkan untuk \"{{repo}}\"",
       "addFailed": "Tidak dapat menetapkan profil lalai",

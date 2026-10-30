@@ -17,8 +17,8 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
-  useAgentProfile,
   useAgentProfileMutations,
+  useAgentProfileSkills,
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -114,12 +114,12 @@ export function ProfileSkillsScreen({
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
-  const profileQuery = useAgentProfile(profileId, organizationId);
+  const profileQuery = useAgentProfileSkills(profileId, organizationId);
   const { createCustomSkill, updateSkill, deleteSkill, setSkillEnabled } =
     useAgentProfileMutations(organizationId);
   const canManage = useCanManageOrganizationProfiles(organizationId);
 
-  const skills = profileQuery.data?.skills ?? NO_SKILLS;
+  const skills = profileQuery.data ?? NO_SKILLS;
   // `null` = closed, `{ skill: null }` = add, `{ skill }` = edit that skill.
   const [form, setForm] = useState<{ skill: SkillTarget | null } | null>(null);
 

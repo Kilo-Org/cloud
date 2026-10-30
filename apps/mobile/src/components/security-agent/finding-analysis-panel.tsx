@@ -3,7 +3,6 @@ import {
   getSecurityAnalysisDetailPresentation,
   getSecurityFindingAnalysisState,
 } from '@kilocode/app-shared/security-agent';
-import { useRouter } from 'expo-router';
 import { ExternalLink, ScanSearch } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -33,6 +32,7 @@ import { formatNumber } from '@/lib/format';
 import { useSecurityAnalysisCapacity } from '@/lib/hooks/use-security-agent';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
 import {
@@ -60,7 +60,7 @@ export function FindingAnalysisPanel({
   isError,
   onRetry,
 }: Readonly<FindingAnalysisPanelProps>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { i18n, t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
@@ -235,7 +235,7 @@ export function FindingAnalysisPanel({
         <Pressable
           className="flex-row items-center justify-center gap-2 rounded-lg bg-secondary p-3 active:opacity-70"
           onPress={() => {
-            router.push(sessionHref);
+            pushOnce(sessionHref);
           }}
         >
           <ExternalLink size={14} color={colors.mutedForeground} />

@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import type * as DirectByokTypes from './types';
 import type { EnabledByokProvider } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { getEnabledByokProviders } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getOpenRouterModelsMetadataFromDatabase,
+  isValidOpenRouterModelId,
+  resolveOpenRouterModelAlias,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   createDirectByokReferenceResolver,
   listDirectByokCatalogModels,
@@ -19,6 +23,8 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   isValidOpenRouterModelId: jest.fn(),
+  resolveOpenRouterModelAlias: jest.fn(),
+  getOpenRouterModelsMetadataFromDatabase: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/preferred-models', () => ({
   getPreferredModels: jest.fn(async () => []),
@@ -74,6 +80,16 @@ jest.mock('./direct-byok-definitions', () => ({
 
 const mockedKeys = jest.mocked(getEnabledByokProviders);
 const mockedIsValid = jest.mocked(isValidOpenRouterModelId);
+const mockedResolveAlias = jest.mocked(resolveOpenRouterModelAlias);
+const mockedStoredModels = jest.mocked(getOpenRouterModelsMetadataFromDatabase);
+
+const ALIAS_TARGETS: Record<string, string> = {
+  '~moonshotai/kimi-latest': 'moonshotai/kimi-k2.6',
+  '~z-ai/glm-latest': 'z-ai/glm-5.2',
+  '~stealth/exclusive-latest': 'stealth/exclusive',
+  '~moonshotai/retired-latest': 'moonshotai/retired',
+  '~example/unknown-latest': 'example/unknown',
+};
 
 function keys(entries: Record<string, boolean>): EnabledByokProvider[] {
   return Object.entries(entries).map(([providerId, serveCatalogModels]) => ({
@@ -85,6 +101,12 @@ function keys(entries: Record<string, boolean>): EnabledByokProvider[] {
 beforeEach(() => {
   jest.clearAllMocks();
   mockedIsValid.mockImplementation(async modelId => modelId !== 'moonshotai/retired');
+  mockedResolveAlias.mockImplementation(async modelId => ALIAS_TARGETS[modelId] ?? modelId);
+  mockedStoredModels.mockResolvedValue(
+    Object.fromEntries(
+      Object.entries(ALIAS_TARGETS).map(([id, slug]) => [id, { alias_target: { slug } }])
+    ) as unknown as Awaited<ReturnType<typeof getOpenRouterModelsMetadataFromDatabase>>
+  );
 });
 
 describe('catalog mode support', () => {
@@ -124,7 +146,27 @@ describe('direct BYOK model lists in catalog mode', () => {
 
     const catalogIds = await getDirectByokCatalogModelIds({ type: 'user', id: 'user-id' });
 
+    expect([...catalogIds]).toEqual(['moonshotai/kimi-k2.6', '~moonshotai/kimi-latest']);
+  });
+
+  test('omits latest aliases that left the catalog', async () => {
+    mockedKeys.mockResolvedValueOnce(keys({ synthetic: true }));
+    mockedIsValid.mockImplementation(
+      async modelId => modelId !== 'moonshotai/retired' && modelId !== '~moonshotai/kimi-latest'
+    );
+
+    const catalogIds = await getDirectByokCatalogModelIds({ type: 'user', id: 'user-id' });
+
     expect([...catalogIds]).toEqual(['moonshotai/kimi-k2.6']);
+  });
+
+  test('lists no latest aliases without catalog-mode keys', async () => {
+    mockedKeys.mockResolvedValueOnce(keys({ 'zai-coding': false }));
+
+    const catalogIds = await getDirectByokCatalogModelIds({ type: 'user', id: 'user-id' });
+
+    expect([...catalogIds]).toEqual([]);
+    expect(mockedStoredModels).not.toHaveBeenCalled();
   });
 });
 
@@ -143,6 +185,26 @@ describe('findDirectByokCatalogModels', () => {
     await expect(findDirectByokCatalogModels('stealth/exclusive')).resolves.toEqual([]);
     mockedIsValid.mockResolvedValueOnce(false);
     await expect(findDirectByokCatalogModels('z-ai/glm-5.2')).resolves.toEqual([]);
+  });
+
+  test('serves a latest alias with the models that serve its target', async () => {
+    const found = await findDirectByokCatalogModels('~moonshotai/kimi-latest');
+
+    expect(found.map(({ provider, model }) => [provider.id, model.id])).toEqual([
+      ['synthetic', 'hf:moonshotai/Kimi-K2.6'],
+      ['zai-coding', 'kimi-k2.6'],
+    ]);
+  });
+
+  test('ignores unknown, unmapped, Kilo-exclusive, retired and retired-target aliases', async () => {
+    await expect(findDirectByokCatalogModels('~moonshotai/unknown-latest')).resolves.toEqual([]);
+    await expect(findDirectByokCatalogModels('~example/unknown-latest')).resolves.toEqual([]);
+    await expect(findDirectByokCatalogModels('~stealth/exclusive-latest')).resolves.toEqual([]);
+    await expect(findDirectByokCatalogModels('~moonshotai/retired-latest')).resolves.toEqual([]);
+    mockedIsValid.mockImplementation(async modelId => modelId !== '~z-ai/glm-latest');
+    await expect(findDirectByokCatalogModels('~z-ai/glm-latest')).resolves.toEqual([]);
+    mockedIsValid.mockImplementation(async modelId => modelId !== 'z-ai/glm-5.2');
+    await expect(findDirectByokCatalogModels('~z-ai/glm-latest')).resolves.toEqual([]);
   });
 });
 

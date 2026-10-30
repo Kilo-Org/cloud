@@ -46,10 +46,11 @@ const environmentKeySchema = z
   .string()
   .max(ENVIRONMENT_LIMITS.MAX_KEY_LENGTH)
   .regex(ENVIRONMENT_KEY_PATTERN);
-const environmentPlainVarsSchema = z.record(
-  environmentKeySchema,
-  z.string().max(ENVIRONMENT_LIMITS.MAX_PLAINTEXT_VALUE_LENGTH)
-);
+export const environmentPlainVarsSchema = z
+  .record(environmentKeySchema, z.string().max(ENVIRONMENT_LIMITS.MAX_PLAINTEXT_VALUE_LENGTH))
+  .refine(vars => Object.keys(vars).length <= ENVIRONMENT_LIMITS.MAX_VARS, {
+    message: `Maximum ${ENVIRONMENT_LIMITS.MAX_VARS} variables and secrets allowed`,
+  });
 const environmentSecretsSchema = z.record(
   environmentKeySchema,
   z.string().max(ENVIRONMENT_LIMITS.MAX_SECRET_VALUE_LENGTH)
@@ -57,15 +58,18 @@ const environmentSecretsSchema = z.record(
 const environmentCommandsSchema = z
   .array(z.string().min(1).max(ENVIRONMENT_LIMITS.MAX_COMMAND_LENGTH))
   .max(ENVIRONMENT_LIMITS.MAX_COMMANDS);
-const environmentSecretChangesSchema = z.array(
-  z.union([
-    z.object({
-      key: environmentKeySchema,
-      value: z.string().max(ENVIRONMENT_LIMITS.MAX_SECRET_VALUE_LENGTH),
-    }),
-    z.object({ key: environmentKeySchema, delete: z.literal(true) }),
-  ])
-);
+/** A change list can remove every stored secret and add a full set at once. */
+export const environmentSecretChangesSchema = z
+  .array(
+    z.union([
+      z.object({
+        key: environmentKeySchema,
+        value: z.string().max(ENVIRONMENT_LIMITS.MAX_SECRET_VALUE_LENGTH),
+      }),
+      z.object({ key: environmentKeySchema, delete: z.literal(true) }),
+    ])
+  )
+  .max(2 * ENVIRONMENT_LIMITS.MAX_VARS);
 
 const environmentSandboxAllocationSchema = z.enum(SELECTABLE_SANDBOX_ALLOCATIONS).nullable();
 

@@ -104,6 +104,10 @@ const GITHUB_REPO: TestRepoOption = { platform: 'github', fullName: 'acme/api', 
 const GITLAB_REPO: TestRepoOption = { platform: 'gitlab', fullName: 'acme/infra', private: false };
 const PROFILE: TestProfile = { id: 'profile-1', name: 'Backend debugging', isDefault: false };
 
+// The picker row for a private repository carries its privacy in the
+// accessible name, so it is matched by that name, never the bare full name.
+const PRIVATE_REPO_LABEL = 'acme/api, private repository';
+
 /** The accessible names of every pressable the screen currently renders. */
 function pressableLabels(root: ReactTestInstance): string[] {
   return findAll(root, 'Pressable')
@@ -164,7 +168,7 @@ describe('RepoBindingsScreen add form', () => {
     const { renderer, unmount } = await mountScreen();
     pressButton(renderer.root, 'Add default');
     pressPressable(renderer.root, 'Select repository…');
-    pressPressable(renderer.root, 'acme/api');
+    pressPressable(renderer.root, PRIVATE_REPO_LABEL);
 
     expect(pressableLabels(renderer.root)).toContain('Repository: acme/api');
     expect(pressableLabels(renderer.root)).not.toContain('Select repository…');

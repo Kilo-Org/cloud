@@ -29,6 +29,17 @@ const PROFILE_ROOTS = {
   profileTab: '/(app)/(tabs)/(3_profile)/profiles',
 } as const;
 
+/**
+ * The name the profiles list registers under inside each Stack. Expo Router
+ * names a screen after its file below the layout that declares it, and an
+ * `index.tsx` keeps the `index` segment, the same shape the layouts rely on
+ * (`unstable_settings.initialRouteName: 'index'`).
+ */
+const PROFILE_LIST_ROUTE_NAMES = {
+  app: 'profile-management/index',
+  profileTab: 'profiles/index',
+} as const;
+
 export function getProfileAgentScope(
   selectedOrganizationId: string | null,
   organizations: readonly ProfileOrganization[] | undefined
@@ -71,6 +82,11 @@ function profileContextQuery(organizationId?: string): string {
 /** The Manage Profiles entry on the Profile tab. */
 export function getProfilesPath(stack: ProfileManagementStack = 'profileTab'): Href {
   return PROFILE_ROOTS[stack] as Href;
+}
+
+/** The route name the profiles list registers under in the given Stack. */
+export function getProfilesRouteName(stack: ProfileManagementStack = 'profileTab'): string {
+  return PROFILE_LIST_ROUTE_NAMES[stack];
 }
 
 /** The repo-to-profile default bindings screen. */

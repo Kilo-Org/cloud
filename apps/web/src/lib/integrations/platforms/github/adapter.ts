@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import type { InstallationToken } from '@/lib/integrations/core/types';
 import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants';
 import { type GitHubAppType, getGitHubAppCredentials } from './app-selector';
+import { isGitHubOwnerName, isGitHubRepositoryName } from './repository-coordinates';
 import { assertGitHubInstallationRuntimeAuthorized } from '../../github/runtime-authorization';
 
 export type { GitHubAppType } from './app-selector';
@@ -1342,10 +1343,46 @@ function normalizeReviewDecision(decision: string | null | undefined): ReviewDec
   }
 }
 
+/** Largest PR number GitHub's GraphQL `Int` argument can carry. */
+const GRAPHQL_INT_MAX = 2_147_483_647;
+
+/**
+ * An entry the batched query can ask GitHub about: repository coordinates that
+ * follow GitHub's name rules and a PR number inside GraphQL's `Int` range.
+ * Anything else is left out of the request, so one unusable entry cannot fail
+ * the rest of the batch.
+ */
+function isActionableReviewDecisionInput(input: BatchedPrInput): boolean {
+  return (
+    isGitHubOwnerName(input.owner) &&
+    isGitHubRepositoryName(input.repo) &&
+    Number.isInteger(input.number) &&
+    input.number > 0 &&
+    input.number <= GRAPHQL_INT_MAX
+  );
+}
+
+type ReviewDecisionQueryEntry = {
+  /** The caller's key in the returned Map. */
+  callerAlias: string;
+  /** Fixed alias generated here; the only alias the query text carries. */
+  fieldAlias: string;
+  owner: string;
+  repo: string;
+  number: number;
+};
+
 /**
  * Fetches `reviewDecision` for multiple PRs in a single aliased GraphQL query.
  * All PRs must belong to the same installation (one token is generated).
- * Returns a Map from alias → ReviewDecision|null.
+ * Returns a Map from alias → ReviewDecision|null. Entries that are not
+ * actionable (see {@link isActionableReviewDecisionInput}) are absent from the
+ * Map, which callers read as "no review decision".
+ *
+ * Repository coordinates and PR numbers cross the GraphQL boundary as
+ * operation variables, so the document text holds only fixed literals and the
+ * generated `pr<N>` aliases.
+ *
  * @throws {GitHubRateLimitError} on 403 secondary rate limit.
  */
 export async function fetchBatchedReviewDecisions(args: {
@@ -1354,31 +1391,51 @@ export async function fetchBatchedReviewDecisions(args: {
   appType?: GitHubAppType;
 }): Promise<Map<string, ReviewDecision | null>> {
   const { installationId, prs, appType = 'standard' } = args;
-  if (prs.length === 0) return new Map();
+  const result = new Map<string, ReviewDecision | null>();
+
+  const entries: ReviewDecisionQueryEntry[] = prs
+    .filter(isActionableReviewDecisionInput)
+    .map(({ alias, owner, repo, number }, index) => ({
+      callerAlias: alias,
+      fieldAlias: `pr${index}`,
+      owner,
+      repo,
+      number,
+    }));
+  if (entries.length === 0) return result;
 
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
 
-  const fragments = prs
+  const variableDeclarations = entries
+    .map((_, index) => `$owner${index}: String!, $name${index}: String!, $number${index}: Int!`)
+    .join(', ');
+  const fields = entries
     .map(
-      ({ alias, owner, repo, number }) =>
-        `${alias}: repository(owner: "${owner}", name: "${repo}") { pullRequest(number: ${number}) { reviewDecision } }`
+      ({ fieldAlias }, index) =>
+        `${fieldAlias}: repository(owner: $owner${index}, name: $name${index}) { pullRequest(number: $number${index}) { reviewDecision } }`
     )
     .join('\n');
+  const variables: Record<string, string | number> = {};
+  entries.forEach(({ owner, repo, number }, index) => {
+    variables[`owner${index}`] = owner;
+    variables[`name${index}`] = repo;
+    variables[`number${index}`] = number;
+  });
 
   try {
     const response = (await octokit.request('POST /graphql', {
-      query: `{ ${fragments} }`,
+      query: `query(${variableDeclarations}) {\n${fields}\n}`,
+      variables,
     })) as {
       data: {
         data: Record<string, { pullRequest: { reviewDecision: string | null } | null } | null>;
       };
     };
 
-    const result = new Map<string, ReviewDecision | null>();
-    for (const { alias } of prs) {
-      const repoData = response.data.data?.[alias];
-      result.set(alias, normalizeReviewDecision(repoData?.pullRequest?.reviewDecision));
+    for (const { callerAlias, fieldAlias } of entries) {
+      const repoData = response.data.data?.[fieldAlias];
+      result.set(callerAlias, normalizeReviewDecision(repoData?.pullRequest?.reviewDecision));
     }
     return result;
   } catch (error) {
@@ -1392,7 +1449,8 @@ export async function fetchBatchedReviewDecisions(args: {
 /**
  * Fetches the rolled-up `reviewDecision` for a single PR via GitHub's GraphQL API.
  * Returns lowercase values matching our DB enum, or `null` when GitHub returns
- * null (no required reviewers and no review submitted yet).
+ * null (no required reviewers and no review submitted yet). A coordinate or PR
+ * number that is not actionable yields `null` without any request.
  * @throws {GitHubRateLimitError} on 403 secondary rate limit.
  */
 export async function fetchPullRequestReviewDecision(args: {

@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The dashboard sections share one data contract and navigation scope. */
 import { getAnalysisIncompleteCount } from '@kilocode/app-shared/security-agent';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { FolderGit2, ShieldCheck } from '@/components/ui/icons';
 import { DirectionalArrowRight } from '@/components/ui/directional-icons';
 import { type ReactNode } from 'react';
@@ -11,8 +11,10 @@ import { EmptyState } from '@/components/empty-state';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber, formatPercent } from '@/lib/format';
 import { type useSecurityAgentDashboardStats } from '@/lib/hooks/use-security-agent';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn } from '@/lib/utils';
@@ -74,7 +76,7 @@ function SectionCard({ title, children }: Readonly<{ title: string; children: Re
 }
 
 function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const finding = data.priorityFinding;
@@ -85,7 +87,7 @@ function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
         <Pressable
           className="flex-row items-center justify-between gap-2 py-3 active:opacity-70"
           onPress={() => {
-            router.push(findingsHref(scope, { status: 'open' }));
+            pushOnce(findingsHref(scope, { status: 'open' }));
           }}
         >
           <View className="flex-row items-center gap-2">
@@ -106,7 +108,7 @@ function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
       <Pressable
         className="gap-1 py-3 active:opacity-70"
         onPress={() => {
-          router.push(getSecurityAgentPath(scope, `findings/${finding.id}`));
+          pushOnce(getSecurityAgentPath(scope, `findings/${finding.id}`));
         }}
       >
         <Text className="text-sm font-medium" numberOfLines={1}>
@@ -204,7 +206,7 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
 }
 
 function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const analysisIncomplete = getAnalysisIncompleteCount(data.analysis);
 
@@ -254,11 +256,18 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
         <Pressable
           key={row.label}
           onPress={() => {
-            router.push(row.href);
+            pushOnce(row.href);
           }}
           className="active:opacity-70"
         >
+          {/* The frame sits on KvRow's own box, not on the wrapper: the
+              divider is that box's bottom edge, so a frame around it would
+              hold the rule above the row's bottom while the next row's
+              padding stacked below — visibly lopsided. With the frame on the
+              row, the padding above and below the label stays even and the
+              pressable still measures the full 48 dp target. */}
           <KvRow
+            className={ROW_TARGET_CLASS}
             label={row.label}
             value={formatNumber(row.value, i18n.language)}
             valueTone="muted"
@@ -272,7 +281,7 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
 }
 
 function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
 
@@ -300,7 +309,7 @@ function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
             index < data.repoHealth.length - 1 && 'border-b-[0.5px] border-hair-soft'
           )}
           onPress={() => {
-            router.push(findingsHref(scope, { status: 'open', repoFullName: repo.repoFullName }));
+            pushOnce(findingsHref(scope, { status: 'open', repoFullName: repo.repoFullName }));
           }}
         >
           <View className="flex-1">

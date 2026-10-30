@@ -1,4 +1,5 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href, useNavigationContainerRef, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
@@ -211,6 +212,35 @@ function reservedTitleHeightClass(size: ScreenHeaderProps['size'], titleLines: n
   return titleLines === 1 ? 'min-h-7' : 'min-h-14';
 }
 
+/**
+ * Whether the header's back control can pop, re-read on every navigation
+ * commit.
+ *
+ * `router.canGoBack()` is a snapshot of the shared navigation container, and a
+ * screen that the relaunch repair or a deep link restores first renders before
+ * the navigators above it hold their parent screens — the read is false at
+ * that moment, and the header would then keep painting no back control for a
+ * screen that is sitting on a complete stack (measured on a code-reviewer edit
+ * screen restored after process death: no back control until an unrelated
+ * re-render). The container's `state` event arrives after that commit, so
+ * re-reading here is what fills the control in; the state comparison makes
+ * React skip the render while the answer is unchanged, the same way
+ * `useRootNavigationReady` watches the same ref.
+ */
+function useCanGoBack(): boolean {
+  const router = useRouter();
+  const navigationRef = useNavigationContainerRef();
+  const [canGoBack, setCanGoBack] = useState<boolean>(() => router.canGoBack());
+  useEffect(() => {
+    const update = () => {
+      setCanGoBack(router.canGoBack());
+    };
+    update();
+    return navigationRef.addListener('state', update);
+  }, [navigationRef, router]);
+  return canGoBack;
+}
+
 export function ScreenHeader({
   title,
   titleContent,
@@ -244,7 +274,8 @@ export function ScreenHeader({
   const { t } = useTranslation();
   const { width: windowWidth } = useWindowDimensions();
   const fontScale = useLiveFontScale();
-  const canGoBack = showBackButton ?? (router.canGoBack() || backFallback !== undefined);
+  const historyCanGoBack = useCanGoBack();
+  const canGoBack = showBackButton ?? (historyCanGoBack || backFallback !== undefined);
   const isOfflineBannerVisible = useOfflineBannerSpace();
   // A window too narrow to hold the title beside its actions drops the actions
   // to their own row instead of squeezing the title into a single-letter

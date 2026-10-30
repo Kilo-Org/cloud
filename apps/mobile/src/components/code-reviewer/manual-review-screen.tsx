@@ -1,8 +1,9 @@
 /* eslint-disable max-lines -- one form surface: platform choice, URL field with its validation, instructions, model choice, and the pinned action share the scroll body */
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { GitPullRequest } from '@/components/ui/icons';
-import { useSinglePushRoute } from '@/components/code-reviewer/use-single-push-route';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, type ScrollViewInstance, TextInput, View } from 'react-native';
@@ -35,7 +36,7 @@ import { cn } from '@/lib/utils';
 import { ManualReviewActionFooter } from './manual-review-action-footer';
 import { ManualReviewPlatformPicker } from './manual-review-platform-picker';
 import { connectNoticeKey } from './connect-notice-key';
-import { manualReviewStartFailureMessage } from './manual-review-start-error';
+import { manualReviewStartFailure } from './manual-review-start-error';
 import { ManualReviewStartFeedback } from './manual-review-start-feedback';
 import { MANUAL_REVIEW_START_DEADLINE_MS, useDeadlineWatchedStart } from './deadline-watched-start';
 
@@ -148,7 +149,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         {
           onSuccess: ({ reviewId }) => {
             settle(null);
-            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            notificationHaptic(Haptics.NotificationFeedbackType.Success);
             router.replace(`/(app)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
           },
           onError: error => {
@@ -160,10 +161,12 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             // server's own message is English and must not reach this
             // localized screen.
             if (isDeadlineStall(error)) {
-              settle(t('common.takingLonger'));
+              // A wait that ran out its budget is retryable: the same draft
+              // may still start.
+              settle({ message: t('common.takingLonger'), retryable: true });
               return;
             }
-            settle(manualReviewStartFailureMessage(error, platform));
+            settle(manualReviewStartFailure(error, platform));
           },
         }
       );
@@ -381,7 +384,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         <ManualReviewActionFooter>
           <ManualReviewStartFeedback
             stalled={start.stalled}
-            startError={start.failureMessage}
+            failure={start.failure}
             onRetry={onSubmit}
           />
           <Button

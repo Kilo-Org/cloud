@@ -6,14 +6,14 @@ import {
   findFields,
   findOne,
   mountScreen,
-  testProfile,
-  type TestProfileDetail,
+  testCommands,
+  type TestCommands,
 } from '@/components/profiles/profile-commands-screen.test-helpers';
 
 const h = vi.hoisted(() => ({
   error: vi.fn(),
   query: {
-    data: undefined as TestProfileDetail | undefined,
+    data: undefined as TestCommands | undefined,
     isError: false,
     isPending: true,
     isRefetching: false,
@@ -32,7 +32,7 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
-  useAgentProfile: () => h.query,
+  useAgentProfileCommands: () => h.query,
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('expo-router', () => ({
@@ -41,6 +41,7 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'android' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -92,7 +93,7 @@ describe('ProfileCommandsScreen without the manage role', () => {
   });
 
   it('shows no add, reorder, or delete control to a member', async () => {
-    h.query.data = testProfile(['a', 'b']);
+    h.query.data = testCommands(['a', 'b']);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen('org-1');
@@ -105,12 +106,26 @@ describe('ProfileCommandsScreen without the manage role', () => {
   });
 
   it('shows no add CTA to a member when the list is empty', async () => {
-    h.query.data = testProfile();
+    h.query.data = testCommands();
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen('org-1');
 
     expect(findOne(renderer.root, 'EmptyState').props.action).toBeNull();
+
+    unmount();
+  });
+
+  it('shows no length counter on a command a member cannot edit', async () => {
+    h.query.data = testCommands(['a'.repeat(499)]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen('org-1');
+
+    const texts = findAll(renderer.root, 'Text')
+      .map(node => node.props.children)
+      .filter((child): child is string => typeof child === 'string');
+    expect(texts.filter(text => text.includes('character'))).toEqual([]);
 
     unmount();
   });

@@ -261,6 +261,51 @@ describe('resolvePendingPermissionId', () => {
     expect(openConnection).not.toHaveBeenCalled();
   });
 
+  it('aborts the in-flight ticket request when the deadline settles the read', async () => {
+    const deadlines: (() => void)[] = [];
+    const signals: (AbortSignal | undefined)[] = [];
+    const pending = resolvePendingPermissionId(
+      { cloudAgentSessionId: 'agent_1', timeoutMs: 50 },
+      {
+        getTicket: async (_sessionId, _organizationId, options) => {
+          signals.push(options?.signal);
+          return new Promise<{ ticket: string; expiresAt: number }>(() => undefined);
+        },
+        createConnection: vi.fn(),
+        setTimeout: handler => {
+          deadlines.push(handler);
+          return () => undefined;
+        },
+      }
+    );
+    const assertion = expect(pending).rejects.toBeInstanceOf(PendingPermissionTimeoutError);
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.aborted).toBe(false);
+    deadlines[0]?.();
+    await assertion;
+    // The POST is cancelled, not abandoned: nothing stays in flight past the
+    // promise the deadline settled.
+    expect(signals[0]?.aborted).toBe(true);
+  });
+
+  it('aborts the ticket request once the read settles with an answer', async () => {
+    const stream = fakeStream([connectedFrame(['perm_first'])]);
+    const signals: (AbortSignal | undefined)[] = [];
+    const permissionId = await resolvePendingPermissionId(
+      { cloudAgentSessionId: 'agent_1' },
+      {
+        getTicket: async (_sessionId, _organizationId, options) => {
+          signals.push(options?.signal);
+          return { ticket: 'ticket', expiresAt: Date.now() + 60_000 };
+        },
+        createConnection: stream.open,
+      }
+    );
+    expect(permissionId).toBe('perm_first');
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.aborted).toBe(true);
+  });
+
   it('rejects when the connected frame lands after the deadline', async () => {
     const stream = fakeStream([connectedFrame(['perm_late'])]);
     const clock = { now: 1000 };

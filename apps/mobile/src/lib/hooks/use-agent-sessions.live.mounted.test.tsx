@@ -16,6 +16,7 @@ import {
   makeConnection,
   makeTestQueryClient,
   QUERY_KEY,
+  type SystemEvent,
 } from '@/lib/active-sessions-live-sync.test-helpers';
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
@@ -463,6 +464,34 @@ describe('live query presentation and refresh contracts', () => {
       await flush();
     });
     expect(state.scheduleNotificationAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('settles a freshly selected scope whose first load a socket write canceled', async () => {
+    // A workspace switch mounts a new activeSessions.list key; its first load is
+    // in flight when the user's CLI heartbeat lands on the same scope.
+    state.organization.organizationId = 'org-1';
+    state.mountSync = true;
+    const first = deferred<CachedActiveSessionsData>();
+    state.request.mockReturnValueOnce(first.promise);
+    await render();
+    expect(state.request).toHaveBeenCalledTimes(1);
+    expect(live().hasAcceptedSuccess).toBe(false);
+    const heartbeat: SystemEvent = {
+      event: 'sessions.heartbeat',
+      data: { connectionId: 'c1', sessions: [] },
+    };
+    await act(async () => {
+      connection.__fireSystem(heartbeat);
+      await flush();
+    });
+    // The canceled attempt is replaced, so the server answer still lands
+    // without the user pulling to refresh.
+    expect(state.request).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      await flush();
+    });
+    expect(live().hasAcceptedSuccess).toBe(true);
+    expect(live().activeSessions).toEqual([]);
   });
 
   it.each(['token', 'bootstrap', 'sign-out', 'organization'] as const)(

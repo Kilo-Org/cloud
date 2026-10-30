@@ -15,6 +15,7 @@ import {
   type ReviewerPlatform,
   toPersonalPlatform,
 } from '@/lib/code-reviewer-config';
+import { reviewerSaveFailure } from '@/lib/code-reviewer-save-error';
 import {
   isLatestMutationGeneration,
   nextMutationGeneration,
@@ -220,7 +221,11 @@ export function useToggleReviewer(scope: string, platform: ReviewerPlatform) {
           old ? { ...old, isEnabled: previous.isEnabled } : old
         );
       }
-      announcingToast.error(error.message);
+      // Same reason as the config save: the server's sentence is English and
+      // may name a refusal the app explains itself.
+      announcingToast.error(
+        reviewerSaveFailure(error, i18n.t('codeReviewer.updateFailed')).message
+      );
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     onSettled: () => queryClient.invalidateQueries({ queryKey }),
@@ -386,7 +391,12 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
           old ? { ...old, ...restoredFields } : old
         );
       }
-      announcingToast.error(error.message);
+      // The server's sentence is English and may describe a refusal the app
+      // already explains (the organization trial gate); the toast shows that
+      // explanation, never the raw sentence.
+      announcingToast.error(
+        reviewerSaveFailure(error, i18n.t('codeReviewer.configSaveFailed')).message
+      );
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     onSettled: () => queryClient.invalidateQueries({ queryKey }),

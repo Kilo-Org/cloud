@@ -11,7 +11,7 @@
 // makes pills non-pressable and hides the add icon entirely; a
 // zero-pill read-only row renders null.
 
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { SmilePlus } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -103,7 +103,7 @@ export function ReactionsRow({
           viewerHasReacted={pill.viewerHasReacted}
           disabled={pillDisabled}
           onPress={() => {
-            void Haptics.selectionAsync();
+            selectionHaptic();
             onToggle(pill.content);
           }}
         />
@@ -116,7 +116,7 @@ export function ReactionsRow({
           accessibilityState={{ disabled: isDisabled }}
           disabled={isDisabled}
           onPress={() => {
-            void Haptics.selectionAsync();
+            selectionHaptic();
             openPicker();
           }}
           hitSlop={ADD_REACTION_HIT_SLOP}
@@ -133,7 +133,7 @@ export function ReactionsRow({
         reactions={reactions}
         onClose={closePicker}
         onPick={content => {
-          void Haptics.selectionAsync();
+          selectionHaptic();
           onToggle(content);
           closePicker();
         }}

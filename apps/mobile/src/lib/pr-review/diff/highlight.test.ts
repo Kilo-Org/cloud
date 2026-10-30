@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   clearHighlightCacheForTests,
+  highlightCacheStatsForTests,
   highlightLine,
   type HighlightToken,
   languageForPath,
@@ -112,5 +113,45 @@ describe('highlightLine', () => {
     const tokens = highlightLine('"name": "kilo"', 'json');
     expect(classes(tokens)).toContain('string');
     expect(texts(tokens).join('')).toBe('"name": "kilo"');
+  });
+
+  it('still caches a normal line, and a repeated call is a hit', () => {
+    highlightLine('const x = 1;', 'typescript');
+    const afterFirstCall = highlightCacheStatsForTests();
+    expect(afterFirstCall.entries).toBe(1);
+    expect(afterFirstCall.characters).toBeGreaterThan(0);
+
+    highlightLine('const x = 1;', 'typescript');
+    // A hit re-inserts the entry for recency; it must not add its weight again.
+    expect(highlightCacheStatsForTests()).toEqual(afterFirstCall);
+  });
+
+  it('highlights a line longer than the cache threshold without caching it', () => {
+    const line = `const bundled = "${'a'.repeat(4096)}";`;
+    const tokens = highlightLine(line, 'typescript');
+    expect(texts(tokens).join('')).toBe(line);
+    expect(highlightCacheStatsForTests()).toEqual({ entries: 0, characters: 0 });
+
+    // Not cached means highlighted again, with the same result.
+    expect(texts(highlightLine(line, 'typescript')).join('')).toBe(line);
+    expect(highlightCacheStatsForTests()).toEqual({ entries: 0, characters: 0 });
+  });
+
+  it('keeps retained characters within the cache budget for many large lines', () => {
+    const filler = 'x'.repeat(1880);
+    for (let index = 0; index < 1000; index += 1) {
+      highlightLine(`const v${index} = "${filler}";`, 'typescript');
+    }
+    const stats = highlightCacheStatsForTests();
+    // 1,000 lines of ~1.9k characters weigh ~3.8M characters together, so the
+    // budget evicts most of them.
+    expect(stats.entries).toBeGreaterThan(0);
+    expect(stats.entries).toBeLessThanOrEqual(1000);
+    expect(stats.characters).toBeLessThanOrEqual(1_000_000);
+
+    // The newest line — the one the current render just asked for — survives.
+    const charactersBefore = stats.characters;
+    highlightLine(`const v999 = "${filler}";`, 'typescript');
+    expect(highlightCacheStatsForTests().characters).toBe(charactersBefore);
   });
 });

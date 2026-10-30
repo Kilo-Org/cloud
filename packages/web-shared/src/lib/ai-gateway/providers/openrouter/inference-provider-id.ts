@@ -276,6 +276,32 @@ export function openRouterToVercelInferenceProviderId(providerId: string): strin
   return openRouterToVercelInferenceProviderMapping[normalizedProviderId] ?? normalizedProviderId;
 }
 
+const providerPolicyVercelProviderIds: ReadonlySet<string> = new Set(
+  OpenRouterInferenceProviderIdSchema.options.map(openRouterToVercelInferenceProviderId)
+);
+
+/**
+ * Whether the organization provider allow-list admits a provider key sent through Vercel.
+ * `allowedProviders` holds the OpenRouter provider slugs the policy allows for the model, or is
+ * undefined when the policy does not restrict providers. A key whose provider has no OpenRouter
+ * slug cannot be named on the provider policy screen, so the allow-list does not apply to it.
+ * Other keys, such as direct BYOK and gateway keys, are not affected.
+ */
+export function isVercelUserByokProviderAllowed(
+  providerId: string,
+  allowedProviders: ReadonlySet<string> | undefined
+): boolean {
+  if (!allowedProviders) return true;
+  const vercelProviderId =
+    providerId === DirectUserByokInferenceProviderIdSchema.enum.codestral
+      ? VercelUserByokInferenceProviderIdSchema.enum.mistral
+      : VercelUserByokInferenceProviderIdSchema.safeParse(providerId).data;
+  if (!vercelProviderId || !providerPolicyVercelProviderIds.has(vercelProviderId)) return true;
+  return [...allowedProviders].some(
+    provider => openRouterToVercelInferenceProviderId(provider) === vercelProviderId
+  );
+}
+
 export function getVercelUserByokProviderIdForEndpoint(
   providerId: string | undefined
 ): VercelUserByokInferenceProviderId | undefined {

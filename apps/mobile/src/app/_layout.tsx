@@ -49,6 +49,7 @@ import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
 import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
+import { DesignGateProbe } from '@/components/design-gate-probe';
 import { OfflineBannerSpaceGate } from '@/components/offline-banner';
 import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
@@ -1382,6 +1383,7 @@ function RootLayout() {
           <OfflineBannerSpaceGate>
             <AppRootProviders languageReady={languageReady}>
               <StatusBar style="auto" />
+              {__DEV__ ? <DesignGateProbe /> : null}
               <AppContentReveal>
                 <StateSurface className="flex-1">
                   <RootLayoutNav

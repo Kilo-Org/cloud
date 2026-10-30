@@ -84,13 +84,6 @@ vi.mock('@/lib/storage-keys', () => ({
   TOKEN_EXPIRES_AT_KEY: 'token-expires-at',
 }));
 
-// auth-context pulls in react-native, Sentry and the telemetry modules.
-// This test only inspects link options, so stub the two symbols trpc.ts uses.
-vi.mock('@/lib/auth/auth-context', () => ({
-  performRefresh: vi.fn().mockResolvedValue({ ok: false, refused: false }),
-  REFRESH_MARGIN_MS: 60_000,
-}));
-
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
 }));
@@ -250,7 +243,6 @@ describe('deadlineFetch', () => {
       // Fetch never resolves unless its signal aborts — simulates a hanging
       // backend where the only thing that cancels the request is the deadline.
       mockFetch.mockImplementation(
-        // eslint-disable-next-line typescript-eslint/promise-function-async
         (_url, init?: RequestInit) =>
           new Promise<Response>((resolve, reject) => {
             const signal = init?.signal;
@@ -296,7 +288,6 @@ describe('deadlineFetch', () => {
     try {
       // Fetch hangs unless its signal aborts.
       mockFetch.mockImplementation(
-        // eslint-disable-next-line typescript-eslint/promise-function-async
         (_url, init?: RequestInit) =>
           new Promise<Response>((_resolve, reject) => {
             const signal = init?.signal;

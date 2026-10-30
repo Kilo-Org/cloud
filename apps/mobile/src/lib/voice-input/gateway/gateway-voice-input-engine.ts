@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- one session state machine: start, rotation, upload, stop, abort, and recording cleanup share the session lifecycle. */
 import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from 'expo-audio';
 
+import { captureTelemetry } from '../../telemetry/error-sink';
 import {
   type VoiceInputNative,
   type VoiceInputNativeEvent,
@@ -101,7 +102,11 @@ type GatewaySession = {
   finalizing: boolean;
   /** True once any segment produced non-empty text. */
   producedText: boolean;
-  /** Serializes segment uploads so their results apply in recording order. */
+  /**
+   * Serializes segment uploads so their results apply in recording order.
+   * Never rejects: `finalizeStop` awaits it, and a rejected chain would skip
+   * the terminal `end` and every later segment.
+   */
   uploadChain: Promise<void>;
   /** Session-scoped credentials, cached before the first upload. */
   credentials: GatewayCredentials | null;
@@ -229,7 +234,19 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
       return;
     }
     for (const listener of set) {
-      (listener as (event: VoiceInputNativeEvent[K]) => void)(payload);
+      try {
+        (listener as (event: VoiceInputNativeEvent[K]) => void)(payload);
+      } catch {
+        // One subscriber must never break the session's protocol: the other
+        // listeners, the recorder cleanup and the terminal `end` still run.
+        // The event name alone identifies the throw site; the payload (a
+        // transcript) stays out of telemetry.
+        captureTelemetry({
+          level: 'error',
+          message: `voice-input listener threw on ${event}`,
+          tags: { 'error.subsystem': 'voice-input', 'error.operation': 'dispatch' },
+        });
+      }
     }
   };
 
@@ -434,13 +451,21 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
 
   /**
    * Queue one segment upload behind the previous ones so their results land
-   * in recording order even when a later request finishes first.
+   * in recording order even when a later request finishes first. The queued
+   * link never rejects: a rejected link would stop every later segment and
+   * `finalizeStop`'s drain, so the session would emit no terminal `end`.
+   * Each upload reports its own failure through `fail`.
    */
   const enqueueSegmentUpload = (current: GatewaySession, uri: string): void => {
     const previous = current.uploadChain;
     current.uploadChain = (async () => {
-      await previous;
-      await uploadSegment(current, uri);
+      try {
+        await previous;
+        await uploadSegment(current, uri);
+      } catch {
+        // `uploadSegment` already terminalized the session when it knew why;
+        // the chain only has to keep the next link and the drain alive.
+      }
     })();
   };
 

@@ -21,7 +21,7 @@ import {
   isPendingStartCancelled,
   type Lifecycle,
   type PendingVoiceInputStart,
-  waitForTerminal,
+  waitForTerminalOutcome,
 } from './voice-input-controller-helpers';
 
 export type VoiceInputNativeEvent = {
@@ -77,6 +77,16 @@ export type VoiceInputStartOptions = {
   owner: string;
   requiresOnDeviceRecognition: boolean;
 };
+
+/**
+ * Bound on how long `stop`, `abort` and the next `start` wait for a session's
+ * terminal `end`. A healthy session settles in well under a second; the
+ * gateway engine serializes segment uploads and each request caps at 30 s, so
+ * this also covers a stop that has one predecessor still uploading. Past the
+ * bound the controller abandons the session itself: the compose lock and the
+ * next start must never depend on a bridge that stopped answering.
+ */
+const VOICE_INPUT_TERMINAL_TIMEOUT_MS = 60_000;
 
 export function createVoiceInputController(native: VoiceInputNative) {
   let availability: VoiceInputAvailability = native.isRecognitionAvailable()
@@ -177,13 +187,37 @@ export function createVoiceInputController(native: VoiceInputNative) {
     }
   };
 
+  /**
+   * Abandon a session whose terminal `end` never arrived within the bound. The
+   * mic and any in-flight upload are released, the session settles, and the
+   * caller learns the stop did not complete normally. `report` tells the user
+   * why: a failed stop keeps their words unsent, while a requested cancel is
+   * silent by contract.
+   */
+  const releaseStalledSession = (current: VoiceInputSession, report: boolean): void => {
+    if (report) {
+      current.failed = true;
+      reportFeedback(classifyVoiceInputError('client'), current.onFeedback);
+    }
+    try {
+      native.abort();
+    } catch {
+      // Best-effort: releasing the recognizer must not stop the release below.
+    }
+    terminalize(true);
+  };
+
   const serializeOwnership = async (): Promise<boolean> => {
     const previous = session;
     if (!previous) {
       return true;
     }
     abortActive(previous);
-    await waitForTerminal(previous);
+    const outcome = await waitForTerminalOutcome(previous, VOICE_INPUT_TERMINAL_TIMEOUT_MS);
+    if (outcome.kind === 'timeout') {
+      // The previous session's bridge is not answering; start anyway.
+      releaseStalledSession(previous, false);
+    }
     return !isDisposed(lifecycle);
   };
 
@@ -284,8 +318,14 @@ export function createVoiceInputController(native: VoiceInputNative) {
       terminalize(true);
       return false;
     }
-    const result = await current.terminalPromise;
-    return result;
+    const outcome = await waitForTerminalOutcome(current, VOICE_INPUT_TERMINAL_TIMEOUT_MS);
+    if (outcome.kind === 'timeout') {
+      // The recorder stopped but the recognizer never reported the final
+      // transcript: settle anyway so the compose send lock is released.
+      releaseStalledSession(current, true);
+      return false;
+    }
+    return outcome.ok;
   };
 
   const abort = async (ownerArg?: string): Promise<boolean> => {
@@ -306,8 +346,13 @@ export function createVoiceInputController(native: VoiceInputNative) {
       terminalize(true);
       return false;
     }
-    const result = await current.terminalPromise;
-    return result;
+    const outcome = await waitForTerminalOutcome(current, VOICE_INPUT_TERMINAL_TIMEOUT_MS);
+    if (outcome.kind === 'timeout') {
+      // A cancel is silent by contract; it only has to free the caller.
+      releaseStalledSession(current, false);
+      return false;
+    }
+    return outcome.ok;
   };
 
   const dispose = (): void => {

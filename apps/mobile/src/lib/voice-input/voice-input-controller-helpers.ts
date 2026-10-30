@@ -6,16 +6,6 @@ type PermissionResult =
   | { kind: 'feedback'; feedback: VoiceInputFeedback }
   | { kind: 'client-error' };
 
-const noopBooleanResolver = (_ok: boolean): void => undefined;
-
-function createBooleanResolver() {
-  let resolveBoolean = noopBooleanResolver;
-  const promise = new Promise<boolean>(resolve => {
-    resolveBoolean = resolve;
-  });
-  return { promise, resolve: resolveBoolean };
-}
-
 export type Lifecycle = { disposed: boolean };
 
 export type PendingVoiceInputStart = {
@@ -42,7 +32,7 @@ export function createVoiceInputStartQueue() {
       }
       pending = request;
       const previousBarrier = barrier;
-      const completion = createBooleanResolver();
+      const completion = Promise.withResolvers<boolean>();
       barrier = completion.promise;
       try {
         if (previousBarrier) {
@@ -71,16 +61,40 @@ export function createTerminal(): {
   promise: Promise<boolean>;
   resolve: (ok: boolean) => void;
 } {
-  return createBooleanResolver();
+  return Promise.withResolvers<boolean>();
 }
 
-export async function waitForTerminal(current: {
-  terminalPromise: Promise<boolean>;
-}): Promise<void> {
+/** How a bounded terminal wait ended: the session settled, or the bound expired. */
+type TerminalOutcome = { kind: 'settled'; ok: boolean } | { kind: 'timeout' };
+
+/**
+ * Wait for a session's terminal outcome, but no longer than `timeoutMs`. A
+ * caller that must always finish — releasing a compose lock, starting the next
+ * session — cannot depend on the recognizer reporting `end`: only the native
+ * binding resolves that promise, and a stalled bridge never does. A timeout
+ * tells the caller to abandon the session itself.
+ */
+export async function waitForTerminalOutcome(
+  current: { terminalPromise: Promise<boolean> },
+  timeoutMs: number
+): Promise<TerminalOutcome> {
+  const timeout = Promise.withResolvers<TerminalOutcome>();
+  const timer = setTimeout(() => {
+    timeout.resolve({ kind: 'timeout' });
+  }, timeoutMs);
+  const settled = async (): Promise<TerminalOutcome> => {
+    try {
+      const ok = await current.terminalPromise;
+      return { kind: 'settled', ok };
+    } catch {
+      // terminalPromise never rejects; a rejection is still a settled session.
+      return { kind: 'settled', ok: false };
+    }
+  };
   try {
-    await current.terminalPromise;
-  } catch {
-    // terminalPromise never rejects
+    return await Promise.race([settled(), timeout.promise]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 

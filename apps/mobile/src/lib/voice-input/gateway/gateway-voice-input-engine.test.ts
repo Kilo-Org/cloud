@@ -1,6 +1,8 @@
 /* eslint-disable max-lines -- the engine suite covers every session path (happy, error mapping, abort, prep races) on one fake harness. */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the engine's fake deps resolve immediately, so they settle without await */
-import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
 import { type VoiceInputNativeEvent } from '../voice-input-controller';
 import {
@@ -479,6 +481,117 @@ describe('createGatewayVoiceInputEngine', () => {
     await drain();
 
     expect(seen).toEqual([]);
+  });
+});
+
+/** A subscriber that fails the way a UI listener would: a synchronous throw. */
+const throwFromListener = (): void => {
+  throw new Error('subscriber failed');
+};
+
+describe('listener isolation', () => {
+  afterEach(() => {
+    setTelemetrySink(null);
+  });
+
+  it('keeps dispatching to the other listeners and still ends the session when one throws', async () => {
+    const harness = buildEngine();
+    const seen: string[] = [];
+    harness.engine.addListener('result', throwFromListener);
+    harness.engine.addListener('result', payload => {
+      seen.push(`result:${payload.results[0]?.transcript ?? ''}`);
+    });
+    harness.engine.addListener('end', () => {
+      seen.push('end');
+    });
+
+    await startAndStop(harness);
+    await vi.waitFor(() => {
+      expect(seen).toEqual(['result:hello world', 'end']);
+    });
+    // The throwing subscriber must not cost the session its cleanup either.
+    expect(harness.recorder.release).toHaveBeenCalledTimes(1);
+    expect(harness.deleteRecording).toHaveBeenCalledWith('file:///recordings/recording.m4a');
+  });
+
+  it('cleans up and emits end when a listener throws on the error event', async () => {
+    const harness = buildEngine({
+      upload: async (): Promise<TranscribeRecordingResult> => ({
+        ok: false,
+        status: 503,
+        isTimeout: false,
+        isNetworkError: false,
+      }),
+    });
+    const ended: string[] = [];
+    harness.engine.addListener('error', throwFromListener);
+    harness.engine.addListener('end', () => {
+      ended.push('end');
+    });
+
+    await startAndStop(harness);
+    await vi.waitFor(() => {
+      expect(ended).toEqual(['end']);
+    });
+    expect(harness.recorder.release).toHaveBeenCalledTimes(1);
+    expect(harness.deleteRecording).toHaveBeenCalledWith('file:///recordings/recording.m4a');
+  });
+
+  it('reports a throwing listener through telemetry without the event payload', async () => {
+    const sink = vi.fn<(event: TelemetryEvent) => void>();
+    setTelemetrySink(sink);
+    const harness = buildEngine();
+    harness.engine.addListener('result', throwFromListener);
+
+    await startAndStop(harness);
+    await vi.waitFor(() => {
+      expect(sink).toHaveBeenCalledWith({
+        level: 'error',
+        message: 'voice-input listener threw on result',
+        tags: { 'error.subsystem': 'voice-input', 'error.operation': 'dispatch' },
+      });
+    });
+  });
+
+  it('uploads the next segment and finalizes after an earlier segment threw in a listener', async () => {
+    vi.useFakeTimers();
+    try {
+      let sequence = 0;
+      const harness = buildEngine({
+        createRecorder: () => {
+          sequence += 1;
+          return makeRecorder(`file:///recordings/segment-${sequence}.m4a`);
+        },
+        segmentDurationMs: 30,
+      });
+      const transcripts: string[] = [];
+      let endCount = 0;
+      harness.engine.addListener('result', (payload): void => {
+        transcripts.push(payload.results[0]?.transcript ?? '');
+        throw new Error('subscriber failed');
+      });
+      harness.engine.addListener('end', () => {
+        endCount += 1;
+      });
+      harness.upload.mockResolvedValueOnce({ ok: true, text: 'first segment' });
+
+      harness.engine.start(START_OPTIONS);
+      await settle();
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+      expect(transcripts).toEqual(['first segment']);
+
+      // A throwing listener must not keep the next segment from uploading, and
+      // the session must still terminalize once the queue drains.
+      harness.upload.mockResolvedValueOnce({ ok: true, text: 'second segment' });
+      harness.engine.stop();
+      await settle();
+
+      expect(transcripts).toEqual(['first segment', 'second segment']);
+      expect(endCount).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

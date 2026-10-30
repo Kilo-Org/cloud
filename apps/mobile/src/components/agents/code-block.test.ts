@@ -796,10 +796,41 @@ describe('CodeBlock fence walk lifetime', () => {
     expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0 });
   });
 
+  it('keeps the walk when one block replaces another for the same fence', async () => {
+    // A list row can unmount while an identical fence mounts in the same
+    // commit, and that commit's effect cleanups run before its effect creates:
+    // the release must not drop the walk the mounting block is about to use.
+    const code = 'const swapped = 1;';
+    const at = (key: string) =>
+      React.createElement(
+        React.Fragment,
+        null,
+        React.createElement(CodeBlock, { key, code, language: null })
+      );
+    const renderer = await mount(at('first'));
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+
+    act(() => {
+      renderer.update(at('second'));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+    await unmount(renderer);
+    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0 });
+  });
+
   it('releases the previous fence walk when the fence text is replaced', async () => {
     const renderer = await mount(blockElement({ code: 'const first = 1;', language: null }));
     act(() => {
       renderer.update(blockElement({ code: 'const second = 2;', language: null }));
+    });
+    // The replaced fence's walk is dropped on the task after the commit that
+    // released it, so a block mounting the same fence in that commit keeps it.
+    await act(async () => {
+      await Promise.resolve();
     });
 
     const { entries } = fenceWalkCacheStatsForTests();

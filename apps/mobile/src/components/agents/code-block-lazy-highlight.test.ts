@@ -132,12 +132,15 @@ describe('fence walk cache accounting', () => {
     expect(weight).toBeGreaterThan(code.length);
   });
 
-  it('drops one fence walk when its block releases it', () => {
+  it('drops one fence walk when its block releases it', async () => {
     const code = 'const value = 1;';
     chunkCodeLines(code, 'typescript', CODE_FIRST_PAINT_CHUNKS);
     expect(fenceWalkCacheStatsForTests().entries).toBe(1);
 
     releaseFenceChunkWalk(code, 'typescript');
+    // The entry is dropped on the task after the release, so a block mounting
+    // the same fence in that commit keeps it.
+    await Promise.resolve();
     expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0 });
 
     // A released fence highlights its lines again, because nothing is retained.
@@ -146,12 +149,13 @@ describe('fence walk cache accounting', () => {
     expect(highlightCalls.lines).toEqual([code]);
   });
 
-  it('keeps the walks of other fences when one is released', () => {
+  it('keeps the walks of other fences when one is released', async () => {
     chunkCodeLines('const a = 1;', null, CODE_FIRST_PAINT_CHUNKS);
     chunkCodeLines('const b = 2;', null, CODE_FIRST_PAINT_CHUNKS);
     expect(fenceWalkCacheStatsForTests().entries).toBe(2);
 
     releaseFenceChunkWalk('const a = 1;', null);
+    await Promise.resolve();
     expect(fenceWalkCacheStatsForTests().entries).toBe(1);
   });
 });

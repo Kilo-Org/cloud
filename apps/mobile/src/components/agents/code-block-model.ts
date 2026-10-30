@@ -361,7 +361,16 @@ export function releaseFenceChunkWalk(code: string, language: string | null): vo
     return;
   }
   fenceWalkHolders.delete(key);
-  fenceWalkCache.delete(key);
+  // A block that renders the same fence can mount in the same commit as this
+  // release, and React runs a commit's effect cleanups before its effect
+  // creates: that new block's retain has not landed yet. Drop the entry on the
+  // next task instead, once the commit's creates have run, and keep it if one
+  // of them retained it.
+  queueMicrotask(() => {
+    if (!fenceWalkHolders.has(key)) {
+      fenceWalkCache.delete(key);
+    }
+  });
 }
 
 /** For tests: drop the resumable fence walks so a suite starts cold. */

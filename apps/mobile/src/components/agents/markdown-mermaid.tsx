@@ -103,16 +103,6 @@ export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidPro
   const [failure, setFailure] = useState<{ source: string } | null>(null);
   const failed = failure?.source === source;
   const [host, setHost] = useState<MermaidHost | null>(null);
-  // Every source change starts a fresh render attempt: drop the previous
-  // diagram's failure and measured height synchronously during render (React's
-  // "adjust state when a prop changes" pattern). A source that comes back gets
-  // its own attempt rather than a failure recorded for an earlier one.
-  const [prevSource, setPrevSource] = useState(source);
-  if (prevSource !== source) {
-    setPrevSource(source);
-    setFailure(null);
-    setHeight(MIN_HEIGHT);
-  }
   // The host is prepared once per process, so a source change only re-runs this
   // after a failed copy: a failure clears the cached promise, and the retry then
   // either recovers the host or re-asserts the fallback.
@@ -148,6 +138,19 @@ export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidPro
   // page is loading or has failed. A color change may redraw a loaded page; a
   // source change remounts the page and its own load draws the new diagram.
   const loadedSource = useRef<string | null>(null);
+  // Every source change starts a fresh render attempt: drop the previous
+  // diagram's failure and measured height synchronously during render (React's
+  // "adjust state when a prop changes" pattern), and forget the loaded page with
+  // them. A source that comes back gets its own attempt rather than a failure
+  // recorded for an earlier one, and a source that cycles back to a value the
+  // previous page carried cannot inject into the page that is loading for it.
+  const [prevSource, setPrevSource] = useState(source);
+  if (prevSource !== source) {
+    setPrevSource(source);
+    setFailure(null);
+    setHeight(MIN_HEIGHT);
+    loadedSource.current = null;
+  }
   const injectWantedRender = useCallback(() => {
     const { source: wantedSource, dark: wantedDark, background } = wantedRender.current;
     webViewRef.current?.injectJavaScript(renderCall(wantedSource, wantedDark, background));

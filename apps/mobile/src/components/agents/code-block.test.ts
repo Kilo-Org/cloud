@@ -774,6 +774,28 @@ describe('CodeBlock fence walk lifetime', () => {
     await unmount(renderer);
   });
 
+  it('keeps the walk while another mounted block renders the same fence', async () => {
+    // The cache is keyed by the fence's value, so two blocks showing the same
+    // fence share one walk; one of them going away must not drop it for the
+    // other, which would re-highlight its prefix on its next mount batch.
+    const twoBlocks = React.createElement(
+      React.Fragment,
+      null,
+      blockElement({ code: 'const shared = 1;', language: null }),
+      blockElement({ code: 'const shared = 1;', language: null })
+    );
+    const renderer = await mount(twoBlocks);
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+
+    act(() => {
+      renderer.update(blockElement({ code: 'const shared = 1;', language: null }));
+    });
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+
+    await unmount(renderer);
+    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0 });
+  });
+
   it('releases the previous fence walk when the fence text is replaced', async () => {
     const renderer = await mount(blockElement({ code: 'const first = 1;', language: null }));
     act(() => {

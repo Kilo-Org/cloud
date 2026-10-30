@@ -186,6 +186,28 @@ describe('MarkdownMermaid page rendering', () => {
     });
   });
 
+  it('does not inject into a page loading for a source it saw before', async () => {
+    // A recycled row can hand the previous diagram back. The page for it is
+    // loading, so the loaded-page record must not survive the change.
+    const renderer = await mount('flowchart TD\n  a --> b');
+    await loadPage(renderer);
+    await rerender(renderer, 'flowchart TD\n  c --> d');
+    webViewMock.injectJavaScript.mockReset();
+
+    rnStub.scheme.current = 'dark';
+    await rerender(renderer, 'flowchart TD\n  a --> b');
+    expect(webViewMock.injectJavaScript).not.toHaveBeenCalled();
+
+    await loadPage(renderer);
+    expect(injected(webViewMock.injectJavaScript)).toEqual([
+      { source: 'flowchart TD\n  a --> b', dark: true, background: '#f4f4f4' },
+    ]);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('ignores a height a superseded diagram reports', async () => {
     const renderer = await mount('flowchart TD\n  a --> b');
     await loadPage(renderer);

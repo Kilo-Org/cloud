@@ -254,6 +254,11 @@ const FENCE_WALK_TOKEN_CHARGE = 16;
 
 const fenceWalkCache = new CharacterBoundedCache<ChunkWalk>(CODE_FENCE_WALK_CACHE_CHARACTERS);
 
+// Mounted blocks per walk key. The cache is keyed by the fence's value, not by
+// an instance, so two blocks rendering the same fence share one walk; a block
+// that goes away may only drop the walk once no other mounted block holds it.
+const fenceWalkHolders = new Map<string, number>();
+
 function fenceWalkKey(code: string, language: string | null): string {
   return `${language ?? ''}\u0000${code}`;
 }
@@ -331,19 +336,38 @@ export function chunkCodeLines(
 }
 
 /**
- * Drop the resumable walk of one fence. `CodeBlock` calls this when the fence it
+ * Record that a mounted fence is using its walk. Paired with
+ * `releaseFenceChunkWalk` for the same language and source; the walk survives
+ * one holder leaving while another still renders the same fence.
+ */
+export function retainFenceChunkWalk(code: string, language: string | null): void {
+  const key = fenceWalkKey(code, language);
+  fenceWalkHolders.set(key, (fenceWalkHolders.get(key) ?? 0) + 1);
+}
+
+/**
+ * Release the walk of one fence. `CodeBlock` calls this when the fence it
  * rendered is gone or its text was replaced, so a transcript the user scrolled
- * past keeps no highlighted copy of its code: a fence still on screen keeps its
- * walk (a FlashList remount then mounts without re-highlighting), and its
- * retained tokens are what the cache budget is charged for.
+ * past keeps no highlighted copy of its code. The walk is dropped only once no
+ * mounted block holds it: a fence still on screen keeps its walk (a FlashList
+ * remount then mounts without re-highlighting its lines), and its retained
+ * tokens are what the cache budget is charged for.
  */
 export function releaseFenceChunkWalk(code: string, language: string | null): void {
-  fenceWalkCache.delete(fenceWalkKey(code, language));
+  const key = fenceWalkKey(code, language);
+  const holders = fenceWalkHolders.get(key) ?? 0;
+  if (holders > 1) {
+    fenceWalkHolders.set(key, holders - 1);
+    return;
+  }
+  fenceWalkHolders.delete(key);
+  fenceWalkCache.delete(key);
 }
 
 /** For tests: drop the resumable fence walks so a suite starts cold. */
 export function clearFenceWalkCacheForTests(): void {
   fenceWalkCache.clear();
+  fenceWalkHolders.clear();
 }
 
 /** For tests: the walks currently retained and the total weight they are charged. */

@@ -177,25 +177,26 @@ test('layout-shift: an overlay or motion shared with an ancestor is not a layout
     []
   );
   // An ancestor that also changes size means content arrived, so the child still reports.
-  const growing = (y: number, height: number, shift: number) => [
+  const growing = (y: number, height: number) => [
     { parent: 0, tag: 'View', rect: [0, y, 400, height] as Rect },
     {
       parent: 1,
       tag: 'Paragraph',
-      rect: [0, y + shift, 100, 20] as Rect,
+      rect: [0, y + 10, 100, 20] as Rect,
       text: 'Title',
       testID: 'title',
     },
   ];
-  assert.equal(
-    checkShift(
-      [growing(0, 200, 10), growing(0, 200, 10), growing(30, 260, 40), growing(30, 260, 40)].map(
-        nodes => tree(nodes)
-      ),
-      120
-    ).length,
-    1
-  );
+  const series = (height: number) =>
+    [growing(0, 200), growing(0, 200), growing(30, height), growing(30, height)].map(nodes =>
+      tree(nodes)
+    );
+  // Same motion, ancestor keeps its size: suppressed as a transition.
+  assert.deepEqual(checkShift(series(200), 120), []);
+  // Same motion, ancestor grew: reported.
+  const reported = checkShift(series(260), 120);
+  assert.equal(reported.length, 1);
+  assert.equal(reported[0]?.measured, 30);
 });
 
 test('layout-shift: a route change starts a new rest', () => {

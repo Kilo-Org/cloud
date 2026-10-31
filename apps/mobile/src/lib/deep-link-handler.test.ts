@@ -1,9 +1,14 @@
 /* eslint-disable max-lines -- the mapping, pass-through, and stash suites share one owned test file */
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only check, runs in node, never bundled into the app
+import { readdirSync } from 'node:fs';
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only check, runs in node, never bundled into the app
+import { fileURLToPath } from 'node:url';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as UniversalLinks from '@kilocode/app-shared/universal-links';
 
-import { redirectSystemPath } from './deep-link-handler';
+import { APP_ROUTE_ROOTS, redirectSystemPath } from './deep-link-handler';
 import {
   _resetDeepLinkLaunchForTests,
   _setGetLinkingURLForTests,
@@ -58,16 +63,16 @@ const MAPPED_CASES = [
     href: '/(app)/(tabs)/(3_profile)/preferences',
   },
   {
-    path: 'https://app.kilo.ai/cloud/sessions/ses_1',
-    href: '/(app)/agent-chat/ses_1',
+    path: 'https://app.kilo.ai/cloud/sessions/ses_0123456789abcdefghijklmnop',
+    href: '/(app)/agent-chat/ses_0123456789abcdefghijklmnop',
   },
   {
-    path: 'https://app.kilo.ai/cloud/sessions/ses_1?at=msg_42',
-    href: '/(app)/agent-chat/ses_1?at=msg_42',
+    path: 'https://app.kilo.ai/cloud/sessions/ses_0123456789abcdefghijklmnop?at=msg_42',
+    href: '/(app)/agent-chat/ses_0123456789abcdefghijklmnop?at=msg_42',
   },
   {
-    path: 'https://app.kilo.ai/cloud/sessions/ses_1?at=msg%2042',
-    href: '/(app)/agent-chat/ses_1?at=msg%2042',
+    path: 'https://app.kilo.ai/cloud/sessions/ses_0123456789abcdefghijklmnop?at=msg%2042',
+    href: '/(app)/agent-chat/ses_0123456789abcdefghijklmnop?at=msg%2042',
   },
   {
     path: 'https://app.kilo.ai/security-agent/findings',
@@ -134,22 +139,86 @@ describe('redirectSystemPath', () => {
     });
   });
 
-  describe('passthrough', () => {
+  describe('a link that names no screen', () => {
+    // Resolving one of these replaces the visible route and unmounts the screen
+    // beneath it, so the unsaved state of that screen (an open form) is lost
+    // even though the link opens nothing anyone asked for.
     it.each([
       'https://app.kilo.ai/admin',
       'https://app.kilo.ai/code-reviews/review-md',
       'https://example.com/profile',
       'not a url',
-    ])('returns %s unchanged without navigate or stash', path => {
-      const result = redirectSystemPath({ path, initial: true });
-      expect(result).toBe(path);
-      expect(getPendingDeepLink()).toBeNull();
-      expect(mocks.navigate).not.toHaveBeenCalled();
+      'kiloapp:///',
+      'kiloapp://',
+      'kiloapp:///definitely-not-a-route',
+      'kiloapp:///dev/unknown-fixture',
+    ])('ignores %s without navigate or stash', path => {
+      for (const initial of [true, false]) {
+        expect(redirectSystemPath({ path, initial })).toBeNull();
+        expect(getPendingDeepLink()).toBeNull();
+        expect(mocks.navigate).not.toHaveBeenCalled();
+      }
+    });
+  });
 
-      const warm = redirectSystemPath({ path, initial: false });
-      expect(warm).toBe(path);
+  describe('session destination', () => {
+    it.each([
+      'https://app.kilo.ai/cloud/sessions/not-a-session',
+      'kiloapp:///cloud/sessions/not-a-session',
+      // An id shape seen in the wild: a UUID can never be a session id.
+      'https://app.kilo.ai/cloud/sessions/00000000-0000-0000-0000-000000000000',
+      'https://app.kilo.ai/cloud/sessions/ses_short',
+    ])('ignores %s, which the session route cannot open', path => {
+      for (const initial of [true, false]) {
+        expect(redirectSystemPath({ path, initial })).toBeNull();
+        expect(getPendingDeepLink()).toBeNull();
+        expect(mocks.navigate).not.toHaveBeenCalled();
+      }
+    });
+
+    it('still opens the composer from the `new` capture', () => {
+      const path = 'kiloapp:///cloud/sessions/new';
+      expect(redirectSystemPath({ path, initial: false })).toBeNull();
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/new');
+    });
+  });
+
+  describe('app route links', () => {
+    // Dev, E2E and system-search links address the app's own routes; the
+    // navigator owns them and `redirectSystemPath` passes them through.
+    it.each([
+      'kiloapp:///(app)/profile-management/34d743e6-7bb8-4dd1-880c-580bd8d907d5/variables',
+      'kiloapp:///(app)/(tabs)/(3_profile)/preferences',
+      'kiloapp:///(auth)/session-row-fixture',
+      'kiloapp:///force-update',
+      'kiloapp:///button-label-fixture',
+      '/(app)/agent-chat/new?mode=code',
+      '/(auth)/login',
+      'kiloapp://agent-chat/ses_0123456789abcdefghijklmnop',
+      'kiloapp://security-agent/personal',
+    ])('passes %s to the navigator without navigate or stash', path => {
+      expect(redirectSystemPath({ path, initial: true })).toBe(path);
+      expect(redirectSystemPath({ path, initial: false })).toBe(path);
       expect(getPendingDeepLink()).toBeNull();
       expect(mocks.navigate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('route namespace', () => {
+    it('names every root entry of the route directory', () => {
+      // A new root-level route must be opened deliberately: an incoming link
+      // reaches the navigator only through one of these names (or the indexed
+      // families), so a route missing here is unreachable by link.
+      const entries = readdirSync(fileURLToPath(new URL('../app', import.meta.url)), {
+        withFileTypes: true,
+      })
+        .map(entry => entry.name)
+        // `_layout` and `+`-prefixed files are navigator plumbing, not routes.
+        .filter(name => !name.startsWith('_') && !name.startsWith('+'))
+        .filter(name => !/\.test\.tsx?$/.test(name))
+        .map(name => name.replace(/\.(tsx|ts|jsx|js)$/, ''));
+
+      expect([...new Set(entries)].sort()).toEqual([...APP_ROUTE_ROOTS].sort());
     });
   });
 
@@ -202,16 +271,21 @@ describe('redirectSystemPath', () => {
   describe('resume anchor', () => {
     it('reads and re-encodes the decoded anchor exactly once', () => {
       redirectSystemPath({
-        path: 'kiloapp:///cloud/sessions/ses_1?at=msg%2042',
+        path: 'kiloapp:///cloud/sessions/ses_0123456789abcdefghijklmnop?at=msg%2042',
         initial: false,
       });
-      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_1?at=msg%2042');
+      expect(getPendingDeepLink()).toBe(
+        '/(app)/agent-chat/ses_0123456789abcdefghijklmnop?at=msg%2042'
+      );
       expect(mocks.navigate).not.toHaveBeenCalled();
     });
 
     it('keeps hrefs without an anchor byte-identical', () => {
-      redirectSystemPath({ path: 'https://app.kilo.ai/cloud/sessions/ses_1', initial: false });
-      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_1');
+      redirectSystemPath({
+        path: 'https://app.kilo.ai/cloud/sessions/ses_0123456789abcdefghijklmnop',
+        initial: false,
+      });
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_0123456789abcdefghijklmnop');
 
       redirectSystemPath({
         path: 'https://app.kilo.ai/cloud/sessions?github_install=success',
@@ -238,17 +312,23 @@ describe('redirectSystemPath', () => {
       // The synchronous launch capture runs first and owns the slot. If it
       // stashed the anchor-less href, expo-router's cold path would skip its
       // restash (see the dedup test above) and the anchor would be lost.
-      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/cloud/sessions/ses_1?at=msg_42');
+      _setGetLinkingURLForTests(
+        () => 'https://app.kilo.ai/cloud/sessions/ses_0123456789abcdefghijklmnop?at=msg_42'
+      );
       captureLaunchDeepLink();
-      expect(getPendingDeepLinkSnapshot()).toBe('/(app)/agent-chat/ses_1?at=msg_42');
+      expect(getPendingDeepLinkSnapshot()).toBe(
+        '/(app)/agent-chat/ses_0123456789abcdefghijklmnop?at=msg_42'
+      );
 
       const result = redirectSystemPath({
-        path: 'https://app.kilo.ai/cloud/sessions/ses_1?at=msg_42',
+        path: 'https://app.kilo.ai/cloud/sessions/ses_0123456789abcdefghijklmnop?at=msg_42',
         initial: true,
       });
 
       expect(result).toBeNull();
-      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_1?at=msg_42');
+      expect(getPendingDeepLink()).toBe(
+        '/(app)/agent-chat/ses_0123456789abcdefghijklmnop?at=msg_42'
+      );
       expect(mocks.navigate).not.toHaveBeenCalled();
     });
 

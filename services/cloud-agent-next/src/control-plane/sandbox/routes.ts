@@ -430,7 +430,15 @@ export async function ensureRoute(
 ): Promise<{ route: RouteRecord; started: boolean }> {
   const existing = await readRoute(ctx.db, spec.sessionId);
   if (existing !== null && existing.state !== 'failed') {
-    return { route: existing, started: false };
+    if (JSON.stringify(existing.spec.worktreeRecovery) === JSON.stringify(spec.worktreeRecovery)) {
+      return { route: existing, started: false };
+    }
+    const route: RouteRecord = {
+      ...existing,
+      spec: { ...existing.spec, worktreeRecovery: spec.worktreeRecovery },
+    };
+    writeRoute(ctx.db, route);
+    return { route, started: false };
   }
   return { route: await startAttempt(ctx, spec, source, environment), started: true };
 }

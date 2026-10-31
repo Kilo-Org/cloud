@@ -1494,5 +1494,5 @@ provider stop reliability, billing or hosted timing; those are checked on a depl
   guards only the credential class and the MCP set, and the last `installCredentials` frame decides
   the desired environment after the next restart. This predates the directory-key flip for legacy
   shared directories.
-- Out of scope: Kilo and model-provider retry policy, workspace file recovery after sandbox loss,
-  the retired legacy plane.
+- Out of scope: Kilo and model-provider retry policy, full workspace snapshot recovery after sandbox
+  loss (saved worktree-change patches are restored), the retired legacy plane.

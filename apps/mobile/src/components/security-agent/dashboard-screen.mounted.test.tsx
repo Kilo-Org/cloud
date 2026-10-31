@@ -714,7 +714,7 @@ describe('DashboardScreen sync control terminal states', () => {
     act(() => {
       triggerSync.isError = false;
       triggerSync.error = null;
-      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+      root.update(dashboardTree('personal'));
     });
 
     expect(syncDisabledStates(root.root)).toEqual([false]);
@@ -737,7 +737,7 @@ describe('DashboardScreen sync control terminal states', () => {
     act(() => {
       triggerSync.isError = false;
       triggerSync.error = null;
-      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+      root.update(dashboardTree('personal'));
     });
 
     expect(syncDisabledStates(root.root)).toEqual([false]);

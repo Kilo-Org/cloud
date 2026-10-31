@@ -20,6 +20,10 @@ import { OrganizationProvider } from '@/lib/organization-context';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 
+// The expiry sentence joins its zone marker to the date with a no-break space,
+// inside an isolate, so a wrap can never start a line with the marker alone.
+const UTC_MARKER = `\u00A0\u2068(UTC)\u2069`;
+
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
 const getContextBalanceQueryFn = vi.hoisted(() => vi.fn());
@@ -416,8 +420,7 @@ describe('CreditsCard balance state', () => {
       creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
     });
     const { renderer, texts, unmount } = await mountCard();
-    const explanation =
-      ' in credits expires 12/17/2099 (UTC). Credits with the earliest expiry are used first.';
+    const explanation = ` in credits expires 12/17/2099${UTC_MARKER}. Credits with the earliest expiry are used first.`;
     await waitFor(() => texts().includes(`$2.00${explanation}`));
 
     await choose(renderer, 'Hide balance');
@@ -427,6 +430,19 @@ describe('CreditsCard balance state', () => {
     await choose(renderer, 'Show balance');
     expect(texts()).toContain(`$2.00${explanation}`);
     expect(texts()).toContain('$10.00');
+    unmount();
+  });
+
+  it('keeps the UTC marker on the expiry date so a wrap cannot start a line with it', async () => {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 2 });
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
+    });
+    const { texts, unmount } = await mountCard();
+    // A breakable space left the marker to start the wrapped line, where a
+    // right-to-left sentence reads it as the end of the following one.
+    await waitFor(() => texts().some(text => text.includes(`12/17/2099${UTC_MARKER}. Credits`)));
     unmount();
   });
 
@@ -488,8 +504,7 @@ describe('CreditsCard balance state', () => {
       creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
     });
     const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
-    const previousNote =
-      '$2.00 in credits expires 12/17/2099 (UTC). Credits with the earliest expiry are used first.';
+    const previousNote = `$2.00 in credits expires 12/17/2099${UTC_MARKER}. Credits with the earliest expiry are used first.`;
     await waitFor(() => texts().includes(previousNote));
     const pending = Promise.withResolvers<{ creditBlocks: [] }>();
     orgCreditBlocksQueryFn.mockReturnValue(pending.promise);
@@ -532,7 +547,7 @@ describe('CreditsCard balance state', () => {
         expect(notes).toEqual(
           future
             ? [
-                '$2.00 in credits expires 12/17/2026 (UTC). Credits with the earliest expiry are used first.',
+                `$2.00 in credits expires 12/17/2026${UTC_MARKER}. Credits with the earliest expiry are used first.`,
               ]
             : []
         );
@@ -570,7 +585,7 @@ describe('CreditsCard balance state', () => {
       try {
         await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
         expect(texts().filter(text => text.includes('in credits expires'))).toEqual([
-          '$2.00 in credits expires 12/17/2026 (UTC). Credits with the earliest expiry are used first.',
+          `$2.00 in credits expires 12/17/2026${UTC_MARKER}. Credits with the earliest expiry are used first.`,
         ]);
       } finally {
         unmount();
@@ -858,7 +873,7 @@ describe('CreditsCard balance state', () => {
       (hide.props.onPress as () => void)();
     });
     expect(texts()).toContain(
-      '***** in credits expires 10/15/2027 (UTC). Credits with the earliest expiry are used first.'
+      `***** in credits expires 10/15/2027${UTC_MARKER}. Credits with the earliest expiry are used first.`
     );
     unmount();
   });

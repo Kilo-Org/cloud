@@ -21,6 +21,8 @@ const CODE_LENGTH = 8;
 const CODE_EXPIRATION_MINUTES = 10;
 const MAX_PENDING_REQUESTS_PER_IP = 5;
 const MAX_USER_CODE_ATTEMPTS = 5;
+/** Advisory-lock namespace for the per-address pending count and insert. */
+const PENDING_LIMIT_LOCK_NAMESPACE = 'device_auth_request_pending';
 
 export const DEVICE_AUTH_PENDING_LIMIT_MESSAGE =
   'Too many sign-in attempts from this network. Wait a few minutes and try again.';
@@ -73,6 +75,13 @@ export function hashDeviceSecret(secret: string): string {
  * `user_code` is the short code shown to the user and typed into the approval
  * page. `device_code_hash` covers the device secret used by the newer
  * device-code flow.
+ *
+ * A request that already has `MAX_PENDING_REQUESTS_PER_IP` live pending rows from
+ * the same address is refused before any row is written. The count and the insert
+ * run inside one transaction that holds a per-address advisory lock, so the limit
+ * is evaluated against the rows committed by the requests that came before.
+ * `pg_advisory_xact_lock` releases on commit or rollback, so the lock never
+ * outlives the transaction.
  */
 export async function createDeviceAuthRequest(params: {
   userAgent?: string;
@@ -92,55 +101,69 @@ export async function createDeviceAuthRequest(params: {
     throw new Error('IP address is required in production');
   }
 
-  // Rate limiting: check pending requests from this IP
-  if (ipAddress) {
-    const [result] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(device_auth_requests)
-      .where(
-        and(
-          eq(device_auth_requests.ip_address, ipAddress),
-          eq(device_auth_requests.status, 'pending'),
-          gt(device_auth_requests.expires_at, new Date().toISOString())
-        )
-      );
-
-    if (result && result.count >= MAX_PENDING_REQUESTS_PER_IP) {
-      throw new DeviceAuthPendingLimitError();
-    }
-  }
-
   const pollSecret = generateDeviceSecret();
   const deviceSecret = generateDeviceSecret();
   const deviceCodeHash = hashDeviceSecret(deviceSecret);
   const expiresAt = new Date(Date.now() + CODE_EXPIRATION_MINUTES * 60 * 1000);
 
-  for (let attempt = 0; attempt < MAX_USER_CODE_ATTEMPTS; attempt++) {
-    const userCode = generateUserCode();
-    const [inserted] = await db
-      .insert(device_auth_requests)
-      .values({
-        code: pollSecret,
-        user_code: userCode,
-        device_code_hash: deviceCodeHash,
-        status: 'pending',
-        expires_at: expiresAt.toISOString(),
-        user_agent: userAgent,
-        ip_address: ipAddress,
-        ...requestingClientColumns(requestingClient),
-      })
-      .onConflictDoNothing({
-        target: device_auth_requests.user_code,
-        where: sql`${device_auth_requests.user_code} IS NOT NULL`,
-      })
-      .returning({ id: device_auth_requests.id });
+  return db.transaction(async tx => {
+    if (ipAddress) {
+      // The count and the insert below are one serialized unit for this
+      // address. The first key namespaces the surface so it cannot contend with
+      // another feature's advisory locks.
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext(${PENDING_LIMIT_LOCK_NAMESPACE}), hashtext(${ipAddress}))`
+      );
 
-    if (inserted) {
-      return { code: pollSecret, userCode, deviceCode: deviceSecret, expiresAt, requestingClient };
+      const [result] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(device_auth_requests)
+        .where(
+          and(
+            eq(device_auth_requests.ip_address, ipAddress),
+            eq(device_auth_requests.status, 'pending'),
+            gt(device_auth_requests.expires_at, new Date().toISOString())
+          )
+        );
+
+      if (result && result.count >= MAX_PENDING_REQUESTS_PER_IP) {
+        throw new DeviceAuthPendingLimitError();
+      }
     }
-  }
 
-  throw new Error('Unable to allocate a device authorization user code');
+    for (let attempt = 0; attempt < MAX_USER_CODE_ATTEMPTS; attempt++) {
+      const userCode = generateUserCode();
+      const [inserted] = await tx
+        .insert(device_auth_requests)
+        .values({
+          code: pollSecret,
+          user_code: userCode,
+          device_code_hash: deviceCodeHash,
+          status: 'pending',
+          expires_at: expiresAt.toISOString(),
+          user_agent: userAgent,
+          ip_address: ipAddress,
+          ...requestingClientColumns(requestingClient),
+        })
+        .onConflictDoNothing({
+          target: device_auth_requests.user_code,
+          where: sql`${device_auth_requests.user_code} IS NOT NULL`,
+        })
+        .returning({ id: device_auth_requests.id });
+
+      if (inserted) {
+        return {
+          code: pollSecret,
+          userCode,
+          deviceCode: deviceSecret,
+          expiresAt,
+          requestingClient,
+        };
+      }
+    }
+
+    throw new Error('Unable to allocate a device authorization user code');
+  });
 }
 
 function requestingClientColumns(client: RequestingClient | null): {

@@ -19,6 +19,7 @@ import {
   type TestVars,
   toggleSecret,
 } from '@/components/profiles/profile-variables-screen.test-helpers';
+import { SECRET_MASK } from '@/components/profiles/profile-variables-model';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
@@ -356,7 +357,7 @@ describe('ProfileVariablesScreen', () => {
 
     const { renderer, unmount } = await mountScreen();
 
-    expect(findAll(renderer.root, 'Text').some(node => node.props.children === '••••••••')).toBe(
+    expect(findAll(renderer.root, 'Text').some(node => node.props.children === SECRET_MASK)).toBe(
       true
     );
     expect(findAll(renderer.root, 'Text').some(node => node.props.children === '***')).toBe(false);

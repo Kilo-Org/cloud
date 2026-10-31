@@ -108,11 +108,12 @@ export function VariableRowView({
           {row.key}
         </Text>
         {row.isSecret && onToggleReveal === undefined ? (
+          // The mask is a fixed run of dots, so it never truncates: a clipped
+          // mask reads as a cut-off value instead of a hidden one.
           <View className="flex-row items-center gap-1">
             <Lock size={12} color={colors.mutedForeground} />
             <Text
-              className="max-w-[45%] text-xs text-muted-foreground"
-              numberOfLines={1}
+              className="text-xs text-muted-foreground"
               accessibilityLabel={t('profiles.secrets.masked')}
             >
               {row.maskedValue}
@@ -148,7 +149,7 @@ export function VariableRowView({
           accessibilityState={{ disabled: isDeleting }}
           onPress={onDelete}
         >
-          <Trash2 size={18} color={colors.destructive} />
+          <Trash2 size={18} color={colors.mutedForeground} />
         </Pressable>
       ) : null}
     </View>

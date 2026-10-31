@@ -71,6 +71,10 @@ export function ProfileCommandsScreen({
   // The list itself is a draft (`lib/form-draft`), so the rows a remount would
   // otherwise drop come back with the text that was typed into them.
   const draftScope = `profiles:commands:${profileId}`;
+  // The list the draft was last reconciled with travels with the draft, so a
+  // remount can tell a restored copy of server truth from unsaved edits even
+  // when the query has no cached rows yet.
+  const [draftBase, setDraftBase] = useFormDraftState<string[]>(draftScope, 'base', serverCommands);
   const [commands, setCommands] = useFormDraftState<string[]>(
     draftScope,
     'commands',
@@ -80,7 +84,7 @@ export function ProfileCommandsScreen({
   const { save, persistedRef, isSaving } = useProfileCommandsSave({
     profileId,
     organizationId,
-    initialCommands: serverCommands,
+    initialCommands: draftBase,
   });
   // The list the screen renders right now. Back reads this, not the state a
   // handler captured, because the field's last edit may not have re-rendered.
@@ -93,13 +97,27 @@ export function ProfileCommandsScreen({
   // Remount uncontrolled fields for reorders and accepted server changes;
   // their text belongs to the position, not the input instance.
   const [generation, setGeneration] = useFormDraftState(draftScope, 'generation', 0);
-  if (serverCommands !== syncedCommands && !isSaving) {
+  // The list on screen reseeds from the server only while it still holds the
+  // list it was seeded from: a mount then can never replay an older copy over
+  // a newer one. Unsaved edits are never replaced, and neither is a list whose
+  // save has not been refetched yet, so a query with no rows yet — or the list
+  // a just-settled save replaced — is not server truth here.
+  const serverList = commandsQuery.data === undefined ? null : serverCommands;
+  const reseed =
+    !isSaving &&
+    serverList !== null &&
+    sameCommands(commands, draftBase) &&
+    !sameCommands(draftBase, serverCommands);
+  if (reseed || (serverCommands !== syncedCommands && !isSaving)) {
     setSyncedCommands(serverCommands);
-    if (sameCommands(commands, persistedRef.current) && !sameCommands(commands, serverCommands)) {
+    if (reseed) {
       setCommands(serverCommands);
       setGeneration(current => current + 1);
     }
-    persistedRef.current = serverCommands;
+    if (serverList !== null) {
+      persistedRef.current = serverCommands;
+      setDraftBase(serverCommands);
+    }
   }
 
   const commit = (index: number) => {
@@ -250,7 +268,7 @@ export function ProfileCommandsScreen({
                 remove(index);
               }}
             >
-              <Trash2 size={20} color={colors.destructive} />
+              <Trash2 size={20} color={colors.mutedForeground} />
             </Pressable>
           </View>
         ) : null}

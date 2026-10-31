@@ -501,4 +501,84 @@ describe('ProfileCommandsScreen', () => {
     ]);
     second.unmount();
   });
+
+  it('reseeds a restored draft that only copied server truth', async () => {
+    h.query.data = testCommands(['npm install']);
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    first.unmount();
+
+    // The query cache is cold, so the restored draft is the only list the mount
+    // has until the server answers.
+    h.query.data = undefined;
+    h.query.isPending = true;
+    const second = await mountScreen();
+    expect(findFields(second.renderer.root)).toHaveLength(0);
+
+    h.query.data = testCommands(['npm install', 'npm run build']);
+    h.query.isPending = false;
+    act(() => {
+      rerenderScreen(second.renderer, second.queryClient);
+    });
+    expect(findFields(second.renderer.root).map(field => field.props.defaultValue)).toEqual([
+      'npm install',
+      'npm run build',
+    ]);
+    expect(h.mutations.setCommands.mutateAsync).not.toHaveBeenCalled();
+
+    second.unmount();
+  });
+
+  it('keeps a restored draft that holds an unsaved edit when the server answers', async () => {
+    h.query.data = testCommands(['npm install']);
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressButton(first.renderer.root, 0);
+    changeRowText(first.renderer.root, 1, 'npm run build');
+    first.unmount();
+
+    h.query.data = undefined;
+    h.query.isPending = true;
+    const second = await mountScreen();
+    h.query.data = testCommands(['npm install', 'remote edit']);
+    h.query.isPending = false;
+    act(() => {
+      rerenderScreen(second.renderer, second.queryClient);
+    });
+    expect(findFields(second.renderer.root).map(field => field.props.defaultValue)).toEqual([
+      'npm install',
+      'npm run build',
+    ]);
+
+    second.unmount();
+  });
+
+  it('keeps the just-saved list until the refetched list arrives', async () => {
+    h.query.data = testCommands();
+    h.query.isPending = false;
+    const pending = Promise.withResolvers<{ success: boolean }>();
+    h.mutations.setCommands.mutateAsync.mockReturnValueOnce(pending.promise);
+
+    const { renderer, queryClient, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeRowText(renderer.root, 0, 'npm install');
+    commitRow(renderer.root, 0);
+    await act(async () => {
+      pending.resolve({ success: true });
+      await pending.promise;
+    });
+
+    // `setCommands` only invalidates, so the query still answers with the list
+    // from before the save; it must not replace the list just written.
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findFields(renderer.root).map(field => field.props.defaultValue)).toEqual([
+      'npm install',
+    ]);
+
+    unmount();
+  });
 });

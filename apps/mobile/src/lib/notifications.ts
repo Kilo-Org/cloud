@@ -13,7 +13,7 @@ import {
   type AndroidNotificationChannelId,
   type PushData,
   pushDataSchema,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 import {
   NOTIFICATION_PERMISSION_RESPONDED_EVENT,
   NOTIFICATION_TOKEN_UPDATED_EVENT,

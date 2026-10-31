@@ -28,7 +28,7 @@ import {
   setupNotificationBackgroundHandler,
 } from './notifications';
 
-import type * as Notifications from '@kilocode/notifications';
+import type * as Notifications from '@kilocode/notifications/schemas';
 
 type Response = { notification: { request: { content: { data: unknown } } } };
 type ResponseListener = (response: Response) => void;

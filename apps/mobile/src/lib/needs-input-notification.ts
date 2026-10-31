@@ -35,7 +35,7 @@ import {
   androidChannelIdForPushData,
   needsInputCategoryId,
   type PushData,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 
 import { type CachedActiveSession, isAttentionStatus } from '@/lib/active-sessions-live';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';

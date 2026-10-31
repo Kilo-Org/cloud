@@ -30,27 +30,43 @@ export const NOTIFICATION_HISTORY_RETENTION_MS =
 export const NOTIFICATION_HISTORY_DEFAULT_PAGE_SIZE = 30;
 
 /**
- * Push kinds that become history rows. A kind is recorded only when the push
- * carries something the user can reopen from a list, and every recorded kind
- * has one settings category except briefings, which have none.
+ * Push kinds that become history rows, keyed by kind, with the settings
+ * category that gates each one. A kind is recorded only when the push carries
+ * something the user can reopen from a list, and every recorded kind has one
+ * settings category except briefings, which have none.
  *
  * Every other kind is an OS-only surface (glanceable aggregate, Live Activity,
  * followed-session update, widget data) with no message to read back, so it is
- * never recorded. The switch in `notificationHistoryEntryForPushData` is the
- * authority; this list mirrors it for callers and tests, which assert the two
- * agree over every kind in `pushDataSchema`.
+ * never recorded.
+ *
+ * This map is the only place a recorded kind is declared: the exported list and
+ * the resolver both derive from it, so adding a kind here is the whole change
+ * and a kind cannot be listed without a category rule.
  */
-export const RECORDED_NOTIFICATION_PUSH_TYPES = [
-  'chat.message',
-  'cloud_agent_session',
-  'low_balance',
-  'spend_alert',
-  'security_finding',
-  'security_lifecycle',
-  'agent_briefing',
-] as const;
+const RECORDED_PUSH_HISTORY_RULES = {
+  'chat.message': () => 'chatMessages',
+  // A needs-input raise is gated by `agentAttention`; a status/ready push by
+  // `sessionStatus`, and an omitted tag is a status push (the rolling-deploy
+  // default the dispatch gate applies).
+  cloud_agent_session: (data: PushData) =>
+    data.type === 'cloud_agent_session' && data.category === 'attention'
+      ? 'agentAttention'
+      : 'sessionStatus',
+  low_balance: () => 'balanceAlerts',
+  spend_alert: () => 'spendAlerts',
+  security_finding: () => 'securityFindings',
+  security_lifecycle: () => 'securityFindings',
+  // Briefings have no settings category; they appear under All only.
+  agent_briefing: () => null,
+} satisfies Partial<
+  Record<PushData['type'], (data: PushData) => NotificationHistoryCategory | null>
+>;
 
-export type RecordedNotificationPushType = (typeof RECORDED_NOTIFICATION_PUSH_TYPES)[number];
+export type RecordedNotificationPushType = keyof typeof RECORDED_PUSH_HISTORY_RULES;
+
+export const RECORDED_NOTIFICATION_PUSH_TYPES = Object.keys(
+  RECORDED_PUSH_HISTORY_RULES
+) as readonly RecordedNotificationPushType[];
 
 /** One history row's content, derived from the push it came from. */
 export type NotificationHistoryEntry = {
@@ -59,38 +75,25 @@ export type NotificationHistoryEntry = {
   category: NotificationHistoryCategory | null;
 };
 
+/** True for the push kinds that become a history row. */
+function isRecordedNotificationPush(
+  type: PushData['type']
+): type is RecordedNotificationPushType {
+  return Object.hasOwn(RECORDED_PUSH_HISTORY_RULES, type);
+}
+
 /**
  * Resolve the history entry for a push, or `null` when the kind is not recorded.
  *
  * The category must match the preference that gates the dispatch, or a row
- * would sit under a switch that never controlled it:
- * - `cloud_agent_session` is gated per session category: a needs-input raise is
- *   `agentAttention`, a status/ready push is `sessionStatus`, and an omitted
- *   tag defaults to `status` (the rolling-deploy default).
- * - balance, spend and security pushes are gated by their own category.
+ * would sit under a switch that never controlled it.
  */
 export function notificationHistoryEntryForPushData(
   data: PushData
 ): NotificationHistoryEntry | null {
-  switch (data.type) {
-    case 'chat.message':
-      return { pushType: 'chat.message', category: 'chatMessages' };
-    case 'cloud_agent_session':
-      return {
-        pushType: 'cloud_agent_session',
-        category: data.category === 'attention' ? 'agentAttention' : 'sessionStatus',
-      };
-    case 'low_balance':
-      return { pushType: 'low_balance', category: 'balanceAlerts' };
-    case 'spend_alert':
-      return { pushType: 'spend_alert', category: 'spendAlerts' };
-    case 'security_finding':
-      return { pushType: 'security_finding', category: 'securityFindings' };
-    case 'security_lifecycle':
-      return { pushType: 'security_lifecycle', category: 'securityFindings' };
-    case 'agent_briefing':
-      return { pushType: 'agent_briefing', category: null };
-    default:
-      return null;
-  }
+  if (!isRecordedNotificationPush(data.type)) return null;
+  return {
+    pushType: data.type,
+    category: RECORDED_PUSH_HISTORY_RULES[data.type](data),
+  };
 }

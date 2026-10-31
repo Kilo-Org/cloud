@@ -110,6 +110,13 @@ export function pressSheetDone(root: ReactTestInstance): void {
   });
 }
 
+/** Ask the open sheet to close, through the control its header renders. */
+export function pressSheetCancel(root: ReactTestInstance): void {
+  act(() => {
+    (findOne(root, 'SheetHeader').props as { onCancel: () => void }).onCancel();
+  });
+}
+
 type TestConfirmRequest = { onConfirm?: () => void };
 
 /** The mock surface `useConfirmDialog().confirm` exposes to the harness. */

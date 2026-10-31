@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -14,6 +15,8 @@ type SetupCommandFieldProps = Readonly<{
   command: string;
   /** The field's label, which is also its accessible name. */
   label: string;
+  /** Controls that belong to this command's own row, at the end of its label line. */
+  trailing?: ReactNode;
   disabled?: boolean;
   accessibilityHint?: string;
   onChangeText: (next: string) => void;
@@ -34,6 +37,7 @@ type SetupCommandFieldProps = Readonly<{
 export function SetupCommandField({
   command,
   label,
+  trailing,
   disabled = false,
   accessibilityHint,
   onChangeText,
@@ -51,6 +55,7 @@ export function SetupCommandField({
     <View className="gap-1.5">
       <FormField
         label={label}
+        labelAccessory={trailing}
         defaultValue={command}
         placeholder={t('profiles.commandPlaceholder')}
         className="min-h-[44px] leading-[normal]"

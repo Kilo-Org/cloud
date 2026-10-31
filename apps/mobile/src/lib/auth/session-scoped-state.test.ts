@@ -12,6 +12,10 @@ const recentPrsMock = vi.hoisted(() => ({
   clearRecentPrs: vi.fn<() => Promise<void>>(),
 }));
 
+const formDraftMock = vi.hoisted(() => ({
+  clearFormDrafts: vi.fn(),
+}));
+
 vi.mock('@/lib/native-system-search', () => nativeSearchMock);
 
 vi.mock('@/lib/telemetry/error-sink', () => telemetryMock);
@@ -19,6 +23,10 @@ vi.mock('@/lib/telemetry/error-sink', () => telemetryMock);
 // The stored PR recents are the other account-bound store this clear owns; the
 // recents module reaches SecureStore on import, so it is mocked here.
 vi.mock('@/lib/pr-review/recent-prs', () => recentPrsMock);
+
+// The draft map has no reader outside a mounted form, so the boundary's call is
+// spied here; the store's own behavior is pinned in `lib/form-draft.mounted.test.tsx`.
+vi.mock('@/lib/form-draft', () => formDraftMock);
 
 /* eslint-disable import/first */
 // vi.mock is hoisted by Vitest before the real import resolves.
@@ -383,5 +391,11 @@ describe('clearSessionScopedState', () => {
     clearSessionScopedState();
 
     expect(isSessionGoalCollapsed('session-scoped-goal')).toBe(false);
+  });
+
+  it('drops the typed profile form drafts, including their secrets', () => {
+    clearSessionScopedState();
+
+    expect(formDraftMock.clearFormDrafts).toHaveBeenCalled();
   });
 });

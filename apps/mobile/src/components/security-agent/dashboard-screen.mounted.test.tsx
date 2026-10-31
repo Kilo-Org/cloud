@@ -1317,6 +1317,33 @@ describe('DashboardScreen first-sync prompt', () => {
     );
   });
 
+  it('leaves the unmeasured statement to the surfaces that report it', () => {
+    // The tiles and the "Act first" row each carry the not-yet-synced line for
+    // this state; the filter row must not repeat it above them.
+    dashboardStats.data = { ...zeroStats, analysis: { ...zeroStats.analysis, total: 3 } };
+    const root = renderScreen();
+    const filterRow = root.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Pressable' &&
+        n.props.accessibilityLabel === i18n.t('securityAgent.dashboard.filterByRepository')
+    )[0];
+    if (!filterRow) {
+      throw new Error('the repository filter row did not render');
+    }
+    const lines = filterRow.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Text' &&
+        typeof n.props.children === 'string'
+    );
+
+    expect(sectionsProps.props.at(-1)?.neverSynced).toBe(true);
+    expect(lines.map(line => line.props.children as string)).toEqual([
+      i18n.t('common.allRepositories'),
+    ]);
+  });
+
   it('waits for the stats read before offering the prompt', () => {
     dashboardStats.isPending = true;
     dashboardStats.data = undefined;

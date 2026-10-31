@@ -415,10 +415,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             <Text className="text-sm font-medium" numberOfLines={1}>
               {repoFullName ?? t('common.allRepositories')}
             </Text>
-            {/* The first-sync prompt below already states that nothing is
-                synced yet, so the status line would repeat it one row above
-                the same words. Every other state keeps its status line. */}
-            {showFirstSyncPrompt ? null : (
+            {/* A scope with no measured sync states that fact once per
+                surface that reports it: the first-sync prompt carries it, and
+                a scope that already holds findings shows it as each tile's
+                caption and in the "Act first" row. The filter row above them
+                would be the same sentence a third time, so it keeps its
+                status line only once a sync has been measured. */}
+            {neverSynced ? null : (
               <Text variant="muted" className="text-xs">
                 {lastSyncLabel}
               </Text>

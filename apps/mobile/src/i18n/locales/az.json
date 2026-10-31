@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLab-da daha çox qrupa və ya layihəyə giriş icazəsi verməyin lazım ola bilər.",
       "installGithubApp": "GitHub tətbiqini repozitoriyalarda quraşdır",
       "installGithubAppDescription": "Kilo GitHub tətbiqinə yoxlanmasını istədiyin repozitoriyalara giriş icazəsi ver.",
-      "repositoryAccess": "repozitoriyaya giriş"
+      "repositoryAccess": "repozitoriyaya giriş",
+      "allModePersonal": "GitHub bağlantın vasitəsilə Kilo-nun əldə edə bildiyi hər bir repozitoriya avtomatik yoxlanılır.",
+      "allModeOrganization": "Təşkilatın GitHub bağlantısı vasitəsilə Kilo-nun əldə edə bildiyi hər bir repozitoriya avtomatik yoxlanılır.",
+      "allModeCount": "Əlçatan repozitoriyalar: {{displayCount}}"
     },
     "style": {
       "title": "Yoxlama üslubu",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktiv sessiyaları yükləmək mümkün olmadı.",
       "couldNotRefresh": "Yeniləmək mümkün olmadı",
-      "noSessionsYetDescription": "Telefonundan kodlaşdırma tapşırığı başlat. Sessiyaların burada görünəcək.",
+      "noSessionsYetDescription": "Telefonundan kodlaşdırma tapşırığı başlat.",
       "viewHistory": "Sessiya tarixçəsi",
       "noMatches": "Uyğun sessiya yoxdur",
       "tryDifferentSearch": "Başqa sözlə axtar.",

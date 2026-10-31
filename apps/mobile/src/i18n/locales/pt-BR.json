@@ -869,7 +869,10 @@
       "gitlabNoRepositoriesDescription": "Talvez você precise conceder acesso a mais grupos ou projetos no GitLab.",
       "installGithubApp": "Instalar o app do GitHub nos repositórios",
       "installGithubAppDescription": "Conceda ao app do Kilo no GitHub acesso aos repositórios que você quer revisar.",
-      "repositoryAccess": "acesso ao repositório"
+      "repositoryAccess": "acesso ao repositório",
+      "allModePersonal": "Todo repositório que o Kilo consegue acessar pela sua conexão do GitHub é revisado automaticamente.",
+      "allModeOrganization": "Todo repositório que o Kilo consegue acessar pela conexão do GitHub da organização é revisado automaticamente.",
+      "allModeCount": "Repositórios disponíveis: {{displayCount}}"
     },
     "style": {
       "title": "Estilo de revisão",
@@ -1119,7 +1122,7 @@
       "sortSeverityDesc": "Gravidade: da maior para a menor",
       "sortSlaDue": "Data de vencimento do SLA",
       "statusIgnored": "Ignorado",
-      "statusOpen": "Abrir"
+      "statusOpen": "Em aberto"
     },
     "analysis": {
       "analyzeRepository": "Analisar repositório",
@@ -1342,7 +1345,7 @@
       "supersededByDescription": "Toque para abrir o registro atual e consultar o status, a análise e a correção.",
       "viewAdvisory": "Ver aviso de segurança no GitHub",
       "vulnerableVersions": "Versões vulneráveis",
-      "statusOpen": "Abrir",
+      "statusOpen": "Em aberto",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "correção já iniciada",
       "reasonNoBandwidth": "sem tempo disponível",
@@ -1604,7 +1607,7 @@
     "sessionList": {
       "couldNotLoadActive": "Não foi possível carregar as sessões ativas.",
       "couldNotRefresh": "Não foi possível atualizar",
-      "noSessionsYetDescription": "Inicie uma tarefa de programação pelo celular. Suas sessões aparecerão aqui.",
+      "noSessionsYetDescription": "Inicie uma tarefa de programação pelo celular.",
       "viewHistory": "Histórico de sessões",
       "noMatches": "Nenhuma sessão encontrada",
       "tryDifferentSearch": "Tente outro termo de pesquisa.",

@@ -1493,7 +1493,10 @@
       "gitlabNoRepositoriesDescription": "Seans go mbeidh ort rochtain ar thuilleadh grúpaí nó tionscadal a thabhairt ar GitLab.",
       "installGithubApp": "Suiteáil an aip GitHub ar stórtha",
       "installGithubAppDescription": "Tabhair rochtain d'aip GitHub Kilo ar na stórtha ar mhaith leat go ndéanfaí athbhreithniú orthu.",
-      "repositoryAccess": "rochtain ar stórtha"
+      "repositoryAccess": "rochtain ar stórtha",
+      "allModePersonal": "Déantar athbhreithniú uathoibríoch ar gach stór a bhfuil rochtain ag Kilo air trí do nasc GitHub.",
+      "allModeOrganization": "Déantar athbhreithniú uathoibríoch ar gach stór a bhfuil rochtain ag Kilo air trí nasc GitHub na heagraíochta.",
+      "allModeCount": "Stórtha ar fáil: {{displayCount}}"
     },
     "style": {
       "title": "Stíl athbhreithnithe",
@@ -2242,7 +2245,7 @@
     "sessionList": {
       "couldNotLoadActive": "Níorbh fhéidir na seisiúin ghníomhacha a lódáil.",
       "couldNotRefresh": "Níorbh fhéidir athnuachan a dhéanamh",
-      "noSessionsYetDescription": "Tosaigh tasc códaithe ó do ghuthán. Beidh do sheisiúin le feiceáil anseo.",
+      "noSessionsYetDescription": "Tosaigh tasc códaithe ó do ghuthán.",
       "viewHistory": "Stair na seisiún",
       "noMatches": "Gan aon seisiún comhoiriúnach",
       "tryDifferentSearch": "Bain triail as téarma cuardaigh eile.",

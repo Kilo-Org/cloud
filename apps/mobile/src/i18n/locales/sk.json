@@ -1471,7 +1471,10 @@
       "gitlabNoRepositoriesDescription": "Možno bude potrebné udeliť prístup k ďalším skupinám alebo projektom na platforme GitLab.",
       "installGithubApp": "Inštalácia aplikácie GitHub pre repozitáre",
       "installGithubAppDescription": "Udeľte aplikácii Kilo na platforme GitHub prístup k repozitárom, ktoré chcete kontrolovať.",
-      "repositoryAccess": "prístup k repozitárom"
+      "repositoryAccess": "prístup k repozitárom",
+      "allModePersonal": "Každý repozitár, ku ktorému má Kilo prístup cez vaše pripojenie k GitHubu, sa automaticky kontroluje.",
+      "allModeOrganization": "Každý repozitár, ku ktorému má Kilo prístup cez pripojenie organizácie k GitHubu, sa automaticky kontroluje.",
+      "allModeCount": "Dostupné repozitáre: {{displayCount}}"
     },
     "style": {
       "title": "Štýl kontroly",
@@ -2213,7 +2216,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktívne relácie sa nepodarilo načítať.",
       "couldNotRefresh": "Obnovenie sa nepodarilo",
-      "noSessionsYetDescription": "Začni programovaciu úlohu z telefónu. Tvoje relácie sa zobrazia tu.",
+      "noSessionsYetDescription": "Začni programovaciu úlohu z telefónu.",
       "viewHistory": "História relácií",
       "noMatches": "Žiadne zodpovedajúce relácie",
       "tryDifferentSearch": "Skús iný vyhľadávací výraz.",

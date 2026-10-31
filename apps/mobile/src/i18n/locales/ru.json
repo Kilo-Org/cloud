@@ -904,7 +904,10 @@
       "gitlabNoRepositoriesDescription": "Возможно, нужно предоставить доступ к дополнительным группам или проектам в GitLab.",
       "installGithubApp": "Установка приложения GitHub для репозиториев",
       "installGithubAppDescription": "Предоставьте приложению Kilo для GitHub доступ к репозиториям, которые нужно проверять.",
-      "repositoryAccess": "доступ к репозиторию"
+      "repositoryAccess": "доступ к репозиторию",
+      "allModePersonal": "Каждый репозиторий, к которому Kilo имеет доступ через ваше подключение GitHub, проверяется автоматически.",
+      "allModeOrganization": "Каждый репозиторий, к которому Kilo имеет доступ через подключение GitHub организации, проверяется автоматически.",
+      "allModeCount": "Доступные репозитории: {{displayCount}}"
     },
     "style": {
       "title": "Стиль проверки",
@@ -1646,7 +1649,7 @@
     "sessionList": {
       "couldNotLoadActive": "Не удалось загрузить активные сеансы.",
       "couldNotRefresh": "Не удалось обновить",
-      "noSessionsYetDescription": "Запустите задачу по разработке с телефона. Ваши сеансы появятся здесь.",
+      "noSessionsYetDescription": "Запустите задачу по разработке с телефона.",
       "viewHistory": "История сеансов",
       "noMatches": "Нет подходящих сеансов",
       "tryDifferentSearch": "Попробуйте другой поисковый запрос.",

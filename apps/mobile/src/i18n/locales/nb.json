@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Du må kanskje gi tilgang til flere grupper eller prosjekter på GitLab.",
       "installGithubApp": "Installer GitHub-appen for kodelagre",
       "installGithubAppDescription": "Gi Kilos GitHub-app tilgang til kodelagrene du vil ha gjennomgått.",
-      "repositoryAccess": "tilgang til kodelagre"
+      "repositoryAccess": "tilgang til kodelagre",
+      "allModePersonal": "Hvert kodelager som Kilo kan få tilgang til gjennom GitHub-tilkoblingen din, blir gjennomgått automatisk.",
+      "allModeOrganization": "Hvert kodelager som Kilo kan få tilgang til gjennom organisasjonens GitHub-tilkobling, blir gjennomgått automatisk.",
+      "allModeCount": "Tilgjengelige kodelagre: {{displayCount}}"
     },
     "style": {
       "title": "Gjennomgangsstil",
@@ -1667,7 +1670,7 @@
       "outcome": "Utfall",
       "slaStatus": "SLA-status",
       "sortBy": "Sorter etter",
-      "statusOpen": "Åpne",
+      "statusOpen": "Åpent",
       "fixed": "Rettet",
       "statusIgnored": "Ignorert",
       "severityHigh": "Høy",
@@ -1841,7 +1844,7 @@
       "source": "Kilde",
       "sourceId": "Kilde-ID",
       "viewAdvisory": "Vis sikkerhetsvarsel på GitHub",
-      "statusOpen": "Åpne",
+      "statusOpen": "Åpent",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "retting er allerede i gang",
       "reasonNoBandwidth": "ingen ledig kapasitet",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Kunne ikke laste inn aktive økter.",
       "couldNotRefresh": "Kunne ikke oppdatere",
-      "noSessionsYetDescription": "Start en kodeoppgave fra telefonen din. Øktene dine vises her.",
+      "noSessionsYetDescription": "Start en kodeoppgave fra telefonen din.",
       "viewHistory": "Økthistorikk",
       "noMatches": "Ingen økter passer til søket",
       "tryDifferentSearch": "Prøv et annet søkeord.",

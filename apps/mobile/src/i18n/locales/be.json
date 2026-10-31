@@ -1471,7 +1471,10 @@
       "gitlabNoRepositoriesDescription": "Магчыма, вам трэба даць доступ да большай колькасці груп або праектаў на GitLab.",
       "installGithubApp": "Усталюйце праграму GitHub для рэпазіторыяў",
       "installGithubAppDescription": "Дайце праграме Kilo для GitHub доступ да рэпазіторыяў, якія хочаце правяраць.",
-      "repositoryAccess": "доступ да рэпазіторыяў"
+      "repositoryAccess": "доступ да рэпазіторыяў",
+      "allModePersonal": "Кожны рэпазіторый, да якога Kilo мае доступ праз вашае падключэнне GitHub, правяраецца аўтаматычна.",
+      "allModeOrganization": "Кожны рэпазіторый, да якога Kilo мае доступ праз падключэнне GitHub арганізацыі, правяраецца аўтаматычна.",
+      "allModeCount": "Даступныя рэпазіторыі: {{displayCount}}"
     },
     "style": {
       "title": "Стыль праверкі",
@@ -2213,7 +2216,7 @@
     "sessionList": {
       "couldNotLoadActive": "Не атрымалася загрузіць актыўныя сеансы.",
       "couldNotRefresh": "Не атрымалася абнавіць",
-      "noSessionsYetDescription": "Запусці задачу па напісанні кода з тэлефона. Твае сеансы з'явяцца тут.",
+      "noSessionsYetDescription": "Запусці задачу па напісанні кода з тэлефона.",
       "viewHistory": "Гісторыя сеансаў",
       "noMatches": "Няма сеансаў паводле ўмоў пошуку",
       "tryDifferentSearch": "Паспрабуй іншы пошукавы запыт.",

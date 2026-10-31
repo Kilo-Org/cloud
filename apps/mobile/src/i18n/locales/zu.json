@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Kungenzeka udinge ukunikeza ukufinyelela kumaqembu noma amaphrojekthi engeziwe ku-GitLab.",
       "installGithubApp": "Faka uhlelo lokusebenza lwe-GitHub ezinqolobaneni zekhodi",
       "installGithubAppDescription": "Nika uhlelo lokusebenza lwe-Kilo ku-GitHub imvume yokufinyelela ezinqolobaneni zekhodi ofuna zihlolwe.",
-      "repositoryAccess": "ukufinyelela enqolobaneni yekhodi"
+      "repositoryAccess": "ukufinyelela enqolobaneni yekhodi",
+      "allModePersonal": "Zonke izinqolobane zekhodi ezingafinyelelwa yi-Kilo ngoxhumano lwakho lwe-GitHub zihlolwa ngokuzenzakalelayo.",
+      "allModeOrganization": "Zonke izinqolobane zekhodi ezingafinyelelwa yi-Kilo ngoxhumano lwenhlangano lwe-GitHub zihlolwa ngokuzenzakalelayo.",
+      "allModeCount": "Izinqolobane zekhodi ezitholakalayo: {{displayCount}}"
     },
     "style": {
       "title": "Indlela yokuhlola",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Asikwazanga ukulayisha iziseshini ezisebenzayo.",
       "couldNotRefresh": "Asikwazanga ukuvuselela",
-      "noSessionsYetDescription": "Qala umsebenzi wokubhala ikhodi efonini yakho. Iziseshini zakho zizovela lapha.",
+      "noSessionsYetDescription": "Qala umsebenzi wokubhala ikhodi efonini yakho.",
       "viewHistory": "Umlando weziseshini",
       "noMatches": "Azikho iziseshini ezihambisanayo",
       "tryDifferentSearch": "Zama igama lokusesha elihlukile.",

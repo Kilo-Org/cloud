@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Можеби треба да дадеш пристап до повеќе групи или проекти на GitLab.",
       "installGithubApp": "Инсталирај ја апликацијата на GitHub за складиштата",
       "installGithubAppDescription": "Дозволи ѝ на апликацијата Kilo за GitHub да пристапи до складиштата што сакаш да се прегледуваат.",
-      "repositoryAccess": "пристап до складиштето"
+      "repositoryAccess": "пристап до складиштето",
+      "allModePersonal": "Секое складиште до кое Kilo може да пристапи преку твојата врска со GitHub се прегледува автоматски.",
+      "allModeOrganization": "Секое складиште до кое Kilo може да пристапи преку врската на организацијата со GitHub се прегледува автоматски.",
+      "allModeCount": "Достапни складишта: {{displayCount}}"
     },
     "style": {
       "title": "Стил на преглед",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Не успеа вчитувањето на активните сесии.",
       "couldNotRefresh": "Не успеа освежувањето",
-      "noSessionsYetDescription": "Започни задача за програмирање од телефонот. Твоите сесии ќе се појават тука.",
+      "noSessionsYetDescription": "Започни задача за програмирање од телефонот.",
       "viewHistory": "Историја на сесиите",
       "noMatches": "Нема сесии што одговараат на пребарувањето",
       "tryDifferentSearch": "Пробај со друг поим за пребарување.",

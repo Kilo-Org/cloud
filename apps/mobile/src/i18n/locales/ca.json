@@ -1449,7 +1449,10 @@
       "gitlabNoRepositoriesDescription": "Pot ser que hagis de concedir accés a més grups o projectes a GitLab.",
       "installGithubApp": "Instal·la l'aplicació de GitHub als repositoris",
       "installGithubAppDescription": "Concedeix a l'aplicació de GitHub de Kilo accés als repositoris que vols revisar.",
-      "repositoryAccess": "accés als repositoris"
+      "repositoryAccess": "accés als repositoris",
+      "allModePersonal": "Tots els repositoris als quals Kilo pot accedir a través de la teva connexió de GitHub es revisen automàticament.",
+      "allModeOrganization": "Tots els repositoris als quals Kilo pot accedir a través de la connexió de GitHub de l'organització es revisen automàticament.",
+      "allModeCount": "Repositoris disponibles: {{displayCount}}"
     },
     "style": {
       "title": "Estil de revisió",
@@ -1689,7 +1692,7 @@
       "outcome": "Resultat",
       "slaStatus": "Estat de l'SLA",
       "sortBy": "Criteri d'ordenació",
-      "statusOpen": "Obertura",
+      "statusOpen": "Oberta",
       "fixed": "Corregit",
       "statusIgnored": "Ignorada",
       "severityHigh": "Alt",
@@ -1866,7 +1869,7 @@
       "source": "Origen",
       "sourceId": "ID d'origen",
       "viewAdvisory": "Consulta l'avís a GitHub",
-      "statusOpen": "Obertura",
+      "statusOpen": "Oberta",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "la correcció ja està en curs",
       "reasonNoBandwidth": "no hi ha recursos disponibles",
@@ -2184,7 +2187,7 @@
     "sessionList": {
       "couldNotLoadActive": "No s'han pogut carregar les sessions actives.",
       "couldNotRefresh": "No s'ha pogut actualitzar",
-      "noSessionsYetDescription": "Inicia una tasca de programació des del mòbil. Les teves sessions apareixeran aquí.",
+      "noSessionsYetDescription": "Inicia una tasca de programació des del mòbil.",
       "viewHistory": "Historial de sessions",
       "noMatches": "Cap sessió coincideix amb la cerca",
       "tryDifferentSearch": "Prova un altre terme de cerca.",

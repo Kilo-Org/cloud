@@ -1449,7 +1449,10 @@
       "gitlabNoRepositoriesDescription": "S-ar putea să fie nevoie să acorzi acces la mai multe grupuri sau proiecte pe GitLab.",
       "installGithubApp": "Instalează aplicația GitHub pe depozite",
       "installGithubAppDescription": "Acordă aplicației Kilo pentru GitHub acces la depozitele pe care vrei să le revizuiască.",
-      "repositoryAccess": "acces la depozit"
+      "repositoryAccess": "acces la depozit",
+      "allModePersonal": "Fiecare depozit pe care Kilo îl poate accesa prin conexiunea ta GitHub este revizuit automat.",
+      "allModeOrganization": "Fiecare depozit pe care Kilo îl poate accesa prin conexiunea GitHub a organizației este revizuit automat.",
+      "allModeCount": "Depozite disponibile: {{displayCount}}"
     },
     "style": {
       "title": "Stil de revizuire",
@@ -1689,7 +1692,7 @@
       "outcome": "Rezultat",
       "slaStatus": "Stare SLA",
       "sortBy": "Sortare după",
-      "statusOpen": "Deschidere",
+      "statusOpen": "Deschisă",
       "fixed": "Remediată",
       "statusIgnored": "Ignorată",
       "severityHigh": "Ridicat",
@@ -1866,7 +1869,7 @@
       "source": "Sursă",
       "sourceId": "ID sursă",
       "viewAdvisory": "Vezi buletinul de securitate pe GitHub",
-      "statusOpen": "Deschidere",
+      "statusOpen": "Deschisă",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "remedierea a început deja",
       "reasonNoBandwidth": "nu sunt resurse disponibile",
@@ -2184,7 +2187,7 @@
     "sessionList": {
       "couldNotLoadActive": "Nu s-au putut încărca sesiunile active.",
       "couldNotRefresh": "Nu s-a putut reîmprospăta",
-      "noSessionsYetDescription": "Începe o sarcină de programare de pe telefon. Sesiunile tale vor apărea aici.",
+      "noSessionsYetDescription": "Începe o sarcină de programare de pe telefon.",
       "viewHistory": "Istoricul sesiunilor",
       "noMatches": "Nicio sesiune nu corespunde filtrelor",
       "tryDifferentSearch": "Încearcă un alt termen de căutare.",

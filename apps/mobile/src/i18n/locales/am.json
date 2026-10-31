@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "በGitLab ላይ ወደ ተጨማሪ ቡድኖች ወይም ፕሮጀክቶች የመድረስ ፈቃድ መስጠት ሊያስፈልግዎ ይችላል።",
       "installGithubApp": "የGitHub መተግበሪያን በማከማቻዎች ላይ ይጫኑ",
       "installGithubAppDescription": "ለKilo የGitHub መተግበሪያ እንዲገመገሙ ወደሚፈልጓቸው ማከማቻዎች የመድረስ ፈቃድ ይስጡ።",
-      "repositoryAccess": "የማከማቻ መዳረሻ"
+      "repositoryAccess": "የማከማቻ መዳረሻ",
+      "allModePersonal": "Kilo በእርስዎ የGitHub ግንኙነት በኩል ማግኘት የሚችላቸው ሁሉም ማከማቻዎች በራስ-ሰር ይገመገማሉ።",
+      "allModeOrganization": "Kilo በድርጅቱ የGitHub ግንኙነት በኩል ማግኘት የሚችላቸው ሁሉም ማከማቻዎች በራስ-ሰር ይገመገማሉ።",
+      "allModeCount": "የሚገኙ ማከማቻዎች: {{displayCount}}"
     },
     "style": {
       "title": "የግምገማ ዘይቤ",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "ንቁ ክፍለ ጊዜዎችን መጫን አልተቻለም።",
       "couldNotRefresh": "ማደስ አልተቻለም",
-      "noSessionsYetDescription": "ከስልክህ ኮድ የመጻፍ ሥራ ጀምር። ክፍለ ጊዜዎችህ እዚህ ይታያሉ።",
+      "noSessionsYetDescription": "ከስልክህ ኮድ የመጻፍ ሥራ ጀምር።",
       "viewHistory": "የክፍለ ጊዜ ታሪክ",
       "noMatches": "የሚዛመዱ ክፍለ ጊዜዎች የሉም",
       "tryDifferentSearch": "ሌላ የፍለጋ ቃል ሞክር።",

@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "ਤੁਹਾਨੂੰ GitLab 'ਤੇ ਹੋਰ ਸਮੂਹਾਂ ਜਾਂ ਪ੍ਰੋਜੈਕਟਾਂ ਤੱਕ ਪਹੁੰਚ ਦੇਣ ਦੀ ਲੋੜ ਹੋ ਸਕਦੀ ਹੈ।",
       "installGithubApp": "ਰਿਪੋਜ਼ਟਰੀਆਂ 'ਤੇ GitHub ਐਪ ਸਥਾਪਤ ਕਰੋ",
       "installGithubAppDescription": "Kilo GitHub ਐਪ ਨੂੰ ਉਨ੍ਹਾਂ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਦਿਓ ਜਿਨ੍ਹਾਂ ਦੀ ਤੁਸੀਂ ਸਮੀਖਿਆ ਕਰਵਾਉਣੀ ਚਾਹੁੰਦੇ ਹੋ।",
-      "repositoryAccess": "ਰਿਪੋਜ਼ਟਰੀ ਤੱਕ ਪਹੁੰਚ"
+      "repositoryAccess": "ਰਿਪੋਜ਼ਟਰੀ ਤੱਕ ਪਹੁੰਚ",
+      "allModePersonal": "ਹਰ ਉਹ ਰਿਪੋਜ਼ਟਰੀ ਜਿਸ ਤੱਕ Kilo ਤੁਹਾਡੇ GitHub ਕਨੈਕਸ਼ਨ ਰਾਹੀਂ ਪਹੁੰਚ ਸਕਦਾ ਹੈ, ਦੀ ਸਵੈਚਾਲਿਤ ਸਮੀਖਿਆ ਕੀਤੀ ਜਾਂਦੀ ਹੈ।",
+      "allModeOrganization": "ਹਰ ਉਹ ਰਿਪੋਜ਼ਟਰੀ ਜਿਸ ਤੱਕ Kilo ਸੰਗਠਨ ਦੇ GitHub ਕਨੈਕਸ਼ਨ ਰਾਹੀਂ ਪਹੁੰਚ ਸਕਦਾ ਹੈ, ਦੀ ਸਵੈਚਾਲਿਤ ਸਮੀਖਿਆ ਕੀਤੀ ਜਾਂਦੀ ਹੈ।",
+      "allModeCount": "ਉਪਲਬਧ ਰਿਪੋਜ਼ਟਰੀਆਂ: {{displayCount}}"
     },
     "style": {
       "title": "ਸਮੀਖਿਆ ਦਾ ਢੰਗ",
@@ -1667,7 +1670,7 @@
       "outcome": "ਨਤੀਜਾ",
       "slaStatus": "SLA ਦੀ ਸਥਿਤੀ",
       "sortBy": "ਤਰਤੀਬ ਦਾ ਆਧਾਰ",
-      "statusOpen": "ਖੋਲ੍ਹੋ",
+      "statusOpen": "ਖੁੱਲ੍ਹੀ",
       "fixed": "ਠੀਕ ਕੀਤਾ ਗਿਆ",
       "statusIgnored": "ਅਣਡਿੱਠੀ",
       "severityHigh": "ਉੱਚ",
@@ -1841,7 +1844,7 @@
       "source": "ਸਰੋਤ",
       "sourceId": "ਸਰੋਤ ਦੀ ID",
       "viewAdvisory": "GitHub 'ਤੇ ਸੁਰੱਖਿਆ ਸੂਚਨਾ ਦੇਖੋ",
-      "statusOpen": "ਖੋਲ੍ਹੋ",
+      "statusOpen": "ਖੁੱਲ੍ਹੀ",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "ਠੀਕ ਕਰਨਾ ਸ਼ੁਰੂ ਹੋ ਗਿਆ ਹੈ",
       "reasonNoBandwidth": "ਸਮਾਂ ਜਾਂ ਸਰੋਤ ਉਪਲਬਧ ਨਹੀਂ ਹਨ",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "ਸਰਗਰਮ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
       "couldNotRefresh": "ਰੀਫ੍ਰੈਸ਼ ਨਹੀਂ ਹੋ ਸਕਿਆ",
-      "noSessionsYetDescription": "ਆਪਣੇ ਫ਼ੋਨ ਤੋਂ ਕੋਡਿੰਗ ਦਾ ਕੰਮ ਸ਼ੁਰੂ ਕਰੋ। ਤੁਹਾਡੇ ਸੈਸ਼ਨ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।",
+      "noSessionsYetDescription": "ਆਪਣੇ ਫ਼ੋਨ ਤੋਂ ਕੋਡਿੰਗ ਦਾ ਕੰਮ ਸ਼ੁਰੂ ਕਰੋ।",
       "viewHistory": "ਸੈਸ਼ਨਾਂ ਦਾ ਇਤਿਹਾਸ",
       "noMatches": "ਕੋਈ ਸੈਸ਼ਨ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ",
       "tryDifferentSearch": "ਕਿਸੇ ਹੋਰ ਸ਼ਬਦ ਨਾਲ ਖੋਜੋ।",

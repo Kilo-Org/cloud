@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "GitLab에서 더 많은 그룹이나 프로젝트에 대한 접근 권한을 부여해야 할 수 있습니다.",
       "installGithubApp": "저장소에 GitHub 앱 설치",
       "installGithubAppDescription": "Kilo GitHub 앱에 리뷰할 저장소의 접근 권한을 부여하세요.",
-      "repositoryAccess": "저장소 접근 권한"
+      "repositoryAccess": "저장소 접근 권한",
+      "allModePersonal": "Kilo가 회원님의 GitHub 연결을 통해 접근할 수 있는 모든 저장소는 자동으로 리뷰됩니다.",
+      "allModeOrganization": "Kilo가 조직의 GitHub 연결을 통해 접근할 수 있는 모든 저장소는 자동으로 리뷰됩니다.",
+      "allModeCount": "사용 가능한 저장소: {{displayCount}}"
     },
     "style": {
       "title": "리뷰 스타일",
@@ -1626,7 +1629,7 @@
     "sessionList": {
       "couldNotLoadActive": "활성 세션을 불러오지 못했습니다.",
       "couldNotRefresh": "새로고침하지 못했습니다",
-      "noSessionsYetDescription": "휴대폰에서 코딩 작업을 시작하세요. 세션이 여기에 표시됩니다.",
+      "noSessionsYetDescription": "휴대폰에서 코딩 작업을 시작하세요.",
       "viewHistory": "세션 기록",
       "noMatches": "일치하는 세션 없음",
       "tryDifferentSearch": "다른 검색어를 사용해 보세요.",

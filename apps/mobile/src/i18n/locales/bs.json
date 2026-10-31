@@ -1449,7 +1449,10 @@
       "gitlabNoRepositoriesDescription": "Možda trebaš odobriti pristup dodatnim grupama ili projektima na GitLabu.",
       "installGithubApp": "Instaliraj GitHub aplikaciju na repozitorije",
       "installGithubAppDescription": "Dodijeli Kilo GitHub aplikaciji pristup repozitorijima koje želiš pregledati.",
-      "repositoryAccess": "pristup repozitoriju"
+      "repositoryAccess": "pristup repozitoriju",
+      "allModePersonal": "Svaki repozitorij kojem Kilo može pristupiti putem tvoje GitHub veze automatski se pregledava.",
+      "allModeOrganization": "Svaki repozitorij kojem Kilo može pristupiti putem GitHub veze organizacije automatski se pregledava.",
+      "allModeCount": "Dostupni repozitoriji: {{displayCount}}"
     },
     "style": {
       "title": "Stil pregleda",
@@ -2184,7 +2187,7 @@
     "sessionList": {
       "couldNotLoadActive": "Učitavanje aktivnih sesija nije uspjelo.",
       "couldNotRefresh": "Osvježavanje nije uspjelo",
-      "noSessionsYetDescription": "Započni zadatak programiranja s mobitela. Tvoje sesije će se pojaviti ovdje.",
+      "noSessionsYetDescription": "Započni zadatak programiranja s mobitela.",
       "viewHistory": "Historija sesija",
       "noMatches": "Nema odgovarajućih sesija",
       "tryDifferentSearch": "Pokušaj s drugim pojmom za pretragu.",

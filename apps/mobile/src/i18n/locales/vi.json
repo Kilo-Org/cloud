@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "Bạn có thể cần cấp quyền truy cập thêm nhóm hoặc dự án trên GitLab.",
       "installGithubApp": "Cài đặt ứng dụng GitHub cho các kho lưu trữ",
       "installGithubAppDescription": "Cấp quyền truy cập cho ứng dụng Kilo trên GitHub vào các kho lưu trữ bạn muốn rà soát.",
-      "repositoryAccess": "quyền truy cập kho lưu trữ"
+      "repositoryAccess": "quyền truy cập kho lưu trữ",
+      "allModePersonal": "Mọi kho lưu trữ mà Kilo có thể truy cập thông qua kết nối GitHub của bạn đều được rà soát tự động.",
+      "allModeOrganization": "Mọi kho lưu trữ mà Kilo có thể truy cập thông qua kết nối GitHub của tổ chức đều được rà soát tự động.",
+      "allModeCount": "Số kho lưu trữ có sẵn: {{displayCount}}"
     },
     "style": {
       "title": "Cách rà soát",
@@ -1626,7 +1629,7 @@
     "sessionList": {
       "couldNotLoadActive": "Không thể tải các phiên đang hoạt động.",
       "couldNotRefresh": "Không thể làm mới",
-      "noSessionsYetDescription": "Bắt đầu tác vụ lập trình từ điện thoại. Các phiên của bạn sẽ xuất hiện tại đây.",
+      "noSessionsYetDescription": "Bắt đầu tác vụ lập trình từ điện thoại.",
       "viewHistory": "Lịch sử phiên",
       "noMatches": "Không có phiên phù hợp",
       "tryDifferentSearch": "Thử tìm bằng từ khóa khác.",

@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLab дээр илүү олон бүлэг эсвэл төсөлд хандах эрх өгөх шаардлагатай байж болно.",
       "installGithubApp": "Репозиториудад GitHub апп суулгах",
       "installGithubAppDescription": "Kilo GitHub аппад шалгуулах репозиториуддаа хандах эрх олгоно уу.",
-      "repositoryAccess": "репозиторийн хандах эрх"
+      "repositoryAccess": "репозиторийн хандах эрх",
+      "allModePersonal": "Kilo таны GitHub холболтоор хандах боломжтой бүх репозитори автоматаар шалгагдана.",
+      "allModeOrganization": "Kilo байгууллагын GitHub холболтоор хандах боломжтой бүх репозитори автоматаар шалгагдана.",
+      "allModeCount": "Боломжтой репозитори: {{displayCount}}"
     },
     "style": {
       "title": "Шалгалтын хэв маяг",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Идэвхтэй сессүүдийг ачаалж чадсангүй.",
       "couldNotRefresh": "Сэргээж чадсангүй",
-      "noSessionsYetDescription": "Утаснаасаа код бичих даалгавар эхлүүлнэ үү. Таны сессүүд энд харагдана.",
+      "noSessionsYetDescription": "Утаснаасаа код бичих даалгавар эхлүүлнэ үү.",
       "viewHistory": "Сессийн түүх",
       "noMatches": "Тохирох сесс олдсонгүй",
       "tryDifferentSearch": "Өөр үгээр хайж үзнэ үү.",

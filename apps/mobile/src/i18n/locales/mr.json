@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLab वरील आणखी गट किंवा प्रकल्पांसाठी प्रवेशाची परवानगी द्यावी लागू शकते.",
       "installGithubApp": "रिपॉझिटरींसाठी GitHub ॲप इन्स्टॉल करा",
       "installGithubAppDescription": "ज्या रिपॉझिटरींचे पुनरावलोकन हवे आहे, त्यांमध्ये Kilo GitHub ॲपला प्रवेश द्या.",
-      "repositoryAccess": "रिपॉझिटरीमधील प्रवेश"
+      "repositoryAccess": "रिपॉझिटरीमधील प्रवेश",
+      "allModePersonal": "तुमच्या GitHub कनेक्शनद्वारे Kilo प्रवेश करू शकते अशा प्रत्येक रिपॉझिटरीचे पुनरावलोकन स्वयंचलितपणे केले जाते.",
+      "allModeOrganization": "संस्थेच्या GitHub कनेक्शनद्वारे Kilo प्रवेश करू शकते अशा प्रत्येक रिपॉझिटरीचे पुनरावलोकन स्वयंचलितपणे केले जाते.",
+      "allModeCount": "उपलब्ध रिपॉझिटरी: {{displayCount}}"
     },
     "style": {
       "title": "समीक्षेची शैली",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "सक्रिय सत्रे लोड करता आली नाहीत.",
       "couldNotRefresh": "रीफ्रेश करता आले नाही",
-      "noSessionsYetDescription": "तुमच्या फोनवरून कोडिंगचे काम सुरू करा. तुमची सत्रे येथे दिसतील.",
+      "noSessionsYetDescription": "तुमच्या फोनवरून कोडिंगचे काम सुरू करा.",
       "viewHistory": "सत्रांचा इतिहास",
       "noMatches": "जुळणारी सत्रे नाहीत",
       "tryDifferentSearch": "दुसरा शब्द वापरून शोधा.",

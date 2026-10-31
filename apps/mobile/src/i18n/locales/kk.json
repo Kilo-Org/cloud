@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLab-та қосымша топтарға немесе жобаларға кіруге рұқсат беру қажет болуы мүмкін.",
       "installGithubApp": "GitHub қолданбасын репозиторийлерге орнатыңыз",
       "installGithubAppDescription": "GitHub-тағы Kilo қолданбасына тексерілетін репозиторийлерге кіруге рұқсат беріңіз.",
-      "repositoryAccess": "репозиторийге кіру рұқсаты"
+      "repositoryAccess": "репозиторийге кіру рұқсаты",
+      "allModePersonal": "Kilo сіздің GitHub қосылымыңыз арқылы қол жеткізе алатын әрбір репозиторий автоматты түрде тексеріледі.",
+      "allModeOrganization": "Kilo ұйымның GitHub қосылымы арқылы қол жеткізе алатын әрбір репозиторий автоматты түрде тексеріледі.",
+      "allModeCount": "Қолжетімді репозиторийлер: {{displayCount}}"
     },
     "style": {
       "title": "Тексеру мәнері",
@@ -1667,7 +1670,7 @@
       "outcome": "Нәтиже",
       "slaStatus": "SLA күйі",
       "sortBy": "Сұрыптау реті",
-      "statusOpen": "Ашу",
+      "statusOpen": "Ашық",
       "fixed": "Түзетілді",
       "statusIgnored": "Еленбеген",
       "severityHigh": "Жоғары",
@@ -1841,7 +1844,7 @@
       "source": "Дереккөз",
       "sourceId": "Дереккөз идентификаторы",
       "viewAdvisory": "GitHub-тағы қауіпсіздік хабарламасын қарау",
-      "statusOpen": "Ашу",
+      "statusOpen": "Ашық",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "түзету басталып кетті",
       "reasonNoBandwidth": "бос ресурс жоқ",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Белсенді сеанстарды жүктеу мүмкін болмады.",
       "couldNotRefresh": "Жаңарту мүмкін болмады",
-      "noSessionsYetDescription": "Телефоныңыздан код жазу тапсырмасын бастаңыз. Сеанстарыңыз осында көрсетіледі.",
+      "noSessionsYetDescription": "Телефоныңыздан код жазу тапсырмасын бастаңыз.",
       "viewHistory": "Сеанс тарихы",
       "noMatches": "Сәйкес сеанстар жоқ",
       "tryDifferentSearch": "Басқа іздеу сөзін қолданып көріңіз.",

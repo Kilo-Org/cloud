@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "คุณอาจต้องให้สิทธิ์เข้าถึงกลุ่มหรือโปรเจกต์เพิ่มเติมบน GitLab",
       "installGithubApp": "ติดตั้ง GitHub App สำหรับคลังโค้ด",
       "installGithubAppDescription": "ให้สิทธิ์ Kilo GitHub App เข้าถึงคลังโค้ดที่คุณต้องการให้ตรวจสอบ",
-      "repositoryAccess": "สิทธิ์เข้าถึงคลังโค้ด"
+      "repositoryAccess": "สิทธิ์เข้าถึงคลังโค้ด",
+      "allModePersonal": "คลังโค้ดทุกแห่งที่ Kilo เข้าถึงได้ผ่านการเชื่อมต่อ GitHub ของคุณจะได้รับการตรวจสอบอัตโนมัติ",
+      "allModeOrganization": "คลังโค้ดทุกแห่งที่ Kilo เข้าถึงได้ผ่านการเชื่อมต่อ GitHub ขององค์กรจะได้รับการตรวจสอบอัตโนมัติ",
+      "allModeCount": "คลังโค้ดที่ใช้ได้: {{displayCount}}"
     },
     "style": {
       "title": "รูปแบบการตรวจสอบ",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "ไม่สามารถโหลดเซสชันที่กำลังทำงานได้",
       "couldNotRefresh": "รีเฟรชไม่ได้",
-      "noSessionsYetDescription": "เริ่มงานเขียนโค้ดจากมือถือ เซสชันของคุณจะแสดงที่นี่",
+      "noSessionsYetDescription": "เริ่มงานเขียนโค้ดจากมือถือ",
       "viewHistory": "ประวัติเซสชัน",
       "noMatches": "ไม่มีเซสชันที่ตรงกัน",
       "tryDifferentSearch": "ลองใช้คำค้นหาอื่น",

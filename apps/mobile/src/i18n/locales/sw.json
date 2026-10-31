@@ -2155,7 +2155,7 @@
     "sessionList": {
       "couldNotLoadActive": "Imeshindikana kupakia vikao vinavyoendelea.",
       "couldNotRefresh": "Imeshindikana kuonyesha upya",
-      "noSessionsYetDescription": "Anza kazi ya kuandika msimbo kutoka kwenye simu yako. Vikao vyako vitaonekana hapa.",
+      "noSessionsYetDescription": "Anza kazi ya kuandika msimbo kutoka kwenye simu yako.",
       "viewHistory": "Historia ya vikao",
       "noMatches": "Hakuna vikao vinavyolingana",
       "tryDifferentSearch": "Jaribu neno lingine la utafutaji.",

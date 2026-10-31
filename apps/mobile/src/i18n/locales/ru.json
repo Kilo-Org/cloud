@@ -1646,7 +1646,7 @@
     "sessionList": {
       "couldNotLoadActive": "Не удалось загрузить активные сеансы.",
       "couldNotRefresh": "Не удалось обновить",
-      "noSessionsYetDescription": "Запустите задачу по разработке с телефона. Ваши сеансы появятся здесь.",
+      "noSessionsYetDescription": "Запустите задачу по разработке с телефона.",
       "viewHistory": "История сеансов",
       "noMatches": "Нет подходящих сеансов",
       "tryDifferentSearch": "Попробуйте другой поисковый запрос.",

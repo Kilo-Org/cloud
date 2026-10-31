@@ -2184,7 +2184,7 @@
     "sessionList": {
       "couldNotLoadActive": "Neizdevās ielādēt aktīvās sesijas.",
       "couldNotRefresh": "Neizdevās atsvaidzināt",
-      "noSessionsYetDescription": "Sāc programmēšanas uzdevumu savā tālrunī. Tavas sesijas parādīsies šeit.",
+      "noSessionsYetDescription": "Sāc programmēšanas uzdevumu savā tālrunī.",
       "viewHistory": "Sesiju vēsture",
       "noMatches": "Nav atbilstošu sesiju",
       "tryDifferentSearch": "Izmēģini citu meklēšanas frāzi.",

@@ -2155,7 +2155,7 @@
     "sessionList": {
       "couldNotLoadActive": "Kunne ikke laste inn aktive økter.",
       "couldNotRefresh": "Kunne ikke oppdatere",
-      "noSessionsYetDescription": "Start en kodeoppgave fra telefonen din. Øktene dine vises her.",
+      "noSessionsYetDescription": "Start en kodeoppgave fra telefonen din.",
       "viewHistory": "Økthistorikk",
       "noMatches": "Ingen økter passer til søket",
       "tryDifferentSearch": "Prøv et annet søkeord.",

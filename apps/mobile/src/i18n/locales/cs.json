@@ -2213,7 +2213,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktivní relace se nepodařilo načíst.",
       "couldNotRefresh": "Obnovení se nezdařilo",
-      "noSessionsYetDescription": "Zadej programovací úkol z telefonu. Tady se zobrazí tvé relace.",
+      "noSessionsYetDescription": "Zadej programovací úkol z telefonu.",
       "viewHistory": "Historie relací",
       "noMatches": "Žádné odpovídající relace",
       "tryDifferentSearch": "Zkus jiný hledaný výraz.",

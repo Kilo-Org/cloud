@@ -2155,7 +2155,7 @@
     "sessionList": {
       "couldNotLoadActive": "Идэвхтэй сессүүдийг ачаалж чадсангүй.",
       "couldNotRefresh": "Сэргээж чадсангүй",
-      "noSessionsYetDescription": "Утаснаасаа код бичих даалгавар эхлүүлнэ үү. Таны сессүүд энд харагдана.",
+      "noSessionsYetDescription": "Утаснаасаа код бичих даалгавар эхлүүлнэ үү.",
       "viewHistory": "Сессийн түүх",
       "noMatches": "Тохирох сесс олдсонгүй",
       "tryDifferentSearch": "Өөр үгээр хайж үзнэ үү.",

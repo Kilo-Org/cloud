@@ -2,14 +2,10 @@ import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type ScrollViewProps, View } from 'react-native';
 
+import { NewSessionButton } from '@/components/agents/new-session-button';
 import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { EmptyState } from '@/components/empty-state';
-import { Button } from '@/components/ui/button';
-import { Bot, Plus } from '@/components/ui/icons';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
+import { Bot } from '@/components/ui/icons';
 
 type LiveSessionListEmptyStateProps = {
   organizationId: string | null;
@@ -27,7 +23,6 @@ export function LiveSessionListEmptyState({
   historyAction,
 }: Readonly<LiveSessionListEmptyStateProps>) {
   const { openNewSession } = useNewSessionNavigator();
-  const colors = useThemeColors();
   const { t } = useTranslation();
   return (
     <EmptyState
@@ -38,18 +33,12 @@ export function LiveSessionListEmptyState({
       compact={compact}
       action={
         <View className="items-center gap-3">
-          <Button
-            variant="default"
-            size={compact ? 'sm' : 'default'}
-            className={cn('max-w-full', STATE_ACTION_CLASS)}
-            accessibilityLabel={t('common.newSession')}
+          <NewSessionButton
+            compact={compact}
             onPress={() => {
               openNewSession(organizationId);
             }}
-          >
-            <Plus size={16} color={colors.primaryForeground} />
-            <Text className="shrink text-center">{t('common.newSession')}</Text>
-          </Button>
+          />
           {historyAction}
         </View>
       }

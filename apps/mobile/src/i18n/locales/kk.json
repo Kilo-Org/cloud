@@ -2155,7 +2155,7 @@
     "sessionList": {
       "couldNotLoadActive": "Белсенді сеанстарды жүктеу мүмкін болмады.",
       "couldNotRefresh": "Жаңарту мүмкін болмады",
-      "noSessionsYetDescription": "Телефоныңыздан код жазу тапсырмасын бастаңыз. Сеанстарыңыз осында көрсетіледі.",
+      "noSessionsYetDescription": "Телефоныңыздан код жазу тапсырмасын бастаңыз.",
       "viewHistory": "Сеанс тарихы",
       "noMatches": "Сәйкес сеанстар жоқ",
       "tryDifferentSearch": "Басқа іздеу сөзін қолданып көріңіз.",

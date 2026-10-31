@@ -2155,7 +2155,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktiivseid seansse ei õnnestunud laadida.",
       "couldNotRefresh": "Värskendamine ebaõnnestus",
-      "noSessionsYetDescription": "Alusta telefonis programmeerimisülesannet. Sinu seansid kuvatakse siin.",
+      "noSessionsYetDescription": "Alusta telefonis programmeerimisülesannet.",
       "viewHistory": "Seansside ajalugu",
       "noMatches": "Sobivaid seansse ei leitud",
       "tryDifferentSearch": "Proovi teistsugust otsingusõna.",

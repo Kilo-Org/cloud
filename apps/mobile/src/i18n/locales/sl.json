@@ -2213,7 +2213,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktivnih sej ni bilo mogoče naložiti.",
       "couldNotRefresh": "Osvežitev ni uspela",
-      "noSessionsYetDescription": "Začni programsko nalogo s telefona. Tvoje seje se bodo prikazale tukaj.",
+      "noSessionsYetDescription": "Začni programsko nalogo s telefona.",
       "viewHistory": "Zgodovina sej",
       "noMatches": "Ni ustreznih sej",
       "tryDifferentSearch": "Poskusi z drugim iskalnim izrazom.",

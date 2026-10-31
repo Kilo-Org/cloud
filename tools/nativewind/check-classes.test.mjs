@@ -19,6 +19,9 @@ import test from 'node:test';
 // assertions, so the fixture tree mirrors the repository layout.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
 const MOBILE_ROOT = join(REPO, 'apps/mobile');
+// Every module under tools/lib the checker imports, copied into each fixture so
+// the checker runs from a root that mirrors the repository layout.
+const SHARED_SCANNERS = ['js-scan.mjs', 'source-files.mjs'];
 
 function makeFixture(context, files) {
   const root = mkdtempSync(join(tmpdir(), 'check-classes-'));
@@ -37,7 +40,9 @@ function makeFixture(context, files) {
     new URL('./check-classes.mjs', import.meta.url),
     join(root, 'tools/nativewind/check-classes.mjs')
   );
-  copyFileSync(new URL('../lib/js-scan.mjs', import.meta.url), join(root, 'tools/lib/js-scan.mjs'));
+  for (const name of SHARED_SCANNERS) {
+    copyFileSync(new URL(`../lib/${name}`, import.meta.url), join(root, `tools/lib/${name}`));
+  }
   copyFileSync(join(MOBILE_ROOT, 'src/global.css'), join(root, 'apps/mobile/src/global.css'));
   symlinkSync(join(MOBILE_ROOT, 'node_modules'), join(root, 'apps/mobile/node_modules'), 'dir');
   return root;
@@ -55,7 +60,7 @@ function runChecker(context, files) {
 }
 
 /**
- * A root holding only the checker and its shared scanner: no source tree, no
+ * A root holding only the checker and its shared scanners: no source tree, no
  * global.css, no installed dependencies. Anything the module does beyond
  * declaring its exports fails here.
  */
@@ -68,7 +73,9 @@ function importOnlyRoot(context) {
     new URL('./check-classes.mjs', import.meta.url),
     join(root, 'tools/nativewind/check-classes.mjs')
   );
-  copyFileSync(new URL('../lib/js-scan.mjs', import.meta.url), join(root, 'tools/lib/js-scan.mjs'));
+  for (const name of SHARED_SCANNERS) {
+    copyFileSync(new URL(`../lib/${name}`, import.meta.url), join(root, `tools/lib/${name}`));
+  }
   return root;
 }
 
@@ -336,6 +343,34 @@ test('accepts theme tokens without an opacity modifier', context => {
       'export const a = "bg-primary-disabled border-hair-soft bg-good-tile-bg";\n',
   });
   assert.equal(result.status, 0);
+});
+
+test('flags a runtime Text import under any name and allows the type-only forms', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/bare.tsx': "import { Text } from 'react-native';\n",
+    'apps/mobile/src/aliased.tsx': "import { Text as RNText } from 'react-native';\n",
+    'apps/mobile/src/mixed.tsx':
+      "import {\n  Pressable,\n  Text as RNText,\n  type TextStyle,\n} from 'react-native';\n",
+    'apps/mobile/src/type-aliased.tsx': "import { type Text as RNText } from 'react-native';\n",
+    'apps/mobile/src/type-import.tsx': "import type { Text } from 'react-native';\n",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /bare\.tsx:1: imports Text from 'react-native'/);
+  assert.match(result.stderr, /aliased\.tsx:1: imports Text from 'react-native'/);
+  assert.match(result.stderr, /mixed\.tsx:1: imports Text from 'react-native'/);
+  assert.doesNotMatch(result.stderr, /type-aliased/);
+  assert.doesNotMatch(result.stderr, /type-import/);
+});
+
+test('ignores test scaffolding', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/components/screen.mounted.test.tsx': "import { Text } from 'react-native';\n",
+    'apps/mobile/src/components/screen.mounted.test-helpers.ts':
+      "import { Text } from 'react-native';\n",
+    'apps/mobile/src/components/screen.test.tsx': "import { Text } from 'react-native';\n",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
 });
 
 test('importing the module neither scans nor runs the compiler probes', context => {

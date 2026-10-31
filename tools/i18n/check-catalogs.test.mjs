@@ -25,7 +25,13 @@ const SOURCE = "t('agents.title');\nt('agents.liveCount', { count: 2 });";
 
 function runChecker(
   context,
-  { english = ENGLISH, translated = TRANSLATED, source = SOURCE, language = 'ru' } = {}
+  {
+    english = ENGLISH,
+    translated = TRANSLATED,
+    source = SOURCE,
+    language = 'ru',
+    extraFiles = {},
+  } = {}
 ) {
   const root = mkdtempSync(join(tmpdir(), 'check-catalogs-'));
   context.after(() => rmSync(root, { recursive: true, force: true }));
@@ -37,6 +43,7 @@ function runChecker(
     [`apps/mobile/src/i18n/locales/${language}.json`]: JSON.stringify(translated),
     'packages/notifications/src/locales/en.json': '{}',
     [`packages/notifications/src/locales/${language}.json`]: '{}',
+    ...extraFiles,
   };
   for (const [path, content] of Object.entries(files)) {
     const file = join(root, path);
@@ -50,6 +57,11 @@ function runChecker(
   for (const name of ['check-catalogs.mjs', 'wording-exceptions.json']) {
     copyFileSync(new URL(`./${name}`, import.meta.url), join(toolDir, name));
   }
+  mkdirSync(join(root, 'tools/lib'), { recursive: true });
+  copyFileSync(
+    new URL('../lib/source-files.mjs', import.meta.url),
+    join(root, 'tools/lib/source-files.mjs')
+  );
   const result = spawnSync(process.execPath, [join(toolDir, 'check-catalogs.mjs')], {
     cwd: root,
     encoding: 'utf8',
@@ -132,6 +144,22 @@ test('rejects unused English plural siblings', context => {
     result.stderr,
     /mobile: en\.json defines "agents\.liveCount_other", which no source file uses/
   );
+});
+
+test('ignores a mounted-harness helper while a source file still reports its keys', context => {
+  const source = "t('agents.missing');\n";
+  const inSource = runChecker(context, { source });
+  assert.equal(inSource.status, 1, inSource.stderr);
+  assert.match(inSource.stderr, /"agents\.missing"/);
+
+  for (const helper of [
+    'apps/mobile/src/components/screen.mounted.test-helpers.ts',
+    'apps/mobile/src/components/screen.test.tsx',
+  ]) {
+    const inScaffolding = runChecker(context, { extraFiles: { [helper]: source } });
+    assert.equal(inScaffolding.status, 0, inScaffolding.stderr);
+    assert.equal(inScaffolding.stderr, '');
+  }
 });
 
 for (const [language, title, badge] of [
@@ -492,6 +520,92 @@ test('rejects a plural sibling that drops a value other than its count', context
   assert.match(
     result.stderr,
     /mobile\/ru: "agents\.window_one" placeholders differ from English \(displayCount,start\)/
+  );
+});
+
+/**
+ * The Security Agent deadline family counts with i18next's own `count`, which
+ * selects the plural category and is also read into the message. Arabic still
+ * names one and two with their own word forms, so the reviewed forms drop that
+ * numeral; an unreviewed form keeps it, and a reviewed form still may not drop a
+ * placeholder that is not the count.
+ */
+const WORDED_COUNT_ENGLISH = {
+  securityAgent: {
+    deadline: {
+      dueInDays_one: 'Due in {{count}} day',
+      dueInDays_other: 'Due in {{count}} days',
+    },
+  },
+};
+const WORDED_COUNT_SOURCE = "t('securityAgent.deadline.dueInDays', { count: 2 });";
+const WORDED_COUNT_TRANSLATED = {
+  securityAgent: {
+    deadline: {
+      dueInDays_zero: 'الأيام المتبقية للموعد: {{count}}',
+      dueInDays_one: 'مستحق بعد يوم واحد',
+      dueInDays_two: 'الموعد بعد يومين',
+      dueInDays_few: 'الموعد بعد {{count}} أيام',
+      dueInDays_many: 'الموعد بعد {{count}} يومًا',
+      dueInDays_other: 'تنتهي المهلة بعد {{count}} يوم',
+    },
+  },
+};
+
+test('accepts a reviewed worded form of a family counted with i18next’s count', context => {
+  const result = runChecker(context, {
+    english: WORDED_COUNT_ENGLISH,
+    translated: WORDED_COUNT_TRANSLATED,
+    source: WORDED_COUNT_SOURCE,
+    language: 'ar',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('rejects a dropped count in an unreviewed form of that family', context => {
+  const result = runChecker(context, {
+    english: WORDED_COUNT_ENGLISH,
+    translated: {
+      securityAgent: {
+        deadline: {
+          ...WORDED_COUNT_TRANSLATED.securityAgent.deadline,
+          dueInDays_few: 'الموعد بعد أيام',
+        },
+      },
+    },
+    source: WORDED_COUNT_SOURCE,
+    language: 'ar',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ar: "securityAgent\.deadline\.dueInDays_few" drops \{\{count\}\} without a reviewed worded form/
+  );
+});
+
+test('rejects the same worded form in a locale the allowlist does not name', context => {
+  const result = runChecker(context, {
+    english: WORDED_COUNT_ENGLISH,
+    translated: {
+      securityAgent: {
+        deadline: {
+          dueInDays_one: 'לתיקון תוך יום',
+          dueInDays_two: 'המועד האחרון בעוד יומיים',
+          dueInDays_many: 'נותרו {{count}} ימים למועד האחרון',
+          dueInDays_other: 'נותרו {{count}} ימים למועד האחרון',
+        },
+      },
+    },
+    source: WORDED_COUNT_SOURCE,
+    language: 'he',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  // The dual has no English sibling, so only the reviewed-form allowance could
+  // accept it: a Hebrew entry must not ride on the Arabic one.
+  assert.match(
+    result.stderr,
+    /mobile\/he: "securityAgent\.deadline\.dueInDays_two" drops \{\{count\}\} without a reviewed worded form/
   );
 });
 

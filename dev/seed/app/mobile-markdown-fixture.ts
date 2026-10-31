@@ -383,5 +383,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       : 'This fixture represents: one finished agent turn whose text parts exercise markdown, Mermaid, and HTML in markdown, plus a Markdown read tool and file part.'
   );
   console.log('Suggested next step: open the deep link on a signed-in dev build.');
-  return { userId: user.id, sessionId: SESSION_ID, deepLink: `kiloapp:///(app)/agent-chat/${SESSION_ID}` };
+  return {
+    userId: user.id,
+    sessionId: SESSION_ID,
+    deepLink: `kiloapp:///(app)/agent-chat/${SESSION_ID}`,
+  };
 }

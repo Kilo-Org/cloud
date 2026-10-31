@@ -887,13 +887,10 @@ describe('buildLocalizedMetrics', () => {
     const metrics = buildLocalizedMetrics(data, true, true);
 
     // Zero counts and the line that read the zeros as a clean report both
-    // became a dash and the screen's own not-yet-synced state.
+    // became a dash; the filter row above the tiles states the not-yet-synced
+    // status once, so a tile keeps no detail line to repeat it.
     expect(metrics.map(metric => metric.value)).toEqual(['—', '—', '—']);
-    expect(metrics.map(metric => metric.detail)).toEqual([
-      i18n.t('securityAgent.dashboard.notYetSynced'),
-      i18n.t('securityAgent.dashboard.notYetSynced'),
-      i18n.t('securityAgent.dashboard.notYetSynced'),
-    ]);
+    expect(metrics.map(metric => metric.detail)).toEqual(['', '', '']);
     expect(metrics.every(metric => metric.tone === 'neutral')).toBe(true);
   });
 

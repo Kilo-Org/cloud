@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- The dashboard sections share one data contract and navigation scope. */
 import { getAnalysisIncompleteCount } from '@kilocode/app-shared/security-agent';
 import { type Href } from 'expo-router';
-import { Clock, FolderGit2, ShieldCheck } from '@/components/ui/icons';
+import { FolderGit2, ShieldCheck } from '@/components/ui/icons';
 import { DirectionalArrowRight } from '@/components/ui/directional-icons';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
@@ -101,15 +101,16 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
 
   // A scope that has never synced has found nothing yet because nothing ran,
   // not because the codebase is clean: the green check and the all-clear line
-  // read as a verified result. The neutral row states the same not-yet-synced
-  // fact the filter above shows, and opens nothing.
+  // read as a verified result. The filter above already states that nothing
+  // has synced, so the card carries the same dash every other unmeasured count
+  // on this dashboard shows, and opens nothing.
   if (neverSynced) {
+    const unmeasured = UNMEASURED_VALUE;
     return (
       <SectionCard title={t('securityAgent.dashboard.actFirst')}>
-        <View className="flex-row items-center gap-2 py-3">
-          <Clock size={16} color={colors.mutedForeground} />
-          <Text variant="muted" className="text-sm">
-            {t('securityAgent.dashboard.notYetSynced')}
+        <View className="py-3">
+          <Text variant="mono" className="text-[13px] text-muted-foreground">
+            {unmeasured}
           </Text>
         </View>
       </SectionCard>

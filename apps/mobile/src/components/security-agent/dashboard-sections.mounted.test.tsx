@@ -140,9 +140,13 @@ describe('DashboardSections priority card', () => {
   it('reports no measurement while the scope has never synced', () => {
     const card = priorityCard(renderSections({ neverSynced: true }));
 
-    // The neutral state carries the screen's own not-yet-synced line; the
-    // all-clear copy and its green check belong to a measured report.
-    expect(copy(card)).toContain('securityAgent.dashboard.notYetSynced');
+    // The filter above the sections states the not-yet-synced status once, so
+    // the card carries the same dash as every other unmeasured count instead
+    // of repeating it; the all-clear copy and its green check belong to a
+    // measured report.
+    expect(copy(card)).toContain('securityAgent.dashboard.actFirst');
+    expect(copy(card)).toContain('—');
+    expect(copy(card)).not.toContain('securityAgent.dashboard.notYetSynced');
     expect(copy(card)).not.toContain('securityAgent.dashboard.noOpenFindings');
     expect(card.findAllByType('ShieldCheck')).toHaveLength(0);
     expect(card.findAllByType('Pressable')).toHaveLength(0);

@@ -177,15 +177,16 @@ export function buildLocalizedMetrics(
   // Before the first sync nothing has been measured, so every tile read a zero
   // count and, under it, a line that described the zeros as a clean report
   // ("All open findings tracked", "No findings have an SLA deadline yet").
-  // A dash in the numeric slot and the screen's own not-yet-synced line state
-  // the measurement is simply absent.
+  // The filter row above already states that nothing has synced, so a dash in
+  // the numeric slot carries the measurement's absence and the tile keeps no
+  // detail line to repeat the status.
   if (!neverSynced) {
     return localized;
   }
   return localized.map(metric =>
     Object.assign(metric, {
       value: UNMEASURED_VALUE,
-      detail: i18n.t('securityAgent.dashboard.notYetSynced'),
+      detail: '',
       tone: 'neutral' as const,
     })
   );
@@ -532,9 +533,11 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 >
                   {metric.value}
                 </Text>
-                <Text variant="muted" className="text-[11px]">
-                  {metric.detail}
-                </Text>
+                {metric.detail ? (
+                  <Text variant="muted" className="text-[11px]">
+                    {metric.detail}
+                  </Text>
+                ) : null}
               </View>
             ))}
           </View>

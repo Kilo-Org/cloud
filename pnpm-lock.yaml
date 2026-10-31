@@ -169,6 +169,7 @@ overrides:
   minimatch@^5: 5.1.9
   nanoid@^3: 3.3.20
   ajv@^8: 8.20.0
+  eas-cli@24.13.0>ts-deepmerge: 8.0.0
   minimatch@^10: 10.2.6
   '@vercel/backends>srvx': 0.11.22
   zod@>=4.0.0 <4.6.6: 4.6.7
@@ -199,6 +200,7 @@ patchedDependencies:
   '@expo/router-server@58.0.13': 83ef7e975269c998aa00b0345a478a67bc0f7742eb253201b9120125ae051269
   '@expo/ui@58.0.17': 0f068b3dfdac2b028b0263b0115307d846cf5a77e3e5279c61529c0490675143
   '@vercel/queue@0.8.0': a0942a1d1f0521e89afba6e6f9896636c2e96b85762e12ac2fae66d3f2bac4d4
+  eas-cli@24.13.0: 1e8b890ebcdded713b541674bf5845468c6a2ca9df2f1750d90fd1b67f214585
   expo-background-task@58.0.10: 090a5f6453404ed7590639660ed51560f64ff7a00097bef406b988bce83fca35
   expo-dev-launcher@58.0.14: 7ba3ff7110dbe4563648e254e484f69ad1e550adc93f6ac1436f5ebf222000ac
   expo-localization@58.0.4: 790ed1623bb21bc6af1bfe44cacd8f383a128e62d0572669c5568fb8f3676b73
@@ -868,7 +870,7 @@ importers:
         version: 0.31.11
       eas-cli:
         specifier: 24.13.0
-        version: 24.13.0(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@6.0.6)
+        version: 24.13.0(patch_hash=1e8b890ebcdded713b541674bf5845468c6a2ca9df2f1750d90fd1b67f214585)(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@6.0.6)
       eslint-plugin-sonarjs:
         specifier: 4.2.2
         version: 4.2.2(eslint@9.39.4(jiti@2.7.0))
@@ -20733,8 +20735,8 @@ packages:
     resolution: {integrity: sha512-q5W7tVM71e2xjHZTlgfTDoPF/SmqKG5hddq9SzR49CH2hayqRKJtQ4mtRlSxKaJlR/+9rEM+mnBHf7I2/BQcpQ==}
     engines: {node: '>=6.10'}
 
-  ts-deepmerge@6.2.0:
-    resolution: {integrity: sha512-2qxI/FZVDPbzh63GwWIZYE7daWKtwXZYuyc8YNq0iTmMUwn4mL0jRLsp6hfFlgbdRSR4x2ppe+E86FnvEpN7Nw==}
+  ts-deepmerge@8.0.0:
+    resolution: {integrity: sha512-133O+10nJmVI8w5xeVZPEv5PIrv7iaUae07wv1aH8XJH95Ur6YIhWAPhPyP1YPlbPS9fCVcNIZTu7m8urRVF0A==}
     engines: {node: '>=14.13.1'}
 
   ts-interface-checker@0.1.13:
@@ -34742,7 +34744,7 @@ snapshots:
 
   duplexer@0.1.2: {}
 
-  eas-cli@24.13.0(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@6.0.6):
+  eas-cli@24.13.0(patch_hash=1e8b890ebcdded713b541674bf5845468c6a2ca9df2f1750d90fd1b67f214585)(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@6.0.6):
     dependencies:
       '@expo/apple-utils': 2.2.1
       '@expo/code-signing-certificates': 0.0.5
@@ -34827,7 +34829,7 @@ snapshots:
       tar: 7.5.21
       tar-stream: 3.1.7
       terminal-link: 2.1.1
-      ts-deepmerge: 6.2.0
+      ts-deepmerge: 8.0.0
       tslib: 2.6.2
       turndown: 7.1.2
       untildify: 4.0.0
@@ -43721,7 +43723,7 @@ snapshots:
 
   ts-dedent@2.2.0: {}
 
-  ts-deepmerge@6.2.0: {}
+  ts-deepmerge@8.0.0: {}
 
   ts-interface-checker@0.1.13: {}
 

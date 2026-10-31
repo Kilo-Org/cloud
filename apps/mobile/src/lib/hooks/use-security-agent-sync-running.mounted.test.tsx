@@ -61,7 +61,9 @@ function isActiveCommandsKey(key: unknown, scope: 'personal' | 'org'): boolean {
   if (scope === 'personal') {
     return key[0] === 'securityAgent' && key[1] === 'listActiveCommands';
   }
-  return key[0] === 'organizations' && key[1] === 'securityAgent' && key[2] === 'listActiveCommands';
+  return (
+    key[0] === 'organizations' && key[1] === 'securityAgent' && key[2] === 'listActiveCommands'
+  );
 }
 
 function activeQueryOptions(scope: 'personal' | 'org'): QueryOptions | undefined {

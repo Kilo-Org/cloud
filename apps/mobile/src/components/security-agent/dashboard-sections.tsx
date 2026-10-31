@@ -8,10 +8,11 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
+import { severityCountPhrase } from '@/components/security-agent/severity-count-phrase';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { DENSE_ROW_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { formatNumber, formatPercent, UNMEASURED_VALUE } from '@/lib/format';
 import { type useSecurityAgentDashboardStats } from '@/lib/hooks/use-security-agent';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
@@ -169,55 +170,13 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
 
 function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
   const { t } = useTranslation();
+  // With SLA deadlines on, the metric tiles above already carry this breakdown:
+  // the compliance tile captions how many findings are within their deadline and
+  // the deadline tile captions the same severity buckets. A second copy here read
+  // the same figures twice, so the section only adds the analysis posture the
+  // tiles leave out.
   if (slaEnabled) {
-    const { overall, bySeverity } = data.sla;
-    return (
-      <SectionCard title={t('securityAgent.dashboard.slaPosture')}>
-        {/* The rows take the same frame as the codebase-risk rows below: those
-            are pressable, so `ROW_TARGET_CLASS` gives them 48 dp, and a bare
-            `KvRow` here measured 44 dp — the same row read tighter in this
-            card than in the one under it. */}
-        <KvRow
-          className={ROW_TARGET_CLASS}
-          label={t('securityAgent.dashboard.withinDeadline')}
-          value={rowValue(
-            neverSynced,
-            `${formatNumber(overall.withinSla, i18n.language)} / ${formatNumber(
-              overall.total,
-              i18n.language
-            )}`
-          )}
-        />
-        <KvRow
-          className={ROW_TARGET_CLASS}
-          label={t('securityAgent.dashboard.criticalOverdue')}
-          value={rowValue(neverSynced, formatNumber(bySeverity.critical.overdue, i18n.language))}
-          valueTone="muted"
-          dotTone={rowTone(neverSynced, bySeverity.critical.overdue > 0 ? 'danger' : 'muted')}
-        />
-        <KvRow
-          className={ROW_TARGET_CLASS}
-          label={t('securityAgent.dashboard.highOverdue')}
-          value={rowValue(neverSynced, formatNumber(bySeverity.high.overdue, i18n.language))}
-          valueTone="muted"
-          dotTone={rowTone(neverSynced, bySeverity.high.overdue > 0 ? 'danger' : 'muted')}
-        />
-        <KvRow
-          className={ROW_TARGET_CLASS}
-          label={t('securityAgent.dashboard.mediumLowOverdue')}
-          value={rowValue(
-            neverSynced,
-            formatNumber(bySeverity.medium.overdue + bySeverity.low.overdue, i18n.language)
-          )}
-          valueTone="muted"
-          dotTone={rowTone(
-            neverSynced,
-            bySeverity.medium.overdue + bySeverity.low.overdue > 0 ? 'danger' : 'muted'
-          )}
-          last
-        />
-      </SectionCard>
-    );
+    return null;
   }
 
   const analysisIncomplete = getAnalysisIncompleteCount(data.analysis);
@@ -228,34 +187,32 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
 
   return (
     <SectionCard title={t('securityAgent.dashboard.actionPosture')}>
-      {/* Same frame as the codebase-risk rows, for the same reason: one row
-          height in both cards of the posture pair. */}
       <KvRow
-        className={ROW_TARGET_CLASS}
         label={t('securityAgent.dashboard.confirmedExploitable')}
         value={rowValue(neverSynced, formatNumber(data.analysis.exploitable, i18n.language))}
         valueTone="muted"
+        valueNumeric
         dotTone={rowTone(neverSynced, 'danger')}
       />
       <KvRow
-        className={ROW_TARGET_CLASS}
         label={t('securityAgent.dashboard.needsEvidenceReview')}
         value={rowValue(neverSynced, formatNumber(data.analysis.needsReview, i18n.language))}
         valueTone="muted"
+        valueNumeric
         dotTone={rowTone(neverSynced, 'warn')}
       />
       <KvRow
-        className={ROW_TARGET_CLASS}
         label={t('securityAgent.dashboard.analysisNotComplete')}
         value={rowValue(neverSynced, formatNumber(analysisIncomplete, i18n.language))}
         valueTone="muted"
+        valueNumeric
         dotTone="muted"
       />
       <KvRow
-        className={ROW_TARGET_CLASS}
         label={t('securityAgent.dashboard.noImmediateAction')}
         value={rowValue(neverSynced, formatNumber(noImmediateAction, i18n.language))}
         valueTone="muted"
+        valueNumeric
         dotTone={rowTone(neverSynced, 'good')}
         last
       />
@@ -316,19 +273,18 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName, neverSynced }:
           onPress={() => {
             pushOnce(row.href);
           }}
+          // The row keeps `KvRow`'s own `py-3` rhythm, so its counts read as one
+          // column at the pitch every other `KvRow` group uses instead of the
+          // taller interactive-row frame. The slop carries the touch region past
+          // the design target without moving the frame the divider sits on.
+          hitSlop={DENSE_ROW_HIT_SLOP}
           className="active:opacity-70"
         >
-          {/* The frame sits on KvRow's own box, not on the wrapper: the
-              divider is that box's bottom edge, so a frame around it would
-              hold the rule above the row's bottom while the next row's
-              padding stacked below — visibly lopsided. With the frame on the
-              row, the padding above and below the label stays even and the
-              pressable still measures the full 48 dp target. */}
           <KvRow
-            className={ROW_TARGET_CLASS}
             label={row.label}
             value={rowValue(neverSynced, formatNumber(row.value, i18n.language))}
             valueTone="muted"
+            valueNumeric
             dotTone={rowTone(neverSynced, row.tone)}
             last={index === rows.length - 1}
           />
@@ -376,13 +332,13 @@ function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
             </Text>
             <Text variant="muted" className="mt-0.5 text-xs">
               {t('securityAgent.dashboard.repoSummary', {
-                open: formatNumber(repo.open, i18n.language),
-                critical: formatNumber(repo.critical, i18n.language),
-                high: formatNumber(repo.high, i18n.language),
+                open: severityCountPhrase('repoOpen', repo.open),
+                critical: severityCountPhrase('repoCritical', repo.critical),
+                high: severityCountPhrase('repoHigh', repo.high),
               })}
             </Text>
           </View>
-          <Text variant="mono" className="text-xs text-muted-foreground">
+          <Text className="text-xs text-muted-foreground tabular-nums">
             {repoTrailingLabel(repo, slaEnabled)}
           </Text>
           <DirectionalArrowRight size={14} color={colors.mutedForeground} />

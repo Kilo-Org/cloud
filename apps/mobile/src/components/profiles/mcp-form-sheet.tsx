@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +22,7 @@ import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
+import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
 const ERROR_KEYS = {
@@ -62,6 +63,12 @@ function errorKeyFor(
 }
 
 type McpFormSheetProps = Readonly<{
+  /**
+   * The form draft the fields belong to (see `lib/form-draft`). The screen
+   * passes a scope scoped to its profile, so a remount reopens the sheet on
+   * what was typed; a caller without one gets fresh fields every mount.
+   */
+  draftScope?: string;
   /** The server being edited, or `null` when adding one. */
   server: McpServerSource | null;
   /** Names of the profile's other servers, so a duplicate fails validation inline. */
@@ -85,6 +92,7 @@ type McpFormSheetProps = Readonly<{
  * per the app's iOS text-input rule; the type and enabled controls are state.
  */
 export function McpFormSheet({
+  draftScope,
   server,
   existingNames,
   isSaving,
@@ -96,13 +104,14 @@ export function McpFormSheet({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const initial = initialMcpFormState(server ?? undefined);
-  const nameRef = useRef(initial.name);
-  const commandRef = useRef(initial.command);
-  const urlRef = useRef(initial.url);
-  const configRef = useRef(initial.configJson);
-  const timeoutRef = useRef(initial.timeout);
-  const [type, setType] = useState<McpFormType>(initial.type);
-  const [enabled, setEnabled] = useState(initial.enabled);
+  const scope = draftScope;
+  const nameRef = useFormDraftRef(scope, 'name', initial.name);
+  const commandRef = useFormDraftRef(scope, 'command', initial.command);
+  const urlRef = useFormDraftRef(scope, 'url', initial.url);
+  const configRef = useFormDraftRef(scope, 'config', initial.configJson);
+  const timeoutRef = useFormDraftRef(scope, 'timeout', initial.timeout);
+  const [type, setType] = useFormDraftState<McpFormType>(scope, 'type', initial.type);
+  const [enabled, setEnabled] = useFormDraftState(scope, 'enabled', initial.enabled);
   const [error, setError] = useState<McpFormError | null>(null);
   // The screen raises the server-reported conflict after a refused save; it stays
   // up until the name changes, so it never outlives the input it describes.
@@ -191,7 +200,7 @@ export function McpFormSheet({
 
         <FormField
           label={t('profiles.mcp.name')}
-          defaultValue={initial.name}
+          defaultValue={nameRef.current}
           error={nameError}
           disabled={isSaving}
           required
@@ -209,7 +218,7 @@ export function McpFormSheet({
         {type === 'local' ? (
           <FormField
             label={t('profiles.mcp.command')}
-            defaultValue={initial.command}
+            defaultValue={commandRef.current}
             error={errorKeyFor(t, error, ['command-required', 'command-too-long'])}
             disabled={isSaving}
             required
@@ -225,7 +234,7 @@ export function McpFormSheet({
         ) : (
           <FormField
             label={t('profiles.mcp.url')}
-            defaultValue={initial.url}
+            defaultValue={urlRef.current}
             error={errorKeyFor(t, error, ['url-required', 'url-invalid', 'url-too-long'])}
             disabled={isSaving}
             required
@@ -244,7 +253,7 @@ export function McpFormSheet({
         <View className="gap-1.5" onLayout={fieldLayout('config')}>
           <FormField
             label={type === 'local' ? t('profiles.mcp.environment') : t('profiles.mcp.headers')}
-            defaultValue={initial.configJson}
+            defaultValue={configRef.current}
             error={errorKeyFor(t, error, ['json-invalid', 'record-too-large'])}
             disabled={isSaving}
             multiline
@@ -267,7 +276,7 @@ export function McpFormSheet({
 
         <FormField
           label={t('profiles.mcp.timeout')}
-          defaultValue={initial.timeout}
+          defaultValue={timeoutRef.current}
           error={errorKeyFor(t, error, ['timeout-invalid'])}
           disabled={isSaving}
           keyboardType="number-pad"

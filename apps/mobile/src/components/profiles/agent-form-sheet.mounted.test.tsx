@@ -7,6 +7,7 @@ import { type AgentSource, PERMISSION_TOOLS } from '@/components/profiles/profil
 import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
   useAvailableModels: vi.fn(),
@@ -178,9 +179,14 @@ function modelOption(id: string, variants: string[]) {
 }
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
-function mountSheet(agent: AgentSource | null, existingSlugs: readonly string[] = []) {
+function mountSheet(
+  agent: AgentSource | null,
+  existingSlugs: readonly string[] = [],
+  draftScope?: string
+) {
   return renderWithProviders(
     createElement(AgentFormSheet, {
+      draftScope,
       agent,
       existingSlugs,
       organizationId: undefined,
@@ -198,6 +204,7 @@ function mountSheet(agent: AgentSource | null, existingSlugs: readonly string[] 
 describe('AgentFormSheet parity fields', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
     h.useAvailableModels.mockReturnValue({ models: [] });
   });
 
@@ -404,6 +411,7 @@ describe('AgentFormSheet parity fields', () => {
 describe('AgentFormSheet refused save', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
     h.useAvailableModels.mockReturnValue({ models: [] });
   });
 
@@ -430,5 +438,57 @@ describe('AgentFormSheet refused save', () => {
     expect(h.onSave).not.toHaveBeenCalled();
 
     unmount();
+  });
+});
+
+describe('AgentFormSheet draft', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    h.useAvailableModels.mockReturnValue({ models: [] });
+  });
+
+  it('restores every typed field when the sheet is mounted again', async () => {
+    const first = await mountSheet(null, [], 'profiles:agents:test');
+    changeText(first.renderer.root, 'Agent slug', 'portal-agent');
+    changeText(first.renderer.root, 'Agent name', 'Portal agent');
+    changeText(first.renderer.root, 'System prompt', 'You answer the portal');
+    changeText(first.renderer.root, 'Max steps', '12');
+    first.unmount();
+
+    const second = await mountSheet(null, [], 'profiles:agents:test');
+    expect(findField(second.renderer.root, 'Agent slug').props.defaultValue).toBe('portal-agent');
+    expect(findField(second.renderer.root, 'Agent name').props.defaultValue).toBe('Portal agent');
+    expect(findField(second.renderer.root, 'System prompt').props.defaultValue).toBe(
+      'You answer the portal'
+    );
+    expect(findField(second.renderer.root, 'Max steps').props.defaultValue).toBe('12');
+    second.unmount();
+  });
+
+  it('saves the restored draft, so a remount never loses what was typed', async () => {
+    const first = await mountSheet(null, [], 'profiles:agents:test');
+    changeText(first.renderer.root, 'Agent slug', 'portal-agent');
+    changeText(first.renderer.root, 'Agent name', 'Portal agent');
+    first.unmount();
+
+    const second = await mountSheet(null, [], 'profiles:agents:test');
+    pressDone(second.renderer.root);
+
+    expect(h.onSave.mock.calls[0]?.[0]).toMatchObject({
+      slug: 'portal-agent',
+      name: 'Portal agent',
+    });
+    second.unmount();
+  });
+
+  it('a mount without a draft scope starts empty again', async () => {
+    const first = await mountSheet(null, [], 'profiles:agents:test');
+    changeText(first.renderer.root, 'Agent slug', 'portal-agent');
+    first.unmount();
+
+    const second = await mountSheet(null);
+    expect(findField(second.renderer.root, 'Agent slug').props.defaultValue).toBe('');
+    second.unmount();
   });
 });

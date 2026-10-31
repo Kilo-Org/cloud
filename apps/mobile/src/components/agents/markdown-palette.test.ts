@@ -15,6 +15,8 @@ const colors = {
   mutedForeground: '#7A756B',
   destructive: '#C25647',
   destructiveForeground: '#FFFFFF',
+  destructiveSolid: '#C25647',
+  destructiveSolidForeground: '#FFFFFF',
   border: 'rgba(20, 15, 10, 0.09)',
   switchTrack: '#8A8680',
   card: '#FFFFFF',

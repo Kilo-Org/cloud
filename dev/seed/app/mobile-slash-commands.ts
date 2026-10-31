@@ -53,7 +53,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     printUsage();
     throw new Error('one fake account email is required');
   }
-  if (!/^kilo-[a-z0-9-]+@example\.com$/.test(email)) {
+  if (!/^[a-z0-9][a-z0-9._+-]*@example\.com$/i.test(email)) {
     throw new Error(`Not a local fake account email: ${email}`);
   }
   const host = new URL(computeDatabaseUrl()).hostname;
@@ -64,11 +64,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('This fixture requires a local development database.');
   }
 
+  const normalizedEmail = email.toLowerCase();
   const db = getSeedDb();
   const [user] = await db
     .select({ id: kilocode_users.id })
     .from(kilocode_users)
-    .where(eq(kilocode_users.normalized_email, email));
+    .where(eq(kilocode_users.normalized_email, normalizedEmail));
   if (!user) {
     throw new Error(`No local account for ${email}; create it before seeding this fixture.`);
   }

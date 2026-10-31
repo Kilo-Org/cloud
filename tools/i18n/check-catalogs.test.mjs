@@ -523,6 +523,92 @@ test('rejects a plural sibling that drops a value other than its count', context
   );
 });
 
+/**
+ * The Security Agent deadline family counts with i18next's own `count`, which
+ * selects the plural category and is also read into the message. Arabic still
+ * names one and two with their own word forms, so the reviewed forms drop that
+ * numeral; an unreviewed form keeps it, and a reviewed form still may not drop a
+ * placeholder that is not the count.
+ */
+const WORDED_COUNT_ENGLISH = {
+  securityAgent: {
+    deadline: {
+      dueInDays_one: 'Due in {{count}} day',
+      dueInDays_other: 'Due in {{count}} days',
+    },
+  },
+};
+const WORDED_COUNT_SOURCE = "t('securityAgent.deadline.dueInDays', { count: 2 });";
+const WORDED_COUNT_TRANSLATED = {
+  securityAgent: {
+    deadline: {
+      dueInDays_zero: 'الأيام المتبقية للموعد: {{count}}',
+      dueInDays_one: 'مستحق بعد يوم واحد',
+      dueInDays_two: 'الموعد بعد يومين',
+      dueInDays_few: 'الموعد بعد {{count}} أيام',
+      dueInDays_many: 'الموعد بعد {{count}} يومًا',
+      dueInDays_other: 'تنتهي المهلة بعد {{count}} يوم',
+    },
+  },
+};
+
+test('accepts a reviewed worded form of a family counted with i18next’s count', context => {
+  const result = runChecker(context, {
+    english: WORDED_COUNT_ENGLISH,
+    translated: WORDED_COUNT_TRANSLATED,
+    source: WORDED_COUNT_SOURCE,
+    language: 'ar',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('rejects a dropped count in an unreviewed form of that family', context => {
+  const result = runChecker(context, {
+    english: WORDED_COUNT_ENGLISH,
+    translated: {
+      securityAgent: {
+        deadline: {
+          ...WORDED_COUNT_TRANSLATED.securityAgent.deadline,
+          dueInDays_few: 'الموعد بعد أيام',
+        },
+      },
+    },
+    source: WORDED_COUNT_SOURCE,
+    language: 'ar',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ar: "securityAgent\.deadline\.dueInDays_few" drops \{\{count\}\} without a reviewed worded form/
+  );
+});
+
+test('rejects the same worded form in a locale the allowlist does not name', context => {
+  const result = runChecker(context, {
+    english: WORDED_COUNT_ENGLISH,
+    translated: {
+      securityAgent: {
+        deadline: {
+          dueInDays_one: 'לתיקון תוך יום',
+          dueInDays_two: 'המועד האחרון בעוד יומיים',
+          dueInDays_many: 'נותרו {{count}} ימים למועד האחרון',
+          dueInDays_other: 'נותרו {{count}} ימים למועד האחרון',
+        },
+      },
+    },
+    source: WORDED_COUNT_SOURCE,
+    language: 'he',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  // The dual has no English sibling, so only the reviewed-form allowance could
+  // accept it: a Hebrew entry must not ride on the Arabic one.
+  assert.match(
+    result.stderr,
+    /mobile\/he: "securityAgent\.deadline\.dueInDays_two" drops \{\{count\}\} without a reviewed worded form/
+  );
+});
+
 const COUNTED = {
   counts: {
     items: '{{count}} items',
@@ -615,6 +701,104 @@ test('still rejects an unrelated extra key beside a counted family', context => 
   });
   assert.equal(result.status, 1, result.stderr);
   assert.match(result.stderr, /mobile\/ru: extra key "counts\.stray" is not in en\.json/);
+});
+
+/**
+ * Two dashboard lines render the same bucket in their own wording: the
+ * repository row and the deadline breakdown. English spells the bucket once, so
+ * both keys hold one string; a catalog may still word them apart, and may still
+ * inflect one family's own categories.
+ */
+const BUCKET_PHRASES = {
+  securityAgent: {
+    dashboard: {
+      title: 'Dashboard',
+      repoSummaryCritical: '{{displayCount}} critical',
+      repoSummaryCritical_one: '{{displayCount}} critical',
+      repoSummaryCritical_other: '{{displayCount}} critical',
+      repoSummaryOpen: '{{displayCount}} open',
+      repoSummaryOpen_one: '{{displayCount}} open',
+      repoSummaryOpen_other: '{{displayCount}} open',
+    },
+    dashboardMetrics: {
+      breakdownCritical: '{{displayCount}} critical',
+      breakdownCritical_one: '{{displayCount}} critical',
+      breakdownCritical_other: '{{displayCount}} critical',
+      breakdownHigh: '{{displayCount}} high',
+      breakdownHigh_one: '{{displayCount}} high',
+      breakdownHigh_other: '{{displayCount}} high',
+    },
+  },
+};
+const BUCKET_SOURCE = [
+  "t('securityAgent.dashboard.title');",
+  "t('securityAgent.dashboard.repoSummaryCritical', { count: 1, displayCount: '1' });",
+  "t('securityAgent.dashboard.repoSummaryOpen', { count: 1, displayCount: '1' });",
+  "t('securityAgent.dashboardMetrics.breakdownCritical', { count: 1, displayCount: '1' });",
+  "t('securityAgent.dashboardMetrics.breakdownHigh', { count: 1, displayCount: '1' });",
+].join('\n');
+
+test('accepts the two lines wording one bucket apart', context => {
+  const result = runChecker(context, {
+    english: BUCKET_PHRASES,
+    translated: {
+      securityAgent: {
+        dashboard: {
+          title: 'Painel',
+          repoSummaryCritical: '{{displayCount}} críticas',
+          repoSummaryCritical_one: '{{displayCount}} crítica',
+          repoSummaryCritical_other: '{{displayCount}} críticas',
+          repoSummaryOpen: '{{displayCount}} abertas',
+          repoSummaryOpen_one: '{{displayCount}} aberta',
+          repoSummaryOpen_other: '{{displayCount}} abertas',
+        },
+        dashboardMetrics: {
+          breakdownCritical: '{{displayCount}} críticos',
+          breakdownCritical_one: '{{displayCount}} crítico',
+          breakdownCritical_other: '{{displayCount}} críticos',
+          breakdownHigh: '{{displayCount}} de nível alto',
+          breakdownHigh_one: '{{displayCount}} de nível alto',
+          breakdownHigh_other: '{{displayCount}} de nível alto',
+        },
+      },
+    },
+    source: BUCKET_SOURCE,
+    // Norwegian Bokmål asks for one and other, so the fixture states only the
+    // categories its own plural rules require.
+    language: 'nb',
+  });
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test('still rejects two unrelated families worded apart', context => {
+  const english = {
+    agents: {
+      title: 'Agents',
+      liveCount_one: '{{count}} live session',
+      liveCount_other: '{{count}} live sessions',
+      heldCount_one: '{{count}} live session',
+      heldCount_other: '{{count}} live sessions',
+    },
+  };
+  const result = runChecker(context, {
+    english,
+    translated: {
+      agents: {
+        title: 'Localized agents',
+        liveCount_one: '{{count}} localized session',
+        liveCount_few: '{{count}} localized sessions (few)',
+        liveCount_many: '{{count}} localized sessions (many)',
+        liveCount_other: '{{count}} localized sessions',
+        heldCount_one: '{{count}} held session',
+        heldCount_few: '{{count}} held sessions (few)',
+        heldCount_many: '{{count}} held sessions (many)',
+        heldCount_other: '{{count}} held sessions',
+      },
+    },
+    source: `${SOURCE}\nt('agents.heldCount', { count: 2 });`,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /is translated 2 ways/);
 });
 
 const AGENT_EDITOR = {

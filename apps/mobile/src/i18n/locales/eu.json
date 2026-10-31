@@ -330,7 +330,7 @@
       "diffTooLarge": "diferentziak handiegiak dira",
       "openFile": "Ireki {{path}}",
       "openFileViewed": "Ireki {{path}} (ikusita)",
-      "title": "Fitxategi"
+      "title": "Fitxategiak"
     },
     "fileRows": {
       "markViewed": "Markatu {{path}} ikusitako gisa",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "Ikuspegi orokorra",
-      "files": "Fitxategi",
+      "files": "Fitxategiak",
       "discussion": "Eztabaida"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "Atera argazkia",
       "photoLibrary": "Argazki-bilduma",
-      "files": "Fitxategi",
+      "files": "Fitxategiak",
       "cameraAccessMessage": "Eman kamera erabiltzeko baimena ezarpenetan, argazki bat ateratzeko."
     },
     "typingIndicator": {
@@ -1753,17 +1753,12 @@
       "findingsCount": "{{displayCount}} aurkikuntza",
       "notMeasured": "Neurtu gabe",
       "actFirst": "Lehentasunezko ekintzak",
-      "slaPosture": "SLAren egoera",
       "actionPosture": "Ekintzen egoera",
       "codebaseRisk": "Kode-basearen arriskua",
       "repositoryActionPlan": "Biltegiaren ekintza-plana",
       "noOpenFindings": "Ez dago arreta behar duen aurkikuntza irekirik",
       "deadlineToday": "Epea gaur bete da",
       "daysOverdue": "{{displayCount}} egun atzeratuta",
-      "withinDeadline": "Epearen barruan",
-      "criticalOverdue": "Kritikoak epez kanpo",
-      "highOverdue": "Larritasun handikoak epez kanpo",
-      "mediumLowOverdue": "Larritasun ertainekoak eta txikikoak epez kanpo",
       "confirmedExploitable": "Ustia daitekeela baieztatuta",
       "needsEvidenceReview": "Frogak berrikusi behar dira",
       "analysisNotComplete": "Azterketa amaitu gabe",
@@ -1773,7 +1768,16 @@
       "noSlaDeadline": "Ez dago SLAren epemugarik esleituta",
       "noRepositoryData": "Oraindik ez dago biltegi-daturik",
       "noRepositoryDataDescription": "Biltegien lehentasunak aurkikuntzak sinkronizatu ondoren agertuko dira.",
-      "repoSummary": "{{open}} irekita · {{critical}} kritiko · {{high}} larritasun handiko",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "{{displayCount}} irekita",
+      "repoSummaryOpen_one": "{{displayCount}} irekita",
+      "repoSummaryOpen_other": "{{displayCount}} irekita",
+      "repoSummaryCritical": "{{displayCount}} kritiko",
+      "repoSummaryCritical_one": "{{displayCount}} kritiko",
+      "repoSummaryCritical_other": "{{displayCount}} kritiko",
+      "repoSummaryHigh": "{{displayCount}} larritasun handiko",
+      "repoSummaryHigh_one": "{{displayCount}} larritasun handiko",
+      "repoSummaryHigh_other": "{{displayCount}} larritasun handiko",
       "couldNotLoad": "Ezin izan dira paneleko datuak kargatu.",
       "filterByRepository": "Iragazi biltegiaren arabera",
       "lastSynced": "Azken sinkronizazioa: {{time}}",
@@ -1798,8 +1802,17 @@
       "withinDeadlineDetail": "{{total}} aurkikuntzatik {{within}} epearen barruan",
       "noDeadlineData": "Oraindik ez dago SLAren epemuga duen aurkikuntzarik",
       "deadlinePassed": "Epea gainditu da",
-      "deadlinePassedDetail": "{{critical}} kritiko, {{high}} larritasun altuko",
-      "deadlinePassedDetailWithMediumLow": "{{critical}} kritiko, {{high}} larritasun altuko, {{mediumLow}} larritasun ertaineko eta txikiko",
+      "deadlinePassedDetail": "{{critical}}, {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
+      "breakdownCritical": "{{displayCount}} kritiko",
+      "breakdownCritical_one": "{{displayCount}} kritiko",
+      "breakdownCritical_other": "{{displayCount}} kritiko",
+      "breakdownHigh": "{{displayCount}} larritasun altuko",
+      "breakdownHigh_one": "{{displayCount}} larritasun altuko",
+      "breakdownHigh_other": "{{displayCount}} larritasun altuko",
+      "breakdownMediumLow": "{{displayCount}} larritasun ertaineko eta txikiko",
+      "breakdownMediumLow_one": "{{displayCount}} larritasun ertaineko eta txikiko",
+      "breakdownMediumLow_other": "{{displayCount}} larritasun ertaineko eta txikiko",
       "dueThisWeek": "Aste honetan amaitzen da",
       "dueThisWeekDetail": "Horietatik {{exploitable}} ustiagarri direla baieztatuta",
       "noDeadline": "Eperik gabe",
@@ -1859,7 +1872,6 @@
       "repositoriesCount_one": "{{displayCount}} biltegi hautatuta",
       "repositoriesCount": "{{displayCount}} biltegi hautatuta",
       "repositoriesCount_other": "{{displayCount}} biltegi hautatuta",
-      "selectRepositoriesSubtitle": "Hautatu segurtasun-agenteak zein biltegiren jarraipena egingo duen",
       "analysisModeSubtitle": "Azterketa: {{mode}}",
       "automationAllOff": "Guztiak desgaituta",
       "automationCount": "3tik {{displayCount}} gaituta",
@@ -2755,7 +2767,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Argazki-bilduma",
-      "files": "Fitxategi",
+      "files": "Fitxategiak",
       "couldNotOpenPhotoPicker": "Ezin izan da argazki-hautatzailea ireki. Berrabiarazi Kilo eta saiatu berriro.",
       "maxFilesAllowed": "Gehienez {{displayCount}} fitxategi onartzen dira.",
       "onlyAddingFiles": "{{total}} fitxategietatik {{accepted}} bakarrik gehitzen (gehienez {{max}})",
@@ -3138,7 +3150,7 @@
     "couldNotSaveChoice": "Ezin izan da zure aukera gorde. Saiatu berriro.",
     "onlineAllowed": "Linean, baimenduta",
     "onlineNotAllowed": "Linean, baimendu gabe",
-    "optionalReview": "Aukerakoa — edonoiz alda dezakezu ezarpenetan",
+    "optionalReview": "Aukerakoa",
     "optionalOnboarding": "Aukerakoa — gaituta, zuk desgaitzen ez baduzu",
     "aiProvidersWhat": "Zure eskaerak, elkarrizketa-historia eta erantsitako fitxategi guztiak.",
     "aiProvidersWhy": "AI erantzunak sortzeko.",
@@ -3964,7 +3976,8 @@
       "nameRequired": "Sartu komando-izen bat",
       "nameInvalid": "Izenak letra xehe batekin hasi behar du eta letra xeheak, zifrak eta marra baino ez ditu erabili",
       "templateRequired": "Sartu komando txantiloia",
-      "nameConflict": "Izen hori barneko komando batek erreserbatzen du"
+      "nameConflict": "Izen hori barneko komando batek erreserbatzen du",
+      "duplicateName": "Izen hori duen komando bat badago lehendik profil honetan"
     },
     "repoBindings": {
       "title": "Repos-en profil lehenetsiak",

@@ -114,19 +114,47 @@ const TWO_SENSE_COPY = new Map([
   ['files', 'the files in a pull request, versus the iOS Files app in the attachment picker'],
   ['plan', 'a billing plan, versus the agent plan mode'],
   ['copied', 'a file copied in a diff, versus the toast after a copy to the clipboard'],
+  [
+    '{{displaycount}} critical',
+    "the repository row's bucket phrase, which agrees with the wording that row already uses, versus the deadline breakdown line's bucket phrase, which agrees with its own",
+  ],
+  [
+    '{{displaycount}} high',
+    "the repository row's bucket phrase, which agrees with the wording that row already uses, versus the deadline breakdown line's bucket phrase, which agrees with its own",
+  ],
 ]);
 
 /**
  * Counted forms that say their number as a word instead of the visible count
  * placeholder, as `base key:plural category:locale`. Arabic names one day and
- * two days with their own word forms, so those two messages read as words and
- * carry no numeral. Every other form of a counted family must keep its
- * language's exact placeholder set, so a count deleted from a form that should
- * show it still fails. Add an entry only after reading the rendered message.
+ * two days with their own word forms, and the singular and dual of any counted
+ * noun inflect for the number, so those messages read as words and carry no
+ * numeral. Every other form of a counted family must keep its language's exact
+ * placeholder set, so a count deleted from a form that should show it still
+ * fails. Add an entry only after reading the rendered message.
  */
 const WORDED_COUNTS = new Set([
   'securityAgent.dashboard.daysOverdue:one:ar',
   'securityAgent.dashboard.daysOverdue:two:ar',
+  'securityAgent.deadline.overdue:one:ar',
+  'securityAgent.deadline.overdue:two:ar',
+  'securityAgent.deadline.dueInDays:one:ar',
+  'securityAgent.deadline.dueInDays:two:ar',
+  'securityAgent.automation.queued:one:ar',
+  'securityAgent.automation.queued:two:ar',
+  'securityAgent.settingsOverview.repositoriesCount:one:ar',
+  'securityAgent.settingsOverview.repositoriesCount:two:ar',
+  'agentChat.partRenderer.updatedFileCount:one:ar',
+  'agentChat.partRenderer.updatedFileCount:two:ar',
+  'agentChat.olderMessages.omitted:two:ar',
+  'agentChat.contextUsage.stepsCount:one:ar',
+  'agentChat.contextUsage.stepsCount:two:ar',
+  'agentChat.contextUsage.modelsCount:two:ar',
+  'prReview.discussion.comment:two:ar',
+  'prReview.hunkRows.fileLoadedCount:two:ar',
+  'prReview.hunkRows.fileLoadedOfTotalCount:two:ar',
+  'organization.kiloPass.paidSeat:one:ar',
+  'organization.kiloPass.paidSeat:two:ar',
 ]);
 
 /**
@@ -201,6 +229,21 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // from localized placeholders, with no translatable words.
   'agentBriefing.atLeast',
   'agentBriefing.window',
+]);
+
+/**
+ * Counted bucket phrases that two dashboard lines render. The repository row
+ * and the deadline breakdown name the same bucket in their own wording (pt-BR
+ * says "críticas" on the row and "críticos" in the breakdown), so those keys
+ * carry the same English string on purpose and a catalog may translate the two
+ * apart. Every other pair of keys holding one English string still has to
+ * agree.
+ */
+const PER_LINE_BUCKET_PHRASES = new Set([
+  'securityAgent.dashboard.repoSummaryCritical',
+  'securityAgent.dashboardMetrics.breakdownCritical',
+  'securityAgent.dashboard.repoSummaryHigh',
+  'securityAgent.dashboardMetrics.breakdownHigh',
 ]);
 
 /** The supported tags, read from the one source of truth. */
@@ -533,6 +576,15 @@ function pluralBaseKey(key) {
 }
 
 /**
+ * The placeholders a counted family uses for the number it counts: the
+ * interpolated figure (`displayCount`, `itemCount`), i18next's own `count`,
+ * which selects the plural category and can also be read into the message, and
+ * the one family that names its figure itself (`steps`). Only a reviewed worded
+ * form may drop one of them.
+ */
+const COUNT_PLACEHOLDERS = new Set(['count', 'displayCount', 'itemCount', 'steps']);
+
+/**
  * The visible-count placeholders an English family declares, e.g.
  * `displayCount`. A translated form must carry each one unless a reviewed
  * worded form spells the number out instead.
@@ -544,7 +596,7 @@ function familyVisibleCounts(english, base) {
       continue;
     }
     for (const name of placeholders(value).split(',').filter(Boolean)) {
-      if (name === 'displayCount' || name === 'itemCount') {
+      if (COUNT_PLACEHOLDERS.has(name)) {
         names.add(name);
       }
     }
@@ -847,14 +899,14 @@ for (const catalog of CATALOGS) {
       const wordedForm = Boolean(
         parts && WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`)
       );
-      const droppedVisibleCount = expectedSet
+      const droppedCount = expectedSet
         .filter(name => !actualSet.includes(name))
-        .every(name => name === 'displayCount' || name === 'itemCount');
+        .every(name => COUNT_PLACEHOLDERS.has(name));
       const addedPlaceholder = actualSet.some(name => !expectedSet.includes(name));
       if (
         actual !== expected &&
         !addsFamilyPlaceholderOnly(english, key, actual, expected) &&
-        !(wordedForm && droppedVisibleCount && !addedPlaceholder)
+        !(wordedForm && droppedCount && !addedPlaceholder)
       ) {
         fail(`${label}: "${key}" placeholders differ from English (${expected || 'none'})`);
       }
@@ -934,11 +986,27 @@ for (const catalog of CATALOGS) {
     // One wording per English string.
     const exceptions = new Set(WORDING_EXCEPTIONS[tag] ?? []);
     for (const [source, keys] of sharedWordings) {
-      if (exceptions.has(source)) {
+      if (
+        exceptions.has(source) ||
+        keys.every(key => PER_LINE_BUCKET_PHRASES.has(pluralBaseKey(key)))
+      ) {
         continue;
       }
       const variants = new Map();
-      for (const key of keys) {
+      // A plural family's own categories carry this language's forms for the
+      // counts it distinguishes, so they differ by design. One member of each
+      // family speaks for it here: its flat base key when the group has one,
+      // otherwise its first category.
+      const representative = new Map();
+      for (const key of [...keys].sort(
+        (a, b) => Number(pluralParts(a) !== null) - Number(pluralParts(b) !== null)
+      )) {
+        const base = pluralBaseKey(key);
+        if (!representative.has(base)) {
+          representative.set(base, key);
+        }
+      }
+      for (const key of representative.values()) {
         const value = translated.get(key);
         if (value === undefined) {
           continue;

@@ -27,12 +27,8 @@ export type VariableRow = Readonly<{
   maskedValue: string;
 }>;
 
-/**
- * The dot run a hidden secret renders instead of its value. Short on purpose:
- * the row gives the key the spare width, and the placeholder matches the dot
- * run the localized hints already name.
- */
-export const SECRET_MASK = '••••';
+/** The dot run a hidden secret renders instead of its value. */
+export const SECRET_MASK = '••••••';
 
 /**
  * Render rows from the profile's variables. A secret is masked by default: the

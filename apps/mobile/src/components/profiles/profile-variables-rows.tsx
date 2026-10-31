@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -18,6 +18,7 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ICON_TARGET_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { cn } from '@/lib/utils';
 
 /** Content-shaped rows in the same slot and height as a loaded variable row. */
@@ -116,11 +117,9 @@ export function VariableRowView({
           {row.key}
         </Text>
         {row.isSecret && onToggleReveal === undefined ? (
-          /* The masked run is a fixed short placeholder, so it is rendered
-             without a width cap or a single-line limit: it always paints in
-             full and ends at the same edge as a plain value, and the key keeps
-             the rest of the row. */
-          <View className="shrink-0 flex-row items-center gap-1">
+          // The mask is a fixed run of dots, so it never truncates: a clipped
+          // mask reads as a cut-off value instead of a hidden one.
+          <View className="flex-row items-center gap-1">
             <Lock size={12} color={colors.mutedForeground} />
             <Text
               className="text-xs text-muted-foreground"
@@ -170,6 +169,13 @@ type VariableEditFormProps = Readonly<{
   isNew: boolean;
   initial: VariableEdit;
   /**
+   * The form draft the fields belong to (see `lib/form-draft`). A screen passes
+   * a scope scoped to its profile so the typed key, value and secret survive a
+   * remount; a caller that owns no draft leaves it out and gets fresh fields
+   * every mount.
+   */
+  draftScope?: string;
+  /**
    * The profile's stored keys, so a new key that cleans onto an existing one is
    * refused rather than silently overwriting it (the server upserts on
    * `(profile_id, key)`). Ignored for an edit, whose key is fixed.
@@ -205,6 +211,7 @@ type VariableEditFormProps = Readonly<{
 export function VariableEditForm({
   isNew,
   initial,
+  draftScope,
   existingKeys = [],
   isSaving,
   requireValue = false,
@@ -214,14 +221,19 @@ export function VariableEditForm({
 }: VariableEditFormProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const keyRef = useRef(initial.key);
-  const valueRef = useRef(initial.value);
-  const [isSecret, setIsSecret] = useState(initial.isSecret);
-  const [revealed, setRevealed] = useState(false);
+  // A caller that passes no draft scope gets plain per-mount fields, so a form
+  // that must start empty, such as the new-session config, never inherits the
+  // text of the last time it was opened.
+  const keyRef = useFormDraftRef(draftScope, 'key', initial.key);
+  const valueRef = useFormDraftRef(draftScope, 'value', initial.value);
+  const [isSecret, setIsSecret] = useFormDraftState(draftScope, 'isSecret', initial.isSecret);
+  const [revealed, setRevealed] = useFormDraftState(draftScope, 'revealed', false);
   const [error, setError] = useState<VariableInputError | null>(null);
   // The key a save will store, when it differs from what the field holds. An
   // edit keeps its stored key, so only an add can change it.
-  const [keyPreview, setKeyPreview] = useState<string | null>(null);
+  const [keyPreview, setKeyPreview] = useState<string | null>(() =>
+    isNew ? variableKeyPreview(keyRef.current) : null
+  );
 
   const valuePlaceholder = valueFieldPlaceholder(t, isSecret, isNew);
   // An edit's key is stored, so only an add can collide with the profile's keys.
@@ -248,7 +260,7 @@ export function VariableEditForm({
       <View className="gap-1.5">
         <FormField
           label={t('profiles.keyLabel')}
-          defaultValue={initial.key}
+          defaultValue={keyRef.current}
           disabled={!isNew}
           required
           autoCapitalize="characters"
@@ -277,7 +289,7 @@ export function VariableEditForm({
       <FormField
         label={t('profiles.valueLabel')}
         placeholder={valuePlaceholder}
-        defaultValue={initial.value}
+        defaultValue={valueRef.current}
         maxLength={maxValueLength}
         secureTextEntry={isSecret && !revealed}
         autoCapitalize="none"

@@ -51,7 +51,6 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   Pressable: 'Pressable',
   View: 'View',
-  ActivityIndicator: 'ActivityIndicator',
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
@@ -359,10 +358,9 @@ describe('VoiceInputSettingsScreen', () => {
       throw new Error('ScrollView not found');
     }
     // The test field sits at the bottom of the content. The native iOS inset
-    // reserves the IME and reveals the focused field, which is exactly what
-    // AGENTS.md requires of an input screen (the shared scroll view lets the
-    // native inset own the keyboard for callers that set this, so it is
-    // reserved once).
+    // reserves the IME and reveals the focused field, as AGENTS.md requires of
+    // an input screen; the shared scroll view lets the native inset own the
+    // keyboard for callers that set this, so it is reserved once.
     expect(scroll.props.automaticallyAdjustKeyboardInsets).toBe(true);
     // With the keyboard up, the default ('never') spends the first tap on the
     // Clear control dismissing the keyboard, so the text survives the tap

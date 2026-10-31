@@ -1,7 +1,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { WrapperBootstrapError } from '../bootstrap-error.js';
+import { workspaceBootstrapError } from '../bootstrap-error.js';
+import type { ControlPlaneRouteSpec } from '../../../src/shared/control-plane-protocol.js';
 import { gitOperationError } from '../git-errors.js';
+import { isSyntheticReviewRef } from '../git-review-ref.js';
 import type { ExecResult } from '../utils.js';
 
 /** Runs one git command in the workspace; network commands retry inside it. */
@@ -9,49 +11,42 @@ export type WorkspaceGit = (args: string[], options?: { network?: true }) => Pro
 
 type Redact = (text: string) => string;
 
-function failure(
-  result: ExecResult,
-  operation: 'clone' | 'checkout',
-  redact: Redact
-): WrapperBootstrapError {
-  return gitOperationError(result, operation, redact);
-}
-
-/**
- * Bring a repository restored from a snapshot to the state a fresh clone has, so
- * the ordinary branch logic then behaves the same on both paths:
- *
- * 1. point `origin` at this route's canonical, credential-free URL. Git
- *    authenticates through the platform's credential helper, never the remote URL;
- * 2. fetch, pruning refs the remote dropped, and refresh the remote default;
- * 3. detach at the remote default branch, so a new branch starts from its tip;
- * 4. drop every local branch. The builder's default branch would otherwise shadow
- *    a newer `origin/<branch>`.
- *
- * Any failure throws and the caller falls back to a clone.
- */
 export async function refreshAdoptedRepository(input: {
   git: WorkspaceGit;
   remoteUrl: string;
   redact: Redact;
-}): Promise<void> {
+  branch?: string;
+  branchMode?: ControlPlaneRouteSpec['branchMode'];
+}): Promise<string | undefined> {
   const { git, remoteUrl, redact } = input;
-  const steps: Array<{ args: string[]; network?: true }> = [
-    { args: ['remote', 'set-url', 'origin', remoteUrl] },
-    { args: ['fetch', '--prune', 'origin'], network: true },
-    { args: ['remote', 'set-head', 'origin', '--auto'], network: true },
-    { args: ['checkout', '--detach', 'origin/HEAD'] },
-  ];
-  for (const step of steps) {
-    const result = await git(step.args, step.network ? { network: true } : undefined);
-    if (result.exitCode !== 0) throw failure(result, 'checkout', redact);
+  async function checked(args: string[], options?: { network?: true }): Promise<void> {
+    const result = await git(args, options);
+    if (result.exitCode === 0) return;
+    const error = gitOperationError(result, 'checkout', redact);
+    const operation = args[0] === 'remote' ? `remote ${args[1]}` : args[0];
+    error.message = `${error.message} (git ${operation})`;
+    throw error;
   }
-  const listed = await git(['for-each-ref', '--format=%(refname:short)', 'refs/heads']);
-  if (listed.exitCode !== 0) throw failure(listed, 'checkout', redact);
-  const branches = listed.stdout.split('\n').filter(name => name.length > 0);
-  if (branches.length === 0) return;
-  const deleted = await git(['branch', '-D', ...branches]);
-  if (deleted.exitCode !== 0) throw failure(deleted, 'checkout', redact);
+
+  await checked(['remote', 'set-url', 'origin', remoteUrl]);
+  await checked(['fetch', '--prune', 'origin'], { network: true });
+  if (input.branch) {
+    if (isSyntheticReviewRef(input.branch) && input.branchMode !== 'working') return undefined;
+    const remoteRef = `refs/remotes/origin/${input.branch}`;
+    const found = await git(['show-ref', '--verify', '--quiet', remoteRef]);
+    if (found.exitCode === 0) return remoteRef;
+    if (found.exitCode !== 1) throw gitOperationError(found, 'checkout', redact);
+    if (input.branchMode !== 'working') {
+      throw workspaceBootstrapError(
+        'git_branch_missing',
+        'Requested repository branch was not found',
+        undefined,
+        false
+      );
+    }
+  }
+  await checked(['remote', 'set-head', 'origin', '--auto'], { network: true });
+  return 'refs/remotes/origin/HEAD';
 }
 
 /**
@@ -86,17 +81,4 @@ export async function stripGitCredentials(input: {
 export async function truncateWrapperLog(logPath: string | undefined): Promise<void> {
   if (logPath === undefined || logPath.length === 0) return;
   await fs.truncate(logPath, 0).catch(() => undefined);
-}
-
-/**
- * Remove a workspace so it can be cloned again. Refuses a path that is not a
- * dedicated directory, because the path comes from the route spec.
- */
-export async function emptyWorkspaceDirectory(directory: string): Promise<void> {
-  const resolved = path.resolve(directory);
-  const { root } = path.parse(resolved);
-  if (resolved === root || path.dirname(resolved) === root) {
-    throw new Error('Refusing to empty a top-level directory');
-  }
-  await fs.rm(resolved, { recursive: true, force: true });
 }

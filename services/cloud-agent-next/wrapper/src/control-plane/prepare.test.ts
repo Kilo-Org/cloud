@@ -514,7 +514,6 @@ describe('replacement workspace local recovery', () => {
     await new Promise(resolve => setTimeout(resolve, 20));
     // The sibling is queued behind the held lock: no adoption, no emptying, and
     // no second import started.
-    expect(harness.emptyCalls).toHaveLength(0);
     expect(harness.ensureCalls()).toBe(ensureDuringHold);
     expect(harness.restoreCalls()).toBe(restoreDuringHold);
     releaseImport();
@@ -645,7 +644,6 @@ type Harness = {
   setStamp: (value: WorkspaceStamp | null) => void;
   stamp: () => WorkspaceStamp | null;
   setHasGit: (value: boolean) => void;
-  emptyCalls: string[];
   setSetupResult: (value: ExecResult) => void;
   setSetupOutput: (
     value: (onOutput: (stream: ProcessOutputStream, output: string) => void) => void
@@ -713,7 +711,6 @@ function createHarness(
     | undefined;
   let stamp: WorkspaceStamp | null = null;
   let hasGitState = options.hasGit ?? false;
-  const emptyCalls: string[] = [];
   const unavailableKeys = new Set<string>();
   let activeClones = 0;
   let maxActiveClones = 0;
@@ -816,11 +813,6 @@ function createHarness(
     readStamp: async () => stamp,
     writeStamp: async (_directory, value) => {
       stamp = value;
-    },
-    emptyDirectory: async directory => {
-      emptyCalls.push(directory);
-      hasGitState = false;
-      stamp = null;
     },
     mkdir: async () => undefined,
     configureGitAuthor: async (_directory, _runGit, author) => {
@@ -929,7 +921,6 @@ function createHarness(
     setHasGit: value => {
       hasGitState = value;
     },
-    emptyCalls,
     setSetupResult: value => {
       setupResult = value;
     },
@@ -1409,7 +1400,6 @@ describe('createPreparationManager', () => {
         if (args[0] !== 'clone') return result(0);
         clones++;
         if (clones === 1) return result(128, 'fatal: server does not support filter');
-        expect(harness.emptyCalls).toEqual([]);
         return result(0);
       });
 
@@ -1517,7 +1507,6 @@ describe('createPreparationManager', () => {
           })
         );
         expect(harness.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(1);
-        expect(harness.emptyCalls).toEqual([]);
         expect(lastFrame(harness.frames)?.type).toBe('session.failed');
       }
     );
@@ -2553,8 +2542,6 @@ describe('adopting an environment snapshot', () => {
     harness.setStamp(FOREIGN_STAMP);
     harness.setGit(args => {
       if (args[0] === 'show-ref') return result(1);
-      if (args[0] === 'for-each-ref')
-        return { stdout: 'main\nsession/old\n', stderr: '', exitCode: 0 };
       if (args[0] === 'rev-parse') return { stdout: 'new-commit\n', stderr: '', exitCode: 0 };
       return result(0);
     });
@@ -2573,19 +2560,22 @@ describe('adopting an environment snapshot', () => {
     expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
     const setUrl = harness.gitCalls.find(args => args[0] === 'remote' && args[1] === 'set-url');
     expect(setUrl?.[3]).toBe(REPO);
-    expect(gitKinds(harness.gitCalls).slice(0, 7)).toEqual([
+    expect(gitKinds(harness.gitCalls).slice(0, 4)).toEqual([
       'remote set-url',
       'fetch',
       'remote set-head',
       'checkout',
-      'for-each-ref',
-      'branch',
-      'show-ref',
     ]);
     expect(harness.gitCalls).toContainEqual(['fetch', '--prune', 'origin']);
-    expect(harness.gitCalls).toContainEqual(['checkout', '--detach', 'origin/HEAD']);
-    expect(harness.gitCalls).toContainEqual(['branch', '-D', 'main', 'session/old']);
-    expect(harness.gitCalls).toContainEqual(['checkout', '--progress', '-b', 'session/scope-1']);
+    expect(harness.gitCalls.some(args => args[0] === 'branch')).toBe(false);
+    expect(harness.gitCalls).toContainEqual([
+      'checkout',
+      '--progress',
+      '--no-track',
+      '-B',
+      'session/scope-1',
+      'refs/remotes/origin/HEAD',
+    ]);
     expect(harness.authorCalls).toEqual([{ name: 'A', email: 'a@b.c' }]);
     expect(progressSteps(harness.frames)).toEqual([
       'restore',
@@ -2600,7 +2590,6 @@ describe('adopting an environment snapshot', () => {
       sessionId: spec.sessionId,
       workspace: 'adopted',
     });
-    expect(harness.emptyCalls).toEqual([]);
   });
 
   it('adopts a stamp written by a snapshot-capturing wrapper', async () => {
@@ -2616,6 +2605,7 @@ describe('adopting an environment snapshot', () => {
 
   it('checks out an explicit branch with the ordinary branch logic', async () => {
     const harness = adoptHarness();
+    harness.setGit(() => result(0));
     const spec = routeSpec({ git: { url: REPO }, branch: 'feature/x' });
 
     await harness.manager.prepare(spec);
@@ -2625,8 +2615,11 @@ describe('adopting an environment snapshot', () => {
       '--progress',
       '-B',
       'feature/x',
-      'origin/feature/x',
+      'refs/remotes/origin/feature/x',
     ]);
+    expect(harness.gitCalls.some(args => args[0] === 'remote' && args[1] === 'set-head')).toBe(
+      false
+    );
     expect(lastFrame(harness.frames)).toMatchObject({
       type: 'session.ready',
       workspace: 'adopted',
@@ -2638,7 +2631,6 @@ describe('adopting an environment snapshot', () => {
     harness.setGit(args => {
       if (args[0] === 'show-ref' && args[3]?.startsWith('refs/heads/')) return result(1);
       if (args[0] === 'show-ref' && args[3]?.startsWith('refs/remotes/')) return result(0);
-      if (args[0] === 'for-each-ref') return { stdout: '', stderr: '', exitCode: 0 };
       return result(0);
     });
     const spec = routeSpec({
@@ -2652,10 +2644,9 @@ describe('adopting an environment snapshot', () => {
     expect(harness.gitCalls).toContainEqual([
       'checkout',
       '--progress',
-      '-b',
+      '-B',
       'session/scope-1',
-      '--track',
-      'origin/session/scope-1',
+      'refs/remotes/origin/session/scope-1',
     ]);
     expect(harness.gitCalls.some(args => args[0] === 'branch')).toBe(false);
     expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'adopted' });
@@ -2684,7 +2675,7 @@ describe('adopting an environment snapshot', () => {
     expect(harness.stamp()).toEqual(FOREIGN_STAMP);
   });
 
-  it('falls back to a clone when the fetch fails', async () => {
+  it('preserves the snapshot and reports the fetch failure without cloning', async () => {
     const harness = adoptHarness();
     harness.setGit(args => {
       if (args[0] === 'fetch') return result(1, 'fatal: repository not found');
@@ -2695,20 +2686,23 @@ describe('adopting an environment snapshot', () => {
 
     await harness.manager.prepare(spec);
 
-    expect(harness.emptyCalls).toEqual([spec.directory]);
-    expect(harness.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(1);
-    expect(progressSteps(harness.frames)).toEqual([
-      'restore',
-      'clone',
-      'checkout',
-      'kilo_runtime',
-      'kilo_session',
-    ]);
-    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready', workspace: 'cloned' });
-    expect(harness.stamp()?.allocationId).toBe('alloc-current');
+    expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
+    expect(progressSteps(harness.frames)).toEqual(['restore']);
+    expect(lastFrame(harness.frames)).toMatchObject({
+      type: 'session.failed',
+      step: 'restore',
+    });
+    expect(
+      harness.logs.some(
+        line =>
+          line.includes('Repository checkout failed (git fetch)') &&
+          line.includes('matcher=unmatched')
+      )
+    ).toBe(true);
+    expect(harness.stamp()).toEqual(FOREIGN_STAMP);
   });
 
-  it('retries a network failure of the fetch before it falls back', async () => {
+  it('retries a network failure of the fetch before adopting', async () => {
     const harness = adoptHarness();
     let fetches = 0;
     harness.setGit(args => {
@@ -2723,11 +2717,52 @@ describe('adopting an environment snapshot', () => {
     await harness.manager.prepare(routeSpec({ git: { url: REPO } }));
 
     expect(fetches).toBe(3);
-    expect(harness.emptyCalls).toEqual([]);
     expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'adopted' });
   });
 
-  it('falls back to a clone when the branch cannot be checked out', async () => {
+  it('reports authentication failure without a clone or another fetch', async () => {
+    const harness = adoptHarness();
+    harness.setGit(args =>
+      args[0] === 'fetch'
+        ? result(
+            128,
+            'fatal: Authentication failed for https://x-access-token:git-secret@github.com/acme/repo'
+          )
+        : result(0)
+    );
+
+    await harness.manager.prepare(routeSpec({ git: { url: REPO, token: 'git-secret' } }));
+
+    expect(harness.gitCalls.filter(args => args[0] === 'fetch')).toHaveLength(1);
+    expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
+    expect(lastFrame(harness.frames)).toMatchObject({
+      type: 'session.failed',
+      step: 'restore',
+      subtype: 'git_authentication_failed',
+    });
+    expect(harness.logs.join('\n')).not.toContain('git-secret');
+    expect(harness.logs.join('\n')).toContain('matcher=git_authentication_failed');
+  });
+
+  it('stops after bounded fetch retries without cloning', async () => {
+    const harness = adoptHarness();
+    harness.setGit(args =>
+      args[0] === 'fetch' ? result(128, 'fatal: Could not resolve host: github.com') : result(0)
+    );
+
+    await harness.manager.prepare(routeSpec({ git: { url: REPO } }));
+
+    expect(harness.gitCalls.filter(args => args[0] === 'fetch')).toHaveLength(3);
+    expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
+    expect(lastFrame(harness.frames)).toMatchObject({
+      type: 'session.failed',
+      step: 'restore',
+      subtype: 'git_network_failed',
+    });
+    expect(harness.stamp()).toEqual(FOREIGN_STAMP);
+  });
+
+  it('reports a checkout conflict without cloning or replacing the snapshot stamp', async () => {
     const harness = adoptHarness();
     let checkouts = 0;
     harness.setGit(args => {
@@ -2743,12 +2778,17 @@ describe('adopting an environment snapshot', () => {
 
     await harness.manager.prepare(spec);
 
-    expect(harness.emptyCalls).toEqual([spec.directory]);
-    expect(harness.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(1);
-    expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'cloned' });
+    expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
+    expect(checkouts).toBe(1);
+    expect(lastFrame(harness.frames)).toMatchObject({
+      type: 'session.failed',
+      step: 'checkout',
+      subtype: 'git_checkout_conflict',
+    });
+    expect(harness.stamp()).toEqual(FOREIGN_STAMP);
   });
 
-  it('falls back to a clone when the adopt exceeds its budget', async () => {
+  it('fails within the restore budget without cloning', async () => {
     const harness = createHarness(timers({ restoreMs: 30, cloneMs: 2_000 }), { hasGit: true });
     harness.setStamp(FOREIGN_STAMP);
     harness.setGit(args => {
@@ -2758,8 +2798,9 @@ describe('adopting an environment snapshot', () => {
 
     await harness.manager.prepare(routeSpec({ git: { url: REPO } }));
 
-    expect(harness.emptyCalls).toHaveLength(1);
-    expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'cloned' });
+    expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
+    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.failed', step: 'restore' });
+    expect(harness.stamp()).toEqual(FOREIGN_STAMP);
   });
 
   it('reuses a prepared workspace without network or setup work', async () => {

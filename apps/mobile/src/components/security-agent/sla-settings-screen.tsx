@@ -239,6 +239,12 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     // Keep a dirty draft and its controls usable if the redirect is cancelled.
     return <>{dialog}</>;
   }
+  // The draft hydrates from the config in an effect; painting the body first
+  // would show the default toggle and then push the day rows down when they
+  // appear.
+  if (baseline === null) {
+    return <SlaSettingsSkeleton />;
+  }
 
   return (
     <View className="flex-1 bg-background">
@@ -277,7 +283,7 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           onValueChange={setSlaEnabled}
         />
 
-        {baseline !== null && slaEnabled && (
+        {slaEnabled && (
           <View className="gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('securityAgent.sla.deadlinesHeading')}

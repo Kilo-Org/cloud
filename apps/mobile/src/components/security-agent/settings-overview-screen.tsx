@@ -268,10 +268,11 @@ export function SettingsOverviewScreen({
                 <ConfigureRow
                   icon={FolderGit2}
                   title={t('common.selectRepositories')}
-                  // Reports the saved selection, not a restatement of the title:
-                  // it comes from the config, so it stays right while the
-                  // repository list loads.
-                  subtitle={repoCountLabel}
+                  // No subtitle: this row only renders without an effective
+                  // selection, so a saved count would always read zero (and an
+                  // *all* mode label only while the repository list is
+                  // unresolved), while the status line above already states
+                  // the state. The row stays the action itself.
                   onPress={() => {
                     pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
                   }}

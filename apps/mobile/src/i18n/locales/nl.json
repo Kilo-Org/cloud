@@ -924,7 +924,6 @@
     "followReviewMd": "REVIEW.md volgen",
     "followReviewMdSubtitle": "Volg de REVIEW.md-instructiebestanden per repository",
     "manualReview": {
-      "connectProviderDescription": "Koppel GitHub om een handmatige review van een PR te starten.",
       "couldNotCheckProviderStatus": "De platformstatus kon niet worden gecontroleerd.",
       "couldNotLoadProviders": "Je gekoppelde platformen konden niet worden geladen. Probeer het opnieuw.",
       "instructions": "Instructies (optioneel)",

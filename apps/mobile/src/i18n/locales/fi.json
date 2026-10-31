@@ -1537,7 +1537,6 @@
       "invalidUrl": "Anna kelvollinen muutospyynnön URL-osoite.",
       "couldNotCheckProviderStatus": "Palveluntarjoajan tilaa ei voitu tarkistaa.",
       "couldNotLoadProviders": "Yhdistettyjä palveluntarjoajia ei voitu ladata. Yritä uudelleen.",
-      "connectProviderDescription": "Yhdistä GitHub, niin voit käynnistää muutospyynnön katselmoinnin manuaalisesti.",
       "pullRequestUrl": "Muutospyynnön URL-osoite",
       "instructions": "Ohjeet (valinnaiset)",
       "instructionsPlaceholder": "Katselmoinnin erityiset painopisteet…",

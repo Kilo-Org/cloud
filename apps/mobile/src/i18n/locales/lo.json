@@ -1537,7 +1537,6 @@
       "invalidUrl": "ໃສ່ URL ຂອງຄຳຂໍລວມໂຄ້ດທີ່ຖືກຕ້ອງ.",
       "couldNotCheckProviderStatus": "ບໍ່ສາມາດກວດສອບສະຖານະຂອງຜູ້ໃຫ້ບໍລິການໄດ້.",
       "couldNotLoadProviders": "ບໍ່ສາມາດໂຫຼດລາຍການຜູ້ໃຫ້ບໍລິການທີ່ທ່ານເຊື່ອມຕໍ່ໄວ້ໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
-      "connectProviderDescription": "ເຊື່ອມຕໍ່ GitHub ເພື່ອເລີ່ມກວດສອບຄຳຂໍລວມໂຄ້ດດ້ວຍຕົນເອງ.",
       "pullRequestUrl": "URL ຂອງຄຳຂໍລວມໂຄ້ດ",
       "instructions": "ຄຳແນະນຳ (ບໍ່ຈຳເປັນຕ້ອງໃສ່)",
       "instructionsPlaceholder": "ຈຸດທີ່ຕ້ອງການໃຫ້ກວດສອບເປັນພິເສດ…",

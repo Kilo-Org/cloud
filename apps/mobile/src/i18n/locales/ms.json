@@ -1537,7 +1537,6 @@
       "invalidUrl": "Masukkan URL permintaan penarikan yang sah.",
       "couldNotCheckProviderStatus": "Tidak dapat menyemak status penyedia.",
       "couldNotLoadProviders": "Kami tidak dapat memuatkan penyedia yang telah anda sambungkan. Sila cuba lagi.",
-      "connectProviderDescription": "Sambungkan GitHub untuk memulakan semakan manual bagi permintaan penarikan.",
       "pullRequestUrl": "URL permintaan penarikan",
       "instructions": "Arahan (pilihan)",
       "instructionsPlaceholder": "Perkara khusus untuk diberi perhatian oleh penyemak…",

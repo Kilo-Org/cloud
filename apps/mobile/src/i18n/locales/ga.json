@@ -1603,7 +1603,6 @@
       "invalidUrl": "Cuir isteach URL bailí d'iarratas tarraingthe.",
       "couldNotCheckProviderStatus": "Níorbh fhéidir stádas an tsoláthraí a sheiceáil.",
       "couldNotLoadProviders": "Níorbh fhéidir linn do sholáthraithe nasctha a lódáil. Bain triail as arís le do thoil.",
-      "connectProviderDescription": "Ceangail GitHub chun athbhreithniú de láimh a thosú ar iarratas tarraingthe.",
       "pullRequestUrl": "URL an iarratais tarraingthe",
       "instructions": "Treoracha (roghnach)",
       "instructionsPlaceholder": "Aon rud ar leith ar cheart don athbhreithneoir díriú air…",

@@ -1559,7 +1559,6 @@
       "invalidUrl": "Unesi valjan URL zahtjeva za spajanje.",
       "couldNotCheckProviderStatus": "Nije moguće provjeriti status pružatelja.",
       "couldNotLoadProviders": "Nije moguće učitati povezane pružatelje. Pokušaj ponovno.",
-      "connectProviderDescription": "Poveži GitHub za pokretanje ručnog pregleda zahtjeva za spajanje.",
       "pullRequestUrl": "URL zahtjeva za spajanje",
       "instructions": "Upute (neobavezno)",
       "instructionsPlaceholder": "Posebne upute za pregled…",

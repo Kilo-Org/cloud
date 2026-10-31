@@ -924,7 +924,6 @@
     "followReviewMd": "遵循 REVIEW.md",
     "followReviewMdSubtitle": "遵循每個存放庫的 REVIEW.md 指示檔案",
     "manualReview": {
-      "connectProviderDescription": "連結 GitHub，即可手動開始審查 PR。",
       "couldNotCheckProviderStatus": "無法檢查平台狀態。",
       "couldNotLoadProviders": "無法載入已連結的平台。請再試一次。",
       "instructions": "指示（選填）",

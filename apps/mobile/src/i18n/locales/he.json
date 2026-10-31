@@ -927,7 +927,6 @@
     "followReviewMd": "פעולה לפי REVIEW.md",
     "followReviewMdSubtitle": "שימוש בהוראות שבקובץ REVIEW.md בכל מאגר",
     "manualReview": {
-      "connectProviderDescription": "חבר את GitHub כדי להתחיל סקירה ידנית של בקשת משיכה.",
       "couldNotCheckProviderStatus": "לא ניתן לבדוק את מצב הספק.",
       "couldNotLoadProviders": "לא ניתן לטעון את הספקים המחוברים שלך. נסה שוב.",
       "instructions": "הוראות (לא חובה)",

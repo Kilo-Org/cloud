@@ -924,7 +924,6 @@
     "followReviewMd": "Ikuti REVIEW.md",
     "followReviewMdSubtitle": "Ikuti instruksi dalam berkas REVIEW.md di setiap repositori",
     "manualReview": {
-      "connectProviderDescription": "Hubungkan GitHub untuk memulai tinjauan manual terhadap PR.",
       "couldNotCheckProviderStatus": "Tidak dapat memeriksa status penyedia.",
       "couldNotLoadProviders": "Kami tidak dapat memuat penyedia yang terhubung. Coba lagi.",
       "instructions": "Instruksi (opsional)",

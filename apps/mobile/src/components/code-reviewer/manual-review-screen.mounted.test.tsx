@@ -133,7 +133,6 @@ vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/form-field-a11y', () => ({ formFieldA11y: () => 'a11y' }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check', GitPullRequest: 'GitPullRequest' }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: 'RadioGroup',
@@ -373,16 +372,17 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     unmount();
   });
 
-  it('keeps the action pinned and disabled while provider status is loading', async () => {
+  it('holds the connect state’s shape while provider status loads', async () => {
     status.loading = true;
     status.connected = false;
     const { renderer, unmount } = await renderScreen();
-    expect(findAllOfType(renderer.root, 'Skeleton')).toHaveLength(2);
-    const button = only(findAllOfType(renderer.root, 'Button'), 'primary action');
-    expect((button.props as { disabled: boolean }).disabled).toBe(true);
-    // The footer is the sole clearance source now (the deleted lift layer is
-    // gone); at rest it reserves the screen's bottom clearance plus its final gap.
-    expect(paddingBottomsAbove(button)).toEqual([BOTTOM_INSET + TAB_SCREEN_BOTTOM_GAP]);
+    // Neither the form nor its pinned action can be rendered before the status
+    // says whether the scope can start one, and the body cannot stay empty.
+    expect(findAllOfType(renderer.root, 'Skeleton')).toHaveLength(3);
+    expect(findAllOfType(renderer.root, 'ScrollView')).toHaveLength(0);
+    expect(findAllOfType(renderer.root, 'TextInput')).toHaveLength(0);
+    expect(findAllOfType(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAllOfType(renderer.root, 'EmptyState')).toHaveLength(0);
     unmount();
   });
 
@@ -464,10 +464,6 @@ describe('ManualReviewScreen empty state role gate', () => {
     expect(propOf(empty, 'description')).toBe(readOnlyNotice());
     expect(propOf(empty, 'action')).toBeUndefined();
     expect(findAllOfType(renderer.root, 'Button')).toHaveLength(0);
-    // It must not offer the copy that instructs a member to connect.
-    expect(renderedTexts(renderer.root)).not.toContain(
-      i18n.t('codeReviewer.manualReview.connectProviderDescription')
-    );
 
     unmount();
   });
@@ -509,9 +505,9 @@ describe('ManualReviewScreen empty state role gate', () => {
       const { renderer, unmount } = await renderScreen(ORG_SCOPE);
 
       const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
-      expect(propOf(empty, 'description')).toBe(
-        i18n.t('codeReviewer.manualReview.connectProviderDescription')
-      );
+      // The title and the button carry the instruction; the old description
+      // repeated both, so the connect state has none.
+      expect(propOf(empty, 'description')).toBeUndefined();
       expect(propOf(empty, 'action')).toBeDefined();
 
       unmount();
@@ -741,6 +737,41 @@ describe('ManualReviewScreen URL validation', () => {
     const [statusText] = findVisibleStatusTexts(renderer.root);
     expect(statusText?.props.children).toBe(i18n.t('codeReviewer.manualReview.invalidUrl'));
     expect(String(findUrlField(renderer.root).props.className)).toContain('border-destructive');
+
+    unmount();
+  });
+});
+
+describe('ManualReviewScreen instructions field', () => {
+  it('names the field after the heading above it, not the draft it holds', async () => {
+    platformState.OS = 'android';
+    const { renderer, unmount } = await renderScreen();
+
+    // The heading is a sibling `Text`, not part of the field, so the field
+    // carried no name of its own: the native edit-text node was named after the
+    // draft. The name now comes from the same catalog key the heading renders.
+    const heading = i18n.t('codeReviewer.manualReview.instructions');
+    only(
+      renderer.root.findAll(
+        node => String(node.type) === 'Text' && node.props.children === heading
+      ),
+      'instructions heading'
+    );
+    const instructions = only(
+      renderer.root.findAll(
+        node => String(node.type) === 'TextInput' && node.props.multiline === true
+      ),
+      'instructions field'
+    );
+    expect(instructions.props.accessibilityLabel).toBe(heading);
+
+    act(() => {
+      (instructions.props.onChangeText as (value: string) => void)('Check the retry budget');
+    });
+    // Uncontrolled: the draft goes to the ref and the mutation only, so the
+    // name stays the heading whether the field is empty or typed into.
+    expect(instructions.props.accessibilityLabel).toBe(heading);
+    expect(instructions.props.value).toBeUndefined();
 
     unmount();
   });

@@ -1537,7 +1537,6 @@
       "invalidUrl": "Sláðu inn gilda URL-slóð á samrunabeiðni.",
       "couldNotCheckProviderStatus": "Ekki tókst að athuga stöðu þjónustuveitanda.",
       "couldNotLoadProviders": "Ekki tókst að sækja tengda þjónustuveitendur. Reyndu aftur.",
-      "connectProviderDescription": "Tengdu GitHub til að hefja handvirka yfirferð á samrunabeiðni.",
       "pullRequestUrl": "URL-slóð samrunabeiðnar",
       "instructions": "Leiðbeiningar (valfrjálsar)",
       "instructionsPlaceholder": "Sérstök atriði til að leggja áherslu á…",

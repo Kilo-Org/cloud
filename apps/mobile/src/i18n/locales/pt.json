@@ -1559,7 +1559,6 @@
       "invalidUrl": "Introduz um URL válido de um pedido de integração.",
       "couldNotCheckProviderStatus": "Não foi possível verificar o estado do fornecedor.",
       "couldNotLoadProviders": "Não foi possível carregar os teus fornecedores ligados. Tenta novamente.",
-      "connectProviderDescription": "Liga o GitHub para iniciar a revisão manual de um pedido de integração.",
       "pullRequestUrl": "URL do pedido de integração",
       "instructions": "Instruções (opcionais)",
       "instructionsPlaceholder": "Aspetos específicos a rever…",

@@ -895,7 +895,6 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Seguir as instruções do arquivo REVIEW.md de cada repositório",
     "manualReview": {
-      "connectProviderDescription": "Conecte o GitHub para iniciar a revisão manual de um PR.",
       "couldNotCheckProviderStatus": "Não foi possível verificar o status do provedor.",
       "couldNotLoadProviders": "Não foi possível carregar seus provedores conectados. Tente novamente.",
       "instructions": "Instruções (opcionais)",

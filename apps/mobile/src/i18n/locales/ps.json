@@ -1537,7 +1537,6 @@
       "invalidUrl": "د PR یو معتبر URL ولیکئ.",
       "couldNotCheckProviderStatus": "د خدمت چمتو کوونکي حالت و نه کتل شو.",
       "couldNotLoadProviders": "ستاسو نښلول شوي خدمت چمتو کوونکي بار نه شول. مهرباني وکړئ بیا هڅه وکړئ.",
-      "connectProviderDescription": "د PR د لاسي بیاکتنې د پیل لپاره GitHub ونښلوئ.",
       "pullRequestUrl": "د PR پته (URL)",
       "instructions": "لارښوونې (اختیاري)",
       "instructionsPlaceholder": "هغه ځانګړي ټکي چې بیاکتونکی باید ورته پام وکړي…",

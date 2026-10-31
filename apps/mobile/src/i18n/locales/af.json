@@ -1537,7 +1537,6 @@
       "invalidUrl": "Voer 'n geldige URL vir 'n trekversoek in.",
       "couldNotCheckProviderStatus": "Die verskafferstatus kon nie nagegaan word nie.",
       "couldNotLoadProviders": "Ons kon nie jou gekoppelde verskaffers laai nie. Probeer asseblief weer.",
-      "connectProviderDescription": "Koppel GitHub om 'n handmatige hersiening van 'n trekversoek te begin.",
       "pullRequestUrl": "Trekversoek-URL",
       "instructions": "Instruksies (opsioneel)",
       "instructionsPlaceholder": "Enigiets spesifieks waarop die hersiener moet fokus…",

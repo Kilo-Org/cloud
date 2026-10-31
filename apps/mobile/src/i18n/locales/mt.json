@@ -1603,7 +1603,6 @@
       "invalidUrl": "Daħħal URL validu għal PR.",
       "couldNotCheckProviderStatus": "Ma setax jiġi ċċekkjat l-istat tal-fornitur.",
       "couldNotLoadProviders": "Ma stajniex ngħabbu l-fornituri konnessi tiegħek. Jekk jogħġbok erġa' pprova.",
-      "connectProviderDescription": "Ikkonnettja GitHub biex tibda reviżjoni manwali ta' PR.",
       "pullRequestUrl": "URL tal-PR",
       "instructions": "Struzzjonijiet (mhux obbligatorji)",
       "instructionsPlaceholder": "Xi ħaġa speċifika li r-reviżur għandu jiffoka fuqha…",

@@ -1537,7 +1537,6 @@
       "invalidUrl": "Etibarlı PR URL-i daxil et.",
       "couldNotCheckProviderStatus": "Provayderin statusunu yoxlamaq mümkün olmadı.",
       "couldNotLoadProviders": "Qoşduğun provayderləri yükləmək mümkün olmadı. Yenidən cəhd et.",
-      "connectProviderDescription": "PR üçün kod yoxlamasını əl ilə başlatmaq üçün GitHub-u qoş.",
       "pullRequestUrl": "PR URL-i",
       "instructions": "Təlimatlar (istəyə bağlı)",
       "instructionsPlaceholder": "Yoxlama zamanı xüsusi diqqət tələb edən məqamlar…",

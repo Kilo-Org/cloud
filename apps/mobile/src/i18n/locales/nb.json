@@ -1537,7 +1537,6 @@
       "invalidUrl": "Skriv inn en gyldig URL til en PR.",
       "couldNotCheckProviderStatus": "Kunne ikke sjekke leverandørstatusen.",
       "couldNotLoadProviders": "Kunne ikke laste inn de tilkoblede leverandørene dine. Prøv igjen.",
-      "connectProviderDescription": "Koble til GitHub for å starte en manuell gjennomgang av en PR.",
       "pullRequestUrl": "URL til PR",
       "instructions": "Instruksjoner (valgfritt)",
       "instructionsPlaceholder": "Noe gjennomgangen skal fokusere spesielt på…",

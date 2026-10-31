@@ -1581,7 +1581,6 @@
       "invalidUrl": "Zadajte platnú URL adresu PR.",
       "couldNotCheckProviderStatus": "Stav poskytovateľa sa nepodarilo overiť.",
       "couldNotLoadProviders": "Pripojených poskytovateľov sa nepodarilo načítať. Skúste to znova.",
-      "connectProviderDescription": "Pripojte GitHub, aby ste mohli spustiť manuálnu kontrolu PR.",
       "pullRequestUrl": "URL adresa PR",
       "instructions": "Pokyny (voliteľné)",
       "instructionsPlaceholder": "Konkrétne oblasti, na ktoré sa má kontrola zamerať…",

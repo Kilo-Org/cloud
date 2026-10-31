@@ -1581,7 +1581,6 @@
       "invalidUrl": "Увядзіце карэктны URL запыту на зліццё.",
       "couldNotCheckProviderStatus": "Не атрымалася праверыць стан платформы.",
       "couldNotLoadProviders": "Не атрымалася загрузіць падключаныя платформы. Паспрабуйце яшчэ раз.",
-      "connectProviderDescription": "Падключыце GitHub, каб пачаць ручную праверку запыту на зліццё.",
       "pullRequestUrl": "URL запыту на зліццё",
       "instructions": "Інструкцыі (неабавязкова)",
       "instructionsPlaceholder": "На што звярнуць асаблівую ўвагу пры праверцы…",

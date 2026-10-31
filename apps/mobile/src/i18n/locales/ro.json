@@ -1559,7 +1559,6 @@
       "invalidUrl": "Introdu o adresă URL validă pentru un PR.",
       "couldNotCheckProviderStatus": "Nu s-a putut verifica starea furnizorului.",
       "couldNotLoadProviders": "Nu s-au putut încărca furnizorii conectați. Încearcă din nou.",
-      "connectProviderDescription": "Conectează GitHub pentru a începe revizuirea manuală a unui PR.",
       "pullRequestUrl": "Adresa URL a PR-ului",
       "instructions": "Instrucțiuni (opțional)",
       "instructionsPlaceholder": "Aspecte specifice de urmărit la revizuire…",

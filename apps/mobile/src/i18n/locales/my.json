@@ -1537,7 +1537,6 @@
       "invalidUrl": "မှန်ကန်သော PR URL ကို ထည့်ပါ။",
       "couldNotCheckProviderStatus": "ဝန်ဆောင်မှုပေးသူ၏ အခြေအနေကို စစ်ဆေး၍ မရပါ။",
       "couldNotLoadProviders": "ချိတ်ဆက်ထားသော ဝန်ဆောင်မှုပေးသူများကို ရယူ၍ မရပါ။ ထပ်ကြိုးစားပါ။",
-      "connectProviderDescription": "PR စစ်ဆေးမှုကို ကိုယ်တိုင် စတင်ရန် GitHub ကို ချိတ်ဆက်ပါ။",
       "pullRequestUrl": "PR ၏ URL",
       "instructions": "ညွှန်ကြားချက်များ (မထည့်လည်းရ)",
       "instructionsPlaceholder": "စစ်ဆေးသူ အလေးပေးသင့်သော သီးခြားအချက်များ…",

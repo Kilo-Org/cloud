@@ -1537,7 +1537,6 @@
       "invalidUrl": "पुल रिक्वेस्टचा वैध URL टाका.",
       "couldNotCheckProviderStatus": "सेवा पुरवठादाराची स्थिती तपासता आली नाही.",
       "couldNotLoadProviders": "तुम्ही जोडलेल्या सेवा पुरवठादारांची माहिती लोड करता आली नाही. कृपया पुन्हा प्रयत्न करा.",
-      "connectProviderDescription": "पुल रिक्वेस्टचे पुनरावलोकन स्वतः सुरू करण्यासाठी GitHub जोडा.",
       "pullRequestUrl": "पुल रिक्वेस्टचा URL",
       "instructions": "सूचना (ऐच्छिक)",
       "instructionsPlaceholder": "पुनरावलोकनात विशेष लक्ष द्यायच्या गोष्टी…",

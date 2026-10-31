@@ -1537,7 +1537,6 @@
       "invalidUrl": "වලංගු PR URL එකක් ඇතුළත් කරන්න.",
       "couldNotCheckProviderStatus": "සැපයුම්කරුගේ තත්ත්වය පරීක්ෂා කළ නොහැකි විය.",
       "couldNotLoadProviders": "ඔබේ සම්බන්ධිත සැපයුම්කරුවන් පූරණය කිරීමට අපට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
-      "connectProviderDescription": "PR එකක සමාලෝචනයක් ඔබ විසින් ආරම්භ කිරීමට GitHub සම්බන්ධ කරන්න.",
       "pullRequestUrl": "PR සඳහා URL",
       "instructions": "උපදෙස් (අත්‍යවශ්‍ය නොවේ)",
       "instructionsPlaceholder": "සමාලෝචකයා විශේෂයෙන් අවධානය යොමු කළ යුතු දෑ…",

@@ -1537,7 +1537,6 @@
       "invalidUrl": "Adj meg egy érvényes URL-t a PR-hez.",
       "couldNotCheckProviderStatus": "Nem sikerült ellenőrizni a szolgáltató állapotát.",
       "couldNotLoadProviders": "Nem sikerült betölteni a csatlakoztatott szolgáltatóidat. Próbáld újra.",
-      "connectProviderDescription": "Csatlakoztasd a GitHubot egy PR kézi kódellenőrzésének indításához.",
       "pullRequestUrl": "PR URL-címe",
       "instructions": "Utasítások (nem kötelező)",
       "instructionsPlaceholder": "Az ellenőrzés kiemelt szempontjai…",

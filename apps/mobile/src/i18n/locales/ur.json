@@ -1537,7 +1537,6 @@
       "invalidUrl": "پل ریکویسٹ کا درست URL درج کریں۔",
       "couldNotCheckProviderStatus": "فراہم کنندہ کی حالت کی جانچ نہیں ہو سکی۔",
       "couldNotLoadProviders": "آپ کے منسلک فراہم کنندگان لوڈ نہیں ہو سکے۔ براہ کرم دوبارہ کوشش کریں۔",
-      "connectProviderDescription": "پل ریکویسٹ کا دستی جائزہ شروع کرنے کے لیے GitHub منسلک کریں۔",
       "pullRequestUrl": "پل ریکویسٹ کا URL",
       "instructions": "ہدایات (اختیاری)",
       "instructionsPlaceholder": "جائزے میں توجہ طلب کوئی خاص بات…",

@@ -1559,7 +1559,6 @@
       "invalidUrl": "Unesi važeći URL zahtjeva za spajanje.",
       "couldNotCheckProviderStatus": "Nije moguće provjeriti status platforme.",
       "couldNotLoadProviders": "Nije moguće učitati povezane platforme. Pokušaj ponovo.",
-      "connectProviderDescription": "Poveži GitHub da započneš ručni pregled zahtjeva za spajanje.",
       "pullRequestUrl": "URL zahtjeva za spajanje",
       "instructions": "Upute (nisu obavezne)",
       "instructionsPlaceholder": "Na šta posebno treba obratiti pažnju pri pregledu…",

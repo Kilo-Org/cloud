@@ -936,7 +936,6 @@
     "followReviewMd": "اتباع تعليمات REVIEW.md",
     "followReviewMdSubtitle": "الالتزام بملفات تعليمات REVIEW.md لكل مستودع",
     "manualReview": {
-      "connectProviderDescription": "اربط GitHub لبدء مراجعة يدوية لطلب سحب.",
       "couldNotCheckProviderStatus": "تعذّر التحقق من حالة المزوّد.",
       "couldNotLoadProviders": "تعذّر تحميل المزوّدين الذين ربطتهم بحسابك. حاول مرة أخرى.",
       "instructions": "تعليمات (اختيارية)",

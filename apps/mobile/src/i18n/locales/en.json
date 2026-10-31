@@ -1603,7 +1603,6 @@
       "invalidUrl": "Enter a valid pull request URL",
       "couldNotCheckProviderStatus": "Couldn't check provider status",
       "couldNotLoadProviders": "We couldn't load your connected providers. Please try again.",
-      "connectProviderDescription": "Connect GitHub to start a manual review of a pull request.",
       "pullRequestUrl": "Pull request URL",
       "instructions": "Instructions (optional)",
       "instructionsPlaceholder": "Anything specific the reviewer should focus on…",

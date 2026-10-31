@@ -1625,7 +1625,6 @@
       "invalidUrl": "Rhowch URL dilys ar gyfer cais tynnu.",
       "couldNotCheckProviderStatus": "Ni ellid gwirio statws y darparwr.",
       "couldNotLoadProviders": "Ni allem lwytho'r darparwyr rydych wedi'u cysylltu. Ceisiwch eto.",
-      "connectProviderDescription": "Cysylltwch GitHub i ddechrau adolygiad â llaw o gais tynnu.",
       "pullRequestUrl": "URL cais tynnu",
       "instructions": "Cyfarwyddiadau (dewisol)",
       "instructionsPlaceholder": "Unrhyw beth penodol y dylai'r adolygydd ganolbwyntio arno…",

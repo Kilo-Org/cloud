@@ -2,6 +2,12 @@
  * Fetches a fresh DoltHub OAuth access token from the web app's
  * `/api/internal/integrations/dolthub/token` endpoint.
  *
+ * The endpoint releases a third-party OAuth credential, so it authenticates
+ * with the Wasteland-only `WASTELAND_DOLTHUB_TOKEN_SECRET` sent as an
+ * `Authorization: Bearer` credential. An unset or empty secret makes every
+ * call report `'unavailable'` without a network call, and there is no other
+ * credential the caller can present.
+ *
  * Why we don't read from the wasteland's local credential store:
  * `wasteland_credentials.encrypted_token` is a one-shot snapshot taken
  * when the user first connected DoltHub. OAuth access tokens rotate
@@ -51,11 +57,11 @@ export type FetchFreshTokenResult =
  */
 export async function fetchFreshDoltHubToken(
   env: Env,
-  params: { userId: string; organizationId?: string }
+  params: { userId: string }
 ): Promise<FetchFreshTokenResult> {
-  const secret = await resolveSecret(env.INTERNAL_API_SECRET);
+  const secret = await resolveSecret(env.WASTELAND_DOLTHUB_TOKEN_SECRET);
   if (!secret) {
-    return { status: 'unavailable', reason: 'INTERNAL_API_SECRET unavailable' };
+    return { status: 'unavailable', reason: 'WASTELAND_DOLTHUB_TOKEN_SECRET unavailable' };
   }
 
   const url = `${env.KILO_INTERNAL_API_URL}/api/internal/integrations/dolthub/token`;
@@ -66,12 +72,9 @@ export async function fetchFreshDoltHubToken(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Internal-Secret': secret,
+        Authorization: `Bearer ${secret}`,
       },
-      body: JSON.stringify({
-        userId: params.userId,
-        ...(params.organizationId ? { organizationId: params.organizationId } : {}),
-      }),
+      body: JSON.stringify({ userId: params.userId }),
     });
   } catch (err) {
     return {

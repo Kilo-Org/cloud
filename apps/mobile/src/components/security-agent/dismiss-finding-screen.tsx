@@ -274,7 +274,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
             {t('securityAgent.dismiss.commentLabel')}
           </Text>
           <TextInput
-            accessibilityLabel={t('securityAgent.dismiss.commentAccessibility')}
+            accessibilityLabel={t('securityAgent.dismiss.commentLabel')}
             className="h-24 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
             multiline
             textAlignVertical="top"

@@ -169,14 +169,16 @@ function render(element: React.ReactElement): TestRenderer.ReactTestRenderer {
   return renderer;
 }
 
-/** The rendered text of the one Text node holding `copy`. */
+/** The one Text node rendering `copy`, i.e. the label the reader sees. */
 function visibleLabel(
   mounted: TestRenderer.ReactTestRenderer,
   copy: string
 ): TestRenderer.ReactTestInstance {
-  return mounted.root.find(
-    node => node.type === 'Text' && (node.props.children as unknown) === copy
-  );
+  const match = mounted.root.findAllByType('Text').find(node => node.props.children === copy);
+  if (!match) {
+    throw new Error(`no Text node renders ${copy}`);
+  }
+  return match;
 }
 
 describe.each([

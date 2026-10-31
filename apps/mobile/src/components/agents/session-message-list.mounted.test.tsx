@@ -52,6 +52,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/components/agents/session-pagination-header', () => ({
   SessionPaginationHeader: () => null,
 }));
+vi.mock('@/components/agents/session-detail-skeleton', () => ({
+  SessionSkeletonMessages: 'SessionSkeletonMessages',
+}));
 
 const baseProps = {
   sessionId: 'session-1',
@@ -160,6 +163,74 @@ describe('SessionMessageList', () => {
   it('mounts rows well ahead of the viewport during a fast fling', () => {
     mountList();
     expect(flashListProps.current?.drawDistance).toBe(2000);
+  });
+});
+
+describe('SessionMessageList open settle', () => {
+  function skeletonCount(renderer: TestRenderer.ReactTestRenderer): number {
+    return renderer.root.findAll(node => Object.is(node.type, 'SessionSkeletonMessages')).length;
+  }
+
+  function fireContentSize(height: number): void {
+    const handler = flashListProps.current?.onContentSizeChange as
+      | ((width: number, height: number) => void)
+      | undefined;
+    act(() => {
+      handler?.(400, height);
+    });
+  }
+
+  function fireLayout(height: number): void {
+    const handler = flashListProps.current?.onLayout as
+      | ((event: { nativeEvent: { layout: { height: number } } }) => void)
+      | undefined;
+    act(() => {
+      handler?.({ nativeEvent: { layout: { height } } });
+    });
+  }
+
+  it('keeps the loading skeleton over the rows until they stop measuring', () => {
+    vi.useFakeTimers();
+    const renderer = mountList({ items: ['m1', 'm2', 'm3'] });
+    expect(skeletonCount(renderer)).toBe(1);
+
+    // Content taller than the viewport: the list still has to settle.
+    fireLayout(655);
+    fireContentSize(790);
+    expect(skeletonCount(renderer)).toBe(1);
+
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(skeletonCount(renderer)).toBe(0);
+  });
+
+  it('reveals a transcript that fits its viewport on the first layout', () => {
+    vi.useFakeTimers();
+    const renderer = mountList();
+    fireLayout(655);
+    fireContentSize(500);
+
+    expect(skeletonCount(renderer)).toBe(0);
+  });
+
+  it('reveals the rows even if the content never stops measuring', () => {
+    vi.useFakeTimers();
+    const renderer = mountList({ items: ['m1', 'm2', 'm3'] });
+    fireLayout(655);
+
+    for (let elapsed = 0; elapsed < 1400; elapsed += 100) {
+      fireContentSize(800 + elapsed);
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+    }
+    expect(skeletonCount(renderer)).toBe(1);
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(skeletonCount(renderer)).toBe(0);
   });
 });
 

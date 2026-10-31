@@ -1122,7 +1122,8 @@
       "sortSeverityDesc": "Gravità: da alta a bassa",
       "sortSlaDue": "Scadenza SLA",
       "statusIgnored": "Ignorata",
-      "statusOpen": "Aperta"
+      "statusOpen": "Aperta",
+      "noRepositories": "Nessun repository è ancora sincronizzato o selezionato. Scegli i repository nelle impostazioni dell'Agente di sicurezza."
     },
     "analysis": {
       "analyzeRepository": "Analizza il repository",
@@ -1515,7 +1516,10 @@
       "settleFailed": "L'operazione è stata completata, ma non è stato possibile registrare il risultato. Riprova.",
       "replayFailed": "Questa operazione non è stata completata. Riprova.",
       "actionFailed": "Impossibile completare questa operazione. Riprova.",
-      "actionBlocked": "Impossibile completare questa operazione. Il problema deve essere risolto prima di riprovare."
+      "actionBlocked": "Impossibile completare questa operazione. Il problema deve essere risolto prima di riprovare.",
+      "syncNoRepositories": "Nessun repository è incluso nell'ambito di sincronizzazione. Scegli i repository monitorati dall'Agente di sicurezza, poi sincronizza di nuovo.",
+      "syncIntegrationInactive": "La connessione GitHub per l'Agente di sicurezza non è attiva. Riconnetti l'app GitHub di Kilo, poi sincronizza di nuovo.",
+      "syncMissingPermission": "L'app GitHub di Kilo non può leggere gli avvisi di vulnerabilità. Concedi questa autorizzazione in GitHub, poi sincronizza di nuovo."
     },
     "analysisState": {
       "queued": "Analisi in coda",

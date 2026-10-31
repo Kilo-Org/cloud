@@ -56,16 +56,18 @@ function hasUsableMessage(error: unknown): boolean {
 }
 
 /**
- * One skill row: the name in mono, its source type, the enabled switch,
- * and delete plus edit for local skills. The row carries no container
- * `accessibilityLabel`, so the switch's label stays the only element a screen
- * reader matches by the skill's name.
+ * One skill row: the name in mono, its source type, the enabled switch, and
+ * delete plus edit for local skills. The name is hidden from assistive
+ * technology, so the switch's label stays the only element a screen reader
+ * matches by the skill's name; the source type keeps its own stop because it
+ * says what the name does not.
  * An uneditable skill keeps an empty edit slot so the columns line up.
  */
 function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const subtitleKey = skillRowSubtitle(skill);
+  const subtitle = subtitleKey === null ? skill.sourceType : t(subtitleKey);
   const showsEdit = onEdit !== undefined && skill.sourceType !== 'skills-sh';
   return (
     <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
@@ -74,7 +76,7 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
           {skill.name}
         </Text>
         <Text variant="muted" className="text-xs">
-          {subtitleKey === null ? skill.sourceType : t(subtitleKey)}
+          {subtitle}
         </Text>
       </View>
       <ProfileSwitch

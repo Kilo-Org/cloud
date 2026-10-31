@@ -150,6 +150,22 @@ describe('ProfileAgentsScreen mode badge', () => {
     await i18n.changeLanguage('en');
   });
 
+  it('announces the agent identity before its controls', async () => {
+    h.query.data = [agent('alpha', 'primary')];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
+    );
+
+    const identity = renderer.root.findAll(
+      node => String(node.type) === 'View' && node.props.accessibilityRole === 'text'
+    )[0];
+
+    expect(identity?.props.accessibilityLabel).toBe('alpha, Primary only');
+    expect(identity?.props.accessible).toBe(true);
+
+    unmount();
+  });
+
   it('drops the row presses of the burst that closed the sheet', async () => {
     h.query.data = [agent('alpha', 'primary')];
     const { renderer, unmount } = await renderWithProviders(

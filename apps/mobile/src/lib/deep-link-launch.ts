@@ -8,6 +8,7 @@ import {
 } from '@kilocode/app-shared/universal-links';
 
 import { currentRouteHref } from './current-route-href';
+import { opensDestination } from './deep-link-destination';
 import { PENDING_DEEP_LINK_KEY } from './storage-keys';
 import { APP_SCHEME, isSystemSearchFamilyLink } from './system-search-families';
 
@@ -512,7 +513,11 @@ export function captureLaunchDeepLink(): void {
     return;
   }
   const resume = resolveIncomingResume(url);
-  if (resume) {
+  // A launch link that cannot open its destination is not captured at all: the
+  // slot is the layout's only navigation input, so stashing the composer
+  // fallback of an unusable session capture would replace the restored screen
+  // with it. `redirectSystemPath` applies the same rule to a warm arrival.
+  if (resume && opensDestination(resume.href)) {
     // An app-scheme launch URL is the shape the Android system-search tap
     // delivers; flag it so the exact `system-search` route for that tap may
     // replace this lossy web-table mapping. An `https://` link is never flagged.

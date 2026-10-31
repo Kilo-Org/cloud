@@ -11,6 +11,7 @@ import {
   type AgentSource,
   type AgentVisibility,
 } from '@/components/profiles/profile-agents-model';
+import { ProfileRowIdentity, profileRowLabel } from '@/components/profiles/profile-row-identity';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -69,6 +70,10 @@ type AgentRowViewProps = Readonly<{
  * the name keeps its width while the name loses its distinguishing tail, and a
  * badge that fits beside a short name but not a long one gives one row type two
  * layouts.
+ *
+ * The name, mode, model and description are one identity element declared first,
+ * so a screen reader hears what the row is before the controls that change it;
+ * this row carries no switch that would name the agent a second time.
  */
 function AgentRowView({
   name,
@@ -80,9 +85,10 @@ function AgentRowView({
 }: AgentRowViewProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const visibilityLabel = t(AGENT_VISIBILITY_LABEL_KEYS[visibility]);
   return (
     <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
-      <View className="min-w-0 flex-1 gap-0.5">
+      <ProfileRowIdentity label={profileRowLabel(name, visibilityLabel, model, description)}>
         <View className="flex-row items-center gap-2">
           <Bot size={16} color={colors.mutedForeground} />
           <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
@@ -90,7 +96,7 @@ function AgentRowView({
           </Text>
         </View>
         <View className="flex-row items-center">
-          <InlineBadge>{t(AGENT_VISIBILITY_LABEL_KEYS[visibility])}</InlineBadge>
+          <InlineBadge>{visibilityLabel}</InlineBadge>
         </View>
         {model.length > 0 ? (
           <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
@@ -102,7 +108,7 @@ function AgentRowView({
             {description}
           </Text>
         ) : null}
-      </View>
+      </ProfileRowIdentity>
       {onEdit !== undefined ? (
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}

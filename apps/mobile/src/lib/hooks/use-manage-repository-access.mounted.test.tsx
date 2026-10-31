@@ -12,7 +12,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import {
   type ManageRepositoryAccess,
   useManageRepositoryAccess,
-} from './use-code-reviewer-manage-access';
+} from './use-manage-repository-access';
 
 const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
@@ -70,7 +70,7 @@ vi.mock('@/lib/pr-review/connect-gate-platform', async importOriginal => ({
 
 type HookResult = ManageRepositoryAccess | undefined;
 
-type Handlers = { onOpen?: () => void; onReturn?: () => void };
+type Handlers = { onOpen?: () => void; onReturn?: (opened: boolean) => void };
 
 function Harness({
   scope,
@@ -125,7 +125,7 @@ describe('useManageRepositoryAccess', () => {
     const pendingLaunch = Promise.withResolvers<unknown>();
     mocks.launch.mockReturnValue(pendingLaunch.promise);
     const onOpen = vi.fn<() => void>();
-    const onReturn = vi.fn<() => void>();
+    const onReturn = vi.fn<(opened: boolean) => void>();
     const resultRef = mountHook('personal', 'github', { onOpen, onReturn });
     expect(requireHook(resultRef).pending).toBe(false);
 
@@ -150,7 +150,7 @@ describe('useManageRepositoryAccess', () => {
       await pendingLaunch.promise;
     });
     await vi.waitFor(() => {
-      expect(onReturn).toHaveBeenCalledOnce();
+      expect(onReturn).toHaveBeenCalledWith(true);
     });
     expect(requireHook(resultRef).pending).toBe(false);
     expect(mocks.toastError).not.toHaveBeenCalled();
@@ -270,7 +270,7 @@ describe('useManageRepositoryAccess', () => {
 
   it('reports a launch that never opened', async () => {
     mocks.launch.mockRejectedValue(new Error('no browser'));
-    const onReturn = vi.fn<() => void>();
+    const onReturn = vi.fn<(opened: boolean) => void>();
     const resultRef = mountHook('personal', 'github', { onReturn });
 
     await act(() => {
@@ -280,8 +280,9 @@ describe('useManageRepositoryAccess', () => {
     await vi.waitFor(() => {
       expect(mocks.toastError).toHaveBeenCalledWith('common.couldNotOpen');
     });
-    // The caller still resyncs: the page may have been changed earlier.
-    expect(onReturn).toHaveBeenCalledOnce();
+    // The caller still resyncs: the page may have been changed earlier. It is
+    // told the page never opened, so a fix-in-place surface can keep it up.
+    expect(onReturn).toHaveBeenCalledWith(false);
   });
 
   it('reports a launch that failed after the foreground edge ended the wait', async () => {

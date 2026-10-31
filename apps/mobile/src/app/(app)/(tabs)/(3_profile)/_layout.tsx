@@ -2,6 +2,8 @@ import { Stack } from 'expo-router';
 import { appSceneLayout } from '@/components/app-screen-layout';
 
 import { TabStackErrorBoundary } from '@/components/tab-stack-error-boundary';
+import { getProfileRouteNames } from '@/lib/profile-agent-navigation';
+import { profileStackRepairScreenOptions } from '@/lib/profile-route-stack';
 import { settleTabSwitchInput } from '@/lib/tab-switch-input-gate';
 
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -59,7 +61,15 @@ export default function ProfileLayout() {
         // the transition ends, so that is where the input window can close for
         // a same-tab press.
         screenListeners={{ transitionEnd: settleTabSwitchInput }}
-      />
+      >
+        {/* The profile tree's screens land without a transition when the stack
+            repair pushes them (`profile-route-stack.ts`), so a profile link
+            opened without its parents does not slide the rebuilt screens past
+            the reader. */}
+        {getProfileRouteNames('profileTab').map(name => (
+          <Stack.Screen key={name} name={name} options={profileStackRepairScreenOptions} />
+        ))}
+      </Stack>
     </TabStackErrorBoundary>
   );
 }

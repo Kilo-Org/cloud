@@ -389,26 +389,34 @@ describe('ProfileMcpScreen', () => {
     unmount();
   });
 
-  it('a11y: the secret badge is one counted node and the lock glyph is hidden', async () => {
+  it('a11y: the switch alone speaks the server name, next to its type and secret count', async () => {
     h.query.data = testProfile([testServer()]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
 
-    const badge = findAll(renderer.root, 'View').find(node =>
-      /^\d+ secrets?$/.test(String(node.props.accessibilityLabel ?? ''))
-    );
-    expect(badge?.props.accessibilityLabel).toBe('1 secret');
-    expect(badge?.props.accessible).toBe(true);
-    expect(findOne(renderer.root, 'Lock').parent?.props).toMatchObject({
-      accessibilityElementsHidden: true,
-      importantForAccessibility: 'no-hide-descendants',
+    const toggle = findOne(renderer.root, 'Switch');
+    expect(toggle.props.accessibilityLabel).toBe('docs');
+    // The visible name is painted only, so the switch is the row's single stop
+    // that speaks it; the type, summary and key count stay their own stops
+    // because they add what the name does not say.
+    const nameText = findAll(renderer.root, 'Text').find(node => node.props.children === 'docs');
+    expect(nameText?.props).toMatchObject({
+      accessible: false,
+      importantForAccessibility: 'no',
     });
+    const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
+    expect(texts).toContain('npx @example/mcp');
+    expect(
+      findAll(renderer.root, 'View').find(node => node.props.accessibilityRole === 'text')
+    ).toBeUndefined();
+    // The counted glyphs stay decorative: the type line names the count's place.
+    expect(findOne(renderer.root, 'Lock').parent?.props.accessibilityLabel).toBeUndefined();
 
     unmount();
   });
 
-  it('a11y: the secret badge names the count in the plural form', async () => {
+  it('a11y: the masked key count reads in the plural form beside the switch', async () => {
     h.query.data = testProfile([
       testServer({
         type: 'remote',
@@ -422,10 +430,10 @@ describe('ProfileMcpScreen', () => {
 
     const { renderer, unmount } = await mountScreen();
 
-    const badge = findAll(renderer.root, 'View').find(node =>
-      /^\d+ secrets?$/.test(String(node.props.accessibilityLabel ?? ''))
-    );
-    expect(badge?.props.accessibilityLabel).toBe('3 secrets');
+    expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('docs');
+    const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
+    expect(texts).toContain(3);
+    expect(texts).toContain('https://example.com/mcp');
 
     unmount();
   });

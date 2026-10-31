@@ -420,7 +420,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
   console.log('The 50-message page boundary splits a tool run between messages 10 and 11:');
   console.log('after the older page prepends, messages 9-11 merge into one 6-item condensed row.');
-  console.log('Open kiloapp://agent-chat/' + SESSION_ID + ' with Condense tool calls enabled.');
+  console.log(
+    'Open kiloapp:///(app)/agent-chat/' + SESSION_ID + ' with Condense tool calls enabled.'
+  );
 
   return {
     userId: user.userId,
@@ -430,6 +432,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     legacyRuntime,
     sessionIngestPort: serviceStatus.port,
     sessionIngestUrl,
-    deepLink: `kiloapp://agent-chat/${SESSION_ID}`,
+    deepLink: `kiloapp:///(app)/agent-chat/${SESSION_ID}`,
   };
 }

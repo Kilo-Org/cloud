@@ -277,6 +277,7 @@ export function ProfileCommandsScreen({
             commit(index);
           }}
         />
+
       </View>
     );
   };

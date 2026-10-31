@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Du kan behöva bevilja åtkomst till fler grupper eller projekt på GitLab.",
       "installGithubApp": "Installera GitHub-appen på kodarkiv",
       "installGithubAppDescription": "Ge Kilos GitHub-app åtkomst till de kodarkiv du vill få granskade.",
-      "repositoryAccess": "åtkomst till kodarkiv"
+      "repositoryAccess": "åtkomst till kodarkiv",
+      "allModePersonal": "Alla kodarkiv som Kilo kan komma åt via din GitHub-anslutning granskas automatiskt.",
+      "allModeOrganization": "Alla kodarkiv som Kilo kan komma åt via organisationens GitHub-anslutning granskas automatiskt.",
+      "allModeCount": "Tillgängliga kodarkiv: {{displayCount}}"
     },
     "style": {
       "title": "Granskningsstil",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "Inte synkroniserat ännu",
       "refreshFailed": "Kunde inte uppdatera. De senast synkroniserade uppgifterna visas.",
       "settings": "Inställningar",
-      "syncFindings": "Synkronisera fynd",
       "syncNow": "Synkronisera nu",
       "syncQueued": "Synkroniseringen har köats",
       "syncStatusUnavailable": "Synkroniseringens status är inte tillgänglig",
@@ -2155,7 +2157,7 @@
     "sessionList": {
       "couldNotLoadActive": "Kunde inte läsa in aktiva sessioner",
       "couldNotRefresh": "Kunde inte uppdatera",
-      "noSessionsYetDescription": "Starta en programmeringsuppgift från mobilen. Dina sessioner visas här.",
+      "noSessionsYetDescription": "Starta en programmeringsuppgift från mobilen.",
       "viewHistory": "Sessionshistorik",
       "noMatches": "Inga matchande sessioner",
       "tryDifferentSearch": "Prova en annan sökterm.",
@@ -3855,6 +3857,7 @@
     "skillMarkdownLabel": "Färdighetsinnehåll",
     "skillsEmpty": "Inga färdigheter än",
     "skillNameRequired": "Ange ett färdighetsnamn",
+    "skillNameTooLong": "Färdighetsnamn får innehålla högst {{max}} tecken",
     "skillNameInvalid": "Färdighetsnamn måste börja med en bokstav eller siffra och endast använda små bokstäver, siffror och bindestreck",
     "skillContentRequired": "Färdighetsinnehåll krävs",
     "skillSaveFailed": "Det gick inte att spara färdigheten. Försök igen.",

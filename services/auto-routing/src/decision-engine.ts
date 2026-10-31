@@ -113,6 +113,23 @@ function pickFreshCandidate(
   candidates: ReadonlyArray<RankedCandidate>,
   mode: AutoRoutingMode
 ): RankedCandidate {
+  if (mode === 'cheapest') {
+    let cheapest: RankedCandidate | undefined;
+    for (const candidate of candidates) {
+      if (!candidate.meetsThreshold) continue;
+      const cost = candidate.estimatedRequestCostUsd ?? candidate.avgCostUsd;
+      const cheapestCost = cheapest?.estimatedRequestCostUsd ?? cheapest?.avgCostUsd;
+      if (
+        cheapest === undefined ||
+        cheapestCost === undefined ||
+        cost < cheapestCost ||
+        (cost === cheapestCost && candidate.accuracy > cheapest.accuracy)
+      ) {
+        cheapest = candidate;
+      }
+    }
+    return cheapest ?? pickFreshCandidate(candidates, 'best_accuracy');
+  }
   if (mode === 'best_accuracy') {
     const [candidate] = candidates.toSorted(
       (a, b) => b.accuracy - a.accuracy || a.avgCostUsd - b.avgCostUsd
@@ -278,12 +295,16 @@ export function computeDecision(
     return null;
   }
 
-  const freshPick = pickFreshCandidate(
-    candidates,
-    isLowConfidence(table, options.confidence) ? 'best_accuracy' : mode
-  );
+  const effectiveMode = isLowConfidence(table, options.confidence) ? 'best_accuracy' : mode;
+  const freshPick = pickFreshCandidate(candidates, effectiveMode);
   const applyComplexityEffort = (candidate: RankedCandidate): RankedCandidate => {
-    if (options.preserveIncumbentVariant || !classification.reasoningComplexity) return candidate;
+    if (
+      effectiveMode === 'cheapest' ||
+      options.preserveIncumbentVariant ||
+      !classification.reasoningComplexity
+    ) {
+      return candidate;
+    }
     const variant =
       table.effortByComplexity?.[routeKey]?.[candidate.model]?.[classification.reasoningComplexity];
     if (variant === undefined) return candidate;
@@ -297,14 +318,11 @@ export function computeDecision(
 
   const incumbentCandidate = findIncumbentCandidate(candidates, incumbent);
   const incumbentPick = incumbentCandidate ? applyComplexityEffort(incumbentCandidate) : undefined;
-  // Sticky eligibility, shared by the keep decision and the switchReason
-  // telemetry below so the two can never disagree. best_accuracy keeps the
-  // strict bar (that mode exists to buy accuracy); cost_per_accuracy keeps
-  // any incumbent inside the benchmark noise band.
+  // Only cost_per_accuracy tolerates a below-threshold incumbent within benchmark noise.
   const incumbentStickyEligible = (candidate: RankedCandidate): boolean =>
-    mode === 'best_accuracy'
-      ? candidate.meetsThreshold
-      : candidate.accuracy >= table.minAccuracy - STICKY_ACCURACY_TOLERANCE;
+    mode === 'cost_per_accuracy'
+      ? candidate.accuracy >= table.minAccuracy - STICKY_ACCURACY_TOLERANCE
+      : candidate.meetsThreshold;
   const costSwitchWorthwhile = (candidate: RankedCandidate): boolean => {
     if (
       table.switchHorizonTurns != null &&
@@ -341,7 +359,7 @@ export function computeDecision(
         { model: incumbentCandidate.model, variant: candidateVariant(incumbentCandidate) },
         freshPair
       ) &&
-        ((mode === 'cost_per_accuracy' && !costSwitchWorthwhile(incumbentPick)) ||
+        ((mode !== 'best_accuracy' && !costSwitchWorthwhile(incumbentPick)) ||
           (mode === 'best_accuracy' &&
             !(picked.accuracy - incumbentPick.accuracy > table.bestAccuracySwitchThreshold)))));
 

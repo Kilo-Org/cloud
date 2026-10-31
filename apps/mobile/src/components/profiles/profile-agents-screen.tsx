@@ -28,6 +28,7 @@ import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-pro
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -143,7 +144,15 @@ export function ProfileAgentsScreen({
   // user can rename without retyping the form. The flag is the form's note, so
   // opening or closing the form resets it with the rest of the draft.
   const form = useProfileFormDraft(draftScope, agents, { slugConflict: false });
-  const { startAdd: handleStartAdd, close: handleClose } = form;
+  // The list sits underneath the sheet, and a sheet dismisses natively, so the
+  // second tap of a Save double tap would land on the row just saved.
+  const { markClosed: markSheetClosed, guard: guardRowPress } = useSheetRowTapGuard();
+  const { startAdd: handleStartAdd } = form;
+
+  const handleClose = () => {
+    markSheetClosed();
+    form.close();
+  };
 
   const saveAgent = async (
     target: AgentSource | null,
@@ -170,7 +179,7 @@ export function ProfileAgentsScreen({
       return;
     }
     if (form.isCurrent(generation)) {
-      form.close();
+      handleClose();
     }
   };
 
@@ -241,16 +250,16 @@ export function ProfileAgentsScreen({
               model={row.model}
               onEdit={
                 canManage
-                  ? () => {
+                  ? guardRowPress(() => {
                       form.startEdit(source);
-                    }
+                    })
                   : undefined
               }
               onDelete={
                 canManage
-                  ? () => {
+                  ? guardRowPress(() => {
                       confirmDelete(source);
-                    }
+                    })
                   : undefined
               }
             />

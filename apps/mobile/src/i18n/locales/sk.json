@@ -178,7 +178,7 @@
     "useDifferentEmail": "Použiť iný e-mail",
     "signInWithApple": "Prihlásiť sa cez Apple",
     "signInWithGoogle": "Prihlásiť sa cez Google",
-    "signInWithPasskey": "Prihlásiť sa prístupovým kľúčom",
+    "signInWithPasskey": "Použiť prístupový kľúč",
     "emailAddress": "E-mailová adresa",
     "emailPlaceholder": "vy@priklad.sk",
     "continueWithEmail": "Pokračovať cez e-mail",
@@ -1471,7 +1471,10 @@
       "gitlabNoRepositoriesDescription": "Možno bude potrebné udeliť prístup k ďalším skupinám alebo projektom na platforme GitLab.",
       "installGithubApp": "Inštalácia aplikácie GitHub pre repozitáre",
       "installGithubAppDescription": "Udeľte aplikácii Kilo na platforme GitHub prístup k repozitárom, ktoré chcete kontrolovať.",
-      "repositoryAccess": "prístup k repozitárom"
+      "repositoryAccess": "prístup k repozitárom",
+      "allModePersonal": "Každý repozitár, ku ktorému má Kilo prístup cez vaše pripojenie k GitHubu, sa automaticky kontroluje.",
+      "allModeOrganization": "Každý repozitár, ku ktorému má Kilo prístup cez pripojenie organizácie k GitHubu, sa automaticky kontroluje.",
+      "allModeCount": "Dostupné repozitáre: {{displayCount}}"
     },
     "style": {
       "title": "Štýl kontroly",
@@ -1824,7 +1827,6 @@
       "notYetSynced": "Zatiaľ nesynchronizované",
       "refreshFailed": "Obnovenie zlyhalo — zobrazujú sa posledné synchronizované údaje.",
       "settings": "Nastavenia",
-      "syncFindings": "Synchronizovať nálezy",
       "syncNow": "Synchronizovať teraz",
       "syncQueued": "Synchronizácia zaradená do frontu",
       "syncStatusUnavailable": "Stav synchronizácie nie je dostupný.",
@@ -2213,7 +2215,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktívne relácie sa nepodarilo načítať.",
       "couldNotRefresh": "Obnovenie sa nepodarilo",
-      "noSessionsYetDescription": "Začni programovaciu úlohu z telefónu. Tvoje relácie sa zobrazia tu.",
+      "noSessionsYetDescription": "Začni programovaciu úlohu z telefónu.",
       "viewHistory": "História relácií",
       "noMatches": "Žiadne zodpovedajúce relácie",
       "tryDifferentSearch": "Skús iný vyhľadávací výraz.",
@@ -3955,6 +3957,7 @@
     "skillMarkdownLabel": "Obsah zručností",
     "skillsEmpty": "Zatiaľ žiadne zručnosti",
     "skillNameRequired": "Zadajte názov zručnosti",
+    "skillNameTooLong": "Názov zručnosti musí mať {{max}} znakov alebo menej",
     "skillNameInvalid": "Názov zručnosti musí začínať písmenom alebo číslicou a používať iba malé písmená, číslice a pomlčky",
     "skillContentRequired": "Vyžaduje sa obsah zručností",
     "skillSaveFailed": "Nepodarilo sa zachrániť zručnosť. Skúste to znova.",

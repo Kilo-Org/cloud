@@ -26,6 +26,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_SKILLS } from '@/lib/agent-profile-forms';
+import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { cn } from '@/lib/utils';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
@@ -137,7 +138,16 @@ export function ProfileSkillsScreen({
   // sits behind the sheet, and opening or closing resets the note with the rest
   // of the draft.
   const form = useProfileFormDraft(draftScope, skills, { saveFailure: null as SaveFailure | null });
-  const { startAdd: handleStartAdd, close: handleClose } = form;
+  // The list sits underneath the sheet, and a sheet dismisses natively, so the
+  // second tap of a Save double tap would land on the row just saved.
+  const { markClosed: markSheetClosed, guard: guardRowPress } = useSheetRowTapGuard();
+  const { startAdd: handleStartAdd } = form;
+
+  const handleClose = () => {
+    markSheetClosed();
+    form.close();
+  };
+
   const setSaveFailure = (next: SaveFailure | null) => {
     form.setNotes({ saveFailure: next });
   };
@@ -181,7 +191,7 @@ export function ProfileSkillsScreen({
       return;
     }
     if (form.isCurrent(generation)) {
-      form.close();
+      handleClose();
     }
   };
 
@@ -244,7 +254,7 @@ export function ProfileSkillsScreen({
             skill={skill}
             onToggle={
               canManage
-                ? enabled => {
+                ? guardRowPress(enabled => {
                     setSkillEnabled.mutate(
                       { profileId, skillId: skill.id, enabled },
                       {
@@ -255,25 +265,25 @@ export function ProfileSkillsScreen({
                         },
                       }
                     );
-                  }
+                  })
                 : undefined
             }
             onEdit={
               canManage
-                ? () => {
+                ? guardRowPress(() => {
                     form.startEdit(skill);
-                  }
+                  })
                 : undefined
             }
             onDelete={
               canManage
-                ? () => {
+                ? guardRowPress(() => {
                     confirmDelete({
                       id: skill.id,
                       name: skill.name,
                       rawMarkdown: skill.rawMarkdown,
                     });
-                  }
+                  })
                 : undefined
             }
           />

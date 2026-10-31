@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import { SECRET_MASK } from '@/components/profiles/profile-variables-model';
 import {
   changeText,
   confirmRequest,
@@ -353,7 +354,7 @@ describe('ProfileVariablesScreen', () => {
 
     const { renderer, unmount } = await mountScreen();
 
-    expect(findAll(renderer.root, 'Text').some(node => node.props.children === '••••••••')).toBe(
+    expect(findAll(renderer.root, 'Text').some(node => node.props.children === SECRET_MASK)).toBe(
       true
     );
     expect(findAll(renderer.root, 'Text').some(node => node.props.children === '***')).toBe(false);

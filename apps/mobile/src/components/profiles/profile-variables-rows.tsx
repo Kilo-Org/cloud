@@ -116,11 +116,14 @@ export function VariableRowView({
           {row.key}
         </Text>
         {row.isSecret && onToggleReveal === undefined ? (
-          <View className="flex-row items-center gap-1">
+          /* The masked run is a fixed short placeholder, so it is rendered
+             without a width cap or a single-line limit: it always paints in
+             full and ends at the same edge as a plain value, and the key keeps
+             the rest of the row. */
+          <View className="shrink-0 flex-row items-center gap-1">
             <Lock size={12} color={colors.mutedForeground} />
             <Text
-              className="max-w-[45%] text-xs text-muted-foreground"
-              numberOfLines={1}
+              className="text-xs text-muted-foreground"
               accessibilityLabel={t('profiles.secrets.masked')}
             >
               {row.maskedValue}

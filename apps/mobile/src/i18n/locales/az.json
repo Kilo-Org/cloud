@@ -330,7 +330,7 @@
       "diffTooLarge": "dəyişikliklərin həcmi çox böyükdür",
       "openFile": "{{path}} faylını aç",
       "openFileViewed": "{{path}} faylını aç (baxılıb)",
-      "title": "Fayl"
+      "title": "Fayllar"
     },
     "fileRows": {
       "markViewed": "{{path}} faylını baxılmış kimi işarələ",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "Xülasə",
-      "files": "Fayl",
+      "files": "Fayllar",
       "discussion": "Müzakirə"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "Şəkil çək",
       "photoLibrary": "Qalereya",
-      "files": "Fayl",
+      "files": "Fayllar",
       "cameraAccessMessage": "Şəkil çəkmək üçün parametrlərdə kameraya girişə icazə ver."
     },
     "typingIndicator": {
@@ -2767,7 +2767,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Qalereya",
-      "files": "Fayl",
+      "files": "Fayllar",
       "couldNotOpenPhotoPicker": "Şəkil seçicisini açmaq mümkün olmadı. Kilo-nu yenidən başlat və yenidən cəhd et.",
       "maxFilesAllowed": "Ən çox {{displayCount}} fayl əlavə etmək olar.",
       "onlyAddingFiles": "{{total}} fayldan yalnız {{accepted}} fayl əlavə olunur (ən çox {{max}})",

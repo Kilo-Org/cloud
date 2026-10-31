@@ -490,7 +490,7 @@
     "attachmentPicker": {
       "takePhoto": "Fotoğraf çek",
       "photoLibrary": "Fotoğraf arşivi",
-      "files": "Dosya",
+      "files": "Dosyalar",
       "cameraAccessMessage": "Fotoğraf çekmek için Ayarlar'dan kamera erişimine izin ver."
     },
     "typingIndicator": {
@@ -2238,7 +2238,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Fotoğraf arşivi",
-      "files": "Dosya",
+      "files": "Dosyalar",
       "couldNotOpenPhotoPicker": "Fotoğraf seçici açılamadı. Kilo'yu yeniden başlatıp tekrar dene.",
       "maxFilesAllowed": "En fazla {{displayCount}} dosya ekleyebilirsin.",
       "onlyAddingFiles": "Toplam {{total}} dosyadan yalnızca {{accepted}} dosya ekleniyor (en fazla {{max}})",
@@ -2866,7 +2866,7 @@
       "retryLoadingAllFiles": "Tüm dosyaları yüklemeyi tekrar dene",
       "retryLoadingFiles": "Dosyaları yüklemeyi tekrar dene",
       "retryLoadingMoreFiles": "Daha fazla dosyayı yüklemeyi tekrar dene",
-      "title": "Dosya",
+      "title": "Dosyalar",
       "viewedCount": "{{viewed}}/{{total}} görüntülendi",
       "viewedOfListed": "listelenen dosyalardan {{viewed}}/{{total}} görüntülendi"
     },
@@ -3120,7 +3120,7 @@
     },
     "tabs": {
       "discussion": "Tartışma",
-      "files": "Dosya",
+      "files": "Dosyalar",
       "overview": "Genel bakış"
     },
     "diff": {

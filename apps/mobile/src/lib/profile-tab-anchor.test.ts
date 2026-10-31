@@ -50,18 +50,21 @@ describe('findingDetailBackTarget', () => {
 
 describe('finding detail back control wiring', () => {
   // Source-read fallback: the pure project cannot mount the screen, so pin the
-  // forced back control by reading the source and asserting every `ScreenHeader`
-  // usage passes `showBackButton`. This fails if the control is removed from any
-  // of the four states (loaded, notFound, error, loading).
+  // forced back control by reading the source. The loaded state renders its own
+  // `ScreenHeader`; the loading, failure and not-found states share one pending
+  // element so the header height cannot change between them. This fails if a
+  // state stops rendering a header, or if its back control is removed.
   const screenPath = fileURLToPath(
     new URL('../components/security-agent/finding-detail-screen.tsx', import.meta.url)
   );
   const source = readFileSync(screenPath, 'utf8');
   const screenHeaderCount = (source.match(/<ScreenHeader\b/g) ?? []).length;
   const showBackButtonCount = (source.match(/\bshowBackButton\b/g) ?? []).length;
+  const pendingHeaderCount = (source.match(/\{pendingHeader\}/g) ?? []).length;
 
-  it('renders a ScreenHeader in all four states', () => {
-    expect(screenHeaderCount).toBe(4);
+  it('renders the loading, failure and not-found states through the shared header', () => {
+    expect(screenHeaderCount).toBe(2);
+    expect(pendingHeaderCount).toBe(3);
   });
 
   it('passes showBackButton on every ScreenHeader usage', () => {

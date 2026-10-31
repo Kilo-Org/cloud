@@ -158,6 +158,9 @@ const sdkMetadataSchema = z.record(z.string(), z.unknown());
 export const createSessionForCloudAgentSchema = z.object({
   sessionId: sessionIdSchema,
   kiloUserId: z.string().min(1),
+  // Any non-empty id: this live create input records the caller's session
+  // identity, and requiring the `workspace_` shape here would reject callers
+  // that predate it.
   cloudAgentSessionId: z.string().min(1),
   cloudAgentWorktreeId: cloudAgentWorktreeIdSchema.optional(),
   cloudAgentWorktreeLocation: cloudAgentWorktreeLocationSchema.optional(),

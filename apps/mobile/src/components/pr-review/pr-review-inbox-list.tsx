@@ -243,9 +243,14 @@ function InboxEmpty({
   onContinueInPersonal: () => void;
 }>) {
   const { t } = useTranslation();
+  // Each state renders under its own element identity. Without it, two states
+  // that draw the same element type at this position reconcile into ONE host
+  // view, and Android keeps the previous state's accessibility label on it: the
+  // reconnect card was announced as "Loading inbox". A key per state gives the
+  // new state a fresh view, so no state ever inherits another's accessibility.
   if (view.kind === 'loading') {
     return (
-      <View accessibilityLabel={t('prReview.inbox.loading')}>
+      <View key={view.kind} accessibilityLabel={t('prReview.inbox.loading')}>
         {Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
           // eslint-disable-next-line react/no-array-index-key -- skeleton placeholders have no stable id
           <View key={index} className="gap-2 border-b-[0.5px] border-hair-soft px-6 py-3">
@@ -260,6 +265,7 @@ function InboxEmpty({
   if (view.kind === 'empty') {
     return (
       <EmptyState
+        key={view.kind}
         icon={GitPullRequest}
         title={t('prReview.inbox.noReviewRequests')}
         description={t('prReview.inbox.noReviewRequestsDescription')}
@@ -269,17 +275,18 @@ function InboxEmpty({
   }
 
   if (view.kind === 'permission') {
-    return <QueryError variant="permission" placement="top" />;
+    return <QueryError key={view.kind} variant="permission" placement="top" />;
   }
 
   if (view.kind === 'not-found') {
-    return <QueryError variant="not-found" placement="top" />;
+    return <QueryError key={view.kind} variant="not-found" placement="top" />;
   }
 
   if (view.kind === 'access-denied' || view.kind === 'organization-unavailable') {
     const unavailable = view.kind === 'organization-unavailable';
     return (
       <QueryError
+        key={view.kind}
         variant={unavailable ? 'not-found' : 'permission'}
         title={t(
           unavailable
@@ -311,7 +318,7 @@ function InboxEmpty({
 
   if (view.kind === 'reconnect') {
     return (
-      <View className="px-6 py-6">
+      <View key={view.kind} className="px-6 py-6">
         <PrReviewReconnectNotice
           platform={reconnectPlatform ?? undefined}
           organizationId={organizationId}
@@ -326,6 +333,7 @@ function InboxEmpty({
   const isServiceUnavailable = view.kind === 'service-unavailable';
   return (
     <QueryError
+      key={view.kind}
       variant="server"
       title={
         isServiceUnavailable

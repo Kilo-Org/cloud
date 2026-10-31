@@ -2813,7 +2813,6 @@
     "entry": {
       "noRecentPrs": "Geen recente beoordelingen",
       "noRecentPrsDescription": "Plak hierboven een koppeling om een beoordeling te starten — deze verschijnt de volgende keer hier.",
-      "couldNotLoad": "Het laden is mislukt.",
       "removeFromRecentsTitle": "Uit recente items verwijderen?",
       "removeFromRecentsMessage": "Deze beoordeling wordt uit je recente items verwijderd.",
       "removeRecentAccessibility": "{{repo}} uit recente items verwijderen",

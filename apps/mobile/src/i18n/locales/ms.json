@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Tiada semakan terkini",
       "noRecentPrsDescription": "Tampal pautan di atas untuk memulakan semakan — ia akan muncul di sini pada kali berikutnya.",
-      "couldNotLoad": "Tidak dapat memuatkan data.",
       "removeFromRecentsTitle": "Alih keluar daripada senarai terkini?",
       "removeFromRecentsMessage": "Semakan ini akan dialih keluar daripada senarai terkini anda.",
       "removeRecentAccessibility": "Alih keluar {{repo}} daripada senarai terkini",

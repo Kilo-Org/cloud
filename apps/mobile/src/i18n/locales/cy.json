@@ -649,7 +649,6 @@
     "entry": {
       "noRecentPrs": "Dim adolygiadau diweddar",
       "noRecentPrsDescription": "Gludwch ddolen uchod i ddechrau adolygiad — bydd yn ymddangos yma y tro nesaf.",
-      "couldNotLoad": "Ni lwyddwyd i lwytho.",
       "removeFromRecentsTitle": "Tynnu o'r rhestr ddiweddar?",
       "removeFromRecentsMessage": "Bydd yr adolygiad hwn yn cael ei dynnu o'ch rhestr ddiweddar.",
       "removeRecentAccessibility": "Tynnu {{repo}} o'r rhestr ddiweddar",

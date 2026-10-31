@@ -113,7 +113,7 @@ describe('recents identity across providers', () => {
     expect(storedRecents().map(entry => entry.platform)).toEqual(['gitlab', 'bitbucket']);
   });
 
-  it('a failed row keeps the retry CTA and provider label', async () => {
+  it('a failed row names what could not be opened in its provider vocabulary', async () => {
     store.clear();
     seedRecents([
       {
@@ -123,9 +123,20 @@ describe('recents identity across providers', () => {
         instanceHint: 'https://gl.acme.dev',
         lastResult: 'failed',
       },
+      {
+        ...SAME_TRIPLE,
+        owner: 'kilo',
+        title: 'Broken PR',
+        platform: 'github',
+        lastResult: 'failed',
+      },
     ]);
     const tree = await renderLoaded();
-    expect(textValues(tree)).toContain("Couldn't load");
+    const copy = textValues(tree);
+    // The GitLab row must not borrow GitHub's noun, and the other way round:
+    // both rows stand for a review request, but only one is a merge request.
+    expect(copy.some(value => value.includes('open merge request'))).toBe(true);
+    expect(copy.some(value => value.includes('open pull request'))).toBe(true);
     const retry = find(tree, 'Button', p => p.accessibilityLabel === 'Retry');
     (propsOf(retry).onPress as () => void)();
     expect(mocks.push).toHaveBeenCalledWith(

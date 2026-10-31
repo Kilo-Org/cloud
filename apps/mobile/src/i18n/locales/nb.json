@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Ingen nylige gjennomganger",
       "noRecentPrsDescription": "Lim inn en lenke ovenfor for å starte en kodegjennomgang — den vises her neste gang.",
-      "couldNotLoad": "Kunne ikke laste inn innholdet.",
       "removeFromRecentsTitle": "Fjerne fra listen over nylige PR-er?",
       "removeFromRecentsMessage": "Denne gjennomgangen fjernes fra listen over nylige.",
       "removeRecentAccessibility": "Fjern {{repo}} fra listen over nylige PR-er",

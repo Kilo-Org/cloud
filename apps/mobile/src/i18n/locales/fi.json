@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Ei viimeaikaisia katselmointeja",
       "noRecentPrsDescription": "Aloita katselmointi liittämällä linkki yllä olevaan kenttään — se näkyy tässä seuraavalla kerralla.",
-      "couldNotLoad": "Lataus epäonnistui.",
       "removeFromRecentsTitle": "Poistetaanko viimeksi avatuista?",
       "removeFromRecentsMessage": "Tämä katselmointi poistetaan viimeksi avatuista.",
       "removeRecentAccessibility": "Poista {{repo}} viimeksi avatuista",

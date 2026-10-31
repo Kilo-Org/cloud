@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Nincs közelmúltbeli kódellenőrzés",
       "noRecentPrsDescription": "Illessz be fent egy hivatkozást a kódellenőrzés indításához — legközelebb itt fog megjelenni.",
-      "couldNotLoad": "Nem sikerült a betöltés.",
       "removeFromRecentsTitle": "Eltávolítod az előzményekből?",
       "removeFromRecentsMessage": "Ez a kódellenőrzés eltűnik az előzményeidből.",
       "removeRecentAccessibility": "{{repo}} eltávolítása az előzményekből",

@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "ยังไม่มีรีวิวล่าสุด",
       "noRecentPrsDescription": "วางลิงก์ด้านบนเพื่อเริ่มรีวิว ครั้งต่อไปจะแสดงที่นี่",
-      "couldNotLoad": "ไม่สามารถโหลดได้",
       "removeFromRecentsTitle": "ลบออกจากรายการล่าสุดหรือไม่?",
       "removeFromRecentsMessage": "รีวิวนี้จะถูกลบออกจากรายการล่าสุดของคุณ",
       "removeRecentAccessibility": "ลบ {{repo}} ออกจากรายการล่าสุด",

@@ -616,7 +616,6 @@
     "entry": {
       "noRecentPrs": "Nicio revizuire recentă",
       "noRecentPrsDescription": "Lipește o legătură mai sus pentru a începe o revizuire — va apărea aici data viitoare.",
-      "couldNotLoad": "Nu s-au putut încărca datele.",
       "removeFromRecentsTitle": "Elimini din lista de PR-uri recente?",
       "removeFromRecentsMessage": "Această revizuire va fi eliminată din recente.",
       "removeRecentAccessibility": "Elimină {{repo}} din lista de PR-uri recente",

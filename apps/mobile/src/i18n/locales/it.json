@@ -2844,7 +2844,6 @@
     "entry": {
       "noRecentPrs": "Nessuna revisione recente",
       "noRecentPrsDescription": "Incolla qui sopra un collegamento per iniziare una revisione — la prossima volta comparirà qui.",
-      "couldNotLoad": "Impossibile caricare i dati.",
       "removeFromRecentsTitle": "Rimuovere dall'elenco delle PR recenti?",
       "removeFromRecentsMessage": "Questa revisione verrà rimossa dall'elenco delle recenti.",
       "removeRecentAccessibility": "Rimuovi {{repo}} dall'elenco delle PR recenti",

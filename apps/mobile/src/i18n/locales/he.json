@@ -2844,7 +2844,6 @@
     "entry": {
       "noRecentPrs": "אין סקירות לאחרונה",
       "noRecentPrsDescription": "הדבקו קישור למעלה כדי להתחיל סקירה — הוא יופיע כאן בפעם הבאה.",
-      "couldNotLoad": "לא ניתן היה לטעון את הנתונים.",
       "removeFromRecentsTitle": "להסיר מהבקשות האחרונות?",
       "removeFromRecentsMessage": "הסקירה הזו תוסר מרשימת האחרונות שלך.",
       "removeRecentAccessibility": "הסרת {{repo}} מרשימת הבקשות האחרונות",

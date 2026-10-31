@@ -616,7 +616,6 @@
     "entry": {
       "noRecentPrs": "Nema skorašnjih pregleda",
       "noRecentPrsDescription": "Da započnete pregled, nalepite vezu gore — sledeći put će se pojaviti ovde.",
-      "couldNotLoad": "Učitavanje nije uspelo.",
       "removeFromRecentsTitle": "Ukloniti sa spiska nedavnih zahteva?",
       "removeFromRecentsMessage": "Ovaj pregled će biti uklonjen iz skorašnjih.",
       "removeRecentAccessibility": "Ukloni {{repo}} sa spiska nedavnih zahteva",

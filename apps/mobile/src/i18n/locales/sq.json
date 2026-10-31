@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Asnjë rishikim i fundit",
       "noRecentPrsDescription": "Ngjit një lidhje më sipër për të filluar një rishikim — do të shfaqet këtu herën tjetër.",
-      "couldNotLoad": "Ngarkimi dështoi.",
       "removeFromRecentsTitle": "Të hiqet nga lista e fundit?",
       "removeFromRecentsMessage": "Ky rishikim do të hiqet nga lista jote e të fundmëve.",
       "removeRecentAccessibility": "Hiq {{repo}} nga lista e fundit",

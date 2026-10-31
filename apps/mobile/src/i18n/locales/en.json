@@ -671,7 +671,6 @@
     "entry": {
       "noRecentPrs": "No recent reviews",
       "noRecentPrsDescription": "Paste a link above to start a review — it'll show up here next time.",
-      "couldNotLoad": "Couldn't load",
       "removeFromRecentsTitle": "Remove from recents?",
       "removeFromRecentsMessage": "This review will be removed from your recents.",
       "removeRecentAccessibility": "Remove {{repo}} from recents",

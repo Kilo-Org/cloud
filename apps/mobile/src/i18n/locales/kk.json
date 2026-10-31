@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Жақында қаралғандар жоқ",
       "noRecentPrsDescription": "Тексеруді бастау үшін жоғарыға сілтеме қойыңыз — келесі жолы ол осында көрсетіледі.",
-      "couldNotLoad": "Жүктеу мүмкін болмады.",
       "removeFromRecentsTitle": "Соңғы ашылғандар тізімінен жою керек пе?",
       "removeFromRecentsMessage": "Бұл тексеру соңғы қаралғандар тізімінен жойылады.",
       "removeRecentAccessibility": "Соңғы ашылғандар тізімінен жою: {{repo}}",

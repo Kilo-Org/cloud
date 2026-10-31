@@ -11,6 +11,7 @@ import { ContextControl } from '@/components/context-control';
 import { EmptyState } from '@/components/empty-state';
 import { PrLinkPlaceholder } from '@/components/pr-review/pr-link-placeholder';
 import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
+import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { selectRecentPrRowState } from '@/lib/pr-review/recent-pr-row-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -19,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { providerPrRefLabel, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import {
@@ -204,14 +205,22 @@ export function PrReviewEntryScreen() {
                 <DirectionalChevronRight size={16} color={colors.mutedForeground} />
               </Pressable>
               {rowState.failed ? (
-                <View className="flex-row items-center justify-between gap-3 border-t border-hair-soft px-3 py-2">
+                // The footer names the item that failed, not just "couldn't
+                // load": the row stands for one pull/merge request, so the
+                // provider's own noun says what to retry. The retry is a text
+                // action — a bordered 48 dp control beside the card's plain
+                // lines read as a piece of another surface.
+                <View className="flex-row items-center justify-between gap-3 border-t border-hair-soft px-3 py-1">
                   <Text variant="muted" className="min-w-0 flex-1 text-xs">
-                    {t('prReview.entry.couldNotLoad')}
+                    {t('common.couldNotOpen', {
+                      label: t(providerPrNounKey(entry.platform ?? 'github')),
+                    })}
                   </Text>
                   <Button
                     size="sm"
-                    variant="outline"
-                    className={STATE_ACTION_CLASS}
+                    variant="link"
+                    className="px-0"
+                    hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}
                     onPress={() => {
                       handleRecentPress(entry);
                     }}

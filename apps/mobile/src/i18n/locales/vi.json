@@ -2813,7 +2813,6 @@
     "entry": {
       "noRecentPrs": "Chưa có đánh giá gần đây",
       "noRecentPrsDescription": "Dán liên kết ở trên để bắt đầu đánh giá — lần sau nó sẽ xuất hiện ở đây.",
-      "couldNotLoad": "Không thể tải dữ liệu.",
       "removeFromRecentsTitle": "Xóa khỏi mục gần đây?",
       "removeFromRecentsMessage": "Đánh giá này sẽ được xóa khỏi danh sách gần đây của bạn.",
       "removeRecentAccessibility": "Xóa {{repo}} khỏi mục gần đây",

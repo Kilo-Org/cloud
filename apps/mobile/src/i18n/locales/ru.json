@@ -2875,7 +2875,6 @@
     "entry": {
       "noRecentPrs": "Нет недавних ревью",
       "noRecentPrsDescription": "Вставьте ссылку выше, чтобы начать ревью. В следующий раз оно появится здесь.",
-      "couldNotLoad": "Не удалось загрузить данные.",
       "removeFromRecentsTitle": "Удалить из недавних?",
       "removeFromRecentsMessage": "Это ревью будет удалено из списка недавних.",
       "removeRecentAccessibility": "Удалить {{repo}} из недавних",

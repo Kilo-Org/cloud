@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "କୌଣସି ସାମ୍ପ୍ରତିକ ସମୀକ୍ଷା ନାହିଁ",
       "noRecentPrsDescription": "ସମୀକ୍ଷା ଆରମ୍ଭ କରିବାକୁ ଉପରେ ଏକ ଲିଙ୍କ୍ ପେଷ୍ଟ କରନ୍ତୁ — ପରବର୍ତ୍ତୀ ସମୟରେ ଏହା ଏଠାରେ ଦେଖାଯିବ।",
-      "couldNotLoad": "ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "removeFromRecentsTitle": "ନିକଟରେ ଖୋଲିଥିବା ତାଲିକାରୁ ହଟାଇବେ?",
       "removeFromRecentsMessage": "ଏହି ସମୀକ୍ଷା ଆପଣଙ୍କ ସାମ୍ପ୍ରତିକ ତାଲିକାରୁ ହଟାଯିବ।",
       "removeRecentAccessibility": "ନିକଟରେ ଖୋଲିଥିବା ତାଲିକାରୁ {{repo}}କୁ ହଟାନ୍ତୁ",

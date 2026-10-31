@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Walang kamakailang pagsusuri",
       "noRecentPrsDescription": "I-paste ang link sa itaas para magsimula ng pagsusuri — lalabas ito rito sa susunod.",
-      "couldNotLoad": "Hindi ma-load.",
       "removeFromRecentsTitle": "Alisin sa mga kamakailang binuksan?",
       "removeFromRecentsMessage": "Aalisin ang pagsusuring ito sa listahan ng mga kamakailan.",
       "removeRecentAccessibility": "Alisin ang {{repo}} sa mga kamakailang binuksan",

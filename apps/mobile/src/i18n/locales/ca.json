@@ -616,7 +616,6 @@
     "entry": {
       "noRecentPrs": "Cap revisió recent",
       "noRecentPrsDescription": "Enganxa un enllaç a dalt per començar una revisió — la propera vegada apareixerà aquí.",
-      "couldNotLoad": "No s'ha pogut carregar.",
       "removeFromRecentsTitle": "Vols eliminar-la de la llista de recents?",
       "removeFromRecentsMessage": "Aquesta revisió s'eliminarà de la llista de recents.",
       "removeRecentAccessibility": "Elimina {{repo}} de la llista de recents",

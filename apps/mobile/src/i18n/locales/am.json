@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "የቅርብ ጊዜ ግምገማዎች የሉም",
       "noRecentPrsDescription": "ግምገማ ለመጀመር ከላይ አገናኝ ያስገቡ — ለቀጣዩ ጊዜ እዚህ ይታያል።",
-      "couldNotLoad": "መጫን አልተቻለም።",
       "removeFromRecentsTitle": "ከቅርብ ጊዜ ዝርዝሩ ይወገድ?",
       "removeFromRecentsMessage": "ይህ ግምገማ ከቅርብ ጊዜዎችዎ ውስጥ ይወገዳል።",
       "removeRecentAccessibility": "{{repo}}ን ከቅርብ ጊዜ ዝርዝሩ አስወግድ",

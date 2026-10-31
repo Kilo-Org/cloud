@@ -627,7 +627,6 @@
     "entry": {
       "noRecentPrs": "Ni nedavnih pregledov",
       "noRecentPrsDescription": "Za začetek pregleda zgoraj prilepite povezavo — naslednjič se pojavi tukaj.",
-      "couldNotLoad": "Vsebine ni bilo mogoče naložiti.",
       "removeFromRecentsTitle": "Odstranim s seznama nedavnih?",
       "removeFromRecentsMessage": "Ta pregled bo odstranjen iz nedavnih.",
       "removeRecentAccessibility": "Odstrani {{repo}} s seznama nedavnih",

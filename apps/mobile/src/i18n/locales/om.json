@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Gamaaggawwan dhiyeenya kanaa hin jiran",
       "noRecentPrsDescription": "Gamaaggama jalqabuuf liinkii olitti maxxansi — yeroo itti aanu asitti ni mul'ata.",
-      "couldNotLoad": "Fe'uu hin danda'amne.",
       "removeFromRecentsTitle": "Tarree dhiheenyaa keessaa haqamuu?",
       "removeFromRecentsMessage": "Gamaaggamaan kun gamaaggawwan dhiyeenya kanaa keessaa ni haqama.",
       "removeRecentAccessibility": "{{repo}} tarree dhiheenyaa keessaa haqi",

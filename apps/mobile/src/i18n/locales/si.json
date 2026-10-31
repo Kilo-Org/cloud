@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "මෑත සමාලෝචන නොමැත",
       "noRecentPrsDescription": "සමාලෝචනයක් අරඹන්න ඉහත සබැඳියක් අලවා — ඊළඟ වරට මෙතැනින් පෙනේ.",
-      "couldNotLoad": "පූරණය කිරීමට නොහැකි විය.",
       "removeFromRecentsTitle": "මෑත ඉල්ලීම් ලැයිස්තුවෙන් ඉවත් කරන්නද?",
       "removeFromRecentsMessage": "මෙම සමාලෝචනය ඔබේ මෑත සමාලෝචන ලැයිස්තුවෙන් ඉවත් කෙරේ.",
       "removeRecentAccessibility": "මෑත ඉල්ලීම් ලැයිස්තුවෙන් {{repo}} ඉවත් කරන්න",

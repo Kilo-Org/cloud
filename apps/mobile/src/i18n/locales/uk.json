@@ -2875,7 +2875,6 @@
     "entry": {
       "noRecentPrs": "Немає нещодавніх рев'ю",
       "noRecentPrsDescription": "Щоб розпочати рев'ю, вставте посилання вище — наступного разу воно з'явиться тут.",
-      "couldNotLoad": "Не вдалося завантажити дані.",
       "removeFromRecentsTitle": "Видалити з нещодавніх?",
       "removeFromRecentsMessage": "Це рев'ю буде видалено зі списку нещодавніх.",
       "removeRecentAccessibility": "Видалити {{repo}} з нещодавніх",

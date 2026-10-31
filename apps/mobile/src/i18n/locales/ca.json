@@ -700,6 +700,9 @@
       "bitbucketDescription": "Connecta Bitbucket a aquesta organització per revisar sol·licituds d'integració des del mòbil.",
       "bitbucketOrgOnlyDescription": "Canvia el compte de dalt a una organització per revisar-ne les sol·licituds d'integració a Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Aquest compte encara no té cap organització. Les sol·licituds d'integració de Bitbucket es poden revisar quan creeu o us uniu a una organització.",
+      "gitlabReconnectAdminOnlyDescription": "Demana a un Propietari, Administrador o Gestor de facturació de l'organització que la reconnecti.",
+      "bitbucketNotConnectedTitle": "Bitbucket no està connectat",
+      "bitbucketAdminOnlyDescription": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
       "contextLine": "Per a {{organization}}",
       "contextLinePersonal": "Per a ús personal"
     },

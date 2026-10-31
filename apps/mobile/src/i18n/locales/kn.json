@@ -685,6 +685,9 @@
       "bitbucketDescription": "ಮೊಬೈಲ್‌ನಲ್ಲಿ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ಈ ಸಂಸ್ಥೆಯನ್ನು Bitbucketಗೆ ಸಂಪರ್ಕಿಸಿ.",
       "bitbucketOrgOnlyDescription": "ಅದರ Bitbucket ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ಮೇಲಿನ ಖಾತೆಯನ್ನು ಒಂದು ಸಂಸ್ಥೆಗೆ ಬದಲಾಯಿಸಿ.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ಈ ಖಾತೆಯಲ್ಲಿ ಇನ್ನೂ ಯಾವುದೇ ಸಂಸ್ಥೆಗಳಿಲ್ಲ. ನೀವು ಒಂದು ಸಂಸ್ಥೆಯನ್ನು ರಚಿಸಿದಾಗ ಅಥವಾ ಸೇರಿದಾಗ Bitbucket ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಬಹುದು.",
+      "gitlabReconnectAdminOnlyDescription": "ಅದನ್ನು ಮತ್ತೆ ಸಂಪರ್ಕಿಸಲು ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು, ನಿರ್ವಾಹಕರು ಅಥವಾ ಬಿಲ್ಲಿಂಗ್ ವ್ಯವಸ್ಥಾಪಕರಲ್ಲಿ ಒಬ್ಬರನ್ನು ಕೇಳಿ.",
+      "bitbucketNotConnectedTitle": "Bitbucket ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ",
+      "bitbucketAdminOnlyDescription": "ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು, ನಿರ್ವಾಹಕರು ಮತ್ತು ಬಿಲ್ಲಿಂಗ್ ವ್ಯವಸ್ಥಾಪಕರು ಮಾತ್ರ ಅದನ್ನು ಸಂಪರ್ಕಿಸಬಹುದು.",
       "contextLine": "{{organization}} ಗಾಗಿ",
       "contextLinePersonal": "ನಿಮ್ಮ ವೈಯಕ್ತಿಕ ಖಾತೆಗಾಗಿ"
     },

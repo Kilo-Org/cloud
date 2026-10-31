@@ -685,6 +685,9 @@
       "bitbucketDescription": "Միացրեք Bitbucket-ը այս կազմակերպությանը՝ միավորման հարցումները բջջայինում վերանայելու համար։",
       "bitbucketOrgOnlyDescription": "Վերեւի հաշիվը փոխեք կազմակերպության՝ դրա Bitbucket-ի միավորման հարցումները վերանայելու համար։",
       "bitbucketOrgOnlyNoOrganizationDescription": "Այս հաշիվն առայժմ չունի որեւէ կազմակերպություն։ Bitbucket-ի միավորման հարցումները հնարավոր կլինի վերանայել, երբ ստեղծեք կամ միանաք կազմակերպության։",
+      "gitlabReconnectAdminOnlyDescription": "Խնդրեք միավորման սեփականատիրոջը, ադմինիստրատորին կամ վճարումների կառավարչին նորից միացնել այն։",
+      "bitbucketNotConnectedTitle": "Bitbucket-ը միացված չէ",
+      "bitbucketAdminOnlyDescription": "Միայն կազմակերպության սեփականատերերը, ադմինիստրատորները և վճարումների կառավարիչները կարող են այն միացնել։",
       "contextLine": "{{organization}}-ի համար",
       "contextLinePersonal": "Անձնական հաշվի համար"
     },

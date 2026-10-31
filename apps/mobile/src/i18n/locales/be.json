@@ -715,6 +715,9 @@
       "bitbucketDescription": "Падключыце Bitbucket да гэтай арганізацыі, каб разглядаць запыты на зліццё з мабільнай прылады.",
       "bitbucketOrgOnlyDescription": "Пераключыце ўліковы запіс, указаны вышэй, на арганізацыю, каб разглядаць яе запыты на зліццё ў Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Гэты ўліковы запіс пакуль не мае арганізацый. Запыты на зліццё ў Bitbucket можна будзе разглядаць пасля таго, як вы створыце арганізацыю або далучыцеся да яе.",
+      "gitlabReconnectAdminOnlyDescription": "Папрасіце ўладальніка арганізацыі, адміністратара або кіраўніка плацяжоў падключыць яго.",
+      "bitbucketNotConnectedTitle": "Bitbucket не падключаны",
+      "bitbucketAdminOnlyDescription": "Толькі ўладальнікі, адміністратары і кіраўнікі плацяжоў арганізацыі могуць яго падключыць.",
       "contextLine": "Для {{organization}}",
       "contextLinePersonal": "Для асабістага ўліковага запісу"
     },

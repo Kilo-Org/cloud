@@ -685,6 +685,9 @@
       "bitbucketDescription": "Telefonda PRlarni ko‘rib chiqish uchun Bitbucketni ushbu tashkilotga ulang.",
       "bitbucketOrgOnlyDescription": "Yuqoridagi hisobni tashkilotga oʻtkazing, uning Bitbucket PRlarini koʻrib chiqish uchun.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hisobda hozircha hech qanday tashkilot yo‘q. Tashkilot yaratganingizdan yoki unga qo‘shilganingizdan so‘ng Bitbucket PRlarini ko‘rib chiqish mumkin.",
+      "gitlabReconnectAdminOnlyDescription": "Uni ulashni tashkilot Egasi, Administrator yoki To'lov menejeridan so'rang.",
+      "bitbucketNotConnectedTitle": "Bitbucket ulanmagan",
+      "bitbucketAdminOnlyDescription": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin.",
       "contextLine": "{{organization}} uchun",
       "contextLinePersonal": "Shaxsiy hisob uchun"
     },

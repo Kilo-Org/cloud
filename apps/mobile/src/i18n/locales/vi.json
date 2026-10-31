@@ -2703,6 +2703,9 @@
       "bitbucketDescription": "Kết nối Bitbucket với tổ chức này để xem PR trên thiết bị di động.",
       "bitbucketOrgOnlyDescription": "Chuyển tài khoản ở trên sang một tổ chức để xem các PR Bitbucket của tổ chức đó.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tài khoản này chưa có tổ chức nào. Bạn có thể xem các PR Bitbucket sau khi tạo hoặc tham gia một tổ chức.",
+      "gitlabReconnectAdminOnlyDescription": "Hãy yêu cầu Chủ sở hữu, Quản trị viên hoặc Người quản lý thanh toán của tổ chức kết nối lại.",
+      "bitbucketNotConnectedTitle": "Bitbucket chưa được kết nối",
+      "bitbucketAdminOnlyDescription": "Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể kết nối.",
       "contextLine": "Cho {{organization}}",
       "contextLinePersonal": "Cho tài khoản cá nhân"
     },

@@ -13,15 +13,18 @@ import { cn } from '@/lib/utils';
 
 /**
  * The active account/organization a PR-review surface operates under, as one
- * muted line above the surface's body copy. The name comes from the shared
- * memberships list (`common.personal` for the personal scope), so the gate and
- * the inbox never name an account the reader did not select.
+ * line alongside the surface's body copy — above it where the copy names the
+ * account ("switch the account above"), below it in the connect gates. The name
+ * comes from the shared memberships list (`common.personal` for the personal
+ * scope), so the gate and the inbox never name an account the reader did not
+ * select.
  *
  * When the memberships offer somewhere else to go, the whole line is the
  * switcher: tapping it opens the same account picker sheet the Profile credits
  * card uses (`useContextPicker`), and a switch re-runs every context-scoped
- * query through `useOrganization()`. With nowhere to switch the line renders as
- * plain text — a chevron on a dead control would read as a broken affordance.
+ * query through `useOrganization()`. It is drawn as an outlined pill so it
+ * reads as a control; with nowhere to switch it renders as plain muted text — a
+ * chevron on a dead control would read as a broken affordance.
  *
  * `instanceHint` optionally names a second line: a GitLab MR deep-linked from a
  * self-managed instance carries the pasted URL's origin, and connecting on
@@ -65,9 +68,16 @@ export function PrReviewContextLine({ instanceHint }: Readonly<{ instanceHint?: 
     statusMessage = t('organization.boundary.organizationUnavailable');
   }
 
+  // The switchable line is a control, so it is drawn as one: a bordered pill in
+  // the primary text color, whose surface/border pair follows `Button`'s
+  // `outline` variant (the dark hairline alone is too faint on the near-black
+  // card). With nowhere to switch the same line stays plain muted text.
   const line = (
     <Text
-      className="text-center text-sm leading-[normal] text-muted-foreground"
+      className={cn(
+        'text-center text-sm leading-[normal]',
+        switchable ? 'text-foreground' : 'text-muted-foreground'
+      )}
       numberOfLines={1}
       ellipsizeMode="tail"
     >
@@ -87,12 +97,12 @@ export function PrReviewContextLine({ instanceHint }: Readonly<{ instanceHint?: 
           onPress={openPicker}
           className={cn(
             ROW_TARGET_CLASS,
-            'max-w-full flex-row items-center gap-1 px-2 active:opacity-70'
+            'max-w-full flex-row items-center gap-1 rounded-full border border-border bg-card px-3 active:opacity-70 dark:border-neutral-700 dark:bg-secondary'
           )}
         >
           {line}
-          <View className="size-5 shrink-0 items-center justify-center">
-            <ChevronDown size={14} color={colors.mutedForeground} />
+          <View className="size-5 shrink-0 self-center items-center justify-center">
+            <ChevronDown size={14} color={colors.foreground} />
           </View>
         </Pressable>
       ) : (

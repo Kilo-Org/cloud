@@ -685,6 +685,9 @@
       "bitbucketDescription": "Свържете Bitbucket с тази организация, за да преглеждате заявки за сливане на мобилно устройство.",
       "bitbucketOrgOnlyDescription": "Превключете акаунта горе към организация, за да преглеждате нейните заявки за сливане в Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Този акаунт все още няма организации. Заявките за сливане в Bitbucket могат да се преглеждат, след като създадете организация или се присъедините към такава.",
+      "gitlabReconnectAdminOnlyDescription": "Поискайте от собственик, администратор или отговорник за плащанията на организацията да я свържат.",
+      "bitbucketNotConnectedTitle": "Няма връзка с Bitbucket",
+      "bitbucketAdminOnlyDescription": "Само собствениците на организацията, администраторите и отговорниците за плащанията могат да я установят.",
       "contextLine": "За {{organization}}",
       "contextLinePersonal": "За личния профил"
     },

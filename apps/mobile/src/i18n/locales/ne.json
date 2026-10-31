@@ -685,6 +685,9 @@
       "bitbucketDescription": "मोबाइलमा पुल रिक्वेस्टहरू समीक्षा गर्न यो संस्थालाई Bitbucket सँग जडान गर्नुहोस्।",
       "bitbucketOrgOnlyDescription": "यसको Bitbucket पुल रिक्वेस्टहरू समीक्षा गर्न माथिको खाता एउटा संस्थामा स्विच गर्नुहोस्।",
       "bitbucketOrgOnlyNoOrganizationDescription": "यो खातामा हालसम्म कुनै संस्था छैन। तपाईंले संस्था सिर्जना गर्नुभएको वा सामेल हुनुभएपछि Bitbucket पुल रिक्वेस्टहरू समीक्षा गर्न सकिन्छ।",
+      "gitlabReconnectAdminOnlyDescription": "यसलाई फेरि जडान गर्न संस्थाको मालिक, प्रशासक वा बिलिङ व्यवस्थापकलाई अनुरोध गर्नुहोस्।",
+      "bitbucketNotConnectedTitle": "Bitbucket जडान भएको छैन",
+      "bitbucketAdminOnlyDescription": "संस्थाका मालिक, प्रशासक र बिलिङ व्यवस्थापकहरूले मात्र यसलाई जडान गर्न सक्छन्।",
       "contextLine": "{{organization}} का लागि",
       "contextLinePersonal": "तपाईंको व्यक्तिगत खाताका लागि"
     },

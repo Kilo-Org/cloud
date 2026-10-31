@@ -269,10 +269,8 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           }}
         />
 
-        <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('securityAgent.dismiss.commentLabel')}
-          </Text>
+        <View className="gap-1.5">
+          <Text className="text-xs font-medium">{t('securityAgent.dismiss.commentLabel')}</Text>
           <TextInput
             accessibilityLabel={t('securityAgent.dismiss.commentLabel')}
             className="h-24 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"

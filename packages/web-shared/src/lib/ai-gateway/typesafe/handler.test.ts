@@ -873,14 +873,24 @@ describe('handleSystemOneRequest', () => {
     }
   );
 
-  it.each(['network failure', 'non-JSON success'])(
-    'records a zero-cost attempt row when the upstream call ends with %s',
-    async failure => {
-      if (failure === 'network failure') {
-        mockedFetch.mockRejectedValue(new Error('connection failed'));
-      } else {
-        mockedFetch.mockResolvedValue(new Response('not JSON', { status: 200 }));
-      }
+  it.each([
+    {
+      case: 'a transport failure',
+      arrange: () => mockedFetch.mockRejectedValue(new Error('connection failed')),
+      message: 'OpenRouter System One request failed',
+      latency: null,
+    },
+    {
+      case: 'an unreadable success body',
+      arrange: () => mockedFetch.mockResolvedValue(new Response('not JSON', { status: 200 })),
+      message: 'OpenRouter System One response body was unreadable',
+      latency: METERED_LATENCY_MS,
+    },
+  ])(
+    'records a zero-cost attempt row when the upstream call ends with $case',
+    async ({ arrange, message, latency }) => {
+      mockMeteredClock();
+      arrange();
 
       const response = await handleSystemOneRequest(makeRequest());
 
@@ -890,7 +900,7 @@ describe('handleSystemOneRequest', () => {
         error_type: 'upstream_error',
       });
       expect(errorExceptInTest).toHaveBeenCalledWith(
-        'OpenRouter System One request failed',
+        message,
         expect.objectContaining({ message: expect.any(String) })
       );
       await runAfter();
@@ -899,9 +909,10 @@ describe('handleSystemOneRequest', () => {
           messageId: null,
           hasError: true,
           status_code: 502,
+          latency,
           cost_mUsd: 0,
         }),
-        expect.objectContaining({ status_code: 502 })
+        expect.objectContaining({ status_code: 502, ttfb_ms: latency })
       );
     }
   );

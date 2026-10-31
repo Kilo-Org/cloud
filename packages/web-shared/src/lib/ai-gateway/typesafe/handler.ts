@@ -366,6 +366,22 @@ export async function handleSystemOneRequest(request: NextRequest) {
     });
   };
 
+  /**
+   * A failed upstream call still owes its attempt row. The row reports the first-byte time the
+   * gateway measured, which is absent only when no response ever arrived.
+   */
+  const upstreamFailureResponse = (error: unknown, measuredTtfbMs: number | null) => {
+    deferZeroCostUsage(null, isUpstreamTimeoutError(error) ? 504 : 502, measuredTtfbMs);
+    if (request.signal.aborted) {
+      return errorResponse(
+        'The client disconnected before the response was sent, so the request was cancelled.',
+        'client_disconnect',
+        499
+      );
+    }
+    return errorResponse('Upstream request failed', 'upstream_error', 502);
+  };
+
   // Nothing has reached the provider yet, so this request owes no usage row.
   if (request.signal.aborted) {
     return errorResponse(
@@ -376,7 +392,6 @@ export async function handleSystemOneRequest(request: NextRequest) {
   }
 
   let response: Response;
-  let responseBody: unknown;
   let ttfbMs: number;
   try {
     response = await fetch(`${OPENROUTER.apiUrl}/systemone`, {
@@ -398,29 +413,32 @@ export async function handleSystemOneRequest(request: NextRequest) {
       signal: AbortSignal.timeout(SYSTEM_ONE_UPSTREAM_TIMEOUT_MS),
     });
     ttfbMs = Math.max(0, Math.round(performance.now() - startedAt));
-    if (!response.ok) {
-      if (response.status === 402) {
-        await response.body?.cancel();
-        errorExceptInTest('OpenRouter System One balance exhausted');
-      }
-      emitMetrics(response.status, ttfbMs);
-      deferZeroCostUsage(null, response.status === 402 ? 503 : response.status, ttfbMs);
-      return response.status === 402
-        ? errorResponse('Service temporarily unavailable', 'upstream_error', 503)
-        : wrapInSafeNextResponse(response);
+  } catch (error) {
+    // No response arrived, so this request has no first byte to report.
+    errorExceptInTest('OpenRouter System One request failed', error);
+    return upstreamFailureResponse(error, null);
+  }
+
+  if (!response.ok) {
+    if (response.status === 402) {
+      await response.body?.cancel();
+      errorExceptInTest('OpenRouter System One balance exhausted');
     }
+    emitMetrics(response.status, ttfbMs);
+    deferZeroCostUsage(null, response.status === 402 ? 503 : response.status, ttfbMs);
+    return response.status === 402
+      ? errorResponse('Service temporarily unavailable', 'upstream_error', 503)
+      : wrapInSafeNextResponse(response);
+  }
+
+  let responseBody: unknown;
+  try {
     responseBody = await response.json();
   } catch (error) {
-    errorExceptInTest('OpenRouter System One request failed', error);
-    deferZeroCostUsage(null, isUpstreamTimeoutError(error) ? 504 : 502, null);
-    if (request.signal.aborted) {
-      return errorResponse(
-        'The client disconnected before the response was sent, so the request was cancelled.',
-        'client_disconnect',
-        499
-      );
-    }
-    return errorResponse('Upstream request failed', 'upstream_error', 502);
+    // The provider received the request and may have billed it, so this row keeps the
+    // first-byte time the gateway measured before the body turned out to be unreadable.
+    errorExceptInTest('OpenRouter System One response body was unreadable', error);
+    return upstreamFailureResponse(error, ttfbMs);
   }
 
   const result = systemOneResponseSchema.safeParse(responseBody);

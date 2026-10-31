@@ -3199,7 +3199,7 @@
     "couldNotSaveChoice": "Nije moguće spremiti tvoj odabir. Pokušaj ponovno.",
     "onlineAllowed": "Putem interneta, dopušteno",
     "onlineNotAllowed": "Putem interneta, nije dopušteno",
-    "optionalReview": "Neobavezno — možeš promijeniti u bilo kojem trenutku u postavkama",
+    "optionalReview": "Neobavezno",
     "optionalOnboarding": "Neobavezno — uključeno dok ne isključiš",
     "aiProvidersWhat": "Tvoji upiti, povijest razgovora i sve datoteke koje priložiš.",
     "aiProvidersWhy": "Za generiranje odgovora AI-ja.",
@@ -4033,7 +4033,8 @@
       "nameRequired": "Unesite naziv naredbe",
       "nameInvalid": "Ime mora započeti malim slovom i koristiti samo mala slova, znamenke i crtice",
       "templateRequired": "Unesite predložak naredbe",
-      "nameConflict": "To je ime rezervirano ugrađenom naredbom"
+      "nameConflict": "To je ime rezervirano ugrađenom naredbom",
+      "duplicateName": "Naredba s ovim imenom već postoji u ovom profilu"
     },
     "repoBindings": {
       "title": "Zadani profili za Repos",

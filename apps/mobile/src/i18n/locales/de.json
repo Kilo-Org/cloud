@@ -2621,7 +2621,7 @@
     "couldNotSaveChoice": "Deine Auswahl konnte nicht gespeichert werden. Bitte versuche es erneut.",
     "onlineAllowed": "Online, erlaubt",
     "onlineNotAllowed": "Online, nicht erlaubt",
-    "optionalReview": "Freiwillig – jederzeit in den Einstellungen änderbar",
+    "optionalReview": "Freiwillig",
     "optionalOnboarding": "Freiwillig – aktiviert, solange du es nicht ausschaltest",
     "aiProvidersWhat": "Deine Prompts, dein Unterhaltungsverlauf und alle Dateien, die du anhängst.",
     "aiProvidersWhy": "Um KI-Antworten zu erstellen.",
@@ -3976,7 +3976,8 @@
       "nameRequired": "Gib einen Befehlsnamen ein",
       "nameInvalid": "Der Name muss mit einem Kleinbuchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten",
       "templateRequired": "Gib eine Befehlsvorlage ein",
-      "nameConflict": "Dieser Name wird durch einen integrierten Befehl reserviert"
+      "nameConflict": "Dieser Name wird durch einen integrierten Befehl reserviert",
+      "duplicateName": "Ein Befehl mit diesem Namen ist in diesem Profil bereits vorhanden"
     },
     "repoBindings": {
       "title": "Standardprofile für Repos",

@@ -238,7 +238,7 @@ describe('ConsentDetails copy', () => {
   it('review heading does not claim optional telemetry is on', () => {
     const renderer = mount('review');
     const texts = findTextStrings(renderer.root);
-    expect(texts).toContain('Optional — you can change this any time in Settings');
+    expect(texts).toContain('Optional');
     expect(texts).not.toContain('Optional — on unless you turn it off');
   });
 

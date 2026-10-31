@@ -1,9 +1,8 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { isRedundantAgentSlug } from '@kilocode/app-shared/agent-profile';
 import { EmptyState } from '@/components/empty-state';
 import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
 import {
@@ -27,6 +26,7 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { cn } from '@/lib/utils';
@@ -47,7 +47,6 @@ function isSlugConflict(error: unknown): boolean {
 
 type AgentRowViewProps = Readonly<{
   name: string;
-  slug: string;
   visibility: AgentVisibility;
   description: string;
   model: string;
@@ -55,10 +54,9 @@ type AgentRowViewProps = Readonly<{
   onDelete?: () => void;
 }>;
 
-/** One agent row: name, slug, visibility, optional model and description, edit/delete. */
+/** One agent row: name, visibility, optional model and description, edit/delete. */
 function AgentRowView({
   name,
-  slug,
   visibility,
   description,
   model,
@@ -70,9 +68,7 @@ function AgentRowView({
   // The name owns its row, so an agent name is ellipsized only when it alone is
   // wider than the card; the mode label never takes the room a short name needs.
   // The label is metadata, so it leads the column under the name at the same
-  // 2 px gap as the slug, the model and the description. A slug that only
-  // repeats the name in lowercase is left out.
-  const showSlug = !isRedundantAgentSlug(name, slug);
+  // 2 dp gap the card uses between its meta lines.
   return (
     <View className="min-h-16 flex-row items-start gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="min-w-0 flex-1 gap-0.5">
@@ -85,11 +81,6 @@ function AgentRowView({
         <Text className="text-xs uppercase tracking-wide text-muted-foreground">
           {t(AGENT_VISIBILITY_LABEL_KEYS[visibility])}
         </Text>
-        {showSlug ? (
-          <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
-            {slug}
-          </Text>
-        ) : null}
         {model.length > 0 ? (
           <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
             {model}
@@ -148,37 +139,42 @@ export function ProfileAgentsScreen({
 
   const agents = profileQuery.data ?? NO_AGENTS;
   const rows = agentRows(agents);
-  // `null` = closed, `{ source: null }` = add, `{ source }` = edit that agent.
-  const [form, setForm] = useState<{ source: AgentSource | null } | null>(null);
+  // `null` = closed, the add form, or the agent being edited. The form and the
+  // fields it holds are a draft (`lib/form-draft`), so a remount reopens it on
+  // what was typed instead of dropping it.
+  const draftScope = `profiles:agents:${profileId}`;
   // A save the server rejected on the slug shows the inline conflict message
   // instead of only a toast: the sheet stays open on the typed values, so the
-  // user can rename without retyping the form.
-  const [serverSlugConflict, setServerSlugConflict] = useState(false);
+  // user can rename without retyping the form. The flag is the form's note, so
+  // opening or closing the form resets it with the rest of the draft.
+  const form = useProfileFormDraft(draftScope, agents, { slugConflict: false });
   // The list sits underneath the sheet, and a sheet dismisses natively, so the
   // second tap of a Save double tap would land on the row just saved.
   const { markClosed: markSheetClosed, guard: guardRowPress } = useSheetRowTapGuard();
+  const { startAdd: handleStartAdd } = form;
 
-  const startAdd = () => {
-    setForm({ source: null });
-    setServerSlugConflict(false);
-  };
-
-  const closeForm = () => {
+  const handleClose = () => {
     markSheetClosed();
-    setForm(null);
+    form.close();
   };
 
   const saveAgent = async (
     target: AgentSource | null,
     payload: { slug: string; name: string; config: Record<string, unknown> }
   ) => {
+    // The form this save belongs to. A remount keeps it alive; a later open or
+    // close replaces it, and this attempt must then leave the new form alone.
+    const generation = form.generation();
     try {
       await (target === null
         ? createAgent.mutateAsync({ profileId, ...payload })
         : updateAgent.mutateAsync({ profileId, agentId: target.id, ...payload }));
     } catch (error) {
+      if (!form.isCurrent(generation)) {
+        return;
+      }
       if (isSlugConflict(error)) {
-        setServerSlugConflict(true);
+        form.setNotes({ slugConflict: true });
         return;
       }
       if (!hasUsableMessage(error)) {
@@ -186,7 +182,9 @@ export function ProfileAgentsScreen({
       }
       return;
     }
-    closeForm();
+    if (form.isCurrent(generation)) {
+      handleClose();
+    }
   };
 
   const runDelete = async (agentId: string) => {
@@ -232,7 +230,7 @@ export function ProfileAgentsScreen({
         placement="top"
         action={
           canManage ? (
-            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
+            <Button className={STATE_ACTION_CLASS} onPress={handleStartAdd}>
               <Text>{t('profiles.agents.add')}</Text>
             </Button>
           ) : null
@@ -251,15 +249,13 @@ export function ProfileAgentsScreen({
             <AgentRowView
               key={source.id}
               name={source.name}
-              slug={source.slug}
               visibility={row.visibility}
               description={row.description}
               model={row.model}
               onEdit={
                 canManage
                   ? guardRowPress(() => {
-                      setForm({ source });
-                      setServerSlugConflict(false);
+                      form.startEdit(source);
                     })
                   : undefined
               }
@@ -274,7 +270,7 @@ export function ProfileAgentsScreen({
           );
         })}
         {canManage ? (
-          <Button onPress={startAdd}>
+          <Button onPress={handleStartAdd}>
             <Text>{t('profiles.agents.add')}</Text>
           </Button>
         ) : null}
@@ -295,18 +291,19 @@ export function ProfileAgentsScreen({
         {content}
       </TabScreenScrollView>
 
-      {form !== null ? (
+      {form.isOpen ? (
         <AgentFormSheet
-          agent={form.source}
+          draftScope={draftScope}
+          agent={form.editing}
           existingSlugs={agents
-            .filter(candidate => candidate.id !== form.source?.id)
+            .filter(candidate => candidate.id !== form.editing?.id)
             .map(candidate => candidate.slug)}
           organizationId={organizationId}
           isSaving={createAgent.isPending || updateAgent.isPending}
-          slugConflictFromServer={serverSlugConflict}
-          onClose={closeForm}
+          slugConflictFromServer={form.notes.slugConflict}
+          onClose={handleClose}
           onSave={payload => {
-            void saveAgent(form.source, payload);
+            void saveAgent(form.editing, payload);
           }}
         />
       ) : null}

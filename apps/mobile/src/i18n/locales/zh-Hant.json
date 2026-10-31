@@ -2621,7 +2621,7 @@
     "couldNotSaveChoice": "無法儲存你的選擇。請再試一次。",
     "onlineAllowed": "已允許線上處理",
     "onlineNotAllowed": "未允許線上處理",
-    "optionalReview": "選用項目：可隨時在「設定」中變更",
+    "optionalReview": "選用",
     "optionalOnboarding": "選用項目：預設開啟，可自行關閉",
     "aiProvidersWhat": "你的提示詞、對話記錄與附加的檔案。",
     "aiProvidersWhy": "用於產生 AI 回覆。",
@@ -3976,7 +3976,8 @@
       "nameRequired": "輸入命令名稱",
       "nameInvalid": "名稱必須以小寫字母開頭，且只能使用小寫字母、數字和連字符",
       "templateRequired": "輸入命令模板",
-      "nameConflict": "該名稱由內建指令保留"
+      "nameConflict": "該名稱由內建指令保留",
+      "duplicateName": "此設定檔中已有相同名稱的指令"
     },
     "repoBindings": {
       "title": "倉庫的預設設定檔",

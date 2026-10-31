@@ -91,7 +91,7 @@ export function McpServerRowView({
           accessibilityLabel={t('profiles.mcp.delete', { name: server.name })}
           onPress={onDelete}
         >
-          <Trash2 size={18} color={colors.destructive} />
+          <Trash2 size={18} color={colors.mutedForeground} />
         </Pressable>
       ) : null}
     </View>

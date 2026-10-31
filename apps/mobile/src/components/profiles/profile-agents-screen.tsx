@@ -109,7 +109,7 @@ function AgentRowView({
           accessibilityLabel={t('profiles.agents.delete', { name })}
           onPress={onDelete}
         >
-          <Trash2 size={18} color={colors.destructive} />
+          <Trash2 size={18} color={colors.mutedForeground} />
         </Pressable>
       ) : null}
     </View>

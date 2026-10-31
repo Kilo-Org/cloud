@@ -47,6 +47,7 @@ const voiceLanguage = vi.hoisted(() => ({ chosen: null as string | null, loaded:
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   Switch: 'Switch',
   Pressable: 'Pressable',
   View: 'View',

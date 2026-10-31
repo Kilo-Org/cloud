@@ -97,7 +97,7 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
           accessibilityLabel={t('profiles.skillDelete', { name: skill.name })}
           onPress={onDelete}
         >
-          <Trash2 size={18} color={colors.destructive} />
+          <Trash2 size={18} color={colors.mutedForeground} />
         </Pressable>
       ) : null}
     </View>

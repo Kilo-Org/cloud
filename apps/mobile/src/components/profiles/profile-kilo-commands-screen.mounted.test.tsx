@@ -36,6 +36,7 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
+  useColorScheme: () => 'light',
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',

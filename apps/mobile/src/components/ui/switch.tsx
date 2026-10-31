@@ -1,4 +1,4 @@
-import { Switch as NativeSwitch, Platform, type SwitchProps } from 'react-native';
+import { Switch as NativeSwitch, Platform, type SwitchProps, useColorScheme } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -10,10 +10,14 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * saturated teal on Android that belongs to no palette entry. In a list row
  * that outranks the row title and the screen's own button, so the track takes
  * the scheme's `primary` and the grip its `primaryForeground`, which keeps the
- * two legible against each other in light and dark. The off-track uses the
- * muted grey rather than the accent, because a control that is off should
- * recede. A caller that wants another pair still wins: its own props are
- * applied last.
+ * two legible against each other in light and dark.
+ *
+ * The off pair follows the scheme as well, because a grip that always takes
+ * `primaryForeground` is near-black in dark mode and vanishes into the off
+ * track. Off draws a light grip on a lighter track, so the control still reads
+ * as a control while it says off: `mutedSoft` with a white grip in light,
+ * `mutedForeground` with a `foreground` grip in dark. A caller that wants
+ * another pair still wins: its own props are applied last.
  *
  * Fabric derives the accessibility traits from the role and
  * `accessibilityState`, then assigns them to the native control, replacing the
@@ -27,16 +31,26 @@ export function Switch({
   accessibilityState,
   trackColor,
   thumbColor,
+  value,
   ...props
 }: SwitchProps) {
   const colors = useThemeColors();
+  const dark = useColorScheme() === 'dark';
   const resolvedDisabled = disabled ?? accessibilityState?.disabled;
+  // The on grip sits on `primary`, the off grip on the off track.
+  const offGrip = dark ? colors.foreground : colors.primaryForeground;
 
   return (
     <NativeSwitch
       {...props}
-      trackColor={trackColor ?? { false: colors.mutedSoft, true: colors.primary }}
-      thumbColor={thumbColor ?? (Platform.OS === 'android' ? colors.primaryForeground : undefined)}
+      value={value}
+      trackColor={
+        trackColor ?? {
+          false: dark ? colors.mutedForeground : colors.mutedSoft,
+          true: colors.primary,
+        }
+      }
+      thumbColor={thumbColor ?? (value ? colors.primaryForeground : offGrip)}
       disabled={resolvedDisabled}
       accessibilityState={
         Platform.OS === 'ios'

@@ -1779,6 +1779,7 @@
       "refreshFailed": "Ezin izan dira datuak eguneratu. Azken sinkronizazioko datuak erakusten dira.",
       "settings": "Ezarpenak",
       "syncFindings": "Sinkronizatu aurkikuntzak",
+      "syncing": "Sinkronizatzen…",
       "syncNow": "Sinkronizatu orain",
       "syncQueued": "Sinkronizazioa ilaran",
       "syncStatusUnavailable": "Sinkronizazioaren egoera ez dago erabilgarri.",

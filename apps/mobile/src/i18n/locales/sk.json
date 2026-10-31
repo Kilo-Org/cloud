@@ -1825,6 +1825,7 @@
       "refreshFailed": "Obnovenie zlyhalo — zobrazujú sa posledné synchronizované údaje.",
       "settings": "Nastavenia",
       "syncFindings": "Synchronizovať nálezy",
+      "syncing": "Synchronizuje sa…",
       "syncNow": "Synchronizovať teraz",
       "syncQueued": "Synchronizácia zaradená do frontu",
       "syncStatusUnavailable": "Stav synchronizácie nie je dostupný.",

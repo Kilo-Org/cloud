@@ -1304,6 +1304,7 @@
       "settings": "Ajustes",
       "slaPosture": "Estado de cumplimiento del SLA",
       "syncFindings": "Sincronizar hallazgos",
+      "syncing": "Sincronizando…",
       "syncNow": "Sincronizar ahora",
       "syncQueued": "Sincronización en cola",
       "syncStatusUnavailable": "El estado de sincronización no está disponible.",

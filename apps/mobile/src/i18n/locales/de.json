@@ -1299,6 +1299,7 @@
       "settings": "Einstellungen",
       "slaPosture": "SLA-Übersicht",
       "syncFindings": "Befunde synchronisieren",
+      "syncing": "Synchronisierung läuft…",
       "syncNow": "Jetzt synchronisieren",
       "syncQueued": "Synchronisierung in die Warteschlange aufgenommen",
       "syncStatusUnavailable": "Der Synchronisierungsstatus ist nicht verfügbar.",

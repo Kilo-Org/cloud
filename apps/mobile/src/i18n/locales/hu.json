@@ -1779,6 +1779,7 @@
       "refreshFailed": "Nem sikerült a frissítés. Az utolsó szinkronizálás adatai láthatók.",
       "settings": "Beállítások",
       "syncFindings": "Találatok szinkronizálása",
+      "syncing": "Szinkronizálás folyamatban…",
       "syncNow": "Szinkronizálás most",
       "syncQueued": "Szinkronizálás sorba állítva",
       "syncStatusUnavailable": "A szinkronizálás állapota nem érhető el.",

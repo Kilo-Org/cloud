@@ -1848,6 +1848,7 @@
       "refreshFailed": "Ma setgħetx tiġi aġġornata d-dejta. Qed tintwera d-dejta tal-aħħar sinkronizzazzjoni.",
       "settings": "Issettjar",
       "syncFindings": "Sinkronizza s-sejbiet",
+      "syncing": "Qed jissinkronizza…",
       "syncNow": "Sinkronizza issa",
       "syncQueued": "Is-sinkronizzazzjoni tqiegħdet fil-kju",
       "syncStatusUnavailable": "L-istat tas-sinkronizzazzjoni mhux disponibbli.",

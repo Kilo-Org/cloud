@@ -1802,6 +1802,7 @@
       "refreshFailed": "Não foi possível atualizar os dados. São apresentados os dados da última sincronização.",
       "settings": "Definições",
       "syncFindings": "Sincronizar ocorrências",
+      "syncing": "Sincronizando…",
       "syncNow": "Sincronizar agora",
       "syncQueued": "Sincronização adicionada à fila",
       "syncStatusUnavailable": "Não é possível consultar o estado da sincronização.",

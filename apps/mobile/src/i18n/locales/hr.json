@@ -1802,6 +1802,7 @@
       "refreshFailed": "Osvježavanje nije uspjelo — prikazuju se zadnji sinkronizirani podaci.",
       "settings": "Postavke",
       "syncFindings": "Sinkroniziraj nalaze",
+      "syncing": "Sinkronizacija u tijeku…",
       "syncNow": "Sinkroniziraj sada",
       "syncQueued": "Sinkronizacija je dodana u red čekanja.",
       "syncStatusUnavailable": "Status sinkronizacije nije dostupan.",

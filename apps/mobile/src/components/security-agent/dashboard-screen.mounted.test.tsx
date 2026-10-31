@@ -47,6 +47,13 @@ const triggerSync = vi.hoisted(() => ({
   isError: false,
   error: null as Error | null,
 }));
+// The server's own view of a running sync for this scope, plus the timestamp
+// of its last read (the dashboard tells a fresh, empty answer from a cached one
+// by comparing it to when it started watching).
+const syncActivity = vi.hoisted(() => ({
+  syncRunning: false,
+  updatedAt: 0,
+}));
 const config = vi.hoisted(() => ({
   data: { slaEnabled: true },
 }));
@@ -178,6 +185,9 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
   useTriggerSecuritySync: () => triggerSync,
   useRetrySecurityAgentSettings: () => settingsRecovery,
 }));
+vi.mock('@/lib/hooks/use-security-agent-sync-running', () => ({
+  useSecurityAgentSyncRunning: () => syncActivity,
+}));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissFailures: () => dismissFailures,
   securityDismissFailureCopy: (draft: { lastError: string }) => draft.lastError,
@@ -302,6 +312,13 @@ function syncDisabledStates(root: I): boolean[] {
   return syncButtons(root).map(n => n.props.disabled as boolean);
 }
 
+function syncBusyStates(root: I): boolean[] {
+  return syncButtons(root).map(n => {
+    const state = n.props.accessibilityState as unknown;
+    return typeof state === 'object' && state !== null && 'busy' in state && state.busy === true;
+  });
+}
+
 // The one Button the dashboard renders on its own: the retry beside a failed
 // sync's copy. Every other failure renders through the shared retry card.
 function syncRetries(root: I): I[] {
@@ -339,6 +356,10 @@ describe('DashboardScreen sync control terminal states', () => {
     triggerSync.isPending = false;
     triggerSync.isError = false;
     triggerSync.error = null;
+    syncActivity.syncRunning = false;
+    syncActivity.updatedAt = 0;
+    dashboardStats.refetch.mockClear();
+    lastSync.refetch.mockClear();
     config.data = { slaEnabled: true };
     dashboardStats.isLoading = false;
     dashboardStats.isPending = false;
@@ -369,13 +390,134 @@ describe('DashboardScreen sync control terminal states', () => {
     expect(syncDisabledStates(root.root)).toEqual([false, false]);
   });
 
-  it('keeps both sync controls enabled after a retryable error and shows its copy', () => {
-    triggerSync.isError = true;
-    triggerSync.error = mapSecuritySyncOperationError(new Error('operation_in_progress'));
+  it('presents an in-progress conflict as a running sync instead of a retryable failure', () => {
+    const root = renderScreen();
+    const syncNow = findSyncButton(root.root, 'securityAgent.dashboard.syncNow');
+    act(() => {
+      (syncNow.props.onPress as () => void)();
+    });
+    const options = triggerSync.mutate.mock.calls.at(-1)?.[1] as {
+      onError: (error: unknown) => void;
+    };
+    act(() => {
+      triggerSync.isError = true;
+      triggerSync.error = mapSecuritySyncOperationError(new Error('operation_in_progress'));
+      options.onError(triggerSync.error);
+      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+    });
+
+    // The ledger refused a duplicate of a submit that is still in flight, so
+    // the sync is running: both controls report progress and stay disabled, and
+    // the conflict sentence with its colliding Retry is gone.
+    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncBusyStates(root.root)).toEqual([true, true]);
+    expect(renderedTexts(root.root)).not.toContain(IN_PROGRESS_COPY);
+    expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.dashboard.syncing'));
+    expect(syncRetries(root.root)).toHaveLength(0);
+
+    // The run it handed over to becomes visible, then finishes: the controls
+    // return, and the conflict copy still never appears.
+    act(() => {
+      syncActivity.syncRunning = true;
+      syncActivity.updatedAt = Date.now() + 1000;
+      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+    });
+    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+
+    act(() => {
+      syncActivity.syncRunning = false;
+      syncActivity.updatedAt = Date.now() + 2000;
+      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+    });
+    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+    expect(renderedTexts(root.root)).not.toContain(IN_PROGRESS_COPY);
+    expect(syncRetries(root.root)).toHaveLength(0);
+  });
+
+  it('gives the controls back when a refused duplicate never shows its run', () => {
+    vi.useFakeTimers();
+    try {
+      const root = renderScreen();
+      const syncNow = findSyncButton(root.root, 'securityAgent.dashboard.syncNow');
+      act(() => {
+        (syncNow.props.onPress as () => void)();
+      });
+      const options = triggerSync.mutate.mock.calls.at(-1)?.[1] as {
+        onError: (error: unknown) => void;
+      };
+      act(() => {
+        triggerSync.isError = true;
+        triggerSync.error = mapSecuritySyncOperationError(new Error('operation_in_progress'));
+        options.onError(triggerSync.error);
+        root.update(createElement(DashboardScreen, { scope: 'personal' }));
+      });
+      expect(syncDisabledStates(root.root)).toEqual([true, true]);
+
+      // One poll later the server still lists no sync: a submit the screen can
+      // never see must not hold the control, so the watch expires.
+      act(() => {
+        syncActivity.updatedAt = Date.now() + 3000;
+        root.update(createElement(DashboardScreen, { scope: 'personal' }));
+      });
+      expect(syncDisabledStates(root.root)).toEqual([true, true]);
+
+      act(() => {
+        vi.advanceTimersByTime(30_000);
+        root.update(createElement(DashboardScreen, { scope: 'personal' }));
+      });
+      expect(syncDisabledStates(root.root)).toEqual([false, false]);
+      expect(renderedTexts(root.root)).not.toContain(IN_PROGRESS_COPY);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the run in progress while the server still reports the sync, then refreshes both dashboard reads', () => {
+    syncActivity.syncRunning = true;
+    syncActivity.updatedAt = Date.now();
     const root = renderScreen();
 
+    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncBusyStates(root.root)).toEqual([true, true]);
+    expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.dashboard.syncing'));
+
+    act(() => {
+      syncActivity.syncRunning = false;
+      syncActivity.updatedAt = Date.now() + 10;
+      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+    });
+
+    // The sync finished: the controls come back and "Last synced" plus the
+    // repository sync state are refreshed without leaving the screen.
     expect(syncDisabledStates(root.root)).toEqual([false, false]);
-    expect(renderedTexts(root.root)).toContain(IN_PROGRESS_COPY);
+    expect(renderedTexts(root.root)).not.toContain(i18n.t('securityAgent.dashboard.syncing'));
+    expect(dashboardStats.refetch).toHaveBeenCalledTimes(1);
+    expect(lastSync.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats an accepted submit as running until a read taken after it reports no sync', () => {
+    const root = renderScreen();
+    const syncNow = findSyncButton(root.root, 'securityAgent.dashboard.syncNow');
+
+    act(() => {
+      (syncNow.props.onPress as () => void)();
+    });
+    const options = triggerSync.mutate.mock.calls.at(-1)?.[1] as { onSuccess: () => void };
+    act(() => {
+      options.onSuccess();
+      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+    });
+
+    // The 202 accepts the command, so the run is still going: a cached empty
+    // answer that predates the submit cannot end the progress state.
+    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+
+    act(() => {
+      syncActivity.updatedAt = Date.now() + 1000;
+      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+    });
+
+    expect(syncDisabledStates(root.root)).toEqual([false, false]);
   });
 
   it('renders the translated ambiguous copy under ja and keeps both controls retryable', async () => {
@@ -464,6 +606,38 @@ describe('DashboardScreen sync control terminal states', () => {
       { repoFullName: 'kilo/repo', operationKey: 'kilo-repo-key' },
       expect.objectContaining({ onSuccess: expect.any(Function) })
     );
+  });
+
+  it('hides a reconcile row while a sync is in flight, and brings it back after', () => {
+    outbox.needsReconcile = [
+      {
+        operationKey: 'kilo-repo-key',
+        fingerprint: 'sync:kilo/repo',
+        scope: 'personal',
+        input: { repoFullName: 'kilo/repo' },
+      },
+    ];
+    const root = renderScreen();
+    expect(retryCards.cards.map(card => card.lastError)).toContain(RECONCILE_COPY);
+
+    // A run is under way, so the row's "may not have completed" copy and its
+    // same-key retry would contradict the progress state and collide with it.
+    retryCards.cards = [];
+    act(() => {
+      syncActivity.syncRunning = true;
+      syncActivity.updatedAt = Date.now();
+      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+    });
+    expect(retryCards.cards.map(card => card.lastError)).not.toContain(RECONCILE_COPY);
+
+    // The run ended: an unfinished row is still the reader's to reconcile.
+    retryCards.cards = [];
+    act(() => {
+      syncActivity.syncRunning = false;
+      syncActivity.updatedAt = Date.now() + 1000;
+      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+    });
+    expect(retryCards.cards.map(card => card.lastError)).toContain(RECONCILE_COPY);
   });
 
   it('keeps the failure and reports progress on the retry while it runs', () => {

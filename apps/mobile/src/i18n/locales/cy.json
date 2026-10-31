@@ -1871,6 +1871,7 @@
       "refreshFailed": "Ni ellid adnewyddu'r data. Dangosir y data o'r cysoniad diwethaf.",
       "settings": "Gosodiadau",
       "syncFindings": "Cysoni canfyddiadau",
+      "syncing": "Wrthi'n cysoni…",
       "syncNow": "Cysoni nawr",
       "syncQueued": "Cysoniad yn y ciw",
       "syncStatusUnavailable": "Nid yw'r statws cysoni ar gael.",

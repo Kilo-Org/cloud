@@ -1779,6 +1779,7 @@
       "refreshFailed": "Päivitys epäonnistui — näytetään viimeksi synkronoidut tiedot.",
       "settings": "Asetukset",
       "syncFindings": "Synkronoi havainnot",
+      "syncing": "Synkronoidaan…",
       "syncNow": "Synkronoi nyt",
       "syncQueued": "Synkronointi lisättiin jonoon",
       "syncStatusUnavailable": "Synkronoinnin tilaa ei ole saatavilla",

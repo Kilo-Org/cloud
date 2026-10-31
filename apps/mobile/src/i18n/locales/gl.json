@@ -1779,6 +1779,7 @@
       "refreshFailed": "Non se puido actualizar: móstranse os últimos datos sincronizados.",
       "settings": "Axustes",
       "syncFindings": "Sincronizar achados",
+      "syncing": "Sincronizando…",
       "syncNow": "Sincronizar agora",
       "syncQueued": "Sincronización na cola",
       "syncStatusUnavailable": "O estado da sincronización non está dispoñible.",

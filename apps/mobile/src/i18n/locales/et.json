@@ -1779,6 +1779,7 @@
       "refreshFailed": "Värskendamine ebaõnnestus — kuvatakse viimati sünkroonitud andmeid.",
       "settings": "Seaded",
       "syncFindings": "Sünkrooni leiud",
+      "syncing": "Sünkroonimine…",
       "syncNow": "Sünkrooni nüüd",
       "syncQueued": "Sünkroonimine on järjekorras",
       "syncStatusUnavailable": "Sünkroonimise olek pole saadaval.",

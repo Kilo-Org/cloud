@@ -1779,6 +1779,7 @@
       "refreshFailed": "Data kunne ikke opdateres. De senest synkroniserede data vises.",
       "settings": "Indstillinger",
       "syncFindings": "Synkronisér fund",
+      "syncing": "Synkroniserer…",
       "syncNow": "Synkronisér nu",
       "syncQueued": "Synkronisering i kø",
       "syncStatusUnavailable": "Status for synkroniseringen er ikke tilgængelig.",

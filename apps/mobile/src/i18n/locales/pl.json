@@ -1309,6 +1309,7 @@
       "settings": "Ustawienia",
       "slaPosture": "Realizacja SLA",
       "syncFindings": "Synchronizuj problemy",
+      "syncing": "Synchronizowanie…",
       "syncNow": "Synchronizuj teraz",
       "syncQueued": "Dodano synchronizację do kolejki",
       "syncStatusUnavailable": "Status synchronizacji jest niedostępny.",

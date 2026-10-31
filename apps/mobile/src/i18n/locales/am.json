@@ -1779,6 +1779,7 @@
       "refreshFailed": "ማደስ አልተቻለም። ለመጨረሻ ጊዜ የተመሳሰለው ውሂብ እየታየ ነው።",
       "settings": "ቅንብሮች",
       "syncFindings": "ግኝቶችን ያመሳስሉ",
+      "syncing": "በማመሳሰል ላይ…",
       "syncNow": "አሁን ያመሳስሉ",
       "syncQueued": "ማመሳሰል ወደ ወረፋ ገብቷል።",
       "syncStatusUnavailable": "የማመሳሰል ሁኔታን ማግኘት አልተቻለም።",

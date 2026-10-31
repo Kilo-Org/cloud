@@ -317,6 +317,7 @@
     "manual review",
     "merge",
     "no changes needed",
+    "only adding {{accepted}} of {{total}} files (max {{max}})",
     "open",
     "open pull request",
     "pr opened",

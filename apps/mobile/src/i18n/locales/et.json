@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Võimalik, et pead GitLabis andma juurdepääsu veel mõnele rühmale või projektile.",
       "installGithubApp": "GitHubi rakenduse paigaldamine hoidlatele",
       "installGithubAppDescription": "Anna Kilo GitHubi rakendusele juurdepääs hoidlatele, mille koodi soovid üle vaadata.",
-      "repositoryAccess": "juurdepääs hoidlatele"
+      "repositoryAccess": "juurdepääs hoidlatele",
+      "allModePersonal": "Kõik hoidlad, millele Kilol on sinu GitHubi ühenduse kaudu juurdepääs, vaadatakse automaatselt üle.",
+      "allModeOrganization": "Kõik hoidlad, millele Kilol on organisatsiooni GitHubi ühenduse kaudu juurdepääs, vaadatakse automaatselt üle.",
+      "allModeCount": "Saadaolevad hoidlad: {{displayCount}}"
     },
     "style": {
       "title": "Ülevaatuse stiil",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktiivseid seansse ei õnnestunud laadida.",
       "couldNotRefresh": "Värskendamine ebaõnnestus",
-      "noSessionsYetDescription": "Alusta telefonis programmeerimisülesannet. Sinu seansid kuvatakse siin.",
+      "noSessionsYetDescription": "Alusta telefonis programmeerimisülesannet.",
       "viewHistory": "Seansside ajalugu",
       "noMatches": "Sobivaid seansse ei leitud",
       "tryDifferentSearch": "Proovi teistsugust otsingusõna.",
@@ -3855,6 +3858,7 @@
     "skillMarkdownLabel": "Oskuste sisu",
     "skillsEmpty": "Oskusi veel pole",
     "skillNameRequired": "Sisestage oskuse nimi",
+    "skillNameTooLong": "Oskuste nimi peab olema {{max}} tähemärki või vähem",
     "skillNameInvalid": "Oskuste nimi peab algama tähe või numbriga ning kasutama ainult väiketähti, numbreid ja sidekriipse",
     "skillContentRequired": "Vajalik on oskuste sisu",
     "skillSaveFailed": "Oskust ei õnnestunud salvestada. Proovi uuesti.",

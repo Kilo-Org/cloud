@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "ښايي په GitLab کې نورو ډلو یا پروژو ته هم د لاسرسي اجازه ورکړئ.",
       "installGithubApp": "په ذخیرو کې د GitHub اپ نصب کړئ",
       "installGithubAppDescription": "د Kilo د GitHub اپ ته هغو ذخیرو ته لاسرسی ورکړئ چې غواړئ بیاکتنه یې وشي.",
-      "repositoryAccess": "ذخیرې ته لاسرسی"
+      "repositoryAccess": "ذخیرې ته لاسرسی",
+      "allModePersonal": "هر هغه زېرمتون چې Kilo ستاسو د GitHub د اتصال له لارې ورته لاسرسی لري، اتوماتیکه بیاکتنه کیږي.",
+      "allModeOrganization": "هر هغه زېرمتون چې Kilo د سازمان د GitHub د اتصال له لارې ورته لاسرسی لري، اتوماتیکه بیاکتنه کیږي.",
+      "allModeCount": "د لاسرسي وړ زېرمتونونه: {{displayCount}}"
     },
     "style": {
       "title": "د بیاکتنې بڼه",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "فعالې ناستې بار نه شوې.",
       "couldNotRefresh": "تازه نه شو",
-      "noSessionsYetDescription": "له خپل تلیفون څخه د کوډ کولو دنده پیل کړئ. ستاسو ناستې به دلته ښکاره شي.",
+      "noSessionsYetDescription": "له خپل تلیفون څخه د کوډ کولو دنده پیل کړئ.",
       "viewHistory": "د ناستو تاریخچه",
       "noMatches": "هېڅ ناسته سمون نه خوري",
       "tryDifferentSearch": "د لټون لپاره بله کلیمه وکاروئ.",
@@ -3855,6 +3858,7 @@
     "skillMarkdownLabel": "د مهارت منځپانګه",
     "skillsEmpty": "تراوسه هیڅ مهارت نه لري",
     "skillNameRequired": "د مهارت نوم دننه کړئ",
+    "skillNameTooLong": "د مهارت نوم باید {{max}} یا لږ توري ولري",
     "skillNameInvalid": "د مهارت نوم باید د یوه لیک یا عدد سره پیل شي او یوازې د کوچنیو حروفو، ګوتو او ډیشونو څخه کار واخلئ",
     "skillContentRequired": "د مهارت منځپانګې ته اړتیا ده",
     "skillSaveFailed": "مهارت نه شو ژغورلی. بیا هڅه وکړئ.",

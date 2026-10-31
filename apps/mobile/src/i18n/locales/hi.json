@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "आपको GitLab पर और समूहों या प्रोजेक्ट तक पहुँच देने की ज़रूरत हो सकती है।",
       "installGithubApp": "रिपॉज़िटरी पर GitHub ऐप इंस्टॉल करें",
       "installGithubAppDescription": "जिन रिपॉज़िटरी की समीक्षा करानी है, उन तक Kilo GitHub ऐप को पहुँच दें।",
-      "repositoryAccess": "रिपॉज़िटरी तक पहुँच"
+      "repositoryAccess": "रिपॉज़िटरी तक पहुँच",
+      "allModePersonal": "Kilo आपके GitHub कनेक्शन के ज़रिए जिन सभी रिपॉज़िटरी तक पहुँच सकता है, उन सभी की समीक्षा स्वचालित रूप से की जाती है।",
+      "allModeOrganization": "Kilo संगठन के GitHub कनेक्शन के ज़रिए जिन सभी रिपॉज़िटरी तक पहुँच सकता है, उन सभी की समीक्षा स्वचालित रूप से की जाती है।",
+      "allModeCount": "उपलब्ध रिपॉज़िटरी: {{displayCount}}"
     },
     "style": {
       "title": "समीक्षा की शैली",
@@ -1631,7 +1634,7 @@
       "noMatches": "कोई सत्र मेल नहीं खाता",
       "noPastSessions": "कोई पिछला सत्र नहीं",
       "pastSessions": "पिछले सत्र",
-      "noSessionsYetDescription": "अपने फ़ोन से कोडिंग कार्य शुरू करें। आपके सत्र यहाँ दिखाई देंगे।",
+      "noSessionsYetDescription": "अपने फ़ोन से कोडिंग कार्य शुरू करें।",
       "viewHistory": "सत्रों का इतिहास",
       "tryAdjustFilters": "अपने फ़िल्टर बदलकर या हटाकर देखें।",
       "tryDifferentSearch": "किसी दूसरे शब्द से खोजें।",
@@ -3855,6 +3858,7 @@
     "skillMarkdownLabel": "कौशल सामग्री",
     "skillsEmpty": "अभी तक कोई कौशल नहीं है",
     "skillNameRequired": "एक कौशल नाम दर्ज करें",
+    "skillNameTooLong": "कौशल का नाम {{max}} अक्षरों या उससे कम होना चाहिए",
     "skillNameInvalid": "कौशल का नाम किसी अक्षर या अंक से शुरू होना चाहिए और केवल छोटे अक्षरों, अंकों और डैश का उपयोग करना चाहिए",
     "skillContentRequired": "कौशल सामग्री की आवश्यकता है",
     "skillSaveFailed": "कौशल सहेजा नहीं जा सका। फिर से प्रयास करें।",

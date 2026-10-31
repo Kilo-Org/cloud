@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLab-da daha çox qrupa və ya layihəyə giriş icazəsi verməyin lazım ola bilər.",
       "installGithubApp": "GitHub tətbiqini repozitoriyalarda quraşdır",
       "installGithubAppDescription": "Kilo GitHub tətbiqinə yoxlanmasını istədiyin repozitoriyalara giriş icazəsi ver.",
-      "repositoryAccess": "repozitoriyaya giriş"
+      "repositoryAccess": "repozitoriyaya giriş",
+      "allModePersonal": "GitHub bağlantın vasitəsilə Kilo-nun əldə edə bildiyi hər bir repozitoriya avtomatik yoxlanılır.",
+      "allModeOrganization": "Təşkilatın GitHub bağlantısı vasitəsilə Kilo-nun əldə edə bildiyi hər bir repozitoriya avtomatik yoxlanılır.",
+      "allModeCount": "Əlçatan repozitoriyalar: {{displayCount}}"
     },
     "style": {
       "title": "Yoxlama üslubu",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktiv sessiyaları yükləmək mümkün olmadı.",
       "couldNotRefresh": "Yeniləmək mümkün olmadı",
-      "noSessionsYetDescription": "Telefonundan kodlaşdırma tapşırığı başlat. Sessiyaların burada görünəcək.",
+      "noSessionsYetDescription": "Telefonundan kodlaşdırma tapşırığı başlat.",
       "viewHistory": "Sessiya tarixçəsi",
       "noMatches": "Uyğun sessiya yoxdur",
       "tryDifferentSearch": "Başqa sözlə axtar.",
@@ -3855,6 +3858,7 @@
     "skillMarkdownLabel": "Bacarıq məzmunu",
     "skillsEmpty": "Hələ bacarıq yoxdur",
     "skillNameRequired": "Bacarıq adı daxil edin",
+    "skillNameTooLong": "Bacarıq adı {{max}} simvoldan çox olmamalıdır",
     "skillNameInvalid": "Bacarıq adı hərf və ya rəqəmlə başlamalı və yalnız kiçik hərflər, rəqəmlər və tirelərdən istifadə etməlidir",
     "skillContentRequired": "Bacarıq məzmunu tələb olunur",
     "skillSaveFailed": "Bacarıq saxlamaq mümkün olmadı. Yenidən cəhd edin.",

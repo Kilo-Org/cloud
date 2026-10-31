@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLab дээр илүү олон бүлэг эсвэл төсөлд хандах эрх өгөх шаардлагатай байж болно.",
       "installGithubApp": "Репозиториудад GitHub апп суулгах",
       "installGithubAppDescription": "Kilo GitHub аппад шалгуулах репозиториуддаа хандах эрх олгоно уу.",
-      "repositoryAccess": "репозиторийн хандах эрх"
+      "repositoryAccess": "репозиторийн хандах эрх",
+      "allModePersonal": "Kilo таны GitHub холболтоор хандах боломжтой бүх репозитори автоматаар шалгагдана.",
+      "allModeOrganization": "Kilo байгууллагын GitHub холболтоор хандах боломжтой бүх репозитори автоматаар шалгагдана.",
+      "allModeCount": "Боломжтой репозитори: {{displayCount}}"
     },
     "style": {
       "title": "Шалгалтын хэв маяг",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Идэвхтэй сессүүдийг ачаалж чадсангүй.",
       "couldNotRefresh": "Сэргээж чадсангүй",
-      "noSessionsYetDescription": "Утаснаасаа код бичих даалгавар эхлүүлнэ үү. Таны сессүүд энд харагдана.",
+      "noSessionsYetDescription": "Утаснаасаа код бичих даалгавар эхлүүлнэ үү.",
       "viewHistory": "Сессийн түүх",
       "noMatches": "Тохирох сесс олдсонгүй",
       "tryDifferentSearch": "Өөр үгээр хайж үзнэ үү.",
@@ -3855,6 +3858,7 @@
     "skillMarkdownLabel": "Ур чадварын агуулга",
     "skillsEmpty": "Одоогоор ур чадвар алга",
     "skillNameRequired": "Ур чадварын нэрийг оруулна уу",
+    "skillNameTooLong": "Ур чадварын нэр {{max}} тэмдэгтээс ихгүй байх ёстой",
     "skillNameInvalid": "Ур чадварын нэр нь үсэг эсвэл цифрээр эхэлж, зөвхөн жижиг үсэг, цифр, зураас ашиглана.",
     "skillContentRequired": "Ур чадварын агуулга шаардлагатай",
     "skillSaveFailed": "Ур чадвараа хадгалж чадсангүй. Дахин оролдоно уу.",

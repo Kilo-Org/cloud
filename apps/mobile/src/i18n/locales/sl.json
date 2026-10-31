@@ -1471,7 +1471,10 @@
       "gitlabNoRepositoriesDescription": "Morda moraš odobriti dostop do več skupin ali projektov na platformi GitLab.",
       "installGithubApp": "Namestitev aplikacije GitHub v skladišča",
       "installGithubAppDescription": "Aplikaciji Kilo za GitHub odobri dostop do skladišč, ki jih želiš pregledati.",
-      "repositoryAccess": "dostop do skladišč"
+      "repositoryAccess": "dostop do skladišč",
+      "allModePersonal": "Vsako skladišče, do katerega lahko Kilo dostopa prek tvoje povezave z GitHubom, se samodejno pregleda.",
+      "allModeOrganization": "Vsako skladišče, do katerega lahko Kilo dostopa prek povezave organizacije z GitHubom, se samodejno pregleda.",
+      "allModeCount": "Razpoložljiva skladišča: {{displayCount}}"
     },
     "style": {
       "title": "Slog pregleda",
@@ -2213,7 +2216,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktivnih sej ni bilo mogoče naložiti.",
       "couldNotRefresh": "Osvežitev ni uspela",
-      "noSessionsYetDescription": "Začni programsko nalogo s telefona. Tvoje seje se bodo prikazale tukaj.",
+      "noSessionsYetDescription": "Začni programsko nalogo s telefona.",
       "viewHistory": "Zgodovina sej",
       "noMatches": "Ni ustreznih sej",
       "tryDifferentSearch": "Poskusi z drugim iskalnim izrazom.",
@@ -3955,6 +3958,7 @@
     "skillMarkdownLabel": "Vsebina spretnosti",
     "skillsEmpty": "Ni še veščin",
     "skillNameRequired": "Vnesite ime spretnosti",
+    "skillNameTooLong": "Ime spretnosti mora imeti {{max}} znakov ali manj",
     "skillNameInvalid": "Ime spretnosti se mora začeti s črko ali številko in uporabljati samo male črke, številke in pomišljaje",
     "skillContentRequired": "Potrebna je vsebina spretnosti",
     "skillSaveFailed": "Spretnosti ni bilo mogoče shraniti. Poskusite znova.",

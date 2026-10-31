@@ -31,7 +31,7 @@ import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { formatNumber, formatPercent } from '@/lib/format';
+import { formatNumber, formatPercent, UNMEASURED_VALUE } from '@/lib/format';
 import {
   useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
@@ -47,6 +47,7 @@ import {
   securitySyncReconcileCopy,
 } from '@/lib/security-agent-ledger';
 import { useSecurityAgentSyncRunning } from '@/lib/hooks/use-security-agent-sync-running';
+import { useSecurityScopeTitle } from '@/lib/hooks/use-security-scope-title';
 import {
   securityDismissFailureCopy,
   useSecurityDismissFailures,
@@ -80,18 +81,17 @@ const DUPLICATE_SYNC_WATCH_MS = 30_000;
 // claiming a sync it cannot see, while a run it does see keeps the state itself.
 const ACCEPTED_SYNC_WATCH_MS = 60_000;
 
-// A tile with no number to show renders the dash the app's other stat tiles
-// use, in the same numeric style as its neighbours: a sentence set in the value
-// style reads as a broken metric beside zeros.
-const NO_METRIC_VALUE = '—';
-
 const METRIC_TONE_CLASS = {
   danger: 'text-destructive',
   warning: 'text-warn',
   neutral: 'text-muted-foreground',
 } satisfies Record<DashboardMetricTone, string>;
 
-export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean) {
+export function buildLocalizedMetrics(
+  data: DashboardStats,
+  slaEnabled: boolean,
+  neverSynced = false
+) {
   const metrics = buildSecurityDashboardMetrics(data, slaEnabled);
   const number = (value: number) => formatNumber(value, i18n.language);
   // The tile value counts every severity, so the detail line names every
@@ -108,7 +108,7 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
       : i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetail', parts);
   };
 
-  return metrics.map(metric => {
+  const localized = metrics.map(metric => {
     switch (metric.id) {
       case 'openFindings': {
         return Object.assign(metric, {
@@ -145,7 +145,11 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
           : null;
         return Object.assign(metric, {
           label: i18n.t('securityAgent.dashboardMetrics.slaCompliance'),
-          value: compliance === null ? NO_METRIC_VALUE : formatPercent(compliance, i18n.language),
+          // An unmeasured value is a dash in the numeric slot, not a word: the
+          // tile's value style is the large mono count, so "Not measured" read
+          // as a heavy placeholder that outweighed the real counts beside it,
+          // and the detail line below already explains why there is none.
+          value: compliance === null ? UNMEASURED_VALUE : formatPercent(compliance, i18n.language),
           detail: measured
             ? i18n.t('securityAgent.dashboardMetrics.withinDeadlineDetail', {
                 within: number(data.sla.overall.withinSla),
@@ -191,12 +195,29 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
       }
     }
   });
+
+  // Before the first sync nothing has been measured, so every tile read a zero
+  // count and, under it, a line that described the zeros as a clean report
+  // ("All open findings tracked", "No findings have an SLA deadline yet").
+  // A dash in the numeric slot and the screen's own not-yet-synced line state
+  // the measurement is simply absent.
+  if (!neverSynced) {
+    return localized;
+  }
+  return localized.map(metric =>
+    Object.assign(metric, {
+      value: UNMEASURED_VALUE,
+      detail: i18n.t('securityAgent.dashboard.notYetSynced'),
+      tone: 'neutral' as const,
+    })
+  );
 }
 
 export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const scopeTitle = useSecurityScopeTitle(scope);
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const [repoFullName, setRepoFullName] = useState<string | undefined>(undefined);
@@ -241,8 +262,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   );
 
   const slaEnabled = config.data?.slaEnabled ?? true;
+  // The stored absence of a sync, the same read that paints "Not yet synced"
+  // under the filter: nothing has been measured yet, so the tiles and the
+  // priority row must not read their empty result as a clean report. A read
+  // that is still loading or failed is not this state.
+  const neverSynced = lastSync.data?.lastSyncTime === null;
   const data = dashboardStats.data;
-  const metrics = data ? buildLocalizedMetrics(data, slaEnabled) : [];
+  const metrics = data ? buildLocalizedMetrics(data, slaEnabled, neverSynced) : [];
 
   const lastSyncTime = lastSync.data?.lastSyncTime;
   const now = useRelativeTimeNow();
@@ -442,12 +468,17 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     <View className="flex-1 bg-background">
       <ScreenHeader
         className="px-6"
-        title={t('common.securityAgent')}
-        // Size-11 (44dp) icon buttons: findings and settings, plus the audit
-        // overflow when the viewer can manage the agent. Declaring exactly the
-        // buttons this viewer renders drops the actions onto their own row
-        // before the one-line CJK title loses its readable minimum.
-        headerRightWidth={canManage ? 3 * 44 : 2 * 44}
+        title={scopeTitle}
+        eyebrow={t('common.securityAgent')}
+        // The scope name is the one thing that tells two organizations apart,
+        // so it wraps to a second line rather than ellipsizing its tail.
+        titleNumberOfLines={2}
+        // The trailing cluster's laid-out width — 48 dp icon boxes 7 dp apart:
+        // findings and settings, plus the audit overflow when the viewer can
+        // manage the agent. Declaring 44 dp boxes understated the cluster, so
+        // the stacking decision believed the heading kept 48 dp more than it
+        // has. The widths the controls actually render are what it reserves.
+        headerRightWidth={canManage ? 3 * 48 + 2 * 7 : 2 * 48 + 7}
         headerRight={
           <View className="flex-row items-center gap-2">
             <IconButton
@@ -681,6 +712,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             data={data}
             slaEnabled={slaEnabled}
             repoFullName={repoFullName}
+            neverSynced={neverSynced}
           />
         ) : null}
       </TabScreenScrollView>

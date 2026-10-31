@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import {
+  bitbucketRowsUnlisted,
   dedupeRepositoriesByPlatformAndFullName,
   detectRepositoryPlatform,
   type NewSessionRepository,
@@ -221,10 +222,11 @@ export function useNewSessionRepos({
     integrationInstalled: gitlabQuery.data?.integrationInstalled,
     repositoryCount: gitlabRepositories.length,
   });
+  const bitbucketStatusRaw = bitbucketQuery.data?.status;
   const bitbucketStatus = resolveBitbucketStatus({
     isLoading: bitbucketQuery.isLoading,
     isError: bitbucketQuery.isError,
-    status: bitbucketQuery.data?.status,
+    status: bitbucketStatusRaw,
     repositoryCount: bitbucketRepositories.length,
   });
 
@@ -243,6 +245,7 @@ export function useNewSessionRepos({
           key: 'bitbucket',
           status: bitbucketStatus,
           repositories: bitbucketRepositories,
+          rowsUnlisted: bitbucketRowsUnlisted(bitbucketStatusRaw),
         },
         recents: recentlyUsed,
       }),
@@ -254,6 +257,7 @@ export function useNewSessionRepos({
       gitlabStatus,
       gitlabRepositories,
       bitbucketStatus,
+      bitbucketStatusRaw,
       bitbucketRepositories,
       recentlyUsed,
     ]

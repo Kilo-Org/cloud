@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Þú gætir þurft að veita aðgang að fleiri hópum eða verkefnum á GitLab.",
       "installGithubApp": "Settu upp GitHub-forritið á geymslum",
       "installGithubAppDescription": "Veittu GitHub-forriti Kilo aðgang að geymslunum sem þú vilt láta yfirfara.",
-      "repositoryAccess": "aðgang að geymslum"
+      "repositoryAccess": "aðgang að geymslum",
+      "allModePersonal": "Hver geymsla sem Kilo getur nálgast í gegnum GitHub-tengingu þína er yfirfarin sjálfkrafa.",
+      "allModeOrganization": "Hver geymsla sem Kilo getur nálgast í gegnum GitHub-tengingu samtakanna er yfirfarin sjálfkrafa.",
+      "allModeCount": "Geymslur í boði: {{displayCount}}"
     },
     "style": {
       "title": "Rýnistíll",
@@ -1667,7 +1670,7 @@
       "outcome": "Útkoma",
       "slaStatus": "SLA-staða",
       "sortBy": "Raða eftir",
-      "statusOpen": "Opna",
+      "statusOpen": "Opið",
       "fixed": "Lagað",
       "statusIgnored": "Hunsað",
       "severityHigh": "Hátt",
@@ -1841,7 +1844,7 @@
       "source": "Uppruni",
       "sourceId": "Upprunakenni",
       "viewAdvisory": "Skoða öryggistilkynningu á GitHub",
-      "statusOpen": "Opna",
+      "statusOpen": "Opið",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "lagfæring er þegar hafin",
       "reasonNoBandwidth": "enginn tími er til ráðstöfunar",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Ekki tókst að hlaða virkum lotum.",
       "couldNotRefresh": "Ekki tókst að endurnýja",
-      "noSessionsYetDescription": "Byrjaðu á forritunarverkefni í símanum þínum. Loturnar þínar birtast hér.",
+      "noSessionsYetDescription": "Byrjaðu á forritunarverkefni í símanum þínum.",
       "viewHistory": "Lotuferill",
       "noMatches": "Engar lotur samsvara leitinni",
       "tryDifferentSearch": "Prófaðu annað leitarorð.",
@@ -3855,6 +3858,7 @@
     "skillMarkdownLabel": "Færniefni",
     "skillsEmpty": "Engin kunnátta ennþá",
     "skillNameRequired": "Sláðu inn hæfileikaheiti",
+    "skillNameTooLong": "Hæfniheiti má ekki vera lengra en {{max}} stafir",
     "skillNameInvalid": "Hæfniheiti verður að byrja á bókstaf eða tölustaf og nota aðeins lágstafi, tölustafi og bandstrik",
     "skillContentRequired": "Færniefni er krafist",
     "skillSaveFailed": "Ekki tókst að bjarga kunnáttu. Reyndu aftur.",

@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Wataƙila kana buƙatar ba da damar shiga ƙarin ƙungiyoyi ko ayyuka a GitLab.",
       "installGithubApp": "Shigar da manhajar GitHub a ma'ajiyoyi",
       "installGithubAppDescription": "Ba manhajar Kilo ta GitHub damar shiga ma'ajiyoyin da kake son a yi bitarsu.",
-      "repositoryAccess": "damar shiga ma'ajiya"
+      "repositoryAccess": "damar shiga ma'ajiya",
+      "allModePersonal": "Kowace ma'ajiyar da Kilo zai iya shiga ta hanyar haɗin GitHub ɗinka ana yin bitarta ta atomatik.",
+      "allModeOrganization": "Kowace ma'ajiyar da Kilo zai iya shiga ta hanyar haɗin GitHub na ƙungiyar ana yin bitarta ta atomatik.",
+      "allModeCount": "Ma'ajiyoyin da ke akwai: {{displayCount}}"
     },
     "style": {
       "title": "Salon bita",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Ba a iya loda zaman da ke aiki ba.",
       "couldNotRefresh": "Ba a iya sabuntawa ba",
-      "noSessionsYetDescription": "Fara aikin rubuta lamba daga wayarka. Zaman aikinka za su bayyana a nan.",
+      "noSessionsYetDescription": "Fara aikin rubuta lamba daga wayarka.",
       "viewHistory": "Tarihin zaman",
       "noMatches": "Babu zaman da ya dace",
       "tryDifferentSearch": "Gwada wata kalmar bincike dabam.",
@@ -3855,6 +3858,7 @@
     "skillMarkdownLabel": "Abubuwan gwaninta",
     "skillsEmpty": "Babu fasaha tukuna",
     "skillNameRequired": "Shigar da sunan fasaha",
+    "skillNameTooLong": "Dole ne sunan fasaha ya kasance haruffa {{max}} ko ƙasa da haka",
     "skillNameInvalid": "Dole ne sunan gwani ya fara da harafi ko lambobi kuma yayi amfani da ƙananan haruffa kawai, lambobi, da dashes",
     "skillContentRequired": "Ana buƙatar abun ciki gwaninta",
     "skillSaveFailed": "An kasa ajiye fasaha. Sake gwadawa.",

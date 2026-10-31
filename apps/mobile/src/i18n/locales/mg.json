@@ -178,7 +178,7 @@
     "useDifferentEmail": "Mampiasà adiresy mailaka hafa",
     "signInWithApple": "Midira amin'ny Apple",
     "signInWithGoogle": "Midira amin'ny Google",
-    "signInWithPasskey": "Midira amin'ny fanalahidin'ny fidirana",
+    "signInWithPasskey": "Mampiasa passkey",
     "emailAddress": "Adiresy mailaka",
     "emailPlaceholder": "ianao@example.com",
     "continueWithEmail": "Tohizo amin'ny mailaka",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Mety mila manome alalana hidirana amin'ny vondrona na tetikasa fanampiny ao amin'ny GitLab ianao.",
       "installGithubApp": "Apetraho amin'ny tahirin-kaody ny rindranasa GitHub",
       "installGithubAppDescription": "Omeo alalana hiditra amin'ny tahirin-kaody tianao hohamarinina ny rindranasa Kilo ao amin'ny GitHub.",
-      "repositoryAccess": "alalana hidirana amin'ny tahirin-kaody"
+      "repositoryAccess": "alalana hidirana amin'ny tahirin-kaody",
+      "allModePersonal": "Hamarinina ho azy ny tahirin-kaody rehetra azon'ny Kilo idirana amin'ny alalan'ny fifandraisanao amin'ny GitHub.",
+      "allModeOrganization": "Hamarinina ho azy ny tahirin-kaody rehetra azon'ny Kilo idirana amin'ny alalan'ny fifandraisan'ny fikambanana amin'ny GitHub.",
+      "allModeCount": "Tahirin-kaody azo: {{displayCount}}"
     },
     "style": {
       "title": "Fomba fandinihana",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Tsy tafiditra ny fotoam-piasana mandeha.",
       "couldNotRefresh": "Tsy vita ny fanavaozana",
-      "noSessionsYetDescription": "Manomboha asa fanoratana kaody amin'ny findainao. Hiseho eto ny fotoam-piasanao.",
+      "noSessionsYetDescription": "Manomboha asa fanoratana kaody amin'ny findainao.",
       "viewHistory": "Tantaran'ny fotoam-piasana",
       "noMatches": "Tsy misy fotoam-piasana mifanaraka",
       "tryDifferentSearch": "Andramo ny teny fikarohana hafa.",
@@ -3855,6 +3858,7 @@
     "skillMarkdownLabel": "Votoatin'ny fahaiza-manao",
     "skillsEmpty": "Tsy mbola misy fahaizana",
     "skillNameRequired": "Ampidiro anarana fahaizana",
+    "skillNameTooLong": "Ny anaran'ny fahaiza-manao dia tsy maintsy {{max}} tarehimarika na latsaka",
     "skillNameInvalid": "Ny anaran'ny fahaiza-manao dia tsy maintsy manomboka amin'ny litera na tarehimarika ary tsy mampiasa afa-tsy litera kely, isa ary tsipiho",
     "skillContentRequired": "Ilaina ny votoatin'ny fahaiza-manao",
     "skillSaveFailed": "Tsy nahavonjy fahaizana. Andramo indray.",

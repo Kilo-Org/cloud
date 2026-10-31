@@ -11,6 +11,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import {
+  SKILL_NAME_MAX_LENGTH,
   type SkillInputError,
   skillNameFromMarkdown,
   validateSkillInput,
@@ -76,7 +77,11 @@ export function SkillFormSheet({
     'status' | 'name' | 'content'
   >();
 
-  const nameError = error === 'empty' || error === 'bad-name' ? t(skillErrorKey(error)) : undefined;
+  /** The codes that belong under the name field; `no-content` is the content one. */
+  const nameErrorShown = error === 'empty' || error === 'too-long' || error === 'bad-name';
+  const nameError = nameErrorShown
+    ? t(skillErrorKey(error), { max: SKILL_NAME_MAX_LENGTH })
+    : undefined;
   const contentError = error === 'no-content' ? t(skillErrorKey(error)) : undefined;
 
   const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
@@ -148,7 +153,7 @@ export function SkillFormSheet({
           onChangeText={value => {
             nameEditedRef.current = true;
             nameRef.current = value;
-            if (error === 'empty' || error === 'bad-name') {
+            if (error !== 'no-content') {
               setError(null);
             }
           }}
@@ -180,7 +185,7 @@ export function SkillFormSheet({
             setPrefill(derived);
             // The field now holds a name the validator accepts, so an error the
             // last save left on the empty field no longer describes it.
-            if (error === 'empty' || error === 'bad-name') {
+            if (error !== 'no-content') {
               setError(null);
             }
           }}

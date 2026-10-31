@@ -178,7 +178,7 @@
     "useDifferentEmail": "Erabili beste helbide elektroniko bat",
     "signInWithApple": "Hasi saioa Apple-rekin",
     "signInWithGoogle": "Hasi saioa Google-rekin",
-    "signInWithPasskey": "Hasi saioa sarbide-gako batekin",
+    "signInWithPasskey": "Erabili sarbide-gakoa",
     "emailAddress": "Helbide elektronikoa",
     "emailPlaceholder": "zu@adibidea.com",
     "continueWithEmail": "Jarraitu posta elektronikoarekin",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Baliteke GitLab-eko talde edo proiektu gehiagorako sarbidea eman behar izatea.",
       "installGithubApp": "Instalatu GitHub aplikazioa biltegietan",
       "installGithubAppDescription": "Eman Kiloren GitHub aplikazioari berrikusi nahi dituzun biltegietarako sarbidea.",
-      "repositoryAccess": "biltegietarako sarbidea"
+      "repositoryAccess": "biltegietarako sarbidea",
+      "allModePersonal": "Zure GitHub konexioaren bidez Kilok atzi dezakeen biltegi bakoitza automatikoki berrikusten da.",
+      "allModeOrganization": "Erakundearen GitHub konexioaren bidez Kilok atzi dezakeen biltegi bakoitza automatikoki berrikusten da.",
+      "allModeCount": "Erabilgarri dauden biltegiak: {{displayCount}}"
     },
     "style": {
       "title": "Berrikuspen-estiloa",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Ezin izan dira saio aktiboak kargatu.",
       "couldNotRefresh": "Ezin izan da freskatu",
-      "noSessionsYetDescription": "Hasi programazio-zeregin bat telefonotik. Zure saioak hemen agertuko dira.",
+      "noSessionsYetDescription": "Hasi programazio-zeregin bat telefonotik.",
       "viewHistory": "Saioen historiala",
       "noMatches": "Ez dago bat datorren saiorik",
       "tryDifferentSearch": "Saiatu beste bilaketa-termino batekin.",
@@ -3855,6 +3858,7 @@
     "skillMarkdownLabel": "Trebetasun edukia",
     "skillsEmpty": "Oraindik ez dago gaitasunik",
     "skillNameRequired": "Sartu trebetasun-izen bat",
+    "skillNameTooLong": "Trebetasunaren izenak {{max}} karaktere edo gutxiago izan behar ditu",
     "skillNameInvalid": "Trebetasunaren izenak letra edo zifra batekin hasi behar du eta letra xeheak, zifrak eta marratxoak soilik erabili behar ditu",
     "skillContentRequired": "Trebetasun edukia beharrezkoa da",
     "skillSaveFailed": "Ezin izan da trebetasuna gorde. Saiatu berriro.",

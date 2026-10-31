@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Lehet, hogy több csoporthoz vagy projekthez kell hozzáférést adnod a GitLabon.",
       "installGithubApp": "GitHub-alkalmazás telepítése a kódtárakhoz",
       "installGithubAppDescription": "Adj hozzáférést a Kilo GitHub-alkalmazásnak az ellenőrizni kívánt kódtárakhoz.",
-      "repositoryAccess": "hozzáférés a kódtárakhoz"
+      "repositoryAccess": "hozzáférés a kódtárakhoz",
+      "allModePersonal": "A Kilo a GitHub-kapcsolatodon keresztül elérhető összes kódtárat automatikusan ellenőrzi.",
+      "allModeOrganization": "A Kilo a szervezet GitHub-kapcsolatán keresztül elérhető összes kódtárat automatikusan ellenőrzi.",
+      "allModeCount": "Elérhető kódtárak: {{displayCount}}"
     },
     "style": {
       "title": "Ellenőrzési stílus",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Nem sikerült betölteni az aktív munkameneteket",
       "couldNotRefresh": "Nem sikerült frissíteni",
-      "noSessionsYetDescription": "Indíts egy programozási feladatot a telefonodról. A munkameneteid itt jelennek meg.",
+      "noSessionsYetDescription": "Indíts egy programozási feladatot a telefonodról.",
       "viewHistory": "Munkamenet-előzmények",
       "noMatches": "Nincs egyező munkamenet",
       "tryDifferentSearch": "Próbálj másik keresőszót.",
@@ -3855,6 +3858,7 @@
     "skillMarkdownLabel": "Készség tartalma",
     "skillsEmpty": "Még nincsenek készségek",
     "skillNameRequired": "Adja meg a készség nevét",
+    "skillNameTooLong": "A készség neve legfeljebb {{max}} karakter lehet",
     "skillNameInvalid": "A készség nevének betűvel vagy számjegygel kell kezdődnie, és csak kisbetűket, számjegyeket és kötőjeleket kell használnia",
     "skillContentRequired": "A készség tartalma kötelező",
     "skillSaveFailed": "Nem sikerült elmenteni a készséget. Próbálja újra.",

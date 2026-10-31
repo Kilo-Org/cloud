@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "Kamu mungkin perlu memberikan akses ke lebih banyak grup atau proyek di GitLab.",
       "installGithubApp": "Pasang aplikasi GitHub di repositori",
       "installGithubAppDescription": "Izinkan aplikasi GitHub Kilo mengakses repositori yang ingin kamu tinjau.",
-      "repositoryAccess": "akses repositori"
+      "repositoryAccess": "akses repositori",
+      "allModePersonal": "Setiap repositori yang dapat diakses Kilo melalui koneksi GitHub kamu akan ditinjau secara otomatis.",
+      "allModeOrganization": "Setiap repositori yang dapat diakses Kilo melalui koneksi GitHub organisasi akan ditinjau secara otomatis.",
+      "allModeCount": "Repositori yang tersedia: {{displayCount}}"
     },
     "style": {
       "title": "Gaya tinjauan",
@@ -1148,7 +1151,7 @@
       "sortSeverityDesc": "Keparahan: tertinggi ke terendah",
       "sortSlaDue": "Tanggal jatuh tempo SLA",
       "statusIgnored": "Diabaikan",
-      "statusOpen": "Buka"
+      "statusOpen": "Terbuka"
     },
     "analysis": {
       "analyzeRepository": "Analisis repositori",
@@ -1367,7 +1370,7 @@
       "supersededByDescription": "Ketuk untuk membuka catatan terbaru dan melihat status, analisis, serta perbaikannya.",
       "viewAdvisory": "Lihat pemberitahuan keamanan di GitHub",
       "vulnerableVersions": "Versi rentan",
-      "statusOpen": "Buka",
+      "statusOpen": "Terbuka",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "perbaikan sudah dimulai",
       "reasonNoBandwidth": "tidak ada kapasitas untuk menangani",
@@ -1626,7 +1629,7 @@
     "sessionList": {
       "couldNotLoadActive": "Tidak dapat memuat sesi aktif.",
       "couldNotRefresh": "Tidak dapat memuat ulang",
-      "noSessionsYetDescription": "Mulai tugas pemrograman dari ponselmu. Sesimu akan muncul di sini.",
+      "noSessionsYetDescription": "Mulai tugas pemrograman dari ponselmu.",
       "viewHistory": "Riwayat sesi",
       "noMatches": "Tidak ada sesi yang cocok",
       "tryDifferentSearch": "Coba kata kunci lain.",
@@ -3855,6 +3858,7 @@
     "skillMarkdownLabel": "Konten keterampilan",
     "skillsEmpty": "Belum ada keterampilan",
     "skillNameRequired": "Masukkan nama keterampilan",
+    "skillNameTooLong": "Nama keterampilan harus {{max}} karakter atau kurang",
     "skillNameInvalid": "Nama keterampilan harus dimulai dengan huruf atau angka dan hanya menggunakan huruf kecil, angka, dan tanda hubung",
     "skillContentRequired": "Konten keterampilan diperlukan",
     "skillSaveFailed": "Tidak dapat menyimpan keterampilan. Coba lagi.",

@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Може да се наложи да предоставиш достъп до повече групи или проекти в GitLab.",
       "installGithubApp": "Инсталирай приложението за GitHub в хранилищата",
       "installGithubAppDescription": "Предостави на приложението на Kilo за GitHub достъп до хранилищата, които искаш да бъдат преглеждани.",
-      "repositoryAccess": "достъп до хранилища"
+      "repositoryAccess": "достъп до хранилища",
+      "allModePersonal": "Всяко хранилище, до което Kilo има достъп чрез твоята GitHub връзка, се преглежда автоматично.",
+      "allModeOrganization": "Всяко хранилище, до което Kilo има достъп чрез GitHub връзката на организацията, се преглежда автоматично.",
+      "allModeCount": "Налични хранилища: {{displayCount}}"
     },
     "style": {
       "title": "Стил на прегледа",
@@ -1667,7 +1670,7 @@
       "outcome": "Резултат",
       "slaStatus": "Състояние по SLA",
       "sortBy": "Сортиране по",
-      "statusOpen": "Отваряне",
+      "statusOpen": "Отворен",
       "fixed": "Отстранено",
       "statusIgnored": "Игнорирани",
       "severityHigh": "Високо",
@@ -1841,7 +1844,7 @@
       "source": "Източник",
       "sourceId": "ID на източника",
       "viewAdvisory": "Виж бюлетина за сигурност в GitHub",
-      "statusOpen": "Отваряне",
+      "statusOpen": "Отворен",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "отстраняването вече е започнало",
       "reasonNoBandwidth": "няма свободен капацитет",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Не можахме да заредим активните сесии.",
       "couldNotRefresh": "Не можахме да опресним",
-      "noSessionsYetDescription": "Започни задача за програмиране от телефона си. Сесиите ти ще се появят тук.",
+      "noSessionsYetDescription": "Започни задача за програмиране от телефона си.",
       "viewHistory": "История на сесиите",
       "noMatches": "Няма сесии за това търсене",
       "tryDifferentSearch": "Опитай с друга дума за търсене.",
@@ -3855,6 +3858,7 @@
     "skillMarkdownLabel": "Съдържание на умения",
     "skillsEmpty": "Все още няма умения",
     "skillNameRequired": "Въведете име на умение",
+    "skillNameTooLong": "Името на умението трябва да е {{max}} знака или по-малко",
     "skillNameInvalid": "Името на умението трябва да започва с буква или цифра и да се използват само малки букви, цифри и тирета",
     "skillContentRequired": "Изисква се съдържание за умения",
     "skillSaveFailed": "Умението не можа да бъде запазено. Опитайте отново.",

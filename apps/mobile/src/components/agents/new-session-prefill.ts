@@ -328,30 +328,6 @@ export function resolveStoredRepoSelection(input: {
 }
 
 /**
- * Whether a selection the complete list does not contain must be dropped.
- *
- * `listsComplete` comes from `areRepositoryListsComplete`: every provider that
- * can list repositories answered with its full list, so a missing row really is
- * gone. Anything less (still loading, a failed read, a partial provider, a
- * provider that cannot be read) leaves the selection alone, because the row
- * may exist and only be missing from the answer. The comparison is the
- * picker's platform-qualified key: a row on another provider with the same
- * `fullName` is a different repository.
- */
-export function shouldDropUnresolvedRepoSelection(input: {
-  listsComplete: boolean;
-  selectedRepo: string;
-  repositories: { platform: string; fullName: string }[];
-}): boolean {
-  if (!input.listsComplete || !input.selectedRepo) {
-    return false;
-  }
-  return !input.repositories.some(
-    repository => `${repository.platform}:${repository.fullName}` === input.selectedRepo
-  );
-}
-
-/**
  * Describe what could not be carried over, if anything.
  *
  * `settled` means "the list finished loading, without error, and is

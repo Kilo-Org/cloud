@@ -10,7 +10,7 @@ import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-ag
 
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
 import {
-  areRepositoryListsComplete,
+  isStoredRepoSelectionGone,
   resetSelectedBranchOverrides,
 } from '@/components/agents/new-session-repository-state';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
@@ -47,7 +47,6 @@ import {
   readCloneUpToMessageId,
   readForkPrefillText,
   readForkSourceIsCloudAgent,
-  shouldDropUnresolvedRepoSelection,
 } from '@/components/agents/new-session-prefill';
 import { shouldAutoFocusNewSessionPrompt } from '@/components/agents/new-session-prompt-focus';
 import { useNewSessionOrganization } from '@/components/agents/use-new-session-organization';
@@ -508,19 +507,14 @@ export function NewSessionScreenBody() {
     [isCloneEntry, repositoryDraftKey, setSelectedRepo, userId]
   );
 
-  // A selection the complete list does not contain belongs to a repository that
-  // is no longer connected (or to another organization's list): the row would
-  // read as chosen while Start refuses it. Drop it and its stored copy, so the
-  // next visit starts from the picker instead of a dead key. Completeness, not
-  // mere "settled", is the gate: a provider that is still loading, failed, or
-  // answered partially leaves the selection alone.
+  // A selection its provider's complete list does not contain belongs to a
+  // repository that is no longer connected (or to another scope's list): the
+  // row would read as chosen while Start refuses it. Drop it and its stored
+  // copy, so the next visit starts from the picker instead of a dead key. A
+  // provider that is loading, failed, answered partially, or cannot be read
+  // leaves the selection alone (see `isStoredRepoSelectionGone`).
   const dropUnresolvedRepo =
-    !isCloneEntry &&
-    shouldDropUnresolvedRepoSelection({
-      listsComplete: areRepositoryListsComplete(groups),
-      selectedRepo,
-      repositories,
-    });
+    !isCloneEntry && isStoredRepoSelectionGone({ groups, repositories, selectedRepo });
   useEffect(() => {
     if (!dropUnresolvedRepo) {
       return;

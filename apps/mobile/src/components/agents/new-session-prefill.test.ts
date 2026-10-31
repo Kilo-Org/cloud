@@ -13,7 +13,6 @@ import {
   resolvePrefillRepo,
   resolvePrefillRepoSelection,
   resolveStoredRepoSelection,
-  shouldDropUnresolvedRepoSelection,
 } from './new-session-prefill';
 
 vi.mock('@/components/ui/icons', () => ({
@@ -376,58 +375,6 @@ describe('resolveStoredRepoSelection', () => {
     expect(
       resolveStoredRepoSelection({ prefill: { mode: 'code' }, selectedRepo: '', storedRepo: '' })
     ).toBeNull();
-  });
-});
-
-describe('shouldDropUnresolvedRepoSelection', () => {
-  const repositories = [
-    { platform: 'github', fullName: 'drain-team/kilo-backend' },
-    { platform: 'gitlab', fullName: 'drain-team/kilo-app' },
-  ];
-
-  it('keeps a selection the complete list contains', () => {
-    expect(
-      shouldDropUnresolvedRepoSelection({
-        listsComplete: true,
-        selectedRepo: 'github:drain-team/kilo-backend',
-        repositories,
-      })
-    ).toBe(false);
-  });
-
-  it('drops a platform-qualified key the list does not contain', () => {
-    // Same fullName, different provider: a different repository, not a match.
-    expect(
-      shouldDropUnresolvedRepoSelection({
-        listsComplete: true,
-        selectedRepo: 'github:drain-team/kilo-app',
-        repositories,
-      })
-    ).toBe(true);
-    expect(
-      shouldDropUnresolvedRepoSelection({
-        listsComplete: true,
-        selectedRepo: 'github:drain-team/disconnected',
-        repositories,
-      })
-    ).toBe(true);
-  });
-
-  it('never drops while the lists are incomplete or nothing is selected', () => {
-    expect(
-      shouldDropUnresolvedRepoSelection({
-        listsComplete: false,
-        selectedRepo: 'github:drain-team/disconnected',
-        repositories,
-      })
-    ).toBe(false);
-    expect(
-      shouldDropUnresolvedRepoSelection({
-        listsComplete: true,
-        selectedRepo: '',
-        repositories: [],
-      })
-    ).toBe(false);
   });
 });
 

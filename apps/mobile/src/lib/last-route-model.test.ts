@@ -1,8 +1,3 @@
-// eslint-disable-next-line import/no-nodejs-modules -- vitest-only check, runs in node, never bundled into the app
-import { readFileSync } from 'node:fs';
-// eslint-disable-next-line import/no-nodejs-modules -- vitest-only check, runs in node, never bundled into the app
-import { fileURLToPath } from 'node:url';
-
 import { describe, expect, it } from 'vitest';
 
 import { PICKER_ROUTE_PATHS } from './picker-routes';
@@ -170,34 +165,27 @@ describe('isRecordableLastRoute', () => {
     }
   });
 
-  it('records nothing on a transient sheet, so its opener stays the target', () => {
-    for (const pathname of [
-      '/transcription-model-picker',
-      '/voice-language-picker',
-      '/todos/list-settings',
-      '/chat/instance-picker',
+  it('records nothing on a sheet, so its opener stays the target', () => {
+    // Every form sheet is presented over the screen that opened it; the
+    // suffixes come from the shared list the tab layer and the layouts keep
+    // aligned (see `form sheet route declarations` in tab-press.test.ts).
+    for (const segments of [
+      ['(app)', 'agent-chat', 'repo-picker'],
+      ['(app)', 'voice-language-picker'],
+      ['(app)', 'todos', 'list-settings'],
+      ['(app)', 'security-agent', '[scope]', 'filter'],
+      ['(app)', 'security-agent', '[scope]', 'dismiss', '[id]'],
+      ['(app)', 'pr-review', 'owner', 'repo', '1', 'comment-composer'],
+      ['(app)', 'profile', 'organization', 'member-limit'],
     ]) {
-      expect(isRecordableLastRoute(pathname, ['(app)', ...pathname.slice(1).split('/')])).toBe(
-        false
-      );
+      expect(
+        isRecordableLastRoute(`/${segments.slice(1).join('/')}`, segments),
+        segments.join('/')
+      ).toBe(false);
     }
-  });
-
-  it('covers every sheet the app stack registers', () => {
-    // The app stack presents a sheet over the screen that opened it, so no
-    // sheet is a relaunch target: the record belongs to the opener. Reading the
-    // layout keeps a new registration from silently becoming recordable.
-    const app = fileURLToPath(new URL('../app/(app)/_layout.tsx', import.meta.url));
-    const tags = [...readFileSync(app, 'utf8').matchAll(/<Stack\.Screen\b[\s\S]*?\/>/g)].map(
-      match => match[0]
-    );
-    const sheets = tags
-      .filter(tag => tag.includes('heetOptions'))
-      .map(tag => /name="([^"]+)"/.exec(tag)?.[1] ?? '');
-    expect(sheets.length).toBeGreaterThan(0);
-    for (const name of sheets) {
-      expect(isRecordableLastRoute(`/${name}`, ['(app)', ...name.split('/')]), name).toBe(false);
-    }
+    expect(
+      isRecordableLastRoute('/pr-review/owner/repo/1', ['(app)', 'pr-review', 'owner', 'repo', '1'])
+    ).toBe(true);
   });
 });
 

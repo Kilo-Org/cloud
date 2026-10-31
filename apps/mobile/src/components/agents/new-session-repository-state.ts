@@ -140,27 +140,56 @@ export function resolveBitbucketStatus({
 // ── Dedup and grouping ───────────────────────────────────────────────
 
 /**
- * Whether every provider that can list repositories has answered with its
- * complete list.
+ * Whether one provider's group accounts for every repository row it has.
  *
  * A provider that is still loading, a read that failed, and a provider that
  * reported only some of its installations (`notice: 'partial'`) each omit rows
- * without the app knowing which: a selection missing from such a list may
- * still be connected, so callers must not treat it as gone. A provider that is
- * connected but cannot be read right now (`unavailable`, e.g. a suspended
- * installation) is unknown for the same reason. `connect`, `connected-empty`
- * and `repos` are answers — an empty or uninstalled list included.
+ * without the app knowing which. `connect` means "no installation exists" for
+ * GitHub and GitLab, which is a real answer with no rows; for Bitbucket the
+ * same status also covers a connected workspace that first needs a workspace
+ * selection or new credentials, where rows exist but were not listed, so it is
+ * not an answer there. A provider that is connected but cannot be read right
+ * now (`unavailable`, e.g. a suspended installation) is unknown for the same
+ * reason. `repos` and `connected-empty` are the answers that list the rows.
  */
-export function areRepositoryListsComplete(groups: readonly RepositoryGroup[]): boolean {
-  return (
-    groups.length > 0 &&
-    groups.every(
-      group =>
-        group.notice !== 'partial' &&
-        (group.status === 'repos' ||
-          group.status === 'connected-empty' ||
-          group.status === 'connect')
-    )
+function isRepositoryGroupComplete(group: RepositoryGroup): boolean {
+  if (group.notice === 'partial') {
+    return false;
+  }
+  if (group.status === 'repos' || group.status === 'connected-empty') {
+    return true;
+  }
+  return group.status === 'connect' && group.key !== 'bitbucket';
+}
+
+/**
+ * Whether a stored selection must be dropped because its provider answered with
+ * its complete list and that list does not contain it.
+ *
+ * Only the provider that holds the selection decides: another provider's error
+ * says nothing about this repository, and a list that is missing rows (see
+ * `isRepositoryGroupComplete`) leaves the selection and its stored copy alone.
+ * The comparison is the picker's platform-qualified key, so a row on another
+ * provider with the same `fullName` is not a match. A key that names no
+ * provider group in this scope (Bitbucket outside an organization) is reported
+ * gone: that scope cannot offer the repository at all.
+ */
+export function isStoredRepoSelectionGone(input: {
+  groups: readonly RepositoryGroup[];
+  repositories: readonly NewSessionRepository[];
+  selectedRepo: string;
+}): boolean {
+  const separator = input.selectedRepo.indexOf(':');
+  if (separator === -1) {
+    return false;
+  }
+  const platform = input.selectedRepo.slice(0, separator);
+  const group = input.groups.find(candidate => candidate.key === platform);
+  if (group !== undefined && !isRepositoryGroupComplete(group)) {
+    return false;
+  }
+  return !input.repositories.some(
+    repository => `${repository.platform}:${repository.fullName}` === input.selectedRepo
   );
 }
 

@@ -1683,7 +1683,8 @@
       "sortSeverityDesc": "Allvarlighetsgrad: hög till låg",
       "sortSeverityAsc": "Allvarlighetsgrad: låg till hög",
       "sortSlaDue": "SLA-tidsfrist",
-      "overdueOnly": "Endast försenade"
+      "overdueOnly": "Endast försenade",
+      "noRepositories": "Inga kodarkiv är synkroniserade eller valda ännu. Välj dem i Säkerhetsagentens inställningar."
     },
     "automation": {
       "title": "Automatisering",
@@ -2065,7 +2066,10 @@
       "settleFailed": "Åtgärden slutfördes, men vi kunde inte registrera resultatet. Försök igen.",
       "replayFailed": "Den här åtgärden slutfördes inte. Försök igen.",
       "actionFailed": "Det gick inte att slutföra den här åtgärden. Försök igen.",
-      "actionBlocked": "Det gick inte att slutföra den här åtgärden. Problemet måste åtgärdas innan du kan försöka igen."
+      "actionBlocked": "Det gick inte att slutföra den här åtgärden. Problemet måste åtgärdas innan du kan försöka igen.",
+      "syncNoRepositories": "Inga kodarkiv finns i synkroniseringsomfånget. Välj de kodarkiv som Säkerhetsagenten övervakar och synkronisera igen.",
+      "syncIntegrationInactive": "GitHub-anslutningen för Säkerhetsagenten är inte aktiv. Återanslut Kilos GitHub-app och synkronisera igen.",
+      "syncMissingPermission": "Kilos GitHub-app kan inte läsa sårbarhetsaviseringar. Bevilja behörigheten i GitHub och synkronisera igen."
     },
     "analysisState": {
       "queued": "Analys i kö",

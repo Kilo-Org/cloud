@@ -1683,7 +1683,8 @@
       "sortSeverityDesc": "Larritasuna: handienetik txikienera",
       "sortSeverityAsc": "Larritasuna: txikienetik handienera",
       "sortSlaDue": "SLAren epemuga",
-      "overdueOnly": "Epez kanpokoak soilik"
+      "overdueOnly": "Epez kanpokoak soilik",
+      "noRepositories": "Oraindik ez dago biltegirik sinkronizatuta edo hautatuta. Aukera itzazu Segurtasun-agentearen ezarpenetan."
     },
     "automation": {
       "title": "Automatizazioa",
@@ -2065,7 +2066,10 @@
       "settleFailed": "Ekintza burutu da, baina ezin izan dugu emaitza erregistratu. Saiatu berriro.",
       "replayFailed": "Ekintza hau ez da burutu. Saiatu berriro.",
       "actionFailed": "Ezin izan da ekintza hau burutu. Saiatu berriro.",
-      "actionBlocked": "Ezin izan da ekintza hau burutu. Arazoa konpondu behar da berriro saiatu aurretik."
+      "actionBlocked": "Ezin izan da ekintza hau burutu. Arazoa konpondu behar da berriro saiatu aurretik.",
+      "syncNoRepositories": "Ez dago biltegirik sinkronizazio-esparruan. Aukeratu Segurtasun-agenteak gainbegiratzen dituen biltegiak, eta gero sinkronizatu berriro.",
+      "syncIntegrationInactive": "Segurtasun-agentearen GitHub konexioa ez dago aktibo. Konektatu berriro Kilo GitHub App, eta gero sinkronizatu berriro.",
+      "syncMissingPermission": "Kilo GitHub App-ek ezin ditu vulnerability alerts irakurri. Eman baimen hori GitHub-en, eta gero sinkronizatu berriro."
     },
     "analysisState": {
       "queued": "Azterketa ilaran",

@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
+import { HOME_WIDGET_TITLE_LIMIT, homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
+import {
+  SESSION_LIVE_COMMAND_LIMIT,
+  sessionLiveChangesSchema,
+  sessionLiveFailureSchema,
+  sessionLivePlanSchema,
+  sessionLiveStepSchema,
+} from '@kilocode/session-ingest-contracts';
 
 import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
 import {
@@ -7,14 +14,7 @@ import {
   scheduledActionEventSchema,
   securityLifecycleEventSchema,
 } from './notification-events';
-import {
-  SESSION_LIVE_COMMAND_LIMIT,
-  sessionLiveChangesSchema,
-  sessionLiveFailureSchema,
-  sessionLiveOutcomeSchema,
-  sessionLivePlanSchema,
-  sessionLiveStepSchema,
-} from './session-live-content';
+import { sessionLiveOutcomeSchema } from './session-live-content';
 import { refineSpendAlertScope } from './spend-alert-scope';
 
 const nonEmptyStringSchema = z.string().min(1);
@@ -36,7 +36,7 @@ export type CloudAgentSessionCategory = z.infer<typeof cloudAgentSessionCategory
 export const sessionLiveActivityContentStateSchema = z.object({
   sessionId: nonEmptyStringSchema,
   /** Trimmed and capped display title; null for an untitled session. */
-  title: z.string().max(120).nullable(),
+  title: z.string().max(HOME_WIDGET_TITLE_LIMIT).nullable(),
   statusKind: z.enum(['needsInput', 'running', 'idle', 'scheduled', 'failed']),
   /** ISO 8601; when the current status kind began. */
   statusSince: z.string(),

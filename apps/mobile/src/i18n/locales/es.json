@@ -1157,7 +1157,8 @@
       "sortSeverityDesc": "Gravedad: de mayor a menor",
       "sortSlaDue": "Fecha de vencimiento del SLA",
       "statusIgnored": "Ignorado",
-      "statusOpen": "Abierto"
+      "statusOpen": "Abierto",
+      "noRepositories": "Aún no hay repositorios sincronizados ni seleccionados. Elígelos en los ajustes del agente de seguridad."
     },
     "analysis": {
       "analyzeRepository": "Analizar repositorio",
@@ -1550,7 +1551,10 @@
       "settleFailed": "La acción se completó, pero no pudimos registrar el resultado. Inténtalo de nuevo.",
       "replayFailed": "Esta acción no se completó. Inténtalo de nuevo.",
       "actionFailed": "No se pudo completar esta acción. Inténtalo de nuevo.",
-      "actionBlocked": "No se pudo completar esta acción. Hay que solucionar el problema antes de poder reintentarlo."
+      "actionBlocked": "No se pudo completar esta acción. Hay que solucionar el problema antes de poder reintentarlo.",
+      "syncNoRepositories": "No hay repositorios en el ámbito de sincronización. Elige qué repositorios supervisa el agente de seguridad y sincroniza de nuevo.",
+      "syncIntegrationInactive": "La conexión de GitHub para el agente de seguridad no está activa. Vuelve a conectar la aplicación de Kilo en GitHub y sincroniza de nuevo.",
+      "syncMissingPermission": "La aplicación de Kilo en GitHub no puede leer las alertas de vulnerabilidades. Concede ese permiso en GitHub y sincroniza de nuevo."
     },
     "analysisState": {
       "queued": "Análisis en cola",

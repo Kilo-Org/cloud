@@ -1705,7 +1705,8 @@
       "sortSeverityDesc": "Gravitate: de la ridicată la scăzută",
       "sortSeverityAsc": "Gravitate: de la scăzută la ridicată",
       "sortSlaDue": "Termen limită SLA",
-      "overdueOnly": "Doar cu termen depășit"
+      "overdueOnly": "Doar cu termen depășit",
+      "noRepositories": "Nu există încă repository-uri sincronizate sau selectate. Alege-le din setările Agentului de securitate."
     },
     "automation": {
       "title": "Automatizare",
@@ -2098,7 +2099,10 @@
       "settleFailed": "Acțiunea s-a finalizat, dar nu am putut înregistra rezultatul. Încearcă din nou.",
       "replayFailed": "Această acțiune nu s-a finalizat. Încearcă din nou.",
       "actionFailed": "Această acțiune nu a putut fi finalizată. Încearcă din nou.",
-      "actionBlocked": "Această acțiune nu a putut fi finalizată. Problema trebuie rezolvată înainte de a încerca din nou."
+      "actionBlocked": "Această acțiune nu a putut fi finalizată. Problema trebuie rezolvată înainte de a încerca din nou.",
+      "syncNoRepositories": "Niciun repository nu face parte din domeniul de sincronizare. Alege repository-urile monitorizate de Agentul de securitate, apoi sincronizează din nou.",
+      "syncIntegrationInactive": "Conexiunea GitHub pentru Agentul de securitate nu este activă. Reconectează Kilo GitHub App, apoi sincronizează din nou.",
+      "syncMissingPermission": "Aplicația Kilo pentru GitHub nu poate citi alertele de vulnerabilitate. Acordă această permisiune în GitHub, apoi sincronizează din nou."
     },
     "analysisState": {
       "queued": "Analiză în coadă",

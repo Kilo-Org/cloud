@@ -1749,7 +1749,8 @@
       "sortSeverityDesc": "Severity: high to low",
       "sortSeverityAsc": "Severity: low to high",
       "sortSlaDue": "SLA due date",
-      "overdueOnly": "Overdue only"
+      "overdueOnly": "Overdue only",
+      "noRepositories": "No repositories are synced or selected yet. Choose them in Security Agent settings."
     },
     "automation": {
       "title": "Automation",
@@ -2130,6 +2131,9 @@
       "ambiguous": "Couldn't confirm — check the security review before retrying.",
       "settleFailed": "The action completed, but we could not record the result. Please try again.",
       "replayFailed": "This action did not complete. Please try again.",
+      "syncNoRepositories": "No repositories are in the sync scope. Choose the repositories Security Agent monitors, then sync again.",
+      "syncIntegrationInactive": "The GitHub connection for Security Agent is not active. Reconnect the Kilo GitHub App, then sync again.",
+      "syncMissingPermission": "The Kilo GitHub App cannot read vulnerability alerts. Grant that permission in GitHub, then sync again.",
       "actionFailed": "Could not complete this action. Please try again.",
       "actionBlocked": "Could not complete this action. The problem needs fixing before you can retry."
     },

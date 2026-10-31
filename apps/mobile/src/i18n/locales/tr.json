@@ -1154,7 +1154,8 @@
       "sortSeverityDesc": "Önem derecesi: yüksekten düşüğe",
       "sortSlaDue": "SLA son tarihi",
       "statusIgnored": "Yok sayıldı",
-      "statusOpen": "Açık"
+      "statusOpen": "Açık",
+      "noRepositories": "Henüz eşitlenmiş veya seçilmiş depo yok. Depoları Güvenlik ajanı ayarlarından seç."
     },
     "analysis": {
       "analyzeRepository": "Depoyu analiz et",
@@ -1536,7 +1537,10 @@
       "settleFailed": "İşlem tamamlandı, ancak sonucu kaydedemedik. Lütfen tekrar dene.",
       "replayFailed": "Bu işlem tamamlanmadı. Lütfen tekrar dene.",
       "actionFailed": "Bu işlem tamamlanamadı. Lütfen tekrar dene.",
-      "actionBlocked": "Bu işlem tamamlanamadı. Yeniden denemeden önce sorunun düzeltilmesi gerekiyor."
+      "actionBlocked": "Bu işlem tamamlanamadı. Yeniden denemeden önce sorunun düzeltilmesi gerekiyor.",
+      "syncNoRepositories": "Eşitleme kapsamında hiçbir depo yok. Güvenlik ajanının izleyeceği depoları seç, ardından yeniden eşitle.",
+      "syncIntegrationInactive": "Güvenlik ajanının GitHub bağlantısı etkin değil. Kilo GitHub uygulamasını yeniden bağla, ardından yeniden eşitle.",
+      "syncMissingPermission": "Kilo GitHub uygulaması güvenlik açığı uyarılarını okuyamıyor. Bu izni GitHub'da ver, ardından yeniden eşitle."
     },
     "analysisState": {
       "queued": "Analiz kuyruğa alındı",

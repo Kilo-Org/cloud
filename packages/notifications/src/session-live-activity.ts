@@ -5,23 +5,20 @@ import {
 import { HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
 import {
   isDefaultSessionTitle,
-  sessionLiveCut,
-  sessionDisplayLine,
-  sessionLiveText,
-} from '@kilocode/session-ingest-contracts';
-
-import { LIVE_ACTIVITY_RELEVANCE, type SessionLiveActivityContentState } from './push-data';
-import {
-  SESSION_CARD_QUIET_AFTER_MS,
   SESSION_LIVE_COMMAND_LIMIT,
   SESSION_LIVE_PLAN_STEP_LIMIT,
   SESSION_LIVE_TARGET_LIMIT,
+  sessionLiveCut,
+  sessionDisplayLine,
+  sessionLiveText,
   type SessionLiveChanges,
   type SessionLiveFailureKind,
-  type SessionLiveOutcomeKind,
   type SessionLivePlan,
   type SessionLiveStep,
-} from './session-live-content';
+} from '@kilocode/session-ingest-contracts';
+
+import { LIVE_ACTIVITY_RELEVANCE, type SessionLiveActivityContentState } from './push-data';
+import { SESSION_CARD_QUIET_AFTER_MS, type SessionLiveOutcomeKind } from './session-live-content';
 
 /** The card's status kinds: the shared vocabulary plus a turn that failed. */
 export type SessionCardStatusKind = GlanceableStatusKind | 'failed';

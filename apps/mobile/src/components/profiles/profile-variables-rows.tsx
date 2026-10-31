@@ -104,7 +104,16 @@ export function VariableRowView({
         disabled={onEdit === undefined}
         onPress={onEdit}
       >
-        <Text className="flex-1 font-mono text-sm text-foreground" numberOfLines={1}>
+        {/* Middle ellipsis: keys in one profile share long prefixes, so a tail
+            cut made neighbouring rows look identical. A key can be up to 256
+            characters and never fits a compact row, and Android middle-truncates
+            single-line text only, so this keeps both ends visible in one line
+            instead of wrapping. */}
+        <Text
+          className="flex-1 font-mono text-sm text-foreground"
+          numberOfLines={1}
+          ellipsizeMode="middle"
+        >
           {row.key}
         </Text>
         {row.isSecret && onToggleReveal === undefined ? (
@@ -321,11 +330,21 @@ export function VariableEditForm({
         <Text className="flex-1 text-sm font-medium text-foreground">
           {t('profiles.secrets.markSecret')}
         </Text>
-        <Switch
-          value={isSecret}
-          accessibilityLabel={t('profiles.secrets.markSecret')}
-          onValueChange={setIsSecret}
-        />
+        {/* The native switch draws its 32dp track inside a box that reserves the
+            thumb's overhang, so the track ends about 12dp before the box does
+            and the row's 10.5dp padding leaves it 23dp from the row's edge,
+            twice the 13dp the lock glyph keeps from its opposite edge. Pulling
+            the box out by the padding itself lines the track's end up with the
+            glyph on both edges. The pull is on the END edge, so it must stay
+            logical: `marginInlineEnd` follows the writing direction, while a
+            hand-picked `-mr-3` lands on the title's side under RTL. */}
+        <View className="-me-3">
+          <Switch
+            value={isSecret}
+            accessibilityLabel={t('profiles.secrets.markSecret')}
+            onValueChange={setIsSecret}
+          />
+        </View>
       </View>
       <View className="flex-row gap-2">
         <Button variant="outline" className="flex-1" onPress={onCancel}>

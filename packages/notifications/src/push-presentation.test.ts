@@ -15,10 +15,10 @@ import {
   androidChannelIdForPushDataToAppVersion,
   LEGACY_AGENT_ANDROID_CHANNEL_ID,
   androidChannelIdForRegisteredClient,
-  genericPushContentForPushData,
   iosInterruptionLevelForPushData,
   iosMutableContentForPushData,
 } from './push-presentation';
+import { genericPushContentForPushData } from './push-copy';
 
 // One representative payload per `pushDataSchema` variant, plus both
 // `cloud_agent_session` categories (attention vs status vs absent). The

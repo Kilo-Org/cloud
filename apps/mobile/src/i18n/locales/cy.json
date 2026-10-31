@@ -1771,7 +1771,8 @@
       "sortSeverityDesc": "Difrifoldeb: uchel i isel",
       "sortSeverityAsc": "Difrifoldeb: isel i uchel",
       "sortSlaDue": "Dyddiad terfyn SLA",
-      "overdueOnly": "Hwyr yn unig"
+      "overdueOnly": "Hwyr yn unig",
+      "noRepositories": "Nid oes unrhyw ystorfeydd wedi'u cydsynio na'u dewis eto. Dewiswch nhw yng ngosodiadau'r Asiant diogelwch."
     },
     "automation": {
       "title": "Awtomeiddio",
@@ -2197,7 +2198,10 @@
       "settleFailed": "Cafodd y weithred ei chwblhau, ond ni allem gofnodi'r canlyniad. Ceisiwch eto.",
       "replayFailed": "Ni chwblhawyd y weithred hon. Ceisiwch eto.",
       "actionFailed": "Ni chafodd y weithred hon ei chwblhau. Ceisiwch eto.",
-      "actionBlocked": "Ni chafodd y weithred hon ei chwblhau. Rhaid trwsio'r broblem yn gyntaf."
+      "actionBlocked": "Ni chafodd y weithred hon ei chwblhau. Rhaid trwsio'r broblem yn gyntaf.",
+      "syncNoRepositories": "Nid oes unrhyw ystorfeydd yng nghwmpas cydsynio. Dewiswch yr ystorfeydd y mae'r Asiant diogelwch yn eu monitro, yna cydsyniwch eto.",
+      "syncIntegrationInactive": "Nid yw'r cysylltiad GitHub ar gyfer yr Asiant diogelwch yn weithredol. Ailgysylltwch ap GitHub Kilo, yna cydsyniwch eto.",
+      "syncMissingPermission": "Nid yw ap GitHub Kilo yn gallu darllen hysbysiadau bregusrwydd. Rhowch y caniatâd hwnnw yn GitHub, yna cydsyniwch eto."
     },
     "analysisState": {
       "queued": "Dadansoddiad mewn ciw",

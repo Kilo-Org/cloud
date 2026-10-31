@@ -385,26 +385,24 @@ describe('ProfileMcpScreen', () => {
     unmount();
   });
 
-  it('a11y: the secret badge is one counted node and the lock glyph is hidden', async () => {
+  it('a11y: the row identity names the server and its secret count before the controls', async () => {
     h.query.data = testProfile([testServer()]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
 
-    const badge = findAll(renderer.root, 'View').find(node =>
-      /^\d+ secrets?$/.test(String(node.props.accessibilityLabel ?? ''))
+    const identity = findAll(renderer.root, 'View').find(
+      node => node.props.accessibilityRole === 'text'
     );
-    expect(badge?.props.accessibilityLabel).toBe('1 secret');
-    expect(badge?.props.accessible).toBe(true);
-    expect(findOne(renderer.root, 'Lock').parent?.props).toMatchObject({
-      accessibilityElementsHidden: true,
-      importantForAccessibility: 'no-hide-descendants',
-    });
+    expect(identity?.props.accessibilityLabel).toBe('docs, Local, npx @example/mcp, 1 secret');
+    expect(identity?.props.accessible).toBe(true);
+    // The counted glyphs stay decorative: the identity carries their meaning.
+    expect(findOne(renderer.root, 'Lock').parent?.props.accessibilityLabel).toBeUndefined();
 
     unmount();
   });
 
-  it('a11y: the secret badge names the count in the plural form', async () => {
+  it('a11y: the row identity names the count in the plural form', async () => {
     h.query.data = testProfile([
       testServer({
         type: 'remote',
@@ -418,10 +416,12 @@ describe('ProfileMcpScreen', () => {
 
     const { renderer, unmount } = await mountScreen();
 
-    const badge = findAll(renderer.root, 'View').find(node =>
-      /^\d+ secrets?$/.test(String(node.props.accessibilityLabel ?? ''))
+    const identity = findAll(renderer.root, 'View').find(
+      node => node.props.accessibilityRole === 'text'
     );
-    expect(badge?.props.accessibilityLabel).toBe('3 secrets');
+    expect(identity?.props.accessibilityLabel).toBe(
+      'docs, Remote, https://example.com/mcp, 3 secrets'
+    );
 
     unmount();
   });

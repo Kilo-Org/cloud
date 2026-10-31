@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SESSION_CARD_QUIET_AFTER_MS,
   type SessionLiveActivityContentState,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 
 import { i18n } from '@/i18n';
 

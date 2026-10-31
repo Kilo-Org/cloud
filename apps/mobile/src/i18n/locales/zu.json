@@ -1928,7 +1928,7 @@
       "highDescription": "Idatha eningi ingase ivezwe ngaphandle kwemvume.",
       "mediumDescription": "Kunomthelela olinganiselwe noma kudinga izimo ezithile.",
       "lowDescription": "Kunomthelela omncane kakhulu kwezokuphepha.",
-      "invalidDayCount": "faka izinsuku ezingu-1–365, usebenzise izinombolo eziphelele kuphela.",
+      "invalidDayCount": "Faka izinsuku ezingu-1–365, usebenzise izinombolo eziphelele kuphela.",
       "remediationDeadlineA11y": "Umnqamulajuqu wokulungisa ngezinsuku: {{label}}",
       "enterWholeNumber": "Faka inombolo ephelele phakathi kuka-1 no-365",
       "permissionNote": "Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangashintsha lezi zilungiselelo.",

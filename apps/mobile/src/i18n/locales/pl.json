@@ -1531,7 +1531,7 @@
       "enterWholeNumber": "Wpisz liczbę całkowitą od 1 do 365",
       "high": "Poziom wysoki",
       "highDescription": "Ryzyko poważnego wycieku danych.",
-      "invalidDayCount": "podaj liczbę dni od 1 do 365, bez części ułamkowej.",
+      "invalidDayCount": "Podaj liczbę dni od 1 do 365, bez części ułamkowej.",
       "low": "Poziom niski",
       "lowDescription": "Minimalny wpływ na bezpieczeństwo.",
       "medium": "Poziom średni",

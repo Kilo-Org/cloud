@@ -1922,7 +1922,7 @@
       "highDescription": "Potensi pendedahan data yang ketara.",
       "mediumDescription": "Kesan terhad atau keadaan tertentu.",
       "lowDescription": "Kesan minimum terhadap keselamatan.",
-      "invalidDayCount": "bilangan hari mesti antara 1 hingga 365, dalam nombor bulat sahaja.",
+      "invalidDayCount": "Bilangan hari mesti antara 1 hingga 365, dalam nombor bulat sahaja.",
       "remediationDeadlineA11y": "Tempoh pemulihan {{label}} dalam hari",
       "enterWholeNumber": "Masukkan nombor bulat antara 1 dan 365",
       "permissionNote": "Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menukar tetapan ini.",

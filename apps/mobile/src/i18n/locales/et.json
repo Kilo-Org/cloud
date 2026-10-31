@@ -1922,7 +1922,7 @@
       "highDescription": "Võib põhjustada ulatusliku andmelekke.",
       "mediumDescription": "Mõju on piiratud või ärakasutamine eeldab kindlaid tingimusi.",
       "lowDescription": "Mõju turvalisusele on minimaalne.",
-      "invalidDayCount": "päevade arv peab olema täisarv vahemikus 1–365.",
+      "invalidDayCount": "Päevade arv peab olema täisarv vahemikus 1–365.",
       "remediationDeadlineA11y": "{{label}}: parandamise tähtaeg päevades",
       "enterWholeNumber": "Sisesta täisarv vahemikus 1 kuni 365",
       "permissionNote": "Neid seadeid saavad muuta ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",

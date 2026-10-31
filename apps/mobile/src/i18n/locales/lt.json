@@ -1986,7 +1986,7 @@
       "highDescription": "Galimas didelio masto duomenų nutekėjimas.",
       "mediumDescription": "Poveikis ribotas arba pažeidžiamumą galima išnaudoti tik tam tikromis sąlygomis.",
       "lowDescription": "Minimalus poveikis saugai.",
-      "invalidDayCount": "įvesk sveikąjį dienų skaičių nuo 1 iki 365.",
+      "invalidDayCount": "Įvesk sveikąjį dienų skaičių nuo 1 iki 365.",
       "remediationDeadlineA11y": "Taisymo terminas dienomis. Pavojingumas: {{label}}",
       "enterWholeNumber": "Įvesk sveikąjį skaičių nuo 1 iki 365",
       "permissionNote": "Šiuos nustatymus gali keisti tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",

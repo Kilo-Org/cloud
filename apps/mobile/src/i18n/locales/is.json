@@ -1922,7 +1922,7 @@
       "highDescription": "Hætta á verulegum gagnaleka.",
       "mediumDescription": "Takmörkuð áhrif eða sérstök skilyrði.",
       "lowDescription": "Óveruleg áhrif á öryggi.",
-      "invalidDayCount": "fjöldi daga verður að vera heil tala frá 1 til 365.",
+      "invalidDayCount": "Fjöldi daga verður að vera heil tala frá 1 til 365.",
       "remediationDeadlineA11y": "Úrbótafrestur í dögum fyrir {{label}}",
       "enterWholeNumber": "Sláðu inn heila tölu milli 1 og 365",
       "permissionNote": "Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta breytt þessum stillingum.",

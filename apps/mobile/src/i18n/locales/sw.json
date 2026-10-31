@@ -1922,7 +1922,7 @@
       "highDescription": "Data inaweza kufichuliwa kwa kiwango kikubwa.",
       "mediumDescription": "Athari ndogo au masharti mahususi.",
       "lowDescription": "Athari ndogo sana kwa usalama.",
-      "invalidDayCount": "weka siku 1–365 kwa nambari nzima tu.",
+      "invalidDayCount": "Weka siku 1–365 kwa nambari nzima tu.",
       "remediationDeadlineA11y": "Muda wa mwisho wa urekebishaji wa {{label}} kwa siku",
       "enterWholeNumber": "Ingiza nambari kamili kati ya 1 na 365",
       "permissionNote": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kubadilisha mipangilio hii.",

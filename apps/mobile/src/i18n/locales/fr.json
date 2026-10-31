@@ -1491,7 +1491,7 @@
       "enterWholeNumber": "Saisissez un nombre entier entre 1 et 365",
       "high": "Élevé",
       "highDescription": "Risque important d'exposition de données.",
-      "invalidDayCount": "saisissez un nombre entier de jours entre 1 et 365.",
+      "invalidDayCount": "Saisissez un nombre entier de jours entre 1 et 365.",
       "low": "Faible",
       "lowDescription": "Impact minimal sur la sécurité.",
       "medium": "Moyen",

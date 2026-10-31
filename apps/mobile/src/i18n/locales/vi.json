@@ -1503,7 +1503,7 @@
       "enterWholeNumber": "Nhập một số nguyên từ 1 đến 365",
       "high": "Cao",
       "highDescription": "Có nguy cơ rò rỉ dữ liệu ở mức đáng kể.",
-      "invalidDayCount": "số ngày phải là số nguyên từ 1 đến 365.",
+      "invalidDayCount": "Số ngày phải là số nguyên từ 1 đến 365.",
       "low": "Thấp",
       "lowDescription": "Ảnh hưởng rất ít đến bảo mật.",
       "medium": "Trung bình",

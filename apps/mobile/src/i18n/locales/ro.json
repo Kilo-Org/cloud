@@ -1954,7 +1954,7 @@
       "highDescription": "Posibilă expunere semnificativă a datelor.",
       "mediumDescription": "Impact limitat sau condiții specifice.",
       "lowDescription": "Impact minim asupra securității.",
-      "invalidDayCount": "introdu un număr întreg de zile între 1 și 365.",
+      "invalidDayCount": "Introdu un număr întreg de zile între 1 și 365.",
       "remediationDeadlineA11y": "Termen limită de remediere în zile pentru {{label}}",
       "enterWholeNumber": "Introdu un număr întreg între 1 și 365",
       "permissionNote": "Doar proprietarii, administratorii și managerii de facturare ai organizației pot modifica aceste setări.",

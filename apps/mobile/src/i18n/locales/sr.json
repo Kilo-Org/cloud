@@ -1954,7 +1954,7 @@
       "highDescription": "Moguće ozbiljno otkrivanje podataka.",
       "mediumDescription": "Ograničen uticaj ili specifični uslovi.",
       "lowDescription": "Minimalan uticaj na bezbednost.",
-      "invalidDayCount": "broj dana mora biti ceo broj od 1 do 365.",
+      "invalidDayCount": "Broj dana mora biti ceo broj od 1 do 365.",
       "remediationDeadlineA11y": "Rok za otklanjanje u danima: {{label}}",
       "enterWholeNumber": "Unesi ceo broj između 1 i 365",
       "permissionNote": "Samo vlasnici organizacije, administratori i menadžeri naplate mogu da promene ova podešavanja.",

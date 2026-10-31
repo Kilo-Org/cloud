@@ -1922,7 +1922,7 @@
       "highDescription": "Kan eksponere betydelige mengder data.",
       "mediumDescription": "Har begrensede konsekvenser eller krever bestemte forhold.",
       "lowDescription": "Har minimale konsekvenser for sikkerheten.",
-      "invalidDayCount": "angi et helt antall dager fra 1 til 365.",
+      "invalidDayCount": "Angi et helt antall dager fra 1 til 365.",
       "remediationDeadlineA11y": "Utbedringsfrist i dager for alvorlighetsgrad {{label}}",
       "enterWholeNumber": "Skriv inn et heltall mellom 1 og 365",
       "permissionNote": "Bare organisasjonseiere, administratorer og faktureringsansvarlige kan endre disse innstillingene.",

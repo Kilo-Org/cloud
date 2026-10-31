@@ -1954,7 +1954,7 @@
       "highDescription": "Iespējama būtiska datu noplūde.",
       "mediumDescription": "Ierobežota ietekme vai īpaši nosacījumi.",
       "lowDescription": "Minimāla ietekme uz drošību.",
-      "invalidDayCount": "norādi no 1 līdz 365 dienām, izmantojot tikai veselus skaitļus.",
+      "invalidDayCount": "Norādi no 1 līdz 365 dienām, izmantojot tikai veselus skaitļus.",
       "remediationDeadlineA11y": "Labošanas termiņš dienās; smaguma pakāpe: {{label}}",
       "enterWholeNumber": "Ievadi veselu skaitli no 1 līdz 365",
       "permissionNote": "Tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki var mainīt šos iestatījumus.",

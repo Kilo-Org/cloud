@@ -1922,7 +1922,7 @@
       "highDescription": "Xog badan ayaa halis ugu jirta inay bannaanka u baxdo.",
       "mediumDescription": "Saamayn xaddidan ama xaalado gaar ah.",
       "lowDescription": "Saamayn amni oo aad u yar.",
-      "invalidDayCount": "geli 1 ilaa 365 maalmood, adigoo isticmaalaya tirooyin dhan oo keliya.",
+      "invalidDayCount": "Geli 1 ilaa 365 maalmood, adigoo isticmaalaya tirooyin dhan oo keliya.",
       "remediationDeadlineA11y": "Muddada hagaajinta ee {{label}}, oo maalmo ah",
       "enterWholeNumber": "Geli tiro dhan oo u dhaxaysa 1 iyo 365",
       "permissionNote": "Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa beddeli kara dejintan.",

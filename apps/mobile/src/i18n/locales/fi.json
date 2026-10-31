@@ -1922,7 +1922,7 @@
       "highDescription": "Merkittävän tietovuodon riski.",
       "mediumDescription": "Rajallinen vaikutus tai hyväksikäyttö vain tietyissä olosuhteissa.",
       "lowDescription": "Vähäinen tietoturvavaikutus.",
-      "invalidDayCount": "anna päivien määrä kokonaislukuna väliltä 1–365.",
+      "invalidDayCount": "Anna päivien määrä kokonaislukuna väliltä 1–365.",
       "remediationDeadlineA11y": "Vakavuus: {{label}}. Korjauksen määräaika päivinä",
       "enterWholeNumber": "Anna kokonaisluku välillä 1–365",
       "permissionNote": "Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat muuttaa näitä asetuksia.",

@@ -1954,7 +1954,7 @@
       "highDescription": "Moguće ozbiljno curenje podataka.",
       "mediumDescription": "Ograničen utjecaj ili posebni uslovi.",
       "lowDescription": "Minimalan utjecaj na sigurnost.",
-      "invalidDayCount": "unesi cijeli broj dana od 1 do 365.",
+      "invalidDayCount": "Unesi cijeli broj dana od 1 do 365.",
       "remediationDeadlineA11y": "Rok za otklanjanje u danima: {{label}}",
       "enterWholeNumber": "Unesi cijeli broj od 1 do 365",
       "permissionNote": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu mijenjati ove postavke.",

@@ -1986,7 +1986,7 @@
       "highDescription": "Možnost obsežnega razkritja podatkov.",
       "mediumDescription": "Omejen vpliv ali posebni pogoji.",
       "lowDescription": "Minimalen vpliv na varnost.",
-      "invalidDayCount": "vnesi celo število dni med 1 in 365.",
+      "invalidDayCount": "Vnesi celo število dni med 1 in 365.",
       "remediationDeadlineA11y": "Rok za odpravljanje v dneh, resnost: {{label}}",
       "enterWholeNumber": "Vnesi celo število med 1 in 365",
       "permissionNote": "Te nastavitve lahko spremenijo samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",

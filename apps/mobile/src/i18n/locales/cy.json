@@ -2050,7 +2050,7 @@
       "highDescription": "Posibilrwydd o ddatgelu llawer o ddata.",
       "mediumDescription": "Effaith gyfyngedig neu amodau penodol.",
       "lowDescription": "Ychydig iawn o effaith ar ddiogelwch.",
-      "invalidDayCount": "rhaid nodi rhwng 1 a 365 diwrnod, mewn rhifau cyfan yn unig.",
+      "invalidDayCount": "Rhaid nodi rhwng 1 a 365 diwrnod, mewn rhifau cyfan yn unig.",
       "remediationDeadlineA11y": "Dyddiad terfyn cywiro mewn diwrnodau: {{label}}",
       "enterWholeNumber": "Rho rif cyfan rhwng 1 a 365",
       "permissionNote": "Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu newid y gosodiadau hyn.",

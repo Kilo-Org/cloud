@@ -1922,7 +1922,7 @@
       "highDescription": "Daataan baay'een saaxilamuu danda'a.",
       "mediumDescription": "Miidhaa daangeffame ykn haalota addaa.",
       "lowDescription": "Miidhaa nageenyaa baay'ee xiqqaa.",
-      "invalidDayCount": "lakkoofsa guutuu guyyaa 1–365 galchi.",
+      "invalidDayCount": "Lakkoofsa guutuu guyyaa 1–365 galchi.",
       "remediationDeadlineA11y": "Daangaa yeroo sirreeffamaa {{label}} guyyaadhaan",
       "enterWholeNumber": "Lakkoofsa guutuu 1 fi 365 gidduu jiru galchi",
       "permissionNote": "Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa qindaa'ina kana jijjiiruu danda'u.",

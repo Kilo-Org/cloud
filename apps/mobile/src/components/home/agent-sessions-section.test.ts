@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { AgentSessionsSection } from '@/components/home/home-agent-sessions-section';
+import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 
@@ -98,7 +99,7 @@ vi.mock('@/components/home/section-header', async () => {
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: () => null }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: vi.fn() }));
@@ -333,5 +334,61 @@ describe('Home live section', () => {
         candidate.children.includes('No internet connection')
       )
     ).not.toHaveLength(0);
+  });
+});
+
+describe('Home live section status box', () => {
+  // Home reports the live facts in the section header, so the feedback column
+  // must add no box of its own: the card column's `gap-2` would then place the
+  // card below an invisible child, twice as far from the section label as the
+  // Explore rows are from theirs (home section-label gap).
+  function mountFeedback(
+    sessions: Props['sessions'] = settled,
+    contextOverride: Props['context'] = context
+  ) {
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(LiveSessionFeedback, {
+          context: contextOverride,
+          sessions,
+          failureLabel: "Couldn't load active sessions",
+          inlineNotices: false,
+        })
+      );
+    });
+  }
+
+  it.each([
+    ['the accepted list is empty', settled, context],
+    [
+      'the list is still resolving',
+      { ...settled, hasAcceptedSuccess: false },
+      { ...context, isResolving: true },
+    ],
+    [
+      'rows are shown',
+      {
+        ...settled,
+        activeSessions: [session('a1', 'running', { statusUpdatedAt: new Date().toISOString() })],
+      },
+      context,
+    ],
+  ])('draws no box between the label and the card while %s', (_state, sessions, ctx) => {
+    mountFeedback(sessions, ctx);
+    expect(nodes('View')).toHaveLength(0);
+  });
+
+  it('keeps announcing a pending list without drawing a box', () => {
+    mountFeedback({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
+    expect(nodes('AccessibleStatus').map(status => status.props.message)).toContain(
+      i18n.t('common.loading')
+    );
+    expect(nodes('View')).toHaveLength(0);
+  });
+
+  it('draws the column when the failure block owns the surface', () => {
+    mountFeedback(settled, { ...context, isError: true });
+    expect(nodes('View').length).toBeGreaterThan(0);
+    expect(nodes('QueryError')).toHaveLength(1);
   });
 });

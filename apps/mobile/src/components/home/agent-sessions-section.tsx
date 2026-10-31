@@ -217,29 +217,59 @@ export function LiveSessionFeedback({
     }
   }
 
+  // The connection row paints only where the surface reports these inline (the
+  // Agents live tab): the offline line, the visible connection status, or the
+  // retry that backs it. Elsewhere — Home puts the same facts in its section
+  // header notice — the row was an empty child of the Home column's `gap-2`, so
+  // an invisible box still held the card 7 dp below the section label.
+  const offlineLine = inlineNotices && internet === 'offline';
+  const connectionStatus = inlineNotices && reconnectExhausted && connectionLabel !== null;
+  const connectionRetry =
+    inlineNotices && context.isReady && !isConnected && reconnectExhausted && !failureOwnsRetry;
+  const connectionRow = offlineLine || connectionStatus || connectionRetry;
+
+  // Status that only the screen reader consumes. Each is absolutely positioned,
+  // so mounting them without the visible column adds no box and no gap.
+  const announcements = (
+    <>
+      <AccessibleStatus
+        message={connectionLabel}
+        tone="status"
+        className="absolute size-px overflow-hidden"
+      />
+      <AccessibleStatus
+        message={content === 'pending' ? t('common.loading') : null}
+        tone="status"
+        className="absolute size-px overflow-hidden"
+      />
+      {content === 'rows' && sessions.isFetching && !sessions.isPaused && !refresh?.busy && (
+        <AccessibleStatus
+          message={t('agents.sessionList.updating')}
+          tone="status"
+          className="absolute size-px overflow-hidden"
+        />
+      )}
+    </>
+  );
+
   const feedback = (
     <View className={cn(compactSpacing ? 'gap-0' : 'gap-2', centered && 'px-6')}>
-      <View className="flex-row items-center gap-2">
-        {/* The app-wide OfflineBanner owns the offline announcement. */}
-        {internet === 'offline' ? (
-          inlineNotices && (
+      {connectionRow ? (
+        <View className="flex-row items-center gap-2">
+          {/* The app-wide OfflineBanner owns the offline announcement. */}
+          {internet === 'offline' ? (
             <Text className="flex-1 text-xs text-muted-foreground">{t('offline.noInternet')}</Text>
-          )
-        ) : (
-          <AccessibleStatus
-            message={connectionLabel}
-            tone="status"
-            className={cn(
-              'flex-1 text-xs',
-              (!reconnectExhausted || !inlineNotices) && 'absolute size-px overflow-hidden'
-            )}
-          />
-        )}
-        {inlineNotices &&
-          context.isReady &&
-          !isConnected &&
-          reconnectExhausted &&
-          !failureOwnsRetry && (
+          ) : (
+            <AccessibleStatus
+              message={connectionLabel}
+              tone="status"
+              className={cn(
+                'flex-1 text-xs',
+                !reconnectExhausted && 'absolute size-px overflow-hidden'
+              )}
+            />
+          )}
+          {connectionRetry && (
             <Button
               variant="ghost"
               size="sm"
@@ -252,7 +282,15 @@ export function LiveSessionFeedback({
               <Text>{t('common.retry')}</Text>
             </Button>
           )}
-      </View>
+        </View>
+      ) : (
+        // Nothing paints in the row: keep the announcement, drop the box.
+        <AccessibleStatus
+          message={connectionLabel}
+          tone="status"
+          className="absolute size-px overflow-hidden"
+        />
+      )}
       {refresh && content === 'rows' ? (
         // The live tab's reserved status line: screen-reader Updating while
         // the pull is in flight, visible "Couldn't refresh" + Retry when it
@@ -285,6 +323,14 @@ export function LiveSessionFeedback({
       {failure}
     </View>
   );
+  // Nothing paints: no local status line (the Agents tab always passes one), no
+  // inline connection row, no failure. Home's card column then holds a single
+  // child, so the card starts on the header's content edge instead of 7 dp
+  // below an invisible box. The announcements still mount.
+  const hasVisibleContent = centered || connectionRow || refresh !== undefined || failure !== null;
+  if (!hasVisibleContent) {
+    return announcements;
+  }
   return centered ? (
     <CenteredState refreshControl={refreshControl}>{feedback}</CenteredState>
   ) : (

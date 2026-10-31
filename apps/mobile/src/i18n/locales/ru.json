@@ -1322,7 +1322,6 @@
       "repoSummaryHigh_other": "Высокая: {{displayCount}}",
       "repositoryActionPlan": "План действий по репозиторию",
       "settings": "Настройки",
-      "syncFindings": "Синхронизировать уязвимости",
       "syncNow": "Синхронизировать сейчас",
       "syncQueued": "Синхронизация в очереди",
       "syncStatusUnavailable": "Статус синхронизации недоступен.",

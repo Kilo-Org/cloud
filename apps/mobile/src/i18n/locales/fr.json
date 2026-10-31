@@ -1285,7 +1285,6 @@
       "repoSummaryHigh_zero": "{{displayCount}} de gravité élevée",
       "repositoryActionPlan": "Plan d'action par dépôt",
       "settings": "Paramètres",
-      "syncFindings": "Synchroniser les signalements",
       "syncNow": "Synchroniser maintenant",
       "syncQueued": "Synchronisation en file d'attente",
       "syncStatusUnavailable": "L'état de la synchronisation est indisponible.",

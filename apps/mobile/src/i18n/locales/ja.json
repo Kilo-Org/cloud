@@ -1306,7 +1306,6 @@
       "repoSummaryHigh_other": "高{{displayCount}}件",
       "repositoryActionPlan": "リポジトリの対応計画",
       "settings": "設定",
-      "syncFindings": "検出結果を同期",
       "syncNow": "今すぐ同期",
       "syncQueued": "同期をキューに追加しました。",
       "syncStatusUnavailable": "同期の状態を確認できません。",

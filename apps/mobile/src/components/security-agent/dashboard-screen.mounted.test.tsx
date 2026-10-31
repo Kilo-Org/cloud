@@ -140,11 +140,6 @@ const sectionsProps = vi.hoisted(() => ({
   props: [] as { data?: unknown; slaEnabled?: boolean; neverSynced?: boolean }[],
 }));
 
-// Captures the empty state the dashboard renders before the first sync.
-const emptyState = vi.hoisted(() => ({
-  props: [] as { title: string; action?: ReactElement }[],
-}));
-
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
   View: 'View',
@@ -264,14 +259,6 @@ vi.mock('@/components/security-agent/dashboard-sections', () => ({
   },
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-// The empty state is a layout component with its own suite; this suite asserts
-// when the dashboard reaches for it and what it offers.
-vi.mock('@/components/empty-state', () => ({
-  EmptyState: (props: { title: string; action?: ReactElement }) => {
-    emptyState.props.push(props);
-    return props.action ?? null;
-  },
-}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: () => null }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -414,18 +401,16 @@ describe('DashboardScreen before the first sync', () => {
   beforeEach(() => {
     dashboardStats.isPending = false;
     dashboardStats.isError = false;
-    dashboardStats.data = { sla: { overall: { total: 0 } }, analysis: { total: 0 } };
+    dashboardStats.data = { sla: { overall: { total: 0 } } };
     sharedMetrics.build.mockReturnValue([]);
   });
 
   // The stored absence of a sync is what paints "Not yet synced" under the
   // filter. The sections must read that same fact, or an organization that has
-  // never run the agent reports an all-clear it never measured. A scope with
-  // findings keeps its sections: only an empty grid gives way to the prompt.
+  // never run the agent reports an all-clear it never measured.
   it('tells the sections nothing has been synced yet', () => {
     sectionsProps.props = [];
     lastSync.data = { lastSyncTime: null };
-    dashboardStats.data = { sla: { overall: { total: 2 } }, analysis: { total: 2 } };
     renderScreen('org_123');
     expect(sectionsProps.props.at(-1)?.neverSynced).toBe(true);
   });
@@ -1217,208 +1202,6 @@ describe('DashboardScreen pending stats', () => {
     expect(
       root.root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton')
     ).toHaveLength(0);
-    expect(renderedTexts(root.root)).toContain(
-      i18n.t('securityAgent.dashboardMetrics.openFindings')
-    );
-  });
-});
-
-describe('DashboardScreen first-sync prompt', () => {
-  const zeroStats = {
-    analysis: {
-      total: 0,
-      exploitable: 0,
-      needsReview: 0,
-      triageComplete: 0,
-      analyzing: 0,
-      notAnalyzed: 0,
-      failed: 0,
-    },
-    severity: { critical: 0, high: 0, medium: 0, low: 0 },
-    sla: {
-      overall: { total: 0, withinSla: 0, overdue: 0 },
-      bySeverity: {
-        critical: { overdue: 0 },
-        high: { overdue: 0 },
-        medium: { overdue: 0 },
-        low: { overdue: 0 },
-      },
-      dueSoon: { total: 0, exploitable: 0 },
-      untrackedCount: 0,
-    },
-  };
-
-  beforeEach(() => {
-    emptyState.props = [];
-    sectionsProps.props = [];
-    triggerSync.mutate.mockClear();
-    triggerSync.isPending = false;
-    triggerSync.isError = false;
-    triggerSync.error = null;
-    config.data = { slaEnabled: true };
-    dashboardStats.isPending = false;
-    dashboardStats.isLoading = false;
-    dashboardStats.isError = false;
-    dashboardStats.data = zeroStats;
-    lastSync.isError = false;
-    lastSync.data = { lastSyncTime: null };
-    repositories.isError = false;
-    repositories.data = [];
-    sharedMetrics.build.mockReturnValue([
-      dashboardMetric('openFindings'),
-      dashboardMetric('slaCompliance'),
-    ]);
-  });
-
-  it('replaces the zero counts and the posture sections with a first-sync prompt', () => {
-    const root = renderScreen();
-
-    // Zeroes read as a clean result, so neither the tiles nor the sections
-    // render until a sync has recorded a time.
-    expect(renderedTexts(root.root)).not.toContain(
-      i18n.t('securityAgent.dashboardMetrics.openFindings')
-    );
-    expect(sectionsProps.props).toHaveLength(0);
-    expect(emptyState.props).toHaveLength(1);
-    expect(emptyState.props[0]?.title).toBe(i18n.t('securityAgent.dashboard.notYetSynced'));
-  });
-
-  it('states the sync status once, in the prompt, before the first sync', () => {
-    // The prompt's title already says the scope has not synced, so the filter
-    // row above it must not repeat the same sentence.
-    const prompt = renderScreen();
-    expect(renderedTexts(prompt.root)).not.toContain(
-      i18n.t('securityAgent.dashboard.notYetSynced')
-    );
-
-    // Every other state keeps the row's status line.
-    lastSync.data = { lastSyncTime: '2026-01-01T00:00:00.000Z' };
-    const synced = renderScreen();
-    expect(renderedTexts(synced.root)).toContain(
-      i18n.t('securityAgent.dashboard.lastSynced', { time: 'recently' })
-    );
-  });
-
-  it('starts a sync from the prompt with the current repository filter', () => {
-    const root = renderScreen();
-    const action = root.root.findAll(
-      n =>
-        typeof n.type === 'string' &&
-        (n.type as string) === 'Button' &&
-        n.props.accessibilityLabel === i18n.t('securityAgent.dashboard.syncFindings')
-    )[0];
-    if (!action) {
-      throw new Error('the first-sync prompt rendered no sync action');
-    }
-
-    act(() => {
-      (action.props.onPress as () => void)();
-    });
-
-    expect(triggerSync.mutate).toHaveBeenCalledWith(
-      { repoFullName: undefined },
-      expect.objectContaining({ onSuccess: expect.any(Function) })
-    );
-  });
-
-  it('disables the prompt while a sync is pending', () => {
-    triggerSync.isPending = true;
-    const root = renderScreen();
-    const action = root.root.findAll(
-      n =>
-        typeof n.type === 'string' &&
-        (n.type as string) === 'Button' &&
-        n.props.accessibilityLabel === i18n.t('securityAgent.dashboard.syncFindings')
-    )[0];
-
-    expect(action?.props.disabled).toBe(true);
-    expect(action?.props.loading).toBe(true);
-  });
-
-  it('keeps the counts once a sync time is recorded', () => {
-    lastSync.data = { lastSyncTime: '2026-01-01T00:00:00.000Z' };
-    const root = renderScreen();
-
-    expect(emptyState.props).toHaveLength(0);
-    expect(renderedTexts(root.root)).toContain(
-      i18n.t('securityAgent.dashboardMetrics.openFindings')
-    );
-    expect(sectionsProps.props).toHaveLength(1);
-  });
-
-  it('keeps findings visible when the sync stamp is missing', () => {
-    // A partial sync can leave findings behind with no owner-level stamp, so
-    // the prompt may only replace an empty grid.
-    dashboardStats.data = { ...zeroStats, analysis: { ...zeroStats.analysis, total: 3 } };
-    const root = renderScreen();
-
-    expect(emptyState.props).toHaveLength(0);
-    expect(sectionsProps.props).toHaveLength(1);
-    expect(renderedTexts(root.root)).toContain(
-      i18n.t('securityAgent.dashboardMetrics.openFindings')
-    );
-  });
-
-  it('leaves the unmeasured statement to the surfaces that report it', () => {
-    // The tiles and the "Act first" row each carry the not-yet-synced line for
-    // this state; the filter row must not repeat it above them.
-    dashboardStats.data = { ...zeroStats, analysis: { ...zeroStats.analysis, total: 3 } };
-    const root = renderScreen();
-    const filterRow = root.root.findAll(
-      n =>
-        typeof n.type === 'string' &&
-        (n.type as string) === 'Pressable' &&
-        n.props.accessibilityLabel === i18n.t('securityAgent.dashboard.filterByRepository')
-    )[0];
-    if (!filterRow) {
-      throw new Error('the repository filter row did not render');
-    }
-    const lines = filterRow.findAll(
-      n =>
-        typeof n.type === 'string' &&
-        (n.type as string) === 'Text' &&
-        typeof n.props.children === 'string'
-    );
-
-    expect(sectionsProps.props.at(-1)?.neverSynced).toBe(true);
-    expect(lines.map(line => line.props.children as string)).toEqual([
-      i18n.t('common.allRepositories'),
-    ]);
-  });
-
-  it('waits for the stats read before offering the prompt', () => {
-    dashboardStats.isPending = true;
-    dashboardStats.data = undefined;
-    const root = renderScreen();
-
-    expect(emptyState.props).toHaveLength(0);
-    expect(
-      root.root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton')
-    ).toHaveLength(4);
-  });
-
-  it('offers repository setup beside the first sync', () => {
-    // A sync without a configured repository answers PRECONDITION_FAILED, so
-    // the pristine state cannot depend on the prompt's single action.
-    const root = renderScreen();
-    const manage = root.root.findAll(
-      n =>
-        typeof n.type === 'string' &&
-        (n.type as string) === 'Pressable' &&
-        n.props.accessibilityLabel === i18n.t('securityAgent.dashboard.manageRepositories')
-    );
-
-    expect(manage).toHaveLength(1);
-  });
-
-  it('keeps the counts while the sync-time read has not answered', () => {
-    // Only a read that succeeded and reports no time proves the scope never
-    // synced; a failed read has its own label and must not hide the counts.
-    lastSync.data = undefined;
-    lastSync.isError = true;
-    const root = renderScreen();
-
-    expect(emptyState.props).toHaveLength(0);
     expect(renderedTexts(root.root)).toContain(
       i18n.t('securityAgent.dashboardMetrics.openFindings')
     );

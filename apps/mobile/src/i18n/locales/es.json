@@ -1314,7 +1314,6 @@
       "repoSummaryHigh_other": "{{displayCount}} de gravedad alta",
       "repositoryActionPlan": "Plan de acción del repositorio",
       "settings": "Ajustes",
-      "syncFindings": "Sincronizar hallazgos",
       "syncNow": "Sincronizar ahora",
       "syncQueued": "Sincronización en cola",
       "syncStatusUnavailable": "El estado de sincronización no está disponible.",

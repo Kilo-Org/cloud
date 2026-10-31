@@ -1855,7 +1855,6 @@
       "notYetSynced": "Not yet synced",
       "refreshFailed": "Could not refresh — showing last synced data.",
       "settings": "Settings",
-      "syncFindings": "Sync findings",
       "syncNow": "Sync now",
       "syncQueued": "Sync queued",
       "syncStatusUnavailable": "Sync status unavailable"
@@ -2080,7 +2079,7 @@
       "newFindingPersonalTitle": "Email me about new findings",
       "newFindingSection": "New-finding notification",
       "newFindingSeverityLabel": "New-finding minimum severity",
-      "newFindingSubtitle": "Sent whenever a new finding is synced.",
+      "newFindingSubtitle": "Sent whenever a new finding is synced, including on first sync.",
       "slaLeadTimeAccessibility": "SLA warning lead time in days",
       "slaLeadTimeError": "Enter a whole number of days between 1 and 365.",
       "slaLeadTimeLabel": "SLA warning lead time (days)",

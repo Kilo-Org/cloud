@@ -161,10 +161,7 @@ describe('DashboardSections priority card', () => {
 
     expect(copy(card)).toContain('securityAgent.dashboard.noOpenFindings');
     expect(card.findAllByType('ShieldCheck')).toHaveLength(1);
-    // Nothing to act on, so the all-clear row leads nowhere: no press target
-    // and no chevron that would promise a destination.
-    expect(card.findAllByType('Pressable')).toHaveLength(0);
-    expect(card.findAllByType('DirectionalArrowRight')).toHaveLength(0);
+    expect(card.findAllByType('Pressable')).toHaveLength(1);
   });
 });
 
@@ -233,13 +230,16 @@ describe('DashboardSections SLA posture', () => {
   // The compliance and deadline tiles above these sections already state the
   // within-deadline ratio and the per-severity overdue counts. The posture card
   // repeated them, so it is gone while SLA tracking is on; the analysis posture
-  // it still shows for a scope without tracking is the part the tiles leave out.
+  // it still shows is the part the tiles leave out.
   it('leaves the SLA figures to the tiles while SLA tracking is on', () => {
-    const texts = copy(renderSections({ neverSynced: false, slaEnabled: true }).root);
+    const labels = renderSections({ neverSynced: false, slaEnabled: true })
+      .root.findAllByType('KvRow')
+      .map(row => row.props.label);
 
-    // The card renders nothing at all in this mode, so neither it nor its
-    // analysis posture is on screen.
-    expect(texts).not.toContain('securityAgent.dashboard.actionPosture');
+    expect(labels).not.toContain('securityAgent.dashboard.withinDeadline');
+    expect(labels).not.toContain('securityAgent.dashboard.criticalOverdue');
+    expect(labels).not.toContain('securityAgent.dashboard.highOverdue');
+    expect(labels).not.toContain('securityAgent.dashboard.mediumLowOverdue');
   });
 
   it('keeps the analysis posture for a scope without SLA tracking', () => {

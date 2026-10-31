@@ -1306,7 +1306,6 @@
       "repoSummaryHigh_other": "{{displayCount}} 个高危",
       "repositoryActionPlan": "仓库处理计划",
       "settings": "设置",
-      "syncFindings": "同步安全问题",
       "syncNow": "立即同步",
       "syncQueued": "同步任务已加入队列",
       "syncStatusUnavailable": "无法获取同步状态",

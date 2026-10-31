@@ -120,12 +120,18 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
   if (!finding) {
     return (
       <SectionCard title={t('securityAgent.dashboard.actFirst')}>
-        {/* Nothing to act on, so the row leads nowhere: no chevron and no
-            press feedback, which would promise a destination. */}
-        <View className="flex-row items-center gap-2 py-3">
-          <ShieldCheck size={16} color={colors.good} />
-          <Text className="text-sm">{t('securityAgent.dashboard.noOpenFindings')}</Text>
-        </View>
+        <Pressable
+          className="flex-row items-center justify-between gap-2 py-3 active:opacity-70"
+          onPress={() => {
+            pushOnce(findingsHref(scope, { status: 'open' }));
+          }}
+        >
+          <View className="flex-row items-center gap-2">
+            <ShieldCheck size={16} color={colors.good} />
+            <Text className="text-sm">{t('securityAgent.dashboard.noOpenFindings')}</Text>
+          </View>
+          <DirectionalArrowRight size={14} color={colors.mutedForeground} />
+        </Pressable>
       </SectionCard>
     );
   }

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { useColorScheme, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
@@ -29,6 +29,16 @@ import {
 import { type ProviderPrPlatform, useProviderPrScopeOrNull } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
+
+/**
+ * The illustration tile above the title. The light cell's hairline separates a
+ * white bubble from the off-white page; on the near-black dark surface both the
+ * card and that 7% hairline all but vanish, so the dark cell takes the
+ * surface/border pair an outlined control uses (`Button`'s `outline` variant).
+ * The caller pairs it with a brighter glyph in dark mode for the same reason.
+ */
+const ICON_TILE_CLASS =
+  'h-14 w-14 rounded-2xl border border-border bg-card dark:border-neutral-700 dark:bg-secondary';
 
 /**
  * The pasted MR URL's origin, when the deep link carried one and it is worth
@@ -92,6 +102,10 @@ export function ProviderConnectGate({
 }>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
+  // The muted glyph the shared bubble uses reads far dimmer on the near-black
+  // dark tile than on the light one, so the dark cell takes the secondary-ink
+  // token and keeps the illustration as visible as its light counterpart.
+  const iconColor = useColorScheme() === 'dark' ? colors.ink2 : colors.mutedForeground;
   const { t } = useTranslation();
   const instanceHint = useInstanceHint(platform);
   // The org-only arm sends a personal reader to the account switch above. That
@@ -219,14 +233,16 @@ export function ProviderConnectGate({
         <PrReviewGateHeader />
         <EmptyState
           icon={ShieldAlert}
+          iconContainerClassName={ICON_TILE_CLASS}
+          iconColor={iconColor}
           title={t('agentChat.newSession.bitbucketOrganizationsOnly')}
           description={
             <>
-              <PrReviewContextLine />
               <OrgOnlyDescription
                 membershipsError={memberships.isError}
                 organizationCount={memberships.data?.length}
               />
+              <PrReviewContextLine />
             </>
           }
         />
@@ -316,13 +332,15 @@ export function ProviderConnectGate({
         <PrReviewGateHeader />
         <EmptyState
           icon={reconnect ? ShieldAlert : PlugZap}
+          iconContainerClassName={ICON_TILE_CLASS}
+          iconColor={iconColor}
           title={title}
           description={
             <>
-              <PrReviewContextLine instanceHint={instanceHint} />
               <Text variant="muted" className="text-center">
                 {description}
               </Text>
+              <PrReviewContextLine instanceHint={instanceHint} />
             </>
           }
           action={

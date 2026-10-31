@@ -133,6 +133,7 @@ vi.mock('react-native', () => ({
   AppState: { addEventListener: appState.addEventListener },
   BackHandler: { addEventListener: () => ({ remove: vi.fn() }) },
   Platform: platform,
+  useColorScheme: () => 'light',
   View: 'View',
 }));
 

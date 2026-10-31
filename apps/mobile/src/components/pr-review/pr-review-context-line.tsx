@@ -65,9 +65,16 @@ export function PrReviewContextLine({ instanceHint }: Readonly<{ instanceHint?: 
     statusMessage = t('organization.boundary.organizationUnavailable');
   }
 
+  // The switchable line is a control, so it is drawn as one: a bordered pill in
+  // the primary text color, whose surface/border pair follows `Button`'s
+  // `outline` variant (the dark hairline alone is too faint on the near-black
+  // card). With nowhere to switch the same line stays plain muted text.
   const line = (
     <Text
-      className="text-center text-sm leading-[normal] text-muted-foreground"
+      className={cn(
+        'text-center text-sm leading-[normal]',
+        switchable ? 'text-foreground' : 'text-muted-foreground'
+      )}
       numberOfLines={1}
       ellipsizeMode="tail"
     >
@@ -87,12 +94,12 @@ export function PrReviewContextLine({ instanceHint }: Readonly<{ instanceHint?: 
           onPress={openPicker}
           className={cn(
             ROW_TARGET_CLASS,
-            'max-w-full flex-row items-center gap-1 px-2 active:opacity-70'
+            'max-w-full flex-row items-center gap-1 rounded-full border border-border bg-card px-3 active:opacity-70 dark:border-neutral-700 dark:bg-secondary'
           )}
         >
           {line}
-          <View className="size-5 shrink-0 items-center justify-center">
-            <ChevronDown size={14} color={colors.mutedForeground} />
+          <View className="size-5 shrink-0 self-center items-center justify-center">
+            <ChevronDown size={14} color={colors.foreground} />
           </View>
         </Pressable>
       ) : (

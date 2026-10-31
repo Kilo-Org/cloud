@@ -202,12 +202,12 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
           title={revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
           description={
             <>
-              <PrReviewContextLine />
               <Text variant="muted" className="text-center">
                 {revoked
                   ? t('prReview.connect.reconnectDescription')
                   : t('prReview.connect.description')}
               </Text>
+              <PrReviewContextLine />
             </>
           }
           action={

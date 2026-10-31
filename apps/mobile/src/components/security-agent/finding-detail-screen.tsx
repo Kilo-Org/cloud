@@ -153,15 +153,23 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   }, [loadFailed, findingId]);
   const showLoadFailure = !findingQuery.data && (loadFailed || failedFindingId === findingId);
 
+  // The loaded header carries the repository eyebrow above the title, so every
+  // state of this screen reserves that line. One header for loading, failure
+  // and not-found keeps the title from moving when the query settles.
+  const pendingHeader = (
+    <ScreenHeader
+      className="px-6"
+      title={t('securityAgent.findingDetail.title')}
+      reserveEyebrow
+      showBackButton
+      onBack={handleBack}
+    />
+  );
+
   if (notFound) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
-          className="px-6"
-          title={t('securityAgent.findingDetail.title')}
-          showBackButton
-          onBack={handleBack}
-        />
+        {pendingHeader}
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.notFoundTitle')}
@@ -174,12 +182,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   if (showLoadFailure) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
-          className="px-6"
-          title={t('securityAgent.findingDetail.title')}
-          showBackButton
-          onBack={handleBack}
-        />
+        {pendingHeader}
         <QueryError
           message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
@@ -192,16 +195,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   if (findingQuery.isLoading || !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
-        {/* The loaded header adds the repository eyebrow above the title.
-            Reserving that line keeps the header height fixed while the finding
-            arrives, instead of moving the title down on the first paint. */}
-        <ScreenHeader
-          className="px-6"
-          title={t('securityAgent.findingDetail.title')}
-          reserveEyebrow
-          showBackButton
-          onBack={handleBack}
-        />
+        {pendingHeader}
         <View className="flex-1 gap-3 px-6 pt-4">
           <Skeleton className="h-6 w-2/3 rounded" />
           <Skeleton className="h-4 w-1/3 rounded" />

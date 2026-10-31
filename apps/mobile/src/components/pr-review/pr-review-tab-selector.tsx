@@ -68,7 +68,10 @@ export function PrReviewTabSelector({
             }}
             className={cn(
               'flex-1 items-center justify-center rounded-md py-2 active:opacity-70',
-              active && 'bg-card shadow-sm shadow-[#0000000D]',
+              // Dark has no neutral above the row's `bg-secondary`, and
+              // `bg-card` is darker than it there, so the selected pill is
+              // raised with a translucent white surface instead.
+              active && 'bg-card shadow-sm shadow-[#0000000D] dark:bg-[#FFFFFF1A]',
               disabled && 'opacity-60'
             )}
           >

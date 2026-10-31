@@ -163,10 +163,15 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         },
         {
           onSuccess: ({ reviewId }) => {
+            // A withdrawn attempt's late success stays silent: the draft it
+            // reviewed is not the one on screen, and ending the current
+            // intent's key would let its retry mint a duplicate.
+            if (!settle(null)) {
+              return;
+            }
             // The intent is fulfilled; a later Start of the same draft is a new
             // review, not a replay of this one.
             rotateKey();
-            settle(null);
             notificationHaptic(Haptics.NotificationFeedbackType.Success);
             router.replace(`/(app)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
           },
@@ -185,12 +190,14 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               return;
             }
             const failure = manualReviewStartFailure(error, platform);
+            if (!settle(failure)) {
+              return;
+            }
             if (!failure.retryable) {
               // Resending cannot fix this refusal, so the intent ends here and
               // the next Start mints its own key.
               rotateKey();
             }
-            settle(failure);
           },
         }
       );

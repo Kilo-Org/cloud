@@ -38,7 +38,10 @@ export type DeadlineWatchedStart = {
  * over the flag — is what releases the button at the deadline. `run`
  * receives a `settle` callback the caller invokes when the operation
  * settles: `settle(null)` marks success, `settle(failure)` records the
- * failure copy the screen renders inline and whether it can be retried. The watchdog is re-armed on every
+ * failure copy the screen renders inline and whether it can be retried.
+ * `settle` reports whether it published: a withdrawn attempt's late settle
+ * returns false, so the caller's own side effects (navigating to the review,
+ * ending an intent) stay bound to the attempt that started them. The watchdog is re-armed on every
  * `begin` and cleared on settle or unmount. When the deadline fires while
  * the operation is still out, `stalled` flips true and the button releases,
  * but the operation itself keeps running, so a late success still lands.
@@ -56,7 +59,7 @@ export type DeadlineWatchedStart = {
 export function useDeadlineWatchedStart(
   deadlineMs: number,
   isPendingNow: () => boolean,
-  run: (settle: (failure: WatchedStartFailure | null) => void) => boolean
+  run: (settle: (failure: WatchedStartFailure | null) => boolean) => boolean
 ): DeadlineWatchedStart & { begin: () => void; reset: () => void } {
   const [stalled, setStalled] = useState(false);
   const [failure, setFailure] = useState<WatchedStartFailure | null>(null);
@@ -92,21 +95,22 @@ export function useDeadlineWatchedStart(
     setStalled(false);
     setFailure(null);
     clearWatchdog();
-    const settle = (settled: WatchedStartFailure | null) => {
+    const settle = (settled: WatchedStartFailure | null): boolean => {
       if (attemptRef.current !== attempt) {
         // The input this attempt describes moved on, so its result must not
         // be published. Its own deadline watch ends with it; a newer
         // attempt's watch is left alone.
         if (watchdogAttemptRef.current !== null && watchdogAttemptRef.current !== attempt) {
-          return;
+          return false;
         }
         clearWatchdog();
         setStalled(false);
-        return;
+        return false;
       }
       clearWatchdog(attempt);
       setStalled(false);
       setFailure(settled);
+      return true;
     };
     if (!run(settle)) {
       // The gate refused before anything was pending: no watchdog, and this

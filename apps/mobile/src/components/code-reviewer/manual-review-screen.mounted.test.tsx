@@ -808,6 +808,63 @@ describe('ManualReviewScreen start operation key', () => {
     unmount();
   });
 
+  it('leaves the current key alone when a withdrawn attempt fails late', async () => {
+    const { renderer, unmount } = await renderScreen();
+    const starts = captureStarts();
+
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(GITHUB_PR_URL);
+    });
+    press(primaryAction(renderer.root));
+    // The user edits the draft and starts again, which withdraws the first
+    // attempt and mints the second one's key.
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(
+        'https://github.com/drain-e2e-labs/notes/pull/43'
+      );
+    });
+    press(primaryAction(renderer.root));
+    operationKey.rotateKey.mockClear();
+    const [, currentKey] = sentOperationKeys(starts);
+
+    // The withdrawn attempt's terminal failure describes a draft that is no
+    // longer on screen: ending the current intent's key here would let its
+    // retry mint a third key and duplicate the review.
+    act(() => starts[0]?.callbacks.onError?.(terminalFailure()));
+    expect(operationKey.rotateKey).not.toHaveBeenCalled();
+
+    // The current draft's own stall keeps its key, so its retry replays.
+    act(() => starts[1]?.callbacks.onError?.(deadlineStall()));
+    press(retryAction(renderer.root));
+    const keys = sentOperationKeys(starts);
+    expect(keys[2]).toBe(currentKey);
+
+    unmount();
+  });
+
+  it('leaves the current key alone when a withdrawn attempt succeeds late', async () => {
+    const { renderer, unmount } = await renderScreen();
+    const starts = captureStarts();
+
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(GITHUB_PR_URL);
+    });
+    press(primaryAction(renderer.root));
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(
+        'https://github.com/drain-e2e-labs/notes/pull/43'
+      );
+    });
+    press(primaryAction(renderer.root));
+    operationKey.rotateKey.mockClear();
+
+    act(() => starts[0]?.callbacks.onSuccess?.({ reviewId: 'review-old-draft' }));
+
+    expect(operationKey.rotateKey).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
   it('keeps the key for a retryable refusal and rotates it for a terminal one', async () => {
     const { renderer, unmount } = await renderScreen();
     const starts = captureStarts();

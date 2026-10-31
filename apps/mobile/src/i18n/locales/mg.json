@@ -1878,7 +1878,6 @@
       "repositoriesCount_one": "Tahirin-kaody {{displayCount}} voafidy",
       "repositoriesCount": "Tahirin-kaody {{displayCount}} voafidy",
       "repositoriesCount_other": "Tahirin-kaody {{displayCount}} voafidy",
-      "selectRepositoriesSubtitle": "Fidio ny tahirin-kaody harahin'ny mpanampy amin'ny fiarovana.",
       "analysisModeSubtitle": "Famakafakana {{mode}}",
       "automationAllOff": "Tsy mandeha avokoa",
       "automationCount": "{{displayCount}} amin'ny 3 no mandeha",
@@ -3157,7 +3156,7 @@
     "couldNotSaveChoice": "Tsy voatahiry ny safidinao. Andramo indray azafady.",
     "onlineAllowed": "An-tserasera, avela",
     "onlineNotAllowed": "An-tserasera, tsy avela",
-    "optionalReview": "Tsy voatery — azonao ovaina ao amin'ny Fikirana amin'ny fotoana rehetra",
+    "optionalReview": "Tsy voatery",
     "optionalOnboarding": "Tsy voatery — alefa afa-tsy raha vonoinao",
     "aiProvidersWhat": "Ny toromarikanao, ny tantaran'ny resaka ary ny rakitra ampiarahinao.",
     "aiProvidersWhy": "Mba hamoronana valin'ny AI.",
@@ -3983,7 +3982,8 @@
       "nameRequired": "Ampidiro anarana baiko",
       "nameInvalid": "Ny anarana dia tsy maintsy manomboka amin'ny litera kely ary tsy mampiasa afa-tsy litera kely, isa ary tsipiho",
       "templateRequired": "Ampidiro môdely baiko",
-      "nameConflict": "Io anarana io dia voatokana amin'ny baiko naorina"
+      "nameConflict": "Io anarana io dia voatokana amin'ny baiko naorina",
+      "duplicateName": "Efa misy baiko mitondra io anarana io ao amin'ity profil ity"
     },
     "repoBindings": {
       "title": "Profiles Default ho an'ny Repos",

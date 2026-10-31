@@ -1965,7 +1965,6 @@
       "repositoriesCount_one": "{{displayCount}} stór roghnaithe",
       "repositoriesCount": "{{displayCount}} stór roghnaithe",
       "repositoriesCount_other": "{{displayCount}} stór roghnaithe",
-      "selectRepositoriesSubtitle": "Roghnaigh na stórtha a ndéanann an Gníomhaire slándála monatóireacht orthu",
       "analysisModeSubtitle": "Anailís: {{mode}}",
       "automationAllOff": "Gach ceann múchta",
       "automationCount": "{{displayCount}} as 3 cumasaithe",
@@ -3298,7 +3297,7 @@
     "couldNotSaveChoice": "Níorbh fhéidir do rogha a shábháil. Bain triail as arís.",
     "onlineAllowed": "Ar líne, ceadaithe",
     "onlineNotAllowed": "Ar líne, gan chead",
-    "optionalReview": "Roghnach — is féidir leat é seo a athrú am ar bith sna socruithe",
+    "optionalReview": "Roghnach",
     "optionalOnboarding": "Roghnach — ar siúl mura gcasann tú as é",
     "aiProvidersWhat": "Do leideanna, stair do chomhráite agus aon chomhaid a cheanglaíonn tú.",
     "aiProvidersWhy": "Le freagraí AI a ghiniúint.",
@@ -4148,7 +4147,8 @@
       "nameRequired": "Cuir isteach ainm ordaithe",
       "nameInvalid": "Caithfidh an t-ainm tosú le litir chás íochtair agus gan ach litreacha beaga, digití agus daiseanna a úsáid",
       "templateRequired": "Cuir isteach teimpléad ordaithe",
-      "nameConflict": "Tá an t-ainm sin forchoimeádta ag ordú ionsuite"
+      "nameConflict": "Tá an t-ainm sin forchoimeádta ag ordú ionsuite",
+      "duplicateName": "Tá an t-ainm sin in úsáid ag ordú eile sa phróifíl seo"
     },
     "repoBindings": {
       "title": "Próifílí Réamhshocraithe le haghaidh Repos",

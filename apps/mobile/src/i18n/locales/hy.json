@@ -1878,7 +1878,6 @@
       "repositoriesCount_one": "Ընտրվել է {{displayCount}} պահոց",
       "repositoriesCount": "Ընտրված է {{displayCount}} պահոց",
       "repositoriesCount_other": "Ընտրված է {{displayCount}} պահոց",
-      "selectRepositoriesSubtitle": "Ընտրել, թե որ պահոցները վերահսկի Անվտանգության գործակալը",
       "analysisModeSubtitle": "{{mode}} վերլուծություն",
       "automationAllOff": "Բոլորն անջատված են",
       "automationCount": "Միացված է 3-ից {{displayCount}}-ը",
@@ -3157,7 +3156,7 @@
     "couldNotSaveChoice": "Չհաջողվեց պահպանել ձեր ընտրությունը։ Կրկին փորձեք։",
     "onlineAllowed": "Առցանց, թույլատրված",
     "onlineNotAllowed": "Առցանց, արգելված",
-    "optionalReview": "Կամընտիր — կարող եք ցանկացած պահի փոխել կարգավորումներում",
+    "optionalReview": "Կամընտիր",
     "optionalOnboarding": "Կամընտիր — միացված է, քանի դեռ չեք անջատել",
     "aiProvidersWhat": "Ձեր հուշումները, զրույցի պատմությունն ու ձեր կցած բոլոր ֆայլերը։",
     "aiProvidersWhy": "AI պատասխաններ ստեղծելու համար։",
@@ -3983,7 +3982,8 @@
       "nameRequired": "Մուտքագրեք հրամանի անունը",
       "nameInvalid": "Անունը պետք է սկսվի փոքրատառով և օգտագործի միայն փոքրատառեր, թվանշաններ և գծիկներ",
       "templateRequired": "Մուտքագրեք հրամանի ձևանմուշ",
-      "nameConflict": "Այդ անունը վերապահված է ներկառուցված հրամանով"
+      "nameConflict": "Այդ անունը վերապահված է ներկառուցված հրամանով",
+      "duplicateName": "Այս անունով հրամանն արդեն գոյություն ունի այս պրոֆիլում"
     },
     "repoBindings": {
       "title": "Կանխադրված պրոֆիլներ ռեպո-ների համար",

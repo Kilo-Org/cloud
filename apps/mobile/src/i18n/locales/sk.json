@@ -330,7 +330,7 @@
       "diffTooLarge": "prehľad zmien je príliš veľký",
       "openFile": "Otvoriť {{path}}",
       "openFileViewed": "Otvoriť {{path}} (prezreté)",
-      "title": "Súborov"
+      "title": "Súbory"
     },
     "fileRows": {
       "markViewed": "Označiť súbor {{path}} ako prezretý",
@@ -795,7 +795,7 @@
     },
     "tabs": {
       "overview": "Prehľad",
-      "files": "Súborov",
+      "files": "Súbory",
       "discussion": "Diskusia"
     },
     "fileStatus": {
@@ -1059,7 +1059,7 @@
     "attachmentPicker": {
       "takePhoto": "Odfotiť",
       "photoLibrary": "Knižnica fotiek",
-      "files": "Súborov",
+      "files": "Súbory",
       "cameraAccessMessage": "Ak chceš fotiť, povoľ v nastaveniach prístup k fotoaparátu."
     },
     "typingIndicator": {
@@ -1934,7 +1934,6 @@
       "repositoriesCount_one": "Vybratý {{displayCount}} repozitár",
       "repositoriesCount": "Vybratých {{displayCount}} repozitárov",
       "repositoriesCount_other": "Vybratých {{displayCount}} repozitárov",
-      "selectRepositoriesSubtitle": "Vyberte repozitáre, ktoré má bezpečnostný agent sledovať",
       "analysisModeSubtitle": "Režim analýzy: {{mode}}",
       "automationAllOff": "Všetko vypnuté",
       "automationCount": "Zapnuté: {{displayCount}} z 3",
@@ -2852,7 +2851,7 @@
     "attachmentPicker": {
       "camera": "Fotoaparát",
       "photoLibrary": "Knižnica fotiek",
-      "files": "Súborov",
+      "files": "Súbory",
       "couldNotOpenPhotoPicker": "Výber fotiek sa nepodarilo otvoriť. Reštartuj Kilo a skús to znova.",
       "maxFilesAllowed": "Povolený počet súborov je najviac {{displayCount}}.",
       "onlyAddingFiles": "Pridávajú sa len niektoré súbory: {{accepted}} z {{total}} (najviac {{max}})",
@@ -3249,7 +3248,7 @@
     "couldNotSaveChoice": "Tvoju voľbu sa nepodarilo uložiť. Skús to znova.",
     "onlineAllowed": "Online, povolené",
     "onlineNotAllowed": "Online, nepovolené",
-    "optionalReview": "Voliteľné — môžeš to kedykoľvek zmeniť v nastaveniach",
+    "optionalReview": "Voliteľné",
     "optionalOnboarding": "Voliteľné — zapnuté, kým to nevypneš",
     "aiProvidersWhat": "Tvoje zadania, história konverzácií a všetky priložené súbory.",
     "aiProvidersWhy": "Na vytváranie odpovedí AI.",
@@ -4091,7 +4090,8 @@
       "nameRequired": "Zadajte názov príkazu",
       "nameInvalid": "Názov musí začínať malým písmenom a používať iba malé písmená, číslice a pomlčky",
       "templateRequired": "Zadajte šablónu príkazu",
-      "nameConflict": "Tento názov je rezervovaný vstavaným príkazom"
+      "nameConflict": "Tento názov je rezervovaný vstavaným príkazom",
+      "duplicateName": "Príkaz s týmto názvom už v tomto profile existuje"
     },
     "repoBindings": {
       "title": "Predvolené profily pre úložiská",

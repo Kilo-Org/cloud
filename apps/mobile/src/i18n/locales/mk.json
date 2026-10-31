@@ -1872,7 +1872,6 @@
       "repositoriesCount_one": "{{displayCount}} избрано складиште",
       "repositoriesCount": "{{displayCount}} избрани репозиториуми",
       "repositoriesCount_other": "{{displayCount}} избрани репозиториуми",
-      "selectRepositoriesSubtitle": "Избери кои складишта ќе ги следи безбедносниот агент",
       "analysisModeSubtitle": "Анализа: {{mode}}",
       "automationAllOff": "Сè е исклучено",
       "automationCount": "{{displayCount}} од 3 овозможени",
@@ -3151,7 +3150,7 @@
     "couldNotSaveChoice": "Не успеа зачувувањето на твојот избор. Обиди се повторно.",
     "onlineAllowed": "Онлајн, дозволено",
     "onlineNotAllowed": "Онлајн, не е дозволено",
-    "optionalReview": "Изборно — можеш да го смениш во секое време во поставките",
+    "optionalReview": "Изборно",
     "optionalOnboarding": "Изборно — вклучено додека не го исклучиш",
     "aiProvidersWhat": "Твоите упатства, историјата на разговорите и сите датотеки што ги прикачуваш.",
     "aiProvidersWhy": "За создавање одговори со AI.",
@@ -3977,7 +3976,8 @@
       "nameRequired": "Внесете име на команда",
       "nameInvalid": "Името мора да започнува со мала буква и да користи само мали букви, цифри и цртички",
       "templateRequired": "Внесете образец за команда",
-      "nameConflict": "Тоа име е резервирано со вградена команда"
+      "nameConflict": "Тоа име е резервирано со вградена команда",
+      "duplicateName": "Во овој профил веќе постои команда со истото име"
     },
     "repoBindings": {
       "title": "Стандардни профили за репо",

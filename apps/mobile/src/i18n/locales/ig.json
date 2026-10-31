@@ -1872,7 +1872,6 @@
       "repositoriesCount_one": "Ebe nchekwa {{displayCount}} ahọpụtara",
       "repositoriesCount": "Ahọpụtara ebe nchekwa koodu {{displayCount}}",
       "repositoriesCount_other": "Ahọpụtara ebe nchekwa koodu {{displayCount}}",
-      "selectRepositoriesSubtitle": "Họrọ ebe nchekwa onye enyemaka nchebe ga-elekọta",
       "analysisModeSubtitle": "Nyocha {{mode}}",
       "automationAllOff": "Niile gbanyụrụ",
       "automationCount": "{{displayCount}} n'ime 3 gbanyere",
@@ -3151,7 +3150,7 @@
     "couldNotSaveChoice": "Enweghị ike ịchekwa nhọrọ gị. Biko nwaa ọzọ.",
     "onlineAllowed": "N'ịntanetị, anabatara",
     "onlineNotAllowed": "N'ịntanetị, anabataghị",
-    "optionalReview": "Ọ bụghị iwu — ị nwere ike ịgbanwe nke a oge ọ bụla na Ntọala",
+    "optionalReview": "Ọ bụghị iwu",
     "optionalOnboarding": "Ọ bụghị iwu — ọ na-arụ ọrụ ọ gwụla ma ị gbanyụọ ya",
     "aiProvidersWhat": "Ihe ị na-ede, ndekọ mkparịta ụka gị, na faịlụ ọ bụla ị na-etinye.",
     "aiProvidersWhy": "Iji mepụta nzaghachi AI.",
@@ -3977,7 +3976,8 @@
       "nameRequired": "Tinye aha iwu",
       "nameInvalid": "Aha ga-eji obere mkpụrụedemede malite ma jiri naanị obere mkpụrụedemede, mkpụrụọnụọgụgụ, na akara akara",
       "templateRequired": "Tinye ndebiri iwu",
-      "nameConflict": "Edebere aha ahụ site na iwu arụnyere n'ime ya"
+      "nameConflict": "Edebere aha ahụ site na iwu arụnyere n'ime ya",
+      "duplicateName": "Iwu nwere aha a dịlarị na profaịlụ a"
     },
     "repoBindings": {
       "title": "Profaịlụ ezighi ezi maka nkwụghachi",

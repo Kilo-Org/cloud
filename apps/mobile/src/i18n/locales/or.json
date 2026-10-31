@@ -1872,7 +1872,6 @@
       "repositoriesCount_one": "{{displayCount}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ କରାଯାଇଛି",
       "repositoriesCount": "{{displayCount}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ ହୋଇଛି",
       "repositoriesCount_other": "{{displayCount}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ ହୋଇଛି",
-      "selectRepositoriesSubtitle": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ କେଉଁ ରିପୋଜିଟୋରୀଗୁଡ଼ିକୁ ନଜରରେ ରଖିବ ତାହା ବାଛନ୍ତୁ",
       "analysisModeSubtitle": "{{mode}} ବିଶ୍ଳେଷଣ",
       "automationAllOff": "ସବୁ ବନ୍ଦ",
       "automationCount": "3ଟି ମଧ୍ୟରୁ {{displayCount}}ଟି ଚାଲୁ",
@@ -3151,7 +3150,7 @@
     "couldNotSaveChoice": "ଆପଣଙ୍କ ପସନ୍ଦ ସଞ୍ଚୟ ହୋଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "onlineAllowed": "ଅନଲାଇନ୍, ଅନୁମତିପ୍ରାପ୍ତ",
     "onlineNotAllowed": "ଅନଲାଇନ୍, ଅନୁମତି ନାହିଁ",
-    "optionalReview": "ଐଚ୍ଛିକ — ସେଟିଂସ୍‌ରେ ଏହି ପସନ୍ଦ ଯେକୌଣସି ସମୟରେ ବଦଳାଇପାରିବେ",
+    "optionalReview": "ଐଚ୍ଛିକ",
     "optionalOnboarding": "ଐଚ୍ଛିକ — ଆପଣ ବନ୍ଦ ନକରିବା ପର୍ଯ୍ୟନ୍ତ ଚାଲୁ",
     "aiProvidersWhat": "ଆପଣଙ୍କ ପ୍ରମ୍ପ୍ଟ, ବାର୍ତ୍ତାଳାପର ଇତିହାସ ଓ ଆପଣ ଯୋଡ଼ୁଥିବା ଫାଇଲ୍।",
     "aiProvidersWhy": "AI ଉତ୍ତର ତିଆରି କରିବାକୁ।",
@@ -3977,7 +3976,8 @@
       "nameRequired": "ଏକ ନିର୍ଦ୍ଦେଶ ନାମ ପ୍ରବେଶ କରନ୍ତୁ।",
       "nameInvalid": "ନାମ ନିଶ୍ଚିତ ଭାବରେ ଏକ ଛୋଟ ଅକ୍ଷରରୁ ଆରମ୍ଭ ହେବ ଏବଂ କେବଳ ଲୋୟର କେସ୍ ଅକ୍ଷର, ସଂଖ୍ୟା ଏବଂ ଡ୍ୟାସ୍ ବ୍ୟବହାର କରିବ।",
       "templateRequired": "ଏକ ନିର୍ଦ୍ଦେଶ ଟେମ୍ପଲେଟ୍ ପ୍ରବେଶ କରନ୍ତୁ।",
-      "nameConflict": "ସେହି ନାମ ଏକ ବିଲ୍ଟ-ଇନ୍ କମାଣ୍ଡ ଦ୍ୱାରା ସଂରକ୍ଷିତ।"
+      "nameConflict": "ସେହି ନାମ ଏକ ବିଲ୍ଟ-ଇନ୍ କମାଣ୍ଡ ଦ୍ୱାରା ସଂରକ୍ଷିତ।",
+      "duplicateName": "ଏହି ନାମରେ ଏକ ନିର୍ଦ୍ଦେଶ ଏହି ପ୍ରୋଫାଇଲ୍‌ରେ ପୂର୍ବରୁ ବିଦ୍ୟମାନ ଅଛି।"
     },
     "repoBindings": {
       "title": "ରେପୋ ପାଇଁ ଡିଫଲ୍ଟ ପ୍ରୋଫାଇଲ୍।",

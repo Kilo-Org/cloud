@@ -1903,7 +1903,6 @@
       "repositoriesCount_one": "{{displayCount}} repositori seleccionat",
       "repositoriesCount": "{{displayCount}} repositoris seleccionats",
       "repositoriesCount_other": "{{displayCount}} repositoris seleccionats",
-      "selectRepositoriesSubtitle": "Tria quins repositoris supervisa l'agent de seguretat",
       "analysisModeSubtitle": "Anàlisi {{mode}}",
       "automationAllOff": "Tot desactivat",
       "automationCount": "{{displayCount}} de 3 activades",
@@ -3200,7 +3199,7 @@
     "couldNotSaveChoice": "No s'ha pogut desar la teva elecció. Torna-ho a provar.",
     "onlineAllowed": "En línia, permesa",
     "onlineNotAllowed": "En línia, no permesa",
-    "optionalReview": "Opcional: ho pots canviar en qualsevol moment a la configuració",
+    "optionalReview": "Opcional",
     "optionalOnboarding": "Opcional: activat tret que ho desactivis",
     "aiProvidersWhat": "Els teus missatges, l'historial de converses i els fitxers que adjuntis.",
     "aiProvidersWhy": "Per generar respostes d'IA.",
@@ -4034,7 +4033,8 @@
       "nameRequired": "Introduïu un nom d'ordre",
       "nameInvalid": "El nom ha de començar amb una lletra minúscula i utilitzar només lletres minúscules, dígits i guions",
       "templateRequired": "Introduïu una plantilla d'ordres",
-      "nameConflict": "Aquest nom està reservat per una ordre integrada"
+      "nameConflict": "Aquest nom està reservat per una ordre integrada",
+      "duplicateName": "Ja existeix una ordre amb aquest nom en aquest perfil"
     },
     "repoBindings": {
       "title": "Perfils predeterminats per a Repos",

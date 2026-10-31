@@ -1482,8 +1482,7 @@
       "on": "Aktif",
       "repositoriesCount": "{{displayCount}} repositori dipilih",
       "repositoriesCount_other": "{{displayCount}} repositori dipilih",
-      "repositoriesCount_one": "{{displayCount}} repositori dipilih",
-      "selectRepositoriesSubtitle": "Pilih repositori yang dipantau Agen keamanan"
+      "repositoriesCount_one": "{{displayCount}} repositori dipilih"
     },
     "settingsSave": {
       "saveChanges": "Simpan perubahan",
@@ -2622,7 +2621,7 @@
     "couldNotSaveChoice": "Tidak dapat menyimpan pilihanmu. Coba lagi.",
     "onlineAllowed": "Daring, diizinkan",
     "onlineNotAllowed": "Daring, tidak diizinkan",
-    "optionalReview": "Opsional — dapat diubah kapan saja di Pengaturan",
+    "optionalReview": "Opsional",
     "optionalOnboarding": "Opsional — aktif sampai kamu menonaktifkannya",
     "aiProvidersWhat": "Instruksimu, riwayat percakapan, dan semua berkas yang kamu lampirkan.",
     "aiProvidersWhy": "Untuk menghasilkan respons AI.",
@@ -3977,7 +3976,8 @@
       "nameRequired": "Masukkan nama perintah",
       "nameInvalid": "Nama harus dimulai dengan huruf kecil dan hanya menggunakan huruf kecil, angka, dan tanda hubung",
       "templateRequired": "Masukkan templat perintah",
-      "nameConflict": "Nama itu dicadangkan oleh perintah bawaan"
+      "nameConflict": "Nama itu dicadangkan oleh perintah bawaan",
+      "duplicateName": "Nama itu sudah digunakan oleh perintah lain di profil ini"
     },
     "repoBindings": {
       "title": "Profil Default untuk Repo",

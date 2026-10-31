@@ -6,6 +6,7 @@ import { SkillFormSheet } from '@/components/profiles/skill-form-sheet';
 import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
   onClose: vi.fn(),
@@ -175,6 +176,7 @@ function statusBlock(root: ReactTestInstance): ReactTestInstance {
 describe('SkillFormSheet dismissal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
   });
 
   it('closes an untouched sheet without asking', async () => {
@@ -217,6 +219,7 @@ describe('SkillFormSheet dismissal', () => {
 describe('SkillFormSheet name fill', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
   });
 
   it('fills the name from frontmatter and clears the empty-name error', async () => {
@@ -281,6 +284,7 @@ describe('SkillFormSheet name fill', () => {
 describe('SkillFormSheet refused save', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
   });
 
   it('scrolls to the name field when the name is missing', async () => {
@@ -330,6 +334,7 @@ describe('SkillFormSheet refused save', () => {
 describe('SkillFormSheet save failure', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
   });
 
   it('shows the refused save above the fields and keeps the typed input', async () => {

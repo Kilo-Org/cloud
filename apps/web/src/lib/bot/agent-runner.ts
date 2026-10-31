@@ -1,7 +1,7 @@
 import { BOT_USER_AGENT, BOT_VERSION, MAX_ITERATIONS, SUMMARY_MODEL } from '@/lib/bot/constants';
 import { getGitHubRepositoryFullNameFromThread } from '@/lib/bot/github-thread';
 import { botPlatforms, type BotPlatform } from '@/lib/bot/platforms';
-import { composeBotSystemPrompt } from '@/lib/bot/prompt';
+import { composeBotAttachmentPromptContext, composeBotSystemPrompt } from '@/lib/bot/prompt';
 import { getGitHubRepositoryReference } from '@/lib/bot/platforms/github';
 import { buildPrSignature } from '@/lib/bot/pr-signature';
 import {
@@ -63,6 +63,8 @@ type RunBotAgentParams = {
   prompt: string;
   /** Pre-uploaded supported attachments from the user's message (already in R2). */
   attachments?: CloudAgentAttachments;
+  /** Names of referenced files this message did not forward, so the run can say they are missing. */
+  declinedAttachmentFilenames?: string[];
   completedStepCount?: number;
   initialSteps?: BotRequestStep[];
   /**
@@ -370,11 +372,13 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
     },
   });
 
-  const attachmentCount = params.attachments?.files.length ?? 0;
-  const promptWithAttachmentContext =
-    attachmentCount > 0
-      ? `${params.prompt}\n\n[The user attached ${attachmentCount} supported attachment${attachmentCount > 1 ? 's' : ''} (images, PDFs, text, Markdown, or CSV) to this message. The attachment${attachmentCount > 1 ? 's are' : ' is'} automatically forwarded to any Cloud Agent session you spawn.]`
-      : params.prompt;
+  const attachmentContext = composeBotAttachmentPromptContext({
+    forwardedCount: params.attachments?.files.length ?? 0,
+    declinedFilenames: params.declinedAttachmentFilenames ?? [],
+  });
+  const promptWithAttachmentContext = attachmentContext
+    ? `${params.prompt}\n\n${attachmentContext}`
+    : params.prompt;
 
   const result = await agent.generate({ prompt: promptWithAttachmentContext });
 

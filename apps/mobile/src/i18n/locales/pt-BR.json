@@ -1470,7 +1470,6 @@
       "repositoriesCount": "{{displayCount}} repositórios selecionados",
       "repositoriesCount_other": "{{displayCount}} repositórios selecionados",
       "repositoriesCount_one": "{{displayCount}} repositório selecionado",
-      "selectRepositoriesSubtitle": "Escolha quais repositórios o agente de segurança monitora",
       "repositoriesCount_many": "{{displayCount}} repositórios selecionados"
     },
     "settingsSave": {
@@ -2658,7 +2657,7 @@
     "couldNotSaveChoice": "Não foi possível salvar sua escolha. Tente novamente.",
     "onlineAllowed": "Online, permitida",
     "onlineNotAllowed": "Online, não permitida",
-    "optionalReview": "Opcional — você pode alterar essa opção a qualquer momento em Ajustes",
+    "optionalReview": "Opcional",
     "optionalOnboarding": "Opcional — ativado por padrão",
     "aiProvidersWhat": "Seus prompts, histórico de conversas e quaisquer arquivos que você anexar.",
     "aiProvidersWhy": "Para gerar respostas de IA.",
@@ -4040,7 +4039,8 @@
       "nameRequired": "Digite um nome de comando",
       "nameInvalid": "O nome deve começar com uma letra minúscula e usar apenas letras minúsculas, dígitos e travessões",
       "templateRequired": "Insira um modelo de comando",
-      "nameConflict": "Esse nome é reservado por um comando interno"
+      "nameConflict": "Esse nome é reservado por um comando interno",
+      "duplicateName": "Esse nome já é usado por outro comando neste perfil"
     },
     "repoBindings": {
       "title": "Perfis padrão para repositórios",

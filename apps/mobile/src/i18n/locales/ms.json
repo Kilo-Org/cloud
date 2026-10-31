@@ -1872,7 +1872,6 @@
       "repositoriesCount_one": "{{displayCount}} repositori dipilih",
       "repositoriesCount": "{{displayCount}} repositori dipilih",
       "repositoriesCount_other": "{{displayCount}} repositori dipilih",
-      "selectRepositoriesSubtitle": "Pilih repositori yang dipantau oleh Ejen Keselamatan",
       "analysisModeSubtitle": "Analisis {{mode}}",
       "automationAllOff": "Semua dinyahdayakan",
       "automationCount": "{{displayCount}} daripada 3 didayakan",
@@ -3151,7 +3150,7 @@
     "couldNotSaveChoice": "Tidak dapat menyimpan pilihan anda. Sila cuba semula.",
     "onlineAllowed": "Dalam talian, dibenarkan",
     "onlineNotAllowed": "Dalam talian, tidak dibenarkan",
-    "optionalReview": "Pilihan — anda boleh mengubahnya pada bila-bila masa dalam Tetapan",
+    "optionalReview": "Pilihan",
     "optionalOnboarding": "Pilihan — didayakan melainkan anda menyahdayakannya",
     "aiProvidersWhat": "Gesaan anda, sejarah perbualan dan sebarang fail yang anda lampirkan.",
     "aiProvidersWhy": "Untuk menjana respons AI.",
@@ -3977,7 +3976,8 @@
       "nameRequired": "Masukkan nama arahan",
       "nameInvalid": "Nama mesti bermula dengan huruf kecil dan hanya menggunakan huruf kecil, angka dan sempang",
       "templateRequired": "Masukkan templat arahan",
-      "nameConflict": "Nama itu dikhaskan oleh arahan terbina dalam"
+      "nameConflict": "Nama itu dikhaskan oleh arahan terbina dalam",
+      "duplicateName": "Arahan dengan nama ini telah wujud dalam profil ini"
     },
     "repoBindings": {
       "title": "Profil Lalai untuk Repos",

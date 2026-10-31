@@ -1872,7 +1872,6 @@
       "repositoriesCount_one": "Hazina {{displayCount}} imechaguliwa",
       "repositoriesCount": "Hazina {{displayCount}} zimechaguliwa",
       "repositoriesCount_other": "Hazina {{displayCount}} zimechaguliwa",
-      "selectRepositoriesSubtitle": "Chagua hazina ambazo wakala wa usalama atafuatilia",
       "analysisModeSubtitle": "Uchambuzi wa {{mode}}",
       "automationAllOff": "Zote zimezimwa",
       "automationCount": "{{displayCount}} kati ya 3 zimewashwa",
@@ -3151,7 +3150,7 @@
     "couldNotSaveChoice": "Imeshindikana kuhifadhi chaguo lako. Tafadhali jaribu tena.",
     "onlineAllowed": "Mtandaoni, inaruhusiwa",
     "onlineNotAllowed": "Mtandaoni, haijaruhusiwa",
-    "optionalReview": "Hiari — unaweza kubadilisha hili wakati wowote kwenye mipangilio",
+    "optionalReview": "Hiari",
     "optionalOnboarding": "Hiari — imewashwa isipokuwa uizime",
     "aiProvidersWhat": "Maagizo yako, historia ya mazungumzo na faili zozote unazoambatisha.",
     "aiProvidersWhy": "Kutoa majibu ya AI.",
@@ -3977,7 +3976,8 @@
       "nameRequired": "Ingiza jina la amri",
       "nameInvalid": "Jina lazima lianze na herufi ndogo na litumie herufi ndogo, tarakimu na deshi pekee",
       "templateRequired": "Ingiza kiolezo cha amri",
-      "nameConflict": "Jina hilo limehifadhiwa na amri iliyojengwa"
+      "nameConflict": "Jina hilo limehifadhiwa na amri iliyojengwa",
+      "duplicateName": "Jina hilo tayari limehifadhiwa na amri nyingine katika wasifu huu"
     },
     "repoBindings": {
       "title": "Profaili Chaguomsingi za Repos",

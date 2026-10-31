@@ -1872,7 +1872,6 @@
       "repositoriesCount_one": "{{displayCount}} kodelager valgt",
       "repositoriesCount": "{{displayCount}} kodelagre valgt",
       "repositoriesCount_other": "{{displayCount}} kodelagre valgt",
-      "selectRepositoriesSubtitle": "Velg hvilke kodelagre sikkerhetsagenten overvåker",
       "analysisModeSubtitle": "Analyse: {{mode}}",
       "automationAllOff": "Alt er deaktivert",
       "automationCount": "{{displayCount}} av 3 aktivert",
@@ -3151,7 +3150,7 @@
     "couldNotSaveChoice": "Kunne ikke lagre valget ditt. Prøv igjen.",
     "onlineAllowed": "På nett, tillatt",
     "onlineNotAllowed": "På nett, ikke tillatt",
-    "optionalReview": "Valgfritt – du kan endre dette når som helst i innstillingene",
+    "optionalReview": "Valgfritt",
     "optionalOnboarding": "Valgfritt – aktivert til du slår det av",
     "aiProvidersWhat": "Instruksjonene dine, samtaleloggen og eventuelle filer du legger ved.",
     "aiProvidersWhy": "For å generere AI-svar.",
@@ -3977,7 +3976,8 @@
       "nameRequired": "Skriv inn et kommandonavn",
       "nameInvalid": "Navnet må begynne med en liten bokstav og kun bruke små bokstaver, sifre og bindestreker",
       "templateRequired": "Skriv inn en kommandomal",
-      "nameConflict": "Dette navnet er reservert av en innebygd kommando"
+      "nameConflict": "Dette navnet er reservert av en innebygd kommando",
+      "duplicateName": "En kommando med dette navnet finnes allerede i denne profilen"
     },
     "repoBindings": {
       "title": "Standardprofiler for Repos",

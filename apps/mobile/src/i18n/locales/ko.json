@@ -1482,8 +1482,7 @@
       "on": "켜짐",
       "repositoriesCount": "저장소 {{displayCount}}개 선택됨",
       "repositoriesCount_other": "저장소 {{displayCount}}개 선택됨",
-      "repositoriesCount_one": "저장소 {{displayCount}}개 선택됨",
-      "selectRepositoriesSubtitle": "보안 에이전트가 모니터링할 저장소를 선택하세요."
+      "repositoriesCount_one": "저장소 {{displayCount}}개 선택됨"
     },
     "settingsSave": {
       "saveChanges": "변경 사항 저장",
@@ -2622,7 +2621,7 @@
     "couldNotSaveChoice": "선택 사항을 저장할 수 없습니다. 다시 시도하세요.",
     "onlineAllowed": "온라인, 허용됨",
     "onlineNotAllowed": "온라인, 허용되지 않음",
-    "optionalReview": "선택 사항 — 설정에서 언제든 변경 가능",
+    "optionalReview": "선택 사항",
     "optionalOnboarding": "선택 사항 — 기본으로 켜져 있음",
     "aiProvidersWhat": "프롬프트, 대화 기록 및 모든 첨부 파일",
     "aiProvidersWhy": "AI 응답 생성",
@@ -3977,7 +3976,8 @@
       "nameRequired": "명령 이름을 입력하세요.",
       "nameInvalid": "이름은 소문자로 시작해야 하며 소문자, 숫자, 대시만 사용할 수 있습니다.",
       "templateRequired": "명령 템플릿을 입력하세요.",
-      "nameConflict": "해당 이름은 내장 명령에 의해 예약되어 있습니다."
+      "nameConflict": "해당 이름은 내장 명령에 의해 예약되어 있습니다.",
+      "duplicateName": "이 이름을 사용하는 명령이 이미 이 프로필에 존재합니다."
     },
     "repoBindings": {
       "title": "저장소의 기본 프로필",

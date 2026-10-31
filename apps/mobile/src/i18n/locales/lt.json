@@ -1934,7 +1934,6 @@
       "repositoriesCount_one": "Pasirinkta {{displayCount}} saugykla",
       "repositoriesCount": "Pasirinkta {{displayCount}} saugyklų",
       "repositoriesCount_other": "Pasirinkta {{displayCount}} saugyklų",
-      "selectRepositoriesSubtitle": "Pasirink, kurias saugyklas stebės saugos agentas",
       "analysisModeSubtitle": "Analizės režimas: {{mode}}",
       "automationAllOff": "Viskas išjungta",
       "automationCount": "Įjungta {{displayCount}} iš 3",
@@ -3249,7 +3248,7 @@
     "couldNotSaveChoice": "Nepavyko išsaugoti jūsų pasirinkimo. Bandykite dar kartą.",
     "onlineAllowed": "Internetu, leista",
     "onlineNotAllowed": "Internetu, neleista",
-    "optionalReview": "Pasirenkama — tai galite pakeisti bet kada nustatymuose",
+    "optionalReview": "Pasirenkama",
     "optionalOnboarding": "Pasirenkama — įjungta, nebent išjungsite",
     "aiProvidersWhat": "Jūsų užklausos, pokalbių istorija ir visi pridedami failai.",
     "aiProvidersWhy": "AI atsakymams generuoti.",
@@ -4091,7 +4090,8 @@
       "nameRequired": "Įveskite komandos pavadinimą",
       "nameInvalid": "Pavadinimas turi prasidėti mažosiomis raidėmis ir naudoti tik mažąsias raides, skaitmenis ir brūkšnius",
       "templateRequired": "Įveskite komandos šabloną",
-      "nameConflict": "Šį pavadinimą rezervuoja įmontuota komanda"
+      "nameConflict": "Šį pavadinimą rezervuoja įmontuota komanda",
+      "duplicateName": "Komanda tokiu pavadinimu šiame profilyje jau egzistuoja"
     },
     "repoBindings": {
       "title": "Numatytieji atpirkimo sandorių profiliai",

@@ -59,11 +59,15 @@ export function ToggleRow({
       onPress={toggle}
       className={cn(
         ROW_TARGET_CLASS,
-        'flex-row items-center justify-between rounded-lg bg-secondary p-4',
+        // The gutter between the label and the switch is row spacing, not padding
+        // on the label: padding on the row's crossing axis lands on the outer edge
+        // under RTL (Yoga keeps the physical inset) and the label's text runs past
+        // its own column, while `gap` sits between the two items in both directions.
+        'flex-row items-center justify-between gap-3 rounded-lg bg-secondary p-4',
         !disabled && 'active:opacity-70'
       )}
     >
-      <View className="flex-1 pr-3">
+      <View className="flex-1">
         <Text className="text-sm font-medium">{title}</Text>
         {subtitle === undefined ? null : (
           <Text variant="muted" className="text-xs">

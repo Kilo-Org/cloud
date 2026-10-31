@@ -97,11 +97,11 @@ function SlaDayRow({
   return (
     <View
       className={cn(
-        'flex-row items-center justify-between rounded-lg bg-secondary p-4',
+        'flex-row items-center justify-between gap-3 rounded-lg bg-secondary p-4',
         disabled && 'opacity-50'
       )}
     >
-      <View className="flex-1 pr-3">
+      <View className="flex-1">
         <Text className="text-sm font-medium">{label}</Text>
         <Text variant="muted" className="text-xs">
           {description}

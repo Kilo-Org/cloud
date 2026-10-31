@@ -281,7 +281,7 @@ describe('Cloud Agent MCP authority', () => {
   });
 
   it.each([null, '11111111-1111-4111-8111-111111111111'])(
-    'tells scoped sessions they may launch child sessions only on explicit request: %s',
+    'binds scoped instructions to the canonical workspace parent, not the invoking sibling: %s',
     async organizationId => {
       const authority = { ...scope, organizationId };
       const scopedAuth = forwardedAuthFromProps({
@@ -303,10 +303,16 @@ describe('Cloud Agent MCP authority', () => {
         scopedAuth
       );
       const body = (await response.json()) as { result: { instructions: string } };
-      expect(body.result.instructions).toContain('may launch child Cloud Agent sessions');
+      expect(body.result.instructions).toContain('canonical parent session');
+      expect(body.result.instructions).toContain('not to the sibling chat that invoked this tool');
       expect(body.result.instructions).toContain('only when the user explicitly asks');
       expect(body.result.instructions).toContain('own sandbox and worktree');
       expect(body.result.instructions).toContain('fan out independent tasks');
+      expect(body.result.instructions).toContain('callbackTarget: { url: "session:parent" }');
+      expect(body.result.instructions).toContain('Do not poll or wait in a tool for a callback');
+      expect(body.result.instructions).toContain(
+        'do not launch a child from a child session, and do not ask a child to launch one'
+      );
       expect(body.result.instructions).toContain(cloudAgentAuthorityProcedure(authority));
     }
   );

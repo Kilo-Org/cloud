@@ -57,6 +57,9 @@ export function AccountDeduplicationTable() {
         hideAllBlocked: String(hideAllBlocked),
       });
       const res = await fetch(`/admin/api/account-deduplication?${params}`);
+      if (!res.ok) {
+        throw new Error(`Failed to load duplicate accounts (${res.status})`);
+      }
       return res.json() as Promise<AccountDeduplicationResponse>;
     },
   });
@@ -146,6 +149,7 @@ export function AccountDeduplicationTable() {
                 <DuplicateGroupRows
                   key={group.normalized_email}
                   normalizedEmail={group.normalized_email}
+                  accountCount={group.account_count}
                   users={group.users}
                 />
               ))
@@ -185,11 +189,14 @@ export function AccountDeduplicationTable() {
 
 function DuplicateGroupRows({
   normalizedEmail,
+  accountCount,
   users,
 }: {
   normalizedEmail: string;
+  accountCount: number;
   users: AccountDeduplicationResponse['groups'][number]['users'];
 }) {
+  const isPartial = users.length < accountCount;
   return (
     <>
       {users.map((user, i) => (
@@ -202,7 +209,9 @@ function DuplicateGroupRows({
               <div className="flex flex-col gap-1">
                 <span>{normalizedEmail}</span>
                 <div className="flex items-center gap-1">
-                  <Badge variant="secondary">{users.length}</Badge>
+                  <Badge variant="secondary">
+                    {isPartial ? `${users.length} of ${accountCount}` : accountCount}
+                  </Badge>
                   <CopyTextButton text={users.map(u => u.google_user_email).join('\n')} showText />
                 </div>
               </div>

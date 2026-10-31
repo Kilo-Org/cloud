@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { TestRenderer } from '@/test/renderer';
 import { McpServerRowView } from './mcp-server-row';
-import type { McpServerSource } from './profile-mcp-model';
+import { type McpServerSource } from './profile-mcp-model';
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
@@ -57,14 +57,14 @@ function renderRow(element: ReactElement) {
   return renderer.root;
 }
 
-function row(overrides: { onToggle?: (enabled: boolean) => void; readOnly?: boolean } = {}) {
+function row(overrides: { readOnly?: boolean } = {}) {
   const readOnly = overrides.readOnly === true;
   return (
     <McpServerRowView
       server={server}
       summary="https://mcp.example.com/docs"
       secretCount={2}
-      onToggle={overrides.onToggle}
+      onToggle={readOnly ? undefined : () => undefined}
       onEdit={readOnly ? undefined : () => undefined}
       onDelete={readOnly ? undefined : () => undefined}
     />
@@ -75,9 +75,7 @@ describe('<McpServerRowView>', () => {
   it('exposes the server name through the switch alone', () => {
     const root = renderRow(row());
 
-    const nameLines = root
-      .findAllByType(TEXT)
-      .filter(node => node.props.children === server.name);
+    const nameLines = root.findAllByType(TEXT).filter(node => node.props.children === server.name);
     expect(nameLines).toHaveLength(1);
     // Painted, not announced: the switch beside it carries the name.
     expect(nameLines[0]?.props).toMatchObject({
@@ -101,23 +99,14 @@ describe('<McpServerRowView>', () => {
     expect(announced).toContain('Remote');
     expect(announced).toContain('https://mcp.example.com/docs');
 
-    const buttons = root
-      .findAllByType(PRESSABLE)
-      .map(node => node.props.accessibilityLabel);
-    expect(buttons).toEqual([
-      'Edit MCP server docs-search',
-      'Delete MCP server docs-search',
-    ]);
+    const buttons = root.findAllByType(PRESSABLE).map(node => node.props.accessibilityLabel);
+    expect(buttons).toEqual(['Edit MCP server docs-search', 'Delete MCP server docs-search']);
   });
 
-  it('reports the toggled state and disables the switch when the profile is read-only', () => {
-    const onToggle = vi.fn();
-    let root = renderRow(row({ onToggle }));
-    act(() => {
-      const props = root.findAllByType(SWITCH)[0]?.props;
-      (props?.onValueChange as (value: boolean) => void)(false);
-    });
-    expect(onToggle).toHaveBeenCalledWith(false);
+  it('carries the enabled state and disables the switch when the profile is read-only', () => {
+    let root = renderRow(row());
+    expect(root.findAllByType(SWITCH)[0]?.props.disabled).toBe(false);
+    expect(root.findAllByType(SWITCH)[0]?.props.value).toBe(true);
 
     root = renderRow(row({ readOnly: true }));
     expect(root.findAllByType(SWITCH)[0]?.props.disabled).toBe(true);

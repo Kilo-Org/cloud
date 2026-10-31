@@ -163,7 +163,7 @@
     "allLanguages": "Alle sprog"
   },
   "login": {
-    "welcome": "Velkommen til Kilo",
+    "welcome": "Velkommen",
     "retrySignIn": "Prøv at logge ind igen",
     "logo": "Kilo-logo",
     "continuingSignIn": "Dit login fortsætter.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Tilslut din GitLab-konto for at gennemgå merge requests på mobilen.",
       "bitbucketDescription": "Tilslut Bitbucket til denne organisation for at gennemgå pull requests på mobilen.",
       "bitbucketOrgOnlyDescription": "Skift kontoen ovenfor til en organisation for at gennemgå dens pull requests i Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Denne konto har endnu ingen organisationer. Bitbucket pull requests kan gennemgås, når du opretter eller tilslutter dig en organisation.",
       "contextLine": "Til {{organization}}",
       "contextLinePersonal": "Til din personlige konto"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub-forbindelsen er udløbet.",
-      "message": "Din GitHub-forbindelse er ikke længere gyldig. Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt.",
+      "message": "Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt.",
       "gitlabTitle": "GitLab-forbindelsen er udløbet.",
-      "bitbucketTitle": "Bitbucket-forbindelsen er udløbet.",
-      "providerMessage": "Din {{provider}}-forbindelse er ikke længere gyldig. Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt."
+      "bitbucketTitle": "Bitbucket-forbindelsen er udløbet."
     },
     "eventChips": {
       "comment": "Kommentar",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Du skal muligvis give adgang til flere grupper eller projekter på GitLab.",
       "installGithubApp": "Installér GitHub-appen på kodelagre",
       "installGithubAppDescription": "Giv Kilos GitHub-app adgang til de kodelagre, du vil have gennemgået.",
-      "repositoryAccess": "adgang til kodelagre"
+      "repositoryAccess": "adgang til kodelagre",
+      "allModePersonal": "Hvert kodelager, som Kilo kan få adgang til via din GitHub-forbindelse, gennemgås automatisk.",
+      "allModeOrganization": "Hvert kodelager, som Kilo kan få adgang til via organisationens GitHub-forbindelse, gennemgås automatisk.",
+      "allModeCount": "Tilgængelige kodelagre: {{displayCount}}"
     },
     "style": {
       "title": "Gennemgangsstil",
@@ -1676,7 +1679,8 @@
       "sortSeverityDesc": "Alvorlighed: høj til lav",
       "sortSeverityAsc": "Alvorlighed: lav til høj",
       "sortSlaDue": "SLA-frist",
-      "overdueOnly": "Kun overskredne frister"
+      "overdueOnly": "Kun overskredne frister",
+      "noRepositories": "Ingen kodelagre er synkroniseret eller valgt endnu. Vælg dem i indstillingerne for Sikkerhedsagenten."
     },
     "automation": {
       "title": "Automatisering",
@@ -1749,17 +1753,12 @@
       "findingsCount": "{{displayCount}} fund",
       "notMeasured": "Ikke målt",
       "actFirst": "Højeste prioritet",
-      "slaPosture": "SLA-status",
       "actionPosture": "Handlingsstatus",
       "codebaseRisk": "Risiko i kodebasen",
       "repositoryActionPlan": "Handlingsplan for kodelageret",
       "noOpenFindings": "Ingen åbne fund kræver opmærksomhed",
       "deadlineToday": "Fristen udløber i dag",
       "daysOverdue": "Frist overskredet med {{displayCount}} dage",
-      "withinDeadline": "Inden for fristen",
-      "criticalOverdue": "Kritisk alvorlighed · frist overskredet",
-      "highOverdue": "Høj alvorlighed · frist overskredet",
-      "mediumLowOverdue": "Middel og lav alvorlighed · frist overskredet",
       "confirmedExploitable": "Bekræftet mulighed for udnyttelse",
       "needsEvidenceReview": "Kræver gennemgang af dokumentation",
       "analysisNotComplete": "Analyse ikke afsluttet",
@@ -1769,7 +1768,16 @@
       "noSlaDeadline": "Ingen SLA-frist angivet",
       "noRepositoryData": "Ingen data om kodelagre endnu",
       "noRepositoryDataDescription": "Prioriteringen af kodelagre vises, når fundene er synkroniseret.",
-      "repoSummary": "{{open}} åbne · {{critical}} med kritisk alvorlighed · {{high}} med høj alvorlighed",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "{{displayCount}} åbne",
+      "repoSummaryOpen_one": "{{displayCount}} åben",
+      "repoSummaryOpen_other": "{{displayCount}} åbne",
+      "repoSummaryCritical": "{{displayCount}} med kritisk alvorlighed",
+      "repoSummaryCritical_one": "{{displayCount}} med kritisk alvorlighed",
+      "repoSummaryCritical_other": "{{displayCount}} med kritisk alvorlighed",
+      "repoSummaryHigh": "{{displayCount}} med høj alvorlighed",
+      "repoSummaryHigh_one": "{{displayCount}} med høj alvorlighed",
+      "repoSummaryHigh_other": "{{displayCount}} med høj alvorlighed",
       "couldNotLoad": "Data til oversigten kunne ikke indlæses.",
       "filterByRepository": "Filtrér efter kodelager",
       "lastSynced": "Sidst synkroniseret {{time}}",
@@ -1777,7 +1785,6 @@
       "notYetSynced": "Ikke synkroniseret endnu",
       "refreshFailed": "Data kunne ikke opdateres. De senest synkroniserede data vises.",
       "settings": "Indstillinger",
-      "syncFindings": "Synkronisér fund",
       "syncNow": "Synkronisér nu",
       "syncQueued": "Synkronisering i kø",
       "syncStatusUnavailable": "Status for synkroniseringen er ikke tilgængelig.",
@@ -1795,8 +1802,17 @@
       "withinDeadlineDetail": "{{within}} af {{total}} inden for fristen",
       "noDeadlineData": "Ingen fund har en SLA-frist endnu",
       "deadlinePassed": "Frist overskredet",
-      "deadlinePassedDetail": "{{critical}} med kritisk risiko, {{high}} med høj risiko",
-      "deadlinePassedDetailWithMediumLow": "{{critical}} med kritisk risiko, {{high}} med høj risiko, {{mediumLow}} med middel og lav alvorlighed",
+      "deadlinePassedDetail": "{{critical}}, {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
+      "breakdownCritical": "{{displayCount}} med kritisk risiko",
+      "breakdownCritical_one": "{{displayCount}} med kritisk risiko",
+      "breakdownCritical_other": "{{displayCount}} med kritisk risiko",
+      "breakdownHigh": "{{displayCount}} med høj risiko",
+      "breakdownHigh_one": "{{displayCount}} med høj risiko",
+      "breakdownHigh_other": "{{displayCount}} med høj risiko",
+      "breakdownMediumLow": "{{displayCount}} med middel og lav alvorlighed",
+      "breakdownMediumLow_one": "{{displayCount}} med middel og lav alvorlighed",
+      "breakdownMediumLow_other": "{{displayCount}} med middel og lav alvorlighed",
       "dueThisWeek": "Frist i denne uge",
       "dueThisWeekDetail": "{{exploitable}} af disse fund er bekræftet udnyttelige",
       "noDeadline": "Ingen frist",
@@ -1856,7 +1872,6 @@
       "repositoriesCount_one": "{{displayCount}} kodelager valgt",
       "repositoriesCount": "{{displayCount}} kodelagre valgt",
       "repositoriesCount_other": "{{displayCount}} kodelagre valgt",
-      "selectRepositoriesSubtitle": "Vælg, hvilke kodelagre Sikkerhedsagenten overvåger",
       "analysisModeSubtitle": "{{mode}} analyse",
       "automationAllOff": "Alt slået fra",
       "automationCount": "{{displayCount}} af 3 aktiveret",
@@ -2047,7 +2062,10 @@
       "settleFailed": "Handlingen blev gennemført, men vi kunne ikke registrere resultatet. Prøv igen.",
       "replayFailed": "Denne handling blev ikke gennemført. Prøv igen.",
       "actionFailed": "Handlingen kunne ikke gennemføres. Prøv igen.",
-      "actionBlocked": "Handlingen kunne ikke gennemføres. Problemet skal løses, før du kan prøve igen."
+      "actionBlocked": "Handlingen kunne ikke gennemføres. Problemet skal løses, før du kan prøve igen.",
+      "syncNoRepositories": "Der er ingen kodelagre i synkroniseringsomfanget. Vælg de kodelagre, som Sikkerhedsagenten overvåger, og synkroniser derefter igen.",
+      "syncIntegrationInactive": "GitHub-forbindelsen for Sikkerhedsagenten er ikke aktiv. Genopret forbindelsen til Kilos GitHub-app, og synkroniser derefter igen.",
+      "syncMissingPermission": "Kilos GitHub-app kan ikke læse sårbarhedsadvarsler. Giv den tilladelse i GitHub, og synkroniser derefter igen."
     },
     "analysisState": {
       "queued": "Analyse i kø",
@@ -2154,7 +2172,7 @@
     "sessionList": {
       "couldNotLoadActive": "De aktive sessioner kunne ikke indlæses.",
       "couldNotRefresh": "Kunne ikke opdatere",
-      "noSessionsYetDescription": "Start en kodeopgave fra din telefon. Dine sessioner vises her.",
+      "noSessionsYetDescription": "Start en kodeopgave fra din telefon.",
       "viewHistory": "Sessionshistorik",
       "noMatches": "Ingen sessioner fundet",
       "tryDifferentSearch": "Prøv et andet søgeord.",
@@ -3135,7 +3153,7 @@
     "couldNotSaveChoice": "Kunne ikke gemme dit valg. Prøv igen.",
     "onlineAllowed": "Online, tilladt",
     "onlineNotAllowed": "Online, ikke tilladt",
-    "optionalReview": "Valgfrit — du kan altid ændre dette i indstillingerne",
+    "optionalReview": "Valgfrit",
     "optionalOnboarding": "Valgfrit — slået til, medmindre du slår det fra",
     "aiProvidersWhat": "Dine forespørgsler, din samtalehistorik og eventuelle filer, du vedhæfter.",
     "aiProvidersWhy": "For at generere AI-svar.",
@@ -3854,6 +3872,7 @@
     "skillMarkdownLabel": "Færdighedsindhold",
     "skillsEmpty": "Ingen færdigheder endnu",
     "skillNameRequired": "Indtast et færdighedsnavn",
+    "skillNameTooLong": "Færdighedsnavn må højst være {{max}} tegn",
     "skillNameInvalid": "Færdighedsnavn skal starte med et bogstav eller ciffer og kun bruge små bogstaver, cifre og bindestreger",
     "skillContentRequired": "Færdighedsindhold er påkrævet",
     "skillSaveFailed": "Kunne ikke gemme færdighed. Prøv igen.",
@@ -3960,7 +3979,8 @@
       "nameRequired": "Indtast et kommandonavn",
       "nameInvalid": "Navnet skal starte med et lille bogstav og kun bruge små bogstaver, cifre og bindestreger",
       "templateRequired": "Indtast en kommandoskabelon",
-      "nameConflict": "Dette navn er reserveret af en indbygget kommando"
+      "nameConflict": "Dette navn er reserveret af en indbygget kommando",
+      "duplicateName": "En kommando med dette navn findes allerede i denne profil"
     },
     "repoBindings": {
       "title": "Standardprofiler for Repos",

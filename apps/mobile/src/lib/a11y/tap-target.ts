@@ -61,6 +61,42 @@ export const STATE_ACTION_CLASS = 'min-h-[48px]';
 export const ROW_TARGET_CLASS = 'min-h-[48px]';
 
 /**
+ * The box a profile row's identity block renders: the item's name and what
+ * qualifies it, declared first in the row. It spans {@link ICON_TARGET_DP}, the
+ * height of the controls beside it, so its frame is the row's leading top
+ * corner rather than a shorter block the taller control boxes start above.
+ * Assistive technology focuses a row from its layout, so a block that starts
+ * higher is reached before those controls. Explicit px, because NativeWind's
+ * rem is 14pt here.
+ */
+export const ROW_IDENTITY_CLASS = 'min-h-[48px] min-w-0 flex-1 justify-center';
+
+/**
+ * The frame a dense interactive row renders when it keeps the group's own
+ * rhythm instead of {@link ROW_TARGET_CLASS}: `py-3` top and bottom plus the
+ * row's 13px value line. Measured on the Android emulator at font scale 1, a
+ * `KvRow` reads 38.9–39.6 dp tall — the rhythm every `KvRow` group already
+ * uses. A list of counts reads as one column, so its rows keep that rhythm
+ * rather than the taller interactive frame.
+ */
+export const DENSE_ROW_FRAME_DP = 39;
+
+/**
+ * Per-side vertical `hitSlop` of a row on {@link DENSE_ROW_FRAME_DP}:
+ * `39 + 3 + 3 = 45 dp`, past `DESIGN.md:364`'s 44pt design target, so even the
+ * shortest measured frame (38.9 dp) reaches 44.9 dp. Stacked rows share the
+ * boundary between them, so two neighbours' reaches meet instead of leaving a
+ * dead strip, and neither reaches another control.
+ */
+export const DENSE_ROW_HIT_SLOP_DP = 3;
+
+/** The `hitSlop` a row on {@link DENSE_ROW_FRAME_DP} renders, as {@link DENSE_ROW_HIT_SLOP_DP}. */
+export const DENSE_ROW_HIT_SLOP = {
+  top: DENSE_ROW_HIT_SLOP_DP,
+  bottom: DENSE_ROW_HIT_SLOP_DP,
+} as const;
+
+/**
  * The box every icon-only control renders. Its own node carries the target, as
  * a control-size audit measures, and 32pt clears the audit's
  * {@link MIN_TAP_TARGET_DP} floor while fitting the agents header row's
@@ -137,16 +173,30 @@ export function textActionTargetClass(): string {
  * floor and the slop carries the reach; a larger box would reflow the prose
  * that should keep `DESIGN.md`'s compact control look.
  *
- * The `-my-[7px]` is the layout-neutral form. The box's 28dp floor is twice
- * the `text-xs` line it sits in (line-height `calc(1 / 0.75)` of 10.5dp = 14dp),
- * so without it the box lifts the whole sentence row to 28dp and centres the
- * glyphs in a taller line. Cancelling `(28 - 14) / 2` on each side leaves the
- * node's own rect at the audit floor while the row keeps a plain text line and
- * one baseline. When the surrounding text is larger than `text-xs`, its line
- * wins over the shorter box outer, so the cancel is safe for either size.
+ * The `-my-[7px]` is the layout-neutral form. It cancels the box's 28dp floor
+ * down to a 14dp outer, so the box can never lift the sentence row to its own
+ * height and centre the glyphs in a taller line; the node's own rect stays at
+ * the audit floor while the row keeps one text line and one baseline. The
+ * sentence itself is `text-sm` ({@link INLINE_LINK_SENTENCE_LINE_DP} 17.5dp), so
+ * the text line is taller than the box's outer and sets the row height, exactly
+ * as it did while the copy was `text-xs`.
+ *
+ * The box therefore overflows its own flex line by
+ * `(28 - {@link INLINE_LINK_SENTENCE_LINE_DP}) / 2` on each side, and a row that
+ * wraps needs {@link INLINE_LINK_LINE_GAP_CLASS} between its lines: wrapped
+ * lines have no gutter of their own, and without it the box on a line reaches
+ * into the prose of the line above it.
  */
 export const INLINE_LINK_BOX_CLASS =
   'min-h-[28px] min-w-[28px] -my-[7px] items-center justify-center';
+
+/**
+ * The line a sentence carrying {@link INLINE_LINK_BOX_CLASS} lays out on, in dp:
+ * `text-sm` at NativeWind's 14dp rem, whose `1.25rem` line-height is 1.4× the
+ * 12.25dp type (`DESIGN.md`'s label step). Everything below measures the box's
+ * overflow against this line rather than assuming the old `text-xs` one.
+ */
+export const INLINE_LINK_SENTENCE_LINE_DP = 17.5;
 
 /**
  * Per-side horizontal `hitSlop` of an inline link pointing at its neighbour.
@@ -174,9 +224,10 @@ export const INLINE_LINK_OUTER_HIT_SLOP_DP = 12;
  * horizontal reach, which spends the sentence's own width, every extra dp of
  * vertical region has to be reserved as free space around the row
  * ({@link INLINE_LINK_ROW_CLASS}). The box's layout-neutral `-my-[7px]` form
- * keeps the sentence on its `text-xs` line while the box's 28dp rect overflows
- * that line by `(28 - 14) / 2 = 7dp` on each side, so each link's vertical
- * region reaches `7 + 8 = 15dp` beyond the line — exactly the free space
+ * keeps the sentence on its `text-sm` line
+ * ({@link INLINE_LINK_SENTENCE_LINE_DP}) while the box's 28dp rect overflows it
+ * by `(28 - 17.5) / 2 = 5.25dp` on each side, so each link's vertical region
+ * reaches `5.25 + 8 = 13.25dp` beyond the line — inside the free space
  * {@link INLINE_LINK_ROW_CLASS} reserves for it.
  */
 export const INLINE_LINK_VERTICAL_HIT_SLOP_DP = 8;
@@ -202,22 +253,40 @@ export function inlineLinkHitSlop(edge: 'start' | 'end') {
 }
 
 /**
+ * The vertical gap a wrapping sentence row keeps between its lines, and its
+ * class. A sentence with an inline link row wraps in long locales, and a link
+ * box's layout-neutral form makes its rect overflow its own flex line by
+ * `(28 - {@link INLINE_LINK_SENTENCE_LINE_DP}) / 2 = 5.25dp` on each side.
+ * Without a gap the wrapped lines sit one text line apart, so a box on the
+ * second line reaches up into the first line's prose (and a box on the first
+ * line reaches down into the second). The gap is the next whole dp above that
+ * overflow plus its headroom, so a wrapped line never collides with the box on
+ * the line before it while the two lines still read as one sentence; a sentence
+ * that fits one line never sees it, because a flex row's `gap-y` only separates
+ * wrapped lines.
+ */
+export const INLINE_LINK_LINE_GAP_DP = 7;
+export const INLINE_LINK_LINE_GAP_CLASS = 'gap-y-[7px]';
+
+/**
  * The extra vertical margin the legal sentence row carries, and its class.
  *
  * A legal link's 44pt vertical region reaches
- * `(28 - 14) / 2 + 8 = 15dp` past the `text-xs` line it sits on. The screen's
- * `gap-3` gutter to the Continue button above the row (and to the ghost button
- * below it) is 10.5dp — 4.5dp short — so a region at the full 44pt would reach
- * into the Continue button's frame, and a tap on its bottom strip would open
- * Terms instead of sending the code (an earlier revision capped the region at
- * 3dp to avoid that and lost the target). The row therefore adds 5dp:
- * 10.5 + 5 = 15.5dp of free space each side, which holds the whole 44pt region
- * clear of both neighbours. The row itself still lays out on a `text-xs` line;
- * the margin is the extra gutter the target needs, and it is part of the row's
- * box, not its height.
+ * `(28 - {@link INLINE_LINK_SENTENCE_LINE_DP}) / 2 + 8 = 13.25dp` past the text
+ * line it sits on. The screen's `gap-3` gutter to the Continue button above the
+ * row (and to the ghost button below it) is 10.5dp — 2.75dp short — so a region
+ * at the full 44pt would reach into the Continue button's frame, and a tap on
+ * its bottom strip would open Terms instead of sending the code (an earlier
+ * revision capped the region at 3dp to avoid that and lost the target). The row
+ * therefore adds 5dp: 10.5 + 5 = 15.5dp of free space each side, which holds
+ * the whole 44pt region clear of both neighbours. The row itself still lays out
+ * on one text line; the margin is the extra gutter the target needs, and it is
+ * part of the row's box, not its height. The wrapped-line gap
+ * ({@link INLINE_LINK_LINE_GAP_CLASS}) is separate from it: this margin is
+ * outside the row, that gap is between the row's own lines.
  */
 export const INLINE_LINK_ROW_MARGIN_DP = 5;
-export const INLINE_LINK_ROW_CLASS = 'my-[5px]';
+export const INLINE_LINK_ROW_CLASS = 'my-[5px] gap-y-[7px]';
 
 /**
  * The class an inline-link connector carries so the two links' facing reaches do
@@ -233,10 +302,11 @@ export const INLINE_LINK_ROW_CLASS = 'my-[5px]';
 export const INLINE_LINK_CONNECTOR_CLASS = 'min-w-[10px] text-center';
 
 /**
- * The box a legal link renders — the two store links under the credit packs,
- * and the privacy-policy link each consent sentence ends with — rather than a
- * word inside a sentence with a neighbour {@link INLINE_LINK_BOX_CLASS} has to
- * stay clear of.
+ * The box a legal link renders — the two store links under the credit packs —
+ * rather than a word inside a sentence with a neighbour
+ * {@link INLINE_LINK_BOX_CLASS} has to stay clear of. A link that ends a
+ * sentence uses {@link INLINE_LINK_BOX_CLASS} instead: it sits in the prose, so
+ * it takes the audit floor and the slop rather than a standalone box.
  *
  * The whole target is the box, {@link ICON_TARGET_DP} 48dp tall and wide, the
  * size the control-size audit reads from a node's own rect (Android's
@@ -257,27 +327,9 @@ export const LEGAL_LINK_MIN_DP = 48;
  * boxes sit one gutter apart and can never overlap, so a tap between the lines
  * opens the link it points at. The footer pays one 48dp line for that, which is
  * what keeps the geometry honest: a box that cancelled its own height would
- * reach 17dp into the line below.
+ * reach 17dp into the line below. The links' copy is `text-xs`, a 14dp line.
  */
 export const LEGAL_LINK_BOX_CLASS = 'min-h-[48px] min-w-[48px] items-center justify-center';
-
-/**
- * The `text-xs` line a legal link centres on, in dp: line-height
- * `calc(1 / 0.75)` of 10.5dp.
- */
-export const LEGAL_LINK_LINE_DP = 14;
-
-/**
- * The vertical margin a legal link cancels inside a running sentence: the box's
- * overflow past the `text-xs` line it centres on, `(48 - 14) / 2`. A sentence
- * has no second link beside it, so the overflow only ever lands on prose, and
- * cancelling it keeps the sentence on its own line exactly as the sign-in
- * sentence's {@link INLINE_LINK_BOX_CLASS} does.
- */
-export const LEGAL_LINK_SENTENCE_CANCEL_DP = (LEGAL_LINK_MIN_DP - LEGAL_LINK_LINE_DP) / 2;
-
-/** The box a legal link renders as the last word of a consent sentence. */
-export const LEGAL_LINK_SENTENCE_BOX_CLASS = `${LEGAL_LINK_BOX_CLASS} -my-[17px]`;
 
 /**
  * The row the two store legal links share: side by side when they fit, one per

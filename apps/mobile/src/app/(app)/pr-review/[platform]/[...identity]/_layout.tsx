@@ -1,4 +1,10 @@
-import { type Href, Redirect, Stack, useLocalSearchParams } from 'expo-router';
+import {
+  type Href,
+  Redirect,
+  Stack,
+  useGlobalSearchParams,
+  useLocalSearchParams,
+} from 'expo-router';
 import { useMemo } from 'react';
 
 import { appScreenLayout } from '@/components/app-screen-layout';
@@ -51,6 +57,11 @@ type Params = {
  */
 export default function ProviderPrReviewLayout() {
   const params = useLocalSearchParams<Params>();
+  // The GitLab instance rides as a QUERY param (`?instance=`), and a layout's
+  // local params carry only its own path segments — the platform and the
+  // catch-all identity. Read the query from the global params, or the pasted
+  // self-managed host never reaches the scope the connect gate names it from.
+  const query = useGlobalSearchParams<{ instance?: string | string[] }>();
   const platform = parseParam(params.platform) ?? '';
   // A catch-all param is a fresh array on every render; the joined form is a
   // stable dependency, and a `/` inside a segment is percent-encoded by
@@ -58,7 +69,7 @@ export default function ProviderPrReviewLayout() {
   const identity = Array.isArray(params.identity)
     ? params.identity.join('/')
     : (parseParam(params.identity) ?? '');
-  const instance = parseParam(params.instance) ?? '';
+  const instance = parseParam(query.instance) ?? '';
   const { organizationId } = useOrganization();
   const sheetOptions = { ...useFormSheetScreenOptions(), sheetInitialDetentIndex: 'last' as const };
   const { userId } = useCurrentUserId();

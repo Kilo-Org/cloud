@@ -163,7 +163,7 @@
     "allLanguages": "Duk harsuna"
   },
   "login": {
-    "welcome": "Barka da zuwa Kilo",
+    "welcome": "Barka da zuwa",
     "retrySignIn": "Sake gwada shiga",
     "logo": "Alamar Kilo",
     "continuingSignIn": "Ana ci gaba da shigarka.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Haɗa asusun GitLab ɗinka don bita buƙatun haɗawa a wayar hannu.",
       "bitbucketDescription": "Haɗa Bitbucket da wannan ƙungiya don bita buƙatun haɗa canje-canje a wayar hannu.",
       "bitbucketOrgOnlyDescription": "Canja asusun da ke sama zuwa ƙungiya don bita buƙatun haɗa canje-canje na Bitbucket na ƙungiyar.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Wannan asusu ba shi da ƙungiyoyi har yanzu. Za a iya bita buƙatun haɗa canje-canje na Bitbucket idan ka ƙirƙiri ƙungiya ko ka shiga cikin wata.",
       "contextLine": "Don {{organization}}",
       "contextLinePersonal": "Don kashin kanka"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Wa'adin haɗin GitHub ya ƙare.",
-      "message": "Haɗinka na GitHub ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata.",
+      "message": "Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata.",
       "gitlabTitle": "Wa'adin haɗin GitLab ya ƙare.",
-      "bitbucketTitle": "Wa'adin haɗin Bitbucket ya ƙare.",
-      "providerMessage": "Haɗinka na {{provider}} ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata."
+      "bitbucketTitle": "Wa'adin haɗin Bitbucket ya ƙare."
     },
     "eventChips": {
       "comment": "Yi tsokaci",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Wataƙila kana buƙatar ba da damar shiga ƙarin ƙungiyoyi ko ayyuka a GitLab.",
       "installGithubApp": "Shigar da manhajar GitHub a ma'ajiyoyi",
       "installGithubAppDescription": "Ba manhajar Kilo ta GitHub damar shiga ma'ajiyoyin da kake son a yi bitarsu.",
-      "repositoryAccess": "damar shiga ma'ajiya"
+      "repositoryAccess": "damar shiga ma'ajiya",
+      "allModePersonal": "Kowace ma'ajiyar da Kilo zai iya shiga ta hanyar haɗin GitHub ɗinka ana yin bitarta ta atomatik.",
+      "allModeOrganization": "Kowace ma'ajiyar da Kilo zai iya shiga ta hanyar haɗin GitHub na ƙungiyar ana yin bitarta ta atomatik.",
+      "allModeCount": "Ma'ajiyoyin da ke akwai: {{displayCount}}"
     },
     "style": {
       "title": "Salon bita",
@@ -1676,7 +1679,8 @@
       "sortSeverityDesc": "Tsanani: daga babba zuwa ƙarami",
       "sortSeverityAsc": "Tsanani: daga ƙarami zuwa babba",
       "sortSlaDue": "Ranar cikar wa'adin SLA",
-      "overdueOnly": "Waɗanda wa'adinsu ya wuce kawai"
+      "overdueOnly": "Waɗanda wa'adinsu ya wuce kawai",
+      "noRepositories": "Babu rumbun ajiya da aka daidaita ko aka zaɓa tukuna. Zaɓe su a cikin saitin Wakilin tsaro."
     },
     "automation": {
       "title": "Aiki na atomatik",
@@ -1749,17 +1753,12 @@
       "findingsCount": "Matsaloli {{displayCount}} da aka gano",
       "notMeasured": "Ba a auna ba",
       "actFirst": "Abubuwan da za a fara yi",
-      "slaPosture": "Halin bin SLA",
       "actionPosture": "Halin matakan da ake ɗauka",
       "codebaseRisk": "Haɗarin lambar shiri",
       "repositoryActionPlan": "Shirin matakan ma'ajiya",
       "noOpenFindings": "Babu matsalolin da ba a warware ba masu buƙatar kulawa",
       "deadlineToday": "Wa'adin ya cika yau",
       "daysOverdue": "Wa'adin ya wuce da kwanaki {{displayCount}}",
-      "withinDeadline": "Cikin wa'adi",
-      "criticalOverdue": "Matsananci, wa'adi ya wuce",
-      "highOverdue": "Babba, wa'adi ya wuce",
-      "mediumLowOverdue": "Matsakaici da ƙarami, wa'adi ya wuce",
       "confirmedExploitable": "An tabbatar ana iya kai hari ta hanyarsa",
       "needsEvidenceReview": "Yana buƙatar duba shaida",
       "analysisNotComplete": "Ba a kammala nazarin ba",
@@ -1769,7 +1768,16 @@
       "noSlaDeadline": "Ba a saita wa'adin SLA ba",
       "noRepositoryData": "Babu bayanan ma'ajiya har yanzu",
       "noRepositoryDataDescription": "Za a nuna ma'ajiyoyin da suka fi buƙatar kulawa bayan an daidaita matsalolin da aka gano.",
-      "repoSummary": "{{open}} ba a warware ba · {{critical}} matsananci · {{high}} babba",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "{{displayCount}} ba a warware ba",
+      "repoSummaryOpen_one": "{{displayCount}} ba a warware ba",
+      "repoSummaryOpen_other": "{{displayCount}} ba a warware ba",
+      "repoSummaryCritical": "{{displayCount}} matsananci",
+      "repoSummaryCritical_one": "{{displayCount}} matsananci",
+      "repoSummaryCritical_other": "{{displayCount}} matsananci",
+      "repoSummaryHigh": "{{displayCount}} babba",
+      "repoSummaryHigh_one": "{{displayCount}} babba",
+      "repoSummaryHigh_other": "{{displayCount}} babba",
       "couldNotLoad": "An kasa loda bayanan allon taƙaitawa.",
       "filterByRepository": "Tace bisa ma'ajiya",
       "lastSynced": "An daidaita a ƙarshe {{time}}",
@@ -1777,7 +1785,6 @@
       "notYetSynced": "Har yanzu ba a daidaita ba",
       "refreshFailed": "An kasa sabuntawa — ana nuna bayanan da aka daidaita a ƙarshe.",
       "settings": "Saituna",
-      "syncFindings": "Daidaita matsalolin da aka gano",
       "syncNow": "Daidaita yanzu",
       "syncQueued": "An saka daidaitawa a jerin jira",
       "syncStatusUnavailable": "Ba a iya samun halin daidaitawa ba.",
@@ -1795,8 +1802,17 @@
       "withinDeadlineDetail": "{{within}} daga cikin {{total}} suna cikin wa'adi",
       "noDeadlineData": "Har yanzu ba a saita wa'adin SLA ga wata matsala ba",
       "deadlinePassed": "Wa'adin ya wuce",
-      "deadlinePassedDetail": "Masu tsanani: {{critical}}, manya: {{high}}",
-      "deadlinePassedDetailWithMediumLow": "Masu tsanani: {{critical}}, manya: {{high}}, matsakaici da ƙarami: {{mediumLow}}",
+      "deadlinePassedDetail": "{{critical}}, {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
+      "breakdownCritical": "Masu tsanani: {{displayCount}}",
+      "breakdownCritical_one": "Masu tsanani: {{displayCount}}",
+      "breakdownCritical_other": "Masu tsanani: {{displayCount}}",
+      "breakdownHigh": "manya: {{displayCount}}",
+      "breakdownHigh_one": "manya: {{displayCount}}",
+      "breakdownHigh_other": "manya: {{displayCount}}",
+      "breakdownMediumLow": "matsakaici da ƙarami: {{displayCount}}",
+      "breakdownMediumLow_one": "matsakaici da ƙarami: {{displayCount}}",
+      "breakdownMediumLow_other": "matsakaici da ƙarami: {{displayCount}}",
       "dueThisWeek": "Wa'adi zai cika wannan makon",
       "dueThisWeekDetail": "An tabbatar da yiwuwar amfani da {{exploitable}} daga cikin waɗannan wajen kai hari",
       "noDeadline": "Babu wa'adi",
@@ -1856,7 +1872,6 @@
       "repositoriesCount_one": "An zaɓi ma'ajiya {{displayCount}}",
       "repositoriesCount": "An zaɓi ma'ajiyoyi {{displayCount}}",
       "repositoriesCount_other": "An zaɓi ma'ajiyoyi {{displayCount}}",
-      "selectRepositoriesSubtitle": "Zaɓi ma'ajiyoyin da Wakilin tsaro zai sa ido a kansu",
       "analysisModeSubtitle": "Nazarin {{mode}}",
       "automationAllOff": "Duk a kashe",
       "automationCount": "An kunna {{displayCount}} daga cikin 3",
@@ -2047,7 +2062,10 @@
       "settleFailed": "An kammala aikin, amma ba mu iya rubuta sakamakon ba. Sake gwadawa.",
       "replayFailed": "Wannan aikin bai kammala ba. Sake gwadawa.",
       "actionFailed": "Ba za a iya kammala wannan aikin ba. Sake gwadawa.",
-      "actionBlocked": "Ba za a iya kammala wannan aikin ba. Dole a gyara matsalar kafin a sake gwadawa."
+      "actionBlocked": "Ba za a iya kammala wannan aikin ba. Dole a gyara matsalar kafin a sake gwadawa.",
+      "syncNoRepositories": "Babu wata ma'ajiyar bayanai da ke cikin iyakar daidaitawa. Zaɓi ma'ajiyoyin bayanai da Wakilin tsaro ke sa ido a kansu, sannan a sake daidaitawa.",
+      "syncIntegrationInactive": "Haɗin GitHub na Wakilin tsaro ba ya aiki. Sake haɗa Kilo GitHub App, sannan ka sake daidaitawa.",
+      "syncMissingPermission": "Kilo GitHub App ba ya iya karanta vulnerability alerts. Ba da wannan izni a GitHub, sannan ka sake daidaitawa."
     },
     "analysisState": {
       "queued": "Nazarin yana layin jira",
@@ -2154,7 +2172,7 @@
     "sessionList": {
       "couldNotLoadActive": "Ba a iya loda zaman da ke aiki ba.",
       "couldNotRefresh": "Ba a iya sabuntawa ba",
-      "noSessionsYetDescription": "Fara aikin rubuta lamba daga wayarka. Zaman aikinka za su bayyana a nan.",
+      "noSessionsYetDescription": "Fara aikin rubuta lamba daga wayarka.",
       "viewHistory": "Tarihin zaman",
       "noMatches": "Babu zaman da ya dace",
       "tryDifferentSearch": "Gwada wata kalmar bincike dabam.",
@@ -3135,7 +3153,7 @@
     "couldNotSaveChoice": "An kasa adana zaɓinka. Sake gwadawa.",
     "onlineAllowed": "Ta yanar gizo, an yarda",
     "onlineNotAllowed": "Ta yanar gizo, ba a yarda ba",
-    "optionalReview": "Na zaɓi — za ka iya canza wannan a Saituna a kowane lokaci",
+    "optionalReview": "Na zaɓi",
     "optionalOnboarding": "Na zaɓi — yana kunne sai idan ka kashe shi",
     "aiProvidersWhat": "Umarnin aikinka, tarihin tattaunawa, da duk fayilolin da ka haɗa.",
     "aiProvidersWhy": "Don samar da amsoshin AI.",
@@ -3854,6 +3872,7 @@
     "skillMarkdownLabel": "Abubuwan gwaninta",
     "skillsEmpty": "Babu fasaha tukuna",
     "skillNameRequired": "Shigar da sunan fasaha",
+    "skillNameTooLong": "Dole ne sunan fasaha ya kasance haruffa {{max}} ko ƙasa da haka",
     "skillNameInvalid": "Dole ne sunan gwani ya fara da harafi ko lambobi kuma yayi amfani da ƙananan haruffa kawai, lambobi, da dashes",
     "skillContentRequired": "Ana buƙatar abun ciki gwaninta",
     "skillSaveFailed": "An kasa ajiye fasaha. Sake gwadawa.",
@@ -3960,7 +3979,8 @@
       "nameRequired": "Shigar da sunan umarni",
       "nameInvalid": "Dole ne suna farawa da ƙananan haruffa kuma amfani da ƙananan haruffa kawai, lambobi, da dashes",
       "templateRequired": "Shigar da samfurin umarni",
-      "nameConflict": "An adana wannan sunan ta hanyar ginanniyar umarni"
+      "nameConflict": "An adana wannan sunan ta hanyar ginanniyar umarni",
+      "duplicateName": "Umarni mai wannan sunan ya riga ya kasance a cikin wannan bayanan martaba"
     },
     "repoBindings": {
       "title": "Tsoffin Bayanan martaba don Repos",

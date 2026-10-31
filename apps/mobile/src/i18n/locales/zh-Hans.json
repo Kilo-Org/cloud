@@ -163,7 +163,7 @@
     "allLanguages": "所有语言"
   },
   "login": {
-    "welcome": "欢迎使用 Kilo",
+    "welcome": "欢迎",
     "retrySignIn": "重新尝试登录",
     "logo": "Kilo 标志",
     "continuingSignIn": "正在继续登录流程。",
@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "你可能需要授予对 GitLab 上更多群组或项目的访问权限。",
       "installGithubApp": "为仓库安装 GitHub 应用",
       "installGithubAppDescription": "请授予 Kilo GitHub 应用访问待审查仓库的权限。",
-      "repositoryAccess": "仓库访问权限"
+      "repositoryAccess": "仓库访问权限",
+      "allModePersonal": "Kilo 通过你的 GitHub 连接能够访问的每个仓库都会自动接受审查。",
+      "allModeOrganization": "Kilo 通过组织的 GitHub 连接能够访问的每个仓库都会自动接受审查。",
+      "allModeCount": "可用仓库：{{displayCount}}"
     },
     "style": {
       "title": "审查风格",
@@ -1147,7 +1150,8 @@
       "sortSeverityDesc": "严重程度：从高到低",
       "sortSlaDue": "SLA 到期日",
       "statusIgnored": "已忽略",
-      "statusOpen": "未解决"
+      "statusOpen": "未解决",
+      "noRepositories": "尚未同步或选择任何仓库。请在«安全智能体»设置中选择。"
     },
     "analysis": {
       "analyzeRepository": "分析仓库",
@@ -1273,15 +1277,12 @@
       "codebaseRisk": "代码库风险",
       "confirmedExploitable": "已确认可利用",
       "couldNotLoad": "无法加载仪表盘数据",
-      "criticalOverdue": "严重级问题逾期",
       "daysOverdue": "逾期 {{displayCount}} 天",
       "deadlineToday": "今天到期",
       "filterByRepository": "按仓库筛选",
       "findingsCount": "{{displayCount}} 个安全问题",
-      "highOverdue": "高危问题逾期",
       "lastSynced": "上次同步：{{time}}",
       "manageRepositories": "管理仓库",
-      "mediumLowOverdue": "中低危问题逾期",
       "needsEvidenceReview": "需要审查证据",
       "needsYourReview": "需要你审查",
       "noImmediateAction": "无需立即处理",
@@ -1293,15 +1294,21 @@
       "notMeasured": "尚未统计",
       "notYetSynced": "尚未同步",
       "refreshFailed": "刷新失败，当前显示的是上次同步的数据。",
-      "repoSummary": "{{open}} 个未解决 · {{critical}} 个严重级 · {{high}} 个高危",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "{{displayCount}} 个未解决",
+      "repoSummaryOpen_one": "{{displayCount}} 个未解决",
+      "repoSummaryOpen_other": "{{displayCount}} 个未解决",
+      "repoSummaryCritical": "{{displayCount}} 个严重级",
+      "repoSummaryCritical_one": "{{displayCount}} 个严重级",
+      "repoSummaryCritical_other": "{{displayCount}} 个严重级",
+      "repoSummaryHigh": "{{displayCount}} 个高危",
+      "repoSummaryHigh_one": "{{displayCount}} 个高危",
+      "repoSummaryHigh_other": "{{displayCount}} 个高危",
       "repositoryActionPlan": "仓库处理计划",
       "settings": "设置",
-      "slaPosture": "SLA 履行情况",
-      "syncFindings": "同步安全问题",
       "syncNow": "立即同步",
       "syncQueued": "同步任务已加入队列",
       "syncStatusUnavailable": "无法获取同步状态",
-      "withinDeadline": "未逾期",
       "daysOverdue_one": "逾期 {{displayCount}} 天",
       "daysOverdue_other": "逾期 {{displayCount}} 天",
       "findingsCount_one": "{{displayCount}} 个安全问题",
@@ -1316,8 +1323,17 @@
       "withinDeadlineDetail": "共 {{total}} 个，其中 {{within}} 个未逾期",
       "noDeadlineData": "尚未为任何安全问题设置 SLA 截止时间",
       "deadlinePassed": "截止时间已过",
-      "deadlinePassedDetail": "严重：{{critical}} 个，高危：{{high}} 个",
-      "deadlinePassedDetailWithMediumLow": "严重：{{critical}} 个，高危：{{high}} 个，中低危：{{mediumLow}} 个",
+      "deadlinePassedDetail": "{{critical}}，{{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}，{{high}}，{{mediumLow}}",
+      "breakdownCritical": "严重：{{displayCount}} 个",
+      "breakdownCritical_one": "严重：{{displayCount}} 个",
+      "breakdownCritical_other": "严重：{{displayCount}} 个",
+      "breakdownHigh": "高危：{{displayCount}} 个",
+      "breakdownHigh_one": "高危：{{displayCount}} 个",
+      "breakdownHigh_other": "高危：{{displayCount}} 个",
+      "breakdownMediumLow": "中低危：{{displayCount}} 个",
+      "breakdownMediumLow_one": "中低危：{{displayCount}} 个",
+      "breakdownMediumLow_other": "中低危：{{displayCount}} 个",
       "dueThisWeek": "本周到期",
       "dueThisWeekDetail": "其中 {{exploitable}} 个已确认可利用",
       "noDeadline": "无截止时间",
@@ -1466,8 +1482,7 @@
       "on": "已开启",
       "repositoriesCount": "已选择 {{displayCount}} 个仓库",
       "repositoriesCount_other": "已选择 {{displayCount}} 个仓库",
-      "repositoriesCount_one": "已选择 {{displayCount}} 个仓库",
-      "selectRepositoriesSubtitle": "选择安全智能体监控的仓库"
+      "repositoriesCount_one": "已选择 {{displayCount}} 个仓库"
     },
     "settingsSave": {
       "saveChanges": "保存更改",
@@ -1518,7 +1533,10 @@
       "settleFailed": "操作已完成，但我们无法记录结果。请重试。",
       "replayFailed": "此操作未完成。请重试。",
       "actionFailed": "无法完成此操作。请重试。",
-      "actionBlocked": "无法完成此操作。必须先修复此问题，才能重试。"
+      "actionBlocked": "无法完成此操作。必须先修复此问题，才能重试。",
+      "syncNoRepositories": "同步范围内没有仓库。请选择安全智能体要监控的仓库，然后再次同步。",
+      "syncIntegrationInactive": "安全智能体的 GitHub 连接未激活。请重新连接 Kilo GitHub App，然后再次同步。",
+      "syncMissingPermission": "Kilo GitHub App 无法读取 vulnerability alerts。请在 GitHub 中授予该权限，然后重新同步。"
     },
     "analysisState": {
       "queued": "分析排队中",
@@ -1625,7 +1643,7 @@
     "sessionList": {
       "couldNotLoadActive": "无法加载进行中的会话",
       "couldNotRefresh": "无法刷新",
-      "noSessionsYetDescription": "在手机上发起编程任务，会话就会显示在这里。",
+      "noSessionsYetDescription": "在手机上发起编程任务。",
       "viewHistory": "会话历史",
       "noMatches": "暂无匹配的会话",
       "tryDifferentSearch": "请尝试其他搜索词。",
@@ -2606,7 +2624,7 @@
     "couldNotSaveChoice": "无法保存你的选择。请重试。",
     "onlineAllowed": "已允许在线处理",
     "onlineNotAllowed": "未允许在线处理",
-    "optionalReview": "可选，可随时在设置中更改",
+    "optionalReview": "可选",
     "optionalOnboarding": "可选，默认开启，可自行关闭",
     "aiProvidersWhat": "你的提示词、对话记录及添加的所有附件。",
     "aiProvidersWhy": "用于生成 AI 回复。",
@@ -2698,6 +2716,7 @@
       "gitlabDescription": "连接你的 GitLab 账户，即可在手机上审查合并请求。",
       "bitbucketDescription": "将 Bitbucket 连接到此组织，以便在手机上审查拉取请求。",
       "bitbucketOrgOnlyDescription": "将上方的账户切换为某个组织，以便审查其 Bitbucket 拉取请求。",
+      "bitbucketOrgOnlyNoOrganizationDescription": "此账户尚未加入任何组织。创建或加入组织后，即可审查 Bitbucket 拉取请求。",
       "contextLine": "适用于 {{organization}}",
       "contextLinePersonal": "适用于个人账户"
     },
@@ -3064,10 +3083,9 @@
     "pullRequestUnavailableDescription": "无法打开此 PR。可能是 PR 已被删除、仓库为私有仓库，或仓库尚未安装 Kilo GitHub 应用。",
     "reconnectNotice": {
       "title": "GitHub 连接已过期",
-      "message": "GitHub 连接已失效。请重新检查连接；如需重新连接，系统会提示你。",
+      "message": "请重新检查连接；如需重新连接，系统会提示你。",
       "gitlabTitle": "GitLab 连接已过期",
-      "bitbucketTitle": "Bitbucket 连接已过期",
-      "providerMessage": "{{provider}} 连接已失效。请重新检查连接；如需重新连接，系统会提示你。"
+      "bitbucketTitle": "Bitbucket 连接已过期"
     },
     "review": "审查",
     "reviewPullRequest": "审查拉取请求",
@@ -3854,6 +3872,7 @@
     "skillMarkdownLabel": "技能内容",
     "skillsEmpty": "还没有技能",
     "skillNameRequired": "输入技能名称",
+    "skillNameTooLong": "技能名称必须不超过 {{max}} 个字符",
     "skillNameInvalid": "技能名称必须以字母或数字开头，并且只能使用小写字母、数字和连字符",
     "skillContentRequired": "技能内容为必填项",
     "skillSaveFailed": "无法保存技能，请重试。",
@@ -3960,7 +3979,8 @@
       "nameRequired": "输入命令名称",
       "nameInvalid": "名称必须以小写字母开头，并且只能使用小写字母、数字和连字符",
       "templateRequired": "输入命令模板",
-      "nameConflict": "该名称由内置命令保留"
+      "nameConflict": "该名称由内置命令保留",
+      "duplicateName": "此配置文件中已存在同名命令"
     },
     "repoBindings": {
       "title": "仓库的默认配置文件",

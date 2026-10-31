@@ -98,6 +98,7 @@
     "commit",
     "deleted",
     "dismissed",
+    "files",
     "no changes needed",
     "open",
     "pr opened",
@@ -314,7 +315,6 @@
     "block",
     "cancelled",
     "deleted",
-    "dismissed",
     "manual review",
     "merge",
     "no changes needed",
@@ -323,8 +323,10 @@
     "pr opened",
     "remediation blocked",
     "remediation failed",
+    "stopped",
     "superseded",
-    "{{count}} open"
+    "{{count}} open",
+    "{{loaded}} of {{total}} files loaded"
   ],
   "he": [
     "completed",
@@ -472,6 +474,7 @@
   "kk": [
     "cancelled",
     "dismissed",
+    "files",
     "open",
     "open pull request",
     "pr opened",
@@ -553,6 +556,7 @@
     "analysis failed",
     "commit",
     "dismissed",
+    "files",
     "manual review",
     "no changes needed",
     "open",
@@ -627,6 +631,7 @@
     "commit",
     "deleted",
     "dismissed",
+    "files",
     "github connection expired",
     "manual review",
     "no changes needed",
@@ -813,6 +818,7 @@
   ],
   "sk": [
     "dismissed",
+    "files",
     "high",
     "manual review",
     "open",
@@ -825,6 +831,7 @@
   ],
   "sl": [
     "dismissed",
+    "files",
     "open",
     "open pull request",
     "pr opened",
@@ -990,6 +997,7 @@
     "deleted",
     "dismissed",
     "draft",
+    "files",
     "manual review",
     "no changes needed",
     "open",

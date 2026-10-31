@@ -163,7 +163,7 @@
     "allLanguages": "すべての言語"
   },
   "login": {
-    "welcome": "Kiloへようこそ",
+    "welcome": "ようこそ",
     "retrySignIn": "サインインを再試行",
     "logo": "Kiloのロゴ",
     "continuingSignIn": "サインインを続行しています。",
@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "GitLabで、追加のグループやプロジェクトへのアクセスを許可する必要がある場合があります。",
       "installGithubApp": "リポジトリにGitHub Appをインストール",
       "installGithubAppDescription": "レビュー対象のリポジトリへのアクセスをKilo GitHub Appに許可してください。",
-      "repositoryAccess": "リポジトリへのアクセス権"
+      "repositoryAccess": "リポジトリへのアクセス権",
+      "allModePersonal": "あなたのGitHub接続を通じてKiloがアクセスできるすべてのリポジトリが自動的にレビューされます。",
+      "allModeOrganization": "組織のGitHub接続を通じてKiloがアクセスできるすべてのリポジトリが自動的にレビューされます。",
+      "allModeCount": "利用可能なリポジトリ: {{displayCount}}"
     },
     "style": {
       "title": "レビュースタイル",
@@ -1147,7 +1150,8 @@
       "sortSeverityDesc": "重大度：高い順",
       "sortSlaDue": "SLA期限",
       "statusIgnored": "無視済み",
-      "statusOpen": "オープン"
+      "statusOpen": "オープン",
+      "noRepositories": "リポジトリはまだ同期も選択もされていません。セキュリティエージェントの設定で選択してください。"
     },
     "analysis": {
       "analyzeRepository": "リポジトリを分析",
@@ -1273,15 +1277,12 @@
       "codebaseRisk": "コードベースのリスク",
       "confirmedExploitable": "悪用可能（確認済み）",
       "couldNotLoad": "ダッシュボードのデータを読み込めませんでした。",
-      "criticalOverdue": "重大・期限超過",
       "daysOverdue": "{{displayCount}}日超過",
       "deadlineToday": "今日が期限",
       "filterByRepository": "リポジトリで絞り込み",
       "findingsCount": "検出結果{{displayCount}}件",
-      "highOverdue": "高・期限超過",
       "lastSynced": "最終同期：{{time}}",
       "manageRepositories": "リポジトリを管理",
-      "mediumLowOverdue": "中・低・期限超過",
       "needsEvidenceReview": "証拠の確認が必要",
       "needsYourReview": "確認が必要",
       "noImmediateAction": "即時対応は不要",
@@ -1293,15 +1294,21 @@
       "notMeasured": "未測定",
       "notYetSynced": "未同期",
       "refreshFailed": "更新できませんでした。最後に同期したデータを表示しています。",
-      "repoSummary": "未解決{{open}}件・重大{{critical}}件・高{{high}}件",
+      "repoSummary": "{{open}}・{{critical}}・{{high}}",
+      "repoSummaryOpen": "未解決{{displayCount}}件",
+      "repoSummaryOpen_one": "未解決{{displayCount}}件",
+      "repoSummaryOpen_other": "未解決{{displayCount}}件",
+      "repoSummaryCritical": "重大{{displayCount}}件",
+      "repoSummaryCritical_one": "重大{{displayCount}}件",
+      "repoSummaryCritical_other": "重大{{displayCount}}件",
+      "repoSummaryHigh": "高{{displayCount}}件",
+      "repoSummaryHigh_one": "高{{displayCount}}件",
+      "repoSummaryHigh_other": "高{{displayCount}}件",
       "repositoryActionPlan": "リポジトリの対応計画",
       "settings": "設定",
-      "slaPosture": "SLA遵守状況",
-      "syncFindings": "検出結果を同期",
       "syncNow": "今すぐ同期",
       "syncQueued": "同期をキューに追加しました。",
       "syncStatusUnavailable": "同期の状態を確認できません。",
-      "withinDeadline": "期限内",
       "daysOverdue_one": "{{displayCount}}日超過",
       "daysOverdue_other": "{{displayCount}}日超過",
       "findingsCount_one": "検出結果{{displayCount}}件",
@@ -1316,8 +1323,17 @@
       "withinDeadlineDetail": "{{total}}件中{{within}}件が期限内",
       "noDeadlineData": "SLA期限が設定された検出結果はまだありません",
       "deadlinePassed": "期限超過",
-      "deadlinePassedDetail": "重大：{{critical}}件、高：{{high}}件",
-      "deadlinePassedDetailWithMediumLow": "重大：{{critical}}件、高：{{high}}件、中・低：{{mediumLow}}件",
+      "deadlinePassedDetail": "{{critical}}、{{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}、{{high}}、{{mediumLow}}",
+      "breakdownCritical": "重大：{{displayCount}}件",
+      "breakdownCritical_one": "重大：{{displayCount}}件",
+      "breakdownCritical_other": "重大：{{displayCount}}件",
+      "breakdownHigh": "高：{{displayCount}}件",
+      "breakdownHigh_one": "高：{{displayCount}}件",
+      "breakdownHigh_other": "高：{{displayCount}}件",
+      "breakdownMediumLow": "中・低：{{displayCount}}件",
+      "breakdownMediumLow_one": "中・低：{{displayCount}}件",
+      "breakdownMediumLow_other": "中・低：{{displayCount}}件",
       "dueThisWeek": "今週が期限",
       "dueThisWeekDetail": "このうち{{exploitable}}件が悪用可能と確認済み",
       "noDeadline": "期限なし",
@@ -1466,8 +1482,7 @@
       "on": "オン",
       "repositoriesCount": "{{displayCount}}件のリポジトリを選択中",
       "repositoriesCount_other": "{{displayCount}}件のリポジトリを選択中",
-      "repositoriesCount_one": "{{displayCount}}件のリポジトリを選択中",
-      "selectRepositoriesSubtitle": "セキュリティエージェントが監視するリポジトリを選択"
+      "repositoriesCount_one": "{{displayCount}}件のリポジトリを選択中"
     },
     "settingsSave": {
       "saveChanges": "変更を保存",
@@ -1518,7 +1533,10 @@
       "settleFailed": "操作は完了しましたが、結果を記録できませんでした。もう一度お試しください。",
       "replayFailed": "この操作は完了しませんでした。もう一度お試しください。",
       "actionFailed": "この操作を完了できませんでした。もう一度お試しください。",
-      "actionBlocked": "この操作を完了できませんでした。再試行するには、まず問題を解決する必要があります。"
+      "actionBlocked": "この操作を完了できませんでした。再試行するには、まず問題を解決する必要があります。",
+      "syncNoRepositories": "同期対象にリポジトリがありません。セキュリティエージェントが監視するリポジトリを選択してから、もう一度同期してください。",
+      "syncIntegrationInactive": "セキュリティエージェントの GitHub 接続が有効になっていません。Kilo GitHub App を再接続してから、もう一度同期してください。",
+      "syncMissingPermission": "Kilo GitHub App は vulnerability alerts を読み取れません。GitHub でその権限を付与してから、もう一度同期してください。"
     },
     "analysisState": {
       "queued": "分析の順番待ち",
@@ -1625,7 +1643,7 @@
     "sessionList": {
       "couldNotLoadActive": "アクティブなセッションを読み込めませんでした。",
       "couldNotRefresh": "更新できませんでした",
-      "noSessionsYetDescription": "スマートフォンからコーディングタスクを開始してください。セッションがここに表示されます。",
+      "noSessionsYetDescription": "スマートフォンからコーディングタスクを開始してください。",
       "viewHistory": "セッション履歴",
       "noMatches": "一致するセッションはありません",
       "tryDifferentSearch": "別の検索語をお試しください。",
@@ -2606,7 +2624,7 @@
     "couldNotSaveChoice": "選択内容を保存できませんでした。もう一度お試しください。",
     "onlineAllowed": "オンライン（許可済み）",
     "onlineNotAllowed": "オンライン（不許可）",
-    "optionalReview": "任意（設定からいつでも変更可能）",
+    "optionalReview": "任意",
     "optionalOnboarding": "任意（オフにするまで有効）",
     "aiProvidersWhat": "プロンプト、会話履歴、添付ファイル",
     "aiProvidersWhy": "AIの応答を生成するため",
@@ -2698,6 +2716,7 @@
       "gitlabDescription": "モバイルでマージリクエストをレビューするには、GitLabアカウントを接続してください。",
       "bitbucketDescription": "モバイルでプルリクエストをレビューするには、この組織をBitbucketに接続してください。",
       "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
+      "bitbucketOrgOnlyNoOrganizationDescription": "このアカウントにはまだ組織がありません。組織を作成または参加すると、Bitbucketのプルリクエストをレビューできるようになります。",
       "contextLine": "{{organization}}用",
       "contextLinePersonal": "個人用"
     },
@@ -3064,10 +3083,9 @@
     "pullRequestUnavailableDescription": "このPRを開けません。PRが削除されたか、リポジトリが非公開になっているか、リポジトリにKilo GitHub Appがインストールされていない可能性があります。",
     "reconnectNotice": {
       "title": "GitHubとの連携が期限切れになりました。",
-      "message": "GitHubとの接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。",
+      "message": "接続を再確認してください。再接続が必要な場合は、案内が表示されます。",
       "gitlabTitle": "GitLabとの連携が期限切れになりました。",
-      "bitbucketTitle": "Bitbucketとの連携が期限切れになりました。",
-      "providerMessage": "{{provider}}との接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。"
+      "bitbucketTitle": "Bitbucketとの連携が期限切れになりました。"
     },
     "review": "レビュー",
     "reviewPullRequest": "プルリクエストをレビュー",
@@ -3854,6 +3872,7 @@
     "skillMarkdownLabel": "スキル内容",
     "skillsEmpty": "まだスキルがありません",
     "skillNameRequired": "スキル名を入力してください",
+    "skillNameTooLong": "スキル名は{{max}}文字以内で入力してください",
     "skillNameInvalid": "スキル名は文字または数字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
     "skillContentRequired": "スキル内容は必須です",
     "skillSaveFailed": "スキルを保存できませんでした。もう一度お試しください。",
@@ -3960,7 +3979,8 @@
       "nameRequired": "コマンド名を入力してください",
       "nameInvalid": "名前は小文字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
       "templateRequired": "コマンドテンプレートを入力してください",
-      "nameConflict": "その名前は組み込みコマンドによって予約されています"
+      "nameConflict": "その名前は組み込みコマンドによって予約されています",
+      "duplicateName": "このプロファイルには同じ名前のコマンドがすでに存在します"
     },
     "repoBindings": {
       "title": "リポジトリのデフォルトプロフィール",

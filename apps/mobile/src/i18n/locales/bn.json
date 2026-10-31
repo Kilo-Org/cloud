@@ -163,7 +163,7 @@
     "allLanguages": "সব ভাষা"
   },
   "login": {
-    "welcome": "Kilo-তে স্বাগতম",
+    "welcome": "স্বাগতম",
     "retrySignIn": "আবার সাইন-ইন করার চেষ্টা করুন",
     "logo": "Kilo-র লোগো",
     "continuingSignIn": "আপনার সাইন-ইন চলছে।",
@@ -684,6 +684,7 @@
       "gitlabDescription": "মোবাইলে মার্জ রিকোয়েস্ট রিভিউ করতে আপনার GitLab অ্যাকাউন্ট সংযুক্ত করুন।",
       "bitbucketDescription": "মোবাইলে পুল রিকোয়েস্ট রিভিউ করতে এই অর্গানাইজেশনটিকে Bitbucket-এর সঙ্গে সংযুক্ত করুন।",
       "bitbucketOrgOnlyDescription": "উপরে থাকা অ্যাকাউন্ট একটি অর্গানাইজেশনে সুইচ করুন তার Bitbucket পুল রিকোয়েস্ট রিভিউ করতে।",
+      "bitbucketOrgOnlyNoOrganizationDescription": "এই অ্যাকাউন্টে এখনো কোনো অর্গানাইজেশন নেই। আপনি একটি অর্গানাইজেশন তৈরি করলে বা যুক্ত হলে Bitbucket পুল রিকোয়েস্ট রিভিউ করা যাবে।",
       "contextLine": "{{organization}}-এর জন্য",
       "contextLinePersonal": "আপনার ব্যক্তিগত অ্যাকাউন্টের জন্য"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub সংযোগের মেয়াদ শেষ হয়েছে।",
-      "message": "আপনার GitHub সংযোগের অনুমতি আর কার্যকর নেই। সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।",
+      "message": "সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।",
       "gitlabTitle": "GitLab সংযোগের মেয়াদ শেষ হয়েছে।",
-      "bitbucketTitle": "Bitbucket সংযোগের মেয়াদ শেষ হয়েছে।",
-      "providerMessage": "আপনার {{provider}} সংযোগের অনুমতি আর কার্যকর নেই। সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।"
+      "bitbucketTitle": "Bitbucket সংযোগের মেয়াদ শেষ হয়েছে।"
     },
     "eventChips": {
       "comment": "মন্তব্য",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLab-এ আরও গ্রুপ বা প্রকল্পে অ্যাক্সেস দিতে হতে পারে।",
       "installGithubApp": "রিপোজিটরিতে GitHub অ্যাপ ইনস্টল করুন",
       "installGithubAppDescription": "যেসব রিপোজিটরি পর্যালোচনা করাতে চান, সেগুলোতে Kilo GitHub অ্যাপকে অ্যাক্সেস দিন।",
-      "repositoryAccess": "রিপোজিটরির অ্যাক্সেস"
+      "repositoryAccess": "রিপোজিটরির অ্যাক্সেস",
+      "allModePersonal": "আপনার GitHub সংযোগের মাধ্যমে Kilo যে সমস্ত রিপোজিটরিতে অ্যাক্সেস করতে পারে, সেগুলো স্বয়ংক্রিয়ভাবে পর্যালোচনা করা হয়।",
+      "allModeOrganization": "সংস্থার GitHub সংযোগের মাধ্যমে Kilo যে সমস্ত রিপোজিটরিতে অ্যাক্সেস করতে পারে, সেগুলো স্বয়ংক্রিয়ভাবে পর্যালোচনা করা হয়।",
+      "allModeCount": "উপলব্ধ রিপোজিটরি: {{displayCount}}"
     },
     "style": {
       "title": "পর্যালোচনার ধরন",
@@ -1676,7 +1679,8 @@
       "sortSeverityDesc": "তীব্রতা: বেশি থেকে কম",
       "sortSeverityAsc": "তীব্রতা: কম থেকে বেশি",
       "sortSlaDue": "SLA শেষ তারিখ",
-      "overdueOnly": "শুধু সময়সীমা পেরোনো ত্রুটি"
+      "overdueOnly": "শুধু সময়সীমা পেরোনো ত্রুটি",
+      "noRepositories": "এখনও কোনো রিপোজিটরি সিঙ্ক বা নির্বাচন করা হয়নি। নিরাপত্তা এজেন্টের সেটিংসে সেগুলো বেছে নিন।"
     },
     "automation": {
       "title": "অটোমেশন",
@@ -1749,17 +1753,12 @@
       "findingsCount": "{{displayCount}}টি ত্রুটি",
       "notMeasured": "পরিমাপ করা হয়নি",
       "actFirst": "অগ্রাধিকারপ্রাপ্ত কাজ",
-      "slaPosture": "SLA পালনের অবস্থা",
       "actionPosture": "পদক্ষেপের অবস্থা",
       "codebaseRisk": "কোডবেসের ঝুঁকি",
       "repositoryActionPlan": "রিপোজিটরির কর্মপরিকল্পনা",
       "noOpenFindings": "নজর দেওয়ার মতো কোনো অমীমাংসিত ত্রুটি নেই",
       "deadlineToday": "আজ সময়সীমা শেষ",
       "daysOverdue": "{{displayCount}} দিন বিলম্বিত",
-      "withinDeadline": "সময়সীমার মধ্যে",
-      "criticalOverdue": "সময়সীমা পেরোনো সংকটজনক ত্রুটি",
-      "highOverdue": "সময়সীমা পেরোনো উচ্চ তীব্রতার ত্রুটি",
-      "mediumLowOverdue": "সময়সীমা পেরোনো মাঝারি ও নিম্ন তীব্রতার ত্রুটি",
       "confirmedExploitable": "আক্রমণে ব্যবহারযোগ্য বলে নিশ্চিত",
       "needsEvidenceReview": "প্রমাণ পর্যালোচনার প্রয়োজন",
       "analysisNotComplete": "বিশ্লেষণ অসম্পূর্ণ",
@@ -1769,7 +1768,19 @@
       "noSlaDeadline": "SLA সময়সীমা নির্ধারিত নেই",
       "noRepositoryData": "এখনো কোনো রিপোজিটরির তথ্য নেই",
       "noRepositoryDataDescription": "ত্রুটিগুলো সিঙ্ক হলে রিপোজিটরিগুলোর অগ্রাধিকার দেখা যাবে।",
-      "repoSummary": "{{open}} অমীমাংসিত · {{critical}} সংকটজনক · {{high}} উচ্চ",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "{{displayCount}} অমীমাংসিত",
+      "repoSummaryOpen_one": "{{displayCount}} অমীমাংসিত",
+      "repoSummaryOpen_other": "{{displayCount}} অমীমাংসিত",
+      "repoSummaryOpen_zero": "{{displayCount}} অমীমাংসিত",
+      "repoSummaryCritical": "{{displayCount}} সংকটজনক",
+      "repoSummaryCritical_one": "{{displayCount}} সংকটজনক",
+      "repoSummaryCritical_other": "{{displayCount}} সংকটজনক",
+      "repoSummaryCritical_zero": "{{displayCount}} সংকটজনক",
+      "repoSummaryHigh": "{{displayCount}} উচ্চ",
+      "repoSummaryHigh_one": "{{displayCount}} উচ্চ",
+      "repoSummaryHigh_other": "{{displayCount}} উচ্চ",
+      "repoSummaryHigh_zero": "{{displayCount}} উচ্চ",
       "couldNotLoad": "ড্যাশবোর্ডের তথ্য লোড করা যায়নি।",
       "filterByRepository": "রিপোজিটরি অনুযায়ী ফিল্টার করুন",
       "lastSynced": "শেষ সিঙ্ক: {{time}}",
@@ -1777,7 +1788,6 @@
       "notYetSynced": "এখনো সিঙ্ক হয়নি",
       "refreshFailed": "রিফ্রেশ করা যায়নি — শেষবার সিঙ্ক করা তথ্য দেখানো হচ্ছে।",
       "settings": "সেটিংস",
-      "syncFindings": "ত্রুটিগুলো সিঙ্ক করুন",
       "syncNow": "এখন সিঙ্ক করুন",
       "syncQueued": "সিঙ্কের অনুরোধ সারিতে যোগ করা হয়েছে।",
       "syncStatusUnavailable": "সিঙ্কের অবস্থা জানা যাচ্ছে না।",
@@ -1795,8 +1805,20 @@
       "withinDeadlineDetail": "মোট {{total}}টির মধ্যে {{within}}টি সময়সীমার মধ্যে",
       "noDeadlineData": "এখনো কোনো ত্রুটির SLA সময়সীমা নির্ধারিত নেই",
       "deadlinePassed": "সময়সীমা পেরিয়ে গেছে",
-      "deadlinePassedDetail": "{{critical}}টি অতি গুরুতর, {{high}}টি উচ্চ",
-      "deadlinePassedDetailWithMediumLow": "{{critical}}টি অতি গুরুতর, {{high}}টি উচ্চ, {{mediumLow}}টি মাঝারি ও নিম্ন",
+      "deadlinePassedDetail": "{{critical}}, {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
+      "breakdownCritical": "{{displayCount}}টি অতি গুরুতর",
+      "breakdownCritical_one": "{{displayCount}}টি অতি গুরুতর",
+      "breakdownCritical_other": "{{displayCount}}টি অতি গুরুতর",
+      "breakdownCritical_zero": "{{displayCount}}টি অতি গুরুতর",
+      "breakdownHigh": "{{displayCount}}টি উচ্চ",
+      "breakdownHigh_one": "{{displayCount}}টি উচ্চ",
+      "breakdownHigh_other": "{{displayCount}}টি উচ্চ",
+      "breakdownHigh_zero": "{{displayCount}}টি উচ্চ",
+      "breakdownMediumLow": "{{displayCount}}টি মাঝারি ও নিম্ন",
+      "breakdownMediumLow_one": "{{displayCount}}টি মাঝারি ও নিম্ন",
+      "breakdownMediumLow_other": "{{displayCount}}টি মাঝারি ও নিম্ন",
+      "breakdownMediumLow_zero": "{{displayCount}}টি মাঝারি ও নিম্ন",
       "dueThisWeek": "এই সপ্তাহে সময়সীমা শেষ",
       "dueThisWeekDetail": "এগুলোর মধ্যে {{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
       "noDeadline": "কোনো সময়সীমা নেই",
@@ -1856,7 +1878,6 @@
       "repositoriesCount_one": "{{displayCount}}টি রিপোজিটরি নির্বাচিত",
       "repositoriesCount": "{{displayCount}}টি রিপোজিটরি নির্বাচিত",
       "repositoriesCount_other": "{{displayCount}}টি রিপোজিটরি নির্বাচিত",
-      "selectRepositoriesSubtitle": "নিরাপত্তা এজেন্ট কোন রিপোজিটরিগুলো পর্যবেক্ষণ করবে তা বেছে নিন",
       "analysisModeSubtitle": "{{mode}} বিশ্লেষণ",
       "automationAllOff": "সব বন্ধ",
       "automationCount": "৩টির মধ্যে {{displayCount}}টি চালু",
@@ -2047,7 +2068,10 @@
       "settleFailed": "কাজটি সম্পন্ন হয়েছে, কিন্তু আমরা ফলাফল রেকর্ড করতে পারিনি। আবার চেষ্টা করুন।",
       "replayFailed": "এই কাজটি সম্পন্ন হয়নি। আবার চেষ্টা করুন।",
       "actionFailed": "এই কাজটি সম্পন্ন করা যায়নি। আবার চেষ্টা করুন।",
-      "actionBlocked": "এই কাজটি সম্পন্ন করা যায়নি। সমস্যাটি ঠিক করা না হলে আবার চেষ্টা করা যাবে না।"
+      "actionBlocked": "এই কাজটি সম্পন্ন করা যায়নি। সমস্যাটি ঠিক করা না হলে আবার চেষ্টা করা যাবে না।",
+      "syncNoRepositories": "সিঙ্ক স্কোপে কোনো রিপোজিটরি নেই। নিরাপত্তা এজেন্ট যে রিপোজিটরিগুলো মনিটর করে সেগুলো বেছে নিন, তারপর আবার সিঙ্ক করুন।",
+      "syncIntegrationInactive": "«নিরাপত্তা এজেন্ট»-এর জন্য GitHub সংযোগ সক্রিয় নয়। Kilo GitHub App আবার সংযুক্ত করুন, তারপর আবার সিঙ্ক করুন।",
+      "syncMissingPermission": "Kilo GitHub App vulnerability alerts পড়তে পারে না। GitHub-এ সেই অনুমতি দিন, তারপর আবার সিঙ্ক করুন।"
     },
     "analysisState": {
       "queued": "বিশ্লেষণ সারিতে আছে",
@@ -2154,7 +2178,7 @@
     "sessionList": {
       "couldNotLoadActive": "সক্রিয় সেশন লোড করা যায়নি।",
       "couldNotRefresh": "রিফ্রেশ করা যায়নি",
-      "noSessionsYetDescription": "আপনার ফোন থেকে কোড লেখার একটি কাজ শুরু করুন। আপনার সেশনগুলো এখানে দেখা যাবে।",
+      "noSessionsYetDescription": "আপনার ফোন থেকে কোড লেখার একটি কাজ শুরু করুন।",
       "viewHistory": "সেশনের ইতিহাস",
       "noMatches": "মিলে যায় এমন কোনো সেশন নেই",
       "tryDifferentSearch": "অন্য শব্দ দিয়ে খুঁজে দেখুন।",
@@ -3135,7 +3159,7 @@
     "couldNotSaveChoice": "আপনার পছন্দ সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।",
     "onlineAllowed": "অনলাইন, অনুমোদিত",
     "onlineNotAllowed": "অনলাইন, অনুমোদিত নয়",
-    "optionalReview": "ঐচ্ছিক — আপনি সেটিংসে যেকোনো সময় এটি পরিবর্তন করতে পারেন",
+    "optionalReview": "ঐচ্ছিক",
     "optionalOnboarding": "ঐচ্ছিক — বন্ধ না করা পর্যন্ত চালু",
     "aiProvidersWhat": "আপনার প্রম্পট, কথোপকথনের ইতিহাস ও সংযুক্ত করা ফাইলগুলো।",
     "aiProvidersWhy": "AI-এর উত্তর তৈরি করতে।",
@@ -3854,6 +3878,7 @@
     "skillMarkdownLabel": "দক্ষতা বিষয়বস্তু",
     "skillsEmpty": "এখনো কোনো দক্ষতা নেই",
     "skillNameRequired": "একটি দক্ষতার নাম লিখুন",
+    "skillNameTooLong": "দক্ষতার নাম অবশ্যই {{max}} অক্ষর বা তার কম হতে হবে",
     "skillNameInvalid": "দক্ষতার নাম অবশ্যই একটি অক্ষর বা অঙ্ক দিয়ে শুরু করতে হবে এবং শুধুমাত্র ছোট হাতের অক্ষর, সংখ্যা এবং ড্যাশ ব্যবহার করতে হবে",
     "skillContentRequired": "দক্ষতা বিষয়বস্তু প্রয়োজন",
     "skillSaveFailed": "দক্ষতা বাঁচাতে পারেনি। আবার চেষ্টা করুন।",
@@ -3960,7 +3985,8 @@
       "nameRequired": "একটি কমান্ডের নাম লিখুন",
       "nameInvalid": "নাম অবশ্যই ছোট হাতের অক্ষর দিয়ে শুরু করতে হবে এবং শুধুমাত্র ছোট হাতের অক্ষর, সংখ্যা এবং ড্যাশ ব্যবহার করতে হবে",
       "templateRequired": "একটি কমান্ড টেমপ্লেট লিখুন",
-      "nameConflict": "সেই নামটি একটি অন্তর্নির্মিত কমান্ড দ্বারা সংরক্ষিত"
+      "nameConflict": "সেই নামটি একটি অন্তর্নির্মিত কমান্ড দ্বারা সংরক্ষিত",
+      "duplicateName": "এই নামের একটি কমান্ড ইতিমধ্যেই এই প্রোফাইলে রয়েছে"
     },
     "repoBindings": {
       "title": "Repos এর জন্য ডিফল্ট প্রোফাইল",

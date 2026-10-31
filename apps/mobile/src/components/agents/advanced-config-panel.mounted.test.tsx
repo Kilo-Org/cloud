@@ -23,6 +23,7 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => listMock);
 vi.mock('react-native', () => ({
   AccessibilityInfo: { announceForAccessibility },
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',
@@ -460,6 +461,22 @@ describe('AdvancedConfigPanel', () => {
       renderer.root.findAllByType('FormField' as never).filter(node => node.props.label === 'Value')
     ).toHaveLength(0);
     expect(texts(renderer)).toContain('1 environment variables · 0 setup commands');
+  });
+
+  it('starts an abandoned session variable empty the next time the form opens', () => {
+    const renderer = mount();
+    press(byLabel(renderer, 'Advanced Configuration'));
+
+    press(buttonByText(renderer, 'Add variable'));
+    typeInto(renderer, 'Key', 'ABANDONED_KEY');
+    typeInto(renderer, 'Value', 'abandoned-value');
+    press(buttonByText(renderer, 'Cancel'));
+
+    press(buttonByText(renderer, 'Add variable'));
+    // A session draft belongs to the compose that opened it: the key and the
+    // value of the cancelled attempt must not come back.
+    expect(field(renderer, 'Key').props.defaultValue).toBe('');
+    expect(field(renderer, 'Value').props.defaultValue).toBe('');
   });
 
   it('names the row reveal control after its action and reveals the draft value', () => {

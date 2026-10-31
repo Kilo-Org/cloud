@@ -163,7 +163,7 @@
     "allLanguages": "Tüm diller"
   },
   "login": {
-    "welcome": "Kilo'ya hoş geldin",
+    "welcome": "Hoş geldin",
     "retrySignIn": "Oturum açmayı tekrar dene",
     "logo": "Kilo logosu",
     "continuingSignIn": "Oturum açma işlemine devam ediliyor.",
@@ -490,7 +490,7 @@
     "attachmentPicker": {
       "takePhoto": "Fotoğraf çek",
       "photoLibrary": "Fotoğraf arşivi",
-      "files": "Dosya",
+      "files": "Dosyalar",
       "cameraAccessMessage": "Fotoğraf çekmek için Ayarlar'dan kamera erişimine izin ver."
     },
     "typingIndicator": {
@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "GitLab'da daha fazla gruba veya projeye erişim izni vermen gerekebilir.",
       "installGithubApp": "GitHub uygulamasını depolara yükle",
       "installGithubAppDescription": "Kilo GitHub uygulamasına, incelenmesini istediğin depolara erişim izni ver.",
-      "repositoryAccess": "depo erişimi"
+      "repositoryAccess": "depo erişimi",
+      "allModePersonal": "Kilo'nun GitHub bağlantın aracılığıyla erişebildiği her depo otomatik olarak incelenir.",
+      "allModeOrganization": "Kilo'nun kuruluşun GitHub bağlantısı aracılığıyla erişebildiği her depo otomatik olarak incelenir.",
+      "allModeCount": "Kullanılabilir depolar: {{displayCount}}"
     },
     "style": {
       "title": "İnceleme stili",
@@ -1147,7 +1150,8 @@
       "sortSeverityDesc": "Önem derecesi: yüksekten düşüğe",
       "sortSlaDue": "SLA son tarihi",
       "statusIgnored": "Yok sayıldı",
-      "statusOpen": "Açık"
+      "statusOpen": "Açık",
+      "noRepositories": "Henüz eşitlenmiş veya seçilmiş depo yok. Depoları Güvenlik ajanı ayarlarından seç."
     },
     "analysis": {
       "analyzeRepository": "Depoyu analiz et",
@@ -1273,15 +1277,12 @@
       "codebaseRisk": "Kod tabanı riski",
       "confirmedExploitable": "İstismar edilebilirliği doğrulandı",
       "couldNotLoad": "Panel verileri yüklenemedi.",
-      "criticalOverdue": "Geciken kritik bulgular",
       "daysOverdue": "{{displayCount}} gün gecikmiş",
       "deadlineToday": "Son tarih bugün doldu",
       "filterByRepository": "Depoya göre filtrele",
       "findingsCount": "{{displayCount}} bulgu",
-      "highOverdue": "Geciken yüksek önem dereceli bulgular",
       "lastSynced": "Son eşitleme: {{time}}",
       "manageRepositories": "Depoları yönet",
-      "mediumLowOverdue": "Geciken orta ve düşük önem dereceli bulgular",
       "needsEvidenceReview": "Kanıt incelemesi gerekiyor",
       "needsYourReview": "İncelemen gerekiyor",
       "noImmediateAction": "Acil işlem gerekmiyor",
@@ -1293,15 +1294,21 @@
       "notMeasured": "Ölçülmedi",
       "notYetSynced": "Henüz eşitlenmedi",
       "refreshFailed": "Veriler yenilenemedi. Son eşitlenen veriler gösteriliyor.",
-      "repoSummary": "{{open}} açık · {{critical}} kritik · {{high}} yüksek",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "{{displayCount}} açık",
+      "repoSummaryOpen_one": "{{displayCount}} açık",
+      "repoSummaryOpen_other": "{{displayCount}} açık",
+      "repoSummaryCritical": "{{displayCount}} kritik",
+      "repoSummaryCritical_one": "{{displayCount}} kritik",
+      "repoSummaryCritical_other": "{{displayCount}} kritik",
+      "repoSummaryHigh": "{{displayCount}} yüksek",
+      "repoSummaryHigh_one": "{{displayCount}} yüksek",
+      "repoSummaryHigh_other": "{{displayCount}} yüksek",
       "repositoryActionPlan": "Depo işlem planı",
       "settings": "Ayarlar",
-      "slaPosture": "SLA durumu",
-      "syncFindings": "Bulguları eşitle",
       "syncNow": "Şimdi eşitle",
       "syncQueued": "Eşitleme kuyruğa alındı",
       "syncStatusUnavailable": "Eşitleme durumu alınamıyor.",
-      "withinDeadline": "Süresi dolmadı",
       "daysOverdue_one": "{{displayCount}} gün gecikmiş",
       "daysOverdue_other": "{{displayCount}} gün gecikmiş",
       "findingsCount_one": "{{displayCount}} bulgu",
@@ -1316,8 +1323,17 @@
       "withinDeadlineDetail": "Toplam {{total}} bulgu içinde süresi dolmayan: {{within}}",
       "noDeadlineData": "Henüz SLA son tarihi olan bulgu yok",
       "deadlinePassed": "Son tarih geçti",
-      "deadlinePassedDetail": "{{critical}} kritik, {{high}} yüksek",
-      "deadlinePassedDetailWithMediumLow": "{{critical}} kritik, {{high}} yüksek, {{mediumLow}} orta ve düşük",
+      "deadlinePassedDetail": "{{critical}}, {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
+      "breakdownCritical": "{{displayCount}} kritik",
+      "breakdownCritical_one": "{{displayCount}} kritik",
+      "breakdownCritical_other": "{{displayCount}} kritik",
+      "breakdownHigh": "{{displayCount}} yüksek",
+      "breakdownHigh_one": "{{displayCount}} yüksek",
+      "breakdownHigh_other": "{{displayCount}} yüksek",
+      "breakdownMediumLow": "{{displayCount}} orta ve düşük",
+      "breakdownMediumLow_one": "{{displayCount}} orta ve düşük",
+      "breakdownMediumLow_other": "{{displayCount}} orta ve düşük",
       "dueThisWeek": "Süresi bu hafta doluyor",
       "dueThisWeekDetail": "Bunlardan {{exploitable}} bulgunun istismar edilebilirliği doğrulandı",
       "noDeadline": "Son tarih yok",
@@ -1466,8 +1482,7 @@
       "on": "Açık",
       "repositoriesCount": "{{displayCount}} depo seçildi",
       "repositoriesCount_other": "{{displayCount}} depo seçildi",
-      "repositoriesCount_one": "{{displayCount}} depo seçili",
-      "selectRepositoriesSubtitle": "Güvenlik ajanının izleyeceği depoları seç"
+      "repositoriesCount_one": "{{displayCount}} depo seçili"
     },
     "settingsSave": {
       "saveChanges": "Değişiklikleri kaydet",
@@ -1518,7 +1533,10 @@
       "settleFailed": "İşlem tamamlandı, ancak sonucu kaydedemedik. Lütfen tekrar dene.",
       "replayFailed": "Bu işlem tamamlanmadı. Lütfen tekrar dene.",
       "actionFailed": "Bu işlem tamamlanamadı. Lütfen tekrar dene.",
-      "actionBlocked": "Bu işlem tamamlanamadı. Yeniden denemeden önce sorunun düzeltilmesi gerekiyor."
+      "actionBlocked": "Bu işlem tamamlanamadı. Yeniden denemeden önce sorunun düzeltilmesi gerekiyor.",
+      "syncNoRepositories": "Eşitleme kapsamında hiçbir depo yok. Güvenlik ajanının izleyeceği depoları seç, ardından yeniden eşitle.",
+      "syncIntegrationInactive": "Güvenlik ajanının GitHub bağlantısı etkin değil. Kilo GitHub uygulamasını yeniden bağla, ardından yeniden eşitle.",
+      "syncMissingPermission": "Kilo GitHub uygulaması güvenlik açığı uyarılarını okuyamıyor. Bu izni GitHub'da ver, ardından yeniden eşitle."
     },
     "analysisState": {
       "queued": "Analiz kuyruğa alındı",
@@ -1625,7 +1643,7 @@
     "sessionList": {
       "couldNotLoadActive": "Etkin oturumlar yüklenemedi.",
       "couldNotRefresh": "Yenilenemedi",
-      "noSessionsYetDescription": "Telefonundan bir kodlama görevi başlat. Oturumların burada görünecek.",
+      "noSessionsYetDescription": "Telefonundan bir kodlama görevi başlat.",
       "viewHistory": "Oturum geçmişi",
       "noMatches": "Eşleşen oturum yok",
       "tryDifferentSearch": "Farklı bir arama terimi dene.",
@@ -2223,7 +2241,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Fotoğraf arşivi",
-      "files": "Dosya",
+      "files": "Dosyalar",
       "couldNotOpenPhotoPicker": "Fotoğraf seçici açılamadı. Kilo'yu yeniden başlatıp tekrar dene.",
       "maxFilesAllowed": "En fazla {{displayCount}} dosya ekleyebilirsin.",
       "onlyAddingFiles": "Toplam {{total}} dosyadan yalnızca {{accepted}} dosya ekleniyor (en fazla {{max}})",
@@ -2606,7 +2624,7 @@
     "couldNotSaveChoice": "Tercihin kaydedilemedi. Tekrar dene.",
     "onlineAllowed": "Çevrimiçi, izin verildi",
     "onlineNotAllowed": "Çevrimiçi, izin verilmedi",
-    "optionalReview": "İsteğe bağlı — ayarlardan istediğin zaman değiştirebilirsin",
+    "optionalReview": "İsteğe bağlı",
     "optionalOnboarding": "İsteğe bağlı — kapatmadıkça açık",
     "aiProvidersWhat": "İstemlerin, konuşma geçmişin ve eklediğin tüm dosyalar.",
     "aiProvidersWhy": "Yapay zekâ yanıtları üretmek için.",
@@ -2698,6 +2716,7 @@
       "gitlabDescription": "Mobilde birleştirme isteklerini gözden geçirmek için GitLab hesabını bağla.",
       "bitbucketDescription": "Mobilde çekme isteklerini gözden geçirmek için Bitbucket'ı bu kuruluşla bağla.",
       "bitbucketOrgOnlyDescription": "Yukarıdaki hesabı bir kuruluşa geçir, onun Bitbucket çekme isteklerini gözden geçirmek için.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabın henüz bir kuruluşu yok. Bitbucket çekme isteklerini, bir kuruluş oluşturduktan ya da birine katıldıktan sonra gözden geçirebilirsin.",
       "contextLine": "{{organization}} için",
       "contextLinePersonal": "Kişisel hesabınız için"
     },
@@ -2850,7 +2869,7 @@
       "retryLoadingAllFiles": "Tüm dosyaları yüklemeyi tekrar dene",
       "retryLoadingFiles": "Dosyaları yüklemeyi tekrar dene",
       "retryLoadingMoreFiles": "Daha fazla dosyayı yüklemeyi tekrar dene",
-      "title": "Dosya",
+      "title": "Dosyalar",
       "viewedCount": "{{viewed}}/{{total}} görüntülendi",
       "viewedOfListed": "listelenen dosyalardan {{viewed}}/{{total}} görüntülendi"
     },
@@ -3064,10 +3083,9 @@
     "pullRequestUnavailableDescription": "Bu PR açılamıyor. Silinmiş olabilir, depo özel olabilir veya depoda Kilo GitHub uygulaması kurulu olmayabilir.",
     "reconnectNotice": {
       "title": "GitHub bağlantısının süresi doldu.",
-      "message": "GitHub bağlantın artık geçerli değil. Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek.",
+      "message": "Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek.",
       "gitlabTitle": "GitLab bağlantısının süresi doldu.",
-      "bitbucketTitle": "Bitbucket bağlantısının süresi doldu.",
-      "providerMessage": "{{provider}} bağlantın artık geçerli değil. Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek."
+      "bitbucketTitle": "Bitbucket bağlantısının süresi doldu."
     },
     "review": "İnceleme",
     "reviewPullRequest": "Çekme isteğini incele",
@@ -3105,7 +3123,7 @@
     },
     "tabs": {
       "discussion": "Tartışma",
-      "files": "Dosya",
+      "files": "Dosyalar",
       "overview": "Genel bakış"
     },
     "diff": {
@@ -3854,6 +3872,7 @@
     "skillMarkdownLabel": "Beceri içeriği",
     "skillsEmpty": "Henüz beceri yok",
     "skillNameRequired": "Bir beceri adı girin",
+    "skillNameTooLong": "Beceri adı {{max}} karakter veya daha az olmalıdır",
     "skillNameInvalid": "Beceri adı bir harf veya rakamla başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
     "skillContentRequired": "Beceri içeriği gerekli",
     "skillSaveFailed": "Beceri kaydedilemedi. Tekrar deneyin.",
@@ -3960,7 +3979,8 @@
       "nameRequired": "Bir komut adı girin",
       "nameInvalid": "Ad küçük harfle başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
       "templateRequired": "Bir komut şablonu girin",
-      "nameConflict": "Bu ad yerleşik bir komut tarafından ayrılmıştır"
+      "nameConflict": "Bu ad yerleşik bir komut tarafından ayrılmıştır",
+      "duplicateName": "Bu adı kullanan bir komut bu profilde zaten mevcut"
     },
     "repoBindings": {
       "title": "Depolar için Varsayılan Profiller",

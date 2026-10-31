@@ -163,7 +163,7 @@
     "allLanguages": "모든 언어"
   },
   "login": {
-    "welcome": "Kilo에 오신 것을 환영합니다",
+    "welcome": "환영합니다",
     "retrySignIn": "로그인 다시 시도",
     "logo": "Kilo 로고",
     "continuingSignIn": "로그인을 진행 중입니다.",
@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "GitLab에서 더 많은 그룹이나 프로젝트에 대한 접근 권한을 부여해야 할 수 있습니다.",
       "installGithubApp": "저장소에 GitHub 앱 설치",
       "installGithubAppDescription": "Kilo GitHub 앱에 리뷰할 저장소의 접근 권한을 부여하세요.",
-      "repositoryAccess": "저장소 접근 권한"
+      "repositoryAccess": "저장소 접근 권한",
+      "allModePersonal": "Kilo가 회원님의 GitHub 연결을 통해 접근할 수 있는 모든 저장소는 자동으로 리뷰됩니다.",
+      "allModeOrganization": "Kilo가 조직의 GitHub 연결을 통해 접근할 수 있는 모든 저장소는 자동으로 리뷰됩니다.",
+      "allModeCount": "사용 가능한 저장소: {{displayCount}}"
     },
     "style": {
       "title": "리뷰 스타일",
@@ -1147,7 +1150,8 @@
       "sortSeverityDesc": "심각도: 높은 순",
       "sortSlaDue": "SLA 마감일",
       "statusIgnored": "무시됨",
-      "statusOpen": "오픈"
+      "statusOpen": "오픈",
+      "noRepositories": "아직 동기화되었거나 선택된 리포지토리가 없습니다. 보안 에이전트 설정에서 선택하세요."
     },
     "analysis": {
       "analyzeRepository": "저장소 분석",
@@ -1273,15 +1277,12 @@
       "codebaseRisk": "코드베이스 위험도",
       "confirmedExploitable": "악용 가능성 확인됨",
       "couldNotLoad": "대시보드 데이터를 불러올 수 없습니다.",
-      "criticalOverdue": "치명적: 기한 초과",
       "daysOverdue": "기한 {{displayCount}}일 초과",
       "deadlineToday": "오늘 마감",
       "filterByRepository": "저장소별 필터링",
       "findingsCount": "발견된 문제 {{displayCount}}건",
-      "highOverdue": "높음: 기한 초과",
       "lastSynced": "마지막 동기화: {{time}}",
       "manageRepositories": "저장소 관리",
-      "mediumLowOverdue": "중간·낮음: 기한 초과",
       "needsEvidenceReview": "근거 검토 필요",
       "needsYourReview": "검토 필요",
       "noImmediateAction": "즉시 조치 불필요",
@@ -1293,15 +1294,21 @@
       "notMeasured": "측정되지 않음",
       "notYetSynced": "아직 동기화 안 됨",
       "refreshFailed": "새로고침하지 못했습니다. 마지막으로 동기화된 데이터를 표시합니다.",
-      "repoSummary": "미해결 {{open}}건 · 치명적 {{critical}}건 · 높음 {{high}}건",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "미해결 {{displayCount}}건",
+      "repoSummaryOpen_one": "미해결 {{displayCount}}건",
+      "repoSummaryOpen_other": "미해결 {{displayCount}}건",
+      "repoSummaryCritical": "치명적 {{displayCount}}건",
+      "repoSummaryCritical_one": "치명적 {{displayCount}}건",
+      "repoSummaryCritical_other": "치명적 {{displayCount}}건",
+      "repoSummaryHigh": "높음 {{displayCount}}건",
+      "repoSummaryHigh_one": "높음 {{displayCount}}건",
+      "repoSummaryHigh_other": "높음 {{displayCount}}건",
       "repositoryActionPlan": "저장소 조치 계획",
       "settings": "설정",
-      "slaPosture": "SLA 현황",
-      "syncFindings": "발견된 문제 동기화",
       "syncNow": "지금 동기화",
       "syncQueued": "동기화를 대기열에 추가했습니다.",
       "syncStatusUnavailable": "동기화 상태를 확인할 수 없습니다.",
-      "withinDeadline": "기한 내",
       "daysOverdue_one": "기한 {{displayCount}}일 초과",
       "daysOverdue_other": "기한 {{displayCount}}일 초과",
       "findingsCount_one": "발견된 문제 {{displayCount}}건",
@@ -1316,8 +1323,17 @@
       "withinDeadlineDetail": "전체 {{total}}건 중 {{within}}건이 기한 내",
       "noDeadlineData": "아직 SLA 마감일이 지정된 문제 없음",
       "deadlinePassed": "마감일 지남",
-      "deadlinePassedDetail": "치명적 {{critical}}건, 높음 {{high}}건",
-      "deadlinePassedDetailWithMediumLow": "치명적 {{critical}}건, 높음 {{high}}건, 중간·낮음 {{mediumLow}}건",
+      "deadlinePassedDetail": "{{critical}}, {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
+      "breakdownCritical": "치명적 {{displayCount}}건",
+      "breakdownCritical_one": "치명적 {{displayCount}}건",
+      "breakdownCritical_other": "치명적 {{displayCount}}건",
+      "breakdownHigh": "높음 {{displayCount}}건",
+      "breakdownHigh_one": "높음 {{displayCount}}건",
+      "breakdownHigh_other": "높음 {{displayCount}}건",
+      "breakdownMediumLow": "중간·낮음 {{displayCount}}건",
+      "breakdownMediumLow_one": "중간·낮음 {{displayCount}}건",
+      "breakdownMediumLow_other": "중간·낮음 {{displayCount}}건",
       "dueThisWeek": "이번 주 마감",
       "dueThisWeekDetail": "이 중 악용 가능성이 확인된 문제 {{exploitable}}건",
       "noDeadline": "마감일 없음",
@@ -1466,8 +1482,7 @@
       "on": "켜짐",
       "repositoriesCount": "저장소 {{displayCount}}개 선택됨",
       "repositoriesCount_other": "저장소 {{displayCount}}개 선택됨",
-      "repositoriesCount_one": "저장소 {{displayCount}}개 선택됨",
-      "selectRepositoriesSubtitle": "보안 에이전트가 모니터링할 저장소를 선택하세요."
+      "repositoriesCount_one": "저장소 {{displayCount}}개 선택됨"
     },
     "settingsSave": {
       "saveChanges": "변경 사항 저장",
@@ -1518,7 +1533,10 @@
       "settleFailed": "작업이 완료되었지만 결과를 기록하지 못했습니다. 다시 시도하세요.",
       "replayFailed": "이 작업은 완료되지 않았습니다. 다시 시도하세요.",
       "actionFailed": "이 작업을 완료하지 못했습니다. 다시 시도하세요.",
-      "actionBlocked": "이 작업을 완료하지 못했습니다. 문제를 먼저 해결해야 재시도할 수 있습니다."
+      "actionBlocked": "이 작업을 완료하지 못했습니다. 문제를 먼저 해결해야 재시도할 수 있습니다.",
+      "syncNoRepositories": "동기화 범위에 리포지토리가 없습니다. 보안 에이전트가 모니터링할 리포지토리를 선택한 후 다시 동기화하세요.",
+      "syncIntegrationInactive": "보안 에이전트의 GitHub 연결이 활성화되어 있지 않습니다. Kilo GitHub App을 다시 연결한 후 다시 동기화하세요.",
+      "syncMissingPermission": "Kilo GitHub 앱이 취약점 알림을 읽을 수 없습니다. GitHub에서 해당 권한을 부여한 후 다시 동기화하세요."
     },
     "analysisState": {
       "queued": "분석 대기 중",
@@ -1625,7 +1643,7 @@
     "sessionList": {
       "couldNotLoadActive": "활성 세션을 불러오지 못했습니다.",
       "couldNotRefresh": "새로고침하지 못했습니다",
-      "noSessionsYetDescription": "휴대폰에서 코딩 작업을 시작하세요. 세션이 여기에 표시됩니다.",
+      "noSessionsYetDescription": "휴대폰에서 코딩 작업을 시작하세요.",
       "viewHistory": "세션 기록",
       "noMatches": "일치하는 세션 없음",
       "tryDifferentSearch": "다른 검색어를 사용해 보세요.",
@@ -2606,7 +2624,7 @@
     "couldNotSaveChoice": "선택 사항을 저장할 수 없습니다. 다시 시도하세요.",
     "onlineAllowed": "온라인, 허용됨",
     "onlineNotAllowed": "온라인, 허용되지 않음",
-    "optionalReview": "선택 사항 — 설정에서 언제든 변경 가능",
+    "optionalReview": "선택 사항",
     "optionalOnboarding": "선택 사항 — 기본으로 켜져 있음",
     "aiProvidersWhat": "프롬프트, 대화 기록 및 모든 첨부 파일",
     "aiProvidersWhy": "AI 응답 생성",
@@ -2698,6 +2716,7 @@
       "gitlabDescription": "모바일에서 머지 요청을 검토하려면 GitLab 계정을 연결하세요.",
       "bitbucketDescription": "모바일에서 풀 리퀘스트를 검토하려면 이 조직을 Bitbucket에 연결하세요.",
       "bitbucketOrgOnlyDescription": "Bitbucket 풀 리퀘스트를 검토하려면 위의 계정을 조직으로 전환하세요.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "이 계정에는 아직 조직이 없습니다. 조직을 만들거나 참여하면 Bitbucket 풀 리퀘스트를 검토할 수 있습니다.",
       "contextLine": "{{organization}}용",
       "contextLinePersonal": "개인용"
     },
@@ -3064,10 +3083,9 @@
     "pullRequestUnavailableDescription": "이 PR을 열 수 없습니다. PR이 삭제되었거나 저장소가 비공개이거나 해당 저장소에 Kilo GitHub 앱이 설치되지 않았을 수 있습니다.",
     "reconnectNotice": {
       "title": "GitHub 연결이 만료되었습니다.",
-      "message": "GitHub 연결이 더 이상 유효하지 않습니다. 연결을 다시 확인하세요. 필요한 경우 다시 연결하라는 안내가 표시됩니다.",
+      "message": "연결을 다시 확인하세요. 필요한 경우 다시 연결하라는 안내가 표시됩니다.",
       "gitlabTitle": "GitLab 연결이 만료되었습니다.",
-      "bitbucketTitle": "Bitbucket 연결이 만료되었습니다.",
-      "providerMessage": "{{provider}} 연결이 더 이상 유효하지 않습니다. 연결을 다시 확인하세요. 필요한 경우 다시 연결하라는 안내가 표시됩니다."
+      "bitbucketTitle": "Bitbucket 연결이 만료되었습니다."
     },
     "review": "리뷰",
     "reviewPullRequest": "풀 리퀘스트 리뷰",
@@ -3854,6 +3872,7 @@
     "skillMarkdownLabel": "스킬 내용",
     "skillsEmpty": "아직 기술이 없습니다",
     "skillNameRequired": "스킬 이름을 입력하세요",
+    "skillNameTooLong": "스킬 이름은 {{max}}자 이하여야 합니다.",
     "skillNameInvalid": "스킬 이름은 문자 또는 숫자로 시작해야 하며 소문자, 숫자, 대시만 사용할 수 있습니다.",
     "skillContentRequired": "스킬 내용이 필요합니다",
     "skillSaveFailed": "스킬 저장이 안되네요. 다시 시도해 주세요.",
@@ -3960,7 +3979,8 @@
       "nameRequired": "명령 이름을 입력하세요.",
       "nameInvalid": "이름은 소문자로 시작해야 하며 소문자, 숫자, 대시만 사용할 수 있습니다.",
       "templateRequired": "명령 템플릿을 입력하세요.",
-      "nameConflict": "해당 이름은 내장 명령에 의해 예약되어 있습니다."
+      "nameConflict": "해당 이름은 내장 명령에 의해 예약되어 있습니다.",
+      "duplicateName": "이 이름을 사용하는 명령이 이미 이 프로필에 존재합니다."
     },
     "repoBindings": {
       "title": "저장소의 기본 프로필",

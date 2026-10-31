@@ -163,7 +163,7 @@
     "allLanguages": "Tout lang"
   },
   "login": {
-    "welcome": "Byenvini nan Kilo",
+    "welcome": "Byenvini",
     "retrySignIn": "Eseye konekte ankò",
     "logo": "Logo Kilo a",
     "continuingSignIn": "N ap kontinye pwosesis koneksyon ou a.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Konekte kont GitLab ou pou w revize merge request sou mobil ou.",
       "bitbucketDescription": "Konekte Bitbucket ak òganizasyon sa a pou w revize demann fizyon sou mobil ou.",
       "bitbucketOrgOnlyDescription": "Chanje kont ki anwo a pou yon òganizasyon pou w revize demann fizyon Bitbucket li.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Kont sa a pa gen òganizasyon pou kounye a. Ou ka revize demann fizyon Bitbucket lè w kreye yon òganizasyon oswa rantre nan yon sèl.",
       "contextLine": "Pou {{organization}}",
       "contextLinePersonal": "Pou kont pèsonèl ou"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Koneksyon ak GitHub la ekspire.",
-      "message": "Koneksyon GitHub ou a pa valab ankò. Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè.",
+      "message": "Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè.",
       "gitlabTitle": "Koneksyon ak GitLab la ekspire.",
-      "bitbucketTitle": "Koneksyon ak Bitbucket la ekspire.",
-      "providerMessage": "Koneksyon {{provider}} ou a pa valab ankò. Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè."
+      "bitbucketTitle": "Koneksyon ak Bitbucket la ekspire."
     },
     "eventChips": {
       "comment": "Kòmantè",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Ou ka bezwen bay aksè nan plis gwoup oswa pwojè sou GitLab.",
       "installGithubApp": "Enstale aplikasyon GitHub la sou depo yo",
       "installGithubAppDescription": "Bay aplikasyon GitHub Kilo a aksè nan depo ou vle fè revize yo.",
-      "repositoryAccess": "aksè nan depo yo"
+      "repositoryAccess": "aksè nan depo yo",
+      "allModePersonal": "Chak depo Kilo ka jwenn aksè a atravè koneksyon GitHub ou a revize otomatikman.",
+      "allModeOrganization": "Chak depo Kilo ka jwenn aksè a atravè koneksyon GitHub òganizasyon an revize otomatikman.",
+      "allModeCount": "Depo ki disponib: {{displayCount}}"
     },
     "style": {
       "title": "Estil revizyon",
@@ -1676,7 +1679,8 @@
       "sortSeverityDesc": "Gravite: soti pi wo rive pi ba",
       "sortSeverityAsc": "Gravite: soti pi ba rive pi wo",
       "sortSlaDue": "Dat limit SLA",
-      "overdueOnly": "An reta sèlman"
+      "overdueOnly": "An reta sèlman",
+      "noRepositories": "Poko gen okenn depo ki senkronize oswa chwazi. Chwazi yo nan paramèt Ajan sekirite."
     },
     "automation": {
       "title": "Otomatizasyon",
@@ -1749,17 +1753,12 @@
       "findingsCount": "{{displayCount}} konsta",
       "notMeasured": "Poko mezire",
       "actFirst": "Aksyon priyoritè",
-      "slaPosture": "Eta respè SLA yo",
       "actionPosture": "Eta aksyon yo",
       "codebaseRisk": "Risk nan baz kòd la",
       "repositoryActionPlan": "Plan aksyon pou depo yo",
       "noOpenFindings": "Pa gen konsta ouvè ki bezwen atansyon",
       "deadlineToday": "Dat limit la rive jodi a",
       "daysOverdue": "{{displayCount}} jou an reta",
-      "withinDeadline": "Nan delè a",
-      "criticalOverdue": "Kritik an reta",
-      "highOverdue": "Wo an reta",
-      "mediumLowOverdue": "Mwayen ak ba an reta",
       "confirmedExploitable": "Konfime kòm eksplwatab",
       "needsEvidenceReview": "Prèv yo bezwen revizyon",
       "analysisNotComplete": "Analiz la poko fini",
@@ -1769,7 +1768,16 @@
       "noSlaDeadline": "Pa gen dat limit SLA ki fikse",
       "noRepositoryData": "Poko gen done sou depo yo",
       "noRepositoryDataDescription": "Priyorite depo yo ap parèt apre konsta yo fin senkronize.",
-      "repoSummary": "{{open}} ouvè · {{critical}} kritik · {{high}} wo",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "{{displayCount}} ouvè",
+      "repoSummaryOpen_one": "{{displayCount}} ouvè",
+      "repoSummaryOpen_other": "{{displayCount}} ouvè",
+      "repoSummaryCritical": "{{displayCount}} kritik",
+      "repoSummaryCritical_one": "{{displayCount}} kritik",
+      "repoSummaryCritical_other": "{{displayCount}} kritik",
+      "repoSummaryHigh": "{{displayCount}} wo",
+      "repoSummaryHigh_one": "{{displayCount}} wo",
+      "repoSummaryHigh_other": "{{displayCount}} wo",
       "couldNotLoad": "Nou pa t ka chaje done tablo bò a.",
       "filterByRepository": "Filtre pa depo",
       "lastSynced": "Dènye senkronizasyon: {{time}}",
@@ -1777,7 +1785,6 @@
       "notYetSynced": "Poko senkronize",
       "refreshFailed": "Nou pa t ka rafrechi done yo. N ap montre done ki te senkronize dènye fwa yo.",
       "settings": "Paramèt",
-      "syncFindings": "Senkronize konsta yo",
       "syncNow": "Senkronize kounye a",
       "syncQueued": "Senkronizasyon nan lis datant",
       "syncStatusUnavailable": "Estati senkronizasyon an pa disponib.",
@@ -1795,8 +1802,17 @@
       "withinDeadlineDetail": "{{within}} sou {{total}} nan delè a",
       "noDeadlineData": "Poko gen konsta ki gen yon dat limit SLA",
       "deadlinePassed": "Dat limit la pase",
-      "deadlinePassedDetail": "{{critical}} kritik, {{high}} wo",
-      "deadlinePassedDetailWithMediumLow": "{{critical}} kritik, {{high}} wo, {{mediumLow}} mwayen ak ba",
+      "deadlinePassedDetail": "{{critical}}, {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
+      "breakdownCritical": "{{displayCount}} kritik",
+      "breakdownCritical_one": "{{displayCount}} kritik",
+      "breakdownCritical_other": "{{displayCount}} kritik",
+      "breakdownHigh": "{{displayCount}} wo",
+      "breakdownHigh_one": "{{displayCount}} wo",
+      "breakdownHigh_other": "{{displayCount}} wo",
+      "breakdownMediumLow": "{{displayCount}} mwayen ak ba",
+      "breakdownMediumLow_one": "{{displayCount}} mwayen ak ba",
+      "breakdownMediumLow_other": "{{displayCount}} mwayen ak ba",
       "dueThisWeek": "Dat limit semèn sa a",
       "dueThisWeekDetail": "Pami yo, {{exploitable}} konfime kòm eksplwatab",
       "noDeadline": "Pa gen dat limit",
@@ -1856,7 +1872,6 @@
       "repositoriesCount_one": "{{displayCount}} depo chwazi",
       "repositoriesCount": "{{displayCount}} depo ki chwazi",
       "repositoriesCount_other": "{{displayCount}} depo ki chwazi",
-      "selectRepositoriesSubtitle": "Chwazi depo Ajan sekirite a ap siveye yo",
       "analysisModeSubtitle": "Analiz {{mode}}",
       "automationAllOff": "Tout dezaktive",
       "automationCount": "{{displayCount}} sou 3 aktive",
@@ -2047,7 +2062,10 @@
       "settleFailed": "Aksyon an fini, men nou pa t ka anrejistre rezilta a. Tanpri eseye ankò.",
       "replayFailed": "Aksyon sa a pa fini. Tanpri eseye ankò.",
       "actionFailed": "Pa t ka fini aksyon sa a. Tanpri eseye ankò.",
-      "actionBlocked": "Pa t ka fini aksyon sa a. Fòk ou repare pwoblèm nan anvan ou ka eseye ankò."
+      "actionBlocked": "Pa t ka fini aksyon sa a. Fòk ou repare pwoblèm nan anvan ou ka eseye ankò.",
+      "syncNoRepositories": "Pa gen okenn depo nan sijè senkronizasyon an. Chwazi depo Ajan sekirite siveye yo, epi senkronize ankò.",
+      "syncIntegrationInactive": "Koneksyon GitHub pou Ajan sekirite a pa aktif. Rekonekte GitHub App Kilo a, epi senkronize ankò.",
+      "syncMissingPermission": "Kilo GitHub App pa ka li alèt vilnerabilite yo. Bay pèmisyon sa a nan GitHub, epi senkronize ankò."
     },
     "analysisState": {
       "queued": "Analiz nan ke",
@@ -2154,7 +2172,7 @@
     "sessionList": {
       "couldNotLoadActive": "Pa t ka chaje sesyon aktif yo.",
       "couldNotRefresh": "Pa t ka rafrechi",
-      "noSessionsYetDescription": "Kòmanse yon travay pwogramasyon sou telefòn ou. Sesyon ou yo ap parèt isit la.",
+      "noSessionsYetDescription": "Kòmanse yon travay pwogramasyon sou telefòn ou.",
       "viewHistory": "Istwa sesyon yo",
       "noMatches": "Pa gen sesyon ki koresponn",
       "tryDifferentSearch": "Eseye yon lòt mo pou rechèch la.",
@@ -3135,7 +3153,7 @@
     "couldNotSaveChoice": "Nou pa t ka anrejistre chwa ou a. Tanpri eseye ankò.",
     "onlineAllowed": "Sou entènèt, pèmèt",
     "onlineNotAllowed": "Sou entènèt, pa pèmèt",
-    "optionalReview": "Opsyonèl — ou ka chanje sa nenpòt lè nan Paramèt",
+    "optionalReview": "Opsyonèl",
     "optionalOnboarding": "Opsyonèl — aktive sof si ou dezaktive li",
     "aiProvidersWhat": "Enstriksyon ou yo, istorik konvèsasyon yo ak tout fichye ou atache.",
     "aiProvidersWhy": "Pou jenere repons AI.",
@@ -3854,6 +3872,7 @@
     "skillMarkdownLabel": "Kontni konpetans",
     "skillsEmpty": "Pa gen ladrès ankò",
     "skillNameRequired": "Antre yon non konpetans",
+    "skillNameTooLong": "Non konpetans lan dwe gen {{max}} karaktè oswa mwens",
     "skillNameInvalid": "Non konpetans yo dwe kòmanse ak yon lèt oswa yon chif epi sèvi ak sèlman lèt miniskil, chif, ak tire",
     "skillContentRequired": "Kontni konpetans obligatwa",
     "skillSaveFailed": "Pa t 'kapab sove konpetans. Eseye ankò.",
@@ -3960,7 +3979,8 @@
       "nameRequired": "Antre yon non kòmand",
       "nameInvalid": "Non yo dwe kòmanse ak yon lèt miniskil epi itilize sèlman lèt miniskil, chif ak tire",
       "templateRequired": "Antre yon modèl lòd",
-      "nameConflict": "Non sa a rezève pa yon kòmandman entegre"
+      "nameConflict": "Non sa a rezève pa yon kòmandman entegre",
+      "duplicateName": "Yon kòmandman ki gen non sa a deja egziste nan pwofil sa a"
     },
     "repoBindings": {
       "title": "Default Profiles pou Repos",

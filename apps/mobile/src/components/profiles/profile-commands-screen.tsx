@@ -26,6 +26,7 @@ import { useAgentProfileCommands } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileCommandsSave } from '@/lib/hooks/use-profile-commands-save';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
 import { cn } from '@/lib/utils';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
@@ -39,12 +40,12 @@ function CommandsSkeleton() {
   return (
     <View className="gap-3">
       {[0, 1, 2].map(index => (
-        <View key={index} className="gap-3 rounded-lg bg-secondary p-3">
-          <Skeleton className="h-4 w-20 rounded bg-muted-soft" />
-          <Skeleton className="h-[44px] w-full rounded-md bg-muted-soft" />
-          <View className="flex-row justify-end">
-            <Skeleton className="h-11 w-32 rounded-md bg-muted-soft" />
+        <View key={index} className="gap-1.5 rounded-lg bg-secondary p-3">
+          <View className="h-[48px] flex-row items-center justify-between">
+            <Skeleton className="h-4 w-20 rounded bg-muted-soft" />
+            <Skeleton className="h-[48px] w-[151px] rounded bg-muted-soft" />
           </View>
+          <Skeleton className="h-[44px] w-full rounded-md bg-muted-soft" />
         </View>
       ))}
     </View>
@@ -67,12 +68,23 @@ export function ProfileCommandsScreen({
   // The screen owns the ordered list — `setCommands` replaces the whole list,
   // so a move/delete/edit works on a local copy. Refetches may replace a clean
   // list, but must not discard a draft typed after the last submitted payload.
-  const [commands, setCommands] = useState<string[]>(serverCommands);
+  // The list itself is a draft (`lib/form-draft`), so the rows a remount would
+  // otherwise drop come back with the text that was typed into them.
+  const draftScope = `profiles:commands:${profileId}`;
+  // The list the draft was last reconciled with travels with the draft, so a
+  // remount can tell a restored copy of server truth from unsaved edits even
+  // when the query has no cached rows yet.
+  const [draftBase, setDraftBase] = useFormDraftState<string[]>(draftScope, 'base', serverCommands);
+  const [commands, setCommands] = useFormDraftState<string[]>(
+    draftScope,
+    'commands',
+    serverCommands
+  );
   const [syncedCommands, setSyncedCommands] = useState<string[]>(serverCommands);
   const { save, persistedRef, isSaving } = useProfileCommandsSave({
     profileId,
     organizationId,
-    initialCommands: serverCommands,
+    initialCommands: draftBase,
   });
   // The list the screen renders right now. Back reads this, not the state a
   // handler captured, because the field's last edit may not have re-rendered.
@@ -84,14 +96,28 @@ export function ProfileCommandsScreen({
   const [leaveAllowed, setLeaveAllowed] = useState(false);
   // Remount uncontrolled fields for reorders and accepted server changes;
   // their text belongs to the position, not the input instance.
-  const [generation, setGeneration] = useState(0);
-  if (serverCommands !== syncedCommands && !isSaving) {
+  const [generation, setGeneration] = useFormDraftState(draftScope, 'generation', 0);
+  // The list on screen reseeds from the server only while it still holds the
+  // list it was seeded from: a mount then can never replay an older copy over
+  // a newer one. Unsaved edits are never replaced, and neither is a list whose
+  // save has not been refetched yet, so a query with no rows yet — or the list
+  // a just-settled save replaced — is not server truth here.
+  const serverList = commandsQuery.data === undefined ? null : serverCommands;
+  const reseed =
+    !isSaving &&
+    serverList !== null &&
+    sameCommands(commands, draftBase) &&
+    !sameCommands(draftBase, serverCommands);
+  if (reseed || (serverCommands !== syncedCommands && !isSaving)) {
     setSyncedCommands(serverCommands);
-    if (sameCommands(commands, persistedRef.current) && !sameCommands(commands, serverCommands)) {
+    if (reseed) {
       setCommands(serverCommands);
       setGeneration(current => current + 1);
     }
-    persistedRef.current = serverCommands;
+    if (serverList !== null) {
+      persistedRef.current = serverCommands;
+      setDraftBase(serverCommands);
+    }
   }
 
   const commit = (index: number) => {
@@ -151,6 +177,9 @@ export function ProfileCommandsScreen({
         return;
       }
       if (sameCommands(nonBlankCommands(commandsRef.current), persistedRef.current)) {
+        // The list is server truth now, so the draft's job is done: the next
+        // mount seeds from the refetched list instead of replaying it.
+        clearFormDraft(draftScope);
         setLeaveAllowed(true);
         repeat();
         return;
@@ -187,11 +216,55 @@ export function ProfileCommandsScreen({
     // position the row's move and delete controls announce.
     const commandLabel = t('profiles.commandLabelPosition', { position });
     const rowHint = commandRowA11yLabel(index, commands.length);
+    // The reorder and delete controls share the field's own label line, so a
+    // card is its label row and its input and carries no separate control band
+    // under the input. They are the label's accessory, so they stay out of the
+    // field's accessible name and keep their own positions.
+    const rowControls = canManage ? (
+      <View className="flex-row items-center gap-1">
+        <Pressable
+          className={controlClass(isFirst)}
+          disabled={isFirst}
+          accessibilityRole="button"
+          accessibilityLabel={upLabel}
+          accessibilityHint={rowHint}
+          onPress={() => {
+            move(index, -1);
+          }}
+        >
+          <ChevronUp size={20} color={colors.mutedForeground} />
+        </Pressable>
+        <Pressable
+          className={controlClass(isLast)}
+          disabled={isLast}
+          accessibilityRole="button"
+          accessibilityLabel={downLabel}
+          accessibilityHint={rowHint}
+          onPress={() => {
+            move(index, 1);
+          }}
+        >
+          <ChevronDown size={20} color={colors.mutedForeground} />
+        </Pressable>
+        <Pressable
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+          accessibilityRole="button"
+          accessibilityLabel={deleteLabel}
+          accessibilityHint={rowHint}
+          onPress={() => {
+            remove(index);
+          }}
+        >
+          <Trash2 size={20} color={colors.mutedForeground} />
+        </Pressable>
+      </View>
+    ) : undefined;
     return (
-      <View key={`${generation}-${index}`} className="gap-3 rounded-lg bg-secondary p-3">
+      <View key={`${generation}-${index}`} className="rounded-lg bg-secondary p-3">
         <SetupCommandField
           command={command}
           label={commandLabel}
+          trailing={rowControls}
           accessibilityHint={rowHint}
           disabled={!canManage}
           onChangeText={value => {
@@ -204,45 +277,6 @@ export function ProfileCommandsScreen({
             commit(index);
           }}
         />
-        {canManage ? (
-          <View className="flex-row items-center justify-end gap-1">
-            <Pressable
-              className={controlClass(isFirst)}
-              disabled={isFirst}
-              accessibilityRole="button"
-              accessibilityLabel={upLabel}
-              accessibilityHint={rowHint}
-              onPress={() => {
-                move(index, -1);
-              }}
-            >
-              <ChevronUp size={20} color={colors.mutedForeground} />
-            </Pressable>
-            <Pressable
-              className={controlClass(isLast)}
-              disabled={isLast}
-              accessibilityRole="button"
-              accessibilityLabel={downLabel}
-              accessibilityHint={rowHint}
-              onPress={() => {
-                move(index, 1);
-              }}
-            >
-              <ChevronDown size={20} color={colors.mutedForeground} />
-            </Pressable>
-            <Pressable
-              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-              accessibilityRole="button"
-              accessibilityLabel={deleteLabel}
-              accessibilityHint={rowHint}
-              onPress={() => {
-                remove(index);
-              }}
-            >
-              <Trash2 size={20} color={colors.destructive} />
-            </Pressable>
-          </View>
-        ) : null}
       </View>
     );
   };

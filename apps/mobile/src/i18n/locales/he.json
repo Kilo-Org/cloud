@@ -163,7 +163,7 @@
     "allLanguages": "כל השפות"
   },
   "login": {
-    "welcome": "ברוך הבא ל-Kilo",
+    "welcome": "ברוך הבא",
     "retrySignIn": "ניסיון כניסה חוזר",
     "logo": "לוגו Kilo",
     "continuingSignIn": "תהליך הכניסה נמשך.",
@@ -901,7 +901,10 @@
       "gitlabNoRepositoriesDescription": "ייתכן שתצטרך להעניק גישה לעוד קבוצות או פרויקטים ב-GitLab.",
       "installGithubApp": "התקנת אפליקציית GitHub במאגרים",
       "installGithubAppDescription": "תן לאפליקציית Kilo ב-GitHub גישה למאגרים שברצונך לסקור.",
-      "repositoryAccess": "גישה למאגר"
+      "repositoryAccess": "גישה למאגר",
+      "allModePersonal": "כל מאגר ש-Kilo יכול לגשת אליו דרך חיבור ה-GitHub שלך נסקר אוטומטית.",
+      "allModeOrganization": "כל מאגר ש-Kilo יכול לגשת אליו דרך חיבור ה-GitHub של הארגון נסקר אוטומטית.",
+      "allModeCount": "מאגרים זמינים: {{displayCount}}"
     },
     "style": {
       "title": "סגנון סקירה",
@@ -1150,7 +1153,8 @@
       "sortSeverityDesc": "חומרה: מהגבוהה לנמוכה",
       "sortSlaDue": "מועד אחרון לפי SLA",
       "statusIgnored": "ממצאים שהוחרגו",
-      "statusOpen": "פתוח"
+      "statusOpen": "פתוח",
+      "noRepositories": "אין עדיין מאגרים מסונכרנים או נבחרים. יש לבחור אותם בהגדרות סוכן האבטחה."
     },
     "analysis": {
       "analyzeRepository": "ניתוח המאגר",
@@ -1278,15 +1282,12 @@
       "codebaseRisk": "סיכון בבסיס הקוד",
       "confirmedExploitable": "ניתן לניצול בוודאות",
       "couldNotLoad": "לא ניתן לטעון את נתוני לוח הבקרה.",
-      "criticalOverdue": "חומרה קריטית — באיחור",
       "daysOverdue": "איחור של {{displayCount}} ימים",
       "deadlineToday": "המועד האחרון חל היום",
       "filterByRepository": "סינון לפי מאגר",
       "findingsCount": "{{displayCount}} ממצאים",
-      "highOverdue": "חומרה גבוהה — באיחור",
       "lastSynced": "סנכרון אחרון: {{time}}",
       "manageRepositories": "ניהול מאגרים",
-      "mediumLowOverdue": "חומרה בינונית ונמוכה — באיחור",
       "needsEvidenceReview": "נדרשת בדיקת ראיות",
       "needsYourReview": "נדרשת בדיקה שלך",
       "noImmediateAction": "לא נדרשת פעולה מיידית",
@@ -1298,15 +1299,24 @@
       "notMeasured": "לא נמדד",
       "notYetSynced": "עדיין לא סונכרן",
       "refreshFailed": "לא ניתן לרענן את הנתונים. מוצגים הנתונים מהסנכרון האחרון.",
-      "repoSummary": "{{open}} פתוחים · {{critical}} בחומרה קריטית · {{high}} בחומרה גבוהה",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "{{displayCount}} פתוחים",
+      "repoSummaryOpen_one": "{{displayCount}} פתוח",
+      "repoSummaryOpen_two": "{{displayCount}} פתוחים",
+      "repoSummaryOpen_other": "{{displayCount}} פתוחים",
+      "repoSummaryCritical": "{{displayCount}} בחומרה קריטית",
+      "repoSummaryCritical_one": "{{displayCount}} בחומרה קריטית",
+      "repoSummaryCritical_two": "{{displayCount}} בחומרה קריטית",
+      "repoSummaryCritical_other": "{{displayCount}} בחומרה קריטית",
+      "repoSummaryHigh": "{{displayCount}} בחומרה גבוהה",
+      "repoSummaryHigh_one": "{{displayCount}} בחומרה גבוהה",
+      "repoSummaryHigh_two": "{{displayCount}} בחומרה גבוהה",
+      "repoSummaryHigh_other": "{{displayCount}} בחומרה גבוהה",
       "repositoryActionPlan": "תוכנית פעולה למאגר",
       "settings": "הגדרות",
-      "slaPosture": "מצב העמידה ב-SLA",
-      "syncFindings": "סנכרון ממצאים",
       "syncNow": "סנכרון עכשיו",
       "syncQueued": "הסנכרון נוסף לתור",
       "syncStatusUnavailable": "מצב הסנכרון אינו זמין.",
-      "withinDeadline": "ללא איחור",
       "daysOverdue_one": "איחור של {{displayCount}} יום",
       "daysOverdue_other": "איחור של {{displayCount}} ימים",
       "daysOverdue_two": "איחור של {{displayCount}} ימים",
@@ -1323,8 +1333,20 @@
       "withinDeadlineDetail": "{{within}} מתוך {{total}} ללא איחור",
       "noDeadlineData": "עדיין לא נקבעו לממצאים מועדים אחרונים לפי SLA",
       "deadlinePassed": "המועד האחרון חלף",
-      "deadlinePassedDetail": "{{critical}} בדרגת חומרה קריטית, {{high}} בדרגת חומרה גבוהה",
-      "deadlinePassedDetailWithMediumLow": "{{critical}} בדרגת חומרה קריטית, {{high}} בדרגת חומרה גבוהה, {{mediumLow}} בדרגת חומרה בינונית ונמוכה",
+      "deadlinePassedDetail": "{{critical}}, {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
+      "breakdownCritical": "{{displayCount}} בדרגת חומרה קריטית",
+      "breakdownCritical_one": "{{displayCount}} בדרגת חומרה קריטית",
+      "breakdownCritical_two": "{{displayCount}} בדרגת חומרה קריטית",
+      "breakdownCritical_other": "{{displayCount}} בדרגת חומרה קריטית",
+      "breakdownHigh": "{{displayCount}} בדרגת חומרה גבוהה",
+      "breakdownHigh_one": "{{displayCount}} בדרגת חומרה גבוהה",
+      "breakdownHigh_two": "{{displayCount}} בדרגת חומרה גבוהה",
+      "breakdownHigh_other": "{{displayCount}} בדרגת חומרה גבוהה",
+      "breakdownMediumLow": "{{displayCount}} בדרגת חומרה בינונית ונמוכה",
+      "breakdownMediumLow_one": "{{displayCount}} בדרגת חומרה בינונית ונמוכה",
+      "breakdownMediumLow_two": "{{displayCount}} בדרגת חומרה בינונית ונמוכה",
+      "breakdownMediumLow_other": "{{displayCount}} בדרגת חומרה בינונית ונמוכה",
       "dueThisWeek": "המועד האחרון חל השבוע",
       "dueThisWeekDetail": "{{exploitable}} מהם אושרו כניתנים לניצול",
       "noDeadline": "אין מועד אחרון",
@@ -1474,7 +1496,6 @@
       "repositoriesCount": "נבחרו {{displayCount}} מאגרים",
       "repositoriesCount_other": "נבחרו {{displayCount}} מאגרים",
       "repositoriesCount_one": "{{displayCount}} מאגר נבחר",
-      "selectRepositoriesSubtitle": "בחירת המאגרים שסוכן האבטחה יעקוב אחריהם",
       "repositoriesCount_two": "{{displayCount}} מאגרים נבחרו"
     },
     "settingsSave": {
@@ -1526,7 +1547,10 @@
       "settleFailed": "הפעולה הושלמה, אך לא הצלחנו לתעד את התוצאה. נסה שוב.",
       "replayFailed": "הפעולה הזו לא הושלמה. נסה שוב.",
       "actionFailed": "לא ניתן להשלים את הפעולה הזו. נסה שוב.",
-      "actionBlocked": "לא ניתן להשלים את הפעולה הזו. יש לתקן את הבעיה לפני שניתן יהיה לנסות שוב."
+      "actionBlocked": "לא ניתן להשלים את הפעולה הזו. יש לתקן את הבעיה לפני שניתן יהיה לנסות שוב.",
+      "syncNoRepositories": "אין מאגרים בהיקף הסנכרון. יש לבחור את המאגרים שסוכן האבטחה עוקב אחריהם, ואז לסנכרן שוב.",
+      "syncIntegrationInactive": "החיבור של GitHub עבור סוכן האבטחה אינו פעיל. יש לחבר מחדש את אפליקציית Kilo GitHub, ואז לסנכרן שוב.",
+      "syncMissingPermission": "אפליקציית Kilo GitHub אינה יכולה לקרוא vulnerability alerts. יש להעניק הרשאה זו ב-GitHub, ואז לסנכרן שוב."
     },
     "analysisState": {
       "queued": "הניתוח ממתין בתור",
@@ -1635,7 +1659,7 @@
     "sessionList": {
       "couldNotLoadActive": "לא ניתן היה לטעון את השיחות הפעילות.",
       "couldNotRefresh": "לא ניתן היה לרענן",
-      "noSessionsYetDescription": "התחל משימת תכנות מהטלפון שלך. השיחות שלך יופיעו כאן.",
+      "noSessionsYetDescription": "התחל משימת תכנות מהטלפון שלך.",
       "viewHistory": "היסטוריית השיחות",
       "noMatches": "אין שיחות תואמות",
       "tryDifferentSearch": "כדאי לנסות מונח חיפוש אחר.",
@@ -2630,7 +2654,7 @@
     "couldNotSaveChoice": "לא ניתן היה לשמור את הבחירה שלך. נסה שוב.",
     "onlineAllowed": "מקוון, מאושר",
     "onlineNotAllowed": "מקוון, לא מאושר",
-    "optionalReview": "לבחירתך — אפשר לשנות בכל עת בהגדרות",
+    "optionalReview": "לבחירתך",
     "optionalOnboarding": "לבחירתך — מופעל כל עוד לא כיבית את האפשרות",
     "aiProvidersWhat": "ההנחיות שלך, היסטוריית השיחות וכל הקבצים שאתה מצרף.",
     "aiProvidersWhy": "כדי ליצור תשובות AI.",
@@ -2726,6 +2750,7 @@
       "gitlabDescription": "חברו את חשבון GitLab שלכם כדי לסקור בקשות מיזוג בנייד.",
       "bitbucketDescription": "חברו את Bitbucket לארגון הזה כדי לסקור בקשות משיכה בנייד.",
       "bitbucketOrgOnlyDescription": "החליפו את החשבון שלמעלה לארגון כדי לסקור את בקשות המשיכה שלו ב-Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "לחשבון הזה אין עדיין ארגונים. אפשר לסקור בקשות משיכה ב-Bitbucket לאחר שתיצרו או תצטרפו לארגון.",
       "contextLine": "עבור {{organization}}",
       "contextLinePersonal": "עבור החשבון האישי"
     },
@@ -3105,10 +3130,9 @@
     "pullRequestUnavailableDescription": "לא ניתן לפתוח את ה-PR הזה. ייתכן שהוא נמחק, שהמאגר פרטי או שאפליקציית Kilo ל-GitHub אינה מותקנת במאגר.",
     "reconnectNotice": {
       "title": "פג תוקף החיבור ל-GitHub.",
-      "message": "החיבור שלך ל-GitHub אינו תקף עוד. בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך.",
+      "message": "בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך.",
       "gitlabTitle": "פג תוקף החיבור ל-GitLab.",
-      "bitbucketTitle": "פג תוקף החיבור ל-Bitbucket.",
-      "providerMessage": "החיבור שלך ל-{{provider}} אינו תקף עוד. בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך."
+      "bitbucketTitle": "פג תוקף החיבור ל-Bitbucket."
     },
     "review": "סקירה",
     "reviewPullRequest": "סקירת בקשת המשיכה",
@@ -3904,6 +3928,7 @@
     "skillMarkdownLabel": "תוכן מיומנות",
     "skillsEmpty": "עדיין אין כישורים",
     "skillNameRequired": "הזן שם מיומנות",
+    "skillNameTooLong": "שם המיומנות חייב להכיל {{max}} תווים או פחות",
     "skillNameInvalid": "שם המיומנות חייב להתחיל באות או ספרה ולהשתמש רק באותיות קטנות, ספרות ומקפים",
     "skillContentRequired": "נדרש תוכן מיומנות",
     "skillSaveFailed": "לא ניתן היה לשמור את המיומנות. נסה שוב.",
@@ -4011,7 +4036,8 @@
       "nameRequired": "הזן שם פקודה",
       "nameInvalid": "השם חייב להתחיל באות קטנה ולהשתמש רק באותיות קטנות, ספרות ומקפים",
       "templateRequired": "הזן תבנית פקודה",
-      "nameConflict": "השם הזה שמור על ידי פקודה מובנית"
+      "nameConflict": "השם הזה שמור על ידי פקודה מובנית",
+      "duplicateName": "כבר קיימת פקודה בשם הזה בפרופיל הזה"
     },
     "repoBindings": {
       "title": "פרופילי ברירת מחדל עבור Repos",

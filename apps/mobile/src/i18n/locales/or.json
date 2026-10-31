@@ -163,7 +163,7 @@
     "allLanguages": "ସମସ୍ତ ଭାଷା"
   },
   "login": {
-    "welcome": "Kilo କୁ ସ୍ୱାଗତ",
+    "welcome": "ସ୍ୱାଗତ",
     "retrySignIn": "ପୁଣି ସାଇନ୍ ଇନ୍ କରନ୍ତୁ",
     "logo": "Kilo ଲୋଗୋ",
     "continuingSignIn": "ଆପଣଙ୍କ ସାଇନ୍ ଇନ୍ ପ୍ରକ୍ରିୟା ଜାରି ରହିଛି।",
@@ -684,6 +684,7 @@
       "gitlabDescription": "ମୋବାଇଲରେ ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକୁ ସମୀକ୍ଷା କରିବାକୁ ଆପଣଙ୍କ GitLab ଖାତା ସଂଯୋଗ କରନ୍ତୁ।",
       "bitbucketDescription": "ମୋବାଇଲରେ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକୁ ସମୀକ୍ଷା କରିବାକୁ ଏହି ସଂଗଠନକୁ Bitbucket ସହ ସଂଯୋଗ କରନ୍ତୁ।",
       "bitbucketOrgOnlyDescription": "ଏହାର Bitbucket ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକୁ ସମୀକ୍ଷା କରିବାକୁ ଉପର ଖାତାକୁ ଏକ ସଂଗଠନକୁ ବଦଳାନ୍ତୁ।",
+      "bitbucketOrgOnlyNoOrganizationDescription": "ଏହି ଖାତାରେ ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସଂଗଠନ ନାହିଁ। ଆପଣ ଏକ ସଂଗଠନ ସୃଷ୍ଟି କଲାପରେ କିମ୍ବା ଯୋଗ ଦେଲାପରେ Bitbucket ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକ ସମୀକ୍ଷା କରାଯାଇପାରିବ।",
       "contextLine": "{{organization}} ପାଇଁ",
       "contextLinePersonal": "ଆପଣଙ୍କ ବ୍ୟକ୍ତିଗତ ଖାତା ପାଇଁ"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub ସଂଯୋଗର ଅବଧି ଶେଷ ହୋଇଛି।",
-      "message": "ଆପଣଙ୍କ GitHub ସଂଯୋଗ ଆଉ ବୈଧ ନୁହେଁ। ସଂଯୋଗ ପୁଣି ଯାଞ୍ଚ କରନ୍ତୁ — ଆବଶ୍ୟକ ହେଲେ ପୁଣି ସଂଯୋଗ କରିବାକୁ କୁହାଯିବ।",
+      "message": "ସଂଯୋଗ ପୁଣି ଯାଞ୍ଚ କରନ୍ତୁ — ଆବଶ୍ୟକ ହେଲେ ପୁଣି ସଂଯୋଗ କରିବାକୁ କୁହାଯିବ।",
       "gitlabTitle": "GitLab ସଂଯୋଗର ଅବଧି ଶେଷ ହୋଇଛି।",
-      "bitbucketTitle": "Bitbucket ସଂଯୋଗର ଅବଧି ଶେଷ ହୋଇଛି।",
-      "providerMessage": "ଆପଣଙ୍କ {{provider}} ସଂଯୋଗ ଆଉ ବୈଧ ନୁହେଁ। ସଂଯୋଗ ପୁଣି ଯାଞ୍ଚ କରନ୍ତୁ — ଆବଶ୍ୟକ ହେଲେ ପୁଣି ସଂଯୋଗ କରିବାକୁ କୁହାଯିବ।"
+      "bitbucketTitle": "Bitbucket ସଂଯୋଗର ଅବଧି ଶେଷ ହୋଇଛି।"
     },
     "eventChips": {
       "comment": "ମନ୍ତବ୍ୟ",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "ଆପଣଙ୍କୁ GitLab ରେ ଅଧିକ ଗୋଷ୍ଠୀ କିମ୍ବା ପ୍ରୋଜେକ୍ଟ ବ୍ୟବହାର କରିବାର ଅନୁମତି ଦେବାକୁ ପଡ଼ିପାରେ।",
       "installGithubApp": "ରିପୋଜିଟୋରୀଗୁଡ଼ିକରେ GitHub ଆପ୍ ସଂସ୍ଥାପନ କରନ୍ତୁ",
       "installGithubAppDescription": "ଆପଣ ସମୀକ୍ଷା କରାଇବାକୁ ଚାହୁଁଥିବା ରିପୋଜିଟୋରୀଗୁଡ଼ିକୁ ବ୍ୟବହାର କରିବା ପାଇଁ Kilo GitHub ଆପ୍‌କୁ ଅନୁମତି ଦିଅନ୍ତୁ।",
-      "repositoryAccess": "ରିପୋଜିଟୋରୀ ବ୍ୟବହାରର ଅନୁମତି"
+      "repositoryAccess": "ରିପୋଜିଟୋରୀ ବ୍ୟବହାରର ଅନୁମତି",
+      "allModePersonal": "ଆପଣଙ୍କ GitHub ସଂଯୋଗ ମାଧ୍ୟମରେ Kilo ଯେଉଁ ସବୁ ରିପୋଜିଟୋରୀ ବ୍ୟବହାର କରିପାରିବ, ସେସବୁ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ସମୀକ୍ଷା କରାଯାଏ।",
+      "allModeOrganization": "ସଂସ୍ଥାର GitHub ସଂଯୋଗ ମାଧ୍ୟମରେ Kilo ଯେଉଁ ସବୁ ରିପୋଜିଟୋରୀ ବ୍ୟବହାର କରିପାରିବ, ସେସବୁ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ସମୀକ୍ଷା କରାଯାଏ।",
+      "allModeCount": "ଉପଲବ୍ଧ ରିପୋଜିଟୋରୀ: {{displayCount}}"
     },
     "style": {
       "title": "ସମୀକ୍ଷା ଶୈଳୀ",
@@ -1676,7 +1679,8 @@
       "sortSeverityDesc": "ତୀବ୍ରତା: ଉଚ୍ଚରୁ ନିମ୍ନ",
       "sortSeverityAsc": "ତୀବ୍ରତା: ନିମ୍ନରୁ ଉଚ୍ଚ",
       "sortSlaDue": "SLA ଶେଷ ତାରିଖ",
-      "overdueOnly": "କେବଳ ବିଳମ୍ବିତ"
+      "overdueOnly": "କେବଳ ବିଳମ୍ବିତ",
+      "noRepositories": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ରିପୋଜିଟୋରୀ ସିଙ୍କ୍ ହୋଇନାହିଁ କିମ୍ବା ବଛାଯାଇନାହିଁ। ସୁରକ୍ଷା ଏଜେଣ୍ଟ ସେଟିଂସ୍‌ରେ ସେଗୁଡ଼ିକୁ ବାଛନ୍ତୁ।"
     },
     "automation": {
       "title": "ସ୍ୱୟଂଚାଳନ",
@@ -1749,17 +1753,12 @@
       "findingsCount": "{{displayCount}}ଟି ଚିହ୍ନଟ ସମସ୍ୟା",
       "notMeasured": "ମାପ ହୋଇନାହିଁ",
       "actFirst": "ପ୍ରଥମେ କରିବାକୁ ଥିବା କାମ",
-      "slaPosture": "SLA ପାଳନର ସ୍ଥିତି",
       "actionPosture": "କାର୍ଯ୍ୟର ସ୍ଥିତି",
       "codebaseRisk": "କୋଡ୍‌ବେସ୍‌ର ବିପଦ",
       "repositoryActionPlan": "ରିପୋଜିଟୋରୀ ପାଇଁ କାର୍ଯ୍ୟ ଯୋଜନା",
       "noOpenFindings": "ଧ୍ୟାନ ଦେବାକୁ ଥିବା କୌଣସି ଅସମାପ୍ତ ଚିହ୍ନଟ ସମସ୍ୟା ନାହିଁ",
       "deadlineToday": "ଆଜି ସମୟସୀମା ଶେଷ",
       "daysOverdue": "{{displayCount}} ଦିନ ବିଳମ୍ବିତ",
-      "withinDeadline": "ସମୟସୀମା ଭିତରେ",
-      "criticalOverdue": "ଗୁରୁତର: ସମୟସୀମା ପାର",
-      "highOverdue": "ଉଚ୍ଚ: ସମୟସୀମା ପାର",
-      "mediumLowOverdue": "ମଧ୍ୟମ ଓ ନିମ୍ନ: ସମୟସୀମା ପାର",
       "confirmedExploitable": "ଆକ୍ରମଣରେ ବ୍ୟବହାରଯୋଗ୍ୟ ବୋଲି ନିଶ୍ଚିତ",
       "needsEvidenceReview": "ପ୍ରମାଣ ସମୀକ୍ଷା ଆବଶ୍ୟକ",
       "analysisNotComplete": "ବିଶ୍ଳେଷଣ ଅସମ୍ପୂର୍ଣ୍ଣ",
@@ -1769,7 +1768,16 @@
       "noSlaDeadline": "କୌଣସି SLA ସମୟସୀମା ଧାର୍ଯ୍ୟ ହୋଇନାହିଁ",
       "noRepositoryData": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ରିପୋଜିଟୋରୀ ତଥ୍ୟ ନାହିଁ",
       "noRepositoryDataDescription": "ଚିହ୍ନଟ ସମସ୍ୟାଗୁଡ଼ିକ ସିଙ୍କ୍ ହେବା ପରେ ରିପୋଜିଟୋରୀଗୁଡ଼ିକର ପ୍ରାଥମିକତା ଦେଖାଯିବ।",
-      "repoSummary": "{{open}} ଅସମାପ୍ତ · {{critical}} ଗୁରୁତର · {{high}} ଉଚ୍ଚ",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "{{displayCount}} ଅସମାପ୍ତ",
+      "repoSummaryOpen_one": "{{displayCount}} ଅସମାପ୍ତ",
+      "repoSummaryOpen_other": "{{displayCount}} ଅସମାପ୍ତ",
+      "repoSummaryCritical": "{{displayCount}} ଗୁରୁତର",
+      "repoSummaryCritical_one": "{{displayCount}} ଗୁରୁତର",
+      "repoSummaryCritical_other": "{{displayCount}} ଗୁରୁତର",
+      "repoSummaryHigh": "{{displayCount}} ଉଚ୍ଚ",
+      "repoSummaryHigh_one": "{{displayCount}} ଉଚ୍ଚ",
+      "repoSummaryHigh_other": "{{displayCount}} ଉଚ୍ଚ",
       "couldNotLoad": "ଡ୍ୟାସ୍‌ବୋର୍ଡ ତଥ୍ୟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "filterByRepository": "ରିପୋଜିଟୋରୀ ଅନୁଯାୟୀ ଫିଲ୍ଟର କରନ୍ତୁ",
       "lastSynced": "ଶେଷ ଥର ସିଙ୍କ୍: {{time}}",
@@ -1777,7 +1785,6 @@
       "notYetSynced": "ଏପର୍ଯ୍ୟନ୍ତ ସିଙ୍କ୍ ହୋଇନାହିଁ",
       "refreshFailed": "ରିଫ୍ରେସ୍ ହୋଇପାରିଲା ନାହିଁ — ଶେଷ ଥର ସିଙ୍କ୍ ହୋଇଥିବା ତଥ୍ୟ ଦେଖାଯାଉଛି।",
       "settings": "ସେଟିଂସ୍",
-      "syncFindings": "ଚିହ୍ନଟ ସମସ୍ୟା ସିଙ୍କ୍ କରନ୍ତୁ",
       "syncNow": "ବର୍ତ୍ତମାନ ସିଙ୍କ୍ କରନ୍ତୁ",
       "syncQueued": "ସିଙ୍କ୍ ଅପେକ୍ଷା ତାଲିକାରେ ରଖାଗଲା",
       "syncStatusUnavailable": "ସିଙ୍କ୍ ସ୍ଥିତି ଉପଲବ୍ଧ ନାହିଁ।",
@@ -1795,8 +1802,17 @@
       "withinDeadlineDetail": "{{total}} ମଧ୍ୟରୁ {{within}} ସମୟସୀମା ଭିତରେ",
       "noDeadlineData": "କୌଣସି ଚିହ୍ନଟ ସମସ୍ୟା ପାଇଁ ଏପର୍ଯ୍ୟନ୍ତ SLA ସମୟସୀମା ଧାର୍ଯ୍ୟ ହୋଇନାହିଁ",
       "deadlinePassed": "ସମୟସୀମା ପାର ହୋଇଛି",
-      "deadlinePassedDetail": "{{critical}} ଗୁରୁତର, {{high}} ଉଚ୍ଚ",
-      "deadlinePassedDetailWithMediumLow": "{{critical}} ଗୁରୁତର, {{high}} ଉଚ୍ଚ, {{mediumLow}} ମଧ୍ୟମ ଓ ନିମ୍ନ",
+      "deadlinePassedDetail": "{{critical}}, {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
+      "breakdownCritical": "{{displayCount}} ଗୁରୁତର",
+      "breakdownCritical_one": "{{displayCount}} ଗୁରୁତର",
+      "breakdownCritical_other": "{{displayCount}} ଗୁରୁତର",
+      "breakdownHigh": "{{displayCount}} ଉଚ୍ଚ",
+      "breakdownHigh_one": "{{displayCount}} ଉଚ୍ଚ",
+      "breakdownHigh_other": "{{displayCount}} ଉଚ୍ଚ",
+      "breakdownMediumLow": "{{displayCount}} ମଧ୍ୟମ ଓ ନିମ୍ନ",
+      "breakdownMediumLow_one": "{{displayCount}} ମଧ୍ୟମ ଓ ନିମ୍ନ",
+      "breakdownMediumLow_other": "{{displayCount}} ମଧ୍ୟମ ଓ ନିମ୍ନ",
       "dueThisWeek": "ଏହି ସପ୍ତାହରେ ସମୟସୀମା ଶେଷ",
       "dueThisWeekDetail": "ଏହା ମଧ୍ୟରୁ {{exploitable}}ଟି ଆକ୍ରମଣରେ ବ୍ୟବହାରଯୋଗ୍ୟ ବୋଲି ନିଶ୍ଚିତ",
       "noDeadline": "କୌଣସି ସମୟସୀମା ନାହିଁ",
@@ -1856,7 +1872,6 @@
       "repositoriesCount_one": "{{displayCount}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ କରାଯାଇଛି",
       "repositoriesCount": "{{displayCount}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ ହୋଇଛି",
       "repositoriesCount_other": "{{displayCount}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ ହୋଇଛି",
-      "selectRepositoriesSubtitle": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ କେଉଁ ରିପୋଜିଟୋରୀଗୁଡ଼ିକୁ ନଜରରେ ରଖିବ ତାହା ବାଛନ୍ତୁ",
       "analysisModeSubtitle": "{{mode}} ବିଶ୍ଳେଷଣ",
       "automationAllOff": "ସବୁ ବନ୍ଦ",
       "automationCount": "3ଟି ମଧ୍ୟରୁ {{displayCount}}ଟି ଚାଲୁ",
@@ -2047,7 +2062,10 @@
       "settleFailed": "କାର୍ଯ୍ୟଟି ସମ୍ପୂର୍ଣ୍ଣ ହେଲା, କିନ୍ତୁ ଆମେ ଫଳାଫଳ ରେକର୍ଡ କରିପାରିଲୁ ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "replayFailed": "ଏହି କାର୍ଯ୍ୟଟି ସମ୍ପୂର୍ଣ୍ଣ ହେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "actionFailed": "ଏହି କାର୍ଯ୍ୟଟି ସମ୍ପୂର୍ଣ୍ଣ କରିପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-      "actionBlocked": "ଏହି କାର୍ଯ୍ୟଟି ସମ୍ପୂର୍ଣ୍ଣ କରିପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବା ପୂର୍ବରୁ ସମସ୍ୟାଟି ସମାଧାନ କରିବାକୁ ହେବ।"
+      "actionBlocked": "ଏହି କାର୍ଯ୍ୟଟି ସମ୍ପୂର୍ଣ୍ଣ କରିପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବା ପୂର୍ବରୁ ସମସ୍ୟାଟି ସମାଧାନ କରିବାକୁ ହେବ।",
+      "syncNoRepositories": "ସିଙ୍କ୍ ପରିସରରେ କୌଣସି ରିପୋଜିଟୋରୀ ନାହିଁ। ସୁରକ୍ଷା ଏଜେଣ୍ଟ ଯେଉଁ ରିପୋଜିଟୋରୀଗୁଡ଼ିକୁ ନଜରରେ ରଖେ ସେଗୁଡ଼ିକୁ ବାଛନ୍ତୁ, ତାପରେ ପୁଣି ସିଙ୍କ୍ କରନ୍ତୁ।",
+      "syncIntegrationInactive": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ ପାଇଁ GitHub ସଂଯୋଗ ସକ୍ରିୟ ନାହିଁ। Kilo GitHub App କୁ ପୁଣି ସଂଯୋଗ କରନ୍ତୁ, ତାପରେ ପୁଣି ସିଙ୍କ୍ କରନ୍ତୁ।",
+      "syncMissingPermission": "Kilo GitHub App vulnerability alerts ପଢ଼ିପାରିବ ନାହିଁ। GitHub ରେ ସେହି ଅନୁମତି ଦିଅନ୍ତୁ, ତାପରେ ପୁଣି ସିଙ୍କ୍ କରନ୍ତୁ।"
     },
     "analysisState": {
       "queued": "ବିଶ୍ଳେଷଣ ଅପେକ୍ଷା ତାଲିକାରେ",
@@ -2154,7 +2172,7 @@
     "sessionList": {
       "couldNotLoadActive": "ସକ୍ରିୟ ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotRefresh": "ରିଫ୍ରେସ୍ କରିହେଲା ନାହିଁ",
-      "noSessionsYetDescription": "ଆପଣଙ୍କ ଫୋନରୁ ଏକ କୋଡିଂ କାର୍ଯ୍ୟ ଆରମ୍ଭ କରନ୍ତୁ। ଆପଣଙ୍କ ସେସନ୍ ଏଠାରେ ଦେଖାଯିବ।",
+      "noSessionsYetDescription": "ଆପଣଙ୍କ ଫୋନରୁ ଏକ କୋଡିଂ କାର୍ଯ୍ୟ ଆରମ୍ଭ କରନ୍ତୁ।",
       "viewHistory": "ସେସନ୍ ଇତିହାସ",
       "noMatches": "କୌଣସି ସେସନ୍ ମେଳ ଖାଉନାହିଁ",
       "tryDifferentSearch": "ଅନ୍ୟ ଏକ ଶବ୍ଦ ଦେଇ ଖୋଜନ୍ତୁ।",
@@ -3135,7 +3153,7 @@
     "couldNotSaveChoice": "ଆପଣଙ୍କ ପସନ୍ଦ ସଞ୍ଚୟ ହୋଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "onlineAllowed": "ଅନଲାଇନ୍, ଅନୁମତିପ୍ରାପ୍ତ",
     "onlineNotAllowed": "ଅନଲାଇନ୍, ଅନୁମତି ନାହିଁ",
-    "optionalReview": "ଐଚ୍ଛିକ — ସେଟିଂସ୍‌ରେ ଏହି ପସନ୍ଦ ଯେକୌଣସି ସମୟରେ ବଦଳାଇପାରିବେ",
+    "optionalReview": "ଐଚ୍ଛିକ",
     "optionalOnboarding": "ଐଚ୍ଛିକ — ଆପଣ ବନ୍ଦ ନକରିବା ପର୍ଯ୍ୟନ୍ତ ଚାଲୁ",
     "aiProvidersWhat": "ଆପଣଙ୍କ ପ୍ରମ୍ପ୍ଟ, ବାର୍ତ୍ତାଳାପର ଇତିହାସ ଓ ଆପଣ ଯୋଡ଼ୁଥିବା ଫାଇଲ୍।",
     "aiProvidersWhy": "AI ଉତ୍ତର ତିଆରି କରିବାକୁ।",
@@ -3854,6 +3872,7 @@
     "skillMarkdownLabel": "ଦକ୍ଷତା ବିଷୟବସ୍ତୁ",
     "skillsEmpty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଦକ୍ଷତା ନାହିଁ।",
     "skillNameRequired": "ଏକ ଦକ୍ଷତା ନାମ ପ୍ରବେଶ କରନ୍ତୁ।",
+    "skillNameTooLong": "ଦକ୍ଷତା ନାମ {{max}} ଅକ୍ଷର କିମ୍ବା କମ୍ ହେବା ଆବଶ୍ୟକ।",
     "skillNameInvalid": "କୌଶଳ ନାମ ନିଶ୍ଚିତ ଭାବରେ ଏକ ଅକ୍ଷର କିମ୍ବା ଅଙ୍କରୁ ଆରମ୍ଭ ହେବ ଏବଂ କେବଳ ଛୋଟ ଅକ୍ଷର, ସଂଖ୍ୟା ଏବଂ ଡ୍ୟାସ୍ ବ୍ୟବହାର କରିବ।",
     "skillContentRequired": "ଦକ୍ଷତା ବିଷୟବସ୍ତୁ ଆବଶ୍ୟକ।",
     "skillSaveFailed": "ଦକ୍ଷତା ସଞ୍ଚୟ କରିପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
@@ -3960,7 +3979,8 @@
       "nameRequired": "ଏକ ନିର୍ଦ୍ଦେଶ ନାମ ପ୍ରବେଶ କରନ୍ତୁ।",
       "nameInvalid": "ନାମ ନିଶ୍ଚିତ ଭାବରେ ଏକ ଛୋଟ ଅକ୍ଷରରୁ ଆରମ୍ଭ ହେବ ଏବଂ କେବଳ ଲୋୟର କେସ୍ ଅକ୍ଷର, ସଂଖ୍ୟା ଏବଂ ଡ୍ୟାସ୍ ବ୍ୟବହାର କରିବ।",
       "templateRequired": "ଏକ ନିର୍ଦ୍ଦେଶ ଟେମ୍ପଲେଟ୍ ପ୍ରବେଶ କରନ୍ତୁ।",
-      "nameConflict": "ସେହି ନାମ ଏକ ବିଲ୍ଟ-ଇନ୍ କମାଣ୍ଡ ଦ୍ୱାରା ସଂରକ୍ଷିତ।"
+      "nameConflict": "ସେହି ନାମ ଏକ ବିଲ୍ଟ-ଇନ୍ କମାଣ୍ଡ ଦ୍ୱାରା ସଂରକ୍ଷିତ।",
+      "duplicateName": "ଏହି ନାମରେ ଏକ ନିର୍ଦ୍ଦେଶ ଏହି ପ୍ରୋଫାଇଲ୍‌ରେ ପୂର୍ବରୁ ବିଦ୍ୟମାନ ଅଛି।"
     },
     "repoBindings": {
       "title": "ରେପୋ ପାଇଁ ଡିଫଲ୍ଟ ପ୍ରୋଫାଇଲ୍।",

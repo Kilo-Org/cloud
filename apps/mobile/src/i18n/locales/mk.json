@@ -163,7 +163,7 @@
     "allLanguages": "Сите јазици"
   },
   "login": {
-    "welcome": "Добре дојде во Kilo",
+    "welcome": "Добре дојде",
     "retrySignIn": "Обиди се повторно да се најавиш",
     "logo": "Лого на Kilo",
     "continuingSignIn": "Се продолжува со твоето најавување.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Поврзете ја вашата GitLab сметка за преглед на merge барања на мобилно.",
       "bitbucketDescription": "Поврзете Bitbucket со оваа организација за преглед на барања за спојување на мобилно.",
       "bitbucketOrgOnlyDescription": "Префрлете ја сметката погоре на организација за преглед на нејзините барања за спојување на Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Оваа сметка сè уште нема организации. Барањата за спојување на Bitbucket може да се прегледуваат откако ќе креирате организација или ќе се приклучите кон неа.",
       "contextLine": "За {{organization}}",
       "contextLinePersonal": "За вашиот личен простор"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Врската со GitHub истече.",
-      "message": "Твојата врска со GitHub веќе не важи. Провери ја повторно — ако е потребно, ќе добиеш барање повторно да се поврзеш.",
+      "message": "Проверете ја врската повторно — ако е потребно, ќе биде побарано да се поврзете одново.",
       "gitlabTitle": "Врската со GitLab истече",
-      "bitbucketTitle": "Врската со Bitbucket истече",
-      "providerMessage": "Вашата врска со {{provider}} повеќе не е важечка. Проверете ја врската повторно — ако е потребно, ќе биде побарано да се поврзете одново."
+      "bitbucketTitle": "Врската со Bitbucket истече"
     },
     "eventChips": {
       "comment": "Коментирај",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Можеби треба да дадеш пристап до повеќе групи или проекти на GitLab.",
       "installGithubApp": "Инсталирај ја апликацијата на GitHub за складиштата",
       "installGithubAppDescription": "Дозволи ѝ на апликацијата Kilo за GitHub да пристапи до складиштата што сакаш да се прегледуваат.",
-      "repositoryAccess": "пристап до складиштето"
+      "repositoryAccess": "пристап до складиштето",
+      "allModePersonal": "Секое складиште до кое Kilo може да пристапи преку твојата врска со GitHub се прегледува автоматски.",
+      "allModeOrganization": "Секое складиште до кое Kilo може да пристапи преку врската на организацијата со GitHub се прегледува автоматски.",
+      "allModeCount": "Достапни складишта: {{displayCount}}"
     },
     "style": {
       "title": "Стил на преглед",
@@ -1676,7 +1679,8 @@
       "sortSeverityDesc": "Сериозност: од висока кон ниска",
       "sortSeverityAsc": "Сериозност: од ниска кон висока",
       "sortSlaDue": "Рок според SLA",
-      "overdueOnly": "Само со пречекорен рок"
+      "overdueOnly": "Само со пречекорен рок",
+      "noRepositories": "Сè уште нема синхронизирани или избрани репозиториуми. Изберете ги во поставките на «Безбедносниот агент»."
     },
     "automation": {
       "title": "Автоматизација",
@@ -1749,17 +1753,12 @@
       "findingsCount": "{{displayCount}} наоди",
       "notMeasured": "Не е измерено",
       "actFirst": "Најитни дејства",
-      "slaPosture": "Состојба според SLA",
       "actionPosture": "Состојба на дејствата",
       "codebaseRisk": "Ризик во кодната база",
       "repositoryActionPlan": "План за дејствување во складиштето",
       "noOpenFindings": "Нема отворени наоди што бараат внимание",
       "deadlineToday": "Рокот истекува денес",
       "daysOverdue": "Рокот е пречекорен за {{displayCount}} дена",
-      "withinDeadline": "Во рамките на рокот",
-      "criticalOverdue": "Критични со пречекорен рок",
-      "highOverdue": "Со висока сериозност и пречекорен рок",
-      "mediumLowOverdue": "Со средна и ниска сериозност и пречекорен рок",
       "confirmedExploitable": "Потврдена можност за искористување",
       "needsEvidenceReview": "Бара преглед на доказите",
       "analysisNotComplete": "Анализата не е завршена",
@@ -1769,7 +1768,16 @@
       "noSlaDeadline": "Нема одреден рок според SLA",
       "noRepositoryData": "Сè уште нема податоци за складиштето",
       "noRepositoryDataDescription": "Приоритетите на складиштето ќе се појават откако наодите ќе се синхронизираат.",
-      "repoSummary": "{{open}} отворени · {{critical}} критични · {{high}} со висока сериозност",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "{{displayCount}} отворени",
+      "repoSummaryOpen_one": "{{displayCount}} отворен",
+      "repoSummaryOpen_other": "{{displayCount}} отворени",
+      "repoSummaryCritical": "{{displayCount}} критични",
+      "repoSummaryCritical_one": "{{displayCount}} критичен",
+      "repoSummaryCritical_other": "{{displayCount}} критични",
+      "repoSummaryHigh": "{{displayCount}} со висока сериозност",
+      "repoSummaryHigh_one": "{{displayCount}} со висока сериозност",
+      "repoSummaryHigh_other": "{{displayCount}} со висока сериозност",
       "couldNotLoad": "Не успеа вчитувањето на податоците за контролната табла.",
       "filterByRepository": "Филтрирај по складиште",
       "lastSynced": "Последна синхронизација: {{time}}",
@@ -1777,7 +1785,6 @@
       "notYetSynced": "Сè уште не е синхронизирано",
       "refreshFailed": "Не можеше да се освежи — се прикажуваат последните синхронизирани податоци.",
       "settings": "Поставки",
-      "syncFindings": "Синхронизирај ги наодите",
       "syncNow": "Синхронизирај сега",
       "syncQueued": "Синхронизацијата е додадена во редицата",
       "syncStatusUnavailable": "Статусот на синхронизацијата не е достапен.",
@@ -1795,8 +1802,17 @@
       "withinDeadlineDetail": "{{within}} од {{total}} во рок",
       "noDeadlineData": "Ниту еден наод сè уште нема рок според SLA",
       "deadlinePassed": "Рокот помина",
-      "deadlinePassedDetail": "{{critical}} со критична, {{high}} со висока сериозност",
-      "deadlinePassedDetailWithMediumLow": "{{critical}} со критична, {{high}} со висока сериозност, {{mediumLow}} со средна и ниска сериозност",
+      "deadlinePassedDetail": "{{critical}}, {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
+      "breakdownCritical": "{{displayCount}} со критична",
+      "breakdownCritical_one": "{{displayCount}} со критична",
+      "breakdownCritical_other": "{{displayCount}} со критична",
+      "breakdownHigh": "{{displayCount}} со висока сериозност",
+      "breakdownHigh_one": "{{displayCount}} со висока сериозност",
+      "breakdownHigh_other": "{{displayCount}} со висока сериозност",
+      "breakdownMediumLow": "{{displayCount}} со средна и ниска сериозност",
+      "breakdownMediumLow_one": "{{displayCount}} со средна и ниска сериозност",
+      "breakdownMediumLow_other": "{{displayCount}} со средна и ниска сериозност",
       "dueThisWeek": "Со рок оваа недела",
       "dueThisWeekDetail": "Од нив за {{exploitable}} е потврдено дека можат да се искористат за напад",
       "noDeadline": "Нема рок",
@@ -1856,7 +1872,6 @@
       "repositoriesCount_one": "{{displayCount}} избрано складиште",
       "repositoriesCount": "{{displayCount}} избрани репозиториуми",
       "repositoriesCount_other": "{{displayCount}} избрани репозиториуми",
-      "selectRepositoriesSubtitle": "Избери кои складишта ќе ги следи безбедносниот агент",
       "analysisModeSubtitle": "Анализа: {{mode}}",
       "automationAllOff": "Сè е исклучено",
       "automationCount": "{{displayCount}} од 3 овозможени",
@@ -2047,7 +2062,10 @@
       "settleFailed": "Дејството е извршено, но не можевме да го запишеме резултатот. Обиди се повторно.",
       "replayFailed": "Ова дејство не е завршено. Обиди се повторно.",
       "actionFailed": "Не успеа да се заврши ова дејство. Обиди се повторно.",
-      "actionBlocked": "Не успеа да се заврши ова дејство. Проблемот мора да се реши пред да се обидеш повторно."
+      "actionBlocked": "Не успеа да се заврши ова дејство. Проблемот мора да се реши пред да се обидеш повторно.",
+      "syncNoRepositories": "Нема репозиториуми во опсегот за синхронизација. Изберете ги репозиториумите што ги надгледува Безбедносниот агент, потоа синхронизирајте повторно.",
+      "syncIntegrationInactive": "Врската со GitHub за Безбедносниот агент не е активна. Поврзете ја повторно Kilo GitHub App, потоа синхронизирајте повторно.",
+      "syncMissingPermission": "Апликацијата Kilo GitHub App не може да чита предупредувања за ранливости. Додели ја таа дозвола во GitHub, потоа синхронизирај повторно."
     },
     "analysisState": {
       "queued": "Анализата е во редица",
@@ -2154,7 +2172,7 @@
     "sessionList": {
       "couldNotLoadActive": "Не успеа вчитувањето на активните сесии.",
       "couldNotRefresh": "Не успеа освежувањето",
-      "noSessionsYetDescription": "Започни задача за програмирање од телефонот. Твоите сесии ќе се појават тука.",
+      "noSessionsYetDescription": "Започни задача за програмирање од телефонот.",
       "viewHistory": "Историја на сесиите",
       "noMatches": "Нема сесии што одговараат на пребарувањето",
       "tryDifferentSearch": "Пробај со друг поим за пребарување.",
@@ -3135,7 +3153,7 @@
     "couldNotSaveChoice": "Не успеа зачувувањето на твојот избор. Обиди се повторно.",
     "onlineAllowed": "Онлајн, дозволено",
     "onlineNotAllowed": "Онлајн, не е дозволено",
-    "optionalReview": "Изборно — можеш да го смениш во секое време во поставките",
+    "optionalReview": "Изборно",
     "optionalOnboarding": "Изборно — вклучено додека не го исклучиш",
     "aiProvidersWhat": "Твоите упатства, историјата на разговорите и сите датотеки што ги прикачуваш.",
     "aiProvidersWhy": "За создавање одговори со AI.",
@@ -3854,6 +3872,7 @@
     "skillMarkdownLabel": "Содржина на вештини",
     "skillsEmpty": "Сè уште нема вештини",
     "skillNameRequired": "Внесете име на вештина",
+    "skillNameTooLong": "Името на вештината мора да содржи {{max}} знаци или помалку",
     "skillNameInvalid": "Името на вештината мора да започнува со буква или цифра и да користи само мали букви, цифри и цртички",
     "skillContentRequired": "Потребна е содржина на вештини",
     "skillSaveFailed": "Не може да се спаси вештината. Обидете се повторно.",
@@ -3960,7 +3979,8 @@
       "nameRequired": "Внесете име на команда",
       "nameInvalid": "Името мора да започнува со мала буква и да користи само мали букви, цифри и цртички",
       "templateRequired": "Внесете образец за команда",
-      "nameConflict": "Тоа име е резервирано со вградена команда"
+      "nameConflict": "Тоа име е резервирано со вградена команда",
+      "duplicateName": "Во овој профил веќе постои команда со истото име"
     },
     "repoBindings": {
       "title": "Стандардни профили за репо",

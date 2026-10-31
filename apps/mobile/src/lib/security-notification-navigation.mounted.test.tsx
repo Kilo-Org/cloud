@@ -2,7 +2,7 @@ import { Children, createElement, isValidElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type PushData } from '@kilocode/notifications';
+import { type PushData } from '@kilocode/notifications/schemas';
 
 import SecurityAgentScopeLayout, {
   unstable_settings,

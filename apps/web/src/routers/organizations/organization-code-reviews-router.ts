@@ -491,9 +491,23 @@ export const organizationReviewAgentRouter = createTRPCRouter({
   getGitLabStatus: organizationMemberProcedure.query(async ({ input, ctx }) => {
     const integration = await getIntegrationForOrganization(input.organizationId, PLATFORM.GITLAB);
 
+    // An existing row that cannot serve a review is a different state from
+    // "never connected": the organization already authorized this integration,
+    // so the connect gate must explain that the connection has to be
+    // re-authorized instead of asking for a first-time connect that was
+    // already completed. Mirrors the personal read.
+    if (!integration) {
+      return {
+        connected: false,
+        reconnectRequired: false,
+        integration: null,
+      };
+    }
+
     if (!isPlatformIntegrationHealthy(integration)) {
       return {
         connected: false,
+        reconnectRequired: true,
         integration: null,
       };
     }
@@ -518,6 +532,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
     ) {
       return {
         connected: false,
+        reconnectRequired: true,
         integration: null,
       };
     }
@@ -531,6 +546,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
 
     return {
       connected: true,
+      reconnectRequired: false,
       integration: {
         accountLogin: integration.platform_account_login,
         repositorySelection: integration.repository_access,

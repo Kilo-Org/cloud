@@ -163,7 +163,7 @@
     "allLanguages": "Vsi jeziki"
   },
   "login": {
-    "welcome": "Dobrodošel v aplikaciji Kilo",
+    "welcome": "Dobrodošel",
     "retrySignIn": "Znova poskusi s prijavo",
     "logo": "Logotip Kilo",
     "continuingSignIn": "Nadaljujemo tvojo prijavo.",
@@ -330,7 +330,7 @@
       "diffTooLarge": "preobsežne razlike",
       "openFile": "Odpri {{path}}",
       "openFileViewed": "Odpri {{path}} (ogledano)",
-      "title": "Datotek"
+      "title": "Datoteke"
     },
     "fileRows": {
       "markViewed": "Označi {{path}} kot ogledano",
@@ -714,6 +714,7 @@
       "gitlabDescription": "Poveži svoj račun GitLab, da lahko pregleduješ merge requeste na mobilni napravi.",
       "bitbucketDescription": "Poveži Bitbucket s to organizacijo, da lahko pregleduješ zahtevke za združitev na mobilni napravi.",
       "bitbucketOrgOnlyDescription": "Preklopi zgornji račun na organizacijo, da lahko pregleduješ njene zahtevke za združitev na Bitbucktu.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Ta račun še nima nobenih organizacij. Zahtevke za združitev na Bitbucktu boš lahko pregledoval, ko ustvariš organizacijo ali se ji pridružiš.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za osebni račun"
     },
@@ -739,10 +740,9 @@
     },
     "reconnectNotice": {
       "title": "Povezava z računom GitHub je potekla.",
-      "message": "Tvoja povezava z GitHubom ni več veljavna. Znova jo preveri. Po potrebi te bomo pozvali k ponovni povezavi.",
+      "message": "Znova jo preveri. Po potrebi te bomo pozvali k ponovni povezavi.",
       "gitlabTitle": "Povezava z računom GitLab je potekla.",
-      "bitbucketTitle": "Povezava z računom Bitbucket je potekla.",
-      "providerMessage": "Tvoja povezava z {{provider}}om ni več veljavna. Znova jo preveri. Po potrebi te bomo pozvali k ponovni povezavi."
+      "bitbucketTitle": "Povezava z računom Bitbucket je potekla."
     },
     "eventChips": {
       "comment": "Komentar",
@@ -795,7 +795,7 @@
     },
     "tabs": {
       "overview": "Pregled",
-      "files": "Datotek",
+      "files": "Datoteke",
       "discussion": "Razprava"
     },
     "fileStatus": {
@@ -1059,7 +1059,7 @@
     "attachmentPicker": {
       "takePhoto": "Posnemi fotografijo",
       "photoLibrary": "Fotografije",
-      "files": "Datotek",
+      "files": "Datoteke",
       "cameraAccessMessage": "Za fotografiranje v nastavitvah dovoli dostop do kamere."
     },
     "typingIndicator": {
@@ -1471,7 +1471,10 @@
       "gitlabNoRepositoriesDescription": "Morda moraš odobriti dostop do več skupin ali projektov na platformi GitLab.",
       "installGithubApp": "Namestitev aplikacije GitHub v skladišča",
       "installGithubAppDescription": "Aplikaciji Kilo za GitHub odobri dostop do skladišč, ki jih želiš pregledati.",
-      "repositoryAccess": "dostop do skladišč"
+      "repositoryAccess": "dostop do skladišč",
+      "allModePersonal": "Vsako skladišče, do katerega lahko Kilo dostopa prek tvoje povezave z GitHubom, se samodejno pregleda.",
+      "allModeOrganization": "Vsako skladišče, do katerega lahko Kilo dostopa prek povezave organizacije z GitHubom, se samodejno pregleda.",
+      "allModeCount": "Razpoložljiva skladišča: {{displayCount}}"
     },
     "style": {
       "title": "Slog pregleda",
@@ -1720,7 +1723,8 @@
       "sortSeverityDesc": "Resnost: od visoke do nizke",
       "sortSeverityAsc": "Resnost: od nizke do visoke",
       "sortSlaDue": "Rok SLA",
-      "overdueOnly": "Samo s pretečenim rokom"
+      "overdueOnly": "Samo s pretečenim rokom",
+      "noRepositories": "Noben repozitorij še ni sinhroniziran ali izbran. Izberite jih v nastavitvah Varnostnega agenta."
     },
     "automation": {
       "title": "Avtomatizacija",
@@ -1795,17 +1799,12 @@
       "findingsCount": "Število ugotovitev: {{displayCount}}",
       "notMeasured": "Ni izmerjeno",
       "actFirst": "Prednostni ukrepi",
-      "slaPosture": "Stanje SLA",
       "actionPosture": "Stanje ukrepov",
       "codebaseRisk": "Tveganje v izvorni kodi",
       "repositoryActionPlan": "Načrt ukrepov za skladišče",
       "noOpenFindings": "Nobena odprta ugotovitev ne zahteva ukrepanja",
       "deadlineToday": "Rok poteče danes",
       "daysOverdue": "{{displayCount}} dni po roku",
-      "withinDeadline": "V roku",
-      "criticalOverdue": "Kritična resnost, rok je potekel",
-      "highOverdue": "Visoka resnost, rok je potekel",
-      "mediumLowOverdue": "Srednja in nizka resnost, rok je potekel",
       "confirmedExploitable": "Potrjeno izkoristljivo",
       "needsEvidenceReview": "Potreben je pregled dokazov",
       "analysisNotComplete": "Analiza ni dokončana",
@@ -1815,7 +1814,22 @@
       "noSlaDeadline": "Rok SLA ni določen",
       "noRepositoryData": "Še ni podatkov o skladišču",
       "noRepositoryDataDescription": "Prednostni ukrepi za skladišča se bodo prikazali po sinhronizaciji ugotovitev.",
-      "repoSummary": "Odprte: {{open}} · kritične: {{critical}} · visoke resnosti: {{high}}",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "Odprte: {{displayCount}}",
+      "repoSummaryOpen_one": "Odprte: {{displayCount}}",
+      "repoSummaryOpen_two": "Odprte: {{displayCount}}",
+      "repoSummaryOpen_few": "Odprte: {{displayCount}}",
+      "repoSummaryOpen_other": "Odprte: {{displayCount}}",
+      "repoSummaryCritical": "kritične: {{displayCount}}",
+      "repoSummaryCritical_one": "kritične: {{displayCount}}",
+      "repoSummaryCritical_two": "kritične: {{displayCount}}",
+      "repoSummaryCritical_few": "kritične: {{displayCount}}",
+      "repoSummaryCritical_other": "kritične: {{displayCount}}",
+      "repoSummaryHigh": "visoke resnosti: {{displayCount}}",
+      "repoSummaryHigh_one": "visoke resnosti: {{displayCount}}",
+      "repoSummaryHigh_two": "visoke resnosti: {{displayCount}}",
+      "repoSummaryHigh_few": "visoke resnosti: {{displayCount}}",
+      "repoSummaryHigh_other": "visoke resnosti: {{displayCount}}",
       "couldNotLoad": "Podatkov nadzorne plošče ni bilo mogoče naložiti.",
       "filterByRepository": "Filtriraj po skladišču",
       "lastSynced": "Nazadnje sinhronizirano {{time}}",
@@ -1823,7 +1837,6 @@
       "notYetSynced": "Še ni sinhronizirano",
       "refreshFailed": "Osvežitev ni uspela. Prikazani so podatki zadnje sinhronizacije.",
       "settings": "Nastavitve",
-      "syncFindings": "Sinhroniziraj ugotovitve",
       "syncNow": "Sinhroniziraj zdaj",
       "syncQueued": "Sinhronizacija v čakalni vrsti",
       "syncStatusUnavailable": "Stanje sinhronizacije ni na voljo.",
@@ -1845,8 +1858,23 @@
       "withinDeadlineDetail": "{{within}} od {{total}} v roku",
       "noDeadlineData": "Nobena ugotovitev še nima roka SLA",
       "deadlinePassed": "Rok je potekel",
-      "deadlinePassedDetail": "Kritično: {{critical}}, visoko: {{high}}",
-      "deadlinePassedDetailWithMediumLow": "Kritično: {{critical}}, visoko: {{high}}, srednje in nisko: {{mediumLow}}",
+      "deadlinePassedDetail": "{{critical}}, {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
+      "breakdownCritical": "Kritično: {{displayCount}}",
+      "breakdownCritical_one": "Kritično: {{displayCount}}",
+      "breakdownCritical_two": "Kritično: {{displayCount}}",
+      "breakdownCritical_few": "Kritično: {{displayCount}}",
+      "breakdownCritical_other": "Kritično: {{displayCount}}",
+      "breakdownHigh": "visoko: {{displayCount}}",
+      "breakdownHigh_one": "visoko: {{displayCount}}",
+      "breakdownHigh_two": "visoko: {{displayCount}}",
+      "breakdownHigh_few": "visoko: {{displayCount}}",
+      "breakdownHigh_other": "visoko: {{displayCount}}",
+      "breakdownMediumLow": "srednje in nisko: {{displayCount}}",
+      "breakdownMediumLow_one": "srednje in nisko: {{displayCount}}",
+      "breakdownMediumLow_two": "srednje in nisko: {{displayCount}}",
+      "breakdownMediumLow_few": "srednje in nisko: {{displayCount}}",
+      "breakdownMediumLow_other": "srednje in nisko: {{displayCount}}",
       "dueThisWeek": "Rok poteče ta teden",
       "dueThisWeekDetail": "{{exploitable}} od teh je potrjeno izkoristljivih",
       "noDeadline": "Brez roka",
@@ -1906,7 +1934,6 @@
       "repositoriesCount_one": "Izbrano {{displayCount}} skladišče",
       "repositoriesCount": "Izbranih {{displayCount}} repozitorijev",
       "repositoriesCount_other": "Izbranih {{displayCount}} repozitorijev",
-      "selectRepositoriesSubtitle": "Izberi, katera skladišča spremlja varnostni agent",
       "analysisModeSubtitle": "Način analize: {{mode}}",
       "automationAllOff": "Vse izklopljeno",
       "automationCount": "Omogočeno: {{displayCount}} od 3",
@@ -2101,7 +2128,10 @@
       "settleFailed": "Dejanje je bilo izvedeno, a rezultata nismo mogli zabeležiti. Poskusi znova.",
       "replayFailed": "To dejanje se ni izvedlo. Poskusi znova.",
       "actionFailed": "Tega dejanja ni bilo mogoče dokončati. Poskusi znova.",
-      "actionBlocked": "Tega dejanja ni bilo mogoče dokončati. Težavo je treba najprej odpraviti."
+      "actionBlocked": "Tega dejanja ni bilo mogoče dokončati. Težavo je treba najprej odpraviti.",
+      "syncNoRepositories": "V obsegu sinhronizacije ni nobenega repozitorija. Izberite repozitorije, ki jih Varnostni agent spremlja, in znova sinhronizirajte.",
+      "syncIntegrationInactive": "Povezava z GitHub za Varnostnega agenta ni aktivna. Znova povežite Kilo GitHub App in nato znova sinhronizirajte.",
+      "syncMissingPermission": "Kilo GitHub App ne more brati opozoril o ranljivostih. V GitHubu dodeli to dovoljenje in znova sinhroniziraj."
     },
     "analysisState": {
       "queued": "Analiza v čakalni vrsti",
@@ -2212,7 +2242,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktivnih sej ni bilo mogoče naložiti.",
       "couldNotRefresh": "Osvežitev ni uspela",
-      "noSessionsYetDescription": "Začni programsko nalogo s telefona. Tvoje seje se bodo prikazale tukaj.",
+      "noSessionsYetDescription": "Začni programsko nalogo s telefona.",
       "viewHistory": "Zgodovina sej",
       "noMatches": "Ni ustreznih sej",
       "tryDifferentSearch": "Poskusi z drugim iskalnim izrazom.",
@@ -2824,7 +2854,7 @@
     "attachmentPicker": {
       "camera": "Fotoaparat",
       "photoLibrary": "Fotografije",
-      "files": "Datotek",
+      "files": "Datoteke",
       "couldNotOpenPhotoPicker": "Izbirnika fotografij ni bilo mogoče odpreti. Znova zaženi Kilo in poskusi znova.",
       "maxFilesAllowed": "Dovoljeno število datotek je največ {{displayCount}}.",
       "onlyAddingFiles": "Dodajanje datotek: samo {{accepted}} od {{total}} (največ {{max}})",
@@ -3221,7 +3251,7 @@
     "couldNotSaveChoice": "Tvoje izbire ni bilo mogoče shraniti. Poskusi znova.",
     "onlineAllowed": "Spletno, dovoljeno",
     "onlineNotAllowed": "Spletno, ni dovoljeno",
-    "optionalReview": "Neobvezno — to lahko kadar koli spremeniš v nastavitvah",
+    "optionalReview": "Neobvezno",
     "optionalOnboarding": "Neobvezno — vklopljeno, dokler tega ne izklopiš",
     "aiProvidersWhat": "Tvoji pozivi, zgodovina pogovorov in vse datoteke, ki jih priložiš.",
     "aiProvidersWhy": "Za ustvarjanje odgovorov umetne inteligence.",
@@ -3954,6 +3984,7 @@
     "skillMarkdownLabel": "Vsebina spretnosti",
     "skillsEmpty": "Ni še veščin",
     "skillNameRequired": "Vnesite ime spretnosti",
+    "skillNameTooLong": "Ime spretnosti mora imeti {{max}} znakov ali manj",
     "skillNameInvalid": "Ime spretnosti se mora začeti s črko ali številko in uporabljati samo male črke, številke in pomišljaje",
     "skillContentRequired": "Potrebna je vsebina spretnosti",
     "skillSaveFailed": "Spretnosti ni bilo mogoče shraniti. Poskusite znova.",
@@ -4062,7 +4093,8 @@
       "nameRequired": "Vnesite ime ukaza",
       "nameInvalid": "Ime se mora začeti z malo začetnico in uporabljati samo male črke, številke in pomišljaje",
       "templateRequired": "Vnesite predlogo ukaza",
-      "nameConflict": "To ime je rezervirano z vgrajenim ukazom"
+      "nameConflict": "To ime je rezervirano z vgrajenim ukazom",
+      "duplicateName": "Ukaz s tem imenom v tem profilu že obstaja"
     },
     "repoBindings": {
       "title": "Privzeti profili za skladišča",

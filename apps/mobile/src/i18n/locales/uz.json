@@ -163,7 +163,7 @@
     "allLanguages": "Barcha tillar"
   },
   "login": {
-    "welcome": "Kiloga xush kelibsiz",
+    "welcome": "Xush kelibsiz",
     "retrySignIn": "Qayta kirishga urinish",
     "logo": "Kilo logotipi",
     "continuingSignIn": "Kirish davom ettirilmoqda.",
@@ -330,7 +330,7 @@
       "diffTooLarge": "farqlar hajmi juda katta",
       "openFile": "{{path}}ni ochish",
       "openFileViewed": "{{path}}ni ochish (ko'rilgan)",
-      "title": "Fayl"
+      "title": "Fayllar"
     },
     "fileRows": {
       "markViewed": "{{path}}ni ko'rilgan deb belgilash",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Telefonda merge so‘rovlarini ko‘rib chiqish uchun GitLab hisobingizni ulang.",
       "bitbucketDescription": "Telefonda PRlarni ko‘rib chiqish uchun Bitbucketni ushbu tashkilotga ulang.",
       "bitbucketOrgOnlyDescription": "Yuqoridagi hisobni tashkilotga oʻtkazing, uning Bitbucket PRlarini koʻrib chiqish uchun.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Bu hisobda hozircha hech qanday tashkilot yo‘q. Tashkilot yaratganingizdan yoki unga qo‘shilganingizdan so‘ng Bitbucket PRlarini ko‘rib chiqish mumkin.",
       "contextLine": "{{organization}} uchun",
       "contextLinePersonal": "Shaxsiy hisob uchun"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub bilan ulanish muddati tugadi.",
-      "message": "GitHub ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi.",
+      "message": "Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi.",
       "gitlabTitle": "GitLab bilan ulanish muddati tugadi.",
-      "bitbucketTitle": "Bitbucket bilan ulanish muddati tugadi.",
-      "providerMessage": "{{provider}} ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi."
+      "bitbucketTitle": "Bitbucket bilan ulanish muddati tugadi."
     },
     "eventChips": {
       "comment": "Izoh",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "Umumiy ko'rinish",
-      "files": "Fayl",
+      "files": "Fayllar",
       "discussion": "Muhokama"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "Rasmga olish",
       "photoLibrary": "Rasmlar kutubxonasi",
-      "files": "Fayl",
+      "files": "Fayllar",
       "cameraAccessMessage": "Suratga olish uchun sozlamalarda kameradan foydalanishga ruxsat bering."
     },
     "typingIndicator": {
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLabda qo'shimcha guruh yoki loyihalarga kirish huquqini berishingiz kerak bo'lishi mumkin.",
       "installGithubApp": "GitHub ilovasini repozitoriyalarga o'rnating",
       "installGithubAppDescription": "Kilo GitHub ilovasiga ko'rib chiqilishini xohlagan repozitoriyalaringizga kirish huquqini bering.",
-      "repositoryAccess": "repozitoriyaga kirish huquqi"
+      "repositoryAccess": "repozitoriyaga kirish huquqi",
+      "allModePersonal": "Kilo sizning GitHub ulanishingiz orqali kira oladigan har bir repozitoriya avtomatik ravishda ko'rib chiqiladi.",
+      "allModeOrganization": "Kilo tashkilotning GitHub ulanishi orqali kira oladigan har bir repozitoriya avtomatik ravishda ko'rib chiqiladi.",
+      "allModeCount": "Mavjud repozitoriylar: {{displayCount}}"
     },
     "style": {
       "title": "Ko‘rib chiqish uslubi",
@@ -1676,7 +1679,8 @@
       "sortSeverityDesc": "Xavf darajasi: yuqoridan pastga",
       "sortSeverityAsc": "Xavf darajasi: pastdan yuqoriga",
       "sortSlaDue": "SLA muddati",
-      "overdueOnly": "Faqat muddati o'tganlar"
+      "overdueOnly": "Faqat muddati o'tganlar",
+      "noRepositories": "Hozircha hech qanday repozitoriy sinxronlanmagan yoki tanlanmagan. Ularni «Xavfsizlik agenti» sozlamalarida tanlang."
     },
     "automation": {
       "title": "Avtomatlashtirish",
@@ -1749,17 +1753,12 @@
       "findingsCount": "{{displayCount}} ta muammo",
       "notMeasured": "O‘lchanmagan",
       "actFirst": "Birinchi navbatdagi amallar",
-      "slaPosture": "SLA holati",
       "actionPosture": "Amallar holati",
       "codebaseRisk": "Kod bazasi xavfi",
       "repositoryActionPlan": "Repozitoriya bo'yicha amallar rejasi",
       "noOpenFindings": "E'tibor talab qiladigan ochiq muammolar yo'q",
       "deadlineToday": "Muddat bugun tugadi",
       "daysOverdue": "Muddati {{displayCount}} kun o'tgan",
-      "withinDeadline": "Muddati o'tmagan",
-      "criticalOverdue": "Muddati o'tgan: o'ta jiddiy",
-      "highOverdue": "Muddati o'tgan: yuqori",
-      "mediumLowOverdue": "Muddati o'tgan: o'rta va past",
       "confirmedExploitable": "Hujumda foydalanish mumkinligi tasdiqlangan",
       "needsEvidenceReview": "Dalillarni ko'rib chiqish kerak",
       "analysisNotComplete": "Tahlil tugallanmagan",
@@ -1769,7 +1768,16 @@
       "noSlaDeadline": "SLA muddati belgilanmagan",
       "noRepositoryData": "Hali repozitoriya ma'lumotlari yo'q",
       "noRepositoryDataDescription": "Muammolar sinxronlangach, repozitoriyalar ustuvorligi ko'rsatiladi.",
-      "repoSummary": "{{open}} ta ochiq · {{critical}} ta o'ta jiddiy · {{high}} ta yuqori",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "{{displayCount}} ta ochiq",
+      "repoSummaryOpen_one": "{{displayCount}} ta ochiq",
+      "repoSummaryOpen_other": "{{displayCount}} ta ochiq",
+      "repoSummaryCritical": "{{displayCount}} ta o'ta jiddiy",
+      "repoSummaryCritical_one": "{{displayCount}} ta o'ta jiddiy",
+      "repoSummaryCritical_other": "{{displayCount}} ta o'ta jiddiy",
+      "repoSummaryHigh": "{{displayCount}} ta yuqori",
+      "repoSummaryHigh_one": "{{displayCount}} ta yuqori",
+      "repoSummaryHigh_other": "{{displayCount}} ta yuqori",
       "couldNotLoad": "Boshqaruv paneli ma'lumotlarini yuklab bo'lmadi.",
       "filterByRepository": "Repozitoriya bo'yicha filtrlash",
       "lastSynced": "Oxirgi sinxronlash: {{time}}",
@@ -1777,7 +1785,6 @@
       "notYetSynced": "Hali sinxronlanmagan",
       "refreshFailed": "Yangilash imkoni bo'lmadi — oxirgi sinxronlangan ma'lumotlar ko'rsatilmoqda.",
       "settings": "Sozlamalar",
-      "syncFindings": "Muammolarni sinxronlash",
       "syncNow": "Hozir sinxronlash",
       "syncQueued": "Sinxronlash navbatga qo'yildi",
       "syncStatusUnavailable": "Sinxronlash holatini aniqlab bo'lmadi.",
@@ -1795,8 +1802,17 @@
       "withinDeadlineDetail": "{{total}} tadan {{within}} tasining muddati o'tmagan",
       "noDeadlineData": "Hali hech bir muammo uchun SLA muddati belgilanmagan",
       "deadlinePassed": "Muddat o'tdi",
-      "deadlinePassedDetail": "{{critical}} ta o‘ta yuqori, {{high}} ta yuqori",
-      "deadlinePassedDetailWithMediumLow": "{{critical}} ta o‘ta yuqori, {{high}} ta yuqori, {{mediumLow}} ta o‘rta va past",
+      "deadlinePassedDetail": "{{critical}}, {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
+      "breakdownCritical": "{{displayCount}} ta o‘ta yuqori",
+      "breakdownCritical_one": "{{displayCount}} ta o‘ta yuqori",
+      "breakdownCritical_other": "{{displayCount}} ta o‘ta yuqori",
+      "breakdownHigh": "{{displayCount}} ta yuqori",
+      "breakdownHigh_one": "{{displayCount}} ta yuqori",
+      "breakdownHigh_other": "{{displayCount}} ta yuqori",
+      "breakdownMediumLow": "{{displayCount}} ta o‘rta va past",
+      "breakdownMediumLow_one": "{{displayCount}} ta o‘rta va past",
+      "breakdownMediumLow_other": "{{displayCount}} ta o‘rta va past",
       "dueThisWeek": "Muddati shu hafta tugaydi",
       "dueThisWeekDetail": "{{exploitable}} tasida hujumda foydalanish mumkinligi tasdiqlangan",
       "noDeadline": "Muddat yo'q",
@@ -1856,7 +1872,6 @@
       "repositoriesCount_one": "{{displayCount}} ta repozitoriya tanlangan",
       "repositoriesCount": "{{displayCount}} ta repozitoriy tanlangan",
       "repositoriesCount_other": "{{displayCount}} ta repozitoriy tanlangan",
-      "selectRepositoriesSubtitle": "Xavfsizlik agenti kuzatadigan repozitoriyalarni tanlang",
       "analysisModeSubtitle": "{{mode}} tahlil",
       "automationAllOff": "Hammasi o'chiq",
       "automationCount": "3 tadan {{displayCount}} tasi yoqilgan",
@@ -2047,7 +2062,10 @@
       "settleFailed": "Amal bajarildi, ammo natijani qayd etishimiz mumkin bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "replayFailed": "Bu amal tugallanmadi. Iltimos, qayta urinib ko'ring.",
       "actionFailed": "Bu amalni tugallab bo'lmadi. Iltimos, qayta urinib ko'ring.",
-      "actionBlocked": "Bu amalni tugallab bo'lmadi. Muammoni avval hal qilish kerak."
+      "actionBlocked": "Bu amalni tugallab bo'lmadi. Muammoni avval hal qilish kerak.",
+      "syncNoRepositories": "Sinxronlash doirasida hech qanday repozitoriy yo'q. «Xavfsizlik agenti» kuzatadigan repozitoriylarni tanlang, so'ngra qayta sinxronlang.",
+      "syncIntegrationInactive": "«Xavfsizlik agenti»ning GitHub ulanishi faol emas. Kilo GitHub App’ni qayta ulang, so‘ng qaytadan sinxronlang.",
+      "syncMissingPermission": "Kilo GitHub App zaiflik ogohlantirishlarini o'qiy olmaydi. GitHubda shu ruxsatni bering, so'ng yana sinxronlang."
     },
     "analysisState": {
       "queued": "Tahlil navbatda",
@@ -2154,7 +2172,7 @@
     "sessionList": {
       "couldNotLoadActive": "Faol sessiyalarni yuklab bo'lmadi.",
       "couldNotRefresh": "Yangilab bo'lmadi",
-      "noSessionsYetDescription": "Telefoningizdan kod yozish vazifasini boshlang. Sessiyalaringiz shu yerda ko'rinadi.",
+      "noSessionsYetDescription": "Telefoningizdan kod yozish vazifasini boshlang.",
       "viewHistory": "Sessiyalar tarixi",
       "noMatches": "Mos sessiya topilmadi",
       "tryDifferentSearch": "Boshqa so‘z bilan qidirib ko‘ring.",
@@ -2752,7 +2770,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Rasmlar kutubxonasi",
-      "files": "Fayl",
+      "files": "Fayllar",
       "couldNotOpenPhotoPicker": "Rasm tanlash oynasini ochib bo'lmadi. Kilo ilovasini qayta ishga tushiring va yana urinib ko'ring.",
       "maxFilesAllowed": "Ko'pi bilan {{displayCount}} ta fayl qo'shish mumkin.",
       "onlyAddingFiles": "{{total}} ta fayldan faqat {{accepted}} tasi qo'shilmoqda (ko'pi bilan {{max}} ta)",
@@ -3135,7 +3153,7 @@
     "couldNotSaveChoice": "Tanlovingizni saqlab bo'lmadi. Iltimos, qayta urinib ko'ring.",
     "onlineAllowed": "Onlayn, ruxsat berilgan",
     "onlineNotAllowed": "Onlayn, ruxsat berilmagan",
-    "optionalReview": "Ixtiyoriy — istalgan vaqtda sozlamalarda o'zgartirishingiz mumkin",
+    "optionalReview": "Ixtiyoriy",
     "optionalOnboarding": "Ixtiyoriy — o'chirmaguningizcha yoqilgan",
     "aiProvidersWhat": "So'rovlaringiz, suhbat tarixi va biriktirgan fayllaringiz.",
     "aiProvidersWhy": "AI javoblarini yaratish uchun.",
@@ -3854,6 +3872,7 @@
     "skillMarkdownLabel": "Ko'nikma tarkibi",
     "skillsEmpty": "Hali mahorat yo'q",
     "skillNameRequired": "Qobiliyat nomini kiriting",
+    "skillNameTooLong": "Malaka nomi {{max}} ta belgidan oshmasligi kerak",
     "skillNameInvalid": "Malaka nomi harf yoki raqam bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
     "skillContentRequired": "Ko'nikma tarkibi talab qilinadi",
     "skillSaveFailed": "Mahorat saqlanmadi. Qayta urinib ko'ring.",
@@ -3960,7 +3979,8 @@
       "nameRequired": "Buyruq nomini kiriting",
       "nameInvalid": "Ism kichik harf bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
       "templateRequired": "Buyruq shablonini kiriting",
-      "nameConflict": "Bu nom o'rnatilgan buyruq bilan saqlangan"
+      "nameConflict": "Bu nom o'rnatilgan buyruq bilan saqlangan",
+      "duplicateName": "Bu profilda bu nom bilan buyruq allaqachon mavjud"
     },
     "repoBindings": {
       "title": "Repos uchun standart profillar",

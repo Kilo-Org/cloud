@@ -25,7 +25,7 @@ import {
   type LiveActivityFactory,
 } from 'expo-widgets';
 
-import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
+import { type GlanceableLiveActivityContentState } from '@kilocode/notifications/schemas';
 
 import { withGlanceableCopy } from './layout-copy';
 import { withWidgetLogo } from './widget-logo';

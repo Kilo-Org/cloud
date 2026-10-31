@@ -163,7 +163,7 @@
     "allLanguages": "所有語言"
   },
   "login": {
-    "welcome": "歡迎使用 Kilo",
+    "welcome": "歡迎",
     "retrySignIn": "重新嘗試登入",
     "logo": "Kilo 標誌",
     "continuingSignIn": "正在繼續登入程序。",
@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "你可能需要授權存取 GitLab 上的更多群組或專案。",
       "installGithubApp": "為存放庫安裝 GitHub App",
       "installGithubAppDescription": "請授權 Kilo GitHub App 存取要審查的存放庫。",
-      "repositoryAccess": "存放庫存取權限"
+      "repositoryAccess": "存放庫存取權限",
+      "allModePersonal": "Kilo 可透過你的 GitHub 連線存取的每個存放庫都會自動進行審查。",
+      "allModeOrganization": "Kilo 可透過組織的 GitHub 連線存取的每個存放庫都會自動進行審查。",
+      "allModeCount": "可用的存放庫：{{displayCount}}"
     },
     "style": {
       "title": "審查風格",
@@ -1147,7 +1150,8 @@
       "sortSeverityDesc": "嚴重程度：高到低",
       "sortSlaDue": "SLA 到期日",
       "statusIgnored": "已忽略",
-      "statusOpen": "開啟"
+      "statusOpen": "開啟",
+      "noRepositories": "尚未同步或選取任何存放庫。請在資安代理程式設定中選擇。"
     },
     "analysis": {
       "analyzeRepository": "分析存放庫",
@@ -1273,15 +1277,12 @@
       "codebaseRisk": "程式碼庫風險",
       "confirmedExploitable": "已確認可被利用",
       "couldNotLoad": "無法載入儀表板資料。",
-      "criticalOverdue": "嚴重問題已逾期",
       "daysOverdue": "逾期 {{displayCount}} 天",
       "deadlineToday": "今天到期",
       "filterByRepository": "依存放庫篩選",
       "findingsCount": "{{displayCount}} 項資安問題",
-      "highOverdue": "高風險問題已逾期",
       "lastSynced": "上次同步於 {{time}}",
       "manageRepositories": "管理存放庫",
-      "mediumLowOverdue": "中低風險問題已逾期",
       "needsEvidenceReview": "待審查證據",
       "needsYourReview": "待你審查",
       "noImmediateAction": "無需立即處理",
@@ -1293,15 +1294,21 @@
       "notMeasured": "尚未評估",
       "notYetSynced": "尚未同步",
       "refreshFailed": "無法重新整理，目前顯示的是上次同步的資料。",
-      "repoSummary": "{{open}} 項未解決 · {{critical}} 項嚴重 · {{high}} 項高風險",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "{{displayCount}} 項未解決",
+      "repoSummaryOpen_one": "{{displayCount}} 項未解決",
+      "repoSummaryOpen_other": "{{displayCount}} 項未解決",
+      "repoSummaryCritical": "{{displayCount}} 項嚴重",
+      "repoSummaryCritical_one": "{{displayCount}} 項嚴重",
+      "repoSummaryCritical_other": "{{displayCount}} 項嚴重",
+      "repoSummaryHigh": "{{displayCount}} 項高風險",
+      "repoSummaryHigh_one": "{{displayCount}} 項高風險",
+      "repoSummaryHigh_other": "{{displayCount}} 項高風險",
       "repositoryActionPlan": "存放庫處理計畫",
       "settings": "設定",
-      "slaPosture": "SLA 達成狀況",
-      "syncFindings": "同步資安問題",
       "syncNow": "立即同步",
       "syncQueued": "已排入同步佇列",
       "syncStatusUnavailable": "無法取得同步狀態。",
-      "withinDeadline": "期限內",
       "daysOverdue_one": "逾期 {{displayCount}} 天",
       "daysOverdue_other": "逾期 {{displayCount}} 天",
       "findingsCount_one": "{{displayCount}} 項資安問題",
@@ -1316,8 +1323,17 @@
       "withinDeadlineDetail": "{{total}} 項中有 {{within}} 項在期限內",
       "noDeadlineData": "尚未為任何資安問題設定 SLA 期限",
       "deadlinePassed": "已超過期限",
-      "deadlinePassedDetail": "嚴重：{{critical}} 項，高：{{high}} 項",
-      "deadlinePassedDetailWithMediumLow": "嚴重：{{critical}} 項，高：{{high}} 項，中低：{{mediumLow}} 項",
+      "deadlinePassedDetail": "{{critical}}，{{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}，{{high}}，{{mediumLow}}",
+      "breakdownCritical": "嚴重：{{displayCount}} 項",
+      "breakdownCritical_one": "嚴重：{{displayCount}} 項",
+      "breakdownCritical_other": "嚴重：{{displayCount}} 項",
+      "breakdownHigh": "高：{{displayCount}} 項",
+      "breakdownHigh_one": "高：{{displayCount}} 項",
+      "breakdownHigh_other": "高：{{displayCount}} 項",
+      "breakdownMediumLow": "中低：{{displayCount}} 項",
+      "breakdownMediumLow_one": "中低：{{displayCount}} 項",
+      "breakdownMediumLow_other": "中低：{{displayCount}} 項",
       "dueThisWeek": "本週到期",
       "dueThisWeekDetail": "其中 {{exploitable}} 項已確認可遭利用",
       "noDeadline": "無期限",
@@ -1466,8 +1482,7 @@
       "on": "開啟",
       "repositoriesCount": "已選擇 {{displayCount}} 個存放庫",
       "repositoriesCount_other": "已選擇 {{displayCount}} 個存放庫",
-      "repositoriesCount_one": "已選取 {{displayCount}} 個存放庫",
-      "selectRepositoriesSubtitle": "選取要由資安代理程式監控的存放庫"
+      "repositoriesCount_one": "已選取 {{displayCount}} 個存放庫"
     },
     "settingsSave": {
       "saveChanges": "儲存變更",
@@ -1518,7 +1533,10 @@
       "settleFailed": "操作已完成，但我們無法記錄結果。請再試一次。",
       "replayFailed": "此操作未完成。請再試一次。",
       "actionFailed": "無法完成此操作。請再試一次。",
-      "actionBlocked": "無法完成此操作。必須先修正此問題，才能重試。"
+      "actionBlocked": "無法完成此操作。必須先修正此問題，才能重試。",
+      "syncNoRepositories": "同步範圍內沒有任何存放庫。請選擇資安代理程式要監控的存放庫，然後再次同步。",
+      "syncIntegrationInactive": "資安代理程式的 GitHub 連線未啟用。請重新連線 Kilo GitHub App，然後再次同步。",
+      "syncMissingPermission": "Kilo GitHub App 無法讀取 vulnerability alerts。請在 GitHub 中授予該權限，然後再次同步。"
     },
     "analysisState": {
       "queued": "等待分析",
@@ -1625,7 +1643,7 @@
     "sessionList": {
       "couldNotLoadActive": "無法載入進行中的工作階段。",
       "couldNotRefresh": "無法重新整理",
-      "noSessionsYetDescription": "用手機開始程式開發任務，工作階段就會顯示在這裡。",
+      "noSessionsYetDescription": "用手機開始程式開發任務。",
       "viewHistory": "工作階段記錄",
       "noMatches": "沒有相符的工作階段",
       "tryDifferentSearch": "請嘗試其他搜尋字詞。",
@@ -2606,7 +2624,7 @@
     "couldNotSaveChoice": "無法儲存你的選擇。請再試一次。",
     "onlineAllowed": "已允許線上處理",
     "onlineNotAllowed": "未允許線上處理",
-    "optionalReview": "選用項目：可隨時在「設定」中變更",
+    "optionalReview": "選用",
     "optionalOnboarding": "選用項目：預設開啟，可自行關閉",
     "aiProvidersWhat": "你的提示詞、對話記錄與附加的檔案。",
     "aiProvidersWhy": "用於產生 AI 回覆。",
@@ -2698,6 +2716,7 @@
       "gitlabDescription": "連結你的 GitLab 帳戶，以便在行動裝置上審查合併請求。",
       "bitbucketDescription": "將 Bitbucket 連結到此組織，以便在行動裝置上審查提取請求。",
       "bitbucketOrgOnlyDescription": "將上方的帳戶切換為某個組織，以便審查其 Bitbucket 提取請求。",
+      "bitbucketOrgOnlyNoOrganizationDescription": "此帳戶尚無任何組織。建立或加入組織後，即可審查 Bitbucket 提取請求。",
       "contextLine": "適用於 {{organization}}",
       "contextLinePersonal": "適用於您的個人帳戶"
     },
@@ -3064,10 +3083,9 @@
     "pullRequestUnavailableDescription": "無法開啟此 PR。可能是 PR 已刪除、存放庫設為私人，或存放庫尚未安裝 Kilo GitHub App。",
     "reconnectNotice": {
       "title": "GitHub 連線已過期。",
-      "message": "你的 GitHub 連線已失效。請重新檢查連線；如有需要，系統會提示你重新連線。",
+      "message": "請重新檢查連線；如有需要，系統會提示你重新連線。",
       "gitlabTitle": "GitLab 連線已過期。",
-      "bitbucketTitle": "Bitbucket 連線已過期。",
-      "providerMessage": "你的 {{provider}} 連線已失效。請重新檢查連線；如有需要，系統會提示你重新連線。"
+      "bitbucketTitle": "Bitbucket 連線已過期。"
     },
     "review": "審查",
     "reviewPullRequest": "審查提取請求",
@@ -3854,6 +3872,7 @@
     "skillMarkdownLabel": "技能內容",
     "skillsEmpty": "還沒有技能",
     "skillNameRequired": "輸入技能名稱",
+    "skillNameTooLong": "技能名稱必須為 {{max}} 個字元以內",
     "skillNameInvalid": "技能名稱必須以字母或數字開頭，且只能使用小寫字母、數字和連字符",
     "skillContentRequired": "技能內容為必填項",
     "skillSaveFailed": "無法保存技能。請重試。",
@@ -3960,7 +3979,8 @@
       "nameRequired": "輸入命令名稱",
       "nameInvalid": "名稱必須以小寫字母開頭，且只能使用小寫字母、數字和連字符",
       "templateRequired": "輸入命令模板",
-      "nameConflict": "該名稱由內建指令保留"
+      "nameConflict": "該名稱由內建指令保留",
+      "duplicateName": "此設定檔中已有相同名稱的指令"
     },
     "repoBindings": {
       "title": "倉庫的預設設定檔",

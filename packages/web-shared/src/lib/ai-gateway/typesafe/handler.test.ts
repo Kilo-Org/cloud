@@ -844,11 +844,11 @@ describe('handleSystemOneRequest', () => {
         messageId: null,
         hasError: true,
         cancelled: false,
-        status_code: 503,
+        status_code: 402,
         cost_mUsd: 0,
         market_cost: 0,
       }),
-      expect.objectContaining({ api_kind: 'systemone', status_code: 503 })
+      expect.objectContaining({ api_kind: 'systemone', status_code: 402 })
     );
   });
 
@@ -1014,6 +1014,41 @@ describe('handleSystemOneRequest', () => {
         status_code: 502,
       }),
       expect.objectContaining({ status_code: 502, ttfb_ms: METERED_LATENCY_MS })
+    );
+  });
+
+  it('attributes an unusable body to the model the provider named', async () => {
+    mockedFetch.mockResolvedValue(
+      Response.json({
+        id: upstreamBody.id,
+        model: OTHER_SYSTEM_ONE_MODEL,
+        answers: { billing: { type: 'noul', noul: 0.5 } },
+      })
+    );
+
+    expect((await handleSystemOneRequest(makeRequest())).status).toBe(502);
+
+    await runAfter();
+    expect(mapToUsageStats).not.toHaveBeenCalled();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ messageId: upstreamBody.id, model: OTHER_SYSTEM_ONE_MODEL }),
+      expect.anything()
+    );
+  });
+
+  it('attributes an unusable body without a model name to the resolved model', async () => {
+    mockedFetch.mockResolvedValue(Response.json({ answers: { billing: { type: 'noul' } } }));
+
+    expect(
+      (await handleSystemOneRequest(makeRequest({ ...requestBody, model: SYSTEM_ONE_ALIAS })))
+        .status
+    ).toBe(502);
+
+    await runAfter();
+    expect(fetchGeneration).not.toHaveBeenCalled();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ messageId: null, model: TYPESAFE_MODEL, cost_mUsd: 0 }),
+      expect.anything()
     );
   });
 

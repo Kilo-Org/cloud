@@ -71,6 +71,9 @@ const SYSTEM_ONE_UPSTREAM_TIMEOUT_MS = 10 * 60 * 1000;
 /** Only a body that carries a generation id can have its cost reconciled. */
 const generationIdSchema = z.object({ id: z.string().min(1) });
 
+/** A body the gateway could not use may still name the model the provider billed. */
+const providerModelSchema = z.object({ model: z.string().trim().min(1) });
+
 function errorResponse(message: string, error_type: ProxyErrorType, status: number) {
   return NextResponse.json({ message, error_type }, { status });
 }
@@ -289,14 +292,22 @@ export async function handleSystemOneRequest(request: NextRequest) {
    * still owes a ledger row and a bouncer event, so its spend stays visible. The
    * row carries no debit: the gateway never charges a cost it did not observe.
    */
-  const zeroCostUsageStats = (
-    messageId: string | null,
-    statusCode: number,
-    cancelled: boolean,
-    ttfb: number | null
-  ): MicrodollarUsageStats => ({
+  const zeroCostUsageStats = ({
     messageId,
-    model: resolvedModel,
+    model = resolvedModel,
+    statusCode,
+    cancelled,
+    ttfb,
+  }: {
+    messageId: string | null;
+    /** The provider's own model id, when the response body named one. */
+    model?: string;
+    statusCode: number;
+    cancelled: boolean;
+    ttfb: number | null;
+  }): MicrodollarUsageStats => ({
+    messageId,
+    model,
     responseContent: '',
     hasError: true,
     inference_provider: null,
@@ -320,9 +331,16 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const deferZeroCostUsage = (
     messageId: string | null,
     statusCode: number,
-    ttfb: number | null
+    ttfb: number | null,
+    model?: string
   ) => {
-    const stats = zeroCostUsageStats(messageId, statusCode, request.signal.aborted, ttfb);
+    const stats = zeroCostUsageStats({
+      messageId,
+      model,
+      statusCode,
+      cancelled: request.signal.aborted,
+      ttfb,
+    });
     const context = usageContextOf(statusCode, ttfb);
     after(async () => {
       await logMicrodollarUsageAndReportToBouncer(stats, context);
@@ -334,14 +352,14 @@ export async function handleSystemOneRequest(request: NextRequest) {
    * body did not carry a usable cost. Reconcile it through the generation
    * endpoint the rest of the gateway uses for the same purpose.
    */
-  const deferReconciledUsage = (generationId: string, ttfb: number) => {
+  const deferReconciledUsage = (generationId: string, ttfb: number, model?: string) => {
     const cancelled = request.signal.aborted;
     const context = usageContextOf(502, ttfb);
     after(async () => {
       const generation = await fetchGeneration(generationId, OPENROUTER);
       if (!generation) {
         await logMicrodollarUsageAndReportToBouncer(
-          zeroCostUsageStats(generationId, 502, cancelled, ttfb),
+          zeroCostUsageStats({ messageId: generationId, model, statusCode: 502, cancelled, ttfb }),
           context
         );
         return;
@@ -425,7 +443,9 @@ export async function handleSystemOneRequest(request: NextRequest) {
       errorExceptInTest('OpenRouter System One balance exhausted');
     }
     emitMetrics(response.status, ttfbMs);
-    deferZeroCostUsage(null, response.status === 402 ? 503 : response.status, ttfbMs);
+    // The row reports the provider's own answer, so it agrees with the metrics
+    // and with the ledger of every other upstream error response.
+    deferZeroCostUsage(null, response.status, ttfbMs);
     return response.status === 402
       ? errorResponse('Service temporarily unavailable', 'upstream_error', 503)
       : wrapInSafeNextResponse(response);
@@ -445,9 +465,14 @@ export async function handleSystemOneRequest(request: NextRequest) {
   emitMetrics(response.status, ttfbMs, result.success ? result.data.provider : undefined);
   if (!result.success) {
     errorExceptInTest('Invalid OpenRouter System One response or missing usage');
+    // A body the gateway could not accept may still name the model the provider
+    // billed, and the row must attribute the attempt the same way an answered
+    // request does.
+    const reportedModel = providerModelSchema.safeParse(responseBody);
+    const model = reportedModel.success ? reportedModel.data.model : undefined;
     const generationId = generationIdSchema.safeParse(responseBody);
-    if (generationId.success) deferReconciledUsage(generationId.data.id, ttfbMs);
-    else deferZeroCostUsage(null, 502, ttfbMs);
+    if (generationId.success) deferReconciledUsage(generationId.data.id, ttfbMs, model);
+    else deferZeroCostUsage(null, 502, ttfbMs, model);
     return errorResponse('Invalid upstream response', 'upstream_error', 502);
   }
 

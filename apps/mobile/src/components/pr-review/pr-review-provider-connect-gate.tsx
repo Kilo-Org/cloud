@@ -14,12 +14,18 @@ import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { PERSONAL_SCOPE, reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { WEB_BASE_URL } from '@/lib/config';
-import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
+import { useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
+import { useOrganization } from '@/lib/organization-context';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
-import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
+import {
+  selectPrReviewConnectAction,
+  selectPrReviewGateView,
+} from '@/lib/pr-review/pr-review-connect-gate-view';
 import { type ProviderPrPlatform, useProviderPrScopeOrNull } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -93,6 +99,15 @@ export function ProviderConnectGate({
   // membership — so the memberships answer decides which copy is true. One
   // cache entry serves this and the context line; nothing refetches.
   const memberships = useOrganizationsList();
+  // The connect CTA opens the web integration page, which refuses some
+  // organization roles for some providers (see `selectPrReviewConnectAction`).
+  // Read the caller's role the way the code-reviewer screens do, from the same
+  // cached memberships answer.
+  const permission = useReviewerPermission(organizationId ?? PERSONAL_SCOPE);
+  // Whether the stored account selection has been restored. Until it has, the
+  // `organizationId` prop is null even for a reader whose organization is being
+  // restored, so the gate must not answer for the personal scope yet.
+  const organization = useOrganization();
 
   // The providers — and the two GitLab scopes, whose payloads now differ by
   // the personal reconnect marker — answer with different status shapes, so
@@ -176,6 +191,11 @@ export function ProviderConnectGate({
     reconnectRequired:
       platform === 'gitlab' ? gitlabStatus.data?.reconnectRequired === true : false,
     organizationId,
+    // The layout hands this gate `useOrganization()`'s value, so the two agree
+    // on when the stored selection has landed. Reading it here too keeps the
+    // gate from asking the personal scope for an organization reader's first
+    // answer.
+    organizationSelectionLoaded: organization.isLoaded,
   });
 
   if (view === 'org-only') {
@@ -238,6 +258,12 @@ export function ProviderConnectGate({
 
   if (view === 'connect' || view === 'reconnect') {
     const reconnect = view === 'reconnect';
+    const action = selectPrReviewConnectAction({
+      platform,
+      view,
+      organizationId,
+      canManageOrganizationBilling: permission.status === 'ready' ? permission.canEdit : null,
+    });
     // Reused translated copy: the title above already names the expired
     // provider connection, so the description carries only the re-check
     // instruction and never restates the title. One key serves both the
@@ -254,7 +280,23 @@ export function ProviderConnectGate({
         ? t('prReview.reconnectNotice.gitlabTitle')
         : t('prReview.reconnectNotice.bitbucketTitle');
     const title = reconnect ? reconnectTitle : connectTitle;
-    const description = reconnect ? t('prReview.reconnectNotice.message') : connectDescription;
+    // The code-reviewer screens word the same dead end the same way: the
+    // connection cannot be completed from this role, and the role that can is
+    // named. Reusing their keys keeps the roles they name identical on both
+    // surfaces.
+    const organizationAdminOnlyDescription =
+      platform === 'gitlab'
+        ? t('codeReviewer.gitlab.notConnectedReadOnly', {
+            platform: reviewerPlatformLabel(platform),
+          })
+        : t('codeReviewer.bitbucket.notConnectedReadOnly');
+    let description = connectDescription;
+    if (reconnect) {
+      description = t('prReview.reconnectNotice.message');
+    }
+    if (action === 'organization-admin-only') {
+      description = organizationAdminOnlyDescription;
+    }
     return (
       <View className="flex-1 bg-background">
         <PrReviewGateHeader />
@@ -270,20 +312,22 @@ export function ProviderConnectGate({
             </>
           }
           action={
-            <Button
-              className={cn('mt-3 w-full flex-row gap-2', STATE_ACTION_CLASS)}
-              disabled={connecting}
-              onPress={() => {
-                void handleConnect();
-              }}
-            >
-              {connecting ? (
-                <ActivityIndicator size="small" color={colors.primaryForeground} />
-              ) : (
-                <RefreshCcw size={16} color={colors.primaryForeground} />
-              )}
-              <Text>{connectTitle}</Text>
-            </Button>
+            action === 'connect' ? (
+              <Button
+                className={cn('mt-3 w-full flex-row gap-2', STATE_ACTION_CLASS)}
+                disabled={connecting}
+                onPress={() => {
+                  void handleConnect();
+                }}
+              >
+                {connecting ? (
+                  <ActivityIndicator size="small" color={colors.primaryForeground} />
+                ) : (
+                  <RefreshCcw size={16} color={colors.primaryForeground} />
+                )}
+                <Text>{connectTitle}</Text>
+              </Button>
+            ) : undefined
           }
         />
       </View>

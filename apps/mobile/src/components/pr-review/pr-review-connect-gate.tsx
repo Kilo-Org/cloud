@@ -158,6 +158,10 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
     connected: authorization.data?.connected === true,
     reconnectRequired: authorization.data?.revoked === true,
     organizationId: null,
+    // The GitHub connect is the caller's own account authorization, identical
+    // with or without an organization selected, so it never waits on that
+    // selection.
+    organizationSelectionLoaded: true,
   });
 
   if (view === 'error') {

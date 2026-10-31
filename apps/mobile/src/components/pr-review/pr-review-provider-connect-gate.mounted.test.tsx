@@ -21,6 +21,29 @@ const queryState = vi.hoisted(
     membershipsError: false,
   })
 );
+// Mutable so each test answers the caller's organization role. The default is
+// a plain member: the tests that expect the Connect CTA raise it to a billing
+// role explicitly.
+type MockPermission =
+  | { status: 'loading' }
+  | { status: 'error'; refetch: () => void; isRetrying: boolean }
+  | { status: 'ready'; canEdit: boolean; canManage: boolean };
+const permissionState = vi.hoisted(
+  (): { value: MockPermission } => ({
+    value: { status: 'ready', canEdit: false, canManage: false },
+  })
+);
+vi.mock('@/lib/hooks/use-reviewer-permission', () => ({
+  useReviewerPermission: () => permissionState.value,
+}));
+// Mutable so each test answers the restored account selection. The layout and
+// the gate read the same context, so they agree on when it has landed.
+const organizationState = vi.hoisted(() => ({
+  value: { organizationId: 'org-1' as string | null, isLoaded: true },
+}));
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => organizationState.value,
+}));
 vi.mock('@/lib/pr-review/provider-pr-ref', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
@@ -135,6 +158,8 @@ beforeEach(() => {
   queryState.status = { connected: false, revoked: false };
   queryState.memberships = undefined;
   queryState.membershipsError = false;
+  permissionState.value = { status: 'ready', canEdit: false, canManage: false };
+  organizationState.value = { organizationId: 'org-1', isLoaded: true };
 });
 
 describe('provider gate instance hint', () => {
@@ -173,6 +198,7 @@ describe('provider gate instance hint', () => {
 
 describe('organization GitLab reconnect state', () => {
   it('offers re-authorization when the organization connection cannot be used', () => {
+    permissionState.value = { status: 'ready', canEdit: true, canManage: true };
     queryState.status = { connected: false, reconnectRequired: true };
     const renderer = mount('gitlab', 'org-1');
     expect(renderer.root.findByType('EmptyState').props.title).toBe('GitLab connection expired');
@@ -186,11 +212,76 @@ describe('organization GitLab reconnect state', () => {
     expect(renderedText(renderer)).toContain('Connect GitLab');
   });
 
+  it('names the roles that can reconnect instead of offering a refused action', () => {
+    // A plain member cannot complete the organization page's re-authorization:
+    // the server restricts replacing an existing integration to billing roles.
+    queryState.status = { connected: false, reconnectRequired: true };
+    const renderer = mount('gitlab', 'org-1');
+    expect(renderer.root.findByType('EmptyState').props.title).toBe('GitLab connection expired');
+    expect(renderedText(renderer)).toContain(
+      "GitLab isn't connected. Ask an organization owner, admin, or billing manager to connect it."
+    );
+    expect(renderedText(renderer)).not.toContain('Connect GitLab');
+    expect(renderer.root.findAllByType('Button')).toHaveLength(0);
+  });
+
   it('keeps the first-time connect copy for an organization with no connection', () => {
     queryState.status = { connected: false, reconnectRequired: false };
     const renderer = mount('gitlab', 'org-1');
     expect(renderer.root.findByType('EmptyState').props.title).toBe('Connect GitLab');
     expect(renderedText(renderer)).not.toContain('GitLab connection expired');
+  });
+
+  it('keeps the first-time connect action for a member', () => {
+    // The organization OAuth connect only requires a billing role when a
+    // connection already exists, so a member can complete a first connect.
+    queryState.status = { connected: false, reconnectRequired: false };
+    const renderer = mount('gitlab', 'org-1');
+    expect(renderedText(renderer)).toContain('Connect GitLab');
+    expect(renderer.root.findAllByType('Button')).toHaveLength(1);
+  });
+
+  it('waits for the restored selection instead of painting the personal scope', () => {
+    // Before the stored selection lands the layout passes a null organization,
+    // so the gate would show the personal Connect screen and then repaint the
+    // organization's — a visible jump on the same route.
+    organizationState.value = { organizationId: null, isLoaded: false };
+    const renderer = mount('gitlab', null);
+    expect(renderer.root.findByType('ActivityIndicator')).toBeDefined();
+    expect(renderer.root.findAllByType('EmptyState')).toHaveLength(0);
+  });
+
+  it.each<[string, MockPermission]>([
+    ['loading', { status: 'loading' }],
+    ['failed', { status: 'error', refetch: () => undefined, isRetrying: false }],
+  ])('keeps the Connect action while the role read is %s', (_case, permission) => {
+    // The provider procedures stay server-authorized, so an unsettled
+    // membership read must not strand the reader without an action.
+    permissionState.value = permission;
+    queryState.status = { connected: false, reconnectRequired: true };
+    const renderer = mount('gitlab', 'org-1');
+    expect(renderer.root.findAllByType('Button')).toHaveLength(1);
+  });
+});
+
+describe('organization Bitbucket connect state', () => {
+  it('names the roles that can connect instead of offering a refused action', () => {
+    // Every organization Bitbucket connect is a billing-role procedure.
+    queryState.status = { connected: false };
+    const renderer = mount('bitbucket', 'org-1');
+    expect(renderer.root.findByType('EmptyState').props.title).toBe('Connect Bitbucket');
+    expect(renderedText(renderer)).toContain(
+      "Bitbucket isn't connected. Only organization owners, admins, and billing managers can connect it."
+    );
+    expect(renderer.root.findAllByType('Button')).toHaveLength(0);
+  });
+
+  it('keeps the Connect action for a billing role', () => {
+    permissionState.value = { status: 'ready', canEdit: true, canManage: true };
+    queryState.status = { connected: false };
+    const renderer = mount('bitbucket', 'org-1');
+    expect(renderedText(renderer)).toContain('Connect Bitbucket');
+    expect(renderer.root.findAllByType('Button')).toHaveLength(1);
   });
 });
 

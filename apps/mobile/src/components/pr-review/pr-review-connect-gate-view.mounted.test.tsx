@@ -91,6 +91,17 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/hooks/use-organizations-list', () => ({
   useOrganizationsList: () => ({ data: [{ organizationId: 'org-1' }] }),
 }));
+// The role split that decides whether an organization keeps the Connect CTA is
+// covered by pr-review-provider-connect-gate.mounted.test.tsx; this harness
+// pins a billing role so every arm still offers the launch it exercises.
+vi.mock('@/lib/hooks/use-reviewer-permission', () => ({
+  useReviewerPermission: () => ({ status: 'ready', canEdit: true, canManage: true }),
+}));
+// The layout publishes the restored account selection and the gate reads the
+// same context; this harness is always past that restore.
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: 'org-1', isLoaded: true }),
+}));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('expo-web-browser', () => ({
   openAuthSessionAsync: vi.fn(),

@@ -61,10 +61,18 @@ describe('finding detail back control wiring', () => {
   const screenHeaderCount = (source.match(/<ScreenHeader\b/g) ?? []).length;
   const showBackButtonCount = (source.match(/\bshowBackButton\b/g) ?? []).length;
   const pendingHeaderCount = (source.match(/\{pendingHeader\}/g) ?? []).length;
+  const pendingHeaderSource = /const pendingHeader = \(([\s\S]*?)\n {2}\);/.exec(source)?.[1] ?? '';
 
   it('renders the loading, failure and not-found states through the shared header', () => {
     expect(screenHeaderCount).toBe(2);
     expect(pendingHeaderCount).toBe(3);
+  });
+
+  it('reserves the eyebrow line the loaded header fills', () => {
+    // The loaded header carries the repository eyebrow above the title. Without
+    // the reservation, settling into any pending state moves the title down by
+    // that line.
+    expect(pendingHeaderSource).toMatch(/\breserveEyebrow\b/);
   });
 
   it('passes showBackButton on every ScreenHeader usage', () => {

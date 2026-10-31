@@ -114,7 +114,7 @@ function logAttachmentFailure(op: string, error: unknown): void {
 }
 
 /** A per-message or per-account ledger bound is an expected refusal. */
-function isLedgerRefusal(error: unknown): boolean {
+function isLedgerRefusal(error: unknown): error is TRPCError {
   return error instanceof TRPCError && error.code === 'BAD_REQUEST';
 }
 

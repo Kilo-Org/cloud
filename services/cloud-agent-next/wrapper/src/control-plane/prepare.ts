@@ -51,7 +51,7 @@ import { restoreSession, seedSessionIngestRegistration } from '../restore-sessio
 import { reportRestoreIncomplete } from '../restore-incomplete.js';
 import { restoreWorktreeRecovery } from './worktree-recovery.js';
 import type { ControlWorkload } from '../control/workload-cgroup.js';
-import { emptyWorkspaceDirectory, refreshAdoptedRepository } from './workspace-adoption.js';
+import { refreshAdoptedRepository } from './workspace-adoption.js';
 import {
   classifyWorkspace,
   readWorkspaceStamp,
@@ -136,7 +136,6 @@ export type PrepareDeps = {
   hasGit?: (directory: string) => Promise<boolean>;
   readStamp?: (directory: string) => Promise<WorkspaceStamp | null>;
   writeStamp?: (directory: string, stamp: WorkspaceStamp) => Promise<void>;
-  emptyDirectory?: (directory: string) => Promise<void>;
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
   inheritedEnv?: NodeJS.ProcessEnv;
   homeRoots?: HomeRoots;
@@ -403,7 +402,6 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     deps.writeStamp ??
     (async (directory: string, stamp: WorkspaceStamp) =>
       writeWorkspaceStamp(directory, await hasGit(directory), stamp));
-  const emptyDirectory = deps.emptyDirectory ?? emptyWorkspaceDirectory;
   const mkdir = deps.mkdir ?? (dir => fs.mkdir(dir, { recursive: true }).then(() => undefined));
   const repository = createRepositoryPreparation({ runGit, runSetup, sleep, mkdir, hasGit, log });
   const { runNetworkGit, headCommit } = repository;
@@ -555,7 +553,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     directory: string,
     env: Record<string, string>,
     redact: (text: string) => string,
-    signal: AbortSignal
+    signal: AbortSignal,
+    startRef?: string
   ): Promise<void> {
     emitProgress(spec.sessionId, 'checkout');
     const gitRoute: GitRouteClass = spec.git?.token ? 'managed' : 'direct';
@@ -591,7 +590,15 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       });
     } else {
       let checkoutArgs = ['checkout', '-B', branch, `origin/${branch}`];
-      if (!spec.branch || spec.branchMode === 'working') {
+      if (startRef) {
+        checkoutArgs = [
+          'checkout',
+          ...(startRef === 'refs/remotes/origin/HEAD' ? ['--no-track'] : []),
+          '-B',
+          branch,
+          startRef,
+        ];
+      } else if (!spec.branch || spec.branchMode === 'working') {
         const existingBranch = await runBranchGit([
           'show-ref',
           '--verify',
@@ -652,49 +659,37 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     );
   }
 
-  /**
-   * Reconcile a workspace restored from a repository snapshot with this route:
-   * refresh the repository, then the ordinary branch logic. Returns false, leaving
-   * the caller to clone, on any failure; an adopt never fails the preparation.
-   */
   async function adoptWorkspace(
     spec: ControlPlaneRouteSpec,
     directory: string,
     env: Record<string, string>,
     redact: (text: string) => string,
     setStep: (step: ControlPlanePreparationStep) => void
-  ): Promise<boolean> {
+  ): Promise<void> {
     const git = spec.git;
-    if (!git) return false;
+    if (!git) throw new Error('A snapshot workspace requires a repository');
     setStep('restore');
-    try {
-      await withinStep('restore', timers.restoreMs, async signal => {
-        emitProgress(spec.sessionId, 'restore');
-        await refreshAdoptedRepository({
-          remoteUrl: credentialFreeGitUrl(git.url),
-          redact,
-          git: (args, options) =>
-            options?.network
-              ? runNetworkGit(
-                  args,
-                  { cwd: directory, env, inheritEnv: false, signal },
-                  redact,
-                  signal
-                )
-              : runGit(args, { cwd: directory, env, inheritEnv: false, signal }),
-        });
-        setStep('checkout');
-        await checkoutWorkspace(spec, directory, env, redact, signal);
+    await withinStep('restore', timers.restoreMs, async signal => {
+      emitProgress(spec.sessionId, 'restore');
+      const startRef = await refreshAdoptedRepository({
+        remoteUrl: credentialFreeGitUrl(git.url),
+        redact,
+        branch: spec.branch,
+        branchMode: spec.branchMode,
+        git: (args, options) =>
+          options?.network
+            ? runNetworkGit(
+                args,
+                { cwd: directory, env, inheritEnv: false, signal },
+                redact,
+                signal
+              )
+            : runGit(args, { cwd: directory, env, inheritEnv: false, signal }),
       });
-      return true;
-    } catch (error) {
-      log(
-        `control-plane adopt failed, cloning session=${spec.sessionId} error=${
-          error instanceof Error ? redact(error.message) : 'unknown'
-        }`
-      );
-      return false;
-    }
+      signal.throwIfAborted();
+      setStep('checkout');
+      await checkoutWorkspace(spec, directory, env, redact, signal, startRef);
+    });
   }
 
   async function inspectWorkspace(
@@ -758,11 +753,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     let adopted = false;
     if (inspection === 'foreign') {
       const adoptStartedAt = Date.now();
-      adopted = await adoptWorkspace(spec, directory, env, redact, setStep);
+      await adoptWorkspace(spec, directory, env, redact, setStep);
+      adopted = true;
       log(
         `control-plane workspace adopt done session=${spec.sessionId} adopted=${adopted} elapsedMs=${Date.now() - adoptStartedAt}`
       );
-      if (!adopted) await emptyDirectory(directory);
     }
     // A clone happens only when there is no repository yet; a partly prepared
     // workspace is reused, as before.

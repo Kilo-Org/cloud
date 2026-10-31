@@ -3,11 +3,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {
-  emptyWorkspaceDirectory,
-  stripGitCredentials,
-  truncateWrapperLog,
-} from './workspace-adoption.js';
+import { stripGitCredentials, truncateWrapperLog } from './workspace-adoption.js';
 import type { WorkspaceGit } from './workspace-adoption.js';
 
 const GIT_ENV = {
@@ -117,20 +113,6 @@ describe('stripGitCredentials', () => {
         bareUrl: 'https://github.com/acme/repo.git',
       })
     ).toBe(false);
-  });
-});
-
-describe('emptyWorkspaceDirectory', () => {
-  it('removes a dedicated directory and everything in it', async () => {
-    await emptyWorkspaceDirectory(repo);
-    expect(await rejection(fs.access(repo))).toBeInstanceOf(Error);
-  });
-
-  it('refuses the filesystem root and a top-level directory', async () => {
-    expect((await rejection(emptyWorkspaceDirectory('/')))?.message).toContain('top-level');
-    expect((await rejection(emptyWorkspaceDirectory('/workspace')))?.message).toContain(
-      'top-level'
-    );
   });
 });
 

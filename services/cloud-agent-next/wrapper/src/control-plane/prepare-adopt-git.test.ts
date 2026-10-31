@@ -134,8 +134,16 @@ describe('adopting an environment snapshot against a real repository', () => {
     expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
     expect(restored.gitCalls.some(args => args[0] === 'clone')).toBe(false);
     expect(git(directory, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('session/scope-2');
+    expect(
+      git(directory, 'for-each-ref', '--format=%(upstream)', 'refs/heads/session/scope-2')
+    ).toBe('');
     expect(git(directory, 'rev-parse', 'HEAD')).toBe(tip);
-    expect(git(directory, 'branch', '--format=%(refname:short)')).toBe('session/scope-2');
+    expect(git(directory, 'branch', '--format=%(refname:short)').split('\n')).toEqual([
+      'main',
+      'session/scope-1',
+      'session/scope-2',
+    ]);
+    expect(restored.gitCalls.filter(args => args[0] === 'checkout')).toHaveLength(1);
     expect(await readWorkspaceStamp(directory, true)).toEqual({
       allocationId: 'alloc-restored',
       commit: tip,
@@ -192,11 +200,78 @@ describe('adopting an environment snapshot against a real repository', () => {
     );
   });
 
-  it('falls back to a fresh clone when the snapshot cannot be reconciled', async () => {
+  it('checks out the target without first touching a conflicting default branch', async () => {
+    await manager('alloc-image').prepared.prepare(spec());
+    git(author, 'checkout', '-q', '-b', 'feature');
+    const featureTip = commitFile('feature.txt', 'feature', 'feature commit');
+    git(author, 'push', '-q', 'origin', 'feature');
+    git(author, 'checkout', '-q', 'main');
+    commitFile('README', 'new default', 'advance default');
+    git(author, 'push', '-q', 'origin', 'main');
+    await fs.writeFile(path.join(directory, 'README'), 'edited by setup');
+    await fs.mkdir(path.join(directory, 'node_modules'));
+    await fs.writeFile(path.join(directory, 'node_modules', 'dep.js'), 'prepared dependency');
+
+    const restored = manager('alloc-restored');
+    await restored.prepared.prepare(spec({ branch: 'feature' }));
+
+    expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+    expect(git(directory, 'rev-parse', 'HEAD')).toBe(featureTip);
+    expect(await fs.readFile(path.join(directory, 'README'), 'utf8')).toBe('edited by setup');
+    expect(await fs.readFile(path.join(directory, 'node_modules', 'dep.js'), 'utf8')).toBe(
+      'prepared dependency'
+    );
+    expect(restored.gitCalls.filter(args => args[0] === 'checkout')).toHaveLength(1);
+    expect(restored.gitCalls.some(args => args[0] === 'clone' || args[0] === 'branch')).toBe(false);
+    expect(restored.gitCalls.some(args => args[0] === 'remote' && args[1] === 'set-head')).toBe(
+      false
+    );
+  });
+
+  it('creates an unpushed working branch from the current default, not a stale local branch', async () => {
+    await manager('alloc-image').prepared.prepare(spec());
+    const tip = commitFile('README', 'two', 'advance default');
+    git(author, 'push', '-q', 'origin', 'main');
+
+    const restored = manager('alloc-restored');
+    await restored.prepared.prepare(spec({ branch: 'session/scope-1', branchMode: 'working' }));
+
+    expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+    expect(git(directory, 'rev-parse', 'HEAD')).toBe(tip);
+    expect(git(directory, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('session/scope-1');
+    expect(
+      git(directory, 'for-each-ref', '--format=%(upstream)', 'refs/heads/session/scope-1')
+    ).toBe('');
+    expect(restored.gitCalls.some(args => args[0] === 'clone')).toBe(false);
+  });
+
+  it('reports a missing requested branch without deleting the snapshot', async () => {
+    await manager('alloc-image').prepared.prepare(spec());
+    const stamp = await readWorkspaceStamp(directory, true);
+
+    const restored = manager('alloc-restored');
+    await restored.prepared.prepare(spec({ branch: 'missing' }));
+
+    expect(restored.frames.findLast(frame => frame.type === 'session.failed')).toMatchObject({
+      step: 'restore',
+      subtype: 'git_branch_missing',
+    });
+    expect(restored.gitCalls.some(args => args[0] === 'clone' || args[0] === 'checkout')).toBe(
+      false
+    );
+    expect(await readWorkspaceStamp(directory, true)).toEqual(stamp);
+    expect(await fs.readFile(path.join(directory, 'README'), 'utf8')).toBe('one');
+  });
+
+  it('preserves setup changes and dependencies when checkout conflicts with upstream', async () => {
     const first = manager('alloc-image');
     await first.prepared.prepare(spec());
     const localEdit = path.join(directory, 'README');
     await fs.writeFile(localEdit, 'edited by setup');
+    await fs.mkdir(path.join(directory, 'node_modules'));
+    const dependency = path.join(directory, 'node_modules', 'dep.js');
+    await fs.writeFile(dependency, 'prepared dependency');
+    const stamp = await readWorkspaceStamp(directory, true);
 
     commitFile('README', 'two', 'second');
     git(author, 'push', '-q', 'origin', 'main');
@@ -204,12 +279,14 @@ describe('adopting an environment snapshot against a real repository', () => {
     const restored = manager('alloc-restored');
     await restored.prepared.prepare(spec({ sessionId: 'ses_b' }));
 
-    expect(ready(restored.frames)).toMatchObject({ workspace: 'cloned' });
-    expect(restored.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(1);
-    expect(await fs.readFile(localEdit, 'utf8')).toBe('two');
-    expect(await readWorkspaceStamp(directory, true)).toMatchObject({
-      allocationId: 'alloc-restored',
+    expect(restored.frames.findLast(frame => frame.type === 'session.failed')).toMatchObject({
+      step: 'checkout',
+      subtype: 'git_checkout_conflict',
     });
+    expect(restored.gitCalls.some(args => args[0] === 'clone')).toBe(false);
+    expect(await fs.readFile(localEdit, 'utf8')).toBe('edited by setup');
+    expect(await fs.readFile(dependency, 'utf8')).toBe('prepared dependency');
+    expect(await readWorkspaceStamp(directory, true)).toEqual(stamp);
   });
 
   it('rewrites a credential-bearing origin to the canonical URL before Kilo starts', async () => {

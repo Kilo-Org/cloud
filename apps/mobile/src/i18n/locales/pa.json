@@ -1879,7 +1879,6 @@
       "repositoriesCount_one": "{{displayCount}} ਰਿਪੋਜ਼ਟਰੀ ਚੁਣੀ ਗਈ",
       "repositoriesCount": "{{displayCount}} ਰਿਪੋਜ਼ਿਟਰੀਆਂ ਚੁਣੀਆਂ ਗਈਆਂ",
       "repositoriesCount_other": "{{displayCount}} ਰਿਪੋਜ਼ਿਟਰੀਆਂ ਚੁਣੀਆਂ ਗਈਆਂ",
-      "selectRepositoriesSubtitle": "ਸੁਰੱਖਿਆ ਏਜੰਟ ਦੀ ਨਿਗਰਾਨੀ ਲਈ ਰਿਪੋਜ਼ਟਰੀਆਂ ਚੁਣੋ",
       "analysisModeSubtitle": "{{mode}} ਵਿਸ਼ਲੇਸ਼ਣ",
       "automationAllOff": "ਸਾਰੇ ਬੰਦ",
       "automationCount": "3 ਵਿੱਚੋਂ {{displayCount}} ਚਾਲੂ",

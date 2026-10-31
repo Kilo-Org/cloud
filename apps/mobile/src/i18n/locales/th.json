@@ -1873,7 +1873,6 @@
       "repositoriesCount_one": "เลือกคลังโค้ดแล้ว {{displayCount}} แห่ง",
       "repositoriesCount": "เลือกคลังโค้ดแล้ว {{displayCount}} รายการ",
       "repositoriesCount_other": "เลือกคลังโค้ดแล้ว {{displayCount}} รายการ",
-      "selectRepositoriesSubtitle": "เลือกคลังโค้ดที่ต้องการให้เอเจนต์ความปลอดภัยตรวจสอบ",
       "analysisModeSubtitle": "การวิเคราะห์แบบ {{mode}}",
       "automationAllOff": "ปิดทั้งหมด",
       "automationCount": "เปิดอยู่ {{displayCount}} จาก 3 รายการ",

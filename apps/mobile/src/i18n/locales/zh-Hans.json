@@ -1483,8 +1483,7 @@
       "on": "已开启",
       "repositoriesCount": "已选择 {{displayCount}} 个仓库",
       "repositoriesCount_other": "已选择 {{displayCount}} 个仓库",
-      "repositoriesCount_one": "已选择 {{displayCount}} 个仓库",
-      "selectRepositoriesSubtitle": "选择安全智能体监控的仓库"
+      "repositoriesCount_one": "已选择 {{displayCount}} 个仓库"
     },
     "settingsSave": {
       "saveChanges": "保存更改",

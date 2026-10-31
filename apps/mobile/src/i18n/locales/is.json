@@ -1873,7 +1873,6 @@
       "repositoriesCount_one": "{{displayCount}} geymsla valin",
       "repositoriesCount": "{{displayCount}} kóðasöfn valin",
       "repositoriesCount_other": "{{displayCount}} kóðasöfn valin",
-      "selectRepositoriesSubtitle": "Veldu hvaða geymslum öryggiserindrekinn fylgist með",
       "analysisModeSubtitle": "Greining: {{mode}}",
       "automationAllOff": "Allt óvirkt",
       "automationCount": "Virkt: {{displayCount}} af 3",

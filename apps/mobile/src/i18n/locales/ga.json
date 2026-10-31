@@ -1966,7 +1966,6 @@
       "repositoriesCount_one": "{{displayCount}} stór roghnaithe",
       "repositoriesCount": "{{displayCount}} stór roghnaithe",
       "repositoriesCount_other": "{{displayCount}} stór roghnaithe",
-      "selectRepositoriesSubtitle": "Roghnaigh na stórtha a ndéanann an Gníomhaire slándála monatóireacht orthu",
       "analysisModeSubtitle": "Anailís: {{mode}}",
       "automationAllOff": "Gach ceann múchta",
       "automationCount": "{{displayCount}} as 3 cumasaithe",

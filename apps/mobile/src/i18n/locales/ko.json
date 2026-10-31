@@ -1483,8 +1483,7 @@
       "on": "켜짐",
       "repositoriesCount": "저장소 {{displayCount}}개 선택됨",
       "repositoriesCount_other": "저장소 {{displayCount}}개 선택됨",
-      "repositoriesCount_one": "저장소 {{displayCount}}개 선택됨",
-      "selectRepositoriesSubtitle": "보안 에이전트가 모니터링할 저장소를 선택하세요."
+      "repositoriesCount_one": "저장소 {{displayCount}}개 선택됨"
     },
     "settingsSave": {
       "saveChanges": "변경 사항 저장",

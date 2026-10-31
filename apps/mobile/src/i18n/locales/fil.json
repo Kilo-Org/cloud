@@ -1879,7 +1879,6 @@
       "repositoriesCount_one": "{{displayCount}} repository ang napili",
       "repositoriesCount": "{{displayCount}} na repositoryo ang napili",
       "repositoriesCount_other": "{{displayCount}} na repositoryo ang napili",
-      "selectRepositoriesSubtitle": "Piliin kung aling mga repository ang susubaybayan ng Ahente sa seguridad",
       "analysisModeSubtitle": "Pagsusuri: {{mode}}",
       "automationAllOff": "Lahat ay hindi pinagana",
       "automationCount": "{{displayCount}} sa 3 ang pinagana",

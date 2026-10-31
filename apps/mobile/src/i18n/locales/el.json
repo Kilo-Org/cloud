@@ -1873,7 +1873,6 @@
       "repositoriesCount_one": "{{displayCount}} επιλεγμένο αποθετήριο",
       "repositoriesCount": "{{displayCount}} επιλεγμένα αποθετήρια",
       "repositoriesCount_other": "{{displayCount}} επιλεγμένα αποθετήρια",
-      "selectRepositoriesSubtitle": "Επίλεξε ποια αποθετήρια παρακολουθεί ο πράκτορας ασφάλειας",
       "analysisModeSubtitle": "Ανάλυση: {{mode}}",
       "automationAllOff": "Όλα ανενεργά",
       "automationCount": "{{displayCount}} από 3 ενεργά",

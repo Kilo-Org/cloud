@@ -1873,7 +1873,6 @@
       "repositoriesCount_one": "{{displayCount}} biltegi hautatuta",
       "repositoriesCount": "{{displayCount}} biltegi hautatuta",
       "repositoriesCount_other": "{{displayCount}} biltegi hautatuta",
-      "selectRepositoriesSubtitle": "Hautatu segurtasun-agenteak zein biltegiren jarraipena egingo duen",
       "analysisModeSubtitle": "Azterketa: {{mode}}",
       "automationAllOff": "Guztiak desgaituta",
       "automationCount": "3tik {{displayCount}} gaituta",

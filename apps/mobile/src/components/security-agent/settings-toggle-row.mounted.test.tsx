@@ -1,5 +1,5 @@
 import { type ElementType } from 'react';
-import { type PressableProps, type SwitchProps, type ViewProps } from 'react-native';
+import { type PressableProps, type SwitchProps } from 'react-native';
 import { describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
@@ -7,7 +7,6 @@ import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 import { ToggleRow } from './settings-toggle-row';
 
 const haptics = vi.hoisted(() => ({ selectionAsync: vi.fn<() => Promise<void>>() }));
-const scheme = vi.hoisted(() => ({ current: 'light' as 'light' | 'dark' }));
 
 vi.mock('expo-haptics', () => ({ selectionAsync: haptics.selectionAsync }));
 vi.mock('react-native', () => ({
@@ -15,25 +14,12 @@ vi.mock('react-native', () => ({
   View: 'View',
   Platform: { OS: 'android' },
   I18nManager: { isRTL: false },
-  useColorScheme: () => scheme.current,
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/lib/utils', () => ({
   cn: (...classes: (string | undefined)[]) => classes.filter(Boolean).join(' '),
 }));
-// The switch's colors come from the theme tokens; the row reads them through
-// the hook, so the test pins the two ends of the ladder the control uses.
-const theme = vi.hoisted(() => ({
-  colors: {
-    mutedForeground: '#6F6A61',
-    background: '#FBFAF5',
-    foreground: '#14130F',
-    primary: '#4F5A10',
-    primaryForeground: '#FFFFFF',
-  },
-}));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => theme.colors }));
 
 type RowProps = Parameters<typeof ToggleRow>[0];
 
@@ -67,7 +53,7 @@ function only(renderer: ReactTestRenderer, type: string) {
 
 // The test renderer types props as `unknown`; the component's own prop types
 // are the contract these assertions read.
-function rowProps(renderer: ReactTestRenderer): PressableProps {
+function textProps(renderer: ReactTestRenderer): PressableProps {
   return only(renderer, 'Pressable').props as PressableProps;
 }
 
@@ -75,21 +61,26 @@ function switchProps(renderer: ReactTestRenderer): SwitchProps {
   return only(renderer, 'Switch').props as SwitchProps;
 }
 
-// The row's press handler ignores its event argument, so the test invokes the
+// The text's press handler ignores its event argument, so the test invokes the
 // handler through its bare (no-argument) form.
-function pressRow(renderer: ReactTestRenderer): void {
+function pressText(renderer: ReactTestRenderer): void {
   const handler = only(renderer, 'Pressable').props.onPress as (() => void) | undefined;
   handler?.();
 }
 
+function changeSwitch(renderer: ReactTestRenderer, next: boolean): void {
+  const handler = switchProps(renderer).onValueChange as ((value: boolean) => void) | undefined;
+  handler?.(next);
+}
+
 describe('<ToggleRow>', () => {
-  it.each([false, true])('flips a %s value once per press on the row', value => {
+  it.each([false, true])('flips a %s value once per press on the text', value => {
     haptics.selectionAsync.mockClear();
     const onValueChange = vi.fn<(next: boolean) => void>();
     const renderer = renderRow({ value, onValueChange });
 
     act(() => {
-      pressRow(renderer);
+      pressText(renderer);
     });
 
     expect(onValueChange).toHaveBeenCalledTimes(1);
@@ -97,94 +88,70 @@ describe('<ToggleRow>', () => {
     expect(haptics.selectionAsync).toHaveBeenCalledTimes(1);
   });
 
-  it('exposes the row as one switch carrying the name and state', () => {
-    const props = rowProps(renderRow({ value: true, disabled: false }));
+  it('flips the value the native switch reports, once per change', () => {
+    haptics.selectionAsync.mockClear();
+    const onValueChange = vi.fn<(next: boolean) => void>();
+    const renderer = renderRow({ value: true, onValueChange });
 
-    expect(props.accessibilityRole).toBe('switch');
-    expect(props.accessibilityLabel).toBe('Enable auto-analysis');
-    expect(props.accessibilityState).toEqual({ checked: true, disabled: false });
+    act(() => {
+      changeSwitch(renderer, false);
+    });
+
+    expect(onValueChange).toHaveBeenCalledTimes(1);
+    expect(onValueChange).toHaveBeenCalledWith(false);
+    expect(haptics.selectionAsync).toHaveBeenCalledTimes(1);
   });
 
-  it('lets a caller name the row apart from its title', () => {
-    const props = rowProps(renderRow({ accessibilityLabel: 'Include existing findings' }));
+  it('exposes the switch as the row control with the name and state', () => {
+    const props = switchProps(renderRow({ value: true, disabled: false }));
+
+    expect(props.accessibilityLabel).toBe('Enable auto-analysis');
+    expect(props.accessibilityState).toEqual({ checked: true, disabled: false });
+    expect(props.value).toBe(true);
+    expect(props.disabled).toBe(false);
+  });
+
+  it('lets a caller name the switch apart from its title', () => {
+    const props = switchProps(renderRow({ accessibilityLabel: 'Include existing findings' }));
 
     expect(props.accessibilityLabel).toBe('Include existing findings');
   });
 
-  it('keeps a disabled row from toggling and reports it as disabled', () => {
-    haptics.selectionAsync.mockClear();
-    const onValueChange = vi.fn<(next: boolean) => void>();
-    const renderer = renderRow({ disabled: true, onValueChange });
-    const props = rowProps(renderer);
-
-    act(() => {
-      pressRow(renderer);
-    });
-
-    expect(props.disabled).toBe(true);
-    expect(props.accessibilityState?.disabled).toBe(true);
-    expect(onValueChange).not.toHaveBeenCalled();
-    expect(haptics.selectionAsync).not.toHaveBeenCalled();
-  });
-
   it('gives the subtitle to assistive technology as the hint', () => {
-    const props = rowProps(renderRow());
+    const props = switchProps(renderRow());
 
-    // The row is one node, so its text children are not read on their own; the
-    // name carries the title and the hint carries the subtitle.
+    // The text is out of the tree, so the name carries the title and the hint
+    // carries the subtitle.
     expect(props.accessibilityLabel).toBe('Enable auto-analysis');
     expect(props.accessibilityHint).toBe('Analyze findings as they are synced.');
   });
 
-  it('paints both switch states from theme tokens so the control stays visible', () => {
-    const off = switchProps(renderRow({ value: false, disabled: false }));
-    const on = switchProps(renderRow({ value: true, disabled: false }));
-
-    // The platform's own off state is pale grey on the card surface; the off
-    // track is the muted foreground so the control can be seen at all.
-    expect(off.trackColor).toEqual({
-      false: theme.colors.mutedForeground,
-      true: theme.colors.primary,
-    });
-    expect(off.ios_backgroundColor).toBe(theme.colors.mutedForeground);
-    expect(off.thumbColor).toBe(theme.colors.background);
-    expect(on.thumbColor).toBe(theme.colors.primaryForeground);
-  });
-
-  it('keeps the off thumb light on the dark card', () => {
-    scheme.current = 'dark';
-    try {
-      const off = switchProps(renderRow({ value: false, disabled: false }));
-
-      // In the dark scheme the background token is near-black, so an off thumb
-      // drawn from it disappeared into the card. The foreground is the light
-      // end of that ladder.
-      expect(off.thumbColor).toBe(theme.colors.foreground);
-      expect(off.trackColor).toEqual({
-        false: theme.colors.mutedForeground,
-        true: theme.colors.primary,
-      });
-    } finally {
-      scheme.current = 'light';
-    }
-  });
-
-  it('leaves the visual switch inert and out of the accessibility tree', () => {
-    const renderer = renderRow({ value: true, disabled: true });
-    const props = switchProps(renderer);
-    const wrapper = only(renderer, 'Switch').parent;
-    if (!wrapper) {
-      throw new Error('the visual switch has no wrapper');
-    }
-    const wrapperProps = wrapper.props as ViewProps;
+  it('leaves the text out of the accessibility tree and keeps its tap', () => {
+    const props = textProps(renderRow());
 
     expect(props.accessible).toBe(false);
-    expect(props.value).toBe(true);
-    expect(props.disabled).toBe(true);
-    expect(props.onValueChange).toBeUndefined();
-    expect(wrapperProps.pointerEvents).toBe('none');
-    expect(wrapperProps.accessibilityElementsHidden).toBe(true);
-    expect(wrapperProps.importantForAccessibility).toBe('no-hide-descendants');
+    expect(props.accessibilityElementsHidden).toBe(true);
+    expect(props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(props.accessibilityRole).toBeUndefined();
+    expect(props.accessibilityLabel).toBeUndefined();
+    expect(typeof props.onPress).toBe('function');
+  });
+
+  it('keeps a disabled row from toggling on either control', () => {
+    haptics.selectionAsync.mockClear();
+    const onValueChange = vi.fn<(next: boolean) => void>();
+    const renderer = renderRow({ disabled: true, onValueChange });
+
+    act(() => {
+      pressText(renderer);
+      changeSwitch(renderer, true);
+    });
+
+    expect(textProps(renderer).disabled).toBe(true);
+    expect(switchProps(renderer).disabled).toBe(true);
+    expect(switchProps(renderer).accessibilityState?.disabled).toBe(true);
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(haptics.selectionAsync).not.toHaveBeenCalled();
   });
 
   it('flips the value when the selection tick rejects', async () => {
@@ -198,7 +165,7 @@ describe('<ToggleRow>', () => {
     try {
       process.on('unhandledRejection', onUnhandledRejection);
       act(() => {
-        pressRow(renderer);
+        pressText(renderer);
       });
       // One macrotask, the turn Node flags an unhandled rejection in.
       const flushed = Promise.withResolvers<undefined>();

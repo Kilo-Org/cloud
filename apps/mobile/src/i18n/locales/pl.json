@@ -1510,7 +1510,6 @@
       "repositoriesCount": "Wybrano {{displayCount}} repozytorium",
       "repositoriesCount_other": "Wybrano {{displayCount}} repozytorium",
       "repositoriesCount_one": "Wybrano {{displayCount}} repozytorium",
-      "selectRepositoriesSubtitle": "Wybierz repozytoria monitorowane przez agenta bezpieczeństwa",
       "repositoriesCount_few": "Wybrano {{displayCount}} repozytoria",
       "repositoriesCount_many": "Wybrano {{displayCount}} repozytoriów"
     },

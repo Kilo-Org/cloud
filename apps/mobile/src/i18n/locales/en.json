@@ -1939,7 +1939,6 @@
       "repositoriesCount_one": "{{displayCount}} repository selected",
       "repositoriesCount": "{{displayCount}} repositories selected",
       "repositoriesCount_other": "{{displayCount}} repositories selected",
-      "selectRepositoriesSubtitle": "Choose which repositories Security Agent monitors",
       "analysisModeSubtitle": "{{mode}} analysis",
       "automationAllOff": "All off",
       "automationCount": "{{displayCount}} of 3 enabled",

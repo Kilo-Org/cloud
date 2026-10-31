@@ -1510,7 +1510,6 @@
       "repositoriesCount": "Вибрано репозиторіїв: {{displayCount}}",
       "repositoriesCount_other": "Вибрано репозиторіїв: {{displayCount}}",
       "repositoriesCount_one": "вибрано {{displayCount}} репозиторій",
-      "selectRepositoriesSubtitle": "Виберіть, які репозиторії відстежує Агент безпеки",
       "repositoriesCount_few": "вибрано {{displayCount}} репозиторії",
       "repositoriesCount_many": "вибрано {{displayCount}} репозиторіїв"
     },

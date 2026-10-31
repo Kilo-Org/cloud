@@ -1873,7 +1873,6 @@
       "repositoriesCount_one": "{{displayCount}} репозитори сонгогдсон",
       "repositoriesCount": "{{displayCount}} кодын сан сонгосон",
       "repositoriesCount_other": "{{displayCount}} кодын сан сонгосон",
-      "selectRepositoriesSubtitle": "Аюулгүй байдлын агентаар хянуулах репозиториудыг сонгох",
       "analysisModeSubtitle": "{{mode}} шинжилгээ",
       "automationAllOff": "Бүгд идэвхгүй",
       "automationCount": "3-аас {{displayCount}} нь идэвхтэй",

@@ -1497,7 +1497,6 @@
       "repositoriesCount": "{{displayCount}} repositorios seleccionados",
       "repositoriesCount_other": "{{displayCount}} repositorios seleccionados",
       "repositoriesCount_one": "{{displayCount}} repositorio seleccionado",
-      "selectRepositoriesSubtitle": "Elige qué repositorios supervisa el agente de seguridad",
       "repositoriesCount_many": "{{displayCount}} repositorios seleccionados"
     },
     "settingsSave": {

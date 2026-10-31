@@ -921,7 +921,6 @@
     "followReviewMd": "遵循 REVIEW.md",
     "followReviewMdSubtitle": "遵循各仓库 REVIEW.md 文件中的说明",
     "manualReview": {
-      "connectProviderDescription": "连接 GitHub，即可手动发起拉取请求审查。",
       "couldNotCheckProviderStatus": "无法检查代码托管平台的状态",
       "couldNotLoadProviders": "无法加载已连接的代码托管平台。请重试。",
       "instructions": "说明（可选）",

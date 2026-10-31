@@ -1556,7 +1556,6 @@
       "invalidUrl": "Introdueix una URL vàlida d'una sol·licitud d'integració.",
       "couldNotCheckProviderStatus": "No s'ha pogut comprovar l'estat del proveïdor.",
       "couldNotLoadProviders": "No hem pogut carregar els teus proveïdors connectats. Torna-ho a provar.",
-      "connectProviderDescription": "Connecta GitHub per iniciar una revisió manual d'una sol·licitud d'integració.",
       "pullRequestUrl": "URL de la sol·licitud d'integració",
       "instructions": "Instruccions (opcionals)",
       "instructionsPlaceholder": "Aspectes concrets en què s'ha de centrar el revisor…",

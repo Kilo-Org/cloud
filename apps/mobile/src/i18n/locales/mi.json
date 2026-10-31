@@ -1534,7 +1534,6 @@
       "invalidUrl": "Whakaurua he URL tika mō te tono kume.",
       "couldNotCheckProviderStatus": "Kāore i taea te tirotiro i te tūnga o te kaiwhakarato.",
       "couldNotLoadProviders": "Kāore i taea te uta i ngā kaiwhakarato kua honoa e koe. Whakamātau anō.",
-      "connectProviderDescription": "Hono atu ki GitHub hei tīmata i te arotake ā-ringa o tētahi tono kume.",
       "pullRequestUrl": "URL tono kume",
       "instructions": "Ngā tohutohu (he kōwhiringa)",
       "instructionsPlaceholder": "Tētahi mea motuhake hei arotahi mā te kaiarotake…",

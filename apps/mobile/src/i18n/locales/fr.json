@@ -892,7 +892,6 @@
     "followReviewMd": "Suivre les consignes de REVIEW.md",
     "followReviewMdSubtitle": "Respecter les fichiers d'instructions REVIEW.md de chaque dépôt",
     "manualReview": {
-      "connectProviderDescription": "Connectez GitHub pour lancer une revue manuelle d'une demande de fusion.",
       "couldNotCheckProviderStatus": "Impossible de vérifier l'état du fournisseur.",
       "couldNotLoadProviders": "Impossible de charger les fournisseurs connectés à votre compte. Réessayez.",
       "instructions": "Instructions (facultatives)",

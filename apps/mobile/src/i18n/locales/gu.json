@@ -1534,7 +1534,6 @@
       "invalidUrl": "પુલ રિક્વેસ્ટનું માન્ય URL દાખલ કરો.",
       "couldNotCheckProviderStatus": "સેવા પ્રદાતાની સ્થિતિ ચકાસી શકાઈ નહીં.",
       "couldNotLoadProviders": "તમે જોડેલા સેવા પ્રદાતાઓની માહિતી લોડ કરી શકાઈ નહીં. કૃપા કરીને ફરી પ્રયાસ કરો.",
-      "connectProviderDescription": "પુલ રિક્વેસ્ટની સમીક્ષા જાતે શરૂ કરવા GitHub જોડો.",
       "pullRequestUrl": "પુલ રિક્વેસ્ટનું URL",
       "instructions": "સૂચનાઓ (વૈકલ્પિક)",
       "instructionsPlaceholder": "સમીક્ષકે ખાસ ધ્યાન આપવાના મુદ્દા…",

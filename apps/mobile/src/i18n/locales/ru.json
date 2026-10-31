@@ -927,7 +927,6 @@
     "followReviewMd": "Следовать инструкциям REVIEW.md",
     "followReviewMdSubtitle": "Соблюдать инструкции из файла REVIEW.md в каждом репозитории",
     "manualReview": {
-      "connectProviderDescription": "Подключите GitHub, чтобы запустить проверку пул-реквеста вручную.",
       "couldNotCheckProviderStatus": "Не удалось проверить статус сервиса.",
       "couldNotLoadProviders": "Не удалось загрузить подключённые сервисы. Попробуйте снова.",
       "instructions": "Инструкции (необязательно)",

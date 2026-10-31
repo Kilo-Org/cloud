@@ -921,7 +921,6 @@
     "followReviewMd": "Tuân theo REVIEW.md",
     "followReviewMdSubtitle": "Tuân theo tệp hướng dẫn REVIEW.md của từng kho lưu trữ",
     "manualReview": {
-      "connectProviderDescription": "Kết nối GitHub để bắt đầu rà soát thủ công một yêu cầu hợp nhất.",
       "couldNotCheckProviderStatus": "Không thể kiểm tra trạng thái nhà cung cấp.",
       "couldNotLoadProviders": "Không thể tải danh sách nhà cung cấp bạn đã kết nối. Vui lòng thử lại.",
       "instructions": "Hướng dẫn (không bắt buộc)",

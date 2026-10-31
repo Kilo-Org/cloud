@@ -921,7 +921,6 @@
     "followReviewMd": "REVIEW.md 따르기",
     "followReviewMdSubtitle": "저장소별 REVIEW.md 파일의 지침을 따릅니다.",
     "manualReview": {
-      "connectProviderDescription": "풀 리퀘스트 수동 리뷰를 시작하려면 GitHub를 연결하세요.",
       "couldNotCheckProviderStatus": "연결 서비스 상태를 확인할 수 없습니다.",
       "couldNotLoadProviders": "연결된 서비스를 불러올 수 없습니다. 다시 시도하세요.",
       "instructions": "지침(선택 사항)",

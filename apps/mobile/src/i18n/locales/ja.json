@@ -921,7 +921,6 @@
     "followReviewMd": "REVIEW.mdに従う",
     "followReviewMdSubtitle": "各リポジトリのREVIEW.mdに記載された指示に従う",
     "manualReview": {
-      "connectProviderDescription": "プルリクエストの手動レビューを開始するにはGitHubを接続してください。",
       "couldNotCheckProviderStatus": "プロバイダーの状態を確認できませんでした。",
       "couldNotLoadProviders": "接続済みプロバイダーを読み込めませんでした。もう一度お試しください。",
       "instructions": "指示（任意）",

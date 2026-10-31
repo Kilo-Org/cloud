@@ -1534,7 +1534,6 @@
       "invalidUrl": "PR uchun to'g'ri URL manzilini kiriting.",
       "couldNotCheckProviderStatus": "Provayder holatini tekshirib bo'lmadi.",
       "couldNotLoadProviders": "Ulangan provayderlaringizni yuklay olmadik. Iltimos, qayta urinib ko'ring.",
-      "connectProviderDescription": "PRni qo'lda ko'rib chiqishni boshlash uchun GitHubni ulang.",
       "pullRequestUrl": "PR manzili (URL)",
       "instructions": "Ko'rsatmalar (ixtiyoriy)",
       "instructionsPlaceholder": "Ko'rib chiqishda alohida e'tibor beriladigan jihatlar…",

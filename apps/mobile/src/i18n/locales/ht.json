@@ -1534,7 +1534,6 @@
       "invalidUrl": "Antre yon URL valab pou demann fizyon an.",
       "couldNotCheckProviderStatus": "Nou pa t ka verifye estati founisè a.",
       "couldNotLoadProviders": "Nou pa t ka chaje founisè ou konekte yo. Tanpri eseye ankò.",
-      "connectProviderDescription": "Konekte GitHub pou kòmanse yon revizyon manyèl sou yon demann fizyon.",
       "pullRequestUrl": "URL demann fizyon an",
       "instructions": "Enstriksyon (opsyonèl)",
       "instructionsPlaceholder": "Pwen espesifik pou revizè a egzamine…",

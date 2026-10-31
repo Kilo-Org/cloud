@@ -1534,7 +1534,6 @@
       "invalidUrl": "ትክክለኛ የኮድ ውህደት ጥያቄ URL ያስገቡ።",
       "couldNotCheckProviderStatus": "የአቅራቢውን ሁኔታ መፈተሽ አልተቻለም።",
       "couldNotLoadProviders": "የተገናኙትን አቅራቢዎች መጫን አልቻልንም። እባክዎ እንደገና ይሞክሩ።",
-      "connectProviderDescription": "የኮድ ውህደት ጥያቄ ግምገማን ራስዎ ለማስጀመር GitHubን ያገናኙ።",
       "pullRequestUrl": "የኮድ ውህደት ጥያቄ URL",
       "instructions": "መመሪያዎች (አማራጭ)",
       "instructionsPlaceholder": "ገምጋሚው በተለይ ትኩረት እንዲሰጠው የሚፈልጉት ነገር…",

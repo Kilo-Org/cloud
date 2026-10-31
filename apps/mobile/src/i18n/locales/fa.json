@@ -1534,7 +1534,6 @@
       "invalidUrl": "یک URL معتبر برای درخواست ادغام وارد کنید.",
       "couldNotCheckProviderStatus": "بررسی وضعیت ارائه‌دهنده ممکن نشد.",
       "couldNotLoadProviders": "نتوانستیم ارائه‌دهنده‌های متصل شما را بارگذاری کنیم. لطفاً دوباره تلاش کنید.",
-      "connectProviderDescription": "برای شروع بررسی دستی یک درخواست ادغام، GitHub را متصل کنید.",
       "pullRequestUrl": "URL درخواست ادغام",
       "instructions": "دستورالعمل‌ها (اختیاری)",
       "instructionsPlaceholder": "نکات خاصی که بررسی‌کننده باید روی آن‌ها تمرکز کند…",

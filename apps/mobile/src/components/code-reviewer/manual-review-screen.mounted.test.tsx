@@ -372,16 +372,17 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     unmount();
   });
 
-  it('keeps the action pinned and disabled while provider status is loading', async () => {
+  it('holds the connect state’s shape while provider status loads', async () => {
     status.loading = true;
     status.connected = false;
     const { renderer, unmount } = await renderScreen();
-    expect(findAllOfType(renderer.root, 'Skeleton')).toHaveLength(2);
-    const button = only(findAllOfType(renderer.root, 'Button'), 'primary action');
-    expect((button.props as { disabled: boolean }).disabled).toBe(true);
-    // The footer is the sole clearance source now (the deleted lift layer is
-    // gone); at rest it reserves the screen's bottom clearance plus its final gap.
-    expect(paddingBottomsAbove(button)).toEqual([BOTTOM_INSET + TAB_SCREEN_BOTTOM_GAP]);
+    // Neither the form nor its pinned action can be rendered before the status
+    // says whether the scope can start one, and the body cannot stay empty.
+    expect(findAllOfType(renderer.root, 'Skeleton')).toHaveLength(3);
+    expect(findAllOfType(renderer.root, 'ScrollView')).toHaveLength(0);
+    expect(findAllOfType(renderer.root, 'TextInput')).toHaveLength(0);
+    expect(findAllOfType(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAllOfType(renderer.root, 'EmptyState')).toHaveLength(0);
     unmount();
   });
 
@@ -463,10 +464,6 @@ describe('ManualReviewScreen empty state role gate', () => {
     expect(propOf(empty, 'description')).toBe(readOnlyNotice());
     expect(propOf(empty, 'action')).toBeUndefined();
     expect(findAllOfType(renderer.root, 'Button')).toHaveLength(0);
-    // It must not offer the copy that instructs a member to connect.
-    expect(renderedTexts(renderer.root)).not.toContain(
-      i18n.t('codeReviewer.manualReview.connectProviderDescription')
-    );
 
     unmount();
   });
@@ -508,9 +505,9 @@ describe('ManualReviewScreen empty state role gate', () => {
       const { renderer, unmount } = await renderScreen(ORG_SCOPE);
 
       const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
-      expect(propOf(empty, 'description')).toBe(
-        i18n.t('codeReviewer.manualReview.connectProviderDescription')
-      );
+      // The title and the button carry the instruction; the old description
+      // repeated both, so the connect state has none.
+      expect(propOf(empty, 'description')).toBeUndefined();
       expect(propOf(empty, 'action')).toBeDefined();
 
       unmount();

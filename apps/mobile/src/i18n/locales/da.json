@@ -1534,7 +1534,6 @@
       "invalidUrl": "Indtast en gyldig URL til en pull request.",
       "couldNotCheckProviderStatus": "Udbyderens status kunne ikke kontrolleres.",
       "couldNotLoadProviders": "Dine tilsluttede udbydere kunne ikke indlæses. Prøv igen.",
-      "connectProviderDescription": "Tilslut GitHub for at starte en manuel gennemgang af en pull request.",
       "pullRequestUrl": "URL til pull request",
       "instructions": "Instruktioner (valgfrie)",
       "instructionsPlaceholder": "Særlige fokuspunkter for gennemgangen…",

@@ -1534,7 +1534,6 @@
       "invalidUrl": "ป้อน URL ของ PR ที่ถูกต้อง",
       "couldNotCheckProviderStatus": "ตรวจสอบสถานะผู้ให้บริการไม่สำเร็จ",
       "couldNotLoadProviders": "ไม่สามารถโหลดข้อมูลผู้ให้บริการที่คุณเชื่อมต่อไว้ได้ กรุณาลองอีกครั้ง",
-      "connectProviderDescription": "เชื่อมต่อ GitHub เพื่อเริ่มตรวจสอบ PR ด้วยตนเอง",
       "pullRequestUrl": "URL ของ PR",
       "instructions": "คำแนะนำ (ไม่บังคับ)",
       "instructionsPlaceholder": "เรื่องที่ต้องการให้ผู้ตรวจสอบเน้นเป็นพิเศษ…",

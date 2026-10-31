@@ -1556,7 +1556,6 @@
       "invalidUrl": "Ievadi derīgu izmaiņu pieprasījuma URL.",
       "couldNotCheckProviderStatus": "Neizdevās pārbaudīt pakalpojuma sniedzēja statusu.",
       "couldNotLoadProviders": "Neizdevās ielādēt tavus pievienotos pakalpojumu sniedzējus. Lūdzu, mēģini vēlreiz.",
-      "connectProviderDescription": "Pievieno GitHub, lai manuāli sāktu izmaiņu pieprasījuma koda pārskatīšanu.",
       "pullRequestUrl": "Izmaiņu pieprasījuma URL",
       "instructions": "Norādījumi (neobligāti)",
       "instructionsPlaceholder": "Kam īpaši pievērst uzmanību…",

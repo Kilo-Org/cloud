@@ -1556,7 +1556,6 @@
       "invalidUrl": "Unesi važeći URL PR-a.",
       "couldNotCheckProviderStatus": "Nije moguće proveriti status platforme.",
       "couldNotLoadProviders": "Nije moguće učitati povezane platforme. Pokušaj ponovo.",
-      "connectProviderDescription": "Poveži GitHub da započneš ručni pregled PR-a.",
       "pullRequestUrl": "URL PR-a",
       "instructions": "Uputstva (opciono)",
       "instructionsPlaceholder": "Na šta posebno obratiti pažnju pri pregledu…",

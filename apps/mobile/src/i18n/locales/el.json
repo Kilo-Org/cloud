@@ -1534,7 +1534,6 @@
       "invalidUrl": "Πληκτρολόγησε ένα έγκυρο URL για το PR.",
       "couldNotCheckProviderStatus": "Δεν ήταν δυνατός ο έλεγχος της κατάστασης του παρόχου",
       "couldNotLoadProviders": "Δεν μπορέσαμε να φορτώσουμε τους συνδεδεμένους παρόχους σου. Δοκίμασε ξανά.",
-      "connectProviderDescription": "Σύνδεσε το GitHub για να ξεκινήσεις έναν χειροκίνητο έλεγχο ενός PR.",
       "pullRequestUrl": "URL του PR",
       "instructions": "Οδηγίες (προαιρετικές)",
       "instructionsPlaceholder": "Συγκεκριμένα σημεία στα οποία θέλεις να εστιάσει ο ελεγκτής…",

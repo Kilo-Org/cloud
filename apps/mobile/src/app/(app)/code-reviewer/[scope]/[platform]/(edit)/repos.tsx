@@ -109,6 +109,12 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     platform === 'bitbucket' && bitbucketReadiness.data?.repositoryCache.status !== 'available';
   const confirmedEmpty =
     !reposLoading && !reposError && !bitbucketNotReady && repoRows.length === 0;
+  // Without the GitHub app the account can review nothing, so the two modes
+  // differ only in a setting nobody can act on: their picker above an install
+  // prompt offers a choice that changes nothing. The prompt owns the body, as
+  // it does for the other platforms' empty surfaces.
+  const githubAppMissing =
+    platform === 'github' && githubRepos.data?.integrationInstalled === false;
   const resyncPlatform: SyncedRepoPlatform = platform === 'gitlab' ? 'gitlab' : 'github';
   const { resync, resyncing } = useReviewerRepositoriesResync(scope, resyncPlatform);
   // Set on the way to the provider's settings page, where installation access
@@ -169,6 +175,7 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
   // its failure paints the whole surface and the repositories read stays below.
   const fullBodyState =
     configFailure != null ||
+    githubAppMissing ||
     (!capabilities.selectionModePicker && !reposLoading && repoRows.length === 0);
   let repoState: ReactNode = null;
   if (configFailure) {
@@ -220,7 +227,9 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     repoState = (
       <EmptyState
         placement={fullBodyState ? 'center' : 'top'}
-        className={allMode ? 'pt-4' : undefined}
+        // Only an in-body state drops the surface-level air; the install prompt
+        // that replaces the whole body keeps it.
+        className={allMode && !fullBodyState ? 'pt-4' : undefined}
         icon={FolderGit2}
         title={emptyStateCopy.title}
         description={emptyStateCopy.description}
@@ -307,6 +316,10 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
 
           {showFooter && (
             <RepositorySyncFooter
+              // All mode already ended on the status block above, so the sync
+              // line continues it at the small gap the explanation and the
+              // count share; selected mode starts a section below its list.
+              className={allMode ? 'mt-2' : 'mt-6'}
               syncedLabel={syncedLabel}
               refreshing={refreshing}
               onRefresh={refreshRepositories}

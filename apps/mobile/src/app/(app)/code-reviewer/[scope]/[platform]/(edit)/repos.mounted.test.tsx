@@ -28,6 +28,7 @@ const state = vi.hoisted(() => ({
   platform: 'github' as 'github' | 'gitlab' | 'bitbucket',
   repositories: [] as { id: number; fullName: string; private: boolean }[],
   syncedAt: null as string | null,
+  githubAppInstalled: true,
   reposLoading: false,
   reposError: false,
   resync: vi.fn(() => Promise.resolve()),
@@ -59,6 +60,7 @@ vi.mock('@/lib/hooks/use-reviewer-route-params', () => ({
 
 vi.mock('react-native', () => ({
   View: 'View',
+  Platform: { OS: 'android' },
   AppState: {
     addEventListener: (event: string, handler: AppStateHandler) => {
       if (event === 'change') {
@@ -126,6 +128,7 @@ vi.mock('@/lib/integration-urls', () => ({
   getGitLabIntegrationUrl: () => 'https://example.test/gitlab',
 }));
 vi.mock('@/lib/utils', () => ({
+  cn: (...values: (string | undefined | false)[]) => values.filter(Boolean).join(' '),
   parseTimestamp: (value: string) => new Date(value),
   timeAgo: () => '2 days ago',
 }));
@@ -145,6 +148,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     data: {
       repositories: state.platform === 'github' ? state.repositories : [],
       syncedAt: state.syncedAt,
+      integrationInstalled: state.githubAppInstalled,
     },
   }),
   useGitLabRepositories: () => ({
@@ -222,6 +226,7 @@ beforeEach(() => {
   state.platform = 'github';
   state.repositories = REPOSITORIES;
   state.syncedAt = '2026-10-20T06:04:13.436632+00';
+  state.githubAppInstalled = true;
   state.reposLoading = false;
   state.reposError = false;
   state.resync.mockClear();
@@ -538,6 +543,26 @@ describe('all repositories mode body', () => {
     // The state follows the explanation and the reserved count row, so it drops
     // the surface-level top air a 'top' placement adds.
     expect(state.emptyStateClassNames.at(-1)).toBe('pt-4');
+    unmount();
+  });
+
+  it('gives the install prompt the body when the GitHub app is not installed', async () => {
+    state.repositories = [];
+    state.githubAppInstalled = false;
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(
+      () => renderer.root.findAll(node => String(node.type) === 'EmptyState').length === 1
+    );
+
+    // Nothing can be reviewed before the app is installed, so the mode choice
+    // offers no effect and its explanation would describe an empty body.
+    expect(renderer.root.findAll(node => String(node.type) === 'ChoiceRow')).toHaveLength(0);
+    expect(texts(renderer)).not.toContain(ORGANIZATION_EXPLANATION);
+    expect(countLines(renderer)).toEqual([]);
+    // The prompt replaces the list, so it keeps the surface-level air.
+    expect(state.emptyStateClassNames.at(-1)).toBeUndefined();
+    expect(button(renderer, 'Manage access')).toBeDefined();
     unmount();
   });
 

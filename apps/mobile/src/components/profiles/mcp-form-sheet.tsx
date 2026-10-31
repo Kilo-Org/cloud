@@ -205,10 +205,17 @@ export function McpFormSheet({
           }}
         />
 
+        {/*
+          The two branches share one tree position, and the field writes its
+          `defaultValue` only on mount, so each needs its own identity: without
+          the keys the input keeps the text typed for the other type while the
+          refs keep theirs. Re-keying remounts it from its own draft.
+        */}
         {type === 'local' ? (
           <FormField
+            key="command"
             label={t('profiles.mcp.command')}
-            defaultValue={initial.command}
+            defaultValue={commandRef.current}
             error={errorKeyFor(t, error, ['command-required', 'command-too-long'])}
             disabled={isSaving}
             required
@@ -223,8 +230,9 @@ export function McpFormSheet({
           />
         ) : (
           <FormField
+            key="url"
             label={t('profiles.mcp.url')}
-            defaultValue={initial.url}
+            defaultValue={urlRef.current}
             error={errorKeyFor(t, error, ['url-required', 'url-invalid', 'url-too-long'])}
             disabled={isSaving}
             required

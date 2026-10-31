@@ -1,6 +1,56 @@
 import { isPickerRoutePath } from '@/lib/picker-routes';
 
 /**
+ * Gate and flow-control paths that own their screen transiently: the bootstrap
+ * gates (consent, force update), the share gate, the post-sign-in
+ * tour/onboarding, and the pickers that ride an RTL language reload. A record
+ * captured there would reopen a flow the next launch either resolves on its own
+ * (bootstrap gates) or cannot complete without its originating context (a gate
+ * opened on top of another screen).
+ */
+const GATE_PATHS: ReadonlySet<string> = new Set([
+  '/consent',
+  '/consent-details',
+  '/language-picker',
+  '/force-update',
+  '/share-gate',
+  '/onboarding',
+  '/tour',
+  '/kilo-pass',
+]);
+
+/**
+ * Sheet routes in the app stack that are never the relaunch target and are not
+ * bridge pickers.
+ *
+ * Each one is presented over the screen that opened it and is not itself the
+ * place the person was working: the voice and transcription pickers (opened
+ * from Preferences), the to-do list settings sheet (opened from a list), and
+ * the tab-nested instance picker. They carry their own data, so they would not
+ * show a dead shell, but reopening one after a restart floats it over the start
+ * route with the screen underneath lost, so the record stays on that screen
+ * instead. The bridge pickers are excluded separately through
+ * `PICKER_ROUTE_PATHS`, the same list the Android Back guard keeps aligned with
+ * the stack's `formSheet` registrations; a test keeps this list aligned with the
+ * app stack's registrations too.
+ */
+const TRANSIENT_SHEET_PATHS: ReadonlySet<string> = new Set([
+  '/transcription-model-picker',
+  '/voice-language-picker',
+  '/todos/list-settings',
+  '/chat/instance-picker',
+]);
+
+/** Whether a concrete router path is one this rule never records. */
+function isUnrecordablePath(pathname: string): boolean {
+  return (
+    GATE_PATHS.has(pathname) ||
+    TRANSIENT_SHEET_PATHS.has(pathname) ||
+    isPickerRoutePath(pathname)
+  );
+}
+
+/**
  * Which concrete route paths may be recorded as the relaunch-restore target.
  *
  * The record exists to repair a cold start whose base Intent replays a stale
@@ -18,34 +68,14 @@ export function isRecordableLastRoute(pathname: string, segments: readonly strin
   if (segments.length === 0 || segments[0] !== '(app)') {
     return false;
   }
-  // Gate and flow-control surfaces: the bootstrap gates (consent, force
-  // update), the share gate, the post-sign-in tour/onboarding, and the pickers
-  // that ride an RTL language reload own their screens transiently. A record
-  // captured there would reopen a flow the next launch either resolves on its
-  // own (bootstrap gates) or cannot complete without its originating context
-  // (a picker or gate opened on top of another screen).
-  const unrecordable = [
-    '/consent',
-    '/consent-details',
-    '/language-picker',
-    '/force-update',
-    '/share-gate',
-    '/onboarding',
-    '/tour',
-    '/kilo-pass',
-  ];
-  if (unrecordable.includes(pathname)) {
-    return false;
-  }
-  // The bridge pickers are the picker case above, and the only one the side
-  // sheet routes still missed: their options live in the module map of
+  // The bridge pickers are the gate case above, and the one the side sheet
+  // routes still missed: their options live in the module map of
   // `lib/route-registry.ts`, which a fresh JS context starts empty. Reopening
   // one on its own therefore paints the "options expired" shell over the start
   // route, with no screen behind it to reopen the picker from. Leaving the
   // record on the screen underneath keeps that screen — and its draft — the
-  // relaunch target instead. `PICKER_ROUTE_PATHS` is the same list the Back
-  // guard keeps aligned with the app stack's `formSheet` registrations.
-  if (isPickerRoutePath(pathname)) {
+  // relaunch target instead.
+  if (isUnrecordablePath(pathname)) {
     return false;
   }
   // The auth group is unreachable with `(app)` first, but the segments guard
@@ -54,6 +84,26 @@ export function isRecordableLastRoute(pathname: string, segments: readonly strin
     return false;
   }
   return true;
+}
+
+/** The group-free leaf path of a recorded href (`/(app)/a/b?x=1` -> `/a/b`). */
+function groupFreePath(href: string): string {
+  const queryStart = href.indexOf('?');
+  const path = queryStart === -1 ? href : href.slice(0, queryStart);
+  const parts = path.split('/').filter(part => part.length > 0 && !part.startsWith('('));
+  return `/${parts.join('/')}`;
+}
+
+/**
+ * Whether a persisted record names a route this rule refuses to restore.
+ *
+ * The record is written through `isRecordableLastRoute`, but a build before a
+ * route was excluded could have persisted it. Reading such a record as absent
+ * leaves the repair on the start route instead of replaying a gate or a sheet
+ * on its own.
+ */
+export function isUnrestorableLastRouteHref(href: string): boolean {
+  return isUnrecordablePath(groupFreePath(href));
 }
 
 /**

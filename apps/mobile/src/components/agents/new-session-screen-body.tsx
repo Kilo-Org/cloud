@@ -9,7 +9,10 @@ import { toast } from 'sonner-native';
 import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
-import { resetSelectedBranchOverrides } from '@/components/agents/new-session-repository-state';
+import {
+  areRepositoryListsComplete,
+  resetSelectedBranchOverrides,
+} from '@/components/agents/new-session-repository-state';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
 import {
   type NewSessionPromptSeed,
@@ -505,13 +508,19 @@ export function NewSessionScreenBody() {
     [isCloneEntry, repositoryDraftKey, setSelectedRepo, userId]
   );
 
-  // A selection the settled list does not contain belongs to a repository that
+  // A selection the complete list does not contain belongs to a repository that
   // is no longer connected (or to another organization's list): the row would
   // read as chosen while Start refuses it. Drop it and its stored copy, so the
-  // next visit starts from the picker instead of a dead key.
+  // next visit starts from the picker instead of a dead key. Completeness, not
+  // mere "settled", is the gate: a provider that is still loading, failed, or
+  // answered partially leaves the selection alone.
   const dropUnresolvedRepo =
     !isCloneEntry &&
-    shouldDropUnresolvedRepoSelection({ reposSettled, selectedRepo, repositories });
+    shouldDropUnresolvedRepoSelection({
+      listsComplete: areRepositoryListsComplete(groups),
+      selectedRepo,
+      repositories,
+    });
   useEffect(() => {
     if (!dropUnresolvedRepo) {
       return;

@@ -385,10 +385,10 @@ describe('shouldDropUnresolvedRepoSelection', () => {
     { platform: 'gitlab', fullName: 'drain-team/kilo-app' },
   ];
 
-  it('keeps a selection the settled list contains', () => {
+  it('keeps a selection the complete list contains', () => {
     expect(
       shouldDropUnresolvedRepoSelection({
-        reposSettled: true,
+        listsComplete: true,
         selectedRepo: 'github:drain-team/kilo-backend',
         repositories,
       })
@@ -399,31 +399,31 @@ describe('shouldDropUnresolvedRepoSelection', () => {
     // Same fullName, different provider: a different repository, not a match.
     expect(
       shouldDropUnresolvedRepoSelection({
-        reposSettled: true,
+        listsComplete: true,
         selectedRepo: 'github:drain-team/kilo-app',
         repositories,
       })
     ).toBe(true);
     expect(
       shouldDropUnresolvedRepoSelection({
-        reposSettled: true,
+        listsComplete: true,
         selectedRepo: 'github:drain-team/disconnected',
         repositories,
       })
     ).toBe(true);
   });
 
-  it('never drops while the list is unsettled or nothing is selected', () => {
+  it('never drops while the lists are incomplete or nothing is selected', () => {
     expect(
       shouldDropUnresolvedRepoSelection({
-        reposSettled: false,
+        listsComplete: false,
         selectedRepo: 'github:drain-team/disconnected',
         repositories,
       })
     ).toBe(false);
     expect(
       shouldDropUnresolvedRepoSelection({
-        reposSettled: true,
+        listsComplete: true,
         selectedRepo: '',
         repositories: [],
       })

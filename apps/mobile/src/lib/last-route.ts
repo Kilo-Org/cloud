@@ -2,8 +2,7 @@ import { z } from 'zod';
 
 import { currentRouteHref } from '@/lib/current-route-href';
 import { LAST_ROUTE_KEY } from '@/lib/storage-keys';
-import { isConcreteLastRouteHref } from '@/lib/last-route-recordable';
-import { isPickerRouteHref } from '@/lib/picker-routes';
+import { isConcreteLastRouteHref, isUnrestorableLastRouteHref } from '@/lib/last-route-recordable';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
 /**
@@ -90,11 +89,11 @@ function parseStoredRecord(raw: string): LastRouteRecord | null {
     if (!isConcreteLastRouteHref(href)) {
       return null;
     }
-    // An older build could record a picker sheet. Replaying it would reopen the
-    // "options expired" shell over the start route with no screen behind it to
-    // reopen the picker from, so it reads as absent like any other unusable
+    // An older build could record a route this rule no longer accepts (a picker
+    // sheet, or another transient sheet). Replaying one would reopen it alone
+    // over the start route, so it reads as absent like any other unusable
     // record and the repair leaves the start route alone.
-    if (isPickerRouteHref(href)) {
+    if (isUnrestorableLastRouteHref(href)) {
       return null;
     }
     return { ...result.data, href };

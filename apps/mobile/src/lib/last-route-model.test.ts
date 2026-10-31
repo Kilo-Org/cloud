@@ -1,9 +1,15 @@
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only check, runs in node, never bundled into the app
+import { readFileSync } from 'node:fs';
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only check, runs in node, never bundled into the app
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { PICKER_ROUTE_PATHS } from './picker-routes';
 import {
   isConcreteLastRouteHref,
   isRecordableLastRoute,
+  isUnrestorableLastRouteHref,
   lastRouteHrefFrom,
 } from './last-route-recordable';
 import { shouldRepairRestoredRoute } from './last-route-repair';
@@ -17,6 +23,23 @@ describe('isConcreteLastRouteHref', () => {
   it('rejects a route pattern and an empty href', () => {
     expect(isConcreteLastRouteHref('/profiles/[profileId]/variables')).toBe(false);
     expect(isConcreteLastRouteHref('')).toBe(false);
+  });
+});
+
+describe('isUnrestorableLastRouteHref', () => {
+  it('rejects a persisted picker or transient sheet, groups and query included', () => {
+    expect(isUnrestorableLastRouteHref('/(app)/agent-chat/repo-picker')).toBe(true);
+    expect(isUnrestorableLastRouteHref('/(app)/agent-chat/model-picker?routeKey=unscoped')).toBe(
+      true
+    );
+    expect(isUnrestorableLastRouteHref('/(app)/voice-language-picker')).toBe(true);
+    expect(isUnrestorableLastRouteHref('/(app)/todos/list-settings?listId=l1')).toBe(true);
+  });
+
+  it('accepts the screens a record may reopen', () => {
+    expect(isUnrestorableLastRouteHref('/(app)/agent-chat/new?organizationId=org_1')).toBe(false);
+    expect(isUnrestorableLastRouteHref('/(app)/agent-chat/ses_1')).toBe(false);
+    expect(isUnrestorableLastRouteHref('/(app)/(tabs)/(0_home)')).toBe(false);
   });
 });
 
@@ -144,6 +167,36 @@ describe('isRecordableLastRoute', () => {
       '/kilo-pass',
     ]) {
       expect(isRecordableLastRoute(pathname, ['(app)', pathname.slice(1)])).toBe(false);
+    }
+  });
+
+  it('records nothing on a transient sheet, so its opener stays the target', () => {
+    for (const pathname of [
+      '/transcription-model-picker',
+      '/voice-language-picker',
+      '/todos/list-settings',
+      '/chat/instance-picker',
+    ]) {
+      expect(isRecordableLastRoute(pathname, ['(app)', ...pathname.slice(1).split('/')])).toBe(
+        false
+      );
+    }
+  });
+
+  it('covers every sheet the app stack registers', () => {
+    // The app stack presents a sheet over the screen that opened it, so no
+    // sheet is a relaunch target: the record belongs to the opener. Reading the
+    // layout keeps a new registration from silently becoming recordable.
+    const app = fileURLToPath(new URL('../app/(app)/_layout.tsx', import.meta.url));
+    const tags = [...readFileSync(app, 'utf8').matchAll(/<Stack\.Screen\b[\s\S]*?\/>/g)].map(
+      match => match[0]
+    );
+    const sheets = tags
+      .filter(tag => tag.includes('heetOptions'))
+      .map(tag => /name="([^"]+)"/.exec(tag)?.[1] ?? '');
+    expect(sheets.length).toBeGreaterThan(0);
+    for (const name of sheets) {
+      expect(isRecordableLastRoute(`/${name}`, ['(app)', ...name.split('/')]), name).toBe(false);
     }
   });
 });

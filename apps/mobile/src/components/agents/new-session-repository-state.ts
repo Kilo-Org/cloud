@@ -139,6 +139,31 @@ export function resolveBitbucketStatus({
 
 // ── Dedup and grouping ───────────────────────────────────────────────
 
+/**
+ * Whether every provider that can list repositories has answered with its
+ * complete list.
+ *
+ * A provider that is still loading, a read that failed, and a provider that
+ * reported only some of its installations (`notice: 'partial'`) each omit rows
+ * without the app knowing which: a selection missing from such a list may
+ * still be connected, so callers must not treat it as gone. A provider that is
+ * connected but cannot be read right now (`unavailable`, e.g. a suspended
+ * installation) is unknown for the same reason. `connect`, `connected-empty`
+ * and `repos` are answers — an empty or uninstalled list included.
+ */
+export function areRepositoryListsComplete(groups: readonly RepositoryGroup[]): boolean {
+  return (
+    groups.length > 0 &&
+    groups.every(
+      group =>
+        group.notice !== 'partial' &&
+        (group.status === 'repos' ||
+          group.status === 'connected-empty' ||
+          group.status === 'connect')
+    )
+  );
+}
+
 const repositoryKey = (repository: NewSessionRepository): string =>
   `${repository.platform}/${repository.fullName}`;
 

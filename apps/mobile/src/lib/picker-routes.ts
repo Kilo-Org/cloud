@@ -35,25 +35,6 @@ export function isPickerRoutePath(pathname: string | null | undefined): boolean 
   return (PICKER_ROUTE_PATHS as readonly string[]).includes(pathname);
 }
 
-/**
- * Whether a full route href (path plus optional query) names a picker sheet.
- *
- * The persisted last-route record stores hrefs with the layout groups in the
- * path (`/(app)/agent-chat/repo-picker`), while `PICKER_ROUTE_PATHS` carries
- * the group-free path an Expo Router `usePathname()` reports, so the groups are
- * stripped before the comparison. A picker in that record cannot be reopened
- * without the screen that published its options.
- */
-export function isPickerRouteHref(href: string): boolean {
-  const queryStart = href.indexOf('?');
-  const path = queryStart === -1 ? href : href.slice(0, queryStart);
-  const withoutGroups = path
-    .split('/')
-    .filter(part => part.length > 0 && !part.startsWith('('))
-    .join('/');
-  return isPickerRoutePath(`/${withoutGroups}`);
-}
-
 type RouteStackState = {
   index?: number;
   routes?: { name?: string }[];

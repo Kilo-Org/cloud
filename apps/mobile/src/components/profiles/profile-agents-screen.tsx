@@ -56,18 +56,19 @@ type AgentRowViewProps = Readonly<{
 }>;
 
 /**
- * One agent row: name and mode, then the model and the description on their
- * own lines, then edit/delete.
+ * One agent row: the name, then the mode badge, the model and the description
+ * on their own lines, then edit/delete.
  *
  * Every row puts the same fields in the same slots: the name owns the first
- * line, the mode badge takes only the room it needs, and the secondary lines
- * follow in order. The slug is not one of them: it is the name normalized, so
- * printing it beside the name repeats the row's identity and, on a narrow
- * screen, squeezes out the name that distinguishes the row.
+ * line, the mode badge the next, and the secondary lines follow in order. The
+ * slug is not one of them: it is the name normalized, so printing it beside the
+ * name repeats the row's identity and, on a narrow screen, squeezes out the name
+ * that distinguishes the row.
  *
- * The badge moves to the next line rather than shrink the name: a badge that
- * keeps its width while the name loses its distinguishing tail leaves the row
- * unidentifiable, and the badge only says how the agent runs.
+ * The badge takes a line of its own rather than share the name's: a badge beside
+ * the name keeps its width while the name loses its distinguishing tail, and a
+ * badge that fits beside a short name but not a long one gives one row type two
+ * layouts.
  */
 function AgentRowView({
   name,
@@ -82,11 +83,13 @@ function AgentRowView({
   return (
     <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="min-w-0 flex-1 gap-0.5">
-        <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">
+        <View className="flex-row items-center gap-2">
           <Bot size={16} color={colors.mutedForeground} />
           <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
             {name}
           </Text>
+        </View>
+        <View className="flex-row items-center">
           <InlineBadge>{t(AGENT_VISIBILITY_LABEL_KEYS[visibility])}</InlineBadge>
         </View>
         {model.length > 0 ? (

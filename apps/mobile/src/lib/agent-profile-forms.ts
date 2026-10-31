@@ -31,7 +31,14 @@ export const MAX_SESSION_ENV_VAR_VALUE_LENGTH = 256;
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
 /** Server bound: `contracts/skills.ts`'s `MAX_SKILL_NAME_LENGTH`. */
-const SKILL_NAME_MAX_LENGTH = 100;
+export const SKILL_NAME_MAX_LENGTH = 100;
+
+/**
+ * Server cap: `contracts/skills.ts`'s `MAX_PROFILE_SKILLS`. The server counts
+ * every row of a profile, enabled or not, so the screen compares the loaded
+ * list's length against it before a create goes out.
+ */
+export const MAX_PROFILE_SKILLS = 50;
 
 export type ProfileNameError = 'empty' | 'too-long';
 
@@ -94,7 +101,7 @@ export function parseSkillFrontmatter(markdown: string): SkillFrontmatter {
   };
 }
 
-export type SkillInputError = 'empty' | 'bad-name' | 'no-content';
+export type SkillInputError = 'empty' | 'too-long' | 'bad-name' | 'no-content';
 
 /**
  * The skill name a pasted SKILL.md offers for the name field: its frontmatter
@@ -123,13 +130,18 @@ export type SkillInputValidation = { error: SkillInputError | null; description?
 
 /**
  * Validate a pasted custom skill. The name is checked against the server's
- * pattern; when the content carries frontmatter, its `description` is returned
- * so the caller can pass it through.
+ * length bound and pattern, in the order the server's schema applies them, so a
+ * name the server would refuse is refused here with the rule that covers it;
+ * when the content carries frontmatter, its `description` is returned so the
+ * caller can pass it through.
  */
 export function validateSkillInput(input: { name: string; content: string }): SkillInputValidation {
   const name = input.name.trim();
   if (name.length === 0) {
     return { error: 'empty' };
+  }
+  if (name.length > SKILL_NAME_MAX_LENGTH) {
+    return { error: 'too-long' };
   }
   if (!SKILL_NAME_PATTERN.test(name)) {
     return { error: 'bad-name' };

@@ -1,6 +1,6 @@
+/* eslint-disable max-lines -- one mounted case per skills screen state: loading, error, empty, rows, edit, add, validation, refused saves, and delete */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
 import {
   changeText,
   confirmRequest,
@@ -8,16 +8,32 @@ import {
   findField,
   findOne,
   mountScreen,
+  pressAddButton,
   pressEmptyAction,
   pressPressable,
+  pressSheetCancel,
   pressSheetDone,
   rerenderScreen,
   type TestConfirmMock,
   testSkill,
   testSkills,
 } from '@/components/profiles/profile-skills-screen.test-helpers';
-import { act } from '@/test/renderer';
+import { i18n } from '@/i18n';
+import { MAX_PROFILE_SKILLS, SKILL_NAME_MAX_LENGTH } from '@/lib/agent-profile-forms';
+import { act, type ReactTestInstance } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
+
+/** The props a mocked Switch host element exposes, which the renderer keeps untyped. */
+type ToggleProps = { onValueChange: (value: boolean) => void };
+
+/** The rendered text node whose content is exactly `copy`. */
+function lineWith(root: ReactTestInstance, copy: string): ReactTestInstance {
+  const node = findAll(root, 'Text').find(candidate => candidate.props.children === copy);
+  if (!node) {
+    throw new Error(`no line renders ${copy}`);
+  }
+  return node;
+}
 
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -50,6 +66,7 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -266,12 +283,104 @@ describe('ProfileSkillsScreen', () => {
     unmount();
   });
 
-  it('retryable: a failure with no message toasts the fallback and keeps the sheet', async () => {
+  it('non-retryable: a name over the server length bound is refused under the field', async () => {
     h.query.data = testSkills();
     h.query.isPending = false;
-    const error = new Error('placeholder');
-    error.message = '';
-    h.mutations.createCustomSkill.mutateAsync.mockRejectedValue(error);
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Skill name', 'a'.repeat(120));
+    changeText(renderer.root, 'Skill content', 'Body');
+    pressSheetDone(renderer.root);
+
+    expect(h.mutations.createCustomSkill.mutateAsync).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Skill name').props.error).toBe(
+      i18n.t('profiles.skillNameTooLong', { max: SKILL_NAME_MAX_LENGTH })
+    );
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('happy: a name at the length bound saves', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+    h.mutations.createCustomSkill.mutateAsync.mockResolvedValue({ id: 'skill-2' });
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Skill name', 'a'.repeat(SKILL_NAME_MAX_LENGTH));
+    changeText(renderer.root, 'Skill content', 'Body');
+    pressSheetDone(renderer.root);
+
+    await waitFor(() => h.mutations.createCustomSkill.mutateAsync.mock.calls.length > 0);
+    expect(h.mutations.createCustomSkill.mutateAsync.mock.calls[0]?.[0]).toMatchObject({
+      name: 'a'.repeat(SKILL_NAME_MAX_LENGTH),
+    });
+
+    unmount();
+  });
+
+  it('refuses a create at the skill cap inside the sheet, without a request', async () => {
+    h.query.data = testSkills(
+      Array.from({ length: MAX_PROFILE_SKILLS }, (_, index) =>
+        testSkill({ id: `skill-${index}`, name: `skill-${index}` })
+      )
+    );
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    const limitCopy = i18n.t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS });
+
+    // The list names the cap under the add control, before any authoring.
+    expect(String(lineWith(renderer.root, limitCopy).props.className)).toContain('text-warn');
+
+    pressAddButton(renderer.root);
+    changeText(renderer.root, 'Skill name', 'one-more');
+    changeText(renderer.root, 'Skill content', 'Body');
+    pressSheetDone(renderer.root);
+
+    expect(h.mutations.createCustomSkill.mutateAsync).not.toHaveBeenCalled();
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })
+    );
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+    expect(findField(renderer.root, 'Skill name').props.disabled).toBe(false);
+
+    unmount();
+  });
+
+  it('names the cap when the server refuses a create the list did not predict', async () => {
+    h.query.data = testSkills([testSkill()]);
+    h.query.isPending = false;
+    h.mutations.createCustomSkill.mutateAsync.mockRejectedValue(
+      Object.assign(new Error(`Profiles are limited to ${MAX_PROFILE_SKILLS} skills`), {
+        data: { code: 'PRECONDITION_FAILED' },
+      })
+    );
+
+    const { renderer, unmount } = await mountScreen();
+    pressAddButton(renderer.root);
+    changeText(renderer.root, 'Skill name', 'one-more');
+    changeText(renderer.root, 'Skill content', 'Body');
+    pressSheetDone(renderer.root);
+
+    await waitFor(() => h.mutations.createCustomSkill.mutateAsync.mock.calls.length > 0);
+    await waitFor(() =>
+      findAll(renderer.root, 'Text').some(
+        node =>
+          node.props.children === i18n.t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })
+      )
+    );
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('shows any other refused save as one line inside the open sheet', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+    h.mutations.createCustomSkill.mutateAsync.mockRejectedValue(new Error('Internal server error'));
 
     const { renderer, unmount } = await mountScreen();
     pressEmptyAction(renderer);
@@ -279,9 +388,146 @@ describe('ProfileSkillsScreen', () => {
     changeText(renderer.root, 'Skill content', 'Body');
     pressSheetDone(renderer.root);
 
-    await waitFor(() => h.error.mock.calls.length > 0);
-    expect(h.error).toHaveBeenCalledWith("Couldn't save skill");
+    await waitFor(() =>
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.skillSaveFailed')
+      )
+    );
+    expect(
+      String(lineWith(renderer.root, i18n.t('profiles.skillSaveFailed')).props.className)
+    ).toContain('text-destructive');
     expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('keeps the generic line for a refused update, which the cap cannot explain', async () => {
+    h.query.data = testSkills([testSkill()]);
+    h.query.isPending = false;
+    h.mutations.updateSkill.mutateAsync.mockRejectedValue(
+      Object.assign(
+        new Error('Skills.sh references cannot be modified; delete and re-add the skill instead'),
+        { data: { code: 'PRECONDITION_FAILED' } }
+      )
+    );
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Edit skill code-review');
+    changeText(renderer.root, 'Skill content', '---\nname: code-review\n---\nNew body');
+    pressSheetDone(renderer.root);
+
+    await waitFor(() =>
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.skillSaveFailed')
+      )
+    );
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })
+    );
+
+    unmount();
+  });
+
+  it('drops a save that settles after its sheet was replaced', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+    const pendingSave = Promise.withResolvers<unknown>();
+    h.mutations.createCustomSkill.mutateAsync.mockImplementation(() => pendingSave.promise);
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Skill name', 'slow-skill');
+    changeText(renderer.root, 'Skill content', 'Body');
+    pressSheetDone(renderer.root);
+    expect(h.mutations.createCustomSkill.mutateAsync).toHaveBeenCalledTimes(1);
+
+    pressSheetCancel(renderer.root);
+    await act(async () => {
+      confirmRequest(h.confirm as TestConfirmMock);
+      await Promise.resolve();
+    });
+    pressEmptyAction(renderer);
+
+    await act(async () => {
+      pendingSave.reject(new Error('late failure'));
+      await Promise.resolve();
+    });
+
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('profiles.skillSaveFailed')
+    );
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('does not close the form opened after a save whose own form was replaced', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+    const pendingSave = Promise.withResolvers<{ id: string }>();
+    h.mutations.createCustomSkill.mutateAsync.mockImplementation(() => pendingSave.promise);
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Skill name', 'slow-skill');
+    changeText(renderer.root, 'Skill content', 'Body');
+    pressSheetDone(renderer.root);
+
+    pressSheetCancel(renderer.root);
+    await act(async () => {
+      confirmRequest(h.confirm as TestConfirmMock);
+      await Promise.resolve();
+    });
+    pressEmptyAction(renderer);
+
+    await act(async () => {
+      pendingSave.resolve({ id: 'skill-2' });
+      await Promise.resolve();
+    });
+
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('names the delete action when a delete fails without a message', async () => {
+    h.query.data = testSkills([testSkill()]);
+    h.query.isPending = false;
+    const error = new Error('placeholder');
+    error.message = '';
+    h.mutations.deleteSkill.mutateAsync.mockRejectedValue(error);
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Delete skill code-review');
+    await act(async () => {
+      confirmRequest(h.confirm as TestConfirmMock);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => h.error.mock.calls.length > 0);
+    expect(h.error).toHaveBeenCalledWith(i18n.t('profiles.skillDeleteFailed'));
+
+    unmount();
+  });
+
+  it('names the toggle action when enabling a skill fails without a message', async () => {
+    h.query.data = testSkills([testSkill()]);
+    h.query.isPending = false;
+    const error = new Error('placeholder');
+    error.message = '';
+    h.mutations.setSkillEnabled.mutate.mockImplementation(
+      (_variables: unknown, options?: { onError?: (failure: Error) => void }) => {
+        options?.onError?.(error);
+      }
+    );
+
+    const { renderer, unmount } = await mountScreen();
+    const toggle = findOne(renderer.root, 'Switch');
+    act(() => {
+      (toggle.props as { onValueChange: (value: boolean) => void }).onValueChange(false);
+    });
+
+    expect(h.error).toHaveBeenCalledWith(i18n.t('profiles.skillToggleFailed'));
 
     unmount();
   });
@@ -320,6 +566,54 @@ describe('ProfileSkillsScreen', () => {
     });
 
     expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('code-review');
+
+    unmount();
+  });
+
+  it('drops the row presses of the burst that saved the sheet', async () => {
+    h.query.data = testSkills([testSkill()]);
+    h.query.isPending = false;
+    h.mutations.updateSkill.mutateAsync.mockResolvedValue({ success: true });
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Edit skill code-review');
+    pressSheetDone(renderer.root);
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 0);
+
+    // The second tap of the double tap lands on the row the sheet covered.
+    pressPressable(renderer.root, 'Delete skill code-review');
+    pressPressable(renderer.root, 'Edit skill code-review');
+    // The test renderer exposes host props untyped; the screen passes this handler.
+    const toggleProps = findOne(renderer.root, 'Switch').props as ToggleProps;
+    act(() => {
+      toggleProps.onValueChange(false);
+    });
+
+    expect(h.confirm).not.toHaveBeenCalled();
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
+    expect(h.mutations.setSkillEnabled.mutate).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('accepts the same row presses once the guard window has passed', async () => {
+    h.query.data = testSkills([testSkill()]);
+    h.query.isPending = false;
+    h.mutations.updateSkill.mutateAsync.mockResolvedValue({ success: true });
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Edit skill code-review');
+    pressSheetDone(renderer.root);
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 0);
+
+    const now = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 10_000);
+    try {
+      pressPressable(renderer.root, 'Delete skill code-review');
+    } finally {
+      now.mockRestore();
+    }
+
+    expect(h.confirm).toHaveBeenCalledTimes(1);
 
     unmount();
   });

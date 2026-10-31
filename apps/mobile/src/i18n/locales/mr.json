@@ -163,7 +163,7 @@
     "allLanguages": "सर्व भाषा"
   },
   "login": {
-    "welcome": "Kilo मध्ये स्वागत आहे",
+    "welcome": "स्वागत आहे",
     "retrySignIn": "पुन्हा साइन इन करा",
     "logo": "Kilo चा लोगो",
     "continuingSignIn": "तुमचे साइन इन सुरू आहे.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "मोबाइलवर मर्ज रिक्वेस्ट तपासण्यासाठी तुमचे GitLab खाते कनेक्ट करा.",
       "bitbucketDescription": "मोबाइलवर पुल रिक्वेस्ट तपासण्यासाठी हे संघटन Bitbucket शी कनेक्ट करा.",
       "bitbucketOrgOnlyDescription": "त्याच्या Bitbucket पुल रिक्वेस्ट तपासण्यासाठी वरील खाते एका संघटनेत बदला.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "या खात्याशी अजून कोणतीही संघटना जोडलेली नाही. संघटना तयार केल्यानंतर किंवा त्यात सामील झाल्यानंतर तुम्ही Bitbucket पुल रिक्वेस्ट तपासू शकता.",
       "contextLine": "{{organization}} साठी",
       "contextLinePersonal": "तुमच्या वैयक्तिक खात्यासाठी"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub जोडणीची मुदत संपली.",
-      "message": "तुमचे GitHub कनेक्शन आता वैध नाही. कनेक्शन पुन्हा तपासा — गरज असल्यास तुम्हाला पुन्हा कनेक्ट करण्यास सांगितले जाईल.",
+      "message": "कनेक्शन पुन्हा तपासा — गरज असल्यास तुम्हाला पुन्हा कनेक्ट करण्यास सांगितले जाईल.",
       "gitlabTitle": "GitLab जोडणीची मुदत संपली.",
-      "bitbucketTitle": "Bitbucket जोडणीची मुदत संपली.",
-      "providerMessage": "तुमचे {{provider}} कनेक्शन आता वैध नाही. कनेक्शन पुन्हा तपासा — गरज असल्यास तुम्हाला पुन्हा कनेक्ट करण्यास सांगितले जाईल."
+      "bitbucketTitle": "Bitbucket जोडणीची मुदत संपली."
     },
     "eventChips": {
       "comment": "टिप्पणी",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "पुल रिक्वेस्ट",
       "mergeRequest": "मर्ज रिक्वेस्ट",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "मर्ज रिक्वेस्ट !{{number}}",
       "shareMergeRequest": "मर्ज रिक्वेस्ट शेअर करा",
       "viewOnProvider": "{{provider}} वर पहा",
       "mergeRequestUnavailable": "मर्ज रिक्वेस्ट अनुपलब्ध",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLab वरील आणखी गट किंवा प्रकल्पांसाठी प्रवेशाची परवानगी द्यावी लागू शकते.",
       "installGithubApp": "रिपॉझिटरींसाठी GitHub ॲप इन्स्टॉल करा",
       "installGithubAppDescription": "ज्या रिपॉझिटरींचे पुनरावलोकन हवे आहे, त्यांमध्ये Kilo GitHub ॲपला प्रवेश द्या.",
-      "repositoryAccess": "रिपॉझिटरीमधील प्रवेश"
+      "repositoryAccess": "रिपॉझिटरीमधील प्रवेश",
+      "allModePersonal": "तुमच्या GitHub कनेक्शनद्वारे Kilo प्रवेश करू शकते अशा प्रत्येक रिपॉझिटरीचे पुनरावलोकन स्वयंचलितपणे केले जाते.",
+      "allModeOrganization": "संस्थेच्या GitHub कनेक्शनद्वारे Kilo प्रवेश करू शकते अशा प्रत्येक रिपॉझिटरीचे पुनरावलोकन स्वयंचलितपणे केले जाते.",
+      "allModeCount": "उपलब्ध रिपॉझिटरी: {{displayCount}}"
     },
     "style": {
       "title": "समीक्षेची शैली",
@@ -1445,6 +1448,7 @@
       "retryMessage": "यामुळे कोडचे पुनरावलोकन पुन्हा केले जाईल.",
       "retryReview": "पुनरावलोकन पुन्हा करा",
       "retryNeedsSettings": "कोड समीक्षक बंद आहे किंवा त्याच्या सेटिंग्जकडे लक्ष देणे आवश्यक आहे. सेटिंग्ज दुरुस्त करा, नंतर हे पुनरावलोकन पुन्हा करा.",
+      "retryNotStarted": "पुन्हा प्रयत्न सुरू झाला नाही.",
       "fixSettings": "सेटिंग्ज दुरुस्त करा",
       "couldNotLoad": "पुनरावलोकन लोड करता आले नाही.",
       "couldNotGetLatest": "सध्याची माहिती मिळवता आली नाही.",
@@ -1525,6 +1529,7 @@
       "changeRequestNoGitHubAccess": "या रेपॉझिटरीपर्यंत पोहोच असलेले कोणतेही GitHub कनेक्शन नाही. तिच्यापर्यंत पोहोच देऊन GitHub पुन्हा जोडा आणि नंतर पुन्हा प्रयत्न करा.",
       "changeRequestMissingPermissions": "Kilo चे GitHub App या रेपॉझिटरीमध्ये पुल रिक्वेस्ट उघडू शकत नाही. रेपॉझिटरीच्या मालकाने अ‍ॅपला contents आणि pull requests साठी राइट प्रवेश द्यावा आणि नंतर पुन्हा प्रयत्न करा.",
       "changeRequestFailed": "Kilo पुल रिक्वेस्ट उघडू शकले नाही. कृपया काही क्षणात पुन्हा प्रयत्न करा.",
+      "proposalConflict": "या रेपॉझिटरीसाठी दुसरा प्रस्ताव अजूनही सक्रिय आहे.",
       "offAction": "पुनरावलोकन मेमरी बंद आहे. ती चालू करा, नंतर पुन्हा प्रयत्न करा."
     },
     "manualReview": {
@@ -1780,7 +1785,6 @@
       "notYetSynced": "अद्याप सिंक केलेले नाही",
       "refreshFailed": "रिफ्रेश करता आले नाही — शेवटच्या सिंकमधील डेटा दाखवत आहे.",
       "settings": "सेटिंग्ज",
-      "syncFindings": "निष्कर्ष सिंक करा",
       "syncNow": "आता सिंक करा",
       "syncQueued": "सिंक रांगेत जोडले",
       "syncStatusUnavailable": "सिंकची स्थिती उपलब्ध नाही.",
@@ -1977,7 +1981,6 @@
       "eventsCount_other": "{{displayCount}} घटना",
       "generated": "{{generatedAt}} रोजी तयार केला.",
       "noActivity": "कोणतीही कृती नोंदवलेली नाही",
-      "noActivityDescription": "{{start}} ते {{end}} या काळात सुरक्षा निष्कर्षांबाबत अहवालात समाविष्ट करण्याजोग्या कोणत्याही कृती Kilo मध्ये नोंदवलेल्या नाहीत.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "रिपॉझिटरी नोंदवलेली नाही",
       "reasonUnknown": "अनोळखी कारण",
@@ -2167,7 +2170,7 @@
     "sessionList": {
       "couldNotLoadActive": "सक्रिय सत्रे लोड करता आली नाहीत.",
       "couldNotRefresh": "रीफ्रेश करता आले नाही",
-      "noSessionsYetDescription": "तुमच्या फोनवरून कोडिंगचे काम सुरू करा. तुमची सत्रे येथे दिसतील.",
+      "noSessionsYetDescription": "तुमच्या फोनवरून कोडिंगचे काम सुरू करा.",
       "viewHistory": "सत्रांचा इतिहास",
       "noMatches": "जुळणारी सत्रे नाहीत",
       "tryDifferentSearch": "दुसरा शब्द वापरून शोधा.",
@@ -2305,9 +2308,9 @@
       "couldNotLoadGithubRepositories": "GitHub रिपॉझिटरी लोड करता आल्या नाहीत.",
       "couldNotLoadGitlabRepositories": "GitLab रिपॉझिटरी लोड करता आल्या नाहीत.",
       "couldNotLoadBitbucketRepositories": "Bitbucket रिपॉझिटरी लोड करता आल्या नाहीत.",
-      "connectGithubDescription": "तुमच्या ब्राउझरमध्ये GitHub कनेक्ट करा, नंतर रिपॉझिटरी निवडण्यासाठी येथे परत या.",
-      "connectGitlabDescription": "तुमच्या ब्राउझरमध्ये GitLab कनेक्ट करा, नंतर रिपॉझिटरी निवडण्यासाठी येथे परत या.",
-      "connectBitbucketDescription": "तुमच्या ब्राउझरमध्ये Bitbucket कनेक्ट करा, नंतर रिपॉझिटरी निवडण्यासाठी येथे परत या.",
+      "connectGithubDescription": "तुमच्या ब्राउझरमधून साइन इन करा, नंतर GitHub रिपॉझिटरी निवडण्यासाठी येथे परत या.",
+      "connectGitlabDescription": "तुमच्या ब्राउझरमधून साइन इन करा, नंतर GitLab रिपॉझिटरी निवडण्यासाठी येथे परत या.",
+      "connectBitbucketDescription": "तुमच्या ब्राउझरमधून साइन इन करा, नंतर Bitbucket रिपॉझिटरी निवडण्यासाठी येथे परत या.",
       "openGithub": "GitHub उघडा",
       "openGitlab": "GitLab उघडा",
       "openBitbucket": "Bitbucket उघडा",
@@ -3859,8 +3862,6 @@
     "commandAtLimit": "आदेश {{max}} अक्षरांपुरता मर्यादित आहे",
     "commandsEmpty": "अद्याप सेटअप आदेश नाहीत",
     "commandsSaveFailed": "सेटअप कमांड सेव्ह करू शकलो नाही",
-    "moveUp": "वर हलवा",
-    "moveDown": "खाली हलवा",
     "moveCommandUp": "आदेश {{position}} वर हलवा",
     "moveCommandDown": "आदेश {{position}} खाली हलवा",
     "skillsTitle": "कौशल्य",
@@ -3869,9 +3870,13 @@
     "skillMarkdownLabel": "कौशल्य सामग्री",
     "skillsEmpty": "अजून कौशल्य नाही",
     "skillNameRequired": "कौशल्याचे नाव एंटर करा",
+    "skillNameTooLong": "कौशल्याचे नाव {{max}} वर्ण किंवा त्यापेक्षा कमी असणे आवश्यक आहे",
     "skillNameInvalid": "कौशल्याचे नाव अक्षर किंवा अंकाने सुरू होणे आवश्यक आहे आणि फक्त लोअरकेस अक्षरे, अंक आणि डॅश वापरणे आवश्यक आहे",
     "skillContentRequired": "कौशल्य सामग्री आवश्यक आहे",
-    "skillSaveFailed": "कौशल्य वाचवू शकलो नाही",
+    "skillSaveFailed": "कौशल्य वाचवू शकलो नाही. पुन्हा प्रयत्न करा.",
+    "skillDeleteFailed": "कौशल्य हटवू शकलो नाही. पुन्हा प्रयत्न करा.",
+    "skillToggleFailed": "कौशल्य अद्ययावत करू शकलो नाही. पुन्हा प्रयत्न करा.",
+    "skillLimitReached": "एका प्रोफाइलमध्ये जास्तीत जास्त {{max}} कौशल्ये असू शकतात. आणखी एक जोडण्यासाठी एक हटवा.",
     "skillSourceCustom": "कस्टम",
     "skillSourceMarketplace": "मार्केटप्लेस",
     "skillSourceSkillsSh": "skills.sh",

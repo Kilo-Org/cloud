@@ -163,7 +163,7 @@
     "allLanguages": "ທຸກພາສາ"
   },
   "login": {
-    "welcome": "ຍິນດີຕ້ອນຮັບສູ່ Kilo",
+    "welcome": "ຍິນດີຕ້ອນຮັບ",
     "retrySignIn": "ລອງເຂົ້າສູ່ລະບົບອີກຄັ້ງ",
     "logo": "ໂລໂກ້ Kilo",
     "continuingSignIn": "ກຳລັງສືບຕໍ່ການເຂົ້າສູ່ລະບົບຂອງທ່ານ.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "ເຊື່ອມຕໍ່ບັນຊີ GitLab ຂອງທ່ານເພື່ອກວດທານ merge request ເທິງມືຖື",
       "bitbucketDescription": "ເຊື່ອມຕໍ່ Bitbucket ກັບອົງກອນນີ້ເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດເທິງມືຖື",
       "bitbucketOrgOnlyDescription": "ປ່ຽນບັນຊີຂ້າງເທິງໄປຫາອົງກອນເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ຂອງມັນ.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "ບັນຊີນີ້ຍັງບໍ່ມີອົງກອນ. ທ່ານສາມາດກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ໄດ້ເມື່ອທ່ານສ້າງ ຫຼື ເຂົ້າຮ່ວມອົງກອນ.",
       "contextLine": "ສຳລັບ {{organization}}",
       "contextLinePersonal": "ສຳລັບບັນຊີສ່ວນຕົວຂອງທ່ານ"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "ການເຊື່ອມຕໍ່ GitHub ໝົດອາຍຸແລ້ວ.",
-      "message": "ການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານໃຊ້ບໍ່ໄດ້ແລ້ວ. ກວດສອບການເຊື່ອມຕໍ່ອີກຄັ້ງ — ລະບົບຈະຂໍໃຫ້ເຊື່ອມຕໍ່ໃໝ່ຖ້າຈຳເປັນ.",
+      "message": "ກວດສອບການເຊື່ອມຕໍ່ອີກຄັ້ງ — ລະບົບຈະຂໍໃຫ້ເຊື່ອມຕໍ່ໃໝ່ຖ້າຈຳເປັນ.",
       "gitlabTitle": "ການເຊື່ອມຕໍ່ GitLab ໝົດອາຍຸແລ້ວ.",
-      "bitbucketTitle": "ການເຊື່ອມຕໍ່ Bitbucket ໝົດອາຍຸແລ້ວ.",
-      "providerMessage": "ການເຊື່ອມຕໍ່ {{provider}} ຂອງທ່ານໃຊ້ບໍ່ໄດ້ແລ້ວ. ກວດສອບການເຊື່ອມຕໍ່ອີກຄັ້ງ — ລະບົບຈະຂໍໃຫ້ເຊື່ອມຕໍ່ໃໝ່ຖ້າຈຳເປັນ."
+      "bitbucketTitle": "ການເຊື່ອມຕໍ່ Bitbucket ໝົດອາຍຸແລ້ວ."
     },
     "eventChips": {
       "comment": "ສະແດງຄຳເຫັນ",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "ຄຳຂໍລວມໂຄ້ດ",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "ແບ່ງປັນ merge request",
       "viewOnProvider": "ເບິ່ງເທິງ {{provider}}",
       "mergeRequestUnavailable": "ບໍ່ສາມາດເປີດ merge request",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "ເຈົ້າອາດຕ້ອງໃຫ້ສິດເຂົ້າເຖິງກຸ່ມ ຫຼື ໂຄງການເພີ່ມໃນ GitLab.",
       "installGithubApp": "ຕິດຕັ້ງແອັບ GitHub ໃນຄັງໂຄ້ດ",
       "installGithubAppDescription": "ໃຫ້ສິດແອັບ GitHub ຂອງ Kilo ເຂົ້າເຖິງຄັງໂຄ້ດທີ່ເຈົ້າຕ້ອງການໃຫ້ກວດທານ.",
-      "repositoryAccess": "ສິດເຂົ້າເຖິງຄັງໂຄ້ດ"
+      "repositoryAccess": "ສິດເຂົ້າເຖິງຄັງໂຄ້ດ",
+      "allModePersonal": "ທຸກຄັງໂຄ້ດທີ່ Kilo ສາມາດເຂົ້າເຖິງໄດ້ຜ່ານການເຊື່ອມຕໍ່ GitHub ຂອງເຈົ້າ ຈະຖືກກວດທານອັດຕະໂນມັດ.",
+      "allModeOrganization": "ທຸກຄັງໂຄ້ດທີ່ Kilo ສາມາດເຂົ້າເຖິງໄດ້ຜ່ານການເຊື່ອມຕໍ່ GitHub ຂອງອົງກອນ ຈະຖືກກວດທານອັດຕະໂນມັດ.",
+      "allModeCount": "ຄັງໂຄ້ດທີ່ມີຢູ່: {{displayCount}}"
     },
     "style": {
       "title": "ຮູບແບບການກວດສອບ",
@@ -1445,6 +1448,7 @@
       "retryMessage": "ການດຳເນີນການນີ້ຈະເລີ່ມກວດທານໂຄ້ດອີກຄັ້ງ.",
       "retryReview": "ລອງກວດທານໃໝ່",
       "retryNeedsSettings": "ຜູ້ກວດສອບໂຄ້ດຖືກປິດ ຫຼື ການຕັ້ງຄ່າຂອງມັນຕ້ອງການການເອົາໃຈໃສ່. ແກ້ໄຂການຕັ້ງຄ່າ, ຈາກນັ້ນລອງກວດທານນີ້ໃໝ່.",
+      "retryNotStarted": "ການລອງກວດທານໃໝ່ບໍ່ໄດ້ເລີ່ມຕົ້ນ.",
       "fixSettings": "ແກ້ໄຂການຕັ້ງຄ່າ",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການກວດທານໄດ້.",
       "couldNotGetLatest": "ບໍ່ສາມາດໂຫຼດຂໍ້ມູນລ່າສຸດໄດ້.",
@@ -1525,6 +1529,7 @@
       "changeRequestNoGitHubAccess": "ບໍ່ມີການເຊື່ອມຕໍ່ GitHub ໃດທີ່ມີສິດເຂົ້າເຖິງ repository ນີ້. ເຊື່ອມຕໍ່ GitHub ຄືນໃໝ່ພ້ອມກັບສິດເຂົ້າເຖິງ repository ນີ້, ແລ້ວລອງອີກຄັ້ງ.",
       "changeRequestMissingPermissions": "GitHub App ຂອງ Kilo ບໍ່ສາມາດເປີດ PR ໃນ repository ນີ້ໄດ້. ເຈົ້າຂອງ repository ຕ້ອງໃຫ້ສິດຂຽນແກ່ແອັບສຳລັບເນື້ອຫາ ແລະ PR, ແລ້ວລອງອີກຄັ້ງ.",
       "changeRequestFailed": "Kilo ບໍ່ສາມາດເປີດ PR ໄດ້. ລອງອີກຄັ້ງໃນອີກຈັກຄູ່.",
+      "proposalConflict": "ຂໍ້ສະເໜີຄວາມຈຳການກວດສອບອີກອັນໜຶ່ງສຳລັບ repository ນີ້ຍັງເຄື່ອນໄຫວຢູ່ ດັ່ງນັ້ນຈຶ່ງຍັງບໍ່ສາມາດບັນທຶກອັນນີ້ໄດ້.",
       "offAction": "ຄວາມຈຳການກວດສອບປິດຢູ່. ເປີດໃຊ້ມັນ, ແລ້ວລອງອີກຄັ້ງ."
     },
     "manualReview": {
@@ -1780,7 +1785,6 @@
       "notYetSynced": "ຍັງບໍ່ໄດ້ຊິງຂໍ້ມູນ",
       "refreshFailed": "ບໍ່ສາມາດໂຫຼດຂໍ້ມູນໃໝ່ໄດ້ — ກຳລັງສະແດງຂໍ້ມູນທີ່ຊິງໄວ້ຄັ້ງລ່າສຸດ.",
       "settings": "ການຕັ້ງຄ່າ",
-      "syncFindings": "ຊິງຂໍ້ມູນບັນຫາທີ່ກວດພົບ",
       "syncNow": "ຊິງຂໍ້ມູນຕອນນີ້",
       "syncQueued": "ເພີ່ມການຊິງຂໍ້ມູນໃສ່ຄິວແລ້ວ",
       "syncStatusUnavailable": "ບໍ່ສາມາດເບິ່ງສະຖານະການຊິງຂໍ້ມູນໄດ້.",
@@ -1977,7 +1981,6 @@
       "eventsCount_other": "{{displayCount}} ເຫດການ",
       "generated": "ສ້າງເມື່ອ {{generatedAt}}.",
       "noActivity": "ບໍ່ມີກິດຈະກຳທີ່ບັນທຶກໄວ້",
-      "noActivityDescription": "Kilo ບໍ່ມີກິດຈະກຳກ່ຽວກັບບັນຫາຄວາມປອດໄພທີ່ກວດພົບທີ່ສາມາດລາຍງານໄດ້ ຕັ້ງແຕ່ {{start}} ຫາ {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ບໍ່ໄດ້ບັນທຶກຄັງໂຄ້ດ",
       "reasonUnknown": "ເຫດຜົນທີ່ບໍ່ຮູ້ຈັກ",
@@ -2167,7 +2170,7 @@
     "sessionList": {
       "couldNotLoadActive": "ບໍ່ສາມາດໂຫຼດເຊດຊັນທີ່ກຳລັງໃຊ້ງານໄດ້.",
       "couldNotRefresh": "ບໍ່ສາມາດໂຫຼດໃໝ່ໄດ້",
-      "noSessionsYetDescription": "ເລີ່ມວຽກຂຽນໂຄ້ດຈາກໂທລະສັບຂອງທ່ານ. ເຊດຊັນຂອງທ່ານຈະປາກົດຢູ່ນີ້.",
+      "noSessionsYetDescription": "ເລີ່ມວຽກຂຽນໂຄ້ດຈາກໂທລະສັບຂອງທ່ານ.",
       "viewHistory": "ປະຫວັດເຊດຊັນ",
       "noMatches": "ບໍ່ພົບເຊດຊັນທີ່ກົງກັບເງື່ອນໄຂ",
       "tryDifferentSearch": "ລອງໃຊ້ຄຳຄົ້ນຫາອື່ນ.",
@@ -2305,9 +2308,9 @@
       "couldNotLoadGithubRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄດຈາກ GitHub ໄດ້.",
       "couldNotLoadGitlabRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄດຈາກ GitLab ໄດ້.",
       "couldNotLoadBitbucketRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄດຈາກ Bitbucket ໄດ້.",
-      "connectGithubDescription": "ເຊື່ອມຕໍ່ GitHub ໃນບຣາວເຊີ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ.",
-      "connectGitlabDescription": "ເຊື່ອມຕໍ່ GitLab ໃນບຣາວເຊີ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ.",
-      "connectBitbucketDescription": "ເຊື່ອມຕໍ່ Bitbucket ໃນບຣາວເຊີ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ.",
+      "connectGithubDescription": "ເຂົ້າສູ່ລະບົບຈາກບຣາວເຊີຂອງທ່ານ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ GitHub.",
+      "connectGitlabDescription": "ເຂົ້າສູ່ລະບົບຈາກບຣາວເຊີຂອງທ່ານ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ GitLab.",
+      "connectBitbucketDescription": "ເຂົ້າສູ່ລະບົບຈາກບຣາວເຊີຂອງທ່ານ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ Bitbucket.",
       "openGithub": "ເປີດ GitHub",
       "openGitlab": "ເປີດ GitLab",
       "openBitbucket": "ເປີດ Bitbucket",
@@ -3859,8 +3862,6 @@
     "commandAtLimit": "ຄຳສັ່ງຈຳກັດບໍ່ເກີນ {{max}} ຕົວອັກສອນ",
     "commandsEmpty": "ບໍ່ມີຄຳສັ່ງຕັ້ງຄ່າເທື່ອ",
     "commandsSaveFailed": "ບໍ່ສາມາດບັນທຶກຄຳສັ່ງຕັ້ງຄ່າໄດ້",
-    "moveUp": "ຍ້າຍຂຶ້ນ",
-    "moveDown": "ຍ້າຍລົງ",
     "moveCommandUp": "ຍ້າຍຄໍາສັ່ງ {{position}} ຂຶ້ນ",
     "moveCommandDown": "ຍ້າຍຄໍາສັ່ງ {{position}} ລົງ",
     "skillsTitle": "ທັກສະ",
@@ -3869,9 +3870,13 @@
     "skillMarkdownLabel": "ເນື້ອໃນທັກສະ",
     "skillsEmpty": "ບໍ່ມີທັກສະເທື່ອ",
     "skillNameRequired": "ໃສ່ຊື່ທັກສະ",
+    "skillNameTooLong": "ຊື່ທັກສະຕ້ອງມີບໍ່ເກີນ {{max}} ຕົວອັກສອນ",
     "skillNameInvalid": "ຊື່ທັກສະຕ້ອງເລີ່ມຕົ້ນດ້ວຍຕົວອັກສອນ ຫຼືຕົວເລກ ແລະໃຊ້ແຕ່ຕົວພິມນ້ອຍ, ຕົວເລກ, ແລະເຄື່ອງໝາຍຂີດ",
     "skillContentRequired": "ເນື້ອຫາທັກສະແມ່ນຕ້ອງການ",
-    "skillSaveFailed": "ບໍ່ສາມາດບັນທຶກທັກສະໄດ້",
+    "skillSaveFailed": "ບໍ່ສາມາດບັນທຶກທັກສະໄດ້ ກະລຸນາລອງໃໝ່ອີກຄັ້ງ",
+    "skillDeleteFailed": "ບໍ່ສາມາດລຶບທັກສະໄດ້ ກະລຸນາລອງໃໝ່ອີກຄັ້ງ",
+    "skillToggleFailed": "ບໍ່ສາມາດອັບເດດທັກສະໄດ້ ກະລຸນາລອງໃໝ່ອີກຄັ້ງ",
+    "skillLimitReached": "ໂປຣໄຟລ໌ສາມາດມີທັກສະໄດ້ສູງສຸດ {{max}} ທັກສະ. ລຶບໜຶ່ງອັນເພື່ອເພີ່ມອັນອື່ນ.",
     "skillSourceCustom": "ກຳນົດເອງ",
     "skillSourceMarketplace": "ຕະຫຼາດ",
     "skillSourceSkillsSh": "skills.sh",

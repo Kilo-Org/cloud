@@ -163,7 +163,7 @@
     "allLanguages": "Öll tungumál"
   },
   "login": {
-    "welcome": "Velkomið í Kilo",
+    "welcome": "Velkomið",
     "retrySignIn": "Reyna innskráningu aftur",
     "logo": "Merki Kilo",
     "continuingSignIn": "Innskráningin þín heldur áfram.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Tengdu GitLab-reikninginn þinn til að yfirfara merge requests í símanum.",
       "bitbucketDescription": "Tengdu Bitbucket við þessa stofnun til að yfirfara sameiningarbeiðnir í símanum.",
       "bitbucketOrgOnlyDescription": "Skiptu reikningnum hér að ofan yfir í stofnun til að yfirfara sameiningarbeiðnir hennar á Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Þessi reikningur er ekki með neinar stofnanir ennþá. Hægt er að yfirfara sameiningarbeiðnir á Bitbucket um leið og þú býrð til eða þiggur boð um aðild að stofnun.",
       "contextLine": "Fyrir {{organization}}",
       "contextLinePersonal": "Fyrir persónulegan reikning"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Tengingin við GitHub er útrunnin.",
-      "message": "GitHub-tengingin þín er ekki lengur gild. Athugaðu tenginguna aftur — þú færð beiðni um að tengjast aftur ef þörf er á.",
+      "message": "Athugaðu tenginguna aftur — þú færð beiðni um að tengjast aftur ef þörf er á.",
       "gitlabTitle": "Tengingin við GitLab er útrunnin.",
-      "bitbucketTitle": "Tengingin við Bitbucket er útrunnin.",
-      "providerMessage": "{{provider}}-tengingin þín er ekki lengur gild. Athugaðu tenginguna aftur — þú færð beiðni um að tengjast aftur ef þörf er á."
+      "bitbucketTitle": "Tengingin við Bitbucket er útrunnin."
     },
     "eventChips": {
       "comment": "Gera athugasemd",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Samrunabeiðni",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Deila merge request",
       "viewOnProvider": "Skoða á {{provider}}",
       "mergeRequestUnavailable": "Merge request ekki tiltæk",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Þú gætir þurft að veita aðgang að fleiri hópum eða verkefnum á GitLab.",
       "installGithubApp": "Settu upp GitHub-forritið á geymslum",
       "installGithubAppDescription": "Veittu GitHub-forriti Kilo aðgang að geymslunum sem þú vilt láta yfirfara.",
-      "repositoryAccess": "aðgang að geymslum"
+      "repositoryAccess": "aðgang að geymslum",
+      "allModePersonal": "Hver geymsla sem Kilo getur nálgast í gegnum GitHub-tengingu þína er yfirfarin sjálfkrafa.",
+      "allModeOrganization": "Hver geymsla sem Kilo getur nálgast í gegnum GitHub-tengingu samtakanna er yfirfarin sjálfkrafa.",
+      "allModeCount": "Geymslur í boði: {{displayCount}}"
     },
     "style": {
       "title": "Rýnistíll",
@@ -1445,6 +1448,7 @@
       "retryMessage": "Þetta keyrir yfirferð kóðans aftur.",
       "retryReview": "Reyna yfirferð aftur",
       "retryNeedsSettings": "Slökkt er á Kóðarýni eða stillingar hans þarfnast athygli. Lagaðu stillingarnar og reyndu síðan þessa yfirferð aftur.",
+      "retryNotStarted": "Endurtilraunin hófst ekki.",
       "fixSettings": "Laga stillingar",
       "couldNotLoad": "Ekki tókst að sækja yfirferðina.",
       "couldNotGetLatest": "Ekki tókst að sækja nýjustu gögnin.",
@@ -1525,6 +1529,7 @@
       "changeRequestNoGitHubAccess": "Engin GitHub-tenging hefur aðgang að þessu hugbúnaðarsafni. Tengdu GitHub aftur með aðgangi að því og reyndu svo aftur.",
       "changeRequestMissingPermissions": "GitHub-app Kilo getur ekki opnað samrunabeiðnir í þessu hugbúnaðarsafni. Eigandi hugbúnaðarsafnsins verður að veita appinu skrifaðgang að efni og samrunabeiðnum og reyna svo aftur.",
       "changeRequestFailed": "Kilo tókst ekki að opna samrunabeiðnina. Reyndu aftur eftir smástund.",
+      "proposalConflict": "Önnur tillaga fyrir þetta hugbúnaðarsafn er enn virk.",
       "offAction": "Slökkt er á yfirferðarminni. Kveiktu á því og reyndu aftur."
     },
     "manualReview": {
@@ -1665,7 +1670,7 @@
       "outcome": "Útkoma",
       "slaStatus": "SLA-staða",
       "sortBy": "Raða eftir",
-      "statusOpen": "Opna",
+      "statusOpen": "Opið",
       "fixed": "Lagað",
       "statusIgnored": "Hunsað",
       "severityHigh": "Hátt",
@@ -1780,7 +1785,6 @@
       "notYetSynced": "Ekki samstillt ennþá",
       "refreshFailed": "Ekki tókst að endurnýja gögnin. Gögn úr síðustu samstillingu eru sýnd.",
       "settings": "Stillingar",
-      "syncFindings": "Samstilla frávik",
       "syncNow": "Samstilla núna",
       "syncQueued": "Samstilling í biðröð",
       "syncStatusUnavailable": "Staða samstillingar er ekki tiltæk.",
@@ -1852,7 +1856,7 @@
       "source": "Uppruni",
       "sourceId": "Upprunakenni",
       "viewAdvisory": "Skoða öryggistilkynningu á GitHub",
-      "statusOpen": "Opna",
+      "statusOpen": "Opið",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "lagfæring er þegar hafin",
       "reasonNoBandwidth": "enginn tími er til ráðstöfunar",
@@ -1977,7 +1981,6 @@
       "eventsCount_other": "{{displayCount}} atburðir",
       "generated": "Skýrslan var búin til {{generatedAt}}.",
       "noActivity": "Engin skráð virkni",
-      "noActivityDescription": "Kilo hefur enga skýrsluskylda virkni tengda öryggisfrávikum frá {{start}} til {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Geymsla ekki skráð",
       "reasonUnknown": "Óþekkt ástæða",
@@ -2167,7 +2170,7 @@
     "sessionList": {
       "couldNotLoadActive": "Ekki tókst að hlaða virkum lotum.",
       "couldNotRefresh": "Ekki tókst að endurnýja",
-      "noSessionsYetDescription": "Byrjaðu á forritunarverkefni í símanum þínum. Loturnar þínar birtast hér.",
+      "noSessionsYetDescription": "Byrjaðu á forritunarverkefni í símanum þínum.",
       "viewHistory": "Lotuferill",
       "noMatches": "Engar lotur samsvara leitinni",
       "tryDifferentSearch": "Prófaðu annað leitarorð.",
@@ -2305,9 +2308,9 @@
       "couldNotLoadGithubRepositories": "Ekki tókst að hlaða kóðasöfnum frá GitHub.",
       "couldNotLoadGitlabRepositories": "Ekki tókst að hlaða kóðasöfnum frá GitLab.",
       "couldNotLoadBitbucketRepositories": "Ekki tókst að hlaða kóðasöfnum frá Bitbucket.",
-      "connectGithubDescription": "Tengdu GitHub í vafranum þínum og komdu svo aftur hingað til að velja kóðasafn.",
-      "connectGitlabDescription": "Tengdu GitLab í vafranum þínum og komdu svo aftur hingað til að velja kóðasafn.",
-      "connectBitbucketDescription": "Tengdu Bitbucket í vafranum þínum og komdu svo aftur hingað til að velja kóðasafn.",
+      "connectGithubDescription": "Skráðu þig inn í vafranum þínum og komdu svo aftur hingað til að velja kóðasafn á GitHub.",
+      "connectGitlabDescription": "Skráðu þig inn í vafranum þínum og komdu svo aftur hingað til að velja kóðasafn á GitLab.",
+      "connectBitbucketDescription": "Skráðu þig inn í vafranum þínum og komdu svo aftur hingað til að velja kóðasafn á Bitbucket.",
       "openGithub": "Opna GitHub",
       "openGitlab": "Opna GitLab",
       "openBitbucket": "Opna Bitbucket",
@@ -3859,8 +3862,6 @@
     "commandAtLimit": "Skipunin er takmörkuð við {{max}} stafi",
     "commandsEmpty": "Engar uppsetningarskipanir ennþá",
     "commandsSaveFailed": "Gat ekki vistað uppsetningarskipanir",
-    "moveUp": "Færðu þig upp",
-    "moveDown": "Færðu þig niður",
     "moveCommandUp": "Færa skipun {{position}} upp",
     "moveCommandDown": "Færa skipun {{position}} niður",
     "skillsTitle": "Færni",
@@ -3869,9 +3870,13 @@
     "skillMarkdownLabel": "Færniefni",
     "skillsEmpty": "Engin kunnátta ennþá",
     "skillNameRequired": "Sláðu inn hæfileikaheiti",
+    "skillNameTooLong": "Hæfniheiti má ekki vera lengra en {{max}} stafir",
     "skillNameInvalid": "Hæfniheiti verður að byrja á bókstaf eða tölustaf og nota aðeins lágstafi, tölustafi og bandstrik",
     "skillContentRequired": "Færniefni er krafist",
-    "skillSaveFailed": "Ekki tókst að bjarga kunnáttu",
+    "skillSaveFailed": "Ekki tókst að bjarga kunnáttu. Reyndu aftur.",
+    "skillDeleteFailed": "Ekki tókst að eyða færni. Reyndu aftur.",
+    "skillToggleFailed": "Ekki tókst að uppfæra færni. Reyndu aftur.",
+    "skillLimitReached": "Prófíll getur haft allt að {{max}} færni. Eyddu einni til að bæta við annarri.",
     "skillSourceCustom": "Sérsniðið",
     "skillSourceMarketplace": "Markaður",
     "skillSourceSkillsSh": "skills.sh",

@@ -163,7 +163,7 @@
     "allLanguages": "Všechny jazyky"
   },
   "login": {
-    "welcome": "Vítejte v aplikaci Kilo",
+    "welcome": "Vítejte",
     "retrySignIn": "Zkusit přihlášení znovu",
     "logo": "Logo Kilo",
     "continuingSignIn": "Přihlašování pokračuje.",
@@ -714,6 +714,7 @@
       "gitlabDescription": "Připoj svůj účet GitLab a kontroluj merge requesty na mobilu.",
       "bitbucketDescription": "Připoj Bitbucket k této organizaci a kontroluj PR na mobilu.",
       "bitbucketOrgOnlyDescription": "Přepni účet nahoře na organizaci a kontroluj její PR na Bitbucketu.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatím nemá žádnou organizaci. PR na Bitbucketu půjde kontrolovat, jakmile nějakou vytvoříš nebo se k ní přidáš.",
       "contextLine": "Pro {{organization}}",
       "contextLinePersonal": "Pro osobní účet"
     },
@@ -739,10 +740,9 @@
     },
     "reconnectNotice": {
       "title": "Platnost připojení ke službě GitHub vypršela.",
-      "message": "Tvé připojení ke GitHubu už není platné. Znovu ho ověř. V případě potřeby tě aplikace vyzve k opětovnému připojení.",
+      "message": "Znovu ho ověř. V případě potřeby tě aplikace vyzve k opětovnému připojení.",
       "gitlabTitle": "Platnost připojení ke službě GitLab vypršela.",
-      "bitbucketTitle": "Platnost připojení ke službě Bitbucket vypršela.",
-      "providerMessage": "Tvé připojení ke {{provider}}u už není platné. Znovu ho ověř. V případě potřeby tě aplikace vyzve k opětovnému připojení."
+      "bitbucketTitle": "Platnost připojení ke službě Bitbucket vypršela."
     },
     "eventChips": {
       "comment": "Komentovat",
@@ -853,7 +853,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Sdílet merge request",
       "viewOnProvider": "Zobrazit na {{provider}}",
       "mergeRequestUnavailable": "Merge request není dostupný",
@@ -1471,7 +1471,10 @@
       "gitlabNoRepositoriesDescription": "Možná bude nutné udělit přístup k dalším skupinám nebo projektům na GitLabu.",
       "installGithubApp": "Instalace aplikace GitHub pro repozitáře",
       "installGithubAppDescription": "Udělte aplikaci Kilo na GitHubu přístup k repozitářům, které chcete nechat zkontrolovat.",
-      "repositoryAccess": "přístup k repozitářům"
+      "repositoryAccess": "přístup k repozitářům",
+      "allModePersonal": "Každý repozitář, ke kterému má Kilo přístup přes vaše připojení ke GitHubu, se automaticky kontroluje.",
+      "allModeOrganization": "Každý repozitář, ke kterému má Kilo přístup přes připojení organizace ke GitHubu, se automaticky kontroluje.",
+      "allModeCount": "Dostupné repozitáře: {{displayCount}}"
     },
     "style": {
       "title": "Styl kontroly",
@@ -1489,6 +1492,7 @@
       "retryMessage": "Kontrola kódu se spustí znovu.",
       "retryReview": "Opakovat kontrolu",
       "retryNeedsSettings": "Kontrola kódu je vypnutá nebo její nastavení vyžaduje pozornost. Opravte nastavení a potom tuto kontrolu zopakujte.",
+      "retryNotStarted": "Opakování se nepodařilo spustit.",
       "fixSettings": "Opravit nastavení",
       "couldNotLoad": "Kontrolu se nepodařilo načíst.",
       "couldNotGetLatest": "Aktuální stav se nepodařilo načíst.",
@@ -1569,6 +1573,7 @@
       "changeRequestNoGitHubAccess": "Žádné připojení k GitHubu nemá přístup k tomuto repozitáři. Znovu připojte GitHub s přístupem k tomuto repozitáři a poté to zkuste znovu.",
       "changeRequestMissingPermissions": "GitHub App od Kilo nemůže v tomto repozitáři otevírat pull requesty. Vlastník repozitáře musí aplikaci udělit přístup pro zápis k obsahu a pull requestům. Poté to zkuste znovu.",
       "changeRequestFailed": "Kilo nedokázalo otevřít pull request. Zkuste to znovu za chvíli.",
+      "proposalConflict": "Pro tento repozitář je stále aktivní jiný návrh paměti kontrol, takže tento zatím nelze uložit.",
       "offAction": "Paměť kontrol je vypnutá. Zapněte ji a zkuste to znovu."
     },
     "manualReview": {
@@ -1832,7 +1837,6 @@
       "notYetSynced": "Zatím nesynchronizováno",
       "refreshFailed": "Obnovení se nezdařilo — zobrazují se poslední synchronizovaná data.",
       "settings": "Nastavení",
-      "syncFindings": "Synchronizovat nálezy",
       "syncNow": "Synchronizovat nyní",
       "syncQueued": "Synchronizace zařazena do fronty",
       "syncStatusUnavailable": "Stav synchronizace není k dispozici.",
@@ -2043,7 +2047,6 @@
       "eventsCount_other": "{{displayCount}} událostí",
       "generated": "Zpráva byla vygenerována {{generatedAt}}.",
       "noActivity": "Žádná zaznamenaná aktivita",
-      "noActivityDescription": "Kilo za období od {{start}} do {{end}} neeviduje žádnou aktivitu u bezpečnostních nálezů, kterou by bylo možné uvést ve zprávě.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitář nezaznamenán",
       "reasonUnknown": "Nerozpoznaný důvod",
@@ -2237,7 +2240,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktivní relace se nepodařilo načíst.",
       "couldNotRefresh": "Obnovení se nezdařilo",
-      "noSessionsYetDescription": "Zadej programovací úkol z telefonu. Tady se zobrazí tvé relace.",
+      "noSessionsYetDescription": "Zadej programovací úkol z telefonu.",
       "viewHistory": "Historie relací",
       "noMatches": "Žádné odpovídající relace",
       "tryDifferentSearch": "Zkus jiný hledaný výraz.",
@@ -2379,9 +2382,9 @@
       "couldNotLoadGithubRepositories": "Repozitáře ze služby GitHub se nepodařilo načíst.",
       "couldNotLoadGitlabRepositories": "Repozitáře ze služby GitLab se nepodařilo načíst.",
       "couldNotLoadBitbucketRepositories": "Repozitáře ze služby Bitbucket se nepodařilo načíst.",
-      "connectGithubDescription": "Připojte GitHub v prohlížeči. Pak se sem vraťte a vyberte repozitář.",
-      "connectGitlabDescription": "Připojte GitLab v prohlížeči. Pak se sem vraťte a vyberte repozitář.",
-      "connectBitbucketDescription": "Připojte Bitbucket v prohlížeči. Pak se sem vraťte a vyberte repozitář.",
+      "connectGithubDescription": "Přihlaste se v prohlížeči. Pak se sem vraťte a vyberte GitHub repozitář.",
+      "connectGitlabDescription": "Přihlaste se v prohlížeči. Pak se sem vraťte a vyberte GitLab repozitář.",
+      "connectBitbucketDescription": "Přihlaste se v prohlížeči. Pak se sem vraťte a vyberte Bitbucket repozitář.",
       "openGithub": "Otevřít GitHub",
       "openGitlab": "Otevřít GitLab",
       "openBitbucket": "Otevřít Bitbucket",
@@ -3971,8 +3974,6 @@
     "commandAtLimit": "Příkaz je omezen na {{max}} znaků",
     "commandsEmpty": "Zatím žádné příkazy k nastavení",
     "commandsSaveFailed": "Příkazy nastavení se nepodařilo uložit",
-    "moveUp": "Posuňte se nahoru",
-    "moveDown": "Posuňte se dolů",
     "moveCommandUp": "Přesunout příkaz {{position}} nahoru",
     "moveCommandDown": "Přesunout příkaz {{position}} dolů",
     "skillsTitle": "Dovednosti",
@@ -3981,9 +3982,13 @@
     "skillMarkdownLabel": "Obsah dovedností",
     "skillsEmpty": "Zatím žádné dovednosti",
     "skillNameRequired": "Zadejte název dovednosti",
+    "skillNameTooLong": "Název dovednosti musí mít maximálně {{max}} znaků",
     "skillNameInvalid": "Název dovednosti musí začínat písmenem nebo číslicí a používat pouze malá písmena, číslice a pomlčky",
     "skillContentRequired": "Je vyžadován obsah dovedností",
-    "skillSaveFailed": "Nepodařilo se zachránit dovednost",
+    "skillSaveFailed": "Nepodařilo se zachránit dovednost. Zkuste to znovu.",
+    "skillDeleteFailed": "Nepodařilo se smazat dovednost. Zkuste to znovu.",
+    "skillToggleFailed": "Nepodařilo se aktualizovat dovednost. Zkuste to znovu.",
+    "skillLimitReached": "Profil může obsahovat až {{max}} dovedností. Chcete-li přidat další, smažte jednu.",
     "skillSourceCustom": "Vlastní",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

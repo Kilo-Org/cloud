@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { OptionList } from '@/components/code-reviewer/option-list';
-import { PlatformErrorScreen } from '@/components/platform-error-screen';
+import { ReviewerErrorScreen } from '@/components/code-reviewer/reviewer-error-screen';
 import { REVIEW_STYLES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
 import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
@@ -45,7 +45,7 @@ function ReviewStyleScreen({
     // flight even after its automatic restart, would otherwise leave every
     // row disabled with no explanation and no action that resolves it.
     return (
-      <PlatformErrorScreen
+      <ReviewerErrorScreen
         title={title}
         variant={failure.variant}
         onRetry={() => {

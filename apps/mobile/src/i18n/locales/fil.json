@@ -163,7 +163,7 @@
     "allLanguages": "Lahat ng wika"
   },
   "login": {
-    "welcome": "Maligayang pagdating sa Kilo",
+    "welcome": "Maligayang pagdating",
     "retrySignIn": "Subukang mag-sign in muli",
     "logo": "Logo ng Kilo",
     "continuingSignIn": "Ipinagpapatuloy ang iyong pag-sign in.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Ikonekta ang iyong GitLab account para suriin ang mga merge request sa mobile.",
       "bitbucketDescription": "Ikonekta ang Bitbucket sa organizasyong ito para suriin ang mga pull request sa mobile.",
       "bitbucketOrgOnlyDescription": "Palitan ang account sa itaas ng isang organisasyon para suriin ang mga pull request nito sa Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Wala pang mga organisasyon ang account na ito. Masusuri ang mga pull request sa Bitbucket kapag gumawa ka o sumali ka ng isang organisasyon.",
       "contextLine": "Para sa {{organization}}",
       "contextLinePersonal": "Para sa pansariling account"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Nag-expire ang koneksyon sa GitHub.",
-      "message": "Wala nang bisa ang koneksyon mo sa GitHub. Suriin muli ang koneksyon mo — hihilinging kumonekta kang muli kung kailangan.",
+      "message": "Suriin muli ang koneksyon mo — hihilinging kumonekta kang muli kung kailangan.",
       "gitlabTitle": "Nag-expire ang koneksyon sa GitLab.",
-      "bitbucketTitle": "Nag-expire ang koneksyon sa Bitbucket.",
-      "providerMessage": "Wala nang bisa ang koneksyon mo sa {{provider}}. Suriin muli ang koneksyon mo — hihilinging kumonekta kang muli kung kailangan."
+      "bitbucketTitle": "Nag-expire ang koneksyon sa Bitbucket."
     },
     "eventChips": {
       "comment": "Komento",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Ibahagi ang merge request",
       "viewOnProvider": "Tingnan sa {{provider}}",
       "mergeRequestUnavailable": "Hindi mabuksan ang merge request",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Maaaring kailangan mong magbigay ng access sa mas maraming grupo o proyekto sa GitLab.",
       "installGithubApp": "I-install ang GitHub app sa mga repository",
       "installGithubAppDescription": "Bigyan ang Kilo GitHub App ng access sa mga repository na gusto mong suriin.",
-      "repositoryAccess": "access sa repository"
+      "repositoryAccess": "access sa repository",
+      "allModePersonal": "Awtomatikong sinusuri ang bawat repository na kayang i-access ng Kilo sa pamamagitan ng iyong koneksyon sa GitHub.",
+      "allModeOrganization": "Awtomatikong sinusuri ang bawat repository na kayang i-access ng Kilo sa pamamagitan ng koneksyon sa GitHub ng organisasyon.",
+      "allModeCount": "Mga repository na magagamit: {{displayCount}}"
     },
     "style": {
       "title": "Estilo ng pagsusuri",
@@ -1445,6 +1448,7 @@
       "retryMessage": "Uulitin nito ang pagsusuri ng code.",
       "retryReview": "Subukang muli ang pagsusuri",
       "retryNeedsSettings": "Naka-off ang Tagasuri ng code o kailangang ayusin ang mga setting nito. Ayusin ang mga setting, pagkatapos ay subukang muli ang pagsusuring ito.",
+      "retryNotStarted": "Hindi nasimulan ang muling pagsubok.",
       "fixSettings": "Ayusin ang mga setting",
       "couldNotLoad": "Hindi ma-load ang pagsusuri.",
       "couldNotGetLatest": "Hindi makuha ang pinakabagong data.",
@@ -1525,6 +1529,7 @@
       "changeRequestNoGitHubAccess": "Walang koneksyon sa GitHub na may access sa repositoryong ito. I-reconnect ang GitHub na may access dito, pagkatapos ay subukan ulit.",
       "changeRequestMissingPermissions": "Hindi makapagbukas ng pull request ang GitHub App ng Kilo sa repositoryong ito. Kailangang bigyan ng may-ari ng repositoryo ang app ng write access sa contents at pull requests, pagkatapos ay subukan ulit.",
       "changeRequestFailed": "Hindi nabuksan ng Kilo ang pull request. Subukan ulit sa ilang sandali.",
+      "proposalConflict": "Aktibo pa ang isa pang mungkahi sa memorya ng pagsusuri para sa repositoryong ito, kaya hindi pa ito mai-save.",
       "offAction": "Hindi pinagana ang memorya ng pagsusuri. Paganahin ito, pagkatapos subukan ulit."
     },
     "manualReview": {
@@ -1783,7 +1788,6 @@
       "notYetSynced": "Hindi pa na-sync",
       "refreshFailed": "Hindi ma-refresh — ipinapakita ang huling na-sync na data.",
       "settings": "Mga setting",
-      "syncFindings": "I-sync ang mga natukoy na isyu",
       "syncNow": "I-sync ngayon",
       "syncQueued": "Nakapila ang sync",
       "syncStatusUnavailable": "Hindi makuha ang katayuan ng pag-sync.",
@@ -1983,7 +1987,6 @@
       "eventsCount_other": "{{displayCount}} kaganapan",
       "generated": "Nabuo noong {{generatedAt}}.",
       "noActivity": "Walang naitalang aktibidad",
-      "noActivityDescription": "Walang aktibidad sa mga natukoy na isyu sa seguridad na maiuulat ang Kilo mula {{start}} hanggang {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Hindi naitala ang repository",
       "reasonUnknown": "Hindi nakikilalang dahilan",
@@ -2173,7 +2176,7 @@
     "sessionList": {
       "couldNotLoadActive": "Hindi ma-load ang mga aktibong session.",
       "couldNotRefresh": "Hindi ma-refresh",
-      "noSessionsYetDescription": "Magsimula ng gawain sa pag-code gamit ang telepono mo. Lalabas dito ang mga session mo.",
+      "noSessionsYetDescription": "Magsimula ng gawain sa pag-code gamit ang telepono mo.",
       "viewHistory": "Kasaysayan ng mga session",
       "noMatches": "Walang session na tugma",
       "tryDifferentSearch": "Subukang maghanap gamit ang ibang salita.",
@@ -2311,9 +2314,9 @@
       "couldNotLoadGithubRepositories": "Hindi ma-load ang mga imbakan ng code sa GitHub.",
       "couldNotLoadGitlabRepositories": "Hindi ma-load ang mga imbakan ng code sa GitLab.",
       "couldNotLoadBitbucketRepositories": "Hindi ma-load ang mga imbakan ng code sa Bitbucket.",
-      "connectGithubDescription": "Ikonekta ang GitHub sa iyong browser, saka bumalik dito para pumili ng imbakan ng code.",
-      "connectGitlabDescription": "Ikonekta ang GitLab sa iyong browser, saka bumalik dito para pumili ng imbakan ng code.",
-      "connectBitbucketDescription": "Ikonekta ang Bitbucket sa iyong browser, saka bumalik dito para pumili ng imbakan ng code.",
+      "connectGithubDescription": "Mag-sign in mula sa iyong browser, saka bumalik dito para pumili ng imbakan ng code sa GitHub.",
+      "connectGitlabDescription": "Mag-sign in mula sa iyong browser, saka bumalik dito para pumili ng imbakan ng code sa GitLab.",
+      "connectBitbucketDescription": "Mag-sign in mula sa iyong browser, saka bumalik dito para pumili ng imbakan ng code sa Bitbucket.",
       "openGithub": "Buksan ang GitHub",
       "openGitlab": "Buksan ang GitLab",
       "openBitbucket": "Buksan ang Bitbucket",
@@ -3865,8 +3868,6 @@
     "commandAtLimit": "Ang utos ay limitado sa {{max}} na character",
     "commandsEmpty": "Wala pang setup command",
     "commandsSaveFailed": "Hindi ma-save ang mga command sa pag-setup",
-    "moveUp": "Umakyat",
-    "moveDown": "Ilipat pababa",
     "moveCommandUp": "Ilipat ang utos {{position}} pataas",
     "moveCommandDown": "Ilipat ang utos {{position}} pababa",
     "skillsTitle": "Mga kasanayan",
@@ -3875,9 +3876,13 @@
     "skillMarkdownLabel": "Nilalaman ng kasanayan",
     "skillsEmpty": "Wala pang skills",
     "skillNameRequired": "Maglagay ng pangalan ng kasanayan",
+    "skillNameTooLong": "Ang pangalan ng kasanayan ay dapat na {{max}} character o mas kaunti",
     "skillNameInvalid": "Ang pangalan ng kasanayan ay dapat magsimula sa isang titik o digit at gumamit lamang ng maliliit na titik, digit, at gitling",
     "skillContentRequired": "Kinakailangan ang nilalaman ng kasanayan",
-    "skillSaveFailed": "Hindi makapag-save ng kasanayan",
+    "skillSaveFailed": "Hindi makapag-save ng kasanayan. Subukan muli.",
+    "skillDeleteFailed": "Hindi makapag-delete ng kasanayan. Subukan muli.",
+    "skillToggleFailed": "Hindi makapag-update ng kasanayan. Subukan muli.",
+    "skillLimitReached": "Maaaring maglaman ang isang profile ng hanggang {{max}} kasanayan. Mag-alis ng isa para makapagdagdag ng iba.",
     "skillSourceCustom": "Custom",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

@@ -229,7 +229,7 @@
     "allLanguages": "All languages"
   },
   "login": {
-    "welcome": "Welcome to Kilo",
+    "welcome": "Welcome",
     "retrySignIn": "Retry sign in",
     "logo": "Kilo logo",
     "continuingSignIn": "Continuing your sign-in.",
@@ -750,6 +750,7 @@
       "gitlabDescription": "Connect your GitLab account to review merge requests on mobile.",
       "bitbucketDescription": "Connect Bitbucket to this organization to review pull requests on mobile.",
       "bitbucketOrgOnlyDescription": "Switch the account above to an organization to review its Bitbucket pull requests.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "This account has no organizations yet. Bitbucket pull requests can be reviewed once you create or join an organization.",
       "contextLine": "For {{organization}}",
       "contextLinePersonal": "For your personal account"
     },
@@ -773,10 +774,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub connection expired",
-      "message": "Your GitHub connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed.",
+      "message": "Re-check your connection — you'll be prompted to reconnect if needed.",
       "gitlabTitle": "GitLab connection expired",
-      "bitbucketTitle": "Bitbucket connection expired",
-      "providerMessage": "Your {{provider}} connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed."
+      "bitbucketTitle": "Bitbucket connection expired"
     },
     "eventChips": {
       "comment": "Comment",
@@ -1491,9 +1491,12 @@
       "manageAccess": "Manage access",
       "bitbucketNoRepositoriesDescription": "No repositories are available in this Bitbucket workspace.",
       "gitlabNoRepositoriesDescription": "You may need to grant access to more groups or projects on GitLab.",
-      "installGithubApp": "Install the GitHub app on repositories",
-      "installGithubAppDescription": "Grant the Kilo GitHub App access to the repositories you want reviewed.",
-      "repositoryAccess": "repository access"
+      "installGithubApp": "Install the GitHub app",
+      "installGithubAppDescription": "Grant it access to the repositories you want reviewed.",
+      "repositoryAccess": "repository access",
+      "allModePersonal": "Every repository Kilo can access through your GitHub connection is reviewed automatically.",
+      "allModeOrganization": "Every repository Kilo can access through the organization's GitHub connection is reviewed automatically.",
+      "allModeCount": "Repositories available: {{displayCount}}"
     },
     "style": {
       "title": "Review style",
@@ -1511,6 +1514,7 @@
       "retryMessage": "This will re-run the code review.",
       "retryReview": "Retry review",
       "retryNeedsSettings": "Code Reviewer is off or its settings need attention. Fix the settings, then retry this review.",
+      "retryNotStarted": "The retry did not start.",
       "fixSettings": "Fix settings",
       "couldNotLoad": "Could not load review",
       "couldNotGetLatest": "Couldn't get the latest.",
@@ -1591,6 +1595,7 @@
       "changeRequestNoGitHubAccess": "No GitHub connection has access to this repository. Reconnect GitHub with access to it, then try again.",
       "changeRequestMissingPermissions": "Kilo's GitHub App cannot open pull requests in this repository. A repository owner must give the app write access to contents and pull requests, then try again.",
       "changeRequestFailed": "Kilo could not open the pull request. Try again in a moment.",
+      "proposalConflict": "Another proposal for this repository is still active.",
       "offAction": "Review memory is off. Turn it on, then try again."
     },
     "manualReview": {
@@ -1850,7 +1855,6 @@
       "notYetSynced": "Not yet synced",
       "refreshFailed": "Could not refresh — showing last synced data.",
       "settings": "Settings",
-      "syncFindings": "Sync findings",
       "syncNow": "Sync now",
       "syncQueued": "Sync queued",
       "syncStatusUnavailable": "Sync status unavailable"
@@ -2060,7 +2064,6 @@
       "eventsCount_other": "{{displayCount}} events",
       "generated": "Generated {{generatedAt}}",
       "noActivity": "No recorded activity",
-      "noActivityDescription": "Kilo has no reportable Security Finding activity from {{start}} to {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "reasonUnknown": "Unrecognized reason",
       "repositoryNotRecorded": "Repository not recorded",
@@ -2234,7 +2237,7 @@
       "couldNotLoadActive": "Could not load active sessions",
       "couldNotRefresh": "Couldn't refresh",
       "updating": "Updating",
-      "noSessionsYetDescription": "Start a coding task from your phone. Your sessions will appear here.",
+      "noSessionsYetDescription": "Start a coding task from your phone.",
       "viewHistory": "Session history",
       "noMatches": "No sessions match",
       "tryDifferentSearch": "Try a different search term.",
@@ -2371,9 +2374,9 @@
       "couldNotLoadGithubRepositories": "Couldn't load GitHub repositories",
       "couldNotLoadGitlabRepositories": "Couldn't load GitLab repositories",
       "couldNotLoadBitbucketRepositories": "Couldn't load Bitbucket repositories",
-      "connectGithubDescription": "Connect GitHub in your browser, then return here to pick a repository.",
-      "connectGitlabDescription": "Connect GitLab in your browser, then return here to pick a repository.",
-      "connectBitbucketDescription": "Connect Bitbucket in your browser, then return here to pick a repository.",
+      "connectGithubDescription": "Sign in from your browser, then return here to pick a GitHub repository.",
+      "connectGitlabDescription": "Sign in from your browser, then return here to pick a GitLab repository.",
+      "connectBitbucketDescription": "Sign in from your browser, then return here to pick a Bitbucket repository.",
       "openGithub": "Open GitHub",
       "openGitlab": "Open GitLab",
       "openBitbucket": "Open Bitbucket",
@@ -3925,8 +3928,6 @@
     "commandAtLimit": "The command is limited to {{max}} characters",
     "commandsEmpty": "No setup commands yet",
     "commandsSaveFailed": "Couldn't save setup commands",
-    "moveUp": "Move up",
-    "moveDown": "Move down",
     "moveCommandUp": "Move command {{position}} up",
     "moveCommandDown": "Move command {{position}} down",
     "skillsTitle": "Skills",
@@ -3935,9 +3936,13 @@
     "skillMarkdownLabel": "Skill content",
     "skillsEmpty": "No skills yet",
     "skillNameRequired": "Enter a skill name",
+    "skillNameTooLong": "Skill name must be {{max}} characters or fewer",
     "skillNameInvalid": "Skill name must start with a letter or digit and use only lowercase letters, digits, and dashes",
     "skillContentRequired": "Skill content is required",
-    "skillSaveFailed": "Couldn't save skill",
+    "skillSaveFailed": "Couldn't save skill. Try again.",
+    "skillDeleteFailed": "Couldn't delete skill. Try again.",
+    "skillToggleFailed": "Couldn't update skill. Try again.",
+    "skillLimitReached": "A profile can hold up to {{max}} skills. Delete one to add another.",
     "skillSourceCustom": "Custom",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

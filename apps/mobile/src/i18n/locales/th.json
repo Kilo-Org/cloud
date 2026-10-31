@@ -163,7 +163,7 @@
     "allLanguages": "ทุกภาษา"
   },
   "login": {
-    "welcome": "ยินดีต้อนรับสู่ Kilo",
+    "welcome": "ยินดีต้อนรับ",
     "retrySignIn": "ลองลงชื่อเข้าใช้อีกครั้ง",
     "logo": "โลโก้ Kilo",
     "continuingSignIn": "กำลังดำเนินการลงชื่อเข้าใช้ต่อ",
@@ -684,6 +684,7 @@
       "gitlabDescription": "เชื่อมต่อบัญชี GitLab ของคุณเพื่อรีวิว merge request บนมือถือ",
       "bitbucketDescription": "เชื่อมต่อ Bitbucket กับองค์กรนี้เพื่อรีวิวพูลรีเควสต์บนมือถือ",
       "bitbucketOrgOnlyDescription": "สลับบัญชีด้านบนไปที่องค์กรเพื่อรีวิวพูลรีเควสต์บน Bitbucket ขององค์กรนั้น",
+      "bitbucketOrgOnlyNoOrganizationDescription": "บัญชีนี้ยังไม่มีองค์กร คุณจะสามารถรีวิวพูลรีเควสต์บน Bitbucket ได้เมื่อสร้างหรือเข้าร่วมองค์กร",
       "contextLine": "สำหรับ {{organization}}",
       "contextLinePersonal": "สำหรับบัญชีส่วนตัวของคุณ"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "การเชื่อมต่อ GitHub หมดอายุแล้ว",
-      "message": "การเชื่อมต่อ GitHub ของคุณใช้ไม่ได้แล้ว ตรวจสอบการเชื่อมต่ออีกครั้ง หากจำเป็น ระบบจะแจ้งให้เชื่อมต่อใหม่",
+      "message": "ตรวจสอบการเชื่อมต่ออีกครั้ง หากจำเป็น ระบบจะแจ้งให้เชื่อมต่อใหม่",
       "gitlabTitle": "การเชื่อมต่อ GitLab หมดอายุแล้ว",
-      "bitbucketTitle": "การเชื่อมต่อ Bitbucket หมดอายุแล้ว",
-      "providerMessage": "การเชื่อมต่อ {{provider}} ของคุณใช้ไม่ได้แล้ว ตรวจสอบการเชื่อมต่ออีกครั้ง หากจำเป็น ระบบจะแจ้งให้เชื่อมต่อใหม่"
+      "bitbucketTitle": "การเชื่อมต่อ Bitbucket หมดอายุแล้ว"
     },
     "eventChips": {
       "comment": "แสดงความคิดเห็น",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "คุณอาจต้องให้สิทธิ์เข้าถึงกลุ่มหรือโปรเจกต์เพิ่มเติมบน GitLab",
       "installGithubApp": "ติดตั้ง GitHub App สำหรับคลังโค้ด",
       "installGithubAppDescription": "ให้สิทธิ์ Kilo GitHub App เข้าถึงคลังโค้ดที่คุณต้องการให้ตรวจสอบ",
-      "repositoryAccess": "สิทธิ์เข้าถึงคลังโค้ด"
+      "repositoryAccess": "สิทธิ์เข้าถึงคลังโค้ด",
+      "allModePersonal": "คลังโค้ดทุกแห่งที่ Kilo เข้าถึงได้ผ่านการเชื่อมต่อ GitHub ของคุณจะได้รับการตรวจสอบอัตโนมัติ",
+      "allModeOrganization": "คลังโค้ดทุกแห่งที่ Kilo เข้าถึงได้ผ่านการเชื่อมต่อ GitHub ขององค์กรจะได้รับการตรวจสอบอัตโนมัติ",
+      "allModeCount": "คลังโค้ดที่ใช้ได้: {{displayCount}}"
     },
     "style": {
       "title": "รูปแบบการตรวจสอบ",
@@ -1445,6 +1448,7 @@
       "retryMessage": "ระบบจะตรวจสอบโค้ดอีกครั้ง",
       "retryReview": "ลองตรวจสอบอีกครั้ง",
       "retryNeedsSettings": "ตัวตรวจสอบโค้ดปิดอยู่ หรือการตั้งค่าต้องได้รับการแก้ไข แก้ไขการตั้งค่า แล้วลองตรวจสอบนี้อีกครั้ง",
+      "retryNotStarted": "การลองใหม่ไม่สามารถเริ่มต้นได้",
       "fixSettings": "แก้ไขการตั้งค่า",
       "couldNotLoad": "โหลดผลการตรวจสอบไม่สำเร็จ",
       "couldNotGetLatest": "ไม่สามารถดึงข้อมูลล่าสุดได้",
@@ -1525,6 +1529,7 @@
       "changeRequestNoGitHubAccess": "ไม่มีการเชื่อมต่อ GitHub ใดที่เข้าถึงที่เก็บนี้ได้ โปรดเชื่อมต่อ GitHub ใหม่ด้วยบัญชีที่เข้าถึงที่เก็บนี้ได้ แล้วลองอีกครั้ง",
       "changeRequestMissingPermissions": "แอป GitHub ของ Kilo ไม่สามารถเปิด Pull Request ในที่เก็บนี้ได้ เจ้าของที่เก็บต้องให้สิทธิ์การเขียนเนื้อหาและ Pull Request แก่แอป แล้วลองอีกครั้ง",
       "changeRequestFailed": "Kilo ไม่สามารถเปิด Pull Request ได้ โปรดลองอีกครั้งในอีกสักครู่",
+      "proposalConflict": "ข้อเสนอความจำในการตรวจสอบอีกข้อสำหรับที่เก็บนี้ยังคงเปิดใช้งานอยู่ จึงยังไม่สามารถบันทึกข้อเสนอนี้ได้",
       "offAction": "ความจำในการตรวจสอบปิดอยู่ เปิดใช้งานแล้วลองอีกครั้ง"
     },
     "manualReview": {
@@ -1780,7 +1785,6 @@
       "notYetSynced": "ยังไม่ซิงค์",
       "refreshFailed": "รีเฟรชไม่สำเร็จ ขณะนี้แสดงข้อมูลที่ซิงค์ไว้ล่าสุด",
       "settings": "การตั้งค่า",
-      "syncFindings": "ซิงค์ข้อค้นพบ",
       "syncNow": "ซิงค์ตอนนี้",
       "syncQueued": "จัดคิวการซิงค์แล้ว",
       "syncStatusUnavailable": "ไม่สามารถดูสถานะการซิงค์ได้",
@@ -1977,7 +1981,6 @@
       "eventsCount_other": "{{displayCount}} เหตุการณ์",
       "generated": "สร้างเมื่อ {{generatedAt}}",
       "noActivity": "ยังไม่มีกิจกรรมที่บันทึกไว้",
-      "noActivityDescription": "Kilo ไม่มีกิจกรรมเกี่ยวกับข้อค้นพบด้านความปลอดภัยที่รายงานได้ในช่วง {{start}} ถึง {{end}}",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ไม่ได้บันทึกคลังโค้ดไว้",
       "reasonUnknown": "ไม่รู้จักเหตุผล",
@@ -2167,7 +2170,7 @@
     "sessionList": {
       "couldNotLoadActive": "ไม่สามารถโหลดเซสชันที่กำลังทำงานได้",
       "couldNotRefresh": "รีเฟรชไม่ได้",
-      "noSessionsYetDescription": "เริ่มงานเขียนโค้ดจากมือถือ เซสชันของคุณจะแสดงที่นี่",
+      "noSessionsYetDescription": "เริ่มงานเขียนโค้ดจากมือถือ",
       "viewHistory": "ประวัติเซสชัน",
       "noMatches": "ไม่มีเซสชันที่ตรงกัน",
       "tryDifferentSearch": "ลองใช้คำค้นหาอื่น",
@@ -2305,9 +2308,9 @@
       "couldNotLoadGithubRepositories": "ไม่สามารถโหลดคลังโค้ดจาก GitHub ได้",
       "couldNotLoadGitlabRepositories": "ไม่สามารถโหลดคลังโค้ดจาก GitLab ได้",
       "couldNotLoadBitbucketRepositories": "ไม่สามารถโหลดคลังโค้ดจาก Bitbucket ได้",
-      "connectGithubDescription": "เชื่อมต่อ GitHub ในเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ดที่นี่",
-      "connectGitlabDescription": "เชื่อมต่อ GitLab ในเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ดที่นี่",
-      "connectBitbucketDescription": "เชื่อมต่อ Bitbucket ในเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ดที่นี่",
+      "connectGithubDescription": "ลงชื่อเข้าใช้จากเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ด GitHub ที่นี่",
+      "connectGitlabDescription": "ลงชื่อเข้าใช้จากเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ด GitLab ที่นี่",
+      "connectBitbucketDescription": "ลงชื่อเข้าใช้จากเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ด Bitbucket ที่นี่",
       "openGithub": "เปิด GitHub",
       "openGitlab": "เปิด GitLab",
       "openBitbucket": "เปิด Bitbucket",
@@ -3859,8 +3862,6 @@
     "commandAtLimit": "คำสั่งจำกัดไว้ที่ {{max}} อักขระ",
     "commandsEmpty": "ยังไม่มีคำสั่งการตั้งค่า",
     "commandsSaveFailed": "ไม่สามารถบันทึกคำสั่งการตั้งค่าได้",
-    "moveUp": "เลื่อนขึ้น",
-    "moveDown": "เลื่อนลง",
     "moveCommandUp": "ย้ายคำสั่ง {{position}} ขึ้น",
     "moveCommandDown": "ย้ายคำสั่ง {{position}} ลง",
     "skillsTitle": "ทักษะ",
@@ -3869,9 +3870,13 @@
     "skillMarkdownLabel": "เนื้อหาทักษะ",
     "skillsEmpty": "ยังไม่มีทักษะเลย",
     "skillNameRequired": "ป้อนชื่อทักษะ",
+    "skillNameTooLong": "ชื่อทักษะต้องมีความยาวไม่เกิน {{max}} ตัวอักษร",
     "skillNameInvalid": "ชื่อทักษะต้องขึ้นต้นด้วยตัวอักษรหรือตัวเลข และใช้เฉพาะตัวอักษรพิมพ์เล็ก ตัวเลข และขีดกลางเท่านั้น",
     "skillContentRequired": "จำเป็นต้องมีเนื้อหาทักษะ",
-    "skillSaveFailed": "ไม่สามารถบันทึกทักษะได้",
+    "skillSaveFailed": "ไม่สามารถบันทึกทักษะได้ โปรดลองอีกครั้ง",
+    "skillDeleteFailed": "ไม่สามารถลบทักษะได้ โปรดลองอีกครั้ง",
+    "skillToggleFailed": "ไม่สามารถอัปเดตทักษะได้ โปรดลองอีกครั้ง",
+    "skillLimitReached": "โปรไฟล์สามารถมีทักษะได้สูงสุด {{max}} ทักษะ ลบหนึ่งรายการเพื่อเพิ่มอีกรายการ",
     "skillSourceCustom": "กำหนดเอง",
     "skillSourceMarketplace": "ตลาด",
     "skillSourceSkillsSh": "skills.sh",

@@ -163,7 +163,7 @@
     "allLanguages": "Bütün dillər"
   },
   "login": {
-    "welcome": "Kilo-ya xoş gəlmisən",
+    "welcome": "Xoş gəlmisən",
     "retrySignIn": "Yenidən daxil ol",
     "logo": "Kilo loqosu",
     "continuingSignIn": "Giriş davam etdirilir.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Mobil cihazda merge sorğularına baxış keçirmək üçün GitLab hesabını qoş.",
       "bitbucketDescription": "Mobil cihazda birləşdirmə sorğularına baxış keçirmək üçün Bitbucket-ı bu təşkilata qoş.",
       "bitbucketOrgOnlyDescription": "Yuxarıdakı hesabı təşkilata keçir ki, onun Bitbucket birləşdirmə sorğularına baxış keçirəsən.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabda hələ ki, heç bir təşkilat yoxdur. Təşkilat yaratdıqdan və ya ona qoşulduqdan sonra Bitbucket birləşdirmə sorğularına baxış keçirə bilərsən.",
       "contextLine": "{{organization}} üçün",
       "contextLinePersonal": "Şəxsi hesabınız üçün"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub bağlantısının müddəti bitdi.",
-      "message": "GitHub bağlantın artıq etibarlı deyil. Bağlantını yenidən yoxla — lazım olsa, yenidən qoşulmaq təklif olunacaq.",
+      "message": "Bağlantını yenidən yoxla — lazım olsa, yenidən qoşulmaq təklif olunacaq.",
       "gitlabTitle": "GitLab bağlantısının müddəti bitdi.",
-      "bitbucketTitle": "Bitbucket bağlantısının müddəti bitdi.",
-      "providerMessage": "{{provider}} bağlantın artıq etibarlı deyil. Bağlantını yenidən yoxla — lazım olsa, yenidən qoşulmaq təklif olunacaq."
+      "bitbucketTitle": "Bitbucket bağlantısının müddəti bitdi."
     },
     "eventChips": {
       "comment": "Şərh",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Birləşdirmə sorğusu",
       "mergeRequest": "Merge sorğusu",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge sorğusu !{{number}}",
       "shareMergeRequest": "Merge sorğusunu paylaş",
       "viewOnProvider": "{{provider}} üzərində bax",
       "mergeRequestUnavailable": "Merge sorğusu əlçatan deyil",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLab-da daha çox qrupa və ya layihəyə giriş icazəsi verməyin lazım ola bilər.",
       "installGithubApp": "GitHub tətbiqini repozitoriyalarda quraşdır",
       "installGithubAppDescription": "Kilo GitHub tətbiqinə yoxlanmasını istədiyin repozitoriyalara giriş icazəsi ver.",
-      "repositoryAccess": "repozitoriyaya giriş"
+      "repositoryAccess": "repozitoriyaya giriş",
+      "allModePersonal": "GitHub bağlantın vasitəsilə Kilo-nun əldə edə bildiyi hər bir repozitoriya avtomatik yoxlanılır.",
+      "allModeOrganization": "Təşkilatın GitHub bağlantısı vasitəsilə Kilo-nun əldə edə bildiyi hər bir repozitoriya avtomatik yoxlanılır.",
+      "allModeCount": "Əlçatan repozitoriyalar: {{displayCount}}"
     },
     "style": {
       "title": "Yoxlama üslubu",
@@ -1445,6 +1448,7 @@
       "retryMessage": "Bu, kod yoxlamasını yenidən başladacaq.",
       "retryReview": "Yoxlamanı təkrarla",
       "retryNeedsSettings": "Kod yoxlayıcısı söndürülüb və ya onun ayarları diqqət tələb edir. Ayarları düzəldin, sonra bu yoxlamanı təkrarlayın.",
+      "retryNotStarted": "Yenidən cəhd başlamadı.",
       "fixSettings": "Ayarları düzəlt",
       "couldNotLoad": "Kod yoxlamasını yükləmək mümkün olmadı.",
       "couldNotGetLatest": "Ən son məlumatları almaq mümkün olmadı.",
@@ -1525,6 +1529,7 @@
       "changeRequestNoGitHubAccess": "Heç bir GitHub bağlantısının bu repozitoriyaya girişi yoxdur. GitHub-u ona girişlə yenidən qoş, sonra yenidən cəhd et.",
       "changeRequestMissingPermissions": "Kilo-nun GitHub Tətbiqi bu repozitoriyada pull sorğusu aça bilmir. Repozitoriya sahibi tətbiqə məzmun və pull sorğuları üçün yazma icazəsi verməlidir, sonra yenidən cəhd et.",
       "changeRequestFailed": "Kilo pull sorğusunu aça bilmədi. Bir azdan yenidən cəhd et.",
+      "proposalConflict": "Bu repozitoriya üçün başqa bir təklif hələ də aktivdir.",
       "offAction": "Kod yoxlaması yaddaşı deaktivdir. Onu aktivləşdir, sonra yenidən cəhd et."
     },
     "manualReview": {
@@ -1780,7 +1785,6 @@
       "notYetSynced": "Hələ sinxronlaşdırılmayıb",
       "refreshFailed": "Məlumatları yeniləmək mümkün olmadı. Son sinxronlaşdırılmış məlumatlar göstərilir.",
       "settings": "Parametrlər",
-      "syncFindings": "Tapıntıları sinxronlaşdır",
       "syncNow": "İndi sinxronlaşdır",
       "syncQueued": "Sinxronlaşdırma növbəyə alındı",
       "syncStatusUnavailable": "Sinxronlaşdırma statusu əlçatan deyil.",
@@ -1977,7 +1981,6 @@
       "eventsCount_other": "{{displayCount}} hadisə",
       "generated": "Hesabat {{generatedAt}} tarixində yaradılıb.",
       "noActivity": "Qeyd olunmuş fəaliyyət yoxdur",
-      "noActivityDescription": "{{start}} – {{end}} aralığında Kilo-da təhlükəsizlik tapıntıları üzrə hesabata daxil ediləcək fəaliyyət yoxdur.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitoriya qeyd olunmayıb",
       "reasonUnknown": "Tanınmayan səbəb",
@@ -2167,7 +2170,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktiv sessiyaları yükləmək mümkün olmadı.",
       "couldNotRefresh": "Yeniləmək mümkün olmadı",
-      "noSessionsYetDescription": "Telefonundan kodlaşdırma tapşırığı başlat. Sessiyaların burada görünəcək.",
+      "noSessionsYetDescription": "Telefonundan kodlaşdırma tapşırığı başlat.",
       "viewHistory": "Sessiya tarixçəsi",
       "noMatches": "Uyğun sessiya yoxdur",
       "tryDifferentSearch": "Başqa sözlə axtar.",
@@ -2305,9 +2308,9 @@
       "couldNotLoadGithubRepositories": "GitHub repozitoriyalarını yükləmək mümkün olmadı.",
       "couldNotLoadGitlabRepositories": "GitLab repozitoriyalarını yükləmək mümkün olmadı.",
       "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarını yükləmək mümkün olmadı.",
-      "connectGithubDescription": "GitHub hesabını brauzerdə qoş, sonra repozitoriya seçmək üçün buraya qayıt.",
-      "connectGitlabDescription": "GitLab hesabını brauzerdə qoş, sonra repozitoriya seçmək üçün buraya qayıt.",
-      "connectBitbucketDescription": "Bitbucket hesabını brauzerdə qoş, sonra repozitoriya seçmək üçün buraya qayıt.",
+      "connectGithubDescription": "Brauzerdə daxil ol, sonra GitHub repozitoriyası seçmək üçün buraya qayıt.",
+      "connectGitlabDescription": "Brauzerdə daxil ol, sonra GitLab repozitoriyası seçmək üçün buraya qayıt.",
+      "connectBitbucketDescription": "Brauzerdə daxil ol, sonra Bitbucket repozitoriyası seçmək üçün buraya qayıt.",
       "openGithub": "GitHub-u aç",
       "openGitlab": "GitLab-ı aç",
       "openBitbucket": "Bitbucket-ı aç",
@@ -3859,8 +3862,6 @@
     "commandAtLimit": "Əmr {{max}} simvolla məhduddur",
     "commandsEmpty": "Hələ quraşdırma əmrləri yoxdur",
     "commandsSaveFailed": "Quraşdırma əmrlərini saxlamaq mümkün olmadı",
-    "moveUp": "Yuxarı hərəkət edin",
-    "moveDown": "Aşağı hərəkət edin",
     "moveCommandUp": "{{position}} nömrəli əmri yuxarı köçür",
     "moveCommandDown": "{{position}} nömrəli əmri aşağı köçür",
     "skillsTitle": "Bacarıqlar",
@@ -3869,9 +3870,13 @@
     "skillMarkdownLabel": "Bacarıq məzmunu",
     "skillsEmpty": "Hələ bacarıq yoxdur",
     "skillNameRequired": "Bacarıq adı daxil edin",
+    "skillNameTooLong": "Bacarıq adı {{max}} simvoldan çox olmamalıdır",
     "skillNameInvalid": "Bacarıq adı hərf və ya rəqəmlə başlamalı və yalnız kiçik hərflər, rəqəmlər və tirelərdən istifadə etməlidir",
     "skillContentRequired": "Bacarıq məzmunu tələb olunur",
-    "skillSaveFailed": "Bacarıq saxlamaq mümkün olmadı",
+    "skillSaveFailed": "Bacarıq saxlamaq mümkün olmadı. Yenidən cəhd edin.",
+    "skillDeleteFailed": "Bacarıq silmək mümkün olmadı. Yenidən cəhd edin.",
+    "skillToggleFailed": "Bacarıq yeniləmək mümkün olmadı. Yenidən cəhd edin.",
+    "skillLimitReached": "Profil maksimum {{max}} bacarıq saxlaya bilər. Başqa bir bacarıq əlavə etmək üçün birini silin.",
     "skillSourceCustom": "Fərdi",
     "skillSourceMarketplace": "Marketpleys",
     "skillSourceSkillsSh": "skills.sh",

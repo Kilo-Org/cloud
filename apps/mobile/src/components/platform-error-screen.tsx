@@ -1,3 +1,4 @@
+import { type Href } from 'expo-router';
 import { type ReactNode } from 'react';
 import { View } from 'react-native';
 
@@ -14,6 +15,7 @@ import { ScreenHeader } from '@/components/screen-header';
 export function PlatformErrorScreen({
   title,
   eyebrow,
+  backFallback,
   errorTitle,
   message,
   variant = 'server',
@@ -24,6 +26,12 @@ export function PlatformErrorScreen({
   /** ScreenHeader's title, e.g. the screen/feature name. */
   title: string;
   eyebrow?: string;
+  /**
+   * Where the header's Back lands when the failed screen has no history to pop,
+   * e.g. a deep link or a relaunch restore that opened it on its own. A caller
+   * that leaves it out keeps the header's default: no Back without history.
+   */
+  backFallback?: Href;
   /** QueryError's own title override — independent of the ScreenHeader title above. */
   errorTitle?: string;
   message?: string;
@@ -36,7 +44,7 @@ export function PlatformErrorScreen({
 }>) {
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} eyebrow={eyebrow} />
+      <ScreenHeader title={title} eyebrow={eyebrow} backFallback={backFallback} />
       <QueryError
         variant={variant}
         title={errorTitle}

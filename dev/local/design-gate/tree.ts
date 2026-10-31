@@ -16,6 +16,7 @@ const ProbeNodeSchema = z.object({
   parent: z.number().int().min(-1),
   tag: z.string(),
   rect: RectSchema,
+  layoutRect: RectSchema.optional(),
   owners: z.array(z.string()).optional(),
   text: z.string().optional(),
   testID: z.string().optional(),

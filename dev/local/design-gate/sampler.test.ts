@@ -15,7 +15,8 @@ test('sampling retains late transitions without merging non-adjacent layouts', c
   position = 399;
   context.mock.timers.tick(120);
   const samples = sampler.stop();
-  assert.equal(samples.length, 403);
+  assert.equal(samples.length, 400);
+  assert.equal(sampler.truncated(), true);
   assert.deepEqual(
     samples.slice(-3).map(sample => [sample.dump.nodes[0]?.rect[0], sample.repeat]),
     [
@@ -40,4 +41,24 @@ test('stopping a sampler releases its timers and does not retain later captures'
   context.mock.timers.tick(10_000);
   assert.equal(captures, stoppedAt);
   assert.deepEqual(sampler.stop(), []);
+});
+
+test('sampling keeps layout changes even when a transform holds the painted frame still', context => {
+  context.mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'] });
+  let y = 0;
+  const sampler = createSampler(() => ({
+    env: { route: '/fixture' },
+    nodes: [{ rect: [0, 0, 100, 20], layoutRect: [0, y, 100, 20] }],
+  }));
+  sampler.start(120, 5_000);
+  context.mock.timers.tick(120);
+  y = 30;
+  context.mock.timers.tick(240);
+  assert.deepEqual(
+    sampler.stop().map(sample => [sample.dump.nodes[0].layoutRect[1], sample.repeat]),
+    [
+      [0, 2],
+      [30, 2],
+    ]
+  );
 });

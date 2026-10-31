@@ -163,7 +163,7 @@
     "allLanguages": "Svi jezici"
   },
   "login": {
-    "welcome": "Dobro došao u Kilo",
+    "welcome": "Dobro došao",
     "retrySignIn": "Ponovo se prijavi",
     "logo": "Kilo logotip",
     "continuingSignIn": "Prijava se nastavlja.",
@@ -699,6 +699,7 @@
       "gitlabDescription": "Poveži svoj GitLab račun da pregledaš merge requeste na mobitelu.",
       "bitbucketDescription": "Poveži Bitbucket s ovom organizacijom da pregledaš zahtjeve za spajanje na mobitelu.",
       "bitbucketOrgOnlyDescription": "Prebaci račun iznad na organizaciju da pregledaš njene zahtjeve za spajanje na Bitbucketu.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj račun još nema organizacije. Zahtjeve za spajanje na Bitbucketu možeš pregledati kada kreiraš ili se pridružiš organizaciji.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za lični nalog"
     },
@@ -723,10 +724,9 @@
     },
     "reconnectNotice": {
       "title": "Veza s GitHubom je istekla.",
-      "message": "Tvoja veza s GitHubom više ne važi. Ponovo provjeri vezu — po potrebi će se pojaviti zahtjev za ponovno povezivanje.",
+      "message": "Ponovo provjeri vezu — po potrebi će se pojaviti zahtjev za ponovno povezivanje.",
       "gitlabTitle": "Veza s GitLabom je istekla.",
-      "bitbucketTitle": "Veza s Bitbucketom je istekla.",
-      "providerMessage": "Tvoja veza s {{provider}}om više ne važi. Ponovo provjeri vezu — po potrebi će se pojaviti zahtjev za ponovno povezivanje."
+      "bitbucketTitle": "Veza s Bitbucketom je istekla."
     },
     "eventChips": {
       "comment": "Komentar",
@@ -834,7 +834,7 @@
     "terms": {
       "pullRequest": "Zahtjev za spajanje",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Podijeli merge request",
       "viewOnProvider": "Pogledaj na {{provider}}",
       "mergeRequestUnavailable": "Merge request nije dostupan",
@@ -1449,7 +1449,10 @@
       "gitlabNoRepositoriesDescription": "Možda trebaš odobriti pristup dodatnim grupama ili projektima na GitLabu.",
       "installGithubApp": "Instaliraj GitHub aplikaciju na repozitorije",
       "installGithubAppDescription": "Dodijeli Kilo GitHub aplikaciji pristup repozitorijima koje želiš pregledati.",
-      "repositoryAccess": "pristup repozitoriju"
+      "repositoryAccess": "pristup repozitoriju",
+      "allModePersonal": "Svaki repozitorij kojem Kilo može pristupiti putem tvoje GitHub veze automatski se pregledava.",
+      "allModeOrganization": "Svaki repozitorij kojem Kilo može pristupiti putem GitHub veze organizacije automatski se pregledava.",
+      "allModeCount": "Dostupni repozitoriji: {{displayCount}}"
     },
     "style": {
       "title": "Stil pregleda",
@@ -1467,6 +1470,7 @@
       "retryMessage": "Ovo će ponovo pokrenuti pregled koda.",
       "retryReview": "Ponovi pregled",
       "retryNeedsSettings": "Agent za pregled koda je isključen ili njegove postavke zahtijevaju pažnju. Popravite postavke, a zatim ponovite ovaj pregled.",
+      "retryNotStarted": "Ponovni pokušaj nije pokrenut.",
       "fixSettings": "Popravi postavke",
       "couldNotLoad": "Nije moguće učitati pregled.",
       "couldNotGetLatest": "Nije moguće dohvatiti najnovije podatke.",
@@ -1547,6 +1551,7 @@
       "changeRequestNoGitHubAccess": "Nijedna GitHub veza nema pristup ovom repozitoriju. Ponovo povežite GitHub s pristupom ovom repozitoriju, pa pokušajte ponovo.",
       "changeRequestMissingPermissions": "Kilo-ova GitHub aplikacija ne može otvoriti pull requestove u ovom repozitoriju. Vlasnik repozitorija mora aplikaciji dati pravo pisanja za sadržaj i pull requestove, pa pokušajte ponovo.",
       "changeRequestFailed": "Kilo nije mogao otvoriti pull request. Pokušajte ponovo za trenutak.",
+      "proposalConflict": "Drugi prijedlog za ovaj repozitorij je još uvijek aktivan.",
       "offAction": "Memorija pregleda je isključena. Uključi je, pa pokušaj ponovo."
     },
     "manualReview": {
@@ -1806,7 +1811,6 @@
       "notYetSynced": "Još nije sinhronizirano",
       "refreshFailed": "Osvježavanje nije uspjelo. Prikazuju se posljednji sinhronizirani podaci.",
       "settings": "Postavke",
-      "syncFindings": "Sinhroniziraj nalaze",
       "syncNow": "Sinhroniziraj sada",
       "syncQueued": "Sinhronizacija je dodana u red.",
       "syncStatusUnavailable": "Status sinhronizacije nije dostupan.",
@@ -2010,7 +2014,6 @@
       "eventsCount_other": "{{displayCount}} događaja",
       "generated": "Izvještaj je generiran {{generatedAt}}.",
       "noActivity": "Nema zabilježene aktivnosti",
-      "noActivityDescription": "Kilo nema aktivnosti vezanih za sigurnosne nalaze koje treba prikazati u izvještaju za period od {{start}} do {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitorij nije zabilježen",
       "reasonUnknown": "Neprepoznat razlog",
@@ -2202,7 +2205,7 @@
     "sessionList": {
       "couldNotLoadActive": "Učitavanje aktivnih sesija nije uspjelo.",
       "couldNotRefresh": "Osvježavanje nije uspjelo",
-      "noSessionsYetDescription": "Započni zadatak programiranja s mobitela. Tvoje sesije će se pojaviti ovdje.",
+      "noSessionsYetDescription": "Započni zadatak programiranja s mobitela.",
       "viewHistory": "Historija sesija",
       "noMatches": "Nema odgovarajućih sesija",
       "tryDifferentSearch": "Pokušaj s drugim pojmom za pretragu.",
@@ -2342,9 +2345,9 @@
       "couldNotLoadGithubRepositories": "Nije moguće učitati GitHub repozitorije.",
       "couldNotLoadGitlabRepositories": "Nije moguće učitati GitLab repozitorije.",
       "couldNotLoadBitbucketRepositories": "Nije moguće učitati Bitbucket repozitorije.",
-      "connectGithubDescription": "Poveži GitHub u pregledniku, zatim se vrati ovdje i odaberi repozitorij.",
-      "connectGitlabDescription": "Poveži GitLab u pregledniku, zatim se vrati ovdje i odaberi repozitorij.",
-      "connectBitbucketDescription": "Poveži Bitbucket u pregledniku, zatim se vrati ovdje i odaberi repozitorij.",
+      "connectGithubDescription": "Prijavi se u pregledniku, zatim se vrati ovdje i odaberi GitHub repozitorij.",
+      "connectGitlabDescription": "Prijavi se u pregledniku, zatim se vrati ovdje i odaberi GitLab repozitorij.",
+      "connectBitbucketDescription": "Prijavi se u pregledniku, zatim se vrati ovdje i odaberi Bitbucket repozitorij.",
       "openGithub": "Otvori GitHub",
       "openGitlab": "Otvori GitLab",
       "openBitbucket": "Otvori Bitbucket",
@@ -3915,8 +3918,6 @@
     "commandAtLimit": "Naredba je ograničena na {{max}} znakova",
     "commandsEmpty": "Još nema naredbi za postavljanje",
     "commandsSaveFailed": "Nije moguće sačuvati naredbe za postavljanje",
-    "moveUp": "Kreni gore",
-    "moveDown": "Pomeri se dole",
     "moveCommandUp": "Premjesti naredbu {{position}} gore",
     "moveCommandDown": "Premjesti naredbu {{position}} dolje",
     "skillsTitle": "Vještine",
@@ -3925,9 +3926,13 @@
     "skillMarkdownLabel": "Sadržaj vještina",
     "skillsEmpty": "Još nema vještina",
     "skillNameRequired": "Unesite naziv vještine",
+    "skillNameTooLong": "Ime vještine može sadržavati najviše {{max}} znakova",
     "skillNameInvalid": "Ime vještine mora početi slovom ili cifrom i koristiti samo mala slova, cifre i crtice",
     "skillContentRequired": "Sadržaj vještina je obavezan",
-    "skillSaveFailed": "Nije moguće sačuvati vještinu",
+    "skillSaveFailed": "Nije moguće sačuvati vještinu. Pokušajte ponovo.",
+    "skillDeleteFailed": "Nije moguće izbrisati vještinu. Pokušajte ponovo.",
+    "skillToggleFailed": "Nije moguće ažurirati vještinu. Pokušajte ponovo.",
+    "skillLimitReached": "Profil može sadržavati najviše {{max}} vještina. Izbrišite jednu da biste dodali drugu.",
     "skillSourceCustom": "Prilagođeno",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

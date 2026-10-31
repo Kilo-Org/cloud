@@ -163,7 +163,7 @@
     "allLanguages": "Visos kalbos"
   },
   "login": {
-    "welcome": "Sveikas atvykęs į Kilo",
+    "welcome": "Sveikas atvykęs",
     "retrySignIn": "Bandyti prisijungti dar kartą",
     "logo": "Kilo logotipas",
     "continuingSignIn": "Tęsiamas prisijungimas.",
@@ -714,6 +714,7 @@
       "gitlabDescription": "Prijunk savo GitLab paskyrą, kad galėtum peržiūrėti merge requests mobiliajame įrenginyje.",
       "bitbucketDescription": "Prijunk Bitbucket prie šios organizacijos, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
       "bitbucketOrgOnlyDescription": "Perjunk aukščiau esančią paskyrą į organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Ši paskyra dar neturi jokių organizacijų. Sukūręs arba prisijungęs prie organizacijos galėsi peržiūrėti Bitbucket pakeitimų užklausas.",
       "contextLine": "Skirta {{organization}}",
       "contextLinePersonal": "Skirta asmeninei paskyrai"
     },
@@ -739,10 +740,9 @@
     },
     "reconnectNotice": {
       "title": "Baigėsi GitHub prieigos galiojimas.",
-      "message": "Tavo GitHub ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo.",
+      "message": "Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo.",
       "gitlabTitle": "Baigėsi GitLab prieigos galiojimas.",
-      "bitbucketTitle": "Baigėsi Bitbucket prieigos galiojimas.",
-      "providerMessage": "Tavo {{provider}} ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo."
+      "bitbucketTitle": "Baigėsi Bitbucket prieigos galiojimas."
     },
     "eventChips": {
       "comment": "Komentuoti",
@@ -853,7 +853,7 @@
     "terms": {
       "pullRequest": "Pakeitimų užklausa",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Bendrinti merge request",
       "viewOnProvider": "Peržiūrėti {{provider}}",
       "mergeRequestUnavailable": "Merge request nepasiekiamas",
@@ -1471,7 +1471,10 @@
       "gitlabNoRepositoriesDescription": "Gali reikėti suteikti prieigą prie daugiau GitLab grupių ar projektų.",
       "installGithubApp": "Įdiek GitHub programėlę saugyklose",
       "installGithubAppDescription": "Suteik Kilo GitHub programėlei prieigą prie saugyklų, kurių kodą nori peržiūrėti.",
-      "repositoryAccess": "prieiga prie saugyklų"
+      "repositoryAccess": "prieiga prie saugyklų",
+      "allModePersonal": "Kiekviena saugykla, kurią Kilo gali pasiekti per tavo GitHub ryšį, peržiūrima automatiškai.",
+      "allModeOrganization": "Kiekviena saugykla, kurią Kilo gali pasiekti per organizacijos GitHub ryšį, peržiūrima automatiškai.",
+      "allModeCount": "Prieinamų saugyklų: {{displayCount}}"
     },
     "style": {
       "title": "Peržiūros stilius",
@@ -1489,6 +1492,7 @@
       "retryMessage": "Kodo peržiūra bus atlikta dar kartą.",
       "retryReview": "Pakartoti peržiūrą",
       "retryNeedsSettings": "Kodo peržiūros agentas išjungtas arba jo nustatymams reikia dėmesio. Pataisykite nustatymus, tada pakartokite šią peržiūrą.",
+      "retryNotStarted": "Pakartojimas neprasidėjo.",
       "fixSettings": "Pataisyti nustatymus",
       "couldNotLoad": "Nepavyko įkelti peržiūros.",
       "couldNotGetLatest": "Nepavyko gauti naujausių duomenų.",
@@ -1569,6 +1573,7 @@
       "changeRequestNoGitHubAccess": "Nė vienas GitHub prisijungimas neturi prieigos prie šios saugyklos. Iš naujo prijunk GitHub, kad jis turėtų prieigą prie jos, tada bandyk dar kartą.",
       "changeRequestMissingPermissions": "Kilo GitHub programėlė negali atidaryti PR šioje saugykloje. Saugyklos savininkas turi suteikti programėlei rašymo prieigą prie turinio ir PR, tada bandyk dar kartą.",
       "changeRequestFailed": "Kilo nepavyko atidaryti PR. Bandyk dar kartą po akimirkos.",
+      "proposalConflict": "Kitas šios saugyklos pasiūlymas vis dar aktyvus.",
       "offAction": "Peržiūros atmintis išjungta. Įjunk ją, tada bandyk dar kartą."
     },
     "manualReview": {
@@ -1832,7 +1837,6 @@
       "notYetSynced": "Dar nesinchronizuota",
       "refreshFailed": "Nepavyko atnaujinti – rodomi paskutinį kartą sinchronizuoti duomenys.",
       "settings": "Nustatymai",
-      "syncFindings": "Sinchronizuoti radinius",
       "syncNow": "Sinchronizuoti dabar",
       "syncQueued": "Sinchronizavimas įtrauktas į eilę",
       "syncStatusUnavailable": "Nepavyko gauti sinchronizavimo būsenos.",
@@ -2043,7 +2047,6 @@
       "eventsCount_other": "{{displayCount}} įvykių",
       "generated": "Ataskaita sugeneruota {{generatedAt}}.",
       "noActivity": "Užfiksuotos veiklos nėra",
-      "noActivityDescription": "Nuo {{start}} iki {{end}} Kilo neužfiksavo su saugos radiniais susijusios veiklos, kurią būtų galima įtraukti į ataskaitą.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Saugykla neužfiksuota",
       "reasonUnknown": "Neatpažinta priežastis",
@@ -2237,7 +2240,7 @@
     "sessionList": {
       "couldNotLoadActive": "Nepavyko įkelti aktyvių sesijų.",
       "couldNotRefresh": "Nepavyko atnaujinti",
-      "noSessionsYetDescription": "Pradėk programavimo užduotį telefone. Tavo sesijos bus rodomos čia.",
+      "noSessionsYetDescription": "Pradėk programavimo užduotį telefone.",
       "viewHistory": "Sesijų istorija",
       "noMatches": "Nėra paiešką atitinkančių sesijų",
       "tryDifferentSearch": "Bandyk ieškoti pagal kitą žodį.",
@@ -2379,9 +2382,9 @@
       "couldNotLoadGithubRepositories": "Nepavyko įkelti GitHub saugyklų.",
       "couldNotLoadGitlabRepositories": "Nepavyko įkelti GitLab saugyklų.",
       "couldNotLoadBitbucketRepositories": "Nepavyko įkelti Bitbucket saugyklų.",
-      "connectGithubDescription": "Naršyklėje susiekite GitHub paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
-      "connectGitlabDescription": "Naršyklėje susiekite GitLab paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
-      "connectBitbucketDescription": "Naršyklėje susiekite Bitbucket paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
+      "connectGithubDescription": "Prisijunkite naršyklėje, tada grįžkite čia ir pasirinkite GitHub saugyklą.",
+      "connectGitlabDescription": "Prisijunkite naršyklėje, tada grįžkite čia ir pasirinkite GitLab saugyklą.",
+      "connectBitbucketDescription": "Prisijunkite naršyklėje, tada grįžkite čia ir pasirinkite Bitbucket saugyklą.",
       "openGithub": "Atidaryti GitHub",
       "openGitlab": "Atidaryti GitLab",
       "openBitbucket": "Atidaryti Bitbucket",
@@ -3971,8 +3974,6 @@
     "commandAtLimit": "Komandos ilgis ribojamas iki {{max}} simbolių",
     "commandsEmpty": "Dar nėra sąrankos komandų",
     "commandsSaveFailed": "Nepavyko išsaugoti sąrankos komandų",
-    "moveUp": "Judėti aukštyn",
-    "moveDown": "Judėti žemyn",
     "moveCommandUp": "Perkelti komandą {{position}} aukštyn",
     "moveCommandDown": "Perkelti komandą {{position}} žemyn",
     "skillsTitle": "Įgūdžiai",
@@ -3981,9 +3982,13 @@
     "skillMarkdownLabel": "Įgūdžių turinys",
     "skillsEmpty": "Įgūdžių dar nėra",
     "skillNameRequired": "Įveskite įgūdžių pavadinimą",
+    "skillNameTooLong": "Įgūdžio pavadinimas turi būti ne ilgesnis kaip {{max}} simbolių",
     "skillNameInvalid": "Įgūdžio pavadinimas turi prasidėti raide arba skaitmeniu ir naudoti tik mažąsias raides, skaitmenis ir brūkšnelius",
     "skillContentRequired": "Reikalingas įgūdžių turinys",
-    "skillSaveFailed": "Nepavyko išsaugoti įgūdžių",
+    "skillSaveFailed": "Nepavyko išsaugoti įgūdžių. Bandykite dar kartą.",
+    "skillDeleteFailed": "Nepavyko ištrinti įgūdžio. Bandykite dar kartą.",
+    "skillToggleFailed": "Nepavyko atnaujinti įgūdžio. Bandykite dar kartą.",
+    "skillLimitReached": "Profilis gali turėti iki {{max}} įgūdžių. Ištrinkite vieną, kad pridėtumėte kitą.",
     "skillSourceCustom": "Pasirinktinis",
     "skillSourceMarketplace": "Parduotuvė",
     "skillSourceSkillsSh": "skills.sh",

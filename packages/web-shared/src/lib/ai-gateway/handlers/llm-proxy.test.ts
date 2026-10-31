@@ -1429,21 +1429,61 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
     });
 
-    it.each(['a catalog-mode direct BYOK key', 'a Vercel BYOK inference provider key'] as const)(
-      'serves a model whose providers are all disallowed through %s',
-      async route => {
-        const response = await sendThrough(route, {
-          allowed: false,
-          denialSource: 'organization_provider',
-        });
+    it('serves a model whose providers are all disallowed through a catalog-mode direct BYOK key', async () => {
+      const response = await sendThrough('a catalog-mode direct BYOK key', {
+        allowed: false,
+        denialSource: 'organization_provider',
+      });
 
-        expect(response.status).toBe(200);
-        expect(mockedUpstreamRequest).toHaveBeenCalled();
-        expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider?.only).toBeUndefined();
-      }
-    );
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest).toHaveBeenCalled();
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider?.only).toBeUndefined();
+    });
 
-    it.each(['an OpenRouter key', 'a Vercel AI Gateway key', 'no BYOK key'] as const)(
+    it('lets routing skip every Vercel provider key when no allowed provider serves the model', async () => {
+      await sendThrough('no BYOK key', { allowed: false, denialSource: 'organization_provider' });
+
+      const getAllowedProviders = mockedGetProvider.mock.calls[0]?.[0].getAllowedProviders;
+      expect(await getAllowedProviders?.()).toEqual(new Set());
+    });
+
+    it('lets routing use only Vercel provider keys for the allowed providers', async () => {
+      await sendThrough('no BYOK key', {
+        allowed: true,
+        eligibleProviderRoutes: new Set(['anthropic']),
+      });
+
+      const getAllowedProviders = mockedGetProvider.mock.calls[0]?.[0].getAllowedProviders;
+      expect(await getAllowedProviders?.()).toEqual(new Set(['anthropic']));
+    });
+
+    it('serves an allowed provider through a Vercel BYOK inference provider key', async () => {
+      const response = await sendThrough('a Vercel BYOK inference provider key', {
+        allowed: true,
+        eligibleProviderRoutes: new Set(['moonshotai']),
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest).toHaveBeenCalled();
+    });
+
+    it('denies a Vercel BYOK inference provider key outside the allowed providers', async () => {
+      const response = await sendThrough('a Vercel BYOK inference provider key', {
+        allowed: true,
+        eligibleProviderRoutes: new Set(['anthropic']),
+      });
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      'a Vercel BYOK inference provider key',
+      'an OpenRouter key',
+      'a Vercel AI Gateway key',
+      'no BYOK key',
+    ] as const)(
       'keeps denying a model whose providers are all disallowed through %s',
       async route => {
         const response = await sendThrough(route, {
@@ -1569,6 +1609,39 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['the internal benchmark bot', 'bot-internal-benchmark', 200],
+    ['another internal bot', 'bot-internal-bouncer-watch', 429],
+  ])(
+    'rate-limits %s on free models only when it is not exempt',
+    async (_caller, userId, status) => {
+      setUserAuth();
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: { id: userId, google_user_email: 'bot@example.com', microdollars_used: 0 } as User,
+        authFailedResponse: null,
+        organizationId: undefined,
+      });
+      mockedGetProvider.mockResolvedValue({
+        kind: 'provider',
+        provider,
+        userByok: null,
+        isFree: true,
+        bypassAccessCheck: false,
+      });
+      mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody('test/free-model:free'), {
+          authorization: `Bearer ${signedToken(KILO_GATEWAY_AUDIENCE)}`,
+        }) as never
+      );
+
+      expect(response.status).toBe(status);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(status === 200 ? 1 : 0);
+    }
+  );
 
   it('applies free-model rate limiting per account to session-cookie callers', async () => {
     mockedIsFreeModelRateLimited.mockResolvedValue(true);

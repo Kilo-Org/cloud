@@ -131,7 +131,7 @@ test('motionFrameRate is unreliable below 24 fps or with a sparse segment', () =
   assert.deepEqual(motionFrameRate([0, 2_000], []), { fps: 0.5, clipFps: 0.5, reliable: true });
 });
 
-function motionFixture(options: { press: string; tapAdb: boolean }) {
+function motionFixture(options: { press: string; tapAdb: boolean; truncated?: boolean }) {
   let now = 0;
   let tapped = false;
   const events: string[] = [];
@@ -187,13 +187,16 @@ function motionFixture(options: { press: string; tapAdb: boolean }) {
     startSampling: async () => {
       beforeTap = dump();
     },
-    stopSampling: async () =>
-      beforeTap === undefined
-        ? []
-        : [
-            { t: 0, repeat: 3, dump: beforeTap },
-            { t: 360, repeat: 5, dump: dump() },
-          ],
+    stopSampling: async () => ({
+      truncated: options.truncated === true,
+      samples:
+        beforeTap === undefined
+          ? []
+          : [
+              { t: 0, repeat: 3, dump: beforeTap },
+              { t: 360, repeat: 5, dump: dump() },
+            ],
+    }),
     disconnect: () => undefined,
   };
   const device: Device = {
@@ -238,6 +241,22 @@ test('runMotion presses through the probe on iOS and reports the interaction shi
   );
   assert.equal(result.reliable, true);
   assert.ok(fs.existsSync(path.join(ctx.out, 'motion.json')));
+});
+
+test('runMotion reports a truncated interaction series', async () => {
+  const { ctx } = motionFixture({ press: 'pressed View Send', tapAdb: false, truncated: true });
+  const result = await runMotion(ctx, {
+    link: 'kiloapp://chat',
+    target: 'chat',
+    tap: 'Send',
+    seconds: 2,
+    observeMs: 0,
+  });
+  assert.equal(result.samplingTruncated, true);
+  assert.match(
+    fs.readFileSync(path.join(ctx.out, 'motion.json'), 'utf8'),
+    /"samplingTruncated": true/
+  );
 });
 
 test('runMotion taps the element where it is after the observe window', async () => {

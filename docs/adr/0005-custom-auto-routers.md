@@ -63,7 +63,7 @@ Custom router definitions live in PostgreSQL, table `auto_routing_custom_routers
 | `owned_by_user_id` / `owned_by_organization_id` | Exactly one is set. |
 | `slug`, `name` | Unique slug per owner; display name. |
 | `base_router` | `efficient` or `frontier`. Selects the dataset, thresholds, and switch settings. |
-| `mode` | `cost_per_accuracy` or `best_accuracy`. The only owner knob. |
+| `mode` | `cost_per_accuracy`, `best_accuracy`, or `cheapest`. The only owner knob. `cheapest` picks the lowest estimated request cost among candidates that meet the base router's accuracy threshold; when none does, it picks the most accurate candidate. |
 | `entries` | JSON array of 1–20 pool entries. |
 | `default_entry_key` | Key of the pool entry used on a null decision. |
 | `created_by_user_id`, `created_at`, `updated_at` | Audit fields. |

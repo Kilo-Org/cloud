@@ -2433,6 +2433,38 @@ describe('codeReviewRouter attempts', () => {
     expect(mockTryDispatchPendingReviews).toHaveBeenCalled();
   });
 
+  it('reports a retry whose dispatch left the review failed again', async () => {
+    await insertEnabledAgentConfig();
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'failed', {
+          session_id: 'agent-first',
+          cli_session_id: 'ses_first',
+          error_message: 'Container shutdown: SIGTERM',
+          terminal_reason: 'sandbox_error',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const dispatchError =
+      'Dispatch failed: could not reach the code review service. ' +
+      'It may be offline — retry the review once it is running.';
+    mockTryDispatchPendingReviews.mockImplementationOnce(async () => {
+      // Real dispatch marks the reservation failed when the worker refuses it.
+      await db
+        .update(cloud_agent_code_reviews)
+        .set({ status: 'failed', error_message: dispatchError })
+        .where(eq(cloud_agent_code_reviews.id, review.id));
+      return { dispatched: 0, notDispatched: 1, activeCount: 0 };
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.retrigger({ reviewId: review.id });
+
+    expect(result).toEqual({ success: false, error: dispatchError });
+  });
+
   it('parallel retriggers dispatch once and the second is a conflict', async () => {
     await insertEnabledAgentConfig();
     const [review] = await db

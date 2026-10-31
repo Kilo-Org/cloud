@@ -88,16 +88,27 @@ function Text({
   const fontScaleCap = resolveFontScaleCap(useSystemFontScale(), props.maxFontSizeMultiplier);
   const Component = asChild ? Slot.Text : RNText;
   const isRTL = I18nManager.isRTL;
-  // The font family is the script's, not the interface's: JetBrains Mono ships
-  // no Arabic or Hebrew glyphs, so the copy that uses either drops the family
-  // in both directions (`withoutMonoFamily`).
-  const isRtlScript = hasRtlScript(props.children);
+  // The shared text primitive re-renders whenever its parent does (streamed chat
+  // copy is re-resolved on every parent render), so the two script scans — the
+  // only work here that looks at the copy character by character — are cached
+  // against the child tree. The reading of their results, the class string below
+  // and the writing direction are unchanged.
+  const { isRtlScript, joinedScript } = React.useMemo(
+    () => ({
+      // The font family is the script's, not the interface's: JetBrains Mono
+      // ships no Arabic or Hebrew glyphs, so the copy that uses either drops the
+      // family in both directions (`withoutMonoFamily`).
+      isRtlScript: hasRtlScript(props.children),
+      joinedScript: containsJoinedScript(props.children),
+    }),
+    [props.children]
+  );
   // Letter-spacing is the script's too. A joined script cannot take it in
   // either direction: an Arabic label on an LTR screen keeps its joins. An RTL
   // interface resets its RTL-script copy as well — a Hebrew label there would
   // take a spacing no Hebrew reader asked for — while Latin copy, in either
   // direction, keeps the tracking its class asks for (`NATURAL_LETTER_SPACING`).
-  const resetsTracking = containsJoinedScript(props.children) || (isRTL && isRtlScript);
+  const resetsTracking = joinedScript || (isRTL && isRtlScript);
   const classes = cn(
     textVariants({ variant }),
     variant === 'eyebrow' && !(isRTL && isRtlScript) && EYEBROW_LATIN_DISPLAY,

@@ -13,7 +13,7 @@ import {
 } from '@/components/code-reviewer/platform-overview-rows';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Switch } from '@/components/ui/switch';
@@ -73,7 +73,7 @@ export function BitbucketOverview({
   if (providerState.status === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
         <QueryError
           onRetry={() => {
             providerState.refetch();
@@ -94,7 +94,7 @@ export function BitbucketOverview({
   if (!isLoading && connected && (configBody.body.status === 'error' || configBody.exhausted)) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
         <QueryError
           variant={configBody.body.status === 'error' ? configBody.body.variant : 'server'}
           onRetry={configBody.body.status === 'error' ? configBody.body.refetch : configBody.retry}
@@ -107,7 +107,7 @@ export function BitbucketOverview({
   if (!isLoading && !connected) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
         <CenteredState contentContainerClassName="px-6">
           {canEdit ? (
             <BitbucketConnectForm scope={scope} />
@@ -156,7 +156,7 @@ export function BitbucketOverview({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+      <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 pt-4"

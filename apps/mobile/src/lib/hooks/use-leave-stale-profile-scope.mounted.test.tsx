@@ -52,6 +52,8 @@ const account = vi.hoisted((): { switchTo: (id: string | null) => void } => ({
 
 const navigation = vi.hoisted(() => ({
   getState: () => ({ index: stack.index, routes: stack.routes }),
+  addListener: vi.fn(() => () => undefined),
+  reset: vi.fn(),
 }));
 
 vi.mock('expo-router', () => ({
@@ -200,6 +202,39 @@ describe('a profile detail after an account switch', () => {
     expect(router.dismissTo).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
     expect(screensOnScreen(ui, 'ProfileOverviewScreen')).toBe(1);
+  });
+
+  it('keeps a session profile editor open when another account is selected meanwhile', async () => {
+    // The editor shows the session's organization, which is unrelated to the
+    // account that changed, so the switch leaves it alone.
+    params.value = { profileId: PROFILE_A, organizationId: ORG_B };
+    stack.routes = [
+      { name: 'agent-chat/[session-id]' },
+      { name: 'profile-management/[profileId]/index' },
+    ];
+    const ui = await mountRoute(AppStackProfileOverviewRoute);
+
+    await switchAccountTo(ORG_C);
+
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
+    expect(screensOnScreen(ui, 'ProfileOverviewScreen')).toBe(1);
+  });
+
+  it('pushes the list when the stale detail is the only route of its stack', async () => {
+    stack.routes = [{ name: 'profile-management/[profileId]/index' }];
+    stack.index = 0;
+    const ui = await mountRoute(AppStackProfileOverviewRoute);
+
+    await switchAccountTo(ORG_B);
+
+    // Nothing to pop to and no list beneath: the list is pushed and the stale
+    // detail retired after the transition, never rewritten in one commit.
+    expect(router.push).toHaveBeenCalledWith(getProfilesPath('app'));
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+    expect(screensOnScreen(ui, 'ProfileOverviewScreen')).toBe(0);
   });
 
   it('keeps repo defaults open for the composer scope while the account shows another', async () => {

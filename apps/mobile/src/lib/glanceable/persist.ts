@@ -13,9 +13,11 @@ import {
 import { type GlanceableSink } from './sink-registry';
 
 /**
- * Durable mirror of the last glanceable snapshot and its scope key, for JS
- * restart fencing only. The snapshot holds generic status, counts, timestamps
- * and an opaque scope key — never titles, ids, or other raw content.
+ * Durable mirror of the last glanceable snapshot, which carries its own scope
+ * key, for JS restart fencing only. One serialized record per publish, so a
+ * restart reads the last publish whole: snapshot and scope key always come from
+ * the same one. The snapshot holds generic status, counts, timestamps and an
+ * opaque scope key — never titles, ids, or other raw content.
  *
  * iOS widgets read the snapshot through expo-widgets `updateSnapshot` /
  * `updateTimeline`; Android widgets read through `react-native-android-widget`
@@ -24,9 +26,13 @@ import { type GlanceableSink } from './sink-registry';
  */
 
 // SecureStore keys are defined here (not storage-keys.ts) so this module stays
-// self-contained; nothing else owns these two keys.
+// self-contained; nothing else owns them.
 const GLANCEABLE_SNAPSHOT_KEY = 'glanceable-snapshot';
-const GLANCEABLE_SCOPE_KEY = 'glanceable-scope-key';
+// The previous release wrote the scope key beside the snapshot. One record now
+// carries both, so this key is only read: a record it wrote before the upgrade
+// still restores, and a scope key it left without a snapshot still fills the
+// scope the way it does today.
+const GLANCEABLE_LEGACY_SCOPE_KEY = 'glanceable-scope-key';
 
 type SecureStoreLike = {
   setItemAsync: (key: string, value: string) => Promise<void>;
@@ -52,6 +58,13 @@ let localScopeKey: string | null = null;
 // its async read and only fills when it is unchanged, so a live publish during
 // the read can never be clobbered by a stale persisted record.
 let persistEpoch = 0;
+
+// The mirror writes, chained one after the other the way `waiting-ask.ts` and
+// `home-widget-data.ts` chain theirs. A later publish is issued only once the
+// previous one has settled, so two rapid publishes can never land out of order:
+// a terminal blank always overwrites the happy frame published before it,
+// instead of racing it.
+let mirrorWrite: Promise<void> | null = null;
 
 // True when the last restore could not read the persisted mirror. A null
 // in-memory snapshot then means "unknown", not "nothing persisted": the record
@@ -123,14 +136,20 @@ export function getLocalScopeKey(): string | null {
 }
 
 /**
- * One fire-and-forget mirror write. The in-memory snapshot is authoritative,
- * so a failed write is reported at warning level with the stable write
- * fingerprint and never rejects: a `void`-ed native rejection here would
- * surface as an unhandled error with no caller able to recover it.
+ * One mirror write, issued only after the previous one settled. The snapshot
+ * carries its own scope key, so one write is the whole record: a restart can
+ * never pair one publish's snapshot with another publish's scope key. The
+ * in-memory snapshot is authoritative, so a failed write is reported at warning
+ * level with the stable write fingerprint and never rejects: a `void`-ed native
+ * rejection here would surface as an unhandled error with no caller able to
+ * recover it.
  */
-async function mirrorSnapshotWrite(operation: () => Promise<void>): Promise<void> {
+async function mirrorSnapshotAfter(previous: Promise<void> | null, raw: string): Promise<void> {
+  if (previous !== null) {
+    await previous;
+  }
   try {
-    await operation();
+    await getSecureStore().setItemAsync(GLANCEABLE_SNAPSHOT_KEY, raw);
   } catch (error) {
     reportSecureStoreFailure('write', error);
   }
@@ -141,12 +160,7 @@ function persistSnapshot(snapshot: GlanceableAgentsSnapshot): void {
   persistEpoch += 1;
   lastSnapshot = snapshot;
   localScopeKey = snapshot.scopeKey;
-  void mirrorSnapshotWrite(async () => {
-    await getSecureStore().setItemAsync(GLANCEABLE_SNAPSHOT_KEY, JSON.stringify(snapshot));
-  });
-  void mirrorSnapshotWrite(async () => {
-    await getSecureStore().setItemAsync(GLANCEABLE_SCOPE_KEY, snapshot.scopeKey);
-  });
+  mirrorWrite = mirrorSnapshotAfter(mirrorWrite, JSON.stringify(snapshot));
 }
 
 /** Parse a stored record with the shared schema; a malformed record is absent. */
@@ -175,25 +189,25 @@ export async function restorePersistedGlanceable(): Promise<void> {
   // "not read yet" until this read lands too.
   restoresInFlight += 1;
   try {
-    const [rawSnapshot, rawScope] = await Promise.all([
-      getSecureStore().getItemAsync(GLANCEABLE_SNAPSHOT_KEY),
-      getSecureStore().getItemAsync(GLANCEABLE_SCOPE_KEY),
-    ]);
+    const rawSnapshot = await getSecureStore().getItemAsync(GLANCEABLE_SNAPSHOT_KEY);
     // A live write landed during the read: it owns the state; skip the fill.
     if (persistEpoch !== startEpoch) {
       return;
     }
+    const stored = rawSnapshot === null ? null : parseStoredSnapshot(rawSnapshot);
     // A remount keeps the module alive, so a logout or privacy blank written
     // before restore owns the state and must not be clobbered by a stale disk
     // record from the prior session.
-    if (rawSnapshot !== null && lastSnapshot === null) {
-      const parsed = parseStoredSnapshot(rawSnapshot);
-      if (parsed !== null) {
-        lastSnapshot = parsed;
-      }
-    }
-    if (rawScope !== null && localScopeKey === null) {
-      localScopeKey = rawScope;
+    if (stored === null) {
+      // No usable record: a scope key the previous release wrote on its own
+      // still names the scope, the same way it did before this record existed.
+      const legacyScopeKey = await getSecureStore().getItemAsync(GLANCEABLE_LEGACY_SCOPE_KEY);
+      localScopeKey ??= legacyScopeKey;
+    } else {
+      lastSnapshot ??= stored;
+      // The record carries its own scope key, so the restored snapshot and the
+      // restored scope always come from the same publish.
+      localScopeKey ??= stored.scopeKey;
     }
     await restoreHomeWidgetData(localScopeKey);
   } catch (error) {
@@ -254,8 +268,14 @@ export function _setGlanceableRestoreUnavailableForTests(unavailable: boolean): 
   restoreUnavailable = unavailable;
 }
 
+/** Settle the mirror chain so a case can assert what landed on disk. */
+export async function _flushGlanceableMirrorForTests(): Promise<void> {
+  await mirrorWrite;
+}
+
 export function _resetGlanceablePersistForTests(): void {
   persistEpoch = 0;
+  mirrorWrite = null;
   lastSnapshot = null;
   localScopeKey = null;
   restoreUnavailable = false;

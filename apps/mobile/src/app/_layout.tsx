@@ -77,7 +77,7 @@ import { useRestoreErrorHold } from '@/lib/hooks/use-restore-error-hold';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
 import { useSystemSearchOpenListener } from '@/lib/hooks/use-system-search-open-listener';
 import { preloadHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
-import { useNavigationTheme } from '@/lib/hooks/use-theme-colors';
+import { useNavigationTheme } from '@/lib/hooks/use-navigation-theme';
 import {
   applyThemePreference,
   preloadThemePreference,
@@ -92,7 +92,7 @@ import {
 import { isRtlLanguage, syncRtl } from '@/i18n/rtl';
 import {
   retryLanguageStartupDirectionAsync,
-  runLanguageStartupDirectionAsync,
+  runLanguageStartupDirectionGuardedAsync,
 } from '@/i18n/startup-direction-run';
 import { type LanguageReturnTarget, readLanguageReturnTarget } from '@/i18n/return-target';
 import {
@@ -457,7 +457,12 @@ function RootLayoutNav({
 
     const prepareLanguage = async () => {
       const resolved = getResolvedLanguage();
-      const direction = await runLanguageStartupDirectionAsync(
+      // Guarded: the direction step's effects are native calls, and a thrown
+      // one must not skip the ready gate below, or the app stays behind this
+      // layout's loading surface with nothing to recover from. A rejection is
+      // reported once and then takes the same terminal path as a direction the
+      // platform refused (`retry` -> the Retry/Continue screen).
+      const direction = await runLanguageStartupDirectionGuardedAsync(
         {
           language: resolved,
           isRtl: I18nManager.isRTL,
@@ -469,6 +474,11 @@ function RootLayoutNav({
           writeAttempt: writeDirectionAttemptAsync,
           clearAttempt: clearDirectionAttemptAsync,
           reload: reloadAppAsync,
+        },
+        error => {
+          Sentry.captureException(error, {
+            tags: { 'error.subsystem': 'startup', 'error.operation': 'language_direction' },
+          });
         }
       );
       if (direction === 'reloaded') {

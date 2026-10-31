@@ -163,7 +163,7 @@
     "allLanguages": "Kõik keeled"
   },
   "login": {
-    "welcome": "Tere tulemast Kilosse",
+    "welcome": "Tere tulemast",
     "retrySignIn": "Proovi sisselogimist uuesti",
     "logo": "Kilo logomärk",
     "continuingSignIn": "Sisselogimine jätkub.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Ühenda oma GitLab konto, et liitmistaotlusi mobiilis üle vaadata.",
       "bitbucketDescription": "Ühenda Bitbucket selle organisatsiooniga, et tõmbetaotlusi mobiilis üle vaadata.",
       "bitbucketOrgOnlyDescription": "Vaheta ülalolev konto organisatsioonile, et selle Bitbucketi tõmbetaotlusi üle vaadata.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Sellel kontol pole veel organisatsioone. Bitbucketi tõmbetaotlusi saab üle vaadata, kui lood või liitud organisatsiooniga.",
       "contextLine": "{{organization}} jaoks",
       "contextLinePersonal": "Sinu isikliku konto jaoks"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHubi ühendus aegus.",
-      "message": "Sinu GitHubi ühendus ei kehti enam. Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada.",
+      "message": "Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada.",
       "gitlabTitle": "GitLabi ühendus aegus.",
-      "bitbucketTitle": "Bitbucketi ühendus aegus.",
-      "providerMessage": "Sinu {{provider}}i ühendus ei kehti enam. Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada."
+      "bitbucketTitle": "Bitbucketi ühendus aegus."
     },
     "eventChips": {
       "comment": "Kommenteeri",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Tõmbetaotlus",
       "mergeRequest": "Liitmistaotlus",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Liitmistaotlus !{{number}}",
       "shareMergeRequest": "Jaga liitmistaotlust",
       "viewOnProvider": "Kuva {{provider}}",
       "mergeRequestUnavailable": "Liitmistaotlus pole saadaval",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Võimalik, et pead GitLabis andma juurdepääsu veel mõnele rühmale või projektile.",
       "installGithubApp": "GitHubi rakenduse paigaldamine hoidlatele",
       "installGithubAppDescription": "Anna Kilo GitHubi rakendusele juurdepääs hoidlatele, mille koodi soovid üle vaadata.",
-      "repositoryAccess": "juurdepääs hoidlatele"
+      "repositoryAccess": "juurdepääs hoidlatele",
+      "allModePersonal": "Kõik hoidlad, millele Kilol on sinu GitHubi ühenduse kaudu juurdepääs, vaadatakse automaatselt üle.",
+      "allModeOrganization": "Kõik hoidlad, millele Kilol on organisatsiooni GitHubi ühenduse kaudu juurdepääs, vaadatakse automaatselt üle.",
+      "allModeCount": "Saadaolevad hoidlad: {{displayCount}}"
     },
     "style": {
       "title": "Ülevaatuse stiil",
@@ -1445,6 +1448,7 @@
       "retryMessage": "See käivitab koodi ülevaatuse uuesti.",
       "retryReview": "Proovi ülevaatust uuesti",
       "retryNeedsSettings": "Koodiülevaataja on välja lülitatud või selle seaded vajavad tähelepanu. Paranda seaded ja proovi seejärel seda ülevaatust uuesti.",
+      "retryNotStarted": "Uuestiproovimist ei õnnestunud alustada.",
       "fixSettings": "Paranda seaded",
       "couldNotLoad": "Ülevaatust ei õnnestunud laadida.",
       "couldNotGetLatest": "Uusimaid andmeid ei õnnestunud laadida.",
@@ -1525,6 +1529,7 @@
       "changeRequestNoGitHubAccess": "Ühelgi GitHubi ühendusel ei ole sellele hoidlale juurdepääsu. Ühenda GitHub uuesti nii, et sellel on juurdepääs sellele hoidlale, ja proovi seejärel uuesti.",
       "changeRequestMissingPermissions": "Kilo GitHubi rakendus ei saa selles hoidlas tõmbetaotlusi avada. Hoidla omanik peab andma rakendusele kirjutamisõiguse sisule ja tõmbetaotlustele, seejärel proovi uuesti.",
       "changeRequestFailed": "Kilol ei õnnestunud tõmbetaotlust avada. Proovi hetke pärast uuesti.",
+      "proposalConflict": "Selle sama hoidla jaoks on veel üks ülevaatuste mälu ettepanek endiselt aktiivne, mistõttu ei saa seda veel salvestada.",
       "offAction": "Ülevaatuste mälu on välja lülitatud. Lülita see sisse ja proovi uuesti."
     },
     "manualReview": {
@@ -1780,7 +1785,6 @@
       "notYetSynced": "Pole veel sünkroonitud",
       "refreshFailed": "Värskendamine ebaõnnestus — kuvatakse viimati sünkroonitud andmeid.",
       "settings": "Seaded",
-      "syncFindings": "Sünkrooni leiud",
       "syncNow": "Sünkrooni nüüd",
       "syncQueued": "Sünkroonimine on järjekorras",
       "syncStatusUnavailable": "Sünkroonimise olek pole saadaval.",
@@ -1977,7 +1981,6 @@
       "eventsCount_other": "{{displayCount}} sündmust",
       "generated": "Aruanne on loodud {{generatedAt}}.",
       "noActivity": "Salvestatud tegevust pole",
-      "noActivityDescription": "Kilol pole ajavahemikust {{start}} kuni {{end}} aruandesse lisatavaid turvaleidudega seotud toiminguid.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Hoidlat pole salvestatud",
       "reasonUnknown": "Tuvastamata põhjus",
@@ -2167,7 +2170,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktiivseid seansse ei õnnestunud laadida.",
       "couldNotRefresh": "Värskendamine ebaõnnestus",
-      "noSessionsYetDescription": "Alusta telefonis programmeerimisülesannet. Sinu seansid kuvatakse siin.",
+      "noSessionsYetDescription": "Alusta telefonis programmeerimisülesannet.",
       "viewHistory": "Seansside ajalugu",
       "noMatches": "Sobivaid seansse ei leitud",
       "tryDifferentSearch": "Proovi teistsugust otsingusõna.",
@@ -2305,9 +2308,9 @@
       "couldNotLoadGithubRepositories": "GitHubi hoidlate laadimine ebaõnnestus.",
       "couldNotLoadGitlabRepositories": "GitLabi hoidlate laadimine ebaõnnestus.",
       "couldNotLoadBitbucketRepositories": "Bitbucketi hoidlate laadimine ebaõnnestus.",
-      "connectGithubDescription": "Ühenda GitHub brauseris ja naase siia, et valida hoidla.",
-      "connectGitlabDescription": "Ühenda GitLab brauseris ja naase siia, et valida hoidla.",
-      "connectBitbucketDescription": "Ühenda Bitbucket brauseris ja naase siia, et valida hoidla.",
+      "connectGithubDescription": "Logi sisse brauseris ja naase siia, et valida hoidla GitHubist.",
+      "connectGitlabDescription": "Logi sisse brauseris ja naase siia, et valida hoidla GitLabist.",
+      "connectBitbucketDescription": "Logi sisse brauseris ja naase siia, et valida hoidla Bitbucketist.",
       "openGithub": "Ava GitHub",
       "openGitlab": "Ava GitLab",
       "openBitbucket": "Ava Bitbucket",
@@ -3859,8 +3862,6 @@
     "commandAtLimit": "Käsu pikkus on piiratud {{max}} tähemärgiga",
     "commandsEmpty": "Seadistuskäske pole veel",
     "commandsSaveFailed": "Seadistuskäske ei saanud salvestada",
-    "moveUp": "Liigu üles",
-    "moveDown": "Liigu alla",
     "moveCommandUp": "Liiguta käsk {{position}} üles",
     "moveCommandDown": "Liiguta käsk {{position}} alla",
     "skillsTitle": "Oskused",
@@ -3869,9 +3870,13 @@
     "skillMarkdownLabel": "Oskuste sisu",
     "skillsEmpty": "Oskusi veel pole",
     "skillNameRequired": "Sisestage oskuse nimi",
+    "skillNameTooLong": "Oskuste nimi peab olema {{max}} tähemärki või vähem",
     "skillNameInvalid": "Oskuste nimi peab algama tähe või numbriga ning kasutama ainult väiketähti, numbreid ja sidekriipse",
     "skillContentRequired": "Vajalik on oskuste sisu",
-    "skillSaveFailed": "Oskust ei õnnestunud salvestada",
+    "skillSaveFailed": "Oskust ei õnnestunud salvestada. Proovi uuesti.",
+    "skillDeleteFailed": "Oskust ei õnnestunud kustutada. Proovi uuesti.",
+    "skillToggleFailed": "Oskust ei õnnestunud uuendada. Proovi uuesti.",
+    "skillLimitReached": "Profiil mahutab kuni {{max}} oskust. Teise lisamiseks kustuta üks.",
     "skillSourceCustom": "Kohandatud",
     "skillSourceMarketplace": "Turg",
     "skillSourceSkillsSh": "skills.sh",

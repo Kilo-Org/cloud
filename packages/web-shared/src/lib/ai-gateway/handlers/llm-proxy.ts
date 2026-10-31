@@ -29,6 +29,7 @@ import {
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { byokOwner, isInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { isVercelUserByokProviderAllowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
@@ -150,7 +151,7 @@ import {
   getMaxTokens,
   hasMiddleOutTransform,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
-import { redactProviderHints } from '@kilocode/auto-routing-contracts';
+import { DEFAULT_BENCHMARK_USER_ID, redactProviderHints } from '@kilocode/auto-routing-contracts';
 import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
@@ -686,8 +687,13 @@ export async function handleLlmProxyRequest(
     if (rateLimitSubject instanceof NextResponse) return rateLimitSubject;
 
     // Private custom LLMs are exempt for signed-in callers, even when their id
-    // matches a free-model pattern.
-    const isExempt = isPrivateCustomLlm && rateLimitSubject.kind === 'account';
+    // matches a free-model pattern. So is the default internal benchmark user: a run
+    // sends every case of every free model it measures, and the anti-abuse limit
+    // would otherwise throttle the measurement itself. A benchmark user override is
+    // not exempt.
+    const isExempt =
+      rateLimitSubject.kind === 'account' &&
+      (isPrivateCustomLlm || rateLimitSubject.kiloUserId === DEFAULT_BENCHMARK_USER_ID);
     if (!isExempt && (await isFreeModelRateLimited(request, rateLimitSubject))) {
       console.warn(
         `Model rate limit exceeded, ${freeModelRateLimitKey(rateLimitSubject)}, model: ${effectiveModelIdLowerCased}, feature: ${feature ?? 'none'}`
@@ -858,9 +864,12 @@ export async function handleLlmProxyRequest(
     let groupModelAllowed = true;
     let groupModelAllowedForInferenceProviderUserByok = true;
     let groupProvidersAllowed = true;
+    let allowedProviders: ReadonlySet<string> | undefined;
     if (groupPolicy) {
       const groupDecision = await getEffectiveModelDecision(groupPolicy, modelId);
       groupModelAllowed = groupDecision.allowed;
+      // An `organization_provider` denial means no allowed provider serves the model.
+      allowedProviders = groupDecision.allowed ? groupDecision.eligibleProviderRoutes : new Set();
       groupModelAllowedForInferenceProviderUserByok =
         allowsInferenceProviderUserByok(groupDecision);
       if (groupDecision.eligibleProviderRoutes) {
@@ -870,6 +879,7 @@ export async function handleLlmProxyRequest(
       }
     }
     return {
+      allowedProviders,
       balance,
       balanceLimitedByUserAllowance,
       effectiveProviderConfig: effectiveProviderConfig
@@ -890,6 +900,9 @@ export async function handleLlmProxyRequest(
       getRoutingProviderConfig: isAnonymousContext(user)
         ? undefined
         : async () => (await get()).effectiveProviderConfig,
+      getAllowedProviders: isAnonymousContext(user)
+        ? undefined
+        : async () => (await get()).allowedProviders,
     };
   }
 
@@ -916,6 +929,7 @@ export async function handleLlmProxyRequest(
     countryCode,
     getRoutingProviderConfig: async () =>
       (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
+    getAllowedProviders: accessCheckResolver.getAllowedProviders,
     kiloIgnoredProviders: ignoredProviders,
   });
   if (providerResult.kind === 'chatgpt-reconnect') {
@@ -985,6 +999,7 @@ export async function handleLlmProxyRequest(
   // Skip balance/org checks for anonymous users - they can only use free models
   if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
     const {
+      allowedProviders,
       balance,
       balanceLimitedByUserAllowance,
       effectiveProviderConfig,
@@ -1014,6 +1029,14 @@ export async function handleLlmProxyRequest(
       return isAutoRoutedRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
     }
     if (!groupProvidersAllowed) return modelNotAllowedResponse();
+    if (
+      effectiveProviderContext.provider.id === 'vercel' &&
+      effectiveProviderContext.userByok?.some(
+        byok => !isVercelUserByokProviderAllowed(byok.providerId, allowedProviders)
+      )
+    ) {
+      return modelNotAllowedResponse();
+    }
 
     if (effectiveProviderConfig) {
       requestBodyParsed.body.provider = effectiveProviderConfig;

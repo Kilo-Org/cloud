@@ -163,7 +163,7 @@
     "allLanguages": "Minden nyelv"
   },
   "login": {
-    "welcome": "Üdv a Kilo világában",
+    "welcome": "Üdvözlünk",
     "retrySignIn": "Bejelentkezés újrapróbálása",
     "logo": "Kilo-logó",
     "continuingSignIn": "Folytatjuk a bejelentkezést.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Csatlakoztasd a GitLab-fiókodat a merge requestek kódellenőrzéséhez mobilon.",
       "bitbucketDescription": "Csatlakoztasd a Bitbucketot ehhez a szervezethez a módosítási kérelmek mobilos kódellenőrzéséhez.",
       "bitbucketOrgOnlyDescription": "Váltsd a fenti fiókot egy szervezetre a Bitbucket-módosítási kérelmek kódellenőrzéséhez.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Ez a fiók még nem tagja egyetlen szervezetnek sem. A Bitbucket-módosítási kérelmek kódellenőrzéséhez hozz létre egy szervezetet, vagy csatlakozz egyhez.",
       "contextLine": "{{organization}} számára",
       "contextLinePersonal": "Személyes fiókodhoz"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "A GitHub-kapcsolat lejárt.",
-      "message": "A GitHub-kapcsolatod már nem érvényes. Ellenőrizd újra a kapcsolatot. Ha szükséges, az alkalmazás kérni fogja az újracsatlakozást.",
+      "message": "Ellenőrizd újra a kapcsolatot. Ha szükséges, az alkalmazás kérni fogja az újracsatlakozást.",
       "gitlabTitle": "A GitLab-kapcsolat lejárt.",
-      "bitbucketTitle": "A Bitbucket-kapcsolat lejárt.",
-      "providerMessage": "A {{provider}}-kapcsolatod már nem érvényes. Ellenőrizd újra a kapcsolatot. Ha szükséges, az alkalmazás kérni fogja az újracsatlakozást."
+      "bitbucketTitle": "A Bitbucket-kapcsolat lejárt."
     },
     "eventChips": {
       "comment": "Hozzászólás",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Lehet, hogy több csoporthoz vagy projekthez kell hozzáférést adnod a GitLabon.",
       "installGithubApp": "GitHub-alkalmazás telepítése a kódtárakhoz",
       "installGithubAppDescription": "Adj hozzáférést a Kilo GitHub-alkalmazásnak az ellenőrizni kívánt kódtárakhoz.",
-      "repositoryAccess": "hozzáférés a kódtárakhoz"
+      "repositoryAccess": "hozzáférés a kódtárakhoz",
+      "allModePersonal": "A Kilo a GitHub-kapcsolatodon keresztül elérhető összes kódtárat automatikusan ellenőrzi.",
+      "allModeOrganization": "A Kilo a szervezet GitHub-kapcsolatán keresztül elérhető összes kódtárat automatikusan ellenőrzi.",
+      "allModeCount": "Elérhető kódtárak: {{displayCount}}"
     },
     "style": {
       "title": "Ellenőrzési stílus",
@@ -1445,6 +1448,7 @@
       "retryMessage": "Ez újra lefuttatja a kódellenőrzést.",
       "retryReview": "Kódellenőrzés újrapróbálása",
       "retryNeedsSettings": "A Kódellenőrző ki van kapcsolva, vagy a beállításai figyelmet igényelnek. Javítsd a beállításokat, majd próbáld újra ezt a kódellenőrzést.",
+      "retryNotStarted": "Az újrapróbálás nem indult el.",
       "fixSettings": "Beállítások javítása",
       "couldNotLoad": "Nem sikerült betölteni a kódellenőrzést.",
       "couldNotGetLatest": "Nem sikerült lekérni a legfrissebb adatokat.",
@@ -1525,6 +1529,7 @@
       "changeRequestNoGitHubAccess": "Egyetlen GitHub-kapcsolatnak sincs hozzáférése ehhez a tárolóhoz. Kapcsold újra a GitHubot úgy, hogy hozzáférjen ehhez a tárolóhoz, majd próbáld újra.",
       "changeRequestMissingPermissions": "A Kilo GitHub-alkalmazása nem tud pull requesteket nyitni ebben a tárolóban. A tároló tulajdonosának írási hozzáférést kell adnia az alkalmazásnak a tartalmakhoz és a pull requestekhez, majd próbáld újra.",
       "changeRequestFailed": "A Kilo nem tudta megnyitni a pull requestet. Próbáld újra egy pillanat múlva.",
+      "proposalConflict": "Ehhez a tárolóhoz egy másik javaslat is aktív, ezért ezt még nem lehet menteni.",
       "offAction": "A kódellenőrzési memória ki van kapcsolva. Kapcsold be, majd próbáld újra."
     },
     "manualReview": {
@@ -1780,7 +1785,6 @@
       "notYetSynced": "Még nincs szinkronizálva",
       "refreshFailed": "Nem sikerült a frissítés. Az utolsó szinkronizálás adatai láthatók.",
       "settings": "Beállítások",
-      "syncFindings": "Találatok szinkronizálása",
       "syncNow": "Szinkronizálás most",
       "syncQueued": "Szinkronizálás sorba állítva",
       "syncStatusUnavailable": "A szinkronizálás állapota nem érhető el.",
@@ -1977,7 +1981,6 @@
       "eventsCount_other": "{{displayCount}} esemény",
       "generated": "A jelentés elkészült: {{generatedAt}}.",
       "noActivity": "Nincs rögzített tevékenység",
-      "noActivityDescription": "A Kilo nem rögzített jelentésbe foglalható tevékenységet a biztonsági találatokhoz {{start}} és {{end}} között.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Nincs rögzített adattár",
       "reasonUnknown": "Nem felismert indok",
@@ -2167,7 +2170,7 @@
     "sessionList": {
       "couldNotLoadActive": "Nem sikerült betölteni az aktív munkameneteket",
       "couldNotRefresh": "Nem sikerült frissíteni",
-      "noSessionsYetDescription": "Indíts egy programozási feladatot a telefonodról. A munkameneteid itt jelennek meg.",
+      "noSessionsYetDescription": "Indíts egy programozási feladatot a telefonodról.",
       "viewHistory": "Munkamenet-előzmények",
       "noMatches": "Nincs egyező munkamenet",
       "tryDifferentSearch": "Próbálj másik keresőszót.",
@@ -2305,9 +2308,9 @@
       "couldNotLoadGithubRepositories": "Nem sikerült betölteni a GitHub-adattárakat.",
       "couldNotLoadGitlabRepositories": "Nem sikerült betölteni a GitLab-adattárakat.",
       "couldNotLoadBitbucketRepositories": "Nem sikerült betölteni a Bitbucket-adattárakat.",
-      "connectGithubDescription": "Kapcsold össze a GitHub-fiókodat a böngészőben, majd térj vissza ide, és válassz egy adattárat.",
-      "connectGitlabDescription": "Kapcsold össze a GitLab-fiókodat a böngészőben, majd térj vissza ide, és válassz egy adattárat.",
-      "connectBitbucketDescription": "Kapcsold össze a Bitbucket-fiókodat a böngészőben, majd térj vissza ide, és válassz egy adattárat.",
+      "connectGithubDescription": "Jelentkezz be a böngészőből, majd térj vissza ide, és válassz egy GitHub-adattárat.",
+      "connectGitlabDescription": "Jelentkezz be a böngészőből, majd térj vissza ide, és válassz egy GitLab-adattárat.",
+      "connectBitbucketDescription": "Jelentkezz be a böngészőből, majd térj vissza ide, és válassz egy Bitbucket-adattárat.",
       "openGithub": "GitHub megnyitása",
       "openGitlab": "GitLab megnyitása",
       "openBitbucket": "Bitbucket megnyitása",
@@ -3859,8 +3862,6 @@
     "commandAtLimit": "A parancs legfeljebb {{max}} karakter lehet",
     "commandsEmpty": "Még nincsenek beállítási parancsok",
     "commandsSaveFailed": "Nem sikerült menteni a beállítási parancsokat",
-    "moveUp": "Mozgassa fel",
-    "moveDown": "Mozgassa le",
     "moveCommandUp": "{{position}}. parancs áthelyezése feljebb",
     "moveCommandDown": "{{position}}. parancs áthelyezése lejjebb",
     "skillsTitle": "Készségek",
@@ -3869,9 +3870,13 @@
     "skillMarkdownLabel": "Készség tartalma",
     "skillsEmpty": "Még nincsenek készségek",
     "skillNameRequired": "Adja meg a készség nevét",
+    "skillNameTooLong": "A készség neve legfeljebb {{max}} karakter lehet",
     "skillNameInvalid": "A készség nevének betűvel vagy számjegygel kell kezdődnie, és csak kisbetűket, számjegyeket és kötőjeleket kell használnia",
     "skillContentRequired": "A készség tartalma kötelező",
-    "skillSaveFailed": "Nem sikerült elmenteni a készséget",
+    "skillSaveFailed": "Nem sikerült elmenteni a készséget. Próbálja újra.",
+    "skillDeleteFailed": "Nem sikerült törölni a készséget. Próbálja újra.",
+    "skillToggleFailed": "Nem sikerült frissíteni a készséget. Próbálja újra.",
+    "skillLimitReached": "A profil legfeljebb {{max}} készséget tartalmazhat. Töröljön egyet, hogy egy másikat hozzáadhasson.",
     "skillSourceCustom": "Egyéni",
     "skillSourceMarketplace": "Piactér",
     "skillSourceSkillsSh": "skills.sh",

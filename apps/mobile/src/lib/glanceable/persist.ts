@@ -97,7 +97,7 @@ let restoredScope: RestoredScope = 'none';
 
 // True once this process wrote the in-memory snapshot itself. A frame it wrote
 // is already fenced by the context that produced it; only a restored record
-// needs `restoredScopeVerified` before a surface may draw it.
+// needs `restoredScope` resolved before a surface may draw it.
 let snapshotWrittenInProcess = false;
 
 export function getLastGlanceableSnapshot(): GlanceableAgentsSnapshot | null {

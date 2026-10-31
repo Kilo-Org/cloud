@@ -294,18 +294,6 @@ describe('platform catalog expansion', () => {
     expect(reason('unknown/model')).toBeNull();
     expect(reason('malformed/model')).toBeNull();
     expect(reason('missing/model')).toBe(CATALOG_PAIR_UNAVAILABLE_REASON);
-    expect(
-      platformRegistryEntries(
-        {
-          deciderModels: [
-            { id: 'small/model' },
-            { id: 'small-reasoning/model' },
-            { id: 'floor/model' },
-          ],
-        },
-        executable
-      )
-    ).toEqual([{ model: 'floor/model', variant: null }]);
   });
 
   it('does not execute an alias whose concrete target is absent', () => {

@@ -11,6 +11,7 @@ import type {
 } from '@kilocode/auto-routing-contracts';
 import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
 import type { BenchmarkJobMessage } from './run';
+import { CATALOG_CONTEXT_TOO_SMALL_REASON } from './platform-models';
 import {
   claimScheduledChunks,
   finishChunk,
@@ -1166,6 +1167,32 @@ describe('drainQueue', () => {
       expect.any(String),
       'efficient',
       'platform/no-parameters',
+      '',
+      expect.any(String),
+      expect.any(Number)
+    );
+  });
+
+  it('fails a platform model whose context window is below the harness floor with that reason', async () => {
+    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockResolvedValue({
+      data: [{ id: 'platform/a' }, { id: 'platform/small', context_length: 16_384 }],
+    });
+    const requestedAt = '2026-06-01T00:00:00.000Z';
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'platform/small', variant: '', requested_at: requestedAt },
+      { model: 'platform/a', variant: '', requested_at: requestedAt },
+    ]);
+
+    const result = await drainQueue(env, 'platform');
+
+    expect(result!.entryCount).toBe(1);
+    expect(vi.mocked(insertRun).mock.calls[0][2].map(row => row.model)).toEqual(['platform/a']);
+    const db = env.BENCH_DB as unknown as { prepare: Mock<() => { bind: Mock }> };
+    expect(db.prepare.mock.results.at(-1)?.value.bind).toHaveBeenCalledWith(
+      CATALOG_CONTEXT_TOO_SMALL_REASON,
+      expect.any(String),
+      'efficient',
+      'platform/small',
       '',
       expect.any(String),
       expect.any(Number)

@@ -112,14 +112,7 @@ export function platformRegistryEntries(
     const model = selectedModel?.id.startsWith('~')
       ? modelsById.get(selectedModel.alias_target ?? '')
       : selectedModel;
-    if (
-      !model ||
-      model.id.startsWith('~') ||
-      !catalogModelSupportsTools(model) ||
-      !catalogModelFitsHarness(model)
-    ) {
-      continue;
-    }
+    if (!model || model.id.startsWith('~') || !catalogModelSupportsTools(model)) continue;
     const variants = getReasoningVariantKeys(model.opencode?.variants);
     for (const variant of variants.length > 0 ? variants : [null]) {
       const key = exactPairKey(model.id, variant);

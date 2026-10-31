@@ -95,9 +95,12 @@ export function hasThrottleDiagnostic(result: Pick<CliRunResult, 'stderrTail'>):
  * with no billed answer, so it is a transient provider failure, not a model failure.
  */
 export function isUnbilledTransientProviderResult(
-  result: Pick<CliRunResult, 'text' | 'stderrTail' | 'costUsd' | 'exitCode' | 'lastEventTypes'>
+  result: Pick<
+    CliRunResult,
+    'text' | 'stderrTail' | 'costUsd' | 'exitCode' | 'lastEventTypes' | 'timedOut'
+  >
 ): boolean {
-  if ((result.costUsd ?? 0) !== 0) return false;
+  if ((result.costUsd ?? 0) !== 0 || result.timedOut) return false;
   const diagnostic = stripVTControlCharacters(result.stderrTail);
   if (!hasThrottleDiagnostic(result) && !UNAVAILABLE_DIAGNOSTIC.test(diagnostic)) {
     return false;

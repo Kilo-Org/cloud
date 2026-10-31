@@ -1159,18 +1159,31 @@ describe('processJob — scheduler waits and paid-call safety', () => {
   });
 
   it.each([
-    { name: 'a 429 after a billed step', costUsd: 0.02, stderrTail: 'HTTP 429 rate limited' },
+    {
+      name: 'a 429 after a billed step',
+      costUsd: 0.02,
+      timedOut: false,
+      stderrTail: 'HTTP 429 rate limited',
+    },
     {
       name: 'an unbilled invalid-request rejection',
       costUsd: 0,
+      timedOut: false,
       stderrTail: '[Phala] The request was rejected as invalid',
     },
-  ])('keeps a graded failure for $name', async ({ costUsd, stderrTail }) => {
+    {
+      name: 'a timeout after an unbilled 429 error event',
+      costUsd: 0,
+      timedOut: true,
+      stderrTail: 'HTTP 429 rate limited',
+    },
+  ])('keeps a graded failure for $name', async ({ costUsd, timedOut, stderrTail }) => {
     vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
       ...successfulCliResult,
       text: 'Partial step before the error',
       lastEventTypes: ['tool_use', 'error'],
-      exitCode: 1,
+      exitCode: timedOut ? -1 : 1,
+      timedOut,
       costUsd,
       stderrTail,
     });

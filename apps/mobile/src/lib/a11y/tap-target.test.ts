@@ -24,10 +24,10 @@ import {
   INLINE_LINK_LINE_GAP_DP,
   INLINE_LINK_OUTER_HIT_SLOP_DP,
   INLINE_LINK_ROW_CLASS,
+  INLINE_LINK_SENTENCE_LINE_DP,
   INLINE_LINK_VERTICAL_HIT_SLOP_DP,
   inlineLinkHitSlop,
   LEGAL_LINK_BOX_CLASS,
-  LEGAL_LINK_LINE_DP,
   LEGAL_LINK_MIN_DP,
   LEGAL_LINK_ROW_CLASS,
   MIN_TAP_TARGET_DP,
@@ -185,11 +185,12 @@ describe('shared tap-target geometry', () => {
   it('keeps a wrapped sentence line clear of the link box that follows it', async () => {
     // The regression this guards: in a long locale the legal sentence wraps
     // (pt-BR measured 6.9dp of collision), the link box's rect overflows its
-    // own flex line by (28 - 14) / 2 = 7dp on each side, and wrapped lines have
-    // no gutter of their own — so the box on the second line reached up into
-    // the first line's prose.
-    const overflowDp = (MIN_TAP_TARGET_DP - LEGAL_LINK_LINE_DP) / 2;
-    expect(LEGAL_LINK_LINE_DP).toBe(14);
+    // own flex line by (28 - line) / 2 on each side, and wrapped lines have no
+    // gutter of their own — so the box on the second line reached up into the
+    // first line's prose.
+    const overflowDp = (MIN_TAP_TARGET_DP - INLINE_LINK_SENTENCE_LINE_DP) / 2;
+    expect(INLINE_LINK_SENTENCE_LINE_DP).toBe(17.5);
+    expect(overflowDp).toBe(5.25);
     expect(INLINE_LINK_LINE_GAP_DP).toBeGreaterThan(overflowDp);
     expect(INLINE_LINK_LINE_GAP_CLASS).toBe(`gap-y-[${INLINE_LINK_LINE_GAP_DP}px]`);
     expect(INLINE_LINK_ROW_CLASS).toContain(INLINE_LINK_LINE_GAP_CLASS);

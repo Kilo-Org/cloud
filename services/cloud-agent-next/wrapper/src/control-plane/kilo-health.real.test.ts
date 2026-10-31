@@ -7,7 +7,7 @@ import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.j
 import { KILO_CLI_VERSION } from '../../../src/shared/kilo-cli-version.js';
 import { createKiloEventFeed } from './kilo-event-feed.js';
 import { createKiloRuntime } from './kilo-runtime.js';
-import { kiloClientConfig } from '../kilo-server-auth.js';
+import { kiloClientConfig, type KiloServer } from '../kilo-server-auth.js';
 
 const binary = process.env.KILO_781_BINARY;
 const suite = binary ? describe : describe.skip;
@@ -74,6 +74,7 @@ suite('pinned Kilo default health supervision', () => {
     const fetchSpy = spyOn(globalThis, 'fetch');
     const events: { type: string; at: number }[] = [];
     const logs: string[] = [];
+    let server: KiloServer | undefined;
     const runtime = createKiloRuntime({
       directory: root,
       env,
@@ -84,6 +85,7 @@ suite('pinned Kilo default health supervision', () => {
         restarts++;
       },
       openFeed(source, callbacks) {
+        server = source.server;
         opens++;
         if (opens > 1) suppress = false;
         return createKiloEventFeed({
@@ -103,8 +105,9 @@ suite('pinned Kilo default health supervision', () => {
       },
     });
     try {
-      const wrapper = await runtime.ensure();
-      const client = createKiloClient(kiloClientConfig(wrapper.server, root));
+      await runtime.ensure();
+      if (!server) throw new Error('Native server not observed');
+      const client = createKiloClient(kiloClientConfig(server, root));
       const before = await client.global.health({ signal: AbortSignal.timeout(5000) });
       expect(before.data?.healthy).toBe(true);
       expect(before.data?.version).toBe(KILO_CLI_VERSION);

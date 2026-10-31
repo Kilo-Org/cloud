@@ -71,6 +71,7 @@ import {
   forwardCloudAgentSessionScopeRequest,
   forwardCloudAgentSessionScopeV2Request,
 } from './cloud-agent-session-scope-proxy.js';
+import { handleRuntimeHistory } from './runtime-history.js';
 import type { ScopeGrantView } from './control-plane/sandbox/scope-view.js';
 import {
   issueRuntimeProxyAttestation,
@@ -558,6 +559,9 @@ async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Res
   const requestPath = new URL(c.req.url).pathname;
   if (!requestPath.startsWith(prefix)) return c.text('Not found', 404);
   const path = `/${requestPath.slice(prefix.length).replace(/^\/+/, '')}`;
+  // Runtime-authenticated session history: served from the Session DO after the
+  // same live-grant validation, never forwarded upstream.
+  if (route === 'history') return handleRuntimeHistory(c, handle, claims, path);
   if (route !== 'backend' && route !== 'provider' && route !== 'ingest' && route !== 'exa')
     return c.text('Not found', 404);
   return forwardRuntimeCredentialProxy(c, handle, claims, route, path);

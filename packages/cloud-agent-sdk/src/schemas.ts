@@ -1,28 +1,12 @@
 import * as z from 'zod';
-import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import { PREPARATION_OUTPUT_MAX_LENGTH, PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
+import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
+import { mutationCursorSchema } from './cloud-conversation-schemas';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
 import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
 
-export const cloudAgentEventSchema = z.object({
-  eventId: z.number(),
-  executionId: z.string().nullable().optional(),
-  sessionId: z.string(),
-  streamEventType: z.string(),
-  timestamp: z.string(),
-  data: z.unknown(),
-});
-export type CloudAgentEvent = z.infer<typeof cloudAgentEventSchema>;
-
-/**
- * Whether an untrusted WebSocket frame is a cloud agent event. The schema is
- * the only definition of the envelope, so this guard cannot drift from the
- * validation `normalize()` applies.
- */
-export function isValidCloudAgentEvent(event: unknown): event is CloudAgentEvent {
-  return cloudAgentEventSchema.safeParse(event).success;
-}
+export * from './cloud-conversation-schemas';
 
 export const cloudWorktreeChangesReadyDataSchema = z
   .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
@@ -1134,6 +1118,7 @@ export type CloudStatusData = z.infer<typeof cloudStatusDataSchema>;
 
 export const connectedDataSchema = z.object({
   bootstrapPending: z.boolean().optional(),
+  ancillaryOmittedItemCount: mutationCursorSchema.optional().catch(undefined),
   sessionStatus: sessionStatusSchema.optional().catch(undefined),
   cloudStatus: cloudStatusSchema.optional().catch(undefined),
 });

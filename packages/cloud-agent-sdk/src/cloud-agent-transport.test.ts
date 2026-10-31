@@ -8,6 +8,8 @@ import type { ChatEvent, ServiceEvent } from './normalizer';
 import type { SessionStatus } from './schemas';
 import { createCloudAgentTransport } from './cloud-agent-transport';
 import { createServiceState } from './service-state';
+import { createMemoryStorage } from './storage/memory';
+import { createChatProcessor } from './chat-processor';
 import type { SessionSnapshot, SessionSnapshotPageOutcome } from './types';
 import { kiloId, cloudAgentId, makeSnapshot, stubUserMessage } from './test-helpers';
 
@@ -50,6 +52,81 @@ async function flushPromises(): Promise<void> {
 }
 
 const emptySnapshot = makeSnapshot({ id: 'ses-1' });
+
+it('renders native v2 parts through the workspace transport without v1 identifier rules', async () => {
+  const sessionId = 'workspace_native';
+  const nativeId = `ses_${'a'.repeat(26)}`;
+  const source = {
+    version: 'v2' as const,
+    session: {
+      id: nativeId,
+      location: { directory: '/workspace/app' },
+      time: { created: 1, updated: 2 },
+    },
+  };
+  const storage = createMemoryStorage();
+  const processor = createChatProcessor(storage);
+  const factory = createCloudAgentTransport({
+    sessionId: cloudAgentId(sessionId),
+    kiloSessionId: kiloId(nativeId),
+    api: createMockApi(),
+    getTicket: () => 'local-ticket',
+    websocketBaseUrl: 'ws://localhost:9999',
+    fetchCloudSnapshotPage: async () => ({
+      kind: 'success',
+      source,
+      info: { id: nativeId },
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+      updateCursor: 0,
+      totalCostMicrodollars: 0,
+    }),
+  });
+  const transport = factory({
+    onChatEvent: event => {
+      processor.process(event);
+    },
+    onServiceEvent() {},
+  });
+  try {
+    transport.connect();
+    await flushPromises();
+    const user = {
+      id: 'msg_native_user',
+      type: 'user',
+      time: { created: 1 },
+      text: 'native prompt',
+    };
+    const assistant = {
+      id: 'msg_native_reply',
+      type: 'assistant',
+      time: { created: 2, completed: 3 },
+      content: [{ type: 'text', text: 'visible native reply' }],
+    };
+    for (const [index, message] of [user, assistant].entries())
+      sendRaw({
+        eventId: index + 1,
+        cursor: index + 1,
+        sessionId,
+        streamEventType: 'kilocode',
+        timestamp: '2026-10-23T09:00:00Z',
+        data: {
+          type: 'conversation.message.updated',
+          properties: { sessionID: nativeId, source, message, parentID: user.id },
+        },
+      });
+    expect(storage.getParts(assistant.id)).toEqual([
+      expect.objectContaining({ type: 'text', text: 'visible native reply' }),
+    ]);
+    expect(storage.getMessageInfo(assistant.id)).toMatchObject({
+      role: 'assistant',
+      parentID: user.id,
+    });
+  } finally {
+    transport.destroy();
+  }
+});
 
 function sendRaw(event: CloudAgentEvent): void {
   mockWs.onmessage?.({ data: JSON.stringify(event) } as MessageEvent);

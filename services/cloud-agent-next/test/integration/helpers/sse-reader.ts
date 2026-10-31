@@ -1,3 +1,5 @@
+import { withTimeout } from '@kilocode/worker-utils';
+
 /**
  * Minimal SSE consumer for the Workers-runtime suite. Parses `data:` frames out
  * of a `text/event-stream` response body one at a time.
@@ -33,7 +35,14 @@ export function createSseDataReader(response: Response): SseDataReader {
         continue;
       }
       if (done) return null;
-      const chunk = await reader.read();
+      const chunk = await withTimeout(
+        reader.read(),
+        10_000,
+        'Timed out waiting for an SSE frame'
+      ).catch(error => {
+        void reader.cancel().catch(() => undefined);
+        throw error;
+      });
       if (chunk.done) {
         done = true;
         return null;

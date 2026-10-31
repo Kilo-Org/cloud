@@ -1,6 +1,7 @@
 import type { Part } from '@kilocode/app-shared/opencode';
 import type { MessageInfo } from '../types';
 import type { SessionStorage } from './types';
+import { forgetMessageVersions, forgetPartVersion, storageVersions } from './versions';
 import {
   EMPTY_PARTS,
   appendPartTextChunks,
@@ -26,7 +27,7 @@ function createMemoryStorage(): SessionStorage {
 
   const subscribers = new Map<string, Set<() => void>>();
 
-  return {
+  const storage: SessionStorage = {
     upsertMessage(info) {
       const existing = messages.get(info.id);
       messages.set(info.id, info);
@@ -46,11 +47,11 @@ function createMemoryStorage(): SessionStorage {
       return messages.get(messageId);
     },
 
-    upsertPart(messageId, part, eventTime) {
+    upsertPart(messageId, part, eventTime, authoritative) {
       const arr = parts.get(messageId) ?? [];
       parts.set(
         messageId,
-        upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, partEvidence)
+        upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, partEvidence, authoritative)
       );
       publishPartsChanged(partsSnapshot, subscribers, messageId);
     },
@@ -70,6 +71,7 @@ function createMemoryStorage(): SessionStorage {
     },
 
     deletePart(messageId, partId) {
+      forgetPartVersion(storage, messageId, partId);
       const arr = parts.get(messageId);
       if (!arr) return;
       parts.set(
@@ -106,6 +108,7 @@ function createMemoryStorage(): SessionStorage {
     },
 
     clear() {
+      storageVersions.delete(storage);
       const existingMessageIds = [...messageIds];
       const existingPartMessageIds = [...parts.keys()];
 
@@ -125,6 +128,7 @@ function createMemoryStorage(): SessionStorage {
     },
 
     deleteMessage(messageId) {
+      forgetMessageVersions(storage, messageId);
       // A part delta can create parts before the message row (see
       // `applyPartDelta`), so part state is dropped regardless of the row.
       const hadMessage = messages.delete(messageId);
@@ -147,6 +151,7 @@ function createMemoryStorage(): SessionStorage {
       notify(subscribers, 'messageIds');
     },
   };
+  return storage;
 }
 
 export { createMemoryStorage };

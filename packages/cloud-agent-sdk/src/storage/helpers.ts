@@ -261,7 +261,8 @@ function upsertPartDroppingStaleSyntheticParts(
   arr: Part[],
   part: Part,
   eventTime: number | undefined,
-  evidence: PartOrderingEvidence
+  evidence: PartOrderingEvidence,
+  authoritative = false
 ): Part[] {
   const nextPart = clonePart(part);
   const incomingIsSynthetic = Reflect.get(part, 'synthetic') === true;
@@ -287,6 +288,7 @@ function upsertPartDroppingStaleSyntheticParts(
       existing === undefined ? undefined : storedPartUpdateTime(evidence, existing);
     if (
       existing !== undefined &&
+      !authoritative &&
       isStaleToolLifecycleUpdate(existing, part, storedEventTime, eventTime)
     ) {
       return arr;

@@ -23,6 +23,7 @@ async function hostFixture() {
   const summaries: string[] = [];
   const summaryRequested = Promise.withResolvers<void>();
   const promptRequested = Promise.withResolvers<void>();
+  const abortRequested = Promise.withResolvers<void>();
   const feeds: Array<{ source: KiloEventFeedSource; callbacks: KiloFeedCallbacks }> = [];
   const intervals = new Map<symbol, () => void>();
   const stopped: number[] = [];
@@ -52,6 +53,7 @@ async function hostFixture() {
       }
       if (url.pathname.endsWith('/abort')) {
         aborts.push({ path: url.pathname, scope: url.searchParams.get('scope') });
+        abortRequested.resolve();
         return Response.json(await abortReply());
       }
       if (url.pathname.endsWith('/prompt_async')) {
@@ -141,6 +143,7 @@ async function hostFixture() {
     summaries,
     summaryRequested: summaryRequested.promise,
     promptRequested: promptRequested.promise,
+    abortRequested: abortRequested.promise,
     stopped,
     async runtime(key: string) {
       await host.runtimes.ensure({ key, directory: '/workspace', env: {} });
@@ -686,8 +689,10 @@ describe('production session host composition', () => {
 
   it('emits a routed autonomous error without inventing an outcome and keeps a progressing sibling awake', async () => {
     const f = await hostFixture();
+    const stop = Promise.withResolvers<boolean>();
     try {
       const feed = await f.runtime('/workspace');
+      f.setAbort(() => stop.promise);
       f.host.turns.registerRoute({
         sessionId: 'workspace_chat',
         kiloSessionId: 'ses_root',
@@ -698,6 +703,7 @@ describe('production session host composition', () => {
       await f.advance(10 * 60_000);
       f.event(feed, 'session.turn.open', { sessionID: 'ses_other' });
       await f.advance(10 * 60_000);
+      await f.abortRequested;
       expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
       expect(f.frames.filter(frame => frame.type === 'session.events')).toContainEqual({
         type: 'session.events',
@@ -716,10 +722,20 @@ describe('production session host composition', () => {
       });
       expect(f.aborts).toHaveLength(1);
       expect(f.host.getHeartbeat().active).toBe(true);
+      const runtime = f.host.runtimes.get('/workspace');
+      expect(runtime?.sessionState('ses_root')?.activity).toBe('stopping');
+      stop.resolve(true);
+      const deadline = Date.now() + 2_000;
+      while (runtime?.sessionState('ses_root') !== undefined && Date.now() < deadline) {
+        await Bun.sleep(1);
+      }
+      expect(runtime?.sessionState('ses_root')).toBeUndefined();
+      expect(f.host.getHeartbeat().active).toBe(true);
       f.event(feed, 'session.status', { sessionID: 'ses_other', status: { type: 'idle' } });
       f.event(feed, 'session.turn.close', { sessionID: 'ses_other', reason: 'completed' });
       expect(f.host.getHeartbeat().active).toBe(false);
     } finally {
+      stop.resolve(true);
       await f.dispose();
     }
   });

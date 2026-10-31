@@ -196,3 +196,30 @@ describe('Profile route names', () => {
     expect(getProfileRouteNames()).toHaveLength(10);
   });
 });
+
+describe('Profile routes opened from outside the tree', () => {
+  it('carries the opener that keeps Back with the screen that asked', () => {
+    expect(
+      getRepoBindingsPath({ organizationId: 'org-1', stack: 'app', openedFrom: 'composer' })
+    ).toBe('/(app)/profile-management/repo-bindings?organizationId=org-1&openedFrom=composer');
+    expect(getProfileOverviewPath('profile-1', { stack: 'app', openedFrom: 'session' })).toBe(
+      '/(app)/profile-management/profile-1?openedFrom=session'
+    );
+    expect(
+      getProfileOverviewPath('profile-1', { organizationId: 'org-1', openedFrom: 'session' })
+    ).toBe('/(app)/(tabs)/(3_profile)/profiles/profile-1?organizationId=org-1&openedFrom=session');
+  });
+
+  it('carries the opener into the create form the repository defaults open', () => {
+    expect(
+      getNewProfilePath('app', {
+        owner: 'organization',
+        returnTo: 'back',
+        organizationId: 'org-1',
+        openedFrom: 'composer',
+      })
+    ).toBe(
+      '/(app)/profile-management/new?owner=organization&returnTo=back&organizationId=org-1&openedFrom=composer'
+    );
+  });
+});

@@ -213,6 +213,12 @@ export type NewProfilePathOptions = {
    * the profile in the organization whose list it showed.
    */
   organizationId?: string;
+  /**
+   * The outside screen that opened this form, when the caller was opened from
+   * one: the form then returns to it on `back` and does not build the profiles
+   * list beneath itself.
+   */
+  openedFrom?: ProfileExternalOpener;
 };
 
 /** The profile editor's create screen. */
@@ -226,6 +232,7 @@ export function getNewProfilePath(
     options.organizationId === undefined
       ? ''
       : `organizationId=${encodeURIComponent(options.organizationId)}`,
+    options.openedFrom === undefined ? '' : openedFromQuery(options.openedFrom),
   ]
     .filter(part => part.length > 0)
     .join('&');

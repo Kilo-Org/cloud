@@ -82,6 +82,9 @@ export function useRepairProfileRouteStack({
     // One decision per mounted screen, whatever it decides.
     let decided = false;
     let retired = false;
+    // The retirement listener is owned by this effect, so it lives exactly as
+    // long as the screen that may still need to retire its original copy.
+    let unsubscribeRetire: (() => void) | undefined = undefined;
 
     const retireOriginal = (retiredKey: string, selfName: string) => {
       if (retired) {
@@ -146,6 +149,9 @@ export function useRepairProfileRouteStack({
       }
       const retiredKey = current.key;
       const selfName = current.name;
+      unsubscribeRetire = navigation.addListener('state', () => {
+        retireOriginal(retiredKey, selfName);
+      });
       if (toPush.list) {
         router.push(withRebuiltParents(getProfilesPath(stack)));
       }
@@ -153,14 +159,14 @@ export function useRepairProfileRouteStack({
         router.push(withRebuiltParents(getProfileOverviewPath(profile, { organizationId, stack })));
       }
       router.push(withRebuiltParents(self));
-      navigation.addListener('state', () => {
-        retireOriginal(retiredKey, selfName);
-      });
     };
 
-    const unsubscribe = navigation.addListener('state', decide);
+    const unsubscribeDecide = navigation.addListener('state', decide);
     // The focused pathname settles on its own render, after a state event.
     decide();
-    return unsubscribe;
+    return () => {
+      unsubscribeDecide();
+      unsubscribeRetire?.();
+    };
   }, [navigation, organizationId, parents, profile, router, screenPath, self, stack]);
 }

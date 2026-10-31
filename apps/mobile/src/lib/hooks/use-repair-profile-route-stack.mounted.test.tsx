@@ -268,3 +268,17 @@ describe('useRepairProfileRouteStack', () => {
     ]);
   });
 });
+
+describe('useRepairProfileRouteStack — cleanup', () => {
+  it('removes both listeners when the screen unmounts', () => {
+    setStack([r('tabs', '(tabs)'), r('a', AGENTS)], 1);
+    const renderer = mount();
+    expect(nav.listeners.size).toBeGreaterThan(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+
+    expect(nav.listeners.size).toBe(0);
+  });
+});

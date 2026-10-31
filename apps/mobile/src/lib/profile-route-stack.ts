@@ -45,9 +45,12 @@ const PROFILE_OPENED_FROM_PARAM = 'openedFrom';
 /** Who opened a profile screen from outside the profile tree. */
 export type ProfileExternalOpener = 'session' | 'composer';
 
+/** The openers a route accepts from its query, for `parseParam`'s allowlist. */
+export const EXTERNAL_OPENERS: readonly ProfileExternalOpener[] = ['session', 'composer'];
+
 /** The marker's schema: absent, or one of the openers that opt out. */
 const openedFromSchema = z.object({
-  [PROFILE_OPENED_FROM_PARAM]: z.enum(['session', 'composer']).optional(),
+  [PROFILE_OPENED_FROM_PARAM]: z.enum(EXTERNAL_OPENERS).optional(),
 });
 
 /**
@@ -216,15 +219,24 @@ export function missingProfileStackParents({
   };
 }
 
-/** Which parents the current screen still has to push, in stack order. */
+/**
+ * Which parents the current screen still has to push, in stack order.
+ *
+ * A section builds the list only as part of building its overview: when the
+ * overview is already beneath, the section reached it from that overview, and
+ * that is its parent whatever the overview's own opener was. Appending a list
+ * above the overview would put a screen on the Back path the reader never took
+ * and would stop the overview being the section's direct parent.
+ */
 export function parentsToPush(
   required: ProfileStackParents,
   missing: ProfileStackParents
 ): ProfileStackParents {
-  return {
-    list: required.list && missing.list,
-    overview: required.overview && missing.overview,
-  };
+  const overview = required.overview && missing.overview;
+  if (required.overview) {
+    return { list: overview && required.list && missing.list, overview };
+  }
+  return { list: required.list && missing.list, overview };
 }
 
 export function hasParentsToPush(toPush: ProfileStackParents): boolean {

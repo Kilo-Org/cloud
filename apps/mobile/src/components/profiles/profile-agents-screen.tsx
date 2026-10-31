@@ -67,8 +67,10 @@ function AgentRowView({
   const { t } = useTranslation();
   const colors = useThemeColors();
   // The slug is the name's identifier; repeating it beside the name reads as a
-  // duplicate, so it only shows when it says something the name does not.
-  const showSlug = slug.length > 0 && slug !== name.trim().toLowerCase();
+  // duplicate, so it only shows when it says something the name does not. The
+  // slug is ASCII, so it is compared in a fixed locale: the UI's locale would
+  // lowercase a leading "I" into a letter the server never stores.
+  const showSlug = slug.length > 0 && slug !== name.trim().toLocaleLowerCase('en');
   return (
     <View className="min-h-16 flex-row items-start gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="min-w-0 flex-1 gap-0.5">

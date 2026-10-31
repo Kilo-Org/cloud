@@ -583,10 +583,10 @@ describe('DashboardScreen sync control terminal states', () => {
     expect(renderedTexts(root.root)).toContain(
       i18n.t('securityAgent.mutations.syncNoRepositories')
     );
-    expect(renderedTexts(root.root)).not.toContain(
-      i18n.t('securityAgent.mutations.actionBlocked')
+    expect(renderedTexts(root.root)).not.toContain(i18n.t('securityAgent.mutations.actionBlocked'));
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
     );
-    expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.dashboard.manageRepositories'));
 
     pressSyncRetry(root.root);
 

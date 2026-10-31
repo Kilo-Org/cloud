@@ -63,7 +63,9 @@ describe('FindingFilterModal repository section', () => {
     const strings = renderedStrings(renderer);
 
     expect(strings).not.toContain(i18n.t('securityAgent.filter.noRepositories'));
-    expect(strings.indexOf('acme/one')).toBeGreaterThan(strings.indexOf(i18n.t('common.repository')));
+    expect(strings.indexOf('acme/one')).toBeGreaterThan(
+      strings.indexOf(i18n.t('common.repository'))
+    );
     expect(strings.indexOf('acme/two')).toBeGreaterThan(strings.indexOf('acme/one'));
   });
 });

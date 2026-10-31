@@ -1678,7 +1678,7 @@
       "sortSeverityAsc": "Alvorlighetsgrad: lav til høy",
       "sortSlaDue": "SLA-frist",
       "overdueOnly": "Bare funn over fristen",
-      "noRepositories": "Ingen kodelagre er synkronisert eller valgt ennå. Velg dem i innstillingene for Security Agent."
+      "noRepositories": "Ingen repositorier er synkronisert eller valgt ennå. Velg dem i innstillingene for Sikkerhetsagent."
     },
     "automation": {
       "title": "Automatisering",
@@ -2050,8 +2050,8 @@
       "replayFailed": "Denne handlingen ble ikke fullført. Prøv igjen.",
       "actionFailed": "Kunne ikke fullføre denne handlingen. Prøv igjen.",
       "actionBlocked": "Kunne ikke fullføre denne handlingen. Problemet må løses før du kan prøve igjen.",
-      "syncNoRepositories": "Ingen kodelagre er i synkroniseringsomfanget. Velg kodelagrene Security Agent overvåker, og synkroniser på nytt.",
-      "syncIntegrationInactive": "GitHub-tilkoblingen for Security Agent er ikke aktiv. Koble til Kilo GitHub App på nytt, og synkroniser på nytt.",
+      "syncNoRepositories": "Ingen repositorier er i synkroniseringsomfanget. Velg repositoriene Sikkerhetsagenten overvåker, og synkroniser på nytt.",
+      "syncIntegrationInactive": "GitHub-tilkoblingen for Sikkerhetsagenten er ikke aktiv. Koble Kilo GitHub App til på nytt, og synkroniser deretter på nytt.",
       "syncMissingPermission": "Kilo GitHub App kan ikke lese vulnerability alerts. Gi denne tillatelsen i GitHub, og synkroniser på nytt."
     },
     "analysisState": {

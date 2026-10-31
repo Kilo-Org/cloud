@@ -1149,7 +1149,7 @@
       "sortSlaDue": "Ngày đến hạn SLA",
       "statusIgnored": "Đã bỏ qua",
       "statusOpen": "Mở",
-      "noRepositories": "Chưa có kho lưu trữ nào được đồng bộ hoặc chọn. Chọn chúng trong cài đặt Security Agent."
+      "noRepositories": "Chưa có kho lưu trữ nào được đồng bộ hoặc chọn. Hãy chọn chúng trong cài đặt «Trợ lý bảo mật»."
     },
     "analysis": {
       "analyzeRepository": "Phân tích kho lưu trữ",
@@ -1521,8 +1521,8 @@
       "replayFailed": "Hành động này chưa hoàn tất. Vui lòng thử lại.",
       "actionFailed": "Không thể hoàn tất hành động này. Vui lòng thử lại.",
       "actionBlocked": "Không thể hoàn tất hành động này. Bạn cần khắc phục sự cố trước khi thử lại.",
-      "syncNoRepositories": "Không có kho lưu trữ nào trong phạm vi đồng bộ. Chọn các kho lưu trữ mà Security Agent giám sát, rồi đồng bộ lại.",
-      "syncIntegrationInactive": "Kết nối GitHub cho Security Agent chưa hoạt động. Kết nối lại Kilo GitHub App, rồi đồng bộ lại.",
+      "syncNoRepositories": "Không có kho lưu trữ nào trong phạm vi đồng bộ. Hãy chọn các kho lưu trữ mà Trợ lý bảo mật giám sát, rồi đồng bộ lại.",
+      "syncIntegrationInactive": "Kết nối GitHub của Trợ lý bảo mật chưa hoạt động. Hãy kết nối lại Ứng dụng GitHub của Kilo, sau đó đồng bộ lại.",
       "syncMissingPermission": "Kilo GitHub App không thể đọc cảnh báo lỗ hổng bảo mật. Cấp quyền đó trong GitHub, rồi đồng bộ lại."
     },
     "analysisState": {

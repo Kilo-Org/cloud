@@ -1678,7 +1678,7 @@
       "sortSeverityAsc": "ຄວາມຮ້າຍແຮງ: ຕ່ຳຫາສູງ",
       "sortSlaDue": "ວັນຄົບກຳນົດ SLA",
       "overdueOnly": "ສະເພາະທີ່ເກີນກຳນົດ",
-      "noRepositories": "ຍັງບໍ່ມີຄັງໂຄ້ດທີ່ຊິງຄ໌ ຫຼື ເລືອກແລ້ວ. ເລືອກພວກມັນໃນການຕັ້ງຄ່າ Security Agent."
+      "noRepositories": "ຍັງບໍ່ມີ repository ໃດທີ່ຖືກ sync ຫຼື ເລືອກເທື່ອ. ເລືອກພວກມັນໃນການຕັ້ງຄ່າ ເອເຈນດ້ານຄວາມປອດໄພ."
     },
     "automation": {
       "title": "ການເຮັດວຽກອັດຕະໂນມັດ",
@@ -2050,8 +2050,8 @@
       "replayFailed": "ການດຳເນີນການນີ້ບໍ່ສຳເລັດ. ກະລຸນາລອງໃໝ່.",
       "actionFailed": "ບໍ່ສາມາດສຳເລັດການດຳເນີນການນີ້ໄດ້. ກະລຸນາລອງໃໝ່.",
       "actionBlocked": "ບໍ່ສາມາດສຳເລັດການດຳເນີນການນີ້ໄດ້. ຕ້ອງແກ້ໄຂບັນຫານີ້ກ່ອນຈຶ່ງຈະລອງໃໝ່ໄດ້.",
-      "syncNoRepositories": "ບໍ່ມີຄັງໂຄ້ດຢູ່ໃນຂອບເຂດການຊິງຄ໌. ເລືອກຄັງໂຄ້ດທີ່ Security Agent ຕິດຕາມ, ແລ້ວຊິງຄ໌ອີກຄັ້ງ.",
-      "syncIntegrationInactive": "ການເຊື່ອມຕໍ່ GitHub ສຳລັບ Security Agent ບໍ່ໄດ້ເຮັດວຽກຢູ່. ເຊື່ອມຕໍ່ Kilo GitHub App ຄືນໃໝ່, ແລ້ວຊິງຄ໌ອີກຄັ້ງ.",
+      "syncNoRepositories": "ບໍ່ມີ repository ໃດຢູ່ໃນຂອບເຂດການຊິງຄ໌. ເລືອກ repository ທີ່ «ເອເຈນດ້ານຄວາມປອດໄພ» ຕິດຕາມ, ແລ້ວຊິງຄ໌ອີກຄັ້ງ.",
+      "syncIntegrationInactive": "ການເຊື່ອມຕໍ່ GitHub ສຳລັບ ເອເຈນດ້ານຄວາມປອດໄພ ບໍ່ໄດ້ເປີດໃຊ້ງານ. ເຊື່ອມຕໍ່ Kilo GitHub App ຄືນໃໝ່, ແລ້ວຊິງຄ໌ອີກຄັ້ງ.",
       "syncMissingPermission": "Kilo GitHub App ບໍ່ສາມາດອ່ານ vulnerability alerts ໄດ້. ໃຫ້ສິດນັ້ນໃນ GitHub, ແລ້ວຊິງຄ໌ອີກຄັ້ງ."
     },
     "analysisState": {

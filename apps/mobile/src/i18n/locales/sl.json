@@ -1722,7 +1722,7 @@
       "sortSeverityAsc": "Resnost: od nizke do visoke",
       "sortSlaDue": "Rok SLA",
       "overdueOnly": "Samo s pretečenim rokom",
-      "noRepositories": "Noben repozitorij še ni sinhroniziran ali izbran. Izberi jih v nastavitvah Security Agent."
+      "noRepositories": "Noben repozitorij še ni sinhroniziran ali izbran. Izberite jih v nastavitvah Varnostnega agenta."
     },
     "automation": {
       "title": "Avtomatizacija",
@@ -2104,8 +2104,8 @@
       "replayFailed": "To dejanje se ni izvedlo. Poskusi znova.",
       "actionFailed": "Tega dejanja ni bilo mogoče dokončati. Poskusi znova.",
       "actionBlocked": "Tega dejanja ni bilo mogoče dokončati. Težavo je treba najprej odpraviti.",
-      "syncNoRepositories": "V obseg sinhronizacije ni vključen noben repozitorij. Izberi repozitorije, ki jih spremlja Security Agent, in znova sinhroniziraj.",
-      "syncIntegrationInactive": "Povezava GitHub za Security Agent ni aktivna. Znova poveži Kilo GitHub App in nato znova sinhroniziraj.",
+      "syncNoRepositories": "V obsegu sinhronizacije ni nobenega repozitorija. Izberite repozitorije, ki jih Varnostni agent spremlja, in znova sinhronizirajte.",
+      "syncIntegrationInactive": "Povezava z GitHub za Varnostnega agenta ni aktivna. Znova povežite Kilo GitHub App in nato znova sinhronizirajte.",
       "syncMissingPermission": "Kilo GitHub App ne more brati opozoril o ranljivostih. V GitHubu dodeli to dovoljenje in znova sinhroniziraj."
     },
     "analysisState": {

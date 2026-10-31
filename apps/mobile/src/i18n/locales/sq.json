@@ -1678,7 +1678,7 @@
       "sortSeverityAsc": "Rreziku: nga i ulëti tek i larti",
       "sortSlaDue": "Data e afatit të SLA-së",
       "overdueOnly": "Vetëm me afat të kaluar",
-      "noRepositories": "Asnjë depo nuk është sinkronizuar ose zgjedhur ende. Zgjidhi ato te cilësimet e Security Agent."
+      "noRepositories": "Asnjë depo nuk është sinkronizuar ose zgjedhur ende. Zgjidhini ato te cilësimet e Agjentit të sigurisë."
     },
     "automation": {
       "title": "Automatizimi",
@@ -2050,8 +2050,8 @@
       "replayFailed": "Ky veprim nuk u krye. Provo përsëri.",
       "actionFailed": "Ky veprim nuk u përfundua dot. Provo përsëri.",
       "actionBlocked": "Ky veprim nuk u përfundua dot. Problemi duhet zgjidhur përpara se të provosh përsëri.",
-      "syncNoRepositories": "Nuk ka depot në fushën e sinkronizimit. Zgjidh depot që monitoron Security Agent, pastaj sinkronizo përsëri.",
-      "syncIntegrationInactive": "Lidhja me GitHub për Security Agent nuk është aktive. Rilidh aplikacionin Kilo për GitHub, pastaj sinkronizo përsëri.",
+      "syncNoRepositories": "Asnjë depo nuk është në fushëveprimin e sinkronizimit. Zgjidhni depot që monitoron Agjenti i sigurisë, më pas sinkronizoni përsëri.",
+      "syncIntegrationInactive": "Lidhja e GitHub për Agjentin e sigurisë nuk është aktive. Rilidhni Kilo GitHub App, më pas sinkronizoni përsëri.",
       "syncMissingPermission": "Aplikacioni Kilo për GitHub nuk mund të lexojë alarmet e dobësive. Jepi atë leje në GitHub, pastaj sinkronizo përsëri."
     },
     "analysisState": {

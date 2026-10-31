@@ -1678,7 +1678,7 @@
       "sortSeverityAsc": "Kalubhaan: mula mababa pataas",
       "sortSlaDue": "Takdang petsa ng SLA",
       "overdueOnly": "Lampas sa takdang petsa lang",
-      "noRepositories": "Wala pang naka-sync o napiling mga repositoryo. Piliin ang mga ito sa mga setting ng Security Agent."
+      "noRepositories": "Wala pang naka-sync o napiling repository. Piliin ang mga ito sa mga setting ng Ahente sa seguridad."
     },
     "automation": {
       "title": "Awtomasyon",
@@ -2050,8 +2050,8 @@
       "replayFailed": "Hindi natapos ang aksyon na ito. Pakisubukang muli.",
       "actionFailed": "Hindi magawang matapos ang aksyon na ito. Pakisubukang muli.",
       "actionBlocked": "Hindi magawang matapos ang aksyon na ito. Kailangang ayusin muna ang problema bago mo ito muling subukan.",
-      "syncNoRepositories": "Walang mga repositoryo sa saklaw ng sync. Piliin ang mga repositoryong sinusubaybayan ng Security Agent, pagkatapos ay mag-sync muli.",
-      "syncIntegrationInactive": "Hindi aktibo ang koneksyon sa GitHub para sa Security Agent. Ikonekta muli ang Kilo GitHub App, pagkatapos ay mag-sync muli.",
+      "syncNoRepositories": "Walang mga repositoryo sa saklaw ng pag-sync. Piliin ang mga repositoryong sinusubaybayan ng Ahente sa seguridad, pagkatapos i-sync muli.",
+      "syncIntegrationInactive": "Hindi aktibo ang koneksyon sa GitHub para sa Ahente sa seguridad. I-reconnect ang Kilo GitHub App, pagkatapos i-sync muli.",
       "syncMissingPermission": "Hindi mabasa ng Kilo GitHub App ang vulnerability alerts. Ibigay ang pahintulot na iyon sa GitHub, pagkatapos ay mag-sync muli."
     },
     "analysisState": {

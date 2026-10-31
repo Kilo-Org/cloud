@@ -1678,7 +1678,7 @@
       "sortSeverityAsc": "Tsanani: daga ƙarami zuwa babba",
       "sortSlaDue": "Ranar cikar wa'adin SLA",
       "overdueOnly": "Waɗanda wa'adinsu ya wuce kawai",
-      "noRepositories": "Ba a daidaita ko zaɓi kowane ma'ajiya ba tukuna. Zaɓe su a cikin saitunan Security Agent."
+      "noRepositories": "Babu rumbun ajiya da aka daidaita ko aka zaɓa tukuna. Zaɓe su a cikin saitin Wakilin tsaro."
     },
     "automation": {
       "title": "Aiki na atomatik",
@@ -2050,8 +2050,8 @@
       "replayFailed": "Wannan aikin bai kammala ba. Sake gwadawa.",
       "actionFailed": "Ba za a iya kammala wannan aikin ba. Sake gwadawa.",
       "actionBlocked": "Ba za a iya kammala wannan aikin ba. Dole a gyara matsalar kafin a sake gwadawa.",
-      "syncNoRepositories": "Babu ma'ajiyoyi a cikin iyakar daidaitawa. Zaɓi ma'ajiyoyin da Security Agent ke sa ido a kansu, sannan ka sake daidaitawa.",
-      "syncIntegrationInactive": "Haɗin GitHub na Security Agent ba ya aiki. Sake haɗa Kilo GitHub App, sannan ka sake daidaitawa.",
+      "syncNoRepositories": "Babu wata ma'ajiyar bayanai da ke cikin iyakar daidaitawa. Zaɓi ma'ajiyoyin bayanai da Wakilin tsaro ke sa ido a kansu, sannan a sake daidaitawa.",
+      "syncIntegrationInactive": "Haɗin GitHub na Wakilin tsaro ba ya aiki. Sake haɗa Kilo GitHub App, sannan ka sake daidaitawa.",
       "syncMissingPermission": "Kilo GitHub App ba ya iya karanta vulnerability alerts. Ba da wannan izni a GitHub, sannan ka sake daidaitawa."
     },
     "analysisState": {

@@ -1120,7 +1120,7 @@
       "sortSlaDue": "Data de vencimento do SLA",
       "statusIgnored": "Ignorado",
       "statusOpen": "Abrir",
-      "noRepositories": "Nenhum repositório foi sincronizado ou selecionado ainda. Escolha os repositórios nas configurações do Security Agent."
+      "noRepositories": "Nenhum repositório foi sincronizado ou selecionado ainda. Escolha-os nas configurações do Agente de segurança."
     },
     "analysis": {
       "analyzeRepository": "Analisar repositório",
@@ -1497,8 +1497,8 @@
       "replayFailed": "Esta ação não foi concluída. Tente novamente.",
       "actionFailed": "Não foi possível concluir esta ação. Tente novamente.",
       "actionBlocked": "Não foi possível concluir esta ação. É preciso corrigir o problema antes de tentar novamente.",
-      "syncNoRepositories": "Nenhum repositório está no escopo de sincronização. Escolha os repositórios que o Security Agent monitora e sincronize novamente.",
-      "syncIntegrationInactive": "A conexão do GitHub para o Security Agent não está ativa. Reconecte o Kilo GitHub App e sincronize novamente.",
+      "syncNoRepositories": "Nenhum repositório está no escopo de sincronização. Escolha os repositórios que o Agente de segurança monitora e sincronize novamente.",
+      "syncIntegrationInactive": "A conexão do GitHub para o Agente de segurança não está ativa. Reconecte o Kilo GitHub App e sincronize novamente.",
       "syncMissingPermission": "O Kilo GitHub App não consegue ler os vulnerability alerts. Conceda essa permissão no GitHub e sincronize novamente."
     },
     "analysisState": {

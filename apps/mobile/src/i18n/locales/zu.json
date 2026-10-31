@@ -1678,7 +1678,7 @@
       "sortSeverityAsc": "Ubucayi: obuphansi kuye kobuphezulu",
       "sortSlaDue": "Usuku lomnqamulajuqu we-SLA",
       "overdueOnly": "Okudlule umnqamulajuqu kuphela",
-      "noRepositories": "Azikho izinqolobane zekhodi ezisynciwe noma ezikhethiwe okwamanje. Zikhetha kuzilungiselelo ze-Security Agent."
+      "noRepositories": "Awekho amarepositori avumelanisiwe noma akhethiwe okwamanje. Wakhethe kuzilungiselelo ze-I-ejenti yezokuphepha."
     },
     "automation": {
       "title": "Ukuzenzakalela",
@@ -2050,8 +2050,8 @@
       "replayFailed": "Lesi senzo asiqedile. Sicela uzame futhi.",
       "actionFailed": "Asikwazanga ukuqedela lesi senzo. Sicela uzame futhi.",
       "actionBlocked": "Asikwazanga ukuqedela lesi senzo. Kumele kulungiswe le nkinga kuqala.",
-      "syncNoRepositories": "Azikho izinqolobane zekhodi ezise-scope ye-sync. Khetha izinqolobane zekhodi eziqashwa yi-Security Agent, bese u-sync futhi.",
-      "syncIntegrationInactive": "Ukuxhumana kwe-GitHub kwe-Security Agent akusasebenzi. Xhuma kabusha i-Kilo GitHub App, bese u-sync futhi.",
+      "syncNoRepositories": "Awekho amakhosombe akumkhawulo wokuvumelanisa. Khetha amakhosombe i-ejenti yezokuphepha ewabhekayo, bese uvumelanisa futhi.",
+      "syncIntegrationInactive": "Ukuxhumana kwe-GitHub kwe-Ejenti yezokuphepha akusebenzi. Xhuma kabusha i-Kilo GitHub App, bese uvumelanisa futhi.",
       "syncMissingPermission": "I-Kilo GitHub App ayikwazi ukufunda vulnerability alerts. Nika leyo mvume ku-GitHub, bese u-sync futhi."
     },
     "analysisState": {

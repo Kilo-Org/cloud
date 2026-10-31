@@ -1722,7 +1722,7 @@
       "sortSeverityAsc": "Závažnosť: od najnižšej",
       "sortSlaDue": "Termín SLA",
       "overdueOnly": "Iba po termíne",
-      "noRepositories": "Zatiaľ nie sú synchronizované ani vybrané žiadne repozitáre. Vyberte ich v nastaveniach Security Agent."
+      "noRepositories": "Zatiaľ nie sú synchronizované ani vybrané žiadne repozitáre. Vyberte ich v nastaveniach Bezpečnostného agenta."
     },
     "automation": {
       "title": "Automatizácia",
@@ -2104,8 +2104,8 @@
       "replayFailed": "Táto akcia sa nevykonala. Skúste to znova.",
       "actionFailed": "Túto akciu sa nepodarilo dokončiť. Skúste to znova.",
       "actionBlocked": "Túto akciu sa nepodarilo dokončiť. Problém je potrebné najprv vyriešiť.",
-      "syncNoRepositories": "V rozsahu synchronizácie nie sú žiadne repozitáre. Vyberte repozitáre, ktoré má Security Agent monitorovať, a potom znova synchronizujte.",
-      "syncIntegrationInactive": "Pripojenie GitHub pre Security Agent nie je aktívne. Znova pripojte aplikáciu Kilo na GitHube a potom znova synchronizujte.",
+      "syncNoRepositories": "V rozsahu synchronizácie nie sú žiadne repozitáre. Vyberte repozitáre, ktoré Bezpečnostný agent monitoruje, a potom znova synchronizujte.",
+      "syncIntegrationInactive": "Pripojenie GitHub pre Bezpečnostného agenta nie je aktívne. Znovu pripojte Kilo GitHub App a potom znova synchronizujte.",
       "syncMissingPermission": "Aplikácia Kilo na GitHube nemôže čítať upozornenia na zraniteľnosti. Udeľte toto povolenie na GitHube a potom znova synchronizujte."
     },
     "analysisState": {

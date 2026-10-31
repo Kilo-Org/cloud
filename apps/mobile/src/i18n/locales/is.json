@@ -1678,7 +1678,7 @@
       "sortSeverityAsc": "Alvarleiki: frá lægsta til hæsta",
       "sortSlaDue": "Lokadagur SLA-frests",
       "overdueOnly": "Aðeins með liðinn frest",
-      "noRepositories": "Engin kóðasöfn eru enn samstillt eða valin. Veldu þau í stillingum Security Agent."
+      "noRepositories": "Engar geymslur hafa enn verið samstilltar eða valdar. Veldu þær í stillingum Öryggiserindrekis."
     },
     "automation": {
       "title": "Sjálfvirkni",
@@ -2050,8 +2050,8 @@
       "replayFailed": "Þessari aðgerð var ekki lokið. Reyndu aftur.",
       "actionFailed": "Ekki tókst að ljúka þessari aðgerð. Reyndu aftur.",
       "actionBlocked": "Ekki tókst að ljúka þessari aðgerð. Leysa verður vandamálið áður en þú getur reynt aftur.",
-      "syncNoRepositories": "Engin kóðasöfn eru innan samstillingarsviðsins. Veldu kóðasöfnin sem Security Agent fylgist með og samstilltu svo aftur.",
-      "syncIntegrationInactive": "GitHub-tengingin fyrir Security Agent er ekki virk. Tengdu Kilo GitHub App aftur og samstilltu svo aftur.",
+      "syncNoRepositories": "Engar geymslur eru í samstillingarsviðinu. Veldu geymslurnar sem Öryggiserindrekinn fylgist með og samstilltu síðan aftur.",
+      "syncIntegrationInactive": "Tengingin við GitHub fyrir Öryggiserindreka er ekki virk. Tengdu Kilo GitHub App aftur og samstilltu svo aftur.",
       "syncMissingPermission": "Kilo GitHub App getur ekki lesið vulnerability alerts. Veittu þá heimild í GitHub og samstilltu svo aftur."
     },
     "analysisState": {

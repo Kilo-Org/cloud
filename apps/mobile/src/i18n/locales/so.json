@@ -1678,7 +1678,7 @@
       "sortSeverityAsc": "Heerka halista: hoose ilaa sare",
       "sortSlaDue": "Taariikhda kama dambaysta ah ee SLA",
       "overdueOnly": "Kuwa waqtigoodu dhaafay oo keliya",
-      "noRepositories": "Weli kaydad lama isku-dhajin lamana dooran. Dooro kaydadka gudaha dejinta Security Agent."
+      "noRepositories": "Weli lama isku-dubbaridin ama lama dooran wax repository-yo ah. Ku dooro dejinta Wakiilka amniga."
     },
     "automation": {
       "title": "Otomaatigayn",
@@ -2050,8 +2050,8 @@
       "replayFailed": "Ficilkan lama dhammeeyn. Fadlan mar kale isku day.",
       "actionFailed": "Ficilkan lama dhammeeyi karin. Fadlan mar kale isku day.",
       "actionBlocked": "Ficilkan lama dhammeeyi karin. Waa in dhibaatadan horay loo xalliyo.",
-      "syncNoRepositories": "Kaydad kuma jiraan baaxadda isku-dhajinta. Dooro kaydadka uu Security Agent kormeero, ka dibna mar kale isku-dhaji.",
-      "syncIntegrationInactive": "Xiriirka GitHub ee Security Agent firfircoon maaha. Dib u xiriir Kilo GitHub App, ka dibna mar kale isku-dhaji.",
+      "syncNoRepositories": "Ma jiro kayd-baakhaaro ku jira baaxadda is-waafajinta. Dooro kayd-baakhaarada uu Wakiilka amniga ilaaliyo, ka dibna mar kale is-waafaji.",
+      "syncIntegrationInactive": "Isku xirka GitHub ee Wakiilka amniga ma firfircoona. Dib u xir Kilo GitHub App, ka dibna mar kale isku dubarid.",
       "syncMissingPermission": "Kilo GitHub App ma akhrin karo digniinaha nuglaanta. Sii ogolaanshahaas gudaha GitHub, ka dibna mar kale isku-dhaji."
     },
     "analysisState": {

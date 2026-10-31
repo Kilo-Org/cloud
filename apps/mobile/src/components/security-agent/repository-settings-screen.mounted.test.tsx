@@ -193,6 +193,21 @@ function emptyStateAction(renderer: TestRenderer.ReactTestRenderer) {
   return onPress as () => void;
 }
 
+// With nothing to save in the header, the grant action is the one control the
+// state exists to offer, so its visual weight is part of this contract.
+function emptyStateActionVariant(renderer: TestRenderer.ReactTestRenderer): unknown {
+  const action: unknown = renderer.root.find(node => String(node.type) === 'EmptyState').props
+    .action;
+  if (typeof action !== 'object' || action === null || !('props' in action)) {
+    throw new TypeError('EmptyState action is not an element');
+  }
+  const { props } = action;
+  if (typeof props !== 'object' || props === null || !('variant' in props)) {
+    return undefined;
+  }
+  return props.variant;
+}
+
 // Presses the action and lets the mint → launch → refetch chain settle.
 async function pressEmptyStateAction(renderer: TestRenderer.ReactTestRenderer) {
   const onPress = emptyStateAction(renderer);
@@ -318,6 +333,9 @@ describe('RepositorySettingsScreen repository picker', () => {
     const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
     expect((empty.props as { placement: string }).placement).toBe('top');
     expect(empty.props as { action: unknown }).toHaveProperty('action');
+    // The grant is the only way out of this state and the header's Save is
+    // quiet here, so the action carries the filled primary style.
+    expect(emptyStateActionVariant(renderer)).toBe('default');
     expect(repoRows(renderer)).toHaveLength(0);
   });
 

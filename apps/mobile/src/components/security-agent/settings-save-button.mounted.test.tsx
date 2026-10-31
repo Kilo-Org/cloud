@@ -106,6 +106,22 @@ describe('SettingsSaveButton header cap', () => {
     expect(label.props.numberOfLines).toBeUndefined();
   });
 
+  it('only carries the filled primary style once there is a change to save', () => {
+    // A clean screen has nothing to save: the header action stays a quiet text
+    // control so it does not outshout the content's own way out.
+    const clean = classes(findSavePressable(render({ dirty: false })));
+    expect(clean).toContain('active:opacity-60');
+    expect(clean).not.toContain('bg-primary');
+
+    // An edit that is not valid yet cannot be saved either.
+    const invalid = classes(findSavePressable(render({ dirty: true, valid: false })));
+    expect(invalid).not.toContain('bg-primary');
+
+    // A pending change is the one state that earns the fill.
+    const pending = classes(findSavePressable(render({ dirty: true, valid: true })));
+    expect(pending).toContain('bg-primary');
+  });
+
   it('still saves and pops the screen when the button is pressed', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     const renderer = render({ onSave });

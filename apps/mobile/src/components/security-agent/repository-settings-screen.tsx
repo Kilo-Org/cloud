@@ -38,7 +38,6 @@ import {
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
 import { type FlattenedSecurityAgentConfig, type SecurityAgentConfig } from '@/lib/security-agent';
-import { cn } from '@/lib/utils';
 
 type RepositorySelectionMode = SecurityAgentConfig['repositorySelectionMode'];
 
@@ -296,16 +295,16 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               icon={FolderGit2}
               title={t('securityAgent.repositories.noRepositories')}
               description={t('securityAgent.repositories.noRepositoriesDescription')}
-              // The card surface and its 7%-white border vanish against the
-              // dark page, which left the state's only action and its tile
-              // outlined in near-black. Dark mode takes the raised neutral
-              // surface and the visible input border, the same pair the
-              // settings rows and the session search field use.
               iconContainerClassName="h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card dark:border-input dark:bg-secondary"
               action={
                 <Button
-                  className={cn(STATE_ACTION_CLASS, 'dark:border-input dark:bg-secondary')}
-                  variant="outline"
+                  className={STATE_ACTION_CLASS}
+                  // Widening the grant is the only way out of this state, and
+                  // the header's Save is quiet while the screen has nothing to
+                  // save. The action therefore carries the filled primary
+                  // style instead of an outlined one that recedes into the
+                  // page beside it.
+                  variant="default"
                   onPress={() => {
                     void manageAccess();
                   }}

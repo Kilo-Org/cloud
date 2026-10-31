@@ -1859,7 +1859,6 @@
       "repositoriesCount_one": "ကုဒ်သိုလှောင်ရာ {{displayCount}} ခု ရွေးထား",
       "repositoriesCount": "ကုဒ်သိုလှောင်ရာ {{displayCount}} ခု ရွေးချယ်ထား",
       "repositoriesCount_other": "ကုဒ်သိုလှောင်ရာ {{displayCount}} ခု ရွေးချယ်ထား",
-      "selectRepositoriesSubtitle": "လုံခြုံရေးအေးဂျင့် စောင့်ကြည့်မည့် ကုဒ်သိုလှောင်ရာများကို ရွေးပါ",
       "analysisModeSubtitle": "{{mode}} ခွဲခြမ်းစိတ်ဖြာမှု",
       "automationAllOff": "အားလုံး ပိတ်ထား",
       "automationCount": "3 ခုတွင် {{displayCount}} ခု ဖွင့်ထား",

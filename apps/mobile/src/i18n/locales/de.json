@@ -1469,8 +1469,7 @@
       "on": "Ein",
       "repositoriesCount": "{{displayCount}} Code-Repositories ausgewählt",
       "repositoriesCount_other": "{{displayCount}} Code-Repositories ausgewählt",
-      "repositoriesCount_one": "{{displayCount}} Repository ausgewählt",
-      "selectRepositoriesSubtitle": "Wähle aus, welche Repositories der Sicherheitsagent überwacht"
+      "repositoriesCount_one": "{{displayCount}} Repository ausgewählt"
     },
     "settingsSave": {
       "saveChanges": "Änderungen speichern",

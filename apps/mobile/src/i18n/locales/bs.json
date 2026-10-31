@@ -1884,7 +1884,6 @@
       "repositoriesCount_one": "Odabran {{displayCount}} repozitorij",
       "repositoriesCount": "Odabrano {{displayCount}} repozitorija",
       "repositoriesCount_other": "Odabrano {{displayCount}} repozitorija",
-      "selectRepositoriesSubtitle": "Odaberi repozitorije koje sigurnosni agent prati",
       "analysisModeSubtitle": "Način analize: {{mode}}",
       "automationAllOff": "Sve isključeno",
       "automationCount": "{{displayCount}} od 3 omogućeno",

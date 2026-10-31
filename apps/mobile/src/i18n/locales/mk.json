@@ -1859,7 +1859,6 @@
       "repositoriesCount_one": "{{displayCount}} избрано складиште",
       "repositoriesCount": "{{displayCount}} избрани репозиториуми",
       "repositoriesCount_other": "{{displayCount}} избрани репозиториуми",
-      "selectRepositoriesSubtitle": "Избери кои складишта ќе ги следи безбедносниот агент",
       "analysisModeSubtitle": "Анализа: {{mode}}",
       "automationAllOff": "Сè е исклучено",
       "automationCount": "{{displayCount}} од 3 овозможени",

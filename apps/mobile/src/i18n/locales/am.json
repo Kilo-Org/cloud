@@ -1859,7 +1859,6 @@
       "repositoriesCount_one": "{{displayCount}} ማከማቻ ተመርጧል",
       "repositoriesCount": "{{displayCount}} ማከማቻዎች ተመርጠዋል",
       "repositoriesCount_other": "{{displayCount}} ማከማቻዎች ተመርጠዋል",
-      "selectRepositoriesSubtitle": "የደህንነት ወኪል የሚከታተላቸውን ማከማቻዎች ይምረጡ",
       "analysisModeSubtitle": "{{mode}} ትንታኔ",
       "automationAllOff": "ሁሉም ተሰናክለዋል",
       "automationCount": "ከ3 ውስጥ {{displayCount}} ነቅተዋል",

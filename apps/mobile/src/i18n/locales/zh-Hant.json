@@ -1469,8 +1469,7 @@
       "on": "開啟",
       "repositoriesCount": "已選擇 {{displayCount}} 個存放庫",
       "repositoriesCount_other": "已選擇 {{displayCount}} 個存放庫",
-      "repositoriesCount_one": "已選取 {{displayCount}} 個存放庫",
-      "selectRepositoriesSubtitle": "選取要由資安代理程式監控的存放庫"
+      "repositoriesCount_one": "已選取 {{displayCount}} 個存放庫"
     },
     "settingsSave": {
       "saveChanges": "儲存變更",

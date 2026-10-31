@@ -1469,8 +1469,7 @@
       "on": "オン",
       "repositoriesCount": "{{displayCount}}件のリポジトリを選択中",
       "repositoriesCount_other": "{{displayCount}}件のリポジトリを選択中",
-      "repositoriesCount_one": "{{displayCount}}件のリポジトリを選択中",
-      "selectRepositoriesSubtitle": "セキュリティエージェントが監視するリポジトリを選択"
+      "repositoriesCount_one": "{{displayCount}}件のリポジトリを選択中"
     },
     "settingsSave": {
       "saveChanges": "変更を保存",

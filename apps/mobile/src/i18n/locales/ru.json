@@ -1484,7 +1484,6 @@
       "repositoriesCount": "Выбрано репозиториев: {{displayCount}}",
       "repositoriesCount_other": "Выбрано репозиториев: {{displayCount}}",
       "repositoriesCount_one": "Выбран {{displayCount}} репозиторий",
-      "selectRepositoriesSubtitle": "Выберите репозитории для отслеживания агентом безопасности",
       "repositoriesCount_few": "Выбрано {{displayCount}} репозитория",
       "repositoriesCount_many": "Выбрано {{displayCount}} репозиториев"
     },

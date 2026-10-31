@@ -1859,7 +1859,6 @@
       "repositoriesCount_one": "{{displayCount}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ କରାଯାଇଛି",
       "repositoriesCount": "{{displayCount}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ ହୋଇଛି",
       "repositoriesCount_other": "{{displayCount}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ ହୋଇଛି",
-      "selectRepositoriesSubtitle": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ କେଉଁ ରିପୋଜିଟୋରୀଗୁଡ଼ିକୁ ନଜରରେ ରଖିବ ତାହା ବାଛନ୍ତୁ",
       "analysisModeSubtitle": "{{mode}} ବିଶ୍ଳେଷଣ",
       "automationAllOff": "ସବୁ ବନ୍ଦ",
       "automationCount": "3ଟି ମଧ୍ୟରୁ {{displayCount}}ଟି ଚାଲୁ",

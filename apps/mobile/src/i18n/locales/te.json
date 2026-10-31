@@ -1859,7 +1859,6 @@
       "repositoriesCount_one": "{{displayCount}} రిపోజిటరీ ఎంచుకోబడింది",
       "repositoriesCount": "{{displayCount}} రిపోజిటరీలను ఎంచుకున్నారు",
       "repositoriesCount_other": "{{displayCount}} రిపోజిటరీలను ఎంచుకున్నారు",
-      "selectRepositoriesSubtitle": "భద్రతా ఏజెంట్ పర్యవేక్షించాల్సిన రిపోజిటరీలను ఎంచుకోండి",
       "analysisModeSubtitle": "{{mode}} విశ్లేషణ",
       "automationAllOff": "అన్నీ ఆఫ్",
       "automationCount": "3లో {{displayCount}} ప్రారంభించబడ్డాయి",

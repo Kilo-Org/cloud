@@ -1445,7 +1445,6 @@
       "repositoriesCount": "{{displayCount}} dépôts sélectionnés",
       "repositoriesCount_other": "{{displayCount}} dépôts sélectionnés",
       "repositoriesCount_one": "{{displayCount}} dépôt sélectionné",
-      "selectRepositoriesSubtitle": "Choisir les dépôts surveillés par l'agent de sécurité",
       "repositoriesCount_many": "{{displayCount}} dépôts sélectionnés"
     },
     "settingsSave": {

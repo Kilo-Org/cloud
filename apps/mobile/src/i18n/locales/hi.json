@@ -1469,8 +1469,7 @@
       "on": "चालू",
       "repositoriesCount": "चुनी गई रिपॉज़िटरी: {{displayCount}}",
       "repositoriesCount_other": "चुनी गई रिपॉज़िटरी: {{displayCount}}",
-      "repositoriesCount_one": "{{displayCount}} रिपॉज़िटरी चयनित",
-      "selectRepositoriesSubtitle": "चुनें कि सुरक्षा एजेंट किन रिपॉज़िटरी की निगरानी करे"
+      "repositoriesCount_one": "{{displayCount}} रिपॉज़िटरी चयनित"
     },
     "settingsSave": {
       "saveChanges": "बदलाव सहेजें",

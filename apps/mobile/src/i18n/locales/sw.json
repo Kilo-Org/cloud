@@ -1859,7 +1859,6 @@
       "repositoriesCount_one": "Hazina {{displayCount}} imechaguliwa",
       "repositoriesCount": "Hazina {{displayCount}} zimechaguliwa",
       "repositoriesCount_other": "Hazina {{displayCount}} zimechaguliwa",
-      "selectRepositoriesSubtitle": "Chagua hazina ambazo wakala wa usalama atafuatilia",
       "analysisModeSubtitle": "Uchambuzi wa {{mode}}",
       "automationAllOff": "Zote zimezimwa",
       "automationCount": "{{displayCount}} kati ya 3 zimewashwa",

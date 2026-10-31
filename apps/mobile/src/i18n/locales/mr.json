@@ -1859,7 +1859,6 @@
       "repositoriesCount_one": "{{displayCount}} रिपॉझिटरी निवडली",
       "repositoriesCount": "{{displayCount}} रिपॉझिटरी निवडल्या",
       "repositoriesCount_other": "{{displayCount}} रिपॉझिटरी निवडल्या",
-      "selectRepositoriesSubtitle": "सुरक्षा एजंटने कोणत्या रिपॉझिटरींचे निरीक्षण करायचे ते निवडा",
       "analysisModeSubtitle": "{{mode}} विश्लेषण",
       "automationAllOff": "सर्व बंद",
       "automationCount": "3 पैकी {{displayCount}} चालू",

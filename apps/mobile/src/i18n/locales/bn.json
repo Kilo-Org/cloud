@@ -1859,7 +1859,6 @@
       "repositoriesCount_one": "{{displayCount}}টি রিপোজিটরি নির্বাচিত",
       "repositoriesCount": "{{displayCount}}টি রিপোজিটরি নির্বাচিত",
       "repositoriesCount_other": "{{displayCount}}টি রিপোজিটরি নির্বাচিত",
-      "selectRepositoriesSubtitle": "নিরাপত্তা এজেন্ট কোন রিপোজিটরিগুলো পর্যবেক্ষণ করবে তা বেছে নিন",
       "analysisModeSubtitle": "{{mode}} বিশ্লেষণ",
       "automationAllOff": "সব বন্ধ",
       "automationCount": "৩টির মধ্যে {{displayCount}}টি চালু",

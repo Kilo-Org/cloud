@@ -1859,7 +1859,6 @@
       "repositoriesCount_one": "{{displayCount}} ذخیره غوره شوې",
       "repositoriesCount": "{{displayCount}} زېرمتونونه غوره شوي",
       "repositoriesCount_other": "{{displayCount}} زېرمتونونه غوره شوي",
-      "selectRepositoriesSubtitle": "هغه ذخیرې غوره کړئ چې امنیتي اجنټ یې څاري",
       "analysisModeSubtitle": "{{mode}} تحلیل",
       "automationAllOff": "ټول غیرفعال",
       "automationCount": "له 3 څخه {{displayCount}} فعال",

@@ -1445,7 +1445,6 @@
       "repositoriesCount": "{{displayCount}} repository selezionati",
       "repositoriesCount_other": "{{displayCount}} repository selezionati",
       "repositoriesCount_one": "{{displayCount}} repository selezionato",
-      "selectRepositoriesSubtitle": "Scegli i repository da monitorare con l'Agente di sicurezza",
       "repositoriesCount_many": "{{displayCount}} repository selezionati"
     },
     "settingsSave": {

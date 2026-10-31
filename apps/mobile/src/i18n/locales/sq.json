@@ -1859,7 +1859,6 @@
       "repositoriesCount_one": "{{displayCount}} depo e zgjedhur",
       "repositoriesCount": "{{displayCount}} depo të zgjedhura",
       "repositoriesCount_other": "{{displayCount}} depo të zgjedhura",
-      "selectRepositoriesSubtitle": "Zgjidh depot që monitoron agjenti i sigurisë",
       "analysisModeSubtitle": "Analiza {{mode}}",
       "automationAllOff": "Të gjitha të çaktivizuara",
       "automationCount": "{{displayCount}} nga 3 të aktivizuara",

@@ -1477,7 +1477,6 @@
       "repositoriesCount": "נבחרו {{displayCount}} מאגרים",
       "repositoriesCount_other": "נבחרו {{displayCount}} מאגרים",
       "repositoriesCount_one": "{{displayCount}} מאגר נבחר",
-      "selectRepositoriesSubtitle": "בחירת המאגרים שסוכן האבטחה יעקוב אחריהם",
       "repositoriesCount_two": "{{displayCount}} מאגרים נבחרו"
     },
     "settingsSave": {

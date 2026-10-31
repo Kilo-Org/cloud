@@ -1884,7 +1884,6 @@
       "repositoriesCount_one": "{{displayCount}} repositori seleccionat",
       "repositoriesCount": "{{displayCount}} repositoris seleccionats",
       "repositoriesCount_other": "{{displayCount}} repositoris seleccionats",
-      "selectRepositoriesSubtitle": "Tria quins repositoris supervisa l'agent de seguretat",
       "analysisModeSubtitle": "Anàlisi {{mode}}",
       "automationAllOff": "Tot desactivat",
       "automationCount": "{{displayCount}} de 3 activades",

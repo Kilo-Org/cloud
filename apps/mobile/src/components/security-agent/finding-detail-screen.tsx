@@ -30,6 +30,7 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/finding-detail-back';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { cn } from '@/lib/utils';
 
@@ -267,7 +268,11 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
             <Pressable
               key={key}
               className={cn(
-                'min-h-11 flex-1 items-center justify-center rounded-lg py-2 active:opacity-80',
+                // The strip is a segmented row: each tab carries the shared
+                // row floor on its own node so a tap anywhere in the tab's
+                // height lands, not just the label line.
+                ROW_TARGET_CLASS,
+                'flex-1 items-center justify-center rounded-lg py-2 active:opacity-80',
                 selected ? 'bg-primary' : 'bg-secondary'
               )}
               onPress={() => {

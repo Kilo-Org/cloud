@@ -5,11 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
-import {
-  initialWindowMetrics,
-  SafeAreaProvider,
-  SafeAreaView,
-} from 'react-native-safe-area-context';
+import { initialWindowMetrics } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
 import { PrReviewFileList } from '@/components/pr-review/diff/pr-diff-file-list';
@@ -277,16 +273,15 @@ export function PrReviewCopyFixture() {
   return (
     <QueryClientProvider client={queryClient}>
       <TRPCProvider trpcClient={client} queryClient={queryClient}>
-        {/* Startup metrics seed the insets, so the top spacer reserves its
-            space at first paint instead of growing when the native insets
-            arrive and pushing the whole surface down. */}
-        <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-          <View className="flex-1 bg-background">
-            <SafeAreaView edges={['top']} />
-            <View className="flex-1">{content}</View>
-            <SafeAreaView edges={['bottom']} />
-          </View>
-        </SafeAreaProvider>
+        {/* The spacers take their height from the startup window metrics, which
+            are known synchronously, so the surface reserves the safe area at
+            first paint instead of growing when the native insets arrive and
+            pushing everything below it down. */}
+        <View className="flex-1 bg-background">
+          <View style={{ height: initialWindowMetrics?.insets.top ?? 0 }} />
+          <View className="flex-1">{content}</View>
+          <View style={{ height: initialWindowMetrics?.insets.bottom ?? 0 }} />
+        </View>
       </TRPCProvider>
     </QueryClientProvider>
   );

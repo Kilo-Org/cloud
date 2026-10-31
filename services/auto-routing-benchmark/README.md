@@ -267,7 +267,7 @@ measurements are included in routing-table version hashes.
 - Admission uses the authenticated catalog for the benchmark identity, including its organization context.
 - Resumed runs preserve their saved user and organization scope. Configuration defaults do not replace a saved personal execution scope.
 - The worker applies the CLI's tool-support rule and validates exact reasoning variants before scheduling.
-- The worker also requires a catalog `context_length` of at least 32,768 tokens; the CLI harness prompt and the completion reserve overflow a smaller window on every case. Such a profile fails with a context-window reason before any paid call. An absent context length is admitted.
+- The drain also requires at least 20,000 input tokens after the completion budget the CLI reserves: catalog `context_length` minus `min(top_provider.max_completion_tokens || max_completion_tokens || 20% of the window, 32,000)`. The CLI harness prompt alone is about 16.6k tokens. A smaller pair is registered, then its profile fails with a context-window reason before any paid call. An absent context length is admitted.
 - Platform and owner pools share measurements for identical concrete model, variant, engine, and repetition settings.
 - Variants must contain explicit `reasoning.enabled` or `reasoning.effort` controls. Unrelated presets do not create benchmark entries.
 - A model without reasoning controls creates one `(model, null)` entry.

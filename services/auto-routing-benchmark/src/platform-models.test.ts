@@ -5,7 +5,7 @@ import {
   benchmarkPairUnavailableReason,
   CATALOG_CONTEXT_TOO_SMALL_REASON,
   CATALOG_PAIR_UNAVAILABLE_REASON,
-  MIN_BENCHMARK_CONTEXT_LENGTH,
+  MIN_BENCHMARK_INPUT_TOKENS,
   catalogCandidatePrices,
   catalogModelProviders,
   fetchBenchmarkModelCatalog,
@@ -272,28 +272,48 @@ describe('platform catalog expansion', () => {
     ).toEqual([{ model: 'tools/model', variant: null }]);
   });
 
-  it('rejects a context window below the harness floor with its own reason', () => {
+  it('rejects a window whose input room after the CLI completion reservation is too small', () => {
     const executable = BenchmarkModelCatalogSchema.parse({
       data: [
-        { id: 'small/model', context_length: MIN_BENCHMARK_CONTEXT_LENGTH - 1 },
-        { id: 'floor/model', context_length: MIN_BENCHMARK_CONTEXT_LENGTH },
-        { id: 'unknown/model', context_length: null },
-        { id: 'malformed/model', context_length: 'wide' },
         {
-          id: 'small-reasoning/model',
+          id: 'reka-like/model',
           context_length: 16_384,
+          top_provider: { max_completion_tokens: 14_745 },
           opencode: { variants: { high: { reasoning: { effort: 'high' } } } },
         },
+        {
+          id: 'reserved/model',
+          context_length: 32_768,
+          top_provider: { max_completion_tokens: 29_000 },
+        },
+        {
+          id: 'capped/model',
+          context_length: 32_000 + MIN_BENCHMARK_INPUT_TOKENS,
+          max_completion_tokens: 1_000_000,
+        },
+        { id: 'default-reserve/model', context_length: 25_000 },
+        {
+          id: 'roomy/model',
+          context_length: 32_768,
+          top_provider: { max_completion_tokens: 8_192 },
+        },
+        { id: 'unknown/model', context_length: null },
+        { id: 'malformed/model', context_length: 'wide' },
       ],
     });
     const reason = (model: string, variant: string | null = null) =>
       benchmarkPairUnavailableReason(executable, { model, variant });
-    expect(reason('small/model')).toBe(CATALOG_CONTEXT_TOO_SMALL_REASON);
-    expect(reason('small-reasoning/model', 'high')).toBe(CATALOG_CONTEXT_TOO_SMALL_REASON);
-    expect(reason('floor/model')).toBeNull();
+    expect(reason('reka-like/model', 'high')).toBe(CATALOG_CONTEXT_TOO_SMALL_REASON);
+    expect(reason('reserved/model')).toBe(CATALOG_CONTEXT_TOO_SMALL_REASON);
+    expect(reason('capped/model')).toBeNull();
+    expect(reason('default-reserve/model')).toBeNull();
+    expect(reason('roomy/model')).toBeNull();
     expect(reason('unknown/model')).toBeNull();
     expect(reason('malformed/model')).toBeNull();
     expect(reason('missing/model')).toBe(CATALOG_PAIR_UNAVAILABLE_REASON);
+    expect(
+      catalogSupportsBenchmarkPair(executable, { model: 'reserved/model', variant: null })
+    ).toBe(true);
   });
 
   it('does not execute an alias whose concrete target is absent', () => {

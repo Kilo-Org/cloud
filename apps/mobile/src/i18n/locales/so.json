@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Waxaa laga yaabaa inaad u baahato inaad oggolaato gelitaanka kooxo ama mashaariic dheeraad ah oo ku jira GitLab.",
       "installGithubApp": "Abka GitHub ku rakib kaydadka",
       "installGithubAppDescription": "U oggolow abka Kilo ee GitHub inuu galo kaydadka aad rabto in dib loo eego.",
-      "repositoryAccess": "oggolaanshaha gelitaanka kaydka"
+      "repositoryAccess": "oggolaanshaha gelitaanka kaydka",
+      "allModePersonal": "Kayd kasta oo Kilo ka heli karo xiriirkaaga GitHub waa dib loo eegaa si otomaatig ah.",
+      "allModeOrganization": "Kayd kasta oo Kilo ka heli karo xiriirka GitHub ee ururka waa dib loo eegaa si otomaatig ah.",
+      "allModeCount": "Kaydadka la heli karo: {{displayCount}}"
     },
     "style": {
       "title": "Qaabka dib-u-eegista",

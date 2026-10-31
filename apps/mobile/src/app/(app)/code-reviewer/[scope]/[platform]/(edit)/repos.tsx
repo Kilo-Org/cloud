@@ -12,9 +12,11 @@ import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
+import {
+  AllRepositoriesSummary,
+  RepositoryModeChoice,
+} from '@/components/code-reviewer/repository-selection-mode';
 import { Button } from '@/components/ui/button';
-import { ChoiceRow } from '@/components/ui/choice-row';
-import { RadioGroup } from '@/components/ui/radio-group';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -24,6 +26,7 @@ import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewe
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import {
+  isPersonal,
   useBitbucketReadiness,
   useGitHubRepositories,
   useGitLabRepositories,
@@ -61,7 +64,7 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
   const { t } = useTranslation();
   const capabilities = PLATFORM_CAPABILITIES[platform];
   const mode = data?.repositorySelectionMode ?? 'all';
-  const githubRepos = useGitHubRepositories(scope, platform === 'github' && mode === 'selected');
+  const githubRepos = useGitHubRepositories(scope, platform === 'github');
   const gitlabRepos = useGitLabRepositories(scope, platform === 'gitlab');
   const bitbucketReadiness = useBitbucketReadiness(scope);
   const bitbucketRepos =
@@ -97,6 +100,11 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
 
   const selectedIds = data?.selectedRepositoryIds ?? [];
   const configDisabled = data == null;
+  // Only GitHub offers the all/selected choice, and the config read decides
+  // which body is real: an explanation shown while it is pending would
+  // describe a mode the saved config may not be in.
+  const allMode = capabilities.selectionModePicker && mode === 'all';
+  const allModeBody = allMode && !configDisabled;
   const bitbucketNotReady =
     platform === 'bitbucket' && bitbucketReadiness.data?.repositoryCache.status !== 'available';
   const confirmedEmpty =
@@ -227,8 +235,15 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     );
   }
 
-  const showRepositoryFooter =
-    !reposLoading && !reposError && !bitbucketNotReady && repoRows.length > 0;
+  // In all mode the footer follows the explanation, so it waits for the config
+  // read with it: a footer that appeared first would be pushed down when the
+  // block above it arrives.
+  const showFooter =
+    !reposLoading &&
+    !reposError &&
+    !bitbucketNotReady &&
+    repoRows.length > 0 &&
+    (!allMode || !configDisabled);
 
   return (
     <View className="flex-1 bg-background">
@@ -244,24 +259,19 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
           }
         >
           {capabilities.selectionModePicker && (
-            <RadioGroup label={t('common.repositories')}>
-              {(['all', 'selected'] as const).map(option => (
-                <ChoiceRow
-                  key={option}
-                  label={
-                    option === 'all'
-                      ? t('common.allRepositories')
-                      : t('common.selectedRepositories')
-                  }
-                  selected={mode === option}
-                  disabled={configDisabled}
-                  className="border-b-[0.5px] border-hair-soft"
-                  onPress={() => {
-                    setMode(option);
-                  }}
-                />
-              ))}
-            </RadioGroup>
+            <RepositoryModeChoice mode={mode} disabled={configDisabled} onSelect={setMode} />
+          )}
+
+          {allModeBody && (
+            <AllRepositoriesSummary
+              personal={isPersonal(scope)}
+              loading={reposLoading}
+              // The skeleton, the error and the empty state own the body when
+              // the snapshot is not a count yet.
+              count={reposLoading || reposError || confirmedEmpty ? null : repoRows.length}
+            >
+              {repoState}
+            </AllRepositoriesSummary>
           )}
 
           {(!capabilities.selectionModePicker || mode === 'selected') && (
@@ -287,16 +297,16 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
                   }}
                 />
               ))}
-
-              {showRepositoryFooter && (
-                <RepositorySyncFooter
-                  syncedLabel={syncedLabel}
-                  refreshing={refreshing}
-                  onRefresh={refreshRepositories}
-                  manageAccess={manageAccess}
-                />
-              )}
             </View>
+          )}
+
+          {showFooter && (
+            <RepositorySyncFooter
+              syncedLabel={syncedLabel}
+              refreshing={refreshing}
+              onRefresh={refreshRepositories}
+              manageAccess={manageAccess}
+            />
           )}
         </TabScreenScrollView>
       )}

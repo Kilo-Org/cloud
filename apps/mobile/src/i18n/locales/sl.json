@@ -1471,7 +1471,10 @@
       "gitlabNoRepositoriesDescription": "Morda moraš odobriti dostop do več skupin ali projektov na platformi GitLab.",
       "installGithubApp": "Namestitev aplikacije GitHub v skladišča",
       "installGithubAppDescription": "Aplikaciji Kilo za GitHub odobri dostop do skladišč, ki jih želiš pregledati.",
-      "repositoryAccess": "dostop do skladišč"
+      "repositoryAccess": "dostop do skladišč",
+      "allModePersonal": "Vsako skladišče, do katerega lahko Kilo dostopa prek tvoje povezave z GitHubom, se samodejno pregleda.",
+      "allModeOrganization": "Vsako skladišče, do katerega lahko Kilo dostopa prek povezave organizacije z GitHubom, se samodejno pregleda.",
+      "allModeCount": "Razpoložljiva skladišča: {{displayCount}}"
     },
     "style": {
       "title": "Slog pregleda",

@@ -910,7 +910,10 @@
       "gitlabNoRepositoriesDescription": "قد تحتاج إلى منح صلاحية الوصول إلى مزيد من المجموعات أو المشاريع على GitLab.",
       "installGithubApp": "ثبّت تطبيق GitHub على المستودعات",
       "installGithubAppDescription": "امنح تطبيق Kilo على GitHub صلاحية الوصول إلى المستودعات التي تريد مراجعتها.",
-      "repositoryAccess": "الوصول إلى المستودع"
+      "repositoryAccess": "الوصول إلى المستودع",
+      "allModePersonal": "تُراجع تلقائيًا كلُّ مستودع يمكن لـ Kilo الوصول إليه عبر اتصالك بـ GitHub.",
+      "allModeOrganization": "تُراجع تلقائيًا كلُّ مستودع يمكن لـ Kilo الوصول إليه عبر اتصال المؤسسة بـ GitHub.",
+      "allModeCount": "المستودعات المتاحة: {{displayCount}}"
     },
     "style": {
       "title": "أسلوب المراجعة",

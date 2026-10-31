@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Може да се наложи да предоставиш достъп до повече групи или проекти в GitLab.",
       "installGithubApp": "Инсталирай приложението за GitHub в хранилищата",
       "installGithubAppDescription": "Предостави на приложението на Kilo за GitHub достъп до хранилищата, които искаш да бъдат преглеждани.",
-      "repositoryAccess": "достъп до хранилища"
+      "repositoryAccess": "достъп до хранилища",
+      "allModePersonal": "Всяко хранилище, до което Kilo има достъп чрез твоята GitHub връзка, се преглежда автоматично.",
+      "allModeOrganization": "Всяко хранилище, до което Kilo има достъп чрез GitHub връзката на организацията, се преглежда автоматично.",
+      "allModeCount": "Налични хранилища: {{displayCount}}"
     },
     "style": {
       "title": "Стил на прегледа",

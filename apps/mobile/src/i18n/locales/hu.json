@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Lehet, hogy több csoporthoz vagy projekthez kell hozzáférést adnod a GitLabon.",
       "installGithubApp": "GitHub-alkalmazás telepítése a kódtárakhoz",
       "installGithubAppDescription": "Adj hozzáférést a Kilo GitHub-alkalmazásnak az ellenőrizni kívánt kódtárakhoz.",
-      "repositoryAccess": "hozzáférés a kódtárakhoz"
+      "repositoryAccess": "hozzáférés a kódtárakhoz",
+      "allModePersonal": "A Kilo a GitHub-kapcsolatodon keresztül elérhető összes kódtárat automatikusan ellenőrzi.",
+      "allModeOrganization": "A Kilo a szervezet GitHub-kapcsolatán keresztül elérhető összes kódtárat automatikusan ellenőrzi.",
+      "allModeCount": "Elérhető kódtárak: {{displayCount}}"
     },
     "style": {
       "title": "Ellenőrzési stílus",

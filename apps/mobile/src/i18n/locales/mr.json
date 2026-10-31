@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLab वरील आणखी गट किंवा प्रकल्पांसाठी प्रवेशाची परवानगी द्यावी लागू शकते.",
       "installGithubApp": "रिपॉझिटरींसाठी GitHub ॲप इन्स्टॉल करा",
       "installGithubAppDescription": "ज्या रिपॉझिटरींचे पुनरावलोकन हवे आहे, त्यांमध्ये Kilo GitHub ॲपला प्रवेश द्या.",
-      "repositoryAccess": "रिपॉझिटरीमधील प्रवेश"
+      "repositoryAccess": "रिपॉझिटरीमधील प्रवेश",
+      "allModePersonal": "तुमच्या GitHub कनेक्शनद्वारे Kilo प्रवेश करू शकते अशा प्रत्येक रिपॉझिटरीचे पुनरावलोकन स्वयंचलितपणे केले जाते.",
+      "allModeOrganization": "संस्थेच्या GitHub कनेक्शनद्वारे Kilo प्रवेश करू शकते अशा प्रत्येक रिपॉझिटरीचे पुनरावलोकन स्वयंचलितपणे केले जाते.",
+      "allModeCount": "उपलब्ध रिपॉझिटरी: {{displayCount}}"
     },
     "style": {
       "title": "समीक्षेची शैली",

@@ -1449,7 +1449,10 @@
       "gitlabNoRepositoriesDescription": "S-ar putea să fie nevoie să acorzi acces la mai multe grupuri sau proiecte pe GitLab.",
       "installGithubApp": "Instalează aplicația GitHub pe depozite",
       "installGithubAppDescription": "Acordă aplicației Kilo pentru GitHub acces la depozitele pe care vrei să le revizuiască.",
-      "repositoryAccess": "acces la depozit"
+      "repositoryAccess": "acces la depozit",
+      "allModePersonal": "Fiecare depozit pe care Kilo îl poate accesa prin conexiunea ta GitHub este revizuit automat.",
+      "allModeOrganization": "Fiecare depozit pe care Kilo îl poate accesa prin conexiunea GitHub a organizației este revizuit automat.",
+      "allModeCount": "Depozite disponibile: {{displayCount}}"
     },
     "style": {
       "title": "Stil de revizuire",

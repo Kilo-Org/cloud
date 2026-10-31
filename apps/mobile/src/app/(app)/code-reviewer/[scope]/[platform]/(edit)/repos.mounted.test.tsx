@@ -24,9 +24,12 @@ type ButtonPressProps = { onPress?: () => void; loading?: boolean; disabled?: bo
 type PullControl = { props: { onRefresh?: () => void; refreshing?: boolean } };
 
 const state = vi.hoisted(() => ({
+  scope: 'org-1',
   platform: 'github' as 'github' | 'gitlab' | 'bitbucket',
   repositories: [] as { id: number; fullName: string; private: boolean }[],
   syncedAt: null as string | null,
+  reposLoading: false,
+  reposError: false,
   resync: vi.fn(() => Promise.resolve()),
   resyncing: false,
   readinessRefetch: vi.fn(),
@@ -50,7 +53,7 @@ vi.mock('expo-router', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-reviewer-route-params', () => ({
-  useReviewerRouteParams: () => ({ scope: 'org-1', platform: state.platform }),
+  useReviewerRouteParams: () => ({ scope: state.scope, platform: state.platform }),
 }));
 
 vi.mock('react-native', () => ({
@@ -128,11 +131,12 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   PERSONAL_SCOPE: 'personal',
+  isPersonal: (scope: string) => scope === 'personal',
   useReviewConfig: () => state.config,
   useSaveReviewConfig: () => ({ mutate: vi.fn() }),
   useGitHubRepositories: () => ({
-    isLoading: false,
-    isError: false,
+    isLoading: state.reposLoading,
+    isError: state.reposError,
     isFetching: false,
     refetch: vi.fn(),
     data: {
@@ -141,8 +145,8 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     },
   }),
   useGitLabRepositories: () => ({
-    isLoading: false,
-    isError: false,
+    isLoading: state.reposLoading,
+    isError: state.reposError,
     isFetching: false,
     refetch: vi.fn(),
     data: {
@@ -211,9 +215,12 @@ function pullControl(renderer: Mounted['renderer']) {
 }
 
 beforeEach(() => {
+  state.scope = 'org-1';
   state.platform = 'github';
   state.repositories = REPOSITORIES;
   state.syncedAt = '2026-10-20T06:04:13.436632+00';
+  state.reposLoading = false;
+  state.reposError = false;
   state.resync.mockClear();
   state.resyncing = false;
   state.readinessRefetch.mockClear();
@@ -436,6 +443,121 @@ describe('repository picker config read states', () => {
     );
 
     expect(state.queryErrorProps).toHaveLength(0);
+    unmount();
+  });
+});
+
+// "All repositories" reviews every repository the connected GitHub app can
+// reach, so the body it leaves has to say what the choice covers and how many
+// repositories it counts, and keep the sync footer that widens that access.
+describe('all repositories mode body', () => {
+  const PERSONAL_EXPLANATION =
+    'Every repository Kilo can access through your GitHub connection is reviewed automatically.';
+  const ORGANIZATION_EXPLANATION =
+    "Every repository Kilo can access through the organization's GitHub connection is reviewed automatically.";
+
+  function texts(renderer: Mounted['renderer']) {
+    return renderer.root
+      .findAll(node => String(node.type) === 'Text')
+      .map(node => node.props.children)
+      .filter((text): text is string => typeof text === 'string');
+  }
+
+  const countLines = (renderer: Mounted['renderer']) =>
+    texts(renderer).filter(text => text.startsWith('Repositories available'));
+
+  beforeEach(() => {
+    state.config.data = { repositorySelectionMode: 'all', selectedRepositoryIds: [] };
+  });
+
+  it('explains the choice and counts the snapshot it covers', async () => {
+    state.scope = 'personal';
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => texts(renderer).includes(PERSONAL_EXPLANATION));
+
+    expect(countLines(renderer)).toEqual(['Repositories available: 2']);
+    // Every repository is reviewed, so there is no list to toggle.
+    expect(renderer.root.findAll(node => String(node.type) === 'RepoToggleRow')).toHaveLength(0);
+    unmount();
+  });
+
+  it('names the organization connection on an organization scope', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => texts(renderer).includes(ORGANIZATION_EXPLANATION));
+
+    expect(texts(renderer)).not.toContain(PERSONAL_EXPLANATION);
+    unmount();
+  });
+
+  it('keeps the sync footer that re-reads and widens the access it counts', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => texts(renderer).includes(ORGANIZATION_EXPLANATION));
+
+    expect(buttons(renderer).map(candidate => candidate.label)).toEqual([
+      'Refresh',
+      'Manage access',
+    ]);
+    expect(texts(renderer)).toContain('Last synced 2 days ago');
+    unmount();
+  });
+
+  it('reserves the count line while the snapshot is loading', async () => {
+    state.reposLoading = true;
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => texts(renderer).includes(ORGANIZATION_EXPLANATION));
+
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(1);
+    expect(countLines(renderer)).toEqual([]);
+    // The footer of a list that has not answered yet is not drawn.
+    expect(button(renderer, 'Refresh')).toBeUndefined();
+    unmount();
+  });
+
+  it('offers the way out when the connection reaches no repository', async () => {
+    state.repositories = [];
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(
+      () => renderer.root.findAll(node => String(node.type) === 'EmptyState').length === 1
+    );
+
+    expect(countLines(renderer)).toEqual([]);
+    expect(button(renderer, 'Manage access')).toBeDefined();
+    expect(button(renderer, 'Refresh')).toBeUndefined();
+    unmount();
+  });
+
+  it('keeps the repositories error below the explanation', async () => {
+    state.reposError = true;
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => state.queryErrorProps.length > 0);
+
+    expect(texts(renderer)).toContain(ORGANIZATION_EXPLANATION);
+    expect(countLines(renderer)).toEqual([]);
+    unmount();
+  });
+
+  it('describes the mode only after the config read settles', async () => {
+    state.config.data = null;
+    state.config.isFetching = true;
+    state.config.fetchStatus = 'fetching';
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(
+      () => renderer.root.findAll(node => String(node.type) === 'ChoiceRow').length === 2
+    );
+
+    // The mode shown while the config is pending is only the default; a saved
+    // selected-mode account must not read a sentence about all repositories,
+    // and the footer must not sit above a block that arrives after it.
+    expect(texts(renderer)).not.toContain(ORGANIZATION_EXPLANATION);
+    expect(texts(renderer)).not.toContain(PERSONAL_EXPLANATION);
+    expect(button(renderer, 'Refresh')).toBeUndefined();
     unmount();
   });
 });

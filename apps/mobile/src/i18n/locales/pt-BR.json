@@ -869,7 +869,10 @@
       "gitlabNoRepositoriesDescription": "Talvez você precise conceder acesso a mais grupos ou projetos no GitLab.",
       "installGithubApp": "Instalar o app do GitHub nos repositórios",
       "installGithubAppDescription": "Conceda ao app do Kilo no GitHub acesso aos repositórios que você quer revisar.",
-      "repositoryAccess": "acesso ao repositório"
+      "repositoryAccess": "acesso ao repositório",
+      "allModePersonal": "Todo repositório que o Kilo consegue acessar pela sua conexão do GitHub é revisado automaticamente.",
+      "allModeOrganization": "Todo repositório que o Kilo consegue acessar pela conexão do GitHub da organização é revisado automaticamente.",
+      "allModeCount": "Repositórios disponíveis: {{displayCount}}"
     },
     "style": {
       "title": "Estilo de revisão",

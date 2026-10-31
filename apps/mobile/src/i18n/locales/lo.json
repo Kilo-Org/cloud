@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "ເຈົ້າອາດຕ້ອງໃຫ້ສິດເຂົ້າເຖິງກຸ່ມ ຫຼື ໂຄງການເພີ່ມໃນ GitLab.",
       "installGithubApp": "ຕິດຕັ້ງແອັບ GitHub ໃນຄັງໂຄ້ດ",
       "installGithubAppDescription": "ໃຫ້ສິດແອັບ GitHub ຂອງ Kilo ເຂົ້າເຖິງຄັງໂຄ້ດທີ່ເຈົ້າຕ້ອງການໃຫ້ກວດທານ.",
-      "repositoryAccess": "ສິດເຂົ້າເຖິງຄັງໂຄ້ດ"
+      "repositoryAccess": "ສິດເຂົ້າເຖິງຄັງໂຄ້ດ",
+      "allModePersonal": "ທຸກຄັງໂຄ້ດທີ່ Kilo ສາມາດເຂົ້າເຖິງໄດ້ຜ່ານການເຊື່ອມຕໍ່ GitHub ຂອງເຈົ້າ ຈະຖືກກວດທານອັດຕະໂນມັດ.",
+      "allModeOrganization": "ທຸກຄັງໂຄ້ດທີ່ Kilo ສາມາດເຂົ້າເຖິງໄດ້ຜ່ານການເຊື່ອມຕໍ່ GitHub ຂອງອົງກອນ ຈະຖືກກວດທານອັດຕະໂນມັດ.",
+      "allModeCount": "ຄັງໂຄ້ດທີ່ມີຢູ່: {{displayCount}}"
     },
     "style": {
       "title": "ຮູບແບບການກວດສອບ",

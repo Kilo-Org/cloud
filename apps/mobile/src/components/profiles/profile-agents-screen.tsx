@@ -75,9 +75,7 @@ function AgentRowView({
   const visibilityLabel = t(AGENT_VISIBILITY_LABEL_KEYS[visibility]);
   return (
     <View className="min-h-16 flex-row items-start gap-1 rounded-lg bg-secondary px-3 py-2">
-      <ProfileRowIdentity
-        label={profileRowLabel(name, slug, visibilityLabel, model, description)}
-      >
+      <ProfileRowIdentity label={profileRowLabel(name, slug, visibilityLabel, model, description)}>
         <View className="flex-row flex-wrap items-center gap-2">
           <Bot size={16} color={colors.mutedForeground} />
           <Text className="text-sm font-medium text-foreground" numberOfLines={1}>

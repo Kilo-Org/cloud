@@ -47,9 +47,7 @@ export function McpServerRowView({
           <Text variant="mono" numberOfLines={1} className="shrink">
             {server.name}
           </Text>
-          <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-            {typeLabel}
-          </Text>
+          <Text className="text-xs uppercase tracking-wide text-muted-foreground">{typeLabel}</Text>
           {secretCount > 0 ? (
             <View className="flex-row items-center gap-0.5">
               <Lock size={12} color={colors.mutedForeground} />

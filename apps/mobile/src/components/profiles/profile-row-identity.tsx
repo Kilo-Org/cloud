@@ -19,7 +19,12 @@ export function ProfileRowIdentity({
   children,
 }: Readonly<{ label: string; children?: ReactNode }>) {
   return (
-    <View accessible accessibilityRole="text" accessibilityLabel={label} className={ROW_IDENTITY_CLASS}>
+    <View
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={label}
+      className={ROW_IDENTITY_CLASS}
+    >
       <View
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"

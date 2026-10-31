@@ -101,7 +101,7 @@ function SlaDayRow({
         disabled && 'opacity-50'
       )}
     >
-      <View className="flex-1 pr-3">
+      <View className="min-w-0 flex-1 pe-3">
         <Text className="text-sm font-medium">{label}</Text>
         <Text variant="muted" className="text-xs">
           {description}

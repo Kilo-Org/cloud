@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   InputAccessoryView,
@@ -34,6 +34,13 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 // The multiline editor's keyboard has no Done key on iOS (return inserts a
 // newline), so a covered Save left no keyboard-adjacent way out. The accessory
 // bar rides above the IME and dismisses it.
+//
+// The field and the bar pair through one id per mounted editor, not one id for
+// every copy of the screen: iOS binds an accessory to the first text input in
+// the window whose `inputAccessoryViewID` matches, once, when the bar enters
+// the window (RCTInputAccessoryComponentView.didMoveToWindow). A constant id
+// therefore lets one mounted editor take the bar of another, which then has no
+// bar above its own keyboard at all.
 const INSTRUCTIONS_DONE_ACCESSORY_ID = 'instructions-editor-done';
 
 function InstructionsEditor({
@@ -56,6 +63,9 @@ function InstructionsEditor({
 }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  // Stable for this mount and distinct from every other mounted editor, so the
+  // bar below can only bind to this editor's field.
+  const accessoryId = `${INSTRUCTIONS_DONE_ACCESSORY_ID}${useId()}`;
   // A stored value taller than the capped field opens at the platform caret,
   // which sits at its end: the value's first line is then out of sight, the
   // symptom #7892 removed for a field that grew with its value. Once the field
@@ -123,7 +133,7 @@ function InstructionsEditor({
         accessibilityLabel={t('codeReviewer.instructions.title')}
         multiline
         textAlignVertical="top"
-        inputAccessoryViewID={INSTRUCTIONS_DONE_ACCESSORY_ID}
+        inputAccessoryViewID={accessoryId}
         placeholder={t('codeReviewer.instructions.placeholder')}
         defaultValue={initial}
         onChangeText={text => {
@@ -133,7 +143,7 @@ function InstructionsEditor({
         }}
       />
       {/* eslint-disable-next-line typescript-eslint/no-deprecated -- the iOS Done bar needs the keyboard accessory view this SDK still exports */}
-      <InputAccessoryView nativeID={INSTRUCTIONS_DONE_ACCESSORY_ID}>
+      <InputAccessoryView nativeID={accessoryId}>
         <View className="flex-row justify-end bg-background px-4 py-2">
           <Pressable
             accessibilityRole="button"

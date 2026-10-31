@@ -11,9 +11,12 @@
  * Both carriers must land on one OS notification, so the app posts under the
  * shared contract: the same `kilo-needs-input:*` category id, the same
  * `needs-input` Android channel, the same `cloud_agent_session` `data`
- * payload the push carries, and the same iOS interruption level. That is also
- * why the plan is keyed on a stable per-session identifier — a later plan for
- * the same session replaces the notification instead of stacking a second one.
+ * payload the push carries, and the same iOS interruption level. The copy
+ * follows the user's message-preview choice exactly as the push's copy does:
+ * `full` shows the session title, and `generic` uses the shared generic copy
+ * from `genericPushContentForPushData`. That is also why the plan is keyed on a
+ * stable per-session identifier — a later plan for the same session replaces
+ * the notification instead of stacking a second one.
  *
  * Everything here uses `expo-notifications` APIs that behave identically on
  * both platforms: the Android channel comes from the shared channel contract
@@ -33,6 +36,7 @@ import { type AppState } from 'react-native';
 
 import {
   androidChannelIdForPushData,
+  genericPushContentForPushData,
   needsInputCategoryId,
   type PushData,
 } from '@kilocode/notifications';
@@ -41,10 +45,18 @@ import { type CachedActiveSession, isAttentionStatus } from '@/lib/active-sessio
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
-import { i18n } from '@/i18n';
+import { getLanguageSnapshot, i18n } from '@/i18n';
 
 /** The two raise kinds a cached row can be in. */
 type NeedsInputAttentionKind = 'question' | 'permission';
+
+/**
+ * The user's message-preview choice, mirroring the server's
+ * `notification_previews` column: `full` shows the session title, and `generic`
+ * — the server's default, and the fallback here — shows the shared generic
+ * copy.
+ */
+export type NotificationPreviews = 'generic' | 'full';
 
 /** One published notification, as the next plan remembers it. */
 export type NeedsInputNotificationRow = {
@@ -53,6 +65,12 @@ export type NeedsInputNotificationRow = {
   kind: NeedsInputAttentionKind;
   prUrl: string | null;
   organizationId: string | null;
+  /**
+   * The preview mode the notification was posted with, so a preference change
+   * re-posts the standing notification with the new copy instead of leaving the
+   * previous copy in place.
+   */
+  previews: NotificationPreviews;
 };
 
 export type NeedsInputNotificationPlan = {
@@ -108,6 +126,15 @@ export type NeedsInputPlanInput = {
    * falling back to ON would alert a category the user turned off.
    */
   attentionEnabled: boolean | undefined;
+  /**
+   * The user's message-preview choice, from the same server-resolved row: the
+   * server push shows the session title only for `full`, and both carriers land
+   * on one OS notification, so the app-owned post follows the same rule.
+   * `undefined` while the row has not loaded, and for a legacy snapshot that
+   * predates the column: the plan then posts the server's own default,
+   * `generic`.
+   */
+  previews?: NotificationPreviews;
 };
 
 /** The identifier a session's needs-input notification is posted and replaced under. */
@@ -192,7 +219,8 @@ export function shouldPublishForSession({
 
 function toNotificationRow(
   row: CachedActiveSession,
-  kind: NeedsInputAttentionKind
+  kind: NeedsInputAttentionKind,
+  previews: NotificationPreviews
 ): NeedsInputNotificationRow {
   return {
     sessionId: row.id,
@@ -203,6 +231,7 @@ function toNotificationRow(
     kind,
     prUrl: row.associatedPr?.url ?? null,
     organizationId: row.organizationId ?? null,
+    previews,
   };
 }
 
@@ -226,6 +255,7 @@ export function planNeedsInputNotifications({
   pathname,
   appState,
   attentionEnabled,
+  previews,
 }: NeedsInputPlanInput): NeedsInputNotificationPlan {
   const attention = new Map<string, { row: CachedActiveSession; kind: NeedsInputAttentionKind }>();
   for (const row of next) {
@@ -261,20 +291,27 @@ export function planNeedsInputNotifications({
 
   const publish: NeedsInputNotificationRow[] = [];
   if (presentsAttention) {
+    // An unloaded preference row (or a legacy snapshot without the column)
+    // posts the server's own default, `generic`: the fallback then matches what
+    // the server push would show, and unlike the attention gate it never
+    // withholds a post the user still wants.
+    const copyPreviews: NotificationPreviews = previews ?? 'generic';
     for (const [sessionId, { row, kind }] of attention) {
       const notifiedRow = alreadyNotified.has(sessionId)
         ? previous.find(previousRow => previousRow.sessionId === sessionId)
         : undefined;
       // An already-notified raise is still waiting under its standing
-      // notification. Re-publish in place only when the action-relevant shape
-      // changed: the kind moved, or the associated PR appeared or changed. A
-      // raise posted before the PR link reached the cache would otherwise never
-      // offer Open PR, and a kind flip would keep offering the wrong controls.
-      if (
-        shouldPublishForSession({ appState, pathname, sessionId }) &&
-        needsRepublish(notifiedRow, row, kind)
-      ) {
-        publish.push(toNotificationRow(row, kind));
+      // notification. Re-publish in place only when the shape the notification
+      // carries changed: the kind moved, the associated PR appeared or changed,
+      // or the preview choice did. A raise posted before the PR link reached the
+      // cache would otherwise never offer Open PR, a kind flip would keep
+      // offering the wrong controls, and a preference change would wait for the
+      // raise's next status change to reach the notification.
+      if (shouldPublishForSession({ appState, pathname, sessionId })) {
+        const candidate = toNotificationRow(row, kind, copyPreviews);
+        if (needsRepublish(notifiedRow, candidate)) {
+          publish.push(candidate);
+        }
       }
     }
   }
@@ -296,19 +333,25 @@ export function planNeedsInputNotifications({
 
 /**
  * Whether a still-waiting raise's standing notification must be re-published in
- * place: never notified, or its action-relevant shape moved — the kind, or the
- * associated PR link the notification's Open PR action carries.
+ * place: never notified, or the copy and controls it carries moved — the kind,
+ * the associated PR link the notification's Open PR action carries, the preview
+ * choice, or, under `full` previews, the title the notification displays. The
+ * title is compared only where it is shown: a raise that first posted while the
+ * backend default title was still in place keeps that fallback until something
+ * else re-publishes it, unless the title counts here.
  */
 function needsRepublish(
   notifiedRow: NeedsInputNotificationRow | undefined,
-  row: CachedActiveSession,
-  kind: NeedsInputAttentionKind
+  next: NeedsInputNotificationRow
 ): boolean {
   if (notifiedRow === undefined) {
     return true;
   }
   return (
-    notifiedRow.kind !== kind || (notifiedRow.prUrl ?? null) !== (row.associatedPr?.url ?? null)
+    notifiedRow.kind !== next.kind ||
+    notifiedRow.prUrl !== next.prUrl ||
+    notifiedRow.previews !== next.previews ||
+    (next.previews === 'full' && notifiedRow.title !== next.title)
   );
 }
 
@@ -324,6 +367,19 @@ function pushDataForRow(
     ...(row.prUrl === null ? {} : { prUrl: row.prUrl }),
     ...(row.organizationId === null ? {} : { organizationId: row.organizationId }),
   };
+}
+
+/**
+ * The copy an app-owned post carries. It follows the user's preview choice the
+ * way the server's attention push does, because both carriers land on one OS
+ * notification: only `full` puts the session title in the notification, and
+ * `generic` uses the shared generic copy the push sends in the same mode.
+ */
+function notificationContentForRow(row: NeedsInputNotificationRow) {
+  if (row.previews === 'full') {
+    return { title: row.title, body: i18n.t('agentChat.questionCard.title') };
+  }
+  return genericPushContentForPushData(pushDataForRow(row), getLanguageSnapshot());
 }
 
 function reportFailure(operation: 'publish' | 'dismiss', error: unknown): void {
@@ -371,12 +427,13 @@ async function publishRow(
   replacesPosted: boolean
 ): Promise<boolean> {
   const data = pushDataForRow(row);
+  const content = notificationContentForRow(row);
   try {
     await Notifications.scheduleNotificationAsync({
       identifier: notificationIdentifierForSession(row.sessionId),
       content: {
-        title: row.title,
-        body: i18n.t('agentChat.questionCard.title'),
+        title: content.title,
+        body: content.body,
         data,
         categoryIdentifier: needsInputCategoryId({ kind: row.kind, hasPr: row.prUrl !== null }),
         interruptionLevel: 'timeSensitive',

@@ -1682,7 +1682,8 @@
       "sortSeverityDesc": "Ogo njọ: elu ruo ala",
       "sortSeverityAsc": "Ogo njọ: ala ruo elu",
       "sortSlaDue": "Ụbọchị njedebe SLA",
-      "overdueOnly": "Naanị ihe gafere oge"
+      "overdueOnly": "Naanị ihe gafere oge",
+      "noRepositories": "Enwebeghị ndebe koodu ọ bụla ejikọrọ ma ọ bụ họpụtara. Họrọ ha na ntọala Onye enyemaka nchebe."
     },
     "automation": {
       "title": "Ịrụ ọrụ na-akpaghị aka",
@@ -2064,7 +2065,10 @@
       "settleFailed": "Emechara omume a, mana anyị enweghị ike dekọọ nsonaazụ ya. Biko nwaa ọzọ.",
       "replayFailed": "Omume a emechaghị. Biko nwaa ọzọ.",
       "actionFailed": "Enweghị ike imecha omume a. Biko nwaa ọzọ.",
-      "actionBlocked": "Enweghị ike imecha omume a. A ghaghị idozi nsogbu a tupu ị nwee ike ịnwa ọzọ."
+      "actionBlocked": "Enweghị ike imecha omume a. A ghaghị idozi nsogbu a tupu ị nwee ike ịnwa ọzọ.",
+      "syncNoRepositories": "Ọnweghị repository dị n'ime oke sync. Họrọ repositories ndị Onye enyemaka nchebe na-enyocha, wee sync ọzọ.",
+      "syncIntegrationInactive": "Njikọ GitHub maka Onye enyemaka nchebe adịghị arụ ọrụ. Jikọọ Kilo GitHub App ọzọ, wee megharịa ọzọ.",
+      "syncMissingPermission": "Kilo GitHub App enweghị ike ịgụ vulnerability alerts. Nye ikike ahụ na GitHub, wee sync ọzọ."
     },
     "analysisState": {
       "queued": "Nyocha dị n'ahịrị",

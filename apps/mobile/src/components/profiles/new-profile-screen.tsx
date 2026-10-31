@@ -148,7 +148,9 @@ export function NewProfileScreen({
         router.back();
         return;
       }
-      router.replace(getProfileOverviewPath(created.id, ownerOrganizationId, stack));
+      router.replace(
+        getProfileOverviewPath(created.id, { organizationId: ownerOrganizationId, stack })
+      );
     } catch (error) {
       if (!hasUsableMessage(error)) {
         toast.error(t('profiles.createFailed'));

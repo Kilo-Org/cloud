@@ -8,7 +8,7 @@
 // only the native surfaces they render through, so the screen-to-dialog
 // wiring is exercised for real.
 
-import { createElement, type ReactNode, useState } from 'react';
+import { createElement, Fragment, type ReactElement, type ReactNode, useState } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -46,6 +46,7 @@ type RecordedInput = {
   placeholder?: string;
   accessibilityLabel?: string;
   onChangeText: (text: string) => void;
+  inputAccessoryViewID?: string;
   multiline?: boolean;
   ref?: { current: { setSelection: (start: number, end: number) => void } | null };
   onLayout?: (event: { nativeEvent: { layout: { height: number } } }) => void;
@@ -171,10 +172,10 @@ function Harness() {
   );
 }
 
-function mount(): TestRenderer.ReactTestRenderer {
+function mount(element: ReactElement = createElement(Harness)): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(Harness));
+    ref.current = TestRenderer.create(element);
   });
   const renderer = ref.current;
   if (!renderer) {
@@ -659,6 +660,52 @@ describe('InstructionsRoute editor', () => {
     const input = latestInput();
     expect(input.accessibilityLabel).toBe(i18n.t('codeReviewer.instructions.title'));
     expect(input.accessibilityLabel).not.toBe('Custom instructions');
+  });
+});
+
+// The iOS accessory bar is the only keyboard-adjacent way out of this
+// multiline field, and iOS binds it to the first text input in the window whose
+// `inputAccessoryViewID` matches the bar's `nativeID`, once, when the bar enters
+// the window. A field and a bar that carry one id for the whole module let a
+// second mounted editor take the first editor's bar and leave its own keyboard
+// with no labeled control above it, so the id belongs to the mount.
+describe('InstructionsRoute keyboard Done bar', () => {
+  it('pairs the field with the bar that carries the Done control', () => {
+    config.data = { customInstructions: STORED };
+    const renderer = mount();
+
+    const bars = findByHostType(renderer, 'InputAccessoryView');
+    expect(bars).toHaveLength(1);
+    const nativeId = bars[0]?.props.nativeID;
+    expect(typeof nativeId).toBe('string');
+    expect(latestInput().inputAccessoryViewID).toBe(nativeId);
+
+    // The bar's one control is the labeled Done button the accessibility tree
+    // reports above the IME.
+    const controls = findByHostType(renderer, 'Pressable');
+    expect(controls).toHaveLength(1);
+    expect(controls[0]?.props.accessibilityLabel).toBe(i18n.t('common.done'));
+  });
+
+  it('gives every mounted editor its own bar', () => {
+    config.data = { customInstructions: STORED };
+    // Two live copies of the editor, the state a visit leaves behind while its
+    // screens are still on the stack.
+    const renderer = mount(
+      createElement(Fragment, null, [
+        createElement(Harness, { key: 'first' }),
+        createElement(Harness, { key: 'second' }),
+      ])
+    );
+
+    const nativeIds = findByHostType(renderer, 'InputAccessoryView').map(
+      node => node.props.nativeID
+    );
+    expect(nativeIds).toHaveLength(2);
+    expect(nativeIds[0]).not.toBe(nativeIds[1]);
+    expect(new Set(textInputs.inputs.map(input => input.inputAccessoryViewID))).toEqual(
+      new Set(nativeIds)
+    );
   });
 });
 

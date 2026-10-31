@@ -1153,7 +1153,8 @@
       "sortSeverityDesc": "嚴重程度：高到低",
       "sortSlaDue": "SLA 到期日",
       "statusIgnored": "已忽略",
-      "statusOpen": "開啟"
+      "statusOpen": "開啟",
+      "noRepositories": "尚未同步或選取任何存放庫。請在資安代理程式設定中選擇。"
     },
     "analysis": {
       "analyzeRepository": "分析存放庫",
@@ -1535,7 +1536,10 @@
       "settleFailed": "操作已完成，但我們無法記錄結果。請再試一次。",
       "replayFailed": "此操作未完成。請再試一次。",
       "actionFailed": "無法完成此操作。請再試一次。",
-      "actionBlocked": "無法完成此操作。必須先修正此問題，才能重試。"
+      "actionBlocked": "無法完成此操作。必須先修正此問題，才能重試。",
+      "syncNoRepositories": "同步範圍內沒有任何存放庫。請選擇資安代理程式要監控的存放庫，然後再次同步。",
+      "syncIntegrationInactive": "資安代理程式的 GitHub 連線未啟用。請重新連線 Kilo GitHub App，然後再次同步。",
+      "syncMissingPermission": "Kilo GitHub App 無法讀取 vulnerability alerts。請在 GitHub 中授予該權限，然後再次同步。"
     },
     "analysisState": {
       "queued": "等待分析",

@@ -330,7 +330,7 @@
       "diffTooLarge": "preobsežne razlike",
       "openFile": "Odpri {{path}}",
       "openFileViewed": "Odpri {{path}} (ogledano)",
-      "title": "Datotek"
+      "title": "Datoteke"
     },
     "fileRows": {
       "markViewed": "Označi {{path}} kot ogledano",
@@ -795,7 +795,7 @@
     },
     "tabs": {
       "overview": "Pregled",
-      "files": "Datotek",
+      "files": "Datoteke",
       "discussion": "Razprava"
     },
     "fileStatus": {
@@ -1059,7 +1059,7 @@
     "attachmentPicker": {
       "takePhoto": "Posnemi fotografijo",
       "photoLibrary": "Fotografije",
-      "files": "Datotek",
+      "files": "Datoteke",
       "cameraAccessMessage": "Za fotografiranje v nastavitvah dovoli dostop do kamere."
     },
     "typingIndicator": {
@@ -2828,7 +2828,7 @@
     "attachmentPicker": {
       "camera": "Fotoaparat",
       "photoLibrary": "Fotografije",
-      "files": "Datotek",
+      "files": "Datoteke",
       "couldNotOpenPhotoPicker": "Izbirnika fotografij ni bilo mogoče odpreti. Znova zaženi Kilo in poskusi znova.",
       "maxFilesAllowed": "Dovoljeno število datotek je največ {{displayCount}}.",
       "onlyAddingFiles": "Dodajanje datotek: samo {{accepted}} od {{total}} (največ {{max}})",

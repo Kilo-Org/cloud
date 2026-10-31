@@ -330,7 +330,7 @@
       "diffTooLarge": "prehľad zmien je príliš veľký",
       "openFile": "Otvoriť {{path}}",
       "openFileViewed": "Otvoriť {{path}} (prezreté)",
-      "title": "Súborov"
+      "title": "Súbory"
     },
     "fileRows": {
       "markViewed": "Označiť súbor {{path}} ako prezretý",
@@ -795,7 +795,7 @@
     },
     "tabs": {
       "overview": "Prehľad",
-      "files": "Súborov",
+      "files": "Súbory",
       "discussion": "Diskusia"
     },
     "fileStatus": {
@@ -1059,7 +1059,7 @@
     "attachmentPicker": {
       "takePhoto": "Odfotiť",
       "photoLibrary": "Knižnica fotiek",
-      "files": "Súborov",
+      "files": "Súbory",
       "cameraAccessMessage": "Ak chceš fotiť, povoľ v nastaveniach prístup k fotoaparátu."
     },
     "typingIndicator": {
@@ -2828,7 +2828,7 @@
     "attachmentPicker": {
       "camera": "Fotoaparát",
       "photoLibrary": "Knižnica fotiek",
-      "files": "Súborov",
+      "files": "Súbory",
       "couldNotOpenPhotoPicker": "Výber fotiek sa nepodarilo otvoriť. Reštartuj Kilo a skús to znova.",
       "maxFilesAllowed": "Povolený počet súborov je najviac {{displayCount}}.",
       "onlyAddingFiles": "Pridávajú sa len niektoré súbory: {{accepted}} z {{total}} (najviac {{max}})",

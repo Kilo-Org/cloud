@@ -330,7 +330,7 @@
       "diffTooLarge": "farqlar hajmi juda katta",
       "openFile": "{{path}}ni ochish",
       "openFileViewed": "{{path}}ni ochish (ko'rilgan)",
-      "title": "Fayl"
+      "title": "Fayllar"
     },
     "fileRows": {
       "markViewed": "{{path}}ni ko'rilgan deb belgilash",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "Umumiy ko'rinish",
-      "files": "Fayl",
+      "files": "Fayllar",
       "discussion": "Muhokama"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "Rasmga olish",
       "photoLibrary": "Rasmlar kutubxonasi",
-      "files": "Fayl",
+      "files": "Fayllar",
       "cameraAccessMessage": "Suratga olish uchun sozlamalarda kameradan foydalanishga ruxsat bering."
     },
     "typingIndicator": {
@@ -2756,7 +2756,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Rasmlar kutubxonasi",
-      "files": "Fayl",
+      "files": "Fayllar",
       "couldNotOpenPhotoPicker": "Rasm tanlash oynasini ochib bo'lmadi. Kilo ilovasini qayta ishga tushiring va yana urinib ko'ring.",
       "maxFilesAllowed": "Ko'pi bilan {{displayCount}} ta fayl qo'shish mumkin.",
       "onlyAddingFiles": "{{total}} ta fayldan faqat {{accepted}} tasi qo'shilmoqda (ko'pi bilan {{max}} ta)",

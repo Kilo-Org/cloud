@@ -42,7 +42,7 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
       return `/(app)/pr-review-entry-fixture${reviewEntryFixture[1] ?? ''}`;
     }
     const reviewCopyFixture =
-      /(?:^|\/)dev\/pr-review-copy-fixture\/(checks|navigator|files|merge|overview|merge-request-missing|merge-request-error|submit)\/?(?:\?([^#]*))?(?:#.*)?$/.exec(
+      /(?:^|\/)dev\/pr-review-copy-fixture\/(tabs|checks|navigator|files|merge|overview|merge-request-missing|merge-request-error|submit)\/?(?:\?([^#]*))?(?:#.*)?$/.exec(
         path
       );
     if (reviewCopyFixture) {

@@ -494,7 +494,7 @@
     "attachmentPicker": {
       "takePhoto": "التقاط صورة",
       "photoLibrary": "مكتبة الصور",
-      "files": "ملف",
+      "files": "الملفات",
       "cameraAccessMessage": "اسمح بالوصول إلى الكاميرا في الإعدادات لالتقاط صورة."
     },
     "typingIndicator": {
@@ -2295,7 +2295,7 @@
     "attachmentPicker": {
       "camera": "الكاميرا",
       "photoLibrary": "مكتبة الصور",
-      "files": "ملف",
+      "files": "الملفات",
       "couldNotOpenPhotoPicker": "تعذّر فتح نافذة اختيار الصور. أعد تشغيل Kilo وحاول مرة أخرى.",
       "maxFilesAllowed": "الحد الأقصى لعدد الملفات هو {{displayCount}}.",
       "onlyAddingFiles": "ستُضاف {{accepted}} فقط من إجمالي الملفات البالغ {{total}} (الحد الأقصى: {{max}})",
@@ -2979,7 +2979,7 @@
       "retryLoadingAllFiles": "إعادة محاولة تحميل جميع الملفات",
       "retryLoadingFiles": "إعادة محاولة تحميل الملفات",
       "retryLoadingMoreFiles": "إعادة محاولة تحميل المزيد من الملفات",
-      "title": "ملف",
+      "title": "الملفات",
       "viewedCount": "تم الاطلاع على {{viewed}} من {{total}}",
       "viewedOfListed": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات"
     },
@@ -3277,7 +3277,7 @@
     },
     "tabs": {
       "discussion": "المناقشة",
-      "files": "ملف",
+      "files": "الملفات",
       "overview": "نظرة عامة"
     },
     "diff": {

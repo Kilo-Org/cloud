@@ -108,6 +108,16 @@ export function ProviderConnectGate({
   // `organizationId` prop is null even for a reader whose organization is being
   // restored, so the gate must not answer for the personal scope yet.
   const organization = useOrganization();
+  // The restore reports a failure through `error` without ever reporting
+  // `isLoaded`, so its failure is the other settled signal — otherwise the gate
+  // would wait for a selection that will never arrive. And a restore re-runs on
+  // a token change, briefly reporting the selection as unrestored again, so
+  // once it has landed this keeps that answer: the review subtree must not be
+  // replaced by the spinner under a reader who is already reviewing.
+  const selectionSettled = useRef(false);
+  if (organization.isLoaded || organization.error !== null) {
+    selectionSettled.current = true;
+  }
 
   // The providers — and the two GitLab scopes, whose payloads now differ by
   // the personal reconnect marker — answer with different status shapes, so
@@ -195,7 +205,7 @@ export function ProviderConnectGate({
     // on when the stored selection has landed. Reading it here too keeps the
     // gate from asking the personal scope for an organization reader's first
     // answer.
-    organizationSelectionLoaded: organization.isLoaded,
+    organizationSelectionLoaded: selectionSettled.current,
   });
 
   if (view === 'org-only') {

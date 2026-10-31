@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one harness mounts the provider gate for every role and connect state; the copy and action assertions share its mocks. */
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -37,7 +38,11 @@ vi.mock('@/lib/hooks/use-reviewer-permission', () => ({
 // Mutable so each test answers the restored account selection. The layout and
 // the gate read the same context, so they agree on when it has landed.
 const organizationState = vi.hoisted(() => ({
-  value: { organizationId: 'org-1' as string | null, isLoaded: true },
+  value: {
+    organizationId: 'org-1' as string | null,
+    isLoaded: true,
+    error: null as 'restore' | 'save' | null,
+  },
 }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => organizationState.value,
@@ -157,7 +162,7 @@ beforeEach(() => {
   queryState.memberships = undefined;
   queryState.membershipsError = false;
   permissionState.value = { status: 'ready', canEdit: false, canManage: false };
-  organizationState.value = { organizationId: 'org-1', isLoaded: true };
+  organizationState.value = { organizationId: 'org-1', isLoaded: true, error: null };
 });
 
 describe('provider gate instance hint', () => {
@@ -243,10 +248,38 @@ describe('organization GitLab reconnect state', () => {
     // Before the stored selection lands the layout passes a null organization,
     // so the gate would show the personal Connect screen and then repaint the
     // organization's — a visible jump on the same route.
-    organizationState.value = { organizationId: null, isLoaded: false };
+    organizationState.value = { organizationId: null, isLoaded: false, error: null };
     const renderer = mount('gitlab', null);
     expect(renderer.root.findByType('ActivityIndicator')).toBeDefined();
     expect(renderer.root.findAllByType('EmptyState')).toHaveLength(0);
+  });
+
+  it('settles when the selection restore failed, which never reports isLoaded', () => {
+    // The provider publishes `error: 'restore'` and leaves `isLoaded` false, so
+    // waiting on that flag alone would spin for good.
+    organizationState.value = { organizationId: null, isLoaded: false, error: 'restore' };
+    const renderer = mount('gitlab', null);
+    expect(renderer.root.findByType('EmptyState')).toBeDefined();
+    expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(0);
+  });
+
+  it('keeps the resolved scope when the selection is restored again', () => {
+    // A restore re-runs on a token change and briefly reports the selection as
+    // unrestored; the reader's review subtree must not become a spinner.
+    queryState.status = { connected: false, reconnectRequired: true };
+    const renderer = mount('gitlab', 'org-1');
+    expect(renderer.root.findByType('EmptyState').props.title).toBe('GitLab connection expired');
+
+    organizationState.value = { organizationId: 'org-1', isLoaded: false, error: null };
+    act(() => {
+      renderer.update(
+        <PrReviewConnectGate platform="gitlab" organizationId="org-1">
+          {React.createElement('ReviewContent')}
+        </PrReviewConnectGate>
+      );
+    });
+    expect(renderer.root.findByType('EmptyState').props.title).toBe('GitLab connection expired');
+    expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(0);
   });
 
   it.each<[string, MockPermission]>([

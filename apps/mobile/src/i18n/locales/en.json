@@ -1848,7 +1848,6 @@
       "notYetSynced": "Not yet synced",
       "refreshFailed": "Could not refresh — showing last synced data.",
       "settings": "Settings",
-      "syncFindings": "Sync findings",
       "syncNow": "Sync now",
       "syncQueued": "Sync queued",
       "syncStatusUnavailable": "Sync status unavailable"

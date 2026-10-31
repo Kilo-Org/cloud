@@ -138,7 +138,12 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
     const { overall, bySeverity } = data.sla;
     return (
       <SectionCard title={t('securityAgent.dashboard.slaPosture')}>
+        {/* The rows take the same frame as the codebase-risk rows below: those
+            are pressable, so `ROW_TARGET_CLASS` gives them 48 dp, and a bare
+            `KvRow` here measured 44 dp — the same row read tighter in this
+            card than in the one under it. */}
         <KvRow
+          className={ROW_TARGET_CLASS}
           label={t('securityAgent.dashboard.withinDeadline')}
           value={`${formatNumber(overall.withinSla, i18n.language)} / ${formatNumber(
             overall.total,
@@ -146,18 +151,21 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
           )}`}
         />
         <KvRow
+          className={ROW_TARGET_CLASS}
           label={t('securityAgent.dashboard.criticalOverdue')}
           value={formatNumber(bySeverity.critical.overdue, i18n.language)}
           valueTone="muted"
           dotTone={bySeverity.critical.overdue > 0 ? 'danger' : 'muted'}
         />
         <KvRow
+          className={ROW_TARGET_CLASS}
           label={t('securityAgent.dashboard.highOverdue')}
           value={formatNumber(bySeverity.high.overdue, i18n.language)}
           valueTone="muted"
           dotTone={bySeverity.high.overdue > 0 ? 'danger' : 'muted'}
         />
         <KvRow
+          className={ROW_TARGET_CLASS}
           label={t('securityAgent.dashboard.mediumLowOverdue')}
           value={formatNumber(bySeverity.medium.overdue + bySeverity.low.overdue, i18n.language)}
           valueTone="muted"
@@ -176,25 +184,31 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
 
   return (
     <SectionCard title={t('securityAgent.dashboard.actionPosture')}>
+      {/* Same frame as the codebase-risk rows, for the same reason: one row
+          height in both cards of the posture pair. */}
       <KvRow
+        className={ROW_TARGET_CLASS}
         label={t('securityAgent.dashboard.confirmedExploitable')}
         value={formatNumber(data.analysis.exploitable, i18n.language)}
         valueTone="muted"
         dotTone="danger"
       />
       <KvRow
+        className={ROW_TARGET_CLASS}
         label={t('securityAgent.dashboard.needsEvidenceReview')}
         value={formatNumber(data.analysis.needsReview, i18n.language)}
         valueTone="muted"
         dotTone="warn"
       />
       <KvRow
+        className={ROW_TARGET_CLASS}
         label={t('securityAgent.dashboard.analysisNotComplete')}
         value={formatNumber(analysisIncomplete, i18n.language)}
         valueTone="muted"
         dotTone="muted"
       />
       <KvRow
+        className={ROW_TARGET_CLASS}
         label={t('securityAgent.dashboard.noImmediateAction')}
         value={formatNumber(noImmediateAction, i18n.language)}
         valueTone="muted"

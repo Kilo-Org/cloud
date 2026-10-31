@@ -300,25 +300,21 @@ function dashboardTree(scope = 'personal', memberships?: unknown[]): ReactElemen
   );
 }
 
-type SyncControlKey = 'securityAgent.dashboard.syncNow' | 'securityAgent.dashboard.syncFindings';
-
 function syncButtons(root: I): I[] {
   const syncNow = i18n.t('securityAgent.dashboard.syncNow');
-  const syncFindings = i18n.t('securityAgent.dashboard.syncFindings');
   return root.findAll(
     n =>
       typeof n.type === 'string' &&
       (n.type as string) === 'Pressable' &&
-      (n.props.accessibilityLabel === syncNow || n.props.accessibilityLabel === syncFindings)
+      n.props.accessibilityLabel === syncNow
   );
 }
 
-function findSyncButton(root: I, key: SyncControlKey): I {
-  const label = i18n.t(key);
-  const nodes = syncButtons(root).filter(n => n.props.accessibilityLabel === label);
-  const n = nodes[0];
+function findSyncButton(root: I): I {
+  const label = i18n.t('securityAgent.dashboard.syncNow');
+  const n = syncButtons(root)[0];
   if (!n) {
-    throw new Error(`expected 1 ${label} button, got ${nodes.length}`);
+    throw new Error(`expected 1 ${label} button, got 0`);
   }
   return n;
 }
@@ -430,30 +426,30 @@ describe('DashboardScreen sync control terminal states', () => {
     sharedMetrics.build.mockReturnValue([]);
   });
 
-  it('keeps both sync controls enabled in the happy state', () => {
+  it('keeps the sync control enabled in the happy state', () => {
     const root = renderScreen();
 
-    expect(syncButtons(root.root)).toHaveLength(2);
-    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+    expect(syncButtons(root.root)).toHaveLength(1);
+    expect(syncDisabledStates(root.root)).toEqual([false]);
   });
 
-  it('keeps both sync controls enabled after a retryable error and shows its copy', () => {
+  it('keeps the sync control enabled after a retryable error and shows its copy', () => {
     triggerSync.isError = true;
     triggerSync.error = mapSecuritySyncOperationError(new Error('operation_in_progress'));
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+    expect(syncDisabledStates(root.root)).toEqual([false]);
     expect(renderedTexts(root.root)).toContain(IN_PROGRESS_COPY);
   });
 
-  it('renders the translated ambiguous copy under ja and keeps both controls retryable', async () => {
+  it('renders the translated ambiguous copy under ja and keeps the control retryable', async () => {
     await i18n.changeLanguage('ja');
     try {
       triggerSync.isError = true;
       triggerSync.error = mapSecuritySyncOperationError(new Error(SECURITY_AMBIGUOUS_MESSAGE));
       const root = renderScreen();
 
-      expect(syncDisabledStates(root.root)).toEqual([false, false]);
+      expect(syncDisabledStates(root.root)).toEqual([false]);
       expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.mutations.ambiguous'));
       expect(renderedTexts(root.root)).not.toContain(SECURITY_AMBIGUOUS_MESSAGE);
     } finally {
@@ -461,31 +457,31 @@ describe('DashboardScreen sync control terminal states', () => {
     }
   });
 
-  it('disables both sync controls and shows configuration-specific copy after a missing-configuration error', () => {
+  it('disables the sync control and shows configuration-specific copy after a missing-configuration error', () => {
     triggerSync.isError = true;
     triggerSync.error = mapSecuritySyncOperationError(new Error(CONFIGURATION_ERROR_MESSAGE));
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabledStates(root.root)).toEqual([true]);
     expect(renderedTexts(root.root)).toContain(CONFIGURATION_COPY);
     // The raw server message is replaced by the state-specific copy.
     expect(renderedTexts(root.root)).not.toContain(CONFIGURATION_ERROR_MESSAGE);
   });
 
-  it('disables both sync controls and shows the error copy after another non-retryable error', () => {
+  it('disables the sync control and shows the error copy after another non-retryable error', () => {
     triggerSync.isError = true;
     triggerSync.error = mapSecuritySyncOperationError(new Error(PERSISTENCE_FAILED_MESSAGE));
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabledStates(root.root)).toEqual([true]);
     expect(renderedTexts(root.root)).toContain(PERSISTENCE_FAILED_MESSAGE);
   });
 
-  it('disables both sync controls while a sync is pending', () => {
+  it('disables the sync control while a sync is pending', () => {
     triggerSync.isPending = true;
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabledStates(root.root)).toEqual([true]);
   });
 
   it('offers a retry beside a retryable failure and resubmits the current intent', () => {
@@ -610,7 +606,7 @@ describe('DashboardScreen sync control terminal states', () => {
 
   it('submits the sync through the header control with the current repo filter', () => {
     const root = renderScreen();
-    const syncNow = findSyncButton(root.root, 'securityAgent.dashboard.syncNow');
+    const syncNow = findSyncButton(root.root);
 
     act(() => {
       (syncNow.props.onPress as () => void)();
@@ -800,6 +796,38 @@ describe('buildLocalizedMetrics', () => {
     );
     expect(slaMetrics.every(item => item.label.length > 0 && item.detail.length > 0)).toBe(true);
     await i18n.changeLanguage('en');
+  });
+
+  it('keeps the numeric slot a dash while no deadline is tracked', () => {
+    const data: Parameters<typeof buildLocalizedMetrics>[0] = {
+      analysis: {
+        total: 0,
+        exploitable: 0,
+        needsReview: 0,
+        triageComplete: 0,
+        analyzing: 0,
+        notAnalyzed: 0,
+        failed: 0,
+      },
+      severity: { critical: 0, high: 0, medium: 0, low: 0 },
+      sla: {
+        overall: { total: 0, withinSla: 0, overdue: 0 },
+        bySeverity: {
+          critical: { overdue: 0 },
+          high: { overdue: 0 },
+          medium: { overdue: 0 },
+          low: { overdue: 0 },
+        },
+        dueSoon: { total: 0, exploitable: 0 },
+        untrackedCount: 0,
+      },
+    };
+
+    sharedMetrics.build.mockReturnValueOnce(['slaCompliance'].map(id => dashboardMetric(id)));
+    const [compliance] = buildLocalizedMetrics(data, true);
+
+    expect(compliance?.value).toBe('—');
+    expect(compliance?.detail).toBe(i18n.t('securityAgent.dashboardMetrics.noDeadlineData'));
   });
 
   it('omits the medium & low bucket while no medium or low finding is counted', () => {

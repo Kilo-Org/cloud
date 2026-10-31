@@ -65,6 +65,13 @@ const METRIC_TONE_CLASS = {
   neutral: 'text-muted-foreground',
 } satisfies Record<DashboardMetricTone, string>;
 
+/**
+ * The numeric slot's value when there is nothing measured to count. A dash
+ * keeps the tile's mono number shape without printing a phrase in a slot sized
+ * for digits; the tile's detail line carries the explanation.
+ */
+const UNMEASURED_METRIC_VALUE = '—';
+
 export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean) {
   const metrics = buildSecurityDashboardMetrics(data, slaEnabled);
   const number = (value: number) => formatNumber(value, i18n.language);
@@ -119,9 +126,13 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
           : null;
         return Object.assign(metric, {
           label: i18n.t('securityAgent.dashboardMetrics.slaCompliance'),
+          // An unmeasured value is a dash in the numeric slot, not a word: the
+          // tile's value style is the large mono count, so "Not measured" read
+          // as a heavy placeholder that outweighed the real counts beside it,
+          // and the detail line below already explains why there is none.
           value:
             compliance === null
-              ? i18n.t('securityAgent.dashboard.notMeasured')
+              ? UNMEASURED_METRIC_VALUE
               : formatPercent(compliance, i18n.language),
           detail: measured
             ? i18n.t('securityAgent.dashboardMetrics.withinDeadlineDetail', {
@@ -318,7 +329,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         className="px-6"
         title={scopeTitle}
         eyebrow={t('common.securityAgent')}
-        titleNumberOfLines={2}
+        // The default one-line cap: the scope name ellipsizes at its tail
+        // rather than wrapping beside the three header controls, which kept
+        // this header taller than every other screen's.
+        //
         // Size-11 (44dp) icon buttons: findings and settings, plus the audit
         // overflow when the viewer can manage the agent. Declaring exactly the
         // buttons this viewer renders drops the actions onto their own row
@@ -513,34 +527,12 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
         {slaEnabled && data && data.sla.overall.total === 0 ? (
           <View className="flex-row items-center gap-4">
-            {/* Both actions take the shared row frame: `min-h-11` measured
-                38.5 dp here (NativeWind's rem is 14 pt), under the touch
-                floor, and the row only grows to the frame the header's icon
-                buttons already use. */}
-            <Pressable
-              onPress={() => {
-                startSync({ repoFullName });
-              }}
-              disabled={syncDisabled}
-              accessibilityRole="button"
-              accessibilityLabel={t('securityAgent.dashboard.syncFindings')}
-              accessibilityState={{
-                disabled: syncDisabled,
-                busy: triggerSync.isPending,
-              }}
-              className={cn(
-                ROW_TARGET_CLASS,
-                'flex-row items-center gap-1.5 active:opacity-70',
-                syncBlocked && 'opacity-50'
-              )}
-            >
-              {triggerSync.isPending && (
-                <SpinningIcon icon={RefreshCw} size={12} color={colors.mutedForeground} spinning />
-              )}
-              <Text className="text-xs font-medium text-primary">
-                {t('securityAgent.dashboard.syncFindings')}
-              </Text>
-            </Pressable>
+            {/* The refresh control in the filter row above is this screen's one
+                sync affordance; a second "Sync findings" link here repeated it
+                inside the empty state that points at the repositories instead.
+                The link takes the shared row frame: `min-h-11` measured 38.5 dp
+                (NativeWind's rem is 14 pt), under the touch floor, and the row
+                only grows to the frame the header's icon buttons already use. */}
             <Pressable
               onPress={() => {
                 pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));

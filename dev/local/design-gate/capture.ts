@@ -437,8 +437,10 @@ export async function runMatrix(
       for (const [index, target] of targets.entries()) {
         const targetLanguage = await ensureLanguage(ctx, language);
         const languageReady = targetLanguage.matched;
-        // Only the first target after a reload sees the cold runtime.
-        const warm = (cellLanguage.reloaded || targetLanguage.reloaded) && index === 0;
+        // A cell-level reload leaves only its first target cold; a reload this
+        // target itself caused (the previous target switched the app language)
+        // leaves this target cold whatever its index.
+        const warm = targetLanguage.reloaded || (cellLanguage.reloaded && index === 0);
         const { sampled, screen, unopened, png } = await captureScreen(
           ctx,
           config.id,

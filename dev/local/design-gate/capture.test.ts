@@ -369,6 +369,21 @@ test('runMatrix skips a target that switches the language and resets it for the 
   assert.deepEqual(state.languageCalls, ['system/en']);
 });
 
+test('runMatrix warms the target that has to reload the language back', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const languages = { 'kiloapp://hindi': 'hi' };
+  const ctx = context(fakeDevice(calls, state, { languages }), fakeProbe(state));
+  await runMatrix(ctx, matrixCells('android', 'base'), [
+    { id: 'hindi', link: 'kiloapp://hindi' },
+    ...HOME,
+  ]);
+
+  // The link switched the app language, so the NEXT target reloads the runtime
+  // and is cold at index 1 — it still pays its own warm open.
+  assert.equal(calls.filter(call => call === 'open:kiloapp://home').length, 2);
+});
+
 test('runMatrix warms a cell once after the language reload', async () => {
   const calls: string[] = [];
   const state = probeState();

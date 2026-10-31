@@ -2042,6 +2042,168 @@ async function rewriteUsageFixture(
   return { payload: envelope.message ?? envelope.response ?? envelope, objects };
 }
 
+describe('Vercel provider metadata archival', () => {
+  const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
+    '@kilocode/web-shared/lib/r2/create-client'
+  );
+  const metadata = {
+    gateway: {
+      cost: '0.25',
+      routing: {
+        finalProvider: 'amazon-bedrock',
+        modelAttempts: [
+          {
+            success: true,
+            providerAttempts: [
+              { provider: 'openai', success: false, error: { code: 'rate_limit' } },
+              { provider: 'amazon-bedrock', success: true, credentialType: 'byok' },
+            ],
+          },
+        ],
+      },
+    },
+  };
+
+  beforeEach(() => {
+    jest.replaceProperty(process, 'env', {
+      ...process.env,
+      R2_VERCEL_PROVIDER_METADATA_BUCKET_NAME: 'test-vercel-metadata',
+      R2_VERCEL_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',
+      R2_VERCEL_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
+    });
+    fakeR2.objects.clear();
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  async function uploadAndReadMetadata() {
+    expect(fakeR2.objects.size).toBe(0);
+    expect(mockedAfter).toHaveBeenCalledTimes(1);
+    const callback = mockedAfter.mock.calls[0]?.[0];
+    if (typeof callback !== 'function') throw new Error('Expected an after callback');
+    await callback();
+    expect(fakeR2.objects.size).toBe(1);
+    return JSON.parse(fakeR2.objects.get('test-vercel-metadata/gen_metadata_test.json') ?? '');
+  }
+
+  describe.each(usageShapes)('$kind', shape => {
+    describe.each([false, true])('stream=%s', stream => {
+      test.each(['provider_metadata', 'providerMetadata'])(
+        'archives %s without exposing it or storing the response body',
+        async metadataKey => {
+          const payload = {
+            id: 'gen_metadata_test',
+            model: 'upstream-model',
+            usage: { ...shape.tokens },
+            [metadataKey]: metadata,
+            ...(shape.kind === 'chat_completions'
+              ? {
+                  choices: [
+                    {
+                      index: 0,
+                      ...(stream
+                        ? { delta: { content: 'answer' } }
+                        : { message: { role: 'assistant', content: 'answer' } }),
+                    },
+                  ],
+                }
+              : {}),
+          };
+          const body =
+            !stream || shape.kind === 'chat_completions'
+              ? payload
+              : shape.kind === 'messages'
+                ? { type: 'message_start', message: payload }
+                : { type: 'response.completed', response: payload };
+          const result = await rewriteModelResponse({
+            response: stream
+              ? sseResponse(`data: ${JSON.stringify(body)}\n\n`)
+              : jsonResponse(body),
+            model: 'requested-model',
+            providerId: 'vercel',
+            kind: shape.kind,
+            isFree: false,
+            userByok: false,
+            logging: makeLogging(),
+            responseTransforms: null,
+          });
+          const output = stream
+            ? await readOutputStream(result)
+            : JSON.stringify(await result.json());
+
+          expect(output).not.toContain('provider_metadata');
+          expect(output).not.toContain('providerMetadata');
+          expect(await uploadAndReadMetadata()).toEqual(metadata);
+        }
+      );
+    });
+  });
+
+  test.each([false, true])(
+    'archives nested Chat Completions metadata without usage, stream=%s',
+    async stream => {
+      const choice = { content: 'answer', provider_metadata: metadata };
+      const body = {
+        id: 'gen_metadata_test',
+        choices: [{ index: 0, ...(stream ? { delta: choice } : { message: choice }) }],
+      };
+      const result = await rewriteModelResponse({
+        response: stream ? sseResponse(`data: ${JSON.stringify(body)}\n\n`) : jsonResponse(body),
+        model: 'requested-model',
+        providerId: 'vercel',
+        kind: 'chat_completions',
+        isFree: false,
+        userByok: false,
+        logging: makeLogging(),
+        responseTransforms: null,
+      });
+      const output = stream ? await readOutputStream(result) : JSON.stringify(await result.json());
+
+      expect(output).not.toContain('provider_metadata');
+      expect(await uploadAndReadMetadata()).toEqual(metadata);
+    }
+  );
+
+  test.each(['openrouter', 'custom'] as const)(
+    'does not archive metadata from %s',
+    async providerId => {
+      await rewriteModelResponse({
+        response: jsonResponse({ id: 'gen_metadata_test', provider_metadata: metadata }),
+        model: 'requested-model',
+        providerId,
+        kind: 'chat_completions',
+        isFree: false,
+        userByok: false,
+        logging: makeLogging(),
+        responseTransforms: null,
+      });
+
+      expect(mockedAfter).not.toHaveBeenCalled();
+      expect(fakeR2.objects.size).toBe(0);
+    }
+  );
+
+  test('archives observed metadata even when the upstream stream disconnects', async () => {
+    const result = await rewriteModelResponse({
+      response: failingResponse(
+        'text/event-stream',
+        'ResponseAborted',
+        `data: ${JSON.stringify({ id: 'gen_metadata_test', choices: [], provider_metadata: metadata })}\n\n`
+      ),
+      model: 'requested-model',
+      providerId: 'vercel',
+      kind: 'chat_completions',
+      isFree: false,
+      userByok: false,
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(await readOutputStream(result)).toContain('upstream_disconnect');
+    expect(await uploadAndReadMetadata()).toEqual(metadata);
+  });
+});
+
 describe.each(usageShapes)('$kind billed usage normalization', shape => {
   describe.each([false, true])('stream=%s', stream => {
     describe.each(['openrouter', 'vercel'] as const)('%s', provider => {

@@ -848,6 +848,9 @@ importers:
       '@expo/plist':
         specifier: 0.10.1
         version: 0.10.1
+      '@react-native-reusables/cli':
+        specifier: 0.7.1
+        version: 0.7.1
       '@sentry/cli':
         specifier: 'catalog:'
         version: 3.8.0
@@ -9314,6 +9317,10 @@ packages:
     peerDependencies:
       react: '>=16'
       react-native: '>=0.57'
+
+  '@react-native-reusables/cli@0.7.1':
+    resolution: {integrity: sha512-Qt55k6mD+HnE2Nx7H3HgugARqCFDNu7gDUPYr4kC0qXMsHT0378j7kQ5q2Xmvfs43pNer9rYMPgUdGNobn+E8Q==}
+    hasBin: true
 
   '@react-native/asset-utils@0.88.0':
     resolution: {integrity: sha512-Bj1DxQt5f4OrjdlgSVkZT37Z3hx5hUIN5AUDSqL/e99vgtTcqj5vnm067epZL1EF/QiqsniZO8Q1GSkItOakDg==}
@@ -29235,6 +29242,10 @@ snapshots:
     dependencies:
       react: 19.3.0
       react-native: 0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)
+
+  '@react-native-reusables/cli@0.7.1':
+    dependencies:
+      tsconfig-paths: 4.2.0
 
   '@react-native/asset-utils@0.88.0': {}
 

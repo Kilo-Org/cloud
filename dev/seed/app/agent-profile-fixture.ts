@@ -14,12 +14,14 @@ export const usage = '<email>';
 
 const PROFILE_NAME = 'Design gate agents';
 const USER_ID = 'user_design_gate_agents';
+/** Stable, so the deep link a previous run printed keeps opening the screen. */
+const PROFILE_ID = 'a9ad137f-bad3-4d1a-9565-0cb862c7f81d';
 const STRIPE_CUSTOMER_ID = 'cus_local_design_gate_agents';
 
 /**
  * The agents the profile carries. The first two print their name twice unless
- * the list hides a slug that only repeats the name; the last pair is long and
- * distinct, so its row shows both a slug and the ellipsis of a squeezed row.
+ * the list hides a slug that only repeats the name; the third has a long name
+ * and a distinct slug, so its row shows both a name and a slug line.
  */
 const AGENTS = [
   {
@@ -118,6 +120,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const [profile] = await db
     .insert(agent_environment_profiles)
     .values({
+      id: PROFILE_ID,
       owned_by_user_id: USER_ID,
       created_by_user_id: USER_ID,
       name: PROFILE_NAME,

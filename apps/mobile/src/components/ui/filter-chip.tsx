@@ -39,10 +39,7 @@ export function FilterChip({
       accessibilityState={{ ...accessibilityState, selected }}
     >
       {selected ? (
-        <View
-          pointerEvents="none"
-          className="border-primary absolute inset-0 rounded-md border"
-        />
+        <View pointerEvents="none" className="border-primary absolute inset-0 rounded-md border" />
       ) : null}
       <Text className={selected ? 'text-primary' : undefined}>{label}</Text>
     </Button>

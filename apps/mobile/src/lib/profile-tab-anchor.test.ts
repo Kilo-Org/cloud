@@ -52,8 +52,8 @@ describe('finding detail back control wiring', () => {
   // Source-read fallback: the pure project cannot mount the screen, so pin the
   // forced back control by reading the source. The loaded state renders its own
   // `ScreenHeader`; the loading, failure and not-found states share one pending
-  // element so the header height cannot change between them. This fails if a
-  // state stops rendering a header, or if its back control is removed.
+  // element so the header cannot change between them. This fails if a state
+  // stops rendering a header, or if its back control is removed.
   const screenPath = fileURLToPath(
     new URL('../components/security-agent/finding-detail-screen.tsx', import.meta.url)
   );
@@ -68,11 +68,11 @@ describe('finding detail back control wiring', () => {
     expect(pendingHeaderCount).toBe(3);
   });
 
-  it('reserves the eyebrow line the loaded header fills', () => {
-    // The loaded header carries the repository eyebrow above the title. Without
-    // the reservation, settling into any pending state moves the title down by
-    // that line.
-    expect(pendingHeaderSource).toMatch(/\breserveEyebrow\b/);
+  it('reserves no eyebrow line in a state that may have no repository', () => {
+    // A finding that does not exist never gains a repository, so a reserved
+    // line would leave the title half a line below the back chevron above a gap
+    // no label ever fills. Without it the title shares the chevron's row.
+    expect(pendingHeaderSource).not.toMatch(/\breserveEyebrow\b/);
   });
 
   it('passes showBackButton on every ScreenHeader usage', () => {

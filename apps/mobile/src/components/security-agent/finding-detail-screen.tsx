@@ -153,14 +153,16 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   }, [loadFailed, findingId]);
   const showLoadFailure = !findingQuery.data && (loadFailed || failedFindingId === findingId);
 
-  // The loaded header carries the repository eyebrow above the title, so every
-  // state of this screen reserves that line. One header for loading, failure
-  // and not-found keeps the title from moving when the query settles.
+  // One header for the loading, load-failure and not-found states. It draws no
+  // eyebrow line of its own: a finding that does not exist never gains a
+  // repository, so reserving that line would leave the title sitting half a
+  // line below the back chevron above a gap no label ever fills. Without it the
+  // title shares the back control's row, centred on the chevron, in every one
+  // of those states.
   const pendingHeader = (
     <ScreenHeader
       className="px-6"
       title={t('securityAgent.findingDetail.title')}
-      reserveEyebrow
       showBackButton
       onBack={handleBack}
     />

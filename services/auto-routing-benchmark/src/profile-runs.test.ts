@@ -662,6 +662,7 @@ describe('decider run completion', () => {
       slot: 0,
       token: 'completion-token',
       attempts: 1,
+      throttle_deferrals: 0,
     });
     await processJob(env, {
       runId,
@@ -1840,6 +1841,7 @@ it('dispatches every claim of one scheduler pass and stops when a pass claims no
     slot: 1,
     token: 'claim-token',
     attempts: 1,
+    throttle_deferrals: 0,
   };
   vi.mocked(claimScheduledChunks)
     .mockResolvedValueOnce([claim, { ...claim, id: 'claim-2', token: 'claim-token-2' }])

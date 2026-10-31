@@ -25,6 +25,7 @@ vi.mock('./scheduler', async importOriginal => {
     clearUnbilledCase: vi.fn(),
     cooldownProviders: vi.fn(),
     deferChunk: vi.fn(),
+    deferThrottledChunk: vi.fn(),
     failChunk: vi.fn(),
     failScheduledEntry: vi.fn(),
     finishChunk: vi.fn(),
@@ -155,6 +156,7 @@ import {
   clearUnbilledCase,
   cooldownProviders,
   deferChunk,
+  deferThrottledChunk,
   failChunk,
   finishChunk,
   failScheduledEntry,
@@ -165,6 +167,8 @@ import {
   restartPaidCase,
   scheduleRunChunks,
   startChunk,
+  SCHEDULER_MAX_ATTEMPTS,
+  SCHEDULER_MAX_THROTTLE_DEFERRALS,
   type SchedulerClaim,
 } from './scheduler';
 
@@ -227,6 +231,7 @@ function mockClaim(overrides: Partial<SchedulerClaim> = {}): SchedulerClaim {
     case_ids: JSON.stringify([benchCase.id]),
     slot: 7,
     attempts: 1,
+    throttle_deferrals: 0,
     ...overrides,
   };
   vi.mocked(getChunk).mockResolvedValue(claim);
@@ -1043,16 +1048,44 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(deferChunk).toHaveBeenCalled();
   });
 
-  it.each([false, true])(
-    'cools down provider 429s and clears transient pending output (persisted: %s)',
-    async persisted => {
+  it.each([
+    { persisted: false, text: '', lastEventTypes: ['error'], stderrTail: 'HTTP 429 rate limited' },
+    { persisted: true, text: '', lastEventTypes: ['error'], stderrTail: 'HTTP 429 rate limited' },
+    {
+      persisted: false,
+      text: 'Partial step before the limit',
+      lastEventTypes: ['tool_use', 'error'],
+      stderrTail: 'HTTP 429 rate limited',
+    },
+    {
+      persisted: true,
+      text: 'Partial step before the limit',
+      lastEventTypes: ['tool_use', 'error'],
+      stderrTail: 'HTTP 429 rate limited',
+    },
+    {
+      persisted: false,
+      text: '',
+      lastEventTypes: ['error'],
+      stderrTail: '\u001b[91m\u001b[1mError: \u001b[0mInternal Server Error\n',
+    },
+    {
+      persisted: false,
+      text: '',
+      lastEventTypes: ['step_start', 'error'],
+      stderrTail: 'Authorization temporarily unavailable',
+    },
+  ])(
+    'cools down unbilled provider failures and clears transient pending output (%j)',
+    async ({ persisted, text, lastEventTypes, stderrTail }) => {
       const claim = mockClaim();
       const result = {
         ...successfulCliResult,
-        text: '',
+        text,
+        lastEventTypes,
         exitCode: 1,
         costUsd: 0,
-        stderrTail: 'HTTP 429 rate limited',
+        stderrTail,
       };
       const persistedStartedAt = 1_729_411_200_000;
       if (persisted) {
@@ -1084,12 +1117,70 @@ describe('processJob — scheduler waits and paid-call safety', () => {
       expect(deletePendingDeciderOutput).toHaveBeenCalledTimes(persisted ? 1 : 0);
       expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(persisted ? 0 : 1);
       expect(cooldownProviders).toHaveBeenCalledWith(env.BENCH_DB, claim, expect.any(Number));
-      expect(deferChunk).toHaveBeenCalled();
+      expect(deferThrottledChunk).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        'chunk-1',
+        'token-1',
+        expect.any(Number)
+      );
+      expect(deferChunk).not.toHaveBeenCalled();
+      expect(failChunk).not.toHaveBeenCalled();
       expect(savePendingDeciderOutput).not.toHaveBeenCalled();
       expect(upsertCaseResult).not.toHaveBeenCalled();
       expect(recordLaneFailure).not.toHaveBeenCalled();
     }
   );
+
+  it('keeps a throttled chunk with spent attempts alive until its throttle budget runs out', async () => {
+    const throttled = {
+      ...successfulCliResult,
+      text: '',
+      exitCode: 1,
+      costUsd: 0,
+      stderrTail: 'HTTP 429 rate limited',
+    };
+    vi.mocked(runDeciderCaseViaCli)
+      .mockResolvedValueOnce(throttled)
+      .mockResolvedValueOnce(throttled);
+    mockClaim({ attempts: SCHEDULER_MAX_ATTEMPTS });
+    await processJob(env, deciderMessage());
+    expect(deferThrottledChunk).toHaveBeenCalled();
+    expect(failChunk).not.toHaveBeenCalled();
+
+    vi.mocked(deferThrottledChunk).mockClear();
+    mockClaim({
+      attempts: SCHEDULER_MAX_ATTEMPTS,
+      throttle_deferrals: SCHEDULER_MAX_THROTTLE_DEFERRALS,
+    });
+    await processJob(env, deciderMessage());
+    expect(deferThrottledChunk).not.toHaveBeenCalled();
+    expect(failChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+    expect(recordLaneFailure).toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: 'a 429 after a billed step', costUsd: 0.02, stderrTail: 'HTTP 429 rate limited' },
+    {
+      name: 'an unbilled invalid-request rejection',
+      costUsd: 0,
+      stderrTail: '[Phala] The request was rejected as invalid',
+    },
+  ])('keeps a graded failure for $name', async ({ costUsd, stderrTail }) => {
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+      ...successfulCliResult,
+      text: 'Partial step before the error',
+      lastEventTypes: ['tool_use', 'error'],
+      exitCode: 1,
+      costUsd,
+      stderrTail,
+    });
+    await processJob(env, deciderMessage());
+    expect(deferThrottledChunk).not.toHaveBeenCalled();
+    expect(upsertCaseResult).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ cost_usd: costUsd })
+    );
+  });
 
   it('fails the lane without paying again once a prior paid execution can no longer deliver', async () => {
     vi.mocked(getPaidCaseStartedAt).mockResolvedValue(Date.now() - PAID_OUTPUT_WAIT_MS);
@@ -1193,6 +1284,33 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     );
     expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
   });
+
+  it.each([
+    { name: 'a signal kill before any event', timedOut: false, eventCount: 0, calls: 2 },
+    { name: 'a timeout', timedOut: true, eventCount: 0, calls: 1 },
+    { name: 'a kill after events', timedOut: false, eventCount: 3, calls: 1 },
+  ])(
+    'retries $name only when the run said nothing about the model',
+    async ({ timedOut, eventCount, calls }) => {
+      const killed = {
+        ...successfulCliResult,
+        text: '',
+        exitCode: -1,
+        timedOut,
+        eventCount,
+        lastEventTypes: [],
+      };
+      for (const result of [killed, successfulCliResult].slice(0, calls)) {
+        vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce(result);
+      }
+      await processJob(env, deciderMessage());
+      expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(calls);
+      expect(upsertCaseResult).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        expect.objectContaining({ retried: calls === 2 })
+      );
+    }
+  );
 
   it('keeps the original measured failure without another call when the ledger refuses a retry', async () => {
     vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({

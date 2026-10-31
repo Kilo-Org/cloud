@@ -22,6 +22,7 @@ export const BenchmarkModelCatalogSchema = z.object({
       alias_target: z.string().trim().min(1).optional(),
       inference_provider_ids: z.array(z.string()).optional(),
       supported_parameters: z.array(z.string()).optional(),
+      context_length: z.number().nullable().catch(null).optional(),
       opencode: z.object({ variants: BenchmarkCatalogVariantsSchema.optional() }).optional(),
       pricing: z
         .object({
@@ -42,14 +43,42 @@ export function catalogModelSupportsTools(model: CatalogModel): boolean {
   return model.supported_parameters?.includes('tools') ?? true;
 }
 
+/**
+ * The CLI harness prompt (system prompt and tool definitions) fills about half of a
+ * 32k window before the case, and every request also reserves the completion
+ * budget. A smaller window rejects every benchmark case.
+ */
+export const MIN_BENCHMARK_CONTEXT_LENGTH = 32_768;
+
+export const CATALOG_PAIR_UNAVAILABLE_REASON =
+  'Model or variant is unavailable in the executable benchmark catalog.';
+export const CATALOG_CONTEXT_TOO_SMALL_REASON = `Model context window is below the ${MIN_BENCHMARK_CONTEXT_LENGTH} tokens the benchmark harness needs.`;
+
+function catalogModelFitsHarness(model: CatalogModel): boolean {
+  return model.context_length == null || model.context_length >= MIN_BENCHMARK_CONTEXT_LENGTH;
+}
+
+/** Why the catalog cannot benchmark this exact pair, or null when it can. */
+export function benchmarkPairUnavailableReason(
+  catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
+  pair: { model: string; variant: string | null }
+): string | null {
+  const model = catalog.data.find(model => model.id === pair.model);
+  if (!model || model.id.startsWith('~') || !catalogModelSupportsTools(model)) {
+    return CATALOG_PAIR_UNAVAILABLE_REASON;
+  }
+  if (!catalogModelFitsHarness(model)) return CATALOG_CONTEXT_TOO_SMALL_REASON;
+  const variants = getReasoningVariantKeys(model.opencode?.variants);
+  const supported =
+    variants.length > 0 ? variants.includes(pair.variant ?? '') : pair.variant === null;
+  return supported ? null : CATALOG_PAIR_UNAVAILABLE_REASON;
+}
+
 export function catalogSupportsBenchmarkPair(
   catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
   pair: { model: string; variant: string | null }
 ): boolean {
-  const model = catalog.data.find(model => model.id === pair.model);
-  if (!model || model.id.startsWith('~') || !catalogModelSupportsTools(model)) return false;
-  const variants = getReasoningVariantKeys(model.opencode?.variants);
-  return variants.length > 0 ? variants.includes(pair.variant ?? '') : pair.variant === null;
+  return benchmarkPairUnavailableReason(catalog, pair) === null;
 }
 
 function resolveCatalogModel(
@@ -83,7 +112,14 @@ export function platformRegistryEntries(
     const model = selectedModel?.id.startsWith('~')
       ? modelsById.get(selectedModel.alias_target ?? '')
       : selectedModel;
-    if (!model || model.id.startsWith('~') || !catalogModelSupportsTools(model)) continue;
+    if (
+      !model ||
+      model.id.startsWith('~') ||
+      !catalogModelSupportsTools(model) ||
+      !catalogModelFitsHarness(model)
+    ) {
+      continue;
+    }
     const variants = getReasoningVariantKeys(model.opencode?.variants);
     for (const variant of variants.length > 0 ? variants : [null]) {
       const key = exactPairKey(model.id, variant);

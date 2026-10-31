@@ -2,6 +2,10 @@ import { createServer } from 'node:http';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BenchmarkModelCatalogSchema,
+  benchmarkPairUnavailableReason,
+  CATALOG_CONTEXT_TOO_SMALL_REASON,
+  CATALOG_PAIR_UNAVAILABLE_REASON,
+  MIN_BENCHMARK_CONTEXT_LENGTH,
   catalogCandidatePrices,
   catalogModelProviders,
   fetchBenchmarkModelCatalog,
@@ -266,6 +270,42 @@ describe('platform catalog expansion', () => {
         executable
       )
     ).toEqual([{ model: 'tools/model', variant: null }]);
+  });
+
+  it('rejects a context window below the harness floor with its own reason', () => {
+    const executable = BenchmarkModelCatalogSchema.parse({
+      data: [
+        { id: 'small/model', context_length: MIN_BENCHMARK_CONTEXT_LENGTH - 1 },
+        { id: 'floor/model', context_length: MIN_BENCHMARK_CONTEXT_LENGTH },
+        { id: 'unknown/model', context_length: null },
+        { id: 'malformed/model', context_length: 'wide' },
+        {
+          id: 'small-reasoning/model',
+          context_length: 16_384,
+          opencode: { variants: { high: { reasoning: { effort: 'high' } } } },
+        },
+      ],
+    });
+    const reason = (model: string, variant: string | null = null) =>
+      benchmarkPairUnavailableReason(executable, { model, variant });
+    expect(reason('small/model')).toBe(CATALOG_CONTEXT_TOO_SMALL_REASON);
+    expect(reason('small-reasoning/model', 'high')).toBe(CATALOG_CONTEXT_TOO_SMALL_REASON);
+    expect(reason('floor/model')).toBeNull();
+    expect(reason('unknown/model')).toBeNull();
+    expect(reason('malformed/model')).toBeNull();
+    expect(reason('missing/model')).toBe(CATALOG_PAIR_UNAVAILABLE_REASON);
+    expect(
+      platformRegistryEntries(
+        {
+          deciderModels: [
+            { id: 'small/model' },
+            { id: 'small-reasoning/model' },
+            { id: 'floor/model' },
+          ],
+        },
+        executable
+      )
+    ).toEqual([{ model: 'floor/model', variant: null }]);
   });
 
   it('does not execute an alias whose concrete target is absent', () => {

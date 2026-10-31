@@ -157,6 +157,12 @@ export async function saveSchedulerOverrides(
 export const SCHEDULER_ACTIVE_LEASE_MS = 20 * 60_000;
 export const SCHEDULER_QUEUE_LEASE_MS = 30 * 60_000;
 export const SCHEDULER_MAX_ATTEMPTS = 6;
+/**
+ * A provider throttle is not a chunk failure, so it refunds the claim's attempt and
+ * counts here instead. Backoff caps at 5 minutes, so the budget allows several hours
+ * of throttling before the chunk falls back to ordinary attempts.
+ */
+export const SCHEDULER_MAX_THROTTLE_DEFERRALS = 48;
 export const SCHEDULER_DISPATCH_LEASE_MS = 20_000;
 export const SCHEDULER_INIT_BUDGET_MS = 20_000;
 export const SCHEDULER_INIT_LEASE_MS = 2 * 60_000;
@@ -179,6 +185,7 @@ export type SchedulerClaim = {
   slot: number;
   token: string;
   attempts: number;
+  throttle_deferrals: number;
 };
 
 type SchedulerLaneHead = {
@@ -641,6 +648,21 @@ export async function deferChunk(
     available_at = ?, slot = NULL, token = NULL, lease_until = 0
     WHERE id = ? AND token = ? AND status IN ('queued', 'active') AND (? = 0 OR status = 'queued')`)
     .bind(SCHEDULER_MAX_ATTEMPTS, availableAt, id, token, onlyQueued ? 1 : 0)
+    .run();
+}
+
+export async function deferThrottledChunk(
+  db: D1Database,
+  id: string,
+  token: string,
+  availableAt: number
+): Promise<void> {
+  await db
+    .prepare(`UPDATE scheduler_chunks SET status = 'pending', attempts = MAX(attempts - 1, 0),
+    throttle_deferrals = throttle_deferrals + 1, available_at = ?, slot = NULL, token = NULL,
+    lease_until = 0
+    WHERE id = ? AND token = ? AND status IN ('queued', 'active')`)
+    .bind(availableAt, id, token)
     .run();
 }
 

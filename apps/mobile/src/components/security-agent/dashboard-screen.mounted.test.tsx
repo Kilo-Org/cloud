@@ -53,6 +53,7 @@ const triggerSync = vi.hoisted(() => ({
 const syncActivity = vi.hoisted(() => ({
   syncRunning: false,
   updatedAt: 0,
+  readFailedAt: 0,
 }));
 const config = vi.hoisted(() => ({
   data: { slaEnabled: true },
@@ -358,6 +359,7 @@ describe('DashboardScreen sync control terminal states', () => {
     triggerSync.error = null;
     syncActivity.syncRunning = false;
     syncActivity.updatedAt = 0;
+    syncActivity.readFailedAt = 0;
     dashboardStats.refetch.mockClear();
     lastSync.refetch.mockClear();
     config.data = { slaEnabled: true };
@@ -467,6 +469,55 @@ describe('DashboardScreen sync control terminal states', () => {
       });
       expect(syncDisabledStates(root.root)).toEqual([false, false]);
       expect(renderedTexts(root.root)).not.toContain(IN_PROGRESS_COPY);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('gives the controls back when the sync status cannot be read at all', () => {
+    const root = renderScreen();
+    const syncNow = findSyncButton(root.root, 'securityAgent.dashboard.syncNow');
+    act(() => {
+      (syncNow.props.onPress as () => void)();
+    });
+    const options = triggerSync.mutate.mock.calls.at(-1)?.[1] as { onSuccess: () => void };
+    act(() => {
+      options.onSuccess();
+      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+    });
+    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+
+    // Every poll after the accept fails: a run the screen cannot observe must
+    // not hold both controls for good.
+    act(() => {
+      syncActivity.readFailedAt = Date.now() + 3000;
+      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+    });
+
+    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+  });
+
+  it('gives the controls back when an accepted submit never shows a run', () => {
+    vi.useFakeTimers();
+    try {
+      const root = renderScreen();
+      const syncNow = findSyncButton(root.root, 'securityAgent.dashboard.syncNow');
+      act(() => {
+        (syncNow.props.onPress as () => void)();
+      });
+      const options = triggerSync.mutate.mock.calls.at(-1)?.[1] as { onSuccess: () => void };
+      act(() => {
+        options.onSuccess();
+        root.update(createElement(DashboardScreen, { scope: 'personal' }));
+      });
+      expect(syncDisabledStates(root.root)).toEqual([true, true]);
+
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+        root.update(createElement(DashboardScreen, { scope: 'personal' }));
+      });
+
+      expect(syncDisabledStates(root.root)).toEqual([false, false]);
     } finally {
       vi.useRealTimers();
     }

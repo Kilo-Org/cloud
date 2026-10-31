@@ -31,7 +31,9 @@ function hasActiveSync(commands: readonly SecurityCommand[] | undefined): boolea
  *
  * `updatedAt` is the last successful read's timestamp: a caller that starts
  * watching at time T can tell a fresh, empty answer from a cached one that
- * predates its own subject.
+ * predates its own subject. `readFailedAt` is the last failed read's: a poll
+ * that errors never advances `updatedAt`, so a caller must be able to tell
+ * "nothing to report" from "nothing can be read".
  */
 export function useSecurityAgentSyncRunning(scope: string, watching: boolean) {
   const trpc = useTRPC();
@@ -53,5 +55,11 @@ export function useSecurityAgentSyncRunning(scope: string, watching: boolean) {
     refetchInterval,
   });
   const query = isPersonal ? personal : organization;
-  return { syncRunning: hasActiveSync(query.data), updatedAt: query.dataUpdatedAt };
+  return {
+    syncRunning: hasActiveSync(query.data),
+    updatedAt: query.dataUpdatedAt,
+    // A failed read cannot tell a finished run from a running one, so a caller
+    // waiting for its own submit must not treat the silence as progress.
+    readFailedAt: query.errorUpdatedAt,
+  };
 }

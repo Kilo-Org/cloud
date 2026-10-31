@@ -52,7 +52,7 @@ function makeCommand(overrides: Record<string, unknown> = {}) {
 }
 
 const useQueryOptions: QueryOptions[] = [];
-const returned: { syncRunning?: boolean; updatedAt?: number } = {};
+const returned: { syncRunning?: boolean; updatedAt?: number; readFailedAt?: number } = {};
 
 function isActiveCommandsKey(key: unknown, scope: 'personal' | 'org'): boolean {
   if (!Array.isArray(key)) {
@@ -72,11 +72,13 @@ function activeQueryOptions(scope: 'personal' | 'org'): QueryOptions | undefined
 
 let commandFixture: unknown[] | undefined = [];
 let updatedAtFixture = 0;
+let readFailedAtFixture = 0;
 
 function Probe({ scope, watching }: Readonly<{ scope: string; watching: boolean }>) {
   const state = useSecurityAgentSyncRunning(scope, watching);
   returned.syncRunning = state.syncRunning;
   returned.updatedAt = state.updatedAt;
+  returned.readFailedAt = state.readFailedAt;
   return null;
 }
 
@@ -92,10 +94,15 @@ beforeEach(() => {
   returned.updatedAt = undefined;
   commandFixture = [];
   updatedAtFixture = 0;
+  readFailedAtFixture = 0;
 
   useQueryMock.mockImplementation((options: QueryOptions) => {
     useQueryOptions.push(options);
-    return { data: commandFixture, dataUpdatedAt: updatedAtFixture };
+    return {
+      data: commandFixture,
+      dataUpdatedAt: updatedAtFixture,
+      errorUpdatedAt: readFailedAtFixture,
+    };
   });
 });
 
@@ -146,10 +153,12 @@ describe('useSecurityAgentSyncRunning (server view of a running sync)', () => {
     );
   });
 
-  it('exposes the last read timestamp so a caller can tell a fresh answer from a cached one', () => {
+  it('exposes the read timestamps so a caller can tell fresh, cached and unreadable apart', () => {
     updatedAtFixture = 1234;
+    readFailedAtFixture = 5678;
     commandFixture = [makeCommand({ status: 'failed' })];
     mount('personal', false);
     expect(returned.updatedAt).toBe(1234);
+    expect(returned.readFailedAt).toBe(5678);
   });
 });

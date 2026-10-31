@@ -73,6 +73,12 @@ type SyncWatch = { at: number; duplicate: boolean };
 // that never sees that submit must still give the controls back.
 const DUPLICATE_SYNC_WATCH_MS = 30_000;
 
+// How long an accepted submit may keep them without a single readable status
+// poll. The Worker lists the command before it answers the accept, so a readable
+// server shows the run within one poll; past this window the screen stops
+// claiming a sync it cannot see, while a run it does see keeps the state itself.
+const ACCEPTED_SYNC_WATCH_MS = 60_000;
+
 const METRIC_TONE_CLASS = {
   danger: 'text-destructive',
   warning: 'text-warn',
@@ -309,9 +315,15 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // accept that reports no active sync command means the server has finished the
   // run, so the control returns to its normal state. A refused duplicate ends the
   // same way once the run it pointed at became visible; until then it waits for
-  // the window below, because that run's command may not exist yet.
+  // the window below, because that run's command may not exist yet. A read that
+  // failed ends the watch too: silence is not evidence of progress, and holding
+  // both controls on an unreadable status would leave the screen with no way out.
   useEffect(() => {
     if (syncWatch === null || triggerSync.isPending) {
+      return;
+    }
+    if (syncRunning.readFailedAt > syncWatch.at) {
+      setSyncWatch(null);
       return;
     }
     if (syncRunning.syncRunning) {
@@ -325,17 +337,25 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
       return;
     }
     setSyncWatch(null);
-  }, [syncWatch, triggerSync.isPending, syncRunning.syncRunning, syncRunning.updatedAt]);
+  }, [
+    syncWatch,
+    triggerSync.isPending,
+    syncRunning.syncRunning,
+    syncRunning.updatedAt,
+    syncRunning.readFailedAt,
+  ]);
 
-  // A refused duplicate names a submit that is admitted server-side, so the
-  // screen reports progress instead of a failure. That submit can only settle or
-  // lose its lease inside the ledger's window, but the screen must not spin on a
-  // submit it never sees: the watch expires on its own.
+  // Whatever the watch was waiting for, the screen must give the controls back:
+  // a refused duplicate's submit settles inside the ledger's window, and an
+  // accepted submit's command is listed the moment the Worker answers, so a run
+  // this screen still cannot see after its own window is one it should stop
+  // speaking for.
   useEffect(() => {
-    if (syncWatch === null || !syncWatch.duplicate) {
+    if (syncWatch === null) {
       return () => undefined;
     }
-    const remaining = syncWatch.at + DUPLICATE_SYNC_WATCH_MS - Date.now();
+    const window = syncWatch.duplicate ? DUPLICATE_SYNC_WATCH_MS : ACCEPTED_SYNC_WATCH_MS;
+    const remaining = syncWatch.at + window - Date.now();
     if (remaining <= 0) {
       setSyncWatch(null);
       return () => undefined;

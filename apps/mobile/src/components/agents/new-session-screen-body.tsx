@@ -439,6 +439,7 @@ export function NewSessionScreenBody() {
     isRetrying,
     reposSettled,
     openIntegration,
+    connectingProvider,
     refreshReposForceFresh,
   } = useNewSessionRepos({ organizationId });
 
@@ -1117,6 +1118,10 @@ export function NewSessionScreenBody() {
         onPress: () => {
           openIntegration(connectProviderPlatform);
         },
+        // The flow's first step is a network round trip (GitHub mints an install
+        // state), so the action keeps a spinner and stays disabled until the
+        // flow ends instead of looking inert for the whole mint.
+        isBusy: connectingProvider !== null,
       };
     }
   } else if (startBlockedReasonKey === 'refresh-repositories') {
@@ -1277,6 +1282,7 @@ export function NewSessionScreenBody() {
         isRetrying={isRetrying}
         onChangeRepo={setSelectedRepo}
         onConnectProvider={openIntegration}
+        connectingProvider={connectingProvider}
         onRefreshRepos={() => void refreshReposForceFresh()}
         repositories={repositories}
         recents={recents}

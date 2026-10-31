@@ -116,6 +116,7 @@ export function NewSessionConfigureForm({
   isRetrying,
   onChangeRepo,
   onConnectProvider,
+  connectingProvider = null,
   onRefreshRepos,
   repositories,
   recents,
@@ -304,6 +305,7 @@ export function NewSessionConfigureForm({
           isRetrying={isRetrying}
           onChange={onChangeRepo}
           onConnect={onConnectProvider}
+          connectingProvider={connectingProvider}
           onRefreshRepos={onRefreshRepos}
           repositories={repositories}
           recents={recents}

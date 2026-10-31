@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 
-import { Button } from '@/components/ui/button';
+import { FilterChip } from '@/components/ui/filter-chip';
 import { Text } from '@/components/ui/text';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 
@@ -42,64 +42,59 @@ export function BriefingFilterControls({
       {/* `Button` pins role="button" and `role` takes precedence over
           `accessibilityRole`, so the tabs pass the entry's own role. */}
       <View accessibilityRole="tablist" className="flex-row flex-wrap gap-2">
-        <Button
+        <FilterChip
           {...tabEntryA11y({ selected: !history })}
-          variant={history ? 'ghost' : 'secondary'}
-          size="sm"
+          selected={!history}
           onPress={() => {
             onSelectHistory(false);
           }}
         >
           <Text>{t('agentBriefing.available')}</Text>
-        </Button>
-        <Button
+        </FilterChip>
+        <FilterChip
           {...tabEntryA11y({ selected: history })}
-          variant={history ? 'secondary' : 'ghost'}
-          size="sm"
+          selected={history}
           onPress={() => {
             onSelectHistory(true);
           }}
         >
           <Text>{t('agentBriefing.history')}</Text>
-        </Button>
+        </FilterChip>
       </View>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerClassName="gap-2"
       >
-        <Button
-          variant={organizationId === undefined ? 'secondary' : 'ghost'}
-          size="sm"
+        <FilterChip
+          selected={organizationId === undefined}
           accessibilityState={{ selected: organizationId === undefined }}
           onPress={() => {
             onSelectOrganization(undefined);
           }}
         >
           <Text>{t('common.all')}</Text>
-        </Button>
-        <Button
-          variant={organizationId === null ? 'secondary' : 'ghost'}
-          size="sm"
+        </FilterChip>
+        <FilterChip
+          selected={organizationId === null}
           accessibilityState={{ selected: organizationId === null }}
           onPress={() => {
             onSelectOrganization(null);
           }}
         >
           <Text>{t('common.personal')}</Text>
-        </Button>
+        </FilterChip>
         {organizations.map(organization => (
-          <Button
+          <FilterChip
             key={organization.organizationId}
-            variant={organizationId === organization.organizationId ? 'secondary' : 'ghost'}
-            size="sm"
+            selected={organizationId === organization.organizationId}
             accessibilityState={{ selected: organizationId === organization.organizationId }}
             onPress={() => {
               onSelectOrganization(organization.organizationId);
             }}
           >
             <Text>{organization.organizationName}</Text>
-          </Button>
+          </FilterChip>
         ))}
       </ScrollView>
     </>

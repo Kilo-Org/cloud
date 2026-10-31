@@ -14,6 +14,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { BellOff } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
+import { FilterChip } from '@/components/ui/filter-chip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
@@ -46,26 +47,6 @@ const MAX_PAGES = 10;
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = { paddingHorizontal: 16 } satisfies ViewStyle;
-
-/** One filter chip. Single-select, so the active one carries `selected`. */
-function FilterChip({
-  label,
-  active,
-  onPress,
-}: Readonly<{ label: string; active: boolean; onPress: () => void }>) {
-  return (
-    <Button
-      variant={active ? 'secondary' : 'ghost'}
-      size="sm"
-      // `Button` pins `role="button"`; a real role must replace it, because
-      // `role` outranks `accessibilityRole`.
-      {...tabEntryA11y({ selected: active })}
-      onPress={onPress}
-    >
-      <Text>{label}</Text>
-    </Button>
-  );
-}
 
 /**
  * The pushes this account received, newest first: one row per recorded
@@ -258,12 +239,16 @@ export function NotificationHistoryScreen() {
             {filters.map(filter => (
               <FilterChip
                 key={filter.category ?? 'all'}
-                label={t(filter.labelKey)}
-                active={filter.category === category}
+                // `Button` pins `role="button"`; a real role must replace it,
+                // because `role` outranks `accessibilityRole`.
+                {...tabEntryA11y({ selected: filter.category === category })}
+                selected={filter.category === category}
                 onPress={() => {
                   setCategory(filter.category);
                 }}
-              />
+              >
+                <Text>{t(filter.labelKey)}</Text>
+              </FilterChip>
             ))}
           </ScrollView>
         )}

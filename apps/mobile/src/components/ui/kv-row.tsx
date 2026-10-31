@@ -19,6 +19,14 @@ type KvRowProps = {
    * red "0" or green "0" reads as alarming/false-positive.
    */
   dotTone?: KvTone;
+  /**
+   * Draw the value in the interface's text face with tabular figures instead of
+   * the mono face. Use it for a column of counts: the mono face's slashed zero
+   * reads as code beside the proportional digits of the label on the same row,
+   * and a count column compares left to right. Identifier values (versions,
+   * paths, commit ids) keep the default mono face.
+   */
+  valueNumeric?: boolean;
   /** Suppress bottom divider on the last row of a group. */
   last?: boolean;
   className?: string;
@@ -50,6 +58,7 @@ export function KvRow({
   value,
   valueTone = 'default',
   dotTone,
+  valueNumeric,
   last,
   className,
   selectable,
@@ -79,12 +88,13 @@ export function KvRow({
         </Text>
       </View>
       <Text
-        variant="mono"
+        variant={valueNumeric ? 'default' : 'mono'}
         selectable={selectable}
         numberOfLines={valueLineLimit}
         ellipsizeMode={valueLineLimit ? 'middle' : undefined}
         className={cn(
           'min-w-0 shrink text-right text-[13px]',
+          valueNumeric && 'tabular-nums',
           VALUE_TONE[valueTone],
           valueClassName
         )}

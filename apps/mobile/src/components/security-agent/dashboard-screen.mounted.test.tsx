@@ -936,6 +936,48 @@ describe('buildLocalizedMetrics', () => {
     expect(analysisMetrics[0]?.detail).toBe('2 critical, 3 high');
     expect(slaMetrics[1]?.detail).toBe('1 critical, 2 high');
   });
+
+  it('agrees a pt-BR breakdown with each of its three numbers', async () => {
+    await i18n.changeLanguage('pt-BR');
+    const data: Parameters<typeof buildLocalizedMetrics>[0] = {
+      analysis: {
+        total: 2,
+        exploitable: 0,
+        needsReview: 0,
+        triageComplete: 0,
+        analyzing: 0,
+        notAnalyzed: 0,
+        failed: 0,
+      },
+      severity: { critical: 1, high: 0, medium: 1, low: 0 },
+      sla: {
+        overall: { total: 2, withinSla: 0, overdue: 2 },
+        bySeverity: {
+          critical: { overdue: 1 },
+          high: { overdue: 0 },
+          medium: { overdue: 1 },
+          low: { overdue: 0 },
+        },
+        dueSoon: { total: 0, exploitable: 0 },
+        untrackedCount: 0,
+      },
+    };
+
+    sharedMetrics.build.mockReturnValueOnce(
+      ['openFindings', 'exploitable', 'needsReview', 'analysisIncomplete'].map(id =>
+        dashboardMetric(id)
+      )
+    );
+    const analysisMetrics = buildLocalizedMetrics(data, false);
+    sharedMetrics.build.mockReturnValueOnce(
+      ['slaCompliance', 'deadlinePassed', 'dueSoon', 'noDeadline'].map(id => dashboardMetric(id))
+    );
+    const slaMetrics = buildLocalizedMetrics(data, true);
+
+    expect(analysisMetrics[0]?.detail).toBe('1 crítico, 0 de nível alto, 1 média/baixa');
+    expect(slaMetrics[1]?.detail).toBe('1 crítico, 0 de nível alto, 1 média/baixa');
+    await i18n.changeLanguage('en');
+  });
 });
 
 describe('DashboardScreen dismiss failure card states', () => {

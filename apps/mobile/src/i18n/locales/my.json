@@ -2081,7 +2081,6 @@
       "closedOn": "{{date}} တွင် {{status}}",
       "deadlineNotSet": "သတ်မှတ်ရက် သတ်မှတ်မထား",
       "noSlaDeadline": "SLA သတ်မှတ်ရက် မရှိ",
-      "dueOn": "{{date}} တွင် သတ်မှတ်ရက်စေ့မည်",
       "overdueNow": "သတ်မှတ်ရက်ကျော်နေ",
       "overdue_other": "သတ်မှတ်ရက်ထက် {{count}} ရက် ကျော်နေ",
       "dueToday": "ယနေ့ သတ်မှတ်ရက်စေ့မည်",

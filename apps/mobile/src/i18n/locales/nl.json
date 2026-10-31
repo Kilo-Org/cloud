@@ -1552,7 +1552,6 @@
       "closedOn": "{{status}} op {{date}}",
       "deadlineNotSet": "Deadline niet ingesteld",
       "noSlaDeadline": "Geen SLA-deadline",
-      "dueOn": "Deadline: {{date}}",
       "overdueNow": "Deadline overschreden",
       "overdue_one": "Deadline {{count}} dag overschreden",
       "overdue_other": "{{count}} dagen te laat",

@@ -276,7 +276,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
               key={key}
               className={cn(
                 'min-h-11 flex-1 items-center justify-center rounded-lg py-2 active:opacity-80',
-                selected ? 'bg-primary' : 'bg-secondary'
+                selected ? 'bg-selection' : 'bg-secondary'
               )}
               onPress={() => {
                 setTab(key);
@@ -286,7 +286,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
               <Text
                 className={cn(
                   'text-xs font-medium',
-                  selected ? 'text-primary-foreground' : 'text-foreground'
+                  selected ? 'text-selection-foreground' : 'text-foreground'
                 )}
               >
                 {t(labelKey)}

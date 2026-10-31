@@ -2081,7 +2081,6 @@
       "closedOn": "{{date}} அன்று {{status}}",
       "deadlineNotSet": "காலக்கெடு அமைக்கப்படவில்லை",
       "noSlaDeadline": "SLA காலக்கெடு இல்லை",
-      "dueOn": "காலக்கெடு: {{date}}",
       "overdueNow": "காலக்கெடு கடந்தது",
       "overdue_one": "{{count}} நாள் தாமதம்",
       "overdue_other": "{{count}} நாட்கள் தாமதம்",

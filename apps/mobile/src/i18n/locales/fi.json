@@ -2081,7 +2081,6 @@
       "closedOn": "Tila: {{status}} · {{date}}",
       "deadlineNotSet": "Määräaikaa ei ole asetettu",
       "noSlaDeadline": "Ei määritettyä SLA-määräaikaa",
-      "dueOn": "Määräaika {{date}}",
       "overdueNow": "Myöhässä",
       "overdue_one": "{{count}} päivä myöhässä",
       "overdue_other": "{{count}} päivää myöhässä",

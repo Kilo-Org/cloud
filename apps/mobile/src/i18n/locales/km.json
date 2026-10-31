@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} នៅ {{date}}",
       "deadlineNotSet": "មិនទាន់កំណត់ថ្ងៃកំណត់",
       "noSlaDeadline": "គ្មានថ្ងៃកំណត់ SLA",
-      "dueOn": "ដល់កំណត់នៅ {{date}}",
       "overdueNow": "ហួសកំណត់",
       "overdue_other": "ហួសកំណត់ {{count}} ថ្ងៃ",
       "dueToday": "ដល់កំណត់ថ្ងៃនេះ",

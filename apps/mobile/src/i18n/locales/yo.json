@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "A kò tíì ṣètò ọjọ́ ìparí",
       "noSlaDeadline": "Kò sí ọjọ́ ìparí SLA",
-      "dueOn": "Ọjọ́ ìparí: {{date}}",
       "overdueNow": "Ọjọ́ ìparí ti kọjá",
       "overdue_other": "Ọjọ́ ìparí ti kọjá ní ọjọ́ {{count}}",
       "dueToday": "Ọjọ́ ìparí dé lónìí",

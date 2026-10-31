@@ -1552,7 +1552,6 @@
       "closedOn": "{{date}} tarihindeki durum: {{status}}",
       "deadlineNotSet": "Son tarih belirtilmedi",
       "noSlaDeadline": "SLA son tarihi yok",
-      "dueOn": "Son tarih: {{date}}",
       "overdueNow": "Gecikmiş",
       "overdue_one": "{{count}} gün gecikmiş",
       "overdue_other": "{{count}} gün gecikti",

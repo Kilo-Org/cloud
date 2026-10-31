@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} เมื่อ {{date}}",
       "deadlineNotSet": "ยังไม่ได้ตั้งกำหนดเวลา",
       "noSlaDeadline": "ไม่มีกำหนดเวลา SLA",
-      "dueOn": "ครบกำหนด {{date}}",
       "overdueNow": "เกินกำหนด",
       "overdue_other": "เกินกำหนด {{count}} วัน",
       "dueToday": "ครบกำหนดวันนี้",

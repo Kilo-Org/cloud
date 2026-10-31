@@ -1552,7 +1552,6 @@
       "closedOn": "{{status}} am {{date}}",
       "deadlineNotSet": "Keine Frist festgelegt",
       "noSlaDeadline": "Keine SLA-Frist",
-      "dueOn": "Fällig am {{date}}",
       "overdueNow": "Überfällig",
       "overdue_one": "{{count}} Tag überfällig",
       "overdue_other": "{{count}} Tage überfällig",

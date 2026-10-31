@@ -2081,7 +2081,6 @@
       "closedOn": "{{date}}: {{status}}",
       "deadlineNotSet": "Muddat belgilanmagan",
       "noSlaDeadline": "SLA muddati belgilanmagan",
-      "dueOn": "Muddati: {{date}}",
       "overdueNow": "Muddati o'tgan",
       "overdue_one": "Muddati {{count}} kun o'tgan",
       "overdue_other": "{{count}} kun kechikdi",

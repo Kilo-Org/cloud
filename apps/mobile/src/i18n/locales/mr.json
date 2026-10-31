@@ -2081,7 +2081,6 @@
       "closedOn": "{{date}} रोजी {{status}}",
       "deadlineNotSet": "मुदत निश्चित नाही",
       "noSlaDeadline": "SLA मुदत नाही",
-      "dueOn": "मुदत {{date}}",
       "overdueNow": "मुदत उलटली",
       "overdue_one": "मुदत उलटून {{count}} दिवस झाला",
       "overdue_other": "मुदत संपून {{count}} दिवस झाले",

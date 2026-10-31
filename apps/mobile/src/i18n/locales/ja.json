@@ -1552,7 +1552,6 @@
       "closedOn": "{{date}}：{{status}}",
       "deadlineNotSet": "期限未設定",
       "noSlaDeadline": "SLA期限なし",
-      "dueOn": "期限：{{date}}",
       "overdueNow": "期限超過",
       "overdue_other": "{{count}}日超過",
       "dueToday": "今日が期限",

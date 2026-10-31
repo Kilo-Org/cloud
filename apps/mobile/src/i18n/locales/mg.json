@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} tamin'ny {{date}}",
       "deadlineNotSet": "Tsy voafaritra ny fe-potoana",
       "noSlaDeadline": "Tsy misy fe-potoana SLA",
-      "dueOn": "Fe-potoana farany: {{date}}",
       "overdueNow": "Nihoatra ny fe-potoana",
       "overdue_one": "Nihoatra {{count}} andro ny fe-potoana",
       "overdue_other": "Tara {{count}} andro",

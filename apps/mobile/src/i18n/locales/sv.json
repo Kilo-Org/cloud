@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Ingen tidsfrist angiven",
       "noSlaDeadline": "Ingen SLA-tidsfrist",
-      "dueOn": "Tidsfristen löper ut {{date}}",
       "overdueNow": "Försenat",
       "overdue_one": "{{count}} dag efter tidsfristen",
       "overdue_other": "{{count}} dagar efter tidsfristen",

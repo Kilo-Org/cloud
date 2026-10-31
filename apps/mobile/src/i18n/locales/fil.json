@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} noong {{date}}",
       "deadlineNotSet": "Wala pang takdang petsa",
       "noSlaDeadline": "Walang takdang petsa ng SLA",
-      "dueOn": "Takdang petsa: {{date}}",
       "overdueNow": "Lampas sa takdang petsa",
       "overdue_one": "{{count}} araw nang lampas sa takdang petsa",
       "overdue_other": "{{count}} araw nang lampas sa takdang petsa",

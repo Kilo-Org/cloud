@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} op {{date}}",
       "deadlineNotSet": "Sperdatum nie gestel nie",
       "noSlaDeadline": "Geen SLA-sperdatum nie",
-      "dueOn": "Sperdatum: {{date}}",
       "overdueNow": "Agterstallig",
       "overdue_one": "{{count}} dag agterstallig",
       "overdue_other": "{{count}} dae agterstallig",

@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Tähtaega pole määratud",
       "noSlaDeadline": "SLA tähtaega pole määratud",
-      "dueOn": "Tähtaeg {{date}}",
       "overdueNow": "Tähtaeg ületatud",
       "overdue_one": "Tähtaeg ületatud {{count}} päeva",
       "overdue_other": "Tähtaeg ületatud {{count}} päeva",

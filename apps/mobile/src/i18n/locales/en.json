@@ -2147,7 +2147,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Deadline not set",
       "noSlaDeadline": "No SLA deadline",
-      "dueOn": "Due {{date}}",
       "overdueNow": "Overdue",
       "overdue_one": "{{count}} day overdue",
       "overdue_other": "{{count}} days overdue",

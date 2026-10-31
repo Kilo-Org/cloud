@@ -2081,7 +2081,6 @@
       "closedOn": "{{date}}፦ {{status}}",
       "deadlineNotSet": "የጊዜ ገደብ አልተወሰነም",
       "noSlaDeadline": "የSLA ጊዜ ገደብ የለም",
-      "dueOn": "ጊዜው የሚያበቃው {{date}}",
       "overdueNow": "ጊዜው አልፏል",
       "overdue_one": "{{count}} ቀን ዘግይቷል",
       "overdue_other": "ቀነ ገደቡ በ{{count}} ቀናት አልፏል",

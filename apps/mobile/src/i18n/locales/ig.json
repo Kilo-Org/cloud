@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Edebeghị oge njedebe",
       "noSlaDeadline": "Enweghị oge njedebe SLA",
-      "dueOn": "Oge njedebe: {{date}}",
       "overdueNow": "Gafere oge",
       "overdue_other": "Oge gafere ụbọchị {{count}}",
       "dueToday": "Oge ga-eru taa",

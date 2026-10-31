@@ -2081,7 +2081,6 @@
       "closedOn": "{{date}} · {{status}}",
       "deadlineNotSet": "Эцсийн хугацаа тогтоогоогүй",
       "noSlaDeadline": "SLA эцсийн хугацаагүй",
-      "dueOn": "{{date}} хүртэл",
       "overdueNow": "Хугацаа хэтэрсэн",
       "overdue_one": "Хугацаа {{count}} хоногоор хэтэрсэн",
       "overdue_other": "{{count}} өдөр хоцорсон",

@@ -2108,7 +2108,6 @@
       "closedOn": "{{status}} la {{date}}",
       "deadlineNotSet": "Termen limită nestabilit",
       "noSlaDeadline": "Fără termen limită SLA",
-      "dueOn": "Termen limită: {{date}}",
       "overdueNow": "Termen depășit",
       "overdue_one": "{{count}} zi întârziere",
       "overdue_few": "{{count}} zile întârziere",

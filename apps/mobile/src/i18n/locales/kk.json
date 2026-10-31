@@ -2081,7 +2081,6 @@
       "closedOn": "{{date}} күні: {{status}}",
       "deadlineNotSet": "Мерзім белгіленбеген",
       "noSlaDeadline": "SLA мерзімі жоқ",
-      "dueOn": "Мерзімі: {{date}}",
       "overdueNow": "Мерзімі өткен",
       "overdue_one": "Мерзімі {{count}} күнге өтіп кеткен",
       "overdue_other": "Мерзімі {{count}} күн бұрын өтті",

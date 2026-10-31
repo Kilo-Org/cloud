@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Dat limit pa fikse",
       "noSlaDeadline": "Pa gen dat limit SLA",
-      "dueOn": "Dat limit: {{date}}",
       "overdueNow": "An reta",
       "overdue_one": "{{count}} jou an reta",
       "overdue_other": "{{count}} jou an reta",

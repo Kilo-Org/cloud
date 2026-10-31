@@ -2108,7 +2108,6 @@
       "closedOn": "{{status}} · {{date}}",
       "deadlineNotSet": "Rok nije određen",
       "noSlaDeadline": "Bez roka prema SLA",
-      "dueOn": "Rok: {{date}}",
       "overdueNow": "Rok prekoračen",
       "overdue_one": "Kašnjenje: {{count}} dan",
       "overdue_few": "Rok je prekoračen za {{count}} dana",

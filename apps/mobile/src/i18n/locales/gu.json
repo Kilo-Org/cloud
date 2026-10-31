@@ -2081,7 +2081,6 @@
       "closedOn": "{{date}} ના રોજ {{status}}",
       "deadlineNotSet": "સમયમર્યાદા નક્કી કરેલી નથી",
       "noSlaDeadline": "SLA ની સમયમર્યાદા નથી",
-      "dueOn": "સમયમર્યાદા: {{date}}",
       "overdueNow": "સમયમર્યાદા વટાવી",
       "overdue_one": "સમયમર્યાદા વટાવ્યાને {{count}} દિવસ",
       "overdue_other": "સમયમર્યાદા વટાવ્યાને {{count}} દિવસ",

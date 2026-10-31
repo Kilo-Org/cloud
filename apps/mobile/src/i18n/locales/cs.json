@@ -2135,7 +2135,6 @@
       "closedOn": "{{status}} dne {{date}}",
       "deadlineNotSet": "Termín není stanoven",
       "noSlaDeadline": "Bez termínu SLA",
-      "dueOn": "Termín: {{date}}",
       "overdueNow": "Po termínu",
       "overdue_one": "{{count}} den po termínu",
       "overdue_few": "{{count}} dny po termínu",

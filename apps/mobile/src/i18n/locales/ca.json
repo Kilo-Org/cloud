@@ -2108,7 +2108,6 @@
       "closedOn": "{{status}} el {{date}}",
       "deadlineNotSet": "Termini no establert",
       "noSlaDeadline": "Sense termini de l'SLA",
-      "dueOn": "Venç el {{date}}",
       "overdueNow": "Fora de termini",
       "overdue_one": "{{count}} dia de retard",
       "overdue_many": "{{count}} dies de retard",

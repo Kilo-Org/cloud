@@ -2162,7 +2162,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Skadenza mhux issettjata",
       "noSlaDeadline": "L-ebda skadenza tas-SLA",
-      "dueOn": "Skadenza: {{date}}",
       "overdueNow": "Skaduta",
       "overdue_one": "{{count}} jum wara l-iskadenza",
       "overdue_two": "{{count}} jiem tard",

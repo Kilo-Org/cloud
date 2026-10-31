@@ -2081,7 +2081,6 @@
       "closedOn": "{{date}} मा {{status}}",
       "deadlineNotSet": "म्याद तोकिएको छैन",
       "noSlaDeadline": "SLA म्याद छैन",
-      "dueOn": "म्याद: {{date}}",
       "overdueNow": "म्याद नाघेको",
       "overdue_one": "म्याद नाघेको {{count}} दिन",
       "overdue_other": "म्याद नाघेको {{count}} दिन",

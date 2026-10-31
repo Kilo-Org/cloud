@@ -2081,7 +2081,6 @@
       "closedOn": "{{date}}: {{status}}",
       "deadlineNotSet": "സമയപരിധി സജ്ജീകരിച്ചിട്ടില്ല",
       "noSlaDeadline": "SLA സമയപരിധിയില്ല",
-      "dueOn": "സമയപരിധി: {{date}}",
       "overdueNow": "സമയപരിധി കഴിഞ്ഞു",
       "overdue_one": "സമയപരിധി കഴിഞ്ഞിട്ട് {{count}} ദിവസം",
       "overdue_other": "സമയപരിധി കഴിഞ്ഞിട്ട് {{count}} ദിവസം",

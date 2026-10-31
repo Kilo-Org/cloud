@@ -2081,7 +2081,6 @@
       "closedOn": "{{date}} දින {{status}}",
       "deadlineNotSet": "නියමිත කාලය සකසා නොමැත",
       "noSlaDeadline": "SLA අවසන් දිනයක් නැත",
-      "dueOn": "{{date}} දින නියමිතයි",
       "overdueNow": "ප්‍රමාදයි",
       "dueToday": "අද නියමිතයි",
       "dueTomorrow": "හෙට නියමිතයි",

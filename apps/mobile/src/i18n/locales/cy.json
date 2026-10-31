@@ -2189,7 +2189,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Dyddiad terfyn heb ei osod",
       "noSlaDeadline": "Dim dyddiad terfyn SLA",
-      "dueOn": "I'w gwblhau erbyn {{date}}",
       "overdueNow": "Hwyr",
       "overdue_zero": "{{count}} diwrnod yn hwyr",
       "overdue_one": "{{count}} diwrnod yn hwyr",

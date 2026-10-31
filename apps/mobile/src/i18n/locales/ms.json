@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} pada {{date}}",
       "deadlineNotSet": "Tarikh akhir tidak ditetapkan",
       "noSlaDeadline": "Tiada tarikh akhir SLA",
-      "dueOn": "Tarikh akhir {{date}}",
       "overdueNow": "Lewat",
       "overdue_other": "Lewat {{count}} hari",
       "dueToday": "Tarikh akhir hari ini",

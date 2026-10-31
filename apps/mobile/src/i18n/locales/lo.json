@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} ເມື່ອ {{date}}",
       "deadlineNotSet": "ຍັງບໍ່ໄດ້ຕັ້ງວັນຄົບກຳນົດ",
       "noSlaDeadline": "ບໍ່ມີວັນຄົບກຳນົດ SLA",
-      "dueOn": "ຄົບກຳນົດ {{date}}",
       "overdueNow": "ເກີນກຳນົດ",
       "overdue_other": "ເກີນກຳນົດ {{count}} ມື້",
       "dueToday": "ຄົບກຳນົດມື້ນີ້",

@@ -1560,7 +1560,6 @@
       "closedOn": "{{status}} ב-{{date}}",
       "deadlineNotSet": "לא הוגדר מועד אחרון",
       "noSlaDeadline": "אין מועד אחרון לפי SLA",
-      "dueOn": "מועד אחרון: {{date}}",
       "overdueNow": "באיחור",
       "overdue_one": "איחור של {{count}} יום",
       "overdue_two": "איחור של {{count}} ימים",

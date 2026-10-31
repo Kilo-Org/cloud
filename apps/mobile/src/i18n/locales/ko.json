@@ -1552,7 +1552,6 @@
       "closedOn": "{{date}} · {{status}}",
       "deadlineNotSet": "마감일 미설정",
       "noSlaDeadline": "SLA 마감일 미지정",
-      "dueOn": "{{date}} 마감",
       "overdueNow": "기한 초과",
       "overdue_other": "기한 {{count}}일 초과",
       "dueToday": "오늘 마감",

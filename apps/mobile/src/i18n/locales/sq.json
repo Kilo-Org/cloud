@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} më {{date}}",
       "deadlineNotSet": "Afati nuk është caktuar",
       "noSlaDeadline": "Pa afat SLA",
-      "dueOn": "Afati më {{date}}",
       "overdueNow": "Me afat të kaluar",
       "overdue_one": "{{count}} ditë me vonesë",
       "overdue_other": "{{count}} ditë me vonesë",

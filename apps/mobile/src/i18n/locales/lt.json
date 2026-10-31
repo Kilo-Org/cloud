@@ -2135,7 +2135,6 @@
       "closedOn": "Būsena: {{status}}. Data: {{date}}",
       "deadlineNotSet": "Terminas nenustatytas",
       "noSlaDeadline": "Nėra SLA termino",
-      "dueOn": "Terminas {{date}}",
       "overdueNow": "Vėluojama",
       "overdue_one": "Vėluojama {{count}} dieną",
       "overdue_few": "vėluojama {{count}} dienas",

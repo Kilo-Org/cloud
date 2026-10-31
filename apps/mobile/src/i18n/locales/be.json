@@ -2135,7 +2135,6 @@
       "closedOn": "{{status}} · {{date}}",
       "deadlineNotSet": "Тэрмін не ўстаноўлены",
       "noSlaDeadline": "Тэрмін SLA не прызначаны",
-      "dueOn": "Тэрмін: {{date}}",
       "overdueNow": "Пратэрмінавана",
       "overdue_one": "Пратэрмінавана на {{count}} дзень",
       "overdue_few": "пратэрмінавана на {{count}} дні",

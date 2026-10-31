@@ -319,6 +319,8 @@ describe('FindingDetailsPanel dates block', () => {
     ]);
   });
 
+  // The row's own label names the deadline, so the value is the date alone: a
+  // "Due 11/2/2026" under "SLA deadline" says the same thing twice.
   it('keeps the deadline row on an open finding that still has one', () => {
     mocks.deadlineState = { kind: 'due-in', days: 12, deadline: new Date(0) };
     mocks.deadlineTone = 'warning';
@@ -330,7 +332,7 @@ describe('FindingDetailsPanel dates block', () => {
       'securityAgent.findingDetails.slaDeadline',
     ]);
     expect(dateRows()[2]).toMatchObject({
-      value: 'securityAgent.deadline.dueOn',
+      value: '1970-01-01T00:00:00.000Z',
       valueTone: 'warn',
       last: true,
     });

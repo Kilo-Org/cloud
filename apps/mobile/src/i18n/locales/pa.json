@@ -2081,7 +2081,6 @@
       "closedOn": "{{date}} ਨੂੰ {{status}}",
       "deadlineNotSet": "ਸਮਾਂ ਸੀਮਾ ਨਿਰਧਾਰਤ ਨਹੀਂ",
       "noSlaDeadline": "ਕੋਈ SLA ਸਮਾਂ ਸੀਮਾ ਨਹੀਂ",
-      "dueOn": "ਆਖ਼ਰੀ ਮਿਤੀ: {{date}}",
       "overdueNow": "ਮਿਆਦ ਲੰਘੀ",
       "overdue_one": "ਮਿਆਦ ਤੋਂ {{count}} ਦਿਨ ਵੱਧ",
       "overdue_other": "{{count}} ਦਿਨ ਦੀ ਦੇਰੀ",

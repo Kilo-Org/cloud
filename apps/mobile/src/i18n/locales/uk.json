@@ -1568,7 +1568,6 @@
       "closedOn": "{{status}}: {{date}}",
       "deadlineNotSet": "Термін не встановлено",
       "noSlaDeadline": "Терміну за SLA немає",
-      "dueOn": "Термін: {{date}}",
       "overdueNow": "Прострочено",
       "overdue_one": "прострочено на {{count}} день",
       "overdue_few": "прострочено на {{count}} дні",

@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} — {{date}}",
       "deadlineNotSet": "সময়সীমা নির্ধারিত নেই",
       "noSlaDeadline": "কোনো SLA সময়সীমা নেই",
-      "dueOn": "শেষ তারিখ: {{date}}",
       "overdueNow": "সময়সীমা পেরিয়েছে",
       "overdue_one": "{{count}} দিন বিলম্বিত",
       "overdue_other": "{{count}} দিন বিলম্বিত",

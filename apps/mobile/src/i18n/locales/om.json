@@ -2081,7 +2081,6 @@
       "closedOn": "{{date}} irratti {{status}}",
       "deadlineNotSet": "Guyyaan xumuraa hin murtoofne",
       "noSlaDeadline": "Guyyaan xumuraa SLA hin jiru",
-      "dueOn": "Guyyaa xumuraa: {{date}}",
       "overdueNow": "Yeroon itti darbe",
       "overdue_one": "Yeroon isaa guyyaa {{count}} darbeera",
       "overdue_other": "Yeroon isaa guyyaa {{count}} darbe",

@@ -1568,7 +1568,6 @@
       "closedOn": "{{status}} · Data: {{date}}",
       "deadlineNotSet": "Nie ustawiono terminu",
       "noSlaDeadline": "Brak terminu SLA",
-      "dueOn": "Termin: {{date}}",
       "overdueNow": "Po terminie",
       "overdue_one": "{{count}} dzień po terminie",
       "overdue_few": "{{count}} dni po terminie",

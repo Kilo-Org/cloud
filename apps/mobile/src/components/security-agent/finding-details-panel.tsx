@@ -255,6 +255,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         <KvRow
           label={t('securityAgent.findingDetails.vulnerableVersions')}
           value={firstNonEmpty(finding.vulnerable_version_range, t('common.unknown'))}
+          valueDirection="ltr"
           selectable
         />
         <KvRow
@@ -263,15 +264,22 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             finding.patched_version,
             t('securityAgent.findingDetails.noPatchAvailable')
           )}
+          valueDirection="ltr"
           selectable
         />
         {finding.cve_id ? (
-          <KvRow label={t('securityAgent.findingDetails.cve')} value={finding.cve_id} selectable />
+          <KvRow
+            label={t('securityAgent.findingDetails.cve')}
+            value={finding.cve_id}
+            valueDirection="ltr"
+            selectable
+          />
         ) : null}
         {finding.ghsa_id ? (
           <KvRow
             label={t('securityAgent.findingDetails.ghsa')}
             value={finding.ghsa_id}
+            valueDirection="ltr"
             selectable
           />
         ) : null}

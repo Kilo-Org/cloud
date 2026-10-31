@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Ba a saita wa'adi ba",
       "noSlaDeadline": "Babu wa'adin SLA",
-      "dueOn": "Wa'adi zai cika {{date}}",
       "overdueNow": "Wa'adi ya wuce",
       "overdue_one": "Wa'adin ya wuce da kwana {{count}}",
       "overdue_other": "An wuce wa'adi da kwanaki {{count}}",

@@ -2081,7 +2081,6 @@
       "closedOn": "{{date}} کو {{status}}",
       "deadlineNotSet": "آخری تاریخ مقرر نہیں",
       "noSlaDeadline": "SLA کی کوئی آخری تاریخ نہیں",
-      "dueOn": "مقررہ تاریخ: {{date}}",
       "overdueNow": "مہلت گزر گئی",
       "overdue_one": "{{count}} دن کی تاخیر",
       "overdue_other": "{{count}} دن کی تاخیر",

@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} ngo-{{date}}",
       "deadlineNotSet": "Umnqamulajuqu awukabekwa",
       "noSlaDeadline": "Awukho umnqamulajuqu we-SLA",
-      "dueOn": "Umnqamulajuqu: {{date}}",
       "overdueNow": "Kudlule umnqamulajuqu",
       "overdue_one": "Kudlule umnqamulajuqu ngosuku olungu-{{count}}",
       "overdue_other": "Kwephuze ngezinsuku ezingu-{{count}}",

@@ -1528,7 +1528,6 @@
       "closedOn": "{{status}} le {{date}}",
       "deadlineNotSet": "Aucune échéance définie",
       "noSlaDeadline": "Aucune échéance de SLA",
-      "dueOn": "Échéance le {{date}}",
       "overdueNow": "En retard",
       "overdue_one": "{{count}} jour de retard",
       "overdue_many": "{{count}} jours de retard",

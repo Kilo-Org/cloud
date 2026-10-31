@@ -2108,7 +2108,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Termiņš nav noteikts",
       "noSlaDeadline": "Nav SLA termiņa",
-      "dueOn": "Termiņš {{date}}",
       "overdueNow": "Nokavēts",
       "overdue_zero": "Nokavēts par {{count}} dienām",
       "overdue_one": "Nokavēts par {{count}} dienu",

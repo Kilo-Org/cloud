@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}}՝ {{date}}",
       "deadlineNotSet": "Վերջնաժամկետ սահմանված չէ",
       "noSlaDeadline": "SLA-ի վերջնաժամկետ չկա",
-      "dueOn": "Վերջնաժամկետը՝ {{date}}",
       "overdueNow": "Ժամկետանց",
       "overdue_one": "{{count}} օրով ժամկետանց",
       "overdue_other": "{{count}} օր ուշացած",

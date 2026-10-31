@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} o {{date}}",
       "deadlineNotSet": "Prazo sen definir",
       "noSlaDeadline": "Sen prazo do SLA",
-      "dueOn": "Vence o {{date}}",
       "overdueNow": "Fóra de prazo",
       "overdue_one": "{{count}} día de atraso",
       "overdue_other": "{{count}} días de atraso",

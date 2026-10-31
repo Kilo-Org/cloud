@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} در {{date}}",
       "deadlineNotSet": "مهلتی تعیین نشده است",
       "noSlaDeadline": "بدون مهلت SLA",
-      "dueOn": "سررسید {{date}}",
       "overdueNow": "معوق",
       "overdue_one": "{{count}} روز تأخیر",
       "overdue_other": "{{count}} روز تأخیر",

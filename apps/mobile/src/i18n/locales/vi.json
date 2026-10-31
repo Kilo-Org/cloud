@@ -1552,7 +1552,6 @@
       "closedOn": "{{status}} vào {{date}}",
       "deadlineNotSet": "Chưa đặt hạn chót",
       "noSlaDeadline": "Không có hạn chót SLA",
-      "dueOn": "Đến hạn {{date}}",
       "overdueNow": "Quá hạn",
       "overdue_other": "Quá hạn {{count}} ngày",
       "dueToday": "Đến hạn hôm nay",

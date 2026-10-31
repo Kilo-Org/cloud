@@ -2081,7 +2081,6 @@
       "closedOn": "{{date}} ରେ {{status}}",
       "deadlineNotSet": "ସମୟସୀମା ଧାର୍ଯ୍ୟ ହୋଇନାହିଁ",
       "noSlaDeadline": "କୌଣସି SLA ସମୟସୀମା ନାହିଁ",
-      "dueOn": "ଶେଷ ତାରିଖ: {{date}}",
       "overdueNow": "ବିଳମ୍ବିତ",
       "dueToday": "ଆଜି ଶେଷ ଦିନ",
       "dueTomorrow": "ଆସନ୍ତାକାଲି ଶେଷ ଦିନ",

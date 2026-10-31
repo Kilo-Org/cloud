@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Waqtiga kama-dambaysta ah lama dejin",
       "noSlaDeadline": "Ma jiro waqti kama-dambays ah oo SLA ah",
-      "dueOn": "Waqtigu wuxuu dhammaanayaa {{date}}",
       "overdueNow": "Waqtigii dhaafay",
       "overdue_one": "Waqtigii dhaafay {{count}} maalin",
       "overdue_other": "{{count}} maalmood ayaa muddadii laga gudbay",

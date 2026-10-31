@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "ვადა დაუდგენელია",
       "noSlaDeadline": "SLA ვადა არ არის",
-      "dueOn": "ვადა: {{date}}",
       "overdueNow": "ვადაგადაცილებული",
       "overdue_one": "ვადას გადაცილებულია {{count}} დღით",
       "overdue_other": "ვადა {{count}} დღით გადაცილებულია",

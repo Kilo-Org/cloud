@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} لە {{date}}",
       "deadlineNotSet": "مۆڵەت دیارینەکراوە",
       "noSlaDeadline": "هیچ مۆڵەتێکی SLA نییە",
-      "dueOn": "کۆتایی مۆڵەت: {{date}}",
       "overdueNow": "دواکەوتوو",
       "overdue_one": "{{count}} ڕۆژ دواکەوتوو",
       "overdue_other": "{{count}} ڕۆژ دواکەوتوو",

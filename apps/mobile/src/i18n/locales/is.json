@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} þann {{date}}",
       "deadlineNotSet": "Frestur ekki ákveðinn",
       "noSlaDeadline": "Enginn SLA-frestur",
-      "dueOn": "Frestur til {{date}}",
       "overdueNow": "Frestur liðinn",
       "overdue_one": "{{count}} dagur umfram frest",
       "overdue_other": "{{count}} dagar fram yfir frest",

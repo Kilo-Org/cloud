@@ -2081,7 +2081,6 @@
       "closedOn": "په {{date}} {{status}}",
       "deadlineNotSet": "وروستۍ نېټه نه ده ټاکل شوې",
       "noSlaDeadline": "د SLA وروستۍ نېټه نشته",
-      "dueOn": "وروستۍ نېټه: {{date}}",
       "overdueNow": "له مهلته تېر",
       "overdue_one": "{{count}} ورځ له مهلته تېر",
       "overdue_other": "{{count}} ورځې له ټاکلي وخت تېرې دي",

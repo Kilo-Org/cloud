@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} στις {{date}}",
       "deadlineNotSet": "Η προθεσμία δεν έχει οριστεί",
       "noSlaDeadline": "Χωρίς προθεσμία SLA",
-      "dueOn": "Λήγει στις {{date}}",
       "overdueNow": "Εκπρόθεσμο",
       "overdue_one": "{{count}} ημέρα καθυστέρησης",
       "overdue_other": "{{count}} ημέρες καθυστέρησης",

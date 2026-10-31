@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} · {{date}}",
       "deadlineNotSet": "Ez da eperik ezarri",
       "noSlaDeadline": "SLAren epemugarik gabe",
-      "dueOn": "Epemuga: {{date}}",
       "overdueNow": "Epez kanpo",
       "overdue_one": "{{count}} egun atzeratuta",
       "overdue_other": "{{count}} egun atzeratuta",

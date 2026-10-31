@@ -2162,7 +2162,6 @@
       "closedOn": "{{status}}: {{date}}",
       "deadlineNotSet": "Gan spriocdháta socraithe",
       "noSlaDeadline": "Gan spriocdháta SLA",
-      "dueOn": "Dlite: {{date}}",
       "overdueNow": "Thar téarma",
       "overdue_one": "{{count}} lá thar téarma",
       "overdue_two": "{{count}} lá thar téarma",

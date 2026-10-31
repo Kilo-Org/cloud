@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Muda wa mwisho haujawekwa",
       "noSlaDeadline": "Hakuna muda wa mwisho wa SLA",
-      "dueOn": "Muda unaisha {{date}}",
       "overdueNow": "Muda umepita",
       "overdue_one": "Muda umepita kwa siku {{count}}",
       "overdue_other": "Imechelewa kwa siku {{count}}",

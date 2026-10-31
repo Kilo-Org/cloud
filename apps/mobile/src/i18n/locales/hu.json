@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}}: {{date}}",
       "deadlineNotSet": "Nincs határidő beállítva",
       "noSlaDeadline": "Nincs SLA-határidő",
-      "dueOn": "Esedékes: {{date}}",
       "overdueNow": "Lejárt",
       "overdue_one": "{{count}} napja lejárt",
       "overdue_other": "{{count}} napja lejárt",

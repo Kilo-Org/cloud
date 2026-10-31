@@ -1552,7 +1552,6 @@
       "closedOn": "{{date}} को {{status}}",
       "deadlineNotSet": "समय सीमा निर्धारित नहीं",
       "noSlaDeadline": "SLA की कोई समय सीमा नहीं",
-      "dueOn": "अंतिम तारीख: {{date}}",
       "overdueNow": "विलंबित",
       "overdue_one": "समय सीमा से {{count}} दिन की देरी",
       "overdue_other": "{{count}} दिन की देरी",

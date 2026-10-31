@@ -1584,7 +1584,6 @@
       "closedOn": "{{status}} في {{date}}",
       "deadlineNotSet": "الموعد النهائي غير محدد",
       "noSlaDeadline": "لا يوجد موعد نهائي حسب SLA",
-      "dueOn": "مستحق في {{date}}",
       "overdueNow": "متأخر",
       "overdue_zero": "أيام التأخير: {{count}}",
       "overdue_one": "متأخر بيوم واحد ({{count}})",

@@ -1552,7 +1552,6 @@
       "closedOn": "{{status}} pada {{date}}",
       "deadlineNotSet": "Tenggat belum ditetapkan",
       "noSlaDeadline": "Tidak ada tenggat SLA",
-      "dueOn": "Jatuh tempo {{date}}",
       "overdueNow": "Terlambat",
       "overdue_other": "Terlambat {{count}} hari",
       "dueToday": "Jatuh tempo hari ini",

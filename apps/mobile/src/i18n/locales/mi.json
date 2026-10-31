@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} i te {{date}}",
       "deadlineNotSet": "Kāore anō kia whakaritea he wā kati",
       "noSlaDeadline": "Kāore he wā kati SLA",
-      "dueOn": "Me whakatutuki i te {{date}}",
       "overdueNow": "Kua tōmuri",
       "overdue_one": "{{count}} rā kua tōmuri",
       "overdue_other": "{{count}} rā kua tōmuri",

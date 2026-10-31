@@ -2081,7 +2081,6 @@
       "closedOn": "{{status}} den {{date}}",
       "deadlineNotSet": "Frist ikke angivet",
       "noSlaDeadline": "Ingen SLA-frist",
-      "dueOn": "Frist den {{date}}",
       "overdueNow": "Frist overskredet",
       "overdue_one": "Frist overskredet med {{count}} dag",
       "overdue_other": "Frist overskredet med {{count}} dage",

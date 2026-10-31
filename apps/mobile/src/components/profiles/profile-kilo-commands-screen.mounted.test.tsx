@@ -355,9 +355,13 @@ describe('ProfileKiloCommandsScreen row controls', () => {
   // state in Material teal and read as disabled against the card.
   it('tints the enable switch from theme tokens instead of the platform accent', async () => {
     h.colorScheme.current = 'light';
+    h.query.data = [testCommand({ enabled: false }), testCommand({ id: 'cmd-2', name: 'deploy' })];
     const { renderer, unmount } = await mountScreen();
 
+    // Both states keep the white thumb and the gray track; the dark pair here
+    // would be the regression the dark case above also catches from its side.
     expect(switchColors(renderer.root)).toEqual([
+      { track: { false: THEME.mutedSoft, true: THEME.primary }, thumb: THEME.primaryForeground },
       { track: { false: THEME.mutedSoft, true: THEME.primary }, thumb: THEME.primaryForeground },
     ]);
 

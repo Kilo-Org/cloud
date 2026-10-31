@@ -48,20 +48,20 @@ export function PreferenceRow({
 }: PreferenceRowProps) {
   const colors = useThemeColors();
   const isDark = useColorScheme() === 'dark';
-  // The row paints on `bg-secondary`, and Android resolves a native switch's
-  // track and thumb from the device theme when it is given neither: its off
-  // track came out `#ECECEC` over this row's light `#F0EEE6`, 1.02:1, so the
-  // off control read as two barely-visible grey marks. The track is filled with
-  // the scheme's mid ink and the thumb with the on-primary ink, so the knob
-  // reads as a knob on either side of the switch: the light off track is
-  // `#6F6A61` (4.5:1 on the light row, 5.2:1 against the white thumb) and the
-  // dark one is `#C4C1B8` (9.2:1 on the dark row, 9.8:1 against the dark
-  // thumb). The light track on its own was too close to the dark row's
-  // `#1F1F24` for the dark thumb to sit on it.
-  const switchColors = {
-    thumbColor: colors.primaryForeground,
-    trackColor: { false: isDark ? colors.ink2 : colors.mutedForeground, true: colors.primary },
-  };
+  // The shared `Switch` already paints the dark scheme: a light grip on the
+  // muted ink, which reads as a knob in a dark row. What it cannot know is this
+  // row's light surface: its off track is `mutedSoft`, 2.1:1 over the row's
+  // `#F0EEE6` card, and Android's own default before it was 1.02:1, so the off
+  // control read as two barely-visible grey marks. The light scheme therefore
+  // overrides both halves with the muted ink `#6F6A61` (4.6:1 on the row) under
+  // the white grip (5.2:1 over that track). The dark scheme passes nothing and
+  // takes the shared pair.
+  const switchColors = isDark
+    ? undefined
+    : {
+        thumbColor: colors.primaryForeground,
+        trackColor: { false: colors.mutedForeground, true: colors.primary },
+      };
   // Both ways of moving the switch flip the same value: a tap on the row and a
   // tap on the thumb can arrive in either order, and a burst must not build one
   // flip from the rendered value and the next from the native thumb state.
@@ -143,8 +143,8 @@ export function PreferenceRow({
       <Switch
         value={value}
         disabled={disabled}
-        thumbColor={switchColors.thumbColor}
-        trackColor={switchColors.trackColor}
+        thumbColor={switchColors?.thumbColor}
+        trackColor={switchColors?.trackColor}
         accessibilityLabel={title}
         accessibilityHint={subtitle}
         accessibilityState={{ disabled, busy, checked: value }}

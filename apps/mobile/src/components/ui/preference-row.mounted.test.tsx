@@ -237,27 +237,35 @@ describe('PreferenceRow', () => {
     expect(copies[1]?.props.className).toContain('-ms-[100%]');
   });
 
-  it.each([
-    ['light', lightColors.secondary],
-    ['dark', darkColors.secondary],
-  ] as const)('keeps the off switch at 3:1 against the %s row it sits on', (scheme, rowSurface) => {
-    // Without these colours Android draws its own off track from the device
-    // theme: `#ECECEC` over the light row's `#F0EEE6` is 1.02:1, so the off
-    // control disappears into the card.
-    schemeState.current = scheme;
+  it('keeps the light off switch at 3:1 against the row it sits on', () => {
+    // Left alone on this light row, the shared switch's `mutedSoft` track sits
+    // at 2.1:1 over the `#F0EEE6` card, and Android's own default before it was
+    // 1.02:1, so the off control read as two barely-visible grey marks.
+    schemeState.current = 'light';
     const root = renderRow({ value: false, onValueChange: () => undefined });
     const toggle = root.find(node => Object.is(node.type, 'Switch'));
     const trackColor = toggle.props.trackColor as { false: string; true: string };
     const thumbColor = toggle.props.thumbColor as string;
 
-    expect(contrast(trackColor.false, rowSurface)).toBeGreaterThanOrEqual(3);
+    expect(trackColor.false).toBe(lightColors.mutedForeground);
+    expect(trackColor.true).toBe(lightColors.primary);
+    expect(contrast(trackColor.false, lightColors.secondary)).toBeGreaterThanOrEqual(3);
     expect(contrast(thumbColor, trackColor.false)).toBeGreaterThanOrEqual(3);
-    expect(trackColor.true).toBe(scheme === 'dark' ? darkColors.primary : lightColors.primary);
-    // The dark scheme fills the off track with the light ink: its thumb is the
-    // dark on-primary ink, and the muted ink it used to carry left the knob
-    // reading as another shadow on the row.
-    expect(trackColor.false).toBe(
-      scheme === 'dark' ? darkColors.ink2 : lightColors.mutedForeground
-    );
+  });
+
+  it('leaves the dark switch to the shared component, whose off grip is light', () => {
+    // The dark pair belongs to the shared `Switch`: a `foreground` grip on the
+    // muted ink. Passing the light scheme's pair here would paint a near-black
+    // grip on the off track and lose the knob in the dark row.
+    schemeState.current = 'dark';
+    const root = renderRow({ value: false, onValueChange: () => undefined });
+    const toggle = root.find(node => Object.is(node.type, 'Switch'));
+    const trackColor = toggle.props.trackColor as { false: string; true: string };
+
+    expect(toggle.props.thumbColor).toBe(darkColors.foreground);
+    expect(trackColor.false).toBe(darkColors.mutedForeground);
+    expect(trackColor.true).toBe(darkColors.primary);
+    expect(contrast(toggle.props.thumbColor as string, trackColor.false)).toBeGreaterThanOrEqual(3);
+    expect(contrast(trackColor.false, darkColors.secondary)).toBeGreaterThanOrEqual(3);
   });
 });

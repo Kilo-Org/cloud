@@ -26,6 +26,7 @@ import {
   deleteProjectWebhook,
   fetchGitLabProjects,
   fetchGitLabBranches,
+  fetchGitLabBoundToAddress,
   fetchGitLabRootTextFileAtRef,
   fetchGitLabRepositorySize,
   findKiloReviewNote,
@@ -630,6 +631,70 @@ describe('fetchGitLabProjects', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('keeps the deadline over a host lookup that does not answer', async () => {
+    jest.useFakeTimers();
+    try {
+      mockLookup.mockImplementation(() => new Promise(() => {}));
+
+      const read = fetchGitLabProjects('test-token', 'https://gitlab.example.com');
+      const failure = expect(read).rejects.toThrow(
+        `GitLab pagination limit exceeded: project listing did not finish within ${GITLAB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+      await jest.advanceTimersByTimeAsync(GITLAB_LISTING_TIMEOUT_MS);
+      await failure;
+
+      expect(mockHttpsRequest).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('drops the deadline listener of a request once it settles', async () => {
+    mockHttpsRequest.mockImplementationOnce((_options, callback) => {
+      const response = new PassThrough() as PassThrough & {
+        statusCode?: number;
+        statusMessage?: string;
+        headers: Record<string, string>;
+      };
+      response.statusCode = 200;
+      response.statusMessage = 'OK';
+      response.headers = { 'content-type': 'application/json' };
+
+      const request = new EventEmitter() as EventEmitter & {
+        write: jest.Mock;
+        end: jest.Mock;
+        destroy: jest.Mock;
+        setTimeout: jest.Mock;
+      };
+      request.write = jest.fn();
+      request.destroy = jest.fn();
+      request.setTimeout = jest.fn();
+      request.end = jest.fn(() => {
+        callback?.(response as never);
+        response.end('[]');
+      });
+      return request as never;
+    });
+    const signal = {
+      aborted: false,
+      reason: undefined,
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+    } as unknown as AbortSignal;
+
+    await fetchGitLabBoundToAddress(
+      {
+        url: new URL('https://gitlab.example.com/api/v4/projects'),
+        address: '93.184.216.34',
+        family: 4,
+      },
+      { signal }
+    );
+
+    expect(signal.addEventListener).toHaveBeenCalledTimes(1);
+    expect(signal.removeEventListener).toHaveBeenCalledTimes(1);
   });
 
   it('reports an error when a provider signals a huge x-total-pages with full pages', async () => {

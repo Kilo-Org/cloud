@@ -1119,7 +1119,7 @@
       "sortSeverityDesc": "Gravità: da alta a bassa",
       "sortSlaDue": "Scadenza SLA",
       "statusIgnored": "Ignorata",
-      "statusOpen": "Apri"
+      "statusOpen": "Aperta"
     },
     "analysis": {
       "analyzeRepository": "Analizza il repository",
@@ -1342,7 +1342,7 @@
       "supersededByDescription": "Tocca per aprire la scheda aggiornata con lo stato, l'analisi e la correzione.",
       "viewAdvisory": "Visualizza l'avviso di sicurezza su GitHub",
       "vulnerableVersions": "Versioni vulnerabili",
-      "statusOpen": "Apri",
+      "statusOpen": "Aperta",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "correzione già in corso",
       "reasonNoBandwidth": "nessuna risorsa disponibile",

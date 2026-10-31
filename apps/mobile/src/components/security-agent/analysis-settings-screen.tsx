@@ -18,6 +18,7 @@ import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
@@ -184,7 +185,12 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
                   key={option.value}
                   disabled={!canManage}
                   className={cn(
-                    'flex-1 items-center rounded-full py-2 active:opacity-70',
+                    // The pill's own node has to carry the floor: its
+                    // `py-2` frame alone renders under the design target.
+                    // `justify-center` keeps the one-line label centred in the
+                    // taller box; a column default would leave it at the top.
+                    ROW_TARGET_CLASS,
+                    'flex-1 items-center justify-center rounded-full py-2 active:opacity-70',
                     active && 'bg-foreground',
                     !canManage && 'opacity-50'
                   )}

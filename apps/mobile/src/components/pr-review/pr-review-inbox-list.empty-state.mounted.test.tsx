@@ -1,4 +1,5 @@
-// The empty slot must never speak another state's accessibility label.
+// The empty slot has two jobs: it must never speak another state's
+// accessibility label, and it must not resize under the sections below it.
 //
 // The explorer opened PR Review on Android and TalkBack announced "Loading
 // inbox" over the reconnecting provider's error card. Both states drew a plain
@@ -6,6 +7,9 @@
 // into ONE host view and the loading state's label stayed on it while its
 // children became the notice and its button. Each state renders under its own
 // element identity now; this suite pins that on the loading -> reconnect edge.
+// The same settling also shrank the slot by ~69 dp and pulled the RECENT
+// section up (design-gate layout shift), so the slot keeps the height of the
+// skeleton it replaced.
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -164,5 +168,74 @@ describe('PrReviewInboxList empty-state accessibility identity', () => {
     // The card carries no container label of its own: its title, message and
     // button are read as themselves.
     expect(notices[0]?.parent?.props.accessibilityLabel).toBeUndefined();
+  });
+});
+
+function slotOf(node: TestRenderer.ReactTestInstance | undefined): TestRenderer.ReactTestInstance {
+  let current = node?.parent ?? null;
+  while (current) {
+    if (typeof current.props.onLayout === 'function') {
+      return current;
+    }
+    current = current.parent;
+  }
+  throw new Error('the empty body has no slot container');
+}
+
+function settleOnReconnect(renderer: TestRenderer.ReactTestRenderer): void {
+  inboxState.isPending = false;
+  inboxState.firstPageErrorState = { kind: 'reconnect' };
+  inboxState.firstPageErrorPlatform = 'bitbucket';
+  act(() => {
+    renderer.update(createElement(PrReviewInboxList, { header: null, recents: null }));
+  });
+}
+
+// The skeletons are five rows; the reconnect card is shorter. Letting the slot
+// shrink moved the RECENT section below it by 68.6 dp after the screen had
+// settled, which the design gate reports as a layout shift. The slot therefore
+// remembers the height it had while loading and keeps it for every settled
+// body, so nothing below it moves.
+describe('PrReviewInboxList empty-slot reservation', () => {
+  beforeEach(() => {
+    inboxState.isPending = true;
+    inboxState.items = [];
+    inboxState.firstPageErrorState = null;
+    inboxState.firstPageErrorPlatform = null;
+    inboxState.organizationId = null;
+    inboxState.laterPageError = false;
+  });
+
+  it('keeps the settled body in the height the skeletons measured', () => {
+    const renderer = mountInboxList();
+    const [loading] = renderer.root.findAll(
+      node => node.props.accessibilityLabel === LOADING_LABEL
+    );
+    const slot = slotOf(loading);
+    // While the skeletons are up the slot is exactly as tall as they are.
+    expect(slot.props.style).toBeUndefined();
+    expect(typeof slot.props.onLayout).toBe('function');
+    const reportLayout = slot.props.onLayout as (event: {
+      nativeEvent: { layout: { height: number } };
+    }) => void;
+    act(() => {
+      reportLayout({ nativeEvent: { layout: { height: 253.75 } } });
+    });
+    expect(slot.props.style).toBeUndefined();
+
+    settleOnReconnect(renderer);
+
+    const [notice] = renderer.root.findAll(node => String(node.type) === 'PrReviewReconnectNotice');
+    expect(slotOf(notice).props.style).toEqual({ minHeight: 253.75 });
+  });
+
+  it('leaves the slot to its own content when nothing was measured', () => {
+    inboxState.isPending = false;
+    inboxState.firstPageErrorState = { kind: 'reconnect' };
+    inboxState.firstPageErrorPlatform = 'bitbucket';
+    const renderer = mountInboxList();
+
+    const [notice] = renderer.root.findAll(node => String(node.type) === 'PrReviewReconnectNotice');
+    expect(slotOf(notice).props.style).toBeUndefined();
   });
 });

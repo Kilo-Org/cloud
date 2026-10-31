@@ -101,14 +101,13 @@ describe('bot callback token', () => {
   });
 
   it('allows the legacy derivation only for requests created before the cutoff', () => {
-    expect(isLegacyBotCallbackTokenAllowed(new Date(LEGACY_BOT_CALLBACK_TOKEN_CUTOFF_MS - 1))).toBe(
-      true
-    );
-    expect(isLegacyBotCallbackTokenAllowed(new Date(LEGACY_BOT_CALLBACK_TOKEN_CUTOFF_MS))).toBe(
-      false
-    );
-    expect(isLegacyBotCallbackTokenAllowed('2026-09-07T00:00:00.000Z')).toBe(true);
-    expect(isLegacyBotCallbackTokenAllowed('2026-12-01T00:00:00.000Z')).toBe(false);
+    const beforeCutoff = new Date(LEGACY_BOT_CALLBACK_TOKEN_CUTOFF_MS - 1);
+    const atCutoff = new Date(LEGACY_BOT_CALLBACK_TOKEN_CUTOFF_MS);
+
+    expect(isLegacyBotCallbackTokenAllowed(beforeCutoff)).toBe(true);
+    expect(isLegacyBotCallbackTokenAllowed(beforeCutoff.toISOString())).toBe(true);
+    expect(isLegacyBotCallbackTokenAllowed(atCutoff)).toBe(false);
+    expect(isLegacyBotCallbackTokenAllowed(atCutoff.toISOString())).toBe(false);
     expect(isLegacyBotCallbackTokenAllowed('not-a-date')).toBe(false);
   });
 });

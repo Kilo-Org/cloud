@@ -10,8 +10,14 @@ export const BOT_CALLBACK_TOKEN_SCOPE = 'bot-session-callback';
  * scoped token rolled out: their stored callback target already carries the
  * older token, and nothing else re-mints it. Valid only for bot requests
  * created before this instant, so the branch drains and can then be deleted.
+ *
+ * The instant must stay comfortably later than any deploy that can still have
+ * such a session in flight; a cutoff close to the code freeze makes the branch
+ * do nothing for a merge that slips. Both derivations use the same dedicated
+ * callback secret, so the window adds no new key exposure, only one more
+ * removal step: delete the branch and this constant once it has passed.
  */
-export const LEGACY_BOT_CALLBACK_TOKEN_CUTOFF_MS = Date.parse('2026-11-15T00:00:00.000Z');
+export const LEGACY_BOT_CALLBACK_TOKEN_CUTOFF_MS = Date.parse('2027-03-31T00:00:00.000Z');
 
 export type BotCallbackTokenMatch = 'scoped' | 'legacy';
 

@@ -1,6 +1,7 @@
 import { createHmac } from 'crypto';
 import { NextRequest } from 'next/server';
 import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
+import { LEGACY_BOT_CALLBACK_TOKEN_CUTOFF_MS } from '@/lib/bot/callback-token';
 
 const BOT_CALLBACK_SECRET = 'callback-secret';
 const BOT_CALLBACK_TOKEN_SCOPE = 'bot-session-callback';
@@ -696,12 +697,12 @@ describe('callback authentication', () => {
   });
 
   test('accepts the compatibility derivation for requests created before the cutover', async () => {
-    requestCreatedAt = '2026-09-07T00:00:00.000Z';
+    requestCreatedAt = new Date(LEGACY_BOT_CALLBACK_TOKEN_CUTOFF_MS - 24 * 60 * 60 * 1000);
     await expect(post(legacyBotCallbackToken(botRequestId))).resolves.toBe(200);
   });
 
   test('rejects the compatibility derivation for requests created after the cutover', async () => {
-    requestCreatedAt = new Date('2026-12-01T00:00:00.000Z');
+    requestCreatedAt = new Date(LEGACY_BOT_CALLBACK_TOKEN_CUTOFF_MS + 24 * 60 * 60 * 1000);
     await expect(post(legacyBotCallbackToken(botRequestId))).resolves.toBe(401);
   });
 });

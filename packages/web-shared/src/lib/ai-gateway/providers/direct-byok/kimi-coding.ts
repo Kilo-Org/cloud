@@ -11,6 +11,7 @@ import {
 
 export default {
   id: 'kimi-coding',
+  openrouter_inference_provider_id: 'moonshotai',
   ...apiKeyUpstream({
     apiUrl: 'https://api.kimi.com/coding/v1',
     supportedChatApis: ['chat_completions'],

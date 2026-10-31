@@ -19,6 +19,8 @@ export type ProviderRow = {
   headquarters?: string;
   datacenters?: string[];
   unavailableReason?: string;
+  /** Kilo never routes to this provider; it only serves the organization's own keys. */
+  byokOnly?: boolean;
 };
 
 export type OfferingPricing = {
@@ -35,6 +37,7 @@ export type ProviderOffering = OfferingPricing & {
   providerIconUrl: string | null;
   trains: boolean;
   retainsPrompts: boolean;
+  byokOnly?: boolean;
 };
 
 export type ProviderModelRow = OfferingPricing & {

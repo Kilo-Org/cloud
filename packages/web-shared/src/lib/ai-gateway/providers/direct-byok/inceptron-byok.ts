@@ -7,6 +7,7 @@ import {
 
 export default {
   id: 'inceptron-byok',
+  openrouter_inference_provider_id: 'inceptron',
   models_dev_id: 'inceptron',
   ...apiKeyUpstream({
     apiUrl: 'https://api.inceptron.io/v1',

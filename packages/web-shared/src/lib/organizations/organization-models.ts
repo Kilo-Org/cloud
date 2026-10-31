@@ -14,10 +14,8 @@ import {
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { listAvailableCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
-import {
-  getDirectByokCatalogModelIds,
-  getDirectByokModelsForOrganization,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { getDirectByokModelsForOrganization } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { getAllowedDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { isOrganizationAutoEnabled } from '@kilocode/web-shared/lib/organizations/organization-auto-model';
 import {
@@ -80,7 +78,7 @@ export async function getAvailableModelsForOrganization(
   const [responseData, byokProviderIds, directByokCatalogModelIds] = await Promise.all([
     getEnhancedOpenRouterModels({ countryCode }),
     getOrganizationByokProviderIds(readDb, organizationId),
-    getDirectByokCatalogModelIds({ type: 'organization', id: organizationId }),
+    getAllowedDirectByokCatalogModelIds(organizationId, policy),
   ]);
   const restrictionCandidates = [...responseData.data];
 
@@ -151,15 +149,14 @@ async function applyModelPolicyToCatalog(
   const inferenceCheck = { checked: 0, withoutProviders: 0 };
   for (const model of candidates) {
     const decision = await getEffectiveModelDecision(policy, model.id);
-    if (!decision.allowed) {
+    if (!decision.allowed && !directByokCatalogModelIds.has(model.id)) {
       if (!allowsInferenceProviderUserByok(decision)) {
         continue;
       }
       inferenceCheck.checked += 1;
       const hasInferenceProviderByok = await hasInferenceProviderUserByokForModel(
         model.id,
-        byokProviderIds,
-        directByokCatalogModelIds
+        byokProviderIds
       );
       if (!hasInferenceProviderByok) {
         inferenceCheck.withoutProviders += 1;

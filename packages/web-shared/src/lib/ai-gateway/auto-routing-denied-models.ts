@@ -16,7 +16,10 @@ import {
   resolveOrganizationMemberModelPolicy,
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
-import { modelsServedByOrganizationInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
+import {
+  getAllowedDirectByokCatalogModelIds,
+  modelsServedByOrganizationInferenceProviderUserByok,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 
 export function policyNeedsCandidateEvaluation(policy: EffectiveOrganizationModelPolicy): boolean {
   return (
@@ -75,17 +78,28 @@ export async function deniedAutoRoutingCandidates(
 
   const uniqueCandidates = [...new Set(candidateIds.filter(id => !isVirtualAutoModelId(id)))];
   const allowed = new Set<string>();
+  const denied: string[] = [];
   const allowedForInferenceProviderUserByok: string[] = [];
   await Promise.all(
     uniqueCandidates.map(async modelId => {
       const decision = await getEffectiveModelDecision(policy, modelId);
       if (decision.allowed) {
         allowed.add(modelId);
-      } else if (allowsInferenceProviderUserByok(decision)) {
+        return;
+      }
+      denied.push(modelId);
+      if (allowsInferenceProviderUserByok(decision)) {
         allowedForInferenceProviderUserByok.push(modelId);
       }
     })
   );
+  const directByokCatalogModelIds =
+    denied.length > 0
+      ? await getAllowedDirectByokCatalogModelIds(policy.customLlmGrantee.organizationId, policy)
+      : new Set<string>();
+  for (const modelId of denied) {
+    if (directByokCatalogModelIds.has(modelId)) allowed.add(modelId);
+  }
   for (const modelId of await modelsServedByOrganizationInferenceProviderUserByok(
     policy.customLlmGrantee.organizationId,
     allowedForInferenceProviderUserByok

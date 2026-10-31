@@ -7,6 +7,7 @@ import {
 
 export default {
   id: 'morph-byok',
+  openrouter_inference_provider_id: 'morph',
   models_dev_id: 'morph',
   ...apiKeyUpstream({
     apiUrl: 'https://api.morphllm.com/v1',

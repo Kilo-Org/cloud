@@ -194,41 +194,23 @@ describe('addUserByokAvailability', () => {
 });
 
 describe('hasInferenceProviderUserByokForModel', () => {
-  const noCatalogModels: ReadonlySet<string> = new Set();
-
   test('does not count a provider key sent through Vercel, which the allow-list can name', async () => {
     mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
 
     await expect(
-      hasInferenceProviderUserByokForModel('anthropic/claude-fixture', ['bedrock'], noCatalogModels)
+      hasInferenceProviderUserByokForModel('anthropic/claude-fixture', ['bedrock'])
     ).resolves.toBe(false);
     await expect(
-      hasInferenceProviderUserByokForModel(
-        'mistral/codestral-fixture',
-        ['codestral', 'mistral'],
-        noCatalogModels
-      )
+      hasInferenceProviderUserByokForModel('mistral/codestral-fixture', ['codestral', 'mistral'])
     ).resolves.toBe(false);
-  });
-
-  test('counts a catalog-mode direct BYOK key without reading the Vercel metadata', async () => {
-    await expect(
-      hasInferenceProviderUserByokForModel(
-        'moonshotai/kimi-k2.6',
-        [],
-        new Set(['moonshotai/kimi-k2.6'])
-      )
-    ).resolves.toBe(true);
-    expect(mockedGetVercelModelsMetadata).not.toHaveBeenCalled();
   });
 
   test('does not count gateway keys', async () => {
     await expect(
-      hasInferenceProviderUserByokForModel(
-        'anthropic/claude-fixture',
-        ['openrouter', 'vercel-ai-gateway'],
-        noCatalogModels
-      )
+      hasInferenceProviderUserByokForModel('anthropic/claude-fixture', [
+        'openrouter',
+        'vercel-ai-gateway',
+      ])
     ).resolves.toBe(false);
     expect(mockedGetVercelModelsMetadata).not.toHaveBeenCalled();
   });
@@ -237,7 +219,7 @@ describe('hasInferenceProviderUserByokForModel', () => {
     mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
 
     await expect(
-      hasInferenceProviderUserByokForModel(EXCLUSIVE_MODEL_ID, ['anthropic'], noCatalogModels)
+      hasInferenceProviderUserByokForModel(EXCLUSIVE_MODEL_ID, ['anthropic'])
     ).resolves.toBe(false);
   });
 
@@ -249,11 +231,7 @@ describe('hasInferenceProviderUserByokForModel', () => {
     );
     try {
       await expect(
-        hasInferenceProviderUserByokForModel(
-          'anthropic/claude-fixture',
-          ['anthropic'],
-          new Set(['anthropic/claude-fixture'])
-        )
+        hasInferenceProviderUserByokForModel('anthropic/claude-fixture', ['anthropic'])
       ).resolves.toBe(false);
     } finally {
       await deleteCustomLlmForTest('anthropic/claude-fixture');

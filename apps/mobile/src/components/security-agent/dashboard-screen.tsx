@@ -24,6 +24,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { DashboardSections } from '@/components/security-agent/dashboard-sections';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
+import { severityCountPhrase } from '@/components/security-agent/severity-count-phrase';
 import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
@@ -75,16 +76,19 @@ export function buildLocalizedMetrics(
   const number = (value: number) => formatNumber(value, i18n.language);
   // The tile value counts every severity, so the detail line names every
   // severity: medium and low share one bucket, which disappears while empty.
-  // Mirrors severityBreakdownDetail in @kilocode/app-shared.
+  // Mirrors severityBreakdownDetail in @kilocode/app-shared. Each bucket is a
+  // counted phrase of its own, because one `count` cannot agree three numbers.
   const breakdownDetail = (counts: DashboardStats['severity']) => {
-    const parts = { critical: number(counts.critical), high: number(counts.high) };
+    const critical = severityCountPhrase('breakdownCritical', counts.critical);
+    const high = severityCountPhrase('breakdownHigh', counts.high);
     const mediumLow = counts.medium + counts.low;
     return mediumLow > 0
       ? i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetailWithMediumLow', {
-          ...parts,
-          mediumLow: number(mediumLow),
+          critical,
+          high,
+          mediumLow: severityCountPhrase('breakdownMediumLow', mediumLow),
         })
-      : i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetail', parts);
+      : i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetail', { critical, high });
   };
 
   const localized = metrics.map(metric => {

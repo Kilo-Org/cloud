@@ -17,11 +17,12 @@
  * Usage: node tools/nativewind/check-classes.mjs
  */
 import { createRequire } from 'node:module';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { endOfComment, endOfQuoted, endOfQuotedOrComment } from '../lib/js-scan.mjs';
+import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
 
 // Resolve from the app: react-native-css is the app's dependency, not the repo root's.
 const require = createRequire(new URL('../../apps/mobile/package.json', import.meta.url));
@@ -333,10 +334,12 @@ export function checkScrollPadding(relative, text) {
 /**
  * `Text` from `react-native` renders without the shared component's RTL
  * paragraph direction, so its copy stays left-aligned in Arabic, Farsi and
- * Hebrew while everything beside it mirrors. Importing it under an alias is
- * fine: `type Text as RNText` is how callers type a ref.
+ * Hebrew while everything beside it mirrors. The type alone is safe — callers
+ * annotate refs with `import type { Text }` or `type Text as RNText` — but a
+ * runtime import renders the raw component under whatever name it takes, so an
+ * alias is reported like a bare import.
  */
-const RAW_TEXT_IMPORT = /import\s*\{([^}]*)\}\s*from\s*'react-native'/gs;
+const RAW_TEXT_IMPORT = /import\s+(type\s*)?\{([^}]*)\}\s*from\s*'react-native'/gs;
 const RAW_TEXT_EXEMPT = new Set([
   // A hidden node measured for height. It must not inherit the shared
   // component's base font classes, or the measurement stops matching the
@@ -348,7 +351,27 @@ const RAW_TEXT_EXEMPT = new Set([
   // environment. Both apply `withRtlWritingDirection` from the same source.
   'apps/mobile/src/components/agents/markdown-html.tsx',
   'apps/mobile/src/components/agents/markdown-html-details.tsx',
+  // The code surfaces — both diff rows, the highlighted runs inside them and
+  // the fenced code block — name their own LTR base direction, because code
+  // reads left to right in every interface language, and they nest a raw
+  // `Text` run under the line's own `Text` so the run inherits the mono font.
+  // The shared component's base font classes would override that font on every
+  // run and its paragraph direction would flip the code in an RTL locale.
+  'apps/mobile/src/components/agents/code-block.tsx',
+  'apps/mobile/src/components/pr-review/diff/diff-line.tsx',
+  'apps/mobile/src/components/pr-review/diff/highlight-runs.tsx',
+  'apps/mobile/src/components/pr-review/diff/pr-diff-side-by-side-row.tsx',
 ]);
+
+/**
+ * Whether one named specifier brings the runtime component in: a bare `Text`
+ * and `Text as <name>` do, while `type Text` and `type Text as <name>` are the
+ * annotations callers type refs with.
+ */
+function importsRuntimeText(specifier) {
+  const [imported] = specifier.split(/\s+as\s+/);
+  return imported.trim() === 'Text' && !specifier.trim().startsWith('type ');
+}
 
 export function checkRawText(relative, text) {
   const problems = [];
@@ -356,8 +379,11 @@ export function checkRawText(relative, text) {
     return problems;
   }
   for (const match of text.matchAll(RAW_TEXT_IMPORT)) {
-    const bare = match[1].split(',').some(name => name.trim() === 'Text');
-    if (bare) {
+    // `import type { … }` types the list, so nothing in it is rendered.
+    const typeOnly = match[1] !== undefined;
+    const runtime =
+      !typeOnly && match[2].split(',').some(specifier => importsRuntimeText(specifier));
+    if (runtime) {
       const line = text.slice(0, match.index).split('\n').length;
       problems.push(
         `${relative}:${line}: imports Text from 'react-native'; use @/components/ui/text so the copy follows the RTL paragraph direction`
@@ -414,20 +440,6 @@ export function checkDirectIntl(relative, absolute, text) {
     }
   }
   return problems;
-}
-
-function sourceFiles(dir, out = []) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name !== 'node_modules') {
-        sourceFiles(path, out);
-      }
-    } else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
-      out.push(path);
-    }
-  }
-  return out;
 }
 
 /** The ban list over one file's lines: every match of every rule. */
@@ -526,7 +538,7 @@ export function checkSourceFile(relative, absolute, text) {
 function run() {
   const problems = [];
   for (const dir of SOURCE_DIRS) {
-    for (const file of sourceFiles(dir)) {
+    for (const file of sourceFiles(dir, isTestArtifact)) {
       problems.push(...checkSourceFile(file.slice(ROOT.length), file, readFileSync(file, 'utf8')));
     }
   }

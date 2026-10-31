@@ -15,6 +15,9 @@ import {
   COMPOSER_CONTROL_GAP_DP,
   COMPOSER_CONTROL_HIT_SLOP_DP,
   composerControlClearanceDp,
+  DENSE_ROW_FRAME_DP,
+  DENSE_ROW_HIT_SLOP,
+  DENSE_ROW_HIT_SLOP_DP,
   ICON_TARGET_BOX_CLASS,
   ICON_TARGET_DP,
   INLINE_LINK_BOX_CLASS,
@@ -166,6 +169,21 @@ describe('shared tap-target geometry', () => {
       tapTargetReachDp(COMPACT_H11_FRAME_DP, COMPACT_H11_HIT_SLOP_DP)
     );
     expect(compactControlTargetDp()).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+  });
+
+  it('carries a dense row from its own rhythm to the design target with its slop', () => {
+    // The regression this guards: a count row that keeps the group's `py-3`
+    // rhythm measures under 40 dp on its own rect, under the design target, so
+    // the slop is what has to reach 44 dp.
+    expect(DENSE_ROW_FRAME_DP).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    expect(DENSE_ROW_FRAME_DP).toBeLessThan(TOUCH_TARGET_DP);
+    expect(DENSE_ROW_HIT_SLOP).toEqual({
+      top: DENSE_ROW_HIT_SLOP_DP,
+      bottom: DENSE_ROW_HIT_SLOP_DP,
+    });
+    expect(tapTargetReachDp(DENSE_ROW_FRAME_DP, DENSE_ROW_HIT_SLOP_DP)).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
   });
 
   it('carries an inline link from the audit floor to the design target with its slop', () => {

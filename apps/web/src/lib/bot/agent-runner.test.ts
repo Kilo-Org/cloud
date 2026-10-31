@@ -38,7 +38,7 @@ type AgentOptions = {
 };
 
 const mockAgentOptions = jest.fn<void, [AgentOptions]>();
-const mockGenerate = jest.fn<Promise<{ text: string }>, []>();
+const mockGenerate = jest.fn<Promise<{ text: string }>, [{ prompt: string }]>();
 const mockGetConversationContext = jest.fn<Promise<string>, []>();
 const mockGetGitHubIntegrationById = jest.fn<Promise<PlatformIntegration | null>, unknown[]>();
 const mockPrepareSession = jest.fn<
@@ -412,6 +412,28 @@ it('can bind the repository from trusted webhook metadata', async () => {
   expect(mockPrepareSession).toHaveBeenCalledWith(
     expect.objectContaining({ githubRepo: threadRepository })
   );
+});
+
+it('tells the run which referenced files were declined', async () => {
+  const params = runParams();
+
+  await runBotAgent({
+    ...params,
+    attachments: { path: 'message-1', files: ['one.md'] },
+    declinedAttachmentFilenames: ['screenshot.png', 'report.pdf'],
+  });
+
+  const prompt = mockGenerate.mock.calls[0]?.[0].prompt;
+  expect(prompt).toContain('The user attached 1 supported attachment');
+  expect(prompt).toContain('"screenshot.png"');
+  expect(prompt).toContain('"report.pdf"');
+  expect(prompt).toContain('not forwarded');
+});
+
+it('says nothing about attachments when none were referenced', async () => {
+  await runBotAgent(runParams());
+
+  expect(mockGenerate.mock.calls[0]?.[0]).toEqual({ prompt: 'Review the current pull request' });
 });
 
 describe.each(['slack', 'linear'] as const)('%s repository selection', platform => {

@@ -1352,7 +1352,6 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Đã phát hiện",
-      "dismissedBecause": "Đã bỏ qua vì {{reason}}.",
       "dismissedOn": "Đã bỏ qua vào",
       "supersededOn": "Đã thay thế vào",
       "ghsa": "GHSA",
@@ -1371,11 +1370,6 @@
       "vulnerableVersions": "Phiên bản có lỗ hổng",
       "statusOpen": "Mở",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "đã bắt đầu khắc phục",
-      "reasonNoBandwidth": "không đủ nguồn lực",
-      "reasonTolerableRisk": "rủi ro có thể chấp nhận được",
-      "reasonInaccurate": "vấn đề được xác định sai",
-      "reasonNotUsed": "không sử dụng mã có lỗ hổng",
       "reasonAfterReview": "sau khi rà soát"
     },
     "findingList": {

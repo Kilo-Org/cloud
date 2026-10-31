@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Kuthathelwe indawo okutholakele kwamanje",
       "supersededByDescription": "Thepha ukuze uvule irekhodi lamanje ubone isimo, ukuhlaziywa nokulungisa.",
-      "dismissedBecause": "Kuchithiwe ngenxa yalokhu: {{reason}}.",
       "dismissedOn": "Usuku lokuchithwa",
       "supersededOn": "Usuku lokuthathelwa indawo",
       "severityLabel": "Ubucayi: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Buka isaziso sokuphepha ku-GitHub",
       "statusOpen": "Vula",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ukulungisa sekuqalile",
-      "reasonNoBandwidth": "asinaso isikhathi sokulungisa",
-      "reasonTolerableRisk": "ubungozi buyamukeleka",
-      "reasonInaccurate": "okutholakele akunembile",
-      "reasonNotUsed": "ikhodi esengozini ayisetshenziswa",
       "reasonAfterReview": "ngemva kokuhlolwa"
     },
     "settingsOverview": {

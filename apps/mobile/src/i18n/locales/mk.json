@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Заменет со актуелен наод",
       "supersededByDescription": "Допри за да го отвориш актуелниот запис со статусот, анализата и санирањето.",
-      "dismissedBecause": "Наодот е отфрлен {{reason}}.",
       "dismissedOn": "Отфрлено на",
       "supersededOn": "Заменето на",
       "severityLabel": "Сериозност: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Прегледај го безбедносното известување на GitHub",
       "statusOpen": "Отворено",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "веќе е започната поправка",
-      "reasonNoBandwidth": "нема слободни ресурси",
-      "reasonTolerableRisk": "ризикот е прифатлив",
-      "reasonInaccurate": "наодот е неточен",
-      "reasonNotUsed": "ранливиот код не се користи",
       "reasonAfterReview": "по прегледот"
     },
     "settingsOverview": {

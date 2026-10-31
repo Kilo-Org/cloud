@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "มีข้อค้นพบใหม่มาแทนที่แล้ว",
       "supersededByDescription": "แตะเพื่อเปิดรายการปัจจุบันและดูสถานะ ผลวิเคราะห์ และการแก้ไข",
-      "dismissedBecause": "ละเว้นแล้ว เนื่องจาก{{reason}}",
       "dismissedOn": "ละเว้นแล้ว เมื่อ",
       "supersededOn": "ถูกแทนที่แล้ว เมื่อ",
       "severityLabel": "ความรุนแรงระดับ{{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "ดูประกาศด้านความปลอดภัยบน GitHub",
       "statusOpen": "เปิด",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "เริ่มแก้ไขแล้ว",
-      "reasonNoBandwidth": "ไม่มีเวลาจัดการ",
-      "reasonTolerableRisk": "ยอมรับความเสี่ยงได้",
-      "reasonInaccurate": "ข้อค้นพบไม่ถูกต้อง",
-      "reasonNotUsed": "ไม่ได้ใช้โค้ดที่มีช่องโหว่",
       "reasonAfterReview": "หลังการตรวจสอบ"
     },
     "settingsOverview": {

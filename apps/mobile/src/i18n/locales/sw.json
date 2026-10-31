@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Nafasi yake imechukuliwa na tatizo la sasa",
       "supersededByDescription": "Gusa ili ufungue rekodi ya sasa na uone hali, uchambuzi na urekebishaji.",
-      "dismissedBecause": "Limeondolewa kwa sababu {{reason}}.",
       "dismissedOn": "Tarehe ya kupuuzwa",
       "supersededOn": "Tarehe ya kubadilishwa na nyingine",
       "severityLabel": "Ukali wa {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Tazama taarifa ya usalama kwenye GitHub",
       "statusOpen": "Wazi",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "marekebisho yameanza",
-      "reasonNoBandwidth": "hakuna muda wa kushughulikia",
-      "reasonTolerableRisk": "hatari inaweza kuvumiliwa",
-      "reasonInaccurate": "matokeo si sahihi",
-      "reasonNotUsed": "msimbo wenye udhaifu hautumiki",
       "reasonAfterReview": "baada ya ukaguzi"
     },
     "settingsOverview": {

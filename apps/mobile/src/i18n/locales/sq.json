@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "E zëvendësuar nga një gjetje aktuale",
       "supersededByDescription": "Prek për të hapur regjistrimin aktual dhe për të parë statusin, analizën dhe korrigjimin.",
-      "dismissedBecause": "U hodh poshtë {{reason}}.",
       "dismissedOn": "E hedhur poshtë më",
       "supersededOn": "E zëvendësuar më",
       "severityLabel": "Niveli i rrezikut: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Shiko njoftimin e sigurisë në GitHub",
       "statusOpen": "Hapje",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "rregullimi ka filluar tashmë",
-      "reasonNoBandwidth": "mungojnë burimet për ta trajtuar",
-      "reasonTolerableRisk": "rreziku është i pranueshëm",
-      "reasonInaccurate": "gjetja është e pasaktë",
-      "reasonNotUsed": "kodi me dobësi sigurie nuk përdoret",
       "reasonAfterReview": "pas shqyrtimit"
     },
     "settingsOverview": {

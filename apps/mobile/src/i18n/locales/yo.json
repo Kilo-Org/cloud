@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Àbùkù tuntun ti rọ́pò rẹ̀",
       "supersededByDescription": "Tẹ̀ ẹ́ láti ṣí àkọsílẹ̀ tuntun fún ipò, ìtúpalẹ̀ àti àtúnṣe.",
-      "dismissedBecause": "A kọ̀ ọ́ sílẹ̀ nítorí {{reason}}.",
       "dismissedOn": "A ti kọ̀ sílẹ̀ ní",
       "supersededOn": "A ti fi òmíràn rọ́pò rẹ̀ ní",
       "severityLabel": "ìwọ̀n ewu: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Wo ìkìlọ̀ ààbò lórí GitHub",
       "statusOpen": "Ṣí",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "a ti bẹ̀rẹ̀ àtúnṣe tẹ́lẹ̀",
-      "reasonNoBandwidth": "kò sí àkókò fún un",
-      "reasonTolerableRisk": "a lè fara da ewu náà",
-      "reasonInaccurate": "àwárí náà kò péye",
-      "reasonNotUsed": "a kò lo kóòdù tó ní àbùkù ààbò",
       "reasonAfterReview": "lẹ́yìn àtúnyẹ̀wò"
     },
     "settingsOverview": {

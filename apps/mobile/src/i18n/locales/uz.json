@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "O'rniga dolzarb muammo qayd etilgan",
       "supersededByDescription": "Holat, tahlil va tuzatish ma'lumotlarini ko'rish uchun dolzarb yozuvni bosing.",
-      "dismissedBecause": "Rad etish sababi: {{reason}}.",
       "dismissedOn": "E’tiborsiz qoldirilgan sana",
       "supersededOn": "Almashtirilgan sana",
       "severityLabel": "Xavf darajasi: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "GitHubda xavfsizlik xabarnomasini ko'rish",
       "statusOpen": "Ochiq",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "tuzatish allaqachon boshlangan",
-      "reasonNoBandwidth": "vaqt va resurs yetarli emas",
-      "reasonTolerableRisk": "xavf maqbul darajada",
-      "reasonInaccurate": "muammo noto‘g‘ri aniqlangan",
-      "reasonNotUsed": "zaiflik bor kod ishlatilmaydi",
       "reasonAfterReview": "ko'rib chiqilgach"
     },
     "settingsOverview": {

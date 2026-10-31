@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Uneko aurkikuntza batek ordezkatu du",
       "supersededByDescription": "Sakatu uneko erregistroa irekitzeko eta egoera, azterketa eta konponketa ikusteko.",
-      "dismissedBecause": "Aurkikuntza baztertu da. Arrazoia: {{reason}}.",
       "dismissedOn": "Baztertuta geratu zen data",
       "supersededOn": "Ordezkatuta geratu zen data",
       "severityLabel": "Larritasuna: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Ikusi segurtasun-abisua GitHub-en",
       "statusOpen": "Ireki",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "konponketa hasita dago",
-      "reasonNoBandwidth": "ez dago horretarako baliabiderik",
-      "reasonTolerableRisk": "arriskua onargarria da",
-      "reasonInaccurate": "antzemandako arazoa ez da zehatza",
-      "reasonNotUsed": "kode zaurgarria ez da erabiltzen",
       "reasonAfterReview": "berrikuspenaren ondoren"
     },
     "settingsOverview": {

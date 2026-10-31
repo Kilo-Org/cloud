@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "በአሁኑ ግኝት ተተክቷል",
       "supersededByDescription": "ሁኔታውን፣ ትንታኔውን እና ጥገናውን ለማየት የአሁኑን መዝገብ ይንኩ።",
-      "dismissedBecause": "ግኝቱ ተወግዷል፦ {{reason}}።",
       "dismissedOn": "የተወገደበት ቀን",
       "supersededOn": "የተተካበት ቀን",
       "severityLabel": "{{severity}} ክብደት",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "የደህንነት ማስጠንቀቂያውን በGitHub ላይ ይመልከቱ",
       "statusOpen": "ክፍት",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ጥገና አስቀድሞ ተጀምሯል",
-      "reasonNoBandwidth": "ለመሥራት የሚበቃ አቅም የለም",
-      "reasonTolerableRisk": "አደጋውን መቀበል ይቻላል",
-      "reasonInaccurate": "ግኝቱ ትክክለኛ አይደለም",
-      "reasonNotUsed": "ተጋላጭ የሆነው ኮድ ጥቅም ላይ አይውልም",
       "reasonAfterReview": "ከግምገማ በኋላ"
     },
     "settingsOverview": {

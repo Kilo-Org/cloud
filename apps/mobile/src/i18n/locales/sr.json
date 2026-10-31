@@ -1851,7 +1851,6 @@
     "findingDetails": {
       "supersededBy": "Zamenjen novijim nalazom",
       "supersededByDescription": "Dodirni da otvoriš noviji zapis i vidiš status, analizu i otklanjanje.",
-      "dismissedBecause": "Nalaz je odbačen: {{reason}}.",
       "dismissedOn": "Datum odbacivanja",
       "supersededOn": "Datum zamene",
       "severityLabel": "Ozbiljnost: {{severity}}",
@@ -1870,11 +1869,6 @@
       "viewAdvisory": "Pogledaj bezbednosno obaveštenje na GitHub-u",
       "statusOpen": "Otvoreno",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ispravka je već započeta",
-      "reasonNoBandwidth": "nema slobodnih kapaciteta",
-      "reasonTolerableRisk": "rizik je prihvatljiv",
-      "reasonInaccurate": "nalaz nije tačan",
-      "reasonNotUsed": "ranljivi kod se ne koristi",
       "reasonAfterReview": "nakon pregleda"
     },
     "settingsOverview": {

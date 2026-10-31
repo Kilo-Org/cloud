@@ -1352,7 +1352,6 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Gedetecteerd",
-      "dismissedBecause": "Deze bevinding is afgewezen: {{reason}}.",
       "dismissedOn": "Genegeerd op",
       "supersededOn": "Vervangen op",
       "ghsa": "GHSA",
@@ -1371,11 +1370,6 @@
       "vulnerableVersions": "Kwetsbare versies",
       "statusOpen": "Openen",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "er wordt al aan een oplossing gewerkt",
-      "reasonNoBandwidth": "er is geen capaciteit beschikbaar",
-      "reasonTolerableRisk": "het risico is aanvaardbaar",
-      "reasonInaccurate": "de bevinding is onjuist",
-      "reasonNotUsed": "kwetsbare code wordt niet gebruikt",
       "reasonAfterReview": "na beoordeling"
     },
     "findingList": {

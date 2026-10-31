@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Nosoloina olana hita vaovao",
       "supersededByDescription": "Tsindrio ny firaketana vaovao hijerena ny sata, ny famakafakana ary ny fanarenana.",
-      "dismissedBecause": "Nailika noho izao antony izao: {{reason}}.",
       "dismissedOn": "Daty fanesorana",
       "supersededOn": "Daty fanoloana",
       "severityLabel": "Hamafy: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Jereo ny fampitandremana ao amin'ny GitHub",
       "statusOpen": "Misokatra",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "efa nanomboka ny fanitsiana",
-      "reasonNoBandwidth": "tsy misy fotoana hanaovana azy",
-      "reasonTolerableRisk": "azo ekena ny risika",
-      "reasonInaccurate": "tsy marina ny olana voalaza",
-      "reasonNotUsed": "tsy ampiasaina ny kaody marefo",
       "reasonAfterReview": "taorian'ny fanamarinana"
     },
     "settingsOverview": {

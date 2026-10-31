@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "اوسنۍ موندنه یې ځایناستې ده",
       "supersededByDescription": "د حالت، تحلیل او اصلاح د لیدلو لپاره پر اوسني ریکارډ ټک وکړئ.",
-      "dismissedBecause": "له پامه غورځول شوې ده، ځکه چې {{reason}}.",
       "dismissedOn": "د پامه غورځولو نېټه",
       "supersededOn": "د ځای نیولو نېټه",
       "severityLabel": "شدت: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "په GitHub کې امنیتي خبرتیا وګورئ",
       "statusOpen": "خلاص",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "سمون لا دمخه پیل شوی",
-      "reasonNoBandwidth": "کاري ظرفیت نشته",
-      "reasonTolerableRisk": "خطر د زغملو وړ دی",
-      "reasonInaccurate": "موندنه ناسمه ده",
-      "reasonNotUsed": "زیان منونکی کوډ نه کارول کېږي",
       "reasonAfterReview": "له بیاکتنې وروسته"
     },
     "settingsOverview": {

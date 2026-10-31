@@ -1363,7 +1363,7 @@
       "couldNotCheckPermissions": "تعذّر التحقق من صلاحيات الاستبعاد.",
       "couldNotLoad": "تعذّر تحميل هذه الملاحظة.",
       "notFoundDescription": "ربما أُزيلت هذه النتيجة، أو لم تعد لديك صلاحية الوصول إليها.",
-      "notFoundTitle": "الملاحظة غير موجودة",
+      "notFoundTitle": "النتيجة غير موجودة",
       "reason": "السبب",
       "reasonFixStarted": "بدأ الإصلاح بالفعل",
       "reasonInaccurate": "الملاحظة غير دقيقة",
@@ -1380,7 +1380,6 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "تاريخ الاكتشاف",
-      "dismissedBecause": "تم استبعاد النتيجة. السبب: {{reason}}.",
       "dismissedOn": "مستبعدة في",
       "supersededOn": "مستبدلة في",
       "ghsa": "GHSA",
@@ -1399,11 +1398,6 @@
       "vulnerableVersions": "الإصدارات المتأثرة بالثغرة",
       "statusOpen": "فتح",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "بدأ الإصلاح بالفعل",
-      "reasonNoBandwidth": "لا تتوفر موارد كافية",
-      "reasonTolerableRisk": "الخطر مقبول",
-      "reasonInaccurate": "الملاحظة غير دقيقة",
-      "reasonNotUsed": "الشيفرة التي تحتوي على الثغرة غير مستخدمة",
       "reasonAfterReview": "بعد المراجعة"
     },
     "findingList": {

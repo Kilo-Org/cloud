@@ -1366,7 +1366,6 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Wykryto",
-      "dismissedBecause": "Powód odrzucenia: {{reason}}.",
       "dismissedOn": "Data odrzucenia",
       "supersededOn": "Data zastąpienia",
       "ghsa": "GHSA",
@@ -1385,11 +1384,6 @@
       "vulnerableVersions": "Podatne wersje",
       "statusOpen": "Otwarte",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "naprawa już trwa",
-      "reasonNoBandwidth": "brak wolnych zasobów",
-      "reasonTolerableRisk": "ryzyko jest akceptowalne",
-      "reasonInaccurate": "błędne wykrycie problemu",
-      "reasonNotUsed": "kod z luką nie jest używany",
       "reasonAfterReview": "po weryfikacji"
     },
     "findingList": {

@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "ਇਸ ਦੀ ਥਾਂ ਨਵੀਂ ਸਮੱਸਿਆ ਦਰਜ ਹੈ",
       "supersededByDescription": "ਸਥਿਤੀ, ਵਿਸ਼ਲੇਸ਼ਣ ਅਤੇ ਸੁਧਾਰ ਦੇ ਵੇਰਵੇ ਦੇਖਣ ਲਈ ਮੌਜੂਦਾ ਰਿਕਾਰਡ 'ਤੇ ਟੈਪ ਕਰੋ।",
-      "dismissedBecause": "ਖਾਰਜ ਕੀਤਾ ਗਿਆ: {{reason}}।",
       "dismissedOn": "ਖਾਰਜ ਹੋਣ ਦੀ ਤਾਰੀਖ",
       "supersededOn": "ਨਵੇਂ ਨਤੀਜੇ ਨਾਲ ਬਦਲੇ ਜਾਣ ਦੀ ਤਾਰੀਖ",
       "severityLabel": "{{severity}} ਗੰਭੀਰਤਾ",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "GitHub 'ਤੇ ਸੁਰੱਖਿਆ ਸੂਚਨਾ ਦੇਖੋ",
       "statusOpen": "ਖੋਲ੍ਹੋ",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ਠੀਕ ਕਰਨਾ ਸ਼ੁਰੂ ਹੋ ਗਿਆ ਹੈ",
-      "reasonNoBandwidth": "ਸਮਾਂ ਜਾਂ ਸਰੋਤ ਉਪਲਬਧ ਨਹੀਂ ਹਨ",
-      "reasonTolerableRisk": "ਜੋਖਮ ਸਵੀਕਾਰਯੋਗ ਹੈ",
-      "reasonInaccurate": "ਜਾਂਚ ਦਾ ਨਤੀਜਾ ਸਹੀ ਨਹੀਂ",
-      "reasonNotUsed": "ਸੁਰੱਖਿਆ ਖਾਮੀ ਵਾਲਾ ਕੋਡ ਵਰਤਿਆ ਨਹੀਂ ਜਾਂਦਾ",
       "reasonAfterReview": "ਸਮੀਖਿਆ ਤੋਂ ਬਾਅਦ"
     },
     "settingsOverview": {

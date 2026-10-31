@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Erstattet av et oppdatert funn",
       "supersededByDescription": "Trykk for å se status, analyse og utbedring for det oppdaterte funnet.",
-      "dismissedBecause": "Avvist {{reason}}.",
       "dismissedOn": "Avvisningsdato",
       "supersededOn": "Erstatningsdato",
       "severityLabel": "Alvorlighetsgrad: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Vis sikkerhetsvarsel på GitHub",
       "statusOpen": "Åpne",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "retting er allerede i gang",
-      "reasonNoBandwidth": "ingen ledig kapasitet",
-      "reasonTolerableRisk": "risikoen er akseptabel",
-      "reasonInaccurate": "funnet er unøyaktig",
-      "reasonNotUsed": "sårbar kode brukes ikke",
       "reasonAfterReview": "etter gjennomgang"
     },
     "settingsOverview": {

@@ -1352,7 +1352,6 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "検出日時",
-      "dismissedBecause": "却下しました（理由：{{reason}}）。",
       "dismissedOn": "却下日",
       "supersededOn": "置き換え日",
       "ghsa": "GHSA",
@@ -1371,11 +1370,6 @@
       "vulnerableVersions": "脆弱性のあるバージョン",
       "statusOpen": "オープン",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "修正に着手済み",
-      "reasonNoBandwidth": "対応する余裕なし",
-      "reasonTolerableRisk": "リスクは許容範囲",
-      "reasonInaccurate": "検出事項が不正確",
-      "reasonNotUsed": "脆弱なコードは未使用",
       "reasonAfterReview": "確認の結果"
     },
     "findingList": {

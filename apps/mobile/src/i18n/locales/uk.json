@@ -1366,7 +1366,6 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Виявлено",
-      "dismissedBecause": "Відхилено: {{reason}}.",
       "dismissedOn": "Дата відхилення",
       "supersededOn": "Дата заміни",
       "ghsa": "GHSA",
@@ -1385,11 +1384,6 @@
       "vulnerableVersions": "Уразливі версії",
       "statusOpen": "Відкрито",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "виправлення вже розпочато",
-      "reasonNoBandwidth": "немає ресурсів на виправлення",
-      "reasonTolerableRisk": "ризик прийнятний",
-      "reasonInaccurate": "проблему визначено неточно",
-      "reasonNotUsed": "уразливий код не використовується",
       "reasonAfterReview": "після перевірки"
     },
     "findingList": {

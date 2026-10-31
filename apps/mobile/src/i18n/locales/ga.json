@@ -1901,7 +1901,6 @@
     "findingDetails": {
       "supersededBy": "Toradh reatha curtha ina ionad",
       "supersededByDescription": "Tapáil chun an taifead reatha a oscailt agus an stádas, an anailís agus an leasú a fheiceáil.",
-      "dismissedBecause": "Díbheadh é ar an gcúis seo: {{reason}}.",
       "dismissedOn": "Curtha as an áireamh ar",
       "supersededOn": "Ceann nua ina áit ar",
       "severityLabel": "Déine: {{severity}}",
@@ -1920,11 +1919,6 @@
       "viewAdvisory": "Féach ar an bhfógra slándála ar GitHub",
       "statusOpen": "Oscailte",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "tá an ceartú ar bun cheana",
-      "reasonNoBandwidth": "níl am ar fáil",
-      "reasonTolerableRisk": "tá an priacal inghlactha",
-      "reasonInaccurate": "tá an toradh míchruinn",
-      "reasonNotUsed": "ní úsáidtear an cód leochaileach",
       "reasonAfterReview": "tar éis athbhreithnithe"
     },
     "settingsOverview": {

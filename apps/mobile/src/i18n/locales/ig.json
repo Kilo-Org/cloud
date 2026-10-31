@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Ihe achọpụtara ọhụrụ nọchiri ya",
       "supersededByDescription": "Pịa ka ị mepee ndekọ nke ugbu a maka ọnọdụ, nyocha na ndozi.",
-      "dismissedBecause": "Ihe kpatara mwepụ: {{reason}}.",
       "dismissedOn": "Ụbọchị elegharala anya",
       "supersededOn": "Ụbọchị edochiri",
       "severityLabel": "Ogo njọ: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Lee ọkwa nchebe na GitHub",
       "statusOpen": "Meghe",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "amalitelarị ndozi",
-      "reasonNoBandwidth": "enweghị oge ma ọ bụ ndị ọrụ",
-      "reasonTolerableRisk": "enwere ike ịnabata ihe ize ndụ ahụ",
-      "reasonInaccurate": "ihe achọpụtara ezighi ezi",
-      "reasonNotUsed": "anaghị eji koodu nwere adịghị ike",
       "reasonAfterReview": "mgbe nyochachara"
     },
     "settingsOverview": {

@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Nýrra frávik kemur í staðinn",
       "supersededByDescription": "Ýttu til að opna nýjustu færsluna og sjá stöðu, greiningu og úrbætur.",
-      "dismissedBecause": "Fráviki var vísað frá: {{reason}}.",
       "dismissedOn": "Vísað frá þann",
       "supersededOn": "Leyst af hólmi þann",
       "severityLabel": "Alvarleiki: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Skoða öryggistilkynningu á GitHub",
       "statusOpen": "Opna",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "lagfæring er þegar hafin",
-      "reasonNoBandwidth": "enginn tími er til ráðstöfunar",
-      "reasonTolerableRisk": "áhættan er ásættanleg",
-      "reasonInaccurate": "niðurstaðan er ónákvæm",
-      "reasonNotUsed": "kóði með veikleikanum er ekki notaður",
       "reasonAfterReview": "eftir yfirferð"
     },
     "settingsOverview": {

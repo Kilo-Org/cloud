@@ -1352,7 +1352,6 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "पता लगाया गया",
-      "dismissedBecause": "खारिज करने का कारण: {{reason}}।",
       "dismissedOn": "खारिज होने की तारीख",
       "supersededOn": "नए रिकॉर्ड से बदले जाने की तारीख",
       "ghsa": "GHSA",
@@ -1371,11 +1370,6 @@
       "vulnerableVersions": "असुरक्षित वर्ज़न",
       "statusOpen": "ओपन",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "सुधार शुरू हो चुका है",
-      "reasonNoBandwidth": "समय और संसाधन उपलब्ध नहीं हैं",
-      "reasonTolerableRisk": "जोखिम स्वीकार्य है",
-      "reasonInaccurate": "मिली समस्या की जानकारी गलत है",
-      "reasonNotUsed": "असुरक्षित कोड का इस्तेमाल नहीं होता",
       "reasonAfterReview": "समीक्षा के बाद"
     },
     "findingList": {

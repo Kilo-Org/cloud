@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Vervang deur 'n huidige bevinding",
       "supersededByDescription": "Tik om die huidige rekord se status, ontleding en regstelling te sien.",
-      "dismissedBecause": "Die bevinding is verwerp: {{reason}}.",
       "dismissedOn": "Verwerp op",
       "supersededOn": "Vervang op",
       "severityLabel": "Ernsgraad: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Bekyk sekuriteitskennisgewing op GitHub",
       "statusOpen": "Oop",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "regstelling reeds begin",
-      "reasonNoBandwidth": "geen kapasiteit beskikbaar nie",
-      "reasonTolerableRisk": "die risiko is aanvaarbaar",
-      "reasonInaccurate": "die bevinding is onjuis",
-      "reasonNotUsed": "kwesbare kode word nie gebruik nie",
       "reasonAfterReview": "na hersiening"
     },
     "settingsOverview": {

@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Wata matsalar da aka gano a yanzu ta maye gurbinta",
       "supersededByDescription": "Danna don buɗe bayanan matsalar ta yanzu ka ga halinta, nazarinta da gyaranta.",
-      "dismissedBecause": "An yi watsi da ita domin {{reason}}.",
       "dismissedOn": "An yi watsi da shi a ranar",
       "supersededOn": "An maye gurbinsa a ranar",
       "severityLabel": "Tsanani: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Duba sanarwar tsaro a GitHub",
       "statusOpen": "Buɗe",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "an riga an fara gyara",
-      "reasonNoBandwidth": "babu damar yin aikin",
-      "reasonTolerableRisk": "ana iya jure haɗarin",
-      "reasonInaccurate": "sakamakon binciken bai yi daidai ba",
-      "reasonNotUsed": "ba a amfani da lambar shirin da ke da rauni",
       "reasonAfterReview": "bayan bita"
     },
     "settingsOverview": {

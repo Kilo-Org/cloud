@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Korvattu ajantasaisella havainnolla",
       "supersededByDescription": "Napauta nähdäksesi ajantasaisen havainnon tilan, analyysin ja korjauksen.",
-      "dismissedBecause": "Havainto hylättiin: {{reason}}.",
       "dismissedOn": "Sivuuttamispäivä",
       "supersededOn": "Korvaamispäivä",
       "severityLabel": "Vakavuus: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Näytä tietoturvatiedote GitHubissa",
       "statusOpen": "Avoin",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "korjaus on jo aloitettu",
-      "reasonNoBandwidth": "ei vapaita resursseja",
-      "reasonTolerableRisk": "riski on hyväksyttävä",
-      "reasonInaccurate": "havainto on virheellinen",
-      "reasonNotUsed": "haavoittuvaa koodia ei käytetä",
       "reasonAfterReview": "tarkistuksen jälkeen"
     },
     "settingsOverview": {

@@ -1892,7 +1892,6 @@
     "findingDetails": {
       "supersededBy": "Superseded by a current finding",
       "supersededByDescription": "Tap to open the current record for status, analysis, and remediation.",
-      "dismissedBecause": "Dismissed because {{reason}}.",
       "dismissedOn": "Dismissed on",
       "supersededOn": "Superseded on",
       "severityLabel": "{{severity}} severity",
@@ -1911,11 +1910,6 @@
       "viewAdvisory": "View advisory on GitHub",
       "statusOpen": "Open",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "a fix has already started",
-      "reasonNoBandwidth": "no bandwidth is available",
-      "reasonTolerableRisk": "the risk is tolerable",
-      "reasonInaccurate": "the finding is inaccurate",
-      "reasonNotUsed": "vulnerable code is not used",
       "reasonAfterReview": "after review"
     },
     "settingsOverview": {

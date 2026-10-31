@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Ersatt av ett aktuellt fynd",
       "supersededByDescription": "Tryck för att öppna den aktuella posten med status, analys och åtgärd.",
-      "dismissedBecause": "Fyndet har avfärdats. Orsak: {{reason}}.",
       "dismissedOn": "Avfärdad den",
       "supersededOn": "Ersatt den",
       "severityLabel": "Allvarlighetsgrad: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Visa säkerhetsmeddelandet på GitHub",
       "statusOpen": "Öppet",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "en åtgärd har redan påbörjats",
-      "reasonNoBandwidth": "det finns inga resurser",
-      "reasonTolerableRisk": "risken är acceptabel",
-      "reasonInaccurate": "fyndet är felaktigt",
-      "reasonNotUsed": "sårbar kod används inte",
       "reasonAfterReview": "efter granskning"
     },
     "settingsOverview": {

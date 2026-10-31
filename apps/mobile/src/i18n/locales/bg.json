@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Заменен с актуален проблем",
       "supersededByDescription": "Докосни, за да отвориш актуалния запис със състоянието, анализа и отстраняването на проблема.",
-      "dismissedBecause": "Проблемът е отхвърлен по следната причина: {{reason}}.",
       "dismissedOn": "Отхвърлено на",
       "supersededOn": "Заменено на",
       "severityLabel": "Сериозност: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Виж бюлетина за сигурност в GitHub",
       "statusOpen": "Отваряне",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "отстраняването вече е започнало",
-      "reasonNoBandwidth": "няма свободен капацитет",
-      "reasonTolerableRisk": "рискът е приемлив",
-      "reasonInaccurate": "проблемът е докладван неточно",
-      "reasonNotUsed": "уязвимият код не се използва",
       "reasonAfterReview": "след преглед"
     },
     "settingsOverview": {

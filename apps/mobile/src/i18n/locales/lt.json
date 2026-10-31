@@ -1876,7 +1876,6 @@
     "findingDetails": {
       "supersededBy": "Pakeistas naujesniu radiniu",
       "supersededByDescription": "Bakstelėk, kad atidarytum naujausią įrašą su būsenos, analizės ir taisymo informacija.",
-      "dismissedBecause": "Atmetimo priežastis: {{reason}}.",
       "dismissedOn": "Atmetimo data",
       "supersededOn": "Pakeitimo data",
       "severityLabel": "Pavojingumas: {{severity}}",
@@ -1895,11 +1894,6 @@
       "viewAdvisory": "Peržiūrėti saugos pranešimą GitHub platformoje",
       "statusOpen": "Atidaryta",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "taisymas jau pradėtas",
-      "reasonNoBandwidth": "trūksta laiko",
-      "reasonTolerableRisk": "rizika priimtina",
-      "reasonInaccurate": "problema nurodyta netiksliai",
-      "reasonNotUsed": "pažeidžiamas kodas nenaudojamas",
       "reasonAfterReview": "po peržiūros"
     },
     "settingsOverview": {

@@ -1901,7 +1901,6 @@
     "findingDetails": {
       "supersededBy": "Sostitwita minn sejba attwali",
       "supersededByDescription": "Tektek biex tiftaħ ir-rekord attwali u tara l-istat, l-analiżi u r-rimedju.",
-      "dismissedBecause": "Is-sejba twarrbet minħabba {{reason}}.",
       "dismissedOn": "Imwarrba fi",
       "supersededOn": "Sostitwita fi",
       "severityLabel": "Severità {{severity}}",
@@ -1920,11 +1919,6 @@
       "viewAdvisory": "Ara l-avviż fuq GitHub",
       "statusOpen": "Ftuħ",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "it-tiswija diġà bdiet",
-      "reasonNoBandwidth": "m'hemmx riżorsi disponibbli",
-      "reasonTolerableRisk": "ir-riskju huwa tollerabbli",
-      "reasonInaccurate": "is-sejba mhix preċiża",
-      "reasonNotUsed": "il-kodiċi vulnerabbli ma jintużax",
       "reasonAfterReview": "wara r-reviżjoni"
     },
     "settingsOverview": {

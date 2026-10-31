@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "புதிய சிக்கல் பதிவால் மாற்றப்பட்டது",
       "supersededByDescription": "நிலை, பகுப்பாய்வு, சரிசெய்தல் ஆகியவற்றைப் பார்க்க, தற்போதைய பதிவைத் தட்டித் திறக்கவும்.",
-      "dismissedBecause": "நிராகரிப்புக்கான காரணம்: {{reason}}.",
       "dismissedOn": "புறக்கணிப்பு தேதி",
       "supersededOn": "புதிய பதிவால் மாற்றப்பட்ட தேதி",
       "severityLabel": "தீவிரத்தன்மை: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "GitHub-இல் பாதுகாப்பு அறிவிப்பைப் பார்க்கவும்",
       "statusOpen": "திறப்பு",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "திருத்தும் பணி ஏற்கெனவே தொடங்கிவிட்டது",
-      "reasonNoBandwidth": "இதற்காக ஒதுக்க நேரமில்லை",
-      "reasonTolerableRisk": "ஏற்றுக்கொள்ளக்கூடிய ஆபத்து",
-      "reasonInaccurate": "கண்டறிந்த சிக்கல் துல்லியமானதல்ல",
-      "reasonNotUsed": "பாதிப்புள்ள நிரல் பயன்படுத்தப்படவில்லை",
       "reasonAfterReview": "மதிப்பாய்வுக்குப் பிறகு"
     },
     "settingsOverview": {

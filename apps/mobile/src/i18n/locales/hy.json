@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Փոխարինվել է խնդրի արդի գրառմամբ",
       "supersededByDescription": "Հպիր՝ արդի գրառումը բացելու և կարգավիճակը, վերլուծությունն ու շտկումը դիտելու համար։",
-      "dismissedBecause": "Մերժվել է՝ {{reason}}։",
       "dismissedOn": "Անտեսված լինելու ամսաթիվ",
       "supersededOn": "Փոխարինված լինելու ամսաթիվ",
       "severityLabel": "Վտանգավորություն՝ {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Դիտել անվտանգության տեղեկագիրը GitHub-ում",
       "statusOpen": "Բաց",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ուղղումն արդեն սկսվել է",
-      "reasonNoBandwidth": "ազատ ռեսուրսներ չկան",
-      "reasonTolerableRisk": "ռիսկն ընդունելի է",
-      "reasonInaccurate": "հայտնաբերված խնդիրը սխալ է նկարագրված",
-      "reasonNotUsed": "խոցելի կոդը չի օգտագործվում",
       "reasonAfterReview": "ստուգումից հետո"
     },
     "settingsOverview": {

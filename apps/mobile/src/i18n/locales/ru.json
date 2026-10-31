@@ -1366,7 +1366,6 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Обнаружено",
-      "dismissedBecause": "Уязвимость отклонена: {{reason}}.",
       "dismissedOn": "Дата отклонения",
       "supersededOn": "Дата замены",
       "ghsa": "GHSA",
@@ -1385,11 +1384,6 @@
       "vulnerableVersions": "Уязвимые версии",
       "statusOpen": "Открыта",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "исправление уже начато",
-      "reasonNoBandwidth": "нет ресурсов на исправление",
-      "reasonTolerableRisk": "риск приемлем",
-      "reasonInaccurate": "замечание неточно",
-      "reasonNotUsed": "уязвимый код не используется",
       "reasonAfterReview": "после проверки"
     },
     "findingList": {

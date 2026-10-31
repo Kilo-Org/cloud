@@ -1851,7 +1851,6 @@
     "findingDetails": {
       "supersededBy": "Aizstāts ar aktuālu konstatējumu",
       "supersededByDescription": "Pieskaries, lai atvērtu aktuālo ierakstu un skatītu statusu, analīzi un labošanas informāciju.",
-      "dismissedBecause": "Noraidīts: {{reason}}.",
       "dismissedOn": "Noraidīšanas datums",
       "supersededOn": "Aizstāšanas datums",
       "severityLabel": "Smaguma pakāpe: {{severity}}",
@@ -1870,11 +1869,6 @@
       "viewAdvisory": "Skatīt drošības paziņojumu vietnē GitHub",
       "statusOpen": "Atvērt",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "labošana jau ir sākta",
-      "reasonNoBandwidth": "trūkst laika vai resursu",
-      "reasonTolerableRisk": "risks ir pieņemams",
-      "reasonInaccurate": "konstatējums ir neprecīzs",
-      "reasonNotUsed": "ievainojamais kods netiek izmantots",
       "reasonAfterReview": "pēc pārskatīšanas"
     },
     "settingsOverview": {

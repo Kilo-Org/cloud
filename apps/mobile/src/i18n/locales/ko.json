@@ -1352,7 +1352,6 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "감지됨",
-      "dismissedBecause": "무시 처리했습니다. 사유: {{reason}}.",
       "dismissedOn": "무시된 날짜",
       "supersededOn": "대체된 날짜",
       "ghsa": "GHSA",
@@ -1371,11 +1370,6 @@
       "vulnerableVersions": "취약점이 있는 버전",
       "statusOpen": "오픈",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "이미 수정 중",
-      "reasonNoBandwidth": "처리 여력 없음",
-      "reasonTolerableRisk": "위험 감수 가능",
-      "reasonInaccurate": "진단 결과 부정확",
-      "reasonNotUsed": "취약한 코드 사용 안 함",
       "reasonAfterReview": "검토 결과에 따른 판단"
     },
     "findingList": {

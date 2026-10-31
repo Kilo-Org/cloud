@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Asendatud uuema leiuga",
       "supersededByDescription": "Puuduta, et avada uuem kirje ning vaadata selle olekut, analüüsi ja parandamise andmeid.",
-      "dismissedBecause": "Leid jäeti kõrvale: {{reason}}.",
       "dismissedOn": "Kõrvale jätmise kuupäev",
       "supersededOn": "Asendamise kuupäev",
       "severityLabel": "Raskusaste: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Vaata turvateadet GitHubis",
       "statusOpen": "Avatud",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "parandamine juba käib",
-      "reasonNoBandwidth": "selleks pole aega",
-      "reasonTolerableRisk": "risk on talutav",
-      "reasonInaccurate": "leid on ebatäpne",
-      "reasonNotUsed": "haavatavat koodi ei kasutata",
       "reasonAfterReview": "pärast ülevaatamist"
     },
     "settingsOverview": {

@@ -1352,7 +1352,6 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "检测时间",
-      "dismissedBecause": "已忽略（{{reason}}）。",
       "dismissedOn": "忽略日期",
       "supersededOn": "取代日期",
       "ghsa": "GHSA",
@@ -1371,11 +1370,6 @@
       "vulnerableVersions": "存在漏洞的版本",
       "statusOpen": "未解决",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "已开始修复",
-      "reasonNoBandwidth": "暂无资源处理",
-      "reasonTolerableRisk": "风险可以接受",
-      "reasonInaccurate": "安全问题不准确",
-      "reasonNotUsed": "未使用存在漏洞的代码",
       "reasonAfterReview": "经审查"
     },
     "findingList": {

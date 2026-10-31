@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Újabb találat váltotta fel",
       "supersededByDescription": "Koppints az aktuális bejegyzésre az állapot, az elemzés és a hibajavítás megtekintéséhez.",
-      "dismissedBecause": "Elvetés indoka: {{reason}}.",
       "dismissedOn": "Elvetés dátuma",
       "supersededOn": "Újabbal helyettesítés dátuma",
       "severityLabel": "{{severity}} súlyosság",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Biztonsági tájékoztató megtekintése a GitHubon",
       "statusOpen": "Nyitott",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "a javítás már folyamatban van",
-      "reasonNoBandwidth": "nincs szabad kapacitás",
-      "reasonTolerableRisk": "a kockázat elfogadható",
-      "reasonInaccurate": "a találat pontatlan",
-      "reasonNotUsed": "a sérülékeny kód nincs használatban",
       "reasonAfterReview": "felülvizsgálat után"
     },
     "settingsOverview": {

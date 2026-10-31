@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Digantikan oleh penemuan semasa",
       "supersededByDescription": "Ketik untuk membuka rekod semasa dan melihat status, analisis serta pemulihan.",
-      "dismissedBecause": "Diketepikan kerana {{reason}}.",
       "dismissedOn": "Diketepikan pada",
       "supersededOn": "Digantikan pada",
       "severityLabel": "Keterukan {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Lihat notis keselamatan di GitHub",
       "statusOpen": "Buka",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "pembetulan telah dimulakan",
-      "reasonNoBandwidth": "tiada masa atau tenaga kerja",
-      "reasonTolerableRisk": "risiko boleh diterima",
-      "reasonInaccurate": "dapatan tidak tepat",
-      "reasonNotUsed": "kod yang rentan tidak digunakan",
       "reasonAfterReview": "selepas semakan"
     },
     "settingsOverview": {

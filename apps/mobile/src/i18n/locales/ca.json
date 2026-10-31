@@ -1851,7 +1851,6 @@
     "findingDetails": {
       "supersededBy": "Substituïda per una incidència actual",
       "supersededByDescription": "Toca per obrir el registre actual i consultar-ne l'estat, l'anàlisi i la correcció.",
-      "dismissedBecause": "S'ha descartat: {{reason}}.",
       "dismissedOn": "Descartat el",
       "supersededOn": "Substituït el",
       "severityLabel": "Gravetat: {{severity}}",
@@ -1870,11 +1869,6 @@
       "viewAdvisory": "Consulta l'avís a GitHub",
       "statusOpen": "Obertura",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "la correcció ja està en curs",
-      "reasonNoBandwidth": "no hi ha recursos disponibles",
-      "reasonTolerableRisk": "el risc és tolerable",
-      "reasonInaccurate": "el problema detectat és inexacte",
-      "reasonNotUsed": "el codi vulnerable no s'utilitza",
       "reasonAfterReview": "després de la revisió"
     },
     "settingsOverview": {

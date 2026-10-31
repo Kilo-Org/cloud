@@ -1352,7 +1352,6 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Tespit tarihi",
-      "dismissedBecause": "Şu nedenle yok sayıldı: {{reason}}.",
       "dismissedOn": "Yok sayılma tarihi",
       "supersededOn": "Yerini yenisi alma tarihi",
       "ghsa": "GHSA",
@@ -1371,11 +1370,6 @@
       "vulnerableVersions": "Güvenlik açığı içeren sürümler",
       "statusOpen": "Açık",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "düzeltmeye başlandı",
-      "reasonNoBandwidth": "yeterli kaynak yok",
-      "reasonTolerableRisk": "risk kabul edilebilir",
-      "reasonInaccurate": "bulgu hatalı",
-      "reasonNotUsed": "açık içeren kod kullanılmıyor",
       "reasonAfterReview": "incelemeden sonra"
     },
     "findingList": {

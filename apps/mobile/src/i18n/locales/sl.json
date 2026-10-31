@@ -1876,7 +1876,6 @@
     "findingDetails": {
       "supersededBy": "Nadomeščeno z aktualno ugotovitvijo",
       "supersededByDescription": "Tapni za prikaz aktualnega zapisa s stanjem, analizo in podatki o odpravljanju.",
-      "dismissedBecause": "Ugotovitev je zavrnjena: {{reason}}.",
       "dismissedOn": "Datum zavrženja",
       "supersededOn": "Datum nadomestitve",
       "severityLabel": "Resnost: {{severity}}",
@@ -1895,11 +1894,6 @@
       "viewAdvisory": "Prikaži varnostno obvestilo na platformi GitHub",
       "statusOpen": "Odprto",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "odpravljanje že poteka",
-      "reasonNoBandwidth": "ni časa za odpravljanje",
-      "reasonTolerableRisk": "tveganje je sprejemljivo",
-      "reasonInaccurate": "ugotovitev je napačna",
-      "reasonNotUsed": "ranljiva koda se ne uporablja",
       "reasonAfterReview": "po pregledu"
     },
     "settingsOverview": {

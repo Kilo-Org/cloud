@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Pinalitan ng mas bagong natukoy na isyu",
       "supersededByDescription": "I-tap para buksan ang kasalukuyang tala ng katayuan, pagsusuri, at pag-aayos.",
-      "dismissedBecause": "Binalewala dahil {{reason}}.",
       "dismissedOn": "Binalewala noong",
       "supersededOn": "Pinalitan noong",
       "severityLabel": "kalubhaan: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Tingnan ang abiso sa GitHub",
       "statusOpen": "Bukas",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "sinimulan na ang pag-aayos",
-      "reasonNoBandwidth": "walang sapat na oras o tauhan",
-      "reasonTolerableRisk": "katanggap-tanggap ang panganib",
-      "reasonInaccurate": "hindi tumpak ang natukoy na isyu",
-      "reasonNotUsed": "hindi ginagamit ang code na may kahinaan",
       "reasonAfterReview": "pagkatapos ng pagsusuri"
     },
     "settingsOverview": {

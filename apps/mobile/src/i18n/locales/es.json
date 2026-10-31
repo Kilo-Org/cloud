@@ -1359,7 +1359,6 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Detectado",
-      "dismissedBecause": "Se descartó por el siguiente motivo: {{reason}}.",
       "dismissedOn": "Descartado el",
       "supersededOn": "Reemplazado el",
       "ghsa": "GHSA",
@@ -1378,11 +1377,6 @@
       "vulnerableVersions": "Versiones vulnerables",
       "statusOpen": "Apertura",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "corrección en curso",
-      "reasonNoBandwidth": "sin recursos disponibles",
-      "reasonTolerableRisk": "riesgo aceptable",
-      "reasonInaccurate": "hallazgo inexacto",
-      "reasonNotUsed": "el código vulnerable no se usa",
       "reasonAfterReview": "después de la revisión"
     },
     "findingList": {

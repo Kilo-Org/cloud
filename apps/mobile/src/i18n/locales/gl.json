@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Substituído por un achado actual",
       "supersededByDescription": "Toca para abrir o rexistro actual e consultar o estado, a análise e a corrección.",
-      "dismissedBecause": "Motivo do descarte: {{reason}}.",
       "dismissedOn": "Descartado o",
       "supersededOn": "Substituído o",
       "severityLabel": "Gravidade: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Ver o aviso de seguridade en GitHub",
       "statusOpen": "Apertura",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "corrección xa iniciada",
-      "reasonNoBandwidth": "falta de tempo",
-      "reasonTolerableRisk": "risco aceptable",
-      "reasonInaccurate": "problema detectado incorrecto",
-      "reasonNotUsed": "código vulnerable sen uso",
       "reasonAfterReview": "despois da revisión"
     },
     "settingsOverview": {

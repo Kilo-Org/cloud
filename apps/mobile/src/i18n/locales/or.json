@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "ନୂଆ ଚିହ୍ନଟ ସମସ୍ୟା ଏହାର ସ୍ଥାନ ନେଇଛି",
       "supersededByDescription": "ସ୍ଥିତି, ବିଶ୍ଳେଷଣ ଏବଂ ସମାଧାନ ପାଇଁ ବର୍ତ୍ତମାନର ରେକର୍ଡ ଖୋଲିବାକୁ ଟାପ୍ କରନ୍ତୁ।",
-      "dismissedBecause": "{{reason}} କାରଣରୁ ଖାରଜ ହୋଇଛି।",
       "dismissedOn": "ଖାରଜ କରାଯାଇଥିବା ତାରିଖ",
       "supersededOn": "ପ୍ରତିସ୍ଥାପିତ ହୋଇଥିବା ତାରିଖ",
       "severityLabel": "ତୀବ୍ରତା: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "GitHub ରେ ସୁରକ୍ଷା ସୂଚନା ଦେଖନ୍ତୁ",
       "statusOpen": "ଖୋଲା",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ସମାଧାନ କାମ ଆରମ୍ଭ ହୋଇସାରିଛି",
-      "reasonNoBandwidth": "ସମୟ କିମ୍ବା ଲୋକବଳ ନାହିଁ",
-      "reasonTolerableRisk": "ବିପଦ ସହନଯୋଗ୍ୟ",
-      "reasonInaccurate": "ଚିହ୍ନଟ ସମସ୍ୟାଟି ସଠିକ୍ ନୁହେଁ",
-      "reasonNotUsed": "ଅସୁରକ୍ଷିତ କୋଡ୍ ବ୍ୟବହୃତ ହେଉନାହିଁ",
       "reasonAfterReview": "ସମୀକ୍ଷା ପରେ"
     },
     "settingsOverview": {

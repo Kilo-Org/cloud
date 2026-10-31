@@ -14,7 +14,7 @@ import {
   FINDING_TONE_TO_KV_ROW_TONE,
 } from '@/components/security-agent/finding-tone';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
-import { DISMISSAL_REASON_PHRASE_KEYS } from '@/components/security-agent/dismissal-reason-keys';
+import { DISMISSAL_REASON_LABEL_KEYS } from '@/components/security-agent/dismissal-reason-keys';
 import { storedText } from '@/components/security-agent/stored-text';
 import { getDeadlineCopy, isOpenDeadline } from '@/lib/security-agent-copy';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
@@ -69,7 +69,7 @@ function getDismissalReasonLabel(reason: string | null): string {
   if (code === null) {
     return i18n.t('securityAgent.findingDetails.reasonAfterReview');
   }
-  const key = lookup(DISMISSAL_REASON_PHRASE_KEYS, code);
+  const key = lookup(DISMISSAL_REASON_LABEL_KEYS, code);
   return key ? i18n.t(key) : code.replaceAll('_', ' ');
 }
 
@@ -116,11 +116,9 @@ function DismissalOrSupersessionNote({
 
   return (
     <View className="gap-1 rounded-lg bg-secondary p-3">
-      <Text className="text-sm font-medium">{t('common.dismissed')}</Text>
+      <Text className="text-sm font-medium">{t('securityAgent.dismiss.reason')}</Text>
       <Text variant="muted" className="text-xs" selectable>
-        {t('securityAgent.findingDetails.dismissedBecause', {
-          reason: getDismissalReasonLabel(finding.ignored_reason),
-        })}
+        {getDismissalReasonLabel(finding.ignored_reason)}
       </Text>
     </View>
   );
@@ -161,6 +159,11 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
   const statusKey = supersedingFindingId ? FINDING_STATUS_KEYS.superseded : knownStatusKey;
   const statusLabel = statusKey ? t(statusKey) : finding.status;
   const advisoryUrl = finding.dependabot_html_url;
+  // An advisory description arrives as provider markdown: wrapped source lines
+  // carry a newline plus the indentation of the next line, which a plain Text
+  // paints as ragged, indented fragments instead of a paragraph. Collapsing the
+  // whitespace runs leaves one block that wraps to the card width.
+  const description = finding.description?.replaceAll(/\s+/g, ' ').trim() ?? '';
   // Each instant the dates group shows carries the label that names it. A
   // dismissed or superseded finding has no deadline left to meet, so its
   // resolution date gets its own row and the SLA row stays with a finding that
@@ -231,9 +234,9 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             />
           ) : null}
         </View>
-        {finding.description ? (
+        {description ? (
           <Text variant="muted" className="text-sm" selectable>
-            {finding.description}
+            {description}
           </Text>
         ) : null}
       </View>

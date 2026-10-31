@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "हालको सुरक्षा समस्याले प्रतिस्थापन गरेको",
       "supersededByDescription": "स्थिति, विश्लेषण र सुधार हेर्न हालको अभिलेख खोल्न ट्याप गर्नुहोस्।",
-      "dismissedBecause": "{{reason}} खारेज गरियो।",
       "dismissedOn": "खारेजी मिति",
       "supersededOn": "प्रतिस्थापन मिति",
       "severityLabel": "गम्भीरता: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "GitHub मा सुरक्षा सूचना हेर्नुहोस्",
       "statusOpen": "खुला",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "सुधार सुरु भइसकेको छ",
-      "reasonNoBandwidth": "समय वा जनशक्ति छैन",
-      "reasonTolerableRisk": "जोखिम सहनयोग्य छ",
-      "reasonInaccurate": "भेटिएको समस्याको विवरण गलत छ",
-      "reasonNotUsed": "सुरक्षा कमजोरी भएको कोड प्रयोगमा छैन",
       "reasonAfterReview": "समीक्षापछि"
     },
     "settingsOverview": {

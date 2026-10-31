@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "આની જગ્યાએ નવું તારણ નોંધાયું છે",
       "supersededByDescription": "સ્થિતિ, વિશ્લેષણ અને સુધારણા માટે હાલનો રેકોર્ડ ખોલવા ટેપ કરો.",
-      "dismissedBecause": "આ કારણસર ખારિજ કર્યું: {{reason}}.",
       "dismissedOn": "ખારિજ કરવાની તારીખ",
       "supersededOn": "નવા તારણે સ્થાન લીધાની તારીખ",
       "severityLabel": "{{severity}} ગંભીરતા",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "GitHub પર સુરક્ષા સૂચના જુઓ",
       "statusOpen": "ખુલ્લું",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "સુધારવાનું કામ શરૂ થઈ ગયું છે",
-      "reasonNoBandwidth": "હાલ સમય કે સંસાધનો નથી",
-      "reasonTolerableRisk": "જોખમ સ્વીકાર્ય છે",
-      "reasonInaccurate": "તારણ સચોટ નથી",
-      "reasonNotUsed": "સુરક્ષાની ખામીવાળો કોડ વપરાતો નથી",
       "reasonAfterReview": "સમીક્ષા પછી"
     },
     "settingsOverview": {

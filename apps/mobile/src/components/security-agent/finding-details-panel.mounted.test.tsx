@@ -13,12 +13,10 @@ import { type SecurityFinding } from '@/lib/security-agent';
 
 const mocks = vi.hoisted(() => {
   const deadlineState: Record<string, unknown> = { kind: 'no-deadline' };
-  const interpolations: { key: string; params: Record<string, unknown> }[] = [];
   const kvRows: Record<string, unknown>[] = [];
   return {
     deadlineState,
     deadlineTone: 'neutral' as string,
-    interpolations,
     kvRows,
     supersedingFindingId: null as string | null,
     routerPush: vi.fn(),
@@ -41,12 +39,7 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, params?: Record<string, unknown>) => {
-      if (params) {
-        mocks.interpolations.push({ key, params });
-      }
-      return key;
-    },
+    t: (key: string) => key,
   }),
 }));
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
@@ -143,6 +136,11 @@ function renderPanel(finding: SecurityFinding): R {
   return r;
 }
 
+/** Every string the panel painted, in tree order. */
+function panelTexts(r: R): unknown[] {
+  return r.root.findAllByType(Text).map(node => node.props.children);
+}
+
 function pressAdvisory(r: R): void {
   const control = r.root.find(
     n => typeof n.type === 'string' && n.props.accessibilityRole === 'link'
@@ -197,30 +195,28 @@ describe('FindingDetailsPanel advisory link routing', () => {
 });
 
 describe('FindingDetailsPanel chip row', () => {
-  it('drops the deadline chip that repeats a dismissed status', () => {
-    mocks.deadlineState = { kind: 'closed', superseded: false, at: new Date(0) };
-    const tree = renderPanel(findingFixture({ status: 'ignored' }));
+  it.each([
+    {
+      state: { kind: 'closed', superseded: false, at: new Date(0) },
+      fixture: { status: 'ignored', ignored_reason: 'not_used' },
+      // The dismissal card names what it holds; only the chip row lost a control.
+      texts: ['securityAgent.dismiss.reason', 'securityAgent.dismiss.reasonNotUsed'],
+    },
+    {
+      state: { kind: 'fixed', beforeDeadline: false, fixedAt: new Date(0) },
+      fixture: { status: 'fixed' },
+      texts: ['securityAgent.filter.fixed'],
+    },
+  ])(
+    'drops the deadline chip that repeats the status ($fixture.status)',
+    ({ state, fixture, texts }) => {
+      mocks.deadlineState = state;
+      const tree = renderPanel(findingFixture(fixture));
 
-    expect(tree.root.findAllByType(FindingStatusBadge)).toHaveLength(0);
-    // The dismissal card still explains the reason; only the row lost a chip.
-    const rendered = tree.root.findAllByType(Text);
-    expect(
-      rendered.filter(
-        node => node.props.children === 'securityAgent.findingDetails.dismissedBecause'
-      )
-    ).toHaveLength(1);
-  });
-
-  it('drops the deadline chip that repeats a fixed status after the deadline', () => {
-    mocks.deadlineState = { kind: 'fixed', beforeDeadline: false, fixedAt: new Date(0) };
-    const tree = renderPanel(findingFixture({ status: 'fixed' }));
-
-    expect(tree.root.findAllByType(FindingStatusBadge)).toHaveLength(0);
-    const rendered = tree.root.findAllByType(Text);
-    expect(
-      rendered.filter(node => node.props.children === 'securityAgent.filter.fixed')
-    ).toHaveLength(1);
-  });
+      expect(tree.root.findAllByType(FindingStatusBadge)).toHaveLength(0);
+      expect(panelTexts(tree)).toEqual(expect.arrayContaining(texts));
+    }
+  );
 
   it.each([
     { state: { kind: 'fixed', beforeDeadline: true, fixedAt: new Date(0) }, status: 'fixed' },
@@ -235,24 +231,28 @@ describe('FindingDetailsPanel chip row', () => {
 });
 
 describe('FindingDetailsPanel stored dismissal values', () => {
-  beforeEach(() => {
-    mocks.deadlineState = { kind: 'closed', superseded: false, at: new Date(0) };
-    mocks.interpolations.length = 0;
-  });
-
-  // A dismissed row reads `ignored_reason` from the stored record, and the
-  // column's type does not guarantee it is still a string.
+  // The column's type does not guarantee `ignored_reason` is still a string.
   it.each([{ ignored_reason: 7 }, { ignored_reason: true }, { ignored_reason: '  ' }])(
     'falls back to the review wording for an unusable reason (%j)',
     override => {
-      renderPanel(findingFixture({ status: 'ignored', ...override }));
-
-      expect(mocks.interpolations).toContainEqual({
-        key: 'securityAgent.findingDetails.dismissedBecause',
-        params: { reason: 'securityAgent.findingDetails.reasonAfterReview' },
-      });
+      mocks.deadlineState = { kind: 'closed', superseded: false, at: new Date(0) };
+      const tree = renderPanel(findingFixture({ status: 'ignored', ...override }));
+      expect(panelTexts(tree)).toContain('securityAgent.findingDetails.reasonAfterReview');
     }
   );
+});
+
+describe('FindingDetailsPanel description paragraph', () => {
+  // Provider markdown wraps its lines; a plain Text paints the newlines and
+  // the next line's indentation as ragged fragments.
+  it('collapses the wrapped source lines into one paragraph', () => {
+    const description = (value: string) =>
+      panelTexts(renderPanel(findingFixture({ description: value })));
+
+    const wrapped = 'A crafted input\r\n    overflows the parser\n  and crashes.';
+    expect(description(wrapped)).toContain('A crafted input overflows the parser and crashes.');
+    expect(description(' \n\t ')).not.toContain('');
+  });
 });
 
 describe('FindingDetailsPanel dates block', () => {

@@ -13,7 +13,7 @@ import { FindingRemediationPanel } from '@/components/security-agent/finding-rem
 import { PanelErrorBoundary } from '@/components/security-agent/panel-error-boundary';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
-import { IconButton } from '@/components/ui/icon-button';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -224,14 +224,24 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         onBack={handleBack}
         headerRight={
           canDismiss ? (
-            <IconButton
+            <Button
+              variant="secondary"
+              size="sm"
               onPress={() => {
                 pushOnce(getSecurityAgentPath(scope, `dismiss/${findingId}`));
               }}
               accessibilityLabel={t('securityAgent.dismiss.title')}
+              // A labelled header action is variable width, so it bounds itself
+              // the way the settings Save button does: the label shrinks inside
+              // the cap instead of taking the title's room (see the trailing
+              // cluster note in screen-header.tsx).
+              className="min-w-0 max-w-[140px] shrink"
             >
-              <Ban size={20} color={colors.mutedForeground} />
-            </IconButton>
+              <Ban size={16} color={colors.secondaryForeground} />
+              <Text className="shrink text-center">
+                {t('securityAgent.analysis.action.dismiss')}
+              </Text>
+            </Button>
           ) : undefined
         }
       />

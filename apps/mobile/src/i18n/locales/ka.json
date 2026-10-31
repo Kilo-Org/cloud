@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "ჩანაცვლებულია აქტუალური მიგნებით",
       "supersededByDescription": "შეეხე აქტუალურ ჩანაწერს სტატუსის, ანალიზისა და გამოსწორების სანახავად.",
-      "dismissedBecause": "უარყოფის მიზეზი: {{reason}}.",
       "dismissedOn": "უგულებელყოფის თარიღი",
       "supersededOn": "ჩანაცვლების თარიღი",
       "severityLabel": "სიმძიმე: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "უსაფრთხოების ცნობარის ნახვა GitHub-ზე",
       "statusOpen": "ღია",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "შესწორება უკვე დაწყებულია",
-      "reasonNoBandwidth": "თავისუფალი რესურსი არ არის",
-      "reasonTolerableRisk": "რისკი მისაღებია",
-      "reasonInaccurate": "პრობლემა არასწორადაა გამოვლენილი",
-      "reasonNotUsed": "მოწყვლადი კოდი არ გამოიყენება",
       "reasonAfterReview": "შემოწმების შემდეგ"
     },
     "settingsOverview": {

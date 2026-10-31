@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Kua whakakapia e tētahi kitenga o nāianei",
       "supersededByDescription": "Patoa kia whakatuwhera i te pūkete o nāianei mō te tūnga, te tātari me te whakatika.",
-      "dismissedBecause": "Kua whakakorea. Te take: {{reason}}.",
       "dismissedOn": "Kua whakakorea i te",
       "supersededOn": "Kua whakakapia i te",
       "severityLabel": "Taumata kino: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "Tirohia te pānui haumarutanga i GitHub",
       "statusOpen": "Tuwhera",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "kua tīmata kē te whakatika",
-      "reasonNoBandwidth": "kāore he wā e wātea ana",
-      "reasonTolerableRisk": "ka taea te whakaae ki te mōrea",
-      "reasonInaccurate": "kāore i te tika te kitenga",
-      "reasonNotUsed": "kāore e whakamahia ana te waehere whakaraerae",
       "reasonAfterReview": "i muri i te arotake"
     },
     "settingsOverview": {

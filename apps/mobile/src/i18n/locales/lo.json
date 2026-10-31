@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "ມີບັນຫາທີ່ກວດພົບລາຍການໃໝ່ແທນແລ້ວ",
       "supersededByDescription": "ແຕະເພື່ອເປີດລາຍການປັດຈຸບັນ ແລະ ເບິ່ງສະຖານະ, ການວິເຄາະ ແລະ ການແກ້ໄຂ.",
-      "dismissedBecause": "ປິດບັນຫາແລ້ວເພາະ {{reason}}.",
       "dismissedOn": "ລະເວັ້ນແລ້ວເມື່ອ",
       "supersededOn": "ແທນທີ່ແລ້ວເມື່ອ",
       "severityLabel": "ຄວາມຮ້າຍແຮງລະດັບ {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "ເບິ່ງປະກາດຄວາມປອດໄພໃນ GitHub",
       "statusOpen": "ເປີດ",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ເລີ່ມແກ້ໄຂແລ້ວ",
-      "reasonNoBandwidth": "ບໍ່ມີເວລາຫຼືກຳລັງຄົນ",
-      "reasonTolerableRisk": "ຍອມຮັບຄວາມສ່ຽງໄດ້",
-      "reasonInaccurate": "ບັນຫາທີ່ກວດພົບບໍ່ຖືກຕ້ອງ",
-      "reasonNotUsed": "ບໍ່ໄດ້ໃຊ້ໂຄ້ດທີ່ມີຊ່ອງໂຫວ່",
       "reasonAfterReview": "ຫຼັງຈາກກວດທານ"
     },
     "settingsOverview": {

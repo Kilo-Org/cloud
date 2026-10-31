@@ -1826,7 +1826,6 @@
     "findingDetails": {
       "supersededBy": "Cari tapıntı ilə əvəz edilib",
       "supersededByDescription": "Cari qeydin statusuna, təhlilinə və düzəlişinə baxmaq üçün toxun.",
-      "dismissedBecause": "Rədd edilib: {{reason}}.",
       "dismissedOn": "Rədd edilmə tarixi",
       "supersededOn": "Əvəz edilmə tarixi",
       "severityLabel": "Ciddilik dərəcəsi: {{severity}}",
@@ -1845,11 +1844,6 @@
       "viewAdvisory": "GitHub-da təhlükəsizlik bildirişinə bax",
       "statusOpen": "Açıq",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "düzəlişə artıq başlanıb",
-      "reasonNoBandwidth": "vaxt və resurs yoxdur",
-      "reasonTolerableRisk": "risk məqbuldur",
-      "reasonInaccurate": "problem səhv müəyyən edilib",
-      "reasonNotUsed": "boşluq olan koddan istifadə edilmir",
       "reasonAfterReview": "yoxlamadan sonra"
     },
     "settingsOverview": {

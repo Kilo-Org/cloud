@@ -59,7 +59,7 @@ const dashboardStats = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 const lastSync = vi.hoisted(() => ({
-  data: undefined as { lastSyncTime?: string } | undefined,
+  data: undefined as { lastSyncTime?: string | null } | undefined,
   isError: false,
   refetch: vi.fn(),
 }));
@@ -137,7 +137,7 @@ const retryCards = vi.hoisted(() => ({
 // Captures the dashboard-sections props, so a test can assert the stats payload
 // a failure leaves on screen.
 const sectionsProps = vi.hoisted(() => ({
-  props: [] as { data?: unknown; slaEnabled?: boolean }[],
+  props: [] as { data?: unknown; slaEnabled?: boolean; neverSynced?: boolean }[],
 }));
 
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
@@ -253,7 +253,7 @@ vi.mock('@/components/security-agent/audit-report-button', () => ({
   AuditReportButton: () => null,
 }));
 vi.mock('@/components/security-agent/dashboard-sections', () => ({
-  DashboardSections: (props: { data?: unknown; slaEnabled?: boolean }) => {
+  DashboardSections: (props: { data?: unknown; slaEnabled?: boolean; neverSynced?: boolean }) => {
     sectionsProps.props.push(props);
     return null;
   },
@@ -394,6 +394,32 @@ describe('DashboardScreen names the scope it acts on', () => {
     const header = headers.props.at(-1);
     expect(header?.title).toBe('Organization');
     expect(header?.eyebrow).toBe('Security Agent');
+  });
+});
+
+describe('DashboardScreen before the first sync', () => {
+  beforeEach(() => {
+    dashboardStats.isPending = false;
+    dashboardStats.isError = false;
+    dashboardStats.data = { sla: { overall: { total: 0 } } };
+    sharedMetrics.build.mockReturnValue([]);
+  });
+
+  // The stored absence of a sync is what paints "Not yet synced" under the
+  // filter. The sections must read that same fact, or an organization that has
+  // never run the agent reports an all-clear it never measured.
+  it('tells the sections nothing has been synced yet', () => {
+    sectionsProps.props = [];
+    lastSync.data = { lastSyncTime: null };
+    renderScreen('org_123');
+    expect(sectionsProps.props.at(-1)?.neverSynced).toBe(true);
+  });
+
+  it('leaves a synced scope measured', () => {
+    sectionsProps.props = [];
+    lastSync.data = { lastSyncTime: '2026-10-30T12:00:00.000Z' };
+    renderScreen('org_123');
+    expect(sectionsProps.props.at(-1)?.neverSynced).toBe(false);
   });
 });
 
@@ -828,6 +854,47 @@ describe('buildLocalizedMetrics', () => {
 
     expect(compliance?.value).toBe('—');
     expect(compliance?.detail).toBe(i18n.t('securityAgent.dashboardMetrics.noDeadlineData'));
+  });
+
+  it('reports no measurement instead of a clean result before the first sync', () => {
+    const data: Parameters<typeof buildLocalizedMetrics>[0] = {
+      analysis: {
+        total: 0,
+        exploitable: 0,
+        needsReview: 0,
+        triageComplete: 0,
+        analyzing: 0,
+        notAnalyzed: 0,
+        failed: 0,
+      },
+      severity: { critical: 0, high: 0, medium: 0, low: 0 },
+      sla: {
+        overall: { total: 0, withinSla: 0, overdue: 0 },
+        bySeverity: {
+          critical: { overdue: 0 },
+          high: { overdue: 0 },
+          medium: { overdue: 0 },
+          low: { overdue: 0 },
+        },
+        dueSoon: { total: 0, exploitable: 0 },
+        untrackedCount: 0,
+      },
+    };
+
+    sharedMetrics.build.mockReturnValueOnce(
+      ['openFindings', 'slaCompliance', 'noDeadline'].map(id => dashboardMetric(id))
+    );
+    const metrics = buildLocalizedMetrics(data, true, true);
+
+    // Zero counts and the line that read the zeros as a clean report both
+    // became a dash and the screen's own not-yet-synced state.
+    expect(metrics.map(metric => metric.value)).toEqual(['—', '—', '—']);
+    expect(metrics.map(metric => metric.detail)).toEqual([
+      i18n.t('securityAgent.dashboard.notYetSynced'),
+      i18n.t('securityAgent.dashboard.notYetSynced'),
+      i18n.t('securityAgent.dashboard.notYetSynced'),
+    ]);
+    expect(metrics.every(metric => metric.tone === 'neutral')).toBe(true);
   });
 
   it('omits the medium & low bucket while no medium or low finding is counted', () => {

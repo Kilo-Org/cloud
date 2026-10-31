@@ -1,3 +1,4 @@
+import { usePreventRemove } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -67,6 +68,21 @@ export function useReviewMemoryProposalEditor({
   const guard = useSheetDismissGuard({
     isDirty: () => !sameProposalDraft(draft.current, baseline.current),
     onDiscard: onClose,
+  });
+
+  // The sheet is a native sheet in its own window, so the route below it is out
+  // of sight but still live: without this, a system Back (the iOS edge swipe has
+  // no handler of its own here, and the sheet's own `interactiveDismissDisabled`
+  // only blocks its drag) removed the review-memory route and left the sheet
+  // presented over whatever screen the app fell back to. Back belongs to the
+  // sheet instead: a mutation in flight keeps the sheet and the outcome it
+  // awaits, and an idle sheet closes through the same keep-editing / discard
+  // path as its Close control, so the user stays on the proposal list.
+  usePreventRemove(true, () => {
+    if (pendingRef.current) {
+      return;
+    }
+    guard.requestClose();
   });
 
   const changeField = (field: keyof ProposalDraft, value: string) => {

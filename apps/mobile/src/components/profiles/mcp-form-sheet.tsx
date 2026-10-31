@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -103,8 +103,7 @@ export function McpFormSheet({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const initial = initialMcpFormState(server ?? undefined);
-  const instanceId = useId();
-  const scope = draftScope ?? `profiles:mcp-form:${instanceId}`;
+  const scope = draftScope;
   const nameRef = useFormDraftRef(scope, 'name', initial.name);
   const commandRef = useFormDraftRef(scope, 'command', initial.command);
   const urlRef = useFormDraftRef(scope, 'url', initial.url);

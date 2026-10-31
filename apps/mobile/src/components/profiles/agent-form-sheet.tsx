@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- the agent form keeps its validation, dirty check, and every field group in one sheet, so Save and the fields it saves stay together */
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -85,8 +85,7 @@ export function AgentFormSheet({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const initial = initialAgentFormState(agent ?? undefined);
-  const instanceId = useId();
-  const scope = draftScope ?? `profiles:agent-form:${instanceId}`;
+  const scope = draftScope;
   const slugRef = useFormDraftRef(scope, 'slug', initial.slug);
   const nameRef = useFormDraftRef(scope, 'name', initial.name);
   const descriptionRef = useFormDraftRef(scope, 'description', initial.description);

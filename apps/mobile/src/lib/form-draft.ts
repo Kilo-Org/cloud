@@ -4,6 +4,7 @@ import {
   type SetStateAction,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -18,6 +19,10 @@ import {
  * Nothing is written to disk, so a typed secret stays in memory, and the values
  * are read synchronously, so a form never restores in two passes. The store
  * lives as long as the app process does; a draft dies with it.
+ *
+ * A draft is opt-in: a caller that passes no scope gets plain per-mount state,
+ * so a form that should start empty every time, such as a composer's one-off
+ * config, never inherits text from the last time it was opened.
  *
  * A scope is one form of one profile. `clearFormDraft` drops a whole scope once
  * the draft is saved or cancelled, so the next open seeds from the server.
@@ -52,17 +57,22 @@ export function resetFormDraftsForTests(): void {
  * mounting again after a remount and mirrored back on every change.
  */
 export function useFormDraftState<T>(
-  scope: string,
+  scope: string | undefined,
   name: string,
   initial: T
 ): readonly [T, Dispatch<SetStateAction<T>>] {
   const [value, setValue] = useState<T>(() => {
+    if (scope === undefined) {
+      return initial;
+    }
     // The store holds `unknown` because it keeps every scope's shape at once.
     const stored = drafts.get(draftKey(scope, name)) as T | undefined;
     return stored ?? initial;
   });
   useEffect(() => {
-    writeDraft(scope, name, value);
+    if (scope !== undefined) {
+      writeDraft(scope, name, value);
+    }
   }, [scope, name, value]);
   return [value, setValue] as const;
 }
@@ -72,9 +82,17 @@ export function useFormDraftState<T>(
  * scope's draft, so the text an input holds is restored by its `defaultValue`
  * after a remount and a keystroke never re-renders the form.
  */
-export function useFormDraftRef<T>(scope: string, name: string, initial: T): RefObject<T> {
-  return useMemo(
-    () => ({
+export function useFormDraftRef<T>(
+  scope: string | undefined,
+  name: string,
+  initial: T
+): RefObject<T> {
+  const local = useRef<T>(initial);
+  return useMemo(() => {
+    if (scope === undefined) {
+      return local;
+    }
+    return {
       get current(): T {
         const stored = drafts.get(draftKey(scope, name)) as T | undefined;
         return stored ?? initial;
@@ -82,7 +100,6 @@ export function useFormDraftRef<T>(scope: string, name: string, initial: T): Ref
       set current(value: T) {
         writeDraft(scope, name, value);
       },
-    }),
-    [scope, name, initial]
-  );
+    };
+  }, [local, scope, name, initial]);
 }

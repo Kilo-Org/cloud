@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -211,14 +211,13 @@ export function VariableEditForm({
 }: VariableEditFormProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  // A caller without a draft gets a scope of its own, so this form still reads
-  // through the same hooks and simply never finds stored text.
-  const instanceId = useId();
-  const scope = draftScope ?? `profiles:variables-form:${instanceId}`;
-  const keyRef = useFormDraftRef(scope, 'key', initial.key);
-  const valueRef = useFormDraftRef(scope, 'value', initial.value);
-  const [isSecret, setIsSecret] = useFormDraftState(scope, 'isSecret', initial.isSecret);
-  const [revealed, setRevealed] = useFormDraftState(scope, 'revealed', false);
+  // A caller that passes no draft scope gets plain per-mount fields, so a form
+  // that must start empty, such as the new-session config, never inherits the
+  // text of the last time it was opened.
+  const keyRef = useFormDraftRef(draftScope, 'key', initial.key);
+  const valueRef = useFormDraftRef(draftScope, 'value', initial.value);
+  const [isSecret, setIsSecret] = useFormDraftState(draftScope, 'isSecret', initial.isSecret);
+  const [revealed, setRevealed] = useFormDraftState(draftScope, 'revealed', false);
   const [error, setError] = useState<VariableInputError | null>(null);
   // The key a save will store, when it differs from what the field holds. An
   // edit keeps its stored key, so only an add can change it.

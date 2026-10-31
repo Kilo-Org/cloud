@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -75,8 +75,7 @@ export function SkillFormSheet({
 }: Readonly<SkillFormSheetProps>) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const instanceId = useId();
-  const scope = draftScope ?? `profiles:skill-form:${instanceId}`;
+  const scope = draftScope;
   const nameRef = useFormDraftRef(scope, 'name', skill?.name ?? '');
   const contentRef = useFormDraftRef(scope, 'content', skill?.rawMarkdown ?? '');
   const nameEditedRef = useFormDraftRef(scope, 'nameEdited', false);

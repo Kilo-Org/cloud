@@ -120,12 +120,56 @@ describe('usage writer telemetry caller context', () => {
     expect(JSON.stringify(logs)).not.toContain('sensitive');
   });
 
-  it('rejects an unauthenticated caller before body parsing or persistence', async () => {
-    const req = request('queue', 'wrong-secret');
-    const json = jest.spyOn(req, 'json');
-    expect((await POST(req)).status).toBe(401);
-    expect(json).not.toHaveBeenCalled();
-    expect(persist).not.toHaveBeenCalled();
+  describe.each([
+    'https://staging-app.kilo.ai/api/internal/usage/record',
+    'https://staging-app.kilo.ai/api/internal/usage/record/',
+    'https://staging-app.kilo.ai/api/internal/usage/record?source=editor',
+    'https://staging-app.kilo.ai/api/internal/usage/record/?source=editor',
+    'https://app.kilo.ai/api/internal/usage/record',
+  ])('authorization at %s', url => {
+    it.each(['missing', 'incorrect'])(
+      'rejects a %s secret before parsing or persistence',
+      async kind => {
+        const req = new NextRequest(url, {
+          method: 'POST',
+          headers: kind === 'missing' ? {} : { 'x-internal-api-key': 'wrong-secret' },
+          body: 'not-json',
+        });
+        const json = jest.spyOn(req, 'json');
+        expect((await POST(req)).status).toBe(401);
+        expect(json).not.toHaveBeenCalled();
+        expect(persist).not.toHaveBeenCalled();
+      }
+    );
+  });
+
+  it.each([
+    ['/api/internal/usage/record', 'x-internal-api-key'],
+    ['/api/internal/usage/record/', 'x-internal-secret'],
+    ['/api/internal/usage/record?source=editor', 'x-internal-secret'],
+    ['/api/internal/usage/record/?source=editor', 'x-internal-api-key'],
+  ])('persists authenticated %s without proxy headers or cookies (%s)', async (path, header) => {
+    const response = await POST(
+      new NextRequest(`https://staging-app.kilo.ai${path}`, {
+        method: 'POST',
+        headers: { [header]: 'synthetic-route-secret' },
+        body: JSON.stringify(payload),
+      })
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      status: 'recorded',
+      result: { usageId: id },
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenCalledWith(
+      payload.core,
+      payload.metadata,
+      payload.prior_microdollar_usage,
+      payload.posthog_distinct_id,
+      payload.bouncer_usage_event,
+      { entrypoint: 'writer_endpoint', writer_caller: 'unknown' }
+    );
   });
 
   it('preserves validation failure independently of caller classification', async () => {

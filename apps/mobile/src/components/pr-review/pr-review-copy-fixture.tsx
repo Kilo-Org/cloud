@@ -5,7 +5,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  initialWindowMetrics,
+  SafeAreaProvider,
+  SafeAreaView,
+} from 'react-native-safe-area-context';
 import { z } from 'zod';
 
 import { PrReviewFileList } from '@/components/pr-review/diff/pr-diff-file-list';
@@ -273,11 +277,16 @@ export function PrReviewCopyFixture() {
   return (
     <QueryClientProvider client={queryClient}>
       <TRPCProvider trpcClient={client} queryClient={queryClient}>
-        <View className="flex-1 bg-background">
-          <SafeAreaView edges={['top']} />
-          <View className="flex-1">{content}</View>
-          <SafeAreaView edges={['bottom']} />
-        </View>
+        {/* Startup metrics seed the insets, so the top spacer reserves its
+            space at first paint instead of growing when the native insets
+            arrive and pushing the whole surface down. */}
+        <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+          <View className="flex-1 bg-background">
+            <SafeAreaView edges={['top']} />
+            <View className="flex-1">{content}</View>
+            <SafeAreaView edges={['bottom']} />
+          </View>
+        </SafeAreaProvider>
       </TRPCProvider>
     </QueryClientProvider>
   );

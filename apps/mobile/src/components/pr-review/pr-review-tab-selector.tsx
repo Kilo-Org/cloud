@@ -75,18 +75,22 @@ export function PrReviewTabSelector({
               disabled && 'opacity-60'
             )}
           >
-            <View className="flex-row items-center gap-1.5">
+            <View className="flex-row items-center gap-1">
               <Text
                 className={cn(
                   'text-sm',
-                  active ? 'font-semibold text-foreground' : 'text-muted-foreground'
+                  active ? 'font-semibold text-foreground' : 'text-muted-foreground dark:text-ink2'
                 )}
               >
                 {t(tab.labelKey)}
               </Text>
               {badge ? (
-                <View className="min-w-5 rounded-full bg-muted px-1.5 py-0.5">
-                  <Text className="text-center text-[11px] text-muted-foreground">{badge}</Text>
+                // `muted` equals the row's `secondary` in both palettes, so the
+                // badge fills with `muted-soft` to read as a pill at all.
+                <View className="min-w-5 items-center justify-center rounded-full bg-muted-soft px-1.5 py-0.5">
+                  <Text className="text-center text-[11px] font-medium leading-none text-foreground">
+                    {badge}
+                  </Text>
                 </View>
               ) : null}
             </View>

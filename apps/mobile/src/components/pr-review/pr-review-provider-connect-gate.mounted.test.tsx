@@ -28,11 +28,9 @@ type MockPermission =
   | { status: 'loading' }
   | { status: 'error'; refetch: () => void; isRetrying: boolean }
   | { status: 'ready'; canEdit: boolean; canManage: boolean };
-const permissionState = vi.hoisted(
-  (): { value: MockPermission } => ({
-    value: { status: 'ready', canEdit: false, canManage: false },
-  })
-);
+const permissionState = vi.hoisted((): { value: MockPermission } => ({
+  value: { status: 'ready', canEdit: false, canManage: false },
+}));
 vi.mock('@/lib/hooks/use-reviewer-permission', () => ({
   useReviewerPermission: () => permissionState.value,
 }));

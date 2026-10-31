@@ -157,6 +157,9 @@ vi.mock('@/components/ui/icons', () => ({
   Settings: 'Settings',
   ShieldAlert: 'ShieldAlert',
 }));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalChevronRight: 'DirectionalChevronRight',
+}));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useFocusEffect: (effect: () => void) => {

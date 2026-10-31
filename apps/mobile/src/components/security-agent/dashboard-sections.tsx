@@ -75,6 +75,12 @@ function SectionCard({ title, children }: Readonly<{ title: string; children: Re
   );
 }
 
+// A zero count is a satisfied row, not a severity: only a count above zero
+// earns the row's tone dot, the rule the SLA posture rows already followed.
+function rowDotTone(count: number, tone: 'good' | 'warn' | 'danger' | 'muted') {
+  return count > 0 ? tone : 'muted';
+}
+
 function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
   const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
@@ -82,20 +88,15 @@ function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
   const finding = data.priorityFinding;
 
   if (!finding) {
+    // Nothing is waiting, so the row is a statement, not a destination: a
+    // trailing arrow and a press state promised a findings list with nothing
+    // to act on.
     return (
       <SectionCard title={t('securityAgent.dashboard.actFirst')}>
-        <Pressable
-          className="flex-row items-center justify-between gap-2 py-3 active:opacity-70"
-          onPress={() => {
-            pushOnce(findingsHref(scope, { status: 'open' }));
-          }}
-        >
-          <View className="flex-row items-center gap-2">
-            <ShieldCheck size={16} color={colors.good} />
-            <Text className="text-sm">{t('securityAgent.dashboard.noOpenFindings')}</Text>
-          </View>
-          <DirectionalArrowRight size={14} color={colors.mutedForeground} />
-        </Pressable>
+        <View className="flex-row items-center gap-2 py-3">
+          <ShieldCheck size={16} color={colors.good} />
+          <Text className="text-sm">{t('securityAgent.dashboard.noOpenFindings')}</Text>
+        </View>
       </SectionCard>
     );
   }
@@ -149,19 +150,19 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
           label={t('securityAgent.dashboard.criticalOverdue')}
           value={formatNumber(bySeverity.critical.overdue, i18n.language)}
           valueTone="muted"
-          dotTone={bySeverity.critical.overdue > 0 ? 'danger' : 'muted'}
+          dotTone={rowDotTone(bySeverity.critical.overdue, 'danger')}
         />
         <KvRow
           label={t('securityAgent.dashboard.highOverdue')}
           value={formatNumber(bySeverity.high.overdue, i18n.language)}
           valueTone="muted"
-          dotTone={bySeverity.high.overdue > 0 ? 'danger' : 'muted'}
+          dotTone={rowDotTone(bySeverity.high.overdue, 'danger')}
         />
         <KvRow
           label={t('securityAgent.dashboard.mediumLowOverdue')}
           value={formatNumber(bySeverity.medium.overdue + bySeverity.low.overdue, i18n.language)}
           valueTone="muted"
-          dotTone={bySeverity.medium.overdue + bySeverity.low.overdue > 0 ? 'danger' : 'muted'}
+          dotTone={rowDotTone(bySeverity.medium.overdue + bySeverity.low.overdue, 'danger')}
           last
         />
       </SectionCard>
@@ -180,13 +181,13 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
         label={t('securityAgent.dashboard.confirmedExploitable')}
         value={formatNumber(data.analysis.exploitable, i18n.language)}
         valueTone="muted"
-        dotTone="danger"
+        dotTone={rowDotTone(data.analysis.exploitable, 'danger')}
       />
       <KvRow
         label={t('securityAgent.dashboard.needsEvidenceReview')}
         value={formatNumber(data.analysis.needsReview, i18n.language)}
         valueTone="muted"
-        dotTone="warn"
+        dotTone={rowDotTone(data.analysis.needsReview, 'warn')}
       />
       <KvRow
         label={t('securityAgent.dashboard.analysisNotComplete')}
@@ -198,7 +199,7 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
         label={t('securityAgent.dashboard.noImmediateAction')}
         value={formatNumber(noImmediateAction, i18n.language)}
         valueTone="muted"
-        dotTone="good"
+        dotTone={rowDotTone(noImmediateAction, 'good')}
         last
       />
     </SectionCard>
@@ -271,7 +272,7 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
             label={row.label}
             value={formatNumber(row.value, i18n.language)}
             valueTone="muted"
-            dotTone={row.tone}
+            dotTone={rowDotTone(row.value, row.tone)}
             last={index === rows.length - 1}
           />
         </Pressable>

@@ -10,6 +10,7 @@ import {
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useFocusEffect } from 'expo-router';
 import { RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -641,22 +642,26 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
         {slaEnabled && data && data.sla.overall.total === 0 ? (
           // The header's Sync now button already starts this run, so the empty
-          // state offers only the navigation it alone provides. The action takes
-          // the shared row frame — `min-h-11` measured 38.5 dp here (NativeWind's
-          // rem is 14 pt), under the touch floor — and the secondary ink token,
-          // which stays muted in both themes instead of the accent the primary
-          // token turns into on the dark surface.
+          // state offers only the navigation it alone provides. It carries the
+          // dashboard's card language — the same surface and radius as the
+          // sections below, at the same gap — because bare body text in the
+          // section gap read as a stray label, not a tappable action. The
+          // label takes the accent and a trailing chevron says it navigates.
           <Pressable
             onPress={() => {
               pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
             }}
             accessibilityRole="button"
             accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
-            className={cn(ROW_TARGET_CLASS, 'justify-center active:opacity-70')}
+            className={cn(
+              ROW_TARGET_CLASS,
+              'flex-row items-center justify-between gap-2 rounded-lg bg-secondary px-3 active:opacity-70'
+            )}
           >
-            <Text className="text-xs font-medium text-ink2">
+            <Text className="text-sm font-medium text-primary">
               {t('securityAgent.dashboard.manageRepositories')}
             </Text>
+            <DirectionalChevronRight size={16} color={colors.primary} />
           </Pressable>
         ) : null}
 

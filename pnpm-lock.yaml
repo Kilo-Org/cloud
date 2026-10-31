@@ -1486,6 +1486,9 @@ importers:
       knip:
         specifier: 6.39.0
         version: 6.39.0
+      linkedom:
+        specifier: 0.18.12
+        version: 0.18.12
       postcss:
         specifier: 8.5.30
         version: 8.5.30

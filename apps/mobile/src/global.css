@@ -127,15 +127,10 @@
     --accent-foreground: #1a1a10;
     --primary: #ffdd00;
     --primary-foreground: #1a1a10;
-    /* Dark counterpart of the disabled primary fill. The near-black ink sits on
-     * the fill, not on the background, so the fill carries the legibility, and
-     * it also carries the emphasis: a neutral grey on a near-black page reads as
-     * a washed-out beige block, while the light theme's disabled fill keeps the
-     * weight of a filled primary (5.14:1 against its page). A desaturated step
-     * of the brand hue keeps that weight (7.6:1 against the page) with 6.9:1 for
-     * the label, above the light theme's white-on-6f6a61 pair (5.37:1), and
-     * stays visibly duller than the enabled #ffdd00 so the two states differ. */
-    --primary-disabled: #b3a34f;
+    /* Dark counterpart of the disabled primary fill; near-black ink clears 4.5:1.
+     * The fill stays neutral and muted: a tinted fill reads as a second brand
+     * colour and competes with the enabled #ffdd00 it replaces. */
+    --primary-disabled: #8a8680;
     --destructive: #f28b7a;
     --destructive-foreground: #1a1a10;
     --border: rgba(255, 255, 255, 0.07);

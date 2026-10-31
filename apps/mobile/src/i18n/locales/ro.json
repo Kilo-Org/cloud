@@ -3201,7 +3201,7 @@
     "couldNotSaveChoice": "Alegerea ta nu a putut fi salvată. Încearcă din nou.",
     "onlineAllowed": "Online, permisă",
     "onlineNotAllowed": "Online, nepermisă",
-    "optionalReview": "Opțional — poți modifica oricând această opțiune în setări",
+    "optionalReview": "Opțional",
     "optionalOnboarding": "Opțional — activat implicit, până la dezactivare",
     "aiProvidersWhat": "Instrucțiunile tale, istoricul conversațiilor și fișierele pe care le atașezi.",
     "aiProvidersWhy": "Pentru a genera răspunsuri AI.",
@@ -4035,7 +4035,8 @@
       "nameRequired": "Introduceți un nume de comandă",
       "nameInvalid": "Numele trebuie să înceapă cu o literă mică și să folosească numai litere mici, cifre și liniuțe",
       "templateRequired": "Introduceți un șablon de comandă",
-      "nameConflict": "Acest nume este rezervat printr-o comandă încorporată"
+      "nameConflict": "Acest nume este rezervat printr-o comandă încorporată",
+      "duplicateName": "O comandă cu acest nume există deja în acest profil"
     },
     "repoBindings": {
       "title": "Profiluri implicite pentru Repos",

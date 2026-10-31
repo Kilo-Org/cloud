@@ -3152,7 +3152,7 @@
     "couldNotSaveChoice": "Doorashadaada lama kaydin karin. Fadlan mar kale isku day.",
     "onlineAllowed": "Internetka, waa la oggol yahay",
     "onlineNotAllowed": "Internetka, lama oggola",
-    "optionalReview": "Ikhtiyaari — tan waad beddeli kartaa wakhti kasta adigoo furaya Dejinta",
+    "optionalReview": "Ikhtiyaari",
     "optionalOnboarding": "Ikhtiyaari — waa daaran yahay ilaa aad damiso",
     "aiProvidersWhat": "Tilmaamahaaga, taariikhda wadahadalladaada iyo fayl kasta oo aad lifaaqdo.",
     "aiProvidersWhy": "Si loo soo saaro jawaabaha AI.",
@@ -3978,7 +3978,8 @@
       "nameRequired": "Geli magaca amarka",
       "nameInvalid": "Magacu waa inuu ku bilowdaa xaraf yar oo uu isticmaalo xarfo yaryar, lambaro, iyo jajab",
       "templateRequired": "Geli qaabka amarka",
-      "nameConflict": "Magacaas waxaa xafiday talis gudaha ku jira"
+      "nameConflict": "Magacaas waxaa xafiday talis gudaha ku jira",
+      "duplicateName": "Magacaas waxaa horey u isticmaalay talis kale oo profaylkan ku jira"
     },
     "repoBindings": {
       "title": "Profile-ka ugu tala galay Repos",

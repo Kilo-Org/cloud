@@ -3207,7 +3207,7 @@
     "couldNotSaveChoice": "Não foi possível guardar a sua escolha. Tente novamente.",
     "onlineAllowed": "Online, permitida",
     "onlineNotAllowed": "Online, não permitida",
-    "optionalReview": "Opcional — pode alterar esta opção a qualquer momento nas definições",
+    "optionalReview": "Opcional",
     "optionalOnboarding": "Opcional — ativado até o desativar",
     "aiProvidersWhat": "Os seus pedidos, o histórico de conversas e quaisquer ficheiros que anexar.",
     "aiProvidersWhy": "Para gerar respostas de IA.",
@@ -4041,7 +4041,8 @@
       "nameRequired": "Introduza um nome de comando",
       "nameInvalid": "O nome deve começar por uma letra minúscula e usar apenas letras minúsculas, dígitos e hífenes",
       "templateRequired": "Introduza um modelo de comando",
-      "nameConflict": "Esse nome está reservado por um comando incorporado"
+      "nameConflict": "Esse nome está reservado por um comando incorporado",
+      "duplicateName": "Já existe um comando com esse nome neste perfil"
     },
     "repoBindings": {
       "title": "Perfis predefinidos para repositórios",

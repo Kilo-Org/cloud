@@ -330,7 +330,7 @@
       "diffTooLarge": "farqlar hajmi juda katta",
       "openFile": "{{path}}ni ochish",
       "openFileViewed": "{{path}}ni ochish (ko'rilgan)",
-      "title": "Fayl"
+      "title": "Fayllar"
     },
     "fileRows": {
       "markViewed": "{{path}}ni ko'rilgan deb belgilash",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "Umumiy ko'rinish",
-      "files": "Fayl",
+      "files": "Fayllar",
       "discussion": "Muhokama"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "Rasmga olish",
       "photoLibrary": "Rasmlar kutubxonasi",
-      "files": "Fayl",
+      "files": "Fayllar",
       "cameraAccessMessage": "Suratga olish uchun sozlamalarda kameradan foydalanishga ruxsat bering."
     },
     "typingIndicator": {
@@ -2769,7 +2769,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Rasmlar kutubxonasi",
-      "files": "Fayl",
+      "files": "Fayllar",
       "couldNotOpenPhotoPicker": "Rasm tanlash oynasini ochib bo'lmadi. Kilo ilovasini qayta ishga tushiring va yana urinib ko'ring.",
       "maxFilesAllowed": "Ko'pi bilan {{displayCount}} ta fayl qo'shish mumkin.",
       "onlyAddingFiles": "{{total}} ta fayldan faqat {{accepted}} tasi qo'shilmoqda (ko'pi bilan {{max}} ta)",
@@ -3152,7 +3152,7 @@
     "couldNotSaveChoice": "Tanlovingizni saqlab bo'lmadi. Iltimos, qayta urinib ko'ring.",
     "onlineAllowed": "Onlayn, ruxsat berilgan",
     "onlineNotAllowed": "Onlayn, ruxsat berilmagan",
-    "optionalReview": "Ixtiyoriy — istalgan vaqtda sozlamalarda o'zgartirishingiz mumkin",
+    "optionalReview": "Ixtiyoriy",
     "optionalOnboarding": "Ixtiyoriy — o'chirmaguningizcha yoqilgan",
     "aiProvidersWhat": "So'rovlaringiz, suhbat tarixi va biriktirgan fayllaringiz.",
     "aiProvidersWhy": "AI javoblarini yaratish uchun.",
@@ -3978,7 +3978,8 @@
       "nameRequired": "Buyruq nomini kiriting",
       "nameInvalid": "Ism kichik harf bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
       "templateRequired": "Buyruq shablonini kiriting",
-      "nameConflict": "Bu nom o'rnatilgan buyruq bilan saqlangan"
+      "nameConflict": "Bu nom o'rnatilgan buyruq bilan saqlangan",
+      "duplicateName": "Bu profilda bu nom bilan buyruq allaqachon mavjud"
     },
     "repoBindings": {
       "title": "Repos uchun standart profillar",

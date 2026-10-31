@@ -3348,7 +3348,7 @@
     "couldNotSaveChoice": "Methu cadw'ch dewis. Ceisiwch eto.",
     "onlineAllowed": "Ar-lein, wedi'i ganiatáu",
     "onlineNotAllowed": "Ar-lein, heb ei ganiatáu",
-    "optionalReview": "Dewisol — gallwch newid hyn unrhyw bryd yn y gosodiadau",
+    "optionalReview": "Dewisol",
     "optionalOnboarding": "Dewisol — ymlaen oni bai eich bod yn diffodd hyn",
     "aiProvidersWhat": "Eich anogiadau, hanes eich sgyrsiau ac unrhyw ffeiliau rydych yn eu hatodi.",
     "aiProvidersWhy": "I gynhyrchu ymatebion AI.",
@@ -4206,7 +4206,8 @@
       "nameRequired": "Rhowch enw gorchymyn",
       "nameInvalid": "Rhaid i'r enw ddechrau gyda llythyren fach a defnyddio llythrennau bach, digidau a llinellau llinellau yn unig",
       "templateRequired": "Rhowch dempled gorchymyn",
-      "nameConflict": "Mae'r enw hwnnw wedi'i gadw gan orchymyn adeiledig"
+      "nameConflict": "Mae'r enw hwnnw wedi'i gadw gan orchymyn adeiledig",
+      "duplicateName": "Mae gorchymyn gyda'r enw hwn eisoes yn bodoli yn y proffil hwn"
     },
     "repoBindings": {
       "title": "Proffiliau Rhagosodedig ar gyfer Repos",

@@ -3152,7 +3152,7 @@
     "couldNotSaveChoice": "Filannoo kee kuusuu hin danda'amne. Deebi'ii yaali.",
     "onlineAllowed": "Interneetiin, hayyamame",
     "onlineNotAllowed": "Interneetiin, hin hayyamamne",
-    "optionalReview": "Dirqamaa miti — yeroo kamiyyuu Qindaa'inoota keessatti jijjiiruu dandeessa",
+    "optionalReview": "Dirqamaa miti",
     "optionalOnboarding": "Dirqamaa miti — yoo dhaamsite malee banaa jira",
     "aiProvidersWhat": "Gaaffiiwwan kee, seenaa marii fi faayiloota qabachiiftu hunda.",
     "aiProvidersWhy": "Deebii AI uumuuf.",
@@ -3978,7 +3978,8 @@
       "nameRequired": "Maqaa ajaja galchi",
       "nameInvalid": "Maqaan qubee xixiqqaatiin jalqabuu fi qubee xixiqqaa, dijiitii fi daash qofa fayyadamuu qaba",
       "templateRequired": "Unkaa ajaja galchi",
-      "nameConflict": "Maqaan sun ajaja keessaa ijaarameen eegama"
+      "nameConflict": "Maqaan sun ajaja keessaa ijaarameen eegama",
+      "duplicateName": "Ajajni maqaa kana qabu durseen profaayilii kana keessaa jira"
     },
     "repoBindings": {
       "title": "Profaayilota Durtii Repos",

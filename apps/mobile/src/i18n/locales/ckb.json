@@ -330,7 +330,7 @@
       "diffTooLarge": "جیاوازییەکە زۆر گەورەیە",
       "openFile": "{{path}} بکەرەوە",
       "openFileViewed": "{{path}} بکەرەوە (بینراو)",
-      "title": "پەڕگە"
+      "title": "فایلەکان"
     },
     "fileRows": {
       "markViewed": "{{path}} وەک بینراو نیشان بکە",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "کورتەی گشتی",
-      "files": "پەڕگە",
+      "files": "فایلەکان",
       "discussion": "گفتوگۆ"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "وێنە بگرە",
       "photoLibrary": "گەلەری وێنەکان",
-      "files": "پەڕگە",
+      "files": "فایلەکان",
       "cameraAccessMessage": "بۆ وێنەگرتن، لە ڕێکخستنەکاندا ڕێگە بە بەکارهێنانی کامێرا بدە."
     },
     "typingIndicator": {
@@ -2769,7 +2769,7 @@
     "attachmentPicker": {
       "camera": "کامێرا",
       "photoLibrary": "گەلەری وێنەکان",
-      "files": "پەڕگە",
+      "files": "فایلەکان",
       "couldNotOpenPhotoPicker": "نەتوانرا هەڵبژێری وێنە بکرێتەوە. Kilo دابخە و دووبارە بیکەرەوە، پاشان دووبارە هەوڵ بدەرەوە.",
       "maxFilesAllowed": "زۆرترین ژمارەی ڕێگەپێدراو {{displayCount}} پەڕگەیە.",
       "onlyAddingFiles": "تەنها {{accepted}} لە {{total}} پەڕگە زیاد دەکرێت (زۆرترین {{max}})",
@@ -3152,7 +3152,7 @@
     "couldNotSaveChoice": "نەتوانرا هەڵبژاردەکەت پاشەکەوت بکرێت. تکایە دووبارە هەوڵ بدەرەوە.",
     "onlineAllowed": "سەرهێڵ، ڕێگەپێدراوە",
     "onlineNotAllowed": "سەرهێڵ، ڕێگەپێنەدراوە",
-    "optionalReview": "ئارەزوومندانە — دەتوانیت ئەمە لە هەر کاتێکدا لە ڕێکخستنەکاندا بگۆڕیت",
+    "optionalReview": "ئارەزوومندانە",
     "optionalOnboarding": "ئارەزوومندانە — چالاکە، مەگەر ناچالاکی بکەیت",
     "aiProvidersWhat": "داواکارییەکانت، مێژووی گفتوگۆکانت و هەر پەڕگەیەک کە هاوپێچی دەکەیت.",
     "aiProvidersWhy": "بۆ دروستکردنی وەڵامی AI.",
@@ -3978,7 +3978,8 @@
       "nameRequired": "ناوی فەرمانێک داخڵ بکە",
       "nameInvalid": "ناو دەبێت بە پیتی بچووک دەست پێبکات و تەنها پیتی بچووک و ژمارە و هێڵکاری بەکاربهێنێت",
       "templateRequired": "قاڵبێکی فەرمان داخڵ بکە",
-      "nameConflict": "ئەو ناوە بە فەرمانێکی ناوەکی تەرخانکراوە"
+      "nameConflict": "ئەو ناوە بە فەرمانێکی ناوەکی تەرخانکراوە",
+      "duplicateName": "فەرمانێک بەم ناوە پێشتر لەم پرۆفایلەدا هەیە"
     },
     "repoBindings": {
       "title": "پرۆفایلی پێشوەختە بۆ Repos",

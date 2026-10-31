@@ -3152,7 +3152,7 @@
     "couldNotSaveChoice": "Jou keuse kon nie gestoor word nie. Probeer asseblief weer.",
     "onlineAllowed": "Aanlyn, toegelaat",
     "onlineNotAllowed": "Aanlyn, nie toegelaat nie",
-    "optionalReview": "Opsioneel — jy kan dit enige tyd in Instellings verander",
+    "optionalReview": "Opsioneel",
     "optionalOnboarding": "Opsioneel — aan tensy jy dit afskakel",
     "aiProvidersWhat": "Jou opdragte, gespreksgeskiedenis en enige lêers wat jy aanheg.",
     "aiProvidersWhy": "Om AI-antwoorde te genereer.",
@@ -3978,7 +3978,8 @@
       "nameRequired": "Voer 'n opdragnaam in",
       "nameInvalid": "Naam moet met 'n kleinletter begin en slegs kleinletters, syfers en strepe gebruik",
       "templateRequired": "Voer 'n opdragsjabloon in",
-      "nameConflict": "Daardie naam word gereserveer deur 'n ingeboude opdrag"
+      "nameConflict": "Daardie naam word gereserveer deur 'n ingeboude opdrag",
+      "duplicateName": "Daardie naam word reeds gebruik deur 'n ander opdrag in hierdie profiel"
     },
     "repoBindings": {
       "title": "Verstekprofiele vir Repos",

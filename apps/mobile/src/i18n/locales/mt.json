@@ -1493,7 +1493,10 @@
       "gitlabNoRepositoriesDescription": "Jista' jkollok bżonn tagħti aċċess għal aktar gruppi jew proġetti fuq GitLab.",
       "installGithubApp": "Installa l-app ta' GitHub fuq ir-repożitorji",
       "installGithubAppDescription": "Agħti lill-app ta' Kilo fuq GitHub aċċess għar-repożitorji li trid jiġu riveduti.",
-      "repositoryAccess": "aċċess għar-repożitorju"
+      "repositoryAccess": "aċċess għar-repożitorju",
+      "allModePersonal": "Kull repożitorju li Kilo jista' jaċċessa permezz tal-konnessjoni tiegħek ma' GitHub jiġi rivedut awtomatikament.",
+      "allModeOrganization": "Kull repożitorju li Kilo jista' jaċċessa permezz tal-konnessjoni tal-organizzazzjoni ma' GitHub jiġi rivedut awtomatikament.",
+      "allModeCount": "Repożitorji disponibbli: {{displayCount}}"
     },
     "style": {
       "title": "Stil ta' reviżjoni",

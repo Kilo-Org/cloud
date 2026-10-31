@@ -1471,7 +1471,10 @@
       "gitlabNoRepositoriesDescription": "Gali reikėti suteikti prieigą prie daugiau GitLab grupių ar projektų.",
       "installGithubApp": "Įdiek GitHub programėlę saugyklose",
       "installGithubAppDescription": "Suteik Kilo GitHub programėlei prieigą prie saugyklų, kurių kodą nori peržiūrėti.",
-      "repositoryAccess": "prieiga prie saugyklų"
+      "repositoryAccess": "prieiga prie saugyklų",
+      "allModePersonal": "Kiekviena saugykla, kurią Kilo gali pasiekti per tavo GitHub ryšį, peržiūrima automatiškai.",
+      "allModeOrganization": "Kiekviena saugykla, kurią Kilo gali pasiekti per organizacijos GitHub ryšį, peržiūrima automatiškai.",
+      "allModeCount": "Prieinamų saugyklų: {{displayCount}}"
     },
     "style": {
       "title": "Peržiūros stilius",

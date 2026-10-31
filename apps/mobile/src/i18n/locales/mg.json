@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Mety mila manome alalana hidirana amin'ny vondrona na tetikasa fanampiny ao amin'ny GitLab ianao.",
       "installGithubApp": "Apetraho amin'ny tahirin-kaody ny rindranasa GitHub",
       "installGithubAppDescription": "Omeo alalana hiditra amin'ny tahirin-kaody tianao hohamarinina ny rindranasa Kilo ao amin'ny GitHub.",
-      "repositoryAccess": "alalana hidirana amin'ny tahirin-kaody"
+      "repositoryAccess": "alalana hidirana amin'ny tahirin-kaody",
+      "allModePersonal": "Hamarinina ho azy ny tahirin-kaody rehetra azon'ny Kilo idirana amin'ny alalan'ny fifandraisanao amin'ny GitHub.",
+      "allModeOrganization": "Hamarinina ho azy ny tahirin-kaody rehetra azon'ny Kilo idirana amin'ny alalan'ny fifandraisan'ny fikambanana amin'ny GitHub.",
+      "allModeCount": "Tahirin-kaody azo: {{displayCount}}"
     },
     "style": {
       "title": "Fomba fandinihana",

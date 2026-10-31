@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "შესაძლოა საჭირო იყოს GitLab-ზე დამატებით ჯგუფებსა და პროექტებზე წვდომის მინიჭება.",
       "installGithubApp": "GitHub აპის დაყენება რეპოზიტორებზე",
       "installGithubAppDescription": "მიანიჭე Kilo-ს GitHub აპს წვდომა იმ რეპოზიტორებზე, რომელთა შემოწმებაც გსურს.",
-      "repositoryAccess": "რეპოზიტორზე წვდომა"
+      "repositoryAccess": "რეპოზიტორზე წვდომა",
+      "allModePersonal": "ყველა რეპოზიტორი, რომელზეც Kilo-ს წვდომა აქვს თქვენი GitHub კავშირის მეშვეობით, ავტომატურად შემოწმდება.",
+      "allModeOrganization": "ყველა რეპოზიტორი, რომელზეც Kilo-ს წვდომა აქვს ორგანიზაციის GitHub კავშირის მეშვეობით, ავტომატურად შემოწმდება.",
+      "allModeCount": "ხელმისაწვდომი რეპოზიტორები: {{displayCount}}"
     },
     "style": {
       "title": "შემოწმების სტილი",

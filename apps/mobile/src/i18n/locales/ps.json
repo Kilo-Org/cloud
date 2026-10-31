@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "ښايي په GitLab کې نورو ډلو یا پروژو ته هم د لاسرسي اجازه ورکړئ.",
       "installGithubApp": "په ذخیرو کې د GitHub اپ نصب کړئ",
       "installGithubAppDescription": "د Kilo د GitHub اپ ته هغو ذخیرو ته لاسرسی ورکړئ چې غواړئ بیاکتنه یې وشي.",
-      "repositoryAccess": "ذخیرې ته لاسرسی"
+      "repositoryAccess": "ذخیرې ته لاسرسی",
+      "allModePersonal": "هر هغه زېرمتون چې Kilo ستاسو د GitHub د اتصال له لارې ورته لاسرسی لري، اتوماتیکه بیاکتنه کیږي.",
+      "allModeOrganization": "هر هغه زېرمتون چې Kilo د سازمان د GitHub د اتصال له لارې ورته لاسرسی لري، اتوماتیکه بیاکتنه کیږي.",
+      "allModeCount": "د لاسرسي وړ زېرمتونونه: {{displayCount}}"
     },
     "style": {
       "title": "د بیاکتنې بڼه",

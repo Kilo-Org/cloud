@@ -869,7 +869,10 @@
       "gitlabNoRepositoriesDescription": "Vous devrez peut-être accorder l'accès à d'autres groupes ou projets sur GitLab.",
       "installGithubApp": "Installer l'application GitHub sur les dépôts",
       "installGithubAppDescription": "Accordez à l'application GitHub de Kilo l'accès aux dépôts dont vous souhaitez faire examiner le code.",
-      "repositoryAccess": "accès au dépôt"
+      "repositoryAccess": "accès au dépôt",
+      "allModePersonal": "Tous les dépôts auxquels Kilo peut accéder via votre connexion GitHub sont revus automatiquement.",
+      "allModeOrganization": "Tous les dépôts auxquels Kilo peut accéder via la connexion GitHub de l'organisation sont revus automatiquement.",
+      "allModeCount": "Dépôts disponibles : {{displayCount}}"
     },
     "style": {
       "title": "Style de revue",

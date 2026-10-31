@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "你可能需要授權存取 GitLab 上的更多群組或專案。",
       "installGithubApp": "為存放庫安裝 GitHub App",
       "installGithubAppDescription": "請授權 Kilo GitHub App 存取要審查的存放庫。",
-      "repositoryAccess": "存放庫存取權限"
+      "repositoryAccess": "存放庫存取權限",
+      "allModePersonal": "Kilo 可透過你的 GitHub 連線存取的每個存放庫都會自動進行審查。",
+      "allModeOrganization": "Kilo 可透過組織的 GitHub 連線存取的每個存放庫都會自動進行審查。",
+      "allModeCount": "可用的存放庫：{{displayCount}}"
     },
     "style": {
       "title": "審查風格",

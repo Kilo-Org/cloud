@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Baliteke GitLab-eko talde edo proiektu gehiagorako sarbidea eman behar izatea.",
       "installGithubApp": "Instalatu GitHub aplikazioa biltegietan",
       "installGithubAppDescription": "Eman Kiloren GitHub aplikazioari berrikusi nahi dituzun biltegietarako sarbidea.",
-      "repositoryAccess": "biltegietarako sarbidea"
+      "repositoryAccess": "biltegietarako sarbidea",
+      "allModePersonal": "Zure GitHub konexioaren bidez Kilok atzi dezakeen biltegi bakoitza automatikoki berrikusten da.",
+      "allModeOrganization": "Erakundearen GitHub konexioaren bidez Kilok atzi dezakeen biltegi bakoitza automatikoki berrikusten da.",
+      "allModeCount": "Erabilgarri dauden biltegiak: {{displayCount}}"
     },
     "style": {
       "title": "Berrikuspen-estiloa",

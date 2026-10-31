@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLab-та қосымша топтарға немесе жобаларға кіруге рұқсат беру қажет болуы мүмкін.",
       "installGithubApp": "GitHub қолданбасын репозиторийлерге орнатыңыз",
       "installGithubAppDescription": "GitHub-тағы Kilo қолданбасына тексерілетін репозиторийлерге кіруге рұқсат беріңіз.",
-      "repositoryAccess": "репозиторийге кіру рұқсаты"
+      "repositoryAccess": "репозиторийге кіру рұқсаты",
+      "allModePersonal": "Kilo сіздің GitHub қосылымыңыз арқылы қол жеткізе алатын әрбір репозиторий автоматты түрде тексеріледі.",
+      "allModeOrganization": "Kilo ұйымның GitHub қосылымы арқылы қол жеткізе алатын әрбір репозиторий автоматты түрде тексеріледі.",
+      "allModeCount": "Қолжетімді репозиторийлер: {{displayCount}}"
     },
     "style": {
       "title": "Тексеру мәнері",

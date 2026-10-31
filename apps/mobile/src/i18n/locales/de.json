@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "Du musst möglicherweise Zugriff auf weitere Gruppen oder Projekte in GitLab gewähren.",
       "installGithubApp": "GitHub-App auf Repositories installieren",
       "installGithubAppDescription": "Gewähre der Kilo-GitHub-App Zugriff auf die Repositories, die du prüfen lassen möchtest.",
-      "repositoryAccess": "repository-Zugriff"
+      "repositoryAccess": "repository-Zugriff",
+      "allModePersonal": "Jedes Repository, auf das Kilo über deine GitHub-Verbindung zugreifen kann, wird automatisch geprüft.",
+      "allModeOrganization": "Jedes Repository, auf das Kilo über die GitHub-Verbindung der Organisation zugreifen kann, wird automatisch geprüft.",
+      "allModeCount": "Verfügbare Repositories: {{displayCount}}"
     },
     "style": {
       "title": "Art der Prüfung",

@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Þú gætir þurft að veita aðgang að fleiri hópum eða verkefnum á GitLab.",
       "installGithubApp": "Settu upp GitHub-forritið á geymslum",
       "installGithubAppDescription": "Veittu GitHub-forriti Kilo aðgang að geymslunum sem þú vilt láta yfirfara.",
-      "repositoryAccess": "aðgang að geymslum"
+      "repositoryAccess": "aðgang að geymslum",
+      "allModePersonal": "Hver geymsla sem Kilo getur nálgast í gegnum GitHub-tengingu þína er yfirfarin sjálfkrafa.",
+      "allModeOrganization": "Hver geymsla sem Kilo getur nálgast í gegnum GitHub-tengingu samtakanna er yfirfarin sjálfkrafa.",
+      "allModeCount": "Geymslur í boði: {{displayCount}}"
     },
     "style": {
       "title": "Rýnistíll",

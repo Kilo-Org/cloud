@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "Je moet mogelijk toegang verlenen tot meer groepen of projecten op GitLab.",
       "installGithubApp": "Installeer de GitHub-app op repositories",
       "installGithubAppDescription": "Geef de Kilo GitHub-app toegang tot de repositories die je wilt laten beoordelen.",
-      "repositoryAccess": "toegang tot repositories"
+      "repositoryAccess": "toegang tot repositories",
+      "allModePersonal": "Elke repository die Kilo via je GitHub-verbinding kan bereiken, wordt automatisch beoordeeld.",
+      "allModeOrganization": "Elke repository die Kilo via de GitHub-verbinding van de organisatie kan bereiken, wordt automatisch beoordeeld.",
+      "allModeCount": "Beschikbare repositories: {{displayCount}}"
     },
     "style": {
       "title": "Beoordelingsstijl",

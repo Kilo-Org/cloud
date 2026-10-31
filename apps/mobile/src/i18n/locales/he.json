@@ -901,7 +901,10 @@
       "gitlabNoRepositoriesDescription": "ייתכן שתצטרך להעניק גישה לעוד קבוצות או פרויקטים ב-GitLab.",
       "installGithubApp": "התקנת אפליקציית GitHub במאגרים",
       "installGithubAppDescription": "תן לאפליקציית Kilo ב-GitHub גישה למאגרים שברצונך לסקור.",
-      "repositoryAccess": "גישה למאגר"
+      "repositoryAccess": "גישה למאגר",
+      "allModePersonal": "כל מאגר ש-Kilo יכול לגשת אליו דרך חיבור ה-GitHub שלך נסקר אוטומטית.",
+      "allModeOrganization": "כל מאגר ש-Kilo יכול לגשת אליו דרך חיבור ה-GitHub של הארגון נסקר אוטומטית.",
+      "allModeCount": "מאגרים זמינים: {{displayCount}}"
     },
     "style": {
       "title": "סגנון סקירה",

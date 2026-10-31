@@ -1493,7 +1493,10 @@
       "gitlabNoRepositoriesDescription": "You may need to grant access to more groups or projects on GitLab.",
       "installGithubApp": "Install the GitHub app",
       "installGithubAppDescription": "Grant it access to the repositories you want reviewed.",
-      "repositoryAccess": "repository access"
+      "repositoryAccess": "repository access",
+      "allModePersonal": "Every repository Kilo can access through your GitHub connection is reviewed automatically.",
+      "allModeOrganization": "Every repository Kilo can access through the organization's GitHub connection is reviewed automatically.",
+      "allModeCount": "Repositories available: {{displayCount}}"
     },
     "style": {
       "title": "Review style",

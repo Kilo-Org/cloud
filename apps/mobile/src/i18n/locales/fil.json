@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Maaaring kailangan mong magbigay ng access sa mas maraming grupo o proyekto sa GitLab.",
       "installGithubApp": "I-install ang GitHub app sa mga repository",
       "installGithubAppDescription": "Bigyan ang Kilo GitHub App ng access sa mga repository na gusto mong suriin.",
-      "repositoryAccess": "access sa repository"
+      "repositoryAccess": "access sa repository",
+      "allModePersonal": "Awtomatikong sinusuri ang bawat repository na kayang i-access ng Kilo sa pamamagitan ng iyong koneksyon sa GitHub.",
+      "allModeOrganization": "Awtomatikong sinusuri ang bawat repository na kayang i-access ng Kilo sa pamamagitan ng koneksyon sa GitHub ng organisasyon.",
+      "allModeCount": "Mga repository na magagamit: {{displayCount}}"
     },
     "style": {
       "title": "Estilo ng pagsusuri",

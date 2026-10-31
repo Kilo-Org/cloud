@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLabda qo'shimcha guruh yoki loyihalarga kirish huquqini berishingiz kerak bo'lishi mumkin.",
       "installGithubApp": "GitHub ilovasini repozitoriyalarga o'rnating",
       "installGithubAppDescription": "Kilo GitHub ilovasiga ko'rib chiqilishini xohlagan repozitoriyalaringizga kirish huquqini bering.",
-      "repositoryAccess": "repozitoriyaga kirish huquqi"
+      "repositoryAccess": "repozitoriyaga kirish huquqi",
+      "allModePersonal": "Kilo sizning GitHub ulanishingiz orqali kira oladigan har bir repozitoriya avtomatik ravishda ko'rib chiqiladi.",
+      "allModeOrganization": "Kilo tashkilotning GitHub ulanishi orqali kira oladigan har bir repozitoriya avtomatik ravishda ko'rib chiqiladi.",
+      "allModeCount": "Mavjud repozitoriylar: {{displayCount}}"
     },
     "style": {
       "title": "Ko‘rib chiqish uslubi",

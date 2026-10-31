@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "ممکن است لازم باشد در GitLab به گروه‌ها یا پروژه‌های بیشتری دسترسی بدهید.",
       "installGithubApp": "برنامه GitHub را روی مخازن نصب کنید",
       "installGithubAppDescription": "به برنامه Kilo در GitHub اجازه دسترسی به مخازنی را بدهید که می‌خواهید بررسی شوند.",
-      "repositoryAccess": "دسترسی به مخزن"
+      "repositoryAccess": "دسترسی به مخزن",
+      "allModePersonal": "هر مخزنی که Kilo می‌تواند از طریق اتصال GitHub شما به آن دسترسی داشته باشد، به‌طور خودکار بررسی می‌شود.",
+      "allModeOrganization": "هر مخزنی که Kilo می‌تواند از طریق اتصال GitHub سازمان به آن دسترسی داشته باشد، به‌طور خودکار بررسی می‌شود.",
+      "allModeCount": "مخازن موجود: {{displayCount}}"
     },
     "style": {
       "title": "سبک بازبینی",

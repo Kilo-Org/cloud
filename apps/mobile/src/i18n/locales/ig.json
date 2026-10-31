@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "O nwere ike ịdị mkpa inye ikike ịnweta otu ma ọ bụ ọrụ ndị ọzọ na GitLab.",
       "installGithubApp": "Wụnye ngwa GitHub na ebe nchekwa",
       "installGithubAppDescription": "Nye ngwa Kilo maka GitHub ikike ịnweta ebe nchekwa ịchọrọ ka a nyochaa.",
-      "repositoryAccess": "ikike ịnweta ebe nchekwa"
+      "repositoryAccess": "ikike ịnweta ebe nchekwa",
+      "allModePersonal": "A na-enyocha akpaaka ebe nchekwa ọ bụla Kilo nwere ike ịnweta site na njikọ GitHub gị.",
+      "allModeOrganization": "A na-enyocha akpaaka ebe nchekwa ọ bụla Kilo nwere ike ịnweta site na njikọ GitHub nke otu a.",
+      "allModeCount": "Ebe nchekwa dị: {{displayCount}}"
     },
     "style": {
       "title": "Ụdị nyocha",

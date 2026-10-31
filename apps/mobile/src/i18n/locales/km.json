@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "អ្នកប្រហែលជាត្រូវផ្តល់សិទ្ធិចូលប្រើក្រុម ឬគម្រោងបន្ថែមនៅលើ GitLab។",
       "installGithubApp": "ដំឡើងកម្មវិធី GitHub សម្រាប់ឃ្លាំងកូដ",
       "installGithubAppDescription": "ផ្តល់សិទ្ធិឱ្យកម្មវិធី GitHub របស់ Kilo ចូលប្រើឃ្លាំងកូដដែលអ្នកចង់ឱ្យត្រួតពិនិត្យ។",
-      "repositoryAccess": "សិទ្ធិចូលប្រើឃ្លាំងកូដ"
+      "repositoryAccess": "សិទ្ធិចូលប្រើឃ្លាំងកូដ",
+      "allModePersonal": "រាល់ឃ្លាំងកូដដែល Kilo អាចចូលប្រើតាមរយៈការតភ្ជាប់ GitHub របស់អ្នក ត្រូវបានត្រួតពិនិត្យដោយស្វ័យប្រវត្តិ។",
+      "allModeOrganization": "រាល់ឃ្លាំងកូដដែល Kilo អាចចូលប្រើតាមរយៈការតភ្ជាប់ GitHub របស់អង្គការ ត្រូវបានត្រួតពិនិត្យដោយស្វ័យប្រវត្តិ។",
+      "allModeCount": "ឃ្លាំងកូដដែលអាចប្រើបាន៖ {{displayCount}}"
     },
     "style": {
       "title": "របៀបពិនិត្យ",

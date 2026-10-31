@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Võimalik, et pead GitLabis andma juurdepääsu veel mõnele rühmale või projektile.",
       "installGithubApp": "GitHubi rakenduse paigaldamine hoidlatele",
       "installGithubAppDescription": "Anna Kilo GitHubi rakendusele juurdepääs hoidlatele, mille koodi soovid üle vaadata.",
-      "repositoryAccess": "juurdepääs hoidlatele"
+      "repositoryAccess": "juurdepääs hoidlatele",
+      "allModePersonal": "Kõik hoidlad, millele Kilol on sinu GitHubi ühenduse kaudu juurdepääs, vaadatakse automaatselt üle.",
+      "allModeOrganization": "Kõik hoidlad, millele Kilol on organisatsiooni GitHubi ühenduse kaudu juurdepääs, vaadatakse automaatselt üle.",
+      "allModeCount": "Saadaolevad hoidlad: {{displayCount}}"
     },
     "style": {
       "title": "Ülevaatuse stiil",

@@ -3,7 +3,7 @@ import {
   RUNTIME_CONTRACT_KEY,
   readRuntimeContract,
 } from '../../src/control-plane/sandbox/runtime-contract.js';
-import { runInDurableObject, env, reset } from 'cloudflare:test';
+import { createExecutionContext, runInDurableObject, env, reset } from 'cloudflare:test';
 import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
 import jwt from 'jsonwebtoken';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -19,6 +19,8 @@ import {
   issueRuntimeCredentialProxyHandle,
 } from '../../src/runtime-credential-proxy.js';
 import { RUNTIME_AUTHORIZATION_KEY } from '../../src/session/runtime-authorization-persistence.js';
+import worker from '../../src/server.js';
+import { markHistoryHydrated } from '../../src/control-plane/session/history-hydration.js';
 import {
   addAcceptedHandleSync,
   digestRuntimeProxyHandle,
@@ -27,7 +29,7 @@ import {
 } from '../../src/control-plane/sandbox/accepted-handles.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-identity.js';
-import type { AgentSandboxProvider } from '../../src/types.js';
+import type { AgentSandboxProvider, Env } from '../../src/types.js';
 import type { ProviderAdapter, StopResult } from '../../src/sandbox-control/provider.js';
 import {
   createFakeCredentialBroker,
@@ -675,5 +677,167 @@ describe('SandboxControlV2 scope-handle resolution', () => {
     expect(outcome.token).toBe(sibling!.token);
     expect(outcome.runtimeAuthorization.resourceId).toBe(sibling!.sessionId);
     expect(outcome.organizationId).toBe(ORG_ID);
+  });
+});
+
+describe('runtime history route across a shared scope', () => {
+  function historyEnv(members: readonly Member[]): Env {
+    const cloudByRoot = new Map(members.map(member => [member.kiloId, member.sessionId]));
+    return {
+      ...env,
+      WORKER_URL,
+      SESSION_INGEST: {
+        fetch: async () => new Response('', { status: 501 }),
+        resolveCloudAgentRootSessionForKiloSession: async (params: {
+          kiloUserId: string;
+          kiloSessionId: string;
+        }) =>
+          params.kiloUserId === USER_ID && cloudByRoot.has(params.kiloSessionId)
+            ? { cloudAgentSessionId: cloudByRoot.get(params.kiloSessionId)! }
+            : null,
+      },
+    } as unknown as Env;
+  }
+
+  function historyRequest(handle: string, body: unknown, requestEnv: Env): Promise<Response> {
+    return worker.fetch(
+      new Request(`${WORKER_URL}/api/runtime-credential-proxy/history/page`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${handle}`, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+      requestEnv,
+      createExecutionContext()
+    );
+  }
+
+  async function seedNativeHistory(
+    stub: DurableObjectStub<SandboxSessionV2>,
+    root: string,
+    sessionId: string
+  ) {
+    await runInDurableObject(stub, (_instance, state) => {
+      markHistoryHydrated(state.storage);
+    });
+    const source = {
+      version: 'v2',
+      session: {
+        id: root,
+        location: { directory: `/workspace/${sessionId}` },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    const nativeMessage = {
+      id: messageId(),
+      type: 'user',
+      time: { created: 7 },
+      text: 'shared-scope-history-marker',
+    };
+    await stub.onEvents({
+      events: [
+        { type: 'conversation.source', properties: { sessionID: root, source } },
+        {
+          type: 'conversation.message.updated',
+          properties: { sessionID: root, source, message: nativeMessage },
+        },
+      ],
+    });
+    return nativeMessage;
+  }
+
+  it('reads a peer member root through the shared handle and cold-opens its own empty page', async () => {
+    const { members } = await createSharedScope(2);
+    const [creator, sibling] = members;
+    if (!creator || !sibling) throw new Error('expected two scope members');
+    expect(sibling.handle).toBe(creator.handle);
+    const requestEnv = historyEnv(members);
+
+    const cold = await historyRequest(
+      creator.handle,
+      { limit: 100, rootNativeId: sibling.kiloId },
+      requestEnv
+    );
+    expect(cold.status).toBe(200);
+    expect(await cold.json()).toMatchObject({
+      kind: 'success',
+      info: { id: sibling.kiloId },
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    });
+
+    const message = await seedNativeHistory(sibling.stub, sibling.kiloId, sibling.sessionId);
+    const restored = await historyRequest(
+      creator.handle,
+      { limit: 100, rootNativeId: sibling.kiloId },
+      requestEnv
+    );
+    expect(restored.status).toBe(200);
+    const page = (await restored.json()) as {
+      source: { version: string };
+      messages: Array<{ message: { id: string } }>;
+    };
+    expect(page.source.version).toBe('v2');
+    expect(page.messages.map(item => item.message.id)).toEqual([message.id]);
+
+    const own = await historyRequest(
+      creator.handle,
+      { limit: 100, rootNativeId: creator.kiloId },
+      requestEnv
+    );
+    expect(own.status).toBe(200);
+    expect(await own.json()).toMatchObject({ info: { id: creator.kiloId } });
+  });
+
+  it('denies a root that belongs to another worktree scope', async () => {
+    const first = await createSharedScope(1);
+    const second = await createSharedScope(1);
+    const issuer = first.members[0];
+    const foreign = second.members[0];
+    if (!issuer || !foreign) throw new Error('expected scope members');
+    // The foreign root has a valid server-side mapping, so only the current
+    // scope membership can deny it.
+    const requestEnv = historyEnv([foreign]);
+    const denied = await historyRequest(
+      issuer.handle,
+      { limit: 100, rootNativeId: foreign.kiloId },
+      requestEnv
+    );
+    expect(denied.status).toBe(404);
+  });
+
+  it('excludes a revoked member root while a live sibling still serves the handle', async () => {
+    const { sandbox, members } = await createSharedScope(2);
+    const [creator, sibling] = members;
+    if (!creator || !sibling) throw new Error('expected two scope members');
+    const requestEnv = historyEnv(members);
+
+    // The issuer is locally revoked and its route is gone, so the shared handle
+    // is served through the live sibling and the current scope view no longer
+    // lists the issuer root.
+    await setAuthorizationState(creator.stub, 'revoked');
+    await runInDurableObject(sandbox, (_instance, state) => {
+      drizzle(state.storage)
+        .update(routes)
+        .set({ state: 'failed' })
+        .where(eq(routes.session_id, creator.sessionId))
+        .run();
+    });
+
+    const excluded = await historyRequest(
+      creator.handle,
+      { limit: 100, rootNativeId: creator.kiloId },
+      requestEnv
+    );
+    expect(excluded.status).toBe(404);
+
+    await seedNativeHistory(sibling.stub, sibling.kiloId, sibling.sessionId);
+    const served = await historyRequest(
+      creator.handle,
+      { limit: 100, rootNativeId: sibling.kiloId },
+      requestEnv
+    );
+    expect(served.status).toBe(200);
+    expect(await served.json()).toMatchObject({ info: { id: sibling.kiloId } });
   });
 });

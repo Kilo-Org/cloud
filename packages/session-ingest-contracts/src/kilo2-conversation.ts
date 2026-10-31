@@ -1,0 +1,138 @@
+import { z } from 'zod';
+
+const timestamp = z.number().finite();
+const model = z.object({ id: z.string(), providerID: z.string(), variant: z.string().optional() });
+const tokens = z.object({
+  input: z.number(),
+  output: z.number(),
+  reasoning: z.number(),
+  cache: z.object({ read: z.number(), write: z.number() }),
+});
+const error = z.object({ type: z.string(), message: z.string(), status: z.number().optional() });
+const content = z
+  .object({
+    type: z.string(),
+    text: z.string().optional(),
+    id: z.string().optional(),
+    name: z.string().optional(),
+    state: z
+      .object({
+        status: z.enum(['streaming', 'running', 'completed', 'error']),
+        input: z.union([z.string(), z.record(z.string(), z.unknown())]),
+        content: z
+          .array(z.object({ type: z.string(), text: z.string().optional() }).passthrough())
+          .optional(),
+        metadata: z.record(z.string(), z.unknown()).optional(),
+        error: error.optional(),
+      })
+      .passthrough()
+      .optional(),
+    time: z
+      .object({ created: timestamp, ran: timestamp.optional(), completed: timestamp.optional() })
+      .optional(),
+  })
+  .passthrough();
+export const kilo2MessageSchema = z
+  .object({
+    id: z.string().startsWith('msg_'),
+    type: z.string(),
+    time: z.object({ created: timestamp, completed: timestamp.optional() }).passthrough(),
+    text: z.string().optional(),
+    content: z.array(content).optional(),
+    files: z
+      .array(
+        z
+          .object({
+            data: z.string(),
+            mime: z.string(),
+            name: z.string().optional(),
+            source: z.discriminatedUnion('type', [
+              z.object({ type: z.literal('inline') }),
+              z.object({ type: z.literal('uri'), uri: z.string() }),
+            ]),
+          })
+          .passthrough()
+      )
+      .optional(),
+    agent: z.string().optional(),
+    model: model.optional(),
+    cost: z.number().optional(),
+    tokens: tokens.optional(),
+    finish: z.string().optional(),
+    status: z.string().optional(),
+    summary: z.string().optional(),
+    error: error.optional(),
+    retry: z.object({ attempt: z.number(), at: timestamp, error }).optional(),
+  })
+  .passthrough();
+export type Kilo2Message = z.infer<typeof kilo2MessageSchema>;
+export const kilo2SessionSchema = z.object({
+  id: z.string().startsWith('ses_'),
+  parentID: z.string().optional(),
+  location: z.object({ directory: z.string() }),
+  title: z.string().optional(),
+  agent: z.string().optional(),
+  model: model.optional(),
+  time: z.object({ created: timestamp, updated: timestamp, idle: timestamp.optional() }),
+});
+export type Kilo2Session = z.infer<typeof kilo2SessionSchema>;
+export const kilo2FormSchema = z.object({
+  id: z.string(),
+  sessionID: z.string(),
+  title: z.string(),
+  metadata: z
+    .object({ tool: z.object({ messageID: z.string(), id: z.string() }).optional() })
+    .passthrough()
+    .optional(),
+  fields: z.array(
+    z.object({
+      key: z.string(),
+      type: z.string(),
+      title: z.string().optional(),
+      description: z.string().optional(),
+      custom: z.boolean().optional(),
+      options: z
+        .array(
+          z.object({ value: z.string(), label: z.string(), description: z.string().optional() })
+        )
+        .optional(),
+    })
+  ),
+});
+export const kilo2PermissionSchema = z.object({
+  id: z.string(),
+  sessionID: z.string(),
+  action: z.string(),
+  resources: z.array(z.string()),
+  save: z.array(z.string()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  source: z.object({ type: z.literal('tool'), messageID: z.string(), id: z.string() }).optional(),
+});
+export const kilo2EventSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  created: timestamp.optional(),
+  location: z.object({ directory: z.string() }).optional(),
+  data: z.record(z.string(), z.unknown()),
+});
+export type Kilo2Event = z.infer<typeof kilo2EventSchema>;
+
+export const kilo2ConversationSourceSchema = z.object({
+  version: z.literal('v2'),
+  session: kilo2SessionSchema,
+});
+export const kilo2ConversationMessageSchema = z
+  .object({
+    sessionID: z.string(),
+    source: kilo2ConversationSourceSchema,
+    message: kilo2MessageSchema,
+    parentID: z.string().optional(),
+  })
+  .refine(value => value.sessionID === value.source.session.id);
+export const kilo2ConversationEventSchema = z
+  .object({
+    sessionID: z.string(),
+    source: z.object({ version: z.literal('v2') }),
+    event: kilo2EventSchema,
+  })
+  .refine(value => value.event.data['sessionID'] === value.sessionID);

@@ -3,6 +3,11 @@ import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { ParentSessionCallbackTargetSchema } from '@kilocode/worker-utils/cloud-agent-authority';
+import {
+  cloudSessionMetadataSchema,
+  cloudSessionMessagesPageInputSchema,
+  cloudSessionMessagesPageWireSchema,
+} from '@kilocode/cloud-agent-sdk/schemas';
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
@@ -606,6 +611,9 @@ export const baseGetSessionNextSchema = z.object({
   cloudAgentSessionId: z.string(),
 });
 
+export const baseGetSessionMessagesPageNextSchema = cloudSessionMessagesPageInputSchema;
+export const baseGetSessionMessagesPageNextOutputSchema = cloudSessionMessagesPageWireSchema;
+
 export const baseGetSandboxStatusNextSchema = z
   .object({
     cloudAgentSessionId: SandboxStatusSessionIdSchema,
@@ -758,6 +766,11 @@ export const baseGetSessionNextOutputSchema = z.object({
   userId: z.string(),
   orgId: z.string().optional(),
   sandboxId: z.string().optional(),
+  title: cloudSessionMetadataSchema.shape.title,
+  associatedPr: cloudSessionMetadataSchema.shape.associatedPr,
+  totalCostMicrodollars: cloudSessionMetadataSchema.shape.totalCostMicrodollars,
+  createdOnPlatform: cloudSessionMetadataSchema.shape.createdOnPlatform,
+  profileId: cloudSessionMetadataSchema.shape.profileId,
 
   // Worktree ownership (present only for worktree sessions)
   worktreeId: z.string().nullable().optional(),

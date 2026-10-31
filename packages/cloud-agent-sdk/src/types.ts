@@ -24,6 +24,8 @@ export type {
 } from '@kilocode/app-shared/opencode';
 
 import type { UserMessage, AssistantMessage, Part } from '@kilocode/app-shared/opencode';
+import type * as z from 'zod';
+import type { cloudSessionMetadataSchema } from './schemas';
 
 export type {
   KiloSdkMessageHistory,
@@ -77,6 +79,7 @@ export type SessionGoal = {
 export type SessionInfo = {
   id: string;
   parentID?: string | undefined;
+  title?: string | undefined;
   model?:
     | {
         providerID: string;
@@ -333,13 +336,23 @@ export type SessionSnapshot = {
  * existing `replay=false` behaviour.
  */
 export type SessionSnapshotPage = {
+  sourceVersion?: 'v1' | 'v2';
   info: SessionInfo;
   messages: SessionSnapshot['messages'];
   nextCursor: string | null;
   omittedItemCount: number;
   watermarkEventId?: number | null;
+  updateCursor?: number;
+  totalCostMicrodollars?: number | null | undefined;
   /** The preparation rows the stream replays first, so the first page can show them. */
   preparationAttempts?: readonly PreparationAttempt[];
+};
+
+export type CloudSessionMetadata = z.infer<typeof cloudSessionMetadataSchema>;
+
+export type CloudSessionSnapshotPage = SessionSnapshotPage & {
+  kind: 'success';
+  updateCursor: number;
 };
 
 /**

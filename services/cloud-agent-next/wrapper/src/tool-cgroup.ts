@@ -222,7 +222,7 @@ export async function readProcessTable(procRoot: string): Promise<Map<number, Pr
 }
 
 /** Basenames of the real kilo server entrypoint (script or re-exec shim). */
-const KILO_SERVER_BASENAMES = new Set(['kilo', '.kilo']);
+const KILO_SERVER_BASENAMES = new Set(['kilo', '.kilo', 'kilo2', '.kilo2']);
 
 /**
  * The kilo-server chain must never be group-killed under the tool cap: an OOM

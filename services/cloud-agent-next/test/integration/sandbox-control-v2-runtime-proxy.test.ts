@@ -13,10 +13,13 @@ import type {
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {
+  createRuntimeProxyGrant,
+  issueRuntimeCredentialProxyHandle,
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeProxyHandleGrantId,
+  RUNTIME_PROXY_GRANT_KEY,
 } from '../../src/runtime-credential-proxy.js';
-import { RUNTIME_PROXY_GRANT_KEY } from '../../src/runtime-credential-proxy.js';
+import { markHistoryHydrated } from '../../src/control-plane/session/history-hydration.js';
 import {
   RUNTIME_AUTHORIZATION_KEY,
   renewStoredRuntimeAuthorization,
@@ -1340,5 +1343,176 @@ describe('SandboxControlV2 runtime proxy prepare frame secrets', () => {
     );
     expect(await wrapper.next(100)).toBeNull();
     expect(JSON.stringify(await readRouteRow(sandboxStub, sessionId))).not.toContain(SECRET_VALUE);
+  });
+});
+
+describe('runtime history route', () => {
+  async function setupAuthorizedHistory() {
+    const sessionId = newSessionId();
+    const kiloId = kiloSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const provider = createProvider();
+    await installSandbox(sandboxId, provider);
+    const { seal, token } = await sealedRuntimeAuthorization(sessionId);
+    const sessionStub = await createVercelSession({
+      sessionId,
+      kiloId,
+      sandboxId,
+      kiloToken: token,
+      seal,
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId, credential });
+    await wrapper.hello({ wrapperId: 'wr_history', allocationId });
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    const handle = frame.credentials?.proxy?.handle ?? '';
+    expect(handle).not.toBe('');
+    await runInDurableObject(sessionStub, (_instance, state) => {
+      markHistoryHydrated(state.storage);
+    });
+    return { sessionId, kiloId, sandboxId, handle, sessionStub, wrapper };
+  }
+
+  function requestEnv(): Env {
+    return { ...env, WORKER_URL } as Env;
+  }
+
+  function historyRequest(handle: string, body: unknown): Promise<Response> {
+    return worker.fetch(
+      new Request(`${WORKER_URL}/api/runtime-credential-proxy/history/page`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${handle}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      }),
+      requestEnv(),
+      createExecutionContext()
+    );
+  }
+
+  it('serves a cold empty page and then the seeded native history over one authorized handle', async () => {
+    const { sessionId, kiloId, sessionStub, handle } = await setupAuthorizedHistory();
+
+    const cold = await historyRequest(handle, { limit: 100 });
+    expect(cold.status).toBe(200);
+    expect(await cold.json()).toMatchObject({
+      kind: 'success',
+      info: { id: kiloId },
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    });
+
+    const source = {
+      version: 'v2',
+      session: {
+        id: kiloId,
+        location: { directory: `/workspace/${sessionId}` },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    const nativeMessage = {
+      id: messageId(),
+      type: 'user',
+      time: { created: 7 },
+      text: 'remember amber-history-marker',
+    };
+    await sessionStub.onEvents({
+      events: [
+        { type: 'conversation.source', properties: { sessionID: kiloId, source } },
+        {
+          type: 'conversation.message.updated',
+          properties: { sessionID: kiloId, source, message: nativeMessage },
+        },
+      ],
+    });
+
+    const restored = await historyRequest(handle, { limit: 100 });
+    expect(restored.status).toBe(200);
+    const page = (await restored.json()) as {
+      source: { version: string };
+      messages: Array<{ message: { id: string } }>;
+    };
+    expect(page.source.version).toBe('v2');
+    expect(page.messages.map(item => item.message.id)).toEqual([nativeMessage.id]);
+  });
+
+  it('fails closed for missing, foreign, and revoked credentials and invalid input', async () => {
+    const { sessionStub, handle } = await setupAuthorizedHistory();
+
+    const anonymous = await worker.fetch(
+      new Request(`${WORKER_URL}/api/runtime-credential-proxy/history/page`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ limit: 100 }),
+      }),
+      requestEnv(),
+      createExecutionContext()
+    );
+    expect(anonymous.status).toBe(401);
+
+    // A signed handle for another cloud session cannot read this history: the
+    // Session DO has no live grant for it and fails closed.
+    const foreign = await issueRuntimeCredentialProxyHandle(
+      { NEXTAUTH_SECRET: SECRET } as never,
+      createRuntimeProxyGrant({
+        plane: 'control',
+        authorizationId: crypto.randomUUID(),
+        sessionId: newSessionId(),
+        kiloSessionId: kiloSessionId(),
+        userId: USER_ID,
+        mode: 'contained',
+        allocationId: 'allocation_foreign',
+        providerInstanceId: 'provider_foreign',
+        connectionId: 'connection_foreign',
+        wrapperInstanceId: 'wrapper_foreign',
+        leaseExpiresAt: Date.now() + 60_000,
+        state: 'active',
+      })
+    );
+    expect((await historyRequest(foreign, { limit: 100 })).status).toBe(401);
+
+    // A cursor that does not decode, or that encodes another session, is a bad
+    // request rather than a partial read.
+    expect((await historyRequest(handle, { limit: 100, cursor: 'not-a-cursor' })).status).toBe(400);
+    // No arbitrary cloud session selector is accepted.
+    expect((await historyRequest(handle, { limit: 100, sessionId: newSessionId() })).status).toBe(
+      400
+    );
+
+    // An expired handle is rejected before any history is read.
+    const startedAt = Date.now();
+    const now = vi.spyOn(Date, 'now').mockReturnValue(startedAt + 25 * 60 * 60_000);
+    expect((await historyRequest(handle, { limit: 100 })).status).toBe(401);
+    now.mockRestore();
+
+    const wrongPath = await worker.fetch(
+      new Request(`${WORKER_URL}/api/runtime-credential-proxy/history/other`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${handle}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ limit: 100 }),
+      }),
+      requestEnv(),
+      createExecutionContext()
+    );
+    expect(wrongPath.status).toBe(404);
+
+    // A native root that is neither the handle root nor (for a shared handle) a
+    // current scope member fails closed before any history read.
+    const foreignRoot = kiloSessionId();
+    expect((await historyRequest(handle, { limit: 100, rootNativeId: foreignRoot })).status).toBe(
+      404
+    );
+
+    // Losing the persisted live grant revokes the credential: the same handle
+    // no longer authorizes a history read.
+    await runInDurableObject(sessionStub, (_instance, state) =>
+      state.storage.delete(RUNTIME_PROXY_GRANT_KEY)
+    );
+    expect((await historyRequest(handle, { limit: 100 })).status).toBe(401);
   });
 });

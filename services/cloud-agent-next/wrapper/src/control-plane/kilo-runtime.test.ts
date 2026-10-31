@@ -632,7 +632,7 @@ describe('createKiloRuntime', () => {
         isIdle: () => inspected.promise,
       });
       const client = await runtime.ensure();
-      client.sendPromptAsync = async () => undefined;
+      client.submit = async () => undefined;
       const turns = createTurnManager({
         timers: TEST_TIMERS,
         runtimes: { get: () => runtime },
@@ -701,7 +701,7 @@ describe('createKiloRuntime', () => {
       });
       const client = await runtime.ensure();
       const submitted: string[] = [];
-      client.sendPromptAsync = async input => {
+      client.submit = async input => {
         submitted.push(input.messageId ?? '');
       };
       const turns = createTurnManager({
@@ -1611,10 +1611,10 @@ describe('Kilo observation recovery', () => {
       materializeAttachments: async message => ({ ...message, prompt: 'Synthetic prompt' }),
     });
     const client = await created.runtime.ensure();
-    client.sendPromptAsync = async input => {
+    client.submit = async input => {
       submissions.push(input.messageId ?? '');
     };
-    client.abortSession = async input => {
+    client.interrupt = async input => {
       aborts.push(input.sessionId);
       return true;
     };

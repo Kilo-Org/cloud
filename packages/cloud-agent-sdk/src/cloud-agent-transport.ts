@@ -2,18 +2,26 @@
  * Cloud Agent transport — wraps createConnection to normalize raw wire events
  * and route them to separate chat/service sinks via the Transport interface.
  *
- * REST messages seed the transcript; WebSocket replay closes ingest lag while
+ * Snapshots seed the transcript; WebSocket replay closes the snapshot gap while
  * service-state notifications are batched until bootstrap completes.
  */
 import { createConnection, type Connection } from './cloud-agent-connection';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
-import { normalize, isChatEvent } from './normalizer';
+import { isChatEvent, type NormalizedEvent } from './normalizer';
+import { createConversationSourceReader } from './conversation-source';
+import type { CloudAgentEvent } from './cloud-conversation-schemas';
 import type { ServiceEvent } from './normalizer';
 import {
   replaySnapshotPage,
+  replayStoredMessages,
   sessionSnapshotFailureMessage,
   snapshotPageFromSnapshot,
 } from './snapshot-page';
+import {
+  cloudMessageInfoSchema,
+  cloudMessagePartSchema,
+  cloudSessionMessagesPageSchema,
+} from './schemas';
 import type {
   CloudAgentSessionId,
   KiloSessionId,
@@ -54,7 +62,13 @@ type CloudAgentTransportConfig = {
   getTicket: (
     sessionId: CloudAgentSessionId
   ) => CloudAgentStreamTicketResult | Promise<CloudAgentStreamTicketResult>;
-  fetchSnapshot: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  fetchSnapshot?: ((kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>) | undefined;
+  fetchCloudSnapshotPage?:
+    | ((
+        sessionId: CloudAgentSessionId,
+        options: { cursor?: string; limit?: number; kiloSessionId?: string }
+      ) => Promise<unknown>)
+    | undefined;
   /**
    * Page-aware root snapshot fetch. When provided, the transport uses it for
    * its initial bounded read (newest 50) instead of `fetchSnapshot`, and for
@@ -91,11 +105,17 @@ function snapshotReadFailureMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   return 'Session history temporarily unavailable';
 }
+const MAX_EVENT_VERSIONS = 2048;
 
 function createCloudAgentTransport(config: CloudAgentTransportConfig): TransportFactory {
   const websocketBaseUrl = config.websocketBaseUrl;
+  const workspaceSession = config.sessionId.startsWith('workspace_');
+  if (workspaceSession && !config.fetchCloudSnapshotPage) {
+    throw new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage');
+  }
 
   return (sink: TransportSink) => {
+    const sources = createConversationSourceReader();
     let connection: Connection | null = null;
     let lifecycleGeneration = 0;
     let stoppedReceived = false;
@@ -118,6 +138,97 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       clearTimeout(snapshotRetryTimer ?? undefined);
       snapshotRetryTimer = null;
       snapshotFailureReported = false;
+    }
+    let lastUpdateCursor = 0;
+    const eventVersions = new Map<number, number>();
+    const sessionInfoVersions = new Map<string, number>();
+
+    function deliverEvent(
+      raw: CloudAgentEvent,
+      event: NormalizedEvent,
+      sourceVersion: 'v1' | 'v2'
+    ): void {
+      if (event.type === 'bootstrap.complete') {
+        finishReplay();
+        return;
+      }
+      if (event.type === 'connected') awaitingConnectedSnapshot = false;
+      // Pending interactions are restored separately after connected.
+      if (
+        awaitingConnectedSnapshot &&
+        (event.type === 'question.asked' ||
+          event.type === 'question.replied' ||
+          event.type === 'question.rejected' ||
+          event.type === 'permission.asked' ||
+          event.type === 'permission.unreadable' ||
+          event.type === 'permission.replied')
+      ) {
+        return;
+      }
+
+      // Cloud Agent sessions have no command path for accepting or
+      // dismissing suggestions, so drop these events before they reach the
+      // sink — otherwise the UI would render a card whose buttons throw.
+      if (
+        event.type === 'suggestion.shown' ||
+        event.type === 'suggestion.accepted' ||
+        event.type === 'suggestion.dismissed'
+      ) {
+        return;
+      }
+
+      if (event.type === 'stopped') {
+        stoppedReceived = true;
+      }
+
+      if (isChatEvent(event)) {
+        if (!workspaceSession) {
+          sink.onChatEvent(event);
+          return;
+        }
+        if (raw.cursor === undefined) return;
+        const version = {
+          sourceId: config.sessionId,
+          eventId: raw.eventId,
+          cursor: raw.cursor,
+        };
+        if (sourceVersion === 'v2') {
+          sink.onChatEvent({ ...event, version });
+        } else if (event.type === 'message.updated') {
+          const info = cloudMessageInfoSchema.safeParse(event.info);
+          if (info.success) sink.onChatEvent({ ...event, info: info.data, version });
+        } else if (event.type === 'message.part.updated') {
+          const part = cloudMessagePartSchema.safeParse(event.part);
+          if (part.success) {
+            const textOmitted =
+              (event.part.type === 'text' || event.part.type === 'reasoning') &&
+              !('text' in event.part);
+            sink.onChatEvent({
+              ...event,
+              part: part.data,
+              version,
+              ...(textOmitted ? { textOmitted: true } : {}),
+            });
+          }
+        } else {
+          sink.onChatEvent({ ...event, version });
+        }
+      } else {
+        if (
+          workspaceSession &&
+          (event.type === 'session.created' || event.type === 'session.updated')
+        ) {
+          if (raw.cursor === undefined) return;
+          const previous = sessionInfoVersions.get(event.info.id);
+          if (previous !== undefined && raw.cursor <= previous) return;
+          sessionInfoVersions.set(event.info.id, raw.cursor);
+        }
+        sink.onServiceEvent(event);
+      }
+
+      if (event.type === 'connected') {
+        if (!event.bootstrapPending) finishReplay();
+      }
     }
 
     function startReplay(): void {
@@ -144,7 +255,9 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       const url = new URL('/stream', websocketBaseUrl);
       url.searchParams.set('cloudAgentSessionId', config.sessionId);
       url.searchParams.set('bootstrap', 'true');
-      if (lastEventId !== null) {
+      if (workspaceSession) {
+        url.searchParams.set('afterCursor', String(lastUpdateCursor));
+      } else if (lastEventId !== null) {
         // Reconnect cursor or initial watermark: the DO replays everything
         // after this id — either a live cursor from the wire, or the
         // event-log watermark from the initial bounded page.
@@ -175,7 +288,11 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       // `fromId=0` — the DO replays every stored event, closing the gap when
       // SessionIngest materialization lags behind the event-log high-water
       // mark. A cursor that live events already advanced is never regressed.
-      if (lastEventId === null && page.watermarkEventId != null) lastEventId = 0;
+      if (workspaceSession && page.updateCursor !== undefined) {
+        lastUpdateCursor = Math.max(lastUpdateCursor, page.updateCursor);
+      } else if (lastEventId === null && page.watermarkEventId != null) {
+        lastEventId = 0;
+      }
       // Exactly one page per connect may seed the manager: a reconnect
       // catch-up that lands first wins, and a slower initial retry must not
       // reset the older-pages cursor back to the newest page afterwards.
@@ -183,7 +300,17 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         initialPageRecorded = true;
         config.onInitialPageLoaded?.(page);
       }
-      replaySnapshotPage(sink, page);
+      const version =
+        workspaceSession && page.updateCursor !== undefined
+          ? { sourceId: config.sessionId, cursor: page.updateCursor }
+          : undefined;
+      const infoCursor = sessionInfoVersions.get(page.info.id);
+      if (!version || infoCursor === undefined || version.cursor >= infoCursor) {
+        if (version) sessionInfoVersions.set(page.info.id, version.cursor);
+        replaySnapshotPage(sink, page, version);
+      } else {
+        replayStoredMessages(page.messages, event => sink.onChatEvent(event), version);
+      }
     }
 
     /**
@@ -191,6 +318,17 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
      * reports and retries, so it can never cost the live connection.
      */
     async function readSnapshot(): Promise<SnapshotRead> {
+      if (workspaceSession) {
+        try {
+          const fetchPage = config.fetchCloudSnapshotPage;
+          if (!fetchPage)
+            throw new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage');
+          const page = cloudSessionMessagesPageSchema.parse(await fetchPage(config.sessionId, {}));
+          return page === null ? { kind: 'missing' } : { kind: 'page', page };
+        } catch (error) {
+          return { kind: 'rejected', error };
+        }
+      }
       const fetchPage = config.fetchSnapshotPage;
       if (fetchPage) {
         let outcome: SessionSnapshotPageOutcome | null;
@@ -204,6 +342,8 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         return { kind: 'typed', outcome };
       }
       try {
+        if (!config.fetchSnapshot)
+          throw new Error('Cloud Agent legacy sessions require fetchSnapshot');
         return {
           kind: 'page',
           page: snapshotPageFromSnapshot(await config.fetchSnapshot(config.kiloSessionId)),
@@ -321,60 +461,36 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           if (expectedGeneration !== lifecycleGeneration || raw.sessionId !== config.sessionId) {
             return;
           }
+          if (workspaceSession && raw.cursor !== undefined) {
+            lastUpdateCursor = Math.max(lastUpdateCursor, raw.cursor);
+            if (raw.eventId > 0) {
+              const previous = eventVersions.get(raw.eventId);
+              if (previous !== undefined && raw.cursor <= previous) return;
+              eventVersions.delete(raw.eventId);
+              eventVersions.set(raw.eventId, raw.cursor);
+              // Bootstrap ancillary rows need not be cursor-ordered; transcript row guards
+              // reject stale payloads even after this recent-event cache evicts them.
+              if (eventVersions.size > MAX_EVENT_VERSIONS) {
+                const oldest = eventVersions.keys().next().value;
+                if (oldest !== undefined) eventVersions.delete(oldest);
+              }
+            }
+          }
           // Track high-water mark for reconnect fromId only. Do not filter
           // by eventId: the DO entity-upserts tool/message parts under a
           // stable row id and rebroadcasts that same (or older) id with a
           // newer payload. Dropping those left live tools stuck on empty input.
           // eventId 0 is a synthetic sentinel and never advances the cursor.
-          if (raw.eventId > 0 && (lastEventId === null || raw.eventId > lastEventId)) {
+          if (
+            !workspaceSession &&
+            raw.eventId > 0 &&
+            (lastEventId === null || raw.eventId > lastEventId)
+          ) {
             lastEventId = raw.eventId;
           }
 
-          const event = normalize(raw);
-          if (!event) return;
-
-          if (event.type === 'bootstrap.complete') {
-            finishReplay();
-            return;
-          }
-          if (event.type === 'connected') awaitingConnectedSnapshot = false;
-          // Pending interactions are restored separately after connected.
-          if (
-            awaitingConnectedSnapshot &&
-            (event.type === 'question.asked' ||
-              event.type === 'question.replied' ||
-              event.type === 'question.rejected' ||
-              event.type === 'permission.asked' ||
-              event.type === 'permission.unreadable' ||
-              event.type === 'permission.replied')
-          ) {
-            return;
-          }
-
-          // Cloud Agent sessions have no command path for accepting or
-          // dismissing suggestions, so drop these events before they reach the
-          // sink — otherwise the UI would render a card whose buttons throw.
-          if (
-            event.type === 'suggestion.shown' ||
-            event.type === 'suggestion.accepted' ||
-            event.type === 'suggestion.dismissed'
-          ) {
-            return;
-          }
-
-          if (event.type === 'stopped') {
-            stoppedReceived = true;
-          }
-
-          if (isChatEvent(event)) {
-            sink.onChatEvent(event);
-          } else {
-            sink.onServiceEvent(event);
-          }
-
-          if (event.type === 'connected') {
-            if (!event.bootstrapPending) finishReplay();
-          }
+          const batch = sources.read(raw);
+          for (const event of batch.events) deliverEvent(raw, event, batch.source.version);
         },
         onConnected: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
@@ -383,6 +499,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         onReconnected: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
           startReplay();
+          if (workspaceSession) return;
           // With a replay cursor the socket itself re-delivers everything
           // missed while dead — replaying a (possibly stale) snapshot on top
           // would overwrite newer parts. Only fall back to the snapshot when
@@ -480,6 +597,8 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         cancelSnapshotRetry();
         lifecycleGeneration += 1;
         closeConnection('destroy');
+        eventVersions.clear();
+        sessionInfoVersions.clear();
       },
 
       send: input => {

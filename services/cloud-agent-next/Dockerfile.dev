@@ -15,6 +15,8 @@ ARG BUN_VERSION="1.4.4"
 ARG PNPM_VERSION="12.14.0"
 ARG GLAB_VERSION="1.124.0"
 ARG GH_VERSION="2.102.0"
+ARG KILOCODE_CLI_V2_TAG="kilo-v2"
+ARG KILO_RUNTIME_HARNESS="kilo"
 
 # Build the kilo binary:
 #   cd ~/projects/kilocode-backend/cloud-agent
@@ -68,6 +70,15 @@ RUN chmod +x /opt/kilo-cloud/kilo-git-credential \
 # Install pnpm and kilocode 
 RUN rm -f /usr/local/bin/bun \
 	&& npm install -g bun@${BUN_VERSION} pnpm@${PNPM_VERSION} @kilocode/cli@${KILOCODE_CLI_VERSION}
+
+# Optional local proof runtime, installed from the published Kilo v2 channel.
+# The v2 package shares the @kilocode/cli name with v1, so it uses its own npm
+# prefix to keep the default `kilo` binary intact.
+RUN if [ "$KILO_RUNTIME_HARNESS" = "kilo2" ]; then \
+      npm install --global --prefix /opt/kilo2 @kilocode/cli@${KILOCODE_CLI_V2_TAG} \
+      && ln -sf /opt/kilo2/bin/kilo2 /usr/local/bin/kilo2; \
+    fi
+ENV KILO_RUNTIME_HARNESS=${KILO_RUNTIME_HARNESS}
 
 # Copy to install pre-built kilo binary (built via ./cloud-agent-build.sh)
 #COPY kilo /usr/local/bin/kilo

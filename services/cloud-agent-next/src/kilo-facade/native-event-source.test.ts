@@ -183,6 +183,18 @@ describe('toNativePublicEvent', () => {
     });
   });
 
+  it.each([
+    'session.created',
+    'session.updated',
+    'session.status',
+    'conversation.source',
+    'conversation.message.updated',
+  ])('delivers upserted %s rows even when their stable id precedes the fence', type => {
+    const event = streamEvent(2, { event: type, properties: { sessionID: kiloSessionId } });
+    expect(isDeliverableNativeEvent(event)).toBe(true);
+    expect(isMaterializedNativeEvent(event)).toBe(true);
+  });
+
   it('classifies stored kilocode autocommit updates as materialized and deliverable', () => {
     const event = streamEvent(2, {
       event: 'autocommit_completed',
@@ -195,7 +207,7 @@ describe('toNativePublicEvent', () => {
       properties: { messageId: 'msg_commit', success: true },
     });
     expect(isMaterializedNativeEvent(streamEvent(3, { type: 'autocommit_completed' }))).toBe(true);
-    expect(isMaterializedNativeEvent(streamEvent(4, { event: 'session.updated' }))).toBe(false);
+    expect(isMaterializedNativeEvent(streamEvent(4, { event: 'session.error' }))).toBe(false);
     expect(isDeliverableNativeEvent(streamEvent(0, event.data))).toBe(false);
     expect(
       isDeliverableNativeEvent(streamEvent(2, { messageId: 'msg_commit' }, 'autocommit_completed'))

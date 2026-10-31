@@ -40,6 +40,7 @@ import {
 import { and, eq } from 'drizzle-orm';
 import type { SandboxLifecycleStatus } from '../../shared/sandbox-status.js';
 import type { PreparationAttempt } from '../../shared/protocol.js';
+import { getSessionAuxiliaryMetadata } from '../../session/session-auxiliary-metadata.js';
 
 function publicRepositoryFields(metadata: CloudAgentSessionState): {
   githubRepo?: string;
@@ -399,9 +400,14 @@ export function createSessionManagementHandlers() {
             });
           }
 
-          // Current work and the durability watermark come from the control-plane
-          // session snapshot.
-          const { currentWork, latestEventId, routeReady } = await (async (): Promise<{
+          const {
+            currentWork,
+            latestEventId,
+            routeReady,
+            title,
+            totalCostMicrodollars,
+            updateCursor,
+          } = await (async (): Promise<{
             currentWork: {
               messageId: string;
               status: 'pending' | 'running';
@@ -409,6 +415,9 @@ export function createSessionManagementHandlers() {
             } | null;
             latestEventId: number | null;
             routeReady: boolean | undefined;
+            title?: string;
+            totalCostMicrodollars?: number;
+            updateCursor?: number;
           }> => {
             const snapshot = await withDORetry<
               DurableObjectStub<SandboxSessionV2>,
@@ -433,6 +442,9 @@ export function createSessionManagementHandlers() {
               // Route readiness is the control-plane owner of "can this
               // session own a terminal": a terminal requires a ready route.
               routeReady: snapshot.route?.state === 'ready',
+              title: snapshot.title,
+              totalCostMicrodollars: snapshot.totalCostMicrodollars,
+              updateCursor: snapshot.updateCursor,
             };
           })();
 
@@ -455,9 +467,21 @@ export function createSessionManagementHandlers() {
           logger.setTags({ sandboxId, orgId: sessionMetadata.identity.orgId ?? '(personal)' });
           logger.info('Session metadata retrieved successfully');
 
-          // Worktree ownership lives on the external ownership row, not in DO
-          // metadata. Only worktree sessions need that read, so ordinary
-          // sessions never touch PostgreSQL here.
+          let auxiliaryMetadata: Awaited<ReturnType<typeof getSessionAuxiliaryMetadata>> = null;
+          try {
+            auxiliaryMetadata = await getSessionAuxiliaryMetadata(getPgDb(env), {
+              userId,
+              cloudAgentSessionId: sessionId,
+              kiloSessionId: sessionAccess.kiloSessionId,
+              organizationId: sessionAccess.organizationId,
+            });
+          } catch (error) {
+            logger
+              .withFields({ sessionId, errorName: error instanceof Error ? error.name : 'unknown' })
+              .warn('Failed to fetch optional auxiliary metadata for getSession');
+          }
+
+          // Worktree ownership lives on the external ownership row, not in DO metadata.
           const worktreeId = sessionMetadata.workspace?.worktreeId;
           let worktreeOwnership: WorktreeOwnership | null = null;
           if (worktreeId) {
@@ -477,6 +501,12 @@ export function createSessionManagementHandlers() {
             userId: sessionMetadata.identity.userId,
             orgId: sessionMetadata.identity.orgId,
             sandboxId,
+            ...auxiliaryMetadata,
+            createdOnPlatform:
+              sessionMetadata.identity.createdOnPlatform ?? auxiliaryMetadata?.createdOnPlatform,
+            title,
+            totalCostMicrodollars,
+            updateCursor,
 
             ...(worktreeId
               ? {

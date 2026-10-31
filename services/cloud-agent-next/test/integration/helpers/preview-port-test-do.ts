@@ -67,6 +67,10 @@ function fakeContainer(): PreviewContainerPort {
 }
 
 export class PreviewPortTestDO extends DurableObject {
+  configure(): Promise<void> {
+    return Promise.resolve();
+  }
+
   async fetch(request: Request): Promise<Response> {
     const marker = request.headers.get('x-kilo-preview-port');
     if (marker === null) return new Response('No marker', { status: 400 });

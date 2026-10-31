@@ -10,6 +10,15 @@ set -eu
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 service_dir="$(CDPATH= cd -- "$script_dir/.." && pwd)"
 
+# A worktree-local preparation step opts into the v2 proof image.
+has_config=0
+for arg in "$@"; do
+  case "$arg" in --config | --config=*) has_config=1 ;; esac
+done
+if [ "$has_config" = 0 ] && [ -f "$service_dir/wrangler.kilo2-local.json" ]; then
+  set -- "$@" --config "$service_dir/wrangler.kilo2-local.json"
+fi
+
 # Unix-domain sockets have a ~104-byte path limit on macOS, so we cannot put
 # the socket under the worktree's .wrangler/ directory. Derive a short stable
 # path under $TMPDIR keyed on the service directory so multiple worktrees can

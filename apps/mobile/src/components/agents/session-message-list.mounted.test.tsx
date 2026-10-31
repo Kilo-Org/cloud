@@ -205,12 +205,17 @@ describe('SessionMessageList open settle', () => {
     expect(skeletonCount(renderer)).toBe(0);
   });
 
-  it('reveals a transcript that fits its viewport on the first layout', () => {
+  it('reveals a short transcript after the quiet window, not on its first height', () => {
     vi.useFakeTimers();
     const renderer = mountList();
     fireLayout(655);
     fireContentSize(500);
 
+    // A height that fits may still be a measurement in progress.
+    expect(skeletonCount(renderer)).toBe(1);
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
     expect(skeletonCount(renderer)).toBe(0);
   });
 

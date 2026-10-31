@@ -89,13 +89,10 @@ export function useSessionListOpenSettle({
     if (content <= 0 || viewport <= 0) {
       return;
     }
-    // A transcript that fits its viewport has nothing to pin, so it is final on
-    // its first layout and must not be held back at all.
-    if (content <= viewport) {
-      clearQuietTimer();
-      setOpenSettled(true);
-      return;
-    }
+    // No fast path for a transcript that fits the viewport: the first reported
+    // content height is a measurement in progress, not a verdict, and a short
+    // transcript can report a fitting height before the rest of its rows land.
+    // The quiet window is short enough to cover both cases.
     clearQuietTimer();
     quietTimerRef.current = setTimeout(() => {
       quietTimerRef.current = null;

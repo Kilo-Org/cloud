@@ -18,7 +18,7 @@ import {
 
 export const usage = '<email>';
 
-export const SESSION_ID = 'ses_markerShiftFixture00000006';
+export const SESSION_ID = 'ses_markerShiftFixture00000001';
 export const SESSION_TITLE = 'Transcript time markers';
 export const SESSION_SLUG = 'transcript-markers-fixture';
 export const MESSAGE_COUNT = 8;

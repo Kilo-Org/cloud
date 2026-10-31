@@ -163,7 +163,7 @@
     "allLanguages": "Afaanota hunda"
   },
   "login": {
-    "welcome": "Baga gara Kilo dhufte",
+    "welcome": "Baga nagaan dhufte",
     "retrySignIn": "Irra deebi'ii seeni",
     "logo": "Mallattoo Kilo",
     "continuingSignIn": "Adeemsi seensaa kee itti fufaa jira.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Gaaffiiwwan walitti makuu simbirroo harkaan gamaaggamuuf herrega GitLab kee walqabsiisi.",
       "bitbucketDescription": "Gaaffiiwwan walitti makuu simbirroo harkaan gamaaggamuuf Bitbucket dhaabbata kana waliin walqabsiisi.",
       "bitbucketOrgOnlyDescription": "Herrega gubbaa jiru gara dhaabbataatti jijjiiri, dhaabbata sanaa gaaffiiwwan walitti makuu Bitbucket ilaaluuf.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Herrega kun dhaabbilee ammas hin qabu. Dhaabbata uumtee yookiin dhaabbataatti seeteen, gaaffiiwwan walitti makuu Bitbucket ilaaluu ni dandeessa.",
       "contextLine": "{{organization}}iif",
       "contextLinePersonal": "Dhuunfaa'iif"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Yeroon walitti hidhamiinsa GitHub darbeera.",
-      "message": "Walqunnamtiin GitHub kee kana booda hin hojjetu. Irra deebi'ii ilaali — yoo barbaachise akka irra deebi'ii walqabsiiftu gaafatamta.",
+      "message": "Irra deebi'ii ilaali — yoo barbaachise akka irra deebi'ii walqabsiiftu gaafatamta.",
       "gitlabTitle": "Yeroon walitti hidhamiinsa GitLab darbeera.",
-      "bitbucketTitle": "Yeroon walitti hidhamiinsa Bitbucket darbeera.",
-      "providerMessage": "Walqunnamtiin {{provider}} kee kana booda hin hojjetu. Irra deebi'ii ilaali — yoo barbaachise akka irra deebi'ii walqabsiiftu gaafatamta."
+      "bitbucketTitle": "Yeroon walitti hidhamiinsa Bitbucket darbeera."
     },
     "eventChips": {
       "comment": "Yaada kenni",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Gaaffii walitti makuu",
       "mergeRequest": "Gaaffii walitti makuu",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Gaaffii walitti makuu !{{number}}",
       "shareMergeRequest": "Gaaffii walitti makuu qoodi",
       "viewOnProvider": "{{provider}} irratti ilaali",
       "mergeRequestUnavailable": "Gaaffiin walitti makuu hin argamu",
@@ -1429,7 +1429,10 @@
       "gitlabNoRepositoriesDescription": "GitLab irratti gareewwan ykn pirojektoota dabalataa argachuuf hayyama kennuun si barbaachisuu danda'a.",
       "installGithubApp": "Aplikeeshinii GitHub kuusaawwan koodii irratti fe'i",
       "installGithubAppDescription": "Aplikeeshinii GitHub kan Kilo kuusaawwan koodii akka sakatta'aman barbaaddu argachuuf hayyama kenniif.",
-      "repositoryAccess": "hayyama kuusaa koodii"
+      "repositoryAccess": "hayyama kuusaa koodii",
+      "allModePersonal": "Kuusaan koodii hundi Kilo walqunnamtii GitHub keetiin argachuu danda'u ofumaan sakatta'ama.",
+      "allModeOrganization": "Kuusaan koodii hundi Kilo walqunnamtii GitHub dhaabbataatiin argachuu danda'u ofumaan sakatta'ama.",
+      "allModeCount": "Kuusaalee koodii jiran: {{displayCount}}"
     },
     "style": {
       "title": "Haala sakatta'aa",
@@ -1528,6 +1531,7 @@
       "changeRequestNoGitHubAccess": "Walitti hidhinnni GitHub tokko illee repository kanaaf dhaqqabama hin qabu. GitHub repository kanaaf dhaqqabamaan walitti deebi'ii hidhi, sana booda irra deebi'ii yaali.",
       "changeRequestMissingPermissions": "Appiin GitHub Kilo repository kana keessatti pull request banuu hin danda'u. Abbaan repository appii sanatti qabeenyaa fi pull request irratti afoomicha barreessuu kennuu qaba, sana booda irra deebi'ii yaali.",
       "changeRequestFailed": "Kilo pull request banuu hin dandeenye. Yeroo gabaabaa booda irra deebi'ii yaali.",
+      "proposalConflict": "Yaadni biraa repository kanaaf amma illee hojiirra jira.",
       "offAction": "Yaadannoon sakatta'aa cufameera. Isa bani, sana booda irra deebi'ii yaali."
     },
     "manualReview": {
@@ -1779,7 +1783,6 @@
       "notYetSynced": "Ammaaf hin walsimsiifamne",
       "refreshFailed": "Haaromsuun hin danda'amne — daataan yeroo dhumaaf walsimsiifame mul'achaa jira.",
       "settings": "Qindaa'ina",
-      "syncFindings": "Argamoota walsimsiisi",
       "syncNow": "Amma walsimsiisi",
       "syncQueued": "Walsimsiisuun tarree eegumsaatti dabalameera",
       "syncStatusUnavailable": "Haala walsimsiisuu argachuun hin danda'amne.",
@@ -1967,7 +1970,6 @@
       "eventsCount_other": "{{displayCount}} taateewwan",
       "generated": "{{generatedAt}} irratti uumame.",
       "noActivity": "Sochiin galmaa'e hin jiru",
-      "noActivityDescription": "Kilo sochii argamoota nageenyaa {{start}} irraa hanga {{end}}tti gabaasuu danda'u hin qabu.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Kuusaan koodii hin galmoofne",
       "reasonUnknown": "Sababa hin beekamne",
@@ -2157,7 +2159,7 @@
     "sessionList": {
       "couldNotLoadActive": "Turtiiwwan hojii irra jiran fe'uu hin danda'amne.",
       "couldNotRefresh": "Haaromsuun hin danda'amne",
-      "noSessionsYetDescription": "Bilbila kee irraa hojii koodii barreessuu jalqabi. Turtiiwwan kee asitti mul'atu.",
+      "noSessionsYetDescription": "Bilbila kee irraa hojii koodii barreessuu jalqabi.",
       "viewHistory": "Seenaa turtiiwwanii",
       "noMatches": "Turtiin walsimu hin jiru",
       "tryDifferentSearch": "Jecha biraatiin barbaadi.",
@@ -2295,9 +2297,9 @@
       "couldNotLoadGithubRepositories": "Kuusaawwan koodii GitHub fe'uu hin danda'amne.",
       "couldNotLoadGitlabRepositories": "Kuusaawwan koodii GitLab fe'uu hin danda'amne.",
       "couldNotLoadBitbucketRepositories": "Kuusaawwan koodii Bitbucket fe'uu hin danda'amne.",
-      "connectGithubDescription": "GitHub biraawzarii kee keessatti walqabsiisi, sana booda kuusaa koodii filachuuf asitti deebi'i.",
-      "connectGitlabDescription": "GitLab biraawzarii kee keessatti walqabsiisi, sana booda kuusaa koodii filachuuf asitti deebi'i.",
-      "connectBitbucketDescription": "Bitbucket biraawzarii kee keessatti walqabsiisi, sana booda kuusaa koodii filachuuf asitti deebi'i.",
+      "connectGithubDescription": "Biraawzarii kee keessatti seeni, sana booda kuusaa koodii GitHub filachuuf asitti deebi'i.",
+      "connectGitlabDescription": "Biraawzarii kee keessatti seeni, sana booda kuusaa koodii GitLab filachuuf asitti deebi'i.",
+      "connectBitbucketDescription": "Biraawzarii kee keessatti seeni, sana booda kuusaa koodii Bitbucket filachuuf asitti deebi'i.",
       "openGithub": "GitHub bani",
       "openGitlab": "GitLab bani",
       "openBitbucket": "Bitbucket bani",
@@ -3849,8 +3851,6 @@
     "commandAtLimit": "Ajajni arfiilee {{max}}tti daangeffama",
     "commandsEmpty": "Ajajni setup hanga ammaatti hin jiru",
     "commandsSaveFailed": "Ajajoota saaguu qusachuu hin dandeenye",
-    "moveUp": "Ol socho'aa",
-    "moveDown": "Gad bu'aa",
     "moveCommandUp": "Ajaja {{position}} ol sochoosi",
     "moveCommandDown": "Ajaja {{position}} gad sochoosi",
     "skillsTitle": "Dandeettiiwwan",
@@ -3859,9 +3859,13 @@
     "skillMarkdownLabel": "Qabiyyee ogummaa",
     "skillsEmpty": "Ammatti ogummaa hin qabu",
     "skillNameRequired": "Maqaa ogummaa galchi",
+    "skillNameTooLong": "Maqaan ogummaa qubee {{max}} caaluu hin qabu",
     "skillNameInvalid": "Maqaan ogummaa qubee ykn dijiitii irraa jalqabuu fi qubee xixiqqaa, dijiitii fi daash qofa fayyadamuu qaba",
     "skillContentRequired": "Qabiyyeen ogummaa barbaachisaadha",
-    "skillSaveFailed": "Ogummaa qusachuu hin dandeenye",
+    "skillSaveFailed": "Ogummaa qusachuu hin dandeenye. Irra deebi'ii yaali.",
+    "skillDeleteFailed": "Ogummaa haquu hin dandeenye. Irra deebi'ii yaali.",
+    "skillToggleFailed": "Ogummaa haaromsuu hin dandeenye. Irra deebi'ii yaali.",
+    "skillLimitReached": "Piroofaayiliin hanga ogummaa {{max}} qabachuu danda'a. Kan biraa dabaluuf tokko haqi.",
     "skillSourceCustom": "Dhuunfaa",
     "skillSourceMarketplace": "Gabaa",
     "skillSourceSkillsSh": "skills.sh",

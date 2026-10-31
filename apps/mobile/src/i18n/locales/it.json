@@ -163,7 +163,7 @@
     "allLanguages": "Tutte le lingue"
   },
   "login": {
-    "welcome": "Benvenuto su Kilo",
+    "welcome": "Benvenuto",
     "retrySignIn": "Riprova ad accedere",
     "logo": "Logo di Kilo",
     "continuingSignIn": "L'accesso è in fase di completamento.",
@@ -871,7 +871,10 @@
       "gitlabNoRepositoriesDescription": "Potresti dover concedere l'accesso a più gruppi o progetti su GitLab.",
       "installGithubApp": "Installa l'app GitHub sui repository",
       "installGithubAppDescription": "Concedi all'app GitHub di Kilo l'accesso ai repository che vuoi far esaminare.",
-      "repositoryAccess": "accesso al repository"
+      "repositoryAccess": "accesso al repository",
+      "allModePersonal": "Ogni repository a cui Kilo può accedere tramite la tua connessione GitHub viene esaminato automaticamente.",
+      "allModeOrganization": "Ogni repository a cui Kilo può accedere tramite la connessione GitHub dell'organizzazione viene esaminato automaticamente.",
+      "allModeCount": "Repository disponibili: {{displayCount}}"
     },
     "style": {
       "title": "Stile di revisione",
@@ -1024,6 +1027,7 @@
       "changeRequestNoGitHubAccess": "Nessuna connessione GitHub ha accesso a questo repository. Riconnetti GitHub con accesso al repository, poi riprova.",
       "changeRequestMissingPermissions": "L'app GitHub di Kilo non può aprire pull request in questo repository. Un proprietario del repository deve concedere all'app l'accesso in scrittura ai contenuti e alle pull request, poi riprova.",
       "changeRequestFailed": "Kilo non è riuscito ad aprire la pull request. Riprova tra un momento.",
+      "proposalConflict": "Un'altra proposta per questo repository è ancora attiva.",
       "offAction": "La memoria di revisione è disattivata. Attivala, poi riprova.",
       "off": "La memoria di revisione è disattivata.",
       "on": "La memoria di revisione è attivata.",
@@ -1120,7 +1124,7 @@
       "sortSeverityDesc": "Gravità: da alta a bassa",
       "sortSlaDue": "Scadenza SLA",
       "statusIgnored": "Ignorata",
-      "statusOpen": "Apri"
+      "statusOpen": "Aperta"
     },
     "analysis": {
       "analyzeRepository": "Analizza il repository",
@@ -1177,7 +1181,6 @@
       "eventsCount_other": "{{displayCount}} eventi",
       "generated": "Il report è stato generato il {{generatedAt}}.",
       "noActivity": "Nessuna attività registrata",
-      "noActivityDescription": "Kilo non ha attività relative alle segnalazioni di sicurezza da includere nel report per il periodo da {{start}} a {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Il recupero dei dati del report non è stato completato. Riprova.",
       "repositoryNotRecorded": "Repository non registrato",
@@ -1273,7 +1276,6 @@
       "repositoryActionPlan": "Piano d'azione per i repository",
       "settings": "Impostazioni",
       "slaPosture": "Stato degli SLA",
-      "syncFindings": "Sincronizza le segnalazioni",
       "syncNow": "Sincronizza ora",
       "syncQueued": "Sincronizzazione in coda",
       "syncStatusUnavailable": "Lo stato della sincronizzazione non è disponibile.",
@@ -1344,7 +1346,7 @@
       "supersededByDescription": "Tocca per aprire la scheda aggiornata con lo stato, l'analisi e la correzione.",
       "viewAdvisory": "Visualizza l'avviso di sicurezza su GitHub",
       "vulnerableVersions": "Versioni vulnerabili",
-      "statusOpen": "Apri",
+      "statusOpen": "Aperta",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "correzione già in corso",
       "reasonNoBandwidth": "nessuna risorsa disponibile",
@@ -1606,7 +1608,7 @@
     "sessionList": {
       "couldNotLoadActive": "Impossibile caricare le sessioni attive.",
       "couldNotRefresh": "Impossibile aggiornare",
-      "noSessionsYetDescription": "Avvia un'attività di programmazione dal telefono. Le tue sessioni appariranno qui.",
+      "noSessionsYetDescription": "Avvia un'attività di programmazione dal telefono.",
       "viewHistory": "Cronologia delle sessioni",
       "noMatches": "Nessuna sessione trovata",
       "tryDifferentSearch": "Prova un termine di ricerca diverso.",
@@ -1746,9 +1748,9 @@
       "couldNotLoadGithubRepositories": "Impossibile caricare i repository GitHub.",
       "couldNotLoadGitlabRepositories": "Impossibile caricare i repository GitLab.",
       "couldNotLoadBitbucketRepositories": "Impossibile caricare i repository Bitbucket.",
-      "connectGithubDescription": "Collega GitHub nel browser, poi torna qui per scegliere un repository.",
-      "connectGitlabDescription": "Collega GitLab nel browser, poi torna qui per scegliere un repository.",
-      "connectBitbucketDescription": "Collega Bitbucket nel browser, poi torna qui per scegliere un repository.",
+      "connectGithubDescription": "Accedi dal browser, poi torna qui per scegliere un repository GitHub.",
+      "connectGitlabDescription": "Accedi dal browser, poi torna qui per scegliere un repository GitLab.",
+      "connectBitbucketDescription": "Accedi dal browser, poi torna qui per scegliere un repository Bitbucket.",
       "openGithub": "Apri GitHub",
       "openGitlab": "Apri GitLab",
       "openBitbucket": "Apri Bitbucket",
@@ -2729,6 +2731,7 @@
       "gitlabDescription": "Connetti il tuo account GitLab per revisionare le merge request dall'app.",
       "bitbucketDescription": "Connetti Bitbucket a questa organizzazione per revisionare le pull request dall'app.",
       "bitbucketOrgOnlyDescription": "Passa l'account qui sopra a un'organizzazione per revisionarne le pull request Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Questo account non ha ancora nessuna organizzazione. Le pull request Bitbucket possono essere revisionate una volta che crei un'organizzazione o ne entri a far parte.",
       "contextLine": "Per {{organization}}",
       "contextLinePersonal": "Per il tuo account personale"
     },
@@ -3108,10 +3111,9 @@
     "pullRequestUnavailableDescription": "Impossibile aprire questa PR. Potrebbe essere stata eliminata, il repository potrebbe essere privato oppure l'app Kilo per GitHub potrebbe non essere installata nel repository.",
     "reconnectNotice": {
       "title": "La connessione a GitHub è scaduta.",
-      "message": "La tua connessione a GitHub non è più valida. Ricontrolla la connessione: ti verrà chiesto di riconnetterti se necessario.",
+      "message": "Ricontrolla la connessione: ti verrà chiesto di riconnetterti se necessario.",
       "gitlabTitle": "La connessione a GitLab è scaduta.",
-      "bitbucketTitle": "La connessione a Bitbucket è scaduta.",
-      "providerMessage": "La tua connessione a {{provider}} non è più valida. Ricontrolla la connessione: ti verrà chiesto di riconnetterti se necessario."
+      "bitbucketTitle": "La connessione a Bitbucket è scaduta."
     },
     "review": "Revisione",
     "reviewPullRequest": "Revisiona la pull request",
@@ -3201,7 +3203,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Condividi il merge request",
       "viewOnProvider": "Visualizza su {{provider}}",
       "mergeRequestUnavailable": "Merge request non disponibile",
@@ -3899,8 +3901,6 @@
     "commandAtLimit": "Il comando è limitato a {{max}} caratteri",
     "commandsEmpty": "Nessun comando di configurazione ancora",
     "commandsSaveFailed": "Impossibile salvare i comandi di configurazione",
-    "moveUp": "Vai su",
-    "moveDown": "Spostati giù",
     "moveCommandUp": "Sposta il comando {{position}} in alto",
     "moveCommandDown": "Sposta il comando {{position}} in basso",
     "skillsTitle": "Competenze",
@@ -3909,9 +3909,13 @@
     "skillMarkdownLabel": "Contenuto delle competenze",
     "skillsEmpty": "Nessuna competenza ancora",
     "skillNameRequired": "Inserisci un nome per la competenza",
+    "skillNameTooLong": "Il nome della competenza deve contenere {{max}} caratteri o meno",
     "skillNameInvalid": "Il nome della competenza deve iniziare con una lettera o un numero e utilizzare solo lettere minuscole, numeri e trattini",
     "skillContentRequired": "È richiesto il contenuto delle competenze",
-    "skillSaveFailed": "Impossibile salvare l'abilità",
+    "skillSaveFailed": "Impossibile salvare l'abilità. Riprova.",
+    "skillDeleteFailed": "Impossibile eliminare l'abilità. Riprova.",
+    "skillToggleFailed": "Impossibile aggiornare l'abilità. Riprova.",
+    "skillLimitReached": "Un profilo può contenere fino a {{max}} abilità. Eliminane una per aggiungerne un'altra.",
     "skillSourceCustom": "Personalizzata",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

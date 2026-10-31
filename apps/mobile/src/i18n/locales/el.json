@@ -163,7 +163,7 @@
     "allLanguages": "Όλες οι γλώσσες"
   },
   "login": {
-    "welcome": "Καλώς ήρθες στο Kilo",
+    "welcome": "Καλώς ήρθες",
     "retrySignIn": "Νέα προσπάθεια σύνδεσης",
     "logo": "Λογότυπο Kilo",
     "continuingSignIn": "Συνεχίζεται η σύνδεσή σου.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Σύνδεσε τον λογαριασμό σου στο GitLab για να αξιολογείς αιτήματα συγχώνευσης στο κινητό.",
       "bitbucketDescription": "Σύνδεσε το Bitbucket με αυτόν τον οργανισμό για να αξιολογείς αιτήματα ενσωμάτωσης στο κινητό.",
       "bitbucketOrgOnlyDescription": "Άλλαξε τον λογαριασμό παραπάνω σε οργανισμό, για να αξιολογείς τα αιτήματα ενσωμάτωσής του στο Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Αυτός ο λογαριασμός δεν ανήκει ακόμα σε κανέναν οργανισμό. Μόλις δημιουργήσεις ή ενταχθείς σε οργανισμό, θα μπορείς να αξιολογείς αιτήματα ενσωμάτωσης στο Bitbucket.",
       "contextLine": "Για {{organization}}",
       "contextLinePersonal": "Για τον προσωπικό σου χώρο"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Η σύνδεση με το GitHub έληξε.",
-      "message": "Η σύνδεσή σου με το GitHub δεν ισχύει πλέον. Έλεγξέ την ξανά — αν χρειαστεί, θα σου ζητηθεί να συνδεθείς ξανά.",
+      "message": "Έλεγξέ την ξανά — αν χρειαστεί, θα σου ζητηθεί να συνδεθείς ξανά.",
       "gitlabTitle": "Η σύνδεση με το GitLab έληξε.",
-      "bitbucketTitle": "Η σύνδεση με το Bitbucket έληξε.",
-      "providerMessage": "Η σύνδεσή σου με το {{provider}} δεν ισχύει πλέον. Έλεγξέ την ξανά — αν χρειαστεί, θα σου ζητηθεί να συνδεθείς ξανά."
+      "bitbucketTitle": "Η σύνδεση με το Bitbucket έληξε."
     },
     "eventChips": {
       "comment": "Σχόλιο",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Αίτημα ενσωμάτωσης",
       "mergeRequest": "Αίτημα συγχώνευσης",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Αίτημα συγχώνευσης !{{number}}",
       "shareMergeRequest": "Κοινοποίηση αιτήματος συγχώνευσης",
       "viewOnProvider": "Προβολή σε {{provider}}",
       "mergeRequestUnavailable": "Μη διαθέσιμο αίτημα συγχώνευσης",
@@ -1429,7 +1429,10 @@
       "gitlabNoRepositoriesDescription": "Ίσως χρειαστεί να δώσεις πρόσβαση σε περισσότερες ομάδες ή έργα στο GitLab.",
       "installGithubApp": "Εγκατάσταση της εφαρμογής GitHub σε αποθετήρια",
       "installGithubAppDescription": "Δώσε στην εφαρμογή Kilo για το GitHub πρόσβαση στα αποθετήρια που θέλεις να ελέγχονται.",
-      "repositoryAccess": "πρόσβαση σε αποθετήρια"
+      "repositoryAccess": "πρόσβαση σε αποθετήρια",
+      "allModePersonal": "Κάθε αποθετήριο στο οποίο έχει πρόσβαση το Kilo μέσω της σύνδεσής σου με το GitHub ελέγχεται αυτόματα.",
+      "allModeOrganization": "Κάθε αποθετήριο στο οποίο έχει πρόσβαση το Kilo μέσω της σύνδεσης του οργανισμού με το GitHub ελέγχεται αυτόματα.",
+      "allModeCount": "Διαθέσιμα αποθετήρια: {{displayCount}}"
     },
     "style": {
       "title": "Τρόπος ελέγχου",
@@ -1528,6 +1531,7 @@
       "changeRequestNoGitHubAccess": "Καμία σύνδεση GitHub δεν έχει πρόσβαση σε αυτό το αποθετήριο. Συνδέσε ξανά το GitHub με πρόσβαση σε αυτό και δοκίμασε ξανά.",
       "changeRequestMissingPermissions": "Η εφαρμογή GitHub του Kilo δεν μπορεί να ανοίξει pull requests σε αυτό το αποθετήριο. Ένας κάτοχος του αποθετηρίου πρέπει να δώσει στην εφαρμογή δικαίωμα εγγραφής στα περιεχόμενα και στα pull requests και μετά δοκίμασε ξανά.",
       "changeRequestFailed": "Το Kilo δεν μπόρεσε να ανοίξει το pull request. Δοκίμασε ξανά σε λίγο.",
+      "proposalConflict": "Μια άλλη πρόταση μνήμης ελέγχων για αυτό το ίδιο αποθετήριο είναι ακόμη ενεργή, οπότε αυτή δεν μπορεί να αποθηκευτεί ακόμη.",
       "offAction": "Η μνήμη ελέγχων είναι απενεργοποιημένη. Ενεργοποίησέ την και δοκίμασε ξανά."
     },
     "manualReview": {
@@ -1779,7 +1783,6 @@
       "notYetSynced": "Δεν έχει συγχρονιστεί ακόμα",
       "refreshFailed": "Δεν ήταν δυνατή η ανανέωση — εμφανίζονται τα τελευταία συγχρονισμένα δεδομένα.",
       "settings": "Ρυθμίσεις",
-      "syncFindings": "Συγχρονισμός ευρημάτων",
       "syncNow": "Συγχρονισμός τώρα",
       "syncQueued": "Ο συγχρονισμός προστέθηκε στην ουρά",
       "syncStatusUnavailable": "Η κατάσταση συγχρονισμού δεν είναι διαθέσιμη.",
@@ -1967,7 +1970,6 @@
       "eventsCount_other": "{{displayCount}} συμβάντα",
       "generated": "Η αναφορά δημιουργήθηκε: {{generatedAt}}.",
       "noActivity": "Δεν υπάρχει καταγεγραμμένη δραστηριότητα",
-      "noActivityDescription": "Το Kilo δεν έχει δραστηριότητα ευρημάτων ασφάλειας προς αναφορά από {{start}} έως {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Το αποθετήριο δεν καταγράφηκε",
       "reasonUnknown": "Μη αναγνωρισμένος λόγος",
@@ -2157,7 +2159,7 @@
     "sessionList": {
       "couldNotLoadActive": "Δεν ήταν δυνατή η φόρτωση των ενεργών συνεδριών.",
       "couldNotRefresh": "Δεν ήταν δυνατή η ανανέωση",
-      "noSessionsYetDescription": "Ξεκίνα μια εργασία προγραμματισμού από το κινητό σου. Οι συνεδρίες σου θα εμφανιστούν εδώ.",
+      "noSessionsYetDescription": "Ξεκίνα μια εργασία προγραμματισμού από το κινητό σου.",
       "viewHistory": "Ιστορικό συνεδριών",
       "noMatches": "Δεν βρέθηκαν συνεδρίες που να ταιριάζουν",
       "tryDifferentSearch": "Δοκίμασε έναν διαφορετικό όρο αναζήτησης.",
@@ -2295,9 +2297,9 @@
       "couldNotLoadGithubRepositories": "Δεν ήταν δυνατή η φόρτωση των αποθετηρίων του GitHub.",
       "couldNotLoadGitlabRepositories": "Δεν ήταν δυνατή η φόρτωση των αποθετηρίων του GitLab.",
       "couldNotLoadBitbucketRepositories": "Δεν ήταν δυνατή η φόρτωση των αποθετηρίων του Bitbucket.",
-      "connectGithubDescription": "Σύνδεσε το GitHub από το πρόγραμμα περιήγησης και μετά επέστρεψε εδώ για να επιλέξεις ένα αποθετήριο.",
-      "connectGitlabDescription": "Σύνδεσε το GitLab από το πρόγραμμα περιήγησης και μετά επέστρεψε εδώ για να επιλέξεις ένα αποθετήριο.",
-      "connectBitbucketDescription": "Σύνδεσε το Bitbucket από το πρόγραμμα περιήγησης και μετά επέστρεψε εδώ για να επιλέξεις ένα αποθετήριο.",
+      "connectGithubDescription": "Συνδέσου από το πρόγραμμα περιήγησης και μετά επέστρεψε εδώ για να επιλέξεις ένα αποθετήριο GitHub.",
+      "connectGitlabDescription": "Συνδέσου από το πρόγραμμα περιήγησης και μετά επέστρεψε εδώ για να επιλέξεις ένα αποθετήριο GitLab.",
+      "connectBitbucketDescription": "Συνδέσου από το πρόγραμμα περιήγησης και μετά επέστρεψε εδώ για να επιλέξεις ένα αποθετήριο Bitbucket.",
       "openGithub": "Άνοιγμα GitHub",
       "openGitlab": "Άνοιγμα GitLab",
       "openBitbucket": "Άνοιγμα Bitbucket",
@@ -3849,8 +3851,6 @@
     "commandAtLimit": "Η εντολή περιορίζεται σε {{max}} χαρακτήρες",
     "commandsEmpty": "Δεν υπάρχουν ακόμη εντολές ρύθμισης",
     "commandsSaveFailed": "Δεν ήταν δυνατή η αποθήκευση εντολών ρύθμισης",
-    "moveUp": "Μετακινηθείτε προς τα πάνω",
-    "moveDown": "Μετακίνηση προς τα κάτω",
     "moveCommandUp": "Μετακίνηση εντολής {{position}} προς τα πάνω",
     "moveCommandDown": "Μετακίνηση εντολής {{position}} προς τα κάτω",
     "skillsTitle": "Δεξιότητες",
@@ -3859,9 +3859,13 @@
     "skillMarkdownLabel": "Περιεχόμενο δεξιότητας",
     "skillsEmpty": "Δεν υπάρχουν ακόμη δεξιότητες",
     "skillNameRequired": "Εισαγάγετε ένα όνομα δεξιότητας",
+    "skillNameTooLong": "Το όνομα δεξιότητας πρέπει να έχει {{max}} χαρακτήρες το πολύ",
     "skillNameInvalid": "Το όνομα δεξιότητας πρέπει να ξεκινά με γράμμα ή ψηφίο και να χρησιμοποιεί μόνο πεζά γράμματα, ψηφία και παύλες",
     "skillContentRequired": "Απαιτείται περιεχόμενο δεξιότητας",
-    "skillSaveFailed": "Δεν ήταν δυνατή η αποθήκευση της δεξιότητας",
+    "skillSaveFailed": "Δεν ήταν δυνατή η αποθήκευση της δεξιότητας. Δοκιμάστε ξανά.",
+    "skillDeleteFailed": "Δεν ήταν δυνατή η διαγραφή της δεξιότητας. Δοκιμάστε ξανά.",
+    "skillToggleFailed": "Δεν ήταν δυνατή η ενημέρωση της δεξιότητας. Δοκιμάστε ξανά.",
+    "skillLimitReached": "Ένα προφίλ μπορεί να περιέχει έως {{max}} δεξιότητες. Διαγράψτε μία για να προσθέσετε άλλη.",
     "skillSourceCustom": "Προσαρμοσμένο",
     "skillSourceMarketplace": "Αγορά",
     "skillSourceSkillsSh": "skills.sh",

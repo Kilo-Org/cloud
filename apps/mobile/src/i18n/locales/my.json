@@ -163,7 +163,7 @@
     "allLanguages": "ဘာသာစကားအားလုံး"
   },
   "login": {
-    "welcome": "Kilo မှ ကြိုဆိုပါသည်",
+    "welcome": "ကြိုဆိုပါသည်",
     "retrySignIn": "အကောင့်ဝင်ရန် ထပ်ကြိုးစားပါ",
     "logo": "Kilo တံဆိပ်",
     "continuingSignIn": "အကောင့်ဝင်ခြင်းကို ဆက်လုပ်နေသည်။",
@@ -684,6 +684,7 @@
       "gitlabDescription": "ဖုန်းပေါ်တွင် merge request များကို သုံးသပ်ရန် သင့် GitLab အကောင့်ကို ချိတ်ဆက်ပါ။",
       "bitbucketDescription": "ဖုန်းပေါ်တွင် PR များကို သုံးသပ်ရန် ဤအဖွဲ့ကို Bitbucket နှင့် ချိတ်ဆက်ပါ။",
       "bitbucketOrgOnlyDescription": "၎င်း၏ Bitbucket PR များကို သုံးသပ်ရန် အပေါ်ရှိ အကောင့်ကို အဖွဲ့တစ်ခုသို့ ပြောင်းပါ။",
+      "bitbucketOrgOnlyNoOrganizationDescription": "ဤအကောင့်တွင် အဖွဲ့များ မရှိသေးပါ။ အဖွဲ့တစ်ခုကို ဖန်တီးပါ သို့မဟုတ် ပါဝင်ပါက Bitbucket PR များကို သုံးသပ်နိုင်ပါသည်။",
       "contextLine": "{{organization}} အတွက်",
       "contextLinePersonal": "ကိုယ်ပိုင်အကောင့်အတွက်"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub ချိတ်ဆက်မှု သက်တမ်းကုန်သွားပါပြီ။",
-      "message": "သင့် GitHub ချိတ်ဆက်မှုကို အသုံးပြု၍မရတော့ပါ။ ချိတ်ဆက်မှုကို ပြန်စစ်ဆေးပါ။ လိုအပ်လျှင် ပြန်ချိတ်ဆက်ရန် တောင်းဆိုပါမည်။",
+      "message": "ချိတ်ဆက်မှုကို ပြန်စစ်ဆေးပါ။ လိုအပ်လျှင် ပြန်ချိတ်ဆက်ရန် တောင်းဆိုပါမည်။",
       "gitlabTitle": "GitLab ချိတ်ဆက်မှု သက်တမ်းကုန်သွားပါပြီ။",
-      "bitbucketTitle": "Bitbucket ချိတ်ဆက်မှု သက်တမ်းကုန်သွားပါပြီ။",
-      "providerMessage": "သင့် {{provider}} ချိတ်ဆက်မှုကို အသုံးပြု၍မရတော့ပါ။ ချိတ်ဆက်မှုကို ပြန်စစ်ဆေးပါ။ လိုအပ်လျှင် ပြန်ချိတ်ဆက်ရန် တောင်းဆိုပါမည်။"
+      "bitbucketTitle": "Bitbucket ချိတ်ဆက်မှု သက်တမ်းကုန်သွားပါပြီ။"
     },
     "eventChips": {
       "comment": "မှတ်ချက်",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Merge request ကို မျှဝေပါ",
       "viewOnProvider": "{{provider}} တွင် ကြည့်ရန်",
       "mergeRequestUnavailable": "Merge request မရနိုင်ပါ",
@@ -1429,7 +1429,10 @@
       "gitlabNoRepositoriesDescription": "GitLab ရှိ နောက်ထပ်အဖွဲ့များ သို့မဟုတ် ပရောဂျက်များသို့ ဝင်ရောက်ခွင့်ပေးရန် လိုအပ်နိုင်သည်။",
       "installGithubApp": "ကုဒ်သိုလှောင်ရာများတွင် GitHub အက်ပ်ကို ထည့်သွင်းပါ",
       "installGithubAppDescription": "စစ်ဆေးစေလိုသော ကုဒ်သိုလှောင်ရာများသို့ Kilo GitHub အက်ပ်ကို ဝင်ရောက်ခွင့်ပေးပါ။",
-      "repositoryAccess": "ကုဒ်သိုလှောင်ရာ ဝင်ရောက်ခွင့်"
+      "repositoryAccess": "ကုဒ်သိုလှောင်ရာ ဝင်ရောက်ခွင့်",
+      "allModePersonal": "သင့် GitHub ချိတ်ဆက်မှုမှတစ်ဆင့် Kilo ဝင်ရောက်နိုင်သည့် ကုဒ်သိုလှောင်ရာတိုင်းကို အလိုအလျောက် စစ်ဆေးပါသည်။",
+      "allModeOrganization": "အဖွဲ့အစည်း၏ GitHub ချိတ်ဆက်မှုမှတစ်ဆင့် Kilo ဝင်ရောက်နိုင်သည့် ကုဒ်သိုလှောင်ရာတိုင်းကို အလိုအလျောက် စစ်ဆေးပါသည်။",
+      "allModeCount": "ရရှိနိုင်သော ကုဒ်သိုလှောင်ရာများ: {{displayCount}}"
     },
     "style": {
       "title": "စစ်ဆေးမှု ပုံစံ",
@@ -1528,6 +1531,7 @@
       "changeRequestNoGitHubAccess": "ဤ repository သို့ ဝင်ရောက်ခွင့်ရှိသော GitHub ချိတ်ဆက်မှု မရှိပါ။ ၎င်းသို့ ဝင်ရောက်ခွင့်ရှိသော GitHub ကို ပြန်လည်ချိတ်ဆက်ပြီး ထပ်မံကြိုးစားပါ။",
       "changeRequestMissingPermissions": "Kilo ၏ GitHub App သည် ဤ repository တွင် Pull Request များ ဖွင့်၍မရပါ။ repository ပိုင်ရှင်တစ်ဦးသည် app အား အကြောင်းအရာများနှင့် Pull Request များအတွက် write access ပေးပြီးမှ ထပ်မံကြိုးစားရန် လိုအပ်ပါသည်။",
       "changeRequestFailed": "Kilo သည် pull request ကို ဖွင့်၍ မရပါ။ ခဏအကြာတွင် ထပ်မံကြိုးစားပါ။",
+      "proposalConflict": "ဤ repository အတွက် အခြား စစ်ဆေးမှုမှတ်ဉာဏ် အဆိုပြုချက်တစ်ခု သက်ဝင်နေသေးသည်။",
       "offAction": "စစ်ဆေးမှုမှတ်ဉာဏ်ကို ပိတ်ထားသည်။ ဖွင့်ပြီးနောက် ထပ်မံကြိုးစားပါ။"
     },
     "manualReview": {
@@ -1779,7 +1783,6 @@
       "notYetSynced": "ထပ်တူမပြုရသေး",
       "refreshFailed": "ဒေတာအသစ်ကို ရယူ၍ မရပါ။ နောက်ဆုံး ထပ်တူပြုထားသော ဒေတာကို ပြထားသည်။",
       "settings": "ဆက်တင်များ",
-      "syncFindings": "တွေ့ရှိချက်များ ထပ်တူပြုရန်",
       "syncNow": "ယခု ထပ်တူပြုပါ",
       "syncQueued": "ထပ်တူပြုရန် အလှည့်စောင့်စာရင်းထဲ ထည့်ထားသည်။",
       "syncStatusUnavailable": "ထပ်တူပြုမှုအခြေအနေကို ရယူ၍ မရပါ။",
@@ -1967,7 +1970,6 @@
       "eventsCount_other": "{{displayCount}} အဖြစ်အပျက်များ",
       "generated": "{{generatedAt}} တွင် ထုတ်ပေးထားသည်။",
       "noActivity": "မှတ်တမ်းတင်ထားသော လုပ်ဆောင်ချက် မရှိပါ",
-      "noActivityDescription": "{{start}} မှ {{end}} အထိ Kilo တွင် အစီရင်ခံရန် လုံခြုံရေးတွေ့ရှိချက်ဆိုင်ရာ လုပ်ဆောင်မှု မရှိပါ။",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ကုဒ်သိုလှောင်ရာကို မှတ်တမ်းမတင်ထား",
       "reasonUnknown": "အသိအမှတ်မပြုသော အကြောင်းရင်း",
@@ -2157,7 +2159,7 @@
     "sessionList": {
       "couldNotLoadActive": "လုပ်ဆောင်နေသော စက်ရှင်များကို ရယူ၍မရပါ။",
       "couldNotRefresh": "ပြန်ရယူ၍မရပါ",
-      "noSessionsYetDescription": "သင့်ဖုန်းမှ ကုဒ်ရေးသည့် အလုပ်တစ်ခုကို စတင်ပါ။ သင့်စက်ရှင်များ ဒီနေရာတွင် ပေါ်လာပါမည်။",
+      "noSessionsYetDescription": "သင့်ဖုန်းမှ ကုဒ်ရေးသည့် အလုပ်တစ်ခုကို စတင်ပါ။",
       "viewHistory": "စက်ရှင်မှတ်တမ်း",
       "noMatches": "ကိုက်ညီသော စက်ရှင် မရှိပါ",
       "tryDifferentSearch": "အခြားစကားလုံးဖြင့် ရှာကြည့်ပါ။",
@@ -2295,9 +2297,9 @@
       "couldNotLoadGithubRepositories": "GitHub ကုဒ်သိုလှောင်ခန်းများကို ရယူ၍မရပါ။",
       "couldNotLoadGitlabRepositories": "GitLab ကုဒ်သိုလှောင်ခန်းများကို ရယူ၍မရပါ။",
       "couldNotLoadBitbucketRepositories": "Bitbucket ကုဒ်သိုလှောင်ခန်းများကို ရယူ၍မရပါ။",
-      "connectGithubDescription": "ဘရောက်ဆာတွင် GitHub ကို ချိတ်ဆက်ပါ။ ထို့နောက် ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
-      "connectGitlabDescription": "ဘရောက်ဆာတွင် GitLab ကို ချိတ်ဆက်ပါ။ ထို့နောက် ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
-      "connectBitbucketDescription": "ဘရောက်ဆာတွင် Bitbucket ကို ချိတ်ဆက်ပါ။ ထို့နောက် ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
+      "connectGithubDescription": "ဘရောက်ဆာမှ လော့ဂ်အင် လုပ်ပါ။ ထို့နောက် GitHub ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
+      "connectGitlabDescription": "ဘရောက်ဆာမှ လော့ဂ်အင် လုပ်ပါ။ ထို့နောက် GitLab ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
+      "connectBitbucketDescription": "ဘရောက်ဆာမှ လော့ဂ်အင် လုပ်ပါ။ ထို့နောက် Bitbucket ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
       "openGithub": "GitHub ဖွင့်ပါ",
       "openGitlab": "GitLab ဖွင့်ပါ",
       "openBitbucket": "Bitbucket ဖွင့်ပါ",
@@ -3849,8 +3851,6 @@
     "commandAtLimit": "အမိန့်ကို စာလုံး {{max}} လုံးအထိ ကန့်သတ်ထားသည်။",
     "commandsEmpty": "စနစ်ထည့်သွင်းရန် အမိန့်များမရှိသေးပါ။",
     "commandsSaveFailed": "စနစ်ထည့်သွင်းမှု အမိန့်များကို မသိမ်းဆည်းနိုင်ခဲ့ပါ။",
-    "moveUp": "အပေါ်ကိုရွှေ့ပါ။",
-    "moveDown": "အောက်သို့ရွှေ့ပါ။",
     "moveCommandUp": "အမိန့် {{position}} ကို အပေါ်သို့ ရွှေ့ပါ",
     "moveCommandDown": "အမိန့် {{position}} ကို အောက်သို့ ရွှေ့ပါ",
     "skillsTitle": "ကျွမ်းကျင်မှု",
@@ -3859,9 +3859,13 @@
     "skillMarkdownLabel": "ကျွမ်းကျင်မှုအကြောင်းအရာ",
     "skillsEmpty": "ကျွမ်းကျင်မှုမရှိသေးပါ။",
     "skillNameRequired": "ကျွမ်းကျင်မှုအမည်ကို ထည့်သွင်းပါ။",
+    "skillNameTooLong": "ကျွမ်းကျင်မှုအမည်သည် စာလုံးရေ {{max}} လုံး သို့မဟုတ် ထိုထက်နည်းရပါမည်။",
     "skillNameInvalid": "ကျွမ်းကျင်မှုအမည်သည် အက္ခရာ သို့မဟုတ် ဂဏန်းဖြင့် စတင်ပြီး စာလုံးသေးများ၊ ဂဏန်းများနှင့် ဒက်ရှ်များကိုသာ အသုံးပြုရပါမည်။",
     "skillContentRequired": "ကျွမ်းကျင်မှုအကြောင်းအရာ လိုအပ်ပါသည်။",
-    "skillSaveFailed": "ကျွမ်းကျင်မှုကို မသိမ်းဆည်းနိုင်ခဲ့ပါ။",
+    "skillSaveFailed": "ကျွမ်းကျင်မှုကို မသိမ်းဆည်းနိုင်ခဲ့ပါ။ ထပ်မံကြိုးစားပါ။",
+    "skillDeleteFailed": "ကျွမ်းကျင်မှုကို မဖျက်နိုင်ခဲ့ပါ။ ထပ်မံကြိုးစားပါ။",
+    "skillToggleFailed": "ကျွမ်းကျင်မှုကို မမွမ်းမံနိုင်ခဲ့ပါ။ ထပ်မံကြိုးစားပါ။",
+    "skillLimitReached": "ပရိုဖိုင်တစ်ခုတွင် ကျွမ်းကျင်မှု {{max}} ခုအထိ သိမ်းဆည်းနိုင်ပါသည်။ နောက်တစ်ခုထည့်ရန် တစ်ခုကို ဖျက်ပါ။",
     "skillSourceCustom": "စိတ်ကြိုက်",
     "skillSourceMarketplace": "မားကက်ပလေ့",
     "skillSourceSkillsSh": "skills.sh",

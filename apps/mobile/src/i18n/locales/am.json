@@ -163,7 +163,7 @@
     "allLanguages": "ሁሉም ቋንቋዎች"
   },
   "login": {
-    "welcome": "ወደ Kilo እንኳን ደህና መጡ",
+    "welcome": "እንኳን ደህና መጡ",
     "retrySignIn": "ለመግባት እንደገና ይሞክሩ",
     "logo": "የKilo አርማ",
     "continuingSignIn": "የመግባት ሂደትዎ እየቀጠለ ነው።",
@@ -684,6 +684,7 @@
       "gitlabDescription": "በሞባይል ላይ የማዋሃድ ጥያቄዎችን ለመገምገም የGitLab መለያዎን ያገናኙ።",
       "bitbucketDescription": "Bitbucketን ከዚህ ድርጅት ጋር ያገናኙ የማዋሃድ ጥያቄዎችን በሞባይል ለመገምገም።",
       "bitbucketOrgOnlyDescription": "ከላይ ያለውን መለያ ወደ ድርጅት ይቀይሩ፣ የዚህ ድርጅት የBitbucket የማዋሃድ ጥያቄዎችን ለመገምገም።",
+      "bitbucketOrgOnlyNoOrganizationDescription": "ይህ መለያ እስካሁን ድርጅቶች የለውም። ድርጅት ሲፈጥሩ ወይም ሲቀላቀሉ የBitbucket የማዋሃድ ጥያቄዎችን ማገምገም ይቻላል።",
       "contextLine": "ለ{{organization}}",
       "contextLinePersonal": "ለግል መለያዎ"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "የGitHub ግንኙነት ጊዜው አልፏል።",
-      "message": "የGitHub ግንኙነትህ ከእንግዲህ አይሠራም። ግንኙነትህን እንደገና ፈትሽ — ካስፈለገ እንደገና እንድታገናኝ ትጠየቃለህ።",
+      "message": "ግንኙነትህን እንደገና ፈትሽ — ካስፈለገ እንደገና እንድታገናኝ ትጠየቃለህ።",
       "gitlabTitle": "የGitLab ግንኙነት ጊዜው አልፏል።",
-      "bitbucketTitle": "የBitbucket ግንኙነት ጊዜው አልፏል።",
-      "providerMessage": "የ{{provider}} ግንኙነትህ ከእንግዲህ አይሠራም። ግንኙነትህን እንደገና ፈትሽ — ካስፈለገ እንደገና እንድታገናኝ ትጠየቃለህ።"
+      "bitbucketTitle": "የBitbucket ግንኙነት ጊዜው አልፏል።"
     },
     "eventChips": {
       "comment": "አስተያየት",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "የማዋሃድ ጥያቄ",
       "mergeRequest": "የማዋሃድ ጥያቄ",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "የማዋሃድ ጥያቄ !{{number}}",
       "shareMergeRequest": "የማዋሃድ ጥያቄውን አጋራ",
       "viewOnProvider": "በ{{provider}} ይመልከቱ",
       "mergeRequestUnavailable": "የማዋሃድ ጥያቄው አይገኝም",
@@ -1429,7 +1429,10 @@
       "gitlabNoRepositoriesDescription": "በGitLab ላይ ወደ ተጨማሪ ቡድኖች ወይም ፕሮጀክቶች የመድረስ ፈቃድ መስጠት ሊያስፈልግዎ ይችላል።",
       "installGithubApp": "የGitHub መተግበሪያን በማከማቻዎች ላይ ይጫኑ",
       "installGithubAppDescription": "ለKilo የGitHub መተግበሪያ እንዲገመገሙ ወደሚፈልጓቸው ማከማቻዎች የመድረስ ፈቃድ ይስጡ።",
-      "repositoryAccess": "የማከማቻ መዳረሻ"
+      "repositoryAccess": "የማከማቻ መዳረሻ",
+      "allModePersonal": "Kilo በእርስዎ የGitHub ግንኙነት በኩል ማግኘት የሚችላቸው ሁሉም ማከማቻዎች በራስ-ሰር ይገመገማሉ።",
+      "allModeOrganization": "Kilo በድርጅቱ የGitHub ግንኙነት በኩል ማግኘት የሚችላቸው ሁሉም ማከማቻዎች በራስ-ሰር ይገመገማሉ።",
+      "allModeCount": "የሚገኙ ማከማቻዎች: {{displayCount}}"
     },
     "style": {
       "title": "የግምገማ ዘይቤ",
@@ -1528,6 +1531,7 @@
       "changeRequestNoGitHubAccess": "ማንኛውም የGitHub ግንኙነት ይህን ማከማቻ ማግኘት አይችልም። GitHubን የዚህ ማከማቻ መዳረሻ ይኖረው ዘንድ እንደገና ያገናኙ፣ ከዚያ እንደገና ይሞክሩ።",
       "changeRequestMissingPermissions": "የKilo GitHub App በዚህ ማከማቻ ውስጥ pull request መክፈት አይችልም። የማከማቻ ባለቤት ለመተግበሪያው የይዘት እና pull request የመጻፍ መዳረሻ መስጠት አለበት፣ ከዚያ እንደገና ይሞክሩ።",
       "changeRequestFailed": "Kilo pull request መክፈት አልቻለም። ከጥቂት ጊዜ በኋላ እንደገና ይሞክሩ።",
+      "proposalConflict": "ለዚህ ማከማቻ ሌላ ሐሳብ አሁንም ንቁ ነው።",
       "offAction": "የግምገማ ትውስታ ተሰናክሏል። ያንቁት፣ ከዚያ እንደገና ይሞክሩ።"
     },
     "manualReview": {
@@ -1779,7 +1783,6 @@
       "notYetSynced": "እስካሁን አልተመሳሰለም",
       "refreshFailed": "ማደስ አልተቻለም። ለመጨረሻ ጊዜ የተመሳሰለው ውሂብ እየታየ ነው።",
       "settings": "ቅንብሮች",
-      "syncFindings": "ግኝቶችን ያመሳስሉ",
       "syncNow": "አሁን ያመሳስሉ",
       "syncQueued": "ማመሳሰል ወደ ወረፋ ገብቷል።",
       "syncStatusUnavailable": "የማመሳሰል ሁኔታን ማግኘት አልተቻለም።",
@@ -1967,7 +1970,6 @@
       "eventsCount_other": "{{displayCount}} ክስተቶች",
       "generated": "ሪፖርቱ በ{{generatedAt}} ተዘጋጅቷል።",
       "noActivity": "ምንም የተመዘገበ እንቅስቃሴ የለም",
-      "noActivityDescription": "ከ{{start}} እስከ {{end}} በKilo ውስጥ በሪፖርት የሚካተት የደህንነት ግኝቶች እንቅስቃሴ የለም።",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ማከማቻው አልተመዘገበም",
       "reasonUnknown": "ያልታወቀ ምክንያት",
@@ -2157,7 +2159,7 @@
     "sessionList": {
       "couldNotLoadActive": "ንቁ ክፍለ ጊዜዎችን መጫን አልተቻለም።",
       "couldNotRefresh": "ማደስ አልተቻለም",
-      "noSessionsYetDescription": "ከስልክህ ኮድ የመጻፍ ሥራ ጀምር። ክፍለ ጊዜዎችህ እዚህ ይታያሉ።",
+      "noSessionsYetDescription": "ከስልክህ ኮድ የመጻፍ ሥራ ጀምር።",
       "viewHistory": "የክፍለ ጊዜ ታሪክ",
       "noMatches": "የሚዛመዱ ክፍለ ጊዜዎች የሉም",
       "tryDifferentSearch": "ሌላ የፍለጋ ቃል ሞክር።",
@@ -2295,9 +2297,9 @@
       "couldNotLoadGithubRepositories": "የGitHub ማከማቻዎችን መጫን አልተቻለም።",
       "couldNotLoadGitlabRepositories": "የGitLab ማከማቻዎችን መጫን አልተቻለም።",
       "couldNotLoadBitbucketRepositories": "የBitbucket ማከማቻዎችን መጫን አልተቻለም።",
-      "connectGithubDescription": "GitHubን በአሳሽዎ ውስጥ ያገናኙ፣ ከዚያ ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
-      "connectGitlabDescription": "GitLabን በአሳሽዎ ውስጥ ያገናኙ፣ ከዚያ ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
-      "connectBitbucketDescription": "Bitbucketን በአሳሽዎ ውስጥ ያገናኙ፣ ከዚያ ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
+      "connectGithubDescription": "በአሳሽዎ ውስጥ ይግቡ፣ ከዚያ GitHub ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
+      "connectGitlabDescription": "በአሳሽዎ ውስጥ ይግቡ፣ ከዚያ GitLab ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
+      "connectBitbucketDescription": "በአሳሽዎ ውስጥ ይግቡ፣ ከዚያ Bitbucket ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
       "openGithub": "GitHubን ይክፈቱ",
       "openGitlab": "GitLabን ይክፈቱ",
       "openBitbucket": "Bitbucketን ይክፈቱ",
@@ -3849,8 +3851,6 @@
     "commandAtLimit": "ትዕዛዙ በ{{max}} ቁምፊዎች የተገደበ ነው",
     "commandsEmpty": "እስካሁን ምንም የማዋቀር ትዕዛዞች የሉም",
     "commandsSaveFailed": "የማዋቀር ትዕዛዞችን ማስቀመጥ አልተቻለም",
-    "moveUp": "ወደ ላይ ተንቀሳቀስ",
-    "moveDown": "ወደ ታች ውሰድ",
     "moveCommandUp": "ትዕዛዝ {{position}} ወደ ላይ አንቀሳቅስ",
     "moveCommandDown": "ትዕዛዝ {{position}} ወደ ታች አንቀሳቅስ",
     "skillsTitle": "ችሎታዎች",
@@ -3859,9 +3859,13 @@
     "skillMarkdownLabel": "የክህሎት ይዘት",
     "skillsEmpty": "እስካሁን ምንም ችሎታ የለም።",
     "skillNameRequired": "የክህሎት ስም አስገባ",
+    "skillNameTooLong": "የክህሎት ስም ከ{{max}} ቁምፊዎች መብለጥ የለበትም",
     "skillNameInvalid": "የክህሎት ስም በፊደል ወይም ዲጂት መጀመር አለበት እና ትንሽ ሆሄያትን፣ አሃዞችን እና ሰረዞችን ብቻ መጠቀም አለበት።",
     "skillContentRequired": "የክህሎት ይዘት ያስፈልጋል",
-    "skillSaveFailed": "ችሎታ ማዳን አልተቻለም",
+    "skillSaveFailed": "ችሎታ ማዳን አልተቻለም። እንደገና ይሞክሩ።",
+    "skillDeleteFailed": "ችሎታ ማጥፋት አልተቻለም። እንደገና ይሞክሩ።",
+    "skillToggleFailed": "ችሎታ ማዘመን አልተቻለም። እንደገና ይሞክሩ።",
+    "skillLimitReached": "አንድ መገለጫ እስከ {{max}} ችሎታዎች ሊይዝ ይችላል። ሌላ ለመጨመር አንዱን ሰርዝ።",
     "skillSourceCustom": "ብጁ",
     "skillSourceMarketplace": "መደብር",
     "skillSourceSkillsSh": "skills.sh",

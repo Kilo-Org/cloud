@@ -458,8 +458,9 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     dom.cleanup();
   });
 
-  function render(props: ComponentProps<typeof CloudChatPageComponent> = {}) {
-    act(() => root.render(createElement(CloudChatPage, { currentUserId: 'owner', ...props })));
+  function render(props: Partial<ComponentProps<typeof CloudChatPageComponent>> = {}) {
+    const { currentUserId = 'owner', ...rest } = props;
+    act(() => root.render(createElement(CloudChatPage, { ...rest, currentUserId })));
   }
 
   function openTerminal() {

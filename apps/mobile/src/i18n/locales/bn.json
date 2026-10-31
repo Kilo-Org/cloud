@@ -163,7 +163,7 @@
     "allLanguages": "সব ভাষা"
   },
   "login": {
-    "welcome": "Kilo-তে স্বাগতম",
+    "welcome": "স্বাগতম",
     "retrySignIn": "আবার সাইন-ইন করার চেষ্টা করুন",
     "logo": "Kilo-র লোগো",
     "continuingSignIn": "আপনার সাইন-ইন চলছে।",
@@ -684,6 +684,7 @@
       "gitlabDescription": "মোবাইলে মার্জ রিকোয়েস্ট রিভিউ করতে আপনার GitLab অ্যাকাউন্ট সংযুক্ত করুন।",
       "bitbucketDescription": "মোবাইলে পুল রিকোয়েস্ট রিভিউ করতে এই অর্গানাইজেশনটিকে Bitbucket-এর সঙ্গে সংযুক্ত করুন।",
       "bitbucketOrgOnlyDescription": "উপরে থাকা অ্যাকাউন্ট একটি অর্গানাইজেশনে সুইচ করুন তার Bitbucket পুল রিকোয়েস্ট রিভিউ করতে।",
+      "bitbucketOrgOnlyNoOrganizationDescription": "এই অ্যাকাউন্টে এখনো কোনো অর্গানাইজেশন নেই। আপনি একটি অর্গানাইজেশন তৈরি করলে বা যুক্ত হলে Bitbucket পুল রিকোয়েস্ট রিভিউ করা যাবে।",
       "contextLine": "{{organization}}-এর জন্য",
       "contextLinePersonal": "আপনার ব্যক্তিগত অ্যাকাউন্টের জন্য"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub সংযোগের মেয়াদ শেষ হয়েছে।",
-      "message": "আপনার GitHub সংযোগের অনুমতি আর কার্যকর নেই। সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।",
+      "message": "সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।",
       "gitlabTitle": "GitLab সংযোগের মেয়াদ শেষ হয়েছে।",
-      "bitbucketTitle": "Bitbucket সংযোগের মেয়াদ শেষ হয়েছে।",
-      "providerMessage": "আপনার {{provider}} সংযোগের অনুমতি আর কার্যকর নেই। সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।"
+      "bitbucketTitle": "Bitbucket সংযোগের মেয়াদ শেষ হয়েছে।"
     },
     "eventChips": {
       "comment": "মন্তব্য",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "পুল রিকোয়েস্ট",
       "mergeRequest": "মার্জ রিকোয়েস্ট",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "মার্জ রিকোয়েস্ট !{{number}}",
       "shareMergeRequest": "মার্জ রিকোয়েস্ট শেয়ার করুন",
       "viewOnProvider": "{{provider}}-এ দেখুন",
       "mergeRequestUnavailable": "মার্জ রিকোয়েস্ট পাওয়া যাচ্ছে না",
@@ -1429,7 +1429,10 @@
       "gitlabNoRepositoriesDescription": "GitLab-এ আরও গ্রুপ বা প্রকল্পে অ্যাক্সেস দিতে হতে পারে।",
       "installGithubApp": "রিপোজিটরিতে GitHub অ্যাপ ইনস্টল করুন",
       "installGithubAppDescription": "যেসব রিপোজিটরি পর্যালোচনা করাতে চান, সেগুলোতে Kilo GitHub অ্যাপকে অ্যাক্সেস দিন।",
-      "repositoryAccess": "রিপোজিটরির অ্যাক্সেস"
+      "repositoryAccess": "রিপোজিটরির অ্যাক্সেস",
+      "allModePersonal": "আপনার GitHub সংযোগের মাধ্যমে Kilo যে সমস্ত রিপোজিটরিতে অ্যাক্সেস করতে পারে, সেগুলো স্বয়ংক্রিয়ভাবে পর্যালোচনা করা হয়।",
+      "allModeOrganization": "সংস্থার GitHub সংযোগের মাধ্যমে Kilo যে সমস্ত রিপোজিটরিতে অ্যাক্সেস করতে পারে, সেগুলো স্বয়ংক্রিয়ভাবে পর্যালোচনা করা হয়।",
+      "allModeCount": "উপলব্ধ রিপোজিটরি: {{displayCount}}"
     },
     "style": {
       "title": "পর্যালোচনার ধরন",
@@ -1528,6 +1531,7 @@
       "changeRequestNoGitHubAccess": "কোনো GitHub সংযোগের এই রিপোজিটরিতে অ্যাক্সেস নেই। এতে অ্যাক্সেসসহ GitHub আবার সংযুক্ত করুন, তারপর আবার চেষ্টা করুন।",
       "changeRequestMissingPermissions": "Kilo-এর GitHub App এই রিপোজিটরিতে পুল রিকোয়েস্ট খুলতে পারে না। একজন রিপোজিটরি মালিককে অ্যাপটিকে কনটেন্ট এবং পুল রিকোয়েস্টে রাইট অ্যাক্সেস দিতে হবে, তারপর আবার চেষ্টা করুন।",
       "changeRequestFailed": "Kilo পুল রিকোয়েস্টটি খুলতে পারেনি। একটু পর আবার চেষ্টা করুন।",
+      "proposalConflict": "এই রিপোজিটরির জন্য আরেকটি পর্যালোচনার মেমরি প্রস্তাব এখনও সক্রিয় আছে, তাই এটি এখনই সংরক্ষণ করা যাবে না।",
       "offAction": "পর্যালোচনার মেমরি বন্ধ আছে। এটি চালু করুন, তারপর আবার চেষ্টা করুন।"
     },
     "manualReview": {
@@ -1779,7 +1783,6 @@
       "notYetSynced": "এখনো সিঙ্ক হয়নি",
       "refreshFailed": "রিফ্রেশ করা যায়নি — শেষবার সিঙ্ক করা তথ্য দেখানো হচ্ছে।",
       "settings": "সেটিংস",
-      "syncFindings": "ত্রুটিগুলো সিঙ্ক করুন",
       "syncNow": "এখন সিঙ্ক করুন",
       "syncQueued": "সিঙ্কের অনুরোধ সারিতে যোগ করা হয়েছে।",
       "syncStatusUnavailable": "সিঙ্কের অবস্থা জানা যাচ্ছে না।",
@@ -1967,7 +1970,6 @@
       "eventsCount_other": "{{displayCount}}টি ইভেন্ট",
       "generated": "তৈরির সময়: {{generatedAt}}।",
       "noActivity": "কোনো কার্যকলাপ রেকর্ড করা হয়নি",
-      "noActivityDescription": "{{start}} থেকে {{end}} পর্যন্ত নিরাপত্তা ত্রুটি নিয়ে রিপোর্টে দেখানোর মতো কোনো কার্যকলাপ Kilo-তে নেই।",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "রিপোজিটরি রেকর্ড করা হয়নি",
       "reasonUnknown": "অপরিচিত কারণ",
@@ -2157,7 +2159,7 @@
     "sessionList": {
       "couldNotLoadActive": "সক্রিয় সেশন লোড করা যায়নি।",
       "couldNotRefresh": "রিফ্রেশ করা যায়নি",
-      "noSessionsYetDescription": "আপনার ফোন থেকে কোড লেখার একটি কাজ শুরু করুন। আপনার সেশনগুলো এখানে দেখা যাবে।",
+      "noSessionsYetDescription": "আপনার ফোন থেকে কোড লেখার একটি কাজ শুরু করুন।",
       "viewHistory": "সেশনের ইতিহাস",
       "noMatches": "মিলে যায় এমন কোনো সেশন নেই",
       "tryDifferentSearch": "অন্য শব্দ দিয়ে খুঁজে দেখুন।",
@@ -2295,9 +2297,9 @@
       "couldNotLoadGithubRepositories": "GitHub রিপোজিটরি লোড করা যায়নি।",
       "couldNotLoadGitlabRepositories": "GitLab রিপোজিটরি লোড করা যায়নি।",
       "couldNotLoadBitbucketRepositories": "Bitbucket রিপোজিটরি লোড করা যায়নি।",
-      "connectGithubDescription": "আপনার ব্রাউজারে GitHub সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
-      "connectGitlabDescription": "আপনার ব্রাউজারে GitLab সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
-      "connectBitbucketDescription": "আপনার ব্রাউজারে Bitbucket সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
+      "connectGithubDescription": "আপনার ব্রাউজার থেকে সাইন ইন করুন, তারপর একটি GitHub রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
+      "connectGitlabDescription": "আপনার ব্রাউজার থেকে সাইন ইন করুন, তারপর একটি GitLab রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
+      "connectBitbucketDescription": "আপনার ব্রাউজার থেকে সাইন ইন করুন, তারপর একটি Bitbucket রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
       "openGithub": "GitHub খুলুন",
       "openGitlab": "GitLab খুলুন",
       "openBitbucket": "Bitbucket খুলুন",
@@ -3849,8 +3851,6 @@
     "commandAtLimit": "কমান্ডটি সর্বাধিক {{max}}টি অক্ষরের মধ্যে সীমাবদ্ধ",
     "commandsEmpty": "এখনো কোনো সেটআপ কমান্ড নেই",
     "commandsSaveFailed": "সেটআপ কমান্ড সংরক্ষণ করা যায়নি",
-    "moveUp": "উপরে সরান",
-    "moveDown": "নিচে সরান",
     "moveCommandUp": "কমান্ড {{position}} উপরে সরান",
     "moveCommandDown": "কমান্ড {{position}} নিচে সরান",
     "skillsTitle": "দক্ষতা",
@@ -3859,9 +3859,13 @@
     "skillMarkdownLabel": "দক্ষতা বিষয়বস্তু",
     "skillsEmpty": "এখনো কোনো দক্ষতা নেই",
     "skillNameRequired": "একটি দক্ষতার নাম লিখুন",
+    "skillNameTooLong": "দক্ষতার নাম অবশ্যই {{max}} অক্ষর বা তার কম হতে হবে",
     "skillNameInvalid": "দক্ষতার নাম অবশ্যই একটি অক্ষর বা অঙ্ক দিয়ে শুরু করতে হবে এবং শুধুমাত্র ছোট হাতের অক্ষর, সংখ্যা এবং ড্যাশ ব্যবহার করতে হবে",
     "skillContentRequired": "দক্ষতা বিষয়বস্তু প্রয়োজন",
-    "skillSaveFailed": "দক্ষতা বাঁচাতে পারেনি",
+    "skillSaveFailed": "দক্ষতা বাঁচাতে পারেনি। আবার চেষ্টা করুন।",
+    "skillDeleteFailed": "দক্ষতা মুছতে পারেনি। আবার চেষ্টা করুন।",
+    "skillToggleFailed": "দক্ষতা আপডেট করতে পারেনি। আবার চেষ্টা করুন।",
+    "skillLimitReached": "একটি প্রোফাইলে সর্বোচ্চ {{max}}টি দক্ষতা রাখা যায়। আরেকটি যোগ করতে একটি মুছুন।",
     "skillSourceCustom": "কাস্টম",
     "skillSourceMarketplace": "মার্কেটপ্লেস",
     "skillSourceSkillsSh": "skills.sh",

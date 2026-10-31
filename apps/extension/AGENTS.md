@@ -53,7 +53,7 @@ Before committing extension changes, run `pnpm format`. Prefer `pnpm --filter ki
 - Chrome dangerous mode uses the `debugger` permission. Firefox does not; use the scripting-based path already in the package.
 - Keep `wxt.config.ts` as the source of truth for manifest permissions, host permissions, and Firefox `browser_specific_settings`.
 - Do not commit `.output/` build artifacts.
-- If `web-ext` crashes under the local Node runtime, use the existing `validate:firefox` script instead of rewriting validation.
+- `validate:firefox` runs the lockfile-pinned `web-ext` on the repository's Node (`engines` and `.nvmrc`). If `web-ext` crashes there, change the pinned `web-ext` version or report the crash; do not introduce another runtime or download packages while validating.
 
 ## Agent Modes
 

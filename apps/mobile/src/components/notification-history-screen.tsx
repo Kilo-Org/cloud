@@ -131,11 +131,10 @@ export function NotificationHistoryScreen() {
     () => query.data?.pages.flatMap(page => page.items) ?? [],
     [query.data?.pages]
   );
-  // `reconcileFirstPage` empties the cached pages before page one refetches, so
-  // the rows a refresh started from stay on screen until it delivers. Without
-  // the hold the list would flash its empty state and lose its scroll.
-  const [refreshHold, setRefreshHold] = useState<HistoryRow[] | null>(null);
-  const items = flatItems.length > 0 ? flatItems : (refreshHold ?? []);
+  // `reconcileFirstPage` keeps the retained pages until page one arrives, so
+  // the rows a refresh started from stay on screen (and scroll survives) even
+  // when the refetch is paused by lost connectivity or fails.
+  const items = flatItems;
   const hasListContent = items.length > 0 || query.isFetchNextPageError;
   // A query that is disabled never leaves `pending`; only a signed-in read can.
   const loading = authToken != null && query.isPending && !query.isError;
@@ -162,7 +161,6 @@ export function NotificationHistoryScreen() {
   const handleRefresh = () => {
     void (async () => {
       setRefreshing(true);
-      setRefreshHold(items);
       try {
         // A retained page is a keyset window that only stays contiguous with
         // the page above it while page one's newest row is unchanged. Rows that
@@ -178,19 +176,12 @@ export function NotificationHistoryScreen() {
           category: category ?? undefined,
           limit: PAGE_SIZE,
         });
-        reconcileFirstPage(queryClient, path);
-        await queryClient.refetchQueries(
-          { queryKey: key, type: 'active' },
-          // `cancelRefetch: false` awaits the page-one fetch the invalidate
-          // started instead of cancelling it and issuing a second one.
-          { cancelRefetch: false }
-        );
+        await reconcileFirstPage(queryClient, path);
         if (queryClient.getQueryState(key)?.status === 'error') {
           toast.error(t('common.couldNotRefresh'));
         }
       } finally {
         setRefreshing(false);
-        setRefreshHold(null);
       }
     })();
   };

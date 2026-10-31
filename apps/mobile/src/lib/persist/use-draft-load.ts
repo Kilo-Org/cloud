@@ -116,6 +116,11 @@ export function useFencedDraftLoad<T = string>({
 
 type UseRemoteSpawnDraftCleanupInput = {
   userId: string | undefined;
+  /**
+   * The repository draft keyed to the same form: a consumed spawn owns the
+   * target it started, so it must not seed the next visit either.
+   */
+  repositoryDraftKey?: string;
 };
 
 /**
@@ -138,7 +143,10 @@ type UseRemoteSpawnDraftCleanupInput = {
  * retry-while-on-screen contract holds — and the disarm makes the leave after
  * a failure behave like a normal leave instead of dropping the prompt.
  */
-export function useRemoteSpawnDraftCleanup({ userId }: UseRemoteSpawnDraftCleanupInput) {
+export function useRemoteSpawnDraftCleanup({
+  userId,
+  repositoryDraftKey,
+}: UseRemoteSpawnDraftCleanupInput) {
   const spawnAttemptedRef = useRef(false);
   const markRemoteSpawnAttempted = useCallback(() => {
     spawnAttemptedRef.current = true;
@@ -153,11 +161,14 @@ export function useRemoteSpawnDraftCleanup({ userId }: UseRemoteSpawnDraftCleanu
       }
       if (spawnAttemptedRef.current) {
         void clearDraft(userId, NEW_SESSION_DRAFT_KEY);
+        if (repositoryDraftKey) {
+          void clearDraft(userId, repositoryDraftKey);
+        }
       } else {
         void flushDraft(userId, NEW_SESSION_DRAFT_KEY);
       }
     },
-    [userId]
+    [repositoryDraftKey, userId]
   );
   return { markRemoteSpawnAttempted, markRemoteSpawnFailed };
 }

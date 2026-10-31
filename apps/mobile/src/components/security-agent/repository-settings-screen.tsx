@@ -13,6 +13,8 @@ import { toast } from 'sonner-native';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { EmptyState } from '@/components/empty-state';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { classifyListBody } from '@/lib/query/list-body-state';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
@@ -75,6 +77,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
   const save = useSaveSecurityAgentConfig(scope);
+  const connectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
 
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -183,10 +186,20 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const showRepositoryStates = mode === 'selected';
   const hasRepositories = (repositories.data?.length ?? 0) > 0;
   // A loading, failed, or not-yet-fetched repository query must not read as
-  // zero repositories. While an enabled query is paused (offline first load)
-  // it is neither loading nor errored and `data` is still undefined, which is
-  // not the settled "No repositories" state the Manage access CTA is for.
-  const repositoriesEmpty = repositories.data?.length === 0;
+  // zero repositories. Only a delivered read may claim the list is empty: a
+  // read paused by lost connectivity delivered nothing and names the
+  // connection with Retry instead.
+  const repositoriesBody = classifyListBody({
+    rowCount: repositories.data?.length ?? 0,
+    hasDeliveredData: repositories.data !== undefined,
+    isError: repositories.isError,
+    isFetching: repositories.isFetching,
+    fetchStatus: repositories.fetchStatus,
+    connectivityKnown,
+  });
+  const repositoriesFailed =
+    repositoriesBody.status === 'error' ||
+    (repositoriesBody.status === 'rows' && repositories.isError);
 
   // Everything above the rows (permission note, mode choice, and — in selected
   // mode — the loading / error / empty branches) rides on the list header so
@@ -220,22 +233,26 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
           <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
             {t('common.repositories')}
           </Text>
-          {repositories.isLoading && (
+          {repositoriesBody.status === 'loading' && (
             <View className="gap-3 pt-2">
               <Skeleton className="h-12 w-full rounded-lg" />
               <Skeleton className="h-12 w-full rounded-lg" />
             </View>
           )}
-          {repositories.isError && (
+          {repositoriesFailed && (
             <QueryError
-              variant="server"
+              variant={
+                repositoriesBody.status === 'error' && repositoriesBody.cause === 'offline'
+                  ? 'offline'
+                  : 'server'
+              }
               placement="top"
               title={t('common.couldNotLoadRepositories')}
               onRetry={() => void repositories.refetch()}
               isRetrying={repositories.isFetching}
             />
           )}
-          {!repositories.isLoading && !repositories.isError && repositoriesEmpty ? (
+          {repositoriesBody.status === 'empty' ? (
             <EmptyState
               placement="top"
               icon={FolderGit2}

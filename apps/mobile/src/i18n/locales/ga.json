@@ -163,7 +163,7 @@
     "allLanguages": "Gach teanga"
   },
   "login": {
-    "welcome": "Fáilte go Kilo",
+    "welcome": "Fáilte",
     "retrySignIn": "Bain triail as síniú isteach arís",
     "logo": "Lógó Kilo",
     "continuingSignIn": "Tá do shíniú isteach ag leanúint ar aghaidh.",
@@ -178,7 +178,7 @@
     "useDifferentEmail": "Úsáid seoladh ríomhphoist eile",
     "signInWithApple": "Sínigh isteach le Apple",
     "signInWithGoogle": "Sínigh isteach le Google",
-    "signInWithPasskey": "Sínigh isteach le heochair rochtana",
+    "signInWithPasskey": "Úsáid eochair rochtana",
     "emailAddress": "Seoladh ríomhphoist",
     "emailPlaceholder": "tusa@sampla.com",
     "continueWithEmail": "Lean ar aghaidh le ríomhphost",
@@ -729,6 +729,7 @@
       "gitlabDescription": "Ceangail do chuntas GitLab chun iarratais chumaisc a athbhreithniú ar an ngléas soghluaiste.",
       "bitbucketDescription": "Ceangail Bitbucket leis an eagraíocht seo chun iarratais tharraingthe a athbhreithniú ar an ngléas soghluaiste.",
       "bitbucketOrgOnlyDescription": "Athraigh an cuntas thuas go heagraíocht chun iarratais tharraingthe Bitbucket na heagraíochta sin a athbhreithniú.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Níl aon eagraíocht ag an gcuntas seo fós. Is féidir iarratais tharraingthe Bitbucket a athbhreithniú nuair a chruthaíonn tú eagraíocht nó nuair a thagann tú isteach i gceann acu.",
       "contextLine": "Do {{organization}}",
       "contextLinePersonal": "Do do chuntas pearsanta"
     },
@@ -755,10 +756,9 @@
     },
     "reconnectNotice": {
       "title": "Tá an nasc GitHub imithe in éag.",
-      "message": "Níl do nasc GitHub bailí a thuilleadh. Seiceáil do nasc arís — iarrfar ort athnascadh más gá.",
+      "message": "Seiceáil do nasc arís — iarrfar ort athnascadh más gá.",
       "gitlabTitle": "Tá an nasc GitLab imithe in éag.",
-      "bitbucketTitle": "Tá an nasc Bitbucket imithe in éag.",
-      "providerMessage": "Níl do nasc {{provider}} bailí a thuilleadh. Seiceáil do nasc arís — iarrfar ort athnascadh más gá."
+      "bitbucketTitle": "Tá an nasc Bitbucket imithe in éag."
     },
     "eventChips": {
       "comment": "Trácht",
@@ -872,7 +872,7 @@
     "terms": {
       "pullRequest": "Iarratas tarraingthe",
       "mergeRequest": "Iarratas cumaisc",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Iarratas cumaisc !{{number}}",
       "shareMergeRequest": "Comhroinn iarratas cumaisc",
       "viewOnProvider": "Amharc ar {{provider}}",
       "mergeRequestUnavailable": "Iarratas cumaisc gan fáil",
@@ -1495,7 +1495,10 @@
       "gitlabNoRepositoriesDescription": "Seans go mbeidh ort rochtain ar thuilleadh grúpaí nó tionscadal a thabhairt ar GitLab.",
       "installGithubApp": "Suiteáil an aip GitHub ar stórtha",
       "installGithubAppDescription": "Tabhair rochtain d'aip GitHub Kilo ar na stórtha ar mhaith leat go ndéanfaí athbhreithniú orthu.",
-      "repositoryAccess": "rochtain ar stórtha"
+      "repositoryAccess": "rochtain ar stórtha",
+      "allModePersonal": "Déantar athbhreithniú uathoibríoch ar gach stór a bhfuil rochtain ag Kilo air trí do nasc GitHub.",
+      "allModeOrganization": "Déantar athbhreithniú uathoibríoch ar gach stór a bhfuil rochtain ag Kilo air trí nasc GitHub na heagraíochta.",
+      "allModeCount": "Stórtha ar fáil: {{displayCount}}"
     },
     "style": {
       "title": "Stíl athbhreithnithe",
@@ -1594,6 +1597,7 @@
       "changeRequestNoGitHubAccess": "Níl aon nasc GitHub a bhfuil rochtain aige ar an stór seo. Athnasc GitHub le rochtain air, ansin bain triail eile as.",
       "changeRequestMissingPermissions": "Ní féidir le hAip GitHub Kilo iarratais tarraingthe a oscailt sa stór seo. Caithfidh úinéir an stóir rochtain scríofa ar ábhair agus ar iarratais tarraingthe a thabhairt don aip, ansin bain triail eile as.",
       "changeRequestFailed": "Níorbh fhéidir le Kilo an t-iarratas tarraingthe a oscailt. Bain triail eile as ar ball.",
+      "proposalConflict": "Tá togra cuimhne athbhreithnithe eile don stór céanna seo fós gníomhach, mar sin ní féidir an ceann seo a shábháil go fóill.",
       "offAction": "Tá cuimhne athbhreithnithe múchta. Cumasaigh í, ansin bain triail eile as."
     },
     "manualReview": {
@@ -1848,7 +1852,6 @@
       "notYetSynced": "Níl sé sioncronaithe fós",
       "refreshFailed": "Níorbh fhéidir na sonraí a athnuachan. Tá sonraí ón sioncronú deireanach á dtaispeáint.",
       "settings": "Socruithe",
-      "syncFindings": "Sioncronaigh torthaí",
       "syncNow": "Sioncronaigh anois",
       "syncQueued": "Sioncronú curtha sa scuaine",
       "syncStatusUnavailable": "Níl stádas an tsioncronaithe ar fáil.",
@@ -2048,7 +2051,6 @@
       "eventsCount_other": "{{displayCount}} imeachtaí",
       "generated": "Gineadh an tuarascáil: {{generatedAt}}.",
       "noActivity": "Níl aon ghníomhaíocht taifeadta",
-      "noActivityDescription": "Níl aon ghníomhaíocht maidir le torthaí slándála le tuairisciú ag Kilo ó {{start}} go dtí {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Stór gan taifeadadh",
       "reasonUnknown": "Cúis neamhaitheanta",
@@ -2244,7 +2246,7 @@
     "sessionList": {
       "couldNotLoadActive": "Níorbh fhéidir na seisiúin ghníomhacha a lódáil.",
       "couldNotRefresh": "Níorbh fhéidir athnuachan a dhéanamh",
-      "noSessionsYetDescription": "Tosaigh tasc códaithe ó do ghuthán. Beidh do sheisiúin le feiceáil anseo.",
+      "noSessionsYetDescription": "Tosaigh tasc códaithe ó do ghuthán.",
       "viewHistory": "Stair na seisiún",
       "noMatches": "Gan aon seisiún comhoiriúnach",
       "tryDifferentSearch": "Bain triail as téarma cuardaigh eile.",
@@ -2388,9 +2390,9 @@
       "couldNotLoadGithubRepositories": "Níorbh fhéidir stórtha GitHub a lódáil.",
       "couldNotLoadGitlabRepositories": "Níorbh fhéidir stórtha GitLab a lódáil.",
       "couldNotLoadBitbucketRepositories": "Níorbh fhéidir stórtha Bitbucket a lódáil.",
-      "connectGithubDescription": "Ceangail GitHub i do bhrabhsálaí, ansin fill anseo chun stór a roghnú.",
-      "connectGitlabDescription": "Ceangail GitLab i do bhrabhsálaí, ansin fill anseo chun stór a roghnú.",
-      "connectBitbucketDescription": "Ceangail Bitbucket i do bhrabhsálaí, ansin fill anseo chun stór a roghnú.",
+      "connectGithubDescription": "Logáil isteach ó do bhrabhsálaí, ansin fill anseo chun stór GitHub a roghnú.",
+      "connectGitlabDescription": "Logáil isteach ó do bhrabhsálaí, ansin fill anseo chun stór GitLab a roghnú.",
+      "connectBitbucketDescription": "Logáil isteach ó do bhrabhsálaí, ansin fill anseo chun stór Bitbucket a roghnú.",
       "openGithub": "Oscail GitHub",
       "openGitlab": "Oscail GitLab",
       "openBitbucket": "Oscail Bitbucket",
@@ -3999,8 +4001,6 @@
     "commandAtLimit": "Tá an t-ordú teoranta do {{max}} carachtar",
     "commandsEmpty": "Níl aon orduithe socraithe fós",
     "commandsSaveFailed": "Níorbh fhéidir na horduithe socraithe a shábháil",
-    "moveUp": "Bog suas",
-    "moveDown": "Bog síos",
     "moveCommandUp": "Bog ordú {{position}} suas",
     "moveCommandDown": "Bog ordú {{position}} síos",
     "skillsTitle": "Scileanna",
@@ -4009,9 +4009,13 @@
     "skillMarkdownLabel": "Ábhar scile",
     "skillsEmpty": "Gan scileanna fós",
     "skillNameRequired": "Cuir isteach ainm scile",
+    "skillNameTooLong": "Ní mór ainm scile a bheith {{max}} carachtar nó níos lú",
     "skillNameInvalid": "Ní mór tús a chur le hainm scile le litir nó le digit agus ní mór ach litreacha beaga, digití agus daiseanna a úsáid",
     "skillContentRequired": "Tá ábhar scile ag teastáil",
-    "skillSaveFailed": "Níorbh fhéidir an scil a shábháil",
+    "skillSaveFailed": "Níorbh fhéidir an scil a shábháil. Bain triail eile as.",
+    "skillDeleteFailed": "Níorbh fhéidir an scil a scriosadh. Bain triail eile as.",
+    "skillToggleFailed": "Níorbh fhéidir an scil a nuashonrú. Bain triail eile as.",
+    "skillLimitReached": "Is féidir le próifíl suas le {{max}} scil a choinneáil. Scrios ceann amháin chun scil eile a chur leis.",
     "skillSourceCustom": "Saincheaptha",
     "skillSourceMarketplace": "Margadh",
     "skillSourceSkillsSh": "skills.sh",

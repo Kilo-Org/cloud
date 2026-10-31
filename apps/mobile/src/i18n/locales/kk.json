@@ -163,7 +163,7 @@
     "allLanguages": "Барлық тілдер"
   },
   "login": {
-    "welcome": "Kilo-ға қош келдіңіз",
+    "welcome": "Қош келдіңіз",
     "retrySignIn": "Кіруді қайталау",
     "logo": "Kilo логотипі",
     "continuingSignIn": "Кіру жалғасуда.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Мобильдіде біріктіру сұрауларын қарау үшін GitLab тіркелгіңізді қосыңыз.",
       "bitbucketDescription": "Мобильдіде тарту сұрауларын қарау үшін Bitbucket-ты осы ұйымға қосыңыз.",
       "bitbucketOrgOnlyDescription": "Жоғарыдағы тіркелгіні ұйымға ауыстырыңыз, оның Bitbucket тарту сұрауларын қарау үшін.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Бұл тіркелгіде әзірге ешбір ұйым жоқ. Ұйым құрғаннан немесе оған қосылғаннан кейін Bitbucket тарту сұрауларын қарауға болады.",
       "contextLine": "{{organization}} үшін",
       "contextLinePersonal": "Жеке аккаунтыңыз үшін"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub қосылымының мерзімі аяқталды.",
-      "message": "GitHub қосылымыңыз енді жарамсыз. Қосылымды қайта тексеріңіз — қажет болса, қайта қосылу ұсынылады.",
+      "message": "Қосылымды қайта тексеріңіз — қажет болса, қайта қосылу ұсынылады.",
       "gitlabTitle": "GitLab қосылымының мерзімі аяқталды.",
-      "bitbucketTitle": "Bitbucket қосылымының мерзімі аяқталды.",
-      "providerMessage": "{{provider}} қосылымыңыз енді жарамсыз. Қосылымды қайта тексеріңіз — қажет болса, қайта қосылу ұсынылады."
+      "bitbucketTitle": "Bitbucket қосылымының мерзімі аяқталды."
     },
     "eventChips": {
       "comment": "Пікір жазу",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Біріктіру сұрауы",
       "mergeRequest": "Біріктіру сұрауы",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Біріктіру сұрауы !{{number}}",
       "shareMergeRequest": "Біріктіру сұрауымен бөлісу",
       "viewOnProvider": "{{provider}}-да қарау",
       "mergeRequestUnavailable": "Біріктіру сұрауы қолжетімсіз",
@@ -1429,7 +1429,10 @@
       "gitlabNoRepositoriesDescription": "GitLab-та қосымша топтарға немесе жобаларға кіруге рұқсат беру қажет болуы мүмкін.",
       "installGithubApp": "GitHub қолданбасын репозиторийлерге орнатыңыз",
       "installGithubAppDescription": "GitHub-тағы Kilo қолданбасына тексерілетін репозиторийлерге кіруге рұқсат беріңіз.",
-      "repositoryAccess": "репозиторийге кіру рұқсаты"
+      "repositoryAccess": "репозиторийге кіру рұқсаты",
+      "allModePersonal": "Kilo сіздің GitHub қосылымыңыз арқылы қол жеткізе алатын әрбір репозиторий автоматты түрде тексеріледі.",
+      "allModeOrganization": "Kilo ұйымның GitHub қосылымы арқылы қол жеткізе алатын әрбір репозиторий автоматты түрде тексеріледі.",
+      "allModeCount": "Қолжетімді репозиторийлер: {{displayCount}}"
     },
     "style": {
       "title": "Тексеру мәнері",
@@ -1528,6 +1531,7 @@
       "changeRequestNoGitHubAccess": "Бұл репозиторийге қатынай алатын GitHub байланысы жоқ. GitHub-ты осы репозиторийге қатынау құқығымен қайта қосып, қайталап көріңіз.",
       "changeRequestMissingPermissions": "Kilo-ның GitHub қолданбасы бұл репозиторийде pull request аша алмайды. Репозиторий иесі қолданбаға мазмұн мен pull request-терге жазу рұқсатын беруі керек, сосын қайталап көріңіз.",
       "changeRequestFailed": "Kilo pull request аша алмады. Сәлден соң қайталап көріңіз.",
+      "proposalConflict": "Осы репозиторий үшін тағы бір тексеру жады ұсынысы әлі белсенді, сондықтан оны әзірге сақтау мүмкін емес.",
       "offAction": "Тексеру жады өшірулі. Оны қосып, қайталап көріңіз."
     },
     "manualReview": {
@@ -1668,7 +1672,7 @@
       "outcome": "Нәтиже",
       "slaStatus": "SLA күйі",
       "sortBy": "Сұрыптау реті",
-      "statusOpen": "Ашу",
+      "statusOpen": "Ашық",
       "fixed": "Түзетілді",
       "statusIgnored": "Еленбеген",
       "severityHigh": "Жоғары",
@@ -1779,7 +1783,6 @@
       "notYetSynced": "Әзірге синхрондалмаған",
       "refreshFailed": "Жаңарту мүмкін болмады — соңғы синхрондалған деректер көрсетілуде.",
       "settings": "Параметрлер",
-      "syncFindings": "Мәселелерді синхрондау",
       "syncNow": "Қазір синхрондау",
       "syncQueued": "Синхрондау кезекке қойылды",
       "syncStatusUnavailable": "Синхрондау күйі қолжетімсіз.",
@@ -1842,7 +1845,7 @@
       "source": "Дереккөз",
       "sourceId": "Дереккөз идентификаторы",
       "viewAdvisory": "GitHub-тағы қауіпсіздік хабарламасын қарау",
-      "statusOpen": "Ашу",
+      "statusOpen": "Ашық",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "түзету басталып кетті",
       "reasonNoBandwidth": "бос ресурс жоқ",
@@ -1967,7 +1970,6 @@
       "eventsCount_other": "{{displayCount}} оқиға",
       "generated": "Жасалған уақыты: {{generatedAt}}.",
       "noActivity": "Тіркелген әрекет жоқ",
-      "noActivityDescription": "Kilo жүйесінде {{start}} – {{end}} аралығында қауіпсіздік мәселелері бойынша есепке енгізілетін әрекеттер жоқ.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Репозиторий тіркелмеген",
       "reasonUnknown": "Танылмаған себеп",
@@ -2157,7 +2159,7 @@
     "sessionList": {
       "couldNotLoadActive": "Белсенді сеанстарды жүктеу мүмкін болмады.",
       "couldNotRefresh": "Жаңарту мүмкін болмады",
-      "noSessionsYetDescription": "Телефоныңыздан код жазу тапсырмасын бастаңыз. Сеанстарыңыз осында көрсетіледі.",
+      "noSessionsYetDescription": "Телефоныңыздан код жазу тапсырмасын бастаңыз.",
       "viewHistory": "Сеанс тарихы",
       "noMatches": "Сәйкес сеанстар жоқ",
       "tryDifferentSearch": "Басқа іздеу сөзін қолданып көріңіз.",
@@ -2295,9 +2297,9 @@
       "couldNotLoadGithubRepositories": "GitHub репозиторийлерін жүктеу мүмкін болмады.",
       "couldNotLoadGitlabRepositories": "GitLab репозиторийлерін жүктеу мүмкін болмады.",
       "couldNotLoadBitbucketRepositories": "Bitbucket репозиторийлерін жүктеу мүмкін болмады.",
-      "connectGithubDescription": "Браузерде GitHub тіркелгісін байланыстырып, репозиторий таңдау үшін осында оралыңыз.",
-      "connectGitlabDescription": "Браузерде GitLab тіркелгісін байланыстырып, репозиторий таңдау үшін осында оралыңыз.",
-      "connectBitbucketDescription": "Браузерде Bitbucket тіркелгісін байланыстырып, репозиторий таңдау үшін осында оралыңыз.",
+      "connectGithubDescription": "Браузерден тіркелгіге кіріп, GitHub репозиторийін таңдау үшін осында оралыңыз.",
+      "connectGitlabDescription": "Браузерден тіркелгіге кіріп, GitLab репозиторийін таңдау үшін осында оралыңыз.",
+      "connectBitbucketDescription": "Браузерден тіркелгіге кіріп, Bitbucket репозиторийін таңдау үшін осында оралыңыз.",
       "openGithub": "GitHub-ты ашу",
       "openGitlab": "GitLab-ты ашу",
       "openBitbucket": "Bitbucket-ті ашу",
@@ -3849,8 +3851,6 @@
     "commandAtLimit": "Пәрмен {{max}} таңбамен шектелген",
     "commandsEmpty": "Орнату пәрмендері әлі жоқ",
     "commandsSaveFailed": "Орнату пәрмендерін сақтау мүмкін болмады",
-    "moveUp": "Жоғары жылжытыңыз",
-    "moveDown": "Төмен жылжытыңыз",
     "moveCommandUp": "{{position}} пәрменін жоғары жылжыту",
     "moveCommandDown": "{{position}} пәрменін төмен жылжыту",
     "skillsTitle": "Дағдылар",
@@ -3859,9 +3859,13 @@
     "skillMarkdownLabel": "Дағды мазмұны",
     "skillsEmpty": "Әзірге дағдылар жоқ",
     "skillNameRequired": "Дағды атын енгізіңіз",
+    "skillNameTooLong": "Дағды атауы {{max}} таңбадан аспауы керек",
     "skillNameInvalid": "Дағды атауы әріптен немесе цифрдан басталып, тек кіші әріптерді, сандарды және сызықшаларды пайдалануы керек.",
     "skillContentRequired": "Біліктілік мазмұны қажет",
-    "skillSaveFailed": "Шеберлікті сақтау мүмкін болмады",
+    "skillSaveFailed": "Шеберлікті сақтау мүмкін болмады. Қайталап көріңіз.",
+    "skillDeleteFailed": "Шеберлікті жою мүмкін болмады. Қайталап көріңіз.",
+    "skillToggleFailed": "Шеберлікті жаңарту мүмкін болмады. Қайталап көріңіз.",
+    "skillLimitReached": "Профиль {{max}} дағдыға дейін сақтай алады. Басқасын қосу үшін біреуін жойыңыз.",
     "skillSourceCustom": "Арнайы",
     "skillSourceMarketplace": "Market",
     "skillSourceSkillsSh": "skills.sh",

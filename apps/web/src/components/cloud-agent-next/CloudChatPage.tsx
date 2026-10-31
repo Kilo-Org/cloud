@@ -172,7 +172,8 @@ function findAnchorElement(
 }
 
 type CloudChatPageProps = {
-  currentUserId?: string;
+  /** The signed-in user: caches are partitioned by user, never shared. */
+  currentUserId: string;
   organizationId?: string;
   organizationName?: string;
   organizationRole?: OrganizationRole;
@@ -269,7 +270,11 @@ export default function CloudChatPage({
   const anchorMessageIdFromParams = searchParams?.get('at') ?? null;
   const { localSession, lastStartedSessionId } = useSessionSwitch(manager, sessionIdFromParams);
   // A known Cloud Agent chat (seeded by the server, or seen recently) skips the loading state.
-  const cachedPage = useCachedTranscriptPage(organizationId ?? null, sessionIdFromParams);
+  const cachedPage = useCachedTranscriptPage(
+    currentUserId,
+    organizationId ?? null,
+    sessionIdFromParams
+  );
   useEffect(() => {
     childSessionDrawerFocusTargetRef.current = null;
     setChildSessionStack([]);
@@ -1740,6 +1745,7 @@ export default function CloudChatPage({
   // Feedback context carries the session the server resolved for this route.
   const sessionActions = (
     <ChatHeader
+      currentUserId={currentUserId}
       cloudAgentSessionId={workspaceCloudSessionId ?? 'Starting session…'}
       changesCloudAgentSessionId={changesCloudSessionId ?? undefined}
       worktreeId={selectedWorktreeId ?? undefined}
@@ -2216,6 +2222,7 @@ export default function CloudChatPage({
                           <TabsContent key={tabId} value={tabId} className="m-0 min-h-0 flex-1">
                             {active && !changesViewOpen && (
                               <WorktreeFilePane
+                                userId={currentUserId}
                                 cloudAgentSessionId={changesCloudSessionId}
                                 organizationId={organizationId}
                                 worktreeId={selectedWorktreeId ?? undefined}
@@ -2238,6 +2245,7 @@ export default function CloudChatPage({
                   {canOpenChanges && changesCloudSessionId && (
                     <WorktreeChangesView
                       key={fileScope}
+                      userId={currentUserId}
                       cloudAgentSessionId={changesCloudSessionId}
                       organizationId={organizationId}
                       worktreeId={selectedWorktreeId ?? undefined}

@@ -163,7 +163,7 @@
     "allLanguages": "Ngā reo katoa"
   },
   "login": {
-    "welcome": "Nau mai ki Kilo",
+    "welcome": "Nau mai",
     "retrySignIn": "Whakamātau anō ki te takiuru",
     "logo": "Moko Kilo",
     "continuingSignIn": "Kei te haere tonu tō takiuru.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Honoa tō pūkete GitLab kia arotakehia ngā tono whakakotahi i te waea pūkoro.",
       "bitbucketDescription": "Honoa a Bitbucket ki tēnei whakahaere kia arotakehia ngā tono kume i te waea pūkoro.",
       "bitbucketOrgOnlyDescription": "Whakawhiti te pūkete kei runga ake nei ki tētahi whakahaere kia arotakehia ōna tono kume Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Kāore anake he whakahaere ō tēnei pūkete. Ka arotakehia ngā tono kume Bitbucket inā waihanga rānei koe i tētahi whakahaere, inā uru rānei koe ki tētahi.",
       "contextLine": "Mō {{organization}}",
       "contextLinePersonal": "Mō tō whaiaro"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Kua pau te wā o te hononga GitHub.",
-      "message": "Kua kore tō hononga GitHub e whai mana. Tirohia anō tō hononga — ka tonoa koe kia hono anō mēnā e hiahiatia ana.",
+      "message": "Tirohia anō tō hononga — ka tonoa koe kia hono anō mēnā e hiahiatia ana.",
       "gitlabTitle": "Kua pau te wā o te hononga GitLab.",
-      "bitbucketTitle": "Kua pau te wā o te hononga Bitbucket.",
-      "providerMessage": "Kua kore tō hononga {{provider}} e whai mana. Tirohia anō tō hononga — ka tonoa koe kia hono anō mēnā e hiahiatia ana."
+      "bitbucketTitle": "Kua pau te wā o te hononga Bitbucket."
     },
     "eventChips": {
       "comment": "Kōrero",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Tono kume",
       "mergeRequest": "Tono whakakotahi",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Tono whakakotahi !{{number}}",
       "shareMergeRequest": "Tohaina te tono whakakotahi",
       "viewOnProvider": "Tirohia i {{provider}}",
       "mergeRequestUnavailable": "Kāore i te wātea te tono whakakotahi",
@@ -1429,7 +1429,10 @@
       "gitlabNoRepositoriesDescription": "Me tuku pea koe i te whakaaetanga uru ki ētahi atu rōpū, kaupapa rānei i GitLab.",
       "installGithubApp": "Tāutahia te taupānga GitHub ki ngā pūranga",
       "installGithubAppDescription": "Tukua te taupānga GitHub a Kilo kia uru ki ngā pūranga e hiahia ana koe kia arotakehia.",
-      "repositoryAccess": "te uru ki ngā pūranga"
+      "repositoryAccess": "te uru ki ngā pūranga",
+      "allModePersonal": "Ka arotake aunoa a Kilo i ngā pūranga katoa ka taea e ia te uru atu mā tō hononga GitHub.",
+      "allModeOrganization": "Ka arotake aunoa a Kilo i ngā pūranga katoa ka taea e ia te uru atu mā te hononga GitHub o te rōpū.",
+      "allModeCount": "Ngā pūranga e wātea ana: {{displayCount}}"
     },
     "style": {
       "title": "Te āhua arotake",
@@ -1528,6 +1531,7 @@
       "changeRequestNoGitHubAccess": "Kāore he hononga GitHub e whai āheitanga ana ki tēnei pātaka. Hono anōtia a GitHub kia whai āheitanga ki a ia, kātahi ka whakamātauria anō.",
       "changeRequestMissingPermissions": "Kāore e taea e te GitHub App a Kilo te whakatuwhera PR i tēnei pātaka. Me hoatu e te kaipupuri o te pātaka te āheitanga tuhi ki ngā ihirangi me ngā PR, kātahi ka whakamātauria anō.",
       "changeRequestFailed": "Kāore i taea e Kilo te whakatuwhera i te PR. Whakamātauria anō ā te wā poto nei.",
+      "proposalConflict": "Kei te hohe tonu tētahi atu tono mahara arotake mō tēnei pātaka, nō reira kāore anō tēnei e taea te tiaki.",
       "offAction": "Kua monoa te mahara arotake. Whakahohea, kātahi ka whakamātauria anō."
     },
     "manualReview": {
@@ -1779,7 +1783,6 @@
       "notYetSynced": "Kāore anō kia tukutahitia",
       "refreshFailed": "Kāore i taea te tāmata — e whakaaturia ana ngā raraunga i tukutahitia whakamutungatia.",
       "settings": "Ngā tautuhinga",
-      "syncFindings": "Tukutahitia ngā kitenga",
       "syncNow": "Tukutahitia ināianei",
       "syncQueued": "Kua tāpirihia te tukutahi ki te tūtira.",
       "syncStatusUnavailable": "Kāore e wātea ana te tūnga tukutahi.",
@@ -1967,7 +1970,6 @@
       "eventsCount_other": "{{displayCount}} takahanga",
       "generated": "I hangaia i te {{generatedAt}}.",
       "noActivity": "Kāore he mahi i tuhia",
-      "noActivityDescription": "Kāore he mahi e pā ana ki ngā kitenga haumarutanga hei pūrongo mā Kilo mai i {{start}} ki {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Kāore i tuhia te pūranga",
       "reasonUnknown": "Te take kāore i te mōhiotia",
@@ -2157,7 +2159,7 @@
     "sessionList": {
       "couldNotLoadActive": "Kāore i taea te uta i ngā wātū e haere ana.",
       "couldNotRefresh": "Kāore i taea te whakahou",
-      "noSessionsYetDescription": "Tīmataria he mahi tuhi waehere i tō waea. Ka puta ō wātū ki konei.",
+      "noSessionsYetDescription": "Tīmataria he mahi tuhi waehere i tō waea.",
       "viewHistory": "Hītori wātū",
       "noMatches": "Kāore he wātū e hāngai ana",
       "tryDifferentSearch": "Whakamātauhia tētahi kupu rapu rerekē.",
@@ -2295,9 +2297,9 @@
       "couldNotLoadGithubRepositories": "Kāore i taea te uta i ngā putunga waehere GitHub.",
       "couldNotLoadGitlabRepositories": "Kāore i taea te uta i ngā putunga waehere GitLab.",
       "couldNotLoadBitbucketRepositories": "Kāore i taea te uta i ngā putunga waehere Bitbucket.",
-      "connectGithubDescription": "Honohia a GitHub mā tō pūtirotiro, kātahi ka hoki mai ki konei ki te kōwhiri i tētahi putunga waehere.",
-      "connectGitlabDescription": "Honohia a GitLab mā tō pūtirotiro, kātahi ka hoki mai ki konei ki te kōwhiri i tētahi putunga waehere.",
-      "connectBitbucketDescription": "Honohia a Bitbucket mā tō pūtirotiro, kātahi ka hoki mai ki konei ki te kōwhiri i tētahi putunga waehere.",
+      "connectGithubDescription": "Takiuru mā tō pūtirotiro, kātahi ka hoki mai ki konei ki te kōwhiri i tētahi putunga waehere GitHub.",
+      "connectGitlabDescription": "Takiuru mā tō pūtirotiro, kātahi ka hoki mai ki konei ki te kōwhiri i tētahi putunga waehere GitLab.",
+      "connectBitbucketDescription": "Takiuru mā tō pūtirotiro, kātahi ka hoki mai ki konei ki te kōwhiri i tētahi putunga waehere Bitbucket.",
       "openGithub": "Whakatuwheratia a GitHub",
       "openGitlab": "Whakatuwheratia a GitLab",
       "openBitbucket": "Whakatuwheratia a Bitbucket",
@@ -3849,8 +3851,6 @@
     "commandAtLimit": "Ka whakawhāitihia te whakahau ki te {{max}} pūāhua",
     "commandsEmpty": "Kare ano he tono tatūnga",
     "commandsSaveFailed": "Kāore i taea te tiaki i ngā tono tatūnga",
-    "moveUp": "Neke ki runga",
-    "moveDown": "Nuku ki raro",
     "moveCommandUp": "Neke whakahau {{position}} ki runga",
     "moveCommandDown": "Neke whakahau {{position}} ki raro",
     "skillsTitle": "Pukenga",
@@ -3859,9 +3859,13 @@
     "skillMarkdownLabel": "Te ihirangi pukenga",
     "skillsEmpty": "Kaore ano he pukenga",
     "skillNameRequired": "Whakauruhia he ingoa pukenga",
+    "skillNameTooLong": "Kia {{max}} pūāhua te roa o te ingoa pukenga, kaua e neke ake",
     "skillNameInvalid": "Me timata te ingoa pukenga ki te reta, mati ranei me te whakamahi i nga reta iti, mati, me nga tohu",
     "skillContentRequired": "Kei te hiahiatia nga ihirangi pukenga",
-    "skillSaveFailed": "Kaore i taea te penapena pukenga",
+    "skillSaveFailed": "Kaore i taea te penapena pukenga. Whakamātauria anō.",
+    "skillDeleteFailed": "Kaore i taea te muku pukenga. Whakamātauria anō.",
+    "skillToggleFailed": "Kaore i taea te whakahōu pukenga. Whakamātauria anō.",
+    "skillLimitReached": "Ka taea e tētahi kōtaha te pupuri tae atu ki te {{max}} pūkenga. Mukua tētahi kia tāpirihia ai tētahi atu.",
     "skillSourceCustom": "Whaiaro",
     "skillSourceMarketplace": "Mākete",
     "skillSourceSkillsSh": "skills.sh",

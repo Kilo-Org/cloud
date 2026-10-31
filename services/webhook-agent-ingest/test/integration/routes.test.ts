@@ -1,7 +1,10 @@
 import { SELF, env, runInDurableObject } from 'cloudflare:test';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { eq } from 'drizzle-orm';
 import { describe, it, expect } from 'vitest';
 import { encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
 import { MAX_PAYLOAD_SIZE } from '../../src/util/constants';
+import { triggerConfig } from '../../src/db/sqlite-schema';
 
 const STREAM_CHUNK_BYTES = 16 * 1024;
 
@@ -438,6 +441,47 @@ describe('Hono Routes', () => {
       await runInDurableObject(stub, async (_instance, state) => {
         expect(await state.storage.getAlarm()).not.toBeNull();
       });
+    });
+  });
+
+  describe('Stored body schema patterns', () => {
+    it('captures a body for a schema stored under the previous policy', async () => {
+      const userId = 'body-schema-user';
+      const triggerId = 'legacy-pattern';
+      const namespace = `user/${userId}`;
+      const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName(`${namespace}/${triggerId}`));
+      await stub.configure(namespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: '{{body}}',
+        bodySchema: { type: 'object', properties: { event: { type: 'string' } } },
+      });
+      await runInDurableObject(stub, async (_instance, state) => {
+        drizzle(state.storage)
+          .update(triggerConfig)
+          .set({
+            body_schema: {
+              type: 'object',
+              properties: { event: { type: 'string', pattern: '^(a+)+$' } },
+              required: ['event'],
+              additionalProperties: false,
+            },
+          })
+          .where(eq(triggerConfig.trigger_id, triggerId))
+          .run();
+      });
+
+      const started = Date.now();
+      const response = await SELF.fetch(`http://localhost/inbound/user/${userId}/${triggerId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event: `${'a'.repeat(40)}!` }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ success: true });
+      expect(Date.now() - started).toBeLessThan(5_000);
     });
   });
 });

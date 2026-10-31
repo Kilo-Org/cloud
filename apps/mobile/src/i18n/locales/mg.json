@@ -163,7 +163,7 @@
     "allLanguages": "Fiteny rehetra"
   },
   "login": {
-    "welcome": "Tongasoa eto amin'ny Kilo",
+    "welcome": "Tongasoa",
     "retrySignIn": "Andramo indray ny fidirana",
     "logo": "Famantarana ny Kilo",
     "continuingSignIn": "Mitohy ny fidiranao.",
@@ -178,7 +178,7 @@
     "useDifferentEmail": "Mampiasà adiresy mailaka hafa",
     "signInWithApple": "Midira amin'ny Apple",
     "signInWithGoogle": "Midira amin'ny Google",
-    "signInWithPasskey": "Midira amin'ny fanalahidin'ny fidirana",
+    "signInWithPasskey": "Mampiasa passkey",
     "emailAddress": "Adiresy mailaka",
     "emailPlaceholder": "ianao@example.com",
     "continueWithEmail": "Tohizo amin'ny mailaka",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Ampifandraiso ny kaonty GitLab-nao mba hijerena ny fangatahana fampiraisana amin'ny finday.",
       "bitbucketDescription": "Ampifandraiso amin'ity fikambanana ity ny Bitbucket mba hijerena ny fangatahana fampiraisana amin'ny finday.",
       "bitbucketOrgOnlyDescription": "Ampifandraiso amin'ny fikambanana ny kaonty etsy ambony mba hijerena ny fangatahana fampiraisana Bitbucket'ny.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Mbola tsy manana fikambanana ity kaonty ity. Azonao jerena ny fangatahana fampiraisana Bitbucket rehefa mamorona na miditra fikambanana.",
       "contextLine": "Ho an'ny {{organization}}",
       "contextLinePersonal": "Ho an'ny kaontinao manokana"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Lany daty ny fifandraisana amin'ny GitHub.",
-      "message": "Tsy manan-kery intsony ny fifandraisanao amin'ny GitHub. Hamarino indray izany — hasaina hampifandray indray ianao raha ilaina.",
+      "message": "Hamarino indray izany — hasaina hampifandray indray ianao raha ilaina.",
       "gitlabTitle": "Lany daty ny fifandraisana amin'ny GitLab.",
-      "bitbucketTitle": "Lany daty ny fifandraisana amin'ny Bitbucket.",
-      "providerMessage": "Tsy manan-kery intsony ny fifandraisanao amin'ny {{provider}}. Hamarino indray izany — hasaina hampifandray indray ianao raha ilaina."
+      "bitbucketTitle": "Lany daty ny fifandraisana amin'ny Bitbucket."
     },
     "eventChips": {
       "comment": "Fanehoan-kevitra",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Fangatahana fampiraisana",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Fangatahana fampiraisana !{{number}}",
       "shareMergeRequest": "Zarao ny fangatahana fampiraisana",
       "viewOnProvider": "Jereo amin'ny {{provider}}",
       "mergeRequestUnavailable": "Tsy azo sokafana ny fangatahana fampiraisana",
@@ -1429,7 +1429,10 @@
       "gitlabNoRepositoriesDescription": "Mety mila manome alalana hidirana amin'ny vondrona na tetikasa fanampiny ao amin'ny GitLab ianao.",
       "installGithubApp": "Apetraho amin'ny tahirin-kaody ny rindranasa GitHub",
       "installGithubAppDescription": "Omeo alalana hiditra amin'ny tahirin-kaody tianao hohamarinina ny rindranasa Kilo ao amin'ny GitHub.",
-      "repositoryAccess": "alalana hidirana amin'ny tahirin-kaody"
+      "repositoryAccess": "alalana hidirana amin'ny tahirin-kaody",
+      "allModePersonal": "Hamarinina ho azy ny tahirin-kaody rehetra azon'ny Kilo idirana amin'ny alalan'ny fifandraisanao amin'ny GitHub.",
+      "allModeOrganization": "Hamarinina ho azy ny tahirin-kaody rehetra azon'ny Kilo idirana amin'ny alalan'ny fifandraisan'ny fikambanana amin'ny GitHub.",
+      "allModeCount": "Tahirin-kaody azo: {{displayCount}}"
     },
     "style": {
       "title": "Fomba fandinihana",
@@ -1528,6 +1531,7 @@
       "changeRequestNoGitHubAccess": "Tsy misy fifandraisana GitHub manana fidirana amin'ity repositera ity. Avereno ampifandraisina amin'ny GitHub manana fidirana aminy, dia andramo indray.",
       "changeRequestMissingPermissions": "Tsy afaka manokatra PR ao amin'ity repositera ity ny GitHub App an'i Kilo. Tsy maintsy omen'ny tompon'ny repositera ny zo hanoratra amin'ny votoaty sy amin'ny PR ny app, dia andramo indray.",
       "changeRequestFailed": "Tsy nety nosokafan'i Kilo ny PR. Andramo indray afaka kelikely.",
+      "proposalConflict": "Mbola mavitrika ny soso-kevitra iray hafa ho an'ity repositera ity, ka tsy mbola azo tehirizina ity iray ity.",
       "offAction": "Tsy mandeha ny fitadidiana ny fanamarinana. Alefaso izany, dia andramo indray."
     },
     "manualReview": {
@@ -1779,7 +1783,6 @@
       "notYetSynced": "Mbola tsy nampifanarahana",
       "refreshFailed": "Tsy nety nohavaozina ny angona. Ny angona tamin'ny fampifanarahana farany no aseho.",
       "settings": "Fikirana",
-      "syncFindings": "Ampifanaraho ny angon'ny olana hita",
       "syncNow": "Ampifanaraho izao",
       "syncQueued": "Voalahatra ny fampifanarahana",
       "syncStatusUnavailable": "Tsy azo jerena ny satan'ny fampifanarahana.",
@@ -1967,7 +1970,6 @@
       "eventsCount_other": "{{displayCount}} Zava-nitranga",
       "generated": "Noforonina tamin'ny {{generatedAt}}.",
       "noActivity": "Tsy misy asa voarakitra",
-      "noActivityDescription": "Tsy manana asa momba ny olana hita amin'ny fiarovana azo ampidirina anaty tatitra i Kilo, nanomboka ny {{start}} ka hatramin'ny {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Tsy voarakitra ny tahirin-kaody",
       "reasonUnknown": "Antony tsy fantatra",
@@ -2157,7 +2159,7 @@
     "sessionList": {
       "couldNotLoadActive": "Tsy tafiditra ny fotoam-piasana mandeha.",
       "couldNotRefresh": "Tsy vita ny fanavaozana",
-      "noSessionsYetDescription": "Manomboha asa fanoratana kaody amin'ny findainao. Hiseho eto ny fotoam-piasanao.",
+      "noSessionsYetDescription": "Manomboha asa fanoratana kaody amin'ny findainao.",
       "viewHistory": "Tantaran'ny fotoam-piasana",
       "noMatches": "Tsy misy fotoam-piasana mifanaraka",
       "tryDifferentSearch": "Andramo ny teny fikarohana hafa.",
@@ -2295,9 +2297,9 @@
       "couldNotLoadGithubRepositories": "Tsy voaray ny tahirin-kaody ao amin'ny GitHub.",
       "couldNotLoadGitlabRepositories": "Tsy voaray ny tahirin-kaody ao amin'ny GitLab.",
       "couldNotLoadBitbucketRepositories": "Tsy voaray ny tahirin-kaody ao amin'ny Bitbucket.",
-      "connectGithubDescription": "Ampifandraiso ny GitHub ao amin'ny mpitety tranonkalanao, dia miverena eto hisafidy tahirin-kaody.",
-      "connectGitlabDescription": "Ampifandraiso ny GitLab ao amin'ny mpitety tranonkalanao, dia miverena eto hisafidy tahirin-kaody.",
-      "connectBitbucketDescription": "Ampifandraiso ny Bitbucket ao amin'ny mpitety tranonkalanao, dia miverena eto hisafidy tahirin-kaody.",
+      "connectGithubDescription": "Hidio ao amin'ny mpitety tranonkalanao, dia miverena eto hisafidy tahirin-kaody GitHub.",
+      "connectGitlabDescription": "Hidio ao amin'ny mpitety tranonkalanao, dia miverena eto hisafidy tahirin-kaody GitLab.",
+      "connectBitbucketDescription": "Hidio ao amin'ny mpitety tranonkalanao, dia miverena eto hisafidy tahirin-kaody Bitbucket.",
       "openGithub": "Sokafy ny GitHub",
       "openGitlab": "Sokafy ny GitLab",
       "openBitbucket": "Sokafy ny Bitbucket",
@@ -3849,8 +3851,6 @@
     "commandAtLimit": "Ny baiko dia voafetra ho {{max}} tarehintsoratra",
     "commandsEmpty": "Tsy mbola misy baiko fanamboarana",
     "commandsSaveFailed": "Tsy afaka mitahiry baiko fanamboarana",
-    "moveUp": "Miakatra",
-    "moveDown": "Mandrosoa midina",
     "moveCommandUp": "Afindra baiko {{position}} miakatra",
     "moveCommandDown": "Afindra baiko {{position}} midina",
     "skillsTitle": "fahaiza-manao",
@@ -3859,9 +3859,13 @@
     "skillMarkdownLabel": "Votoatin'ny fahaiza-manao",
     "skillsEmpty": "Tsy mbola misy fahaizana",
     "skillNameRequired": "Ampidiro anarana fahaizana",
+    "skillNameTooLong": "Ny anaran'ny fahaiza-manao dia tsy maintsy {{max}} tarehimarika na latsaka",
     "skillNameInvalid": "Ny anaran'ny fahaiza-manao dia tsy maintsy manomboka amin'ny litera na tarehimarika ary tsy mampiasa afa-tsy litera kely, isa ary tsipiho",
     "skillContentRequired": "Ilaina ny votoatin'ny fahaiza-manao",
-    "skillSaveFailed": "Tsy nahavonjy fahaizana",
+    "skillSaveFailed": "Tsy nahavonjy fahaizana. Andramo indray.",
+    "skillDeleteFailed": "Tsy afaka namafa fahaizana. Andramo indray.",
+    "skillToggleFailed": "Tsy afaka nanavao fahaizana. Andramo indray.",
+    "skillLimitReached": "Ny mombamomba dia afaka mitazona fahaiza-manao hatramin'ny {{max}}. Fafao ny iray mba hampiana iray hafa.",
     "skillSourceCustom": "Namboarinao",
     "skillSourceMarketplace": "Tsena",
     "skillSourceSkillsSh": "skills.sh",

@@ -163,7 +163,7 @@
     "allLanguages": "Tots els idiomes"
   },
   "login": {
-    "welcome": "Et donem la benvinguda a Kilo",
+    "welcome": "Et donem la benvinguda",
     "retrySignIn": "Torna a iniciar la sessió",
     "logo": "Logotip de Kilo",
     "continuingSignIn": "S'està continuant l'inici de sessió.",
@@ -178,7 +178,7 @@
     "useDifferentEmail": "Utilitza una altra adreça de correu",
     "signInWithApple": "Inicia la sessió amb Apple",
     "signInWithGoogle": "Inicia la sessió amb Google",
-    "signInWithPasskey": "Inicia la sessió amb una clau d'accés",
+    "signInWithPasskey": "Usar clau d'accés",
     "emailAddress": "Adreça de correu electrònic",
     "emailPlaceholder": "nom@example.com",
     "continueWithEmail": "Continua amb el correu electrònic",
@@ -699,6 +699,7 @@
       "gitlabDescription": "Connecta el teu compte de GitLab per revisar sol·licituds de fusió des del mòbil.",
       "bitbucketDescription": "Connecta Bitbucket a aquesta organització per revisar sol·licituds d'integració des del mòbil.",
       "bitbucketOrgOnlyDescription": "Canvia el compte de dalt a una organització per revisar-ne les sol·licituds d'integració a Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Aquest compte encara no té cap organització. Les sol·licituds d'integració de Bitbucket es poden revisar quan creeu o us uniu a una organització.",
       "contextLine": "Per a {{organization}}",
       "contextLinePersonal": "Per a ús personal"
     },
@@ -723,10 +724,9 @@
     },
     "reconnectNotice": {
       "title": "La connexió amb GitHub ha caducat.",
-      "message": "La teva connexió amb GitHub ja no és vàlida. Torna a comprovar-la. Si cal, se't demanarà que et tornis a connectar.",
+      "message": "Torna a comprovar-la. Si cal, se't demanarà que et tornis a connectar.",
       "gitlabTitle": "La connexió amb GitLab ha caducat.",
-      "bitbucketTitle": "La connexió amb Bitbucket ha caducat.",
-      "providerMessage": "La teva connexió amb {{provider}} ja no és vàlida. Torna a comprovar-la. Si cal, se't demanarà que et tornis a connectar."
+      "bitbucketTitle": "La connexió amb Bitbucket ha caducat."
     },
     "eventChips": {
       "comment": "Comentari",
@@ -834,7 +834,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Sol·licitud de fusió",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Sol·licitud de fusió !{{number}}",
       "shareMergeRequest": "Comparteix la sol·licitud de fusió",
       "viewOnProvider": "Mostra-ho a {{provider}}",
       "mergeRequestUnavailable": "Sol·licitud de fusió no disponible",
@@ -1451,7 +1451,10 @@
       "gitlabNoRepositoriesDescription": "Pot ser que hagis de concedir accés a més grups o projectes a GitLab.",
       "installGithubApp": "Instal·la l'aplicació de GitHub als repositoris",
       "installGithubAppDescription": "Concedeix a l'aplicació de GitHub de Kilo accés als repositoris que vols revisar.",
-      "repositoryAccess": "accés als repositoris"
+      "repositoryAccess": "accés als repositoris",
+      "allModePersonal": "Tots els repositoris als quals Kilo pot accedir a través de la teva connexió de GitHub es revisen automàticament.",
+      "allModeOrganization": "Tots els repositoris als quals Kilo pot accedir a través de la connexió de GitHub de l'organització es revisen automàticament.",
+      "allModeCount": "Repositoris disponibles: {{displayCount}}"
     },
     "style": {
       "title": "Estil de revisió",
@@ -1550,6 +1553,7 @@
       "changeRequestNoGitHubAccess": "Cap connexió de GitHub té accés a aquest repositori. Torna a connectar GitHub amb accés a aquest repositori i torna-ho a provar.",
       "changeRequestMissingPermissions": "L'aplicació GitHub de Kilo no pot obrir pull requests en aquest repositori. Un propietari del repositori ha de donar a l'aplicació accés d'escriptura als continguts i a les pull requests, i després tornar-ho a provar.",
       "changeRequestFailed": "Kilo no ha pogut obrir la pull request. Torna-ho a provar d'aquí a un moment.",
+      "proposalConflict": "Una altra proposta de memòria de revisió per a aquest repositori encara està activa, de manera que aquesta encara no es pot desar.",
       "offAction": "La memòria de revisió està desactivada. Activa-la i torna-ho a provar."
     },
     "manualReview": {
@@ -1690,7 +1694,7 @@
       "outcome": "Resultat",
       "slaStatus": "Estat de l'SLA",
       "sortBy": "Criteri d'ordenació",
-      "statusOpen": "Obertura",
+      "statusOpen": "Oberta",
       "fixed": "Corregit",
       "statusIgnored": "Ignorada",
       "severityHigh": "Alt",
@@ -1802,7 +1806,6 @@
       "notYetSynced": "Encara no sincronitzat",
       "refreshFailed": "No s'ha pogut actualitzar; es mostren les últimes dades sincronitzades.",
       "settings": "Configuració",
-      "syncFindings": "Sincronitza les incidències",
       "syncNow": "Sincronitza ara",
       "syncQueued": "Sincronització en cua",
       "syncStatusUnavailable": "L'estat de la sincronització no està disponible.",
@@ -1867,7 +1870,7 @@
       "source": "Origen",
       "sourceId": "ID d'origen",
       "viewAdvisory": "Consulta l'avís a GitHub",
-      "statusOpen": "Obertura",
+      "statusOpen": "Oberta",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "la correcció ja està en curs",
       "reasonNoBandwidth": "no hi ha recursos disponibles",
@@ -1994,7 +1997,6 @@
       "eventsCount_other": "{{displayCount}} esdeveniments",
       "generated": "L'informe s'ha generat el {{generatedAt}}.",
       "noActivity": "Cap activitat registrada",
-      "noActivityDescription": "Kilo no té activitat d'incidències de seguretat per incloure a l'informe del període de {{start}} a {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repositori no registrat",
       "reasonUnknown": "Motiu no reconegut",
@@ -2186,7 +2188,7 @@
     "sessionList": {
       "couldNotLoadActive": "No s'han pogut carregar les sessions actives.",
       "couldNotRefresh": "No s'ha pogut actualitzar",
-      "noSessionsYetDescription": "Inicia una tasca de programació des del mòbil. Les teves sessions apareixeran aquí.",
+      "noSessionsYetDescription": "Inicia una tasca de programació des del mòbil.",
       "viewHistory": "Historial de sessions",
       "noMatches": "Cap sessió coincideix amb la cerca",
       "tryDifferentSearch": "Prova un altre terme de cerca.",
@@ -2326,9 +2328,9 @@
       "couldNotLoadGithubRepositories": "No s'han pogut carregar els repositoris de GitHub.",
       "couldNotLoadGitlabRepositories": "No s'han pogut carregar els repositoris de GitLab.",
       "couldNotLoadBitbucketRepositories": "No s'han pogut carregar els repositoris de Bitbucket.",
-      "connectGithubDescription": "Connecta GitHub al navegador i torna aquí per triar un repositori.",
-      "connectGitlabDescription": "Connecta GitLab al navegador i torna aquí per triar un repositori.",
-      "connectBitbucketDescription": "Connecta Bitbucket al navegador i torna aquí per triar un repositori.",
+      "connectGithubDescription": "Inicia la sessió des del navegador i torna aquí per triar un repositori de GitHub.",
+      "connectGitlabDescription": "Inicia la sessió des del navegador i torna aquí per triar un repositori de GitLab.",
+      "connectBitbucketDescription": "Inicia la sessió des del navegador i torna aquí per triar un repositori de Bitbucket.",
       "openGithub": "Obre GitHub",
       "openGitlab": "Obre GitLab",
       "openBitbucket": "Obre Bitbucket",
@@ -3899,8 +3901,6 @@
     "commandAtLimit": "El comandament està limitat a {{max}} caràcters",
     "commandsEmpty": "Encara no hi ha ordres de configuració",
     "commandsSaveFailed": "No s'han pogut desar les ordres de configuració",
-    "moveUp": "Mou cap amunt",
-    "moveDown": "Mou cap avall",
     "moveCommandUp": "Mou l'ordre {{position}} amunt",
     "moveCommandDown": "Mou l'ordre {{position}} avall",
     "skillsTitle": "Habilitats",
@@ -3909,9 +3909,13 @@
     "skillMarkdownLabel": "Contingut d'habilitat",
     "skillsEmpty": "Encara no hi ha habilitats",
     "skillNameRequired": "Introduïu un nom d'habilitat",
+    "skillNameTooLong": "El nom de l'habilitat ha de tenir {{max}} caràcters o menys",
     "skillNameInvalid": "El nom de l'habilitat ha de començar amb una lletra o un dígit i utilitzar només lletres minúscules, dígits i guions",
     "skillContentRequired": "Es requereix contingut d'habilitat",
-    "skillSaveFailed": "No s'ha pogut estalviar l'habilitat",
+    "skillSaveFailed": "No s'ha pogut desar l'habilitat. Torna-ho a provar.",
+    "skillDeleteFailed": "No s'ha pogut eliminar l'habilitat. Torna-ho a provar.",
+    "skillToggleFailed": "No s'ha pogut actualitzar l'habilitat. Torna-ho a provar.",
+    "skillLimitReached": "Un perfil pot tenir fins a {{max}} habilitats. Elimina'n una per afegir-ne una altra.",
     "skillSourceCustom": "Personalitzada",
     "skillSourceMarketplace": "Mercat",
     "skillSourceSkillsSh": "skills.sh",

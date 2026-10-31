@@ -94,12 +94,14 @@ function ChangeLineCounts({
 }
 
 export function WorktreeChangesButton({
+  userId,
   cloudAgentSessionId,
   organizationId,
   worktreeId,
   open,
   onToggle,
 }: {
+  userId: string;
   cloudAgentSessionId: string;
   organizationId?: string;
   worktreeId?: string;
@@ -110,6 +112,7 @@ export function WorktreeChangesButton({
   const refreshSignal = useAtomValue(manager.atoms.worktreeChangesRefresh);
   const queryClient = useQueryClient();
   const { saved, queryKey } = useSavedWorktreeChanges({
+    userId,
     cloudAgentSessionId,
     organizationId,
     worktreeId,
@@ -178,6 +181,7 @@ export function WorktreeChangesButton({
 }
 
 export function WorktreeChangesView({
+  userId,
   cloudAgentSessionId,
   organizationId,
   worktreeId,
@@ -186,6 +190,7 @@ export function WorktreeChangesView({
   review,
   reviewScope,
 }: {
+  userId: string;
   cloudAgentSessionId: string;
   organizationId?: string;
   worktreeId?: string;
@@ -201,6 +206,7 @@ export function WorktreeChangesView({
   );
   const activeTabRef = useRef<HTMLButtonElement>(null);
   const { saved } = useSavedWorktreeChanges({
+    userId,
     cloudAgentSessionId,
     organizationId,
     worktreeId,
@@ -246,6 +252,7 @@ export function WorktreeChangesView({
         style={{ '--worktree-list-width': `${listWidth}px` } as CSSProperties}
       >
         <WorktreeChanges
+          userId={userId}
           cloudAgentSessionId={cloudAgentSessionId}
           organizationId={organizationId}
           worktreeId={worktreeId}
@@ -285,6 +292,7 @@ export function WorktreeChangesView({
         <div className="min-h-0 flex-1">
           {selectedFile ? (
             <WorktreeFilePane
+              userId={userId}
               cloudAgentSessionId={cloudAgentSessionId}
               organizationId={organizationId}
               worktreeId={worktreeId}
@@ -416,6 +424,7 @@ function ChangedFileTree({
 }
 
 function WorktreeChanges({
+  userId,
   cloudAgentSessionId,
   organizationId,
   worktreeId,
@@ -427,6 +436,7 @@ function WorktreeChanges({
   activeTabRef,
   commentCounts,
 }: {
+  userId: string;
   cloudAgentSessionId: string;
   organizationId?: string;
   worktreeId?: string;
@@ -441,6 +451,7 @@ function WorktreeChanges({
   const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
   const { saved, queryKey } = useSavedWorktreeChanges({
+    userId,
     cloudAgentSessionId,
     organizationId,
     worktreeId,

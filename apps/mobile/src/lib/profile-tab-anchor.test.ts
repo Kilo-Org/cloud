@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from './finding-detail-back';
 import { getSecurityAgentPath } from './security-agent';
+import { type TabPressAction } from './tab-press';
 import { profileTabPressListeners } from './tab-press-listeners';
 import { __resetTabSwitchInputForTests } from './tab-switch-input-gate';
 
@@ -86,9 +87,15 @@ describe('profile tab press', () => {
   // The re-press resets through the shared plan (`planProfileTabPress`), which
   // dispatches a targeted stack pop so the unsaved-changes guard can intercept
   // it; a cross-tab press and a form-sheet leaf are left to the navigator, which
-  // keeps the tab's stack.
+  // keeps the tab's stack. Every press also selects its own tab (`JUMP_TO`), so
+  // a press the bar's render still calls focused is not dropped.
   const PROFILE_SEGMENTS = ['(app)', '(tabs)', '(3_profile)'];
   const HOME_SEGMENTS = ['(app)', '(tabs)', '(0_home)'];
+  const PROFILE_ROUTE = { name: '(3_profile)' };
+  const JUMP_TO_PROFILE = {
+    type: 'JUMP_TO',
+    payload: { name: '(3_profile)', params: undefined },
+  };
 
   function pressProfileTab({
     segments,
@@ -96,7 +103,7 @@ describe('profile tab press', () => {
     stackIndex = 0,
   }: Readonly<{ segments: string[]; stackKey?: string; stackIndex?: number }>) {
     const preventDefault = vi.fn<() => void>();
-    const dispatch = vi.fn<(action: { type: string; target?: string }) => void>();
+    const dispatch = vi.fn<(action: TabPressAction) => void>();
 
     profileTabPressListeners(segments)({
       navigation: {
@@ -106,6 +113,7 @@ describe('profile tab press', () => {
         }),
         dispatch,
       },
+      route: PROFILE_ROUTE,
     }).tabPress({ preventDefault });
 
     return { preventDefault, dispatch };
@@ -115,21 +123,21 @@ describe('profile tab press', () => {
     __resetTabSwitchInputForTests();
   });
 
-  it('leaves a cross-tab press to the navigator so the tab keeps its stack', () => {
+  it('selects the profile tab on a cross-tab press and leaves its stack to the navigator', () => {
     const { preventDefault, dispatch } = pressProfileTab({
       segments: HOME_SEGMENTS,
       stackIndex: 2,
     });
 
     expect(preventDefault).not.toHaveBeenCalled();
-    expect(dispatch).not.toHaveBeenCalled();
+    expect(dispatch.mock.calls).toEqual([[JUMP_TO_PROFILE]]);
   });
 
-  it('leaves a re-press at the profile root to the navigator', () => {
+  it('selects the profile tab on a re-press at the profile root', () => {
     const { preventDefault, dispatch } = pressProfileTab({ segments: PROFILE_SEGMENTS });
 
     expect(preventDefault).not.toHaveBeenCalled();
-    expect(dispatch).not.toHaveBeenCalled();
+    expect(dispatch.mock.calls).toEqual([[JUMP_TO_PROFILE]]);
   });
 
   it('pops back to the profile root from a screen above it', () => {
@@ -139,6 +147,9 @@ describe('profile tab press', () => {
     });
 
     expect(preventDefault).toHaveBeenCalledTimes(1);
-    expect(dispatch).toHaveBeenCalledWith({ type: 'POP_TO_TOP', target: 'profile-stack' });
+    expect(dispatch.mock.calls).toEqual([
+      [JUMP_TO_PROFILE],
+      [{ type: 'POP_TO_TOP', target: 'profile-stack' }],
+    ]);
   });
 });

@@ -163,7 +163,7 @@
     "allLanguages": "Semua bahasa"
   },
   "login": {
-    "welcome": "Selamat datang di Kilo",
+    "welcome": "Selamat datang",
     "retrySignIn": "Coba masuk lagi",
     "logo": "Logo Kilo",
     "continuingSignIn": "Melanjutkan proses masuk.",
@@ -900,7 +900,10 @@
       "gitlabNoRepositoriesDescription": "Kamu mungkin perlu memberikan akses ke lebih banyak grup atau proyek di GitLab.",
       "installGithubApp": "Pasang aplikasi GitHub di repositori",
       "installGithubAppDescription": "Izinkan aplikasi GitHub Kilo mengakses repositori yang ingin kamu tinjau.",
-      "repositoryAccess": "akses repositori"
+      "repositoryAccess": "akses repositori",
+      "allModePersonal": "Setiap repositori yang dapat diakses Kilo melalui koneksi GitHub kamu akan ditinjau secara otomatis.",
+      "allModeOrganization": "Setiap repositori yang dapat diakses Kilo melalui koneksi GitHub organisasi akan ditinjau secara otomatis.",
+      "allModeCount": "Repositori yang tersedia: {{displayCount}}"
     },
     "style": {
       "title": "Gaya tinjauan",
@@ -1053,6 +1056,7 @@
       "changeRequestNoGitHubAccess": "Tidak ada koneksi GitHub yang memiliki akses ke repositori ini. Hubungkan ulang GitHub dengan akses ke repositori ini, lalu coba lagi.",
       "changeRequestMissingPermissions": "Aplikasi GitHub milik Kilo tidak dapat membuka pull request di repositori ini. Pemilik repositori harus memberikan akses tulis aplikasi ke konten dan pull request, lalu coba lagi.",
       "changeRequestFailed": "Kilo tidak dapat membuka pull request. Coba lagi sebentar.",
+      "proposalConflict": "Usulan memori tinjauan lain untuk repositori ini masih aktif, jadi usulan ini belum dapat disimpan.",
       "offAction": "Memori tinjauan nonaktif. Aktifkan, lalu coba lagi.",
       "off": "Memori tinjauan nonaktif.",
       "on": "Memori tinjauan aktif.",
@@ -1149,7 +1153,7 @@
       "sortSeverityDesc": "Keparahan: tertinggi ke terendah",
       "sortSlaDue": "Tanggal jatuh tempo SLA",
       "statusIgnored": "Diabaikan",
-      "statusOpen": "Buka"
+      "statusOpen": "Terbuka"
     },
     "analysis": {
       "analyzeRepository": "Analisis repositori",
@@ -1205,7 +1209,6 @@
       "eventsCount_other": "{{displayCount}} peristiwa",
       "generated": "Laporan dibuat pada {{generatedAt}}.",
       "noActivity": "Tidak ada aktivitas yang tercatat",
-      "noActivityDescription": "Tidak ada aktivitas temuan keamanan di Kilo yang dapat dilaporkan dari {{start}} hingga {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Kueri laporan tidak selesai. Coba lagi.",
       "repositoryNotRecorded": "Repositori tidak tercatat",
@@ -1300,7 +1303,6 @@
       "repositoryActionPlan": "Rencana tindakan repositori",
       "settings": "Pengaturan",
       "slaPosture": "Kondisi kepatuhan SLA",
-      "syncFindings": "Sinkronkan temuan",
       "syncNow": "Sinkronkan sekarang",
       "syncQueued": "Sinkronisasi diantrekan",
       "syncStatusUnavailable": "Status sinkronisasi tidak tersedia.",
@@ -1369,7 +1371,7 @@
       "supersededByDescription": "Ketuk untuk membuka catatan terbaru dan melihat status, analisis, serta perbaikannya.",
       "viewAdvisory": "Lihat pemberitahuan keamanan di GitHub",
       "vulnerableVersions": "Versi rentan",
-      "statusOpen": "Buka",
+      "statusOpen": "Terbuka",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "perbaikan sudah dimulai",
       "reasonNoBandwidth": "tidak ada kapasitas untuk menangani",
@@ -1628,7 +1630,7 @@
     "sessionList": {
       "couldNotLoadActive": "Tidak dapat memuat sesi aktif.",
       "couldNotRefresh": "Tidak dapat memuat ulang",
-      "noSessionsYetDescription": "Mulai tugas pemrograman dari ponselmu. Sesimu akan muncul di sini.",
+      "noSessionsYetDescription": "Mulai tugas pemrograman dari ponselmu.",
       "viewHistory": "Riwayat sesi",
       "noMatches": "Tidak ada sesi yang cocok",
       "tryDifferentSearch": "Coba kata kunci lain.",
@@ -1766,9 +1768,9 @@
       "couldNotLoadGithubRepositories": "Tidak dapat memuat repositori GitHub.",
       "couldNotLoadGitlabRepositories": "Tidak dapat memuat repositori GitLab.",
       "couldNotLoadBitbucketRepositories": "Tidak dapat memuat repositori Bitbucket.",
-      "connectGithubDescription": "Hubungkan GitHub melalui peramban, lalu kembali ke sini untuk memilih repositori.",
-      "connectGitlabDescription": "Hubungkan GitLab melalui peramban, lalu kembali ke sini untuk memilih repositori.",
-      "connectBitbucketDescription": "Hubungkan Bitbucket melalui peramban, lalu kembali ke sini untuk memilih repositori.",
+      "connectGithubDescription": "Masuk dari peramban, lalu kembali ke sini untuk memilih repositori GitHub.",
+      "connectGitlabDescription": "Masuk dari peramban, lalu kembali ke sini untuk memilih repositori GitLab.",
+      "connectBitbucketDescription": "Masuk dari peramban, lalu kembali ke sini untuk memilih repositori Bitbucket.",
       "openGithub": "Buka GitHub",
       "openGitlab": "Buka GitLab",
       "openBitbucket": "Buka Bitbucket",
@@ -2701,6 +2703,7 @@
       "gitlabDescription": "Hubungkan akun GitLab kamu untuk meninjau merge request di ponsel.",
       "bitbucketDescription": "Hubungkan Bitbucket ke organisasi ini untuk meninjau PR di ponsel.",
       "bitbucketOrgOnlyDescription": "Ganti akun di atas ke sebuah organisasi untuk meninjau PR Bitbucket-nya.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Akun ini belum memiliki organisasi. PR Bitbucket dapat ditinjau setelah Anda membuat atau bergabung dengan organisasi.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akun pribadi Anda"
     },
@@ -3067,10 +3070,9 @@
     "pullRequestUnavailableDescription": "PR ini tidak dapat dibuka. PR ini mungkin sudah dihapus, repositorinya bersifat privat, atau aplikasi Kilo untuk GitHub belum dipasang di repositori tersebut.",
     "reconnectNotice": {
       "title": "Koneksi GitHub kedaluwarsa.",
-      "message": "Koneksi GitHub kamu sudah tidak valid. Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu.",
+      "message": "Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu.",
       "gitlabTitle": "Koneksi GitLab kedaluwarsa.",
-      "bitbucketTitle": "Koneksi Bitbucket kedaluwarsa.",
-      "providerMessage": "Koneksi {{provider}} kamu sudah tidak valid. Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu."
+      "bitbucketTitle": "Koneksi Bitbucket kedaluwarsa."
     },
     "review": "Tinjauan",
     "reviewPullRequest": "Tinjau PR",
@@ -3158,7 +3160,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Bagikan merge request",
       "viewOnProvider": "Lihat di {{provider}}",
       "mergeRequestUnavailable": "Merge request tidak tersedia",
@@ -3849,8 +3851,6 @@
     "commandAtLimit": "Perintah dibatasi hingga {{max}} karakter",
     "commandsEmpty": "Belum ada perintah pengaturan",
     "commandsSaveFailed": "Tidak dapat menyimpan perintah penyiapan",
-    "moveUp": "Naik",
-    "moveDown": "Pindah ke bawah",
     "moveCommandUp": "Pindahkan perintah {{position}} ke atas",
     "moveCommandDown": "Pindahkan perintah {{position}} ke bawah",
     "skillsTitle": "Keterampilan",
@@ -3859,9 +3859,13 @@
     "skillMarkdownLabel": "Konten keterampilan",
     "skillsEmpty": "Belum ada keterampilan",
     "skillNameRequired": "Masukkan nama keterampilan",
+    "skillNameTooLong": "Nama keterampilan harus {{max}} karakter atau kurang",
     "skillNameInvalid": "Nama keterampilan harus dimulai dengan huruf atau angka dan hanya menggunakan huruf kecil, angka, dan tanda hubung",
     "skillContentRequired": "Konten keterampilan diperlukan",
-    "skillSaveFailed": "Tidak dapat menyimpan keterampilan",
+    "skillSaveFailed": "Tidak dapat menyimpan keterampilan. Coba lagi.",
+    "skillDeleteFailed": "Tidak dapat menghapus keterampilan. Coba lagi.",
+    "skillToggleFailed": "Tidak dapat memperbarui keterampilan. Coba lagi.",
+    "skillLimitReached": "Profil dapat menampung hingga {{max}} keterampilan. Hapus satu untuk menambahkan yang lain.",
     "skillSourceCustom": "Kustom",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

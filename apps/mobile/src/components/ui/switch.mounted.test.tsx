@@ -2,19 +2,10 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
-
+import { darkColors, lightColors } from '@/lib/hooks/use-theme-colors';
 import { Switch } from './switch';
 
-const native = vi.hoisted(() => ({ os: 'ios' }));
-
-// `vi.mock` factories are hoisted above the imports, so they cannot close over
-// the palette modules; the holder is declared inside `vi.hoisted` and each test
-// points it at the shipped light or dark palette before rendering.
-const theme = vi.hoisted(() => {
-  const colors: Record<string, string> = {};
-  return { colors };
-});
+const native = vi.hoisted(() => ({ os: 'ios', scheme: 'light' as 'light' | 'dark' }));
 
 vi.mock('react-native', () => ({
   Platform: {
@@ -22,17 +13,22 @@ vi.mock('react-native', () => ({
       return native.os;
     },
   },
+  useColorScheme: () => native.scheme,
   Switch: 'Switch',
-}));
-
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => theme.colors,
 }));
 
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
 
-function renderSwitch(props: { disabled?: boolean; accessibilityState?: { busy?: boolean } }) {
+type SwitchFixture = {
+  disabled?: boolean;
+  accessibilityState?: { busy?: boolean };
+  trackColor?: { false?: string; true?: string };
+  thumbColor?: string;
+  value?: boolean;
+};
+
+function renderSwitch(props: SwitchFixture) {
   const ref: { current: R | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(createElement(Switch, { value: false, ...props }));
@@ -47,8 +43,9 @@ function renderSwitch(props: { disabled?: boolean; accessibilityState?: { busy?:
 function nativeProps(root: I): {
   disabled?: boolean;
   accessibilityState?: { disabled?: boolean; busy?: boolean };
-  thumbColor?: string;
   trackColor?: { false?: string; true?: string };
+  thumbColor?: string;
+  value?: boolean;
 } {
   const node = root.findAll(candidate => (candidate.type as string) === 'Switch')[0];
   if (!node) {
@@ -86,28 +83,53 @@ describe('Switch', () => {
     expect(props.accessibilityState?.disabled).toBe(false);
   });
 
-  // A switch that states no colours takes them from the Android theme, which
-  // tinted the track with the framework accent and left the dark off thumb
-  // near-white. Both states therefore name a palette colour in each theme, and
-  // the dark off track is the lighter secondary ink: the thumb is the palette's
-  // near-black primary ink in that theme, so a muted track would swallow it.
-  it('draws the light palette in both states', () => {
-    Object.assign(theme.colors, lightColors);
+  it('paints the palette on the track and the grip', () => {
+    native.os = 'android';
+    native.scheme = 'light';
     const props = nativeProps(renderSwitch({}).root);
-    expect(props.trackColor).toEqual({
-      false: lightColors.mutedForeground,
-      true: lightColors.primary,
-    });
+    expect(props.trackColor).toEqual({ false: lightColors.mutedSoft, true: lightColors.primary });
     expect(props.thumbColor).toBe(lightColors.primaryForeground);
   });
 
-  it('draws the dark palette in both states', () => {
-    Object.assign(theme.colors, darkColors);
-    const props = nativeProps(renderSwitch({}).root);
+  it('paints the light grip on the on track', () => {
+    native.os = 'android';
+    native.scheme = 'light';
+    const props = nativeProps(renderSwitch({ value: true }).root);
+    expect(props.trackColor).toEqual({ false: lightColors.mutedSoft, true: lightColors.primary });
+    expect(props.thumbColor).toBe(lightColors.primaryForeground);
+  });
+
+  it('keeps the off state readable in dark mode', () => {
+    native.os = 'android';
+    native.scheme = 'dark';
+    const props = nativeProps(renderSwitch({ value: false }).root);
     expect(props.trackColor).toEqual({
-      false: darkColors.ink2,
+      false: darkColors.mutedForeground,
+      true: darkColors.primary,
+    });
+    expect(props.thumbColor).toBe(darkColors.foreground);
+    expect(props.thumbColor).not.toBe(darkColors.primaryForeground);
+  });
+
+  it('paints the dark on grip from the primary foreground', () => {
+    native.os = 'android';
+    native.scheme = 'dark';
+    const props = nativeProps(renderSwitch({ value: true }).root);
+    expect(props.trackColor).toEqual({
+      false: darkColors.mutedForeground,
       true: darkColors.primary,
     });
     expect(props.thumbColor).toBe(darkColors.primaryForeground);
+  });
+
+  it('keeps track and grip colors a caller supplies', () => {
+    native.os = 'android';
+    native.scheme = 'dark';
+    const props = nativeProps(
+      renderSwitch({ trackColor: { false: '#222222', true: '#111111' }, thumbColor: '#333333' })
+        .root
+    );
+    expect(props.trackColor).toEqual({ false: '#222222', true: '#111111' });
+    expect(props.thumbColor).toBe('#333333');
   });
 });

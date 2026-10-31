@@ -163,7 +163,7 @@
     "allLanguages": "Duk harsuna"
   },
   "login": {
-    "welcome": "Barka da zuwa Kilo",
+    "welcome": "Barka da zuwa",
     "retrySignIn": "Sake gwada shiga",
     "logo": "Alamar Kilo",
     "continuingSignIn": "Ana ci gaba da shigarka.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Haɗa asusun GitLab ɗinka don bita buƙatun haɗawa a wayar hannu.",
       "bitbucketDescription": "Haɗa Bitbucket da wannan ƙungiya don bita buƙatun haɗa canje-canje a wayar hannu.",
       "bitbucketOrgOnlyDescription": "Canja asusun da ke sama zuwa ƙungiya don bita buƙatun haɗa canje-canje na Bitbucket na ƙungiyar.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Wannan asusu ba shi da ƙungiyoyi har yanzu. Za a iya bita buƙatun haɗa canje-canje na Bitbucket idan ka ƙirƙiri ƙungiya ko ka shiga cikin wata.",
       "contextLine": "Don {{organization}}",
       "contextLinePersonal": "Don kashin kanka"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Wa'adin haɗin GitHub ya ƙare.",
-      "message": "Haɗinka na GitHub ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata.",
+      "message": "Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata.",
       "gitlabTitle": "Wa'adin haɗin GitLab ya ƙare.",
-      "bitbucketTitle": "Wa'adin haɗin Bitbucket ya ƙare.",
-      "providerMessage": "Haɗinka na {{provider}} ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata."
+      "bitbucketTitle": "Wa'adin haɗin Bitbucket ya ƙare."
     },
     "eventChips": {
       "comment": "Yi tsokaci",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Buƙatar haɗa canje-canje",
       "mergeRequest": "Buƙatar haɗawa",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Buƙatar haɗawa !{{number}}",
       "shareMergeRequest": "Raba buƙatar haɗawa",
       "viewOnProvider": "Duba a {{provider}}",
       "mergeRequestUnavailable": "Buƙatar haɗawa ba ta samuwa",
@@ -1429,7 +1429,10 @@
       "gitlabNoRepositoriesDescription": "Wataƙila kana buƙatar ba da damar shiga ƙarin ƙungiyoyi ko ayyuka a GitLab.",
       "installGithubApp": "Shigar da manhajar GitHub a ma'ajiyoyi",
       "installGithubAppDescription": "Ba manhajar Kilo ta GitHub damar shiga ma'ajiyoyin da kake son a yi bitarsu.",
-      "repositoryAccess": "damar shiga ma'ajiya"
+      "repositoryAccess": "damar shiga ma'ajiya",
+      "allModePersonal": "Kowace ma'ajiyar da Kilo zai iya shiga ta hanyar haɗin GitHub ɗinka ana yin bitarta ta atomatik.",
+      "allModeOrganization": "Kowace ma'ajiyar da Kilo zai iya shiga ta hanyar haɗin GitHub na ƙungiyar ana yin bitarta ta atomatik.",
+      "allModeCount": "Ma'ajiyoyin da ke akwai: {{displayCount}}"
     },
     "style": {
       "title": "Salon bita",
@@ -1528,6 +1531,7 @@
       "changeRequestNoGitHubAccess": "Babu haɗin GitHub da ke da damar shiga wannan ajiya. Sake haɗa GitHub da ke da damar shiga ta, sannan sake gwadawa.",
       "changeRequestMissingPermissions": "Aplikashin GitHub na Kilo ba zai iya buɗe pull request a cikin wannan ajiya ba. Dole mai ajiyar ya ba app ɗin damar rubutu ga abubuwan ciki da pull request, sannan sake gwadawa.",
       "changeRequestFailed": "Kilo ya kasa buɗe pull request ɗin. Sake gwadawa nan da ɗan lokaci.",
+      "proposalConflict": "Wata shawara don wannan ajiya har yanzu tana aiki.",
       "offAction": "An kashe ƙwaƙwalwar bita. Kunna ta, sannan sake gwadawa."
     },
     "manualReview": {
@@ -1779,7 +1783,6 @@
       "notYetSynced": "Har yanzu ba a daidaita ba",
       "refreshFailed": "An kasa sabuntawa — ana nuna bayanan da aka daidaita a ƙarshe.",
       "settings": "Saituna",
-      "syncFindings": "Daidaita matsalolin da aka gano",
       "syncNow": "Daidaita yanzu",
       "syncQueued": "An saka daidaitawa a jerin jira",
       "syncStatusUnavailable": "Ba a iya samun halin daidaitawa ba.",
@@ -1967,7 +1970,6 @@
       "eventsCount_other": "{{displayCount}} abubuwan da suka faru",
       "generated": "An samar da rahoton {{generatedAt}}.",
       "noActivity": "Babu aiki da aka rubuta",
-      "noActivityDescription": "Kilo ba shi da wani aikin da ya shafi matsalolin tsaro da aka gano daga {{start}} zuwa {{end}} wanda za a saka a rahoto.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Ba a rubuta ma'ajiya ba",
       "reasonUnknown": "Dalilin da ba a gane ba",
@@ -2157,7 +2159,7 @@
     "sessionList": {
       "couldNotLoadActive": "Ba a iya loda zaman da ke aiki ba.",
       "couldNotRefresh": "Ba a iya sabuntawa ba",
-      "noSessionsYetDescription": "Fara aikin rubuta lamba daga wayarka. Zaman aikinka za su bayyana a nan.",
+      "noSessionsYetDescription": "Fara aikin rubuta lamba daga wayarka.",
       "viewHistory": "Tarihin zaman",
       "noMatches": "Babu zaman da ya dace",
       "tryDifferentSearch": "Gwada wata kalmar bincike dabam.",
@@ -2295,9 +2297,9 @@
       "couldNotLoadGithubRepositories": "An kasa loda ma'ajiyoyin GitHub.",
       "couldNotLoadGitlabRepositories": "An kasa loda ma'ajiyoyin GitLab.",
       "couldNotLoadBitbucketRepositories": "An kasa loda ma'ajiyoyin Bitbucket.",
-      "connectGithubDescription": "Haɗa GitHub a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
-      "connectGitlabDescription": "Haɗa GitLab a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
-      "connectBitbucketDescription": "Haɗa Bitbucket a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
+      "connectGithubDescription": "Shiga asusunka a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya ta GitHub.",
+      "connectGitlabDescription": "Shiga asusunka a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya ta GitLab.",
+      "connectBitbucketDescription": "Shiga asusunka a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya ta Bitbucket.",
       "openGithub": "Buɗe GitHub",
       "openGitlab": "Buɗe GitLab",
       "openBitbucket": "Buɗe Bitbucket",
@@ -3849,8 +3851,6 @@
     "commandAtLimit": "An iyakance umurnin zuwa haruffa {{max}}",
     "commandsEmpty": "Babu umarnin saitin tukuna",
     "commandsSaveFailed": "An kasa ajiye umarnin saitin",
-    "moveUp": "Matsa sama",
-    "moveDown": "Matsa ƙasa",
     "moveCommandUp": "Matsar da umarni {{position}} sama",
     "moveCommandDown": "Matsar da umarni {{position}} ƙasa",
     "skillsTitle": "Ƙwarewa",
@@ -3859,9 +3859,13 @@
     "skillMarkdownLabel": "Abubuwan gwaninta",
     "skillsEmpty": "Babu fasaha tukuna",
     "skillNameRequired": "Shigar da sunan fasaha",
+    "skillNameTooLong": "Dole ne sunan fasaha ya kasance haruffa {{max}} ko ƙasa da haka",
     "skillNameInvalid": "Dole ne sunan gwani ya fara da harafi ko lambobi kuma yayi amfani da ƙananan haruffa kawai, lambobi, da dashes",
     "skillContentRequired": "Ana buƙatar abun ciki gwaninta",
-    "skillSaveFailed": "An kasa ajiye fasaha",
+    "skillSaveFailed": "An kasa ajiye fasaha. Sake gwadawa.",
+    "skillDeleteFailed": "An kasa share fasaha. Sake gwadawa.",
+    "skillToggleFailed": "An kasa sabunta fasaha. Sake gwadawa.",
+    "skillLimitReached": "Bayanan martaba na iya ɗaukar ƙwarewa har {{max}}. Share ɗaya don ƙara wata.",
     "skillSourceCustom": "Al'ada",
     "skillSourceMarketplace": "Kasuwa",
     "skillSourceSkillsSh": "skills.sh",

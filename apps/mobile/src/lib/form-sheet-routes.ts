@@ -39,10 +39,28 @@ export const FORM_SHEET_ROUTE_SUFFIXES: readonly (readonly string[])[] = [
 
 /** Is the route these segments point at presented as a form sheet? */
 export function isFormSheetRoute(segments: readonly string[]): boolean {
-  return FORM_SHEET_ROUTE_SUFFIXES.some(suffix => {
-    const tail = segments.slice(-suffix.length);
-    return (
-      tail.length === suffix.length && tail.every((segment, index) => segment === suffix[index])
-    );
-  });
+  return FORM_SHEET_ROUTE_SUFFIXES.some(suffix => matchesSuffix(segments, suffix));
+}
+
+/**
+ * Is the route a persisted href names presented as a form sheet?
+ *
+ * A stored href carries the concrete value of every dynamic segment
+ * (`dismiss/<uuid>`) and the layout groups in the path, while the suffix list
+ * names the pattern, so a pattern segment matches any value.
+ */
+export function isFormSheetRouteHref(href: string): boolean {
+  const queryStart = href.indexOf('?');
+  const path = queryStart === -1 ? href : href.slice(0, queryStart);
+  return FORM_SHEET_ROUTE_SUFFIXES.some(suffix => matchesSuffix(path.split('/'), suffix));
+}
+
+function matchesSuffix(segments: readonly string[], suffix: readonly string[]): boolean {
+  const tail = segments.slice(-suffix.length);
+  return (
+    tail.length === suffix.length &&
+    tail.every(
+      (segment, index) => suffix[index]?.startsWith('[') === true || segment === suffix[index]
+    )
+  );
 }

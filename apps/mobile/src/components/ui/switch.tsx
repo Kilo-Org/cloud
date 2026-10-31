@@ -1,11 +1,23 @@
-import { Switch as NativeSwitch, Platform, type SwitchProps } from 'react-native';
+import { Switch as NativeSwitch, Platform, type SwitchProps, useColorScheme } from 'react-native';
 
-import { isDarkPalette } from '@/lib/hooks/theme-palette';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 /**
- * The native `Switch` with its disabled state mirrored into
- * `accessibilityState`, and both of its colours taken from the app palette.
+ * The native `Switch`, painted with the app palette, with its disabled state
+ * mirrored into `accessibilityState`.
+ *
+ * Untinted, the control draws its on-track with the platform accent, a
+ * saturated teal on Android that belongs to no palette entry. In a list row
+ * that outranks the row title and the screen's own button, so the track takes
+ * the scheme's `primary` and the grip its `primaryForeground`, which keeps the
+ * two legible against each other in light and dark.
+ *
+ * The off pair follows the scheme as well, because a grip that always takes
+ * `primaryForeground` is near-black in dark mode and vanishes into the off
+ * track. Off draws a light grip on a lighter track, so the control still reads
+ * as a control while it says off: `mutedSoft` with a white grip in light,
+ * `mutedForeground` with a `foreground` grip in dark. A caller that wants
+ * another pair still wins: its own props are applied last.
  *
  * Fabric derives the accessibility traits from the role and
  * `accessibilityState`, then assigns them to the native control, replacing the
@@ -13,36 +25,32 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * `disabled` but not the matching state, so a switch that cannot be toggled
  * still announces itself as enabled. Android already folds `disabled` into that
  * state; doing it here keeps both platforms honest.
- *
- * The colours are stated here because Android otherwise resolves the track and
- * the thumb from the device theme: the on track came out as the framework
- * accent (a teal that is in no palette) and the off thumb as near-white in dark
- * mode, which made one control look unlike every other surface.
  */
 export function Switch({
   disabled,
   accessibilityState,
-  thumbColor,
   trackColor,
+  thumbColor,
+  value,
   ...props
 }: SwitchProps) {
-  const resolvedDisabled = disabled ?? accessibilityState?.disabled;
   const colors = useThemeColors();
-
-  // `thumbColor` is one value for both states, so the off track has to carry
-  // the theme the thumb belongs to. The light palette's on-thumb ink is white
-  // and sits well on the muted ink; the dark palette's is near-black, and a
-  // near-black thumb over the muted ink in the dark card left the whole
-  // control as one dim shape. The off track therefore takes the lighter
-  // secondary ink in dark mode, which keeps the thumb and the outline of the
-  // control visible against the card.
-  const offTrack = isDarkPalette(colors) ? colors.ink2 : colors.mutedForeground;
+  const dark = useColorScheme() === 'dark';
+  const resolvedDisabled = disabled ?? accessibilityState?.disabled;
+  // The on grip sits on `primary`, the off grip on the off track.
+  const offGrip = dark ? colors.foreground : colors.primaryForeground;
 
   return (
     <NativeSwitch
       {...props}
-      thumbColor={thumbColor ?? colors.primaryForeground}
-      trackColor={trackColor ?? { false: offTrack, true: colors.primary }}
+      value={value}
+      trackColor={
+        trackColor ?? {
+          false: dark ? colors.mutedForeground : colors.mutedSoft,
+          true: colors.primary,
+        }
+      }
+      thumbColor={thumbColor ?? (value ? colors.primaryForeground : offGrip)}
       disabled={resolvedDisabled}
       accessibilityState={
         Platform.OS === 'ios'

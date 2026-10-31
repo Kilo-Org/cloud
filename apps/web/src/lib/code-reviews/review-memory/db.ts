@@ -14,6 +14,7 @@ import type {
   ReviewMemoryPlatform,
   ReviewMemoryProposalStatus,
 } from '@kilocode/db/schema-types';
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
 import { reviewMemoryRetentionCutoff } from './retention';
 
 export type ReviewMemoryOwner = { type: 'org'; id: string } | { type: 'user'; id: string };
@@ -32,6 +33,49 @@ const TERMINAL_PRUNABLE_PROPOSAL_STATUSES = [
   'superseded',
 ] as const;
 const REVIEW_MEMORY_PRUNE_BATCH_SIZE = 1_000;
+
+/** PostgreSQL SQLSTATE for a unique constraint violation. */
+const POSTGRES_UNIQUE_VIOLATION = '23505';
+
+/**
+ * Raised when a proposal write loses a race with another active proposal for
+ * the same owner, platform and repository. Callers turn it into a typed
+ * rejection so the PostgreSQL unique violation never reaches a client.
+ */
+export class ReviewMemoryProposalConflictError extends Error {
+  constructor() {
+    super(REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_conflict);
+    this.name = 'ReviewMemoryProposalConflictError';
+  }
+}
+
+/**
+ * Whether a write failed on the "one active proposal per scope" unique index.
+ * Drizzle wraps the driver's error in its own query error, so the PostgreSQL
+ * code and constraint name sit on `cause`; both partial index names end this
+ * way, and any other unique violation (or any other error) is somebody's bug
+ * and must keep its own diagnosis.
+ */
+export function isActiveProposalScopeViolation(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && typeof current === 'object' && current !== null; depth += 1) {
+    const { code, constraint, cause } = current as {
+      code?: unknown;
+      constraint?: unknown;
+      cause?: unknown;
+    };
+    if (
+      code === POSTGRES_UNIQUE_VIOLATION &&
+      typeof constraint === 'string' &&
+      constraint.startsWith('UQ_code_review_memory_proposals_') &&
+      constraint.endsWith('_active_scope')
+    ) {
+      return true;
+    }
+    current = cause;
+  }
+  return false;
+}
 
 export function createReviewMemoryDedupeHash(parts: readonly unknown[]): string {
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
@@ -166,19 +210,55 @@ export async function upsertScopeProposal(input: {
   database?: ReviewMemoryDatabase;
 }): Promise<CodeReviewMemoryProposal> {
   const database = input.database ?? db;
-  const existing = await getActiveProposalForScope({
-    owner: input.owner,
-    platform: input.platform,
-    repoFullName: input.repoFullName,
-    database,
-  });
   const now = new Date().toISOString();
 
-  if (existing) {
-    const [updated] = await database
-      .update(code_review_memory_proposals)
-      .set({
-        status: existing.status === 'opening_change_request' ? existing.status : 'open',
+  // A concurrent analysis, rejection or supersession can change the active row
+  // between the read and the write. Every write is guarded on the row it read,
+  // and a lost race re-reads instead of failing, so one analysis never turns
+  // another writer's win into an error. Two attempts: read, write, re-read
+  // once; a third outcome means the database and this code disagree.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const existing = await getActiveProposalForScope({
+      owner: input.owner,
+      platform: input.platform,
+      repoFullName: input.repoFullName,
+      database,
+    });
+
+    if (existing) {
+      const [updated] = await database
+        .update(code_review_memory_proposals)
+        .set({
+          status: existing.status === 'opening_change_request' ? existing.status : 'open',
+          title: input.title,
+          rationale: input.rationale,
+          proposed_markdown: input.proposedMarkdown,
+          evidence: input.evidence,
+          positive_count: input.positiveCount,
+          negative_count: input.negativeCount,
+          neutral_count: input.neutralCount,
+          updated_at: now,
+        })
+        .where(
+          and(
+            eq(code_review_memory_proposals.id, existing.id),
+            // The status that was read, not the whole active set: an approval
+            // that started in between must keep `opening_change_request`, or the
+            // PR it opens would never be recorded on the row.
+            eq(code_review_memory_proposals.status, existing.status)
+          )
+        )
+        .returning();
+      if (updated) return updated;
+      continue;
+    }
+
+    const [inserted] = await database
+      .insert(code_review_memory_proposals)
+      .values({
+        ...ownerInsertValues(input.owner),
+        platform: input.platform,
+        repo_full_name: input.repoFullName,
         title: input.title,
         rationale: input.rationale,
         proposed_markdown: input.proposedMarkdown,
@@ -186,41 +266,23 @@ export async function upsertScopeProposal(input: {
         positive_count: input.positiveCount,
         negative_count: input.negativeCount,
         neutral_count: input.neutralCount,
-        updated_at: now,
       })
-      .where(eq(code_review_memory_proposals.id, existing.id))
+      .onConflictDoNothing()
       .returning();
-    if (!updated) throw new Error('Review Memory active proposal update failed');
-    return updated;
+    if (inserted) return inserted;
   }
 
-  const [inserted] = await database
-    .insert(code_review_memory_proposals)
-    .values({
-      ...ownerInsertValues(input.owner),
-      platform: input.platform,
-      repo_full_name: input.repoFullName,
-      title: input.title,
-      rationale: input.rationale,
-      proposed_markdown: input.proposedMarkdown,
-      evidence: input.evidence,
-      positive_count: input.positiveCount,
-      negative_count: input.negativeCount,
-      neutral_count: input.neutralCount,
-    })
-    .onConflictDoNothing()
-    .returning();
-  if (!inserted) {
-    const conflicted = await getActiveProposalForScope({
-      owner: input.owner,
-      platform: input.platform,
-      repoFullName: input.repoFullName,
-      database,
-    });
-    if (conflicted) return conflicted;
-    throw new Error('Review Memory active proposal conflict lookup failed');
-  }
-  return inserted;
+  // Another writer holds the scope after both attempts. Its proposal is the
+  // scope's active one; this analysis keeps it rather than overwriting a row it
+  // never observed as active.
+  const conflicted = await getActiveProposalForScope({
+    owner: input.owner,
+    platform: input.platform,
+    repoFullName: input.repoFullName,
+    database,
+  });
+  if (conflicted) return conflicted;
+  throw new Error('Review Memory active proposal upsert failed');
 }
 
 export type ReviewMemoryProposalPage = {
@@ -352,24 +414,32 @@ export async function updateProposal(input: {
   database?: ReviewMemoryDatabase;
 }): Promise<CodeReviewMemoryProposal | null> {
   const database = input.database ?? db;
-  const [proposal] = await database
-    .update(code_review_memory_proposals)
-    .set({
-      title: input.title,
-      rationale: input.rationale,
-      proposed_markdown: input.proposedMarkdown,
-      status: 'edited',
-      updated_at: new Date().toISOString(),
-    })
-    .where(
-      and(
-        ...proposalOwnerConditions(input.owner),
-        eq(code_review_memory_proposals.id, input.proposalId),
-        inArray(code_review_memory_proposals.status, [...EDITABLE_PROPOSAL_STATUSES])
+  try {
+    const [proposal] = await database
+      .update(code_review_memory_proposals)
+      .set({
+        title: input.title,
+        rationale: input.rationale,
+        proposed_markdown: input.proposedMarkdown,
+        status: 'edited',
+        updated_at: new Date().toISOString(),
+      })
+      .where(
+        and(
+          ...proposalOwnerConditions(input.owner),
+          eq(code_review_memory_proposals.id, input.proposalId),
+          inArray(code_review_memory_proposals.status, [...EDITABLE_PROPOSAL_STATUSES])
+        )
       )
-    )
-    .returning();
-  return proposal ?? null;
+      .returning();
+    return proposal ?? null;
+  } catch (error) {
+    // The status change makes this row's scope key active. The unique index
+    // normally guarantees the row already owns that key, so this only happens
+    // on data the index could not see; a caller deserves the reason, not SQL.
+    if (isActiveProposalScopeViolation(error)) throw new ReviewMemoryProposalConflictError();
+    throw error;
+  }
 }
 
 export async function rejectProposal(input: {

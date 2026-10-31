@@ -19,9 +19,10 @@ const PROFILE_ID = 'a9ad137f-bad3-4d1a-9565-0cb862c7f81d';
 const STRIPE_CUSTOMER_ID = 'cus_local_design_gate_agents';
 
 /**
- * The agents the profile carries. The first two print their name twice unless
- * the list hides a slug that only repeats the name; the third has a long name
- * and a distinct slug, so its row shows both a name and a slug line.
+ * The agents the profile carries. Each visibility label appears once: a short
+ * name with a model, the subagent label on its own, and a long name with a
+ * distinct slug, a model and a description, so one screen covers the label
+ * variants and a row that needs an ellipsis.
  */
 const AGENTS = [
   {

@@ -687,9 +687,10 @@ export async function handleLlmProxyRequest(
     if (rateLimitSubject instanceof NextResponse) return rateLimitSubject;
 
     // Private custom LLMs are exempt for signed-in callers, even when their id
-    // matches a free-model pattern. So is the internal benchmark bot: a run sends
-    // every case of every free model it measures, and the anti-abuse limit would
-    // otherwise throttle the measurement itself.
+    // matches a free-model pattern. So is the default internal benchmark user: a run
+    // sends every case of every free model it measures, and the anti-abuse limit
+    // would otherwise throttle the measurement itself. A benchmark user override is
+    // not exempt.
     const isExempt =
       rateLimitSubject.kind === 'account' &&
       (isPrivateCustomLlm || rateLimitSubject.kiloUserId === DEFAULT_BENCHMARK_USER_ID);

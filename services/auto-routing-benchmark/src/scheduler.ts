@@ -159,10 +159,10 @@ export const SCHEDULER_QUEUE_LEASE_MS = 30 * 60_000;
 export const SCHEDULER_MAX_ATTEMPTS = 6;
 /**
  * A provider throttle is not a chunk failure, so it refunds the claim's attempt and
- * counts here instead. Backoff caps at 5 minutes, so the budget allows several hours
- * of throttling before the chunk falls back to ordinary attempts.
+ * counts here instead. With 15–300 second backoff, the budget gives a throttled chunk
+ * about an hour before it falls back to ordinary attempts and can fail its lane.
  */
-export const SCHEDULER_MAX_THROTTLE_DEFERRALS = 48;
+export const SCHEDULER_MAX_THROTTLE_DEFERRALS = 16;
 export const SCHEDULER_DISPATCH_LEASE_MS = 20_000;
 export const SCHEDULER_INIT_BUDGET_MS = 20_000;
 export const SCHEDULER_INIT_LEASE_MS = 2 * 60_000;

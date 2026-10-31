@@ -149,9 +149,11 @@ limit, and a resume keeps the running lease. The one-minute tick recovers abando
 completion refills slots immediately without waiting for a tick. Recovery and
 infrastructure/grader waits are bounded to six claims, with 15–300 second backoff. Capacity
 and unbilled provider-throttle waits do not create model-failure rows. A provider throttle
-refunds its claim and counts against a separate budget of 48 throttle deferrals (several
-hours at the 5-minute backoff cap), so a rate-limited model is paced instead of losing its
-lanes; only after that budget does the chunk fall back to the six-claim limit.
+refunds its claim and counts against a separate budget of 16 throttle deferrals (about an
+hour of backoff), so a briefly rate-limited model is paced instead of losing its lanes; after
+that budget, the chunk falls back to the six-claim limit, so a persistent throttle still fails
+its lane. The gateway exempts only the default benchmark user (`bot-internal-benchmark`)
+from its free-model account limit; a `benchmarkUserId` override is limited like other accounts.
 
 A dispatch pass reads current occupancy and the next pending chunk of every lane — one
 `(run, model, variant, repetition)` chunk chain — and claims as many of those lanes as fit.

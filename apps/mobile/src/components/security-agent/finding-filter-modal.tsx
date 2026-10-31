@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
+import { hasRtlScript } from '@/lib/rtl-text';
 
 const STATUS_OPTIONS = [
   { value: 'all', labelKey: 'common.all' },
@@ -99,7 +100,12 @@ function FilterSection<T>({
 }>) {
   return (
     <View className="gap-1">
-      <Text variant="eyebrow" className="px-3">
+      {/* The eyebrow's 10 px capitals treatment is a Latin display device: a
+          joined script cannot take the tracking (the shared Text primitive
+          drops it), and at that size the Arabic glyphs are too small to read
+          against the sheet. RTL-script headings take the secondary text size
+          and colour instead, while Latin headings keep the eyebrow. */}
+      <Text variant={hasRtlScript(title) ? 'muted' : 'eyebrow'} className="px-3">
         {title}
       </Text>
       {description === undefined ? null : (
@@ -153,14 +159,20 @@ export function FindingFilterModal({
 
   return (
     <View className="gap-6 bg-background px-6 pb-8 pt-4">
+      {/* Reset is a secondary action, not the sheet's heading: at the default
+          label size and foreground ink it outweighed the section labels below
+          it. It takes the rows' inset and the muted secondary text so it reads
+          as the least of the sheet's controls while keeping a 44 dp target. */}
       <Button
         variant="ghost"
-        className="self-start"
+        className="self-start px-3"
         onPress={() => {
           onChange(DEFAULT_SECURITY_FINDING_FILTERS);
         }}
       >
-        <Text>{t('securityAgent.filter.reset')}</Text>
+        <Text className="text-sm font-medium text-muted-foreground">
+          {t('securityAgent.filter.reset')}
+        </Text>
       </Button>
       <View className="gap-4">
         <FilterSection

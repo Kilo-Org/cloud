@@ -1301,6 +1301,7 @@
       "repositoryActionPlan": "存放庫處理計畫",
       "settings": "設定",
       "slaPosture": "SLA 達成狀況",
+      "syncFindings": "同步資安問題",
       "syncNow": "立即同步",
       "syncQueued": "已排入同步佇列",
       "syncStatusUnavailable": "無法取得同步狀態。",

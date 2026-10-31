@@ -1804,6 +1804,7 @@
       "notYetSynced": "Još nije sinkronizirano",
       "refreshFailed": "Osvježavanje nije uspjelo — prikazuju se zadnji sinkronizirani podaci.",
       "settings": "Postavke",
+      "syncFindings": "Sinkroniziraj nalaze",
       "syncNow": "Sinkroniziraj sada",
       "syncQueued": "Sinkronizacija je dodana u red čekanja.",
       "syncStatusUnavailable": "Status sinkronizacije nije dostupan.",

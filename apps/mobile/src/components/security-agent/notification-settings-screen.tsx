@@ -201,9 +201,14 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
           </Text>
         )}
         <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('securityAgent.notifications.newFindingSection')}
-          </Text>
+          {/* The org scope titles both rows "Email owners", so the sections are
+              what tells them apart. A personal scope titles each row itself,
+              and the header above it only restated that title. */}
+          {personal ? null : (
+            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+              {t('securityAgent.notifications.newFindingSection')}
+            </Text>
+          )}
           <ToggleRow
             title={
               personal
@@ -238,9 +243,11 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
         </View>
 
         <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('securityAgent.notifications.slaSection')}
-          </Text>
+          {personal ? null : (
+            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+              {t('securityAgent.notifications.slaSection')}
+            </Text>
+          )}
           <ToggleRow
             title={
               personal

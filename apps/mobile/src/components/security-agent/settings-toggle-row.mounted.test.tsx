@@ -7,6 +7,7 @@ import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 import { ToggleRow } from './settings-toggle-row';
 
 const haptics = vi.hoisted(() => ({ selectionAsync: vi.fn<() => Promise<void>>() }));
+const scheme = vi.hoisted(() => ({ current: 'light' as 'light' | 'dark' }));
 
 vi.mock('expo-haptics', () => ({ selectionAsync: haptics.selectionAsync }));
 vi.mock('react-native', () => ({
@@ -14,12 +15,25 @@ vi.mock('react-native', () => ({
   View: 'View',
   Platform: { OS: 'android' },
   I18nManager: { isRTL: false },
+  useColorScheme: () => scheme.current,
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/lib/utils', () => ({
   cn: (...classes: (string | undefined)[]) => classes.filter(Boolean).join(' '),
 }));
+// The switch's colors come from the theme tokens; the row reads them through
+// the hook, so the test pins the two ends of the ladder the control uses.
+const theme = vi.hoisted(() => ({
+  colors: {
+    mutedForeground: '#6F6A61',
+    background: '#FBFAF5',
+    foreground: '#14130F',
+    primary: '#4F5A10',
+    primaryForeground: '#FFFFFF',
+  },
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => theme.colors }));
 
 type RowProps = Parameters<typeof ToggleRow>[0];
 
@@ -120,6 +134,39 @@ describe('<ToggleRow>', () => {
     // name carries the title and the hint carries the subtitle.
     expect(props.accessibilityLabel).toBe('Enable auto-analysis');
     expect(props.accessibilityHint).toBe('Analyze findings as they are synced.');
+  });
+
+  it('paints both switch states from theme tokens so the control stays visible', () => {
+    const off = switchProps(renderRow({ value: false, disabled: false }));
+    const on = switchProps(renderRow({ value: true, disabled: false }));
+
+    // The platform's own off state is pale grey on the card surface; the off
+    // track is the muted foreground so the control can be seen at all.
+    expect(off.trackColor).toEqual({
+      false: theme.colors.mutedForeground,
+      true: theme.colors.primary,
+    });
+    expect(off.ios_backgroundColor).toBe(theme.colors.mutedForeground);
+    expect(off.thumbColor).toBe(theme.colors.background);
+    expect(on.thumbColor).toBe(theme.colors.primaryForeground);
+  });
+
+  it('keeps the off thumb light on the dark card', () => {
+    scheme.current = 'dark';
+    try {
+      const off = switchProps(renderRow({ value: false, disabled: false }));
+
+      // In the dark scheme the background token is near-black, so an off thumb
+      // drawn from it disappeared into the card. The foreground is the light
+      // end of that ladder.
+      expect(off.thumbColor).toBe(theme.colors.foreground);
+      expect(off.trackColor).toEqual({
+        false: theme.colors.mutedForeground,
+        true: theme.colors.primary,
+      });
+    } finally {
+      scheme.current = 'light';
+    }
   });
 
   it('leaves the visual switch inert and out of the accessibility tree', () => {

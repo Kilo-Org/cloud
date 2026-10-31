@@ -1311,6 +1311,7 @@
       "repositoryActionPlan": "Plan działań dla repozytorium",
       "settings": "Ustawienia",
       "slaPosture": "Realizacja SLA",
+      "syncFindings": "Synchronizuj problemy",
       "syncNow": "Synchronizuj teraz",
       "syncQueued": "Dodano synchronizację do kolejki",
       "syncStatusUnavailable": "Status synchronizacji jest niedostępny.",

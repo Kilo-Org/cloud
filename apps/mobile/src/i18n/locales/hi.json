@@ -1301,6 +1301,7 @@
       "repositoryActionPlan": "रिपॉज़िटरी के लिए कार्ययोजना",
       "settings": "सेटिंग",
       "slaPosture": "SLA की स्थिति",
+      "syncFindings": "समस्याएँ सिंक करें",
       "syncNow": "अभी सिंक करें",
       "syncQueued": "सिंक का अनुरोध कतार में जोड़ा गया।",
       "syncStatusUnavailable": "सिंक की स्थिति उपलब्ध नहीं है।",

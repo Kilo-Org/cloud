@@ -119,18 +119,12 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
   if (!finding) {
     return (
       <SectionCard title={t('securityAgent.dashboard.actFirst')}>
-        <Pressable
-          className="flex-row items-center justify-between gap-2 py-3 active:opacity-70"
-          onPress={() => {
-            pushOnce(findingsHref(scope, { status: 'open' }));
-          }}
-        >
-          <View className="flex-row items-center gap-2">
-            <ShieldCheck size={16} color={colors.good} />
-            <Text className="text-sm">{t('securityAgent.dashboard.noOpenFindings')}</Text>
-          </View>
-          <DirectionalArrowRight size={14} color={colors.mutedForeground} />
-        </Pressable>
+        {/* Nothing to act on, so the row leads nowhere: no chevron and no
+            press feedback, which would promise a destination. */}
+        <View className="flex-row items-center gap-2 py-3">
+          <ShieldCheck size={16} color={colors.good} />
+          <Text className="text-sm">{t('securityAgent.dashboard.noOpenFindings')}</Text>
+        </View>
       </SectionCard>
     );
   }
@@ -188,19 +182,23 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
             )}`
           )}
         />
+        {/* Each dot carries its row's severity class, the same way the action
+            posture below marks confirmed-exploitable red and needs-review
+            amber: critical red, high amber, medium & low neutral. A count of
+            zero does not change what the row is about. */}
         <KvRow
           className={ROW_TARGET_CLASS}
           label={t('securityAgent.dashboard.criticalOverdue')}
           value={rowValue(neverSynced, formatNumber(bySeverity.critical.overdue, i18n.language))}
           valueTone="muted"
-          dotTone={rowTone(neverSynced, bySeverity.critical.overdue > 0 ? 'danger' : 'muted')}
+          dotTone={rowTone(neverSynced, 'danger')}
         />
         <KvRow
           className={ROW_TARGET_CLASS}
           label={t('securityAgent.dashboard.highOverdue')}
           value={rowValue(neverSynced, formatNumber(bySeverity.high.overdue, i18n.language))}
           valueTone="muted"
-          dotTone={rowTone(neverSynced, bySeverity.high.overdue > 0 ? 'danger' : 'muted')}
+          dotTone={rowTone(neverSynced, 'warn')}
         />
         <KvRow
           className={ROW_TARGET_CLASS}
@@ -210,10 +208,7 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
             formatNumber(bySeverity.medium.overdue + bySeverity.low.overdue, i18n.language)
           )}
           valueTone="muted"
-          dotTone={rowTone(
-            neverSynced,
-            bySeverity.medium.overdue + bySeverity.low.overdue > 0 ? 'danger' : 'muted'
-          )}
+          dotTone={rowTone(neverSynced, 'muted')}
           last
         />
       </SectionCard>

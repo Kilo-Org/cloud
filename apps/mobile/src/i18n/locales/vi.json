@@ -1301,6 +1301,7 @@
       "repositoryActionPlan": "Kế hoạch xử lý cho từng kho lưu trữ",
       "settings": "Cài đặt",
       "slaPosture": "Tình trạng SLA",
+      "syncFindings": "Đồng bộ vấn đề",
       "syncNow": "Đồng bộ ngay",
       "syncQueued": "Đã đưa yêu cầu đồng bộ vào hàng đợi",
       "syncStatusUnavailable": "Không thể lấy trạng thái đồng bộ.",

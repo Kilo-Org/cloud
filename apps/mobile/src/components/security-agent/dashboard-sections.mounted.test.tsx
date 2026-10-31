@@ -153,7 +153,10 @@ describe('DashboardSections priority card', () => {
 
     expect(copy(card)).toContain('securityAgent.dashboard.noOpenFindings');
     expect(card.findAllByType('ShieldCheck')).toHaveLength(1);
-    expect(card.findAllByType('Pressable')).toHaveLength(1);
+    // Nothing to act on, so the all-clear row leads nowhere: no press target
+    // and no chevron that would promise a destination.
+    expect(card.findAllByType('Pressable')).toHaveLength(0);
+    expect(card.findAllByType('DirectionalArrowRight')).toHaveLength(0);
   });
 });
 

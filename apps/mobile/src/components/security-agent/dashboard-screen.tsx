@@ -19,6 +19,7 @@ import { toast } from 'sonner-native';
 import { QueryError } from '@/components/query-error';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardSections } from '@/components/security-agent/dashboard-sections';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
@@ -29,7 +30,7 @@ import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { INLINE_LINK_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { INLINE_LINK_BOX_CLASS, ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber, formatPercent, UNMEASURED_VALUE } from '@/lib/format';
 import {
   useRetrySecurityAgentSettings,
@@ -249,6 +250,11 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const metrics = data ? buildLocalizedMetrics(data, slaEnabled, neverSynced) : [];
 
   const lastSyncTime = lastSync.data?.lastSyncTime;
+  // The prompt stands in for an empty grid, never for counts: a scope whose
+  // owner-level sync stamp is missing can still hold findings from a partial
+  // run, and those must stay visible. A read that has not answered yet keeps
+  // its own surface (the skeleton or the retry card).
+  const showFirstSyncPrompt = neverSynced && data?.analysis.total === 0;
   const now = useRelativeTimeNow();
   let lastSyncLabel = t('securityAgent.dashboard.notYetSynced');
   if (lastSync.isError) {
@@ -409,9 +415,17 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             <Text className="text-sm font-medium" numberOfLines={1}>
               {repoFullName ?? t('common.allRepositories')}
             </Text>
-            <Text variant="muted" className="text-xs">
-              {lastSyncLabel}
-            </Text>
+            {/* A scope with no measured sync states that fact once per
+                surface that reports it: the first-sync prompt carries it, and
+                a scope that already holds findings shows it as each tile's
+                caption and in the "Act first" row. The filter row above them
+                would be the same sentence a third time, so it keeps its
+                status line only once a sync has been measured. */}
+            {neverSynced ? null : (
+              <Text variant="muted" className="text-xs">
+                {lastSyncLabel}
+              </Text>
+            )}
           </Pressable>
           <IconButton
             onPress={() => {
@@ -510,35 +524,15 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           />
         ))}
 
-        {/* `isPending` rather than `isLoading`: a NetInfo-paused read is pending
-            without fetching, and it must show this skeleton instead of an empty
-            metrics row. */}
-        {dashboardStats.isPending ? (
-          <View className="flex-row flex-wrap gap-3">
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-          </View>
-        ) : (
-          <View className="flex-row flex-wrap gap-3">
-            {metrics.map(metric => (
-              <View key={metric.label} className="w-[47%] gap-1 rounded-lg bg-secondary p-3">
-                <Text variant="muted" className="text-xs">
-                  {metric.label}
-                </Text>
-                <Text
-                  className={cn('font-mono text-xl font-semibold', METRIC_TONE_CLASS[metric.tone])}
-                >
-                  {metric.value}
-                </Text>
-                <Text variant="muted" className="text-[11px]">
-                  {metric.detail}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
+        {dashboardStats.isError && !data ? (
+          <QueryError
+            variant="server"
+            placement="top"
+            title={t('securityAgent.dashboard.couldNotLoad')}
+            onRetry={() => void dashboardStats.refetch()}
+            isRetrying={dashboardStats.isFetching}
+          />
+        ) : null}
 
         {slaEnabled && data && data.sla.overall.total === 0 ? (
           <View className="flex-row items-center gap-4">
@@ -568,25 +562,75 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           </View>
         ) : null}
 
-        {dashboardStats.isError && !data ? (
-          <QueryError
-            variant="server"
+        {showFirstSyncPrompt ? (
+          // Every count reads 0 before the first sync finishes, so the KPI grid
+          // and the posture sections looked like a clean result. Until a sync
+          // has completed the screen offers the sync itself instead.
+          <EmptyState
+            icon={ShieldAlert}
             placement="top"
-            title={t('securityAgent.dashboard.couldNotLoad')}
-            onRetry={() => void dashboardStats.refetch()}
-            isRetrying={dashboardStats.isFetching}
+            className="py-6"
+            title={t('securityAgent.dashboard.notYetSynced')}
+            action={
+              <Button
+                className={STATE_ACTION_CLASS}
+                disabled={syncDisabled}
+                loading={triggerSync.isPending}
+                accessibilityLabel={t('securityAgent.dashboard.syncFindings')}
+                onPress={() => {
+                  startSync({ repoFullName });
+                }}
+              >
+                <Text>{t('securityAgent.dashboard.syncFindings')}</Text>
+              </Button>
+            }
           />
-        ) : null}
+        ) : (
+          <>
+            {/* `isPending` rather than `isLoading`: a NetInfo-paused read is
+                pending without fetching, and it must show this skeleton instead
+                of an empty metrics row. */}
+            {dashboardStats.isPending ? (
+              <View className="flex-row flex-wrap gap-3">
+                <Skeleton className="h-24 w-[47%] rounded-lg" />
+                <Skeleton className="h-24 w-[47%] rounded-lg" />
+                <Skeleton className="h-24 w-[47%] rounded-lg" />
+                <Skeleton className="h-24 w-[47%] rounded-lg" />
+              </View>
+            ) : (
+              <View className="flex-row flex-wrap gap-3">
+                {metrics.map(metric => (
+                  <View key={metric.label} className="w-[47%] gap-1 rounded-lg bg-secondary p-3">
+                    <Text variant="muted" className="text-xs">
+                      {metric.label}
+                    </Text>
+                    <Text
+                      className={cn(
+                        'font-mono text-xl font-semibold',
+                        METRIC_TONE_CLASS[metric.tone]
+                      )}
+                    >
+                      {metric.value}
+                    </Text>
+                    <Text variant="muted" className="text-[11px]">
+                      {metric.detail}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
 
-        {data ? (
-          <DashboardSections
-            scope={scope}
-            data={data}
-            slaEnabled={slaEnabled}
-            repoFullName={repoFullName}
-            neverSynced={neverSynced}
-          />
-        ) : null}
+            {data ? (
+              <DashboardSections
+                scope={scope}
+                data={data}
+                slaEnabled={slaEnabled}
+                repoFullName={repoFullName}
+                neverSynced={neverSynced}
+              />
+            ) : null}
+          </>
+        )}
       </TabScreenScrollView>
     </View>
   );

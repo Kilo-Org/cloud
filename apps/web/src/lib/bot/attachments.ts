@@ -1,4 +1,5 @@
 import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { TRPCError } from '@trpc/server';
 import {
   CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
   CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES,
@@ -112,6 +113,11 @@ function logAttachmentFailure(op: string, error: unknown): void {
   });
 }
 
+/** A per-message or per-account ledger bound is an expected refusal. */
+function isLedgerRefusal(error: unknown): boolean {
+  return error instanceof TRPCError && error.code === 'BAD_REQUEST';
+}
+
 /**
  * Upload supported Slack attachments to the canonical Cloud Agent attachment
  * location and return one ordered reference for the initial session prompt.
@@ -192,7 +198,13 @@ export async function extractAndUploadAttachments(
       // A row whose write failed holds ceiling budget without an object, so
       // give it back now instead of waiting for its lease to lapse.
       if (admittedKey) await discardPendingUploads(userId, [admittedKey]);
-      logAttachmentFailure('upload-bot-attachment', error);
+      if (isLedgerRefusal(error)) {
+        // A ledger bound is an expected answer to this message, not an
+        // incident; the other files of the message still go through.
+        console.warn('[KiloBot] Attachment not forwarded:', error.message);
+      } else {
+        logAttachmentFailure('upload-bot-attachment', error);
+      }
     }
   }
 

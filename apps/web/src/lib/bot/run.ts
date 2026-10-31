@@ -143,12 +143,15 @@ async function processMessage({
 
     if (!result.startedCloudAgentSession) {
       // The run never handed these files to a session, so release their
-      // pending rows and objects now instead of waiting for the reaper.
-      await discardUploadedAttachments(user.id, uploadedAttachments);
+      // pending rows and objects now. The reclaim starts before the reply and
+      // is still awaited before returning, so the user is not held behind
+      // storage work and the invocation does not leave it behind.
+      const discarded = discardUploadedAttachments(user.id, uploadedAttachments);
       await botPlatform.withAuthContext({
         platformIntegration,
         fn: () => thread.post({ markdown: result.finalText }),
       });
+      await discarded;
     }
 
     return result.startedCloudAgentSession;
@@ -156,8 +159,9 @@ async function processMessage({
     const errMsg = error instanceof Error ? error.message : String(error);
 
     // A started session's rows are already linked, so this only reclaims the
-    // uploads of a run that failed before a session took them.
-    await discardUploadedAttachments(user.id, uploadedAttachments);
+    // uploads of a run that failed before a session took them. Start it before
+    // the error reply and await it at the end of the branch.
+    const discarded = discardUploadedAttachments(user.id, uploadedAttachments);
 
     updateBotRequest(botRequestId, {
       status: 'error',
@@ -172,6 +176,7 @@ async function processMessage({
       fn: () =>
         thread.post(`Sorry, there was an error calling the AI service: ${errMsg.slice(0, 200)}`),
     });
+    await discarded;
 
     return false;
   }

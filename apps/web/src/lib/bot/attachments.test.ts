@@ -2,6 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@j
 import type { Attachment, Message } from 'chat';
 import type { randomUUID as RandomUUID } from 'crypto';
 import type { captureException as CaptureException } from '@sentry/nextjs';
+import { TRPCError } from '@trpc/server';
 import type { extractAndUploadAttachments as ExtractAndUploadAttachments } from './attachments';
 
 jest.mock('@kilocode/web-shared/lib/r2/client', () => ({
@@ -319,7 +320,10 @@ describe('extractAndUploadAttachments', () => {
       .mockReturnValueOnce(MARKDOWN_ID)
       .mockReturnValueOnce(FRESH_IDS[1]);
     mockAdmitPendingUpload.mockRejectedValueOnce(
-      new Error('Maximum 25 uploads allowed per account')
+      new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Maximum 25 uploads allowed per account',
+      })
     );
 
     const result = await extractAndUploadAttachments(
@@ -339,7 +343,8 @@ describe('extractAndUploadAttachments', () => {
     expect(mockSend.mock.calls[0]?.[0]).toMatchObject({
       input: { Key: `user-1/cloud-agent/${MESSAGE_UUID}/${MARKDOWN_ID}.md` },
     });
-    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    // A bound is an expected answer to the message, not an incident.
+    expect(mockCaptureException).not.toHaveBeenCalled();
     expect(mockReleasePendingUploads).not.toHaveBeenCalled();
   });
 

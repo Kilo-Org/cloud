@@ -157,10 +157,7 @@ export function getPrReviewEntryPath(): Href {
  * opener (`profile-route-stack.ts`), which keeps Back with that screen instead
  * of building the profiles list beneath it.
  */
-function profileContextQuery(
-  organizationId?: string,
-  openedFrom?: ProfileExternalOpener
-): string {
+function profileContextQuery(organizationId?: string, openedFrom?: ProfileExternalOpener): string {
   const parts = [
     organizationId === undefined ? '' : `organizationId=${encodeURIComponent(organizationId)}`,
     openedFrom === undefined ? '' : openedFromQuery(openedFrom),
@@ -177,7 +174,6 @@ export function getProfilesPath(stack: ProfileManagementStack = 'profileTab'): H
 export function getProfilesRouteName(stack: ProfileManagementStack = 'profileTab'): string {
   return PROFILE_LIST_ROUTE_NAMES[stack];
 }
-
 
 /** Where the repo-to-profile defaults screen is opened from. */
 export type RepoBindingsPathOptions = {

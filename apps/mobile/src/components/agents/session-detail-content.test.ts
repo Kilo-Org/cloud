@@ -1218,10 +1218,10 @@ describe('session detail active-profile indicator', () => {
       });
       expect(navigationRoutes.at(-1)).toBe(
         `/(app)/profile-management/p1${
-        ownerType === 'organization'
-          ? '?organizationId=org-a&openedFrom=session'
-          : '?openedFrom=session'
-      }`
+          ownerType === 'organization'
+            ? '?organizationId=org-a&openedFrom=session'
+            : '?openedFrom=session'
+        }`
       );
     }
   );

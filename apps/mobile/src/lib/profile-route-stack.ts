@@ -40,7 +40,7 @@ export const PROFILE_STACK_REBUILT_PARAM = 'stackRebuilt';
  * belongs to the screen that opened the form, not to the profiles list the
  * reader never came from, so the marker keeps the stack repair away from them.
  */
-export const PROFILE_OPENED_FROM_PARAM = 'openedFrom';
+const PROFILE_OPENED_FROM_PARAM = 'openedFrom';
 
 /** Who opened a profile screen from outside the profile tree. */
 export type ProfileExternalOpener = 'session' | 'composer';
@@ -132,7 +132,9 @@ export function profileStackRepairScreenOptions({
 export function profileScreenPath(href: Href): string {
   const path = hrefPathSchema.parse(href);
   const [withoutQuery = ''] = path.split('?');
-  const segments = withoutQuery.split('/').filter(part => part.length > 0 && !/^\(.+\)$/.test(part));
+  const segments = withoutQuery
+    .split('/')
+    .filter(part => part.length > 0 && !/^\(.+\)$/.test(part));
   return `/${segments.join('/')}`;
 }
 

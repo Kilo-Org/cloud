@@ -220,10 +220,7 @@ describe('useRepairProfileRouteStack', () => {
     setStack([r('tabs', '(tabs)'), r('a', AGENTS)], 1);
     mount();
 
-    setStack(
-      [r('tabs', '(tabs)'), r('a', AGENTS), r('l', LIST, { stackRebuilt: '1' })],
-      2
-    );
+    setStack([r('tabs', '(tabs)'), r('a', AGENTS), r('l', LIST, { stackRebuilt: '1' })], 2);
     endTransition();
 
     expect(resetMock).not.toHaveBeenCalled();

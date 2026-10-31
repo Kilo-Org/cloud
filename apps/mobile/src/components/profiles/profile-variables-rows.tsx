@@ -103,7 +103,16 @@ export function VariableRowView({
         disabled={onEdit === undefined}
         onPress={onEdit}
       >
-        <Text className="flex-1 font-mono text-sm text-foreground" numberOfLines={1}>
+        {/* Middle ellipsis: keys in one profile share long prefixes, so a tail
+            cut made neighbouring rows look identical. A key can be up to 256
+            characters and never fits a compact row, and Android middle-truncates
+            single-line text only, so this keeps both ends visible in one line
+            instead of wrapping. */}
+        <Text
+          className="flex-1 font-mono text-sm text-foreground"
+          numberOfLines={1}
+          ellipsizeMode="middle"
+        >
           {row.key}
         </Text>
         {row.isSecret && onToggleReveal === undefined ? (

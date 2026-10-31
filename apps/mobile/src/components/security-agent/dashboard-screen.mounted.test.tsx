@@ -10,6 +10,7 @@
 // Retryable failures keep both controls enabled so the user can retry under the
 // same hoisted key.
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -225,7 +226,28 @@ vi.mock('@/lib/utils', () => ({
   parseTimestamp: (value: string) => value,
   timeAgo: () => 'recently',
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+// The header the dashboard paints: its title names the scope, the eyebrow the
+// product. Captured per render so a test can assert what a reader reads.
+const headers = vi.hoisted(() => ({
+  props: [] as { title?: string; eyebrow?: string }[],
+}));
+// The shared membership list the scope title resolves from. The title never
+// fetches it, so the mock only needs the cache key it reads.
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: (props: { title?: string; eyebrow?: string }) => {
+    headers.props.push(props);
+    return null;
+  },
+}));
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    organizations: {
+      list: {
+        queryOptions: () => ({ queryKey: ['organizations', 'list'] }),
+      },
+    },
+  }),
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: () => null }));
 vi.mock('@/components/security-agent/audit-report-button', () => ({
   AuditReportButton: () => null,
@@ -250,16 +272,32 @@ vi.mock('@/components/tab-screen', () => ({
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
 
-function renderScreen(): R {
+function renderScreen(scope = 'personal', memberships?: unknown[]): R {
   const ref: { current: R | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(DashboardScreen, { scope: 'personal' }));
+    ref.current = TestRenderer.create(dashboardTree(scope, memberships));
   });
   const r = ref.current;
   if (!r) {
     throw new Error('renderer was not created');
   }
   return r;
+}
+
+/** The dashboard inside the provider stack it needs, for a first render or an update. */
+function dashboardTree(scope = 'personal', memberships?: unknown[]): ReactElement {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  if (memberships) {
+    // The app-wide membership list the scope title reads, already cached.
+    queryClient.setQueryData(['organizations', 'list'], memberships);
+  }
+  return createElement(
+    QueryClientProvider,
+    { client: queryClient },
+    createElement(DashboardScreen, { scope })
+  );
 }
 
 type SyncControlKey = 'securityAgent.dashboard.syncNow' | 'securityAgent.dashboard.syncFindings';
@@ -332,6 +370,36 @@ function renderedTexts(root: I): string[] {
 function dashboardMetric(id: string) {
   return { id, label: '', value: '', detail: '', tone: 'neutral' as const };
 }
+
+describe('DashboardScreen names the scope it acts on', () => {
+  // The dashboard is the enabled landing of one scope. An admin in several
+  // organizations reads whose agent — and whose GitHub app — this one is.
+  it('names the organization the dashboard belongs to', () => {
+    headers.props = [];
+    renderScreen('org_123', [
+      { organizationId: 'org_123', organizationName: 'Drain Labs', role: 'owner' },
+    ]);
+    const header = headers.props.at(-1);
+    expect(header?.title).toBe('Drain Labs');
+    expect(header?.eyebrow).toBe('Security Agent');
+  });
+
+  it('names the personal scope', () => {
+    headers.props = [];
+    renderScreen('personal');
+    const header = headers.props.at(-1);
+    expect(header?.title).toBe('Personal');
+    expect(header?.eyebrow).toBe('Security Agent');
+  });
+
+  it('keeps the header line while the membership list loads', () => {
+    headers.props = [];
+    renderScreen('org_123');
+    const header = headers.props.at(-1);
+    expect(header?.title).toBe('Organization');
+    expect(header?.eyebrow).toBe('Security Agent');
+  });
+});
 
 describe('DashboardScreen sync control terminal states', () => {
   beforeEach(() => {
@@ -478,7 +546,7 @@ describe('DashboardScreen sync control terminal states', () => {
       triggerSync.isError = false;
       triggerSync.isPending = true;
       triggerSync.error = null;
-      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+      root.update(dashboardTree());
     });
 
     expect(syncRetries(root.root)).toHaveLength(1);
@@ -511,7 +579,7 @@ describe('DashboardScreen sync control terminal states', () => {
       triggerSync.isPending = false;
       triggerSync.error = null;
       options.onSuccess();
-      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+      root.update(dashboardTree());
     });
 
     expect(syncRetries(root.root)).toHaveLength(0);

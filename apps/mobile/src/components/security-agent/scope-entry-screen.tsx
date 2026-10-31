@@ -26,13 +26,20 @@ import {
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { useSecurityScopeTitle } from '@/lib/hooks/use-security-scope-title';
 import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
 
-function ScopeEntrySkeleton() {
+function ScopeEntrySkeleton({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
+  const scopeTitle = useSecurityScopeTitle(scope);
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={t('common.securityAgent')} />
+      <ScreenHeader
+        className="px-6"
+        title={scopeTitle}
+        eyebrow={t('common.securityAgent')}
+        titleNumberOfLines={2}
+      />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-10 w-full rounded-lg" />
         <View className="flex-row flex-wrap gap-3">
@@ -50,6 +57,7 @@ function ScopeEntrySkeleton() {
 
 export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
+  const scopeTitle = useSecurityScopeTitle(scope);
   const permission = useSecurityAgentPermissionStatus(scope);
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
@@ -182,7 +190,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   if (view === 'denied') {
     return (
       <ScopeAccessDeniedScreen
-        title={t('common.securityAgent')}
+        title={scopeTitle}
+        eyebrow={t('common.securityAgent')}
         kind={access === 'not-found' ? 'not-found' : 'denied'}
         onRetry={() => void recovery.retry()}
         isRetrying={recovery.isRetrying}
@@ -208,7 +217,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     // started from. A retry that resolves the other reads still lands on their
     // own view, as before.
     if (recovery.isRetrying) {
-      return <ScopeEntrySkeleton />;
+      return <ScopeEntrySkeleton scope={scope} />;
     }
     // Only the reads that produced this screen carry the cause. A read that
     // still holds cached data, or that resolved, must not vote on it.
@@ -230,7 +239,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     });
     return (
       <PlatformErrorScreen
-        title={t('common.securityAgent')}
+        title={scopeTitle}
+        eyebrow={t('common.securityAgent')}
         errorTitle={t('securityAgent.scopeEntry.couldNotLoad')}
         variant={failure.variant}
         message={failure.descriptionKey ? t(failure.descriptionKey) : undefined}
@@ -240,7 +250,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   }
 
   if (view === 'loading') {
-    return <ScopeEntrySkeleton />;
+    return <ScopeEntrySkeleton scope={scope} />;
   }
 
   // Audit-report access shouldn't depend on the agent being connected or
@@ -258,7 +268,9 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
         <View className="flex-1 bg-background">
           <ScreenHeader
             className="px-6"
-            title={t('common.securityAgent')}
+            title={scopeTitle}
+            eyebrow={t('common.securityAgent')}
+            titleNumberOfLines={2}
             headerRight={auditAction}
           />
           {!connectUrl && isMinting ? (
@@ -290,7 +302,9 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
         <View className="flex-1 bg-background">
           <ScreenHeader
             className="px-6"
-            title={t('common.securityAgent')}
+            title={scopeTitle}
+            eyebrow={t('common.securityAgent')}
+            titleNumberOfLines={2}
             headerRight={auditAction}
           />
           {!reauthUrl && !connectUrl && isMinting ? (

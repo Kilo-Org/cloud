@@ -41,6 +41,7 @@ import {
   useTriggerSecuritySync,
 } from '@/lib/hooks/use-security-agent';
 import { isSecuritySyncRetryable, securitySyncReconcileCopy } from '@/lib/security-agent-ledger';
+import { useSecurityScopeTitle } from '@/lib/hooks/use-security-scope-title';
 import {
   securityDismissFailureCopy,
   useSecurityDismissFailures,
@@ -173,6 +174,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const scopeTitle = useSecurityScopeTitle(scope);
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const [repoFullName, setRepoFullName] = useState<string | undefined>(undefined);
@@ -314,7 +316,9 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     <View className="flex-1 bg-background">
       <ScreenHeader
         className="px-6"
-        title={t('common.securityAgent')}
+        title={scopeTitle}
+        eyebrow={t('common.securityAgent')}
+        titleNumberOfLines={2}
         // Size-11 (44dp) icon buttons: findings and settings, plus the audit
         // overflow when the viewer can manage the agent. Declaring exactly the
         // buttons this viewer renders drops the actions onto their own row

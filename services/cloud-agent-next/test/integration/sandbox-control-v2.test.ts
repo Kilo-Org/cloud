@@ -1984,6 +1984,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
     'media.githubusercontent.com',
     'objects.githubusercontent.com',
     'raw.githubusercontent.com',
+    'uploads.github.com',
     'worker.example.com',
   ];
 

@@ -11,6 +11,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { DashboardSections } from './dashboard-sections';
 
+// The counted bucket helper is spied on: a line that names three counts can
+// only agree them if each bucket is handed to its own plural family with its
+// own count, so what the row passes here is the thing worth pinning.
+const { severityCountPhrase } = vi.hoisted(() => ({
+  severityCountPhrase: vi.fn((bucket: string, count: number) => `${bucket}:${count}`),
+}));
+vi.mock('@/components/security-agent/severity-count-phrase', () => ({ severityCountPhrase }));
+
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
@@ -174,7 +182,72 @@ describe('DashboardSections stat rows', () => {
   it('keeps the measured counts for a synced organization', () => {
     const rows = renderSections({ neverSynced: false }).root.findAllByType('KvRow');
 
-    expect(rows.map(row => row.props.value)).toContain('0 / 0');
+    // The SLA figures live on the metric tiles above these rows, so every row
+    // here is a measured coverage count: a number, never the unmeasured dash.
+    expect(rows.map(row => row.props.value)).not.toContain('—');
+    expect(rows.map(row => row.props.value)).toContain('0');
     expect(rows.map(row => row.props.dotTone)).toContain('good');
+  });
+});
+
+describe('DashboardSections repository row', () => {
+  // One line names three counts, so a single `count` on the line cannot agree
+  // any of them: each bucket has to reach its own plural family with its own
+  // count. A formatted number passed instead would render the plural form for
+  // every count — "1 críticas" — which is the defect this pins.
+  it('names each bucket through its own counted phrase', () => {
+    severityCountPhrase.mockClear();
+    renderSections({
+      neverSynced: false,
+      data: dashboardData({
+        repoHealth: [
+          {
+            repoFullName: 'drain-e2e-labs/notes',
+            open: 3,
+            critical: 1,
+            high: 1,
+            medium: 1,
+            low: 0,
+            overdue: 2,
+            exploitable: 1,
+            needsAction: 3,
+            slaCompliancePercent: 33.3,
+            slaComplianceMeasured: true,
+          },
+        ],
+      }),
+    });
+
+    expect(severityCountPhrase.mock.calls).toEqual([
+      ['repoOpen', 3],
+      ['repoCritical', 1],
+      ['repoHigh', 1],
+    ]);
+  });
+});
+
+describe('DashboardSections SLA posture', () => {
+  // The compliance and deadline tiles above these sections already state the
+  // within-deadline ratio and the per-severity overdue counts. The posture card
+  // repeated them, so it is gone while SLA tracking is on; the analysis posture
+  // it still shows is the part the tiles leave out.
+  it('leaves the SLA figures to the tiles while SLA tracking is on', () => {
+    const labels = renderSections({ neverSynced: false, slaEnabled: true })
+      .root.findAllByType('KvRow')
+      .map(row => row.props.label);
+
+    expect(labels).not.toContain('securityAgent.dashboard.withinDeadline');
+    expect(labels).not.toContain('securityAgent.dashboard.criticalOverdue');
+    expect(labels).not.toContain('securityAgent.dashboard.highOverdue');
+    expect(labels).not.toContain('securityAgent.dashboard.mediumLowOverdue');
+  });
+
+  it('keeps the analysis posture for a scope without SLA tracking', () => {
+    const labels = renderSections({ neverSynced: false, slaEnabled: false })
+      .root.findAllByType('KvRow')
+      .map(row => row.props.label);
+
+    expect(labels).toContain('securityAgent.dashboard.confirmedExploitable');
+    expect(labels).toContain('securityAgent.dashboard.noImmediateAction');
   });
 });

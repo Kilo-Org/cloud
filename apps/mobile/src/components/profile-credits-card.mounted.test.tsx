@@ -420,6 +420,9 @@ describe('CreditsCard balance state', () => {
       creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
     });
     const { renderer, texts, unmount } = await mountCard();
+    // The expected sentence pins the zone marker on the date's line: a breakable
+    // space let it start the wrapped line, where a right-to-left sentence reads
+    // it as the end of the following one.
     const explanation = ` in credits expires 12/17/2099${UTC_MARKER}. Credits with the earliest expiry are used first.`;
     await waitFor(() => texts().includes(`$2.00${explanation}`));
 
@@ -430,19 +433,6 @@ describe('CreditsCard balance state', () => {
     await choose(renderer, 'Show balance');
     expect(texts()).toContain(`$2.00${explanation}`);
     expect(texts()).toContain('$10.00');
-    unmount();
-  });
-
-  it('keeps the UTC marker on the expiry date so a wrap cannot start a line with it', async () => {
-    currentUser.userId = 'user-a';
-    getContextBalanceQueryFn.mockResolvedValue({ balance: 2 });
-    personalCreditBlocksQueryFn.mockResolvedValue({
-      creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
-    });
-    const { texts, unmount } = await mountCard();
-    // A breakable space left the marker to start the wrapped line, where a
-    // right-to-left sentence reads it as the end of the following one.
-    await waitFor(() => texts().some(text => text.includes(`12/17/2099${UTC_MARKER}. Credits`)));
     unmount();
   });
 

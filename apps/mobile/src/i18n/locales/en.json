@@ -1746,7 +1746,8 @@
       "sortSeverityDesc": "Severity: high to low",
       "sortSeverityAsc": "Severity: low to high",
       "sortSlaDue": "SLA due date",
-      "overdueOnly": "Overdue only"
+      "overdueOnly": "Overdue only",
+      "noRepositories": "No repositories are synced or selected yet. Choose them in Security Agent settings."
     },
     "automation": {
       "title": "Automation",
@@ -2127,6 +2128,9 @@
       "ambiguous": "Couldn't confirm — check the security review before retrying.",
       "settleFailed": "The action completed, but we could not record the result. Please try again.",
       "replayFailed": "This action did not complete. Please try again.",
+      "syncNoRepositories": "No repositories are in the sync scope. Choose the repositories Security Agent monitors, then sync again.",
+      "syncIntegrationInactive": "The GitHub connection for Security Agent is not active. Reconnect the Kilo GitHub App, then sync again.",
+      "syncMissingPermission": "The Kilo GitHub App cannot read vulnerability alerts. Grant that permission in GitHub, then sync again.",
       "actionFailed": "Could not complete this action. Please try again.",
       "actionBlocked": "Could not complete this action. The problem needs fixing before you can retry."
     },
@@ -3230,7 +3234,7 @@
     "couldNotSaveChoice": "Could not save your choice. Please try again.",
     "onlineAllowed": "Online, allowed",
     "onlineNotAllowed": "Online, not allowed",
-    "optionalReview": "Optional — you can change this any time in Settings",
+    "optionalReview": "Optional",
     "optionalOnboarding": "Optional — on unless you turn it off",
     "aiProvidersWhat": "Your prompts, conversation history, and any files you attach.",
     "aiProvidersWhy": "To generate AI responses.",
@@ -4042,7 +4046,8 @@
       "nameRequired": "Enter a command name",
       "nameInvalid": "Name must start with a lowercase letter and use only lowercase letters, digits, and dashes",
       "templateRequired": "Enter a command template",
-      "nameConflict": "That name is reserved by a built-in command"
+      "nameConflict": "That name is reserved by a built-in command",
+      "duplicateName": "A command with this name already exists in this profile"
     },
     "repoBindings": {
       "title": "Default Profiles for Repos",

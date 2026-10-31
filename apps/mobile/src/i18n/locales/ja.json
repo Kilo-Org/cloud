@@ -1151,7 +1151,8 @@
       "sortSeverityDesc": "重大度：高い順",
       "sortSlaDue": "SLA期限",
       "statusIgnored": "無視済み",
-      "statusOpen": "オープン"
+      "statusOpen": "オープン",
+      "noRepositories": "リポジトリはまだ同期も選択もされていません。セキュリティエージェントの設定で選択してください。"
     },
     "analysis": {
       "analyzeRepository": "リポジトリを分析",
@@ -1533,7 +1534,10 @@
       "settleFailed": "操作は完了しましたが、結果を記録できませんでした。もう一度お試しください。",
       "replayFailed": "この操作は完了しませんでした。もう一度お試しください。",
       "actionFailed": "この操作を完了できませんでした。もう一度お試しください。",
-      "actionBlocked": "この操作を完了できませんでした。再試行するには、まず問題を解決する必要があります。"
+      "actionBlocked": "この操作を完了できませんでした。再試行するには、まず問題を解決する必要があります。",
+      "syncNoRepositories": "同期対象にリポジトリがありません。セキュリティエージェントが監視するリポジトリを選択してから、もう一度同期してください。",
+      "syncIntegrationInactive": "セキュリティエージェントの GitHub 接続が有効になっていません。Kilo GitHub App を再接続してから、もう一度同期してください。",
+      "syncMissingPermission": "Kilo GitHub App は vulnerability alerts を読み取れません。GitHub でその権限を付与してから、もう一度同期してください。"
     },
     "analysisState": {
       "queued": "分析の順番待ち",
@@ -2621,7 +2625,7 @@
     "couldNotSaveChoice": "選択内容を保存できませんでした。もう一度お試しください。",
     "onlineAllowed": "オンライン（許可済み）",
     "onlineNotAllowed": "オンライン（不許可）",
-    "optionalReview": "任意（設定からいつでも変更可能）",
+    "optionalReview": "任意",
     "optionalOnboarding": "任意（オフにするまで有効）",
     "aiProvidersWhat": "プロンプト、会話履歴、添付ファイル",
     "aiProvidersWhy": "AIの応答を生成するため",
@@ -3976,7 +3980,8 @@
       "nameRequired": "コマンド名を入力してください",
       "nameInvalid": "名前は小文字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
       "templateRequired": "コマンドテンプレートを入力してください",
-      "nameConflict": "その名前は組み込みコマンドによって予約されています"
+      "nameConflict": "その名前は組み込みコマンドによって予約されています",
+      "duplicateName": "このプロファイルには同じ名前のコマンドがすでに存在します"
     },
     "repoBindings": {
       "title": "リポジトリのデフォルトプロフィール",

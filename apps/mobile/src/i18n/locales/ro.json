@@ -1702,7 +1702,8 @@
       "sortSeverityDesc": "Gravitate: de la ridicată la scăzută",
       "sortSeverityAsc": "Gravitate: de la scăzută la ridicată",
       "sortSlaDue": "Termen limită SLA",
-      "overdueOnly": "Doar cu termen depășit"
+      "overdueOnly": "Doar cu termen depășit",
+      "noRepositories": "Nu există încă repository-uri sincronizate sau selectate. Alege-le din setările Agentului de securitate."
     },
     "automation": {
       "title": "Automatizare",
@@ -2095,7 +2096,10 @@
       "settleFailed": "Acțiunea s-a finalizat, dar nu am putut înregistra rezultatul. Încearcă din nou.",
       "replayFailed": "Această acțiune nu s-a finalizat. Încearcă din nou.",
       "actionFailed": "Această acțiune nu a putut fi finalizată. Încearcă din nou.",
-      "actionBlocked": "Această acțiune nu a putut fi finalizată. Problema trebuie rezolvată înainte de a încerca din nou."
+      "actionBlocked": "Această acțiune nu a putut fi finalizată. Problema trebuie rezolvată înainte de a încerca din nou.",
+      "syncNoRepositories": "Niciun repository nu face parte din domeniul de sincronizare. Alege repository-urile monitorizate de Agentul de securitate, apoi sincronizează din nou.",
+      "syncIntegrationInactive": "Conexiunea GitHub pentru Agentul de securitate nu este activă. Reconectează Kilo GitHub App, apoi sincronizează din nou.",
+      "syncMissingPermission": "Aplicația Kilo pentru GitHub nu poate citi alertele de vulnerabilitate. Acordă această permisiune în GitHub, apoi sincronizează din nou."
     },
     "analysisState": {
       "queued": "Analiză în coadă",
@@ -3199,7 +3203,7 @@
     "couldNotSaveChoice": "Alegerea ta nu a putut fi salvată. Încearcă din nou.",
     "onlineAllowed": "Online, permisă",
     "onlineNotAllowed": "Online, nepermisă",
-    "optionalReview": "Opțional — poți modifica oricând această opțiune în setări",
+    "optionalReview": "Opțional",
     "optionalOnboarding": "Opțional — activat implicit, până la dezactivare",
     "aiProvidersWhat": "Instrucțiunile tale, istoricul conversațiilor și fișierele pe care le atașezi.",
     "aiProvidersWhy": "Pentru a genera răspunsuri AI.",
@@ -4033,7 +4037,8 @@
       "nameRequired": "Introduceți un nume de comandă",
       "nameInvalid": "Numele trebuie să înceapă cu o literă mică și să folosească numai litere mici, cifre și liniuțe",
       "templateRequired": "Introduceți un șablon de comandă",
-      "nameConflict": "Acest nume este rezervat printr-o comandă încorporată"
+      "nameConflict": "Acest nume este rezervat printr-o comandă încorporată",
+      "duplicateName": "O comandă cu acest nume există deja în acest profil"
     },
     "repoBindings": {
       "title": "Profiluri implicite pentru Repos",

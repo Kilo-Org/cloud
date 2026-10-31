@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Alvorlighed: høj til lav",
       "sortSeverityAsc": "Alvorlighed: lav til høj",
       "sortSlaDue": "SLA-frist",
-      "overdueOnly": "Kun overskredne frister"
+      "overdueOnly": "Kun overskredne frister",
+      "noRepositories": "Ingen kodelagre er synkroniseret eller valgt endnu. Vælg dem i indstillingerne for Sikkerhedsagenten."
     },
     "automation": {
       "title": "Automatisering",
@@ -2062,7 +2063,10 @@
       "settleFailed": "Handlingen blev gennemført, men vi kunne ikke registrere resultatet. Prøv igen.",
       "replayFailed": "Denne handling blev ikke gennemført. Prøv igen.",
       "actionFailed": "Handlingen kunne ikke gennemføres. Prøv igen.",
-      "actionBlocked": "Handlingen kunne ikke gennemføres. Problemet skal løses, før du kan prøve igen."
+      "actionBlocked": "Handlingen kunne ikke gennemføres. Problemet skal løses, før du kan prøve igen.",
+      "syncNoRepositories": "Der er ingen kodelagre i synkroniseringsomfanget. Vælg de kodelagre, som Sikkerhedsagenten overvåger, og synkroniser derefter igen.",
+      "syncIntegrationInactive": "GitHub-forbindelsen for Sikkerhedsagenten er ikke aktiv. Genopret forbindelsen til Kilos GitHub-app, og synkroniser derefter igen.",
+      "syncMissingPermission": "Kilos GitHub-app kan ikke læse sårbarhedsadvarsler. Giv den tilladelse i GitHub, og synkroniser derefter igen."
     },
     "analysisState": {
       "queued": "Analyse i kø",
@@ -3150,7 +3154,7 @@
     "couldNotSaveChoice": "Kunne ikke gemme dit valg. Prøv igen.",
     "onlineAllowed": "Online, tilladt",
     "onlineNotAllowed": "Online, ikke tilladt",
-    "optionalReview": "Valgfrit — du kan altid ændre dette i indstillingerne",
+    "optionalReview": "Valgfrit",
     "optionalOnboarding": "Valgfrit — slået til, medmindre du slår det fra",
     "aiProvidersWhat": "Dine forespørgsler, din samtalehistorik og eventuelle filer, du vedhæfter.",
     "aiProvidersWhy": "For at generere AI-svar.",
@@ -3976,7 +3980,8 @@
       "nameRequired": "Indtast et kommandonavn",
       "nameInvalid": "Navnet skal starte med et lille bogstav og kun bruge små bogstaver, cifre og bindestreger",
       "templateRequired": "Indtast en kommandoskabelon",
-      "nameConflict": "Dette navn er reserveret af en indbygget kommando"
+      "nameConflict": "Dette navn er reserveret af en indbygget kommando",
+      "duplicateName": "En kommando med dette navn findes allerede i denne profil"
     },
     "repoBindings": {
       "title": "Standardprofiler for Repos",

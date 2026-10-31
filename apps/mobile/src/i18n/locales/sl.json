@@ -330,7 +330,7 @@
       "diffTooLarge": "preobsežne razlike",
       "openFile": "Odpri {{path}}",
       "openFileViewed": "Odpri {{path}} (ogledano)",
-      "title": "Datotek"
+      "title": "Datoteke"
     },
     "fileRows": {
       "markViewed": "Označi {{path}} kot ogledano",
@@ -795,7 +795,7 @@
     },
     "tabs": {
       "overview": "Pregled",
-      "files": "Datotek",
+      "files": "Datoteke",
       "discussion": "Razprava"
     },
     "fileStatus": {
@@ -1059,7 +1059,7 @@
     "attachmentPicker": {
       "takePhoto": "Posnemi fotografijo",
       "photoLibrary": "Fotografije",
-      "files": "Datotek",
+      "files": "Datoteke",
       "cameraAccessMessage": "Za fotografiranje v nastavitvah dovoli dostop do kamere."
     },
     "typingIndicator": {
@@ -1724,7 +1724,8 @@
       "sortSeverityDesc": "Resnost: od visoke do nizke",
       "sortSeverityAsc": "Resnost: od nizke do visoke",
       "sortSlaDue": "Rok SLA",
-      "overdueOnly": "Samo s pretečenim rokom"
+      "overdueOnly": "Samo s pretečenim rokom",
+      "noRepositories": "Noben repozitorij še ni sinhroniziran ali izbran. Izberite jih v nastavitvah Varnostnega agenta."
     },
     "automation": {
       "title": "Avtomatizacija",
@@ -2128,7 +2129,10 @@
       "settleFailed": "Dejanje je bilo izvedeno, a rezultata nismo mogli zabeležiti. Poskusi znova.",
       "replayFailed": "To dejanje se ni izvedlo. Poskusi znova.",
       "actionFailed": "Tega dejanja ni bilo mogoče dokončati. Poskusi znova.",
-      "actionBlocked": "Tega dejanja ni bilo mogoče dokončati. Težavo je treba najprej odpraviti."
+      "actionBlocked": "Tega dejanja ni bilo mogoče dokončati. Težavo je treba najprej odpraviti.",
+      "syncNoRepositories": "V obsegu sinhronizacije ni nobenega repozitorija. Izberite repozitorije, ki jih Varnostni agent spremlja, in znova sinhronizirajte.",
+      "syncIntegrationInactive": "Povezava z GitHub za Varnostnega agenta ni aktivna. Znova povežite Kilo GitHub App in nato znova sinhronizirajte.",
+      "syncMissingPermission": "Kilo GitHub App ne more brati opozoril o ranljivostih. V GitHubu dodeli to dovoljenje in znova sinhroniziraj."
     },
     "analysisState": {
       "queued": "Analiza v čakalni vrsti",
@@ -2851,7 +2855,7 @@
     "attachmentPicker": {
       "camera": "Fotoaparat",
       "photoLibrary": "Fotografije",
-      "files": "Datotek",
+      "files": "Datoteke",
       "couldNotOpenPhotoPicker": "Izbirnika fotografij ni bilo mogoče odpreti. Znova zaženi Kilo in poskusi znova.",
       "maxFilesAllowed": "Dovoljeno število datotek je največ {{displayCount}}.",
       "onlyAddingFiles": "Dodajanje datotek: samo {{accepted}} od {{total}} (največ {{max}})",
@@ -3248,7 +3252,7 @@
     "couldNotSaveChoice": "Tvoje izbire ni bilo mogoče shraniti. Poskusi znova.",
     "onlineAllowed": "Spletno, dovoljeno",
     "onlineNotAllowed": "Spletno, ni dovoljeno",
-    "optionalReview": "Neobvezno — to lahko kadar koli spremeniš v nastavitvah",
+    "optionalReview": "Neobvezno",
     "optionalOnboarding": "Neobvezno — vklopljeno, dokler tega ne izklopiš",
     "aiProvidersWhat": "Tvoji pozivi, zgodovina pogovorov in vse datoteke, ki jih priložiš.",
     "aiProvidersWhy": "Za ustvarjanje odgovorov umetne inteligence.",
@@ -4090,7 +4094,8 @@
       "nameRequired": "Vnesite ime ukaza",
       "nameInvalid": "Ime se mora začeti z malo začetnico in uporabljati samo male črke, številke in pomišljaje",
       "templateRequired": "Vnesite predlogo ukaza",
-      "nameConflict": "To ime je rezervirano z vgrajenim ukazom"
+      "nameConflict": "To ime je rezervirano z vgrajenim ukazom",
+      "duplicateName": "Ukaz s tem imenom v tem profilu že obstaja"
     },
     "repoBindings": {
       "title": "Privzeti profili za skladišča",

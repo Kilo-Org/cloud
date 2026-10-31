@@ -1,7 +1,8 @@
 import { createElement } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 import { ProfileAgentsScreen } from '@/components/profiles/profile-agents-screen';
 import { type AgentSource } from '@/components/profiles/profile-agents-model';
 import { act, type ReactTestInstance } from '@/test/renderer';
@@ -123,6 +124,22 @@ describe('ProfileAgentsScreen mode badge', () => {
     await i18n.changeLanguage('en');
   });
 
+  it('announces the agent identity before its controls', async () => {
+    h.query.data = [agent('alpha', 'primary')];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
+    );
+
+    const identity = renderer.root.findAll(
+      node => String(node.type) === 'View' && node.props.accessibilityRole === 'text'
+    )[0];
+
+    expect(identity?.props.accessibilityLabel).toBe('alpha, Primary only');
+    expect(identity?.props.accessible).toBe(true);
+
+    unmount();
+  });
+
   it('drops the row presses of the burst that closed the sheet', async () => {
     h.query.data = [agent('alpha', 'primary')];
     const { renderer, unmount } = await renderWithProviders(
@@ -143,6 +160,155 @@ describe('ProfileAgentsScreen mode badge', () => {
     expect(sheetCount(renderer.root)).toBe(0);
     expect(h.confirm).not.toHaveBeenCalled();
 
+    unmount();
+  });
+});
+
+type PressableProps = { onPress: () => void; onClose?: () => void };
+
+/** Fire one handler a host stub carries; the stubs keep props untyped. */
+function press(node: { props: unknown }): void {
+  const props = node.props as PressableProps;
+  act(() => {
+    props.onPress();
+  });
+}
+
+function pressClose(sheet: { props: unknown }): void {
+  const props = sheet.props as PressableProps;
+  const onClose = props.onClose;
+  if (typeof onClose !== 'function') {
+    throw new TypeError('the sheet rendered no onClose');
+  }
+  act(() => {
+    onClose();
+  });
+}
+
+describe('ProfileAgentsScreen form draft', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+  });
+
+  it('reopens the add sheet after a remount', async () => {
+    h.query.data = [agent('alpha', 'primary')];
+    const first = await renderWithProviders(
+      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
+    );
+    const addButton = first.renderer.root.findAll(node => String(node.type) === 'Button')[0];
+    if (!addButton) {
+      throw new Error('the add button was not rendered');
+    }
+    press(addButton);
+    expect(
+      first.renderer.root.findAll(node => String(node.type) === 'AgentFormSheet')
+    ).toHaveLength(1);
+    first.unmount();
+
+    const second = await renderWithProviders(
+      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
+    );
+    expect(
+      second.renderer.root.findAll(node => String(node.type) === 'AgentFormSheet')
+    ).toHaveLength(1);
+    second.unmount();
+  });
+
+  it('keeps the add sheet closed after the form was cancelled', async () => {
+    h.query.data = [agent('alpha', 'primary')];
+    const first = await renderWithProviders(
+      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
+    );
+    const addButton = first.renderer.root.findAll(node => String(node.type) === 'Button')[0];
+    if (!addButton) {
+      throw new Error('the add button was not rendered');
+    }
+    press(addButton);
+    const sheet = first.renderer.root.findAll(node => String(node.type) === 'AgentFormSheet')[0];
+    if (!sheet) {
+      throw new Error('the sheet was not rendered');
+    }
+    pressClose(sheet);
+    first.unmount();
+
+    const second = await renderWithProviders(
+      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
+    );
+    expect(
+      second.renderer.root.findAll(node => String(node.type) === 'AgentFormSheet')
+    ).toHaveLength(0);
+    second.unmount();
+  });
+});
+
+type MountedRenderer = Awaited<ReturnType<typeof renderWithProviders>>['renderer'];
+
+/** The nodes of one host type; the stubs keep their props untyped. */
+function nodesOfType(renderer: MountedRenderer, type: string) {
+  return renderer.root.findAll(node => String(node.type) === type);
+}
+
+/** The open sheet, which the screen wires to its own save pipeline. */
+function openSheet(renderer: MountedRenderer) {
+  const sheet = nodesOfType(renderer, 'AgentFormSheet')[0];
+  if (!sheet) {
+    throw new Error('the sheet was not rendered');
+  }
+  return sheet;
+}
+
+function pressAdd(renderer: MountedRenderer): void {
+  const button = nodesOfType(renderer, 'Button')[0];
+  if (!button) {
+    throw new Error('the add button was not rendered');
+  }
+  act(() => {
+    (button.props as { onPress: () => void }).onPress();
+  });
+}
+
+describe('ProfileAgentsScreen save ownership', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    h.query.data = [agent('alpha', 'primary')];
+    h.query.isPending = false;
+  });
+
+  it('leaves the form opened after a refused save alone when that save settles', async () => {
+    const pendingSave = Promise.withResolvers<unknown>();
+    h.mutations.createAgent.mutateAsync.mockImplementation(() => pendingSave.promise);
+
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
+    );
+    pressAdd(renderer);
+    const first = openSheet(renderer);
+    act(() => {
+      (first.props.onSave as (payload: unknown) => void)({
+        slug: 'first-agent',
+        name: 'First agent',
+        config: {},
+      });
+    });
+    expect(h.mutations.createAgent.mutateAsync).toHaveBeenCalledTimes(1);
+
+    // Dismiss that attempt and open a different form: the refusal of the first
+    // save belongs to the first form and must not appear under the second.
+    act(() => {
+      (first.props.onClose as () => void)();
+    });
+    pressAdd(renderer);
+    const second = openSheet(renderer);
+
+    await act(async () => {
+      pendingSave.reject({ data: { code: 'CONFLICT' } });
+      await Promise.resolve();
+    });
+
+    expect(second.props.slugConflictFromServer).toBe(false);
+    expect(nodesOfType(renderer, 'AgentFormSheet')).toHaveLength(1);
     unmount();
   });
 });

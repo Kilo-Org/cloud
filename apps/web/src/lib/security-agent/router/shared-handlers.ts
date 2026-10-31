@@ -84,6 +84,11 @@ import {
   buildSecurityFindingAuditHumanActor,
   REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS,
 } from '@kilocode/worker-utils/security-finding-audit';
+import {
+  SECURITY_SYNC_PRECONDITION_CODES,
+  type SecuritySyncPreconditionCode,
+} from '@kilocode/app-shared/security-agent';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import {
@@ -755,6 +760,22 @@ async function getRemediationTimeline(findingId: string): Promise<RemediationTim
     action: row.action,
     occurredAt: new Date(row.occurredAt).toISOString(),
   }));
+}
+
+/**
+ * A manual-sync precondition rejection. The English message stays the web
+ * surface's copy; `upstreamCode` is the stable marker the mobile ledger maps
+ * onto translated catalog copy, so the device never parses server prose.
+ */
+function securitySyncPreconditionError(
+  precondition: SecuritySyncPreconditionCode,
+  message: string
+): TRPCError {
+  return new TRPCError({
+    code: 'PRECONDITION_FAILED',
+    message,
+    cause: new UpstreamApiError(precondition),
+  });
 }
 
 export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps<TExtra>) {
@@ -1577,25 +1598,27 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
         const integration = await deps.getIntegration(ctx, input);
         if (!integration || integration.integration_status !== 'active') {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'GitHub integration not found or inactive',
-          });
+          throw securitySyncPreconditionError(
+            SECURITY_SYNC_PRECONDITION_CODES.integrationInactive,
+            'GitHub integration not found or inactive'
+          );
         }
 
         if (!hasSecurityReviewPermissions(integration)) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'GitHub App does not have vulnerability_alerts permission',
-          });
+          throw securitySyncPreconditionError(
+            SECURITY_SYNC_PRECONDITION_CODES.missingPermission,
+            'GitHub App does not have vulnerability_alerts permission'
+          );
         }
 
         const installationId = integration.platform_installation_id;
         if (!installationId) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'GitHub installation ID not found',
-          });
+          // Same reader-visible state as an inactive integration: the Kilo
+          // GitHub App is not usable for this owner until it is reconnected.
+          throw securitySyncPreconditionError(
+            SECURITY_SYNC_PRECONDITION_CODES.integrationInactive,
+            'GitHub installation ID not found'
+          );
         }
 
         const allRepos = readRepositorySnapshot(owner, integration).repositories;
@@ -1630,10 +1653,10 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
                   .filter((name): name is string => !!name);
 
           if (repositoriesToSync.length === 0) {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'No repositories configured for security reviews',
-            });
+            throw securitySyncPreconditionError(
+              SECURITY_SYNC_PRECONDITION_CODES.noRepositories,
+              'No repositories configured for security reviews'
+            );
           }
           syncScope = { syncType: 'all_repos', repoCount: repositoriesToSync.length };
         }

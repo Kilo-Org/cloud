@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Hamafy: avo mankany ambany",
       "sortSeverityAsc": "Hamafy: ambany mankany avo",
       "sortSlaDue": "Daty farany araka ny SLA",
-      "overdueOnly": "Nihoatra ny fe-potoana ihany"
+      "overdueOnly": "Nihoatra ny fe-potoana ihany",
+      "noRepositories": "Tsy mbola misy repositera voarindra na voafidy. Safidio ao amin'ny fikira ny Mpanampy amin'ny fiarovana izy ireo."
     },
     "automation": {
       "title": "Fampandehanana ho azy",
@@ -2068,7 +2069,10 @@
       "settleFailed": "Vita ny hetsika, fa tsy voatahiry ny vokatra. Andramo indray azafady.",
       "replayFailed": "Tsy vita ity hetsika ity. Andramo indray azafady.",
       "actionFailed": "Tsy azo vitaina ity hetsika ity. Andramo indray azafady.",
-      "actionBlocked": "Tsy azo vitaina ity hetsika ity. Mila vahana aloha ny olana."
+      "actionBlocked": "Tsy azo vitaina ity hetsika ity. Mila vahana aloha ny olana.",
+      "syncNoRepositories": "Tsy misy depo ao amin'ny sehatry ny fampifanarahana. Safidio ny depo arovan'ny Mpanampy amin'ny fiarovana, dia mifanaraha indray.",
+      "syncIntegrationInactive": "Tsy mavitrika ny fifandraisana amin'ny GitHub an'ny Mpanampy amin'ny fiarovana. Ampifandraiso indray ny Kilo GitHub App, dia avereno indray ny fampifanarahana.",
+      "syncMissingPermission": "Tsy afaka mamaky ny vulnerability alerts ny Kilo GitHub App. Omeo ao amin'ny GitHub io alalana io, dia avereno indray ny sync."
     },
     "analysisState": {
       "queued": "Voalahatra ny famakafakana",
@@ -3156,7 +3160,7 @@
     "couldNotSaveChoice": "Tsy voatahiry ny safidinao. Andramo indray azafady.",
     "onlineAllowed": "An-tserasera, avela",
     "onlineNotAllowed": "An-tserasera, tsy avela",
-    "optionalReview": "Tsy voatery — azonao ovaina ao amin'ny Fikirana amin'ny fotoana rehetra",
+    "optionalReview": "Tsy voatery",
     "optionalOnboarding": "Tsy voatery — alefa afa-tsy raha vonoinao",
     "aiProvidersWhat": "Ny toromarikanao, ny tantaran'ny resaka ary ny rakitra ampiarahinao.",
     "aiProvidersWhy": "Mba hamoronana valin'ny AI.",
@@ -3982,7 +3986,8 @@
       "nameRequired": "Ampidiro anarana baiko",
       "nameInvalid": "Ny anarana dia tsy maintsy manomboka amin'ny litera kely ary tsy mampiasa afa-tsy litera kely, isa ary tsipiho",
       "templateRequired": "Ampidiro môdely baiko",
-      "nameConflict": "Io anarana io dia voatokana amin'ny baiko naorina"
+      "nameConflict": "Io anarana io dia voatokana amin'ny baiko naorina",
+      "duplicateName": "Efa misy baiko mitondra io anarana io ao amin'ity profil ity"
     },
     "repoBindings": {
       "title": "Profiles Default ho an'ny Repos",

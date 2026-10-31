@@ -249,7 +249,7 @@ describe('SheetHeader', () => {
   it.each([
     { title: 'Language', doneLabel: 'Done', cancelLabel: 'Cancel' },
     { title: 'اللغة', doneLabel: 'تم', cancelLabel: 'إلغاء' },
-  ])('gives $doneLabel and $cancelLabel matching neutral rounded controls', async labels => {
+  ])('gives $doneLabel and $cancelLabel the same rounded control frame', async labels => {
     const onDone = vi.fn<() => void>();
     const onCancel = vi.fn<() => void>();
     const renderer = await mountElement(
@@ -268,9 +268,17 @@ describe('SheetHeader', () => {
     }
     expect(done?.props.onPress).toBe(onDone);
     expect(cancel?.props.onPress).toBe(onCancel);
-    expect(renderer.root.findByProps({ children: labels.doneLabel }).props.className).toBe(
-      renderer.root.findByProps({ children: labels.cancelLabel }).props.className
-    );
+    const doneLabelClass = renderer.root.findByProps({ children: labels.doneLabel }).props
+      .className as string;
+    const cancelLabelClass = renderer.root.findByProps({ children: labels.cancelLabel }).props
+      .className as string;
+    // The commit label carries the accent so it reads as the sheet's primary
+    // action; Cancel stays a neutral label.
+    expect(doneLabelClass).toContain('font-semibold');
+    expect(doneLabelClass).toContain('text-primary');
+    expect(cancelLabelClass).toContain('font-medium');
+    expect(cancelLabelClass).toContain('text-foreground');
+    expect(cancelLabelClass).not.toContain('text-primary');
 
     renderer.unmount();
   });

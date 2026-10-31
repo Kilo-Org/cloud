@@ -1746,7 +1746,8 @@
       "sortSeverityDesc": "Déine: ón leibhéal is airde go dtí an leibhéal is ísle",
       "sortSeverityAsc": "Déine: ón leibhéal is ísle go dtí an leibhéal is airde",
       "sortSlaDue": "Dáta dlite SLA",
-      "overdueOnly": "Thar téarma amháin"
+      "overdueOnly": "Thar téarma amháin",
+      "noRepositories": "Níl aon stórtha sioncrónaithe ná roghnaithe fós. Roghnaigh iad i socruithe an Ghníomhaire slándála."
     },
     "automation": {
       "title": "Uathoibriú",
@@ -2161,7 +2162,10 @@
       "settleFailed": "Rinneadh an gníomh, ach níorbh fhéidir linn an toradh a thaifeadadh. Bain triail as arís le do thoil.",
       "replayFailed": "Níor chríochnaigh an gníomh seo. Bain triail as arís le do thoil.",
       "actionFailed": "Níorbh fhéidir an gníomh seo a chríochnú. Bain triail as arís le do thoil.",
-      "actionBlocked": "Níorbh fhéidir an gníomh seo a chríochnú. Caithfear an fhadhb a réiteach ar dtús."
+      "actionBlocked": "Níorbh fhéidir an gníomh seo a chríochnú. Caithfear an fhadhb a réiteach ar dtús.",
+      "syncNoRepositories": "Níl aon stórtha i scóip an tsioncrónaithe. Roghnaigh na stórtha a ndéanann an Gníomhaire slándála monatóireacht orthu, ansin sioncrónaigh arís.",
+      "syncIntegrationInactive": "Níl an nasc GitHub don Ghníomhaire slándála gníomhach. Athcheangail Aip GitHub Kilo, ansin sioncrónaigh arís.",
+      "syncMissingPermission": "Ní féidir le Aip GitHub Kilo foláirimh leochaileachta a léamh. Deonaigh an cead sin i GitHub, ansin sioncrónaigh arís."
     },
     "analysisState": {
       "queued": "Anailís sa scuaine",
@@ -3297,7 +3301,7 @@
     "couldNotSaveChoice": "Níorbh fhéidir do rogha a shábháil. Bain triail as arís.",
     "onlineAllowed": "Ar líne, ceadaithe",
     "onlineNotAllowed": "Ar líne, gan chead",
-    "optionalReview": "Roghnach — is féidir leat é seo a athrú am ar bith sna socruithe",
+    "optionalReview": "Roghnach",
     "optionalOnboarding": "Roghnach — ar siúl mura gcasann tú as é",
     "aiProvidersWhat": "Do leideanna, stair do chomhráite agus aon chomhaid a cheanglaíonn tú.",
     "aiProvidersWhy": "Le freagraí AI a ghiniúint.",
@@ -4147,7 +4151,8 @@
       "nameRequired": "Cuir isteach ainm ordaithe",
       "nameInvalid": "Caithfidh an t-ainm tosú le litir chás íochtair agus gan ach litreacha beaga, digití agus daiseanna a úsáid",
       "templateRequired": "Cuir isteach teimpléad ordaithe",
-      "nameConflict": "Tá an t-ainm sin forchoimeádta ag ordú ionsuite"
+      "nameConflict": "Tá an t-ainm sin forchoimeádta ag ordú ionsuite",
+      "duplicateName": "Tá an t-ainm sin in úsáid ag ordú eile sa phróifíl seo"
     },
     "repoBindings": {
       "title": "Próifílí Réamhshocraithe le haghaidh Repos",

@@ -330,7 +330,7 @@
       "diffTooLarge": "dəyişikliklərin həcmi çox böyükdür",
       "openFile": "{{path}} faylını aç",
       "openFileViewed": "{{path}} faylını aç (baxılıb)",
-      "title": "Fayl"
+      "title": "Fayllar"
     },
     "fileRows": {
       "markViewed": "{{path}} faylını baxılmış kimi işarələ",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "Xülasə",
-      "files": "Fayl",
+      "files": "Fayllar",
       "discussion": "Müzakirə"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "Şəkil çək",
       "photoLibrary": "Qalereya",
-      "files": "Fayl",
+      "files": "Fayllar",
       "cameraAccessMessage": "Şəkil çəkmək üçün parametrlərdə kameraya girişə icazə ver."
     },
     "typingIndicator": {
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Ciddilik: yüksəkdən aşağıya",
       "sortSeverityAsc": "Ciddilik: aşağıdan yüksəyə",
       "sortSlaDue": "SLA üzrə son tarix",
-      "overdueOnly": "Yalnız gecikənlər"
+      "overdueOnly": "Yalnız gecikənlər",
+      "noRepositories": "Hələ heç bir repozitoriya sinxronlaşdırılmayıb və ya seçilməyib. Onları Təhlükəsizlik agentinin parametrlərində seç."
     },
     "automation": {
       "title": "Avtomatlaşdırma",
@@ -2062,7 +2063,10 @@
       "settleFailed": "İş tamamlandı, lakin nəticəni qeyd edə bilmədik. Yenidən cəhd et.",
       "replayFailed": "Bu iş tamamlanmadı. Yenidən cəhd et.",
       "actionFailed": "Bu işi tamamlamaq mümkün olmadı. Yenidən cəhd et.",
-      "actionBlocked": "Bu işi tamamlamaq mümkün olmadı. Problemi həll etmədən yenidən cəhd etmək olmaz."
+      "actionBlocked": "Bu işi tamamlamaq mümkün olmadı. Problemi həll etmədən yenidən cəhd etmək olmaz.",
+      "syncNoRepositories": "Sinxronizasiya əhatəsində repozitoriya yoxdur. Təhlükəsizlik agentinin izlədiyi repozitoriyaları seç, sonra yenidən sinxronlaşdır.",
+      "syncIntegrationInactive": "Təhlükəsizlik agenti üçün GitHub bağlantısı aktiv deyil. Kilo GitHub tətbiqini yenidən qoş, sonra yenidən sinxronlaşdır.",
+      "syncMissingPermission": "Kilo GitHub tətbiqi zəiflik xəbərdarlıqlarını oxuya bilmir. Həmin icazəni GitHub-da ver, sonra yenidən sinxronlaşdır."
     },
     "analysisState": {
       "queued": "Təhlil növbəyə alınıb",
@@ -2767,7 +2771,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Qalereya",
-      "files": "Fayl",
+      "files": "Fayllar",
       "couldNotOpenPhotoPicker": "Şəkil seçicisini açmaq mümkün olmadı. Kilo-nu yenidən başlat və yenidən cəhd et.",
       "maxFilesAllowed": "Ən çox {{displayCount}} fayl əlavə etmək olar.",
       "onlyAddingFiles": "{{total}} fayldan yalnız {{accepted}} fayl əlavə olunur (ən çox {{max}})",
@@ -3150,7 +3154,7 @@
     "couldNotSaveChoice": "Seçimini saxlamaq mümkün olmadı. Yenidən cəhd et.",
     "onlineAllowed": "Onlayn, icazə verilib",
     "onlineNotAllowed": "Onlayn, icazə verilməyib",
-    "optionalReview": "İstəyə bağlı — istənilən vaxt parametrlərdə dəyişə bilərsən",
+    "optionalReview": "İstəyə bağlı",
     "optionalOnboarding": "İstəyə bağlı — söndürməsən, aktiv qalır",
     "aiProvidersWhat": "Sorğuların, söhbət tarixçən və əlavə etdiyin bütün fayllar.",
     "aiProvidersWhy": "AI cavabları yaratmaq üçün.",
@@ -3976,7 +3980,8 @@
       "nameRequired": "Komanda adını daxil edin",
       "nameInvalid": "Ad kiçik hərflə başlamalı və yalnız kiçik hərflərdən, rəqəmlərdən və tirelərdən istifadə etməlidir",
       "templateRequired": "Komanda şablonu daxil edin",
-      "nameConflict": "Bu ad daxili əmrlə qorunur"
+      "nameConflict": "Bu ad daxili əmrlə qorunur",
+      "duplicateName": "Bu profildə bu adda komanda artıq mövcuddur"
     },
     "repoBindings": {
       "title": "Repos üçün defolt profillər",

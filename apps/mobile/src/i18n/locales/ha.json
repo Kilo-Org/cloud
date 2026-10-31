@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Tsanani: daga babba zuwa ƙarami",
       "sortSeverityAsc": "Tsanani: daga ƙarami zuwa babba",
       "sortSlaDue": "Ranar cikar wa'adin SLA",
-      "overdueOnly": "Waɗanda wa'adinsu ya wuce kawai"
+      "overdueOnly": "Waɗanda wa'adinsu ya wuce kawai",
+      "noRepositories": "Babu rumbun ajiya da aka daidaita ko aka zaɓa tukuna. Zaɓe su a cikin saitin Wakilin tsaro."
     },
     "automation": {
       "title": "Aiki na atomatik",
@@ -2062,7 +2063,10 @@
       "settleFailed": "An kammala aikin, amma ba mu iya rubuta sakamakon ba. Sake gwadawa.",
       "replayFailed": "Wannan aikin bai kammala ba. Sake gwadawa.",
       "actionFailed": "Ba za a iya kammala wannan aikin ba. Sake gwadawa.",
-      "actionBlocked": "Ba za a iya kammala wannan aikin ba. Dole a gyara matsalar kafin a sake gwadawa."
+      "actionBlocked": "Ba za a iya kammala wannan aikin ba. Dole a gyara matsalar kafin a sake gwadawa.",
+      "syncNoRepositories": "Babu wata ma'ajiyar bayanai da ke cikin iyakar daidaitawa. Zaɓi ma'ajiyoyin bayanai da Wakilin tsaro ke sa ido a kansu, sannan a sake daidaitawa.",
+      "syncIntegrationInactive": "Haɗin GitHub na Wakilin tsaro ba ya aiki. Sake haɗa Kilo GitHub App, sannan ka sake daidaitawa.",
+      "syncMissingPermission": "Kilo GitHub App ba ya iya karanta vulnerability alerts. Ba da wannan izni a GitHub, sannan ka sake daidaitawa."
     },
     "analysisState": {
       "queued": "Nazarin yana layin jira",
@@ -3150,7 +3154,7 @@
     "couldNotSaveChoice": "An kasa adana zaɓinka. Sake gwadawa.",
     "onlineAllowed": "Ta yanar gizo, an yarda",
     "onlineNotAllowed": "Ta yanar gizo, ba a yarda ba",
-    "optionalReview": "Na zaɓi — za ka iya canza wannan a Saituna a kowane lokaci",
+    "optionalReview": "Na zaɓi",
     "optionalOnboarding": "Na zaɓi — yana kunne sai idan ka kashe shi",
     "aiProvidersWhat": "Umarnin aikinka, tarihin tattaunawa, da duk fayilolin da ka haɗa.",
     "aiProvidersWhy": "Don samar da amsoshin AI.",
@@ -3976,7 +3980,8 @@
       "nameRequired": "Shigar da sunan umarni",
       "nameInvalid": "Dole ne suna farawa da ƙananan haruffa kuma amfani da ƙananan haruffa kawai, lambobi, da dashes",
       "templateRequired": "Shigar da samfurin umarni",
-      "nameConflict": "An adana wannan sunan ta hanyar ginanniyar umarni"
+      "nameConflict": "An adana wannan sunan ta hanyar ginanniyar umarni",
+      "duplicateName": "Umarni mai wannan sunan ya riga ya kasance a cikin wannan bayanan martaba"
     },
     "repoBindings": {
       "title": "Tsoffin Bayanan martaba don Repos",

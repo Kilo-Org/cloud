@@ -330,7 +330,7 @@
       "diffTooLarge": "ìyàtọ̀ náà tóbi jù",
       "openFile": "Ṣí {{path}}",
       "openFileViewed": "Ṣí {{path}} (a ti wò ó)",
-      "title": "Fáìlì"
+      "title": "Àwọn fáìlì"
     },
     "fileRows": {
       "markViewed": "Sàmì sí {{path}} pé o ti wò ó",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "Àkópọ̀",
-      "files": "Fáìlì",
+      "files": "Àwọn fáìlì",
       "discussion": "Ìjíròrò"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "Ya fọ́tò",
       "photoLibrary": "Àkójọpọ̀ fọ́tò",
-      "files": "Fáìlì",
+      "files": "Àwọn fáìlì",
       "cameraAccessMessage": "Gba lílo kámẹ́rà láyè nínú àwọn ètò kí o lè ya fọ́tò."
     },
     "typingIndicator": {
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Ìwọ̀n ewu: gíga sí kékeré",
       "sortSeverityAsc": "Ìwọ̀n ewu: kékeré sí gíga",
       "sortSlaDue": "Ọjọ́ ìparí SLA",
-      "overdueOnly": "Tí ọjọ́ ìparí ti kọjá nìkan"
+      "overdueOnly": "Tí ọjọ́ ìparí ti kọjá nìkan",
+      "noRepositories": "A kò tíì mú àwọn ibi ìpamọ́ kóòdù dọ́gba tàbí yan wọ́n. Yan wọ́n nínú ètó Aṣojú ààbò."
     },
     "automation": {
       "title": "Ìṣiṣẹ́ aládàáṣiṣẹ́",
@@ -2062,7 +2063,10 @@
       "settleFailed": "A ti parun iṣẹ́ náà, ṣùgbọ́n a kò lè ṣàkósílẹ̀ èrè rẹ̀. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "replayFailed": "Iṣẹ́ yìí kò parun. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "actionFailed": "A kò lè parun iṣẹ́ yìí. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
-      "actionBlocked": "A kò lè parun iṣẹ́ yìí. Ìṣòro yìí gbọ́dọ̀ túnsẹ̀ kí a tó lè gbìyànjú lẹ́ẹ̀kan sí i."
+      "actionBlocked": "A kò lè parun iṣẹ́ yìí. Ìṣòro yìí gbọ́dọ̀ túnsẹ̀ kí a tó lè gbìyànjú lẹ́ẹ̀kan sí i.",
+      "syncNoRepositories": "Kò sí àwọn ibi ìpamọ́ kóòdù kankan nínú ààlà ìmúdọ́gba. Yan àwọn ibi ìpamọ́ tí Aṣojú ààbò ń bójú tó, kí o sì tún mú dọ́gba.",
+      "syncIntegrationInactive": "Ìsopọ̀ GitHub fún Aṣojú ààbò kò ṣiṣẹ́. Tún ṣe ìsopọ̀ Kilo GitHub App, kí o sì tún mú dọ́gba.",
+      "syncMissingPermission": "Kilo GitHub App kò lè ka vulnerability alerts. Fún ní àṣẹ yẹn ní GitHub, kí o sì tún mú dọ́gba."
     },
     "analysisState": {
       "queued": "Ìtúpalẹ̀ wà ní ìlà ìdúró",
@@ -2767,7 +2771,7 @@
     "attachmentPicker": {
       "camera": "Kámẹ́rà",
       "photoLibrary": "Àkójọpọ̀ fọ́tò",
-      "files": "Fáìlì",
+      "files": "Àwọn fáìlì",
       "couldNotOpenPhotoPicker": "A kò lè ṣí ààyè yíyan àwòrán. Tún Kilo bẹ̀rẹ̀ kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
       "maxFilesAllowed": "Fáìlì {{displayCount}} ni ó pọ̀ jù tí o lè fi kún un.",
       "onlyAddingFiles": "Ń fi fáìlì {{accepted}} nínú {{total}} kún un nìkan (ó pọ̀ jù: {{max}})",
@@ -3150,7 +3154,7 @@
     "couldNotSaveChoice": "A kò lè fi àṣàyàn rẹ pamọ́. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
     "onlineAllowed": "Lórí ayélujára, a yọ̀ǹda",
     "onlineNotAllowed": "Lórí ayélujára, a kò yọ̀ǹda",
-    "optionalReview": "Kì í ṣe dandan — o lè yí èyí padà nígbàkigbà nínú Àwọn ètò",
+    "optionalReview": "Kì í ṣe dandan",
     "optionalOnboarding": "Kì í ṣe dandan — ó ti tàn àyàfi tí o bá pa á",
     "aiProvidersWhat": "Àwọn ọ̀rọ̀ ìtọ́ni rẹ, ìtàn ìjíròrò àti fáìlì èyíkéyìí tí o so mọ́ ọn.",
     "aiProvidersWhy": "Láti ṣe àwọn ìdáhùn AI.",
@@ -3976,7 +3980,8 @@
       "nameRequired": "Tẹ orukọ aṣẹ sii",
       "nameInvalid": "Orukọ gbọdọ bẹrẹ pẹlu lẹta kekere ati lo awọn lẹta kekere nikan, awọn nọmba, ati dashes",
       "templateRequired": "Tẹ awoṣe aṣẹ sii",
-      "nameConflict": "Orukọ yẹn wa ni ipamọ nipasẹ aṣẹ ti a ṣe sinu"
+      "nameConflict": "Orukọ yẹn wa ni ipamọ nipasẹ aṣẹ ti a ṣe sinu",
+      "duplicateName": "Aṣẹ miiran ti o ni orukọ yẹn wa ninu profaili yii tẹlẹ"
     },
     "repoBindings": {
       "title": "Awọn profaili Aiyipada fun Repos",

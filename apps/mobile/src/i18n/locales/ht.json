@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Gravite: soti pi wo rive pi ba",
       "sortSeverityAsc": "Gravite: soti pi ba rive pi wo",
       "sortSlaDue": "Dat limit SLA",
-      "overdueOnly": "An reta sèlman"
+      "overdueOnly": "An reta sèlman",
+      "noRepositories": "Poko gen okenn depo ki senkronize oswa chwazi. Chwazi yo nan paramèt Ajan sekirite."
     },
     "automation": {
       "title": "Otomatizasyon",
@@ -2062,7 +2063,10 @@
       "settleFailed": "Aksyon an fini, men nou pa t ka anrejistre rezilta a. Tanpri eseye ankò.",
       "replayFailed": "Aksyon sa a pa fini. Tanpri eseye ankò.",
       "actionFailed": "Pa t ka fini aksyon sa a. Tanpri eseye ankò.",
-      "actionBlocked": "Pa t ka fini aksyon sa a. Fòk ou repare pwoblèm nan anvan ou ka eseye ankò."
+      "actionBlocked": "Pa t ka fini aksyon sa a. Fòk ou repare pwoblèm nan anvan ou ka eseye ankò.",
+      "syncNoRepositories": "Pa gen okenn depo nan sijè senkronizasyon an. Chwazi depo Ajan sekirite siveye yo, epi senkronize ankò.",
+      "syncIntegrationInactive": "Koneksyon GitHub pou Ajan sekirite a pa aktif. Rekonekte GitHub App Kilo a, epi senkronize ankò.",
+      "syncMissingPermission": "Kilo GitHub App pa ka li alèt vilnerabilite yo. Bay pèmisyon sa a nan GitHub, epi senkronize ankò."
     },
     "analysisState": {
       "queued": "Analiz nan ke",
@@ -3150,7 +3154,7 @@
     "couldNotSaveChoice": "Nou pa t ka anrejistre chwa ou a. Tanpri eseye ankò.",
     "onlineAllowed": "Sou entènèt, pèmèt",
     "onlineNotAllowed": "Sou entènèt, pa pèmèt",
-    "optionalReview": "Opsyonèl — ou ka chanje sa nenpòt lè nan Paramèt",
+    "optionalReview": "Opsyonèl",
     "optionalOnboarding": "Opsyonèl — aktive sof si ou dezaktive li",
     "aiProvidersWhat": "Enstriksyon ou yo, istorik konvèsasyon yo ak tout fichye ou atache.",
     "aiProvidersWhy": "Pou jenere repons AI.",
@@ -3976,7 +3980,8 @@
       "nameRequired": "Antre yon non kòmand",
       "nameInvalid": "Non yo dwe kòmanse ak yon lèt miniskil epi itilize sèlman lèt miniskil, chif ak tire",
       "templateRequired": "Antre yon modèl lòd",
-      "nameConflict": "Non sa a rezève pa yon kòmandman entegre"
+      "nameConflict": "Non sa a rezève pa yon kòmandman entegre",
+      "duplicateName": "Yon kòmandman ki gen non sa a deja egziste nan pwofil sa a"
     },
     "repoBindings": {
       "title": "Default Profiles pou Repos",

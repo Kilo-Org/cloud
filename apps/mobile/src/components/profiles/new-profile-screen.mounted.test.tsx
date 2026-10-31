@@ -7,8 +7,6 @@ import '@/i18n';
 import { NewProfileScreen } from '@/components/profiles/new-profile-screen';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
-// ── Hoisted mocks ──────────────────────────────────────────────────────────
-
 const createMutate = vi.hoisted(() => vi.fn());
 const toastSuccess = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
@@ -40,14 +38,13 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 }));
 
 vi.mock('@/lib/profile-agent-navigation', () => ({
-  getProfileOverviewPath: (profileId: string, organizationId?: string) =>
-    organizationId ? `/profiles/${profileId}?org=${organizationId}` : `/profiles/${profileId}`,
+  getProfileOverviewPath: (profileId: string, options: { organizationId?: string } = {}) =>
+    options.organizationId
+      ? `/profiles/${profileId}?org=${options.organizationId}`
+      : `/profiles/${profileId}`,
 }));
 
-vi.mock('react-native', () => ({
-  View: 'View',
-  ScrollView: 'ScrollView',
-}));
+vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView' }));
 
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
@@ -55,8 +52,6 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 
 function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && node.type === type);

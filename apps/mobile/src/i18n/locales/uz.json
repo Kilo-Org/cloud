@@ -330,7 +330,7 @@
       "diffTooLarge": "farqlar hajmi juda katta",
       "openFile": "{{path}}ni ochish",
       "openFileViewed": "{{path}}ni ochish (ko'rilgan)",
-      "title": "Fayl"
+      "title": "Fayllar"
     },
     "fileRows": {
       "markViewed": "{{path}}ni ko'rilgan deb belgilash",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "Umumiy ko'rinish",
-      "files": "Fayl",
+      "files": "Fayllar",
       "discussion": "Muhokama"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "Rasmga olish",
       "photoLibrary": "Rasmlar kutubxonasi",
-      "files": "Fayl",
+      "files": "Fayllar",
       "cameraAccessMessage": "Suratga olish uchun sozlamalarda kameradan foydalanishga ruxsat bering."
     },
     "typingIndicator": {
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Xavf darajasi: yuqoridan pastga",
       "sortSeverityAsc": "Xavf darajasi: pastdan yuqoriga",
       "sortSlaDue": "SLA muddati",
-      "overdueOnly": "Faqat muddati o'tganlar"
+      "overdueOnly": "Faqat muddati o'tganlar",
+      "noRepositories": "Hozircha hech qanday repozitoriy sinxronlanmagan yoki tanlanmagan. Ularni «Xavfsizlik agenti» sozlamalarida tanlang."
     },
     "automation": {
       "title": "Avtomatlashtirish",
@@ -2062,7 +2063,10 @@
       "settleFailed": "Amal bajarildi, ammo natijani qayd etishimiz mumkin bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "replayFailed": "Bu amal tugallanmadi. Iltimos, qayta urinib ko'ring.",
       "actionFailed": "Bu amalni tugallab bo'lmadi. Iltimos, qayta urinib ko'ring.",
-      "actionBlocked": "Bu amalni tugallab bo'lmadi. Muammoni avval hal qilish kerak."
+      "actionBlocked": "Bu amalni tugallab bo'lmadi. Muammoni avval hal qilish kerak.",
+      "syncNoRepositories": "Sinxronlash doirasida hech qanday repozitoriy yo'q. «Xavfsizlik agenti» kuzatadigan repozitoriylarni tanlang, so'ngra qayta sinxronlang.",
+      "syncIntegrationInactive": "«Xavfsizlik agenti»ning GitHub ulanishi faol emas. Kilo GitHub App’ni qayta ulang, so‘ng qaytadan sinxronlang.",
+      "syncMissingPermission": "Kilo GitHub App zaiflik ogohlantirishlarini o'qiy olmaydi. GitHubda shu ruxsatni bering, so'ng yana sinxronlang."
     },
     "analysisState": {
       "queued": "Tahlil navbatda",
@@ -2767,7 +2771,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Rasmlar kutubxonasi",
-      "files": "Fayl",
+      "files": "Fayllar",
       "couldNotOpenPhotoPicker": "Rasm tanlash oynasini ochib bo'lmadi. Kilo ilovasini qayta ishga tushiring va yana urinib ko'ring.",
       "maxFilesAllowed": "Ko'pi bilan {{displayCount}} ta fayl qo'shish mumkin.",
       "onlyAddingFiles": "{{total}} ta fayldan faqat {{accepted}} tasi qo'shilmoqda (ko'pi bilan {{max}} ta)",
@@ -3150,7 +3154,7 @@
     "couldNotSaveChoice": "Tanlovingizni saqlab bo'lmadi. Iltimos, qayta urinib ko'ring.",
     "onlineAllowed": "Onlayn, ruxsat berilgan",
     "onlineNotAllowed": "Onlayn, ruxsat berilmagan",
-    "optionalReview": "Ixtiyoriy — istalgan vaqtda sozlamalarda o'zgartirishingiz mumkin",
+    "optionalReview": "Ixtiyoriy",
     "optionalOnboarding": "Ixtiyoriy — o'chirmaguningizcha yoqilgan",
     "aiProvidersWhat": "So'rovlaringiz, suhbat tarixi va biriktirgan fayllaringiz.",
     "aiProvidersWhy": "AI javoblarini yaratish uchun.",
@@ -3976,7 +3980,8 @@
       "nameRequired": "Buyruq nomini kiriting",
       "nameInvalid": "Ism kichik harf bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
       "templateRequired": "Buyruq shablonini kiriting",
-      "nameConflict": "Bu nom o'rnatilgan buyruq bilan saqlangan"
+      "nameConflict": "Bu nom o'rnatilgan buyruq bilan saqlangan",
+      "duplicateName": "Bu profilda bu nom bilan buyruq allaqachon mavjud"
     },
     "repoBindings": {
       "title": "Repos uchun standart profillar",

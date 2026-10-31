@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Kalubhaan: mula mataas pababa",
       "sortSeverityAsc": "Kalubhaan: mula mababa pataas",
       "sortSlaDue": "Takdang petsa ng SLA",
-      "overdueOnly": "Lampas sa takdang petsa lang"
+      "overdueOnly": "Lampas sa takdang petsa lang",
+      "noRepositories": "Wala pang naka-sync o napiling repository. Piliin ang mga ito sa mga setting ng Ahente sa seguridad."
     },
     "automation": {
       "title": "Awtomasyon",
@@ -2068,7 +2069,10 @@
       "settleFailed": "Nagawa ang aksyon, ngunit hindi namin mai-record ang resulta. Pakisubukang muli.",
       "replayFailed": "Hindi natapos ang aksyon na ito. Pakisubukang muli.",
       "actionFailed": "Hindi magawang matapos ang aksyon na ito. Pakisubukang muli.",
-      "actionBlocked": "Hindi magawang matapos ang aksyon na ito. Kailangang ayusin muna ang problema bago mo ito muling subukan."
+      "actionBlocked": "Hindi magawang matapos ang aksyon na ito. Kailangang ayusin muna ang problema bago mo ito muling subukan.",
+      "syncNoRepositories": "Walang mga repositoryo sa saklaw ng pag-sync. Piliin ang mga repositoryong sinusubaybayan ng Ahente sa seguridad, pagkatapos i-sync muli.",
+      "syncIntegrationInactive": "Hindi aktibo ang koneksyon sa GitHub para sa Ahente sa seguridad. I-reconnect ang Kilo GitHub App, pagkatapos i-sync muli.",
+      "syncMissingPermission": "Hindi mabasa ng Kilo GitHub App ang vulnerability alerts. Ibigay ang pahintulot na iyon sa GitHub, pagkatapos ay mag-sync muli."
     },
     "analysisState": {
       "queued": "Nakapila ang pagsusuri",
@@ -3156,7 +3160,7 @@
     "couldNotSaveChoice": "Hindi ma-save ang pinili mo. Subukang muli.",
     "onlineAllowed": "Online, pinapayagan",
     "onlineNotAllowed": "Online, hindi pinapayagan",
-    "optionalReview": "Opsyonal — maaari mo itong baguhin anumang oras sa mga setting",
+    "optionalReview": "Opsyonal",
     "optionalOnboarding": "Opsyonal — pinagana maliban kung i-off mo ito",
     "aiProvidersWhat": "Ang mga prompt mo, kasaysayan ng pag-uusap, at anumang file na ilalakip mo.",
     "aiProvidersWhy": "Para makabuo ng mga tugon ng AI.",
@@ -3982,7 +3986,8 @@
       "nameRequired": "Maglagay ng command name",
       "nameInvalid": "Ang pangalan ay dapat magsimula sa maliit na titik at gumamit lamang ng maliliit na titik, digit, at gitling",
       "templateRequired": "Maglagay ng command template",
-      "nameConflict": "Ang pangalang iyon ay nakalaan sa pamamagitan ng isang built-in na command"
+      "nameConflict": "Ang pangalang iyon ay nakalaan sa pamamagitan ng isang built-in na command",
+      "duplicateName": "Mayroon nang command na may ganyang pangalan sa profile na ito"
     },
     "repoBindings": {
       "title": "Mga Default na Profile para sa Repos",

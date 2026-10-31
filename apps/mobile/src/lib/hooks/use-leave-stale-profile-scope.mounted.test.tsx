@@ -30,7 +30,7 @@ const ORG_B = 'org-b';
 const ORG_C = 'org-c';
 const PROFILE_A = 'profile-a';
 
-type RouteParams = { profileId?: string; organizationId?: string };
+type RouteParams = { profileId?: string; organizationId?: string; openedFrom?: string };
 
 const params = vi.hoisted((): { value: RouteParams } => ({ value: {} }));
 const router = vi.hoisted(() => ({
@@ -39,10 +39,12 @@ const router = vi.hoisted(() => ({
   push: vi.fn<(href: unknown) => void>(),
   replace: vi.fn<(href: unknown) => void>(),
 }));
-const stack = vi.hoisted((): { routes: { name: string }[]; index: number } => ({
-  routes: [],
-  index: 0,
-}));
+const stack = vi.hoisted(
+  (): { routes: { name: string; params?: { openedFrom?: string } }[]; index: number } => ({
+    routes: [],
+    index: 0,
+  })
+);
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
 const list = vi.hoisted(() => vi.fn());
 const account = vi.hoisted((): { switchTo: (id: string | null) => void } => ({
@@ -57,6 +59,7 @@ const navigation = vi.hoisted(() => ({
 }));
 
 vi.mock('expo-router', () => ({
+  usePathname: () => '/profile-management/profile-a',
   useLocalSearchParams: () => params.value,
   useRouter: () => router,
   useNavigation: () => navigation,
@@ -192,25 +195,28 @@ describe('a profile detail after an account switch', () => {
   it('keeps a session profile editor open for the session organization the account never showed', async () => {
     // A session of another organization renders while the selection is this
     // account, and its profile chip opens that organization's profile.
-    params.value = { profileId: PROFILE_A, organizationId: ORG_B };
+    params.value = { profileId: PROFILE_A, organizationId: ORG_B, openedFrom: 'session' };
     stack.routes = [
       { name: 'agent-chat/[session-id]' },
-      { name: 'profile-management/[profileId]/index' },
+      { name: 'profile-management/[profileId]/index', params: { openedFrom: 'session' } },
     ];
     const ui = await mountRoute(AppStackProfileOverviewRoute);
 
     expect(router.dismissTo).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
+    // A session opened this editor on purpose, so no profiles list is built
+    // under it: Back belongs to the session.
+    expect(router.push).not.toHaveBeenCalled();
     expect(screensOnScreen(ui, 'ProfileOverviewScreen')).toBe(1);
   });
 
   it('keeps a session profile editor open when another account is selected meanwhile', async () => {
     // The editor shows the session's organization, which is unrelated to the
     // account that changed, so the switch leaves it alone.
-    params.value = { profileId: PROFILE_A, organizationId: ORG_B };
+    params.value = { profileId: PROFILE_A, organizationId: ORG_B, openedFrom: 'session' };
     stack.routes = [
       { name: 'agent-chat/[session-id]' },
-      { name: 'profile-management/[profileId]/index' },
+      { name: 'profile-management/[profileId]/index', params: { openedFrom: 'session' } },
     ];
     const ui = await mountRoute(AppStackProfileOverviewRoute);
 
@@ -238,12 +244,16 @@ describe('a profile detail after an account switch', () => {
   });
 
   it('keeps repo defaults open for the composer scope while the account shows another', async () => {
-    params.value = { organizationId: ORG_B };
-    stack.routes = [{ name: 'agent-chat/new' }, { name: 'profile-management/repo-bindings' }];
+    params.value = { organizationId: ORG_B, openedFrom: 'composer' };
+    stack.routes = [
+      { name: 'agent-chat/new' },
+      { name: 'profile-management/repo-bindings', params: { openedFrom: 'composer' } },
+    ];
     const ui = await mountRoute(AppStackRepoBindingsRoute, 'RepoBindingsScreen');
 
     expect(router.dismissTo).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
     expect(screensOnScreen(ui, 'RepoBindingsScreen')).toBe(1);
   });
 

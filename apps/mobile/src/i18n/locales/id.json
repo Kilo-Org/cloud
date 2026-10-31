@@ -1151,7 +1151,8 @@
       "sortSeverityDesc": "Keparahan: tertinggi ke terendah",
       "sortSlaDue": "Tanggal jatuh tempo SLA",
       "statusIgnored": "Diabaikan",
-      "statusOpen": "Terbuka"
+      "statusOpen": "Terbuka",
+      "noRepositories": "Belum ada repositori yang disinkronkan atau dipilih. Pilih repositori di setelan Agen keamanan."
     },
     "analysis": {
       "analyzeRepository": "Analisis repositori",
@@ -1533,7 +1534,10 @@
       "settleFailed": "Tindakan telah selesai, tetapi kami tidak dapat mencatat hasilnya. Coba lagi.",
       "replayFailed": "Tindakan ini tidak selesai. Coba lagi.",
       "actionFailed": "Tindakan ini tidak dapat diselesaikan. Coba lagi.",
-      "actionBlocked": "Tindakan ini tidak dapat diselesaikan. Masalahnya harus diperbaiki terlebih dahulu sebelum mencoba lagi."
+      "actionBlocked": "Tindakan ini tidak dapat diselesaikan. Masalahnya harus diperbaiki terlebih dahulu sebelum mencoba lagi.",
+      "syncNoRepositories": "Tidak ada repositori dalam cakupan sinkronisasi. Pilih repositori yang dipantau Agen keamanan, lalu sinkronkan lagi.",
+      "syncIntegrationInactive": "Koneksi GitHub untuk Agen keamanan tidak aktif. Hubungkan ulang Aplikasi GitHub Kilo, lalu sinkronkan lagi.",
+      "syncMissingPermission": "Aplikasi GitHub Kilo tidak dapat membaca vulnerability alerts. Berikan izin tersebut di GitHub, lalu sinkronkan lagi."
     },
     "analysisState": {
       "queued": "Analisis dalam antrean",
@@ -2621,7 +2625,7 @@
     "couldNotSaveChoice": "Tidak dapat menyimpan pilihanmu. Coba lagi.",
     "onlineAllowed": "Daring, diizinkan",
     "onlineNotAllowed": "Daring, tidak diizinkan",
-    "optionalReview": "Opsional — dapat diubah kapan saja di Pengaturan",
+    "optionalReview": "Opsional",
     "optionalOnboarding": "Opsional — aktif sampai kamu menonaktifkannya",
     "aiProvidersWhat": "Instruksimu, riwayat percakapan, dan semua berkas yang kamu lampirkan.",
     "aiProvidersWhy": "Untuk menghasilkan respons AI.",
@@ -3976,7 +3980,8 @@
       "nameRequired": "Masukkan nama perintah",
       "nameInvalid": "Nama harus dimulai dengan huruf kecil dan hanya menggunakan huruf kecil, angka, dan tanda hubung",
       "templateRequired": "Masukkan templat perintah",
-      "nameConflict": "Nama itu dicadangkan oleh perintah bawaan"
+      "nameConflict": "Nama itu dicadangkan oleh perintah bawaan",
+      "duplicateName": "Nama itu sudah digunakan oleh perintah lain di profil ini"
     },
     "repoBindings": {
       "title": "Profil Default untuk Repo",

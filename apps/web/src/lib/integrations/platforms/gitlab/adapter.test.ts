@@ -41,6 +41,8 @@ import {
   revokeProjectAccessToken,
   updateProjectWebhook,
   fetchMRInlineComments,
+  GITLAB_LISTING_TIMEOUT_MS,
+  MAX_GITLAB_LISTING_BYTES,
   MAX_MR_NOTE_BODY_BYTES,
 } from './adapter';
 
@@ -156,6 +158,30 @@ function createGitLabProjectDiscoveryResponse() {
       marked_for_deletion_at: '2026-07-01',
     },
   ];
+}
+
+const LISTING_PAGE_ITEM_PADDING_CHARS = 60_000;
+
+/**
+ * A projects page of about 6 MiB at the adapter's page size, and a branches page of about
+ * 6 MiB, for the tests that fill a read's cumulative byte budget.
+ */
+function createPaddedProjectsPage() {
+  return Array.from({ length: 100 }, (_, i) => ({
+    id: i + 1,
+    name: `project-${i}`,
+    path_with_namespace: `group/project-${i}`,
+    visibility: 'private',
+    archived: false,
+    description: 'x'.repeat(LISTING_PAGE_ITEM_PADDING_CHARS),
+  }));
+}
+
+function createPaddedBranchesPage() {
+  return Array.from({ length: 100 }, (_, i) => ({
+    name: `branch-${i}`,
+    commit: { id: 'abc', message: 'y'.repeat(LISTING_PAGE_ITEM_PADDING_CHARS) },
+  }));
 }
 
 describe('GitLab OAuth endpoint safety', () => {
@@ -513,6 +539,99 @@ describe('fetchGitLabProjects', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
+  it('stops a read that exceeds the cumulative byte budget', async () => {
+    const page = createPaddedProjectsPage();
+    let pageRequests = 0;
+    mockFetch.mockImplementation(() => {
+      pageRequests += 1;
+      return Promise.resolve(
+        new Response(JSON.stringify(page), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+            'x-next-page': String(pageRequests + 1),
+          },
+        })
+      );
+    });
+
+    await expect(fetchGitLabProjects('test-token')).rejects.toThrow(
+      `GitLab pagination limit exceeded: project listing returned more than ${MAX_GITLAB_LISTING_BYTES / (1024 * 1024)} MiB`
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('covers every page of one read with the same deadline', async () => {
+    jest.useFakeTimers();
+    try {
+      const signals: AbortSignal[] = [];
+      mockFetch.mockImplementation((_url: string, init?: RequestInit) => {
+        const signal = init?.signal as AbortSignal;
+        signals.push(signal);
+        if (signals.length === 1) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => [],
+            headers: { get: (name: string) => (name === 'x-next-page' ? '2' : null) },
+          });
+        }
+        const { promise, reject } = Promise.withResolvers<Response>();
+        const abort = () => reject(signal.reason);
+        if (signal.aborted) {
+          abort();
+          return promise;
+        }
+        signal.addEventListener('abort', abort, { once: true });
+        return promise;
+      });
+
+      const read = fetchGitLabProjects('test-token');
+      const failure = expect(read).rejects.toThrow(
+        `GitLab pagination limit exceeded: project listing did not finish within ${GITLAB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+      await jest.advanceTimersByTimeAsync(GITLAB_LISTING_TIMEOUT_MS);
+      await failure;
+
+      expect(signals).toHaveLength(2);
+      expect(signals.every(signal => signal.aborted)).toBe(true);
+      expect((signals[0].reason as Error).message).toBe(
+        `GitLab pagination limit exceeded: project listing did not finish within ${GITLAB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('stops a self-hosted read that passes the total deadline', async () => {
+    jest.useFakeTimers();
+    try {
+      mockHttpsRequest.mockImplementation(() => {
+        const request = new EventEmitter() as EventEmitter & {
+          write: jest.Mock;
+          end: jest.Mock;
+          destroy: jest.Mock;
+          setTimeout: jest.Mock;
+        };
+        request.write = jest.fn();
+        request.end = jest.fn();
+        request.destroy = jest.fn();
+        request.setTimeout = jest.fn();
+        return request as never;
+      });
+
+      const read = fetchGitLabProjects('test-token', 'https://gitlab.example.com');
+      const failure = expect(read).rejects.toThrow(
+        `GitLab pagination limit exceeded: project listing did not finish within ${GITLAB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+      await jest.advanceTimersByTimeAsync(GITLAB_LISTING_TIMEOUT_MS);
+      await failure;
+
+      expect(mockHttpsRequest).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('reports an error when a provider signals a huge x-total-pages with full pages', async () => {
     const branches = Array.from({ length: 100 }, (_, i) => ({
       name: `branch-${i}`,
@@ -560,6 +679,23 @@ describe('fetchGitLabProjects', () => {
     const branches = await fetchGitLabBranches('test-token', 123);
     expect(branches.map(b => b.name)).toEqual(['main', 'feature']);
     expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops a branch listing that exceeds the cumulative byte budget', async () => {
+    const page = createPaddedBranchesPage();
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(page), {
+          status: 200,
+          headers: { 'content-type': 'application/json', 'x-total-pages': '10' },
+        })
+      )
+    );
+
+    await expect(fetchGitLabBranches('test-token', 123)).rejects.toThrow(
+      `GitLab pagination limit exceeded: branch listing returned more than ${MAX_GITLAB_LISTING_BYTES / (1024 * 1024)} MiB`
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 });
 

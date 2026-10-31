@@ -18,6 +18,7 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   Text: 'Text',
   View: 'View',
+  useColorScheme: () => schemeState.current,
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({
@@ -252,5 +253,11 @@ describe('PreferenceRow', () => {
     expect(contrast(trackColor.false, rowSurface)).toBeGreaterThanOrEqual(3);
     expect(contrast(thumbColor, trackColor.false)).toBeGreaterThanOrEqual(3);
     expect(trackColor.true).toBe(scheme === 'dark' ? darkColors.primary : lightColors.primary);
+    // The dark scheme fills the off track with the light ink: its thumb is the
+    // dark on-primary ink, and the muted ink it used to carry left the knob
+    // reading as another shadow on the row.
+    expect(trackColor.false).toBe(
+      scheme === 'dark' ? darkColors.ink2 : lightColors.mutedForeground
+    );
   });
 });

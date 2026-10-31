@@ -2161,7 +2161,7 @@
     "sessionList": {
       "couldNotLoadActive": "ບໍ່ສາມາດໂຫຼດເຊດຊັນທີ່ກຳລັງໃຊ້ງານໄດ້.",
       "couldNotRefresh": "ບໍ່ສາມາດໂຫຼດໃໝ່ໄດ້",
-      "noSessionsYetDescription": "ເລີ່ມວຽກຂຽນໂຄ້ດຈາກໂທລະສັບຂອງທ່ານ. ເຊດຊັນຂອງທ່ານຈະປາກົດຢູ່ນີ້.",
+      "noSessionsYetDescription": "ເລີ່ມວຽກຂຽນໂຄ້ດຈາກໂທລະສັບຂອງທ່ານ.",
       "viewHistory": "ປະຫວັດເຊດຊັນ",
       "noMatches": "ບໍ່ພົບເຊດຊັນທີ່ກົງກັບເງື່ອນໄຂ",
       "tryDifferentSearch": "ລອງໃຊ້ຄຳຄົ້ນຫາອື່ນ.",
@@ -3861,6 +3861,7 @@
     "skillMarkdownLabel": "ເນື້ອໃນທັກສະ",
     "skillsEmpty": "ບໍ່ມີທັກສະເທື່ອ",
     "skillNameRequired": "ໃສ່ຊື່ທັກສະ",
+    "skillNameTooLong": "ຊື່ທັກສະຕ້ອງມີບໍ່ເກີນ {{max}} ຕົວອັກສອນ",
     "skillNameInvalid": "ຊື່ທັກສະຕ້ອງເລີ່ມຕົ້ນດ້ວຍຕົວອັກສອນ ຫຼືຕົວເລກ ແລະໃຊ້ແຕ່ຕົວພິມນ້ອຍ, ຕົວເລກ, ແລະເຄື່ອງໝາຍຂີດ",
     "skillContentRequired": "ເນື້ອຫາທັກສະແມ່ນຕ້ອງການ",
     "skillSaveFailed": "ບໍ່ສາມາດບັນທຶກທັກສະໄດ້ ກະລຸນາລອງໃໝ່ອີກຄັ້ງ",

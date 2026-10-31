@@ -2161,7 +2161,7 @@
     "sessionList": {
       "couldNotLoadActive": "A kò lè ṣàkójọ àwọn ìgbà iṣẹ́ tó ń lọ.",
       "couldNotRefresh": "A kò lè sọ di tuntun",
-      "noSessionsYetDescription": "Bẹ̀rẹ̀ iṣẹ́ ìkọ̀wé kóòdù kan láti fóònù rẹ. Àwọn ìgbà iṣẹ́ rẹ yóò hàn níbí.",
+      "noSessionsYetDescription": "Bẹ̀rẹ̀ iṣẹ́ ìkọ̀wé kóòdù kan láti fóònù rẹ.",
       "viewHistory": "Ìtàn àwọn ìgbà iṣẹ́",
       "noMatches": "Kò sí ìgbà iṣẹ́ tó bá ohun tí o wá mu",
       "tryDifferentSearch": "Gbìyànjú ọ̀rọ̀ ìwá mìíràn.",
@@ -3861,6 +3861,7 @@
     "skillMarkdownLabel": "Akoonu ogbon",
     "skillsEmpty": "Ko si ogbon sibẹsibẹ",
     "skillNameRequired": "Tẹ a olorijori orukọ",
+    "skillNameTooLong": "Orukọ ogbon gbọdọ ní ami {{max}} tabi kere si",
     "skillNameInvalid": "Orukọ ogbon gbọdọ bẹrẹ pẹlu lẹta tabi nọmba ati lo awọn lẹta kekere nikan, awọn nọmba, ati dashes",
     "skillContentRequired": "Akoonu ogbon ni a nilo",
     "skillSaveFailed": "Ko le fi ogbon pamọ. Gbiyanju lẹẹkansi.",

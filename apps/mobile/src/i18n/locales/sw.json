@@ -2161,7 +2161,7 @@
     "sessionList": {
       "couldNotLoadActive": "Imeshindikana kupakia vikao vinavyoendelea.",
       "couldNotRefresh": "Imeshindikana kuonyesha upya",
-      "noSessionsYetDescription": "Anza kazi ya kuandika msimbo kutoka kwenye simu yako. Vikao vyako vitaonekana hapa.",
+      "noSessionsYetDescription": "Anza kazi ya kuandika msimbo kutoka kwenye simu yako.",
       "viewHistory": "Historia ya vikao",
       "noMatches": "Hakuna vikao vinavyolingana",
       "tryDifferentSearch": "Jaribu neno lingine la utafutaji.",
@@ -3861,6 +3861,7 @@
     "skillMarkdownLabel": "Maudhui ya ujuzi",
     "skillsEmpty": "Hakuna ujuzi bado",
     "skillNameRequired": "Weka jina la ujuzi",
+    "skillNameTooLong": "Jina la ujuzi lazima liwe na herufi zisizozidi {{max}}",
     "skillNameInvalid": "Jina la ustadi lazima lianze na herufi au tarakimu na litumie herufi ndogo, tarakimu na deshi pekee.",
     "skillContentRequired": "Maudhui ya ujuzi yanahitajika",
     "skillSaveFailed": "Haikuweza kuhifadhi ujuzi. Jaribu tena.",

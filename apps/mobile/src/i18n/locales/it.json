@@ -1610,7 +1610,7 @@
     "sessionList": {
       "couldNotLoadActive": "Impossibile caricare le sessioni attive.",
       "couldNotRefresh": "Impossibile aggiornare",
-      "noSessionsYetDescription": "Avvia un'attività di programmazione dal telefono. Le tue sessioni appariranno qui.",
+      "noSessionsYetDescription": "Avvia un'attività di programmazione dal telefono.",
       "viewHistory": "Cronologia delle sessioni",
       "noMatches": "Nessuna sessione trovata",
       "tryDifferentSearch": "Prova un termine di ricerca diverso.",
@@ -3911,6 +3911,7 @@
     "skillMarkdownLabel": "Contenuto delle competenze",
     "skillsEmpty": "Nessuna competenza ancora",
     "skillNameRequired": "Inserisci un nome per la competenza",
+    "skillNameTooLong": "Il nome della competenza deve contenere {{max}} caratteri o meno",
     "skillNameInvalid": "Il nome della competenza deve iniziare con una lettera o un numero e utilizzare solo lettere minuscole, numeri e trattini",
     "skillContentRequired": "È richiesto il contenuto delle competenze",
     "skillSaveFailed": "Impossibile salvare l'abilità. Riprova.",

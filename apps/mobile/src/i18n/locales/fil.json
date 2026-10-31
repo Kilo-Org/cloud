@@ -2161,7 +2161,7 @@
     "sessionList": {
       "couldNotLoadActive": "Hindi ma-load ang mga aktibong session.",
       "couldNotRefresh": "Hindi ma-refresh",
-      "noSessionsYetDescription": "Magsimula ng gawain sa pag-code gamit ang telepono mo. Lalabas dito ang mga session mo.",
+      "noSessionsYetDescription": "Magsimula ng gawain sa pag-code gamit ang telepono mo.",
       "viewHistory": "Kasaysayan ng mga session",
       "noMatches": "Walang session na tugma",
       "tryDifferentSearch": "Subukang maghanap gamit ang ibang salita.",
@@ -3861,6 +3861,7 @@
     "skillMarkdownLabel": "Nilalaman ng kasanayan",
     "skillsEmpty": "Wala pang skills",
     "skillNameRequired": "Maglagay ng pangalan ng kasanayan",
+    "skillNameTooLong": "Ang pangalan ng kasanayan ay dapat na {{max}} character o mas kaunti",
     "skillNameInvalid": "Ang pangalan ng kasanayan ay dapat magsimula sa isang titik o digit at gumamit lamang ng maliliit na titik, digit, at gitling",
     "skillContentRequired": "Kinakailangan ang nilalaman ng kasanayan",
     "skillSaveFailed": "Hindi makapag-save ng kasanayan. Subukan muli.",

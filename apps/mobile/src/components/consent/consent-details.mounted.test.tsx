@@ -6,7 +6,12 @@ import { TestRenderer } from '@/test/renderer';
 import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
-import { LEGAL_LINK_BOX_CLASS } from '@/lib/a11y/tap-target';
+import {
+  INLINE_LINK_BOX_CLASS,
+  MIN_TAP_TARGET_DP,
+  tapTargetReachDp,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
 import { ConsentDetails, VoiceTranscriptionControl } from './consent-details';
 
 // ---- mocks ----
@@ -25,6 +30,7 @@ vi.mock('react-native-safe-area-context', () => ({
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',
@@ -333,11 +339,16 @@ describe('ConsentDetails copy', () => {
     if (!link) {
       throw new Error('privacy link not found');
     }
-    // A real 48dp box: the control-size audit reads the node's own rect, so the
-    // 14dp text line alone was reported as too small to tap.
-    expect(String((link.props as { className?: string }).className)).toContain(
-      LEGAL_LINK_BOX_CLASS
+    // A real 28dp box plus the vertical slop: the control-size audit reads the
+    // node's own rect, and the 14dp text line alone was reported as too small
+    // to tap; the slop carries the 44pt region.
+    // Test renderer props are untyped (`any` from the JSON tree); name them once.
+    const props = link.props as { className?: string; hitSlop?: { top?: number; bottom?: number } };
+    expect(String(props.className)).toContain(INLINE_LINK_BOX_CLASS);
+    expect(tapTargetReachDp(MIN_TAP_TARGET_DP, props.hitSlop?.top ?? 0)).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
     );
+    expect(props.hitSlop?.bottom).toBe(props.hitSlop?.top);
 
     await TestRenderer.act(async () => {
       await Promise.resolve();

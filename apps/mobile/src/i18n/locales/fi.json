@@ -2161,7 +2161,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktiivisia istuntoja ei voitu ladata.",
       "couldNotRefresh": "Päivitys epäonnistui",
-      "noSessionsYetDescription": "Aloita koodaustehtävä puhelimellasi. Istunnot näkyvät tässä.",
+      "noSessionsYetDescription": "Aloita koodaustehtävä puhelimellasi.",
       "viewHistory": "Istuntojen historia",
       "noMatches": "Ei vastaavia istuntoja",
       "tryDifferentSearch": "Kokeile toista hakusanaa.",
@@ -3861,6 +3861,7 @@
     "skillMarkdownLabel": "Taidon sisältö",
     "skillsEmpty": "Ei taitoja vielä",
     "skillNameRequired": "Anna taidon nimi",
+    "skillNameTooLong": "Taidon nimen tulee olla enintään {{max}} merkkiä",
     "skillNameInvalid": "Taidon nimen tulee alkaa kirjaimella tai numerolla ja käyttää vain pieniä kirjaimia, numeroita ja väliviivoja",
     "skillContentRequired": "Taidon sisältö vaaditaan",
     "skillSaveFailed": "Taitoa ei voitu tallentaa. Yritä uudelleen.",

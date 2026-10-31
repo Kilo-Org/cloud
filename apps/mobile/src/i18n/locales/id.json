@@ -1632,7 +1632,7 @@
     "sessionList": {
       "couldNotLoadActive": "Tidak dapat memuat sesi aktif.",
       "couldNotRefresh": "Tidak dapat memuat ulang",
-      "noSessionsYetDescription": "Mulai tugas pemrograman dari ponselmu. Sesimu akan muncul di sini.",
+      "noSessionsYetDescription": "Mulai tugas pemrograman dari ponselmu.",
       "viewHistory": "Riwayat sesi",
       "noMatches": "Tidak ada sesi yang cocok",
       "tryDifferentSearch": "Coba kata kunci lain.",
@@ -3861,6 +3861,7 @@
     "skillMarkdownLabel": "Konten keterampilan",
     "skillsEmpty": "Belum ada keterampilan",
     "skillNameRequired": "Masukkan nama keterampilan",
+    "skillNameTooLong": "Nama keterampilan harus {{max}} karakter atau kurang",
     "skillNameInvalid": "Nama keterampilan harus dimulai dengan huruf atau angka dan hanya menggunakan huruf kecil, angka, dan tanda hubung",
     "skillContentRequired": "Konten keterampilan diperlukan",
     "skillSaveFailed": "Tidak dapat menyimpan keterampilan. Coba lagi.",

@@ -2161,7 +2161,7 @@
     "sessionList": {
       "couldNotLoadActive": "ਸਰਗਰਮ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
       "couldNotRefresh": "ਰੀਫ੍ਰੈਸ਼ ਨਹੀਂ ਹੋ ਸਕਿਆ",
-      "noSessionsYetDescription": "ਆਪਣੇ ਫ਼ੋਨ ਤੋਂ ਕੋਡਿੰਗ ਦਾ ਕੰਮ ਸ਼ੁਰੂ ਕਰੋ। ਤੁਹਾਡੇ ਸੈਸ਼ਨ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।",
+      "noSessionsYetDescription": "ਆਪਣੇ ਫ਼ੋਨ ਤੋਂ ਕੋਡਿੰਗ ਦਾ ਕੰਮ ਸ਼ੁਰੂ ਕਰੋ।",
       "viewHistory": "ਸੈਸ਼ਨਾਂ ਦਾ ਇਤਿਹਾਸ",
       "noMatches": "ਕੋਈ ਸੈਸ਼ਨ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ",
       "tryDifferentSearch": "ਕਿਸੇ ਹੋਰ ਸ਼ਬਦ ਨਾਲ ਖੋਜੋ।",
@@ -3861,6 +3861,7 @@
     "skillMarkdownLabel": "ਹੁਨਰ ਸਮੱਗਰੀ",
     "skillsEmpty": "ਅਜੇ ਕੋਈ ਹੁਨਰ ਨਹੀਂ ਹੈ",
     "skillNameRequired": "ਇੱਕ ਹੁਨਰ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ",
+    "skillNameTooLong": "ਹੁਨਰ ਦਾ ਨਾਮ {{max}} ਅੱਖਰ ਜਾਂ ਇਸ ਤੋਂ ਘੱਟ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ",
     "skillNameInvalid": "ਹੁਨਰ ਦਾ ਨਾਮ ਇੱਕ ਅੱਖਰ ਜਾਂ ਅੰਕ ਨਾਲ ਸ਼ੁਰੂ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ ਅਤੇ ਸਿਰਫ ਛੋਟੇ ਅੱਖਰਾਂ, ਅੰਕਾਂ ਅਤੇ ਡੈਸ਼ਾਂ ਦੀ ਵਰਤੋਂ ਕਰਨਾ ਚਾਹੀਦਾ ਹੈ",
     "skillContentRequired": "ਹੁਨਰ ਸਮੱਗਰੀ ਦੀ ਲੋੜ ਹੈ",
     "skillSaveFailed": "ਹੁਨਰ ਨੂੰ ਬਚਾ ਨਹੀਂ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",

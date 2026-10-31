@@ -2161,7 +2161,7 @@
     "sessionList": {
       "couldNotLoadActive": "Faol sessiyalarni yuklab bo'lmadi.",
       "couldNotRefresh": "Yangilab bo'lmadi",
-      "noSessionsYetDescription": "Telefoningizdan kod yozish vazifasini boshlang. Sessiyalaringiz shu yerda ko'rinadi.",
+      "noSessionsYetDescription": "Telefoningizdan kod yozish vazifasini boshlang.",
       "viewHistory": "Sessiyalar tarixi",
       "noMatches": "Mos sessiya topilmadi",
       "tryDifferentSearch": "Boshqa so‘z bilan qidirib ko‘ring.",
@@ -3861,6 +3861,7 @@
     "skillMarkdownLabel": "Ko'nikma tarkibi",
     "skillsEmpty": "Hali mahorat yo'q",
     "skillNameRequired": "Qobiliyat nomini kiriting",
+    "skillNameTooLong": "Malaka nomi {{max}} ta belgidan oshmasligi kerak",
     "skillNameInvalid": "Malaka nomi harf yoki raqam bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
     "skillContentRequired": "Ko'nikma tarkibi talab qilinadi",
     "skillSaveFailed": "Mahorat saqlanmadi. Qayta urinib ko'ring.",

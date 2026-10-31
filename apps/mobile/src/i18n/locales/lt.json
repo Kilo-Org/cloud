@@ -2219,7 +2219,7 @@
     "sessionList": {
       "couldNotLoadActive": "Nepavyko įkelti aktyvių sesijų.",
       "couldNotRefresh": "Nepavyko atnaujinti",
-      "noSessionsYetDescription": "Pradėk programavimo užduotį telefone. Tavo sesijos bus rodomos čia.",
+      "noSessionsYetDescription": "Pradėk programavimo užduotį telefone.",
       "viewHistory": "Sesijų istorija",
       "noMatches": "Nėra paiešką atitinkančių sesijų",
       "tryDifferentSearch": "Bandyk ieškoti pagal kitą žodį.",
@@ -3961,6 +3961,7 @@
     "skillMarkdownLabel": "Įgūdžių turinys",
     "skillsEmpty": "Įgūdžių dar nėra",
     "skillNameRequired": "Įveskite įgūdžių pavadinimą",
+    "skillNameTooLong": "Įgūdžio pavadinimas turi būti ne ilgesnis kaip {{max}} simbolių",
     "skillNameInvalid": "Įgūdžio pavadinimas turi prasidėti raide arba skaitmeniu ir naudoti tik mažąsias raides, skaitmenis ir brūkšnelius",
     "skillContentRequired": "Reikalingas įgūdžių turinys",
     "skillSaveFailed": "Nepavyko išsaugoti įgūdžių. Bandykite dar kartą.",

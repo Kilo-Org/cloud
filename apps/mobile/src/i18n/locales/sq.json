@@ -2161,7 +2161,7 @@
     "sessionList": {
       "couldNotLoadActive": "Nuk u ngarkuan seancat aktive.",
       "couldNotRefresh": "Rifreskimi dështoi",
-      "noSessionsYetDescription": "Nis një detyrë programimi nga telefoni yt. Seancat e tua do të shfaqen këtu.",
+      "noSessionsYetDescription": "Nis një detyrë programimi nga telefoni yt.",
       "viewHistory": "Historiku i seancave",
       "noMatches": "Asnjë seancë nuk përputhet",
       "tryDifferentSearch": "Provo një term tjetër kërkimi.",
@@ -3861,6 +3861,7 @@
     "skillMarkdownLabel": "Përmbajtja e aftësive",
     "skillsEmpty": "Ende nuk ka aftësi",
     "skillNameRequired": "Futni një emër aftësie",
+    "skillNameTooLong": "Emri i aftësisë duhet të ketë {{max}} karaktere ose më pak",
     "skillNameInvalid": "Emri i aftësisë duhet të fillojë me një shkronjë ose shifër dhe të përdorë vetëm shkronja të vogla, shifra dhe viza",
     "skillContentRequired": "Kërkohet përmbajtja e aftësive",
     "skillSaveFailed": "Aftësia nuk mund të kursehej. Provoni përsëri.",

@@ -133,7 +133,7 @@ export function KiloCommandRowView({
               accessibilityLabel={t('profiles.slashCommands.delete', { name })}
               onPress={onDelete}
             >
-              <Trash2 size={18} color={colors.destructive} />
+              <Trash2 size={18} color={colors.mutedForeground} />
             </Pressable>
           ) : null}
         </View>

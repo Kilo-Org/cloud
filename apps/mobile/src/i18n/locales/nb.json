@@ -2161,7 +2161,7 @@
     "sessionList": {
       "couldNotLoadActive": "Kunne ikke laste inn aktive økter.",
       "couldNotRefresh": "Kunne ikke oppdatere",
-      "noSessionsYetDescription": "Start en kodeoppgave fra telefonen din. Øktene dine vises her.",
+      "noSessionsYetDescription": "Start en kodeoppgave fra telefonen din.",
       "viewHistory": "Økthistorikk",
       "noMatches": "Ingen økter passer til søket",
       "tryDifferentSearch": "Prøv et annet søkeord.",
@@ -3861,6 +3861,7 @@
     "skillMarkdownLabel": "Ferdighetsinnhold",
     "skillsEmpty": "Ingen ferdigheter ennå",
     "skillNameRequired": "Skriv inn et ferdighetsnavn",
+    "skillNameTooLong": "Ferdighetsnavn må være {{max}} tegn eller færre",
     "skillNameInvalid": "Ferdighetsnavn må starte med en bokstav eller et siffer og kun bruke små bokstaver, sifre og bindestreker",
     "skillContentRequired": "Ferdighetsinnhold kreves",
     "skillSaveFailed": "Kunne ikke lagre ferdigheter. Prøv igjen.",

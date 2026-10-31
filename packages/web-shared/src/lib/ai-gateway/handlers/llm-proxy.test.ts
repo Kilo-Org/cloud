@@ -1610,6 +1610,39 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['the internal benchmark bot', 'bot-internal-benchmark', 200],
+    ['another internal bot', 'bot-internal-bouncer-watch', 429],
+  ])(
+    'rate-limits %s on free models only when it is not exempt',
+    async (_caller, userId, status) => {
+      setUserAuth();
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: { id: userId, google_user_email: 'bot@example.com', microdollars_used: 0 } as User,
+        authFailedResponse: null,
+        organizationId: undefined,
+      });
+      mockedGetProvider.mockResolvedValue({
+        kind: 'provider',
+        provider,
+        userByok: null,
+        isFree: true,
+        bypassAccessCheck: false,
+      });
+      mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody('test/free-model:free'), {
+          authorization: `Bearer ${signedToken(KILO_GATEWAY_AUDIENCE)}`,
+        }) as never
+      );
+
+      expect(response.status).toBe(status);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(status === 200 ? 1 : 0);
+    }
+  );
+
   it('applies free-model rate limiting per account to session-cookie callers', async () => {
     mockedIsFreeModelRateLimited.mockResolvedValue(true);
 

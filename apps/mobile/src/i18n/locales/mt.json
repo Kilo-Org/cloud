@@ -2248,7 +2248,7 @@
     "sessionList": {
       "couldNotLoadActive": "Ma setgħux jitgħabbew is-sessjonijiet attivi.",
       "couldNotRefresh": "Ma setax isir l-aġġornament",
-      "noSessionsYetDescription": "Ibda kompitu tal-ipprogrammar mill-mowbajl tiegħek. Is-sessjonijiet tiegħek se jidhru hawn.",
+      "noSessionsYetDescription": "Ibda kompitu tal-ipprogrammar mill-mowbajl tiegħek.",
       "viewHistory": "Storja tas-sessjonijiet",
       "noMatches": "L-ebda sessjoni ma taqbel mat-tfittxija",
       "tryDifferentSearch": "Ipprova fittex b'kelma oħra.",
@@ -4011,6 +4011,7 @@
     "skillMarkdownLabel": "Kontenut tal-ħiliet",
     "skillsEmpty": "Għadu l-ebda ħiliet",
     "skillNameRequired": "Daħħal isem tal-ħila",
+    "skillNameTooLong": "L-isem tal-ħila għandu jkun {{max}} karattri jew inqas",
     "skillNameInvalid": "L-isem tal-ħiliet għandu jibda b'ittra jew ċifra u juża biss ittri żgħar, ċifri u sings",
     "skillContentRequired": "Il-kontenut tal-ħiliet huwa meħtieġ",
     "skillSaveFailed": "Ma setgħetx tiffranka l-ħiliet. Erġa' pprova.",

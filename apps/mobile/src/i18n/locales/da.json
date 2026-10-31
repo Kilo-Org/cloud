@@ -2161,7 +2161,7 @@
     "sessionList": {
       "couldNotLoadActive": "De aktive sessioner kunne ikke indlæses.",
       "couldNotRefresh": "Kunne ikke opdatere",
-      "noSessionsYetDescription": "Start en kodeopgave fra din telefon. Dine sessioner vises her.",
+      "noSessionsYetDescription": "Start en kodeopgave fra din telefon.",
       "viewHistory": "Sessionshistorik",
       "noMatches": "Ingen sessioner fundet",
       "tryDifferentSearch": "Prøv et andet søgeord.",
@@ -3861,6 +3861,7 @@
     "skillMarkdownLabel": "Færdighedsindhold",
     "skillsEmpty": "Ingen færdigheder endnu",
     "skillNameRequired": "Indtast et færdighedsnavn",
+    "skillNameTooLong": "Færdighedsnavn må højst være {{max}} tegn",
     "skillNameInvalid": "Færdighedsnavn skal starte med et bogstav eller ciffer og kun bruge små bogstaver, cifre og bindestreger",
     "skillContentRequired": "Færdighedsindhold er påkrævet",
     "skillSaveFailed": "Kunne ikke gemme færdighed. Prøv igen.",

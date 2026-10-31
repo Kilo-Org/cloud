@@ -2161,7 +2161,7 @@
     "sessionList": {
       "couldNotLoadActive": "सक्रिय सत्रे लोड करता आली नाहीत.",
       "couldNotRefresh": "रीफ्रेश करता आले नाही",
-      "noSessionsYetDescription": "तुमच्या फोनवरून कोडिंगचे काम सुरू करा. तुमची सत्रे येथे दिसतील.",
+      "noSessionsYetDescription": "तुमच्या फोनवरून कोडिंगचे काम सुरू करा.",
       "viewHistory": "सत्रांचा इतिहास",
       "noMatches": "जुळणारी सत्रे नाहीत",
       "tryDifferentSearch": "दुसरा शब्द वापरून शोधा.",
@@ -3861,6 +3861,7 @@
     "skillMarkdownLabel": "कौशल्य सामग्री",
     "skillsEmpty": "अजून कौशल्य नाही",
     "skillNameRequired": "कौशल्याचे नाव एंटर करा",
+    "skillNameTooLong": "कौशल्याचे नाव {{max}} वर्ण किंवा त्यापेक्षा कमी असणे आवश्यक आहे",
     "skillNameInvalid": "कौशल्याचे नाव अक्षर किंवा अंकाने सुरू होणे आवश्यक आहे आणि फक्त लोअरकेस अक्षरे, अंक आणि डॅश वापरणे आवश्यक आहे",
     "skillContentRequired": "कौशल्य सामग्री आवश्यक आहे",
     "skillSaveFailed": "कौशल्य वाचवू शकलो नाही. पुन्हा प्रयत्न करा.",

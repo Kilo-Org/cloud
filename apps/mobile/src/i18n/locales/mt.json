@@ -4147,7 +4147,8 @@
       "nameRequired": "Daħħal isem tal-kmand",
       "nameInvalid": "L-isem irid jibda b'ittra żgħira u juża biss ittri żgħar, ċifri u sings",
       "templateRequired": "Daħħal mudell ta' kmand",
-      "nameConflict": "Dak l-isem huwa riżervat minn kmand inkorporat"
+      "nameConflict": "Dak l-isem huwa riżervat minn kmand inkorporat",
+      "duplicateName": "Kmand b'dan l-isem diġà jeżisti f'dan il-profil"
     },
     "repoBindings": {
       "title": "Profili default għal Repos",

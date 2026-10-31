@@ -4147,7 +4147,8 @@
       "nameRequired": "Cuir isteach ainm ordaithe",
       "nameInvalid": "Caithfidh an t-ainm tosú le litir chás íochtair agus gan ach litreacha beaga, digití agus daiseanna a úsáid",
       "templateRequired": "Cuir isteach teimpléad ordaithe",
-      "nameConflict": "Tá an t-ainm sin forchoimeádta ag ordú ionsuite"
+      "nameConflict": "Tá an t-ainm sin forchoimeádta ag ordú ionsuite",
+      "duplicateName": "Tá an t-ainm sin in úsáid ag ordú eile sa phróifíl seo"
     },
     "repoBindings": {
       "title": "Próifílí Réamhshocraithe le haghaidh Repos",

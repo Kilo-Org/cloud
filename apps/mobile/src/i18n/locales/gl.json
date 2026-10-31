@@ -3976,7 +3976,8 @@
       "nameRequired": "Introduza un nome de comando",
       "nameInvalid": "O nome debe comezar cunha letra minúscula e usar só letras minúsculas, díxitos e guións",
       "templateRequired": "Introduza un modelo de comando",
-      "nameConflict": "Ese nome está reservado por un comando incorporado"
+      "nameConflict": "Ese nome está reservado por un comando incorporado",
+      "duplicateName": "Xa existe un comando con ese nome neste perfil"
     },
     "repoBindings": {
       "title": "Perfís predeterminados para Repos",

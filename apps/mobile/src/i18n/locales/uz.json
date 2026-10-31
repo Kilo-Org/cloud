@@ -3976,7 +3976,8 @@
       "nameRequired": "Buyruq nomini kiriting",
       "nameInvalid": "Ism kichik harf bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
       "templateRequired": "Buyruq shablonini kiriting",
-      "nameConflict": "Bu nom o'rnatilgan buyruq bilan saqlangan"
+      "nameConflict": "Bu nom o'rnatilgan buyruq bilan saqlangan",
+      "duplicateName": "Bu profilda bu nom bilan buyruq allaqachon mavjud"
     },
     "repoBindings": {
       "title": "Repos uchun standart profillar",

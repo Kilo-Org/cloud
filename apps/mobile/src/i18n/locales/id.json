@@ -3976,7 +3976,8 @@
       "nameRequired": "Masukkan nama perintah",
       "nameInvalid": "Nama harus dimulai dengan huruf kecil dan hanya menggunakan huruf kecil, angka, dan tanda hubung",
       "templateRequired": "Masukkan templat perintah",
-      "nameConflict": "Nama itu dicadangkan oleh perintah bawaan"
+      "nameConflict": "Nama itu dicadangkan oleh perintah bawaan",
+      "duplicateName": "Nama itu sudah digunakan oleh perintah lain di profil ini"
     },
     "repoBindings": {
       "title": "Profil Default untuk Repo",

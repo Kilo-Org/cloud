@@ -3976,7 +3976,8 @@
       "nameRequired": "Ange ett kommandonamn",
       "nameInvalid": "Namnet måste börja med en liten bokstav och endast använda små bokstäver, siffror och bindestreck",
       "templateRequired": "Ange en kommandomall",
-      "nameConflict": "Det namnet är reserverat av ett inbyggt kommando"
+      "nameConflict": "Det namnet är reserverat av ett inbyggt kommando",
+      "duplicateName": "Ett kommando med det namnet finns redan i den här profilen"
     },
     "repoBindings": {
       "title": "Standardprofiler för kodarkiv",

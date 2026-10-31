@@ -3976,7 +3976,8 @@
       "nameRequired": "Futni një emër komande",
       "nameInvalid": "Emri duhet të fillojë me një shkronjë të vogël dhe të përdorë vetëm shkronja të vogla, shifra dhe viza",
       "templateRequired": "Futni një shabllon komandimi",
-      "nameConflict": "Ky emër është i rezervuar nga një komandë e integruar"
+      "nameConflict": "Ky emër është i rezervuar nga një komandë e integruar",
+      "duplicateName": "Një komandë me këtë emër ekziston tashmë në këtë profil"
     },
     "repoBindings": {
       "title": "Profilet e parazgjedhura për repos",

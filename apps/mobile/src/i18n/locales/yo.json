@@ -3976,7 +3976,8 @@
       "nameRequired": "Tẹ orukọ aṣẹ sii",
       "nameInvalid": "Orukọ gbọdọ bẹrẹ pẹlu lẹta kekere ati lo awọn lẹta kekere nikan, awọn nọmba, ati dashes",
       "templateRequired": "Tẹ awoṣe aṣẹ sii",
-      "nameConflict": "Orukọ yẹn wa ni ipamọ nipasẹ aṣẹ ti a ṣe sinu"
+      "nameConflict": "Orukọ yẹn wa ni ipamọ nipasẹ aṣẹ ti a ṣe sinu",
+      "duplicateName": "Aṣẹ miiran ti o ni orukọ yẹn wa ninu profaili yii tẹlẹ"
     },
     "repoBindings": {
       "title": "Awọn profaili Aiyipada fun Repos",

@@ -3976,7 +3976,8 @@
       "nameRequired": "Bir komut adı girin",
       "nameInvalid": "Ad küçük harfle başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
       "templateRequired": "Bir komut şablonu girin",
-      "nameConflict": "Bu ad yerleşik bir komut tarafından ayrılmıştır"
+      "nameConflict": "Bu ad yerleşik bir komut tarafından ayrılmıştır",
+      "duplicateName": "Bu adı kullanan bir komut bu profilde zaten mevcut"
     },
     "repoBindings": {
       "title": "Depolar için Varsayılan Profiller",

@@ -3976,7 +3976,8 @@
       "nameRequired": "Komanda adını daxil edin",
       "nameInvalid": "Ad kiçik hərflə başlamalı və yalnız kiçik hərflərdən, rəqəmlərdən və tirelərdən istifadə etməlidir",
       "templateRequired": "Komanda şablonu daxil edin",
-      "nameConflict": "Bu ad daxili əmrlə qorunur"
+      "nameConflict": "Bu ad daxili əmrlə qorunur",
+      "duplicateName": "Bu profildə bu adda komanda artıq mövcuddur"
     },
     "repoBindings": {
       "title": "Repos üçün defolt profillər",

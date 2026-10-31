@@ -3976,7 +3976,8 @@
       "nameRequired": "Tinye aha iwu",
       "nameInvalid": "Aha ga-eji obere mkpụrụedemede malite ma jiri naanị obere mkpụrụedemede, mkpụrụọnụọgụgụ, na akara akara",
       "templateRequired": "Tinye ndebiri iwu",
-      "nameConflict": "Edebere aha ahụ site na iwu arụnyere n'ime ya"
+      "nameConflict": "Edebere aha ahụ site na iwu arụnyere n'ime ya",
+      "duplicateName": "Iwu nwere aha a dịlarị na profaịlụ a"
     },
     "repoBindings": {
       "title": "Profaịlụ ezighi ezi maka nkwụghachi",

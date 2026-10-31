@@ -4090,7 +4090,8 @@
       "nameRequired": "Įveskite komandos pavadinimą",
       "nameInvalid": "Pavadinimas turi prasidėti mažosiomis raidėmis ir naudoti tik mažąsias raides, skaitmenis ir brūkšnius",
       "templateRequired": "Įveskite komandos šabloną",
-      "nameConflict": "Šį pavadinimą rezervuoja įmontuota komanda"
+      "nameConflict": "Šį pavadinimą rezervuoja įmontuota komanda",
+      "duplicateName": "Komanda tokiu pavadinimu šiame profilyje jau egzistuoja"
     },
     "repoBindings": {
       "title": "Numatytieji atpirkimo sandorių profiliai",

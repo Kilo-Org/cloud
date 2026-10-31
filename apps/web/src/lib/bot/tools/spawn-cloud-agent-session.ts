@@ -20,6 +20,7 @@ import {
   validateGitLabRepoAccessForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
+import { linkUploadedAttachments, releaseRefusedAttachments } from '@/lib/bot/attachments';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/web-config.server';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
@@ -306,11 +307,27 @@ export default async function spawnCloudAgentSession(
   let cloudAgentSessionId: string;
   let kiloSessionId: string;
 
+  // Link this message's attachment rows before the worker can accept the
+  // session, so the reaper keeps their objects while a session references them.
+  // A row that is already gone fails the dispatch instead of starting a session
+  // with a missing attachment.
+  const attachmentUserId = payerUserId ?? owner.id;
+  let linkedAttachmentKeys: string[] = [];
+  try {
+    linkedAttachmentKeys = await linkUploadedAttachments(attachmentUserId, options?.attachments);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { response: `Error: ${message}` };
+  }
+
   try {
     const prepared = await client.prepareSession(prepareInput);
     cloudAgentSessionId = prepared.cloudAgentSessionId;
     kiloSessionId = prepared.kiloSessionId;
   } catch (error) {
+    // No session holds these uploads, so hand the rows back for run-level
+    // cleanup instead of leaving the objects behind.
+    await releaseRefusedAttachments(attachmentUserId, options?.attachments, linkedAttachmentKeys);
     if (error instanceof InsufficientCreditsError) {
       return { response: INSUFFICIENT_CREDITS_RESPONSE };
     }
@@ -327,6 +344,8 @@ export default async function spawnCloudAgentSession(
       // The session record exists at this point; release it promptly with a
       // best-effort cleanup so it does not linger until periodic expiry.
       void Promise.resolve(client.cleanupSession?.(cloudAgentSessionId)).catch(() => {});
+      // The refused session will never consume its attachments.
+      await releaseRefusedAttachments(attachmentUserId, options?.attachments, linkedAttachmentKeys);
       return { response: INSUFFICIENT_CREDITS_RESPONSE };
     }
     const message = error instanceof Error ? error.message : String(error);

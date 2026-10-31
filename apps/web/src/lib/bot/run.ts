@@ -1,6 +1,10 @@
 import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { runBotAgent } from '@/lib/bot/agent-runner';
-import { extractAndUploadAttachments } from '@/lib/bot/attachments';
+import {
+  discardUploadedAttachments,
+  extractAndUploadAttachments,
+  type UploadedBotAttachments,
+} from '@/lib/bot/attachments';
 import { botPlatforms } from '@/lib/bot/platforms';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
@@ -105,9 +109,9 @@ async function processMessage({
 
   // Upload all supported files through the canonical attachments contract so
   // mixed image/document messages share one path and one five-file limit.
-  let attachments: Awaited<ReturnType<typeof extractAndUploadAttachments>>;
+  let uploadedAttachments: UploadedBotAttachments | undefined;
   try {
-    attachments = await extractAndUploadAttachments(message, user.id);
+    uploadedAttachments = await extractAndUploadAttachments(message, user.id);
   } catch (error) {
     console.error(
       '[KiloBot] Failed to extract/upload attachments, continuing without them:',
@@ -127,7 +131,7 @@ async function processMessage({
       user,
       botRequestId,
       prompt: message.text,
-      attachments,
+      attachments: uploadedAttachments?.attachments,
       actorLogin: message.author.userName,
     });
 
@@ -138,6 +142,9 @@ async function processMessage({
     });
 
     if (!result.startedCloudAgentSession) {
+      // The run never handed these files to a session, so release their
+      // pending rows and objects now instead of waiting for the reaper.
+      await discardUploadedAttachments(user.id, uploadedAttachments);
       await botPlatform.withAuthContext({
         platformIntegration,
         fn: () => thread.post({ markdown: result.finalText }),
@@ -147,6 +154,10 @@ async function processMessage({
     return result.startedCloudAgentSession;
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
+
+    // A started session's rows are already linked, so this only reclaims the
+    // uploads of a run that failed before a session took them.
+    await discardUploadedAttachments(user.id, uploadedAttachments);
 
     updateBotRequest(botRequestId, {
       status: 'error',

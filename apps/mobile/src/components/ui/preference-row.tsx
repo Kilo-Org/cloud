@@ -47,6 +47,18 @@ export function PreferenceRow({
   resolveValue,
 }: PreferenceRowProps) {
   const colors = useThemeColors();
+  // The row paints on `bg-secondary`, and Android resolves a native switch's
+  // track and thumb from the device theme when it is given neither: its off
+  // track came out `#ECECEC` over this row's light `#F0EEE6`, 1.02:1, so the off
+  // control read as two barely-visible grey marks. One token pair serves both
+  // schemes here — the off track is the muted ink (4.6:1 on the light row,
+  // 4.5:1 on the dark one) and the thumb is the on-primary ink (5.4:1 over that
+  // track, 4.8:1 in dark), which keeps every piece above the 3:1 floor without
+  // reading the colour scheme at all.
+  const switchColors = {
+    thumbColor: colors.primaryForeground,
+    trackColor: { false: colors.mutedForeground, true: colors.primary },
+  };
   // Both ways of moving the switch flip the same value: a tap on the row and a
   // tap on the thumb can arrive in either order, and a burst must not build one
   // flip from the rendered value and the next from the native thumb state.
@@ -128,6 +140,8 @@ export function PreferenceRow({
       <Switch
         value={value}
         disabled={disabled}
+        thumbColor={switchColors.thumbColor}
+        trackColor={switchColors.trackColor}
         accessibilityLabel={title}
         accessibilityHint={subtitle}
         accessibilityState={{ disabled, busy, checked: value }}

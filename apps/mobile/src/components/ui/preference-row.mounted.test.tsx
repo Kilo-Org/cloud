@@ -3,9 +3,12 @@ import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type LucideIcon } from '@/components/ui/icons';
+import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { PreferenceRow } from './preference-row';
+
+const schemeState = vi.hoisted(() => ({ current: 'light' as 'light' | 'dark' }));
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
@@ -20,12 +23,18 @@ vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({
-    mutedForeground: '#666666',
-    secondaryForeground: '#111111',
-  }),
-}));
+// The real palettes, so the switch-colour assertions below hold the token pairs
+// the screen actually renders rather than values invented for the test. The
+// import has to be dynamic: `vi.mock` factories are hoisted above this file's
+// static imports, so a top-level `import` of the palette would not be
+// initialized when the factory runs.
+vi.mock('@/lib/hooks/use-theme-colors', async () => {
+  const palette = await import('@/lib/hooks/theme-colors.generated');
+  return {
+    useThemeColors: () =>
+      schemeState.current === 'dark' ? palette.darkColors : palette.lightColors,
+  };
+});
 
 /** The row's icon prop takes a Lucide component; the test never inspects it. */
 const Icon = (() => null) as unknown as LucideIcon;
@@ -63,7 +72,26 @@ function renderRow(props: {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
+  schemeState.current = 'light';
 });
+
+/** WCAG relative luminance, for the switch's contrast floor. */
+function luminance(hex: string): number {
+  const channels = [1, 3, 5].map(at => Number.parseInt(hex.slice(at, at + 2), 16) / 255);
+  const linear = channels.map(channel =>
+    channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+  );
+  const [r, g, b] = linear as [number, number, number];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrast(a: string, b: string): number {
+  const [high, low] = [luminance(a), luminance(b)].sort((left, right) => right - left) as [
+    number,
+    number,
+  ];
+  return (high + 0.05) / (low + 0.05);
+}
 
 describe('PreferenceRow', () => {
   it('moves the switch when the title is pressed, so a tap on the label is a tap on the control', () => {
@@ -206,5 +234,23 @@ describe('PreferenceRow', () => {
     // so the row is as tall as the taller copy instead of the sum.
     expect(copies[0]?.props.className).toContain('w-full');
     expect(copies[1]?.props.className).toContain('-ms-[100%]');
+  });
+
+  it.each([
+    ['light', lightColors.secondary],
+    ['dark', darkColors.secondary],
+  ] as const)('keeps the off switch at 3:1 against the %s row it sits on', (scheme, rowSurface) => {
+    // Without these colours Android draws its own off track from the device
+    // theme: `#ECECEC` over the light row's `#F0EEE6` is 1.02:1, so the off
+    // control disappears into the card.
+    schemeState.current = scheme;
+    const root = renderRow({ value: false, onValueChange: () => undefined });
+    const toggle = root.find(node => Object.is(node.type, 'Switch'));
+    const trackColor = toggle.props.trackColor as { false: string; true: string };
+    const thumbColor = toggle.props.thumbColor as string;
+
+    expect(contrast(trackColor.false, rowSurface)).toBeGreaterThanOrEqual(3);
+    expect(contrast(thumbColor, trackColor.false)).toBeGreaterThanOrEqual(3);
+    expect(trackColor.true).toBe(scheme === 'dark' ? darkColors.primary : lightColors.primary);
   });
 });

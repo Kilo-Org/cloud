@@ -551,6 +551,65 @@ describe('shape validation', () => {
   });
 });
 
+describe('unloadable entry removal', () => {
+  it('removes a value that is not valid JSON, so the next load reports nothing', async () => {
+    seedStoredValue('draft:u1', 'k', 'not-json{{{');
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(kvStore.has(storageKey('draft:u1', 'k'))).toBe(false);
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('removes a value that fails its shape guard', async () => {
+    seedStoredValue('draft:u1', 'k', '42');
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(kvStore.has(storageKey('draft:u1', 'k'))).toBe(false);
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('removes a value over the size cap', async () => {
+    seedStoredValue('draft:u1', 'k', `"${'x'.repeat(DRAFT_MAX_BYTES + 1)}"`);
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(kvStore.has(storageKey('draft:u1', 'k'))).toBe(false);
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a draft written after the failed read', async () => {
+    let reads = 0;
+    kvMock.getItem.mockImplementation(async () => {
+      reads += 1;
+      return reads === 1 ? 'not-json{{{' : '"newer"';
+    });
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+
+    expect(kvMock.removeItem).not.toHaveBeenCalled();
+  });
+
+  it('keeps the read report and the removal failure as separate events', async () => {
+    seedStoredValue('draft:u1', 'k', 'not-json{{{');
+    // A persistent implementation, not a `Once` queue: a change that skips the
+    // removal must not leave a queued rejection for the next case.
+    kvMock.removeItem.mockRejectedValue(new Error('store busy'));
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+
+    expect(Sentry.captureException).toHaveBeenCalledTimes(2);
+    expect(Sentry.captureException).toHaveBeenLastCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'drafts', 'error.operation': 'clear' },
+    });
+  });
+});
+
 describe('write rejection boundary', () => {
   it('reports and swallows a failed debounced write so the timer never leaks an unhandled rejection', async () => {
     vi.useFakeTimers();

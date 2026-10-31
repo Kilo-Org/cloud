@@ -44,6 +44,8 @@ export function McpServerRowView({
   const colors = useThemeColors();
   const typeLabel =
     server.type === 'local' ? t('profiles.mcp.localType') : t('profiles.mcp.remoteType');
+  const secretLabel =
+    secretCount > 0 ? t('profiles.mcp.secretCount', { count: secretCount }) : null;
   return (
     <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="min-w-0 flex-1 gap-0.5">
@@ -52,12 +54,17 @@ export function McpServerRowView({
             {server.name}
           </Text>
           <Text className="text-xs uppercase tracking-wide text-muted-foreground">{typeLabel}</Text>
-          {secretCount > 0 ? (
+          {secretLabel === null ? null : (
             <View className="flex-row items-center gap-0.5">
               <Lock size={12} color={colors.mutedForeground} />
-              <Text className="text-xs text-muted-foreground">{secretCount}</Text>
+              {/* The count sits beside a lock glyph and a bare number reads as
+                  nothing, so the line carries the plural wording as its name
+                  while the row keeps the compact digit on screen. */}
+              <Text className="text-xs text-muted-foreground" accessibilityLabel={secretLabel}>
+                {secretCount}
+              </Text>
             </View>
-          ) : null}
+          )}
         </View>
         {summary.length > 0 ? (
           <Text variant="mono" className="text-xs text-muted-foreground" {...SUMMARY_PROPS}>

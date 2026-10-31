@@ -434,6 +434,10 @@ describe('ProfileMcpScreen', () => {
     const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
     expect(texts).toContain(3);
     expect(texts).toContain('https://example.com/mcp');
+    // The bare digit sits beside a lock glyph, so the line carries the plural
+    // wording as its name.
+    const count = findAll(renderer.root, 'Text').find(node => node.props.children === 3);
+    expect(count?.props.accessibilityLabel).toBe('3 secrets');
 
     unmount();
   });

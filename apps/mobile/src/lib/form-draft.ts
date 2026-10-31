@@ -47,9 +47,18 @@ export function clearFormDraft(scope: string): void {
   }
 }
 
+/**
+ * Drop every draft in the app. The account boundary calls this with the other
+ * session-scoped stores, so a form typed under one account cannot reopen under
+ * the next one.
+ */
+export function clearFormDrafts(): void {
+  drafts.clear();
+}
+
 /** Test-only: no case may see a draft an earlier case left behind. */
 export function resetFormDraftsForTests(): void {
-  drafts.clear();
+  clearFormDrafts();
 }
 
 /**

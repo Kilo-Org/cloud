@@ -6,13 +6,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { AgentSessionsSection } from '@/components/home/home-agent-sessions-section';
+import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 
 const navigateSpy = vi.hoisted(() => vi.fn());
 const dismissToSpy = vi.hoisted(() => vi.fn());
 const sessionDestination = vi.hoisted(() => ({ id: '' }));
-const connectivity = vi.hoisted(() => ({ offline: false }));
+const connectivity = vi.hoisted(() => ({
+  offline: false,
+  connected: true,
+  reconnectExhausted: false,
+}));
+const retryConnectionSpy = vi.hoisted(() => vi.fn());
 const queryClient = new ReactQuery.QueryClient();
 vi.mock('expo-router', () => ({
   useRouter: () => ({ navigate: navigateSpy, dismissTo: dismissToSpy }),
@@ -98,7 +104,15 @@ vi.mock('@/components/home/section-header', async () => {
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: () => null }));
+// A host element so a notice's message and treatment stay assertable: the
+// screens read the same copy whether it paints or is announced.
+vi.mock('@/components/ui/accessible-status', async () => {
+  const { createElement: create } = await import('react');
+  type StatusProps = { message: string | null; tone: string; className?: string };
+  return {
+    AccessibleStatus: (props: StatusProps) => create('AccessibleStatus', props),
+  };
+});
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: vi.fn() }));
@@ -111,12 +125,12 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
   useUserWebConnectionHealth: () => ({
-    isConnected: !connectivity.offline,
-    reconnectExhausted: false,
+    isConnected: connectivity.connected,
+    reconnectExhausted: connectivity.reconnectExhausted,
   }),
 }));
 vi.mock('@/components/agents/user-web-connection-provider', () => ({
-  useUserWebConnection: () => ({}),
+  useUserWebConnection: () => ({ retryConnection: retryConnectionSpy }),
 }));
 vi.mock('@/components/agents/use-agent-session-navigator', () => ({
   useAgentSessionNavigator: () => (id: string) => {
@@ -196,6 +210,9 @@ beforeEach(() => {
   dismissToSpy.mockClear();
   sessionDestination.id = '';
   connectivity.offline = false;
+  connectivity.connected = true;
+  connectivity.reconnectExhausted = false;
+  retryConnectionSpy.mockClear();
 });
 afterEach(() => {
   act(() => renderer?.unmount());
@@ -333,5 +350,144 @@ describe('Home live section', () => {
         candidate.children.includes('No internet connection')
       )
     ).not.toHaveLength(0);
+  });
+});
+
+describe('Live session feedback band', () => {
+  // The band is one child of the column that spaces it against the content it
+  // introduces: a band that paints nothing still takes a gap, which stood the
+  // section header twice as far from its card as the sibling section stands
+  // from its first row. It must exist only while it paints.
+  type PaintedNode = {
+    type: string;
+    props: Record<string, unknown>;
+    children: readonly (PaintedNode | string)[] | null;
+  };
+
+  /** Every painted element of `type`, in tree order, from a rendered tree. */
+  function paintedNodes(json: unknown, type: string): PaintedNode[] {
+    let roots: readonly unknown[] = [];
+    if (Array.isArray(json)) {
+      roots = json;
+    } else if (json !== null) {
+      roots = [json];
+    }
+    const found: PaintedNode[] = [];
+    const walk = (element: PaintedNode) => {
+      if (element.type === type) {
+        found.push(element);
+      }
+      for (const child of element.children ?? []) {
+        if (typeof child !== 'string') {
+          walk(child);
+        }
+      }
+    };
+    for (const root of roots) {
+      walk(root as PaintedNode);
+    }
+    return found;
+  }
+
+  function statusWithMessage(json: unknown, message: string) {
+    return paintedNodes(json, 'AccessibleStatus').filter(
+      candidate => candidate.props.message === message
+    );
+  }
+
+  const connectionLost = i18n.t('agentChat.sessionConnection.connectionLost');
+  const hiddenAnnouncement = 'absolute size-px overflow-hidden';
+
+  async function bandJson(
+    sessions: Props['sessions'] = settled,
+    contextOverride: Props['context'] = context,
+    inlineNotices = false
+  ) {
+    const holder: { tree?: TestRenderer.ReactTestRenderer } = {};
+    await act(async () => {
+      holder.tree = TestRenderer.create(
+        createElement(LiveSessionFeedback, {
+          context: contextOverride,
+          sessions,
+          failureLabel: i18n.t('home.couldNotLoadActiveSessions'),
+          inlineNotices,
+        })
+      );
+      await Promise.resolve();
+    });
+    const json = holder.tree?.toJSON() ?? null;
+    act(() => holder.tree?.unmount());
+    return json;
+  }
+
+  it('paints no band while it has nothing to report', async () => {
+    // The band and its row are the only plain Views this component draws.
+    expect(paintedNodes(await bandJson(), 'View')).toHaveLength(0);
+    // The loading fact is announced, not painted, so the pending card keeps
+    // that same one gap.
+    expect(
+      paintedNodes(
+        await bandJson(
+          { ...settled, hasAcceptedSuccess: false },
+          { ...context, isResolving: true }
+        ),
+        'View'
+      )
+    ).toHaveLength(0);
+  });
+
+  it('draws the offline notice on a surface that carries the notice itself', async () => {
+    connectivity.offline = true;
+    expect(paintedNodes(await bandJson(settled, context, true), 'View')).not.toHaveLength(0);
+  });
+
+  it('draws the connection line with the socket retry and stops announcing it', async () => {
+    connectivity.connected = false;
+    connectivity.reconnectExhausted = true;
+
+    const drawn = await bandJson(settled, context, true);
+
+    // On a surface that carries the notice itself the line paints beside the
+    // socket's own retry.
+    const painted = statusWithMessage(drawn, connectionLost);
+    expect(painted).toHaveLength(1);
+    expect(painted[0]?.props.className).toBe('flex-1 text-xs');
+    expect(
+      paintedNodes(drawn, 'Button').filter(
+        candidate =>
+          candidate.props.accessibilityLabel ===
+          i18n.t('agentChat.sessionConnection.retryConnection')
+      )
+    ).toHaveLength(1);
+  });
+
+  it('announces the connection line only where the surface does not paint it', async () => {
+    connectivity.connected = false;
+    connectivity.reconnectExhausted = true;
+
+    const announced = await bandJson(settled, context, false);
+
+    // Nothing paints on that surface, so the same copy is announced instead.
+    const spoken = statusWithMessage(announced, connectionLost);
+    expect(spoken).toHaveLength(1);
+    expect(spoken[0]?.props.className).toBe(hiddenAnnouncement);
+    expect(paintedNodes(announced, 'Button')).toHaveLength(0);
+  });
+
+  it('draws no connection row while a failure is all the band reports', async () => {
+    const failed: Props['sessions'] = {
+      ...settled,
+      terminalError: { error: new Error('socket closed'), kind: 'retryable' },
+    };
+
+    const drawn = await bandJson(failed, context, true);
+
+    // The failure card is the whole band: an empty connection row would add a
+    // second gap above it for nothing.
+    const rows = paintedNodes(drawn, 'View').filter(
+      candidate => candidate.props.className === 'flex-row items-center gap-2'
+    );
+    expect(rows).toHaveLength(0);
+    expect(statusWithMessage(drawn, connectionLost)).toHaveLength(0);
   });
 });

@@ -2874,7 +2874,6 @@
     "entry": {
       "noRecentPrs": "Aucune revue récente",
       "noRecentPrsDescription": "Collez un lien ci-dessus pour démarrer une revue — elle apparaîtra ici la prochaine fois.",
-      "couldNotLoad": "Le chargement est impossible.",
       "removeFromRecentsTitle": "Retirer des éléments récents ?",
       "removeFromRecentsMessage": "Cette revue sera retirée de vos éléments récents.",
       "removeRecentAccessibility": "Retirer {{repo}} des éléments récents",

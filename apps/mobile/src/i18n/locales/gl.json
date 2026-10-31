@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Non hai revisións recentes",
       "noRecentPrsDescription": "Pega arriba unha ligazón para comezar a revisión — aparecerá aquí a próxima vez.",
-      "couldNotLoad": "Non se puido cargar.",
       "removeFromRecentsTitle": "Eliminar da lista de recentes?",
       "removeFromRecentsMessage": "Esta revisión eliminarase da túa lista de recentes.",
       "removeRecentAccessibility": "Eliminar {{repo}} da lista de recentes",

@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "ఇటీవలి సమీక్షలు లేవు",
       "noRecentPrsDescription": "సమీక్ష ప్రారంభించడానికి పైన లింక్‌ను పేస్ట్ చేయండి — తదుపరి సారి అది ఇక్కడ కనిపిస్తుంది.",
-      "couldNotLoad": "లోడ్ చేయలేకపోయాము.",
       "removeFromRecentsTitle": "ఇటీవలి జాబితా నుంచి తీసివేయాలా?",
       "removeFromRecentsMessage": "ఈ సమీక్ష మీ ఇటీవలి జాబితా నుండి తొలగించబడుతుంది.",
       "removeRecentAccessibility": "{{repo}}ను ఇటీవలి జాబితా నుంచి తీసివేయండి",

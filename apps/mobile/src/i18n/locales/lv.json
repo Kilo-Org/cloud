@@ -616,7 +616,6 @@
     "entry": {
       "noRecentPrs": "Nav nesenu pārskatu",
       "noRecentPrsDescription": "Ielīmē saiti augšā, lai sāktu pārskatīšanu — nākamreiz tā būs redzama šeit.",
-      "couldNotLoad": "Neizdevās ielādēt.",
       "removeFromRecentsTitle": "Noņemt no nesen atvērtajiem?",
       "removeFromRecentsMessage": "Šī pārskatīšana tiks noņemta no nesenajiem vienumiem.",
       "removeRecentAccessibility": "Noņemt {{repo}} no nesen atvērtajiem",

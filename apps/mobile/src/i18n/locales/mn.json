@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Саяхны шалгалт алга",
       "noRecentPrsDescription": "Шалгалт эхлэхийн тулд холбоосыг дээр буулгана уу — дараагийн удаа тэр энд харагдана.",
-      "couldNotLoad": "Ачаалж чадсангүй.",
       "removeFromRecentsTitle": "Саяхан үзсэн жагсаалтаас хасах уу?",
       "removeFromRecentsMessage": "Энэ шалгалт таны саяхны жагсаалтаас хасагдана.",
       "removeRecentAccessibility": "{{repo}}-г саяхан үзсэн жагсаалтаас хасах",

@@ -2831,7 +2831,6 @@
     "entry": {
       "noRecentPrs": "Belum ada riwayat tinjauan",
       "noRecentPrsDescription": "Tempel tautan di atas untuk mulai meninjau — akan muncul di sini saat kamu kembali.",
-      "couldNotLoad": "Tidak dapat memuat data.",
       "removeFromRecentsTitle": "Hapus dari riwayat?",
       "removeFromRecentsMessage": "Tinjauan ini akan dihapus dari riwayatmu.",
       "removeRecentAccessibility": "Hapus {{repo}} dari riwayat",

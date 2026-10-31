@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "ਕੋਈ ਹਾਲੀਆ ਸਮੀਖਿਆ ਨਹੀਂ",
       "noRecentPrsDescription": "ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਉੱਤੇ ਲਿੰਕ ਪੇਸਟ ਕਰੋ — ਅਗਲੀ ਵਾਰ ਇਹ ਇੱਥੇ ਦਿਖਾਈ ਦੇਵੇਗੀ।",
-      "couldNotLoad": "ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
       "removeFromRecentsTitle": "ਹਾਲੀਆ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾਈਏ?",
       "removeFromRecentsMessage": "ਇਹ ਸਮੀਖਿਆ ਤੁਹਾਡੀ ਹਾਲੀਆ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾ ਦਿੱਤੀ ਜਾਵੇਗੀ।",
       "removeRecentAccessibility": "{{repo}} ਨੂੰ ਹਾਲੀਆ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾਓ",

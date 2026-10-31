@@ -2831,7 +2831,6 @@
     "entry": {
       "noRecentPrs": "Son inceleme yok",
       "noRecentPrsDescription": "İnceleme başlatmak için yukarıya bir bağlantı yapıştır — bir dahaki sefere burada görünecek.",
-      "couldNotLoad": "Yüklenemedi.",
       "removeFromRecentsTitle": "Son kullanılanlardan kaldırılsın mı?",
       "removeFromRecentsMessage": "Bu inceleme son kullanılanlardan kaldırılacak.",
       "removeRecentAccessibility": "{{repo}} öğesini son kullanılanlardan kaldır",

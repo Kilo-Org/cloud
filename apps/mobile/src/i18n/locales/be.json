@@ -627,7 +627,6 @@
     "entry": {
       "noRecentPrs": "Няма нядаўніх аглядаў",
       "noRecentPrsDescription": "Каб пачаць агляд, устаўце спасылку вышэй — наступным разам ён з'явіцца тут.",
-      "couldNotLoad": "Не атрымалася загрузіць.",
       "removeFromRecentsTitle": "Выдаліць са спіса нядаўніх?",
       "removeFromRecentsMessage": "Гэты агляд будзе выдалены са спісу нядаўніх.",
       "removeRecentAccessibility": "Выдаліць {{repo}} са спіса нядаўніх",

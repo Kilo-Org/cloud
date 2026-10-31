@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "કોઈ તાજેતરની સમીક્ષા નથી",
       "noRecentPrsDescription": "સમીક્ષા શરૂ કરવા ઉપર લિંક પેસ્ટ કરો — આગલી વારે તે અહીં દેખાશે.",
-      "couldNotLoad": "લોડ કરી શકાયું નહીં.",
       "removeFromRecentsTitle": "તાજેતરની યાદીમાંથી દૂર કરવી છે?",
       "removeFromRecentsMessage": "આ સમીક્ષા તમારી તાજેતરની યાદીમાંથી દૂર કરવામાં આવશે.",
       "removeRecentAccessibility": "{{repo}}ને તાજેતરની યાદીમાંથી દૂર કરો",

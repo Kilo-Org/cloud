@@ -638,7 +638,6 @@
     "entry": {
       "noRecentPrs": "L-ebda reviżjoni riċenti",
       "noRecentPrsDescription": "Waħħal ħolqa hawn fuq biex tibda reviżjoni — id-darba li jmiss tidher hawn.",
-      "couldNotLoad": "Ma setax jitgħabba l-kontenut.",
       "removeFromRecentsTitle": "Trid tneħħiha mir-riċenti?",
       "removeFromRecentsMessage": "Din ir-reviżjoni se titneħħa mil-lista tar-riċenti tiegħek.",
       "removeRecentAccessibility": "Neħħi {{repo}} mir-riċenti",

@@ -2831,7 +2831,6 @@
     "entry": {
       "noRecentPrs": "尚無最近審查",
       "noRecentPrsDescription": "在上方貼上連結即可開始審查，下次就會在這裡看到。",
-      "couldNotLoad": "無法載入。",
       "removeFromRecentsTitle": "要從最近項目移除嗎？",
       "removeFromRecentsMessage": "此審查將從你的最近項目中移除。",
       "removeRecentAccessibility": "從最近項目移除 {{repo}}",

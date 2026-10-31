@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "ຍັງບໍ່ມີການກວດທານຫຼ້າສຸດ",
       "noRecentPrsDescription": "ວາງລິ້ງຂ້າງເທິງເພື່ອເລີ່ມການກວດທານ — ຄັ້ງໜ້າມັນຈະສະແດງຢູ່ນີ້",
-      "couldNotLoad": "ບໍ່ສາມາດໂຫຼດໄດ້.",
       "removeFromRecentsTitle": "ເອົາອອກຈາກລາຍການທີ່ເປີດຫຼ້າສຸດບໍ?",
       "removeFromRecentsMessage": "ການກວດທານນີ້ຈະຖືກລຶບອອກຈາກລາຍການຫຼ້າສຸດຂອງທ່ານ",
       "removeRecentAccessibility": "ເອົາ {{repo}} ອອກຈາກລາຍການທີ່ເປີດຫຼ້າສຸດ",

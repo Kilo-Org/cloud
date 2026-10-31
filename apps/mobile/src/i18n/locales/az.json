@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Son baxış yoxdur",
       "noRecentPrsDescription": "Kod baxışına başlamaq üçün yuxarıya keçid yapışdır — növbəti dəfə burada görünəcək.",
-      "couldNotLoad": "Yükləmək mümkün olmadı.",
       "removeFromRecentsTitle": "Son baxılanlardan silinsin?",
       "removeFromRecentsMessage": "Bu baxış son baxılanlar siyahısından silinəcək.",
       "removeRecentAccessibility": "{{repo}} repozitoriyasını son baxılanlardan sil",

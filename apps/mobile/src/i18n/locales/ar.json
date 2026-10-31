@@ -2979,7 +2979,6 @@
     "entry": {
       "noRecentPrs": "لا توجد مراجعات حديثة",
       "noRecentPrsDescription": "الصق رابطًا أعلاه لبدء المراجعة. سيظهر هنا في المرة القادمة.",
-      "couldNotLoad": "تعذّر التحميل.",
       "removeFromRecentsTitle": "إزالة الطلب من القائمة الأخيرة؟",
       "removeFromRecentsMessage": "ستتم إزالة هذه المراجعة من قائمة العناصر الأخيرة.",
       "removeRecentAccessibility": "إزالة {{repo}} من قائمة الطلبات الأخيرة",

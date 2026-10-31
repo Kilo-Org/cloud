@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "ბოლოს განხილული არ არის",
       "noRecentPrsDescription": "განხილვის დასაწყებად ზემოთ ჩასვით ბმული — შემდეგ ჯერზე ის აქ გამოჩნდება.",
-      "couldNotLoad": "ჩატვირთვა ვერ მოხერხდა.",
       "removeFromRecentsTitle": "წაიშალოს ბოლოს ნანახების სიიდან?",
       "removeFromRecentsMessage": "ეს მიმოხილვა ბოლო ნანახების სიიდან წაიშლება.",
       "removeRecentAccessibility": "{{repo}}-ის წაშლა ბოლოს ნანახების სიიდან",

@@ -616,7 +616,6 @@
     "entry": {
       "noRecentPrs": "Sem revisões recentes",
       "noRecentPrsDescription": "Cola uma ligação acima para iniciar uma revisão — aparecerá aqui na próxima vez.",
-      "couldNotLoad": "Não foi possível carregar os dados.",
       "removeFromRecentsTitle": "Remover dos recentes?",
       "removeFromRecentsMessage": "Esta revisão será removida da tua lista de recentes.",
       "removeRecentAccessibility": "Remover {{repo}} dos recentes",

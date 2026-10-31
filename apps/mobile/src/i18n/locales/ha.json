@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Babu bitutu na baya-bayan nan",
       "noRecentPrsDescription": "Manna mahaɗi a sama don fara bita — zai bayyana a nan a karo na gaba.",
-      "couldNotLoad": "Ba a iya lodawa ba.",
       "removeFromRecentsTitle": "A cire daga jerin na kwanan nan?",
       "removeFromRecentsMessage": "Za a cire wannan bita daga na baya-bayan nan.",
       "removeRecentAccessibility": "Cire {{repo}} daga jerin na kwanan nan",

@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Tsy misy fandinihana vao haingana",
       "noRecentPrsDescription": "Apetaho ny rohy ambony mba hanombohana fandinihana — hita eto izy amin'ny manaraka.",
-      "couldNotLoad": "Tsy tafiditra ny angona.",
       "removeFromRecentsTitle": "Hesorina amin'ny lisitry ny nosokafana farany ve?",
       "removeFromRecentsMessage": "Ho esorina ao amin'ny lisitry ny vao haingana ity fandinihana ity.",
       "removeRecentAccessibility": "Esory amin'ny lisitry ny nosokafana farany ny {{repo}}",

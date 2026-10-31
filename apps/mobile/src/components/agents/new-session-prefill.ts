@@ -307,6 +307,48 @@ export function resolvePrefillRepoSelection(
 }
 
 /**
+ * The repository a new-session form seeds from its durable draft, as the
+ * picker's `platform:fullName` key, or null while the form must keep what it
+ * has.
+ *
+ * Only a form that arrived without a repository request takes it: an explicit
+ * route prefill names where the person chose to go, so it outranks the last
+ * selection, and a form that already holds one (the person picked while the
+ * draft was still loading) is never overwritten.
+ */
+export function resolveStoredRepoSelection(input: {
+  prefill: NewSessionPrefill;
+  selectedRepo: string;
+  storedRepo: string | null;
+}): string | null {
+  if (input.prefill.repo || input.selectedRepo || !input.storedRepo) {
+    return null;
+  }
+  return input.storedRepo;
+}
+
+/**
+ * Whether a selection the settled list does not contain must be dropped.
+ *
+ * `settled` means the list loaded without a provider error, so a failed read
+ * never discards a selection that may still be valid. The comparison is the
+ * picker's platform-qualified key: a row on another provider with the same
+ * `fullName` is a different repository.
+ */
+export function shouldDropUnresolvedRepoSelection(input: {
+  reposSettled: boolean;
+  selectedRepo: string;
+  repositories: { platform: string; fullName: string }[];
+}): boolean {
+  if (!input.reposSettled || !input.selectedRepo) {
+    return false;
+  }
+  return !input.repositories.some(
+    repository => `${repository.platform}:${repository.fullName}` === input.selectedRepo
+  );
+}
+
+/**
  * Describe what could not be carried over, if anything.
  *
  * `settled` means "the list finished loading, without error, and is

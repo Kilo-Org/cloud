@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { PICKER_ROUTE_PATHS } from './picker-routes';
 import {
   isConcreteLastRouteHref,
   isRecordableLastRoute,
@@ -107,6 +108,20 @@ describe('isRecordableLastRoute', () => {
       ])
     ).toBe(true);
     expect(isRecordableLastRoute('/(app)/agent-chat/ses_1', ['(app)', 'agent-chat', 'ses_1'])).toBe(
+      true
+    );
+  });
+
+  it('keeps the record on the screen under a bridge picker', () => {
+    // A picker sheet's options live in a module map that a fresh JS context
+    // starts empty, so reopening one on its own paints the expired shell over
+    // the start route. The record must stay on the form that opened it.
+    for (const pathname of PICKER_ROUTE_PATHS) {
+      expect(isRecordableLastRoute(pathname, ['(app)', ...pathname.slice(1).split('/')])).toBe(
+        false
+      );
+    }
+    expect(isRecordableLastRoute('/(app)/agent-chat/new', ['(app)', 'agent-chat', 'new'])).toBe(
       true
     );
   });

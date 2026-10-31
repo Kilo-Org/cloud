@@ -44,6 +44,7 @@ import {
   readCloneUpToMessageId,
   readForkPrefillText,
   readForkSourceIsCloudAgent,
+  shouldDropUnresolvedRepoSelection,
 } from '@/components/agents/new-session-prefill';
 import { shouldAutoFocusNewSessionPrompt } from '@/components/agents/new-session-prompt-focus';
 import { useNewSessionOrganization } from '@/components/agents/use-new-session-organization';
@@ -89,6 +90,7 @@ import {
   clearDraft,
   flushDraft,
   NEW_SESSION_DRAFT_KEY,
+  newSessionRepositoryDraftKey,
   resolvePrefillOverDraft,
   saveDraft,
 } from '@/lib/persist/drafts';
@@ -443,11 +445,24 @@ export function NewSessionScreenBody() {
     refreshReposForceFresh,
   } = useNewSessionRepos({ organizationId });
 
+  // The repository the account last chose in this organization, so a form
+  // reopened after a process restart or an Activity recreation shows the same
+  // target the person had, next to the durable prompt. A clone entry keeps the
+  // source session's own repository and never reads or writes this draft,
+  // exactly like the prompt draft.
+  const repositoryDraftKey = newSessionRepositoryDraftKey(organizationId ?? null);
+  const repositoryDraft = useFencedDraftLoad({
+    userId: isCloneEntry ? undefined : userId,
+    isIdentityLoading,
+    entityKey: repositoryDraftKey,
+  });
+
   const { selectedRepo, setSelectedRepo } = useNewSessionPrefillTargets({
     repositories,
     reposSettled,
     models,
     modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
+    storedRepo: repositoryDraft.settled ? repositoryDraft.value : null,
   });
 
   // The branch pick belongs to THIS screen, not to the repository section: the
@@ -474,6 +489,38 @@ export function NewSessionScreenBody() {
       ) ?? null
     );
   }, [repositories, selectedRepo]);
+
+  // A repository is one discrete choice, not a keystroke burst, so it is
+  // written through the debounce immediately: a restart in the next half second
+  // must still reopen the form on the target the person had just picked.
+  const handleRepoChange = useCallback(
+    (next: string) => {
+      setSelectedRepo(next);
+      if (!userId || isCloneEntry) {
+        return;
+      }
+      saveDraft(userId, repositoryDraftKey, next);
+      void flushDraft(userId, repositoryDraftKey);
+    },
+    [isCloneEntry, repositoryDraftKey, setSelectedRepo, userId]
+  );
+
+  // A selection the settled list does not contain belongs to a repository that
+  // is no longer connected (or to another organization's list): the row would
+  // read as chosen while Start refuses it. Drop it and its stored copy, so the
+  // next visit starts from the picker instead of a dead key.
+  const dropUnresolvedRepo =
+    !isCloneEntry &&
+    shouldDropUnresolvedRepoSelection({ reposSettled, selectedRepo, repositories });
+  useEffect(() => {
+    if (!dropUnresolvedRepo) {
+      return;
+    }
+    setSelectedRepo('');
+    if (userId) {
+      void clearDraft(userId, repositoryDraftKey);
+    }
+  }, [dropUnresolvedRepo, repositoryDraftKey, setSelectedRepo, userId]);
 
   const {
     profile,
@@ -584,9 +631,10 @@ export function NewSessionScreenBody() {
   const handleCreated = useCallback(() => {
     if (userId) {
       void clearDraft(userId, NEW_SESSION_DRAFT_KEY);
+      void clearDraft(userId, repositoryDraftKey);
     }
     skipDiscardGuardRef.current = true;
-  }, [userId]);
+  }, [repositoryDraftKey, userId]);
 
   // The form owns the cloud-create failure feedback (a persistent inline
   // error), so the creator hook does not also toast the same rejection.
@@ -603,6 +651,7 @@ export function NewSessionScreenBody() {
   // the unmount flush preserves the draft.
   const { markRemoteSpawnAttempted, markRemoteSpawnFailed } = useRemoteSpawnDraftCleanup({
     userId: isCloneEntry ? undefined : userId,
+    repositoryDraftKey,
   });
 
   // A committed remote spawn arms the discard-confirm bypass alongside the
@@ -860,7 +909,8 @@ export function NewSessionScreenBody() {
   const handleDiscardDraft = useCallback(async () => {
     if (userId) {
       const cleared = await clearDraft(userId, NEW_SESSION_DRAFT_KEY);
-      if (!cleared) {
+      const clearedRepository = await clearDraft(userId, repositoryDraftKey);
+      if (!cleared || !clearedRepository) {
         // The stored draft could not be removed: stay on the screen so the
         // guard keeps the draft and toasts instead of navigating away.
         throw new Error('Failed to clear the new-session draft');
@@ -870,7 +920,7 @@ export function NewSessionScreenBody() {
     // Release only after the discard is committed (clearDraft succeeded): a
     // failed clear keeps the composer mounted, so the uploads stay recoverable.
     attachments.releaseUnclaimedUploads();
-  }, [userId, promptRef, attachments]);
+  }, [attachments, promptRef, repositoryDraftKey, userId]);
 
   // "Save as to-do" keeps the leave the confirm intercepted until a list is
   // picked; saving then discards the draft and replays that leave.
@@ -1280,7 +1330,7 @@ export function NewSessionScreenBody() {
         autoFocusPrompt={autoFocusPrompt}
         groups={groups}
         isRetrying={isRetrying}
-        onChangeRepo={setSelectedRepo}
+        onChangeRepo={handleRepoChange}
         onConnectProvider={openIntegration}
         connectingProvider={connectingProvider}
         onRefreshRepos={() => void refreshReposForceFresh()}

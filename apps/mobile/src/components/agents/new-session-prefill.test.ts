@@ -12,6 +12,8 @@ import {
   resolvePrefillModel,
   resolvePrefillRepo,
   resolvePrefillRepoSelection,
+  resolveStoredRepoSelection,
+  shouldDropUnresolvedRepoSelection,
 } from './new-session-prefill';
 
 vi.mock('@/components/ui/icons', () => ({
@@ -335,6 +337,97 @@ describe('resolvePrefillRepoSelection', () => {
     { repo: '', desc: 'empty string' },
   ])('returns null when repo is $desc', ({ repo }) => {
     expect(resolvePrefillRepoSelection(repos, { mode: 'code', repo })).toBeNull();
+  });
+});
+
+describe('resolveStoredRepoSelection', () => {
+  const storedRepo = 'github:drain-team/kilo-backend';
+
+  it('seeds the durable draft into an empty form', () => {
+    expect(
+      resolveStoredRepoSelection({ prefill: { mode: 'code' }, selectedRepo: '', storedRepo })
+    ).toBe(storedRepo);
+  });
+
+  it('leaves an explicit route prefill in charge', () => {
+    expect(
+      resolveStoredRepoSelection({
+        prefill: { mode: 'code', repo: 'drain-team/kilo-app' },
+        selectedRepo: '',
+        storedRepo,
+      })
+    ).toBeNull();
+  });
+
+  it('never overwrites a choice the person already made', () => {
+    expect(
+      resolveStoredRepoSelection({
+        prefill: { mode: 'code' },
+        selectedRepo: 'gitlab:team/other',
+        storedRepo,
+      })
+    ).toBeNull();
+  });
+
+  it('seeds nothing when no draft is stored or it has not loaded', () => {
+    expect(
+      resolveStoredRepoSelection({ prefill: { mode: 'code' }, selectedRepo: '', storedRepo: null })
+    ).toBeNull();
+    expect(
+      resolveStoredRepoSelection({ prefill: { mode: 'code' }, selectedRepo: '', storedRepo: '' })
+    ).toBeNull();
+  });
+});
+
+describe('shouldDropUnresolvedRepoSelection', () => {
+  const repositories = [
+    { platform: 'github', fullName: 'drain-team/kilo-backend' },
+    { platform: 'gitlab', fullName: 'drain-team/kilo-app' },
+  ];
+
+  it('keeps a selection the settled list contains', () => {
+    expect(
+      shouldDropUnresolvedRepoSelection({
+        reposSettled: true,
+        selectedRepo: 'github:drain-team/kilo-backend',
+        repositories,
+      })
+    ).toBe(false);
+  });
+
+  it('drops a platform-qualified key the list does not contain', () => {
+    // Same fullName, different provider: a different repository, not a match.
+    expect(
+      shouldDropUnresolvedRepoSelection({
+        reposSettled: true,
+        selectedRepo: 'github:drain-team/kilo-app',
+        repositories,
+      })
+    ).toBe(true);
+    expect(
+      shouldDropUnresolvedRepoSelection({
+        reposSettled: true,
+        selectedRepo: 'github:drain-team/disconnected',
+        repositories,
+      })
+    ).toBe(true);
+  });
+
+  it('never drops while the list is unsettled or nothing is selected', () => {
+    expect(
+      shouldDropUnresolvedRepoSelection({
+        reposSettled: false,
+        selectedRepo: 'github:drain-team/disconnected',
+        repositories,
+      })
+    ).toBe(false);
+    expect(
+      shouldDropUnresolvedRepoSelection({
+        reposSettled: true,
+        selectedRepo: '',
+        repositories: [],
+      })
+    ).toBe(false);
   });
 });
 

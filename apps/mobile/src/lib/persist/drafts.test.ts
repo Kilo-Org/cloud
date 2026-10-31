@@ -35,6 +35,7 @@ import {
   isStringDraft,
   loadDraft,
   NEW_SESSION_DRAFT_KEY,
+  newSessionRepositoryDraftKey,
   prCommentDraftKey,
   prConversationCommentDraftKey,
   prMergeDraftKey,
@@ -125,6 +126,11 @@ describe('draft scope and entity keys', () => {
     expect(securityDismissDraftKey('personal', 'finding-1')).toBe(
       'security-dismiss:personal:finding-1'
     );
+  });
+
+  it('scopes the new-session repository draft to the organization', () => {
+    expect(newSessionRepositoryDraftKey(null)).toBe('agent-composer:new:repository:personal');
+    expect(newSessionRepositoryDraftKey('org-1')).toBe('agent-composer:new:repository:org-1');
   });
 
   it('builds the merge, reply, and comment draft entity keys', () => {

@@ -5,7 +5,12 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { isPickerRoutePath, PICKER_ROUTE_NAMES, PICKER_ROUTE_PATHS } from './picker-routes';
+import {
+  isPickerRouteHref,
+  isPickerRoutePath,
+  PICKER_ROUTE_NAMES,
+  PICKER_ROUTE_PATHS,
+} from './picker-routes';
 
 const APP = fileURLToPath(new URL('../app/(app)/', import.meta.url));
 
@@ -30,5 +35,12 @@ describe('picker route paths', () => {
     expect(isPickerRoutePath('/agent-chat/repo-picker-preview')).toBe(false);
     expect(isPickerRoutePath(undefined)).toBe(false);
     expect(isPickerRoutePath(null)).toBe(false);
+  });
+
+  it('recognises a persisted picker href with its route groups and query', () => {
+    expect(isPickerRouteHref('/(app)/agent-chat/repo-picker')).toBe(true);
+    expect(isPickerRouteHref('/(app)/agent-chat/model-picker?routeKey=unscoped')).toBe(true);
+    expect(isPickerRouteHref('/(app)/agent-chat/new')).toBe(false);
+    expect(isPickerRouteHref('/(app)/agent-chat/repo-picker-preview')).toBe(false);
   });
 });

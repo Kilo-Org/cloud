@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { currentRouteHref } from '@/lib/current-route-href';
 import { LAST_ROUTE_KEY } from '@/lib/storage-keys';
 import { isConcreteLastRouteHref } from '@/lib/last-route-recordable';
+import { isPickerRouteHref } from '@/lib/picker-routes';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
 /**
@@ -86,7 +87,17 @@ function parseStoredRecord(raw: string): LastRouteRecord | null {
     // (`profiles/[profileId]/variables`); restoring it opens a screen whose
     // data reads cannot resolve, so it is dropped instead of replayed once.
     const href = currentRouteHref(result.data.href);
-    return isConcreteLastRouteHref(href) ? { ...result.data, href } : null;
+    if (!isConcreteLastRouteHref(href)) {
+      return null;
+    }
+    // An older build could record a picker sheet. Replaying it would reopen the
+    // "options expired" shell over the start route with no screen behind it to
+    // reopen the picker from, so it reads as absent like any other unusable
+    // record and the repair leaves the start route alone.
+    if (isPickerRouteHref(href)) {
+      return null;
+    }
+    return { ...result.data, href };
   } catch {
     return null;
   }

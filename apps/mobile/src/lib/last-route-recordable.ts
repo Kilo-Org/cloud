@@ -1,3 +1,5 @@
+import { isPickerRoutePath } from '@/lib/picker-routes';
+
 /**
  * Which concrete route paths may be recorded as the relaunch-restore target.
  *
@@ -33,6 +35,17 @@ export function isRecordableLastRoute(pathname: string, segments: readonly strin
     '/kilo-pass',
   ];
   if (unrecordable.includes(pathname)) {
+    return false;
+  }
+  // The bridge pickers are the picker case above, and the only one the side
+  // sheet routes still missed: their options live in the module map of
+  // `lib/route-registry.ts`, which a fresh JS context starts empty. Reopening
+  // one on its own therefore paints the "options expired" shell over the start
+  // route, with no screen behind it to reopen the picker from. Leaving the
+  // record on the screen underneath keeps that screen — and its draft — the
+  // relaunch target instead. `PICKER_ROUTE_PATHS` is the same list the Back
+  // guard keeps aligned with the app stack's `formSheet` registrations.
+  if (isPickerRoutePath(pathname)) {
     return false;
   }
   // The auth group is unreachable with `(app)` first, but the segments guard

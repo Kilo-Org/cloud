@@ -26,7 +26,6 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useFormDraftState } from '@/lib/form-draft';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
@@ -144,16 +143,12 @@ export function ProfileAgentsScreen({
   // fields it holds are a draft (`lib/form-draft`), so a remount reopens it on
   // what was typed instead of dropping it.
   const draftScope = `profiles:agents:${profileId}`;
-  const form = useProfileFormDraft(draftScope, agents);
-  const { startAdd: handleStartAdd, close: handleClose } = form;
   // A save the server rejected on the slug shows the inline conflict message
   // instead of only a toast: the sheet stays open on the typed values, so the
-  // user can rename without retyping the form.
-  const [serverSlugConflict, setServerSlugConflict] = useFormDraftState(
-    draftScope,
-    'slugConflict',
-    false
-  );
+  // user can rename without retyping the form. The flag is the form's note, so
+  // opening or closing the form resets it with the rest of the draft.
+  const form = useProfileFormDraft(draftScope, agents, { slugConflict: false });
+  const { startAdd: handleStartAdd, close: handleClose } = form;
 
   const saveAgent = async (
     target: AgentSource | null,
@@ -165,7 +160,7 @@ export function ProfileAgentsScreen({
         : updateAgent.mutateAsync({ profileId, agentId: target.id, ...payload }));
     } catch (error) {
       if (isSlugConflict(error)) {
-        setServerSlugConflict(true);
+        form.setNotes({ slugConflict: true });
         return;
       }
       if (!hasUsableMessage(error)) {
@@ -290,7 +285,7 @@ export function ProfileAgentsScreen({
             .map(candidate => candidate.slug)}
           organizationId={organizationId}
           isSaving={createAgent.isPending || updateAgent.isPending}
-          slugConflictFromServer={serverSlugConflict}
+          slugConflictFromServer={form.notes.slugConflict}
           onClose={handleClose}
           onSave={payload => {
             void saveAgent(form.editing, payload);

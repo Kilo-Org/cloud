@@ -23,7 +23,6 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useFormDraftState } from '@/lib/form-draft';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_SKILLS } from '@/lib/agent-profile-forms';
@@ -133,16 +132,16 @@ export function ProfileSkillsScreen({
   // fields it holds are a draft (`lib/form-draft`), so a remount reopens it on
   // what was typed instead of dropping it.
   const draftScope = `profiles:skills:${profileId}`;
-  const form = useProfileFormDraft(draftScope, skills);
-  const { startAdd: handleStartAdd, close: handleClose } = form;
   // The message the open sheet shows for a refused save, and whether it is a
-  // failure or an expected limit. The mutation hook's toast sits behind the
-  // sheet, so the reason is rendered inside it instead.
-  const [saveFailure, setSaveFailure] = useFormDraftState<SaveFailure | null>(
-    draftScope,
-    'saveFailure',
-    null
-  );
+  // failure or an expected limit, is the form's note: the mutation hook's toast
+  // sits behind the sheet, and opening or closing resets the note with the rest
+  // of the draft.
+  const form = useProfileFormDraft(draftScope, skills, { saveFailure: null as SaveFailure | null });
+  const { startAdd: handleStartAdd, close: handleClose } = form;
+  const setSaveFailure = (next: SaveFailure | null) => {
+    form.setNotes({ saveFailure: next });
+  };
+  const saveFailure = form.notes.saveFailure;
 
   const skillLimitFailure = (): SaveFailure => ({
     message: t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS }),

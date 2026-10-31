@@ -388,6 +388,37 @@ describe('ProfileSkillsScreen', () => {
     unmount();
   });
 
+  it('drops a refused-save message when the next form is opened', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+    h.mutations.createCustomSkill.mutateAsync.mockRejectedValueOnce(new Error('refused'));
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Skill name', 'first-skill');
+    changeText(renderer.root, 'Skill content', 'Body');
+    pressSheetDone(renderer.root);
+    await waitFor(() =>
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.skillSaveFailed')
+      )
+    );
+
+    // The message describes the attempt that failed; a form opened afterwards
+    // is a new attempt and must not open under the old refusal.
+    pressSheetCancel(renderer.root);
+    await act(async () => {
+      confirmRequest(h.confirm as TestConfirmMock);
+      await Promise.resolve();
+    });
+    pressEmptyAction(renderer);
+
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('profiles.skillSaveFailed')
+    );
+    unmount();
+  });
+
   it('drops a save that settles after its sheet was replaced', async () => {
     h.query.data = testSkills();
     h.query.isPending = false;

@@ -586,4 +586,22 @@ describe('ProfileVariablesScreen', () => {
     expect(findAll(second.renderer.root, 'FormField')).toHaveLength(0);
     second.unmount();
   });
+  it('still offers the add control when the restored edit names a row that is gone', async () => {
+    h.query.data = testVars([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressPressable(first.renderer.root, 'API_KEY');
+    first.unmount();
+
+    // The row was deleted elsewhere while the screen was away, so the restored
+    // edit has nothing to edit; the screen must not strand the reader without
+    // the add control.
+    h.query.data = testVars([{ key: 'OTHER_KEY', value: '2', isSecret: false }]);
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'FormField')).toHaveLength(0);
+    pressButton(second.renderer.root, 'Add variable');
+    expect(findField(second.renderer.root, 'Key').props.defaultValue).toBe('');
+    second.unmount();
+  });
 });

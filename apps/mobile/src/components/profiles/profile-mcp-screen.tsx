@@ -26,7 +26,6 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useFormDraftState } from '@/lib/form-draft';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
@@ -150,29 +149,27 @@ export function ProfileMcpScreen({
   const canManage = useCanManageOrganizationProfiles(organizationId);
   const servers = profileQuery.data ?? NO_MCP_SERVERS;
   const rows = mcpServerRows(servers);
-  // The open form and its fields are a draft (`lib/form-draft`).
+  // The open form, its fields and the refusal the sheet shows are one draft, so
+  // opening or closing the form resets the refusal with everything else.
   const draftScope = `profiles:mcp:${profileId}`;
-  const form = useProfileFormDraft(draftScope, servers);
+  const form = useProfileFormDraft(draftScope, servers, {
+    conflict: false,
+    failure: null as string | null,
+  });
   const { startAdd: handleStartAdd, close: handleClose } = form;
-  // A save refused on the name index shows the inline conflict; any other
-  // refusal shows one line inside the sheet. Both reset on the next open.
-  const [saveNotes, setSaveNotes] = useFormDraftState<{
-    conflict: boolean;
-    failure: string | null;
-  }>(draftScope, 'saveNotes', { conflict: false, failure: null });
 
   const saveServer = async (target: McpServerSource | null, payload: McpServerPayload) => {
-    setSaveNotes({ conflict: false, failure: null });
+    form.setNotes({ conflict: false, failure: null });
     try {
       await (target === null
         ? createMcp.mutateAsync({ profileId, server: payload })
         : updateMcp.mutateAsync({ profileId, mcpServerId: target.id, server: payload }));
     } catch (error) {
       if (readTrpcErrorField(error, 'code') === 'CONFLICT') {
-        setSaveNotes({ conflict: true, failure: null });
+        form.setNotes({ conflict: true, failure: null });
         return;
       }
-      setSaveNotes({ conflict: false, failure: t('profiles.mcp.saveFailed') });
+      form.setNotes({ conflict: false, failure: t('profiles.mcp.saveFailed') });
       return;
     }
     form.close();
@@ -305,8 +302,8 @@ export function ProfileMcpScreen({
             .filter(candidate => candidate.id !== form.editing?.id)
             .map(candidate => candidate.name)}
           isSaving={createMcp.isPending || updateMcp.isPending}
-          nameConflictFromServer={saveNotes.conflict}
-          saveFailure={saveNotes.failure}
+          nameConflictFromServer={form.notes.conflict}
+          saveFailure={form.notes.failure}
           onClose={handleClose}
           onSave={payload => {
             void saveServer(form.editing, payload);

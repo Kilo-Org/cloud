@@ -86,7 +86,16 @@ export function ProfileVariablesScreen({
   );
 
   const rows = variableRows(vars);
+  // A restored edit whose row is gone, e.g. deleted on another device while
+  // this screen was away, must not leave the screen with no way back to the
+  // add control: it reads as closed, so the form and the add button render.
+  const orphanedEdit =
+    editingKey !== null && editingKey !== '' && !rows.some(row => row.key === editingKey);
   const isAdding = editingKey === '';
+  const isEditing = editingKey !== null && !isAdding && !orphanedEdit;
+  // The add control is what an orphaned edit would otherwise leave the reader
+  // without, so it renders for that state exactly as it does when closed.
+  const showAdd = editingKey === null || orphanedEdit;
 
   const startAdd = () => {
     clearFormDraft(draftScope);
@@ -199,7 +208,7 @@ export function ProfileVariablesScreen({
     content = (
       <>
         {rows.map(row =>
-          row.key === editingKey ? (
+          isEditing && row.key === editingKey ? (
             renderEditForm(false, initialVariableEdit(row))
           ) : (
             <VariableRowView
@@ -226,7 +235,7 @@ export function ProfileVariablesScreen({
 
         {isAdding ? renderEditForm(true, initialVariableEdit(undefined)) : null}
 
-        {editingKey === null && canManage ? (
+        {showAdd && canManage ? (
           <Button onPress={startAdd}>
             <Text>{t('profiles.addVariable')}</Text>
           </Button>

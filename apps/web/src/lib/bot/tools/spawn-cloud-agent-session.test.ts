@@ -14,6 +14,7 @@ import type { getBotUserId as GetBotUserId } from '@/lib/bot-users/bot-user-serv
 import type { resolveGitHubRepositoryForOwner as ResolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
 import type SpawnCloudAgentSession from './spawn-cloud-agent-session';
 import { INSUFFICIENT_CREDITS_RESPONSE } from '@/lib/cloud-agent-next/run-session';
+import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
 
 const mockGetGitHubIntegrationById =
   jest.fn<(...args: unknown[]) => Promise<PlatformIntegration | null>>();
@@ -227,7 +228,13 @@ describe('spawnCloudAgentSession delegation', () => {
         attachments,
         callbackTarget: expect.objectContaining({
           url: expect.stringContaining('/api/internal/bot-session-callback/request-1'),
-          headers: { 'X-Bot-Callback-Token': expect.any(String) },
+          headers: {
+            'X-Bot-Callback-Token': await deriveCallbackToken({
+              secret: 'callback-secret',
+              scope: 'bot-session-callback',
+              resourceParts: ['request-1'],
+            }),
+          },
         }),
       })
     );

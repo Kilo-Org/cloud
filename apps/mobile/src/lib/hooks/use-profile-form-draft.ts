@@ -17,6 +17,12 @@ export type ProfileFormDraft<T, TNotes> = Readonly<{
   setNotes: (next: TNotes) => void;
   /** Every open and close bumps this, so a save that settles late can tell it is stale. */
   generation: () => number;
+  /**
+   * Whether the form that started a save is still the one on screen. A save
+   * reads the generation when it starts and writes nothing (no note, no close)
+   * once a later open or close has replaced or dismissed that form.
+   */
+  isCurrent: (generation: number) => boolean;
   startAdd: () => void;
   startEdit: (item: T) => void;
   close: () => void;
@@ -85,6 +91,7 @@ export function useProfileFormDraft<T extends { id: string }, TNotes>(
     notes: draft?.notes ?? initialNotes,
     setNotes,
     generation: () => generationRef.current,
+    isCurrent: (generation: number) => generationRef.current === generation,
     startAdd,
     startEdit,
     close,

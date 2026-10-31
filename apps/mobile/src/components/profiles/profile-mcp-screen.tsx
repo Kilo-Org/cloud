@@ -159,12 +159,18 @@ export function ProfileMcpScreen({
   const { startAdd: handleStartAdd, close: handleClose } = form;
 
   const saveServer = async (target: McpServerSource | null, payload: McpServerPayload) => {
+    // The form this save belongs to. A remount keeps it alive; a later open or
+    // close replaces it, and this attempt must then leave the new form alone.
+    const generation = form.generation();
     form.setNotes({ conflict: false, failure: null });
     try {
       await (target === null
         ? createMcp.mutateAsync({ profileId, server: payload })
         : updateMcp.mutateAsync({ profileId, mcpServerId: target.id, server: payload }));
     } catch (error) {
+      if (!form.isCurrent(generation)) {
+        return;
+      }
       if (readTrpcErrorField(error, 'code') === 'CONFLICT') {
         form.setNotes({ conflict: true, failure: null });
         return;
@@ -172,7 +178,9 @@ export function ProfileMcpScreen({
       form.setNotes({ conflict: false, failure: t('profiles.mcp.saveFailed') });
       return;
     }
-    form.close();
+    if (form.isCurrent(generation)) {
+      form.close();
+    }
   };
 
   const runDelete = async (mcpServerId: string) => {

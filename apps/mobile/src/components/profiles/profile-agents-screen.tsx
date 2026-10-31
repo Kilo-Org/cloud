@@ -154,11 +154,17 @@ export function ProfileAgentsScreen({
     target: AgentSource | null,
     payload: { slug: string; name: string; config: Record<string, unknown> }
   ) => {
+    // The form this save belongs to. A remount keeps it alive; a later open or
+    // close replaces it, and this attempt must then leave the new form alone.
+    const generation = form.generation();
     try {
       await (target === null
         ? createAgent.mutateAsync({ profileId, ...payload })
         : updateAgent.mutateAsync({ profileId, agentId: target.id, ...payload }));
     } catch (error) {
+      if (!form.isCurrent(generation)) {
+        return;
+      }
       if (isSlugConflict(error)) {
         form.setNotes({ slugConflict: true });
         return;
@@ -168,7 +174,9 @@ export function ProfileAgentsScreen({
       }
       return;
     }
-    form.close();
+    if (form.isCurrent(generation)) {
+      form.close();
+    }
   };
 
   const runDelete = async (agentId: string) => {

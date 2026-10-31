@@ -167,7 +167,7 @@ export function ProfileSkillsScreen({
             description: submission.description ?? null,
           }));
     } catch (error) {
-      if (form.generation() !== generation) {
+      if (!form.isCurrent(generation)) {
         return;
       }
       // A create the server refused at the cap, e.g. the list was stale; an
@@ -180,7 +180,7 @@ export function ProfileSkillsScreen({
       );
       return;
     }
-    if (form.generation() === generation) {
+    if (form.isCurrent(generation)) {
       form.close();
     }
   };

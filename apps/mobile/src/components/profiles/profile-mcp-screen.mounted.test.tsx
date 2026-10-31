@@ -12,8 +12,10 @@ import {
   pressAddButton,
   pressEmptyAction,
   pressPressable,
+  pressSheetCancel,
   pressSheetDone,
   rerenderScreen,
+  type TestConfirmMock,
   testProfile,
   testServer,
 } from '@/components/profiles/profile-mcp-screen.test-helpers';
@@ -534,5 +536,38 @@ describe('ProfileMcpScreen', () => {
     pressEmptyAction(second.renderer);
     expect(findField(second.renderer.root, 'Server name').props.defaultValue).toBe('');
     second.unmount();
+  });
+  it('leaves the form opened after a failed save alone when that save settles', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+    const pendingSave = Promise.withResolvers<unknown>();
+    h.mutations.createMcp.mutateAsync.mockImplementation(() => pendingSave.promise);
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Server name', 'first-server');
+    changeText(renderer.root, 'Command line', 'npx first-mcp');
+    pressSheetDone(renderer.root);
+    expect(h.mutations.createMcp.mutateAsync).toHaveBeenCalledTimes(1);
+
+    // Dismiss that attempt and open a different form: the refusal of the first
+    // save belongs to the first form and must not appear under the second.
+    pressSheetCancel(renderer.root);
+    await act(async () => {
+      confirmRequest(h.confirm as TestConfirmMock);
+      await Promise.resolve();
+    });
+    pressEmptyAction(renderer);
+
+    await act(async () => {
+      pendingSave.reject(new Error('late failure'));
+      await Promise.resolve();
+    });
+
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('profiles.mcp.saveFailed')
+    );
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+    unmount();
   });
 });

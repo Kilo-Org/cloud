@@ -22,6 +22,13 @@ export const BenchmarkModelCatalogSchema = z.object({
       alias_target: z.string().trim().min(1).optional(),
       inference_provider_ids: z.array(z.string()).optional(),
       supported_parameters: z.array(z.string()).optional(),
+      context_length: z.number().nullable().catch(null).optional(),
+      max_completion_tokens: z.number().nullable().catch(null).optional(),
+      top_provider: z
+        .object({ max_completion_tokens: z.number().nullable().catch(null).optional() })
+        .nullable()
+        .catch(null)
+        .optional(),
       opencode: z.object({ variants: BenchmarkCatalogVariantsSchema.optional() }).optional(),
       pricing: z
         .object({
@@ -42,6 +49,36 @@ export function catalogModelSupportsTools(model: CatalogModel): boolean {
   return model.supported_parameters?.includes('tools') ?? true;
 }
 
+/**
+ * The CLI's output cap and completion fallback, mirrored from the kilo CLI:
+ * `OUTPUT_TOKEN_MAX` in `packages/opencode/src/provider/transform.ts` and the
+ * `maxOutputTokens` fallback in `packages/kilo-gateway/src/api/models.ts`.
+ */
+const CLI_OUTPUT_TOKEN_MAX = 32_000;
+
+/**
+ * Input tokens every benchmark request needs: the CLI harness prompt (system prompt
+ * and tool definitions, about 16.6k tokens) plus a short case.
+ */
+export const MIN_BENCHMARK_INPUT_TOKENS = 20_000;
+
+export const CATALOG_PAIR_UNAVAILABLE_REASON =
+  'Model or variant is unavailable in the executable benchmark catalog.';
+export const CATALOG_CONTEXT_TOO_SMALL_REASON = `Model context window leaves fewer than ${MIN_BENCHMARK_INPUT_TOKENS} input tokens after the CLI completion reservation.`;
+
+/**
+ * Input room after the completion budget the CLI reserves on every request, derived
+ * the way the CLI derives it from the gateway catalog. Null when the window is unknown.
+ */
+export function catalogModelInputRoom(model: CatalogModel): number | null {
+  if (model.context_length == null) return null;
+  const output =
+    model.top_provider?.max_completion_tokens ||
+    model.max_completion_tokens ||
+    Math.ceil(model.context_length * 0.2);
+  return model.context_length - Math.min(output, CLI_OUTPUT_TOKEN_MAX);
+}
+
 export function catalogSupportsBenchmarkPair(
   catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
   pair: { model: string; variant: string | null }
@@ -50,6 +87,22 @@ export function catalogSupportsBenchmarkPair(
   if (!model || model.id.startsWith('~') || !catalogModelSupportsTools(model)) return false;
   const variants = getReasoningVariantKeys(model.opencode?.variants);
   return variants.length > 0 ? variants.includes(pair.variant ?? '') : pair.variant === null;
+}
+
+/**
+ * Why the drain cannot benchmark this exact pair, or null when it can. Registration
+ * admits a pair whose window is too small, so its profile fails here with that reason.
+ */
+export function benchmarkPairUnavailableReason(
+  catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
+  pair: { model: string; variant: string | null }
+): string | null {
+  if (!catalogSupportsBenchmarkPair(catalog, pair)) return CATALOG_PAIR_UNAVAILABLE_REASON;
+  const model = catalog.data.find(model => model.id === pair.model);
+  const room = model ? catalogModelInputRoom(model) : null;
+  return room !== null && room < MIN_BENCHMARK_INPUT_TOKENS
+    ? CATALOG_CONTEXT_TOO_SMALL_REASON
+    : null;
 }
 
 function resolveCatalogModel(

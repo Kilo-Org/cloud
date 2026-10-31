@@ -23,7 +23,7 @@ let permissionData = {
 };
 let configData = structuredClone(securityConfigFixture);
 let repositoriesData: { id: number }[] = [];
-let roles: { organizationId: string; role: string }[] = [];
+let roles: { organizationId: string; organizationName: string; role: string }[] = [];
 let queryClient = new QueryClient();
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 let previousOnline = true;
@@ -57,6 +57,7 @@ vi.mock('@/lib/trpc', async () => {
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://settings.test' }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   View: 'View',
   Switch: 'Switch',
   Pressable: 'Pressable',
@@ -165,7 +166,7 @@ beforeEach(() => {
   connectivity = 'online';
   releaseHeld = undefined;
   repositoriesData = [{ id: 1 }];
-  roles = [{ organizationId: 'org_123', role: 'owner' }];
+  roles = [{ organizationId: 'org_123', organizationName: 'Drain Labs', role: 'owner' }];
   transport.mockReset().mockImplementation(async input => {
     await Promise.resolve();
     if (configHold && procedureFor(input) === 'getConfig') {
@@ -334,6 +335,68 @@ describe.each(['personal', 'org_123'])('ScopeEntryScreen %s routing', scope => {
       ).toBe(false);
     }
   );
+});
+
+describe('ScopeEntryScreen names the scope it acts on', () => {
+  // An admin in several organizations reauthorizes one organization's GitHub
+  // app: the header has to say whose agent the button acts on, the way the Code
+  // Reviewer's scope screens already do.
+  it('names the organization on the reauthorize view', async () => {
+    permissionData = {
+      hasIntegration: true,
+      hasPermissions: false,
+      reauthorizeUrl: 'https://github.test/install',
+    };
+    const root = await mount('org_123');
+    const header = host(root, 'ScreenHeader')[0];
+    expect(header?.props.title).toBe('Drain Labs');
+    expect(header?.props.eyebrow).toBe('Security Agent');
+  });
+
+  it('names the personal scope on the reauthorize view', async () => {
+    permissionData = {
+      hasIntegration: true,
+      hasPermissions: false,
+      reauthorizeUrl: 'https://github.test/install',
+    };
+    const root = await mount('personal');
+    const header = host(root, 'ScreenHeader')[0];
+    expect(header?.props.title).toBe('Personal');
+    expect(header?.props.eyebrow).toBe('Security Agent');
+  });
+
+  it('names the organization on the load-failure view', async () => {
+    failingProcedures = new Set(['getConfig']);
+    const root = await mount('org_123');
+    const failure = host(root, 'PlatformErrorScreen')[0];
+    expect(failure?.props.title).toBe('Drain Labs');
+    expect(failure?.props.eyebrow).toBe('Security Agent');
+  });
+
+  it('names the organization on the no-access view', async () => {
+    deniedProcedures = new Set(['getPermissionStatus', 'getConfig', 'getRepositories']);
+    const root = await mount('org_123');
+    const denied = host(root, 'ScopeAccessDeniedScreen')[0];
+    expect(denied?.props.title).toBe('Drain Labs');
+    expect(denied?.props.eyebrow).toBe('Security Agent');
+  });
+
+  it('keeps the header line while the membership list is still loading', async () => {
+    // The name arrives with the shared membership list. Until then the header
+    // keeps a placeholder title rather than an empty line, so the body does not
+    // move when the real name lands.
+    heldProcedures = new Set(['list']);
+    permissionData = {
+      hasIntegration: true,
+      hasPermissions: false,
+      reauthorizeUrl: 'https://github.test/install',
+    };
+    const root = await mount('org_123');
+    const header = host(root, 'ScreenHeader')[0];
+    expect(header?.props.title).toBe('Organization');
+    expect(header?.props.eyebrow).toBe('Security Agent');
+    releaseHeld?.();
+  });
 });
 
 describe('ScopeEntryScreen dashboard first mount', () => {
@@ -553,7 +616,10 @@ describe.each([
   it.each(['member', 'absent'])(
     'keeps the %s organization role restricted after Retry',
     async role => {
-      roles = role === 'absent' ? [] : [{ organizationId: 'org_123', role }];
+      roles =
+        role === 'absent'
+          ? []
+          : [{ organizationId: 'org_123', organizationName: 'Drain Labs', role }];
       onlineManager.setOnline(false);
       const root = await mount('org_123', Screen);
       await retry(root);

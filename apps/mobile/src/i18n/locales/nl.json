@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "Je moet mogelijk toegang verlenen tot meer groepen of projecten op GitLab.",
       "installGithubApp": "Installeer de GitHub-app op repositories",
       "installGithubAppDescription": "Geef de Kilo GitHub-app toegang tot de repositories die je wilt laten beoordelen.",
-      "repositoryAccess": "toegang tot repositories"
+      "repositoryAccess": "toegang tot repositories",
+      "allModePersonal": "Elke repository die Kilo via je GitHub-verbinding kan bereiken, wordt automatisch beoordeeld.",
+      "allModeOrganization": "Elke repository die Kilo via de GitHub-verbinding van de organisatie kan bereiken, wordt automatisch beoordeeld.",
+      "allModeCount": "Beschikbare repositories: {{displayCount}}"
     },
     "style": {
       "title": "Beoordelingsstijl",
@@ -1148,7 +1151,7 @@
       "sortSeverityDesc": "Ernst: van hoog naar laag",
       "sortSlaDue": "SLA-deadline",
       "statusIgnored": "Genegeerd",
-      "statusOpen": "Openen"
+      "statusOpen": "Open"
     },
     "analysis": {
       "analyzeRepository": "Repository analyseren",
@@ -1298,7 +1301,6 @@
       "repositoryActionPlan": "Actieplan per repository",
       "settings": "Instellingen",
       "slaPosture": "SLA-overzicht",
-      "syncFindings": "Bevindingen synchroniseren",
       "syncNow": "Nu synchroniseren",
       "syncQueued": "Synchronisatie in de wachtrij gezet",
       "syncStatusUnavailable": "De synchronisatiestatus is niet beschikbaar.",
@@ -1367,7 +1369,7 @@
       "supersededByDescription": "Tik om de huidige bevinding te openen en de status, analyse en het herstel te bekijken.",
       "viewAdvisory": "Beveiligingsadvies bekijken op GitHub",
       "vulnerableVersions": "Kwetsbare versies",
-      "statusOpen": "Openen",
+      "statusOpen": "Open",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "er wordt al aan een oplossing gewerkt",
       "reasonNoBandwidth": "er is geen capaciteit beschikbaar",
@@ -1626,7 +1628,7 @@
     "sessionList": {
       "couldNotLoadActive": "De actieve sessies konden niet worden geladen.",
       "couldNotRefresh": "Het vernieuwen is mislukt",
-      "noSessionsYetDescription": "Start een programmeertaak vanaf je telefoon. Je sessies verschijnen hier.",
+      "noSessionsYetDescription": "Start een programmeertaak vanaf je telefoon.",
       "viewHistory": "Sessiegeschiedenis",
       "noMatches": "Geen sessies gevonden",
       "tryDifferentSearch": "Probeer een andere zoekterm.",
@@ -3855,6 +3857,7 @@
     "skillMarkdownLabel": "Vaardigheid inhoud",
     "skillsEmpty": "Nog geen vaardigheden",
     "skillNameRequired": "Voer een vaardigheidsnaam in",
+    "skillNameTooLong": "De naam van de vaardigheid mag maximaal {{max}} tekens bevatten",
     "skillNameInvalid": "De naam van de vaardigheid moet beginnen met een letter of cijfer en mag alleen kleine letters, cijfers en streepjes bevatten",
     "skillContentRequired": "Vaardigheidsinhoud is vereist",
     "skillSaveFailed": "Kan vaardigheid niet opslaan. Probeer het opnieuw.",

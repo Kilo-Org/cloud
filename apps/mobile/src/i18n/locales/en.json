@@ -1493,7 +1493,10 @@
       "gitlabNoRepositoriesDescription": "You may need to grant access to more groups or projects on GitLab.",
       "installGithubApp": "Install the GitHub app",
       "installGithubAppDescription": "Grant it access to the repositories you want reviewed.",
-      "repositoryAccess": "repository access"
+      "repositoryAccess": "repository access",
+      "allModePersonal": "Every repository Kilo can access through your GitHub connection is reviewed automatically.",
+      "allModeOrganization": "Every repository Kilo can access through the organization's GitHub connection is reviewed automatically.",
+      "allModeCount": "Repositories available: {{displayCount}}"
     },
     "style": {
       "title": "Review style",
@@ -1848,7 +1851,6 @@
       "notYetSynced": "Not yet synced",
       "refreshFailed": "Could not refresh — showing last synced data.",
       "settings": "Settings",
-      "syncFindings": "Sync findings",
       "syncNow": "Sync now",
       "syncQueued": "Sync queued",
       "syncStatusUnavailable": "Sync status unavailable"
@@ -2222,7 +2224,7 @@
       "couldNotLoadActive": "Could not load active sessions",
       "couldNotRefresh": "Couldn't refresh",
       "updating": "Updating",
-      "noSessionsYetDescription": "Start a coding task from your phone. Your sessions will appear here.",
+      "noSessionsYetDescription": "Start a coding task from your phone.",
       "viewHistory": "Session history",
       "noMatches": "No sessions match",
       "tryDifferentSearch": "Try a different search term.",
@@ -3921,6 +3923,7 @@
     "skillMarkdownLabel": "Skill content",
     "skillsEmpty": "No skills yet",
     "skillNameRequired": "Enter a skill name",
+    "skillNameTooLong": "Skill name must be {{max}} characters or fewer",
     "skillNameInvalid": "Skill name must start with a letter or digit and use only lowercase letters, digits, and dashes",
     "skillContentRequired": "Skill content is required",
     "skillSaveFailed": "Couldn't save skill. Try again.",

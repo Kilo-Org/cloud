@@ -239,7 +239,7 @@ export function ProfileCommandsScreen({
                 remove(index);
               }}
             >
-              <Trash2 size={20} color={colors.destructive} />
+              <Trash2 size={20} color={colors.mutedForeground} />
             </Pressable>
           </View>
         ) : null}

@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "GitLab'da daha fazla gruba veya projeye erişim izni vermen gerekebilir.",
       "installGithubApp": "GitHub uygulamasını depolara yükle",
       "installGithubAppDescription": "Kilo GitHub uygulamasına, incelenmesini istediğin depolara erişim izni ver.",
-      "repositoryAccess": "depo erişimi"
+      "repositoryAccess": "depo erişimi",
+      "allModePersonal": "Kilo'nun GitHub bağlantın aracılığıyla erişebildiği her depo otomatik olarak incelenir.",
+      "allModeOrganization": "Kilo'nun kuruluşun GitHub bağlantısı aracılığıyla erişebildiği her depo otomatik olarak incelenir.",
+      "allModeCount": "Kullanılabilir depolar: {{displayCount}}"
     },
     "style": {
       "title": "İnceleme stili",
@@ -1298,7 +1301,6 @@
       "repositoryActionPlan": "Depo işlem planı",
       "settings": "Ayarlar",
       "slaPosture": "SLA durumu",
-      "syncFindings": "Bulguları eşitle",
       "syncNow": "Şimdi eşitle",
       "syncQueued": "Eşitleme kuyruğa alındı",
       "syncStatusUnavailable": "Eşitleme durumu alınamıyor.",
@@ -1626,7 +1628,7 @@
     "sessionList": {
       "couldNotLoadActive": "Etkin oturumlar yüklenemedi.",
       "couldNotRefresh": "Yenilenemedi",
-      "noSessionsYetDescription": "Telefonundan bir kodlama görevi başlat. Oturumların burada görünecek.",
+      "noSessionsYetDescription": "Telefonundan bir kodlama görevi başlat.",
       "viewHistory": "Oturum geçmişi",
       "noMatches": "Eşleşen oturum yok",
       "tryDifferentSearch": "Farklı bir arama terimi dene.",
@@ -3855,6 +3857,7 @@
     "skillMarkdownLabel": "Beceri içeriği",
     "skillsEmpty": "Henüz beceri yok",
     "skillNameRequired": "Bir beceri adı girin",
+    "skillNameTooLong": "Beceri adı {{max}} karakter veya daha az olmalıdır",
     "skillNameInvalid": "Beceri adı bir harf veya rakamla başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
     "skillContentRequired": "Beceri içeriği gerekli",
     "skillSaveFailed": "Beceri kaydedilemedi. Tekrar deneyin.",

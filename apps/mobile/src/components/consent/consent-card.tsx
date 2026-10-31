@@ -16,14 +16,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { PRIVACY_URL } from '@/lib/config';
 import { acceptConsent, readConsent, revokeConsent, setOptionalConsent } from '@/lib/consent';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSideInsetStyle } from '@/lib/screen-insets';
-import { cn } from '@/lib/utils';
 
 type ConsentCardProps = {
   readonly mode?: ConsentMode;
@@ -36,14 +34,20 @@ type ConsentCardProps = {
  * line and two `size="lg"` buttons. Uncapped, the `text-sm` sentence grows
  * with Dynamic Type to several lines at the largest system text size, and
  * that height comes out of the sheet, not the scroll region: the footer has
- * no room left and the second action clips at the sheet bottom. Capped at
- * 1.6 the sentence stays within two bounded lines on the smallest supported
- * width, so the footer keeps a bounded height and the actions stay on
- * screen; scales below 1.6 pass through untouched, so a11y users keep most
- * of their preferred scale. Same cap and reasoning as the tour header (see
- * `tour-font-scale`).
+ * no room left and the second action clips at the sheet bottom.
+ *
+ * 1.4 is the cap that keeps the sentence within two bounded lines on the
+ * smallest supported width (360dp; the card's `px-6` leaves 318dp for the
+ * row) now that the copy is `text-sm`. The sentence's longer segment — the
+ * pt-BR lead-in — measures 209.52dp at scale 1 and the link 169.52dp, so at
+ * 1.4 the lead-in is 293.3dp and each segment still takes its own line. It
+ * also keeps the largest rendered sentence the size it already was: the old
+ * `text-xs` copy at the previous 1.6 cap rendered 16.8dp, and 12.25dp at 1.4
+ * renders 17.15dp. Scales below the cap pass through untouched, so a11y
+ * users keep most of their preferred scale. Same reasoning as the tour
+ * header's cap (see `tour-font-scale`).
  */
-export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.6;
+export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.4;
 
 export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const router = useRouter();
@@ -308,7 +312,10 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={t('consent.seeFullDetails')}
-            className={cn('mt-6 flex-row items-center gap-1 active:opacity-70', ROW_TARGET_CLASS)}
+            // The row's own node carries the control-size floor: the link's
+            // text line is 17.5dp, below the audit's 28dp minimum, and the
+            // 8dp slop carries the 44pt region on top of it.
+            className="mt-6 min-h-[28px] flex-row items-center gap-1 active:opacity-70"
           >
             <Text className="text-sm font-semibold text-primary">
               {t('consent.seeFullDetails')}
@@ -327,17 +334,14 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             moving the actions. The privacy disclosure is pinned here too,
             because at the foot of the scrolling body the footer edge cut the
             sentence in half. Its font scale is capped so the pinned height
-            stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE), and its
-            policy link takes its 48dp target into the row
-            (`reserveTargetHeight`): the cancelled box behind the details
-            screens leaves 15dp of frame above its line, and here that frame
-            started about 4.5dp above the footer's `pt-3` top edge, over the
-            scroll region. */}
+            stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE). The policy
+            link's 28dp box overflows its 17.5dp line by 5.25dp, which stays
+            inside this footer's `pt-3` top padding rather than reaching the
+            scroll region above it. */}
         <ConsentPolicySentence
           prefix={t('consent.privacyPolicyPrefix')}
           linkLabel={t('consent.privacyPolicy')}
           maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
-          reserveTargetHeight
           onOpenPolicy={handleOpenPrivacy}
         />
         <View className="min-h-5 justify-center">

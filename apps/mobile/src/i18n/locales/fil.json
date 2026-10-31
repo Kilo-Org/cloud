@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Maaaring kailangan mong magbigay ng access sa mas maraming grupo o proyekto sa GitLab.",
       "installGithubApp": "I-install ang GitHub app sa mga repository",
       "installGithubAppDescription": "Bigyan ang Kilo GitHub App ng access sa mga repository na gusto mong suriin.",
-      "repositoryAccess": "access sa repository"
+      "repositoryAccess": "access sa repository",
+      "allModePersonal": "Awtomatikong sinusuri ang bawat repository na kayang i-access ng Kilo sa pamamagitan ng iyong koneksyon sa GitHub.",
+      "allModeOrganization": "Awtomatikong sinusuri ang bawat repository na kayang i-access ng Kilo sa pamamagitan ng koneksyon sa GitHub ng organisasyon.",
+      "allModeCount": "Mga repository na magagamit: {{displayCount}}"
     },
     "style": {
       "title": "Estilo ng pagsusuri",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "Hindi pa na-sync",
       "refreshFailed": "Hindi ma-refresh — ipinapakita ang huling na-sync na data.",
       "settings": "Mga setting",
-      "syncFindings": "I-sync ang mga natukoy na isyu",
       "syncNow": "I-sync ngayon",
       "syncQueued": "Nakapila ang sync",
       "syncStatusUnavailable": "Hindi makuha ang katayuan ng pag-sync.",
@@ -2155,7 +2157,7 @@
     "sessionList": {
       "couldNotLoadActive": "Hindi ma-load ang mga aktibong session.",
       "couldNotRefresh": "Hindi ma-refresh",
-      "noSessionsYetDescription": "Magsimula ng gawain sa pag-code gamit ang telepono mo. Lalabas dito ang mga session mo.",
+      "noSessionsYetDescription": "Magsimula ng gawain sa pag-code gamit ang telepono mo.",
       "viewHistory": "Kasaysayan ng mga session",
       "noMatches": "Walang session na tugma",
       "tryDifferentSearch": "Subukang maghanap gamit ang ibang salita.",
@@ -3855,6 +3857,7 @@
     "skillMarkdownLabel": "Nilalaman ng kasanayan",
     "skillsEmpty": "Wala pang skills",
     "skillNameRequired": "Maglagay ng pangalan ng kasanayan",
+    "skillNameTooLong": "Ang pangalan ng kasanayan ay dapat na {{max}} character o mas kaunti",
     "skillNameInvalid": "Ang pangalan ng kasanayan ay dapat magsimula sa isang titik o digit at gumamit lamang ng maliliit na titik, digit, at gitling",
     "skillContentRequired": "Kinakailangan ang nilalaman ng kasanayan",
     "skillSaveFailed": "Hindi makapag-save ng kasanayan. Subukan muli.",

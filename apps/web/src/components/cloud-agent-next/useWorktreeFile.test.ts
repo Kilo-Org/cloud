@@ -150,6 +150,7 @@ function installDom() {
 
 describe('worktree-scoped saved changes and file hooks', () => {
   const scope: Scope = {
+    userId: 'user-alice',
     cloudAgentSessionId: 'workspace-chat-a',
     worktreeId: 'worktree-a',
     path: 'src/file.ts',
@@ -261,6 +262,30 @@ describe('worktree-scoped saved changes and file hooks', () => {
       expect(results.get(sibling.cloudAgentSessionId)?.state).toEqual(file(4));
     }
   );
+
+  it('reads again for another user of the same session instead of reusing its cache', async () => {
+    render([scope]);
+    await settle();
+    expect(readFile).toHaveBeenCalledTimes(1);
+    expect(queryClient.getQueryData(getWorktreeChangesQueryKey(scope))).toEqual(saved(3));
+
+    const otherUser: Scope = { ...scope, userId: 'user-bob' };
+    readChanges.mockResolvedValue(saved(5));
+    readFile.mockResolvedValue(file(5, scope.path));
+    render([otherUser]);
+    await settle();
+
+    expect(readChanges.mock.calls.at(-1)?.[0]).toEqual({
+      cloudAgentSessionId: scope.cloudAgentSessionId,
+    });
+    expect(readFile).toHaveBeenCalledTimes(2);
+    expect(results.get(scope.cloudAgentSessionId)?.state).toEqual(file(5));
+    expect(queryClient.getQueryData(getWorktreeChangesQueryKey(scope))).toEqual(saved(3));
+    expect(queryClient.getQueryData(getWorktreeChangesQueryKey(otherUser))).toEqual(saved(5));
+    expect(
+      queryClient.getQueryData(getWorktreeFileQueryKey({ ...scope, expectedRevision: 3 }))
+    ).toEqual(file(3, scope.path));
+  });
 
   it('keeps cached files while switching the selected session in a mounted hook', async () => {
     const select = (props: Scope) => {

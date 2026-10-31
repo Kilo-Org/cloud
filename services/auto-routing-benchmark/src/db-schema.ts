@@ -248,6 +248,7 @@ export const schedulerChunks = sqliteTable(
     lease_until: integer('lease_until').notNull().default(0),
     available_at: integer('available_at').notNull().default(0),
     attempts: integer('attempts').notNull().default(0),
+    throttle_deferrals: integer('throttle_deferrals').notNull().default(0),
   },
   table => [
     index('IX_scheduler_chunks_pending').on(table.status, table.available_at),

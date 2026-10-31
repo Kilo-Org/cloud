@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "你可能需要授予对 GitLab 上更多群组或项目的访问权限。",
       "installGithubApp": "为仓库安装 GitHub 应用",
       "installGithubAppDescription": "请授予 Kilo GitHub 应用访问待审查仓库的权限。",
-      "repositoryAccess": "仓库访问权限"
+      "repositoryAccess": "仓库访问权限",
+      "allModePersonal": "Kilo 通过你的 GitHub 连接能够访问的每个仓库都会自动接受审查。",
+      "allModeOrganization": "Kilo 通过组织的 GitHub 连接能够访问的每个仓库都会自动接受审查。",
+      "allModeCount": "可用仓库：{{displayCount}}"
     },
     "style": {
       "title": "审查风格",
@@ -1298,7 +1301,6 @@
       "repositoryActionPlan": "仓库处理计划",
       "settings": "设置",
       "slaPosture": "SLA 履行情况",
-      "syncFindings": "同步安全问题",
       "syncNow": "立即同步",
       "syncQueued": "同步任务已加入队列",
       "syncStatusUnavailable": "无法获取同步状态",
@@ -1626,7 +1628,7 @@
     "sessionList": {
       "couldNotLoadActive": "无法加载进行中的会话",
       "couldNotRefresh": "无法刷新",
-      "noSessionsYetDescription": "在手机上发起编程任务，会话就会显示在这里。",
+      "noSessionsYetDescription": "在手机上发起编程任务。",
       "viewHistory": "会话历史",
       "noMatches": "暂无匹配的会话",
       "tryDifferentSearch": "请尝试其他搜索词。",
@@ -3855,6 +3857,7 @@
     "skillMarkdownLabel": "技能内容",
     "skillsEmpty": "还没有技能",
     "skillNameRequired": "输入技能名称",
+    "skillNameTooLong": "技能名称必须不超过 {{max}} 个字符",
     "skillNameInvalid": "技能名称必须以字母或数字开头，并且只能使用小写字母、数字和连字符",
     "skillContentRequired": "技能内容为必填项",
     "skillSaveFailed": "无法保存技能，请重试。",

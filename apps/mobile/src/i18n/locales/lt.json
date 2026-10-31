@@ -1471,7 +1471,10 @@
       "gitlabNoRepositoriesDescription": "Gali reikėti suteikti prieigą prie daugiau GitLab grupių ar projektų.",
       "installGithubApp": "Įdiek GitHub programėlę saugyklose",
       "installGithubAppDescription": "Suteik Kilo GitHub programėlei prieigą prie saugyklų, kurių kodą nori peržiūrėti.",
-      "repositoryAccess": "prieiga prie saugyklų"
+      "repositoryAccess": "prieiga prie saugyklų",
+      "allModePersonal": "Kiekviena saugykla, kurią Kilo gali pasiekti per tavo GitHub ryšį, peržiūrima automatiškai.",
+      "allModeOrganization": "Kiekviena saugykla, kurią Kilo gali pasiekti per organizacijos GitHub ryšį, peržiūrima automatiškai.",
+      "allModeCount": "Prieinamų saugyklų: {{displayCount}}"
     },
     "style": {
       "title": "Peržiūros stilius",
@@ -1824,7 +1827,6 @@
       "notYetSynced": "Dar nesinchronizuota",
       "refreshFailed": "Nepavyko atnaujinti – rodomi paskutinį kartą sinchronizuoti duomenys.",
       "settings": "Nustatymai",
-      "syncFindings": "Sinchronizuoti radinius",
       "syncNow": "Sinchronizuoti dabar",
       "syncQueued": "Sinchronizavimas įtrauktas į eilę",
       "syncStatusUnavailable": "Nepavyko gauti sinchronizavimo būsenos.",
@@ -2213,7 +2215,7 @@
     "sessionList": {
       "couldNotLoadActive": "Nepavyko įkelti aktyvių sesijų.",
       "couldNotRefresh": "Nepavyko atnaujinti",
-      "noSessionsYetDescription": "Pradėk programavimo užduotį telefone. Tavo sesijos bus rodomos čia.",
+      "noSessionsYetDescription": "Pradėk programavimo užduotį telefone.",
       "viewHistory": "Sesijų istorija",
       "noMatches": "Nėra paiešką atitinkančių sesijų",
       "tryDifferentSearch": "Bandyk ieškoti pagal kitą žodį.",
@@ -3955,6 +3957,7 @@
     "skillMarkdownLabel": "Įgūdžių turinys",
     "skillsEmpty": "Įgūdžių dar nėra",
     "skillNameRequired": "Įveskite įgūdžių pavadinimą",
+    "skillNameTooLong": "Įgūdžio pavadinimas turi būti ne ilgesnis kaip {{max}} simbolių",
     "skillNameInvalid": "Įgūdžio pavadinimas turi prasidėti raide arba skaitmeniu ir naudoti tik mažąsias raides, skaitmenis ir brūkšnelius",
     "skillContentRequired": "Reikalingas įgūdžių turinys",
     "skillSaveFailed": "Nepavyko išsaugoti įgūdžių. Bandykite dar kartą.",

@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Du skal muligvis give adgang til flere grupper eller projekter på GitLab.",
       "installGithubApp": "Installér GitHub-appen på kodelagre",
       "installGithubAppDescription": "Giv Kilos GitHub-app adgang til de kodelagre, du vil have gennemgået.",
-      "repositoryAccess": "adgang til kodelagre"
+      "repositoryAccess": "adgang til kodelagre",
+      "allModePersonal": "Hvert kodelager, som Kilo kan få adgang til via din GitHub-forbindelse, gennemgås automatisk.",
+      "allModeOrganization": "Hvert kodelager, som Kilo kan få adgang til via organisationens GitHub-forbindelse, gennemgås automatisk.",
+      "allModeCount": "Tilgængelige kodelagre: {{displayCount}}"
     },
     "style": {
       "title": "Gennemgangsstil",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "Ikke synkroniseret endnu",
       "refreshFailed": "Data kunne ikke opdateres. De senest synkroniserede data vises.",
       "settings": "Indstillinger",
-      "syncFindings": "Synkronisér fund",
       "syncNow": "Synkronisér nu",
       "syncQueued": "Synkronisering i kø",
       "syncStatusUnavailable": "Status for synkroniseringen er ikke tilgængelig.",
@@ -2155,7 +2157,7 @@
     "sessionList": {
       "couldNotLoadActive": "De aktive sessioner kunne ikke indlæses.",
       "couldNotRefresh": "Kunne ikke opdatere",
-      "noSessionsYetDescription": "Start en kodeopgave fra din telefon. Dine sessioner vises her.",
+      "noSessionsYetDescription": "Start en kodeopgave fra din telefon.",
       "viewHistory": "Sessionshistorik",
       "noMatches": "Ingen sessioner fundet",
       "tryDifferentSearch": "Prøv et andet søgeord.",
@@ -3855,6 +3857,7 @@
     "skillMarkdownLabel": "Færdighedsindhold",
     "skillsEmpty": "Ingen færdigheder endnu",
     "skillNameRequired": "Indtast et færdighedsnavn",
+    "skillNameTooLong": "Færdighedsnavn må højst være {{max}} tegn",
     "skillNameInvalid": "Færdighedsnavn skal starte med et bogstav eller ciffer og kun bruge små bogstaver, cifre og bindestreger",
     "skillContentRequired": "Færdighedsindhold er påkrævet",
     "skillSaveFailed": "Kunne ikke gemme færdighed. Prøv igen.",

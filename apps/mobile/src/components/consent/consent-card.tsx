@@ -220,11 +220,10 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
 
   return (
     <View className="flex-1 bg-background" style={rootStyle}>
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={contentContainerStyle}
-        showsVerticalScrollIndicator={false}
-      >
+      {/* The body keeps the platform scroll indicator: at a compact window it
+          is taller than the viewport, and the hidden thumb made the rest of it
+          read as missing rather than as one scroll away. */}
+      <ScrollView className="flex-1" contentContainerStyle={contentContainerStyle}>
         <View className="px-6">
           {/* The badge alone carries the brand: the title below already states
               what the screen is about, and repeating the product name beside

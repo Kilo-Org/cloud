@@ -119,9 +119,16 @@ export function ProviderConnectGate({
   // a token change, briefly reporting the selection as unrestored again, so
   // once it has landed this keeps that answer: the review subtree must not be
   // replaced by the spinner under a reader who is already reviewing.
-  const selectionSettled = useRef(false);
-  if (organization.isLoaded || organization.error !== null) {
-    selectionSettled.current = true;
+  //
+  // The latch is state, adjusted synchronously during render (React's "adjust
+  // state when props change" pattern, as in `agents/markdown-image.tsx`): a
+  // render React discards drops the adjustment with it, and the re-render it
+  // schedules happens before the selector below runs, so no frame shows the
+  // spinner for a selection that has already landed.
+  const selectionSettledNow = organization.isLoaded || organization.error !== null;
+  const [selectionSettled, setSelectionSettled] = useState(selectionSettledNow);
+  if (selectionSettledNow && !selectionSettled) {
+    setSelectionSettled(true);
   }
 
   // The providers — and the two GitLab scopes, whose payloads now differ by
@@ -210,7 +217,7 @@ export function ProviderConnectGate({
     // on when the stored selection has landed. Reading it here too keeps the
     // gate from asking the personal scope for an organization reader's first
     // answer.
-    organizationSelectionLoaded: selectionSettled.current,
+    organizationSelectionLoaded: selectionSettled,
   });
 
   if (view === 'org-only') {

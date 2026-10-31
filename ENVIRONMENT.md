@@ -61,7 +61,7 @@ accepts no other credential, including request parameters. Every response, inclu
 `401`, carries `Cache-Control: no-store`. Each running instance shares one evaluation of
 the probe across authorized callers for 60 seconds, and simultaneous requests share one
 evaluation, so the endpoint performs at most one database read per instance per minute
-whatever the caller's request rate. The probe read runs on the read replica.
+whatever the caller's request rate.
 
 Order the cutover so no poll lands on an unauthenticated endpoint: first run
 `pnpm web:env set UPTIME_PROBE_SECRET` and supply a newly generated value, then add the

@@ -16,18 +16,18 @@ jest.mock('@sentry/nextjs', () => ({
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => {
   const { sql } = jest.requireActual('drizzle-orm');
-  const rejectPrimaryRead = () => {
-    throw new Error('the uptime probe must not run on the write primary');
+  const rejectReplicaRead = () => {
+    throw new Error('the uptime probe reads the primary so its flags keep their meaning');
   };
   return {
     sql,
-    readDb: {
+    db: {
       query: { microdollar_usage: { findFirst: (...args: unknown[]) => mockFindFirst(...args) } },
     },
-    db: {
-      query: { microdollar_usage: { findFirst: rejectPrimaryRead } },
-      transaction: rejectPrimaryRead,
-      execute: rejectPrimaryRead,
+    readDb: {
+      query: { microdollar_usage: { findFirst: rejectReplicaRead } },
+      transaction: rejectReplicaRead,
+      execute: rejectReplicaRead,
     },
   };
 });

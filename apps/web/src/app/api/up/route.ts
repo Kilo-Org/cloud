@@ -1,7 +1,7 @@
 import { timingSafeEqual } from '@kilocode/encryption';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import { UPTIME_PROBE_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { readDb, sql } from '@kilocode/web-shared/lib/drizzle';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { NextResponse } from 'next/server';
 import { and, gte, gt } from 'drizzle-orm';
@@ -22,9 +22,7 @@ async function evaluateUptime(): Promise<ProbeResult> {
     recentAIActivity: false,
   };
   try {
-    // A five-minute activity window tolerates replica lag, so this read belongs
-    // on the replica instead of the write primary.
-    const db_usage_shows_recent_llm_usage = await readDb.query.microdollar_usage.findFirst({
+    const db_usage_shows_recent_llm_usage = await db.query.microdollar_usage.findFirst({
       columns: { id: true },
       where: and(
         gte(microdollar_usage.created_at, sql`NOW() - INTERVAL '5 minutes'`),

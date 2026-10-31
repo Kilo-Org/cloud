@@ -13,15 +13,18 @@ import { cn } from '@/lib/utils';
 
 /**
  * The active account/organization a PR-review surface operates under, as one
- * muted line above the surface's body copy. The name comes from the shared
- * memberships list (`common.personal` for the personal scope), so the gate and
- * the inbox never name an account the reader did not select.
+ * line alongside the surface's body copy — above it where the copy names the
+ * account ("switch the account above"), below it in the connect gates. The name
+ * comes from the shared memberships list (`common.personal` for the personal
+ * scope), so the gate and the inbox never name an account the reader did not
+ * select.
  *
  * When the memberships offer somewhere else to go, the whole line is the
  * switcher: tapping it opens the same account picker sheet the Profile credits
  * card uses (`useContextPicker`), and a switch re-runs every context-scoped
- * query through `useOrganization()`. With nowhere to switch the line renders as
- * plain text — a chevron on a dead control would read as a broken affordance.
+ * query through `useOrganization()`. It is drawn as an outlined pill so it
+ * reads as a control; with nowhere to switch it renders as plain muted text — a
+ * chevron on a dead control would read as a broken affordance.
  *
  * `instanceHint` optionally names a second line: a GitLab MR deep-linked from a
  * self-managed instance carries the pasted URL's origin, and connecting on

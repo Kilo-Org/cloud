@@ -19,6 +19,10 @@ import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
+import {
+  PR_REVIEW_GATE_ICON_TILE_CLASS,
+  usePrReviewGateIconColor,
+} from '@/lib/pr-review/pr-review-gate-illustration';
 import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
 import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
@@ -93,6 +97,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
+  const iconColor = usePrReviewGateIconColor();
   const { t } = useTranslation();
   const authorization = useQuery(trpc.githubApps.getUserAuthorization.queryOptions());
   const connect = useMutation(
@@ -199,6 +204,8 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
         <PrReviewGateHeader />
         <EmptyState
           icon={revoked ? ShieldAlert : PlugZap}
+          iconContainerClassName={PR_REVIEW_GATE_ICON_TILE_CLASS}
+          iconColor={iconColor}
           title={revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
           description={
             <>

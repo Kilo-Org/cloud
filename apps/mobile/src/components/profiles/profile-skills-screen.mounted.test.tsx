@@ -621,7 +621,6 @@ describe('ProfileSkillsScreen', () => {
     second.unmount();
   });
 
-
   it('drops the row presses of the burst that saved the sheet', async () => {
     h.query.data = testSkills([testSkill()]);
     h.query.isPending = false;

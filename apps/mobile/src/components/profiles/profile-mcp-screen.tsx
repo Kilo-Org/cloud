@@ -38,7 +38,6 @@ function hasUsableMessage(error: unknown): boolean {
   return error instanceof Error && error.message.trim().length > 0;
 }
 
-
 /** Content-shaped rows in the same slot and height as a loaded server row. */
 function McpSkeleton() {
   return (

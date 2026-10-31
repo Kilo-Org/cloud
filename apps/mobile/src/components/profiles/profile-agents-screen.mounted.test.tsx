@@ -1,7 +1,6 @@
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { act } from '@/test/renderer';
 import { i18n } from '@/i18n';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
 import { ProfileAgentsScreen } from '@/components/profiles/profile-agents-screen';

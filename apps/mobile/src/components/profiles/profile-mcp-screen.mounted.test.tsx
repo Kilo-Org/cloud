@@ -570,6 +570,7 @@ describe('ProfileMcpScreen', () => {
       i18n.t('profiles.mcp.saveFailed')
     );
     expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+    unmount();
   });
 
   it('drops the row presses of the burst that saved the sheet', async () => {

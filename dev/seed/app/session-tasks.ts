@@ -396,7 +396,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     ...Object.fromEntries(
       SCENARIOS.map(scenario => [
         `${scenario.key}DeepLink`,
-        `kiloapp://agent-chat/${scenario.sessionId}`,
+        `kiloapp:///(app)/agent-chat/${scenario.sessionId}`,
       ])
     ),
   };

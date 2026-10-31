@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { CreditsCard } from './profile-credits-card';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { OrganizationProvider } from '@/lib/organization-context';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
@@ -816,6 +817,23 @@ describe('CreditsCard balance state', () => {
     });
     expect(texts()).toContain('$10.00');
     expect(texts()).not.toContain('*****');
+
+    unmount();
+  });
+
+  it('gives the balance toggle the shared 48dp icon box as its own target', async () => {
+    currentUser.userId = 'user-A';
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData([...BALANCE_KEY], { balance: 10 });
+
+    const { renderer, texts, unmount } = await mountCard(queryClient);
+    await waitFor(() => texts().includes('$10.00'));
+
+    // The audit reads the button's own node rect: `min-h-11` is 38.5pt under
+    // NativeWind's 14pt rem, and `hitSlop` never widens that rect.
+    const toggle = renderer.root.findByProps({ accessibilityLabel: 'Hide balance' });
+    expect(String(toggle.props.className)).toContain(ICON_TARGET_BOX_CLASS);
+    expect(toggle.props.hitSlop).toBeUndefined();
 
     unmount();
   });

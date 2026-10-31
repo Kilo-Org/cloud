@@ -217,36 +217,34 @@ export function LiveSessionFeedback({
     }
   }
 
-  // The band is one child of the column that spaces it against the content it
-  // introduces, and a child that paints nothing still costs one gap: on Home
-  // the header then stood twice as far from its card as `EXPLORE` stands from
-  // its first row. The screen-reader statuses are out of flow, so they cost no
-  // layout and mount on their own; the band exists only while it paints.
-  const offlineLine = internet === 'offline' && inlineNotices;
-  const connectionLine = connectionLabel !== null && inlineNotices && reconnectExhausted;
-  const reconnectRetry =
+  // The connection row paints only where the surface reports these inline (the
+  // Agents live tab): the offline line, the visible connection status, or the
+  // retry that backs it. Elsewhere — Home puts the same facts in its section
+  // header notice — the row was an empty child of the Home column's `gap-2`, so
+  // an invisible box still held the card 7 dp below the section label.
+  const offlineLine = inlineNotices && internet === 'offline';
+  const connectionStatus = inlineNotices && reconnectExhausted && connectionLabel !== null;
+  const connectionRetry =
     inlineNotices && context.isReady && !isConnected && reconnectExhausted && !failureOwnsRetry;
-  const refreshLine = refresh != null && content === 'rows';
-  const bandPaints =
-    failure !== null || offlineLine || connectionLine || reconnectRetry || refreshLine;
+  const connectionRow = offlineLine || connectionStatus || connectionRetry;
 
+  // Status only the screen reader consumes, mounted here rather than inside the
+  // visible column: the column is drawn and dropped with its content, and a
+  // remount starts the announcement dedupe from nothing and speaks an unchanged
+  // message again. One node per message, one position. When the connection row
+  // paints its own visible status that row is the channel, so this copy clears.
   const announcements = (
     <>
-      {/* The app-wide OfflineBanner owns the offline announcement. */}
-      {internet !== 'offline' && !connectionLine && (
-        <AccessibleStatus
-          message={connectionLabel}
-          tone="status"
-          className="absolute size-px overflow-hidden"
-        />
-      )}
-      {!refreshLine && (
-        <AccessibleStatus
-          message={content === 'pending' ? t('common.loading') : null}
-          tone="status"
-          className="absolute size-px overflow-hidden"
-        />
-      )}
+      <AccessibleStatus
+        message={connectionStatus ? null : connectionLabel}
+        tone="status"
+        className="absolute size-px overflow-hidden"
+      />
+      <AccessibleStatus
+        message={content === 'pending' ? t('common.loading') : null}
+        tone="status"
+        className="absolute size-px overflow-hidden"
+      />
       {content === 'rows' && sessions.isFetching && !sessions.isPaused && !refresh?.busy && (
         <AccessibleStatus
           message={t('agents.sessionList.updating')}
@@ -257,24 +255,17 @@ export function LiveSessionFeedback({
     </>
   );
 
-  const band = (
+  const feedback = (
     <View className={cn(compactSpacing ? 'gap-0' : 'gap-2', centered && 'px-6')}>
-      {(offlineLine || connectionLine || reconnectRetry) && (
-        // Only a painting row: an empty one still costs the column gap, which
-        // would space a failure-only band off the content it introduces.
+      {connectionRow ? (
         <View className="flex-row items-center gap-2">
-          {offlineLine ? (
+          {/* The app-wide OfflineBanner owns the offline announcement. */}
+          {internet === 'offline' ? (
             <Text className="flex-1 text-xs text-muted-foreground">{t('offline.noInternet')}</Text>
           ) : (
-            connectionLine && (
-              <AccessibleStatus
-                message={connectionLabel}
-                tone="status"
-                className="flex-1 text-xs"
-              />
-            )
+            <AccessibleStatus message={connectionLabel} tone="status" className="flex-1 text-xs" />
           )}
-          {reconnectRetry && (
+          {connectionRetry && (
             <Button
               variant="ghost"
               size="sm"
@@ -288,14 +279,13 @@ export function LiveSessionFeedback({
             </Button>
           )}
         </View>
-      )}
-      {refreshLine ? (
+      ) : null}
+      {refresh && content === 'rows' && (
         // The live tab's reserved status line: screen-reader Updating while
         // the pull is in flight, visible "Couldn't refresh" + Retry when it
-        // failed. It takes the slot of the (layout-free) loading status so the
-        // column has the same children either way, and its height is allocated
-        // whenever rows are shown: a failure that arrives while the kept rows
-        // are on screen replaces empty space instead of pushing the rows down.
+        // failed. Its height is allocated whenever rows are shown: a failure
+        // that arrives while the kept rows are on screen replaces empty space
+        // instead of pushing the rows down.
         <View className="min-h-5">
           <SessionListRefreshStatus
             busy={refresh.busy}
@@ -304,19 +294,25 @@ export function LiveSessionFeedback({
             progressInBody={refresh.progressInBody}
           />
         </View>
-      ) : null}
+      )}
       {failure}
     </View>
   );
-  const feedback = (
+  // The column is dropped when it would paint nothing: Home's card column then
+  // holds one child, so the card starts on the header's content edge instead of
+  // 7 dp below an invisible box. The announcements above keep their position
+  // either way, so nothing is re-spoken when the column appears or goes.
+  const hasVisibleContent = centered || connectionRow || refresh !== undefined || failure !== null;
+
+  return (
     <>
       {announcements}
-      {bandPaints && band}
+      {hasVisibleContent &&
+        (centered ? (
+          <CenteredState refreshControl={refreshControl}>{feedback}</CenteredState>
+        ) : (
+          feedback
+        ))}
     </>
-  );
-  return centered ? (
-    <CenteredState refreshControl={refreshControl}>{feedback}</CenteredState>
-  ) : (
-    feedback
   );
 }

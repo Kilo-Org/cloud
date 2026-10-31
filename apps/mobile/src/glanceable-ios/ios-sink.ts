@@ -11,7 +11,7 @@ import {
   oldestNeedsInputSince,
   soonestScheduledAt,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { aggregateLiveActivityRelevance } from '@kilocode/notifications';
+import { aggregateLiveActivityRelevance } from '@kilocode/notifications/schemas';
 
 import { i18n } from '@/i18n';
 import {

@@ -96,7 +96,7 @@ export function invalidateSecurityQueryScopes(
     const agent = trpc.securityAgent;
     if (scopeSet.has('findings')) {
       scheduleCacheMaintenance(() => {
-        reconcileFirstPage(queryClient, agent.listFindings.queryKey());
+        void reconcileFirstPage(queryClient, agent.listFindings.queryKey());
       });
     }
     if (scopeSet.has('findingDetails')) {
@@ -127,7 +127,7 @@ export function invalidateSecurityQueryScopes(
   const ownerInput = { organizationId: scope };
   if (scopeSet.has('findings')) {
     scheduleCacheMaintenance(() => {
-      reconcileFirstPage(queryClient, agent.listFindings.queryKey(ownerInput));
+      void reconcileFirstPage(queryClient, agent.listFindings.queryKey(ownerInput));
     });
   }
   if (scopeSet.has('findingDetails')) {

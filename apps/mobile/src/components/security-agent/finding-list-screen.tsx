@@ -34,6 +34,8 @@ import {
   useSecurityAnalysisCapacity,
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityFindings } from '@/lib/hooks/use-security-findings';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { classifyListBody } from '@/lib/query/list-body-state';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { isSecurityFindingAnalyzable, type SecurityFinding } from '@/lib/security-agent';
@@ -121,7 +123,19 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
     () => items.some(item => isSecurityFindingAnalyzable(item)),
     [items]
   );
-  const hasListContent = items.length > 0 || findings.isFetchNextPageError;
+  // Only a delivered page may claim there are no open findings: a read that is
+  // paused, never started, or whose pages were cleared has not answered. An
+  // unsettled connectivity keeps the skeleton instead of naming the connection.
+  const connectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
+  const body = classifyListBody({
+    rowCount: items.length,
+    hasDeliveredData: (findings.data?.pages.length ?? 0) > 0,
+    hasInlineError: findings.isFetchNextPageError,
+    isError: findings.isError,
+    isFetching: findings.isFetching,
+    fetchStatus: findings.fetchStatus,
+    connectivityKnown,
+  });
   // Hoisted so the list keeps one renderer identity across unrelated screen
   // renders (refresh, filter sheet). FlashList's memoized ViewHolder compares
   // `renderItem` and `extraData` by identity before re-rendering a row.
@@ -198,7 +212,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         />
       ) : null}
 
-      {findings.isLoading && (
+      {body.status === 'loading' && (
         <View className="flex-1 gap-3 px-6 pt-4">
           <Skeleton className="h-24 w-full rounded-lg" />
           <Skeleton className="h-24 w-full rounded-lg" />
@@ -206,15 +220,17 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         </View>
       )}
 
-      {!findings.isLoading && findings.isError && !hasListContent && (
+      {body.status === 'error' && (
         <QueryError
+          variant={body.cause === 'offline' ? 'offline' : 'neutral'}
           message={t('securityAgent.findingList.couldNotLoad')}
           onRetry={() => void findings.refetch()}
+          isRetrying={body.isRetrying}
           refreshControl={refreshControl}
         />
       )}
 
-      {!findings.isLoading && !findings.isError && !hasListContent && (
+      {body.status === 'empty' && (
         <EmptyState
           icon={ShieldCheck}
           refreshControl={refreshControl}
@@ -244,7 +260,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         />
       )}
 
-      {!findings.isLoading && hasListContent && (
+      {body.status === 'rows' && (
         <FlashList<SecurityFinding>
           style={listStyle}
           data={items}

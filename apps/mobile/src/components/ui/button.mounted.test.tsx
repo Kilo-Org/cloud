@@ -134,6 +134,7 @@ describe('Button native target contract', () => {
     'default',
     'destructive',
     'outline',
+    'outline-destructive',
     'secondary',
     'ghost',
     'link',

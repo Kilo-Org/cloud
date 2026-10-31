@@ -31,17 +31,23 @@ type ConsentCardProps = {
  * Maximum font scale honoured by the pinned privacy disclosure.
  *
  * The disclosure sits in the card's pinned footer with the reserved error
- * line and two `size="lg"` buttons. Uncapped, the `text-xs` sentence grows
+ * line and two `size="lg"` buttons. Uncapped, the `text-sm` sentence grows
  * with Dynamic Type to several lines at the largest system text size, and
  * that height comes out of the sheet, not the scroll region: the footer has
- * no room left and the second action clips at the sheet bottom. Capped at
- * 1.6 the sentence stays within two bounded lines on the smallest supported
- * width, so the footer keeps a bounded height and the actions stay on
- * screen; scales below 1.6 pass through untouched, so a11y users keep most
- * of their preferred scale. Same cap and reasoning as the tour header (see
- * `tour-font-scale`).
+ * no room left and the second action clips at the sheet bottom.
+ *
+ * 1.4 is the cap that keeps the sentence within two bounded lines on the
+ * smallest supported width (360dp; the card's `px-6` leaves 318dp for the
+ * row) now that the copy is `text-sm`. The sentence's longer segment — the
+ * pt-BR lead-in — measures 209.52dp at scale 1 and the link 169.52dp, so at
+ * 1.4 the lead-in is 293.3dp and each segment still takes its own line. It
+ * also keeps the largest rendered sentence the size it already was: the old
+ * `text-xs` copy at the previous 1.6 cap rendered 16.8dp, and 12.25dp at 1.4
+ * renders 17.15dp. Scales below the cap pass through untouched, so a11y
+ * users keep most of their preferred scale. Same reasoning as the tour
+ * header's cap (see `tour-font-scale`).
  */
-export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.6;
+export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.4;
 
 export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const router = useRouter();
@@ -218,17 +224,22 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
 
   return (
     <View className="flex-1 bg-background" style={rootStyle}>
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={contentContainerStyle}
-        showsVerticalScrollIndicator={false}
-      >
+      {/* The body keeps the platform scroll indicator: at a compact window it
+          is taller than the viewport, and the hidden thumb made the rest of it
+          read as missing rather than as one scroll away. */}
+      <ScrollView className="flex-1" contentContainerStyle={contentContainerStyle}>
         <View className="px-6">
-          <View className="flex-row items-center gap-3">
-            <View className="h-10 w-10 items-center justify-center rounded-lg bg-secondary">
-              <Shield size={20} color={colors.foreground} />
-            </View>
-            <Text className="text-base font-semibold text-foreground">{t('consent.kilo')}</Text>
+          {/* The badge alone carries the brand: the title below already states
+              what the screen is about, and repeating the product name beside
+              the mark said nothing a reader did not already see. The mark keeps
+              the name for assistive tech, which cannot read the glyph. */}
+          <View
+            accessible
+            accessibilityRole="image"
+            accessibilityLabel={t('consent.kilo')}
+            className="h-10 w-10 items-center justify-center rounded-lg bg-secondary"
+          >
+            <Shield size={20} color={colors.foreground} />
           </View>
 
           <Text className="mt-6 text-2xl font-bold text-foreground">
@@ -301,7 +312,10 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={t('consent.seeFullDetails')}
-            className="mt-6 flex-row items-center gap-1 active:opacity-70"
+            // The row's own node carries the control-size floor: the link's
+            // text line is 17.5dp, below the audit's 28dp minimum, and the
+            // 8dp slop carries the 44pt region on top of it.
+            className="mt-6 min-h-[28px] flex-row items-center gap-1 active:opacity-70"
           >
             <Text className="text-sm font-semibold text-primary">
               {t('consent.seeFullDetails')}
@@ -320,7 +334,10 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             moving the actions. The privacy disclosure is pinned here too,
             because at the foot of the scrolling body the footer edge cut the
             sentence in half. Its font scale is capped so the pinned height
-            stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE). */}
+            stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE). The policy
+            link's 28dp box overflows its 17.5dp line by 5.25dp, which stays
+            inside this footer's `pt-3` top padding rather than reaching the
+            scroll region above it. */}
         <ConsentPolicySentence
           prefix={t('consent.privacyPolicyPrefix')}
           linkLabel={t('consent.privacyPolicy')}
@@ -342,7 +359,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           <Text>{actions.primaryLabel}</Text>
         </Button>
         <Button
-          variant={mode === 'review' ? 'destructive' : 'outline'}
+          variant={mode === 'review' ? 'outline-destructive' : 'outline'}
           size="lg"
           onPress={handleSecondaryAction}
           accessibilityLabel={actions.secondaryLabel}

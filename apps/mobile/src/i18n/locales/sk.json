@@ -163,7 +163,7 @@
     "allLanguages": "Všetky jazyky"
   },
   "login": {
-    "welcome": "Vitajte v aplikácii Kilo",
+    "welcome": "Vitajte",
     "retrySignIn": "Znova sa prihlásiť",
     "logo": "Logo Kilo",
     "continuingSignIn": "Prihlasovanie pokračuje.",
@@ -178,7 +178,7 @@
     "useDifferentEmail": "Použiť iný e-mail",
     "signInWithApple": "Prihlásiť sa cez Apple",
     "signInWithGoogle": "Prihlásiť sa cez Google",
-    "signInWithPasskey": "Prihlásiť sa prístupovým kľúčom",
+    "signInWithPasskey": "Použiť prístupový kľúč",
     "emailAddress": "E-mailová adresa",
     "emailPlaceholder": "vy@priklad.sk",
     "continueWithEmail": "Pokračovať cez e-mail",
@@ -330,7 +330,7 @@
       "diffTooLarge": "prehľad zmien je príliš veľký",
       "openFile": "Otvoriť {{path}}",
       "openFileViewed": "Otvoriť {{path}} (prezreté)",
-      "title": "Súborov"
+      "title": "Súbory"
     },
     "fileRows": {
       "markViewed": "Označiť súbor {{path}} ako prezretý",
@@ -714,6 +714,7 @@
       "gitlabDescription": "Pripoj svoj účet GitLab a kontroluj merge requesty v mobile.",
       "bitbucketDescription": "Pripoj Bitbucket k tejto organizácii a kontroluj žiadosti o zlúčenie v mobile.",
       "bitbucketOrgOnlyDescription": "Prepni účet hore na organizáciu a kontroluj jej žiadosti o zlúčenie na Bitbucku.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatiaľ nemá žiadne organizácie. Žiadosti o zlúčenie na Bitbucku môžeš kontrolovať po vytvorení organizácie alebo vstúpení do nej.",
       "contextLine": "Pre {{organization}}",
       "contextLinePersonal": "Pre osobný účet"
     },
@@ -739,10 +740,9 @@
     },
     "reconnectNotice": {
       "title": "Platnosť pripojenia k službe GitHub vypršala.",
-      "message": "Tvoje pripojenie k službe GitHub už nie je platné. Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie.",
+      "message": "Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie.",
       "gitlabTitle": "Platnosť pripojenia k službe GitLab vypršala.",
-      "bitbucketTitle": "Platnosť pripojenia k službe Bitbucket vypršala.",
-      "providerMessage": "Tvoje pripojenie k službe {{provider}} už nie je platné. Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie."
+      "bitbucketTitle": "Platnosť pripojenia k službe Bitbucket vypršala."
     },
     "eventChips": {
       "comment": "Komentár",
@@ -795,7 +795,7 @@
     },
     "tabs": {
       "overview": "Prehľad",
-      "files": "Súborov",
+      "files": "Súbory",
       "discussion": "Diskusia"
     },
     "fileStatus": {
@@ -853,7 +853,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Zdieľať merge request",
       "viewOnProvider": "Zobraziť v {{provider}}",
       "mergeRequestUnavailable": "Merge request nie je dostupný",
@@ -1059,7 +1059,7 @@
     "attachmentPicker": {
       "takePhoto": "Odfotiť",
       "photoLibrary": "Knižnica fotiek",
-      "files": "Súborov",
+      "files": "Súbory",
       "cameraAccessMessage": "Ak chceš fotiť, povoľ v nastaveniach prístup k fotoaparátu."
     },
     "typingIndicator": {
@@ -1471,7 +1471,10 @@
       "gitlabNoRepositoriesDescription": "Možno bude potrebné udeliť prístup k ďalším skupinám alebo projektom na platforme GitLab.",
       "installGithubApp": "Inštalácia aplikácie GitHub pre repozitáre",
       "installGithubAppDescription": "Udeľte aplikácii Kilo na platforme GitHub prístup k repozitárom, ktoré chcete kontrolovať.",
-      "repositoryAccess": "prístup k repozitárom"
+      "repositoryAccess": "prístup k repozitárom",
+      "allModePersonal": "Každý repozitár, ku ktorému má Kilo prístup cez vaše pripojenie k GitHubu, sa automaticky kontroluje.",
+      "allModeOrganization": "Každý repozitár, ku ktorému má Kilo prístup cez pripojenie organizácie k GitHubu, sa automaticky kontroluje.",
+      "allModeCount": "Dostupné repozitáre: {{displayCount}}"
     },
     "style": {
       "title": "Štýl kontroly",
@@ -1570,6 +1573,7 @@
       "changeRequestNoGitHubAccess": "Žiadne pripojenie GitHub nemá prístup k tomuto úložisku. Znova pripojte GitHub s prístupom k nemu a potom to skúste znova.",
       "changeRequestMissingPermissions": "Aplikácia Kilo na GitHube nemôže v tomto úložisku otvárať pull requesty. Vlastník úložiska musí aplikácii udeliť prístup na zápis k obsahu a pull requestom a potom to skúste znova.",
       "changeRequestFailed": "Kilo nemohlo otvoriť pull request. Skúste to o chvíľu znova.",
+      "proposalConflict": "Ďalší návrh pre toto úložisko je stále aktívny, takže tento zatiaľ nemožno uložiť.",
       "offAction": "Pamäť kontrol je vypnutá. Zapnite ju a skúste to znova."
     },
     "manualReview": {
@@ -1720,7 +1724,8 @@
       "sortSeverityDesc": "Závažnosť: od najvyššej",
       "sortSeverityAsc": "Závažnosť: od najnižšej",
       "sortSlaDue": "Termín SLA",
-      "overdueOnly": "Iba po termíne"
+      "overdueOnly": "Iba po termíne",
+      "noRepositories": "Zatiaľ nie sú synchronizované ani vybrané žiadne repozitáre. Vyberte ich v nastaveniach Bezpečnostného agenta."
     },
     "automation": {
       "title": "Automatizácia",
@@ -1795,17 +1800,12 @@
       "findingsCount": "Počet nálezov: {{displayCount}}",
       "notMeasured": "Nezmerané",
       "actFirst": "Najnaliehavejšie úlohy",
-      "slaPosture": "Plnenie SLA",
       "actionPosture": "Stav akcií",
       "codebaseRisk": "Riziká v zdrojovom kóde",
       "repositoryActionPlan": "Plán opatrení pre repozitáre",
       "noOpenFindings": "Žiadne otvorené nálezy nevyžadujú pozornosť",
       "deadlineToday": "Termín uplynul dnes",
       "daysOverdue": "Počet dní po termíne: {{displayCount}}",
-      "withinDeadline": "V termíne",
-      "criticalOverdue": "Kritické po termíne",
-      "highOverdue": "Vysoká závažnosť po termíne",
-      "mediumLowOverdue": "Stredná a nízka závažnosť po termíne",
       "confirmedExploitable": "Potvrdené ako zneužiteľné",
       "needsEvidenceReview": "Vyžaduje kontrolu dôkazov",
       "analysisNotComplete": "Nedokončená analýza",
@@ -1815,7 +1815,22 @@
       "noSlaDeadline": "Nie je priradený termín SLA",
       "noRepositoryData": "Zatiaľ žiadne údaje o repozitári",
       "noRepositoryDataDescription": "Priority repozitára sa zobrazia po synchronizácii nálezov.",
-      "repoSummary": "Otvorené: {{open}} · kritické: {{critical}} · vysoká závažnosť: {{high}}",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "Otvorené: {{displayCount}}",
+      "repoSummaryOpen_one": "Otvorené: {{displayCount}}",
+      "repoSummaryOpen_few": "Otvorené: {{displayCount}}",
+      "repoSummaryOpen_many": "Otvorené: {{displayCount}}",
+      "repoSummaryOpen_other": "Otvorené: {{displayCount}}",
+      "repoSummaryCritical": "kritické: {{displayCount}}",
+      "repoSummaryCritical_one": "kritické: {{displayCount}}",
+      "repoSummaryCritical_few": "kritické: {{displayCount}}",
+      "repoSummaryCritical_many": "kritické: {{displayCount}}",
+      "repoSummaryCritical_other": "kritické: {{displayCount}}",
+      "repoSummaryHigh": "vysoká závažnosť: {{displayCount}}",
+      "repoSummaryHigh_one": "vysoká závažnosť: {{displayCount}}",
+      "repoSummaryHigh_few": "vysoká závažnosť: {{displayCount}}",
+      "repoSummaryHigh_many": "vysoká závažnosť: {{displayCount}}",
+      "repoSummaryHigh_other": "vysoká závažnosť: {{displayCount}}",
       "couldNotLoad": "Údaje prehľadu sa nepodarilo načítať.",
       "filterByRepository": "Filtrovať podľa repozitára",
       "lastSynced": "Naposledy synchronizované {{time}}",
@@ -1823,7 +1838,6 @@
       "notYetSynced": "Zatiaľ nesynchronizované",
       "refreshFailed": "Obnovenie zlyhalo — zobrazujú sa posledné synchronizované údaje.",
       "settings": "Nastavenia",
-      "syncFindings": "Synchronizovať nálezy",
       "syncNow": "Synchronizovať teraz",
       "syncQueued": "Synchronizácia zaradená do frontu",
       "syncStatusUnavailable": "Stav synchronizácie nie je dostupný.",
@@ -1845,8 +1859,23 @@
       "withinDeadlineDetail": "V termíne: {{within}} z {{total}}",
       "noDeadlineData": "Žiadny nález zatiaľ nemá termín SLA",
       "deadlinePassed": "Termín uplynul",
-      "deadlinePassedDetail": "Kritická závažnosť: {{critical}}, vysoká závažnosť: {{high}}",
-      "deadlinePassedDetailWithMediumLow": "Kritická závažnosť: {{critical}}, vysoká závažnosť: {{high}}, stredná a nízka závažnosť: {{mediumLow}}",
+      "deadlinePassedDetail": "{{critical}}, {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
+      "breakdownCritical": "Kritická závažnosť: {{displayCount}}",
+      "breakdownCritical_one": "Kritická závažnosť: {{displayCount}}",
+      "breakdownCritical_few": "Kritická závažnosť: {{displayCount}}",
+      "breakdownCritical_many": "Kritická závažnosť: {{displayCount}}",
+      "breakdownCritical_other": "Kritická závažnosť: {{displayCount}}",
+      "breakdownHigh": "vysoká závažnosť: {{displayCount}}",
+      "breakdownHigh_one": "vysoká závažnosť: {{displayCount}}",
+      "breakdownHigh_few": "vysoká závažnosť: {{displayCount}}",
+      "breakdownHigh_many": "vysoká závažnosť: {{displayCount}}",
+      "breakdownHigh_other": "vysoká závažnosť: {{displayCount}}",
+      "breakdownMediumLow": "stredná a nízka závažnosť: {{displayCount}}",
+      "breakdownMediumLow_one": "stredná a nízka závažnosť: {{displayCount}}",
+      "breakdownMediumLow_few": "stredná a nízka závažnosť: {{displayCount}}",
+      "breakdownMediumLow_many": "stredná a nízka závažnosť: {{displayCount}}",
+      "breakdownMediumLow_other": "stredná a nízka závažnosť: {{displayCount}}",
       "dueThisWeek": "Termín tento týždeň",
       "dueThisWeekDetail": "{{exploitable}} z týchto je potvrdených ako zneužiteľných",
       "noDeadline": "Bez termínu",
@@ -1906,7 +1935,6 @@
       "repositoriesCount_one": "Vybratý {{displayCount}} repozitár",
       "repositoriesCount": "Vybratých {{displayCount}} repozitárov",
       "repositoriesCount_other": "Vybratých {{displayCount}} repozitárov",
-      "selectRepositoriesSubtitle": "Vyberte repozitáre, ktoré má bezpečnostný agent sledovať",
       "analysisModeSubtitle": "Režim analýzy: {{mode}}",
       "automationAllOff": "Všetko vypnuté",
       "automationCount": "Zapnuté: {{displayCount}} z 3",
@@ -2019,7 +2047,6 @@
       "eventsCount_other": "{{displayCount}} udalostí",
       "generated": "Správa bola vygenerovaná {{generatedAt}}.",
       "noActivity": "Žiadna zaznamenaná aktivita",
-      "noActivityDescription": "Kilo za obdobie od {{start}} do {{end}} neeviduje žiadnu aktivitu týkajúcu sa bezpečnostných nálezov, ktorú by bolo možné zahrnúť do správy.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitár nezaznamenaný",
       "reasonUnknown": "Nerozpoznaný dôvod",
@@ -2102,7 +2129,10 @@
       "settleFailed": "Akcia sa vykonala, ale nepodarilo sa nám zaznamenať výsledok. Skúste to znova.",
       "replayFailed": "Táto akcia sa nevykonala. Skúste to znova.",
       "actionFailed": "Túto akciu sa nepodarilo dokončiť. Skúste to znova.",
-      "actionBlocked": "Túto akciu sa nepodarilo dokončiť. Problém je potrebné najprv vyriešiť."
+      "actionBlocked": "Túto akciu sa nepodarilo dokončiť. Problém je potrebné najprv vyriešiť.",
+      "syncNoRepositories": "V rozsahu synchronizácie nie sú žiadne repozitáre. Vyberte repozitáre, ktoré Bezpečnostný agent monitoruje, a potom znova synchronizujte.",
+      "syncIntegrationInactive": "Pripojenie GitHub pre Bezpečnostného agenta nie je aktívne. Znovu pripojte Kilo GitHub App a potom znova synchronizujte.",
+      "syncMissingPermission": "Aplikácia Kilo na GitHube nemôže čítať upozornenia na zraniteľnosti. Udeľte toto povolenie na GitHube a potom znova synchronizujte."
     },
     "analysisState": {
       "queued": "Analýza čaká v poradí",
@@ -2213,7 +2243,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktívne relácie sa nepodarilo načítať.",
       "couldNotRefresh": "Obnovenie sa nepodarilo",
-      "noSessionsYetDescription": "Začni programovaciu úlohu z telefónu. Tvoje relácie sa zobrazia tu.",
+      "noSessionsYetDescription": "Začni programovaciu úlohu z telefónu.",
       "viewHistory": "História relácií",
       "noMatches": "Žiadne zodpovedajúce relácie",
       "tryDifferentSearch": "Skús iný vyhľadávací výraz.",
@@ -2355,9 +2385,9 @@
       "couldNotLoadGithubRepositories": "Repozitáre zo služby GitHub sa nepodarilo načítať.",
       "couldNotLoadGitlabRepositories": "Repozitáre zo služby GitLab sa nepodarilo načítať.",
       "couldNotLoadBitbucketRepositories": "Repozitáre zo služby Bitbucket sa nepodarilo načítať.",
-      "connectGithubDescription": "Pripoj GitHub v prehliadači, potom sa sem vráť a vyber repozitár.",
-      "connectGitlabDescription": "Pripoj GitLab v prehliadači, potom sa sem vráť a vyber repozitár.",
-      "connectBitbucketDescription": "Pripoj Bitbucket v prehliadači, potom sa sem vráť a vyber repozitár.",
+      "connectGithubDescription": "Prihlás sa v prehliadači, potom sa sem vráť a vyber GitHub repozitár.",
+      "connectGitlabDescription": "Prihlás sa v prehliadači, potom sa sem vráť a vyber GitLab repozitár.",
+      "connectBitbucketDescription": "Prihlás sa v prehliadači, potom sa sem vráť a vyber Bitbucket repozitár.",
       "openGithub": "Otvoriť GitHub",
       "openGitlab": "Otvoriť GitLab",
       "openBitbucket": "Otvoriť Bitbucket",
@@ -2825,7 +2855,7 @@
     "attachmentPicker": {
       "camera": "Fotoaparát",
       "photoLibrary": "Knižnica fotiek",
-      "files": "Súborov",
+      "files": "Súbory",
       "couldNotOpenPhotoPicker": "Výber fotiek sa nepodarilo otvoriť. Reštartuj Kilo a skús to znova.",
       "maxFilesAllowed": "Povolený počet súborov je najviac {{displayCount}}.",
       "onlyAddingFiles": "Pridávajú sa len niektoré súbory: {{accepted}} z {{total}} (najviac {{max}})",
@@ -3222,7 +3252,7 @@
     "couldNotSaveChoice": "Tvoju voľbu sa nepodarilo uložiť. Skús to znova.",
     "onlineAllowed": "Online, povolené",
     "onlineNotAllowed": "Online, nepovolené",
-    "optionalReview": "Voliteľné — môžeš to kedykoľvek zmeniť v nastaveniach",
+    "optionalReview": "Voliteľné",
     "optionalOnboarding": "Voliteľné — zapnuté, kým to nevypneš",
     "aiProvidersWhat": "Tvoje zadania, história konverzácií a všetky priložené súbory.",
     "aiProvidersWhy": "Na vytváranie odpovedí AI.",
@@ -3947,8 +3977,6 @@
     "commandAtLimit": "Príkaz je obmedzený na {{max}} znakov",
     "commandsEmpty": "Zatiaľ žiadne príkazy na nastavenie",
     "commandsSaveFailed": "Nepodarilo sa uložiť príkazy nastavenia",
-    "moveUp": "Posunúť sa hore",
-    "moveDown": "Presuňte sa nadol",
     "moveCommandUp": "Presunúť príkaz {{position}} nahor",
     "moveCommandDown": "Presunúť príkaz {{position}} nadol",
     "skillsTitle": "Zručnosti",
@@ -3957,9 +3985,13 @@
     "skillMarkdownLabel": "Obsah zručností",
     "skillsEmpty": "Zatiaľ žiadne zručnosti",
     "skillNameRequired": "Zadajte názov zručnosti",
+    "skillNameTooLong": "Názov zručnosti musí mať {{max}} znakov alebo menej",
     "skillNameInvalid": "Názov zručnosti musí začínať písmenom alebo číslicou a používať iba malé písmená, číslice a pomlčky",
     "skillContentRequired": "Vyžaduje sa obsah zručností",
-    "skillSaveFailed": "Nepodarilo sa zachrániť zručnosť",
+    "skillSaveFailed": "Nepodarilo sa zachrániť zručnosť. Skúste to znova.",
+    "skillDeleteFailed": "Nepodarilo sa odstrániť zručnosť. Skúste to znova.",
+    "skillToggleFailed": "Nepodarilo sa aktualizovať zručnosť. Skúste to znova.",
+    "skillLimitReached": "Profil môže obsahovať až {{max}} zručností. Vymažte jednu, aby ste pridali ďalšiu.",
     "skillSourceCustom": "Vlastné",
     "skillSourceMarketplace": "Obchod",
     "skillSourceSkillsSh": "skills.sh",
@@ -4062,7 +4094,8 @@
       "nameRequired": "Zadajte názov príkazu",
       "nameInvalid": "Názov musí začínať malým písmenom a používať iba malé písmená, číslice a pomlčky",
       "templateRequired": "Zadajte šablónu príkazu",
-      "nameConflict": "Tento názov je rezervovaný vstavaným príkazom"
+      "nameConflict": "Tento názov je rezervovaný vstavaným príkazom",
+      "duplicateName": "Príkaz s týmto názvom už v tomto profile existuje"
     },
     "repoBindings": {
       "title": "Predvolené profily pre úložiská",

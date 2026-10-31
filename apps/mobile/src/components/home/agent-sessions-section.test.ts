@@ -13,12 +13,7 @@ import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 const navigateSpy = vi.hoisted(() => vi.fn());
 const dismissToSpy = vi.hoisted(() => vi.fn());
 const sessionDestination = vi.hoisted(() => ({ id: '' }));
-const connectivity = vi.hoisted(() => ({
-  offline: false,
-  connected: true,
-  reconnectExhausted: false,
-}));
-const retryConnectionSpy = vi.hoisted(() => vi.fn());
+const connectivity = vi.hoisted(() => ({ offline: false, connected: true, exhausted: false }));
 const queryClient = new ReactQuery.QueryClient();
 vi.mock('expo-router', () => ({
   useRouter: () => ({ navigate: navigateSpy, dismissTo: dismissToSpy }),
@@ -104,15 +99,7 @@ vi.mock('@/components/home/section-header', async () => {
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-// A host element so a notice's message and treatment stay assertable: the
-// screens read the same copy whether it paints or is announced.
-vi.mock('@/components/ui/accessible-status', async () => {
-  const { createElement: create } = await import('react');
-  type StatusProps = { message: string | null; tone: string; className?: string };
-  return {
-    AccessibleStatus: (props: StatusProps) => create('AccessibleStatus', props),
-  };
-});
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: vi.fn() }));
@@ -125,12 +112,12 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
   useUserWebConnectionHealth: () => ({
-    isConnected: connectivity.connected,
-    reconnectExhausted: connectivity.reconnectExhausted,
+    isConnected: connectivity.connected && !connectivity.offline,
+    reconnectExhausted: connectivity.exhausted,
   }),
 }));
 vi.mock('@/components/agents/user-web-connection-provider', () => ({
-  useUserWebConnection: () => ({ retryConnection: retryConnectionSpy }),
+  useUserWebConnection: () => ({}),
 }));
 vi.mock('@/components/agents/use-agent-session-navigator', () => ({
   useAgentSessionNavigator: () => (id: string) => {
@@ -211,8 +198,7 @@ beforeEach(() => {
   sessionDestination.id = '';
   connectivity.offline = false;
   connectivity.connected = true;
-  connectivity.reconnectExhausted = false;
-  retryConnectionSpy.mockClear();
+  connectivity.exhausted = false;
 });
 afterEach(() => {
   act(() => renderer?.unmount());
@@ -353,141 +339,89 @@ describe('Home live section', () => {
   });
 });
 
-describe('Live session feedback band', () => {
-  // The band is one child of the column that spaces it against the content it
-  // introduces: a band that paints nothing still takes a gap, which stood the
-  // section header twice as far from its card as the sibling section stands
-  // from its first row. It must exist only while it paints.
-  type PaintedNode = {
-    type: string;
-    props: Record<string, unknown>;
-    children: readonly (PaintedNode | string)[] | null;
-  };
-
-  /** Every painted element of `type`, in tree order, from a rendered tree. */
-  function paintedNodes(json: unknown, type: string): PaintedNode[] {
-    let roots: readonly unknown[] = [];
-    if (Array.isArray(json)) {
-      roots = json;
-    } else if (json !== null) {
-      roots = [json];
-    }
-    const found: PaintedNode[] = [];
-    const walk = (element: PaintedNode) => {
-      if (element.type === type) {
-        found.push(element);
-      }
-      for (const child of element.children ?? []) {
-        if (typeof child !== 'string') {
-          walk(child);
-        }
-      }
-    };
-    for (const root of roots) {
-      walk(root as PaintedNode);
-    }
-    return found;
-  }
-
-  function statusWithMessage(json: unknown, message: string) {
-    return paintedNodes(json, 'AccessibleStatus').filter(
-      candidate => candidate.props.message === message
-    );
-  }
-
-  const connectionLost = i18n.t('agentChat.sessionConnection.connectionLost');
-  const hiddenAnnouncement = 'absolute size-px overflow-hidden';
-
-  async function bandJson(
+describe('Home live section status box', () => {
+  // Home reports the live facts in the section header, so the feedback column
+  // must add no box of its own: the card column's `gap-2` would then place the
+  // card below an invisible child, twice as far from the section label as the
+  // Explore rows are from theirs (home section-label gap).
+  function mountFeedback(
     sessions: Props['sessions'] = settled,
-    contextOverride: Props['context'] = context,
-    inlineNotices = false
+    contextOverride: Props['context'] = context
   ) {
-    const holder: { tree?: TestRenderer.ReactTestRenderer } = {};
-    await act(async () => {
-      holder.tree = TestRenderer.create(
+    act(() => {
+      renderer = TestRenderer.create(
         createElement(LiveSessionFeedback, {
           context: contextOverride,
           sessions,
-          failureLabel: i18n.t('home.couldNotLoadActiveSessions'),
-          inlineNotices,
+          failureLabel: "Couldn't load active sessions",
+          inlineNotices: false,
         })
       );
-      await Promise.resolve();
     });
-    const json = holder.tree?.toJSON() ?? null;
-    act(() => holder.tree?.unmount());
-    return json;
   }
 
-  it('paints no band while it has nothing to report', async () => {
-    // The band and its row are the only plain Views this component draws.
-    expect(paintedNodes(await bandJson(), 'View')).toHaveLength(0);
-    // The loading fact is announced, not painted, so the pending card keeps
-    // that same one gap.
-    expect(
-      paintedNodes(
-        await bandJson(
-          { ...settled, hasAcceptedSuccess: false },
-          { ...context, isResolving: true }
-        ),
-        'View'
-      )
-    ).toHaveLength(0);
+  it.each([
+    ['the accepted list is empty', settled, context],
+    [
+      'the list is still resolving',
+      { ...settled, hasAcceptedSuccess: false },
+      { ...context, isResolving: true },
+    ],
+    [
+      'rows are shown',
+      {
+        ...settled,
+        activeSessions: [session('a1', 'running', { statusUpdatedAt: new Date().toISOString() })],
+      },
+      context,
+    ],
+  ])('draws no box between the label and the card while %s', (_state, sessions, ctx) => {
+    mountFeedback(sessions, ctx);
+    expect(nodes('View')).toHaveLength(0);
   });
 
-  it('draws the offline notice on a surface that carries the notice itself', async () => {
-    connectivity.offline = true;
-    expect(paintedNodes(await bandJson(settled, context, true), 'View')).not.toHaveLength(0);
-  });
-
-  it('draws the connection line with the socket retry and stops announcing it', async () => {
-    connectivity.connected = false;
-    connectivity.reconnectExhausted = true;
-
-    const drawn = await bandJson(settled, context, true);
-
-    // On a surface that carries the notice itself the line paints beside the
-    // socket's own retry.
-    const painted = statusWithMessage(drawn, connectionLost);
-    expect(painted).toHaveLength(1);
-    expect(painted[0]?.props.className).toBe('flex-1 text-xs');
-    expect(
-      paintedNodes(drawn, 'Button').filter(
-        candidate =>
-          candidate.props.accessibilityLabel ===
-          i18n.t('agentChat.sessionConnection.retryConnection')
-      )
-    ).toHaveLength(1);
-  });
-
-  it('announces the connection line only where the surface does not paint it', async () => {
-    connectivity.connected = false;
-    connectivity.reconnectExhausted = true;
-
-    const announced = await bandJson(settled, context, false);
-
-    // Nothing paints on that surface, so the same copy is announced instead.
-    const spoken = statusWithMessage(announced, connectionLost);
-    expect(spoken).toHaveLength(1);
-    expect(spoken[0]?.props.className).toBe(hiddenAnnouncement);
-    expect(paintedNodes(announced, 'Button')).toHaveLength(0);
-  });
-
-  it('draws no connection row while a failure is all the band reports', async () => {
-    const failed: Props['sessions'] = {
-      ...settled,
-      terminalError: { error: new Error('socket closed'), kind: 'retryable' },
-    };
-
-    const drawn = await bandJson(failed, context, true);
-
-    // The failure card is the whole band: an empty connection row would add a
-    // second gap above it for nothing.
-    const rows = paintedNodes(drawn, 'View').filter(
-      candidate => candidate.props.className === 'flex-row items-center gap-2'
+  it('keeps announcing a pending list without drawing a box', () => {
+    mountFeedback({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
+    expect(nodes('AccessibleStatus').map(status => status.props.message)).toContain(
+      i18n.t('common.loading')
     );
-    expect(rows).toHaveLength(0);
-    expect(statusWithMessage(drawn, connectionLost)).toHaveLength(0);
+    expect(nodes('View')).toHaveLength(0);
+  });
+
+  it('draws the column when the failure block owns the surface', () => {
+    mountFeedback(settled, { ...context, isError: true });
+    expect(nodes('View').length).toBeGreaterThan(0);
+    expect(nodes('QueryError')).toHaveLength(1);
+  });
+
+  it('keeps the status announcement mounted when the visible column appears', () => {
+    // Home flips this way while the socket still reports the same connection
+    // state: the load fails and the column is drawn. A remounted announcement
+    // starts its dedupe from nothing and speaks the unchanged message again, so
+    // the node has to survive the flip.
+    connectivity.connected = false;
+    mountFeedback();
+    const before = nodes('AccessibleStatus').find(
+      status => status.props.message === i18n.t('agentChat.sessionConnection.connecting')
+    );
+    expect(before).toBeDefined();
+    expect(nodes('QueryError')).toHaveLength(0);
+
+    act(() => {
+      renderer?.update(
+        createElement(LiveSessionFeedback, {
+          context: { ...context, isError: true },
+          sessions: settled,
+          failureLabel: "Couldn't load active sessions",
+          inlineNotices: false,
+        })
+      );
+    });
+    expect(nodes('QueryError')).toHaveLength(1);
+    const after = nodes('AccessibleStatus').filter(
+      status => status.props.message === i18n.t('agentChat.sessionConnection.connecting')
+    );
+    expect(after).toHaveLength(1);
+    expect(after[0]).toBe(before);
   });
 });

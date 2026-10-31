@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  expectDashLabel,
   expectHiddenReservedBox,
   findAll,
   info,
@@ -268,7 +267,7 @@ describe('SessionContextMetrics', () => {
     }
   });
 
-  it('messages with neither info nor cost show a visible dash beside the track-only ring', () => {
+  it('messages with neither info nor cost keep the placeholder beside the track-only ring', () => {
     const root = render({
       hasMessages: true,
       info: undefined,
@@ -280,7 +279,9 @@ describe('SessionContextMetrics', () => {
     expect(
       (root.props as { accessibilityElementsHidden?: boolean }).accessibilityElementsHidden
     ).toBeUndefined();
-    expectDashLabel(root);
+    // The settled pill is the same shape the loading one shows: no label, never
+    // a dash standing in for a value that has not arrived.
+    expect(findAll(root, el => el.type === 'Text')).toHaveLength(0);
     const ring = findAll(root, el => el.type === 'ContextUsageRing')[0];
     expect(ring).toBeDefined();
     if (ring == null) {
@@ -289,11 +290,10 @@ describe('SessionContextMetrics', () => {
     expect((ring.props as { arcFraction?: number }).arcFraction).toBe(0);
   });
 
-  // Owner audit gap D5: a session whose transcript failed to load (no usage,
-  // no messages, loading finished) must not show a bare unlabeled ring that
-  // reads as a rendering bug. The dash labels the slot, and the accessibility
-  // label names usage as unavailable, in both themes.
-  it('load-error session shows the dash beside the ring and names usage unavailable', () => {
+  // A session whose transcript failed to load (no usage, no messages, loading
+  // finished) keeps the loading placeholder rather than changing shape late;
+  // the accessibility label is what names usage as unavailable.
+  it('load-error session keeps the placeholder ring and names usage unavailable', () => {
     const onPress = vi.fn<() => void>();
     const root = render({
       info: undefined,
@@ -312,7 +312,7 @@ describe('SessionContextMetrics', () => {
     for (const token of PILL_LAYOUT_TOKENS) {
       expect(props.className ?? '').toContain(token);
     }
-    expectDashLabel(root);
+    expect(findAll(root, el => el.type === 'Text')).toHaveLength(0);
   });
 
   it('loading pill keeps the placeholder body without a label', () => {

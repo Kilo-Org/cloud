@@ -101,20 +101,33 @@ export function useContextPicker(
 }
 
 /**
+ * The trigger a stacked form gives its pickers: the same bordered full-width
+ * box `InstanceSelector` and `RepoSelector` render, so one label-value relation
+ * on a form keeps one shape.
+ */
+const FIELD_TRIGGER_CLASS =
+  'flex-row items-center justify-between rounded-lg border border-border bg-secondary px-3 py-3';
+
+/**
  * An explicit `scope` is always read-only; explicit null never inherits global
  * scope. `value` instead keeps the control switchable while it shows the account
  * the caller's screen is scoped to, which may differ from the active account.
+ *
+ * `variant` picks the shape: `inline` is the compact label-and-chevron a header
+ * or a detail row shows, and `field` is the stacked form's full-width trigger.
  */
 export function ContextControl({
   scope,
   showOrganizationName = true,
   onSelectionChange,
   value,
+  variant = 'inline',
 }: Readonly<{
   scope?: ContextDisplayScope;
   showOrganizationName?: boolean;
   onSelectionChange?: (organizationId: string | null) => void;
   value?: string | null;
+  variant?: 'inline' | 'field';
 }>) {
   const context = useOrganization();
   const { token } = useAuth();
@@ -169,11 +182,15 @@ export function ContextControl({
     providerError === 'save' ? context.isSaving : !providerError && organizations.isFetching;
   const disabled = !isResolved || orgs === undefined;
   const pickerBusy = pending || (orgs === undefined && token != null && organizations.isPending);
+  const field = variant === 'field';
   const content = pending ? (
     <Skeleton className="h-5 w-36 max-w-full shrink rounded" />
   ) : (
     <Text
-      className="min-w-0 shrink text-sm leading-[normal] text-muted-foreground"
+      className={cn(
+        'min-w-0 leading-[normal]',
+        field ? 'flex-1 text-base text-foreground' : 'shrink text-sm text-muted-foreground'
+      )}
       numberOfLines={1}
       ellipsizeMode="tail"
     >
@@ -189,7 +206,7 @@ export function ContextControl({
           accessibilityRole="text"
           accessibilityLabel={label}
           accessibilityState={{ busy: pending }}
-          className={cn(ROW_TARGET_CLASS, 'justify-center')}
+          className={field ? FIELD_TRIGGER_CLASS : cn(ROW_TARGET_CLASS, 'justify-center')}
         >
           {content}
         </View>
@@ -201,7 +218,11 @@ export function ContextControl({
           accessibilityState={{ busy: pickerBusy, disabled }}
           disabled={disabled}
           onPress={openPicker}
-          className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-1 active:opacity-70')}
+          className={cn(
+            field ? FIELD_TRIGGER_CLASS : cn(ROW_TARGET_CLASS, 'flex-row items-center gap-1'),
+            'active:opacity-70',
+            field && disabled && 'opacity-50'
+          )}
         >
           {content}
           <View className="size-5 shrink-0 items-center justify-center">

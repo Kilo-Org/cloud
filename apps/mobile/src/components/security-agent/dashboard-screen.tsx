@@ -10,7 +10,7 @@ import {
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useFocusEffect } from 'expo-router';
 import { RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
@@ -23,14 +23,15 @@ import { ScreenHeader } from '@/components/screen-header';
 import { DashboardSections } from '@/components/security-agent/dashboard-sections';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
+import { severityCountPhrase } from '@/components/security-agent/severity-count-phrase';
 import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { formatNumber, formatPercent } from '@/lib/format';
+import { INLINE_LINK_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { formatNumber, formatPercent, UNMEASURED_VALUE } from '@/lib/format';
 import {
   useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
@@ -40,7 +41,13 @@ import {
   useSecurityAgentRepositories,
   useTriggerSecuritySync,
 } from '@/lib/hooks/use-security-agent';
-import { isSecuritySyncRetryable, securitySyncReconcileCopy } from '@/lib/security-agent-ledger';
+import {
+  isSecuritySyncRetryable,
+  securitySyncPreconditionFor,
+  securitySyncReconcileCopy,
+} from '@/lib/security-agent-ledger';
+import { useManageRepositoryAccess } from '@/lib/hooks/use-manage-repository-access';
+import { useSecurityScopeTitle } from '@/lib/hooks/use-security-scope-title';
 import {
   securityDismissFailureCopy,
   useSecurityDismissFailures,
@@ -64,24 +71,31 @@ const METRIC_TONE_CLASS = {
   neutral: 'text-muted-foreground',
 } satisfies Record<DashboardMetricTone, string>;
 
-export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean) {
+export function buildLocalizedMetrics(
+  data: DashboardStats,
+  slaEnabled: boolean,
+  neverSynced = false
+) {
   const metrics = buildSecurityDashboardMetrics(data, slaEnabled);
   const number = (value: number) => formatNumber(value, i18n.language);
   // The tile value counts every severity, so the detail line names every
   // severity: medium and low share one bucket, which disappears while empty.
-  // Mirrors severityBreakdownDetail in @kilocode/app-shared.
+  // Mirrors severityBreakdownDetail in @kilocode/app-shared. Each bucket is a
+  // counted phrase of its own, because one `count` cannot agree three numbers.
   const breakdownDetail = (counts: DashboardStats['severity']) => {
-    const parts = { critical: number(counts.critical), high: number(counts.high) };
+    const critical = severityCountPhrase('breakdownCritical', counts.critical);
+    const high = severityCountPhrase('breakdownHigh', counts.high);
     const mediumLow = counts.medium + counts.low;
     return mediumLow > 0
       ? i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetailWithMediumLow', {
-          ...parts,
-          mediumLow: number(mediumLow),
+          critical,
+          high,
+          mediumLow: severityCountPhrase('breakdownMediumLow', mediumLow),
         })
-      : i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetail', parts);
+      : i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetail', { critical, high });
   };
 
-  return metrics.map(metric => {
+  const localized = metrics.map(metric => {
     switch (metric.id) {
       case 'openFindings': {
         return Object.assign(metric, {
@@ -118,10 +132,11 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
           : null;
         return Object.assign(metric, {
           label: i18n.t('securityAgent.dashboardMetrics.slaCompliance'),
-          value:
-            compliance === null
-              ? i18n.t('securityAgent.dashboard.notMeasured')
-              : formatPercent(compliance, i18n.language),
+          // An unmeasured value is a dash in the numeric slot, not a word: the
+          // tile's value style is the large mono count, so "Not measured" read
+          // as a heavy placeholder that outweighed the real counts beside it,
+          // and the detail line below already explains why there is none.
+          value: compliance === null ? UNMEASURED_VALUE : formatPercent(compliance, i18n.language),
           detail: measured
             ? i18n.t('securityAgent.dashboardMetrics.withinDeadlineDetail', {
                 within: number(data.sla.overall.withinSla),
@@ -167,12 +182,29 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
       }
     }
   });
+
+  // Before the first sync nothing has been measured, so every tile read a zero
+  // count and, under it, a line that described the zeros as a clean report
+  // ("All open findings tracked", "No findings have an SLA deadline yet").
+  // A dash in the numeric slot and the screen's own not-yet-synced line state
+  // the measurement is simply absent.
+  if (!neverSynced) {
+    return localized;
+  }
+  return localized.map(metric =>
+    Object.assign(metric, {
+      value: UNMEASURED_VALUE,
+      detail: i18n.t('securityAgent.dashboard.notYetSynced'),
+      tone: 'neutral' as const,
+    })
+  );
 }
 
 export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const scopeTitle = useSecurityScopeTitle(scope);
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const [repoFullName, setRepoFullName] = useState<string | undefined>(undefined);
@@ -199,14 +231,65 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // another scope must not show a card or POST this scope.
   const reconcileRows = needsReconcile.filter(row => row.scope === scope);
 
+  // React Query clears a mutation's error when the next attempt starts, so the
+  // failure copy and the retry under it blink out for the length of the retry —
+  // the screen looked like the tap did nothing. Hold the failure being retried,
+  // together with the intent that produced it, until that attempt reports its
+  // own outcome: a retry must resubmit the failed intent, not whatever filter
+  // the reader switched to meanwhile.
+  const [lastSyncAttempt, setLastSyncAttempt] = useState<{
+    error: Error | null;
+    intent: SyncIntent;
+  } | null>(null);
+
+  // A precondition rejection describes server state this screen cannot change:
+  // no repository in the sync scope, or a GitHub connection that is inactive or
+  // missing the vulnerability-alerts permission. The fix is applied in the
+  // repositories settings or on the GitHub App page, so the first return to
+  // this screen is when the controls must work again. Both readings go through
+  // refs so the focus callback and the handoff's return callback keep a stable
+  // identity — a callback that changed whenever a failure arrived would re-run
+  // the focus effect and clear the failure it had just shown.
+  const triggerSyncRef = useRef(triggerSync);
+  triggerSyncRef.current = triggerSync;
+  const lastSyncAttemptRef = useRef(lastSyncAttempt);
+  lastSyncAttemptRef.current = lastSyncAttempt;
+
+  const clearSyncPreconditionFailure = useCallback(() => {
+    const failure = triggerSyncRef.current.error ?? lastSyncAttemptRef.current?.error;
+    if (securitySyncPreconditionFor(failure) === null) {
+      return;
+    }
+    triggerSyncRef.current.reset();
+    setLastSyncAttempt(null);
+  }, []);
+
+  // The GitHub preconditions' fix lives on the GitHub App page; this is the
+  // app-wide handoff that mints the install state and waits for the return. A
+  // handoff that never opened a page clears nothing: the copy still explains
+  // what blocks the sync, and the handoff already reported its own failure.
+  const handleHandoffReturn = useCallback(
+    (opened: boolean) => {
+      if (opened) {
+        clearSyncPreconditionFailure();
+      }
+    },
+    [clearSyncPreconditionFailure]
+  );
+  const manageAccess = useManageRepositoryAccess(scope, 'github', {
+    onReturn: handleHandoffReturn,
+  });
+
   // The dashboard stays mounted while the dismiss sheet is open, so re-read
   // the failed dismiss drafts on focus: a fresh failure must show a card and
-  // an accepted dismissal must drop it.
+  // an accepted dismissal must drop it. The same focus is the return from the
+  // settings screen a precondition copy sends the reader to.
   useFocusEffect(
     useCallback(() => {
       refreshDismissFailures();
       refreshOutbox();
-    }, [refreshDismissFailures, refreshOutbox])
+      clearSyncPreconditionFailure();
+    }, [refreshDismissFailures, refreshOutbox, clearSyncPreconditionFailure])
   );
 
   // A failed repositories fetch disables the filter controls until a refetch
@@ -217,8 +300,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   );
 
   const slaEnabled = config.data?.slaEnabled ?? true;
+  // The stored absence of a sync, the same read that paints "Not yet synced"
+  // under the filter: nothing has been measured yet, so the tiles and the
+  // priority row must not read their empty result as a clean report. A read
+  // that is still loading or failed is not this state.
+  const neverSynced = lastSync.data?.lastSyncTime === null;
   const data = dashboardStats.data;
-  const metrics = data ? buildLocalizedMetrics(data, slaEnabled) : [];
+  const metrics = data ? buildLocalizedMetrics(data, slaEnabled, neverSynced) : [];
 
   const lastSyncTime = lastSync.data?.lastSyncTime;
   const now = useRelativeTimeNow();
@@ -260,20 +348,45 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
   // A non-retryable sync outcome ended the intent, so both sync controls
   // disable and the inline copy below explains the state.
-  const syncBlocked = triggerSync.isError && !isSecuritySyncRetryable(triggerSync.error);
-  const syncDisabled = triggerSync.isPending || syncBlocked;
-  // React Query clears a mutation's error when the next attempt starts, so the
-  // failure copy and the retry under it blink out for the length of the retry —
-  // the screen looked like the tap did nothing. Hold the failure being retried,
-  // together with the intent that produced it, until that attempt reports its
-  // own outcome: a retry must resubmit the failed intent, not whatever filter
-  // the reader switched to meanwhile.
-  const [lastSyncAttempt, setLastSyncAttempt] = useState<{
-    error: Error | null;
-    intent: SyncIntent;
-  } | null>(null);
   const syncFailure = triggerSync.error ?? lastSyncAttempt?.error ?? null;
+  const syncPrecondition = securitySyncPreconditionFor(syncFailure);
+  const syncBlocked = syncFailure !== null && !isSecuritySyncRetryable(syncFailure);
+  const syncDisabled = triggerSync.isPending || syncBlocked;
   const syncRetryable = syncFailure !== null && isSecuritySyncRetryable(syncFailure);
+  // A precondition's fix is applied outside this screen, so the row offers that
+  // action instead of a Retry that would fail the same way: the in-app
+  // repository picker when nothing is in the sync scope, the GitHub App page
+  // when the connection itself is what blocks the sync.
+  let syncAction: { label: string; pending: boolean; handlePress: () => void } | null = null;
+  if (syncPrecondition === 'noRepositories') {
+    syncAction = {
+      label: t('securityAgent.dashboard.manageRepositories'),
+      pending: false,
+      handlePress: () => {
+        pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
+      },
+    };
+  } else if (syncPrecondition !== null) {
+    syncAction = {
+      label: t('securityAgent.repositories.manageAccess'),
+      pending: manageAccess?.pending === true,
+      handlePress: () => {
+        manageAccess?.handlePress();
+      },
+    };
+  } else if (syncRetryable) {
+    // The retry sits beside the sentence it retries and reports its own
+    // progress: a failed sync can settle in a blink, so the header icon's flash
+    // alone read as "nothing happened". It replays the intent that failed, not
+    // the filter the reader may have switched to since.
+    syncAction = {
+      label: t('common.retry'),
+      pending: triggerSync.isPending,
+      handlePress: () => {
+        startSync(lastSyncAttempt?.intent ?? { repoFullName });
+      },
+    };
+  }
 
   // One submit path for every control that starts a sync — the header button,
   // the empty-state action, the retry beside the failure copy, and a
@@ -314,12 +427,17 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     <View className="flex-1 bg-background">
       <ScreenHeader
         className="px-6"
-        title={t('common.securityAgent')}
-        // Size-11 (44dp) icon buttons: findings and settings, plus the audit
-        // overflow when the viewer can manage the agent. Declaring exactly the
-        // buttons this viewer renders drops the actions onto their own row
-        // before the one-line CJK title loses its readable minimum.
-        headerRightWidth={canManage ? 3 * 44 : 2 * 44}
+        title={scopeTitle}
+        eyebrow={t('common.securityAgent')}
+        // The scope name is the one thing that tells two organizations apart,
+        // so it wraps to a second line rather than ellipsizing its tail.
+        titleNumberOfLines={2}
+        // The trailing cluster's laid-out width — 48 dp icon boxes 7 dp apart:
+        // findings and settings, plus the audit overflow when the viewer can
+        // manage the agent. Declaring 44 dp boxes understated the cluster, so
+        // the stacking decision believed the heading kept 48 dp more than it
+        // has. The widths the controls actually render are what it reserves.
+        headerRightWidth={canManage ? 3 * 48 + 2 * 7 : 2 * 48 + 7}
         headerRight={
           <View className="flex-row items-center gap-2">
             <IconButton
@@ -426,23 +544,18 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             >
               {syncFailure.message}
             </Text>
-            {syncRetryable ? (
-              // The retry sits beside the sentence it retries and reports its
-              // own progress: a failed sync can settle in a blink, so the
-              // header icon's flash alone read as "nothing happened".
+            {syncAction ? (
               <Button
                 size="sm"
                 variant="ghost"
-                loading={triggerSync.isPending}
+                loading={syncAction.pending}
                 // A busy non-primary control dims itself, spinner included,
                 // which left the control the reader just pressed fainter than
                 // the header icon spinning beside it.
-                className={cn(triggerSync.isPending && 'opacity-100')}
-                onPress={() => {
-                  startSync(lastSyncAttempt?.intent ?? { repoFullName });
-                }}
+                className={cn(syncAction.pending && 'opacity-100')}
+                onPress={syncAction.handlePress}
               >
-                <Text>{t('common.retry')}</Text>
+                <Text>{syncAction.label}</Text>
               </Button>
             ) : null}
           </View>
@@ -495,7 +608,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                   {metric.label}
                 </Text>
                 <Text
-                  className={cn('font-mono text-xl font-semibold', METRIC_TONE_CLASS[metric.tone])}
+                  className={cn(
+                    'text-xl font-semibold tabular-nums',
+                    METRIC_TONE_CLASS[metric.tone]
+                  )}
                 >
                   {metric.value}
                 </Text>
@@ -509,41 +625,24 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
         {slaEnabled && data && data.sla.overall.total === 0 ? (
           <View className="flex-row items-center gap-4">
-            {/* Both actions take the shared row frame: `min-h-11` measured
-                38.5 dp here (NativeWind's rem is 14 pt), under the touch
-                floor, and the row only grows to the frame the header's icon
-                buttons already use. */}
-            <Pressable
-              onPress={() => {
-                startSync({ repoFullName });
-              }}
-              disabled={syncDisabled}
-              accessibilityRole="button"
-              accessibilityLabel={t('securityAgent.dashboard.syncFindings')}
-              accessibilityState={{
-                disabled: syncDisabled,
-                busy: triggerSync.isPending,
-              }}
-              className={cn(
-                ROW_TARGET_CLASS,
-                'flex-row items-center gap-1.5 active:opacity-70',
-                syncBlocked && 'opacity-50'
-              )}
-            >
-              {triggerSync.isPending && (
-                <SpinningIcon icon={RefreshCw} size={12} color={colors.mutedForeground} spinning />
-              )}
-              <Text className="text-xs font-medium text-primary">
-                {t('securityAgent.dashboard.syncFindings')}
-              </Text>
-            </Pressable>
+            {/* The refresh control in the filter row above is this screen's one
+                sync affordance; a second "Sync findings" link here repeated it
+                inside the empty state that points at the repositories instead.
+                The link takes the layout-neutral inline box: a 48 dp frame
+                around this `text-xs` line centred the text with 17 dp of its
+                own space above and below, so the link floated roughly twice as
+                far from its neighbours as the sections sit from each other. The
+                28 dp box is the audit's own minimum, the `-my-[7px]` cancels
+                the box's overflow so the line sits one section gap away, and
+                `hitSlop` carries the 44 dp touch region. */}
             <Pressable
               onPress={() => {
                 pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
               }}
+              hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
               accessibilityRole="button"
               accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
-              className={cn(ROW_TARGET_CLASS, 'justify-center active:opacity-70')}
+              className={cn(INLINE_LINK_BOX_CLASS, 'active:opacity-70')}
             >
               <Text className="text-xs font-medium text-primary">
                 {t('securityAgent.dashboard.manageRepositories')}
@@ -568,6 +667,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             data={data}
             slaEnabled={slaEnabled}
             repoFullName={repoFullName}
+            neverSynced={neverSynced}
           />
         ) : null}
       </TabScreenScrollView>

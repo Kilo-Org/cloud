@@ -42,6 +42,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   Switch: 'Switch',
   Platform: { OS: 'android' },
+  useColorScheme: () => 'light',
 }));
 vi.mock('@shopify/flash-list', () => ({
   FlashList: ({

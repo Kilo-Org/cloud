@@ -13,7 +13,7 @@ import {
   type AndroidNotificationChannelId,
   type PushData,
   pushDataSchema,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 import {
   NOTIFICATION_PERMISSION_RESPONDED_EVENT,
   NOTIFICATION_TOKEN_UPDATED_EVENT,
@@ -66,6 +66,7 @@ import { BACKGROUND_NOTIFICATION_TASK } from './notification-background-task';
 import {
   handleNeedsInputNotificationResponse,
   isNeedsInputActionIdentifier,
+  type NeedsInputActionDeps,
   pendingDeepLinkOptionsForData,
 } from './notification-actions';
 import { isAgentProgressAllowedInActiveFocus } from './notification-focus-filter';
@@ -622,11 +623,11 @@ export function setupNotificationBackgroundHandler(): void {
   void registerBackgroundNotificationTask();
 }
 
-export function setupNotificationResponseHandler() {
+export function setupNotificationResponseHandler(deps: NeedsInputActionDeps = {}) {
   const subscription = Notifications.addNotificationResponseReceivedListener(response => {
     // Our four action ids run headless or stash the deep link; any other
     // identifier keeps the tap path inside the handler.
-    void handleNeedsInputNotificationResponse(response);
+    void handleNeedsInputNotificationResponse(response, deps);
   });
 
   return subscription;

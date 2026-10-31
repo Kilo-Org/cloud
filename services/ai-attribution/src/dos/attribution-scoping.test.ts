@@ -23,21 +23,30 @@ jest.mock(
   { virtual: true }
 );
 
+/**
+ * The generated `drizzle/migrations` module imports `.sql` and `.json` files,
+ * which this jest setup does not transform, so the module is rebuilt here from
+ * the same inputs: the real journal and every migration file it names.
+ */
 jest.mock('../../drizzle/migrations', () => {
   const fs = jest.requireActual('node:fs') as {
     readFileSync: (file: string, encoding: 'utf8') => string;
   };
   const path = jest.requireActual('node:path') as { join: (...parts: string[]) => string };
+  const directory = path.join(__dirname, '../../drizzle');
+  const journal = JSON.parse(
+    fs.readFileSync(path.join(directory, 'meta/_journal.json'), 'utf8')
+  ) as { entries: { idx: number; tag: string }[] };
   return {
     __esModule: true,
     default: {
-      journal: { entries: [{ idx: 0, when: 1, tag: '0000', breakpoints: true }] },
-      migrations: {
-        m0000: fs.readFileSync(
-          path.join(__dirname, '../../drizzle/0000_youthful_alex_power.sql'),
-          'utf8'
-        ),
-      },
+      journal,
+      migrations: Object.fromEntries(
+        journal.entries.map(entry => [
+          `m${String(entry.idx).padStart(4, '0')}`,
+          fs.readFileSync(path.join(directory, `${entry.tag}.sql`), 'utf8'),
+        ])
+      ),
     },
   };
 });

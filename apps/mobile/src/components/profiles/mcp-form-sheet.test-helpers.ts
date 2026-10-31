@@ -33,7 +33,7 @@ export function McpFormFieldStub(props: {
 }
 
 /** A host stub keeps the component's own props untyped; these suites call one handler each. */
-export function voidHandler(value: unknown): () => void {
+function voidHandler(value: unknown): () => void {
   if (typeof value !== 'function') {
     throw new TypeError('expected a handler prop');
   }
@@ -49,7 +49,7 @@ export function booleanHandler(value: unknown): () => boolean {
 }
 
 /** A field stub's onChangeText arrives untyped from the host element. */
-export function textHandler(value: unknown): (text: string) => void {
+function textHandler(value: unknown): (text: string) => void {
   if (typeof value !== 'function') {
     throw new TypeError('expected a text handler');
   }
@@ -68,7 +68,7 @@ export function findOne(root: ReactTestInstance, type: string): ReactTestInstanc
   return node;
 }
 
-export function findField(root: ReactTestInstance, label: string): ReactTestInstance {
+function findField(root: ReactTestInstance, label: string): ReactTestInstance {
   const field = findAll(root, 'FormField').find(node => node.props.label === label);
   if (!field) {
     throw new Error(`field ${label} was not rendered`);

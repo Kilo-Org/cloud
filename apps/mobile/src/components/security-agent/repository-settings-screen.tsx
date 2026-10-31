@@ -196,6 +196,58 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
     repositoriesBody.status === 'error' ||
     (repositoriesBody.status === 'rows' && repositories.isError);
 
+  // An empty grant is the one repository state that is not about the mode: with
+  // nothing accessible there is nothing to select and nothing to sync whichever
+  // mode is stored, and widening the app's access is the only way out. Naming it
+  // only in `selected` mode left the disabled agent's "Select repositories" row
+  // landing on a screen whose only controls were the two mode choices. Only the
+  // classifier's delivered-empty answer reaches the section in `all` mode, so a
+  // cached `[]` under a failed read cannot render a label with no control.
+  const showRepositorySection = showRepositoryStates || repositoriesBody.status === 'empty';
+
+  // The GitHub settings page is where installation access is widened on the
+  // web, and `openExternalUrl` resolves when that page closes — on both
+  // platforms it awaits the browser's own dismissal (a launch it could not open
+  // is toasted by that helper and still resolves). Reading the repository list
+  // again on that return edge is what makes a grant show up here: without it the
+  // cached empty answer stays fresh for the whole stale window, and the disabled
+  // agent's enable rule counts exactly these repositories.
+  //
+  // The mint is only the hand-off token. An organization's mint needs
+  // `ORGANIZATION_MANAGE_ROLES` (`owner`/`admin`), which is narrower than this
+  // screen's `canManage` (`canManageOrganizationBilling` admits
+  // `billing_manager`), and `ensureOrganizationAccess` refuses the role with
+  // `UNAUTHORIZED`; an organization whose installation cannot take a second one
+  // is refused with `FORBIDDEN`. Both are ordinary states here, and both are
+  // exactly the empty-grant case this screen exists for. The web page mints
+  // its own state for the signed-in user, so any organization refusal falls
+  // back to the plain settings URL instead of leaving the control inert — the
+  // same rule the Code Reviewer's GitHub recovery control applies. A personal
+  // mint failure has no such page-level fallback to reach, so it keeps the
+  // toast.
+  const manageAccess = async () => {
+    const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
+    const open = async (url: string) => {
+      await openExternalUrl(url, {
+        label: t('securityAgent.repositories.githubAppSettings'),
+      });
+    };
+    try {
+      const { token } = await trpcClient.githubApps.mintInstallState.mutate({
+        organizationId: orgId ?? undefined,
+        returnTo: '/cloud/sessions',
+      });
+      await open(getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token));
+    } catch {
+      if (!orgId) {
+        toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
+        return;
+      }
+      await open(getGitHubIntegrationUrl(WEB_BASE_URL, orgId));
+    }
+    await repositories.refetch();
+  };
+
   // Everything above the rows (permission note, mode choice, and — in selected
   // mode — the loading / error / empty branches) rides on the list header so
   // the rendered order and paddings are unchanged from the ScrollView version.
@@ -223,11 +275,15 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
         ))}
       </RadioGroup>
 
-      {showRepositoryStates && (
+      {showRepositorySection && (
         <View className="mt-6">
-          <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
-            {t('common.repositories')}
-          </Text>
+          {/* The empty state's own title already says "No repositories", so a
+              section label above it only repeats the screen title. */}
+          {repositoriesBody.status === 'empty' ? null : (
+            <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
+              {t('common.repositories')}
+            </Text>
+          )}
           {repositoriesBody.status === 'loading' && (
             <View className="gap-3 pt-2">
               <Skeleton className="h-12 w-full rounded-lg" />
@@ -253,25 +309,18 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               icon={FolderGit2}
               title={t('securityAgent.repositories.noRepositories')}
               description={t('securityAgent.repositories.noRepositoriesDescription')}
+              iconContainerClassName="h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card dark:border-input dark:bg-secondary"
               action={
                 <Button
                   className={STATE_ACTION_CLASS}
-                  variant="outline"
+                  // Widening the grant is the only way out of this state, and
+                  // the header's Save is quiet while the screen has nothing to
+                  // save. The action therefore carries the filled primary
+                  // style instead of an outlined one that recedes into the
+                  // page beside it.
+                  variant="default"
                   onPress={() => {
-                    void (async () => {
-                      const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
-                      try {
-                        const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-                          organizationId: orgId ?? undefined,
-                          returnTo: '/cloud/sessions',
-                        });
-                        await openExternalUrl(getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token), {
-                          label: t('securityAgent.repositories.githubAppSettings'),
-                        });
-                      } catch {
-                        toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
-                      }
-                    })();
+                    void manageAccess();
                   }}
                 >
                   <Text>{t('securityAgent.repositories.manageAccess')}</Text>

@@ -63,7 +63,11 @@ export function ToggleRow({
         !disabled && 'active:opacity-70'
       )}
     >
-      <View className="flex-1 pr-3">
+      {/* `pe-3` keeps the gap between the text and the switch on the switch's
+          side in both directions. A physical `pr-3` mirrored the padding into
+          the text's box under RTL: the title kept its reduced width but started
+          at the padded edge, so it ran past the row's content box. */}
+      <View className="flex-1 pe-3">
         <Text className="text-sm font-medium">{title}</Text>
         {subtitle === undefined ? null : (
           <Text variant="muted" className="text-xs">

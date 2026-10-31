@@ -88,7 +88,7 @@ export function PrReviewTabSelector({
                 // `muted` equals the row's `secondary` in both palettes, so the
                 // badge fills with `muted-soft` to read as a pill at all.
                 <View className="min-w-5 items-center justify-center rounded-full bg-muted-soft px-1.5 py-0.5">
-                  <Text className="text-center text-[11px] font-medium leading-none text-foreground">
+                  <Text className="text-center text-[11px] font-medium text-foreground">
                     {badge}
                   </Text>
                 </View>

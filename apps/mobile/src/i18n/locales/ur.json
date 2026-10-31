@@ -163,7 +163,7 @@
     "allLanguages": "تمام زبانیں"
   },
   "login": {
-    "welcome": "Kilo میں خوش آمدید",
+    "welcome": "خوش آمدید",
     "retrySignIn": "دوبارہ سائن ان کریں",
     "logo": "Kilo کا لوگو",
     "continuingSignIn": "آپ کا سائن ان جاری ہے۔",
@@ -684,6 +684,7 @@
       "gitlabDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لینے کے لیے اپنا GitLab اکاؤنٹ منسلک کریں۔",
       "bitbucketDescription": "موبائل پر پل ریکویسٹس کا جائزہ لینے کے لیے Bitbucket کو اس تنظیم سے منسلک کریں۔",
       "bitbucketOrgOnlyDescription": "اس کی Bitbucket پل ریکویسٹس کا جائزہ لینے کے لیے اوپر موجود اکاؤنٹ کو ایک تنظیم پر تبدیل کریں۔",
+      "bitbucketOrgOnlyNoOrganizationDescription": "اس اکاؤنٹ کی ابھی تک کوئی تنظیم نہیں ہے۔ ایک تنظیم بنانے یا اس میں شامل ہونے پر آپ Bitbucket پل ریکویسٹس کا جائزہ لے سکتے ہیں۔",
       "contextLine": "{{organization}} کے لیے",
       "contextLinePersonal": "ذاتی اکاؤنٹ کے لیے"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub سے کنکشن کی مدت ختم ہو گئی۔",
-      "message": "آپ کا GitHub کنکشن اب قابل استعمال نہیں ہے۔ کنکشن دوبارہ چیک کریں — ضرورت پڑی تو آپ سے دوبارہ منسلک کرنے کو کہا جائے گا۔",
+      "message": "کنکشن دوبارہ چیک کریں — ضرورت پڑی تو آپ سے دوبارہ منسلک کرنے کو کہا جائے گا۔",
       "gitlabTitle": "GitLab سے کنکشن کی مدت ختم ہو گئی۔",
-      "bitbucketTitle": "Bitbucket سے کنکشن کی مدت ختم ہو گئی۔",
-      "providerMessage": "آپ کا {{provider}} کنکشن اب قابل استعمال نہیں ہے۔ کنکشن دوبارہ چیک کریں — ضرورت پڑی تو آپ سے دوبارہ منسلک کرنے کو کہا جائے گا۔"
+      "bitbucketTitle": "Bitbucket سے کنکشن کی مدت ختم ہو گئی۔"
     },
     "eventChips": {
       "comment": "تبصرہ",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "آپ کو GitLab پر مزید گروپس یا پروجیکٹس تک رسائی دینے کی ضرورت پڑ سکتی ہے۔",
       "installGithubApp": "ریپوزٹریز پر GitHub ایپ انسٹال کریں",
       "installGithubAppDescription": "Kilo کی GitHub ایپ کو ان ریپوزٹریز تک رسائی دیں جن کا آپ جائزہ کروانا چاہتے ہیں۔",
-      "repositoryAccess": "ریپوزٹری تک رسائی"
+      "repositoryAccess": "ریپوزٹری تک رسائی",
+      "allModePersonal": "ہر وہ ریپوزٹری جس تک Kilo آپ کے GitHub کنکشن کے ذریعے رسائی حاصل کر سکتا ہے، خودکار طور پر جائزہ لی جاتی ہے۔",
+      "allModeOrganization": "ہر وہ ریپوزٹری جس تک Kilo تنظیم کے GitHub کنکشن کے ذریعے رسائی حاصل کر سکتا ہے، خودکار طور پر جائزہ لی جاتی ہے۔",
+      "allModeCount": "دستیاب ریپوزٹریز: {{displayCount}}"
     },
     "style": {
       "title": "جائزے کا انداز",
@@ -1667,7 +1670,7 @@
       "outcome": "نتیجہ",
       "slaStatus": "SLA کی حالت",
       "sortBy": "ترتیب کی بنیاد",
-      "statusOpen": "کھولیں",
+      "statusOpen": "کھلا",
       "fixed": "درست شدہ",
       "statusIgnored": "نظر انداز کیا گیا",
       "severityHigh": "زیادہ",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "ابھی ہم آہنگ نہیں ہوا",
       "refreshFailed": "ڈیٹا تازہ نہیں ہو سکا — آخری بار ہم آہنگ کیا گیا ڈیٹا دکھایا جا رہا ہے۔",
       "settings": "ترتیبات",
-      "syncFindings": "مسائل ہم آہنگ کریں",
       "syncNow": "ابھی ہم آہنگ کریں",
       "syncQueued": "ہم آہنگی کی درخواست قطار میں شامل کر دی گئی",
       "syncStatusUnavailable": "ہم آہنگی کی حالت دستیاب نہیں ہے۔",
@@ -1841,7 +1843,7 @@
       "source": "ماخذ",
       "sourceId": "ماخذ کی شناخت",
       "viewAdvisory": "GitHub پر حفاظتی اطلاع دیکھیں",
-      "statusOpen": "کھولیں",
+      "statusOpen": "کھلا",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "اصلاح پہلے ہی شروع ہو چکی ہے",
       "reasonNoBandwidth": "وقت یا وسائل دستیاب نہیں",
@@ -2154,7 +2156,7 @@
     "sessionList": {
       "couldNotLoadActive": "فعال سیشنز لوڈ نہیں ہو سکے۔",
       "couldNotRefresh": "تازہ نہیں کیا جا سکا",
-      "noSessionsYetDescription": "اپنے فون سے کوڈنگ کا کام شروع کریں۔ آپ کے سیشن یہاں ظاہر ہوں گے۔",
+      "noSessionsYetDescription": "اپنے فون سے کوڈنگ کا کام شروع کریں۔",
       "viewHistory": "سیشنوں کی سرگزشت",
       "noMatches": "کوئی سیشن نہیں ملا",
       "tryDifferentSearch": "کسی اور لفظ سے تلاش کریں۔",
@@ -3854,6 +3856,7 @@
     "skillMarkdownLabel": "مہارت کا مواد",
     "skillsEmpty": "ابھی تک کوئی ہنر نہیں ہے۔",
     "skillNameRequired": "مہارت کا نام درج کریں۔",
+    "skillNameTooLong": "مہارت کا نام {{max}} حروف یا اس سے کم ہونا چاہیے",
     "skillNameInvalid": "ہنر کا نام ایک حرف یا ہندسے سے شروع ہونا چاہیے اور صرف چھوٹے حروف، ہندسوں اور ڈیشز کا استعمال کریں",
     "skillContentRequired": "مہارت کا مواد درکار ہے۔",
     "skillSaveFailed": "مہارت نہیں بچا سکا۔ دوبارہ کوشش کریں۔",

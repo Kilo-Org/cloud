@@ -163,7 +163,7 @@
     "allLanguages": "Tout lang"
   },
   "login": {
-    "welcome": "Byenvini nan Kilo",
+    "welcome": "Byenvini",
     "retrySignIn": "Eseye konekte ankò",
     "logo": "Logo Kilo a",
     "continuingSignIn": "N ap kontinye pwosesis koneksyon ou a.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Konekte kont GitLab ou pou w revize merge request sou mobil ou.",
       "bitbucketDescription": "Konekte Bitbucket ak òganizasyon sa a pou w revize demann fizyon sou mobil ou.",
       "bitbucketOrgOnlyDescription": "Chanje kont ki anwo a pou yon òganizasyon pou w revize demann fizyon Bitbucket li.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Kont sa a pa gen òganizasyon pou kounye a. Ou ka revize demann fizyon Bitbucket lè w kreye yon òganizasyon oswa rantre nan yon sèl.",
       "contextLine": "Pou {{organization}}",
       "contextLinePersonal": "Pou kont pèsonèl ou"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Koneksyon ak GitHub la ekspire.",
-      "message": "Koneksyon GitHub ou a pa valab ankò. Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè.",
+      "message": "Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè.",
       "gitlabTitle": "Koneksyon ak GitLab la ekspire.",
-      "bitbucketTitle": "Koneksyon ak Bitbucket la ekspire.",
-      "providerMessage": "Koneksyon {{provider}} ou a pa valab ankò. Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè."
+      "bitbucketTitle": "Koneksyon ak Bitbucket la ekspire."
     },
     "eventChips": {
       "comment": "Kòmantè",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Ou ka bezwen bay aksè nan plis gwoup oswa pwojè sou GitLab.",
       "installGithubApp": "Enstale aplikasyon GitHub la sou depo yo",
       "installGithubAppDescription": "Bay aplikasyon GitHub Kilo a aksè nan depo ou vle fè revize yo.",
-      "repositoryAccess": "aksè nan depo yo"
+      "repositoryAccess": "aksè nan depo yo",
+      "allModePersonal": "Chak depo Kilo ka jwenn aksè a atravè koneksyon GitHub ou a revize otomatikman.",
+      "allModeOrganization": "Chak depo Kilo ka jwenn aksè a atravè koneksyon GitHub òganizasyon an revize otomatikman.",
+      "allModeCount": "Depo ki disponib: {{displayCount}}"
     },
     "style": {
       "title": "Estil revizyon",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "Poko senkronize",
       "refreshFailed": "Nou pa t ka rafrechi done yo. N ap montre done ki te senkronize dènye fwa yo.",
       "settings": "Paramèt",
-      "syncFindings": "Senkronize konsta yo",
       "syncNow": "Senkronize kounye a",
       "syncQueued": "Senkronizasyon nan lis datant",
       "syncStatusUnavailable": "Estati senkronizasyon an pa disponib.",
@@ -2154,7 +2156,7 @@
     "sessionList": {
       "couldNotLoadActive": "Pa t ka chaje sesyon aktif yo.",
       "couldNotRefresh": "Pa t ka rafrechi",
-      "noSessionsYetDescription": "Kòmanse yon travay pwogramasyon sou telefòn ou. Sesyon ou yo ap parèt isit la.",
+      "noSessionsYetDescription": "Kòmanse yon travay pwogramasyon sou telefòn ou.",
       "viewHistory": "Istwa sesyon yo",
       "noMatches": "Pa gen sesyon ki koresponn",
       "tryDifferentSearch": "Eseye yon lòt mo pou rechèch la.",
@@ -3854,6 +3856,7 @@
     "skillMarkdownLabel": "Kontni konpetans",
     "skillsEmpty": "Pa gen ladrès ankò",
     "skillNameRequired": "Antre yon non konpetans",
+    "skillNameTooLong": "Non konpetans lan dwe gen {{max}} karaktè oswa mwens",
     "skillNameInvalid": "Non konpetans yo dwe kòmanse ak yon lèt oswa yon chif epi sèvi ak sèlman lèt miniskil, chif, ak tire",
     "skillContentRequired": "Kontni konpetans obligatwa",
     "skillSaveFailed": "Pa t 'kapab sove konpetans. Eseye ankò.",

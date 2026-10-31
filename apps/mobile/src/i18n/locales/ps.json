@@ -163,7 +163,7 @@
     "allLanguages": "ټولې ژبې"
   },
   "login": {
-    "welcome": "Kilo ته ښه راغلاست",
+    "welcome": "ښه راغلاست",
     "retrySignIn": "د ننوتلو بیا هڅه وکړئ",
     "logo": "د Kilo نښه",
     "continuingSignIn": "ستاسو د ننوتلو بهیر دوام لري.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "په موبایل کې د یوځای کولو د غوښتنو د بیاکتنې لپاره خپل GitLab حساب ونښلوئ.",
       "bitbucketDescription": "په موبایل کې د پول ریکویسټونو د بیاکتنې لپاره Bitbucket له دې بنسټ سره ونښلوئ.",
       "bitbucketOrgOnlyDescription": "د هغې د Bitbucket پول ریکویسټونو د بیاکتنې لپاره پورته حساب یو بنسټ ته وبدلئ.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "دا حساب تر اوسه هېڅ بنسټ نه لري. د Bitbucket پول ریکویسټونو بیاکتنه به وشي چې یو وخت تاسو یو بنسټ جوړ کړئ یا یو بنسټ ته ورشئ.",
       "contextLine": "{{organization}} لپاره",
       "contextLinePersonal": "د ستاسې د شخصي حساب لپاره"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "له GitHub سره د اړیکې موده پای ته ورسېده.",
-      "message": "ستاسو د GitHub اړیکه نور اعتبار نه لري. خپله اړیکه بیا وګورئ — که اړتیا وي، د بیا نښلولو غوښتنه به درڅخه وشي.",
+      "message": "خپله اړیکه بیا وګورئ — که اړتیا وي، د بیا نښلولو غوښتنه به درڅخه وشي.",
       "gitlabTitle": "له GitLab سره د اړیکې موده پای ته ورسېده.",
-      "bitbucketTitle": "له Bitbucket سره د اړیکې موده پای ته ورسېده.",
-      "providerMessage": "ستاسو د {{provider}} اړیکه نور اعتبار نه لري. خپله اړیکه بیا وګورئ — که اړتیا وي، د بیا نښلولو غوښتنه به درڅخه وشي."
+      "bitbucketTitle": "له Bitbucket سره د اړیکې موده پای ته ورسېده."
     },
     "eventChips": {
       "comment": "تبصره",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "ښايي په GitLab کې نورو ډلو یا پروژو ته هم د لاسرسي اجازه ورکړئ.",
       "installGithubApp": "په ذخیرو کې د GitHub اپ نصب کړئ",
       "installGithubAppDescription": "د Kilo د GitHub اپ ته هغو ذخیرو ته لاسرسی ورکړئ چې غواړئ بیاکتنه یې وشي.",
-      "repositoryAccess": "ذخیرې ته لاسرسی"
+      "repositoryAccess": "ذخیرې ته لاسرسی",
+      "allModePersonal": "هر هغه زېرمتون چې Kilo ستاسو د GitHub د اتصال له لارې ورته لاسرسی لري، اتوماتیکه بیاکتنه کیږي.",
+      "allModeOrganization": "هر هغه زېرمتون چې Kilo د سازمان د GitHub د اتصال له لارې ورته لاسرسی لري، اتوماتیکه بیاکتنه کیږي.",
+      "allModeCount": "د لاسرسي وړ زېرمتونونه: {{displayCount}}"
     },
     "style": {
       "title": "د بیاکتنې بڼه",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "تر اوسه هممهاله شوي نه دي",
       "refreshFailed": "معلومات تازه نه شول — وروستي هممهاله شوي معلومات ښودل کېږي.",
       "settings": "امستنې",
-      "syncFindings": "موندنې هممهاله کړئ",
       "syncNow": "اوس هممهاله کړئ",
       "syncQueued": "هممهاله کول په کتار کې واچول شول",
       "syncStatusUnavailable": "د هممهاله کېدو حالت نه دی معلوم.",
@@ -2154,7 +2156,7 @@
     "sessionList": {
       "couldNotLoadActive": "فعالې ناستې بار نه شوې.",
       "couldNotRefresh": "تازه نه شو",
-      "noSessionsYetDescription": "له خپل تلیفون څخه د کوډ کولو دنده پیل کړئ. ستاسو ناستې به دلته ښکاره شي.",
+      "noSessionsYetDescription": "له خپل تلیفون څخه د کوډ کولو دنده پیل کړئ.",
       "viewHistory": "د ناستو تاریخچه",
       "noMatches": "هېڅ ناسته سمون نه خوري",
       "tryDifferentSearch": "د لټون لپاره بله کلیمه وکاروئ.",
@@ -3854,6 +3856,7 @@
     "skillMarkdownLabel": "د مهارت منځپانګه",
     "skillsEmpty": "تراوسه هیڅ مهارت نه لري",
     "skillNameRequired": "د مهارت نوم دننه کړئ",
+    "skillNameTooLong": "د مهارت نوم باید {{max}} یا لږ توري ولري",
     "skillNameInvalid": "د مهارت نوم باید د یوه لیک یا عدد سره پیل شي او یوازې د کوچنیو حروفو، ګوتو او ډیشونو څخه کار واخلئ",
     "skillContentRequired": "د مهارت منځپانګې ته اړتیا ده",
     "skillSaveFailed": "مهارت نه شو ژغورلی. بیا هڅه وکړئ.",

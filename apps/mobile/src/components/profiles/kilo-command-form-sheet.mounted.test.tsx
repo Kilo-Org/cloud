@@ -23,8 +23,8 @@ vi.mock('react-native', async () => {
     useImperativeHandle,
   } = await import('react');
   return {
-    useColorScheme: () => 'light',
     Platform: { OS: 'ios' },
+    useColorScheme: () => 'light',
     View: 'View',
     Switch: 'Switch',
     ScrollView: forwardRef(function ScrollViewStub(

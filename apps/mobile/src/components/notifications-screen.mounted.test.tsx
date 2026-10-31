@@ -42,7 +42,6 @@ const { openSettings, setLiveActivityEnabled, liveActivityEnabled, systemAllowsL
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
-  useColorScheme: () => 'light',
   View: 'View',
   Switch: 'Switch',
   Pressable: 'Pressable',
@@ -50,6 +49,7 @@ vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   Linking: { openSettings: openSettings },
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
 }));
 // The Live Activity row: the preference is SecureStore-backed and the system
 // switch is a native read, so both are stubbed the way every other native

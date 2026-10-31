@@ -163,7 +163,7 @@
     "allLanguages": "Alle språk"
   },
   "login": {
-    "welcome": "Velkommen til Kilo",
+    "welcome": "Velkommen",
     "retrySignIn": "Prøv å logge inn igjen",
     "logo": "Kilo-logo",
     "continuingSignIn": "Fortsetter innloggingen.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Koble til GitLab-kontoen din for å gå gjennom merge requests på mobilen.",
       "bitbucketDescription": "Koble Bitbucket til denne organisasjonen for å gå gjennom PR-er på mobilen.",
       "bitbucketOrgOnlyDescription": "Bytt kontoen over til en organisasjon for å gå gjennom dens PR-er på Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Denne kontoen har ingen organisasjoner ennå. Du kan gå gjennom PR-er på Bitbucket når du oppretter eller blir med i en organisasjon.",
       "contextLine": "For {{organization}}",
       "contextLinePersonal": "For personlig konto"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub-tilkoblingen er utløpt.",
-      "message": "GitHub-tilkoblingen din er ikke lenger gyldig. Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov.",
+      "message": "Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov.",
       "gitlabTitle": "GitLab-tilkoblingen er utløpt.",
-      "bitbucketTitle": "Bitbucket-tilkoblingen er utløpt.",
-      "providerMessage": "{{provider}}-tilkoblingen din er ikke lenger gyldig. Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov."
+      "bitbucketTitle": "Bitbucket-tilkoblingen er utløpt."
     },
     "eventChips": {
       "comment": "Kommenter",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Du må kanskje gi tilgang til flere grupper eller prosjekter på GitLab.",
       "installGithubApp": "Installer GitHub-appen for kodelagre",
       "installGithubAppDescription": "Gi Kilos GitHub-app tilgang til kodelagrene du vil ha gjennomgått.",
-      "repositoryAccess": "tilgang til kodelagre"
+      "repositoryAccess": "tilgang til kodelagre",
+      "allModePersonal": "Hvert kodelager som Kilo kan få tilgang til gjennom GitHub-tilkoblingen din, blir gjennomgått automatisk.",
+      "allModeOrganization": "Hvert kodelager som Kilo kan få tilgang til gjennom organisasjonens GitHub-tilkobling, blir gjennomgått automatisk.",
+      "allModeCount": "Tilgjengelige kodelagre: {{displayCount}}"
     },
     "style": {
       "title": "Gjennomgangsstil",
@@ -1667,7 +1670,7 @@
       "outcome": "Utfall",
       "slaStatus": "SLA-status",
       "sortBy": "Sorter etter",
-      "statusOpen": "Åpne",
+      "statusOpen": "Åpent",
       "fixed": "Rettet",
       "statusIgnored": "Ignorert",
       "severityHigh": "Høy",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "Ikke synkronisert ennå",
       "refreshFailed": "Kunne ikke oppdatere. Viser de sist synkroniserte dataene.",
       "settings": "Innstillinger",
-      "syncFindings": "Synkroniser funn",
       "syncNow": "Synkroniser nå",
       "syncQueued": "Synkronisering i kø",
       "syncStatusUnavailable": "Synkroniseringsstatusen er ikke tilgjengelig.",
@@ -1841,7 +1843,7 @@
       "source": "Kilde",
       "sourceId": "Kilde-ID",
       "viewAdvisory": "Vis sikkerhetsvarsel på GitHub",
-      "statusOpen": "Åpne",
+      "statusOpen": "Åpent",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "retting er allerede i gang",
       "reasonNoBandwidth": "ingen ledig kapasitet",
@@ -2154,7 +2156,7 @@
     "sessionList": {
       "couldNotLoadActive": "Kunne ikke laste inn aktive økter.",
       "couldNotRefresh": "Kunne ikke oppdatere",
-      "noSessionsYetDescription": "Start en kodeoppgave fra telefonen din. Øktene dine vises her.",
+      "noSessionsYetDescription": "Start en kodeoppgave fra telefonen din.",
       "viewHistory": "Økthistorikk",
       "noMatches": "Ingen økter passer til søket",
       "tryDifferentSearch": "Prøv et annet søkeord.",
@@ -3854,6 +3856,7 @@
     "skillMarkdownLabel": "Ferdighetsinnhold",
     "skillsEmpty": "Ingen ferdigheter ennå",
     "skillNameRequired": "Skriv inn et ferdighetsnavn",
+    "skillNameTooLong": "Ferdighetsnavn må være {{max}} tegn eller færre",
     "skillNameInvalid": "Ferdighetsnavn må starte med en bokstav eller et siffer og kun bruke små bokstaver, sifre og bindestreker",
     "skillContentRequired": "Ferdighetsinnhold kreves",
     "skillSaveFailed": "Kunne ikke lagre ferdigheter. Prøv igjen.",

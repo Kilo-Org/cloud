@@ -163,7 +163,7 @@
     "allLanguages": "Të gjitha gjuhët"
   },
   "login": {
-    "welcome": "Mirë se erdhe në Kilo",
+    "welcome": "Mirë se erdhe",
     "retrySignIn": "Riprovo hyrjen",
     "logo": "Logoja e Kilo",
     "continuingSignIn": "Po vazhdon hyrja jote.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Lidho llogarinë tënde GitLab për të rishikuar kërkesat e integrimit në celular.",
       "bitbucketDescription": "Lidho Bitbucket me këtë organizatë për të rishikuar kërkesat për bashkim në celular.",
       "bitbucketOrgOnlyDescription": "Ndrysho llogarinë e mësipërme në një organizatë për të rishikuar kërkesat për bashkim në Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Kjo llogari nuk ka ende organizata. Kërkesat për bashkim në Bitbucket mund të rishikohen sapo të krijosh ose të bëhesh pjesë e një organizate.",
       "contextLine": "Për {{organization}}",
       "contextLinePersonal": "Për llogarinë personale"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Lidhja me GitHub skadoi.",
-      "message": "Lidhja jote me GitHub nuk është më e vlefshme. Rikontrollo lidhjen — do të të kërkohet të rilidhesh nëse është e nevojshme.",
+      "message": "Rikontrollo lidhjen — do të të kërkohet të rilidhesh nëse është e nevojshme.",
       "gitlabTitle": "Lidhja me GitLab skadoi.",
-      "bitbucketTitle": "Lidhja me Bitbucket skadoi.",
-      "providerMessage": "Lidhja jote me {{provider}} nuk është më e vlefshme. Rikontrollo lidhjen — do të të kërkohet të rilidhesh nëse është e nevojshme."
+      "bitbucketTitle": "Lidhja me Bitbucket skadoi."
     },
     "eventChips": {
       "comment": "Koment",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Mund të të duhet të japësh qasje në më shumë grupe ose projekte në GitLab.",
       "installGithubApp": "Instalo aplikacionin GitHub në depot",
       "installGithubAppDescription": "Jepi aplikacionit Kilo për GitHub qasje në depot që dëshiron të shqyrtohen.",
-      "repositoryAccess": "qasja në depot"
+      "repositoryAccess": "qasja në depot",
+      "allModePersonal": "Çdo depo që Kilo mund ta aksesojë përmes lidhjes tënde me GitHub shqyrtohet automatikisht.",
+      "allModeOrganization": "Çdo depo që Kilo mund ta aksesojë përmes lidhjes së organizatës me GitHub shqyrtohet automatikisht.",
+      "allModeCount": "Depo të disponueshme: {{displayCount}}"
     },
     "style": {
       "title": "Stili i shqyrtimit",
@@ -1667,7 +1670,7 @@
       "outcome": "Rezultati",
       "slaStatus": "Statusi i SLA-së",
       "sortBy": "Renditja sipas",
-      "statusOpen": "Hapje",
+      "statusOpen": "Hapur",
       "fixed": "E rregulluar",
       "statusIgnored": "E injoruar",
       "severityHigh": "E lartë",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "Ende pa u sinkronizuar",
       "refreshFailed": "Nuk u rifreskua — po shfaqen të dhënat e sinkronizimit të fundit.",
       "settings": "Cilësimet",
-      "syncFindings": "Sinkronizo gjetjet",
       "syncNow": "Sinkronizo tani",
       "syncQueued": "Sinkronizimi u vendos në radhë",
       "syncStatusUnavailable": "Statusi i sinkronizimit nuk është i disponueshëm.",
@@ -1841,7 +1843,7 @@
       "source": "Burimi",
       "sourceId": "ID e burimit",
       "viewAdvisory": "Shiko njoftimin e sigurisë në GitHub",
-      "statusOpen": "Hapje",
+      "statusOpen": "Hapur",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "rregullimi ka filluar tashmë",
       "reasonNoBandwidth": "mungojnë burimet për ta trajtuar",
@@ -2154,7 +2156,7 @@
     "sessionList": {
       "couldNotLoadActive": "Nuk u ngarkuan seancat aktive.",
       "couldNotRefresh": "Rifreskimi dështoi",
-      "noSessionsYetDescription": "Nis një detyrë programimi nga telefoni yt. Seancat e tua do të shfaqen këtu.",
+      "noSessionsYetDescription": "Nis një detyrë programimi nga telefoni yt.",
       "viewHistory": "Historiku i seancave",
       "noMatches": "Asnjë seancë nuk përputhet",
       "tryDifferentSearch": "Provo një term tjetër kërkimi.",
@@ -3854,6 +3856,7 @@
     "skillMarkdownLabel": "Përmbajtja e aftësive",
     "skillsEmpty": "Ende nuk ka aftësi",
     "skillNameRequired": "Futni një emër aftësie",
+    "skillNameTooLong": "Emri i aftësisë duhet të ketë {{max}} karaktere ose më pak",
     "skillNameInvalid": "Emri i aftësisë duhet të fillojë me një shkronjë ose shifër dhe të përdorë vetëm shkronja të vogla, shifra dhe viza",
     "skillContentRequired": "Kërkohet përmbajtja e aftësive",
     "skillSaveFailed": "Aftësia nuk mund të kursehej. Provoni përsëri.",

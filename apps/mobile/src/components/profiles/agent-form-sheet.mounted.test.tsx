@@ -30,8 +30,8 @@ vi.mock('react-native', async () => {
     useImperativeHandle,
   } = await import('react');
   return {
-    useColorScheme: () => 'light',
     Platform: { OS: 'ios' },
+    useColorScheme: () => 'light',
     View: 'View',
     Pressable: 'Pressable',
     Switch: 'Switch',

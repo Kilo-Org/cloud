@@ -163,7 +163,7 @@
     "allLanguages": "Asụsụ niile"
   },
   "login": {
-    "welcome": "Nnọọ na Kilo",
+    "welcome": "Nnọọ",
     "retrySignIn": "Nwaa ịbanye ọzọ",
     "logo": "Akara Kilo",
     "continuingSignIn": "A na-aga n'ihu na nbanye gị.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Jikọọ akaụntụ GitLab gị iji nyochaa arịrịọ njikọta na ekwentị.",
       "bitbucketDescription": "Jikọọ Bitbucket na òtù a iji nyochaa arịrịọ ijikọ koodu na ekwentị.",
       "bitbucketOrgOnlyDescription": "Gbanwee akaụntụ dị n'elu gaa n'òtụ iji nyochaa arịrịọ ijikọ koodu Bitbucket ya.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Akaụntụ a enweghị òtù ọ bụla ruo ugbu a. Enwere ike ịnyochaa arịrịọ ijikọ koodu Bitbucket ozugbo ị mepụtara òtụ ma ọ bụ sonye na òtụ.",
       "contextLine": "Maka {{organization}}",
       "contextLinePersonal": "Maka nkeonwe"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Oge njikọ GitHub agwụla.",
-      "message": "Njikọ GitHub gị adịkwaghị irè. Lelee njikọ gị ọzọ — a ga-agwa gị ka ị jikọtaghachi ma ọ bụrụ na ọ dị mkpa.",
+      "message": "Lelee njikọ gị ọzọ — a ga-agwa gị ka ị jikọtaghachi ma ọ bụrụ na ọ dị mkpa.",
       "gitlabTitle": "Oge njikọ GitLab agwụla.",
-      "bitbucketTitle": "Oge njikọ Bitbucket agwụla.",
-      "providerMessage": "Njikọ {{provider}} gị adịkwaghị irè. Lelee njikọ gị ọzọ — a ga-agwa gị ka ị jikọtaghachi ma ọ bụrụ na ọ dị mkpa."
+      "bitbucketTitle": "Oge njikọ Bitbucket agwụla."
     },
     "eventChips": {
       "comment": "Nkwupụta",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "O nwere ike ịdị mkpa inye ikike ịnweta otu ma ọ bụ ọrụ ndị ọzọ na GitLab.",
       "installGithubApp": "Wụnye ngwa GitHub na ebe nchekwa",
       "installGithubAppDescription": "Nye ngwa Kilo maka GitHub ikike ịnweta ebe nchekwa ịchọrọ ka a nyochaa.",
-      "repositoryAccess": "ikike ịnweta ebe nchekwa"
+      "repositoryAccess": "ikike ịnweta ebe nchekwa",
+      "allModePersonal": "A na-enyocha akpaaka ebe nchekwa ọ bụla Kilo nwere ike ịnweta site na njikọ GitHub gị.",
+      "allModeOrganization": "A na-enyocha akpaaka ebe nchekwa ọ bụla Kilo nwere ike ịnweta site na njikọ GitHub nke otu a.",
+      "allModeCount": "Ebe nchekwa dị: {{displayCount}}"
     },
     "style": {
       "title": "Ụdị nyocha",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "E mekọrịtabeghị data",
       "refreshFailed": "Enweghị ike ime ka data dị ọhụrụ. A na-egosi data sitere na mmekọrịta ikpeazụ.",
       "settings": "Ntọala",
-      "syncFindings": "Mekọrịta data ihe achọpụtara",
       "syncNow": "Mekọrịta data ugbu a",
       "syncQueued": "E tinyela mmekọrịta data n'ahịrị nchere",
       "syncStatusUnavailable": "Enweghị ike ịnweta ọnọdụ mmekọrịta data.",
@@ -2154,7 +2156,7 @@
     "sessionList": {
       "couldNotLoadActive": "Enweghị ike ibudata nnọkọ na-arụ ọrụ.",
       "couldNotRefresh": "Enweghị ike ibugharịa",
-      "noSessionsYetDescription": "Malite ọrụ ide koodu site na ekwentị gị. Nnọkọ gị ga-apụta ebe a.",
+      "noSessionsYetDescription": "Malite ọrụ ide koodu site na ekwentị gị.",
       "viewHistory": "Ndekọ nnọkọ",
       "noMatches": "Enweghị nnọkọ dabara",
       "tryDifferentSearch": "Nwaa okwu ọchụchọ dị iche.",
@@ -3854,6 +3856,7 @@
     "skillMarkdownLabel": "Ọdịnaya nka",
     "skillsEmpty": "Enweghị nka ma",
     "skillNameRequired": "Tinye aha nka",
+    "skillNameTooLong": "Aha nka ga-abụ {{max}} mkpụrụedemede ma ọ bụ obere",
     "skillNameInvalid": "Aha nka ga-ebidorịrị site na mkpụrụedemede ma ọ bụ mkpụrụọnụọgụgụ ma jiri naanị obere mkpụrụedemede, mkpụrụọnụọgụgụ na ngwucha",
     "skillContentRequired": "Achọrọ ọdịnaya nka",
     "skillSaveFailed": "Enweghị ike ichekwa nka. Nwaa ọzọ.",

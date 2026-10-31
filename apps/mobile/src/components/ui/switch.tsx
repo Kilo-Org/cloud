@@ -1,10 +1,23 @@
 import { Switch as NativeSwitch, Platform, type SwitchProps, useColorScheme } from 'react-native';
 
-import { darkColors } from '@/lib/hooks/theme-colors.generated';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 /**
- * The native `Switch` with its disabled state mirrored into
- * `accessibilityState`.
+ * The native `Switch`, painted with the app palette, with its disabled state
+ * mirrored into `accessibilityState`.
+ *
+ * Untinted, the control draws its on-track with the platform accent, a
+ * saturated teal on Android that belongs to no palette entry. In a list row
+ * that outranks the row title and the screen's own button, so the track takes
+ * the scheme's `primary` and the grip its `primaryForeground`, which keeps the
+ * two legible against each other in light and dark.
+ *
+ * The off pair follows the scheme as well, because a grip that always takes
+ * `primaryForeground` is near-black in dark mode and vanishes into the off
+ * track. Off draws a light grip on a lighter track, so the control still reads
+ * as a control while it says off: `mutedSoft` with a white grip in light,
+ * `mutedForeground` with a `foreground` grip in dark. A caller that wants
+ * another pair still wins: its own props are applied last.
  *
  * Fabric derives the accessibility traits from the role and
  * `accessibilityState`, then assigns them to the native control, replacing the
@@ -12,26 +25,32 @@ import { darkColors } from '@/lib/hooks/theme-colors.generated';
  * `disabled` but not the matching state, so a switch that cannot be toggled
  * still announces itself as enabled. Android already folds `disabled` into that
  * state; doing it here keeps both platforms honest.
- *
- * Android fills an off switch's track from the theme's control color, which in
- * the dark theme is all but the card's own fill: the track disappears and only
- * the thumb reads, unlike the light theme, where the track stays a gray band.
- * The off track therefore takes `mutedSoft` in the dark theme — the one neutral
- * the theme guarantees differs from the card — and every other combination of
- * platform, theme and state keeps the platform colors.
  */
-export function Switch({ disabled, accessibilityState, trackColor, ...props }: SwitchProps) {
+export function Switch({
+  disabled,
+  accessibilityState,
+  trackColor,
+  thumbColor,
+  value,
+  ...props
+}: SwitchProps) {
+  const colors = useThemeColors();
+  const dark = useColorScheme() === 'dark';
   const resolvedDisabled = disabled ?? accessibilityState?.disabled;
-  const colorScheme = useColorScheme();
-  const darkOffTrack =
-    Platform.OS === 'android' && colorScheme === 'dark' ? darkColors.mutedSoft : undefined;
-  const resolvedTrackColor =
-    darkOffTrack === undefined ? trackColor : { ...trackColor, false: darkOffTrack };
+  // The on grip sits on `primary`, the off grip on the off track.
+  const offGrip = dark ? colors.foreground : colors.primaryForeground;
 
   return (
     <NativeSwitch
       {...props}
-      trackColor={resolvedTrackColor}
+      value={value}
+      trackColor={
+        trackColor ?? {
+          false: dark ? colors.mutedForeground : colors.mutedSoft,
+          true: colors.primary,
+        }
+      }
+      thumbColor={thumbColor ?? (value ? colors.primaryForeground : offGrip)}
       disabled={resolvedDisabled}
       accessibilityState={
         Platform.OS === 'ios'

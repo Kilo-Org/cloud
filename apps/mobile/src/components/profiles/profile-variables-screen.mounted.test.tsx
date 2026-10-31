@@ -47,8 +47,8 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
-  useColorScheme: () => 'light',
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',

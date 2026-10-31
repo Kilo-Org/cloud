@@ -39,12 +39,12 @@ vi.mock('@/components/centered-state-surface', () => ({
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
-  useColorScheme: () => 'light',
   Switch: 'Switch',
   Pressable: 'Pressable',
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'android' },
+  useColorScheme: () => 'light',
   AccessibilityInfo: {},
   AppState: { currentState: 'active', addEventListener: () => ({ remove: () => undefined }) },
 }));

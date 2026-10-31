@@ -29,6 +29,12 @@ type NewSessionRepositorySectionProps = {
   isRetrying: boolean;
   onChange: (fullName: string) => void;
   onConnect: (platform: RepositoryPlatform) => void;
+  /**
+   * The provider whose connect flow is running, or null. That provider's own
+   * open control shows the busy state, so the network round trip at the start of
+   * the flow never reads as an inert tap.
+   */
+  connectingProvider?: RepositoryPlatform | null;
   onRefreshRepos: () => void;
   repositories: NewSessionRepository[];
   /** Recently used rows for the picker's "Recently used" section. */
@@ -62,6 +68,7 @@ export function NewSessionRepositorySection({
   isRetrying,
   onChange,
   onConnect,
+  connectingProvider = null,
   onRefreshRepos,
   repositories,
   recents,
@@ -157,6 +164,7 @@ export function NewSessionRepositorySection({
           <RepositoryUnavailableCard
             platform={platform}
             onConnect={onConnect}
+            isConnecting={connectingProvider === platform}
             onRefreshRepos={onRefreshRepos}
             isRetrying={isRetrying}
           />
@@ -236,6 +244,7 @@ export function NewSessionRepositorySection({
         platform={platform}
         labelKey={selectedRepository === null ? copy.openLabel : copy.connectTitle}
         onConnect={onConnect}
+        isConnecting={connectingProvider === platform}
         onRefreshRepos={onRefreshRepos}
         isRetrying={isRetrying}
       />

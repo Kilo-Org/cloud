@@ -35,8 +35,8 @@ const queryError = vi.hoisted(() => ({
 const skeletonRenders = vi.hoisted(() => ({ count: 0 }));
 
 vi.mock('react-native', () => ({
-  useColorScheme: () => 'light',
   Platform: { OS: 'android' },
+  useColorScheme: () => 'light',
   View: 'View',
   Switch: 'Switch',
 }));

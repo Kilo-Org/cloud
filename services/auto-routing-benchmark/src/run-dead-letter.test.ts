@@ -76,6 +76,7 @@ const claim = {
   slot: 3,
   token: 'owned-token',
   attempts: 2,
+  throttle_deferrals: 0,
 } satisfies SchedulerClaim;
 const env = {
   BENCH_DB: { prepare: schedulerPrepare } as unknown as D1Database,

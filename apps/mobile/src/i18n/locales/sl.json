@@ -163,7 +163,7 @@
     "allLanguages": "Vsi jeziki"
   },
   "login": {
-    "welcome": "Dobrodošel v aplikaciji Kilo",
+    "welcome": "Dobrodošel",
     "retrySignIn": "Znova poskusi s prijavo",
     "logo": "Logotip Kilo",
     "continuingSignIn": "Nadaljujemo tvojo prijavo.",
@@ -714,6 +714,7 @@
       "gitlabDescription": "Poveži svoj račun GitLab, da lahko pregleduješ merge requeste na mobilni napravi.",
       "bitbucketDescription": "Poveži Bitbucket s to organizacijo, da lahko pregleduješ zahtevke za združitev na mobilni napravi.",
       "bitbucketOrgOnlyDescription": "Preklopi zgornji račun na organizacijo, da lahko pregleduješ njene zahtevke za združitev na Bitbucktu.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Ta račun še nima nobenih organizacij. Zahtevke za združitev na Bitbucktu boš lahko pregledoval, ko ustvariš organizacijo ali se ji pridružiš.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za osebni račun"
     },
@@ -739,10 +740,9 @@
     },
     "reconnectNotice": {
       "title": "Povezava z računom GitHub je potekla.",
-      "message": "Tvoja povezava z GitHubom ni več veljavna. Znova jo preveri. Po potrebi te bomo pozvali k ponovni povezavi.",
+      "message": "Znova jo preveri. Po potrebi te bomo pozvali k ponovni povezavi.",
       "gitlabTitle": "Povezava z računom GitLab je potekla.",
-      "bitbucketTitle": "Povezava z računom Bitbucket je potekla.",
-      "providerMessage": "Tvoja povezava z {{provider}}om ni več veljavna. Znova jo preveri. Po potrebi te bomo pozvali k ponovni povezavi."
+      "bitbucketTitle": "Povezava z računom Bitbucket je potekla."
     },
     "eventChips": {
       "comment": "Komentar",
@@ -1471,7 +1471,10 @@
       "gitlabNoRepositoriesDescription": "Morda moraš odobriti dostop do več skupin ali projektov na platformi GitLab.",
       "installGithubApp": "Namestitev aplikacije GitHub v skladišča",
       "installGithubAppDescription": "Aplikaciji Kilo za GitHub odobri dostop do skladišč, ki jih želiš pregledati.",
-      "repositoryAccess": "dostop do skladišč"
+      "repositoryAccess": "dostop do skladišč",
+      "allModePersonal": "Vsako skladišče, do katerega lahko Kilo dostopa prek tvoje povezave z GitHubom, se samodejno pregleda.",
+      "allModeOrganization": "Vsako skladišče, do katerega lahko Kilo dostopa prek povezave organizacije z GitHubom, se samodejno pregleda.",
+      "allModeCount": "Razpoložljiva skladišča: {{displayCount}}"
     },
     "style": {
       "title": "Slog pregleda",
@@ -1824,7 +1827,6 @@
       "notYetSynced": "Še ni sinhronizirano",
       "refreshFailed": "Osvežitev ni uspela. Prikazani so podatki zadnje sinhronizacije.",
       "settings": "Nastavitve",
-      "syncFindings": "Sinhroniziraj ugotovitve",
       "syncNow": "Sinhroniziraj zdaj",
       "syncQueued": "Sinhronizacija v čakalni vrsti",
       "syncStatusUnavailable": "Stanje sinhronizacije ni na voljo.",
@@ -2212,7 +2214,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktivnih sej ni bilo mogoče naložiti.",
       "couldNotRefresh": "Osvežitev ni uspela",
-      "noSessionsYetDescription": "Začni programsko nalogo s telefona. Tvoje seje se bodo prikazale tukaj.",
+      "noSessionsYetDescription": "Začni programsko nalogo s telefona.",
       "viewHistory": "Zgodovina sej",
       "noMatches": "Ni ustreznih sej",
       "tryDifferentSearch": "Poskusi z drugim iskalnim izrazom.",
@@ -3954,6 +3956,7 @@
     "skillMarkdownLabel": "Vsebina spretnosti",
     "skillsEmpty": "Ni še veščin",
     "skillNameRequired": "Vnesite ime spretnosti",
+    "skillNameTooLong": "Ime spretnosti mora imeti {{max}} znakov ali manj",
     "skillNameInvalid": "Ime spretnosti se mora začeti s črko ali številko in uporabljati samo male črke, številke in pomišljaje",
     "skillContentRequired": "Potrebna je vsebina spretnosti",
     "skillSaveFailed": "Spretnosti ni bilo mogoče shraniti. Poskusite znova.",

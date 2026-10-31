@@ -163,7 +163,7 @@
     "allLanguages": "Il-lingwi kollha"
   },
   "login": {
-    "welcome": "Merħba f'Kilo",
+    "welcome": "Merħba",
     "retrySignIn": "Erġa' idħol",
     "logo": "Logo ta' Kilo",
     "continuingSignIn": "Il-proċess tad-dħul tiegħek qed ikompli.",
@@ -729,6 +729,7 @@
       "gitlabDescription": "Ikkonnettja l-kont GitLab tiegħek biex tirrevedi l-merge requests fuq il-mowbajl.",
       "bitbucketDescription": "Ikkonnettja Bitbucket ma' din l-organizzazzjoni biex tirrevedi l-PRs fuq il-mowbajl.",
       "bitbucketOrgOnlyDescription": "Ibdel il-kont ta' fuq għal organizzazzjoni biex tirrevedi l-PRs Bitbucket tagħha.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Dan il-kont m'għandux organizzazzjonijiet għadu. Tista' tirrevedi l-PRs Bitbucket ladarba toħloq organizzazzjoni jew tingħaqad ma' waħda.",
       "contextLine": "Għal {{organization}}",
       "contextLinePersonal": "Għall-kont personali tiegħek"
     },
@@ -755,10 +756,9 @@
     },
     "reconnectNotice": {
       "title": "Il-konnessjoni ma' GitHub skadiet.",
-      "message": "Il-konnessjoni tiegħek ma' GitHub m'għadhiex valida. Erġa' ċċekkja l-konnessjoni — jekk ikun hemm bżonn, tintalab terġa' tikkonnettja.",
+      "message": "Erġa' ċċekkja l-konnessjoni — jekk ikun hemm bżonn, tintalab terġa' tikkonnettja.",
       "gitlabTitle": "Il-konnessjoni ma' GitLab skadiet.",
-      "bitbucketTitle": "Il-konnessjoni ma' Bitbucket skadiet.",
-      "providerMessage": "Il-konnessjoni tiegħek ma' {{provider}} m'għadhiex valida. Erġa' ċċekkja l-konnessjoni — jekk ikun hemm bżonn, tintalab terġa' tikkonnettja."
+      "bitbucketTitle": "Il-konnessjoni ma' Bitbucket skadiet."
     },
     "eventChips": {
       "comment": "Kumment",
@@ -1493,7 +1493,10 @@
       "gitlabNoRepositoriesDescription": "Jista' jkollok bżonn tagħti aċċess għal aktar gruppi jew proġetti fuq GitLab.",
       "installGithubApp": "Installa l-app ta' GitHub fuq ir-repożitorji",
       "installGithubAppDescription": "Agħti lill-app ta' Kilo fuq GitHub aċċess għar-repożitorji li trid jiġu riveduti.",
-      "repositoryAccess": "aċċess għar-repożitorju"
+      "repositoryAccess": "aċċess għar-repożitorju",
+      "allModePersonal": "Kull repożitorju li Kilo jista' jaċċessa permezz tal-konnessjoni tiegħek ma' GitHub jiġi rivedut awtomatikament.",
+      "allModeOrganization": "Kull repożitorju li Kilo jista' jaċċessa permezz tal-konnessjoni tal-organizzazzjoni ma' GitHub jiġi rivedut awtomatikament.",
+      "allModeCount": "Repożitorji disponibbli: {{displayCount}}"
     },
     "style": {
       "title": "Stil ta' reviżjoni",
@@ -1733,7 +1736,7 @@
       "outcome": "Riżultat",
       "slaStatus": "Stat tas-SLA",
       "sortBy": "Irranġa skont",
-      "statusOpen": "Ftuħ",
+      "statusOpen": "Miftuħa",
       "fixed": "Imsewwija",
       "statusIgnored": "Injorata",
       "severityHigh": "Għoli",
@@ -1847,7 +1850,6 @@
       "notYetSynced": "Għadu mhux sinkronizzat",
       "refreshFailed": "Ma setgħetx tiġi aġġornata d-dejta. Qed tintwera d-dejta tal-aħħar sinkronizzazzjoni.",
       "settings": "Issettjar",
-      "syncFindings": "Sinkronizza s-sejbiet",
       "syncNow": "Sinkronizza issa",
       "syncQueued": "Is-sinkronizzazzjoni tqiegħdet fil-kju",
       "syncStatusUnavailable": "L-istat tas-sinkronizzazzjoni mhux disponibbli.",
@@ -1916,7 +1918,7 @@
       "source": "Sors",
       "sourceId": "ID tas-sors",
       "viewAdvisory": "Ara l-avviż fuq GitHub",
-      "statusOpen": "Ftuħ",
+      "statusOpen": "Miftuħa",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "it-tiswija diġà bdiet",
       "reasonNoBandwidth": "m'hemmx riżorsi disponibbli",
@@ -2241,7 +2243,7 @@
     "sessionList": {
       "couldNotLoadActive": "Ma setgħux jitgħabbew is-sessjonijiet attivi.",
       "couldNotRefresh": "Ma setax isir l-aġġornament",
-      "noSessionsYetDescription": "Ibda kompitu tal-ipprogrammar mill-mowbajl tiegħek. Is-sessjonijiet tiegħek se jidhru hawn.",
+      "noSessionsYetDescription": "Ibda kompitu tal-ipprogrammar mill-mowbajl tiegħek.",
       "viewHistory": "Storja tas-sessjonijiet",
       "noMatches": "L-ebda sessjoni ma taqbel mat-tfittxija",
       "tryDifferentSearch": "Ipprova fittex b'kelma oħra.",
@@ -4004,6 +4006,7 @@
     "skillMarkdownLabel": "Kontenut tal-ħiliet",
     "skillsEmpty": "Għadu l-ebda ħiliet",
     "skillNameRequired": "Daħħal isem tal-ħila",
+    "skillNameTooLong": "L-isem tal-ħila għandu jkun {{max}} karattri jew inqas",
     "skillNameInvalid": "L-isem tal-ħiliet għandu jibda b'ittra jew ċifra u juża biss ittri żgħar, ċifri u sings",
     "skillContentRequired": "Il-kontenut tal-ħiliet huwa meħtieġ",
     "skillSaveFailed": "Ma setgħetx tiffranka l-ħiliet. Erġa' pprova.",

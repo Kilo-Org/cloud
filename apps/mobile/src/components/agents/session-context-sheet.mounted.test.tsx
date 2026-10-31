@@ -50,8 +50,8 @@ vi.mock('react-i18next', async importOriginal => {
   };
 });
 vi.mock('react-native', () => ({
-  useColorScheme: () => 'light',
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',

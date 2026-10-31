@@ -163,7 +163,7 @@
     "allLanguages": "Tất cả ngôn ngữ"
   },
   "login": {
-    "welcome": "Chào mừng đến với Kilo",
+    "welcome": "Chào mừng",
     "retrySignIn": "Thử đăng nhập lại",
     "logo": "Biểu trưng Kilo",
     "continuingSignIn": "Đang tiếp tục quá trình đăng nhập.",
@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "Bạn có thể cần cấp quyền truy cập thêm nhóm hoặc dự án trên GitLab.",
       "installGithubApp": "Cài đặt ứng dụng GitHub cho các kho lưu trữ",
       "installGithubAppDescription": "Cấp quyền truy cập cho ứng dụng Kilo trên GitHub vào các kho lưu trữ bạn muốn rà soát.",
-      "repositoryAccess": "quyền truy cập kho lưu trữ"
+      "repositoryAccess": "quyền truy cập kho lưu trữ",
+      "allModePersonal": "Mọi kho lưu trữ mà Kilo có thể truy cập thông qua kết nối GitHub của bạn đều được rà soát tự động.",
+      "allModeOrganization": "Mọi kho lưu trữ mà Kilo có thể truy cập thông qua kết nối GitHub của tổ chức đều được rà soát tự động.",
+      "allModeCount": "Số kho lưu trữ có sẵn: {{displayCount}}"
     },
     "style": {
       "title": "Cách rà soát",
@@ -1298,7 +1301,6 @@
       "repositoryActionPlan": "Kế hoạch xử lý cho từng kho lưu trữ",
       "settings": "Cài đặt",
       "slaPosture": "Tình trạng SLA",
-      "syncFindings": "Đồng bộ vấn đề",
       "syncNow": "Đồng bộ ngay",
       "syncQueued": "Đã đưa yêu cầu đồng bộ vào hàng đợi",
       "syncStatusUnavailable": "Không thể lấy trạng thái đồng bộ.",
@@ -1625,7 +1627,7 @@
     "sessionList": {
       "couldNotLoadActive": "Không thể tải các phiên đang hoạt động.",
       "couldNotRefresh": "Không thể làm mới",
-      "noSessionsYetDescription": "Bắt đầu tác vụ lập trình từ điện thoại. Các phiên của bạn sẽ xuất hiện tại đây.",
+      "noSessionsYetDescription": "Bắt đầu tác vụ lập trình từ điện thoại.",
       "viewHistory": "Lịch sử phiên",
       "noMatches": "Không có phiên phù hợp",
       "tryDifferentSearch": "Thử tìm bằng từ khóa khác.",
@@ -2698,6 +2700,7 @@
       "gitlabDescription": "Kết nối tài khoản GitLab để xem merge request trên thiết bị di động.",
       "bitbucketDescription": "Kết nối Bitbucket với tổ chức này để xem PR trên thiết bị di động.",
       "bitbucketOrgOnlyDescription": "Chuyển tài khoản ở trên sang một tổ chức để xem các PR Bitbucket của tổ chức đó.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Tài khoản này chưa có tổ chức nào. Bạn có thể xem các PR Bitbucket sau khi tạo hoặc tham gia một tổ chức.",
       "contextLine": "Cho {{organization}}",
       "contextLinePersonal": "Cho tài khoản cá nhân"
     },
@@ -3064,10 +3067,9 @@
     "pullRequestUnavailableDescription": "Không thể mở PR này. Có thể PR đã bị xóa, kho lưu trữ ở chế độ riêng tư hoặc ứng dụng Kilo trên GitHub chưa được cài đặt cho kho lưu trữ này.",
     "reconnectNotice": {
       "title": "Kết nối GitHub đã hết hạn.",
-      "message": "Kết nối GitHub của bạn không còn hợp lệ. Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần.",
+      "message": "Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần.",
       "gitlabTitle": "Kết nối GitLab đã hết hạn.",
-      "bitbucketTitle": "Kết nối Bitbucket đã hết hạn.",
-      "providerMessage": "Kết nối {{provider}} của bạn không còn hợp lệ. Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần."
+      "bitbucketTitle": "Kết nối Bitbucket đã hết hạn."
     },
     "review": "Rà soát",
     "reviewPullRequest": "Đánh giá PR",
@@ -3854,6 +3856,7 @@
     "skillMarkdownLabel": "Nội dung kỹ năng",
     "skillsEmpty": "Chưa có kỹ năng",
     "skillNameRequired": "Nhập tên kỹ năng",
+    "skillNameTooLong": "Tên kỹ năng không được vượt quá {{max}} ký tự",
     "skillNameInvalid": "Tên kỹ năng phải bắt đầu bằng một chữ cái hoặc chữ số và chỉ sử dụng chữ cái viết thường, chữ số và dấu gạch ngang",
     "skillContentRequired": "Nội dung kỹ năng là bắt buộc",
     "skillSaveFailed": "Không thể lưu kỹ năng. Vui lòng thử lại.",

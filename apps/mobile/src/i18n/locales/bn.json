@@ -163,7 +163,7 @@
     "allLanguages": "সব ভাষা"
   },
   "login": {
-    "welcome": "Kilo-তে স্বাগতম",
+    "welcome": "স্বাগতম",
     "retrySignIn": "আবার সাইন-ইন করার চেষ্টা করুন",
     "logo": "Kilo-র লোগো",
     "continuingSignIn": "আপনার সাইন-ইন চলছে।",
@@ -684,6 +684,7 @@
       "gitlabDescription": "মোবাইলে মার্জ রিকোয়েস্ট রিভিউ করতে আপনার GitLab অ্যাকাউন্ট সংযুক্ত করুন।",
       "bitbucketDescription": "মোবাইলে পুল রিকোয়েস্ট রিভিউ করতে এই অর্গানাইজেশনটিকে Bitbucket-এর সঙ্গে সংযুক্ত করুন।",
       "bitbucketOrgOnlyDescription": "উপরে থাকা অ্যাকাউন্ট একটি অর্গানাইজেশনে সুইচ করুন তার Bitbucket পুল রিকোয়েস্ট রিভিউ করতে।",
+      "bitbucketOrgOnlyNoOrganizationDescription": "এই অ্যাকাউন্টে এখনো কোনো অর্গানাইজেশন নেই। আপনি একটি অর্গানাইজেশন তৈরি করলে বা যুক্ত হলে Bitbucket পুল রিকোয়েস্ট রিভিউ করা যাবে।",
       "contextLine": "{{organization}}-এর জন্য",
       "contextLinePersonal": "আপনার ব্যক্তিগত অ্যাকাউন্টের জন্য"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub সংযোগের মেয়াদ শেষ হয়েছে।",
-      "message": "আপনার GitHub সংযোগের অনুমতি আর কার্যকর নেই। সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।",
+      "message": "সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।",
       "gitlabTitle": "GitLab সংযোগের মেয়াদ শেষ হয়েছে।",
-      "bitbucketTitle": "Bitbucket সংযোগের মেয়াদ শেষ হয়েছে।",
-      "providerMessage": "আপনার {{provider}} সংযোগের অনুমতি আর কার্যকর নেই। সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।"
+      "bitbucketTitle": "Bitbucket সংযোগের মেয়াদ শেষ হয়েছে।"
     },
     "eventChips": {
       "comment": "মন্তব্য",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLab-এ আরও গ্রুপ বা প্রকল্পে অ্যাক্সেস দিতে হতে পারে।",
       "installGithubApp": "রিপোজিটরিতে GitHub অ্যাপ ইনস্টল করুন",
       "installGithubAppDescription": "যেসব রিপোজিটরি পর্যালোচনা করাতে চান, সেগুলোতে Kilo GitHub অ্যাপকে অ্যাক্সেস দিন।",
-      "repositoryAccess": "রিপোজিটরির অ্যাক্সেস"
+      "repositoryAccess": "রিপোজিটরির অ্যাক্সেস",
+      "allModePersonal": "আপনার GitHub সংযোগের মাধ্যমে Kilo যে সমস্ত রিপোজিটরিতে অ্যাক্সেস করতে পারে, সেগুলো স্বয়ংক্রিয়ভাবে পর্যালোচনা করা হয়।",
+      "allModeOrganization": "সংস্থার GitHub সংযোগের মাধ্যমে Kilo যে সমস্ত রিপোজিটরিতে অ্যাক্সেস করতে পারে, সেগুলো স্বয়ংক্রিয়ভাবে পর্যালোচনা করা হয়।",
+      "allModeCount": "উপলব্ধ রিপোজিটরি: {{displayCount}}"
     },
     "style": {
       "title": "পর্যালোচনার ধরন",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "এখনো সিঙ্ক হয়নি",
       "refreshFailed": "রিফ্রেশ করা যায়নি — শেষবার সিঙ্ক করা তথ্য দেখানো হচ্ছে।",
       "settings": "সেটিংস",
-      "syncFindings": "ত্রুটিগুলো সিঙ্ক করুন",
       "syncNow": "এখন সিঙ্ক করুন",
       "syncQueued": "সিঙ্কের অনুরোধ সারিতে যোগ করা হয়েছে।",
       "syncStatusUnavailable": "সিঙ্কের অবস্থা জানা যাচ্ছে না।",
@@ -2154,7 +2156,7 @@
     "sessionList": {
       "couldNotLoadActive": "সক্রিয় সেশন লোড করা যায়নি।",
       "couldNotRefresh": "রিফ্রেশ করা যায়নি",
-      "noSessionsYetDescription": "আপনার ফোন থেকে কোড লেখার একটি কাজ শুরু করুন। আপনার সেশনগুলো এখানে দেখা যাবে।",
+      "noSessionsYetDescription": "আপনার ফোন থেকে কোড লেখার একটি কাজ শুরু করুন।",
       "viewHistory": "সেশনের ইতিহাস",
       "noMatches": "মিলে যায় এমন কোনো সেশন নেই",
       "tryDifferentSearch": "অন্য শব্দ দিয়ে খুঁজে দেখুন।",
@@ -3854,6 +3856,7 @@
     "skillMarkdownLabel": "দক্ষতা বিষয়বস্তু",
     "skillsEmpty": "এখনো কোনো দক্ষতা নেই",
     "skillNameRequired": "একটি দক্ষতার নাম লিখুন",
+    "skillNameTooLong": "দক্ষতার নাম অবশ্যই {{max}} অক্ষর বা তার কম হতে হবে",
     "skillNameInvalid": "দক্ষতার নাম অবশ্যই একটি অক্ষর বা অঙ্ক দিয়ে শুরু করতে হবে এবং শুধুমাত্র ছোট হাতের অক্ষর, সংখ্যা এবং ড্যাশ ব্যবহার করতে হবে",
     "skillContentRequired": "দক্ষতা বিষয়বস্তু প্রয়োজন",
     "skillSaveFailed": "দক্ষতা বাঁচাতে পারেনি। আবার চেষ্টা করুন।",

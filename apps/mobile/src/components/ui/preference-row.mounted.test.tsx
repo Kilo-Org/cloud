@@ -8,8 +8,8 @@ import { act, TestRenderer } from '@/test/renderer';
 import { PreferenceRow } from './preference-row';
 
 vi.mock('react-native', () => ({
-  useColorScheme: () => 'light',
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Pressable: 'Pressable',

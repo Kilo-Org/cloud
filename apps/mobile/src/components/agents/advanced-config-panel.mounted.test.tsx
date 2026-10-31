@@ -21,9 +21,9 @@ const listMock = vi.hoisted(() => ({
 vi.mock('@/lib/hooks/use-agent-profiles', () => listMock);
 
 vi.mock('react-native', () => ({
-  useColorScheme: () => 'light',
   AccessibilityInfo: { announceForAccessibility },
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',

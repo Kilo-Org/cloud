@@ -40,13 +40,13 @@ const state = vi.hoisted(() => ({
 export { state };
 
 vi.mock('react-native', () => ({
-  useColorScheme: () => 'light',
   ScrollView: 'ScrollView',
   View: 'View',
   TextInput: 'TextInput',
   Switch: 'Switch',
   Pressable: 'Pressable',
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   AppState: {
     addEventListener: (_event: string, listener: (next: string) => void) => {

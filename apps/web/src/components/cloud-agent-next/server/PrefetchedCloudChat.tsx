@@ -56,7 +56,8 @@ async function seedCachedTranscript(
   sessionId: KiloSessionId,
   organizationId: string | null
 ): Promise<void> {
-  const caller = rootRouter.createCaller(await createTRPCContext());
+  const context = await createTRPCContext();
+  const caller = rootRouter.createCaller(context);
   const [outcome, session] = await Promise.all([
     fetchWebSessionSnapshotPage(
       {
@@ -76,7 +77,7 @@ async function seedCachedTranscript(
   // Settings are cached only for Cloud Agent sessions, as the SDK caches them.
   const isCloudAgent = data.cloudAgentSessionId !== null && session.runtimeState !== null;
   queryClient.setQueryData(
-    transcriptCacheKey(transcriptCacheScope(organizationId), sessionId),
+    transcriptCacheKey(transcriptCacheScope(context.user.id, organizationId), sessionId),
     toCachedTranscriptPage({
       ...page,
       ...(isCloudAgent ? { sessionConfig: sessionConfigFromFetchedSession(sessionId, data) } : {}),

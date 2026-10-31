@@ -129,7 +129,6 @@ vi.mock('expo-secure-store', () => storage);
 vi.mock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 0 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
-  useColorScheme: () => 'light',
   View: 'View',
   Text: 'Text',
   ScrollView: 'ScrollView',
@@ -137,6 +136,7 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   ActivityIndicator: 'ActivityIndicator',
   Platform: platform,
+  useColorScheme: () => 'light',
   BackHandler: {
     addEventListener: vi.fn(() => ({ remove: vi.fn() })),
   },

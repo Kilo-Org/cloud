@@ -169,7 +169,7 @@ export function ProfileRepoPinsSection({
                     );
                   }}
                 >
-                  <Trash2 size={16} color={colors.destructive} />
+                  <Trash2 size={16} color={colors.mutedForeground} />
                 </Pressable>
               ) : null}
             </View>

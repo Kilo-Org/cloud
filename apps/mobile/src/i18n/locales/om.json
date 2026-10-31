@@ -163,7 +163,7 @@
     "allLanguages": "Afaanota hunda"
   },
   "login": {
-    "welcome": "Baga gara Kilo dhufte",
+    "welcome": "Baga nagaan dhufte",
     "retrySignIn": "Irra deebi'ii seeni",
     "logo": "Mallattoo Kilo",
     "continuingSignIn": "Adeemsi seensaa kee itti fufaa jira.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Gaaffiiwwan walitti makuu simbirroo harkaan gamaaggamuuf herrega GitLab kee walqabsiisi.",
       "bitbucketDescription": "Gaaffiiwwan walitti makuu simbirroo harkaan gamaaggamuuf Bitbucket dhaabbata kana waliin walqabsiisi.",
       "bitbucketOrgOnlyDescription": "Herrega gubbaa jiru gara dhaabbataatti jijjiiri, dhaabbata sanaa gaaffiiwwan walitti makuu Bitbucket ilaaluuf.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Herrega kun dhaabbilee ammas hin qabu. Dhaabbata uumtee yookiin dhaabbataatti seeteen, gaaffiiwwan walitti makuu Bitbucket ilaaluu ni dandeessa.",
       "contextLine": "{{organization}}iif",
       "contextLinePersonal": "Dhuunfaa'iif"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Yeroon walitti hidhamiinsa GitHub darbeera.",
-      "message": "Walqunnamtiin GitHub kee kana booda hin hojjetu. Irra deebi'ii ilaali — yoo barbaachise akka irra deebi'ii walqabsiiftu gaafatamta.",
+      "message": "Irra deebi'ii ilaali — yoo barbaachise akka irra deebi'ii walqabsiiftu gaafatamta.",
       "gitlabTitle": "Yeroon walitti hidhamiinsa GitLab darbeera.",
-      "bitbucketTitle": "Yeroon walitti hidhamiinsa Bitbucket darbeera.",
-      "providerMessage": "Walqunnamtiin {{provider}} kee kana booda hin hojjetu. Irra deebi'ii ilaali — yoo barbaachise akka irra deebi'ii walqabsiiftu gaafatamta."
+      "bitbucketTitle": "Yeroon walitti hidhamiinsa Bitbucket darbeera."
     },
     "eventChips": {
       "comment": "Yaada kenni",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLab irratti gareewwan ykn pirojektoota dabalataa argachuuf hayyama kennuun si barbaachisuu danda'a.",
       "installGithubApp": "Aplikeeshinii GitHub kuusaawwan koodii irratti fe'i",
       "installGithubAppDescription": "Aplikeeshinii GitHub kan Kilo kuusaawwan koodii akka sakatta'aman barbaaddu argachuuf hayyama kenniif.",
-      "repositoryAccess": "hayyama kuusaa koodii"
+      "repositoryAccess": "hayyama kuusaa koodii",
+      "allModePersonal": "Kuusaan koodii hundi Kilo walqunnamtii GitHub keetiin argachuu danda'u ofumaan sakatta'ama.",
+      "allModeOrganization": "Kuusaan koodii hundi Kilo walqunnamtii GitHub dhaabbataatiin argachuu danda'u ofumaan sakatta'ama.",
+      "allModeCount": "Kuusaalee koodii jiran: {{displayCount}}"
     },
     "style": {
       "title": "Haala sakatta'aa",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "Ammaaf hin walsimsiifamne",
       "refreshFailed": "Haaromsuun hin danda'amne — daataan yeroo dhumaaf walsimsiifame mul'achaa jira.",
       "settings": "Qindaa'ina",
-      "syncFindings": "Argamoota walsimsiisi",
       "syncNow": "Amma walsimsiisi",
       "syncQueued": "Walsimsiisuun tarree eegumsaatti dabalameera",
       "syncStatusUnavailable": "Haala walsimsiisuu argachuun hin danda'amne.",
@@ -2154,7 +2156,7 @@
     "sessionList": {
       "couldNotLoadActive": "Turtiiwwan hojii irra jiran fe'uu hin danda'amne.",
       "couldNotRefresh": "Haaromsuun hin danda'amne",
-      "noSessionsYetDescription": "Bilbila kee irraa hojii koodii barreessuu jalqabi. Turtiiwwan kee asitti mul'atu.",
+      "noSessionsYetDescription": "Bilbila kee irraa hojii koodii barreessuu jalqabi.",
       "viewHistory": "Seenaa turtiiwwanii",
       "noMatches": "Turtiin walsimu hin jiru",
       "tryDifferentSearch": "Jecha biraatiin barbaadi.",
@@ -3854,6 +3856,7 @@
     "skillMarkdownLabel": "Qabiyyee ogummaa",
     "skillsEmpty": "Ammatti ogummaa hin qabu",
     "skillNameRequired": "Maqaa ogummaa galchi",
+    "skillNameTooLong": "Maqaan ogummaa qubee {{max}} caaluu hin qabu",
     "skillNameInvalid": "Maqaan ogummaa qubee ykn dijiitii irraa jalqabuu fi qubee xixiqqaa, dijiitii fi daash qofa fayyadamuu qaba",
     "skillContentRequired": "Qabiyyeen ogummaa barbaachisaadha",
     "skillSaveFailed": "Ogummaa qusachuu hin dandeenye. Irra deebi'ii yaali.",

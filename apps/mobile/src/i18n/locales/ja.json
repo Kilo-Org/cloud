@@ -163,7 +163,7 @@
     "allLanguages": "すべての言語"
   },
   "login": {
-    "welcome": "Kiloへようこそ",
+    "welcome": "ようこそ",
     "retrySignIn": "サインインを再試行",
     "logo": "Kiloのロゴ",
     "continuingSignIn": "サインインを続行しています。",
@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "GitLabで、追加のグループやプロジェクトへのアクセスを許可する必要がある場合があります。",
       "installGithubApp": "リポジトリにGitHub Appをインストール",
       "installGithubAppDescription": "レビュー対象のリポジトリへのアクセスをKilo GitHub Appに許可してください。",
-      "repositoryAccess": "リポジトリへのアクセス権"
+      "repositoryAccess": "リポジトリへのアクセス権",
+      "allModePersonal": "あなたのGitHub接続を通じてKiloがアクセスできるすべてのリポジトリが自動的にレビューされます。",
+      "allModeOrganization": "組織のGitHub接続を通じてKiloがアクセスできるすべてのリポジトリが自動的にレビューされます。",
+      "allModeCount": "利用可能なリポジトリ: {{displayCount}}"
     },
     "style": {
       "title": "レビュースタイル",
@@ -1298,7 +1301,6 @@
       "repositoryActionPlan": "リポジトリの対応計画",
       "settings": "設定",
       "slaPosture": "SLA遵守状況",
-      "syncFindings": "検出結果を同期",
       "syncNow": "今すぐ同期",
       "syncQueued": "同期をキューに追加しました。",
       "syncStatusUnavailable": "同期の状態を確認できません。",
@@ -1625,7 +1627,7 @@
     "sessionList": {
       "couldNotLoadActive": "アクティブなセッションを読み込めませんでした。",
       "couldNotRefresh": "更新できませんでした",
-      "noSessionsYetDescription": "スマートフォンからコーディングタスクを開始してください。セッションがここに表示されます。",
+      "noSessionsYetDescription": "スマートフォンからコーディングタスクを開始してください。",
       "viewHistory": "セッション履歴",
       "noMatches": "一致するセッションはありません",
       "tryDifferentSearch": "別の検索語をお試しください。",
@@ -2698,6 +2700,7 @@
       "gitlabDescription": "モバイルでマージリクエストをレビューするには、GitLabアカウントを接続してください。",
       "bitbucketDescription": "モバイルでプルリクエストをレビューするには、この組織をBitbucketに接続してください。",
       "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
+      "bitbucketOrgOnlyNoOrganizationDescription": "このアカウントにはまだ組織がありません。組織を作成または参加すると、Bitbucketのプルリクエストをレビューできるようになります。",
       "contextLine": "{{organization}}用",
       "contextLinePersonal": "個人用"
     },
@@ -3064,10 +3067,9 @@
     "pullRequestUnavailableDescription": "このPRを開けません。PRが削除されたか、リポジトリが非公開になっているか、リポジトリにKilo GitHub Appがインストールされていない可能性があります。",
     "reconnectNotice": {
       "title": "GitHubとの連携が期限切れになりました。",
-      "message": "GitHubとの接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。",
+      "message": "接続を再確認してください。再接続が必要な場合は、案内が表示されます。",
       "gitlabTitle": "GitLabとの連携が期限切れになりました。",
-      "bitbucketTitle": "Bitbucketとの連携が期限切れになりました。",
-      "providerMessage": "{{provider}}との接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。"
+      "bitbucketTitle": "Bitbucketとの連携が期限切れになりました。"
     },
     "review": "レビュー",
     "reviewPullRequest": "プルリクエストをレビュー",
@@ -3854,6 +3856,7 @@
     "skillMarkdownLabel": "スキル内容",
     "skillsEmpty": "まだスキルがありません",
     "skillNameRequired": "スキル名を入力してください",
+    "skillNameTooLong": "スキル名は{{max}}文字以内で入力してください",
     "skillNameInvalid": "スキル名は文字または数字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
     "skillContentRequired": "スキル内容は必須です",
     "skillSaveFailed": "スキルを保存できませんでした。もう一度お試しください。",

@@ -163,7 +163,7 @@
     "allLanguages": "Tüm diller"
   },
   "login": {
-    "welcome": "Kilo'ya hoş geldin",
+    "welcome": "Hoş geldin",
     "retrySignIn": "Oturum açmayı tekrar dene",
     "logo": "Kilo logosu",
     "continuingSignIn": "Oturum açma işlemine devam ediliyor.",
@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "GitLab'da daha fazla gruba veya projeye erişim izni vermen gerekebilir.",
       "installGithubApp": "GitHub uygulamasını depolara yükle",
       "installGithubAppDescription": "Kilo GitHub uygulamasına, incelenmesini istediğin depolara erişim izni ver.",
-      "repositoryAccess": "depo erişimi"
+      "repositoryAccess": "depo erişimi",
+      "allModePersonal": "Kilo'nun GitHub bağlantın aracılığıyla erişebildiği her depo otomatik olarak incelenir.",
+      "allModeOrganization": "Kilo'nun kuruluşun GitHub bağlantısı aracılığıyla erişebildiği her depo otomatik olarak incelenir.",
+      "allModeCount": "Kullanılabilir depolar: {{displayCount}}"
     },
     "style": {
       "title": "İnceleme stili",
@@ -1298,7 +1301,6 @@
       "repositoryActionPlan": "Depo işlem planı",
       "settings": "Ayarlar",
       "slaPosture": "SLA durumu",
-      "syncFindings": "Bulguları eşitle",
       "syncNow": "Şimdi eşitle",
       "syncQueued": "Eşitleme kuyruğa alındı",
       "syncStatusUnavailable": "Eşitleme durumu alınamıyor.",
@@ -1625,7 +1627,7 @@
     "sessionList": {
       "couldNotLoadActive": "Etkin oturumlar yüklenemedi.",
       "couldNotRefresh": "Yenilenemedi",
-      "noSessionsYetDescription": "Telefonundan bir kodlama görevi başlat. Oturumların burada görünecek.",
+      "noSessionsYetDescription": "Telefonundan bir kodlama görevi başlat.",
       "viewHistory": "Oturum geçmişi",
       "noMatches": "Eşleşen oturum yok",
       "tryDifferentSearch": "Farklı bir arama terimi dene.",
@@ -2698,6 +2700,7 @@
       "gitlabDescription": "Mobilde birleştirme isteklerini gözden geçirmek için GitLab hesabını bağla.",
       "bitbucketDescription": "Mobilde çekme isteklerini gözden geçirmek için Bitbucket'ı bu kuruluşla bağla.",
       "bitbucketOrgOnlyDescription": "Yukarıdaki hesabı bir kuruluşa geçir, onun Bitbucket çekme isteklerini gözden geçirmek için.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabın henüz bir kuruluşu yok. Bitbucket çekme isteklerini, bir kuruluş oluşturduktan ya da birine katıldıktan sonra gözden geçirebilirsin.",
       "contextLine": "{{organization}} için",
       "contextLinePersonal": "Kişisel hesabınız için"
     },
@@ -3064,10 +3067,9 @@
     "pullRequestUnavailableDescription": "Bu PR açılamıyor. Silinmiş olabilir, depo özel olabilir veya depoda Kilo GitHub uygulaması kurulu olmayabilir.",
     "reconnectNotice": {
       "title": "GitHub bağlantısının süresi doldu.",
-      "message": "GitHub bağlantın artık geçerli değil. Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek.",
+      "message": "Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek.",
       "gitlabTitle": "GitLab bağlantısının süresi doldu.",
-      "bitbucketTitle": "Bitbucket bağlantısının süresi doldu.",
-      "providerMessage": "{{provider}} bağlantın artık geçerli değil. Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek."
+      "bitbucketTitle": "Bitbucket bağlantısının süresi doldu."
     },
     "review": "İnceleme",
     "reviewPullRequest": "Çekme isteğini incele",
@@ -3854,6 +3856,7 @@
     "skillMarkdownLabel": "Beceri içeriği",
     "skillsEmpty": "Henüz beceri yok",
     "skillNameRequired": "Bir beceri adı girin",
+    "skillNameTooLong": "Beceri adı {{max}} karakter veya daha az olmalıdır",
     "skillNameInvalid": "Beceri adı bir harf veya rakamla başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
     "skillContentRequired": "Beceri içeriği gerekli",
     "skillSaveFailed": "Beceri kaydedilemedi. Tekrar deneyin.",

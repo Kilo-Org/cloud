@@ -163,7 +163,7 @@
     "allLanguages": "Svi jezici"
   },
   "login": {
-    "welcome": "Dobro došao u Kilo",
+    "welcome": "Dobro došao",
     "retrySignIn": "Ponovo se prijavi",
     "logo": "Kilo logotip",
     "continuingSignIn": "Prijava se nastavlja.",
@@ -699,6 +699,7 @@
       "gitlabDescription": "Poveži svoj GitLab račun da pregledaš merge requeste na mobitelu.",
       "bitbucketDescription": "Poveži Bitbucket s ovom organizacijom da pregledaš zahtjeve za spajanje na mobitelu.",
       "bitbucketOrgOnlyDescription": "Prebaci račun iznad na organizaciju da pregledaš njene zahtjeve za spajanje na Bitbucketu.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj račun još nema organizacije. Zahtjeve za spajanje na Bitbucketu možeš pregledati kada kreiraš ili se pridružiš organizaciji.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za lični nalog"
     },
@@ -723,10 +724,9 @@
     },
     "reconnectNotice": {
       "title": "Veza s GitHubom je istekla.",
-      "message": "Tvoja veza s GitHubom više ne važi. Ponovo provjeri vezu — po potrebi će se pojaviti zahtjev za ponovno povezivanje.",
+      "message": "Ponovo provjeri vezu — po potrebi će se pojaviti zahtjev za ponovno povezivanje.",
       "gitlabTitle": "Veza s GitLabom je istekla.",
-      "bitbucketTitle": "Veza s Bitbucketom je istekla.",
-      "providerMessage": "Tvoja veza s {{provider}}om više ne važi. Ponovo provjeri vezu — po potrebi će se pojaviti zahtjev za ponovno povezivanje."
+      "bitbucketTitle": "Veza s Bitbucketom je istekla."
     },
     "eventChips": {
       "comment": "Komentar",
@@ -1449,7 +1449,10 @@
       "gitlabNoRepositoriesDescription": "Možda trebaš odobriti pristup dodatnim grupama ili projektima na GitLabu.",
       "installGithubApp": "Instaliraj GitHub aplikaciju na repozitorije",
       "installGithubAppDescription": "Dodijeli Kilo GitHub aplikaciji pristup repozitorijima koje želiš pregledati.",
-      "repositoryAccess": "pristup repozitoriju"
+      "repositoryAccess": "pristup repozitoriju",
+      "allModePersonal": "Svaki repozitorij kojem Kilo može pristupiti putem tvoje GitHub veze automatski se pregledava.",
+      "allModeOrganization": "Svaki repozitorij kojem Kilo može pristupiti putem GitHub veze organizacije automatski se pregledava.",
+      "allModeCount": "Dostupni repozitoriji: {{displayCount}}"
     },
     "style": {
       "title": "Stil pregleda",
@@ -1801,7 +1804,6 @@
       "notYetSynced": "Još nije sinhronizirano",
       "refreshFailed": "Osvježavanje nije uspjelo. Prikazuju se posljednji sinhronizirani podaci.",
       "settings": "Postavke",
-      "syncFindings": "Sinhroniziraj nalaze",
       "syncNow": "Sinhroniziraj sada",
       "syncQueued": "Sinhronizacija je dodana u red.",
       "syncStatusUnavailable": "Status sinhronizacije nije dostupan.",
@@ -2183,7 +2185,7 @@
     "sessionList": {
       "couldNotLoadActive": "Učitavanje aktivnih sesija nije uspjelo.",
       "couldNotRefresh": "Osvježavanje nije uspjelo",
-      "noSessionsYetDescription": "Započni zadatak programiranja s mobitela. Tvoje sesije će se pojaviti ovdje.",
+      "noSessionsYetDescription": "Započni zadatak programiranja s mobitela.",
       "viewHistory": "Historija sesija",
       "noMatches": "Nema odgovarajućih sesija",
       "tryDifferentSearch": "Pokušaj s drugim pojmom za pretragu.",
@@ -3904,6 +3906,7 @@
     "skillMarkdownLabel": "Sadržaj vještina",
     "skillsEmpty": "Još nema vještina",
     "skillNameRequired": "Unesite naziv vještine",
+    "skillNameTooLong": "Ime vještine može sadržavati najviše {{max}} znakova",
     "skillNameInvalid": "Ime vještine mora početi slovom ili cifrom i koristiti samo mala slova, cifre i crtice",
     "skillContentRequired": "Sadržaj vještina je obavezan",
     "skillSaveFailed": "Nije moguće sačuvati vještinu. Pokušajte ponovo.",

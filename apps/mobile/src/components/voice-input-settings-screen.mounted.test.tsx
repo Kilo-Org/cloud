@@ -46,12 +46,11 @@ const organization = vi.hoisted(() => ({ organizationId: 'org-1' as string | nul
 const voiceLanguage = vi.hoisted(() => ({ chosen: null as string | null, loaded: true }));
 
 vi.mock('react-native', () => ({
-  useColorScheme: () => 'light',
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   Switch: 'Switch',
   Pressable: 'Pressable',
   View: 'View',
-  ActivityIndicator: 'ActivityIndicator',
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
@@ -239,8 +238,11 @@ describe('VoiceInputSettingsScreen', () => {
     if (!errorState) {
       throw new Error('QueryError not found');
     }
-    expect(errorState.props).toMatchObject({ variant: 'server', placement: 'top' });
-    expect(errorState.props.title).toBe("Couldn't load transcription models.");
+    expect(errorState.props).toMatchObject({
+      variant: 'server',
+      placement: 'top',
+      title: "Couldn't load transcription models.",
+    });
     act(() => {
       (errorState.props.onRetry as () => void)();
     });
@@ -356,10 +358,9 @@ describe('VoiceInputSettingsScreen', () => {
       throw new Error('ScrollView not found');
     }
     // The test field sits at the bottom of the content. The native iOS inset
-    // reserves the IME and reveals the focused field, which is exactly what
-    // AGENTS.md requires of an input screen (the shared scroll view lets the
-    // native inset own the keyboard for callers that set this, so it is
-    // reserved once).
+    // reserves the IME and reveals the focused field, as AGENTS.md requires of
+    // an input screen; the shared scroll view lets the native inset own the
+    // keyboard for callers that set this, so it is reserved once.
     expect(scroll.props.automaticallyAdjustKeyboardInsets).toBe(true);
     // With the keyboard up, the default ('never') spends the first tap on the
     // Clear control dismissing the keyboard, so the text survives the tap

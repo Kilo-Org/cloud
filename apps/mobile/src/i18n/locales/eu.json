@@ -163,7 +163,7 @@
     "allLanguages": "Hizkuntza guztiak"
   },
   "login": {
-    "welcome": "Ongi etorri Kilora",
+    "welcome": "Ongi etorri",
     "retrySignIn": "Saiatu berriro saioa hasten",
     "logo": "Kiloren logoa",
     "continuingSignIn": "Saioa hasteko prozesuak aurrera jarraitzen du.",
@@ -178,7 +178,7 @@
     "useDifferentEmail": "Erabili beste helbide elektroniko bat",
     "signInWithApple": "Hasi saioa Apple-rekin",
     "signInWithGoogle": "Hasi saioa Google-rekin",
-    "signInWithPasskey": "Hasi saioa sarbide-gako batekin",
+    "signInWithPasskey": "Erabili sarbide-gakoa",
     "emailAddress": "Helbide elektronikoa",
     "emailPlaceholder": "zu@adibidea.com",
     "continueWithEmail": "Jarraitu posta elektronikoarekin",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Konektatu zure GitLab kontua merge-eskaerak mugikorrean berrikusteko.",
       "bitbucketDescription": "Konektatu Bitbucket erakunde honetara bateratze-eskaerak mugikorrean berrikusteko.",
       "bitbucketOrgOnlyDescription": "Aldatu goiko kontua erakunde batera haren Bitbucket bateratze-eskaerak berrikusteko.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Kontu honek ez du oraindik erakunderik. Erakunde bat sortu edo batekin bat egiten duzunean, haren Bitbucket bateratze-eskaerak berrikus ditzakezu.",
       "contextLine": "{{organization}}-rako",
       "contextLinePersonal": "Zure kontu pertsonalerako"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub-erako konexioa iraungi da.",
-      "message": "GitHub-ekiko konexioa ez da jada baliozkoa. Egiaztatu konexioa berriro; behar izanez gero, berriro konektatzeko eskatuko zaizu.",
+      "message": "Egiaztatu konexioa berriro; behar izanez gero, berriro konektatzeko eskatuko zaizu.",
       "gitlabTitle": "GitLab-erako konexioa iraungi da.",
-      "bitbucketTitle": "Bitbucket-erako konexioa iraungi da.",
-      "providerMessage": "{{provider}}-ekiko konexioa ez da jada baliozkoa. Egiaztatu konexioa berriro; behar izanez gero, berriro konektatzeko eskatuko zaizu."
+      "bitbucketTitle": "Bitbucket-erako konexioa iraungi da."
     },
     "eventChips": {
       "comment": "Egin iruzkina",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Baliteke GitLab-eko talde edo proiektu gehiagorako sarbidea eman behar izatea.",
       "installGithubApp": "Instalatu GitHub aplikazioa biltegietan",
       "installGithubAppDescription": "Eman Kiloren GitHub aplikazioari berrikusi nahi dituzun biltegietarako sarbidea.",
-      "repositoryAccess": "biltegietarako sarbidea"
+      "repositoryAccess": "biltegietarako sarbidea",
+      "allModePersonal": "Zure GitHub konexioaren bidez Kilok atzi dezakeen biltegi bakoitza automatikoki berrikusten da.",
+      "allModeOrganization": "Erakundearen GitHub konexioaren bidez Kilok atzi dezakeen biltegi bakoitza automatikoki berrikusten da.",
+      "allModeCount": "Erabilgarri dauden biltegiak: {{displayCount}}"
     },
     "style": {
       "title": "Berrikuspen-estiloa",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "Oraindik ez da sinkronizatu",
       "refreshFailed": "Ezin izan dira datuak eguneratu. Azken sinkronizazioko datuak erakusten dira.",
       "settings": "Ezarpenak",
-      "syncFindings": "Sinkronizatu aurkikuntzak",
       "syncNow": "Sinkronizatu orain",
       "syncQueued": "Sinkronizazioa ilaran",
       "syncStatusUnavailable": "Sinkronizazioaren egoera ez dago erabilgarri.",
@@ -2154,7 +2156,7 @@
     "sessionList": {
       "couldNotLoadActive": "Ezin izan dira saio aktiboak kargatu.",
       "couldNotRefresh": "Ezin izan da freskatu",
-      "noSessionsYetDescription": "Hasi programazio-zeregin bat telefonotik. Zure saioak hemen agertuko dira.",
+      "noSessionsYetDescription": "Hasi programazio-zeregin bat telefonotik.",
       "viewHistory": "Saioen historiala",
       "noMatches": "Ez dago bat datorren saiorik",
       "tryDifferentSearch": "Saiatu beste bilaketa-termino batekin.",
@@ -3854,6 +3856,7 @@
     "skillMarkdownLabel": "Trebetasun edukia",
     "skillsEmpty": "Oraindik ez dago gaitasunik",
     "skillNameRequired": "Sartu trebetasun-izen bat",
+    "skillNameTooLong": "Trebetasunaren izenak {{max}} karaktere edo gutxiago izan behar ditu",
     "skillNameInvalid": "Trebetasunaren izenak letra edo zifra batekin hasi behar du eta letra xeheak, zifrak eta marratxoak soilik erabili behar ditu",
     "skillContentRequired": "Trebetasun edukia beharrezkoa da",
     "skillSaveFailed": "Ezin izan da trebetasuna gorde. Saiatu berriro.",

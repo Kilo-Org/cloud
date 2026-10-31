@@ -240,6 +240,35 @@ describe('NewSessionRepositorySection connect card open action', () => {
     }
   });
 
+  it('keeps the provider open control busy while its connect flow runs', () => {
+    // The connect flow's first step is a network round trip (GitHub mints an
+    // install state before the browser opens), so the open control shows the
+    // flow running from the tap. Without it the tap reads as inert for the whole
+    // round trip, which is also what lets a second tap start a second flow.
+    const renderer = mountSection({
+      groups: [group('github', 'connect'), group('gitlab', 'connect')],
+      connectingProvider: 'github',
+    });
+
+    // The open button carries its label as child text, so it is found by the
+    // label it renders.
+    const openButton = (copy: string) =>
+      renderer.root
+        .findAllByType('Button' as never)
+        .find(node =>
+          node.findAllByType('Text' as never).some(text => text.props.children === copy)
+        );
+
+    const githubOpen = openButton(i18n.t('agentChat.newSession.openGithub'));
+    const gitlabOpen = openButton(i18n.t('agentChat.newSession.openGitlab'));
+
+    expect(githubOpen?.props.disabled).toBe(true);
+    expect(githubOpen?.props.loading).toBe(true);
+    // A provider whose flow is not running keeps its normal enabled control.
+    expect(gitlabOpen?.props.disabled).toBe(false);
+    expect(gitlabOpen?.props.loading).toBe(false);
+  });
+
   it('offers no open label on the connected-empty card', () => {
     // The connected-empty card replaces the open action with its guidance, so
     // it must leave no empty gap where the button used to be.

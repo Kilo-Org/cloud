@@ -37,12 +37,12 @@ const h = vi.hoisted(() => {
 });
 
 vi.mock('react-native', () => ({
-  useColorScheme: () => 'light',
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
   Switch: 'Switch',
   Platform: { OS: 'android' },
+  useColorScheme: () => 'light',
 }));
 vi.mock('@shopify/flash-list', () => ({
   FlashList: ({

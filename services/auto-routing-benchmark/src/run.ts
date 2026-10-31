@@ -93,9 +93,12 @@ import {
   type AttemptUsage,
   DECIDER_CLI_TIMEOUT_MS,
   destroyDeciderCliContainer,
+  hasThrottleDiagnostic,
   isRetryableContainerAvailabilityError,
   isExactModelUnavailableResult,
   isCatalogLoadFailureResult,
+  isKilledBeforeEventsResult,
+  isUnbilledTransientProviderResult,
   isUnsupportedModelResult,
   parseContainerRunResponse,
   runDeciderCaseViaCli,
@@ -104,7 +107,7 @@ import {
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 import {
   catalogCandidatePrices,
-  catalogSupportsBenchmarkPair,
+  benchmarkPairUnavailableReason,
   fetchBenchmarkModelCatalog,
 } from './platform-models';
 import { pickClassifierWinner } from './winner';
@@ -124,6 +127,7 @@ import {
   getPaidCasePromptRevision,
   cooldownProviders,
   deferChunk,
+  deferThrottledChunk,
   failChunk,
   failScheduledEntry,
   finishChunk,
@@ -140,6 +144,7 @@ import {
   schedulerBackoffSeconds,
   startChunk,
   SCHEDULER_MAX_ATTEMPTS,
+  SCHEDULER_MAX_THROTTLE_DEFERRALS,
   type SchedulerClaim,
   type SchedulerConfig,
 } from './scheduler';
@@ -1054,20 +1059,23 @@ export async function drainQueue(
   const remeasures = await listQueuedRemeasures(env.BENCH_DB, current, queue);
   if (pending.length === 0 && remeasures.length === 0) return null;
   const catalog = await fetchExecutableBenchmarkModelCatalog(env, resolveRunIdentity(config));
-  const unavailable = pending.filter(
-    row =>
-      !catalogSupportsBenchmarkPair(catalog, {
-        model: row.model,
-        variant: variantFromStorage(row.variant),
-      })
+  const checked = pending.map(row => ({
+    row,
+    reason: benchmarkPairUnavailableReason(catalog, {
+      model: row.model,
+      variant: variantFromStorage(row.variant),
+    }),
+  }));
+  const unavailable = checked.flatMap(({ row, reason }) =>
+    reason === null ? [] : [{ row, reason }]
   );
   if (unavailable.length > 0) {
     await env.BENCH_DB.batch(
-      unavailable.map(row =>
+      unavailable.map(({ row, reason }) =>
         env.BENCH_DB.prepare(
           "UPDATE benchmark_profiles SET status = 'failed', failure_reason = ?, updated_at = ? WHERE router = ? AND model = ? AND variant = ? AND engine_identity = ? AND repetitions = ? AND status = 'pending'"
         ).bind(
-          'Model or variant is unavailable in the executable benchmark catalog.',
+          reason,
           new Date().toISOString(),
           router,
           row.model,
@@ -1078,12 +1086,7 @@ export async function drainQueue(
       )
     );
   }
-  const available = pending.filter(row =>
-    catalogSupportsBenchmarkPair(catalog, {
-      model: row.model,
-      variant: variantFromStorage(row.variant),
-    })
-  );
+  const available = checked.flatMap(({ row, reason }) => (reason === null ? [row] : []));
   // Queued re-measures of ready rows are reserved ahead of the pending backlog, so an
   // operator's repair starts on the next drain instead of waiting for the backlog.
   const queued = [
@@ -1517,9 +1520,7 @@ async function recoverPendingOutputJob(env: Env, message: BenchmarkJobMessage): 
   if (
     isCatalogLoadFailureResult(pending.result) ||
     isUnsupportedModelResult(pending.result, message.model) ||
-    (pending.result.text.length === 0 &&
-      (pending.result.costUsd ?? 0) === 0 &&
-      /(?:\b429\b|rate.?limit|throttl)/i.test(pending.result.stderrTail))
+    isUnbilledTransientProviderResult(pending.result)
   ) {
     await deletePendingDeciderOutput(env.BENCH_DB, key);
     skipRecovery(
@@ -1696,6 +1697,17 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
             Math.min(PAID_OUTPUT_RECHECK_MS, outputDeadline - Date.now()) / 1000
           ),
         }
+      );
+    } else if (
+      error instanceof BenchmarkThrottleError &&
+      claim.throttle_deferrals < SCHEDULER_MAX_THROTTLE_DEFERRALS
+    ) {
+      const delaySeconds = schedulerBackoffSeconds(claim.throttle_deferrals + 1);
+      await deferThrottledChunk(env.BENCH_DB, id, token, Date.now() + delaySeconds * 1000);
+      await cooldownProviders(env.BENCH_DB, claim, Date.now() + delaySeconds * 1000);
+      await env.BENCH_QUEUE.send(
+        { runId: claim.run_id, kind: 'decider', model: claim.model, schedulerWake: true },
+        { delaySeconds }
       );
     } else if (
       error instanceof AmbiguousBenchmarkExecutionError ||
@@ -2197,15 +2209,16 @@ async function processDeciderJob(
           });
         const first = await invokeCli();
         // The CLI occasionally ends a session with no assistant text at all
-        // (transient empty completion: a lone step_finish with cost 0). Mirror
-        // the production classifier's policy and retry once.
+        // (transient empty completion: a lone step_finish with cost 0), or dies from
+        // a signal before its first event. Mirror the production classifier's policy
+        // and retry once.
+        const emptyCompletion = first.exitCode === 0 && first.text.length === 0;
         if (
           isExactModelUnavailableResult(first, message.model) ||
           isCatalogLoadFailureResult(first) ||
           isUnsupportedModelResult(first, message.model) ||
-          first.exitCode !== 0 ||
-          first.text.length > 0 ||
-          /(?:\b429\b|rate.?limit|throttl)/i.test(first.stderrTail)
+          !(emptyCompletion || isKilledBeforeEventsResult(first)) ||
+          hasThrottleDiagnostic(first)
         ) {
           return { result: first, retried: false, attemptStartedAt: startedAt };
         }
@@ -2248,10 +2261,7 @@ async function processDeciderJob(
         const output = pending ?? (await runPaidCase());
         const { result, retried } = output;
         attemptStartedAt = output.attemptStartedAt;
-        const throttled =
-          result.text.length === 0 &&
-          (result.costUsd ?? 0) === 0 &&
-          /(?:\b429\b|rate.?limit|throttl)/i.test(result.stderrTail);
+        const throttled = isUnbilledTransientProviderResult(result);
         const unsupported = isUnsupportedModelResult(result, message.model);
         if (isCatalogLoadFailureResult(result) || unsupported || throttled) {
           const { token: _token, ...unbilled } = execution;
@@ -2262,7 +2272,9 @@ async function processDeciderJob(
             await deletePendingDeciderOutput(env.BENCH_DB, pendingKey);
           }
           if (throttled) {
-            throw new BenchmarkThrottleError('Provider throttled an unbilled benchmark request');
+            throw new BenchmarkThrottleError(
+              'Provider throttled or failed an unbilled benchmark request'
+            );
           }
           throw new BenchmarkCatalogLoadError(
             unsupported

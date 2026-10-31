@@ -163,7 +163,7 @@
     "allLanguages": "Kõik keeled"
   },
   "login": {
-    "welcome": "Tere tulemast Kilosse",
+    "welcome": "Tere tulemast",
     "retrySignIn": "Proovi sisselogimist uuesti",
     "logo": "Kilo logomärk",
     "continuingSignIn": "Sisselogimine jätkub.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Ühenda oma GitLab konto, et liitmistaotlusi mobiilis üle vaadata.",
       "bitbucketDescription": "Ühenda Bitbucket selle organisatsiooniga, et tõmbetaotlusi mobiilis üle vaadata.",
       "bitbucketOrgOnlyDescription": "Vaheta ülalolev konto organisatsioonile, et selle Bitbucketi tõmbetaotlusi üle vaadata.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Sellel kontol pole veel organisatsioone. Bitbucketi tõmbetaotlusi saab üle vaadata, kui lood või liitud organisatsiooniga.",
       "contextLine": "{{organization}} jaoks",
       "contextLinePersonal": "Sinu isikliku konto jaoks"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHubi ühendus aegus.",
-      "message": "Sinu GitHubi ühendus ei kehti enam. Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada.",
+      "message": "Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada.",
       "gitlabTitle": "GitLabi ühendus aegus.",
-      "bitbucketTitle": "Bitbucketi ühendus aegus.",
-      "providerMessage": "Sinu {{provider}}i ühendus ei kehti enam. Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada."
+      "bitbucketTitle": "Bitbucketi ühendus aegus."
     },
     "eventChips": {
       "comment": "Kommenteeri",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Võimalik, et pead GitLabis andma juurdepääsu veel mõnele rühmale või projektile.",
       "installGithubApp": "GitHubi rakenduse paigaldamine hoidlatele",
       "installGithubAppDescription": "Anna Kilo GitHubi rakendusele juurdepääs hoidlatele, mille koodi soovid üle vaadata.",
-      "repositoryAccess": "juurdepääs hoidlatele"
+      "repositoryAccess": "juurdepääs hoidlatele",
+      "allModePersonal": "Kõik hoidlad, millele Kilol on sinu GitHubi ühenduse kaudu juurdepääs, vaadatakse automaatselt üle.",
+      "allModeOrganization": "Kõik hoidlad, millele Kilol on organisatsiooni GitHubi ühenduse kaudu juurdepääs, vaadatakse automaatselt üle.",
+      "allModeCount": "Saadaolevad hoidlad: {{displayCount}}"
     },
     "style": {
       "title": "Ülevaatuse stiil",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "Pole veel sünkroonitud",
       "refreshFailed": "Värskendamine ebaõnnestus — kuvatakse viimati sünkroonitud andmeid.",
       "settings": "Seaded",
-      "syncFindings": "Sünkrooni leiud",
       "syncNow": "Sünkrooni nüüd",
       "syncQueued": "Sünkroonimine on järjekorras",
       "syncStatusUnavailable": "Sünkroonimise olek pole saadaval.",
@@ -2154,7 +2156,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktiivseid seansse ei õnnestunud laadida.",
       "couldNotRefresh": "Värskendamine ebaõnnestus",
-      "noSessionsYetDescription": "Alusta telefonis programmeerimisülesannet. Sinu seansid kuvatakse siin.",
+      "noSessionsYetDescription": "Alusta telefonis programmeerimisülesannet.",
       "viewHistory": "Seansside ajalugu",
       "noMatches": "Sobivaid seansse ei leitud",
       "tryDifferentSearch": "Proovi teistsugust otsingusõna.",
@@ -3854,6 +3856,7 @@
     "skillMarkdownLabel": "Oskuste sisu",
     "skillsEmpty": "Oskusi veel pole",
     "skillNameRequired": "Sisestage oskuse nimi",
+    "skillNameTooLong": "Oskuste nimi peab olema {{max}} tähemärki või vähem",
     "skillNameInvalid": "Oskuste nimi peab algama tähe või numbriga ning kasutama ainult väiketähti, numbreid ja sidekriipse",
     "skillContentRequired": "Vajalik on oskuste sisu",
     "skillSaveFailed": "Oskust ei õnnestunud salvestada. Proovi uuesti.",

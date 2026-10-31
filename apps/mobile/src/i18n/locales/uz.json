@@ -163,7 +163,7 @@
     "allLanguages": "Barcha tillar"
   },
   "login": {
-    "welcome": "Kiloga xush kelibsiz",
+    "welcome": "Xush kelibsiz",
     "retrySignIn": "Qayta kirishga urinish",
     "logo": "Kilo logotipi",
     "continuingSignIn": "Kirish davom ettirilmoqda.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Telefonda merge so‘rovlarini ko‘rib chiqish uchun GitLab hisobingizni ulang.",
       "bitbucketDescription": "Telefonda PRlarni ko‘rib chiqish uchun Bitbucketni ushbu tashkilotga ulang.",
       "bitbucketOrgOnlyDescription": "Yuqoridagi hisobni tashkilotga oʻtkazing, uning Bitbucket PRlarini koʻrib chiqish uchun.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Bu hisobda hozircha hech qanday tashkilot yo‘q. Tashkilot yaratganingizdan yoki unga qo‘shilganingizdan so‘ng Bitbucket PRlarini ko‘rib chiqish mumkin.",
       "contextLine": "{{organization}} uchun",
       "contextLinePersonal": "Shaxsiy hisob uchun"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub bilan ulanish muddati tugadi.",
-      "message": "GitHub ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi.",
+      "message": "Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi.",
       "gitlabTitle": "GitLab bilan ulanish muddati tugadi.",
-      "bitbucketTitle": "Bitbucket bilan ulanish muddati tugadi.",
-      "providerMessage": "{{provider}} ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi."
+      "bitbucketTitle": "Bitbucket bilan ulanish muddati tugadi."
     },
     "eventChips": {
       "comment": "Izoh",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLabda qo'shimcha guruh yoki loyihalarga kirish huquqini berishingiz kerak bo'lishi mumkin.",
       "installGithubApp": "GitHub ilovasini repozitoriyalarga o'rnating",
       "installGithubAppDescription": "Kilo GitHub ilovasiga ko'rib chiqilishini xohlagan repozitoriyalaringizga kirish huquqini bering.",
-      "repositoryAccess": "repozitoriyaga kirish huquqi"
+      "repositoryAccess": "repozitoriyaga kirish huquqi",
+      "allModePersonal": "Kilo sizning GitHub ulanishingiz orqali kira oladigan har bir repozitoriya avtomatik ravishda ko'rib chiqiladi.",
+      "allModeOrganization": "Kilo tashkilotning GitHub ulanishi orqali kira oladigan har bir repozitoriya avtomatik ravishda ko'rib chiqiladi.",
+      "allModeCount": "Mavjud repozitoriylar: {{displayCount}}"
     },
     "style": {
       "title": "Ko‘rib chiqish uslubi",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "Hali sinxronlanmagan",
       "refreshFailed": "Yangilash imkoni bo'lmadi — oxirgi sinxronlangan ma'lumotlar ko'rsatilmoqda.",
       "settings": "Sozlamalar",
-      "syncFindings": "Muammolarni sinxronlash",
       "syncNow": "Hozir sinxronlash",
       "syncQueued": "Sinxronlash navbatga qo'yildi",
       "syncStatusUnavailable": "Sinxronlash holatini aniqlab bo'lmadi.",
@@ -2154,7 +2156,7 @@
     "sessionList": {
       "couldNotLoadActive": "Faol sessiyalarni yuklab bo'lmadi.",
       "couldNotRefresh": "Yangilab bo'lmadi",
-      "noSessionsYetDescription": "Telefoningizdan kod yozish vazifasini boshlang. Sessiyalaringiz shu yerda ko'rinadi.",
+      "noSessionsYetDescription": "Telefoningizdan kod yozish vazifasini boshlang.",
       "viewHistory": "Sessiyalar tarixi",
       "noMatches": "Mos sessiya topilmadi",
       "tryDifferentSearch": "Boshqa so‘z bilan qidirib ko‘ring.",
@@ -3854,6 +3856,7 @@
     "skillMarkdownLabel": "Ko'nikma tarkibi",
     "skillsEmpty": "Hali mahorat yo'q",
     "skillNameRequired": "Qobiliyat nomini kiriting",
+    "skillNameTooLong": "Malaka nomi {{max}} ta belgidan oshmasligi kerak",
     "skillNameInvalid": "Malaka nomi harf yoki raqam bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
     "skillContentRequired": "Ko'nikma tarkibi talab qilinadi",
     "skillSaveFailed": "Mahorat saqlanmadi. Qayta urinib ko'ring.",

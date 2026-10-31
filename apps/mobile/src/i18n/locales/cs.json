@@ -163,7 +163,7 @@
     "allLanguages": "Všechny jazyky"
   },
   "login": {
-    "welcome": "Vítejte v aplikaci Kilo",
+    "welcome": "Vítejte",
     "retrySignIn": "Zkusit přihlášení znovu",
     "logo": "Logo Kilo",
     "continuingSignIn": "Přihlašování pokračuje.",
@@ -714,6 +714,7 @@
       "gitlabDescription": "Připoj svůj účet GitLab a kontroluj merge requesty na mobilu.",
       "bitbucketDescription": "Připoj Bitbucket k této organizaci a kontroluj PR na mobilu.",
       "bitbucketOrgOnlyDescription": "Přepni účet nahoře na organizaci a kontroluj její PR na Bitbucketu.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatím nemá žádnou organizaci. PR na Bitbucketu půjde kontrolovat, jakmile nějakou vytvoříš nebo se k ní přidáš.",
       "contextLine": "Pro {{organization}}",
       "contextLinePersonal": "Pro osobní účet"
     },
@@ -739,10 +740,9 @@
     },
     "reconnectNotice": {
       "title": "Platnost připojení ke službě GitHub vypršela.",
-      "message": "Tvé připojení ke GitHubu už není platné. Znovu ho ověř. V případě potřeby tě aplikace vyzve k opětovnému připojení.",
+      "message": "Znovu ho ověř. V případě potřeby tě aplikace vyzve k opětovnému připojení.",
       "gitlabTitle": "Platnost připojení ke službě GitLab vypršela.",
-      "bitbucketTitle": "Platnost připojení ke službě Bitbucket vypršela.",
-      "providerMessage": "Tvé připojení ke {{provider}}u už není platné. Znovu ho ověř. V případě potřeby tě aplikace vyzve k opětovnému připojení."
+      "bitbucketTitle": "Platnost připojení ke službě Bitbucket vypršela."
     },
     "eventChips": {
       "comment": "Komentovat",
@@ -1471,7 +1471,10 @@
       "gitlabNoRepositoriesDescription": "Možná bude nutné udělit přístup k dalším skupinám nebo projektům na GitLabu.",
       "installGithubApp": "Instalace aplikace GitHub pro repozitáře",
       "installGithubAppDescription": "Udělte aplikaci Kilo na GitHubu přístup k repozitářům, které chcete nechat zkontrolovat.",
-      "repositoryAccess": "přístup k repozitářům"
+      "repositoryAccess": "přístup k repozitářům",
+      "allModePersonal": "Každý repozitář, ke kterému má Kilo přístup přes vaše připojení ke GitHubu, se automaticky kontroluje.",
+      "allModeOrganization": "Každý repozitář, ke kterému má Kilo přístup přes připojení organizace ke GitHubu, se automaticky kontroluje.",
+      "allModeCount": "Dostupné repozitáře: {{displayCount}}"
     },
     "style": {
       "title": "Styl kontroly",
@@ -1824,7 +1827,6 @@
       "notYetSynced": "Zatím nesynchronizováno",
       "refreshFailed": "Obnovení se nezdařilo — zobrazují se poslední synchronizovaná data.",
       "settings": "Nastavení",
-      "syncFindings": "Synchronizovat nálezy",
       "syncNow": "Synchronizovat nyní",
       "syncQueued": "Synchronizace zařazena do fronty",
       "syncStatusUnavailable": "Stav synchronizace není k dispozici.",
@@ -2212,7 +2214,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktivní relace se nepodařilo načíst.",
       "couldNotRefresh": "Obnovení se nezdařilo",
-      "noSessionsYetDescription": "Zadej programovací úkol z telefonu. Tady se zobrazí tvé relace.",
+      "noSessionsYetDescription": "Zadej programovací úkol z telefonu.",
       "viewHistory": "Historie relací",
       "noMatches": "Žádné odpovídající relace",
       "tryDifferentSearch": "Zkus jiný hledaný výraz.",
@@ -3954,6 +3956,7 @@
     "skillMarkdownLabel": "Obsah dovedností",
     "skillsEmpty": "Zatím žádné dovednosti",
     "skillNameRequired": "Zadejte název dovednosti",
+    "skillNameTooLong": "Název dovednosti musí mít maximálně {{max}} znaků",
     "skillNameInvalid": "Název dovednosti musí začínat písmenem nebo číslicí a používat pouze malá písmena, číslice a pomlčky",
     "skillContentRequired": "Je vyžadován obsah dovedností",
     "skillSaveFailed": "Nepodařilo se zachránit dovednost. Zkuste to znovu.",

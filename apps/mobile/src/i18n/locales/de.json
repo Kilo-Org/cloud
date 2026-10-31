@@ -163,7 +163,7 @@
     "allLanguages": "Alle Sprachen"
   },
   "login": {
-    "welcome": "Willkommen bei Kilo",
+    "welcome": "Willkommen",
     "retrySignIn": "Anmeldung erneut versuchen",
     "logo": "Kilo-Logo",
     "continuingSignIn": "Deine Anmeldung wird fortgesetzt.",
@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "Du musst möglicherweise Zugriff auf weitere Gruppen oder Projekte in GitLab gewähren.",
       "installGithubApp": "GitHub-App auf Repositories installieren",
       "installGithubAppDescription": "Gewähre der Kilo-GitHub-App Zugriff auf die Repositories, die du prüfen lassen möchtest.",
-      "repositoryAccess": "repository-Zugriff"
+      "repositoryAccess": "repository-Zugriff",
+      "allModePersonal": "Jedes Repository, auf das Kilo über deine GitHub-Verbindung zugreifen kann, wird automatisch geprüft.",
+      "allModeOrganization": "Jedes Repository, auf das Kilo über die GitHub-Verbindung der Organisation zugreifen kann, wird automatisch geprüft.",
+      "allModeCount": "Verfügbare Repositories: {{displayCount}}"
     },
     "style": {
       "title": "Art der Prüfung",
@@ -1298,7 +1301,6 @@
       "repositoryActionPlan": "Maßnahmenplan für Repositories",
       "settings": "Einstellungen",
       "slaPosture": "SLA-Übersicht",
-      "syncFindings": "Befunde synchronisieren",
       "syncNow": "Jetzt synchronisieren",
       "syncQueued": "Synchronisierung in die Warteschlange aufgenommen",
       "syncStatusUnavailable": "Der Synchronisierungsstatus ist nicht verfügbar.",
@@ -1625,7 +1627,7 @@
     "sessionList": {
       "couldNotLoadActive": "Die aktiven Sitzungen konnten nicht geladen werden.",
       "couldNotRefresh": "Konnte nicht aktualisiert werden",
-      "noSessionsYetDescription": "Starte eine Programmieraufgabe auf deinem Handy. Deine Sitzungen erscheinen hier.",
+      "noSessionsYetDescription": "Starte eine Programmieraufgabe auf deinem Handy.",
       "viewHistory": "Sitzungsverlauf",
       "noMatches": "Keine Sitzungen gefunden",
       "tryDifferentSearch": "Versuche einen anderen Suchbegriff.",
@@ -2698,6 +2700,7 @@
       "gitlabDescription": "Verbinde dein GitLab-Konto, um Merge-Requests in der App zu prüfen.",
       "bitbucketDescription": "Verbinde Bitbucket mit dieser Organisation, um Pull-Requests in der App zu prüfen.",
       "bitbucketOrgOnlyDescription": "Wechsle das Konto oben zu einer Organisation, um deren Pull-Requests in Bitbucket zu prüfen.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Diesem Konto ist noch keine Organisation zugeordnet. Du kannst Bitbucket-Pull-Requests prüfen, sobald du eine Organisation erstellst oder einer beitrittst.",
       "contextLine": "Für {{organization}}",
       "contextLinePersonal": "Für den persönlichen Bereich"
     },
@@ -3064,10 +3067,9 @@
     "pullRequestUnavailableDescription": "Dieser PR kann nicht geöffnet werden. Möglicherweise wurde er gelöscht, das Repository ist privat oder die GitHub-App von Kilo ist dort nicht installiert.",
     "reconnectNotice": {
       "title": "Die GitHub-Verbindung ist abgelaufen.",
-      "message": "Deine GitHub-Verbindung ist nicht mehr gültig. Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen.",
+      "message": "Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen.",
       "gitlabTitle": "Die GitLab-Verbindung ist abgelaufen.",
-      "bitbucketTitle": "Die Bitbucket-Verbindung ist abgelaufen.",
-      "providerMessage": "Deine {{provider}}-Verbindung ist nicht mehr gültig. Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen."
+      "bitbucketTitle": "Die Bitbucket-Verbindung ist abgelaufen."
     },
     "review": "Prüfung",
     "reviewPullRequest": "Pull-Request prüfen",
@@ -3854,6 +3856,7 @@
     "skillMarkdownLabel": "Kompetenzinhalte",
     "skillsEmpty": "Noch keine Fähigkeiten",
     "skillNameRequired": "Gib einen Skill-Namen ein",
+    "skillNameTooLong": "Der Fertigkeitsname darf höchstens {{max}} Zeichen enthalten",
     "skillNameInvalid": "Der Fertigkeitsname muss mit einem Buchstaben oder einer Ziffer beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten",
     "skillContentRequired": "Kompetenzinhalte sind erforderlich",
     "skillSaveFailed": "Fertigkeit konnte nicht gespeichert werden. Versuche es erneut.",

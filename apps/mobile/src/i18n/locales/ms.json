@@ -163,7 +163,7 @@
     "allLanguages": "Semua bahasa"
   },
   "login": {
-    "welcome": "Selamat datang ke Kilo",
+    "welcome": "Selamat datang",
     "retrySignIn": "Cuba log masuk semula",
     "logo": "Logo Kilo",
     "continuingSignIn": "Proses log masuk anda sedang diteruskan.",
@@ -178,7 +178,7 @@
     "useDifferentEmail": "Guna e-mel lain",
     "signInWithApple": "Log masuk dengan Apple",
     "signInWithGoogle": "Log masuk dengan Google",
-    "signInWithPasskey": "Log masuk dengan kunci laluan",
+    "signInWithPasskey": "Guna kunci laluan",
     "emailAddress": "Alamat e-mel",
     "emailPlaceholder": "anda@contoh.com",
     "continueWithEmail": "Teruskan dengan e-mel",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Sambungkan akaun GitLab anda untuk menyemak permintaan gabungan pada mudah alih.",
       "bitbucketDescription": "Sambungkan Bitbucket ke organisasi ini untuk menyemak permintaan tarik pada mudah alih.",
       "bitbucketOrgOnlyDescription": "Tukar akaun di atas kepada organisasi untuk menyemak permintaan tarik Bitbucket-nya.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Akaun ini belum mempunyai sebarang organisasi. Permintaan tarik Bitbucket boleh disemak setelah anda mencipta atau menyertai sebuah organisasi.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akaun peribadi anda"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Sambungan GitHub telah tamat tempoh.",
-      "message": "Sambungan GitHub anda tidak lagi sah. Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu.",
+      "message": "Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu.",
       "gitlabTitle": "Sambungan GitLab telah tamat tempoh.",
-      "bitbucketTitle": "Sambungan Bitbucket telah tamat tempoh.",
-      "providerMessage": "Sambungan {{provider}} anda tidak lagi sah. Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu."
+      "bitbucketTitle": "Sambungan Bitbucket telah tamat tempoh."
     },
     "eventChips": {
       "comment": "Komen",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Anda mungkin perlu memberikan akses kepada lebih banyak kumpulan atau projek di GitLab.",
       "installGithubApp": "Pasang apl GitHub pada repositori",
       "installGithubAppDescription": "Benarkan apl GitHub Kilo mengakses repositori yang anda mahu disemak.",
-      "repositoryAccess": "akses repositori"
+      "repositoryAccess": "akses repositori",
+      "allModePersonal": "Setiap repositori yang boleh diakses oleh Kilo melalui sambungan GitHub anda akan disemak secara automatik.",
+      "allModeOrganization": "Setiap repositori yang boleh diakses oleh Kilo melalui sambungan GitHub organisasi akan disemak secara automatik.",
+      "allModeCount": "Repositori tersedia: {{displayCount}}"
     },
     "style": {
       "title": "Gaya semakan",
@@ -1667,7 +1670,7 @@
       "outcome": "Hasil",
       "slaStatus": "Status SLA",
       "sortBy": "Susun mengikut",
-      "statusOpen": "Buka",
+      "statusOpen": "Terbuka",
       "fixed": "Diperbaiki",
       "statusIgnored": "Diabaikan",
       "severityHigh": "Tinggi",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "Belum disegerakkan",
       "refreshFailed": "Tidak dapat memuat semula data. Data daripada penyegerakan terakhir dipaparkan.",
       "settings": "Tetapan",
-      "syncFindings": "Segerakkan penemuan",
       "syncNow": "Segerakkan sekarang",
       "syncQueued": "Penyegerakan dimasukkan ke dalam baris gilir",
       "syncStatusUnavailable": "Status penyegerakan tidak tersedia.",
@@ -1841,7 +1843,7 @@
       "source": "Sumber",
       "sourceId": "ID sumber",
       "viewAdvisory": "Lihat notis keselamatan di GitHub",
-      "statusOpen": "Buka",
+      "statusOpen": "Terbuka",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "pembetulan telah dimulakan",
       "reasonNoBandwidth": "tiada masa atau tenaga kerja",
@@ -2154,7 +2156,7 @@
     "sessionList": {
       "couldNotLoadActive": "Tidak dapat memuatkan sesi aktif.",
       "couldNotRefresh": "Tidak dapat memuat semula",
-      "noSessionsYetDescription": "Mulakan tugasan pengekodan dari telefon anda. Sesi anda akan muncul di sini.",
+      "noSessionsYetDescription": "Mulakan tugasan pengekodan dari telefon anda.",
       "viewHistory": "Sejarah sesi",
       "noMatches": "Tiada sesi yang sepadan",
       "tryDifferentSearch": "Cuba kata carian lain.",
@@ -3854,6 +3856,7 @@
     "skillMarkdownLabel": "Kandungan kemahiran",
     "skillsEmpty": "Belum ada kemahiran",
     "skillNameRequired": "Masukkan nama kemahiran",
+    "skillNameTooLong": "Nama kemahiran mesti {{max}} aksara atau kurang",
     "skillNameInvalid": "Nama kemahiran mesti bermula dengan huruf atau digit dan hanya menggunakan huruf kecil, angka dan sempang",
     "skillContentRequired": "Kandungan kemahiran diperlukan",
     "skillSaveFailed": "Tidak dapat menyelamatkan kemahiran. Cuba lagi.",

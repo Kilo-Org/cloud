@@ -163,7 +163,7 @@
     "allLanguages": "Dhammaan luqadaha"
   },
   "login": {
-    "welcome": "Ku soo dhawoow Kilo",
+    "welcome": "Ku soo dhawoow",
     "retrySignIn": "Mar kale isku day soo galista",
     "logo": "Summada Kilo",
     "continuingSignIn": "Waxaa sii socota soo galistaada.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Ku xir xisaabtaada GitLab si aad mobilka ugu eegto merge request-yada.",
       "bitbucketDescription": "Bitbucket ku xir hay'addan si aad mobilka ugu eegto PR-yada.",
       "bitbucketOrgOnlyDescription": "Beddel xisaabta kor ku qoran hay'ad si aad u eegto PR-yadeeda Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Xisaabtan weli ma laha hay'ado. PR-yada Bitbucket waxaad eegi kartaa marka aad abuurto ama aad ku biirto hay'ad.",
       "contextLine": "{{organization}} u",
       "contextLinePersonal": "Akoonkaaga shakhsiyeed u"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Muddadii xiriirka GitHub way dhammaatay.",
-      "message": "Xiriirkaaga GitHub hadda ma ansaxsana. Mar kale hubi xiriirkaaga — waxaa lagu weydiin doonaa inaad dib u xirto haddii loo baahdo.",
+      "message": "Mar kale hubi xiriirkaaga — waxaa lagu weydiin doonaa inaad dib u xirto haddii loo baahdo.",
       "gitlabTitle": "Muddadii xiriirka GitLab way dhammaatay.",
-      "bitbucketTitle": "Muddadii xiriirka Bitbucket way dhammaatay.",
-      "providerMessage": "Xiriirkaaga {{provider}} hadda ma ansaxsana. Mar kale hubi xiriirkaaga — waxaa lagu weydiin doonaa inaad dib u xirto haddii loo baahdo."
+      "bitbucketTitle": "Muddadii xiriirka Bitbucket way dhammaatay."
     },
     "eventChips": {
       "comment": "Faallo",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Waxaa laga yaabaa inaad u baahato inaad oggolaato gelitaanka kooxo ama mashaariic dheeraad ah oo ku jira GitLab.",
       "installGithubApp": "Abka GitHub ku rakib kaydadka",
       "installGithubAppDescription": "U oggolow abka Kilo ee GitHub inuu galo kaydadka aad rabto in dib loo eego.",
-      "repositoryAccess": "oggolaanshaha gelitaanka kaydka"
+      "repositoryAccess": "oggolaanshaha gelitaanka kaydka",
+      "allModePersonal": "Kayd kasta oo Kilo ka heli karo xiriirkaaga GitHub waa dib loo eegaa si otomaatig ah.",
+      "allModeOrganization": "Kayd kasta oo Kilo ka heli karo xiriirka GitHub ee ururka waa dib loo eegaa si otomaatig ah.",
+      "allModeCount": "Kaydadka la heli karo: {{displayCount}}"
     },
     "style": {
       "title": "Qaabka dib-u-eegista",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "Weli lama isku waafajin",
       "refreshFailed": "Lama cusboonaysiin karin. Waxaa la muujinayaa xogtii ugu dambaysay ee la isku waafajiyay.",
       "settings": "Dejinta",
-      "syncFindings": "Isku waafaji natiijooyinka",
       "syncNow": "Hadda isku waafaji",
       "syncQueued": "Isku waafajinta ayaa safka la geliyay",
       "syncStatusUnavailable": "Xaaladda isku waafajinta lama heli karo.",
@@ -2154,7 +2156,7 @@
     "sessionList": {
       "couldNotLoadActive": "Kalfadhiyada firfircoon lama soo rari karin.",
       "couldNotRefresh": "Lama cusboonaysiin karin",
-      "noSessionsYetDescription": "Taleefankaaga ka bilow hawl koodh-qoris ah. Kalfadhiyadaada ayaa halkan ka soo muuqan doona.",
+      "noSessionsYetDescription": "Taleefankaaga ka bilow hawl koodh-qoris ah.",
       "viewHistory": "Taariikhda kalfadhiyada",
       "noMatches": "Ma jiraan kalfadhiyo u dhigma",
       "tryDifferentSearch": "Isku day erey kale oo raadinta ah.",
@@ -3854,6 +3856,7 @@
     "skillMarkdownLabel": "Waxa ku jira xirfad",
     "skillsEmpty": "Weli xirfado ma laha",
     "skillNameRequired": "Geli magac xirfad",
+    "skillNameTooLong": "Magaca xirfaddu waa inuu noqdaa {{max}} xaraf ama ka yar",
     "skillNameInvalid": "Magaca xirfaddu waa inuu ku bilaabmaa xaraf ama lambar oo waa inuu isticmaalo xarfo yaryar, lambaro, iyo jajab",
     "skillContentRequired": "Waxa loo baahan yahay nuxurka xirfadaha",
     "skillSaveFailed": "Ma badbaadin karin xirfad. Isku day mar kale.",

@@ -2,7 +2,7 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { user_notification_history } from '@kilocode/db/schema';
-import { NOTIFICATION_HISTORY_RETENTION_MS } from '@kilocode/notifications';
+import { NOTIFICATION_HISTORY_RETENTION_MS } from '@kilocode/notifications/schemas';
 import { eq } from 'drizzle-orm';
 
 const DAY_MS = 24 * 60 * 60 * 1000;

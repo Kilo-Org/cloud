@@ -47,22 +47,28 @@ export function TabBarButton({
   onPressIn,
   onPressOut,
   style,
+  'aria-selected': ariaSelected,
   ...props
 }: BottomTabBarButtonProps) {
   const pressed = useRef(false);
+  // The entry the user is already on opens no screen, and its scene stays
+  // focused, so the input window cannot tell the two cases apart by focus. The
+  // bar marks that entry as selected; the window is armed as a same-tab one so
+  // the scene keeps the claim for its own bounded settle.
+  const sameTab = ariaSelected === true;
   return (
     <Pressable
       {...props}
       onPressIn={event => {
         pressed.current = true;
-        markTabSwitchPending();
+        markTabSwitchPending(Date.now(), { sameTab });
         onPressIn?.(event);
       }}
       onPress={event => {
         pressed.current = false;
         // A completed press navigates, so its window starts here: this clears a
         // settle the touch up may already have scheduled.
-        markTabSwitchPending();
+        markTabSwitchPending(Date.now(), { sameTab });
         onPress?.(event);
       }}
       onPressOut={event => {

@@ -1,4 +1,6 @@
 import { createLinkAccountToken } from '@/lib/bot-identity';
+import { createSlackBotLinkState } from '@/lib/bot/slack-link-state';
+import { getSlackOidcAuthorizeUrl } from '@/lib/integrations/slack-oidc';
 import { isSlackMissingScopeError, postSlackReinstallInstruction } from '@/lib/bot/helpers';
 import { getPlatformIntegrationByBotUserId } from '@/lib/bot/platform-helpers';
 import {
@@ -273,6 +275,22 @@ export function createSlackBotPlatform(slackAdapter: SlackAdapter): BotPlatform 
       await target.postEphemeral(message.author, linkAccountCard(url.toString()), {
         fallbackToDM: true,
       });
+    },
+    /**
+     * Prove the clicker is the Slack user this link names, with Sign in with
+     * Slack (OpenID Connect). The round trip ends at the Slack platform OAuth
+     * callback, which compares the identity Slack asserts with the one the
+     * signed state carries before writing anything.
+     */
+    beginLinkAccountProof({ identity, contextKey, user }) {
+      return getSlackOidcAuthorizeUrl(
+        createSlackBotLinkState({
+          userId: user.id,
+          slackTeamId: identity.teamId,
+          slackUserId: identity.userId,
+          contextKey,
+        })
+      );
     },
     async withAuthContext({ platformIntegration, fn }) {
       const platformAccountId = platformIntegration.platform_account_id;

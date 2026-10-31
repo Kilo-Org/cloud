@@ -666,18 +666,19 @@ directory when there is no repository). The reader also accepts the older `captu
 | Stamp from this allocation | A sibling session or a wrapper restart | Nothing |
 | Stamp from another allocation | A restored environment snapshot | **Adopt** |
 
-Adopt makes the snapshot equal to a fresh clone, then runs the ordinary steps:
+Adopt preserves the prepared workspace and selects the route's starting ref explicitly:
 
 1. Point `origin` at this route's canonical, credential-free URL.
-2. `fetch --prune`, then refresh the remote default branch.
-3. Detach at the remote default branch, so a new branch starts from its tip.
-4. Delete every local branch. The builder's default branch would otherwise shadow a newer
-   `origin/<branch>`.
-5. Check out this route's branch (working branch, explicit branch or review ref) and set the git
-   author, as after a clone.
-6. Run the setup commands, then write the stamp.
+2. `fetch --prune`. An explicit branch starts from its current remote ref, not a cached local branch.
+3. Resolve the remote default only for a new session branch or a working branch that has not been pushed.
+4. Check out the target directly, without an intermediate checkout or deleting other local branches.
+   Review refs retain their dedicated fetch and checkout path. Set the git author.
+5. Run the setup commands, then write the stamp.
 
-Any failure empties the directory and clones. The Kilo session step is unchanged: the builder
+Git failures retain the directory, dependencies, setup changes and original stamp. Network failures
+use the bounded git retry policy; missing branches, authentication failures and checkout conflicts
+fail preparation without cloning. Checkout never forces away conflicting setup changes.
+The Kilo session step is unchanged: the builder
 starts no Kilo runtime, so nothing stale shadows the restore from session-ingest. HOME of a
 `worktree` runtime is `/home/<sha256(directory)>`, the same path the builder uses, so caches that
 setup wrote (`~/.cache`, toolchains) are present after restore. An allocation that keeps
@@ -938,7 +939,8 @@ them through one development-only override.
 | Runtime install fails transiently, or the base is incompatible | Bootstrap report | Stop; new allocation within the route deadline, from the image after a restore | Queued fail at the deadline |
 | Startup report lost | Sandbox DO, 5 min | Same as "Wrapper never connects" | Queued fail at the deadline |
 | Clone network error | Wrapper | 3 attempts | Queued fail (`workspace_setup_failed`) |
-| Environment snapshot cannot be used (lookup, start, adopt) | Sandbox DO, container DO, wrapper | Start from the image, or clone | None; a cold start |
+| Environment snapshot cannot be used (lookup, start) | Sandbox DO, container DO | Start from the image | None; a cold start |
+| Environment snapshot git preparation fails | Wrapper | Bounded network retries; preserve workspace, no clone | Queued fail (`workspace_setup_failed`) with classified subtype |
 | Setup command fails | Wrapper | None | Queued fail with the command output visible |
 | Socket drops, wrapper returns | Sandbox DO | Wrapper reconnects | None |
 | Socket down 90 s | Sandbox DO | Stop the sandbox | Accepted fail (`connection_lost`); queued re-prepare |

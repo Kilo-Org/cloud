@@ -245,7 +245,14 @@ function Button({
         role="button"
         disabled={isDisabled}
         accessibilityLabel={resolvedLabel}
-        accessibilityState={{ ...accessibilityState, disabled: isDisabled, busy: loading }}
+        accessibilityState={{
+          ...accessibilityState,
+          disabled: isDisabled,
+          // A caller that shows its own busy response (for example an icon that
+          // spins while the same glyph stays drawn) declares `busy` without
+          // opting into the loading layout; `loading` still wins when it is set.
+          busy: loading ?? accessibilityState?.busy,
+        }}
         hitSlop={hitSlop ?? (size === 'sm' ? SM_HIT_SLOP : undefined)}
         {...props}
       >

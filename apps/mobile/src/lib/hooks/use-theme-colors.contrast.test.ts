@@ -197,12 +197,21 @@ describe('disabled primary fill contrast (WCAG AA text)', () => {
   });
 
   it('dark theme: the disabled primary pair is at least as legible as the light pair', () => {
-    // The dark fill carries a near-black ink, so a muted neutral fill leaves a
-    // dull grey label on grey. The dark pair must not fall below the light
+    // The dark fill carries a near-black ink, so a fill that is too dark leaves a
+    // dull label on a dull block. The dark pair must not fall below the light
     // pair's white-on-warm-grey legibility (5.37:1).
     const dark = contrastRatio(darkColors.primaryForeground, darkColors.primaryDisabled);
     const light = contrastRatio(lightColors.primaryForeground, lightColors.primaryDisabled);
     expect(dark).toBeGreaterThanOrEqual(light);
+  });
+
+  it('dark theme: the disabled fill stays distinguishable from the enabled brand fill', () => {
+    // The disabled fill takes a desaturated step of the brand hue so it keeps
+    // the weight of a filled primary instead of reading as a washed-out neutral.
+    // It must still be visibly duller than the enabled #ffdd00 (1.89:1 between
+    // the two fills), or a disabled Start would look tappable.
+    const separation = contrastRatio(darkColors.primary, darkColors.primaryDisabled);
+    expect(separation).toBeGreaterThanOrEqual(1.5);
   });
 });
 

@@ -262,14 +262,16 @@ export function SettingsOverviewScreen({
                 <ConfigureRow
                   icon={FolderGit2}
                   title={t('common.selectRepositories')}
-                  // A settled empty grant has nothing to choose from yet, so the
-                  // row names the real next step instead of describing a choice
-                  // the user cannot make.
-                  subtitle={t(
+                  // No count subtitle: this row renders only without an
+                  // effective selection, so a saved count would always read
+                  // zero. A settled empty grant is the one state that names the
+                  // real next step instead — there is nothing to select, so
+                  // widening the GitHub App grant is the only way out.
+                  subtitle={
                     repositoriesSettledEmpty
-                      ? 'securityAgent.repositories.noRepositoriesDescription'
-                      : 'securityAgent.settingsOverview.selectRepositoriesSubtitle'
-                  )}
+                      ? t('securityAgent.repositories.noRepositoriesDescription')
+                      : undefined
+                  }
                   onPress={() => {
                     pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
                   }}

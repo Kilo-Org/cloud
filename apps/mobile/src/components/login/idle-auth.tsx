@@ -368,13 +368,14 @@ export function IdleAuth({
             variant="outline"
             size="lg"
             // min-h (not fixed h) so Dynamic Type can grow the control, matching
-            // the Google button's Apple-parity 44pt floor. No flex-wrap: the
-            // label must never wrap to its own line. The Arabic label
-            // ("تسجيل الدخول بمفتاح المرور") once wrapped onto two lines and made
-            // this button visibly taller than the single-line Google button
-            // directly above it; the flex-1 label box gives the copy the whole
-            // content width and centers it on the button, so the stack keeps one
-            // row height.
+            // the Google button's Apple-parity 44pt floor. The flex-1 label box
+            // gives the copy the whole content width and centers it on the
+            // button, but a label wider than that box still wraps and makes this
+            // row taller than the Google row above it (the Arabic label once
+            // did). The row therefore stays one line only while every catalog's
+            // `login.signInWithPasskey` fits the compact 360dp content width
+            // (248dp at the 17pt label size); the 14 locales whose label was
+            // wider are phrased short for that reason, not for style.
             className={PROVIDER_ROW_CLASS}
             disabled={authBusy}
             onPress={() => {
@@ -400,12 +401,16 @@ export function IdleAuth({
       )}
 
       {showDivider && (
+        // The border token is 7% white in dark, a hairline that all but
+        // vanishes on the near-black background; the outline button carries
+        // neutral-700 for the same reason, so the rule keeps the weight it has
+        // in the light scheme.
         <View className="flex-row items-center gap-3">
-          <View className="h-px flex-1 bg-border" />
+          <View className="h-px flex-1 bg-border dark:bg-neutral-700" />
           <Text variant="muted" className="text-xs">
             {t('login.or')}
           </Text>
-          <View className="h-px flex-1 bg-border" />
+          <View className="h-px flex-1 bg-border dark:bg-neutral-700" />
         </View>
       )}
 
@@ -491,17 +496,19 @@ export function IdleAuth({
             28dp floor is cancelled by the shared layout-neutral form), so the
             only gaps between the words are the sentence's own spaces, and the
             connector's min-width keeps both 4dp facing reaches apart in a
-            catalog with a short conjunction. The links' 44pt vertical reach
-            needs `(28 - 14) / 2 + 8 = 15dp` of free space above and below the
-            `text-xs` line, which the screen's `gap-3` gutter (10.5dp) cannot
-            give it, so the row carries the extra 5dp margin: both regions then
-            stay clear of the Continue button above and the ghost button
-            below. */}
+            catalog with a short conjunction. The 12.25dp `text-sm` copy is
+            DESIGN.md's label step: the smaller `text-xs` sat below every other
+            line on the screen and its 8dp wrapped-line gap left the two lines
+            of the sentence reading as separate items. The row's 5dp margin
+            still holds the links' vertical reach clear of the buttons above and
+            below. A long locale wraps the sentence, so the row also keeps the
+            shared wrapped-line gap (`INLINE_LINK_LINE_GAP_CLASS`); a sentence
+            that fits one line never sees it. */}
 
         <Text
           importantForAccessibility="no-hide-descendants"
           accessibilityElementsHidden
-          className="text-xs text-muted-foreground"
+          className="text-sm text-muted-foreground"
         >
           {t('login.termsPrefix')}
         </Text>
@@ -514,12 +521,12 @@ export function IdleAuth({
           accessibilityLabel={t('login.terms')}
           onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}
         >
-          <Text className="text-xs text-primary underline">{t('login.terms')}</Text>
+          <Text className="text-sm text-primary underline">{t('login.terms')}</Text>
         </Pressable>
         <Text
           importantForAccessibility="no-hide-descendants"
           accessibilityElementsHidden
-          className={cn('text-xs text-muted-foreground', INLINE_LINK_CONNECTOR_CLASS)}
+          className={cn('text-sm text-muted-foreground', INLINE_LINK_CONNECTOR_CLASS)}
         >
           {t('login.termsConnector')}
         </Text>
@@ -532,12 +539,12 @@ export function IdleAuth({
           accessibilityLabel={t('common.privacyPolicy')}
           onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}
         >
-          <Text className="text-xs text-primary underline">{t('common.privacyPolicy')}</Text>
+          <Text className="text-sm text-primary underline">{t('common.privacyPolicy')}</Text>
         </Pressable>
         <Text
           importantForAccessibility="no-hide-descendants"
           accessibilityElementsHidden
-          className="text-xs text-muted-foreground"
+          className="text-sm text-muted-foreground"
         >
           {t('login.termsSuffix')}
         </Text>

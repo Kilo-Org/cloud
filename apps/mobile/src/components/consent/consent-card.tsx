@@ -31,17 +31,23 @@ type ConsentCardProps = {
  * Maximum font scale honoured by the pinned privacy disclosure.
  *
  * The disclosure sits in the card's pinned footer with the reserved error
- * line and two `size="lg"` buttons. Uncapped, the `text-xs` sentence grows
+ * line and two `size="lg"` buttons. Uncapped, the `text-sm` sentence grows
  * with Dynamic Type to several lines at the largest system text size, and
  * that height comes out of the sheet, not the scroll region: the footer has
- * no room left and the second action clips at the sheet bottom. Capped at
- * 1.6 the sentence stays within two bounded lines on the smallest supported
- * width, so the footer keeps a bounded height and the actions stay on
- * screen; scales below 1.6 pass through untouched, so a11y users keep most
- * of their preferred scale. Same cap and reasoning as the tour header (see
- * `tour-font-scale`).
+ * no room left and the second action clips at the sheet bottom.
+ *
+ * 1.4 is the cap that keeps the sentence within two bounded lines on the
+ * smallest supported width (360dp; the card's `px-6` leaves 318dp for the
+ * row) now that the copy is `text-sm`. The sentence's longer segment — the
+ * pt-BR lead-in — measures 209.52dp at scale 1 and the link 169.52dp, so at
+ * 1.4 the lead-in is 293.3dp and each segment still takes its own line. It
+ * also keeps the largest rendered sentence the size it already was: the old
+ * `text-xs` copy at the previous 1.6 cap rendered 16.8dp, and 12.25dp at 1.4
+ * renders 17.15dp. Scales below the cap pass through untouched, so a11y
+ * users keep most of their preferred scale. Same reasoning as the tour
+ * header's cap (see `tour-font-scale`).
  */
-export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.6;
+export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.4;
 
 export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const router = useRouter();
@@ -301,7 +307,10 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={t('consent.seeFullDetails')}
-            className="mt-6 flex-row items-center gap-1 active:opacity-70"
+            // The row's own node carries the control-size floor: the link's
+            // text line is 17.5dp, below the audit's 28dp minimum, and the
+            // 8dp slop carries the 44pt region on top of it.
+            className="mt-6 min-h-[28px] flex-row items-center gap-1 active:opacity-70"
           >
             <Text className="text-sm font-semibold text-primary">
               {t('consent.seeFullDetails')}

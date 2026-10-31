@@ -1,18 +1,19 @@
 /* eslint-disable max-lines -- The dashboard sections share one data contract and navigation scope. */
 import { getAnalysisIncompleteCount } from '@kilocode/app-shared/security-agent';
 import { type Href } from 'expo-router';
-import { FolderGit2, ShieldCheck } from '@/components/ui/icons';
+import { Clock, FolderGit2, ShieldCheck } from '@/components/ui/icons';
 import { DirectionalArrowRight } from '@/components/ui/directional-icons';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
+import { severityCountPhrase } from '@/components/security-agent/severity-count-phrase';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { formatNumber, formatPercent } from '@/lib/format';
+import { DENSE_ROW_HIT_SLOP } from '@/lib/a11y/tap-target';
+import { formatNumber, formatPercent, UNMEASURED_VALUE } from '@/lib/format';
 import { type useSecurityAgentDashboardStats } from '@/lib/hooks/use-security-agent';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -31,6 +32,8 @@ type SectionProps = Readonly<{
   data: DashboardStats;
   slaEnabled: boolean;
   repoFullName: string | undefined;
+  /** No sync has completed yet, so nothing here counts a measured result. */
+  neverSynced: boolean;
 }>;
 
 function repoTrailingLabel(
@@ -64,6 +67,22 @@ function findingsHref(
   return (query ? `${base}?${query}` : base) as Href;
 }
 
+/**
+ * A row's value before the first sync: the counts below it are not measured,
+ * so a dash replaces each number the row would otherwise claim as zero.
+ */
+function rowValue(neverSynced: boolean, rendered: string): string {
+  return neverSynced ? UNMEASURED_VALUE : rendered;
+}
+
+/** The status dot an unmeasured row shows: neutral, never a success or alarm colour. */
+function rowTone(
+  neverSynced: boolean,
+  measured: 'good' | 'warn' | 'danger' | 'muted'
+): 'good' | 'warn' | 'danger' | 'muted' {
+  return neverSynced ? 'muted' : measured;
+}
+
 function SectionCard({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
   return (
     <View className="gap-1 rounded-lg bg-secondary px-3">
@@ -75,11 +94,28 @@ function SectionCard({ title, children }: Readonly<{ title: string; children: Re
   );
 }
 
-function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
+function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: SectionProps) {
   const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const finding = data.priorityFinding;
+
+  // A scope that has never synced has found nothing yet because nothing ran,
+  // not because the codebase is clean: the green check and the all-clear line
+  // read as a verified result. The neutral row states the same not-yet-synced
+  // fact the filter above shows, and opens nothing.
+  if (neverSynced) {
+    return (
+      <SectionCard title={t('securityAgent.dashboard.actFirst')}>
+        <View className="flex-row items-center gap-2 py-3">
+          <Clock size={16} color={colors.mutedForeground} />
+          <Text variant="muted" className="text-sm">
+            {t('securityAgent.dashboard.notYetSynced')}
+          </Text>
+        </View>
+      </SectionCard>
+    );
+  }
 
   if (!finding) {
     return (
@@ -132,40 +168,15 @@ function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
   );
 }
 
-function PostureSection({ data, slaEnabled }: SectionProps) {
+function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
   const { t } = useTranslation();
+  // With SLA deadlines on, the metric tiles above already carry this breakdown:
+  // the compliance tile captions how many findings are within their deadline and
+  // the deadline tile captions the same severity buckets. A second copy here read
+  // the same figures twice, so the section only adds the analysis posture the
+  // tiles leave out.
   if (slaEnabled) {
-    const { overall, bySeverity } = data.sla;
-    return (
-      <SectionCard title={t('securityAgent.dashboard.slaPosture')}>
-        <KvRow
-          label={t('securityAgent.dashboard.withinDeadline')}
-          value={`${formatNumber(overall.withinSla, i18n.language)} / ${formatNumber(
-            overall.total,
-            i18n.language
-          )}`}
-        />
-        <KvRow
-          label={t('securityAgent.dashboard.criticalOverdue')}
-          value={formatNumber(bySeverity.critical.overdue, i18n.language)}
-          valueTone="muted"
-          dotTone={bySeverity.critical.overdue > 0 ? 'danger' : 'muted'}
-        />
-        <KvRow
-          label={t('securityAgent.dashboard.highOverdue')}
-          value={formatNumber(bySeverity.high.overdue, i18n.language)}
-          valueTone="muted"
-          dotTone={bySeverity.high.overdue > 0 ? 'danger' : 'muted'}
-        />
-        <KvRow
-          label={t('securityAgent.dashboard.mediumLowOverdue')}
-          value={formatNumber(bySeverity.medium.overdue + bySeverity.low.overdue, i18n.language)}
-          valueTone="muted"
-          dotTone={bySeverity.medium.overdue + bySeverity.low.overdue > 0 ? 'danger' : 'muted'}
-          last
-        />
-      </SectionCard>
-    );
+    return null;
   }
 
   const analysisIncomplete = getAnalysisIncompleteCount(data.analysis);
@@ -178,34 +189,38 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
     <SectionCard title={t('securityAgent.dashboard.actionPosture')}>
       <KvRow
         label={t('securityAgent.dashboard.confirmedExploitable')}
-        value={formatNumber(data.analysis.exploitable, i18n.language)}
+        value={rowValue(neverSynced, formatNumber(data.analysis.exploitable, i18n.language))}
         valueTone="muted"
-        dotTone="danger"
+        valueNumeric
+        dotTone={rowTone(neverSynced, 'danger')}
       />
       <KvRow
         label={t('securityAgent.dashboard.needsEvidenceReview')}
-        value={formatNumber(data.analysis.needsReview, i18n.language)}
+        value={rowValue(neverSynced, formatNumber(data.analysis.needsReview, i18n.language))}
         valueTone="muted"
-        dotTone="warn"
+        valueNumeric
+        dotTone={rowTone(neverSynced, 'warn')}
       />
       <KvRow
         label={t('securityAgent.dashboard.analysisNotComplete')}
-        value={formatNumber(analysisIncomplete, i18n.language)}
+        value={rowValue(neverSynced, formatNumber(analysisIncomplete, i18n.language))}
         valueTone="muted"
+        valueNumeric
         dotTone="muted"
       />
       <KvRow
         label={t('securityAgent.dashboard.noImmediateAction')}
-        value={formatNumber(noImmediateAction, i18n.language)}
+        value={rowValue(neverSynced, formatNumber(noImmediateAction, i18n.language))}
         valueTone="muted"
-        dotTone="good"
+        valueNumeric
+        dotTone={rowTone(neverSynced, 'good')}
         last
       />
     </SectionCard>
   );
 }
 
-function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps) {
+function CoverageSection({ scope, data, slaEnabled, repoFullName, neverSynced }: SectionProps) {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const analysisIncomplete = getAnalysisIncompleteCount(data.analysis);
@@ -258,20 +273,19 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
           onPress={() => {
             pushOnce(row.href);
           }}
+          // The row keeps `KvRow`'s own `py-3` rhythm, so its counts read as one
+          // column at the pitch every other `KvRow` group uses instead of the
+          // taller interactive-row frame. The slop carries the touch region past
+          // the design target without moving the frame the divider sits on.
+          hitSlop={DENSE_ROW_HIT_SLOP}
           className="active:opacity-70"
         >
-          {/* The frame sits on KvRow's own box, not on the wrapper: the
-              divider is that box's bottom edge, so a frame around it would
-              hold the rule above the row's bottom while the next row's
-              padding stacked below — visibly lopsided. With the frame on the
-              row, the padding above and below the label stays even and the
-              pressable still measures the full 48 dp target. */}
           <KvRow
-            className={ROW_TARGET_CLASS}
             label={row.label}
-            value={formatNumber(row.value, i18n.language)}
+            value={rowValue(neverSynced, formatNumber(row.value, i18n.language))}
             valueTone="muted"
-            dotTone={row.tone}
+            valueNumeric
+            dotTone={rowTone(neverSynced, row.tone)}
             last={index === rows.length - 1}
           />
         </Pressable>
@@ -318,13 +332,13 @@ function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
             </Text>
             <Text variant="muted" className="mt-0.5 text-xs">
               {t('securityAgent.dashboard.repoSummary', {
-                open: formatNumber(repo.open, i18n.language),
-                critical: formatNumber(repo.critical, i18n.language),
-                high: formatNumber(repo.high, i18n.language),
+                open: severityCountPhrase('repoOpen', repo.open),
+                critical: severityCountPhrase('repoCritical', repo.critical),
+                high: severityCountPhrase('repoHigh', repo.high),
               })}
             </Text>
           </View>
-          <Text variant="mono" className="text-xs text-muted-foreground">
+          <Text className="text-xs text-muted-foreground tabular-nums">
             {repoTrailingLabel(repo, slaEnabled)}
           </Text>
           <DirectionalArrowRight size={14} color={colors.mutedForeground} />

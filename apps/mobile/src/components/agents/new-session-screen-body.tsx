@@ -264,10 +264,13 @@ export function NewSessionScreenBody() {
   );
   // Stacked like the Run on and Repository sections below it: one label above
   // one full-width picker, so the form's label-value relation keeps one shape.
-  const organizationSection = (
+  // The label names the account, not the organization: the picker holds either
+  // the personal account or one of the reader's organizations, and its sheet is
+  // titled "Select account" (`profile.selectAccount`).
+  const accountSection = (
     <View className="mt-5">
       <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('common.organization')}
+        {t('preferences.account')}
       </Text>
       {isCloneEntry ? (
         <ContextControl
@@ -1301,7 +1304,7 @@ export function NewSessionScreenBody() {
         onManualVarsChange={setManualVars}
         onManualCommandsChange={setManualCommands}
         onOpenRepoDefaults={handleOpenRepoDefaults}
-        organizationSection={organizationSection}
+        accountSection={accountSection}
         autoCommit={autoCommit}
         onAutoCommitChange={setAutoCommit}
         isStartDisabled={isStartDisabled}

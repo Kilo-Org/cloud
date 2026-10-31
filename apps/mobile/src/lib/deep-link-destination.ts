@@ -78,8 +78,8 @@ function pathnameOf(path: string): string | null {
  * web table, owns. A dev or E2E link carries the route with its group segment
  * (`kiloapp:///(app)/…`, the form the design gate and the mobile docs use); a
  * system-search tap is delivered as the group-stripped family link the app
- * itself indexed (`kiloapp://agent-chat/…`), whose session member still has to
- * name a screen the session route can open.
+ * itself indexed (`kiloapp://agent-chat/…`). The session route appears in both
+ * forms and its param must name a screen either way.
  */
 export function opensAppRoutePath(path: string): boolean {
   const pathname = pathnameOf(path);
@@ -87,14 +87,16 @@ export function opensAppRoutePath(path: string): boolean {
     return false;
   }
   const withoutLeadingSlash = pathname.replace(/^\/+/, '');
+  // One href for the session route, whichever form the link carries: with the
+  // group segment (dev and E2E links) or without it (a search tap).
+  const sessionHref = withoutLeadingSlash.startsWith(SESSION_FAMILY_PREFIX)
+    ? `${SESSION_HREF_PREFIX}${withoutLeadingSlash.slice(SESSION_FAMILY_PREFIX.length)}`
+    : `/${withoutLeadingSlash}`;
+  if (sessionHref.startsWith(SESSION_HREF_PREFIX)) {
+    return opensDestination(sessionHref);
+  }
   if (INDEXED_LINK_PREFIXES.some(prefix => withoutLeadingSlash.startsWith(prefix))) {
-    // Only the session family carries a route param; the others name a screen.
-    return (
-      !withoutLeadingSlash.startsWith(SESSION_FAMILY_PREFIX) ||
-      opensDestination(
-        `${SESSION_HREF_PREFIX}${withoutLeadingSlash.slice(SESSION_FAMILY_PREFIX.length)}`
-      )
-    );
+    return true;
   }
   const root = withoutLeadingSlash.split('/')[0];
   return root !== undefined && APP_ROUTE_ROOTS.includes(root);

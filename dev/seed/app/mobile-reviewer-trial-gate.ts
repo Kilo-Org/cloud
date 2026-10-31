@@ -124,6 +124,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     userId,
     organizationId: ORGANIZATION_ID,
     organizationName: 'Reviewer trial gate lab',
-    deepLink: `kiloapp:///code-reviewer/${ORGANIZATION_ID}/github/gate`,
+    deepLink: `kiloapp:///(app)/code-reviewer/${ORGANIZATION_ID}/github/gate`,
   };
 }

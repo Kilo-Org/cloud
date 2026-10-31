@@ -197,5 +197,5 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   console.log(
     'Suggested next step: open the session on a signed-in dev build, then tap View changes.'
   );
-  return { userId: user.id, sessionId: SESSION_ID, deepLink: `kiloapp://agent-chat/${SESSION_ID}` };
+  return { userId: user.id, sessionId: SESSION_ID, deepLink: `kiloapp:///(app)/agent-chat/${SESSION_ID}` };
 }

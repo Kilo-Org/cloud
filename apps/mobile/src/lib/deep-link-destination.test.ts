@@ -4,7 +4,7 @@
 // resolves them and the screen beneath keeps its unsaved state.
 
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only check, runs in node, never bundled into the app
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only check, runs in node, never bundled into the app
 import { fileURLToPath } from 'node:url';
 
@@ -43,6 +43,8 @@ describe('opensAppRoutePath', () => {
     'kiloapp:///button-label-fixture',
     '/(app)/agent-chat/new?mode=code',
     '/(auth)/login',
+    `kiloapp:///(app)/agent-chat/${SESSION_ID}`,
+    'kiloapp:///(app)/agent-chat/new',
     `kiloapp://agent-chat/${SESSION_ID}`,
     'kiloapp://pr-review/Kilo-Org/cloud/6234',
     'kiloapp://security-agent/personal',
@@ -59,6 +61,8 @@ describe('opensAppRoutePath', () => {
     'https://example.com/profile',
     'not a url',
     'kiloapp://agent-chat/not-a-session',
+    'kiloapp:///(app)/agent-chat/not-a-session',
+    '/(app)/agent-chat/ses_short',
   ])('refuses %s', path => {
     expect(opensAppRoutePath(path)).toBe(false);
   });
@@ -81,3 +85,33 @@ describe('route namespace', () => {
     expect([...new Set(entries)].sort()).toEqual([...APP_ROUTE_ROOTS].sort());
   });
 });
+
+describe('seed fixture links', () => {
+  it('records the link form the app opens', () => {
+    // `dev/seed/AGENTS.md` requires a fixture to record the deep link that opens
+    // it, and `opensAppRoutePath` forwards only the group-prefixed form (or a
+    // `dev/` fixture link, which `+native-intent` answers before the mapper).
+    const files = seedSources(fileURLToPath(new URL('../../../../dev/seed', import.meta.url)));
+    const links = files.flatMap(file =>
+      [...readFileSync(file, 'utf8').matchAll(/kiloapp:\/\/[^\s'"`]+/g)].map(match => match[0])
+    );
+
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(
+        link.startsWith('kiloapp:///(app)/') || link.startsWith('kiloapp:///dev/'),
+        `${link} does not follow the recorded link form`
+      ).toBe(true);
+    }
+  });
+});
+
+function seedSources(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+    const path = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) {
+      return seedSources(path);
+    }
+    return entry.name.endsWith('.ts') ? [path] : [];
+  });
+}

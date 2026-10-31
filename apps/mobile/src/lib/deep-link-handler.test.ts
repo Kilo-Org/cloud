@@ -148,6 +148,7 @@ describe('redirectSystemPath', () => {
       'kiloapp:///definitely-not-a-route',
       'kiloapp:///dev/unknown-fixture',
       'kiloapp://agent-chat/not-a-session',
+      'kiloapp:///(app)/agent-chat/not-a-session',
     ])('ignores %s without navigate or stash', path => {
       for (const initial of [true, false]) {
         expect(redirectSystemPath({ path, initial })).toBeNull();

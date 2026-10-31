@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 
 import { FilterChip } from '@/components/ui/filter-chip';
-import { Text } from '@/components/ui/text';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 
 type BriefingOrganizationFilter = {
@@ -45,21 +44,19 @@ export function BriefingFilterControls({
         <FilterChip
           {...tabEntryA11y({ selected: !history })}
           selected={!history}
+          label={t('agentBriefing.available')}
           onPress={() => {
             onSelectHistory(false);
           }}
-        >
-          <Text>{t('agentBriefing.available')}</Text>
-        </FilterChip>
+        />
         <FilterChip
           {...tabEntryA11y({ selected: history })}
           selected={history}
+          label={t('agentBriefing.history')}
           onPress={() => {
             onSelectHistory(true);
           }}
-        >
-          <Text>{t('agentBriefing.history')}</Text>
-        </FilterChip>
+        />
       </View>
       <ScrollView
         horizontal
@@ -68,33 +65,27 @@ export function BriefingFilterControls({
       >
         <FilterChip
           selected={organizationId === undefined}
-          accessibilityState={{ selected: organizationId === undefined }}
+          label={t('common.all')}
           onPress={() => {
             onSelectOrganization(undefined);
           }}
-        >
-          <Text>{t('common.all')}</Text>
-        </FilterChip>
+        />
         <FilterChip
           selected={organizationId === null}
-          accessibilityState={{ selected: organizationId === null }}
+          label={t('common.personal')}
           onPress={() => {
             onSelectOrganization(null);
           }}
-        >
-          <Text>{t('common.personal')}</Text>
-        </FilterChip>
+        />
         {organizations.map(organization => (
           <FilterChip
             key={organization.organizationId}
             selected={organizationId === organization.organizationId}
-            accessibilityState={{ selected: organizationId === organization.organizationId }}
+            label={organization.organizationName}
             onPress={() => {
               onSelectOrganization(organization.organizationId);
             }}
-          >
-            <Text>{organization.organizationName}</Text>
-          </FilterChip>
+          />
         ))}
       </ScrollView>
     </>

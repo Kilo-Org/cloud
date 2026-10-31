@@ -243,12 +243,11 @@ export function NotificationHistoryScreen() {
                 // because `role` outranks `accessibilityRole`.
                 {...tabEntryA11y({ selected: filter.category === category })}
                 selected={filter.category === category}
+                label={t(filter.labelKey)}
                 onPress={() => {
                   setCategory(filter.category);
                 }}
-              >
-                <Text>{t(filter.labelKey)}</Text>
-              </FilterChip>
+              />
             ))}
           </ScrollView>
         )}

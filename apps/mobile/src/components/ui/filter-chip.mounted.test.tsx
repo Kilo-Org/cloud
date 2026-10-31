@@ -25,18 +25,25 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 
+/** The chip's props, read once so the assertions stay typed. */
+type ChipProps = { className?: string; accessibilityState?: { selected?: boolean } };
+
+function chipProps(node: TestRenderer.ReactTestInstance): ChipProps {
+  return node.props as ChipProps;
+}
+
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function chip(selected: boolean): TestRenderer.ReactTestInstance {
+function render(selected: boolean): TestRenderer.ReactTestInstance {
   act(() => {
     if (renderer) {
-      renderer.update(createElement(FilterChip, { selected, accessibilityLabel: 'Balance' }));
+      renderer.update(createElement(FilterChip, { selected, label: 'Balance' }));
     } else {
       renderer = TestRenderer.create(
         createElement(FilterChip, {
           selected,
+          label: 'Balance',
           accessibilityState: { selected },
-          accessibilityLabel: 'Balance',
           onPress: () => undefined,
         })
       );
@@ -45,21 +52,67 @@ function chip(selected: boolean): TestRenderer.ReactTestInstance {
   if (!renderer) {
     throw new Error('Missing FilterChip renderer');
   }
-  return renderer.root.findByType(Pressable);
+  return renderer.root;
 }
 
 /**
- * The chip's whole visible selection signal is its fill: `secondary` over
- * `ghost` drew a 1.1:1 difference and left the label colour alone, so the
- * current filter was announced to assistive tech only. The selected chip must
- * keep the primary fill, and the unselected one must stay unpainted.
+ * Selecting a chip only switched `secondary` over `ghost`, which drew a 1.1:1
+ * fill and kept the label colour, so the current filter reached assistive tech
+ * but not the screen. The selected option now keeps the neutral surface, adds a
+ * `primary` ring over its edge and paints the label in the same ink, while the
+ * saturated `primary` fill stays with the page's primary action.
  */
-it('paints the selected chip with the primary fill and leaves the rest transparent', () => {
-  const selected = chip(true);
-  expect(selected.props.className).toContain('bg-primary');
-  expect(selected.props.className).not.toContain('bg-secondary');
+it('rings the selected chip and paints its label, keeping the neutral surface', () => {
+  const root = render(true);
+  const chip = chipProps(root.findByType(Pressable));
+  expect(chip.className).toContain('bg-secondary');
+  expect(chip.className).not.toContain('bg-primary');
+  expect(chip.accessibilityState?.selected).toBe(true);
+  expect(chipProps(root.findByType('Text')).className).toContain('text-primary');
 
-  const unselected = chip(false);
-  expect(unselected.props.className).not.toContain('bg-primary');
-  expect(unselected.props.className).not.toContain('bg-secondary');
+  const rings = root.findAllByType('View');
+  expect(rings).toHaveLength(1);
+  const ring = chipProps(rings[0] as TestRenderer.ReactTestInstance).className ?? '';
+  expect(ring).toContain('border-primary');
+  // An overlay, so the ring never changes the chip's size or the row's frames.
+  expect(ring).toContain('absolute');
+  expect(ring).toContain('inset-0');
+});
+
+it('leaves the unselected chip unpainted and unringed', () => {
+  const root = render(false);
+  const chip = chipProps(root.findByType(Pressable));
+  expect(chip.className).not.toContain('bg-secondary');
+  expect(chip.className).not.toContain('bg-primary');
+  expect(root.findAllByType('View')).toHaveLength(0);
+  expect(chipProps(root.findByType('Text')).className ?? '').not.toContain('text-primary');
+  expect(chip.accessibilityState?.selected).toBe(false);
+});
+
+/** Moving the selection repaints the same chip instead of resizing it. */
+it('keeps one chip of the same size across both states', () => {
+  const selected = chipProps(render(true).findByType(Pressable)).className ?? '';
+  const unselected = chipProps(render(false).findByType(Pressable)).className ?? '';
+  expect(selected).toMatch(/min-h-\[36px\]/);
+  expect(unselected).toMatch(/min-h-\[36px\]/);
+  expect(selected).not.toMatch(/\bborder\b/);
+  expect(unselected).not.toMatch(/\bborder\b/);
+});
+
+/** A caller's `accessibilityState` cannot disagree with the painted state. */
+it('announces the chip it painted, whatever the caller passed', () => {
+  act(() => {
+    renderer = TestRenderer.create(
+      createElement(FilterChip, {
+        selected: true,
+        label: 'Balance',
+        accessibilityState: { selected: false },
+        onPress: () => undefined,
+      })
+    );
+  });
+  if (!renderer) {
+    throw new Error('Missing FilterChip renderer');
+  }
+  expect(chipProps(renderer.root.findByType(Pressable)).accessibilityState?.selected).toBe(true);
 });

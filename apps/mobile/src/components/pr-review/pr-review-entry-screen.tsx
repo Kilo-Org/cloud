@@ -207,9 +207,11 @@ export function PrReviewEntryScreen() {
               {rowState.failed ? (
                 // The footer names the item that failed, not just "couldn't
                 // load": the row stands for one pull/merge request, so the
-                // provider's own noun says what to retry. The retry is a text
-                // action — a bordered 48 dp control beside the card's plain
-                // lines read as a piece of another surface.
+                // provider's own noun says what to retry. The retry keeps the
+                // link treatment — a bordered control beside the card's plain
+                // lines read as a piece of another surface — while its own node
+                // still carries the state-action box, because `hitSlop` widens
+                // the touch region without enlarging the rect an audit reads.
                 <View className="flex-row items-center justify-between gap-3 border-t border-hair-soft px-3 py-1">
                   <Text variant="muted" className="min-w-0 flex-1 text-xs">
                     {t('common.couldNotOpen', {
@@ -217,7 +219,7 @@ export function PrReviewEntryScreen() {
                     })}
                   </Text>
                   <Button
-                    size="sm"
+                    size="action"
                     variant="link"
                     className="px-0"
                     hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}

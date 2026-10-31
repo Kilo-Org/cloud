@@ -81,7 +81,7 @@ describe('<KiloCommandRowView>', () => {
     });
 
     const switches = root.findAllByType(SWITCH);
-    expect(switches.map(node => node.props.accessibilityLabel)).toEqual(['release-notes']);
+    expect(switches.map(node => node.props.accessibilityLabel)).toEqual(['/release-notes']);
   });
 
   it('keeps the toggle on the switch after the name leaves the accessibility tree', () => {

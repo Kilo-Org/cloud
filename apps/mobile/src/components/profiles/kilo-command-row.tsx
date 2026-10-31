@@ -30,8 +30,8 @@ type KiloCommandRowProps = Readonly<{
  * One slash command row: the `/name`, optional subtask/agent/model metadata, the
  * template preview, the enabled switch, and up/down/edit/delete controls. The
  * row carries no container `accessibilityLabel`, and the visible `/name` is
- * hidden from assistive technology, so the switch's label stays the single
- * element a screen reader matches by the command's name.
+ * hidden from assistive technology, so the switch carries that same visible name
+ * as the row's single accessible one.
  */
 export function KiloCommandRowView({
   name,
@@ -51,6 +51,9 @@ export function KiloCommandRowView({
 }: KiloCommandRowProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  // The slash form is the command's visible name; the row renders it once and
+  // hands it to the switch when the visible copy leaves the accessibility tree.
+  const visibleName = `/${name}`;
   const controlClass = (disabled: boolean) =>
     cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70', disabled && 'opacity-40');
   return (
@@ -60,7 +63,7 @@ export function KiloCommandRowView({
           <View className="flex-row flex-wrap items-center gap-2">
             <Terminal size={16} color={colors.mutedForeground} />
             <Text variant="mono" className="text-sm" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
-              {`/${name}`}
+              {visibleName}
             </Text>
             {subtask ? (
               <Text className="rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -86,7 +89,9 @@ export function KiloCommandRowView({
         </View>
         <Switch
           value={enabled}
-          accessibilityLabel={name}
+          // The only element carrying the row's name, so it takes the visible
+          // form: a screen reader hears the command as the slash command it is.
+          accessibilityLabel={visibleName}
           disabled={onToggle === undefined}
           onValueChange={onToggle}
         />

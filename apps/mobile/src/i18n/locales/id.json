@@ -1148,7 +1148,7 @@
       "sortSeverityDesc": "Keparahan: tertinggi ke terendah",
       "sortSlaDue": "Tanggal jatuh tempo SLA",
       "statusIgnored": "Diabaikan",
-      "statusOpen": "Buka"
+      "statusOpen": "Terbuka"
     },
     "analysis": {
       "analyzeRepository": "Analisis repositori",
@@ -1367,7 +1367,7 @@
       "supersededByDescription": "Ketuk untuk membuka catatan terbaru dan melihat status, analisis, serta perbaikannya.",
       "viewAdvisory": "Lihat pemberitahuan keamanan di GitHub",
       "vulnerableVersions": "Versi rentan",
-      "statusOpen": "Buka",
+      "statusOpen": "Terbuka",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "perbaikan sudah dimulai",
       "reasonNoBandwidth": "tidak ada kapasitas untuk menangani",

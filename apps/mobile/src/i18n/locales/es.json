@@ -1151,7 +1151,7 @@
       "sortSeverityDesc": "Gravedad: de mayor a menor",
       "sortSlaDue": "Fecha de vencimiento del SLA",
       "statusIgnored": "Ignorado",
-      "statusOpen": "Apertura"
+      "statusOpen": "Abierto"
     },
     "analysis": {
       "analyzeRepository": "Analizar repositorio",
@@ -1374,7 +1374,7 @@
       "supersededByDescription": "Toca para consultar el estado, el análisis y la corrección en el registro actual.",
       "viewAdvisory": "Ver el aviso de seguridad en GitHub",
       "vulnerableVersions": "Versiones vulnerables",
-      "statusOpen": "Apertura",
+      "statusOpen": "Abierto",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "corrección en curso",
       "reasonNoBandwidth": "sin recursos disponibles",

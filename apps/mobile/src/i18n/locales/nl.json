@@ -1148,7 +1148,7 @@
       "sortSeverityDesc": "Ernst: van hoog naar laag",
       "sortSlaDue": "SLA-deadline",
       "statusIgnored": "Genegeerd",
-      "statusOpen": "Openen"
+      "statusOpen": "Open"
     },
     "analysis": {
       "analyzeRepository": "Repository analyseren",
@@ -1367,7 +1367,7 @@
       "supersededByDescription": "Tik om de huidige bevinding te openen en de status, analyse en het herstel te bekijken.",
       "viewAdvisory": "Beveiligingsadvies bekijken op GitHub",
       "vulnerableVersions": "Kwetsbare versies",
-      "statusOpen": "Openen",
+      "statusOpen": "Open",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "er wordt al aan een oplossing gewerkt",
       "reasonNoBandwidth": "er is geen capaciteit beschikbaar",

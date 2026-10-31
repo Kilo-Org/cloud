@@ -901,7 +901,10 @@
       "gitlabNoRepositoriesDescription": "ייתכן שתצטרך להעניק גישה לעוד קבוצות או פרויקטים ב-GitLab.",
       "installGithubApp": "התקנת אפליקציית GitHub במאגרים",
       "installGithubAppDescription": "תן לאפליקציית Kilo ב-GitHub גישה למאגרים שברצונך לסקור.",
-      "repositoryAccess": "גישה למאגר"
+      "repositoryAccess": "גישה למאגר",
+      "allModePersonal": "כל מאגר ש-Kilo יכול לגשת אליו דרך חיבור ה-GitHub שלך נסקר אוטומטית.",
+      "allModeOrganization": "כל מאגר ש-Kilo יכול לגשת אליו דרך חיבור ה-GitHub של הארגון נסקר אוטומטית.",
+      "allModeCount": "מאגרים זמינים: {{displayCount}}"
     },
     "style": {
       "title": "סגנון סקירה",
@@ -1303,7 +1306,6 @@
       "repositoryActionPlan": "תוכנית פעולה למאגר",
       "settings": "הגדרות",
       "slaPosture": "מצב העמידה ב-SLA",
-      "syncFindings": "סנכרון ממצאים",
       "syncNow": "סנכרון עכשיו",
       "syncQueued": "הסנכרון נוסף לתור",
       "syncStatusUnavailable": "מצב הסנכרון אינו זמין.",
@@ -1636,7 +1638,7 @@
     "sessionList": {
       "couldNotLoadActive": "לא ניתן היה לטעון את השיחות הפעילות.",
       "couldNotRefresh": "לא ניתן היה לרענן",
-      "noSessionsYetDescription": "התחל משימת תכנות מהטלפון שלך. השיחות שלך יופיעו כאן.",
+      "noSessionsYetDescription": "התחל משימת תכנות מהטלפון שלך.",
       "viewHistory": "היסטוריית השיחות",
       "noMatches": "אין שיחות תואמות",
       "tryDifferentSearch": "כדאי לנסות מונח חיפוש אחר.",
@@ -3905,6 +3907,7 @@
     "skillMarkdownLabel": "תוכן מיומנות",
     "skillsEmpty": "עדיין אין כישורים",
     "skillNameRequired": "הזן שם מיומנות",
+    "skillNameTooLong": "שם המיומנות חייב להכיל {{max}} תווים או פחות",
     "skillNameInvalid": "שם המיומנות חייב להתחיל באות או ספרה ולהשתמש רק באותיות קטנות, ספרות ומקפים",
     "skillContentRequired": "נדרש תוכן מיומנות",
     "skillSaveFailed": "לא ניתן היה לשמור את המיומנות. נסה שוב.",

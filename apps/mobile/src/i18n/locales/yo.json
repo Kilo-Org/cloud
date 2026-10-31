@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Ó ṣeé ṣe kí o nílò láti fúnni ní àṣẹ láti wọlé sí àwọn ẹgbẹ́ tàbí iṣẹ́ sí i lórí GitLab.",
       "installGithubApp": "Fi ohun èlò GitHub sórí àwọn ibi ìpamọ́",
       "installGithubAppDescription": "Fún ohun èlò Kilo fún GitHub ní àṣẹ láti wọlé sí àwọn ibi ìpamọ́ tí o fẹ́ kí a ṣàtúnyẹ̀wò.",
-      "repositoryAccess": "àṣẹ ìwọlé sí ibi ìpamọ́"
+      "repositoryAccess": "àṣẹ ìwọlé sí ibi ìpamọ́",
+      "allModePersonal": "Gbogbo ibi ìpamọ́ tí Kilo lè wọlé sí nípasẹ̀ ìsopọ̀ GitHub rẹ ni a ṣàtúnyẹ̀wò lọ́nà aládàáṣiṣẹ́.",
+      "allModeOrganization": "Gbogbo ibi ìpamọ́ tí Kilo lè wọlé sí nípasẹ̀ ìsopọ̀ GitHub ti ẹgbẹ́ ni a ṣàtúnyẹ̀wò lọ́nà aládàáṣiṣẹ́.",
+      "allModeCount": "Àwọn ibi ìpamọ́ tó wà: {{displayCount}}"
     },
     "style": {
       "title": "Ọ̀nà àtúnyẹ̀wò",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "A kò tíì mú ṣiṣẹ́pọ̀",
       "refreshFailed": "A kò lè sọ dátà di tuntun — dátà ìmúṣiṣẹ́pọ̀ tó kẹ́yìn ni a ń fi hàn.",
       "settings": "Àwọn ètò",
-      "syncFindings": "Mú àwọn àbùkù ṣiṣẹ́pọ̀",
       "syncNow": "Mú ṣiṣẹ́pọ̀ báyìí",
       "syncQueued": "Ìmúṣiṣẹ́pọ̀ wà ní ìlà ìdúró",
       "syncStatusUnavailable": "A kò lè rí ipò ìmúṣiṣẹ́pọ̀.",
@@ -2155,7 +2157,7 @@
     "sessionList": {
       "couldNotLoadActive": "A kò lè ṣàkójọ àwọn ìgbà iṣẹ́ tó ń lọ.",
       "couldNotRefresh": "A kò lè sọ di tuntun",
-      "noSessionsYetDescription": "Bẹ̀rẹ̀ iṣẹ́ ìkọ̀wé kóòdù kan láti fóònù rẹ. Àwọn ìgbà iṣẹ́ rẹ yóò hàn níbí.",
+      "noSessionsYetDescription": "Bẹ̀rẹ̀ iṣẹ́ ìkọ̀wé kóòdù kan láti fóònù rẹ.",
       "viewHistory": "Ìtàn àwọn ìgbà iṣẹ́",
       "noMatches": "Kò sí ìgbà iṣẹ́ tó bá ohun tí o wá mu",
       "tryDifferentSearch": "Gbìyànjú ọ̀rọ̀ ìwá mìíràn.",
@@ -3855,6 +3857,7 @@
     "skillMarkdownLabel": "Akoonu ogbon",
     "skillsEmpty": "Ko si ogbon sibẹsibẹ",
     "skillNameRequired": "Tẹ a olorijori orukọ",
+    "skillNameTooLong": "Orukọ ogbon gbọdọ ní ami {{max}} tabi kere si",
     "skillNameInvalid": "Orukọ ogbon gbọdọ bẹrẹ pẹlu lẹta tabi nọmba ati lo awọn lẹta kekere nikan, awọn nọmba, ati dashes",
     "skillContentRequired": "Akoonu ogbon ni a nilo",
     "skillSaveFailed": "Ko le fi ogbon pamọ. Gbiyanju lẹẹkansi.",

@@ -26,6 +26,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_SKILLS } from '@/lib/agent-profile-forms';
+import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { cn } from '@/lib/utils';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
@@ -100,7 +101,7 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
           accessibilityLabel={t('profiles.skillDelete', { name: skill.name })}
           onPress={onDelete}
         >
-          <Trash2 size={18} color={colors.destructive} />
+          <Trash2 size={18} color={colors.mutedForeground} />
         </Pressable>
       ) : null}
     </View>
@@ -140,6 +141,9 @@ export function ProfileSkillsScreen({
   // Bumped by every open and close, so a save that settles after its own form is
   // gone cannot write its message into, or close, the form opened since.
   const formGeneration = useRef(0);
+  // The list sits underneath the sheet, and a sheet dismisses natively, so the
+  // second tap of a Save double tap would land on the row just saved.
+  const { markClosed: markSheetClosed, guard: guardRowPress } = useSheetRowTapGuard();
 
   const openForm = (skill: SkillTarget | null) => {
     formGeneration.current += 1;
@@ -153,6 +157,7 @@ export function ProfileSkillsScreen({
 
   const closeForm = () => {
     formGeneration.current += 1;
+    markSheetClosed();
     setForm(null);
   };
 
@@ -257,7 +262,7 @@ export function ProfileSkillsScreen({
             skill={skill}
             onToggle={
               canManage
-                ? enabled => {
+                ? guardRowPress(enabled => {
                     setSkillEnabled.mutate(
                       { profileId, skillId: skill.id, enabled },
                       {
@@ -268,29 +273,29 @@ export function ProfileSkillsScreen({
                         },
                       }
                     );
-                  }
+                  })
                 : undefined
             }
             onEdit={
               canManage
-                ? () => {
+                ? guardRowPress(() => {
                     openForm({
                       id: skill.id,
                       name: skill.name,
                       rawMarkdown: skill.rawMarkdown,
                     });
-                  }
+                  })
                 : undefined
             }
             onDelete={
               canManage
-                ? () => {
+                ? guardRowPress(() => {
                     confirmDelete({
                       id: skill.id,
                       name: skill.name,
                       rawMarkdown: skill.rawMarkdown,
                     });
-                  }
+                  })
                 : undefined
             }
           />

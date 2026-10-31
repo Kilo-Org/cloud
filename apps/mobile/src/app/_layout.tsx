@@ -77,7 +77,7 @@ import { useRestoreErrorHold } from '@/lib/hooks/use-restore-error-hold';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
 import { useSystemSearchOpenListener } from '@/lib/hooks/use-system-search-open-listener';
 import { preloadHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
-import { useNavigationTheme } from '@/lib/hooks/use-theme-colors';
+import { useNavigationTheme } from '@/lib/hooks/use-navigation-theme';
 import {
   applyThemePreference,
   preloadThemePreference,

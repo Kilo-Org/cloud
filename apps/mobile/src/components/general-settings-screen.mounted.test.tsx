@@ -44,6 +44,7 @@ vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'android' },
+  useColorScheme: () => 'light',
   AccessibilityInfo: {},
   AppState: { currentState: 'active', addEventListener: () => ({ remove: () => undefined }) },
 }));

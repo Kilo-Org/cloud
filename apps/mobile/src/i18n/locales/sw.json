@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Huenda unahitaji kutoa ufikiaji kwa vikundi au miradi zaidi kwenye GitLab.",
       "installGithubApp": "Sakinisha programu ya GitHub kwenye hazina",
       "installGithubAppDescription": "Ipe programu ya Kilo ya GitHub ruhusa ya kufikia hazina unazotaka zikaguliwe.",
-      "repositoryAccess": "ufikiaji wa hazina"
+      "repositoryAccess": "ufikiaji wa hazina",
+      "allModePersonal": "Kila hazina ambayo Kilo anaweza kufikia kupitia muunganisho wako wa GitHub inakaguliwa kiotomatiki.",
+      "allModeOrganization": "Kila hazina ambayo Kilo anaweza kufikia kupitia muunganisho wa GitHub wa shirika inakaguliwa kiotomatiki.",
+      "allModeCount": "Hazina zinazopatikana: {{displayCount}}"
     },
     "style": {
       "title": "Mtindo wa ukaguzi",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "Haijasawazishwa bado",
       "refreshFailed": "Imeshindikana kuonyesha upya data — data iliyosawazishwa mara ya mwisho ndiyo inayoonyeshwa.",
       "settings": "Mipangilio",
-      "syncFindings": "Sawazisha matatizo",
       "syncNow": "Sawazisha sasa",
       "syncQueued": "Usawazishaji umeongezwa kwenye foleni.",
       "syncStatusUnavailable": "Hali ya usawazishaji haipatikani.",
@@ -2155,7 +2157,7 @@
     "sessionList": {
       "couldNotLoadActive": "Imeshindikana kupakia vikao vinavyoendelea.",
       "couldNotRefresh": "Imeshindikana kuonyesha upya",
-      "noSessionsYetDescription": "Anza kazi ya kuandika msimbo kutoka kwenye simu yako. Vikao vyako vitaonekana hapa.",
+      "noSessionsYetDescription": "Anza kazi ya kuandika msimbo kutoka kwenye simu yako.",
       "viewHistory": "Historia ya vikao",
       "noMatches": "Hakuna vikao vinavyolingana",
       "tryDifferentSearch": "Jaribu neno lingine la utafutaji.",
@@ -3855,6 +3857,7 @@
     "skillMarkdownLabel": "Maudhui ya ujuzi",
     "skillsEmpty": "Hakuna ujuzi bado",
     "skillNameRequired": "Weka jina la ujuzi",
+    "skillNameTooLong": "Jina la ujuzi lazima liwe na herufi zisizozidi {{max}}",
     "skillNameInvalid": "Jina la ustadi lazima lianze na herufi au tarakimu na litumie herufi ndogo, tarakimu na deshi pekee.",
     "skillContentRequired": "Maudhui ya ujuzi yanahitajika",
     "skillSaveFailed": "Haikuweza kuhifadhi ujuzi. Jaribu tena.",

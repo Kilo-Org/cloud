@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "ممکن است لازم باشد در GitLab به گروه‌ها یا پروژه‌های بیشتری دسترسی بدهید.",
       "installGithubApp": "برنامه GitHub را روی مخازن نصب کنید",
       "installGithubAppDescription": "به برنامه Kilo در GitHub اجازه دسترسی به مخازنی را بدهید که می‌خواهید بررسی شوند.",
-      "repositoryAccess": "دسترسی به مخزن"
+      "repositoryAccess": "دسترسی به مخزن",
+      "allModePersonal": "هر مخزنی که Kilo می‌تواند از طریق اتصال GitHub شما به آن دسترسی داشته باشد، به‌طور خودکار بررسی می‌شود.",
+      "allModeOrganization": "هر مخزنی که Kilo می‌تواند از طریق اتصال GitHub سازمان به آن دسترسی داشته باشد، به‌طور خودکار بررسی می‌شود.",
+      "allModeCount": "مخازن موجود: {{displayCount}}"
     },
     "style": {
       "title": "سبک بازبینی",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "هنوز همگام‌سازی نشده",
       "refreshFailed": "تازه‌سازی ممکن نشد. داده‌های آخرین همگام‌سازی نمایش داده می‌شوند.",
       "settings": "تنظیمات",
-      "syncFindings": "همگام‌سازی یافته‌ها",
       "syncNow": "همگام‌سازی فوری",
       "syncQueued": "همگام‌سازی در صف قرار گرفت",
       "syncStatusUnavailable": "وضعیت همگام‌سازی در دسترس نیست.",
@@ -2155,7 +2157,7 @@
     "sessionList": {
       "couldNotLoadActive": "بارگذاری نشست‌های فعال ممکن نشد.",
       "couldNotRefresh": "بازخوانی ممکن نشد",
-      "noSessionsYetDescription": "با گوشی خود یک کار کدنویسی شروع کنید. نشست‌های شما اینجا نمایش داده می‌شوند.",
+      "noSessionsYetDescription": "با گوشی خود یک کار کدنویسی شروع کنید.",
       "viewHistory": "تاریخچه نشست‌ها",
       "noMatches": "نشستی مطابق با فیلترها پیدا نشد",
       "tryDifferentSearch": "عبارت دیگری را جست‌وجو کنید.",
@@ -3855,6 +3857,7 @@
     "skillMarkdownLabel": "محتوای مهارتی",
     "skillsEmpty": "هنوز هیچ مهارتی وجود ندارد",
     "skillNameRequired": "یک نام مهارت وارد کنید",
+    "skillNameTooLong": "نام مهارت باید {{max}} کاراکتر یا کمتر باشد",
     "skillNameInvalid": "نام مهارت باید با یک حرف یا رقم شروع شود و فقط از حروف کوچک، ارقام و خط تیره استفاده کند.",
     "skillContentRequired": "محتوای مهارتی مورد نیاز است",
     "skillSaveFailed": "مهارت ذخیره نشد. دوباره امتحان کنید.",

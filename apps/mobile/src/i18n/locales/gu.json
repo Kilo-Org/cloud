@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "તમારે GitLab પર વધુ જૂથો અથવા પ્રોજેક્ટની ઍક્સેસ આપવાની જરૂર પડી શકે છે.",
       "installGithubApp": "રિપોઝિટરીઓ પર GitHub ઍપ ઇન્સ્ટોલ કરો",
       "installGithubAppDescription": "જે રિપોઝિટરીઓની સમીક્ષા કરાવવી હોય તેમની ઍક્સેસ Kilo GitHub ઍપને આપો.",
-      "repositoryAccess": "રિપોઝિટરીની ઍક્સેસ"
+      "repositoryAccess": "રિપોઝિટરીની ઍક્સેસ",
+      "allModePersonal": "તમારા GitHub કનેક્શન દ્વારા Kilo જે દરેક રિપોઝિટરીની ઍક્સેસ મેળવી શકે છે તેની સ્વચાલિત સમીક્ષા થાય છે.",
+      "allModeOrganization": "સંસ્થાના GitHub કનેક્શન દ્વારા Kilo જે દરેક રિપોઝિટરીની ઍક્સેસ મેળવી શકે છે તેની સ્વચાલિત સમીક્ષા થાય છે.",
+      "allModeCount": "ઉપલબ્ધ રિપોઝિટરીઓ: {{displayCount}}"
     },
     "style": {
       "title": "સમીક્ષાની શૈલી",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "હજુ સિંક થયેલ નથી",
       "refreshFailed": "રિફ્રેશ કરી શકાયું નહીં — છેલ્લે સિંક કરેલો ડેટા દેખાડવામાં આવે છે.",
       "settings": "સેટિંગ્સ",
-      "syncFindings": "તારણો સિંક કરો",
       "syncNow": "હવે સિંક કરો",
       "syncQueued": "સિંક કરવાની વિનંતી કતારમાં મૂકાઈ",
       "syncStatusUnavailable": "સિંકની સ્થિતિ ઉપલબ્ધ નથી.",
@@ -2155,7 +2157,7 @@
     "sessionList": {
       "couldNotLoadActive": "સક્રિય સત્રો લોડ કરી શકાયાં નહીં.",
       "couldNotRefresh": "ફરી લોડ કરી શકાયું નહીં",
-      "noSessionsYetDescription": "તમારા ફોન પરથી કોડિંગ કાર્ય શરૂ કરો. તમારા સત્રો અહીં દેખાશે.",
+      "noSessionsYetDescription": "તમારા ફોન પરથી કોડિંગ કાર્ય શરૂ કરો.",
       "viewHistory": "સત્રોનો ઇતિહાસ",
       "noMatches": "કોઈ સત્ર મેળ ખાતું નથી",
       "tryDifferentSearch": "બીજો શબ્દ વાપરીને શોધો.",
@@ -3855,6 +3857,7 @@
     "skillMarkdownLabel": "કૌશલ્ય સામગ્રી",
     "skillsEmpty": "હજુ સુધી કોઈ કૌશલ્ય નથી",
     "skillNameRequired": "કૌશલ્યનું નામ દાખલ કરો",
+    "skillNameTooLong": "કૌશલ્યનું નામ {{max}} અક્ષરો અથવા તેથી ઓછા હોવું જોઈએ",
     "skillNameInvalid": "કૌશલ્યનું નામ અક્ષર અથવા અંકથી શરૂ થવું જોઈએ અને માત્ર નાના અક્ષરો, અંકો અને ડેશનો ઉપયોગ કરવો જોઈએ",
     "skillContentRequired": "કૌશલ્ય સામગ્રી જરૂરી છે",
     "skillSaveFailed": "કૌશલ્ય સાચવી શકાયું નથી. ફરી પ્રયાસ કરો.",

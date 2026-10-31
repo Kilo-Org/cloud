@@ -152,7 +152,7 @@ export function VariableRowView({
           accessibilityState={{ disabled: isDeleting }}
           onPress={onDelete}
         >
-          <Trash2 size={18} color={colors.destructive} />
+          <Trash2 size={18} color={colors.mutedForeground} />
         </Pressable>
       ) : null}
     </View>

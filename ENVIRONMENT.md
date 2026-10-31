@@ -52,6 +52,27 @@ Keep credentials out of tracked defaults. For local monitor development, generat
 a separate value with `openssl rand -base64 32` and set it in the local environment;
 ordinary local startup does not require this credential.
 
+### Uptime probe
+
+`UPTIME_PROBE_SECRET` is a dedicated server-only credential for `GET /api/up`. `[SECRET]`
+The caller must send `Authorization: Bearer <configured value>`; an unset or empty value
+answers `401` with `{ "database": false, "recentAIActivity": false }`, and the endpoint
+accepts no other credential, including request parameters. Every response, including the
+`401`, carries `Cache-Control: no-store`. Each running instance shares one evaluation of
+the probe across authorized callers for 60 seconds, and simultaneous requests share one
+evaluation, so the endpoint performs at most one database read per instance per minute
+whatever the caller's request rate. The probe read runs on the read replica.
+
+Order the cutover so no poll lands on an unauthenticated endpoint: first run
+`pnpm web:env set UPTIME_PROBE_SECRET` and supply a newly generated value, then add the
+`Authorization: Bearer` header to the external monitor, then deploy the application. Verify
+the monitor after the deployment. Only one configured secret is accepted; deployment and
+monitor configuration must agree.
+
+Keep the credential out of tracked defaults. For local probing, generate a separate value
+with `openssl rand -base64 32` and set it in the local environment; ordinary local startup
+does not require this credential.
+
 ### Configuration & Constant URLs
 
 - `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `packages/web-shared/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]

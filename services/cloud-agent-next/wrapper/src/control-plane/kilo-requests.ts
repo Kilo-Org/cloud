@@ -7,7 +7,7 @@ import {
   CONTROL_PLANE_KILO_MESSAGE_LIMIT,
   CONTROL_PLANE_KILO_RESULT_MAX_BYTES,
 } from '../../../src/shared/control-plane-protocol.js';
-import type { WrapperKiloClient } from '../kilo-api.js';
+import type { HarnessReads } from './harness.js';
 import type { SnapshotFileDiff } from '@kilocode/sdk/v2';
 import {
   worktreeSnapshotCaptureSchema,
@@ -35,7 +35,7 @@ export type ControlPlaneKiloRequestsDeps = {
   /** Runtime identity of a prepared route, or null while it is not attached. */
   preparedRoute: (sessionId: string) => { runtimeKey: string; directory: string } | null;
   /** The live native client for one runtime key, or null when it is gone. */
-  clientFor: (runtimeKey: string) => WrapperKiloClient | null;
+  clientFor: (runtimeKey: string) => HarnessReads | null;
   captureSnapshot?: (
     directory: string,
     payload: SessionGitSummaryPayload,
@@ -75,7 +75,7 @@ export function createControlPlaneKiloRequests(deps: ControlPlaneKiloRequestsDep
   }
 
   async function run(
-    client: WrapperKiloClient,
+    client: HarnessReads,
     directory: string,
     kiloSessionId: string,
     operation: ControlPlaneNativeOperation,

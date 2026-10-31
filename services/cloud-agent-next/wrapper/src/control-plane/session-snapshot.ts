@@ -19,7 +19,17 @@ type PendingRequest = {
 
 /** Reads a bounded, complete observation; callers reject all partial failures. */
 export async function readSessionSnapshot(input: {
-  client: WrapperKiloClient;
+  client: Pick<
+    WrapperKiloClient,
+    | 'listSessionMetadata'
+    | 'getSessionStatuses'
+    | 'getQuestions'
+    | 'getPermissions'
+    | 'getSuggestions'
+    | 'getSessionDetails'
+    | 'getRecentSessionMessages'
+    | 'getSessionMessage'
+  >;
   directory: string;
   observedDirectories: Iterable<string>;
   knownSessions: KnownSession[];
@@ -102,7 +112,10 @@ export async function readSessionSnapshot(input: {
         parentID: details.parentID,
         status,
         ...(status === 'retry' && statusEntry ? { retry: executionRetry(statusEntry) } : {}),
-        messages: [...byId.values()],
+        messages: [...byId.values()].map(({ info, parts }) => ({
+          info: { id: info.id, role: info.role, time: info.time },
+          parts,
+        })),
         interactions,
       });
     }

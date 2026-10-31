@@ -4,7 +4,11 @@ import { extractEntityId } from '../session/ingest-handlers/entity-id.js';
 import type { EventId } from '../types/ids.js';
 import type { StoredEvent } from '../websocket/types.js';
 import { slimPersistedKilocodeEvent } from '../shared/ingest-frame.js';
-import { projectSafeAssistantError, projectSafeSessionError } from '../shared/assistant-failure.js';
+import {
+  projectSafeAssistantError,
+  projectSafeSdkAssistantError,
+  projectSafeSessionError,
+} from '../shared/assistant-failure.js';
 
 const PERSISTED_KILO_EVENT_NAMES: ReadonlySet<string> = new Set([
   'message.removed',
@@ -101,15 +105,61 @@ export type SandboxControlSessionEventInput = {
   timestamp?: string;
 };
 
-function publicEventProperties({
+export function publicEventProperties({
   type,
   properties,
 }: SandboxControlSessionEventInput): Record<string, unknown> {
+  if (type === 'conversation.message.updated' || type === 'conversation.event') {
+    const projectError = (error: unknown) => {
+      const parsed = z
+        .object({ type: z.string(), message: z.string(), status: z.number().optional() })
+        .safeParse(error);
+      if (!parsed.success) return undefined;
+      return {
+        type: parsed.data.type,
+        message: projectSafeAssistantError({
+          name: 'APIError',
+          data: { message: parsed.data.message, statusCode: parsed.data.status },
+        }),
+        ...(parsed.data.status === undefined ? {} : { status: parsed.data.status }),
+      };
+    };
+    if (type === 'conversation.message.updated') {
+      const message = z.record(z.string(), z.unknown()).safeParse(properties.message);
+      if (!message.success) return properties;
+      const retry = z.record(z.string(), z.unknown()).safeParse(message.data.retry);
+      return {
+        ...properties,
+        message: {
+          ...message.data,
+          ...(message.data.error === undefined ? {} : { error: projectError(message.data.error) }),
+          ...(retry.success
+            ? { retry: { ...retry.data, error: projectError(retry.data.error) } }
+            : {}),
+        },
+      };
+    }
+    const event = z
+      .object({ data: z.record(z.string(), z.unknown()) })
+      .passthrough()
+      .safeParse(properties.event);
+    if (!event.success || event.data.data.error === undefined) return properties;
+    return {
+      ...properties,
+      event: {
+        ...event.data,
+        data: { ...event.data.data, error: projectError(event.data.data.error) },
+      },
+    };
+  }
   if (type === 'session.error') {
     return {
       ...properties,
       error: projectSafeSessionError(properties.error, properties.reason),
     };
+  }
+  if (type === 'session.turn.close' && properties.error !== undefined) {
+    return { ...properties, error: projectSafeAssistantError(properties.error) };
   }
   const key =
     type === 'message.updated' ? 'info' : type === 'message.part.updated' ? 'part' : undefined;
@@ -121,7 +171,13 @@ function publicEventProperties({
     return properties;
   return {
     ...properties,
-    [key]: { ...carrier, error: projectSafeAssistantError(carrier.error) },
+    [key]: {
+      ...carrier,
+      error:
+        key === 'part' && 'type' in carrier && carrier.type === 'retry'
+          ? projectSafeSdkAssistantError(carrier.error)
+          : projectSafeAssistantError(carrier.error),
+    },
   };
 }
 

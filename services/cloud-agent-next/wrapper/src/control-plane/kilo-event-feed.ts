@@ -6,6 +6,7 @@ import { kiloClientConfig, type KiloServer } from '../kilo-server-auth.js';
 export type KiloFeedEvent = {
   type: string;
   properties: Record<string, unknown>;
+  audience?: 'supervisor';
   directory?: string;
   nativeRuntimeId: string;
   /**

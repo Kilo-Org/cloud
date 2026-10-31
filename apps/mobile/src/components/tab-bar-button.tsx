@@ -59,6 +59,7 @@ export function TabBarButton({
   return (
     <Pressable
       {...props}
+      aria-selected={ariaSelected}
       onPressIn={event => {
         pressed.current = true;
         markTabSwitchPending(Date.now(), { sameTab });

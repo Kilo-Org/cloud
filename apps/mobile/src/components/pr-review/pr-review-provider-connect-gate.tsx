@@ -334,7 +334,7 @@ export function ProviderConnectGate({
               <Text variant="muted" className="text-center">
                 {description}
               </Text>
-              <PrReviewContextLine instanceHint={instanceHint} />
+              <PrReviewContextLine instanceHint={instanceHint} className="mt-3" />
             </>
           }
           action={

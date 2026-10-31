@@ -214,7 +214,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
                   ? t('prReview.connect.reconnectDescription')
                   : t('prReview.connect.description')}
               </Text>
-              <PrReviewContextLine />
+              <PrReviewContextLine className="mt-3" />
             </>
           }
           action={

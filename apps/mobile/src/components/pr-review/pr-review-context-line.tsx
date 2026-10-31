@@ -32,7 +32,18 @@ import { cn } from '@/lib/utils';
  * the line exists to prevent. The hint is display only — the server re-derives
  * the authoritative instance.
  */
-export function PrReviewContextLine({ instanceHint }: Readonly<{ instanceHint?: string }>) {
+export function PrReviewContextLine({
+  instanceHint,
+  className,
+}: Readonly<{
+  instanceHint?: string;
+  /**
+   * Spacing for the caller's stack. A caller that puts the line below body copy
+   * passes a top margin so the outlined pill does not sit against the last
+   * text line; the arm that puts it above its explanation needs none.
+   */
+  className?: string;
+}>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
@@ -88,7 +99,7 @@ export function PrReviewContextLine({ instanceHint }: Readonly<{ instanceHint?: 
   );
 
   return (
-    <View className="min-w-0 max-w-full items-center self-center">
+    <View className={cn('min-w-0 max-w-full items-center self-center', className)}>
       {switchable ? (
         <Pressable
           accessibilityRole="button"

@@ -76,9 +76,7 @@ export type NotificationHistoryEntry = {
 };
 
 /** True for the push kinds that become a history row. */
-function isRecordedNotificationPush(
-  type: PushData['type']
-): type is RecordedNotificationPushType {
+function isRecordedNotificationPush(type: PushData['type']): type is RecordedNotificationPushType {
   return Object.hasOwn(RECORDED_PUSH_HISTORY_RULES, type);
 }
 

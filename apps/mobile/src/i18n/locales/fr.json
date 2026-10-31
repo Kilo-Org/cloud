@@ -1119,7 +1119,7 @@
       "sortSeverityDesc": "Gravité : de la plus élevée à la plus faible",
       "sortSlaDue": "Échéance du SLA",
       "statusIgnored": "Ignoré",
-      "statusOpen": "Ouverture",
+      "statusOpen": "Ouvert",
       "noRepositories": "Aucun dépôt n'est encore synchronisé ni sélectionné. Choisissez-les dans les paramètres de l'Agent de sécurité."
     },
     "analysis": {
@@ -1342,7 +1342,7 @@
       "supersededByDescription": "Touchez pour ouvrir la fiche à jour et consulter son état, son analyse et sa correction.",
       "viewAdvisory": "Voir l'avis de sécurité sur GitHub",
       "vulnerableVersions": "Versions vulnérables",
-      "statusOpen": "Ouverture",
+      "statusOpen": "Ouvert",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "correction déjà en cours",
       "reasonNoBandwidth": "manque de ressources disponibles",

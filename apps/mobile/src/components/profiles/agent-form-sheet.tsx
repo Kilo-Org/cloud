@@ -23,6 +23,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
+import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
@@ -318,7 +319,11 @@ export function AgentFormSheet({
               const enabled = !disabledTools.includes(tool);
               return (
                 <View key={tool} className="min-h-11 flex-row items-center gap-3 px-1">
-                  <Text variant="mono" className="flex-1 text-sm text-foreground">
+                  <Text
+                    variant="mono"
+                    {...HIDDEN_LABEL_PROPS}
+                    className="flex-1 text-sm text-foreground"
+                  >
                     {tool}
                   </Text>
                   <Switch

@@ -3,7 +3,7 @@ import { createElement, type ReactNode, type Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
-import { type AgentSource } from '@/components/profiles/profile-agents-model';
+import { type AgentSource, PERMISSION_TOOLS } from '@/components/profiles/profile-agents-model';
 import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -203,6 +203,29 @@ describe('AgentFormSheet parity fields', () => {
     expect(findField(renderer.root, 'Max steps')).toBeTruthy();
     expect(findField(renderer.root, 'Temperature')).toBeTruthy();
     expect(findField(renderer.root, 'Top P')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('reaches a screen reader as one named switch per tool, with no duplicate text stop', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+
+    for (const tool of PERMISSION_TOOLS) {
+      // The visible name is painted only: the switch beside it carries the name
+      // and the state, so a screen reader meets each tool once.
+      const labelTexts = findAll(renderer.root, 'Text').filter(
+        node => node.props.children === tool
+      );
+      expect(labelTexts).toHaveLength(1);
+      expect(labelTexts[0]?.props).toMatchObject({
+        accessible: false,
+        importantForAccessibility: 'no',
+      });
+      const switches = findAll(renderer.root, 'Switch').filter(
+        node => node.props.accessibilityLabel === tool
+      );
+      expect(switches).toHaveLength(1);
+    }
 
     unmount();
   });

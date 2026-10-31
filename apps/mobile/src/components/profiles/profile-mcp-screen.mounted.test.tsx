@@ -147,6 +147,10 @@ describe('ProfileMcpScreen', () => {
 
     const toggle = findOne(renderer.root, 'Switch');
     expect(toggle.props.accessibilityLabel).toBe('docs');
+    // The visible name is painted only, so the switch is the row's single stop
+    // that speaks it.
+    const nameText = findAll(renderer.root, 'Text').find(node => node.props.children === 'docs');
+    expect(nameText?.props).toMatchObject({ accessible: false, importantForAccessibility: 'no' });
     act(() => {
       (toggle.props as { onValueChange: (v: boolean) => void }).onValueChange(false);
     });

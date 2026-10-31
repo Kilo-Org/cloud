@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, Pencil, Terminal, Trash2 } from '@/components/u
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { cn } from '@/lib/utils';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 
@@ -28,8 +29,9 @@ type KiloCommandRowProps = Readonly<{
 /**
  * One slash command row: the `/name`, optional subtask/agent/model metadata, the
  * template preview, the enabled switch, and up/down/edit/delete controls. The
- * row carries no container `accessibilityLabel`, so the switch's label stays the
- * only element a screen reader matches by the command's name.
+ * row carries no container `accessibilityLabel`, and the visible `/name` is
+ * hidden from assistive technology, so the switch's label stays the single
+ * element a screen reader matches by the command's name.
  */
 export function KiloCommandRowView({
   name,
@@ -57,7 +59,7 @@ export function KiloCommandRowView({
         <View className="min-w-0 flex-1 gap-0.5">
           <View className="flex-row flex-wrap items-center gap-2">
             <Terminal size={16} color={colors.mutedForeground} />
-            <Text variant="mono" className="text-sm" numberOfLines={1}>
+            <Text variant="mono" className="text-sm" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
               {`/${name}`}
             </Text>
             {subtask ? (

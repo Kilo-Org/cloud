@@ -23,6 +23,7 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_SKILLS } from '@/lib/agent-profile-forms';
 import { cn } from '@/lib/utils';
@@ -66,7 +67,7 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
   return (
     <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="min-w-0 flex-1 gap-0.5">
-        <Text variant="mono" numberOfLines={1}>
+        <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
           {skill.name}
         </Text>
         <Text variant="muted" className="text-xs">

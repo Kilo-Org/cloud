@@ -26,17 +26,13 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_MCP_SERVERS: AgentProfileDetail['mcpServers'] = [];
-
-/** The mutation hook toasts `error.message`; the screen supplies a fallback otherwise. */
-function hasUsableMessage(error: unknown): boolean {
-  return error instanceof Error && error.message.trim().length > 0;
-}
 
 type McpServerRowProps = Readonly<{
   server: McpServerSource;
@@ -67,7 +63,7 @@ function McpServerRowView({
     <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="min-w-0 flex-1 gap-0.5">
         <View className="flex-row items-center gap-2">
-          <Text variant="mono" numberOfLines={1} className="shrink">
+          <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS} className="shrink">
             {server.name}
           </Text>
           <Text className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -191,7 +187,8 @@ export function ProfileMcpScreen({
     try {
       await deleteMcp.mutateAsync({ profileId, mcpServerId });
     } catch (error) {
-      if (!hasUsableMessage(error)) {
+      // The cleanup hook toasts a readable message itself; a silent failure gets ours.
+      if (!(error instanceof Error) || error.message.trim().length === 0) {
         toast.error(t('profiles.mcp.deleteFailed'));
       }
     }
@@ -258,7 +255,7 @@ export function ProfileMcpScreen({
                         { profileId, mcpServerId: server.id, enabled },
                         {
                           onError: error => {
-                            if (!hasUsableMessage(error)) {
+                            if (!(error instanceof Error) || error.message.trim().length === 0) {
                               toast.error(t('profiles.mcp.updateFailed'));
                             }
                           },

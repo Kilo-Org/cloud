@@ -161,6 +161,12 @@ describe('ProfileSkillsScreen', () => {
     const toggle = findOne(renderer.root, 'Switch');
     expect(toggle.props.accessibilityLabel).toBe('code-review');
     expect(toggle.props.value).toBe(true);
+    // The visible name is painted only, so the switch is the row's single stop
+    // that speaks it.
+    expect(lineWith(renderer.root, 'code-review').props).toMatchObject({
+      accessible: false,
+      importantForAccessibility: 'no',
+    });
     act(() => {
       (toggle.props as { onValueChange: (v: boolean) => void }).onValueChange(false);
     });

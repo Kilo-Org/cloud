@@ -1452,7 +1452,7 @@
       "fixSettings": "ਸੈਟਿੰਗਾਂ ਠੀਕ ਕਰੋ",
       "couldNotLoad": "ਸਮੀਖਿਆ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ।",
       "couldNotGetLatest": "ਤਾਜ਼ਾ ਜਾਣਕਾਰੀ ਨਹੀਂ ਮਿਲ ਸਕੀ।",
-      "byline": "{{repo}} #{{number}} — {{author}} ਦੁਆਰਾ",
+      "byline": "#{{number}} — {{author}} ਦੁਆਰਾ",
       "noFindings": "ਕੋਈ ਸਮੱਸਿਆ ਨਹੀਂ ਮਿਲੀ।",
       "findingsUnavailable": "ਇਹ ਸਮੀਖਿਆ ਅਸਫਲ ਹੋਣ ਕਾਰਨ ਨਤੀਜੇ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",
       "findingsInProgress": "ਇਹ ਸਮੀਖਿਆ ਹਾਲੇ ਚੱਲ ਰਹੀ ਹੈ। ਪੂਰੀ ਹੋਣ 'ਤੇ ਸਮੱਸਿਆਵਾਂ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",

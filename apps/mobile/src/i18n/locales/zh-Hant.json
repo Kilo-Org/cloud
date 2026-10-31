@@ -962,7 +962,7 @@
       "bitbucketError": "無法開啟 Bitbucket 設定。請再試一次。"
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}}，作者 {{author}}",
+      "byline": "#{{number}}，作者 {{author}}",
       "cancelMessage": "這會停止進行中的程式碼審查。",
       "cancelReview": "取消審查",
       "cancelTitle": "要取消審查嗎？",

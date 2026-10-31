@@ -1452,7 +1452,7 @@
       "fixSettings": "Konpondu ezarpenak",
       "couldNotLoad": "Ezin izan da berrikuspena kargatu.",
       "couldNotGetLatest": "Ezin izan da azken egoera lortu.",
-      "byline": "{{repo}} #{{number}} · Egilea: {{author}}",
+      "byline": "#{{number}} · Egilea: {{author}}",
       "noFindings": "Ez dago aurkikuntzarik.",
       "findingsUnavailable": "Emaitzak ez daude erabilgarri, berrikuspen honek huts egin duelako.",
       "findingsInProgress": "Berrikuspen hau oraindik abian da. Aurkikuntzak hemen agertuko dira amaitzean.",

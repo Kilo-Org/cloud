@@ -1452,7 +1452,7 @@
       "fixSettings": "Paranda seaded",
       "couldNotLoad": "Ülevaatust ei õnnestunud laadida.",
       "couldNotGetLatest": "Uusimaid andmeid ei õnnestunud laadida.",
-      "byline": "{{repo}} #{{number}}, autor {{author}}",
+      "byline": "#{{number}}, autor {{author}}",
       "noFindings": "Leide ei leitud.",
       "findingsUnavailable": "Tulemused pole saadaval, sest see ülevaatus ebaõnnestus.",
       "findingsInProgress": "See ülevaatus on veel käimas. Leiud ilmuvad siia, kui see lõpeb.",

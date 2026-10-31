@@ -1452,7 +1452,7 @@
       "fixSettings": "Ranje paramèt yo",
       "couldNotLoad": "Nou pa t ka chaje revizyon an.",
       "couldNotGetLatest": "Nou pa t ka jwenn dènye done yo.",
-      "byline": "{{repo}} #{{number}} pa {{author}}",
+      "byline": "#{{number}} pa {{author}}",
       "noFindings": "Pa gen okenn konsta.",
       "findingsUnavailable": "Rezilta yo pa disponib paske revizyon sa a echwe.",
       "findingsInProgress": "Revizyon sa a poko fini. Konsta yo ap parèt la a lè l fini.",

@@ -1452,7 +1452,7 @@
       "fixSettings": "Dozie ntọala",
       "couldNotLoad": "Enweghị ike ibudata nyocha.",
       "couldNotGetLatest": "Enweghị ike ịnweta nke kachasị ọhụrụ.",
-      "byline": "{{repo}} #{{number}} nke {{author}}",
+      "byline": "#{{number}} nke {{author}}",
       "noFindings": "Enweghị ihe achọpụtara.",
       "findingsUnavailable": "Nsonaazụ adịghị n'ihi na nyocha a kụrụ afọ n'ala.",
       "findingsInProgress": "Nyocha a ka na-aga n'ihu. Ihe achọpụtara ga-apụta ebe a mgbe ọ gwụchara.",

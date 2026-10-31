@@ -1452,7 +1452,7 @@
       "fixSettings": "Corrixir a configuración",
       "couldNotLoad": "Non se puido cargar a revisión.",
       "couldNotGetLatest": "Non se puido obter a información máis recente.",
-      "byline": "{{repo}} #{{number}} por {{author}}",
+      "byline": "#{{number}} por {{author}}",
       "noFindings": "Non hai achados.",
       "findingsUnavailable": "Os resultados non están dispoñibles porque esta revisión fallou.",
       "findingsInProgress": "Esta revisión segue en curso. Os achados aparecerán aquí cando remate.",

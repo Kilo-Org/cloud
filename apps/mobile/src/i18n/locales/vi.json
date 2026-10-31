@@ -962,7 +962,7 @@
       "bitbucketError": "Không thể mở trang thiết lập Bitbucket. Vui lòng thử lại."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} do {{author}} tạo",
+      "byline": "#{{number}} do {{author}} tạo",
       "cancelMessage": "Thao tác này sẽ dừng lượt rà soát mã đang chạy.",
       "cancelReview": "Hủy rà soát",
       "cancelTitle": "Hủy rà soát?",

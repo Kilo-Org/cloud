@@ -1452,7 +1452,7 @@
       "fixSettings": "Herstel instellings",
       "couldNotLoad": "Die hersiening kon nie gelaai word nie.",
       "couldNotGetLatest": "Die jongste data kon nie verkry word nie.",
-      "byline": "{{repo}} #{{number}} deur {{author}}",
+      "byline": "#{{number}} deur {{author}}",
       "noFindings": "Daar is geen bevindings nie.",
       "findingsUnavailable": "Resultate is nie beskikbaar nie omdat hierdie hersiening misluk het.",
       "findingsInProgress": "Hierdie hersiening is nog besig. Bevindings verskyn hier wanneer dit klaar is.",

@@ -1452,7 +1452,7 @@
       "fixSettings": "Ṣàtúnṣe àwọn ètò",
       "couldNotLoad": "A kò lè gbé àtúnyẹ̀wò wọlé.",
       "couldNotGetLatest": "A kò lè gba dátà tuntun.",
-      "byline": "{{repo}} #{{number}} láti ọwọ́ {{author}}",
+      "byline": "#{{number}} láti ọwọ́ {{author}}",
       "noFindings": "Kò sí àbùkù.",
       "findingsUnavailable": "Àwọn àbájáde kò sí nítorí pé àtúnyẹ̀wò yìí kùnà.",
       "findingsInProgress": "Àtúnyẹ̀wò yìí ń tẹ̀ síwájú sì. Àwọn àbùkù yóò fara hàn níbí nígbà tí ó bá parí.",

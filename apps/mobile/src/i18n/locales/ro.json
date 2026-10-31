@@ -1474,7 +1474,7 @@
       "fixSettings": "Corectează setările",
       "couldNotLoad": "Nu s-a putut încărca revizuirea.",
       "couldNotGetLatest": "Nu s-au putut obține cele mai recente date.",
-      "byline": "{{repo}} #{{number}}, autor: {{author}}",
+      "byline": "#{{number}}, autor: {{author}}",
       "noFindings": "Nu există constatări.",
       "findingsUnavailable": "Rezultatele nu sunt disponibile deoarece această revizuire a eșuat.",
       "findingsInProgress": "Această revizuire este încă în desfășurare. Constatările vor apărea aici la finalizarea ei.",

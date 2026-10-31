@@ -933,7 +933,7 @@
       "bitbucketError": "Impossibile aprire la configurazione di Bitbucket. Riprova."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} di {{author}}",
+      "byline": "#{{number}} di {{author}}",
       "cancelMessage": "Questa azione interromperà la revisione del codice in corso.",
       "cancelReview": "Annulla la revisione",
       "cancelTitle": "Annullare la revisione?",

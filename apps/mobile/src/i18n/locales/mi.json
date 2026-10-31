@@ -1452,7 +1452,7 @@
       "fixSettings": "Whakatikahia ngā tautuhinga",
       "couldNotLoad": "Kāore i taea te uta i te arotake.",
       "couldNotGetLatest": "Kāore i taea te tiki i ngā mōhiohio hou rawa.",
-      "byline": "{{repo}} #{{number}} nā {{author}}",
+      "byline": "#{{number}} nā {{author}}",
       "noFindings": "Kāore he kitenga.",
       "findingsUnavailable": "Kāore ngā hua i te wātea nā te mea i rahua tēnei arotake.",
       "findingsInProgress": "Kei te haere tonu tēnei arotake. Ka puta ngā kitenga i konei ina oti.",

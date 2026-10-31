@@ -1724,7 +1724,8 @@
       "sortSeverityDesc": "Závažnost: od nejvyšší",
       "sortSeverityAsc": "Závažnost: od nejnižší",
       "sortSlaDue": "Termín podle SLA",
-      "overdueOnly": "Pouze po termínu"
+      "overdueOnly": "Pouze po termínu",
+      "noRepositories": "Zatím nejsou žádné repozitáře synchronizované ani vybrané. Vyberte je v nastavení bezpečnostního agenta."
     },
     "automation": {
       "title": "Automatizace",
@@ -2128,7 +2129,10 @@
       "settleFailed": "Akce proběhla, ale výsledek se nám nepodařilo zaznamenat. Zkuste to znovu.",
       "replayFailed": "Tato akce neproběhla. Zkuste to znovu.",
       "actionFailed": "Tuto akci se nepodařilo dokončit. Zkuste to znovu.",
-      "actionBlocked": "Tuto akci se nepodařilo dokončit. Problém je nutné nejprve vyřešit, teprve pak můžete akci zopakovat."
+      "actionBlocked": "Tuto akci se nepodařilo dokončit. Problém je nutné nejprve vyřešit, teprve pak můžete akci zopakovat.",
+      "syncNoRepositories": "V rozsahu synchronizace nejsou žádné repozitáře. Vyberte repozitáře, které má bezpečnostní agent sledovat, a pak synchronizujte znovu.",
+      "syncIntegrationInactive": "Připojení GitHubu pro bezpečnostního agenta není aktivní. Znovu připojte aplikaci Kilo na GitHubu a pak synchronizujte znovu.",
+      "syncMissingPermission": "Aplikace Kilo na GitHubu nemůže číst upozornění na zranitelnosti. Udělte jí toto oprávnění na GitHubu a pak synchronizujte znovu."
     },
     "analysisState": {
       "queued": "Analýza ve frontě",

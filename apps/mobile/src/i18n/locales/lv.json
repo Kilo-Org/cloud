@@ -1702,7 +1702,8 @@
       "sortSeverityDesc": "Smaguma pakāpe: no augstākās līdz zemākajai",
       "sortSeverityAsc": "Smaguma pakāpe: no zemākās līdz augstākajai",
       "sortSlaDue": "SLA termiņš",
-      "overdueOnly": "Tikai nokavētie"
+      "overdueOnly": "Tikai nokavētie",
+      "noRepositories": "Vēl nav sinhronizēta vai atlasīta neviena repozitorija. Izvēlieties tās Drošības aģenta iestatījumos."
     },
     "automation": {
       "title": "Automatizācija",
@@ -2095,7 +2096,10 @@
       "settleFailed": "Darbība tika pabeigta, bet mēs nevarējām reģistrēt rezultātu. Lūdzu, mēģini vēlreiz.",
       "replayFailed": "Šī darbība netika pabeigta. Lūdzu, mēģini vēlreiz.",
       "actionFailed": "Neizdevās pabeigt šo darbību. Lūdzu, mēģini vēlreiz.",
-      "actionBlocked": "Neizdevās pabeigt šo darbību. Vispirms jāatrisina problēma, lai varētu mēģināt vēlreiz."
+      "actionBlocked": "Neizdevās pabeigt šo darbību. Vispirms jāatrisina problēma, lai varētu mēģināt vēlreiz.",
+      "syncNoRepositories": "Sinhronizācijas tvērumā nav neviena repozitorija. Izvēlieties repozitorijus, kurus pārrauga Drošības aģents, un pēc tam sinhronizējiet vēlreiz.",
+      "syncIntegrationInactive": "Drošības aģenta GitHub savienojums nav aktīvs. Atkārtoti pievienojiet Kilo GitHub App un pēc tam sinhronizējiet vēlreiz.",
+      "syncMissingPermission": "Kilo GitHub lietotne nevar lasīt ievainojamību brīdinājumus. Piešķir šo atļauju GitHub un pēc tam sinhronizē vēlreiz."
     },
     "analysisState": {
       "queued": "Analīze rindā",

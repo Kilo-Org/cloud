@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Súlyosság: csökkenő",
       "sortSeverityAsc": "Súlyosság: növekvő",
       "sortSlaDue": "SLA-határidő",
-      "overdueOnly": "Csak a lejártak"
+      "overdueOnly": "Csak a lejártak",
+      "noRepositories": "Még nincs szinkronizált vagy kiválasztott adattár. Válassza ki őket a Biztonsági ügynök beállításaiban."
     },
     "automation": {
       "title": "Automatizálás",
@@ -2062,7 +2063,10 @@
       "settleFailed": "A művelet lefutott, de nem sikerült rögzítenünk az eredményt. Próbáld újra.",
       "replayFailed": "Ez a művelet nem fejeződött be. Próbáld újra.",
       "actionFailed": "Nem sikerült befejezni ezt a műveletet. Próbáld újra.",
-      "actionBlocked": "Nem sikerült befejezni ezt a műveletet. A hibát előbb javítani kell."
+      "actionBlocked": "Nem sikerült befejezni ezt a műveletet. A hibát előbb javítani kell.",
+      "syncNoRepositories": "Egyetlen adattár sem esik a szinkronizálás hatókörébe. Válassza ki azokat az adattárakat, amelyeket a Biztonsági ügynök figyel, majd szinkronizáljon újra.",
+      "syncIntegrationInactive": "A Biztonsági ügynök GitHub-kapcsolata nem aktív. Csatlakoztassa újra a Kilo GitHub App-ot, majd szinkronizáljon újra.",
+      "syncMissingPermission": "A Kilo GitHub-alkalmazás nem tudja olvasni a sebezhetőségi riasztásokat. Add meg ezt az engedélyt a GitHubbon, majd szinkronizálj újra."
     },
     "analysisState": {
       "queued": "Elemzés várólistán",

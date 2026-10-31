@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Ciddilik: yüksəkdən aşağıya",
       "sortSeverityAsc": "Ciddilik: aşağıdan yüksəyə",
       "sortSlaDue": "SLA üzrə son tarix",
-      "overdueOnly": "Yalnız gecikənlər"
+      "overdueOnly": "Yalnız gecikənlər",
+      "noRepositories": "Hələ heç bir repozitoriya sinxronlaşdırılmayıb və ya seçilməyib. Onları Təhlükəsizlik agentinin parametrlərində seç."
     },
     "automation": {
       "title": "Avtomatlaşdırma",
@@ -2062,7 +2063,10 @@
       "settleFailed": "İş tamamlandı, lakin nəticəni qeyd edə bilmədik. Yenidən cəhd et.",
       "replayFailed": "Bu iş tamamlanmadı. Yenidən cəhd et.",
       "actionFailed": "Bu işi tamamlamaq mümkün olmadı. Yenidən cəhd et.",
-      "actionBlocked": "Bu işi tamamlamaq mümkün olmadı. Problemi həll etmədən yenidən cəhd etmək olmaz."
+      "actionBlocked": "Bu işi tamamlamaq mümkün olmadı. Problemi həll etmədən yenidən cəhd etmək olmaz.",
+      "syncNoRepositories": "Sinxronizasiya əhatəsində repozitoriya yoxdur. Təhlükəsizlik agentinin izlədiyi repozitoriyaları seç, sonra yenidən sinxronlaşdır.",
+      "syncIntegrationInactive": "Təhlükəsizlik agenti üçün GitHub bağlantısı aktiv deyil. Kilo GitHub tətbiqini yenidən qoş, sonra yenidən sinxronlaşdır.",
+      "syncMissingPermission": "Kilo GitHub tətbiqi zəiflik xəbərdarlıqlarını oxuya bilmir. Həmin icazəni GitHub-da ver, sonra yenidən sinxronlaşdır."
     },
     "analysisState": {
       "queued": "Təhlil növbəyə alınıb",

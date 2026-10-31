@@ -3964,7 +3964,8 @@
       "nameRequired": "Ingiza jina la amri",
       "nameInvalid": "Jina lazima lianze na herufi ndogo na litumie herufi ndogo, tarakimu na deshi pekee",
       "templateRequired": "Ingiza kiolezo cha amri",
-      "nameConflict": "Jina hilo limehifadhiwa na amri iliyojengwa"
+      "nameConflict": "Jina hilo limehifadhiwa na amri iliyojengwa",
+      "duplicateName": "Jina hilo tayari limehifadhiwa na amri nyingine katika wasifu huu"
     },
     "repoBindings": {
       "title": "Profaili Chaguomsingi za Repos",

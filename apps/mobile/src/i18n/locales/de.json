@@ -3964,7 +3964,8 @@
       "nameRequired": "Gib einen Befehlsnamen ein",
       "nameInvalid": "Der Name muss mit einem Kleinbuchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten",
       "templateRequired": "Gib eine Befehlsvorlage ein",
-      "nameConflict": "Dieser Name wird durch einen integrierten Befehl reserviert"
+      "nameConflict": "Dieser Name wird durch einen integrierten Befehl reserviert",
+      "duplicateName": "Ein Befehl mit diesem Namen ist in diesem Profil bereits vorhanden"
     },
     "repoBindings": {
       "title": "Standardprofile für Repos",

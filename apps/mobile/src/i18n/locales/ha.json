@@ -3964,7 +3964,8 @@
       "nameRequired": "Shigar da sunan umarni",
       "nameInvalid": "Dole ne suna farawa da ƙananan haruffa kuma amfani da ƙananan haruffa kawai, lambobi, da dashes",
       "templateRequired": "Shigar da samfurin umarni",
-      "nameConflict": "An adana wannan sunan ta hanyar ginanniyar umarni"
+      "nameConflict": "An adana wannan sunan ta hanyar ginanniyar umarni",
+      "duplicateName": "Umarni mai wannan sunan ya riga ya kasance a cikin wannan bayanan martaba"
     },
     "repoBindings": {
       "title": "Tsoffin Bayanan martaba don Repos",

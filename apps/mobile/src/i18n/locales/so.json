@@ -3964,7 +3964,8 @@
       "nameRequired": "Geli magaca amarka",
       "nameInvalid": "Magacu waa inuu ku bilowdaa xaraf yar oo uu isticmaalo xarfo yaryar, lambaro, iyo jajab",
       "templateRequired": "Geli qaabka amarka",
-      "nameConflict": "Magacaas waxaa xafiday talis gudaha ku jira"
+      "nameConflict": "Magacaas waxaa xafiday talis gudaha ku jira",
+      "duplicateName": "Magacaas waxaa horey u isticmaalay talis kale oo profaylkan ku jira"
     },
     "repoBindings": {
       "title": "Profile-ka ugu tala galay Repos",

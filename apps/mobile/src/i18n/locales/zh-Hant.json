@@ -3964,7 +3964,8 @@
       "nameRequired": "輸入命令名稱",
       "nameInvalid": "名稱必須以小寫字母開頭，且只能使用小寫字母、數字和連字符",
       "templateRequired": "輸入命令模板",
-      "nameConflict": "該名稱由內建指令保留"
+      "nameConflict": "該名稱由內建指令保留",
+      "duplicateName": "此設定檔中已有相同名稱的指令"
     },
     "repoBindings": {
       "title": "倉庫的預設設定檔",

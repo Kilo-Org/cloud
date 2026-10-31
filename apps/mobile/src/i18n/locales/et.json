@@ -3964,7 +3964,8 @@
       "nameRequired": "Sisestage käsu nimi",
       "nameInvalid": "Nimi peab algama väiketähtedega ja kasutama ainult väiketähti, numbreid ja sidekriipse",
       "templateRequired": "Sisestage käsumall",
-      "nameConflict": "See nimi on reserveeritud sisseehitatud käsuga"
+      "nameConflict": "See nimi on reserveeritud sisseehitatud käsuga",
+      "duplicateName": "Selle nimega käsk on selles profiilis juba olemas"
     },
     "repoBindings": {
       "title": "Repode vaikeprofiilid",

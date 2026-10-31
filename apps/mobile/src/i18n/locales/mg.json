@@ -3964,7 +3964,8 @@
       "nameRequired": "Ampidiro anarana baiko",
       "nameInvalid": "Ny anarana dia tsy maintsy manomboka amin'ny litera kely ary tsy mampiasa afa-tsy litera kely, isa ary tsipiho",
       "templateRequired": "Ampidiro môdely baiko",
-      "nameConflict": "Io anarana io dia voatokana amin'ny baiko naorina"
+      "nameConflict": "Io anarana io dia voatokana amin'ny baiko naorina",
+      "duplicateName": "Efa misy baiko mitondra io anarana io ao amin'ity profil ity"
     },
     "repoBindings": {
       "title": "Profiles Default ho an'ny Repos",

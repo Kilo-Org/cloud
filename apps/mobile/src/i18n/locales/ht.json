@@ -3964,7 +3964,8 @@
       "nameRequired": "Antre yon non kòmand",
       "nameInvalid": "Non yo dwe kòmanse ak yon lèt miniskil epi itilize sèlman lèt miniskil, chif ak tire",
       "templateRequired": "Antre yon modèl lòd",
-      "nameConflict": "Non sa a rezève pa yon kòmandman entegre"
+      "nameConflict": "Non sa a rezève pa yon kòmandman entegre",
+      "duplicateName": "Yon kòmandman ki gen non sa a deja egziste nan pwofil sa a"
     },
     "repoBindings": {
       "title": "Default Profiles pou Repos",

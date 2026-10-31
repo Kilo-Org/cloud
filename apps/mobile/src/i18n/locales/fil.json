@@ -3964,7 +3964,8 @@
       "nameRequired": "Maglagay ng command name",
       "nameInvalid": "Ang pangalan ay dapat magsimula sa maliit na titik at gumamit lamang ng maliliit na titik, digit, at gitling",
       "templateRequired": "Maglagay ng command template",
-      "nameConflict": "Ang pangalang iyon ay nakalaan sa pamamagitan ng isang built-in na command"
+      "nameConflict": "Ang pangalang iyon ay nakalaan sa pamamagitan ng isang built-in na command",
+      "duplicateName": "Mayroon nang command na may ganyang pangalan sa profile na ito"
     },
     "repoBindings": {
       "title": "Mga Default na Profile para sa Repos",

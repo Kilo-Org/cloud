@@ -3964,7 +3964,8 @@
       "nameRequired": "Sláðu inn heiti skipunar",
       "nameInvalid": "Nafn verður að byrja á lágstöfum og nota aðeins lágstafi, tölustafi og bandstrik",
       "templateRequired": "Sláðu inn skipanasniðmát",
-      "nameConflict": "Það nafn er frátekið af innbyggðri skipun"
+      "nameConflict": "Það nafn er frátekið af innbyggðri skipun",
+      "duplicateName": "Þegar er til skipun með þetta nafn í þessum prófíl"
     },
     "repoBindings": {
       "title": "Sjálfgefin snið fyrir geymslur",

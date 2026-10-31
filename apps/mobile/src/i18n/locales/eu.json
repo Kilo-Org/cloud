@@ -3964,7 +3964,8 @@
       "nameRequired": "Sartu komando-izen bat",
       "nameInvalid": "Izenak letra xehe batekin hasi behar du eta letra xeheak, zifrak eta marra baino ez ditu erabili",
       "templateRequired": "Sartu komando txantiloia",
-      "nameConflict": "Izen hori barneko komando batek erreserbatzen du"
+      "nameConflict": "Izen hori barneko komando batek erreserbatzen du",
+      "duplicateName": "Izen hori duen komando bat badago lehendik profil honetan"
     },
     "repoBindings": {
       "title": "Repos-en profil lehenetsiak",

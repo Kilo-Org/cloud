@@ -4015,7 +4015,8 @@
       "nameRequired": "Ievadiet komandas nosaukumu",
       "nameInvalid": "Nosaukumam ir jāsākas ar mazo burtu un jāizmanto tikai mazie burti, cipari un domuzīmes",
       "templateRequired": "Ievadiet komandas veidni",
-      "nameConflict": "Šo nosaukumu rezervē iebūvēta komanda"
+      "nameConflict": "Šo nosaukumu rezervē iebūvēta komanda",
+      "duplicateName": "Komanda ar šādu nosaukumu šajā profilā jau pastāv"
     },
     "repoBindings": {
       "title": "Atpirkšanas darījumu noklusējuma profili",

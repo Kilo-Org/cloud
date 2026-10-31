@@ -4066,7 +4066,8 @@
       "nameRequired": "Wprowadź nazwę polecenia",
       "nameInvalid": "Nazwa musi zaczynać się od małej litery i zawierać wyłącznie małe litery, cyfry i myślniki",
       "templateRequired": "Wprowadź szablon polecenia",
-      "nameConflict": "Nazwa ta jest zarezerwowana przez wbudowane polecenie"
+      "nameConflict": "Nazwa ta jest zarezerwowana przez wbudowane polecenie",
+      "duplicateName": "Polecenie o tej nazwie już istnieje w tym profilu"
     },
     "repoBindings": {
       "title": "Domyślne profile dla repozytoriów",

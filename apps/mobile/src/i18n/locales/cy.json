@@ -4168,7 +4168,8 @@
       "nameRequired": "Rhowch enw gorchymyn",
       "nameInvalid": "Rhaid i'r enw ddechrau gyda llythyren fach a defnyddio llythrennau bach, digidau a llinellau llinellau yn unig",
       "templateRequired": "Rhowch dempled gorchymyn",
-      "nameConflict": "Mae'r enw hwnnw wedi'i gadw gan orchymyn adeiledig"
+      "nameConflict": "Mae'r enw hwnnw wedi'i gadw gan orchymyn adeiledig",
+      "duplicateName": "Mae gorchymyn gyda'r enw hwn eisoes yn bodoli yn y proffil hwn"
     },
     "repoBindings": {
       "title": "Proffiliau Rhagosodedig ar gyfer Repos",

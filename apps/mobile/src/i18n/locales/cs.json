@@ -1825,7 +1825,6 @@
       "notYetSynced": "Zatím nesynchronizováno",
       "refreshFailed": "Obnovení se nezdařilo — zobrazují se poslední synchronizovaná data.",
       "settings": "Nastavení",
-      "syncFindings": "Synchronizovat nálezy",
       "syncNow": "Synchronizovat nyní",
       "syncQueued": "Synchronizace zařazena do fronty",
       "syncStatusUnavailable": "Stav synchronizace není k dispozici.",

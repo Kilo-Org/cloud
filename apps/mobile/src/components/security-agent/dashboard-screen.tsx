@@ -123,10 +123,10 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
           : null;
         return Object.assign(metric, {
           label: i18n.t('securityAgent.dashboardMetrics.slaCompliance'),
-          value:
-            compliance === null
-              ? i18n.t('securityAgent.dashboard.notMeasured')
-              : formatPercent(compliance, i18n.language),
+          // The tile prints its value in the count face, where a sentence reads
+          // as a broken number. An unmeasured share is a dash; the detail line
+          // below says why there is nothing to measure yet.
+          value: compliance === null ? '—' : formatPercent(compliance, i18n.language),
           detail: measured
             ? i18n.t('securityAgent.dashboardMetrics.withinDeadlineDetail', {
                 within: number(data.sla.overall.withinSla),
@@ -585,34 +585,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
         {slaEnabled && data && data.sla.overall.total === 0 ? (
           <View className="flex-row items-center gap-4">
-            {/* Both actions take the shared row frame: `min-h-11` measured
-                38.5 dp here (NativeWind's rem is 14 pt), under the touch
-                floor, and the row only grows to the frame the header's icon
-                buttons already use. */}
-            <Pressable
-              onPress={() => {
-                startSync({ repoFullName });
-              }}
-              disabled={syncDisabled}
-              accessibilityRole="button"
-              accessibilityLabel={t('securityAgent.dashboard.syncFindings')}
-              accessibilityState={{
-                disabled: syncDisabled,
-                busy: triggerSync.isPending,
-              }}
-              className={cn(
-                ROW_TARGET_CLASS,
-                'flex-row items-center gap-1.5 active:opacity-70',
-                syncBlocked && 'opacity-50'
-              )}
-            >
-              {triggerSync.isPending && (
-                <SpinningIcon icon={RefreshCw} size={12} color={colors.mutedForeground} spinning />
-              )}
-              <Text className="text-xs font-medium text-primary">
-                {t('securityAgent.dashboard.syncFindings')}
-              </Text>
-            </Pressable>
+            {/* The header's sync control is the one way to run a sync, so this
+                row only offers the setup the empty state points at. The link
+                takes the shared row frame: `min-h-11` measured 38.5 dp here
+                (NativeWind's rem is 14 pt), under the touch floor. */}
             <Pressable
               onPress={() => {
                 pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));

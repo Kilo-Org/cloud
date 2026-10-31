@@ -17,11 +17,11 @@ import { RadioGroup } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
 
 const STATUS_OPTIONS = [
+  { value: 'all', labelKey: 'common.all' },
   { value: 'open', labelKey: 'securityAgent.filter.statusOpen' },
   { value: 'fixed', labelKey: 'securityAgent.filter.fixed' },
   { value: 'ignored', labelKey: 'securityAgent.filter.statusIgnored' },
   { value: 'closed', labelKey: 'common.closed' },
-  { value: 'all', labelKey: 'common.all' },
 ] as const satisfies readonly { value: SecurityFindingStatusFilter; labelKey: string }[];
 
 const SEVERITY_OPTIONS = [

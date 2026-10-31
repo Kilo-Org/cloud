@@ -2,12 +2,11 @@
 
 // Dashboard sync-control terminal-state contract: a non-retryable sync outcome
 // (missing-configuration rejection, persistence failure) ends the intent — the
-// hook rotates the operation key, so both sync controls ("Sync now" header
-// button and the "Sync findings" empty-state action) must disable and the
-// inline copy must explain the state. The hook maps every failure onto catalog
-// copy before it reaches the screen, so the banner renders the mapped message;
-// these cases feed the real mapper's output.
-// Retryable failures keep both controls enabled so the user can retry under the
+// hook rotates the operation key, so the header's "Sync now" control must
+// disable and the inline copy must explain the state. The hook maps every
+// failure onto catalog copy before it reaches the screen, so the banner renders
+// the mapped message; these cases feed the real mapper's output.
+// Retryable failures keep the control enabled so the user can retry under the
 // same hoisted key.
 
 import { createElement, type ReactElement } from 'react';
@@ -289,25 +288,20 @@ function renderScreen(): R {
   return r;
 }
 
-type SyncControlKey = 'securityAgent.dashboard.syncNow' | 'securityAgent.dashboard.syncFindings';
-
 function syncButtons(root: I): I[] {
   const syncNow = i18n.t('securityAgent.dashboard.syncNow');
-  const syncFindings = i18n.t('securityAgent.dashboard.syncFindings');
   return root.findAll(
     n =>
       typeof n.type === 'string' &&
       (n.type as string) === 'Pressable' &&
-      (n.props.accessibilityLabel === syncNow || n.props.accessibilityLabel === syncFindings)
+      n.props.accessibilityLabel === syncNow
   );
 }
 
-function findSyncButton(root: I, key: SyncControlKey): I {
-  const label = i18n.t(key);
-  const nodes = syncButtons(root).filter(n => n.props.accessibilityLabel === label);
-  const n = nodes[0];
+function findSyncButton(root: I): I {
+  const n = syncButtons(root)[0];
   if (!n) {
-    throw new Error(`expected 1 ${label} button, got ${nodes.length}`);
+    throw new Error('expected 1 sync button, got 0');
   }
   return n;
 }
@@ -408,30 +402,30 @@ describe('DashboardScreen sync control terminal states', () => {
     sharedMetrics.build.mockReturnValue([]);
   });
 
-  it('keeps both sync controls enabled in the happy state', () => {
+  it('keeps the sync control enabled in the happy state', () => {
     const root = renderScreen();
 
-    expect(syncButtons(root.root)).toHaveLength(2);
-    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+    expect(syncButtons(root.root)).toHaveLength(1);
+    expect(syncDisabledStates(root.root)).toEqual([false]);
   });
 
-  it('keeps both sync controls enabled after a retryable error and shows its copy', () => {
+  it('keeps the sync control enabled after a retryable error and shows its copy', () => {
     triggerSync.isError = true;
     triggerSync.error = mapSecuritySyncOperationError(new Error('operation_in_progress'));
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+    expect(syncDisabledStates(root.root)).toEqual([false]);
     expect(renderedTexts(root.root)).toContain(IN_PROGRESS_COPY);
   });
 
-  it('renders the translated ambiguous copy under ja and keeps both controls retryable', async () => {
+  it('renders the translated ambiguous copy under ja and keeps the control retryable', async () => {
     await i18n.changeLanguage('ja');
     try {
       triggerSync.isError = true;
       triggerSync.error = mapSecuritySyncOperationError(new Error(SECURITY_AMBIGUOUS_MESSAGE));
       const root = renderScreen();
 
-      expect(syncDisabledStates(root.root)).toEqual([false, false]);
+      expect(syncDisabledStates(root.root)).toEqual([false]);
       expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.mutations.ambiguous'));
       expect(renderedTexts(root.root)).not.toContain(SECURITY_AMBIGUOUS_MESSAGE);
     } finally {
@@ -439,31 +433,31 @@ describe('DashboardScreen sync control terminal states', () => {
     }
   });
 
-  it('disables both sync controls and shows configuration-specific copy after a missing-configuration error', () => {
+  it('disables the sync control and shows configuration-specific copy after a missing-configuration error', () => {
     triggerSync.isError = true;
     triggerSync.error = mapSecuritySyncOperationError(new Error(CONFIGURATION_ERROR_MESSAGE));
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabledStates(root.root)).toEqual([true]);
     expect(renderedTexts(root.root)).toContain(CONFIGURATION_COPY);
     // The raw server message is replaced by the state-specific copy.
     expect(renderedTexts(root.root)).not.toContain(CONFIGURATION_ERROR_MESSAGE);
   });
 
-  it('disables both sync controls and shows the error copy after another non-retryable error', () => {
+  it('disables the sync control and shows the error copy after another non-retryable error', () => {
     triggerSync.isError = true;
     triggerSync.error = mapSecuritySyncOperationError(new Error(PERSISTENCE_FAILED_MESSAGE));
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabledStates(root.root)).toEqual([true]);
     expect(renderedTexts(root.root)).toContain(PERSISTENCE_FAILED_MESSAGE);
   });
 
-  it('disables both sync controls while a sync is pending', () => {
+  it('disables the sync control while a sync is pending', () => {
     triggerSync.isPending = true;
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabledStates(root.root)).toEqual([true]);
   });
 
   it('offers a retry beside a retryable failure and resubmits the current intent', () => {
@@ -579,7 +573,7 @@ describe('DashboardScreen sync control terminal states', () => {
     triggerSync.error = preconditionError('security_sync_no_repositories');
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabledStates(root.root)).toEqual([true]);
     expect(renderedTexts(root.root)).toContain(
       i18n.t('securityAgent.mutations.syncNoRepositories')
     );
@@ -610,11 +604,11 @@ describe('DashboardScreen sync control terminal states', () => {
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it('lets both sync controls work again when the dashboard regains focus after a rejection', () => {
+  it('lets the sync control work again when the dashboard regains focus after a rejection', () => {
     triggerSync.isError = true;
     triggerSync.error = preconditionError('security_sync_no_repositories');
     const root = renderScreen();
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabledStates(root.root)).toEqual([true]);
 
     // Returning from the settings screen: a changed repository selection is a
     // new intent, so the rejection that described the old one no longer holds.
@@ -629,17 +623,17 @@ describe('DashboardScreen sync control terminal states', () => {
       root.update(createElement(DashboardScreen, { scope: 'personal' }));
     });
 
-    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+    expect(syncDisabledStates(root.root)).toEqual([false]);
     expect(renderedTexts(root.root)).not.toContain(
       i18n.t('securityAgent.mutations.syncNoRepositories')
     );
   });
 
-  it('lets both sync controls work again when the GitHub handoff returns', () => {
+  it('lets the sync control work again when the GitHub handoff returns', () => {
     triggerSync.isError = true;
     triggerSync.error = preconditionError('security_sync_integration_inactive');
     const root = renderScreen();
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabledStates(root.root)).toEqual([true]);
 
     act(() => {
       manageAccess.onReturn?.(true);
@@ -652,7 +646,7 @@ describe('DashboardScreen sync control terminal states', () => {
       root.update(createElement(DashboardScreen, { scope: 'personal' }));
     });
 
-    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+    expect(syncDisabledStates(root.root)).toEqual([false]);
   });
 
   it('keeps the precondition copy when the GitHub handoff never opened a page', () => {
@@ -665,7 +659,7 @@ describe('DashboardScreen sync control terminal states', () => {
     });
 
     expect(triggerSync.reset).not.toHaveBeenCalled();
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabledStates(root.root)).toEqual([true]);
     expect(renderedTexts(root.root)).toContain(
       i18n.t('securityAgent.mutations.syncIntegrationInactive')
     );
@@ -681,7 +675,7 @@ describe('DashboardScreen sync control terminal states', () => {
     });
 
     expect(triggerSync.reset).not.toHaveBeenCalled();
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabledStates(root.root)).toEqual([true]);
   });
 
   it('keeps the last risk breakdown on screen while a sync failure is shown', () => {
@@ -698,7 +692,7 @@ describe('DashboardScreen sync control terminal states', () => {
 
   it('submits the sync through the header control with the current repo filter', () => {
     const root = renderScreen();
-    const syncNow = findSyncButton(root.root, 'securityAgent.dashboard.syncNow');
+    const syncNow = findSyncButton(root.root);
 
     act(() => {
       (syncNow.props.onPress as () => void)();

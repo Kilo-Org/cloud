@@ -127,8 +127,13 @@
     --accent-foreground: #1a1a10;
     --primary: #ffdd00;
     --primary-foreground: #1a1a10;
-    /* Dark counterpart of the disabled primary fill; near-black ink clears 4.5:1. */
-    --primary-disabled: #8a8680;
+    /* Dark counterpart of the disabled primary fill. The near-black ink sits on
+     * the fill, not on the background, so the fill carries the legibility: at
+     * the muted neutral (4.84:1) the label read as dull grey text on grey and
+     * the action looked faded. This warm step clears 5.88:1, above the light
+     * theme's white-on-6f6a61 pair (5.37:1), and still reads as muted next to
+     * the saturated brand fill. */
+    --primary-disabled: #9a958b;
     --destructive: #f28b7a;
     --destructive-foreground: #1a1a10;
     --border: rgba(255, 255, 255, 0.07);

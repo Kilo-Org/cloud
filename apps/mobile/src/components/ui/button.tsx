@@ -180,7 +180,12 @@ function Button({
   // contrasts with the ink label, so the label stays legible. A busy primary
   // keeps the brand fill and its spinner so it still reads as working.
   const isMutedDisabled = isDisabled && !loading && isPrimary;
-  const isDimmed = isDisabled && !isPrimary;
+  // Dimming is a disabled signal, and a busy control has nothing visible to
+  // signal with: the label is already transparent and the spinner sits alone in
+  // the slot. Halving the control's opacity then halves the indicator too, which
+  // leaves an icon-only button looking empty on a dark surface. Keep the busy
+  // control at full strength in both themes.
+  const isDimmed = isDisabled && !isPrimary && !loading;
   // On Android, a node's accessible name is only rewritten while the incoming
   // state still carries `busy`. A loading button therefore keeps announcing its
   // busy state after the request settles unless its label prop holds a real

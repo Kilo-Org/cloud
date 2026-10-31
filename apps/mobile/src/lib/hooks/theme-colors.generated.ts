@@ -42,7 +42,7 @@ export const darkColors = {
   foreground: '#F2F0EB',
   primary: '#FFDD00',
   primaryForeground: '#1A1A10',
-  primaryDisabled: '#8A8680',
+  primaryDisabled: '#9A958B',
   secondary: '#1F1F24',
   secondaryForeground: '#F2F0EB',
   muted: '#1F1F24',

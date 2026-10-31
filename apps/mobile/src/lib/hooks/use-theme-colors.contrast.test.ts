@@ -195,6 +195,15 @@ describe('disabled primary fill contrast (WCAG AA text)', () => {
     const ratio = contrastRatio(darkColors.primaryForeground, darkColors.primaryDisabled);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
+
+  it('dark theme: the disabled primary pair is at least as legible as the light pair', () => {
+    // The dark fill carries a near-black ink, so a muted neutral fill leaves a
+    // dull grey label on grey. The dark pair must not fall below the light
+    // pair's white-on-warm-grey legibility (5.37:1).
+    const dark = contrastRatio(darkColors.primaryForeground, darkColors.primaryDisabled);
+    const light = contrastRatio(lightColors.primaryForeground, lightColors.primaryDisabled);
+    expect(dark).toBeGreaterThanOrEqual(light);
+  });
 });
 
 describe('warn foreground token contrast (WCAG AA text)', () => {

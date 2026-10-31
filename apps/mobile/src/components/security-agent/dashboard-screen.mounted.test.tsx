@@ -2,12 +2,11 @@
 
 // Dashboard sync-control terminal-state contract: a non-retryable sync outcome
 // (missing-configuration rejection, persistence failure) ends the intent — the
-// hook rotates the operation key, so both sync controls ("Sync now" header
-// button and the "Sync findings" empty-state action) must disable and the
-// inline copy must explain the state. The hook maps every failure onto catalog
-// copy before it reaches the screen, so the banner renders the mapped message;
-// these cases feed the real mapper's output.
-// Retryable failures keep both controls enabled so the user can retry under the
+// hook rotates the operation key, so the header "Sync now" control must disable
+// and the inline copy must explain the state. The hook maps every failure onto
+// catalog copy before it reaches the screen, so the banner renders the mapped
+// message; these cases feed the real mapper's output.
+// Retryable failures keep the control enabled so the user can retry under the
 // same hoisted key.
 
 import { createElement, type ReactElement } from 'react';
@@ -273,16 +272,15 @@ function renderScreen(): R {
   return r;
 }
 
-type SyncControlKey = 'securityAgent.dashboard.syncNow' | 'securityAgent.dashboard.syncFindings';
+type SyncControlKey = 'securityAgent.dashboard.syncNow';
 
 function syncButtons(root: I): I[] {
   const syncNow = i18n.t('securityAgent.dashboard.syncNow');
-  const syncFindings = i18n.t('securityAgent.dashboard.syncFindings');
   return root.findAll(
     n =>
       typeof n.type === 'string' &&
       (n.type as string) === 'Pressable' &&
-      (n.props.accessibilityLabel === syncNow || n.props.accessibilityLabel === syncFindings)
+      n.props.accessibilityLabel === syncNow
   );
 }
 
@@ -309,15 +307,14 @@ function findFilterControl(root: I): I {
   return filter;
 }
 
-function syncDisabledStates(root: I): boolean[] {
-  return syncButtons(root).map(n => n.props.disabled as boolean);
+function syncDisabled(root: I): boolean {
+  return findSyncButton(root, 'securityAgent.dashboard.syncNow').props.disabled === true;
 }
 
-function syncBusyStates(root: I): boolean[] {
-  return syncButtons(root).map(n => {
-    const state = n.props.accessibilityState as unknown;
-    return typeof state === 'object' && state !== null && 'busy' in state && state.busy === true;
-  });
+function syncBusy(root: I): boolean {
+  const state = findSyncButton(root, 'securityAgent.dashboard.syncNow').props
+    .accessibilityState as unknown;
+  return typeof state === 'object' && state !== null && 'busy' in state && state.busy === true;
 }
 
 // The one Button the dashboard renders on its own: the retry beside a failed
@@ -385,11 +382,11 @@ describe('DashboardScreen sync control terminal states', () => {
     sharedMetrics.build.mockReturnValue([]);
   });
 
-  it('keeps both sync controls enabled in the happy state', () => {
+  it('keeps the sync control enabled in the happy state', () => {
     const root = renderScreen();
 
-    expect(syncButtons(root.root)).toHaveLength(2);
-    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+    expect(syncButtons(root.root)).toHaveLength(1);
+    expect(syncDisabled(root.root)).toBe(false);
   });
 
   it('presents an in-progress conflict as a running sync instead of a retryable failure', () => {
@@ -409,10 +406,10 @@ describe('DashboardScreen sync control terminal states', () => {
     });
 
     // The ledger refused a duplicate of a submit that is still in flight, so
-    // the sync is running: both controls report progress and stay disabled, and
+    // the sync is running: the control reports progress and stays disabled, and
     // the conflict sentence with its colliding Retry is gone.
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
-    expect(syncBusyStates(root.root)).toEqual([true, true]);
+    expect(syncDisabled(root.root)).toBe(true);
+    expect(syncBusy(root.root)).toBe(true);
     expect(renderedTexts(root.root)).not.toContain(IN_PROGRESS_COPY);
     expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.dashboard.syncing'));
     expect(syncRetries(root.root)).toHaveLength(0);
@@ -424,14 +421,14 @@ describe('DashboardScreen sync control terminal states', () => {
       syncActivity.updatedAt = Date.now() + 1000;
       root.update(createElement(DashboardScreen, { scope: 'personal' }));
     });
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabled(root.root)).toBe(true);
 
     act(() => {
       syncActivity.syncRunning = false;
       syncActivity.updatedAt = Date.now() + 2000;
       root.update(createElement(DashboardScreen, { scope: 'personal' }));
     });
-    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+    expect(syncDisabled(root.root)).toBe(false);
     expect(renderedTexts(root.root)).not.toContain(IN_PROGRESS_COPY);
     expect(syncRetries(root.root)).toHaveLength(0);
   });
@@ -453,7 +450,7 @@ describe('DashboardScreen sync control terminal states', () => {
         options.onError(triggerSync.error);
         root.update(createElement(DashboardScreen, { scope: 'personal' }));
       });
-      expect(syncDisabledStates(root.root)).toEqual([true, true]);
+      expect(syncDisabled(root.root)).toBe(true);
 
       // One poll later the server still lists no sync: a submit the screen can
       // never see must not hold the control, so the watch expires.
@@ -461,13 +458,13 @@ describe('DashboardScreen sync control terminal states', () => {
         syncActivity.updatedAt = Date.now() + 3000;
         root.update(createElement(DashboardScreen, { scope: 'personal' }));
       });
-      expect(syncDisabledStates(root.root)).toEqual([true, true]);
+      expect(syncDisabled(root.root)).toBe(true);
 
       act(() => {
         vi.advanceTimersByTime(30_000);
         root.update(createElement(DashboardScreen, { scope: 'personal' }));
       });
-      expect(syncDisabledStates(root.root)).toEqual([false, false]);
+      expect(syncDisabled(root.root)).toBe(false);
       expect(renderedTexts(root.root)).not.toContain(IN_PROGRESS_COPY);
     } finally {
       vi.useRealTimers();
@@ -485,16 +482,16 @@ describe('DashboardScreen sync control terminal states', () => {
       options.onSuccess();
       root.update(createElement(DashboardScreen, { scope: 'personal' }));
     });
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabled(root.root)).toBe(true);
 
     // Every poll after the accept fails: a run the screen cannot observe must
-    // not hold both controls for good.
+    // not hold the control for good.
     act(() => {
       syncActivity.readFailedAt = Date.now() + 3000;
       root.update(createElement(DashboardScreen, { scope: 'personal' }));
     });
 
-    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+    expect(syncDisabled(root.root)).toBe(false);
   });
 
   it('gives the controls back when an accepted submit never shows a run', () => {
@@ -510,14 +507,14 @@ describe('DashboardScreen sync control terminal states', () => {
         options.onSuccess();
         root.update(createElement(DashboardScreen, { scope: 'personal' }));
       });
-      expect(syncDisabledStates(root.root)).toEqual([true, true]);
+      expect(syncDisabled(root.root)).toBe(true);
 
       act(() => {
         vi.advanceTimersByTime(60_000);
         root.update(createElement(DashboardScreen, { scope: 'personal' }));
       });
 
-      expect(syncDisabledStates(root.root)).toEqual([false, false]);
+      expect(syncDisabled(root.root)).toBe(false);
     } finally {
       vi.useRealTimers();
     }
@@ -528,8 +525,8 @@ describe('DashboardScreen sync control terminal states', () => {
     syncActivity.updatedAt = Date.now();
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
-    expect(syncBusyStates(root.root)).toEqual([true, true]);
+    expect(syncDisabled(root.root)).toBe(true);
+    expect(syncBusy(root.root)).toBe(true);
     expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.dashboard.syncing'));
 
     act(() => {
@@ -540,7 +537,7 @@ describe('DashboardScreen sync control terminal states', () => {
 
     // The sync finished: the controls come back and "Last synced" plus the
     // repository sync state are refreshed without leaving the screen.
-    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+    expect(syncDisabled(root.root)).toBe(false);
     expect(renderedTexts(root.root)).not.toContain(i18n.t('securityAgent.dashboard.syncing'));
     expect(dashboardStats.refetch).toHaveBeenCalledTimes(1);
     expect(lastSync.refetch).toHaveBeenCalledTimes(1);
@@ -561,24 +558,24 @@ describe('DashboardScreen sync control terminal states', () => {
 
     // The 202 accepts the command, so the run is still going: a cached empty
     // answer that predates the submit cannot end the progress state.
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabled(root.root)).toBe(true);
 
     act(() => {
       syncActivity.updatedAt = Date.now() + 1000;
       root.update(createElement(DashboardScreen, { scope: 'personal' }));
     });
 
-    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+    expect(syncDisabled(root.root)).toBe(false);
   });
 
-  it('renders the translated ambiguous copy under ja and keeps both controls retryable', async () => {
+  it('renders the translated ambiguous copy under ja and keeps the control retryable', async () => {
     await i18n.changeLanguage('ja');
     try {
       triggerSync.isError = true;
       triggerSync.error = mapSecuritySyncOperationError(new Error(SECURITY_AMBIGUOUS_MESSAGE));
       const root = renderScreen();
 
-      expect(syncDisabledStates(root.root)).toEqual([false, false]);
+      expect(syncDisabled(root.root)).toBe(false);
       expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.mutations.ambiguous'));
       expect(renderedTexts(root.root)).not.toContain(SECURITY_AMBIGUOUS_MESSAGE);
     } finally {
@@ -586,31 +583,31 @@ describe('DashboardScreen sync control terminal states', () => {
     }
   });
 
-  it('disables both sync controls and shows configuration-specific copy after a missing-configuration error', () => {
+  it('disables the sync control and shows configuration-specific copy after a missing-configuration error', () => {
     triggerSync.isError = true;
     triggerSync.error = mapSecuritySyncOperationError(new Error(CONFIGURATION_ERROR_MESSAGE));
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabled(root.root)).toBe(true);
     expect(renderedTexts(root.root)).toContain(CONFIGURATION_COPY);
     // The raw server message is replaced by the state-specific copy.
     expect(renderedTexts(root.root)).not.toContain(CONFIGURATION_ERROR_MESSAGE);
   });
 
-  it('disables both sync controls and shows the error copy after another non-retryable error', () => {
+  it('disables the sync control and shows the error copy after another non-retryable error', () => {
     triggerSync.isError = true;
     triggerSync.error = mapSecuritySyncOperationError(new Error(PERSISTENCE_FAILED_MESSAGE));
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabled(root.root)).toBe(true);
     expect(renderedTexts(root.root)).toContain(PERSISTENCE_FAILED_MESSAGE);
   });
 
-  it('disables both sync controls while a sync is pending', () => {
+  it('disables the sync control while a sync is pending', () => {
     triggerSync.isPending = true;
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabled(root.root)).toBe(true);
   });
 
   it('offers a retry beside a retryable failure and resubmits the current intent', () => {
@@ -997,6 +994,40 @@ describe('buildLocalizedMetrics', () => {
 
     expect(analysisMetrics[0]?.detail).toBe('2 critical, 3 high');
     expect(slaMetrics[1]?.detail).toBe('1 critical, 2 high');
+  });
+
+  it('shows the placeholder dash for an unmeasured SLA compliance', () => {
+    const data: Parameters<typeof buildLocalizedMetrics>[0] = {
+      analysis: {
+        total: 3,
+        exploitable: 1,
+        needsReview: 1,
+        triageComplete: 1,
+        analyzing: 0,
+        notAnalyzed: 0,
+        failed: 0,
+      },
+      severity: { critical: 1, high: 1, medium: 0, low: 0 },
+      sla: {
+        overall: { total: 0, withinSla: 0, overdue: 0 },
+        bySeverity: {
+          critical: { overdue: 0 },
+          high: { overdue: 0 },
+          medium: { overdue: 0 },
+          low: { overdue: 0 },
+        },
+        dueSoon: { total: 0, exploitable: 0 },
+        untrackedCount: 3,
+      },
+    };
+
+    sharedMetrics.build.mockReturnValueOnce([dashboardMetric('slaCompliance')]);
+    const [compliance] = buildLocalizedMetrics(data, true);
+
+    // The value slot carries a placeholder a reader can scan past, never a
+    // sentence set in the numeric style; the detail line says what is missing.
+    expect(compliance?.value).toBe('—');
+    expect(compliance?.detail).toBe(i18n.t('securityAgent.dashboardMetrics.noDeadlineData'));
   });
 });
 

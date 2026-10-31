@@ -79,6 +79,11 @@ const DUPLICATE_SYNC_WATCH_MS = 30_000;
 // claiming a sync it cannot see, while a run it does see keeps the state itself.
 const ACCEPTED_SYNC_WATCH_MS = 60_000;
 
+// A tile with no number to show renders the dash the app's other stat tiles
+// use, in the same numeric style as its neighbours: a sentence set in the value
+// style reads as a broken metric beside zeros.
+const NO_METRIC_VALUE = '—';
+
 const METRIC_TONE_CLASS = {
   danger: 'text-destructive',
   warning: 'text-warn',
@@ -139,10 +144,7 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
           : null;
         return Object.assign(metric, {
           label: i18n.t('securityAgent.dashboardMetrics.slaCompliance'),
-          value:
-            compliance === null
-              ? i18n.t('securityAgent.dashboard.notMeasured')
-              : formatPercent(compliance, i18n.language),
+          value: compliance === null ? NO_METRIC_VALUE : formatPercent(compliance, i18n.language),
           detail: measured
             ? i18n.t('securityAgent.dashboardMetrics.withinDeadlineDetail', {
                 within: number(data.sla.overall.withinSla),
@@ -638,48 +640,24 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         )}
 
         {slaEnabled && data && data.sla.overall.total === 0 ? (
-          <View className="flex-row items-center gap-4">
-            {/* Both actions take the shared row frame: `min-h-11` measured
-                38.5 dp here (NativeWind's rem is 14 pt), under the touch
-                floor, and the row only grows to the frame the header's icon
-                buttons already use. */}
-            <Pressable
-              onPress={() => {
-                startSync({ repoFullName });
-              }}
-              disabled={syncDisabled}
-              accessibilityRole="button"
-              accessibilityLabel={t('securityAgent.dashboard.syncFindings')}
-              accessibilityState={{
-                disabled: syncDisabled,
-                busy: syncInFlight,
-              }}
-              className={cn(
-                ROW_TARGET_CLASS,
-                'flex-row items-center gap-1.5 active:opacity-70',
-                syncBlocked && 'opacity-50'
-              )}
-            >
-              {syncInFlight && (
-                <SpinningIcon icon={RefreshCw} size={12} color={colors.mutedForeground} spinning />
-              )}
-              <Text className="text-xs font-medium text-primary">
-                {t('securityAgent.dashboard.syncFindings')}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
-              className={cn(ROW_TARGET_CLASS, 'justify-center active:opacity-70')}
-            >
-              <Text className="text-xs font-medium text-primary">
-                {t('securityAgent.dashboard.manageRepositories')}
-              </Text>
-            </Pressable>
-          </View>
+          // The header's Sync now button already starts this run, so the empty
+          // state offers only the navigation it alone provides. The action takes
+          // the shared row frame — `min-h-11` measured 38.5 dp here (NativeWind's
+          // rem is 14 pt), under the touch floor — and the secondary ink token,
+          // which stays muted in both themes instead of the accent the primary
+          // token turns into on the dark surface.
+          <Pressable
+            onPress={() => {
+              pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
+            className={cn(ROW_TARGET_CLASS, 'justify-center active:opacity-70')}
+          >
+            <Text className="text-xs font-medium text-ink2">
+              {t('securityAgent.dashboard.manageRepositories')}
+            </Text>
+          </Pressable>
         ) : null}
 
         {dashboardStats.isError && !data ? (

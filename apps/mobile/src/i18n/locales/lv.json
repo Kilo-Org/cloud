@@ -1449,7 +1449,10 @@
       "gitlabNoRepositoriesDescription": "Iespējams, tev jāpiešķir piekļuve papildu grupām vai projektiem pakalpojumā GitLab.",
       "installGithubApp": "Instalē GitHub lietotni repozitorijos",
       "installGithubAppDescription": "Piešķir Kilo GitHub lietotnei piekļuvi repozitorijiem, kuru kodu vēlies pārskatīt.",
-      "repositoryAccess": "piekļuve repozitorijiem"
+      "repositoryAccess": "piekļuve repozitorijiem",
+      "allModePersonal": "Katrs repozitorijs, kuram Kilo var piekļūt, izmantojot tavu GitHub savienojumu, tiek automātiski pārskatīts.",
+      "allModeOrganization": "Katrs repozitorijs, kuram Kilo var piekļūt, izmantojot organizācijas GitHub savienojumu, tiek automātiski pārskatīts.",
+      "allModeCount": "Pieejamie repozitoriji: {{displayCount}}"
     },
     "style": {
       "title": "Pārskatīšanas stils",

@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "GitLabで、追加のグループやプロジェクトへのアクセスを許可する必要がある場合があります。",
       "installGithubApp": "リポジトリにGitHub Appをインストール",
       "installGithubAppDescription": "レビュー対象のリポジトリへのアクセスをKilo GitHub Appに許可してください。",
-      "repositoryAccess": "リポジトリへのアクセス権"
+      "repositoryAccess": "リポジトリへのアクセス権",
+      "allModePersonal": "あなたのGitHub接続を通じてKiloがアクセスできるすべてのリポジトリが自動的にレビューされます。",
+      "allModeOrganization": "組織のGitHub接続を通じてKiloがアクセスできるすべてのリポジトリが自動的にレビューされます。",
+      "allModeCount": "利用可能なリポジトリ: {{displayCount}}"
     },
     "style": {
       "title": "レビュースタイル",

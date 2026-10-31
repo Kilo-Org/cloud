@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "آپ کو GitLab پر مزید گروپس یا پروجیکٹس تک رسائی دینے کی ضرورت پڑ سکتی ہے۔",
       "installGithubApp": "ریپوزٹریز پر GitHub ایپ انسٹال کریں",
       "installGithubAppDescription": "Kilo کی GitHub ایپ کو ان ریپوزٹریز تک رسائی دیں جن کا آپ جائزہ کروانا چاہتے ہیں۔",
-      "repositoryAccess": "ریپوزٹری تک رسائی"
+      "repositoryAccess": "ریپوزٹری تک رسائی",
+      "allModePersonal": "ہر وہ ریپوزٹری جس تک Kilo آپ کے GitHub کنکشن کے ذریعے رسائی حاصل کر سکتا ہے، خودکار طور پر جائزہ لی جاتی ہے۔",
+      "allModeOrganization": "ہر وہ ریپوزٹری جس تک Kilo تنظیم کے GitHub کنکشن کے ذریعے رسائی حاصل کر سکتا ہے، خودکار طور پر جائزہ لی جاتی ہے۔",
+      "allModeCount": "دستیاب ریپوزٹریز: {{displayCount}}"
     },
     "style": {
       "title": "جائزے کا انداز",

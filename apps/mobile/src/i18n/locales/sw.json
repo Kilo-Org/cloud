@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Huenda unahitaji kutoa ufikiaji kwa vikundi au miradi zaidi kwenye GitLab.",
       "installGithubApp": "Sakinisha programu ya GitHub kwenye hazina",
       "installGithubAppDescription": "Ipe programu ya Kilo ya GitHub ruhusa ya kufikia hazina unazotaka zikaguliwe.",
-      "repositoryAccess": "ufikiaji wa hazina"
+      "repositoryAccess": "ufikiaji wa hazina",
+      "allModePersonal": "Kila hazina ambayo Kilo anaweza kufikia kupitia muunganisho wako wa GitHub inakaguliwa kiotomatiki.",
+      "allModeOrganization": "Kila hazina ambayo Kilo anaweza kufikia kupitia muunganisho wa GitHub wa shirika inakaguliwa kiotomatiki.",
+      "allModeCount": "Hazina zinazopatikana: {{displayCount}}"
     },
     "style": {
       "title": "Mtindo wa ukaguzi",

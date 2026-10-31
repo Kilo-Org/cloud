@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLab irratti gareewwan ykn pirojektoota dabalataa argachuuf hayyama kennuun si barbaachisuu danda'a.",
       "installGithubApp": "Aplikeeshinii GitHub kuusaawwan koodii irratti fe'i",
       "installGithubAppDescription": "Aplikeeshinii GitHub kan Kilo kuusaawwan koodii akka sakatta'aman barbaaddu argachuuf hayyama kenniif.",
-      "repositoryAccess": "hayyama kuusaa koodii"
+      "repositoryAccess": "hayyama kuusaa koodii",
+      "allModePersonal": "Kuusaan koodii hundi Kilo walqunnamtii GitHub keetiin argachuu danda'u ofumaan sakatta'ama.",
+      "allModeOrganization": "Kuusaan koodii hundi Kilo walqunnamtii GitHub dhaabbataatiin argachuu danda'u ofumaan sakatta'ama.",
+      "allModeCount": "Kuusaalee koodii jiran: {{displayCount}}"
     },
     "style": {
       "title": "Haala sakatta'aa",

@@ -74,7 +74,7 @@ function AgentRowView({
   const { t } = useTranslation();
   const colors = useThemeColors();
   return (
-    <View className="min-h-16 flex-row items-start gap-1 rounded-lg bg-secondary px-3 py-2">
+    <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="min-w-0 flex-1 gap-0.5">
         <View className="flex-row items-center gap-2">
           <Bot size={16} color={colors.mutedForeground} />

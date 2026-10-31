@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Pencil, Sparkles, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
+import { ProfileSwitch } from '@/components/profiles/profile-switch';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
@@ -58,12 +58,13 @@ function hasUsableMessage(error: unknown): boolean {
  * and delete plus edit for local skills. The row carries no container
  * `accessibilityLabel`, so the switch's label stays the only element a screen
  * reader matches by the skill's name.
+ * An uneditable skill keeps an empty edit slot so the columns line up.
  */
 function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const subtitleKey = skillRowSubtitle(skill);
-  const canEdit = skill.sourceType !== 'skills-sh';
+  const showsEdit = onEdit !== undefined && skill.sourceType !== 'skills-sh';
   return (
     <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="min-w-0 flex-1 gap-0.5">
@@ -74,13 +75,13 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
           {subtitleKey === null ? skill.sourceType : t(subtitleKey)}
         </Text>
       </View>
-      <Switch
+      <ProfileSwitch
         value={skill.enabled}
         accessibilityLabel={skill.name}
         disabled={onToggle === undefined}
         onValueChange={onToggle}
       />
-      {onEdit !== undefined && canEdit ? (
+      {showsEdit ? (
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
@@ -92,7 +93,9 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
       ) : null}
       {onDelete !== undefined ? (
         <Pressable
-          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+          // A row it cannot edit keeps the edit column, so the switch and the
+          // delete button line up down the list.
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70', !showsEdit && 'ms-[52px]')}
           accessibilityRole="button"
           accessibilityLabel={t('profiles.skillDelete', { name: skill.name })}
           onPress={onDelete}

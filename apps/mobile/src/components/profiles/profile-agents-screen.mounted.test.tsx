@@ -83,7 +83,7 @@ describe('ProfileAgentsScreen mode badge', () => {
     await i18n.changeLanguage('en');
   });
 
-  it('shows the slug only when it says something the name does not', async () => {
+  it('does not print the slug beside the name', async () => {
     h.query.data = [
       { id: 'agent-a', slug: 'reviewer', name: 'Reviewer', config: { mode: 'primary' } },
       {
@@ -102,8 +102,9 @@ describe('ProfileAgentsScreen mode badge', () => {
       .map(node => node.props.children);
 
     expect(texts).toContain('Reviewer');
+    expect(texts).toContain('Release auditor');
     expect(texts).not.toContain('reviewer');
-    expect(texts).toContain('release-auditor');
+    expect(texts).not.toContain('release-auditor');
 
     unmount();
   });

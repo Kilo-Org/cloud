@@ -46,7 +46,6 @@ function isSlugConflict(error: unknown): boolean {
 
 type AgentRowViewProps = Readonly<{
   name: string;
-  slug: string;
   visibility: AgentVisibility;
   description: string;
   model: string;
@@ -54,10 +53,18 @@ type AgentRowViewProps = Readonly<{
   onDelete?: () => void;
 }>;
 
-/** One agent row: name, slug, visibility, optional model and description, edit/delete. */
+/**
+ * One agent row: name and mode, then the model and the description on their
+ * own lines, then edit/delete.
+ *
+ * Every row puts the same fields in the same slots: the name owns the first
+ * line, the mode badge takes only the room it needs, and the secondary lines
+ * follow in order. The slug is not one of them: it is the name normalized, so
+ * printing it beside the name repeats the row's identity and, on a narrow
+ * screen, squeezes out the name that distinguishes the row.
+ */
 function AgentRowView({
   name,
-  slug,
   visibility,
   description,
   model,
@@ -66,11 +73,6 @@ function AgentRowView({
 }: AgentRowViewProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  // The slug is the name's identifier; repeating it beside the name reads as a
-  // duplicate, so it only shows when it says something the name does not. The
-  // slug is ASCII, so it is compared in a fixed locale: the UI's locale would
-  // lowercase a leading "I" into a letter the server never stores.
-  const showSlug = slug.length > 0 && slug !== name.trim().toLocaleLowerCase('en');
   return (
     <View className="min-h-16 flex-row items-start gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="min-w-0 flex-1 gap-0.5">
@@ -79,12 +81,9 @@ function AgentRowView({
           <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>
             {name}
           </Text>
-          {showSlug ? (
-            <Text variant="mono" className="shrink text-xs text-muted-foreground" numberOfLines={1}>
-              {slug}
-            </Text>
-          ) : null}
-          <InlineBadge>{t(AGENT_VISIBILITY_LABEL_KEYS[visibility])}</InlineBadge>
+          <InlineBadge className="shrink-0">
+            {t(AGENT_VISIBILITY_LABEL_KEYS[visibility])}
+          </InlineBadge>
         </View>
         {model.length > 0 ? (
           <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
@@ -243,7 +242,6 @@ export function ProfileAgentsScreen({
             <AgentRowView
               key={source.id}
               name={source.name}
-              slug={source.slug}
               visibility={row.visibility}
               description={row.description}
               model={row.model}

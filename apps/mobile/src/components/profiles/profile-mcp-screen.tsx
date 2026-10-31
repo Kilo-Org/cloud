@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Lock, Pencil, Server, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
+import { ProfileSwitch } from '@/components/profiles/profile-switch';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
@@ -99,7 +99,7 @@ function McpServerRowView({
           </Text>
         ) : null}
       </View>
-      <Switch
+      <ProfileSwitch
         value={server.enabled}
         accessibilityLabel={server.name}
         disabled={onToggle === undefined}

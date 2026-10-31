@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 
 import { ChevronDown, ChevronUp, Pencil, Terminal, Trash2 } from '@/components/ui/icons';
 import { InlineBadge } from '@/components/ui/inline-badge';
-import { Switch } from '@/components/ui/switch';
+import { ProfileSwitch } from '@/components/profiles/profile-switch';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
@@ -29,11 +29,11 @@ type KiloCommandRowProps = Readonly<{
 
 /**
  * One slash command row: the `/name`, optional subtask/agent/model metadata and
- * the template preview, then one trailing row holding the enabled switch,
- * up/down and edit/delete controls, as the MCP server and skill rows do. The
- * row carries no container `accessibilityLabel`, and the visible `/name` is
- * hidden from assistive technology, so the switch carries that same visible name
- * as the row's single accessible one.
+ * the template preview, then one control row that spans the card: the enabled
+ * switch on the leading edge, the up/down and edit/delete actions on the
+ * trailing edge. The row carries no container `accessibilityLabel`, and the
+ * visible `/name` is hidden from assistive technology, so the switch carries
+ * that same visible name as the row's single accessible one.
  */
 export function KiloCommandRowView({
   name,
@@ -84,8 +84,8 @@ export function KiloCommandRowView({
           </Text>
         ) : null}
       </View>
-      <View className="flex-row items-center justify-end gap-1">
-        <Switch
+      <View className="flex-row items-center justify-between gap-2">
+        <ProfileSwitch
           value={enabled}
           // The only element carrying the row's name, so it takes the visible
           // form: a screen reader hears the command as the slash command it is.
@@ -93,48 +93,50 @@ export function KiloCommandRowView({
           disabled={onToggle === undefined}
           onValueChange={onToggle}
         />
-        {onMoveUp !== undefined ? (
-          <Pressable
-            className={controlClass(isFirst)}
-            disabled={isFirst}
-            accessibilityRole="button"
-            accessibilityLabel={t('profiles.slashCommands.moveUp', { name })}
-            onPress={onMoveUp}
-          >
-            <ChevronUp size={20} color={colors.mutedForeground} />
-          </Pressable>
-        ) : null}
-        {onMoveDown !== undefined ? (
-          <Pressable
-            className={controlClass(isLast)}
-            disabled={isLast}
-            accessibilityRole="button"
-            accessibilityLabel={t('profiles.slashCommands.moveDown', { name })}
-            onPress={onMoveDown}
-          >
-            <ChevronDown size={20} color={colors.mutedForeground} />
-          </Pressable>
-        ) : null}
-        {onEdit !== undefined ? (
-          <Pressable
-            className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-            accessibilityRole="button"
-            accessibilityLabel={t('profiles.slashCommands.edit', { name })}
-            onPress={onEdit}
-          >
-            <Pencil size={18} color={colors.mutedForeground} />
-          </Pressable>
-        ) : null}
-        {onDelete !== undefined ? (
-          <Pressable
-            className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-            accessibilityRole="button"
-            accessibilityLabel={t('profiles.slashCommands.delete', { name })}
-            onPress={onDelete}
-          >
-            <Trash2 size={18} color={colors.destructive} />
-          </Pressable>
-        ) : null}
+        <View className="flex-row items-center gap-1">
+          {onMoveUp !== undefined ? (
+            <Pressable
+              className={controlClass(isFirst)}
+              disabled={isFirst}
+              accessibilityRole="button"
+              accessibilityLabel={t('profiles.slashCommands.moveUp', { name })}
+              onPress={onMoveUp}
+            >
+              <ChevronUp size={20} color={colors.mutedForeground} />
+            </Pressable>
+          ) : null}
+          {onMoveDown !== undefined ? (
+            <Pressable
+              className={controlClass(isLast)}
+              disabled={isLast}
+              accessibilityRole="button"
+              accessibilityLabel={t('profiles.slashCommands.moveDown', { name })}
+              onPress={onMoveDown}
+            >
+              <ChevronDown size={20} color={colors.mutedForeground} />
+            </Pressable>
+          ) : null}
+          {onEdit !== undefined ? (
+            <Pressable
+              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+              accessibilityRole="button"
+              accessibilityLabel={t('profiles.slashCommands.edit', { name })}
+              onPress={onEdit}
+            >
+              <Pencil size={18} color={colors.mutedForeground} />
+            </Pressable>
+          ) : null}
+          {onDelete !== undefined ? (
+            <Pressable
+              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+              accessibilityRole="button"
+              accessibilityLabel={t('profiles.slashCommands.delete', { name })}
+              onPress={onDelete}
+            >
+              <Trash2 size={18} color={colors.destructive} />
+            </Pressable>
+          ) : null}
+        </View>
       </View>
     </View>
   );

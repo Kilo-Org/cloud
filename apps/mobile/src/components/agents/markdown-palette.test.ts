@@ -16,6 +16,7 @@ const colors = {
   destructive: '#C25647',
   destructiveForeground: '#FFFFFF',
   border: 'rgba(20, 15, 10, 0.09)',
+  switchTrack: '#ECECEC',
   card: '#FFFFFF',
   ink2: '#3C382F',
   mutedSoft: '#A9A39A',

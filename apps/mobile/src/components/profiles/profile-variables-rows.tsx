@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Eye, EyeOff, Lock, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
+import { ProfileSwitch } from '@/components/profiles/profile-switch';
 import { Text } from '@/components/ui/text';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -84,6 +84,10 @@ type VariableRowViewProps = Readonly<{
  * stored value — the server sends `***`, and the row shows the dot run instead.
  * When the caller passes `onToggleReveal`, the row offers a reveal control;
  * otherwise a secret stays masked.
+ *
+ * The value takes the key's body size in the secondary ink: it is what the row
+ * exists to show. The row keeps a real gap between that column and the delete
+ * control, so the value never touches the icon.
  */
 export function VariableRowView({
   row,
@@ -96,7 +100,7 @@ export function VariableRowView({
   const { t } = useTranslation();
   const colors = useThemeColors();
   return (
-    <View className="min-h-14 flex-row items-center gap-1 rounded-lg bg-secondary pr-1 pl-3">
+    <View className="min-h-14 flex-row items-center gap-2 rounded-lg bg-secondary pr-1 pl-3">
       <Pressable
         className="min-h-14 flex-1 flex-row items-center gap-2 py-2 active:opacity-70"
         accessibilityRole="button"
@@ -111,7 +115,7 @@ export function VariableRowView({
           <View className="flex-row items-center gap-1">
             <Lock size={12} color={colors.mutedForeground} />
             <Text
-              className="max-w-[45%] text-xs text-muted-foreground"
+              className="max-w-[45%] text-sm text-muted-foreground"
               numberOfLines={1}
               accessibilityLabel={t('profiles.secrets.masked')}
             >
@@ -119,7 +123,7 @@ export function VariableRowView({
             </Text>
           </View>
         ) : (
-          <Text className="max-w-[45%] text-xs text-muted-foreground" numberOfLines={1}>
+          <Text className="max-w-[45%] text-sm text-muted-foreground" numberOfLines={1}>
             {revealed ? row.value : row.maskedValue}
           </Text>
         )}
@@ -307,7 +311,7 @@ export function VariableEditForm({
         <Text {...HIDDEN_LABEL_PROPS} className="flex-1 text-sm font-medium text-foreground">
           {t('profiles.secrets.markSecret')}
         </Text>
-        <Switch
+        <ProfileSwitch
           value={isSecret}
           accessibilityLabel={t('profiles.secrets.markSecret')}
           onValueChange={setIsSecret}

@@ -20,7 +20,7 @@ import {
 } from '@/components/profiles/profile-agents-model';
 import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
-import { Switch } from '@/components/ui/switch';
+import { ProfileSwitch } from '@/components/profiles/profile-switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
@@ -326,7 +326,7 @@ export function AgentFormSheet({
                   >
                     {tool}
                   </Text>
-                  <Switch
+                  <ProfileSwitch
                     value={enabled}
                     disabled={isSaving}
                     accessibilityLabel={tool}

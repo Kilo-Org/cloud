@@ -31,14 +31,14 @@ function type(next: string): void {
   });
 }
 
-describe('form drafts at the account boundary', () => {
+describe('useFormDraftState', () => {
   beforeEach(() => {
     clearFormDrafts();
     field.value = '';
     field.set = undefined;
   });
 
-  it('drops what was typed under the previous account, and keeps a same-account remount', async () => {
+  it('restores the typed text on a remount and seeds fresh once every draft is dropped', async () => {
     const scope = 'profiles:variables:profile-a';
     const first = await mount(scope);
     type('typed-key');

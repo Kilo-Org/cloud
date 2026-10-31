@@ -320,7 +320,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   console.log('');
   console.log('Seeded a read-only transcript whose markers sit above every message.');
-  console.log('Run the design gate on kiloapp:///agent-chat/' + SESSION_ID + '.');
+  console.log(`Run the design gate on kiloapp:///(app)/agent-chat/${SESSION_ID}.`);
 
   return {
     userId: user.userId,

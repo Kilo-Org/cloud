@@ -1677,7 +1677,8 @@
       "sortSeverityDesc": "Raskusaste: kõrgemast madalamani",
       "sortSeverityAsc": "Raskusaste: madalamast kõrgemani",
       "sortSlaDue": "SLA tähtaeg",
-      "overdueOnly": "Ainult tähtaja ületanud"
+      "overdueOnly": "Ainult tähtaja ületanud",
+      "noRepositories": "Ühtegi hoidlat pole veel sünkroonitud ega valitud. Valige need Security Agenti seadetes."
     },
     "automation": {
       "title": "Automatiseerimine",
@@ -2048,7 +2049,10 @@
       "settleFailed": "Toiming lõppes edukalt, kuid me ei suutnud tulemust salvestada. Proovi uuesti.",
       "replayFailed": "Toimingut ei lõpetatud. Proovi uuesti.",
       "actionFailed": "Seda toimingut ei õnnestunud lõpule viia. Proovi uuesti.",
-      "actionBlocked": "Seda toimingut ei õnnestunud lõpule viia. Probleem tuleb kõigepealt lahendada."
+      "actionBlocked": "Seda toimingut ei õnnestunud lõpule viia. Probleem tuleb kõigepealt lahendada.",
+      "syncNoRepositories": "Sünkroonimise ulatuses pole ühtegi hoidlat. Valige hoidlad, mida Security Agent jälgib, ja sünkroonige uuesti.",
+      "syncIntegrationInactive": "Security Agenti GitHubi ühendus pole aktiivne. Ühendage Kilo GitHub App uuesti ja sünkroonige uuesti.",
+      "syncMissingPermission": "Kilo GitHub App ei saa haavatavusteateid lugeda. Andke see õigus GitHubis ja sünkroonige uuesti."
     },
     "analysisState": {
       "queued": "Analüüs järjekorras",

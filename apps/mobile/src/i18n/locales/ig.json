@@ -1677,7 +1677,8 @@
       "sortSeverityDesc": "Ogo njọ: elu ruo ala",
       "sortSeverityAsc": "Ogo njọ: ala ruo elu",
       "sortSlaDue": "Ụbọchị njedebe SLA",
-      "overdueOnly": "Naanị ihe gafere oge"
+      "overdueOnly": "Naanị ihe gafere oge",
+      "noRepositories": "Enwebeghị ebe nchekwa koodu e mere sync ma ọ bụ họrọ. Họrọ ha na ntọala Security Agent."
     },
     "automation": {
       "title": "Ịrụ ọrụ na-akpaghị aka",
@@ -2048,7 +2049,10 @@
       "settleFailed": "Emechara omume a, mana anyị enweghị ike dekọọ nsonaazụ ya. Biko nwaa ọzọ.",
       "replayFailed": "Omume a emechaghị. Biko nwaa ọzọ.",
       "actionFailed": "Enweghị ike imecha omume a. Biko nwaa ọzọ.",
-      "actionBlocked": "Enweghị ike imecha omume a. A ghaghị idozi nsogbu a tupu ị nwee ike ịnwa ọzọ."
+      "actionBlocked": "Enweghị ike imecha omume a. A ghaghị idozi nsogbu a tupu ị nwee ike ịnwa ọzọ.",
+      "syncNoRepositories": "Ọnweghị ebe nchekwa koodu dị na mpaghara sync. Họrọ ebe nchekwa koodu ndị Security Agent na-elekọta, wee sync ọzọ.",
+      "syncIntegrationInactive": "Njikọ GitHub maka Security Agent adịghị arụ ọrụ. Jikọọ Kilo GitHub App ọzọ, wee sync ọzọ.",
+      "syncMissingPermission": "Kilo GitHub App enweghị ike ịgụ vulnerability alerts. Nye ikike ahụ na GitHub, wee sync ọzọ."
     },
     "analysisState": {
       "queued": "Nyocha dị n'ahịrị",

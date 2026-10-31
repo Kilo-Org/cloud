@@ -15,6 +15,8 @@ import {
   type OperationLedgerRow,
 } from '@kilocode/db/schema';
 import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
+import { SECURITY_SYNC_PRECONDITION_CODES } from '@kilocode/app-shared/security-agent';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import type { SecurityFindingWithRemediation } from '../db/security-remediation';
 
 const commandId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
@@ -1151,6 +1153,41 @@ describe('getAnalysis remediation timeline', () => {
     });
   });
 });
+
+describe('triggerSync precondition markers', () => {
+  it('marks a rejection with no repository in the sync scope', async () => {
+    const error = await createHandlers()
+      .triggerSync.handler({ ctx: context, input: {} })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect(error).toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'No repositories configured for security reviews',
+    });
+    // `upstreamCode` is the value the mobile ledger maps onto translated copy;
+    // the English message stays for the web surface.
+    expect(causeUpstreamCode(error)).toBe(SECURITY_SYNC_PRECONDITION_CODES.noRepositories);
+  });
+
+  it('marks a rejection caused by a missing or inactive integration', async () => {
+    const error = await createHandlersWithUnhealthyStatusIntegration()
+      .triggerSync.handler({ ctx: context, input: { repoFullName: 'kilo/repo' } })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'GitHub integration not found or inactive',
+    });
+    expect(causeUpstreamCode(error)).toBe(SECURITY_SYNC_PRECONDITION_CODES.integrationInactive);
+  });
+});
+
+/** The stable code the tRPC error formatter exposes as `data.upstreamCode`. */
+function causeUpstreamCode(error: unknown): string | undefined {
+  const cause = error instanceof TRPCError ? error.cause : undefined;
+  return cause instanceof UpstreamApiError ? cause.upstreamCode : undefined;
+}
 
 describe('queue-backed handlers', () => {
   it('returns sync command correlation', async () => {

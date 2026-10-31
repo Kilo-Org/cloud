@@ -30,7 +30,7 @@ import {
   useReviewConfig,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
-import { useManageRepositoryAccess } from '@/lib/hooks/use-code-reviewer-manage-access';
+import { useManageRepositoryAccess } from '@/lib/hooks/use-manage-repository-access';
 import {
   type SyncedRepoPlatform,
   useReviewerRepositoriesResync,

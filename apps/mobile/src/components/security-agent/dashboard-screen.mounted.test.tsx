@@ -14,6 +14,7 @@ import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as SecurityAgentModule from '@kilocode/app-shared/security-agent';
 import { i18n } from '@/i18n';
 import {
   mapSecuritySyncOperationError,
@@ -43,6 +44,7 @@ const RECONCILE_COPY = vi.hoisted(
 
 const triggerSync = vi.hoisted(() => ({
   mutate: vi.fn(),
+  reset: vi.fn(),
   isPending: false,
   isError: false,
   error: null as Error | null,
@@ -118,6 +120,17 @@ const focusEffect = vi.hoisted(() => ({
   effect: undefined as (() => void) | undefined,
 }));
 
+// The dashboard navigates to the repository settings from a precondition row.
+const router = vi.hoisted(() => ({ push: vi.fn() }));
+
+// The GitHub handoff the dashboard renders for a connection precondition. The
+// real hook opens a browser; the suite owns only what the row does with it.
+const manageAccess = vi.hoisted(() => ({
+  handlePress: vi.fn(),
+  pending: false,
+  onReturn: undefined as (() => void) | undefined,
+}));
+
 // Captures the refresh control element the dashboard passes to the scroll view.
 const tabScreen = vi.hoisted(() => ({
   refreshControl: undefined as unknown,
@@ -151,9 +164,19 @@ vi.mock('@/components/ui/icons', () => ({
   ShieldAlert: 'ShieldAlert',
 }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => router,
   useFocusEffect: (effect: () => void) => {
     focusEffect.effect = effect;
+  },
+}));
+vi.mock('@/lib/hooks/use-manage-repository-access', () => ({
+  useManageRepositoryAccess: (
+    _scope: string,
+    _platform: string,
+    handlers?: { onReturn?: () => void }
+  ) => {
+    manageAccess.onReturn = handlers?.onReturn;
+    return { handlePress: manageAccess.handlePress, pending: manageAccess.pending };
   },
 }));
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({
@@ -206,17 +229,21 @@ vi.mock('@/components/security-agent/security-command-retry-card', () => ({
     return null;
   },
 }));
-vi.mock('@kilocode/app-shared/security-agent', () => ({
-  buildSecurityDashboardMetrics: sharedMetrics.build,
-  getAnalysisIncompleteCount: (analysis: {
-    triageComplete: number;
-    analyzing: number;
-    notAnalyzed: number;
-    failed: number;
-  }) => analysis.triageComplete + analysis.analyzing + analysis.notAnalyzed + analysis.failed,
-  getSecurityRepositoriesInScope: () => [],
-  isPersonalSecurityScope: (scope: string) => scope === 'personal',
-}));
+vi.mock('@kilocode/app-shared/security-agent', async importOriginal => {
+  const actual = await importOriginal<typeof SecurityAgentModule>();
+  return {
+    ...actual,
+    buildSecurityDashboardMetrics: sharedMetrics.build,
+    getAnalysisIncompleteCount: (analysis: {
+      triageComplete: number;
+      analyzing: number;
+      notAnalyzed: number;
+      failed: number;
+    }) => analysis.triageComplete + analysis.analyzing + analysis.notAnalyzed + analysis.failed,
+    getSecurityRepositoriesInScope: () => [],
+    isPersonalSecurityScope: (scope: string) => scope === 'personal',
+  };
+});
 vi.mock('@/lib/security-agent', () => ({
   getSecurityAgentPath: (scope: string, section: string) => `/security/${scope}/${section}`,
 }));
@@ -302,14 +329,15 @@ function syncDisabledStates(root: I): boolean[] {
   return syncButtons(root).map(n => n.props.disabled as boolean);
 }
 
-// The one Button the dashboard renders on its own: the retry beside a failed
-// sync's copy. Every other failure renders through the shared retry card.
-function syncRetries(root: I): I[] {
+// The one Button the dashboard renders on its own: the retry or the fix action
+// beside a failed sync's copy. Every other failure renders through the shared
+// retry card.
+function syncFailureActions(root: I): I[] {
   return root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Button');
 }
 
 function pressSyncRetry(root: I): void {
-  const retry = syncRetries(root)[0];
+  const retry = syncFailureActions(root)[0];
   if (!retry) {
     throw new Error('no sync retry control rendered');
   }
@@ -329,6 +357,19 @@ function renderedTexts(root: I): string[] {
     .map(n => n.props.children as string);
 }
 
+/**
+ * A manual-sync rejection from the real server contract: `PRECONDITION_FAILED`
+ * carrying the stable `upstreamCode` the mobile ledger maps onto catalog copy.
+ * The literals are the wire values both sides share.
+ */
+function preconditionError(upstreamCode: string): Error {
+  return mapSecuritySyncOperationError(
+    Object.assign(new Error('server sentence the device cannot translate'), {
+      data: { code: 'PRECONDITION_FAILED', upstreamCode },
+    })
+  );
+}
+
 function dashboardMetric(id: string) {
   return { id, label: '', value: '', detail: '', tone: 'neutral' as const };
 }
@@ -336,9 +377,14 @@ function dashboardMetric(id: string) {
 describe('DashboardScreen sync control terminal states', () => {
   beforeEach(() => {
     triggerSync.mutate.mockClear();
+    triggerSync.reset.mockClear();
     triggerSync.isPending = false;
     triggerSync.isError = false;
     triggerSync.error = null;
+    router.push.mockClear();
+    manageAccess.handlePress.mockClear();
+    manageAccess.pending = false;
+    manageAccess.onReturn = undefined;
     config.data = { slaEnabled: true };
     dashboardStats.isLoading = false;
     dashboardStats.isPending = false;
@@ -427,8 +473,8 @@ describe('DashboardScreen sync control terminal states', () => {
     );
     const root = renderScreen();
 
-    expect(syncRetries(root.root)).toHaveLength(1);
-    expect(syncRetries(root.root)[0]?.props.loading).toBe(false);
+    expect(syncFailureActions(root.root)).toHaveLength(1);
+    expect(syncFailureActions(root.root)[0]?.props.loading).toBe(false);
 
     pressSyncRetry(root.root);
 
@@ -481,14 +527,14 @@ describe('DashboardScreen sync control terminal states', () => {
       root.update(createElement(DashboardScreen, { scope: 'personal' }));
     });
 
-    expect(syncRetries(root.root)).toHaveLength(1);
-    expect(syncRetries(root.root)[0]?.props.loading).toBe(true);
+    expect(syncFailureActions(root.root)).toHaveLength(1);
+    expect(syncFailureActions(root.root)[0]?.props.loading).toBe(true);
     expect(renderedTexts(root.root)).toContain(
       i18n.t('securityAgent.mutations.serviceUnavailable')
     );
     // The pressed control keeps its own spinner visible, and the sentence it is
     // retrying steps back so it does not read as a fresh failure.
-    expect(syncRetries(root.root)[0]?.props.className).toContain('opacity-100');
+    expect(syncFailureActions(root.root)[0]?.props.className).toContain('opacity-100');
     const message = root.root.findAll(
       n =>
         typeof n.type === 'string' &&
@@ -514,7 +560,7 @@ describe('DashboardScreen sync control terminal states', () => {
       root.update(createElement(DashboardScreen, { scope: 'personal' }));
     });
 
-    expect(syncRetries(root.root)).toHaveLength(0);
+    expect(syncFailureActions(root.root)).toHaveLength(0);
     expect(renderedTexts(root.root)).not.toContain(
       i18n.t('securityAgent.mutations.serviceUnavailable')
     );
@@ -525,7 +571,101 @@ describe('DashboardScreen sync control terminal states', () => {
     triggerSync.error = mapSecuritySyncOperationError(new Error(CONFIGURATION_ERROR_MESSAGE));
     const root = renderScreen();
 
-    expect(syncRetries(root.root)).toHaveLength(0);
+    expect(syncFailureActions(root.root)).toHaveLength(0);
+  });
+
+  it('names a rejection with no repository in scope and opens the repository picker', () => {
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_no_repositories');
+    const root = renderScreen();
+
+    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.mutations.syncNoRepositories')
+    );
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.mutations.actionBlocked')
+    );
+    expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.dashboard.manageRepositories'));
+
+    pressSyncRetry(root.root);
+
+    expect(router.push).toHaveBeenCalledWith('/security/personal/settings/repositories');
+    expect(manageAccess.handlePress).not.toHaveBeenCalled();
+  });
+
+  it('names a broken GitHub connection and hands the reader to the GitHub App page', () => {
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_missing_permission');
+    const root = renderScreen();
+
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.mutations.syncMissingPermission')
+    );
+    expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.repositories.manageAccess'));
+
+    pressSyncRetry(root.root);
+
+    expect(manageAccess.handlePress).toHaveBeenCalledTimes(1);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('lets both sync controls work again when the dashboard regains focus after a rejection', () => {
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_no_repositories');
+    const root = renderScreen();
+    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+
+    // Returning from the settings screen: a changed repository selection is a
+    // new intent, so the rejection that described the old one no longer holds.
+    act(() => {
+      focusEffect.effect?.();
+    });
+    expect(triggerSync.reset).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      triggerSync.isError = false;
+      triggerSync.error = null;
+      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+    });
+
+    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.mutations.syncNoRepositories')
+    );
+  });
+
+  it('lets both sync controls work again when the GitHub handoff returns', () => {
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_integration_inactive');
+    const root = renderScreen();
+    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+
+    act(() => {
+      manageAccess.onReturn?.();
+    });
+    expect(triggerSync.reset).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      triggerSync.isError = false;
+      triggerSync.error = null;
+      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+    });
+
+    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+  });
+
+  it('keeps the controls down on focus for a terminal failure that is not a precondition', () => {
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(new Error(CONFIGURATION_ERROR_MESSAGE));
+    const root = renderScreen();
+
+    act(() => {
+      focusEffect.effect?.();
+    });
+
+    expect(triggerSync.reset).not.toHaveBeenCalled();
+    expect(syncDisabledStates(root.root)).toEqual([true, true]);
   });
 
   it('keeps the last risk breakdown on screen while a sync failure is shown', () => {

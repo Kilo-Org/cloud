@@ -12,7 +12,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import {
   type ManageRepositoryAccess,
   useManageRepositoryAccess,
-} from './use-code-reviewer-manage-access';
+} from './use-manage-repository-access';
 
 const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),

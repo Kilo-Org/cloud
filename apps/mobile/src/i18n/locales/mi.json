@@ -1677,7 +1677,8 @@
       "sortSeverityDesc": "Taumata kino: teitei ki te iti",
       "sortSeverityAsc": "Taumata kino: iti ki te teitei",
       "sortSlaDue": "Te rā kati SLA",
-      "overdueOnly": "Tōmuri anake"
+      "overdueOnly": "Tōmuri anake",
+      "noRepositories": "Kāore anō he pūranga waehere kia tukutukuhia, kia kōwhiria rānei. Kōwhiria i roto i ngā tautuhinga o te Kaiāwhina haumarutanga."
     },
     "automation": {
       "title": "Te aunoatanga",
@@ -2048,7 +2049,10 @@
       "settleFailed": "Oti te mahi, engari kāore i taea te tuhi i te hua. Whakamātau anō.",
       "replayFailed": "Kāore i oti tēnei mahi. Whakamātau anō.",
       "actionFailed": "Kāore i taea te oti i tēnei mahi. Whakamātau anō.",
-      "actionBlocked": "Kāore i taea te oti i tēnei mahi. Me whakatika te raru i te tuatahi."
+      "actionBlocked": "Kāore i taea te oti i tēnei mahi. Me whakatika te raru i te tuatahi.",
+      "syncNoRepositories": "Kāore he pūranga waehere i roto i te awhe tukutuku. Kōwhiria ngā pūranga waehere e aroturukitia ana e te Kaiāwhina haumarutanga, kātahi ka tukutuku anō.",
+      "syncIntegrationInactive": "Kāore te hononga GitHub mō te Kaiāwhina haumarutanga i te hohe. Honoa anō te Taupānga GitHub a Kilo, kātahi ka tukutuku anō.",
+      "syncMissingPermission": "Kāore te Taupānga GitHub a Kilo e taea te pānui i ngā whakamōhiotanga whakaraerae. Tukuna tērā whakaaetanga i GitHub, kātahi ka tukutuku anō."
     },
     "analysisState": {
       "queued": "Kei te rārangi tatari te tātari",

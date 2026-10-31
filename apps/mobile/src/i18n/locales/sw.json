@@ -1677,7 +1677,8 @@
       "sortSeverityDesc": "Ukali: juu hadi chini",
       "sortSeverityAsc": "Ukali: chini hadi juu",
       "sortSlaDue": "Tarehe ya mwisho ya SLA",
-      "overdueOnly": "Yaliyochelewa tu"
+      "overdueOnly": "Yaliyochelewa tu",
+      "noRepositories": "Hakuna hazina zilizosinkronishwa au kuchaguliwa bado. Zichague katika mipangilio ya Security Agent."
     },
     "automation": {
       "title": "Uendeshaji wa kiotomatiki",
@@ -2048,7 +2049,10 @@
       "settleFailed": "Kitendo kimekamilika, lakini hatukuweza kurekodi matokeo yake. Tafadhali jaribu tena.",
       "replayFailed": "Kitendo hiki hakikukamilika. Tafadhali jaribu tena.",
       "actionFailed": "Imeshindikana kukamilisha kitendo hiki. Tafadhali jaribu tena.",
-      "actionBlocked": "Imeshindikana kukamilisha kitendo hiki. Tatizo lazima litatuliwe kwanza."
+      "actionBlocked": "Imeshindikana kukamilisha kitendo hiki. Tatizo lazima litatuliwe kwanza.",
+      "syncNoRepositories": "Hakuna hazina katika wigo wa kusinkronisha. Chagua hazina ambazo Security Agent hufuatilia, kisha sinkronisha tena.",
+      "syncIntegrationInactive": "Muunganisho wa GitHub wa Security Agent haufanyi kazi. Unganisha tena Kilo GitHub App, kisha sinkronisha tena.",
+      "syncMissingPermission": "Kilo GitHub App haiwezi kusoma arifa za udhaifu. Toa ruhusa hiyo katika GitHub, kisha sinkronisha tena."
     },
     "analysisState": {
       "queued": "Uchambuzi uko kwenye foleni",

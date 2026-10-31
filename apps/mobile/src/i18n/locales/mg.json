@@ -1677,7 +1677,8 @@
       "sortSeverityDesc": "Hamafy: avo mankany ambany",
       "sortSeverityAsc": "Hamafy: ambany mankany avo",
       "sortSlaDue": "Daty farany araka ny SLA",
-      "overdueOnly": "Nihoatra ny fe-potoana ihany"
+      "overdueOnly": "Nihoatra ny fe-potoana ihany",
+      "noRepositories": "Tsy mbola misy tahirin-kaody vita sync na voafidy. Fidio ao amin'ny fandrindran'ny Security Agent izy ireo."
     },
     "automation": {
       "title": "Fampandehanana ho azy",
@@ -2048,7 +2049,10 @@
       "settleFailed": "Vita ny hetsika, fa tsy voatahiry ny vokatra. Andramo indray azafady.",
       "replayFailed": "Tsy vita ity hetsika ity. Andramo indray azafady.",
       "actionFailed": "Tsy azo vitaina ity hetsika ity. Andramo indray azafady.",
-      "actionBlocked": "Tsy azo vitaina ity hetsika ity. Mila vahana aloha ny olana."
+      "actionBlocked": "Tsy azo vitaina ity hetsika ity. Mila vahana aloha ny olana.",
+      "syncNoRepositories": "Tsy misy tahirin-kaody ao amin'ny faritry ny sync. Fidio ny tahirin-kaody karohin'ny Security Agent, dia avereno indray ny sync.",
+      "syncIntegrationInactive": "Tsy mavitrika ny fifandraisan'ny Security Agent amin'ny GitHub. Ampifandraiso indray ny Kilo GitHub App, dia avereno indray ny sync.",
+      "syncMissingPermission": "Tsy afaka mamaky ny vulnerability alerts ny Kilo GitHub App. Omeo ao amin'ny GitHub io alalana io, dia avereno indray ny sync."
     },
     "analysisState": {
       "queued": "Voalahatra ny famakafakana",

@@ -1148,7 +1148,8 @@
       "sortSeverityDesc": "重大度：高い順",
       "sortSlaDue": "SLA期限",
       "statusIgnored": "無視済み",
-      "statusOpen": "オープン"
+      "statusOpen": "オープン",
+      "noRepositories": "同期済みまたは選択済みのリポジトリがまだありません。Security Agent の設定で選択してください。"
     },
     "analysis": {
       "analyzeRepository": "リポジトリを分析",
@@ -1519,7 +1520,10 @@
       "settleFailed": "操作は完了しましたが、結果を記録できませんでした。もう一度お試しください。",
       "replayFailed": "この操作は完了しませんでした。もう一度お試しください。",
       "actionFailed": "この操作を完了できませんでした。もう一度お試しください。",
-      "actionBlocked": "この操作を完了できませんでした。再試行するには、まず問題を解決する必要があります。"
+      "actionBlocked": "この操作を完了できませんでした。再試行するには、まず問題を解決する必要があります。",
+      "syncNoRepositories": "同期スコープにリポジトリがありません。Security Agent が監視するリポジトリを選択してから、もう一度同期してください。",
+      "syncIntegrationInactive": "Security Agent の GitHub 接続が有効ではありません。Kilo GitHub App を再接続してから、もう一度同期してください。",
+      "syncMissingPermission": "Kilo GitHub App は vulnerability alerts を読み取れません。GitHub でその権限を付与してから、もう一度同期してください。"
     },
     "analysisState": {
       "queued": "分析の順番待ち",

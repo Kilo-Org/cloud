@@ -1160,7 +1160,8 @@
       "sortSeverityDesc": "الخطورة: من الأعلى إلى الأدنى",
       "sortSlaDue": "الموعد النهائي حسب SLA",
       "statusIgnored": "تم تجاهلها",
-      "statusOpen": "فتح"
+      "statusOpen": "فتح",
+      "noRepositories": "لم تتم مزامنة أي مستودعات أو تحديدها بعد. اخترها في إعدادات Security Agent."
     },
     "analysis": {
       "analyzeRepository": "تحليل المستودع",
@@ -1551,7 +1552,10 @@
       "settleFailed": "اكتمل الإجراء، لكن لم نتمكن من تسجيل النتيجة. حاول مرة أخرى.",
       "replayFailed": "لم يكتمل هذا الإجراء. حاول مرة أخرى.",
       "actionFailed": "تعذّر إكمال هذا الإجراء. حاول مرة أخرى.",
-      "actionBlocked": "تعذّر إكمال هذا الإجراء. يجب إصلاح المشكلة أولاً قبل إعادة المحاولة."
+      "actionBlocked": "تعذّر إكمال هذا الإجراء. يجب إصلاح المشكلة أولاً قبل إعادة المحاولة.",
+      "syncNoRepositories": "لا توجد مستودعات في نطاق المزامنة. اختر المستودعات التي يراقبها Security Agent، ثم أعد المزامنة.",
+      "syncIntegrationInactive": "اتصال GitHub الخاص بـ Security Agent غير نشط. أعد ربط تطبيق Kilo على GitHub، ثم أعد المزامنة.",
+      "syncMissingPermission": "لا يستطيع تطبيق Kilo على GitHub قراءة تنبيهات الثغرات. امنح هذه الصلاحية في GitHub، ثم أعد المزامنة."
     },
     "analysisState": {
       "queued": "التحليل في قائمة الانتظار",

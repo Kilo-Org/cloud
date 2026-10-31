@@ -85,11 +85,14 @@ function FilterOptionRow({ label, isSelected, onPress }: Readonly<FilterOptionRo
 
 function FilterSection<T>({
   title,
+  description,
   options,
   selected,
   onSelect,
 }: Readonly<{
   title: string;
+  /** Explains a section whose option list is shorter than the reader expects. */
+  description?: string;
   options: { value: T; label: string }[];
   selected: T;
   onSelect: (value: T) => void;
@@ -99,6 +102,11 @@ function FilterSection<T>({
       <Text variant="eyebrow" className="px-3">
         {title}
       </Text>
+      {description === undefined ? null : (
+        <Text variant="muted" className="px-3 text-xs">
+          {description}
+        </Text>
+      )}
       <RadioGroup label={title}>
         {options.map(option => (
           <FilterOptionRow
@@ -157,6 +165,12 @@ export function FindingFilterModal({
       <View className="gap-4">
         <FilterSection
           title={t('common.repository')}
+          // A successful read with nothing in scope leaves only the "All
+          // repositories" row, which reads the same as a list that silently
+          // failed. The note says why the one option is the whole set.
+          description={
+            repositories.length === 0 ? t('securityAgent.filter.noRepositories') : undefined
+          }
           options={repoOptions}
           selected={filters.repoFullName}
           onSelect={repoFullName => {

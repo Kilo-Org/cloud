@@ -161,7 +161,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
 vi.mock('@/lib/hooks/use-code-reviewer-repo-sync', () => ({
   useReviewerRepositoriesResync: () => ({ resync: state.resync, resyncing: state.resyncing }),
 }));
-vi.mock('@/lib/hooks/use-code-reviewer-manage-access', () => ({
+vi.mock('@/lib/hooks/use-manage-repository-access', () => ({
   // The hook owns the tap sequence; this suite owns what the screen does with
   // its two signals, so the mock hands them back for the test to fire.
   useManageRepositoryAccess: (

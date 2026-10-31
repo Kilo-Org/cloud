@@ -27,7 +27,8 @@ import { isPersonal } from './use-code-reviewer';
 const HANDOFF_WATCHDOG_MS = 20_000;
 
 /**
- * The picker's Manage access control: the tap handler plus the busy state the
+ * The shared Manage access control — the code-reviewer repository picker's and
+ * the Security Agent dashboard's — as the tap handler plus the busy state the
  * tap itself owes.
  */
 export type ManageRepositoryAccess = {
@@ -50,9 +51,10 @@ type ManageRepositoryAccessHandlers = {
 
 /**
  * Opens the provider settings page where installation access is widened. The
- * picker only ever shows what the integration may read, so this action is the
- * way to make more repositories appear; Bitbucket has no such page and gets
- * `undefined`.
+ * code-reviewer picker only ever shows what the integration may read, so this
+ * action is the way to make more repositories appear there; the Security Agent
+ * dashboard uses it for the rejections that a broken GitHub connection causes.
+ * Bitbucket has no such page and gets `undefined`.
  *
  * The wait settles when the user is back from the page: Android opens a custom
  * tab that returns on the next foreground, while iOS presents the page in an

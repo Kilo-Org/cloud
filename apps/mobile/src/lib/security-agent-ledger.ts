@@ -11,6 +11,11 @@
 
 import { i18n } from '@/i18n';
 import {
+  type SecuritySyncPrecondition,
+  securitySyncPreconditionForCode,
+} from '@kilocode/app-shared/security-agent';
+import { readTrpcErrorField } from '@/lib/trpc-error';
+import {
   isOperationInProgress,
   OPERATION_KEY_REUSE_MISMATCH_MESSAGE,
 } from '@/lib/operation-markers';
@@ -135,8 +140,36 @@ export function securityRetainsOperationKey(error: unknown): boolean {
   );
 }
 
+/**
+ * The copy key for each sync precondition the server can reject a manual sync
+ * with. The server attaches the stable code as `data.upstreamCode` (see
+ * `SECURITY_SYNC_PRECONDITION_CODES`); the sentence it sends for web is not
+ * matched on here, because the device cannot translate it.
+ */
+const SECURITY_SYNC_PRECONDITION_COPY_KEYS = {
+  noRepositories: 'securityAgent.mutations.syncNoRepositories',
+  integrationInactive: 'securityAgent.mutations.syncIntegrationInactive',
+  missingPermission: 'securityAgent.mutations.syncMissingPermission',
+} as const satisfies Record<SecuritySyncPrecondition, string>;
+
+/**
+ * The sync precondition a failure was rejected for, or null when the failure is
+ * not one. A precondition is not a transient fault: the copy that names it also
+ * names the fix, and the surface offers the action that applies it.
+ */
+export function securitySyncPreconditionFor(error: unknown): SecuritySyncPrecondition | null {
+  // The hook hands the surface a mapped error, whose raw failure (and with it
+  // the upstream code) is on `cause`.
+  const source = error instanceof SecurityMutationError ? error.cause : error;
+  return securitySyncPreconditionForCode(readTrpcErrorField(source, 'upstreamCode'));
+}
+
 /** The catalog key each known server marker's copy comes from, or null. */
 function markerKeyFor(error: Error): string | null {
+  const precondition = securitySyncPreconditionFor(error);
+  if (precondition !== null) {
+    return SECURITY_SYNC_PRECONDITION_COPY_KEYS[precondition];
+  }
   switch (error.message) {
     case SECURITY_AMBIGUOUS_MESSAGE: {
       return 'securityAgent.mutations.ambiguous';

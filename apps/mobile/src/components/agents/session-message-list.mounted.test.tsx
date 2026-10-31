@@ -214,6 +214,40 @@ describe('SessionMessageList open settle', () => {
     expect(skeletonCount(renderer)).toBe(0);
   });
 
+  it('does not reveal before the list has measured anything', () => {
+    vi.useFakeTimers();
+    const renderer = mountList({ items: ['m1', 'm2', 'm3'] });
+
+    // A slow first measurement must not let the quiet window run out first.
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(skeletonCount(renderer)).toBe(1);
+
+    fireLayout(655);
+    fireContentSize(790);
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(skeletonCount(renderer)).toBe(0);
+  });
+
+  it('settles again for a session the mounted list switches to', () => {
+    vi.useFakeTimers();
+    const renderer = mountList({ items: ['m1', 'm2', 'm3'] });
+    fireLayout(655);
+    fireContentSize(790);
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(skeletonCount(renderer)).toBe(0);
+
+    // The Chat tab follows a conversation that moved onto a new session: the
+    // same list now paints different rows.
+    rerenderList(renderer, { sessionId: 'session-2', items: ['n1', 'n2', 'n3'] });
+    expect(skeletonCount(renderer)).toBe(1);
+  });
+
   it('reveals the rows even if the content never stops measuring', () => {
     vi.useFakeTimers();
     const renderer = mountList({ items: ['m1', 'm2', 'm3'] });

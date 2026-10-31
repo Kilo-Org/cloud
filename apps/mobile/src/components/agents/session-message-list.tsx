@@ -164,6 +164,7 @@ export function SessionMessageList<T>({
     handleContentSizeChange: handleContentSizeChangeForOpen,
     handleListLayout: handleListLayoutForOpen,
   } = useSessionListOpenSettle({
+    sessionId,
     followTailAtMount,
     onContentSizeChange: handleContentSizeChange,
     onLayout: handleListLayout,

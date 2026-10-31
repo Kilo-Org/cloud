@@ -27,6 +27,12 @@ const OPEN_SETTLE_QUIET_MS = 150;
 const OPEN_SETTLE_LIMIT_MS = 1500;
 
 type OpenSettleParams = Readonly<{
+  /**
+   * The session this list is showing. A mounted list can switch sessions (the
+   * Chat tab follows a conversation that moved onto a new session), and the new
+   * one has to measure from its own first frame.
+   */
+  sessionId: string;
   /** Whether this open follows the newest row (the tail) rather than an anchor. */
   followTailAtMount: boolean;
   /** The list's own content-size handler. */
@@ -43,11 +49,19 @@ type OpenSettle = Readonly<{
 }>;
 
 export function useSessionListOpenSettle({
+  sessionId,
   followTailAtMount,
   onContentSizeChange,
   onLayout,
 }: OpenSettleParams): OpenSettle {
   const [openSettled, setOpenSettled] = useState(!followTailAtMount);
+  // Render-phase reset for a list that switched sessions: the state belongs to
+  // the session whose rows it describes.
+  const [settledForSessionId, setSettledForSessionId] = useState(sessionId);
+  if (settledForSessionId !== sessionId) {
+    setSettledForSessionId(sessionId);
+    setOpenSettled(!followTailAtMount);
+  }
   const settledRef = useRef(openSettled);
   settledRef.current = openSettled;
   const contentHeightRef = useRef(0);
@@ -66,11 +80,18 @@ export function useSessionListOpenSettle({
     if (settledRef.current) {
       return;
     }
+    // Nothing measured yet: the quiet window only means something once the list
+    // has reported both a content height and a viewport, or a slow first
+    // measurement would let the rows paint before their position is final. The
+    // cap in the effect still reveals a list that never reports either.
+    const content = contentHeightRef.current;
+    const viewport = viewportHeightRef.current;
+    if (content <= 0 || viewport <= 0) {
+      return;
+    }
     // A transcript that fits its viewport has nothing to pin, so it is final on
     // its first layout and must not be held back at all.
-    const fits =
-      contentHeightRef.current > 0 && contentHeightRef.current <= viewportHeightRef.current;
-    if (fits) {
+    if (content <= viewport) {
       clearQuietTimer();
       setOpenSettled(true);
       return;
@@ -83,19 +104,23 @@ export function useSessionListOpenSettle({
   }, [clearQuietTimer]);
 
   useEffect(() => {
-    const cap = settledRef.current
-      ? null
-      : setTimeout(() => {
-          setOpenSettled(true);
-        }, OPEN_SETTLE_LIMIT_MS);
-    armQuietTimer();
+    if (openSettled) {
+      clearQuietTimer();
+      return undefined;
+    }
+    const cap = setTimeout(() => {
+      setOpenSettled(true);
+    }, OPEN_SETTLE_LIMIT_MS);
+    // A previous session's measurements, and any window armed from them, do not
+    // describe this one.
+    contentHeightRef.current = 0;
+    viewportHeightRef.current = 0;
+    clearQuietTimer();
     return () => {
-      if (cap !== null) {
-        clearTimeout(cap);
-      }
+      clearTimeout(cap);
       clearQuietTimer();
     };
-  }, [armQuietTimer, clearQuietTimer]);
+  }, [clearQuietTimer, openSettled, sessionId]);
 
   const handleContentSizeChange = useCallback(
     (width: number, height: number) => {

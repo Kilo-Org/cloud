@@ -30,6 +30,10 @@ export function SessionTranscriptOpenGate({
         className="flex-1"
         style={settled ? null : hiddenStyle}
         pointerEvents={settled ? 'auto' : 'none'}
+        // Hidden rows are not yet a position the user can read, so assistive
+        // technology must not reach them either.
+        accessibilityElementsHidden={!settled}
+        importantForAccessibility={settled ? 'auto' : 'no-hide-descendants'}
       >
         {children}
       </View>

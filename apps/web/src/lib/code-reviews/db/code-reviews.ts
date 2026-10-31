@@ -1886,23 +1886,35 @@ export async function findManualReviewByOperationKey(input: {
       ? eq(cloud_agent_code_reviews.owned_by_organization_id, input.owner.id)
       : eq(cloud_agent_code_reviews.owned_by_user_id, input.owner.id);
 
-  const [review] = await db
-    .select({
-      id: cloud_agent_code_reviews.id,
-      platform: cloud_agent_code_reviews.platform,
-      repoFullName: cloud_agent_code_reviews.repo_full_name,
-      prNumber: cloud_agent_code_reviews.pr_number,
-    })
-    .from(cloud_agent_code_reviews)
-    .where(
-      and(
-        ownerCondition,
-        eq(cloud_agent_code_reviews.manual_operation_key, input.manualOperationKey)
+  try {
+    const [review] = await db
+      .select({
+        id: cloud_agent_code_reviews.id,
+        platform: cloud_agent_code_reviews.platform,
+        repoFullName: cloud_agent_code_reviews.repo_full_name,
+        prNumber: cloud_agent_code_reviews.pr_number,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(
+        and(
+          ownerCondition,
+          eq(cloud_agent_code_reviews.manual_operation_key, input.manualOperationKey)
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  return review ?? null;
+    return review ?? null;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'findManualReviewByOperationKey' },
+      extra: {
+        ownerType: input.owner.type,
+        ownerId: input.owner.id,
+        manualOperationKey: input.manualOperationKey,
+      },
+    });
+    throw error;
+  }
 }
 
 export function bitbucketCodeReviewerLifecycleLockKey(integrationId: string): string {

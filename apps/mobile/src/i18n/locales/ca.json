@@ -1702,7 +1702,8 @@
       "sortSeverityDesc": "Gravetat: d'alta a baixa",
       "sortSeverityAsc": "Gravetat: de baixa a alta",
       "sortSlaDue": "Data límit de l'SLA",
-      "overdueOnly": "Només fora de termini"
+      "overdueOnly": "Només fora de termini",
+      "noRepositories": "Encara no hi ha repositoris sincronitzats ni seleccionats. Tria'ls a la configuració de l'agent de seguretat."
     },
     "automation": {
       "title": "Automatització",
@@ -2077,7 +2078,10 @@
       "settleFailed": "L'acció s'ha completat, però no hem pogut registrar el resultat. Torna-ho a provar.",
       "replayFailed": "Aquesta acció no s'ha completat. Torna-ho a provar.",
       "actionFailed": "No s'ha pogut completar aquesta acció. Torna-ho a provar.",
-      "actionBlocked": "No s'ha pogut completar aquesta acció. Cal resoldre el problema abans de poder tornar-ho a provar."
+      "actionBlocked": "No s'ha pogut completar aquesta acció. Cal resoldre el problema abans de poder tornar-ho a provar.",
+      "syncNoRepositories": "No hi ha cap repositori a l'abast de la sincronització. Tria quins repositoris supervisa l'agent de seguretat i torna a sincronitzar.",
+      "syncIntegrationInactive": "La connexió de GitHub per a l'agent de seguretat no està activa. Torna a connectar l'aplicació de GitHub de Kilo i torna a sincronitzar.",
+      "syncMissingPermission": "L'aplicació de GitHub de Kilo no pot llegir els avisos de vulnerabilitat. Concedeix aquest permís a GitHub i torna a sincronitzar."
     },
     "analysisState": {
       "queued": "Anàlisi en cua",

@@ -1702,7 +1702,8 @@
       "sortSeverityDesc": "Ozbiljnost: od visoke ka niskoj",
       "sortSeverityAsc": "Ozbiljnost: od niske ka visokoj",
       "sortSlaDue": "Rok prema SLA",
-      "overdueOnly": "Samo sa prekoračenim rokom"
+      "overdueOnly": "Samo sa prekoračenim rokom",
+      "noRepositories": "Nijedan repozitorijum još uvek nije sinhronizovan ili izabran. Izaberite ih u podešavanjima Bezbednosnog agenta."
     },
     "automation": {
       "title": "Automatizacija",
@@ -2077,7 +2078,10 @@
       "settleFailed": "Radnja je izvršena, ali nismo mogli da zabeležimo rezultat. Pokušaj ponovo.",
       "replayFailed": "Ova radnja nije dovršena. Pokušaj ponovo.",
       "actionFailed": "Nije moguće dovršiti ovu radnju. Pokušaj ponovo.",
-      "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem mora biti rešen pre nego što pokušaš ponovo."
+      "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem mora biti rešen pre nego što pokušaš ponovo.",
+      "syncNoRepositories": "Nijedan repozitorijum nije u opsegu sinhronizacije. Izaberite repozitorijume koje Bezbednosni agent nadgleda, pa ponovo sinhronizujte.",
+      "syncIntegrationInactive": "GitHub veza za Bezbednosni agent nije aktivna. Ponovo povežite Kilo GitHub App, zatim ponovo sinhronizujte.",
+      "syncMissingPermission": "Kilo GitHub aplikacija ne može da čita upozorenja o ranjivostima. Dodeli to ovlašćenje na GitHub-u, pa sinhronizuj ponovo."
     },
     "analysisState": {
       "queued": "Analiza u redu čekanja",

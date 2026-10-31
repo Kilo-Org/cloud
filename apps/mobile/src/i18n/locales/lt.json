@@ -1724,7 +1724,8 @@
       "sortSeverityDesc": "Pavojingumas: nuo didžiausio iki mažiausio",
       "sortSeverityAsc": "Pavojingumas: nuo mažiausio iki didžiausio",
       "sortSlaDue": "SLA terminas",
-      "overdueOnly": "Tik pradelsti"
+      "overdueOnly": "Tik pradelsti",
+      "noRepositories": "Dar nėra sinchronizuotų ar pasirinktų saugyklų. Pasirinkite jas Saugos agento nustatymuose."
     },
     "automation": {
       "title": "Automatizavimas",
@@ -2104,7 +2105,10 @@
       "settleFailed": "Veiksmas buvo atliktas, bet nepavyko įrašyti rezultato. Bandyk dar kartą.",
       "replayFailed": "Šis veiksmas nebuvo užbaigtas. Bandyk dar kartą.",
       "actionFailed": "Nepavyko užbaigti šio veiksmo. Bandyk dar kartą.",
-      "actionBlocked": "Nepavyko užbaigti šio veiksmo. Iš pradžių reikia išspręsti problemą."
+      "actionBlocked": "Nepavyko užbaigti šio veiksmo. Iš pradžių reikia išspręsti problemą.",
+      "syncNoRepositories": "Sinchronizavimo apimtyje nėra saugyklų. Pasirinkite saugyklas, kurias stebi Saugos agentas, ir sinchronizuokite dar kartą.",
+      "syncIntegrationInactive": "Saugos agento GitHub ryšys neaktyvus. Iš naujo prijunkite Kilo GitHub App, tada sinchronizuokite dar kartą.",
+      "syncMissingPermission": "Kilo GitHub programėlė negali skaityti vulnerability alerts. Suteik šį leidimą GitHub, tada sinchronizuok dar kartą."
     },
     "analysisState": {
       "queued": "Analizė eilėje",

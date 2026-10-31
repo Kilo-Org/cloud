@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Xavf darajasi: yuqoridan pastga",
       "sortSeverityAsc": "Xavf darajasi: pastdan yuqoriga",
       "sortSlaDue": "SLA muddati",
-      "overdueOnly": "Faqat muddati o'tganlar"
+      "overdueOnly": "Faqat muddati o'tganlar",
+      "noRepositories": "Hozircha hech qanday repozitoriy sinxronlanmagan yoki tanlanmagan. Ularni «Xavfsizlik agenti» sozlamalarida tanlang."
     },
     "automation": {
       "title": "Avtomatlashtirish",
@@ -2050,7 +2051,10 @@
       "settleFailed": "Amal bajarildi, ammo natijani qayd etishimiz mumkin bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "replayFailed": "Bu amal tugallanmadi. Iltimos, qayta urinib ko'ring.",
       "actionFailed": "Bu amalni tugallab bo'lmadi. Iltimos, qayta urinib ko'ring.",
-      "actionBlocked": "Bu amalni tugallab bo'lmadi. Muammoni avval hal qilish kerak."
+      "actionBlocked": "Bu amalni tugallab bo'lmadi. Muammoni avval hal qilish kerak.",
+      "syncNoRepositories": "Sinxronlash doirasida hech qanday repozitoriy yo'q. «Xavfsizlik agenti» kuzatadigan repozitoriylarni tanlang, so'ngra qayta sinxronlang.",
+      "syncIntegrationInactive": "«Xavfsizlik agenti»ning GitHub ulanishi faol emas. Kilo GitHub App’ni qayta ulang, so‘ng qaytadan sinxronlang.",
+      "syncMissingPermission": "Kilo GitHub App zaiflik ogohlantirishlarini o'qiy olmaydi. GitHubda shu ruxsatni bering, so'ng yana sinxronlang."
     },
     "analysisState": {
       "queued": "Tahlil navbatda",

@@ -1746,7 +1746,8 @@
       "sortSeverityDesc": "Severità: mill-ogħla għall-inqas",
       "sortSeverityAsc": "Severità: mill-inqas għall-ogħla",
       "sortSlaDue": "Data ta' skadenza tas-SLA",
-      "overdueOnly": "Skaduti biss"
+      "overdueOnly": "Skaduti biss",
+      "noRepositories": "Bħalissa m'hemm l-ebda repożitorju sinkronizzat jew magħżul. Agħżelhom fl-issettjar tal-Aġent tas-sigurtà."
     },
     "automation": {
       "title": "Awtomazzjoni",
@@ -2131,7 +2132,10 @@
       "settleFailed": "L-azzjoni tlestiet, imma ma stajniex nirreġistraw ir-riżultat. Jekk jogħġbok erġa' pprova.",
       "replayFailed": "Din l-azzjoni ma tlestietx. Jekk jogħġbok erġa' pprova.",
       "actionFailed": "Ma stajniex nikkompletaw din l-azzjoni. Jekk jogħġbok erġa' pprova.",
-      "actionBlocked": "Ma stajniex nikkompletaw din l-azzjoni. Il-problema trid titfixxa qabel ma tista' terġa' tipprova."
+      "actionBlocked": "Ma stajniex nikkompletaw din l-azzjoni. Il-problema trid titfixxa qabel ma tista' terġa' tipprova.",
+      "syncNoRepositories": "M'hemm l-ebda repożitorju fl-ambitu tas-sinkronizzazzjoni. Agħżel ir-repożitorji li jimmonitorja l-Aġent tas-sigurtà, imbagħad erġa' sinkronizza.",
+      "syncIntegrationInactive": "Il-konnessjoni ma' GitHub għall-Aġent tas-sigurtà mhijiex attiva. Erġa' qabbad il-Kilo GitHub App, imbagħad erġa' sinkronizza.",
+      "syncMissingPermission": "L-app ta' Kilo fuq GitHub ma tistax taqra l-vulnerability alerts. Agħti dik il-permess f'GitHub, imbagħad erġa' sinkronizza."
     },
     "analysisState": {
       "queued": "Analiżi fil-kju",

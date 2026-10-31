@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Vakavuus: vakavimmasta lievimpään",
       "sortSeverityAsc": "Vakavuus: lievimmästä vakavimpaan",
       "sortSlaDue": "SLA-määräaika",
-      "overdueOnly": "Vain myöhässä olevat"
+      "overdueOnly": "Vain myöhässä olevat",
+      "noRepositories": "Yhtään repositoriota ei ole vielä synkronoitu tai valittu. Valitse ne Tietoturva-agentin asetuksista."
     },
     "automation": {
       "title": "Automaatio",
@@ -2050,7 +2051,10 @@
       "settleFailed": "Toiminto valmistui, mutta emme voineet tallentaa tulosta. Yritä uudelleen.",
       "replayFailed": "Tämä toiminto ei valmistunut. Yritä uudelleen.",
       "actionFailed": "Toimintoa ei voitu suorittaa loppuun. Yritä uudelleen.",
-      "actionBlocked": "Toimintoa ei voitu suorittaa loppuun. Ongelma on korjattava ensin."
+      "actionBlocked": "Toimintoa ei voitu suorittaa loppuun. Ongelma on korjattava ensin.",
+      "syncNoRepositories": "Synkronointilaajuudessa ei ole yhtään repositoriota. Valitse repositoriot, joita Tietoturva-agentti valvoo, ja synkronoi sitten uudelleen.",
+      "syncIntegrationInactive": "Tietoturva-agentin GitHub-yhteys ei ole aktiivinen. Yhdistä Kilo GitHub App uudelleen ja synkronoi sitten uudelleen.",
+      "syncMissingPermission": "Kilo GitHub App ei voi lukea haavoittuvuushälytyksiä. Myönnä kyseinen käyttöoikeus GitHubissa ja synkronoi sitten uudelleen."
     },
     "analysisState": {
       "queued": "Analyysi jonossa",

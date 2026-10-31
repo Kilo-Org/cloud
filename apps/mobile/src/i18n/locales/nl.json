@@ -1151,7 +1151,8 @@
       "sortSeverityDesc": "Ernst: van hoog naar laag",
       "sortSlaDue": "SLA-deadline",
       "statusIgnored": "Genegeerd",
-      "statusOpen": "Open"
+      "statusOpen": "Open",
+      "noRepositories": "Nog geen repositories gesynchroniseerd of geselecteerd. Kies ze in de instellingen van de Beveiligingsagent."
     },
     "analysis": {
       "analyzeRepository": "Repository analyseren",
@@ -1521,7 +1522,10 @@
       "settleFailed": "De actie is voltooid, maar we konden het resultaat niet vastleggen. Probeer het opnieuw.",
       "replayFailed": "Deze actie is niet voltooid. Probeer het opnieuw.",
       "actionFailed": "Deze actie kon niet worden voltooid. Probeer het opnieuw.",
-      "actionBlocked": "Deze actie kon niet worden voltooid. Het probleem moet eerst worden opgelost."
+      "actionBlocked": "Deze actie kon niet worden voltooid. Het probleem moet eerst worden opgelost.",
+      "syncNoRepositories": "Geen repositories in het synchronisatiebereik. Kies de repositories die de Beveiligingsagent bewaakt en synchroniseer daarna opnieuw.",
+      "syncIntegrationInactive": "De GitHub-koppeling voor de Beveiligingsagent is niet actief. Verbind de Kilo GitHub-app opnieuw en synchroniseer daarna opnieuw.",
+      "syncMissingPermission": "De Kilo GitHub-app kan geen kwetsbaarheidsalerts lezen. Verleen die machtiging in GitHub en synchroniseer daarna opnieuw."
     },
     "analysisState": {
       "queued": "Analyse in de wachtrij",

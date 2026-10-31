@@ -105,6 +105,12 @@ export const MCP_CATALOG_TOKEN_SECRET = getEnvVariable('MCP_CATALOG_TOKEN_SECRET
 // benchmark). It authenticates only the mint in app/api/internal/bot-token;
 // it is never accepted as a Kilo credential.
 export const BOT_TOKEN_MINT_SECRET = getEnvVariable('BOT_TOKEN_MINT_SECRET');
+// Shared secret with the wasteland worker. It authenticates only
+// app/api/internal/integrations/dolthub/token, whose response carries a
+// third-party OAuth access token; it is never accepted as a Kilo credential,
+// and the platform-wide internal secret is not accepted there. Unset or empty
+// disables the endpoint.
+export const WASTELAND_DOLTHUB_TOKEN_SECRET = getEnvVariable('WASTELAND_DOLTHUB_TOKEN_SECRET');
 export function isBoundedInternalServiceTokenIssuanceEnabled(): boolean {
   return getEnvVariable('BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED') === 'true';
 }

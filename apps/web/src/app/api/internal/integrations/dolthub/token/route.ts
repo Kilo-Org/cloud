@@ -1,5 +1,5 @@
 /**
- * Internal API: fresh DoltHub access token for a given owner.
+ * Internal API: fresh DoltHub access token for a user.
  *
  * Called by:
  * - services/wasteland (cloudflare-wasteland) — every wanted-board op needs
@@ -9,32 +9,43 @@
  *   makes the web app the single source of truth for the token, with
  *   automatic refresh via `getValidDoltHubToken`.
  *
- * Auth: shared `INTERNAL_API_SECRET` over `X-Internal-Secret` header,
- * enforced by `authorizeInternalApiRequest` in
- * `apps/web/src/lib/internal-api-auth.ts`.
+ * Auth: only `WASTELAND_DOLTHUB_TOKEN_SECRET`, the Wasteland-only caller
+ * credential, sent as `Authorization: Bearer <secret>` and compared with
+ * `timingSafeEqual`. The response is a third-party OAuth credential, so the
+ * route has a credential of its own that only the service acting for the
+ * owning user holds. Unset or empty disables the route.
+ *
+ * Only a user owner is accepted. Organization-owned DoltHub integrations are
+ * read by the web app for the signed-in member directly; no internal caller
+ * acts for an organization.
+ *
+ * Every issuance is logged with the owner it was issued for. The token and
+ * the cached username never appear in logs.
  *
  * URL: POST /api/internal/integrations/dolthub/token
  */
 
-import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
-import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
+import { timingSafeEqual } from '@kilocode/encryption';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import { WASTELAND_DOLTHUB_TOKEN_SECRET } from '@kilocode/web-shared/lib/config.server';
 import * as dolthubService from '@/lib/integrations/dolthub-service';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 
-const RequestSchema = z
-  .object({
-    userId: z.string().min(1).optional(),
-    organizationId: z.string().min(1).optional(),
-  })
-  .refine(v => Boolean(v.userId) !== Boolean(v.organizationId), {
-    message: 'Provide exactly one of userId or organizationId',
-  });
+const CALLER = 'wasteland';
+
+const RequestSchema = z.object({ userId: z.string().min(1) }).strict();
 
 export async function POST(req: NextRequest) {
-  const unauthorized = authorizeInternalApiRequest(req);
-  if (unauthorized) return unauthorized;
+  const secret = extractBearerToken(req.headers.get('authorization'));
+  if (
+    !WASTELAND_DOLTHUB_TOKEN_SECRET ||
+    !secret ||
+    !timingSafeEqual(secret, WASTELAND_DOLTHUB_TOKEN_SECRET)
+  ) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
   let body: unknown;
   try {
@@ -51,24 +62,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // The Zod `.refine` above guarantees exactly one of `userId` /
-  // `organizationId` is set, but TS can't see through the refinement.
-  // Branch on each property explicitly so flow-sensitive narrowing
-  // gives us a non-undefined `id` without the `!` assertion. The
-  // 500 fallback is unreachable in practice but keeps the function
-  // total.
-  const { userId, organizationId } = parsed.data;
-  let owner: { type: 'user'; id: string } | { type: 'org'; id: string };
-  if (userId !== undefined) {
-    owner = { type: 'user', id: userId };
-  } else if (organizationId !== undefined) {
-    owner = { type: 'org', id: organizationId };
-  } else {
-    return NextResponse.json(
-      { error: 'Invalid request body: missing userId/organizationId' },
-      { status: 400 }
-    );
-  }
+  const owner = { type: 'user', id: parsed.data.userId } as const;
 
   const integration = await dolthubService.getInstallation(owner);
   if (!integration) {
@@ -97,6 +91,13 @@ export async function POST(req: NextRequest) {
       { status: 409 }
     );
   }
+
+  console.info('[dolthub-internal-token] issued', {
+    caller: CALLER,
+    ownerType: owner.type,
+    ownerId: owner.id,
+    integrationId: integration.id,
+  });
 
   return NextResponse.json({
     token,

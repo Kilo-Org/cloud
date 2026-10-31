@@ -9,7 +9,7 @@ declare namespace Cloudflare {
 		WASTELAND_AE: AnalyticsEngineDataset;
 		NEXTAUTH_SECRET: SecretsStoreSecret;
 		WASTELAND_ENCRYPTION_KEY: SecretsStoreSecret;
-		INTERNAL_API_SECRET: SecretsStoreSecret;
+		WASTELAND_DOLTHUB_TOKEN_SECRET: SecretsStoreSecret;
 		ENVIRONMENT: "development";
 		CF_ACCESS_TEAM: "engineering-e11";
 		CF_ACCESS_AUD: "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be";
@@ -25,7 +25,7 @@ declare namespace Cloudflare {
 		WASTELAND_AE: AnalyticsEngineDataset;
 		NEXTAUTH_SECRET: SecretsStoreSecret;
 		WASTELAND_ENCRYPTION_KEY: SecretsStoreSecret;
-		INTERNAL_API_SECRET: SecretsStoreSecret;
+		WASTELAND_DOLTHUB_TOKEN_SECRET: SecretsStoreSecret;
 		ENVIRONMENT: "development" | "production";
 		CF_ACCESS_TEAM: "engineering-e11";
 		CF_ACCESS_AUD: "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be";

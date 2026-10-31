@@ -2398,6 +2398,7 @@ describe('foreground attention-push suppression', () => {
     kind: 'permission',
     prUrl: null,
     organizationId: null,
+    previews: 'generic',
   } as const;
 
   it('suppresses the server attention push while the app notification for that session is posted', async () => {

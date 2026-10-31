@@ -238,9 +238,19 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   }, []);
 
   // The GitHub preconditions' fix lives on the GitHub App page; this is the
-  // app-wide handoff that mints the install state and waits for the return.
+  // app-wide handoff that mints the install state and waits for the return. A
+  // handoff that never opened a page clears nothing: the copy still explains
+  // what blocks the sync, and the handoff already reported its own failure.
+  const handleHandoffReturn = useCallback(
+    (opened: boolean) => {
+      if (opened) {
+        clearSyncPreconditionFailure();
+      }
+    },
+    [clearSyncPreconditionFailure]
+  );
   const manageAccess = useManageRepositoryAccess(scope, 'github', {
-    onReturn: clearSyncPreconditionFailure,
+    onReturn: handleHandoffReturn,
   });
 
   // The dashboard stays mounted while the dismiss sheet is open, so re-read

@@ -45,8 +45,12 @@ export type ManageRepositoryAccess = {
 type ManageRepositoryAccessHandlers = {
   /** A launch is starting, before the install state is minted. */
   onOpen?: () => void;
-  /** The browser wait settled: the user is back, or the launch never opened. */
-  onReturn?: () => void;
+  /**
+   * The browser wait settled. `opened` is false when the mint or the launch
+   * failed, so a caller that explains a fix in place can keep that explanation
+   * up instead of clearing it for a page the reader never saw.
+   */
+  onReturn?: (opened: boolean) => void;
 };
 
 /**
@@ -92,7 +96,7 @@ export function useManageRepositoryAccess(
     []
   );
 
-  const open = useCallback(async () => {
+  const open = useCallback(async (): Promise<boolean> => {
     const label = t('codeReviewer.repos.repositoryAccess');
     const couldNotOpen = () => {
       toast.error(t('common.couldNotOpen', { label }));
@@ -107,14 +111,15 @@ export function useManageRepositoryAccess(
         return undefined;
       }
     };
-    const openSettings = async (url: string) => {
+    const openSettings = async (url: string): Promise<boolean> => {
       const wait = await launch(url);
       if (!wait) {
-        return;
+        return false;
       }
       // A foreground return can settle the wait before the browser reports. A
       // launch that failed after that point never reached the catch above.
       reportLateLaunchFailure(wait, { onFailure: couldNotOpen });
+      return true;
     };
 
     if (platform === 'github') {
@@ -123,7 +128,8 @@ export function useManageRepositoryAccess(
           organizationId: orgScope ?? undefined,
           returnTo: '/cloud/sessions',
         });
-        await openSettings(getGitHubIntegrationUrl(WEB_BASE_URL, orgScope, token));
+        const opened = await openSettings(getGitHubIntegrationUrl(WEB_BASE_URL, orgScope, token));
+        return opened;
       } catch (error) {
         // A non-multi-installation organization that already has an active
         // GitHub App connection rejects the mint, so a pre-minted token cannot
@@ -131,14 +137,18 @@ export function useManageRepositoryAccess(
         // state for the signed-in web user.
         const code = readTrpcErrorField(error, 'code');
         if (code === 'FORBIDDEN' && orgScope) {
-          await openSettings(getGitHubIntegrationUrl(WEB_BASE_URL, orgScope));
-          return;
+          const opened = await openSettings(getGitHubIntegrationUrl(WEB_BASE_URL, orgScope));
+          return opened;
         }
         toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
       }
-    } else if (platform === 'gitlab') {
-      await openSettings(getGitLabIntegrationUrl(WEB_BASE_URL, orgScope));
+      return false;
     }
+    if (platform === 'gitlab') {
+      const opened = await openSettings(getGitLabIntegrationUrl(WEB_BASE_URL, orgScope));
+      return opened;
+    }
+    return false;
   }, [orgScope, platform, t]);
 
   const handlePress = useCallback(() => {
@@ -163,11 +173,12 @@ export function useManageRepositoryAccess(
     };
     watchdog.current = setTimeout(release, HANDOFF_WATCHDOG_MS);
     void (async () => {
+      let opened = false;
       try {
-        await open();
+        opened = await open();
       } finally {
         release();
-        onReturn?.();
+        onReturn?.(opened);
       }
     })();
   }, [onOpen, onReturn, open]);

@@ -128,7 +128,7 @@ const router = vi.hoisted(() => ({ push: vi.fn() }));
 const manageAccess = vi.hoisted(() => ({
   handlePress: vi.fn(),
   pending: false,
-  onReturn: undefined as (() => void) | undefined,
+  onReturn: undefined as ((opened: boolean) => void) | undefined,
 }));
 
 // Captures the refresh control element the dashboard passes to the scroll view.
@@ -173,7 +173,7 @@ vi.mock('@/lib/hooks/use-manage-repository-access', () => ({
   useManageRepositoryAccess: (
     _scope: string,
     _platform: string,
-    handlers?: { onReturn?: () => void }
+    handlers?: { onReturn?: (opened: boolean) => void }
   ) => {
     manageAccess.onReturn = handlers?.onReturn;
     return { handlePress: manageAccess.handlePress, pending: manageAccess.pending };
@@ -642,7 +642,7 @@ describe('DashboardScreen sync control terminal states', () => {
     expect(syncDisabledStates(root.root)).toEqual([true, true]);
 
     act(() => {
-      manageAccess.onReturn?.();
+      manageAccess.onReturn?.(true);
     });
     expect(triggerSync.reset).toHaveBeenCalledTimes(1);
 
@@ -653,6 +653,22 @@ describe('DashboardScreen sync control terminal states', () => {
     });
 
     expect(syncDisabledStates(root.root)).toEqual([false, false]);
+  });
+
+  it('keeps the precondition copy when the GitHub handoff never opened a page', () => {
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_integration_inactive');
+    const root = renderScreen();
+
+    act(() => {
+      manageAccess.onReturn?.(false);
+    });
+
+    expect(triggerSync.reset).not.toHaveBeenCalled();
+    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.mutations.syncIntegrationInactive')
+    );
   });
 
   it('keeps the controls down on focus for a terminal failure that is not a precondition', () => {

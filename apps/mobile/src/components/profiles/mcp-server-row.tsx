@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { type McpServerSource } from '@/components/profiles/profile-mcp-model';
+import { ProfileRowIdentity, profileRowLabel } from '@/components/profiles/profile-row-identity';
 import { Lock, Pencil, Trash2 } from '@/components/ui/icons';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
@@ -19,10 +20,11 @@ type McpServerRowProps = Readonly<{
 }>;
 
 /**
- * One MCP server row: the name in mono, its type, the command/URL summary, the
- * enabled switch and a lock badge with the masked env/header key count. The row
- * carries no container `accessibilityLabel`, so the switch's label stays the
- * only element a screen reader matches by the server's name.
+ * One MCP server row: the name in mono, its type, the command/URL summary and
+ * a lock badge with the masked env/header key count, the enabled switch and the
+ * edit/delete controls. The name and what qualifies it are one identity element
+ * declared first, so a screen reader hears what the row is before the controls
+ * that change it.
  */
 export function McpServerRowView({
   server,
@@ -34,31 +36,22 @@ export function McpServerRowView({
 }: McpServerRowProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const typeLabel =
+    server.type === 'local' ? t('profiles.mcp.localType') : t('profiles.mcp.remoteType');
+  const secretLabel =
+    secretCount > 0 ? t('profiles.mcp.secretCount', { count: secretCount }) : null;
   return (
     <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
-      <View className="min-w-0 flex-1 gap-0.5">
+      <ProfileRowIdentity label={profileRowLabel(server.name, typeLabel, summary, secretLabel)}>
         <View className="flex-row items-center gap-2">
           <Text variant="mono" numberOfLines={1} className="shrink">
             {server.name}
           </Text>
-          <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-            {server.type === 'local' ? t('profiles.mcp.localType') : t('profiles.mcp.remoteType')}
-          </Text>
+          <Text className="text-xs uppercase tracking-wide text-muted-foreground">{typeLabel}</Text>
           {secretCount > 0 ? (
-            <View
-              accessible
-              accessibilityRole="text"
-              accessibilityLabel={t('profiles.mcp.secretCount', { count: secretCount })}
-              className="flex-row items-center"
-            >
-              <View
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-                className="flex-row items-center gap-0.5"
-              >
-                <Lock size={12} color={colors.mutedForeground} />
-                <Text className="text-xs text-muted-foreground">{secretCount}</Text>
-              </View>
+            <View className="flex-row items-center gap-0.5">
+              <Lock size={12} color={colors.mutedForeground} />
+              <Text className="text-xs text-muted-foreground">{secretCount}</Text>
             </View>
           ) : null}
         </View>
@@ -67,7 +60,7 @@ export function McpServerRowView({
             {summary}
           </Text>
         ) : null}
-      </View>
+      </ProfileRowIdentity>
       <Switch
         value={server.enabled}
         accessibilityLabel={server.name}

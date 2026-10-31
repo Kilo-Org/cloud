@@ -1,3 +1,5 @@
+import { sessionLiveText } from '@kilocode/session-ingest-contracts';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, useColorScheme, View } from 'react-native';
 
@@ -26,6 +28,35 @@ type KiloCommandRowProps = Readonly<{
 }>;
 
 /**
+ * The longest preview the row draws and reads: one clipped line of the template.
+ * A trailing ellipsis counts inside it.
+ */
+const TEMPLATE_PREVIEW_LIMIT = 40;
+
+/** Where a template's first line ends: the platform's line breaks. */
+const TEMPLATE_LINE_BREAK = /[\r\n\u2028\u2029]/;
+
+/**
+ * The template's first line, bounded for the row's preview.
+ *
+ * `numberOfLines={1}` clips only the drawing: the native text view still holds
+ * the whole stored template (up to 100,000 characters), so an Android screen
+ * reader read a multi-KB command body before the controls that follow it. The
+ * bounded string is the entire text the row draws, and Android reads a text view
+ * without an `accessibilityLabel` from that same string, so what is read out is
+ * what is shown and the template never reaches the native view whole.
+ * `sessionLiveText` cuts on a character boundary and drops format controls, which
+ * a template pasted from a document can carry.
+ */
+function templatePreview(template: string): string | null {
+  const lineBreak = template.search(TEMPLATE_LINE_BREAK);
+  return sessionLiveText(
+    lineBreak === -1 ? template : template.slice(0, lineBreak),
+    TEMPLATE_PREVIEW_LIMIT
+  );
+}
+
+/**
  * One slash command row: the `/name`, optional subtask/agent/model metadata, the
  * template preview, the enabled switch, and up/down/edit/delete controls. The
  * row carries no container `accessibilityLabel`, so the switch's label stays the
@@ -49,6 +80,7 @@ export function KiloCommandRowView({
 }: KiloCommandRowProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const preview = useMemo(() => templatePreview(template), [template]);
   // Same signal `useThemeColors` reads. The dark palette's `primaryForeground`
   // is near-black, so an off switch drawn from it put a dark thumb on a dark
   // track over the dark card; the off state asks for a light thumb on a track
@@ -78,9 +110,11 @@ export function KiloCommandRowView({
               {description}
             </Text>
           ) : null}
-          <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
-            {template}
-          </Text>
+          {preview === null ? null : (
+            <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
+              {preview}
+            </Text>
+          )}
           {agent.length > 0 || model.length > 0 ? (
             <Text className="text-xs text-muted-foreground" numberOfLines={1}>
               {[agent.length > 0 ? `${t('common.agent')}: ${agent}` : '', model]

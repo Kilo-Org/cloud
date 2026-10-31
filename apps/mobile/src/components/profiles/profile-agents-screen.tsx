@@ -11,6 +11,7 @@ import {
   type AgentSource,
   type AgentVisibility,
 } from '@/components/profiles/profile-agents-model';
+import { ProfileRowIdentity, profileRowLabel } from '@/components/profiles/profile-row-identity';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -54,7 +55,11 @@ type AgentRowViewProps = Readonly<{
   onDelete?: () => void;
 }>;
 
-/** One agent row: name, visibility, optional model and description, edit/delete. */
+/**
+ * One agent row: name, visibility, optional model and description, edit/delete.
+ * The name and what qualifies it are one identity element declared first, so a
+ * screen reader hears what the row is before the controls that change it.
+ */
 function AgentRowView({
   name,
   visibility,
@@ -65,13 +70,14 @@ function AgentRowView({
 }: AgentRowViewProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const visibilityLabel = t(AGENT_VISIBILITY_LABEL_KEYS[visibility]);
   // The name owns its row, so an agent name is ellipsized only when it alone is
   // wider than the card; the mode label never takes the room a short name needs.
   // The label is metadata, so it leads the column under the name at the same
   // 2 dp gap the card uses between its meta lines.
   return (
     <View className="min-h-16 flex-row items-start gap-1 rounded-lg bg-secondary px-3 py-2">
-      <View className="min-w-0 flex-1 gap-0.5">
+      <ProfileRowIdentity label={profileRowLabel(name, visibilityLabel, model, description)}>
         <View className="flex-row items-center gap-2">
           <Bot size={16} color={colors.mutedForeground} />
           <Text className="min-w-0 shrink text-sm font-medium text-foreground" numberOfLines={1}>
@@ -79,7 +85,7 @@ function AgentRowView({
           </Text>
         </View>
         <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-          {t(AGENT_VISIBILITY_LABEL_KEYS[visibility])}
+          {visibilityLabel}
         </Text>
         {model.length > 0 ? (
           <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
@@ -91,7 +97,7 @@ function AgentRowView({
             {description}
           </Text>
         ) : null}
-      </View>
+      </ProfileRowIdentity>
       {onEdit !== undefined ? (
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}

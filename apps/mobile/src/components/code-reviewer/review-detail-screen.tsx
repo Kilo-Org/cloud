@@ -126,10 +126,23 @@ export function ReviewDetailScreen({
     );
   }
 
+  // One header for every state. The eyebrow is the review's repository, which
+  // only the payload knows, so its line is reserved from the first frame: the
+  // title above the body must not move when the review lands — nor when a
+  // refetch drops it back to loading, nor on the error branches that paint the
+  // same header.
+  const header = (
+    <ReviewerHeader
+      title={t('codeReviewer.reviewDetail.title')}
+      eyebrow={loadedReview?.repo_full_name}
+      reserveEyebrow
+    />
+  );
+
   if (isLoading) {
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={t('codeReviewer.reviewDetail.title')} />
+        {header}
         <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
           <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
             <Skeleton className="h-14 w-full rounded-lg" />
@@ -151,7 +164,7 @@ export function ReviewDetailScreen({
     if (errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED') {
       return (
         <View className="flex-1 bg-background">
-          <ReviewerHeader title={t('codeReviewer.reviewDetail.title')} />
+          {header}
           <QueryError variant={errorCode === 'NOT_FOUND' ? 'not-found' : 'permission'} />
           {dialog}
         </View>
@@ -159,7 +172,7 @@ export function ReviewDetailScreen({
     }
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={t('codeReviewer.reviewDetail.title')} />
+        {header}
         <QueryError
           variant={trpcErrorVariant(error)}
           title={t('codeReviewer.reviewDetail.couldNotLoad')}
@@ -209,10 +222,7 @@ export function ReviewDetailScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ReviewerHeader
-        title={t('codeReviewer.reviewDetail.title')}
-        eyebrow={review.repo_full_name}
-      />
+      {header}
       <ReviewSpectatorSheet
         key={reviewId}
         visible={transcriptReviewId === reviewId}

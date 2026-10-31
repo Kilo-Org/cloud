@@ -167,6 +167,26 @@ export function readAgentPushPreferenceIfLoaded(
   return readFromSnapshot(snapshot)[category];
 }
 
+/**
+ * The user's message-preview choice, or `undefined` while the server-resolved
+ * row has not loaded. A caller that acts on it treats `undefined` as the
+ * server's own default (`generic`): a legacy snapshot that predates the column
+ * carries no choice either, so it reads the same way instead of claiming the
+ * content-revealing value.
+ */
+export function readNotificationPreviewsIfLoaded(
+  queryClient: Pick<QueryClient, 'getQueryData'>,
+  queryKey: readonly unknown[]
+): NotificationPreferences['notificationPreviews'] {
+  const snapshot = queryClient.getQueryData(queryKey) as NotificationPreferencesSnapshot;
+  if (snapshot === undefined) {
+    return undefined;
+  }
+  // Neither a legacy snapshot nor a row from a server that predates the column
+  // carries a choice, so both read as unloaded rather than as `full`.
+  return readFromSnapshot(snapshot).notificationPreviews;
+}
+
 type OptimisticArgs = Readonly<{
   queryClient: Pick<QueryClient, 'cancelQueries' | 'getQueryData' | 'setQueryData'>;
   queryKey: readonly unknown[];

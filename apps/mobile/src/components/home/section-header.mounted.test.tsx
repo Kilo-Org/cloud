@@ -110,6 +110,11 @@ describe('SectionHeader mounted layout', () => {
     expect(actionBoxClasses).toEqual(expect.arrayContaining(ACTION_BOX_CLASSES));
     expect(actionBoxClasses).not.toContain('grow');
     expect(actionBoxClasses).not.toContain('justify-end');
+    // Label and action copy sit on the row's content bottom edge, not its
+    // centre: a 48 dp action box would otherwise hold the label half a box away
+    // from the rows it names (home section-label gap).
+    expect(rowClasses.filter(name => name.startsWith('items-'))).toEqual(['items-end']);
+    expect(actionBoxClasses).toContain('items-end');
     const actionTextClasses = (text.props.className as string).split(' ');
     expect(actionTextClasses).toEqual(expect.arrayContaining(ACTION_TEXT_CLASSES));
     expect(actionTextClasses.filter(name => PHYSICAL_ALIGNMENT_CLASSES.has(name))).toEqual([]);
@@ -323,6 +328,10 @@ describe('SectionHeader mounted layout', () => {
     const root = mount(createElement(SectionHeader, { label: 'Explore', ...props }));
     expect(root.findAll(node => Object.is(node.type, 'Pressable'))).toHaveLength(0);
     expect(root.find(node => Object.is(node.type, 'Text')).children).toEqual(['Explore']);
+    // No tall child here, and the same rule still puts the label on the row's
+    // content edge: one label-to-content gap with or without an action.
+    const row = root.find(node => Object.is(node.type, 'View'));
+    expect(String(row.props.className).split(' ')).toContain('items-end');
   });
 
   it('gives a notice all the free space and keeps the action at the outer edge', () => {
@@ -352,5 +361,10 @@ describe('SectionHeader mounted layout', () => {
       expect.arrayContaining(['grow', 'basis-0', 'min-w-0'])
     );
     expect(root.findByProps({ accessibilityRole: 'button' })).toBeDefined();
+    // The divider keeps its own centring against a 48 dp notice action.
+    const divider = root.find(
+      node => Object.is(node.type, 'View') && String(node.props.className).includes('w-px')
+    );
+    expect((divider.props.className as string).split(' ')).toContain('self-center');
   });
 });

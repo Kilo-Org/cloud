@@ -10,8 +10,10 @@ import {
   captureFiles,
   DEFAULT_OBSERVE_MS,
   InfraError,
+  layoutSignature,
   runMatrix,
   screenFindings,
+  unsettledFinding,
   waitForApp,
   writeJson,
   type Clock,
@@ -29,6 +31,9 @@ import { runMotion } from './motion';
 import { readRgba } from './pixels';
 import { APP_ID, PROBE_REQUIREMENT, recordRestoreError, summarize, writeArtifacts } from './report';
 import { normalize } from './rules';
+import type { Finding } from './findings';
+import type { Rgba } from './pixels';
+import type { ProbeDump } from './tree';
 import { uiautomatorToProbeDump } from './uiautomator';
 
 const DEFAULT_METRO = 'http://127.0.0.1:8081';
@@ -58,7 +63,7 @@ export type CliArgs =
 
 export const USAGE = `Usage: pnpm dev:mobile:design-gate <command> [flags]
   run    --link <deeplink> [--link ...] [--targets <file>] [--matrix base|standard|full] [--observe-ms ${DEFAULT_OBSERVE_MS}]
-  scan   [--source probe|uiautomator|agent-device] [--session <agent-device session>]
+  scan   [--source probe|uiautomator|agent-device] [--session <agent-device session>]   waits for a settled layout on the accessibility sources
   motion --link <deeplink> [--tap <text|testID|label>] [--seconds 3] [--observe-ms ${DEFAULT_OBSERVE_MS}]   exit 1 on an interaction layout shift
   help   print this text
 Common: [--platform android|ios] [--device <serial|udid>] [--metro ${DEFAULT_METRO}] [--out <dir>]
@@ -329,34 +334,120 @@ function openDevice(args: CliArgs, deps: CliDeps): Device {
   });
 }
 
+export const SCAN_SETTLE_READS = 3;
+const SCAN_SETTLE_INTERVAL_MS = 250;
+const SCAN_SETTLE_TIMEOUT_MS = 15_000;
+
+export type SettledRead = { dump: ProbeDump; settled: boolean; elapsedMs: number; reads: number };
+
+/**
+ * The accessibility sources have no probe to ask: `uiautomator dump` and an
+ * `agent-device snapshot` read the platform's native tree node by node, and a screen that
+ * is still moving (a sheet sliding in, a list settling, a transcript streaming) answers
+ * with nodes from different layouts. A text read after its container was clipped to the
+ * window edge is then past that container by the whole scroll offset, and the same
+ * mismatch turns any window clamp into a "clipped" report. Reads repeat until two
+ * consecutive layouts match, so only a screen that has stopped moving is measured.
+ */
+export async function readSettledDump(
+  read: () => ProbeDump,
+  clock: Clock,
+  options: { reads?: number; intervalMs?: number; timeoutMs?: number } = {}
+): Promise<SettledRead> {
+  const settledReads = options.reads ?? SCAN_SETTLE_READS;
+  const intervalMs = options.intervalMs ?? SCAN_SETTLE_INTERVAL_MS;
+  const timeoutMs = options.timeoutMs ?? SCAN_SETTLE_TIMEOUT_MS;
+  const started = clock.now();
+  let dump = read();
+  let count = 1;
+  let run = 1;
+  for (;;) {
+    if (run >= settledReads) {
+      return { dump, settled: true, elapsedMs: clock.now() - started, reads: count };
+    }
+    if (clock.now() - started >= timeoutMs) {
+      return { dump, settled: false, elapsedMs: clock.now() - started, reads: count };
+    }
+    await clock.sleep(intervalMs);
+    const next = read();
+    count += 1;
+    run = layoutSignature(next) === layoutSignature(dump) ? run + 1 : 1;
+    dump = next;
+  }
+}
+
+/**
+ * A settled screen is measured by every rule; a screen that never stopped moving only
+ * reports that it could not be measured. Its frames mix layouts, so a rect rule there
+ * reports the mismatch between two frames as a layout defect — the false "text past its
+ * parent" report this scan source is prone to.
+ */
+export function scanScreenFindings(args: {
+  dump: ProbeDump;
+  image?: Rgba;
+  settled: boolean;
+  elapsedMs: number;
+}): Finding[] {
+  if (!args.settled) {
+    return [
+      unsettledFinding({
+        cell: 'current',
+        target: 'current',
+        dump: args.dump,
+        elapsedMs: args.elapsedMs,
+      }),
+    ];
+  }
+  return screenFindings({
+    cell: 'current',
+    target: 'current',
+    dump: args.dump,
+    tree: normalize(args.dump),
+    image: args.image,
+  });
+}
+
 async function scanOutcome(
   args: Extract<CliArgs, { command: 'scan' }>,
   device: Device,
   deps: CliDeps,
   out: string
 ): Promise<RunOutcome> {
-  let dump;
-  if (args.source === 'uiautomator') {
-    if (device.uiSnapshot === undefined)
-      throw new UsageError('--source uiautomator is Android only');
-    dump = uiautomatorToProbeDump(device.uiSnapshot());
-  } else if (args.source === 'agent-device') {
-    dump = agentDeviceToProbeDump(
+  const readAccessibilityDump = (): ProbeDump => {
+    if (args.source === 'uiautomator') {
+      if (device.uiSnapshot === undefined)
+        throw new UsageError('--source uiautomator is Android only');
+      return uiautomatorToProbeDump(device.uiSnapshot());
+    }
+    return agentDeviceToProbeDump(
       deps.exec('agent-device', agentDeviceArgs(args.session)).toString()
     );
-  } else {
+  };
+  let dump: ProbeDump;
+  let settled = true;
+  let elapsedMs = 0;
+  if (args.source === 'probe') {
     const probe = createProbeClient({ metro: args.metro, names: device.names });
     dump = await waitForApp(probe, deps.clock, undefined, 5_000);
+  } else {
+    const read = await readSettledDump(readAccessibilityDump, deps.clock);
+    dump = read.dump;
+    settled = read.settled;
+    elapsedMs = read.elapsedMs;
+    deps.log(
+      settled
+        ? `design-gate: layout settled after ${read.reads} reads (${elapsedMs} ms)`
+        : `design-gate: layout kept changing for ${elapsedMs} ms over ${read.reads} reads; layout rules skipped`
+    );
   }
   const files = captureFiles(out, 'current', 'current');
   writeJson(files.absolute(files.dump), dump);
   device.screenshot(files.absolute(files.screenshot));
-  const findings = screenFindings({
-    cell: 'current',
-    target: 'current',
+  const findings = scanScreenFindings({
     dump,
-    tree: normalize(dump),
     image: readRgba(files.absolute(files.screenshot), deps.exec),
+    settled,
+    elapsedMs,
   });
   return {
     cells: [

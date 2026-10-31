@@ -362,6 +362,32 @@ export function layoutSignature(dump: ProbeDump): string {
   return dump.nodes.map(node => node.rect.join(',')).join(';');
 }
 
+/**
+ * The screen was still moving while it was read, so its frames describe more than one
+ * layout and every rule that measures a rect against another rect is meaningless. One
+ * warning replaces those findings; the run is not a pass, and it is not a defect either.
+ */
+export function unsettledFinding(args: {
+  cell: string;
+  target: string;
+  dump: ProbeDump;
+  elapsedMs: number;
+}): Finding {
+  return {
+    rule: 'unsettled',
+    severity: 'warning',
+    cell: args.cell,
+    target: args.target,
+    element: rootRef(args.dump),
+    measured: args.elapsedMs,
+    expected: 'the same layout on consecutive reads',
+    unit: 'ms',
+    message:
+      `The screen kept changing for ${args.elapsedMs} ms and its frames describe more than one ` +
+      'layout; layout rules were skipped for this screen.',
+  };
+}
+
 function warningFinding(
   cell: string,
   target: string,

@@ -12,7 +12,7 @@ import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { formatNumber, formatPercent } from '@/lib/format';
+import { formatNumber, formatPercent, UNMEASURED_VALUE } from '@/lib/format';
 import { type useSecurityAgentDashboardStats } from '@/lib/hooks/use-security-agent';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -64,6 +64,22 @@ function findingsHref(
   const query = search.toString();
   const base = getSecurityAgentPath(scope, 'findings') as string;
   return (query ? `${base}?${query}` : base) as Href;
+}
+
+/**
+ * A row's value before the first sync: the counts below it are not measured,
+ * so a dash replaces each number the row would otherwise claim as zero.
+ */
+function rowValue(neverSynced: boolean, rendered: string): string {
+  return neverSynced ? UNMEASURED_VALUE : rendered;
+}
+
+/** The status dot an unmeasured row shows: neutral, never a success or alarm colour. */
+function rowTone(
+  neverSynced: boolean,
+  measured: 'good' | 'warn' | 'danger' | 'muted'
+): 'good' | 'warn' | 'danger' | 'muted' {
+  return neverSynced ? 'muted' : measured;
 }
 
 function SectionCard({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
@@ -151,7 +167,7 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
   );
 }
 
-function PostureSection({ data, slaEnabled }: SectionProps) {
+function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
   const { t } = useTranslation();
   if (slaEnabled) {
     const { overall, bySeverity } = data.sla;
@@ -164,31 +180,40 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
         <KvRow
           className={ROW_TARGET_CLASS}
           label={t('securityAgent.dashboard.withinDeadline')}
-          value={`${formatNumber(overall.withinSla, i18n.language)} / ${formatNumber(
-            overall.total,
-            i18n.language
-          )}`}
+          value={rowValue(
+            neverSynced,
+            `${formatNumber(overall.withinSla, i18n.language)} / ${formatNumber(
+              overall.total,
+              i18n.language
+            )}`
+          )}
         />
         <KvRow
           className={ROW_TARGET_CLASS}
           label={t('securityAgent.dashboard.criticalOverdue')}
-          value={formatNumber(bySeverity.critical.overdue, i18n.language)}
+          value={rowValue(neverSynced, formatNumber(bySeverity.critical.overdue, i18n.language))}
           valueTone="muted"
-          dotTone={bySeverity.critical.overdue > 0 ? 'danger' : 'muted'}
+          dotTone={rowTone(neverSynced, bySeverity.critical.overdue > 0 ? 'danger' : 'muted')}
         />
         <KvRow
           className={ROW_TARGET_CLASS}
           label={t('securityAgent.dashboard.highOverdue')}
-          value={formatNumber(bySeverity.high.overdue, i18n.language)}
+          value={rowValue(neverSynced, formatNumber(bySeverity.high.overdue, i18n.language))}
           valueTone="muted"
-          dotTone={bySeverity.high.overdue > 0 ? 'danger' : 'muted'}
+          dotTone={rowTone(neverSynced, bySeverity.high.overdue > 0 ? 'danger' : 'muted')}
         />
         <KvRow
           className={ROW_TARGET_CLASS}
           label={t('securityAgent.dashboard.mediumLowOverdue')}
-          value={formatNumber(bySeverity.medium.overdue + bySeverity.low.overdue, i18n.language)}
+          value={rowValue(
+            neverSynced,
+            formatNumber(bySeverity.medium.overdue + bySeverity.low.overdue, i18n.language)
+          )}
           valueTone="muted"
-          dotTone={bySeverity.medium.overdue + bySeverity.low.overdue > 0 ? 'danger' : 'muted'}
+          dotTone={rowTone(
+            neverSynced,
+            bySeverity.medium.overdue + bySeverity.low.overdue > 0 ? 'danger' : 'muted'
+          )}
           last
         />
       </SectionCard>
@@ -208,37 +233,37 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
       <KvRow
         className={ROW_TARGET_CLASS}
         label={t('securityAgent.dashboard.confirmedExploitable')}
-        value={formatNumber(data.analysis.exploitable, i18n.language)}
+        value={rowValue(neverSynced, formatNumber(data.analysis.exploitable, i18n.language))}
         valueTone="muted"
-        dotTone="danger"
+        dotTone={rowTone(neverSynced, 'danger')}
       />
       <KvRow
         className={ROW_TARGET_CLASS}
         label={t('securityAgent.dashboard.needsEvidenceReview')}
-        value={formatNumber(data.analysis.needsReview, i18n.language)}
+        value={rowValue(neverSynced, formatNumber(data.analysis.needsReview, i18n.language))}
         valueTone="muted"
-        dotTone="warn"
+        dotTone={rowTone(neverSynced, 'warn')}
       />
       <KvRow
         className={ROW_TARGET_CLASS}
         label={t('securityAgent.dashboard.analysisNotComplete')}
-        value={formatNumber(analysisIncomplete, i18n.language)}
+        value={rowValue(neverSynced, formatNumber(analysisIncomplete, i18n.language))}
         valueTone="muted"
         dotTone="muted"
       />
       <KvRow
         className={ROW_TARGET_CLASS}
         label={t('securityAgent.dashboard.noImmediateAction')}
-        value={formatNumber(noImmediateAction, i18n.language)}
+        value={rowValue(neverSynced, formatNumber(noImmediateAction, i18n.language))}
         valueTone="muted"
-        dotTone="good"
+        dotTone={rowTone(neverSynced, 'good')}
         last
       />
     </SectionCard>
   );
 }
 
-function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps) {
+function CoverageSection({ scope, data, slaEnabled, repoFullName, neverSynced }: SectionProps) {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const analysisIncomplete = getAnalysisIncompleteCount(data.analysis);
@@ -302,9 +327,9 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
           <KvRow
             className={ROW_TARGET_CLASS}
             label={row.label}
-            value={formatNumber(row.value, i18n.language)}
+            value={rowValue(neverSynced, formatNumber(row.value, i18n.language))}
             valueTone="muted"
-            dotTone={row.tone}
+            dotTone={rowTone(neverSynced, row.tone)}
             last={index === rows.length - 1}
           />
         </Pressable>

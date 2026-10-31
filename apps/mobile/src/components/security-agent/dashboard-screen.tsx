@@ -30,7 +30,7 @@ import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { INLINE_LINK_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { formatNumber, formatPercent } from '@/lib/format';
+import { formatNumber, formatPercent, UNMEASURED_VALUE } from '@/lib/format';
 import {
   useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
@@ -64,13 +64,6 @@ const METRIC_TONE_CLASS = {
   warning: 'text-warn',
   neutral: 'text-muted-foreground',
 } satisfies Record<DashboardMetricTone, string>;
-
-/**
- * The numeric slot's value when there is nothing measured to count. A dash
- * keeps the tile's mono number shape without printing a phrase in a slot sized
- * for digits; the tile's detail line carries the explanation.
- */
-const UNMEASURED_METRIC_VALUE = '—';
 
 export function buildLocalizedMetrics(
   data: DashboardStats,
@@ -134,10 +127,7 @@ export function buildLocalizedMetrics(
           // tile's value style is the large mono count, so "Not measured" read
           // as a heavy placeholder that outweighed the real counts beside it,
           // and the detail line below already explains why there is none.
-          value:
-            compliance === null
-              ? UNMEASURED_METRIC_VALUE
-              : formatPercent(compliance, i18n.language),
+          value: compliance === null ? UNMEASURED_VALUE : formatPercent(compliance, i18n.language),
           detail: measured
             ? i18n.t('securityAgent.dashboardMetrics.withinDeadlineDetail', {
                 within: number(data.sla.overall.withinSla),
@@ -194,7 +184,7 @@ export function buildLocalizedMetrics(
   }
   return localized.map(metric =>
     Object.assign(metric, {
-      value: UNMEASURED_METRIC_VALUE,
+      value: UNMEASURED_VALUE,
       detail: i18n.t('securityAgent.dashboard.notYetSynced'),
       tone: 'neutral' as const,
     })

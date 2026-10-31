@@ -43,6 +43,7 @@ vi.mock('@/lib/security-agent', () => ({
 vi.mock('@/lib/format', () => ({
   formatNumber: String,
   formatPercent: (value: number) => `${value}%`,
+  UNMEASURED_VALUE: '—',
 }));
 vi.mock('@/lib/utils', () => ({
   cn: (...classes: (string | undefined)[]) => classes.filter(Boolean).join(' '),
@@ -153,5 +154,27 @@ describe('DashboardSections priority card', () => {
     expect(copy(card)).toContain('securityAgent.dashboard.noOpenFindings');
     expect(card.findAllByType('ShieldCheck')).toHaveLength(1);
     expect(card.findAllByType('Pressable')).toHaveLength(1);
+  });
+});
+
+describe('DashboardSections stat rows', () => {
+  // The counts below the priority card are read from the same sync the filter
+  // dates; before the first one they were zeros, and two of them carried a
+  // success dot. A dash and a neutral dot state that nothing was measured.
+  it('reports every stat row as unmeasured while the scope has never synced', () => {
+    const rows = renderSections({ neverSynced: true }).root.findAllByType('KvRow');
+
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every(row => row.props.value === '—')).toBe(true);
+    expect(
+      rows.every(row => row.props.dotTone === 'muted' || row.props.dotTone === undefined)
+    ).toBe(true);
+  });
+
+  it('keeps the measured counts for a synced organization', () => {
+    const rows = renderSections({ neverSynced: false }).root.findAllByType('KvRow');
+
+    expect(rows.map(row => row.props.value)).toContain('0 / 0');
+    expect(rows.map(row => row.props.dotTone)).toContain('good');
   });
 });

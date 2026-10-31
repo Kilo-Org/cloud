@@ -16,6 +16,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
+
 const ROOT = new URL('../../', import.meta.url).pathname;
 const LANGUAGES_FILE = join(ROOT, 'apps/mobile/src/i18n/languages.ts');
 const SOURCE_DIRS = [join(ROOT, 'apps/mobile/src')];
@@ -421,20 +423,6 @@ function holdsLabel(values, run) {
   return false;
 }
 
-function sourceFiles(dir, out = []) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name !== 'node_modules') {
-        sourceFiles(path, out);
-      }
-    } else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
-      out.push(path);
-    }
-  }
-  return out;
-}
-
 /**
  * Two sets:
  * - `called`: keys passed to t() or i18n.t() as a plain string. Each must exist.
@@ -446,7 +434,7 @@ function scanSource() {
   const called = new Set();
   const referenced = new Set();
   for (const dir of SOURCE_DIRS) {
-    for (const file of sourceFiles(dir)) {
+    for (const file of sourceFiles(dir, isTestArtifact)) {
       const text = readFileSync(file, 'utf8');
       for (const match of text.matchAll(/\b(?:i18n\.)?t\(\s*'([^']+)'/g)) {
         called.add(match[1]);

@@ -25,7 +25,13 @@ const SOURCE = "t('agents.title');\nt('agents.liveCount', { count: 2 });";
 
 function runChecker(
   context,
-  { english = ENGLISH, translated = TRANSLATED, source = SOURCE, language = 'ru' } = {}
+  {
+    english = ENGLISH,
+    translated = TRANSLATED,
+    source = SOURCE,
+    language = 'ru',
+    extraFiles = {},
+  } = {}
 ) {
   const root = mkdtempSync(join(tmpdir(), 'check-catalogs-'));
   context.after(() => rmSync(root, { recursive: true, force: true }));
@@ -37,6 +43,7 @@ function runChecker(
     [`apps/mobile/src/i18n/locales/${language}.json`]: JSON.stringify(translated),
     'packages/notifications/src/locales/en.json': '{}',
     [`packages/notifications/src/locales/${language}.json`]: '{}',
+    ...extraFiles,
   };
   for (const [path, content] of Object.entries(files)) {
     const file = join(root, path);
@@ -50,6 +57,11 @@ function runChecker(
   for (const name of ['check-catalogs.mjs', 'wording-exceptions.json']) {
     copyFileSync(new URL(`./${name}`, import.meta.url), join(toolDir, name));
   }
+  mkdirSync(join(root, 'tools/lib'), { recursive: true });
+  copyFileSync(
+    new URL('../lib/source-files.mjs', import.meta.url),
+    join(root, 'tools/lib/source-files.mjs')
+  );
   const result = spawnSync(process.execPath, [join(toolDir, 'check-catalogs.mjs')], {
     cwd: root,
     encoding: 'utf8',
@@ -132,6 +144,22 @@ test('rejects unused English plural siblings', context => {
     result.stderr,
     /mobile: en\.json defines "agents\.liveCount_other", which no source file uses/
   );
+});
+
+test('ignores a mounted-harness helper while a source file still reports its keys', context => {
+  const source = "t('agents.missing');\n";
+  const inSource = runChecker(context, { source });
+  assert.equal(inSource.status, 1, inSource.stderr);
+  assert.match(inSource.stderr, /"agents\.missing"/);
+
+  for (const helper of [
+    'apps/mobile/src/components/screen.mounted.test-helpers.ts',
+    'apps/mobile/src/components/screen.test.tsx',
+  ]) {
+    const inScaffolding = runChecker(context, { extraFiles: { [helper]: source } });
+    assert.equal(inScaffolding.status, 0, inScaffolding.stderr);
+    assert.equal(inScaffolding.stderr, '');
+  }
 });
 
 for (const [language, title, badge] of [

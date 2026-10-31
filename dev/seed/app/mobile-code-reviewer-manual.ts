@@ -116,6 +116,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     email,
     userId,
     gitlabIntegrationId: integration.id,
-    manualReviewDeepLink: 'kiloapp:///code-reviewer/personal/manual-review',
+    manualReviewDeepLink: 'kiloapp:///(app)/code-reviewer/personal/manual-review',
   };
 }

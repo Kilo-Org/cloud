@@ -163,7 +163,7 @@
     "allLanguages": "Pob iaith"
   },
   "login": {
-    "welcome": "Croeso i Kilo",
+    "welcome": "Croeso",
     "retrySignIn": "Rhoi cynnig eto ar fewngofnodi",
     "logo": "Logo Kilo",
     "continuingSignIn": "Mae'r broses mewngofnodi'n parhau.",
@@ -744,6 +744,7 @@
       "gitlabDescription": "Cysylltwch eich cyfrif GitLab i adolygu ceisiadau uno ar y dyfais symudol.",
       "bitbucketDescription": "Cysylltwch Bitbucket â'r sefydliad hwn i adolygu ceisiadau tynnu ar y dyfais symudol.",
       "bitbucketOrgOnlyDescription": "Newidiwch y cyfrif uchod i sefydliad i adolygu ei geisiadau tynnu ar Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Nid oes unrhyw sefydliadau gyda'r cyfrif hwn eto. Gallwch adolygu ceisiadau tynnu Bitbucket unwaith y byddwch yn creu sefydliad neu'n ymuno ag un.",
       "contextLine": "Ar gyfer {{organization}}",
       "contextLinePersonal": "Ar gyfer eich cyfrif personol"
     },
@@ -771,10 +772,9 @@
     },
     "reconnectNotice": {
       "title": "Mae'r cysylltiad â GitHub wedi dod i ben.",
-      "message": "Nid yw'ch cysylltiad GitHub yn ddilys mwyach. Gwiriwch eich cysylltiad eto — gofynnir i chi ailgysylltu os oes angen.",
+      "message": "Gwiriwch eich cysylltiad eto — gofynnir i chi ailgysylltu os oes angen.",
       "gitlabTitle": "Mae'r cysylltiad â GitLab wedi dod i ben.",
-      "bitbucketTitle": "Mae'r cysylltiad â Bitbucket wedi dod i ben.",
-      "providerMessage": "Nid yw'ch cysylltiad {{provider}} yn ddilys mwyach. Gwiriwch eich cysylltiad eto — gofynnir i chi ailgysylltu os oes angen."
+      "bitbucketTitle": "Mae'r cysylltiad â Bitbucket wedi dod i ben."
     },
     "eventChips": {
       "comment": "Sylwadu",
@@ -891,7 +891,7 @@
     "terms": {
       "pullRequest": "Cais tynnu",
       "mergeRequest": "Cais uno",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Cais uno !{{number}}",
       "shareMergeRequest": "Rhannu cais uno",
       "viewOnProvider": "Gweld ar {{provider}}",
       "mergeRequestUnavailable": "Cais uno ddim ar gael",
@@ -1515,7 +1515,10 @@
       "gitlabNoRepositoriesDescription": "Efallai y bydd angen i chi ganiatáu mynediad i fwy o grwpiau neu brosiectau ar GitLab.",
       "installGithubApp": "Gosod yr ap GitHub ar ystorfeydd",
       "installGithubAppDescription": "Rhowch fynediad i ap GitHub Kilo at yr ystorfeydd rydych am eu hadolygu.",
-      "repositoryAccess": "mynediad i ystorfa"
+      "repositoryAccess": "mynediad i ystorfa",
+      "allModePersonal": "Mae pob ystorfa y gall Kilo gael mynediad iddi trwy eich cysylltiad GitHub yn cael ei hadolygu'n awtomatig.",
+      "allModeOrganization": "Mae pob ystorfa y gall Kilo gael mynediad iddi trwy gysylltiad GitHub y sefydliad yn cael ei hadolygu'n awtomatig.",
+      "allModeCount": "Ystorfeydd ar gael: {{displayCount}}"
     },
     "style": {
       "title": "Arddull adolygu",
@@ -1755,7 +1758,7 @@
       "outcome": "Canlyniad",
       "slaStatus": "Statws SLA",
       "sortBy": "Trefnu yn ôl",
-      "statusOpen": "Agor",
+      "statusOpen": "Agored",
       "fixed": "Wedi'i drwsio",
       "statusIgnored": "Wedi'i anwybyddu",
       "severityHigh": "Uchel",
@@ -1941,7 +1944,7 @@
       "source": "Ffynhonnell",
       "sourceId": "ID y ffynhonnell",
       "viewAdvisory": "Gweld yr hysbysiad diogelwch ar GitHub",
-      "statusOpen": "Agor",
+      "statusOpen": "Agored",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "mae'r gwaith trwsio eisoes wedi dechrau",
       "reasonNoBandwidth": "dim capasiti ar gael",
@@ -2417,9 +2420,9 @@
       "couldNotLoadGithubRepositories": "Methu llwytho ystorfeydd GitHub.",
       "couldNotLoadGitlabRepositories": "Methu llwytho ystorfeydd GitLab.",
       "couldNotLoadBitbucketRepositories": "Methu llwytho ystorfeydd Bitbucket.",
-      "connectGithubDescription": "Cysylltwch â GitHub yn eich porwr, yna dewch yn ôl yma i ddewis ystorfa.",
-      "connectGitlabDescription": "Cysylltwch â GitLab yn eich porwr, yna dewch yn ôl yma i ddewis ystorfa.",
-      "connectBitbucketDescription": "Cysylltwch â Bitbucket yn eich porwr, yna dewch yn ôl yma i ddewis ystorfa.",
+      "connectGithubDescription": "Mewngofnodwch o'ch porwr, yna dewch yn ôl yma i ddewis ystorfa GitHub.",
+      "connectGitlabDescription": "Mewngofnodwch o'ch porwr, yna dewch yn ôl yma i ddewis ystorfa GitLab.",
+      "connectBitbucketDescription": "Mewngofnodwch o'ch porwr, yna dewch yn ôl yma i ddewis ystorfa Bitbucket.",
       "openGithub": "Agor GitHub",
       "openGitlab": "Agor GitLab",
       "openBitbucket": "Agor Bitbucket",
@@ -4047,8 +4050,6 @@
     "commandAtLimit": "Mae'r gorchymyn wedi'i gyfyngu i {{max}} nod",
     "commandsEmpty": "Dim gorchmynion gosod eto",
     "commandsSaveFailed": "Ni fu modd cadw'r gorchmynion gosod",
-    "moveUp": "Symud i fyny",
-    "moveDown": "Symud i lawr",
     "moveCommandUp": "Symud gorchymyn {{position}} i fyny",
     "moveCommandDown": "Symud gorchymyn {{position}} i lawr",
     "skillsTitle": "Sgiliau",
@@ -4059,7 +4060,10 @@
     "skillNameRequired": "Rhowch enw sgil",
     "skillNameInvalid": "Rhaid i enw sgil ddechrau gyda llythyren neu ddigid a defnyddio llythrennau bach, digidau a llinellau llinellau yn unig",
     "skillContentRequired": "Mae angen cynnwys sgil",
-    "skillSaveFailed": "Methu arbed sgil",
+    "skillSaveFailed": "Methu arbed sgil. Rhowch gynnig arall arni.",
+    "skillDeleteFailed": "Methu dileu sgil. Rhowch gynnig arall arni.",
+    "skillToggleFailed": "Methu diweddaru sgil. Rhowch gynnig arall arni.",
+    "skillLimitReached": "Gall proffil ddal hyd at {{max}} o sgiliau. Dilëwch un i ychwanegu un arall.",
     "skillSourceCustom": "Personol",
     "skillSourceMarketplace": "Marchnad",
     "skillSourceSkillsSh": "skills.sh",

@@ -163,7 +163,7 @@
     "allLanguages": "Dhammaan luqadaha"
   },
   "login": {
-    "welcome": "Ku soo dhawoow Kilo",
+    "welcome": "Ku soo dhawoow",
     "retrySignIn": "Mar kale isku day soo galista",
     "logo": "Summada Kilo",
     "continuingSignIn": "Waxaa sii socota soo galistaada.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Ku xir xisaabtaada GitLab si aad mobilka ugu eegto merge request-yada.",
       "bitbucketDescription": "Bitbucket ku xir hay'addan si aad mobilka ugu eegto PR-yada.",
       "bitbucketOrgOnlyDescription": "Beddel xisaabta kor ku qoran hay'ad si aad u eegto PR-yadeeda Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Xisaabtan weli ma laha hay'ado. PR-yada Bitbucket waxaad eegi kartaa marka aad abuurto ama aad ku biirto hay'ad.",
       "contextLine": "{{organization}} u",
       "contextLinePersonal": "Akoonkaaga shakhsiyeed u"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Muddadii xiriirka GitHub way dhammaatay.",
-      "message": "Xiriirkaaga GitHub hadda ma ansaxsana. Mar kale hubi xiriirkaaga — waxaa lagu weydiin doonaa inaad dib u xirto haddii loo baahdo.",
+      "message": "Mar kale hubi xiriirkaaga — waxaa lagu weydiin doonaa inaad dib u xirto haddii loo baahdo.",
       "gitlabTitle": "Muddadii xiriirka GitLab way dhammaatay.",
-      "bitbucketTitle": "Muddadii xiriirka Bitbucket way dhammaatay.",
-      "providerMessage": "Xiriirkaaga {{provider}} hadda ma ansaxsana. Mar kale hubi xiriirkaaga — waxaa lagu weydiin doonaa inaad dib u xirto haddii loo baahdo."
+      "bitbucketTitle": "Muddadii xiriirka Bitbucket way dhammaatay."
     },
     "eventChips": {
       "comment": "Faallo",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Codsi isku-darid",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "La wadaag merge request-ka",
       "viewOnProvider": "Kasoo eeg {{provider}}",
       "mergeRequestUnavailable": "Merge request-ka lama heli karo",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Waxaa laga yaabaa inaad u baahato inaad oggolaato gelitaanka kooxo ama mashaariic dheeraad ah oo ku jira GitLab.",
       "installGithubApp": "Abka GitHub ku rakib kaydadka",
       "installGithubAppDescription": "U oggolow abka Kilo ee GitHub inuu galo kaydadka aad rabto in dib loo eego.",
-      "repositoryAccess": "oggolaanshaha gelitaanka kaydka"
+      "repositoryAccess": "oggolaanshaha gelitaanka kaydka",
+      "allModePersonal": "Kayd kasta oo Kilo ka heli karo xiriirkaaga GitHub waa dib loo eegaa si otomaatig ah.",
+      "allModeOrganization": "Kayd kasta oo Kilo ka heli karo xiriirka GitHub ee ururka waa dib loo eegaa si otomaatig ah.",
+      "allModeCount": "Kaydadka la heli karo: {{displayCount}}"
     },
     "style": {
       "title": "Qaabka dib-u-eegista",
@@ -2293,9 +2296,9 @@
       "couldNotLoadGithubRepositories": "Kaydadka GitHub lama soo shubi karin.",
       "couldNotLoadGitlabRepositories": "Kaydadka GitLab lama soo shubi karin.",
       "couldNotLoadBitbucketRepositories": "Kaydadka Bitbucket lama soo shubi karin.",
-      "connectGithubDescription": "GitHub ku xiriiri biraawsarkaaga, ka dibna halkan ku soo noqo si aad kayd u doorato.",
-      "connectGitlabDescription": "GitLab ku xiriiri biraawsarkaaga, ka dibna halkan ku soo noqo si aad kayd u doorato.",
-      "connectBitbucketDescription": "Bitbucket ku xiriiri biraawsarkaaga, ka dibna halkan ku soo noqo si aad kayd u doorato.",
+      "connectGithubDescription": "Biraawsarkaaga ku gal, ka dibna halkan ku soo noqo si aad kayd GitHub u doorato.",
+      "connectGitlabDescription": "Biraawsarkaaga ku gal, ka dibna halkan ku soo noqo si aad kayd GitLab u doorato.",
+      "connectBitbucketDescription": "Biraawsarkaaga ku gal, ka dibna halkan ku soo noqo si aad kayd Bitbucket u doorato.",
       "openGithub": "Fur GitHub",
       "openGitlab": "Fur GitLab",
       "openBitbucket": "Fur Bitbucket",
@@ -3847,8 +3850,6 @@
     "commandAtLimit": "Amarku wuxuu ku xaddidan yahay {{max}} xaraf",
     "commandsEmpty": "Ma jiro amar dejin weli",
     "commandsSaveFailed": "Ma kaydin kari waayay amarrada dejinta",
-    "moveUp": "Kor u dhaqaaq",
-    "moveDown": "Hoos u dhaqaaq",
     "moveCommandUp": "U rari taliska {{position}} kor",
     "moveCommandDown": "U rari taliska {{position}} hoos",
     "skillsTitle": "Xirfadaha",
@@ -3859,7 +3860,10 @@
     "skillNameRequired": "Geli magac xirfad",
     "skillNameInvalid": "Magaca xirfaddu waa inuu ku bilaabmaa xaraf ama lambar oo waa inuu isticmaalo xarfo yaryar, lambaro, iyo jajab",
     "skillContentRequired": "Waxa loo baahan yahay nuxurka xirfadaha",
-    "skillSaveFailed": "Ma badbaadin karin xirfad",
+    "skillSaveFailed": "Ma badbaadin karin xirfad. Isku day mar kale.",
+    "skillDeleteFailed": "Ma tirtirin karin xirfad. Isku day mar kale.",
+    "skillToggleFailed": "Ma cusboonaysiin karin xirfad. Isku day mar kale.",
+    "skillLimitReached": "Borofaylku wuxuu qaban karaa ilaa {{max}} xirfadood. Tirtir mid si aad ugu darto mid kale.",
     "skillSourceCustom": "Gaar ah",
     "skillSourceMarketplace": "Suuqa",
     "skillSourceSkillsSh": "skills.sh",

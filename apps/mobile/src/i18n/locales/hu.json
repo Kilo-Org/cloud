@@ -163,7 +163,7 @@
     "allLanguages": "Minden nyelv"
   },
   "login": {
-    "welcome": "Üdv a Kilo világában",
+    "welcome": "Üdvözlünk",
     "retrySignIn": "Bejelentkezés újrapróbálása",
     "logo": "Kilo-logó",
     "continuingSignIn": "Folytatjuk a bejelentkezést.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Csatlakoztasd a GitLab-fiókodat a merge requestek kódellenőrzéséhez mobilon.",
       "bitbucketDescription": "Csatlakoztasd a Bitbucketot ehhez a szervezethez a módosítási kérelmek mobilos kódellenőrzéséhez.",
       "bitbucketOrgOnlyDescription": "Váltsd a fenti fiókot egy szervezetre a Bitbucket-módosítási kérelmek kódellenőrzéséhez.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Ez a fiók még nem tagja egyetlen szervezetnek sem. A Bitbucket-módosítási kérelmek kódellenőrzéséhez hozz létre egy szervezetet, vagy csatlakozz egyhez.",
       "contextLine": "{{organization}} számára",
       "contextLinePersonal": "Személyes fiókodhoz"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "A GitHub-kapcsolat lejárt.",
-      "message": "A GitHub-kapcsolatod már nem érvényes. Ellenőrizd újra a kapcsolatot. Ha szükséges, az alkalmazás kérni fogja az újracsatlakozást.",
+      "message": "Ellenőrizd újra a kapcsolatot. Ha szükséges, az alkalmazás kérni fogja az újracsatlakozást.",
       "gitlabTitle": "A GitLab-kapcsolat lejárt.",
-      "bitbucketTitle": "A Bitbucket-kapcsolat lejárt.",
-      "providerMessage": "A {{provider}}-kapcsolatod már nem érvényes. Ellenőrizd újra a kapcsolatot. Ha szükséges, az alkalmazás kérni fogja az újracsatlakozást."
+      "bitbucketTitle": "A Bitbucket-kapcsolat lejárt."
     },
     "eventChips": {
       "comment": "Hozzászólás",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Lehet, hogy több csoporthoz vagy projekthez kell hozzáférést adnod a GitLabon.",
       "installGithubApp": "GitHub-alkalmazás telepítése a kódtárakhoz",
       "installGithubAppDescription": "Adj hozzáférést a Kilo GitHub-alkalmazásnak az ellenőrizni kívánt kódtárakhoz.",
-      "repositoryAccess": "hozzáférés a kódtárakhoz"
+      "repositoryAccess": "hozzáférés a kódtárakhoz",
+      "allModePersonal": "A Kilo a GitHub-kapcsolatodon keresztül elérhető összes kódtárat automatikusan ellenőrzi.",
+      "allModeOrganization": "A Kilo a szervezet GitHub-kapcsolatán keresztül elérhető összes kódtárat automatikusan ellenőrzi.",
+      "allModeCount": "Elérhető kódtárak: {{displayCount}}"
     },
     "style": {
       "title": "Ellenőrzési stílus",
@@ -2293,9 +2296,9 @@
       "couldNotLoadGithubRepositories": "Nem sikerült betölteni a GitHub-adattárakat.",
       "couldNotLoadGitlabRepositories": "Nem sikerült betölteni a GitLab-adattárakat.",
       "couldNotLoadBitbucketRepositories": "Nem sikerült betölteni a Bitbucket-adattárakat.",
-      "connectGithubDescription": "Kapcsold össze a GitHub-fiókodat a böngészőben, majd térj vissza ide, és válassz egy adattárat.",
-      "connectGitlabDescription": "Kapcsold össze a GitLab-fiókodat a böngészőben, majd térj vissza ide, és válassz egy adattárat.",
-      "connectBitbucketDescription": "Kapcsold össze a Bitbucket-fiókodat a böngészőben, majd térj vissza ide, és válassz egy adattárat.",
+      "connectGithubDescription": "Jelentkezz be a böngészőből, majd térj vissza ide, és válassz egy GitHub-adattárat.",
+      "connectGitlabDescription": "Jelentkezz be a böngészőből, majd térj vissza ide, és válassz egy GitLab-adattárat.",
+      "connectBitbucketDescription": "Jelentkezz be a böngészőből, majd térj vissza ide, és válassz egy Bitbucket-adattárat.",
       "openGithub": "GitHub megnyitása",
       "openGitlab": "GitLab megnyitása",
       "openBitbucket": "Bitbucket megnyitása",
@@ -3847,8 +3850,6 @@
     "commandAtLimit": "A parancs legfeljebb {{max}} karakter lehet",
     "commandsEmpty": "Még nincsenek beállítási parancsok",
     "commandsSaveFailed": "Nem sikerült menteni a beállítási parancsokat",
-    "moveUp": "Mozgassa fel",
-    "moveDown": "Mozgassa le",
     "moveCommandUp": "{{position}}. parancs áthelyezése feljebb",
     "moveCommandDown": "{{position}}. parancs áthelyezése lejjebb",
     "skillsTitle": "Készségek",
@@ -3859,7 +3860,10 @@
     "skillNameRequired": "Adja meg a készség nevét",
     "skillNameInvalid": "A készség nevének betűvel vagy számjegygel kell kezdődnie, és csak kisbetűket, számjegyeket és kötőjeleket kell használnia",
     "skillContentRequired": "A készség tartalma kötelező",
-    "skillSaveFailed": "Nem sikerült elmenteni a készséget",
+    "skillSaveFailed": "Nem sikerült elmenteni a készséget. Próbálja újra.",
+    "skillDeleteFailed": "Nem sikerült törölni a készséget. Próbálja újra.",
+    "skillToggleFailed": "Nem sikerült frissíteni a készséget. Próbálja újra.",
+    "skillLimitReached": "A profil legfeljebb {{max}} készséget tartalmazhat. Töröljön egyet, hogy egy másikat hozzáadhasson.",
     "skillSourceCustom": "Egyéni",
     "skillSourceMarketplace": "Piactér",
     "skillSourceSkillsSh": "skills.sh",

@@ -163,7 +163,7 @@
     "allLanguages": "Alle talen"
   },
   "login": {
-    "welcome": "Welkom bij Kilo",
+    "welcome": "Welkom",
     "retrySignIn": "Opnieuw aanmelden",
     "logo": "Kilo-logo",
     "continuingSignIn": "Je aanmelding wordt voortgezet.",
@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "Je moet mogelijk toegang verlenen tot meer groepen of projecten op GitLab.",
       "installGithubApp": "Installeer de GitHub-app op repositories",
       "installGithubAppDescription": "Geef de Kilo GitHub-app toegang tot de repositories die je wilt laten beoordelen.",
-      "repositoryAccess": "toegang tot repositories"
+      "repositoryAccess": "toegang tot repositories",
+      "allModePersonal": "Elke repository die Kilo via je GitHub-verbinding kan bereiken, wordt automatisch beoordeeld.",
+      "allModeOrganization": "Elke repository die Kilo via de GitHub-verbinding van de organisatie kan bereiken, wordt automatisch beoordeeld.",
+      "allModeCount": "Beschikbare repositories: {{displayCount}}"
     },
     "style": {
       "title": "Beoordelingsstijl",
@@ -1148,7 +1151,7 @@
       "sortSeverityDesc": "Ernst: van hoog naar laag",
       "sortSlaDue": "SLA-deadline",
       "statusIgnored": "Genegeerd",
-      "statusOpen": "Openen"
+      "statusOpen": "Open"
     },
     "analysis": {
       "analyzeRepository": "Repository analyseren",
@@ -1367,7 +1370,7 @@
       "supersededByDescription": "Tik om de huidige bevinding te openen en de status, analyse en het herstel te bekijken.",
       "viewAdvisory": "Beveiligingsadvies bekijken op GitHub",
       "vulnerableVersions": "Kwetsbare versies",
-      "statusOpen": "Openen",
+      "statusOpen": "Open",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "er wordt al aan een oplossing gewerkt",
       "reasonNoBandwidth": "er is geen capaciteit beschikbaar",
@@ -1764,9 +1767,9 @@
       "couldNotLoadGithubRepositories": "De GitHub-repositories konden niet worden geladen.",
       "couldNotLoadGitlabRepositories": "De GitLab-repositories konden niet worden geladen.",
       "couldNotLoadBitbucketRepositories": "De Bitbucket-repositories konden niet worden geladen.",
-      "connectGithubDescription": "Koppel GitHub in je browser en kom hier terug om een repository te kiezen.",
-      "connectGitlabDescription": "Koppel GitLab in je browser en kom hier terug om een repository te kiezen.",
-      "connectBitbucketDescription": "Koppel Bitbucket in je browser en kom hier terug om een repository te kiezen.",
+      "connectGithubDescription": "Log in via je browser en kom hier terug om een GitHub-repository te kiezen.",
+      "connectGitlabDescription": "Log in via je browser en kom hier terug om een GitLab-repository te kiezen.",
+      "connectBitbucketDescription": "Log in via je browser en kom hier terug om een Bitbucket-repository te kiezen.",
       "openGithub": "GitHub openen",
       "openGitlab": "GitLab openen",
       "openBitbucket": "Bitbucket openen",
@@ -2699,6 +2702,7 @@
       "gitlabDescription": "Koppel je GitLab-account om merge requests op je telefoon te beoordelen.",
       "bitbucketDescription": "Koppel Bitbucket aan deze organisatie om PR's op je telefoon te beoordelen.",
       "bitbucketOrgOnlyDescription": "Wissel het account hierboven naar een organisatie om diens Bitbucket-PR's te beoordelen.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Dit account heeft nog geen organisaties. Je kunt Bitbucket-PR's beoordelen zodra je een organisatie aanmaakt of er lid van wordt.",
       "contextLine": "Voor {{organization}}",
       "contextLinePersonal": "Voor je persoonlijke account"
     },
@@ -3065,10 +3069,9 @@
     "pullRequestUnavailableDescription": "Deze PR kan niet worden geopend. Mogelijk is de PR verwijderd, is de repository privé of is de Kilo GitHub-app niet voor deze repository geïnstalleerd.",
     "reconnectNotice": {
       "title": "De GitHub-koppeling is verlopen.",
-      "message": "Je GitHub-verbinding is niet meer geldig. Controleer de verbinding opnieuw. Als dat nodig is, krijg je de vraag om opnieuw verbinding te maken.",
+      "message": "Controleer de verbinding opnieuw. Als dat nodig is, krijg je de vraag om opnieuw verbinding te maken.",
       "gitlabTitle": "De GitLab-koppeling is verlopen.",
-      "bitbucketTitle": "De Bitbucket-koppeling is verlopen.",
-      "providerMessage": "Je {{provider}}-verbinding is niet meer geldig. Controleer de verbinding opnieuw. Als dat nodig is, krijg je de vraag om opnieuw verbinding te maken."
+      "bitbucketTitle": "De Bitbucket-koppeling is verlopen."
     },
     "review": "Beoordeling",
     "reviewPullRequest": "PR beoordelen",
@@ -3156,7 +3159,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Merge request delen",
       "viewOnProvider": "Bekijken op {{provider}}",
       "mergeRequestUnavailable": "Merge request niet beschikbaar",
@@ -3847,8 +3850,6 @@
     "commandAtLimit": "Het commando is beperkt tot {{max}} tekens",
     "commandsEmpty": "Nog geen installatieopdrachten",
     "commandsSaveFailed": "Kan installatieopdrachten niet opslaan",
-    "moveUp": "Ga omhoog",
-    "moveDown": "Ga naar beneden",
     "moveCommandUp": "Commando {{position}} omhoog verplaatsen",
     "moveCommandDown": "Commando {{position}} omlaag verplaatsen",
     "skillsTitle": "Vaardigheden",
@@ -3859,7 +3860,10 @@
     "skillNameRequired": "Voer een vaardigheidsnaam in",
     "skillNameInvalid": "De naam van de vaardigheid moet beginnen met een letter of cijfer en mag alleen kleine letters, cijfers en streepjes bevatten",
     "skillContentRequired": "Vaardigheidsinhoud is vereist",
-    "skillSaveFailed": "Kan vaardigheid niet opslaan",
+    "skillSaveFailed": "Kan vaardigheid niet opslaan. Probeer het opnieuw.",
+    "skillDeleteFailed": "Kan vaardigheid niet verwijderen. Probeer het opnieuw.",
+    "skillToggleFailed": "Kan vaardigheid niet bijwerken. Probeer het opnieuw.",
+    "skillLimitReached": "Een profiel kan maximaal {{max}} vaardigheden bevatten. Verwijder er een om een andere toe te voegen.",
     "skillSourceCustom": "Aangepast",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

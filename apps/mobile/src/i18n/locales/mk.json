@@ -163,7 +163,7 @@
     "allLanguages": "Сите јазици"
   },
   "login": {
-    "welcome": "Добре дојде во Kilo",
+    "welcome": "Добре дојде",
     "retrySignIn": "Обиди се повторно да се најавиш",
     "logo": "Лого на Kilo",
     "continuingSignIn": "Се продолжува со твоето најавување.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Поврзете ја вашата GitLab сметка за преглед на merge барања на мобилно.",
       "bitbucketDescription": "Поврзете Bitbucket со оваа организација за преглед на барања за спојување на мобилно.",
       "bitbucketOrgOnlyDescription": "Префрлете ја сметката погоре на организација за преглед на нејзините барања за спојување на Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Оваа сметка сè уште нема организации. Барањата за спојување на Bitbucket може да се прегледуваат откако ќе креирате организација или ќе се приклучите кон неа.",
       "contextLine": "За {{organization}}",
       "contextLinePersonal": "За вашиот личен простор"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Врската со GitHub истече.",
-      "message": "Твојата врска со GitHub веќе не важи. Провери ја повторно — ако е потребно, ќе добиеш барање повторно да се поврзеш.",
+      "message": "Проверете ја врската повторно — ако е потребно, ќе биде побарано да се поврзете одново.",
       "gitlabTitle": "Врската со GitLab истече",
-      "bitbucketTitle": "Врската со Bitbucket истече",
-      "providerMessage": "Вашата врска со {{provider}} повеќе не е важечка. Проверете ја врската повторно — ако е потребно, ќе биде побарано да се поврзете одново."
+      "bitbucketTitle": "Врската со Bitbucket истече"
     },
     "eventChips": {
       "comment": "Коментирај",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge барање",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge барање !{{number}}",
       "shareMergeRequest": "Сподели merge барање",
       "viewOnProvider": "Прикажи на {{provider}}",
       "mergeRequestUnavailable": "Merge барањето е недостапно",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Можеби треба да дадеш пристап до повеќе групи или проекти на GitLab.",
       "installGithubApp": "Инсталирај ја апликацијата на GitHub за складиштата",
       "installGithubAppDescription": "Дозволи ѝ на апликацијата Kilo за GitHub да пристапи до складиштата што сакаш да се прегледуваат.",
-      "repositoryAccess": "пристап до складиштето"
+      "repositoryAccess": "пристап до складиштето",
+      "allModePersonal": "Секое складиште до кое Kilo може да пристапи преку твојата врска со GitHub се прегледува автоматски.",
+      "allModeOrganization": "Секое складиште до кое Kilo може да пристапи преку врската на организацијата со GitHub се прегледува автоматски.",
+      "allModeCount": "Достапни складишта: {{displayCount}}"
     },
     "style": {
       "title": "Стил на преглед",
@@ -2293,9 +2296,9 @@
       "couldNotLoadGithubRepositories": "Не успеа вчитувањето на репозиториумите од GitHub.",
       "couldNotLoadGitlabRepositories": "Не успеа вчитувањето на репозиториумите од GitLab.",
       "couldNotLoadBitbucketRepositories": "Не успеа вчитувањето на репозиториумите од Bitbucket.",
-      "connectGithubDescription": "Поврзи го GitHub преку прелистувачот, па врати се тука за да избереш репозиториум.",
-      "connectGitlabDescription": "Поврзи го GitLab преку прелистувачот, па врати се тука за да избереш репозиториум.",
-      "connectBitbucketDescription": "Поврзи го Bitbucket преку прелистувачот, па врати се тука за да избереш репозиториум.",
+      "connectGithubDescription": "Најави се преку прелистувачот, па врати се тука за да избереш репозиториум од GitHub.",
+      "connectGitlabDescription": "Најави се преку прелистувачот, па врати се тука за да избереш репозиториум од GitLab.",
+      "connectBitbucketDescription": "Најави се преку прелистувачот, па врати се тука за да избереш репозиториум од Bitbucket.",
       "openGithub": "Отвори GitHub",
       "openGitlab": "Отвори GitLab",
       "openBitbucket": "Отвори Bitbucket",
@@ -3847,8 +3850,6 @@
     "commandAtLimit": "Командата е ограничена на {{max}} знаци",
     "commandsEmpty": "Сè уште нема команди за поставување",
     "commandsSaveFailed": "Не може да се зачуваат командите за поставување",
-    "moveUp": "Движете се нагоре",
-    "moveDown": "Движете се надолу",
     "moveCommandUp": "Премести команда {{position}} нагоре",
     "moveCommandDown": "Премести команда {{position}} надолу",
     "skillsTitle": "Вештини",
@@ -3859,7 +3860,10 @@
     "skillNameRequired": "Внесете име на вештина",
     "skillNameInvalid": "Името на вештината мора да започнува со буква или цифра и да користи само мали букви, цифри и цртички",
     "skillContentRequired": "Потребна е содржина на вештини",
-    "skillSaveFailed": "Не може да се спаси вештината",
+    "skillSaveFailed": "Не може да се спаси вештината. Обидете се повторно.",
+    "skillDeleteFailed": "Не може да се избрише вештината. Обидете се повторно.",
+    "skillToggleFailed": "Не може да се ажурира вештината. Обидете се повторно.",
+    "skillLimitReached": "Профилот може да содржи до {{max}} вештини. Избришете една за да додадете друга.",
     "skillSourceCustom": "Прилагодено",
     "skillSourceMarketplace": "Пазар",
     "skillSourceSkillsSh": "skills.sh",

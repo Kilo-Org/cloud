@@ -163,7 +163,7 @@
     "allLanguages": "सबै भाषाहरू"
   },
   "login": {
-    "welcome": "Kilo मा स्वागत छ",
+    "welcome": "स्वागत छ",
     "retrySignIn": "साइन इन गर्न फेरि प्रयास गर्नुहोस्",
     "logo": "Kilo लोगो",
     "continuingSignIn": "तपाईंको साइन इन जारी छ।",
@@ -684,6 +684,7 @@
       "gitlabDescription": "मोबाइलमा मर्ज रिक्वेस्टहरू समीक्षा गर्न आफ्नो GitLab खाता जडान गर्नुहोस्।",
       "bitbucketDescription": "मोबाइलमा पुल रिक्वेस्टहरू समीक्षा गर्न यो संस्थालाई Bitbucket सँग जडान गर्नुहोस्।",
       "bitbucketOrgOnlyDescription": "यसको Bitbucket पुल रिक्वेस्टहरू समीक्षा गर्न माथिको खाता एउटा संस्थामा स्विच गर्नुहोस्।",
+      "bitbucketOrgOnlyNoOrganizationDescription": "यो खातामा हालसम्म कुनै संस्था छैन। तपाईंले संस्था सिर्जना गर्नुभएको वा सामेल हुनुभएपछि Bitbucket पुल रिक्वेस्टहरू समीक्षा गर्न सकिन्छ।",
       "contextLine": "{{organization}} का लागि",
       "contextLinePersonal": "तपाईंको व्यक्तिगत खाताका लागि"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub जडानको म्याद सकियो।",
-      "message": "तपाईंको GitHub जडान अब मान्य छैन। तपाईंको जडान फेरि जाँच्नुहोस् — आवश्यक परेमा फेरि जडान गर्न भनिनेछ।",
+      "message": "तपाईंको जडान फेरि जाँच्नुहोस् — आवश्यक परेमा फेरि जडान गर्न भनिनेछ।",
       "gitlabTitle": "GitLab जडानको म्याद सकियो।",
-      "bitbucketTitle": "Bitbucket जडानको म्याद सकियो।",
-      "providerMessage": "तपाईंको {{provider}} जडान अब मान्य छैन। तपाईंको जडान फेरि जाँच्नुहोस् — आवश्यक परेमा फेरि जडान गर्न भनिनेछ।"
+      "bitbucketTitle": "Bitbucket जडानको म्याद सकियो।"
     },
     "eventChips": {
       "comment": "टिप्पणी",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "पुल रिक्वेस्ट",
       "mergeRequest": "मर्ज रिक्वेस्ट",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "मर्ज रिक्वेस्ट !{{number}}",
       "shareMergeRequest": "मर्ज रिक्वेस्ट सेयर गर्नुहोस्",
       "viewOnProvider": "{{provider}} मा हेर्नुहोस्",
       "mergeRequestUnavailable": "मर्ज रिक्वेस्ट उपलब्ध छैन",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "तपाईंले GitLab मा थप समूह वा परियोजनाहरूमा पहुँच दिनुपर्ने हुन सक्छ।",
       "installGithubApp": "रिपोजिटरीहरूमा GitHub एप स्थापना गर्नुहोस्",
       "installGithubAppDescription": "तपाईंले समीक्षा गराउन चाहेका रिपोजिटरीहरूमा Kilo GitHub एपलाई पहुँच दिनुहोस्।",
-      "repositoryAccess": "रिपोजिटरीको पहुँच"
+      "repositoryAccess": "रिपोजिटरीको पहुँच",
+      "allModePersonal": "तपाईंको GitHub जडानमार्फत Kilo ले पहुँच गर्न सक्ने हरेक रिपोजिटरी स्वचालित रूपमा समीक्षा गरिन्छ।",
+      "allModeOrganization": "संस्थाको GitHub जडानमार्फत Kilo ले पहुँच गर्न सक्ने हरेक रिपोजिटरी स्वचालित रूपमा समीक्षा गरिन्छ।",
+      "allModeCount": "उपलब्ध रिपोजिटरीहरू: {{displayCount}}"
     },
     "style": {
       "title": "समीक्षा शैली",
@@ -2293,9 +2296,9 @@
       "couldNotLoadGithubRepositories": "GitHub रिपोजिटरीहरू लोड गर्न सकिएन।",
       "couldNotLoadGitlabRepositories": "GitLab रिपोजिटरीहरू लोड गर्न सकिएन।",
       "couldNotLoadBitbucketRepositories": "Bitbucket रिपोजिटरीहरू लोड गर्न सकिएन।",
-      "connectGithubDescription": "आफ्नो ब्राउजरमा GitHub जडान गर्नुहोस्। त्यसपछि रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
-      "connectGitlabDescription": "आफ्नो ब्राउजरमा GitLab जडान गर्नुहोस्। त्यसपछि रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
-      "connectBitbucketDescription": "आफ्नो ब्राउजरमा Bitbucket जडान गर्नुहोस्। त्यसपछि रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
+      "connectGithubDescription": "आफ्नो ब्राउजरबाट साइन इन गर्नुहोस्। त्यसपछि GitHub रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
+      "connectGitlabDescription": "आफ्नो ब्राउजरबाट साइन इन गर्नुहोस्। त्यसपछि GitLab रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
+      "connectBitbucketDescription": "आफ्नो ब्राउजरबाट साइन इन गर्नुहोस्। त्यसपछि Bitbucket रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
       "openGithub": "GitHub खोल्नुहोस्",
       "openGitlab": "GitLab खोल्नुहोस्",
       "openBitbucket": "Bitbucket खोल्नुहोस्",
@@ -3847,8 +3850,6 @@
     "commandAtLimit": "आदेश {{max}} अक्षरहरूमा सीमित छ",
     "commandsEmpty": "अहिलेसम्म कुनै सेटअप आदेशहरू छैनन्",
     "commandsSaveFailed": "सेटअप आदेशहरू बचत गर्न सकिएन",
-    "moveUp": "माथि सार्नुहोस्",
-    "moveDown": "तल सार्नुहोस्",
     "moveCommandUp": "आदेश {{position}} माथि सार्नुहोस्",
     "moveCommandDown": "आदेश {{position}} तल सार्नुहोस्",
     "skillsTitle": "सीपहरू",
@@ -3859,7 +3860,10 @@
     "skillNameRequired": "कौशल नाम प्रविष्ट गर्नुहोस्",
     "skillNameInvalid": "सीपको नाम अक्षर वा अंकबाट सुरु हुनुपर्छ र सानो अक्षर, अंक र ड्यास मात्र प्रयोग गर्नुपर्छ।",
     "skillContentRequired": "सीप सामग्री आवश्यक छ",
-    "skillSaveFailed": "कौशल बचाउन सकेन",
+    "skillSaveFailed": "कौशल बचाउन सकेन। फेरि प्रयास गर्नुहोस्।",
+    "skillDeleteFailed": "कौशल मेटाउन सकेन। फेरि प्रयास गर्नुहोस्।",
+    "skillToggleFailed": "कौशल अपडेट गर्न सकेन। फेरि प्रयास गर्नुहोस्।",
+    "skillLimitReached": "प्रोफाइलमा बढीमा {{max}} सीपहरू राख्न सकिन्छ। अर्को थप्न एउटा मेटाउनुहोस्।",
     "skillSourceCustom": "कस्टम",
     "skillSourceMarketplace": "मार्केटप्लेस",
     "skillSourceSkillsSh": "skills.sh",

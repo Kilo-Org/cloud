@@ -163,7 +163,7 @@
     "allLanguages": "Všetky jazyky"
   },
   "login": {
-    "welcome": "Vitajte v aplikácii Kilo",
+    "welcome": "Vitajte",
     "retrySignIn": "Znova sa prihlásiť",
     "logo": "Logo Kilo",
     "continuingSignIn": "Prihlasovanie pokračuje.",
@@ -714,6 +714,7 @@
       "gitlabDescription": "Pripoj svoj účet GitLab a kontroluj merge requesty v mobile.",
       "bitbucketDescription": "Pripoj Bitbucket k tejto organizácii a kontroluj žiadosti o zlúčenie v mobile.",
       "bitbucketOrgOnlyDescription": "Prepni účet hore na organizáciu a kontroluj jej žiadosti o zlúčenie na Bitbucku.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatiaľ nemá žiadne organizácie. Žiadosti o zlúčenie na Bitbucku môžeš kontrolovať po vytvorení organizácie alebo vstúpení do nej.",
       "contextLine": "Pre {{organization}}",
       "contextLinePersonal": "Pre osobný účet"
     },
@@ -739,10 +740,9 @@
     },
     "reconnectNotice": {
       "title": "Platnosť pripojenia k službe GitHub vypršala.",
-      "message": "Tvoje pripojenie k službe GitHub už nie je platné. Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie.",
+      "message": "Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie.",
       "gitlabTitle": "Platnosť pripojenia k službe GitLab vypršala.",
-      "bitbucketTitle": "Platnosť pripojenia k službe Bitbucket vypršala.",
-      "providerMessage": "Tvoje pripojenie k službe {{provider}} už nie je platné. Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie."
+      "bitbucketTitle": "Platnosť pripojenia k službe Bitbucket vypršala."
     },
     "eventChips": {
       "comment": "Komentár",
@@ -853,7 +853,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Zdieľať merge request",
       "viewOnProvider": "Zobraziť v {{provider}}",
       "mergeRequestUnavailable": "Merge request nie je dostupný",
@@ -1471,7 +1471,10 @@
       "gitlabNoRepositoriesDescription": "Možno bude potrebné udeliť prístup k ďalším skupinám alebo projektom na platforme GitLab.",
       "installGithubApp": "Inštalácia aplikácie GitHub pre repozitáre",
       "installGithubAppDescription": "Udeľte aplikácii Kilo na platforme GitHub prístup k repozitárom, ktoré chcete kontrolovať.",
-      "repositoryAccess": "prístup k repozitárom"
+      "repositoryAccess": "prístup k repozitárom",
+      "allModePersonal": "Každý repozitár, ku ktorému má Kilo prístup cez vaše pripojenie k GitHubu, sa automaticky kontroluje.",
+      "allModeOrganization": "Každý repozitár, ku ktorému má Kilo prístup cez pripojenie organizácie k GitHubu, sa automaticky kontroluje.",
+      "allModeCount": "Dostupné repozitáre: {{displayCount}}"
     },
     "style": {
       "title": "Štýl kontroly",
@@ -2355,9 +2358,9 @@
       "couldNotLoadGithubRepositories": "Repozitáre zo služby GitHub sa nepodarilo načítať.",
       "couldNotLoadGitlabRepositories": "Repozitáre zo služby GitLab sa nepodarilo načítať.",
       "couldNotLoadBitbucketRepositories": "Repozitáre zo služby Bitbucket sa nepodarilo načítať.",
-      "connectGithubDescription": "Pripoj GitHub v prehliadači, potom sa sem vráť a vyber repozitár.",
-      "connectGitlabDescription": "Pripoj GitLab v prehliadači, potom sa sem vráť a vyber repozitár.",
-      "connectBitbucketDescription": "Pripoj Bitbucket v prehliadači, potom sa sem vráť a vyber repozitár.",
+      "connectGithubDescription": "Prihlás sa v prehliadači, potom sa sem vráť a vyber GitHub repozitár.",
+      "connectGitlabDescription": "Prihlás sa v prehliadači, potom sa sem vráť a vyber GitLab repozitár.",
+      "connectBitbucketDescription": "Prihlás sa v prehliadači, potom sa sem vráť a vyber Bitbucket repozitár.",
       "openGithub": "Otvoriť GitHub",
       "openGitlab": "Otvoriť GitLab",
       "openBitbucket": "Otvoriť Bitbucket",
@@ -3947,8 +3950,6 @@
     "commandAtLimit": "Príkaz je obmedzený na {{max}} znakov",
     "commandsEmpty": "Zatiaľ žiadne príkazy na nastavenie",
     "commandsSaveFailed": "Nepodarilo sa uložiť príkazy nastavenia",
-    "moveUp": "Posunúť sa hore",
-    "moveDown": "Presuňte sa nadol",
     "moveCommandUp": "Presunúť príkaz {{position}} nahor",
     "moveCommandDown": "Presunúť príkaz {{position}} nadol",
     "skillsTitle": "Zručnosti",
@@ -3959,7 +3960,10 @@
     "skillNameRequired": "Zadajte názov zručnosti",
     "skillNameInvalid": "Názov zručnosti musí začínať písmenom alebo číslicou a používať iba malé písmená, číslice a pomlčky",
     "skillContentRequired": "Vyžaduje sa obsah zručností",
-    "skillSaveFailed": "Nepodarilo sa zachrániť zručnosť",
+    "skillSaveFailed": "Nepodarilo sa zachrániť zručnosť. Skúste to znova.",
+    "skillDeleteFailed": "Nepodarilo sa odstrániť zručnosť. Skúste to znova.",
+    "skillToggleFailed": "Nepodarilo sa aktualizovať zručnosť. Skúste to znova.",
+    "skillLimitReached": "Profil môže obsahovať až {{max}} zručností. Vymažte jednu, aby ste pridali ďalšiu.",
     "skillSourceCustom": "Vlastné",
     "skillSourceMarketplace": "Obchod",
     "skillSourceSkillsSh": "skills.sh",

@@ -163,7 +163,7 @@
     "allLanguages": "ସମସ୍ତ ଭାଷା"
   },
   "login": {
-    "welcome": "Kilo କୁ ସ୍ୱାଗତ",
+    "welcome": "ସ୍ୱାଗତ",
     "retrySignIn": "ପୁଣି ସାଇନ୍ ଇନ୍ କରନ୍ତୁ",
     "logo": "Kilo ଲୋଗୋ",
     "continuingSignIn": "ଆପଣଙ୍କ ସାଇନ୍ ଇନ୍ ପ୍ରକ୍ରିୟା ଜାରି ରହିଛି।",
@@ -684,6 +684,7 @@
       "gitlabDescription": "ମୋବାଇଲରେ ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକୁ ସମୀକ୍ଷା କରିବାକୁ ଆପଣଙ୍କ GitLab ଖାତା ସଂଯୋଗ କରନ୍ତୁ।",
       "bitbucketDescription": "ମୋବାଇଲରେ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକୁ ସମୀକ୍ଷା କରିବାକୁ ଏହି ସଂଗଠନକୁ Bitbucket ସହ ସଂଯୋଗ କରନ୍ତୁ।",
       "bitbucketOrgOnlyDescription": "ଏହାର Bitbucket ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକୁ ସମୀକ୍ଷା କରିବାକୁ ଉପର ଖାତାକୁ ଏକ ସଂଗଠନକୁ ବଦଳାନ୍ତୁ।",
+      "bitbucketOrgOnlyNoOrganizationDescription": "ଏହି ଖାତାରେ ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସଂଗଠନ ନାହିଁ। ଆପଣ ଏକ ସଂଗଠନ ସୃଷ୍ଟି କଲାପରେ କିମ୍ବା ଯୋଗ ଦେଲାପରେ Bitbucket ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକ ସମୀକ୍ଷା କରାଯାଇପାରିବ।",
       "contextLine": "{{organization}} ପାଇଁ",
       "contextLinePersonal": "ଆପଣଙ୍କ ବ୍ୟକ୍ତିଗତ ଖାତା ପାଇଁ"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub ସଂଯୋଗର ଅବଧି ଶେଷ ହୋଇଛି।",
-      "message": "ଆପଣଙ୍କ GitHub ସଂଯୋଗ ଆଉ ବୈଧ ନୁହେଁ। ସଂଯୋଗ ପୁଣି ଯାଞ୍ଚ କରନ୍ତୁ — ଆବଶ୍ୟକ ହେଲେ ପୁଣି ସଂଯୋଗ କରିବାକୁ କୁହାଯିବ।",
+      "message": "ସଂଯୋଗ ପୁଣି ଯାଞ୍ଚ କରନ୍ତୁ — ଆବଶ୍ୟକ ହେଲେ ପୁଣି ସଂଯୋଗ କରିବାକୁ କୁହାଯିବ।",
       "gitlabTitle": "GitLab ସଂଯୋଗର ଅବଧି ଶେଷ ହୋଇଛି।",
-      "bitbucketTitle": "Bitbucket ସଂଯୋଗର ଅବଧି ଶେଷ ହୋଇଛି।",
-      "providerMessage": "ଆପଣଙ୍କ {{provider}} ସଂଯୋଗ ଆଉ ବୈଧ ନୁହେଁ। ସଂଯୋଗ ପୁଣି ଯାଞ୍ଚ କରନ୍ତୁ — ଆବଶ୍ୟକ ହେଲେ ପୁଣି ସଂଯୋଗ କରିବାକୁ କୁହାଯିବ।"
+      "bitbucketTitle": "Bitbucket ସଂଯୋଗର ଅବଧି ଶେଷ ହୋଇଛି।"
     },
     "eventChips": {
       "comment": "ମନ୍ତବ୍ୟ",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ",
       "mergeRequest": "ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ !{{number}}",
       "shareMergeRequest": "ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ସେୟାର କରନ୍ତୁ",
       "viewOnProvider": "{{provider}}ରେ ଦେଖନ୍ତୁ",
       "mergeRequestUnavailable": "ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ଉପଲବ୍ଧ ନାହିଁ",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "ଆପଣଙ୍କୁ GitLab ରେ ଅଧିକ ଗୋଷ୍ଠୀ କିମ୍ବା ପ୍ରୋଜେକ୍ଟ ବ୍ୟବହାର କରିବାର ଅନୁମତି ଦେବାକୁ ପଡ଼ିପାରେ।",
       "installGithubApp": "ରିପୋଜିଟୋରୀଗୁଡ଼ିକରେ GitHub ଆପ୍ ସଂସ୍ଥାପନ କରନ୍ତୁ",
       "installGithubAppDescription": "ଆପଣ ସମୀକ୍ଷା କରାଇବାକୁ ଚାହୁଁଥିବା ରିପୋଜିଟୋରୀଗୁଡ଼ିକୁ ବ୍ୟବହାର କରିବା ପାଇଁ Kilo GitHub ଆପ୍‌କୁ ଅନୁମତି ଦିଅନ୍ତୁ।",
-      "repositoryAccess": "ରିପୋଜିଟୋରୀ ବ୍ୟବହାରର ଅନୁମତି"
+      "repositoryAccess": "ରିପୋଜିଟୋରୀ ବ୍ୟବହାରର ଅନୁମତି",
+      "allModePersonal": "ଆପଣଙ୍କ GitHub ସଂଯୋଗ ମାଧ୍ୟମରେ Kilo ଯେଉଁ ସବୁ ରିପୋଜିଟୋରୀ ବ୍ୟବହାର କରିପାରିବ, ସେସବୁ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ସମୀକ୍ଷା କରାଯାଏ।",
+      "allModeOrganization": "ସଂସ୍ଥାର GitHub ସଂଯୋଗ ମାଧ୍ୟମରେ Kilo ଯେଉଁ ସବୁ ରିପୋଜିଟୋରୀ ବ୍ୟବହାର କରିପାରିବ, ସେସବୁ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ସମୀକ୍ଷା କରାଯାଏ।",
+      "allModeCount": "ଉପଲବ୍ଧ ରିପୋଜିଟୋରୀ: {{displayCount}}"
     },
     "style": {
       "title": "ସମୀକ୍ଷା ଶୈଳୀ",
@@ -2293,9 +2296,9 @@
       "couldNotLoadGithubRepositories": "GitHub ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotLoadGitlabRepositories": "GitLab ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotLoadBitbucketRepositories": "Bitbucket ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-      "connectGithubDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ GitHub ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
-      "connectGitlabDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ GitLab ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
-      "connectBitbucketDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ Bitbucket ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
+      "connectGithubDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରୁ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ, ତା'ପରେ ଏକ GitHub ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
+      "connectGitlabDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରୁ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ, ତା'ପରେ ଏକ GitLab ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
+      "connectBitbucketDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରୁ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ, ତା'ପରେ ଏକ Bitbucket ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
       "openGithub": "GitHub ଖୋଲନ୍ତୁ",
       "openGitlab": "GitLab ଖୋଲନ୍ତୁ",
       "openBitbucket": "Bitbucket ଖୋଲନ୍ତୁ",
@@ -3847,8 +3850,6 @@
     "commandAtLimit": "ନିର୍ଦ୍ଦେଶଟି {{max}} ଅକ୍ଷରରେ ସୀମିତ।",
     "commandsEmpty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସେଟଅପ୍ ନିର୍ଦ୍ଦେଶ ନାହିଁ।",
     "commandsSaveFailed": "ସେଟଅପ୍ କମାଣ୍ଡ୍ ସଞ୍ଚୟ କରିପାରିଲା ନାହିଁ।",
-    "moveUp": "ଉପରକୁ ଯାଅ।",
-    "moveDown": "ତଳକୁ ଯାଅ।",
     "moveCommandUp": "ନିର୍ଦ୍ଦେଶ {{position}} ଉପରକୁ ଘୁଞ୍ଚାନ୍ତୁ",
     "moveCommandDown": "ନିର୍ଦ୍ଦେଶ {{position}} ତଳକୁ ଘୁଞ୍ଚାନ୍ତୁ",
     "skillsTitle": "ଦକ୍ଷତା।",
@@ -3859,7 +3860,10 @@
     "skillNameRequired": "ଏକ ଦକ୍ଷତା ନାମ ପ୍ରବେଶ କରନ୍ତୁ।",
     "skillNameInvalid": "କୌଶଳ ନାମ ନିଶ୍ଚିତ ଭାବରେ ଏକ ଅକ୍ଷର କିମ୍ବା ଅଙ୍କରୁ ଆରମ୍ଭ ହେବ ଏବଂ କେବଳ ଛୋଟ ଅକ୍ଷର, ସଂଖ୍ୟା ଏବଂ ଡ୍ୟାସ୍ ବ୍ୟବହାର କରିବ।",
     "skillContentRequired": "ଦକ୍ଷତା ବିଷୟବସ୍ତୁ ଆବଶ୍ୟକ।",
-    "skillSaveFailed": "ଦକ୍ଷତା ସଞ୍ଚୟ କରିପାରିଲା ନାହିଁ।",
+    "skillSaveFailed": "ଦକ୍ଷତା ସଞ୍ଚୟ କରିପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "skillDeleteFailed": "ଦକ୍ଷତା ବିଲୋପ କରିପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "skillToggleFailed": "ଦକ୍ଷତା ଅଦ୍ୟତନ କରିପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "skillLimitReached": "ଏକ ପ୍ରୋଫାଇଲ୍ {{max}} ପର୍ଯ୍ୟନ୍ତ ଦକ୍ଷତା ରଖିପାରେ। ଅନ୍ୟଟି ଯୋଡିବା ପାଇଁ ଗୋଟିଏ ଡିଲିଟ୍ କରନ୍ତୁ।",
     "skillSourceCustom": "କଷ୍ଟମ୍",
     "skillSourceMarketplace": "ମାର୍କେଟପ୍ଲେସ୍",
     "skillSourceSkillsSh": "skills.sh",

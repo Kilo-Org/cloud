@@ -163,7 +163,7 @@
     "allLanguages": "Hizkuntza guztiak"
   },
   "login": {
-    "welcome": "Ongi etorri Kilora",
+    "welcome": "Ongi etorri",
     "retrySignIn": "Saiatu berriro saioa hasten",
     "logo": "Kiloren logoa",
     "continuingSignIn": "Saioa hasteko prozesuak aurrera jarraitzen du.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Konektatu zure GitLab kontua merge-eskaerak mugikorrean berrikusteko.",
       "bitbucketDescription": "Konektatu Bitbucket erakunde honetara bateratze-eskaerak mugikorrean berrikusteko.",
       "bitbucketOrgOnlyDescription": "Aldatu goiko kontua erakunde batera haren Bitbucket bateratze-eskaerak berrikusteko.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Kontu honek ez du oraindik erakunderik. Erakunde bat sortu edo batekin bat egiten duzunean, haren Bitbucket bateratze-eskaerak berrikus ditzakezu.",
       "contextLine": "{{organization}}-rako",
       "contextLinePersonal": "Zure kontu pertsonalerako"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub-erako konexioa iraungi da.",
-      "message": "GitHub-ekiko konexioa ez da jada baliozkoa. Egiaztatu konexioa berriro; behar izanez gero, berriro konektatzeko eskatuko zaizu.",
+      "message": "Egiaztatu konexioa berriro; behar izanez gero, berriro konektatzeko eskatuko zaizu.",
       "gitlabTitle": "GitLab-erako konexioa iraungi da.",
-      "bitbucketTitle": "Bitbucket-erako konexioa iraungi da.",
-      "providerMessage": "{{provider}}-ekiko konexioa ez da jada baliozkoa. Egiaztatu konexioa berriro; behar izanez gero, berriro konektatzeko eskatuko zaizu."
+      "bitbucketTitle": "Bitbucket-erako konexioa iraungi da."
     },
     "eventChips": {
       "comment": "Egin iruzkina",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Bateratze-eskaera",
       "mergeRequest": "Merge-eskaera",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge-eskaera !{{number}}",
       "shareMergeRequest": "Partekatu merge-eskaera",
       "viewOnProvider": "Ikusi {{provider}}(e)n",
       "mergeRequestUnavailable": "Merge-eskaera ez dago eskuragarri",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Baliteke GitLab-eko talde edo proiektu gehiagorako sarbidea eman behar izatea.",
       "installGithubApp": "Instalatu GitHub aplikazioa biltegietan",
       "installGithubAppDescription": "Eman Kiloren GitHub aplikazioari berrikusi nahi dituzun biltegietarako sarbidea.",
-      "repositoryAccess": "biltegietarako sarbidea"
+      "repositoryAccess": "biltegietarako sarbidea",
+      "allModePersonal": "Zure GitHub konexioaren bidez Kilok atzi dezakeen biltegi bakoitza automatikoki berrikusten da.",
+      "allModeOrganization": "Erakundearen GitHub konexioaren bidez Kilok atzi dezakeen biltegi bakoitza automatikoki berrikusten da.",
+      "allModeCount": "Erabilgarri dauden biltegiak: {{displayCount}}"
     },
     "style": {
       "title": "Berrikuspen-estiloa",
@@ -2293,9 +2296,9 @@
       "couldNotLoadGithubRepositories": "Ezin izan dira GitHub-eko biltegiak kargatu.",
       "couldNotLoadGitlabRepositories": "Ezin izan dira GitLab-eko biltegiak kargatu.",
       "couldNotLoadBitbucketRepositories": "Ezin izan dira Bitbucket-eko biltegiak kargatu.",
-      "connectGithubDescription": "Konektatu GitHub zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
-      "connectGitlabDescription": "Konektatu GitLab zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
-      "connectBitbucketDescription": "Konektatu Bitbucket zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
+      "connectGithubDescription": "Hasi saioa zure nabigatzailean, eta gero itzuli hona GitHub biltegi bat aukeratzeko.",
+      "connectGitlabDescription": "Hasi saioa zure nabigatzailean, eta gero itzuli hona GitLab biltegi bat aukeratzeko.",
+      "connectBitbucketDescription": "Hasi saioa zure nabigatzailean, eta gero itzuli hona Bitbucket biltegi bat aukeratzeko.",
       "openGithub": "Ireki GitHub",
       "openGitlab": "Ireki GitLab",
       "openBitbucket": "Ireki Bitbucket",
@@ -3847,8 +3850,6 @@
     "commandAtLimit": "Komandoa {{max}} karakteretara mugatuta dago",
     "commandsEmpty": "Oraindik ez dago konfigurazio komandorik",
     "commandsSaveFailed": "Ezin izan dira gorde konfigurazio komandoak",
-    "moveUp": "Gora",
-    "moveDown": "Mugitu behera",
     "moveCommandUp": "Mugitu {{position}}. komandoa gora",
     "moveCommandDown": "Mugitu {{position}}. komandoa behera",
     "skillsTitle": "Trebetasunak",
@@ -3859,7 +3860,10 @@
     "skillNameRequired": "Sartu trebetasun-izen bat",
     "skillNameInvalid": "Trebetasunaren izenak letra edo zifra batekin hasi behar du eta letra xeheak, zifrak eta marratxoak soilik erabili behar ditu",
     "skillContentRequired": "Trebetasun edukia beharrezkoa da",
-    "skillSaveFailed": "Ezin izan da trebetasuna gorde",
+    "skillSaveFailed": "Ezin izan da trebetasuna gorde. Saiatu berriro.",
+    "skillDeleteFailed": "Ezin izan da trebetasuna ezabatu. Saiatu berriro.",
+    "skillToggleFailed": "Ezin izan da trebetasuna eguneratu. Saiatu berriro.",
+    "skillLimitReached": "Profil batek gehienez {{max}} trebetasun izan ditzake. Ezabatu bat beste bat gehitzeko.",
     "skillSourceCustom": "Pertsonalizatua",
     "skillSourceMarketplace": "Merkatua",
     "skillSourceSkillsSh": "skills.sh",

@@ -163,7 +163,7 @@
     "allLanguages": "Svi jezici"
   },
   "login": {
-    "welcome": "Dobro došao u Kilo",
+    "welcome": "Dobro došao",
     "retrySignIn": "Ponovo pokušaj prijavu",
     "logo": "Logotip Kilo",
     "continuingSignIn": "Prijava se nastavlja.",
@@ -699,6 +699,7 @@
       "gitlabDescription": "Poveži svoj GitLab nalog da pregledaš merge requeste na telefonu.",
       "bitbucketDescription": "Poveži Bitbucket sa ovom organizacijom da pregledaš zahteve za spajanje na telefonu.",
       "bitbucketOrgOnlyDescription": "Prebaci nalog gore na organizaciju da pregledaš njene zahteve za spajanje na Bitbucktu.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj nalog još nema organizacije. Zahteve za spajanje na Bitbucktu možeš pregledati kada kreiraš ili se pridružiš organizaciji.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za lični nalog"
     },
@@ -723,10 +724,9 @@
     },
     "reconnectNotice": {
       "title": "Veza sa GitHub nalogom je istekla.",
-      "message": "Tvoja veza sa GitHub-om više ne važi. Ponovo proveri vezu — po potrebi će se pojaviti zahtev za ponovno povezivanje.",
+      "message": "Ponovo proveri vezu — po potrebi će se pojaviti zahtev za ponovno povezivanje.",
       "gitlabTitle": "Veza sa GitLab nalogom je istekla.",
-      "bitbucketTitle": "Veza sa Bitbucket nalogom je istekla.",
-      "providerMessage": "Tvoja veza sa {{provider}}-om više ne važi. Ponovo proveri vezu — po potrebi će se pojaviti zahtev za ponovno povezivanje."
+      "bitbucketTitle": "Veza sa Bitbucket nalogom je istekla."
     },
     "eventChips": {
       "comment": "Komentariši",
@@ -834,7 +834,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Podeli merge request",
       "viewOnProvider": "Pogledaj na {{provider}}",
       "mergeRequestUnavailable": "Merge request nije dostupan",
@@ -1449,7 +1449,10 @@
       "gitlabNoRepositoriesDescription": "Možda treba da odobriš pristup za više grupa ili projekata na GitLab-u.",
       "installGithubApp": "Instaliraj GitHub aplikaciju na repozitorijume",
       "installGithubAppDescription": "Dodeli Kilo GitHub aplikaciji pristup repozitorijumima koje želiš da pregleda.",
-      "repositoryAccess": "pristup repozitorijumu"
+      "repositoryAccess": "pristup repozitorijumu",
+      "allModePersonal": "Svaki repozitorijum kojem Kilo može da pristupi preko tvoje GitHub veze automatski se pregleda.",
+      "allModeOrganization": "Svaki repozitorijum kojem Kilo može da pristupi preko GitHub veze organizacije automatski se pregleda.",
+      "allModeCount": "Dostupni repozitorijumi: {{displayCount}}"
     },
     "style": {
       "title": "Stil pregleda",
@@ -2324,9 +2327,9 @@
       "couldNotLoadGithubRepositories": "Učitavanje GitHub repozitorijuma nije uspelo.",
       "couldNotLoadGitlabRepositories": "Učitavanje GitLab repozitorijuma nije uspelo.",
       "couldNotLoadBitbucketRepositories": "Učitavanje Bitbucket repozitorijuma nije uspelo.",
-      "connectGithubDescription": "Poveži GitHub u pregledaču, a zatim se vrati ovde da izabereš repozitorijum.",
-      "connectGitlabDescription": "Poveži GitLab u pregledaču, a zatim se vrati ovde da izabereš repozitorijum.",
-      "connectBitbucketDescription": "Poveži Bitbucket u pregledaču, a zatim se vrati ovde da izabereš repozitorijum.",
+      "connectGithubDescription": "Prijavi se u pregledaču, a zatim se vrati ovde da izabereš GitHub repozitorijum.",
+      "connectGitlabDescription": "Prijavi se u pregledaču, a zatim se vrati ovde da izabereš GitLab repozitorijum.",
+      "connectBitbucketDescription": "Prijavi se u pregledaču, a zatim se vrati ovde da izabereš Bitbucket repozitorijum.",
       "openGithub": "Otvori GitHub",
       "openGitlab": "Otvori GitLab",
       "openBitbucket": "Otvori Bitbucket",
@@ -3897,8 +3900,6 @@
     "commandAtLimit": "Komanda je ograničena na {{max}} znakova",
     "commandsEmpty": "Još nema komandi za podešavanje",
     "commandsSaveFailed": "Nije moguće sačuvati komande za podešavanje",
-    "moveUp": "Pomeri se gore",
-    "moveDown": "Pomeri se dole",
     "moveCommandUp": "Premesti komandu {{position}} gore",
     "moveCommandDown": "Premesti komandu {{position}} dole",
     "skillsTitle": "Veštine",
@@ -3909,7 +3910,10 @@
     "skillNameRequired": "Unesite naziv veštine",
     "skillNameInvalid": "Ime veštine mora da počinje slovom ili cifrom i koristi samo mala slova, cifre i crtice",
     "skillContentRequired": "Neophodan je sadržaj veština",
-    "skillSaveFailed": "Nije moguće sačuvati veštinu",
+    "skillSaveFailed": "Nije moguće sačuvati veštinu. Pokušajte ponovo.",
+    "skillDeleteFailed": "Nije moguće obrisati veštinu. Pokušajte ponovo.",
+    "skillToggleFailed": "Nije moguće ažurirati veštinu. Pokušajte ponovo.",
+    "skillLimitReached": "Profil može da sadrži najviše {{max}} veština. Obrišite jednu da biste dodali drugu.",
     "skillSourceCustom": "Prilagođeno",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

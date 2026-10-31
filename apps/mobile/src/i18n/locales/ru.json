@@ -163,7 +163,7 @@
     "allLanguages": "Все языки"
   },
   "login": {
-    "welcome": "Добро пожаловать в Kilo",
+    "welcome": "Добро пожаловать",
     "retrySignIn": "Повторить вход",
     "logo": "Логотип Kilo",
     "continuingSignIn": "Вход продолжается.",
@@ -904,7 +904,10 @@
       "gitlabNoRepositoriesDescription": "Возможно, нужно предоставить доступ к дополнительным группам или проектам в GitLab.",
       "installGithubApp": "Установка приложения GitHub для репозиториев",
       "installGithubAppDescription": "Предоставьте приложению Kilo для GitHub доступ к репозиториям, которые нужно проверять.",
-      "repositoryAccess": "доступ к репозиторию"
+      "repositoryAccess": "доступ к репозиторию",
+      "allModePersonal": "Каждый репозиторий, к которому Kilo имеет доступ через ваше подключение GitHub, проверяется автоматически.",
+      "allModeOrganization": "Каждый репозиторий, к которому Kilo имеет доступ через подключение GitHub организации, проверяется автоматически.",
+      "allModeCount": "Доступные репозитории: {{displayCount}}"
     },
     "style": {
       "title": "Стиль проверки",
@@ -1788,9 +1791,9 @@
       "couldNotLoadGithubRepositories": "Не удалось загрузить репозитории GitHub.",
       "couldNotLoadGitlabRepositories": "Не удалось загрузить репозитории GitLab.",
       "couldNotLoadBitbucketRepositories": "Не удалось загрузить репозитории Bitbucket.",
-      "connectGithubDescription": "Подключите GitHub в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
-      "connectGitlabDescription": "Подключите GitLab в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
-      "connectBitbucketDescription": "Подключите Bitbucket в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
+      "connectGithubDescription": "Войдите в браузере, затем вернитесь сюда, чтобы выбрать репозиторий GitHub.",
+      "connectGitlabDescription": "Войдите в браузере, затем вернитесь сюда, чтобы выбрать репозиторий GitLab.",
+      "connectBitbucketDescription": "Войдите в браузере, затем вернитесь сюда, чтобы выбрать репозиторий Bitbucket.",
       "openGithub": "Открыть GitHub",
       "openGitlab": "Открыть GitLab",
       "openBitbucket": "Открыть Bitbucket",
@@ -2755,6 +2758,7 @@
       "gitlabDescription": "Подключите аккаунт GitLab, чтобы просматривать запросы на слияние с мобильного.",
       "bitbucketDescription": "Подключите Bitbucket к этой организации, чтобы просматривать пул-реквесты с мобильного.",
       "bitbucketOrgOnlyDescription": "Переключите аккаунт, указанный выше, на организацию, чтобы просматривать её пул-реквесты в Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "В вашем аккаунте пока нет организаций. Пул-реквесты в Bitbucket можно просматривать после того, как вы создадите организацию или присоединитесь к ней.",
       "contextLine": "Для {{organization}}",
       "contextLinePersonal": "Для личного аккаунта"
     },
@@ -3147,10 +3151,9 @@
     "pullRequestUnavailableDescription": "Не удаётся открыть этот PR. Возможно, он удалён, репозиторий закрытый или в нём не установлено приложение Kilo для GitHub.",
     "reconnectNotice": {
       "title": "Срок действия подключения к GitHub истёк.",
-      "message": "Подключение к GitHub больше не действует. Проверьте его снова — при необходимости появится предложение подключиться заново.",
+      "message": "Повторно проверьте подключение — при необходимости вам предложат подключиться заново.",
       "gitlabTitle": "Срок действия подключения к GitLab истёк",
-      "bitbucketTitle": "Срок действия подключения к Bitbucket истёк",
-      "providerMessage": "Ваше подключение к {{provider}} больше не действительно. Повторно проверьте подключение — при необходимости вам предложат подключиться заново."
+      "bitbucketTitle": "Срок действия подключения к Bitbucket истёк"
     },
     "review": "Проверка",
     "reviewPullRequest": "Провести ревью запроса на слияние",
@@ -3242,7 +3245,7 @@
     "terms": {
       "pullRequest": "Пул-реквест",
       "mergeRequest": "Запрос на слияние",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Запрос на слияние !{{number}}",
       "shareMergeRequest": "Поделиться запросом на слияние",
       "viewOnProvider": "Открыть в {{provider}}",
       "mergeRequestUnavailable": "Запрос на слияние недоступен",
@@ -3947,8 +3950,6 @@
     "commandAtLimit": "Команда ограничена {{max}} символами",
     "commandsEmpty": "Команд настройки пока нет",
     "commandsSaveFailed": "Не удалось сохранить команды настройки.",
-    "moveUp": "Вверх",
-    "moveDown": "Двигаться вниз",
     "moveCommandUp": "Переместить команду {{position}} вверх",
     "moveCommandDown": "Переместить команду {{position}} вниз",
     "skillsTitle": "Навыки",
@@ -3959,7 +3960,10 @@
     "skillNameRequired": "Введите название навыка",
     "skillNameInvalid": "Название навыка должно начинаться с буквы или цифры и содержать только строчные буквы, цифры и тире.",
     "skillContentRequired": "Требуется содержание навыков.",
-    "skillSaveFailed": "Не удалось сохранить навык",
+    "skillSaveFailed": "Не удалось сохранить навык. Попробуйте ещё раз.",
+    "skillDeleteFailed": "Не удалось удалить навык. Попробуйте ещё раз.",
+    "skillToggleFailed": "Не удалось обновить навык. Попробуйте ещё раз.",
+    "skillLimitReached": "В одном профиле может храниться до {{max}} навыков. Удалите один, чтобы добавить ещё один.",
     "skillSourceCustom": "Собственный",
     "skillSourceMarketplace": "Магазин",
     "skillSourceSkillsSh": "skills.sh",

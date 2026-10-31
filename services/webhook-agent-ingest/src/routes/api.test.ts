@@ -701,4 +701,22 @@ describe('standard pattern configuration', () => {
     ).toBe(true);
     expect(TriggerConfigUpdateInput.parse({ bodySchema })).toEqual({ bodySchema });
   });
+
+  it('rejects patterns outside the accepted subset', () => {
+    const bodySchema = { type: 'string', pattern: '^(a+)+$' };
+    const create = TriggerConfigInput.safeParse({
+      githubRepo: 'owner/repo',
+      mode: 'code',
+      model: 'model',
+      promptTemplate: '{{body}}',
+      bodySchema,
+    });
+    expect(create.error?.issues.map(issue => [issue.path, issue.message])).toEqual([
+      [
+        ['bodySchema', 'pattern'],
+        'Pattern must not nest quantifiers that exceed 64 combined repetitions',
+      ],
+    ]);
+    expect(TriggerConfigUpdateInput.safeParse({ bodySchema }).success).toBe(false);
+  });
 });

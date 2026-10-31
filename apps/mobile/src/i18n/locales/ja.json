@@ -163,7 +163,7 @@
     "allLanguages": "すべての言語"
   },
   "login": {
-    "welcome": "Kiloへようこそ",
+    "welcome": "ようこそ",
     "retrySignIn": "サインインを再試行",
     "logo": "Kiloのロゴ",
     "continuingSignIn": "サインインを続行しています。",
@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "GitLabで、追加のグループやプロジェクトへのアクセスを許可する必要がある場合があります。",
       "installGithubApp": "リポジトリにGitHub Appをインストール",
       "installGithubAppDescription": "レビュー対象のリポジトリへのアクセスをKilo GitHub Appに許可してください。",
-      "repositoryAccess": "リポジトリへのアクセス権"
+      "repositoryAccess": "リポジトリへのアクセス権",
+      "allModePersonal": "あなたのGitHub接続を通じてKiloがアクセスできるすべてのリポジトリが自動的にレビューされます。",
+      "allModeOrganization": "組織のGitHub接続を通じてKiloがアクセスできるすべてのリポジトリが自動的にレビューされます。",
+      "allModeCount": "利用可能なリポジトリ: {{displayCount}}"
     },
     "style": {
       "title": "レビュースタイル",
@@ -1764,9 +1767,9 @@
       "couldNotLoadGithubRepositories": "GitHubのリポジトリを読み込めませんでした。",
       "couldNotLoadGitlabRepositories": "GitLabのリポジトリを読み込めませんでした。",
       "couldNotLoadBitbucketRepositories": "Bitbucketのリポジトリを読み込めませんでした。",
-      "connectGithubDescription": "ブラウザーでGitHubと連携し、この画面に戻ってリポジトリを選択してください。",
-      "connectGitlabDescription": "ブラウザーでGitLabと連携し、この画面に戻ってリポジトリを選択してください。",
-      "connectBitbucketDescription": "ブラウザーでBitbucketと連携し、この画面に戻ってリポジトリを選択してください。",
+      "connectGithubDescription": "ブラウザーからサインインし、この画面に戻ってGitHubリポジトリを選択してください。",
+      "connectGitlabDescription": "ブラウザーからサインインし、この画面に戻ってGitLabリポジトリを選択してください。",
+      "connectBitbucketDescription": "ブラウザーからサインインし、この画面に戻ってBitbucketリポジトリを選択してください。",
       "openGithub": "GitHubを開く",
       "openGitlab": "GitLabを開く",
       "openBitbucket": "Bitbucketを開く",
@@ -2699,6 +2702,7 @@
       "gitlabDescription": "モバイルでマージリクエストをレビューするには、GitLabアカウントを接続してください。",
       "bitbucketDescription": "モバイルでプルリクエストをレビューするには、この組織をBitbucketに接続してください。",
       "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
+      "bitbucketOrgOnlyNoOrganizationDescription": "このアカウントにはまだ組織がありません。組織を作成または参加すると、Bitbucketのプルリクエストをレビューできるようになります。",
       "contextLine": "{{organization}}用",
       "contextLinePersonal": "個人用"
     },
@@ -3065,10 +3069,9 @@
     "pullRequestUnavailableDescription": "このPRを開けません。PRが削除されたか、リポジトリが非公開になっているか、リポジトリにKilo GitHub Appがインストールされていない可能性があります。",
     "reconnectNotice": {
       "title": "GitHubとの連携が期限切れになりました。",
-      "message": "GitHubとの接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。",
+      "message": "接続を再確認してください。再接続が必要な場合は、案内が表示されます。",
       "gitlabTitle": "GitLabとの連携が期限切れになりました。",
-      "bitbucketTitle": "Bitbucketとの連携が期限切れになりました。",
-      "providerMessage": "{{provider}}との接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。"
+      "bitbucketTitle": "Bitbucketとの連携が期限切れになりました。"
     },
     "review": "レビュー",
     "reviewPullRequest": "プルリクエストをレビュー",
@@ -3156,7 +3159,7 @@
     "terms": {
       "pullRequest": "プルリクエスト",
       "mergeRequest": "マージリクエスト",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "マージリクエスト !{{number}}",
       "shareMergeRequest": "マージリクエストを共有",
       "viewOnProvider": "{{provider}}で表示",
       "mergeRequestUnavailable": "マージリクエストを開けません",
@@ -3847,8 +3850,6 @@
     "commandAtLimit": "コマンドは{{max}}文字以内です",
     "commandsEmpty": "セットアップ コマンドはまだありません",
     "commandsSaveFailed": "セットアップコマンドを保存できませんでした",
-    "moveUp": "上に移動",
-    "moveDown": "下に移動",
     "moveCommandUp": "コマンド{{position}}を上に移動",
     "moveCommandDown": "コマンド{{position}}を下に移動",
     "skillsTitle": "スキル",
@@ -3859,7 +3860,10 @@
     "skillNameRequired": "スキル名を入力してください",
     "skillNameInvalid": "スキル名は文字または数字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
     "skillContentRequired": "スキル内容は必須です",
-    "skillSaveFailed": "スキルを保存できませんでした",
+    "skillSaveFailed": "スキルを保存できませんでした。もう一度お試しください。",
+    "skillDeleteFailed": "スキルを削除できませんでした。もう一度お試しください。",
+    "skillToggleFailed": "スキルを更新できませんでした。もう一度お試しください。",
+    "skillLimitReached": "プロフィールには最大 {{max}} 件のスキルを登録できます。別のスキルを追加するには 1 件削除してください。",
     "skillSourceCustom": "カスタム",
     "skillSourceMarketplace": "マーケットプレイス",
     "skillSourceSkillsSh": "skills.sh",

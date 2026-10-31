@@ -23,10 +23,12 @@ import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { IconButton } from '@/components/ui/icon-button';
 import { KvRow } from '@/components/ui/kv-row';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { agentColor, type Tint, toneColor } from '@/lib/agent-color';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatMoney, formatNumber } from '@/lib/format';
@@ -112,33 +114,35 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   return (
     <View className="flex-1 bg-background">
       {/* The organization name is user prose, not a UI label, so it keeps a
-          second line for a natural break. */}
-      <ScreenHeader title={org.organizationName} titleNumberOfLines={2} />
+          second line for a natural break. The rename control sits beside it, so
+          the name appears once on the screen instead of again in the card. */}
+      <ScreenHeader
+        title={org.organizationName}
+        titleNumberOfLines={2}
+        headerRight={
+          showMoney ? (
+            <IconButton
+              onPress={() => {
+                setRenameVisible(true);
+              }}
+              accessibilityLabel={t('organization.hub.renameTitle')}
+            >
+              <Pencil size={16} color={colors.mutedForeground} />
+            </IconButton>
+          ) : undefined
+        }
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
         <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary px-3">
-          <View className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3">
-            <Text className="flex-1 pr-3 text-sm font-medium text-foreground" numberOfLines={1}>
-              {org.organizationName}
-            </Text>
-            {showMoney && (
-              <IconButton
-                onPress={() => {
-                  setRenameVisible(true);
-                }}
-                accessibilityLabel={t('organization.hub.renameTitle')}
-              >
-                <Pencil size={16} color={colors.mutedForeground} />
-              </IconButton>
-            )}
-          </View>
           {showMoney && (
             <KvRow
               label={t('organization.hub.balance')}
               value={formatMoney(fromMicrodollars(org.balance), i18n.language)}
+              valueVariant="sans"
             />
           )}
           {showMoney && org.balance === 0 && (
@@ -153,12 +157,15 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
             // purchased capacity and can legitimately be zero.
             value={
               org.requireSeats
-                ? `${formatNumber(org.seatCount.used, i18n.language)} / ${formatNumber(
-                    org.seatCount.total,
-                    i18n.language
-                  )}`
+                ? isolateLtrBidiText(
+                    `${formatNumber(org.seatCount.used, i18n.language)} / ${formatNumber(
+                      org.seatCount.total,
+                      i18n.language
+                    )}`
+                  )
                 : formatNumber(org.seatCount.used, i18n.language)
             }
+            valueVariant="sans"
             last
           />
         </Animated.View>
@@ -286,7 +293,12 @@ function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowPro
   } else if (state.action === 'retry') {
     onPress = onRetry;
   }
-  const opensWeb = state.action === 'manage' || state.action === 'setup';
+  // Every settled state of this row but the retryable error opens the Kilo Pass
+  // management page on the web. The unresolved status (`action: 'none'`, shown
+  // while the summary query is in flight) keeps that chevron too: it lasts one
+  // request, and a momentary row without it reads as broken beside the rows
+  // above and below it.
+  const showsChevron = state.action !== 'retry';
   const accessibilityLabel = state.actionLabel
     ? `${t('kiloPass.title')}. ${state.subtitle}. ${state.actionLabel}`
     : `${t('kiloPass.title')}. ${state.subtitle}`;
@@ -304,12 +316,16 @@ function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowPro
       </View>
       <View className="flex-1">
         <Text className="text-sm font-medium text-foreground">{t('kiloPass.title')}</Text>
-        <Text className="mt-0.5 text-xs text-muted-foreground">{state.subtitle}</Text>
+        {state.loading ? (
+          <Skeleton className="mt-0.5 h-3 w-28 rounded" />
+        ) : (
+          <Text className="mt-0.5 text-xs text-muted-foreground">{state.subtitle}</Text>
+        )}
       </View>
       {state.action === 'retry' ? (
         <Text className="shrink-0 text-xs font-medium text-primary">{state.actionLabel}</Text>
       ) : null}
-      {opensWeb ? <DirectionalChevronRight size={14} color={colors.mutedForeground} /> : null}
+      {showsChevron ? <DirectionalChevronRight size={14} color={colors.mutedForeground} /> : null}
     </View>
   );
 

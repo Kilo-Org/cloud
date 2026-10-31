@@ -249,7 +249,9 @@ export function ProfileKiloCommandsScreen({
               }
               onEdit={
                 canManage
-                  ? guardRowPress(() => startEdit(source))
+                  ? guardRowPress(() => {
+                      startEdit(source);
+                    })
                   : undefined
               }
               onDelete={

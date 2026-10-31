@@ -2657,7 +2657,7 @@
     "couldNotSaveChoice": "Não foi possível salvar sua escolha. Tente novamente.",
     "onlineAllowed": "Online, permitida",
     "onlineNotAllowed": "Online, não permitida",
-    "optionalReview": "Opcional — você pode alterar essa opção a qualquer momento em Ajustes",
+    "optionalReview": "Opcional",
     "optionalOnboarding": "Opcional — ativado por padrão",
     "aiProvidersWhat": "Seus prompts, histórico de conversas e quaisquer arquivos que você anexar.",
     "aiProvidersWhy": "Para gerar respostas de IA.",

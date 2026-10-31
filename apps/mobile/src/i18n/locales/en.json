@@ -3230,7 +3230,7 @@
     "couldNotSaveChoice": "Could not save your choice. Please try again.",
     "onlineAllowed": "Online, allowed",
     "onlineNotAllowed": "Online, not allowed",
-    "optionalReview": "Optional — you can change this any time in Settings",
+    "optionalReview": "Optional",
     "optionalOnboarding": "Optional — on unless you turn it off",
     "aiProvidersWhat": "Your prompts, conversation history, and any files you attach.",
     "aiProvidersWhy": "To generate AI responses.",

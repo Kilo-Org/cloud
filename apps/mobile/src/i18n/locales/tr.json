@@ -2621,7 +2621,7 @@
     "couldNotSaveChoice": "Tercihin kaydedilemedi. Tekrar dene.",
     "onlineAllowed": "Çevrimiçi, izin verildi",
     "onlineNotAllowed": "Çevrimiçi, izin verilmedi",
-    "optionalReview": "İsteğe bağlı — ayarlardan istediğin zaman değiştirebilirsin",
+    "optionalReview": "İsteğe bağlı",
     "optionalOnboarding": "İsteğe bağlı — kapatmadıkça açık",
     "aiProvidersWhat": "İstemlerin, konuşma geçmişin ve eklediğin tüm dosyalar.",
     "aiProvidersWhy": "Yapay zekâ yanıtları üretmek için.",

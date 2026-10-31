@@ -1274,7 +1274,6 @@
       "repositoryActionPlan": "Plan d'action par dépôt",
       "settings": "Paramètres",
       "slaPosture": "Respect des SLA",
-      "syncFindings": "Synchroniser les signalements",
       "syncNow": "Synchroniser maintenant",
       "syncQueued": "Synchronisation en file d'attente",
       "syncStatusUnavailable": "L'état de la synchronisation est indisponible.",

@@ -34,7 +34,9 @@ const h = vi.hoisted(() => {
     error: vi.fn(),
     openUrl: vi.fn(),
     preventRemove: undefined as boolean | undefined,
-    preventRemoveHandler: undefined as ((options: { repeat: () => void }) => void) | undefined,
+    preventRemoveHandler: undefined as
+      | ((options: { data: { action: { type: string } }; repeat: () => void }) => void)
+      | undefined,
     focusEffect: undefined as (() => (() => void) | undefined) | undefined,
   };
 });
@@ -68,7 +70,7 @@ vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'Se
 vi.mock('expo-router', () => ({
   usePreventRemove: (
     preventRemove: boolean,
-    handler: (options: { repeat: () => void }) => void
+    handler: (options: { data: { action: { type: string } }; repeat: () => void }) => void
   ) => {
     h.preventRemove = preventRemove;
     h.preventRemoveHandler = handler;
@@ -554,7 +556,7 @@ describe('review memory proposal interaction', () => {
     // edge swipe has no sheet handler of its own, so the sheet owns the leave.
     expect(h.preventRemove).toBe(true);
     act(() => {
-      h.preventRemoveHandler?.({ repeat: () => undefined });
+      h.preventRemoveHandler?.({ data: { action: { type: 'POP' } }, repeat: () => undefined });
     });
     // A save in flight owns the screen: Back must neither close the form nor
     // drop the outcome it is waiting for.
@@ -572,7 +574,7 @@ describe('review memory proposal interaction', () => {
     // Idle and clean after the save settled: Back closes the form and leaves the
     // user on the proposal list for the scope.
     act(() => {
-      h.preventRemoveHandler?.({ repeat: () => undefined });
+      h.preventRemoveHandler?.({ data: { action: { type: 'POP' } }, repeat: () => undefined });
     });
     await waitFor(() => hosts(ui.renderer.root, 'SessionPageSheet').length === 0);
     expect(
@@ -586,7 +588,7 @@ describe('review memory proposal interaction', () => {
     const ui = await mountOpen();
     change(ui.renderer.root, 'codeReviewer.reviewMemory.proposalTitle', 'Unsent draft');
     act(() => {
-      h.preventRemoveHandler?.({ repeat: () => undefined });
+      h.preventRemoveHandler?.({ data: { action: { type: 'POP' } }, repeat: () => undefined });
     });
     expect(hosts(ui.renderer.root, 'SessionPageSheet')).toHaveLength(1);
     expect(h.confirm).toHaveBeenCalledWith(
@@ -610,6 +612,22 @@ describe('review memory proposal interaction', () => {
     expect(
       hosts(ui.renderer.root, 'Pressable').filter(node => node.props.accessibilityRole === 'button')
     ).toHaveLength(1);
+    ui.unmount();
+  });
+
+  it('lets forward navigation through: the sheet closes and the action is replayed', async () => {
+    const ui = await mountOpen();
+    change(ui.renderer.root, 'codeReviewer.reviewMemory.proposalTitle', 'Unsent draft');
+    const repeat = vi.fn<() => void>();
+    act(() => {
+      h.preventRemoveHandler?.({ data: { action: { type: 'REPLACE' } }, repeat });
+    });
+    // A replace or reset is the app's own redirect (sign-out, consent,
+    // force-update), not an abandoned screen: the form goes with it and the
+    // intercepted action still runs.
+    await waitFor(() => hosts(ui.renderer.root, 'SessionPageSheet').length === 0);
+    expect(repeat).toHaveBeenCalledOnce();
+    expect(h.confirm).not.toHaveBeenCalled();
     ui.unmount();
   });
 });

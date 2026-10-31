@@ -228,12 +228,15 @@ export function LiveSessionFeedback({
     inlineNotices && context.isReady && !isConnected && reconnectExhausted && !failureOwnsRetry;
   const connectionRow = offlineLine || connectionStatus || connectionRetry;
 
-  // Status that only the screen reader consumes. Each is absolutely positioned,
-  // so mounting them without the visible column adds no box and no gap.
+  // Status only the screen reader consumes, mounted here rather than inside the
+  // visible column: the column is drawn and dropped with its content, and a
+  // remount starts the announcement dedupe from nothing and speaks an unchanged
+  // message again. One node per message, one position. When the connection row
+  // paints its own visible status that row is the channel, so this copy clears.
   const announcements = (
     <>
       <AccessibleStatus
-        message={connectionLabel}
+        message={connectionStatus ? null : connectionLabel}
         tone="status"
         className="absolute size-px overflow-hidden"
       />
@@ -260,14 +263,7 @@ export function LiveSessionFeedback({
           {internet === 'offline' ? (
             <Text className="flex-1 text-xs text-muted-foreground">{t('offline.noInternet')}</Text>
           ) : (
-            <AccessibleStatus
-              message={connectionLabel}
-              tone="status"
-              className={cn(
-                'flex-1 text-xs',
-                !reconnectExhausted && 'absolute size-px overflow-hidden'
-              )}
-            />
+            <AccessibleStatus message={connectionLabel} tone="status" className="flex-1 text-xs" />
           )}
           {connectionRetry && (
             <Button
@@ -283,21 +279,13 @@ export function LiveSessionFeedback({
             </Button>
           )}
         </View>
-      ) : (
-        // Nothing paints in the row: keep the announcement, drop the box.
-        <AccessibleStatus
-          message={connectionLabel}
-          tone="status"
-          className="absolute size-px overflow-hidden"
-        />
-      )}
-      {refresh && content === 'rows' ? (
+      ) : null}
+      {refresh && content === 'rows' && (
         // The live tab's reserved status line: screen-reader Updating while
         // the pull is in flight, visible "Couldn't refresh" + Retry when it
-        // failed. It takes the slot of the (layout-free) loading status so the
-        // column has the same children either way, and its height is allocated
-        // whenever rows are shown: a failure that arrives while the kept rows
-        // are on screen replaces empty space instead of pushing the rows down.
+        // failed. Its height is allocated whenever rows are shown: a failure
+        // that arrives while the kept rows are on screen replaces empty space
+        // instead of pushing the rows down.
         <View className="min-h-5">
           <SessionListRefreshStatus
             busy={refresh.busy}
@@ -306,34 +294,25 @@ export function LiveSessionFeedback({
             progressInBody={refresh.progressInBody}
           />
         </View>
-      ) : (
-        <AccessibleStatus
-          message={content === 'pending' ? t('common.loading') : null}
-          tone="status"
-          className="absolute size-px overflow-hidden"
-        />
-      )}
-      {content === 'rows' && sessions.isFetching && !sessions.isPaused && !refresh?.busy && (
-        <AccessibleStatus
-          message={t('agents.sessionList.updating')}
-          tone="status"
-          className="absolute size-px overflow-hidden"
-        />
       )}
       {failure}
     </View>
   );
-  // Nothing paints: no local status line (the Agents tab always passes one), no
-  // inline connection row, no failure. Home's card column then holds a single
-  // child, so the card starts on the header's content edge instead of 7 dp
-  // below an invisible box. The announcements still mount.
+  // The column is dropped when it would paint nothing: Home's card column then
+  // holds one child, so the card starts on the header's content edge instead of
+  // 7 dp below an invisible box. The announcements above keep their position
+  // either way, so nothing is re-spoken when the column appears or goes.
   const hasVisibleContent = centered || connectionRow || refresh !== undefined || failure !== null;
-  if (!hasVisibleContent) {
-    return announcements;
-  }
-  return centered ? (
-    <CenteredState refreshControl={refreshControl}>{feedback}</CenteredState>
-  ) : (
-    feedback
+
+  return (
+    <>
+      {announcements}
+      {hasVisibleContent &&
+        (centered ? (
+          <CenteredState refreshControl={refreshControl}>{feedback}</CenteredState>
+        ) : (
+          feedback
+        ))}
+    </>
   );
 }

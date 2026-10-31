@@ -13,7 +13,7 @@ import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 const navigateSpy = vi.hoisted(() => vi.fn());
 const dismissToSpy = vi.hoisted(() => vi.fn());
 const sessionDestination = vi.hoisted(() => ({ id: '' }));
-const connectivity = vi.hoisted(() => ({ offline: false }));
+const connectivity = vi.hoisted(() => ({ offline: false, connected: true, exhausted: false }));
 const queryClient = new ReactQuery.QueryClient();
 vi.mock('expo-router', () => ({
   useRouter: () => ({ navigate: navigateSpy, dismissTo: dismissToSpy }),
@@ -112,8 +112,8 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
   useUserWebConnectionHealth: () => ({
-    isConnected: !connectivity.offline,
-    reconnectExhausted: false,
+    isConnected: connectivity.connected && !connectivity.offline,
+    reconnectExhausted: connectivity.exhausted,
   }),
 }));
 vi.mock('@/components/agents/user-web-connection-provider', () => ({
@@ -197,6 +197,8 @@ beforeEach(() => {
   dismissToSpy.mockClear();
   sessionDestination.id = '';
   connectivity.offline = false;
+  connectivity.connected = true;
+  connectivity.exhausted = false;
 });
 afterEach(() => {
   act(() => renderer?.unmount());
@@ -390,5 +392,36 @@ describe('Home live section status box', () => {
     mountFeedback(settled, { ...context, isError: true });
     expect(nodes('View').length).toBeGreaterThan(0);
     expect(nodes('QueryError')).toHaveLength(1);
+  });
+
+  it('keeps the status announcement mounted when the visible column appears', () => {
+    // Home flips this way while the socket still reports the same connection
+    // state: the load fails and the column is drawn. A remounted announcement
+    // starts its dedupe from nothing and speaks the unchanged message again, so
+    // the node has to survive the flip.
+    connectivity.connected = false;
+    mountFeedback();
+    const before = nodes('AccessibleStatus').find(
+      status => status.props.message === i18n.t('agentChat.sessionConnection.connecting')
+    );
+    expect(before).toBeDefined();
+    expect(nodes('QueryError')).toHaveLength(0);
+
+    act(() => {
+      renderer?.update(
+        createElement(LiveSessionFeedback, {
+          context: { ...context, isError: true },
+          sessions: settled,
+          failureLabel: "Couldn't load active sessions",
+          inlineNotices: false,
+        })
+      );
+    });
+    expect(nodes('QueryError')).toHaveLength(1);
+    const after = nodes('AccessibleStatus').filter(
+      status => status.props.message === i18n.t('agentChat.sessionConnection.connecting')
+    );
+    expect(after).toHaveLength(1);
+    expect(after[0]).toBe(before);
   });
 });

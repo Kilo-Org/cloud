@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  bitbucketRowsUnlisted,
   isStoredRepoSelectionGone,
   type NewSessionRepository,
   type RepositoryGroup,
@@ -11,14 +12,9 @@ import {
 function group(
   key: RepositoryPlatform,
   status: RepositoryProviderStatus,
-  notice?: RepositoryGroup['notice']
+  extra: Pick<RepositoryGroup, 'notice' | 'rowsUnlisted'> = {}
 ): RepositoryGroup {
-  return {
-    key,
-    status,
-    repositories: [],
-    ...(notice === undefined ? {} : { notice }),
-  };
+  return { key, status, repositories: [], ...extra };
 }
 
 const stored: NewSessionRepository = {
@@ -76,7 +72,7 @@ describe('isStoredRepoSelectionGone', () => {
     }
     expect(
       isStoredRepoSelectionGone({
-        groups: [group('github', 'repos', 'partial'), group('gitlab', 'repos')],
+        groups: [group('github', 'repos', { notice: 'partial' }), group('gitlab', 'repos')],
         repositories: others,
         selectedRepo: 'github:drain-team/kilo-app',
       })
@@ -95,17 +91,24 @@ describe('isStoredRepoSelectionGone', () => {
     ).toBe(true);
   });
 
-  it('treats a Bitbucket connect as unlisted, but a GitHub connect as an answer', () => {
-    // Bitbucket reports a workspace that needs re-selecting or new credentials
-    // with the same status as "not connected", and rows exist behind the fix.
+  it('keeps a selection while its provider left rows unlisted, and drops it when it answered', () => {
+    // A Bitbucket workspace that needs selecting or new credentials reports the
+    // same status as "not connected" but keeps its repositories behind the fix.
+    expect(
+      isStoredRepoSelectionGone({
+        groups: [group('bitbucket', 'connect', { rowsUnlisted: true })],
+        repositories: [],
+        selectedRepo: 'bitbucket:acme/widgets',
+      })
+    ).toBe(false);
+    // A provider that really has nothing connected has no rows to offer.
     expect(
       isStoredRepoSelectionGone({
         groups: [group('bitbucket', 'connect')],
         repositories: [],
         selectedRepo: 'bitbucket:acme/widgets',
       })
-    ).toBe(false);
-    // A GitHub installation that is gone really has no repositories.
+    ).toBe(true);
     expect(
       isStoredRepoSelectionGone({
         groups: [group('github', 'connect')],
@@ -133,5 +136,21 @@ describe('isStoredRepoSelectionGone', () => {
     expect(
       isStoredRepoSelectionGone({ groups: answers, repositories: [], selectedRepo: 'drain-team/x' })
     ).toBe(false);
+  });
+});
+
+describe('bitbucketRowsUnlisted', () => {
+  it('knows which Bitbucket answers leave the repositories unlisted', () => {
+    for (const status of [
+      'workspace_selection_required',
+      'reconnect_required',
+      'insufficient_permissions',
+    ]) {
+      expect(bitbucketRowsUnlisted(status), status).toBe(true);
+    }
+    // Nothing connected means nothing to list.
+    expect(bitbucketRowsUnlisted('not_connected')).toBe(false);
+    expect(bitbucketRowsUnlisted('available')).toBe(false);
+    expect(bitbucketRowsUnlisted(undefined)).toBe(false);
   });
 });

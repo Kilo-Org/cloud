@@ -79,6 +79,23 @@ function findLabel(renderer: TestRenderer.ReactTestRenderer): Instance {
   );
 }
 
+// The spinner's ink has to match the surface it is drawn on; reading it through
+// a guard keeps a missing indicator failing loudly.
+function spinnerColor(renderer: TestRenderer.ReactTestRenderer): unknown {
+  const spinner = renderer.root.findAll(
+    node => typeof node.type === 'string' && (node.type as string) === 'ActivityIndicator'
+  )[0];
+  if (spinner === undefined) {
+    throw new Error('spinner was not rendered');
+  }
+  const { props } = spinner;
+  if (!('color' in props)) {
+    return undefined;
+  }
+  const color: unknown = props.color;
+  return color;
+}
+
 describe('SettingsSaveButton header cap', () => {
   beforeEach(() => {
     routerState.back.mockReset();
@@ -120,6 +137,14 @@ describe('SettingsSaveButton header cap', () => {
     // A pending change is the one state that earns the fill.
     const pending = classes(findSavePressable(render({ dirty: true, valid: true })));
     expect(pending).toContain('bg-primary');
+  });
+
+  it('keeps the pending spinner ink on the surface it sits in', () => {
+    // A save in flight whose draft turned invalid drops the header back to the
+    // quiet style, so the spinner must switch to the body foreground instead of
+    // the filled variant's white.
+    expect(spinnerColor(render({ dirty: true, valid: true, pending: true }))).toBe('#fff');
+    expect(spinnerColor(render({ dirty: true, valid: false, pending: true }))).toBe('#000');
   });
 
   it('still saves and pops the screen when the button is pressed', async () => {

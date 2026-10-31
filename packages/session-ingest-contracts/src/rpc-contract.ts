@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import {
   cloudAgentChildSessionLineageSchema,
+  cloudAgentSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   type CloudAgentWorktreeId,
 } from './cloud-agent-session-scope';
 
-export { cloudAgentWorktreeIdSchema, type CloudAgentWorktreeId };
+export { cloudAgentSessionIdSchema, cloudAgentWorktreeIdSchema, type CloudAgentWorktreeId };
 
 export const sessionIdSchema = z.string().startsWith('ses_').length(30);
 
@@ -25,7 +26,7 @@ export const cloudAgentWorktreeDeletionManifestSchema = z
       z
         .object({
           sessionId: sessionIdSchema,
-          cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]).nullable(),
+          cloudAgentSessionId: cloudAgentSessionIdSchema.nullable(),
         })
         .strict()
     ),
@@ -56,7 +57,7 @@ export type CloudAgentWorktreeDeletionState = z.infer<typeof cloudAgentWorktreeD
 
 export const retireCloudAgentWorktreeIfSoleMemberSchema = cloudAgentWorktreeDeletionSchema
   .extend({
-    cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+    cloudAgentSessionId: cloudAgentSessionIdSchema,
   })
   .strict();
 export type RetireCloudAgentWorktreeIfSoleMemberParams = z.infer<
@@ -81,7 +82,7 @@ export const recordCloudAgentWorktreeCleanupSchema = cloudAgentWorktreeDeletionS
     childSessions: z
       .array(
         cloudAgentChildSessionLineageSchema.extend({
-          cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+          cloudAgentSessionId: cloudAgentSessionIdSchema,
         })
       )
       .optional(),
@@ -111,6 +112,10 @@ export const unresolvedCloudAgentSandboxOwnerSchema = z
         z
           .object({
             sessionId: sessionIdSchema.nullable(),
+            // Read straight from the historical `cli_sessions_v2` column, which
+            // still holds owner ids minted before the `workspace_` shape. This
+            // reader reports foreign owners, so it must accept them rather than
+            // fail the whole teardown answer.
             cloudAgentSessionId: z.string().min(1),
           })
           .strict()
@@ -240,7 +245,7 @@ export const deleteHostedWorkspaceSessionSchema = z
     kiloUserId: z.string().min(1),
     workspaceId: cloudAgentWorktreeIdSchema,
     sessionId: sessionIdSchema,
-    cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+    cloudAgentSessionId: cloudAgentSessionIdSchema,
   })
   .strict();
 export type DeleteHostedWorkspaceSessionParams = z.input<typeof deleteHostedWorkspaceSessionSchema>;
@@ -255,7 +260,7 @@ export const assertHostedWorkspaceSessionDeletableSchema = z
   .object({
     kiloUserId: z.string().min(1),
     sessionId: sessionIdSchema,
-    cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+    cloudAgentSessionId: cloudAgentSessionIdSchema,
   })
   .strict();
 export type AssertHostedWorkspaceSessionDeletableParams = z.input<
@@ -417,33 +422,63 @@ function decodeBase64Url(value: string, options: { fatalUtf8: boolean }): string
   return new TextDecoder('utf-8', { fatal: options.fatalUtf8, ignoreBOM: false }).decode(bytes);
 }
 
+const OPAQUE_CURSOR_WIRE_PATTERN = /^[A-Za-z0-9_-]{1,256}$/;
+
+/**
+ * One codec for every opaque cursor whose wire form is a canonical unpadded
+ * base64url JSON payload: the same charset and length guard, a fatal UTF-8
+ * decode, and a canonical re-encode comparison. `label` is the whole error
+ * message, so each cursor family keeps its own text.
+ */
+function opaqueCursorCodec<S extends z.ZodType>(
+  schema: S,
+  label: string
+): {
+  encode(value: z.input<S>): string;
+  decode(cursor: string): z.output<S>;
+  validate(cursor: string): boolean;
+} {
+  function decode(cursor: string): z.output<S> {
+    if (!OPAQUE_CURSOR_WIRE_PATTERN.test(cursor)) {
+      throw new Error(label);
+    }
+    const parsed = schema.parse(JSON.parse(decodeBase64Url(cursor, { fatalUtf8: true })));
+    if (encodeBase64Url(JSON.stringify(parsed)) !== cursor) {
+      throw new Error(label);
+    }
+    return parsed;
+  }
+  return {
+    encode: value => encodeBase64Url(JSON.stringify(schema.parse(value))),
+    decode,
+    validate: cursor => {
+      try {
+        decode(cursor);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  };
+}
+
+const rootSessionsCursorCodec = opaqueCursorCodec(
+  cloudAgentRootSessionsCursorSchema,
+  'Invalid Cloud Agent root sessions cursor'
+);
+
 export function encodeCloudAgentRootSessionsCursor(
   cursor: Omit<CloudAgentRootSessionsCursor, 'version'>
 ): string {
-  const parsed = cloudAgentRootSessionsCursorSchema.parse({ version: 1, ...cursor });
-  return encodeBase64Url(JSON.stringify(parsed));
+  return rootSessionsCursorCodec.encode({ version: 1, ...cursor });
 }
 
 export function decodeCloudAgentRootSessionsCursor(cursor: string): CloudAgentRootSessionsCursor {
-  if (!/^[A-Za-z0-9_-]{1,256}$/.test(cursor)) {
-    throw new Error('Invalid Cloud Agent root sessions cursor');
-  }
-  const parsed = cloudAgentRootSessionsCursorSchema.parse(
-    JSON.parse(decodeBase64Url(cursor, { fatalUtf8: true }))
-  );
-  if (encodeBase64Url(JSON.stringify(parsed)) !== cursor) {
-    throw new Error('Invalid Cloud Agent root sessions cursor');
-  }
-  return parsed;
+  return rootSessionsCursorCodec.decode(cursor);
 }
 
 export function validateCloudAgentRootSessionsCursor(cursor: string): boolean {
-  try {
-    decodeCloudAgentRootSessionsCursor(cursor);
-    return true;
-  } catch {
-    return false;
-  }
+  return rootSessionsCursorCodec.validate(cursor);
 }
 
 export const cloudAgentWorkspacesCursorSchema = z
@@ -455,33 +490,23 @@ export const cloudAgentWorkspacesCursorSchema = z
   .strict();
 export type CloudAgentWorkspacesCursor = z.infer<typeof cloudAgentWorkspacesCursorSchema>;
 
+const workspacesCursorCodec = opaqueCursorCodec(
+  cloudAgentWorkspacesCursorSchema,
+  'Invalid Cloud Agent workspaces cursor'
+);
+
 export function encodeCloudAgentWorkspacesCursor(
   cursor: Omit<CloudAgentWorkspacesCursor, 'version'>
 ): string {
-  const parsed = cloudAgentWorkspacesCursorSchema.parse({ version: 1, ...cursor });
-  return encodeBase64Url(JSON.stringify(parsed));
+  return workspacesCursorCodec.encode({ version: 1, ...cursor });
 }
 
 export function decodeCloudAgentWorkspacesCursor(cursor: string): CloudAgentWorkspacesCursor {
-  if (!/^[A-Za-z0-9_-]{1,256}$/.test(cursor)) {
-    throw new Error('Invalid Cloud Agent workspaces cursor');
-  }
-  const parsed = cloudAgentWorkspacesCursorSchema.parse(
-    JSON.parse(decodeBase64Url(cursor, { fatalUtf8: true }))
-  );
-  if (encodeBase64Url(JSON.stringify(parsed)) !== cursor) {
-    throw new Error('Invalid Cloud Agent workspaces cursor');
-  }
-  return parsed;
+  return workspacesCursorCodec.decode(cursor);
 }
 
 export function validateCloudAgentWorkspacesCursor(cursor: string): boolean {
-  try {
-    decodeCloudAgentWorkspacesCursor(cursor);
-    return true;
-  } catch {
-    return false;
-  }
+  return workspacesCursorCodec.validate(cursor);
 }
 
 export const listCloudAgentRootSessionsSchema = z

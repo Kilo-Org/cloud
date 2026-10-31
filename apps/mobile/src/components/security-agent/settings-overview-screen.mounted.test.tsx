@@ -369,13 +369,17 @@ describe.each([
     }
   );
 
-  it('keeps the generic picker subtitle once a repository is accessible', async () => {
+  // The row only carries a subtitle for the settled empty grant, where it names
+  // the step that unblocks the switch. With a repository accessible the row
+  // stays the action alone: a saved count would always read zero, and the
+  // status line above already states the state.
+  it('keeps the row subtitle off once a repository is accessible', async () => {
     configData.isEnabled = false;
     configData.repositorySelectionMode = 'selected';
     configData.selectedRepositoryIds = [];
     const root = await mount('personal');
     const cta = host(root, 'ConfigureRow').find(node => node.props.title === 'Select repositories');
-    expect(cta?.props.subtitle).toBe('Choose which repositories Security Agent monitors');
+    expect(cta?.props.subtitle).toBeUndefined();
   });
 
   it('hides the picker CTA from a reader who cannot manage the agent', async () => {

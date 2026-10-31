@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +17,7 @@ import {
   validateSkillInput,
 } from '@/lib/agent-profile-forms';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
+import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 
 /** The validated fields a saved skill is built from. */
 export type SkillFormSubmission = {
@@ -26,6 +27,12 @@ export type SkillFormSubmission = {
 };
 
 type SkillFormSheetProps = Readonly<{
+  /**
+   * The form draft the fields belong to (see `lib/form-draft`). The screen
+   * passes a scope scoped to its profile, so a remount reopens the sheet on
+   * what was typed; a caller without one gets fresh fields every mount.
+   */
+  draftScope?: string;
   /** The skill being edited, or `null` when adding a new one. */
   skill: { name: string; rawMarkdown: string } | null;
   isSaving: boolean;
@@ -59,6 +66,7 @@ type SkillFormSheetProps = Readonly<{
  * swallows the reason.
  */
 export function SkillFormSheet({
+  draftScope,
   skill,
   isSaving,
   onClose,
@@ -68,10 +76,11 @@ export function SkillFormSheet({
 }: Readonly<SkillFormSheetProps>) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const nameRef = useRef(skill?.name ?? '');
-  const contentRef = useRef(skill?.rawMarkdown ?? '');
-  const nameEditedRef = useRef(false);
-  const [prefill, setPrefill] = useState(skill?.name ?? '');
+  const scope = draftScope;
+  const nameRef = useFormDraftRef(scope, 'name', skill?.name ?? '');
+  const contentRef = useFormDraftRef(scope, 'content', skill?.rawMarkdown ?? '');
+  const nameEditedRef = useFormDraftRef(scope, 'nameEdited', false);
+  const [prefill, setPrefill] = useFormDraftState(scope, 'prefill', skill?.name ?? '');
   const [error, setError] = useState<SkillInputError | null>(null);
   const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
     'status' | 'name' | 'content'
@@ -142,7 +151,7 @@ export function SkillFormSheet({
         <FormField
           key={`skill-name-${prefill}`}
           label={t('profiles.skillNameLabel')}
-          defaultValue={prefill}
+          defaultValue={nameRef.current}
           error={nameError}
           disabled={isSaving}
           required
@@ -160,7 +169,7 @@ export function SkillFormSheet({
         />
         <FormField
           label={t('profiles.skillMarkdownLabel')}
-          defaultValue={skill?.rawMarkdown ?? ''}
+          defaultValue={contentRef.current}
           error={contentError}
           disabled={isSaving}
           multiline

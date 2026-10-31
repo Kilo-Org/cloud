@@ -3199,7 +3199,7 @@
     "couldNotSaveChoice": "Čuvanje tvog izbora nije uspelo. Pokušaj ponovo.",
     "onlineAllowed": "Onlajn, dozvoljeno",
     "onlineNotAllowed": "Onlajn, nije dozvoljeno",
-    "optionalReview": "Opciono — možeš da promeniš u bilo kom trenutku u podešavanjima",
+    "optionalReview": "Opciono",
     "optionalOnboarding": "Opciono — uključeno dok ne isključiš",
     "aiProvidersWhat": "Tvoji upiti, istorija razgovora i svi fajlovi koje priložiš.",
     "aiProvidersWhy": "Za generisanje AI odgovora.",
@@ -4033,7 +4033,8 @@
       "nameRequired": "Unesite ime komande",
       "nameInvalid": "Ime mora da počinje malim slovom i da koristi samo mala slova, cifre i crtice",
       "templateRequired": "Unesite šablon komande",
-      "nameConflict": "To ime je rezervisano ugrađenom komandom"
+      "nameConflict": "To ime je rezervisano ugrađenom komandom",
+      "duplicateName": "Komanda sa ovim imenom već postoji u ovom profilu"
     },
     "repoBindings": {
       "title": "Podrazumevani profili za Repos",

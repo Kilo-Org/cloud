@@ -3248,7 +3248,7 @@
     "couldNotSaveChoice": "Vaši volbu se nepodařilo uložit. Zkuste to prosím znovu.",
     "onlineAllowed": "Online, povoleno",
     "onlineNotAllowed": "Online, nepovoleno",
-    "optionalReview": "Volitelné – lze kdykoli změnit v nastavení",
+    "optionalReview": "Volitelné",
     "optionalOnboarding": "Volitelné – zapnuto, pokud nevypnete",
     "aiProvidersWhat": "Vaše zadání, historie konverzací a všechny připojené soubory.",
     "aiProvidersWhy": "Pro generování odpovědí AI.",
@@ -4090,7 +4090,8 @@
       "nameRequired": "Zadejte název příkazu",
       "nameInvalid": "Název musí začínat malým písmenem a používat pouze malá písmena, číslice a pomlčky",
       "templateRequired": "Zadejte šablonu příkazu",
-      "nameConflict": "Tento název je rezervován vestavěným příkazem"
+      "nameConflict": "Tento název je rezervován vestavěným příkazem",
+      "duplicateName": "Příkaz s tímto názvem již v tomto profilu existuje"
     },
     "repoBindings": {
       "title": "Výchozí profily pro úložiště",

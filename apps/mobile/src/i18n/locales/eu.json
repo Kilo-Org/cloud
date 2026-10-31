@@ -330,7 +330,7 @@
       "diffTooLarge": "diferentziak handiegiak dira",
       "openFile": "Ireki {{path}}",
       "openFileViewed": "Ireki {{path}} (ikusita)",
-      "title": "Fitxategi"
+      "title": "Fitxategiak"
     },
     "fileRows": {
       "markViewed": "Markatu {{path}} ikusitako gisa",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "Ikuspegi orokorra",
-      "files": "Fitxategi",
+      "files": "Fitxategiak",
       "discussion": "Eztabaida"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "Atera argazkia",
       "photoLibrary": "Argazki-bilduma",
-      "files": "Fitxategi",
+      "files": "Fitxategiak",
       "cameraAccessMessage": "Eman kamera erabiltzeko baimena ezarpenetan, argazki bat ateratzeko."
     },
     "typingIndicator": {
@@ -2767,7 +2767,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Argazki-bilduma",
-      "files": "Fitxategi",
+      "files": "Fitxategiak",
       "couldNotOpenPhotoPicker": "Ezin izan da argazki-hautatzailea ireki. Berrabiarazi Kilo eta saiatu berriro.",
       "maxFilesAllowed": "Gehienez {{displayCount}} fitxategi onartzen dira.",
       "onlyAddingFiles": "{{total}} fitxategietatik {{accepted}} bakarrik gehitzen (gehienez {{max}})",
@@ -3150,7 +3150,7 @@
     "couldNotSaveChoice": "Ezin izan da zure aukera gorde. Saiatu berriro.",
     "onlineAllowed": "Linean, baimenduta",
     "onlineNotAllowed": "Linean, baimendu gabe",
-    "optionalReview": "Aukerakoa — edonoiz alda dezakezu ezarpenetan",
+    "optionalReview": "Aukerakoa",
     "optionalOnboarding": "Aukerakoa — gaituta, zuk desgaitzen ez baduzu",
     "aiProvidersWhat": "Zure eskaerak, elkarrizketa-historia eta erantsitako fitxategi guztiak.",
     "aiProvidersWhy": "AI erantzunak sortzeko.",
@@ -3976,7 +3976,8 @@
       "nameRequired": "Sartu komando-izen bat",
       "nameInvalid": "Izenak letra xehe batekin hasi behar du eta letra xeheak, zifrak eta marra baino ez ditu erabili",
       "templateRequired": "Sartu komando txantiloia",
-      "nameConflict": "Izen hori barneko komando batek erreserbatzen du"
+      "nameConflict": "Izen hori barneko komando batek erreserbatzen du",
+      "duplicateName": "Izen hori duen komando bat badago lehendik profil honetan"
     },
     "repoBindings": {
       "title": "Repos-en profil lehenetsiak",

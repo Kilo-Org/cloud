@@ -3150,7 +3150,7 @@
     "couldNotSaveChoice": "Sinu valikut ei õnnestunud salvestada. Proovi uuesti.",
     "onlineAllowed": "Veebis, lubatud",
     "onlineNotAllowed": "Veebis, keelatud",
-    "optionalReview": "Valikuline – saad seda igal ajal seadetes muuta",
+    "optionalReview": "Valikuline",
     "optionalOnboarding": "Valikuline – lubatud, kuni selle välja lülitad",
     "aiProvidersWhat": "Sinu viibad, vestlusajalugu ja kõik lisatud failid.",
     "aiProvidersWhy": "AI-vastuste genereerimiseks.",
@@ -3976,7 +3976,8 @@
       "nameRequired": "Sisestage käsu nimi",
       "nameInvalid": "Nimi peab algama väiketähtedega ja kasutama ainult väiketähti, numbreid ja sidekriipse",
       "templateRequired": "Sisestage käsumall",
-      "nameConflict": "See nimi on reserveeritud sisseehitatud käsuga"
+      "nameConflict": "See nimi on reserveeritud sisseehitatud käsuga",
+      "duplicateName": "Selle nimega käsk on selles profiilis juba olemas"
     },
     "repoBindings": {
       "title": "Repode vaikeprofiilid",

@@ -3150,7 +3150,7 @@
     "couldNotSaveChoice": "Valintaasi ei voitu tallentaa. Yritä uudelleen.",
     "onlineAllowed": "Verkossa, sallittu",
     "onlineNotAllowed": "Verkossa, ei sallittu",
-    "optionalReview": "Valinnainen – voit muuttaa asetusta milloin tahansa asetuksissa",
+    "optionalReview": "Valinnainen",
     "optionalOnboarding": "Valinnainen – käytössä, ellet poista käytöstä",
     "aiProvidersWhat": "Kehotteesi, keskusteluhistoriasi ja kaikki liittämäsi tiedostot.",
     "aiProvidersWhy": "AI-vastausten tuottamiseen.",
@@ -3976,7 +3976,8 @@
       "nameRequired": "Anna komennon nimi",
       "nameInvalid": "Nimen tulee alkaa pienellä kirjaimella ja käyttää vain pieniä kirjaimia, numeroita ja väliviivoja",
       "templateRequired": "Anna komentomalli",
-      "nameConflict": "Tämän nimen on varannut sisäänrakennettu komento"
+      "nameConflict": "Tämän nimen on varannut sisäänrakennettu komento",
+      "duplicateName": "Samanniminen komento on jo olemassa tässä profiilissa"
     },
     "repoBindings": {
       "title": "Koodivarastojen oletusprofiilit",

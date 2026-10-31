@@ -142,6 +142,22 @@ describe('PrReviewInboxList empty-state accessibility identity', () => {
     );
   });
 
+  // A label one level below the slot never reaches Android's accessibility tree:
+  // the outer node has to carry it, or the announcement is lost entirely.
+  it('announces the loading state on the slot node itself', () => {
+    const renderer = mountInboxList();
+    const [slot] = renderer.root.findAll(node => node.props.accessibilityLabel === LOADING_LABEL);
+
+    expect(slot).toBeDefined();
+    expect(typeof slot?.props.onLayout).toBe('function');
+    expect(slot?.props.style).toBeUndefined();
+
+    settleOnReconnect(renderer);
+    expect(
+      renderer.root.findAll(node => node.props.accessibilityLabel === LOADING_LABEL)
+    ).toHaveLength(0);
+  });
+
   it('gives the reconnect notice its own container instead of the loading one', () => {
     const renderer = mountInboxList();
     const loading = renderer.root.findAll(node => node.props.accessibilityLabel === LOADING_LABEL);
@@ -162,22 +178,23 @@ describe('PrReviewInboxList empty-state accessibility identity', () => {
     ).toHaveLength(0);
     const notices = renderer.root.findAll(node => String(node.type) === 'PrReviewReconnectNotice');
     expect(notices).toHaveLength(1);
-    // ...because the card is not rendered inside the view the skeletons owned.
+    // ...because the card is not rendered inside the slot the skeletons owned.
     expect(String(notices[0]?.parent?.type)).toBe('View');
     expect(notices[0]?.parent).not.toBe(loading[0]);
+    expect(slotOf(notices[0])).not.toBe(loading[0]);
     // The card carries no container label of its own: its title, message and
     // button are read as themselves.
     expect(notices[0]?.parent?.props.accessibilityLabel).toBeUndefined();
   });
 });
 
+// The slot IS the labelled node while loading; a settled body sits inside a
+// fresh slot, so the walk starts at the node and then goes up.
 function slotOf(node: TestRenderer.ReactTestInstance | undefined): TestRenderer.ReactTestInstance {
-  let current = node?.parent ?? null;
-  while (current) {
+  for (let current = node ?? null; current; current = current.parent) {
     if (typeof current.props.onLayout === 'function') {
       return current;
     }
-    current = current.parent;
   }
   throw new Error('the empty body has no slot container');
 }

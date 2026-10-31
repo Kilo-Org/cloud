@@ -264,6 +264,7 @@ export function linkPath(link: string): string | undefined {
 }
 
 async function captureScreen(ctx: CaptureContext, cell: string, target: Target, warm: boolean) {
+  const linkRoute = linkPath(target.link);
   // A language switch reloads the runtime. Right after it the target screen is
   // cold: its own loading state can be the first stable layout, so the measured
   // capture would show skeletons rather than the screen the link opens. Open the
@@ -271,13 +272,19 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   if (warm) {
     ctx.log(`design-gate: warming ${target.id} after the language reload`);
     await ctx.probe.openLink(target.link);
-    await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
+    let warmRoute = (await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs)).dump.env.route;
+    // The first link after a reload is the one that gets dropped. Re-send it on
+    // that evidence, never on a fixed retry count.
+    if (linkRoute !== undefined && warmRoute.split('?')[0] !== linkRoute) {
+      ctx.log(`design-gate: warm link for ${target.id} did not land; sending it again`);
+      await ctx.probe.openLink(target.link);
+      warmRoute = (await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs)).dump.env.route;
+    }
   }
   await ctx.probe.resetNavigation();
   const beforeDump = (await sampleUntilSettled(ctx.probe, ctx.clock)).dump;
   const beforeTexts = screenTexts(beforeDump);
   const beforeRoute = beforeDump.env.route.split('?')[0];
-  const linkRoute = linkPath(target.link);
   // A route name is not proof that the screen painted. Right after a language
   // switch the runtime reloads, restores its initial route and then overwrites a
   // push that landed mid-restore: the router reports the target route while the

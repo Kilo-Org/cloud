@@ -37,9 +37,19 @@ type InboxEmptyProps = {
 };
 
 export function InboxEmpty(props: Readonly<InboxEmptyProps>) {
+  const { t } = useTranslation();
   const slot = useEmptySlotHeight(props.view.kind === 'loading');
+  // The loading announcement lives on this keyed slot. A keyed slot is one host
+  // view per state, so the announcement cannot survive into a settled body, and
+  // it survives the wrapper that reserves the height — a label one level below
+  // the slot never reaches Android's accessibility tree.
   return (
-    <View onLayout={slot.handleLayout} style={slot.style}>
+    <View
+      key={props.view.kind}
+      accessibilityLabel={props.view.kind === 'loading' ? t('prReview.inbox.loading') : undefined}
+      onLayout={slot.handleLayout}
+      style={slot.style}
+    >
       <InboxBody {...props} />
     </View>
   );
@@ -56,7 +66,7 @@ function InboxBody({
   const { t } = useTranslation();
   if (view.kind === 'loading') {
     return (
-      <View key={view.kind} accessibilityLabel={t('prReview.inbox.loading')}>
+      <View>
         {Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
           // eslint-disable-next-line react/no-array-index-key -- skeleton placeholders have no stable id
           <View key={index} className="gap-2 border-b-[0.5px] border-hair-soft px-6 py-3">
@@ -71,7 +81,6 @@ function InboxBody({
   if (view.kind === 'empty') {
     return (
       <EmptyState
-        key={view.kind}
         icon={GitPullRequest}
         title={t('prReview.inbox.noReviewRequests')}
         description={t('prReview.inbox.noReviewRequestsDescription')}
@@ -81,18 +90,17 @@ function InboxBody({
   }
 
   if (view.kind === 'permission') {
-    return <QueryError key={view.kind} variant="permission" placement="top" />;
+    return <QueryError variant="permission" placement="top" />;
   }
 
   if (view.kind === 'not-found') {
-    return <QueryError key={view.kind} variant="not-found" placement="top" />;
+    return <QueryError variant="not-found" placement="top" />;
   }
 
   if (view.kind === 'access-denied' || view.kind === 'organization-unavailable') {
     const unavailable = view.kind === 'organization-unavailable';
     return (
       <QueryError
-        key={view.kind}
         variant={unavailable ? 'not-found' : 'permission'}
         title={t(
           unavailable
@@ -124,7 +132,7 @@ function InboxBody({
 
   if (view.kind === 'reconnect') {
     return (
-      <View key={view.kind} className="px-6 py-6">
+      <View className="px-6 py-6">
         <PrReviewReconnectNotice
           platform={reconnectPlatform ?? undefined}
           organizationId={organizationId}
@@ -139,7 +147,6 @@ function InboxBody({
   const isServiceUnavailable = view.kind === 'service-unavailable';
   return (
     <QueryError
-      key={view.kind}
       variant="server"
       title={
         isServiceUnavailable

@@ -195,6 +195,23 @@ export function takeSharePayload(id: ShareId): SharePayload | null {
   return payload;
 }
 
+/**
+ * Put a payload back under the id it was taken with, after a delivery that
+ * threw. The route keeps its `shareId`, so the next mount of that route (the
+ * composer's own Retry) delivers the same files again instead of showing an
+ * empty composer. Re-insertion re-files the id at the newest position and
+ * evicts the oldest past the cap, so a restored payload lives exactly as long
+ * as a freshly staged one.
+ */
+export function restoreSharePayload(id: ShareId, payload: SharePayload): void {
+  if (payloads.has(id)) {
+    return;
+  }
+  payloads.set(id, payload);
+  insertionOrder.push(id);
+  evictOldestIfNeeded();
+}
+
 /** Read-only, for the gate's own preview. */
 export function peekSharePayload(id: ShareId): SharePayload | null {
   return payloads.get(id) ?? null;

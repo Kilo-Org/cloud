@@ -2,7 +2,7 @@ import { type RefObject, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
-import { takeSharePayload } from '@/lib/share-payload';
+import { restoreSharePayload, takeSharePayload } from '@/lib/share-payload';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
 
 type SharePrefillTextInput = {
@@ -28,7 +28,9 @@ type ApplySharePrefillOptions = {
  * Delivers a share payload into a composer once. Ordered: take → text → files →
  * signal delivery → clear route params. Text is applied before awaiting files so
  * a file failure cannot cost the user their text. On `addCandidates` throw the
- * payload is not restored and text is not re-applied.
+ * payload goes back to the store under the same id and the route params stay,
+ * so the retry that follows — the composer's own Retry, or its route error
+ * boundary's — delivers the same files instead of an empty composer.
  */
 export async function applySharePrefill(options: ApplySharePrefillOptions): Promise<void> {
   const shareId = options.shareId;
@@ -56,7 +58,13 @@ export async function applySharePrefill(options: ApplySharePrefillOptions): Prom
     try {
       await options.addCandidates(payload.files);
     } catch {
-      // Keep text; do not restore the payload. Upload hook toasts name failures.
+      // Keep the text that already landed, but put the files back: the route
+      // keeps its `shareId`, so a retry delivers this payload again instead of
+      // leaving the person with an empty composer and no photo. Neither the
+      // delivery signal nor the param clear runs, because nothing was delivered
+      // and the param is what re-arms the retry.
+      restoreSharePayload(shareId, payload);
+      return;
     }
   }
 

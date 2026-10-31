@@ -3,7 +3,9 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import NewSessionScreen from '@/app/(app)/agent-chat/new';
+import NewSessionScreen, {
+  ErrorBoundary as NewSessionErrorBoundary,
+} from '@/app/(app)/agent-chat/new';
 
 const state = vi.hoisted(() => ({
   organization: {
@@ -12,7 +14,17 @@ const state = vi.hoisted(() => ({
     usesActiveAccount: true,
   },
   context: { error: null as 'restore' | 'save' | null, retry: vi.fn() },
+  router: {
+    canGoBack: vi.fn(() => true),
+    back: vi.fn(),
+    replace: vi.fn(),
+  },
 }));
+vi.mock('expo-router', () => ({ useRouter: () => state.router }));
+vi.mock('@sentry/react-native', () => ({
+  wrapExpoRouterErrorBoundary: <T,>(component: T): T => component,
+}));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/agents/use-new-session-organization', () => ({
   useNewSessionOrganization: () => ({ isCloneEntry: false, ...state.organization }),
 }));
@@ -57,6 +69,9 @@ function unmount(renderer: TestRenderer.ReactTestRenderer) {
 beforeEach(() => {
   state.organization = { organizationId: undefined, isResolved: true, usesActiveAccount: true };
   state.context = { error: null, retry: vi.fn() };
+  state.router.canGoBack.mockReset().mockReturnValue(true);
+  state.router.back.mockReset();
+  state.router.replace.mockReset();
 });
 
 describe('NewSessionScreen account gate', () => {
@@ -124,6 +139,83 @@ describe('NewSessionScreen account gate', () => {
   it('mounts a personal form with no organization', async () => {
     const renderer = await render();
     expect(renderer.root.findByType(ModelProvider).props.organizationId).toBeUndefined();
+    unmount(renderer);
+  });
+});
+
+const AGENTS_SESSIONS_HREF = '/(app)/(tabs)/(2_agents)/';
+
+async function renderErrorBoundary(): Promise<TestRenderer.ReactTestRenderer> {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  await act(async () => {
+    ref.current = TestRenderer.create(
+      createElement(NewSessionErrorBoundary, {
+        error: new Error('composer render failed'),
+        retry: vi.fn(),
+      })
+    );
+    await Promise.resolve();
+  });
+  if (!ref.current) {
+    throw new Error('renderer did not mount');
+  }
+  return ref.current;
+}
+
+/**
+ * The Back control is the route failure screen's last Pressable: the QueryError
+ * above it owns its own Retry.
+ */
+function pressBack(renderer: TestRenderer.ReactTestRenderer): void {
+  const back = renderer.root.findAllByType(Retry).at(-1);
+  if (!back) {
+    throw new Error('back control did not render');
+  }
+  expect(back.props.accessibilityLabel).toBe('Back');
+  const press = back.props.onPress as () => void;
+  act(() => {
+    press();
+  });
+}
+
+describe('NewSessionScreen route error boundary', () => {
+  it('keeps a Back out of the screen and re-runs the prefill on Retry', async () => {
+    const retry = vi.fn();
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    await act(async () => {
+      ref.current = TestRenderer.create(
+        createElement(NewSessionErrorBoundary, {
+          error: new Error('composer render failed'),
+          retry,
+        })
+      );
+      await Promise.resolve();
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer did not mount');
+    }
+
+    const error = renderer.root.findByType('QueryError' as never);
+    const retryFromBoundary = error.props.onRetry as () => void;
+    expect(typeof retryFromBoundary).toBe('function');
+    act(() => {
+      retryFromBoundary();
+    });
+    expect(retry).toHaveBeenCalledTimes(1);
+
+    pressBack(renderer);
+    expect(state.router.back).toHaveBeenCalledTimes(1);
+    expect(state.router.replace).not.toHaveBeenCalled();
+    unmount(renderer);
+  });
+
+  it('leaves for the sessions list when the route has no history', async () => {
+    state.router.canGoBack.mockReturnValue(false);
+    const renderer = await renderErrorBoundary();
+    pressBack(renderer);
+    expect(state.router.back).not.toHaveBeenCalled();
+    expect(state.router.replace).toHaveBeenCalledExactlyOnceWith(AGENTS_SESSIONS_HREF);
     unmount(renderer);
   });
 });

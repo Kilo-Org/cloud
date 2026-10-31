@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   __resetSharePayloadStoreForTests,
+  peekSharePayload,
   putSharePayload,
   takeSharePayload,
 } from '@/lib/share-payload';
@@ -219,7 +220,7 @@ describe('applySharePrefill', () => {
     expect(order).toEqual(['text:shared body', 'files-start', 'files-done', 'clear']);
   });
 
-  it('keeps text and does not restore the payload when addCandidates throws', async () => {
+  it('keeps text, restores the payload, and leaves the param when addCandidates throws', async () => {
     const id = putSharePayload({
       text: 'keep me',
       files: [{ name: 'bad.png', uri: 'file:///bad.png' }],
@@ -228,6 +229,7 @@ describe('applySharePrefill', () => {
     const { input, calls: nativeCalls } = makeInput();
     const { onChangeText, calls: changeCalls } = makeChange();
     const clearCalls: number[] = [];
+    const deliveredCalls: number[] = [];
 
     await applySharePrefill({
       shareId: id,
@@ -237,29 +239,45 @@ describe('applySharePrefill', () => {
       addCandidates: rejectAfterTick,
       clearShareIdParam: () => {
         clearCalls.push(1);
+      },
+      onDelivered: () => {
+        deliveredCalls.push(1);
       },
     });
 
     expect(changeCalls).toEqual(['keep me']);
     expect(nativeCalls).toEqual([{ text: 'keep me' }]);
-    // Param still cleared after the throw path (hygiene; no retry).
-    expect(clearCalls).toHaveLength(1);
-    // Payload was consumed and not restored.
-    expect(takeSharePayload(id)).toBeNull();
+    // Nothing was delivered, so neither the delivery signal nor the param clear
+    // runs: the param is what re-arms the retry.
+    expect(deliveredCalls).toEqual([]);
+    expect(clearCalls).toEqual([]);
+    // The files are back under the same id, so the retry re-delivers them.
+    expect(peekSharePayload(id)).not.toBeNull();
 
-    // A second apply with the same id is a take-null no-op (no re-apply).
+    // The retry — the composer's own Retry remounting the route — delivers the
+    // same files this time.
     changeCalls.length = 0;
+    const retried = vi.fn<() => Promise<void>>(async () => {
+      await Promise.resolve();
+    });
     await applySharePrefill({
       shareId: id,
       input,
       maxLength: 4000,
       onChangeText,
-      addCandidates: rejectAfterTick,
+      addCandidates: retried,
       clearShareIdParam: () => {
         clearCalls.push(1);
       },
+      onDelivered: () => {
+        deliveredCalls.push(1);
+      },
     });
-    expect(changeCalls).toEqual([]);
+    expect(retried).toHaveBeenCalledExactlyOnceWith([
+      { name: 'bad.png', uri: 'file:///bad.png' },
+    ]);
+    expect(deliveredCalls).toEqual([1]);
+    expect(clearCalls).toEqual([1]);
   });
 
   it('with files, calls onDelivered after addCandidates and before clearShareIdParam', async () => {

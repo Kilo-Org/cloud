@@ -30,10 +30,8 @@ export function PillGroup<T extends string>({
 }>) {
   const colors = useThemeColors();
   return (
-    <View className="gap-2">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {label}
-      </Text>
+    <View className="gap-1.5">
+      <Text className="text-xs font-medium">{label}</Text>
       <RadioGroup label={label} className="overflow-hidden rounded-lg bg-secondary">
         {options.map((option, index) => {
           const active = value === option.value;

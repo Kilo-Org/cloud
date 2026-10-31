@@ -213,11 +213,16 @@ export function captureFiles(out: string, cell: string, target: string) {
   };
 }
 
+/** The text on glass, sorted: what the screen really shows, without the route. */
+export function screenTexts(dump: ProbeDump): string {
+  return normalize(dump)
+    .nodes.flatMap(node => (node.probe.text === undefined ? [] : [node.probe.text]))
+    .sort()
+    .join('\n');
+}
+
 export function screenIdentity(dump: ProbeDump): string {
-  const texts = normalize(dump).nodes.flatMap(node =>
-    node.probe.text === undefined ? [] : [node.probe.text]
-  );
-  return [dump.env.route, ...texts.sort()].join('\n');
+  return [dump.env.route, screenTexts(dump)].join('\n');
 }
 
 export async function waitForStableLayout(
@@ -258,12 +263,30 @@ export function linkPath(link: string): string | undefined {
   }
 }
 
-async function captureScreen(ctx: CaptureContext, cell: string, target: Target) {
+async function captureScreen(ctx: CaptureContext, cell: string, target: Target, warm: boolean) {
+  // A language switch reloads the runtime. Right after it the target screen is
+  // cold: its own loading state can be the first stable layout, so the measured
+  // capture would show skeletons rather than the screen the link opens. Open the
+  // target once, let it settle, and measure the second, warm open instead.
+  if (warm) {
+    ctx.log(`design-gate: warming ${target.id} after the language reload`);
+    await ctx.probe.openLink(target.link);
+    await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
+  }
   await ctx.probe.resetNavigation();
-  const before = screenIdentity((await sampleUntilSettled(ctx.probe, ctx.clock)).dump);
+  const beforeDump = (await sampleUntilSettled(ctx.probe, ctx.clock)).dump;
+  const beforeTexts = screenTexts(beforeDump);
+  const beforeRoute = beforeDump.env.route.split('?')[0];
   const linkRoute = linkPath(target.link);
+  // A route name is not proof that the screen painted. Right after a language
+  // switch the runtime reloads, restores its initial route and then overwrites a
+  // push that landed mid-restore: the router reports the target route while the
+  // previous screen is still on glass. The link counts as opened when the text
+  // on screen changed, or when it re-opens the route the app was already on, so
+  // the one re-send below happens on evidence, never on a fixed retry count.
   const opened = (dump: ProbeDump) =>
-    screenIdentity(dump) !== before || dump.env.route.split('?')[0] === linkRoute;
+    screenTexts(dump) !== beforeTexts ||
+    (beforeRoute === linkRoute && dump.env.route.split('?')[0] === linkRoute);
   await ctx.probe.startSampling(SAMPLE_INTERVAL_MS, ctx.observeMs + IN_APP_SAMPLING_SLACK_MS);
   await ctx.probe.openLink(target.link);
   let settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
@@ -305,8 +328,12 @@ type LanguageTarget = { preference: string; resolved: string; rtl?: boolean };
 const languageMatches = (dump: ProbeDump, want: LanguageTarget) =>
   dump.env.language === want.resolved && (want.rtl === undefined || dump.env.isRTL === want.rtl);
 
-async function ensureLanguage(ctx: CaptureContext, want: LanguageTarget): Promise<boolean> {
-  if (languageMatches(await waitForApp(ctx.probe, ctx.clock), want)) return true;
+type LanguageOutcome = { matched: boolean; reloaded: boolean };
+
+async function ensureLanguage(ctx: CaptureContext, want: LanguageTarget): Promise<LanguageOutcome> {
+  if (languageMatches(await waitForApp(ctx.probe, ctx.clock), want)) {
+    return { matched: true, reloaded: false };
+  }
   try {
     ctx.log(`design-gate: language → ${want.preference} (${want.resolved})`);
     await ctx.probe.setLanguage(want.preference, want.resolved);
@@ -321,7 +348,7 @@ async function ensureLanguage(ctx: CaptureContext, want: LanguageTarget): Promis
     RELOAD_WAIT_MS
   );
   await waitForStableLayout(ctx.probe, ctx.clock);
-  return languageMatches(dump, want);
+  return { matched: languageMatches(dump, want), reloaded: true };
 }
 
 export function layoutSignature(dump: ProbeDump): string {
@@ -395,14 +422,22 @@ export async function runMatrix(
       const language: LanguageTarget = config.rtl
         ? { preference: RTL_LANGUAGE, resolved: RTL_LANGUAGE, rtl: true }
         : ltrLanguage;
-      await ensureLanguage(ctx, language);
+      const cellLanguage = await ensureLanguage(ctx, language);
       await ctx.clock.sleep(CONFIG_SETTLE_MS);
       const run: CellRun = { id: config.id, config, screens: [] };
       outcome.cells.push(run);
       const seen = new Map<string, string>();
-      for (const target of targets) {
-        const languageReady = await ensureLanguage(ctx, language);
-        const { sampled, screen, unopened, png } = await captureScreen(ctx, config.id, target);
+      for (const [index, target] of targets.entries()) {
+        const targetLanguage = await ensureLanguage(ctx, language);
+        const languageReady = targetLanguage.matched;
+        // Only the first target after a reload sees the cold runtime.
+        const warm = (cellLanguage.reloaded || targetLanguage.reloaded) && index === 0;
+        const { sampled, screen, unopened, png } = await captureScreen(
+          ctx,
+          config.id,
+          target,
+          warm
+        );
         const { dump } = sampled;
         run.env ??= dump.env;
         run.screens.push(screen);

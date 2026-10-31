@@ -5848,6 +5848,14 @@ export const cloud_agent_code_reviews = pgTable(
 
     // Immutable per-job manual review snapshot. Null means webhook-created review.
     manual_config: jsonb('manual_config').$type<ManualCodeReviewConfig>(),
+    /**
+     * Stable per-intent key from the client for a manual start. A same-key
+     * create resolves to this review instead of creating a second one, so a
+     * retry whose first attempt the server already accepted (its response lost
+     * to the client deadline) lands on the review it started. Null for
+     * webhook-created and keyless manual reviews.
+     */
+    manual_operation_key: text(),
 
     // Review type for this run: 'standard' (single reviewer) or 'council' (multi-specialist).
     review_type: text().$type<CodeReviewType>().notNull().default('standard'),
@@ -5927,6 +5935,23 @@ export const cloud_agent_code_reviews = pgTable(
     ).where(sql`${table.platform_integration_id} IS NOT NULL
         AND ${table.status} IN ('pending', 'queued', 'running')
         AND (${table.manual_config} IS NULL OR ${table.manual_config}->>'outputMode' = 'provider')`),
+    // Manual-start retry identity, one index per owner branch for the same
+    // reason as `security_agent_commands`: an operation key is unique per
+    // owner only, and the other branch's owner column is NULL, which a single
+    // composite unique index would treat as distinct. Both are partial so
+    // webhook-created and keyless manual reviews stay unconstrained.
+    uniqueIndex('UQ_cloud_agent_code_reviews_user_manual_operation_key')
+      .on(table.owned_by_user_id, table.manual_operation_key)
+      .concurrently()
+      .where(
+        sql`${table.owned_by_user_id} IS NOT NULL AND ${table.manual_operation_key} IS NOT NULL`
+      ),
+    uniqueIndex('UQ_cloud_agent_code_reviews_org_manual_operation_key')
+      .on(table.owned_by_organization_id, table.manual_operation_key)
+      .concurrently()
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.manual_operation_key} IS NOT NULL`
+      ),
     // Indexes for ownership lookups
     index('idx_cloud_agent_code_reviews_owned_by_org_id').on(table.owned_by_organization_id),
     index('idx_cloud_agent_code_reviews_owned_by_user_id').on(table.owned_by_user_id),

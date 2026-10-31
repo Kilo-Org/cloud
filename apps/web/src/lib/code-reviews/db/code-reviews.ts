@@ -234,6 +234,7 @@ function codeReviewInsertValues(
     platform: params.platform ?? 'github',
     platform_project_id: params.platformProjectId ?? null,
     manual_config: params.manualConfig ?? null,
+    manual_operation_key: params.manualOperationKey ?? null,
     review_type: params.reviewType ?? 'standard',
     trigger_source: params.triggerSource ?? null,
     agent_version: 'v2',
@@ -1862,6 +1863,46 @@ export async function findActiveProviderPublishingReview(input: {
     });
     throw error;
   }
+}
+
+/**
+ * Resolves the review a manual-start operation key already produced. The
+ * client sends the same key with a retry of the same draft, so a lookup hit
+ * means the first attempt was accepted even if its response never reached the
+ * client. Owner-scoped, matching the partial unique indexes on
+ * `manual_operation_key`.
+ */
+export async function findManualReviewByOperationKey(input: {
+  owner: CreateReviewParams['owner'];
+  manualOperationKey: string;
+}): Promise<{
+  id: string;
+  platform: CodeReviewPlatform;
+  repoFullName: string;
+  prNumber: number;
+} | null> {
+  const ownerCondition =
+    input.owner.type === 'org'
+      ? eq(cloud_agent_code_reviews.owned_by_organization_id, input.owner.id)
+      : eq(cloud_agent_code_reviews.owned_by_user_id, input.owner.id);
+
+  const [review] = await db
+    .select({
+      id: cloud_agent_code_reviews.id,
+      platform: cloud_agent_code_reviews.platform,
+      repoFullName: cloud_agent_code_reviews.repo_full_name,
+      prNumber: cloud_agent_code_reviews.pr_number,
+    })
+    .from(cloud_agent_code_reviews)
+    .where(
+      and(
+        ownerCondition,
+        eq(cloud_agent_code_reviews.manual_operation_key, input.manualOperationKey)
+      )
+    )
+    .limit(1);
+
+  return review ?? null;
 }
 
 export function bitbucketCodeReviewerLifecycleLockKey(integrationId: string): string {

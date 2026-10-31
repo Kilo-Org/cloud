@@ -117,6 +117,13 @@ export const CreateReviewParamsSchema = z.object({
   platform: CodeReviewPlatformSchema.default('github'),
   platformProjectId: z.number().int().positive().optional(),
   manualConfig: ManualCodeReviewConfigSchema.nullable().optional(),
+  /**
+   * Client-generated key for one manual start intent, stable across a retry of
+   * the same draft. The unique index on it makes a repeat insert resolve to the
+   * review the first attempt produced instead of creating a second one. Unset
+   * for webhook-created and keyless manual reviews.
+   */
+  manualOperationKey: z.string().min(1).max(128).optional(),
   // Review type for this run; unset defaults to standard at the insert boundary.
   reviewType: CodeReviewTypeSchema.optional(),
   // Origin of the run (manual vs webhook); optional for legacy/unknown callers.

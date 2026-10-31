@@ -4,6 +4,7 @@ import { notificationHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { GitPullRequest } from '@/components/ui/icons';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, type ScrollViewInstance, TextInput, View } from 'react-native';
@@ -116,6 +117,10 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   // control-plane deadline while the request is still pending, releases the
   // busy button, and a late success still navigates.
   const createReview = useCreateManualReview(scope, { silent: true });
+  // One operation key per draft intent: a retry of the draft this stall belongs
+  // to replays the review the server already accepted, instead of creating a
+  // second one for the same change.
+  const { getKey, rotateKey } = useHoistedOperationKey();
   const start = useDeadlineWatchedStart(
     MANUAL_REVIEW_START_DEADLINE_MS,
     () => createReview.isPending,
@@ -138,16 +143,29 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
       if (!config.data) {
         return false;
       }
+      const instructions = instructionsRef.current.trim() || undefined;
       createReview.mutate(
         {
           platform,
           url,
           modelSlug: effectiveModel.modelSlug,
           thinkingEffort: effectiveModel.thinkingEffort,
-          instructions: instructionsRef.current.trim() || undefined,
+          instructions,
+          operationKey: getKey(
+            JSON.stringify([
+              platform,
+              url,
+              effectiveModel.modelSlug,
+              effectiveModel.thinkingEffort,
+              instructions ?? null,
+            ])
+          ),
         },
         {
           onSuccess: ({ reviewId }) => {
+            // The intent is fulfilled; a later Start of the same draft is a new
+            // review, not a replay of this one.
+            rotateKey();
             settle(null);
             notificationHaptic(Haptics.NotificationFeedbackType.Success);
             router.replace(`/(app)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
@@ -162,11 +180,17 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             // localized screen.
             if (isDeadlineStall(error)) {
               // A wait that ran out its budget is retryable: the same draft
-              // may still start.
+              // may still start, so the key stays for the retry to replay it.
               settle({ message: t('common.takingLonger'), retryable: true });
               return;
             }
-            settle(manualReviewStartFailure(error, platform));
+            const failure = manualReviewStartFailure(error, platform);
+            if (!failure.retryable) {
+              // Resending cannot fix this refusal, so the intent ends here and
+              // the next Start mints its own key.
+              rotateKey();
+            }
+            settle(failure);
           },
         }
       );

@@ -8,6 +8,7 @@ const mockIsLocalCodeReviewDevelopmentEnabled = jest.fn();
 const mockGetAgentConfigForOwner = jest.fn();
 const mockAssertCouncilCreationAllowed = jest.fn();
 const mockCreateCodeReview = jest.fn();
+const mockFindManualReviewByOperationKey = jest.fn();
 const mockTryDispatchPendingReviews = jest.fn();
 const mockGetAllIntegrationsForOwner = jest.fn();
 const mockGetIntegrationForOwner = jest.fn();
@@ -46,6 +47,8 @@ jest.mock('./core/council-entitlement', () => ({
 jest.mock('./db/code-reviews', () => ({
   createCodeReview: (...args: unknown[]) => mockCreateCodeReview(...args),
   findActiveProviderPublishingReview: jest.fn(),
+  findManualReviewByOperationKey: (...args: unknown[]) =>
+    mockFindManualReviewByOperationKey(...args),
 }));
 
 jest.mock('./dispatch/dispatch-pending-reviews', () => ({
@@ -401,6 +404,137 @@ describe('createManualCodeReviewJob connected GitLab source', () => {
       userId: 'bot-1',
       organizationId: 'org-1',
     });
+  });
+});
+
+describe('createManualCodeReviewJob operation key', () => {
+  const OPERATION_KEY = 'c0ffee11-2222-4333-8444-555566667777';
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  /** The provider read a keyless start makes, so a replay can prove it skips it. */
+  function stubPullRequestRead() {
+    return jest.spyOn(global, 'fetch').mockResolvedValue(
+      providerResponse(200, {
+        number: 123,
+        html_url: GITHUB_PR_URL,
+        title: 'Fix the thing',
+        state: 'open',
+        draft: false,
+        user: { login: 'octocat', id: 1 },
+        base: { ref: 'main', repo: { full_name: 'owner/repo' } },
+        head: { ref: 'feature', sha: 'abc123' },
+      })
+    );
+  }
+
+  it('replays the review an accepted start already created instead of starting a second one', async () => {
+    mockFindManualReviewByOperationKey.mockResolvedValue({
+      id: 'review-accepted',
+      platform: 'github',
+      repoFullName: 'owner/repo',
+      prNumber: 123,
+    });
+    const fetchSpy = stubPullRequestRead();
+
+    await expect(
+      createManualCodeReviewJob({
+        owner: OWNER,
+        input: taskInput({ operationKey: OPERATION_KEY }),
+      })
+    ).resolves.toEqual({ reviewId: 'review-accepted', outputMode: 'kilo' });
+
+    expect(mockFindManualReviewByOperationKey).toHaveBeenCalledWith({
+      owner: OWNER,
+      manualOperationKey: OPERATION_KEY,
+    });
+    // The retry repeats none of the work the first, accepted create did: no
+    // provider read, no entitlement lookup, no second row, no second dispatch.
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockGetAgentConfigForOwner).not.toHaveBeenCalled();
+    expect(mockAssertCouncilCreationAllowed).not.toHaveBeenCalled();
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+    expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+  });
+
+  it('refuses a key that already produced a different change', async () => {
+    mockFindManualReviewByOperationKey.mockResolvedValue({
+      id: 'review-other-change',
+      platform: 'github',
+      repoFullName: 'owner/repo',
+      prNumber: 9,
+    });
+    const fetchSpy = stubPullRequestRead();
+
+    const error = await captureError({ operationKey: OPERATION_KEY });
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect((error as TRPCError).code).toBe('CONFLICT');
+    expect((error as TRPCError).message).toBe('operation_key_reuse_mismatch');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('records the key on the create it accepts', async () => {
+    stubPullRequestRead();
+    mockFindManualReviewByOperationKey.mockResolvedValue(null);
+    mockCreateCodeReview.mockResolvedValue('review-new');
+
+    await expect(
+      createManualCodeReviewJob({
+        owner: OWNER,
+        input: taskInput({ operationKey: OPERATION_KEY }),
+      })
+    ).resolves.toEqual({ reviewId: 'review-new', outputMode: 'kilo' });
+
+    expect(mockCreateCodeReview).toHaveBeenCalledWith(
+      expect.objectContaining({ manualOperationKey: OPERATION_KEY })
+    );
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledWith(OWNER);
+  });
+
+  it('replays the winner when a concurrent create with the same key wins the insert', async () => {
+    stubPullRequestRead();
+    mockFindManualReviewByOperationKey
+      // The pre-create lookup misses: the winning create has not committed yet.
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'review-winner',
+        platform: 'github',
+        repoFullName: 'Owner/Repo',
+        prNumber: 123,
+      });
+    mockCreateCodeReview.mockRejectedValue(
+      Object.assign(new Error('duplicate key value violates unique constraint'), { code: '23505' })
+    );
+
+    await expect(
+      createManualCodeReviewJob({
+        owner: OWNER,
+        input: taskInput({ operationKey: OPERATION_KEY }),
+      })
+    ).resolves.toEqual({ reviewId: 'review-winner', outputMode: 'kilo' });
+
+    expect(mockFindManualReviewByOperationKey).toHaveBeenCalledTimes(2);
+    // The winner's create already dispatched; the loser must not dispatch again.
+    expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+  });
+
+  it('leaves a keyless start unchanged', async () => {
+    stubPullRequestRead();
+    mockCreateCodeReview.mockResolvedValue('review-keyless');
+
+    await expect(createManualCodeReviewJob({ owner: OWNER, input: taskInput() })).resolves.toEqual({
+      reviewId: 'review-keyless',
+      outputMode: 'kilo',
+    });
+
+    expect(mockFindManualReviewByOperationKey).not.toHaveBeenCalled();
+    expect(mockCreateCodeReview).toHaveBeenCalledWith(
+      expect.objectContaining({ manualOperationKey: undefined })
+    );
   });
 });
 

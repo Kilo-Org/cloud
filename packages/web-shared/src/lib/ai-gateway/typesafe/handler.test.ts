@@ -191,7 +191,6 @@ const reconciledStats = {
   cancelled: null,
   status_code: 200,
   cost_mUsd: 124,
-  market_cost: 124,
   inputTokens: 23,
   outputTokens: 7,
   cacheWriteTokens: 0,
@@ -981,6 +980,26 @@ describe('handleSystemOneRequest', () => {
         status_code: 502,
       }),
       expect.objectContaining({ status_code: 502 })
+    );
+  });
+
+  it('keeps the reconciled provider cost as market cost and charges a free model nothing', async () => {
+    mockedFetch.mockResolvedValue(
+      Response.json({ ...upstreamBody, model: OTHER_SYSTEM_ONE_MODEL, usage: undefined })
+    );
+    jest.mocked(fetchGeneration).mockResolvedValue({
+      data: { id: upstreamBody.id },
+    } as OpenRouterGeneration);
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: OTHER_SYSTEM_ONE_MODEL })
+    );
+
+    expect(response.status).toBe(502);
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 0, market_cost: 124, hasError: true }),
+      expect.objectContaining({ is_free: true })
     );
   });
 

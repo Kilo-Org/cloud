@@ -339,15 +339,25 @@ export async function handleSystemOneRequest(request: NextRequest) {
     const context = usageContextOf(502, null);
     after(async () => {
       const generation = await fetchGeneration(generationId, OPENROUTER);
+      if (!generation) {
+        await logMicrodollarUsageAndReportToBouncer(
+          zeroCostUsageStats(generationId, 502, cancelled, null),
+          context
+        );
+        return;
+      }
+      const reconciled = mapToUsageStats(generation, '', user.id, OPENROUTER.id);
       await logMicrodollarUsageAndReportToBouncer(
-        generation
-          ? {
-              ...mapToUsageStats(generation, '', user.id, OPENROUTER.id),
-              hasError: true,
-              status_code: 502,
-              cancelled,
-            }
-          : zeroCostUsageStats(generationId, 502, cancelled, null),
+        {
+          ...reconciled,
+          hasError: true,
+          status_code: 502,
+          cancelled,
+          // Same split the answered path records: the provider cost stays on the
+          // row as `market_cost`, and a free model charges nothing.
+          cost_mUsd: isFree ? 0 : reconciled.cost_mUsd,
+          market_cost: reconciled.cost_mUsd,
+        },
         context
       );
     });

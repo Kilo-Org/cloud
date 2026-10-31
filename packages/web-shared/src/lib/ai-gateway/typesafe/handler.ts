@@ -334,14 +334,14 @@ export async function handleSystemOneRequest(request: NextRequest) {
    * body did not carry a usable cost. Reconcile it through the generation
    * endpoint the rest of the gateway uses for the same purpose.
    */
-  const deferReconciledUsage = (generationId: string) => {
+  const deferReconciledUsage = (generationId: string, ttfb: number) => {
     const cancelled = request.signal.aborted;
-    const context = usageContextOf(502, null);
+    const context = usageContextOf(502, ttfb);
     after(async () => {
       const generation = await fetchGeneration(generationId, OPENROUTER);
       if (!generation) {
         await logMicrodollarUsageAndReportToBouncer(
-          zeroCostUsageStats(generationId, 502, cancelled, null),
+          zeroCostUsageStats(generationId, 502, cancelled, ttfb),
           context
         );
         return;
@@ -353,6 +353,9 @@ export async function handleSystemOneRequest(request: NextRequest) {
           hasError: true,
           status_code: 502,
           cancelled,
+          // The generation lookup carries no latency, so the gateway's own
+          // measurement is the one this row reports, as it does for the other rows.
+          latency: ttfb,
           // Same split the answered path records: the provider cost stays on the
           // row as `market_cost`, and a free model charges nothing.
           cost_mUsd: isFree ? 0 : reconciled.cost_mUsd,
@@ -425,7 +428,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
   if (!result.success) {
     errorExceptInTest('Invalid OpenRouter System One response or missing usage');
     const generationId = generationIdSchema.safeParse(responseBody);
-    if (generationId.success) deferReconciledUsage(generationId.data.id);
+    if (generationId.success) deferReconciledUsage(generationId.data.id, ttfbMs);
     else deferZeroCostUsage(null, 502, ttfbMs);
     return errorResponse('Invalid upstream response', 'upstream_error', 502);
   }

@@ -115,9 +115,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => (
 }));
 
 const routeUrl = 'http://localhost:3000/api/gateway/typesafe/v1/systemone';
-// The handler reads `performance.now()` twice before it meters: request start, then first byte.
+// The handler reads `performance.now()` once per measured point: request start, first byte, then
+// the metrics read. Advancing by one step per read makes each measured interval exact.
 const CLOCK_START_MS = 1_000;
-const MEASURED_TTFB_MS = 500;
+const CLOCK_STEP_MS = 500;
+const METERED_LATENCY_MS = CLOCK_STEP_MS;
+const METERED_COMPLETE_REQUEST_MS = 2 * CLOCK_STEP_MS;
 const OTHER_SYSTEM_ONE_MODEL = 'respan/span-01-lite:free';
 const SYSTEM_ONE_ALIAS = '~typesafe/jev-latest';
 const pricedSystemOneModels: Record<string, StoredModel> = {
@@ -251,12 +254,10 @@ function mockVerdict(verdict: DecideResponse | null) {
   jest.mocked(startBouncerDecide).mockResolvedValue(verdict);
 }
 
-/** Pins the request-start and first-byte clock reads so metered latency is exact. */
-function mockMeasuredTtfb() {
-  return jest
-    .spyOn(performance, 'now')
-    .mockReturnValueOnce(CLOCK_START_MS)
-    .mockReturnValueOnce(CLOCK_START_MS + MEASURED_TTFB_MS);
+/** Pins every `performance.now()` read to a fixed cadence so the measured times are exact. */
+function mockMeteredClock() {
+  let now = CLOCK_START_MS;
+  jest.spyOn(performance, 'now').mockImplementation(() => (now += CLOCK_STEP_MS));
 }
 
 describe('handleSystemOneRequest', () => {
@@ -305,6 +306,7 @@ describe('handleSystemOneRequest', () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    jest.restoreAllMocks();
   });
 
   it('supports the TypeSafe SDK contract through a custom fetch transport', async () => {
@@ -928,7 +930,7 @@ describe('handleSystemOneRequest', () => {
     ['negative tokens', { ...upstreamBody.usage, input_tokens: -1 }],
     ['fractional tokens', { ...upstreamBody.usage, output_tokens: 1.5 }],
   ])('reconciles the cost of an upstream %s rejection', async (_name, usage) => {
-    const clock = mockMeasuredTtfb();
+    mockMeteredClock();
     mockedFetch.mockResolvedValue(Response.json({ ...upstreamBody, usage }));
     jest.mocked(fetchGeneration).mockResolvedValue({
       data: { id: upstreamBody.id },
@@ -950,17 +952,22 @@ describe('handleSystemOneRequest', () => {
       expect.objectContaining({ id: 'openrouter' })
     );
     expect(mapToUsageStats).toHaveBeenCalledWith(expect.anything(), '', user.id, 'openrouter');
+    expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ttfbMs: METERED_LATENCY_MS,
+        completeRequestMs: METERED_COMPLETE_REQUEST_MS,
+      })
+    );
     expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
       expect.objectContaining({
         hasError: true,
         status_code: 502,
-        latency: MEASURED_TTFB_MS,
+        latency: METERED_LATENCY_MS,
         cost_mUsd: 124,
         market_cost: 124,
       }),
-      expect.objectContaining({ status_code: 502, ttfb_ms: MEASURED_TTFB_MS })
+      expect.objectContaining({ status_code: 502, ttfb_ms: METERED_LATENCY_MS })
     );
-    clock.mockRestore();
   });
 
   it('records a zero-cost row when an invalid body carries no generation id', async () => {
@@ -979,7 +986,7 @@ describe('handleSystemOneRequest', () => {
   });
 
   it('records a zero-cost row when the generation lookup has no answer', async () => {
-    const clock = mockMeasuredTtfb();
+    mockMeteredClock();
     mockedFetch.mockResolvedValue(Response.json({ ...upstreamBody, usage: undefined }));
 
     expect((await handleSystemOneRequest(makeRequest())).status).toBe(502);
@@ -991,13 +998,12 @@ describe('handleSystemOneRequest', () => {
       expect.objectContaining({
         messageId: upstreamBody.id,
         hasError: true,
-        latency: MEASURED_TTFB_MS,
+        latency: METERED_LATENCY_MS,
         cost_mUsd: 0,
         status_code: 502,
       }),
-      expect.objectContaining({ status_code: 502, ttfb_ms: MEASURED_TTFB_MS })
+      expect.objectContaining({ status_code: 502, ttfb_ms: METERED_LATENCY_MS })
     );
-    clock.mockRestore();
   });
 
   it('keeps the reconciled provider cost as market cost and charges a free model nothing', async () => {

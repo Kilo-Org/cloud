@@ -281,13 +281,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // pull-to-refresh both refetch the repositories query.
   const repoFilterUnavailable = repositories.isLoading || repositories.isError;
 
-  // A non-retryable sync outcome ended the intent, so both sync controls
-  // disable and the inline copy below explains the state.
+  // A non-retryable sync outcome ended the intent, so the sync control disables
+  // and the inline copy below explains the state.
   const syncBlocked = triggerSync.isError && !isSecuritySyncRetryable(triggerSync.error);
   // A sync outlives the request that started it. `syncWatch` marks a submit whose
   // command is still to be accounted for — accepted, or refused as already in
-  // flight — and `syncRunning` is the server's own view of the run, so both sync
-  // controls stay in a progress state for the whole sync instead of only for the
+  // flight — and `syncRunning` is the server's own view of the run, so the sync
+  // control stays in a progress state for the whole sync instead of only for the
   // submission, and the refresh effect below fires when it ends.
   const [syncWatch, setSyncWatch] = useState<SyncWatch | null>(null);
   // Whether the run a watch points at was ever visible in the server's list:
@@ -319,7 +319,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // same way once the run it pointed at became visible; until then it waits for
   // the window below, because that run's command may not exist yet. A read that
   // failed ends the watch too: silence is not evidence of progress, and holding
-  // both controls on an unreadable status would leave the screen with no way out.
+  // the control on an unreadable status would leave the screen with no way out.
   useEffect(() => {
     if (syncWatch === null || triggerSync.isPending) {
       return;
@@ -391,8 +391,8 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   }, [syncInFlight, refetchDashboardStats, refetchLastSync]);
 
   // One submit path for every control that starts a sync — the header button,
-  // the empty-state action, the retry beside the failure copy, and a
-  // reconcile-row retry — so their handlers cannot drift apart.
+  // the retry beside the failure copy, and a reconcile-row retry — so their
+  // handlers cannot drift apart.
   const startSync = (intent: SyncIntent) => {
     setLastSyncAttempt({ error: triggerSync.error, intent });
     sawSyncRun.current = false;

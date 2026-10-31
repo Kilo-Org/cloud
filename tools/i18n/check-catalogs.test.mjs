@@ -523,6 +523,92 @@ test('rejects a plural sibling that drops a value other than its count', context
   );
 });
 
+/**
+ * The Security Agent deadline family counts with i18next's own `count`, which
+ * selects the plural category and is also read into the message. Arabic still
+ * names one and two with their own word forms, so the reviewed forms drop that
+ * numeral; an unreviewed form keeps it, and a reviewed form still may not drop a
+ * placeholder that is not the count.
+ */
+const WORDED_COUNT_ENGLISH = {
+  securityAgent: {
+    deadline: {
+      dueInDays_one: 'Due in {{count}} day',
+      dueInDays_other: 'Due in {{count}} days',
+    },
+  },
+};
+const WORDED_COUNT_SOURCE = "t('securityAgent.deadline.dueInDays', { count: 2 });";
+const WORDED_COUNT_TRANSLATED = {
+  securityAgent: {
+    deadline: {
+      dueInDays_zero: 'الأيام المتبقية للموعد: {{count}}',
+      dueInDays_one: 'مستحق بعد يوم واحد',
+      dueInDays_two: 'الموعد بعد يومين',
+      dueInDays_few: 'الموعد بعد {{count}} أيام',
+      dueInDays_many: 'الموعد بعد {{count}} يومًا',
+      dueInDays_other: 'تنتهي المهلة بعد {{count}} يوم',
+    },
+  },
+};
+
+test('accepts a reviewed worded form of a family counted with i18next’s count', context => {
+  const result = runChecker(context, {
+    english: WORDED_COUNT_ENGLISH,
+    translated: WORDED_COUNT_TRANSLATED,
+    source: WORDED_COUNT_SOURCE,
+    language: 'ar',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('rejects a dropped count in an unreviewed form of that family', context => {
+  const result = runChecker(context, {
+    english: WORDED_COUNT_ENGLISH,
+    translated: {
+      securityAgent: {
+        deadline: {
+          ...WORDED_COUNT_TRANSLATED.securityAgent.deadline,
+          dueInDays_few: 'الموعد بعد أيام',
+        },
+      },
+    },
+    source: WORDED_COUNT_SOURCE,
+    language: 'ar',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ar: "securityAgent\.deadline\.dueInDays_few" drops \{\{count\}\} without a reviewed worded form/
+  );
+});
+
+test('rejects the same worded form in a locale the allowlist does not name', context => {
+  const result = runChecker(context, {
+    english: WORDED_COUNT_ENGLISH,
+    translated: {
+      securityAgent: {
+        deadline: {
+          dueInDays_one: 'לתיקון תוך יום',
+          dueInDays_two: 'המועד האחרון בעוד יומיים',
+          dueInDays_many: 'נותרו {{count}} ימים למועד האחרון',
+          dueInDays_other: 'נותרו {{count}} ימים למועד האחרון',
+        },
+      },
+    },
+    source: WORDED_COUNT_SOURCE,
+    language: 'he',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  // The dual has no English sibling, so only the reviewed-form allowance could
+  // accept it: a Hebrew entry must not ride on the Arabic one.
+  assert.match(
+    result.stderr,
+    /mobile\/he: "securityAgent\.deadline\.dueInDays_two" drops \{\{count\}\} without a reviewed worded form/
+  );
+});
+
 const COUNTED = {
   counts: {
     items: '{{count}} items',

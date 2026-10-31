@@ -333,9 +333,12 @@ export function planNeedsInputNotifications({
 
 /**
  * Whether a still-waiting raise's standing notification must be re-published in
- * place: never notified, or the shape the notification carries moved — the
- * kind, the associated PR link the notification's Open PR action carries, or
- * the user's preview choice, which decides whether the title may be shown.
+ * place: never notified, or the copy and controls it carries moved — the kind,
+ * the associated PR link the notification's Open PR action carries, the preview
+ * choice, or, under `full` previews, the title the notification displays. The
+ * title is compared only where it is shown: a raise that first posted while the
+ * backend default title was still in place keeps that fallback until something
+ * else re-publishes it, unless the title counts here.
  */
 function needsRepublish(
   notifiedRow: NeedsInputNotificationRow | undefined,
@@ -347,7 +350,8 @@ function needsRepublish(
   return (
     notifiedRow.kind !== next.kind ||
     notifiedRow.prUrl !== next.prUrl ||
-    notifiedRow.previews !== next.previews
+    notifiedRow.previews !== next.previews ||
+    (next.previews === 'full' && notifiedRow.title !== next.title)
   );
 }
 

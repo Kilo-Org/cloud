@@ -295,6 +295,34 @@ describe('planNeedsInputNotifications', () => {
     expect(plan).toEqual({ publish: [], dismiss: [], updates: [] });
   });
 
+  it('re-publishes in place when the shown title changes under full previews', () => {
+    // The raise first posted while the backend default title stood in; the
+    // notification displays that fallback, so the real title must replace it
+    // under `full` without waiting for a kind or PR change.
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow({ title: 'Untitled session', previews: 'full' })],
+      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+      previews: 'full',
+    });
+    expect(plan.publish).toEqual([notifiedRow({ title: 'Fix the bug', previews: 'full' })]);
+    expect(plan.updates).toEqual(['ses_1']);
+  });
+
+  it('does not re-post on a title change while the generic copy is shown', () => {
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow({ title: 'Untitled session', previews: 'generic' })],
+      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+      previews: 'generic',
+    });
+    expect(plan).toEqual({ publish: [], dismiss: [], updates: [] });
+  });
+
   it('alerts again when a raise it dismisses is re-posted under a new organization', () => {
     // A raise that moved organization and changed kind lands in both `dismiss`
     // and `publish`. The dismissal removes the standing notification first, so

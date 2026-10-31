@@ -427,7 +427,10 @@ describe('Live session feedback band', () => {
     // that same one gap.
     expect(
       paintedNodes(
-        await bandJson({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true }),
+        await bandJson(
+          { ...settled, hasAcceptedSuccess: false },
+          { ...context, isResolving: true }
+        ),
         'View'
       )
     ).toHaveLength(0);

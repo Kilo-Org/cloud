@@ -88,9 +88,7 @@ export async function readSignedInScope(keychain: ScopeKeychain): Promise<Signed
       keychain.getItemAsync(ACTIVE_USER_ID_KEY),
       keychain.getItemAsync(ORGANIZATION_STORAGE_KEY),
     ]);
-    return userId === null
-      ? { status: 'absent' }
-      : { status: 'known', userId, organizationId };
+    return userId === null ? { status: 'absent' } : { status: 'known', userId, organizationId };
   } catch (error) {
     reportSecureStoreFailure('read', error);
     return { status: 'unavailable' };

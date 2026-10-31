@@ -2621,7 +2621,7 @@
     "couldNotSaveChoice": "Je keuze kon niet worden opgeslagen. Probeer het opnieuw.",
     "onlineAllowed": "Online, toegestaan",
     "onlineNotAllowed": "Online, niet toegestaan",
-    "optionalReview": "Optioneel — je kunt dit op elk moment wijzigen in de instellingen",
+    "optionalReview": "Optioneel",
     "optionalOnboarding": "Optioneel — aan, tenzij je het uitschakelt",
     "aiProvidersWhat": "Je prompts, gespreksgeschiedenis en alle bestanden die je bijvoegt.",
     "aiProvidersWhy": "Om AI-antwoorden te genereren.",
@@ -3976,7 +3976,8 @@
       "nameRequired": "Voer een opdrachtnaam in",
       "nameInvalid": "De naam moet beginnen met een kleine letter en mag alleen kleine letters, cijfers en streepjes bevatten",
       "templateRequired": "Voer een opdrachtsjabloon in",
-      "nameConflict": "Die naam is gereserveerd door een ingebouwd commando"
+      "nameConflict": "Die naam is gereserveerd door een ingebouwd commando",
+      "duplicateName": "Er bestaat al een opdracht met deze naam in dit profiel"
     },
     "repoBindings": {
       "title": "Standaardprofielen voor repo's",

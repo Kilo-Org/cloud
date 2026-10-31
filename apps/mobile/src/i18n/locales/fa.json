@@ -330,7 +330,7 @@
       "diffTooLarge": "حجم تغییرات بیش از حد است",
       "openFile": "باز کردن {{path}}",
       "openFileViewed": "باز کردن {{path}} (مشاهده‌شده)",
-      "title": "فایل"
+      "title": "فایل‌ها"
     },
     "fileRows": {
       "markViewed": "علامت‌گذاری {{path}} به‌عنوان مشاهده‌شده",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "مرور کلی",
-      "files": "فایل",
+      "files": "فایل‌ها",
       "discussion": "گفت‌وگو"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "گرفتن عکس",
       "photoLibrary": "گالری عکس",
-      "files": "فایل",
+      "files": "فایل‌ها",
       "cameraAccessMessage": "برای گرفتن عکس، دسترسی به دوربین را در تنظیمات فعال کنید."
     },
     "typingIndicator": {
@@ -2773,7 +2773,7 @@
     "attachmentPicker": {
       "camera": "دوربین",
       "photoLibrary": "گالری عکس",
-      "files": "فایل",
+      "files": "فایل‌ها",
       "couldNotOpenPhotoPicker": "انتخاب‌گر عکس باز نشد. Kilo را ببندید و دوباره باز کنید، سپس دوباره تلاش کنید.",
       "maxFilesAllowed": "حداکثر {{displayCount}} فایل مجاز است.",
       "onlyAddingFiles": "فقط {{accepted}} فایل از {{total}} فایل اضافه می‌شود (سقف مجاز: {{max}})",
@@ -3156,7 +3156,7 @@
     "couldNotSaveChoice": "انتخاب شما ذخیره نشد. لطفاً دوباره تلاش کنید.",
     "onlineAllowed": "آنلاین، مجاز",
     "onlineNotAllowed": "آنلاین، غیرمجاز",
-    "optionalReview": "اختیاری — قابل تغییر در تنظیمات در هر زمان",
+    "optionalReview": "اختیاری",
     "optionalOnboarding": "اختیاری — فعال تا زمانی که آن را غیرفعال کنید",
     "aiProvidersWhat": "پیام‌های شما، تاریخچهٔ گفت‌وگو و هر فایلی که پیوست می‌کنید.",
     "aiProvidersWhy": "برای تولید پاسخ‌های هوش مصنوعی.",
@@ -3982,7 +3982,8 @@
       "nameRequired": "یک نام فرمان وارد کنید",
       "nameInvalid": "نام باید با یک حرف کوچک شروع شود و فقط از حروف کوچک، ارقام و خط تیره استفاده کند",
       "templateRequired": "یک قالب فرمان را وارد کنید",
-      "nameConflict": "این نام توسط یک دستور داخلی رزرو شده است"
+      "nameConflict": "این نام توسط یک دستور داخلی رزرو شده است",
+      "duplicateName": "فرمانی با این نام از قبل در این نمایه وجود دارد"
     },
     "repoBindings": {
       "title": "نمایه های پیش فرض برای مخازن",

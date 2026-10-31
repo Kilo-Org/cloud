@@ -1,13 +1,13 @@
 import { sessionLiveText } from '@kilocode/session-ingest-contracts';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Pressable, useColorScheme, View } from 'react-native';
 
 import { ChevronDown, ChevronUp, Pencil, Terminal, Trash2 } from '@/components/ui/icons';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { COMPACT_CONTROL_BOX_CLASS, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 
 type KiloCommandRowProps = Readonly<{
   name: string;
@@ -80,8 +80,15 @@ export function KiloCommandRowView({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const preview = templatePreview(template);
+  // Same signal `useThemeColors` reads. The dark palette's `primaryForeground`
+  // is near-black, so an off switch drawn from it put a dark thumb on a dark
+  // track over the dark card; the off state asks for a light thumb on a track
+  // that stands off the card in both schemes.
+  const isDark = useColorScheme() === 'dark';
+  const offTrackColor = isDark ? colors.mutedForeground : colors.mutedSoft;
+  const offThumbColor = isDark ? colors.foreground : colors.primaryForeground;
   const controlClass = (disabled: boolean) =>
-    cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70', disabled && 'opacity-40');
+    cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70', disabled && 'opacity-40');
   return (
     <View className="gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="flex-row items-center gap-1">
@@ -120,19 +127,22 @@ export function KiloCommandRowView({
           accessibilityLabel={name}
           disabled={onToggle === undefined}
           onValueChange={onToggle}
+          trackColor={{ false: offTrackColor, true: colors.primary }}
+          thumbColor={enabled ? colors.primaryForeground : offThumbColor}
         />
       </View>
       {onMoveUp !== undefined ||
       onMoveDown !== undefined ||
       onEdit !== undefined ||
       onDelete !== undefined ? (
-        <View className="flex-row items-center justify-end gap-1">
+        <View className="flex-row items-center justify-end gap-5">
           {onMoveUp !== undefined ? (
             <Pressable
               className={controlClass(isFirst)}
               disabled={isFirst}
               accessibilityRole="button"
               accessibilityLabel={t('profiles.slashCommands.moveUp', { name })}
+              hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
               onPress={onMoveUp}
             >
               <ChevronUp size={20} color={colors.mutedForeground} />
@@ -144,6 +154,7 @@ export function KiloCommandRowView({
               disabled={isLast}
               accessibilityRole="button"
               accessibilityLabel={t('profiles.slashCommands.moveDown', { name })}
+              hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
               onPress={onMoveDown}
             >
               <ChevronDown size={20} color={colors.mutedForeground} />
@@ -151,9 +162,10 @@ export function KiloCommandRowView({
           ) : null}
           {onEdit !== undefined ? (
             <Pressable
-              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+              className={cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70')}
               accessibilityRole="button"
               accessibilityLabel={t('profiles.slashCommands.edit', { name })}
+              hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
               onPress={onEdit}
             >
               <Pencil size={18} color={colors.mutedForeground} />
@@ -161,9 +173,10 @@ export function KiloCommandRowView({
           ) : null}
           {onDelete !== undefined ? (
             <Pressable
-              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+              className={cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70')}
               accessibilityRole="button"
               accessibilityLabel={t('profiles.slashCommands.delete', { name })}
+              hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
               onPress={onDelete}
             >
               <Trash2 size={18} color={colors.mutedForeground} />

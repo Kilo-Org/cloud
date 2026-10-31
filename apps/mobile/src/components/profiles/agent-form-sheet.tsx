@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- the agent form keeps its validation, dirty check, and every field group in one sheet, so Save and the fields it saves stay together */
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,6 +26,7 @@ import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
+import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { cn } from '@/lib/utils';
 
 const ERROR_FIELDS = {
@@ -38,6 +39,12 @@ const ERROR_FIELDS = {
 } as const satisfies Record<AgentFormError, string>;
 
 type AgentFormSheetProps = Readonly<{
+  /**
+   * The form draft the fields belong to (see `lib/form-draft`). The screen
+   * passes a scope scoped to its profile, so a remount reopens the sheet on
+   * what was typed; a caller without one gets fresh fields every mount.
+   */
+  draftScope?: string;
   agent: AgentSource | null;
   /** Slugs of the profile's other agents, so a duplicate fails validation inline. */
   existingSlugs: readonly string[];
@@ -66,6 +73,7 @@ type AgentFormSheetProps = Readonly<{
  * save: an unavailable model list only hides the control.
  */
 export function AgentFormSheet({
+  draftScope,
   agent,
   existingSlugs,
   organizationId,
@@ -77,20 +85,29 @@ export function AgentFormSheet({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const initial = initialAgentFormState(agent ?? undefined);
-  const slugRef = useRef(initial.slug);
-  const nameRef = useRef(initial.name);
-  const descriptionRef = useRef(initial.description);
-  const promptRef = useRef(initial.prompt);
-  const modelRef = useRef(initial.model);
-  const stepsRef = useRef(initial.steps);
-  const temperatureRef = useRef(initial.temperature);
-  const topPRef = useRef(initial.topP);
+  const scope = draftScope;
+  const slugRef = useFormDraftRef(scope, 'slug', initial.slug);
+  const nameRef = useFormDraftRef(scope, 'name', initial.name);
+  const descriptionRef = useFormDraftRef(scope, 'description', initial.description);
+  const promptRef = useFormDraftRef(scope, 'prompt', initial.prompt);
+  const modelRef = useFormDraftRef(scope, 'model', initial.model);
+  const stepsRef = useFormDraftRef(scope, 'steps', initial.steps);
+  const temperatureRef = useFormDraftRef(scope, 'temperature', initial.temperature);
+  const topPRef = useFormDraftRef(scope, 'topP', initial.topP);
   // The typed model is text in `modelRef`; this state exists only to derive the
   // variant options the catalogue publishes for it.
-  const [modelValue, setModelValue] = useState(initial.model);
-  const [visibility, setVisibility] = useState<AgentVisibility>(initial.visibility);
-  const [variant, setVariant] = useState(initial.variant);
-  const [disabledTools, setDisabledTools] = useState<readonly string[]>(initial.disabledTools);
+  const [modelValue, setModelValue] = useFormDraftState(scope, 'modelValue', initial.model);
+  const [visibility, setVisibility] = useFormDraftState<AgentVisibility>(
+    scope,
+    'visibility',
+    initial.visibility
+  );
+  const [variant, setVariant] = useFormDraftState(scope, 'variant', initial.variant);
+  const [disabledTools, setDisabledTools] = useFormDraftState<readonly string[]>(
+    scope,
+    'disabledTools',
+    initial.disabledTools
+  );
   const [error, setError] = useState<AgentFormError | null>(null);
   const { models } = useAvailableModels(organizationId);
   const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
@@ -163,7 +180,7 @@ export function AgentFormSheet({
       >
         <FormField
           label={t('profiles.agents.slug')}
-          defaultValue={initial.slug}
+          defaultValue={slugRef.current}
           error={slugFieldError(t, error, slugConflictFromServer)}
           disabled={isSaving}
           required
@@ -180,7 +197,7 @@ export function AgentFormSheet({
         />
         <FormField
           label={t('profiles.agents.name')}
-          defaultValue={initial.name}
+          defaultValue={nameRef.current}
           error={
             error === 'name-required' || error === 'name-too-long'
               ? agentErrorText(t, error)
@@ -197,7 +214,7 @@ export function AgentFormSheet({
         />
         <FormField
           label={t('profiles.agents.description')}
-          defaultValue={initial.description}
+          defaultValue={descriptionRef.current}
           error={error === 'description-too-long' ? agentErrorText(t, error) : undefined}
           disabled={isSaving}
           placeholder={t('profiles.descriptionPlaceholder')}
@@ -209,7 +226,7 @@ export function AgentFormSheet({
         />
         <FormField
           label={t('profiles.agents.prompt')}
-          defaultValue={initial.prompt}
+          defaultValue={promptRef.current}
           disabled={isSaving}
           multiline
           textAlignVertical="top"
@@ -223,7 +240,7 @@ export function AgentFormSheet({
         />
         <FormField
           label={t('profiles.agents.model')}
-          defaultValue={initial.model}
+          defaultValue={modelRef.current}
           disabled={isSaving}
           autoCapitalize="none"
           autoCorrect={false}
@@ -248,7 +265,7 @@ export function AgentFormSheet({
 
         <FormField
           label={t('profiles.agents.steps')}
-          defaultValue={initial.steps}
+          defaultValue={stepsRef.current}
           disabled={isSaving}
           keyboardType="number-pad"
           placeholder={t('profiles.agents.stepsPlaceholder')}
@@ -258,7 +275,7 @@ export function AgentFormSheet({
         />
         <FormField
           label={t('profiles.agents.temperature')}
-          defaultValue={initial.temperature}
+          defaultValue={temperatureRef.current}
           disabled={isSaving}
           keyboardType="decimal-pad"
           placeholder={t('profiles.agents.temperaturePlaceholder')}
@@ -268,7 +285,7 @@ export function AgentFormSheet({
         />
         <FormField
           label={t('profiles.agents.topP')}
-          defaultValue={initial.topP}
+          defaultValue={topPRef.current}
           disabled={isSaving}
           keyboardType="decimal-pad"
           placeholder={t('profiles.agents.topPPlaceholder')}

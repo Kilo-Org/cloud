@@ -3156,7 +3156,7 @@
     "couldNotSaveChoice": "Hindi ma-save ang pinili mo. Subukang muli.",
     "onlineAllowed": "Online, pinapayagan",
     "onlineNotAllowed": "Online, hindi pinapayagan",
-    "optionalReview": "Opsyonal — maaari mo itong baguhin anumang oras sa mga setting",
+    "optionalReview": "Opsyonal",
     "optionalOnboarding": "Opsyonal — pinagana maliban kung i-off mo ito",
     "aiProvidersWhat": "Ang mga prompt mo, kasaysayan ng pag-uusap, at anumang file na ilalakip mo.",
     "aiProvidersWhy": "Para makabuo ng mga tugon ng AI.",
@@ -3982,7 +3982,8 @@
       "nameRequired": "Maglagay ng command name",
       "nameInvalid": "Ang pangalan ay dapat magsimula sa maliit na titik at gumamit lamang ng maliliit na titik, digit, at gitling",
       "templateRequired": "Maglagay ng command template",
-      "nameConflict": "Ang pangalang iyon ay nakalaan sa pamamagitan ng isang built-in na command"
+      "nameConflict": "Ang pangalang iyon ay nakalaan sa pamamagitan ng isang built-in na command",
+      "duplicateName": "Mayroon nang command na may ganyang pangalan sa profile na ito"
     },
     "repoBindings": {
       "title": "Mga Default na Profile para sa Repos",

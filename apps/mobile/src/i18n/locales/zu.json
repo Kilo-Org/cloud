@@ -3156,7 +3156,7 @@
     "couldNotSaveChoice": "Asikwazanga ukulondoloza okukhethile. Sicela uzame futhi.",
     "onlineAllowed": "Nge-inthanethi, kuvunyelwe",
     "onlineNotAllowed": "Nge-inthanethi, akuvunyelwe",
-    "optionalReview": "Ongazikhethela kona — ungakushintsha noma nini ezilungiselelweni",
+    "optionalReview": "Ongazikhethela kona",
     "optionalOnboarding": "Ongazikhethela kona — kuvuliwe ngaphandle uma ukuvala",
     "aiProvidersWhat": "Izicelo zakho, umlando wengxoxo nanoma yimaphi amafayela owanamathiselayo.",
     "aiProvidersWhy": "Ukuze kukhiqizwe izimpendulo ze-AI.",
@@ -3982,7 +3982,8 @@
       "nameRequired": "Faka igama lomyalo",
       "nameInvalid": "Igama kufanele liqale ngohlamvu oluncane futhi lisebenzise kuphela izinhlamvu ezincane, amadijithi, namadeshi",
       "templateRequired": "Faka isifanekiso somyalo",
-      "nameConflict": "Lelo gama ligodliwe umyalo owakhelwe ngaphakathi"
+      "nameConflict": "Lelo gama ligodliwe umyalo owakhelwe ngaphakathi",
+      "duplicateName": "Umyalo onaleli gama isivele ukhona kuleli phrofayili"
     },
     "repoBindings": {
       "title": "Amaphrofayili Azenzakalelayo we-Repos",

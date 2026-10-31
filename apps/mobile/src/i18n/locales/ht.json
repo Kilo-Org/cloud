@@ -3150,7 +3150,7 @@
     "couldNotSaveChoice": "Nou pa t ka anrejistre chwa ou a. Tanpri eseye ankò.",
     "onlineAllowed": "Sou entènèt, pèmèt",
     "onlineNotAllowed": "Sou entènèt, pa pèmèt",
-    "optionalReview": "Opsyonèl — ou ka chanje sa nenpòt lè nan Paramèt",
+    "optionalReview": "Opsyonèl",
     "optionalOnboarding": "Opsyonèl — aktive sof si ou dezaktive li",
     "aiProvidersWhat": "Enstriksyon ou yo, istorik konvèsasyon yo ak tout fichye ou atache.",
     "aiProvidersWhy": "Pou jenere repons AI.",
@@ -3976,7 +3976,8 @@
       "nameRequired": "Antre yon non kòmand",
       "nameInvalid": "Non yo dwe kòmanse ak yon lèt miniskil epi itilize sèlman lèt miniskil, chif ak tire",
       "templateRequired": "Antre yon modèl lòd",
-      "nameConflict": "Non sa a rezève pa yon kòmandman entegre"
+      "nameConflict": "Non sa a rezève pa yon kòmandman entegre",
+      "duplicateName": "Yon kòmandman ki gen non sa a deja egziste nan pwofil sa a"
     },
     "repoBindings": {
       "title": "Default Profiles pou Repos",

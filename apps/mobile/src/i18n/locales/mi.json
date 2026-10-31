@@ -330,7 +330,7 @@
       "diffTooLarge": "he nui rawa ngā rerekētanga",
       "openFile": "Whakatuwheratia {{path}}",
       "openFileViewed": "Whakatuwheratia {{path}} (kua tirohia)",
-      "title": "Kōnae"
+      "title": "Ngā kōnae"
     },
     "fileRows": {
       "markViewed": "Tohua {{path}} hei kōnae kua tirohia",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "Tirohanga whānui",
-      "files": "Kōnae",
+      "files": "Ngā kōnae",
       "discussion": "Kōrerorero"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "Hopu whakaahua",
       "photoLibrary": "Puna whakaahua",
-      "files": "Kōnae",
+      "files": "Ngā kōnae",
       "cameraAccessMessage": "Whakaaetia te uru ki te kāmera i ngā tautuhinga kia taea ai te tango whakaahua."
     },
     "typingIndicator": {
@@ -2767,7 +2767,7 @@
     "attachmentPicker": {
       "camera": "Kāmera",
       "photoLibrary": "Puna whakaahua",
-      "files": "Kōnae",
+      "files": "Ngā kōnae",
       "couldNotOpenPhotoPicker": "Kāore i taea te whakatuwhera i te pūkōwhiri whakaahua. Tīmataria anō a Kilo, kātahi ka whakamātau anō.",
       "maxFilesAllowed": "Ko te mōrahi o ngā kōnae e whakaaetia ana ko {{displayCount}}.",
       "onlyAddingFiles": "Kei te tāpiri i ngā kōnae {{accepted}} anake o te {{total}} (mōrahi {{max}})",
@@ -3150,7 +3150,7 @@
     "couldNotSaveChoice": "Kāore i taea te tiaki i tō kōwhiringa. Whakamātau anō.",
     "onlineAllowed": "Ā-ipurangi, kua whakaaetia",
     "onlineNotAllowed": "Ā-ipurangi, kāore e whakaaetia",
-    "optionalReview": "He kōwhiringa — ka taea te huri i tēnei i ngā tautuhinga ahakoa te wā",
+    "optionalReview": "He kōwhiringa",
     "optionalOnboarding": "He kōwhiringa — ka noho kā tonu kia whakawetohia e koe",
     "aiProvidersWhat": "Ō tohutohu, tō hītori kōrerorero me ngā kōnae ka whakapiria e koe.",
     "aiProvidersWhy": "Hei whakaputa whakautu AI.",
@@ -3976,7 +3976,8 @@
       "nameRequired": "Whakauruhia he ingoa whakahau",
       "nameInvalid": "Me timata te ingoa ki te reta iti me te whakamahi i nga reta iti, nga mati me nga tohu",
       "templateRequired": "Whakauruhia he tauira whakahau",
-      "nameConflict": "Ko taua ingoa kua rahuitia e tetahi tono whakauru"
+      "nameConflict": "Ko taua ingoa kua rahuitia e tetahi tono whakauru",
+      "duplicateName": "Kua whakamahia tēnei ingoa e tētahi atu whakahau i tēnei kōtaha"
     },
     "repoBindings": {
       "title": "Kōtaha Taunoa mō Repos",

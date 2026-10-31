@@ -2621,7 +2621,7 @@
     "couldNotSaveChoice": "Không thể lưu lựa chọn của bạn. Vui lòng thử lại.",
     "onlineAllowed": "Trực tuyến, được phép",
     "onlineNotAllowed": "Trực tuyến, không được phép",
-    "optionalReview": "Tùy chọn — bạn có thể thay đổi bất cứ lúc nào trong Cài đặt",
+    "optionalReview": "Tùy chọn",
     "optionalOnboarding": "Tùy chọn — mặc định bật, bạn có thể tắt",
     "aiProvidersWhat": "Yêu cầu, lịch sử trò chuyện và mọi tệp bạn đính kèm.",
     "aiProvidersWhy": "Để tạo phản hồi AI.",
@@ -3976,7 +3976,8 @@
       "nameRequired": "Nhập tên lệnh",
       "nameInvalid": "Tên phải bắt đầu bằng chữ cái viết thường và chỉ sử dụng chữ cái viết thường, chữ số và dấu gạch ngang",
       "templateRequired": "Nhập mẫu lệnh",
-      "nameConflict": "Tên đó được bảo lưu bởi một lệnh tích hợp"
+      "nameConflict": "Tên đó được bảo lưu bởi một lệnh tích hợp",
+      "duplicateName": "Một lệnh có tên này đã tồn tại trong hồ sơ này"
     },
     "repoBindings": {
       "title": "Hồ sơ mặc định cho Repos",

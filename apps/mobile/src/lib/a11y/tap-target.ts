@@ -291,15 +291,9 @@ export const LEGAL_LINK_MIN_DP = 48;
  * boxes sit one gutter apart and can never overlap, so a tap between the lines
  * opens the link it points at. The footer pays one 48dp line for that, which is
  * what keeps the geometry honest: a box that cancelled its own height would
- * reach 17dp into the line below.
+ * reach 17dp into the line below. The links' copy is `text-xs`, a 14dp line.
  */
 export const LEGAL_LINK_BOX_CLASS = 'min-h-[48px] min-w-[48px] items-center justify-center';
-
-/**
- * The `text-xs` line a legal link centres on, in dp: line-height
- * `calc(1 / 0.75)` of 10.5dp.
- */
-export const LEGAL_LINK_LINE_DP = 14;
 
 /**
  * The row the two store legal links share: side by side when they fit, one per

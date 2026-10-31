@@ -49,7 +49,11 @@ export function catalogModelSupportsTools(model: CatalogModel): boolean {
   return model.supported_parameters?.includes('tools') ?? true;
 }
 
-/** The CLI's output cap (`OUTPUT_TOKEN_MAX` in the kilo CLI). */
+/**
+ * The CLI's output cap and completion fallback, mirrored from the kilo CLI:
+ * `OUTPUT_TOKEN_MAX` in `packages/opencode/src/provider/transform.ts` and the
+ * `maxOutputTokens` fallback in `packages/kilo-gateway/src/api/models.ts`.
+ */
 const CLI_OUTPUT_TOKEN_MAX = 32_000;
 
 /**

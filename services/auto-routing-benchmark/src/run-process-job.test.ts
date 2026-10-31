@@ -1055,6 +1055,12 @@ describe('processJob — scheduler waits and paid-call safety', () => {
       persisted: false,
       text: 'Partial step before the limit',
       lastEventTypes: ['tool_use', 'error'],
+      stderrTail: 'Error: rate\u001b[0m limit reached',
+    },
+    {
+      persisted: false,
+      text: 'Partial step before the limit',
+      lastEventTypes: ['tool_use', 'error'],
       stderrTail: 'HTTP 429 rate limited',
     },
     {

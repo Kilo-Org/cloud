@@ -86,7 +86,7 @@ const UNAVAILABLE_DIAGNOSTIC =
   /\b(?:internal server error|bad gateway|service unavailable|gateway timeout|temporarily unavailable|HTTP 5\d\d)\b/i;
 
 export function hasThrottleDiagnostic(result: Pick<CliRunResult, 'stderrTail'>): boolean {
-  return THROTTLE_DIAGNOSTIC.test(result.stderrTail);
+  return THROTTLE_DIAGNOSTIC.test(stripVTControlCharacters(result.stderrTail));
 }
 
 /**
@@ -102,7 +102,7 @@ export function isUnbilledTransientProviderResult(
 ): boolean {
   if ((result.costUsd ?? 0) !== 0 || result.timedOut) return false;
   const diagnostic = stripVTControlCharacters(result.stderrTail);
-  if (!hasThrottleDiagnostic(result) && !UNAVAILABLE_DIAGNOSTIC.test(diagnostic)) {
+  if (!THROTTLE_DIAGNOSTIC.test(diagnostic) && !UNAVAILABLE_DIAGNOSTIC.test(diagnostic)) {
     return false;
   }
   return (

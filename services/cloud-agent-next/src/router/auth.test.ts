@@ -172,4 +172,22 @@ describe('scoped Cloud Agent Worker authorization', () => {
       })
     ).resolves.toEqual({ owner: 'owner' });
   });
+
+  it('accepts a web-resolved GitHub integration id only across the trusted internal boundary', async () => {
+    const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+    const launch = { ...input, githubIntegrationId };
+
+    await expect(
+      scopedRouter.createCaller(context('internal-fixture')).prepareSession(launch)
+    ).resolves.toEqual({ owner: 'owner' });
+    await expect(scopedRouter.createCaller(context()).prepareSession(launch)).rejects.toMatchObject(
+      { code: 'UNAUTHORIZED' }
+    );
+    await expect(
+      scopedRouter.createCaller(context('internal-fixture')).prepareSession({
+        ...input,
+        githubIntegrationId: 'not-a-uuid',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
 });

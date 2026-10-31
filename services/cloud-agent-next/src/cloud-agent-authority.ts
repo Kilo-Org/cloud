@@ -98,6 +98,7 @@ const workerPreparationMetadataSchema = z
     githubAccessPurpose: z.enum(['agent', 'workflow']).optional(),
     clientProvenance: z.enum(['browser', 'mobile']).optional(),
     kilocodeOrganizationId: z.string().optional(),
+    githubIntegrationId: z.uuid().optional(),
   })
   .passthrough();
 

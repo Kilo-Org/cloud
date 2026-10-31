@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import {
   CloudAgentAuthoritySchema,
+  validateCloudAgentAuthorityRequest,
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
 import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
@@ -43,6 +44,15 @@ const launch = {
   mode: 'code',
   model: 'kilo/test-model',
   autoInitiate: true,
+};
+const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+const webForwardedLaunch = {
+  ...launch,
+  platform: 'github',
+  createdOnPlatform: 'cloud-agent-web',
+  githubAccessPurpose: 'agent',
+  clientProvenance: 'browser',
+  githubIntegrationId,
 };
 
 function fixture() {
@@ -194,6 +204,44 @@ describe('Cloud Agent spawn authority', () => {
       validateScopedWorkerPreparation(organizationScope, {
         ...launch,
         kilocodeOrganizationId: 'other',
+      })
+    ).toThrow();
+  });
+
+  it('accepts the full web-forwarded personal preparation input without widening the public scoped schema', () => {
+    expect(validateScopedWorkerPreparation(scope, webForwardedLaunch)).toEqual({
+      ...launch,
+    });
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', webForwardedLaunch)
+    ).toThrow();
+  });
+
+  it('accepts the full web-forwarded organization preparation input without widening the public scoped schema', () => {
+    const organizationId = '22345678-1234-4234-8234-123456789abc';
+    const organizationScope: CloudAgentAuthority = { ...scope, organizationId };
+    const input = {
+      ...webForwardedLaunch,
+      kilocodeOrganizationId: organizationId,
+    };
+    expect(validateScopedWorkerPreparation(organizationScope, input)).toEqual({
+      ...launch,
+      organizationId,
+    });
+    expect(() =>
+      validateCloudAgentAuthorityRequest(
+        organizationScope,
+        'organizations.cloudAgentNext.prepareSession',
+        input
+      )
+    ).toThrow();
+  });
+
+  it('rejects a malformed trusted GitHub integration identity', () => {
+    expect(() =>
+      validateScopedWorkerPreparation(scope, {
+        ...webForwardedLaunch,
+        githubIntegrationId: 'not-a-uuid',
       })
     ).toThrow();
   });

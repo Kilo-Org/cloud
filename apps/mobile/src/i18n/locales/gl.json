@@ -1781,6 +1781,7 @@
       "notYetSynced": "Aínda non sincronizado",
       "refreshFailed": "Non se puido actualizar: móstranse os últimos datos sincronizados.",
       "settings": "Axustes",
+      "syncing": "Sincronizando…",
       "syncNow": "Sincronizar agora",
       "syncQueued": "Sincronización na cola",
       "syncStatusUnavailable": "O estado da sincronización non está dispoñible.",

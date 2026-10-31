@@ -117,20 +117,15 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
   }
 
   if (!finding) {
+    // Nothing is waiting, so the row is a statement, not a destination: a
+    // trailing arrow and a press state promised a findings list with nothing
+    // to act on.
     return (
       <SectionCard title={t('securityAgent.dashboard.actFirst')}>
-        <Pressable
-          className="flex-row items-center justify-between gap-2 py-3 active:opacity-70"
-          onPress={() => {
-            pushOnce(findingsHref(scope, { status: 'open' }));
-          }}
-        >
-          <View className="flex-row items-center gap-2">
-            <ShieldCheck size={16} color={colors.good} />
-            <Text className="text-sm">{t('securityAgent.dashboard.noOpenFindings')}</Text>
-          </View>
-          <DirectionalArrowRight size={14} color={colors.mutedForeground} />
-        </Pressable>
+        <View className="flex-row items-center gap-2 py-3">
+          <ShieldCheck size={16} color={colors.good} />
+          <Text className="text-sm">{t('securityAgent.dashboard.noOpenFindings')}</Text>
+        </View>
       </SectionCard>
     );
   }
@@ -235,14 +230,14 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
         label={t('securityAgent.dashboard.confirmedExploitable')}
         value={rowValue(neverSynced, formatNumber(data.analysis.exploitable, i18n.language))}
         valueTone="muted"
-        dotTone={rowTone(neverSynced, 'danger')}
+        dotTone={rowTone(neverSynced, data.analysis.exploitable > 0 ? 'danger' : 'muted')}
       />
       <KvRow
         className={ROW_TARGET_CLASS}
         label={t('securityAgent.dashboard.needsEvidenceReview')}
         value={rowValue(neverSynced, formatNumber(data.analysis.needsReview, i18n.language))}
         valueTone="muted"
-        dotTone={rowTone(neverSynced, 'warn')}
+        dotTone={rowTone(neverSynced, data.analysis.needsReview > 0 ? 'warn' : 'muted')}
       />
       <KvRow
         className={ROW_TARGET_CLASS}
@@ -256,7 +251,7 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
         label={t('securityAgent.dashboard.noImmediateAction')}
         value={rowValue(neverSynced, formatNumber(noImmediateAction, i18n.language))}
         valueTone="muted"
-        dotTone={rowTone(neverSynced, 'good')}
+        dotTone={rowTone(neverSynced, noImmediateAction > 0 ? 'good' : 'muted')}
         last
       />
     </SectionCard>
@@ -329,7 +324,7 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName, neverSynced }:
             label={row.label}
             value={rowValue(neverSynced, formatNumber(row.value, i18n.language))}
             valueTone="muted"
-            dotTone={rowTone(neverSynced, row.tone)}
+            dotTone={rowTone(neverSynced, row.value > 0 ? row.tone : 'muted')}
             last={index === rows.length - 1}
           />
         </Pressable>

@@ -1321,6 +1321,7 @@
       "repositoryActionPlan": "خطة عمل المستودع",
       "settings": "الإعدادات",
       "slaPosture": "حالة الالتزام بـ SLA",
+      "syncing": "جارٍ المزامنة…",
       "syncNow": "المزامنة الآن",
       "syncQueued": "أُضيفت المزامنة إلى قائمة الانتظار.",
       "syncStatusUnavailable": "حالة المزامنة غير متاحة.",

@@ -1301,6 +1301,7 @@
       "repositoryActionPlan": "Actieplan per repository",
       "settings": "Instellingen",
       "slaPosture": "SLA-overzicht",
+      "syncing": "Bezig met synchroniseren…",
       "syncNow": "Nu synchroniseren",
       "syncQueued": "Synchronisatie in de wachtrij gezet",
       "syncStatusUnavailable": "De synchronisatiestatus is niet beschikbaar.",

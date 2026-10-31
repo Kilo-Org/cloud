@@ -1274,6 +1274,7 @@
       "repositoryActionPlan": "Piano d'azione per i repository",
       "settings": "Impostazioni",
       "slaPosture": "Stato degli SLA",
+      "syncing": "Sincronizzazione in corso…",
       "syncNow": "Sincronizza ora",
       "syncQueued": "Sincronizzazione in coda",
       "syncStatusUnavailable": "Lo stato della sincronizzazione non è disponibile.",

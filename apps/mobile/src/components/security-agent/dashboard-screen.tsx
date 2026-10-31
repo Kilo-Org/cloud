@@ -10,7 +10,8 @@ import {
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useFocusEffect } from 'expo-router';
 import { RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
-import { useCallback, useState } from 'react';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
@@ -29,7 +30,7 @@ import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { INLINE_LINK_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber, formatPercent, UNMEASURED_VALUE } from '@/lib/format';
 import {
   useRetrySecurityAgentSettings,
@@ -40,7 +41,12 @@ import {
   useSecurityAgentRepositories,
   useTriggerSecuritySync,
 } from '@/lib/hooks/use-security-agent';
-import { isSecuritySyncRetryable, securitySyncReconcileCopy } from '@/lib/security-agent-ledger';
+import {
+  isSecuritySyncInProgress,
+  isSecuritySyncRetryable,
+  securitySyncReconcileCopy,
+} from '@/lib/security-agent-ledger';
+import { useSecurityAgentSyncRunning } from '@/lib/hooks/use-security-agent-sync-running';
 import { useSecurityScopeTitle } from '@/lib/hooks/use-security-scope-title';
 import {
   securityDismissFailureCopy,
@@ -58,6 +64,22 @@ import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refr
 // The input one sync attempt carries: the repository filter it was started
 // under, and the operation key a reconcile row replays.
 type SyncIntent = { repoFullName?: string; operationKey?: string };
+
+// A submit whose sync the screen is still waiting to see: `at` is when it
+// reported, and `duplicate` marks the ledger refusing it because the same submit
+// was already in flight (whose command may not exist yet).
+type SyncWatch = { at: number; duplicate: boolean };
+
+// How long a refused duplicate keeps the controls in progress. The submit it
+// refused settles, or loses its ledger lease, well inside this window; a screen
+// that never sees that submit must still give the controls back.
+const DUPLICATE_SYNC_WATCH_MS = 30_000;
+
+// How long an accepted submit may keep them without a single readable status
+// poll. The Worker lists the command before it answers the accept, so a readable
+// server shows the run within one poll; past this window the screen stops
+// claiming a sync it cannot see, while a run it does see keeps the state itself.
+const ACCEPTED_SYNC_WATCH_MS = 60_000;
 
 const METRIC_TONE_CLASS = {
   danger: 'text-destructive',
@@ -286,10 +308,21 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // pull-to-refresh both refetch the repositories query.
   const repoFilterUnavailable = repositories.isLoading || repositories.isError;
 
-  // A non-retryable sync outcome ended the intent, so both sync controls
-  // disable and the inline copy below explains the state.
+  // A non-retryable sync outcome ended the intent, so the sync control disables
+  // and the inline copy below explains the state.
   const syncBlocked = triggerSync.isError && !isSecuritySyncRetryable(triggerSync.error);
-  const syncDisabled = triggerSync.isPending || syncBlocked;
+  // A sync outlives the request that started it. `syncWatch` marks a submit whose
+  // command is still to be accounted for — accepted, or refused as already in
+  // flight — and `syncRunning` is the server's own view of the run, so the sync
+  // control stays in a progress state for the whole sync instead of only for the
+  // submission, and the refresh effect below fires when it ends.
+  const [syncWatch, setSyncWatch] = useState<SyncWatch | null>(null);
+  // Whether the run a watch points at was ever visible in the server's list:
+  // once it is, its disappearance ends the watch instead of the window.
+  const sawSyncRun = useRef(false);
+  const syncRunning = useSecurityAgentSyncRunning(scope, syncWatch !== null);
+  const syncInFlight = triggerSync.isPending || syncWatch !== null || syncRunning.syncRunning;
+  const syncDisabled = syncInFlight || syncBlocked;
   // React Query clears a mutation's error when the next attempt starts, so the
   // failure copy and the retry under it blink out for the length of the retry —
   // the screen looked like the tap did nothing. Hold the failure being retried,
@@ -302,16 +335,109 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   } | null>(null);
   const syncFailure = triggerSync.error ?? lastSyncAttempt?.error ?? null;
   const syncRetryable = syncFailure !== null && isSecuritySyncRetryable(syncFailure);
+  // The ledger's in-progress conflict is not a failure of this sync: it is the
+  // sync already running under the same operation key. It gets the running
+  // presentation instead of a sentence with a Retry that would collide again.
+  const syncFailureInProgress = syncFailure !== null && isSecuritySyncInProgress(syncFailure);
+
+  // The run's own read ends an accepted submit's watch: a read taken after the
+  // accept that reports no active sync command means the server has finished the
+  // run, so the control returns to its normal state. A refused duplicate ends the
+  // same way once the run it pointed at became visible; until then it waits for
+  // the window below, because that run's command may not exist yet. A read that
+  // failed ends the watch too: silence is not evidence of progress, and holding
+  // the control on an unreadable status would leave the screen with no way out.
+  useEffect(() => {
+    if (syncWatch === null || triggerSync.isPending) {
+      return;
+    }
+    if (syncRunning.readFailedAt > syncWatch.at) {
+      setSyncWatch(null);
+      return;
+    }
+    if (syncRunning.syncRunning) {
+      sawSyncRun.current = true;
+      return;
+    }
+    if (syncRunning.updatedAt <= syncWatch.at) {
+      return;
+    }
+    if (syncWatch.duplicate && !sawSyncRun.current) {
+      return;
+    }
+    setSyncWatch(null);
+  }, [
+    syncWatch,
+    triggerSync.isPending,
+    syncRunning.syncRunning,
+    syncRunning.updatedAt,
+    syncRunning.readFailedAt,
+  ]);
+
+  // Whatever the watch was waiting for, the screen must give the controls back:
+  // a refused duplicate's submit settles inside the ledger's window, and an
+  // accepted submit's command is listed the moment the Worker answers, so a run
+  // this screen still cannot see after its own window is one it should stop
+  // speaking for.
+  useEffect(() => {
+    if (syncWatch === null) {
+      return () => undefined;
+    }
+    const window = syncWatch.duplicate ? DUPLICATE_SYNC_WATCH_MS : ACCEPTED_SYNC_WATCH_MS;
+    const remaining = syncWatch.at + window - Date.now();
+    if (remaining <= 0) {
+      setSyncWatch(null);
+      return () => undefined;
+    }
+    const expiry = setTimeout(() => {
+      setSyncWatch(null);
+    }, remaining);
+    return () => {
+      clearTimeout(expiry);
+    };
+  }, [syncWatch]);
+
+  // A finished sync changes what the dashboard shows — "Last synced" and the
+  // repository sync state — so refresh both without making the reader leave and
+  // come back. The command observer invalidates the same queries for a tracked
+  // command; this covers a run whose command this screen never tracked.
+  const wasSyncInFlight = useRef(false);
+  const refetchDashboardStats = dashboardStats.refetch;
+  const refetchLastSync = lastSync.refetch;
+  useEffect(() => {
+    if (syncInFlight) {
+      wasSyncInFlight.current = true;
+      return;
+    }
+    if (!wasSyncInFlight.current) {
+      return;
+    }
+    wasSyncInFlight.current = false;
+    void refetchDashboardStats();
+    void refetchLastSync();
+  }, [syncInFlight, refetchDashboardStats, refetchLastSync]);
 
   // One submit path for every control that starts a sync — the header button,
-  // the empty-state action, the retry beside the failure copy, and a
-  // reconcile-row retry — so their handlers cannot drift apart.
+  // the retry beside the failure copy, and a reconcile-row retry — so their
+  // handlers cannot drift apart.
   const startSync = (intent: SyncIntent) => {
     setLastSyncAttempt({ error: triggerSync.error, intent });
+    sawSyncRun.current = false;
+    setSyncWatch(null);
     triggerSync.mutate(intent, {
       onSuccess: () => {
         setLastSyncAttempt(null);
+        // The 202 accepts the command; the worker runs it afterwards, so the
+        // progress state follows the run instead of stopping at the response.
+        setSyncWatch({ at: Date.now(), duplicate: false });
         toast.success(t('securityAgent.dashboard.syncQueued'));
+      },
+      onError: error => {
+        // A same-key conflict means another submit is in flight right now, so
+        // this screen is looking at a sync that is already running.
+        if (isSecuritySyncInProgress(error)) {
+          setSyncWatch({ at: Date.now(), duplicate: true });
+        }
       },
       onSettled: () => {
         refreshOutbox();
@@ -410,7 +536,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               {repoFullName ?? t('common.allRepositories')}
             </Text>
             <Text variant="muted" className="text-xs">
-              {lastSyncLabel}
+              {syncInFlight ? t('securityAgent.dashboard.syncing') : lastSyncLabel}
             </Text>
           </Pressable>
           <IconButton
@@ -419,14 +545,14 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             }}
             disabled={syncDisabled}
             accessibilityLabel={t('securityAgent.dashboard.syncNow')}
-            accessibilityState={{ disabled: syncDisabled, busy: triggerSync.isPending }}
+            accessibilityState={{ disabled: syncDisabled, busy: syncInFlight }}
             className={cn(syncBlocked && 'opacity-50')}
           >
             <SpinningIcon
               icon={RefreshCw}
               size={18}
               color={colors.mutedForeground}
-              spinning={triggerSync.isPending}
+              spinning={syncInFlight}
             />
           </IconButton>
         </View>
@@ -445,7 +571,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           <Text className="text-xs text-warn">{t('securityAgent.dashboard.refreshFailed')}</Text>
         ) : null}
 
-        {syncFailure ? (
+        {syncFailure !== null && !syncFailureInProgress ? (
           <View className="flex-row items-center gap-3">
             {/* While a retry runs this sentence is the failure being retried,
                 not a fresh one, so it steps back from error red — to the warn
@@ -495,7 +621,12 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           />
         ))}
 
-        {reconcileRows.map(row => (
+        {/* A reconcile row says the previous attempt may not have completed and
+            offers a same-key retry. While a sync is in flight the screen already
+            knows its outcome is undecided: the run is visible above, and a second
+            retry from this row would collide with it. The row is not lost — a
+            failed run brings it straight back. */}
+        {(syncInFlight ? [] : reconcileRows).map(row => (
           <SecurityCommandRetryCard
             key={row.fingerprint}
             lastError={securitySyncReconcileCopy()}
@@ -541,31 +672,28 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         )}
 
         {slaEnabled && data && data.sla.overall.total === 0 ? (
-          <View className="flex-row items-center gap-4">
-            {/* The refresh control in the filter row above is this screen's one
-                sync affordance; a second "Sync findings" link here repeated it
-                inside the empty state that points at the repositories instead.
-                The link takes the layout-neutral inline box: a 48 dp frame
-                around this `text-xs` line centred the text with 17 dp of its
-                own space above and below, so the link floated roughly twice as
-                far from its neighbours as the sections sit from each other. The
-                28 dp box is the audit's own minimum, the `-my-[7px]` cancels
-                the box's overflow so the line sits one section gap away, and
-                `hitSlop` carries the 44 dp touch region. */}
-            <Pressable
-              onPress={() => {
-                pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
-              }}
-              hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
-              accessibilityRole="button"
-              accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
-              className={cn(INLINE_LINK_BOX_CLASS, 'active:opacity-70')}
-            >
-              <Text className="text-xs font-medium text-primary">
-                {t('securityAgent.dashboard.manageRepositories')}
-              </Text>
-            </Pressable>
-          </View>
+          // The header's Sync now button already starts this run, so the empty
+          // state offers only the navigation it alone provides. It carries the
+          // dashboard's card language — the same surface and radius as the
+          // sections below, at the same gap — because bare body text in the
+          // section gap read as a stray label, not a tappable action. The
+          // label takes the accent and a trailing chevron says it navigates.
+          <Pressable
+            onPress={() => {
+              pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
+            className={cn(
+              ROW_TARGET_CLASS,
+              'flex-row items-center justify-between gap-2 rounded-lg bg-secondary px-3 active:opacity-70'
+            )}
+          >
+            <Text className="text-sm font-medium text-primary">
+              {t('securityAgent.dashboard.manageRepositories')}
+            </Text>
+            <DirectionalChevronRight size={16} color={colors.primary} />
+          </Pressable>
         ) : null}
 
         {dashboardStats.isError && !data ? (

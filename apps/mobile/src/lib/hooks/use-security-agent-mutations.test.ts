@@ -23,6 +23,7 @@ import type * as ReactQuery from '@tanstack/react-query';
 
 import type * as OperationKeyModule from '@/lib/operation-key';
 import {
+  isSecuritySyncInProgress,
   isSecuritySyncRetryable,
   mapSecurityDismissOperationError,
   mapSecuritySyncOperationError,
@@ -261,14 +262,12 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
   it('onError toasts the mapped message through the existing toast path', () => {
     useTriggerSecuritySync('personal');
     lastCapturedOptions?.onError?.(
-      mapSecuritySyncOperationError(new Error('operation_in_progress'))
+      mapSecuritySyncOperationError(new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE))
     );
-    expect(toastErrorMock).toHaveBeenCalledWith(
-      'A security sync is already in progress. Please try again.'
-    );
+    expect(toastErrorMock).toHaveBeenCalledWith('The security service is unavailable. Try again.');
   });
 
-  it('surfaces the in-progress copy and sends no app-error event for it', async () => {
+  it('stays silent for the in-progress conflict, whose screen shows the running sync', async () => {
     const events: TelemetryEvent[] = [];
     setTelemetrySink(event => {
       events.push(event);
@@ -286,9 +285,12 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     reportAppError(rejection, { source: 'mutation' });
     setTelemetrySink(null);
 
-    expect(toastErrorMock).toHaveBeenCalledWith(
-      'A security sync is already in progress. Please try again.'
-    );
+    // The conflict copy still reaches the screen's own classification, but an
+    // error toast over a control that is showing progress would contradict it.
+    expect(rejection).toMatchObject({
+      message: 'A security sync is already in progress. Please try again.',
+    });
+    expect(toastErrorMock).not.toHaveBeenCalled();
     expect(events).toEqual([]);
   });
 
@@ -570,6 +572,29 @@ describe('securitySyncIntentFingerprint (P1-A-08e changed-input)', () => {
     expect(securitySyncIntentFingerprint(ORG_ID, 'kilo/other')).not.toBe(original);
     expect(securitySyncIntentFingerprint(ORG_ID, undefined)).not.toBe(original);
     expect(securitySyncIntentFingerprint('personal', 'kilo/repo')).not.toBe(original);
+  });
+});
+
+describe('isSecuritySyncInProgress (a duplicate of a sync that is still running)', () => {
+  it('recognises the in-progress marker raw and after the surface mapping', () => {
+    expect(isSecuritySyncInProgress(new Error('operation_in_progress'))).toBe(true);
+    expect(
+      isSecuritySyncInProgress(mapSecuritySyncOperationError(new Error('operation_in_progress')))
+    ).toBe(true);
+  });
+
+  it('leaves every other security failure as a failure', () => {
+    // A dismissal conflict is another surface's in-progress copy, not a sync.
+    expect(
+      isSecuritySyncInProgress(mapSecurityDismissOperationError(new Error('operation_in_progress')))
+    ).toBe(false);
+    expect(
+      isSecuritySyncInProgress(
+        mapSecuritySyncOperationError(new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE))
+      )
+    ).toBe(false);
+    expect(isSecuritySyncInProgress(new Error('Network request failed'))).toBe(false);
+    expect(isSecuritySyncInProgress(null)).toBe(false);
   });
 });
 

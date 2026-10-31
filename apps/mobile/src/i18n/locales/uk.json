@@ -1311,6 +1311,7 @@
       "repositoryActionPlan": "План дій для репозиторіїв",
       "settings": "Налаштування",
       "slaPosture": "Дотримання SLA",
+      "syncing": "Синхронізується…",
       "syncNow": "Синхронізувати зараз",
       "syncQueued": "Синхронізацію додано до черги",
       "syncStatusUnavailable": "Стан синхронізації недоступний.",

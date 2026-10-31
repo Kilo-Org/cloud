@@ -1827,6 +1827,7 @@
       "notYetSynced": "Še ni sinhronizirano",
       "refreshFailed": "Osvežitev ni uspela. Prikazani so podatki zadnje sinhronizacije.",
       "settings": "Nastavitve",
+      "syncing": "Sinhronizacija poteka…",
       "syncNow": "Sinhroniziraj zdaj",
       "syncQueued": "Sinhronizacija v čakalni vrsti",
       "syncStatusUnavailable": "Stanje sinhronizacije ni na voljo.",

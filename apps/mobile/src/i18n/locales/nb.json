@@ -1781,6 +1781,7 @@
       "notYetSynced": "Ikke synkronisert ennå",
       "refreshFailed": "Kunne ikke oppdatere. Viser de sist synkroniserte dataene.",
       "settings": "Innstillinger",
+      "syncing": "Synkroniserer…",
       "syncNow": "Synkroniser nå",
       "syncQueued": "Synkronisering i kø",
       "syncStatusUnavailable": "Synkroniseringsstatusen er ikke tilgjengelig.",

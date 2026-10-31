@@ -153,7 +153,9 @@ describe('DashboardSections priority card', () => {
 
     expect(copy(card)).toContain('securityAgent.dashboard.noOpenFindings');
     expect(card.findAllByType('ShieldCheck')).toHaveLength(1);
-    expect(card.findAllByType('Pressable')).toHaveLength(1);
+    // Nothing is waiting, so the row is a statement: a press state would
+    // promise a findings list that has nothing in it.
+    expect(card.findAllByType('Pressable')).toHaveLength(0);
   });
 });
 
@@ -175,6 +177,12 @@ describe('DashboardSections stat rows', () => {
     const rows = renderSections({ neverSynced: false }).root.findAllByType('KvRow');
 
     expect(rows.map(row => row.props.value)).toContain('0 / 0');
-    expect(rows.map(row => row.props.dotTone)).toContain('good');
+    // Synced, so the counts are real numbers rather than dashes — and with
+    // nothing counted in any of them the dots stay neutral, because a zero is
+    // a satisfied row rather than a severity.
+    expect(rows.every(row => row.props.value !== '—')).toBe(true);
+    expect(
+      rows.every(row => row.props.dotTone === 'muted' || row.props.dotTone === undefined)
+    ).toBe(true);
   });
 });

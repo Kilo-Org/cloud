@@ -1301,6 +1301,7 @@
       "repositoryActionPlan": "リポジトリの対応計画",
       "settings": "設定",
       "slaPosture": "SLA遵守状況",
+      "syncing": "同期中…",
       "syncNow": "今すぐ同期",
       "syncQueued": "同期をキューに追加しました。",
       "syncStatusUnavailable": "同期の状態を確認できません。",

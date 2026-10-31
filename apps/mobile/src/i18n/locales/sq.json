@@ -1781,6 +1781,7 @@
       "notYetSynced": "Ende pa u sinkronizuar",
       "refreshFailed": "Nuk u rifreskua — po shfaqen të dhënat e sinkronizimit të fundit.",
       "settings": "Cilësimet",
+      "syncing": "Duke sinkronizuar…",
       "syncNow": "Sinkronizo tani",
       "syncQueued": "Sinkronizimi u vendos në radhë",
       "syncStatusUnavailable": "Statusi i sinkronizimit nuk është i disponueshëm.",

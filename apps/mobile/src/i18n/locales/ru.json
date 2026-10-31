@@ -1311,6 +1311,7 @@
       "repositoryActionPlan": "План действий по репозиторию",
       "settings": "Настройки",
       "slaPosture": "Соблюдение SLA",
+      "syncing": "Синхронизация…",
       "syncNow": "Синхронизировать сейчас",
       "syncQueued": "Синхронизация в очереди",
       "syncStatusUnavailable": "Статус синхронизации недоступен.",

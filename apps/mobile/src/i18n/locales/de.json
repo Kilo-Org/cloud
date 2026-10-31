@@ -2816,7 +2816,6 @@
     "entry": {
       "noRecentPrs": "Noch keine aktuellen Reviews",
       "noRecentPrsDescription": "Füge oben einen Link ein, um ein Review zu starten — es erscheint beim nächsten Mal hier.",
-      "couldNotLoad": "Die Daten konnten nicht geladen werden.",
       "removeFromRecentsTitle": "Aus dem Verlauf entfernen?",
       "removeFromRecentsMessage": "Dieses Review wird aus deinem Verlauf entfernt.",
       "removeRecentAccessibility": "{{repo}} aus dem Verlauf entfernen",

@@ -638,7 +638,6 @@
     "entry": {
       "noRecentPrs": "Gan aon athbhreithniú le déanaí",
       "noRecentPrsDescription": "Greamaigh nasc thuas chun athbhreithniú a thosú — taispeánfar é anseo an chéad uair eile.",
-      "couldNotLoad": "Níorbh fhéidir an t-ábhar a lódáil.",
       "removeFromRecentsTitle": "An mbainfear den liosta le déanaí é?",
       "removeFromRecentsMessage": "Bainfear an t-athbhreithniú seo den liosta le déanaí.",
       "removeRecentAccessibility": "Bain {{repo}} den liosta le déanaí",

@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "بازبینی اخیری وجود ندارد",
       "noRecentPrsDescription": "برای شروع بازبینی، پیوندی را در بالا جای‌گذاری کنید. دفعهٔ بعد، اینجا نمایش داده می‌شود.",
-      "couldNotLoad": "بارگذاری ممکن نشد.",
       "removeFromRecentsTitle": "از موارد اخیر حذف شود؟",
       "removeFromRecentsMessage": "این بازبینی از فهرست موارد اخیر شما حذف می‌شود.",
       "removeRecentAccessibility": "حذف {{repo}} از موارد اخیر",

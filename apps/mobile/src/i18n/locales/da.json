@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Ingen seneste gennemgange",
       "noRecentPrsDescription": "Indsæt et link ovenfor for at starte en gennemgang — den vises her næste gang.",
-      "couldNotLoad": "Indholdet kunne ikke indlæses.",
       "removeFromRecentsTitle": "Fjern fra listen over seneste?",
       "removeFromRecentsMessage": "Denne gennemgang fjernes fra listen over dine seneste.",
       "removeRecentAccessibility": "Fjern {{repo}} fra listen over seneste",

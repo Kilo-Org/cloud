@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Няма скорошни прегледи",
       "noRecentPrsDescription": "Поставете връзка по-горе, за да започнете преглед — следващия път ще се появи тук.",
-      "couldNotLoad": "Не можахме да заредим данните.",
       "removeFromRecentsTitle": "Да се премахне ли от последно отваряните?",
       "removeFromRecentsMessage": "Този преглед ще бъде премахнат от скорошните ви.",
       "removeRecentAccessibility": "Премахни {{repo}} от последно отваряните",

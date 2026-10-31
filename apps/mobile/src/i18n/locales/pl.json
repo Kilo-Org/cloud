@@ -2878,7 +2878,6 @@
     "entry": {
       "noRecentPrs": "Brak ostatnich recenzji",
       "noRecentPrsDescription": "Wklej powyżej odnośnik, aby rozpocząć recenzję — następnym razem pojawi się tutaj.",
-      "couldNotLoad": "Nie udało się wczytać danych.",
       "removeFromRecentsTitle": "Usunąć z listy ostatnio otwieranych?",
       "removeFromRecentsMessage": "Ta recenzja zostanie usunięta z listy ostatnich.",
       "removeRecentAccessibility": "Usuń {{repo}} z listy ostatnio otwieranych",

@@ -627,7 +627,6 @@
     "entry": {
       "noRecentPrs": "Nėra nesenių peržiūrų",
       "noRecentPrsDescription": "Įklijuok nuorodą viršuje ir pradėk peržiūrą — kitą kartą ji bus rodoma čia.",
-      "couldNotLoad": "Nepavyko įkelti.",
       "removeFromRecentsTitle": "Pašalinti iš neseniai peržiūrėtų?",
       "removeFromRecentsMessage": "Ši peržiūra bus pašalinta iš neseniai peržiūrėtų sąrašo.",
       "removeRecentAccessibility": "Pašalinti {{repo}} iš neseniai peržiūrėtų užklausų sąrašo",

@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Kò sí àtúnyẹ̀wò àìpẹ́",
       "noRecentPrsDescription": "Lẹ̀ mọ́ ọ̀nà àsopọ̀ lókè láti bẹ̀rẹ̀ àtúnyẹ̀wò — yóò fara hàn níbí nígbà mìíràn.",
-      "couldNotLoad": "A kò lè ṣàkójọ rẹ̀.",
       "removeFromRecentsTitle": "Yọ kúrò nínú àkójọ àìpẹ́?",
       "removeFromRecentsMessage": "A ó yọ àtúnyẹ̀wò yìí kúrò nínú àwọn àìpẹ́ rẹ.",
       "removeRecentAccessibility": "Yọ {{repo}} kúrò nínú àkójọ àìpẹ́",

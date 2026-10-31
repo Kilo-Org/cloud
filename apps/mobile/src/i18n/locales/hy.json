@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Վերջերս վերանայումներ չկան",
       "noRecentPrsDescription": "Վերանայում սկսելու համար վերևում տեղադրեք հղում — հաջորդ անգամ այն կհայտնվի այստեղ։",
-      "couldNotLoad": "Չհաջողվեց բեռնել։",
       "removeFromRecentsTitle": "Հեռացնե՞լ վերջերս բացվածների ցանկից",
       "removeFromRecentsMessage": "Այս վերանայումը կհեռացվի Ձեր վերջերսի ցանկից։",
       "removeRecentAccessibility": "Հեռացնել {{repo}}-ն վերջերս բացվածների ցանկից",

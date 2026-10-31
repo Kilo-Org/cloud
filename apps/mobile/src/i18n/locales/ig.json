@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Enweghị nyocha ọhụrụ",
       "noRecentPrsDescription": "Mado njikọ n'elu iji malite nyocha — ọ ga-apụta ebe a oge ọzọ.",
-      "couldNotLoad": "Enweghị ike ibudata.",
       "removeFromRecentsTitle": "Wepụ na ndepụta ndị elelere nso nso a?",
       "removeFromRecentsMessage": "A ga-ewepụ nyocha a na nyocha ndị ị rụrụ n'oge na-adịbeghị anya.",
       "removeRecentAccessibility": "Wepụ {{repo}} na ndepụta ndị elelere nso nso a",

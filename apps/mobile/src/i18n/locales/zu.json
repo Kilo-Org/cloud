@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Azikho izibuyekeza zakamuva",
       "noRecentPrsDescription": "Namathisela isixhumanisi ngenhla ukuze uqale ukubuyekeza — sizovela lapha okwesinye isikhathi.",
-      "couldNotLoad": "Asikwazanga ukulayisha.",
       "removeFromRecentsTitle": "Uyakususa kokusanda kubukwa?",
       "removeFromRecentsMessage": "Lokhu kubuyekeza kuzosuswa ohlwini lwakho lwakamuva.",
       "removeRecentAccessibility": "Susa {{repo}} ohlwini lokusanda kubukwa",

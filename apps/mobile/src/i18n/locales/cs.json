@@ -627,7 +627,6 @@
     "entry": {
       "noRecentPrs": "Žádné nedávné revize",
       "noRecentPrsDescription": "Pro spuštění revize vlož nahoře odkaz — příště se zobrazí tady.",
-      "couldNotLoad": "Načítání se nezdařilo.",
       "removeFromRecentsTitle": "Odebrat z nedávných PR?",
       "removeFromRecentsMessage": "Tahle revize se odstraní z nedávných.",
       "removeRecentAccessibility": "Odebrat {{repo}} ze seznamu nedávných PR",

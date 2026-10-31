@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Pa gen revizyon resan",
       "noRecentPrsDescription": "Kole yon lyen pi wo a pou kòmanse yon revizyon — l ap parèt isit la pwochen fwa a.",
-      "couldNotLoad": "Pa t ka chaje.",
       "removeFromRecentsTitle": "Retire nan lis PR resan yo?",
       "removeFromRecentsMessage": "Revizyon sa a ap retire nan lis resan ou yo.",
       "removeRecentAccessibility": "Retire {{repo}} nan lis PR resan yo",

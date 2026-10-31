@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Kāore he arotake o nā tata nei",
       "noRecentPrsDescription": "Whakapirihia he hono ki runga hei tīmata i te arotake — ka kitea i konei ā muri ake.",
-      "couldNotLoad": "Kāore i taea te uta.",
       "removeFromRecentsTitle": "Tangohia i te rārangi o nā tata nei?",
       "removeFromRecentsMessage": "Ka tangohia tēnei arotake i tō rārangi o nā tata nei.",
       "removeRecentAccessibility": "Tangohia {{repo}} i te rārangi o nā tata nei",

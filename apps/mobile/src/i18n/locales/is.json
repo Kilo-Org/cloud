@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Engar nýlegar yfirferðir",
       "noRecentPrsDescription": "Límdu tengil hér að ofan til að hefja yfirferð — hún birtist hér næst.",
-      "couldNotLoad": "Ekki tókst að hlaða efni.",
       "removeFromRecentsTitle": "Fjarlægja úr nýlegum beiðnum?",
       "removeFromRecentsMessage": "Þessi yfirferð verður fjarlægð af listanum yfir nýlegar.",
       "removeRecentAccessibility": "Fjarlægja {{repo}} úr nýlegum beiðnum",

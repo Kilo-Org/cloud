@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Inga senaste granskningar",
       "noRecentPrsDescription": "Klistra in en länk ovan för att börja granska — den visas här nästa gång.",
-      "couldNotLoad": "Kunde inte läsa in innehållet",
       "removeFromRecentsTitle": "Ta bort från senast öppnade?",
       "removeFromRecentsMessage": "Den här granskningen tas bort från listan över senaste.",
       "removeRecentAccessibility": "Ta bort {{repo}} från senast öppnade",

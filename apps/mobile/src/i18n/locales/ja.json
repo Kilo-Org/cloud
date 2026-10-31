@@ -2816,7 +2816,6 @@
     "entry": {
       "noRecentPrs": "最近のレビューはありません",
       "noRecentPrsDescription": "上にリンクを貼り付けてレビューを始めると、次からはここに表示されます。",
-      "couldNotLoad": "読み込めませんでした。",
       "removeFromRecentsTitle": "最近の履歴から削除しますか？",
       "removeFromRecentsMessage": "このレビューは最近の履歴から削除されます。",
       "removeRecentAccessibility": "{{repo}}を最近の履歴から削除",

@@ -627,7 +627,6 @@
     "entry": {
       "noRecentPrs": "Žiadne nedávne recenzie",
       "noRecentPrsDescription": "Ak chcete začať recenziu, vložte vyššie odkaz — nabudúce sa zobrazí tu.",
-      "couldNotLoad": "Nepodarilo sa načítať.",
       "removeFromRecentsTitle": "Odstrániť z nedávnych žiadostí?",
       "removeFromRecentsMessage": "Táto recenzia sa odstráni z nedávnych.",
       "removeRecentAccessibility": "Odstrániť {{repo}} zo zoznamu nedávnych žiadostí",

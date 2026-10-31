@@ -2816,7 +2816,6 @@
     "entry": {
       "noRecentPrs": "최근 리뷰 없음",
       "noRecentPrsDescription": "위에 링크를 붙여넣어 리뷰를 시작하세요. 다음부터는 여기에 표시됩니다.",
-      "couldNotLoad": "불러오지 못했습니다.",
       "removeFromRecentsTitle": "최근 항목에서 제거할까요?",
       "removeFromRecentsMessage": "이 리뷰는 최근 항목에서 제거됩니다.",
       "removeRecentAccessibility": "최근 항목에서 {{repo}} 제거",

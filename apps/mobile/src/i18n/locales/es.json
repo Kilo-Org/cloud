@@ -2847,7 +2847,6 @@
     "entry": {
       "noRecentPrs": "No hay revisiones recientes",
       "noRecentPrsDescription": "Pega un enlace arriba para iniciar una revisión — aparecerá aquí la próxima vez.",
-      "couldNotLoad": "No se pudo cargar.",
       "removeFromRecentsTitle": "¿Quitar de la lista de recientes?",
       "removeFromRecentsMessage": "Esta revisión se quitará de tu lista de recientes.",
       "removeRecentAccessibility": "Quitar {{repo}} de la lista de recientes",

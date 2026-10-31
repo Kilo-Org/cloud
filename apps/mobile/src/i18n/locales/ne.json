@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "हालैका समीक्षाहरू छैनन्",
       "noRecentPrsDescription": "समीक्षा सुरु गर्न माथि लिङ्क टाँस्नुहोस् — यो अर्को पटक यहाँ देखिनेछ।",
-      "couldNotLoad": "लोड गर्न सकिएन।",
       "removeFromRecentsTitle": "हालैको सूचीबाट हटाउने?",
       "removeFromRecentsMessage": "यो समीक्षा तपाईंको हालैको सूचीबाट हटाइनेछ।",
       "removeRecentAccessibility": "{{repo}} लाई हालैको सूचीबाट हटाउनुहोस्",

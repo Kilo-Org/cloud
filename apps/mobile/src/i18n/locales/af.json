@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Geen onlangse hersieninge nie",
       "noRecentPrsDescription": "Plak hierbo 'n skakel om 'n hersiening te begin — dit sal volgende keer hier verskyn.",
-      "couldNotLoad": "Kon nie laai nie.",
       "removeFromRecentsTitle": "Verwyder uit onlangse trekversoeke?",
       "removeFromRecentsMessage": "Hierdie hersiening sal uit jou onlangse lys verwyder word.",
       "removeRecentAccessibility": "Verwyder {{repo}} uit onlangse trekversoeke",

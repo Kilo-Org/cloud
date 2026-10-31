@@ -2816,7 +2816,6 @@
     "entry": {
       "noRecentPrs": "कोई हालिया समीक्षा नहीं",
       "noRecentPrsDescription": "समीक्षा शुरू करने के लिए ऊपर लिंक पेस्ट करें — यह अगली बार यहाँ दिखाई देगा।",
-      "couldNotLoad": "लोड नहीं हो सका।",
       "removeFromRecentsTitle": "हालिया सूची से हटाएँ?",
       "removeFromRecentsMessage": "यह समीक्षा आपकी हालिया सूची से हटा दी जाएगी।",
       "removeRecentAccessibility": "{{repo}} को हालिया सूची से हटाएँ",

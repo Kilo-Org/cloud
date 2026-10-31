@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Hakuna ukaguzi wa hivi karibuni",
       "noRecentPrsDescription": "Bandika kiungo hapo juu kuanza ukaguzi — kitaonekana hapa mara ijayo.",
-      "couldNotLoad": "Imeshindikana kupakia.",
       "removeFromRecentsTitle": "Ungependa kuondoa kwenye orodha ya hivi karibuni?",
       "removeFromRecentsMessage": "Ukaguzi huu utaondolewa kwenye orodha yako ya hivi karibuni.",
       "removeRecentAccessibility": "Ondoa {{repo}} kwenye orodha ya hivi karibuni",

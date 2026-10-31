@@ -3138,7 +3138,7 @@
     "couldNotSaveChoice": "Seçimini saxlamaq mümkün olmadı. Yenidən cəhd et.",
     "onlineAllowed": "Onlayn, icazə verilib",
     "onlineNotAllowed": "Onlayn, icazə verilməyib",
-    "optionalReview": "İstəyə bağlı — istənilən vaxt parametrlərdə dəyişə bilərsən",
+    "optionalReview": "İstəyə bağlı",
     "optionalOnboarding": "İstəyə bağlı — söndürməsən, aktiv qalır",
     "aiProvidersWhat": "Sorğuların, söhbət tarixçən və əlavə etdiyin bütün fayllar.",
     "aiProvidersWhy": "AI cavabları yaratmaq üçün.",

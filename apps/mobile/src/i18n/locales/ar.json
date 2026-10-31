@@ -2705,7 +2705,7 @@
     "couldNotSaveChoice": "تعذّر حفظ اختيارك. حاول مرة أخرى.",
     "onlineAllowed": "عبر الإنترنت، مسموح",
     "onlineNotAllowed": "عبر الإنترنت، غير مسموح",
-    "optionalReview": "اختياري — يمكنك تغيير هذا الخيار في أي وقت من الإعدادات",
+    "optionalReview": "اختياري",
     "optionalOnboarding": "اختياري — مفعّل ما لم تعطّله",
     "aiProvidersWhat": "تعليماتك وسجل محادثاتك وأي ملفات ترفقها.",
     "aiProvidersWhy": "لإنشاء ردود الذكاء الاصطناعي.",

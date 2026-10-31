@@ -3138,7 +3138,7 @@
     "couldNotSaveChoice": "Non se puido gardar a túa elección. Téntao de novo.",
     "onlineAllowed": "En liña, permitida",
     "onlineNotAllowed": "En liña, non permitida",
-    "optionalReview": "Opcional — podes cambiar esta opción en calquera momento na configuración",
+    "optionalReview": "Opcional",
     "optionalOnboarding": "Opcional — activado por defecto",
     "aiProvidersWhat": "As túas instrucións, o historial de conversas e os ficheiros que anexes.",
     "aiProvidersWhy": "Para xerar respostas de IA.",

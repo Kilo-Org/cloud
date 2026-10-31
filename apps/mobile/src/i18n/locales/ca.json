@@ -3181,7 +3181,7 @@
     "couldNotSaveChoice": "No s'ha pogut desar la teva elecció. Torna-ho a provar.",
     "onlineAllowed": "En línia, permesa",
     "onlineNotAllowed": "En línia, no permesa",
-    "optionalReview": "Opcional: ho pots canviar en qualsevol moment a la configuració",
+    "optionalReview": "Opcional",
     "optionalOnboarding": "Opcional: activat tret que ho desactivis",
     "aiProvidersWhat": "Els teus missatges, l'historial de converses i els fitxers que adjuntis.",
     "aiProvidersWhy": "Per generar respostes d'IA.",

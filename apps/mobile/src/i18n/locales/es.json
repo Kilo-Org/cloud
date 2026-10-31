@@ -2633,7 +2633,7 @@
     "couldNotSaveChoice": "No se pudo guardar tu elección. Inténtalo de nuevo.",
     "onlineAllowed": "En línea, permitida",
     "onlineNotAllowed": "En línea, no permitida",
-    "optionalReview": "Opcional: puedes cambiarlo cuando quieras en los ajustes",
+    "optionalReview": "Opcional",
     "optionalOnboarding": "Opcional: activado de forma predeterminada",
     "aiProvidersWhat": "Tus instrucciones, tu historial de conversaciones y los archivos que adjuntes.",
     "aiProvidersWhy": "Para generar respuestas de IA.",

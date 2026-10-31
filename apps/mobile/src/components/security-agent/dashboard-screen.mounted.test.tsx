@@ -61,6 +61,7 @@ const dashboardStats = vi.hoisted(() => ({
 const lastSync = vi.hoisted(() => ({
   data: undefined as { lastSyncTime?: string | null } | undefined,
   isError: false,
+  isPending: false,
   refetch: vi.fn(),
 }));
 const repositories = vi.hoisted(() => ({
@@ -1127,6 +1128,12 @@ describe('DashboardScreen pending stats', () => {
     },
   };
 
+  // Each case decides for itself whether the sync-status read has settled.
+  beforeEach(() => {
+    lastSync.isPending = false;
+    lastSync.data = undefined;
+  });
+
   it('paints the metric skeleton while a paused stats read is still pending', () => {
     // A NetInfo-paused read is pending without fetching, so `isLoading` is
     // false. The body must still show its loading state instead of an empty
@@ -1160,5 +1167,37 @@ describe('DashboardScreen pending stats', () => {
     expect(renderedTexts(root.root)).toContain(
       i18n.t('securityAgent.dashboardMetrics.openFindings')
     );
+  });
+
+  // `neverSynced` decides whether a tile carries a detail line, so a tile drawn
+  // before that read settles would shrink by a line the moment it resolves and
+  // move everything below it. The tiles wait for the read instead.
+  it('keeps the tiles in the skeleton state while the sync-status read is pending', () => {
+    dashboardStats.isPending = false;
+    dashboardStats.data = resolvedData;
+    lastSync.isPending = true;
+    lastSync.data = undefined;
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+
+    expect(
+      root.root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton')
+    ).toHaveLength(4);
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboardMetrics.openFindings')
+    );
+  });
+
+  it('renders the sections only after the sync-status read settles', () => {
+    dashboardStats.isPending = false;
+    dashboardStats.data = resolvedData;
+    lastSync.isPending = true;
+    lastSync.data = undefined;
+    sectionsProps.props = [];
+
+    renderScreen();
+
+    expect(sectionsProps.props).toHaveLength(0);
   });
 });

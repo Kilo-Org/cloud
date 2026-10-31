@@ -513,8 +513,11 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
         {/* `isPending` rather than `isLoading`: a NetInfo-paused read is pending
             without fetching, and it must show this skeleton instead of an empty
-            metrics row. */}
-        {dashboardStats.isPending ? (
+            metrics row. The sync-status read joins it because `neverSynced`
+            decides whether a tile carries a detail line: a tile that rendered
+            the measured shape first would shrink by a line the moment the read
+            resolved, which moves the whole dashboard. */}
+        {dashboardStats.isPending || lastSync.isPending ? (
           <View className="flex-row flex-wrap gap-3">
             <Skeleton className="h-24 w-[47%] rounded-lg" />
             <Skeleton className="h-24 w-[47%] rounded-lg" />
@@ -581,7 +584,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           />
         ) : null}
 
-        {data ? (
+        {/* The Act first card's body depends on `neverSynced` too, so it waits
+            for the sync-status read rather than swapping one shape for the
+            other once the read resolves. */}
+        {data && !lastSync.isPending ? (
           <DashboardSections
             scope={scope}
             data={data}

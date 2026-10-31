@@ -895,6 +895,9 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Seguir as instruções do arquivo REVIEW.md de cada repositório",
     "manualReview": {
+      "invalidMergeRequestUrl": "Digite uma URL válida de merge request.",
+      "mergeRequestUrl": "URL do merge request",
+      "instructionsAtLimit": "As instruções são limitadas a {{max}} caracteres",
       "connectProviderDescription": "Conecte o GitHub para iniciar a revisão manual de um PR.",
       "couldNotCheckProviderStatus": "Não foi possível verificar o status do provedor.",
       "couldNotLoadProviders": "Não foi possível carregar seus provedores conectados. Tente novamente.",

@@ -1533,6 +1533,9 @@
       "offAction": "Die hersieningsgeheue is af. Skakel dit aan en probeer dan weer."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Voer 'n geldige URL vir 'n merge request in.",
+      "mergeRequestUrl": "Merge request-URL",
+      "instructionsAtLimit": "Instruksies is beperk tot {{max}} karakters",
       "title": "Handmatige hersiening",
       "invalidUrl": "Voer 'n geldige URL vir 'n trekversoek in.",
       "couldNotCheckProviderStatus": "Die verskafferstatus kon nie nagegaan word nie.",

@@ -1533,6 +1533,9 @@
       "offAction": "A memoria de revisión está desactivada. Actívaa e téntao de novo."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Introduce un URL válido dunha solicitude de fusión.",
+      "mergeRequestUrl": "URL da solicitude de fusión",
+      "instructionsAtLimit": "As instrucións están limitadas a {{max}} caracteres",
       "title": "Revisión manual",
       "invalidUrl": "Introduce un URL válido dunha solicitude de cambios.",
       "couldNotCheckProviderStatus": "Non se puido comprobar o estado do provedor.",

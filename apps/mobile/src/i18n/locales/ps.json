@@ -1533,6 +1533,9 @@
       "offAction": "د بیاکتنې حافظه غیرفعاله ده. فعاله یې کړئ، بیا هڅه وکړئ."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "د یوځای کولو غوښتنې یو معتبر URL ولیکئ.",
+      "mergeRequestUrl": "د یوځای کولو غوښتنې پته (URL)",
+      "instructionsAtLimit": "لارښوونې تر {{max}} توري پورې محدودې دي.",
       "title": "لاسي بیاکتنه",
       "invalidUrl": "د PR یو معتبر URL ولیکئ.",
       "couldNotCheckProviderStatus": "د خدمت چمتو کوونکي حالت و نه کتل شو.",

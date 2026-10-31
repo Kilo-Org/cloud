@@ -1577,6 +1577,9 @@
       "offAction": "Pamäť kontrol je vypnutá. Zapnite ju a skúste to znova."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Zadajte platnú URL adresu merge requestu.",
+      "mergeRequestUrl": "URL adresa merge requestu",
+      "instructionsAtLimit": "Pokyny sú obmedzené na {{max}} znakov",
       "title": "Manuálna kontrola",
       "invalidUrl": "Zadajte platnú URL adresu PR.",
       "couldNotCheckProviderStatus": "Stav poskytovateľa sa nepodarilo overiť.",

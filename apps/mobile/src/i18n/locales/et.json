@@ -1533,6 +1533,9 @@
       "offAction": "Ülevaatuste mälu on välja lülitatud. Lülita see sisse ja proovi uuesti."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Sisesta kehtiv liitmistaotluse URL.",
+      "mergeRequestUrl": "Liitmistaotluse URL",
+      "instructionsAtLimit": "Juhised on piiratud {{max}} tähemärgiga",
       "title": "Käsitsi käivitatav ülevaatus",
       "invalidUrl": "Sisesta kehtiv tõmbetaotluse URL.",
       "couldNotCheckProviderStatus": "Teenusepakkuja olekut ei õnnestunud kontrollida.",

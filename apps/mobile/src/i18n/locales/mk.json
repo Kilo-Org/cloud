@@ -1533,6 +1533,9 @@
       "offAction": "Меморијата за прегледи е исклучена. Вклучи ја, потоа обиди се повторно."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Внеси валидна URL-адреса на merge барање.",
+      "mergeRequestUrl": "URL-адреса на merge барањето",
+      "instructionsAtLimit": "Инструкциите се ограничени на {{max}} знаци",
       "title": "Рачен преглед",
       "invalidUrl": "Внеси валидна URL-адреса на барање за спојување.",
       "couldNotCheckProviderStatus": "Не успеа проверката на статусот на платформата.",

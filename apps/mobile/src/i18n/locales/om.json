@@ -1533,6 +1533,9 @@
       "offAction": "Yaadannoon sakatta'aa cufameera. Isa bani, sana booda irra deebi'ii yaali."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "URL gaaffii makuu sirrii galchi.",
+      "mergeRequestUrl": "URL gaaffii makuu",
+      "instructionsAtLimit": "Ajajni arfiilee {{max}}tti daangeffama",
       "title": "Sakatta'a harkaa",
       "invalidUrl": "URL gaaffii makuu sirrii galchi.",
       "couldNotCheckProviderStatus": "Haala waltajjii mirkaneessuun hin danda'amne.",

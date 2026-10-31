@@ -1533,6 +1533,9 @@
       "offAction": "समीक्षा मेमोरी बन्द छ। यसलाई चालु गर्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।"
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "मर्ज रिक्वेस्टको मान्य URL लेख्नुहोस्।",
+      "mergeRequestUrl": "मर्ज रिक्वेस्टको URL",
+      "instructionsAtLimit": "निर्देशनहरू {{max}} अक्षरहरूमा सीमित छ",
       "title": "म्यानुअल समीक्षा",
       "invalidUrl": "पुल रिक्वेस्टको मान्य URL लेख्नुहोस्।",
       "couldNotCheckProviderStatus": "प्रदायकको स्थिति जाँच्न सकिएन।",

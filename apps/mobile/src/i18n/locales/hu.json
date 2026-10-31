@@ -1533,6 +1533,9 @@
       "offAction": "A kódellenőrzési memória ki van kapcsolva. Kapcsold be, majd próbáld újra."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Adj meg egy érvényes URL-t a merge request-hez.",
+      "mergeRequestUrl": "Merge request URL-címe",
+      "instructionsAtLimit": "Az utasítások legfeljebb {{max}} karakter lehetnek",
       "title": "Kézi kódellenőrzés",
       "invalidUrl": "Adj meg egy érvényes URL-t a PR-hez.",
       "couldNotCheckProviderStatus": "Nem sikerült ellenőrizni a szolgáltató állapotát.",

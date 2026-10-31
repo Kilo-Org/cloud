@@ -1533,6 +1533,9 @@
       "offAction": "Ko'rib chiqish xotirasi o'chiq. Uni yoqing, so'ng qayta urinib ko'ring."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Merge so‘rovi uchun to'g'ri URL manzilini kiriting.",
+      "mergeRequestUrl": "Merge so‘rovi manzili (URL)",
+      "instructionsAtLimit": "Ko‘rsatmalar {{max}} ta belgi bilan cheklangan",
       "title": "Qo'lda ko'rib chiqish",
       "invalidUrl": "PR uchun to'g'ri URL manzilini kiriting.",
       "couldNotCheckProviderStatus": "Provayder holatini tekshirib bo'lmadi.",

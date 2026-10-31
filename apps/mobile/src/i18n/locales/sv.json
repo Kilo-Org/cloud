@@ -1533,6 +1533,9 @@
       "offAction": "Granskningsminnet är avstängt. Aktivera det och försök igen."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Ange en giltig URL till en merge request",
+      "mergeRequestUrl": "URL till merge request",
+      "instructionsAtLimit": "Instruktionerna är begränsade till {{max}} tecken",
       "title": "Manuell granskning",
       "invalidUrl": "Ange en giltig URL till en pull-begäran",
       "couldNotCheckProviderStatus": "Kunde inte kontrollera leverantörens status",

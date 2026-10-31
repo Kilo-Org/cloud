@@ -1533,6 +1533,9 @@
       "offAction": "ସମୀକ୍ଷା ସ୍ମୃତି ବନ୍ଦ ଅଛି। ଏହାକୁ ଚାଲୁ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "ଏକ ବୈଧ ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ URL ଲେଖନ୍ତୁ।",
+      "mergeRequestUrl": "ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ URL",
+      "instructionsAtLimit": "ନିର୍ଦ୍ଦେଶଗୁଡ଼ିକ {{max}} ଅକ୍ଷରରେ ସୀମିତ।",
       "title": "ନିଜେ ଆରମ୍ଭ କରୁଥିବା ସମୀକ୍ଷା",
       "invalidUrl": "ଏକ ବୈଧ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ URL ଲେଖନ୍ତୁ।",
       "couldNotCheckProviderStatus": "ସେବା ପ୍ରଦାତାଙ୍କ ସ୍ଥିତି ଯାଞ୍ଚ ହୋଇପାରିଲା ନାହିଁ।",

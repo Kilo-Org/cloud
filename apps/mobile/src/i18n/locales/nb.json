@@ -1533,6 +1533,9 @@
       "offAction": "Minnet for kodegjennomganger er deaktivert. Aktiver det, og prøv igjen."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Skriv inn en gyldig URL til en merge request.",
+      "mergeRequestUrl": "URL til merge request",
+      "instructionsAtLimit": "Instruksjonene er begrenset til {{max}} tegn",
       "title": "Manuell gjennomgang",
       "invalidUrl": "Skriv inn en gyldig URL til en PR.",
       "couldNotCheckProviderStatus": "Kunne ikke sjekke leverandørstatusen.",

@@ -1533,6 +1533,9 @@
       "offAction": "Kua monoa te mahara arotake. Whakahohea, kātahi ka whakamātauria anō."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Whakaurua he URL tika mō te tono whakakotahi.",
+      "mergeRequestUrl": "URL tono whakakotahi",
+      "instructionsAtLimit": "Ka whakawhāitihia ngā tohutohu ki te {{max}} pūāhua",
       "title": "Te arotake ā-ringa",
       "invalidUrl": "Whakaurua he URL tika mō te tono kume.",
       "couldNotCheckProviderStatus": "Kāore i taea te tirotiro i te tūnga o te kaiwhakarato.",

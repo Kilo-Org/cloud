@@ -924,6 +924,9 @@
     "followReviewMd": "REVIEW.md yönergelerine uy",
     "followReviewMdSubtitle": "Her deponun REVIEW.md dosyasındaki talimatlara uy",
     "manualReview": {
+      "invalidMergeRequestUrl": "Geçerli bir birleştirme isteği URL'si gir.",
+      "mergeRequestUrl": "Birleştirme isteği URL'si",
+      "instructionsAtLimit": "Yönergeler {{max}} karakterle sınırlıdır",
       "connectProviderDescription": "Bir çekme isteğinin incelemesini manuel olarak başlatmak için GitHub'ı bağla.",
       "couldNotCheckProviderStatus": "Sağlayıcı durumu kontrol edilemedi.",
       "couldNotLoadProviders": "Bağladığın sağlayıcılar yüklenemedi. Lütfen tekrar dene.",

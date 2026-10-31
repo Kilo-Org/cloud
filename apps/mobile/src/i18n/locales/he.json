@@ -927,6 +927,9 @@
     "followReviewMd": "פעולה לפי REVIEW.md",
     "followReviewMdSubtitle": "שימוש בהוראות שבקובץ REVIEW.md בכל מאגר",
     "manualReview": {
+      "invalidMergeRequestUrl": "יש להזין כתובת URL תקינה של בקשת מיזוג.",
+      "mergeRequestUrl": "כתובת URL של בקשת מיזוג",
+      "instructionsAtLimit": "ההוראות מוגבלות ל-{{max}} תווים",
       "connectProviderDescription": "חבר את GitHub כדי להתחיל סקירה ידנית של בקשת משיכה.",
       "couldNotCheckProviderStatus": "לא ניתן לבדוק את מצב הספק.",
       "couldNotLoadProviders": "לא ניתן לטעון את הספקים המחוברים שלך. נסה שוב.",

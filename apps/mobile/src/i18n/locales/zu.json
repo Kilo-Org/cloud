@@ -1533,6 +1533,9 @@
       "offAction": "Inkumbulo yokuhlola ivaliwe. Yivule, bese uzama futhi."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Faka i-URL evumelekile yesicelo sokuhlanganisa.",
+      "mergeRequestUrl": "I-URL yesicelo sokuhlanganisa",
+      "instructionsAtLimit": "Imiyalo ilinganiselwe ezinhlamvini ezingu-{{max}}",
       "title": "Ukuhlola okuqalwa nguwe",
       "invalidUrl": "Faka i-URL evumelekile yesicelo sokuhlanganisa ikhodi.",
       "couldNotCheckProviderStatus": "Asikwazanga ukuhlola isimo somhlinzeki.",

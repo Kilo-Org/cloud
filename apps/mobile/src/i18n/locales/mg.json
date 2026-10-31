@@ -1533,6 +1533,9 @@
       "offAction": "Tsy mandeha ny fitadidiana ny fanamarinana. Alefaso izany, dia andramo indray."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Ampidiro ny URL manan-kery an'ny fangatahana fampiraisana.",
+      "mergeRequestUrl": "URL-n'ny fangatahana fampiraisana",
+      "instructionsAtLimit": "Ny torolalana dia voafetra ho {{max}} tarehintsoratra",
       "title": "Fanamarinana atomboka mivantana",
       "invalidUrl": "Ampidiro ny URL manan-kery an'ny PR.",
       "couldNotCheckProviderStatus": "Tsy nety nohamarinina ny satan'ny mpanome tolotra.",

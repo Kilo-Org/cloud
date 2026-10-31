@@ -1533,6 +1533,9 @@
       "offAction": "Memwa revizyon an dezaktive. Aktive li, epi eseye ankò."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Antre yon URL valab pou merge request la.",
+      "mergeRequestUrl": "URL merge request la",
+      "instructionsAtLimit": "Enstriksyon yo limite a {{max}} karaktè",
       "title": "Revizyon manyèl",
       "invalidUrl": "Antre yon URL valab pou demann fizyon an.",
       "couldNotCheckProviderStatus": "Nou pa t ka verifye estati founisè a.",

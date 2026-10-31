@@ -1533,6 +1533,9 @@
       "offAction": "Hindi pinagana ang memorya ng pagsusuri. Paganahin ito, pagkatapos subukan ulit."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Maglagay ng wastong URL ng merge request.",
+      "mergeRequestUrl": "URL ng merge request",
+      "instructionsAtLimit": "Ang mga instruksyon ay limitado sa {{max}} na character.",
       "title": "Manu-manong pagsusuri",
       "invalidUrl": "Maglagay ng wastong URL ng pull request.",
       "couldNotCheckProviderStatus": "Hindi masuri ang katayuan ng provider.",

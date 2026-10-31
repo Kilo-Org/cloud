@@ -1533,6 +1533,9 @@
       "offAction": "የግምገማ ትውስታ ተሰናክሏል። ያንቁት፣ ከዚያ እንደገና ይሞክሩ።"
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "ትክክለኛ የማዋሃድ ጥያቄ URL ያስገቡ።",
+      "mergeRequestUrl": "የማዋሃድ ጥያቄ URL",
+      "instructionsAtLimit": "መመሪያዎቹ በ{{max}} ቁምፊዎች የተገደቡ ናቸው",
       "title": "በተጠቃሚ የሚጀመር ግምገማ",
       "invalidUrl": "ትክክለኛ የኮድ ውህደት ጥያቄ URL ያስገቡ።",
       "couldNotCheckProviderStatus": "የአቅራቢውን ሁኔታ መፈተሽ አልተቻለም።",

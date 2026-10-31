@@ -1533,6 +1533,9 @@
       "offAction": "A gbanyụrụ ebe nchekwa nyocha. Gbanye ya, wee nwaa ọzọ."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Tinye URL arịrịọ njikọta dị irè.",
+      "mergeRequestUrl": "URL arịrịọ njikọta",
+      "instructionsAtLimit": "Ntụziaka ahụ nwere oke mkpụrụedemede {{max}}",
       "title": "Nyocha a na-amalite n'aka",
       "invalidUrl": "Tinye URL arịrịọ njikọ dị irè.",
       "couldNotCheckProviderStatus": "Enweghị ike ịlele ọnọdụ onye na-enye ọrụ.",

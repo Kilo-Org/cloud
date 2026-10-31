@@ -1533,6 +1533,9 @@
       "offAction": "Hukommelsen for gennemgange er slået fra. Slå den til, og prøv igen."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Indtast en gyldig URL til en merge request.",
+      "mergeRequestUrl": "URL til merge request",
+      "instructionsAtLimit": "Instruktionerne er begrænset til {{max}} tegn",
       "title": "Manuel gennemgang",
       "invalidUrl": "Indtast en gyldig URL til en pull request.",
       "couldNotCheckProviderStatus": "Udbyderens status kunne ikke kontrolleres.",

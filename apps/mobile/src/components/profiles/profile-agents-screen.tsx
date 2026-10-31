@@ -67,11 +67,11 @@ function AgentRowView({
 }: AgentRowViewProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  // The name row is one line on every width: the name shrinks and ellipsizes
-  // instead of wrapping, so the mode label keeps the row's even gap above it.
-  // The slug moves to the meta line below, where it has room to truncate on its
-  // own instead of taking width from the name; a slug that only repeats the
-  // name in lowercase is left out.
+  // The name owns its row, so an agent name is ellipsized only when it alone is
+  // wider than the card; the mode label never takes the room a short name needs.
+  // The label is metadata, so it leads the column under the name at the same
+  // 2 px gap as the slug, the model and the description. A slug that only
+  // repeats the name in lowercase is left out.
   const showSlug = !isRedundantAgentSlug(name, slug);
   return (
     <View className="min-h-16 flex-row items-start gap-1 rounded-lg bg-secondary px-3 py-2">
@@ -81,10 +81,10 @@ function AgentRowView({
           <Text className="min-w-0 shrink text-sm font-medium text-foreground" numberOfLines={1}>
             {name}
           </Text>
-          <Text className="shrink-0 text-xs uppercase tracking-wide text-muted-foreground">
-            {t(AGENT_VISIBILITY_LABEL_KEYS[visibility])}
-          </Text>
         </View>
+        <Text className="text-xs uppercase tracking-wide text-muted-foreground">
+          {t(AGENT_VISIBILITY_LABEL_KEYS[visibility])}
+        </Text>
         {showSlug ? (
           <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
             {slug}

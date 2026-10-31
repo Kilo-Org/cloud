@@ -151,7 +151,7 @@ import {
   getMaxTokens,
   hasMiddleOutTransform,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
-import { redactProviderHints } from '@kilocode/auto-routing-contracts';
+import { DEFAULT_BENCHMARK_USER_ID, redactProviderHints } from '@kilocode/auto-routing-contracts';
 import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
@@ -687,8 +687,13 @@ export async function handleLlmProxyRequest(
     if (rateLimitSubject instanceof NextResponse) return rateLimitSubject;
 
     // Private custom LLMs are exempt for signed-in callers, even when their id
-    // matches a free-model pattern.
-    const isExempt = isPrivateCustomLlm && rateLimitSubject.kind === 'account';
+    // matches a free-model pattern. So is the default internal benchmark user: a run
+    // sends every case of every free model it measures, and the anti-abuse limit
+    // would otherwise throttle the measurement itself. A benchmark user override is
+    // not exempt.
+    const isExempt =
+      rateLimitSubject.kind === 'account' &&
+      (isPrivateCustomLlm || rateLimitSubject.kiloUserId === DEFAULT_BENCHMARK_USER_ID);
     if (!isExempt && (await isFreeModelRateLimited(request, rateLimitSubject))) {
       console.warn(
         `Model rate limit exceeded, ${freeModelRateLimitKey(rateLimitSubject)}, model: ${effectiveModelIdLowerCased}, feature: ${feature ?? 'none'}`

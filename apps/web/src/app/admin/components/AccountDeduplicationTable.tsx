@@ -47,7 +47,7 @@ export function AccountDeduplicationTable() {
     [searchParams, router, pathname]
   );
 
-  const { data, isLoading } = useQuery<AccountDeduplicationResponse>({
+  const { data, isLoading, isError } = useQuery<AccountDeduplicationResponse>({
     queryKey: ['account-deduplication', page, minAccounts, hideAllBlocked],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -138,6 +138,12 @@ export function AccountDeduplicationTable() {
                   ))}
                 </TableRow>
               ))
+            ) : isError ? (
+              <TableRow>
+                <TableCell colSpan={7} className="h-24 text-center">
+                  <p className="text-destructive">Could not load duplicate accounts.</p>
+                </TableCell>
+              </TableRow>
             ) : groups.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="h-24 text-center">
@@ -212,7 +218,15 @@ function DuplicateGroupRows({
                   <Badge variant="secondary">
                     {isPartial ? `${users.length} of ${accountCount}` : accountCount}
                   </Badge>
-                  <CopyTextButton text={users.map(u => u.google_user_email).join('\n')} showText />
+                  <CopyTextButton
+                    text={users.map(u => u.google_user_email).join('\n')}
+                    description={
+                      isPartial
+                        ? `Copy the ${users.length} listed email addresses; ${accountCount - users.length} more accounts in this group are not listed`
+                        : undefined
+                    }
+                    showText
+                  />
                 </div>
               </div>
             </TableCell>

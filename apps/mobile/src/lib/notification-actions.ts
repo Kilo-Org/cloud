@@ -27,7 +27,7 @@ import {
   needsInputCategoryDescriptors,
   type PushData,
   pushDataSchema,
-} from '@kilocode/notifications/schemas';
+} from '@kilocode/notifications';
 
 import * as Sentry from '@sentry/react-native';
 

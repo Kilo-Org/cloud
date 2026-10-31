@@ -39,7 +39,7 @@ import {
   genericPushContentForPushData,
   needsInputCategoryId,
   type PushData,
-} from '@kilocode/notifications/schemas';
+} from '@kilocode/notifications';
 
 import { type CachedActiveSession, isAttentionStatus } from '@/lib/active-sessions-live';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';

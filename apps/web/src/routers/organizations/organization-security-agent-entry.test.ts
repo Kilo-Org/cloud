@@ -10,7 +10,7 @@
  * `0259` could not rank, or any row written outside the connection writers)
  * therefore disagreed: the app said the organization was connected while the
  * entry gate said connect-GitHub, and the organization's findings were
- * unreachable. `0321` gives those rows the workflow role so both resolutions
+ * unreachable. `0322` gives those rows the workflow role so both resolutions
  * name the same installation.
  */
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
@@ -29,7 +29,7 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 
 import { createCallerForUser } from '@/routers/test-utils';
 
-const BACKFILL_MIGRATION = '0321_github_connection_role_org_backfill.sql';
+const BACKFILL_MIGRATION = '0322_github_connection_role_org_backfill.sql';
 
 async function applyConnectionRoleBackfill() {
   const migration = readFileSync(

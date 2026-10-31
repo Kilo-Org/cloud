@@ -15,6 +15,7 @@ vi.mock('@/lib/persist/encrypted-kv', () => kvMock);
 
 /* eslint-disable import/first */
 import { USER_SESSION_TITLES_KEY } from '@/lib/storage-keys';
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 import { namedSessionTitle } from './session-detail-rename-state';
 import {
   __flushUserSessionTitlesWritesForTests,
@@ -76,6 +77,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await __flushUserSessionTitlesWritesForTests();
+  setTelemetrySink(null);
 });
 
 describe('session-user-titles durable record', () => {
@@ -193,5 +195,61 @@ describe('session-user-titles durable record', () => {
     rememberUserSessionTitle('ses-new', PLACEHOLDER);
     await __flushUserSessionTitlesWritesForTests();
     expect(storedBlobEntries()).toEqual([{ sessionId: 'ses-new', title: PLACEHOLDER }]);
+  });
+
+  it('retries a failed read on the next rename and keeps the persisted entries', async () => {
+    const persisted = [
+      { sessionId: 'ses-a', title: PLACEHOLDER },
+      { sessionId: 'ses-b', title: 'New session - 2021-01-01T00:00:00.000Z' },
+    ];
+    kvStore.set(storageKey(USER_SESSION_TITLES_KEY, TITLES_ENTRY_KEY), JSON.stringify(persisted));
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    kvMock.getItem.mockRejectedValueOnce(new Error('kv unavailable'));
+
+    // The read fails, so the store stays empty — and the failure is reported
+    // once, at warning level, on the hydration operation.
+    await __hydrateUserSessionTitlesForTests();
+    expect(getUserSessionTitle('ses-a')).toBeUndefined();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      level: 'warning',
+      tags: { 'error.subsystem': 'session_titles', 'error.operation': 'hydrate' },
+    });
+
+    // The next rename reads again before it writes, so the blob keeps the two
+    // entries the failed read never returned instead of being replaced by a
+    // map that only holds the new title.
+    rememberUserSessionTitle('ses-c', PLACEHOLDER);
+    await __flushUserSessionTitlesWritesForTests();
+
+    expect(kvMock.getItem).toHaveBeenCalledTimes(2);
+    // The blob keeps both persisted entries and adds this run's title, instead
+    // of being replaced by a blob rebuilt from the map the failed read left
+    // empty. Map order is not the record's contract, so compare contents.
+    const stored = storedBlobEntries();
+    expect(stored).toHaveLength(3);
+    expect(stored).toEqual(
+      expect.arrayContaining([...persisted, { sessionId: 'ses-c', title: PLACEHOLDER }])
+    );
+    expect(getUserSessionTitle('ses-a')).toBe(PLACEHOLDER);
+    // The retried read succeeded, so it reported nothing further.
+    expect(events).toHaveLength(1);
+  });
+
+  it('leaves the persisted blob alone while every read keeps failing', async () => {
+    const existing = JSON.stringify([{ sessionId: 'ses-a', title: PLACEHOLDER }]);
+    kvStore.set(storageKey(USER_SESSION_TITLES_KEY, TITLES_ENTRY_KEY), existing);
+    kvMock.getItem.mockRejectedValue(new Error('kv unavailable'));
+
+    rememberUserSessionTitle('ses-b', PLACEHOLDER);
+    await __flushUserSessionTitlesWritesForTests();
+
+    expect(kvMock.setItem).not.toHaveBeenCalled();
+    expect(kvStore.get(storageKey(USER_SESSION_TITLES_KEY, TITLES_ENTRY_KEY))).toBe(existing);
+    // The title is still recorded for this run: only its persistence waits.
+    expect(getUserSessionTitle('ses-b')).toBe(PLACEHOLDER);
   });
 });

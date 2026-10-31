@@ -314,7 +314,6 @@
     "block",
     "cancelled",
     "deleted",
-    "dismissed",
     "manual review",
     "merge",
     "no changes needed",
@@ -323,8 +322,10 @@
     "pr opened",
     "remediation blocked",
     "remediation failed",
+    "stopped",
     "superseded",
-    "{{count}} open"
+    "{{count}} open",
+    "{{loaded}} of {{total}} files loaded"
   ],
   "he": [
     "completed",

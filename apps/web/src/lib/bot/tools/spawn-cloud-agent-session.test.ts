@@ -28,6 +28,14 @@ jest.mock('@/lib/bot/github-repository-permission', () => ({
   authorizeGitHubRepository,
 }));
 
+const mockLinkUploadedAttachmentsFn = jest.fn<(...args: unknown[]) => Promise<string[]>>();
+const mockReleaseRefusedAttachmentsFn = jest.fn<(...args: unknown[]) => Promise<void>>();
+
+jest.mock('@/lib/bot/attachments', () => ({
+  linkUploadedAttachments: (...args: unknown[]) => mockLinkUploadedAttachmentsFn(...args),
+  releaseRefusedAttachments: (...args: unknown[]) => mockReleaseRefusedAttachmentsFn(...args),
+}));
+
 // Hoisted jest fns referenced from the jest.mock factories below; typed
 // loosely to avoid re-instantiating the factories' drizzle generics.
 const mockCreateCloudAgentNextClient = jest.fn<(...args: unknown[]) => unknown>();
@@ -102,6 +110,10 @@ const attachments: CloudAgentAttachments = {
   path: 'message-attachments',
   files: ['image.png', 'requirements.md'],
 };
+const linkedAttachmentKeys = [
+  'user-9/cloud-agent/message-attachments/image.png',
+  'user-9/cloud-agent/message-attachments/requirements.md',
+];
 const profileDerivedInlineFields = [
   'envVars',
   'encryptedSecrets',
@@ -202,6 +214,8 @@ describe('spawnCloudAgentSession delegation', () => {
     mockValidateGitLabRepoAccessForUser.mockResolvedValue(true);
     mockValidateGitLabRepoAccessForOrganization.mockResolvedValue(true);
     mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockLinkUploadedAttachmentsFn.mockResolvedValue(linkedAttachmentKeys);
+    mockReleaseRefusedAttachmentsFn.mockResolvedValue(undefined);
   });
 
   it('delegates GitHub profile resolution while preserving repository and organization context', async () => {
@@ -550,6 +564,110 @@ describe('spawnCloudAgentSession delegation', () => {
 
     expect(mockComputeCloudAgentNextBalanceCheckEligibility).toHaveBeenCalledWith(
       expect.objectContaining({ user: { id: 'owner-1' } })
+    );
+  });
+
+  it('links the message attachments before preparing the session', async () => {
+    await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'model',
+      userIntegration,
+      'auth-token',
+      'request-link',
+      undefined,
+      { chatPlatform: 'slack', attachments, payerUserId: 'user-9' }
+    );
+
+    expect(mockLinkUploadedAttachmentsFn).toHaveBeenCalledWith('user-9', attachments);
+    expect(mockLinkUploadedAttachmentsFn.mock.invocationCallOrder[0]).toBeLessThan(
+      mockPrepareSession.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
+    expect(mockReleaseRefusedAttachmentsFn).not.toHaveBeenCalled();
+  });
+
+  it('refuses the session when a linked attachment row is gone', async () => {
+    mockLinkUploadedAttachmentsFn.mockRejectedValueOnce(
+      new Error('Attachment upload expired. Add the file again to send it.')
+    );
+
+    const result = await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'model',
+      userIntegration,
+      'auth-token',
+      'request-link-failed',
+      undefined,
+      { chatPlatform: 'slack', attachments, payerUserId: 'user-9' }
+    );
+
+    expect(result.response).toBe(
+      'Error: Attachment upload expired. Add the file again to send it.'
+    );
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+  });
+
+  it('releases the linked attachments when prepare is rejected for insufficient credits', async () => {
+    const { InsufficientCreditsError } = await import('@/lib/cloud-agent-next/cloud-agent-client');
+    mockPrepareSession.mockRejectedValueOnce(new InsufficientCreditsError());
+
+    const result = await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'model',
+      userIntegration,
+      'auth-token',
+      'request-credits-link',
+      undefined,
+      { chatPlatform: 'slack', attachments, payerUserId: 'user-9' }
+    );
+
+    expect(result.response).toBe(INSUFFICIENT_CREDITS_RESPONSE);
+    expect(mockReleaseRefusedAttachmentsFn).toHaveBeenCalledWith(
+      'user-9',
+      attachments,
+      linkedAttachmentKeys
+    );
+  });
+
+  it('releases the linked attachments when initiate is rejected for insufficient credits', async () => {
+    const { InsufficientCreditsError } = await import('@/lib/cloud-agent-next/cloud-agent-client');
+    mockInitiateFromPreparedSession.mockRejectedValueOnce(new InsufficientCreditsError());
+
+    const result = await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'model',
+      userIntegration,
+      'auth-token',
+      'request-credits-initiate-link',
+      undefined,
+      { chatPlatform: 'slack', attachments, payerUserId: 'user-9' }
+    );
+
+    expect(result.response).toBe(INSUFFICIENT_CREDITS_RESPONSE);
+    expect(mockReleaseRefusedAttachmentsFn).toHaveBeenCalledWith(
+      'user-9',
+      attachments,
+      linkedAttachmentKeys
+    );
+  });
+
+  it('releases the linked attachments when initiate fails for any other reason', async () => {
+    mockInitiateFromPreparedSession.mockRejectedValueOnce(new Error('worker unavailable'));
+
+    const result = await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'model',
+      userIntegration,
+      'auth-token',
+      'request-initiate-failure-link',
+      undefined,
+      { chatPlatform: 'slack', attachments, payerUserId: 'user-9' }
+    );
+
+    expect(result.response).toContain('Error initiating Cloud Agent');
+    expect(mockReleaseRefusedAttachmentsFn).toHaveBeenCalledWith(
+      'user-9',
+      attachments,
+      linkedAttachmentKeys
     );
   });
 });

@@ -6766,11 +6766,13 @@ export type CloudAgentSession = typeof cloud_agent_sessions.$inferSelect;
 export type NewCloudAgentSession = typeof cloud_agent_sessions.$inferInsert;
 
 /**
- * Pending-upload ledger for cloud agent attachments. A presign admits a row in
- * status 'pending'; send-time finalization flips the matching rows to 'linked'
- * in one transaction; a cron reaper deletes the R2 objects behind abandoned
- * 'pending' rows whose lease has expired and records them as 'reaped'.
- * kilo_user_id is text() because user IDs are not always UUIDs (OAuth users).
+ * Pending-upload ledger for cloud agent attachments. An uploader admits a row
+ * in status 'pending' before its R2 write (the presigned composer path and the
+ * Kilo Bot upload path); send-time finalization flips the matching rows to
+ * 'linked' in one transaction; a cron reaper deletes the R2 objects behind
+ * abandoned 'pending' rows whose lease has expired and records them as
+ * 'reaped'. kilo_user_id is text() because user IDs are not always UUIDs
+ * (OAuth users).
  */
 export const cloud_agent_pending_uploads = pgTable(
   'cloud_agent_pending_uploads',

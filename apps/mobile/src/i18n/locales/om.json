@@ -2158,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Turtiiwwan hojii irra jiran fe'uu hin danda'amne.",
       "couldNotRefresh": "Haaromsuun hin danda'amne",
-      "noSessionsYetDescription": "Bilbila kee irraa hojii koodii barreessuu jalqabi. Turtiiwwan kee asitti mul'atu.",
+      "noSessionsYetDescription": "Bilbila kee irraa hojii koodii barreessuu jalqabi.",
       "viewHistory": "Seenaa turtiiwwanii",
       "noMatches": "Turtiin walsimu hin jiru",
       "tryDifferentSearch": "Jecha biraatiin barbaadi.",
@@ -3858,6 +3858,7 @@
     "skillMarkdownLabel": "Qabiyyee ogummaa",
     "skillsEmpty": "Ammatti ogummaa hin qabu",
     "skillNameRequired": "Maqaa ogummaa galchi",
+    "skillNameTooLong": "Maqaan ogummaa qubee {{max}} caaluu hin qabu",
     "skillNameInvalid": "Maqaan ogummaa qubee ykn dijiitii irraa jalqabuu fi qubee xixiqqaa, dijiitii fi daash qofa fayyadamuu qaba",
     "skillContentRequired": "Qabiyyeen ogummaa barbaachisaadha",
     "skillSaveFailed": "Ogummaa qusachuu hin dandeenye. Irra deebi'ii yaali.",

@@ -2158,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "ไม่สามารถโหลดเซสชันที่กำลังทำงานได้",
       "couldNotRefresh": "รีเฟรชไม่ได้",
-      "noSessionsYetDescription": "เริ่มงานเขียนโค้ดจากมือถือ เซสชันของคุณจะแสดงที่นี่",
+      "noSessionsYetDescription": "เริ่มงานเขียนโค้ดจากมือถือ",
       "viewHistory": "ประวัติเซสชัน",
       "noMatches": "ไม่มีเซสชันที่ตรงกัน",
       "tryDifferentSearch": "ลองใช้คำค้นหาอื่น",
@@ -3858,6 +3858,7 @@
     "skillMarkdownLabel": "เนื้อหาทักษะ",
     "skillsEmpty": "ยังไม่มีทักษะเลย",
     "skillNameRequired": "ป้อนชื่อทักษะ",
+    "skillNameTooLong": "ชื่อทักษะต้องมีความยาวไม่เกิน {{max}} ตัวอักษร",
     "skillNameInvalid": "ชื่อทักษะต้องขึ้นต้นด้วยตัวอักษรหรือตัวเลข และใช้เฉพาะตัวอักษรพิมพ์เล็ก ตัวเลข และขีดกลางเท่านั้น",
     "skillContentRequired": "จำเป็นต้องมีเนื้อหาทักษะ",
     "skillSaveFailed": "ไม่สามารถบันทึกทักษะได้ โปรดลองอีกครั้ง",

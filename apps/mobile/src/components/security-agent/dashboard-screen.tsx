@@ -30,8 +30,8 @@ import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { formatNumber, formatPercent } from '@/lib/format';
+import { INLINE_LINK_BOX_CLASS, ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { formatNumber, formatPercent, UNMEASURED_VALUE } from '@/lib/format';
 import {
   useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
@@ -42,6 +42,7 @@ import {
   useTriggerSecuritySync,
 } from '@/lib/hooks/use-security-agent';
 import { isSecuritySyncRetryable, securitySyncReconcileCopy } from '@/lib/security-agent-ledger';
+import { useSecurityScopeTitle } from '@/lib/hooks/use-security-scope-title';
 import {
   securityDismissFailureCopy,
   useSecurityDismissFailures,
@@ -65,11 +66,11 @@ const METRIC_TONE_CLASS = {
   neutral: 'text-muted-foreground',
 } satisfies Record<DashboardMetricTone, string>;
 
-// A metric with no measured value: the app's dash placeholder, shared with the
-// session-context pill and the usage tiles.
-const NO_VALUE_DASH = '—';
-
-export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean) {
+export function buildLocalizedMetrics(
+  data: DashboardStats,
+  slaEnabled: boolean,
+  neverSynced = false
+) {
   const metrics = buildSecurityDashboardMetrics(data, slaEnabled);
   const number = (value: number) => formatNumber(value, i18n.language);
   // The tile value counts every severity, so the detail line names every
@@ -86,7 +87,7 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
       : i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetail', parts);
   };
 
-  return metrics.map(metric => {
+  const localized = metrics.map(metric => {
     switch (metric.id) {
       case 'openFindings': {
         return Object.assign(metric, {
@@ -123,11 +124,11 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
           : null;
         return Object.assign(metric, {
           label: i18n.t('securityAgent.dashboardMetrics.slaCompliance'),
-          // The tile's value slot is the monospace figure style: a sentence
-          // there reads as code and outweighs the counts beside it. An
-          // unmeasured SLA shows the standard no-value dash, and the caption
-          // carries what the dash means.
-          value: compliance === null ? NO_VALUE_DASH : formatPercent(compliance, i18n.language),
+          // An unmeasured value is a dash in the numeric slot, not a word: the
+          // tile's value style is the large mono count, so "Not measured" read
+          // as a heavy placeholder that outweighed the real counts beside it,
+          // and the detail line below already explains why there is none.
+          value: compliance === null ? UNMEASURED_VALUE : formatPercent(compliance, i18n.language),
           detail: measured
             ? i18n.t('securityAgent.dashboardMetrics.withinDeadlineDetail', {
                 within: number(data.sla.overall.withinSla),
@@ -173,12 +174,29 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
       }
     }
   });
+
+  // Before the first sync nothing has been measured, so every tile read a zero
+  // count and, under it, a line that described the zeros as a clean report
+  // ("All open findings tracked", "No findings have an SLA deadline yet").
+  // A dash in the numeric slot and the screen's own not-yet-synced line state
+  // the measurement is simply absent.
+  if (!neverSynced) {
+    return localized;
+  }
+  return localized.map(metric =>
+    Object.assign(metric, {
+      value: UNMEASURED_VALUE,
+      detail: i18n.t('securityAgent.dashboard.notYetSynced'),
+      tone: 'neutral' as const,
+    })
+  );
 }
 
 export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const scopeTitle = useSecurityScopeTitle(scope);
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const [repoFullName, setRepoFullName] = useState<string | undefined>(undefined);
@@ -223,16 +241,20 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   );
 
   const slaEnabled = config.data?.slaEnabled ?? true;
+  // The stored absence of a sync, the same read that paints "Not yet synced"
+  // under the filter: nothing has been measured yet, so the tiles and the
+  // priority row must not read their empty result as a clean report. A read
+  // that is still loading or failed is not this state.
+  const neverSynced = lastSync.data?.lastSyncTime === null;
   const data = dashboardStats.data;
-  const metrics = data ? buildLocalizedMetrics(data, slaEnabled) : [];
+  const metrics = data ? buildLocalizedMetrics(data, slaEnabled, neverSynced) : [];
 
   const lastSyncTime = lastSync.data?.lastSyncTime;
   // The prompt stands in for an empty grid, never for counts: a scope whose
   // owner-level sync stamp is missing can still hold findings from a partial
   // run, and those must stay visible. A read that has not answered yet keeps
   // its own surface (the skeleton or the retry card).
-  const syncReadAnswered = lastSync.data !== undefined;
-  const neverSynced = syncReadAnswered && !lastSyncTime && data?.analysis.total === 0;
+  const showFirstSyncPrompt = neverSynced && data?.analysis.total === 0;
   const now = useRelativeTimeNow();
   let lastSyncLabel = t('securityAgent.dashboard.notYetSynced');
   if (lastSync.isError) {
@@ -326,12 +348,17 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     <View className="flex-1 bg-background">
       <ScreenHeader
         className="px-6"
-        title={t('common.securityAgent')}
-        // Size-11 (44dp) icon buttons: findings and settings, plus the audit
-        // overflow when the viewer can manage the agent. Declaring exactly the
-        // buttons this viewer renders drops the actions onto their own row
-        // before the one-line CJK title loses its readable minimum.
-        headerRightWidth={canManage ? 3 * 44 : 2 * 44}
+        title={scopeTitle}
+        eyebrow={t('common.securityAgent')}
+        // The scope name is the one thing that tells two organizations apart,
+        // so it wraps to a second line rather than ellipsizing its tail.
+        titleNumberOfLines={2}
+        // The trailing cluster's laid-out width — 48 dp icon boxes 7 dp apart:
+        // findings and settings, plus the audit overflow when the viewer can
+        // manage the agent. Declaring 44 dp boxes understated the cluster, so
+        // the stacking decision believed the heading kept 48 dp more than it
+        // has. The widths the controls actually render are what it reserves.
+        headerRightWidth={canManage ? 3 * 48 + 2 * 7 : 2 * 48 + 7}
         headerRight={
           <View className="flex-row items-center gap-2">
             <IconButton
@@ -391,7 +418,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             {/* The first-sync prompt below already states that nothing is
                 synced yet, so the status line would repeat it one row above
                 the same words. Every other state keeps its status line. */}
-            {neverSynced ? null : (
+            {showFirstSyncPrompt ? null : (
               <Text variant="muted" className="text-xs">
                 {lastSyncLabel}
               </Text>
@@ -505,21 +532,26 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         ) : null}
 
         {slaEnabled && data && data.sla.overall.total === 0 ? (
-          // One row, one link, outside the branches below: the header's
-          // refresh control already starts a sync, and a pristine scope needs
-          // its way into repository setup before that sync can succeed.
-          <View className="flex-row items-center">
+          <View className="flex-row items-center gap-4">
+            {/* The refresh control in the filter row above is this screen's one
+                sync affordance; a second "Sync findings" link here repeated it
+                inside the empty state that points at the repositories instead.
+                The link takes the layout-neutral inline box: a 48 dp frame
+                around this `text-xs` line centred the text with 17 dp of its
+                own space above and below, so the link floated roughly twice as
+                far from its neighbours as the sections sit from each other. The
+                28 dp box is the audit's own minimum, the `-my-[7px]` cancels
+                the box's overflow so the line sits one section gap away, and
+                `hitSlop` carries the 44 dp touch region. */}
             <Pressable
               onPress={() => {
                 pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
               }}
+              hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
               accessibilityRole="button"
               accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
-              className={cn(ROW_TARGET_CLASS, 'justify-center active:opacity-70')}
+              className={cn(INLINE_LINK_BOX_CLASS, 'active:opacity-70')}
             >
-              {/* The app's link style is the primary token (`Button`
-                  variant="link"): olive on the light card, the brand yellow on
-                  the dark one, the same pairing every other surface uses. */}
               <Text className="text-xs font-medium text-primary">
                 {t('securityAgent.dashboard.manageRepositories')}
               </Text>
@@ -527,7 +559,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           </View>
         ) : null}
 
-        {neverSynced ? (
+        {showFirstSyncPrompt ? (
           // Every count reads 0 before the first sync finishes, so the KPI grid
           // and the posture sections looked like a clean result. Until a sync
           // has completed the screen offers the sync itself instead.
@@ -591,6 +623,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 data={data}
                 slaEnabled={slaEnabled}
                 repoFullName={repoFullName}
+                neverSynced={neverSynced}
               />
             ) : null}
           </>

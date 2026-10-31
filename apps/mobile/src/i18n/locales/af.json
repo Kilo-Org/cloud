@@ -2158,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Kon nie die aktiewe sessies laai nie.",
       "couldNotRefresh": "Kon nie verfris nie",
-      "noSessionsYetDescription": "Begin 'n kodeertaak op jou foon. Jou sessies sal hier verskyn.",
+      "noSessionsYetDescription": "Begin 'n kodeertaak op jou foon.",
       "viewHistory": "Sessiegeskiedenis",
       "noMatches": "Geen ooreenstemmende sessies nie",
       "tryDifferentSearch": "Probeer 'n ander soekterm.",
@@ -3858,6 +3858,7 @@
     "skillMarkdownLabel": "Vaardigheidsinhoud",
     "skillsEmpty": "Nog geen vaardighede nie",
     "skillNameRequired": "Voer 'n vaardigheidsnaam in",
+    "skillNameTooLong": "Vaardigheidsnaam moet {{max}} karakters of minder wees",
     "skillNameInvalid": "Vaardigheidsnaam moet met 'n letter of syfer begin en slegs kleinletters, syfers en strepies gebruik",
     "skillContentRequired": "Vaardigheidsinhoud word vereis",
     "skillSaveFailed": "Kon nie vaardigheid red nie. Probeer weer.",

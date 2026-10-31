@@ -2612,7 +2612,7 @@ export function SessionDetailContent({
               {t('agentChat.session.readOnly')}
             </Text>
             <Button
-              variant="outline"
+              variant="default"
               size="action"
               accessibilityLabel={t('agentChat.session.continueInNewSession')}
               onPress={handleContinueInNewSession}

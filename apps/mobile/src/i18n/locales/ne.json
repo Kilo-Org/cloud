@@ -2158,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "सक्रिय सत्रहरू लोड गर्न सकिएन।",
       "couldNotRefresh": "रिफ्रेस गर्न सकिएन",
-      "noSessionsYetDescription": "आफ्नो फोनबाट कोडिङको काम सुरु गर्नुहोस्। तपाईंका सत्रहरू यहाँ देखिनेछन्।",
+      "noSessionsYetDescription": "आफ्नो फोनबाट कोडिङको काम सुरु गर्नुहोस्।",
       "viewHistory": "सत्रहरूको इतिहास",
       "noMatches": "मिल्ने कुनै सत्र छैन",
       "tryDifferentSearch": "अर्को शब्द राखेर खोज्नुहोस्।",
@@ -3858,6 +3858,7 @@
     "skillMarkdownLabel": "कौशल सामग्री",
     "skillsEmpty": "अझै सीप छैन",
     "skillNameRequired": "कौशल नाम प्रविष्ट गर्नुहोस्",
+    "skillNameTooLong": "सीपको नाम {{max}} अक्षर वा कम हुनुपर्छ",
     "skillNameInvalid": "सीपको नाम अक्षर वा अंकबाट सुरु हुनुपर्छ र सानो अक्षर, अंक र ड्यास मात्र प्रयोग गर्नुपर्छ।",
     "skillContentRequired": "सीप सामग्री आवश्यक छ",
     "skillSaveFailed": "कौशल बचाउन सकेन। फेरि प्रयास गर्नुहोस्।",

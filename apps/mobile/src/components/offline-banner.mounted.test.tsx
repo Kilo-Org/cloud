@@ -32,10 +32,10 @@ vi.mock('@/lib/trpc', async () => {
 });
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   View: 'View',
   Switch: 'Switch',
   Pressable: 'Pressable',
-  useColorScheme: () => 'light',
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },

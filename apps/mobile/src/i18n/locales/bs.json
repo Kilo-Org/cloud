@@ -2187,7 +2187,7 @@
     "sessionList": {
       "couldNotLoadActive": "Učitavanje aktivnih sesija nije uspjelo.",
       "couldNotRefresh": "Osvježavanje nije uspjelo",
-      "noSessionsYetDescription": "Započni zadatak programiranja s mobitela. Tvoje sesije će se pojaviti ovdje.",
+      "noSessionsYetDescription": "Započni zadatak programiranja s mobitela.",
       "viewHistory": "Historija sesija",
       "noMatches": "Nema odgovarajućih sesija",
       "tryDifferentSearch": "Pokušaj s drugim pojmom za pretragu.",
@@ -3908,6 +3908,7 @@
     "skillMarkdownLabel": "Sadržaj vještina",
     "skillsEmpty": "Još nema vještina",
     "skillNameRequired": "Unesite naziv vještine",
+    "skillNameTooLong": "Ime vještine može sadržavati najviše {{max}} znakova",
     "skillNameInvalid": "Ime vještine mora početi slovom ili cifrom i koristiti samo mala slova, cifre i crtice",
     "skillContentRequired": "Sadržaj vještina je obavezan",
     "skillSaveFailed": "Nije moguće sačuvati vještinu. Pokušajte ponovo.",

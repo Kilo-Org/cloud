@@ -2158,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "ንቁ ክፍለ ጊዜዎችን መጫን አልተቻለም።",
       "couldNotRefresh": "ማደስ አልተቻለም",
-      "noSessionsYetDescription": "ከስልክህ ኮድ የመጻፍ ሥራ ጀምር። ክፍለ ጊዜዎችህ እዚህ ይታያሉ።",
+      "noSessionsYetDescription": "ከስልክህ ኮድ የመጻፍ ሥራ ጀምር።",
       "viewHistory": "የክፍለ ጊዜ ታሪክ",
       "noMatches": "የሚዛመዱ ክፍለ ጊዜዎች የሉም",
       "tryDifferentSearch": "ሌላ የፍለጋ ቃል ሞክር።",
@@ -3858,6 +3858,7 @@
     "skillMarkdownLabel": "የክህሎት ይዘት",
     "skillsEmpty": "እስካሁን ምንም ችሎታ የለም።",
     "skillNameRequired": "የክህሎት ስም አስገባ",
+    "skillNameTooLong": "የክህሎት ስም ከ{{max}} ቁምፊዎች መብለጥ የለበትም",
     "skillNameInvalid": "የክህሎት ስም በፊደል ወይም ዲጂት መጀመር አለበት እና ትንሽ ሆሄያትን፣ አሃዞችን እና ሰረዞችን ብቻ መጠቀም አለበት።",
     "skillContentRequired": "የክህሎት ይዘት ያስፈልጋል",
     "skillSaveFailed": "ችሎታ ማዳን አልተቻለም። እንደገና ይሞክሩ።",

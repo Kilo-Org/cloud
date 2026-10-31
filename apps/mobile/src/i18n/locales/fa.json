@@ -2158,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "بارگذاری نشست‌های فعال ممکن نشد.",
       "couldNotRefresh": "بازخوانی ممکن نشد",
-      "noSessionsYetDescription": "با گوشی خود یک کار کدنویسی شروع کنید. نشست‌های شما اینجا نمایش داده می‌شوند.",
+      "noSessionsYetDescription": "با گوشی خود یک کار کدنویسی شروع کنید.",
       "viewHistory": "تاریخچه نشست‌ها",
       "noMatches": "نشستی مطابق با فیلترها پیدا نشد",
       "tryDifferentSearch": "عبارت دیگری را جست‌وجو کنید.",
@@ -3858,6 +3858,7 @@
     "skillMarkdownLabel": "محتوای مهارتی",
     "skillsEmpty": "هنوز هیچ مهارتی وجود ندارد",
     "skillNameRequired": "یک نام مهارت وارد کنید",
+    "skillNameTooLong": "نام مهارت باید {{max}} کاراکتر یا کمتر باشد",
     "skillNameInvalid": "نام مهارت باید با یک حرف یا رقم شروع شود و فقط از حروف کوچک، ارقام و خط تیره استفاده کند.",
     "skillContentRequired": "محتوای مهارتی مورد نیاز است",
     "skillSaveFailed": "مهارت ذخیره نشد. دوباره امتحان کنید.",

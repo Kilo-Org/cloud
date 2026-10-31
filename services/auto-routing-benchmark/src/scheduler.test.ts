@@ -10,6 +10,7 @@ import {
   clearUnbilledCase,
   cooldownProviders,
   deferChunk,
+  deferThrottledChunk,
   finishChunk,
   failScheduledEntry,
   getPaidCasePromptRevision,
@@ -848,6 +849,36 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(await claimMany(db, config, 1, 'too-soon', NOW + 999)).toEqual([]);
     const [available] = await claimMany(db, config, 1, 'available', NOW + 1000);
     expect(available).toMatchObject({ id: claim.id, attempts: 2, slot: claim.slot });
+  });
+
+  it('keeps a throttled chunk claimable past the attempt limit while counting its throttles', async () => {
+    insertRun(sqlite, 'throttled');
+    await scheduleRunChunks(db, {
+      runId: 'throttled',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const throttles = SCHEDULER_MAX_ATTEMPTS + 2;
+    for (let throttle = 1; throttle <= throttles; throttle++) {
+      const [claim] = await claimMany(db, config, 1, `throttle-${throttle}`, NOW + throttle);
+      if (!claim) throw new Error(`Expected throttled claim ${throttle}`);
+      expect(claim.attempts).toBe(1);
+      await deferThrottledChunk(db, claim.id, claim.token, NOW + throttle + 1);
+    }
+    const [stored] = storedChunks(sqlite);
+    if (!stored) throw new Error('Expected the throttled chunk');
+    expect(stored).toMatchObject({
+      status: 'pending',
+      attempts: 0,
+      throttle_deferrals: throttles,
+      slot: null,
+      token: null,
+    });
+    await deferThrottledChunk(db, stored.id, 'stale-token', NOW);
+    expect(storedChunks(sqlite)[0]).toEqual(stored);
   });
 
   it('fails exhausted leases without allowing another claim or retaining a slot', async () => {

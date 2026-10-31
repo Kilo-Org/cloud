@@ -1629,7 +1629,7 @@
     "sessionList": {
       "couldNotLoadActive": "アクティブなセッションを読み込めませんでした。",
       "couldNotRefresh": "更新できませんでした",
-      "noSessionsYetDescription": "スマートフォンからコーディングタスクを開始してください。セッションがここに表示されます。",
+      "noSessionsYetDescription": "スマートフォンからコーディングタスクを開始してください。",
       "viewHistory": "セッション履歴",
       "noMatches": "一致するセッションはありません",
       "tryDifferentSearch": "別の検索語をお試しください。",
@@ -3858,6 +3858,7 @@
     "skillMarkdownLabel": "スキル内容",
     "skillsEmpty": "まだスキルがありません",
     "skillNameRequired": "スキル名を入力してください",
+    "skillNameTooLong": "スキル名は{{max}}文字以内で入力してください",
     "skillNameInvalid": "スキル名は文字または数字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
     "skillContentRequired": "スキル内容は必須です",
     "skillSaveFailed": "スキルを保存できませんでした。もう一度お試しください。",

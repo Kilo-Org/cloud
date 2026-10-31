@@ -573,9 +573,11 @@ test('rejects the same worded form in a locale the allowlist does not name', con
     language: 'he',
   });
   assert.equal(result.status, 1, result.stderr);
+  // The dual has no English sibling, so only the reviewed-form allowance could
+  // accept it: a Hebrew entry must not ride on the Arabic one.
   assert.match(
     result.stderr,
-    /mobile\/he: "securityAgent\.deadline\.dueInDays_one" placeholders differ from English \(count\)/
+    /mobile\/he: "securityAgent\.deadline\.dueInDays_two" drops \{\{count\}\} without a reviewed worded form/
   );
 });
 

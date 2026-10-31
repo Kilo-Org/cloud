@@ -16,7 +16,10 @@ import {
 import { useAuth } from '@/lib/auth/auth-context';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { resolveAnsweredRaises } from '@/lib/glanceable/attention-rows';
-import { readAgentPushPreferenceIfLoaded } from '@/lib/hooks/agent-push-preference';
+import {
+  readAgentPushPreferenceIfLoaded,
+  readNotificationPreviewsIfLoaded,
+} from '@/lib/hooks/agent-push-preference';
 import { useUserWebConnectionState } from '@/lib/hooks/use-user-web-connection-state';
 import {
   applyNeedsInputNotifications,
@@ -96,8 +99,11 @@ function useActiveSessionsLiveSync(): void {
  *
  * The user's `agentAttention` preference is read from the cache the
  * Notifications screen edits and is a plan input, so the app-owned carrier
- * alerts exactly when the server's attention push would. The mount subscribes
- * to that query itself, because the Notifications screen may never be visited:
+ * alerts exactly when the server's attention push would. The message-preview
+ * choice (`previews`) rides the same row, so the posted copy follows it: the
+ * session title only under full previews, the shared generic copy otherwise.
+ * The mount subscribes to that query itself, because the Notifications screen
+ * may never be visited:
  * without the subscription the cache would stay empty after every restart and
  * the gate would have nothing to read. Until the row loads the plan withholds
  * the post, so the gate never falls back to ON for a user who turned the
@@ -161,6 +167,7 @@ function useNeedsInputLocalNotifications(): void {
         preferencesQueryKey,
         'agentAttention'
       ),
+      previews: readNotificationPreviewsIfLoaded(queryClient, preferencesQueryKey),
     });
     const dismissed = new Set(plan.dismiss);
     // A re-published row REPLACES its previous entry instead of joining it. An

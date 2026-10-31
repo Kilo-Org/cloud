@@ -1877,6 +1877,8 @@
       "supersededBy": "Заменена актуальнай праблемай",
       "supersededByDescription": "Націсніце, каб адкрыць актуальны запіс са станам, аналізам і выпраўленнем.",
       "dismissedBecause": "Праблема адхілена: {{reason}}.",
+      "dismissedOn": "Дата адхілення",
+      "supersededOn": "Дата замены",
       "severityLabel": "Узровень небяспекі: {{severity}}",
       "package": "Пакет",
       "vulnerableVersions": "Уразлівыя версіі",

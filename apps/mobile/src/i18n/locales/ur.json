@@ -1827,6 +1827,8 @@
       "supersededBy": "اس کی جگہ نیا مسئلہ درج ہو چکا ہے",
       "supersededByDescription": "حالت، تجزیے اور اصلاح کی تفصیلات دیکھنے کے لیے موجودہ ریکارڈ پر ٹیپ کریں۔",
       "dismissedBecause": "خارج کر دیا گیا: {{reason}}۔",
+      "dismissedOn": "نظر اندازی کی تاریخ",
+      "supersededOn": "نئے اندراج سے تبدیلی کی تاریخ",
       "severityLabel": "شدت: {{severity}}",
       "package": "پیکیج",
       "vulnerableVersions": "حفاظتی خامی والے ورژن",

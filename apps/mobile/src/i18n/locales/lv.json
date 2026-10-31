@@ -1852,6 +1852,8 @@
       "supersededBy": "Aizstāts ar aktuālu konstatējumu",
       "supersededByDescription": "Pieskaries, lai atvērtu aktuālo ierakstu un skatītu statusu, analīzi un labošanas informāciju.",
       "dismissedBecause": "Noraidīts: {{reason}}.",
+      "dismissedOn": "Noraidīšanas datums",
+      "supersededOn": "Aizstāšanas datums",
       "severityLabel": "Smaguma pakāpe: {{severity}}",
       "package": "Pakete",
       "vulnerableVersions": "Ievainojamās versijas",

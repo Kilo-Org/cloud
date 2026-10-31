@@ -1381,6 +1381,8 @@
       "cve": "CVE",
       "detected": "تاريخ الاكتشاف",
       "dismissedBecause": "تم استبعاد النتيجة. السبب: {{reason}}.",
+      "dismissedOn": "مستبعدة في",
+      "supersededOn": "مستبدلة في",
       "ghsa": "GHSA",
       "manifest": "ملف تعريف الحزمة",
       "noPatchAvailable": "لا يوجد تصحيح متاح",

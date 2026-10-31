@@ -1827,6 +1827,8 @@
       "supersededBy": "हालको सुरक्षा समस्याले प्रतिस्थापन गरेको",
       "supersededByDescription": "स्थिति, विश्लेषण र सुधार हेर्न हालको अभिलेख खोल्न ट्याप गर्नुहोस्।",
       "dismissedBecause": "{{reason}} खारेज गरियो।",
+      "dismissedOn": "खारेजी मिति",
+      "supersededOn": "प्रतिस्थापन मिति",
       "severityLabel": "गम्भीरता: {{severity}}",
       "package": "प्याकेज",
       "vulnerableVersions": "सुरक्षा कमजोरी भएका संस्करणहरू",

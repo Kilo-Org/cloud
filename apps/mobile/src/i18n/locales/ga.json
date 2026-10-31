@@ -1902,6 +1902,8 @@
       "supersededBy": "Toradh reatha curtha ina ionad",
       "supersededByDescription": "Tapáil chun an taifead reatha a oscailt agus an stádas, an anailís agus an leasú a fheiceáil.",
       "dismissedBecause": "Díbheadh é ar an gcúis seo: {{reason}}.",
+      "dismissedOn": "Curtha as an áireamh ar",
+      "supersededOn": "Ceann nua ina áit ar",
       "severityLabel": "Déine: {{severity}}",
       "package": "Pacáiste",
       "vulnerableVersions": "Leaganacha leochaileacha",

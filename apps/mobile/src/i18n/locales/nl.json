@@ -1353,6 +1353,8 @@
       "cve": "CVE",
       "detected": "Gedetecteerd",
       "dismissedBecause": "Deze bevinding is afgewezen: {{reason}}.",
+      "dismissedOn": "Genegeerd op",
+      "supersededOn": "Vervangen op",
       "ghsa": "GHSA",
       "manifest": "Manifestbestand",
       "noPatchAvailable": "Geen patch beschikbaar",

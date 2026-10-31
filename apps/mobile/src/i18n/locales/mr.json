@@ -1827,6 +1827,8 @@
       "supersededBy": "या निष्कर्षाची जागा नवीन निष्कर्षाने घेतली आहे",
       "supersededByDescription": "स्थिती, विश्लेषण आणि निराकरण पाहण्यासाठी सध्याची नोंद उघडण्याकरिता टॅप करा.",
       "dismissedBecause": "फेटाळले. कारण: {{reason}}.",
+      "dismissedOn": "दुर्लक्षित केल्याचा दिनांक",
+      "supersededOn": "नव्या निष्कर्षाने बदलल्याचा दिनांक",
       "severityLabel": "{{severity}} तीव्रता",
       "package": "पॅकेज",
       "vulnerableVersions": "असुरक्षित आवृत्त्या",

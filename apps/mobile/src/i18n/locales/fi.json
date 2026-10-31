@@ -1827,6 +1827,8 @@
       "supersededBy": "Korvattu ajantasaisella havainnolla",
       "supersededByDescription": "Napauta nähdäksesi ajantasaisen havainnon tilan, analyysin ja korjauksen.",
       "dismissedBecause": "Havainto hylättiin: {{reason}}.",
+      "dismissedOn": "Sivuuttamispäivä",
+      "supersededOn": "Korvaamispäivä",
       "severityLabel": "Vakavuus: {{severity}}",
       "package": "Paketti",
       "vulnerableVersions": "Haavoittuvat versiot",

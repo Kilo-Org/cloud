@@ -1852,6 +1852,8 @@
       "supersededBy": "Substituïda per una incidència actual",
       "supersededByDescription": "Toca per obrir el registre actual i consultar-ne l'estat, l'anàlisi i la correcció.",
       "dismissedBecause": "S'ha descartat: {{reason}}.",
+      "dismissedOn": "Descartat el",
+      "supersededOn": "Substituït el",
       "severityLabel": "Gravetat: {{severity}}",
       "package": "Paquet",
       "vulnerableVersions": "Versions vulnerables",

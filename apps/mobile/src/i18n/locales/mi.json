@@ -1827,6 +1827,8 @@
       "supersededBy": "Kua whakakapia e tētahi kitenga o nāianei",
       "supersededByDescription": "Patoa kia whakatuwhera i te pūkete o nāianei mō te tūnga, te tātari me te whakatika.",
       "dismissedBecause": "Kua whakakorea. Te take: {{reason}}.",
+      "dismissedOn": "Kua whakakorea i te",
+      "supersededOn": "Kua whakakapia i te",
       "severityLabel": "Taumata kino: {{severity}}",
       "package": "Mōkī",
       "vulnerableVersions": "Ngā putanga whakaraerae",

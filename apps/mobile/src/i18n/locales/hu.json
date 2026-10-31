@@ -1827,6 +1827,8 @@
       "supersededBy": "Újabb találat váltotta fel",
       "supersededByDescription": "Koppints az aktuális bejegyzésre az állapot, az elemzés és a hibajavítás megtekintéséhez.",
       "dismissedBecause": "Elvetés indoka: {{reason}}.",
+      "dismissedOn": "Elvetés dátuma",
+      "supersededOn": "Újabbal helyettesítés dátuma",
       "severityLabel": "{{severity}} súlyosság",
       "package": "Csomag",
       "vulnerableVersions": "Sebezhető verziók",

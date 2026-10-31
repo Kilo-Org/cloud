@@ -1827,6 +1827,8 @@
       "supersededBy": "ନୂଆ ଚିହ୍ନଟ ସମସ୍ୟା ଏହାର ସ୍ଥାନ ନେଇଛି",
       "supersededByDescription": "ସ୍ଥିତି, ବିଶ୍ଳେଷଣ ଏବଂ ସମାଧାନ ପାଇଁ ବର୍ତ୍ତମାନର ରେକର୍ଡ ଖୋଲିବାକୁ ଟାପ୍ କରନ୍ତୁ।",
       "dismissedBecause": "{{reason}} କାରଣରୁ ଖାରଜ ହୋଇଛି।",
+      "dismissedOn": "ଖାରଜ କରାଯାଇଥିବା ତାରିଖ",
+      "supersededOn": "ପ୍ରତିସ୍ଥାପିତ ହୋଇଥିବା ତାରିଖ",
       "severityLabel": "ତୀବ୍ରତା: {{severity}}",
       "package": "ପ୍ୟାକେଜ୍",
       "vulnerableVersions": "ଅସୁରକ୍ଷିତ ସଂସ୍କରଣ",

@@ -1827,6 +1827,8 @@
       "supersededBy": "Kuthathelwe indawo okutholakele kwamanje",
       "supersededByDescription": "Thepha ukuze uvule irekhodi lamanje ubone isimo, ukuhlaziywa nokulungisa.",
       "dismissedBecause": "Kuchithiwe ngenxa yalokhu: {{reason}}.",
+      "dismissedOn": "Usuku lokuchithwa",
+      "supersededOn": "Usuku lokuthathelwa indawo",
       "severityLabel": "Ubucayi: {{severity}}",
       "package": "Iphakethe",
       "vulnerableVersions": "Izinguqulo ezinobungozi",

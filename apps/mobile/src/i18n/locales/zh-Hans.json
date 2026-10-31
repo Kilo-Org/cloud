@@ -1353,6 +1353,8 @@
       "cve": "CVE",
       "detected": "检测时间",
       "dismissedBecause": "已忽略（{{reason}}）。",
+      "dismissedOn": "忽略日期",
+      "supersededOn": "取代日期",
       "ghsa": "GHSA",
       "manifest": "清单文件",
       "noPatchAvailable": "暂无可用补丁",

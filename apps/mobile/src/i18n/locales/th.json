@@ -1827,6 +1827,8 @@
       "supersededBy": "มีข้อค้นพบใหม่มาแทนที่แล้ว",
       "supersededByDescription": "แตะเพื่อเปิดรายการปัจจุบันและดูสถานะ ผลวิเคราะห์ และการแก้ไข",
       "dismissedBecause": "ละเว้นแล้ว เนื่องจาก{{reason}}",
+      "dismissedOn": "ละเว้นแล้ว เมื่อ",
+      "supersededOn": "ถูกแทนที่แล้ว เมื่อ",
       "severityLabel": "ความรุนแรงระดับ{{severity}}",
       "package": "แพ็กเกจ",
       "vulnerableVersions": "เวอร์ชันที่มีช่องโหว่",

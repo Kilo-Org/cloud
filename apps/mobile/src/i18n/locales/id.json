@@ -1353,6 +1353,8 @@
       "cve": "CVE",
       "detected": "Terdeteksi",
       "dismissedBecause": "Diabaikan karena {{reason}}.",
+      "dismissedOn": "Diabaikan pada",
+      "supersededOn": "Digantikan pada",
       "ghsa": "GHSA",
       "manifest": "Manifes",
       "noPatchAvailable": "Belum ada perbaikan",

@@ -1827,6 +1827,8 @@
       "supersededBy": "Жаңа мәселемен ауыстырылған",
       "supersededByDescription": "Күйін, талдауын және түзетуін көру үшін жаңа жазбаны түртіп ашыңыз.",
       "dismissedBecause": "Мәселе еленбеді. Себебі: {{reason}}.",
+      "dismissedOn": "Еленбеу күні",
+      "supersededOn": "Жаңасымен ауыстырылу күні",
       "severityLabel": "Қауіп деңгейі: {{severity}}",
       "package": "Пакет",
       "vulnerableVersions": "Осал нұсқалар",

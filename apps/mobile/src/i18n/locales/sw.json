@@ -1827,6 +1827,8 @@
       "supersededBy": "Nafasi yake imechukuliwa na tatizo la sasa",
       "supersededByDescription": "Gusa ili ufungue rekodi ya sasa na uone hali, uchambuzi na urekebishaji.",
       "dismissedBecause": "Limeondolewa kwa sababu {{reason}}.",
+      "dismissedOn": "Tarehe ya kupuuzwa",
+      "supersededOn": "Tarehe ya kubadilishwa na nyingine",
       "severityLabel": "Ukali wa {{severity}}",
       "package": "Kifurushi",
       "vulnerableVersions": "Matoleo hatarishi",

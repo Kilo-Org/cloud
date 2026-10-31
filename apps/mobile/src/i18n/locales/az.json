@@ -1827,6 +1827,8 @@
       "supersededBy": "Cari tapıntı ilə əvəz edilib",
       "supersededByDescription": "Cari qeydin statusuna, təhlilinə və düzəlişinə baxmaq üçün toxun.",
       "dismissedBecause": "Rədd edilib: {{reason}}.",
+      "dismissedOn": "Rədd edilmə tarixi",
+      "supersededOn": "Əvəz edilmə tarixi",
       "severityLabel": "Ciddilik dərəcəsi: {{severity}}",
       "package": "Paket",
       "vulnerableVersions": "Boşluq olan versiyalar",

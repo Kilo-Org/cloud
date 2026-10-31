@@ -1827,6 +1827,8 @@
       "supersededBy": "បានជំនួសដោយបញ្ហាដែលរកឃើញបច្ចុប្បន្ន",
       "supersededByDescription": "ប៉ះដើម្បីបើកកំណត់ត្រាបច្ចុប្បន្ន និងមើលស្ថានភាព ការវិភាគ និងការជួសជុល។",
       "dismissedBecause": "បានច្រានចោលដោយសារ {{reason}}។",
+      "dismissedOn": "បានសម្គាល់ថាមិនអើពើ នៅ",
+      "supersededOn": "ត្រូវបានជំនួស នៅ",
       "severityLabel": "កម្រិតធ្ងន់ធ្ងរ {{severity}}",
       "package": "កញ្ចប់",
       "vulnerableVersions": "កំណែដែលមានភាពងាយរងគ្រោះ",

@@ -1328,6 +1328,8 @@
       "cve": "CVE",
       "detected": "Détecté",
       "dismissedBecause": "Ce signalement a été exclu : {{reason}}.",
+      "dismissedOn": "Ignoré le",
+      "supersededOn": "Remplacé le",
       "ghsa": "GHSA",
       "manifest": "Manifeste",
       "noPatchAvailable": "Aucun correctif disponible",

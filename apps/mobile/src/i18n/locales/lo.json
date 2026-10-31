@@ -1827,6 +1827,8 @@
       "supersededBy": "ມີບັນຫາທີ່ກວດພົບລາຍການໃໝ່ແທນແລ້ວ",
       "supersededByDescription": "ແຕະເພື່ອເປີດລາຍການປັດຈຸບັນ ແລະ ເບິ່ງສະຖານະ, ການວິເຄາະ ແລະ ການແກ້ໄຂ.",
       "dismissedBecause": "ປິດບັນຫາແລ້ວເພາະ {{reason}}.",
+      "dismissedOn": "ລະເວັ້ນແລ້ວເມື່ອ",
+      "supersededOn": "ແທນທີ່ແລ້ວເມື່ອ",
       "severityLabel": "ຄວາມຮ້າຍແຮງລະດັບ {{severity}}",
       "package": "ແພັກເກດ",
       "vulnerableVersions": "ລຸ້ນທີ່ມີຊ່ອງໂຫວ່",

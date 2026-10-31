@@ -1827,6 +1827,8 @@
       "supersededBy": "ჩანაცვლებულია აქტუალური მიგნებით",
       "supersededByDescription": "შეეხე აქტუალურ ჩანაწერს სტატუსის, ანალიზისა და გამოსწორების სანახავად.",
       "dismissedBecause": "უარყოფის მიზეზი: {{reason}}.",
+      "dismissedOn": "უგულებელყოფის თარიღი",
+      "supersededOn": "ჩანაცვლების თარიღი",
       "severityLabel": "სიმძიმე: {{severity}}",
       "package": "პაკეტი",
       "vulnerableVersions": "მოწყვლადი ვერსიები",

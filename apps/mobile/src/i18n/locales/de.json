@@ -1353,6 +1353,8 @@
       "cve": "CVE",
       "detected": "Erkannt",
       "dismissedBecause": "Dieser Befund wurde verworfen. Grund: {{reason}}.",
+      "dismissedOn": "Verworfen am",
+      "supersededOn": "Ersetzt am",
       "ghsa": "GHSA",
       "manifest": "Manifestdatei",
       "noPatchAvailable": "Kein Patch verfügbar",

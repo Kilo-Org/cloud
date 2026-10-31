@@ -1827,6 +1827,8 @@
       "supersededBy": "Заменет со актуелен наод",
       "supersededByDescription": "Допри за да го отвориш актуелниот запис со статусот, анализата и санирањето.",
       "dismissedBecause": "Наодот е отфрлен {{reason}}.",
+      "dismissedOn": "Отфрлено на",
+      "supersededOn": "Заменето на",
       "severityLabel": "Сериозност: {{severity}}",
       "package": "Пакет",
       "vulnerableVersions": "Ранливи верзии",

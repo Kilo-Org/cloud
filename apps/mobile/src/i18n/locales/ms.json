@@ -1827,6 +1827,8 @@
       "supersededBy": "Digantikan oleh penemuan semasa",
       "supersededByDescription": "Ketik untuk membuka rekod semasa dan melihat status, analisis serta pemulihan.",
       "dismissedBecause": "Diketepikan kerana {{reason}}.",
+      "dismissedOn": "Diketepikan pada",
+      "supersededOn": "Digantikan pada",
       "severityLabel": "Keterukan {{severity}}",
       "package": "Pakej",
       "vulnerableVersions": "Versi yang terdedah kepada serangan",

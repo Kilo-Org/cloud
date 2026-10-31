@@ -1827,6 +1827,8 @@
       "supersededBy": "ಪತ್ತೆಯಾದ ಹೊಸ ಸಮಸ್ಯೆಯ ದಾಖಲೆ ಇದನ್ನು ಬದಲಿಸಿದೆ",
       "supersededByDescription": "ಸ್ಥಿತಿ, ವಿಶ್ಲೇಷಣೆ ಮತ್ತು ಪರಿಹಾರವನ್ನು ನೋಡಲು ಪ್ರಸ್ತುತ ದಾಖಲೆಯನ್ನು ಟ್ಯಾಪ್ ಮಾಡಿ.",
       "dismissedBecause": "ವಜಾಗೊಳಿಸಲಾಗಿದೆ: {{reason}}.",
+      "dismissedOn": "ಕಡೆಗಣಿಸಿದ ದಿನಾಂಕ",
+      "supersededOn": "ಹೊಸದು ಬದಲಿಗೆ ಬಂದ ದಿನಾಂಕ",
       "severityLabel": "{{severity}} ತೀವ್ರತೆ",
       "package": "ಪ್ಯಾಕೇಜ್",
       "vulnerableVersions": "ಭದ್ರತಾ ದೋಷವಿರುವ ಆವೃತ್ತಿಗಳು",

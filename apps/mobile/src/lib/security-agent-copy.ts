@@ -152,6 +152,25 @@ export function getRemediationUnavailableKey(reason: string | null | undefined):
 
 type DeadlineCopy = { label: string; detail: string };
 
+/**
+ * Whether the finding still has a deadline to meet. A fixed or dismissed
+ * finding has none: its state copy names the resolution date, so it never
+ * belongs under the deadline label.
+ */
+const OPEN_DEADLINE_KINDS = {
+  overdue: true,
+  'due-today': true,
+  'due-tomorrow': true,
+  'due-in': true,
+  fixed: false,
+  closed: false,
+  'no-deadline': false,
+} satisfies Record<FindingDeadlineState['kind'], boolean>;
+
+export function isOpenDeadline(state: FindingDeadlineState): boolean {
+  return OPEN_DEADLINE_KINDS[state.kind];
+}
+
 // Renders the deadline from its stable state code, never from the English
 // label/detail the shared module built (web still reads those). Dates use the
 // active app language via formatDate.

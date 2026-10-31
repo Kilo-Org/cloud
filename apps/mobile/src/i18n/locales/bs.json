@@ -1852,6 +1852,8 @@
       "supersededBy": "Zamijenjen aktuelnim nalazom",
       "supersededByDescription": "Dodirni za prikaz aktuelnog zapisa sa statusom, analizom i otklanjanjem.",
       "dismissedBecause": "Nalaz je odbačen {{reason}}.",
+      "dismissedOn": "Datum odbacivanja",
+      "supersededOn": "Datum zamjene",
       "severityLabel": "Ozbiljnost: {{severity}}",
       "package": "Paket",
       "vulnerableVersions": "Ranjive verzije",

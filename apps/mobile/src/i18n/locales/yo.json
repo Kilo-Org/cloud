@@ -1827,6 +1827,8 @@
       "supersededBy": "Àbùkù tuntun ti rọ́pò rẹ̀",
       "supersededByDescription": "Tẹ̀ ẹ́ láti ṣí àkọsílẹ̀ tuntun fún ipò, ìtúpalẹ̀ àti àtúnṣe.",
       "dismissedBecause": "A kọ̀ ọ́ sílẹ̀ nítorí {{reason}}.",
+      "dismissedOn": "A ti kọ̀ sílẹ̀ ní",
+      "supersededOn": "A ti fi òmíràn rọ́pò rẹ̀ ní",
       "severityLabel": "ìwọ̀n ewu: {{severity}}",
       "package": "Àkójọpọ̀ sọ́fitiwia",
       "vulnerableVersions": "Àwọn ẹ̀yà tó ní àbùkù ààbò",

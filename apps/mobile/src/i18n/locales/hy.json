@@ -1827,6 +1827,8 @@
       "supersededBy": "Փոխարինվել է խնդրի արդի գրառմամբ",
       "supersededByDescription": "Հպիր՝ արդի գրառումը բացելու և կարգավիճակը, վերլուծությունն ու շտկումը դիտելու համար։",
       "dismissedBecause": "Մերժվել է՝ {{reason}}։",
+      "dismissedOn": "Անտեսված լինելու ամսաթիվ",
+      "supersededOn": "Փոխարինված լինելու ամսաթիվ",
       "severityLabel": "Վտանգավորություն՝ {{severity}}",
       "package": "Փաթեթ",
       "vulnerableVersions": "Խոցելի տարբերակներ",

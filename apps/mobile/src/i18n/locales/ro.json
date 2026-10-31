@@ -1852,6 +1852,8 @@
       "supersededBy": "Înlocuită de o constatare actuală",
       "supersededByDescription": "Atinge pentru a deschide înregistrarea actuală și a vedea starea, analiza și remedierea.",
       "dismissedBecause": "Constatarea a fost respinsă {{reason}}.",
+      "dismissedOn": "Ignorată la",
+      "supersededOn": "Înlocuită la",
       "severityLabel": "Gravitate: {{severity}}",
       "package": "Pachet",
       "vulnerableVersions": "Versiuni vulnerabile",

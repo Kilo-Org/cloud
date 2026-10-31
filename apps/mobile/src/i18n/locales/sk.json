@@ -1877,6 +1877,8 @@
       "supersededBy": "Nahradené aktuálnym nálezom",
       "supersededByDescription": "Klepnutím otvoríte aktuálny záznam s údajmi o stave, analýze a náprave.",
       "dismissedBecause": "Dôvod zamietnutia: {{reason}}.",
+      "dismissedOn": "Ignorované dňa",
+      "supersededOn": "Nahradené dňa",
       "severityLabel": "Závažnosť: {{severity}}",
       "package": "Balík",
       "vulnerableVersions": "Zraniteľné verzie",

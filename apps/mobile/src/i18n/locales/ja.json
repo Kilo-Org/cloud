@@ -1353,6 +1353,8 @@
       "cve": "CVE",
       "detected": "検出日時",
       "dismissedBecause": "却下しました（理由：{{reason}}）。",
+      "dismissedOn": "却下日",
+      "supersededOn": "置き換え日",
       "ghsa": "GHSA",
       "manifest": "マニフェスト",
       "noPatchAvailable": "利用可能なパッチなし",

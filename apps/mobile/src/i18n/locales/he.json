@@ -1360,6 +1360,8 @@
       "cve": "CVE",
       "detected": "זוהה",
       "dismissedBecause": "סיבת הדחייה: {{reason}}.",
+      "dismissedOn": "תאריך ההתעלמות",
+      "supersededOn": "תאריך ההחלפה",
       "ghsa": "GHSA",
       "manifest": "קובץ מניפסט",
       "noPatchAvailable": "אין תיקון זמין",

@@ -1827,6 +1827,8 @@
       "supersededBy": "O'rniga dolzarb muammo qayd etilgan",
       "supersededByDescription": "Holat, tahlil va tuzatish ma'lumotlarini ko'rish uchun dolzarb yozuvni bosing.",
       "dismissedBecause": "Rad etish sababi: {{reason}}.",
+      "dismissedOn": "E’tiborsiz qoldirilgan sana",
+      "supersededOn": "Almashtirilgan sana",
       "severityLabel": "Xavf darajasi: {{severity}}",
       "package": "Paket",
       "vulnerableVersions": "Zaiflik mavjud versiyalar",

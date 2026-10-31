@@ -1367,6 +1367,8 @@
       "cve": "CVE",
       "detected": "Обнаружено",
       "dismissedBecause": "Уязвимость отклонена: {{reason}}.",
+      "dismissedOn": "Дата отклонения",
+      "supersededOn": "Дата замены",
       "ghsa": "GHSA",
       "manifest": "Манифест",
       "noPatchAvailable": "Исправления пока нет",

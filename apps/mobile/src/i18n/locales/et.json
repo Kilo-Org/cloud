@@ -1827,6 +1827,8 @@
       "supersededBy": "Asendatud uuema leiuga",
       "supersededByDescription": "Puuduta, et avada uuem kirje ning vaadata selle olekut, analüüsi ja parandamise andmeid.",
       "dismissedBecause": "Leid jäeti kõrvale: {{reason}}.",
+      "dismissedOn": "Kõrvale jätmise kuupäev",
+      "supersededOn": "Asendamise kuupäev",
       "severityLabel": "Raskusaste: {{severity}}",
       "package": "Pakett",
       "vulnerableVersions": "Haavatavad versioonid",

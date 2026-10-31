@@ -1827,6 +1827,8 @@
       "supersededBy": "Nosoloina olana hita vaovao",
       "supersededByDescription": "Tsindrio ny firaketana vaovao hijerena ny sata, ny famakafakana ary ny fanarenana.",
       "dismissedBecause": "Nailika noho izao antony izao: {{reason}}.",
+      "dismissedOn": "Daty fanesorana",
+      "supersededOn": "Daty fanoloana",
       "severityLabel": "Hamafy: {{severity}}",
       "package": "Fonosana",
       "vulnerableVersions": "Dikan-teny marefo",

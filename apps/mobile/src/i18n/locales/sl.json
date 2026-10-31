@@ -1877,6 +1877,8 @@
       "supersededBy": "Nadomeščeno z aktualno ugotovitvijo",
       "supersededByDescription": "Tapni za prikaz aktualnega zapisa s stanjem, analizo in podatki o odpravljanju.",
       "dismissedBecause": "Ugotovitev je zavrnjena: {{reason}}.",
+      "dismissedOn": "Datum zavrženja",
+      "supersededOn": "Datum nadomestitve",
       "severityLabel": "Resnost: {{severity}}",
       "package": "Paket",
       "vulnerableVersions": "Ranljive različice",

@@ -1827,6 +1827,8 @@
       "supersededBy": "പകരം പുതിയ കണ്ടെത്തൽ നിലവിലുണ്ട്",
       "supersededByDescription": "നില, വിശകലനം, പരിഹാരം എന്നിവ കാണാൻ നിലവിലെ രേഖ ടാപ്പ് ചെയ്ത് തുറക്കുക.",
       "dismissedBecause": "നിരസിച്ചു. കാരണം: {{reason}}.",
+      "dismissedOn": "ഒഴിവാക്കിയ തീയതി",
+      "supersededOn": "മാറ്റിസ്ഥാപിച്ച തീയതി",
       "severityLabel": "ഗുരുതരത്വം: {{severity}}",
       "package": "പാക്കേജ്",
       "vulnerableVersions": "സുരക്ഷാ ദൗർബല്യമുള്ള പതിപ്പുകൾ",

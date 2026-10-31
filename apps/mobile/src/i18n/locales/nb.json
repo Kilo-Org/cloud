@@ -1827,6 +1827,8 @@
       "supersededBy": "Erstattet av et oppdatert funn",
       "supersededByDescription": "Trykk for å se status, analyse og utbedring for det oppdaterte funnet.",
       "dismissedBecause": "Avvist {{reason}}.",
+      "dismissedOn": "Avvisningsdato",
+      "supersededOn": "Erstatningsdato",
       "severityLabel": "Alvorlighetsgrad: {{severity}}",
       "package": "Pakke",
       "vulnerableVersions": "Sårbare versjoner",

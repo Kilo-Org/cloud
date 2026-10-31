@@ -1827,6 +1827,8 @@
       "supersededBy": "Αντικαταστάθηκε από το τρέχον εύρημα",
       "supersededByDescription": "Πάτησε για να δεις την κατάσταση, την ανάλυση και την αποκατάσταση στην τρέχουσα εγγραφή.",
       "dismissedBecause": "Απορρίφθηκε: {{reason}}.",
+      "dismissedOn": "Απορρίφθηκε στις",
+      "supersededOn": "Αντικαταστάθηκε στις",
       "severityLabel": "Σοβαρότητα: {{severity}}",
       "package": "Πακέτο",
       "vulnerableVersions": "Ευάλωτες εκδόσεις",

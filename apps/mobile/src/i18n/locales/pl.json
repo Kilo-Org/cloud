@@ -1367,6 +1367,8 @@
       "cve": "CVE",
       "detected": "Wykryto",
       "dismissedBecause": "Powód odrzucenia: {{reason}}.",
+      "dismissedOn": "Data odrzucenia",
+      "supersededOn": "Data zastąpienia",
       "ghsa": "GHSA",
       "manifest": "Plik manifestu",
       "noPatchAvailable": "Brak dostępnej poprawki",

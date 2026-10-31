@@ -1360,6 +1360,8 @@
       "cve": "CVE",
       "detected": "Detectado",
       "dismissedBecause": "Se descartó por el siguiente motivo: {{reason}}.",
+      "dismissedOn": "Descartado el",
+      "supersededOn": "Reemplazado el",
       "ghsa": "GHSA",
       "manifest": "Manifiesto",
       "noPatchAvailable": "No hay parche disponible",

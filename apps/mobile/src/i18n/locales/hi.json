@@ -1353,6 +1353,8 @@
       "cve": "CVE",
       "detected": "पता लगाया गया",
       "dismissedBecause": "खारिज करने का कारण: {{reason}}।",
+      "dismissedOn": "खारिज होने की तारीख",
+      "supersededOn": "नए रिकॉर्ड से बदले जाने की तारीख",
       "ghsa": "GHSA",
       "manifest": "मैनिफ़ेस्ट",
       "noPatchAvailable": "कोई पैच उपलब्ध नहीं",

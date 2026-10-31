@@ -1827,6 +1827,8 @@
       "supersededBy": "නව සොයාගැනීමකින් ප්‍රතිස්ථාපනය කර ඇත",
       "supersededByDescription": "තත්ත්වය, විශ්ලේෂණය සහ පිළියම් යෙදීම පිළිබඳ විස්තර බැලීමට වත්මන් වාර්තාව තට්ටු කර විවෘත කරන්න.",
       "dismissedBecause": "ඉවතලා ඇත්තේ {{reason}} නිසාය.",
+      "dismissedOn": "ඉවතලා ඇති දිනය",
+      "supersededOn": "ප්‍රතිස්ථාපනය වී ඇති දිනය",
       "severityLabel": "බරපතළකම: {{severity}}",
       "package": "පැකේජය",
       "vulnerableVersions": "දුර්වලතා සහිත අනුවාද",

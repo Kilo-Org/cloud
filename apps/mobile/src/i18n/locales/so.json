@@ -1827,6 +1827,8 @@
       "supersededBy": "Waxaa beddelay natiijo hadda jirta",
       "supersededByDescription": "Taabo si aad u furto diiwaanka hadda jira oo aad u aragto xaaladda, falanqaynta iyo hagaajinta.",
       "dismissedBecause": "Waa la iska dhaafay sababtoo ah {{reason}}.",
+      "dismissedOn": "Taariikhda la iska dhaafay",
+      "supersededOn": "Taariikhda la beddelay",
       "severityLabel": "Heerka halista: {{severity}}",
       "package": "Xirmo",
       "vulnerableVersions": "Noocyo nugul",

@@ -1827,6 +1827,8 @@
       "supersededBy": "Yon konsta aktyèl ranplase li",
       "supersededByDescription": "Peze pou ouvri dosye aktyèl la epi wè estati, analiz ak koreksyon yo.",
       "dismissedBecause": "Yo rejte li paske {{reason}}.",
+      "dismissedOn": "Rejte sou",
+      "supersededOn": "Ranplase sou",
       "severityLabel": "Gravite {{severity}}",
       "package": "Pakè",
       "vulnerableVersions": "Vèsyon vilnerab",

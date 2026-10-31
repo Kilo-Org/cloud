@@ -1827,6 +1827,8 @@
       "supersededBy": "Erstattet af et aktuelt fund",
       "supersededByDescription": "Tryk for at se det aktuelle funds status, analyse og udbedring.",
       "dismissedBecause": "Fundet er afvist {{reason}}.",
+      "dismissedOn": "Afvist den",
+      "supersededOn": "Erstattet den",
       "severityLabel": "Alvorlighed: {{severity}}",
       "package": "Pakke",
       "vulnerableVersions": "Sårbare versioner",

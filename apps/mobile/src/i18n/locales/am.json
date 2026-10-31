@@ -1827,6 +1827,8 @@
       "supersededBy": "በአሁኑ ግኝት ተተክቷል",
       "supersededByDescription": "ሁኔታውን፣ ትንታኔውን እና ጥገናውን ለማየት የአሁኑን መዝገብ ይንኩ።",
       "dismissedBecause": "ግኝቱ ተወግዷል፦ {{reason}}።",
+      "dismissedOn": "የተወገደበት ቀን",
+      "supersededOn": "የተተካበት ቀን",
       "severityLabel": "{{severity}} ክብደት",
       "package": "ፓኬጅ",
       "vulnerableVersions": "ተጋላጭ ስሪቶች",

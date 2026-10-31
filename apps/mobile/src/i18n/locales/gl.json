@@ -1827,6 +1827,8 @@
       "supersededBy": "Substituído por un achado actual",
       "supersededByDescription": "Toca para abrir o rexistro actual e consultar o estado, a análise e a corrección.",
       "dismissedBecause": "Motivo do descarte: {{reason}}.",
+      "dismissedOn": "Descartado o",
+      "supersededOn": "Substituído o",
       "severityLabel": "Gravidade: {{severity}}",
       "package": "Paquete",
       "vulnerableVersions": "Versións vulnerables",

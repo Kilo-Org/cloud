@@ -1827,6 +1827,8 @@
       "supersededBy": "اوسنۍ موندنه یې ځایناستې ده",
       "supersededByDescription": "د حالت، تحلیل او اصلاح د لیدلو لپاره پر اوسني ریکارډ ټک وکړئ.",
       "dismissedBecause": "له پامه غورځول شوې ده، ځکه چې {{reason}}.",
+      "dismissedOn": "د پامه غورځولو نېټه",
+      "supersededOn": "د ځای نیولو نېټه",
       "severityLabel": "شدت: {{severity}}",
       "package": "بسته",
       "vulnerableVersions": "د امنیتي نیمګړتیا لرونکې نسخې",

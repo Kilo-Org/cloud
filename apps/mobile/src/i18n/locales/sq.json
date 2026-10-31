@@ -1827,6 +1827,8 @@
       "supersededBy": "E zëvendësuar nga një gjetje aktuale",
       "supersededByDescription": "Prek për të hapur regjistrimin aktual dhe për të parë statusin, analizën dhe korrigjimin.",
       "dismissedBecause": "U hodh poshtë {{reason}}.",
+      "dismissedOn": "E hedhur poshtë më",
+      "supersededOn": "E zëvendësuar më",
       "severityLabel": "Niveli i rrezikut: {{severity}}",
       "package": "Paketa",
       "vulnerableVersions": "Versionet me cenueshmëri",

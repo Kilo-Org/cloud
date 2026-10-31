@@ -1827,6 +1827,8 @@
       "supersededBy": "دۆزینەوەیەکی نوێ جێگەی گرتووەتەوە",
       "supersededByDescription": "لێی بدە بۆ کردنەوەی تۆماری ئێستا و بینینی دۆخ، شیکاری و چارەسەر.",
       "dismissedBecause": "هۆکاری ڕەتکردنەوە: {{reason}}.",
+      "dismissedOn": "پشتگوێخراو لە",
+      "supersededOn": "جێگەی گیراوەتەوە لە",
       "severityLabel": "ئاستی مەترسی: {{severity}}",
       "package": "پاکێج",
       "vulnerableVersions": "وەشانە کەلێندارەکان",

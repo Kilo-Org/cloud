@@ -1827,6 +1827,8 @@
       "supersededBy": "ఈ సమస్య స్థానంలో తాజా సమస్య నమోదైంది",
       "supersededByDescription": "స్థితి, విశ్లేషణ, పరిష్కారం వివరాలను చూడటానికి తాజా రికార్డును నొక్కండి.",
       "dismissedBecause": "తీసివేయడానికి కారణం: {{reason}}.",
+      "dismissedOn": "విస్మరణ తేదీ",
+      "supersededOn": "భర్తీ తేదీ",
       "severityLabel": "{{severity}} తీవ్రత",
       "package": "ప్యాకేజీ",
       "vulnerableVersions": "భద్రతా లోపం ఉన్న వెర్షన్‌లు",

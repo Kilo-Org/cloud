@@ -1353,6 +1353,8 @@
       "cve": "CVE",
       "detected": "偵測時間",
       "dismissedBecause": "已忽略，原因：{{reason}}。",
+      "dismissedOn": "忽略日期",
+      "supersededOn": "取代日期",
       "ghsa": "GHSA",
       "manifest": "套件清單檔",
       "noPatchAvailable": "沒有可用的修補程式",

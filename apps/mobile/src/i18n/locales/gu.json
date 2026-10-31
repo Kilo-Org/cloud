@@ -1827,6 +1827,8 @@
       "supersededBy": "આની જગ્યાએ નવું તારણ નોંધાયું છે",
       "supersededByDescription": "સ્થિતિ, વિશ્લેષણ અને સુધારણા માટે હાલનો રેકોર્ડ ખોલવા ટેપ કરો.",
       "dismissedBecause": "આ કારણસર ખારિજ કર્યું: {{reason}}.",
+      "dismissedOn": "ખારિજ કરવાની તારીખ",
+      "supersededOn": "નવા તારણે સ્થાન લીધાની તારીખ",
       "severityLabel": "{{severity}} ગંભીરતા",
       "package": "પેકેજ",
       "vulnerableVersions": "સુરક્ષા ખામીવાળી આવૃત્તિઓ",

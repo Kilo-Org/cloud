@@ -1827,6 +1827,8 @@
       "supersededBy": "Ersatt av ett aktuellt fynd",
       "supersededByDescription": "Tryck för att öppna den aktuella posten med status, analys och åtgärd.",
       "dismissedBecause": "Fyndet har avfärdats. Orsak: {{reason}}.",
+      "dismissedOn": "Avfärdad den",
+      "supersededOn": "Ersatt den",
       "severityLabel": "Allvarlighetsgrad: {{severity}}",
       "package": "Paket",
       "vulnerableVersions": "Sårbara versioner",

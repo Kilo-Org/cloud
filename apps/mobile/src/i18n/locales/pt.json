@@ -1852,6 +1852,8 @@
       "supersededBy": "Substituída por uma ocorrência atual",
       "supersededByDescription": "Toca para abrir o registo atual e consultar o estado, a análise e a correção.",
       "dismissedBecause": "Ocorrência descartada: {{reason}}.",
+      "dismissedOn": "Ignorada em",
+      "supersededOn": "Substituída em",
       "severityLabel": "Gravidade {{severity}}",
       "package": "Pacote",
       "vulnerableVersions": "Versões vulneráveis",

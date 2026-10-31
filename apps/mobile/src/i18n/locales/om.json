@@ -1827,6 +1827,8 @@
       "supersededBy": "Argamni ammaa bakka isaa bu'eera",
       "supersededByDescription": "Haala, xiinxalaa fi sirreeffama ilaaluuf galmee ammaa tuqiitii bani.",
       "dismissedBecause": "Sababa dhiifameef: {{reason}}.",
+      "dismissedOn": "Guyyaa itti dhiifame",
+      "supersededOn": "Guyyaa itti bakka bu'ame",
       "severityLabel": "Cimina {{severity}}",
       "package": "Paakeejii",
       "vulnerableVersions": "Fooyya'inoota saaxilamoo",

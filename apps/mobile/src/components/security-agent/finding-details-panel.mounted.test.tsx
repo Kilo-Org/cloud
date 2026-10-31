@@ -14,9 +14,13 @@ import { type SecurityFinding } from '@/lib/security-agent';
 const mocks = vi.hoisted(() => {
   const deadlineState: Record<string, unknown> = { kind: 'no-deadline' };
   const interpolations: { key: string; params: Record<string, unknown> }[] = [];
+  const kvRows: Record<string, unknown>[] = [];
   return {
     deadlineState,
+    deadlineTone: 'neutral' as string,
     interpolations,
+    kvRows,
+    supersedingFindingId: null as string | null,
     routerPush: vi.fn(),
     openBrowser: vi.fn(),
     linkingOpenUrl: vi.fn(),
@@ -61,7 +65,12 @@ vi.mock('@/components/security-agent/finding-tone', () => ({
   },
   findingToneColor: () => '#666',
 }));
-vi.mock('@/components/ui/kv-row', () => ({ KvRow: () => null }));
+vi.mock('@/components/ui/kv-row', () => ({
+  KvRow: (props: Record<string, unknown>) => {
+    mocks.kvRows.push(props);
+    return null;
+  },
+}));
 vi.mock('@/components/security-agent/collapsible-section', () => ({
   CollapsibleSection: (props: { children?: unknown }) => props.children ?? null,
 }));
@@ -71,16 +80,13 @@ vi.mock('@/components/security-agent/finding-status-badge', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666' }),
 }));
-vi.mock('@/lib/security-agent-copy', () => ({
-  getDeadlineCopy: (state: { kind: string }) => ({
-    label: `${state.kind} deadline`,
-    detail: `${state.kind} detail`,
-  }),
+vi.mock('@/lib/format', () => ({
+  formatDate: (date: Date) => date.toISOString(),
 }));
 vi.mock('@/lib/utils', () => ({
   cn: (...classes: unknown[]) => classes.join(' '),
   firstNonEmpty: (value: string | null, fallback: string) => value ?? fallback,
-  parseTimestamp: () => 0,
+  parseTimestamp: (value: string | null) => new Date(value ?? 0),
   timeAgo: () => 'a while ago',
 }));
 vi.mock('@kilocode/app-shared/security-agent', () => ({
@@ -88,10 +94,10 @@ vi.mock('@kilocode/app-shared/security-agent', () => ({
   getFindingSeverityPresentation: () => ({ tone: 'danger' }),
   getSecurityDeadlinePresentation: () => ({
     state: mocks.deadlineState,
-    tone: 'neutral',
+    tone: mocks.deadlineTone,
     icon: 'clock',
   }),
-  getSupersedingFindingId: () => null,
+  getSupersedingFindingId: () => mocks.supersedingFindingId,
 }));
 
 type R = TestRenderer.ReactTestRenderer;
@@ -247,4 +253,95 @@ describe('FindingDetailsPanel stored dismissal values', () => {
       });
     }
   );
+});
+
+describe('FindingDetailsPanel dates block', () => {
+  // The labels the dates group can render; any other KvRow belongs to another
+  // group on the panel.
+  const DATE_LABEL_KEYS: Record<string, true> = {
+    'securityAgent.findingDetails.detected': true,
+    'common.updated': true,
+    'securityAgent.filter.fixed': true,
+    'securityAgent.findingDetails.slaDeadline': true,
+    'securityAgent.findingDetails.dismissedOn': true,
+    'securityAgent.findingDetails.supersededOn': true,
+  };
+
+  function dateRows() {
+    return mocks.kvRows.filter(row => DATE_LABEL_KEYS[row.label as string]);
+  }
+
+  beforeEach(() => {
+    mocks.kvRows.length = 0;
+    mocks.deadlineState = { kind: 'no-deadline' };
+    mocks.supersedingFindingId = null;
+  });
+
+  // An ignored finding has no deadline left to meet: the date it carries is
+  // the day it left the open set, so it gets its own label instead of the
+  // deadline label it used to sit under.
+  it('labels the resolution date with the status that closed the finding', () => {
+    mocks.deadlineState = { kind: 'closed', superseded: false, at: new Date(0) };
+    renderPanel(
+      findingFixture({
+        status: 'ignored',
+        sla_due_at: '2026-11-02T00:00:00.000Z',
+        updated_at: '2026-10-30T00:00:00.000Z',
+      })
+    );
+
+    expect(dateRows().map(row => row.label)).toEqual([
+      'securityAgent.findingDetails.detected',
+      'securityAgent.findingDetails.dismissedOn',
+    ]);
+    expect(dateRows()[1]).toMatchObject({ value: '2026-10-30T00:00:00.000Z', last: true });
+
+    mocks.kvRows.length = 0;
+    mocks.supersedingFindingId = 'finding-2';
+    renderPanel(findingFixture({ status: 'ignored' }));
+    expect(dateRows()[1]).toMatchObject({ label: 'securityAgent.findingDetails.supersededOn' });
+  });
+
+  it('keeps the fixed date row and drops the deadline row once the source reports the finding fixed', () => {
+    mocks.deadlineState = { kind: 'fixed', beforeDeadline: true, fixedAt: new Date(0) };
+    renderPanel(
+      findingFixture({
+        status: 'fixed',
+        sla_due_at: '2026-11-02T00:00:00.000Z',
+        fixed_at: '2026-10-05T00:00:00.000Z',
+      })
+    );
+
+    expect(dateRows().map(row => row.label)).toEqual([
+      'securityAgent.findingDetails.detected',
+      'common.updated',
+      'securityAgent.filter.fixed',
+    ]);
+  });
+
+  it('keeps the deadline row on an open finding that still has one', () => {
+    mocks.deadlineState = { kind: 'due-in', days: 12, deadline: new Date(0) };
+    mocks.deadlineTone = 'warning';
+    renderPanel(findingFixture({ status: 'open', sla_due_at: '2026-11-02T00:00:00.000Z' }));
+
+    expect(dateRows().map(row => row.label)).toEqual([
+      'securityAgent.findingDetails.detected',
+      'common.updated',
+      'securityAgent.findingDetails.slaDeadline',
+    ]);
+    expect(dateRows()[2]).toMatchObject({
+      value: 'securityAgent.deadline.dueOn',
+      valueTone: 'warn',
+      last: true,
+    });
+  });
+
+  it('renders no deadline row for an open finding without one', () => {
+    renderPanel(findingFixture({ status: 'open', sla_due_at: null }));
+
+    expect(dateRows().map(row => row.label)).toEqual([
+      'securityAgent.findingDetails.detected',
+      'common.updated',
+    ]);
+  });
 });

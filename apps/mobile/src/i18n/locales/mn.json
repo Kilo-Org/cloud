@@ -1827,6 +1827,8 @@
       "supersededBy": "Шинэ асуудлаар орлуулсан",
       "supersededByDescription": "Шинэ бүртгэлийн төлөв, шинжилгээ, засварыг харахын тулд товшино уу.",
       "dismissedBecause": "Хассан шалтгаан: {{reason}}.",
+      "dismissedOn": "Хасагдсан огноо",
+      "supersededOn": "Орлогдсон огноо",
       "severityLabel": "Ноцтой байдлын зэрэг: {{severity}}",
       "package": "Багц",
       "vulnerableVersions": "Эмзэг байдалтай хувилбарууд",

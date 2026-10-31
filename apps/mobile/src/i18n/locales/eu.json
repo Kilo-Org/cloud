@@ -1827,6 +1827,8 @@
       "supersededBy": "Uneko aurkikuntza batek ordezkatu du",
       "supersededByDescription": "Sakatu uneko erregistroa irekitzeko eta egoera, azterketa eta konponketa ikusteko.",
       "dismissedBecause": "Aurkikuntza baztertu da. Arrazoia: {{reason}}.",
+      "dismissedOn": "Baztertuta geratu zen data",
+      "supersededOn": "Ordezkatuta geratu zen data",
       "severityLabel": "Larritasuna: {{severity}}",
       "package": "Paketea",
       "vulnerableVersions": "Bertsio ahulak",

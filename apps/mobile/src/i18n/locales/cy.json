@@ -1927,6 +1927,8 @@
       "supersededBy": "Wedi'i ddisodli gan ganfyddiad cyfredol",
       "supersededByDescription": "Tapiwch i agor y cofnod cyfredol a gweld y statws, y dadansoddiad a'r gwaith cywiro.",
       "dismissedBecause": "Diystyrwyd y canfyddiad: {{reason}}.",
+      "dismissedOn": "Wedi'i ddiystyru ar",
+      "supersededOn": "Wedi'i ddisodli ar",
       "severityLabel": "Difrifoldeb {{severity}}",
       "package": "Pecyn",
       "vulnerableVersions": "Fersiynau bregus",

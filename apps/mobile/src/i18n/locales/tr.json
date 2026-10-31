@@ -1353,6 +1353,8 @@
       "cve": "CVE",
       "detected": "Tespit tarihi",
       "dismissedBecause": "Şu nedenle yok sayıldı: {{reason}}.",
+      "dismissedOn": "Yok sayılma tarihi",
+      "supersededOn": "Yerini yenisi alma tarihi",
       "ghsa": "GHSA",
       "manifest": "Bildirim dosyası",
       "noPatchAvailable": "Yama yok",

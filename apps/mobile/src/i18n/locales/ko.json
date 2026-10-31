@@ -1353,6 +1353,8 @@
       "cve": "CVE",
       "detected": "감지됨",
       "dismissedBecause": "무시 처리했습니다. 사유: {{reason}}.",
+      "dismissedOn": "무시된 날짜",
+      "supersededOn": "대체된 날짜",
       "ghsa": "GHSA",
       "manifest": "매니페스트",
       "noPatchAvailable": "사용 가능한 패치 없음",

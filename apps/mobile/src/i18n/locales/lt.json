@@ -1877,6 +1877,8 @@
       "supersededBy": "Pakeistas naujesniu radiniu",
       "supersededByDescription": "Bakstelėk, kad atidarytum naujausią įrašą su būsenos, analizės ir taisymo informacija.",
       "dismissedBecause": "Atmetimo priežastis: {{reason}}.",
+      "dismissedOn": "Atmetimo data",
+      "supersededOn": "Pakeitimo data",
       "severityLabel": "Pavojingumas: {{severity}}",
       "package": "Paketas",
       "vulnerableVersions": "Pažeidžiamos versijos",

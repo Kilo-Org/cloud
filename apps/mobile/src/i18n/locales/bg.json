@@ -1827,6 +1827,8 @@
       "supersededBy": "Заменен с актуален проблем",
       "supersededByDescription": "Докосни, за да отвориш актуалния запис със състоянието, анализа и отстраняването на проблема.",
       "dismissedBecause": "Проблемът е отхвърлен по следната причина: {{reason}}.",
+      "dismissedOn": "Отхвърлено на",
+      "supersededOn": "Заменено на",
       "severityLabel": "Сериозност: {{severity}}",
       "package": "Пакет",
       "vulnerableVersions": "Уязвими версии",

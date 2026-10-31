@@ -1827,6 +1827,8 @@
       "supersededBy": "নতুন ত্রুটির রেকর্ড দিয়ে প্রতিস্থাপিত",
       "supersededByDescription": "অবস্থা, বিশ্লেষণ ও সমাধান দেখতে বর্তমান রেকর্ডটি ট্যাপ করে খুলুন।",
       "dismissedBecause": "খারিজ করা হয়েছে: {{reason}}।",
+      "dismissedOn": "খারিজের তারিখ",
+      "supersededOn": "প্রতিস্থাপনের তারিখ",
       "severityLabel": "তীব্রতা: {{severity}}",
       "package": "প্যাকেজ",
       "vulnerableVersions": "নিরাপত্তা দুর্বলতাযুক্ত সংস্করণ",

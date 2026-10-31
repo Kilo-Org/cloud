@@ -1353,6 +1353,8 @@
       "cve": "CVE",
       "detected": "Đã phát hiện",
       "dismissedBecause": "Đã bỏ qua vì {{reason}}.",
+      "dismissedOn": "Đã bỏ qua vào",
+      "supersededOn": "Đã thay thế vào",
       "ghsa": "GHSA",
       "manifest": "Tệp kê khai",
       "noPatchAvailable": "Chưa có bản vá",

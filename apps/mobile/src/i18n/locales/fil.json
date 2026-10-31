@@ -1827,6 +1827,8 @@
       "supersededBy": "Pinalitan ng mas bagong natukoy na isyu",
       "supersededByDescription": "I-tap para buksan ang kasalukuyang tala ng katayuan, pagsusuri, at pag-aayos.",
       "dismissedBecause": "Binalewala dahil {{reason}}.",
+      "dismissedOn": "Binalewala noong",
+      "supersededOn": "Pinalitan noong",
       "severityLabel": "kalubhaan: {{severity}}",
       "package": "Pakete",
       "vulnerableVersions": "Mga bersyong may kahinaan sa seguridad",

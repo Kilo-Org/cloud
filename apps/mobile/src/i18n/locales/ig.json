@@ -1827,6 +1827,8 @@
       "supersededBy": "Ihe achọpụtara ọhụrụ nọchiri ya",
       "supersededByDescription": "Pịa ka ị mepee ndekọ nke ugbu a maka ọnọdụ, nyocha na ndozi.",
       "dismissedBecause": "Ihe kpatara mwepụ: {{reason}}.",
+      "dismissedOn": "Ụbọchị elegharala anya",
+      "supersededOn": "Ụbọchị edochiri",
       "severityLabel": "Ogo njọ: {{severity}}",
       "package": "Ngwugwu",
       "vulnerableVersions": "Ụdị nwere oghere nchebe",

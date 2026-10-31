@@ -50,6 +50,9 @@ export const oauthPendingAuthorizations = sqliteTable(
   },
   table => [
     uniqueIndex('uq_oauth_pending_authorizations_device_auth_code').on(table.device_auth_code),
+    // Housekeeping reads expired rows by `expires_at`; the index lets each
+    // batch stop after its own rows instead of scanning the table.
+    index('idx_oauth_pending_authorizations_expires_at').on(table.expires_at),
   ]
 );
 

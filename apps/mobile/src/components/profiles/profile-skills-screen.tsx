@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -9,6 +9,7 @@ import { SkillFormSheet, type SkillFormSubmission } from '@/components/profiles/
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Pencil, Sparkles, Trash2 } from '@/components/ui/icons';
@@ -23,13 +24,19 @@ import {
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { MAX_PROFILE_SKILLS } from '@/lib/agent-profile-forms';
+import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { cn } from '@/lib/utils';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_SKILLS: AgentProfileDetail['skills'] = [];
 
 /** The skill the sheet edits; `null` opens the sheet in add mode. */
 type SkillTarget = { id: string; name: string; rawMarkdown: string };
+
+/** A refused save, and whether it is a failure or an expected limit. */
+type SaveFailure = { message: string; tone: 'error' | 'warn' };
 
 type SkillRowProps = Readonly<{
   skill: AgentProfileDetail['skills'][number];
@@ -90,7 +97,7 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
           accessibilityLabel={t('profiles.skillDelete', { name: skill.name })}
           onPress={onDelete}
         >
-          <Trash2 size={18} color={colors.destructive} />
+          <Trash2 size={18} color={colors.mutedForeground} />
         </Pressable>
       ) : null}
     </View>
@@ -120,18 +127,50 @@ export function ProfileSkillsScreen({
   const canManage = useCanManageOrganizationProfiles(organizationId);
 
   const skills = profileQuery.data ?? NO_SKILLS;
+  const atSkillCap = skills.length >= MAX_PROFILE_SKILLS;
   // `null` = closed, `{ skill: null }` = add, `{ skill }` = edit that skill.
   const [form, setForm] = useState<{ skill: SkillTarget | null } | null>(null);
+  // The message the open sheet shows for a refused save, and whether it is a
+  // failure or an expected limit. The mutation hook's toast sits behind the
+  // sheet, so the reason is rendered inside it instead.
+  const [saveFailure, setSaveFailure] = useState<SaveFailure | null>(null);
+  // Bumped by every open and close, so a save that settles after its own form is
+  // gone cannot write its message into, or close, the form opened since.
+  const formGeneration = useRef(0);
+  // The list sits underneath the sheet, and a sheet dismisses natively, so the
+  // second tap of a Save double tap would land on the row just saved.
+  const { markClosed: markSheetClosed, guard: guardRowPress } = useSheetRowTapGuard();
+
+  const openForm = (skill: SkillTarget | null) => {
+    formGeneration.current += 1;
+    setForm({ skill });
+    setSaveFailure(null);
+  };
 
   const startAdd = () => {
-    setForm({ skill: null });
+    openForm(null);
   };
 
   const closeForm = () => {
+    formGeneration.current += 1;
+    markSheetClosed();
     setForm(null);
   };
 
+  const skillLimitFailure = (): SaveFailure => ({
+    message: t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS }),
+    tone: 'warn',
+  });
+
   const saveSkill = async (target: SkillTarget | null, submission: SkillFormSubmission) => {
+    const generation = formGeneration.current;
+    setSaveFailure(null);
+    // The server counts every skill row of the profile, so a full list cannot
+    // take another create: name the cap here instead of round-tripping for it.
+    if (target === null && atSkillCap) {
+      setSaveFailure(skillLimitFailure());
+      return;
+    }
     try {
       await (target === null
         ? createCustomSkill.mutateAsync({ profileId, ...submission })
@@ -142,12 +181,22 @@ export function ProfileSkillsScreen({
             description: submission.description ?? null,
           }));
     } catch (error) {
-      if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.skillSaveFailed'));
+      if (formGeneration.current !== generation) {
+        return;
       }
+      // A create the server refused at the cap, e.g. the list was stale; an
+      // update never hits the cap, so its PRECONDITION_FAILED (an unmodifiable
+      // skills.sh reference) keeps the generic message.
+      const limited =
+        target === null && readTrpcErrorField(error, 'code') === 'PRECONDITION_FAILED';
+      setSaveFailure(
+        limited ? skillLimitFailure() : { message: t('profiles.skillSaveFailed'), tone: 'error' }
+      );
       return;
     }
-    closeForm();
+    if (formGeneration.current === generation) {
+      closeForm();
+    }
   };
 
   const runDelete = async (skillId: string) => {
@@ -155,7 +204,7 @@ export function ProfileSkillsScreen({
       await deleteSkill.mutateAsync({ profileId, skillId });
     } catch (error) {
       if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.skillSaveFailed'));
+        toast.error(t('profiles.skillDeleteFailed'));
       }
     }
   };
@@ -209,46 +258,57 @@ export function ProfileSkillsScreen({
             skill={skill}
             onToggle={
               canManage
-                ? enabled => {
+                ? guardRowPress(enabled => {
                     setSkillEnabled.mutate(
                       { profileId, skillId: skill.id, enabled },
                       {
                         onError: error => {
                           if (!hasUsableMessage(error)) {
-                            toast.error(t('profiles.skillSaveFailed'));
+                            toast.error(t('profiles.skillToggleFailed'));
                           }
                         },
                       }
                     );
-                  }
+                  })
                 : undefined
             }
             onEdit={
               canManage
-                ? () => {
-                    setForm({
-                      skill: { id: skill.id, name: skill.name, rawMarkdown: skill.rawMarkdown },
+                ? guardRowPress(() => {
+                    openForm({
+                      id: skill.id,
+                      name: skill.name,
+                      rawMarkdown: skill.rawMarkdown,
                     });
-                  }
+                  })
                 : undefined
             }
             onDelete={
               canManage
-                ? () => {
+                ? guardRowPress(() => {
                     confirmDelete({
                       id: skill.id,
                       name: skill.name,
                       rawMarkdown: skill.rawMarkdown,
                     });
-                  }
+                  })
                 : undefined
             }
           />
         ))}
         {canManage ? (
-          <Button onPress={startAdd}>
-            <Text>{t('profiles.addSkill')}</Text>
-          </Button>
+          <>
+            <Button onPress={startAdd}>
+              <Text>{t('profiles.addSkill')}</Text>
+            </Button>
+            {atSkillCap ? (
+              <AccessibleStatus
+                message={t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })}
+                tone="warn"
+                className="text-sm"
+              />
+            ) : null}
+          </>
         ) : null}
       </>
     );
@@ -271,6 +331,8 @@ export function ProfileSkillsScreen({
         <SkillFormSheet
           skill={form.skill}
           isSaving={createCustomSkill.isPending || updateSkill.isPending}
+          saveFailure={saveFailure?.message ?? null}
+          saveFailureTone={saveFailure?.tone}
           onClose={closeForm}
           onSave={submission => {
             void saveSkill(form.skill, submission);

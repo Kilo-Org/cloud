@@ -136,6 +136,7 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   ActivityIndicator: 'ActivityIndicator',
   Platform: platform,
+  useColorScheme: () => 'light',
   BackHandler: {
     addEventListener: vi.fn(() => ({ remove: vi.fn() })),
   },

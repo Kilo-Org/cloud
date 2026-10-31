@@ -86,6 +86,11 @@ vi.mock('expo-router', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61', primaryForeground: '#FFFFFF' }),
 }));
+// The provider gate reads the memberships answer to word the Bitbucket
+// org-only guidance; this harness always has one organization.
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => ({ data: [{ organizationId: 'org-1' }] }),
+}));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('expo-web-browser', () => ({
   openAuthSessionAsync: vi.fn(),

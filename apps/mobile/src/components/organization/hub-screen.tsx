@@ -142,7 +142,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
             <KvRow
               label={t('organization.hub.balance')}
               value={formatMoney(fromMicrodollars(org.balance), i18n.language)}
-              valueVariant="sans"
+              valueNumeric
             />
           )}
           {showMoney && org.balance === 0 && (
@@ -165,7 +165,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                   )
                 : formatNumber(org.seatCount.used, i18n.language)
             }
-            valueVariant="sans"
+            valueNumeric
             last
           />
         </Animated.View>

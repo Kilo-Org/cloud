@@ -250,6 +250,7 @@ export const CustomRouterBaseRouter = {
 export const CustomRouterMode = {
   CostPerAccuracy: 'cost_per_accuracy',
   BestAccuracy: 'best_accuracy',
+  Cheapest: 'cheapest',
 } as const;
 
 export const SCHEMA_CHECK_ENUMS = {
@@ -4778,6 +4779,68 @@ export const platform_oauth_credentials = pgTable(
 
 export type PlatformOAuthCredential = typeof platform_oauth_credentials.$inferSelect;
 export type NewPlatformOAuthCredential = typeof platform_oauth_credentials.$inferInsert;
+
+/**
+ * The lease a request holds while it exchanges a rotating OAuth refresh token
+ * with a provider. One row per credential: either a `platform_oauth_credentials`
+ * row (GitLab, Bitbucket) or a `user_github_app_tokens` row (GitHub user
+ * authorization), never both.
+ *
+ * Provider refresh tokens rotate: when two requests exchange the same token,
+ * one succeeds and the other is told `invalid_grant`, which looks exactly like a
+ * credential the user has to reconnect. A refresh attempt that receives that
+ * answer may only revoke the credential when no other exchange can be in
+ * flight, and that question cannot be answered from the credential row alone.
+ * Holding this lease is that answer: only the attempt that inserted or took over
+ * an expired lease talks to the provider, and every other attempt reports
+ * temporary unavailability without exchanging anything.
+ *
+ * `expires_at` and the takeover predicate use the database clock (`now()`), so
+ * clock skew between worker isolates cannot let a stale attempt act. The lease
+ * is released in the transaction that persists the outcome; `expires_at` only
+ * covers an attempt that dies mid-exchange.
+ *
+ * Deliberately a separate table rather than extra columns on
+ * `platform_oauth_credentials`: `GitLabOAuthCredentialRowSchema` in
+ * `packages/worker-utils/src/gitlab-credential.ts` is `.strict()` and
+ * `git-token-service` selects that whole row, so any column added to
+ * `platform_oauth_credentials` fails GitLab/GitHub/Bitbucket credential
+ * resolution closed.
+ *
+ * PII: there is no direct user FK, and both credential columns cascade, so
+ * `softDeleteUser` and integration deletion still remove the rows.
+ */
+export const oauth_refresh_exchange_leases = pgTable(
+  'oauth_refresh_exchange_leases',
+  {
+    id: idPrimaryKeyColumn,
+    platform_oauth_credential_id: uuid().references(() => platform_oauth_credentials.id, {
+      onDelete: 'cascade',
+    }),
+    user_github_app_token_id: uuid().references(() => user_github_app_tokens.id, {
+      onDelete: 'cascade',
+    }),
+    attempt_id: text().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_oauth_refresh_exchange_leases_platform_oauth_credential_id')
+      .on(table.platform_oauth_credential_id)
+      .where(isNotNull(table.platform_oauth_credential_id)),
+    uniqueIndex('UQ_oauth_refresh_exchange_leases_user_github_app_token_id')
+      .on(table.user_github_app_token_id)
+      .where(isNotNull(table.user_github_app_token_id)),
+    check(
+      'oauth_refresh_exchange_leases_owner_check',
+      sql`num_nonnulls(${table.platform_oauth_credential_id}, ${table.user_github_app_token_id}) = 1`
+    ),
+    check('oauth_refresh_exchange_leases_attempt_id_check', sql`${table.attempt_id} <> ''`),
+  ]
+);
+
+export type OAuthRefreshExchangeLease = typeof oauth_refresh_exchange_leases.$inferSelect;
+export type NewOAuthRefreshExchangeLease = typeof oauth_refresh_exchange_leases.$inferInsert;
 
 export const platform_access_token_credentials = pgTable(
   'platform_access_token_credentials',

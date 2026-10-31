@@ -776,6 +776,25 @@ describe('/api/auto-routing/custom-routers', () => {
     });
   });
 
+  test('persists the cheapest mode through the database check constraint', async () => {
+    await create(routerBody({ slug: 'thrifty', mode: 'cheapest' }));
+    const modeUpdate = await updateRouter(
+      request('/user/thrifty', { method: 'PATCH', body: { mode: 'best_accuracy' } }),
+      params('user', 'thrifty')
+    );
+    expect(modeUpdate.status).toBe(200);
+    const backToCheapest = await updateRouter(
+      request('/user/thrifty', { method: 'PATCH', body: { mode: 'cheapest' } }),
+      params('user', 'thrifty')
+    );
+    expect(backToCheapest.status).toBe(200);
+    const [row] = await db
+      .select()
+      .from(auto_routing_custom_routers)
+      .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
+    expect(row).toMatchObject({ slug: 'thrifty', mode: 'cheapest' });
+  });
+
   describe('linked entries', () => {
     test('rejects a link on a gateway entry the platform can serve', async () => {
       const entry = { ...gateway(FLASH), measuredAs: SONNET };

@@ -49,7 +49,7 @@ export function invalidateAllSecurityLifecycleScopes(
   const { trpc, queryClient } = deps;
 
   scheduleCacheMaintenance(() => {
-    reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
+    void reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
   });
   void queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getFinding.queryKey() });
   void queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getAnalysis.queryKey() });
@@ -61,7 +61,7 @@ export function invalidateAllSecurityLifecycleScopes(
   });
 
   scheduleCacheMaintenance(() => {
-    reconcileFirstPage(queryClient, trpc.organizations.securityAgent.listFindings.queryKey());
+    void reconcileFirstPage(queryClient, trpc.organizations.securityAgent.listFindings.queryKey());
   });
   void queryClient.invalidateQueries({
     queryKey: trpc.organizations.securityAgent.getFinding.queryKey(),

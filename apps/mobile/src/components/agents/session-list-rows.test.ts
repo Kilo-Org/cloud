@@ -108,6 +108,15 @@ describe('flattenSessionSections', () => {
     expect(first.data[0]).toBe(snapshot.data[0]);
   });
 
+  it('carries each section heading onto its session rows', () => {
+    const rows = flattenSessionSections([
+      section('Today', ['a']),
+      section('Yesterday', ['b', 'c']),
+    ]);
+    const carried = rows.flatMap(row => (row.kind === 'session' ? [row.sectionTitle] : []));
+    expect(carried).toEqual(['Today', 'Yesterday', 'Yesterday']);
+  });
+
   it('interleaves each header immediately before its section rows', () => {
     const rows = flattenSessionSections([section('Today', ['a']), section('Older', ['b', 'c'])]);
     expect(rows.map(row => row.kind)).toEqual([

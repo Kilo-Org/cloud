@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import { PICKER_ROUTE_PATHS } from './picker-routes';
 import {
   isConcreteLastRouteHref,
   isRecordableLastRoute,
+  isUnrestorableLastRouteHref,
   lastRouteHrefFrom,
 } from './last-route-recordable';
 import { shouldRepairRestoredRoute } from './last-route-repair';
@@ -16,6 +18,23 @@ describe('isConcreteLastRouteHref', () => {
   it('rejects a route pattern and an empty href', () => {
     expect(isConcreteLastRouteHref('/profiles/[profileId]/variables')).toBe(false);
     expect(isConcreteLastRouteHref('')).toBe(false);
+  });
+});
+
+describe('isUnrestorableLastRouteHref', () => {
+  it('rejects a persisted picker or transient sheet, groups and query included', () => {
+    expect(isUnrestorableLastRouteHref('/(app)/agent-chat/repo-picker')).toBe(true);
+    expect(isUnrestorableLastRouteHref('/(app)/agent-chat/model-picker?routeKey=unscoped')).toBe(
+      true
+    );
+    expect(isUnrestorableLastRouteHref('/(app)/voice-language-picker')).toBe(true);
+    expect(isUnrestorableLastRouteHref('/(app)/todos/list-settings?listId=l1')).toBe(true);
+  });
+
+  it('accepts the screens a record may reopen', () => {
+    expect(isUnrestorableLastRouteHref('/(app)/agent-chat/new?organizationId=org_1')).toBe(false);
+    expect(isUnrestorableLastRouteHref('/(app)/agent-chat/ses_1')).toBe(false);
+    expect(isUnrestorableLastRouteHref('/(app)/(tabs)/(0_home)')).toBe(false);
   });
 });
 
@@ -111,6 +130,20 @@ describe('isRecordableLastRoute', () => {
     );
   });
 
+  it('keeps the record on the screen under a bridge picker', () => {
+    // A picker sheet's options live in a module map that a fresh JS context
+    // starts empty, so reopening one on its own paints the expired shell over
+    // the start route. The record must stay on the form that opened it.
+    for (const pathname of PICKER_ROUTE_PATHS) {
+      expect(isRecordableLastRoute(pathname, ['(app)', ...pathname.slice(1).split('/')])).toBe(
+        false
+      );
+    }
+    expect(isRecordableLastRoute('/(app)/agent-chat/new', ['(app)', 'agent-chat', 'new'])).toBe(
+      true
+    );
+  });
+
   it('records nothing outside the app group', () => {
     expect(isRecordableLastRoute('/(auth)/login', ['(auth)', 'login'])).toBe(false);
     expect(isRecordableLastRoute('/force-update', ['force-update'])).toBe(false);
@@ -130,6 +163,29 @@ describe('isRecordableLastRoute', () => {
     ]) {
       expect(isRecordableLastRoute(pathname, ['(app)', pathname.slice(1)])).toBe(false);
     }
+  });
+
+  it('records nothing on a sheet, so its opener stays the target', () => {
+    // Every form sheet is presented over the screen that opened it; the
+    // suffixes come from the shared list the tab layer and the layouts keep
+    // aligned (see `form sheet route declarations` in tab-press.test.ts).
+    for (const segments of [
+      ['(app)', 'agent-chat', 'repo-picker'],
+      ['(app)', 'voice-language-picker'],
+      ['(app)', 'todos', 'list-settings'],
+      ['(app)', 'security-agent', '[scope]', 'filter'],
+      ['(app)', 'security-agent', '[scope]', 'dismiss', '[id]'],
+      ['(app)', 'pr-review', 'owner', 'repo', '1', 'comment-composer'],
+      ['(app)', 'profile', 'organization', 'member-limit'],
+    ]) {
+      expect(
+        isRecordableLastRoute(`/${segments.slice(1).join('/')}`, segments),
+        segments.join('/')
+      ).toBe(false);
+    }
+    expect(
+      isRecordableLastRoute('/pr-review/owner/repo/1', ['(app)', 'pr-review', 'owner', 'repo', '1'])
+    ).toBe(true);
   });
 });
 

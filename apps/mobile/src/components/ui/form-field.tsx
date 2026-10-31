@@ -123,6 +123,12 @@ function FormField({
           // insets the already-centered text rect by it, drawing the value and
           // the placeholder below the middle (apps/mobile/AGENTS.md).
           'rounded-md border border-input bg-background text-sm text-foreground',
+          // DESIGN.md's input recipe fills the field with `border.inputBg` (4 %
+          // white) over the canvas. `bg-background` is the canvas itself, so in
+          // dark the field had no surface of its own and only the border color
+          // separated it from the page. Light keeps the canvas fill, where the
+          // 45 % ink `--input` border already carries the field.
+          'dark:bg-[#FFFFFF0A]',
           'focus:border-ring',
           displayedError && 'border-destructive',
           disabled && 'opacity-50',

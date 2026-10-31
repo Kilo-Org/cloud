@@ -126,15 +126,17 @@ export class AttributionTrackerDO extends DurableObject<Env> {
       .orderBy(linesAdded.line_hash, linesAdded.line_number)
       .all();
 
-    const result: Record<string, number[]> = {};
+    const lineNumbersByHash = new Map<string, number[]>();
     for (const row of rows) {
-      if (!result[row.line_hash]) {
-        result[row.line_hash] = [];
+      const lineNumbers = lineNumbersByHash.get(row.line_hash);
+      if (lineNumbers) {
+        lineNumbers.push(row.line_number);
+      } else {
+        lineNumbersByHash.set(row.line_hash, [row.line_number]);
       }
-      result[row.line_hash].push(row.line_number);
     }
 
-    return result;
+    return Object.fromEntries(lineNumbersByHash);
   }
 
   getAttributionEvents(
@@ -207,12 +209,12 @@ export class AttributionTrackerDO extends DurableObject<Env> {
 
     let totalLinesAdded = 0;
     let totalLinesRemoved = 0;
-    const byStatus: Record<string, number> = {};
-    const byBranch: Record<string, number> = {};
+    const statusCounts = new Map<string, number>();
+    const branchCounts = new Map<string, number>();
 
     for (const metadata of metadataRows) {
-      byStatus[metadata.status] = (byStatus[metadata.status] || 0) + 1;
-      byBranch[metadata.branch] = (byBranch[metadata.branch] || 0) + 1;
+      statusCounts.set(metadata.status, (statusCounts.get(metadata.status) ?? 0) + 1);
+      branchCounts.set(metadata.branch, (branchCounts.get(metadata.branch) ?? 0) + 1);
 
       const linesAddedRows = this.db
         .select()
@@ -245,8 +247,8 @@ export class AttributionTrackerDO extends DurableObject<Env> {
         total_attributions: metadataRows.length,
         total_lines_added: totalLinesAdded,
         total_lines_removed: totalLinesRemoved,
-        by_status: byStatus,
-        by_branch: byBranch,
+        by_status: Object.fromEntries(statusCounts),
+        by_branch: Object.fromEntries(branchCounts),
       },
     };
   }

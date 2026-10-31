@@ -15,7 +15,14 @@ import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 export type SessionListRow =
   | { kind: 'section-header'; key: string; title: string; count: number }
   | { kind: 'skeleton'; key: string; index: number }
-  | { kind: 'session'; key: string; session: StoredSession };
+  | {
+      kind: 'session';
+      key: string;
+      session: StoredSession;
+      /** Heading of the date section this row sits under, so the row can tell
+       * when its relative label would restate it (see `sectionAwareTimeMeta`). */
+      sectionTitle: string;
+    };
 
 /** Reserved loading rows shown while the first history page loads. */
 export const SESSION_LIST_SKELETON_COUNT = 8;
@@ -56,7 +63,12 @@ export function flattenSessionSections(
       count: section.data.length,
     });
     for (const session of section.data) {
-      rows.push({ kind: 'session', key: session.session_id, session });
+      rows.push({
+        kind: 'session',
+        key: session.session_id,
+        session,
+        sectionTitle: section.title,
+      });
     }
   }
   return rows;

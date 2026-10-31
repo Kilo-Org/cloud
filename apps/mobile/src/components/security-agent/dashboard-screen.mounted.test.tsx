@@ -10,6 +10,7 @@
 // Retryable failures keep both controls enabled so the user can retry under the
 // same hoisted key.
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -58,7 +59,7 @@ const dashboardStats = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 const lastSync = vi.hoisted(() => ({
-  data: undefined as { lastSyncTime?: string } | undefined,
+  data: undefined as { lastSyncTime?: string | null } | undefined,
   isError: false,
   refetch: vi.fn(),
 }));
@@ -136,7 +137,7 @@ const retryCards = vi.hoisted(() => ({
 // Captures the dashboard-sections props, so a test can assert the stats payload
 // a failure leaves on screen.
 const sectionsProps = vi.hoisted(() => ({
-  props: [] as { data?: unknown; slaEnabled?: boolean }[],
+  props: [] as { data?: unknown; slaEnabled?: boolean; neverSynced?: boolean }[],
 }));
 
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
@@ -225,13 +226,34 @@ vi.mock('@/lib/utils', () => ({
   parseTimestamp: (value: string) => value,
   timeAgo: () => 'recently',
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+// The header the dashboard paints: its title names the scope, the eyebrow the
+// product. Captured per render so a test can assert what a reader reads.
+const headers = vi.hoisted(() => ({
+  props: [] as { title?: string; eyebrow?: string }[],
+}));
+// The shared membership list the scope title resolves from. The title never
+// fetches it, so the mock only needs the cache key it reads.
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: (props: { title?: string; eyebrow?: string }) => {
+    headers.props.push(props);
+    return null;
+  },
+}));
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    organizations: {
+      list: {
+        queryOptions: () => ({ queryKey: ['organizations', 'list'] }),
+      },
+    },
+  }),
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: () => null }));
 vi.mock('@/components/security-agent/audit-report-button', () => ({
   AuditReportButton: () => null,
 }));
 vi.mock('@/components/security-agent/dashboard-sections', () => ({
-  DashboardSections: (props: { data?: unknown; slaEnabled?: boolean }) => {
+  DashboardSections: (props: { data?: unknown; slaEnabled?: boolean; neverSynced?: boolean }) => {
     sectionsProps.props.push(props);
     return null;
   },
@@ -250,10 +272,10 @@ vi.mock('@/components/tab-screen', () => ({
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
 
-function renderScreen(): R {
+function renderScreen(scope = 'personal', memberships?: unknown[]): R {
   const ref: { current: R | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(DashboardScreen, { scope: 'personal' }));
+    ref.current = TestRenderer.create(dashboardTree(scope, memberships));
   });
   const r = ref.current;
   if (!r) {
@@ -262,25 +284,37 @@ function renderScreen(): R {
   return r;
 }
 
-type SyncControlKey = 'securityAgent.dashboard.syncNow' | 'securityAgent.dashboard.syncFindings';
+/** The dashboard inside the provider stack it needs, for a first render or an update. */
+function dashboardTree(scope = 'personal', memberships?: unknown[]): ReactElement {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  if (memberships) {
+    // The app-wide membership list the scope title reads, already cached.
+    queryClient.setQueryData(['organizations', 'list'], memberships);
+  }
+  return createElement(
+    QueryClientProvider,
+    { client: queryClient },
+    createElement(DashboardScreen, { scope })
+  );
+}
 
 function syncButtons(root: I): I[] {
   const syncNow = i18n.t('securityAgent.dashboard.syncNow');
-  const syncFindings = i18n.t('securityAgent.dashboard.syncFindings');
   return root.findAll(
     n =>
       typeof n.type === 'string' &&
       (n.type as string) === 'Pressable' &&
-      (n.props.accessibilityLabel === syncNow || n.props.accessibilityLabel === syncFindings)
+      n.props.accessibilityLabel === syncNow
   );
 }
 
-function findSyncButton(root: I, key: SyncControlKey): I {
-  const label = i18n.t(key);
-  const nodes = syncButtons(root).filter(n => n.props.accessibilityLabel === label);
-  const n = nodes[0];
+function findSyncButton(root: I): I {
+  const label = i18n.t('securityAgent.dashboard.syncNow');
+  const n = syncButtons(root)[0];
   if (!n) {
-    throw new Error(`expected 1 ${label} button, got ${nodes.length}`);
+    throw new Error(`expected 1 ${label} button, got 0`);
   }
   return n;
 }
@@ -333,6 +367,62 @@ function dashboardMetric(id: string) {
   return { id, label: '', value: '', detail: '', tone: 'neutral' as const };
 }
 
+describe('DashboardScreen names the scope it acts on', () => {
+  // The dashboard is the enabled landing of one scope. An admin in several
+  // organizations reads whose agent — and whose GitHub app — this one is.
+  it('names the organization the dashboard belongs to', () => {
+    headers.props = [];
+    renderScreen('org_123', [
+      { organizationId: 'org_123', organizationName: 'Drain Labs', role: 'owner' },
+    ]);
+    const header = headers.props.at(-1);
+    expect(header?.title).toBe('Drain Labs');
+    expect(header?.eyebrow).toBe('Security Agent');
+  });
+
+  it('names the personal scope', () => {
+    headers.props = [];
+    renderScreen('personal');
+    const header = headers.props.at(-1);
+    expect(header?.title).toBe('Personal');
+    expect(header?.eyebrow).toBe('Security Agent');
+  });
+
+  it('keeps the header line while the membership list loads', () => {
+    headers.props = [];
+    renderScreen('org_123');
+    const header = headers.props.at(-1);
+    expect(header?.title).toBe('Organization');
+    expect(header?.eyebrow).toBe('Security Agent');
+  });
+});
+
+describe('DashboardScreen before the first sync', () => {
+  beforeEach(() => {
+    dashboardStats.isPending = false;
+    dashboardStats.isError = false;
+    dashboardStats.data = { sla: { overall: { total: 0 } } };
+    sharedMetrics.build.mockReturnValue([]);
+  });
+
+  // The stored absence of a sync is what paints "Not yet synced" under the
+  // filter. The sections must read that same fact, or an organization that has
+  // never run the agent reports an all-clear it never measured.
+  it('tells the sections nothing has been synced yet', () => {
+    sectionsProps.props = [];
+    lastSync.data = { lastSyncTime: null };
+    renderScreen('org_123');
+    expect(sectionsProps.props.at(-1)?.neverSynced).toBe(true);
+  });
+
+  it('leaves a synced scope measured', () => {
+    sectionsProps.props = [];
+    lastSync.data = { lastSyncTime: '2026-10-30T12:00:00.000Z' };
+    renderScreen('org_123');
+    expect(sectionsProps.props.at(-1)?.neverSynced).toBe(false);
+  });
+});
+
 describe('DashboardScreen sync control terminal states', () => {
   beforeEach(() => {
     triggerSync.mutate.mockClear();
@@ -362,30 +452,30 @@ describe('DashboardScreen sync control terminal states', () => {
     sharedMetrics.build.mockReturnValue([]);
   });
 
-  it('keeps both sync controls enabled in the happy state', () => {
+  it('keeps the sync control enabled in the happy state', () => {
     const root = renderScreen();
 
-    expect(syncButtons(root.root)).toHaveLength(2);
-    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+    expect(syncButtons(root.root)).toHaveLength(1);
+    expect(syncDisabledStates(root.root)).toEqual([false]);
   });
 
-  it('keeps both sync controls enabled after a retryable error and shows its copy', () => {
+  it('keeps the sync control enabled after a retryable error and shows its copy', () => {
     triggerSync.isError = true;
     triggerSync.error = mapSecuritySyncOperationError(new Error('operation_in_progress'));
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+    expect(syncDisabledStates(root.root)).toEqual([false]);
     expect(renderedTexts(root.root)).toContain(IN_PROGRESS_COPY);
   });
 
-  it('renders the translated ambiguous copy under ja and keeps both controls retryable', async () => {
+  it('renders the translated ambiguous copy under ja and keeps the control retryable', async () => {
     await i18n.changeLanguage('ja');
     try {
       triggerSync.isError = true;
       triggerSync.error = mapSecuritySyncOperationError(new Error(SECURITY_AMBIGUOUS_MESSAGE));
       const root = renderScreen();
 
-      expect(syncDisabledStates(root.root)).toEqual([false, false]);
+      expect(syncDisabledStates(root.root)).toEqual([false]);
       expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.mutations.ambiguous'));
       expect(renderedTexts(root.root)).not.toContain(SECURITY_AMBIGUOUS_MESSAGE);
     } finally {
@@ -393,31 +483,31 @@ describe('DashboardScreen sync control terminal states', () => {
     }
   });
 
-  it('disables both sync controls and shows configuration-specific copy after a missing-configuration error', () => {
+  it('disables the sync control and shows configuration-specific copy after a missing-configuration error', () => {
     triggerSync.isError = true;
     triggerSync.error = mapSecuritySyncOperationError(new Error(CONFIGURATION_ERROR_MESSAGE));
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabledStates(root.root)).toEqual([true]);
     expect(renderedTexts(root.root)).toContain(CONFIGURATION_COPY);
     // The raw server message is replaced by the state-specific copy.
     expect(renderedTexts(root.root)).not.toContain(CONFIGURATION_ERROR_MESSAGE);
   });
 
-  it('disables both sync controls and shows the error copy after another non-retryable error', () => {
+  it('disables the sync control and shows the error copy after another non-retryable error', () => {
     triggerSync.isError = true;
     triggerSync.error = mapSecuritySyncOperationError(new Error(PERSISTENCE_FAILED_MESSAGE));
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabledStates(root.root)).toEqual([true]);
     expect(renderedTexts(root.root)).toContain(PERSISTENCE_FAILED_MESSAGE);
   });
 
-  it('disables both sync controls while a sync is pending', () => {
+  it('disables the sync control while a sync is pending', () => {
     triggerSync.isPending = true;
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabledStates(root.root)).toEqual([true]);
   });
 
   it('offers a retry beside a retryable failure and resubmits the current intent', () => {
@@ -478,7 +568,7 @@ describe('DashboardScreen sync control terminal states', () => {
       triggerSync.isError = false;
       triggerSync.isPending = true;
       triggerSync.error = null;
-      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+      root.update(dashboardTree());
     });
 
     expect(syncRetries(root.root)).toHaveLength(1);
@@ -511,7 +601,7 @@ describe('DashboardScreen sync control terminal states', () => {
       triggerSync.isPending = false;
       triggerSync.error = null;
       options.onSuccess();
-      root.update(createElement(DashboardScreen, { scope: 'personal' }));
+      root.update(dashboardTree());
     });
 
     expect(syncRetries(root.root)).toHaveLength(0);
@@ -542,7 +632,7 @@ describe('DashboardScreen sync control terminal states', () => {
 
   it('submits the sync through the header control with the current repo filter', () => {
     const root = renderScreen();
-    const syncNow = findSyncButton(root.root, 'securityAgent.dashboard.syncNow');
+    const syncNow = findSyncButton(root.root);
 
     act(() => {
       (syncNow.props.onPress as () => void)();
@@ -734,6 +824,79 @@ describe('buildLocalizedMetrics', () => {
     await i18n.changeLanguage('en');
   });
 
+  it('keeps the numeric slot a dash while no deadline is tracked', () => {
+    const data: Parameters<typeof buildLocalizedMetrics>[0] = {
+      analysis: {
+        total: 0,
+        exploitable: 0,
+        needsReview: 0,
+        triageComplete: 0,
+        analyzing: 0,
+        notAnalyzed: 0,
+        failed: 0,
+      },
+      severity: { critical: 0, high: 0, medium: 0, low: 0 },
+      sla: {
+        overall: { total: 0, withinSla: 0, overdue: 0 },
+        bySeverity: {
+          critical: { overdue: 0 },
+          high: { overdue: 0 },
+          medium: { overdue: 0 },
+          low: { overdue: 0 },
+        },
+        dueSoon: { total: 0, exploitable: 0 },
+        untrackedCount: 0,
+      },
+    };
+
+    sharedMetrics.build.mockReturnValueOnce(['slaCompliance'].map(id => dashboardMetric(id)));
+    const [compliance] = buildLocalizedMetrics(data, true);
+
+    expect(compliance?.value).toBe('—');
+    expect(compliance?.detail).toBe(i18n.t('securityAgent.dashboardMetrics.noDeadlineData'));
+  });
+
+  it('reports no measurement instead of a clean result before the first sync', () => {
+    const data: Parameters<typeof buildLocalizedMetrics>[0] = {
+      analysis: {
+        total: 0,
+        exploitable: 0,
+        needsReview: 0,
+        triageComplete: 0,
+        analyzing: 0,
+        notAnalyzed: 0,
+        failed: 0,
+      },
+      severity: { critical: 0, high: 0, medium: 0, low: 0 },
+      sla: {
+        overall: { total: 0, withinSla: 0, overdue: 0 },
+        bySeverity: {
+          critical: { overdue: 0 },
+          high: { overdue: 0 },
+          medium: { overdue: 0 },
+          low: { overdue: 0 },
+        },
+        dueSoon: { total: 0, exploitable: 0 },
+        untrackedCount: 0,
+      },
+    };
+
+    sharedMetrics.build.mockReturnValueOnce(
+      ['openFindings', 'slaCompliance', 'noDeadline'].map(id => dashboardMetric(id))
+    );
+    const metrics = buildLocalizedMetrics(data, true, true);
+
+    // Zero counts and the line that read the zeros as a clean report both
+    // became a dash and the screen's own not-yet-synced state.
+    expect(metrics.map(metric => metric.value)).toEqual(['—', '—', '—']);
+    expect(metrics.map(metric => metric.detail)).toEqual([
+      i18n.t('securityAgent.dashboard.notYetSynced'),
+      i18n.t('securityAgent.dashboard.notYetSynced'),
+      i18n.t('securityAgent.dashboard.notYetSynced'),
+    ]);
+    expect(metrics.every(metric => metric.tone === 'neutral')).toBe(true);
+  });
+
   it('omits the medium & low bucket while no medium or low finding is counted', () => {
     const data: Parameters<typeof buildLocalizedMetrics>[0] = {
       analysis: {
@@ -772,6 +935,48 @@ describe('buildLocalizedMetrics', () => {
 
     expect(analysisMetrics[0]?.detail).toBe('2 critical, 3 high');
     expect(slaMetrics[1]?.detail).toBe('1 critical, 2 high');
+  });
+
+  it('agrees a pt-BR breakdown with each of its three numbers', async () => {
+    await i18n.changeLanguage('pt-BR');
+    const data: Parameters<typeof buildLocalizedMetrics>[0] = {
+      analysis: {
+        total: 2,
+        exploitable: 0,
+        needsReview: 0,
+        triageComplete: 0,
+        analyzing: 0,
+        notAnalyzed: 0,
+        failed: 0,
+      },
+      severity: { critical: 1, high: 0, medium: 1, low: 0 },
+      sla: {
+        overall: { total: 2, withinSla: 0, overdue: 2 },
+        bySeverity: {
+          critical: { overdue: 1 },
+          high: { overdue: 0 },
+          medium: { overdue: 1 },
+          low: { overdue: 0 },
+        },
+        dueSoon: { total: 0, exploitable: 0 },
+        untrackedCount: 0,
+      },
+    };
+
+    sharedMetrics.build.mockReturnValueOnce(
+      ['openFindings', 'exploitable', 'needsReview', 'analysisIncomplete'].map(id =>
+        dashboardMetric(id)
+      )
+    );
+    const analysisMetrics = buildLocalizedMetrics(data, false);
+    sharedMetrics.build.mockReturnValueOnce(
+      ['slaCompliance', 'deadlinePassed', 'dueSoon', 'noDeadline'].map(id => dashboardMetric(id))
+    );
+    const slaMetrics = buildLocalizedMetrics(data, true);
+
+    expect(analysisMetrics[0]?.detail).toBe('1 crítico, 0 de nível alto, 1 média/baixa');
+    expect(slaMetrics[1]?.detail).toBe('1 crítico, 0 de nível alto, 1 média/baixa');
+    await i18n.changeLanguage('en');
   });
 });
 

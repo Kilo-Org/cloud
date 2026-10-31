@@ -5,12 +5,12 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
-import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
   _resetHomeWidgetDataForTests,
   _setHomeWidgetStoreForTests,
   restoreHomeWidgetData,
 } from './home-widget-data';
+import { readSignedInScope, type SignedInScope } from './scope';
 
 import { type GlanceableSink } from './sink-registry';
 
@@ -198,16 +198,18 @@ function persistSnapshot(snapshot: GlanceableAgentsSnapshot): void {
 }
 
 /** How a record's scope key relates to the signed-in scope the restore read. */
-function scopeRelation(
-  recordScopeKey: string,
-  authenticated: AuthenticatedGlanceableScope
-): RestoredScope {
-  if (authenticated.status === 'unavailable') {
+function scopeRelation(recordScopeKey: string, signedInScope: SignedInScope): RestoredScope {
+  if (signedInScope.status === 'unavailable') {
     return 'unknown';
   }
-  return authenticated.status === 'known' && authenticated.scopeKey === recordScopeKey
+  return signedInScope.status === 'known' && scopeKeyOf(signedInScope) === recordScopeKey
     ? 'match'
     : 'mismatch';
+}
+
+/** The opaque key of a known signed-in scope; the one form the fence compares. */
+function scopeKeyOf(scope: Extract<SignedInScope, { status: 'known' }>): string {
+  return buildOpaqueScopeKey({ userId: scope.userId, organizationId: scope.organizationId });
 }
 
 /** Parse a stored record with the shared schema; a malformed record is absent. */
@@ -222,40 +224,13 @@ function parseStoredSnapshot(raw: string): GlanceableAgentsSnapshot | null {
 }
 
 /**
- * The signed-in scope, read from the same store the auth hints live in. The
- * three outcomes are distinct: a known scope, no signed-in account, and a read
- * that did not complete. Only the first can confirm a record, and an incomplete
- * read is not a mismatch either.
- */
-type AuthenticatedGlanceableScope =
-  | { readonly status: 'known'; readonly scopeKey: string }
-  | { readonly status: 'absent' }
-  | { readonly status: 'unavailable' };
-
-async function readAuthenticatedGlanceableScope(): Promise<AuthenticatedGlanceableScope> {
-  try {
-    const { getItemAsync } = getSecureStore();
-    const [userId, organizationId] = await Promise.all([
-      getItemAsync(ACTIVE_USER_ID_KEY),
-      getItemAsync(ORGANIZATION_STORAGE_KEY),
-    ]);
-    return userId === null
-      ? { status: 'absent' }
-      : { status: 'known', scopeKey: buildOpaqueScopeKey({ userId, organizationId }) };
-  } catch (error) {
-    reportSecureStoreFailure('read', error);
-    return { status: 'unavailable' };
-  }
-}
-
-/**
  * The scope key of the signed-in account, or `null` when it is not known: no
  * signed-in account or a read that did not complete. Callers that must not act
  * on an unconfirmed scope treat `null` as a refusal.
  */
 export async function getAuthenticatedGlanceableScopeKey(): Promise<string | null> {
-  const scope = await readAuthenticatedGlanceableScope();
-  return scope.status === 'known' ? scope.scopeKey : null;
+  const signedInScope = await readSignedInScope(getSecureStore());
+  return signedInScope.status === 'known' ? scopeKeyOf(signedInScope) : null;
 }
 
 /**
@@ -279,7 +254,7 @@ export async function restorePersistedGlanceable(): Promise<void> {
       return;
     }
     const stored = rawSnapshot === null ? null : parseStoredSnapshot(rawSnapshot);
-    const authenticatedScope = await readAuthenticatedGlanceableScope();
+    const authenticatedScope = await readSignedInScope(getSecureStore());
     // A live write that landed during the identity read owns the state, the
     // same as one that landed during the record read: skip the fill rather than
     // clobber it with what was read before it.
@@ -287,7 +262,7 @@ export async function restorePersistedGlanceable(): Promise<void> {
       return;
     }
     const authenticatedScopeKey =
-      authenticatedScope.status === 'known' ? authenticatedScope.scopeKey : null;
+      authenticatedScope.status === 'known' ? scopeKeyOf(authenticatedScope) : null;
     if (stored === null) {
       // No usable record: a scope key the previous release wrote on its own
       // still names the scope, the same way it did before this record existed.

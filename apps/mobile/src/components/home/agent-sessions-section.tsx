@@ -259,28 +259,36 @@ export function LiveSessionFeedback({
 
   const band = (
     <View className={cn(compactSpacing ? 'gap-0' : 'gap-2', centered && 'px-6')}>
-      <View className="flex-row items-center gap-2">
-        {offlineLine ? (
-          <Text className="flex-1 text-xs text-muted-foreground">{t('offline.noInternet')}</Text>
-        ) : (
-          connectionLine && (
-            <AccessibleStatus message={connectionLabel} tone="status" className="flex-1 text-xs" />
-          )
-        )}
-        {reconnectRetry && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className={STATE_ACTION_CLASS}
-            accessibilityLabel={t('agentChat.sessionConnection.retryConnection')}
-            onPress={() => {
-              connection.retryConnection();
-            }}
-          >
-            <Text>{t('common.retry')}</Text>
-          </Button>
-        )}
-      </View>
+      {(offlineLine || connectionLine || reconnectRetry) && (
+        // Only a painting row: an empty one still costs the column gap, which
+        // would space a failure-only band off the content it introduces.
+        <View className="flex-row items-center gap-2">
+          {offlineLine ? (
+            <Text className="flex-1 text-xs text-muted-foreground">{t('offline.noInternet')}</Text>
+          ) : (
+            connectionLine && (
+              <AccessibleStatus
+                message={connectionLabel}
+                tone="status"
+                className="flex-1 text-xs"
+              />
+            )
+          )}
+          {reconnectRetry && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={STATE_ACTION_CLASS}
+              accessibilityLabel={t('agentChat.sessionConnection.retryConnection')}
+              onPress={() => {
+                connection.retryConnection();
+              }}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          )}
+        </View>
+      )}
       {refreshLine ? (
         // The live tab's reserved status line: screen-reader Updating while
         // the pull is in flight, visible "Couldn't refresh" + Retry when it

@@ -685,7 +685,7 @@
       "bitbucketDescription": "मोबाइलवर पुल रिक्वेस्ट तपासण्यासाठी हे संघटन Bitbucket शी कनेक्ट करा.",
       "bitbucketOrgOnlyDescription": "त्याच्या Bitbucket पुल रिक्वेस्ट तपासण्यासाठी वरील खाते एका संघटनेत बदला.",
       "bitbucketOrgOnlyNoOrganizationDescription": "या खात्याशी अजून कोणतीही संघटना जोडलेली नाही. संघटना तयार केल्यानंतर किंवा त्यात सामील झाल्यानंतर तुम्ही Bitbucket पुल रिक्वेस्ट तपासू शकता.",
-      "gitlabReconnectAdminOnlyDescription": "GitLab जोडणीची मुदत संपली. संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते पुन्हा जोडण्यास सांगा.",
+      "gitlabReconnectAdminOnlyDescription": "संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते पुन्हा जोडण्यास सांगा.",
       "bitbucketNotConnectedTitle": "Bitbucket जोडलेले नाही",
       "bitbucketAdminOnlyDescription": "केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात.",
       "contextLine": "{{organization}} साठी",

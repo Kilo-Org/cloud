@@ -222,10 +222,10 @@ describe('organization GitLab reconnect state', () => {
     const renderer = mount('gitlab', 'org-1');
     expect(renderer.root.findByType('EmptyState').props.title).toBe('GitLab connection expired');
     expect(renderedText(renderer)).toContain(
-      'The GitLab connection expired. Ask an organization owner, admin, or billing manager to reconnect it.'
+      'Ask an organization owner, admin, or billing manager to reconnect it.'
     );
-    // The description below the expiry title must not claim the provider was
-    // never connected.
+    // The description below the expiry title names who can act and must not
+    // restate the expiry or claim the provider was never connected.
     expect(renderedText(renderer)).not.toContain("GitLab isn't connected");
     expect(renderedText(renderer)).not.toContain('Connect GitLab');
     expect(renderer.root.findAllByType('Button')).toHaveLength(0);

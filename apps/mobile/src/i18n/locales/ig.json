@@ -685,7 +685,7 @@
       "bitbucketDescription": "Jikọọ Bitbucket na òtù a iji nyochaa arịrịọ ijikọ koodu na ekwentị.",
       "bitbucketOrgOnlyDescription": "Gbanwee akaụntụ dị n'elu gaa n'òtụ iji nyochaa arịrịọ ijikọ koodu Bitbucket ya.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaụntụ a enweghị òtù ọ bụla ruo ugbu a. Enwere ike ịnyochaa arịrịọ ijikọ koodu Bitbucket ozugbo ị mepụtara òtụ ma ọ bụ sonye na òtụ.",
-      "gitlabReconnectAdminOnlyDescription": "Oge njikọ GitLab agwụla. Rịọ Onye nwe nzukọ, Onye nchịkwa, ma ọ bụ Onye njikwa ịgba ụgwọ ka ha jikọọ ya.",
+      "gitlabReconnectAdminOnlyDescription": "Rịọ Onye nwe nzukọ, Onye nchịkwa, ma ọ bụ Onye njikwa ịgba ụgwọ ka ha jikọọ ya.",
       "bitbucketNotConnectedTitle": "E jikọghị Bitbucket",
       "bitbucketAdminOnlyDescription": "Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ijikọ ya.",
       "contextLine": "Maka {{organization}}",

@@ -715,7 +715,7 @@
       "bitbucketDescription": "Poveži Bitbucket s to organizacijo, da lahko pregleduješ zahtevke za združitev na mobilni napravi.",
       "bitbucketOrgOnlyDescription": "Preklopi zgornji račun na organizacijo, da lahko pregleduješ njene zahtevke za združitev na Bitbucktu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ta račun še nima nobenih organizacij. Zahtevke za združitev na Bitbucktu boš lahko pregledoval, ko ustvariš organizacijo ali se ji pridružiš.",
-      "gitlabReconnectAdminOnlyDescription": "Povezava z računom GitLab je potekla. Prosite lastnika organizacije, skrbnika ali skrbnika obračunavanja, da jo ponovno poveže.",
+      "gitlabReconnectAdminOnlyDescription": "Prosite lastnika organizacije, skrbnika ali skrbnika obračunavanja, da jo ponovno poveže.",
       "bitbucketNotConnectedTitle": "Bitbucket ni povezan",
       "bitbucketAdminOnlyDescription": "Povežejo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
       "contextLine": "Za {{organization}}",

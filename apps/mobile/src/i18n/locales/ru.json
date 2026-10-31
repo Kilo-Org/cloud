@@ -2756,7 +2756,7 @@
       "bitbucketDescription": "Подключите Bitbucket к этой организации, чтобы просматривать пул-реквесты с мобильного.",
       "bitbucketOrgOnlyDescription": "Переключите аккаунт, указанный выше, на организацию, чтобы просматривать её пул-реквесты в Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "В вашем аккаунте пока нет организаций. Пул-реквесты в Bitbucket можно просматривать после того, как вы создадите организацию или присоединитесь к ней.",
-      "gitlabReconnectAdminOnlyDescription": "Срок действия подключения к GitLab истёк. Попросите Владельца, Администратора или Ответственного за оплату организации подключить его заново.",
+      "gitlabReconnectAdminOnlyDescription": "Попросите Владельца, Администратора или Ответственного за оплату организации подключить его заново.",
       "bitbucketNotConnectedTitle": "Bitbucket не подключён",
       "bitbucketAdminOnlyDescription": "Подключить его могут только владельцы организации, администраторы и ответственные за оплату.",
       "contextLine": "Для {{organization}}",

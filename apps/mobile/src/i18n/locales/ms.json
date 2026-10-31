@@ -685,7 +685,7 @@
       "bitbucketDescription": "Sambungkan Bitbucket ke organisasi ini untuk menyemak permintaan tarik pada mudah alih.",
       "bitbucketOrgOnlyDescription": "Tukar akaun di atas kepada organisasi untuk menyemak permintaan tarik Bitbucket-nya.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaun ini belum mempunyai sebarang organisasi. Permintaan tarik Bitbucket boleh disemak setelah anda mencipta atau menyertai sebuah organisasi.",
-      "gitlabReconnectAdminOnlyDescription": "Sambungan GitLab telah tamat tempoh. Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menyambungkannya.",
+      "gitlabReconnectAdminOnlyDescription": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menyambungkannya.",
       "bitbucketNotConnectedTitle": "Bitbucket tidak disambungkan",
       "bitbucketAdminOnlyDescription": "Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya.",
       "contextLine": "Untuk {{organization}}",

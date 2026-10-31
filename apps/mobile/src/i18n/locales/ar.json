@@ -2812,7 +2812,7 @@
       "bitbucketDescription": "اربط Bitbucket بهذه المؤسسة لمراجعة طلبات السحب على الجوال.",
       "bitbucketOrgOnlyDescription": "بدّل الحساب أعلاه إلى مؤسسة لمراجعة طلبات السحب الخاصة بها على Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "لا توجد مؤسسات في هذا الحساب بعد. يمكنك مراجعة طلبات السحب على Bitbucket بعد إنشاء مؤسسة أو الانضمام إلى واحدة.",
-      "gitlabReconnectAdminOnlyDescription": "انتهت صلاحية الربط مع GitLab. اطلب من مالك مؤسسة أو مشرف أو مدير الفوترة ربطه.",
+      "gitlabReconnectAdminOnlyDescription": "اطلب من مالك مؤسسة أو مشرف أو مدير الفوترة ربطه.",
       "bitbucketNotConnectedTitle": "Bitbucket غير متصل",
       "bitbucketAdminOnlyDescription": "يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط ربطه.",
       "contextLine": "للمؤسسة: {{organization}}",

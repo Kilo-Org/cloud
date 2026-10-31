@@ -700,7 +700,7 @@
       "bitbucketDescription": "Conectează Bitbucket la această organizație pentru a revizui PR-uri de pe mobil.",
       "bitbucketOrgOnlyDescription": "Comută contul de mai sus pe o organizație pentru a revizui PR-urile Bitbucket ale acesteia.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Acest cont nu are încă nicio organizație. PR-urile Bitbucket pot fi revizuite după ce creezi o organizație sau te alături uneia.",
-      "gitlabReconnectAdminOnlyDescription": "Conexiunea la GitLab a expirat. Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să o reconecteze.",
+      "gitlabReconnectAdminOnlyDescription": "Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să o reconecteze.",
       "bitbucketNotConnectedTitle": "Bitbucket nu este conectat",
       "bitbucketAdminOnlyDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
       "contextLine": "Pentru {{organization}}",

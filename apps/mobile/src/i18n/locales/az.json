@@ -685,7 +685,7 @@
       "bitbucketDescription": "Mobil cihazda birləşdirmə sorğularına baxış keçirmək üçün Bitbucket-ı bu təşkilata qoş.",
       "bitbucketOrgOnlyDescription": "Yuxarıdakı hesabı təşkilata keçir ki, onun Bitbucket birləşdirmə sorğularına baxış keçirəsən.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabda hələ ki, heç bir təşkilat yoxdur. Təşkilat yaratdıqdan və ya ona qoşulduqdan sonra Bitbucket birləşdirmə sorğularına baxış keçirə bilərsən.",
-      "gitlabReconnectAdminOnlyDescription": "GitLab bağlantısının müddəti bitdi. Onu yenidən qoşmaq üçün təşkilat sahibindən, inzibatçıdan və ya ödəniş menecerindən xahiş edin.",
+      "gitlabReconnectAdminOnlyDescription": "Onu yenidən qoşmaq üçün təşkilat sahibindən, inzibatçıdan və ya ödəniş menecerindən xahiş edin.",
       "bitbucketNotConnectedTitle": "Bitbucket qoşulmayıb",
       "bitbucketAdminOnlyDescription": "Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
       "contextLine": "{{organization}} üçün",

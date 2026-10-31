@@ -2700,7 +2700,7 @@
       "bitbucketDescription": "Koppel Bitbucket aan deze organisatie om PR's op je telefoon te beoordelen.",
       "bitbucketOrgOnlyDescription": "Wissel het account hierboven naar een organisatie om diens Bitbucket-PR's te beoordelen.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Dit account heeft nog geen organisaties. Je kunt Bitbucket-PR's beoordelen zodra je een organisatie aanmaakt of er lid van wordt.",
-      "gitlabReconnectAdminOnlyDescription": "De GitLab-koppeling is verlopen. Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om het opnieuw te koppelen.",
+      "gitlabReconnectAdminOnlyDescription": "Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om het opnieuw te koppelen.",
       "bitbucketNotConnectedTitle": "Bitbucket is niet gekoppeld",
       "bitbucketAdminOnlyDescription": "Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen.",
       "contextLine": "Voor {{organization}}",

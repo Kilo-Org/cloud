@@ -715,7 +715,7 @@
       "bitbucketDescription": "Prijunk Bitbucket prie šios organizacijos, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
       "bitbucketOrgOnlyDescription": "Perjunk aukščiau esančią paskyrą į organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ši paskyra dar neturi jokių organizacijų. Sukūręs arba prisijungęs prie organizacijos galėsi peržiūrėti Bitbucket pakeitimų užklausas.",
-      "gitlabReconnectAdminOnlyDescription": "Baigėsi GitLab prieigos galiojimas. Paprašykite organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus ją prijungti iš naujo.",
+      "gitlabReconnectAdminOnlyDescription": "Paprašykite organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus ją prijungti iš naujo.",
       "bitbucketNotConnectedTitle": "Bitbucket neprijungtas",
       "bitbucketAdminOnlyDescription": "Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
       "contextLine": "Skirta {{organization}}",

@@ -2756,7 +2756,7 @@
       "bitbucketDescription": "Połącz Bitbucket z tą organizacją, aby przeglądać PR-y na telefonie.",
       "bitbucketOrgOnlyDescription": "Przełącz konto powyżej na organizację, aby przeglądać jej PR-y na Bitbucketu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "To konto nie ma jeszcze żadnych organizacji. PR-y na Bitbucketu będzie można przeglądać po utworzeniu organizacji lub dołączeniu do niej.",
-      "gitlabReconnectAdminOnlyDescription": "Połączenie z serwisem GitLab wygasło. Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby je ponownie połączyć.",
+      "gitlabReconnectAdminOnlyDescription": "Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby je ponownie połączyć.",
       "bitbucketNotConnectedTitle": "Brak połączenia z Bitbucket",
       "bitbucketAdminOnlyDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je połączyć.",
       "contextLine": "Dla {{organization}}",

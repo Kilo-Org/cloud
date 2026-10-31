@@ -715,7 +715,7 @@
       "bitbucketDescription": "Pripoj Bitbucket k tejto organizácii a kontroluj žiadosti o zlúčenie v mobile.",
       "bitbucketOrgOnlyDescription": "Prepni účet hore na organizáciu a kontroluj jej žiadosti o zlúčenie na Bitbucku.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatiaľ nemá žiadne organizácie. Žiadosti o zlúčenie na Bitbucku môžeš kontrolovať po vytvorení organizácie alebo vstúpení do nej.",
-      "gitlabReconnectAdminOnlyDescription": "Platnosť pripojenia k službe GitLab vypršala. Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby ho znova pripojil.",
+      "gitlabReconnectAdminOnlyDescription": "Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby ho znova pripojil.",
       "bitbucketNotConnectedTitle": "Bitbucket nie je pripojený",
       "bitbucketAdminOnlyDescription": "Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie.",
       "contextLine": "Pre {{organization}}",

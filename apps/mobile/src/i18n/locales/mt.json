@@ -730,7 +730,7 @@
       "bitbucketDescription": "Ikkonnettja Bitbucket ma' din l-organizzazzjoni biex tirrevedi l-PRs fuq il-mowbajl.",
       "bitbucketOrgOnlyDescription": "Ibdel il-kont ta' fuq għal organizzazzjoni biex tirrevedi l-PRs Bitbucket tagħha.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Dan il-kont m'għandux organizzazzjonijiet għadu. Tista' tirrevedi l-PRs Bitbucket ladarba toħloq organizzazzjoni jew tingħaqad ma' waħda.",
-      "gitlabReconnectAdminOnlyDescription": "Il-konnessjoni ma' GitLab skadiet. Itlob lis-sid ta' organizzazzjoni, lill-amministratur jew lill-maniġer tal-ħlasijiet biex jikkonnettjaha.",
+      "gitlabReconnectAdminOnlyDescription": "Itlob lis-sid ta' organizzazzjoni, lill-amministratur jew lill-maniġer tal-ħlasijiet biex jikkonnettjaha.",
       "bitbucketNotConnectedTitle": "Bitbucket mhux konness",
       "bitbucketAdminOnlyDescription": "Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh.",
       "contextLine": "Għal {{organization}}",

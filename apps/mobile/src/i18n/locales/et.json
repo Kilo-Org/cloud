@@ -685,7 +685,7 @@
       "bitbucketDescription": "Ühenda Bitbucket selle organisatsiooniga, et tõmbetaotlusi mobiilis üle vaadata.",
       "bitbucketOrgOnlyDescription": "Vaheta ülalolev konto organisatsioonile, et selle Bitbucketi tõmbetaotlusi üle vaadata.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Sellel kontol pole veel organisatsioone. Bitbucketi tõmbetaotlusi saab üle vaadata, kui lood või liitud organisatsiooniga.",
-      "gitlabReconnectAdminOnlyDescription": "GitLabi ühendus aegus. Palu organisatsiooni omanikul, administraatoril või arveldushalduril see uuesti ühendada.",
+      "gitlabReconnectAdminOnlyDescription": "Palu organisatsiooni omanikul, administraatoril või arveldushalduril see uuesti ühendada.",
       "bitbucketNotConnectedTitle": "Bitbucket pole ühendatud",
       "bitbucketAdminOnlyDescription": "Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
       "contextLine": "{{organization}} jaoks",

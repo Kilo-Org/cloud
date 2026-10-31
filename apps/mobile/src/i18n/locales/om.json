@@ -685,7 +685,7 @@
       "bitbucketDescription": "Gaaffiiwwan walitti makuu simbirroo harkaan gamaaggamuuf Bitbucket dhaabbata kana waliin walqabsiisi.",
       "bitbucketOrgOnlyDescription": "Herrega gubbaa jiru gara dhaabbataatti jijjiiri, dhaabbata sanaa gaaffiiwwan walitti makuu Bitbucket ilaaluuf.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Herrega kun dhaabbilee ammas hin qabu. Dhaabbata uumtee yookiin dhaabbataatti seeteen, gaaffiiwwan walitti makuu Bitbucket ilaaluu ni dandeessa.",
-      "gitlabReconnectAdminOnlyDescription": "Yeroon walitti hidhamiinsa GitLab darbeera. Isa irra deebi'ii akka walqabsiisuuf dhaabbataa abbaa dhaabbataa, bulchaa, ykn bulchaa kaffaltii tokko gaafadhu.",
+      "gitlabReconnectAdminOnlyDescription": "Isa irra deebi'ii akka walqabsiisuuf dhaabbataa abbaa dhaabbataa, bulchaa, ykn bulchaa kaffaltii tokko gaafadhu.",
       "bitbucketNotConnectedTitle": "Bitbucket hin walqabsiifamne",
       "bitbucketAdminOnlyDescription": "Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u.",
       "contextLine": "{{organization}}iif",

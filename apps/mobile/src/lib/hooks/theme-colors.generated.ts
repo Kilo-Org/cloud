@@ -13,7 +13,7 @@ export const lightColors = {
   destructive: '#B0483A',
   destructiveForeground: '#FFFFFF',
   border: 'rgba(20, 15, 10, 0.09)',
-  switchTrack: '#ECECEC',
+  switchTrack: '#8A8680',
   card: '#FFFFFF',
   ink2: '#3C382F',
   mutedSoft: '#A9A39A',

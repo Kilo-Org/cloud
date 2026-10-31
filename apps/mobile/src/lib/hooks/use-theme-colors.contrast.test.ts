@@ -217,9 +217,12 @@ describe('switch off track contrast (WCAG 1.4.11 non-text)', () => {
   // without a track the thumb floats free on the card. Measured against
   // `secondary`, the surface of every row that carries a switch.
   //
-  // Only the dark theme asserts here: its track is an app colour, because
-  // Android paints the platform's own off track in almost the card colour. The
-  // light theme keeps that platform neutral, whose off thumb carries the shape.
+  it('light theme: switchTrack vs secondary >= 3:1', () => {
+    expect(contrastRatio(lightColors.switchTrack, lightColors.secondary)).toBeGreaterThanOrEqual(
+      MIN_NON_TEXT_RATIO
+    );
+  });
+
   it('dark theme: switchTrack vs secondary >= 3:1', () => {
     expect(contrastRatio(darkColors.switchTrack, darkColors.secondary)).toBeGreaterThanOrEqual(
       MIN_NON_TEXT_RATIO

@@ -33,9 +33,10 @@
   --border: rgba(20, 15, 10, 0.09);
   --input: rgba(20, 15, 10, 0.45);
   --ring: #4f5a10;
-  /* Off state of a native switch track. The platform's own light neutral, so
-   * the control keeps the shape it has always had in this theme. */
-  --switch-track: #ececec;
+  /* Off state of a native switch track. The platform's own off track is within
+   * 1.1:1 of the row it sits on in either theme — only the thumb showed — so
+   * the track takes the warm neutral that clears 3:1 on a light row. */
+  --switch-track: #8a8680;
   --radius: 0.625rem;
 
   /* Focus-only tokens */

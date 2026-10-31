@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { initialWindowMetrics } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
 import { PrReviewFileList } from '@/components/pr-review/diff/pr-diff-file-list';
@@ -19,6 +19,10 @@ import {
   reviewOverviewFixture,
 } from '@/components/pr-review/pr-review-overview-copy-fixture';
 import { PrReviewReviewSubmitScreen } from '@/components/pr-review/pr-review-review-submit-screen';
+import {
+  type PrReviewTabId,
+  PrReviewTabSelector,
+} from '@/components/pr-review/pr-review-tab-selector';
 import { ScreenHeader } from '@/components/screen-header';
 import { FeedbackPromptProvider } from '@/components/use-feedback-prompt';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
@@ -29,7 +33,7 @@ import {
 import { type ProviderPrScope, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
 import { TRPCProvider } from '@/lib/trpc';
 
-// In a development build, open dev/pr-review-copy-fixture/{checks,navigator,files,merge}
+// In a development build, open dev/pr-review-copy-fixture/{checks,navigator,files,merge,tabs}
 // through the app's native link scheme.
 // Uses the app's selected language without changing its preference.
 // Real review consumers read owned fake DTOs across an asynchronous tRPC boundary.
@@ -173,11 +177,18 @@ export function PrReviewCopyFixture() {
       })
   );
   const [client] = useState(createFixtureClient);
+  const [tab, setTab] = useState<PrReviewTabId>('files');
   const header = (
     <ScreenHeader title={t('prReview.fileNavigator.title')} eyebrow="sample/review-copy#1" />
   );
   let content: ReactNode = null;
-  if (surface === 'merge') {
+  if (surface === 'tabs') {
+    content = (
+      <View className="px-4 pb-2 pt-3">
+        <PrReviewTabSelector activeTab={tab} onChange={setTab} discussionCount={3} />
+      </View>
+    );
+  } else if (surface === 'merge') {
     content = (
       <ProviderPrScopeProvider value={scope}>
         <PrMergeSheet
@@ -262,10 +273,14 @@ export function PrReviewCopyFixture() {
   return (
     <QueryClientProvider client={queryClient}>
       <TRPCProvider trpcClient={client} queryClient={queryClient}>
+        {/* The spacers take their height from the startup window metrics, which
+            are known synchronously, so the surface reserves the safe area at
+            first paint instead of growing when the native insets arrive and
+            pushing everything below it down. */}
         <View className="flex-1 bg-background">
-          <SafeAreaView edges={['top']} />
+          <View style={{ height: initialWindowMetrics?.insets.top ?? 0 }} />
           <View className="flex-1">{content}</View>
-          <SafeAreaView edges={['bottom']} />
+          <View style={{ height: initialWindowMetrics?.insets.bottom ?? 0 }} />
         </View>
       </TRPCProvider>
     </QueryClientProvider>

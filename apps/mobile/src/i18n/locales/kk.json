@@ -330,7 +330,7 @@
       "diffTooLarge": "өзгерістер көлемі тым үлкен",
       "openFile": "{{path}} файлын ашу",
       "openFileViewed": "{{path}} файлын ашу (қаралған)",
-      "title": "Файл"
+      "title": "Файлдар"
     },
     "fileRows": {
       "markViewed": "{{path}} файлын қаралған деп белгілеу",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "Шолу",
-      "files": "Файл",
+      "files": "Файлдар",
       "discussion": "Талқылау"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "Суретке түсіру",
       "photoLibrary": "Фотосуреттер жинағы",
-      "files": "Файл",
+      "files": "Файлдар",
       "cameraAccessMessage": "Фото түсіру үшін параметрлерден камераны пайдалануға рұқсат беріңіз."
     },
     "typingIndicator": {
@@ -1753,17 +1753,12 @@
       "findingsCount": "{{displayCount}} мәселе",
       "notMeasured": "Өлшенбеген",
       "actFirst": "Бірінші кезектегі әрекеттер",
-      "slaPosture": "SLA орындалу жағдайы",
       "actionPosture": "Қажетті әрекеттер",
       "codebaseRisk": "Код базасының қаупі",
       "repositoryActionPlan": "Репозиторий бойынша әрекет жоспары",
       "noOpenFindings": "Назар аударуды қажет ететін ашық мәселелер жоқ",
       "deadlineToday": "Мерзім бүгін аяқталады",
       "daysOverdue": "Мерзімі {{displayCount}} күнге өтіп кеткен",
-      "withinDeadline": "Мерзімі өтпеген",
-      "criticalOverdue": "Мерзімі өткен: аса жоғары қауіп",
-      "highOverdue": "Мерзімі өткен: жоғары қауіп",
-      "mediumLowOverdue": "Мерзімі өткен: орташа және төмен қауіп",
       "confirmedExploitable": "Шабуылда пайдалануға болатыны расталды",
       "needsEvidenceReview": "Дәлелдерді тексеру қажет",
       "analysisNotComplete": "Талдау аяқталмаған",
@@ -1773,7 +1768,16 @@
       "noSlaDeadline": "SLA мерзімі белгіленбеген",
       "noRepositoryData": "Әзірге репозиторий деректері жоқ",
       "noRepositoryDataDescription": "Мәселелер синхрондалғаннан кейін репозиторийлердің басымдықтары көрсетіледі.",
-      "repoSummary": "{{open}} ашық · {{critical}} аса жоғары · {{high}} жоғары",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "{{displayCount}} ашық",
+      "repoSummaryOpen_one": "{{displayCount}} ашық",
+      "repoSummaryOpen_other": "{{displayCount}} ашық",
+      "repoSummaryCritical": "{{displayCount}} аса жоғары",
+      "repoSummaryCritical_one": "{{displayCount}} аса жоғары",
+      "repoSummaryCritical_other": "{{displayCount}} аса жоғары",
+      "repoSummaryHigh": "{{displayCount}} жоғары",
+      "repoSummaryHigh_one": "{{displayCount}} жоғары",
+      "repoSummaryHigh_other": "{{displayCount}} жоғары",
       "couldNotLoad": "Бақылау тақтасының деректерін жүктеу мүмкін болмады.",
       "filterByRepository": "Репозиторий бойынша сүзу",
       "lastSynced": "Соңғы синхрондау: {{time}}",
@@ -1798,8 +1802,17 @@
       "withinDeadlineDetail": "Барлығы {{total}}, мерзімі өтпегені: {{within}}",
       "noDeadlineData": "Әзірге ешбір мәселеге SLA мерзімі белгіленбеген",
       "deadlinePassed": "Мерзім өтті",
-      "deadlinePassedDetail": "{{critical}} өте жоғары, {{high}} жоғары",
-      "deadlinePassedDetailWithMediumLow": "{{critical}} өте жоғары, {{high}} жоғары, {{mediumLow}} орташа және төмен",
+      "deadlinePassedDetail": "{{critical}}, {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
+      "breakdownCritical": "{{displayCount}} өте жоғары",
+      "breakdownCritical_one": "{{displayCount}} өте жоғары",
+      "breakdownCritical_other": "{{displayCount}} өте жоғары",
+      "breakdownHigh": "{{displayCount}} жоғары",
+      "breakdownHigh_one": "{{displayCount}} жоғары",
+      "breakdownHigh_other": "{{displayCount}} жоғары",
+      "breakdownMediumLow": "{{displayCount}} орташа және төмен",
+      "breakdownMediumLow_one": "{{displayCount}} орташа және төмен",
+      "breakdownMediumLow_other": "{{displayCount}} орташа және төмен",
       "dueThisWeek": "Мерзімі осы аптада",
       "dueThisWeekDetail": "Осы мәселелердің {{exploitable}}-і шабуылға пайдалануға болатыны расталды",
       "noDeadline": "Мерзім жоқ",
@@ -1859,7 +1872,6 @@
       "repositoriesCount_one": "{{displayCount}} репозиторий таңдалды",
       "repositoriesCount": "{{displayCount}} репозиторий таңдалды",
       "repositoriesCount_other": "{{displayCount}} репозиторий таңдалды",
-      "selectRepositoriesSubtitle": "Қауіпсіздік агенті бақылайтын репозиторийлерді таңдаңыз",
       "analysisModeSubtitle": "{{mode}} талдау",
       "automationAllOff": "Барлығы өшірулі",
       "automationCount": "3 мүмкіндіктің {{displayCount}} қосулы",
@@ -2755,7 +2767,7 @@
     "attachmentPicker": {
       "camera": "Камера",
       "photoLibrary": "Фотосуреттер жинағы",
-      "files": "Файл",
+      "files": "Файлдар",
       "couldNotOpenPhotoPicker": "Фотосурет таңдау құралын ашу мүмкін болмады. Kilo қолданбасын қайта іске қосып, қайталап көріңіз.",
       "maxFilesAllowed": "Ең көбі {{displayCount}} файл қосуға болады.",
       "onlyAddingFiles": "Тек {{total}} файлдың {{accepted}}-і қосылуда (ең көбі {{max}})",
@@ -3138,7 +3150,7 @@
     "couldNotSaveChoice": "Таңдауыңызды сақтау мүмкін болмады. Қайталап көріңіз.",
     "onlineAllowed": "Онлайн, рұқсат етілген",
     "onlineNotAllowed": "Онлайн, рұқсат етілмеген",
-    "optionalReview": "Міндетті емес — баптаулардан кез келген уақытта өзгерте аласыз",
+    "optionalReview": "Міндетті емес",
     "optionalOnboarding": "Міндетті емес — өшірмесеңіз, қосулы тұрады",
     "aiProvidersWhat": "Сұрауларыңыз, сөйлесу тарихы және тіркеген файлдарыңыз.",
     "aiProvidersWhy": "AI жауаптарын жасау үшін.",
@@ -3964,7 +3976,8 @@
       "nameRequired": "Пәрмен атауын енгізіңіз",
       "nameInvalid": "Атау кіші әріптен басталып, тек кіші әріптерді, сандарды және сызықшаларды пайдалануы керек",
       "templateRequired": "Пәрмен үлгісін енгізіңіз",
-      "nameConflict": "Бұл атау кірістірілген пәрмен арқылы сақталады"
+      "nameConflict": "Бұл атау кірістірілген пәрмен арқылы сақталады",
+      "duplicateName": "Мұндай атаулы пәрмен бұл профильде әлдеқашан бар"
     },
     "repoBindings": {
       "title": "Репо үшін әдепкі профильдер",

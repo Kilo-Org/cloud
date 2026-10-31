@@ -330,7 +330,7 @@
       "diffTooLarge": "جیاوازییەکە زۆر گەورەیە",
       "openFile": "{{path}} بکەرەوە",
       "openFileViewed": "{{path}} بکەرەوە (بینراو)",
-      "title": "پەڕگە"
+      "title": "فایلەکان"
     },
     "fileRows": {
       "markViewed": "{{path}} وەک بینراو نیشان بکە",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "کورتەی گشتی",
-      "files": "پەڕگە",
+      "files": "فایلەکان",
       "discussion": "گفتوگۆ"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "وێنە بگرە",
       "photoLibrary": "گەلەری وێنەکان",
-      "files": "پەڕگە",
+      "files": "فایلەکان",
       "cameraAccessMessage": "بۆ وێنەگرتن، لە ڕێکخستنەکاندا ڕێگە بە بەکارهێنانی کامێرا بدە."
     },
     "typingIndicator": {
@@ -1753,17 +1753,12 @@
       "findingsCount": "{{displayCount}} دۆزینەوە",
       "notMeasured": "نەپێوراو",
       "actFirst": "کارە پێشینەکان",
-      "slaPosture": "دۆخی پابەندی بە SLA",
       "actionPosture": "دۆخی کردارەکان",
       "codebaseRisk": "مەترسی کۆد",
       "repositoryActionPlan": "پلانی کار بۆ کۆگا",
       "noOpenFindings": "هیچ دۆزینەوەیەکی کراوە نییە کە پێویستی بە سەرنج بێت",
       "deadlineToday": "مۆڵەتەکە ئەمڕۆ کۆتایی دێت",
       "daysOverdue": "{{displayCount}} ڕۆژ دواکەوتوو",
-      "withinDeadline": "لە ماوەی مۆڵەتدا",
-      "criticalOverdue": "مەترسی زۆر بەرز، دواکەوتوو",
-      "highOverdue": "مەترسی بەرز، دواکەوتوو",
-      "mediumLowOverdue": "مەترسی ناوەند و نزم، دواکەوتوو",
       "confirmedExploitable": "شیاوی خراپ بەکارهێنان (پشتڕاستکراوە)",
       "needsEvidenceReview": "بەڵگەکان پێویستیان بە پێداچوونەوە هەیە",
       "analysisNotComplete": "شیکاری تەواو نییە",
@@ -1773,7 +1768,16 @@
       "noSlaDeadline": "هیچ مۆڵەتێکی SLA دیاری نەکراوە",
       "noRepositoryData": "هێشتا هیچ داتای کۆگا نییە",
       "noRepositoryDataDescription": "دوای هاوکاتکردنی دۆزینەوەکان، کارە پێشینەکانی کۆگا دەردەکەون.",
-      "repoSummary": "{{open}} کراوە · {{critical}} زۆر بەرز · {{high}} بەرز",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "{{displayCount}} کراوە",
+      "repoSummaryOpen_one": "{{displayCount}} کراوە",
+      "repoSummaryOpen_other": "{{displayCount}} کراوە",
+      "repoSummaryCritical": "{{displayCount}} زۆر بەرز",
+      "repoSummaryCritical_one": "{{displayCount}} زۆر بەرز",
+      "repoSummaryCritical_other": "{{displayCount}} زۆر بەرز",
+      "repoSummaryHigh": "{{displayCount}} بەرز",
+      "repoSummaryHigh_one": "{{displayCount}} بەرز",
+      "repoSummaryHigh_other": "{{displayCount}} بەرز",
       "couldNotLoad": "نەتوانرا داتای داشبۆرد بار بکرێت.",
       "filterByRepository": "بەپێی کۆگا بپاڵێوە",
       "lastSynced": "دوایین هاوکاتکردن: {{time}}",
@@ -1798,8 +1802,17 @@
       "withinDeadlineDetail": "{{within}} لە {{total}} لە ماوەی مۆڵەتدا",
       "noDeadlineData": "هێشتا بۆ هیچ دۆزینەوەیەک مۆڵەتی SLA دیاری نەکراوە",
       "deadlinePassed": "مۆڵەت تێپەڕیوە",
-      "deadlinePassedDetail": "{{critical}} زۆر مەترسیدار، {{high}} بەرز",
-      "deadlinePassedDetailWithMediumLow": "{{critical}} زۆر مەترسیدار، {{high}} بەرز، {{mediumLow}} ناوەند و نزم",
+      "deadlinePassedDetail": "{{critical}}، {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}، {{high}}، {{mediumLow}}",
+      "breakdownCritical": "{{displayCount}} زۆر مەترسیدار",
+      "breakdownCritical_one": "{{displayCount}} زۆر مەترسیدار",
+      "breakdownCritical_other": "{{displayCount}} زۆر مەترسیدار",
+      "breakdownHigh": "{{displayCount}} بەرز",
+      "breakdownHigh_one": "{{displayCount}} بەرز",
+      "breakdownHigh_other": "{{displayCount}} بەرز",
+      "breakdownMediumLow": "{{displayCount}} ناوەند و نزم",
+      "breakdownMediumLow_one": "{{displayCount}} ناوەند و نزم",
+      "breakdownMediumLow_other": "{{displayCount}} ناوەند و نزم",
       "dueThisWeek": "مۆڵەتیان ئەم هەفتەیە تەواو دەبێت",
       "dueThisWeekDetail": "{{exploitable}} لە ئەمانە خراپ بەکارهێنانیان پشتڕاست کراوەتەوە",
       "noDeadline": "مۆڵەت نییە",
@@ -1859,7 +1872,6 @@
       "repositoriesCount_one": "{{displayCount}} کۆگا هەڵبژێردراوە",
       "repositoriesCount": "{{displayCount}} کۆگا هەڵبژێردراون",
       "repositoriesCount_other": "{{displayCount}} کۆگا هەڵبژێردراون",
-      "selectRepositoriesSubtitle": "ئەو کۆگایانە هەڵبژێرە کە بریکاری ئاسایش چاودێرییان دەکات",
       "analysisModeSubtitle": "شیکاری {{mode}}",
       "automationAllOff": "هەموویان ناچالاکن",
       "automationCount": "{{displayCount}} لە ٣ چالاکن",
@@ -2755,7 +2767,7 @@
     "attachmentPicker": {
       "camera": "کامێرا",
       "photoLibrary": "گەلەری وێنەکان",
-      "files": "پەڕگە",
+      "files": "فایلەکان",
       "couldNotOpenPhotoPicker": "نەتوانرا هەڵبژێری وێنە بکرێتەوە. Kilo دابخە و دووبارە بیکەرەوە، پاشان دووبارە هەوڵ بدەرەوە.",
       "maxFilesAllowed": "زۆرترین ژمارەی ڕێگەپێدراو {{displayCount}} پەڕگەیە.",
       "onlyAddingFiles": "تەنها {{accepted}} لە {{total}} پەڕگە زیاد دەکرێت (زۆرترین {{max}})",
@@ -3138,7 +3150,7 @@
     "couldNotSaveChoice": "نەتوانرا هەڵبژاردەکەت پاشەکەوت بکرێت. تکایە دووبارە هەوڵ بدەرەوە.",
     "onlineAllowed": "سەرهێڵ، ڕێگەپێدراوە",
     "onlineNotAllowed": "سەرهێڵ، ڕێگەپێنەدراوە",
-    "optionalReview": "ئارەزوومندانە — دەتوانیت ئەمە لە هەر کاتێکدا لە ڕێکخستنەکاندا بگۆڕیت",
+    "optionalReview": "ئارەزوومندانە",
     "optionalOnboarding": "ئارەزوومندانە — چالاکە، مەگەر ناچالاکی بکەیت",
     "aiProvidersWhat": "داواکارییەکانت، مێژووی گفتوگۆکانت و هەر پەڕگەیەک کە هاوپێچی دەکەیت.",
     "aiProvidersWhy": "بۆ دروستکردنی وەڵامی AI.",
@@ -3964,7 +3976,8 @@
       "nameRequired": "ناوی فەرمانێک داخڵ بکە",
       "nameInvalid": "ناو دەبێت بە پیتی بچووک دەست پێبکات و تەنها پیتی بچووک و ژمارە و هێڵکاری بەکاربهێنێت",
       "templateRequired": "قاڵبێکی فەرمان داخڵ بکە",
-      "nameConflict": "ئەو ناوە بە فەرمانێکی ناوەکی تەرخانکراوە"
+      "nameConflict": "ئەو ناوە بە فەرمانێکی ناوەکی تەرخانکراوە",
+      "duplicateName": "فەرمانێک بەم ناوە پێشتر لەم پرۆفایلەدا هەیە"
     },
     "repoBindings": {
       "title": "پرۆفایلی پێشوەختە بۆ Repos",

@@ -224,17 +224,22 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
 
   return (
     <View className="flex-1 bg-background" style={rootStyle}>
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={contentContainerStyle}
-        showsVerticalScrollIndicator={false}
-      >
+      {/* The body keeps the platform scroll indicator: at a compact window it
+          is taller than the viewport, and the hidden thumb made the rest of it
+          read as missing rather than as one scroll away. */}
+      <ScrollView className="flex-1" contentContainerStyle={contentContainerStyle}>
         <View className="px-6">
-          <View className="flex-row items-center gap-3">
-            <View className="h-10 w-10 items-center justify-center rounded-lg bg-secondary">
-              <Shield size={20} color={colors.foreground} />
-            </View>
-            <Text className="text-base font-semibold text-foreground">{t('consent.kilo')}</Text>
+          {/* The badge alone carries the brand: the title below already states
+              what the screen is about, and repeating the product name beside
+              the mark said nothing a reader did not already see. The mark keeps
+              the name for assistive tech, which cannot read the glyph. */}
+          <View
+            accessible
+            accessibilityRole="image"
+            accessibilityLabel={t('consent.kilo')}
+            className="h-10 w-10 items-center justify-center rounded-lg bg-secondary"
+          >
+            <Shield size={20} color={colors.foreground} />
           </View>
 
           <Text className="mt-6 text-2xl font-bold text-foreground">
@@ -329,7 +334,10 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             moving the actions. The privacy disclosure is pinned here too,
             because at the foot of the scrolling body the footer edge cut the
             sentence in half. Its font scale is capped so the pinned height
-            stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE). */}
+            stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE). The policy
+            link's 28dp box overflows its 17.5dp line by 5.25dp, which stays
+            inside this footer's `pt-3` top padding rather than reaching the
+            scroll region above it. */}
         <ConsentPolicySentence
           prefix={t('consent.privacyPolicyPrefix')}
           linkLabel={t('consent.privacyPolicy')}
@@ -351,7 +359,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           <Text>{actions.primaryLabel}</Text>
         </Button>
         <Button
-          variant={mode === 'review' ? 'destructive' : 'outline'}
+          variant={mode === 'review' ? 'outline-destructive' : 'outline'}
           size="lg"
           onPress={handleSecondaryAction}
           accessibilityLabel={actions.secondaryLabel}

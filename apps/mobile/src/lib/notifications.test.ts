@@ -30,7 +30,15 @@ import {
 
 import type * as Notifications from '@kilocode/notifications/schemas';
 
-type Response = { notification: { request: { content: { data: unknown } } } };
+type Response = {
+  actionIdentifier?: string;
+  notification: {
+    request: {
+      identifier?: string;
+      content: { title?: string | null; categoryIdentifier?: string; data: unknown };
+    };
+  };
+};
 type ResponseListener = (response: Response) => void;
 
 const mocks = vi.hoisted(() => ({
@@ -2398,6 +2406,7 @@ describe('foreground attention-push suppression', () => {
     kind: 'permission',
     prUrl: null,
     organizationId: null,
+    previews: 'generic',
   } as const;
 
   it('suppresses the server attention push while the app notification for that session is posted', async () => {
@@ -2498,6 +2507,49 @@ describe('foreground attention-push suppression', () => {
       },
     });
     expect(progress.shouldShowBanner).toBe(true);
+  });
+});
+
+describe('warm needs-input answer', () => {
+  it('posts the answer result with the preview choice the listener was given', async () => {
+    // The warm listener resolves the user's message-preview choice from the
+    // preferences query and hands it to the answer; the notification it posts
+    // in place of the acted-on one follows that choice.
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+    const { setupNotificationResponseHandler } = await loadNotifications();
+    const subscription = setupNotificationResponseHandler({
+      readPreviews: () => 'generic',
+      refreshGlanceableSurfaces: () => Promise.resolve(),
+    });
+
+    deliverWarmResponse({
+      actionIdentifier: 'kilo:approve',
+      notification: {
+        request: {
+          identifier: 'needs-input:ses_1',
+          content: {
+            title: 'Fix the bug',
+            data: {
+              type: 'cloud_agent_session',
+              cliSessionId: 'ses_1',
+              category: 'attention',
+              attentionKind: 'permission',
+            },
+          },
+        },
+      },
+    });
+
+    await vi.waitFor(() => {
+      expect(mocks.scheduleNotificationAsync).toHaveBeenCalled();
+    });
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identifier: 'needs-input:ses_1',
+        content: expect.objectContaining({ title: 'Kilo', body: 'Request approved' }),
+      })
+    );
+    subscription.remove();
   });
 });
 

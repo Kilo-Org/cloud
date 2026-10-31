@@ -456,6 +456,51 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
     );
   });
 
+  it('posts the shared generic title on the result under generic previews', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+
+    // The result follows the current choice even when the acted-on notification
+    // was produced under a different one.
+    await handleNeedsInputNotificationResponse(raiseResponse({ title: 'Fix the bug' }), {
+      runInteraction: mocks.runNeedsInputInteraction,
+      readPreviews: () => 'generic',
+    });
+
+    const [request] = mocks.scheduleNotificationAsync.mock.calls[0] as [
+      { content: { title: string; body: string } },
+    ];
+    expect(request.content.title).toBe('Kilo');
+    expect(request.content.body).toBe('Request approved');
+  });
+
+  it('keeps the session title on the result when the user chose full previews', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+
+    await handleNeedsInputNotificationResponse(raiseResponse({ title: 'Fix the bug' }), {
+      runInteraction: mocks.runNeedsInputInteraction,
+      readPreviews: () => 'full',
+    });
+
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ content: expect.objectContaining({ title: 'Fix the bug' }) })
+    );
+  });
+
+  it('passes the acted-on title through a headless answer with no preference source', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+
+    // The app was closed, so no preference is reachable: the acted-on
+    // notification was posted under the choice at that moment, and the result
+    // adds nothing it had not already shown.
+    await handleNeedsInputNotificationResponse(raiseResponse({ title: 'Fix the bug' }), {
+      runInteraction: mocks.runNeedsInputInteraction,
+    });
+
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ content: expect.objectContaining({ title: 'Fix the bug' }) })
+    );
+  });
+
   it('dismisses an answer action whose notification carries no session', async () => {
     const handled = await handleNeedsInputNotificationResponse(
       raiseResponse({

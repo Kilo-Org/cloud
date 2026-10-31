@@ -12,6 +12,12 @@
  * gateway accepts it as a real user token. It expires in 1 hour — a single
  * catalog dump run — and is scoped to the benchmarking organization.
  *
+ * Because the token carries that account's pepper and organization claims, the
+ * identity is held to the same rules as the sibling bot-token mint: an
+ * unblocked `bot-internal-*` bot user with a non-empty API-token pepper, holding
+ * an owner or member role in the benchmarking organization. Anything else is
+ * refused with 403 and mints nothing.
+ *
  * The account is the benchmark worker's configured identity, not a hardcoded
  * default: production configures a dedicated service account. A saved config
  * with no override falls back to the contracts defaults. A worker error is
@@ -31,8 +37,20 @@ import { getBenchmarkConfig } from '@kilocode/web-shared/lib/ai-gateway/auto-rou
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { MCP_CATALOG_TOKEN_SECRET } from '@kilocode/web-shared/lib/config.server';
+import {
+  internalBotAccountIssue,
+  isInternalBotOrganizationRole,
+  type InternalBotAccountIssue,
+} from '@/lib/bot-users/eligibility';
 
 const ONE_HOUR_IN_SECONDS = 60 * 60;
+
+const CATALOG_ACCOUNT_ISSUE_MESSAGES: Record<InternalBotAccountIssue, string> = {
+  'not-an-internal-bot-id': 'the configured user id is not an internal bot user id',
+  'not-a-bot': 'the account is not a bot user',
+  blocked: 'the account is blocked',
+  'missing-api-token-pepper': 'the account has no API token pepper',
+};
 
 /**
  * Resolve the service account the catalog dump runs as. The benchmark worker
@@ -95,6 +113,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Benchmark service account not found' }, { status: 404 });
   }
 
+  // The token carries the account's pepper and organization claims, so the
+  // account must be the dedicated internal bot the route documents, under the
+  // same rules the sibling bot-token mint applies. A mis-set worker config then
+  // fails here with a clear reason instead of minting for whatever it names.
+  const accountIssue = internalBotAccountIssue(user);
+  if (accountIssue !== null) {
+    return NextResponse.json(
+      {
+        error: `Benchmark service account is not usable: ${CATALOG_ACCOUNT_ISSUE_MESSAGES[accountIssue]}`,
+      },
+      { status: 403 }
+    );
+  }
+
   const [membership] = await db
     .select({ role: organization_memberships.role })
     .from(organization_memberships)
@@ -113,18 +145,27 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (!isInternalBotOrganizationRole(membership.role)) {
+    return NextResponse.json(
+      { error: 'Benchmark service account organization role is not supported' },
+      { status: 403 }
+    );
+  }
+
+  const organizationRole = membership.role;
   const apiToken = generateApiToken(
     user,
     {
       tokenSource: 'mcp-catalog',
       organizationId,
-      organizationRole: membership.role,
+      organizationRole,
     },
     { expiresIn: ONE_HOUR_IN_SECONDS }
   );
 
   return NextResponse.json({
     token: apiToken,
+    userId,
     organizationId,
     expiresAt: new Date(Date.now() + ONE_HOUR_IN_SECONDS * 1000).toISOString(),
   });

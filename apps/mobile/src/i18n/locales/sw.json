@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "Maudhui ya ujuzi",
     "skillsEmpty": "Hakuna ujuzi bado",
     "skillNameRequired": "Weka jina la ujuzi",
+    "skillNameTooLong": "Jina la ujuzi lazima liwe na herufi zisizozidi {{max}}",
     "skillNameInvalid": "Jina la ustadi lazima lianze na herufi au tarakimu na litumie herufi ndogo, tarakimu na deshi pekee.",
     "skillContentRequired": "Maudhui ya ujuzi yanahitajika",
     "skillSaveFailed": "Haikuweza kuhifadhi ujuzi. Jaribu tena.",

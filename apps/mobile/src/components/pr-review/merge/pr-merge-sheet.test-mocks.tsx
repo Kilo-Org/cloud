@@ -46,6 +46,7 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   Pressable: 'Pressable',
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   AppState: {
     addEventListener: (_event: string, listener: (next: string) => void) => {

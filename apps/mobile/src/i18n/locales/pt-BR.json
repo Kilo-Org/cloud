@@ -3907,6 +3907,7 @@
     "skillMarkdownLabel": "Conteúdo de habilidade",
     "skillsEmpty": "Nenhuma habilidade ainda",
     "skillNameRequired": "Insira um nome de habilidade",
+    "skillNameTooLong": "O nome da habilidade deve ter {{max}} caracteres ou menos",
     "skillNameInvalid": "O nome da habilidade deve começar com uma letra ou dígito e usar apenas letras minúsculas, dígitos e travessões",
     "skillContentRequired": "O conteúdo da habilidade é obrigatório",
     "skillSaveFailed": "Não foi possível salvar a habilidade. Tente novamente.",

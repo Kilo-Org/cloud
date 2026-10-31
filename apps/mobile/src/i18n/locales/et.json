@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "Oskuste sisu",
     "skillsEmpty": "Oskusi veel pole",
     "skillNameRequired": "Sisestage oskuse nimi",
+    "skillNameTooLong": "Oskuste nimi peab olema {{max}} tähemärki või vähem",
     "skillNameInvalid": "Oskuste nimi peab algama tähe või numbriga ning kasutama ainult väiketähti, numbreid ja sidekriipse",
     "skillContentRequired": "Vajalik on oskuste sisu",
     "skillSaveFailed": "Oskust ei õnnestunud salvestada. Proovi uuesti.",

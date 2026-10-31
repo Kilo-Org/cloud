@@ -3957,6 +3957,7 @@
     "skillMarkdownLabel": "Vsebina spretnosti",
     "skillsEmpty": "Ni še veščin",
     "skillNameRequired": "Vnesite ime spretnosti",
+    "skillNameTooLong": "Ime spretnosti mora imeti {{max}} znakov ali manj",
     "skillNameInvalid": "Ime spretnosti se mora začeti s črko ali številko in uporabljati samo male črke, številke in pomišljaje",
     "skillContentRequired": "Potrebna je vsebina spretnosti",
     "skillSaveFailed": "Spretnosti ni bilo mogoče shraniti. Poskusite znova.",

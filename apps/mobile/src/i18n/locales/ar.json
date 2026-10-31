@@ -4057,6 +4057,7 @@
     "skillMarkdownLabel": "محتوى المهارة",
     "skillsEmpty": "لا توجد مهارات بعد",
     "skillNameRequired": "أدخل اسم المهارة",
+    "skillNameTooLong": "يجب أن يكون اسم المهارة {{max}} حرفًا أو أقل",
     "skillNameInvalid": "يجب أن يبدأ اسم المهارة بحرف أو رقم ويستخدم فقط الأحرف الصغيرة والأرقام والشرطات",
     "skillContentRequired": "مطلوب محتوى المهارة",
     "skillSaveFailed": "لا يمكن حفظ المهارة. حاول مرة أخرى.",

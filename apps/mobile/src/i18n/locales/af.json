@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "Vaardigheidsinhoud",
     "skillsEmpty": "Nog geen vaardighede nie",
     "skillNameRequired": "Voer 'n vaardigheidsnaam in",
+    "skillNameTooLong": "Vaardigheidsnaam moet {{max}} karakters of minder wees",
     "skillNameInvalid": "Vaardigheidsnaam moet met 'n letter of syfer begin en slegs kleinletters, syfers en strepies gebruik",
     "skillContentRequired": "Vaardigheidsinhoud word vereis",
     "skillSaveFailed": "Kon nie vaardigheid red nie. Probeer weer.",

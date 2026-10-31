@@ -3907,6 +3907,7 @@
     "skillMarkdownLabel": "Contingut d'habilitat",
     "skillsEmpty": "Encara no hi ha habilitats",
     "skillNameRequired": "Introduïu un nom d'habilitat",
+    "skillNameTooLong": "El nom de l'habilitat ha de tenir {{max}} caràcters o menys",
     "skillNameInvalid": "El nom de l'habilitat ha de començar amb una lletra o un dígit i utilitzar només lletres minúscules, dígits i guions",
     "skillContentRequired": "Es requereix contingut d'habilitat",
     "skillSaveFailed": "No s'ha pogut desar l'habilitat. Torna-ho a provar.",

@@ -3907,6 +3907,7 @@
     "skillMarkdownLabel": "Sadržaj veština",
     "skillsEmpty": "Još nema veština",
     "skillNameRequired": "Unesite naziv veštine",
+    "skillNameTooLong": "Ime veštine mora da ima {{max}} karaktera ili manje",
     "skillNameInvalid": "Ime veštine mora da počinje slovom ili cifrom i koristi samo mala slova, cifre i crtice",
     "skillContentRequired": "Neophodan je sadržaj veština",
     "skillSaveFailed": "Nije moguće sačuvati veštinu. Pokušajte ponovo.",

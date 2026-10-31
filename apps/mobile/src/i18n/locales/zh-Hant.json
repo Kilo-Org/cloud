@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "技能內容",
     "skillsEmpty": "還沒有技能",
     "skillNameRequired": "輸入技能名稱",
+    "skillNameTooLong": "技能名稱必須為 {{max}} 個字元以內",
     "skillNameInvalid": "技能名稱必須以字母或數字開頭，且只能使用小寫字母、數字和連字符",
     "skillContentRequired": "技能內容為必填項",
     "skillSaveFailed": "無法保存技能。請重試。",

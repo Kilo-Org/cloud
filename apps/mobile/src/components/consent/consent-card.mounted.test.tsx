@@ -79,6 +79,7 @@ vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',

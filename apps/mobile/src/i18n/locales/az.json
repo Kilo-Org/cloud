@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "Bacarıq məzmunu",
     "skillsEmpty": "Hələ bacarıq yoxdur",
     "skillNameRequired": "Bacarıq adı daxil edin",
+    "skillNameTooLong": "Bacarıq adı {{max}} simvoldan çox olmamalıdır",
     "skillNameInvalid": "Bacarıq adı hərf və ya rəqəmlə başlamalı və yalnız kiçik hərflər, rəqəmlər və tirelərdən istifadə etməlidir",
     "skillContentRequired": "Bacarıq məzmunu tələb olunur",
     "skillSaveFailed": "Bacarıq saxlamaq mümkün olmadı. Yenidən cəhd edin.",

@@ -3923,6 +3923,7 @@
     "skillMarkdownLabel": "Skill content",
     "skillsEmpty": "No skills yet",
     "skillNameRequired": "Enter a skill name",
+    "skillNameTooLong": "Skill name must be {{max}} characters or fewer",
     "skillNameInvalid": "Skill name must start with a letter or digit and use only lowercase letters, digits, and dashes",
     "skillContentRequired": "Skill content is required",
     "skillSaveFailed": "Couldn't save skill. Try again.",

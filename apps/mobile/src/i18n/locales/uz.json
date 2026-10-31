@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "Ko'nikma tarkibi",
     "skillsEmpty": "Hali mahorat yo'q",
     "skillNameRequired": "Qobiliyat nomini kiriting",
+    "skillNameTooLong": "Malaka nomi {{max}} ta belgidan oshmasligi kerak",
     "skillNameInvalid": "Malaka nomi harf yoki raqam bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
     "skillContentRequired": "Ko'nikma tarkibi talab qilinadi",
     "skillSaveFailed": "Mahorat saqlanmadi. Qayta urinib ko'ring.",

@@ -27,6 +27,7 @@ import {
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -108,7 +109,7 @@ function AgentRowView({
           accessibilityLabel={t('profiles.agents.delete', { name })}
           onPress={onDelete}
         >
-          <Trash2 size={18} color={colors.destructive} />
+          <Trash2 size={18} color={colors.mutedForeground} />
         </Pressable>
       ) : null}
     </View>
@@ -144,6 +145,9 @@ export function ProfileAgentsScreen({
   // instead of only a toast: the sheet stays open on the typed values, so the
   // user can rename without retyping the form.
   const [serverSlugConflict, setServerSlugConflict] = useState(false);
+  // The list sits underneath the sheet, and a sheet dismisses natively, so the
+  // second tap of a Save double tap would land on the row just saved.
+  const { markClosed: markSheetClosed, guard: guardRowPress } = useSheetRowTapGuard();
 
   const startAdd = () => {
     setForm({ source: null });
@@ -151,6 +155,7 @@ export function ProfileAgentsScreen({
   };
 
   const closeForm = () => {
+    markSheetClosed();
     setForm(null);
   };
 
@@ -243,17 +248,17 @@ export function ProfileAgentsScreen({
               model={row.model}
               onEdit={
                 canManage
-                  ? () => {
+                  ? guardRowPress(() => {
                       setForm({ source });
                       setServerSlugConflict(false);
-                    }
+                    })
                   : undefined
               }
               onDelete={
                 canManage
-                  ? () => {
+                  ? guardRowPress(() => {
                       confirmDelete(source);
-                    }
+                    })
                   : undefined
               }
             />

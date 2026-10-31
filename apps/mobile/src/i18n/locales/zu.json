@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "Okuqukethwe kwekhono",
     "skillsEmpty": "Awekho amakhono okwamanje",
     "skillNameRequired": "Faka igama lekhono",
+    "skillNameTooLong": "Igama lekhono kufanele libe nezinhlamvu eziyi-{{max}} noma ngaphansi",
     "skillNameInvalid": "Igama lekhono kufanele liqale ngohlamvu noma idijithi futhi lisebenzise kuphela izinhlamvu ezincane, amadijithi, namadeshi.",
     "skillContentRequired": "Okuqukethwe kwekhono kuyadingeka",
     "skillSaveFailed": "Ayikwazanga ukulondoloza ikhono. Zama futhi.",

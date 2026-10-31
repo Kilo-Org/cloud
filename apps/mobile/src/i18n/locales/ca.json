@@ -3904,6 +3904,7 @@
       "markSecret": "Marca com a secret",
       "masked": "Valor ocult",
       "reveal": "Revelar valor",
+      "hide": "Ocultar valor",
       "newValuePlaceholder": "Introdueix un valor secret nou",
       "valuePlaceholder": "Valor secret (xifrat)"
     },

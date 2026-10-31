@@ -3848,6 +3848,7 @@
       "markSecret": "Als geheim markieren",
       "masked": "Versteckter Wert",
       "reveal": "Wert offenbaren",
+      "hide": "Wert verbergen",
       "newValuePlaceholder": "Neuen geheimen Wert eingeben",
       "valuePlaceholder": "Geheimer Wert (verschlüsselt)"
     },

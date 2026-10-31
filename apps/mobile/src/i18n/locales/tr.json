@@ -3848,6 +3848,7 @@
       "markSecret": "Gizli olarak işaretle",
       "masked": "Gizli değer",
       "reveal": "Değeri ortaya çıkarın",
+      "hide": "Değeri gizleyin",
       "newValuePlaceholder": "Yeni gizli değer girin",
       "valuePlaceholder": "Gizli değer (şifrelenmiş)"
     },

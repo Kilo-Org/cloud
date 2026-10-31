@@ -3848,6 +3848,7 @@
       "markSecret": "Sir sifatida belgilang",
       "masked": "Yashirin qiymat",
       "reveal": "Qiymatni oshkor qilish",
+      "hide": "Qiymatni yashirish",
       "newValuePlaceholder": "Yangi maxfiy qiymatni kiriting",
       "valuePlaceholder": "Maxfiy qiymat (shifrlangan)"
     },

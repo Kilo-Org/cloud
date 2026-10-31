@@ -3848,6 +3848,7 @@
       "markSecret": "Jelölje meg titkosként",
       "masked": "Rejtett érték",
       "reveal": "Érték feltárása",
+      "hide": "Érték elrejtése",
       "newValuePlaceholder": "Adj meg új titkos értéket",
       "valuePlaceholder": "Titkos érték (titkosítva)"
     },

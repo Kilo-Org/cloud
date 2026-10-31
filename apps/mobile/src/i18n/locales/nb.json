@@ -3848,6 +3848,7 @@
       "markSecret": "Merk som hemmelig",
       "masked": "Skjult verdi",
       "reveal": "Avslør verdi",
+      "hide": "Skjul verdi",
       "newValuePlaceholder": "Skriv inn ny hemmelig verdi",
       "valuePlaceholder": "Hemmelig verdi (kryptert)"
     },

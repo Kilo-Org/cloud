@@ -3910,6 +3910,7 @@
       "markSecret": "Marcar como secreto",
       "masked": "Valor oculto",
       "reveal": "Revelar valor",
+      "hide": "Ocultar valor",
       "newValuePlaceholder": "Insira um novo valor secreto",
       "valuePlaceholder": "Valor secreto (criptografado)"
     },

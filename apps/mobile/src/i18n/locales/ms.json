@@ -3848,6 +3848,7 @@
       "markSecret": "Tandakan sebagai rahsia",
       "masked": "Nilai tersembunyi",
       "reveal": "Mendedahkan nilai",
+      "hide": "Sembunyikan nilai",
       "newValuePlaceholder": "Masukkan nilai rahsia baharu",
       "valuePlaceholder": "Nilai rahsia (disulitkan)"
     },

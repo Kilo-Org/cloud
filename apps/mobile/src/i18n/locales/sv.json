@@ -3848,6 +3848,7 @@
       "markSecret": "Markera som hemlig",
       "masked": "Dolt värde",
       "reveal": "Avslöja värde",
+      "hide": "Dölj värde",
       "newValuePlaceholder": "Ange ett nytt hemligt värde",
       "valuePlaceholder": "Hemligt värde (krypterat)"
     },

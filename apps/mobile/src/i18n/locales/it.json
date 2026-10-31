@@ -3904,6 +3904,7 @@
       "markSecret": "Contrassegna come segreto",
       "masked": "Valore nascosto",
       "reveal": "Rivela valore",
+      "hide": "Nascondi valore",
       "newValuePlaceholder": "Inserisci un nuovo valore segreto",
       "valuePlaceholder": "Valore segreto (cifrato)"
     },

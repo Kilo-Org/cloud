@@ -4016,6 +4016,7 @@
       "markSecret": "Immarka bħala sigriet",
       "masked": "Valur moħbi",
       "reveal": "Ikxef il-valur",
+      "hide": "Aħbi l-valur",
       "newValuePlaceholder": "Daħħal valur sigriet ġdid",
       "valuePlaceholder": "Valur sigriet (inkriptat)"
     },

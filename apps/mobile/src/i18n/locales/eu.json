@@ -3848,6 +3848,7 @@
       "markSecret": "Markatu sekretu gisa",
       "masked": "Ezkutuko balioa",
       "reveal": "Erakutsi balioa",
+      "hide": "Ezkutatu balioa",
       "newValuePlaceholder": "Sartu balio sekretu berria",
       "valuePlaceholder": "Balio sekretua (zifratuta)"
     },

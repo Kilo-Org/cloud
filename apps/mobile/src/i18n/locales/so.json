@@ -3848,6 +3848,7 @@
       "markSecret": "Ku calaamadee sir",
       "masked": "Qiimaha qarsoon",
       "reveal": "Muujinta qiimaha",
+      "hide": "Qarinta qiimaha",
       "newValuePlaceholder": "Geli qiime sir ah oo cusub",
       "valuePlaceholder": "Qiime sir ah (la sireeyay)"
     },

@@ -3848,6 +3848,7 @@
       "markSecret": "標記為秘密",
       "masked": "隱藏值",
       "reveal": "顯示值",
+      "hide": "隱藏此值",
       "newValuePlaceholder": "輸入新的秘密值",
       "valuePlaceholder": "秘密值（已加密）"
     },

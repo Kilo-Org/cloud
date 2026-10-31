@@ -3848,6 +3848,7 @@
       "markSecret": "シークレットとしてマークする",
       "masked": "隠された値",
       "reveal": "値を明らかにする",
+      "hide": "値を隠す",
       "newValuePlaceholder": "新しいシークレット値を入力",
       "valuePlaceholder": "シークレット値（暗号化）"
     },

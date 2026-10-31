@@ -4016,6 +4016,7 @@
       "markSecret": "Marcáil mar rún",
       "masked": "Luach i bhfolach",
       "reveal": "Nocht luach",
+      "hide": "Folaigh luach",
       "newValuePlaceholder": "Cuir isteach luach rúnda nua",
       "valuePlaceholder": "Luach rúnda (criptithe)"
     },

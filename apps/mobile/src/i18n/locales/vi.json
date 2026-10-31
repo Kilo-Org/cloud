@@ -3848,6 +3848,7 @@
       "markSecret": "Đánh dấu là bí mật",
       "masked": "Giá trị ẩn",
       "reveal": "Tiết lộ giá trị",
+      "hide": "Ẩn giá trị",
       "newValuePlaceholder": "Nhập giá trị bí mật mới",
       "valuePlaceholder": "Giá trị bí mật (đã mã hóa)"
     },

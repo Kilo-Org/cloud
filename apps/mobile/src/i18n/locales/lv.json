@@ -3904,6 +3904,7 @@
       "markSecret": "Atzīmēt kā noslēpumu",
       "masked": "Slēptā vērtība",
       "reveal": "Atklāj vērtību",
+      "hide": "Paslēpt vērtību",
       "newValuePlaceholder": "Ievadiet jaunu slepenu vērtību",
       "valuePlaceholder": "Slepena vērtība (šifrēta)"
     },

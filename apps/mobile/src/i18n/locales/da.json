@@ -3848,6 +3848,7 @@
       "markSecret": "Markér som hemmelig",
       "masked": "Skjult værdi",
       "reveal": "Afsløre værdi",
+      "hide": "Skjul værdi",
       "newValuePlaceholder": "Indtast ny hemmelig værdi",
       "valuePlaceholder": "Hemmelig værdi (krypteret)"
     },

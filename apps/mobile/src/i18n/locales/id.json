@@ -3848,6 +3848,7 @@
       "markSecret": "Tandai sebagai rahasia",
       "masked": "Nilai tersembunyi",
       "reveal": "Mengungkapkan nilai",
+      "hide": "Sembunyikan nilai",
       "newValuePlaceholder": "Masukkan nilai rahasia baru",
       "valuePlaceholder": "Nilai rahasia (terenkripsi)"
     },

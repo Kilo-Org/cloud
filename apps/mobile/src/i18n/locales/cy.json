@@ -4072,6 +4072,7 @@
       "markSecret": "Marciwch fel cyfrinach",
       "masked": "Gwerth cudd",
       "reveal": "Datgelu gwerth",
+      "hide": "Cuddio gwerth",
       "newValuePlaceholder": "Nodwch werth cyfrinachol newydd",
       "valuePlaceholder": "Gwerth cyfrinachol (wedi'i amgryptio)"
     },

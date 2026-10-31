@@ -3848,6 +3848,7 @@
       "markSecret": "Merktu sem leyndarmál",
       "masked": "Falið gildi",
       "reveal": "Sýndu gildi",
+      "hide": "Feldu gildi",
       "newValuePlaceholder": "Sláðu inn nýtt leynilegt gildi",
       "valuePlaceholder": "Leynilegt gildi (dulkóðað)"
     },

@@ -3848,6 +3848,7 @@
       "markSecret": "비밀로 표시",
       "masked": "숨겨진 가치",
       "reveal": "가치 공개",
+      "hide": "가치 숨기기",
       "newValuePlaceholder": "새 비밀 값 입력",
       "valuePlaceholder": "비밀 값(암호화됨)"
     },

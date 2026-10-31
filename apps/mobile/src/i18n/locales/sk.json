@@ -3960,6 +3960,7 @@
       "markSecret": "Označiť ako tajné",
       "masked": "Skrytá hodnota",
       "reveal": "Odhaliť hodnotu",
+      "hide": "Skryť hodnotu",
       "newValuePlaceholder": "Zadajte novú tajnú hodnotu",
       "valuePlaceholder": "Tajná hodnota (šifrovaná)"
     },

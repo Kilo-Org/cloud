@@ -3848,6 +3848,7 @@
       "markSecret": "Akka iccitiitti Mallatteessi",
       "masked": "Gatii dhokataa",
       "reveal": "Gatii mul'isuu",
+      "hide": "Gatii dhoksuu",
       "newValuePlaceholder": "Gatii iccitii haaraa galchi",
       "valuePlaceholder": "Gatii iccitii (dhoksame)"
     },

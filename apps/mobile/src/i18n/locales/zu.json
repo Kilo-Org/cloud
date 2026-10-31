@@ -3854,6 +3854,7 @@
       "markSecret": "Maka njengokuyimfihlo",
       "masked": "Inani elifihliwe",
       "reveal": "Veza inani",
+      "hide": "Fihla inani",
       "newValuePlaceholder": "Faka inani eliyimfihlo elisha",
       "valuePlaceholder": "Inani eliyimfihlo (kubethelwe)"
     },

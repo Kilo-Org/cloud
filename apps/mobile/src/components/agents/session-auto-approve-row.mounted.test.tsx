@@ -6,14 +6,6 @@ import '@/i18n';
 import { type SessionAutoApproveState } from './session-auto-approve';
 import { SessionAutoApproveRow } from './session-auto-approve-row';
 
-// The shared switch takes its track and thumb from the app palette.
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({
-    mutedForeground: '#6f6a61',
-    primary: '#4f5a10',
-    primaryForeground: '#ffffff',
-  }),
-}));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   useColorScheme: () => 'light',

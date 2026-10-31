@@ -40,14 +40,6 @@ vi.mock('react-native', () => ({
   View: 'View',
   Switch: 'Switch',
 }));
-// The shared switch reads the app palette for its track and thumb.
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({
-    mutedForeground: '#6f6a61',
-    primary: '#4f5a10',
-    primaryForeground: '#fff',
-  }),
-}));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: (ms: number) => ({ fadeIn: ms }) },

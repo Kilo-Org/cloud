@@ -46,7 +46,6 @@ export const organizationAuditLogRouter = createTRPCRouter({
       const { organizationId, before, after, action, actorEmail, fuzzySearch, startTime, endTime } =
         input;
 
-      // Build the where conditions for pagination and filtering
       const whereConditions = [eq(organization_audit_logs.organization_id, organizationId)];
 
       if (action && action.length > 0) {
@@ -74,7 +73,6 @@ export const organizationAuditLogRouter = createTRPCRouter({
         ? asc(organization_audit_logs.created_at) // When going back (previous page), fetch oldest first
         : desc(organization_audit_logs.created_at); // Default and next page, fetch newest first
 
-      // Fetch one extra record to determine if there are more pages
       const logs = await db
         .select({
           id: organization_audit_logs.id,
@@ -95,7 +93,6 @@ export const organizationAuditLogRouter = createTRPCRouter({
         logs.reverse();
       }
 
-      // Check if there are more pages
       const hasMore = logs.length > PAGE_SIZE;
       const resultLogs = hasMore ? logs.slice(0, PAGE_SIZE) : logs;
 
@@ -104,7 +101,6 @@ export const organizationAuditLogRouter = createTRPCRouter({
       const maskedLogs = isRequestingUserKiloAdmin
         ? resultLogs
         : resultLogs.map(log => {
-            // Check if the actor is a Kilo admin
             if (log.actor_email && log.actor_email.endsWith('@kilocode.ai')) {
               return {
                 ...log,

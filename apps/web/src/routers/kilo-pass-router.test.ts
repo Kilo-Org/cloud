@@ -4244,7 +4244,6 @@ describe('kiloPassRouter', () => {
         status: 'paused',
       });
 
-      // Insert an open pause event for the subscription
       await db.insert(kilo_pass_pause_events).values({
         kilo_pass_subscription_id: subscriptionId,
         paused_at: new Date('2026-01-01T00:00:00.000Z').toISOString(),

@@ -155,7 +155,6 @@ describe('kiloclaw.getMyPin', () => {
   });
 
   it('returns pin details when user has a pin', async () => {
-    // Create a pin for userB
     await db.insert(kiloclaw_version_pins).values({
       instance_id: userBInstanceId,
       image_tag: availableVersion.image_tag,
@@ -203,7 +202,6 @@ describe('kiloclaw.setMyPin', () => {
   it('updates existing pin when called again', async () => {
     const caller = await createCallerForUser(userA.id);
 
-    // Create initial pin
     await caller.kiloclaw.setMyPin({
       imageTag: availableVersion.image_tag,
       reason: 'Initial reason',
@@ -257,7 +255,6 @@ describe('kiloclaw.setMyPin', () => {
 
 describe('kiloclaw.removeMyPin', () => {
   it('removes the user pin', async () => {
-    // Create a pin first
     await db.insert(kiloclaw_version_pins).values({
       instance_id: userAInstanceId,
       image_tag: availableVersion.image_tag,
@@ -291,7 +288,6 @@ describe('kiloclaw.removeMyPin', () => {
 
 describe('Authorization', () => {
   beforeEach(async () => {
-    // Create pins for both users
     await db.insert(kiloclaw_version_pins).values([
       {
         instance_id: userAInstanceId,

@@ -409,7 +409,6 @@ const PrepareSessionSharedFields = {
    */
   profileId: z.uuid().optional(),
 
-  // Optional configuration
   envVars: z.record(z.string().max(256), z.string().max(256)).optional(),
   setupCommands: setupCommandsSchema.optional(),
   mcpServers: z.record(z.string(), mcpServerConfigNextSchema).optional(),
@@ -752,7 +751,6 @@ export const executionStatusNextSchema = z
 
 // Output schema for getSession (sanitized, no secrets)
 export const baseGetSessionNextOutputSchema = z.object({
-  // Session identifiers
   sessionId: z.string(),
   kiloSessionId: kiloSessionIdSchema.optional(),
   userId: z.string(),
@@ -769,7 +767,6 @@ export const baseGetSessionNextOutputSchema = z.object({
   gitUrl: z.string().optional(),
   platform: z.enum(['github', 'gitlab', 'bitbucket']).optional(),
 
-  // Execution params
   prompt: z.string().optional(),
   mode: z.string().optional(),
   model: z.string().optional(),
@@ -792,10 +789,8 @@ export const baseGetSessionNextOutputSchema = z.object({
     )
     .optional(),
 
-  // Execution status (grouped for cleaner API)
   execution: executionStatusNextSchema,
 
-  // Lifecycle timestamps
   preparedAt: z.number().optional(),
   initiatedAt: z.number().optional(),
 
@@ -810,7 +805,6 @@ export const baseGetSessionNextOutputSchema = z.object({
   // Initial message ID for correlation
   initialMessageId: messageIdNextSchema.optional(),
 
-  // Versioning
   timestamp: z.number(),
   version: z.number(),
 });

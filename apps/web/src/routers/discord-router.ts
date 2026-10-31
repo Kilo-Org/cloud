@@ -12,7 +12,6 @@ import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizat
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 
 export const discordRouter = createTRPCRouter({
-  // Get Discord installation status
   getInstallation: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
@@ -42,7 +41,6 @@ export const discordRouter = createTRPCRouter({
     };
   }),
 
-  // Uninstall Discord integration
   uninstallApp: baseProcedure.input(optionalOrgInput).mutation(async ({ ctx, input }) => {
     const owner = await resolveAuthorizedOwner(ctx, input?.organizationId);
     const result = await discordService.uninstallApp(owner);
@@ -61,7 +59,6 @@ export const discordRouter = createTRPCRouter({
     return result;
   }),
 
-  // Test Discord connection
   testConnection: baseProcedure.input(optionalOrgInput).mutation(async ({ ctx, input }) => {
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
@@ -70,7 +67,6 @@ export const discordRouter = createTRPCRouter({
     return discordService.testConnection(owner);
   }),
 
-  // Update the model for Discord integration
   updateModel: baseProcedure
     .input(
       z.object({

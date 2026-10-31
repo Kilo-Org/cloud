@@ -1569,7 +1569,6 @@ describe('organizations members trpc router', () => {
         role: 'member',
       });
 
-      // Get the invitation ID from the database
       const { db } = await import('@kilocode/web-shared/lib/drizzle');
       const { organization_invitations } = await import('@kilocode/db/schema');
       const { eq, and } = await import('drizzle-orm');
@@ -1643,7 +1642,6 @@ describe('organizations members trpc router', () => {
         role: 'member',
       });
 
-      // Get the invitation ID from the database
       const { db } = await import('@kilocode/web-shared/lib/drizzle');
       const { organization_invitations } = await import('@kilocode/db/schema');
       const { eq, and } = await import('drizzle-orm');
@@ -1691,7 +1689,6 @@ describe('organizations members trpc router', () => {
         role: 'member',
       });
 
-      // Get the invitation ID from the database
       const { db } = await import('@kilocode/web-shared/lib/drizzle');
       const { organization_invitations } = await import('@kilocode/db/schema');
       const { eq, and } = await import('drizzle-orm');

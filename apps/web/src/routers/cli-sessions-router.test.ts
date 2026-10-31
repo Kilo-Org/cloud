@@ -715,7 +715,6 @@ describe('cli-sessions-router', () => {
     });
 
     it('should throw NOT_FOUND when creating session with parent_session_id where parent belongs to another user', async () => {
-      // First, create the parent session directly in the database with organization
       const [parentSession] = await db
         .insert(cliSessions)
         .values({

@@ -45,7 +45,6 @@ describe('organization auto-top-up router', () => {
   let testOrg: Organization;
 
   beforeAll(async () => {
-    // Create test users
     ownerUser = await insertTestUser({
       google_user_email: `org-atu-owner-${Date.now()}@example.com`,
       google_user_name: 'Org ATU Owner',
@@ -62,7 +61,6 @@ describe('organization auto-top-up router', () => {
       google_user_name: 'Org ATU Non-Member',
     });
 
-    // Create test organization
     testOrg = await createOrganization('Auto TopUp Router Test Org', ownerUser.id);
     await db
       .update(organizations)
@@ -127,7 +125,6 @@ describe('organization auto-top-up router', () => {
     });
 
     it('returns config with payment method when configured', async () => {
-      // Create config with payment method
       await db.insert(auto_top_up_configs).values({
         owned_by_organization_id: testOrg.id,
         owned_by_user_id: null,
@@ -187,7 +184,6 @@ describe('organization auto-top-up router', () => {
     });
 
     it('enables auto-top-up directly when payment method exists', async () => {
-      // Create config with payment method
       await db.insert(auto_top_up_configs).values({
         owned_by_organization_id: testOrg.id,
         owned_by_user_id: null,

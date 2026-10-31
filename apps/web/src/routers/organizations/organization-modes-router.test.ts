@@ -271,7 +271,6 @@ describe('organization modes tRPC router', () => {
     it('should throw error for duplicate slug', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // Create first mode
       await caller.organizations.modes.create({
         organizationId: testOrganization.id,
         name: 'First Mode',
@@ -318,10 +317,8 @@ describe('organization modes tRPC router', () => {
     it('should list all modes for an organization', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // Create a fresh organization for this test
       const freshOrg = await createTestOrganization('List Test Org', owner.id, 0, {}, false);
 
-      // Create multiple modes
       await caller.organizations.modes.create({
         organizationId: freshOrg.id,
         name: 'Mode 1',
@@ -396,7 +393,6 @@ describe('organization modes tRPC router', () => {
     it('should get a mode by id', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // Create a mode
       const created = await caller.organizations.modes.create({
         organizationId: testOrganization.id,
         name: 'Get By ID Mode',
@@ -433,7 +429,6 @@ describe('organization modes tRPC router', () => {
     it('should allow members to get modes', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // Create a mode
       const created = await caller.organizations.modes.create({
         organizationId: testOrganization.id,
         name: 'Member Access Mode',
@@ -455,7 +450,6 @@ describe('organization modes tRPC router', () => {
     it('should update mode name and slug', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // Create a mode
       const created = await caller.organizations.modes.create({
         organizationId: testOrganization.id,
         name: 'Original Name',
@@ -476,7 +470,6 @@ describe('organization modes tRPC router', () => {
     it('should update mode config', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // Create a mode
       const created = await caller.organizations.modes.create({
         organizationId: testOrganization.id,
         name: 'Config Update Mode',
@@ -505,7 +498,6 @@ describe('organization modes tRPC router', () => {
     it('should allow members to update modes', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // Create a mode
       const created = await caller.organizations.modes.create({
         organizationId: testOrganization.id,
         name: 'Update Test Mode',
@@ -567,7 +559,6 @@ describe('organization modes tRPC router', () => {
     it('should throw error when updating to duplicate slug', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // Create two modes
       await caller.organizations.modes.create({
         organizationId: testOrganization.id,
         name: 'Mode A',
@@ -780,7 +771,6 @@ describe('organization modes tRPC router', () => {
     it('should delete a mode', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // Create a mode
       const created = await caller.organizations.modes.create({
         organizationId: testOrganization.id,
         name: 'To Be Deleted',
@@ -977,7 +967,6 @@ describe('organization modes tRPC router', () => {
     it('should allow members to delete modes', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // Create a mode
       const created = await caller.organizations.modes.create({
         organizationId: testOrganization.id,
         name: 'Delete Test Mode',

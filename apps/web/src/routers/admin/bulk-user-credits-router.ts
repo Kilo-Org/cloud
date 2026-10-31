@@ -59,7 +59,6 @@ export const bulkUserCreditsRouter = createTRPCRouter({
         return { matched: [], unmatched: [] };
       }
 
-      // Normalize emails to lowercase and deduplicate
       const normalizedEmails = [...new Set(emails.map(e => e.toLowerCase()))];
 
       // Find all users with matching emails
@@ -107,7 +106,6 @@ export const bulkUserCreditsRouter = createTRPCRouter({
       // Normalize emails and deduplicate to prevent double-crediting
       const normalizedEmails = [...new Set(emails.map(e => e.toLowerCase()))];
 
-      // Fetch all users at once
       const users = await db
         .select()
         .from(kilocode_users)

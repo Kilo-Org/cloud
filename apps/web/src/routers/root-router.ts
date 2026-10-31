@@ -102,5 +102,4 @@ export const rootRouter = createTRPCRouter({
   spendAlerts: spendAlertRouter,
   agentBriefing: agentBriefingRouter,
 });
-// export type definition of API
 export type RootRouter = typeof rootRouter;

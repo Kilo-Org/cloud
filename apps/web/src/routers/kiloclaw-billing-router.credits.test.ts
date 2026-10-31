@@ -32,8 +32,6 @@ import {
 import { differenceInCalendarMonths } from 'date-fns';
 import { CURRENT_KILOCLAW_PRICE_VERSION, LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 
-// ── Credit Enrollment ──────────────────────────────────────────────────────
-
 describe('enrollWithCredits', () => {
   async function giveUserCredits(userId: string, microdollars: number) {
     await db
@@ -1063,8 +1061,6 @@ describe('enrollWithCredits', () => {
     );
   });
 });
-
-// ── Billing Status with Credits ────────────────────────────────────────────
 
 describe('getBillingStatus with credits', () => {
   async function createKiloPassSubscription(params: {

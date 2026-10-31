@@ -3,14 +3,12 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import { rootRouter } from './root-router';
 
-// Test users will be created dynamically
 let regularUser: User;
 let adminUser: User;
 let creditManagerUser: User;
 
 describe('trpc tests', () => {
   beforeAll(async () => {
-    // Create test users using the helper function
     regularUser = await insertTestUser({
       google_user_email: 'regular@example.com',
       google_user_name: 'Regular User',
@@ -31,9 +29,7 @@ describe('trpc tests', () => {
     });
   });
 
-  afterAll(async () => {
-    // Test cleanup is handled automatically by the test framework
-  });
+  afterAll(async () => {});
 
   describe('router composition', () => {
     it('registers providerReview on the server root so mobile calls resolve', () => {

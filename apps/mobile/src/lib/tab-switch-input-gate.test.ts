@@ -6,6 +6,7 @@ import {
   markTabSwitchPending,
   scheduleTabSwitchSettle,
   settleTabSwitchInput,
+  shouldClaimTabSwitchTouch,
   TAB_SWITCH_ACTIVE_TAB_SETTLE_MS,
   TAB_SWITCH_INPUT_FALLBACK_MS,
 } from '@/lib/tab-switch-input-gate';
@@ -67,5 +68,45 @@ describe('tab switch input gate', () => {
     vi.advanceTimersByTime(TAB_SWITCH_ACTIVE_TAB_SETTLE_MS);
 
     expect(isTabSwitchPending()).toBe(true);
+  });
+
+  it('keeps the window on a scene the user has left', () => {
+    markTabSwitchPending(1000);
+
+    expect(shouldClaimTabSwitchTouch(false, 1000)).toBe(true);
+  });
+
+  it('leaves the destination scene free to act during the window', () => {
+    markTabSwitchPending(1000);
+
+    expect(shouldClaimTabSwitchTouch(true, 1000)).toBe(false);
+  });
+
+  it('keeps the focused scene for a press on the tab it already shows', () => {
+    markTabSwitchPending(1000, { sameTab: true });
+
+    expect(shouldClaimTabSwitchTouch(true, 1000)).toBe(true);
+    expect(shouldClaimTabSwitchTouch(true, 1000 + TAB_SWITCH_ACTIVE_TAB_SETTLE_MS - 1)).toBe(true);
+  });
+
+  it('stops keeping the focused scene once the same-tab settle would have fired', () => {
+    markTabSwitchPending(1000, { sameTab: true });
+
+    expect(shouldClaimTabSwitchTouch(true, 1000 + TAB_SWITCH_ACTIVE_TAB_SETTLE_MS)).toBe(false);
+  });
+
+  it('drops the same-tab claim with the window', () => {
+    markTabSwitchPending(1000, { sameTab: true });
+
+    settleTabSwitchInput();
+
+    expect(shouldClaimTabSwitchTouch(true, 1000)).toBe(false);
+  });
+
+  it('drops the same-tab claim when the fallback expires it', () => {
+    markTabSwitchPending(1000, { sameTab: true });
+
+    expect(shouldClaimTabSwitchTouch(true, 1000 + TAB_SWITCH_INPUT_FALLBACK_MS)).toBe(false);
+    expect(shouldClaimTabSwitchTouch(true, 1000 + TAB_SWITCH_INPUT_FALLBACK_MS + 1)).toBe(false);
   });
 });

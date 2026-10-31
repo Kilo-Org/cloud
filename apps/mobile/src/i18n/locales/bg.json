@@ -2158,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Не можахме да заредим активните сесии.",
       "couldNotRefresh": "Не можахме да опресним",
-      "noSessionsYetDescription": "Започни задача за програмиране от телефона си. Сесиите ти ще се появят тук.",
+      "noSessionsYetDescription": "Започни задача за програмиране от телефона си.",
       "viewHistory": "История на сесиите",
       "noMatches": "Няма сесии за това търсене",
       "tryDifferentSearch": "Опитай с друга дума за търсене.",

@@ -2158,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Asikwazanga ukulayisha iziseshini ezisebenzayo.",
       "couldNotRefresh": "Asikwazanga ukuvuselela",
-      "noSessionsYetDescription": "Qala umsebenzi wokubhala ikhodi efonini yakho. Iziseshini zakho zizovela lapha.",
+      "noSessionsYetDescription": "Qala umsebenzi wokubhala ikhodi efonini yakho.",
       "viewHistory": "Umlando weziseshini",
       "noMatches": "Azikho iziseshini ezihambisanayo",
       "tryDifferentSearch": "Zama igama lokusesha elihlukile.",

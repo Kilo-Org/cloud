@@ -2158,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Kon nie die aktiewe sessies laai nie.",
       "couldNotRefresh": "Kon nie verfris nie",
-      "noSessionsYetDescription": "Begin 'n kodeertaak op jou foon. Jou sessies sal hier verskyn.",
+      "noSessionsYetDescription": "Begin 'n kodeertaak op jou foon.",
       "viewHistory": "Sessiegeskiedenis",
       "noMatches": "Geen ooreenstemmende sessies nie",
       "tryDifferentSearch": "Probeer 'n ander soekterm.",

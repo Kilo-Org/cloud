@@ -2216,7 +2216,7 @@
     "sessionList": {
       "couldNotLoadActive": "Не атрымалася загрузіць актыўныя сеансы.",
       "couldNotRefresh": "Не атрымалася абнавіць",
-      "noSessionsYetDescription": "Запусці задачу па напісанні кода з тэлефона. Твае сеансы з'явяцца тут.",
+      "noSessionsYetDescription": "Запусці задачу па напісанні кода з тэлефона.",
       "viewHistory": "Гісторыя сеансаў",
       "noMatches": "Няма сеансаў паводле ўмоў пошуку",
       "tryDifferentSearch": "Паспрабуй іншы пошукавы запыт.",

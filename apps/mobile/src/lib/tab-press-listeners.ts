@@ -6,6 +6,7 @@ import {
   type TabPressNavigation,
 } from '@/lib/tab-press';
 import {
+  markTabSwitchPending,
   scheduleTabSwitchSettle,
   TAB_SWITCH_ACTIVE_TAB_SETTLE_MS,
 } from '@/lib/tab-switch-input-gate';
@@ -17,10 +18,13 @@ type TabPressEvent = { preventDefault: () => void };
 /**
  * A press on the tab that is already focused opens no screen, so its input
  * window settles on its own timer instead of waiting for a layout that never
- * comes; the pop back to that tab's root still has time to land.
+ * comes; the pop back to that tab's root still has time to land. The focused
+ * scene stays focused for such a press, so the window is armed as a same-tab
+ * one: the claim then rests on the timer rather than on the scene's focus.
  */
 function settleFocusedTabPress(navigation: TabFocus): void {
   if (navigation.isFocused()) {
+    markTabSwitchPending(Date.now(), { sameTab: true });
     scheduleTabSwitchSettle(TAB_SWITCH_ACTIVE_TAB_SETTLE_MS);
   }
 }

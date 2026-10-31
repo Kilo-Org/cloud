@@ -2158,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktiv sessiyaları yükləmək mümkün olmadı.",
       "couldNotRefresh": "Yeniləmək mümkün olmadı",
-      "noSessionsYetDescription": "Telefonundan kodlaşdırma tapşırığı başlat. Sessiyaların burada görünəcək.",
+      "noSessionsYetDescription": "Telefonundan kodlaşdırma tapşırığı başlat.",
       "viewHistory": "Sessiya tarixçəsi",
       "noMatches": "Uyğun sessiya yoxdur",
       "tryDifferentSearch": "Başqa sözlə axtar.",

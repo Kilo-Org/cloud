@@ -23,12 +23,18 @@ export const TAB_SWITCH_ACTIVE_TAB_SETTLE_MS = 500;
 
 type SettleTimer = ReturnType<typeof setTimeout>;
 
-type TabSwitchInputStore = { pendingSince: number | null; settleTimer: SettleTimer | null };
+type TabSwitchInputStore = {
+  pendingSince: number | null;
+  /** The press landed on the tab the user is already on, so no scene changes. */
+  pendingSameTab: boolean;
+  settleTimer: SettleTimer | null;
+};
 
 const STORE_KEY = '__kiloTabSwitchInputGate__';
 const globalScope = globalThis as typeof globalThis & { [STORE_KEY]?: TabSwitchInputStore };
 const store: TabSwitchInputStore = (globalScope[STORE_KEY] ??= {
   pendingSince: null,
+  pendingSameTab: false,
   settleTimer: null,
 });
 
@@ -40,15 +46,20 @@ function clearSettleTimer(): void {
 }
 
 /** Arms the window when a tab entry is pressed on the bar. */
-export function markTabSwitchPending(now: number = Date.now()): void {
+export function markTabSwitchPending(
+  now: number = Date.now(),
+  options: { sameTab?: boolean } = {}
+): void {
   clearSettleTimer();
   store.pendingSince = now;
+  store.pendingSameTab = options.sameTab === true;
 }
 
 /** Closes the window: the destination screen is on screen, or the switch ended. */
 export function settleTabSwitchInput(): void {
   clearSettleTimer();
   store.pendingSince = null;
+  store.pendingSameTab = false;
 }
 
 /**
@@ -71,7 +82,37 @@ export function isTabSwitchPending(now: number = Date.now()): boolean {
   }
   if (now - pendingSince >= TAB_SWITCH_INPUT_FALLBACK_MS) {
     store.pendingSince = null;
+    store.pendingSameTab = false;
     return false;
+  }
+  return true;
+}
+
+/**
+ * Whether a touch that starts inside a tab screen must be kept from it.
+ *
+ * The screen being left is the one the touch was hit-tested against, and it is
+ * the one that is no longer focused: a scene claims only while it is blurred,
+ * or for a press on the tab it already shows, which opens no screen and leaves
+ * the scene focused. A tab switch therefore never keeps the destination —
+ * the scene the user is now on — from acting; the window's task is only to
+ * shield the screen the user left, and it does that for as long as the
+ * navigator leaves that screen in the touch path.
+ */
+export function shouldClaimTabSwitchTouch(
+  sceneFocused: boolean,
+  now: number = Date.now()
+): boolean {
+  if (!isTabSwitchPending(now)) {
+    return false;
+  }
+  if (sceneFocused) {
+    // A press on the tab already shown opens no screen and leaves this scene
+    // focused; its window is the bounded settle, measured from the press, so it
+    // cannot outlast the timer that ends it.
+    return (
+      store.pendingSameTab && now - (store.pendingSince ?? now) < TAB_SWITCH_ACTIVE_TAB_SETTLE_MS
+    );
   }
   return true;
 }
@@ -79,4 +120,5 @@ export function isTabSwitchPending(now: number = Date.now()): boolean {
 export function __resetTabSwitchInputForTests(): void {
   clearSettleTimer();
   store.pendingSince = null;
+  store.pendingSameTab = false;
 }

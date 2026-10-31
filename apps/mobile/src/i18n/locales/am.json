@@ -2158,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "ንቁ ክፍለ ጊዜዎችን መጫን አልተቻለም።",
       "couldNotRefresh": "ማደስ አልተቻለም",
-      "noSessionsYetDescription": "ከስልክህ ኮድ የመጻፍ ሥራ ጀምር። ክፍለ ጊዜዎችህ እዚህ ይታያሉ።",
+      "noSessionsYetDescription": "ከስልክህ ኮድ የመጻፍ ሥራ ጀምር።",
       "viewHistory": "የክፍለ ጊዜ ታሪክ",
       "noMatches": "የሚዛመዱ ክፍለ ጊዜዎች የሉም",
       "tryDifferentSearch": "ሌላ የፍለጋ ቃል ሞክር።",

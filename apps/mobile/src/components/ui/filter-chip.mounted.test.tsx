@@ -58,22 +58,27 @@ function render(selected: boolean): TestRenderer.ReactTestInstance {
 /**
  * Selecting a chip only switched `secondary` over `ghost`, which drew a 1.1:1
  * fill and kept the label colour, so the current filter reached assistive tech
- * but not the screen. The selected option now keeps the neutral surface, adds a
- * `primary` ring over its edge and paints the label in the same ink, while the
- * saturated `primary` fill stays with the page's primary action.
+ * but not the screen. The selected option now keeps the neutral surface and
+ * default label ink, and adds a muted neutral ring over its edge, so it reads
+ * as selected without spending the brand `primary` ink that the page's primary
+ * action owns.
  */
-it('rings the selected chip and paints its label, keeping the neutral surface', () => {
+it('rings the selected chip with a muted neutral edge, keeping its surface and label ink', () => {
   const root = render(true);
   const chip = chipProps(root.findByType(Pressable));
   expect(chip.className).toContain('bg-secondary');
   expect(chip.className).not.toContain('bg-primary');
   expect(chip.accessibilityState?.selected).toBe(true);
-  expect(chipProps(root.findByType('Text')).className).toContain('text-primary');
+  // The label keeps the surface's neutral ink; only the ring carries the selection.
+  const labelClass = chipProps(root.findByType('Text')).className ?? '';
+  expect(labelClass).toContain('text-secondary-foreground');
+  expect(labelClass).not.toContain('text-primary');
 
   const rings = root.findAllByType('View');
   expect(rings).toHaveLength(1);
   const ring = chipProps(rings[0] as TestRenderer.ReactTestInstance).className ?? '';
-  expect(ring).toContain('border-primary');
+  expect(ring).toContain('border-muted-foreground');
+  expect(ring).not.toContain('border-primary');
   // An overlay, so the ring never changes the chip's size or the row's frames.
   expect(ring).toContain('absolute');
   expect(ring).toContain('inset-0');

@@ -165,6 +165,9 @@ describe('AnalysisSettingsScreen depth picker touch target', () => {
     expect(pills).toHaveLength(3);
     for (const pill of pills) {
       expect(String(pill.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
+      // The pill lays out as a column, so the taller box needs `justify-center`
+      // for its one-line label to stay centred instead of sitting at the top.
+      expect(String(pill.props.className).split(' ')).toContain('justify-center');
       expect(pill.props.hitSlop).toBeUndefined();
     }
     renderer.unmount();

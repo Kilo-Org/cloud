@@ -187,8 +187,10 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
                   className={cn(
                     // The pill's own node has to carry the floor: its
                     // `py-2` frame alone renders under the design target.
+                    // `justify-center` keeps the one-line label centred in the
+                    // taller box; a column default would leave it at the top.
                     ROW_TARGET_CLASS,
-                    'flex-1 items-center rounded-full py-2 active:opacity-70',
+                    'flex-1 items-center justify-center rounded-full py-2 active:opacity-70',
                     active && 'bg-foreground',
                     !canManage && 'opacity-50'
                   )}

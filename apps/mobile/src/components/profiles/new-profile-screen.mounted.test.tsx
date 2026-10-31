@@ -40,8 +40,10 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 }));
 
 vi.mock('@/lib/profile-agent-navigation', () => ({
-  getProfileOverviewPath: (profileId: string, organizationId?: string) =>
-    organizationId ? `/profiles/${profileId}?org=${organizationId}` : `/profiles/${profileId}`,
+  getProfileOverviewPath: (profileId: string, options: { organizationId?: string } = {}) =>
+    options.organizationId
+      ? `/profiles/${profileId}?org=${options.organizationId}`
+      : `/profiles/${profileId}`,
 }));
 
 vi.mock('react-native', () => ({

@@ -17,6 +17,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Bot, Pencil, Trash2 } from '@/components/ui/icons';
+import { InlineBadge } from '@/components/ui/inline-badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -65,20 +66,23 @@ function AgentRowView({
 }: AgentRowViewProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  // The slug is the name's identifier; repeating it beside the name reads as a
+  // duplicate, so it only shows when it says something the name does not.
+  const showSlug = slug.length > 0 && slug !== name.trim().toLowerCase();
   return (
     <View className="min-h-16 flex-row items-start gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="min-w-0 flex-1 gap-0.5">
-        <View className="flex-row flex-wrap items-center gap-2">
+        <View className="flex-row items-center gap-2">
           <Bot size={16} color={colors.mutedForeground} />
-          <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+          <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>
             {name}
           </Text>
-          <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
-            {slug}
-          </Text>
-          <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-            {t(AGENT_VISIBILITY_LABEL_KEYS[visibility])}
-          </Text>
+          {showSlug ? (
+            <Text variant="mono" className="shrink text-xs text-muted-foreground" numberOfLines={1}>
+              {slug}
+            </Text>
+          ) : null}
+          <InlineBadge>{t(AGENT_VISIBILITY_LABEL_KEYS[visibility])}</InlineBadge>
         </View>
         {model.length > 0 ? (
           <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>

@@ -34,6 +34,12 @@ import { readTrpcErrorField } from '@/lib/trpc-error';
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_MCP_SERVERS: AgentProfileDetail['mcpServers'] = [];
 
+/**
+ * A server row's URL or command line truncates in the middle: its tail is what
+ * tells one endpoint apart from another, so the head alone does not carry it.
+ */
+const SUMMARY_PROPS = { numberOfLines: 1, ellipsizeMode: 'middle' } as const;
+
 type McpServerRowProps = Readonly<{
   server: McpServerSource;
   summary: string;
@@ -88,7 +94,7 @@ function McpServerRowView({
           ) : null}
         </View>
         {summary.length > 0 ? (
-          <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
+          <Text variant="mono" className="text-xs text-muted-foreground" {...SUMMARY_PROPS}>
             {summary}
           </Text>
         ) : null}

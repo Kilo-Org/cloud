@@ -1,25 +1,10 @@
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode } from 'react';
 import { View } from 'react-native';
 
-import { isTabSwitchPending, settleTabSwitchInput } from '@/lib/tab-switch-input-gate';
+import { shouldClaimTabSwitchTouch } from '@/lib/tab-switch-input-gate';
 
-/** The scene surface the gate reads: this scene's own focus events. */
-type SceneNavigation = {
-  addListener: (event: 'focus', listener: () => void) => () => void;
-};
-
-/**
- * Closes the input window when this scene reports focus — the moment it is the
- * scene the next touch is hit-tested against.
- *
- * A component of its own because the navigator calls a `screenLayout` as a
- * plain function: hooks there join the navigator's own hook order and change it
- * between renders. This one renders nothing.
- */
-function SceneFocusSettle({ navigation }: Readonly<{ navigation: SceneNavigation }>) {
-  useEffect(() => navigation.addListener('focus', settleTabSwitchInput), [navigation]);
-  return null;
-}
+/** The scene surface the gate reads: whether this scene is the focused one. */
+type SceneNavigation = { isFocused: () => boolean };
 
 /**
  * The tabs navigator's `screenLayout`: every tab screen is wrapped by it, and
@@ -40,15 +25,22 @@ function SceneFocusSettle({ navigation }: Readonly<{ navigation: SceneNavigation
  * a tab family renders, so only the families that remembered to mount it were
  * shielded.
  *
- * The window is closed by the tab stacks' `transitionEnd` listener
- * (`settleTabSwitchInput`, passed by the tab layouts), by this scene's own
- * `focus`, and, for a press that opens no screen, by the bounded settle in
- * `tab-switch-input-gate.ts`. The focus settle is what a tab switch needs: it
- * pushes nothing into the destination stack, so no `transitionEnd` fires there,
- * and the window used to run to its bound. Every touch inside the newly shown
- * tab screen — the Agents empty state's view-history link, or any other control
- * — was dropped silently for that whole window (explorer finding: the link did
- * nothing).
+ * Which scene claims is decided by that scene's own focus: the scene the user
+ * is leaving is the one the touch was hit-tested against, and it reports itself
+ * blurred from the moment the destination is chosen, while the destination
+ * reports itself focused before its views have replaced the old ones. Claiming
+ * on "the scene I am not on" therefore shields exactly the outgoing screen for
+ * exactly as long as it stays in the touch path, and never blocks the screen
+ * the user switched to. Closing the window from a navigation event could not do
+ * that: measured on the Android emulator, the destination's `focus` fires
+ * before the scenes swap and even its `transitionEnd` can land while the
+ * outgoing views are still the touch targets, so a window settled from either
+ * one let a tap run the outgoing screen's control. Without the focus-scoped
+ * claim, nothing settled the window on a tab switch at all — it pushes nothing
+ * into the destination stack — and every touch inside the newly shown tab
+ * screen, the Agents empty state's view-history link included, was dropped
+ * silently until the window's 1200 ms bound expired (explorer finding: the link
+ * did nothing).
  */
 export function TabSwitchInputSettle({
   navigation,
@@ -57,10 +49,9 @@ export function TabSwitchInputSettle({
   return (
     <View
       className="flex-1"
-      onStartShouldSetResponderCapture={() => isTabSwitchPending()}
+      onStartShouldSetResponderCapture={() => shouldClaimTabSwitchTouch(navigation.isFocused())}
       onResponderTerminationRequest={() => false}
     >
-      <SceneFocusSettle navigation={navigation} />
       {children}
     </View>
   );

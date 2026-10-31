@@ -562,7 +562,6 @@ export const organizationsMembersRouter = createTRPCRouter({
         assertOwnerAuthority(actorRole, { nextRole: role });
       }
 
-      // Get organization details
       const organization = await getOrganizationById(organizationId);
       if (!organization) {
         throw new TRPCError({
@@ -669,7 +668,6 @@ export const organizationsMembersRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { organizationId, inviteId } = input;
 
-      // Find the invitation
       const [invitation] = await db
         .select()
         .from(organization_invitations)
@@ -737,7 +735,6 @@ export const organizationsMembersRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { organizationId, inviteId } = input;
 
-      // Find the invitation
       const [invitation] = await db
         .select()
         .from(organization_invitations)

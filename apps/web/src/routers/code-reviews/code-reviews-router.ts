@@ -347,14 +347,11 @@ export const codeReviewRouter = createTRPCRouter({
         });
       }
 
-      // Authorization check based on owner type
       let canSeeRawIds = true;
       if (review.owned_by_organization_id) {
-        // Organization review: verify user is org member
         const callerRole = await ensureOrganizationAccess(ctx, review.owned_by_organization_id);
         canSeeRawIds = callerRole === 'owner' || callerRole === 'admin';
       } else if (review.owned_by_user_id) {
-        // Personal review: verify user owns it
         if (review.owned_by_user_id !== ctx.user.id) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -362,7 +359,6 @@ export const codeReviewRouter = createTRPCRouter({
           });
         }
       } else {
-        // Should not happen, but handle edge case
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Invalid review ownership data',
@@ -495,12 +491,9 @@ export const codeReviewRouter = createTRPCRouter({
         });
       }
 
-      // Authorization check based on owner type
       if (review.owned_by_organization_id) {
-        // Organization review: verify user is org member
         await ensureOrganizationAccess(ctx, review.owned_by_organization_id);
       } else if (review.owned_by_user_id) {
-        // Personal review: verify user owns it
         if (review.owned_by_user_id !== ctx.user.id) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -508,7 +501,6 @@ export const codeReviewRouter = createTRPCRouter({
           });
         }
       } else {
-        // Should not happen, but handle edge case
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Invalid review ownership data',
@@ -589,7 +581,6 @@ export const codeReviewRouter = createTRPCRouter({
         }
       }
 
-      // For pending reviews (not yet dispatched to worker), update DB and finalize gate
       await cancelCodeReview(input.reviewId);
       await settleCodeReviewLedgerRow({
         reviewId: input.reviewId,
@@ -629,12 +620,9 @@ export const codeReviewRouter = createTRPCRouter({
           });
         }
 
-        // Authorization check based on owner type
         if (review.owned_by_organization_id) {
-          // Organization review: verify user is org member
           await ensureOrganizationAccess(ctx, review.owned_by_organization_id);
         } else if (review.owned_by_user_id) {
-          // Personal review: verify user owns it
           if (review.owned_by_user_id !== ctx.user.id) {
             throw new TRPCError({
               code: 'FORBIDDEN',
@@ -642,14 +630,12 @@ export const codeReviewRouter = createTRPCRouter({
             });
           }
         } else {
-          // Should not happen, but handle edge case
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Invalid review ownership data',
           });
         }
 
-        // Allow retriggering failed, cancelled, and interrupted reviews
         const retriggableStatuses = ['failed', 'cancelled', 'interrupted'];
         if (!retriggableStatuses.includes(review.status)) {
           throw new TRPCError({
@@ -658,7 +644,6 @@ export const codeReviewRouter = createTRPCRouter({
           });
         }
 
-        // Build owner object for dispatch.
         // For org reviews, use the bot user ID so retrigger dispatch matches webhook-created reviews.
         let owner: Owner;
         if (review.owned_by_organization_id) {
@@ -731,7 +716,6 @@ export const codeReviewRouter = createTRPCRouter({
           logExceptInTest('[retrigger] Failed to re-create PR gate check:', gateError);
         }
 
-        // Try to dispatch the review
         await tryDispatchPendingReviews(owner);
 
         // Dispatch owns the retry from here: a worker that refuses the job marks
@@ -782,7 +766,6 @@ export const codeReviewRouter = createTRPCRouter({
           });
         }
 
-        // Authorization check based on owner type
         if (review.owned_by_organization_id) {
           await ensureOrganizationAccess(ctx, review.owned_by_organization_id);
         } else if (review.owned_by_user_id) {
@@ -843,7 +826,6 @@ export const codeReviewRouter = createTRPCRouter({
           });
         }
 
-        // Authorization check based on owner type
         if (review.owned_by_organization_id) {
           await ensureOrganizationAccess(ctx, review.owned_by_organization_id);
         } else if (review.owned_by_user_id) {

@@ -712,7 +712,6 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      // Update the data collection setting
       const updatedSettings = await updateOrganizationSettings(organizationId, {
         ...existingOrg.settings,
         data_collection: dataCollection,
@@ -749,14 +748,12 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      // Merge with existing settings
       const currentSettings = existingOrg.settings || {};
       const updatedSettings = await updateOrganizationSettings(organizationId, {
         ...currentSettings,
         projects_ui_enabled,
       });
 
-      // Create audit log if the value changed
       if (currentSettings.projects_ui_enabled !== projects_ui_enabled) {
         await createAuditLog({
           action: 'organization.settings.change',
@@ -806,7 +803,6 @@ export const organizationsSettingsRouter = createTRPCRouter({
         updatedSettings = await updateOrganizationSettings(organizationId, rest);
       }
 
-      // Create audit log
       const wasEnabled =
         currentSettings.minimum_balance !== undefined &&
         currentSettings.minimum_balance_alert_email !== undefined;

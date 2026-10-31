@@ -279,7 +279,6 @@ export const byokRouter = createTRPCRouter({
     .query(async ({ input, ctx }): Promise<BYOKApiKeyResponse[]> => {
       const { organizationId } = input;
 
-      // If organizationId provided, verify membership; otherwise use user's own keys
       const organizationRole = organizationId
         ? await ensureOrganizationAccess(ctx, organizationId)
         : null;
@@ -293,7 +292,6 @@ export const byokRouter = createTRPCRouter({
             : eq(byok_api_keys.kilo_user_id, ctx.user.id)
         );
 
-      // Map provider_id to provider_name (will be enhanced in UI with actual provider names)
       return Promise.all(keys.map(key => toBYOKApiKeyResponse(key, organizationRole)));
     }),
 
@@ -323,7 +321,6 @@ export const byokRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse> => {
       const { organizationId, provider_id, api_key } = input;
 
-      // If organizationId provided, verify owner/billing access
       const organizationRole = organizationId
         ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES)
         : null;
@@ -331,7 +328,6 @@ export const byokRouter = createTRPCRouter({
       rejectUnavailableExperimentalProvider(provider_id, organizationId);
       validateUserByokCredential(provider_id, api_key);
 
-      // Encrypt the API key
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
       const keyId = crypto.randomUUID();
       const envelope = await encryptByokForStorage({
@@ -345,7 +341,6 @@ export const byokRouter = createTRPCRouter({
         actorUserId: ctx.user.id,
       });
 
-      // Insert into database - either org-owned or user-owned
       const [newKey] = await db
         .insert(byok_api_keys)
         .values({
@@ -359,7 +354,6 @@ export const byokRouter = createTRPCRouter({
         })
         .returning(BYOK_KEY_COLUMNS);
 
-      // Create audit log only for organization keys
       if (organizationId) {
         await createAuditLog({
           action: 'organization.settings.change',
@@ -380,12 +374,10 @@ export const byokRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse> => {
       const { organizationId, id, api_key } = input;
 
-      // If organizationId provided, verify owner/billing access
       const organizationRole = organizationId
         ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES)
         : null;
 
-      // Verify key exists and belongs to the organization or user
       const [existingKey] = await db
         .select({
           id: byok_api_keys.id,
@@ -441,7 +433,6 @@ export const byokRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
       }
 
-      // Create audit log only for organization keys
       if (existingKey.organization_id) {
         await createAuditLog({
           action: 'organization.settings.change',
@@ -750,12 +741,10 @@ export const byokRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { organizationId, id } = input;
 
-      // If organizationId provided, verify owner/billing access
       if (organizationId) {
         await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
       }
 
-      // Verify key exists and belongs to the organization or user
       const [existingKey] = await db
         .select({
           organization_id: byok_api_keys.organization_id,
@@ -792,10 +781,8 @@ export const byokRouter = createTRPCRouter({
 
       rejectManagedKeyMutation(existingKey.management_source);
 
-      // Delete from database
       await db.delete(byok_api_keys).where(eq(byok_api_keys.id, id));
 
-      // Create audit log only for organization keys
       if (existingKey.organization_id) {
         await createAuditLog({
           action: 'organization.settings.change',

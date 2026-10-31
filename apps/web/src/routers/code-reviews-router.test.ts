@@ -3772,7 +3772,6 @@ describe('personalReviewAgent.patchReviewConfig', () => {
   });
 });
 
-// ============================================================================
 // P1-D-32: GitLab webhook secret handling on the personal surface.
 //
 // Regression guards for two security fixes:
@@ -3783,7 +3782,6 @@ describe('personalReviewAgent.patchReviewConfig', () => {
 //      webhooks so the integration keeps working with the new secret. The
 //      previous shape persisted a new secret and never re-synced, so live
 //      webhooks kept carrying the old secret and stopped validating.
-// ============================================================================
 
 async function seedPersonalGitLabIntegration(
   userId: string,

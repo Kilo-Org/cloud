@@ -195,7 +195,6 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { organizationId, startDate, endDate } = input;
 
-      // Fetch organization members (active only, not invited)
       const allMembers = await getOrganizationMembers(organizationId);
       const members = allMembers
         .filter((m): m is Extract<typeof m, { status: 'active' }> => m.status === 'active')
@@ -218,7 +217,6 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
       // Get user emails for PostHog query
       const userEmails = members.map(m => m.email);
 
-      // Fetch all component data in parallel
       const [agentInteractionsData, autocompleteData, cloudAgentSessionsData, codeReviewsData] =
         await Promise.all([
           getAgentInteractionsPerDay(organizationId, userIds, extendedStartDateStr, endDate),

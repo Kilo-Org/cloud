@@ -109,12 +109,10 @@ function isSessionNotFoundError(err: unknown): boolean {
   if (err instanceof TRPCClientError) {
     const data = err.data as { code?: string; httpStatus?: number } | undefined;
     const shape = err.shape as { data?: { code?: string; httpStatus?: number } } | undefined;
-    // Check TRPC error code
     const code = data?.code ?? shape?.data?.code;
     if (code === 'NOT_FOUND') {
       return true;
     }
-    // Also check HTTP status 404
     const httpStatus = data?.httpStatus ?? shape?.data?.httpStatus;
     if (httpStatus === 404) {
       return true;
@@ -1727,7 +1725,6 @@ export const cliSessionsV2Router = createTRPCRouter({
     .input(GetSessionInputSchema)
     .output(
       z.object({
-        // DB fields
         session_id: z.string(),
         title: z.string().nullable(),
         cloud_agent_session_id: z.string().nullable(),
@@ -1757,9 +1754,6 @@ export const cliSessionsV2Router = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const { session_id } = input;
 
-      // 1. Fetch from DB with ownership check, LEFT JOINing the PR cache by PR
-      //    identity through the shared predicate. A session with no verified
-      //    stored link joins nothing and shows no PR.
       const [row] = await db
         .select({
           session: cli_sessions_v2,
@@ -1800,7 +1794,6 @@ export const cliSessionsV2Router = createTRPCRouter({
         await ensureOrganizationAccess(ctx, session.organization_id);
       }
 
-      // 2. If session has cloud_agent_session_id, fetch runtime state from DO
       let runtimeState: z.infer<typeof baseGetSessionNextOutputSchema> | null = null;
 
       if (session.cloud_agent_session_id && SESSION_ID_RE.test(session.cloud_agent_session_id)) {
@@ -1821,7 +1814,6 @@ export const cliSessionsV2Router = createTRPCRouter({
             console.log(
               `Session ${session_id} not found in cloud-agent DO - treating as legacy session`
             );
-            // runtimeState stays null
           } else {
             console.error(
               `Failed to fetch runtime state for session ${session_id}:`,
@@ -1908,9 +1900,6 @@ export const cliSessionsV2Router = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { sessionId } = input;
 
-      // 1. Load session with ownership check, LEFT JOINing the PR cache by PR
-      //    identity so the throttle can be evaluated without a second query.
-      //    The join only matches when the session already has a verified link.
       const [row] = await db
         .select({
           session: cli_sessions_v2,
@@ -2016,7 +2005,6 @@ export const cliSessionsV2Router = createTRPCRouter({
         }
       }
 
-      // Resolve the GitHub installation for this session's owner.
       let integration;
       if (session.organization_id) {
         integration = await getIntegrationForOwner(
@@ -2081,7 +2069,6 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
-      // Fetch the rolled-up review decision when we have a PR.
       // Failures are swallowed so a GraphQL hiccup doesn't break the refresh.
       let reviewDecision: string | null = null;
       let reviewDecisionFetched = false;

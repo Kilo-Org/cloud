@@ -2180,7 +2180,6 @@ export const kiloPassRouter = createTRPCRouter({
       }
       assertStripeManagedSubscription(subscription);
 
-      // Can only cancel active subscriptions that aren't already pending cancellation
       if (subscription.status !== 'active' || subscription.cancelAtPeriodEnd) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -2319,7 +2318,6 @@ export const kiloPassRouter = createTRPCRouter({
         });
       }
 
-      // Clear pause_collection on Stripe to resume immediately
       await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
         pause_collection: '',
       });
@@ -2460,7 +2458,6 @@ export const kiloPassRouter = createTRPCRouter({
       }
       assertStripeManagedSubscription(subscription);
 
-      // Only allow scheduling changes for active subscriptions.
       if (subscription.status !== 'active') {
         throw new TRPCError({
           code: 'BAD_REQUEST',

@@ -646,7 +646,6 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
       return { synced: 0, alreadyExisted: 0, invalid: 0, total: 0 };
     }
 
-    // Fetch only existing tags that match KV versions (more memory-efficient)
     const kvTags = kvVersions.map(v => v.imageTag);
     const existingTags = new Set(
       (
@@ -657,7 +656,6 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
       ).map(row => row.image_tag)
     );
 
-    // Filter out entries that already exist in Postgres
     const newEntries = kvVersions.filter(entry => !existingTags.has(entry.imageTag));
 
     // Validate entries before inserting — KV data may be malformed.

@@ -543,7 +543,6 @@ describe('switchPlan', () => {
     const result = await caller.kiloclaw.switchPlan({ toPlan: 'commit' });
 
     expect(result).toEqual({ success: true });
-    // Should update existing schedule, not create a new one
     expect(stripeMock.subscriptionSchedules.create).not.toHaveBeenCalled();
     expect(stripeMock.subscriptionSchedules.update).toHaveBeenCalledWith(
       'sched_auto',
@@ -864,7 +863,6 @@ describe('cancelPlanSwitch', () => {
     const result = await caller.kiloclaw.cancelPlanSwitch();
 
     expect(result).toEqual({ success: true });
-    // Should have restored the auto schedule
     expect(stripeMock.subscriptionSchedules.create).toHaveBeenCalled();
 
     const [row] = await db
@@ -918,8 +916,6 @@ describe('cancelPlanSwitch', () => {
     expect(result).toEqual({ success: true });
   });
 });
-
-// ── org-subscription coexistence ──────────────────────────────────────────
 
 describe('personal billing mutations do not affect org subscriptions', () => {
   async function createPersonalAndOrgSubscriptions(overrides?: {
@@ -1104,8 +1100,6 @@ describe('personal billing mutations do not affect org subscriptions', () => {
   });
 });
 
-// ── switchPlan ─────────────────────────────────────────────────────────────
-
 describe('switchPlan', () => {
   const now = Math.floor(Date.now() / 1000);
 
@@ -1204,7 +1198,6 @@ describe('switchPlan', () => {
       'A plan switch is already pending'
     );
 
-    // Should NOT have created or released anything on Stripe
     expect(stripeMock.subscriptionSchedules.create).not.toHaveBeenCalled();
   });
 
@@ -1216,7 +1209,6 @@ describe('switchPlan', () => {
     const caller = await createCallerForUser(user.id);
     await caller.kiloclaw.switchPlan({ toPlan: 'standard' });
 
-    // Should have released the orphaned schedule first, then created a new one
     expect(stripeMock.subscriptionSchedules.release).toHaveBeenCalledWith('sub_sched_orphaned');
     expect(stripeMock.subscriptionSchedules.create).toHaveBeenCalledWith({
       from_subscription: 'sub_switch_test',
@@ -1237,7 +1229,6 @@ describe('switchPlan', () => {
       'Unable to switch plan: failed to release existing schedule'
     );
 
-    // Should NOT have attempted to create a new schedule
     expect(stripeMock.subscriptionSchedules.create).not.toHaveBeenCalled();
   });
 
@@ -1354,7 +1345,6 @@ describe('switchPlan', () => {
       'A plan switch is already pending'
     );
 
-    // Should have released the schedule it created since the DB write lost the race
     expect(stripeMock.subscriptionSchedules.release).toHaveBeenCalledWith('sub_sched_race');
 
     // DB should still have the concurrent request's schedule
@@ -1367,8 +1357,6 @@ describe('switchPlan', () => {
     expect(row.stripe_schedule_id).toBe('sub_sched_concurrent');
   });
 });
-
-// ── cancelPlanSwitch ───────────────────────────────────────────────────────
 
 describe('cancelPlanSwitch', () => {
   it('releases the schedule and clears DB fields on happy path', async () => {
@@ -1518,8 +1506,6 @@ describe('cancelPlanSwitch', () => {
     expect(row.stripe_schedule_id).toBe('sub_sched_fail');
   });
 });
-
-// ── Pure Credit Cancel/Reactivate/SwitchPlan/CancelPlanSwitch ──────────────
 
 describe('pure credit cancel/reactivate', () => {
   async function createPureCreditSubscription(

@@ -27,8 +27,6 @@ import { eq } from 'drizzle-orm';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { KiloPassTier, KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
-// ── Tests ──────────────────────────────────────────────────────────────────
-
 describe('getBillingStatus', () => {
   it('returns trialEligible true when user has no instance rows and no subscription', async () => {
     const caller = await createCallerForUser(user.id);

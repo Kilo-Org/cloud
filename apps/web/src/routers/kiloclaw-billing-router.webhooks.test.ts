@@ -1033,7 +1033,6 @@ describe('handleKiloClawSubscriptionCreated', () => {
 
   it('calls ensureAutoIntroSchedule for intro-price subscription', async () => {
     const instance = await createWebhookAnchor();
-    // Set up stripe.subscriptions.retrieve to return intro price
     stripeMock.subscriptions.retrieve.mockResolvedValue({
       schedule: null,
       items: { data: [{ price: { id: 'price_standard_intro' } }] },
@@ -1123,7 +1122,6 @@ describe('handleKiloClawSubscriptionCreated', () => {
       subscription,
     });
 
-    // Should have rewritten the schedule with 2 phases
     expect(stripeMock.subscriptionSchedules.update).toHaveBeenCalledWith(
       'sched_half',
       expect.objectContaining({
@@ -1250,7 +1248,6 @@ describe('handleKiloClawSubscriptionCreated', () => {
       subscription,
     });
 
-    // Should NOT create a schedule
     expect(stripeMock.subscriptionSchedules.create).not.toHaveBeenCalled();
   });
 
@@ -1983,8 +1980,6 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
     expect(posthogCaptureMock).not.toHaveBeenCalled();
   });
 });
-
-// ── Stripe-Funded Credit Settlement ─────────────────────────────────────────
 
 describe('applyStripeFundedKiloClawPeriod', () => {
   async function giveUserCredits(userId: string, microdollars: number) {

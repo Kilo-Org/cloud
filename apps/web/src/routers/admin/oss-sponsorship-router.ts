@@ -172,7 +172,6 @@ async function processOssRow(
           invited_by: adminUser.id,
         });
 
-        // Send welcome email (not an invite - they're already added)
         await sendOssInviteExistingUserEmail({
           to: normalizedEmail,
           organizationName: orgName,
@@ -194,7 +193,6 @@ async function processOssRow(
           expires_at: inviteExpiry.toISOString(),
         });
 
-        // Send invitation email
         const acceptInviteUrl = getAcceptInviteUrl(inviteToken);
         await sendOssInviteNewUserEmail({
           to: normalizedEmail,
@@ -493,7 +491,6 @@ export const ossSponsorshipRouter = createTRPCRouter({
       const creditsMicrodollars = monthlyTopUpDollars > 0 ? monthlyTopUpDollars * 1_000_000 : null;
       const now = new Date();
 
-      // Fetch the organization
       const [existingOrg] = await db
         .select()
         .from(organizations)
@@ -517,12 +514,9 @@ export const ossSponsorshipRouter = createTRPCRouter({
         });
       }
 
-      // Update organization within a transaction
       await db.transaction(async (tx: DrizzleTransaction) => {
-        // Calculate 1 year from now for trial extension
         const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
 
-        // Update the organization
         await tx
           .update(organizations)
           .set({
@@ -576,9 +570,7 @@ export const ossSponsorshipRouter = createTRPCRouter({
         },
       });
 
-      // Send email to org owners if requested
       if (sendEmail) {
-        // Get all owners of the organization
         const ownerMemberships = await db
           .select({
             kilo_user_id: organization_memberships.kilo_user_id,
@@ -591,7 +583,6 @@ export const ossSponsorshipRouter = createTRPCRouter({
             )
           );
 
-        // Get emails for all owners
         const ownerEmails: string[] = [];
         for (const membership of ownerMemberships) {
           if (membership.kilo_user_id) {

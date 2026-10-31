@@ -40,12 +40,12 @@ function CommandsSkeleton() {
   return (
     <View className="gap-3">
       {[0, 1, 2].map(index => (
-        <View key={index} className="gap-3 rounded-lg bg-secondary p-3">
-          <Skeleton className="h-4 w-20 rounded bg-muted-soft" />
-          <Skeleton className="h-[44px] w-full rounded-md bg-muted-soft" />
-          <View className="flex-row justify-end">
-            <Skeleton className="h-11 w-32 rounded-md bg-muted-soft" />
+        <View key={index} className="gap-1.5 rounded-lg bg-secondary p-3">
+          <View className="h-[48px] flex-row items-center justify-between">
+            <Skeleton className="h-4 w-20 rounded bg-muted-soft" />
+            <Skeleton className="h-[48px] w-[151px] rounded bg-muted-soft" />
           </View>
+          <Skeleton className="h-[44px] w-full rounded-md bg-muted-soft" />
         </View>
       ))}
     </View>
@@ -216,11 +216,55 @@ export function ProfileCommandsScreen({
     // position the row's move and delete controls announce.
     const commandLabel = t('profiles.commandLabelPosition', { position });
     const rowHint = commandRowA11yLabel(index, commands.length);
+    // The reorder and delete controls share the field's own label line, so a
+    // card is its label row and its input and carries no separate control band
+    // under the input. They are the label's accessory, so they stay out of the
+    // field's accessible name and keep their own positions.
+    const rowControls = canManage ? (
+      <View className="flex-row items-center gap-1">
+        <Pressable
+          className={controlClass(isFirst)}
+          disabled={isFirst}
+          accessibilityRole="button"
+          accessibilityLabel={upLabel}
+          accessibilityHint={rowHint}
+          onPress={() => {
+            move(index, -1);
+          }}
+        >
+          <ChevronUp size={20} color={colors.mutedForeground} />
+        </Pressable>
+        <Pressable
+          className={controlClass(isLast)}
+          disabled={isLast}
+          accessibilityRole="button"
+          accessibilityLabel={downLabel}
+          accessibilityHint={rowHint}
+          onPress={() => {
+            move(index, 1);
+          }}
+        >
+          <ChevronDown size={20} color={colors.mutedForeground} />
+        </Pressable>
+        <Pressable
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+          accessibilityRole="button"
+          accessibilityLabel={deleteLabel}
+          accessibilityHint={rowHint}
+          onPress={() => {
+            remove(index);
+          }}
+        >
+          <Trash2 size={20} color={colors.mutedForeground} />
+        </Pressable>
+      </View>
+    ) : undefined;
     return (
-      <View key={`${generation}-${index}`} className="gap-3 rounded-lg bg-secondary p-3">
+      <View key={`${generation}-${index}`} className="rounded-lg bg-secondary p-3">
         <SetupCommandField
           command={command}
           label={commandLabel}
+          trailing={rowControls}
           accessibilityHint={rowHint}
           disabled={!canManage}
           onChangeText={value => {
@@ -233,45 +277,6 @@ export function ProfileCommandsScreen({
             commit(index);
           }}
         />
-        {canManage ? (
-          <View className="flex-row items-center justify-end gap-1">
-            <Pressable
-              className={controlClass(isFirst)}
-              disabled={isFirst}
-              accessibilityRole="button"
-              accessibilityLabel={upLabel}
-              accessibilityHint={rowHint}
-              onPress={() => {
-                move(index, -1);
-              }}
-            >
-              <ChevronUp size={20} color={colors.mutedForeground} />
-            </Pressable>
-            <Pressable
-              className={controlClass(isLast)}
-              disabled={isLast}
-              accessibilityRole="button"
-              accessibilityLabel={downLabel}
-              accessibilityHint={rowHint}
-              onPress={() => {
-                move(index, 1);
-              }}
-            >
-              <ChevronDown size={20} color={colors.mutedForeground} />
-            </Pressable>
-            <Pressable
-              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-              accessibilityRole="button"
-              accessibilityLabel={deleteLabel}
-              accessibilityHint={rowHint}
-              onPress={() => {
-                remove(index);
-              }}
-            >
-              <Trash2 size={20} color={colors.mutedForeground} />
-            </Pressable>
-          </View>
-        ) : null}
       </View>
     );
   };

@@ -11,6 +11,13 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
   React.RefAttributes<TextInput> & {
     label: string;
     error?: string;
+    /**
+     * Controls that belong to the field's own row, rendered at the end of the
+     * label line: the reorder and delete controls of a list a field sits in.
+     * The label keeps the line's remaining width and the row is as tall as the
+     * accessory, so the controls take no separate band under the input.
+     */
+    labelAccessory?: React.ReactNode;
     /** Reserve the tallest localized message, including wrapping and font scaling. */
     reserveErrorMessages?: readonly string[];
     disabled?: boolean;
@@ -46,6 +53,7 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
  */
 function FormField({
   label,
+  labelAccessory,
   error,
   reserveErrorMessages,
   disabled,
@@ -80,7 +88,14 @@ function FormField({
 
   return (
     <View className="gap-1.5" onLayout={containerOnLayout}>
-      <Text className="text-sm font-medium text-foreground">{label}</Text>
+      {labelAccessory === undefined ? (
+        <Text className="text-sm font-medium text-foreground">{label}</Text>
+      ) : (
+        <View className="flex-row items-center gap-2">
+          <Text className="min-w-0 flex-1 text-sm font-medium text-foreground">{label}</Text>
+          {labelAccessory}
+        </View>
+      )}
       <Input
         ref={instance => {
           nativeInput.current = instance;

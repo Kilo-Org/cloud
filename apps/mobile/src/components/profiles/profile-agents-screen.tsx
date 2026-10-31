@@ -46,7 +46,6 @@ function isSlugConflict(error: unknown): boolean {
 
 type AgentRowViewProps = Readonly<{
   name: string;
-  slug: string;
   visibility: AgentVisibility;
   description: string;
   model: string;
@@ -54,10 +53,9 @@ type AgentRowViewProps = Readonly<{
   onDelete?: () => void;
 }>;
 
-/** One agent row: name, slug, visibility, optional model and description, edit/delete. */
+/** One agent row: name, visibility, optional model and description, edit/delete. */
 function AgentRowView({
   name,
-  slug,
   visibility,
   description,
   model,
@@ -73,9 +71,6 @@ function AgentRowView({
           <Bot size={16} color={colors.mutedForeground} />
           <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
             {name}
-          </Text>
-          <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
-            {slug}
           </Text>
           <Text className="text-xs uppercase tracking-wide text-muted-foreground">
             {t(AGENT_VISIBILITY_LABEL_KEYS[visibility])}
@@ -241,7 +236,6 @@ export function ProfileAgentsScreen({
             <AgentRowView
               key={source.id}
               name={source.name}
-              slug={source.slug}
               visibility={row.visibility}
               description={row.description}
               model={row.model}

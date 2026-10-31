@@ -33,7 +33,6 @@ describe('agentRows', () => {
     expect(agentRows([agentSource(), agentSource({ config: {} })])).toEqual([
       {
         id: 'agent-1',
-        slug: 'reviewer',
         name: 'Reviewer',
         visibility: 'primary',
         description: 'Reviews code',
@@ -41,7 +40,6 @@ describe('agentRows', () => {
       },
       {
         id: 'agent-1',
-        slug: 'reviewer',
         name: 'Reviewer',
         visibility: 'primary',
         description: '',

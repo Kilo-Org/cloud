@@ -12,8 +12,10 @@ import { join } from 'node:path';
 /**
  * Whether a file name is test scaffolding rather than app code: a suite
  * (`x.test.ts`), a mounted harness (`x.mounted.test.tsx`) and the helper a
- * harness shares with its suite (`x.mounted.test-helpers.ts`). The audits that
- * read copy, classes or formatters all leave test scaffolding out.
+ * harness shares with its suite (`x.mounted.test-helpers.ts`). Every audit that
+ * reads copy, classes or formatters passes this predicate. It matches the two
+ * name segments, so a helper named only `x.test-helpers.ts` still counts as app
+ * code — say so here rather than widening the rule silently.
  */
 export function isTestArtifact(name) {
   return name.includes('.test.') || name.includes('.mounted.');

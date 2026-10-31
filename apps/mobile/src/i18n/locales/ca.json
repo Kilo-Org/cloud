@@ -178,7 +178,7 @@
     "useDifferentEmail": "Utilitza una altra adreça de correu",
     "signInWithApple": "Inicia la sessió amb Apple",
     "signInWithGoogle": "Inicia la sessió amb Google",
-    "signInWithPasskey": "Inicia la sessió amb una clau d'accés",
+    "signInWithPasskey": "Usar clau d'accés",
     "emailAddress": "Adreça de correu electrònic",
     "emailPlaceholder": "nom@example.com",
     "continueWithEmail": "Continua amb el correu electrònic",

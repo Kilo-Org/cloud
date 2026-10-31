@@ -499,6 +499,13 @@ describe('ConsentCard', () => {
   });
 
   it('caps the pinned disclosure font scale so its footer height stays bounded', () => {
+    // The cap is bounded by the two-line guarantee, not by taste: on the
+    // smallest supported width the card leaves 318dp for the sentence, and
+    // its longer segment (the pt-BR lead-in, `text-sm`) measures 209.52dp at
+    // scale 1, so a cap above 318 / 209.52 = 1.52 would wrap that segment and
+    // push the pinned footer's second action off the sheet. Headroom is why
+    // the shipped value is lower than the bound.
+    expect(CONSENT_DISCLOSURE_MAX_FONT_SCALE * 209.52).toBeLessThanOrEqual(318);
     for (const mode of ['onboarding', 'review'] as const) {
       const root = mountCard(mode).root;
       // The sentence has no line cap: uncapped it grows to several lines at

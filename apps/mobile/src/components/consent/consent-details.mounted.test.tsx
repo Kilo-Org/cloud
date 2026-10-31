@@ -53,18 +53,6 @@ vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
 
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({
-    background: '#fff',
-    foreground: '#000',
-    primary: '#4F5A10',
-    secondary: '#F0EEE6',
-    mutedForeground: '#6F6A61',
-    card: '#FFFFFF',
-    border: 'rgba(20, 15, 10, 0.09)',
-  }),
-}));
-
 vi.mock('@/lib/config', () => ({
   WEB_BASE_URL: 'https://kilo.ai',
   PRIVACY_URL: 'https://kilo.ai/privacy-app',

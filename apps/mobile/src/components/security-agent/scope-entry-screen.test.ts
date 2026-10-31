@@ -62,13 +62,6 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   Pressable: 'Pressable',
 }));
-// The shared Switch reads the theme for its track and thumb; this suite replaces
-// `react-native` with a partial factory, so the palette comes from the generated
-// tokens directly.
-vi.mock('@/lib/hooks/use-theme-colors', async () => {
-  const { lightColors } = await import('@/lib/hooks/theme-colors.generated');
-  return { useThemeColors: () => lightColors };
-});
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: () => ({}) },

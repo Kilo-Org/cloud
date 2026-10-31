@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "你可能需要授予对 GitLab 上更多群组或项目的访问权限。",
       "installGithubApp": "为仓库安装 GitHub 应用",
       "installGithubAppDescription": "请授予 Kilo GitHub 应用访问待审查仓库的权限。",
-      "repositoryAccess": "仓库访问权限"
+      "repositoryAccess": "仓库访问权限",
+      "allModePersonal": "Kilo 通过你的 GitHub 连接能够访问的每个仓库都会自动接受审查。",
+      "allModeOrganization": "Kilo 通过组织的 GitHub 连接能够访问的每个仓库都会自动接受审查。",
+      "allModeCount": "可用仓库：{{displayCount}}"
     },
     "style": {
       "title": "审查风格",

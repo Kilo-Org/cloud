@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLab-এ আরও গ্রুপ বা প্রকল্পে অ্যাক্সেস দিতে হতে পারে।",
       "installGithubApp": "রিপোজিটরিতে GitHub অ্যাপ ইনস্টল করুন",
       "installGithubAppDescription": "যেসব রিপোজিটরি পর্যালোচনা করাতে চান, সেগুলোতে Kilo GitHub অ্যাপকে অ্যাক্সেস দিন।",
-      "repositoryAccess": "রিপোজিটরির অ্যাক্সেস"
+      "repositoryAccess": "রিপোজিটরির অ্যাক্সেস",
+      "allModePersonal": "আপনার GitHub সংযোগের মাধ্যমে Kilo যে সমস্ত রিপোজিটরিতে অ্যাক্সেস করতে পারে, সেগুলো স্বয়ংক্রিয়ভাবে পর্যালোচনা করা হয়।",
+      "allModeOrganization": "সংস্থার GitHub সংযোগের মাধ্যমে Kilo যে সমস্ত রিপোজিটরিতে অ্যাক্সেস করতে পারে, সেগুলো স্বয়ংক্রিয়ভাবে পর্যালোচনা করা হয়।",
+      "allModeCount": "উপলব্ধ রিপোজিটরি: {{displayCount}}"
     },
     "style": {
       "title": "পর্যালোচনার ধরন",

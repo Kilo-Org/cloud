@@ -38,7 +38,7 @@
     "discard": "تجاهل",
     "discardChangesMessage": "ستفقد تغييراتك.",
     "discardChangesTitle": "تجاهل التغييرات؟",
-    "findings": "الملاحظات",
+    "findings": "النتائج",
     "mergeRequest": "طلب دمج",
     "notConnected": "غير مرتبط",
     "notifications": "الإشعارات",
@@ -910,7 +910,10 @@
       "gitlabNoRepositoriesDescription": "قد تحتاج إلى منح صلاحية الوصول إلى مزيد من المجموعات أو المشاريع على GitLab.",
       "installGithubApp": "ثبّت تطبيق GitHub على المستودعات",
       "installGithubAppDescription": "امنح تطبيق Kilo على GitHub صلاحية الوصول إلى المستودعات التي تريد مراجعتها.",
-      "repositoryAccess": "الوصول إلى المستودع"
+      "repositoryAccess": "الوصول إلى المستودع",
+      "allModePersonal": "تُراجع تلقائيًا كلُّ مستودع يمكن لـ Kilo الوصول إليه عبر اتصالك بـ GitHub.",
+      "allModeOrganization": "تُراجع تلقائيًا كلُّ مستودع يمكن لـ Kilo الوصول إليه عبر اتصال المؤسسة بـ GitHub.",
+      "allModeCount": "المستودعات المتاحة: {{displayCount}}"
     },
     "style": {
       "title": "أسلوب المراجعة",
@@ -1160,7 +1163,7 @@
       "sortSeverityDesc": "الخطورة: من الأعلى إلى الأدنى",
       "sortSlaDue": "الموعد النهائي حسب SLA",
       "statusIgnored": "تم تجاهلها",
-      "statusOpen": "فتح"
+      "statusOpen": "مفتوحة"
     },
     "analysis": {
       "analyzeRepository": "تحليل المستودع",
@@ -1272,8 +1275,8 @@
       "includeExistingFindingsAnalysisSubtitle": "تحليل النتائج التي تمت مزامنتها سابقًا أيضًا. قد يستهلك ذلك رصيدًا إضافيًا.",
       "includeExistingFindingsRemediationSubtitle": "إضافة النتائج التي سبق تحليلها وتستوفي الشروط إلى قائمة الانتظار أيضًا، مع الاستمرار في منع طلبات PR المكررة.",
       "minimumSeverity": "الحد الأدنى للخطورة",
-      "queued": "أُضيفت الملاحظات الحالية إلى قائمة انتظار التحليل. عددها: {{displayCount}}.",
-      "queued_other": "أُضيفت الملاحظات الحالية إلى قائمة انتظار التحليل. عددها: {{displayCount}}.",
+      "queued": "أُضيفت النتائج الحالية إلى قائمة انتظار التحليل. عددها: {{displayCount}}.",
+      "queued_other": "أُضيفت النتائج الحالية إلى قائمة انتظار التحليل. عددها: {{displayCount}}.",
       "queued_one": "أُضيفت نتيجة حالية واحدة ({{displayCount}}) إلى قائمة انتظار التحليل.",
       "requireApproval": "اشتراط الموافقة قبل المعالجة التلقائية",
       "requireApprovalSubtitle": "تنتظر المعالجة التلقائية موافقتك قبل فتح طلبات PR.",
@@ -1361,16 +1364,16 @@
       "commentLabel": "التعليق (اختياري)",
       "commentPlaceholder": "تفاصيل إضافية عن سبب الاستبعاد…",
       "couldNotCheckPermissions": "تعذّر التحقق من صلاحيات الاستبعاد.",
-      "couldNotLoad": "تعذّر تحميل هذه الملاحظة.",
+      "couldNotLoad": "تعذّر تحميل هذه النتيجة.",
       "notFoundDescription": "ربما أُزيلت هذه النتيجة، أو لم تعد لديك صلاحية الوصول إليها.",
       "notFoundTitle": "النتيجة غير موجودة",
       "reason": "السبب",
       "reasonFixStarted": "بدأ الإصلاح بالفعل",
-      "reasonInaccurate": "الملاحظة غير دقيقة",
+      "reasonInaccurate": "النتيجة غير دقيقة",
       "reasonNoBandwidth": "لا تتوفر موارد كافية",
       "reasonNotUsed": "الشيفرة التي تحتوي على الثغرة غير مستخدمة",
       "reasonTolerableRisk": "الخطر مقبول",
-      "title": "استبعاد الملاحظة"
+      "title": "استبعاد النتيجة"
     },
     "findingDetail": {
       "tabAnalysis": "التحليل",
@@ -1396,7 +1399,7 @@
       "supersededByDescription": "اضغط لفتح السجل الحالي والاطلاع على الحالة والتحليل والمعالجة.",
       "viewAdvisory": "عرض النشرة الأمنية على GitHub",
       "vulnerableVersions": "الإصدارات المتأثرة بالثغرة",
-      "statusOpen": "فتح",
+      "statusOpen": "مفتوحة",
       "sourceDependabot": "GitHub Dependabot",
       "reasonAfterReview": "بعد المراجعة"
     },
@@ -1457,7 +1460,7 @@
       },
       "queued": "أُضيفت المعالجة إلى قائمة الانتظار.",
       "retryQueued": "أُضيفت إعادة محاولة المعالجة إلى قائمة الانتظار.",
-      "unavailable": "لا تتوفر معالجة لهذه الملاحظة."
+      "unavailable": "لا تتوفر معالجة لهذه النتيجة."
     },
     "repositories": {
       "couldNotLoad": "تعذّر تحميل إعدادات المستودعات.",
@@ -3182,7 +3185,7 @@
       "file_other": "ملف",
       "file_one": "ملف",
       "stateMerged": "تم الدمج",
-      "stateOpen": "فتح",
+      "stateOpen": "مفتوح",
       "stateOpenApproved": "مفتوح · تمت الموافقة",
       "stateOpenChangesRequested": "مفتوح · تم طلب تغييرات",
       "stateOpenReviewRequired": "مفتوح · المراجعة مطلوبة",
@@ -3401,7 +3404,7 @@
       "sharingUnavailable": "المشاركة غير متاحة على هذا الجهاز.",
       "status": {
         "paid": "مدفوعة",
-        "open": "فتح",
+        "open": "مفتوحة",
         "void": "ملغاة",
         "uncollectible": "غير قابلة للتحصيل"
       },

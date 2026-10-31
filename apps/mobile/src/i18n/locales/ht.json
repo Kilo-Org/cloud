@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Ou ka bezwen bay aksè nan plis gwoup oswa pwojè sou GitLab.",
       "installGithubApp": "Enstale aplikasyon GitHub la sou depo yo",
       "installGithubAppDescription": "Bay aplikasyon GitHub Kilo a aksè nan depo ou vle fè revize yo.",
-      "repositoryAccess": "aksè nan depo yo"
+      "repositoryAccess": "aksè nan depo yo",
+      "allModePersonal": "Chak depo Kilo ka jwenn aksè a atravè koneksyon GitHub ou a revize otomatikman.",
+      "allModeOrganization": "Chak depo Kilo ka jwenn aksè a atravè koneksyon GitHub òganizasyon an revize otomatikman.",
+      "allModeCount": "Depo ki disponib: {{displayCount}}"
     },
     "style": {
       "title": "Estil revizyon",

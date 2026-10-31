@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "आपको GitLab पर और समूहों या प्रोजेक्ट तक पहुँच देने की ज़रूरत हो सकती है।",
       "installGithubApp": "रिपॉज़िटरी पर GitHub ऐप इंस्टॉल करें",
       "installGithubAppDescription": "जिन रिपॉज़िटरी की समीक्षा करानी है, उन तक Kilo GitHub ऐप को पहुँच दें।",
-      "repositoryAccess": "रिपॉज़िटरी तक पहुँच"
+      "repositoryAccess": "रिपॉज़िटरी तक पहुँच",
+      "allModePersonal": "Kilo आपके GitHub कनेक्शन के ज़रिए जिन सभी रिपॉज़िटरी तक पहुँच सकता है, उन सभी की समीक्षा स्वचालित रूप से की जाती है।",
+      "allModeOrganization": "Kilo संगठन के GitHub कनेक्शन के ज़रिए जिन सभी रिपॉज़िटरी तक पहुँच सकता है, उन सभी की समीक्षा स्वचालित रूप से की जाती है।",
+      "allModeCount": "उपलब्ध रिपॉज़िटरी: {{displayCount}}"
     },
     "style": {
       "title": "समीक्षा की शैली",

@@ -1449,7 +1449,10 @@
       "gitlabNoRepositoriesDescription": "Možda trebaš odobriti pristup dodatnim grupama ili projektima na GitLabu.",
       "installGithubApp": "Instaliraj aplikaciju GitHub za repozitorije",
       "installGithubAppDescription": "Odobri aplikaciji Kilo za GitHub pristup repozitorijima koje želiš pregledati.",
-      "repositoryAccess": "pristup repozitoriju"
+      "repositoryAccess": "pristup repozitoriju",
+      "allModePersonal": "Svaki repozitorij kojem Kilo može pristupiti preko tvoje GitHub veze automatski se pregledava.",
+      "allModeOrganization": "Svaki repozitorij kojem Kilo može pristupiti preko GitHub veze organizacije automatski se pregledava.",
+      "allModeCount": "Dostupni repozitoriji: {{displayCount}}"
     },
     "style": {
       "title": "Stil pregleda",

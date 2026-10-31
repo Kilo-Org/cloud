@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Anda mungkin perlu memberikan akses kepada lebih banyak kumpulan atau projek di GitLab.",
       "installGithubApp": "Pasang apl GitHub pada repositori",
       "installGithubAppDescription": "Benarkan apl GitHub Kilo mengakses repositori yang anda mahu disemak.",
-      "repositoryAccess": "akses repositori"
+      "repositoryAccess": "akses repositori",
+      "allModePersonal": "Setiap repositori yang boleh diakses oleh Kilo melalui sambungan GitHub anda akan disemak secara automatik.",
+      "allModeOrganization": "Setiap repositori yang boleh diakses oleh Kilo melalui sambungan GitHub organisasi akan disemak secara automatik.",
+      "allModeCount": "Repositori tersedia: {{displayCount}}"
     },
     "style": {
       "title": "Gaya semakan",
@@ -1667,7 +1670,7 @@
       "outcome": "Hasil",
       "slaStatus": "Status SLA",
       "sortBy": "Susun mengikut",
-      "statusOpen": "Buka",
+      "statusOpen": "Terbuka",
       "fixed": "Diperbaiki",
       "statusIgnored": "Diabaikan",
       "severityHigh": "Tinggi",
@@ -1842,7 +1845,7 @@
       "source": "Sumber",
       "sourceId": "ID sumber",
       "viewAdvisory": "Lihat notis keselamatan di GitHub",
-      "statusOpen": "Buka",
+      "statusOpen": "Terbuka",
       "sourceDependabot": "GitHub Dependabot",
       "reasonAfterReview": "selepas semakan"
     },

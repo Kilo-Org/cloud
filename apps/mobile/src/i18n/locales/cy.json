@@ -1515,7 +1515,10 @@
       "gitlabNoRepositoriesDescription": "Efallai y bydd angen i chi ganiatáu mynediad i fwy o grwpiau neu brosiectau ar GitLab.",
       "installGithubApp": "Gosod yr ap GitHub ar ystorfeydd",
       "installGithubAppDescription": "Rhowch fynediad i ap GitHub Kilo at yr ystorfeydd rydych am eu hadolygu.",
-      "repositoryAccess": "mynediad i ystorfa"
+      "repositoryAccess": "mynediad i ystorfa",
+      "allModePersonal": "Mae pob ystorfa y gall Kilo gael mynediad iddi trwy eich cysylltiad GitHub yn cael ei hadolygu'n awtomatig.",
+      "allModeOrganization": "Mae pob ystorfa y gall Kilo gael mynediad iddi trwy gysylltiad GitHub y sefydliad yn cael ei hadolygu'n awtomatig.",
+      "allModeCount": "Ystorfeydd ar gael: {{displayCount}}"
     },
     "style": {
       "title": "Arddull adolygu",
@@ -1755,7 +1758,7 @@
       "outcome": "Canlyniad",
       "slaStatus": "Statws SLA",
       "sortBy": "Trefnu yn ôl",
-      "statusOpen": "Agor",
+      "statusOpen": "Agored",
       "fixed": "Wedi'i drwsio",
       "statusIgnored": "Wedi'i anwybyddu",
       "severityHigh": "Uchel",
@@ -1942,7 +1945,7 @@
       "source": "Ffynhonnell",
       "sourceId": "ID y ffynhonnell",
       "viewAdvisory": "Gweld yr hysbysiad diogelwch ar GitHub",
-      "statusOpen": "Agor",
+      "statusOpen": "Agored",
       "sourceDependabot": "GitHub Dependabot",
       "reasonAfterReview": "ar ôl adolygiad"
     },

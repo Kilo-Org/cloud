@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Jy moet dalk toegang tot meer groepe of projekte op GitLab verleen.",
       "installGithubApp": "Installeer die GitHub-app op bewaarplekke",
       "installGithubAppDescription": "Gee die Kilo GitHub-app toegang tot die bewaarplekke wat jy wil laat hersien.",
-      "repositoryAccess": "bewaarplektoegang"
+      "repositoryAccess": "bewaarplektoegang",
+      "allModePersonal": "Elke bewaarplek wat Kilo deur jou GitHub-verbinding kan bereik, word outomaties hersien.",
+      "allModeOrganization": "Elke bewaarplek wat Kilo deur die organisasie se GitHub-verbinding kan bereik, word outomaties hersien.",
+      "allModeCount": "Bewaarplekke beskikbaar: {{displayCount}}"
     },
     "style": {
       "title": "Hersieningstyl",

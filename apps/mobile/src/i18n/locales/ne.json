@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "तपाईंले GitLab मा थप समूह वा परियोजनाहरूमा पहुँच दिनुपर्ने हुन सक्छ।",
       "installGithubApp": "रिपोजिटरीहरूमा GitHub एप स्थापना गर्नुहोस्",
       "installGithubAppDescription": "तपाईंले समीक्षा गराउन चाहेका रिपोजिटरीहरूमा Kilo GitHub एपलाई पहुँच दिनुहोस्।",
-      "repositoryAccess": "रिपोजिटरीको पहुँच"
+      "repositoryAccess": "रिपोजिटरीको पहुँच",
+      "allModePersonal": "तपाईंको GitHub जडानमार्फत Kilo ले पहुँच गर्न सक्ने हरेक रिपोजिटरी स्वचालित रूपमा समीक्षा गरिन्छ।",
+      "allModeOrganization": "संस्थाको GitHub जडानमार्फत Kilo ले पहुँच गर्न सक्ने हरेक रिपोजिटरी स्वचालित रूपमा समीक्षा गरिन्छ।",
+      "allModeCount": "उपलब्ध रिपोजिटरीहरू: {{displayCount}}"
     },
     "style": {
       "title": "समीक्षा शैली",

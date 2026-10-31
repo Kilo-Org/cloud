@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Հնարավոր է՝ պետք է GitLab-ում ավելի շատ խմբերի կամ նախագծերի հասանելիություն տրամադրես։",
       "installGithubApp": "GitHub հավելվածի տեղադրում պահոցներում",
       "installGithubAppDescription": "Kilo-ի GitHub հավելվածին տրամադրիր այն պահոցների հասանելիությունը, որոնք ուզում ես ստուգել։",
-      "repositoryAccess": "պահոցի հասանելիություն"
+      "repositoryAccess": "պահոցի հասանելիություն",
+      "allModePersonal": "Յուրաքանչյուր պահոց, որին Kilo-ն հասանելիություն ունի քո GitHub կապի միջոցով, ավտոմատ ստուգվում է։",
+      "allModeOrganization": "Յուրաքանչյուր պահոց, որին Kilo-ն հասանելիություն ունի կազմակերպության GitHub կապի միջոցով, ավտոմատ ստուգվում է։",
+      "allModeCount": "Հասանելի պահոցներ՝ {{displayCount}}"
     },
     "style": {
       "title": "Ստուգման ոճ",

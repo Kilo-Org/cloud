@@ -904,7 +904,10 @@
       "gitlabNoRepositoriesDescription": "Можливо, потрібно надати доступ до більшої кількості груп або проєктів у GitLab.",
       "installGithubApp": "Установіть застосунок GitHub для репозиторіїв",
       "installGithubAppDescription": "Надайте застосунку Kilo для GitHub доступ до репозиторіїв, які потрібно перевіряти.",
-      "repositoryAccess": "доступ до репозиторію"
+      "repositoryAccess": "доступ до репозиторію",
+      "allModePersonal": "Кожен репозиторій, до якого Kilo має доступ через ваше підключення GitHub, перевіряється автоматично.",
+      "allModeOrganization": "Кожен репозиторій, до якого Kilo має доступ через підключення GitHub організації, перевіряється автоматично.",
+      "allModeCount": "Доступні репозиторії: {{displayCount}}"
     },
     "style": {
       "title": "Стиль перевірки",

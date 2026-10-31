@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Du kan behöva bevilja åtkomst till fler grupper eller projekt på GitLab.",
       "installGithubApp": "Installera GitHub-appen på kodarkiv",
       "installGithubAppDescription": "Ge Kilos GitHub-app åtkomst till de kodarkiv du vill få granskade.",
-      "repositoryAccess": "åtkomst till kodarkiv"
+      "repositoryAccess": "åtkomst till kodarkiv",
+      "allModePersonal": "Alla kodarkiv som Kilo kan komma åt via din GitHub-anslutning granskas automatiskt.",
+      "allModeOrganization": "Alla kodarkiv som Kilo kan komma åt via organisationens GitHub-anslutning granskas automatiskt.",
+      "allModeCount": "Tillgängliga kodarkiv: {{displayCount}}"
     },
     "style": {
       "title": "Granskningsstil",

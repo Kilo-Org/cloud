@@ -901,7 +901,10 @@
       "gitlabNoRepositoriesDescription": "Es posible que debas conceder acceso a más grupos o proyectos en GitLab.",
       "installGithubApp": "Instala la aplicación de GitHub en los repositorios",
       "installGithubAppDescription": "Concede a la aplicación de Kilo en GitHub acceso a los repositorios que quieres revisar.",
-      "repositoryAccess": "acceso al repositorio"
+      "repositoryAccess": "acceso al repositorio",
+      "allModePersonal": "Todos los repositorios a los que Kilo puede acceder a través de tu conexión de GitHub se revisan automáticamente.",
+      "allModeOrganization": "Todos los repositorios a los que Kilo puede acceder a través de la conexión de GitHub de la organización se revisan automáticamente.",
+      "allModeCount": "Repositorios disponibles: {{displayCount}}"
     },
     "style": {
       "title": "Estilo de revisión",
@@ -1151,7 +1154,7 @@
       "sortSeverityDesc": "Gravedad: de mayor a menor",
       "sortSlaDue": "Fecha de vencimiento del SLA",
       "statusIgnored": "Ignorado",
-      "statusOpen": "Apertura"
+      "statusOpen": "Abierto"
     },
     "analysis": {
       "analyzeRepository": "Analizar repositorio",
@@ -1375,7 +1378,7 @@
       "supersededByDescription": "Toca para consultar el estado, el análisis y la corrección en el registro actual.",
       "viewAdvisory": "Ver el aviso de seguridad en GitHub",
       "vulnerableVersions": "Versiones vulnerables",
-      "statusOpen": "Apertura",
+      "statusOpen": "Abierto",
       "sourceDependabot": "GitHub Dependabot",
       "reasonAfterReview": "después de la revisión"
     },

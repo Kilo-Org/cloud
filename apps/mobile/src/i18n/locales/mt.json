@@ -1493,7 +1493,10 @@
       "gitlabNoRepositoriesDescription": "Jista' jkollok bżonn tagħti aċċess għal aktar gruppi jew proġetti fuq GitLab.",
       "installGithubApp": "Installa l-app ta' GitHub fuq ir-repożitorji",
       "installGithubAppDescription": "Agħti lill-app ta' Kilo fuq GitHub aċċess għar-repożitorji li trid jiġu riveduti.",
-      "repositoryAccess": "aċċess għar-repożitorju"
+      "repositoryAccess": "aċċess għar-repożitorju",
+      "allModePersonal": "Kull repożitorju li Kilo jista' jaċċessa permezz tal-konnessjoni tiegħek ma' GitHub jiġi rivedut awtomatikament.",
+      "allModeOrganization": "Kull repożitorju li Kilo jista' jaċċessa permezz tal-konnessjoni tal-organizzazzjoni ma' GitHub jiġi rivedut awtomatikament.",
+      "allModeCount": "Repożitorji disponibbli: {{displayCount}}"
     },
     "style": {
       "title": "Stil ta' reviżjoni",
@@ -1733,7 +1736,7 @@
       "outcome": "Riżultat",
       "slaStatus": "Stat tas-SLA",
       "sortBy": "Irranġa skont",
-      "statusOpen": "Ftuħ",
+      "statusOpen": "Miftuħa",
       "fixed": "Imsewwija",
       "statusIgnored": "Injorata",
       "severityHigh": "Għoli",
@@ -1917,7 +1920,7 @@
       "source": "Sors",
       "sourceId": "ID tas-sors",
       "viewAdvisory": "Ara l-avviż fuq GitHub",
-      "statusOpen": "Ftuħ",
+      "statusOpen": "Miftuħa",
       "sourceDependabot": "GitHub Dependabot",
       "reasonAfterReview": "wara r-reviżjoni"
     },

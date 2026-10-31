@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Mund të të duhet të japësh qasje në më shumë grupe ose projekte në GitLab.",
       "installGithubApp": "Instalo aplikacionin GitHub në depot",
       "installGithubAppDescription": "Jepi aplikacionit Kilo për GitHub qasje në depot që dëshiron të shqyrtohen.",
-      "repositoryAccess": "qasja në depot"
+      "repositoryAccess": "qasja në depot",
+      "allModePersonal": "Çdo depo që Kilo mund ta aksesojë përmes lidhjes tënde me GitHub shqyrtohet automatikisht.",
+      "allModeOrganization": "Çdo depo që Kilo mund ta aksesojë përmes lidhjes së organizatës me GitHub shqyrtohet automatikisht.",
+      "allModeCount": "Depo të disponueshme: {{displayCount}}"
     },
     "style": {
       "title": "Stili i shqyrtimit",
@@ -1667,7 +1670,7 @@
       "outcome": "Rezultati",
       "slaStatus": "Statusi i SLA-së",
       "sortBy": "Renditja sipas",
-      "statusOpen": "Hapje",
+      "statusOpen": "Hapur",
       "fixed": "E rregulluar",
       "statusIgnored": "E injoruar",
       "severityHigh": "E lartë",
@@ -1842,7 +1845,7 @@
       "source": "Burimi",
       "sourceId": "ID e burimit",
       "viewAdvisory": "Shiko njoftimin e sigurisë në GitHub",
-      "statusOpen": "Hapje",
+      "statusOpen": "Hapur",
       "sourceDependabot": "GitHub Dependabot",
       "reasonAfterReview": "pas shqyrtimit"
     },

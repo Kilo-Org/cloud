@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "તમારે GitLab પર વધુ જૂથો અથવા પ્રોજેક્ટની ઍક્સેસ આપવાની જરૂર પડી શકે છે.",
       "installGithubApp": "રિપોઝિટરીઓ પર GitHub ઍપ ઇન્સ્ટોલ કરો",
       "installGithubAppDescription": "જે રિપોઝિટરીઓની સમીક્ષા કરાવવી હોય તેમની ઍક્સેસ Kilo GitHub ઍપને આપો.",
-      "repositoryAccess": "રિપોઝિટરીની ઍક્સેસ"
+      "repositoryAccess": "રિપોઝિટરીની ઍક્સેસ",
+      "allModePersonal": "તમારા GitHub કનેક્શન દ્વારા Kilo જે દરેક રિપોઝિટરીની ઍક્સેસ મેળવી શકે છે તેની સ્વચાલિત સમીક્ષા થાય છે.",
+      "allModeOrganization": "સંસ્થાના GitHub કનેક્શન દ્વારા Kilo જે દરેક રિપોઝિટરીની ઍક્સેસ મેળવી શકે છે તેની સ્વચાલિત સમીક્ષા થાય છે.",
+      "allModeCount": "ઉપલબ્ધ રિપોઝિટરીઓ: {{displayCount}}"
     },
     "style": {
       "title": "સમીક્ષાની શૈલી",

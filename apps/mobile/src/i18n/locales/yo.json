@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Ó ṣeé ṣe kí o nílò láti fúnni ní àṣẹ láti wọlé sí àwọn ẹgbẹ́ tàbí iṣẹ́ sí i lórí GitLab.",
       "installGithubApp": "Fi ohun èlò GitHub sórí àwọn ibi ìpamọ́",
       "installGithubAppDescription": "Fún ohun èlò Kilo fún GitHub ní àṣẹ láti wọlé sí àwọn ibi ìpamọ́ tí o fẹ́ kí a ṣàtúnyẹ̀wò.",
-      "repositoryAccess": "àṣẹ ìwọlé sí ibi ìpamọ́"
+      "repositoryAccess": "àṣẹ ìwọlé sí ibi ìpamọ́",
+      "allModePersonal": "Gbogbo ibi ìpamọ́ tí Kilo lè wọlé sí nípasẹ̀ ìsopọ̀ GitHub rẹ ni a ṣàtúnyẹ̀wò lọ́nà aládàáṣiṣẹ́.",
+      "allModeOrganization": "Gbogbo ibi ìpamọ́ tí Kilo lè wọlé sí nípasẹ̀ ìsopọ̀ GitHub ti ẹgbẹ́ ni a ṣàtúnyẹ̀wò lọ́nà aládàáṣiṣẹ́.",
+      "allModeCount": "Àwọn ibi ìpamọ́ tó wà: {{displayCount}}"
     },
     "style": {
       "title": "Ọ̀nà àtúnyẹ̀wò",

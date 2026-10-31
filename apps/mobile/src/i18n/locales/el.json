@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Ίσως χρειαστεί να δώσεις πρόσβαση σε περισσότερες ομάδες ή έργα στο GitLab.",
       "installGithubApp": "Εγκατάσταση της εφαρμογής GitHub σε αποθετήρια",
       "installGithubAppDescription": "Δώσε στην εφαρμογή Kilo για το GitHub πρόσβαση στα αποθετήρια που θέλεις να ελέγχονται.",
-      "repositoryAccess": "πρόσβαση σε αποθετήρια"
+      "repositoryAccess": "πρόσβαση σε αποθετήρια",
+      "allModePersonal": "Κάθε αποθετήριο στο οποίο έχει πρόσβαση το Kilo μέσω της σύνδεσής σου με το GitHub ελέγχεται αυτόματα.",
+      "allModeOrganization": "Κάθε αποθετήριο στο οποίο έχει πρόσβαση το Kilo μέσω της σύνδεσης του οργανισμού με το GitHub ελέγχεται αυτόματα.",
+      "allModeCount": "Διαθέσιμα αποθετήρια: {{displayCount}}"
     },
     "style": {
       "title": "Τρόπος ελέγχου",

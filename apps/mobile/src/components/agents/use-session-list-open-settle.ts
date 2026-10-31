@@ -111,10 +111,11 @@ export function useSessionListOpenSettle({
     const cap = setTimeout(() => {
       setOpenSettled(true);
     }, OPEN_SETTLE_LIMIT_MS);
-    // A previous session's measurements, and any window armed from them, do not
-    // describe this one.
+    // A previous session's content height, and any window armed from it, do not
+    // describe this one. The viewport survives the switch: React Native fires
+    // `onLayout` only when the frame changes, and a list that swaps sessions in
+    // place keeps the frame it measured.
     contentHeightRef.current = 0;
-    viewportHeightRef.current = 0;
     clearQuietTimer();
     return () => {
       clearTimeout(cap);

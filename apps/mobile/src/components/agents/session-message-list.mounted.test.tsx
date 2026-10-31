@@ -243,9 +243,16 @@ describe('SessionMessageList open settle', () => {
     expect(skeletonCount(renderer)).toBe(0);
 
     // The Chat tab follows a conversation that moved onto a new session: the
-    // same list now paints different rows.
+    // same list now paints different rows, without a new layout (the frame did
+    // not change), so only the content size arrives.
     rerenderList(renderer, { sessionId: 'session-2', items: ['n1', 'n2', 'n3'] });
     expect(skeletonCount(renderer)).toBe(1);
+
+    fireContentSize(810);
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(skeletonCount(renderer)).toBe(0);
   });
 
   it('reveals the rows even if the content never stops measuring', () => {

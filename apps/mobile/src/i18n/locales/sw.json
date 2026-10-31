@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "Nafasi yake imechukuliwa na tatizo la sasa",
       "supersededByDescription": "Gusa ili ufungue rekodi ya sasa na uone hali, uchambuzi na urekebishaji.",
-      "dismissedBecause": "Limeondolewa kwa sababu {{reason}}.",
+      "dismissedOn": "Tarehe ya kupuuzwa",
+      "supersededOn": "Tarehe ya kubadilishwa na nyingine",
       "severityLabel": "Ukali wa {{severity}}",
       "package": "Kifurushi",
       "vulnerableVersions": "Matoleo hatarishi",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "Tazama taarifa ya usalama kwenye GitHub",
       "statusOpen": "Wazi",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "marekebisho yameanza",
-      "reasonNoBandwidth": "hakuna muda wa kushughulikia",
-      "reasonTolerableRisk": "hatari inaweza kuvumiliwa",
-      "reasonInaccurate": "matokeo si sahihi",
-      "reasonNotUsed": "msimbo wenye udhaifu hautumiki",
       "reasonAfterReview": "baada ya ukaguzi"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Muda wa mwisho haujawekwa",
       "noSlaDeadline": "Hakuna muda wa mwisho wa SLA",
-      "dueOn": "Muda unaisha {{date}}",
       "overdueNow": "Muda umepita",
       "overdue_one": "Muda umepita kwa siku {{count}}",
       "overdue_other": "Imechelewa kwa siku {{count}}",

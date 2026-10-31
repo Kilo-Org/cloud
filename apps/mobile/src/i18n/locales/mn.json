@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "Шинэ асуудлаар орлуулсан",
       "supersededByDescription": "Шинэ бүртгэлийн төлөв, шинжилгээ, засварыг харахын тулд товшино уу.",
-      "dismissedBecause": "Хассан шалтгаан: {{reason}}.",
+      "dismissedOn": "Хасагдсан огноо",
+      "supersededOn": "Орлогдсон огноо",
       "severityLabel": "Ноцтой байдлын зэрэг: {{severity}}",
       "package": "Багц",
       "vulnerableVersions": "Эмзэг байдалтай хувилбарууд",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "GitHub дээр аюулгүй байдлын зөвлөмжийг үзэх",
       "statusOpen": "Нээлттэй",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "засвар аль хэдийн эхэлсэн",
-      "reasonNoBandwidth": "цаг, нөөц хүрэлцэхгүй",
-      "reasonTolerableRisk": "эрсдэлийг хүлээн зөвшөөрөх боломжтой",
-      "reasonInaccurate": "асуудлыг буруу илрүүлсэн",
-      "reasonNotUsed": "эмзэг кодыг ашигладаггүй",
       "reasonAfterReview": "шалгалтын дараа"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{date}} · {{status}}",
       "deadlineNotSet": "Эцсийн хугацаа тогтоогоогүй",
       "noSlaDeadline": "SLA эцсийн хугацаагүй",
-      "dueOn": "{{date}} хүртэл",
       "overdueNow": "Хугацаа хэтэрсэн",
       "overdue_one": "Хугацаа {{count}} хоногоор хэтэрсэн",
       "overdue_other": "{{count}} өдөр хоцорсон",

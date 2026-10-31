@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "Nýrra frávik kemur í staðinn",
       "supersededByDescription": "Ýttu til að opna nýjustu færsluna og sjá stöðu, greiningu og úrbætur.",
-      "dismissedBecause": "Fráviki var vísað frá: {{reason}}.",
+      "dismissedOn": "Vísað frá þann",
+      "supersededOn": "Leyst af hólmi þann",
       "severityLabel": "Alvarleiki: {{severity}}",
       "package": "Pakki",
       "vulnerableVersions": "Útgáfur með öryggisveikleika",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "Skoða öryggistilkynningu á GitHub",
       "statusOpen": "Opið",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "lagfæring er þegar hafin",
-      "reasonNoBandwidth": "enginn tími er til ráðstöfunar",
-      "reasonTolerableRisk": "áhættan er ásættanleg",
-      "reasonInaccurate": "niðurstaðan er ónákvæm",
-      "reasonNotUsed": "kóði með veikleikanum er ekki notaður",
       "reasonAfterReview": "eftir yfirferð"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{status}} þann {{date}}",
       "deadlineNotSet": "Frestur ekki ákveðinn",
       "noSlaDeadline": "Enginn SLA-frestur",
-      "dueOn": "Frestur til {{date}}",
       "overdueNow": "Frestur liðinn",
       "overdue_one": "{{count}} dagur umfram frest",
       "overdue_other": "{{count}} dagar fram yfir frest",

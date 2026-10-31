@@ -1879,7 +1879,8 @@
     "findingDetails": {
       "supersededBy": "Pakeistas naujesniu radiniu",
       "supersededByDescription": "Bakstelėk, kad atidarytum naujausią įrašą su būsenos, analizės ir taisymo informacija.",
-      "dismissedBecause": "Atmetimo priežastis: {{reason}}.",
+      "dismissedOn": "Atmetimo data",
+      "supersededOn": "Pakeitimo data",
       "severityLabel": "Pavojingumas: {{severity}}",
       "package": "Paketas",
       "vulnerableVersions": "Pažeidžiamos versijos",
@@ -1896,11 +1897,6 @@
       "viewAdvisory": "Peržiūrėti saugos pranešimą GitHub platformoje",
       "statusOpen": "Atidaryta",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "taisymas jau pradėtas",
-      "reasonNoBandwidth": "trūksta laiko",
-      "reasonTolerableRisk": "rizika priimtina",
-      "reasonInaccurate": "problema nurodyta netiksliai",
-      "reasonNotUsed": "pažeidžiamas kodas nenaudojamas",
       "reasonAfterReview": "po peržiūros"
     },
     "settingsOverview": {
@@ -2139,7 +2135,6 @@
       "closedOn": "Būsena: {{status}}. Data: {{date}}",
       "deadlineNotSet": "Terminas nenustatytas",
       "noSlaDeadline": "Nėra SLA termino",
-      "dueOn": "Terminas {{date}}",
       "overdueNow": "Vėluojama",
       "overdue_one": "Vėluojama {{count}} dieną",
       "overdue_few": "vėluojama {{count}} dienas",

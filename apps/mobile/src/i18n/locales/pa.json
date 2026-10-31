@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "ਇਸ ਦੀ ਥਾਂ ਨਵੀਂ ਸਮੱਸਿਆ ਦਰਜ ਹੈ",
       "supersededByDescription": "ਸਥਿਤੀ, ਵਿਸ਼ਲੇਸ਼ਣ ਅਤੇ ਸੁਧਾਰ ਦੇ ਵੇਰਵੇ ਦੇਖਣ ਲਈ ਮੌਜੂਦਾ ਰਿਕਾਰਡ 'ਤੇ ਟੈਪ ਕਰੋ।",
-      "dismissedBecause": "ਖਾਰਜ ਕੀਤਾ ਗਿਆ: {{reason}}।",
+      "dismissedOn": "ਖਾਰਜ ਹੋਣ ਦੀ ਤਾਰੀਖ",
+      "supersededOn": "ਨਵੇਂ ਨਤੀਜੇ ਨਾਲ ਬਦਲੇ ਜਾਣ ਦੀ ਤਾਰੀਖ",
       "severityLabel": "{{severity}} ਗੰਭੀਰਤਾ",
       "package": "ਪੈਕੇਜ",
       "vulnerableVersions": "ਸੁਰੱਖਿਆ ਖਾਮੀ ਵਾਲੇ ਵਰਜਨ",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "GitHub 'ਤੇ ਸੁਰੱਖਿਆ ਸੂਚਨਾ ਦੇਖੋ",
       "statusOpen": "ਖੁੱਲ੍ਹੀ",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ਠੀਕ ਕਰਨਾ ਸ਼ੁਰੂ ਹੋ ਗਿਆ ਹੈ",
-      "reasonNoBandwidth": "ਸਮਾਂ ਜਾਂ ਸਰੋਤ ਉਪਲਬਧ ਨਹੀਂ ਹਨ",
-      "reasonTolerableRisk": "ਜੋਖਮ ਸਵੀਕਾਰਯੋਗ ਹੈ",
-      "reasonInaccurate": "ਜਾਂਚ ਦਾ ਨਤੀਜਾ ਸਹੀ ਨਹੀਂ",
-      "reasonNotUsed": "ਸੁਰੱਖਿਆ ਖਾਮੀ ਵਾਲਾ ਕੋਡ ਵਰਤਿਆ ਨਹੀਂ ਜਾਂਦਾ",
       "reasonAfterReview": "ਸਮੀਖਿਆ ਤੋਂ ਬਾਅਦ"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{date}} ਨੂੰ {{status}}",
       "deadlineNotSet": "ਸਮਾਂ ਸੀਮਾ ਨਿਰਧਾਰਤ ਨਹੀਂ",
       "noSlaDeadline": "ਕੋਈ SLA ਸਮਾਂ ਸੀਮਾ ਨਹੀਂ",
-      "dueOn": "ਆਖ਼ਰੀ ਮਿਤੀ: {{date}}",
       "overdueNow": "ਮਿਆਦ ਲੰਘੀ",
       "overdue_one": "ਮਿਆਦ ਤੋਂ {{count}} ਦਿਨ ਵੱਧ",
       "overdue_other": "{{count}} ਦਿਨ ਦੀ ਦੇਰੀ",

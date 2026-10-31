@@ -1879,7 +1879,8 @@
     "findingDetails": {
       "supersededBy": "Nahrazeno aktuálním nálezem",
       "supersededByDescription": "Klepnutím otevřete aktuální záznam se stavem, analýzou a nápravou.",
-      "dismissedBecause": "Nález byl zamítnut z tohoto důvodu: {{reason}}.",
+      "dismissedOn": "Zamítnuto dne",
+      "supersededOn": "Nahrazeno dne",
       "severityLabel": "Závažnost: {{severity}}",
       "package": "Balíček",
       "vulnerableVersions": "Zranitelné verze",
@@ -1896,11 +1897,6 @@
       "viewAdvisory": "Zobrazit bezpečnostní upozornění na GitHubu",
       "statusOpen": "Otevřeno",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "oprava už probíhá",
-      "reasonNoBandwidth": "chybí kapacita",
-      "reasonTolerableRisk": "riziko je přijatelné",
-      "reasonInaccurate": "zjištění je nepřesné",
-      "reasonNotUsed": "zranitelný kód se nepoužívá",
       "reasonAfterReview": "po posouzení"
     },
     "settingsOverview": {
@@ -2139,7 +2135,6 @@
       "closedOn": "{{status}} dne {{date}}",
       "deadlineNotSet": "Termín není stanoven",
       "noSlaDeadline": "Bez termínu SLA",
-      "dueOn": "Termín: {{date}}",
       "overdueNow": "Po termínu",
       "overdue_one": "{{count}} den po termínu",
       "overdue_few": "{{count}} dny po termínu",

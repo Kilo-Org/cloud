@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "በአሁኑ ግኝት ተተክቷል",
       "supersededByDescription": "ሁኔታውን፣ ትንታኔውን እና ጥገናውን ለማየት የአሁኑን መዝገብ ይንኩ።",
-      "dismissedBecause": "ግኝቱ ተወግዷል፦ {{reason}}።",
+      "dismissedOn": "የተወገደበት ቀን",
+      "supersededOn": "የተተካበት ቀን",
       "severityLabel": "{{severity}} ክብደት",
       "package": "ፓኬጅ",
       "vulnerableVersions": "ተጋላጭ ስሪቶች",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "የደህንነት ማስጠንቀቂያውን በGitHub ላይ ይመልከቱ",
       "statusOpen": "ክፍት",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ጥገና አስቀድሞ ተጀምሯል",
-      "reasonNoBandwidth": "ለመሥራት የሚበቃ አቅም የለም",
-      "reasonTolerableRisk": "አደጋውን መቀበል ይቻላል",
-      "reasonInaccurate": "ግኝቱ ትክክለኛ አይደለም",
-      "reasonNotUsed": "ተጋላጭ የሆነው ኮድ ጥቅም ላይ አይውልም",
       "reasonAfterReview": "ከግምገማ በኋላ"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{date}}፦ {{status}}",
       "deadlineNotSet": "የጊዜ ገደብ አልተወሰነም",
       "noSlaDeadline": "የSLA ጊዜ ገደብ የለም",
-      "dueOn": "ጊዜው የሚያበቃው {{date}}",
       "overdueNow": "ጊዜው አልፏል",
       "overdue_one": "{{count}} ቀን ዘግይቷል",
       "overdue_other": "ቀነ ገደቡ በ{{count}} ቀናት አልፏል",

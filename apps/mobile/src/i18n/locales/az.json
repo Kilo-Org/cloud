@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "Cari tapıntı ilə əvəz edilib",
       "supersededByDescription": "Cari qeydin statusuna, təhlilinə və düzəlişinə baxmaq üçün toxun.",
-      "dismissedBecause": "Rədd edilib: {{reason}}.",
+      "dismissedOn": "Rədd edilmə tarixi",
+      "supersededOn": "Əvəz edilmə tarixi",
       "severityLabel": "Ciddilik dərəcəsi: {{severity}}",
       "package": "Paket",
       "vulnerableVersions": "Boşluq olan versiyalar",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "GitHub-da təhlükəsizlik bildirişinə bax",
       "statusOpen": "Açıq",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "düzəlişə artıq başlanıb",
-      "reasonNoBandwidth": "vaxt və resurs yoxdur",
-      "reasonTolerableRisk": "risk məqbuldur",
-      "reasonInaccurate": "problem səhv müəyyən edilib",
-      "reasonNotUsed": "boşluq olan koddan istifadə edilmir",
       "reasonAfterReview": "yoxlamadan sonra"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{date}} — {{status}}",
       "deadlineNotSet": "Müddət təyin edilməyib",
       "noSlaDeadline": "SLA müddəti yoxdur",
-      "dueOn": "{{date}} tarixində bitir",
       "overdueNow": "Gecikib",
       "overdue_one": "{{count}} gün gecikib",
       "overdue_other": "{{count}} gün gecikib",

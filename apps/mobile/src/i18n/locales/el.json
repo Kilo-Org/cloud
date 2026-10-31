@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "Αντικαταστάθηκε από το τρέχον εύρημα",
       "supersededByDescription": "Πάτησε για να δεις την κατάσταση, την ανάλυση και την αποκατάσταση στην τρέχουσα εγγραφή.",
-      "dismissedBecause": "Απορρίφθηκε: {{reason}}.",
+      "dismissedOn": "Απορρίφθηκε στις",
+      "supersededOn": "Αντικαταστάθηκε στις",
       "severityLabel": "Σοβαρότητα: {{severity}}",
       "package": "Πακέτο",
       "vulnerableVersions": "Ευάλωτες εκδόσεις",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "Προβολή δελτίου ασφάλειας στο GitHub",
       "statusOpen": "Ανοιχτό",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "η διόρθωση έχει ήδη ξεκινήσει",
-      "reasonNoBandwidth": "δεν υπάρχει διαθέσιμος χρόνος",
-      "reasonTolerableRisk": "ο κίνδυνος είναι αποδεκτός",
-      "reasonInaccurate": "το εύρημα είναι ανακριβές",
-      "reasonNotUsed": "ο ευάλωτος κώδικας δεν χρησιμοποιείται",
       "reasonAfterReview": "μετά από έλεγχο"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{status}} στις {{date}}",
       "deadlineNotSet": "Η προθεσμία δεν έχει οριστεί",
       "noSlaDeadline": "Χωρίς προθεσμία SLA",
-      "dueOn": "Λήγει στις {{date}}",
       "overdueNow": "Εκπρόθεσμο",
       "overdue_one": "{{count}} ημέρα καθυστέρησης",
       "overdue_other": "{{count}} ημέρες καθυστέρησης",

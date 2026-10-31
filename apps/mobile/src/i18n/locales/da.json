@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "Erstattet af et aktuelt fund",
       "supersededByDescription": "Tryk for at se det aktuelle funds status, analyse og udbedring.",
-      "dismissedBecause": "Fundet er afvist {{reason}}.",
+      "dismissedOn": "Afvist den",
+      "supersededOn": "Erstattet den",
       "severityLabel": "Alvorlighed: {{severity}}",
       "package": "Pakke",
       "vulnerableVersions": "Sårbare versioner",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "Se sikkerhedsbulletin på GitHub",
       "statusOpen": "Åben",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "rettelsen er allerede i gang",
-      "reasonNoBandwidth": "der er ingen ledig kapacitet",
-      "reasonTolerableRisk": "risikoen er acceptabel",
-      "reasonInaccurate": "fundet er misvisende",
-      "reasonNotUsed": "sårbar kode bruges ikke",
       "reasonAfterReview": "efter gennemgang"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{status}} den {{date}}",
       "deadlineNotSet": "Frist ikke angivet",
       "noSlaDeadline": "Ingen SLA-frist",
-      "dueOn": "Frist den {{date}}",
       "overdueNow": "Frist overskredet",
       "overdue_one": "Frist overskredet med {{count}} dag",
       "overdue_other": "Frist overskredet med {{count}} dage",

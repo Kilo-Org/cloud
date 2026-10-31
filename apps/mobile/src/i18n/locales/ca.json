@@ -1854,7 +1854,8 @@
     "findingDetails": {
       "supersededBy": "Substituïda per una incidència actual",
       "supersededByDescription": "Toca per obrir el registre actual i consultar-ne l'estat, l'anàlisi i la correcció.",
-      "dismissedBecause": "S'ha descartat: {{reason}}.",
+      "dismissedOn": "Descartat el",
+      "supersededOn": "Substituït el",
       "severityLabel": "Gravetat: {{severity}}",
       "package": "Paquet",
       "vulnerableVersions": "Versions vulnerables",
@@ -1871,11 +1872,6 @@
       "viewAdvisory": "Consulta l'avís a GitHub",
       "statusOpen": "Oberta",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "la correcció ja està en curs",
-      "reasonNoBandwidth": "no hi ha recursos disponibles",
-      "reasonTolerableRisk": "el risc és tolerable",
-      "reasonInaccurate": "el problema detectat és inexacte",
-      "reasonNotUsed": "el codi vulnerable no s'utilitza",
       "reasonAfterReview": "després de la revisió"
     },
     "settingsOverview": {
@@ -2112,7 +2108,6 @@
       "closedOn": "{{status}} el {{date}}",
       "deadlineNotSet": "Termini no establert",
       "noSlaDeadline": "Sense termini de l'SLA",
-      "dueOn": "Venç el {{date}}",
       "overdueNow": "Fora de termini",
       "overdue_one": "{{count}} dia de retard",
       "overdue_many": "{{count}} dies de retard",

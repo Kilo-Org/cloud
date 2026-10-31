@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "Újabb találat váltotta fel",
       "supersededByDescription": "Koppints az aktuális bejegyzésre az állapot, az elemzés és a hibajavítás megtekintéséhez.",
-      "dismissedBecause": "Elvetés indoka: {{reason}}.",
+      "dismissedOn": "Elvetés dátuma",
+      "supersededOn": "Újabbal helyettesítés dátuma",
       "severityLabel": "{{severity}} súlyosság",
       "package": "Csomag",
       "vulnerableVersions": "Sebezhető verziók",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "Biztonsági tájékoztató megtekintése a GitHubon",
       "statusOpen": "Nyitott",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "a javítás már folyamatban van",
-      "reasonNoBandwidth": "nincs szabad kapacitás",
-      "reasonTolerableRisk": "a kockázat elfogadható",
-      "reasonInaccurate": "a találat pontatlan",
-      "reasonNotUsed": "a sérülékeny kód nincs használatban",
       "reasonAfterReview": "felülvizsgálat után"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{status}}: {{date}}",
       "deadlineNotSet": "Nincs határidő beállítva",
       "noSlaDeadline": "Nincs SLA-határidő",
-      "dueOn": "Esedékes: {{date}}",
       "overdueNow": "Lejárt",
       "overdue_one": "{{count}} napja lejárt",
       "overdue_other": "{{count}} napja lejárt",

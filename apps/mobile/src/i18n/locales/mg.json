@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "Nosoloina olana hita vaovao",
       "supersededByDescription": "Tsindrio ny firaketana vaovao hijerena ny sata, ny famakafakana ary ny fanarenana.",
-      "dismissedBecause": "Nailika noho izao antony izao: {{reason}}.",
+      "dismissedOn": "Daty fanesorana",
+      "supersededOn": "Daty fanoloana",
       "severityLabel": "Hamafy: {{severity}}",
       "package": "Fonosana",
       "vulnerableVersions": "Dikan-teny marefo",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "Jereo ny fampitandremana ao amin'ny GitHub",
       "statusOpen": "Misokatra",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "efa nanomboka ny fanitsiana",
-      "reasonNoBandwidth": "tsy misy fotoana hanaovana azy",
-      "reasonTolerableRisk": "azo ekena ny risika",
-      "reasonInaccurate": "tsy marina ny olana voalaza",
-      "reasonNotUsed": "tsy ampiasaina ny kaody marefo",
       "reasonAfterReview": "taorian'ny fanamarinana"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{status}} tamin'ny {{date}}",
       "deadlineNotSet": "Tsy voafaritra ny fe-potoana",
       "noSlaDeadline": "Tsy misy fe-potoana SLA",
-      "dueOn": "Fe-potoana farany: {{date}}",
       "overdueNow": "Nihoatra ny fe-potoana",
       "overdue_one": "Nihoatra {{count}} andro ny fe-potoana",
       "overdue_other": "Tara {{count}} andro",

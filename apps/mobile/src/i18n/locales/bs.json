@@ -1854,7 +1854,8 @@
     "findingDetails": {
       "supersededBy": "Zamijenjen aktuelnim nalazom",
       "supersededByDescription": "Dodirni za prikaz aktuelnog zapisa sa statusom, analizom i otklanjanjem.",
-      "dismissedBecause": "Nalaz je odbačen {{reason}}.",
+      "dismissedOn": "Datum odbacivanja",
+      "supersededOn": "Datum zamjene",
       "severityLabel": "Ozbiljnost: {{severity}}",
       "package": "Paket",
       "vulnerableVersions": "Ranjive verzije",
@@ -1871,11 +1872,6 @@
       "viewAdvisory": "Pogledaj sigurnosnu obavijest na GitHubu",
       "statusOpen": "Otvoreno",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ispravka je već u toku",
-      "reasonNoBandwidth": "nema slobodnih kapaciteta",
-      "reasonTolerableRisk": "rizik je prihvatljiv",
-      "reasonInaccurate": "nalaz je netačan",
-      "reasonNotUsed": "ranjivi kod se ne koristi",
       "reasonAfterReview": "nakon pregleda"
     },
     "settingsOverview": {
@@ -2112,7 +2108,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Rok nije postavljen",
       "noSlaDeadline": "Nema roka prema SLA-u",
-      "dueOn": "Rok: {{date}}",
       "overdueNow": "Rok prekoračen",
       "overdue_one": "{{count}} dan zakašnjenja",
       "overdue_few": "{{count}} dana zakašnjenja",

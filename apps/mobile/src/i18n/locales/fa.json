@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "با یافته جدید جایگزین شده",
       "supersededByDescription": "برای دیدن وضعیت، تحلیل و اصلاح، روی این مورد بزنید تا رکورد جدید باز شود.",
-      "dismissedBecause": "به دلیل {{reason}} نادیده گرفته شده است.",
+      "dismissedOn": "نادیده‌گرفته‌شده در",
+      "supersededOn": "جایگزین‌شده در",
       "severityLabel": "شدت {{severity}}",
       "package": "بسته",
       "vulnerableVersions": "نسخه‌های آسیب‌پذیر",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "مشاهده اطلاعیه امنیتی در GitHub",
       "statusOpen": "باز",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "رفع مشکل شروع شده است",
-      "reasonNoBandwidth": "ظرفیتی برای رسیدگی نداریم",
-      "reasonTolerableRisk": "ریسک قابل تحمل است",
-      "reasonInaccurate": "یافته دقیق نیست",
-      "reasonNotUsed": "از کد آسیب‌پذیر استفاده نمی‌شود",
       "reasonAfterReview": "پس از بررسی"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{status}} در {{date}}",
       "deadlineNotSet": "مهلتی تعیین نشده است",
       "noSlaDeadline": "بدون مهلت SLA",
-      "dueOn": "سررسید {{date}}",
       "overdueNow": "معوق",
       "overdue_one": "{{count}} روز تأخیر",
       "overdue_other": "{{count}} روز تأخیر",

@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "Wata matsalar da aka gano a yanzu ta maye gurbinta",
       "supersededByDescription": "Danna don buɗe bayanan matsalar ta yanzu ka ga halinta, nazarinta da gyaranta.",
-      "dismissedBecause": "An yi watsi da ita domin {{reason}}.",
+      "dismissedOn": "An yi watsi da shi a ranar",
+      "supersededOn": "An maye gurbinsa a ranar",
       "severityLabel": "Tsanani: {{severity}}",
       "package": "Kunshi",
       "vulnerableVersions": "Sigogin da ke da raunin tsaro",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "Duba sanarwar tsaro a GitHub",
       "statusOpen": "Buɗe",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "an riga an fara gyara",
-      "reasonNoBandwidth": "babu damar yin aikin",
-      "reasonTolerableRisk": "ana iya jure haɗarin",
-      "reasonInaccurate": "sakamakon binciken bai yi daidai ba",
-      "reasonNotUsed": "ba a amfani da lambar shirin da ke da rauni",
       "reasonAfterReview": "bayan bita"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Ba a saita wa'adi ba",
       "noSlaDeadline": "Babu wa'adin SLA",
-      "dueOn": "Wa'adi zai cika {{date}}",
       "overdueNow": "Wa'adi ya wuce",
       "overdue_one": "Wa'adin ya wuce da kwana {{count}}",
       "overdue_other": "An wuce wa'adi da kwanaki {{count}}",

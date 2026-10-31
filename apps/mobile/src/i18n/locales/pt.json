@@ -1854,7 +1854,8 @@
     "findingDetails": {
       "supersededBy": "Substituída por uma ocorrência atual",
       "supersededByDescription": "Toca para abrir o registo atual e consultar o estado, a análise e a correção.",
-      "dismissedBecause": "Ocorrência descartada: {{reason}}.",
+      "dismissedOn": "Ignorada em",
+      "supersededOn": "Substituída em",
       "severityLabel": "Gravidade {{severity}}",
       "package": "Pacote",
       "vulnerableVersions": "Versões vulneráveis",
@@ -1871,11 +1872,6 @@
       "viewAdvisory": "Ver aviso de segurança no GitHub",
       "statusOpen": "Aberta",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "correção já iniciada",
-      "reasonNoBandwidth": "sem disponibilidade",
-      "reasonTolerableRisk": "risco aceitável",
-      "reasonInaccurate": "ocorrência imprecisa",
-      "reasonNotUsed": "código vulnerável não utilizado",
       "reasonAfterReview": "após a revisão"
     },
     "settingsOverview": {
@@ -2112,7 +2108,6 @@
       "closedOn": "{{status}} em {{date}}",
       "deadlineNotSet": "Prazo não definido",
       "noSlaDeadline": "Sem prazo do SLA",
-      "dueOn": "Prazo termina em {{date}}",
       "overdueNow": "Em atraso",
       "overdue_one": "{{count}} dia em atraso",
       "overdue_many": "{{count}} dias em atraso",

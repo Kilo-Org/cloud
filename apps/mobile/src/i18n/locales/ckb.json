@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "دۆزینەوەیەکی نوێ جێگەی گرتووەتەوە",
       "supersededByDescription": "لێی بدە بۆ کردنەوەی تۆماری ئێستا و بینینی دۆخ، شیکاری و چارەسەر.",
-      "dismissedBecause": "هۆکاری ڕەتکردنەوە: {{reason}}.",
+      "dismissedOn": "پشتگوێخراو لە",
+      "supersededOn": "جێگەی گیراوەتەوە لە",
       "severityLabel": "ئاستی مەترسی: {{severity}}",
       "package": "پاکێج",
       "vulnerableVersions": "وەشانە کەلێندارەکان",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "ڕاگەیەنراوی ئاسایش لە GitHub ببینە",
       "statusOpen": "کراوە",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "دەست بە چارەسەرکردن کراوە",
-      "reasonNoBandwidth": "کات و توانای پێویست نییە",
-      "reasonTolerableRisk": "مەترسییەکە جێگەی قبووڵە",
-      "reasonInaccurate": "دۆزینەوەکە دروست نییە",
-      "reasonNotUsed": "کۆدی کەلێندار بەکارناهێنرێت",
       "reasonAfterReview": "دوای پێداچوونەوە"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{status}} لە {{date}}",
       "deadlineNotSet": "مۆڵەت دیارینەکراوە",
       "noSlaDeadline": "هیچ مۆڵەتێکی SLA نییە",
-      "dueOn": "کۆتایی مۆڵەت: {{date}}",
       "overdueNow": "دواکەوتوو",
       "overdue_one": "{{count}} ڕۆژ دواکەوتوو",
       "overdue_other": "{{count}} ڕۆژ دواکەوتوو",

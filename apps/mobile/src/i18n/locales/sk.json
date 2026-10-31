@@ -1879,7 +1879,8 @@
     "findingDetails": {
       "supersededBy": "Nahradené aktuálnym nálezom",
       "supersededByDescription": "Klepnutím otvoríte aktuálny záznam s údajmi o stave, analýze a náprave.",
-      "dismissedBecause": "Dôvod zamietnutia: {{reason}}.",
+      "dismissedOn": "Ignorované dňa",
+      "supersededOn": "Nahradené dňa",
       "severityLabel": "Závažnosť: {{severity}}",
       "package": "Balík",
       "vulnerableVersions": "Zraniteľné verzie",
@@ -1896,11 +1897,6 @@
       "viewAdvisory": "Zobraziť bezpečnostné upozornenie na platforme GitHub",
       "statusOpen": "Otvorené",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "oprava sa už začala",
-      "reasonNoBandwidth": "nie je voľná kapacita",
-      "reasonTolerableRisk": "riziko je prijateľné",
-      "reasonInaccurate": "zistenie je nepresné",
-      "reasonNotUsed": "zraniteľný kód sa nepoužíva",
       "reasonAfterReview": "po preskúmaní"
     },
     "settingsOverview": {
@@ -2139,7 +2135,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Termín nie je nastavený",
       "noSlaDeadline": "Bez termínu SLA",
-      "dueOn": "Termín: {{date}}",
       "overdueNow": "Po termíne",
       "dueToday": "Termín dnes",
       "dueTomorrow": "Termín zajtra",

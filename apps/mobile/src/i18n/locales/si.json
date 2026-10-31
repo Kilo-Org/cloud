@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "නව සොයාගැනීමකින් ප්‍රතිස්ථාපනය කර ඇත",
       "supersededByDescription": "තත්ත්වය, විශ්ලේෂණය සහ පිළියම් යෙදීම පිළිබඳ විස්තර බැලීමට වත්මන් වාර්තාව තට්ටු කර විවෘත කරන්න.",
-      "dismissedBecause": "ඉවතලා ඇත්තේ {{reason}} නිසාය.",
+      "dismissedOn": "ඉවතලා ඇති දිනය",
+      "supersededOn": "ප්‍රතිස්ථාපනය වී ඇති දිනය",
       "severityLabel": "බරපතළකම: {{severity}}",
       "package": "පැකේජය",
       "vulnerableVersions": "දුර්වලතා සහිත අනුවාද",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "GitHub හි ආරක්ෂක නිවේදනය බලන්න",
       "statusOpen": "විවෘත",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "නිවැරදි කිරීමක් දැනටමත් ආරම්භ වී ඇත",
-      "reasonNoBandwidth": "කාලය හෝ සම්පත් නැත",
-      "reasonTolerableRisk": "අවදානම පිළිගත හැකිය",
-      "reasonInaccurate": "හඳුනාගත් ගැටලුව නිවැරදි නොවේ",
-      "reasonNotUsed": "අනාරක්ෂිත කේතය භාවිත නොවේ",
       "reasonAfterReview": "සමාලෝචනයෙන් පසුව"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{date}} දින {{status}}",
       "deadlineNotSet": "නියමිත කාලය සකසා නොමැත",
       "noSlaDeadline": "SLA අවසන් දිනයක් නැත",
-      "dueOn": "{{date}} දින නියමිතයි",
       "overdueNow": "ප්‍රමාදයි",
       "dueToday": "අද නියමිතයි",
       "dueTomorrow": "හෙට නියමිතයි",

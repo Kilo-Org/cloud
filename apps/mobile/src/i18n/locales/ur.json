@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "اس کی جگہ نیا مسئلہ درج ہو چکا ہے",
       "supersededByDescription": "حالت، تجزیے اور اصلاح کی تفصیلات دیکھنے کے لیے موجودہ ریکارڈ پر ٹیپ کریں۔",
-      "dismissedBecause": "خارج کر دیا گیا: {{reason}}۔",
+      "dismissedOn": "نظر اندازی کی تاریخ",
+      "supersededOn": "نئے اندراج سے تبدیلی کی تاریخ",
       "severityLabel": "شدت: {{severity}}",
       "package": "پیکیج",
       "vulnerableVersions": "حفاظتی خامی والے ورژن",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "GitHub پر حفاظتی اطلاع دیکھیں",
       "statusOpen": "کھلا",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "اصلاح پہلے ہی شروع ہو چکی ہے",
-      "reasonNoBandwidth": "وقت یا وسائل دستیاب نہیں",
-      "reasonTolerableRisk": "خطرہ قابلِ برداشت ہے",
-      "reasonInaccurate": "مسئلے کی نشاندہی غلط ہے",
-      "reasonNotUsed": "سیکیورٹی کی خامی والا کوڈ استعمال نہیں ہوتا",
       "reasonAfterReview": "جائزے کے بعد"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{date}} کو {{status}}",
       "deadlineNotSet": "آخری تاریخ مقرر نہیں",
       "noSlaDeadline": "SLA کی کوئی آخری تاریخ نہیں",
-      "dueOn": "مقررہ تاریخ: {{date}}",
       "overdueNow": "مہلت گزر گئی",
       "overdue_one": "{{count}} دن کی تاخیر",
       "overdue_other": "{{count}} دن کی تاخیر",

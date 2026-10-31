@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "Substituído por un achado actual",
       "supersededByDescription": "Toca para abrir o rexistro actual e consultar o estado, a análise e a corrección.",
-      "dismissedBecause": "Motivo do descarte: {{reason}}.",
+      "dismissedOn": "Descartado o",
+      "supersededOn": "Substituído o",
       "severityLabel": "Gravidade: {{severity}}",
       "package": "Paquete",
       "vulnerableVersions": "Versións vulnerables",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "Ver o aviso de seguridade en GitHub",
       "statusOpen": "Aberto",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "corrección xa iniciada",
-      "reasonNoBandwidth": "falta de tempo",
-      "reasonTolerableRisk": "risco aceptable",
-      "reasonInaccurate": "problema detectado incorrecto",
-      "reasonNotUsed": "código vulnerable sen uso",
       "reasonAfterReview": "despois da revisión"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{status}} o {{date}}",
       "deadlineNotSet": "Prazo sen definir",
       "noSlaDeadline": "Sen prazo do SLA",
-      "dueOn": "Vence o {{date}}",
       "overdueNow": "Fóra de prazo",
       "overdue_one": "{{count}} día de atraso",
       "overdue_other": "{{count}} días de atraso",

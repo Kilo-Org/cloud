@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "Digantikan oleh penemuan semasa",
       "supersededByDescription": "Ketik untuk membuka rekod semasa dan melihat status, analisis serta pemulihan.",
-      "dismissedBecause": "Diketepikan kerana {{reason}}.",
+      "dismissedOn": "Diketepikan pada",
+      "supersededOn": "Digantikan pada",
       "severityLabel": "Keterukan {{severity}}",
       "package": "Pakej",
       "vulnerableVersions": "Versi yang terdedah kepada serangan",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "Lihat notis keselamatan di GitHub",
       "statusOpen": "Terbuka",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "pembetulan telah dimulakan",
-      "reasonNoBandwidth": "tiada masa atau tenaga kerja",
-      "reasonTolerableRisk": "risiko boleh diterima",
-      "reasonInaccurate": "dapatan tidak tepat",
-      "reasonNotUsed": "kod yang rentan tidak digunakan",
       "reasonAfterReview": "selepas semakan"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{status}} pada {{date}}",
       "deadlineNotSet": "Tarikh akhir tidak ditetapkan",
       "noSlaDeadline": "Tiada tarikh akhir SLA",
-      "dueOn": "Tarikh akhir {{date}}",
       "overdueNow": "Lewat",
       "overdue_other": "Lewat {{count}} hari",
       "dueToday": "Tarikh akhir hari ini",

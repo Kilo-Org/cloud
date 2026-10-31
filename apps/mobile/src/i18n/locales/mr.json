@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "या निष्कर्षाची जागा नवीन निष्कर्षाने घेतली आहे",
       "supersededByDescription": "स्थिती, विश्लेषण आणि निराकरण पाहण्यासाठी सध्याची नोंद उघडण्याकरिता टॅप करा.",
-      "dismissedBecause": "फेटाळले. कारण: {{reason}}.",
+      "dismissedOn": "दुर्लक्षित केल्याचा दिनांक",
+      "supersededOn": "नव्या निष्कर्षाने बदलल्याचा दिनांक",
       "severityLabel": "{{severity}} तीव्रता",
       "package": "पॅकेज",
       "vulnerableVersions": "असुरक्षित आवृत्त्या",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "GitHub वर सुरक्षा सूचना पाहा",
       "statusOpen": "उघडा",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "दुरुस्ती आधीच सुरू आहे",
-      "reasonNoBandwidth": "कामासाठी वेळ उपलब्ध नाही",
-      "reasonTolerableRisk": "जोखीम स्वीकारण्याजोगी आहे",
-      "reasonInaccurate": "निष्कर्ष अचूक नाही",
-      "reasonNotUsed": "असुरक्षित कोड वापरला जात नाही",
       "reasonAfterReview": "पुनरावलोकनानंतर"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{date}} रोजी {{status}}",
       "deadlineNotSet": "मुदत निश्चित नाही",
       "noSlaDeadline": "SLA मुदत नाही",
-      "dueOn": "मुदत {{date}}",
       "overdueNow": "मुदत उलटली",
       "overdue_one": "मुदत उलटून {{count}} दिवस झाला",
       "overdue_other": "मुदत संपून {{count}} दिवस झाले",

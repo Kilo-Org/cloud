@@ -35,6 +35,13 @@
   --ring: #4f5a10;
   --radius: 0.625rem;
 
+  /* Selected-state fill of an in-page tab pill, and its label. The fill is the
+   * accent at the luminance its own label carries: the muted olive in both
+   * themes, because the dark accent (#ffdd00) as a full pill glares on the dark
+   * page and pulls focus from the panel the tab selects. */
+  --selection: #4f5a10;
+  --selection-foreground: #ffffff;
+
   /* Focus-only tokens */
   --ink2: #3c382f;
   --muted-soft: #a9a39a;
@@ -136,6 +143,11 @@
     --ring: #ffdd00;
     --radius: 0.625rem;
 
+    /* The muted olive on the dark page: the dark accent (#ffdd00) as a full
+     * pill glares and pulls focus from the panel the tab selects. */
+    --selection: #4f5a10;
+    --selection-foreground: #f2f0eb;
+
     /* Focus-only tokens */
     --ink2: #c4c1b8;
     --muted-soft: #56544f;
@@ -221,6 +233,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-selection: var(--selection);
+  --color-selection-foreground: var(--selection-foreground);
 
   /* Focus-only */
   --color-ink2: var(--ink2);

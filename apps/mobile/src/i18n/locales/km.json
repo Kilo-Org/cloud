@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "បានជំនួសដោយបញ្ហាដែលរកឃើញបច្ចុប្បន្ន",
       "supersededByDescription": "ប៉ះដើម្បីបើកកំណត់ត្រាបច្ចុប្បន្ន និងមើលស្ថានភាព ការវិភាគ និងការជួសជុល។",
-      "dismissedBecause": "បានច្រានចោលដោយសារ {{reason}}។",
+      "dismissedOn": "បានសម្គាល់ថាមិនអើពើ នៅ",
+      "supersededOn": "ត្រូវបានជំនួស នៅ",
       "severityLabel": "កម្រិតធ្ងន់ធ្ងរ {{severity}}",
       "package": "កញ្ចប់",
       "vulnerableVersions": "កំណែដែលមានភាពងាយរងគ្រោះ",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "មើលសេចក្តីជូនដំណឹងសុវត្ថិភាពនៅលើ GitHub",
       "statusOpen": "បើក",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "បានចាប់ផ្តើមកែតម្រូវរួចហើយ",
-      "reasonNoBandwidth": "គ្មានពេល ឬធនធានគ្រប់គ្រាន់",
-      "reasonTolerableRisk": "ហានិភ័យអាចទទួលយកបាន",
-      "reasonInaccurate": "បញ្ហាដែលរកឃើញមិនត្រឹមត្រូវ",
-      "reasonNotUsed": "មិនប្រើកូដដែលមានភាពងាយរងគ្រោះ",
       "reasonAfterReview": "បន្ទាប់ពីការពិនិត្យ"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{status}} នៅ {{date}}",
       "deadlineNotSet": "មិនទាន់កំណត់ថ្ងៃកំណត់",
       "noSlaDeadline": "គ្មានថ្ងៃកំណត់ SLA",
-      "dueOn": "ដល់កំណត់នៅ {{date}}",
       "overdueNow": "ហួសកំណត់",
       "overdue_other": "ហួសកំណត់ {{count}} ថ្ងៃ",
       "dueToday": "ដល់កំណត់ថ្ងៃនេះ",

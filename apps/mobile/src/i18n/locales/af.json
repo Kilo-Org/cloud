@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "Vervang deur 'n huidige bevinding",
       "supersededByDescription": "Tik om die huidige rekord se status, ontleding en regstelling te sien.",
-      "dismissedBecause": "Die bevinding is verwerp: {{reason}}.",
+      "dismissedOn": "Verwerp op",
+      "supersededOn": "Vervang op",
       "severityLabel": "Ernsgraad: {{severity}}",
       "package": "Pakket",
       "vulnerableVersions": "Kwesbare weergawes",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "Bekyk sekuriteitskennisgewing op GitHub",
       "statusOpen": "Oop",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "regstelling reeds begin",
-      "reasonNoBandwidth": "geen kapasiteit beskikbaar nie",
-      "reasonTolerableRisk": "die risiko is aanvaarbaar",
-      "reasonInaccurate": "die bevinding is onjuis",
-      "reasonNotUsed": "kwesbare kode word nie gebruik nie",
       "reasonAfterReview": "na hersiening"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{status}} op {{date}}",
       "deadlineNotSet": "Sperdatum nie gestel nie",
       "noSlaDeadline": "Geen SLA-sperdatum nie",
-      "dueOn": "Sperdatum: {{date}}",
       "overdueNow": "Agterstallig",
       "overdue_one": "{{count}} dag agterstallig",
       "overdue_other": "{{count}} dae agterstallig",

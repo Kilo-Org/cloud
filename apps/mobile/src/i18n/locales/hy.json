@@ -1829,7 +1829,8 @@
     "findingDetails": {
       "supersededBy": "Փոխարինվել է խնդրի արդի գրառմամբ",
       "supersededByDescription": "Հպիր՝ արդի գրառումը բացելու և կարգավիճակը, վերլուծությունն ու շտկումը դիտելու համար։",
-      "dismissedBecause": "Մերժվել է՝ {{reason}}։",
+      "dismissedOn": "Անտեսված լինելու ամսաթիվ",
+      "supersededOn": "Փոխարինված լինելու ամսաթիվ",
       "severityLabel": "Վտանգավորություն՝ {{severity}}",
       "package": "Փաթեթ",
       "vulnerableVersions": "Խոցելի տարբերակներ",
@@ -1846,11 +1847,6 @@
       "viewAdvisory": "Դիտել անվտանգության տեղեկագիրը GitHub-ում",
       "statusOpen": "Բաց",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ուղղումն արդեն սկսվել է",
-      "reasonNoBandwidth": "ազատ ռեսուրսներ չկան",
-      "reasonTolerableRisk": "ռիսկն ընդունելի է",
-      "reasonInaccurate": "հայտնաբերված խնդիրը սխալ է նկարագրված",
-      "reasonNotUsed": "խոցելի կոդը չի օգտագործվում",
       "reasonAfterReview": "ստուգումից հետո"
     },
     "settingsOverview": {
@@ -2085,7 +2081,6 @@
       "closedOn": "{{status}}՝ {{date}}",
       "deadlineNotSet": "Վերջնաժամկետ սահմանված չէ",
       "noSlaDeadline": "SLA-ի վերջնաժամկետ չկա",
-      "dueOn": "Վերջնաժամկետը՝ {{date}}",
       "overdueNow": "Ժամկետանց",
       "overdue_one": "{{count}} օրով ժամկետանց",
       "overdue_other": "{{count}} օր ուշացած",

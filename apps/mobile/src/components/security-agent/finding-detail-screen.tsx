@@ -192,9 +192,13 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   if (findingQuery.isLoading || !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
+        {/* The loaded header adds the repository eyebrow above the title.
+            Reserving that line keeps the header height fixed while the finding
+            arrives, instead of moving the title down on the first paint. */}
         <ScreenHeader
           className="px-6"
           title={t('securityAgent.findingDetail.title')}
+          reserveEyebrow
           showBackButton
           onBack={handleBack}
         />

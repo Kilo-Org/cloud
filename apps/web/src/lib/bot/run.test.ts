@@ -136,6 +136,7 @@ test('an allowed repository authorization runs the agent with the triggering log
 const uploadedAttachments = {
   attachments: { path: 'message-attachments', files: ['notes.md'] },
   objectKeys: ['user_1/cloud-agent/message-attachments/notes.md'],
+  declinedFilenames: ['shot.png'],
 };
 
 test('a run that never starts a session discards its uploaded attachments', async () => {
@@ -145,7 +146,10 @@ test('a run that never starts a session discards its uploaded attachments', asyn
   await processLinkedMessage({ thread, message, platformIntegration: integration, user });
 
   expect(mockRunBotAgentFn).toHaveBeenCalledWith(
-    expect.objectContaining({ attachments: uploadedAttachments.attachments })
+    expect.objectContaining({
+      attachments: uploadedAttachments.attachments,
+      declinedAttachmentFilenames: ['shot.png'],
+    })
   );
   expect(mockDiscardUploadedAttachmentsFn).toHaveBeenCalledWith('user_1', uploadedAttachments);
 });

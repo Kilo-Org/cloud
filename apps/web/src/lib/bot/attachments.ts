@@ -98,13 +98,27 @@ function toUploadableAttachment(attachment: Attachment): UploadableAttachment | 
 
 /**
  * The result of forwarding one chat message's attachments: the ordered
- * references for the session prompt, plus the ledger object keys behind them
- * so the caller can link or discard exactly this message's uploads.
+ * references for the session prompt, the ledger object keys behind them so the
+ * caller can link or discard exactly this message's uploads, and the names of
+ * the referenced files the ledger declined so the run can say they are missing.
  */
 export type UploadedBotAttachments = {
-  attachments: CloudAgentAttachments;
+  /** Absent when every referenced file was declined. */
+  attachments?: CloudAgentAttachments;
   objectKeys: string[];
+  declinedFilenames: string[];
 };
+
+const MAX_DECLINED_FILENAME_LENGTH = 120;
+
+/** A user-supplied name is prompt data, so keep it single-line and bounded. */
+function describeDeclinedAttachment(attachment: Attachment, fallback: string): string {
+  const name = (attachment.name ?? '')
+    .replaceAll(/[\p{Cc}\p{Cf}]+/gu, ' ')
+    .replaceAll(/\s+/gu, ' ')
+    .trim();
+  return name.slice(0, MAX_DECLINED_FILENAME_LENGTH) || fallback;
+}
 
 function logAttachmentFailure(op: string, error: unknown): void {
   console.error(`[KiloBot] ${op}:`, error);
@@ -142,6 +156,7 @@ export async function extractAndUploadAttachments(
 
   const messageUuid = randomUUID();
   const uploaded: { filename: string; objectKey: string }[] = [];
+  const declinedFilenames: string[] = [];
 
   for (const { attachment, fetchData, mimeType } of uploadableAttachments) {
     const attachmentId = randomUUID();
@@ -200,7 +215,9 @@ export async function extractAndUploadAttachments(
       if (admittedKey) await discardPendingUploads(userId, [admittedKey]);
       if (isLedgerRefusal(error)) {
         // A ledger bound is an expected answer to this message, not an
-        // incident; the other files of the message still go through.
+        // incident; the other files of the message still go through, and the
+        // run is told this one is missing so it does not answer as if it had it.
+        declinedFilenames.push(describeDeclinedAttachment(attachment, filename));
         console.warn('[KiloBot] Attachment not forwarded:', error.message);
       } else {
         logAttachmentFailure('upload-bot-attachment', error);
@@ -208,11 +225,14 @@ export async function extractAndUploadAttachments(
     }
   }
 
-  if (uploaded.length === 0) return undefined;
+  if (uploaded.length === 0 && declinedFilenames.length === 0) return undefined;
 
   return {
-    attachments: { path: messageUuid, files: uploaded.map(entry => entry.filename) },
+    ...(uploaded.length > 0
+      ? { attachments: { path: messageUuid, files: uploaded.map(entry => entry.filename) } }
+      : {}),
     objectKeys: uploaded.map(entry => entry.objectKey),
+    declinedFilenames,
   };
 }
 

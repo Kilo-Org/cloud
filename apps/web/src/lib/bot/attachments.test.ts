@@ -148,6 +148,7 @@ describe('extractAndUploadAttachments', () => {
         `user-1/cloud-agent/${MESSAGE_UUID}/${CSV_ID}.csv`,
         `user-1/cloud-agent/${MESSAGE_UUID}/${TEXT_ID}.txt`,
       ],
+      declinedFilenames: [],
     });
     expect(mockAdmitPendingUpload).toHaveBeenCalledTimes(4);
     expect(mockSend).toHaveBeenCalledTimes(4);
@@ -198,7 +199,7 @@ describe('extractAndUploadAttachments', () => {
       'user-1'
     );
 
-    expect(result?.attachments.files).toHaveLength(5);
+    expect(result?.attachments?.files).toHaveLength(5);
     expect(mockSend).toHaveBeenCalledTimes(5);
     expect(sixthFetch).not.toHaveBeenCalled();
   });
@@ -236,6 +237,7 @@ describe('extractAndUploadAttachments', () => {
     expect(result).toEqual({
       attachments: { path: MESSAGE_UUID, files: [`${CSV_ID}.md`] },
       objectKeys: [`user-1/cloud-agent/${MESSAGE_UUID}/${CSV_ID}.md`],
+      declinedFilenames: [],
     });
     expect(preflightFetch).not.toHaveBeenCalled();
     expect(oversizedDownloadFetch).toHaveBeenCalledTimes(1);
@@ -263,6 +265,7 @@ describe('extractAndUploadAttachments', () => {
     expect(result).toEqual({
       attachments: { path: MESSAGE_UUID, files: [`${MARKDOWN_ID}.md`] },
       objectKeys: [`user-1/cloud-agent/${MESSAGE_UUID}/${MARKDOWN_ID}.md`],
+      declinedFilenames: [],
     });
     expect(mockSend).toHaveBeenCalledTimes(2);
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
@@ -337,6 +340,7 @@ describe('extractAndUploadAttachments', () => {
     expect(result).toEqual({
       attachments: { path: MESSAGE_UUID, files: [`${MARKDOWN_ID}.md`] },
       objectKeys: [`user-1/cloud-agent/${MESSAGE_UUID}/${MARKDOWN_ID}.md`],
+      declinedFilenames: ['refused.png'],
     });
     // A refused admit must never reach the bucket.
     expect(mockSend).toHaveBeenCalledTimes(1);
@@ -346,6 +350,54 @@ describe('extractAndUploadAttachments', () => {
     // A bound is an expected answer to the message, not an incident.
     expect(mockCaptureException).not.toHaveBeenCalled();
     expect(mockReleasePendingUploads).not.toHaveBeenCalled();
+  });
+
+  it('reports a declined file by name and forwards the rest', async () => {
+    mockRandomUUID
+      .mockReturnValueOnce(MESSAGE_UUID)
+      .mockReturnValueOnce(IMAGE_ID)
+      .mockReturnValueOnce(FRESH_IDS[0])
+      .mockReturnValueOnce(MARKDOWN_ID)
+      .mockReturnValueOnce(FRESH_IDS[1]);
+    mockAdmitPendingUpload.mockRejectedValueOnce(
+      new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Maximum 25 uploads allowed per account',
+      })
+    );
+
+    const result = await extractAndUploadAttachments(
+      createMessage([
+        createAttachment({ type: 'image', name: 'refused.png', mimeType: 'image/png' }),
+        createAttachment({ type: 'file', name: 'saved.md', mimeType: 'text/plain' }),
+      ]),
+      'user-1'
+    );
+
+    expect(result?.declinedFilenames).toEqual(['refused.png']);
+    expect(result?.attachments?.files).toEqual([`${MARKDOWN_ID}.md`]);
+  });
+
+  it('still reports the declined files of a message that forwarded nothing', async () => {
+    mockRandomUUID.mockReturnValueOnce(MESSAGE_UUID).mockReturnValueOnce(IMAGE_ID);
+    mockAdmitPendingUpload.mockRejectedValue(
+      new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Maximum 25 uploads allowed per account',
+      })
+    );
+
+    const result = await extractAndUploadAttachments(
+      createMessage([createAttachment({ type: 'image', name: 'shot.png', mimeType: 'image/png' })]),
+      'user-1'
+    );
+
+    expect(result).toEqual({
+      objectKeys: [],
+      declinedFilenames: ['shot.png'],
+    });
+    expect(result).not.toHaveProperty('attachments');
+    expect(mockSend).not.toHaveBeenCalled();
   });
 
   it('writes to the key the ledger admitted', async () => {
@@ -366,6 +418,6 @@ describe('extractAndUploadAttachments', () => {
       Key: `user-1/cloud-agent/${MESSAGE_UUID}/${OTHER_IDS[0]}.png`,
     });
     expect(result?.objectKeys).toEqual([`user-1/cloud-agent/${MESSAGE_UUID}/${OTHER_IDS[0]}.png`]);
-    expect(result?.attachments.files).toEqual([`${OTHER_IDS[0]}.png`]);
+    expect(result?.attachments?.files).toEqual([`${OTHER_IDS[0]}.png`]);
   });
 });

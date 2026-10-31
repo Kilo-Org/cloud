@@ -94,7 +94,10 @@ describe('bot attachment uploads against the pending-upload ledger', () => {
       kiloUserId
     );
 
-    expect(result).toBeUndefined();
+    expect(result).toEqual({
+      objectKeys: [],
+      declinedFilenames: ['notes.md', 'more.txt'],
+    });
     // Nothing reaches the bucket and the pre-existing ceiling is untouched.
     expect(mockSend).not.toHaveBeenCalled();
     expect(await rowsFor(kiloUserId)).toHaveLength(CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT);
@@ -112,7 +115,7 @@ describe('bot attachment uploads against the pending-upload ledger', () => {
       kiloUserId
     );
 
-    expect(uploaded?.attachments.files).toHaveLength(2);
+    expect(uploaded?.attachments?.files).toHaveLength(2);
     const admitted = await rowsFor(kiloUserId);
     expect(admitted.map(row => row.status)).toEqual(['pending', 'pending']);
     expect(admitted.map(row => row.byte_size).sort()).toEqual([5, 9]);
@@ -163,7 +166,7 @@ describe('bot attachment uploads against the pending-upload ledger', () => {
       kiloUserId
     );
 
-    expect(second?.attachments.files).toHaveLength(1);
+    expect(second?.attachments?.files).toHaveLength(1);
     expect(
       await db
         .select({ count: sql<number>`count(*)::int` })

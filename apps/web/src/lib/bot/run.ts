@@ -132,6 +132,7 @@ async function processMessage({
       botRequestId,
       prompt: message.text,
       attachments: uploadedAttachments?.attachments,
+      declinedAttachmentFilenames: uploadedAttachments?.declinedFilenames,
       actorLogin: message.author.userName,
     });
 

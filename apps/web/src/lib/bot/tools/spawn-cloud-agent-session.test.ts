@@ -649,4 +649,25 @@ describe('spawnCloudAgentSession delegation', () => {
       linkedAttachmentKeys
     );
   });
+
+  it('releases the linked attachments when initiate fails for any other reason', async () => {
+    mockInitiateFromPreparedSession.mockRejectedValueOnce(new Error('worker unavailable'));
+
+    const result = await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'model',
+      userIntegration,
+      'auth-token',
+      'request-initiate-failure-link',
+      undefined,
+      { chatPlatform: 'slack', attachments, payerUserId: 'user-9' }
+    );
+
+    expect(result.response).toContain('Error initiating Cloud Agent');
+    expect(mockReleaseRefusedAttachmentsFn).toHaveBeenCalledWith(
+      'user-9',
+      attachments,
+      linkedAttachmentKeys
+    );
+  });
 });

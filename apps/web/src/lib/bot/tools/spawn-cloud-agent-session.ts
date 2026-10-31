@@ -340,12 +340,15 @@ export default async function spawnCloudAgentSession(
       cloudAgentSessionId,
     });
   } catch (error) {
+    // No accepted session consumes these uploads on any initiate failure, so
+    // hand the rows back before returning: linked rows are skipped by both the
+    // reaper and the run-level cleanup, and a retried tool call can link them
+    // again.
+    await releaseRefusedAttachments(attachmentUserId, options?.attachments, linkedAttachmentKeys);
     if (error instanceof InsufficientCreditsError) {
       // The session record exists at this point; release it promptly with a
       // best-effort cleanup so it does not linger until periodic expiry.
       void Promise.resolve(client.cleanupSession?.(cloudAgentSessionId)).catch(() => {});
-      // The refused session will never consume its attachments.
-      await releaseRefusedAttachments(attachmentUserId, options?.attachments, linkedAttachmentKeys);
       return { response: INSUFFICIENT_CREDITS_RESPONSE };
     }
     const message = error instanceof Error ? error.message : String(error);

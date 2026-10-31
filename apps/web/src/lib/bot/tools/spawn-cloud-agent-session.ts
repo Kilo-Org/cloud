@@ -7,6 +7,7 @@ import {
   type PrepareSessionInput,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
+import { workerRefusalStatus } from '@/lib/cloud-agent-next/release-refused-send';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { RunSessionInput } from '@/lib/cloud-agent-next/run-session';
 import { INSUFFICIENT_CREDITS_RESPONSE } from '@/lib/cloud-agent-next/run-session';
@@ -340,11 +341,15 @@ export default async function spawnCloudAgentSession(
       cloudAgentSessionId,
     });
   } catch (error) {
-    // No accepted session consumes these uploads on any initiate failure, so
-    // hand the rows back before returning: linked rows are skipped by both the
-    // reaper and the run-level cleanup, and a retried tool call can link them
-    // again.
-    await releaseRefusedAttachments(attachmentUserId, options?.attachments, linkedAttachmentKeys);
+    // A 4xx answer is the worker refusing this initiate before it admits the
+    // turn, so no session consumes these uploads and the rows go back to
+    // 'pending' for a retried tool call and the run-level cleanup. A transport
+    // failure, a timeout or a 5xx proves nothing, because the worker may have
+    // accepted the turn, so those keep the rows linked and their objects intact.
+    const refusalStatus = workerRefusalStatus(error);
+    if (refusalStatus !== undefined && refusalStatus >= 400 && refusalStatus < 500) {
+      await releaseRefusedAttachments(attachmentUserId, options?.attachments, linkedAttachmentKeys);
+    }
     if (error instanceof InsufficientCreditsError) {
       // The session record exists at this point; release it promptly with a
       // best-effort cleanup so it does not linger until periodic expiry.

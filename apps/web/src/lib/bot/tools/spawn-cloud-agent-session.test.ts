@@ -650,15 +650,38 @@ describe('spawnCloudAgentSession delegation', () => {
     );
   });
 
-  it('releases the linked attachments when initiate fails for any other reason', async () => {
-    mockInitiateFromPreparedSession.mockRejectedValueOnce(new Error('worker unavailable'));
+  it('keeps the linked attachments when an initiate failure does not prove a refusal', async () => {
+    // A transport failure or a 5xx may arrive after the worker accepted the
+    // turn, so the session may still reference these rows.
+    mockInitiateFromPreparedSession.mockRejectedValueOnce(
+      Object.assign(new Error('worker unavailable'), { httpStatus: 503 })
+    );
 
     const result = await spawnCloudAgentSession(
       { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
       'model',
       userIntegration,
       'auth-token',
-      'request-initiate-failure-link',
+      'request-initiate-5xx-link',
+      undefined,
+      { chatPlatform: 'slack', attachments, payerUserId: 'user-9' }
+    );
+
+    expect(result.response).toContain('Error initiating Cloud Agent');
+    expect(mockReleaseRefusedAttachmentsFn).not.toHaveBeenCalled();
+  });
+
+  it('releases the linked attachments when the worker refuses the initiate with a 4xx', async () => {
+    mockInitiateFromPreparedSession.mockRejectedValueOnce(
+      Object.assign(new Error('initiate rejected'), { httpStatus: 400 })
+    );
+
+    const result = await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'model',
+      userIntegration,
+      'auth-token',
+      'request-initiate-4xx-link',
       undefined,
       { chatPlatform: 'slack', attachments, payerUserId: 'user-9' }
     );

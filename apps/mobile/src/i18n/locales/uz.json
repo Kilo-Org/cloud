@@ -1872,7 +1872,6 @@
       "repositoriesCount_one": "{{displayCount}} ta repozitoriya tanlangan",
       "repositoriesCount": "{{displayCount}} ta repozitoriy tanlangan",
       "repositoriesCount_other": "{{displayCount}} ta repozitoriy tanlangan",
-      "selectRepositoriesSubtitle": "Xavfsizlik agenti kuzatadigan repozitoriyalarni tanlang",
       "analysisModeSubtitle": "{{mode}} tahlil",
       "automationAllOff": "Hammasi o'chiq",
       "automationCount": "3 tadan {{displayCount}} tasi yoqilgan",

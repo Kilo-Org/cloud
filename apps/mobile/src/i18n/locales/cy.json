@@ -1996,7 +1996,6 @@
       "repositoriesCount_one": "{{displayCount}} ystorfa wedi'i dewis",
       "repositoriesCount": "{{displayCount}} o ystorfeydd wedi'u dewis",
       "repositoriesCount_other": "{{displayCount}} o ystorfeydd wedi'u dewis",
-      "selectRepositoriesSubtitle": "Dewis yr ystorfeydd y mae'r Asiant diogelwch yn eu monitro",
       "analysisModeSubtitle": "Dadansoddiad {{mode}}",
       "automationAllOff": "Popeth wedi'i ddiffodd",
       "automationCount": "{{displayCount}} o 3 wedi'u galluogi",

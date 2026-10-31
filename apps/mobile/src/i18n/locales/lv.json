@@ -1903,7 +1903,6 @@
       "repositoriesCount_one": "Izvēlēts {{displayCount}} repozitorijs",
       "repositoriesCount": "Atlasīti {{displayCount}} repozitoriji",
       "repositoriesCount_other": "Atlasīti {{displayCount}} repozitoriji",
-      "selectRepositoriesSubtitle": "Izvēlies, kurus repozitorijus uzraudzīs drošības aģents",
       "analysisModeSubtitle": "Analīzes režīms: {{mode}}",
       "automationAllOff": "Viss izslēgts",
       "automationCount": "Iespējoti {{displayCount}} no 3",

@@ -1872,7 +1872,6 @@
       "repositoriesCount_one": "არჩეულია {{displayCount}} რეპოზიტორი",
       "repositoriesCount": "არჩეულია {{displayCount}} რეპოზიტორია",
       "repositoriesCount_other": "არჩეულია {{displayCount}} რეპოზიტორია",
-      "selectRepositoriesSubtitle": "აირჩიე, რომელ რეპოზიტორებს აკონტროლებს უსაფრთხოების აგენტი",
       "analysisModeSubtitle": "ანალიზის რეჟიმი: {{mode}}",
       "automationAllOff": "ყველა გამორთულია",
       "automationCount": "ჩართულია 3-დან {{displayCount}}",

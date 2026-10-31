@@ -1482,8 +1482,7 @@
       "on": "Bật",
       "repositoriesCount": "Đã chọn {{displayCount}} kho mã nguồn",
       "repositoriesCount_other": "Đã chọn {{displayCount}} kho mã nguồn",
-      "repositoriesCount_one": "Đã chọn {{displayCount}} kho lưu trữ",
-      "selectRepositoriesSubtitle": "Chọn các kho lưu trữ để Trợ lý bảo mật giám sát"
+      "repositoriesCount_one": "Đã chọn {{displayCount}} kho lưu trữ"
     },
     "settingsSave": {
       "saveChanges": "Lưu thay đổi",

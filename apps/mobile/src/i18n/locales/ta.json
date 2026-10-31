@@ -1872,7 +1872,6 @@
       "repositoriesCount_one": "{{displayCount}} களஞ்சியம் தேர்ந்தெடுக்கப்பட்டது",
       "repositoriesCount": "{{displayCount}} களஞ்சியங்கள் தேர்ந்தெடுக்கப்பட்டன",
       "repositoriesCount_other": "{{displayCount}} களஞ்சியங்கள் தேர்ந்தெடுக்கப்பட்டன",
-      "selectRepositoriesSubtitle": "பாதுகாப்பு முகவர் கண்காணிக்க வேண்டிய களஞ்சியங்களைத் தேர்ந்தெடுக்கவும்",
       "analysisModeSubtitle": "{{mode}} பகுப்பாய்வு",
       "automationAllOff": "அனைத்தும் முடக்கப்பட்டுள்ளன",
       "automationCount": "3-இல் {{displayCount}} இயக்கத்தில்",

@@ -1872,7 +1872,6 @@
       "repositoriesCount_one": "ເລືອກຄັງໂຄ້ດແລ້ວ {{displayCount}} ແຫ່ງ",
       "repositoriesCount": "ເລືອກຄັງໂຄ້ດແລ້ວ {{displayCount}} ຄັງ",
       "repositoriesCount_other": "ເລືອກຄັງໂຄ້ດແລ້ວ {{displayCount}} ຄັງ",
-      "selectRepositoriesSubtitle": "ເລືອກຄັງໂຄ້ດທີ່ຈະໃຫ້ເອເຈນດ້ານຄວາມປອດໄພຕິດຕາມ",
       "analysisModeSubtitle": "ການວິເຄາະແບບ {{mode}}",
       "automationAllOff": "ປິດທັງໝົດ",
       "automationCount": "ເປີດແລ້ວ {{displayCount}} ຈາກ 3 ລາຍການ",

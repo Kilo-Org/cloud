@@ -1872,7 +1872,6 @@
       "repositoriesCount_one": "បានជ្រើសរើសឃ្លាំងកូដចំនួន {{displayCount}}",
       "repositoriesCount": "បានជ្រើសរើសឃ្លាំងកូដ {{displayCount}}",
       "repositoriesCount_other": "បានជ្រើសរើសឃ្លាំងកូដ {{displayCount}}",
-      "selectRepositoriesSubtitle": "ជ្រើសរើសឃ្លាំងកូដដែលភ្នាក់ងារសុវត្ថិភាពត្រូវតាមដាន",
       "analysisModeSubtitle": "ការវិភាគ {{mode}}",
       "automationAllOff": "បិទទាំងអស់",
       "automationCount": "បានបើក {{displayCount}} ក្នុងចំណោម 3",

@@ -1482,8 +1482,7 @@
       "on": "Açık",
       "repositoriesCount": "{{displayCount}} depo seçildi",
       "repositoriesCount_other": "{{displayCount}} depo seçildi",
-      "repositoriesCount_one": "{{displayCount}} depo seçili",
-      "selectRepositoriesSubtitle": "Güvenlik ajanının izleyeceği depoları seç"
+      "repositoriesCount_one": "{{displayCount}} depo seçili"
     },
     "settingsSave": {
       "saveChanges": "Değişiklikleri kaydet",

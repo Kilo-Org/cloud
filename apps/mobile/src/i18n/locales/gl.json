@@ -1872,7 +1872,6 @@
       "repositoriesCount_one": "{{displayCount}} repositorio seleccionado",
       "repositoriesCount": "{{displayCount}} repositorios seleccionados",
       "repositoriesCount_other": "{{displayCount}} repositorios seleccionados",
-      "selectRepositoriesSubtitle": "Escolle os repositorios que supervisa o axente de seguridade",
       "analysisModeSubtitle": "Análise: {{mode}}",
       "automationAllOff": "Todo desactivado",
       "automationCount": "{{displayCount}} de 3 activados",

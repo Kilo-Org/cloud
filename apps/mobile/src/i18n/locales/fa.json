@@ -1878,7 +1878,6 @@
       "repositoriesCount_one": "{{displayCount}} مخزن انتخاب‌شده",
       "repositoriesCount": "{{displayCount}} مخزن انتخاب‌شده",
       "repositoriesCount_other": "{{displayCount}} مخزن انتخاب‌شده",
-      "selectRepositoriesSubtitle": "مخازنی را که عامل امنیتی پایش می‌کند انتخاب کنید",
       "analysisModeSubtitle": "تحلیل {{mode}}",
       "automationAllOff": "همه غیرفعال",
       "automationCount": "{{displayCount}} مورد از ۳ مورد فعال",

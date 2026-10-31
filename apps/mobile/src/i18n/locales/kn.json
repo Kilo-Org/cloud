@@ -1878,7 +1878,6 @@
       "repositoriesCount_one": "{{displayCount}} ರೆಪೊಸಿಟರಿ ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",
       "repositoriesCount": "{{displayCount}} ರೆಪೊಸಿಟರಿಗಳನ್ನು ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",
       "repositoriesCount_other": "{{displayCount}} ರೆಪೊಸಿಟರಿಗಳನ್ನು ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",
-      "selectRepositoriesSubtitle": "ಭದ್ರತಾ ಏಜೆಂಟ್ ಮೇಲ್ವಿಚಾರಣೆ ಮಾಡಬೇಕಾದ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಆಯ್ಕೆ ಮಾಡಿ",
       "analysisModeSubtitle": "{{mode}} ವಿಶ್ಲೇಷಣೆ",
       "automationAllOff": "ಎಲ್ಲವೂ ನಿಷ್ಕ್ರಿಯ",
       "automationCount": "3 ರಲ್ಲಿ {{displayCount}} ಸಕ್ರಿಯ",

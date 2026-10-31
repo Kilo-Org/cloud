@@ -1878,7 +1878,6 @@
       "repositoriesCount_one": "{{displayCount}} રિપોઝિટરી પસંદ કરેલી",
       "repositoriesCount": "{{displayCount}} રિપોઝિટરીઓ પસંદ કરેલી",
       "repositoriesCount_other": "{{displayCount}} રિપોઝિટરીઓ પસંદ કરેલી",
-      "selectRepositoriesSubtitle": "સુરક્ષા એજન્ટ કઈ રિપોઝિટરીઓ પર નજર રાખે તે પસંદ કરો",
       "analysisModeSubtitle": "{{mode}} વિશ્લેષણ",
       "automationAllOff": "બધું બંધ",
       "automationCount": "3 માંથી {{displayCount}} ચાલુ",

@@ -1878,7 +1878,6 @@
       "repositoriesCount_one": "Tahirin-kaody {{displayCount}} voafidy",
       "repositoriesCount": "Tahirin-kaody {{displayCount}} voafidy",
       "repositoriesCount_other": "Tahirin-kaody {{displayCount}} voafidy",
-      "selectRepositoriesSubtitle": "Fidio ny tahirin-kaody harahin'ny mpanampy amin'ny fiarovana.",
       "analysisModeSubtitle": "Famakafakana {{mode}}",
       "automationAllOff": "Tsy mandeha avokoa",
       "automationCount": "{{displayCount}} amin'ny 3 no mandeha",

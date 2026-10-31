@@ -1872,7 +1872,6 @@
       "repositoriesCount_one": "{{displayCount}} kayd oo la doortay",
       "repositoriesCount": "{{displayCount}} kayd oo la doortay",
       "repositoriesCount_other": "{{displayCount}} kayd oo la doortay",
-      "selectRepositoriesSubtitle": "Dooro kaydadka uu Wakiilka amnigu la soconayo",
       "analysisModeSubtitle": "Falanqaynta {{mode}}",
       "automationAllOff": "Dhammaan way dansan yihiin",
       "automationCount": "{{displayCount}} oo ka mid ah 3 ayaa shidan",

@@ -1965,7 +1965,6 @@
       "repositoriesCount_one": "{{displayCount}} repożitorju magħżul",
       "repositoriesCount": "{{displayCount}} repożitorji magħżula",
       "repositoriesCount_other": "{{displayCount}} repożitorji magħżula",
-      "selectRepositoriesSubtitle": "Agħżel liema repożitorji jissorvelja l-aġent tas-sigurtà",
       "analysisModeSubtitle": "Analiżi {{mode}}",
       "automationAllOff": "Kollha diżattivati",
       "automationCount": "{{displayCount}} minn 3 attivati",

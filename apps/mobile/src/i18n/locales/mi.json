@@ -1872,7 +1872,6 @@
       "repositoriesCount_one": "{{displayCount}} pūranga kua kōwhiria",
       "repositoriesCount": "{{displayCount}} pūranga waehere kua kōwhiria",
       "repositoriesCount_other": "{{displayCount}} pūranga waehere kua kōwhiria",
-      "selectRepositoriesSubtitle": "Kōwhiria ngā pūranga hei aroturuki mā te Kaiāwhina haumarutanga",
       "analysisModeSubtitle": "Tātari {{mode}}",
       "automationAllOff": "Kua weto katoa",
       "automationCount": "{{displayCount}} o te 3 kua whakahohea",

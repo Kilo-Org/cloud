@@ -1482,8 +1482,7 @@
       "on": "Aktif",
       "repositoriesCount": "{{displayCount}} repositori dipilih",
       "repositoriesCount_other": "{{displayCount}} repositori dipilih",
-      "repositoriesCount_one": "{{displayCount}} repositori dipilih",
-      "selectRepositoriesSubtitle": "Pilih repositori yang dipantau Agen keamanan"
+      "repositoriesCount_one": "{{displayCount}} repositori dipilih"
     },
     "settingsSave": {
       "saveChanges": "Simpan perubahan",

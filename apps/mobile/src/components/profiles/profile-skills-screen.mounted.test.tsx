@@ -162,6 +162,12 @@ describe('ProfileSkillsScreen', () => {
     expect(texts).toContain('code-review');
     expect(texts).toContain('Custom');
 
+    // The name and its source type are one element declared before the controls.
+    const identity = findAll(renderer.root, 'View').find(
+      node => node.props.accessibilityRole === 'text'
+    );
+    expect(identity?.props.accessibilityLabel).toBe('code-review, Custom');
+
     const toggle = findOne(renderer.root, 'Switch');
     expect(toggle.props.accessibilityLabel).toBe('code-review');
     expect(toggle.props.value).toBe(true);
@@ -192,6 +198,10 @@ describe('ProfileSkillsScreen', () => {
     const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
     expect(texts).toContain('skills.sh');
     expect(texts).not.toContain('skills-sh');
+    expect(
+      findAll(renderer.root, 'View').find(node => node.props.accessibilityRole === 'text')?.props
+        .accessibilityLabel
+    ).toBe('code-review, skills.sh');
 
     unmount();
   });

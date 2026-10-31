@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { ProfileRowIdentity, profileRowLabel } from '@/components/profiles/profile-row-identity';
 import { skillRowSubtitle } from '@/components/profiles/skill-markdown';
 import { SkillFormSheet, type SkillFormSubmission } from '@/components/profiles/skill-form-sheet';
 import { QueryError } from '@/components/query-error';
@@ -55,25 +56,26 @@ function hasUsableMessage(error: unknown): boolean {
 
 /**
  * One skill row: the name in mono, its source type, the enabled switch,
- * and delete plus edit for local skills. The row carries no container
- * `accessibilityLabel`, so the switch's label stays the only element a screen
- * reader matches by the skill's name.
+ * and delete plus edit for local skills. The name and its source type are one
+ * identity element declared first, so a screen reader hears what the row is
+ * before the controls that change it.
  */
 function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const subtitleKey = skillRowSubtitle(skill);
+  const subtitle = subtitleKey === null ? skill.sourceType : t(subtitleKey);
   const canEdit = skill.sourceType !== 'skills-sh';
   return (
     <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
-      <View className="min-w-0 flex-1 gap-0.5">
+      <ProfileRowIdentity label={profileRowLabel(skill.name, subtitle)}>
         <Text variant="mono" numberOfLines={1}>
           {skill.name}
         </Text>
         <Text variant="muted" className="text-xs">
-          {subtitleKey === null ? skill.sourceType : t(subtitleKey)}
+          {subtitle}
         </Text>
-      </View>
+      </ProfileRowIdentity>
       <Switch
         value={skill.enabled}
         accessibilityLabel={skill.name}

@@ -61,6 +61,17 @@ export const STATE_ACTION_CLASS = 'min-h-[48px]';
 export const ROW_TARGET_CLASS = 'min-h-[48px]';
 
 /**
+ * The box a profile row's identity block renders: the item's name and what
+ * qualifies it, declared first in the row. It spans {@link ICON_TARGET_DP}, the
+ * height of the controls beside it, so its frame is the row's leading top
+ * corner rather than a shorter block the taller control boxes start above.
+ * Assistive technology focuses a row from its layout, so a block that starts
+ * higher is reached before those controls. Explicit px, because NativeWind's
+ * rem is 14pt here.
+ */
+export const ROW_IDENTITY_CLASS = 'min-h-[48px] min-w-0 flex-1 justify-center';
+
+/**
  * The box every icon-only control renders. Its own node carries the target, as
  * a control-size audit measures, and 32pt clears the audit's
  * {@link MIN_TAP_TARGET_DP} floor while fitting the agents header row's

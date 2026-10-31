@@ -240,6 +240,49 @@ describe('createSecureStorePreference', () => {
     unsubscribe();
   });
 
+  it('never repaints a pre-merge choice over the merged value', async () => {
+    const pendingRead = Promise.withResolvers<string | null>();
+    const writeGate = Promise.withResolvers<undefined>();
+    getItemAsync.mockReturnValueOnce(pendingRead.promise).mockResolvedValue(null);
+    setItemAsync.mockImplementationOnce(async () => {
+      await writeGate.promise;
+    });
+    const store = createSecureStorePreference<string[]>({
+      key: 'k',
+      defaultValue: [],
+      parse: raw => (raw ? (JSON.parse(raw) as string[]) : []),
+      serialize: value => JSON.stringify(value),
+      mergeOnLoad: (disk, pending) => [...new Set([...disk, ...pending])],
+    });
+
+    const seen: string[][] = [];
+    const unsubscribe = store.subscribe(() => {
+      seen.push(store.get());
+    });
+
+    // The choice starts its write, then the read settles and reconciles the
+    // disk entries into the value, which supersedes that in-flight write: it
+    // must not paint its own target back over the merge while the reconciliation
+    // write is still to come.
+    store.set(['local']);
+    pendingRead.resolve('["disk"]');
+    await flushMicrotasks();
+    writeGate.resolve(undefined);
+    await store.whenPersisted();
+
+    // The merged value is visible once the read settles, and no later repaint
+    // may drop back to the pre-merge target (which would hide the disk entries
+    // until the reconciliation write lands).
+    const mergedAt = seen.findIndex(entry => entry.length === 2);
+    expect(mergedAt).toBeGreaterThanOrEqual(0);
+    // Every repaint after the merge keeps the disk entries; none drops back to
+    // the pre-merge target, which would hide them until the reconciliation
+    // write lands.
+    expect(seen.slice(mergedAt).every(entry => entry.length === 2)).toBe(true);
+    expect(seen.at(-1)).toEqual(['disk', 'local']);
+    unsubscribe();
+  });
+
   it('keeps the default when clear() runs during an in-flight initial load', async () => {
     const pendingReads: ((raw: string | null) => void)[] = [];
     getItemAsync.mockReturnValue(

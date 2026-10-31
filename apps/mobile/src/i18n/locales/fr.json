@@ -163,7 +163,7 @@
     "allLanguages": "Toutes les langues"
   },
   "login": {
-    "welcome": "Bienvenue sur Kilo",
+    "welcome": "Bienvenue",
     "retrySignIn": "Réessayer la connexion",
     "logo": "Logo Kilo",
     "continuingSignIn": "Votre connexion se poursuit.",
@@ -869,7 +869,10 @@
       "gitlabNoRepositoriesDescription": "Vous devrez peut-être accorder l'accès à d'autres groupes ou projets sur GitLab.",
       "installGithubApp": "Installer l'application GitHub sur les dépôts",
       "installGithubAppDescription": "Accordez à l'application GitHub de Kilo l'accès aux dépôts dont vous souhaitez faire examiner le code.",
-      "repositoryAccess": "accès au dépôt"
+      "repositoryAccess": "accès au dépôt",
+      "allModePersonal": "Tous les dépôts auxquels Kilo peut accéder via votre connexion GitHub sont revus automatiquement.",
+      "allModeOrganization": "Tous les dépôts auxquels Kilo peut accéder via la connexion GitHub de l'organisation sont revus automatiquement.",
+      "allModeCount": "Dépôts disponibles : {{displayCount}}"
     },
     "style": {
       "title": "Style de revue",
@@ -1119,7 +1122,7 @@
       "sortSeverityDesc": "Gravité : de la plus élevée à la plus faible",
       "sortSlaDue": "Échéance du SLA",
       "statusIgnored": "Ignoré",
-      "statusOpen": "Ouverture"
+      "statusOpen": "Ouvert"
     },
     "analysis": {
       "analyzeRepository": "Analyser le dépôt",
@@ -1342,7 +1345,7 @@
       "supersededByDescription": "Touchez pour ouvrir la fiche à jour et consulter son état, son analyse et sa correction.",
       "viewAdvisory": "Voir l'avis de sécurité sur GitHub",
       "vulnerableVersions": "Versions vulnérables",
-      "statusOpen": "Ouverture",
+      "statusOpen": "Ouvert",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "correction déjà en cours",
       "reasonNoBandwidth": "manque de ressources disponibles",
@@ -1678,9 +1681,9 @@
       "couldNotLoadGithubRepositories": "Impossible de charger les dépôts GitHub.",
       "couldNotLoadGitlabRepositories": "Impossible de charger les dépôts GitLab.",
       "couldNotLoadBitbucketRepositories": "Impossible de charger les dépôts Bitbucket.",
-      "connectGithubDescription": "Connectez votre compte GitHub dans votre navigateur, puis revenez ici pour choisir un dépôt.",
-      "connectGitlabDescription": "Connectez votre compte GitLab dans votre navigateur, puis revenez ici pour choisir un dépôt.",
-      "connectBitbucketDescription": "Connectez votre compte Bitbucket dans votre navigateur, puis revenez ici pour choisir un dépôt.",
+      "connectGithubDescription": "Connectez-vous depuis votre navigateur, puis revenez ici pour choisir un dépôt GitHub.",
+      "connectGitlabDescription": "Connectez-vous depuis votre navigateur, puis revenez ici pour choisir un dépôt GitLab.",
+      "connectBitbucketDescription": "Connectez-vous depuis votre navigateur, puis revenez ici pour choisir un dépôt Bitbucket.",
       "openGithub": "Ouvrir GitHub",
       "openGitlab": "Ouvrir GitLab",
       "openBitbucket": "Ouvrir Bitbucket",
@@ -2603,7 +2606,7 @@
     "sessionList": {
       "couldNotLoadActive": "Impossible de charger les sessions actives.",
       "couldNotRefresh": "Impossible d'actualiser",
-      "noSessionsYetDescription": "Lancez une tâche de programmation depuis votre téléphone. Vos sessions apparaîtront ici.",
+      "noSessionsYetDescription": "Lancez une tâche de programmation depuis votre téléphone.",
       "viewHistory": "Historique des sessions",
       "noMatches": "Aucune session ne correspond aux critères",
       "tryDifferentSearch": "Essayez un autre terme de recherche.",
@@ -2727,6 +2730,7 @@
       "gitlabDescription": "Connectez votre compte GitLab pour examiner des merge requests sur mobile.",
       "bitbucketDescription": "Connectez Bitbucket à cette organisation pour examiner des PR sur mobile.",
       "bitbucketOrgOnlyDescription": "Basculez le compte ci-dessus vers une organisation pour examiner ses PR Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Ce compte n'a encore aucune organisation. Les PR Bitbucket peuvent être examinées une fois que vous créez ou rejoignez une organisation.",
       "contextLine": "Pour {{organization}}",
       "contextLinePersonal": "Pour votre compte personnel"
     },
@@ -3106,10 +3110,9 @@
     "pullRequestUnavailableDescription": "Impossible d'ouvrir cette PR. Elle a peut-être été supprimée, le dépôt est privé ou l'application GitHub de Kilo n'y est pas installée.",
     "reconnectNotice": {
       "title": "La connexion à GitHub a expiré.",
-      "message": "Votre connexion GitHub n'est plus valide. Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter.",
+      "message": "Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter.",
       "gitlabTitle": "La connexion à GitLab a expiré.",
-      "bitbucketTitle": "La connexion à Bitbucket a expiré.",
-      "providerMessage": "Votre connexion {{provider}} n'est plus valide. Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter."
+      "bitbucketTitle": "La connexion à Bitbucket a expiré."
     },
     "review": "Revue",
     "reviewPullRequest": "Examiner la demande de fusion",
@@ -3199,7 +3202,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Partager le merge request",
       "viewOnProvider": "Voir sur {{provider}}",
       "mergeRequestUnavailable": "Merge request indisponible",
@@ -3897,8 +3900,6 @@
     "commandAtLimit": "La commande est limitée à {{max}} caractères",
     "commandsEmpty": "Aucune commande de configuration pour l'instant",
     "commandsSaveFailed": "Impossible d'enregistrer les commandes de configuration",
-    "moveUp": "Monter",
-    "moveDown": "Descendre",
     "moveCommandUp": "Déplacer la commande {{position}} vers le haut",
     "moveCommandDown": "Déplacer la commande {{position}} vers le bas",
     "skillsTitle": "Compétences",
@@ -3909,7 +3910,10 @@
     "skillNameRequired": "Entrez un nom de compétence",
     "skillNameInvalid": "Le nom de la compétence doit commencer par une lettre ou un chiffre et utiliser uniquement des lettres minuscules, des chiffres et des tirets.",
     "skillContentRequired": "Un contenu de compétence est requis",
-    "skillSaveFailed": "Impossible de sauvegarder la compétence",
+    "skillSaveFailed": "Impossible de sauvegarder la compétence. Réessayez.",
+    "skillDeleteFailed": "Impossible de supprimer la compétence. Réessayez.",
+    "skillToggleFailed": "Impossible de mettre à jour la compétence. Réessayez.",
+    "skillLimitReached": "Un profil peut contenir jusqu'à {{max}} compétences. Supprimez-en une pour en ajouter une autre.",
     "skillSourceCustom": "Personnalisé",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

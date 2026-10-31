@@ -163,7 +163,7 @@
     "allLanguages": "Tüm diller"
   },
   "login": {
-    "welcome": "Kilo'ya hoş geldin",
+    "welcome": "Hoş geldin",
     "retrySignIn": "Oturum açmayı tekrar dene",
     "logo": "Kilo logosu",
     "continuingSignIn": "Oturum açma işlemine devam ediliyor.",
@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "GitLab'da daha fazla gruba veya projeye erişim izni vermen gerekebilir.",
       "installGithubApp": "GitHub uygulamasını depolara yükle",
       "installGithubAppDescription": "Kilo GitHub uygulamasına, incelenmesini istediğin depolara erişim izni ver.",
-      "repositoryAccess": "depo erişimi"
+      "repositoryAccess": "depo erişimi",
+      "allModePersonal": "Kilo'nun GitHub bağlantın aracılığıyla erişebildiği her depo otomatik olarak incelenir.",
+      "allModeOrganization": "Kilo'nun kuruluşun GitHub bağlantısı aracılığıyla erişebildiği her depo otomatik olarak incelenir.",
+      "allModeCount": "Kullanılabilir depolar: {{displayCount}}"
     },
     "style": {
       "title": "İnceleme stili",
@@ -1626,7 +1629,7 @@
     "sessionList": {
       "couldNotLoadActive": "Etkin oturumlar yüklenemedi.",
       "couldNotRefresh": "Yenilenemedi",
-      "noSessionsYetDescription": "Telefonundan bir kodlama görevi başlat. Oturumların burada görünecek.",
+      "noSessionsYetDescription": "Telefonundan bir kodlama görevi başlat.",
       "viewHistory": "Oturum geçmişi",
       "noMatches": "Eşleşen oturum yok",
       "tryDifferentSearch": "Farklı bir arama terimi dene.",
@@ -1764,9 +1767,9 @@
       "couldNotLoadGithubRepositories": "GitHub depoları yüklenemedi.",
       "couldNotLoadGitlabRepositories": "GitLab depoları yüklenemedi.",
       "couldNotLoadBitbucketRepositories": "Bitbucket depoları yüklenemedi.",
-      "connectGithubDescription": "Tarayıcında GitHub hesabını bağla, ardından bir depo seçmek için buraya dön.",
-      "connectGitlabDescription": "Tarayıcında GitLab hesabını bağla, ardından bir depo seçmek için buraya dön.",
-      "connectBitbucketDescription": "Tarayıcında Bitbucket hesabını bağla, ardından bir depo seçmek için buraya dön.",
+      "connectGithubDescription": "Tarayıcında oturum aç, ardından buraya dönüp bir GitHub deposu seç.",
+      "connectGitlabDescription": "Tarayıcında oturum aç, ardından buraya dönüp bir GitLab deposu seç.",
+      "connectBitbucketDescription": "Tarayıcında oturum aç, ardından buraya dönüp bir Bitbucket deposu seç.",
       "openGithub": "GitHub'ı aç",
       "openGitlab": "GitLab'ı aç",
       "openBitbucket": "Bitbucket'ı aç",
@@ -2699,6 +2702,7 @@
       "gitlabDescription": "Mobilde birleştirme isteklerini gözden geçirmek için GitLab hesabını bağla.",
       "bitbucketDescription": "Mobilde çekme isteklerini gözden geçirmek için Bitbucket'ı bu kuruluşla bağla.",
       "bitbucketOrgOnlyDescription": "Yukarıdaki hesabı bir kuruluşa geçir, onun Bitbucket çekme isteklerini gözden geçirmek için.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabın henüz bir kuruluşu yok. Bitbucket çekme isteklerini, bir kuruluş oluşturduktan ya da birine katıldıktan sonra gözden geçirebilirsin.",
       "contextLine": "{{organization}} için",
       "contextLinePersonal": "Kişisel hesabınız için"
     },
@@ -3065,10 +3069,9 @@
     "pullRequestUnavailableDescription": "Bu PR açılamıyor. Silinmiş olabilir, depo özel olabilir veya depoda Kilo GitHub uygulaması kurulu olmayabilir.",
     "reconnectNotice": {
       "title": "GitHub bağlantısının süresi doldu.",
-      "message": "GitHub bağlantın artık geçerli değil. Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek.",
+      "message": "Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek.",
       "gitlabTitle": "GitLab bağlantısının süresi doldu.",
-      "bitbucketTitle": "Bitbucket bağlantısının süresi doldu.",
-      "providerMessage": "{{provider}} bağlantın artık geçerli değil. Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek."
+      "bitbucketTitle": "Bitbucket bağlantısının süresi doldu."
     },
     "review": "İnceleme",
     "reviewPullRequest": "Çekme isteğini incele",
@@ -3156,7 +3159,7 @@
     "terms": {
       "pullRequest": "Çekme isteği",
       "mergeRequest": "Birleştirme isteği",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Birleştirme isteği !{{number}}",
       "shareMergeRequest": "Birleştirme isteğini paylaş",
       "viewOnProvider": "{{provider}} üzerinde görüntüle",
       "mergeRequestUnavailable": "Birleştirme isteği kullanılamıyor",
@@ -3847,8 +3850,6 @@
     "commandAtLimit": "Komut {{max}} karakterle sınırlıdır",
     "commandsEmpty": "Henüz kurulum komutu yok",
     "commandsSaveFailed": "Kurulum komutları kaydedilemedi",
-    "moveUp": "Yukarı taşı",
-    "moveDown": "Aşağı taşı",
     "moveCommandUp": "{{position}}. komutu yukarı taşı",
     "moveCommandDown": "{{position}}. komutu aşağı taşı",
     "skillsTitle": "Yetenekler",
@@ -3859,7 +3860,10 @@
     "skillNameRequired": "Bir beceri adı girin",
     "skillNameInvalid": "Beceri adı bir harf veya rakamla başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
     "skillContentRequired": "Beceri içeriği gerekli",
-    "skillSaveFailed": "Beceri kaydedilemedi",
+    "skillSaveFailed": "Beceri kaydedilemedi. Tekrar deneyin.",
+    "skillDeleteFailed": "Beceri silinemedi. Tekrar deneyin.",
+    "skillToggleFailed": "Beceri güncellenemedi. Tekrar deneyin.",
+    "skillLimitReached": "Bir profil en fazla {{max}} beceri barındırabilir. Bir tane daha eklemek için birini silin.",
     "skillSourceCustom": "Özel",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

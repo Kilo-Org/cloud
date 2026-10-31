@@ -163,7 +163,7 @@
     "allLanguages": "所有語言"
   },
   "login": {
-    "welcome": "歡迎使用 Kilo",
+    "welcome": "歡迎",
     "retrySignIn": "重新嘗試登入",
     "logo": "Kilo 標誌",
     "continuingSignIn": "正在繼續登入程序。",
@@ -898,7 +898,10 @@
       "gitlabNoRepositoriesDescription": "你可能需要授權存取 GitLab 上的更多群組或專案。",
       "installGithubApp": "為存放庫安裝 GitHub App",
       "installGithubAppDescription": "請授權 Kilo GitHub App 存取要審查的存放庫。",
-      "repositoryAccess": "存放庫存取權限"
+      "repositoryAccess": "存放庫存取權限",
+      "allModePersonal": "Kilo 可透過你的 GitHub 連線存取的每個存放庫都會自動進行審查。",
+      "allModeOrganization": "Kilo 可透過組織的 GitHub 連線存取的每個存放庫都會自動進行審查。",
+      "allModeCount": "可用的存放庫：{{displayCount}}"
     },
     "style": {
       "title": "審查風格",
@@ -1626,7 +1629,7 @@
     "sessionList": {
       "couldNotLoadActive": "無法載入進行中的工作階段。",
       "couldNotRefresh": "無法重新整理",
-      "noSessionsYetDescription": "用手機開始程式開發任務，工作階段就會顯示在這裡。",
+      "noSessionsYetDescription": "用手機開始程式開發任務。",
       "viewHistory": "工作階段記錄",
       "noMatches": "沒有相符的工作階段",
       "tryDifferentSearch": "請嘗試其他搜尋字詞。",
@@ -1764,9 +1767,9 @@
       "couldNotLoadGithubRepositories": "無法載入 GitHub 儲存庫。",
       "couldNotLoadGitlabRepositories": "無法載入 GitLab 儲存庫。",
       "couldNotLoadBitbucketRepositories": "無法載入 Bitbucket 儲存庫。",
-      "connectGithubDescription": "請在瀏覽器中連結 GitHub，再回到這裡選取儲存庫。",
-      "connectGitlabDescription": "請在瀏覽器中連結 GitLab，再回到這裡選取儲存庫。",
-      "connectBitbucketDescription": "請在瀏覽器中連結 Bitbucket，再回到這裡選取儲存庫。",
+      "connectGithubDescription": "請在瀏覽器中登入，再回到這裡選取 GitHub 儲存庫。",
+      "connectGitlabDescription": "請在瀏覽器中登入，再回到這裡選取 GitLab 儲存庫。",
+      "connectBitbucketDescription": "請在瀏覽器中登入，再回到這裡選取 Bitbucket 儲存庫。",
       "openGithub": "開啟 GitHub",
       "openGitlab": "開啟 GitLab",
       "openBitbucket": "開啟 Bitbucket",
@@ -2699,6 +2702,7 @@
       "gitlabDescription": "連結你的 GitLab 帳戶，以便在行動裝置上審查合併請求。",
       "bitbucketDescription": "將 Bitbucket 連結到此組織，以便在行動裝置上審查提取請求。",
       "bitbucketOrgOnlyDescription": "將上方的帳戶切換為某個組織，以便審查其 Bitbucket 提取請求。",
+      "bitbucketOrgOnlyNoOrganizationDescription": "此帳戶尚無任何組織。建立或加入組織後，即可審查 Bitbucket 提取請求。",
       "contextLine": "適用於 {{organization}}",
       "contextLinePersonal": "適用於您的個人帳戶"
     },
@@ -3065,10 +3069,9 @@
     "pullRequestUnavailableDescription": "無法開啟此 PR。可能是 PR 已刪除、存放庫設為私人，或存放庫尚未安裝 Kilo GitHub App。",
     "reconnectNotice": {
       "title": "GitHub 連線已過期。",
-      "message": "你的 GitHub 連線已失效。請重新檢查連線；如有需要，系統會提示你重新連線。",
+      "message": "請重新檢查連線；如有需要，系統會提示你重新連線。",
       "gitlabTitle": "GitLab 連線已過期。",
-      "bitbucketTitle": "Bitbucket 連線已過期。",
-      "providerMessage": "你的 {{provider}} 連線已失效。請重新檢查連線；如有需要，系統會提示你重新連線。"
+      "bitbucketTitle": "Bitbucket 連線已過期。"
     },
     "review": "審查",
     "reviewPullRequest": "審查提取請求",
@@ -3156,7 +3159,7 @@
     "terms": {
       "pullRequest": "提取要求",
       "mergeRequest": "合併請求",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "合併請求 !{{number}}",
       "shareMergeRequest": "分享合併請求",
       "viewOnProvider": "在 {{provider}} 上檢視",
       "mergeRequestUnavailable": "無法開啟合併請求",
@@ -3847,8 +3850,6 @@
     "commandAtLimit": "命令最多為 {{max}} 個字元",
     "commandsEmpty": "還沒有設定命令",
     "commandsSaveFailed": "無法儲存設定命令",
-    "moveUp": "向上移動",
-    "moveDown": "下移",
     "moveCommandUp": "上移命令 {{position}}",
     "moveCommandDown": "下移命令 {{position}}",
     "skillsTitle": "技能",
@@ -3859,7 +3860,10 @@
     "skillNameRequired": "輸入技能名稱",
     "skillNameInvalid": "技能名稱必須以字母或數字開頭，且只能使用小寫字母、數字和連字符",
     "skillContentRequired": "技能內容為必填項",
-    "skillSaveFailed": "無法保存技能",
+    "skillSaveFailed": "無法保存技能。請重試。",
+    "skillDeleteFailed": "無法刪除技能。請重試。",
+    "skillToggleFailed": "無法更新技能。請重試。",
+    "skillLimitReached": "一個設定檔最多可容納 {{max}} 個技能。刪除一個才能新增另一個。",
     "skillSourceCustom": "自訂",
     "skillSourceMarketplace": "市集",
     "skillSourceSkillsSh": "skills.sh",

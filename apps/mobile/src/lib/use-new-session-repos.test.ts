@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   setQueryData: vi.fn(() => undefined),
   toastError: vi.fn(),
   refreshGitHubForceFresh: vi.fn(async () => undefined),
+  openGithub: vi.fn(async (): Promise<void> => undefined),
   listBranches: vi.fn(async (_input: unknown): Promise<unknown> => ({
     defaultBranch: 'main',
     branches: ['main'],
@@ -24,6 +25,8 @@ const mocks = vi.hoisted(() => ({
   queryCalls: [] as { queryKey?: unknown[]; enabled?: boolean; staleTime?: number }[],
   /** Result the branch query (the one with a `queryFn`) reports. */
   branchQueryResult: emptyQueryResult(),
+  /** The browser launch every provider's connect flow waits on. */
+  openAuthorization: vi.fn(async (_url: string): Promise<void> => undefined),
 }));
 
 function emptyQueryResult(): Record<string, unknown> {
@@ -67,18 +70,18 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
 }));
 
 vi.mock('@/lib/integration-urls', () => ({
-  getGitLabIntegrationUrl: vi.fn(() => ''),
-  getBitbucketIntegrationUrl: vi.fn(() => ''),
+  getGitLabIntegrationUrl: vi.fn(() => 'gitlab-url'),
+  getBitbucketIntegrationUrl: vi.fn(() => 'bitbucket-url'),
 }));
 
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
-  openAuthorizationAndWaitForReturn: vi.fn(async () => undefined),
+  openAuthorizationAndWaitForReturn: mocks.openAuthorization,
   reportLateLaunchFailure: vi.fn(),
 }));
 
 vi.mock('@/lib/use-github-repos-refresh', () => ({
   useGitHubReposRefresh: () => ({
-    openGitHubIntegration: vi.fn(),
+    openGitHubIntegration: mocks.openGithub,
     refreshReposForceFresh: mocks.refreshGitHubForceFresh,
     isRefreshingRepos: false,
     connectCheckFailed: false,
@@ -263,6 +266,89 @@ describe('useNewSessionRepos provider staleTime', () => {
     mountRepos('org-1');
 
     expectProviderStaleTime();
+  });
+});
+
+describe('useNewSessionRepos connect busy state', () => {
+  // The connect flow's first step is a network round trip (GitHub mints an
+  // install state), so the control that starts it has to show the flow running
+  // from the tap; a caller reading only `isRetrying` sees nothing until the
+  // round trip settles, which is what made the tap look inert.
+  function deferred(): { promise: Promise<void>; resolve: () => void } {
+    let settle: (() => void) | undefined = undefined;
+    const promise = new Promise<void>(resolve => {
+      settle = resolve;
+    });
+
+    return { promise, resolve: () => settle?.() };
+  }
+
+  it('reports the provider whose connect flow is running and clears it after', async () => {
+    const pending = deferred();
+    mocks.openGithub.mockImplementation(async () => pending.promise);
+    const resultRef = mountRepos(undefined);
+
+    act(() => {
+      requireResult(resultRef).openIntegration('github');
+    });
+    expect(requireResult(resultRef).connectingProvider).toBe('github');
+
+    await act(async () => {
+      pending.resolve();
+      await pending.promise;
+    });
+    expect(requireResult(resultRef).connectingProvider).toBeNull();
+  });
+
+  it('reports a GitLab flow, which opens the browser without a mint first', async () => {
+    const pending = deferred();
+    mocks.openAuthorization.mockImplementation(async () => pending.promise);
+    const resultRef = mountRepos('org-1');
+
+    act(() => {
+      requireResult(resultRef).openIntegration('gitlab');
+    });
+    expect(requireResult(resultRef).connectingProvider).toBe('gitlab');
+    expect(mocks.openAuthorization).toHaveBeenCalledWith('gitlab-url');
+
+    await act(async () => {
+      pending.resolve();
+      await pending.promise;
+    });
+    expect(requireResult(resultRef).connectingProvider).toBeNull();
+  });
+
+  it('ignores a second tap while a connect flow runs', () => {
+    const pending = deferred();
+    mocks.openGithub.mockImplementation(async () => pending.promise);
+    const resultRef = mountRepos(undefined);
+
+    act(() => {
+      requireResult(resultRef).openIntegration('github');
+    });
+    act(() => {
+      requireResult(resultRef).openIntegration('github');
+      requireResult(resultRef).openIntegration('gitlab');
+    });
+
+    // One mint, one browser: the second tap never reaches another flow.
+    expect(mocks.openGithub).toHaveBeenCalledTimes(1);
+    expect(mocks.openAuthorization).not.toHaveBeenCalled();
+    expect(requireResult(resultRef).connectingProvider).toBe('github');
+  });
+
+  it('clears the busy state when the flow fails', async () => {
+    mocks.openAuthorization.mockImplementationOnce(async () => {
+      throw new Error('no browser');
+    });
+    const resultRef = mountRepos('org-1');
+
+    await act(async () => {
+      requireResult(resultRef).openIntegration('gitlab');
+    });
+
+    expect(mocks.toastError).toHaveBeenCalledWith('Could not open GitLab setup. Please try again.');
+    expect(requireResult(resultRef).connectingProvider).toBeNull();
   });
 });
 

@@ -163,7 +163,7 @@
     "allLanguages": "Asụsụ niile"
   },
   "login": {
-    "welcome": "Nnọọ na Kilo",
+    "welcome": "Nnọọ",
     "retrySignIn": "Nwaa ịbanye ọzọ",
     "logo": "Akara Kilo",
     "continuingSignIn": "A na-aga n'ihu na nbanye gị.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Jikọọ akaụntụ GitLab gị iji nyochaa arịrịọ njikọta na ekwentị.",
       "bitbucketDescription": "Jikọọ Bitbucket na òtù a iji nyochaa arịrịọ ijikọ koodu na ekwentị.",
       "bitbucketOrgOnlyDescription": "Gbanwee akaụntụ dị n'elu gaa n'òtụ iji nyochaa arịrịọ ijikọ koodu Bitbucket ya.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Akaụntụ a enweghị òtù ọ bụla ruo ugbu a. Enwere ike ịnyochaa arịrịọ ijikọ koodu Bitbucket ozugbo ị mepụtara òtụ ma ọ bụ sonye na òtụ.",
       "contextLine": "Maka {{organization}}",
       "contextLinePersonal": "Maka nkeonwe"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Oge njikọ GitHub agwụla.",
-      "message": "Njikọ GitHub gị adịkwaghị irè. Lelee njikọ gị ọzọ — a ga-agwa gị ka ị jikọtaghachi ma ọ bụrụ na ọ dị mkpa.",
+      "message": "Lelee njikọ gị ọzọ — a ga-agwa gị ka ị jikọtaghachi ma ọ bụrụ na ọ dị mkpa.",
       "gitlabTitle": "Oge njikọ GitLab agwụla.",
-      "bitbucketTitle": "Oge njikọ Bitbucket agwụla.",
-      "providerMessage": "Njikọ {{provider}} gị adịkwaghị irè. Lelee njikọ gị ọzọ — a ga-agwa gị ka ị jikọtaghachi ma ọ bụrụ na ọ dị mkpa."
+      "bitbucketTitle": "Oge njikọ Bitbucket agwụla."
     },
     "eventChips": {
       "comment": "Nkwupụta",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Arịrịọ ijikọ koodu",
       "mergeRequest": "Arịrịọ njikọta",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Arịrịọ njikọta !{{number}}",
       "shareMergeRequest": "Kekọrịta arịrịọ njikọta",
       "viewOnProvider": "Lelee na {{provider}}",
       "mergeRequestUnavailable": "Arịrịọ njikọta adịghị",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "O nwere ike ịdị mkpa inye ikike ịnweta otu ma ọ bụ ọrụ ndị ọzọ na GitLab.",
       "installGithubApp": "Wụnye ngwa GitHub na ebe nchekwa",
       "installGithubAppDescription": "Nye ngwa Kilo maka GitHub ikike ịnweta ebe nchekwa ịchọrọ ka a nyochaa.",
-      "repositoryAccess": "ikike ịnweta ebe nchekwa"
+      "repositoryAccess": "ikike ịnweta ebe nchekwa",
+      "allModePersonal": "A na-enyocha akpaaka ebe nchekwa ọ bụla Kilo nwere ike ịnweta site na njikọ GitHub gị.",
+      "allModeOrganization": "A na-enyocha akpaaka ebe nchekwa ọ bụla Kilo nwere ike ịnweta site na njikọ GitHub nke otu a.",
+      "allModeCount": "Ebe nchekwa dị: {{displayCount}}"
     },
     "style": {
       "title": "Ụdị nyocha",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Enweghị ike ibudata nnọkọ na-arụ ọrụ.",
       "couldNotRefresh": "Enweghị ike ibugharịa",
-      "noSessionsYetDescription": "Malite ọrụ ide koodu site na ekwentị gị. Nnọkọ gị ga-apụta ebe a.",
+      "noSessionsYetDescription": "Malite ọrụ ide koodu site na ekwentị gị.",
       "viewHistory": "Ndekọ nnọkọ",
       "noMatches": "Enweghị nnọkọ dabara",
       "tryDifferentSearch": "Nwaa okwu ọchụchọ dị iche.",
@@ -2293,9 +2296,9 @@
       "couldNotLoadGithubRepositories": "Enweghị ike ibudata ebe nchekwa koodu GitHub.",
       "couldNotLoadGitlabRepositories": "Enweghị ike ibudata ebe nchekwa koodu GitLab.",
       "couldNotLoadBitbucketRepositories": "Enweghị ike ibudata ebe nchekwa koodu Bitbucket.",
-      "connectGithubDescription": "Jikọọ GitHub n'ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa koodu.",
-      "connectGitlabDescription": "Jikọọ GitLab n'ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa koodu.",
-      "connectBitbucketDescription": "Jikọọ Bitbucket n'ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa koodu.",
+      "connectGithubDescription": "Banye n'ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa koodu GitHub.",
+      "connectGitlabDescription": "Banye n'ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa koodu GitLab.",
+      "connectBitbucketDescription": "Banye n'ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa koodu Bitbucket.",
       "openGithub": "Mepee GitHub",
       "openGitlab": "Mepee GitLab",
       "openBitbucket": "Mepee Bitbucket",
@@ -3847,8 +3850,6 @@
     "commandAtLimit": "Iwu ahụ nwere oke mkpụrụedemede {{max}}",
     "commandsEmpty": "Enweghị iwu ntọlite ka",
     "commandsSaveFailed": "Enweghị ike ichekwa iwu ntọala",
-    "moveUp": "Bulie elu",
-    "moveDown": "Budata ala",
     "moveCommandUp": "Bufee iwu {{position}} elu",
     "moveCommandDown": "Bufee iwu {{position}} ala",
     "skillsTitle": "Nkà",
@@ -3859,7 +3860,10 @@
     "skillNameRequired": "Tinye aha nka",
     "skillNameInvalid": "Aha nka ga-ebidorịrị site na mkpụrụedemede ma ọ bụ mkpụrụọnụọgụgụ ma jiri naanị obere mkpụrụedemede, mkpụrụọnụọgụgụ na ngwucha",
     "skillContentRequired": "Achọrọ ọdịnaya nka",
-    "skillSaveFailed": "Enweghị ike ichekwa nka",
+    "skillSaveFailed": "Enweghị ike ichekwa nka. Nwaa ọzọ.",
+    "skillDeleteFailed": "Enweghị ike ihichapụ nka. Nwaa ọzọ.",
+    "skillToggleFailed": "Enweghị ike imelite nka. Nwaa ọzọ.",
+    "skillLimitReached": "Profaịlụ nwere ike ijide ruo {{max}} nkà. Hichapụ otu iji tinye nke ọzọ.",
     "skillSourceCustom": "Nke onwe",
     "skillSourceMarketplace": "Ahịa",
     "skillSourceSkillsSh": "skills.sh",

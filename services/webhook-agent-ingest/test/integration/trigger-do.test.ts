@@ -1,5 +1,6 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { eq } from 'drizzle-orm';
 import { describe, it, expect, vi } from 'vitest';
 import { requests, triggerConfig } from '../../src/db/sqlite-schema';
 import type { TriggerDO } from '../../src/dos/TriggerDO';
@@ -1517,5 +1518,74 @@ describe('standard JSON Schema patterns', () => {
     });
     expect(await stub.getConfig()).toBeNull();
     expect((await stub.listRequests()).requests).toEqual([]);
+  });
+
+  it('refuses patterns outside the accepted subset', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/pattern/subset'));
+    const bodySchema = { type: 'string', pattern: '^(a+)+$' };
+    await runInDurableObject(stub, async instance => {
+      await expect(
+        instance.configure('user/pattern', 'subset', {
+          promptTemplate: '{{body}}',
+          bodySchema,
+        })
+      ).rejects.toThrow('Pattern must not nest quantifiers');
+    });
+    expect(await stub.getConfig()).toBeNull();
+    await stub.configure('user/pattern', 'subset', { promptTemplate: '{{body}}' });
+    await runInDurableObject(stub, async instance => {
+      await expect(instance.updateConfig({ bodySchema })).rejects.toThrow(
+        'Pattern must not nest quantifiers'
+      );
+    });
+    expect((await stub.getConfig())?.bodySchema).toBeNull();
+  });
+
+  it('keeps a schema stored under the previous policy loadable and captures without applying it', async () => {
+    const legacySchema = {
+      type: 'object',
+      properties: { event: { type: 'string', pattern: '^(a+)+$' } },
+      required: ['event'],
+      additionalProperties: false,
+    };
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/pattern/legacy'));
+    await stub.configure('user/pattern', 'legacy', {
+      promptTemplate: '{{body}}',
+      bodySchema: { type: 'object', properties: { event: { type: 'string' } } },
+    });
+    await runInDurableObject(stub, async (_instance, state) => {
+      drizzle(state.storage)
+        .update(triggerConfig)
+        .set({ body_schema: legacySchema })
+        .where(eq(triggerConfig.trigger_id, 'legacy'))
+        .run();
+    });
+    expect((await stub.getConfig())?.bodySchema).toEqual(legacySchema);
+    expect((await stub.getConfigForResponse())?.bodySchema).toEqual(legacySchema);
+    const capture = (body: string) =>
+      stub.captureRequest({
+        method: 'POST',
+        path: '/',
+        queryString: null,
+        headers: {},
+        body,
+        contentType: 'application/json',
+        sourceIp: null,
+      });
+    const started = Date.now();
+    expect(await capture(JSON.stringify({ event: `${'a'.repeat(40)}!` }))).toMatchObject({
+      success: true,
+    });
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(await capture('{}')).toMatchObject({ success: true });
+    expect(await capture('not json')).toMatchObject({
+      success: false,
+      error: 'Body validation failed',
+    });
+    await runInDurableObject(stub, async instance => {
+      await expect(instance.updateConfig({ bodySchema: legacySchema })).rejects.toThrow(
+        'Pattern must not nest quantifiers'
+      );
+    });
   });
 });

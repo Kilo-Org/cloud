@@ -163,7 +163,7 @@
     "allLanguages": "Kaikki kielet"
   },
   "login": {
-    "welcome": "Tervetuloa Kiloon",
+    "welcome": "Tervetuloa",
     "retrySignIn": "Yritä kirjautumista uudelleen",
     "logo": "Kilo-logo",
     "continuingSignIn": "Jatketaan kirjautumista.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Yhdistä GitLab-tilisi, niin voit katselmoida yhdistämispyyntöjä mobiililaitteella.",
       "bitbucketDescription": "Yhdistä Bitbucket tähän organisaatioon, niin voit katselmoida muutospyyntöjä mobiililaitteella.",
       "bitbucketOrgOnlyDescription": "Vaihda yllä oleva tili organisaatioon, niin voit katselmoida sen Bitbucket-muutospyyntöjä.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Tällä tilillä ei ole vielä organisaatioita. Voit katselmoida Bitbucket-muutospyyntöjä, kun luot organisaation tai liityt sellaiseen.",
       "contextLine": "{{organization}}-organisaatiolle",
       "contextLinePersonal": "Henkilökohtaiselle tilillesi"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub-yhteys on vanhentunut",
-      "message": "GitHub-yhteytesi ei ole enää voimassa. Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen.",
+      "message": "Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen.",
       "gitlabTitle": "GitLab-yhteys on vanhentunut",
-      "bitbucketTitle": "Bitbucket-yhteys on vanhentunut",
-      "providerMessage": "{{provider}}-yhteytesi ei ole enää voimassa. Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen."
+      "bitbucketTitle": "Bitbucket-yhteys on vanhentunut"
     },
     "eventChips": {
       "comment": "Kommentoi",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Sinun on ehkä myönnettävä käyttöoikeus useampiin ryhmiin tai projekteihin GitLabissa.",
       "installGithubApp": "Asenna GitHub-sovellus koodivarastoihin",
       "installGithubAppDescription": "Anna Kilon GitHub-sovellukselle käyttöoikeus koodivarastoihin, jotka haluat katselmoida.",
-      "repositoryAccess": "koodivaraston käyttöoikeus"
+      "repositoryAccess": "koodivaraston käyttöoikeus",
+      "allModePersonal": "Jokainen koodivarasto, johon Kilo pääsee käsiksi GitHub-yhteytesi kautta, katselmoidaan automaattisesti.",
+      "allModeOrganization": "Jokainen koodivarasto, johon Kilo pääsee käsiksi organisaation GitHub-yhteyden kautta, katselmoidaan automaattisesti.",
+      "allModeCount": "Käytettävissä olevat koodivarastot: {{displayCount}}"
     },
     "style": {
       "title": "Katselmointityyli",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Aktiivisia istuntoja ei voitu ladata.",
       "couldNotRefresh": "Päivitys epäonnistui",
-      "noSessionsYetDescription": "Aloita koodaustehtävä puhelimellasi. Istunnot näkyvät tässä.",
+      "noSessionsYetDescription": "Aloita koodaustehtävä puhelimellasi.",
       "viewHistory": "Istuntojen historia",
       "noMatches": "Ei vastaavia istuntoja",
       "tryDifferentSearch": "Kokeile toista hakusanaa.",
@@ -2293,9 +2296,9 @@
       "couldNotLoadGithubRepositories": "GitHub-koodivarastojen lataus epäonnistui.",
       "couldNotLoadGitlabRepositories": "GitLab-koodivarastojen lataus epäonnistui.",
       "couldNotLoadBitbucketRepositories": "Bitbucket-koodivarastojen lataus epäonnistui.",
-      "connectGithubDescription": "Yhdistä GitHub selaimessa ja palaa sitten tänne valitsemaan koodivarasto.",
-      "connectGitlabDescription": "Yhdistä GitLab selaimessa ja palaa sitten tänne valitsemaan koodivarasto.",
-      "connectBitbucketDescription": "Yhdistä Bitbucket selaimessa ja palaa sitten tänne valitsemaan koodivarasto.",
+      "connectGithubDescription": "Kirjaudu sisään selaimessa ja palaa sitten tänne valitsemaan GitHub-koodivarasto.",
+      "connectGitlabDescription": "Kirjaudu sisään selaimessa ja palaa sitten tänne valitsemaan GitLab-koodivarasto.",
+      "connectBitbucketDescription": "Kirjaudu sisään selaimessa ja palaa sitten tänne valitsemaan Bitbucket-koodivarasto.",
       "openGithub": "Avaa GitHub",
       "openGitlab": "Avaa GitLab",
       "openBitbucket": "Avaa Bitbucket",
@@ -3847,8 +3850,6 @@
     "commandAtLimit": "Komento saa olla enintään {{max}} merkkiä",
     "commandsEmpty": "Ei vielä asennuskomentoja",
     "commandsSaveFailed": "Asennuskomentoja ei voitu tallentaa",
-    "moveUp": "Siirrä ylös",
-    "moveDown": "Siirrä alas",
     "moveCommandUp": "Siirrä komento {{position}} ylös",
     "moveCommandDown": "Siirrä komento {{position}} alas",
     "skillsTitle": "Taidot",
@@ -3859,7 +3860,10 @@
     "skillNameRequired": "Anna taidon nimi",
     "skillNameInvalid": "Taidon nimen tulee alkaa kirjaimella tai numerolla ja käyttää vain pieniä kirjaimia, numeroita ja väliviivoja",
     "skillContentRequired": "Taidon sisältö vaaditaan",
-    "skillSaveFailed": "Taitoa ei voitu tallentaa",
+    "skillSaveFailed": "Taitoa ei voitu tallentaa. Yritä uudelleen.",
+    "skillDeleteFailed": "Taitoa ei voitu poistaa. Yritä uudelleen.",
+    "skillToggleFailed": "Taitoa ei voitu päivittää. Yritä uudelleen.",
+    "skillLimitReached": "Profiiliin mahtuu enintään {{max}} taitoa. Poista yksi, jotta voit lisätä toisen.",
     "skillSourceCustom": "Mukautettu",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

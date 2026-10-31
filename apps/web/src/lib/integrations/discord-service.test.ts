@@ -231,4 +231,16 @@ describe('discord-service organization install model', () => {
     const inserted = mockInsertValues.mock.calls[0][0] as { metadata: Record<string, unknown> };
     expect(inserted.metadata.model_slug).toBe('test/allowed-model');
   });
+
+  it('stores the model the caller resolved', async () => {
+    mockGetDefaultAllowedModel.mockResolvedValue('test/unused-model');
+
+    await upsertDiscordInstallation(orgOwner, oauthResponse, {
+      defaultModel: 'test/caller-model',
+    });
+
+    const inserted = mockInsertValues.mock.calls[0][0] as { metadata: Record<string, unknown> };
+    expect(inserted.metadata.model_slug).toBe('test/caller-model');
+    expect(mockGetDefaultAllowedModel).not.toHaveBeenCalled();
+  });
 });

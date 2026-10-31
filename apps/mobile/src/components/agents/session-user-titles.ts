@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { chainSave } from '@/lib/hooks/save-chain';
 import { USER_SESSION_TITLES_KEY } from '@/lib/storage-keys';
+import { captureTelemetry } from '@/lib/telemetry/error-sink';
 
 /**
  * Durable record of the titles the app's own rename flow wrote for sessions
@@ -26,7 +27,9 @@ import { USER_SESSION_TITLES_KEY } from '@/lib/storage-keys';
  * the native SQLCipher chain (and importable in node tests). Until hydration
  * completes the store is empty, so a title the user chose before the restart is
  * hidden for the first frames; `useUserSessionTitlesRevision` re-renders the
- * consumers once it lands.
+ * consumers once it lands. A read that fails is retried by the next rename and
+ * never replaces the stored blob: until one succeeds the map may be missing
+ * entries the blob holds, so writing it would drop them.
  */
 
 /** Item key for the single serialized titles blob under the storage scope. */
@@ -108,10 +111,19 @@ let lastWrite: Promise<void> | null = null;
 
 function persistTitles(): void {
   lastWrite = chainSave(USER_SESSION_TITLES_KEY, async () => {
-    // Serialize only after hydration settles. A remember that lands during the
-    // hydration window must not overwrite the persisted blob before the
-    // hydrated titles are applied, or it erases other sessions' titles.
-    await hydrationPromise;
+    // Read before writing, and read again rather than awaiting the remembered
+    // promise: `hydrate` re-arms itself after a failed read, so this write
+    // retries the read instead of leaving the blob frozen for the module's
+    // life. A remember that lands during the hydration window must not
+    // overwrite the persisted blob before the hydrated titles are applied, or
+    // it erases other sessions' titles.
+    await hydrate();
+    if (!hydratedUnderEpoch) {
+      // The blob has never been read on this account boundary, so the map may
+      // be missing entries it holds. Skipping the write keeps them; the next
+      // rename retries the read and persists then.
+      return;
+    }
     const serialized = serializeTitles();
     await writeTitlesSafely(serialized);
   });
@@ -149,6 +161,12 @@ function applyHydratedTitles(raw: string): boolean {
 
 let hydrationPromise: Promise<void> | null = null;
 
+// Set only by a read that returned under the current account boundary. The
+// in-memory map is the whole record only once that happened: before it, the
+// map may be missing entries the persisted blob holds, so a write that
+// replaces the blob would drop them.
+let hydratedUnderEpoch = false;
+
 // Bumped at every account boundary so a hydration already in flight cannot
 // apply a read that started before the clear. Without it, a `getItem` that
 // resolves after `clearUserSessionTitles` would repopulate the emptied map
@@ -156,13 +174,19 @@ let hydrationPromise: Promise<void> | null = null;
 // serialize those stale ids back to the shared KV scope.
 let hydrationEpoch = 0;
 
+// Identifies the attempt currently memoized in `hydrationPromise`, so a failed
+// attempt re-arms hydration only while it is still the current one.
+let hydrationAttempt = 0;
+
 // eslint-disable-next-line require-await, @typescript-eslint/require-await -- single-flight must memoize hydration synchronously before any await; the awaits live inside the memoized hydration chain (same pattern as openDatabase in encrypted-kv.ts)
 async function hydrate(): Promise<void> {
   if (hydrationPromise) {
     return hydrationPromise;
   }
   const epoch = hydrationEpoch;
-  hydrationPromise = (async () => {
+  hydrationAttempt += 1;
+  const attempt = hydrationAttempt;
+  const next = (async () => {
     const kv = await loadKv();
     if (!kv) {
       return;
@@ -174,16 +198,32 @@ async function hydrate(): Promise<void> {
       if (epoch !== hydrationEpoch) {
         return;
       }
+      // The read returned, so the map now holds everything the blob does — or
+      // the blob was empty/unreadable as data, which the map may replace.
+      hydratedUnderEpoch = true;
       if (raw !== null && applyHydratedTitles(raw)) {
         // A restored title changes what a row or header renders: notify
         // subscribers so they re-render and re-evaluate their title.
         bumpRevision();
       }
-    } catch {
-      // Unreadable KV: start empty; the backend placeholder stays hidden.
+    } catch (error) {
+      // Unreadable KV: start empty and leave the store not-known-hydrated, so
+      // no write replaces the blob this read never saw. Re-arming hydration
+      // makes the next rename read again instead of reusing this failure for
+      // the life of the module.
+      if (hydrationAttempt === attempt) {
+        hydrationPromise = null;
+      }
+      captureTelemetry({
+        error,
+        level: 'warning',
+        tags: { 'error.subsystem': 'session_titles', 'error.operation': 'hydrate' },
+        fingerprint: ['session-titles-hydrate-failure'],
+      });
     }
   })();
-  return hydrationPromise;
+  hydrationPromise = next;
+  return next;
 }
 
 // Hydrate at module init, before the first read. The store stays empty until
@@ -278,8 +318,10 @@ export async function clearUserSessionTitles(): Promise<void> {
   });
   await lastWrite;
   // Re-arm hydration so the next account does not read the cleared blob
-  // through the settled promise of this run.
+  // through the settled promise of this run, and require its own read before
+  // any write replaces the blob.
   hydrationPromise = null;
+  hydratedUnderEpoch = false;
 }
 
 /**
@@ -305,6 +347,7 @@ export function __resetUserSessionTitlesForTests(): void {
   // Invalidate any hydration left in flight by the previous case.
   hydrationEpoch += 1;
   hydrationPromise = null;
+  hydratedUnderEpoch = false;
   lastWrite = null;
 }
 

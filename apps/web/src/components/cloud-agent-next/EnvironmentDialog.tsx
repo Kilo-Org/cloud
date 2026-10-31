@@ -176,6 +176,7 @@ function EnvironmentForm({
   };
 
   const handleSave = async () => {
+    if (!canManage) return;
     if (!variables) {
       setPage('variables');
       return;
@@ -220,7 +221,7 @@ function EnvironmentForm({
     }
   };
   const handleDelete = async () => {
-    if (!existing) return;
+    if (!canManage || !existing) return;
     try {
       await deleteEnvironment.mutateAsync({ organizationId, environmentId: existing.id });
       toast.success('Environment deleted');
@@ -258,6 +259,11 @@ function EnvironmentForm({
           </DialogTitle>
         </div>
         <DialogDescription className="break-all">{fullName}</DialogDescription>
+        {!canManage && (
+          <p className="text-muted-foreground text-xs">
+            View only. Organization owners and admins can edit this environment.
+          </p>
+        )}
       </DialogHeader>
       <div className="min-h-0 space-y-5 overflow-y-auto px-6 pb-6">
         <fieldset disabled={isSaving || deleteEnvironment.isPending} className="min-w-0 space-y-5">
@@ -268,7 +274,7 @@ function EnvironmentForm({
                   organizationId={organizationId}
                   repository={sandboxRepository}
                   value={sandboxAllocation}
-                  disabled={isSaving}
+                  disabled={!canManage || isSaving}
                   onChange={setSandboxAllocation}
                 />
               )}
@@ -298,10 +304,13 @@ function EnvironmentForm({
               </div>
             </>
           )}
-          {page === 'scripts' && <EnvironmentScriptsEditor script={script} onChange={setScript} />}
+          {page === 'scripts' && (
+            <EnvironmentScriptsEditor script={script} onChange={setScript} readOnly={!canManage} />
+          )}
           {page === 'variables' && (
             <EnvironmentVariablesEditor
               text={variablesText}
+              readOnly={!canManage}
               onChange={setVariablesText}
               removedKeys={variables?.removedKeys ?? []}
               error={variablesError}
@@ -368,7 +377,7 @@ function EnvironmentForm({
       </div>
       <DialogFooter className="shrink-0 gap-3 border-t px-6 py-4 sm:items-center sm:justify-between">
         <div>
-          {existing && page === 'overview' && (
+          {canManage && existing && page === 'overview' && (
             <EnvironmentDeleteDialog
               repositoryName={fullName}
               onDelete={handleDelete}
@@ -380,21 +389,23 @@ function EnvironmentForm({
         <div className="flex justify-end gap-2">
           <DialogClose asChild>
             <Button variant="ghost" size="sm" disabled={isSaving}>
-              Cancel
+              {canManage ? 'Cancel' : 'Close'}
             </Button>
           </DialogClose>
-          <Button
-            size="sm"
-            onClick={handleSave}
-            disabled={
-              isSaving ||
-              deleteEnvironment.isPending ||
-              profileQuery.isLoading ||
-              profileQuery.isError
-            }
-          >
-            {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}Save environment
-          </Button>
+          {canManage && (
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={
+                isSaving ||
+                deleteEnvironment.isPending ||
+                profileQuery.isLoading ||
+                profileQuery.isError
+              }
+            >
+              {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}Save environment
+            </Button>
+          )}
         </div>
       </DialogFooter>
     </>

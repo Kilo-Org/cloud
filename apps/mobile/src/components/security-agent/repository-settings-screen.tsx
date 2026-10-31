@@ -13,6 +13,8 @@ import { toast } from 'sonner-native';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { EmptyState } from '@/components/empty-state';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { classifyListBody } from '@/lib/query/list-body-state';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
@@ -75,6 +77,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
   const save = useSaveSecurityAgentConfig(scope);
+  const connectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
 
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -178,22 +181,29 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const showRepositoryStates = mode === 'selected';
   const hasRepositories = (repositories.data?.length ?? 0) > 0;
   // A loading, failed, or not-yet-fetched repository query must not read as
-  // zero repositories. While an enabled query is paused (offline first load)
-  // it is neither loading nor errored and `data` is still undefined, which is
-  // not the settled "No repositories" state the Manage access CTA is for.
-  const repositoriesEmpty = repositories.data?.length === 0;
-  // Only a settled read says the grant has nothing to select.
-  const repositoriesSettledEmpty =
-    repositoriesEmpty && !repositories.isLoading && !repositories.isError;
+  // zero repositories. Only a delivered read may claim the list is empty: a
+  // read paused by lost connectivity delivered nothing and names the
+  // connection with Retry instead.
+  const repositoriesBody = classifyListBody({
+    rowCount: repositories.data?.length ?? 0,
+    hasDeliveredData: repositories.data !== undefined,
+    isError: repositories.isError,
+    isFetching: repositories.isFetching,
+    fetchStatus: repositories.fetchStatus,
+    connectivityKnown,
+  });
+  const repositoriesFailed =
+    repositoriesBody.status === 'error' ||
+    (repositoriesBody.status === 'rows' && repositories.isError);
+
   // An empty grant is the one repository state that is not about the mode: with
   // nothing accessible there is nothing to select and nothing to sync whichever
   // mode is stored, and widening the app's access is the only way out. Naming it
   // only in `selected` mode left the disabled agent's "Select repositories" row
-  // landing on a screen whose only controls were the two mode choices.
-  // Only a settled read qualifies: a `[]` left over from before a failed
-  // refetch (which the return edge below can hit) must not render the grant
-  // state, which would leave the section with a label and no control.
-  const showRepositorySection = showRepositoryStates || repositoriesSettledEmpty;
+  // landing on a screen whose only controls were the two mode choices. Only the
+  // classifier's delivered-empty answer reaches the section in `all` mode, so a
+  // cached `[]` under a failed read cannot render a label with no control.
+  const showRepositorySection = showRepositoryStates || repositoriesBody.status === 'empty';
 
   // The GitHub settings page is where installation access is widened on the
   // web, and `openExternalUrl` resolves when that page closes — on both
@@ -209,12 +219,12 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // `billing_manager`), and `ensureOrganizationAccess` refuses the role with
   // `UNAUTHORIZED`; an organization whose installation cannot take a second one
   // is refused with `FORBIDDEN`. Both are ordinary states here, and both are
-  // exactly the settled-empty-grant case this screen exists for. The web page
-  // mints its own state for the signed-in user, so any organization refusal
-  // falls back to the plain settings URL instead of leaving the control inert —
-  // the same rule the Code Reviewer's GitHub recovery control applies. A
-  // personal mint failure has no such page-level fallback to reach, so it keeps
-  // the toast.
+  // exactly the empty-grant case this screen exists for. The web page mints
+  // its own state for the signed-in user, so any organization refusal falls
+  // back to the plain settings URL instead of leaving the control inert — the
+  // same rule the Code Reviewer's GitHub recovery control applies. A personal
+  // mint failure has no such page-level fallback to reach, so it keeps the
+  // toast.
   const manageAccess = async () => {
     const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
     const open = async (url: string) => {
@@ -269,27 +279,31 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
         <View className="mt-6">
           {/* The empty state's own title already says "No repositories", so a
               section label above it only repeats the screen title. */}
-          {repositoriesSettledEmpty ? null : (
+          {repositoriesBody.status === 'empty' ? null : (
             <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
               {t('common.repositories')}
             </Text>
           )}
-          {showRepositoryStates && repositories.isLoading && (
+          {repositoriesBody.status === 'loading' && (
             <View className="gap-3 pt-2">
               <Skeleton className="h-12 w-full rounded-lg" />
               <Skeleton className="h-12 w-full rounded-lg" />
             </View>
           )}
-          {showRepositoryStates && repositories.isError && (
+          {repositoriesFailed && (
             <QueryError
-              variant="server"
+              variant={
+                repositoriesBody.status === 'error' && repositoriesBody.cause === 'offline'
+                  ? 'offline'
+                  : 'server'
+              }
               placement="top"
               title={t('common.couldNotLoadRepositories')}
               onRetry={() => void repositories.refetch()}
               isRetrying={repositories.isFetching}
             />
           )}
-          {repositoriesSettledEmpty ? (
+          {repositoriesBody.status === 'empty' ? (
             <EmptyState
               placement="top"
               icon={FolderGit2}

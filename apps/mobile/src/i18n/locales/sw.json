@@ -163,7 +163,7 @@
     "allLanguages": "Lugha zote"
   },
   "login": {
-    "welcome": "Karibu Kilo",
+    "welcome": "Karibu",
     "retrySignIn": "Jaribu tena kuingia",
     "logo": "Nembo ya Kilo",
     "continuingSignIn": "Mchakato wako wa kuingia unaendelea.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Unganisha akaunti yako ya GitLab ili kukagua maombi ya kuunganisha kwenye simu.",
       "bitbucketDescription": "Unganisha Bitbucket na shirika hili ili kukagua maombi ya kuunganisha kwenye simu.",
       "bitbucketOrgOnlyDescription": "Badilisha akaunti iliyo juu kuwa shirika ili kukagua maombi yake ya kuunganisha kwenye Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Akaunti hii haina shirika lolote kwa sasa. Unaweza kukagua maombi ya kuunganisha kwenye Bitbucket mara tu unapounda au kujiunga na shirika.",
       "contextLine": "Kwa {{organization}}",
       "contextLinePersonal": "Kwa akaunti yako binafsi"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Muda wa muunganisho wa GitHub umeisha.",
-      "message": "Muunganisho wako wa GitHub si halali tena. Uangalie tena — utaombwa kuunganisha upya ikihitajika.",
+      "message": "Uangalie tena — utaombwa kuunganisha upya ikihitajika.",
       "gitlabTitle": "Muda wa muunganisho wa GitLab umeisha.",
-      "bitbucketTitle": "Muda wa muunganisho wa Bitbucket umeisha.",
-      "providerMessage": "Muunganisho wako wa {{provider}} si halali tena. Uangalie tena — utaombwa kuunganisha upya ikihitajika."
+      "bitbucketTitle": "Muda wa muunganisho wa Bitbucket umeisha."
     },
     "eventChips": {
       "comment": "Toa maoni",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Ombi la kuunganisha",
       "mergeRequest": "Ombi la kuunganisha",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Ombi la kuunganisha !{{number}}",
       "shareMergeRequest": "Shiriki ombi la kuunganisha",
       "viewOnProvider": "Tazama kwenye {{provider}}",
       "mergeRequestUnavailable": "Ombi la kuunganisha halipatikani",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Huenda unahitaji kutoa ufikiaji kwa vikundi au miradi zaidi kwenye GitLab.",
       "installGithubApp": "Sakinisha programu ya GitHub kwenye hazina",
       "installGithubAppDescription": "Ipe programu ya Kilo ya GitHub ruhusa ya kufikia hazina unazotaka zikaguliwe.",
-      "repositoryAccess": "ufikiaji wa hazina"
+      "repositoryAccess": "ufikiaji wa hazina",
+      "allModePersonal": "Kila hazina ambayo Kilo anaweza kufikia kupitia muunganisho wako wa GitHub inakaguliwa kiotomatiki.",
+      "allModeOrganization": "Kila hazina ambayo Kilo anaweza kufikia kupitia muunganisho wa GitHub wa shirika inakaguliwa kiotomatiki.",
+      "allModeCount": "Hazina zinazopatikana: {{displayCount}}"
     },
     "style": {
       "title": "Mtindo wa ukaguzi",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "Imeshindikana kupakia vikao vinavyoendelea.",
       "couldNotRefresh": "Imeshindikana kuonyesha upya",
-      "noSessionsYetDescription": "Anza kazi ya kuandika msimbo kutoka kwenye simu yako. Vikao vyako vitaonekana hapa.",
+      "noSessionsYetDescription": "Anza kazi ya kuandika msimbo kutoka kwenye simu yako.",
       "viewHistory": "Historia ya vikao",
       "noMatches": "Hakuna vikao vinavyolingana",
       "tryDifferentSearch": "Jaribu neno lingine la utafutaji.",
@@ -2293,9 +2296,9 @@
       "couldNotLoadGithubRepositories": "Imeshindikana kupakia hazina za GitHub.",
       "couldNotLoadGitlabRepositories": "Imeshindikana kupakia hazina za GitLab.",
       "couldNotLoadBitbucketRepositories": "Imeshindikana kupakia hazina za Bitbucket.",
-      "connectGithubDescription": "Unganisha GitHub kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",
-      "connectGitlabDescription": "Unganisha GitLab kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",
-      "connectBitbucketDescription": "Unganisha Bitbucket kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",
+      "connectGithubDescription": "Ingia kwenye kivinjari chako, kisha rudi hapa kuchagua hazina ya GitHub.",
+      "connectGitlabDescription": "Ingia kwenye kivinjari chako, kisha rudi hapa kuchagua hazina ya GitLab.",
+      "connectBitbucketDescription": "Ingia kwenye kivinjari chako, kisha rudi hapa kuchagua hazina ya Bitbucket.",
       "openGithub": "Fungua GitHub",
       "openGitlab": "Fungua GitLab",
       "openBitbucket": "Fungua Bitbucket",
@@ -3847,8 +3850,6 @@
     "commandAtLimit": "Amri ina kikomo cha vibambo {{max}}",
     "commandsEmpty": "Bado hakuna amri za usanidi",
     "commandsSaveFailed": "Haikuweza kuhifadhi amri za usanidi",
-    "moveUp": "Sogeza juu",
-    "moveDown": "Sogeza chini",
     "moveCommandUp": "Sogeza amri {{position}} juu",
     "moveCommandDown": "Sogeza amri {{position}} chini",
     "skillsTitle": "Ujuzi",
@@ -3859,7 +3860,10 @@
     "skillNameRequired": "Weka jina la ujuzi",
     "skillNameInvalid": "Jina la ustadi lazima lianze na herufi au tarakimu na litumie herufi ndogo, tarakimu na deshi pekee.",
     "skillContentRequired": "Maudhui ya ujuzi yanahitajika",
-    "skillSaveFailed": "Haikuweza kuhifadhi ujuzi",
+    "skillSaveFailed": "Haikuweza kuhifadhi ujuzi. Jaribu tena.",
+    "skillDeleteFailed": "Haikuweza kufuta ujuzi. Jaribu tena.",
+    "skillToggleFailed": "Haikuweza kusasisha ujuzi. Jaribu tena.",
+    "skillLimitReached": "Wasifu unaweza kubeba hadi {{max}} ujuzi. Futa mmoja ili kuongeza mwingine.",
     "skillSourceCustom": "Maalum",
     "skillSourceMarketplace": "Soko",
     "skillSourceSkillsSh": "skills.sh",

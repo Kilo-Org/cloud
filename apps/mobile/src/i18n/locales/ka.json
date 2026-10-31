@@ -163,7 +163,7 @@
     "allLanguages": "ყველა ენა"
   },
   "login": {
-    "welcome": "კეთილი იყოს შენი მობრძანება Kilo-ში",
+    "welcome": "კეთილი იყოს შენი მობრძანება",
     "retrySignIn": "შესვლის ხელახლა ცდა",
     "logo": "Kilo-ს ლოგო",
     "continuingSignIn": "შესვლის პროცესი გრძელდება.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "დააკავშირეთ თქვენი GitLab ანგარიში, შერწყმის მოთხოვნების მობილურში განსახილველად.",
       "bitbucketDescription": "დააკავშირეთ Bitbucket ამ ორგანიზაციას, PR-ების მობილურში განსახილველად.",
       "bitbucketOrgOnlyDescription": "ზემოთ მყოფი ანგარიში გადართეთ ორგანიზაციაზე, მისი Bitbucket-ის PR-ების განსახილველად.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "ამ ანგარიშს ჯერ არ ჰყავს ორგანიზაციები. შექმენით ორგანიზაცია ან შეუერთდით მას, Bitbucket-ის PR-ების განსახილველად.",
       "contextLine": "{{organization}}-სთვის",
       "contextLinePersonal": "პირადი ანგარიშისთვის"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub-თან კავშირს ვადა გაუვიდა.",
-      "message": "GitHub-თან კავშირი აღარ მოქმედებს. ხელახლა შეამოწმე კავშირი — საჭიროების შემთხვევაში აპი ხელახლა დაკავშირებას მოგთხოვს.",
+      "message": "ხელახლა შეამოწმე კავშირი — საჭიროების შემთხვევაში აპი ხელახლა დაკავშირებას მოგთხოვს.",
       "gitlabTitle": "GitLab-თან კავშირს ვადა გაუვიდა.",
-      "bitbucketTitle": "Bitbucket-თან კავშირს ვადა გაუვიდა.",
-      "providerMessage": "{{provider}}-თან კავშირი აღარ მოქმედებს. ხელახლა შეამოწმე კავშირი — საჭიროების შემთხვევაში აპი ხელახლა დაკავშირებას მოგთხოვს."
+      "bitbucketTitle": "Bitbucket-თან კავშირს ვადა გაუვიდა."
     },
     "eventChips": {
       "comment": "კომენტარი",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Შერწყმის მოთხოვნა",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Შერწყმის მოთხოვნა !{{number}}",
       "shareMergeRequest": "შერწყმის მოთხოვნის გაზიარება",
       "viewOnProvider": "ნახვა {{provider}}-ში",
       "mergeRequestUnavailable": "შერწყმის მოთხოვნა მიუწვდომელია",
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "შესაძლოა საჭირო იყოს GitLab-ზე დამატებით ჯგუფებსა და პროექტებზე წვდომის მინიჭება.",
       "installGithubApp": "GitHub აპის დაყენება რეპოზიტორებზე",
       "installGithubAppDescription": "მიანიჭე Kilo-ს GitHub აპს წვდომა იმ რეპოზიტორებზე, რომელთა შემოწმებაც გსურს.",
-      "repositoryAccess": "რეპოზიტორზე წვდომა"
+      "repositoryAccess": "რეპოზიტორზე წვდომა",
+      "allModePersonal": "ყველა რეპოზიტორი, რომელზეც Kilo-ს წვდომა აქვს თქვენი GitHub კავშირის მეშვეობით, ავტომატურად შემოწმდება.",
+      "allModeOrganization": "ყველა რეპოზიტორი, რომელზეც Kilo-ს წვდომა აქვს ორგანიზაციის GitHub კავშირის მეშვეობით, ავტომატურად შემოწმდება.",
+      "allModeCount": "ხელმისაწვდომი რეპოზიტორები: {{displayCount}}"
     },
     "style": {
       "title": "შემოწმების სტილი",
@@ -2155,7 +2158,7 @@
     "sessionList": {
       "couldNotLoadActive": "აქტიური სესიების ჩატვირთვა ვერ მოხერხდა.",
       "couldNotRefresh": "განახლება ვერ მოხერხდა",
-      "noSessionsYetDescription": "დაიწყე კოდის წერის დავალება ტელეფონიდან. შენი სესიები აქ გამოჩნდება.",
+      "noSessionsYetDescription": "დაიწყე კოდის წერის დავალება ტელეფონიდან.",
       "viewHistory": "სესიების ისტორია",
       "noMatches": "შესაბამისი სესიები არ არის",
       "tryDifferentSearch": "სხვა საძიებო სიტყვა სცადე.",
@@ -2293,9 +2296,9 @@
       "couldNotLoadGithubRepositories": "GitHub-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
       "couldNotLoadGitlabRepositories": "GitLab-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
       "couldNotLoadBitbucketRepositories": "Bitbucket-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
-      "connectGithubDescription": "ბრაუზერში დააკავშირეთ GitHub-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",
-      "connectGitlabDescription": "ბრაუზერში დააკავშირეთ GitLab-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",
-      "connectBitbucketDescription": "ბრაუზერში დააკავშირეთ Bitbucket-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",
+      "connectGithubDescription": "შედით ბრაუზერში, შემდეგ აქ დაბრუნდით GitHub-ის რეპოზიტორიის ასარჩევად.",
+      "connectGitlabDescription": "შედით ბრაუზერში, შემდეგ აქ დაბრუნდით GitLab-ის რეპოზიტორიის ასარჩევად.",
+      "connectBitbucketDescription": "შედით ბრაუზერში, შემდეგ აქ დაბრუნდით Bitbucket-ის რეპოზიტორიის ასარჩევად.",
       "openGithub": "GitHub-ის გახსნა",
       "openGitlab": "GitLab-ის გახსნა",
       "openBitbucket": "Bitbucket-ის გახსნა",
@@ -3847,8 +3850,6 @@
     "commandAtLimit": "ბრძანება შემოიფარგლება {{max}} სიმბოლოთი",
     "commandsEmpty": "დაყენების ბრძანებები ჯერ არ არის",
     "commandsSaveFailed": "დაყენების ბრძანებების შენახვა ვერ მოხერხდა",
-    "moveUp": "ზევით გადაადგილება",
-    "moveDown": "ქვევით გადაადგილება",
     "moveCommandUp": "გადაიტანე ბრძანება {{position}} ზემოთ",
     "moveCommandDown": "გადაიტანე ბრძანება {{position}} ქვემოთ",
     "skillsTitle": "უნარები",
@@ -3859,7 +3860,10 @@
     "skillNameRequired": "შეიყვანეთ უნარის სახელი",
     "skillNameInvalid": "უნარის სახელი უნდა დაიწყოს ასოთი ან ციფრით და გამოიყენოს მხოლოდ მცირე ასოები, ციფრები და ტირეები",
     "skillContentRequired": "საჭიროა უნარების შინაარსი",
-    "skillSaveFailed": "უნარების შენახვა ვერ მოხერხდა",
+    "skillSaveFailed": "უნარების შენახვა ვერ მოხერხდა. სცადეთ ხელახლა.",
+    "skillDeleteFailed": "უნარის წაშლა ვერ მოხერხდა. სცადეთ ხელახლა.",
+    "skillToggleFailed": "უნარის განახლება ვერ მოხერხდა. სცადეთ ხელახლა.",
+    "skillLimitReached": "პროფილს შეიძლება ჰქონდეს {{max}}-მდე უნარი. სხვის დასამატებლად წაშალეთ ერთი.",
     "skillSourceCustom": "საკუთარი",
     "skillSourceMarketplace": "ბაზარი",
     "skillSourceSkillsSh": "skills.sh",

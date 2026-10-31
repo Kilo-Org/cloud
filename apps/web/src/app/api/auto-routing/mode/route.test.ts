@@ -116,7 +116,7 @@ describe('/api/auto-routing/mode', () => {
     expect(mockedGetMode).toHaveBeenCalledWith({ ownerType: 'user', ownerId: user.id });
   });
 
-  test.each(['cost_per_accuracy', 'best_accuracy', null] as const)(
+  test.each(['cost_per_accuracy', 'best_accuracy', 'cheapest', null] as const)(
     'updates the authenticated personal mode to %s with null preserved as inheritance',
     async mode => {
       const response = await PUT(

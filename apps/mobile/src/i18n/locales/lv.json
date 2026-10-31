@@ -163,7 +163,7 @@
     "allLanguages": "Visas valodas"
   },
   "login": {
-    "welcome": "Laipni lūdzam Kilo",
+    "welcome": "Laipni lūdzam",
     "retrySignIn": "Mēģināt pierakstīties vēlreiz",
     "logo": "Kilo logotips",
     "continuingSignIn": "Tiek turpināta tava pierakstīšanās.",
@@ -699,6 +699,7 @@
       "gitlabDescription": "Pievieno savu GitLab kontu, lai pārskatītu merge requests mobilajā ierīcē.",
       "bitbucketDescription": "Pievieno Bitbucket šai organizācijai, lai pārskatītu izmaiņu pieprasījumus mobilajā ierīcē.",
       "bitbucketOrgOnlyDescription": "Pārslēdz augstāk redzamo kontu uz organizāciju, lai pārskatītu tās Bitbucket izmaiņu pieprasījumus.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Šim kontam vēl nav organizāciju. Bitbucket izmaiņu pieprasījumus varēs pārskatīt, kad izveidosi organizāciju vai tai pievienosies.",
       "contextLine": "Priekš {{organization}}",
       "contextLinePersonal": "Priekš personīgā konta"
     },
@@ -723,10 +724,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub savienojuma derīguma termiņš ir beidzies.",
-      "message": "Tavs GitHub savienojums vairs nav derīgs. Pārbaudi savienojumu vēlreiz — ja vajadzēs, lietotne aicinās izveidot savienojumu no jauna.",
+      "message": "Pārbaudi savienojumu vēlreiz — ja vajadzēs, lietotne aicinās izveidot savienojumu no jauna.",
       "gitlabTitle": "GitLab savienojuma derīguma termiņš ir beidzies.",
-      "bitbucketTitle": "Bitbucket savienojuma derīguma termiņš ir beidzies.",
-      "providerMessage": "Tavs {{provider}} savienojums vairs nav derīgs. Pārbaudi savienojumu vēlreiz — ja vajadzēs, lietotne aicinās izveidot savienojumu no jauna."
+      "bitbucketTitle": "Bitbucket savienojuma derīguma termiņš ir beidzies."
     },
     "eventChips": {
       "comment": "Komentēt",
@@ -834,7 +834,7 @@
     "terms": {
       "pullRequest": "Izmaiņu pieprasījums",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Kopīgot merge request",
       "viewOnProvider": "Skatīt {{provider}}",
       "mergeRequestUnavailable": "Merge request nav pieejams",
@@ -1449,7 +1449,10 @@
       "gitlabNoRepositoriesDescription": "Iespējams, tev jāpiešķir piekļuve papildu grupām vai projektiem pakalpojumā GitLab.",
       "installGithubApp": "Instalē GitHub lietotni repozitorijos",
       "installGithubAppDescription": "Piešķir Kilo GitHub lietotnei piekļuvi repozitorijiem, kuru kodu vēlies pārskatīt.",
-      "repositoryAccess": "piekļuve repozitorijiem"
+      "repositoryAccess": "piekļuve repozitorijiem",
+      "allModePersonal": "Katrs repozitorijs, kuram Kilo var piekļūt, izmantojot tavu GitHub savienojumu, tiek automātiski pārskatīts.",
+      "allModeOrganization": "Katrs repozitorijs, kuram Kilo var piekļūt, izmantojot organizācijas GitHub savienojumu, tiek automātiski pārskatīts.",
+      "allModeCount": "Pieejamie repozitoriji: {{displayCount}}"
     },
     "style": {
       "title": "Pārskatīšanas stils",
@@ -1689,7 +1692,7 @@
       "outcome": "Rezultāts",
       "slaStatus": "SLA statuss",
       "sortBy": "Kārtot pēc",
-      "statusOpen": "Atvērt",
+      "statusOpen": "Atvērts",
       "fixed": "Novērsts",
       "statusIgnored": "Ignorēts",
       "severityHigh": "Augsts",
@@ -1866,7 +1869,7 @@
       "source": "Avots",
       "sourceId": "Avota ID",
       "viewAdvisory": "Skatīt drošības paziņojumu vietnē GitHub",
-      "statusOpen": "Atvērt",
+      "statusOpen": "Atvērts",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "labošana jau ir sākta",
       "reasonNoBandwidth": "trūkst laika vai resursu",
@@ -2184,7 +2187,7 @@
     "sessionList": {
       "couldNotLoadActive": "Neizdevās ielādēt aktīvās sesijas.",
       "couldNotRefresh": "Neizdevās atsvaidzināt",
-      "noSessionsYetDescription": "Sāc programmēšanas uzdevumu savā tālrunī. Tavas sesijas parādīsies šeit.",
+      "noSessionsYetDescription": "Sāc programmēšanas uzdevumu savā tālrunī.",
       "viewHistory": "Sesiju vēsture",
       "noMatches": "Nav atbilstošu sesiju",
       "tryDifferentSearch": "Izmēģini citu meklēšanas frāzi.",
@@ -2324,9 +2327,9 @@
       "couldNotLoadGithubRepositories": "Neizdevās ielādēt GitHub repozitorijus.",
       "couldNotLoadGitlabRepositories": "Neizdevās ielādēt GitLab repozitorijus.",
       "couldNotLoadBitbucketRepositories": "Neizdevās ielādēt Bitbucket repozitorijus.",
-      "connectGithubDescription": "Pievieno GitHub kontu pārlūkā, pēc tam atgriezies šeit, lai izvēlētos repozitoriju.",
-      "connectGitlabDescription": "Pievieno GitLab kontu pārlūkā, pēc tam atgriezies šeit, lai izvēlētos repozitoriju.",
-      "connectBitbucketDescription": "Pievieno Bitbucket kontu pārlūkā, pēc tam atgriezies šeit, lai izvēlētos repozitoriju.",
+      "connectGithubDescription": "Piesakies pārlūkā, pēc tam atgriezies šeit, lai izvēlētos GitHub repozitoriju.",
+      "connectGitlabDescription": "Piesakies pārlūkā, pēc tam atgriezies šeit, lai izvēlētos GitLab repozitoriju.",
+      "connectBitbucketDescription": "Piesakies pārlūkā, pēc tam atgriezies šeit, lai izvēlētos Bitbucket repozitoriju.",
       "openGithub": "Atvērt GitHub",
       "openGitlab": "Atvērt GitLab",
       "openBitbucket": "Atvērt Bitbucket",
@@ -3897,8 +3900,6 @@
     "commandAtLimit": "Komanda ir ierobežota līdz {{max}} rakstzīmēm",
     "commandsEmpty": "Vēl nav nevienas iestatīšanas komandas",
     "commandsSaveFailed": "Nevarēja saglabāt iestatīšanas komandas",
-    "moveUp": "Pārvietojieties uz augšu",
-    "moveDown": "Pārvietojieties uz leju",
     "moveCommandUp": "Pārvietot komandu {{position}} uz augšu",
     "moveCommandDown": "Pārvietot komandu {{position}} uz leju",
     "skillsTitle": "Prasmes",
@@ -3909,7 +3910,10 @@
     "skillNameRequired": "Ievadiet prasmes nosaukumu",
     "skillNameInvalid": "Prasmes nosaukumam jāsākas ar burtu vai ciparu, un tajā jāizmanto tikai mazie burti, cipari un domuzīmes.",
     "skillContentRequired": "Nepieciešams prasmju saturs",
-    "skillSaveFailed": "Nevarēja saglabāt prasmi",
+    "skillSaveFailed": "Nevarēja saglabāt prasmi. Mēģiniet vēlreiz.",
+    "skillDeleteFailed": "Nevarēja dzēst prasmi. Mēģiniet vēlreiz.",
+    "skillToggleFailed": "Nevarēja atjaunināt prasmi. Mēģiniet vēlreiz.",
+    "skillLimitReached": "Profilā var saglabāt līdz {{max}} prasmēm. Dzēsiet vienu, lai pievienotu citu.",
     "skillSourceCustom": "Pielāgots",
     "skillSourceMarketplace": "Tirgus",
     "skillSourceSkillsSh": "skills.sh",

@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "Me tuku pea koe i te whakaaetanga uru ki ētahi atu rōpū, kaupapa rānei i GitLab.",
       "installGithubApp": "Tāutahia te taupānga GitHub ki ngā pūranga",
       "installGithubAppDescription": "Tukua te taupānga GitHub a Kilo kia uru ki ngā pūranga e hiahia ana koe kia arotakehia.",
-      "repositoryAccess": "te uru ki ngā pūranga"
+      "repositoryAccess": "te uru ki ngā pūranga",
+      "allModePersonal": "Ka arotake aunoa a Kilo i ngā pūranga katoa ka taea e ia te uru atu mā tō hononga GitHub.",
+      "allModeOrganization": "Ka arotake aunoa a Kilo i ngā pūranga katoa ka taea e ia te uru atu mā te hononga GitHub o te rōpū.",
+      "allModeCount": "Ngā pūranga e wātea ana: {{displayCount}}"
     },
     "style": {
       "title": "Te āhua arotake",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "Kāore anō kia tukutahitia",
       "refreshFailed": "Kāore i taea te tāmata — e whakaaturia ana ngā raraunga i tukutahitia whakamutungatia.",
       "settings": "Ngā tautuhinga",
-      "syncFindings": "Tukutahitia ngā kitenga",
       "syncNow": "Tukutahitia ināianei",
       "syncQueued": "Kua tāpirihia te tukutahi ki te tūtira.",
       "syncStatusUnavailable": "Kāore e wātea ana te tūnga tukutahi.",
@@ -2155,7 +2157,7 @@
     "sessionList": {
       "couldNotLoadActive": "Kāore i taea te uta i ngā wātū e haere ana.",
       "couldNotRefresh": "Kāore i taea te whakahou",
-      "noSessionsYetDescription": "Tīmataria he mahi tuhi waehere i tō waea. Ka puta ō wātū ki konei.",
+      "noSessionsYetDescription": "Tīmataria he mahi tuhi waehere i tō waea.",
       "viewHistory": "Hītori wātū",
       "noMatches": "Kāore he wātū e hāngai ana",
       "tryDifferentSearch": "Whakamātauhia tētahi kupu rapu rerekē.",
@@ -3855,6 +3857,7 @@
     "skillMarkdownLabel": "Te ihirangi pukenga",
     "skillsEmpty": "Kaore ano he pukenga",
     "skillNameRequired": "Whakauruhia he ingoa pukenga",
+    "skillNameTooLong": "Kia {{max}} pūāhua te roa o te ingoa pukenga, kaua e neke ake",
     "skillNameInvalid": "Me timata te ingoa pukenga ki te reta, mati ranei me te whakamahi i nga reta iti, mati, me nga tohu",
     "skillContentRequired": "Kei te hiahiatia nga ihirangi pukenga",
     "skillSaveFailed": "Kaore i taea te penapena pukenga. Whakamātauria anō.",

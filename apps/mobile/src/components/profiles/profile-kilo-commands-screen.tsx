@@ -27,6 +27,7 @@ import {
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
@@ -75,6 +76,9 @@ export function ProfileKiloCommandsScreen({
   // inside the sheet. Both reset when the form opens and each save starts.
   const [serverNameConflict, setServerNameConflict] = useState(false);
   const [saveFailure, setSaveFailure] = useState<string | null>(null);
+  // The list sits underneath the sheet, and a sheet dismisses natively, so the
+  // second tap of a Save double tap would land on the row just saved.
+  const { markClosed: markSheetClosed, guard: guardRowPress } = useSheetRowTapGuard();
 
   const startAdd = () => {
     setForm({ source: null });
@@ -89,6 +93,7 @@ export function ProfileKiloCommandsScreen({
   };
 
   const closeForm = () => {
+    markSheetClosed();
     setForm(null);
   };
 
@@ -214,7 +219,7 @@ export function ProfileKiloCommandsScreen({
               isLast={index === rows.length - 1}
               onToggle={
                 canManage
-                  ? enabled => {
+                  ? guardRowPress(enabled => {
                       setKiloCommandEnabled.mutate(
                         { profileId, commandId: source.id, enabled },
                         {
@@ -225,35 +230,33 @@ export function ProfileKiloCommandsScreen({
                           },
                         }
                       );
-                    }
+                    })
                   : undefined
               }
               onMoveUp={
                 canManage
-                  ? () => {
+                  ? guardRowPress(() => {
                       move(index, -1);
-                    }
+                    })
                   : undefined
               }
               onMoveDown={
                 canManage
-                  ? () => {
+                  ? guardRowPress(() => {
                       move(index, 1);
-                    }
+                    })
                   : undefined
               }
               onEdit={
                 canManage
-                  ? () => {
-                      startEdit(source);
-                    }
+                  ? guardRowPress(() => startEdit(source))
                   : undefined
               }
               onDelete={
                 canManage
-                  ? () => {
+                  ? guardRowPress(() => {
                       confirmDelete(source);
-                    }
+                    })
                   : undefined
               }
             />

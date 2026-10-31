@@ -60,7 +60,7 @@ export function RepoBindingRow({
         disabled={isRemoving}
         onPress={onRemove}
       >
-        <Trash2 size={18} color={colors.destructive} />
+        <Trash2 size={18} color={colors.mutedForeground} />
       </Pressable>
     </View>
   );

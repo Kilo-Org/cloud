@@ -87,6 +87,12 @@ export type NewSessionConfigureFormProps = {
   isRetrying: boolean;
   onChangeRepo: (fullName: string) => void;
   onConnectProvider: (platform: RepositoryPlatform) => void;
+  /**
+   * The provider whose connect flow is running, or null. Its own open control
+   * stays busy from the tap until the flow ends: the flow's first step is a
+   * network round trip, and a control with no busy state reads as inert there.
+   */
+  connectingProvider?: RepositoryPlatform | null;
   onRefreshRepos: () => void;
   repositories: NewSessionRepository[];
   /** Recently used rows, threaded to the picker's "Recently used" section. */

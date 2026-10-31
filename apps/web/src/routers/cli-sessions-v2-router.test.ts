@@ -773,11 +773,45 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history,
         watermarkEventId: null,
+        parentSessionId: null,
         preparationAttempts: [],
       });
       expect(fetchSessionMessagesPage).toHaveBeenCalledWith(sessionId, regularUser.id, {
         limit: 50,
       });
+    });
+
+    it('projects the parent session id so a client needs no second session read', async () => {
+      const parentSessionId = 'ses_messages_page_parent_1234';
+      await db.insert(cli_sessions_v2).values({
+        session_id: parentSessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent',
+      });
+      await db
+        .update(cli_sessions_v2)
+        .set({ parent_session_id: parentSessionId })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      fetchSessionMessagesPage.mockResolvedValueOnce({
+        kiloSessionId: sessionId,
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 50 })
+      ).resolves.toEqual({
+        kiloSessionId: sessionId,
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        watermarkEventId: null,
+        parentSessionId,
+        preparationAttempts: [],
+      });
+      await db
+        .update(cli_sessions_v2)
+        .set({ parent_session_id: null })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, parentSessionId));
     });
 
     it('projects grouped paginated assistant and attachment paths into their own public directory', async () => {
@@ -835,6 +869,7 @@ describe('cli-sessions-v2-router', () => {
           omittedItemCount: 2,
         },
         watermarkEventId: null,
+        parentSessionId: null,
         preparationAttempts: [],
       });
       expect(JSON.stringify(result)).not.toContain(privateDirectory);
@@ -853,6 +888,7 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history,
         watermarkEventId: null,
+        parentSessionId: null,
         preparationAttempts: [],
       });
     });
@@ -873,6 +909,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: sessionId,
           history,
           watermarkEventId: null,
+          parentSessionId: null,
           preparationAttempts: [],
         });
       }
@@ -960,6 +997,7 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history: { messages: [], nextCursor: null, omittedItemCount: 0 },
         watermarkEventId: null,
+        parentSessionId: null,
         preparationAttempts: [],
         sessionGoal: goal,
       });
@@ -986,6 +1024,7 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history,
         watermarkEventId: null,
+        parentSessionId: null,
         preparationAttempts: [],
       });
     });
@@ -1013,6 +1052,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: sessionId,
           history,
           watermarkEventId: null,
+          parentSessionId: null,
           preparationAttempts: [],
         });
       }
@@ -1034,6 +1074,7 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history: { messages: [], nextCursor: null, omittedItemCount: 0 },
         watermarkEventId: null,
+        parentSessionId: null,
         preparationAttempts: [],
       });
     });
@@ -1235,6 +1276,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: 42,
+          parentSessionId: null,
           preparationAttempts: [],
         });
         expect(mockGetSession).toHaveBeenCalledWith(cloudAgentSessionId);
@@ -1259,6 +1301,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: null,
+          parentSessionId: null,
           preparationAttempts: [],
         });
       });
@@ -1281,6 +1324,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: null,
+          parentSessionId: null,
           preparationAttempts: [],
         });
       });
@@ -1314,6 +1358,7 @@ describe('cli-sessions-v2-router', () => {
         mockGetPreparationAttempts.mockRejectedValueOnce(new Error('No procedure found'));
         await expect(read()).resolves.toMatchObject({
           watermarkEventId: 42,
+          parentSessionId: null,
           preparationAttempts: [],
         });
       });
@@ -1341,6 +1386,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: null,
+          parentSessionId: null,
           preparationAttempts: [],
         });
       });
@@ -1414,6 +1460,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: 99,
+          parentSessionId: null,
           preparationAttempts: [],
         });
       });

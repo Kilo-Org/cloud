@@ -4,9 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import { ProfileAgentsScreen } from '@/components/profiles/profile-agents-screen';
 import { type AgentSource } from '@/components/profiles/profile-agents-model';
+import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => ({
+  confirm: vi.fn(),
   query: {
     data: undefined as AgentSource[] | undefined,
     isError: false,
@@ -43,7 +45,7 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/dialog', () => ({
-  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+  useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -56,6 +58,26 @@ vi.mock('@/components/profiles/agent-form-sheet', () => ({ AgentFormSheet: 'Agen
 
 function agent(id: string, mode: AgentSource['config']['mode']): AgentSource {
   return { id, slug: id, name: id, config: mode === undefined ? {} : { mode } };
+}
+
+/** How many form sheets the screen currently renders. */
+function sheetCount(root: ReactTestInstance): number {
+  return root.findAll(node => String(node.type) === 'AgentFormSheet').length;
+}
+
+/** Press the row control whose accessibility label starts with `prefix`. */
+function pressRow(root: ReactTestInstance, prefix: string): void {
+  const control = root.findAll(
+    node =>
+      String(node.type) === 'Pressable' &&
+      typeof node.props.onPress === 'function' &&
+      String(node.props.accessibilityLabel).startsWith(prefix)
+  )[0];
+  // The test renderer exposes host props untyped; the screen passes this handler.
+  const onPress = control?.props.onPress as (() => void) | undefined;
+  act(() => {
+    onPress?.();
+  });
 }
 
 describe('ProfileAgentsScreen mode badge', () => {
@@ -99,5 +121,28 @@ describe('ProfileAgentsScreen mode badge', () => {
 
     unmount();
     await i18n.changeLanguage('en');
+  });
+
+  it('drops the row presses of the burst that closed the sheet', async () => {
+    h.query.data = [agent('alpha', 'primary')];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
+    );
+
+    pressRow(renderer.root, 'Edit');
+    const sheet = renderer.root.find(node => String(node.type) === 'AgentFormSheet');
+    // The test renderer exposes host props untyped; the screen passes this handler.
+    const closeSheet = sheet.props.onClose as () => void;
+    act(() => {
+      closeSheet();
+    });
+
+    pressRow(renderer.root, 'Delete');
+    pressRow(renderer.root, 'Edit');
+
+    expect(sheetCount(renderer.root)).toBe(0);
+    expect(h.confirm).not.toHaveBeenCalled();
+
+    unmount();
   });
 });

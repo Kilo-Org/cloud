@@ -205,6 +205,20 @@ function mountScreen() {
   return renderWithProviders(createElement(ProfileKiloCommandsScreen, { profileId: 'profile-1' }));
 }
 
+/**
+ * Run `action` past the row tap guard window. The screen drops row presses for
+ * a short span after its form sheet closed, so a test that presses a row right
+ * after closing the sheet moves the clock past that span.
+ */
+function afterTapGuardWindow(action: () => void): void {
+  const now = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 10_000);
+  try {
+    action();
+  } finally {
+    now.mockRestore();
+  }
+}
+
 describe('ProfileKiloCommandsScreen save refusals', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -330,7 +344,9 @@ describe('ProfileKiloCommandsScreen save refusals', () => {
       })
     );
 
-    pressPressable(renderer.root, 'Edit slash command release-notes');
+    afterTapGuardWindow(() => {
+      pressPressable(renderer.root, 'Edit slash command release-notes');
+    });
     changeText(renderer.root, 'Command name', 'deploy');
     pressSheetDone(renderer.root);
 
@@ -402,6 +418,85 @@ describe('ProfileKiloCommandsScreen row controls', () => {
     for (const action of actions) {
       expect(action.props.hitSlop).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
     }
+
+    unmount();
+  });
+});
+
+/**
+ * Press the `at`-th row control whose accessibility label starts with `prefix`.
+ * The test renderer exposes its handler untyped; the screen passes it.
+ */
+function pressRow(root: ReactTestInstance, prefix: string, at = 0): void {
+  const control = findAll(root, 'Pressable').filter(node =>
+    String(node.props.accessibilityLabel).startsWith(prefix)
+  )[at];
+  const press = control?.props.onPress;
+  if (typeof press !== 'function') {
+    throw new TypeError(`row control ${prefix} was not rendered`);
+  }
+  act(() => {
+    (press as () => void)();
+  });
+}
+
+/** The `at`-th row's enabled switch handler, which the screen passes untyped through the host. */
+function toggleRow(root: ReactTestInstance, value: boolean, at = 0): void {
+  const toggle = findAll(root, 'Switch')[at]?.props.onValueChange;
+  if (typeof toggle !== 'function') {
+    throw new TypeError('row switch has no value change handler');
+  }
+  act(() => {
+    (toggle as (next: boolean) => void)(value);
+  });
+}
+
+describe('ProfileKiloCommandsScreen after the form sheet closes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.query.data = [testCommand(), testCommand({ id: 'cmd-2', name: 'deploy' })];
+    h.query.isPending = false;
+    h.query.isError = false;
+    permissionState.canManage = true;
+  });
+
+  // The sheet dismisses natively and the list sits underneath it, so the rest
+  // of the burst that closed the sheet would act on the row it uncovered.
+  it('drops the row presses of the burst that closed the sheet', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    pressRow(renderer.root, 'Edit');
+    pressSheetDone(renderer.root);
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 0);
+
+    pressRow(renderer.root, 'Delete');
+    pressRow(renderer.root, 'Move', 1);
+    toggleRow(renderer.root, false);
+
+    expect(h.confirm).not.toHaveBeenCalled();
+    expect(h.mutations.setKiloCommandEnabled.mutate).not.toHaveBeenCalled();
+    expect(h.mutations.reorderKiloCommands.mutate).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('accepts the same row presses once the guard window has passed', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    pressRow(renderer.root, 'Edit');
+    pressSheetDone(renderer.root);
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 0);
+
+    afterTapGuardWindow(() => {
+      pressRow(renderer.root, 'Delete');
+      pressRow(renderer.root, 'Move', 1);
+    });
+
+    expect(h.confirm).toHaveBeenCalledTimes(1);
+    expect(h.mutations.reorderKiloCommands.mutate.mock.calls[0]?.[0]).toEqual({
+      profileId: 'profile-1',
+      orderedIds: ['cmd-2', 'cmd-1'],
+    });
 
     unmount();
   });

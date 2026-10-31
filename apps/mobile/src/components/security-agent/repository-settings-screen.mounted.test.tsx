@@ -25,8 +25,10 @@ const repositories = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
   isFetching: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   refetch: vi.fn(),
 }));
+const connectivity = vi.hoisted(() => ({ known: true }));
 const capability = vi.hoisted(() => ({ canManage: true }));
 const save = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
 const saveButton = vi.hoisted(() => ({ onSave: null as (() => Promise<void>) | null }));
@@ -99,6 +101,9 @@ vi.mock('@/lib/trpc', () => ({
   trpcClient: { githubApps: { mintInstallState: { mutate: vi.fn() } } },
 }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => (connectivity.known ? 'online' : 'unknown'),
+}));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 12 }));
 vi.mock('@/components/security-agent/settings-save-button', () => ({
@@ -179,6 +184,8 @@ beforeEach(() => {
   repositories.isLoading = false;
   repositories.isError = false;
   repositories.isFetching = false;
+  repositories.fetchStatus = 'idle';
+  connectivity.known = true;
   capability.canManage = true;
   save.isPending = false;
   save.mutateAsync.mockReset();
@@ -292,6 +299,34 @@ describe('RepositorySettingsScreen repository picker', () => {
 
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     expect(repoRows(renderer)).toHaveLength(0);
+  });
+
+  it('names the connection with Retry when the repository read is paused', async () => {
+    // A read paused by lost connectivity delivered nothing: it must not read as
+    // "No repositories", and it names its cause with a Retry.
+    repositories.data = undefined;
+    repositories.isLoading = false;
+    repositories.isError = false;
+    repositories.fetchStatus = 'paused';
+    const { renderer } = await mount();
+
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    const error = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect((error.props as { variant: string }).variant).toBe('offline');
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
+  });
+
+  it('keeps the skeleton for a paused read whose connectivity is unsettled', async () => {
+    connectivity.known = false;
+    repositories.data = undefined;
+    repositories.isLoading = false;
+    repositories.isError = false;
+    repositories.fetchStatus = 'paused';
+    const { renderer } = await mount();
+
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(2);
   });
 
   it('shows the selectAtLeastOne validation only with an empty selection', async () => {

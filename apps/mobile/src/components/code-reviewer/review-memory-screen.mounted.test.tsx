@@ -140,6 +140,7 @@ vi.mock('react-native', () => ({
   },
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
   Pressable: (props: {
     children?: unknown;

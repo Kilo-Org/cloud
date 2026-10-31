@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "GitLab හි තවත් කණ්ඩායම් හෝ ව්‍යාපෘති වෙත ප්‍රවේශ වීමට අවසර දීමට ඔබට සිදු විය හැක.",
       "installGithubApp": "ගබඩා සඳහා GitHub යෙදුම ස්ථාපනය කරන්න",
       "installGithubAppDescription": "සමාලෝචනය කිරීමට අවශ්‍ය ගබඩාවලට ප්‍රවේශ වීමට Kilo GitHub යෙදුමට අවසර දෙන්න.",
-      "repositoryAccess": "ගබඩා ප්‍රවේශය"
+      "repositoryAccess": "ගබඩා ප්‍රවේශය",
+      "allModePersonal": "ඔබේ GitHub සම්බන්ධතාවය හරහා Kilo හට ප්‍රවේශ විය හැකි සෑම ගබඩාවක්ම ස්වයංක්‍රීයව සමාලෝචනය කෙරේ.",
+      "allModeOrganization": "සංවිධානයේ GitHub සම්බන්ධතාවය හරහා Kilo හට ප්‍රවේශ විය හැකි සෑම ගබඩාවක්ම ස්වයංක්‍රීයව සමාලෝචනය කෙරේ.",
+      "allModeCount": "ලබා ගත හැකි ගබඩා: {{displayCount}}"
     },
     "style": {
       "title": "සමාලෝචන විලාසය",
@@ -1778,7 +1781,6 @@
       "notYetSynced": "තවම සමමුහුර්ත කර නැත",
       "refreshFailed": "නැවත පූරණය කළ නොහැකි විය. අවසන් වරට සමමුහුර්ත කළ දත්ත පෙන්වයි.",
       "settings": "සැකසුම්",
-      "syncFindings": "සොයාගැනීම් සමමුහුර්ත කරන්න",
       "syncNow": "දැන් සමමුහුර්ත කරන්න",
       "syncQueued": "සමමුහුර්ත කිරීම පෝලිමට එක් කළා",
       "syncStatusUnavailable": "සමමුහුර්ත කිරීමේ තත්ත්වය ලබාගත නොහැක.",
@@ -2155,7 +2157,7 @@
     "sessionList": {
       "couldNotLoadActive": "සක්‍රීය සැසි පූරණය කිරීමට නොහැකි විය.",
       "couldNotRefresh": "නැවුම් කිරීමට නොහැකි විය",
-      "noSessionsYetDescription": "ඔබේ දුරකථනයෙන් කේත ලිවීමේ කාර්යයක් ආරම්භ කරන්න. ඔබේ සැසි මෙහි දිස්වනු ඇත.",
+      "noSessionsYetDescription": "ඔබේ දුරකථනයෙන් කේත ලිවීමේ කාර්යයක් ආරම්භ කරන්න.",
       "viewHistory": "සැසි ඉතිහාසය",
       "noMatches": "ගැළපෙන සැසි නොමැත",
       "tryDifferentSearch": "වෙනත් සෙවුම් පදයක් යොදා බලන්න.",
@@ -3855,6 +3857,7 @@
     "skillMarkdownLabel": "කුසලතා අන්තර්ගතය",
     "skillsEmpty": "තවමත් කුසලතා නොමැත",
     "skillNameRequired": "කුසලතා නාමයක් ඇතුළත් කරන්න",
+    "skillNameTooLong": "කුසලතා නාමය {{max}} අක්ෂර හෝ ඊට අඩු විය යුතුය",
     "skillNameInvalid": "කුසලතා නාමය අකුරකින් හෝ ඉලක්කමකින් ආරම්භ විය යුතු අතර කුඩා අකුරු, ඉලක්කම් සහ ඉරි පමණක් භාවිතා කළ යුතුය",
     "skillContentRequired": "නිපුණතා අන්තර්ගතය අවශ්ය වේ",
     "skillSaveFailed": "කුසලතා සුරැකීමට නොහැකි විය. නැවත උත්සාහ කරන්න.",

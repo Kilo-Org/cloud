@@ -146,7 +146,7 @@ export function KiloCommandRowView({
               hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
               onPress={onDelete}
             >
-              <Trash2 size={18} color={colors.destructive} />
+              <Trash2 size={18} color={colors.mutedForeground} />
             </Pressable>
           ) : null}
         </View>

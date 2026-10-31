@@ -1,14 +1,9 @@
-/* eslint-disable max-lines -- the mapping, pass-through, and stash suites share one owned test file */
-// eslint-disable-next-line import/no-nodejs-modules -- vitest-only check, runs in node, never bundled into the app
-import { readdirSync } from 'node:fs';
-// eslint-disable-next-line import/no-nodejs-modules -- vitest-only check, runs in node, never bundled into the app
-import { fileURLToPath } from 'node:url';
-
+/* eslint-disable max-lines -- the mapping, ignore, and stash suites share one owned test file */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as UniversalLinks from '@kilocode/app-shared/universal-links';
 
-import { APP_ROUTE_ROOTS, redirectSystemPath } from './deep-link-handler';
+import { redirectSystemPath } from './deep-link-handler';
 import {
   _resetDeepLinkLaunchForTests,
   _setGetLinkingURLForTests,
@@ -152,6 +147,7 @@ describe('redirectSystemPath', () => {
       'kiloapp://',
       'kiloapp:///definitely-not-a-route',
       'kiloapp:///dev/unknown-fixture',
+      'kiloapp://agent-chat/not-a-session',
     ])('ignores %s without navigate or stash', path => {
       for (const initial of [true, false]) {
         expect(redirectSystemPath({ path, initial })).toBeNull();
@@ -201,24 +197,6 @@ describe('redirectSystemPath', () => {
       expect(redirectSystemPath({ path, initial: false })).toBe(path);
       expect(getPendingDeepLink()).toBeNull();
       expect(mocks.navigate).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('route namespace', () => {
-    it('names every root entry of the route directory', () => {
-      // A new root-level route must be opened deliberately: an incoming link
-      // reaches the navigator only through one of these names (or the indexed
-      // families), so a route missing here is unreachable by link.
-      const entries = readdirSync(fileURLToPath(new URL('../app', import.meta.url)), {
-        withFileTypes: true,
-      })
-        .map(entry => entry.name)
-        // `_layout` and `+`-prefixed files are navigator plumbing, not routes.
-        .filter(name => !name.startsWith('_') && !name.startsWith('+'))
-        .filter(name => !/\.test\.tsx?$/.test(name))
-        .map(name => name.replace(/\.(tsx|ts|jsx|js)$/, ''));
-
-      expect([...new Set(entries)].sort()).toEqual([...APP_ROUTE_ROOTS].sort());
     });
   });
 

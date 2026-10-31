@@ -1,36 +1,12 @@
-import { parseKiloWebPath, resolveIncomingResume } from '@kilocode/app-shared/universal-links';
+import { resolveIncomingResume } from '@kilocode/app-shared/universal-links';
 
+import { opensAppRoutePath, opensDestination } from './deep-link-destination';
 import { resumeDeepLinkHref, setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
 import { parseGitHubReturnParams, setGitHubInstallReturnOutcome } from './github-install-return';
-import { isPlausibleKiloSessionId } from './session-id-shape';
-import { INDEXED_LINK_PREFIXES, isSystemSearchFamilyLink } from './system-search-families';
+import { isSystemSearchFamilyLink } from './system-search-families';
 
 /** Target app path for the /cloud/sessions universal-link route. */
 const AGENTS_TAB_HREF = '/(app)/(tabs)/(2_agents)';
-
-/**
- * Root entries of `src/app` a link may address directly: the two route groups
- * and the root-level screens. The universal-link table routes the app's
- * published links; these are the in-app routes a dev or E2E link opens
- * (`kiloapp:///(app)/…`, `kiloapp:///force-update`).
- *
- * Anything outside this set and the indexed families below names no screen the
- * app can open, so it is ignored rather than handed to the navigator (see
- * `redirectSystemPath`). `deep-link-handler.test.ts` keeps the list equal to the
- * route directory's entries.
- */
-export const APP_ROUTE_ROOTS: readonly string[] = [
-  '(app)',
-  '(auth)',
-  'button-label-fixture',
-  'force-update',
-];
-
-/** Prefix of the session-detail row's app target (`UNIVERSAL_LINK_ROUTES`). */
-const SESSION_HREF_PREFIX = '/(app)/agent-chat/';
-
-/** The one session capture that opens the composer instead of a session. */
-const NEW_SESSION_CAPTURE = 'new';
 
 /**
  * Extract the query portion of a raw URL so C13 return-outcome params can be
@@ -47,56 +23,6 @@ function getQueryFromRaw(raw: string): string | null {
     end = h;
   }
   return raw.slice(q, end);
-}
-
-/**
- * The pathname of a raw link: the path of one of our URL forms, or the
- * scheme-less path expo-router hands `redirectSystemPath`. Null when the link
- * carries no path of ours at all (a bare `kiloapp://`, or another host).
- */
-function pathnameOf(path: string): string | null {
-  const webPath = parseKiloWebPath(path);
-  if (webPath !== null) {
-    return webPath;
-  }
-  if (!path.startsWith('/')) {
-    return null;
-  }
-  const end = path.search(/[?#]/);
-  return end === -1 ? path : path.slice(0, end);
-}
-
-/**
- * Whether a link addresses the app's own route namespace. A dev or E2E link
- * carries the route with its group segment (`kiloapp:///(app)/…`, the form the
- * design gate and the mobile docs use); a system-search tap is delivered as the
- * group-stripped family link the app itself indexed (`kiloapp://agent-chat/…`).
- */
-function addressesAppRoute(path: string): boolean {
-  const pathname = pathnameOf(path);
-  if (pathname === null) {
-    return false;
-  }
-  const withoutLeadingSlash = pathname.replace(/^\/+/, '');
-  if (INDEXED_LINK_PREFIXES.some(prefix => withoutLeadingSlash.startsWith(prefix))) {
-    return true;
-  }
-  const root = withoutLeadingSlash.split('/')[0];
-  return root !== undefined && APP_ROUTE_ROOTS.includes(root);
-}
-
-/**
- * Whether a table destination opens something the app can show. A session
- * target must carry a session id the route can resolve — `new` is the composer,
- * and `isPlausibleKiloSessionId` is the same shape guard the session route uses
- * before it decides an id can never be a session.
- */
-function opensDestination(href: string): boolean {
-  if (!href.startsWith(SESSION_HREF_PREFIX)) {
-    return true;
-  }
-  const capture = href.slice(SESSION_HREF_PREFIX.length);
-  return capture === NEW_SESSION_CAPTURE || isPlausibleKiloSessionId(capture);
 }
 
 /**
@@ -129,7 +55,7 @@ export function redirectSystemPath({
     // screen — and with it unsaved state such as an open form — with whatever
     // the resolver makes of it. A link that opens nothing leaves the screen be.
     if (resume == null) {
-      return addressesAppRoute(path) ? path : null;
+      return opensAppRoutePath(path) ? path : null;
     }
     const { href, anchorMessageId } = resume;
     // A table route that cannot open its destination is not a link either: the

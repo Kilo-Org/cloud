@@ -1483,7 +1483,9 @@
     "instructions": {
       "title": "Treoracha saincheaptha",
       "deprecation": "Tá sé beartaithe deireadh a chur le treoracha saincheaptha. Bog na treoirlínte seo go comhad REVIEW.md i do stór ina ionad.",
-      "placeholder": "m.sh. Ár ngnáis maidir le láimhseáil earráidí a chur i bhfeidhm…"
+      "placeholder": "m.sh. Ár ngnáis maidir le láimhseáil earráidí a chur i bhfeidhm…",
+      "clearTitle": "Bain na treoracha saincheaptha?",
+      "clearMessage": "Má shábhálann tú réimse folamh, scriostar na treoracha saincheaptha atá stóráilte don athbhreithneoir seo."
     },
     "repos": {
       "unavailable": "Níl na stórtha ar fáil. Críochnaigh socrú Bitbucket ar kilo.ai.",
@@ -1668,8 +1670,8 @@
       "reviewStyle": "Stíl athbhreithnithe",
       "focusAreas": "Réimsí béime",
       "allAreas": "Gach réimse",
-      "customInstructions": "Treoracha saincheaptha",
       "set": "Socraithe",
+      "notSet": "Gan socrú",
       "nSelected": "{{displayCount}} roghnaithe",
       "proposedReviewMdGuidance": "Treoir REVIEW.md molta"
     },

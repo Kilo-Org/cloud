@@ -1482,8 +1482,10 @@
     },
     "instructions": {
       "title": "Custom instructions",
-      "deprecation": "Custom Instructions is planned for deprecation. Move these guidelines into a REVIEW.md file in your repository instead.",
-      "placeholder": "e.g. Enforce our error-handling conventions…"
+      "deprecation": "Custom instructions is planned for deprecation. Move these guidelines into a REVIEW.md file in your repository instead.",
+      "placeholder": "e.g. Enforce our error-handling conventions…",
+      "clearTitle": "Remove custom instructions?",
+      "clearMessage": "Saving an empty field deletes the custom instructions stored for this reviewer."
     },
     "repos": {
       "unavailable": "Repositories unavailable — finish Bitbucket setup on kilo.ai.",
@@ -1668,8 +1670,8 @@
       "reviewStyle": "Review Style",
       "focusAreas": "Focus Areas",
       "allAreas": "All areas",
-      "customInstructions": "Custom Instructions",
       "set": "Set",
+      "notSet": "Not set",
       "nSelected": "{{displayCount}} selected",
       "proposedReviewMdGuidance": "Proposed REVIEW.md guidance"
     },

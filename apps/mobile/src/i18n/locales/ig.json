@@ -1417,7 +1417,9 @@
     "instructions": {
       "title": "Ntuziaka nkeonwe",
       "deprecation": "A na-eme atụmatụ ịkwụsị ntụziaka ahaziri iche. Kama iji ha ebe a, tinye ntụziaka ndị a na faịlụ REVIEW.md n'ebe nchekwa gị.",
-      "placeholder": "dịka: ịgbaso usoro anyị maka njikwa njehie…"
+      "placeholder": "dịka: ịgbaso usoro anyị maka njikwa njehie…",
+      "clearTitle": "Wepụ ntuziaka nkeonwe?",
+      "clearMessage": "Ịzọpụta oghere tọgbọrọ chakoo na-ehichapụ ntuziaka nkeonwe echekwara maka onye nyocha koodu a."
     },
     "repos": {
       "unavailable": "Ebe nchekwa adịghị — mechaa nhazi Bitbucket na kilo.ai.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Ụdị nyocha",
       "focusAreas": "Ihe a ga-elekwasị anya",
       "allAreas": "Akụkụ niile",
-      "customInstructions": "Ntuziaka nkeonwe",
       "set": "E debere",
+      "notSet": "E debeghị",
       "nSelected": "A họrọla {{displayCount}}",
       "proposedReviewMdGuidance": "Nduzi REVIEW.md atụrụ aro"
     },

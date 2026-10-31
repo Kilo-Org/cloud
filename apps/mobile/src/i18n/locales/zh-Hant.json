@@ -888,7 +888,9 @@
     "instructions": {
       "title": "自訂指示",
       "deprecation": "自訂指示功能預計將停止使用。請改將這些準則移至存放庫中的 REVIEW.md 檔案。",
-      "placeholder": "例如：確保程式碼符合我們的錯誤處理規範…"
+      "placeholder": "例如：確保程式碼符合我們的錯誤處理規範…",
+      "clearTitle": "移除自訂指示？",
+      "clearMessage": "儲存空白欄位將刪除此檢閱者所儲存的自訂指示。"
     },
     "repos": {
       "unavailable": "目前無法存取存放庫。請在 kilo.ai 上完成 Bitbucket 設定。",
@@ -1077,12 +1079,12 @@
     },
     "overview": {
       "allAreas": "所有面向",
-      "customInstructions": "自訂指示",
       "focusAreas": "審查重點",
       "nSelected": "已選取 {{displayCount}} 項",
       "proposedReviewMdGuidance": "建議的 REVIEW.md 指引",
       "reviewStyle": "審查風格",
-      "set": "已設定"
+      "set": "已設定",
+      "notSet": "未設定"
     },
     "updateFailed": "無法更新審查員。",
     "configSaveFailed": "無法儲存審查設定。",

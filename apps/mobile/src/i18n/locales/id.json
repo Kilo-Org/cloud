@@ -888,7 +888,9 @@
     "instructions": {
       "title": "Instruksi kustom",
       "deprecation": "Fitur instruksi khusus akan dihentikan. Pindahkan panduan ini ke berkas REVIEW.md di repositorimu.",
-      "placeholder": "contoh: Terapkan aturan penanganan kesalahan kami…"
+      "placeholder": "contoh: Terapkan aturan penanganan kesalahan kami…",
+      "clearTitle": "Hapus instruksi kustom?",
+      "clearMessage": "Menyimpan kolom yang kosong akan menghapus instruksi kustom yang tersimpan untuk peninjau ini."
     },
     "repos": {
       "unavailable": "Repositori tidak tersedia — selesaikan penyiapan Bitbucket di kilo.ai.",
@@ -1077,12 +1079,12 @@
     },
     "overview": {
       "allAreas": "Semua area",
-      "customInstructions": "Instruksi kustom",
       "focusAreas": "Area fokus",
       "nSelected": "{{displayCount}} dipilih",
       "proposedReviewMdGuidance": "Panduan REVIEW.md yang diusulkan",
       "reviewStyle": "Gaya tinjauan",
-      "set": "Sudah diatur"
+      "set": "Sudah diatur",
+      "notSet": "Belum diatur"
     },
     "updateFailed": "Gagal memperbarui peninjau.",
     "configSaveFailed": "Gagal menyimpan konfigurasi tinjauan.",

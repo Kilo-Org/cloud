@@ -1417,7 +1417,9 @@
     "instructions": {
       "title": "Kohandatud juhised",
       "deprecation": "Kohandatud juhiste funktsioon on kavas kasutuselt kõrvaldada. Tõsta need juhised oma hoidla faili REVIEW.md.",
-      "placeholder": "nt meie veakäsitluse reeglite järgimine…"
+      "placeholder": "nt meie veakäsitluse reeglite järgimine…",
+      "clearTitle": "Kas eemaldada kohandatud juhised?",
+      "clearMessage": "Tühja välja salvestamine kustutab sellele retsensendile salvestatud kohandatud juhised."
     },
     "repos": {
       "unavailable": "Hoidlad pole saadaval. Lõpeta Bitbucketi seadistamine saidil kilo.ai.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Ülevaatuse stiil",
       "focusAreas": "Fookusvaldkonnad",
       "allAreas": "Kõik valdkonnad",
-      "customInstructions": "Kohandatud juhised",
       "set": "Määratud",
+      "notSet": "Pole määratud",
       "nSelected": "Valitud {{displayCount}}",
       "proposedReviewMdGuidance": "Soovitatud REVIEW.md-juhised"
     },

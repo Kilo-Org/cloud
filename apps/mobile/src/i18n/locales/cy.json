@@ -1505,7 +1505,9 @@
     "instructions": {
       "title": "Cyfarwyddiadau personol",
       "deprecation": "Mae bwriad i roi'r gorau i gefnogi cyfarwyddiadau personol. Symudwch y canllawiau hyn i ffeil REVIEW.md yn eich ystorfa yn lle hynny.",
-      "placeholder": "e.e. Gorfodi ein rheolau trin gwallau…"
+      "placeholder": "e.e. Gorfodi ein rheolau trin gwallau…",
+      "clearTitle": "Tynnu'r cyfarwyddiadau personol?",
+      "clearMessage": "Bydd cadw maes gwag yn dileu'r cyfarwyddiadau personol sydd wedi'u cadw ar gyfer yr adolygydd hwn."
     },
     "repos": {
       "unavailable": "Nid yw'r ystorfeydd ar gael. Gorffennwch sefydlu Bitbucket ar kilo.ai.",
@@ -1690,8 +1692,8 @@
       "reviewStyle": "Arddull adolygu",
       "focusAreas": "Meysydd i ganolbwyntio arnynt",
       "allAreas": "Pob maes",
-      "customInstructions": "Cyfarwyddiadau personol",
       "set": "Wedi'i osod",
+      "notSet": "Heb ei osod",
       "nSelected": "{{displayCount}} wedi'u dewis",
       "proposedReviewMdGuidance": "Canllawiau arfaethedig ar gyfer REVIEW.md"
     },

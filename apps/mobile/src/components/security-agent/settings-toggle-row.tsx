@@ -63,7 +63,7 @@ export function ToggleRow({
         !disabled && 'active:opacity-70'
       )}
     >
-      <View className="flex-1 pr-3">
+      <View className="flex-1 pe-3">
         <Text className="text-sm font-medium">{title}</Text>
         {subtitle === undefined ? null : (
           <Text variant="muted" className="text-xs">

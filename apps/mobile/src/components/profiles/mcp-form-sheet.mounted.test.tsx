@@ -16,6 +16,14 @@ const h = vi.hoisted(() => ({
 // A mock factory is hoisted above this file's imports, so React comes in through a
 // dynamic import there (the pattern this suite's harness already relies on). The
 // stub exposes `scrollTo`, which a refused Save drives, so tests can observe it.
+// The shared switch takes its track and thumb from the app palette.
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({
+    mutedForeground: '#6f6a61',
+    primary: '#4f5a10',
+    primaryForeground: '#ffffff',
+  }),
+}));
 vi.mock('react-native', async () => {
   const {
     createElement: createMockElement,

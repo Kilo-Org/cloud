@@ -888,7 +888,9 @@
     "instructions": {
       "title": "Hướng dẫn tùy chỉnh",
       "deprecation": "Tính năng hướng dẫn tùy chỉnh dự kiến sẽ ngừng được hỗ trợ. Hãy chuyển các hướng dẫn này vào tệp REVIEW.md trong kho lưu trữ.",
-      "placeholder": "ví dụ: Tuân thủ các quy ước xử lý lỗi của nhóm…"
+      "placeholder": "ví dụ: Tuân thủ các quy ước xử lý lỗi của nhóm…",
+      "clearTitle": "Xóa hướng dẫn tùy chỉnh?",
+      "clearMessage": "Lưu trường trống sẽ xóa hướng dẫn tùy chỉnh đã lưu cho người duyệt mã này."
     },
     "repos": {
       "unavailable": "Không thể truy cập các kho lưu trữ. Hãy hoàn tất thiết lập Bitbucket trên kilo.ai.",
@@ -1077,12 +1079,12 @@
     },
     "overview": {
       "allAreas": "Tất cả nội dung",
-      "customInstructions": "Hướng dẫn tùy chỉnh",
       "focusAreas": "Nội dung trọng tâm",
       "nSelected": "Đã chọn {{displayCount}}",
       "proposedReviewMdGuidance": "Hướng dẫn đề xuất cho REVIEW.md",
       "reviewStyle": "Cách rà soát",
-      "set": "Đã thiết lập"
+      "set": "Đã thiết lập",
+      "notSet": "Chưa thiết lập"
     },
     "updateFailed": "Không thể cập nhật Trình rà soát mã.",
     "configSaveFailed": "Không thể lưu cấu hình rà soát.",

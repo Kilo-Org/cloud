@@ -891,7 +891,9 @@
     "instructions": {
       "title": "הוראות מותאמות אישית",
       "deprecation": "התמיכה בהוראות מותאמות אישית צפויה להסתיים. העבר את ההנחיות האלה לקובץ REVIEW.md במאגר שלך.",
-      "placeholder": "לדוגמה: הקפדה על כללי הטיפול בשגיאות שלנו…"
+      "placeholder": "לדוגמה: הקפדה על כללי הטיפול בשגיאות שלנו…",
+      "clearTitle": "להסיר את ההוראות המותאמות אישית?",
+      "clearMessage": "שמירת שדה ריק תמחק את ההוראות המותאמות אישית שנשמרו עבור סוקר הקוד הזה."
     },
     "repos": {
       "unavailable": "המאגרים אינם זמינים — השלם את הגדרת Bitbucket ב-kilo.ai.",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "כל התחומים",
-      "customInstructions": "הוראות מותאמות אישית",
       "focusAreas": "תחומי מיקוד",
       "nSelected": "{{displayCount}} נבחרו",
       "proposedReviewMdGuidance": "הנחיות מוצעות לקובץ REVIEW.md",
       "reviewStyle": "סגנון סקירה",
-      "set": "הוגדר"
+      "set": "הוגדר",
+      "notSet": "לא הוגדר"
     },
     "updateFailed": "עדכון סוקר הקוד נכשל.",
     "configSaveFailed": "שמירת הגדרות הסקירה נכשלה.",

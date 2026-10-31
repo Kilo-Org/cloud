@@ -1439,7 +1439,9 @@
     "instructions": {
       "title": "Instruções personalizadas",
       "deprecation": "As instruções personalizadas vão ser descontinuadas. Transfere estas orientações para um ficheiro REVIEW.md no teu repositório.",
-      "placeholder": "por exemplo: exigir o cumprimento das nossas regras de tratamento de erros…"
+      "placeholder": "por exemplo: exigir o cumprimento das nossas regras de tratamento de erros…",
+      "clearTitle": "Remover instruções personalizadas?",
+      "clearMessage": "Ao guardares um campo vazio, eliminas as instruções personalizadas armazenadas para este revisor."
     },
     "repos": {
       "unavailable": "Os repositórios não estão disponíveis. Conclui a configuração do Bitbucket em kilo.ai.",
@@ -1624,8 +1626,8 @@
       "reviewStyle": "Estilo de revisão",
       "focusAreas": "Áreas prioritárias",
       "allAreas": "Todas as áreas",
-      "customInstructions": "Instruções personalizadas",
       "set": "Definido",
+      "notSet": "Não definido",
       "nSelected": "{{displayCount}} selecionados",
       "proposedReviewMdGuidance": "Orientações propostas para o ficheiro REVIEW.md"
     },

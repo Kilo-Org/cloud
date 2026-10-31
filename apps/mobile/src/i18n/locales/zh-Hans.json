@@ -888,7 +888,9 @@
     "instructions": {
       "title": "自定义说明",
       "deprecation": "自定义说明功能计划停用。请将这些准则移至仓库中的 REVIEW.md 文件。",
-      "placeholder": "例如：遵循我们的错误处理规范…"
+      "placeholder": "例如：遵循我们的错误处理规范…",
+      "clearTitle": "移除自定义说明？",
+      "clearMessage": "保存空字段将删除为此审查者存储的自定义说明。"
     },
     "repos": {
       "unavailable": "仓库暂不可用。请在 kilo.ai 上完成 Bitbucket 配置。",
@@ -1077,12 +1079,12 @@
     },
     "overview": {
       "allAreas": "所有方面",
-      "customInstructions": "自定义说明",
       "focusAreas": "审查重点",
       "nSelected": "已选 {{displayCount}} 项",
       "proposedReviewMdGuidance": "REVIEW.md 审查准则建议",
       "reviewStyle": "审查风格",
-      "set": "已设置"
+      "set": "已设置",
+      "notSet": "未设置"
     },
     "updateFailed": "更新代码审查器失败。",
     "configSaveFailed": "保存审查配置失败。",

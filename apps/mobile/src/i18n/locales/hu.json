@@ -1417,7 +1417,9 @@
     "instructions": {
       "title": "Egyéni utasítások",
       "deprecation": "Az egyéni utasítások funkcióját a tervek szerint megszüntetjük. Helyezd át ezeket az irányelveket a kódtáradban lévő REVIEW.md fájlba.",
-      "placeholder": "pl. a hibakezelési szabályaink betartása…"
+      "placeholder": "pl. a hibakezelési szabályaink betartása…",
+      "clearTitle": "Eltávolítod az egyéni utasításokat?",
+      "clearMessage": "Az üres mező mentése törli az ellenőrzőhöz tárolt egyéni utasításokat."
     },
     "repos": {
       "unavailable": "A kódtárak nem érhetők el. Fejezd be a Bitbucket beállítását a kilo.ai oldalon.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Ellenőrzési stílus",
       "focusAreas": "Kiemelt területek",
       "allAreas": "Minden terület",
-      "customInstructions": "Egyéni utasítások",
       "set": "Beállítva",
+      "notSet": "Nincs beállítva",
       "nSelected": "{{displayCount}} kijelölve",
       "proposedReviewMdGuidance": "Javasolt útmutatás a REVIEW.md fájlhoz"
     },

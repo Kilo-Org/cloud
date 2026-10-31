@@ -1417,7 +1417,9 @@
     "instructions": {
       "title": "Tilmaamo gaar ah",
       "deprecation": "Taageerada tilmaamaha gaarka ah waxaa la qorshaynayaa in la joojiyo. Tilmaamahan u rar faylka REVIEW.md ee kaydkaaga.",
-      "placeholder": "tusaale: Raac habraacayaga maaraynta khaladaadka…"
+      "placeholder": "tusaale: Raac habraacayaga maaraynta khaladaadka…",
+      "clearTitle": "Ka saar tilmaamaha gaarka ah?",
+      "clearMessage": "Kaydinta beer madhan waxay tirtiraysaa tilmaamaha gaarka ah ee lagu kaydiyay fiiriyahan."
     },
     "repos": {
       "unavailable": "Kaydadka lama heli karo. Ku dhammaystir dejinta Bitbucket bogga kilo.ai.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Qaabka dib-u-eegista",
       "focusAreas": "Qaybaha xoogga la saarayo",
       "allAreas": "Dhammaan meelaha",
-      "customInstructions": "Tilmaamo gaar ah",
       "set": "La dejiyay",
+      "notSet": "Lama dejin",
       "nSelected": "{{displayCount}} ayaa la doortay",
       "proposedReviewMdGuidance": "Hagaha REVIEW.md ee la soo jeediyay"
     },

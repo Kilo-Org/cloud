@@ -1417,7 +1417,9 @@
     "instructions": {
       "title": "Maagizo maalum",
       "deprecation": "Kipengele cha maagizo maalumu kimepangiwa kuondolewa. Badala yake, hamishia miongozo hii kwenye faili ya REVIEW.md katika hazina yako.",
-      "placeholder": "mfano: Hakikisha kanuni zetu za kushughulikia hitilafu zinafuatwa…"
+      "placeholder": "mfano: Hakikisha kanuni zetu za kushughulikia hitilafu zinafuatwa…",
+      "clearTitle": "Ondoa maagizo maalum?",
+      "clearMessage": "Kuhifadhi sehemu tupu hufuta maagizo maalum yaliyohifadhiwa kwa mkaguzi huyu."
     },
     "repos": {
       "unavailable": "Hazina hazipatikani — kamilisha usanidi wa Bitbucket kwenye kilo.ai.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Mtindo wa ukaguzi",
       "focusAreas": "Maeneo ya kuzingatia",
       "allAreas": "Maeneo yote",
-      "customInstructions": "Maagizo maalum",
       "set": "Imewekwa",
+      "notSet": "Haijawekwa",
       "nSelected": "{{displayCount}} zimechaguliwa",
       "proposedReviewMdGuidance": "Mwongozo uliopendekezwa wa REVIEW.md"
     },

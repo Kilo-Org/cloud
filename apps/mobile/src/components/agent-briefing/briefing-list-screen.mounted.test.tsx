@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ElementType, type ReactElement } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
 
-import { act, TestRenderer } from '@/test/renderer';
+import { act, type ReactTestInstance, TestRenderer } from '@/test/renderer';
 
 import { BriefingListScreen } from './briefing-list-screen';
 
@@ -25,7 +25,10 @@ vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: requests.push }) }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: ({ headerRight }: { headerRight?: ReactElement }) =>
+    createElement('ScreenHeader', null, headerRight),
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -66,6 +69,18 @@ vi.mock('@/lib/trpc', () => ({
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 let client: QueryClient | undefined = undefined;
+
+function pressSettings(root: ReactTestInstance): void {
+  const [button] = root.findAllByType('Button' as ElementType);
+  if (!button) {
+    throw new Error('Briefing settings control is missing');
+  }
+  // The Button stub keeps the caller's onPress; the renderer exposes props untyped.
+  const props: { onPress: () => void } = button.props as { onPress: () => void };
+  act(() => {
+    props.onPress();
+  });
+}
 
 afterEach(() => {
   act(() => renderer?.unmount());
@@ -150,11 +165,44 @@ it('offers settings instead of claiming an empty activity window when no context
   if (!mounted) {
     throw new Error('Briefing list did not mount');
   }
-  const { onPress } = mounted.root.findByType('Button' as ElementType).props as {
-    onPress: () => void;
-  };
-  act(() => {
-    onPress();
+  const buttons = mounted.root.findAllByType('Button' as ElementType);
+  expect(buttons).toHaveLength(1);
+  pressSettings(mounted.root);
+  expect(requests.push).toHaveBeenCalledWith('/(app)/agent-briefing/settings');
+});
+
+it('keeps the settings action in the header while the list has reports', () => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
+  client = queryClient;
+  queryClient.setQueryData(queryKey, {
+    pages: [
+      {
+        reports: [
+          {
+            id: 'report-1',
+            context: { id: 'personal', name: null, organizationId: null },
+            dismissedAt: null,
+          },
+        ],
+        nextCursor: null,
+      },
+    ],
+    pageParams: [undefined],
+  });
+  act(() => {
+    renderer = TestRenderer.create(
+      createElement(QueryClientProvider, { client: queryClient }, createElement(BriefingListScreen))
+    );
+  });
+  const mounted = renderer;
+  if (!mounted) {
+    throw new Error('Briefing list did not mount');
+  }
+  const header = mounted.root.findByType('ScreenHeader' as ElementType);
+  expect(header.findAllByType('Button' as ElementType)).toHaveLength(1);
+  expect(mounted.root.findAllByType('Button' as ElementType)).toHaveLength(1);
+  pressSettings(header);
   expect(requests.push).toHaveBeenCalledWith('/(app)/agent-briefing/settings');
 });

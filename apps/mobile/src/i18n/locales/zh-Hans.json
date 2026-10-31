@@ -2700,6 +2700,9 @@
       "bitbucketDescription": "将 Bitbucket 连接到此组织，以便在手机上审查拉取请求。",
       "bitbucketOrgOnlyDescription": "将上方的账户切换为某个组织，以便审查其 Bitbucket 拉取请求。",
       "bitbucketOrgOnlyNoOrganizationDescription": "此账户尚未加入任何组织。创建或加入组织后，即可审查 Bitbucket 拉取请求。",
+      "gitlabReconnectAdminOnlyDescription": "GitLab 连接已过期。请让组织所有者、管理员或账单管理员重新连接。",
+      "bitbucketNotConnectedTitle": "尚未连接 Bitbucket",
+      "bitbucketAdminOnlyDescription": "只有组织所有者、管理员和账单管理员可以完成连接。",
       "contextLine": "适用于 {{organization}}",
       "contextLinePersonal": "适用于个人账户"
     },

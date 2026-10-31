@@ -685,6 +685,9 @@
       "bitbucketDescription": "Tilslut Bitbucket til denne organisation for at gennemgå pull requests på mobilen.",
       "bitbucketOrgOnlyDescription": "Skift kontoen ovenfor til en organisation for at gennemgå dens pull requests i Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Denne konto har endnu ingen organisationer. Bitbucket pull requests kan gennemgås, når du opretter eller tilslutter dig en organisation.",
+      "gitlabReconnectAdminOnlyDescription": "GitLab-forbindelsen er udløbet. Bed en organisationsejer, administrator eller faktureringsansvarlig om at tilslutte den.",
+      "bitbucketNotConnectedTitle": "Bitbucket er ikke tilsluttet",
+      "bitbucketAdminOnlyDescription": "Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen.",
       "contextLine": "Til {{organization}}",
       "contextLinePersonal": "Til din personlige konto"
     },

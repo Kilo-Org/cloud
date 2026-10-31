@@ -685,6 +685,9 @@
       "bitbucketDescription": "ភ្ជាប់ Bitbucket ទៅអង្គភាពនេះដើម្បីពិនិត្យសំណើបញ្ចូលកូដលើទូរស័ព្ទ។",
       "bitbucketOrgOnlyDescription": "ប្ដូរគណនីខាងលើទៅអង្គភាពមួយដើម្បីពិនិត្យសំណើបញ្ចូលកូដ Bitbucket របស់វា។",
       "bitbucketOrgOnlyNoOrganizationDescription": "គណនីនេះមិនទាន់មានអង្គភាពទេ។ អ្នកអាចពិនិត្យសំណើបញ្ចូលកូដ Bitbucket បាន នៅពេលអ្នកបង្កើត ឬចូលរួមអង្គភាពមួយ។",
+      "gitlabReconnectAdminOnlyDescription": "ការតភ្ជាប់ទៅ GitLab បានផុតកំណត់ហើយ។ សូមស្នើសុំឱ្យម្ចាស់អង្គការ អ្នកគ្រប់គ្រង ឬអ្នកគ្រប់គ្រងការគិតប្រាក់ណាម្នាក់ភ្ជាប់វាឡើងវិញ។",
+      "bitbucketNotConnectedTitle": "Bitbucket មិនបានភ្ជាប់ទេ",
+      "bitbucketAdminOnlyDescription": "មានតែម្ចាស់អង្គការ អ្នកគ្រប់គ្រង និងអ្នកគ្រប់គ្រងការគិតប្រាក់ប៉ុណ្ណោះដែលអាចភ្ជាប់វាបាន។",
       "contextLine": "សម្រាប់ {{organization}}",
       "contextLinePersonal": "សម្រាប់គណនីផ្ទាល់ខ្លួន"
     },

@@ -685,6 +685,9 @@
       "bitbucketDescription": "په موبایل کې د پول ریکویسټونو د بیاکتنې لپاره Bitbucket له دې بنسټ سره ونښلوئ.",
       "bitbucketOrgOnlyDescription": "د هغې د Bitbucket پول ریکویسټونو د بیاکتنې لپاره پورته حساب یو بنسټ ته وبدلئ.",
       "bitbucketOrgOnlyNoOrganizationDescription": "دا حساب تر اوسه هېڅ بنسټ نه لري. د Bitbucket پول ریکویسټونو بیاکتنه به وشي چې یو وخت تاسو یو بنسټ جوړ کړئ یا یو بنسټ ته ورشئ.",
+      "gitlabReconnectAdminOnlyDescription": "له GitLab سره د اړیکې موده پای ته ورسېده. له یو سازمان مالک، مدیر، یا د بلونو مدیر څخه وغواړئ چې دا ونښلوي.",
+      "bitbucketNotConnectedTitle": "Bitbucket نښلول شوی نه دی",
+      "bitbucketAdminOnlyDescription": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي.",
       "contextLine": "{{organization}} لپاره",
       "contextLinePersonal": "د ستاسې د شخصي حساب لپاره"
     },

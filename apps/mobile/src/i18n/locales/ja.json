@@ -2700,6 +2700,9 @@
       "bitbucketDescription": "モバイルでプルリクエストをレビューするには、この組織をBitbucketに接続してください。",
       "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
       "bitbucketOrgOnlyNoOrganizationDescription": "このアカウントにはまだ組織がありません。組織を作成または参加すると、Bitbucketのプルリクエストをレビューできるようになります。",
+      "gitlabReconnectAdminOnlyDescription": "GitLabとの連携が期限切れになりました。組織のオーナー、管理者、または請求管理者に再接続を依頼してください。",
+      "bitbucketNotConnectedTitle": "Bitbucketが接続されていません",
+      "bitbucketAdminOnlyDescription": "接続できるのは組織のオーナー、管理者、請求管理者のみです。",
       "contextLine": "{{organization}}用",
       "contextLinePersonal": "個人用"
     },

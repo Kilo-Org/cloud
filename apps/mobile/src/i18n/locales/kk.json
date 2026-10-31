@@ -685,6 +685,9 @@
       "bitbucketDescription": "Мобильдіде тарту сұрауларын қарау үшін Bitbucket-ты осы ұйымға қосыңыз.",
       "bitbucketOrgOnlyDescription": "Жоғарыдағы тіркелгіні ұйымға ауыстырыңыз, оның Bitbucket тарту сұрауларын қарау үшін.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Бұл тіркелгіде әзірге ешбір ұйым жоқ. Ұйым құрғаннан немесе оған қосылғаннан кейін Bitbucket тарту сұрауларын қарауға болады.",
+      "gitlabReconnectAdminOnlyDescription": "GitLab қосылымының мерзімі аяқталды. Оны қайта қосу үшін ұйым иесіне, әкімшісіне немесе төлем менеджеріне жүгініңіз.",
+      "bitbucketNotConnectedTitle": "Bitbucket қосылмаған",
+      "bitbucketAdminOnlyDescription": "Оны тек ұйым иелері, әкімшілері мен төлем менеджерлері қоса алады.",
       "contextLine": "{{organization}} үшін",
       "contextLinePersonal": "Жеке аккаунтыңыз үшін"
     },

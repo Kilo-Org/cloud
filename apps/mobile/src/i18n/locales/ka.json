@@ -685,6 +685,9 @@
       "bitbucketDescription": "დააკავშირეთ Bitbucket ამ ორგანიზაციას, PR-ების მობილურში განსახილველად.",
       "bitbucketOrgOnlyDescription": "ზემოთ მყოფი ანგარიში გადართეთ ორგანიზაციაზე, მისი Bitbucket-ის PR-ების განსახილველად.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ამ ანგარიშს ჯერ არ ჰყავს ორგანიზაციები. შექმენით ორგანიზაცია ან შეუერთდით მას, Bitbucket-ის PR-ების განსახილველად.",
+      "gitlabReconnectAdminOnlyDescription": "GitLab-თან კავშირს ვადა გაუვიდა. სთხოვეთ ორგანიზაციის მფლობელს, ადმინისტრატორს ან ანგარიშსწორების მენეჯერს, რომ დააკავშიროს ის.",
+      "bitbucketNotConnectedTitle": "Bitbucket არ არის დაკავშირებული",
+      "bitbucketAdminOnlyDescription": "მისი დაკავშირება მხოლოდ ორგანიზაციის მფლობელებს, ადმინისტრატორებსა და ანგარიშსწორების მენეჯერებს შეუძლიათ.",
       "contextLine": "{{organization}}-სთვის",
       "contextLinePersonal": "პირადი ანგარიშისთვის"
     },

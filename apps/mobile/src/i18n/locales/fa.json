@@ -685,6 +685,9 @@
       "bitbucketDescription": "Bitbucket را به این سازمان وصل کنید تا پول ریکوئست‌ها را در موبایل بازبینی کنید.",
       "bitbucketOrgOnlyDescription": "حساب بالا را به یک سازمان تغییر دهید تا پول ریکوئست‌های Bitbucket آن را بازبینی کنید.",
       "bitbucketOrgOnlyNoOrganizationDescription": "این حساب هنوز سازمانی ندارد. پول ریکوئست‌های Bitbucket را می‌توانید پس از ایجاد یک سازمان یا پیوستن به آن بازبینی کنید.",
+      "gitlabReconnectAdminOnlyDescription": "اعتبار اتصال به GitLab تمام شده است. از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را دوباره متصل کند.",
+      "bitbucketNotConnectedTitle": "Bitbucket متصل نیست",
+      "bitbucketAdminOnlyDescription": "فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند.",
       "contextLine": "برای {{organization}}",
       "contextLinePersonal": "برای حساب شخصی شما"
     },

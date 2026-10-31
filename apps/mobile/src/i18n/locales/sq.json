@@ -685,6 +685,9 @@
       "bitbucketDescription": "Lidho Bitbucket me këtë organizatë për të rishikuar kërkesat për bashkim në celular.",
       "bitbucketOrgOnlyDescription": "Ndrysho llogarinë e mësipërme në një organizatë për të rishikuar kërkesat për bashkim në Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Kjo llogari nuk ka ende organizata. Kërkesat për bashkim në Bitbucket mund të rishikohen sapo të krijosh ose të bëhesh pjesë e një organizate.",
+      "gitlabReconnectAdminOnlyDescription": "Lidhja me GitLab skadoi. Kërkoni nga një pronar, administrator ose menaxher faturimi i organizatës ta rilidhë atë.",
+      "bitbucketNotConnectedTitle": "Bitbucket nuk është i lidhur",
+      "bitbucketAdminOnlyDescription": "Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund ta lidhin.",
       "contextLine": "Për {{organization}}",
       "contextLinePersonal": "Për llogarinë personale"
     },

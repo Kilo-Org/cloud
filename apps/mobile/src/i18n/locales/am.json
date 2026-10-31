@@ -685,6 +685,9 @@
       "bitbucketDescription": "Bitbucketን ከዚህ ድርጅት ጋር ያገናኙ የማዋሃድ ጥያቄዎችን በሞባይል ለመገምገም።",
       "bitbucketOrgOnlyDescription": "ከላይ ያለውን መለያ ወደ ድርጅት ይቀይሩ፣ የዚህ ድርጅት የBitbucket የማዋሃድ ጥያቄዎችን ለመገምገም።",
       "bitbucketOrgOnlyNoOrganizationDescription": "ይህ መለያ እስካሁን ድርጅቶች የለውም። ድርጅት ሲፈጥሩ ወይም ሲቀላቀሉ የBitbucket የማዋሃድ ጥያቄዎችን ማገምገም ይቻላል።",
+      "gitlabReconnectAdminOnlyDescription": "የGitLab ግንኙነት ጊዜው አልፏል። የድርጅት ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።",
+      "bitbucketNotConnectedTitle": "Bitbucket አልተገናኘም",
+      "bitbucketAdminOnlyDescription": "ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
       "contextLine": "ለ{{organization}}",
       "contextLinePersonal": "ለግል መለያዎ"
     },

@@ -222,8 +222,11 @@ describe('organization GitLab reconnect state', () => {
     const renderer = mount('gitlab', 'org-1');
     expect(renderer.root.findByType('EmptyState').props.title).toBe('GitLab connection expired');
     expect(renderedText(renderer)).toContain(
-      "GitLab isn't connected. Ask an organization owner, admin, or billing manager to connect it."
+      'The GitLab connection expired. Ask an organization owner, admin, or billing manager to reconnect it.'
     );
+    // The description below the expiry title must not claim the provider was
+    // never connected.
+    expect(renderedText(renderer)).not.toContain("GitLab isn't connected");
     expect(renderedText(renderer)).not.toContain('Connect GitLab');
     expect(renderer.root.findAllByType('Button')).toHaveLength(0);
   });
@@ -300,10 +303,13 @@ describe('organization Bitbucket connect state', () => {
     // Every organization Bitbucket connect is a billing-role procedure.
     queryState.status = { connected: false };
     const renderer = mount('bitbucket', 'org-1');
-    expect(renderer.root.findByType('EmptyState').props.title).toBe('Connect Bitbucket');
+    expect(renderer.root.findByType('EmptyState').props.title).toBe('Bitbucket not connected');
     expect(renderedText(renderer)).toContain(
-      "Bitbucket isn't connected. Only organization owners, admins, and billing managers can connect it."
+      'Only organization owners, admins, and billing managers can connect it.'
     );
+    // The title states the absence, so the line below names only the roles and
+    // never repeats it.
+    expect(renderedText(renderer)).not.toContain("Bitbucket isn't connected");
     expect(renderer.root.findAllByType('Button')).toHaveLength(0);
   });
 

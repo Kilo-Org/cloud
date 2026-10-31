@@ -685,6 +685,9 @@
       "bitbucketDescription": "Гар утаснаас татах хүсэлтүүдийг шалгахын тулд Bitbucket-ийг энэ байгууллагад холбоно уу.",
       "bitbucketOrgOnlyDescription": "Түүний Bitbucket татах хүсэлтүүдийг шалгахын тулд дээрх бүртгэлийг байгууллагад шилжүүлнэ үү.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Энэ бүртгэлд одоогоор ямар ч байгууллага алга. Байгууллага үүсгэсэн эсвэл нэгэнд нэгдсэний дараа Bitbucket татах хүсэлтийг шалгах боломжтой болно.",
+      "gitlabReconnectAdminOnlyDescription": "GitLab холболтын хугацаа дууссан. Дахин холбуулахын тулд байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежерт хандана уу.",
+      "bitbucketNotConnectedTitle": "Bitbucket холбогдоогүй байна",
+      "bitbucketAdminOnlyDescription": "Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй.",
       "contextLine": "{{organization}}-ийн хувьд",
       "contextLinePersonal": "Хувийн дансны хувьд"
     },

@@ -685,6 +685,9 @@
       "bitbucketDescription": "Bitbucket بەم ڕێکخراوە بچەلەێنە بۆ پێداچوونەوەی داواکارییەکانی ڕاکێشان لە مۆبایلدا.",
       "bitbucketOrgOnlyDescription": "هەژمارەی سەرەوە بگۆڕە بۆ ڕێکخراوێک بۆ پێداچوونەوەی داواکارییەکانی ڕاکێشانی Bitbucketی.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ئەم هەژمارە هێشتا هیچ ڕێکخراوێکی نییە. دوای دروستکردن یان بەشداریکردن لە ڕێکخراوێکدا، دەتوانیت پێداچوونەوەی داواکارییەکانی ڕاکێشانی Bitbucket بکەیت.",
+      "gitlabReconnectAdminOnlyDescription": "ماوەی پەیوەندی بە GitLab بەسەرچووە. داوای لە خاوەنێکی ڕێکخراو، بەڕێوەبەرێک، یان بەڕێوەبەرێکی پارەدان بکە کە بیبەستێتەوە.",
+      "bitbucketNotConnectedTitle": "Bitbucket نەبەستراوە",
+      "bitbucketAdminOnlyDescription": "تەنها خاوەنەکانی ڕێکخراو، بەڕێوەبەران و بەڕێوەبەرانی پارەدان دەتوانن بیبەستن.",
       "contextLine": "بۆ {{organization}}",
       "contextLinePersonal": "بۆ هەژماری کەسی"
     },

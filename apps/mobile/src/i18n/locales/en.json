@@ -751,6 +751,9 @@
       "bitbucketDescription": "Connect Bitbucket to this organization to review pull requests on mobile.",
       "bitbucketOrgOnlyDescription": "Switch the account above to an organization to review its Bitbucket pull requests.",
       "bitbucketOrgOnlyNoOrganizationDescription": "This account has no organizations yet. Bitbucket pull requests can be reviewed once you create or join an organization.",
+      "gitlabReconnectAdminOnlyDescription": "The GitLab connection expired. Ask an organization owner, admin, or billing manager to reconnect it.",
+      "bitbucketNotConnectedTitle": "Bitbucket not connected",
+      "bitbucketAdminOnlyDescription": "Only organization owners, admins, and billing managers can connect it.",
       "contextLine": "For {{organization}}",
       "contextLinePersonal": "For your personal account"
     },

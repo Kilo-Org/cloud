@@ -685,6 +685,9 @@
       "bitbucketDescription": "Yhdistä Bitbucket tähän organisaatioon, niin voit katselmoida muutospyyntöjä mobiililaitteella.",
       "bitbucketOrgOnlyDescription": "Vaihda yllä oleva tili organisaatioon, niin voit katselmoida sen Bitbucket-muutospyyntöjä.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tällä tilillä ei ole vielä organisaatioita. Voit katselmoida Bitbucket-muutospyyntöjä, kun luot organisaation tai liityt sellaiseen.",
+      "gitlabReconnectAdminOnlyDescription": "GitLab-yhteys on vanhentunut. Pyydä organisaation omistajaa, ylläpitäjää tai laskutusvastaavaa yhdistämään se.",
+      "bitbucketNotConnectedTitle": "Bitbucketia ei ole yhdistetty",
+      "bitbucketAdminOnlyDescription": "Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen.",
       "contextLine": "{{organization}}-organisaatiolle",
       "contextLinePersonal": "Henkilökohtaiselle tilillesi"
     },

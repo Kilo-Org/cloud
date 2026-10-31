@@ -685,6 +685,9 @@
       "bitbucketDescription": "Csatlakoztasd a Bitbucketot ehhez a szervezethez a módosítási kérelmek mobilos kódellenőrzéséhez.",
       "bitbucketOrgOnlyDescription": "Váltsd a fenti fiókot egy szervezetre a Bitbucket-módosítási kérelmek kódellenőrzéséhez.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ez a fiók még nem tagja egyetlen szervezetnek sem. A Bitbucket-módosítási kérelmek kódellenőrzéséhez hozz létre egy szervezetet, vagy csatlakozz egyhez.",
+      "gitlabReconnectAdminOnlyDescription": "A GitLab-kapcsolat lejárt. Kérd meg egy szervezet tulajdonosát, adminisztrátorát vagy számlázási felelősét, hogy újracsatlakoztassa.",
+      "bitbucketNotConnectedTitle": "A Bitbucket nincs csatlakoztatva",
+      "bitbucketAdminOnlyDescription": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
       "contextLine": "{{organization}} számára",
       "contextLinePersonal": "Személyes fiókodhoz"
     },

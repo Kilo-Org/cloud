@@ -14,7 +14,7 @@ import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { PERSONAL_SCOPE, reviewerPlatformLabel } from '@/lib/code-reviewer-config';
+import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
@@ -289,23 +289,27 @@ export function ProviderConnectGate({
       platform === 'gitlab'
         ? t('prReview.reconnectNotice.gitlabTitle')
         : t('prReview.reconnectNotice.bitbucketTitle');
-    const title = reconnect ? reconnectTitle : connectTitle;
-    // The code-reviewer screens word the same dead end the same way: the
-    // connection cannot be completed from this role, and the role that can is
-    // named. Reusing their keys keeps the roles they name identical on both
-    // surfaces.
-    const organizationAdminOnlyDescription =
-      platform === 'gitlab'
-        ? t('codeReviewer.gitlab.notConnectedReadOnly', {
-            platform: reviewerPlatformLabel(platform),
-          })
-        : t('codeReviewer.bitbucket.notConnectedReadOnly');
+    let title = reconnect ? reconnectTitle : connectTitle;
     let description = connectDescription;
     if (reconnect) {
+      // The title above already names the expired provider connection, so the
+      // description carries only the re-check instruction and never restates
+      // the title. One key serves both the provider gate and the mid-session
+      // notice, so the two surfaces cannot drift apart.
       description = t('prReview.reconnectNotice.message');
     }
     if (action === 'organization-admin-only') {
-      description = organizationAdminOnlyDescription;
+      // The reader cannot complete the integration page's action from this
+      // role, so the state names the roles that can and carries no action. An
+      // expired GitLab connection keeps its title and asks for a reconnection;
+      // an absent Bitbucket connection cannot make the connect call its title
+      // no longer offers, so that title states the absence instead.
+      if (platform === 'gitlab') {
+        description = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
+      } else {
+        title = t('prReview.connect.bitbucketNotConnectedTitle');
+        description = t('prReview.connect.bitbucketAdminOnlyDescription');
+      }
     }
     return (
       <View className="flex-1 bg-background">

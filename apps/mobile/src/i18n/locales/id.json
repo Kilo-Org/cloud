@@ -2700,6 +2700,9 @@
       "bitbucketDescription": "Hubungkan Bitbucket ke organisasi ini untuk meninjau PR di ponsel.",
       "bitbucketOrgOnlyDescription": "Ganti akun di atas ke sebuah organisasi untuk meninjau PR Bitbucket-nya.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akun ini belum memiliki organisasi. PR Bitbucket dapat ditinjau setelah Anda membuat atau bergabung dengan organisasi.",
+      "gitlabReconnectAdminOnlyDescription": "Koneksi GitLab kedaluwarsa. Minta pemilik, admin, atau manajer penagihan organisasi untuk menghubungkannya.",
+      "bitbucketNotConnectedTitle": "Bitbucket tidak terhubung",
+      "bitbucketAdminOnlyDescription": "Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat menghubungkannya.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akun pribadi Anda"
     },

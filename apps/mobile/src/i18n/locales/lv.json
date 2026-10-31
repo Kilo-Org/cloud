@@ -700,6 +700,9 @@
       "bitbucketDescription": "Pievieno Bitbucket šai organizācijai, lai pārskatītu izmaiņu pieprasījumus mobilajā ierīcē.",
       "bitbucketOrgOnlyDescription": "Pārslēdz augstāk redzamo kontu uz organizāciju, lai pārskatītu tās Bitbucket izmaiņu pieprasījumus.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Šim kontam vēl nav organizāciju. Bitbucket izmaiņu pieprasījumus varēs pārskatīt, kad izveidosi organizāciju vai tai pievienosies.",
+      "gitlabReconnectAdminOnlyDescription": "GitLab savienojuma derīguma termiņš ir beidzies. Lūdziet organizācijas īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot no jauna.",
+      "bitbucketNotConnectedTitle": "Bitbucket nav pievienots",
+      "bitbucketAdminOnlyDescription": "To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
       "contextLine": "Priekš {{organization}}",
       "contextLinePersonal": "Priekš personīgā konta"
     },

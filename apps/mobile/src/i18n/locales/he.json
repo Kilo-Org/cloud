@@ -2728,6 +2728,9 @@
       "bitbucketDescription": "חברו את Bitbucket לארגון הזה כדי לסקור בקשות משיכה בנייד.",
       "bitbucketOrgOnlyDescription": "החליפו את החשבון שלמעלה לארגון כדי לסקור את בקשות המשיכה שלו ב-Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "לחשבון הזה אין עדיין ארגונים. אפשר לסקור בקשות משיכה ב-Bitbucket לאחר שתיצרו או תצטרפו לארגון.",
+      "gitlabReconnectAdminOnlyDescription": "פג תוקף החיבור ל-GitLab. בקש מבעלים של הארגון, מנהל או מנהל חיובים לחבר אותו מחדש.",
+      "bitbucketNotConnectedTitle": "Bitbucket לא מחובר",
+      "bitbucketAdminOnlyDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
       "contextLine": "עבור {{organization}}",
       "contextLinePersonal": "עבור החשבון האישי"
     },

@@ -2728,6 +2728,9 @@
       "bitbucketDescription": "Connectez Bitbucket à cette organisation pour examiner des PR sur mobile.",
       "bitbucketOrgOnlyDescription": "Basculez le compte ci-dessus vers une organisation pour examiner ses PR Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ce compte n'a encore aucune organisation. Les PR Bitbucket peuvent être examinées une fois que vous créez ou rejoignez une organisation.",
+      "gitlabReconnectAdminOnlyDescription": "La connexion à GitLab a expiré. Demandez à un propriétaire de l'organisation, à un administrateur ou à un responsable de la facturation de la reconnecter.",
+      "bitbucketNotConnectedTitle": "Bitbucket n'est pas connecté",
+      "bitbucketAdminOnlyDescription": "Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion.",
       "contextLine": "Pour {{organization}}",
       "contextLinePersonal": "Pour votre compte personnel"
     },

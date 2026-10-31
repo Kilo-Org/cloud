@@ -685,6 +685,9 @@
       "bitbucketDescription": "മൊബൈലിൽ പുൾ റിക്വസ്റ്റുകൾ പരിശോധിക്കാൻ ഈ ഓർഗനൈസേഷനെ Bitbucket-മായി കണക്റ്റ് ചെയ്യുക.",
       "bitbucketOrgOnlyDescription": "അതിന്റെ Bitbucket പുൾ റിക്വസ്റ്റുകൾ പരിശോധിക്കാൻ മുകളിലുള്ള അക്കൗണ്ട് ഒരു ഓർഗനൈസേഷനിലേക്ക് മാറ്റുക.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ഈ അക്കൗണ്ടിൽ ഇതുവരെ ഓർഗനൈസേഷനുകളൊന്നുമില്ല. നിങ്ങൾ ഒരു ഓർഗനൈസേഷൻ സൃഷ്ടിക്കുകയോ ചേരുകയോ ചെയ്താൽ Bitbucket പുൾ റിക്വസ്റ്റുകൾ പരിശോധിക്കാൻ കഴിയും.",
+      "gitlabReconnectAdminOnlyDescription": "GitLab കണക്ഷൻ കാലഹരണപ്പെട്ടു. ഒരു ഓർഗനൈസേഷൻ ഉടമ, അഡ്മിൻ അല്ലെങ്കിൽ ബില്ലിംഗ് മാനേജറോട് അത് വീണ്ടും കണക്റ്റുചെയ്യാൻ ആവശ്യപ്പെടുക.",
+      "bitbucketNotConnectedTitle": "Bitbucket കണക്റ്റുചെയ്തിട്ടില്ല",
+      "bitbucketAdminOnlyDescription": "ഓർഗനൈസേഷൻ ഉടമകൾക്കും അഡ്മിനുകൾക്കും ബില്ലിംഗ് മാനേജർമാർക്കും മാത്രമേ അത് കണക്റ്റുചെയ്യാൻ കഴിയൂ.",
       "contextLine": "{{organization}}-ന്",
       "contextLinePersonal": "വ്യക്തിപരത്തിന്"
     },

@@ -493,7 +493,7 @@ function defaultTimeoutForScope(scope: 'user' | 'org' | 'admin'): number {
   return parseTimeoutEnv('USAGE_QUERY_TIMEOUT_USER_MS', 5_000);
 }
 
-async function timedSnowflakeQuery<T>(
+export async function timedSnowflakeQuery<T>(
   params: {
     route: string;
     queryLabel: string;

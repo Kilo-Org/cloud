@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { UsageAnalyticsDashboard } from '@/components/usage-analytics/UsageAnalyticsDashboard';
 import { ChatGptUsageLink } from '@/components/chatgpt/ChatGptUsageLink';
+import { AiRequestsLink } from '@/components/usage-requests/AiRequestsLink';
 import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 
 export default async function UsagePage() {
@@ -11,7 +12,12 @@ export default async function UsagePage() {
       <UsageAnalyticsDashboard
         context="personal"
         title="Usage"
-        notice={<ChatGptUsageLink kiloUserId={user.id} />}
+        notice={
+          <>
+            <AiRequestsLink />
+            <ChatGptUsageLink kiloUserId={user.id} />
+          </>
+        }
       />
     </Suspense>
   );

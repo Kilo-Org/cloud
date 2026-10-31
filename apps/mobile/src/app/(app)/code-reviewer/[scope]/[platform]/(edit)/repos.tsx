@@ -186,6 +186,10 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
       <QueryError
         variant={trpcErrorVariant(reposQuery.error)}
         placement={fullBodyState ? 'center' : 'top'}
+        // In all mode the state follows the explanation and the reserved count
+        // row, so the surface-level top air of a 'top' placement only doubles
+        // the gap above it.
+        className={allMode ? 'pt-4' : undefined}
         title={t('common.couldNotLoadRepositories')}
         onRetry={isRetryableTrpcError(reposQuery.error) ? refetchRepos : undefined}
         isRetrying={reposFetching}
@@ -216,6 +220,7 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     repoState = (
       <EmptyState
         placement={fullBodyState ? 'center' : 'top'}
+        className={allMode ? 'pt-4' : undefined}
         icon={FolderGit2}
         title={emptyStateCopy.title}
         description={emptyStateCopy.description}

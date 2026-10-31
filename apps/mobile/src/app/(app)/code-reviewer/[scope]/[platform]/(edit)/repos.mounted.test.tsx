@@ -38,6 +38,7 @@ const state = vi.hoisted(() => ({
   manageAccess: undefined as { handlePress: () => void; pending: boolean } | undefined,
   accessHandlers: null as { onOpen?: () => void; onReturn?: () => void } | null,
   appStateHandler: null as AppStateHandler | null,
+  emptyStateClassNames: [] as (string | undefined)[],
   config: {
     data: { repositorySelectionMode: 'selected', selectedRepositoryIds: [] } as unknown,
     isError: false,
@@ -85,8 +86,10 @@ vi.mock('@/components/query-error', () => ({
   },
 }));
 vi.mock('@/components/empty-state', () => ({
-  EmptyState: (props: { title: string; action?: ReactNode }) =>
-    createElement('EmptyState', { title: props.title }, props.action),
+  EmptyState: (props: { title: string; action?: ReactNode; className?: string }) => {
+    state.emptyStateClassNames.push(props.className);
+    return createElement('EmptyState', { title: props.title }, props.action);
+  },
 }));
 vi.mock('@/components/repo-toggle-row', () => ({ RepoToggleRow: 'RepoToggleRow' }));
 vi.mock('@/components/ui/button', () => ({
@@ -229,6 +232,7 @@ beforeEach(() => {
   state.manageAccess = { handlePress: vi.fn<() => void>(), pending: false };
   state.accessHandlers = null;
   state.appStateHandler = null;
+  state.emptyStateClassNames = [];
   state.config.data = { repositorySelectionMode: 'selected', selectedRepositoryIds: [] };
   state.config.isError = false;
   state.config.isFetching = false;
@@ -272,6 +276,9 @@ describe('repository picker resync affordance', () => {
 
     expect(button(renderer, 'Refresh')).toBeUndefined();
     expect(button(renderer, 'Manage access')).toBeDefined();
+    // Selected mode replaces the list at the top of the surface, where the
+    // state's own top air is the only separation it has.
+    expect(state.emptyStateClassNames.at(-1)).toBeUndefined();
     // The list carries no heading of its own: the screen header names it, and a
     // second name here labelled nothing but the empty state.
     expect(
@@ -528,6 +535,9 @@ describe('all repositories mode body', () => {
     expect(countLines(renderer)).toEqual([]);
     expect(button(renderer, 'Manage access')).toBeDefined();
     expect(button(renderer, 'Refresh')).toBeUndefined();
+    // The state follows the explanation and the reserved count row, so it drops
+    // the surface-level top air a 'top' placement adds.
+    expect(state.emptyStateClassNames.at(-1)).toBe('pt-4');
     unmount();
   });
 

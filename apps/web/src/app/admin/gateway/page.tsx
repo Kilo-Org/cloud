@@ -14,6 +14,7 @@ import { VercelModelIdOverridesContent } from '@/app/admin/gateway/VercelModelId
 import { PreferredProviderOrderContent } from '@/app/admin/gateway/PreferredProviderOrderContent';
 import { CustomPricingContent } from '@/app/admin/gateway/CustomPricingContent';
 import { EnkryptGuardrailChargesContent } from '@/app/admin/gateway/EnkryptGuardrailChargesContent';
+import { OrganizationFeaturesContent } from '@/app/admin/gateway/OrganizationFeaturesContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
 
@@ -26,6 +27,7 @@ const VALID_TABS: readonly string[] = [
   'unavailable-models',
   'provider-order',
   'custom-pricing',
+  'organization-features',
   'api-request-log',
   'enkrypt-charges',
 ];
@@ -38,6 +40,7 @@ type Tab =
   | 'unavailable-models'
   | 'provider-order'
   | 'custom-pricing'
+  | 'organization-features'
   | 'api-request-log'
   | 'enkrypt-charges';
 const isValidTab = (value: string | null): value is Tab =>
@@ -104,6 +107,9 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="custom-pricing" className={tabTriggerClass}>
               Custom Pricing
             </TabsTrigger>
+            <TabsTrigger value="organization-features" className={tabTriggerClass}>
+              Organization Features
+            </TabsTrigger>
             <TabsTrigger value="api-request-log" className={tabTriggerClass}>
               API Request Log
             </TabsTrigger>
@@ -160,6 +166,9 @@ export default function AdminGatewayPage() {
           </TabsContent>
           <TabsContent value="custom-pricing" className="mt-4">
             <CustomPricingContent />
+          </TabsContent>
+          <TabsContent value="organization-features" className="mt-4">
+            <OrganizationFeaturesContent />
           </TabsContent>
           <TabsContent
             value="api-request-log"

@@ -21,6 +21,12 @@ import {
   providerPrivacySchema,
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import {
+  getOrganizationGatewaySettings,
+  isManagedGatewayDisabled,
+  withDataRegion,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import {
@@ -80,6 +86,7 @@ import {
   chatGptReconnectResponse,
   directByokCatalogOnlyMessage,
   directByokCatalogOnlyResponse,
+  managedGatewayDisabledResponse,
   lastUserPromptText,
   requestedLogprobs,
   requestedSamples,
@@ -954,7 +961,25 @@ export async function handleLlmProxyRequest(
         )
       : directByokCatalogOnlyResponse(message);
   }
-  const effectiveProviderContext = providerResult;
+  const organizationGatewaySettings = organizationId
+    ? getOrganizationGatewaySettings(
+        await getRuntimeOrganizationFeatures(),
+        organizationId,
+        (await balanceAndSettingsPromise).settings
+      )
+    : null;
+  if (
+    organizationGatewaySettings &&
+    isManagedGatewayDisabled(organizationGatewaySettings, providerResult.provider.id)
+  ) {
+    return managedGatewayDisabledResponse(providerResult.provider.id);
+  }
+  const effectiveProviderContext = organizationGatewaySettings?.dataRegion
+    ? {
+        ...providerResult,
+        provider: withDataRegion(providerResult.provider, organizationGatewaySettings.dataRegion),
+      }
+    : providerResult;
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
     try {

@@ -153,11 +153,14 @@ async function toBYOKApiKeyResponse(
   };
 }
 
-function rejectUnavailableExperimentalProvider(
+async function rejectUnavailableExperimentalProvider(
   providerId: string,
   organizationId: string | null | undefined
 ) {
-  if (isExperimentalByokProviderId(providerId) && !isExperimentalByokEnabled(organizationId)) {
+  if (
+    isExperimentalByokProviderId(providerId) &&
+    !(await isExperimentalByokEnabled(organizationId))
+  ) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: `Provider ${providerId} is not available yet.`,
@@ -328,7 +331,7 @@ export const byokRouter = createTRPCRouter({
         ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES)
         : null;
 
-      rejectUnavailableExperimentalProvider(provider_id, organizationId);
+      await rejectUnavailableExperimentalProvider(provider_id, organizationId);
       validateUserByokCredential(provider_id, api_key);
 
       // Encrypt the API key
@@ -422,7 +425,10 @@ export const byokRouter = createTRPCRouter({
       }
 
       rejectManagedKeyMutation(existingKey.management_source);
-      rejectUnavailableExperimentalProvider(existingKey.provider_id, existingKey.organization_id);
+      await rejectUnavailableExperimentalProvider(
+        existingKey.provider_id,
+        existingKey.organization_id
+      );
       validateUserByokCredential(existingKey.provider_id, api_key);
 
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);

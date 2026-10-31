@@ -63,7 +63,7 @@ type RunBotAgentParams = {
   prompt: string;
   /** Pre-uploaded supported attachments from the user's message (already in R2). */
   attachments?: CloudAgentAttachments;
-  /** Names of referenced files the upload ledger declined, so the run can say they are missing. */
+  /** Names of referenced files this message did not forward, so the run can say they are missing. */
   declinedAttachmentFilenames?: string[];
   completedStepCount?: number;
   initialSteps?: BotRequestStep[];

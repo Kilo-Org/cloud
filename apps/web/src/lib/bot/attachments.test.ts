@@ -237,7 +237,7 @@ describe('extractAndUploadAttachments', () => {
     expect(result).toEqual({
       attachments: { path: MESSAGE_UUID, files: [`${CSV_ID}.md`] },
       objectKeys: [`user-1/cloud-agent/${MESSAGE_UUID}/${CSV_ID}.md`],
-      declinedFilenames: [],
+      declinedFilenames: ['too-large.pdf', 'also-too-large.txt'],
     });
     expect(preflightFetch).not.toHaveBeenCalled();
     expect(oversizedDownloadFetch).toHaveBeenCalledTimes(1);
@@ -265,7 +265,7 @@ describe('extractAndUploadAttachments', () => {
     expect(result).toEqual({
       attachments: { path: MESSAGE_UUID, files: [`${MARKDOWN_ID}.md`] },
       objectKeys: [`user-1/cloud-agent/${MESSAGE_UUID}/${MARKDOWN_ID}.md`],
-      declinedFilenames: [],
+      declinedFilenames: ['failed.png'],
     });
     expect(mockSend).toHaveBeenCalledTimes(2);
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
@@ -273,6 +273,35 @@ describe('extractAndUploadAttachments', () => {
     expect(mockReleasePendingUploads).toHaveBeenCalledWith('user-1', [
       `user-1/cloud-agent/${MESSAGE_UUID}/${IMAGE_ID}.png`,
     ]);
+  });
+
+  it('labels a dropped file the user did not name instead of its generated key', async () => {
+    mockRandomUUID
+      .mockReturnValueOnce(MESSAGE_UUID)
+      .mockReturnValueOnce(IMAGE_ID)
+      .mockReturnValueOnce(FRESH_IDS[0])
+      .mockReturnValueOnce(MARKDOWN_ID)
+      .mockReturnValueOnce(FRESH_IDS[1]);
+    mockAdmitPendingUpload.mockRejectedValue(
+      new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Maximum 25 uploads allowed per account',
+      })
+    );
+
+    const result = await extractAndUploadAttachments(
+      createMessage([
+        createAttachment({ type: 'image', mimeType: 'image/png' }),
+        createAttachment({ type: 'file', name: '\u0007\u0007', mimeType: 'text/plain' }),
+      ]),
+      'user-1'
+    );
+
+    expect(result).toEqual({
+      objectKeys: [],
+      declinedFilenames: ['an unnamed attachment', 'an unnamed attachment'],
+    });
+    expect(result?.declinedFilenames.join()).not.toContain(IMAGE_ID);
   });
 
   it('admits each upload with its exact size before writing it', async () => {

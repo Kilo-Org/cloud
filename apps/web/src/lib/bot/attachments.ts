@@ -100,7 +100,8 @@ function toUploadableAttachment(attachment: Attachment): UploadableAttachment | 
  * The result of forwarding one chat message's attachments: the ordered
  * references for the session prompt, the ledger object keys behind them so the
  * caller can link or discard exactly this message's uploads, and the names of
- * the referenced files the ledger declined so the run can say they are missing.
+ * the referenced files this message did not forward, so the run can say they
+ * are missing.
  */
 export type UploadedBotAttachments = {
   /** Absent when every referenced file was declined. */
@@ -110,14 +111,15 @@ export type UploadedBotAttachments = {
 };
 
 const MAX_DECLINED_FILENAME_LENGTH = 120;
+const UNNAMED_DECLINED_ATTACHMENT = 'an unnamed attachment';
 
 /** A user-supplied name is prompt data, so keep it single-line and bounded. */
-function describeDeclinedAttachment(attachment: Attachment, fallback: string): string {
+function describeDeclinedAttachment(attachment: Attachment): string {
   const name = (attachment.name ?? '')
     .replaceAll(/[\p{Cc}\p{Cf}]+/gu, ' ')
     .replaceAll(/\s+/gu, ' ')
     .trim();
-  return name.slice(0, MAX_DECLINED_FILENAME_LENGTH) || fallback;
+  return name.slice(0, MAX_DECLINED_FILENAME_LENGTH) || UNNAMED_DECLINED_ATTACHMENT;
 }
 
 function logAttachmentFailure(op: string, error: unknown): void {
@@ -213,11 +215,13 @@ export async function extractAndUploadAttachments(
       // A row whose write failed holds ceiling budget without an object, so
       // give it back now instead of waiting for its lease to lapse.
       if (admittedKey) await discardPendingUploads(userId, [admittedKey]);
+      // Whatever the cause, this file is not in the run: name it so the model
+      // does not answer as if it received every file the user referenced, and
+      // the other files of the message still go through.
+      declinedFilenames.push(describeDeclinedAttachment(attachment));
       if (isLedgerRefusal(error)) {
         // A ledger bound is an expected answer to this message, not an
-        // incident; the other files of the message still go through, and the
-        // run is told this one is missing so it does not answer as if it had it.
-        declinedFilenames.push(describeDeclinedAttachment(attachment, filename));
+        // incident.
         console.warn('[KiloBot] Attachment not forwarded:', error.message);
       } else {
         logAttachmentFailure('upload-bot-attachment', error);

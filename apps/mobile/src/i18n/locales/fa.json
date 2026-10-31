@@ -330,7 +330,7 @@
       "diffTooLarge": "حجم تغییرات بیش از حد است",
       "openFile": "باز کردن {{path}}",
       "openFileViewed": "باز کردن {{path}} (مشاهده‌شده)",
-      "title": "فایل"
+      "title": "فایل‌ها"
     },
     "fileRows": {
       "markViewed": "علامت‌گذاری {{path}} به‌عنوان مشاهده‌شده",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "مرور کلی",
-      "files": "فایل",
+      "files": "فایل‌ها",
       "discussion": "گفت‌وگو"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "گرفتن عکس",
       "photoLibrary": "گالری عکس",
-      "files": "فایل",
+      "files": "فایل‌ها",
       "cameraAccessMessage": "برای گرفتن عکس، دسترسی به دوربین را در تنظیمات فعال کنید."
     },
     "typingIndicator": {
@@ -2753,7 +2753,7 @@
     "attachmentPicker": {
       "camera": "دوربین",
       "photoLibrary": "گالری عکس",
-      "files": "فایل",
+      "files": "فایل‌ها",
       "couldNotOpenPhotoPicker": "انتخاب‌گر عکس باز نشد. Kilo را ببندید و دوباره باز کنید، سپس دوباره تلاش کنید.",
       "maxFilesAllowed": "حداکثر {{displayCount}} فایل مجاز است.",
       "onlyAddingFiles": "فقط {{accepted}} فایل از {{total}} فایل اضافه می‌شود (سقف مجاز: {{max}})",

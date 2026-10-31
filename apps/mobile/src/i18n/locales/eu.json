@@ -330,7 +330,7 @@
       "diffTooLarge": "diferentziak handiegiak dira",
       "openFile": "Ireki {{path}}",
       "openFileViewed": "Ireki {{path}} (ikusita)",
-      "title": "Fitxategi"
+      "title": "Fitxategiak"
     },
     "fileRows": {
       "markViewed": "Markatu {{path}} ikusitako gisa",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "Ikuspegi orokorra",
-      "files": "Fitxategi",
+      "files": "Fitxategiak",
       "discussion": "Eztabaida"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "Atera argazkia",
       "photoLibrary": "Argazki-bilduma",
-      "files": "Fitxategi",
+      "files": "Fitxategiak",
       "cameraAccessMessage": "Eman kamera erabiltzeko baimena ezarpenetan, argazki bat ateratzeko."
     },
     "typingIndicator": {
@@ -2753,7 +2753,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Argazki-bilduma",
-      "files": "Fitxategi",
+      "files": "Fitxategiak",
       "couldNotOpenPhotoPicker": "Ezin izan da argazki-hautatzailea ireki. Berrabiarazi Kilo eta saiatu berriro.",
       "maxFilesAllowed": "Gehienez {{displayCount}} fitxategi onartzen dira.",
       "onlyAddingFiles": "{{total}} fitxategietatik {{accepted}} bakarrik gehitzen (gehienez {{max}})",

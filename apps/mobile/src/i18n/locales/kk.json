@@ -330,7 +330,7 @@
       "diffTooLarge": "өзгерістер көлемі тым үлкен",
       "openFile": "{{path}} файлын ашу",
       "openFileViewed": "{{path}} файлын ашу (қаралған)",
-      "title": "Файл"
+      "title": "Файлдар"
     },
     "fileRows": {
       "markViewed": "{{path}} файлын қаралған деп белгілеу",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "Шолу",
-      "files": "Файл",
+      "files": "Файлдар",
       "discussion": "Талқылау"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "Суретке түсіру",
       "photoLibrary": "Фотосуреттер жинағы",
-      "files": "Файл",
+      "files": "Файлдар",
       "cameraAccessMessage": "Фото түсіру үшін параметрлерден камераны пайдалануға рұқсат беріңіз."
     },
     "typingIndicator": {
@@ -2753,7 +2753,7 @@
     "attachmentPicker": {
       "camera": "Камера",
       "photoLibrary": "Фотосуреттер жинағы",
-      "files": "Файл",
+      "files": "Файлдар",
       "couldNotOpenPhotoPicker": "Фотосурет таңдау құралын ашу мүмкін болмады. Kilo қолданбасын қайта іске қосып, қайталап көріңіз.",
       "maxFilesAllowed": "Ең көбі {{displayCount}} файл қосуға болады.",
       "onlyAddingFiles": "Тек {{total}} файлдың {{accepted}}-і қосылуда (ең көбі {{max}})",

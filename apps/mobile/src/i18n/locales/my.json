@@ -330,7 +330,7 @@
       "diffTooLarge": "ကွာခြားချက် ကြီးလွန်းသည်",
       "openFile": "{{path}} ကို ဖွင့်ပါ",
       "openFileViewed": "{{path}} ကို ဖွင့်ပါ (ကြည့်ပြီး)",
-      "title": "ဖိုင်"
+      "title": "ဖိုင်များ"
     },
     "fileRows": {
       "markViewed": "{{path}} ကို ကြည့်ပြီးအဖြစ် မှတ်သားပါ",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "ခြုံငုံချက်",
-      "files": "ဖိုင်",
+      "files": "ဖိုင်များ",
       "discussion": "ဆွေးနွေးချက်"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "ဓာတ်ပုံရိုက်ရန်",
       "photoLibrary": "ဓာတ်ပုံစုစည်းမှု",
-      "files": "ဖိုင်",
+      "files": "ဖိုင်များ",
       "cameraAccessMessage": "ဓာတ်ပုံရိုက်ရန် ဆက်တင်များတွင် ကင်မရာ အသုံးပြုခွင့် ပေးပါ။"
     },
     "typingIndicator": {
@@ -2753,7 +2753,7 @@
     "attachmentPicker": {
       "camera": "ကင်မရာ",
       "photoLibrary": "ဓာတ်ပုံစုစည်းမှု",
-      "files": "ဖိုင်",
+      "files": "ဖိုင်များ",
       "couldNotOpenPhotoPicker": "ဓာတ်ပုံရွေးသည့်အကွက်ကို ဖွင့်၍မရပါ။ Kilo ကို ပြန်ဖွင့်ပြီး ထပ်ကြိုးစားပါ။",
       "maxFilesAllowed": "ဖိုင်အများဆုံး {{displayCount}} ခုသာ ထည့်နိုင်ပါသည်။",
       "onlyAddingFiles": "ဖိုင် {{total}} ခုမှ {{accepted}} ခုသာ ထည့်နေသည် (အများဆုံး {{max}})",

@@ -330,7 +330,7 @@
       "diffTooLarge": "ცვლილებების მოცულობა ზედმეტად დიდია",
       "openFile": "{{path}}-ის გახსნა",
       "openFileViewed": "{{path}}-ის გახსნა (ნანახია)",
-      "title": "ფაილი"
+      "title": "ფაილები"
     },
     "fileRows": {
       "markViewed": "{{path}}-ის ნანახად მონიშვნა",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "მიმოხილვა",
-      "files": "ფაილი",
+      "files": "ფაილები",
       "discussion": "დისკუსია"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "ფოტოს გადაღება",
       "photoLibrary": "ფოტოგალერეა",
-      "files": "ფაილი",
+      "files": "ფაილები",
       "cameraAccessMessage": "ფოტოს გადასაღებად პარამეტრებში კამერაზე წვდომა დაუშვი."
     },
     "typingIndicator": {
@@ -2753,7 +2753,7 @@
     "attachmentPicker": {
       "camera": "კამერა",
       "photoLibrary": "ფოტოგალერეა",
-      "files": "ფაილი",
+      "files": "ფაილები",
       "couldNotOpenPhotoPicker": "ფოტოების არჩევის ფანჯრის გახსნა ვერ მოხერხდა. ხელახლა გაუშვით Kilo და სცადეთ კიდევ ერთხელ.",
       "maxFilesAllowed": "შეგიძლიათ დაამატოთ მაქსიმუმ {{displayCount}} ფაილი.",
       "onlyAddingFiles": "{{total}} ფაილიდან ემატება მხოლოდ {{accepted}} (მაქსიმუმ {{max}})",

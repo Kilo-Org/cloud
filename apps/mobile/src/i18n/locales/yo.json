@@ -330,7 +330,7 @@
       "diffTooLarge": "ìyàtọ̀ náà tóbi jù",
       "openFile": "Ṣí {{path}}",
       "openFileViewed": "Ṣí {{path}} (a ti wò ó)",
-      "title": "Fáìlì"
+      "title": "Àwọn fáìlì"
     },
     "fileRows": {
       "markViewed": "Sàmì sí {{path}} pé o ti wò ó",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "Àkópọ̀",
-      "files": "Fáìlì",
+      "files": "Àwọn fáìlì",
       "discussion": "Ìjíròrò"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "Ya fọ́tò",
       "photoLibrary": "Àkójọpọ̀ fọ́tò",
-      "files": "Fáìlì",
+      "files": "Àwọn fáìlì",
       "cameraAccessMessage": "Gba lílo kámẹ́rà láyè nínú àwọn ètò kí o lè ya fọ́tò."
     },
     "typingIndicator": {
@@ -2753,7 +2753,7 @@
     "attachmentPicker": {
       "camera": "Kámẹ́rà",
       "photoLibrary": "Àkójọpọ̀ fọ́tò",
-      "files": "Fáìlì",
+      "files": "Àwọn fáìlì",
       "couldNotOpenPhotoPicker": "A kò lè ṣí ààyè yíyan àwòrán. Tún Kilo bẹ̀rẹ̀ kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
       "maxFilesAllowed": "Fáìlì {{displayCount}} ni ó pọ̀ jù tí o lè fi kún un.",
       "onlyAddingFiles": "Ń fi fáìlì {{accepted}} nínú {{total}} kún un nìkan (ó pọ̀ jù: {{max}})",

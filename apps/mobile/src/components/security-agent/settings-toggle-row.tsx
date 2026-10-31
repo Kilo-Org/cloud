@@ -1,5 +1,5 @@
 import { selectionHaptic } from '@/lib/haptics';
-import { Pressable, View } from 'react-native';
+import { Pressable, useColorScheme, View } from 'react-native';
 
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
@@ -40,6 +40,12 @@ export function ToggleRow({
   onValueChange: (value: boolean) => void;
 }>) {
   const colors = useThemeColors();
+  // The off thumb is the light end of the surface ladder so it reads as a
+  // thumb on the mid-neutral off track. The background token is that light end
+  // only in the light scheme; on the near-black dark card it is near-black
+  // itself, which left the control looking empty, so the dark scheme takes the
+  // foreground instead.
+  const offThumbColor = useColorScheme() === 'dark' ? colors.foreground : colors.background;
   const toggle = () => {
     if (disabled) {
       return;
@@ -91,7 +97,7 @@ export function ToggleRow({
           disabled={disabled}
           ios_backgroundColor={colors.mutedForeground}
           trackColor={{ false: colors.mutedForeground, true: colors.primary }}
-          thumbColor={value ? colors.primaryForeground : colors.background}
+          thumbColor={value ? colors.primaryForeground : offThumbColor}
         />
       </View>
     </Pressable>

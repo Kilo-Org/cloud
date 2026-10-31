@@ -139,23 +139,27 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
             i18n.language
           )}`}
         />
+        {/* Each dot carries its row's severity class, the same way the action
+            posture below marks confirmed-exploitable red and needs-review
+            amber: critical red, high amber, medium & low neutral. A count of
+            zero does not change what the row is about. */}
         <KvRow
           label={t('securityAgent.dashboard.criticalOverdue')}
           value={formatNumber(bySeverity.critical.overdue, i18n.language)}
           valueTone="muted"
-          dotTone={bySeverity.critical.overdue > 0 ? 'danger' : 'muted'}
+          dotTone="danger"
         />
         <KvRow
           label={t('securityAgent.dashboard.highOverdue')}
           value={formatNumber(bySeverity.high.overdue, i18n.language)}
           valueTone="muted"
-          dotTone={bySeverity.high.overdue > 0 ? 'danger' : 'muted'}
+          dotTone="warn"
         />
         <KvRow
           label={t('securityAgent.dashboard.mediumLowOverdue')}
           value={formatNumber(bySeverity.medium.overdue + bySeverity.low.overdue, i18n.language)}
           valueTone="muted"
-          dotTone={bySeverity.medium.overdue + bySeverity.low.overdue > 0 ? 'danger' : 'muted'}
+          dotTone="muted"
           last
         />
       </SectionCard>

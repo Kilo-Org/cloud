@@ -7,6 +7,7 @@ import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 import { ToggleRow } from './settings-toggle-row';
 
 const haptics = vi.hoisted(() => ({ selectionAsync: vi.fn<() => Promise<void>>() }));
+const scheme = vi.hoisted(() => ({ current: 'light' as 'light' | 'dark' }));
 
 vi.mock('expo-haptics', () => ({ selectionAsync: haptics.selectionAsync }));
 vi.mock('react-native', () => ({
@@ -14,6 +15,7 @@ vi.mock('react-native', () => ({
   View: 'View',
   Platform: { OS: 'android' },
   I18nManager: { isRTL: false },
+  useColorScheme: () => scheme.current,
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
@@ -26,6 +28,7 @@ const theme = vi.hoisted(() => ({
   colors: {
     mutedForeground: '#6F6A61',
     background: '#FBFAF5',
+    foreground: '#14130F',
     primary: '#4F5A10',
     primaryForeground: '#FFFFFF',
   },
@@ -146,6 +149,24 @@ describe('<ToggleRow>', () => {
     expect(off.ios_backgroundColor).toBe(theme.colors.mutedForeground);
     expect(off.thumbColor).toBe(theme.colors.background);
     expect(on.thumbColor).toBe(theme.colors.primaryForeground);
+  });
+
+  it('keeps the off thumb light on the dark card', () => {
+    scheme.current = 'dark';
+    try {
+      const off = switchProps(renderRow({ value: false, disabled: false }));
+
+      // In the dark scheme the background token is near-black, so an off thumb
+      // drawn from it disappeared into the card. The foreground is the light
+      // end of that ladder.
+      expect(off.thumbColor).toBe(theme.colors.foreground);
+      expect(off.trackColor).toEqual({
+        false: theme.colors.mutedForeground,
+        true: theme.colors.primary,
+      });
+    } finally {
+      scheme.current = 'light';
+    }
   });
 
   it('leaves the visual switch inert and out of the accessibility tree', () => {

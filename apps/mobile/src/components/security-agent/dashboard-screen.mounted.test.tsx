@@ -1104,6 +1104,22 @@ describe('DashboardScreen before the first sync', () => {
     expect(emptyState.props[0]?.title).toBe(i18n.t('securityAgent.dashboard.notYetSynced'));
   });
 
+  it('states the sync status once, in the prompt, before the first sync', () => {
+    // The prompt's title already says the scope has not synced, so the filter
+    // row above it must not repeat the same sentence.
+    const prompt = renderScreen();
+    expect(renderedTexts(prompt.root)).not.toContain(
+      i18n.t('securityAgent.dashboard.notYetSynced')
+    );
+
+    // Every other state keeps the row's status line.
+    lastSync.data = { lastSyncTime: '2026-01-01T00:00:00.000Z' };
+    const synced = renderScreen();
+    expect(renderedTexts(synced.root)).toContain(
+      i18n.t('securityAgent.dashboard.lastSynced', { time: 'recently' })
+    );
+  });
+
   it('starts a sync from the prompt with the current repository filter', () => {
     const root = renderScreen();
     const action = root.root.findAll(

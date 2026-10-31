@@ -2065,7 +2065,7 @@
       "newFindingPersonalTitle": "Email me about new findings",
       "newFindingSection": "New-finding notification",
       "newFindingSeverityLabel": "New-finding minimum severity",
-      "newFindingSubtitle": "Sent whenever a new finding is synced, including on first sync.",
+      "newFindingSubtitle": "Sent whenever a new finding is synced.",
       "slaLeadTimeAccessibility": "SLA warning lead time in days",
       "slaLeadTimeError": "Enter a whole number of days between 1 and 365.",
       "slaLeadTimeLabel": "SLA warning lead time (days)",

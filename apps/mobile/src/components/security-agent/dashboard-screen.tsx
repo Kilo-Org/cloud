@@ -388,9 +388,14 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             <Text className="text-sm font-medium" numberOfLines={1}>
               {repoFullName ?? t('common.allRepositories')}
             </Text>
-            <Text variant="muted" className="text-xs">
-              {lastSyncLabel}
-            </Text>
+            {/* The first-sync prompt below already states that nothing is
+                synced yet, so the status line would repeat it one row above
+                the same words. Every other state keeps its status line. */}
+            {neverSynced ? null : (
+              <Text variant="muted" className="text-xs">
+                {lastSyncLabel}
+              </Text>
+            )}
           </Pressable>
           <IconButton
             onPress={() => {
@@ -512,7 +517,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
               className={cn(ROW_TARGET_CLASS, 'justify-center active:opacity-70')}
             >
-              <Text className="text-xs font-medium text-primary dark:text-info">
+              {/* The app's link style is the primary token (`Button`
+                  variant="link"): olive on the light card, the brand yellow on
+                  the dark one, the same pairing every other surface uses. */}
+              <Text className="text-xs font-medium text-primary">
                 {t('securityAgent.dashboard.manageRepositories')}
               </Text>
             </Pressable>

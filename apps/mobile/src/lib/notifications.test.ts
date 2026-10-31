@@ -204,7 +204,7 @@ vi.mock('@/lib/active-sessions-live-sync', () => ({
 }));
 vi.mock('@/lib/persist/read-cache', () => ({ readCachedUserId: () => null }));
 
-vi.mock('@kilocode/notifications', async importOriginal => ({
+vi.mock('@kilocode/notifications/schemas', async importOriginal => ({
   ...(await importOriginal<typeof Notifications>()),
   ANDROID_NOTIFICATION_CHANNELS: [
     { id: 'needs-input', name: 'Needs input', importance: 'high', bypassDnd: true },

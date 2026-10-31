@@ -302,17 +302,18 @@ afterEach(() => {
   mounts.length = 0;
 });
 
-describe.each(CASES)('$name first body frame', ({ Screen, settled }) => {
-  it('paints the body with the config draft already applied', () => {
+describe.each(CASES)('$name body frames', ({ Screen, settled }) => {
+  it('paints every body frame with the config draft already applied', () => {
     config.data = enabledConfig();
     mount(Screen);
 
     const built = frames(record.events);
     expect(built.length).toBeGreaterThan(0);
-    // The frame the body first paints is already the settled one: no frame
+    // Every committed body frame already carries the config's draft: no frame
     // shows the default draft's collapsed sections before the config's arrive.
-    expect(built.at(0)).toEqual(settled);
-    expect(built.at(-1)).toEqual(settled);
+    for (const frame of built) {
+      expect(frame).toEqual(settled);
+    }
   });
 
   it('keeps the skeleton until the config arrives', () => {

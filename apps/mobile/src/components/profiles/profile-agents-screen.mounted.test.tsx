@@ -146,3 +146,56 @@ describe('ProfileAgentsScreen mode badge', () => {
     unmount();
   });
 });
+
+describe('ProfileAgentsScreen agent row', () => {
+  const source = (id: string, name: string, slug: string): AgentSource => ({
+    id,
+    slug,
+    name,
+    config: {},
+  });
+
+  it('leaves out a slug that only repeats the agent name', async () => {
+    h.query.data = [
+      source('a', 'Reviewer', 'reviewer'),
+      source('b', 'Code Reviewer', 'code-reviewer'),
+      source('c', 'Reviewer', 'reviewer-pro'),
+    ];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
+    );
+
+    const texts = renderer.root
+      .findAll(node => String(node.type) === 'Text')
+      .map(node => node.props.children);
+
+    expect(texts).toContain('reviewer-pro');
+    expect(texts).toContain('Reviewer');
+    expect(texts).not.toContain('reviewer');
+    expect(texts).not.toContain('code-reviewer');
+
+    unmount();
+  });
+
+  it('keeps the mode label on the nowrap name row and the slug on the meta line', async () => {
+    h.query.data = [source('a', 'Alpha', 'alpha-bravo-charlie-delta-echo')];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
+    );
+
+    const texts = renderer.root.findAll(node => String(node.type) === 'Text');
+    const label = texts.find(node => String(node.props.className ?? '').includes('uppercase'));
+    const slugText = texts.find(node => node.props.children === 'alpha-bravo-charlie-delta-echo');
+
+    // React Native defaults flexShrink to 0, so a nowrap row truncates only the
+    // texts that opt in; the label keeps its own width on the same line instead
+    // of wrapping under the name with a different gap above and below.
+    expect(label?.props.className).toContain('shrink-0');
+    expect(label?.parent?.props.className).toBe('flex-row items-center gap-2');
+    // The slug sits in the row's column, not the name row: it cannot take width
+    // from the name on a narrow screen.
+    expect(slugText?.parent?.props.className).toBe('min-w-0 flex-1 gap-0.5');
+
+    unmount();
+  });
+});

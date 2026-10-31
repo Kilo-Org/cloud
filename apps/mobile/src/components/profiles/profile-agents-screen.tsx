@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { isRedundantAgentSlug } from '@kilocode/app-shared/agent-profile';
 import { EmptyState } from '@/components/empty-state';
 import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
 import {
@@ -66,21 +67,29 @@ function AgentRowView({
 }: AgentRowViewProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  // The name row is one line on every width: the name shrinks and ellipsizes
+  // instead of wrapping, so the mode label keeps the row's even gap above it.
+  // The slug moves to the meta line below, where it has room to truncate on its
+  // own instead of taking width from the name; a slug that only repeats the
+  // name in lowercase is left out.
+  const showSlug = !isRedundantAgentSlug(name, slug);
   return (
     <View className="min-h-16 flex-row items-start gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="min-w-0 flex-1 gap-0.5">
-        <View className="flex-row flex-wrap items-center gap-2">
+        <View className="flex-row items-center gap-2">
           <Bot size={16} color={colors.mutedForeground} />
-          <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+          <Text className="min-w-0 shrink text-sm font-medium text-foreground" numberOfLines={1}>
             {name}
           </Text>
-          <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
-            {slug}
-          </Text>
-          <Text className="text-xs uppercase tracking-wide text-muted-foreground">
+          <Text className="shrink-0 text-xs uppercase tracking-wide text-muted-foreground">
             {t(AGENT_VISIBILITY_LABEL_KEYS[visibility])}
           </Text>
         </View>
+        {showSlug ? (
+          <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
+            {slug}
+          </Text>
+        ) : null}
         {model.length > 0 ? (
           <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
             {model}

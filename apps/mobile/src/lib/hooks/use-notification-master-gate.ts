@@ -52,6 +52,14 @@ export function useNotificationMasterGate(): NotificationMasterGate {
   const pushTokens = useQuery({
     ...trpc.user.getMyPushTokens.queryOptions(),
     enabled: authToken != null,
+    // The history screen shows its push banner above content that must not
+    // move once it has settled, so it waits for this gate. A read started
+    // offline must therefore settle into its error instead of pausing in
+    // `pending`, which would hold that content behind a gate that never
+    // answers; `networkMode: 'always'` also drops the derived reconnect
+    // refetch, so ask for it back.
+    networkMode: 'always',
+    refetchOnReconnect: true,
   });
 
   const settled = deriveGateSettled({

@@ -22,10 +22,10 @@ import {
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/web-config.server';
+import { deriveBotCallbackToken } from '@/lib/bot/callback-token';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
 import type { Owner } from '@/lib/integrations/core/types';
-import { createHmac } from 'crypto';
 import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
 import z from 'zod';
@@ -33,16 +33,6 @@ import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { resolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
 import { getGitHubIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { authorizeGitHubRepository } from '@/lib/bot/github-repository-permission';
-
-/**
- * Derive a per-request callback token so the dedicated callback HMAC secret
- * is never stored in session metadata (which is visible via getSession).
- */
-function deriveBotCallbackToken(botRequestId: string): string {
-  return createHmac('sha256', CALLBACK_TOKEN_SECRET)
-    .update(`bot-callback:${botRequestId}`)
-    .digest('hex');
-}
 
 function buildBotCallbackUrl(botRequestId: string, currentStep: number | undefined): string {
   const url = new URL(`/api/internal/bot-session-callback/${botRequestId}`, APP_URL);
@@ -133,7 +123,7 @@ export default async function spawnCloudAgentSession(
   const payerUserId = options?.payerUserId;
   const callbackTarget = {
     url: buildBotCallbackUrl(botRequestId, options?.currentStep),
-    headers: { 'X-Bot-Callback-Token': deriveBotCallbackToken(botRequestId) },
+    headers: { 'X-Bot-Callback-Token': await deriveBotCallbackToken(botRequestId) },
   };
 
   if (!args.githubRepo && !args.gitlabProject) {

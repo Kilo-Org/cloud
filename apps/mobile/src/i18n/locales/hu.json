@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "Fotó készítése",
       "photoLibrary": "Fotótár",
-      "files": "Fájl",
+      "files": "Fájlok",
       "cameraAccessMessage": "Fotó készítéséhez engedélyezd a kamera használatát a Beállításokban."
     },
     "typingIndicator": {
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Súlyosság: csökkenő",
       "sortSeverityAsc": "Súlyosság: növekvő",
       "sortSlaDue": "SLA-határidő",
-      "overdueOnly": "Csak a lejártak"
+      "overdueOnly": "Csak a lejártak",
+      "noRepositories": "Még nincs szinkronizált vagy kiválasztott adattár. Válassza ki őket a Biztonsági ügynök beállításaiban."
     },
     "automation": {
       "title": "Automatizálás",
@@ -1873,7 +1874,6 @@
       "repositoriesCount_one": "{{displayCount}} adattár kiválasztva",
       "repositoriesCount": "{{displayCount}} adattár kiválasztva",
       "repositoriesCount_other": "{{displayCount}} adattár kiválasztva",
-      "selectRepositoriesSubtitle": "Válaszd ki, mely adattárakat figyelje a biztonsági ügynök",
       "analysisModeSubtitle": "{{mode}} elemzés",
       "automationAllOff": "Mind kikapcsolva",
       "automationCount": "3 közül {{displayCount}} engedélyezve",
@@ -2064,7 +2064,10 @@
       "settleFailed": "A művelet lefutott, de nem sikerült rögzítenünk az eredményt. Próbáld újra.",
       "replayFailed": "Ez a művelet nem fejeződött be. Próbáld újra.",
       "actionFailed": "Nem sikerült befejezni ezt a műveletet. Próbáld újra.",
-      "actionBlocked": "Nem sikerült befejezni ezt a műveletet. A hibát előbb javítani kell."
+      "actionBlocked": "Nem sikerült befejezni ezt a műveletet. A hibát előbb javítani kell.",
+      "syncNoRepositories": "Egyetlen adattár sem esik a szinkronizálás hatókörébe. Válassza ki azokat az adattárakat, amelyeket a Biztonsági ügynök figyel, majd szinkronizáljon újra.",
+      "syncIntegrationInactive": "A Biztonsági ügynök GitHub-kapcsolata nem aktív. Csatlakoztassa újra a Kilo GitHub App-ot, majd szinkronizáljon újra.",
+      "syncMissingPermission": "A Kilo GitHub-alkalmazás nem tudja olvasni a sebezhetőségi riasztásokat. Add meg ezt az engedélyt a GitHubbon, majd szinkronizálj újra."
     },
     "analysisState": {
       "queued": "Elemzés várólistán",
@@ -3152,7 +3155,7 @@
     "couldNotSaveChoice": "A választásod mentése nem sikerült. Próbáld újra.",
     "onlineAllowed": "Online, engedélyezve",
     "onlineNotAllowed": "Online, nem engedélyezve",
-    "optionalReview": "Opcionális – a beállításokban bármikor módosíthatod",
+    "optionalReview": "Opcionális",
     "optionalOnboarding": "Opcionális – alapértelmezetten bekapcsolva",
     "aiProvidersWhat": "Az utasításaid, a beszélgetési előzményeid és minden csatolt fájlod.",
     "aiProvidersWhy": "Az AI-válaszok létrehozásához.",
@@ -3978,7 +3981,8 @@
       "nameRequired": "Adja meg a parancs nevét",
       "nameInvalid": "A névnek kisbetűvel kell kezdődnie, és csak kisbetűket, számjegyeket és kötőjeleket kell használnia",
       "templateRequired": "Írjon be egy parancssablont",
-      "nameConflict": "Ezt a nevet egy beépített parancs foglalja le"
+      "nameConflict": "Ezt a nevet egy beépített parancs foglalja le",
+      "duplicateName": "Ezt a nevet már egy másik parancs használja ebben a profilban"
     },
     "repoBindings": {
       "title": "Alapértelmezett profilok adattárakhoz",

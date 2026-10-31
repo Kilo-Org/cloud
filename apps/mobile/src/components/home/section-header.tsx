@@ -39,7 +39,15 @@ export function SectionHeader({
 }: Readonly<SectionHeaderProps>) {
   const hasAction = Boolean(actionLabel && onActionPress) && !(actionHidden && notice);
   return (
-    <View className="flex-row flex-wrap items-center justify-end gap-2 px-4 pb-2 pt-2">
+    // The label sits on the row's content bottom edge (`items-end`), not on its
+    // vertical centre. An action's touch box is 48 dp tall while the label is
+    // one 11 px line, so a centred row holds the label 17 dp above the rows and
+    // cards it names — twice the gap a header without an action has — and the
+    // same label-to-content relation then reads as two different spacings
+    // (home section-label gap). The box still sets the row's height, so the air
+    // sits above the line instead of between the label and its content, which
+    // is the header's own `pb-2` everywhere.
+    <View className="flex-row flex-wrap items-end justify-end gap-2 px-4 pb-2 pt-2">
       {/* With a notice the label keeps its own width, so the notice takes all
           the free space on the line instead of an equal share of it. */}
       <Text variant="eyebrow" className={cn('max-w-full', !notice && 'grow')}>
@@ -50,7 +58,7 @@ export function SectionHeader({
           {notice}
         </View>
       ) : null}
-      {notice && hasAction ? <View className="h-3 w-px bg-border" /> : null}
+      {notice && hasAction ? <View className="h-3 w-px self-center bg-border" /> : null}
       {hasAction ? (
         <Pressable
           onPress={onActionPress}
@@ -78,9 +86,13 @@ export function SectionHeader({
           // parent, so a shrunk layout box would leave part of the target dead
           // (`textActionTargetClass`, `comment-row.tsx`). The hidden action keeps
           // the same box, so hiding it still cannot resize the header.
+          // Its copy sits on the box's bottom edge (`items-end`, the row's own
+          // cross-axis rule), so the action and the section label share one
+          // baseline instead of the action holding the label half a box away
+          // from the content it names.
           className={cn(
             textActionTargetClass(),
-            'max-w-full shrink-0 flex-row items-center justify-center active:opacity-70',
+            'max-w-full shrink-0 flex-row items-end justify-center active:opacity-70',
             actionHidden && 'opacity-0'
           )}
         >

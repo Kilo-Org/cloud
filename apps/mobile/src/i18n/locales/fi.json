@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Vakavuus: vakavimmasta lievimpään",
       "sortSeverityAsc": "Vakavuus: lievimmästä vakavimpaan",
       "sortSlaDue": "SLA-määräaika",
-      "overdueOnly": "Vain myöhässä olevat"
+      "overdueOnly": "Vain myöhässä olevat",
+      "noRepositories": "Yhtään repositoriota ei ole vielä synkronoitu tai valittu. Valitse ne Tietoturva-agentin asetuksista."
     },
     "automation": {
       "title": "Automaatio",
@@ -1873,7 +1874,6 @@
       "repositoriesCount_one": "{{displayCount}} koodivarasto valittu",
       "repositoriesCount": "{{displayCount}} koodivarastoa valittu",
       "repositoriesCount_other": "{{displayCount}} koodivarastoa valittu",
-      "selectRepositoriesSubtitle": "Valitse tietoturva-agentin valvomat koodivarastot",
       "analysisModeSubtitle": "Analyysitila: {{mode}}",
       "automationAllOff": "Kaikki pois käytöstä",
       "automationCount": "{{displayCount}}/3 käytössä",
@@ -2064,7 +2064,10 @@
       "settleFailed": "Toiminto valmistui, mutta emme voineet tallentaa tulosta. Yritä uudelleen.",
       "replayFailed": "Tämä toiminto ei valmistunut. Yritä uudelleen.",
       "actionFailed": "Toimintoa ei voitu suorittaa loppuun. Yritä uudelleen.",
-      "actionBlocked": "Toimintoa ei voitu suorittaa loppuun. Ongelma on korjattava ensin."
+      "actionBlocked": "Toimintoa ei voitu suorittaa loppuun. Ongelma on korjattava ensin.",
+      "syncNoRepositories": "Synkronointilaajuudessa ei ole yhtään repositoriota. Valitse repositoriot, joita Tietoturva-agentti valvoo, ja synkronoi sitten uudelleen.",
+      "syncIntegrationInactive": "Tietoturva-agentin GitHub-yhteys ei ole aktiivinen. Yhdistä Kilo GitHub App uudelleen ja synkronoi sitten uudelleen.",
+      "syncMissingPermission": "Kilo GitHub App ei voi lukea haavoittuvuushälytyksiä. Myönnä kyseinen käyttöoikeus GitHubissa ja synkronoi sitten uudelleen."
     },
     "analysisState": {
       "queued": "Analyysi jonossa",
@@ -3152,7 +3155,7 @@
     "couldNotSaveChoice": "Valintaasi ei voitu tallentaa. Yritä uudelleen.",
     "onlineAllowed": "Verkossa, sallittu",
     "onlineNotAllowed": "Verkossa, ei sallittu",
-    "optionalReview": "Valinnainen – voit muuttaa asetusta milloin tahansa asetuksissa",
+    "optionalReview": "Valinnainen",
     "optionalOnboarding": "Valinnainen – käytössä, ellet poista käytöstä",
     "aiProvidersWhat": "Kehotteesi, keskusteluhistoriasi ja kaikki liittämäsi tiedostot.",
     "aiProvidersWhy": "AI-vastausten tuottamiseen.",
@@ -3978,7 +3981,8 @@
       "nameRequired": "Anna komennon nimi",
       "nameInvalid": "Nimen tulee alkaa pienellä kirjaimella ja käyttää vain pieniä kirjaimia, numeroita ja väliviivoja",
       "templateRequired": "Anna komentomalli",
-      "nameConflict": "Tämän nimen on varannut sisäänrakennettu komento"
+      "nameConflict": "Tämän nimen on varannut sisäänrakennettu komento",
+      "duplicateName": "Samanniminen komento on jo olemassa tässä profiilissa"
     },
     "repoBindings": {
       "title": "Koodivarastojen oletusprofiilit",

@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "ຄວາມຮ້າຍແຮງ: ສູງຫາຕ່ຳ",
       "sortSeverityAsc": "ຄວາມຮ້າຍແຮງ: ຕ່ຳຫາສູງ",
       "sortSlaDue": "ວັນຄົບກຳນົດ SLA",
-      "overdueOnly": "ສະເພາະທີ່ເກີນກຳນົດ"
+      "overdueOnly": "ສະເພາະທີ່ເກີນກຳນົດ",
+      "noRepositories": "ຍັງບໍ່ມີ repository ໃດທີ່ຖືກ sync ຫຼື ເລືອກເທື່ອ. ເລືອກພວກມັນໃນການຕັ້ງຄ່າ ເອເຈນດ້ານຄວາມປອດໄພ."
     },
     "automation": {
       "title": "ການເຮັດວຽກອັດຕະໂນມັດ",
@@ -1873,7 +1874,6 @@
       "repositoriesCount_one": "ເລືອກຄັງໂຄ້ດແລ້ວ {{displayCount}} ແຫ່ງ",
       "repositoriesCount": "ເລືອກຄັງໂຄ້ດແລ້ວ {{displayCount}} ຄັງ",
       "repositoriesCount_other": "ເລືອກຄັງໂຄ້ດແລ້ວ {{displayCount}} ຄັງ",
-      "selectRepositoriesSubtitle": "ເລືອກຄັງໂຄ້ດທີ່ຈະໃຫ້ເອເຈນດ້ານຄວາມປອດໄພຕິດຕາມ",
       "analysisModeSubtitle": "ການວິເຄາະແບບ {{mode}}",
       "automationAllOff": "ປິດທັງໝົດ",
       "automationCount": "ເປີດແລ້ວ {{displayCount}} ຈາກ 3 ລາຍການ",
@@ -2064,7 +2064,10 @@
       "settleFailed": "ການດຳເນີນການສຳເລັດແລ້ວ ແຕ່ພວກເຮົາບໍ່ສາມາດບັນທຶກຜົນຂອງມັນໄດ້. ກະລຸນາລອງໃໝ່.",
       "replayFailed": "ການດຳເນີນການນີ້ບໍ່ສຳເລັດ. ກະລຸນາລອງໃໝ່.",
       "actionFailed": "ບໍ່ສາມາດສຳເລັດການດຳເນີນການນີ້ໄດ້. ກະລຸນາລອງໃໝ່.",
-      "actionBlocked": "ບໍ່ສາມາດສຳເລັດການດຳເນີນການນີ້ໄດ້. ຕ້ອງແກ້ໄຂບັນຫານີ້ກ່ອນຈຶ່ງຈະລອງໃໝ່ໄດ້."
+      "actionBlocked": "ບໍ່ສາມາດສຳເລັດການດຳເນີນການນີ້ໄດ້. ຕ້ອງແກ້ໄຂບັນຫານີ້ກ່ອນຈຶ່ງຈະລອງໃໝ່ໄດ້.",
+      "syncNoRepositories": "ບໍ່ມີ repository ໃດຢູ່ໃນຂອບເຂດການຊິງຄ໌. ເລືອກ repository ທີ່ «ເອເຈນດ້ານຄວາມປອດໄພ» ຕິດຕາມ, ແລ້ວຊິງຄ໌ອີກຄັ້ງ.",
+      "syncIntegrationInactive": "ການເຊື່ອມຕໍ່ GitHub ສຳລັບ ເອເຈນດ້ານຄວາມປອດໄພ ບໍ່ໄດ້ເປີດໃຊ້ງານ. ເຊື່ອມຕໍ່ Kilo GitHub App ຄືນໃໝ່, ແລ້ວຊິງຄ໌ອີກຄັ້ງ.",
+      "syncMissingPermission": "Kilo GitHub App ບໍ່ສາມາດອ່ານ vulnerability alerts ໄດ້. ໃຫ້ສິດນັ້ນໃນ GitHub, ແລ້ວຊິງຄ໌ອີກຄັ້ງ."
     },
     "analysisState": {
       "queued": "ລໍຄິວວິເຄາະ",
@@ -3152,7 +3155,7 @@
     "couldNotSaveChoice": "ບໍ່ສາມາດບັນທຶກຕົວເລືອກຂອງທ່ານໄດ້. ລອງອີກຄັ້ງ.",
     "onlineAllowed": "ອອນໄລນ໌, ອະນຸຍາດ",
     "onlineNotAllowed": "ອອນໄລນ໌, ບໍ່ອະນຸຍາດ",
-    "optionalReview": "ບໍ່ບັງຄັບ — ປ່ຽນໄດ້ທຸກເວລາໃນການຕັ້ງຄ່າ",
+    "optionalReview": "ບໍ່ບັງຄັບ",
     "optionalOnboarding": "ບໍ່ບັງຄັບ — ເປີດໄວ້ຈົນກວ່າທ່ານຈະປິດ",
     "aiProvidersWhat": "ຂໍ້ຄວາມສັ່ງງານ, ປະຫວັດການສົນທະນາ ແລະ ໄຟລ໌ທັງໝົດທີ່ທ່ານແນບ.",
     "aiProvidersWhy": "ເພື່ອໃຫ້ AI ສ້າງຄຳຕອບ.",
@@ -3978,7 +3981,8 @@
       "nameRequired": "ໃສ່ຊື່ຄໍາສັ່ງ",
       "nameInvalid": "ຊື່ຕ້ອງຂຶ້ນຕົ້ນດ້ວຍຕົວພິມນ້ອຍ ແລະ ໃຊ້ແຕ່ຕົວພິມນ້ອຍ, ຕົວເລກ ແລະ ຂີດ",
       "templateRequired": "ໃສ່ແມ່ແບບຄໍາສັ່ງ",
-      "nameConflict": "ຊື່ນັ້ນຖືກສະຫງວນໄວ້ໂດຍຄໍາສັ່ງໃນຕົວ"
+      "nameConflict": "ຊື່ນັ້ນຖືກສະຫງວນໄວ້ໂດຍຄໍາສັ່ງໃນຕົວ",
+      "duplicateName": "ຄໍາສັ່ງທີ່ມີຊື່ນີ້ມີຢູ່ໃນໂປຣໄຟລ໌ນີ້ແລ້ວ"
     },
     "repoBindings": {
       "title": "ໂປຣໄຟລ໌ເລີ່ມຕົ້ນສຳລັບ Repos",

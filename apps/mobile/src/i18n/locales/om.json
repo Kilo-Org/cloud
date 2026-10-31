@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Cimina: olaanaa irraa gara gadi aanaatti",
       "sortSeverityAsc": "Cimina: gadi aanaa irraa gara olaanaatti",
       "sortSlaDue": "Guyyaa xumuraa SLA",
-      "overdueOnly": "Yeroon itti darbe qofa"
+      "overdueOnly": "Yeroon itti darbe qofa",
+      "noRepositories": "Kuusaawwan koodii tokkollee amma illee sync hin ta'an, filatamnees hin jiran. Qindaa'ina Eejentii nageenyaa keessatti filadhu."
     },
     "automation": {
       "title": "Ofumaan hojjechiisuu",
@@ -1873,7 +1874,6 @@
       "repositoriesCount_one": "Kuusaa koodii {{displayCount}} filatame",
       "repositoriesCount": "Kuusaaleen koodii {{displayCount}} filatamaniiru",
       "repositoriesCount_other": "Kuusaaleen koodii {{displayCount}} filatamaniiru",
-      "selectRepositoriesSubtitle": "Kuusaawwan koodii Eejentiin nageenyaa hordofu filadhu",
       "analysisModeSubtitle": "Xiinxala {{mode}}",
       "automationAllOff": "Hundi cufamaniiru",
       "automationCount": "3 keessaa {{displayCount}} banamaniiru",
@@ -2064,7 +2064,10 @@
       "settleFailed": "Tarkaanfiin xumuramee, garuu bu'aa isaa galmeessuu hin dandeenye. Irra deebi'ii yaali.",
       "replayFailed": "Tarkaanfi kun hin xumuramne. Irra deebi'ii yaali.",
       "actionFailed": "Tarkaanfa kana xumuruu hin dandeenye. Irra deebi'ii yaali.",
-      "actionBlocked": "Tarkaanfa kana xumuruu hin dandeenye. Rakkoon kana duraan furuu qaba."
+      "actionBlocked": "Tarkaanfa kana xumuruu hin dandeenye. Rakkoon kana duraan furuu qaba.",
+      "syncNoRepositories": "Kuusaawwan koodii tokkollee daangaa syncii keessa hin jiran. Kuusaawwan koodii Eejentii nageenyaa hordofu filadhu, sana booda irra deebi'ii sync godhi.",
+      "syncIntegrationInactive": "Walitti hidhinni GitHub Eejentii nageenyaaf hin hojjetu. Appii GitHub Kilo irra deebi'ii walitti hidhi, sana booda irra deebi'ii sync godhi.",
+      "syncMissingPermission": "Appiin GitHub Kilo vulnerability alerts dubbisuu hin danda'u. Hayyama sana GitHub keessatti kenni, sana booda irra deebi'ii sync godhi."
     },
     "analysisState": {
       "queued": "Xiinxalli dabaree eeggachaa jira",
@@ -3152,7 +3155,7 @@
     "couldNotSaveChoice": "Filannoo kee kuusuu hin danda'amne. Deebi'ii yaali.",
     "onlineAllowed": "Interneetiin, hayyamame",
     "onlineNotAllowed": "Interneetiin, hin hayyamamne",
-    "optionalReview": "Dirqamaa miti — yeroo kamiyyuu Qindaa'inoota keessatti jijjiiruu dandeessa",
+    "optionalReview": "Dirqamaa miti",
     "optionalOnboarding": "Dirqamaa miti — yoo dhaamsite malee banaa jira",
     "aiProvidersWhat": "Gaaffiiwwan kee, seenaa marii fi faayiloota qabachiiftu hunda.",
     "aiProvidersWhy": "Deebii AI uumuuf.",
@@ -3978,7 +3981,8 @@
       "nameRequired": "Maqaa ajaja galchi",
       "nameInvalid": "Maqaan qubee xixiqqaatiin jalqabuu fi qubee xixiqqaa, dijiitii fi daash qofa fayyadamuu qaba",
       "templateRequired": "Unkaa ajaja galchi",
-      "nameConflict": "Maqaan sun ajaja keessaa ijaarameen eegama"
+      "nameConflict": "Maqaan sun ajaja keessaa ijaarameen eegama",
+      "duplicateName": "Ajajni maqaa kana qabu durseen profaayilii kana keessaa jira"
     },
     "repoBindings": {
       "title": "Profaayilota Durtii Repos",

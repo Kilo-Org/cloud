@@ -7,6 +7,7 @@ import {
   type PrepareSessionInput,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
+import { workerRefusalStatus } from '@/lib/cloud-agent-next/release-refused-send';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { RunSessionInput } from '@/lib/cloud-agent-next/run-session';
 import { INSUFFICIENT_CREDITS_RESPONSE } from '@/lib/cloud-agent-next/run-session';
@@ -20,12 +21,13 @@ import {
   validateGitLabRepoAccessForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
+import { linkUploadedAttachments, releaseRefusedAttachments } from '@/lib/bot/attachments';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/web-config.server';
+import { deriveBotCallbackToken } from '@/lib/bot/callback-token';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
 import type { Owner } from '@/lib/integrations/core/types';
-import { createHmac } from 'crypto';
 import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
 import z from 'zod';
@@ -33,16 +35,6 @@ import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { resolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
 import { getGitHubIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { authorizeGitHubRepository } from '@/lib/bot/github-repository-permission';
-
-/**
- * Derive a per-request callback token so the dedicated callback HMAC secret
- * is never stored in session metadata (which is visible via getSession).
- */
-function deriveBotCallbackToken(botRequestId: string): string {
-  return createHmac('sha256', CALLBACK_TOKEN_SECRET)
-    .update(`bot-callback:${botRequestId}`)
-    .digest('hex');
-}
 
 function buildBotCallbackUrl(botRequestId: string, currentStep: number | undefined): string {
   const url = new URL(`/api/internal/bot-session-callback/${botRequestId}`, APP_URL);
@@ -133,7 +125,7 @@ export default async function spawnCloudAgentSession(
   const payerUserId = options?.payerUserId;
   const callbackTarget = {
     url: buildBotCallbackUrl(botRequestId, options?.currentStep),
-    headers: { 'X-Bot-Callback-Token': deriveBotCallbackToken(botRequestId) },
+    headers: { 'X-Bot-Callback-Token': await deriveBotCallbackToken(botRequestId) },
   };
 
   if (!args.githubRepo && !args.gitlabProject) {
@@ -306,11 +298,27 @@ export default async function spawnCloudAgentSession(
   let cloudAgentSessionId: string;
   let kiloSessionId: string;
 
+  // Link this message's attachment rows before the worker can accept the
+  // session, so the reaper keeps their objects while a session references them.
+  // A row that is already gone fails the dispatch instead of starting a session
+  // with a missing attachment.
+  const attachmentUserId = payerUserId ?? owner.id;
+  let linkedAttachmentKeys: string[] = [];
+  try {
+    linkedAttachmentKeys = await linkUploadedAttachments(attachmentUserId, options?.attachments);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { response: `Error: ${message}` };
+  }
+
   try {
     const prepared = await client.prepareSession(prepareInput);
     cloudAgentSessionId = prepared.cloudAgentSessionId;
     kiloSessionId = prepared.kiloSessionId;
   } catch (error) {
+    // No session holds these uploads, so hand the rows back for run-level
+    // cleanup instead of leaving the objects behind.
+    await releaseRefusedAttachments(attachmentUserId, options?.attachments, linkedAttachmentKeys);
     if (error instanceof InsufficientCreditsError) {
       return { response: INSUFFICIENT_CREDITS_RESPONSE };
     }
@@ -323,6 +331,15 @@ export default async function spawnCloudAgentSession(
       cloudAgentSessionId,
     });
   } catch (error) {
+    // A 4xx answer is the worker refusing this initiate before it admits the
+    // turn, so no session consumes these uploads and the rows go back to
+    // 'pending' for a retried tool call and the run-level cleanup. A transport
+    // failure, a timeout or a 5xx proves nothing, because the worker may have
+    // accepted the turn, so those keep the rows linked and their objects intact.
+    const refusalStatus = workerRefusalStatus(error);
+    if (refusalStatus !== undefined && refusalStatus >= 400 && refusalStatus < 500) {
+      await releaseRefusedAttachments(attachmentUserId, options?.attachments, linkedAttachmentKeys);
+    }
     if (error instanceof InsufficientCreditsError) {
       // The session record exists at this point; release it promptly with a
       // best-effort cleanup so it does not linger until periodic expiry.

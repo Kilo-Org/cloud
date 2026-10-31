@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Gravidade: de maior a menor",
       "sortSeverityAsc": "Gravidade: de menor a maior",
       "sortSlaDue": "Data de vencemento do SLA",
-      "overdueOnly": "Só fóra de prazo"
+      "overdueOnly": "Só fóra de prazo",
+      "noRepositories": "Aínda non hai repositorios sincronizados nin seleccionados. Escólleos na configuración do axente de seguridade."
     },
     "automation": {
       "title": "Automatización",
@@ -1873,7 +1874,6 @@
       "repositoriesCount_one": "{{displayCount}} repositorio seleccionado",
       "repositoriesCount": "{{displayCount}} repositorios seleccionados",
       "repositoriesCount_other": "{{displayCount}} repositorios seleccionados",
-      "selectRepositoriesSubtitle": "Escolle os repositorios que supervisa o axente de seguridade",
       "analysisModeSubtitle": "Análise: {{mode}}",
       "automationAllOff": "Todo desactivado",
       "automationCount": "{{displayCount}} de 3 activados",
@@ -2064,7 +2064,10 @@
       "settleFailed": "A acción completouse, pero non puidemos rexistrar o resultado. Téntao de novo.",
       "replayFailed": "Esta acción non se completou. Téntao de novo.",
       "actionFailed": "Non se puido completar esta acción. Téntao de novo.",
-      "actionBlocked": "Non se puido completar esta acción. Tes que resolver o problema antes de tentalo de novo."
+      "actionBlocked": "Non se puido completar esta acción. Tes que resolver o problema antes de tentalo de novo.",
+      "syncNoRepositories": "Non hai repositorios no ámbito de sincronización. Escolle os repositorios que supervisa o axente de seguridade e volve sincronizar.",
+      "syncIntegrationInactive": "A conexión de GitHub para o axente de seguridade non está activa. Volve conectar a aplicación de Kilo en GitHub e sincroniza de novo.",
+      "syncMissingPermission": "A aplicación de Kilo en GitHub non pode ler as alertas de vulnerabilidade. Concede ese permiso en GitHub e sincroniza de novo."
     },
     "analysisState": {
       "queued": "Análise na cola",
@@ -3152,7 +3155,7 @@
     "couldNotSaveChoice": "Non se puido gardar a túa elección. Téntao de novo.",
     "onlineAllowed": "En liña, permitida",
     "onlineNotAllowed": "En liña, non permitida",
-    "optionalReview": "Opcional — podes cambiar esta opción en calquera momento na configuración",
+    "optionalReview": "Opcional",
     "optionalOnboarding": "Opcional — activado por defecto",
     "aiProvidersWhat": "As túas instrucións, o historial de conversas e os ficheiros que anexes.",
     "aiProvidersWhy": "Para xerar respostas de IA.",
@@ -3978,7 +3981,8 @@
       "nameRequired": "Introduza un nome de comando",
       "nameInvalid": "O nome debe comezar cunha letra minúscula e usar só letras minúsculas, díxitos e guións",
       "templateRequired": "Introduza un modelo de comando",
-      "nameConflict": "Ese nome está reservado por un comando incorporado"
+      "nameConflict": "Ese nome está reservado por un comando incorporado",
+      "duplicateName": "Xa existe un comando con ese nome neste perfil"
     },
     "repoBindings": {
       "title": "Perfís predeterminados para Repos",

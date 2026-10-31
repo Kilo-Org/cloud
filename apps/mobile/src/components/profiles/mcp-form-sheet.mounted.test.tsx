@@ -2,9 +2,21 @@ import { createElement, type ReactNode, type Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { McpFormSheet } from '@/components/profiles/mcp-form-sheet';
+import {
+  booleanHandler,
+  changeText,
+  chooseType,
+  fieldError,
+  fieldText,
+  findAll,
+  findOne,
+  layoutField,
+  pressCancel,
+  pressDone,
+} from '@/components/profiles/mcp-form-sheet.test-helpers';
 import { i18n } from '@/i18n';
-import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
   onClose: vi.fn(),
@@ -41,7 +53,11 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
-vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
+vi.mock('@/components/ui/form-field', async () => {
+  // Hoisted above this file's imports, so the stub arrives by a dynamic import.
+  const { McpFormFieldStub } = await import('@/components/profiles/mcp-form-sheet.test-helpers');
+  return { FormField: McpFormFieldStub };
+});
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 vi.mock('@/components/ui/dialog', () => ({
@@ -52,92 +68,6 @@ vi.mock('@/components/ui/dialog', () => ({
     dialog: null,
   }),
 }));
-
-/** A host stub keeps the component's own props untyped; these suites call one handler each. */
-function voidHandler(value: unknown): () => void {
-  if (typeof value !== 'function') {
-    throw new TypeError('expected a handler prop');
-  }
-  return value as () => void;
-}
-
-/** The sheet's dismissal request answers whether it may close. */
-function booleanHandler(value: unknown): () => boolean {
-  if (typeof value !== 'function') {
-    throw new TypeError('expected a handler prop');
-  }
-  return value as () => boolean;
-}
-
-/** A field stub's onChangeText arrives untyped from the host element. */
-function textHandler(value: unknown): (text: string) => void {
-  if (typeof value !== 'function') {
-    throw new TypeError('expected a text handler');
-  }
-  return value as (text: string) => void;
-}
-
-function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {
-  return root.findAll(node => typeof node.type === 'string' && node.type === type);
-}
-
-function findOne(root: ReactTestInstance, type: string): ReactTestInstance {
-  const node = findAll(root, type)[0];
-  if (!node) {
-    throw new Error(`${type} was not rendered`);
-  }
-  return node;
-}
-
-function changeText(root: ReactTestInstance, label: string, value: string): void {
-  const field = findAll(root, 'FormField').find(node => node.props.label === label);
-  if (!field) {
-    throw new Error(`field ${label} was not rendered`);
-  }
-  const onChangeText = textHandler(field.props.onChangeText);
-  act(() => {
-    onChangeText(value);
-  });
-}
-
-function pressCancel(root: ReactTestInstance): void {
-  const onCancel = voidHandler(findOne(root, 'SheetHeader').props.onCancel);
-  act(() => {
-    onCancel();
-  });
-}
-
-/** A host stub's layout prop, read from the renderer's untyped props. */
-type ContainerLayout = (event: { nativeEvent: { layout: { y: number } } }) => void;
-
-/** Register a field block's offset the way the scroll view reports it after layout. */
-function layoutField(root: ReactTestInstance, label: string, y: number): void {
-  const field = findAll(root, 'FormField').find(node => node.props.label === label);
-  if (!field) {
-    throw new Error(`field ${label} was not rendered`);
-  }
-  const handler: unknown = field.props.containerOnLayout ?? field.parent?.props.onLayout;
-  if (typeof handler !== 'function') {
-    throw new TypeError(`field ${label} has no layout handler`);
-  }
-  // Checked to be a function above; the stub props carry no call signature.
-  const onLayout = handler as ContainerLayout;
-  act(() => {
-    onLayout({ nativeEvent: { layout: { y } } });
-  });
-}
-
-function pressDone(root: ReactTestInstance): void {
-  const onDone = voidHandler(findOne(root, 'SheetHeader').props.onDone);
-  act(() => {
-    onDone();
-  });
-}
-
-/** A field stub's inline error, read from the renderer's untyped props. */
-function fieldError(root: ReactTestInstance, label: string): unknown {
-  return findAll(root, 'FormField').find(node => node.props.label === label)?.props.error;
-}
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
 function mountSheet(
@@ -157,8 +87,8 @@ function mountSheet(
       onClose: () => {
         h.onClose();
       },
-      onSave: () => {
-        h.onSave();
+      onSave: (payload: unknown) => {
+        h.onSave(payload);
       },
     })
   );
@@ -167,6 +97,7 @@ function mountSheet(
 describe('McpFormSheet dismissal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
   });
 
   it('closes an untouched sheet without asking', async () => {
@@ -208,6 +139,7 @@ describe('McpFormSheet dismissal', () => {
 describe('McpFormSheet refused save', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
   });
 
   it('scrolls to the name field when it is missing', async () => {
@@ -278,6 +210,73 @@ describe('McpFormSheet refused save', () => {
     expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
       i18n.t('profiles.mcp.saveFailed')
     );
+
+    unmount();
+  });
+});
+
+describe('McpFormSheet server type', () => {
+  const COMMAND = 'npx -y carried-command-test --flag=1';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('shows an empty URL instead of the typed command when Remote is chosen', async () => {
+    const { renderer, unmount } = await mountSheet();
+    changeText(renderer.root, 'Command line', COMMAND);
+
+    chooseType(renderer.root, 'remote');
+
+    expect(findAll(renderer.root, 'FormField').map(node => node.props.label)).not.toContain(
+      'Command line'
+    );
+    expect(fieldText(renderer.root, 'URL')).toBe('');
+
+    unmount();
+  });
+
+  it('saves the remote URL and no command after a switch from local', async () => {
+    const { renderer, unmount } = await mountSheet();
+    changeText(renderer.root, 'Server name', 'notes');
+    changeText(renderer.root, 'Command line', COMMAND);
+    chooseType(renderer.root, 'remote');
+    changeText(renderer.root, 'URL', 'https://example.com/mcp');
+
+    pressDone(renderer.root);
+
+    expect(h.onSave).toHaveBeenCalledWith({
+      type: 'remote',
+      name: 'notes',
+      enabled: true,
+      config: { url: 'https://example.com/mcp' },
+    });
+
+    unmount();
+  });
+
+  it('brings back the typed command when Local is chosen again', async () => {
+    const { renderer, unmount } = await mountSheet();
+    changeText(renderer.root, 'Command line', COMMAND);
+
+    chooseType(renderer.root, 'remote');
+    chooseType(renderer.root, 'local');
+
+    expect(fieldText(renderer.root, 'Command line')).toBe(COMMAND);
+
+    unmount();
+  });
+
+  it('refuses Save under the URL field when the URL is missing after a switch', async () => {
+    const { renderer, unmount } = await mountSheet();
+    changeText(renderer.root, 'Server name', 'notes');
+    changeText(renderer.root, 'Command line', COMMAND);
+    chooseType(renderer.root, 'remote');
+
+    pressDone(renderer.root);
+
+    expect(h.onSave).not.toHaveBeenCalled();
+    expect(fieldError(renderer.root, 'URL')).toBe(i18n.t('profiles.mcp.urlRequired'));
 
     unmount();
   });

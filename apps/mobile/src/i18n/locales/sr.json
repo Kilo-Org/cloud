@@ -1702,7 +1702,8 @@
       "sortSeverityDesc": "Ozbiljnost: od visoke ka niskoj",
       "sortSeverityAsc": "Ozbiljnost: od niske ka visokoj",
       "sortSlaDue": "Rok prema SLA",
-      "overdueOnly": "Samo sa prekoračenim rokom"
+      "overdueOnly": "Samo sa prekoračenim rokom",
+      "noRepositories": "Nijedan repozitorijum još uvek nije sinhronizovan ili izabran. Izaberite ih u podešavanjima Bezbednosnog agenta."
     },
     "automation": {
       "title": "Automatizacija",
@@ -1904,7 +1905,6 @@
       "repositoriesCount_one": "Izabran je {{displayCount}} repozitorijum",
       "repositoriesCount": "Izabrano je {{displayCount}} repozitorijuma",
       "repositoriesCount_other": "Izabrano je {{displayCount}} repozitorijuma",
-      "selectRepositoriesSubtitle": "Izaberi repozitorijume koje bezbednosni agent prati",
       "analysisModeSubtitle": "Režim analize: {{mode}}",
       "automationAllOff": "Sve isključeno",
       "automationCount": "Uključeno: {{displayCount}} od 3",
@@ -2097,7 +2097,10 @@
       "settleFailed": "Radnja je izvršena, ali nismo mogli da zabeležimo rezultat. Pokušaj ponovo.",
       "replayFailed": "Ova radnja nije dovršena. Pokušaj ponovo.",
       "actionFailed": "Nije moguće dovršiti ovu radnju. Pokušaj ponovo.",
-      "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem mora biti rešen pre nego što pokušaš ponovo."
+      "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem mora biti rešen pre nego što pokušaš ponovo.",
+      "syncNoRepositories": "Nijedan repozitorijum nije u opsegu sinhronizacije. Izaberite repozitorijume koje Bezbednosni agent nadgleda, pa ponovo sinhronizujte.",
+      "syncIntegrationInactive": "GitHub veza za Bezbednosni agent nije aktivna. Ponovo povežite Kilo GitHub App, zatim ponovo sinhronizujte.",
+      "syncMissingPermission": "Kilo GitHub aplikacija ne može da čita upozorenja o ranjivostima. Dodeli to ovlašćenje na GitHub-u, pa sinhronizuj ponovo."
     },
     "analysisState": {
       "queued": "Analiza u redu čekanja",
@@ -3201,7 +3204,7 @@
     "couldNotSaveChoice": "Čuvanje tvog izbora nije uspelo. Pokušaj ponovo.",
     "onlineAllowed": "Onlajn, dozvoljeno",
     "onlineNotAllowed": "Onlajn, nije dozvoljeno",
-    "optionalReview": "Opciono — možeš da promeniš u bilo kom trenutku u podešavanjima",
+    "optionalReview": "Opciono",
     "optionalOnboarding": "Opciono — uključeno dok ne isključiš",
     "aiProvidersWhat": "Tvoji upiti, istorija razgovora i svi fajlovi koje priložiš.",
     "aiProvidersWhy": "Za generisanje AI odgovora.",
@@ -4035,7 +4038,8 @@
       "nameRequired": "Unesite ime komande",
       "nameInvalid": "Ime mora da počinje malim slovom i da koristi samo mala slova, cifre i crtice",
       "templateRequired": "Unesite šablon komande",
-      "nameConflict": "To ime je rezervisano ugrađenom komandom"
+      "nameConflict": "To ime je rezervisano ugrađenom komandom",
+      "duplicateName": "Komanda sa ovim imenom već postoji u ovom profilu"
     },
     "repoBindings": {
       "title": "Podrazumevani profili za Repos",

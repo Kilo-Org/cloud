@@ -330,7 +330,7 @@
       "diffTooLarge": "өөрчлөлтийн хэмжээ хэт их",
       "openFile": "{{path}} нээх",
       "openFileViewed": "{{path}} нээх (үзсэн)",
-      "title": "Файл"
+      "title": "Файлууд"
     },
     "fileRows": {
       "markViewed": "{{path}}-ыг үзсэн гэж тэмдэглэх",
@@ -759,7 +759,7 @@
     },
     "tabs": {
       "overview": "Тойм",
-      "files": "Файл",
+      "files": "Файлууд",
       "discussion": "Хэлэлцүүлэг"
     },
     "fileStatus": {
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "Зураг авах",
       "photoLibrary": "Зургийн сан",
-      "files": "Файл",
+      "files": "Файлууд",
       "cameraAccessMessage": "Зураг авахын тулд тохиргооноос камер ашиглах эрхийг зөвшөөрнө үү."
     },
     "typingIndicator": {
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Ноцтой байдлын зэрэг: ихээс бага руу",
       "sortSeverityAsc": "Ноцтой байдлын зэрэг: багаас их рүү",
       "sortSlaDue": "SLA эцсийн хугацаа",
-      "overdueOnly": "Зөвхөн хугацаа хэтэрсэн"
+      "overdueOnly": "Зөвхөн хугацаа хэтэрсэн",
+      "noRepositories": "Одоогоор синклэгдсэн эсвэл сонгосон репозитор байхгүй. «Аюулгүй байдлын агент»-ын тохиргооноос сонгоно уу."
     },
     "automation": {
       "title": "Автоматжуулалт",
@@ -1873,7 +1874,6 @@
       "repositoriesCount_one": "{{displayCount}} репозитори сонгогдсон",
       "repositoriesCount": "{{displayCount}} кодын сан сонгосон",
       "repositoriesCount_other": "{{displayCount}} кодын сан сонгосон",
-      "selectRepositoriesSubtitle": "Аюулгүй байдлын агентаар хянуулах репозиториудыг сонгох",
       "analysisModeSubtitle": "{{mode}} шинжилгээ",
       "automationAllOff": "Бүгд идэвхгүй",
       "automationCount": "3-аас {{displayCount}} нь идэвхтэй",
@@ -2064,7 +2064,10 @@
       "settleFailed": "Үйлдэл бүрэн дууслаа, гэхдээ бид үр дүнг бүртгэж чадсангүй. Дахин оролдоно уу.",
       "replayFailed": "Энэ үйлдэл дууссангүй. Дахин оролдоно уу.",
       "actionFailed": "Энэ үйлдлийг дуусгаж чадсангүй. Дахин оролдоно уу.",
-      "actionBlocked": "Энэ үйлдлийг дуусгаж чадсангүй. Асуудлыг эхэлж шийдвэрлэх шаардлагатай."
+      "actionBlocked": "Энэ үйлдлийг дуусгаж чадсангүй. Асуудлыг эхэлж шийдвэрлэх шаардлагатай.",
+      "syncNoRepositories": "Синхрончлолын хүрээнд нэг ч репозитор байхгүй. Аюулгүй байдлын агентын хянадаг репозиторуудыг сонгоод, дахин синхрончлоорой.",
+      "syncIntegrationInactive": "«Аюулгүй байдлын агент»-ын GitHub холболт идэвхтэй биш байна. Kilo GitHub App-ыг дахин холбож, дараа нь дахин синхрончлоорой.",
+      "syncMissingPermission": "Kilo GitHub App нь vulnerability alerts-г уншиж чадахгүй байна. GitHub дээр тухайн зөвшөөрлийг олгоод, дахин синк хийнэ үү."
     },
     "analysisState": {
       "queued": "Шинжилгээ дараалалд",
@@ -2769,7 +2772,7 @@
     "attachmentPicker": {
       "camera": "Камер",
       "photoLibrary": "Зургийн сан",
-      "files": "Файл",
+      "files": "Файлууд",
       "couldNotOpenPhotoPicker": "Зураг сонгох цонхыг нээж чадсангүй. Kilo-г дахин эхлүүлээд оролдоно уу.",
       "maxFilesAllowed": "Хамгийн ихдээ {{displayCount}} файл хавсаргах боломжтой.",
       "onlyAddingFiles": "Нийт {{total}} файлаас зөвхөн {{accepted}} файлыг нэмж байна (дээд хязгаар {{max}})",
@@ -3152,7 +3155,7 @@
     "couldNotSaveChoice": "Сонголтыг хадгалж чадсангүй. Дахин оролдоно уу.",
     "onlineAllowed": "Онлайн, зөвшөөрөгдсөн",
     "onlineNotAllowed": "Онлайн, зөвшөөрөгдөөгүй",
-    "optionalReview": "Заавал биш — тохиргооноос хүссэн үедээ өөрчилж болно",
+    "optionalReview": "Заавал биш",
     "optionalOnboarding": "Заавал биш — унтраагаагүй бол асаалттай",
     "aiProvidersWhat": "Таны заавар, харилцан ярианы түүх болон хавсаргасан файлууд.",
     "aiProvidersWhy": "AI хариулт үүсгэхийн тулд.",
@@ -3978,7 +3981,8 @@
       "nameRequired": "Тушаалын нэрийг оруулна уу",
       "nameInvalid": "Нэр нь жижиг үсгээр эхэлж, зөвхөн жижиг үсэг, цифр, зураас ашиглана",
       "templateRequired": "Тушаалын загварыг оруулна уу",
-      "nameConflict": "Энэ нэрийг суулгасан тушаалаар хадгалдаг"
+      "nameConflict": "Энэ нэрийг суулгасан тушаалаар хадгалдаг",
+      "duplicateName": "Энэ профайлд ийм нэртэй тушаал аль хэдийн байна"
     },
     "repoBindings": {
       "title": "Репогийн өгөгдмөл профайл",

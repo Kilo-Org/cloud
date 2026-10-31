@@ -1122,7 +1122,8 @@
       "sortSeverityDesc": "Gravité : de la plus élevée à la plus faible",
       "sortSlaDue": "Échéance du SLA",
       "statusIgnored": "Ignoré",
-      "statusOpen": "Ouvert"
+      "statusOpen": "Ouvert",
+      "noRepositories": "Aucun dépôt n'est encore synchronisé ni sélectionné. Choisissez-les dans les paramètres de l'Agent de sécurité."
     },
     "analysis": {
       "analyzeRepository": "Analyser le dépôt",
@@ -1471,7 +1472,6 @@
       "repositoriesCount": "{{displayCount}} dépôts sélectionnés",
       "repositoriesCount_other": "{{displayCount}} dépôts sélectionnés",
       "repositoriesCount_one": "{{displayCount}} dépôt sélectionné",
-      "selectRepositoriesSubtitle": "Choisir les dépôts surveillés par l'agent de sécurité",
       "repositoriesCount_many": "{{displayCount}} dépôts sélectionnés"
     },
     "settingsSave": {
@@ -1523,7 +1523,10 @@
       "settleFailed": "L'action a été effectuée, mais nous n'avons pas pu enregistrer le résultat. Réessayez.",
       "replayFailed": "Cette action n'a pas abouti. Réessayez.",
       "actionFailed": "Impossible d'effectuer cette action. Réessayez.",
-      "actionBlocked": "Impossible d'effectuer cette action. Le problème doit être résolu avant de pouvoir réessayer."
+      "actionBlocked": "Impossible d'effectuer cette action. Le problème doit être résolu avant de pouvoir réessayer.",
+      "syncNoRepositories": "Aucun dépôt ne fait partie du périmètre de synchronisation. Choisissez les dépôts que «Agent de sécurité» surveille, puis relancez la synchronisation.",
+      "syncIntegrationInactive": "La connexion GitHub pour l'Agent de sécurité n'est pas active. Reconnectez Kilo GitHub App, puis relancez la synchronisation.",
+      "syncMissingPermission": "L'application GitHub de Kilo ne peut pas lire les alertes de vulnérabilité. Accordez cette autorisation dans GitHub, puis synchronisez à nouveau."
     },
     "analysisState": {
       "queued": "Analyse en file d'attente",
@@ -2590,7 +2593,7 @@
     "couldNotSaveChoice": "Impossible d'enregistrer votre choix. Veuillez réessayer.",
     "onlineAllowed": "En ligne, autorisée",
     "onlineNotAllowed": "En ligne, non autorisée",
-    "optionalReview": "Facultatif — modifiable à tout moment dans les réglages",
+    "optionalReview": "Facultatif",
     "optionalOnboarding": "Facultatif — activé par défaut, désactivable à tout moment",
     "aiProvidersWhat": "Vos consignes, l'historique de vos conversations et les fichiers que vous joignez.",
     "aiProvidersWhy": "Pour générer des réponses à l'aide de l'IA.",
@@ -4041,7 +4044,8 @@
       "nameRequired": "Entrez un nom de commande",
       "nameInvalid": "Le nom doit commencer par une lettre minuscule et utiliser uniquement des lettres minuscules, des chiffres et des tirets.",
       "templateRequired": "Entrez un modèle de commande",
-      "nameConflict": "Ce nom est réservé par une commande intégrée"
+      "nameConflict": "Ce nom est réservé par une commande intégrée",
+      "duplicateName": "Une commande portant ce nom existe déjà dans ce profil"
     },
     "repoBindings": {
       "title": "Profils par défaut pour les dépôts",

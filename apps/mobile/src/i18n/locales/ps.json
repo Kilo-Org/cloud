@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "شدت: له لوړ څخه ټیټ ته",
       "sortSeverityAsc": "شدت: له ټیټ څخه لوړ ته",
       "sortSlaDue": "د SLA وروستۍ نېټه",
-      "overdueOnly": "یوازې له مهلته تېرې"
+      "overdueOnly": "یوازې له مهلته تېرې",
+      "noRepositories": "تر اوسه هیڅ زېرمتون همغږي شوی یا ټاکل شوی نه دی. هغه په امنیتي اجنټ تنظیماتو کې وټاکئ."
     },
     "automation": {
       "title": "اتومات کول",
@@ -1873,7 +1874,6 @@
       "repositoriesCount_one": "{{displayCount}} ذخیره غوره شوې",
       "repositoriesCount": "{{displayCount}} زېرمتونونه غوره شوي",
       "repositoriesCount_other": "{{displayCount}} زېرمتونونه غوره شوي",
-      "selectRepositoriesSubtitle": "هغه ذخیرې غوره کړئ چې امنیتي اجنټ یې څاري",
       "analysisModeSubtitle": "{{mode}} تحلیل",
       "automationAllOff": "ټول غیرفعال",
       "automationCount": "له 3 څخه {{displayCount}} فعال",
@@ -2064,7 +2064,10 @@
       "settleFailed": "کړنه بشپړه شوه، خو پایله مو ثبت نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
       "replayFailed": "دا کړنه بشپړه نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
       "actionFailed": "د دې کړنې بشپړول ممکن نه وو. مهرباني وکړئ بیا هڅه وکړئ.",
-      "actionBlocked": "د دې کړنې بشپړول ممکن نه وو. د بیا هڅې دمخه باید دا ستونزه حل شي."
+      "actionBlocked": "د دې کړنې بشپړول ممکن نه وو. د بیا هڅې دمخه باید دا ستونزه حل شي.",
+      "syncNoRepositories": "هیڅ زېرمتون د همغږۍ په حد کې نه دی. هغه زېرمتونونه وټاکئ چې امنیتي اجنټ یې څاري، بیا همغږي وکړئ.",
+      "syncIntegrationInactive": "د امنیتي اجنټ لپاره GitHub اړیکه فعاله نه ده. د Kilo GitHub اپ بیا وصل کړئ، بیا همغږي وکړئ.",
+      "syncMissingPermission": "د Kilo GitHub اپ د زیانمنتیا خبرتیاوې لوستلای نشي. په GitHub کې هغه اجازه ورکړئ، بیا همغږي وکړئ."
     },
     "analysisState": {
       "queued": "شننه په کتار کې ده",
@@ -3152,7 +3155,7 @@
     "couldNotSaveChoice": "ستاسو ټاکنه خوندي نه شوه. بیا هڅه وکړئ.",
     "onlineAllowed": "آنلاین، اجازه ورکړل شوې",
     "onlineNotAllowed": "آنلاین، اجازه نه ده ورکړل شوې",
-    "optionalReview": "اختیاري — تاسو کولای شئ دا هر وخت په تنظیماتو کې بدل کړئ",
+    "optionalReview": "اختیاري",
     "optionalOnboarding": "اختیاري — تر هغه فعال دی چې تاسو یې بند نه کړئ",
     "aiProvidersWhat": "ستاسو پرامپټونه، د خبرو اترو تاریخچه او ټول هغه فایلونه چې ضمیمه کوئ.",
     "aiProvidersWhy": "د AI ځوابونو رامنځته کولو لپاره.",
@@ -3978,7 +3981,8 @@
       "nameRequired": "د کمانډ نوم دننه کړئ",
       "nameInvalid": "نوم باید د کوچنیو تورو سره پیل شي او یوازې د کوچنیو تورو، عددونو او ډیشونو څخه کار واخلئ",
       "templateRequired": "د کمانډ ټیمپلیټ دننه کړئ",
-      "nameConflict": "دا نوم د جوړ شوي قوماندې لخوا ساتل کیږي"
+      "nameConflict": "دا نوم د جوړ شوي قوماندې لخوا ساتل کیږي",
+      "duplicateName": "د دې نوم سره یوه قومانده لا دمخه په دې پروفایل کې شتون لري"
     },
     "repoBindings": {
       "title": "د ریپوز لپاره ډیفالټ پروفایلونه",

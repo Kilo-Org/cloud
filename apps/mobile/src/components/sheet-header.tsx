@@ -214,6 +214,9 @@ export function SheetHeader({
               {title}
             </Text>
           </View>
+          {/* The trailing control commits what the sheet holds, so it carries
+              the accent weight and colour while the leading Cancel stays a
+              neutral label. Both keep the same hit box. */}
           <Pressable
             onPress={onDone}
             disabled={disabled || doneDisabled}
@@ -223,7 +226,7 @@ export function SheetHeader({
             className="ms-auto min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
           >
             <Text
-              className="text-center text-base font-medium text-foreground"
+              className="text-center text-base font-semibold text-primary"
               numberOfLines={1}
               ellipsizeMode="clip"
             >

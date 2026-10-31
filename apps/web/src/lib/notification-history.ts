@@ -13,11 +13,11 @@
  */
 
 import { user_notification_history } from '@kilocode/db/schema';
-import type { NotificationHistoryCategory } from '@kilocode/notifications';
 import {
   NOTIFICATION_HISTORY_DEFAULT_PAGE_SIZE,
   NOTIFICATION_HISTORY_RETENTION_MS,
-} from '@kilocode/notifications';
+  type NotificationHistoryCategory,
+} from '@kilocode/notifications/schemas';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, gte, lt, or } from 'drizzle-orm';

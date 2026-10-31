@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Ukali: juu hadi chini",
       "sortSeverityAsc": "Ukali: chini hadi juu",
       "sortSlaDue": "Tarehe ya mwisho ya SLA",
-      "overdueOnly": "Yaliyochelewa tu"
+      "overdueOnly": "Yaliyochelewa tu",
+      "noRepositories": "Hakuna hazina zilizosawazishwa au kuchaguliwa bado. Zichague katika mipangilio ya Wakala wa usalama."
     },
     "automation": {
       "title": "Uendeshaji wa kiotomatiki",
@@ -1873,7 +1874,6 @@
       "repositoriesCount_one": "Hazina {{displayCount}} imechaguliwa",
       "repositoriesCount": "Hazina {{displayCount}} zimechaguliwa",
       "repositoriesCount_other": "Hazina {{displayCount}} zimechaguliwa",
-      "selectRepositoriesSubtitle": "Chagua hazina ambazo wakala wa usalama atafuatilia",
       "analysisModeSubtitle": "Uchambuzi wa {{mode}}",
       "automationAllOff": "Zote zimezimwa",
       "automationCount": "{{displayCount}} kati ya 3 zimewashwa",
@@ -2064,7 +2064,10 @@
       "settleFailed": "Kitendo kimekamilika, lakini hatukuweza kurekodi matokeo yake. Tafadhali jaribu tena.",
       "replayFailed": "Kitendo hiki hakikukamilika. Tafadhali jaribu tena.",
       "actionFailed": "Imeshindikana kukamilisha kitendo hiki. Tafadhali jaribu tena.",
-      "actionBlocked": "Imeshindikana kukamilisha kitendo hiki. Tatizo lazima litatuliwe kwanza."
+      "actionBlocked": "Imeshindikana kukamilisha kitendo hiki. Tatizo lazima litatuliwe kwanza.",
+      "syncNoRepositories": "Hakuna hazina zilizo katika wigo wa usawazishaji. Chagua hazina ambazo Wakala wa usalama hufuatilia, kisha usawazishe tena.",
+      "syncIntegrationInactive": "Muunganisho wa GitHub wa Wakala wa usalama haupo hai. Unganisha tena GitHub App ya Kilo, kisha usawazishe tena.",
+      "syncMissingPermission": "Kilo GitHub App haiwezi kusoma arifa za udhaifu. Toa ruhusa hiyo katika GitHub, kisha sinkronisha tena."
     },
     "analysisState": {
       "queued": "Uchambuzi uko kwenye foleni",
@@ -3152,7 +3155,7 @@
     "couldNotSaveChoice": "Imeshindikana kuhifadhi chaguo lako. Tafadhali jaribu tena.",
     "onlineAllowed": "Mtandaoni, inaruhusiwa",
     "onlineNotAllowed": "Mtandaoni, haijaruhusiwa",
-    "optionalReview": "Hiari — unaweza kubadilisha hili wakati wowote kwenye mipangilio",
+    "optionalReview": "Hiari",
     "optionalOnboarding": "Hiari — imewashwa isipokuwa uizime",
     "aiProvidersWhat": "Maagizo yako, historia ya mazungumzo na faili zozote unazoambatisha.",
     "aiProvidersWhy": "Kutoa majibu ya AI.",
@@ -3978,7 +3981,8 @@
       "nameRequired": "Ingiza jina la amri",
       "nameInvalid": "Jina lazima lianze na herufi ndogo na litumie herufi ndogo, tarakimu na deshi pekee",
       "templateRequired": "Ingiza kiolezo cha amri",
-      "nameConflict": "Jina hilo limehifadhiwa na amri iliyojengwa"
+      "nameConflict": "Jina hilo limehifadhiwa na amri iliyojengwa",
+      "duplicateName": "Jina hilo tayari limehifadhiwa na amri nyingine katika wasifu huu"
     },
     "repoBindings": {
       "title": "Profaili Chaguomsingi za Repos",

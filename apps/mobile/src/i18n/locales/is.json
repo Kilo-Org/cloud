@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Alvarleiki: frá hæsta til lægsta",
       "sortSeverityAsc": "Alvarleiki: frá lægsta til hæsta",
       "sortSlaDue": "Lokadagur SLA-frests",
-      "overdueOnly": "Aðeins með liðinn frest"
+      "overdueOnly": "Aðeins með liðinn frest",
+      "noRepositories": "Engar geymslur hafa enn verið samstilltar eða valdar. Veldu þær í stillingum Öryggiserindrekis."
     },
     "automation": {
       "title": "Sjálfvirkni",
@@ -1873,7 +1874,6 @@
       "repositoriesCount_one": "{{displayCount}} geymsla valin",
       "repositoriesCount": "{{displayCount}} kóðasöfn valin",
       "repositoriesCount_other": "{{displayCount}} kóðasöfn valin",
-      "selectRepositoriesSubtitle": "Veldu hvaða geymslum öryggiserindrekinn fylgist með",
       "analysisModeSubtitle": "Greining: {{mode}}",
       "automationAllOff": "Allt óvirkt",
       "automationCount": "Virkt: {{displayCount}} af 3",
@@ -2064,7 +2064,10 @@
       "settleFailed": "Aðgerðinni var lokið, en okkur tókst ekki að skrá niðurstöðuna. Reyndu aftur.",
       "replayFailed": "Þessari aðgerð var ekki lokið. Reyndu aftur.",
       "actionFailed": "Ekki tókst að ljúka þessari aðgerð. Reyndu aftur.",
-      "actionBlocked": "Ekki tókst að ljúka þessari aðgerð. Leysa verður vandamálið áður en þú getur reynt aftur."
+      "actionBlocked": "Ekki tókst að ljúka þessari aðgerð. Leysa verður vandamálið áður en þú getur reynt aftur.",
+      "syncNoRepositories": "Engar geymslur eru í samstillingarsviðinu. Veldu geymslurnar sem Öryggiserindrekinn fylgist með og samstilltu síðan aftur.",
+      "syncIntegrationInactive": "Tengingin við GitHub fyrir Öryggiserindreka er ekki virk. Tengdu Kilo GitHub App aftur og samstilltu svo aftur.",
+      "syncMissingPermission": "Kilo GitHub App getur ekki lesið vulnerability alerts. Veittu þá heimild í GitHub og samstilltu svo aftur."
     },
     "analysisState": {
       "queued": "Greining í biðröð",
@@ -3152,7 +3155,7 @@
     "couldNotSaveChoice": "Ekki tókst að vista valið þitt. Reyndu aftur.",
     "onlineAllowed": "Á netinu, leyft",
     "onlineNotAllowed": "Á netinu, ekki leyft",
-    "optionalReview": "Valfrjálst — þú getur breytt þessu hvenær sem er í stillingum",
+    "optionalReview": "Valfrjálst",
     "optionalOnboarding": "Valfrjálst — virkt nema þú slökkvir á því",
     "aiProvidersWhat": "Skilaboðin þín, samtalsferillinn og allar skrár sem þú hengir við.",
     "aiProvidersWhy": "Til að mynda svör með gervigreind.",
@@ -3978,7 +3981,8 @@
       "nameRequired": "Sláðu inn heiti skipunar",
       "nameInvalid": "Nafn verður að byrja á lágstöfum og nota aðeins lágstafi, tölustafi og bandstrik",
       "templateRequired": "Sláðu inn skipanasniðmát",
-      "nameConflict": "Það nafn er frátekið af innbyggðri skipun"
+      "nameConflict": "Það nafn er frátekið af innbyggðri skipun",
+      "duplicateName": "Þegar er til skipun með þetta nafn í þessum prófíl"
     },
     "repoBindings": {
       "title": "Sjálfgefin snið fyrir geymslur",

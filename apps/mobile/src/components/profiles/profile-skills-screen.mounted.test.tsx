@@ -22,6 +22,7 @@ import { i18n } from '@/i18n';
 import { MAX_PROFILE_SKILLS, SKILL_NAME_MAX_LENGTH } from '@/lib/agent-profile-forms';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 /** The props a mocked Switch host element exposes, which the renderer keeps untyped. */
 type ToggleProps = { onValueChange: (value: boolean) => void };
@@ -106,6 +107,7 @@ vi.mock('@/components/ui/icons', () => ({
 describe('ProfileSkillsScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -162,6 +164,12 @@ describe('ProfileSkillsScreen', () => {
     expect(texts).toContain('code-review');
     expect(texts).toContain('Custom');
 
+    // The name and its source type are one element declared before the controls.
+    const identity = findAll(renderer.root, 'View').find(
+      node => node.props.accessibilityRole === 'text'
+    );
+    expect(identity?.props.accessibilityLabel).toBe('code-review, Custom');
+
     const toggle = findOne(renderer.root, 'Switch');
     expect(toggle.props.accessibilityLabel).toBe('code-review');
     expect(toggle.props.value).toBe(true);
@@ -192,6 +200,10 @@ describe('ProfileSkillsScreen', () => {
     const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
     expect(texts).toContain('skills.sh');
     expect(texts).not.toContain('skills-sh');
+    expect(
+      findAll(renderer.root, 'View').find(node => node.props.accessibilityRole === 'text')?.props
+        .accessibilityLabel
+    ).toBe('code-review, skills.sh');
 
     unmount();
   });
@@ -428,6 +440,37 @@ describe('ProfileSkillsScreen', () => {
     unmount();
   });
 
+  it('drops a refused-save message when the next form is opened', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+    h.mutations.createCustomSkill.mutateAsync.mockRejectedValueOnce(new Error('refused'));
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Skill name', 'first-skill');
+    changeText(renderer.root, 'Skill content', 'Body');
+    pressSheetDone(renderer.root);
+    await waitFor(() =>
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.skillSaveFailed')
+      )
+    );
+
+    // The message describes the attempt that failed; a form opened afterwards
+    // is a new attempt and must not open under the old refusal.
+    pressSheetCancel(renderer.root);
+    await act(async () => {
+      confirmRequest(h.confirm as TestConfirmMock);
+      await Promise.resolve();
+    });
+    pressEmptyAction(renderer);
+
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('profiles.skillSaveFailed')
+    );
+    unmount();
+  });
+
   it('drops a save that settles after its sheet was replaced', async () => {
     h.query.data = testSkills();
     h.query.isPending = false;
@@ -568,6 +611,24 @@ describe('ProfileSkillsScreen', () => {
     expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('code-review');
 
     unmount();
+  });
+  it('reopens the add sheet with its typed fields after a remount', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressEmptyAction(first.renderer);
+    changeText(first.renderer.root, 'Skill name', 'portal-skill');
+    changeText(first.renderer.root, 'Skill content', 'Use the portal carefully.');
+    first.unmount();
+
+    const second = await mountScreen();
+    expect(findOne(second.renderer.root, 'SheetHeader')).toBeTruthy();
+    expect(findField(second.renderer.root, 'Skill name').props.defaultValue).toBe('portal-skill');
+    expect(findField(second.renderer.root, 'Skill content').props.defaultValue).toBe(
+      'Use the portal carefully.'
+    );
+    second.unmount();
   });
 
   it('drops the row presses of the burst that saved the sheet', async () => {

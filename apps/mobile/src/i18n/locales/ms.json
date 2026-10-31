@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Keterukan: tertinggi ke terendah",
       "sortSeverityAsc": "Keterukan: terendah ke tertinggi",
       "sortSlaDue": "Tarikh akhir SLA",
-      "overdueOnly": "Lewat sahaja"
+      "overdueOnly": "Lewat sahaja",
+      "noRepositories": "Belum ada repositori disegerakkan atau dipilih. Pilihnya dalam tetapan Ejen Keselamatan."
     },
     "automation": {
       "title": "Automasi",
@@ -1873,7 +1874,6 @@
       "repositoriesCount_one": "{{displayCount}} repositori dipilih",
       "repositoriesCount": "{{displayCount}} repositori dipilih",
       "repositoriesCount_other": "{{displayCount}} repositori dipilih",
-      "selectRepositoriesSubtitle": "Pilih repositori yang dipantau oleh Ejen Keselamatan",
       "analysisModeSubtitle": "Analisis {{mode}}",
       "automationAllOff": "Semua dinyahdayakan",
       "automationCount": "{{displayCount}} daripada 3 didayakan",
@@ -2064,7 +2064,10 @@
       "settleFailed": "Tindakan telah selesai, tetapi kami tidak dapat merekodkan hasilnya. Sila cuba lagi.",
       "replayFailed": "Tindakan ini tidak selesai. Sila cuba lagi.",
       "actionFailed": "Tindakan ini tidak dapat disiapkan. Sila cuba lagi.",
-      "actionBlocked": "Tindakan ini tidak dapat disiapkan. Masalah ini perlu diselesaikan terlebih dahulu."
+      "actionBlocked": "Tindakan ini tidak dapat disiapkan. Masalah ini perlu diselesaikan terlebih dahulu.",
+      "syncNoRepositories": "Tiada repositori dalam skop segerak. Pilih repositori yang dipantau oleh Ejen Keselamatan, kemudian segerakkan semula.",
+      "syncIntegrationInactive": "Sambungan GitHub untuk Ejen Keselamatan tidak aktif. Sambung semula Apl GitHub Kilo, kemudian segerakkan semula.",
+      "syncMissingPermission": "Apl GitHub Kilo tidak dapat membaca makluman kerentanan. Berikan kebenaran itu dalam GitHub, kemudian segerakkan semula."
     },
     "analysisState": {
       "queued": "Analisis dalam baris gilir",
@@ -3152,7 +3155,7 @@
     "couldNotSaveChoice": "Tidak dapat menyimpan pilihan anda. Sila cuba semula.",
     "onlineAllowed": "Dalam talian, dibenarkan",
     "onlineNotAllowed": "Dalam talian, tidak dibenarkan",
-    "optionalReview": "Pilihan — anda boleh mengubahnya pada bila-bila masa dalam Tetapan",
+    "optionalReview": "Pilihan",
     "optionalOnboarding": "Pilihan — didayakan melainkan anda menyahdayakannya",
     "aiProvidersWhat": "Gesaan anda, sejarah perbualan dan sebarang fail yang anda lampirkan.",
     "aiProvidersWhy": "Untuk menjana respons AI.",
@@ -3978,7 +3981,8 @@
       "nameRequired": "Masukkan nama arahan",
       "nameInvalid": "Nama mesti bermula dengan huruf kecil dan hanya menggunakan huruf kecil, angka dan sempang",
       "templateRequired": "Masukkan templat arahan",
-      "nameConflict": "Nama itu dikhaskan oleh arahan terbina dalam"
+      "nameConflict": "Nama itu dikhaskan oleh arahan terbina dalam",
+      "duplicateName": "Arahan dengan nama ini telah wujud dalam profil ini"
     },
     "repoBindings": {
       "title": "Profil Lalai untuk Repos",

@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Ogo njọ: elu ruo ala",
       "sortSeverityAsc": "Ogo njọ: ala ruo elu",
       "sortSlaDue": "Ụbọchị njedebe SLA",
-      "overdueOnly": "Naanị ihe gafere oge"
+      "overdueOnly": "Naanị ihe gafere oge",
+      "noRepositories": "Enwebeghị ndebe koodu ọ bụla ejikọrọ ma ọ bụ họpụtara. Họrọ ha na ntọala Onye enyemaka nchebe."
     },
     "automation": {
       "title": "Ịrụ ọrụ na-akpaghị aka",
@@ -1873,7 +1874,6 @@
       "repositoriesCount_one": "Ebe nchekwa {{displayCount}} ahọpụtara",
       "repositoriesCount": "Ahọpụtara ebe nchekwa koodu {{displayCount}}",
       "repositoriesCount_other": "Ahọpụtara ebe nchekwa koodu {{displayCount}}",
-      "selectRepositoriesSubtitle": "Họrọ ebe nchekwa onye enyemaka nchebe ga-elekọta",
       "analysisModeSubtitle": "Nyocha {{mode}}",
       "automationAllOff": "Niile gbanyụrụ",
       "automationCount": "{{displayCount}} n'ime 3 gbanyere",
@@ -2064,7 +2064,10 @@
       "settleFailed": "Emechara omume a, mana anyị enweghị ike dekọọ nsonaazụ ya. Biko nwaa ọzọ.",
       "replayFailed": "Omume a emechaghị. Biko nwaa ọzọ.",
       "actionFailed": "Enweghị ike imecha omume a. Biko nwaa ọzọ.",
-      "actionBlocked": "Enweghị ike imecha omume a. A ghaghị idozi nsogbu a tupu ị nwee ike ịnwa ọzọ."
+      "actionBlocked": "Enweghị ike imecha omume a. A ghaghị idozi nsogbu a tupu ị nwee ike ịnwa ọzọ.",
+      "syncNoRepositories": "Ọnweghị repository dị n'ime oke sync. Họrọ repositories ndị Onye enyemaka nchebe na-enyocha, wee sync ọzọ.",
+      "syncIntegrationInactive": "Njikọ GitHub maka Onye enyemaka nchebe adịghị arụ ọrụ. Jikọọ Kilo GitHub App ọzọ, wee megharịa ọzọ.",
+      "syncMissingPermission": "Kilo GitHub App enweghị ike ịgụ vulnerability alerts. Nye ikike ahụ na GitHub, wee sync ọzọ."
     },
     "analysisState": {
       "queued": "Nyocha dị n'ahịrị",
@@ -3152,7 +3155,7 @@
     "couldNotSaveChoice": "Enweghị ike ịchekwa nhọrọ gị. Biko nwaa ọzọ.",
     "onlineAllowed": "N'ịntanetị, anabatara",
     "onlineNotAllowed": "N'ịntanetị, anabataghị",
-    "optionalReview": "Ọ bụghị iwu — ị nwere ike ịgbanwe nke a oge ọ bụla na Ntọala",
+    "optionalReview": "Ọ bụghị iwu",
     "optionalOnboarding": "Ọ bụghị iwu — ọ na-arụ ọrụ ọ gwụla ma ị gbanyụọ ya",
     "aiProvidersWhat": "Ihe ị na-ede, ndekọ mkparịta ụka gị, na faịlụ ọ bụla ị na-etinye.",
     "aiProvidersWhy": "Iji mepụta nzaghachi AI.",
@@ -3978,7 +3981,8 @@
       "nameRequired": "Tinye aha iwu",
       "nameInvalid": "Aha ga-eji obere mkpụrụedemede malite ma jiri naanị obere mkpụrụedemede, mkpụrụọnụọgụgụ, na akara akara",
       "templateRequired": "Tinye ndebiri iwu",
-      "nameConflict": "Edebere aha ahụ site na iwu arụnyere n'ime ya"
+      "nameConflict": "Edebere aha ahụ site na iwu arụnyere n'ime ya",
+      "duplicateName": "Iwu nwere aha a dịlarị na profaịlụ a"
     },
     "repoBindings": {
       "title": "Profaịlụ ezighi ezi maka nkwụghachi",

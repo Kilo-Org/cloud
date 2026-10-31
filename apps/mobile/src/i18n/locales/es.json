@@ -1154,7 +1154,8 @@
       "sortSeverityDesc": "Gravedad: de mayor a menor",
       "sortSlaDue": "Fecha de vencimiento del SLA",
       "statusIgnored": "Ignorado",
-      "statusOpen": "Abierto"
+      "statusOpen": "Abierto",
+      "noRepositories": "Aún no hay repositorios sincronizados ni seleccionados. Elígelos en los ajustes del agente de seguridad."
     },
     "analysis": {
       "analyzeRepository": "Analizar repositorio",
@@ -1497,7 +1498,6 @@
       "repositoriesCount": "{{displayCount}} repositorios seleccionados",
       "repositoriesCount_other": "{{displayCount}} repositorios seleccionados",
       "repositoriesCount_one": "{{displayCount}} repositorio seleccionado",
-      "selectRepositoriesSubtitle": "Elige qué repositorios supervisa el agente de seguridad",
       "repositoriesCount_many": "{{displayCount}} repositorios seleccionados"
     },
     "settingsSave": {
@@ -1549,7 +1549,10 @@
       "settleFailed": "La acción se completó, pero no pudimos registrar el resultado. Inténtalo de nuevo.",
       "replayFailed": "Esta acción no se completó. Inténtalo de nuevo.",
       "actionFailed": "No se pudo completar esta acción. Inténtalo de nuevo.",
-      "actionBlocked": "No se pudo completar esta acción. Hay que solucionar el problema antes de poder reintentarlo."
+      "actionBlocked": "No se pudo completar esta acción. Hay que solucionar el problema antes de poder reintentarlo.",
+      "syncNoRepositories": "No hay repositorios en el ámbito de sincronización. Elige qué repositorios supervisa el agente de seguridad y sincroniza de nuevo.",
+      "syncIntegrationInactive": "La conexión de GitHub para el agente de seguridad no está activa. Vuelve a conectar la aplicación de Kilo en GitHub y sincroniza de nuevo.",
+      "syncMissingPermission": "La aplicación de Kilo en GitHub no puede leer las alertas de vulnerabilidades. Concede ese permiso en GitHub y sincroniza de nuevo."
     },
     "analysisState": {
       "queued": "Análisis en cola",
@@ -2653,7 +2656,7 @@
     "couldNotSaveChoice": "No se pudo guardar tu elección. Inténtalo de nuevo.",
     "onlineAllowed": "En línea, permitida",
     "onlineNotAllowed": "En línea, no permitida",
-    "optionalReview": "Opcional: puedes cambiarlo cuando quieras en los ajustes",
+    "optionalReview": "Opcional",
     "optionalOnboarding": "Opcional: activado de forma predeterminada",
     "aiProvidersWhat": "Tus instrucciones, tu historial de conversaciones y los archivos que adjuntes.",
     "aiProvidersWhy": "Para generar respuestas de IA.",
@@ -4035,7 +4038,8 @@
       "nameRequired": "Introduzca un nombre de comando",
       "nameInvalid": "El nombre debe comenzar con una letra minúscula y usar solo letras minúsculas, dígitos y guiones.",
       "templateRequired": "Ingrese una plantilla de comando",
-      "nameConflict": "Ese nombre está reservado mediante un comando integrado."
+      "nameConflict": "Ese nombre está reservado mediante un comando integrado.",
+      "duplicateName": "Ya existe un comando con ese nombre en este perfil."
     },
     "repoBindings": {
       "title": "Perfiles predeterminados para repositorios",

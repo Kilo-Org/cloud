@@ -45,9 +45,11 @@ import {
 import {
   isSecuritySyncInProgress,
   isSecuritySyncRetryable,
+  securitySyncPreconditionFor,
   securitySyncReconcileCopy,
 } from '@/lib/security-agent-ledger';
 import { useSecurityAgentSyncRunning } from '@/lib/hooks/use-security-agent-sync-running';
+import { useManageRepositoryAccess } from '@/lib/hooks/use-manage-repository-access';
 import { useSecurityScopeTitle } from '@/lib/hooks/use-security-scope-title';
 import {
   securityDismissFailureCopy,
@@ -248,14 +250,65 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // another scope must not show a card or POST this scope.
   const reconcileRows = needsReconcile.filter(row => row.scope === scope);
 
+  // React Query clears a mutation's error when the next attempt starts, so the
+  // failure copy and the retry under it blink out for the length of the retry —
+  // the screen looked like the tap did nothing. Hold the failure being retried,
+  // together with the intent that produced it, until that attempt reports its
+  // own outcome: a retry must resubmit the failed intent, not whatever filter
+  // the reader switched to meanwhile.
+  const [lastSyncAttempt, setLastSyncAttempt] = useState<{
+    error: Error | null;
+    intent: SyncIntent;
+  } | null>(null);
+
+  // A precondition rejection describes server state this screen cannot change:
+  // no repository in the sync scope, or a GitHub connection that is inactive or
+  // missing the vulnerability-alerts permission. The fix is applied in the
+  // repositories settings or on the GitHub App page, so the first return to
+  // this screen is when the controls must work again. Both readings go through
+  // refs so the focus callback and the handoff's return callback keep a stable
+  // identity — a callback that changed whenever a failure arrived would re-run
+  // the focus effect and clear the failure it had just shown.
+  const triggerSyncRef = useRef(triggerSync);
+  triggerSyncRef.current = triggerSync;
+  const lastSyncAttemptRef = useRef(lastSyncAttempt);
+  lastSyncAttemptRef.current = lastSyncAttempt;
+
+  const clearSyncPreconditionFailure = useCallback(() => {
+    const failure = triggerSyncRef.current.error ?? lastSyncAttemptRef.current?.error;
+    if (securitySyncPreconditionFor(failure) === null) {
+      return;
+    }
+    triggerSyncRef.current.reset();
+    setLastSyncAttempt(null);
+  }, []);
+
+  // The GitHub preconditions' fix lives on the GitHub App page; this is the
+  // app-wide handoff that mints the install state and waits for the return. A
+  // handoff that never opened a page clears nothing: the copy still explains
+  // what blocks the sync, and the handoff already reported its own failure.
+  const handleHandoffReturn = useCallback(
+    (opened: boolean) => {
+      if (opened) {
+        clearSyncPreconditionFailure();
+      }
+    },
+    [clearSyncPreconditionFailure]
+  );
+  const manageAccess = useManageRepositoryAccess(scope, 'github', {
+    onReturn: handleHandoffReturn,
+  });
+
   // The dashboard stays mounted while the dismiss sheet is open, so re-read
   // the failed dismiss drafts on focus: a fresh failure must show a card and
-  // an accepted dismissal must drop it.
+  // an accepted dismissal must drop it. The same focus is the return from the
+  // settings screen a precondition copy sends the reader to.
   useFocusEffect(
     useCallback(() => {
       refreshDismissFailures();
       refreshOutbox();
-    }, [refreshDismissFailures, refreshOutbox])
+      clearSyncPreconditionFailure();
+    }, [refreshDismissFailures, refreshOutbox, clearSyncPreconditionFailure])
   );
 
   // A failed repositories fetch disables the filter controls until a refetch
@@ -312,43 +365,34 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // pull-to-refresh both refetch the repositories query.
   const repoFilterUnavailable = repositories.isLoading || repositories.isError;
 
-  // A non-retryable sync outcome ended the intent, so the sync control disables
-  // and the inline copy below explains the state.
-  const syncBlocked = triggerSync.isError && !isSecuritySyncRetryable(triggerSync.error);
+  // A non-retryable sync outcome ended the intent, so both sync controls
+  // disable and the inline copy below explains the state.
+  const syncFailure = triggerSync.error ?? lastSyncAttempt?.error ?? null;
+  const syncPrecondition = securitySyncPreconditionFor(syncFailure);
+  const syncBlocked = syncFailure !== null && !isSecuritySyncRetryable(syncFailure);
   // A sync outlives the request that started it. `syncWatch` marks a submit whose
   // command is still to be accounted for — accepted, or refused as already in
-  // flight — and `syncRunning` is the server's own view of the run, so the sync
+  // flight — and `syncRunning` is the server’s own view of the run, so the sync
   // control stays in a progress state for the whole sync instead of only for the
   // submission, and the refresh effect below fires when it ends.
   const [syncWatch, setSyncWatch] = useState<SyncWatch | null>(null);
-  // Whether the run a watch points at was ever visible in the server's list:
+  // Whether the run a watch points at was ever visible in the server’s list:
   // once it is, its disappearance ends the watch instead of the window.
   const sawSyncRun = useRef(false);
   const syncRunning = useSecurityAgentSyncRunning(scope, syncWatch !== null);
   const syncInFlight = triggerSync.isPending || syncWatch !== null || syncRunning.syncRunning;
   const syncDisabled = syncInFlight || syncBlocked;
-  // React Query clears a mutation's error when the next attempt starts, so the
-  // failure copy and the retry under it blink out for the length of the retry —
-  // the screen looked like the tap did nothing. Hold the failure being retried,
-  // together with the intent that produced it, until that attempt reports its
-  // own outcome: a retry must resubmit the failed intent, not whatever filter
-  // the reader switched to meanwhile.
-  const [lastSyncAttempt, setLastSyncAttempt] = useState<{
-    error: Error | null;
-    intent: SyncIntent;
-  } | null>(null);
-  const syncFailure = triggerSync.error ?? lastSyncAttempt?.error ?? null;
   const syncRetryable = syncFailure !== null && isSecuritySyncRetryable(syncFailure);
-  // The ledger's in-progress conflict is not a failure of this sync: it is the
+  // The ledger’s in-progress conflict is not a failure of this sync: it is the
   // sync already running under the same operation key. It gets the running
   // presentation instead of a sentence with a Retry that would collide again.
   const syncFailureInProgress = syncFailure !== null && isSecuritySyncInProgress(syncFailure);
 
-  // The run's own read ends an accepted submit's watch: a read taken after the
+  // The run’s own read ends an accepted submit’s watch: a read taken after the
   // accept that reports no active sync command means the server has finished the
   // run, so the control returns to its normal state. A refused duplicate ends the
   // same way once the run it pointed at became visible; until then it waits for
-  // the window below, because that run's command may not exist yet. A read that
+  // the window below, because that run’s command may not exist yet. A read that
   // failed ends the watch too: silence is not evidence of progress, and holding
   // the control on an unreadable status would leave the screen with no way out.
   useEffect(() => {
@@ -379,8 +423,8 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   ]);
 
   // Whatever the watch was waiting for, the screen must give the controls back:
-  // a refused duplicate's submit settles inside the ledger's window, and an
-  // accepted submit's command is listed the moment the Worker answers, so a run
+  // a refused duplicate’s submit settles inside the ledger’s window, and an
+  // accepted submit’s command is listed the moment the Worker answers, so a run
   // this screen still cannot see after its own window is one it should stop
   // speaking for.
   useEffect(() => {
@@ -401,10 +445,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     };
   }, [syncWatch]);
 
-  // A finished sync changes what the dashboard shows — "Last synced" and the
-  // repository sync state — so refresh both without making the reader leave and
-  // come back. The command observer invalidates the same queries for a tracked
-  // command; this covers a run whose command this screen never tracked.
+  // A finished sync changes what the dashboard shows — the last synced time and
+  // the repository sync state — so refresh both without making the reader leave
+  // and come back. The command observer invalidates the same queries for a
+  // tracked command; this covers a run whose command this screen never tracked.
   const wasSyncInFlight = useRef(false);
   const refetchDashboardStats = dashboardStats.refetch;
   const refetchLastSync = lastSync.refetch;
@@ -420,10 +464,44 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     void refetchDashboardStats();
     void refetchLastSync();
   }, [syncInFlight, refetchDashboardStats, refetchLastSync]);
+  // A precondition's fix is applied outside this screen, so the row offers that
+  // action instead of a Retry that would fail the same way: the in-app
+  // repository picker when nothing is in the sync scope, the GitHub App page
+  // when the connection itself is what blocks the sync.
+  let syncAction: { label: string; pending: boolean; handlePress: () => void } | null = null;
+  if (syncPrecondition === 'noRepositories') {
+    syncAction = {
+      label: t('securityAgent.dashboard.manageRepositories'),
+      pending: false,
+      handlePress: () => {
+        pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
+      },
+    };
+  } else if (syncPrecondition !== null) {
+    syncAction = {
+      label: t('securityAgent.repositories.manageAccess'),
+      pending: manageAccess?.pending === true,
+      handlePress: () => {
+        manageAccess?.handlePress();
+      },
+    };
+  } else if (syncRetryable) {
+    // The retry sits beside the sentence it retries and reports its own
+    // progress: a failed sync can settle in a blink, so the header icon's flash
+    // alone read as "nothing happened". It replays the intent that failed, not
+    // the filter the reader may have switched to since.
+    syncAction = {
+      label: t('common.retry'),
+      pending: triggerSync.isPending,
+      handlePress: () => {
+        startSync(lastSyncAttempt?.intent ?? { repoFullName });
+      },
+    };
+  }
 
   // One submit path for every control that starts a sync — the header button,
-  // the retry beside the failure copy, and a reconcile-row retry — so their
-  // handlers cannot drift apart.
+  // the empty-state action, the retry beside the failure copy, and a
+  // reconcile-row retry — so their handlers cannot drift apart.
   const startSync = (intent: SyncIntent) => {
     setLastSyncAttempt({ error: triggerSync.error, intent });
     sawSyncRun.current = false;
@@ -589,23 +667,18 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             >
               {syncFailure.message}
             </Text>
-            {syncRetryable ? (
-              // The retry sits beside the sentence it retries and reports its
-              // own progress: a failed sync can settle in a blink, so the
-              // header icon's flash alone read as "nothing happened".
+            {syncAction ? (
               <Button
                 size="sm"
                 variant="ghost"
-                loading={triggerSync.isPending}
+                loading={syncAction.pending}
                 // A busy non-primary control dims itself, spinner included,
                 // which left the control the reader just pressed fainter than
                 // the header icon spinning beside it.
-                className={cn(triggerSync.isPending && 'opacity-100')}
-                onPress={() => {
-                  startSync(lastSyncAttempt?.intent ?? { repoFullName });
-                }}
+                className={cn(syncAction.pending && 'opacity-100')}
+                onPress={syncAction.handlePress}
               >
-                <Text>{t('common.retry')}</Text>
+                <Text>{syncAction.label}</Text>
               </Button>
             ) : null}
           </View>
@@ -679,12 +752,12 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         )}
 
         {slaEnabled && data && data.sla.overall.total === 0 ? (
-          // The header's Sync now button already starts this run, so the empty
+          // The header’s Sync now button already starts this run, so the empty
           // state offers only the navigation it alone provides. It carries the
-          // dashboard's card language — the same surface and radius as the
+          // dashboard’s card language — the same surface and radius as the
           // sections below, at the same gap — because bare body text in the
-          // section gap read as a stray label, not a tappable action. The
-          // label takes the accent and a trailing chevron says it navigates.
+          // section gap read as a stray label, not a tappable action. The label
+          // takes the accent and a trailing chevron says it navigates.
           <Pressable
             onPress={() => {
               pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));

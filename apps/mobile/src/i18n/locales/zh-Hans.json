@@ -1151,7 +1151,8 @@
       "sortSeverityDesc": "严重程度：从高到低",
       "sortSlaDue": "SLA 到期日",
       "statusIgnored": "已忽略",
-      "statusOpen": "未解决"
+      "statusOpen": "未解决",
+      "noRepositories": "尚未同步或选择任何仓库。请在«安全智能体»设置中选择。"
     },
     "analysis": {
       "analyzeRepository": "分析仓库",
@@ -1483,8 +1484,7 @@
       "on": "已开启",
       "repositoriesCount": "已选择 {{displayCount}} 个仓库",
       "repositoriesCount_other": "已选择 {{displayCount}} 个仓库",
-      "repositoriesCount_one": "已选择 {{displayCount}} 个仓库",
-      "selectRepositoriesSubtitle": "选择安全智能体监控的仓库"
+      "repositoriesCount_one": "已选择 {{displayCount}} 个仓库"
     },
     "settingsSave": {
       "saveChanges": "保存更改",
@@ -1535,7 +1535,10 @@
       "settleFailed": "操作已完成，但我们无法记录结果。请重试。",
       "replayFailed": "此操作未完成。请重试。",
       "actionFailed": "无法完成此操作。请重试。",
-      "actionBlocked": "无法完成此操作。必须先修复此问题，才能重试。"
+      "actionBlocked": "无法完成此操作。必须先修复此问题，才能重试。",
+      "syncNoRepositories": "同步范围内没有仓库。请选择安全智能体要监控的仓库，然后再次同步。",
+      "syncIntegrationInactive": "安全智能体的 GitHub 连接未激活。请重新连接 Kilo GitHub App，然后再次同步。",
+      "syncMissingPermission": "Kilo GitHub App 无法读取 vulnerability alerts。请在 GitHub 中授予该权限，然后重新同步。"
     },
     "analysisState": {
       "queued": "分析排队中",
@@ -2623,7 +2626,7 @@
     "couldNotSaveChoice": "无法保存你的选择。请重试。",
     "onlineAllowed": "已允许在线处理",
     "onlineNotAllowed": "未允许在线处理",
-    "optionalReview": "可选，可随时在设置中更改",
+    "optionalReview": "可选",
     "optionalOnboarding": "可选，默认开启，可自行关闭",
     "aiProvidersWhat": "你的提示词、对话记录及添加的所有附件。",
     "aiProvidersWhy": "用于生成 AI 回复。",
@@ -3978,7 +3981,8 @@
       "nameRequired": "输入命令名称",
       "nameInvalid": "名称必须以小写字母开头，并且只能使用小写字母、数字和连字符",
       "templateRequired": "输入命令模板",
-      "nameConflict": "该名称由内置命令保留"
+      "nameConflict": "该名称由内置命令保留",
+      "duplicateName": "此配置文件中已存在同名命令"
     },
     "repoBindings": {
       "title": "仓库的默认配置文件",

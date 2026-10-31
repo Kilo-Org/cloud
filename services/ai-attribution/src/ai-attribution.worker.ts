@@ -5,7 +5,11 @@
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { useWorkersLogger } from 'workers-tagged-logger';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
-import { AttributionTrackerDO, getAttributionTrackerDO } from './dos/AttributionTracker.do';
+import {
+  AttributionTrackerDO,
+  attributionTrackerKey,
+  getAttributionTrackerDO,
+} from './dos/AttributionTracker.do';
 import { logger } from './util/logger';
 import { resError, resSuccess } from '@kilocode/worker-utils';
 import { authMiddleware } from './util/auth';
@@ -192,15 +196,16 @@ app.get('/admin/attributions', async c => {
   }
 
   // Get DurableObject stub
-  const stub = getAttributionTrackerDO(env, {
+  const target = {
     organization_id: params.organization_id,
     project_id: params.project_id,
     file_path: params.file_path,
-  });
+  };
+  const stub = getAttributionTrackerDO(env, target);
 
   // Get lines added grouped by hash, optionally filtered by branch
   try {
-    const linesAddedByHash = await stub.getLinesAddedByHash(params.branch);
+    const linesAddedByHash = await stub.getLinesAddedByHash(target, params.branch);
     return c.json(resSuccess({ lines_added: linesAddedByHash }));
   } catch (error) {
     console.error(error);
@@ -233,15 +238,16 @@ app.get('/admin/attribution-events', async c => {
   }
 
   // Get DurableObject stub
-  const stub = getAttributionTrackerDO(env, {
+  const target = {
     organization_id: params.organization_id,
     project_id: params.project_id,
     file_path: params.file_path,
-  });
+  };
+  const stub = getAttributionTrackerDO(env, target);
 
   // Get attribution events with ordered line hashes
   try {
-    const events = await stub.getAttributionEvents(params.branch);
+    const events = await stub.getAttributionEvents(target, params.branch);
     // Validate response shape
     const validatedEvents = events.map(e => AttributionEventResponse.parse(e));
     return c.json(resSuccess({ events: validatedEvents }));
@@ -276,16 +282,17 @@ app.get('/admin/debug-data', async c => {
   }
 
   // Get DurableObject stub
-  const stub = getAttributionTrackerDO(env, {
+  const target = {
     organization_id: params.organization_id,
     project_id: params.project_id,
     file_path: params.file_path,
-  });
+  };
+  const stub = getAttributionTrackerDO(env, target);
 
   // Get debug data from the DO
   try {
-    const debugData = await stub.getDebugData();
-    const doKey = `${params.organization_id}/${params.project_id}/${params.file_path}`;
+    const debugData = await stub.getDebugData(target);
+    const doKey = attributionTrackerKey(target);
     return c.json(resSuccess({ doKey, ...debugData }));
   } catch (error) {
     console.error(error);
@@ -318,15 +325,16 @@ app.delete('/admin/attribution/:id', async c => {
   }
 
   // Get DurableObject stub
-  const stub = getAttributionTrackerDO(env, {
+  const target = {
     organization_id: params.organization_id,
     project_id: params.project_id,
     file_path: params.file_path,
-  });
+  };
+  const stub = getAttributionTrackerDO(env, target);
 
   // Delete the attribution
   try {
-    const deleted = await stub.deleteAttribution(params.attribution_id);
+    const deleted = await stub.deleteAttribution(target, params.attribution_id);
     if (!deleted) {
       return c.json(resError('Attribution not found'), 404);
     }

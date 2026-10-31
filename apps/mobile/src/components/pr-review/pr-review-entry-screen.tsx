@@ -228,7 +228,13 @@ export function PrReviewEntryScreen() {
                     }}
                     accessibilityLabel={t('common.retry')}
                   >
-                    <Text>{t('common.retry')}</Text>
+                    {/* The card's own ink, not the link accent: this retry sits
+                        in a footer under a row's plain lines, and the accent is
+                        the loudest colour the dark card can carry, so it read
+                        as a second primary action over the screen's own Open
+                        button. The link affordance (the press underline) and
+                        the action box stay. */}
+                    <Text className="text-foreground">{t('common.retry')}</Text>
                   </Button>
                 </View>
               ) : null}
@@ -240,7 +246,7 @@ export function PrReviewEntryScreen() {
   }
 
   const pasteBlock = (
-    <View className="gap-3">
+    <View className="gap-4">
       <View className="flex-row items-center gap-2">
         <View
           className="min-h-14 min-w-0 flex-1 flex-row items-center rounded-md border border-border bg-card"
@@ -298,6 +304,20 @@ export function PrReviewEntryScreen() {
           <ClipboardIcon size={18} color={colors.mutedForeground} />
         </Pressable>
       </View>
+      <Button
+        disabled={linkState !== 'valid'}
+        onPress={handleSubmit}
+        accessibilityLabel={t('prReview.entry.openAccessibility')}
+      >
+        <Text>{t('prReview.entry.open')}</Text>
+      </Button>
+      {/* The invalid-link notice is the field's own error, but its line sits
+          under the field's action, not between the field and Open: a line
+          there pushed Open 38.5 dp away from the field — nearly twice the
+          20.5 dp that separates the whole form from the unrelated INBOX
+          section — so the field and its button stopped reading as one group.
+          The line stays reserved (an invisible copy holds its height) so a
+          pasted non-PR link never shifts the form. */}
       <View>
         <Text
           className="text-sm opacity-0"
@@ -313,13 +333,6 @@ export function PrReviewEntryScreen() {
           />
         </View>
       </View>
-      <Button
-        disabled={linkState !== 'valid'}
-        onPress={handleSubmit}
-        accessibilityLabel={t('prReview.entry.openAccessibility')}
-      >
-        <Text>{t('prReview.entry.open')}</Text>
-      </Button>
     </View>
   );
 

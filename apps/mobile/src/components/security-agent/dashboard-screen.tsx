@@ -637,7 +637,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
               className={cn(INLINE_LINK_BOX_CLASS, 'active:opacity-70')}
             >
-              <Text className="text-xs font-medium text-primary dark:text-ink2">
+              <Text className="text-xs font-medium text-primary">
                 {t('securityAgent.dashboard.manageRepositories')}
               </Text>
             </Pressable>

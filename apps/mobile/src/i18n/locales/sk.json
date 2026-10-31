@@ -1907,7 +1907,6 @@
       "repositoriesCount_one": "Vybratý {{displayCount}} repozitár",
       "repositoriesCount": "Vybratých {{displayCount}} repozitárov",
       "repositoriesCount_other": "Vybratých {{displayCount}} repozitárov",
-      "selectRepositoriesSubtitle": "Vyberte repozitáre, ktoré má bezpečnostný agent sledovať",
       "analysisModeSubtitle": "Režim analýzy: {{mode}}",
       "automationAllOff": "Všetko vypnuté",
       "automationCount": "Zapnuté: {{displayCount}} z 3",

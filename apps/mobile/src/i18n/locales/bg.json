@@ -1857,7 +1857,6 @@
       "repositoriesCount_one": "{{displayCount}} избрано хранилище",
       "repositoriesCount": "{{displayCount}} избрани хранилища",
       "repositoriesCount_other": "{{displayCount}} избрани хранилища",
-      "selectRepositoriesSubtitle": "Избери кои хранилища да следи агентът по сигурността",
       "analysisModeSubtitle": "Режим на анализ: {{mode}}",
       "automationAllOff": "Всички са изключени",
       "automationCount": "{{displayCount}} от 3 активирани",

@@ -1857,7 +1857,6 @@
       "repositoriesCount_one": "{{displayCount}} adattár kiválasztva",
       "repositoriesCount": "{{displayCount}} adattár kiválasztva",
       "repositoriesCount_other": "{{displayCount}} adattár kiválasztva",
-      "selectRepositoriesSubtitle": "Válaszd ki, mely adattárakat figyelje a biztonsági ügynök",
       "analysisModeSubtitle": "{{mode}} elemzés",
       "automationAllOff": "Mind kikapcsolva",
       "automationCount": "3 közül {{displayCount}} engedélyezve",

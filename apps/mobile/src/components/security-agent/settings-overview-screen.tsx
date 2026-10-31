@@ -268,7 +268,10 @@ export function SettingsOverviewScreen({
                 <ConfigureRow
                   icon={FolderGit2}
                   title={t('common.selectRepositories')}
-                  subtitle={t('securityAgent.settingsOverview.selectRepositoriesSubtitle')}
+                  // Reports the saved selection, not a restatement of the title:
+                  // it comes from the config, so it stays right while the
+                  // repository list loads.
+                  subtitle={repoCountLabel}
                   onPress={() => {
                     pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
                   }}

@@ -1496,7 +1496,6 @@
       "repositoriesCount": "المستودعات المحددة: {{displayCount}}",
       "repositoriesCount_other": "المستودعات المحددة: {{displayCount}}",
       "repositoriesCount_one": "مستودع واحد محدد ({{displayCount}})",
-      "selectRepositoriesSubtitle": "اختر المستودعات التي يراقبها وكيل الأمان",
       "repositoriesCount_zero": "عدد المستودعات المحددة: {{displayCount}}",
       "repositoriesCount_two": "مستودعان محددان ({{displayCount}})",
       "repositoriesCount_few": "تم تحديد {{displayCount}} مستودعات",

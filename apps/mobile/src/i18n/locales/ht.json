@@ -1857,7 +1857,6 @@
       "repositoriesCount_one": "{{displayCount}} depo chwazi",
       "repositoriesCount": "{{displayCount}} depo ki chwazi",
       "repositoriesCount_other": "{{displayCount}} depo ki chwazi",
-      "selectRepositoriesSubtitle": "Chwazi depo Ajan sekirite a ap siveye yo",
       "analysisModeSubtitle": "Analiz {{mode}}",
       "automationAllOff": "Tout dezaktive",
       "automationCount": "{{displayCount}} sou 3 aktive",

@@ -1857,7 +1857,6 @@
       "repositoriesCount_one": "{{displayCount}} റിപ്പോസിറ്ററി തിരഞ്ഞെടുത്തു",
       "repositoriesCount": "{{displayCount}} റിപ്പോസിറ്ററികൾ തിരഞ്ഞെടുത്തു",
       "repositoriesCount_other": "{{displayCount}} റിപ്പോസിറ്ററികൾ തിരഞ്ഞെടുത്തു",
-      "selectRepositoriesSubtitle": "സുരക്ഷാ ഏജന്റ് നിരീക്ഷിക്കേണ്ട റിപ്പോസിറ്ററികൾ തിരഞ്ഞെടുക്കുക",
       "analysisModeSubtitle": "{{mode}} വിശകലനം",
       "automationAllOff": "എല്ലാം പ്രവർത്തനരഹിതം",
       "automationCount": "3-ൽ {{displayCount}} പ്രവർത്തനക്ഷമം",

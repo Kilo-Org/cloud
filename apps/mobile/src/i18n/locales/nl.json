@@ -1467,8 +1467,7 @@
       "on": "Aan",
       "repositoriesCount": "{{displayCount}} coderepository's geselecteerd",
       "repositoriesCount_other": "{{displayCount}} coderepository's geselecteerd",
-      "repositoriesCount_one": "{{displayCount}} repository geselecteerd",
-      "selectRepositoriesSubtitle": "Kies welke repositories de Beveiligingsagent bewaakt"
+      "repositoriesCount_one": "{{displayCount}} repository geselecteerd"
     },
     "settingsSave": {
       "saveChanges": "Wijzigingen opslaan",

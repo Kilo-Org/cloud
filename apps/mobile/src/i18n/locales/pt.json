@@ -1882,7 +1882,6 @@
       "repositoriesCount_one": "{{displayCount}} repositório selecionado",
       "repositoriesCount": "{{displayCount}} repositórios selecionados",
       "repositoriesCount_other": "{{displayCount}} repositórios selecionados",
-      "selectRepositoriesSubtitle": "Escolher os repositórios que o agente de segurança monitoriza",
       "analysisModeSubtitle": "Modo de análise: {{mode}}",
       "automationAllOff": "Todas desativadas",
       "automationCount": "{{displayCount}} de 3 ativadas",

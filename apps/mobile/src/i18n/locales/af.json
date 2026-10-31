@@ -1857,7 +1857,6 @@
       "repositoriesCount_one": "{{displayCount}} bewaarplek gekies",
       "repositoriesCount": "{{displayCount}} bewaarplekke gekies",
       "repositoriesCount_other": "{{displayCount}} bewaarplekke gekies",
-      "selectRepositoriesSubtitle": "Kies watter bewaarplekke die Sekuriteitsagent monitor",
       "analysisModeSubtitle": "Ontleding: {{mode}}",
       "automationAllOff": "Alles af",
       "automationCount": "{{displayCount}} van 3 geaktiveer",

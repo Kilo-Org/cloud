@@ -1857,7 +1857,6 @@
       "repositoriesCount_one": "{{displayCount}} रिपोजिटरी चयन गरिएको",
       "repositoriesCount": "{{displayCount}} रिपोजिटरी छानिएका छन्",
       "repositoriesCount_other": "{{displayCount}} रिपोजिटरी छानिएका छन्",
-      "selectRepositoriesSubtitle": "सुरक्षा एजेन्टले निगरानी गर्ने रिपोजिटरीहरू छान्नुहोस्",
       "analysisModeSubtitle": "{{mode}} विश्लेषण",
       "automationAllOff": "सबै बन्द",
       "automationCount": "३ मध्ये {{displayCount}} चालु",

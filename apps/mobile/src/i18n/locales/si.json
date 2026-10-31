@@ -1857,7 +1857,6 @@
       "repositoriesCount_one": "ගබඩා {{displayCount}} ක් තෝරා ඇත",
       "repositoriesCount": "කේත ගබඩා {{displayCount}}ක් තෝරා ඇත",
       "repositoriesCount_other": "කේත ගබඩා {{displayCount}}ක් තෝරා ඇත",
-      "selectRepositoriesSubtitle": "ආරක්ෂක නියෝජිතයා නිරීක්ෂණය කළ යුතු ගබඩා තෝරන්න",
       "analysisModeSubtitle": "{{mode}} විශ්ලේෂණය",
       "automationAllOff": "සියල්ල අක්‍රීයයි",
       "automationCount": "3 න් {{displayCount}} ක් සක්‍රීයයි",

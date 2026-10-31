@@ -36,6 +36,9 @@ vi.mock('react-native', async () => {
     }),
   };
 });
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ switchTrack: '#767470' }),
+}));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -295,6 +298,25 @@ describe('KiloCommandFormSheet refused save', () => {
     callHandler(findOne(renderer.root, 'SheetHeader'), 'onDone');
 
     expect(h.scrollTo).toHaveBeenCalledWith({ y: 628, animated: true });
+
+    unmount();
+  });
+});
+
+describe('KiloCommandFormSheet subtask row', () => {
+  it('reaches a screen reader as the switch alone, without a duplicate label stop', async () => {
+    const { renderer, unmount } = await mountSheet();
+
+    const label = i18n.t('profiles.slashCommands.subtask');
+    const labels = findAll(renderer.root, 'Text').filter(node => node.props.children === label);
+    expect(labels).toHaveLength(1);
+    expect(labels[0]?.props).toMatchObject({
+      accessible: false,
+      importantForAccessibility: 'no',
+    });
+
+    const toggles = findAll(renderer.root, 'Switch');
+    expect(toggles.map(node => node.props.accessibilityLabel)).toEqual([label]);
 
     unmount();
   });

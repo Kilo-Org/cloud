@@ -211,6 +211,25 @@ describe('warn foreground token contrast (WCAG AA text)', () => {
   });
 });
 
+describe('switch off track contrast (WCAG 1.4.11 non-text)', () => {
+  // An off switch reads as a control only while its track is visible against
+  // the row it sits on: the thumb's position is what carries the state, and
+  // without a track the thumb floats free on the card. Measured against
+  // `secondary`, the surface of every row that carries a switch.
+  //
+  it('light theme: switchTrack vs secondary >= 3:1', () => {
+    expect(contrastRatio(lightColors.switchTrack, lightColors.secondary)).toBeGreaterThanOrEqual(
+      MIN_NON_TEXT_RATIO
+    );
+  });
+
+  it('dark theme: switchTrack vs secondary >= 3:1', () => {
+    expect(contrastRatio(darkColors.switchTrack, darkColors.secondary)).toBeGreaterThanOrEqual(
+      MIN_NON_TEXT_RATIO
+    );
+  });
+});
+
 describe('row palette contrast (WCAG 1.4.11 non-text)', () => {
   // A 16px stroked glyph on a 30x30 tile is a non-text graphic, so WCAG 1.4.11
   // asks for 3:1: measured against the row surface (`secondary`) and against the

@@ -25,6 +25,7 @@ export const TOKEN_KEYS = [
   ['destructive', '--destructive'],
   ['destructiveForeground', '--destructive-foreground'],
   ['border', '--border'],
+  ['switchTrack', '--switch-track'],
   ['card', '--card'],
   ['ink2', '--ink2'],
   ['mutedSoft', '--muted-soft'],

@@ -2,10 +2,11 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { type McpServerSource } from '@/components/profiles/profile-mcp-model';
+import { ProfileSwitch } from '@/components/profiles/profile-switch';
 import { Lock, Pencil, Trash2 } from '@/components/ui/icons';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
@@ -17,6 +18,12 @@ type McpServerRowProps = Readonly<{
   onEdit?: () => void;
   onDelete?: () => void;
 }>;
+
+/**
+ * A server row's URL or command line truncates in the middle: its tail is what
+ * tells one endpoint apart from another, so the head alone does not carry it.
+ */
+const SUMMARY_PROPS = { numberOfLines: 1, ellipsizeMode: 'middle' } as const;
 
 /**
  * One MCP server row: the name in mono, its type, the command/URL summary, the
@@ -38,7 +45,7 @@ export function McpServerRowView({
     <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="min-w-0 flex-1 gap-0.5">
         <View className="flex-row items-center gap-2">
-          <Text variant="mono" numberOfLines={1} className="shrink">
+          <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS} className="shrink">
             {server.name}
           </Text>
           <Text className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -63,12 +70,12 @@ export function McpServerRowView({
           ) : null}
         </View>
         {summary.length > 0 ? (
-          <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
+          <Text variant="mono" className="text-xs text-muted-foreground" {...SUMMARY_PROPS}>
             {summary}
           </Text>
         ) : null}
       </View>
-      <Switch
+      <ProfileSwitch
         value={server.enabled}
         accessibilityLabel={server.name}
         disabled={onToggle === undefined}

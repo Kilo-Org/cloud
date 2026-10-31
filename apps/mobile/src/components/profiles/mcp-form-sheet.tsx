@@ -17,9 +17,10 @@ import { SheetHeader } from '@/components/sheet-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { Switch } from '@/components/ui/switch';
+import { ProfileSwitch } from '@/components/profiles/profile-switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
+import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
@@ -279,8 +280,10 @@ export function McpFormSheet({
         />
 
         <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-          <Text className="flex-1 text-sm font-medium text-foreground">{t('common.enabled')}</Text>
-          <Switch
+          <Text {...HIDDEN_LABEL_PROPS} className="flex-1 text-sm font-medium text-foreground">
+            {t('common.enabled')}
+          </Text>
+          <ProfileSwitch
             value={enabled}
             disabled={isSaving}
             accessibilityLabel={t('common.enabled')}

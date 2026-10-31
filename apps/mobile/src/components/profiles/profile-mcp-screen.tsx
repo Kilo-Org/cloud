@@ -32,11 +32,6 @@ import { readTrpcErrorField } from '@/lib/trpc-error';
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_MCP_SERVERS: AgentProfileDetail['mcpServers'] = [];
 
-/** The mutation hook toasts `error.message`; the screen supplies a fallback otherwise. */
-function hasUsableMessage(error: unknown): boolean {
-  return error instanceof Error && error.message.trim().length > 0;
-}
-
 /** Content-shaped rows in the same slot and height as a loaded server row. */
 function McpSkeleton() {
   return (
@@ -105,7 +100,8 @@ export function ProfileMcpScreen({
     try {
       await deleteMcp.mutateAsync({ profileId, mcpServerId });
     } catch (error) {
-      if (!hasUsableMessage(error)) {
+      // The cleanup hook toasts a readable message itself; a silent failure gets ours.
+      if (!(error instanceof Error) || error.message.trim().length === 0) {
         toast.error(t('profiles.mcp.deleteFailed'));
       }
     }
@@ -172,7 +168,7 @@ export function ProfileMcpScreen({
                         { profileId, mcpServerId: server.id, enabled },
                         {
                           onError: error => {
-                            if (!hasUsableMessage(error)) {
+                            if (!(error instanceof Error) || error.message.trim().length === 0) {
                               toast.error(t('profiles.mcp.updateFailed'));
                             }
                           },

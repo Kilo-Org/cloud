@@ -251,10 +251,6 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         <View
           className={cn(
             'min-h-16 gap-2 rounded-lg bg-secondary px-3 py-2',
-            // The 48dp toggle makes this row 2.29dp taller than its 38.5dp
-            // predecessor; the negative margin keeps the card's height and every
-            // row below it exactly where they were.
-            '-my-[1.15px]',
             stackBalance ? 'items-stretch' : 'flex-row items-center'
           )}
         >

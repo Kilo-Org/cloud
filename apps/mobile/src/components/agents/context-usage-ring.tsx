@@ -37,7 +37,7 @@ export function ContextUsageRing({
   const colors = useThemeColors();
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const trackColor = colors.hairSoft;
+  const trackColor = colors.ringTrack;
   const arcColor = toneColor(tone, colors);
   // Undefined percentage → indeterminate: a stable partial neutral arc so the
   // visual is clearly "we don't know", not a broken empty ring.

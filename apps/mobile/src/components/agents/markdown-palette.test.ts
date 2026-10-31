@@ -20,6 +20,8 @@ const colors = {
   ink2: '#3C382F',
   mutedSoft: '#A9A39A',
   hairSoft: 'rgba(20, 15, 10, 0.05)',
+  controlIdle: '#F0EEE6',
+  ringTrack: 'rgba(20, 15, 10, 0.05)',
   accentSoft: '#FFDD00',
   accentSoftForeground: '#1A1A10',
   good: '#2F9A5F',

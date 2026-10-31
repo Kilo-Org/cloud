@@ -12,6 +12,7 @@ import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
 import {
   PERSONAL_SCOPE,
   useBitbucketReadiness,
@@ -60,11 +61,13 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
     ...trpc.organizations.list.queryOptions(),
     enabled: !isPersonal,
   });
-  const orgs = organizations.data;
-  const scopeTitle = isPersonal
-    ? t('common.personal')
-    : (orgs?.find(org => org.organizationId === scope)?.organizationName ??
-      t('common.organization'));
+  // This screen fetches the memberships itself — its access classification and
+  // its Retry read that query — so it resolves the title from the same rule the
+  // screens without a list use, over the list it already has.
+  const scopeTitle = reviewerScopeTitle(scope, organizations.data, {
+    personal: t('common.personal'),
+    organization: t('common.organization'),
+  });
 
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);

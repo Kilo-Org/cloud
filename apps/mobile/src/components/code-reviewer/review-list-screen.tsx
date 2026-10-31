@@ -18,6 +18,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
+import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
 import { useGitHubStatus, useGitLabStatus } from '@/lib/hooks/use-code-reviewer';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -98,6 +100,8 @@ function ReviewListFooter({
 export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
+  const isPersonal = scope === PERSONAL_SCOPE;
+  const scopeTitle = useReviewerScopeTitle(scope);
   // The page-one probe refetches unchanged rows while a review is in flight, so
   // the row objects keep their identity and nothing re-renders. A shared minute
   // clock is the row's one changing input: it advances the relative label, and
@@ -258,8 +262,18 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ReviewerHeader
-        title={t('codeReviewer.reviewList.title')}
-        eyebrow={t('common.codeReviewer')}
+        title={scopeTitle}
+        // The scope name is the one thing that tells two organizations apart, so
+        // it keeps the platform list's second line for a natural break — and
+        // both lines are reserved: the name arrives with the membership read, so
+        // its placeholder must not push the list down when it lands. `Personal`
+        // is a fixed label, so it keeps one line and reserves no blank one.
+        titleNumberOfLines={isPersonal ? 1 : 2}
+        reserveTitleSpace={!isPersonal}
+        // The scope now titles the screen, so the eyebrow keeps the screen's own
+        // name where the header's category label goes — the org name is user
+        // prose and must not be uppercased or tail-truncated into it.
+        eyebrow={t('codeReviewer.reviewList.title')}
       />
       {body}
     </View>

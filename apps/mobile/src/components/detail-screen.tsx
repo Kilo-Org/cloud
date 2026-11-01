@@ -18,10 +18,33 @@ import { useDetailScreenBottomPadding, useScreenInsets } from '@/lib/screen-inse
 
 type ScrollEvent = NativeSyntheticEvent<NativeScrollEvent>;
 
+type DetailScreenScrollViewProps = ScrollViewProps & {
+  /**
+   * Draw the reduced-motion progress band over the content instead of
+   * reserving its `h-9` row above it.
+   *
+   * In flow, the band is the content's first child, so the caller's container
+   * gap is added after it and its 31.5 dp reserve pushes the first child down
+   * whenever reduced motion is on: a screen whose first block must sit one
+   * section gap below its header would show a band three times that gap under
+   * reduced motion. Out of flow it takes neither the gap nor the height, and
+   * the static spinner — still the only pull feedback under reduced motion —
+   * paints over the top of the first child while a refresh is in flight.
+   *
+   * Opt-in: every other caller keeps the reserved band.
+   */
+  overlayRefreshProgress?: boolean;
+};
+
 // Detail-screen counterpart to TabScreenScrollView. Provides bottom clearance via
 // a trailing spacer instead of contentContainerStyle — setting that style prop
 // makes NativeWind drop the caller's contentContainerClassName (padding/gap).
-export function DetailScreenScrollView({ children, style, ...props }: ScrollViewProps) {
+export function DetailScreenScrollView({
+  children,
+  style,
+  overlayRefreshProgress = false,
+  ...props
+}: DetailScreenScrollViewProps) {
   const paddingBottom = useDetailScreenBottomPadding();
   const { left, right } = useScreenInsets();
   // Native-inset callers rely on the scroll view's own focused-field reveal,
@@ -78,6 +101,9 @@ export function DetailScreenScrollView({ children, style, ...props }: ScrollView
     }
     props.onLayout?.(event);
   };
+  const refreshBand = props.refreshControl ? (
+    <RefreshProgress refreshControl={props.refreshControl} />
+  ) : null;
   return (
     <ScrollView
       {...props}
@@ -102,7 +128,13 @@ export function DetailScreenScrollView({ children, style, ...props }: ScrollView
         },
       ]}
     >
-      {props.refreshControl ? <RefreshProgress refreshControl={props.refreshControl} /> : null}
+      {refreshBand !== null && overlayRefreshProgress ? (
+        <View className="absolute inset-x-0 top-0" pointerEvents="none">
+          {refreshBand}
+        </View>
+      ) : (
+        refreshBand
+      )}
       {children}
       <View style={{ height: paddingBottom }} pointerEvents="none" />
     </ScrollView>

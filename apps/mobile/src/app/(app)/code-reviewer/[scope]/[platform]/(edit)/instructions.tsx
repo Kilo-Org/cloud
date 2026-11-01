@@ -13,10 +13,11 @@ import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
+import { performCopy } from '@/components/agents/use-message-copy';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { AlertTriangle } from '@/components/ui/icons';
+import { AlertTriangle, Copy } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -63,6 +64,9 @@ function InstructionsEditor({
 }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  // The value the notice hands over: the stored instructions, trimmed the way
+  // Save persists them, so the copied text is the value the backend holds.
+  const storedValue = initial.trim();
   // Stable for this mount and distinct from every other mounted editor, so the
   // bar below can only bind to this editor's field.
   const accessoryId = `${INSTRUCTIONS_DONE_ACCESSORY_ID}${useId()}`;
@@ -109,12 +113,32 @@ function InstructionsEditor({
     <View className="gap-4">
       {/* The deprecation note asks the reader to move the guidelines elsewhere;
           as body-coloured text it read as a field description. A tinted notice
-          with its own mark separates it from the field below. */}
-      <View className="flex-row items-start gap-2 rounded-xl border border-warn-tile-border bg-warn-tile-bg p-3">
-        <AlertTriangle size={16} color={colors.warn} />
-        <Text className="min-w-0 flex-1 text-sm text-warn">
-          {t('codeReviewer.instructions.deprecation')}
-        </Text>
+          with its own mark separates it from the field below. The action beside
+          it hands over the whole stored value: the field shows at most ten
+          lines and scrolls the rest, so selecting the text by hand meant
+          dragging through a window that never shows it all. */}
+      <View className="flex-row items-center gap-3 rounded-xl border border-warn-tile-border bg-warn-tile-bg p-3">
+        <View className="min-w-0 flex-1 flex-row items-start gap-2">
+          <AlertTriangle size={16} color={colors.warn} />
+          <Text className="min-w-0 flex-1 text-sm text-warn">
+            {t('codeReviewer.instructions.deprecation')}
+          </Text>
+        </View>
+        {storedValue === '' ? null : (
+          // What is copied is the value the notice retires — what the backend
+          // holds and a save writes — not the draft under it. With nothing
+          // stored there is no action rather than one that copies nothing.
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={() => {
+              void performCopy(storedValue);
+            }}
+          >
+            <Copy size={14} color={colors.foreground} />
+            <Text>{t('common.copy')}</Text>
+          </Button>
+        )}
       </View>
       {/* A multiline field takes the platform's generic text-view name on iOS,
           so the accessible name is the localized heading this screen renders.

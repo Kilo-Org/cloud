@@ -17,12 +17,20 @@ type DoltHubIntegrationDetailsProps = {
   organizationId?: string;
   success?: boolean;
   error?: string;
+  /** An organization connection needs the role that governs integrations. */
+  canManage?: boolean;
+};
+
+const dolthubConnectionErrorMessages: Record<string, string> = {
+  permission_required: 'Only organization owners, admins, and billing managers can change this',
+  organization_access_required: 'You do not have access to this organization',
 };
 
 export function DoltHubIntegrationDetails({
   organizationId,
   success,
   error,
+  canManage = true,
 }: DoltHubIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -52,7 +60,7 @@ export function DoltHubIntegrationDetails({
       toast.success('DoltHub connected successfully!');
     }
     if (error) {
-      toast.error(`Connection failed: ${error}`);
+      toast.error(dolthubConnectionErrorMessages[error] ?? `Connection failed: ${error}`);
     }
   }, [success, error]);
 
@@ -106,7 +114,9 @@ export function DoltHubIntegrationDetails({
         <Alert variant="destructive">
           <XCircle className="h-4 w-4" />
           <AlertTitle>Could not connect DoltHub</AlertTitle>
-          <AlertDescription>Connection failed: {error}</AlertDescription>
+          <AlertDescription>
+            {dolthubConnectionErrorMessages[error] ?? `Connection failed: ${error}`}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -161,17 +171,19 @@ export function DoltHubIntegrationDetails({
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    variant="destructive"
-                    onClick={handleDisconnect}
-                    disabled={disconnect.isPending}
-                  >
-                    {disconnect.isPending ? 'Disconnecting...' : 'Disconnect'}
-                  </Button>
+              {canManage && (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      variant="destructive"
+                      onClick={handleDisconnect}
+                      disabled={disconnect.isPending}
+                    >
+                      {disconnect.isPending ? 'Disconnecting...' : 'Disconnect'}
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
             </>
           ) : (
             <>
@@ -189,16 +201,27 @@ export function DoltHubIntegrationDetails({
                 </ul>
               </div>
 
-              <Button
-                onClick={handleConnect}
-                size="lg"
-                className="w-full"
-                disabled={isStartingConnection}
-              >
-                <Database className="mr-2 h-4 w-4" />
-                {isStartingConnection ? 'Loading...' : 'Connect DoltHub'}
-              </Button>
+              {canManage && (
+                <Button
+                  onClick={handleConnect}
+                  size="lg"
+                  className="w-full"
+                  disabled={isStartingConnection}
+                >
+                  <Database className="mr-2 h-4 w-4" />
+                  {isStartingConnection ? 'Loading...' : 'Connect DoltHub'}
+                </Button>
+              )}
             </>
+          )}
+
+          {!canManage && (
+            <Alert>
+              <AlertDescription>
+                Only organization owners, admins, and billing managers can connect or disconnect
+                DoltHub.
+              </AlertDescription>
+            </Alert>
           )}
         </CardContent>
       </Card>

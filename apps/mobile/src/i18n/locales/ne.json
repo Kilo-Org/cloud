@@ -1540,7 +1540,6 @@
       "invalidUrl": "पुल रिक्वेस्टको मान्य URL लेख्नुहोस्।",
       "couldNotCheckProviderStatus": "प्रदायकको स्थिति जाँच्न सकिएन।",
       "couldNotLoadProviders": "तपाईंले जडान गरेका प्रदायकहरू लोड गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
-      "connectProviderDescription": "पुल रिक्वेस्टको म्यानुअल समीक्षा सुरु गर्न GitHub जडान गर्नुहोस्।",
       "pullRequestUrl": "पुल रिक्वेस्टको URL",
       "instructions": "निर्देशनहरू (ऐच्छिक)",
       "instructionsPlaceholder": "समीक्षकले ध्यान दिनुपर्ने कुनै विशेष कुरा…",

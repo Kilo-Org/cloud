@@ -1540,7 +1540,6 @@
       "invalidUrl": "Нэгтгэх хүсэлтийн хүчинтэй URL оруулна уу.",
       "couldNotCheckProviderStatus": "Үйлчилгээ үзүүлэгчийн төлөвийг шалгаж чадсангүй.",
       "couldNotLoadProviders": "Холбосон үйлчилгээ үзүүлэгчдийн мэдээллийг ачаалж чадсангүй. Дахин оролдоно уу.",
-      "connectProviderDescription": "Нэгтгэх хүсэлтийн шалгалтыг гараар эхлүүлэхийн тулд GitHub-ыг холбоно уу.",
       "pullRequestUrl": "Нэгтгэх хүсэлтийн URL",
       "instructions": "Заавар (заавал биш)",
       "instructionsPlaceholder": "Шалгагчийн онцлон анхаарах зүйл…",

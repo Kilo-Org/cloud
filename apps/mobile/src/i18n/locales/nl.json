@@ -928,7 +928,6 @@
       "invalidMergeRequestUrl": "Voer een geldige URL van een merge request in.",
       "mergeRequestUrl": "URL van de merge request",
       "instructionsAtLimit": "Instructies zijn beperkt tot {{max}} tekens",
-      "connectProviderDescription": "Koppel GitHub om een handmatige review van een PR te starten.",
       "couldNotCheckProviderStatus": "De platformstatus kon niet worden gecontroleerd.",
       "couldNotLoadProviders": "Je gekoppelde platformen konden niet worden geladen. Probeer het opnieuw.",
       "instructions": "Instructies (optioneel)",

@@ -1540,7 +1540,6 @@
       "invalidUrl": "Sisesta kehtiv tõmbetaotluse URL.",
       "couldNotCheckProviderStatus": "Teenusepakkuja olekut ei õnnestunud kontrollida.",
       "couldNotLoadProviders": "Ühendatud teenusepakkujaid ei õnnestunud laadida. Proovi uuesti.",
-      "connectProviderDescription": "Ühenda GitHub, et käivitada tõmbetaotluse ülevaatus käsitsi.",
       "pullRequestUrl": "Tõmbetaotluse URL",
       "instructions": "Juhised (valikulised)",
       "instructionsPlaceholder": "Millele ülevaataja peab keskenduma…",

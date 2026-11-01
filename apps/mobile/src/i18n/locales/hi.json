@@ -928,7 +928,6 @@
       "invalidMergeRequestUrl": "मर्ज रिक्वेस्ट का मान्य URL दर्ज करें।",
       "mergeRequestUrl": "मर्ज रिक्वेस्ट का URL",
       "instructionsAtLimit": "निर्देश {{max}} अक्षरों तक सीमित हैं",
-      "connectProviderDescription": "पुल रिक्वेस्ट की मैन्युअल समीक्षा शुरू करने के लिए GitHub कनेक्ट करें।",
       "couldNotCheckProviderStatus": "प्रदाता की स्थिति की जाँच नहीं हो सकी।",
       "couldNotLoadProviders": "आपके कनेक्ट किए गए प्रदाताओं की जानकारी लोड नहीं हो सकी। कृपया फिर से कोशिश करें।",
       "instructions": "निर्देश (वैकल्पिक)",

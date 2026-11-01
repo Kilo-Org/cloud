@@ -934,7 +934,6 @@
       "invalidMergeRequestUrl": "Введите корректный URL запроса на слияние.",
       "mergeRequestUrl": "URL запроса на слияние",
       "instructionsAtLimit": "Инструкции ограничены {{max}} символами",
-      "connectProviderDescription": "Подключите GitHub, чтобы запустить проверку пул-реквеста вручную.",
       "couldNotCheckProviderStatus": "Не удалось проверить статус сервиса.",
       "couldNotLoadProviders": "Не удалось загрузить подключённые сервисы. Попробуйте снова.",
       "instructions": "Инструкции (необязательно)",

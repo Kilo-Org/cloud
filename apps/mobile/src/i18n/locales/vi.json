@@ -928,7 +928,6 @@
       "invalidMergeRequestUrl": "Nhập URL hợp lệ của merge request.",
       "mergeRequestUrl": "URL merge request",
       "instructionsAtLimit": "Hướng dẫn được giới hạn tối đa {{max}} ký tự",
-      "connectProviderDescription": "Kết nối GitHub để bắt đầu rà soát thủ công một yêu cầu hợp nhất.",
       "couldNotCheckProviderStatus": "Không thể kiểm tra trạng thái nhà cung cấp.",
       "couldNotLoadProviders": "Không thể tải danh sách nhà cung cấp bạn đã kết nối. Vui lòng thử lại.",
       "instructions": "Hướng dẫn (không bắt buộc)",

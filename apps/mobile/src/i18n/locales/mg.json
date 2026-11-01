@@ -1540,7 +1540,6 @@
       "invalidUrl": "Ampidiro ny URL manan-kery an'ny PR.",
       "couldNotCheckProviderStatus": "Tsy nety nohamarinina ny satan'ny mpanome tolotra.",
       "couldNotLoadProviders": "Tsy nety nampidirina ny mpanome tolotra nampifandraisinao. Andramo indray azafady.",
-      "connectProviderDescription": "Ampifandraiso ny GitHub mba hanombohana mivantana ny fanamarinana PR.",
       "pullRequestUrl": "URL-n'ny PR",
       "instructions": "Torolalana (tsy voatery)",
       "instructionsPlaceholder": "Zavatra manokana hifantohan'ny mpanamarina…",

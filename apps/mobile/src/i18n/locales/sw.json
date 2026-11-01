@@ -1540,7 +1540,6 @@
       "invalidUrl": "Ingiza URL halali ya ombi la kuunganisha.",
       "couldNotCheckProviderStatus": "Imeshindikana kuangalia hali ya mtoa huduma.",
       "couldNotLoadProviders": "Hatukuweza kupakia watoa huduma wako waliounganishwa. Tafadhali jaribu tena.",
-      "connectProviderDescription": "Unganisha GitHub ili kuanzisha mwenyewe ukaguzi wa ombi la kuunganisha.",
       "pullRequestUrl": "URL ya ombi la kuunganisha",
       "instructions": "Maagizo (si lazima)",
       "instructionsPlaceholder": "Jambo mahususi ambalo mkaguzi azingatie…",

@@ -285,25 +285,20 @@ export function PrReviewOverview({
       <PrReviewChecksSection owner={owner} repo={repo} number={number} headSha={data.headSha} />
 
       {isGitHub ? (
-        <View className="gap-2">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('prReview.review')}
-          </Text>
-          {/* The ScreenHeader already carries the primary Submit-review CTA
-              (same route). This section is its secondary re-entry, so it must
-              not be a second olive primary: the merge section below owns the
-              overview body's single primary action. */}
-          <Button
-            variant="outline"
-            onPress={handleOpenReviewSubmit}
-            accessibilityLabel={t('prReview.reviewPullRequest')}
-          >
-            <View className="flex-row items-center gap-2">
-              <CheckCheck size={14} color={colors.foreground} />
-              <Text>{t('prReview.review')}</Text>
-            </View>
-          </Button>
-        </View>
+        // The ScreenHeader already carries the primary Submit-review CTA
+        // (same route). This section is its secondary re-entry, so it must
+        // not be a second olive primary: the merge section below owns the
+        // overview body's single primary action.
+        <Button
+          variant="outline"
+          onPress={handleOpenReviewSubmit}
+          accessibilityLabel={t('prReview.reviewPullRequest')}
+        >
+          <View className="flex-row items-center gap-2">
+            <CheckCheck size={14} color={colors.foreground} />
+            <Text>{t('prReview.review')}</Text>
+          </View>
+        </Button>
       ) : null}
 
       {isGitHub ? (

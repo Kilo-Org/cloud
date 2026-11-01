@@ -96,3 +96,12 @@ export function bindingsForProfile<T extends RepoBindingLike>(
 export function repoPlatformBadge(platform: string): 'GH' | 'GL' {
   return platform === 'gitlab' ? 'GL' : 'GH';
 }
+
+/**
+ * The i18n key of the provider's display name, for the accessible name of a row
+ * that keeps the badge decorative. An unknown platform reads as GitHub, exactly
+ * as {@link repoPlatformBadge} labels it.
+ */
+export function repoPlatformLabelKey(platform: string): 'common.github' | 'common.gitlab' {
+  return platform === 'gitlab' ? 'common.gitlab' : 'common.github';
+}

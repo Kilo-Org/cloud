@@ -200,28 +200,28 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
         label={t('securityAgent.dashboard.confirmedExploitable')}
         value={rowValue(neverSynced, formatNumber(data.analysis.exploitable, i18n.language))}
         valueTone="muted"
-        valueNumeric
+        valueFace="numeric"
         dotTone={rowTone(neverSynced, 'danger')}
       />
       <KvRow
         label={t('securityAgent.dashboard.needsEvidenceReview')}
         value={rowValue(neverSynced, formatNumber(data.analysis.needsReview, i18n.language))}
         valueTone="muted"
-        valueNumeric
+        valueFace="numeric"
         dotTone={rowTone(neverSynced, 'warn')}
       />
       <KvRow
         label={t('securityAgent.dashboard.analysisNotComplete')}
         value={rowValue(neverSynced, formatNumber(analysisIncomplete, i18n.language))}
         valueTone="muted"
-        valueNumeric
+        valueFace="numeric"
         dotTone="muted"
       />
       <KvRow
         label={t('securityAgent.dashboard.noImmediateAction')}
         value={rowValue(neverSynced, formatNumber(noImmediateAction, i18n.language))}
         valueTone="muted"
-        valueNumeric
+        valueFace="numeric"
         dotTone={rowTone(neverSynced, 'good')}
         last
       />
@@ -229,7 +229,7 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
   );
 }
 
-function CoverageSection({ scope, data, slaEnabled, repoFullName, neverSynced }: SectionProps) {
+function CoverageSection({ scope, data, repoFullName, neverSynced }: SectionProps) {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const analysisIncomplete = getAnalysisIncompleteCount(data.analysis);
@@ -265,14 +265,6 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName, neverSynced }:
       href: findingsHref(scope, { status: 'open', repoFullName }),
     },
   ];
-  if (slaEnabled) {
-    rows.push({
-      label: t('securityAgent.dashboard.noSlaDeadline'),
-      value: data.sla.untrackedCount,
-      tone: 'muted',
-      href: findingsHref(scope, { status: 'open', repoFullName }),
-    });
-  }
 
   return (
     <SectionCard title={t('securityAgent.dashboard.codebaseRisk')}>
@@ -293,7 +285,7 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName, neverSynced }:
             label={row.label}
             value={rowValue(neverSynced, formatNumber(row.value, i18n.language))}
             valueTone="muted"
-            valueNumeric
+            valueFace="numeric"
             dotTone={rowTone(neverSynced, row.tone)}
             last={index === rows.length - 1}
           />
@@ -402,9 +394,9 @@ function SectionCardSkeleton({ rows }: Readonly<{ rows: readonly SkeletonRow[] }
  *
  * The posture card is the one section this agent hides when SLA deadlines are
  * on (`PostureSection` returns nothing, because the metric tiles already carry
- * that breakdown) and its risk rows gain the untracked-findings row instead.
- * The repository card cannot know how many repositories the scope covers, so
- * it stands in with a few two-line rows.
+ * that breakdown), and its rows do not depend on whether deadlines are on. The
+ * repository card cannot know how many repositories the scope covers, so it
+ * stands in with a few two-line rows.
  */
 export function DashboardSectionsSkeleton({
   slaEnabled,
@@ -419,7 +411,7 @@ export function DashboardSectionsSkeleton({
           scope. Without the answer the synced shape (the common one) stays. */}
       <SectionCardSkeleton rows={neverSynced ? [1] : [2]} />
       {slaEnabled ? null : <SectionCardSkeleton rows={[1, 1, 1, 1]} />}
-      <SectionCardSkeleton rows={slaEnabled ? [1, 1, 1, 1, 1] : [1, 1, 1, 1]} />
+      <SectionCardSkeleton rows={[1, 1, 1, 1]} />
       <SectionCardSkeleton rows={[2, 2, 2]} />
     </>
   );

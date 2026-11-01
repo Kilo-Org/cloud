@@ -84,6 +84,28 @@ async function callCallback(
   return { response, state };
 }
 
+function makeCallbackRequest(query: string) {
+  return new NextRequest(`http://localhost:3000/api/integrations/slack/callback?${query}`);
+}
+
+/** Every captured diagnostic carries the shared callback context and nothing raw. */
+function expectRedactedDiagnostic(state: string, code?: string) {
+  const calls = [...mockCaptureMessage.mock.calls, ...mockCaptureException.mock.calls];
+  expect(calls).toHaveLength(1);
+  const context = calls[0]![1] as { extra?: Record<string, unknown> };
+  expect(context.extra).toEqual(
+    expect.objectContaining({
+      hasState: true,
+      stateHash: expect.stringMatching(/^[0-9a-f]{8}$/),
+    })
+  );
+  expect(context.extra).not.toHaveProperty('state');
+  expect(context.extra).not.toHaveProperty('code');
+  const serialized = JSON.stringify(context);
+  expect(serialized).not.toContain(state);
+  if (code) expect(serialized).not.toContain(code);
+}
+
 describe('handleSlackOAuthCallback organization authority', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -149,5 +171,81 @@ describe('handleSlackOAuthCallback organization authority', () => {
       'installed'
     );
     expect(mockEnsureOrganizationAccess).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleSlackOAuthCallback diagnostics', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: USER_ID, is_admin: false },
+      authFailedResponse: null,
+    } as never);
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockConsumeProviderOAuthAttempt.mockResolvedValue(true);
+    mockUpsertSlackInstallation.mockResolvedValue({ id: 'integration-1' });
+    mockExchangeSlackOAuthCode.mockResolvedValue({ installationId: 'T123', installation });
+  });
+
+  it('reports a provider error with the shared callback context', async () => {
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+      provider: 'slack',
+      purpose: 'provider_install',
+    });
+
+    const response = await handleSlackOAuthCallback(
+      makeCallbackRequest(`error=access_denied&state=${encodeURIComponent(state)}`)
+    );
+
+    expect(new URL(response.headers.get('location') ?? '').searchParams.get('error')).toBe(
+      'access_denied'
+    );
+    expectRedactedDiagnostic(state);
+    expect(mockCaptureMessage.mock.calls[0]![1]).toEqual(
+      expect.objectContaining({ extra: expect.objectContaining({ error: 'access_denied' }) })
+    );
+  });
+
+  it('reports a missing code with the shared callback context', async () => {
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+      provider: 'slack',
+      purpose: 'provider_install',
+    });
+
+    const response = await handleSlackOAuthCallback(
+      makeCallbackRequest(`state=${encodeURIComponent(state)}`)
+    );
+
+    expect(new URL(response.headers.get('location') ?? '').searchParams.get('error')).toBe(
+      'missing_code'
+    );
+    expectRedactedDiagnostic(state);
+  });
+
+  it('reports a rejected state signature with the shared callback context', async () => {
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+      provider: 'slack',
+      purpose: 'provider_install',
+    });
+    const tampered = `${state.slice(0, -1)}${state.endsWith('A') ? 'B' : 'A'}`;
+
+    const response = await handleSlackOAuthCallback(
+      makeCallbackRequest(`code=code-1&state=${encodeURIComponent(tampered)}`)
+    );
+
+    const redirect = new URL(response.headers.get('location') ?? '');
+    expect(`${redirect.pathname}${redirect.search}`).toBe('/integrations?error=invalid_state');
+    expectRedactedDiagnostic(tampered, 'code-1');
+  });
+
+  it('reports an installation failure with the shared callback context', async () => {
+    mockExchangeSlackOAuthCode.mockRejectedValue(new Error('slack exchange failed'));
+
+    const { response, state } = await callCallback(`user_${USER_ID}`);
+
+    expect(new URL(response.headers.get('location') ?? '').searchParams.get('error')).toBe(
+      'installation_failed'
+    );
+    expectRedactedDiagnostic(state, 'code-1');
   });
 });

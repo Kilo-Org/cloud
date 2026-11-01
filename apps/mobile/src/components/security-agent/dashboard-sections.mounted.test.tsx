@@ -145,6 +145,17 @@ function priorityCard(renderer: TestRenderer.ReactTestRenderer): Instance {
   return card;
 }
 
+/** The Codebase risk card, found by its title line. */
+function coverageCard(renderer: TestRenderer.ReactTestRenderer): Instance {
+  const card = renderer.root
+    .findAllByType('View')
+    .find(node => copy(node).includes('securityAgent.dashboard.codebaseRisk'));
+  if (!card) {
+    throw new Error('coverage card not found');
+  }
+  return card;
+}
+
 describe('DashboardSections priority card', () => {
   it('reports no measurement while the scope has never synced', () => {
     const card = priorityCard(renderSections({ neverSynced: true }));
@@ -343,9 +354,11 @@ describe('DashboardSectionsSkeleton', () => {
     expect(placeholderLines(false)).toBe(placeholderLines(true) + 1);
   });
 
-  it('grows the risk placeholder by the row the loaded card gains with SLA tracking', () => {
+  it('draws the risk placeholder at the row count the loaded card shows', () => {
     // The skeleton card order mirrors the sections': priority, posture (only
-    // without SLA tracking), risk, repositories.
+    // without SLA tracking), risk, repositories. The risk card's rows are the
+    // analysis outcomes, so they read the same with SLA tracking on and off and
+    // the placeholder must not carry a row the loaded card has dropped.
     const loadedRows = (slaEnabled: boolean) => {
       const risk = cards(renderSections({ slaEnabled }).root).find(card =>
         copy(card).includes('securityAgent.dashboard.codebaseRisk')
@@ -365,5 +378,33 @@ describe('DashboardSectionsSkeleton', () => {
 
     expect(placeholderRows(true)).toBe(loadedRows(true));
     expect(placeholderRows(false)).toBe(loadedRows(false));
+    expect(placeholderRows(true)).toBe(placeholderRows(false));
+  });
+});
+
+describe('DashboardSections Codebase risk card', () => {
+  // The untracked count is already the "No deadline" tile above these cards, so
+  // the risk card carried the same number a second time under its own label.
+  // The rows here are the analysis outcomes, and they do not depend on SLA
+  // tracking: the card reads the same with it on and off.
+  it('keeps the same outcome rows with and without SLA tracking', () => {
+    const labels = (slaEnabled: boolean) =>
+      coverageCard(
+        renderSections({
+          neverSynced: false,
+          slaEnabled,
+          data: dashboardData({
+            sla: {
+              ...dashboardData().sla,
+              untrackedCount: 5,
+            },
+          }),
+        })
+      )
+        .findAllByType('KvRow')
+        .map(row => row.props.label);
+
+    expect(labels(true)).toHaveLength(4);
+    expect(labels(true)).toEqual(labels(false));
   });
 });

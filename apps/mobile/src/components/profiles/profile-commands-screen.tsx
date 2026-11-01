@@ -15,8 +15,8 @@ import {
   sameCommands,
 } from '@/components/profiles/profile-commands-model';
 import { SetupCommandField } from '@/components/profiles/setup-command-field';
+import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp, Terminal, Trash2 } from '@/components/ui/icons';
@@ -325,7 +325,9 @@ export function ProfileCommandsScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
+      <ProfileSectionHeader
+        profileId={profileId}
+        organizationId={organizationId}
         title={t('profiles.commandsTitle')}
         onBack={() => {
           router.back();

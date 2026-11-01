@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 
 import { type ModelOption } from '@/lib/hooks/use-available-models';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { AnalysisSettingsScreen } from './analysis-settings-screen';
 
 const catalog = vi.hoisted(() => ({
@@ -139,6 +140,36 @@ describe('AnalysisSettingsScreen model rows when the catalogue refetch fails', (
 
     expect(hostElements(renderer, 'QueryError')).toHaveLength(1);
     expect(hostElements(renderer, 'ConfigureRow')).toHaveLength(0);
+    renderer.unmount();
+  });
+});
+
+describe('AnalysisSettingsScreen depth picker touch target', () => {
+  beforeEach(() => {
+    catalog.models = [];
+    catalog.isLoading = false;
+    catalog.isError = false;
+    config.data = enabledConfig();
+  });
+
+  // Regression: a depth pill was sized by its `py-2` frame alone and rendered
+  // under the design target, so only the label band was tappable. The floor has
+  // to be the pill node's own class; `hitSlop` would not move the rect a
+  // control-size audit measures.
+  it('carries the shared row floor on every depth option', async () => {
+    const renderer = await mountScreen();
+    const pills = hostElements(renderer, 'Pressable').filter(element =>
+      String(element.props.className).includes('rounded-full')
+    );
+
+    expect(pills).toHaveLength(3);
+    for (const pill of pills) {
+      expect(String(pill.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
+      // The pill lays out as a column, so the taller box needs `justify-center`
+      // for its one-line label to stay centred instead of sitting at the top.
+      expect(String(pill.props.className).split(' ')).toContain('justify-center');
+      expect(pill.props.hitSlop).toBeUndefined();
+    }
     renderer.unmount();
   });
 });

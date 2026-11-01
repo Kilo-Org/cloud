@@ -192,7 +192,10 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
       />
     );
   }
-  if (config.isLoading || !config.data) {
+  // The draft is hydrated from the config in the effect, so painting before
+  // the baseline exists renders the revealed fields closed and then expands
+  // them, pushing everything below down by the height of the revealed list.
+  if (config.isLoading || !config.data || baseline === null) {
     return <AutomationSettingsSkeleton />;
   }
   if (!config.data.isEnabled && !dirty) {

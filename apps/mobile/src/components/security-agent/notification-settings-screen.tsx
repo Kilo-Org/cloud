@@ -163,7 +163,11 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
       />
     );
   }
-  if (config.isLoading || !config.data) {
+  // The draft starts collapsed/default and is hydrated from the config in the
+  // effect, so painting the form before the baseline exists shows the lists
+  // closed for one frame and then expands them, pushing every section below
+  // down by the height of the revealed list. Wait for the hydrate instead.
+  if (config.isLoading || !config.data || baseline === null) {
     return <NotificationSettingsSkeleton />;
   }
   if (!config.data.isEnabled && !dirty) {

@@ -31,7 +31,12 @@ type ChoiceRowProps = {
   multi?: boolean;
   /** Extra classes on the row container, e.g. a divider border. */
   className?: string;
-  /** Custom row content instead of the default label/description text — e.g. an icon-prefixed row. */
+  /**
+   * Custom row content instead of the default label/description text — e.g. an
+   * icon-prefixed row. A caller that supplies it owns the disabled cue: the row
+   * keeps every line readable, so the caller's own label takes
+   * `text-muted-foreground` while `disabled` is true.
+   */
   children?: ReactNode;
 };
 

@@ -178,6 +178,21 @@ describe('ModelPickerOptionRow unavailable row', () => {
 
     expect(nameClass(renderer, 'Minimax M2.5')).toBe('text-base text-foreground');
   });
+
+  it('dims the decorative badges and the selected check, not the reason', () => {
+    const renderer = renderRow(
+      cliCatalogOption({ unavailable: true, hasUserByokAvailable: true, name: 'Minimax M2.5' }),
+      { selected: true }
+    );
+
+    const badgeRow = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'View'
+    );
+    const dimmed = badgeRow.filter(node => String(node.props.className).includes('opacity-50'));
+    expect(dimmed.length).toBeGreaterThan(0);
+
+    expect(checkAccessories(renderer)).toEqual([{ color: '#6F6A61', size: 18 }]);
+  });
 });
 
 describe('Auto model labels', () => {

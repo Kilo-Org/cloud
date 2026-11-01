@@ -343,7 +343,15 @@ export function ModelPickerOptionRow({
               </Text>
             ) : null}
             {showFreeBadge || byok || collectsData || tools || images ? (
-              <View className="mt-1 flex-row items-center gap-1 self-start">
+              // The badges are decoration on the row's identity, so an
+              // unavailable row still dims them; the name and the
+              // `unavailable` line above stay at full contrast.
+              <View
+                className={cn(
+                  'mt-1 flex-row items-center gap-1 self-start',
+                  option.unavailable && 'opacity-50'
+                )}
+              >
                 {showFreeBadge ? (
                   <View className="rounded-full bg-good px-2 py-0.5">
                     <Text className="text-[11px] font-medium text-good-foreground">
@@ -372,7 +380,9 @@ export function ModelPickerOptionRow({
           </View>
         </Pressable>
         <View className="w-[18px] items-center justify-center">
-          {selected ? <Check size={18} color={colors.primary} /> : null}
+          {selected ? (
+            <Check size={18} color={option.unavailable ? colors.mutedForeground : colors.primary} />
+          ) : null}
         </View>
         <Pressable
           onPress={() => {

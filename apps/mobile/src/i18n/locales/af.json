@@ -2373,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Lêers op hierdie rekenaar word nie verander nie.",
       "pickProfile": "Kies 'n profiel",
       "noProfile": "Geen profiel nie",
+      "defaultProfileResolvesTo": "Los tans op {{name}}",
+      "defaultProfileResolvesToAccessibility": "Verstek profiel: {{name}}",
       "manageProfiles": "Bestuur profiele",
       "noProfiles": "Nog geen profiele nie. Skep een om omgewingsveranderlikes, MCP-bedieners en vaardighede by te voeg.",
       "advancedConfig": "Gevorderde konfigurasie",

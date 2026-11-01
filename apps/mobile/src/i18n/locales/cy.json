@@ -2521,6 +2521,8 @@
       "forkFilesUnchangedOnComputer": "Nid yw'r ffeiliau ar y cyfrifiadur hwn yn cael eu newid.",
       "pickProfile": "Dewiswch broffil",
       "noProfile": "Dim proffil",
+      "defaultProfileResolvesTo": "Yn cyfeirio at {{name}}",
+      "defaultProfileResolvesToAccessibility": "Proffil diofyn: {{name}}",
       "manageProfiles": "Rheoli proffiliau",
       "noProfiles": "Dim proffiliau eto. Creu un i ychwanegu newidynnau amgylchedd, gweinyddwyr MCP, a sgiliau.",
       "advancedConfig": "Ffurfweddiad Uwch",

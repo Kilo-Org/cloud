@@ -2373,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "فایلەکانی ئەم کۆمپیوتەرە ناگۆڕدرێن.",
       "pickProfile": "پڕۆفایلی هەڵبژێرە",
       "noProfile": "هیچ پڕۆفایلی نییە",
+      "defaultProfileResolvesTo": "ئێستا بۆ {{name}} دانراوە",
+      "defaultProfileResolvesToAccessibility": "پرۆفایلی پێشوەختە: {{name}}",
       "manageProfiles": "بەڕێوەبردنی پڕۆفایلی",
       "noProfiles": "هێشتا هیچ پڕۆفایلی نییە. یەکێکیان دروست بکە بۆ زیادکردنی گۆڕاوە ژینگەییەکان، سێرڤەرەکانی MCP و کارامەییەکان.",
       "advancedConfig": "ڕێکخستنی پێشکەوتوو",

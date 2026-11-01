@@ -178,18 +178,46 @@ describe('ProfilePickerSheet', () => {
     const renderer = mount({
       selectedOverrideProfileId: 'backend',
       defaultProfileApplies: true,
+      defaultProfileName: BACKEND.name,
       onSelect,
     });
 
     // Clearing the override hands the session to the default, so the row says
-    // which profile that is instead of claiming no profile.
+    // which profile that is instead of claiming no profile. The name is what
+    // the Environment chip shows, so the checked row and the chip agree.
+    expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
+      'Default profile: Backend',
+      'Backend',
+      'Frontend',
+    ]);
+    expect(texts(renderer)).toContain('Default profile');
+    expect(texts(renderer)).toContain('Resolves to Backend');
+    press(radio(renderer, 'Default profile: Backend'));
+    expect(onSelect).toHaveBeenLastCalledWith(null);
+  });
+
+  it('keeps the generic default row when the resolved profile name is unknown', () => {
+    const renderer = mount({ defaultProfileApplies: true });
+
     expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
       'Default profile',
       'Backend',
       'Frontend',
     ]);
-    press(radio(renderer, 'Default profile'));
-    expect(onSelect).toHaveBeenLastCalledWith(null);
+    expect(texts(renderer)).not.toContainEqual(expect.stringContaining('Resolves to'));
+  });
+
+  it('does not name a default on the No profile row when none applies', () => {
+    // A name without an applicable default must not leak onto the row that
+    // clears the override: that row means the session runs on no profile.
+    const renderer = mount({ defaultProfileName: BACKEND.name });
+
+    expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
+      'No profile',
+      'Backend',
+      'Frontend',
+    ]);
+    expect(texts(renderer)).not.toContainEqual(expect.stringContaining('Resolves to'));
   });
 
   it('leaves every row unchecked and shows the attention copy for a stale override', () => {

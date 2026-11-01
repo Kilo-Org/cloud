@@ -2373,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Осы компьютердегі файлдар өзгертілмейді.",
       "pickProfile": "Профиль таңдаңыз",
       "noProfile": "Профиль жоқ",
+      "defaultProfileResolvesTo": "Қазіргі мәні: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Әдепкі профиль: {{name}}",
       "manageProfiles": "Профильдерді басқару",
       "noProfiles": "Әзірге профильдер жоқ. Айнымалы ортаны, MCP серверлерін және дағдыларды қосу үшін біреуін жасаңыз.",
       "advancedConfig": "Кеңейтілген конфигурация",

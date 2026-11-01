@@ -2379,6 +2379,8 @@
       "forkFilesUnchangedOnComputer": "এই কম্পিউটারের ফাইলগুলো পরিবর্তন হবে না।",
       "pickProfile": "একটি প্রোফাইল বাছাই করুন",
       "noProfile": "কোনো প্রোফাইল নেই",
+      "defaultProfileResolvesTo": "বর্তমানে {{name}} নির্ধারিত",
+      "defaultProfileResolvesToAccessibility": "ডিফল্ট প্রোফাইল: {{name}}",
       "manageProfiles": "প্রোফাইল পরিচালনা করুন",
       "noProfiles": "এখনো কোনো প্রোফাইল নেই. পরিবেশ ভেরিয়েবল, MCP সার্ভার এবং দক্ষতা যোগ করতে একটি তৈরি করুন।",
       "advancedConfig": "উন্নত কনফিগারেশন",

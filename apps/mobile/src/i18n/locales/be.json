@@ -2447,6 +2447,8 @@
       "forkFilesUnchangedOnComputer": "Файлы на гэтым камп'ютары не змяняюцца.",
       "pickProfile": "Выберыце профіль",
       "noProfile": "Няма профілю",
+      "defaultProfileResolvesTo": "Супадае з {{name}}",
+      "defaultProfileResolvesToAccessibility": "Стандартны профіль: {{name}}",
       "manageProfiles": "Кіраванне профілямі",
       "noProfiles": "Профіляў пакуль няма. Стварыце яго, каб дадаць зменныя асяроддзя, серверы MCP і навыкі.",
       "advancedConfig": "Пашыраная канфігурацыя",

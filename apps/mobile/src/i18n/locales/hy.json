@@ -2379,6 +2379,8 @@
       "forkFilesUnchangedOnComputer": "Այս համակարգչի ֆայլերը չեն փոխվում։",
       "pickProfile": "Ընտրեք պրոֆիլ",
       "noProfile": "Ոչ մի պրոֆիլ",
+      "defaultProfileResolvesTo": "Համապատասխանում է {{name}}",
+      "defaultProfileResolvesToAccessibility": "Կանխադրված պրոֆիլը՝ {{name}}",
       "manageProfiles": "Կառավարեք պրոֆիլները",
       "noProfiles": "Դեռևս պրոֆիլներ չկան: Ստեղծեք մեկը՝ շրջակա միջավայրի փոփոխականներ, MCP սերվերներ և հմտություններ ավելացնելու համար:",
       "advancedConfig": "Ընդլայնված կոնֆիգուրացիա",

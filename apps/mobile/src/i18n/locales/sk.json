@@ -2447,6 +2447,8 @@
       "forkFilesUnchangedOnComputer": "Súbory v tomto počítači sa nezmenia.",
       "pickProfile": "Vyberte profil",
       "noProfile": "Žiadny profil",
+      "defaultProfileResolvesTo": "Aktuálne {{name}}",
+      "defaultProfileResolvesToAccessibility": "Predvolený profil: {{name}}",
       "manageProfiles": "Spravovať profily",
       "noProfiles": "Zatiaľ žiadne profily. Vytvorte jeden a pridajte premenné prostredia, servery MCP a zručnosti.",
       "advancedConfig": "Pokročilá konfigurácia",

@@ -2379,6 +2379,8 @@
       "forkFilesUnchangedOnComputer": "આ કમ્પ્યુટર પરની ફાઇલોમાં કોઈ ફેરફાર થતો નથી.",
       "pickProfile": "પ્રોફાઇલ ચૂંટો",
       "noProfile": "કોઈ પ્રોફાઇલ નથી",
+      "defaultProfileResolvesTo": "અત્યારે {{name}} પર સેટ છે",
+      "defaultProfileResolvesToAccessibility": "ડિફૉલ્ટ પ્રોફાઇલ: {{name}}",
       "manageProfiles": "પ્રોફાઇલ મેનેજ કરો",
       "noProfiles": "હજુ સુધી કોઈ પ્રોફાઇલ નથી. પર્યાવરણ ચલો, MCP સર્વર અને કુશળતા ઉમેરવા માટે એક બનાવો.",
       "advancedConfig": "અદ્યતન રૂપરેખાંકન",

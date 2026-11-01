@@ -2484,6 +2484,8 @@
       "forkFilesUnchangedOnComputer": "Il-fajls fuq dan il-kompjuter ma jinbidlux.",
       "pickProfile": "Agħżel profil",
       "noProfile": "Ebda profil",
+      "defaultProfileResolvesTo": "Jikkorrispondi għal {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profil default: {{name}}",
       "manageProfiles": "Immaniġġja profili",
       "noProfiles": "Għadu l-ebda profil. Oħloq wieħed biex iżżid varjabbli ambjentali, servers MCP, u ħiliet.",
       "advancedConfig": "Konfigurazzjoni Avvanzata",

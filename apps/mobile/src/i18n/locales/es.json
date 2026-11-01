@@ -1861,6 +1861,8 @@
       "forkFilesUnchangedOnComputer": "Los archivos de este equipo no se modifican.",
       "pickProfile": "Elige un perfil",
       "noProfile": "Sin perfil",
+      "defaultProfileResolvesTo": "Corresponde a {{name}}",
+      "defaultProfileResolvesToAccessibility": "Perfil predeterminado: {{name}}",
       "manageProfiles": "Administrar perfiles",
       "noProfiles": "Aún no hay perfiles. Cree uno para agregar variables de entorno, servidores MCP y habilidades.",
       "advancedConfig": "Configuración avanzada",

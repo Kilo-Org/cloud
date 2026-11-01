@@ -1861,6 +1861,8 @@
       "forkFilesUnchangedOnComputer": "הקבצים במחשב הזה לא משתנים.",
       "pickProfile": "בחר פרופיל",
       "noProfile": "אין פרופיל",
+      "defaultProfileResolvesTo": "מוגדר ל-{{name}}",
+      "defaultProfileResolvesToAccessibility": "פרופיל ברירת מחדל: {{name}}",
       "manageProfiles": "נהל פרופילים",
       "noProfiles": "עדיין אין פרופילים. צור אחד כדי להוסיף משתני סביבה, שרתי MCP ומיומנויות.",
       "advancedConfig": "תצורה מתקדמת",

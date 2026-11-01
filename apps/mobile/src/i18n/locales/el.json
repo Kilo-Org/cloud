@@ -2373,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Τα αρχεία σε αυτόν τον υπολογιστή δεν αλλάζουν.",
       "pickProfile": "Επίλεξε ένα προφίλ",
       "noProfile": "Χωρίς προφίλ",
+      "defaultProfileResolvesTo": "Αντιστοιχεί σε {{name}}",
+      "defaultProfileResolvesToAccessibility": "Προεπιλεγμένο προφίλ: {{name}}",
       "manageProfiles": "Διαχείριση προφίλ",
       "noProfiles": "Δεν υπάρχουν ακόμα προφίλ. Δημιούργησε ένα για να προσθέσεις μεταβλητές περιβάλλοντος, διακομιστές MCP και δεξιότητες.",
       "advancedConfig": "Προηγμένη διαμόρφωση",

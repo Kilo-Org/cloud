@@ -1843,6 +1843,8 @@
       "forkFilesUnchangedOnComputer": "Bu bilgisayardaki dosyalar değiştirilmez.",
       "pickProfile": "Bir profil seç",
       "noProfile": "Profil yok",
+      "defaultProfileResolvesTo": "Şu an {{name}} profiline karşılık gelir",
+      "defaultProfileResolvesToAccessibility": "Varsayılan profil: {{name}}",
       "manageProfiles": "Profilleri yönet",
       "noProfiles": "Henüz profil yok. Ortam değişkenleri, MCP sunucuları ve beceriler eklemek için bir tane oluşturun.",
       "advancedConfig": "Gelişmiş Yapılandırma",

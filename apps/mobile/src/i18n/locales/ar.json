@@ -1915,6 +1915,8 @@
       "forkFilesUnchangedOnComputer": "لن تتغير الملفات على هذا الكمبيوتر.",
       "pickProfile": "اختر ملفًا شخصيًا",
       "noProfile": "لا يوجد ملف شخصي",
+      "defaultProfileResolvesTo": "يشير إلى {{name}}",
+      "defaultProfileResolvesToAccessibility": "الملف الشخصي الافتراضي: {{name}}",
       "manageProfiles": "إدارة الملفات الشخصية",
       "noProfiles": "لا توجد ملفات شخصية حتى الآن. قم بإنشاء واحد لإضافة متغيرات البيئة وخوادم MCP والمهارات.",
       "advancedConfig": "التكوين المتقدم",

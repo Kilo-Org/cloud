@@ -2373,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "ଏହି କମ୍ପ୍ୟୁଟରରେ ଥିବା ଫାଇଲଗୁଡ଼ିକ ବଦଳାଯାଏ ନାହିଁ।",
       "pickProfile": "ଏକ ପ୍ରୋଫାଇଲ୍ ବାଛନ୍ତୁ।",
       "noProfile": "କୌଣସି ପ୍ରୋଫାଇଲ୍ ନାହିଁ।",
+      "defaultProfileResolvesTo": "{{name}} ଅଟେ",
+      "defaultProfileResolvesToAccessibility": "ଡିଫଲ୍ଟ ପ୍ରୋଫାଇଲ୍: {{name}}",
       "manageProfiles": "ପ୍ରୋଫାଇଲ୍ ପରିଚାଳନା କରନ୍ତୁ।",
       "noProfiles": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ପ୍ରୋଫାଇଲ୍ ନାହିଁ। ପରିବେଶ ଭେରିଏବଲ୍, MCP ସର୍ଭର, ଏବଂ କୌଶଳ ଯୋଗ କରିବାକୁ ଗୋଟିଏ ସୃଷ୍ଟି କରନ୍ତୁ।",
       "advancedConfig": "ଉନ୍ନତ ବିନ୍ୟାସ",

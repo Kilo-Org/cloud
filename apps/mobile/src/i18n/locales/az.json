@@ -2373,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Bu kompüterdəki fayllar dəyişdirilmir.",
       "pickProfile": "Profil seçin",
       "noProfile": "Profil yoxdur",
+      "defaultProfileResolvesTo": "{{name}} profilinə uyğun gəlir",
+      "defaultProfileResolvesToAccessibility": "Defolt profil: {{name}}",
       "manageProfiles": "Profilləri idarə edin",
       "noProfiles": "Hələ profil yoxdur. Ətraf mühit dəyişənləri, MCP serverləri və bacarıqları əlavə etmək üçün birini yaradın.",
       "advancedConfig": "Qabaqcıl Konfiqurasiya",

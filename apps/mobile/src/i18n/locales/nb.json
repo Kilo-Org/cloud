@@ -2373,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Filene på denne datamaskinen blir ikke endret.",
       "pickProfile": "Velg en profil",
       "noProfile": "Ingen profil",
+      "defaultProfileResolvesTo": "Er satt til {{name}}",
+      "defaultProfileResolvesToAccessibility": "Standard profil: {{name}}",
       "manageProfiles": "Administrer profiler",
       "noProfiles": "Ingen profiler ennå. Lag en for å legge til miljøvariabler, MCP-servere og ferdigheter.",
       "advancedConfig": "Avansert konfigurasjon",

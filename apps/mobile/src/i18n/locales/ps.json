@@ -2373,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "په دې کمپیوټر کې فایلونه نه بدلېږي.",
       "pickProfile": "یو پروفایل غوره کړئ",
       "noProfile": "هیڅ پروفایل نشته",
+      "defaultProfileResolvesTo": "اوس مهال {{name}} ته ټاکل شوی",
+      "defaultProfileResolvesToAccessibility": "ډیفالټ پروفایل: {{name}}",
       "manageProfiles": "پروفایلونه اداره کړئ",
       "noProfiles": "تراوسه هیڅ پروفایل نشته. د چاپیریال متغیرونو، MCP سرورونو، او مهارتونو اضافه کولو لپاره یو جوړ کړئ.",
       "advancedConfig": "پرمختللی ترتیب",

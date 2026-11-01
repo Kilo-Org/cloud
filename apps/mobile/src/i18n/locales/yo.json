@@ -2373,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Àwọn fáìlì tó wà lórí kọ̀ǹpútà yìí kò ní yípadà.",
       "pickProfile": "Yan profaili kan",
       "noProfile": "Ko si profaili",
+      "defaultProfileResolvesTo": "O da sí {{name}}",
+      "defaultProfileResolvesToAccessibility": "profaili aiyipada: {{name}}",
       "manageProfiles": "Ṣakoso awọn profaili",
       "noProfiles": "Ko si awọn profaili sibẹsibẹ. Ṣẹda ọkan lati ṣafikun awọn oniyipada ayika, awọn olupin MCP, ati awọn ọgbọn.",
       "advancedConfig": "To ti ni ilọsiwaju iṣeto ni",

@@ -2373,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Fail pada komputer ini tidak diubah.",
       "pickProfile": "Pilih profil",
       "noProfile": "Tiada profil",
+      "defaultProfileResolvesTo": "Bersamaan dengan {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profil lalai: {{name}}",
       "manageProfiles": "Urus profil",
       "noProfiles": "Tiada profil lagi. Buat satu untuk menambah pembolehubah persekitaran, pelayan MCP dan kemahiran.",
       "advancedConfig": "Konfigurasi Lanjutan",

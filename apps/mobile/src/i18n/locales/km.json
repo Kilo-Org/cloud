@@ -2373,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "ឯកសារនៅលើកុំព្យូទ័រនេះមិនត្រូវបានផ្លាស់ប្ដូរទេ។",
       "pickProfile": "ជ្រើសរើសកម្រងព័ត៌មាន",
       "noProfile": "គ្មានកម្រងព័ត៌មាន",
+      "defaultProfileResolvesTo": "ស្មើនឹង {{name}}",
+      "defaultProfileResolvesToAccessibility": "កម្រងព័ត៌មានលំនាំដើម៖ {{name}}",
       "manageProfiles": "គ្រប់គ្រងកម្រងព័ត៌មាន",
       "noProfiles": "មិនទាន់មានកម្រងព័ត៌មានទេ។ បង្កើតមួយដើម្បីបន្ថែមអថេរបរិស្ថាន ម៉ាស៊ីនមេ MCP និងជំនាញ។",
       "advancedConfig": "ការកំណត់រចនាសម្ព័ន្ធកម្រិតខ្ពស់",

@@ -1879,6 +1879,8 @@
       "forkFilesUnchangedOnComputer": "Файлы на этом компьютере не изменятся.",
       "pickProfile": "Выберите профиль",
       "noProfile": "Нет профиля",
+      "defaultProfileResolvesTo": "Сейчас: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Профиль по умолчанию: {{name}}",
       "manageProfiles": "Управление профилями",
       "noProfiles": "Профилей пока нет. Создайте его, чтобы добавить переменные среды, серверы MCP и навыки.",
       "advancedConfig": "Расширенная конфигурация",

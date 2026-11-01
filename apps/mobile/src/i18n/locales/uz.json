@@ -2373,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Bu kompyuterdagi fayllar o'zgartirilmaydi.",
       "pickProfile": "Profilni tanlang",
       "noProfile": "Profil yo'q",
+      "defaultProfileResolvesTo": "Hozir {{name}} profili",
+      "defaultProfileResolvesToAccessibility": "Standart profil: {{name}}",
       "manageProfiles": "Profillarni boshqarish",
       "noProfiles": "Hozircha profil yo'q. Atrof-muhit o'zgaruvchilari, MCP serverlari va ko'nikmalarini qo'shish uchun bitta yarating.",
       "advancedConfig": "Kengaytirilgan konfiguratsiya",

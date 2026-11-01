@@ -2373,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Faili kwenye kompyuta hii hazibadilishwi.",
       "pickProfile": "Chagua wasifu",
       "noProfile": "Hakuna wasifu",
+      "defaultProfileResolvesTo": "Imewekwa kwa {{name}}",
+      "defaultProfileResolvesToAccessibility": "Wasifu chaguomsingi: {{name}}",
       "manageProfiles": "Dhibiti wasifu",
       "noProfiles": "Bado hakuna wasifu. Unda moja ili kuongeza vigezo vya mazingira, seva za MCP na ujuzi.",
       "advancedConfig": "Usanidi wa hali ya juu",

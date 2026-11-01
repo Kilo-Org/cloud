@@ -1843,6 +1843,8 @@
       "forkFilesUnchangedOnComputer": "此電腦上的檔案不會變更。",
       "pickProfile": "選擇個人資料",
       "noProfile": "沒有個人資料",
+      "defaultProfileResolvesTo": "目前對應 {{name}}",
+      "defaultProfileResolvesToAccessibility": "預設設定檔：{{name}}",
       "manageProfiles": "管理個人資料",
       "noProfiles": "還沒有個人資料。建立一個以新增環境變數、MCP 伺服器和技能。",
       "advancedConfig": "進階配置",

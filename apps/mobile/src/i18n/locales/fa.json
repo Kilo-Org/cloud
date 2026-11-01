@@ -2379,6 +2379,8 @@
       "forkFilesUnchangedOnComputer": "فایل‌های این رایانه تغییر نمی‌کنند.",
       "pickProfile": "یک نمایه انتخاب کنید",
       "noProfile": "بدون پروفایل",
+      "defaultProfileResolvesTo": "در حال حاضر {{name}}",
+      "defaultProfileResolvesToAccessibility": "نمایه پیش فرض: {{name}}",
       "manageProfiles": "مدیریت پروفایل ها",
       "noProfiles": "هنوز پروفایلی وجود ندارد یکی برای اضافه کردن متغیرهای محیطی، سرورهای MCP و مهارت‌ها ایجاد کنید.",
       "advancedConfig": "پیکربندی پیشرفته",

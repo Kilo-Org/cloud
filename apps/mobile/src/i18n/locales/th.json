@@ -2373,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "ไฟล์ในคอมพิวเตอร์เครื่องนี้จะไม่ถูกเปลี่ยนแปลง",
       "pickProfile": "เลือกโปรไฟล์",
       "noProfile": "ไม่มีโปรไฟล์",
+      "defaultProfileResolvesTo": "ใช้โปรไฟล์ {{name}}",
+      "defaultProfileResolvesToAccessibility": "โปรไฟล์เริ่มต้น: {{name}}",
       "manageProfiles": "จัดการโปรไฟล์",
       "noProfiles": "ยังไม่มีโปรไฟล์ สร้างโปรไฟล์เพื่อเพิ่มตัวแปรสภาพแวดล้อม เซิร์ฟเวอร์ MCP และทักษะ",
       "advancedConfig": "การกำหนดค่าขั้นสูง",

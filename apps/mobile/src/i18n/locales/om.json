@@ -2373,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Faayiloonni kompiitara kana irra jiran hin jijjiiraman.",
       "pickProfile": "Profaayila tokko filadhu",
       "noProfile": "Profaayila hin qabu",
+      "defaultProfileResolvesTo": "Amma {{name}} ti",
+      "defaultProfileResolvesToAccessibility": "Profaayilii durtii: {{name}}",
       "manageProfiles": "Profaayilii bulchuu",
       "noProfiles": "Ammatti piroofaayilii hin jiru. Jijjiiramoota naannoo, sarvaroota MCP, fi dandeettiiwwan dabaluudhaaf tokko uumi.",
       "advancedConfig": "Qindeessituu Ol'aanaa",

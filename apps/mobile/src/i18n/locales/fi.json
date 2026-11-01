@@ -2373,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Tämän tietokoneen tiedostoja ei muuteta.",
       "pickProfile": "Valitse profiili",
       "noProfile": "Ei profiilia",
+      "defaultProfileResolvesTo": "Käytössä: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Oletusprofiili: {{name}}",
       "manageProfiles": "Hallitse profiileja",
       "noProfiles": "Ei vielä profiileja. Luo sellainen, jonka avulla voit lisätä ympäristömuuttujia, MCP-palvelimia ja taitoja.",
       "advancedConfig": "Lisäasetukset",

@@ -2373,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "ഈ കമ്പ്യൂട്ടറിലെ ഫയലുകൾക്ക് മാറ്റം വരുന്നില്ല.",
       "pickProfile": "ഒരു പ്രൊഫൈൽ തിരഞ്ഞെടുക്കുക",
       "noProfile": "പ്രൊഫൈൽ ഇല്ല",
+      "defaultProfileResolvesTo": "നിലവിൽ {{name}}",
+      "defaultProfileResolvesToAccessibility": "ഡിഫോൾട്ട് പ്രൊഫൈൽ: {{name}}",
       "manageProfiles": "പ്രൊഫൈലുകൾ കൈകാര്യം ചെയ്യുക",
       "noProfiles": "ഇതുവരെ പ്രൊഫൈലുകളൊന്നുമില്ല. പരിസ്ഥിതി വേരിയബിളുകൾ, MCP സെർവറുകൾ, കഴിവുകൾ എന്നിവ ചേർക്കാൻ ഒരെണ്ണം സൃഷ്‌ടിക്കുക.",
       "advancedConfig": "വിപുലമായ കോൺഫിഗറേഷൻ",

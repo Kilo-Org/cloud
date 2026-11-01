@@ -2379,6 +2379,8 @@
       "forkFilesUnchangedOnComputer": "ಈ ಕಂಪ್ಯೂಟರ್‌ನಲ್ಲಿರುವ ಫೈಲ್‌ಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ.",
       "pickProfile": "ಪ್ರೊಫೈಲ್ ಅನ್ನು ಆರಿಸಿ",
       "noProfile": "ಪ್ರೊಫೈಲ್ ಇಲ್ಲ",
+      "defaultProfileResolvesTo": "ಪ್ರಸ್ತುತ {{name}} ಆಗಿದೆ",
+      "defaultProfileResolvesToAccessibility": "ಡೀಫಾಲ್ಟ್ ಪ್ರೊಫೈಲ್: {{name}}",
       "manageProfiles": "ಪ್ರೊಫೈಲ್‌ಗಳನ್ನು ನಿರ್ವಹಿಸಿ",
       "noProfiles": "ಇನ್ನೂ ಯಾವುದೇ ಪ್ರೊಫೈಲ್‌ಗಳಿಲ್ಲ. ಪರಿಸರ ವೇರಿಯಬಲ್‌ಗಳು, MCP ಸರ್ವರ್‌ಗಳು ಮತ್ತು ಕೌಶಲ್ಯಗಳನ್ನು ಸೇರಿಸಲು ಒಂದನ್ನು ರಚಿಸಿ.",
       "advancedConfig": "ಸುಧಾರಿತ ಸಂರಚನೆ",

@@ -166,11 +166,12 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   // Starting a GitHub installation for an organization is an organization-manage
   // role's action: `githubApps.mintInstallState` refuses a billing manager with
   // `UNAUTHORIZED`, so a screen that offered the press to every `canManage`
-  // reader would end in `setupFailed` with nothing the reader could do. The
-  // connect view only renders once the role read has settled — a pending or
-  // failed one holds the screen on its skeleton or its load failure — so the
-  // capability here is the resolved answer.
-  const canInstallGitHub = capability.canManageGitHub;
+  // reader would end in `setupFailed` with nothing the reader could do. Only a
+  // resolved role may withhold it: an enabled agent reaches this view while the
+  // role list is still loading, and hiding the press then would dead-end the
+  // owner who can take it.
+  const roleResolved = capability.status === 'allowed' || capability.status === 'denied';
+  const canInstallGitHub = !roleResolved || capability.canManageGitHub;
 
   // Mint only when the entry view actually needs a fresh GitHub install URL:
   // connect-github always, reauthorize only when the server offered no

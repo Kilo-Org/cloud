@@ -261,6 +261,22 @@ describe('mcp-catalog catalog', () => {
       );
     });
 
+    it('keeps searchable field tags across union and intersection branches', () => {
+      const { rows } = buildCatalogRows(
+        withMutation([
+          mutationLeaf('cloudAgentNext.prepareSession', [
+            z.intersection(
+              z.object({ egressAudit: z.boolean().optional() }),
+              z.union([z.object({ prompt: z.string() }), z.object({ cloneFrom: z.string() })])
+            ),
+          ]),
+        ]),
+        new Map([['cloudAgentNext.prepareSession', 'Prepares a session.']])
+      );
+      expect(rows[0]?.tags).toEqual(expect.arrayContaining(['egressaudit', 'prompt', 'clonefrom']));
+      expect(rows[0]?.searchBlob).toContain('egressAudit');
+    });
+
     it('keeps every constraint when two chained schemas declare the same key', () => {
       const { rows } = buildCatalogRows(
         withMutation([

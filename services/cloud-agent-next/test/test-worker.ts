@@ -76,6 +76,7 @@ export class UserKiloFacade extends RealUserKiloFacade {
 // names to the control-plane V2 classes, matching production after the C1c flip.
 export { SandboxControlV2, SandboxSessionV2 };
 export { EnvironmentBuild } from '../src/environment-build/environment-build-do.js';
+export { SandboxContainers } from '../src/sandbox-containers/SandboxContainers.js';
 export { PreviewPortTestDO } from './integration/helpers/preview-port-test-do.js';
 
 type TestEnv = {

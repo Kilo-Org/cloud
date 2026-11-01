@@ -2032,6 +2032,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Paigalda Kilo GitHubi rakendus, et sünkroonida Dependaboti hoiatusi automaatselt ja hallata oma hoidlate turvaleide.",
+      "connectOwnerOnly": "Ainult organisatsiooni omanikud ja administraatorid saavad {{platform}} ühendada.",
       "connectTitle": "Alustamiseks ühenda GitHub",
       "couldNotLoad": "Turvaagenti ei õnnestunud laadida.",
       "installApp": "Paigalda GitHubi rakendus",

@@ -2038,6 +2038,7 @@
     },
     "scopeEntry": {
       "connectDescription": "برای همگام‌سازی خودکار هشدارهای Dependabot و مدیریت یافته‌های امنیتی در مخازن خود، برنامه Kilo را در GitHub نصب کنید.",
+      "connectOwnerOnly": "فقط مالکان سازمان و مدیران می‌توانند {{platform}} را متصل کنند.",
       "connectTitle": "برای شروع GitHub را وصل کنید",
       "couldNotLoad": "بارگذاری عامل امنیتی ممکن نشد.",
       "installApp": "نصب برنامه GitHub",

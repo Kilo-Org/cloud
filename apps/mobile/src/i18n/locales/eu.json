@@ -2032,6 +2032,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Instalatu Kiloren GitHub aplikazioa Dependabot-en abisuak automatikoki sinkronizatzeko eta zure biltegietako segurtasun-aurkikuntzak kudeatzeko.",
+      "connectOwnerOnly": "Erakundeko jabeek eta administratzaileek soilik konekta dezakete {{platform}}.",
       "connectTitle": "Konektatu GitHub hasteko",
       "couldNotLoad": "Ezin izan da segurtasun-agentea kargatu.",
       "installApp": "Instalatu GitHub aplikazioa",

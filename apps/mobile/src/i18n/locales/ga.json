@@ -2131,6 +2131,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Suiteáil aip GitHub Kilo chun foláirimh Dependabot a shioncronú go huathoibríoch agus torthaí slándála a bhainistiú ar fud do stórtha.",
+      "connectOwnerOnly": "Ní féidir ach le húinéirí agus riarthóirí eagraíochta {{platform}} a cheangal.",
       "connectTitle": "Ceangail GitHub chun tosú",
       "couldNotLoad": "Níorbh fhéidir an Gníomhaire slándála a lódáil.",
       "installApp": "Suiteáil an aip GitHub",

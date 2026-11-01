@@ -1510,6 +1510,7 @@
     },
     "scopeEntry": {
       "connectDescription": "ثبّت تطبيق Kilo على GitHub لمزامنة تنبيهات Dependabot تلقائيًا وإدارة النتائج الأمنية في مستودعاتك.",
+      "connectOwnerOnly": "يمكن لمالكي المؤسسة والمشرفين فقط ربط {{platform}}.",
       "connectTitle": "اربط GitHub للبدء",
       "couldNotLoad": "تعذّر تحميل وكيل الأمان.",
       "installApp": "تثبيت تطبيق GitHub",

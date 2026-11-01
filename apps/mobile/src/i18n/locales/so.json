@@ -2032,6 +2032,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Rakib abka Kilo ee GitHub si aad si otomaatig ah u isku waafajiso digniinaha Dependabot una maamusho natiijooyinka amniga ee kaydadkaaga oo dhan.",
+      "connectOwnerOnly": "Milkiilayaasha ururka iyo maamulayaasha oo keliya ayaa ku xidhi kara {{platform}}.",
       "connectTitle": "Ku xidh GitHub si aad u bilowdo",
       "couldNotLoad": "Wakiilka amniga lama soo dejin karin.",
       "installApp": "Rakib abka GitHub",

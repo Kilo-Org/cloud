@@ -2098,6 +2098,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Namesti aplikacijo Kilo za GitHub, da samodejno sinhroniziraš opozorila Dependabot in upravljaš varnostne ugotovitve v svojih skladiščih.",
+      "connectOwnerOnly": "Povezavo s platformo {{platform}} lahko vzpostavijo samo lastniki organizacije in skrbniki.",
       "connectTitle": "Povezava s platformo GitHub",
       "couldNotLoad": "Varnostnega agenta ni bilo mogoče naložiti.",
       "installApp": "Namesti aplikacijo GitHub",

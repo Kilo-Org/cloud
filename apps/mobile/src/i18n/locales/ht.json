@@ -2032,6 +2032,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Enstale aplikasyon GitHub Kilo a pou senkronize alèt Dependabot yo otomatikman epi jere konsta sekirite nan tout depo ou yo.",
+      "connectOwnerOnly": "Se sèlman pwopriyetè òganizasyon an ak administratè yo ki ka konekte {{platform}}.",
       "connectTitle": "Konekte GitHub pou kòmanse",
       "couldNotLoad": "Nou pa t ka chaje Ajan sekirite a.",
       "installApp": "Enstale aplikasyon GitHub la",

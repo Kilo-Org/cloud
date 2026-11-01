@@ -1458,6 +1458,7 @@
     },
     "scopeEntry": {
       "connectDescription": "安装 Kilo GitHub 应用，即可自动同步 Dependabot 警报，并统一管理各仓库的安全问题。",
+      "connectOwnerOnly": "只有组织所有者和管理员可以连接 {{platform}}。",
       "connectTitle": "连接 GitHub 开始使用",
       "couldNotLoad": "无法加载安全智能体",
       "installApp": "安装 GitHub 应用",

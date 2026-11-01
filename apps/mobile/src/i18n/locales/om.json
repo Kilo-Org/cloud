@@ -2032,6 +2032,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Akeekkachiisa Dependabot ofumaan walsimsiisuuf fi argamoota nageenyaa kuusaawwan koodii kee keessatti bulchuuf aplikeeshinii GitHub kan Kilo fe'i.",
+      "connectOwnerOnly": "Abbootiin dhaabbataa fi bulchitootaa qofa {{platform}} walqabsiisuu danda'u.",
       "connectTitle": "Jalqabuuf GitHub walqabsiisi",
       "couldNotLoad": "Eejentii nageenyaa fe'uun hin danda'amne.",
       "installApp": "Aplikeeshinii GitHub fe'i",

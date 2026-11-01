@@ -2032,6 +2032,7 @@
     },
     "scopeEntry": {
       "connectDescription": "ติดตั้ง Kilo GitHub App เพื่อซิงค์การแจ้งเตือน Dependabot โดยอัตโนมัติและจัดการข้อค้นพบด้านความปลอดภัยในคลังโค้ดของคุณ",
+      "connectOwnerOnly": "เฉพาะเจ้าขององค์กรและผู้ดูแลระบบเท่านั้นที่สามารถเชื่อมต่อ {{platform}} ได้",
       "connectTitle": "เชื่อมต่อ GitHub เพื่อเริ่มต้น",
       "couldNotLoad": "ไม่สามารถโหลดเอเจนต์ความปลอดภัยได้",
       "installApp": "ติดตั้ง GitHub App",

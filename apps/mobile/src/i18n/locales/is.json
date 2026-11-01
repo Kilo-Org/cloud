@@ -2032,6 +2032,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Settu upp GitHub-forrit Kilo til að samstilla Dependabot-viðvaranir sjálfkrafa og stjórna öryggisfrávikum í geymslunum þínum.",
+      "connectOwnerOnly": "Aðeins eigendur fyrirtækisins og stjórnendur geta tengt {{platform}}.",
       "connectTitle": "Tengdu GitHub til að byrja",
       "couldNotLoad": "Ekki tókst að hlaða öryggiserindrekanum.",
       "installApp": "Setja upp GitHub-forrit",

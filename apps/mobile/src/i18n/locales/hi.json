@@ -1464,6 +1464,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot अलर्ट अपने आप सिंक करने और अपनी रिपॉज़िटरी में सुरक्षा समस्याएँ प्रबंधित करने के लिए Kilo GitHub ऐप इंस्टॉल करें।",
+      "connectOwnerOnly": "केवल संगठन के मालिक और एडमिन ही {{platform}} कनेक्ट कर सकते हैं।",
       "connectTitle": "शुरू करने के लिए GitHub कनेक्ट करें",
       "couldNotLoad": "सुरक्षा एजेंट लोड नहीं हो सका।",
       "installApp": "GitHub ऐप इंस्टॉल करें",

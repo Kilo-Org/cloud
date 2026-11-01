@@ -2032,6 +2032,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Wụnye ngwa Kilo maka GitHub iji mekọrịta data ọkwa Dependabot na-akpaghị aka ma jikwaa ihe achọpụtara na nchebe n'ebe nchekwa gị niile.",
+      "connectOwnerOnly": "Naanị ndị nwe nzukọ na ndị nchịkwa nwere ike ijikọ {{platform}}.",
       "connectTitle": "Jikọọ GitHub iji bido",
       "couldNotLoad": "Enweghị ike ibudata onye enyemaka nchebe.",
       "installApp": "Wụnye ngwa GitHub",

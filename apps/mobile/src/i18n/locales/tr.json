@@ -1458,6 +1458,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot uyarılarını otomatik olarak eşitlemek ve depolarındaki güvenlik bulgularını yönetmek için Kilo GitHub uygulamasını yükle.",
+      "connectOwnerOnly": "Yalnızca kuruluş sahipleri ve yöneticiler {{platform}} bağlayabilir.",
       "connectTitle": "Başlamak için GitHub'ı bağla",
       "couldNotLoad": "Güvenlik ajanı yüklenemedi.",
       "installApp": "GitHub uygulamasını yükle",

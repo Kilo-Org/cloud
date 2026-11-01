@@ -2032,6 +2032,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Tāutahia te taupānga GitHub a Kilo hei tukutahi aunoa i ngā matohi Dependabot, hei whakahaere hoki i ngā kitenga haumarutanga puta noa i ō pūranga.",
+      "connectOwnerOnly": "Ko ngā rangatira o te rōpū me ngā kaiwhakahaere anake ka āhei ki te hono atu ki {{platform}}.",
       "connectTitle": "Hono atu ki GitHub kia tīmata",
       "couldNotLoad": "Kāore i taea te uta i te Kaiāwhina haumarutanga.",
       "installApp": "Tāutahia te taupānga GitHub",

@@ -2038,6 +2038,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Apetraho ny rindranasa Kilo ao amin'ny GitHub mba hampifanarahana ho azy ny fampandrenesan'ny Dependabot sy hitantanana ny olana hita amin'ny fiarovana ao amin'ny tahirin-kaodinao.",
+      "connectOwnerOnly": "Ny tompon'ny fikambanana sy ny mpitantana ihany no afaka mampifandray an'i {{platform}}.",
       "connectTitle": "Ampifandraiso ny GitHub mba hanombohana",
       "couldNotLoad": "Tsy nety nampidirina ny mpanampy amin'ny fiarovana.",
       "installApp": "Apetraho ny rindranasa GitHub",

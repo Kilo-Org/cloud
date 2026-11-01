@@ -2032,6 +2032,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Installera Kilos GitHub-app för att automatiskt synkronisera Dependabot-varningar och hantera säkerhetsfynd i dina kodarkiv.",
+      "connectOwnerOnly": "Endast organisationsägare och administratörer kan ansluta {{platform}}.",
       "connectTitle": "Anslut GitHub för att komma igång",
       "couldNotLoad": "Kunde inte läsa in Säkerhetsagenten",
       "installApp": "Installera GitHub-appen",

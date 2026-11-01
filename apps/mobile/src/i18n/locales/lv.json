@@ -2065,6 +2065,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Instalē Kilo GitHub lietotni, lai automātiski sinhronizētu Dependabot brīdinājumus un pārvaldītu drošības konstatējumus savos repozitorijos.",
+      "connectOwnerOnly": "Tikai organizācijas īpašnieki un administratori var pievienot {{platform}}.",
       "connectTitle": "Pievieno GitHub, lai sāktu",
       "couldNotLoad": "Neizdevās ielādēt drošības aģentu.",
       "installApp": "Instalēt GitHub lietotni",

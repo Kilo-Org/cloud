@@ -1458,6 +1458,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Installiere die Kilo-GitHub-App, um Dependabot-Warnungen automatisch zu synchronisieren und Sicherheitsbefunde in deinen Repositories zu verwalten.",
+      "connectOwnerOnly": "Nur Organisationsinhaber und Admins können {{platform}} verbinden.",
       "connectTitle": "GitHub verbinden, um loszulegen",
       "couldNotLoad": "Der Sicherheitsagent konnte nicht geladen werden.",
       "installApp": "GitHub-App installieren",

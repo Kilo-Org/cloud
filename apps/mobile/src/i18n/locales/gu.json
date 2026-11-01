@@ -2038,6 +2038,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot ની ચેતવણીઓ આપમેળે સિંક કરવા અને તમારી રિપોઝિટરીઓનાં સુરક્ષા તારણોનું સંચાલન કરવા Kilo GitHub ઍપ ઇન્સ્ટોલ કરો.",
+      "connectOwnerOnly": "માત્ર સંસ્થાના માલિકો અને એડમિનો જ {{platform}} જોડી શકે છે.",
       "connectTitle": "શરૂ કરવા GitHub કનેક્ટ કરો",
       "couldNotLoad": "સુરક્ષા એજન્ટ લોડ કરી શકાયો નહીં.",
       "installApp": "GitHub ઍપ ઇન્સ્ટોલ કરો",

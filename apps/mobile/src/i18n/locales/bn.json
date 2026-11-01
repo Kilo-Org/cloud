@@ -2038,6 +2038,7 @@
     },
     "scopeEntry": {
       "connectDescription": "আপনার রিপোজিটরিগুলোর Dependabot সতর্কতা স্বয়ংক্রিয়ভাবে সিঙ্ক করতে এবং নিরাপত্তা ত্রুটি পরিচালনা করতে Kilo GitHub অ্যাপ ইনস্টল করুন।",
+      "connectOwnerOnly": "শুধুমাত্র সংস্থার মালিক এবং অ্যাডমিনরা {{platform}} সংযুক্ত করতে পারেন।",
       "connectTitle": "শুরু করতে GitHub সংযুক্ত করুন",
       "couldNotLoad": "নিরাপত্তা এজেন্ট লোড করা যায়নি।",
       "installApp": "GitHub অ্যাপ ইনস্টল করুন",

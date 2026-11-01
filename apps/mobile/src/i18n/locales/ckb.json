@@ -2032,6 +2032,7 @@
     },
     "scopeEntry": {
       "connectDescription": "ئەپی Kilo لە GitHub دابمەزرێنە بۆ هاوکاتکردنی خۆکاری ئاگادارکردنەوەکانی Dependabot و بەڕێوەبردنی دۆزینەوەکانی ئاسایش لە کۆگاکانتدا.",
+      "connectOwnerOnly": "تەنها خاوەنەکانی ڕێکخراو و بەڕێوەبەران دەتوانن {{platform}} بیبەستن.",
       "connectTitle": "بۆ دەستپێکردن پەیوەندی بە GitHub بکە",
       "couldNotLoad": "نەتوانرا بریکاری ئاسایش بار بکرێت.",
       "installApp": "ئەپی GitHub دابمەزرێنە",

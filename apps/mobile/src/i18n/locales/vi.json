@@ -1458,6 +1458,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Cài đặt ứng dụng Kilo trên GitHub để tự động đồng bộ cảnh báo Dependabot và quản lý vấn đề bảo mật trong các kho lưu trữ của bạn.",
+      "connectOwnerOnly": "Chỉ chủ sở hữu tổ chức và quản trị viên mới có thể kết nối {{platform}}.",
       "connectTitle": "Kết nối GitHub để bắt đầu",
       "couldNotLoad": "Không thể tải Trợ lý bảo mật.",
       "installApp": "Cài đặt ứng dụng GitHub",

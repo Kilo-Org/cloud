@@ -330,6 +330,74 @@ describe.each(['personal', 'org_123'])('ScopeEntryScreen %s routing', scope => {
   );
 });
 
+describe('ScopeEntryScreen GitHub install capability', () => {
+  // `githubApps.mintInstallState` takes an organization-manage role, so the
+  // entry must not offer its press to a reader the server will refuse: that
+  // press can only end in the setup failure line. A resolved narrower role gets
+  // the role notice instead, and no install state is minted for it.
+  it.each(['member', 'billing_manager'])(
+    'offers the read-only notice to a %s instead of the install press',
+    async role => {
+      roles = [{ organizationId: 'org_123', organizationName: 'Drain Labs', role }];
+      permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+
+      const root = await mount('org_123');
+      const setup = host(root, 'SecurityAgentSetup')[0];
+
+      expect(setup?.props.readOnlyNotice).toBe(
+        'Only organization owners and admins can connect GitHub.'
+      );
+      expect(setup?.props.url).toBeUndefined();
+      expect(
+        transport.mock.calls.filter(([input]) => procedureFor(input) === 'mintInstallState')
+      ).toHaveLength(0);
+    }
+  );
+
+  it.each(['owner', 'admin'])('keeps the install press for an %s', async role => {
+    roles = [{ organizationId: 'org_123', organizationName: 'Drain Labs', role }];
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+
+    const root = await mount('org_123');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(new URL(setup?.props.url as string).pathname).toBe('/github-app');
+    expect(
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'mintInstallState')
+    ).toHaveLength(1);
+  });
+
+  it("keeps the install press while an enabled agent's role list is unread", async () => {
+    // An enabled agent with no connection reaches the connect view before the
+    // shared membership list lands. Withholding the press on that unresolved
+    // role would hide the only action from the owner who can take it.
+    configData.isEnabled = true;
+    roles = [];
+    heldProcedures = new Set(['list']);
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+
+    const root = await mount('org_123');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(setup?.props.buttonLabel).toBe('Install GitHub App');
+    releaseHeld?.();
+  });
+
+  it('never withholds the personal install press', async () => {
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+
+    const root = await mount('personal');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'mintInstallState')
+    ).toHaveLength(1);
+  });
+});
+
 describe('ScopeEntryScreen names the scope it acts on', () => {
   // An admin in several organizations reauthorizes one organization's GitHub
   // app: the header has to say whose agent the button acts on, the way the Code

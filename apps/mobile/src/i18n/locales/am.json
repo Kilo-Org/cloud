@@ -2038,6 +2038,7 @@
     },
     "scopeEntry": {
       "connectDescription": "የDependabot ማስጠንቀቂያዎችን በራስ-ሰር ለማመሳሰል እና በማከማቻዎችዎ ያሉትን የደህንነት ግኝቶች ለማስተዳደር የKilo የGitHub መተግበሪያን ይጫኑ።",
+      "connectOwnerOnly": "የድርጅት ባለቤቶች እና አስተዳዳሪዎች ብቻ {{platform}}ን ማገናኘት ይችላሉ።",
       "connectTitle": "ለመጀመር GitHubን ያገናኙ",
       "couldNotLoad": "የደህንነት ወኪሉን መጫን አልተቻለም።",
       "installApp": "የGitHub መተግበሪያን ይጫኑ",

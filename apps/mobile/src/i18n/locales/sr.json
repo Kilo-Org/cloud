@@ -2065,6 +2065,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Instaliraj Kilo GitHub aplikaciju za automatsku sinhronizaciju Dependabot upozorenja i upravljanje bezbednosnim nalazima u svojim repozitorijumima.",
+      "connectOwnerOnly": "Samo vlasnici organizacije i administratori mogu da povežu {{platform}}.",
       "connectTitle": "Poveži GitHub za početak",
       "couldNotLoad": "Nije moguće učitati bezbednosnog agenta.",
       "installApp": "Instaliraj GitHub aplikaciju",

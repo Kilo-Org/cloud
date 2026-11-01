@@ -19,6 +19,14 @@ type SecurityAgentSetupProps<T> = {
   description: string;
   buttonLabel: string;
   /**
+   * Why the reader cannot start this connection themselves, from a resolved
+   * role. When set, the action is withheld: the body shows this sentence where
+   * the button would be and never resolves a URL, so the screen cannot offer a
+   * press whose destination refuses the reader. An unresolved capability
+   * passes nothing, keeping the button while the role is still unknown.
+   */
+  readOnlyNotice?: string;
+  /**
    * The URL to open. Undefined while the install-state token is still being
    * minted or after a failed mint: pressing the button then mints again and
    * only opens once a URL exists, so a transient mint failure never replaces
@@ -35,6 +43,7 @@ export function SecurityAgentSetup<T>({
   title,
   description,
   buttonLabel,
+  readOnlyNotice,
   url,
   resolveUrl,
   onConnected,
@@ -89,16 +98,26 @@ export function SecurityAgentSetup<T>({
         <ShieldCheck size={28} color={colors.mutedForeground} />
         <Text className="text-center text-base font-semibold">{title}</Text>
         <Text className="text-center text-sm text-muted-foreground">{description}</Text>
-        <Button
-          className="mt-3 w-full flex-row gap-2"
-          disabled={connecting}
-          onPress={() => {
-            void connect();
-          }}
-        >
-          {connecting ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : null}
-          <Text>{buttonLabel}</Text>
-        </Button>
+        {readOnlyNotice ? (
+          // The notice takes the action's place rather than sitting beside it:
+          // this reader has no press to make, and the sentence is the only
+          // thing left to say. It keeps the button's `mt-3` so the block reads
+          // the same in both states.
+          <Text className="mt-3 text-center text-xs text-muted-foreground">{readOnlyNotice}</Text>
+        ) : (
+          <Button
+            className="mt-3 w-full flex-row gap-2"
+            disabled={connecting}
+            onPress={() => {
+              void connect();
+            }}
+          >
+            {connecting ? (
+              <ActivityIndicator size="small" color={colors.primaryForeground} />
+            ) : null}
+            <Text>{buttonLabel}</Text>
+          </Button>
+        )}
         <AccessibleStatus message={failure} className="text-center text-sm" />
       </View>
     </CenteredState>

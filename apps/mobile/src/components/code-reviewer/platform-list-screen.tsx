@@ -125,12 +125,11 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
     <View className="flex-1 bg-background">
       <ReviewerHeader
         title={scopeTitle}
-        // The same one-line header the review list for this scope paints: the
-        // name arrives with the membership read, so its line is reserved and the
-        // platform rows below never move, and `Personal` keeps the same single
-        // line so both scopes report one header height.
+        // The same one-line header the review list for this scope paints, so
+        // both scopes report one header height and the platform rows never move
+        // when the name arrives with the membership read: a longer name
+        // tail-truncates inside that line.
         titleNumberOfLines={1}
-        reserveTitleSpace={!isPersonal}
         eyebrow={t('common.codeReviewer')}
       />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">

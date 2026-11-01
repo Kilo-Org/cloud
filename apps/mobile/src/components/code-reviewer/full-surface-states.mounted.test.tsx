@@ -648,10 +648,11 @@ describe('Recent review header', () => {
     // The scope name is prose, but the header paints it on the one line the
     // personal scope uses: a second line reserved for it made this header
     // taller than the Personal one, pushing the eyebrow down and opening a
-    // wider gap above the first review. Its single line is still reserved from
-    // the first frame, so the body does not move when the name lands.
+    // wider gap above the first review. One line needs no reserved blank line —
+    // a name that arrives later still paints on that same line — so the header
+    // keeps the personal header's height instead of outgrowing it.
     expect(findHeader().props.titleNumberOfLines).toBe(1);
-    expect(findHeader().props.reserveTitleSpace).toBe(true);
+    expect(findHeader().props.reserveTitleSpace).toBe(false);
     unmount();
   });
 

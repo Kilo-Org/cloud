@@ -12,7 +12,8 @@ const mockTryDispatchPendingReviews = jest.fn();
 const mockCancelReview = jest.fn();
 const mockAddReactionToPR = jest.fn();
 const mockResolveMergeHeadContent = jest.fn();
-const mockHasReviewCoveringHeads = jest.fn();
+const mockFindReviewCoveringHeads = jest.fn();
+const mockGetCheckRunConclusion = jest.fn();
 const mockIsCouncilEntitledForOwner = jest.fn();
 
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
@@ -34,7 +35,7 @@ jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
   cancelSupersededReviewsForPR: (...args: unknown[]) => mockCancelSupersededReviewsForPR(...args),
   findExistingReview: (...args: unknown[]) => mockFindExistingReview(...args),
   findActiveReviewsForPR: (...args: unknown[]) => mockFindActiveReviewsForPR(...args),
-  hasReviewCoveringHeads: (...args: unknown[]) => mockHasReviewCoveringHeads(...args),
+  findReviewCoveringHeads: (...args: unknown[]) => mockFindReviewCoveringHeads(...args),
   updateReviewHeadShaAndCheckRun: (...args: unknown[]) =>
     mockUpdateReviewHeadShaAndCheckRun(...args),
   updateCheckRunId: (...args: unknown[]) => mockUpdateCheckRunId(...args),
@@ -53,6 +54,7 @@ jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   addReactionToPR: (...args: unknown[]) => mockAddReactionToPR(...args),
   createCheckRun: (...args: unknown[]) => mockCreateCheckRun(...args),
+  getCheckRunConclusion: (...args: unknown[]) => mockGetCheckRunConclusion(...args),
   resolveMergeHeadContent: (...args: unknown[]) => mockResolveMergeHeadContent(...args),
   updateCheckRun: (...args: unknown[]) => mockUpdateCheckRun(...args),
 }));
@@ -121,7 +123,8 @@ beforeEach(() => {
   mockCancelReview.mockResolvedValue({ success: true, reviewId: 'old-review' });
   mockAddReactionToPR.mockResolvedValue(undefined);
   mockResolveMergeHeadContent.mockResolvedValue({ kind: 'not_merge' });
-  mockHasReviewCoveringHeads.mockResolvedValue(false);
+  mockFindReviewCoveringHeads.mockResolvedValue(null);
+  mockGetCheckRunConclusion.mockResolvedValue(undefined);
   mockIsCouncilEntitledForOwner.mockResolvedValue(false);
 });
 
@@ -593,7 +596,7 @@ describe('handlePullRequest', () => {
     expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
   });
 
-  it('skips supersession cancel on merge-commit synchronize events', async () => {
+  it('skips supersession cancel on merge-commit synchronize events while a review is in flight', async () => {
     mockGetBotUserId.mockResolvedValue('bot-user-1');
     mockGetAgentConfigForOwner.mockResolvedValue({
       is_enabled: true,
@@ -604,18 +607,89 @@ describe('handlePullRequest', () => {
       kind: 'review_content',
       shas: ['merge-sha', 'content-sha'],
     });
-    mockHasReviewCoveringHeads.mockResolvedValue(true);
+    mockFindReviewCoveringHeads.mockResolvedValue({
+      checkRunId: 12345,
+      headSha: 'content-sha',
+      id: 'review-1',
+      status: 'running',
+    });
 
     const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ message: 'Skipped merge commit' });
-    expect(mockHasReviewCoveringHeads).toHaveBeenCalledWith(expect.anything(), [
+    expect(mockFindReviewCoveringHeads).toHaveBeenCalledWith(expect.anything(), [
       'merge-sha',
       'content-sha',
     ]);
+    // The running review is repointed at the head instead of superseded.
+    expect(mockUpdateReviewHeadShaAndCheckRun).toHaveBeenCalledWith('review-1', 'abc123', 98765);
     expect(mockCancelSupersededReviewsForPR).not.toHaveBeenCalled();
     expect(mockCancelReview).not.toHaveBeenCalled();
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('carries a finished review verdict onto the merge-commit head', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+    mockResolveMergeHeadContent.mockResolvedValue({
+      kind: 'review_content',
+      shas: ['merge-sha', 'content-sha'],
+    });
+    mockFindReviewCoveringHeads.mockResolvedValue({
+      checkRunId: 12345,
+      headSha: 'content-sha',
+      id: 'review-1',
+      status: 'completed',
+    });
+    mockGetCheckRunConclusion.mockResolvedValue('success');
+
+    const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+    expect(response.status).toBe(200);
+    expect(mockGetCheckRunConclusion).toHaveBeenCalledWith(
+      '98765',
+      'acme',
+      'widgets',
+      12345,
+      'standard'
+    );
+    expect(mockCreateCheckRun).toHaveBeenCalledWith(
+      '98765',
+      'acme',
+      'widgets',
+      'abc123',
+      expect.objectContaining({ conclusion: 'success' }),
+      'standard'
+    );
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('leaves the merge-commit head without a run when the finished verdict cannot be read', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+    mockResolveMergeHeadContent.mockResolvedValue({
+      kind: 'review_content',
+      shas: ['merge-sha', 'content-sha'],
+    });
+    mockFindReviewCoveringHeads.mockResolvedValue({
+      checkRunId: 12345,
+      headSha: 'content-sha',
+      id: 'review-1',
+      status: 'completed',
+    });
+    mockGetCheckRunConclusion.mockResolvedValue(undefined);
+
+    const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+    expect(response.status).toBe(200);
+    expect(mockCreateCheckRun).not.toHaveBeenCalled();
     expect(mockCreateCodeReview).not.toHaveBeenCalled();
   });
 
@@ -661,7 +735,7 @@ describe('handlePullRequest', () => {
       kind: 'review_content',
       shas: ['merge-sha', 'content-sha'],
     });
-    mockHasReviewCoveringHeads.mockResolvedValue(false);
+    mockFindReviewCoveringHeads.mockResolvedValue(null);
 
     const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
 
@@ -682,7 +756,7 @@ describe('handlePullRequest', () => {
     const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
 
     expect(response.status).toBe(202);
-    expect(mockHasReviewCoveringHeads).not.toHaveBeenCalled();
+    expect(mockFindReviewCoveringHeads).not.toHaveBeenCalled();
     expect(mockCreateCodeReview).toHaveBeenCalled();
   });
 
@@ -696,7 +770,7 @@ describe('handlePullRequest', () => {
       kind: 'review_content',
       shas: ['merge-sha', 'content-sha'],
     });
-    mockHasReviewCoveringHeads.mockRejectedValue(new Error('database unavailable'));
+    mockFindReviewCoveringHeads.mockRejectedValue(new Error('database unavailable'));
 
     const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
 
@@ -715,7 +789,12 @@ describe('handlePullRequest', () => {
       kind: 'review_content',
       shas: ['merge-sha', 'content-sha'],
     });
-    mockHasReviewCoveringHeads.mockResolvedValue(true);
+    mockFindReviewCoveringHeads.mockResolvedValue({
+      checkRunId: 12345,
+      headSha: 'content-sha',
+      id: 'review-1',
+      status: 'running',
+    });
     mockUpdateReviewHeadShaAndCheckRun.mockRejectedValue(new Error('database write failed'));
 
     const response = await handlePullRequest(

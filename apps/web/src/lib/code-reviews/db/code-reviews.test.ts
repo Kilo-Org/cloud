@@ -28,7 +28,7 @@ import {
   ensureCurrentCodeReviewAttemptFromReview,
   findActiveReviewsForPR,
   findExistingReview,
-  hasReviewCoveringHeads,
+  findReviewCoveringHeads,
   getCodeReviewAttemptForReview,
   getCodeReviewCouncilResult,
   getSessionUsageFromBilling,
@@ -463,19 +463,24 @@ describe('review identity', () => {
 
     // A head it holds covers it only while the review can still stand for the content.
     expect(
-      await hasReviewCoveringHeads(scope, ['other-head-sha', 'covering-heads-content-sha'])
-    ).toBe(true);
+      await findReviewCoveringHeads(scope, ['other-head-sha', 'covering-heads-content-sha'])
+    ).toEqual({
+      checkRunId: null,
+      headSha: 'covering-heads-content-sha',
+      id: reviewId,
+      status: 'pending',
+    });
 
     await updateCodeReviewStatus(reviewId, 'cancelled');
 
-    expect(await hasReviewCoveringHeads(scope, ['covering-heads-content-sha'])).toBe(false);
+    expect(await findReviewCoveringHeads(scope, ['covering-heads-content-sha'])).toBeNull();
     expect(
-      await hasReviewCoveringHeads(
+      await findReviewCoveringHeads(
         { ...scope, platformIntegrationId: alternateFirstUserIntegrationId },
         ['covering-heads-content-sha']
       )
-    ).toBe(false);
-    expect(await hasReviewCoveringHeads(scope, [])).toBe(false);
+    ).toBeNull();
+    expect(await findReviewCoveringHeads(scope, [])).toBeNull();
   });
 
   it('scopes GitLab active review uniqueness to the integration; separate instances are independent', async () => {

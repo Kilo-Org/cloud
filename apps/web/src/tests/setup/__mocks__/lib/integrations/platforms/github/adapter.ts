@@ -46,6 +46,10 @@ export async function resolveMergeHeadContent(_args: {
   return { kind: 'not_merge' };
 }
 
+export async function getCheckRunConclusion(): Promise<'success' | undefined> {
+  return undefined;
+}
+
 export async function addReactionToPR(
   _installationId: string,
   _owner: string,

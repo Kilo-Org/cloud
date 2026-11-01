@@ -1705,6 +1705,19 @@ type CheckRunOutput = {
   text?: string;
 };
 
+const checkRunConclusions: Readonly<Record<CheckRunConclusion, true>> = {
+  action_required: true,
+  cancelled: true,
+  failure: true,
+  neutral: true,
+  success: true,
+  timed_out: true,
+};
+
+function isCheckRunConclusion(value: string | null | undefined): value is CheckRunConclusion {
+  return value !== null && value !== undefined && Object.hasOwn(checkRunConclusions, value);
+}
+
 /**
  * Creates a GitHub Check Run on a commit.
  *
@@ -1722,18 +1735,24 @@ export async function createCheckRun(
   options: {
     detailsUrl?: string;
     output?: CheckRunOutput;
+    // Set for a head that is already decided, such as one that carries content a
+    // finished review covered: the run is created completed with that conclusion.
+    conclusion?: CheckRunConclusion;
   } = {},
   appType: GitHubAppType = 'standard'
 ): Promise<number> {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
+  const completed = options.conclusion !== undefined;
 
   const { data } = await octokit.checks.create({
     owner,
     repo,
     name: 'Kilo Code Review',
     head_sha: headSha,
-    status: 'queued',
+    status: completed ? 'completed' : 'queued',
+    ...(options.conclusion ? { conclusion: options.conclusion } : {}),
+    ...(completed ? { completed_at: new Date().toISOString() } : {}),
     ...(options.detailsUrl ? { details_url: options.detailsUrl } : {}),
     ...(options.output ? { output: options.output } : {}),
   });
@@ -1743,9 +1762,38 @@ export async function createCheckRun(
     repo,
     headSha: headSha.substring(0, 8),
     checkRunId: data.id,
+    conclusion: options.conclusion,
   });
 
   return data.id;
+}
+
+/**
+ * Reads the conclusion a check run finished with, so a later commit that
+ * carries the same reviewed content can be gated with the same verdict.
+ * Returns undefined when the run cannot be read or has no conclusion yet.
+ */
+export async function getCheckRunConclusion(
+  installationId: string,
+  owner: string,
+  repo: string,
+  checkRunId: number,
+  appType: GitHubAppType = 'standard'
+): Promise<CheckRunConclusion | undefined> {
+  try {
+    const tokenData = await generateGitHubInstallationToken(installationId, appType);
+    const octokit = new Octokit({ auth: tokenData.token });
+    const { data } = await octokit.checks.get({
+      owner,
+      repo,
+      check_run_id: checkRunId,
+    });
+    const conclusion = data.conclusion ?? undefined;
+    return isCheckRunConclusion(conclusion) ? conclusion : undefined;
+  } catch (error) {
+    logExceptInTest('[getCheckRunConclusion] Failed to read check run:', error);
+    return undefined;
+  }
 }
 
 /**

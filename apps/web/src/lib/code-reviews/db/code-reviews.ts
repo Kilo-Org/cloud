@@ -1701,20 +1701,36 @@ export function findExistingReviewInTransaction(
 }
 
 /**
- * Whether a review of any of these heads covers the scope: one that finished, or
- * one still in flight. A cancelled or failed review covers nothing, and neither
- * does an empty list.
+ * A review that covers the content a merge-commit head carries: it sits on one of
+ * the heads that content spans and either finished or is still in flight.
  */
-export async function hasReviewCoveringHeads(
+export type CoveringReview = Readonly<{
+  checkRunId: number | null;
+  headSha: string;
+  id: string;
+  status: CodeReviewStatus;
+}>;
+
+/**
+ * The newest review in the scope at any of these heads that covers the content:
+ * one that finished, or one still in flight. A cancelled or failed review covers
+ * nothing, and neither does an empty list.
+ */
+export async function findReviewCoveringHeads(
   scope: ReviewScope,
   headShas: readonly string[]
-): Promise<boolean> {
+): Promise<CoveringReview | null> {
   if (headShas.length === 0) {
-    return false;
+    return null;
   }
   try {
     const [review] = await db
-      .select({ id: cloud_agent_code_reviews.id })
+      .select({
+        checkRunId: cloud_agent_code_reviews.check_run_id,
+        headSha: cloud_agent_code_reviews.head_sha,
+        id: cloud_agent_code_reviews.id,
+        status: cloud_agent_code_reviews.status,
+      })
       .from(cloud_agent_code_reviews)
       .where(
         and(
@@ -1726,12 +1742,13 @@ export async function hasReviewCoveringHeads(
           ])
         )
       )
+      .orderBy(desc(cloud_agent_code_reviews.created_at))
       .limit(1);
 
-    return review !== undefined;
+    return review === undefined ? null : { ...review, status: review.status as CodeReviewStatus };
   } catch (error) {
     captureException(error, {
-      tags: { operation: 'hasReviewCoveringHeads' },
+      tags: { operation: 'findReviewCoveringHeads' },
       extra: { scope, headShas },
     });
     throw error;

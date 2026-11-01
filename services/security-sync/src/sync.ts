@@ -8,6 +8,7 @@
 import { z } from 'zod';
 import { eq, and, asc, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import {
+  organizationWorkflowGitHubConnectionSql,
   recordSecurityAgentRepositorySyncAttempt,
   recordSecurityAgentRepositorySyncFailure,
   recordSecurityAgentRepositorySyncSuccess,
@@ -716,6 +717,18 @@ function integrationOwnerFilter(owner: SecurityReviewOwner) {
   return eq(platform_integrations.owned_by_user_id, owner.userId);
 }
 
+/**
+ * The connection role an eligible sync may act on. An organization resolves the
+ * shared workflow connection definition, so the same installation its Security
+ * Agent entry gate reports is the one this sync reads. A personal association
+ * keeps its stored role.
+ */
+function connectionRoleFilter(owner: SecurityReviewOwner) {
+  return isOrgOwner(owner)
+    ? organizationWorkflowGitHubConnectionSql()
+    : eq(platform_integrations.github_connection_role, 'workflow');
+}
+
 function eligibleSecuritySyncIntegration(owner: SecurityReviewOwner) {
   const canonicalInstallationMatchesIntegration = sql`
     ${github_app_installations.lifecycle_state} = 'active'
@@ -736,7 +749,7 @@ function eligibleSecuritySyncIntegration(owner: SecurityReviewOwner) {
   return and(
     integrationOwnerFilter(owner),
     eq(platform_integrations.platform, 'github'),
-    eq(platform_integrations.github_connection_role, 'workflow'),
+    connectionRoleFilter(owner),
     eq(platform_integrations.integration_type, 'app'),
     eq(platform_integrations.integration_status, 'active'),
     isNull(platform_integrations.suspended_at),

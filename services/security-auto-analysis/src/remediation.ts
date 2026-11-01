@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
-import { transitionSecurityAgentCommand } from '@kilocode/db';
+import { organizationWorkflowGitHubConnectionSql, transitionSecurityAgentCommand } from '@kilocode/db';
 import {
   agent_configs,
   kilocode_users,
@@ -396,7 +396,9 @@ async function getRuntimeConfig(db: WorkerDb, owner: QueueOwner): Promise<Runtim
       and(
         ownerWhereIntegration(owner),
         eq(platform_integrations.platform, 'github'),
-        eq(platform_integrations.github_connection_role, 'workflow'),
+        owner.type === 'org'
+          ? organizationWorkflowGitHubConnectionSql()
+          : eq(platform_integrations.github_connection_role, 'workflow'),
         isNull(platform_integrations.suspended_at),
         isNull(platform_integrations.auth_invalid_at),
         isNull(platform_integrations.github_disconnected_at),

@@ -1,5 +1,6 @@
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { github_app_installations, platform_integrations } from '@kilocode/db/schema';
+import { organizationWorkflowGitHubConnectionSql } from '@kilocode/db';
 import { eq, and, or, isNull, asc, desc, sql, ne } from 'drizzle-orm';
 import type {
   GitHubRequester,
@@ -176,6 +177,11 @@ export async function findIntegrationByInstallationIdForOwner(
 /**
  * Gets an organization's preferred integration, including an unhealthy row
  * when no healthy integration exists. Use this for status and recovery UI.
+ *
+ * A GitHub workflow lookup uses the shared organization workflow connection
+ * definition, so a roleless association that is the organization's real
+ * installation resolves here exactly as the installation surfaces and the
+ * operational lookups resolve it.
  */
 export async function getIntegrationForOrganization(
   organizationId: string,
@@ -190,7 +196,7 @@ export async function getIntegrationForOrganization(
         eq(platform_integrations.owned_by_organization_id, organizationId),
         eq(platform_integrations.platform, platform),
         platform === PLATFORM.GITHUB && purpose === 'workflow'
-          ? eq(platform_integrations.github_connection_role, 'workflow')
+          ? organizationWorkflowGitHubConnectionSql()
           : undefined
       )
     )
@@ -209,6 +215,10 @@ export async function getIntegrationForOrganization(
 /**
  * Gets the oldest healthy GitHub integration for an organization.
  * Operational callers must not fall back to an unhealthy installation.
+ *
+ * The healthy organization workflow connection includes a roleless association
+ * that is the organization's real installation, so a Security Agent operation
+ * serves the same installation its entry gate reports.
  */
 export async function getPrimaryGitHubIntegrationForOrganization(organizationId: string) {
   const [integration] = await db
@@ -218,7 +228,7 @@ export async function getPrimaryGitHubIntegrationForOrganization(organizationId:
       and(
         eq(platform_integrations.owned_by_organization_id, organizationId),
         eq(platform_integrations.platform, PLATFORM.GITHUB),
-        eq(platform_integrations.github_connection_role, 'workflow'),
+        organizationWorkflowGitHubConnectionSql(),
         platformIntegrationHealthSql()
       )
     )

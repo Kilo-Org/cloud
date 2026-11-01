@@ -8,6 +8,7 @@ export type GitHubInstallationBackfillResult = {
   scanned: number;
   canonicalCreated: number;
   linked: number;
+  roleAssigned: number;
   skipped: number;
   skippedInvalid: number;
   skippedDeduplicated: number;
@@ -41,6 +42,7 @@ export async function backfillGitHubInstallations(
     scanned: rows.length,
     canonicalCreated: 0,
     linked: 0,
+    roleAssigned: 0,
     skipped: 0,
     skippedInvalid: 0,
     skippedDeduplicated: 0,
@@ -136,7 +138,35 @@ export async function backfillGitHubInstallations(
       if (!canonical) return;
       const updated = await tx
         .update(platform_integrations)
-        .set({ github_installation_id: canonical.id })
+        .set({
+          github_installation_id: canonical.id,
+          // Linking a legacy row to its canonical installation is the last
+          // writer that could leave a real organization installation without a
+          // connection role, which the organization Security Agent reads to
+          // decide between its setup state and its dashboard. Give the role to
+          // the same rows migration 0322 classified — a healthy, organization
+          // owned GitHub App association whose installation identity no other
+          // row claims — and leave every other row exactly as it is.
+          github_connection_role: sql`
+            CASE WHEN (
+              ${platform_integrations.github_connection_role} IS NULL
+              AND ${platform_integrations.owned_by_organization_id} IS NOT NULL
+              AND ${platform_integrations.integration_type} = 'app'
+              AND NOT (COALESCE(${platform_integrations.metadata}, '{}'::jsonb) ? 'github_dedup')
+              AND NOT EXISTS (
+                SELECT 1
+                FROM platform_integrations claimed
+                WHERE claimed.github_connection_role = 'workflow'
+                  AND claimed.id <> ${platform_integrations.id}
+                  AND claimed.platform_installation_id = ${platform_integrations.platform_installation_id}
+                  AND COALESCE(claimed.github_app_type, 'standard') =
+                    COALESCE(${platform_integrations.github_app_type}, 'standard')
+              )
+            ) THEN 'workflow'
+            ELSE ${platform_integrations.github_connection_role}
+            END
+          `,
+        })
         .where(
           and(
             eq(platform_integrations.id, row.id),
@@ -146,8 +176,14 @@ export async function backfillGitHubInstallations(
             isNull(platform_integrations.suspended_at),
             isNull(platform_integrations.auth_invalid_at)
           )
-        );
-      if ((updated.rowCount ?? 0) === 1) result.linked++;
+        )
+        .returning({ role: platform_integrations.github_connection_role });
+      if (updated.length === 1) {
+        result.linked++;
+        if (row.github_connection_role === null && updated[0]?.role === 'workflow') {
+          result.roleAssigned++;
+        }
+      }
     });
   }
   return result;

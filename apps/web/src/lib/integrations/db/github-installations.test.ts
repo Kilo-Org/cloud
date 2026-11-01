@@ -2602,6 +2602,7 @@ describe('GitHub installation persistence', () => {
       scanned: 1,
       canonicalCreated: 0,
       linked: 0,
+      roleAssigned: 0,
       skipped: 1,
       skippedInvalid: 0,
       skippedDeduplicated: 1,
@@ -2613,6 +2614,80 @@ describe('GitHub installation persistence', () => {
     await expect(
       db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, loser.id) })
     ).resolves.toMatchObject({ github_installation_id: null, integration_status: 'suspended' });
+  });
+
+  test('gives a linked organization association its connection role', async () => {
+    const organization = await createTestOrganization('Backfill role', ownerId, 0);
+    const [legacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '777001',
+        platform_account_login: 'acme',
+        integration_status: 'active',
+        github_app_type: 'standard',
+        permissions: { vulnerability_alerts: 'read' },
+        repository_access: 'all',
+        repositories: [{ id: 1, name: 'repo', full_name: 'acme/repo', private: true }],
+      })
+      .returning();
+    expect(legacy.github_connection_role).toBeNull();
+
+    await expect(backfillGitHubInstallations()).resolves.toMatchObject({
+      scanned: 1,
+      canonicalCreated: 1,
+      linked: 1,
+      roleAssigned: 1,
+    });
+
+    // The organization's entry gate and its operational lookups resolve the
+    // row, so the installation surfaces and the Security Agent agree.
+    await expect(getPrimaryGitHubIntegrationForOrganization(organization.id)).resolves.toMatchObject({
+      id: legacy.id,
+      github_connection_role: 'workflow',
+      github_installation_id: expect.any(String),
+    });
+  });
+
+  test('leaves a linked organization association roleless when another row claims the installation', async () => {
+    const claimingOrganization = await createTestOrganization('Claimant', ownerId, 0);
+    const organization = await createTestOrganization('Shadowed', ownerId, 0);
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: claimingOrganization.id,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: '777002',
+      platform_account_login: 'acme',
+      integration_status: 'active',
+      github_connection_role: 'workflow',
+      github_app_type: 'standard',
+      auth_invalid_at: new Date().toISOString(),
+      repository_access: 'all',
+    });
+    const [shadow] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '777002',
+        platform_account_login: 'acme',
+        integration_status: 'active',
+        github_app_type: 'standard',
+        repository_access: 'all',
+      })
+      .returning();
+
+    await expect(backfillGitHubInstallations()).resolves.toMatchObject({ roleAssigned: 0 });
+
+    await expect(
+      db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, shadow.id) })
+    ).resolves.toMatchObject({
+      github_installation_id: expect.any(String),
+      github_connection_role: null,
+    });
   });
 });
 

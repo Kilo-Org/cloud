@@ -752,7 +752,7 @@
       "staleHint": "bunu yazdıqdan sonra PR dəyişib.",
       "deleteA11y": "{{location}} yerindəki göndərilməmiş şərhi sil",
       "deletedAnnouncement": "Göndərilməmiş şərh silindi",
-      "noCommentsQueued": "Növbədə şərh yoxdur. Kod baxışı yalnız yuxarıda seçilmiş nəticə ilə göndəriləcək.",
+      "noCommentsQueued": "Kod baxışı yalnız yuxarıda seçilmiş nəticə ilə göndəriləcək.",
       "staleQueueHint": "Əvvəlki kommitə yazılmış şərhlər göndərilmir. Onları redaktə edə və ya silə bilməyin üçün növbəndə qalırlar.",
       "allQueuedHint": "Bütün şərhlər bir sorğuda birlikdə göndəriləcək.",
       "summaryPlaceholder": "Kod baxışının xülasəsi (məcburi deyil)",

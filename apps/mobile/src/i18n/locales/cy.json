@@ -824,7 +824,7 @@
       "staleHint": "mae'r PR wedi newid ers i chi ysgrifennu hyn.",
       "deleteA11y": "Dileu'r sylw sydd heb ei gyflwyno ar {{location}}",
       "deletedAnnouncement": "Wedi dileu'r sylw oedd heb ei gyflwyno",
-      "noCommentsQueued": "Nid oes sylwadau yn y ciw. Cyflwynir yr adolygiad gyda'r digwyddiad uchod yn unig.",
+      "noCommentsQueued": "Cyflwynir yr adolygiad gyda'r digwyddiad uchod yn unig.",
       "staleQueueHint": "Ni anfonir sylwadau sy'n cyfeirio at ymrwymiad hŷn. Byddant yn aros yn eich ciw er mwyn i chi allu eu golygu neu eu dileu.",
       "allQueuedHint": "Anfonir yr holl sylwadau gyda'i gilydd mewn un cais.",
       "summaryPlaceholder": "Crynodeb dewisol ar gyfer yr adolygiad",

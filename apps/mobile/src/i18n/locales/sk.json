@@ -788,7 +788,7 @@
       "staleHint": "PR sa od napísania tohto komentára zmenil.",
       "deleteA11y": "Odstrániť neodoslaný komentár k {{location}}",
       "deletedAnnouncement": "Neodoslaný komentár bol odstránený",
-      "noCommentsQueued": "Na odoslanie nečakajú žiadne komentáre. Kontrola kódu sa odošle len s výsledkom zvoleným vyššie.",
+      "noCommentsQueued": "Kontrola kódu sa odošle len s výsledkom zvoleným vyššie.",
       "staleQueueHint": "Komentáre k staršiemu commitu sa neodošlú. Zostanú v zozname na odoslanie, kde ich môžeš upraviť alebo odstrániť.",
       "allQueuedHint": "Všetky komentáre sa odošlú naraz v jednej požiadavke.",
       "summaryPlaceholder": "Voliteľné zhrnutie kontroly kódu",

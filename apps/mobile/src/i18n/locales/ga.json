@@ -806,7 +806,7 @@
       "staleHint": "athraíodh an PR ó scríobh tú é seo.",
       "deleteA11y": "Scrios an trácht ar feitheamh ag {{location}}",
       "deletedAnnouncement": "Scriosadh an trácht ar feitheamh",
-      "noCommentsQueued": "Níl aon trácht sa scuaine. Seolfar an t-athbhreithniú leis an ngníomh thuas amháin.",
+      "noCommentsQueued": "Seolfar an t-athbhreithniú leis an ngníomh thuas amháin.",
       "staleQueueHint": "Ní sheoltar tráchtanna a bhaineann le taifead athruithe níos sine. Fanann siad i do scuaine ionas gur féidir leat iad a chur in eagar nó a scriosadh.",
       "allQueuedHint": "Seolfar na tráchtanna go léir le chéile in aon iarratas amháin.",
       "summaryPlaceholder": "Achoimre roghnach don athbhreithniú",

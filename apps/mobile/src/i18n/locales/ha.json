@@ -752,7 +752,7 @@
       "staleHint": "an sabunta PR tun lokacin da ka rubuta wannan.",
       "deleteA11y": "Share tsokacin da ke jira a {{location}}",
       "deletedAnnouncement": "An share tsokacin da ke jira",
-      "noCommentsQueued": "Babu tsokacin da ke jira. Za a aika bitar tare da lamarin da aka zaɓa a sama kawai.",
+      "noCommentsQueued": "Za a aika bitar tare da lamarin da aka zaɓa a sama kawai.",
       "staleQueueHint": "Ba a aika tsokacin da aka rubuta kan tsohon rikodin canje-canje. Suna nan a jerin masu jira don ka gyara ko share su.",
       "allQueuedHint": "Za a aika duk tsokaci a cikin buƙata guda ɗaya.",
       "summaryPlaceholder": "Taƙaitawa na zaɓi don bita",

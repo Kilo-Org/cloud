@@ -788,7 +788,7 @@
       "staleHint": "nuo tada, kai parašei šį komentarą, PR pasikeitė.",
       "deleteA11y": "Ištrinti nepateiktą komentarą: {{location}}",
       "deletedAnnouncement": "Nepateiktas komentaras ištrintas",
-      "noCommentsQueued": "Komentarų eilė tuščia. Peržiūra bus pateikta tik su aukščiau pasirinktu veiksmu.",
+      "noCommentsQueued": "Peržiūra bus pateikta tik su aukščiau pasirinktu veiksmu.",
       "staleQueueHint": "Komentarai apie senesnį pakeitimų įrašą nesiunčiami. Jie lieka tavo eilėje, kad galėtum juos redaguoti arba ištrinti.",
       "allQueuedHint": "Visi komentarai bus išsiųsti kartu viena užklausa.",
       "summaryPlaceholder": "Neprivaloma peržiūros santrauka",

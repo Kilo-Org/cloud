@@ -788,7 +788,7 @@
       "staleHint": "PR se je od nastanka tega komentarja spremenil.",
       "deleteA11y": "Izbriši čakajoči komentar na {{location}}",
       "deletedAnnouncement": "Čakajoči komentar izbrisan",
-      "noCommentsQueued": "Ni čakajočih komentarjev. Pregled bo oddan samo z zgoraj izbrano vrsto pregleda.",
+      "noCommentsQueued": "Pregled bo oddan samo z zgoraj izbrano vrsto pregleda.",
       "staleQueueHint": "Komentarji za starejšo potrditev se ne pošljejo. Ostanejo v tvoji čakalni vrsti, da jih lahko urediš ali izbrišeš.",
       "allQueuedHint": "Vsi komentarji bodo poslani skupaj v eni zahtevi.",
       "summaryPlaceholder": "Neobvezen povzetek pregleda",

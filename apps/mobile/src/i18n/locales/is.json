@@ -752,7 +752,7 @@
       "staleHint": "PR-beiðnin hefur breyst síðan þú skrifaðir þetta.",
       "deleteA11y": "Eyða athugasemd í bið við {{location}}",
       "deletedAnnouncement": "Athugasemd í bið eytt",
-      "noCommentsQueued": "Engar athugasemdir eru í bið. Yfirferðin verður send með þeirri tegund sem valin er hér að ofan, án athugasemda.",
+      "noCommentsQueued": "Yfirferðin verður send með þeirri tegund sem valin er hér að ofan.",
       "staleQueueHint": "Athugasemdir við eldri innsendingu verða ekki sendar. Þær verða áfram í biðröðinni þinni svo þú getir breytt þeim eða eytt.",
       "allQueuedHint": "Allar athugasemdir verða sendar saman í einni beiðni.",
       "summaryPlaceholder": "Valfrjáls samantekt yfirferðar",

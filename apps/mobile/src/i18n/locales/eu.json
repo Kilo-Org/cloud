@@ -752,7 +752,7 @@
       "staleHint": "PRa aldatu da hau idatzi zenuenetik.",
       "deleteA11y": "Ezabatu bidaltzeko dagoen iruzkina: {{location}}",
       "deletedAnnouncement": "Bidaltzeko zegoen iruzkina ezabatuta",
-      "noCommentsQueued": "Ez dago iruzkinik ilaran. Berrikuspena goiko gertaerarekin soilik bidaliko da.",
+      "noCommentsQueued": "Berrikuspena goiko gertaerarekin soilik bidaliko da.",
       "staleQueueHint": "Egikaritze zaharrago bati buruz idatzitako iruzkinak ez dira bidaltzen. Zure ilaran geratzen dira, editatu edo ezabatu ahal izan ditzazun.",
       "allQueuedHint": "Iruzkin guztiak eskaera bakarrean bidaliko dira.",
       "summaryPlaceholder": "Berrikuspenaren laburpena (aukerakoa)",

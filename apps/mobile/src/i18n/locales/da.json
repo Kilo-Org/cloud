@@ -752,7 +752,7 @@
       "staleHint": "PR'en er blevet opdateret, siden du skrev dette.",
       "deleteA11y": "Slet ventende kommentar ved {{location}}",
       "deletedAnnouncement": "Ventende kommentar slettet",
-      "noCommentsQueued": "Der er ingen kommentarer i køen. Gennemgangen sendes kun med det valgte resultat ovenfor.",
+      "noCommentsQueued": "Gennemgangen sendes kun med det valgte resultat ovenfor.",
       "staleQueueHint": "Kommentarer til en ældre commit sendes ikke. De bliver i køen, så du kan redigere eller slette dem.",
       "allQueuedHint": "Alle kommentarer sendes samlet i én anmodning.",
       "summaryPlaceholder": "Valgfrit resumé af gennemgangen",

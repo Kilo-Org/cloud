@@ -752,7 +752,7 @@
       "staleHint": "nagbago na ang PR mula nang isinulat mo ito.",
       "deleteA11y": "Burahin ang nakabinbing komento sa {{location}}",
       "deletedAnnouncement": "Nabura ang nakabinbing komento",
-      "noCommentsQueued": "Walang komentong nakapila. Isusumite ang pagsusuri gamit lang ang aksiyon sa itaas.",
+      "noCommentsQueued": "Isusumite ang pagsusuri gamit lang ang aksiyon sa itaas.",
       "staleQueueHint": "Hindi ipinapadala ang mga komento sa mas lumang commit. Nananatili ang mga ito sa pila mo para ma-edit o mabura mo.",
       "allQueuedHint": "Sabay-sabay na ipapadala ang lahat ng komento sa iisang kahilingan.",
       "summaryPlaceholder": "Opsyonal na buod ng pagsusuri",

@@ -770,7 +770,7 @@
       "staleHint": "la PR ha canviat des que vas escriure aquest comentari.",
       "deleteA11y": "Elimina el comentari pendent a {{location}}",
       "deletedAnnouncement": "Comentari pendent eliminat",
-      "noCommentsQueued": "No hi ha cap comentari a la cua. La revisió s'enviarà només amb el tipus seleccionat més amunt.",
+      "noCommentsQueued": "La revisió s'enviarà només amb el tipus seleccionat més amunt.",
       "staleQueueHint": "Els comentaris sobre una comissió anterior no s'envien. Es mantenen a la cua perquè els puguis editar o eliminar.",
       "allQueuedHint": "Tots els comentaris s'enviaran junts en una sola sol·licitud.",
       "summaryPlaceholder": "Resum opcional per a la revisió",

@@ -3125,7 +3125,7 @@
       "deletedAnnouncement": "Commentaire en attente supprimé",
       "editA11y": "Modifier le commentaire en attente sur {{location}}",
       "editOutdatedA11y": "Modifier le commentaire obsolète en attente sur {{location}}",
-      "noCommentsQueued": "Aucun commentaire n'est en attente. La revue sera envoyée avec le seul type de revue sélectionné ci-dessus.",
+      "noCommentsQueued": "La revue sera envoyée avec le seul type de revue sélectionné ci-dessus.",
       "staleHint": "la PR a été modifiée depuis la rédaction de ce commentaire.",
       "staleQueueHint": "Les commentaires qui concernent un commit plus ancien ne sont pas envoyés. Ils restent en attente pour que vous puissiez les modifier ou les supprimer.",
       "summaryA11y": "Résumé de la revue",

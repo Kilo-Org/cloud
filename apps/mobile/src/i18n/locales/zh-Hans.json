@@ -3072,7 +3072,7 @@
       "deletedAnnouncement": "待提交的评论已删除",
       "editA11y": "编辑 {{location}} 处的待提交评论",
       "editOutdatedA11y": "编辑 {{location}} 处已过时的待提交评论",
-      "noCommentsQueued": "没有待提交的评论。此次审查将仅提交上方所选的审查类型。",
+      "noCommentsQueued": "此次审查将仅提交上方所选的审查类型。",
       "staleHint": "写下此评论后，PR 已有更新。",
       "staleQueueHint": "针对旧提交的评论不会发送，而是保留在队列中，供你编辑或删除。",
       "summaryA11y": "审查总结",

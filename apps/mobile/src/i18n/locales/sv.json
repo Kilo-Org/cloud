@@ -752,7 +752,7 @@
       "staleHint": "PR:en har uppdaterats sedan du skrev kommentaren.",
       "deleteA11y": "Ta bort oskickad kommentar vid {{location}}",
       "deletedAnnouncement": "Oskickad kommentar borttagen",
-      "noCommentsQueued": "Det finns inga kommentarer i kön. Granskningen skickas enbart med den typ du har valt ovan.",
+      "noCommentsQueued": "Granskningen skickas enbart med den typ du har valt ovan.",
       "staleQueueHint": "Kommentarer som gäller en äldre incheckning skickas inte. De ligger kvar i kön så att du kan redigera eller ta bort dem.",
       "allQueuedHint": "Alla kommentarer skickas tillsammans i en enda begäran.",
       "summaryPlaceholder": "Valfri sammanfattning av granskningen",

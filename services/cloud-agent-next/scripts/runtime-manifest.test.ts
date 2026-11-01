@@ -90,11 +90,10 @@ describe('runtime distribution contract', () => {
     }
     for (const tool of ['bun', 'rg', 'gh', 'glab', 'pnpm', 'kilo'] as const) {
       const pin = RUNTIME_TOOLCHAIN[tool];
-      expect(script).toContain(pin.installedSha256[0]);
+      const path =
+        pin.kind === 'archive' ? `'${pin.installPath}'` : `"$npm_root/${pin.installedPath}"`;
+      expect(script).toContain(`check_sha256 ${path} '${pin.installedSha256[0]}'`);
     }
-    expect(script).toContain(`check_sha256 '/usr/local/bin/bun'`);
-    expect(script).toContain(`check_sha256 "$npm_root/pnpm/pnpm"`);
-    expect(script).toContain(`check_sha256 "$npm_root/@kilocode/cli/bin/.kilo"`);
     for (const artifact of artifacts) {
       expect(script).toContain(`sha256sum '${artifact.installPath}'`);
     }

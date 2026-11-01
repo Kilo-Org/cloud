@@ -185,5 +185,6 @@ export function runtimeVerificationScript(artifacts: readonly RuntimeArtifact[])
     if (artifact.linkPath) checks.push(`test -L ${shellQuote(artifact.linkPath)}`);
     return checks.join(' && ');
   });
-  return [...pins, ...presence, ...files].join('\n');
+  // One check per line, so the first failure ends the script.
+  return ['set -euo pipefail', ...pins, ...presence, ...files].join('\n');
 }

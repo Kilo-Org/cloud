@@ -61,6 +61,7 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: routerPush }) }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('react-native', () => ({
+  Keyboard: { dismiss: () => undefined },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',

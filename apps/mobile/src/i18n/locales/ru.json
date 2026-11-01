@@ -971,7 +971,7 @@
       "bitbucketError": "Не удалось открыть настройку Bitbucket. Попробуйте снова."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · Автор: {{author}}",
+      "byline": "#{{number}} · Автор: {{author}}",
       "cancelMessage": "Это остановит текущую проверку кода.",
       "cancelReview": "Отменить проверку",
       "cancelTitle": "Отменить проверку?",

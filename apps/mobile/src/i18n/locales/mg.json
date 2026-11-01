@@ -1450,7 +1450,7 @@
       "fixSettings": "Amboary ny fikirana",
       "couldNotLoad": "Tsy nety nampidirina ny fanamarinana.",
       "couldNotGetLatest": "Tsy nety nalaina ny angona farany.",
-      "byline": "{{repo}} #{{number}} nataon'i {{author}}",
+      "byline": "#{{number}} nataon'i {{author}}",
       "noFindings": "Tsy misy olana hita.",
       "findingsUnavailable": "Tsy misy valiny azo jerena satria tsy nahomby ity fanamarinana ity.",
       "findingsInProgress": "Mbola mandeha ity fanamarinana ity. Hiseho eto ny olana hita rehefa vita izy.",

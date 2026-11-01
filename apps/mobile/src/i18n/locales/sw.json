@@ -1450,7 +1450,7 @@
       "fixSettings": "Rekebisha mipangilio",
       "couldNotLoad": "Imeshindikana kupakia ukaguzi.",
       "couldNotGetLatest": "Imeshindikana kupata taarifa za hivi karibuni.",
-      "byline": "{{repo}} #{{number}} na {{author}}",
+      "byline": "#{{number}} na {{author}}",
       "noFindings": "Hakuna matatizo yaliyopatikana.",
       "findingsUnavailable": "Matokeo hayapatikani kwa sababu ukaguzi huu umeshindikana.",
       "findingsInProgress": "Ukaguzi huu bado unaendelea. Matokeo yataonekana hapa ukaguzi ukikamilika.",

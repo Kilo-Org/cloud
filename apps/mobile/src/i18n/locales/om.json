@@ -1450,7 +1450,7 @@
       "fixSettings": "Qindaa'ina sirreessi",
       "couldNotLoad": "Sakatta'a fe'uun hin danda'amne.",
       "couldNotGetLatest": "Odeeffannoo ammaa argachuun hin danda'amne.",
-      "byline": "{{repo}} #{{number}} kan {{author}}",
+      "byline": "#{{number}} kan {{author}}",
       "noFindings": "Argamni hin jiru.",
       "findingsUnavailable": "Sakatta'i kun waan hin milkoofneef bu'aawwan hin argaman.",
       "findingsInProgress": "Sakatta'i kun hojjetaa jira. Yeroo xumuru argamni asitti mul'ata.",

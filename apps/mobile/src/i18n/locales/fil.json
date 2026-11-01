@@ -1450,7 +1450,7 @@
       "fixSettings": "Ayusin ang mga setting",
       "couldNotLoad": "Hindi ma-load ang pagsusuri.",
       "couldNotGetLatest": "Hindi makuha ang pinakabagong data.",
-      "byline": "{{repo}} #{{number}} ni {{author}}",
+      "byline": "#{{number}} ni {{author}}",
       "noFindings": "Walang natukoy na isyu.",
       "findingsUnavailable": "Hindi available ang mga resulta dahil nabigo ang pagsusuring ito.",
       "findingsInProgress": "Nagpapatuloy pa ang pagsusuri. Lalabas dito ang mga resulta kapag natapos na ito.",

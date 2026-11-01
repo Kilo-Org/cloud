@@ -1494,7 +1494,7 @@
       "fixSettings": "Opraviť nastavenia",
       "couldNotLoad": "Kontrolu sa nepodarilo načítať.",
       "couldNotGetLatest": "Najnovšie údaje sa nepodarilo načítať.",
-      "byline": "{{repo}} #{{number}} · autor: {{author}}",
+      "byline": "#{{number}} · autor: {{author}}",
       "noFindings": "Nenašli sa žiadne nálezy.",
       "findingsUnavailable": "Výsledky nie sú k dispozícii, pretože táto kontrola zlyhala.",
       "findingsInProgress": "Táto kontrola stále prebieha. Nálezy sa tu zobrazia po jej dokončení.",

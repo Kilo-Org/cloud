@@ -965,7 +965,7 @@
       "bitbucketError": "Tidak dapat membuka penyiapan Bitbucket. Coba lagi."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} oleh {{author}}",
+      "byline": "#{{number}} oleh {{author}}",
       "cancelMessage": "Ini akan menghentikan tinjauan kode yang sedang berjalan.",
       "cancelReview": "Batalkan tinjauan",
       "cancelTitle": "Batalkan tinjauan?",

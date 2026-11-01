@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one header contract: the title, eyebrow and subtitle slots, the back control, the action reflow, and the safe-area and offline-banner rules must stay in step */
 import { type Href, useNavigationContainerRef, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
@@ -106,6 +107,25 @@ type ScreenHeaderProps = {
    * (session headers: `SESSION_HEADER_TITLE_LINES`, todos: 2).
    */
   titleNumberOfLines?: number;
+  /**
+   * One line of context under the title, in the muted body style. The title
+   * stays the screen's name and its accessible header; the subtitle is read
+   * after it, never instead of it.
+   *
+   * Kept to a single line with a tail ellipsis: it carries context such as the
+   * profile a section edits, so a wrapped line would grow the header and move
+   * the body below it. It is not the `eyebrow`, which is a category label the
+   * text style uppercases; a user-authored name in that slot renders as
+   * letterspaced small capitals.
+   */
+  subtitle?: string;
+  /**
+   * Reserve the subtitle's line even when there is none yet, so a name that
+   * arrives after the first render (a cold deep link's profile read) cannot
+   * change the header's height. The reserved line is the same style as the
+   * text, so it scales with the font size the way the real line does.
+   */
+  reserveSubtitle?: boolean;
   /**
    * Cap the eyebrow to this many lines, overriding the header's default single
    * line. When set the eyebrow ellipsizes in the middle: the repo name is the
@@ -258,6 +278,8 @@ export function ScreenHeader({
   title,
   titleContent,
   titleNumberOfLines = 1,
+  subtitle,
+  reserveSubtitle = false,
   eyebrowNumberOfLines,
   reserveTitleSpace = false,
   eyebrow,
@@ -425,6 +447,23 @@ export function ScreenHeader({
         </Eyebrow>
       ) : null}
       {titleNode}
+      {subtitle || reserveSubtitle ? (
+        <Text
+          variant="muted"
+          className={cn('mt-0.5', centerTitle && 'text-center', !subtitle && 'opacity-0')}
+          // One line: the subtitle is context for the title, so it truncates at
+          // its tail instead of taking a second line and moving the body. The
+          // reserved copy is a no-break space in the same style, so the height
+          // it holds is the height the name will take.
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          accessible={Boolean(subtitle)}
+          accessibilityElementsHidden={!subtitle}
+          importantForAccessibility={subtitle ? 'auto' : 'no-hide-descendants'}
+        >
+          {subtitle ?? '\u00A0'}
+        </Text>
+      ) : null}
     </View>
   );
   // A centered title shares its row with the leading and trailing controls.

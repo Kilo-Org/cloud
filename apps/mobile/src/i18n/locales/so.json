@@ -1450,7 +1450,7 @@
       "fixSettings": "Hagaaji dejinta",
       "couldNotLoad": "Dib-u-eegista lama soo dejin karin.",
       "couldNotGetLatest": "Xogta ugu dambaysa lama heli karin.",
-      "byline": "{{repo}} #{{number}} oo uu qoray {{author}}",
+      "byline": "#{{number}} oo uu qoray {{author}}",
       "noFindings": "Ma jiraan natiijooyin.",
       "findingsUnavailable": "Natiijooyinka lama heli karo sababtoo ah dib-u-eegistan way fashilantay.",
       "findingsInProgress": "Dib-u-eegistan wali way socotaa. Natiijooyinku halkan ayay ka soo baxaan markay dhammaato.",

@@ -1450,7 +1450,7 @@
       "fixSettings": "Korjaa asetukset",
       "couldNotLoad": "Katselmointia ei voitu ladata.",
       "couldNotGetLatest": "Uusimpia tietoja ei voitu hakea.",
-      "byline": "{{repo}} #{{number}}, tekijä {{author}}",
+      "byline": "#{{number}}, tekijä {{author}}",
       "noFindings": "Havaintoja ei ole.",
       "findingsUnavailable": "Tulokset eivät ole saatavilla, koska tämä katselmointi epäonnistui.",
       "findingsInProgress": "Tämä katselmointi on vielä kesken. Havainnot näkyvät tässä, kun se valmistuu.",

@@ -161,6 +161,12 @@ const sectionsProps = vi.hoisted(() => ({
   props: [] as { data?: unknown; slaEnabled?: boolean; neverSynced?: boolean }[],
 }));
 
+// Captures the sections placeholder's props, so a test can assert the loading
+// state stands in for the cards the same owner renders.
+const sectionsSkeletonProps = vi.hoisted(() => ({
+  props: [] as { slaEnabled?: boolean; neverSynced?: boolean }[],
+}));
+
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
   View: 'View',
@@ -301,6 +307,10 @@ vi.mock('@/components/security-agent/audit-report-button', () => ({
 vi.mock('@/components/security-agent/dashboard-sections', () => ({
   DashboardSections: (props: { data?: unknown; slaEnabled?: boolean; neverSynced?: boolean }) => {
     sectionsProps.props.push(props);
+    return null;
+  },
+  DashboardSectionsSkeleton: (props: { slaEnabled?: boolean }) => {
+    sectionsSkeletonProps.props.push(props);
     return null;
   },
 }));
@@ -1620,7 +1630,30 @@ describe('DashboardScreen pending stats', () => {
   beforeEach(() => {
     lastSync.isPending = false;
     lastSync.data = undefined;
+    config.data = { slaEnabled: true };
+    sectionsProps.props = [];
+    sectionsSkeletonProps.props = [];
   });
+
+  /**
+   * The line boxes the loading state paints: three per metric tile, or two
+   * once the sync-status read has said the tiles carry no detail line.
+   */
+  function skeletonBars(root: I): I[] {
+    return root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton');
+  }
+
+  /** Every view carrying the metric card's frame, placeholder or loaded. */
+  function tileFrames(root: I): string[] {
+    return root
+      .findAll(
+        n =>
+          typeof n.type === 'string' &&
+          (n.type as string) === 'View' &&
+          String(n.props.className ?? '').includes('rounded-lg bg-secondary p-3')
+      )
+      .map(n => String(n.props.className));
+  }
 
   it('paints the metric skeleton while a paused stats read is still pending', () => {
     // A NetInfo-paused read is pending without fetching, so `isLoading` is
@@ -1633,12 +1666,33 @@ describe('DashboardScreen pending stats', () => {
 
     const root = renderScreen();
 
-    expect(
-      root.root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton')
-    ).toHaveLength(4);
+    expect(tileFrames(root.root)).toHaveLength(4);
+    expect(skeletonBars(root.root)).toHaveLength(12);
     expect(renderedTexts(root.root)).not.toContain(
       i18n.t('securityAgent.dashboardMetrics.openFindings')
     );
+  });
+
+  it('draws the pending tiles in the frame the loaded cards use', () => {
+    // The placeholder's height comes from the card's own frame and three line
+    // boxes; a hand-sized bar is what made the tiles taller than the cards they
+    // replaced.
+    dashboardStats.isPending = true;
+    dashboardStats.data = undefined;
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+    const pending = tileFrames(renderScreen().root);
+
+    dashboardStats.isPending = false;
+    dashboardStats.data = resolvedData;
+    sharedMetrics.build.mockReturnValue(
+      ['openFindings', 'exploitable', 'needsReview', 'analysisIncomplete'].map(id =>
+        Object.assign(dashboardMetric(id), { label: id })
+      )
+    );
+    const loaded = tileFrames(renderScreen().root);
+
+    expect(loaded).toHaveLength(4);
+    expect(new Set(pending)).toEqual(new Set(loaded));
   });
 
   it('replaces the skeleton with the metric once the read resolves', () => {
@@ -1649,9 +1703,7 @@ describe('DashboardScreen pending stats', () => {
 
     const root = renderScreen();
 
-    expect(
-      root.root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton')
-    ).toHaveLength(0);
+    expect(skeletonBars(root.root)).toHaveLength(0);
     expect(renderedTexts(root.root)).toContain(
       i18n.t('securityAgent.dashboardMetrics.openFindings')
     );
@@ -1659,7 +1711,9 @@ describe('DashboardScreen pending stats', () => {
 
   // `neverSynced` decides whether a tile carries a detail line, so a tile drawn
   // before that read settles would shrink by a line the moment it resolves and
-  // move everything below it. The tiles wait for the read instead.
+  // move everything below it. The tiles wait for the read instead, and the
+  // section cards wait with them: they render below the tiles only once both
+  // reads settle, so their placeholders hold that space until then.
   it('keeps the tiles in the skeleton state while the sync-status read is pending', () => {
     dashboardStats.isPending = false;
     dashboardStats.data = resolvedData;
@@ -1669,12 +1723,69 @@ describe('DashboardScreen pending stats', () => {
 
     const root = renderScreen();
 
-    expect(
-      root.root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton')
-    ).toHaveLength(4);
+    expect(skeletonBars(root.root)).toHaveLength(12);
     expect(renderedTexts(root.root)).not.toContain(
       i18n.t('securityAgent.dashboardMetrics.openFindings')
     );
+    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, neverSynced: false }]);
+    expect(sectionsProps.props).toHaveLength(0);
+  });
+
+  it('paints the tiles and the link a never-synced scope loads once that read has answered', () => {
+    // The tiles wait for the sync-status read, and a scope that has never
+    // synced drops their detail line and shows the Manage repositories link
+    // under them. When the stats read outlasts that read, the placeholder
+    // already knows both shapes and must hold them: a three-line placeholder
+    // and a missing link moved every card below when the reads resolved.
+    dashboardStats.isPending = true;
+    dashboardStats.data = undefined;
+    lastSync.isPending = false;
+    lastSync.data = { lastSyncTime: null };
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+    const bars = skeletonBars(root.root);
+
+    expect(tileFrames(root.root)).toHaveLength(4);
+    // Four two-line tiles, then the link's own box.
+    expect(bars).toHaveLength(9);
+    expect(bars.at(-1)?.props.className).toContain('min-h-[28px]');
+    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, neverSynced: true }]);
+    expect(sectionsProps.props).toHaveLength(0);
+  });
+
+  it('keeps the link out of the placeholder while SLA tracking is off', () => {
+    // The link is the empty state's way to the repositories, and a scope
+    // without SLA tracking has no deadline column to explain: the loaded
+    // screen does not draw it either.
+    config.data = { slaEnabled: false };
+    dashboardStats.isPending = true;
+    dashboardStats.data = undefined;
+    lastSync.isPending = false;
+    lastSync.data = { lastSyncTime: null };
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+
+    expect(skeletonBars(root.root)).toHaveLength(8);
+  });
+
+  it('loads a never-synced scope without the detail line the placeholder dropped', () => {
+    dashboardStats.isPending = false;
+    dashboardStats.data = resolvedData;
+    lastSync.isPending = false;
+    lastSync.data = { lastSyncTime: null };
+    sharedMetrics.build.mockReturnValue(
+      ['openFindings', 'exploitable', 'needsReview', 'analysisIncomplete'].map(id =>
+        Object.assign(dashboardMetric(id), { label: id })
+      )
+    );
+
+    const root = renderScreen();
+
+    expect(skeletonBars(root.root)).toHaveLength(0);
+    expect(tileFrames(root.root)).toHaveLength(4);
+    expect(sectionsProps.props.at(-1)?.neverSynced).toBe(true);
   });
 
   it('renders the sections only after the sync-status read settles', () => {
@@ -1682,11 +1793,23 @@ describe('DashboardScreen pending stats', () => {
     dashboardStats.data = resolvedData;
     lastSync.isPending = true;
     lastSync.data = undefined;
-    sectionsProps.props = [];
 
     renderScreen();
 
     expect(sectionsProps.props).toHaveLength(0);
+  });
+
+  it('drops the sections placeholder once the sections render', () => {
+    dashboardStats.isPending = false;
+    dashboardStats.data = resolvedData;
+    lastSync.isPending = false;
+    lastSync.data = { lastSyncTime: '2026-10-01T00:00:00.000Z' };
+
+    const root = renderScreen();
+
+    expect(sectionsProps.props).toHaveLength(1);
+    expect(sectionsSkeletonProps.props).toHaveLength(0);
+    expect(skeletonBars(root.root)).toHaveLength(0);
   });
 });
 
@@ -1719,9 +1842,14 @@ describe('DashboardLoadingView frame', () => {
     const skeletons = root.root.findAll(
       n => typeof n.type === 'string' && (n.type as string) === 'Skeleton'
     );
-    // One tile per metric card — at the cards' own width — plus the status
-    // line's placeholder, which keeps that line's height until the read lands.
-    expect(skeletons.filter(n => String(n.props.className).includes('w-[47%]'))).toHaveLength(4);
-    expect(skeletons).toHaveLength(5);
+    // Four tile slots on the loaded card's own class, each with the card's three
+    // line boxes (label, value, detail), plus the status line's placeholder,
+    // which keeps that line's height until the read lands.
+    expect(
+      root.root.findAll(
+        n => typeof n.type === 'string' && String(n.props.className).includes('w-[47%]')
+      )
+    ).toHaveLength(4);
+    expect(skeletons).toHaveLength(13);
   });
 });

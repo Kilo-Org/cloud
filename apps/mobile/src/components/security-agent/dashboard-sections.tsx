@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/empty-state';
 import { severityCountPhrase } from '@/components/security-agent/severity-count-phrase';
 import { KvRow } from '@/components/ui/kv-row';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { DENSE_ROW_HIT_SLOP } from '@/lib/a11y/tap-target';
@@ -83,9 +84,16 @@ function rowTone(
   return neverSynced ? 'muted' : measured;
 }
 
+/**
+ * The frame every section card and its placeholder share. The loading state
+ * repeats it instead of restating the classes, so the two cannot drift apart
+ * and change the page's height when the cards arrive.
+ */
+const SECTION_CARD_CLASS = 'gap-1 rounded-lg bg-secondary px-3';
+
 function SectionCard({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
   return (
-    <View className="gap-1 rounded-lg bg-secondary px-3">
+    <View className={SECTION_CARD_CLASS}>
       <Text variant="small" className="pt-3 uppercase tracking-wide text-muted-foreground">
         {title}
       </Text>
@@ -343,6 +351,63 @@ export function DashboardSections(props: SectionProps) {
       <PostureSection {...props} />
       <CoverageSection {...props} />
       <RepoHealthSection {...props} />
+    </>
+  );
+}
+
+/** One line of a row: a label/value row, or a title over its secondary line. */
+type SkeletonRow = 1 | 2;
+
+/** The primary line of a `text-sm` row, in dp at the app's default text size. */
+const SKELETON_PRIMARY_LINE_CLASS = 'h-[17.5px] rounded';
+/** The secondary line under it, and the section title's own line. */
+const SKELETON_SECONDARY_LINE_CLASS = 'h-4 rounded';
+
+/**
+ * A section card's placeholder. The card frame, the title's `pt-3`, and each
+ * row's `py-3` are the loaded card's own, and a row draws the same one or two
+ * line boxes the loaded row holds, so the card this replaces lands on the same
+ * height instead of moving the page when the reads resolve.
+ */
+function SectionCardSkeleton({ rows }: Readonly<{ rows: readonly SkeletonRow[] }>) {
+  return (
+    <View className={SECTION_CARD_CLASS}>
+      <Skeleton className={cn('mt-3 w-28', SKELETON_SECONDARY_LINE_CLASS)} />
+      {rows.map((lines, index) => (
+        <View key={index} className="gap-1 py-3">
+          <Skeleton className={cn('w-full', SKELETON_PRIMARY_LINE_CLASS)} />
+          {lines === 2 ? <Skeleton className={cn('w-2/3', SKELETON_SECONDARY_LINE_CLASS)} /> : null}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/**
+ * What the sections look like while the dashboard reads: one placeholder per
+ * card `DashboardSections` will render for the same owner.
+ *
+ * The posture card is the one section this agent hides when SLA deadlines are
+ * on (`PostureSection` returns nothing, because the metric tiles already carry
+ * that breakdown), and its rows do not depend on whether deadlines are on. The
+ * repository card cannot know how many repositories the scope covers, so it
+ * stands in with a few two-line rows.
+ */
+export function DashboardSectionsSkeleton({
+  slaEnabled,
+  neverSynced = false,
+}: Readonly<{ slaEnabled: boolean; neverSynced?: boolean }>) {
+  return (
+    <>
+      {/* The Act-first card is the one section whose shape the sync-status read
+          decides on its own: before the first sync it holds a single line of
+          pending copy instead of a title over its repository, so the
+          placeholder drops that second line once the read has settled to that
+          scope. Without the answer the synced shape (the common one) stays. */}
+      <SectionCardSkeleton rows={neverSynced ? [1] : [2]} />
+      {slaEnabled ? null : <SectionCardSkeleton rows={[1, 1, 1, 1]} />}
+      <SectionCardSkeleton rows={[1, 1, 1, 1]} />
+      <SectionCardSkeleton rows={[2, 2, 2]} />
     </>
   );
 }

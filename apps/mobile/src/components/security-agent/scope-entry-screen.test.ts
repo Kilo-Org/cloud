@@ -576,12 +576,15 @@ describe.each([
   ['standalone', SettingsOverviewScreen],
   ['inline', ScopeEntryScreen],
 ] as const)('%s settings readiness and access', (presentation, Screen) => {
+  // An empty repository set keeps the picker reachable: the disabled switch is
+  // refused without an effective repository, and the GitHub App grant is widened
+  // from the picker, so hiding the row there stranded the page.
   it.each([
-    ['selected', [], { repos: [], disabled: true, cta: false }],
+    ['selected', [], { repos: [], disabled: true, cta: true }],
     ['selected', [], { repos: [{ id: 1 }], disabled: true, cta: true }],
     ['selected', [1], { repos: [], disabled: false, cta: false }],
     ['all', [], { repos: [{ id: 1 }], disabled: false, cta: false }],
-    ['all', [], { repos: [], disabled: true, cta: false }],
+    ['all', [], { repos: [], disabled: true, cta: true }],
   ] as const)(
     'preserves setup controls for %s, selection %j and repositories %j',
     async (mode, selected, expected) => {

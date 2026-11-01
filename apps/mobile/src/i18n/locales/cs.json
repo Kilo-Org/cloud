@@ -1494,7 +1494,7 @@
       "fixSettings": "Opravit nastavení",
       "couldNotLoad": "Kontrolu se nepodařilo načíst.",
       "couldNotGetLatest": "Aktuální stav se nepodařilo načíst.",
-      "byline": "{{repo}} #{{number}} · autor: {{author}}",
+      "byline": "#{{number}} · autor: {{author}}",
       "noFindings": "Kontrola neodhalila žádné nálezy.",
       "findingsUnavailable": "Výsledky nejsou k dispozici, protože tato kontrola selhala.",
       "findingsInProgress": "Tato kontrola stále probíhá. Nálezy se zde zobrazí po jejím dokončení.",

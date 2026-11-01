@@ -1472,7 +1472,7 @@
       "fixSettings": "Labot iestatījumus",
       "couldNotLoad": "Neizdevās ielādēt koda pārskatīšanu.",
       "couldNotGetLatest": "Neizdevās iegūt jaunākos datus.",
-      "byline": "{{repo}} #{{number}} autors: {{author}}",
+      "byline": "#{{number}} autors: {{author}}",
       "noFindings": "Nav konstatējumu.",
       "findingsUnavailable": "Rezultāti nav pieejami, jo šī koda pārskatīšana neizdevās.",
       "findingsInProgress": "Šī pārskatīšana vēl notiek. Konstatējumi šeit parādīsies, kad tā tiks pabeigta.",

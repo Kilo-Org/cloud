@@ -11,8 +11,8 @@ import {
   mcpServerRows,
   type McpServerSource,
 } from '@/components/profiles/profile-mcp-model';
+import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -211,7 +211,11 @@ export function ProfileMcpScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profiles.mcp.title')} />
+      <ProfileSectionHeader
+        profileId={profileId}
+        organizationId={organizationId}
+        title={t('profiles.mcp.title')}
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"

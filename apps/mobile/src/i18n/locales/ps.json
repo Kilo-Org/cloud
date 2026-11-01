@@ -1450,7 +1450,7 @@
       "fixSettings": "تنظیمات سم کړئ",
       "couldNotLoad": "بیاکتنه بار نه شوه.",
       "couldNotGetLatest": "وروستي معلومات ترلاسه نه شول.",
-      "byline": "{{repo}} #{{number}} د {{author}} لخوا",
+      "byline": "#{{number}} د {{author}} لخوا",
       "noFindings": "هېڅ موندنه نشته.",
       "findingsUnavailable": "پایلې شتون نه لري ځکه چې دا بیاکتنه ناکامه شوه.",
       "findingsInProgress": "دا بیاکتنه لاهم روانه ده. کله چې پای ته ورسېشي، موندنې به دلته ښکاره شي.",

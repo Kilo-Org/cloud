@@ -935,6 +935,82 @@ describe('ScreenHeader mounted', () => {
     renderer.unmount();
   });
 
+  it('renders the subtitle under the title on one muted line', () => {
+    const renderer = renderHeader({
+      title: 'Profile agents',
+      subtitle: 'Shared Agency Review Profile',
+    });
+
+    const heading = renderer.root.findByProps({ className: 'min-w-0 flex-1' });
+    const texts = heading.findAllByType('Text');
+    expect(texts[0]?.children).toEqual(['Profile agents']);
+    const subtitle = texts[1];
+    expect(subtitle?.children).toEqual(['Shared Agency Review Profile']);
+    // Context under the title, never a second title: one line, tail ellipsis,
+    // and the muted body style with no uppercase or tracking of its own.
+    expect(subtitle?.props.variant).toBe('muted');
+    expect(subtitle?.props.numberOfLines).toBe(1);
+    expect(subtitle?.props.ellipsizeMode).toBe('tail');
+    expect(subtitle?.props.className).not.toContain('uppercase');
+    expect(subtitle?.props.className).not.toContain('tracking');
+    expect(subtitle?.props.accessible).toBe(true);
+    renderer.unmount();
+  });
+
+  it('keeps a reserved subtitle line hidden until its name arrives', () => {
+    const renderer = renderHeader({
+      title: 'Profile agents',
+      reserveSubtitle: true,
+      centerTitle: true,
+    });
+
+    const placeholder = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.variant === 'muted'
+    )[0];
+    expect(placeholder?.props.numberOfLines).toBe(1);
+    expect(placeholder?.children).toEqual(['\u00A0']);
+    expect(placeholder?.props.className).toContain('opacity-0');
+    expect(placeholder?.props.accessible).toBe(false);
+    expect(placeholder?.props.accessibilityElementsHidden).toBe(true);
+    expect(placeholder?.props.importantForAccessibility).toBe('no-hide-descendants');
+
+    act(() => {
+      renderer.update(
+        createElement(ScreenHeader, {
+          title: 'Profile agents',
+          reserveSubtitle: true,
+          centerTitle: true,
+          subtitle: 'Shared Agency Review Profile',
+        })
+      );
+    });
+    const name = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.variant === 'muted'
+    )[0];
+    expect(name?.children).toEqual(['Shared Agency Review Profile']);
+    expect(name?.props.className).not.toContain('opacity-0');
+    expect(name?.props.className).toContain('text-center');
+    renderer.unmount();
+  });
+
+  it('omits the subtitle line when the caller reserves no space for it', () => {
+    const renderer = renderHeader({ title: 'Profile agents' });
+    const subtitles = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.variant === 'muted'
+    );
+    expect(subtitles).toHaveLength(0);
+    renderer.unmount();
+  });
+
   it('pads the sheet header by the landscape side insets even when it skips the safe-area top', () => {
     safeArea.left = 47;
     safeArea.right = 59;

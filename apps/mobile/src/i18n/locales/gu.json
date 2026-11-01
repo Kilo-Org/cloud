@@ -2072,7 +2072,8 @@
       "actionBlocked": "આ ક્રિયા પૂર્ણ કરી શકાઈ નહીં. ફરી પ્રયાસ કરતાં પહેલાં સમસ્યા ઠીક કરવી પડશે.",
       "syncNoRepositories": "કોઈ પણ રિપોઝિટરી સિંક સ્કોપમાં નથી. સુરક્ષા એજન્ટ કઈ રિપોઝિટરીઓ મોનિટર કરે તે પસંદ કરો, પછી ફરીથી સિંક કરો.",
       "syncIntegrationInactive": "સુરક્ષા એજન્ટ માટે GitHub કનેક્શન સક્રિય નથી. Kilo GitHub App ફરીથી જોડો, પછી ફરીથી સિંક કરો.",
-      "syncMissingPermission": "Kilo GitHub ઍપ vulnerability alerts વાંચી શકતું નથી. GitHub માં એ પરવાનગી આપો, પછી ફરી સિંક કરો."
+      "syncMissingPermission": "Kilo GitHub ઍપ vulnerability alerts વાંચી શકતું નથી. GitHub માં એ પરવાનગી આપો, પછી ફરી સિંક કરો.",
+      "configConflict": "સુરક્ષા એજન્ટની સેટિંગ્સ બીજે ક્યાંક બદલાઈ છે. નવીનતમ સેટિંગ્સ સમીક્ષા કરો અને ફરી સાચવો."
     },
     "analysisState": {
       "queued": "વિશ્લેષણ કતારમાં છે",
@@ -3085,7 +3086,7 @@
     "unavailable": "Kilo Pass ઉપલબ્ધ નથી.",
     "couldNotLoad": "Kilo Pass લોડ કરી શકાયું નહીં. ફરી પ્રયાસ કરો.",
     "retryLoading": "Kilo Pass ફરી લોડ કરવાનો પ્રયાસ કરો",
-    "productsUnavailable": "App Store નાં ઉત્પાદનો ઉપલબ્ધ નથી.",
+    "productsUnavailable": "App Store નાં ઉત્પાદનો ઉપલબ્ધ નથી",
     "completingPurchase": "ખરીદી પૂર્ણ થઈ રહી છે",
     "subscriptionLoading": "Kilo Pass નું સબસ્ક્રિપ્શન લોડ થઈ રહ્યું છે",
     "retryHint": "Kilo Pass ની સ્થિતિ ફરી મેળવવાનો પ્રયાસ કરે છે.",
@@ -3099,13 +3100,13 @@
     "opensManagementOnWeb": "વેબ પર Kilo Pass સંચાલન ખોલે છે.",
     "tryAgainFromProfile": "પ્રોફાઇલમાંથી ફરી પ્રયાસ કરો.",
     "legalTermsOfUse": "ઉપયોગની શરતો (EULA)",
-    "purchaseDifferentAccount": "App Store ની આ ખરીદી તમારા Kilo એકાઉન્ટ સાથે જોડાયેલી નથી. ખરીદી માટે વાપરેલા Apple Account માં સાઇન ઇન કરો, પછી ફરી પ્રયાસ કરો.",
+    "purchaseDifferentAccount": "આ App Store ખરીદી તમારા Kilo એકાઉન્ટ સાથે જોડાયેલી નથી. ખરીદી માટે વપરાયેલ Apple Account માં સાઇન ઇન કરો, પછી ફરી પ્રયાસ કરો.",
     "purchaseFailed": "ખરીદી પૂર્ણ કરી શકાઈ નહીં.",
     "couldNotConnectToAppStore": "App Store સાથે જોડાઈ શકાયું નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયાસ કરો.",
     "purchaseMissingSignedTransaction": "App Store ની ખરીદીમાં ડિજિટલ સહીવાળો વ્યવહારનો JWS સામેલ નહોતો.",
-    "couldNotConnectToPlay": "Google Play સાથે કનેક્ટ થઈ શક્યું નહીં. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
-    "productsUnavailablePlay": "Google Play ઉત્પાદનો ઉપલબ્ધ નથી",
-    "purchaseDifferentAccountPlay": "આ Google Play ખરીદી તમારા Kilo ખાતા સાથે લિંક થયેલી નથી. ખરીદી માટે વપરાયેલ Google એકાઉન્ટમાં સાઇન ઇન કરો, પછી ફરી પ્રયાસ કરો.",
+    "couldNotConnectToPlay": "Google Play સાથે જોડાઈ શકાયું નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયાસ કરો.",
+    "productsUnavailablePlay": "Google Play નાં ઉત્પાદનો ઉપલબ્ધ નથી",
+    "purchaseDifferentAccountPlay": "આ Google Play ખરીદી તમારા Kilo એકાઉન્ટ સાથે જોડાયેલી નથી. ખરીદી માટે વપરાયેલ Google એકાઉન્ટમાં સાઇન ઇન કરો, પછી ફરી પ્રયાસ કરો.",
     "purchaseMissingPurchaseToken": "Google Play ખરીદીમાં ખરીદી ટોકન શામેલ ન હતું."
   },
   "consent": {
@@ -3257,7 +3258,7 @@
       "sharingUnavailable": "આ ઉપકરણ પર શેર કરવાની સુવિધા ઉપલબ્ધ નથી.",
       "status": {
         "paid": "ચૂકવેલ",
-        "open": "ખોલો",
+        "open": "ખુલ્લું",
         "void": "રદ",
         "uncollectible": "વસૂલ ન થઈ શકે"
       },
@@ -3346,9 +3347,9 @@
       "paidSeat_one": "{{displayCount}} ચૂકવણી કરેલી સીટ",
       "paidSeat": "{{displayCount}} ચૂકવણી કરેલી સીટો",
       "paidSeat_other": "{{displayCount}} ચૂકવણી કરેલી સીટો",
-      "paymentNeedsAttention": "ચુકવણી પર ધ્યાન આપવાની જરૂર છે",
-      "paymentPending": "ચુકવણી બાકી",
-      "processingBlocked": "પ્રક્રિયા અટકી છે",
+      "paymentNeedsAttention": "ચૂકવણી પર ધ્યાન આપવાની જરૂર છે",
+      "paymentPending": "ચૂકવણી બાકી",
+      "processingBlocked": "પ્રક્રિયા અવરોધિત છે",
       "processingNeedsReview": "પ્રક્રિયાની સમીક્ષા જરૂરી છે",
       "retryHint": "Kilo Passની સ્થિતિ લોડ કરવા ફરી પ્રયાસ કરે છે.",
       "setupHint": "વેબ પર Kilo Pass સેટઅપ ખોલે છે."
@@ -4156,7 +4157,8 @@
     "sources": "પુરાવા અને આર્ટિફેક્ટ્સ",
     "timezone": "રિપોર્ટ સમય ઝોન",
     "deviceTimezone": "ઉપકરણનો સમય ઝોન વાપરો",
-    "timezoneHint": "IANA સમય ઝોન, ઉદાહરણ તરીકે Europe/Berlin. શેડ્યૂલ ફેરફારો આગામી રિપોર્ટ પર લાગુ થશે.",
+    "timezoneHint": "IANA સમય ઝોન, ઉદાહરણ તરીકે Europe/Berlin.",
+    "scheduleHint": "શેડ્યૂલ ફેરફારો આગામી રિપોર્ટ પર લાગુ થશે.",
     "nightStart": "રિપોર્ટ વિન્ડો શરૂ થાય",
     "morningStart": "રિપોર્ટ તૈયાર થાય તે સમયે",
     "morningEnd": "રિપોર્ટ ઉપલબ્ધ રહે તે સમય સુધી",

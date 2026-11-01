@@ -2132,7 +2132,8 @@
       "actionBlocked": "Nepavyko užbaigti šio veiksmo. Iš pradžių reikia išspręsti problemą.",
       "syncNoRepositories": "Sinchronizavimo apimtyje nėra saugyklų. Pasirinkite saugyklas, kurias stebi Saugos agentas, ir sinchronizuokite dar kartą.",
       "syncIntegrationInactive": "Saugos agento GitHub ryšys neaktyvus. Iš naujo prijunkite Kilo GitHub App, tada sinchronizuokite dar kartą.",
-      "syncMissingPermission": "Kilo GitHub programėlė negali skaityti vulnerability alerts. Suteik šį leidimą GitHub, tada sinchronizuok dar kartą."
+      "syncMissingPermission": "Kilo GitHub programėlė negali skaityti vulnerability alerts. Suteik šį leidimą GitHub, tada sinchronizuok dar kartą.",
+      "configConflict": "Saugos agento nustatymai pakeisti kitoje vietoje. Peržiūrėk naujausius nustatymus ir išsaugok dar kartą."
     },
     "analysisState": {
       "queued": "Analizė eilėje",
@@ -4272,7 +4273,8 @@
     "sources": "Įrodymai ir artefaktai",
     "timezone": "Suvestinės laiko juosta",
     "deviceTimezone": "Naudoti įrenginio laiko juostą",
-    "timezoneHint": "IANA laiko juosta, pvz., Europe/Berlin. Grafiko pakeitimai taikomi būsimoms suvestinėms.",
+    "timezoneHint": "IANA laiko juosta, pvz., Europe/Berlin.",
+    "scheduleHint": "Grafiko pakeitimai taikomi būsimoms suvestinėms.",
     "nightStart": "Suvestinės laikotarpis prasideda",
     "morningStart": "Suvestinė paruošta",
     "morningEnd": "Suvestinė galima iki",

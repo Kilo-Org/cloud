@@ -2066,7 +2066,8 @@
       "actionBlocked": "Ky veprim nuk u përfundua dot. Problemi duhet zgjidhur përpara se të provosh përsëri.",
       "syncNoRepositories": "Asnjë depo nuk është në fushëveprimin e sinkronizimit. Zgjidhni depot që monitoron Agjenti i sigurisë, më pas sinkronizoni përsëri.",
       "syncIntegrationInactive": "Lidhja e GitHub për Agjentin e sigurisë nuk është aktive. Rilidhni Kilo GitHub App, më pas sinkronizoni përsëri.",
-      "syncMissingPermission": "Aplikacioni Kilo për GitHub nuk mund të lexojë alarmet e dobësive. Jepi atë leje në GitHub, pastaj sinkronizo përsëri."
+      "syncMissingPermission": "Aplikacioni Kilo për GitHub nuk mund të lexojë alarmet e dobësive. Jepi atë leje në GitHub, pastaj sinkronizo përsëri.",
+      "configConflict": "Cilësimet e Agjentit të sigurisë u ndryshuan diku tjetër. Rishiko cilësimet më të fundit dhe ruaj përsëri."
     },
     "analysisState": {
       "queued": "Analiza në radhë",
@@ -4150,7 +4151,8 @@
     "sources": "Prova dhe artefakte",
     "timezone": "Zona kohore e raportit",
     "deviceTimezone": "Përdor zonën kohore të pajisjes",
-    "timezoneHint": "Zonë kohore IANA, p.sh. Europe/Berlin. Ndryshimet e orarit zbatohen për raportet e ardhshme.",
+    "timezoneHint": "Zonë kohore IANA, p.sh. Europe/Berlin.",
+    "scheduleHint": "Ndryshimet e orarit zbatohen për raportet e ardhshme.",
     "nightStart": "Dritarja kohore e raportit fillon",
     "morningStart": "Raporti gati në",
     "morningEnd": "Raporti i disponueshëm deri në",

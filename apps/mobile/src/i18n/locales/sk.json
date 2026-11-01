@@ -2132,7 +2132,8 @@
       "actionBlocked": "Túto akciu sa nepodarilo dokončiť. Problém je potrebné najprv vyriešiť.",
       "syncNoRepositories": "V rozsahu synchronizácie nie sú žiadne repozitáre. Vyberte repozitáre, ktoré Bezpečnostný agent monitoruje, a potom znova synchronizujte.",
       "syncIntegrationInactive": "Pripojenie GitHub pre Bezpečnostného agenta nie je aktívne. Znovu pripojte Kilo GitHub App a potom znova synchronizujte.",
-      "syncMissingPermission": "Aplikácia Kilo na GitHube nemôže čítať upozornenia na zraniteľnosti. Udeľte toto povolenie na GitHube a potom znova synchronizujte."
+      "syncMissingPermission": "Aplikácia Kilo na GitHube nemôže čítať upozornenia na zraniteľnosti. Udeľte toto povolenie na GitHube a potom znova synchronizujte.",
+      "configConflict": "Nastavenia bezpečnostného agenta sa zmenili inde. Skontrolujte najnovšie nastavenia a znova uložte."
     },
     "analysisState": {
       "queued": "Analýza čaká v poradí",
@@ -4272,7 +4273,8 @@
     "sources": "Dôkazy a artefakty",
     "timezone": "Časové pásmo prehľadu",
     "deviceTimezone": "Použiť časové pásmo zariadenia",
-    "timezoneHint": "Časové pásmo IANA, napríklad Europe/Berlin. Zmeny rozvrhu platia pre budúce prehľady.",
+    "timezoneHint": "Časové pásmo IANA, napríklad Europe/Berlin.",
+    "scheduleHint": "Zmeny rozvrhu platia pre budúce prehľady.",
     "nightStart": "Začiatok okna prehľadu",
     "morningStart": "Prehľad pripravený o",
     "morningEnd": "Prehľad dostupný do",

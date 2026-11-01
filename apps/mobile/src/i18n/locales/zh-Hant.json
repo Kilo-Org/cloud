@@ -1536,7 +1536,8 @@
       "actionBlocked": "無法完成此操作。必須先修正此問題，才能重試。",
       "syncNoRepositories": "同步範圍內沒有任何存放庫。請選擇資安代理程式要監控的存放庫，然後再次同步。",
       "syncIntegrationInactive": "資安代理程式的 GitHub 連線未啟用。請重新連線 Kilo GitHub App，然後再次同步。",
-      "syncMissingPermission": "Kilo GitHub App 無法讀取 vulnerability alerts。請在 GitHub 中授予該權限，然後再次同步。"
+      "syncMissingPermission": "Kilo GitHub App 無法讀取 vulnerability alerts。請在 GitHub 中授予該權限，然後再次同步。",
+      "configConflict": "資安代理程式的設定已在其他地方變更。請檢視最新設定並重新儲存。"
     },
     "analysisState": {
       "queued": "等待分析",
@@ -4150,7 +4151,8 @@
     "sources": "證據與產出物",
     "timezone": "簡報時區",
     "deviceTimezone": "使用裝置時區",
-    "timezoneHint": "IANA 時區，例如 Europe/Berlin。排程變更將套用於之後的簡報。",
+    "timezoneHint": "IANA 時區，例如 Europe/Berlin。",
+    "scheduleHint": "排程變更將套用於之後的簡報。",
     "nightStart": "簡報時段開始",
     "morningStart": "簡報就緒時間",
     "morningEnd": "簡報可用至",

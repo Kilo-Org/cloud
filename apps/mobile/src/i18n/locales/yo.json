@@ -2066,7 +2066,8 @@
       "actionBlocked": "A kò lè parun iṣẹ́ yìí. Ìṣòro yìí gbọ́dọ̀ túnsẹ̀ kí a tó lè gbìyànjú lẹ́ẹ̀kan sí i.",
       "syncNoRepositories": "Kò sí àwọn ibi ìpamọ́ kóòdù kankan nínú ààlà ìmúdọ́gba. Yan àwọn ibi ìpamọ́ tí Aṣojú ààbò ń bójú tó, kí o sì tún mú dọ́gba.",
       "syncIntegrationInactive": "Ìsopọ̀ GitHub fún Aṣojú ààbò kò ṣiṣẹ́. Tún ṣe ìsopọ̀ Kilo GitHub App, kí o sì tún mú dọ́gba.",
-      "syncMissingPermission": "Kilo GitHub App kò lè ka vulnerability alerts. Fún ní àṣẹ yẹn ní GitHub, kí o sì tún mú dọ́gba."
+      "syncMissingPermission": "Kilo GitHub App kò lè ka vulnerability alerts. Fún ní àṣẹ yẹn ní GitHub, kí o sì tún mú dọ́gba.",
+      "configConflict": "A ti yi ètò Aṣojú ààbò padà níbòmíràn. Ṣàyẹ̀wò àwọn ètò tuntun kí o sì tún fipamọ́."
     },
     "analysisState": {
       "queued": "Ìtúpalẹ̀ wà ní ìlà ìdúró",
@@ -4150,7 +4151,8 @@
     "sources": "Ẹ̀rí àti àwọn ohun èlò",
     "timezone": "Àgbègbè àkókò ìròyìn",
     "deviceTimezone": "Lo àgbègbè àkókò ẹ̀rọ",
-    "timezoneHint": "Àgbègbè àkókò IANA, fún àpẹẹrẹ Europe/Berlin. Àyípadà ìṣètò yóò kan àwọn ìròyìn iwájú.",
+    "timezoneHint": "Àgbègbè àkókò IANA, fún àpẹẹrẹ Europe/Berlin.",
+    "scheduleHint": "Àyípadà ìṣètò yóò kan àwọn ìròyìn iwájú.",
     "nightStart": "Àkókò ìròyìn bẹ̀rẹ̀",
     "morningStart": "Ìròyìn ti ṣetán ní",
     "morningEnd": "Ìròyìn wà títí dé",

@@ -2072,7 +2072,8 @@
       "actionBlocked": "ይህን እርምጃ ማጠናቀቅ አልተቻለም። ችግሩ ከመፍትሔ አላገኘ በፊት መልሶ መሞከር አይቻልም።",
       "syncNoRepositories": "በማመሳሰል ወሰን ውስጥ ምንም ማከማቻ የለም። የደህንነት ወኪል የሚከታተላቸውን ማከማቻዎች ይምረጡ፣ ከዚያ እንደገና ያመሳስሉ።",
       "syncIntegrationInactive": "የደህንነት ወኪል የGitHub ግንኙነት ንቁ አይደለም። የKilo GitHub መተግበሪያን እንደገና ያገናኙ፣ ከዚያ እንደገና ያመሳስሉ።",
-      "syncMissingPermission": "የKilo GitHub መተግበሪያ የተጋላጭነት ማንቂያዎችን ማንበብ አይችልም። ይህን ፈቃድ በGitHub ይስጡ፣ ከዚያ እንደገና ያመሳስሉ።"
+      "syncMissingPermission": "የKilo GitHub መተግበሪያ የተጋላጭነት ማንቂያዎችን ማንበብ አይችልም። ይህን ፈቃድ በGitHub ይስጡ፣ ከዚያ እንደገና ያመሳስሉ።",
+      "configConflict": "የደህንነት ወኪሉ ቅንብሮች በሌላ ቦታ ተቀይረዋል። የቅርብ ጊዜውን ቅንብሮች ይመልከቱ እና እንደገና ያስቀምጡ።"
     },
     "analysisState": {
       "queued": "ትንተናው ወረፋ ይዟል",
@@ -4156,7 +4157,8 @@
     "sources": "ማስረጃዎች እና ውጤቶች",
     "timezone": "የሪፖርት የሰዓት ሰቅ",
     "deviceTimezone": "የመሣሪያውን የሰዓት ሰቅ ተጠቀም",
-    "timezoneHint": "IANA የሰዓት ሰቅ፣ ለምሳሌ Europe/Berlin። የመርሃ ግብር ለውጦች ለወደፊት ሪፖርቶች ይተገበራሉ።",
+    "timezoneHint": "IANA የሰዓት ሰቅ፣ ለምሳሌ Europe/Berlin።",
+    "scheduleHint": "የመርሃ ግብር ለውጦች ለወደፊት ሪፖርቶች ይተገበራሉ።",
     "nightStart": "የሪፖርት ጊዜ ይጀምራል",
     "morningStart": "ሪፖርት ዝግጁ የሚሆንበት ሰዓት",
     "morningEnd": "ሪፖርቱ የሚገኝበት የመጨረሻ ሰዓት",

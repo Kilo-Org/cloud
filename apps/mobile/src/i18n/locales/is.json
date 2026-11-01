@@ -2066,7 +2066,8 @@
       "actionBlocked": "Ekki tókst að ljúka þessari aðgerð. Leysa verður vandamálið áður en þú getur reynt aftur.",
       "syncNoRepositories": "Engar geymslur eru í samstillingarsviðinu. Veldu geymslurnar sem Öryggiserindrekinn fylgist með og samstilltu síðan aftur.",
       "syncIntegrationInactive": "Tengingin við GitHub fyrir Öryggiserindreka er ekki virk. Tengdu Kilo GitHub App aftur og samstilltu svo aftur.",
-      "syncMissingPermission": "Kilo GitHub App getur ekki lesið vulnerability alerts. Veittu þá heimild í GitHub og samstilltu svo aftur."
+      "syncMissingPermission": "Kilo GitHub App getur ekki lesið vulnerability alerts. Veittu þá heimild í GitHub og samstilltu svo aftur.",
+      "configConflict": "Stillingar öryggiserindrekans voru breyttar annars staðar. Farðu yfir nýjustu stillingarnar og vistaðu aftur."
     },
     "analysisState": {
       "queued": "Greining í biðröð",
@@ -4150,7 +4151,8 @@
     "sources": "Gögn og afurðir",
     "timezone": "Tímabelti yfirlits",
     "deviceTimezone": "Nota tímabelti tækis",
-    "timezoneHint": "IANA tímabelti, til dæmis Europe/Berlin. Breytingar á tímaáætlun gilda fyrir komandi yfirlit.",
+    "timezoneHint": "IANA tímabelti, til dæmis Europe/Berlin.",
+    "scheduleHint": "Breytingar á tímaáætlun gilda fyrir komandi yfirlit.",
     "nightStart": "Yfirlitsgluggi hefst",
     "morningStart": "Yfirlit tilbúið klukkan",
     "morningEnd": "Yfirlit tiltækt til",

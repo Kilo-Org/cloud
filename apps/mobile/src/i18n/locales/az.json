@@ -2066,7 +2066,8 @@
       "actionBlocked": "Bu işi tamamlamaq mümkün olmadı. Problemi həll etmədən yenidən cəhd etmək olmaz.",
       "syncNoRepositories": "Sinxronizasiya əhatəsində repozitoriya yoxdur. Təhlükəsizlik agentinin izlədiyi repozitoriyaları seç, sonra yenidən sinxronlaşdır.",
       "syncIntegrationInactive": "Təhlükəsizlik agenti üçün GitHub bağlantısı aktiv deyil. Kilo GitHub tətbiqini yenidən qoş, sonra yenidən sinxronlaşdır.",
-      "syncMissingPermission": "Kilo GitHub tətbiqi zəiflik xəbərdarlıqlarını oxuya bilmir. Həmin icazəni GitHub-da ver, sonra yenidən sinxronlaşdır."
+      "syncMissingPermission": "Kilo GitHub tətbiqi zəiflik xəbərdarlıqlarını oxuya bilmir. Həmin icazəni GitHub-da ver, sonra yenidən sinxronlaşdır.",
+      "configConflict": "Təhlükəsizlik agentinin parametrləri başqa yerdə dəyişdirildi. Ən son parametrlərə bax və yenidən yadda saxla."
     },
     "analysisState": {
       "queued": "Təhlil növbəyə alınıb",
@@ -4150,7 +4151,8 @@
     "sources": "Sübutlar və artefaktlar",
     "timezone": "Hesabat saat qurşağı",
     "deviceTimezone": "Cihazın saat qurşağından istifadə et",
-    "timezoneHint": "IANA saat qurşağı, məsələn Europe/Berlin. Cədvəl dəyişiklikləri gələcək hesabatlara tətbiq olunur.",
+    "timezoneHint": "IANA saat qurşağı, məsələn Europe/Berlin.",
+    "scheduleHint": "Cədvəl dəyişiklikləri gələcək hesabatlara tətbiq olunur.",
     "nightStart": "Hesabat pəncərəsi başlayır",
     "morningStart": "Hesabatın hazır olduğu vaxt",
     "morningEnd": "Hesabatın mövcud olduğu son vaxt",

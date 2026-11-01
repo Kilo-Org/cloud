@@ -2066,7 +2066,8 @@
       "actionBlocked": "Seda toimingut ei õnnestunud lõpule viia. Probleem tuleb kõigepealt lahendada, enne kui saad uuesti proovida.",
       "syncNoRepositories": "Sünkroonimisalasse ei kuulu ükski hoidla. Vali hoidlad, mida Turvaagent jälgib, ja sünkrooni seejärel uuesti.",
       "syncIntegrationInactive": "Turvaagendi GitHubi ühendus ei ole aktiivne. Ühenda Kilo GitHub App uuesti ja seejärel sünkrooni uuesti.",
-      "syncMissingPermission": "Kilo GitHub App ei saa haavatavusteateid lugeda. Anna see õigus GitHubis ja sünkrooni uuesti."
+      "syncMissingPermission": "Kilo GitHub App ei saa haavatavusteateid lugeda. Anna see õigus GitHubis ja sünkrooni uuesti.",
+      "configConflict": "Turvaagendi seadeid muudeti mujal. Vaata uusimad seaded üle ja salvesta uuesti."
     },
     "analysisState": {
       "queued": "Analüüs järjekorras",
@@ -4150,7 +4151,8 @@
     "sources": "Tõendid ja artefaktid",
     "timezone": "Ülevaate ajavöönd",
     "deviceTimezone": "Kasuta seadme ajavööndit",
-    "timezoneHint": "IANA ajavöönd, näiteks Europe/Berlin. Ajakava muudatused kehtivad tulevastele ülevaadetele.",
+    "timezoneHint": "IANA ajavöönd, näiteks Europe/Berlin.",
+    "scheduleHint": "Ajakava muudatused kehtivad tulevastele ülevaadetele.",
     "nightStart": "Ülevaatevahemik algab",
     "morningStart": "Ülevaade valmis kell",
     "morningEnd": "Ülevaade saadaval kuni",

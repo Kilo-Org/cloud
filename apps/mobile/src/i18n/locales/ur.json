@@ -2066,7 +2066,8 @@
       "actionBlocked": "یہ کارروائی مکمل نہیں ہو سکی۔ دوبارہ کوشش کرنے سے پہلے اس مسئلے کو حل کرنا ضروری ہے۔",
       "syncNoRepositories": "کوئی بھی ریپوزٹری سنک کے دائرہ کار میں نہیں ہے۔ وہ ریپوزٹریز منتخب کریں جن کی «سیکیورٹی ایجنٹ» نگرانی کرتا ہے، پھر دوبارہ سنک کریں۔",
       "syncIntegrationInactive": "سیکیورٹی ایجنٹ کے لیے GitHub کنکشن فعال نہیں ہے۔ Kilo GitHub App کو دوبارہ جوڑیں، پھر دوبارہ سنک کریں۔",
-      "syncMissingPermission": "Kilo GitHub App vulnerability alerts نہیں پڑھ سکتی۔ GitHub میں یہ اجازت دیں، پھر دوبارہ سنک کریں۔"
+      "syncMissingPermission": "Kilo GitHub App vulnerability alerts نہیں پڑھ سکتی۔ GitHub میں یہ اجازت دیں، پھر دوبارہ سنک کریں۔",
+      "configConflict": "سیکیورٹی ایجنٹ کی ترتیبات کہیں اور تبدیل ہو گئی ہیں۔ تازہ ترین ترتیبات کا جائزہ لیں اور دوبارہ محفوظ کریں۔"
     },
     "analysisState": {
       "queued": "تجزیہ قطار میں ہے",
@@ -4150,7 +4151,8 @@
     "sources": "شواہد اور آرٹیفیکٹس",
     "timezone": "بریفنگ کا ٹائم زون",
     "deviceTimezone": "ڈیوائس کا ٹائم زون استعمال کریں",
-    "timezoneHint": "IANA ٹائم زون، مثلاً Europe/Berlin۔ شیڈول کی تبدیلیاں آئندہ بریفنگز پر لاگو ہوں گی۔",
+    "timezoneHint": "IANA ٹائم زون، مثلاً Europe/Berlin۔",
+    "scheduleHint": "شیڈول کی تبدیلیاں آئندہ بریفنگز پر لاگو ہوں گی۔",
     "nightStart": "بریفنگ کی مدت کا آغاز",
     "morningStart": "بریفنگ تیار ہونے کا وقت",
     "morningEnd": "بریفنگ کی دستیابی کا اختتامی وقت",

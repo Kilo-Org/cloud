@@ -1536,7 +1536,8 @@
       "actionBlocked": "无法完成此操作。必须先修复此问题，才能重试。",
       "syncNoRepositories": "同步范围内没有仓库。请选择安全智能体要监控的仓库，然后再次同步。",
       "syncIntegrationInactive": "安全智能体的 GitHub 连接未激活。请重新连接 Kilo GitHub App，然后再次同步。",
-      "syncMissingPermission": "Kilo GitHub App 无法读取 vulnerability alerts。请在 GitHub 中授予该权限，然后重新同步。"
+      "syncMissingPermission": "Kilo GitHub App 无法读取 vulnerability alerts。请在 GitHub 中授予该权限，然后重新同步。",
+      "configConflict": "安全智能体的设置已在其他地方更改。请查看最新设置并重新保存。"
     },
     "analysisState": {
       "queued": "分析排队中",
@@ -4150,7 +4151,8 @@
     "sources": "证据与产物",
     "timezone": "简报时区",
     "deviceTimezone": "使用设备时区",
-    "timezoneHint": "IANA 时区，例如 Europe/Berlin。日程更改将从之后的简报生效。",
+    "timezoneHint": "IANA 时区，例如 Europe/Berlin。",
+    "scheduleHint": "日程更改将从之后的简报生效。",
     "nightStart": "简报时段开始",
     "morningStart": "简报就绪时间",
     "morningEnd": "简报可用至",

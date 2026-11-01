@@ -2132,7 +2132,8 @@
       "actionBlocked": "Tega dejanja ni bilo mogoče dokončati. Težavo je treba najprej odpraviti.",
       "syncNoRepositories": "V obsegu sinhronizacije ni nobenega repozitorija. Izberite repozitorije, ki jih Varnostni agent spremlja, in znova sinhronizirajte.",
       "syncIntegrationInactive": "Povezava z GitHub za Varnostnega agenta ni aktivna. Znova povežite Kilo GitHub App in nato znova sinhronizirajte.",
-      "syncMissingPermission": "Kilo GitHub App ne more brati opozoril o ranljivostih. V GitHubu dodeli to dovoljenje in znova sinhroniziraj."
+      "syncMissingPermission": "Kilo GitHub App ne more brati opozoril o ranljivostih. V GitHubu dodeli to dovoljenje in znova sinhroniziraj.",
+      "configConflict": "Nastavitve varnostnega agenta so bile spremenjene drugje. Preglej najnovejše nastavitve in znova shrani."
     },
     "analysisState": {
       "queued": "Analiza v čakalni vrsti",
@@ -4272,7 +4273,8 @@
     "sources": "Dokazi in artefakti",
     "timezone": "Časovni pas poročila",
     "deviceTimezone": "Uporabi časovni pas naprave",
-    "timezoneHint": "Časovni pas IANA, na primer Europe/Berlin. Spremembe urnika veljajo za prihodnja poročila.",
+    "timezoneHint": "Časovni pas IANA, na primer Europe/Berlin.",
+    "scheduleHint": "Spremembe urnika veljajo za prihodnja poročila.",
     "nightStart": "Začetek časovnega obdobja poročila",
     "morningStart": "Poročilo pripravljeno ob",
     "morningEnd": "Poročilo na voljo do",

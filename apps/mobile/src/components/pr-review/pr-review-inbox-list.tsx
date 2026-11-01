@@ -39,8 +39,22 @@ import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 type InboxItem = ProviderInboxRow;
 
+/**
+ * The one spacing both section headers of this screen sit under.
+ *
+ * The INBOX header follows the paste block and the RECENT header follows the
+ * inbox body; the two breaks are the same section-to-section relation, so they
+ * share one token instead of each picking its own. The field's inline link
+ * error lives inside the INBOX break (`room`), which is why the header side
+ * reserves a height rather than adding a padding on top of one.
+ */
+export const PR_REVIEW_SECTION_BREAK = { room: 'min-h-6', padding: 'pt-6' } as const;
+
 type PrReviewInboxListProps = {
-  /** The "Paste a PR link" block, rendered above the Inbox eyebrow. */
+  /**
+   * The "Paste a PR link" block, rendered above the Inbox eyebrow. It owns the
+   * section break under itself, so the eyebrow follows it directly.
+   */
   header: ReactNode;
   /** The recents body, rendered below the pagination footer. */
   recents: ReactNode;
@@ -96,7 +110,7 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
       keyExtractor={item => item.key}
       renderItem={({ item }) => <InboxRow item={item} />}
       ListHeaderComponent={
-        <View className="gap-6 px-6 pt-4">
+        <View className="px-6 pt-4">
           {header}
           <InboxEyebrow />
         </View>
@@ -112,7 +126,7 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
         />
       }
       ListFooterComponent={
-        <View className="gap-6 px-6 pb-12 pt-4">
+        <View className={`gap-6 px-6 pb-12 ${PR_REVIEW_SECTION_BREAK.padding}`}>
           {inbox.githubNeedsReconnect &&
           view.kind !== 'reconnect' &&
           !isOrganizationAccessView(view) ? (

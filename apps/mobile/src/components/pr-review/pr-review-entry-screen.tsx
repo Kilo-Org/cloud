@@ -10,7 +10,10 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { ContextControl } from '@/components/context-control';
 import { EmptyState } from '@/components/empty-state';
 import { PrLinkPlaceholder } from '@/components/pr-review/pr-link-placeholder';
-import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
+import {
+  PR_REVIEW_SECTION_BREAK,
+  PrReviewInboxList,
+} from '@/components/pr-review/pr-review-inbox-list';
 import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { selectRecentPrRowState } from '@/lib/pr-review/recent-pr-row-state';
 import { ScreenHeader } from '@/components/screen-header';
@@ -246,92 +249,85 @@ export function PrReviewEntryScreen() {
   }
 
   const pasteBlock = (
-    <View className="gap-4">
-      <View className="flex-row items-center gap-2">
-        <View
-          className="min-h-14 min-w-0 flex-1 flex-row items-center rounded-md border border-border bg-card"
-          testID="pr-link-input-row"
-          collapsable={false}
-        >
-          <Input
-            ref={inputRef}
-            defaultValue={initialText}
-            placeholder={urlPlaceholder}
-            // The native hint is not reliably one line: Android lays it out
-            // on a second line the one-line field clips. Both platforms draw
-            // the visible placeholder with the one-line PrLinkPlaceholder
-            // overlay instead; the hint stays set for the digest and
-            // accessibility text but is invisible.
-            placeholderTextColor="transparent"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            numberOfLines={1}
-            onChangeText={handleFieldChange}
-            // The shared single-line box (`@/components/ui/input`) supplies the
-            // height floor, the one line box for the placeholder and the value,
-            // and the RTL content alignment, so this field keeps only its own
-            // chrome and text size.
-            className="min-w-0 flex-1 bg-transparent pl-3 pr-1 text-base text-foreground"
-            accessibilityLabel={t('prReview.entry.urlAccessibility')}
-            returnKeyType="go"
-            onSubmitEditing={handleSubmit}
-          />
-          {!hasInput ? <PrLinkPlaceholder label={urlPlaceholder} /> : null}
-          {showClearButton ? (
-            // The clear control is icon-only like the paste control beside it,
-            // so it carries the same shared 48dp target; the 45pt box it used
-            // to render (`h-13`, which is 45pt at this app's 14pt rem) sits
-            // under Android's minimum.
-            <Pressable
-              onPress={clearField}
-              accessibilityRole="button"
-              accessibilityLabel={t('prReview.entry.clearLink')}
-              className={`${ICON_TARGET_BOX_CLASS} active:opacity-70`}
-            >
-              <X size={16} color={colors.mutedForeground} />
-            </Pressable>
-          ) : null}
+    <View>
+      <View className="gap-4">
+        <View className="flex-row items-center gap-2">
+          <View
+            className="min-h-14 min-w-0 flex-1 flex-row items-center rounded-md border border-border bg-card"
+            testID="pr-link-input-row"
+            collapsable={false}
+          >
+            <Input
+              ref={inputRef}
+              defaultValue={initialText}
+              placeholder={urlPlaceholder}
+              // The native hint is not reliably one line: Android lays it out
+              // on a second line the one-line field clips. Both platforms draw
+              // the visible placeholder with the one-line PrLinkPlaceholder
+              // overlay instead; the hint stays set for the digest and
+              // accessibility text but is invisible.
+              placeholderTextColor="transparent"
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              numberOfLines={1}
+              onChangeText={handleFieldChange}
+              // The shared single-line box (`@/components/ui/input`) supplies the
+              // height floor, the one line box for the placeholder and the value,
+              // and the RTL content alignment, so this field keeps only its own
+              // chrome and text size.
+              className="min-w-0 flex-1 bg-transparent pl-3 pr-1 text-base text-foreground"
+              accessibilityLabel={t('prReview.entry.urlAccessibility')}
+              returnKeyType="go"
+              onSubmitEditing={handleSubmit}
+            />
+            {!hasInput ? <PrLinkPlaceholder label={urlPlaceholder} /> : null}
+            {showClearButton ? (
+              // The clear control is icon-only like the paste control beside it,
+              // so it carries the same shared 48dp target; the 45pt box it used
+              // to render (`h-13`, which is 45pt at this app's 14pt rem) sits
+              // under Android's minimum.
+              <Pressable
+                onPress={clearField}
+                accessibilityRole="button"
+                accessibilityLabel={t('prReview.entry.clearLink')}
+                className={`${ICON_TARGET_BOX_CLASS} active:opacity-70`}
+              >
+                <X size={16} color={colors.mutedForeground} />
+              </Pressable>
+            ) : null}
+          </View>
+          <Pressable
+            onPress={() => {
+              void handlePaste();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('prReview.entry.pasteLink')}
+            className={`${ICON_TARGET_BOX_CLASS} rounded-md border border-border bg-card active:opacity-70`}
+          >
+            <ClipboardIcon size={18} color={colors.mutedForeground} />
+          </Pressable>
         </View>
-        <Pressable
-          onPress={() => {
-            void handlePaste();
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={t('prReview.entry.pasteLink')}
-          className={`${ICON_TARGET_BOX_CLASS} rounded-md border border-border bg-card active:opacity-70`}
+        <Button
+          disabled={linkState !== 'valid'}
+          onPress={handleSubmit}
+          accessibilityLabel={t('prReview.entry.openAccessibility')}
         >
-          <ClipboardIcon size={18} color={colors.mutedForeground} />
-        </Pressable>
+          <Text>{t('prReview.entry.open')}</Text>
+        </Button>
       </View>
-      <Button
-        disabled={linkState !== 'valid'}
-        onPress={handleSubmit}
-        accessibilityLabel={t('prReview.entry.openAccessibility')}
-      >
-        <Text>{t('prReview.entry.open')}</Text>
-      </Button>
-      {/* The invalid-link notice is the field's own error, but its line sits
-          under the field's action, not between the field and Open: a line
-          there pushed Open 38.5 dp away from the field — nearly twice the
-          20.5 dp that separates the whole form from the unrelated INBOX
-          section — so the field and its button stopped reading as one group.
-          The line stays reserved (an invisible copy holds its height) so a
-          pasted non-PR link never shifts the form. */}
-      <View>
-        <Text
-          className="text-sm opacity-0"
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-        >
-          {t('prReview.linkPasteNotAPullRequest')}
-        </Text>
-        <View className="absolute inset-0">
-          <AccessibleStatus
-            className="text-sm"
-            message={linkState === 'invalid' ? t('prReview.linkPasteNotAPullRequest') : null}
-          />
-        </View>
+      {/* The invalid-link notice is the field's own error and sits under the
+          field's action, not between the field and Open: a line there pushed
+          Open 38.5 dp away from the field and the two stopped reading as one
+          group. Its line occupies the section break above the INBOX header
+          instead of a block of its own, so the break is the one section-gap
+          token in either state and a pasted non-PR link never moves the
+          sections below the form. */}
+      <View className={PR_REVIEW_SECTION_BREAK.room}>
+        <AccessibleStatus
+          className="text-sm"
+          message={linkState === 'invalid' ? t('prReview.linkPasteNotAPullRequest') : null}
+        />
       </View>
     </View>
   );

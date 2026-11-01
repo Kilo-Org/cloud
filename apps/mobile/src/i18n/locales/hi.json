@@ -2009,6 +2009,7 @@
       "preparingEnvironment": "एनवायरनमेंट तैयार हो रहा है",
       "preparationComplete": "तैयारी पूरी हुई",
       "preparationFailed": "तैयारी विफल रही",
+      "preparationStageFailed": "{{stage}} नाम का चरण विफल रहा",
       "setupCommand": "सेटअप आदेश {{index}}",
       "setupCommandOf": "{{displayCount}} में से सेटअप आदेश {{index}}",
       "stepWorkspaceSetup": "वर्कस्पेस सेटअप",

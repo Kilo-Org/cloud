@@ -2638,6 +2638,7 @@
       "preparingEnvironment": "Příprava prostředí",
       "preparationComplete": "Příprava dokončena",
       "preparationFailed": "Příprava selhala",
+      "preparationStageFailed": "Fáze {{stage}} selhala",
       "setupCommand": "Příkaz pro přípravu prostředí {{index}}",
       "setupCommandOf": "Příkaz pro přípravu prostředí {{index}} z {{displayCount}}",
       "stepWorkspaceSetup": "Nastavení pracovního prostoru",

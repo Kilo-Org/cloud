@@ -2556,6 +2556,7 @@
       "preparingEnvironment": "சூழல் தயாராகிறது",
       "preparationComplete": "தயார்நிலை முடிந்தது",
       "preparationFailed": "தயார்ப்படுத்த முடியவில்லை",
+      "preparationStageFailed": "{{stage}} என்ற கட்டம் தோல்வியுற்றது",
       "setupCommand": "அமைவுக் கட்டளை {{index}}",
       "setupCommandOf": "அமைவுக் கட்டளை {{index}} / {{displayCount}}",
       "stepWorkspaceSetup": "பணியிட அமைப்பு",

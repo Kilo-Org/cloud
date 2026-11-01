@@ -2026,6 +2026,7 @@
       "preparingEnvironment": "Preparando ambiente",
       "preparationComplete": "Preparação concluída",
       "preparationFailed": "Falha na preparação",
+      "preparationStageFailed": "Falha na etapa {{stage}}",
       "setupCommand": "Comando de configuração {{index}}",
       "setupCommandOf": "Comando de configuração {{index}} de {{displayCount}}",
       "stepWorkspaceSetup": "Configuração do workspace",

@@ -2556,6 +2556,7 @@
       "preparingEnvironment": "Ingurunea prestatzen",
       "preparationComplete": "Prestaketa amaituta",
       "preparationFailed": "Prestaketak huts egin du",
+      "preparationStageFailed": "{{stage}} izeneko etapak huts egin du",
       "setupCommand": "{{index}}. konfigurazio-komandoa",
       "setupCommandOf": "{{index}}. konfigurazio-komandoa ({{displayCount}} guztira)",
       "stepWorkspaceSetup": "Lan-eremuaren konfigurazioa",

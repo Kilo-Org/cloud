@@ -2118,6 +2118,7 @@
       "preparingEnvironment": "جارٍ إعداد البيئة",
       "preparationComplete": "اكتمل الإعداد",
       "preparationFailed": "فشل الإعداد",
+      "preparationStageFailed": "فشلت المرحلة المسمّاة {{stage}}",
       "setupCommand": "أمر الإعداد {{index}}",
       "setupCommandOf": "أمر الإعداد {{index}} من {{displayCount}}",
       "stepWorkspaceSetup": "إعداد مساحة العمل",

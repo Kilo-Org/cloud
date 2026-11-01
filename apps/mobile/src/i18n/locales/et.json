@@ -2556,6 +2556,7 @@
       "preparingEnvironment": "Keskkonna ettevalmistamine",
       "preparationComplete": "Ettevalmistus on valmis",
       "preparationFailed": "Ettevalmistamine ebaõnnestus",
+      "preparationStageFailed": "Etapp nimega {{stage}} ebaõnnestus",
       "setupCommand": "Seadistamiskäsk {{index}}",
       "setupCommandOf": "Seadistamiskäsk {{index}} (kokku {{displayCount}})",
       "stepWorkspaceSetup": "Tööruumi seadistamine",

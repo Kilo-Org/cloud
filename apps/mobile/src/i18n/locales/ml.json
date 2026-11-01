@@ -2556,6 +2556,7 @@
       "preparingEnvironment": "പ്രവർത്തനാന്തരീക്ഷം തയ്യാറാക്കുന്നു",
       "preparationComplete": "തയ്യാറെടുപ്പ് പൂർത്തിയായി",
       "preparationFailed": "തയ്യാറെടുപ്പ് പരാജയപ്പെട്ടു",
+      "preparationStageFailed": "{{stage}} എന്ന ഘട്ടം പരാജയപ്പെട്ടു",
       "setupCommand": "സജ്ജീകരണ കമാൻഡ് {{index}}",
       "setupCommandOf": "ആകെ {{displayCount}} സജ്ജീകരണ കമാൻഡുകളിൽ {{index}}",
       "stepWorkspaceSetup": "വർക്ക്സ്പേസ് സജ്ജീകരണം",

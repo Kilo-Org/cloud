@@ -2030,6 +2030,7 @@
       "preparingEnvironment": "Menyiapkan lingkungan",
       "preparationComplete": "Persiapan selesai",
       "preparationFailed": "Persiapan gagal",
+      "preparationStageFailed": "Tahap bernama {{stage}} gagal",
       "setupCommand": "Perintah penyiapan {{index}}",
       "setupCommandOf": "Perintah penyiapan {{index}} dari {{displayCount}}",
       "stepWorkspaceSetup": "Penyiapan workspace",

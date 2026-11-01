@@ -2641,6 +2641,7 @@
       "preparingEnvironment": "Preparing environment",
       "preparationComplete": "Preparation complete",
       "preparationFailed": "Preparation failed",
+      "preparationStageFailed": "{{stage}} failed",
       "setupCommand": "Setup command {{index}}",
       "setupCommandOf": "Setup command {{index}} of {{displayCount}}",
       "stepWorkspaceSetup": "Workspace setup",

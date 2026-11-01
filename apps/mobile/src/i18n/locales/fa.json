@@ -2562,6 +2562,7 @@
       "preparingEnvironment": "در حال آماده‌سازی محیط",
       "preparationComplete": "آماده‌سازی کامل شد",
       "preparationFailed": "آماده‌سازی ناموفق بود",
+      "preparationStageFailed": "مرحله {{stage}} ناموفق بود",
       "setupCommand": "دستور راه‌اندازی {{index}}",
       "setupCommandOf": "دستور راه‌اندازی {{index}} از {{displayCount}}",
       "stepWorkspaceSetup": "راه‌اندازی فضای کار",

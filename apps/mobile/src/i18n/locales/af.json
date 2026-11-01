@@ -2556,6 +2556,7 @@
       "preparingEnvironment": "Omgewing word voorberei",
       "preparationComplete": "Voorbereiding voltooi",
       "preparationFailed": "Voorbereiding misluk",
+      "preparationStageFailed": "Die fase genaamd {{stage}} het misluk",
       "setupCommand": "Opstelopdrag {{index}}",
       "setupCommandOf": "Opstelopdrag {{index}} van {{displayCount}}",
       "stepWorkspaceSetup": "Werkruimte-opstelling",

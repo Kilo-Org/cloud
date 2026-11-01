@@ -211,7 +211,7 @@ describe('PreparationGroup incomplete restore', () => {
     mounted.unmount();
   });
 
-  it('keeps the running title and names a failed attempt after its cause', async () => {
+  it('keeps the running title and keeps a stage-less cause in the body', async () => {
     const running = await mount(restoreAttempt({ status: 'running' }));
     expect(running.group().props.accessibilityLabel).toBe('Preparing environment');
     expect(running.renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
@@ -220,7 +220,7 @@ describe('PreparationGroup incomplete restore', () => {
     const failed = await mount(
       restoreAttempt({ status: 'failed', safeError: 'preparation_timeout' })
     );
-    expect(failed.group().props.accessibilityLabel).toBe('Environment preparation timed out');
+    expect(failed.group().props.accessibilityLabel).toBe('Preparation failed');
     expect(failed.renderer.root.findAllByType('Check')).toHaveLength(0);
     expect(failed.renderedTextValues()).toContain('Environment preparation timed out');
     expect(failed.renderedTextValues()).not.toContain('preparation_timeout');
@@ -242,8 +242,28 @@ describe('PreparationGroup incomplete restore', () => {
         ],
       })
     );
-    expect(mounted.group().props.accessibilityLabel).toBe('Starting sandbox');
+    expect(mounted.group().props.accessibilityLabel).toBe('Starting sandbox failed');
     expect(mounted.group().findAllByType('AlertCircle').length).toBeGreaterThan(0);
+    mounted.unmount();
+  });
+
+  it('names a failed setup command by its number, not by the phase it belongs to', async () => {
+    const mounted = await mount(
+      restoreAttempt({
+        status: 'failed',
+        steps: [
+          incompleteStep({
+            id: 'commands',
+            key: 'setup_commands',
+            kind: 'setup_command',
+            commandIndex: 1,
+            commandCount: 3,
+            status: 'failed',
+          }),
+        ],
+      })
+    );
+    expect(mounted.group().props.accessibilityLabel).toBe('Setup command 2 of 3 failed');
     mounted.unmount();
   });
 

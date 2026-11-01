@@ -2030,6 +2030,7 @@
       "preparingEnvironment": "Ortam hazırlanıyor",
       "preparationComplete": "Hazırlık tamamlandı",
       "preparationFailed": "Hazırlık başarısız oldu",
+      "preparationStageFailed": "{{stage}} adlı aşama başarısız oldu",
       "setupCommand": "Kurulum komutu {{index}}",
       "setupCommandOf": "Kurulum komutu {{index}} / {{displayCount}}",
       "stepWorkspaceSetup": "Çalışma alanı kurulumu",

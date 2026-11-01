@@ -2556,6 +2556,7 @@
       "preparingEnvironment": "Förbereder miljön",
       "preparationComplete": "Förberedelserna är klara",
       "preparationFailed": "Förberedelserna misslyckades",
+      "preparationStageFailed": "Steget {{stage}} misslyckades",
       "setupCommand": "Konfigurationskommando {{index}}",
       "setupCommandOf": "Konfigurationskommando {{index}} av {{displayCount}}",
       "stepWorkspaceSetup": "Konfigurerar arbetsyta",

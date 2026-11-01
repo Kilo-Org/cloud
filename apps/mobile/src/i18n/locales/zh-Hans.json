@@ -2030,6 +2030,7 @@
       "preparingEnvironment": "正在准备环境",
       "preparationComplete": "准备完成",
       "preparationFailed": "准备失败",
+      "preparationStageFailed": "{{stage}}失败",
       "setupCommand": "初始化命令 {{index}}",
       "setupCommandOf": "初始化命令 {{index}}/{{displayCount}}",
       "stepWorkspaceSetup": "工作区设置",

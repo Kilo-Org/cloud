@@ -2562,6 +2562,7 @@
       "preparingEnvironment": "કાર્યપરિસર તૈયાર થઈ રહ્યું છે",
       "preparationComplete": "તૈયારી પૂર્ણ",
       "preparationFailed": "તૈયારી નિષ્ફળ",
+      "preparationStageFailed": "{{stage}} નામનો તબક્કો નિષ્ફળ ગયો",
       "setupCommand": "સેટઅપ આદેશ {{index}}",
       "setupCommandOf": "કુલ {{displayCount}}માંથી સેટઅપ આદેશ {{index}}",
       "stepWorkspaceSetup": "કાર્યપરિસર સેટઅપ",

@@ -2556,6 +2556,7 @@
       "preparingEnvironment": "လုပ်ဆောင်မှုပတ်ဝန်းကျင်ကို ပြင်ဆင်နေသည်",
       "preparationComplete": "ပြင်ဆင်ပြီး",
       "preparationFailed": "ပြင်ဆင်မှု မအောင်မြင်ခဲ့ပါ",
+      "preparationStageFailed": "{{stage}} အဆင့် မအောင်မြင်ခဲ့ပါ",
       "setupCommand": "ပြင်ဆင်သတ်မှတ်ရေးအမိန့် {{index}}",
       "setupCommandOf": "ပြင်ဆင်သတ်မှတ်ရေးအမိန့် {{displayCount}} ခုအနက် {{index}}",
       "stepWorkspaceSetup": "ဝါ့ခ်စပေ့စ် ပြင်ဆင်သတ်မှတ်ခြင်း",

@@ -2597,6 +2597,7 @@
       "preparingEnvironment": "Se pregătește mediul",
       "preparationComplete": "Pregătire finalizată",
       "preparationFailed": "Pregătire eșuată",
+      "preparationStageFailed": "Etapa denumită {{stage}} a eșuat",
       "setupCommand": "Comanda de configurare {{index}}",
       "setupCommandOf": "Comanda de configurare {{index}} din {{displayCount}}",
       "stepWorkspaceSetup": "Configurare spațiu de lucru",

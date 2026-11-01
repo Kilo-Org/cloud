@@ -2556,6 +2556,7 @@
       "preparingEnvironment": "កំពុងរៀបចំបរិស្ថានដំណើរការ",
       "preparationComplete": "ការរៀបចំបានបញ្ចប់",
       "preparationFailed": "ការរៀបចំបានបរាជ័យ",
+      "preparationStageFailed": "ដំណាក់កាលឈ្មោះ {{stage}} បានបរាជ័យ",
       "setupCommand": "ពាក្យបញ្ជាដំឡើង {{index}}",
       "setupCommandOf": "ពាក្យបញ្ជាដំឡើង {{index}} ក្នុងចំណោម {{displayCount}}",
       "stepWorkspaceSetup": "ការរៀបចំ Workspace",

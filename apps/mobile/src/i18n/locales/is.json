@@ -2556,6 +2556,7 @@
       "preparingEnvironment": "Undirbýr umhverfi",
       "preparationComplete": "Undirbúningi lokið",
       "preparationFailed": "Undirbúningur mistókst",
+      "preparationStageFailed": "Undirbúningsstigið {{stage}} mistókst",
       "setupCommand": "Uppsetningarskipun {{index}}",
       "setupCommandOf": "Uppsetningarskipun {{index}} af {{displayCount}}",
       "stepWorkspaceSetup": "Uppsetning vinnusvæðis",

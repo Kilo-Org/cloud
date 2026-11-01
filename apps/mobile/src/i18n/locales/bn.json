@@ -2562,6 +2562,7 @@
       "preparingEnvironment": "পরিবেশ প্রস্তুত হচ্ছে",
       "preparationComplete": "প্রস্তুতি সম্পন্ন",
       "preparationFailed": "প্রস্তুতি ব্যর্থ",
+      "preparationStageFailed": "{{stage}} নামের ধাপটি ব্যর্থ হয়েছে",
       "setupCommand": "সেটআপ কমান্ড {{index}}",
       "setupCommandOf": "মোট {{displayCount}}টি সেটআপ কমান্ডের মধ্যে {{index}}",
       "stepWorkspaceSetup": "ওয়ার্কস্পেস সেটআপ",

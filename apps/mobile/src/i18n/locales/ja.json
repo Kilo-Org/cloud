@@ -2030,6 +2030,7 @@
       "preparingEnvironment": "環境を準備中",
       "preparationComplete": "準備完了",
       "preparationFailed": "準備失敗",
+      "preparationStageFailed": "{{stage}}に失敗しました",
       "setupCommand": "セットアップコマンド {{index}}",
       "setupCommandOf": "セットアップコマンド {{index}} / {{displayCount}}",
       "stepWorkspaceSetup": "ワークスペースのセットアップ",

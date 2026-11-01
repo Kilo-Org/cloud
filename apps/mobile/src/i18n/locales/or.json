@@ -2556,6 +2556,7 @@
       "preparingEnvironment": "ପରିବେଶ ପ୍ରସ୍ତୁତ ହେଉଛି",
       "preparationComplete": "ପ୍ରସ୍ତୁତି ସମ୍ପୂର୍ଣ୍ଣ",
       "preparationFailed": "ପ୍ରସ୍ତୁତି ବିଫଳ ହେଲା",
+      "preparationStageFailed": "{{stage}} ନାମକ ପର୍ଯ୍ୟାୟ ବିଫଳ ହେଲା",
       "setupCommand": "ସେଟଅପ୍ କମାଣ୍ଡ {{index}}",
       "setupCommandOf": "ମୋଟ {{displayCount}}ଟି ସେଟଅପ୍ କମାଣ୍ଡ ମଧ୍ୟରୁ {{index}}",
       "stepWorkspaceSetup": "ୱାର୍କସ୍ପେସ୍ ସେଟଅପ୍",

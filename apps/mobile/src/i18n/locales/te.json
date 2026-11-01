@@ -2556,6 +2556,7 @@
       "preparingEnvironment": "పని వాతావరణాన్ని సిద్ధం చేస్తోంది",
       "preparationComplete": "సిద్ధత పూర్తయింది",
       "preparationFailed": "సిద్ధత విఫలమైంది",
+      "preparationStageFailed": "{{stage}} అనే దశ విఫలమైంది",
       "setupCommand": "సెటప్ ఆదేశం {{index}}",
       "setupCommandOf": "మొత్తం {{displayCount}} సెటప్ ఆదేశాలలో {{index}}",
       "stepWorkspaceSetup": "వర్క్‌స్పేస్ సెటప్",

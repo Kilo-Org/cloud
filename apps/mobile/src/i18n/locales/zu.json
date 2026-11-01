@@ -2562,6 +2562,7 @@
       "preparingEnvironment": "Kulungiswa indawo yokusebenza",
       "preparationComplete": "Ukulungisa kuqediwe",
       "preparationFailed": "Ukulungisa kwehlulekile",
+      "preparationStageFailed": "Isigaba esibizwa nge-{{stage}} sehlulekile",
       "setupCommand": "Umyalo wokusetha {{index}}",
       "setupCommandOf": "Umyalo wokusetha {{index}} kwengu-{{displayCount}}",
       "stepWorkspaceSetup": "Ukusetha kwendawo yokusebenza",

@@ -2562,6 +2562,7 @@
       "preparingEnvironment": "ਵਾਤਾਵਰਣ ਤਿਆਰ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
       "preparationComplete": "ਤਿਆਰੀ ਪੂਰੀ ਹੋਈ",
       "preparationFailed": "ਤਿਆਰੀ ਅਸਫਲ",
+      "preparationStageFailed": "{{stage}} ਨਾਮਕ ਪੜਾਅ ਅਸਫਲ ਹੋਇਆ",
       "setupCommand": "ਸੈੱਟਅੱਪ ਕਮਾਂਡ {{index}}",
       "setupCommandOf": "ਕੁੱਲ {{displayCount}} ਵਿੱਚੋਂ ਸੈੱਟਅੱਪ ਕਮਾਂਡ {{index}}",
       "stepWorkspaceSetup": "ਵਰਕਸਪੇਸ ਸੈੱਟਅੱਪ",

@@ -2030,6 +2030,7 @@
       "preparingEnvironment": "Đang chuẩn bị môi trường",
       "preparationComplete": "Đã chuẩn bị xong",
       "preparationFailed": "Chuẩn bị thất bại",
+      "preparationStageFailed": "Giai đoạn {{stage}} đã thất bại",
       "setupCommand": "Lệnh thiết lập {{index}}",
       "setupCommandOf": "Lệnh thiết lập {{index}} trong tổng số {{displayCount}}",
       "stepWorkspaceSetup": "Thiết lập vùng làm việc",

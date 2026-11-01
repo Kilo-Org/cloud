@@ -2556,6 +2556,7 @@
       "preparingEnvironment": "Mühit hazırlanır",
       "preparationComplete": "Hazırlıq tamamlandı",
       "preparationFailed": "Hazırlıq uğursuz oldu",
+      "preparationStageFailed": "{{stage}} adlı mərhələ uğursuz oldu",
       "setupCommand": "Quraşdırma əmri: {{index}}",
       "setupCommandOf": "Quraşdırma əmri: {{index}} / {{displayCount}}",
       "stepWorkspaceSetup": "İş sahəsi quraşdırması",

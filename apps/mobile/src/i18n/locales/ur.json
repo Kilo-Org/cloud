@@ -2556,6 +2556,7 @@
       "preparingEnvironment": "ماحول تیار کیا جا رہا ہے",
       "preparationComplete": "تیاری مکمل",
       "preparationFailed": "تیاری ناکام",
+      "preparationStageFailed": "{{stage}} نامی مرحلہ ناکام",
       "setupCommand": "سیٹ اپ کمانڈ {{index}}",
       "setupCommandOf": "سیٹ اپ کی کمانڈ {{index}}، کل {{displayCount}}",
       "stepWorkspaceSetup": "ورک اسپیس سیٹ اپ",

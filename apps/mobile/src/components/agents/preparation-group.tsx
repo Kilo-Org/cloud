@@ -109,8 +109,8 @@ function AttemptIcon({
 
 /**
  * The warning line the expanded body opens with: the restore report when the
- * attempt carries one, otherwise the attempt's own failure sentence. An
- * attempt with steps reports them instead, so its body stays a list.
+ * attempt carries one, otherwise the attempt's own failure sentence. The header
+ * never repeats it, so a cause with no stage is still readable in full.
  */
 function groupAlertText(
   attempt: PreparationAttempt,
@@ -120,7 +120,7 @@ function groupAlertText(
   if (incompleteReport !== undefined) {
     return incompleteReport;
   }
-  if (attempt.steps.length > 0 || attempt.safeError === undefined || attempt.safeError === '') {
+  if (attempt.safeError === undefined || attempt.safeError === '') {
     return undefined;
   }
   return preparationErrorText(attempt.safeError, t);
@@ -129,8 +129,8 @@ function groupAlertText(
 /**
  * A group's header line, kept short enough for one row: the restore status when
  * the attempt carries one, otherwise the attempt's own state. A failed attempt
- * names the stage that failed, or its cause when it has no stage, so two failed
- * groups never read the same.
+ * names the stage that failed, so the header never restates the cause the body
+ * carries.
  */
 function groupTitle(attempt: PreparationAttempt, incomplete: boolean, t: TFunction): string {
   if (incomplete) {
@@ -144,10 +144,9 @@ function groupTitle(attempt: PreparationAttempt, incomplete: boolean, t: TFuncti
   }
   const stage = failedStageStep(attempt);
   if (stage !== undefined) {
-    return preparationStepLabel(stage, t);
-  }
-  if (attempt.safeError !== undefined && attempt.safeError !== '') {
-    return preparationErrorText(attempt.safeError, t);
+    return t('agentChat.preparation.preparationStageFailed', {
+      stage: setupCommandLabel(stage, t) ?? preparationStepLabel(stage, t),
+    });
   }
   return t('agentChat.preparation.preparationFailed');
 }

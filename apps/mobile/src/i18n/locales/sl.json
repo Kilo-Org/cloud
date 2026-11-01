@@ -2638,6 +2638,7 @@
       "preparingEnvironment": "Priprava okolja",
       "preparationComplete": "Priprava končana",
       "preparationFailed": "Priprava ni uspela",
+      "preparationStageFailed": "Faza z imenom {{stage}} ni uspela",
       "setupCommand": "Ukaz za pripravo {{index}}",
       "setupCommandOf": "Ukaz za pripravo {{index}} od {{displayCount}}",
       "stepWorkspaceSetup": "Nastavitev delovnega prostora",

@@ -2556,6 +2556,7 @@
       "preparingEnvironment": "Menyediakan persekitaran",
       "preparationComplete": "Penyediaan selesai",
       "preparationFailed": "Penyediaan gagal",
+      "preparationStageFailed": "Peringkat bernama {{stage}} gagal",
       "setupCommand": "Arahan penyediaan {{index}}",
       "setupCommandOf": "Arahan penyediaan {{index}} daripada {{displayCount}}",
       "stepWorkspaceSetup": "Penyediaan ruang kerja",

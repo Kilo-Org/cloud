@@ -2556,6 +2556,7 @@
       "preparingEnvironment": "Ń mú àyíká iṣẹ́ sílẹ̀",
       "preparationComplete": "Ìmúrasílẹ̀ ti parí",
       "preparationFailed": "Ìmúrasílẹ̀ kùnà",
+      "preparationStageFailed": "Ìpele tí à ń pè ní {{stage}} kùnà",
       "setupCommand": "Àṣẹ ìmúrasílẹ̀ {{index}}",
       "setupCommandOf": "Àṣẹ ìmúrasílẹ̀ {{index}} nínú {{displayCount}}",
       "stepWorkspaceSetup": "Ìṣètò ibi-iṣẹ́",

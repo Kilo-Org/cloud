@@ -2556,6 +2556,7 @@
       "preparingEnvironment": "Подготовка на околината",
       "preparationComplete": "Подготовката е завршена",
       "preparationFailed": "Подготовката не успеа",
+      "preparationStageFailed": "Фазата {{stage}} не успеа",
       "setupCommand": "Команда за подготовка {{index}}",
       "setupCommandOf": "Команда за подготовка {{index}} од {{displayCount}}",
       "stepWorkspaceSetup": "Поставување на работниот простор",

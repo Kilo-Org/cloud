@@ -2638,6 +2638,7 @@
       "preparingEnvironment": "Rengiama aplinka",
       "preparationComplete": "Parengimas baigtas",
       "preparationFailed": "Parengimas nepavyko",
+      "preparationStageFailed": "Etapas „{{stage}}“ nepavyko",
       "setupCommand": "Sąrankos komanda {{index}}",
       "setupCommandOf": "Sąrankos komanda {{index}} iš {{displayCount}}",
       "stepWorkspaceSetup": "Darbo srities sąranka",

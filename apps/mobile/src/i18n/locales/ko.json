@@ -2030,6 +2030,7 @@
       "preparingEnvironment": "환경 준비 중",
       "preparationComplete": "준비 완료",
       "preparationFailed": "준비 실패",
+      "preparationStageFailed": "{{stage}} 단계가 실패했습니다",
       "setupCommand": "설정 명령 {{index}}",
       "setupCommandOf": "전체 {{displayCount}}개 중 {{index}}번째 설정 명령",
       "stepWorkspaceSetup": "워크스페이스 설정",

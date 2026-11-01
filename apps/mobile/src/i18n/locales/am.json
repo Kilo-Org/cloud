@@ -2562,6 +2562,7 @@
       "preparingEnvironment": "የሥራ አካባቢውን በማዘጋጀት ላይ",
       "preparationComplete": "ዝግጅቱ ተጠናቋል",
       "preparationFailed": "ዝግጅቱ አልተሳካም",
+      "preparationStageFailed": "የ{{stage}} ደረጃ አልተሳካም",
       "setupCommand": "የማዋቀር ትዕዛዝ {{index}}",
       "setupCommandOf": "ከ{{displayCount}} የማዋቀር ትዕዛዞች {{index}}ኛው",
       "stepWorkspaceSetup": "የሥራ አካባቢ ማዋቀር",

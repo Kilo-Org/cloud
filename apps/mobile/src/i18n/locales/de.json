@@ -2030,6 +2030,7 @@
       "preparingEnvironment": "Umgebung wird vorbereitet",
       "preparationComplete": "Vorbereitung abgeschlossen",
       "preparationFailed": "Vorbereitung fehlgeschlagen",
+      "preparationStageFailed": "Der Schritt {{stage}} ist fehlgeschlagen",
       "setupCommand": "Einrichtungsbefehl {{index}}",
       "setupCommandOf": "Einrichtungsbefehl {{index}} von {{displayCount}}",
       "stepWorkspaceSetup": "Workspace-Einrichtung",

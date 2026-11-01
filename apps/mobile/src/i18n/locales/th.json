@@ -2556,6 +2556,7 @@
       "preparingEnvironment": "กำลังเตรียมสภาพแวดล้อม",
       "preparationComplete": "เตรียมพร้อมแล้ว",
       "preparationFailed": "เตรียมการไม่สำเร็จ",
+      "preparationStageFailed": "ขั้นตอน {{stage}} ไม่สำเร็จ",
       "setupCommand": "คำสั่งตั้งค่า {{index}}",
       "setupCommandOf": "คำสั่งตั้งค่า {{index}} จาก {{displayCount}}",
       "stepWorkspaceSetup": "ตั้งค่าพื้นที่ทำงาน",

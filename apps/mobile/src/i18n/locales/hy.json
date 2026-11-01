@@ -2562,6 +2562,7 @@
       "preparingEnvironment": "Միջավայրի նախապատրաստում",
       "preparationComplete": "Նախապատրաստումն ավարտված է",
       "preparationFailed": "Նախապատրաստումը ձախողվեց",
+      "preparationStageFailed": "{{stage}} անունով փուլը ձախողվեց",
       "setupCommand": "Կարգավորման հրաման {{index}}",
       "setupCommandOf": "Կարգավորման հրաման {{index}}՝ {{displayCount}}-ից",
       "stepWorkspaceSetup": "Աշխատատարածքի կարգավորում",

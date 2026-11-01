@@ -2852,6 +2852,60 @@ describe('GitHub installation persistence', () => {
       github_connection_role: null,
     });
   });
+
+  test('leaves a linked organization association roleless when a stale identity already claims its canonical installation', async () => {
+    const claimant = await createTestOrganization('Canonical claimant', ownerId, 0);
+    const organization = await createTestOrganization('Canonical shadowed', otherOwnerId, 0);
+    const [canonical] = await db
+      .insert(github_app_installations)
+      .values({ installation_id: '777005', github_app_type: 'standard', lifecycle_state: 'active' })
+      .returning();
+    // The claim is held through the canonical link while the stored identity is
+    // the association's own, so the identity exclusion alone does not see it.
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: claimant.id,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: '777901',
+      platform_account_login: 'acme',
+      integration_status: 'active',
+      github_connection_role: 'workflow',
+      github_installation_id: canonical.id,
+      github_app_type: 'standard',
+      repository_access: 'all',
+    });
+    const [shadow] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '777005',
+        platform_account_login: 'acme',
+        integration_status: 'active',
+        github_app_type: 'standard',
+        repository_access: 'all',
+      })
+      .returning();
+
+    // The link is repaired, but the canonical installation already has its
+    // workflow connection, so a second role here would violate
+    // UQ_platform_integrations_github_workflow_canonical and abort the batch.
+    await expect(backfillGitHubInstallations()).resolves.toMatchObject({
+      scanned: 1,
+      canonicalCreated: 0,
+      linked: 1,
+      roleAssigned: 0,
+    });
+
+    await expect(
+      db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, shadow.id) })
+    ).resolves.toMatchObject({
+      github_installation_id: canonical.id,
+      github_connection_role: null,
+    });
+    await expect(getPrimaryGitHubIntegrationForOrganization(organization.id)).resolves.toBeNull();
+  });
 });
 
 async function waitForBlockedGitHubOwnerLock(

@@ -5,6 +5,7 @@ import { platform_integrations } from './schema';
 
 const siblingAliasName = 'sibling';
 const claimingAliasName = 'claimed';
+const canonicalClaimAliasName = 'canonical_claim';
 
 /**
  * The `platform_integrations` relation, named however a caller references it:
@@ -59,9 +60,10 @@ type ConnectionRelation = {
  *     of this exact identity, and it has none when it is unlinked, so the
  *     canonical lookups accept the same row;
  *   * no other association of the same installation identity already claims the
- *     workflow role, and no earlier eligible roleless association of that
- *     identity exists, so a shared installation's second organization and any
- *     shadowed duplicate stay exactly as they are.
+ *     workflow role, no workflow association already claims the canonical
+ *     installation this row is linked to, and no earlier eligible roleless
+ *     association of that identity exists, so a shared installation's second
+ *     organization and any shadowed duplicate stay exactly as they are.
  *
  * Personal associations are out of scope: they always carry their role, and
  * their lookups keep the stored role. The predicate carries that scope itself —
@@ -69,10 +71,11 @@ type ConnectionRelation = {
  * widen it to a personal or non-GitHub association by forgetting a filter, and
  * the planner can use the platform index. The relations the predicate reads
  * carry the scope as well: a shadowing sibling is a GitHub organization row of
- * the same installation identity, and the relation that could claim the role
- * is any GitHub association of that identity, personal or organization, exactly
- * as migration 0322 counted claims. Neither is ever a row of another platform
- * that happens to reuse a numeric `platform_installation_id`.
+ * the same installation identity, and the relations that could claim the role
+ * are any GitHub association of that identity, personal or organization, and
+ * any workflow association of the canonical installation this row is linked
+ * to, exactly as migration 0322 counted claims. None is ever a row of another
+ * platform that happens to reuse a numeric `platform_installation_id`.
  *
  * The eligibility conditions are built once, by
  * {@link eligibleRolelessOrganizationGitHubAppSql}, and the sibling relation
@@ -82,6 +85,7 @@ type ConnectionRelation = {
 export function organizationWorkflowGitHubConnectionSql(): SQL {
   const sibling = alias(platform_integrations, siblingAliasName);
   const claiming = alias(platform_integrations, claimingAliasName);
+  const canonicalClaim = alias(platform_integrations, canonicalClaimAliasName);
   return sql`(
     ${organizationGitHubAppSql(platform_integrations)}
     AND (
@@ -98,6 +102,18 @@ export function organizationWorkflowGitHubConnectionSql(): SQL {
               ${platform_integrations.platform_installation_id}
             AND COALESCE(${claiming.github_app_type}, 'standard') =
               COALESCE(${platform_integrations.github_app_type}, 'standard')
+        )
+        AND (
+          ${platform_integrations.github_installation_id} IS NULL
+          OR NOT EXISTS (
+            SELECT 1
+            FROM ${aliasedRelationSql(canonicalClaimAliasName)}
+            WHERE ${canonicalClaim.id} <> ${platform_integrations.id}
+              AND ${canonicalClaim.platform} = 'github'
+              AND ${canonicalClaim.github_connection_role} = 'workflow'
+              AND ${canonicalClaim.github_installation_id} =
+                ${platform_integrations.github_installation_id}
+          )
         )
         AND NOT EXISTS (
           SELECT 1
@@ -132,8 +148,8 @@ export function organizationWorkflowGitHubPreferenceSql(): SQL {
  * Scope of the association under test: a GitHub association that an
  * organization owns. Applied to the outer row and, through
  * {@link eligibleRolelessOrganizationGitHubAppSql}, to a shadowing sibling.
- * The claiming relation carries the platform filter alone, because a claim can
- * come from a personal association as well.
+ * The claim relations carry the platform filter alone, because a claim can come
+ * from a personal association as well.
  */
 function organizationGitHubAppSql(connection: ConnectionRelation): SQL {
   return sql`(

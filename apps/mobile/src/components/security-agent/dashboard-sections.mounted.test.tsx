@@ -9,7 +9,7 @@ import { type ComponentProps } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { DashboardSections } from './dashboard-sections';
+import { DashboardSections, DashboardSectionsSkeleton } from './dashboard-sections';
 
 // The counted bucket helper is spied on: a line that names three counts can
 // only agree them if each bucket is handed to its own plural family with its
@@ -29,6 +29,7 @@ vi.mock('@/i18n', () => ({
   i18n: { language: 'en', t: (key: string) => key },
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/icons', () => ({
@@ -253,5 +254,87 @@ describe('DashboardSections SLA posture', () => {
 
     expect(labels).toContain('securityAgent.dashboard.confirmedExploitable');
     expect(labels).toContain('securityAgent.dashboard.noImmediateAction');
+  });
+});
+
+describe('DashboardSectionsSkeleton', () => {
+  // The dashboard paints these placeholders while it reads, so they stand in
+  // for the cards the same owner renders: one per card, in the card's own
+  // frame, holding the loaded line boxes. A hand-sized bar instead made the
+  // loading state taller than the content that replaced it.
+  function renderSkeleton(slaEnabled: boolean): TestRenderer.ReactTestRenderer {
+    const slot: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    act(() => {
+      slot.current = TestRenderer.create(<DashboardSectionsSkeleton slaEnabled={slaEnabled} />);
+    });
+    const renderer = slot.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    return renderer;
+  }
+
+  /** The section cards: the views that carry the card frame. */
+  function cards(instance: Instance): Instance[] {
+    return instance.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'View' &&
+        String(n.props.className ?? '').includes('bg-secondary')
+    );
+  }
+
+  /** The row blocks of a placeholder card, one per loaded row. */
+  function rowBlocks(card: Instance): Instance[] {
+    return card.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'View' &&
+        String(n.props.className ?? '').includes('py-3')
+    );
+  }
+
+  it.each([true, false])(
+    'draws one placeholder per loaded card, in the card frame (slaEnabled=%s)',
+    slaEnabled => {
+      const loaded = cards(renderSections({ slaEnabled }).root);
+      const placeholders = cards(renderSkeleton(slaEnabled).root);
+
+      expect(placeholders).toHaveLength(loaded.length);
+      expect(new Set(placeholders.map(card => card.props.className))).toEqual(
+        new Set(loaded.map(card => card.props.className))
+      );
+    }
+  );
+
+  it('names nothing it has not measured', () => {
+    const placeholders = cards(renderSkeleton(true).root);
+
+    expect(placeholders.every(card => copy(card).length === 0)).toBe(true);
+    expect(placeholders.every(card => card.findAllByType('Skeleton').length > 0)).toBe(true);
+  });
+
+  it('grows the risk placeholder by the row the loaded card gains with SLA tracking', () => {
+    // The skeleton card order mirrors the sections': priority, posture (only
+    // without SLA tracking), risk, repositories.
+    const loadedRows = (slaEnabled: boolean) => {
+      const risk = cards(renderSections({ slaEnabled }).root).find(card =>
+        copy(card).includes('securityAgent.dashboard.codebaseRisk')
+      );
+      if (!risk) {
+        throw new Error('risk card not found');
+      }
+      return risk.findAllByType('KvRow').length;
+    };
+    const placeholderRows = (slaEnabled: boolean) => {
+      const card = cards(renderSkeleton(slaEnabled).root)[slaEnabled ? 1 : 2];
+      if (!card) {
+        throw new Error('risk placeholder not found');
+      }
+      return rowBlocks(card).length;
+    };
+
+    expect(placeholderRows(true)).toBe(loadedRows(true));
+    expect(placeholderRows(false)).toBe(loadedRows(false));
   });
 });

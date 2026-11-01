@@ -20,7 +20,10 @@ import { QueryError } from '@/components/query-error';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { Button } from '@/components/ui/button';
 import { ScreenHeader } from '@/components/screen-header';
-import { DashboardSections } from '@/components/security-agent/dashboard-sections';
+import {
+  DashboardSections,
+  DashboardSectionsSkeleton,
+} from '@/components/security-agent/dashboard-sections';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { severityCountPhrase } from '@/components/security-agent/severity-count-phrase';
@@ -70,6 +73,22 @@ const METRIC_TONE_CLASS = {
   warning: 'text-warn',
   neutral: 'text-muted-foreground',
 } satisfies Record<DashboardMetricTone, string>;
+
+/**
+ * The metric tile's frame, shared with its placeholder so the loading state
+ * cannot drift from the rendered card.
+ */
+const STAT_TILE_CLASS = 'w-[47%] gap-1 rounded-lg bg-secondary p-3';
+
+// One placeholder per tile: the metrics fill four of them with or without SLA
+// deadlines. Each bar is the loaded line's own box at the app's default text
+// size — the `text-xs` label, the `text-xl` value and the `text-[11px]` detail
+// — so the tile's height comes out the same and the loaded cards replace the
+// placeholders without moving anything below them.
+const STAT_TILE_PLACEHOLDERS = [0, 1, 2, 3] as const;
+const STAT_LABEL_LINE_CLASS = 'h-4 rounded';
+const STAT_VALUE_LINE_CLASS = 'h-7 rounded';
+const STAT_DETAIL_LINE_CLASS = 'h-[15px] rounded';
 
 export function buildLocalizedMetrics(
   data: DashboardStats,
@@ -596,18 +615,28 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             metrics row. The sync-status read joins it because `neverSynced`
             decides whether a tile carries a detail line: a tile that rendered
             the measured shape first would shrink by a line the moment the read
-            resolved, which moves the whole dashboard. */}
+            resolved, which moves the whole dashboard. The section cards join it
+            for the same reason — they render below the tiles only once both
+            reads settle — so their placeholders keep the page's height until
+            then instead of letting the cards push it down. */}
         {dashboardStats.isPending || lastSync.isPending ? (
-          <View className="flex-row flex-wrap gap-3">
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
+          <View className="gap-4">
+            <View className="flex-row flex-wrap gap-3">
+              {STAT_TILE_PLACEHOLDERS.map(placeholder => (
+                <View key={placeholder} className={STAT_TILE_CLASS}>
+                  {/* The loaded card's own line boxes: label, value, detail. */}
+                  <Skeleton className={cn('w-2/3', STAT_LABEL_LINE_CLASS)} />
+                  <Skeleton className={cn('w-1/2', STAT_VALUE_LINE_CLASS)} />
+                  <Skeleton className={cn('w-full', STAT_DETAIL_LINE_CLASS)} />
+                </View>
+              ))}
+            </View>
+            <DashboardSectionsSkeleton slaEnabled={slaEnabled} />
           </View>
         ) : (
           <View className="flex-row flex-wrap gap-3">
             {metrics.map(metric => (
-              <View key={metric.label} className="w-[47%] gap-1 rounded-lg bg-secondary p-3">
+              <View key={metric.label} className={STAT_TILE_CLASS}>
                 <Text variant="muted" className="text-xs">
                   {metric.label}
                 </Text>

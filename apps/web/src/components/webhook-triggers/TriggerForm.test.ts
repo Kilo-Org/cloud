@@ -157,7 +157,40 @@ jest.mock('@/components/shared/RepositoryCombobox', () => ({
       'select-repository'
     ),
 }));
-jest.mock('@/components/shared/ModeCombobox', () => ({ ModeCombobox: () => null }));
+jest.mock('@/components/shared/ModeCombobox', () => ({
+  LEGACY_MODE_OPTIONS: ['architect', 'code', 'ask', 'debug', 'orchestrator'].map(value => ({
+    value,
+    label: value,
+    description: value,
+  })),
+  ModeCombobox: ({
+    value,
+    onValueChange,
+    options,
+    disabled,
+  }: {
+    value: string;
+    onValueChange: (value: string) => void;
+    options: { value: string; label: string }[];
+    disabled?: boolean;
+  }) =>
+    createElement(
+      'div',
+      { 'data-agent-mode': value },
+      options.map(option =>
+        createElement(
+          'button',
+          {
+            key: option.value,
+            type: 'button',
+            disabled,
+            onClick: () => onValueChange(option.value),
+          },
+          option.label
+        )
+      )
+    ),
+}));
 jest.mock('@/components/shared/ModelCombobox', () => ({
   ModelCombobox: ({
     onValueChange,
@@ -384,6 +417,98 @@ describe('TriggerForm variants', () => {
     act(() => root?.render(createElement(TriggerForm, allProps)));
     return { container: dom.container, onSubmit, allProps };
   }
+
+  it.each(['webhook', 'scheduled'] as const)(
+    'submits a custom agent with a selected profile for a %s trigger',
+    activationMode => {
+      const { container, onSubmit } = render({
+        mode: 'create',
+        initialData: initialData(undefined, activationMode),
+      });
+      click(container, 'Custom agent');
+      submit(container);
+      expect(onSubmit).not.toHaveBeenCalled();
+      const input = container.querySelector<HTMLInputElement>('#customAgentSlug');
+      if (!input) throw new Error('custom agent input missing');
+      expect(container.textContent).toContain('.kilo/agent/foreman.md');
+      expect(container.textContent).toContain('selected profile');
+      changeValue(input, 'foreman');
+      click(container, 'select-profile');
+      submit(container);
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode: 'foreman',
+          profileId: 'replacement-profile',
+          activationMode,
+        })
+      );
+    }
+  );
+
+  it.each(['webhook', 'scheduled'] as const)(
+    'round-trips a saved custom agent when editing a %s trigger',
+    activationMode => {
+      const { container, onSubmit } = render({
+        initialData: { ...initialData(undefined, activationMode), mode: 'foreman' },
+      });
+      expect(container.querySelector('[data-agent-mode="__custom_agent__"]')).not.toBeNull();
+      expect(container.querySelector<HTMLInputElement>('#customAgentSlug')?.value).toBe('foreman');
+      submit(container);
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ mode: 'foreman' }));
+    }
+  );
+
+  it.each(['Foreman', 'bad_slug', '../foreman', '1foreman', 'custom', 'f'.repeat(51)])(
+    'rejects malformed or reserved custom agent %s',
+    slug => {
+      const { container, onSubmit } = render({});
+      click(container, 'Custom agent');
+      const input = container.querySelector<HTMLInputElement>('#customAgentSlug');
+      if (!input) throw new Error('custom agent input missing');
+      changeValue(input, slug);
+      expect(input.getAttribute('aria-invalid')).toBe('true');
+      expect(container.querySelector('#customAgentError')).not.toBeNull();
+      submit(container);
+      expect(onSubmit).not.toHaveBeenCalled();
+    }
+  );
+
+  it('switches a saved custom agent back to a built-in mode', () => {
+    const { container, onSubmit } = render({
+      initialData: { ...initialData(), mode: 'foreman' },
+    });
+    click(container, 'code');
+    expect(container.querySelector('#customAgentSlug')).toBeNull();
+    submit(container);
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ mode: 'code' }));
+  });
+
+  it('preserves the slug when reselecting Custom agent', () => {
+    const { container, onSubmit } = render({
+      initialData: { ...initialData(), mode: 'foreman' },
+    });
+    click(container, 'Custom agent');
+    expect(container.querySelector<HTMLInputElement>('#customAgentSlug')?.value).toBe('foreman');
+    submit(container);
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ mode: 'foreman' }));
+  });
+
+  it('resets the custom agent slug when edit data changes', () => {
+    const { container, allProps, onSubmit } = render({
+      initialData: { ...initialData(), mode: 'foreman' },
+    });
+    act(() =>
+      root?.render(
+        createElement(TriggerForm, {
+          ...allProps,
+          initialData: { ...initialData(), mode: 'reviewer-2' },
+        })
+      )
+    );
+    expect(container.querySelector<HTMLInputElement>('#customAgentSlug')?.value).toBe('reviewer-2');
+    submit(container);
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ mode: 'reviewer-2' }));
+  });
 
   it('does not offer creator mode for personal triggers', () => {
     const { container } = render({ mode: 'create' });

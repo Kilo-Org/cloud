@@ -35,7 +35,7 @@ import {
 import { ProfileSelector } from '@/components/cloud-agent/ProfileSelector';
 import { RepoProfileBindingsDialog } from '@/components/cloud-agent/RepoProfileBindingsDialog';
 import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/RepositoryCombobox';
-import { ModeCombobox } from '@/components/shared/ModeCombobox';
+import { LEGACY_MODE_OPTIONS, ModeCombobox } from '@/components/shared/ModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
@@ -54,13 +54,23 @@ import {
   RESERVED_TRIGGER_IDS,
   MIN_CREATOR_WEBHOOK_SECRET_LENGTH,
   CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE,
+  webhookTriggerModeSchema,
 } from '@/lib/webhook-trigger-validation';
 import { TimezoneSelector } from './TimezoneSelector';
 import { ScheduleBuilder } from './ScheduleBuilder';
 import { cn } from '@/lib/utils';
 import { Check, Clock, Copy, Loader2, Webhook } from 'lucide-react';
 import { toast } from 'sonner';
-import type { AgentMode } from '@/components/cloud-agent/types';
+
+const CUSTOM_AGENT_OPTION = '__custom_agent__';
+const TRIGGER_MODE_OPTIONS = [
+  ...LEGACY_MODE_OPTIONS,
+  {
+    value: CUSTOM_AGENT_OPTION,
+    label: 'Custom agent',
+    description: 'Use an agent from the repository or profile',
+  },
+];
 
 export type TriggerFormData = {
   triggerId: string;
@@ -69,7 +79,7 @@ export type TriggerFormData = {
   cronExpression?: string;
   cronTimezone?: string;
   githubRepo: string;
-  mode: AgentMode;
+  mode: string;
   model: string;
   variant?: string | null;
   sandboxAllocation?: SandboxAllocation | null;
@@ -96,7 +106,7 @@ export type TriggerFormProps = {
     cronExpression?: string | null;
     cronTimezone?: string | null;
     githubRepo: string;
-    mode: AgentMode;
+    mode: string;
     model: string;
     variant?: string;
     sandboxAllocation?: SandboxAllocation | null;
@@ -186,7 +196,12 @@ export function TriggerForm({
   const [triggerId, setTriggerId] = useState(initialData?.triggerId ?? '');
   const [triggerIdError, setTriggerIdError] = useState<string | null>(null);
   const [githubRepo, setGithubRepo] = useState(initialData?.githubRepo ?? '');
-  const [agentMode, setAgentMode] = useState<AgentMode>((initialData?.mode as AgentMode) ?? 'ask');
+  const [agentMode, setAgentMode] = useState(initialData?.mode ?? 'ask');
+  const [useCustomAgent, setUseCustomAgent] = useState(
+    !!initialData?.mode && !LEGACY_MODE_OPTIONS.some(option => option.value === initialData.mode)
+  );
+  const agentModeResult = webhookTriggerModeSchema.safeParse(agentMode);
+  const agentModeError = agentModeResult.success ? null : agentModeResult.error.issues[0].message;
   const [model, setModel] = useState(initialData?.model ?? '');
   const [variant, setVariant] = useState(initialData?.variant);
   const initialSandboxAllocation = initialData?.sandboxAllocation ?? 'automatic';
@@ -267,6 +282,9 @@ export function TriggerForm({
       setTriggerId(initialData.triggerId);
       setGithubRepo(initialData.githubRepo);
       setAgentMode(initialData.mode ?? 'ask');
+      setUseCustomAgent(
+        !!initialData.mode && !LEGACY_MODE_OPTIONS.some(option => option.value === initialData.mode)
+      );
       setModel(initialData.model);
       setVariant(initialData.variant);
       setSandboxAllocation(initialData.sandboxAllocation ?? 'automatic');
@@ -389,6 +407,10 @@ export function TriggerForm({
       errors.push('Model is required');
     }
 
+    if (agentModeError) {
+      errors.push(agentModeError);
+    }
+
     if (!promptTemplate.trim()) {
       errors.push('Prompt template is required');
     }
@@ -429,6 +451,7 @@ export function TriggerForm({
     cronExpression,
     githubRepo,
     model,
+    agentModeError,
     promptTemplate,
     profileId,
     bodySchema,
@@ -708,12 +731,50 @@ export function TriggerForm({
                     : 'md:grid-cols-2'
                 )}
               >
-                <ModeCombobox
-                  label="Mode"
-                  value={agentMode}
-                  onValueChange={setAgentMode}
-                  disabled={isLoading}
-                />
+                <div className="min-w-0 space-y-2">
+                  <ModeCombobox
+                    label="Mode"
+                    options={TRIGGER_MODE_OPTIONS}
+                    value={useCustomAgent ? CUSTOM_AGENT_OPTION : agentMode}
+                    onValueChange={value => {
+                      if (value === CUSTOM_AGENT_OPTION && useCustomAgent) return;
+                      setUseCustomAgent(value === CUSTOM_AGENT_OPTION);
+                      setAgentMode(value === CUSTOM_AGENT_OPTION ? '' : value);
+                    }}
+                    disabled={isLoading}
+                  />
+                  {useCustomAgent && (
+                    <>
+                      <Label htmlFor="customAgentSlug">Agent slug</Label>
+                      <Input
+                        id="customAgentSlug"
+                        value={agentMode}
+                        onChange={event => setAgentMode(event.target.value)}
+                        placeholder="foreman"
+                        maxLength={50}
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        disabled={isLoading}
+                        aria-invalid={!!agentModeError}
+                        aria-describedby={
+                          agentModeError ? 'customAgentHelp customAgentError' : 'customAgentHelp'
+                        }
+                      />
+                      <p id="customAgentHelp" className="text-muted-foreground text-xs">
+                        The agent must exist in the repository&apos;s <code>.kilo/agent/</code>{' '}
+                        directory (for example, <code>.kilo/agent/foreman.md</code>) or in the
+                        selected profile. Use 1-50 lowercase letters, numbers, or hyphens, starting
+                        with a letter.
+                      </p>
+                      {agentModeError && (
+                        <p id="customAgentError" role="alert" className="text-destructive text-xs">
+                          {agentModeError}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
                 <ModelCombobox
                   label="Model"
                   models={models}

@@ -31,6 +31,7 @@ import { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
 import {
   triggerIdSchema,
   triggerIdCreateSchema,
+  webhookTriggerModeSchema,
   MIN_CREATOR_WEBHOOK_SECRET_LENGTH,
   CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE,
   type WebhookTriggerEditRestriction,
@@ -69,7 +70,7 @@ export const WebhookTriggerCreateInput = z
     kiloclawInstanceId: z.string().uuid().optional(),
     // Cloud Agent target fields (optional — required only when targetType = 'cloud_agent')
     githubRepo: z.string().min(1, 'GitHub repo is required').optional(),
-    mode: z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']).optional(),
+    mode: webhookTriggerModeSchema.optional(),
     model: z.string().min(1, 'Model is required').optional(),
     variant: variantSchema.optional(),
     sandboxAllocation: sandboxAllocationSchema.optional(),
@@ -195,7 +196,7 @@ export const WebhookTriggerUpdateInput = z
   .object({
     triggerId: triggerIdSchema,
     organizationId: z.string().uuid().optional(),
-    mode: z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']).optional(),
+    mode: webhookTriggerModeSchema.optional(),
     model: z.string().min(1).optional(),
     variant: variantSchema.nullable().optional(),
     sandboxAllocation: sandboxAllocationSchema.nullable().optional(),

@@ -6,6 +6,8 @@ import { createKiloClient as createLegacyKiloClient } from '@kilocode/sdk';
 import { createWrapperKiloClient } from '../kilo-api.js';
 import { unfilteredKiloEvents } from '../control/feed.js';
 import { KILO_CLI_VERSION } from '../../../src/shared/kilo-cli-version.js';
+import type { ControlPlaneRouteSpec } from '../../../src/shared/control-plane-protocol.js';
+import { materializeRuntimeProfile, withRuntimeProfileEnvironment } from './runtime-profile.js';
 
 type ToolCall = { name: string; arguments: Record<string, unknown> };
 export type ModelReply = { text?: string; tools?: ToolCall[]; status?: number };
@@ -17,6 +19,8 @@ export async function activityFixture(
     subagentPermission?: Record<string, 'allow' | 'ask' | 'deny'>;
     modelBaseUrl?: string;
     skillMarkdown?: string;
+    repositoryAgent?: { slug: string; markdown: string };
+    runtimeAgents?: ControlPlaneRouteSpec['runtimeAgents'];
   } = {}
 ) {
   const root = await fsp.realpath(await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-activity-781-')));
@@ -28,7 +32,7 @@ export async function activityFixture(
     await fsp.writeFile(path.join(skillDirectory, 'SKILL.md'), options.skillMarkdown);
   }
   const env = {
-    PATH: process.env.PATH,
+    PATH: process.env.PATH ?? '',
     HOME: root,
     XDG_CONFIG_HOME: path.join(root, 'config'),
     XDG_DATA_HOME: path.join(root, 'data'),
@@ -38,8 +42,22 @@ export async function activityFixture(
   const version = Bun.spawnSync([binary, '--version'], { env });
   if (version.stdout.toString().trim() !== KILO_CLI_VERSION)
     throw new Error(`Expected Kilo ${KILO_CLI_VERSION}`);
+  if (options.repositoryAgent) {
+    const initialized = Bun.spawnSync(['git', 'init', '--quiet'], { cwd: directory, env });
+    if (initialized.exitCode !== 0)
+      throw new Error('Could not initialize agent fixture repository');
+    const agents = path.join(directory, '.kilo', 'agent');
+    await fsp.mkdir(agents, { recursive: true });
+    await fsp.writeFile(
+      path.join(agents, `${options.repositoryAgent.slug}.md`),
+      options.repositoryAgent.markdown
+    );
+  }
+  const profile = { runtimeAgents: options.runtimeAgents };
+  if (options.runtimeAgents?.length) await materializeRuntimeProfile(root, profile);
   let respond: () => Promise<ModelReply> = async () => ({ text: 'done' });
   let requests = 0;
+  const modelRequests: string[] = [];
   const fake = Bun.serve({
     hostname: '127.0.0.1',
     port: 0,
@@ -48,7 +66,7 @@ export async function activityFixture(
         return Response.json({ data: [] });
       }
       requests++;
-      await request.arrayBuffer();
+      modelRequests.push(await request.text());
       const reply = await respond();
       if (reply.status)
         return Response.json({ error: { message: 'fixture retry' } }, { status: reply.status });
@@ -80,7 +98,7 @@ export async function activityFixture(
   const proc = Bun.spawn([binary, 'serve', '--hostname=127.0.0.1', '--port=0'], {
     cwd: directory,
     env: {
-      ...env,
+      ...withRuntimeProfileEnvironment(env, profile),
       KILO_CONFIG_CONTENT: JSON.stringify({
         model: 'contract/fake-deterministic',
         small_model: 'contract/fake-deterministic',
@@ -179,6 +197,7 @@ export async function activityFixture(
       ),
       globalClient: createKiloClient({ baseUrl: url }),
       events,
+      modelRequests,
       signal,
       dispose,
       until,

@@ -96,6 +96,7 @@ exist as an org-scoped mirror under `organizations`, for example
 - `unifiedSessions`
 - `usageAnalytics`
 - `user`
+- `userAiRequests`
 - `userExports`
 - `userFeedback`
 - `vercelCompute`

@@ -41,6 +41,13 @@ const protectedRouteEntries: ProtectedRouteEntry[] = [
     },
   },
   {
+    route: '/usage/requests',
+    render: async () => {
+      const { default: AiRequestsPage } = await import('@/app/(app)/usage/requests/page');
+      return AiRequestsPage();
+    },
+  },
+  {
     route: '/security-agent/config',
     render: renderSecurityAgentLayout,
   },

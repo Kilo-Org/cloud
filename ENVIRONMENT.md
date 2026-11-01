@@ -581,6 +581,7 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `CANDIDATE_TAG` - Tag string used by `scripts/test-rollout-bucket.mjs` to test rollout bucket assignment. [SERVER]
 - `PERCENT` - Percentage value (0-100) used by `scripts/test-rollout-bucket.mjs` when testing rollout bucket logic. [SERVER]
 - `SNOWFLAKE_MAX_POLL_ATTEMPTS` - Max poll attempts for Snowflake job completion in `services/kiloclaw-billing/src/snowflake.ts`. [SERVER]
+- `SNOWFLAKE_AI_REQUESTS_TABLE` - Optional Snowflake table path (`[DATABASE.][SCHEMA.]TABLE`) for the per-request usage page in `apps/web/src/routers/user-ai-requests-router.ts`. Defaults to `KILO_INTERMEDIATE.INT_MICRODOLLAR_USAGE__ENRICHED`; set it when a dbt sandbox builds that model in another schema. [SERVER]
 - `CF_AE_TOKEN` - Cloudflare Account/Enterprise API token for the local dev CLI (`dev/local/cli.ts`). `[SECRET]`
 - `KILO_PORT_OFFSET` - Port offset for the local dev tmux dashboard; applied by `dev/local/cli.ts` and `dev/local/services.ts` to prevent port conflicts. [SERVER]
 - `COMPOSE_PROJECT_NAME` - Docker Compose project for the local infrastructure; written to `dev/.env` by `dev/local/infra-env.ts` so a worktree with a port offset owns its own containers and volumes. [SERVER]

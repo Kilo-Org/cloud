@@ -69,6 +69,7 @@
     "organization": "Organisation",
     "platform": "Plattform",
     "prReview": "PR-Prüfung",
+    "prReviewSubtitle": "Pull-Requests mobil prüfen",
     "queued": "In der Warteschlange",
     "remove": "Entfernen",
     "repository": "Code-Repository",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "Automatische PR-Prüfungen",
     "securityAgentSubtitle": "Schwachstellen finden und beheben",
     "reviews": "Code-Prüfungen",
-    "prReviewSubtitle": "Pull-Requests mobil prüfen",
     "couldNotLoadOrganization": "Die Organisation konnte nicht geladen werden.",
     "couldNotLoadOrganizationDescription": "Die Einstellungen für Organisation und Agenten sind erst verfügbar, wenn die Organisation geladen wurde.",
     "linkedAccounts": "Verknüpfte Konten",
@@ -889,7 +889,9 @@
     "instructions": {
       "title": "Benutzerdefinierte Anweisungen",
       "deprecation": "Benutzerdefinierte Anweisungen sollen künftig entfallen. Verschiebe diese Richtlinien stattdessen in eine REVIEW.md-Datei in deinem Repository.",
-      "placeholder": "z. B. auf die Einhaltung unserer Regeln zur Fehlerbehandlung achten …"
+      "placeholder": "z. B. auf die Einhaltung unserer Regeln zur Fehlerbehandlung achten …",
+      "clearTitle": "Benutzerdefinierte Anweisungen entfernen?",
+      "clearMessage": "Wenn du ein leeres Feld speicherst, werden die für diesen Reviewer gespeicherten benutzerdefinierten Anweisungen gelöscht."
     },
     "repos": {
       "unavailable": "Die Repositories sind nicht verfügbar. Schließe die Bitbucket-Einrichtung auf kilo.ai ab.",
@@ -965,7 +967,7 @@
       "bitbucketError": "Die Bitbucket-Einrichtung konnte nicht geöffnet werden. Bitte versuche es erneut."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} von {{author}}",
+      "byline": "#{{number}} von {{author}}",
       "cancelMessage": "Das laufende Code-Review wird abgebrochen.",
       "cancelReview": "Review abbrechen",
       "cancelTitle": "Review abbrechen?",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "Alle Bereiche",
-      "customInstructions": "Benutzerdefinierte Anweisungen",
       "focusAreas": "Schwerpunkte",
       "nSelected": "{{displayCount}} ausgewählt",
       "proposedReviewMdGuidance": "Vorgeschlagene Richtlinien für REVIEW.md",
       "reviewStyle": "Art der Prüfung",
-      "set": "Festgelegt"
+      "set": "Festgelegt",
+      "notSet": "Nicht festgelegt"
     },
     "updateFailed": "Code Reviewer konnte nicht aktualisiert werden.",
     "configSaveFailed": "Die Review-Einstellungen konnten nicht gespeichert werden.",
@@ -1293,7 +1295,6 @@
       "noOpenFindings": "Keine offenen Befunde erfordern Maßnahmen",
       "noRepositoryData": "Noch keine Repository-Daten",
       "noRepositoryDataDescription": "Die Prioritäten der Repositories werden angezeigt, sobald die Befunde synchronisiert sind.",
-      "noSlaDeadline": "Keine SLA-Frist zugewiesen",
       "notExploitable": "Nicht ausnutzbar",
       "notMeasured": "Nicht gemessen",
       "notYetSynced": "Noch nicht synchronisiert",
@@ -1349,7 +1350,6 @@
       "alreadyResolvedDescription": "Dieser Befund wurde bereits behoben und kann nicht mehr verworfen werden.",
       "cannotDismissDescription": "Nur Organisationsinhaber, Admins und Abrechnungsmanager können Befunde verwerfen.",
       "cannotDismissTitle": "Dieser Befund kann nicht verworfen werden",
-      "commentAccessibility": "Kommentar zum Verwerfen",
       "commentLabel": "Kommentar (optional)",
       "commentPlaceholder": "Weitere Angaben zum Verwerfen …",
       "couldNotCheckPermissions": "Die Berechtigungen zum Verwerfen konnten nicht geprüft werden.",
@@ -1419,7 +1419,6 @@
       "newFindingSection": "Benachrichtigung bei neuen Befunden",
       "newFindingSeverityLabel": "Mindestschweregrad für neue Befunde",
       "newFindingSubtitle": "Die Benachrichtigung wird bei jedem neu synchronisierten Befund gesendet, auch bei der ersten Synchronisierung.",
-      "slaLeadTimeAccessibility": "Vorlauf für SLA-Warnungen in Tagen",
       "slaLeadTimeError": "Gib die Anzahl der Tage als ganze Zahl zwischen 1 und 365 ein.",
       "slaLeadTimeLabel": "Vorlauf für SLA-Warnungen (Tage)",
       "slaPersonalTitle": "Mich bei SLA-Warnungen per E-Mail benachrichtigen",
@@ -2713,10 +2712,8 @@
       "checkFailedTitleBitbucket": "Die Bitbucket-Verbindung konnte nicht geprüft werden.",
       "providerCheckFailedMessage": "Der Verbindungsstatus ist erst verfügbar, wenn die Prüfung abgeschlossen ist.",
       "reconnectTitle": "GitHub erneut verbinden",
-      "reconnectDescription": "Deine GitHub-Verbindung wurde widerrufen. Stelle sie erneut her, um Pull-Requests weiterhin in der App zu prüfen.",
-      "description": "Verbinde dein GitHub-Konto, um Pull-Requests in der App zu prüfen.",
-      "gitlabDescription": "Verbinde dein GitLab-Konto, um Merge-Requests in der App zu prüfen.",
-      "bitbucketDescription": "Verbinde Bitbucket mit dieser Organisation, um Pull-Requests in der App zu prüfen.",
+      "reconnectDescription": "Deine GitHub-Verbindung wurde widerrufen.",
+      "gitlabDescription": "Merge-Requests mobil prüfen",
       "bitbucketOrgOnlyDescription": "Wechsle das Konto oben zu einer Organisation, um deren Pull-Requests in Bitbucket zu prüfen.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Diesem Konto ist noch keine Organisation zugeordnet. Du kannst Bitbucket-Pull-Requests prüfen, sobald du eine Organisation erstellst oder einer beitrittst.",
       "contextLine": "Für {{organization}}",
@@ -2950,6 +2947,7 @@
     "installKiloGitHubApp": "GitHub-App von Kilo installieren",
     "merge": {
       "merge": "Zusammenführen",
+      "mergeTitle": "Zusammenführen",
       "mergeNow": "Jetzt zusammenführen",
       "mergePullRequest": "Pull-Request zusammenführen",
       "mergeTermTitle": "{{term}} zusammenführen",

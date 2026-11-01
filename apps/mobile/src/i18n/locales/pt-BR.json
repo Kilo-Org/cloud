@@ -69,6 +69,7 @@
     "organization": "Organização",
     "platform": "Plataforma",
     "prReview": "Revisão de PR",
+    "prReviewSubtitle": "Revisar PRs no celular",
     "queued": "Na fila",
     "remove": "Remover",
     "repository": "Repositório",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "Revisões automáticas de PR",
     "securityAgentSubtitle": "Encontrar e corrigir vulnerabilidades",
     "reviews": "Revisões",
-    "prReviewSubtitle": "Revisar PRs no celular",
     "couldNotLoadOrganization": "Não foi possível carregar a organização.",
     "couldNotLoadOrganizationDescription": "As configurações da organização e dos agentes só ficarão disponíveis após o carregamento dos dados.",
     "linkedAccounts": "Contas vinculadas",
@@ -860,7 +860,9 @@
     "instructions": {
       "title": "Instruções personalizadas",
       "deprecation": "Está prevista a descontinuação das instruções personalizadas. Transfira essas orientações para um arquivo REVIEW.md no seu repositório.",
-      "placeholder": "ex.: seguir nossas convenções de tratamento de erros…"
+      "placeholder": "ex.: seguir nossas convenções de tratamento de erros…",
+      "clearTitle": "Remover instruções personalizadas?",
+      "clearMessage": "Salvar um campo vazio exclui as instruções personalizadas armazenadas para este revisor."
     },
     "repos": {
       "unavailable": "Repositórios indisponíveis — conclua a configuração do Bitbucket em kilo.ai.",
@@ -936,7 +938,7 @@
       "bitbucketError": "Não foi possível abrir a configuração do Bitbucket. Tente novamente."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} por {{author}}",
+      "byline": "#{{number}} por {{author}}",
       "cancelMessage": "Isso interromperá a revisão de código em andamento.",
       "cancelReview": "Cancelar revisão",
       "cancelTitle": "Cancelar revisão?",
@@ -1051,12 +1053,12 @@
     },
     "overview": {
       "allAreas": "Todas as áreas",
-      "customInstructions": "Instruções personalizadas",
       "focusAreas": "Áreas prioritárias",
       "nSelected": "{{displayCount}} selecionados",
       "proposedReviewMdGuidance": "Orientações propostas para o REVIEW.md",
       "reviewStyle": "Estilo de revisão",
-      "set": "Configurado"
+      "set": "Configurado",
+      "notSet": "Não configurado"
     },
     "updateFailed": "Não foi possível atualizar o revisor.",
     "configSaveFailed": "Não foi possível salvar a configuração de revisão.",
@@ -1266,7 +1268,6 @@
       "noOpenFindings": "Nenhuma ocorrência em aberto precisa de atenção",
       "noRepositoryData": "Ainda não há dados dos repositórios",
       "noRepositoryDataDescription": "As prioridades dos repositórios aparecerão após a sincronização das ocorrências.",
-      "noSlaDeadline": "Nenhum prazo de SLA definido",
       "notExploitable": "Não explorável",
       "notMeasured": "Não medido",
       "notYetSynced": "Ainda não sincronizado",
@@ -1336,7 +1337,6 @@
       "alreadyResolvedDescription": "Esta ocorrência já foi resolvida e não pode mais ser descartada.",
       "cannotDismissDescription": "Somente proprietários, administradores e gerentes de cobrança da organização podem descartar ocorrências.",
       "cannotDismissTitle": "Não é possível descartar esta ocorrência",
-      "commentAccessibility": "Comentário sobre o descarte",
       "commentLabel": "Comentário (opcional)",
       "commentPlaceholder": "Contexto do descarte…",
       "couldNotCheckPermissions": "Não foi possível verificar as permissões para descartar ocorrências.",
@@ -1406,7 +1406,6 @@
       "newFindingSection": "Notificações de novas ocorrências",
       "newFindingSeverityLabel": "Gravidade mínima das novas ocorrências",
       "newFindingSubtitle": "Enviada sempre que uma nova ocorrência é sincronizada, inclusive na primeira sincronização.",
-      "slaLeadTimeAccessibility": "Antecedência do aviso de SLA em dias",
       "slaLeadTimeError": "Digite um número inteiro de dias entre 1 e 365.",
       "slaLeadTimeLabel": "Antecedência do aviso de SLA (dias)",
       "slaPersonalTitle": "Receber avisos de SLA por e-mail",
@@ -2753,10 +2752,8 @@
       "checkFailedTitleBitbucket": "Não foi possível verificar a conexão com o Bitbucket.",
       "providerCheckFailedMessage": "O status da conexão só fica disponível quando o carregamento terminar.",
       "reconnectTitle": "Reconexão com o GitHub",
-      "reconnectDescription": "Sua conexão com o GitHub foi revogada. Conecte-se novamente para continuar revisando pull requests no celular.",
-      "description": "Conecte sua conta do GitHub para revisar pull requests no celular.",
-      "gitlabDescription": "Conecte sua conta do GitLab para revisar merge requests no celular.",
-      "bitbucketDescription": "Conecte o Bitbucket a esta organização para revisar pull requests no celular.",
+      "reconnectDescription": "Sua conexão com o GitHub foi revogada.",
+      "gitlabDescription": "Revisar merge requests no celular",
       "bitbucketOrgOnlyDescription": "Mude a conta acima para uma organização para revisar as pull requests dela no Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta conta ainda não tem organizações. As pull requests do Bitbucket podem ser revisadas quando você criar ou entrar em uma organização.",
       "contextLine": "Para {{organization}}",
@@ -3000,6 +2997,7 @@
     "installKiloGitHubApp": "Instalar o aplicativo do Kilo para GitHub",
     "merge": {
       "merge": "Mesclagem",
+      "mergeTitle": "Mesclagem",
       "mergeNow": "Mesclar agora",
       "mergePullRequest": "Mesclagem do pull request",
       "mergeTermTitle": "Mesclar {{term}}",

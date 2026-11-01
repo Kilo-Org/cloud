@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- one publisher state machine: derive, gate, renew, coalesce, and terminal end */
 import {
   buildGlanceableSnapshot,
+  buildOpaqueScopeKey,
   GLANCEABLE_COALESCE_MS,
   GLANCEABLE_STALE_MS,
   GLANCEABLE_TERMINAL_MS,
@@ -52,6 +53,12 @@ export type GlanceablePublisherOptions = {
   sinks: readonly GlanceableSink[];
   /** Seeded from the persisted last snapshot so revision stays monotonic. */
   initial?: GlanceableAgentsSnapshot | null;
+  /**
+   * Revision floor for a publisher that starts with no current snapshot: a sink
+   * drops a frame at or below the revision it holds, so the first frame this
+   * publisher writes still outranks the one already on the surfaces.
+   */
+  initialRevision?: number;
   now?: () => number;
   coalesceMs?: number;
   terminalMs?: number;
@@ -136,6 +143,7 @@ export class GlanceablePublisher {
   private readonly terminalMs: number;
   private readonly terminalBlankEpoch: () => number;
   private readonly blankEpochAtStart: number;
+  private readonly initialRevision: number;
   private readonly orgLost: () => boolean;
   private readonly onWaitingAskChange?: (ask: WaitingAsk | null) => void;
   private readonly skipWaitingAskSessionId?: string;
@@ -181,6 +189,7 @@ export class GlanceablePublisher {
     this.terminalMs = options.terminalMs ?? GLANCEABLE_TERMINAL_MS;
     this.terminalBlankEpoch = options.terminalBlankEpoch ?? (() => 0);
     this.blankEpochAtStart = this.terminalBlankEpoch();
+    this.initialRevision = options.initialRevision ?? options.initial?.revision ?? 0;
     this.orgLost = options.orgLost ?? (() => false);
     this.onWaitingAskChange = options.onWaitingAskChange;
     this.skipWaitingAskSessionId = options.skipWaitingAskSessionId;
@@ -258,7 +267,7 @@ export class GlanceablePublisher {
       userId: ctx.userId,
       organizationId: ctx.organizationId,
       now,
-      previousRevision: this.current?.revision ?? 0,
+      previousRevision: this.current?.revision ?? this.initialRevision,
     });
     rememberSnapshotRows(snapshot.scopeKey, sessions);
 
@@ -369,6 +378,7 @@ export class GlanceablePublisher {
       userId: ctx.userId,
       organizationId: ctx.organizationId,
       now: this.now(),
+      previousRevision: this.initialRevision,
       status: 'waiting',
     });
     this.publish(snapshot);
@@ -384,6 +394,12 @@ export class GlanceablePublisher {
     // so a still-recorded waiting session must not stay approvable from it.
     this.noteWaitingAsk(null);
     if (this.isGated() || this.current === null) {
+      return;
+    }
+    // A publisher writes frames of its own scope only. A held frame under any
+    // other scope key is not this context's state.
+    if (this.current.scopeKey !== buildOpaqueScopeKey(ctx)) {
+      this.current = null;
       return;
     }
     // A fetch error supersedes any pending coalesced happy emit: otherwise the

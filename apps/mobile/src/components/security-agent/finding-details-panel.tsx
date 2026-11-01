@@ -126,9 +126,10 @@ function DismissalOrSupersessionNote({
 }
 
 // Ported from FindingDetailDialog.tsx:552 (getFindingDetailsPresentation) —
-// source, package, repository, severity/status, timestamps, and
-// dismissal/supersession context as plain facts rather than the web's
-// hero + next-step action card (Task 7 owns actions).
+// source, package, severity/status, timestamps, and dismissal/supersession
+// context as plain facts rather than the web's hero + next-step action card
+// (Task 7 owns actions). The repository is the screen header's eyebrow, so this
+// card does not repeat it.
 export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsPanelProps>) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -214,6 +215,19 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
       : []),
   ];
 
+  // The repository is the header's eyebrow, which sits directly above this
+  // card, so the details list does not repeat it. What the source reported of
+  // the advisory identifiers is optional; the group's divider hangs under
+  // whichever row ends it.
+  const advisoryRows = [
+    ...(finding.cve_id
+      ? [{ label: t('securityAgent.findingDetails.cve'), value: finding.cve_id }]
+      : []),
+    ...(finding.ghsa_id
+      ? [{ label: t('securityAgent.findingDetails.ghsa'), value: finding.ghsa_id }]
+      : []),
+  ];
+
   return (
     <View className="gap-4">
       <View className="gap-2 rounded-lg bg-secondary p-3">
@@ -257,6 +271,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         <KvRow
           label={t('securityAgent.findingDetails.vulnerableVersions')}
           value={firstNonEmpty(finding.vulnerable_version_range, t('common.unknown'))}
+          valueFace={finding.vulnerable_version_range ? 'mono' : 'text'}
           valueDirection={finding.vulnerable_version_range ? 'ltr' : undefined}
           selectable
         />
@@ -266,32 +281,21 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             finding.patched_version,
             t('securityAgent.findingDetails.noPatchAvailable')
           )}
+          valueFace={finding.patched_version ? 'mono' : 'text'}
           valueDirection={finding.patched_version ? 'ltr' : undefined}
+          last={advisoryRows.length === 0 && !finding.manifest_path}
           selectable
         />
-        {finding.cve_id ? (
+        {advisoryRows.map((row, index) => (
           <KvRow
-            label={t('securityAgent.findingDetails.cve')}
-            value={finding.cve_id}
+            key={row.label}
+            label={row.label}
+            value={row.value}
+            last={index === advisoryRows.length - 1 && !finding.manifest_path}
             valueDirection="ltr"
             selectable
           />
-        ) : null}
-        {finding.ghsa_id ? (
-          <KvRow
-            label={t('securityAgent.findingDetails.ghsa')}
-            value={finding.ghsa_id}
-            valueDirection="ltr"
-            selectable
-          />
-        ) : null}
-        <KvRow
-          label={t('common.repository')}
-          value={finding.repo_full_name}
-          last={!finding.manifest_path}
-          valueDirection="ltr"
-          selectable
-        />
+        ))}
         {finding.manifest_path ? (
           <KvRow
             label={t('securityAgent.findingDetails.manifest')}
@@ -309,6 +313,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             key={row.key}
             label={row.label}
             value={row.value}
+            valueFace="text"
             valueTone={row.tone}
             last={index === dateRows.length - 1}
           />
@@ -319,6 +324,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         <KvRow
           label={t('securityAgent.findingDetails.source')}
           value={getFindingSourceLabel(finding.source)}
+          valueFace="text"
         />
         <KvRow
           label={t('securityAgent.findingDetails.sourceId')}

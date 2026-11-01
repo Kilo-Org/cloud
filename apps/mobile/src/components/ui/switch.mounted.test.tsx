@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import { TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { darkColors, lightColors } from '@/lib/hooks/use-theme-colors';
 import { Switch } from './switch';
 
@@ -26,6 +27,7 @@ type SwitchFixture = {
   trackColor?: { false?: string; true?: string };
   thumbColor?: string;
   value?: boolean;
+  style?: { marginVertical?: number };
 };
 
 function renderSwitch(props: SwitchFixture) {
@@ -46,6 +48,7 @@ function nativeProps(root: I): {
   trackColor?: { false?: string; true?: string };
   thumbColor?: string;
   value?: boolean;
+  style?: unknown;
 } {
   const node = root.findAll(candidate => (candidate.type as string) === 'Switch')[0];
   if (!node) {
@@ -105,21 +108,24 @@ describe('Switch', () => {
     const props = nativeProps(renderSwitch({ value: false }).root);
     expect(props.trackColor).toEqual({
       false: darkColors.mutedForeground,
-      true: darkColors.primary,
+      true: darkColors.selection,
     });
     expect(props.thumbColor).toBe(darkColors.foreground);
     expect(props.thumbColor).not.toBe(darkColors.primaryForeground);
   });
 
-  it('paints the dark on grip from the primary foreground', () => {
+  // Dark's accent is the brand yellow, which glares on the near-black page; the
+  // on pair takes the muted olive both schemes share instead.
+  it('paints the dark on track with the muted olive, not the accent', () => {
     native.os = 'android';
     native.scheme = 'dark';
     const props = nativeProps(renderSwitch({ value: true }).root);
     expect(props.trackColor).toEqual({
       false: darkColors.mutedForeground,
-      true: darkColors.primary,
+      true: darkColors.selection,
     });
-    expect(props.thumbColor).toBe(darkColors.primaryForeground);
+    expect(props.trackColor?.true).not.toBe(darkColors.primary);
+    expect(props.thumbColor).toBe(darkColors.selectionForeground);
   });
 
   it('keeps track and grip colors a caller supplies', () => {
@@ -131,6 +137,22 @@ describe('Switch', () => {
     );
     expect(props.trackColor).toEqual({ false: '#222222', true: '#111111' });
     expect(props.thumbColor).toBe('#333333');
+  });
+
+  it('gives the control a full touch target on both axes', () => {
+    native.os = 'android';
+    const props = nativeProps(renderSwitch({}).root);
+    expect((props.style as unknown[])[0]).toEqual({
+      minHeight: TOUCH_TARGET_DP,
+      minWidth: TOUCH_TARGET_DP,
+    });
+  });
+
+  it('applies a caller style after the touch target box', () => {
+    native.os = 'android';
+    const style = { marginVertical: 3 };
+    const props = nativeProps(renderSwitch({ style }).root);
+    expect(props.style).toEqual([{ minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP }, style]);
   });
 
   it('paints the muted pair on a disabled on switch and keeps it on', () => {

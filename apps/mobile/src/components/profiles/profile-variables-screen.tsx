@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import {
   applyVariableEdit,
   type ProfileVarSource,
@@ -17,7 +18,6 @@ import {
   VariablesSkeleton,
 } from '@/components/profiles/profile-variables-rows';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -246,7 +246,11 @@ export function ProfileVariablesScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profiles.variablesTitle')} />
+      <ProfileSectionHeader
+        profileId={profileId}
+        organizationId={organizationId}
+        title={t('profiles.variablesTitle')}
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"

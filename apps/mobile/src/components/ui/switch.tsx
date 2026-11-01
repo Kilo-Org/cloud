@@ -1,5 +1,6 @@
 import { Switch as NativeSwitch, Platform, type SwitchProps, useColorScheme } from 'react-native';
 
+import { TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 /**
@@ -9,8 +10,14 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * Untinted, the control draws its on-track with the platform accent, a
  * saturated teal on Android that belongs to no palette entry. In a list row
  * that outranks the row title and the screen's own button, so the track takes
- * the scheme's `primary` and the grip its `primaryForeground`, which keeps the
- * two legible against each other in light and dark.
+ * the palette's olive accent and the grip its foreground, which keeps the two
+ * legible against each other in light and dark.
+ *
+ * The olive is `primary` in light and `selection` in dark: dark's `primary`
+ * is the brand yellow (#ffdd00), which glares on the near-black page and pulls
+ * the eye harder than the row title it sits beside, so dark takes the muted
+ * olive the palette keeps for the same theme (`selection`, #4f5a10 — the light
+ * primary's own hue) rather than the accent.
  *
  * The off pair follows the scheme as well, because a grip that always takes
  * `primaryForeground` is near-black in dark mode and vanishes into the off
@@ -41,6 +48,14 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * `disabled` but not the matching state, so a switch that cannot be toggled
  * still announces itself as enabled. Android already folds `disabled` into that
  * state; doing it here keeps both platforms honest.
+ *
+ * The control draws at the platform's own size — about 46.5x27dp on Android,
+ * 51x31pt on iOS — which is under `DESIGN.md:364`'s 44pt touch target, and the
+ * audit reads the control's own node rect, so a caller's row or `hitSlop` does
+ * not lift it. Every caller gets the target here instead: the node renders at
+ * least {@link TOUCH_TARGET_DP} on both axes and a caller's `style` is applied
+ * last, so a row grows to the control it hosts rather than the control
+ * shrinking to the row.
  */
 export function Switch({
   disabled,
@@ -48,6 +63,7 @@ export function Switch({
   trackColor,
   thumbColor,
   value,
+  style,
   ...props
 }: SwitchProps) {
   const colors = useThemeColors();
@@ -55,20 +71,26 @@ export function Switch({
   const resolvedDisabled = disabled ?? accessibilityState?.disabled;
   // Only Android needs the muted pair: iOS fades a disabled `UISwitch` itself.
   const inactive = resolvedDisabled === true && Platform.OS === 'android';
+  // The on pair is the olive accent at the luminance its grip needs: light
+  // fills with `primary`, dark with the muted olive `selection`.
+  const enabledOnTrack = dark ? colors.selection : colors.primary;
+  const enabledOnGrip = dark ? colors.selectionForeground : colors.primaryForeground;
   const enabledOffGrip = dark ? colors.foreground : colors.primaryForeground;
   const enabledOffTrack = dark ? colors.mutedForeground : colors.mutedSoft;
-  // The on grip sits on `primary`, the off grip on the off track; the off grip
-  // and track lose their strength when the control is unavailable.
+  // The off grip sits on the off track; the grip and track lose their strength
+  // when the control is unavailable, and the on track takes the disabled fill.
   const offGrip = inactive ? colors.mutedForeground : enabledOffGrip;
   const offTrack = inactive ? colors.mutedSoft : enabledOffTrack;
-  const onTrack = inactive ? colors.primaryDisabled : colors.primary;
+  const onTrack = inactive ? colors.primaryDisabled : enabledOnTrack;
+  const onGrip = inactive ? colors.primaryForeground : enabledOnGrip;
 
   return (
     <NativeSwitch
       {...props}
+      style={[{ minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP }, style]}
       value={value}
       trackColor={trackColor ?? { false: offTrack, true: onTrack }}
-      thumbColor={thumbColor ?? (value ? colors.primaryForeground : offGrip)}
+      thumbColor={thumbColor ?? (value ? onGrip : offGrip)}
       disabled={resolvedDisabled}
       accessibilityState={
         Platform.OS === 'ios'

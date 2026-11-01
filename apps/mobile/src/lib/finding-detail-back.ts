@@ -22,13 +22,18 @@ export function findingDetailHasLocalHistory(state: { index: number } | undefine
  * Decide the finding-detail back action from the local-history signal.
  *
  * - `pop` when there is local history: the normal findings-list -> finding
- *   flow must return to the list, so back pops normally.
+ *   flow must return to the list, so back pops normally. A report a link
+ *   opened on its own has the scope dashboard beneath it too, because the
+ *   group's scene layout puts it there (`use-repair-security-agent-scope-stack`),
+ *   so back steps to the dashboard — the parent the reader arrived under —
+ *   rather than leaving the feature.
  * - `replace` to the scope's findings list when there is no local history: a
  *   push/deep-link opened the report with nothing beneath it, so a bare `pop`
  *   is a no-op and back must land on that list. It is a sibling route in the
  *   same stack as the report — `security-agent` lives in the root stack, above
  *   the tab bar — so the landing leaves no tab selected and never drops the
- *   user into a different tab.
+ *   user into a different tab. This is the frame before that repair commits,
+ *   and the fallback for a Stack the repair cannot settle.
  */
 export function findingDetailBackTarget(
   hasLocalHistory: boolean,

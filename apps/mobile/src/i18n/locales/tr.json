@@ -69,6 +69,7 @@
     "organization": "Kuruluş",
     "platform": "Kod barındırma hizmeti",
     "prReview": "PR incelemesi",
+    "prReviewSubtitle": "Çekme isteklerini mobilde incele",
     "queued": "Kuyrukta",
     "remove": "Kaldır",
     "repository": "Depo",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "Otomatik PR incelemeleri",
     "securityAgentSubtitle": "Güvenlik açıklarını bul ve gider",
     "reviews": "İncelemeler",
-    "prReviewSubtitle": "Çekme isteklerini mobilde incele",
     "couldNotLoadOrganization": "Kuruluş yüklenemedi.",
     "couldNotLoadOrganizationDescription": "Kuruluş yüklenene kadar kuruluş ve ajan ayarları kullanılamaz.",
     "linkedAccounts": "Bağlı hesaplar",
@@ -889,7 +889,9 @@
     "instructions": {
       "title": "Özel talimatlar",
       "deprecation": "Özel talimatlar özelliğinin kullanımdan kaldırılması planlanıyor. Bu yönergeleri depondaki bir REVIEW.md dosyasına taşı.",
-      "placeholder": "örn. Hata işleme kurallarımıza uy…"
+      "placeholder": "örn. Hata işleme kurallarımıza uy…",
+      "clearTitle": "Özel talimatlar kaldırılsın mı?",
+      "clearMessage": "Boş bir alanı kaydetmek, bu inceleyici için depolanan özel talimatları siler."
     },
     "repos": {
       "unavailable": "Depolara erişilemiyor. Bitbucket kurulumunu kilo.ai üzerinden tamamla.",
@@ -965,7 +967,7 @@
       "bitbucketError": "Bitbucket kurulumu açılamadı. Lütfen tekrar dene."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · Oluşturan: {{author}}",
+      "byline": "#{{number}} · Oluşturan: {{author}}",
       "cancelMessage": "Devam eden kod incelemesi durdurulacak.",
       "cancelReview": "İncelemeyi iptal et",
       "cancelTitle": "İnceleme iptal edilsin mi?",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "Tüm alanlar",
-      "customInstructions": "Özel talimatlar",
       "focusAreas": "Odak alanları",
       "nSelected": "{{displayCount}} seçili",
       "proposedReviewMdGuidance": "Önerilen REVIEW.md yönergeleri",
       "reviewStyle": "İnceleme stili",
-      "set": "Belirlendi"
+      "set": "Belirlendi",
+      "notSet": "Belirlenmedi"
     },
     "updateFailed": "Kod inceleyici güncellenemedi.",
     "configSaveFailed": "İnceleme ayarları kaydedilemedi.",
@@ -1293,7 +1295,6 @@
       "noOpenFindings": "Müdahale gerektiren açık bulgu yok",
       "noRepositoryData": "Henüz depo verisi yok",
       "noRepositoryDataDescription": "Depo öncelikleri, bulgular eşitlendikten sonra görünür.",
-      "noSlaDeadline": "SLA son tarihi belirlenmedi",
       "notExploitable": "İstismar edilemez",
       "notMeasured": "Ölçülmedi",
       "notYetSynced": "Henüz eşitlenmedi",
@@ -1349,7 +1350,6 @@
       "alreadyResolvedDescription": "Bu bulgu zaten çözüldüğü için artık yok sayılamaz.",
       "cannotDismissDescription": "Bulguları yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri yok sayabilir.",
       "cannotDismissTitle": "Bu bulgu yok sayılamıyor",
-      "commentAccessibility": "Yok sayma yorumu",
       "commentLabel": "Yorum (isteğe bağlı)",
       "commentPlaceholder": "Yok sayma nedenine ilişkin ek bilgi…",
       "couldNotCheckPermissions": "Yok sayma izinleri kontrol edilemedi.",
@@ -1419,7 +1419,6 @@
       "newFindingSection": "Yeni bulgu bildirimi",
       "newFindingSeverityLabel": "Yeni bulgular için en düşük önem derecesi",
       "newFindingSubtitle": "İlk eşitleme dahil, yeni bir bulgu eşitlendiğinde gönderilir.",
-      "slaLeadTimeAccessibility": "SLA uyarısının kaç gün önce gönderileceği",
       "slaLeadTimeError": "Gün sayısı olarak 1 ile 365 arasında bir tam sayı gir.",
       "slaLeadTimeLabel": "SLA uyarısını önceden gönder (gün)",
       "slaPersonalTitle": "SLA uyarıları hakkında bana e-posta gönder",
@@ -2713,10 +2712,8 @@
       "checkFailedTitleBitbucket": "Bitbucket bağlantısı kontrol edilemedi.",
       "providerCheckFailedMessage": "Bağlantı durumu, yüklenene kadar kullanılamıyor.",
       "reconnectTitle": "GitHub'a yeniden bağlan",
-      "reconnectDescription": "GitHub bağlantının izni kaldırıldı. Mobilde çekme isteklerini incelemeye devam etmek için yeniden bağlan.",
-      "description": "Mobilde çekme isteklerini incelemek için GitHub hesabını bağla.",
-      "gitlabDescription": "Mobilde birleştirme isteklerini gözden geçirmek için GitLab hesabını bağla.",
-      "bitbucketDescription": "Mobilde çekme isteklerini gözden geçirmek için Bitbucket'ı bu kuruluşla bağla.",
+      "reconnectDescription": "GitHub bağlantının izni kaldırıldı.",
+      "gitlabDescription": "Birleştirme isteklerini mobilde incele",
       "bitbucketOrgOnlyDescription": "Yukarıdaki hesabı bir kuruluşa geçir, onun Bitbucket çekme isteklerini gözden geçirmek için.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabın henüz bir kuruluşu yok. Bitbucket çekme isteklerini, bir kuruluş oluşturduktan ya da birine katıldıktan sonra gözden geçirebilirsin.",
       "contextLine": "{{organization}} için",
@@ -2950,6 +2947,7 @@
     "installKiloGitHubApp": "Kilo GitHub uygulamasını yükle",
     "merge": {
       "merge": "Birleştirme",
+      "mergeTitle": "Birleştirme",
       "mergeNow": "Şimdi birleştir",
       "mergePullRequest": "Çekme isteğini birleştirme",
       "mergeTermTitle": "{{term}}ni birleştirme",

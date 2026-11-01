@@ -47,7 +47,7 @@ export function PrMergeSectionProvider({ prRef, state }: PrMergeSectionProviderP
   return (
     <View className="gap-2">
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('prReview.merge.merge')}
+        {t('prReview.merge.mergeTitle')}
       </Text>
       <Button
         onPress={() => {

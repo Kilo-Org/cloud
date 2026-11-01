@@ -2653,6 +2653,45 @@ describe('GitHub installation persistence', () => {
     });
   });
 
+  test('leaves a linked organization association roleless when its canonical record is unusable', async () => {
+    const organization = await createTestOrganization('Backfill stale canonical', ownerId, 0);
+    await db.insert(github_app_installations).values({
+      installation_id: '777003',
+      github_app_type: 'standard',
+      lifecycle_state: 'suspended',
+    });
+    const [legacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '777003',
+        platform_account_login: 'acme',
+        integration_status: 'active',
+        github_app_type: 'standard',
+        repository_access: 'all',
+      })
+      .returning();
+
+    await expect(backfillGitHubInstallations()).resolves.toMatchObject({
+      scanned: 1,
+      canonicalCreated: 0,
+      linked: 1,
+      roleAssigned: 0,
+    });
+
+    // The link is repaired, but a stored role here would report the
+    // organization connected through an installation no lookup accepts.
+    await expect(
+      db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, legacy.id) })
+    ).resolves.toMatchObject({
+      github_installation_id: expect.any(String),
+      github_connection_role: null,
+    });
+    await expect(getPrimaryGitHubIntegrationForOrganization(organization.id)).resolves.toBeNull();
+  });
+
   test('leaves a linked organization association roleless when another row claims the installation', async () => {
     const claimingOrganization = await createTestOrganization('Claimant', ownerId, 0);
     const organization = await createTestOrganization('Shadowed', ownerId, 0);

@@ -126,7 +126,13 @@ export async function backfillGitHubInstallations(
         .returning({ id: github_app_installations.id });
       if (inserted.length > 0) result.canonicalCreated++;
       const [canonical] = await tx
-        .select({ id: github_app_installations.id })
+        .select({
+          id: github_app_installations.id,
+          lifecycle_state: github_app_installations.lifecycle_state,
+          suspended_at: github_app_installations.suspended_at,
+          deleted_at: github_app_installations.deleted_at,
+          auth_invalid_at: github_app_installations.auth_invalid_at,
+        })
         .from(github_app_installations)
         .where(
           and(
@@ -136,6 +142,18 @@ export async function backfillGitHubInstallations(
         )
         .limit(1);
       if (!canonical) return;
+      // The role is the stored half of the shared organization workflow
+      // connection definition, whose canonical check only accepts the active
+      // record of this identity. Linking to a canonical record that is
+      // suspended, deleted or auth-invalid is a repair the organizations that
+      // read this row still need, so the link happens either way, but such a
+      // row keeps its role: a stored `workflow` would otherwise report the
+      // organization connected with an installation no lookup will use.
+      const canonicalIsUsable =
+        canonical.lifecycle_state === 'active' &&
+        !canonical.suspended_at &&
+        !canonical.deleted_at &&
+        !canonical.auth_invalid_at;
       const updated = await tx
         .update(platform_integrations)
         .set({
@@ -147,7 +165,9 @@ export async function backfillGitHubInstallations(
           // the same rows migration 0322 classified — a healthy, organization
           // owned GitHub App association whose installation identity no other
           // row claims — and leave every other row exactly as it is.
-          github_connection_role: sql`
+          ...(canonicalIsUsable
+            ? {
+                github_connection_role: sql`
             CASE WHEN (
               ${platform_integrations.github_connection_role} IS NULL
               AND ${platform_integrations.owned_by_organization_id} IS NOT NULL
@@ -166,6 +186,8 @@ export async function backfillGitHubInstallations(
             ELSE ${platform_integrations.github_connection_role}
             END
           `,
+              }
+            : {}),
         })
         .where(
           and(

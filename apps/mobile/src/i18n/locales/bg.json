@@ -403,6 +403,7 @@
     "connectionExpired": "Срокът на връзката с GitHub изтече.",
     "merge": {
       "merge": "Сливане",
+      "mergeTitle": "Сливане",
       "mergeNow": "Обедини сега",
       "mergePullRequest": "Обединяване на заявката",
       "mergeTermTitle": "Обедини {{term}}",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Преглеждай merge заявки от телефона си",
       "bitbucketOrgOnlyDescription": "Превключете акаунта горе към организация, за да преглеждате нейните заявки за сливане в Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Този акаунт все още няма организации. Заявките за сливане в Bitbucket могат да се преглеждат, след като създадете организация или се присъедините към такава.",
+      "gitlabReconnectAdminOnlyDescription": "Поискайте от собственик, администратор или отговорник за плащанията на организацията да я свържат.",
+      "bitbucketNotConnectedTitle": "Няма връзка с Bitbucket",
+      "bitbucketAdminOnlyDescription": "Само собствениците на организацията, администраторите и отговорниците за плащанията могат да я установят.",
       "contextLine": "За {{organization}}",
       "contextLinePersonal": "За личния профил"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Персонализирани инструкции",
       "deprecation": "Предстои спиране на поддръжката за персонализираните инструкции. Вместо това премести тези насоки във файл REVIEW.md в хранилището си.",
-      "placeholder": "напр. спазване на правилата ни за обработка на грешки…"
+      "placeholder": "напр. спазване на правилата ни за обработка на грешки…",
+      "clearTitle": "Премахване на персонализираните инструкции?",
+      "clearMessage": "Ако запазиш празно поле, ще изтриеш персонализираните инструкции, съхранени за този рецензент."
     },
     "repos": {
       "unavailable": "Хранилищата са недостъпни — завърши настройката на Bitbucket в kilo.ai.",
@@ -1599,11 +1605,9 @@
       "bitbucketError": "Не успяхме да отворим настройката на Bitbucket. Опитай отново."
     },
     "overview": {
-      "reviewStyle": "Стил на прегледа",
-      "focusAreas": "Акценти",
       "allAreas": "Всички области",
-      "customInstructions": "Персонализирани инструкции",
       "set": "Зададено",
+      "notSet": "Не е зададено",
       "nSelected": "{{displayCount}} избрани",
       "proposedReviewMdGuidance": "Предложени насоки за REVIEW.md"
     },
@@ -2061,7 +2065,8 @@
       "actionBlocked": "Не можахме да завършим това действие. Проблемът трябва да бъде отстранен, преди да опиташ отново.",
       "syncNoRepositories": "Няма репозиторита в обхвата на синхронизиране. Изберете репозиторитата, които Агентът по сигурността наблюдава, и синхронизирайте отново.",
       "syncIntegrationInactive": "Връзката с GitHub за Агент по сигурността не е активна. Свържете отново Kilo GitHub App и след това синхронизирайте отново.",
-      "syncMissingPermission": "Приложението на Kilo за GitHub не може да чете vulnerability alerts. Дай това разрешение в GitHub и синхронизирай отново."
+      "syncMissingPermission": "Приложението на Kilo за GitHub не може да чете vulnerability alerts. Дай това разрешение в GitHub и синхронизирай отново.",
+      "configConflict": "Настройките на Агента по сигурността са променени другаде. Прегледай последните настройки и запази отново."
     },
     "analysisState": {
       "queued": "Анализът е на опашка",
@@ -2368,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "Файловете на този компютър не се променят.",
       "pickProfile": "Изберете профил",
       "noProfile": "Няма профил",
+      "defaultProfileResolvesTo": "Насочва към {{name}}",
+      "defaultProfileResolvesToAccessibility": "Профил по подразбиране: {{name}}",
       "manageProfiles": "Управление на профили",
       "noProfiles": "Все още няма профили. Създайте такъв, за да добавите променливи на средата, MCP сървъри и умения.",
       "advancedConfig": "Разширена конфигурация",
       "advancedConfigDescription": "Вали за тази сесия. Запазването като профил го запазва за следващия път.",
       "saveAsProfile": "Запази като профил",
       "saveProfileDescription": "Запазете текущите променливи на средата и командите за настройка като профил за многократна употреба.",
-      "profileSummary": "{{vars}} променливи на средата · {{commands}} команди за настройка",
       "profileSaved": "Профилът „{{name}}“ е запазен",
       "organizationProfiles": "Профили на организацията",
       "personalProfiles": "Лични профили",
@@ -2735,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Доставчик {{id}}",
-      "modelId": "Модел {{id}}",
       "unavailable": "Недостъпен",
       "unavailableState": "недостъпен",
       "selectedState": "избран",
@@ -4145,7 +4150,8 @@
     "sources": "Доказателства и артефакти",
     "timezone": "Часова зона на брифинга",
     "deviceTimezone": "Използвай часовата зона на устройството",
-    "timezoneHint": "IANA часова зона, например Europe/Berlin. Промените в графика важат за следващите брифинги.",
+    "timezoneHint": "IANA часова зона, например Europe/Berlin.",
+    "scheduleHint": "Промените в графика важат за следващите брифинги.",
     "nightStart": "Начало на периода на брифинга",
     "morningStart": "Брифингът е готов в",
     "morningEnd": "Брифингът е наличен до",

@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub සම්බන්ධතාව කල් ඉකුත් වී ඇත.",
     "merge": {
       "merge": "ඒකාබද්ධ කිරීම",
+      "mergeTitle": "ඒකාබද්ධ කිරීම",
       "mergeNow": "දැන් ඒකාබද්ධ කරන්න",
       "mergePullRequest": "පුල් ඉල්ලීම ඒකාබද්ධ කිරීම",
       "mergeTermTitle": "{{term}} ඒකාබද්ධ කරන්න",
@@ -682,6 +683,9 @@
       "gitlabDescription": "ජංගම දුරකථනයෙන් මර්ජ ඉල්ලීම් සමාලෝචනය කරන්න",
       "bitbucketOrgOnlyDescription": "එහි Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කිරීමට ඉහත ගිණුම සංවිධානයකට මාරු කරන්න.",
       "bitbucketOrgOnlyNoOrganizationDescription": "මෙම ගිණුමට තවම සංවිධාන කිසිවක් නොමැත. සංවිධානයක් සෑදීමෙන් හෝ එකකට සම්බන්ධ වීමෙන් පසු Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කළ හැක.",
+      "gitlabReconnectAdminOnlyDescription": "එය නැවත සම්බන්ධ කරන ලෙස සංවිධානයේ හිමිකරු, පරිපාලක හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලන්න.",
+      "bitbucketNotConnectedTitle": "Bitbucket සම්බන්ධ වී නොමැත",
+      "bitbucketAdminOnlyDescription": "එය සම්බන්ධ කළ හැක්කේ සංවිධාන හිමිකරුවන්ට, පරිපාලකවරුන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි.",
       "contextLine": "{{organization}} සඳහා",
       "contextLinePersonal": "ඔබේ පෞද්ගලික ගිණුම සඳහා"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "අභිරුචි උපදෙස්",
       "deprecation": "අභිරුචි උපදෙස් පහසුකම ඉවත් කිරීමට සැලසුම් කර ඇත. ඒ වෙනුවට මෙම මාර්ගෝපදේශ ඔබේ ගබඩාවේ REVIEW.md ගොනුවකට ගෙන යන්න.",
-      "placeholder": "උදා. අපගේ දෝෂ හැසිරවීමේ රීති අනුගමනය කරන බව තහවුරු කරන්න…"
+      "placeholder": "උදා. අපගේ දෝෂ හැසිරවීමේ රීති අනුගමනය කරන බව තහවුරු කරන්න…",
+      "clearTitle": "අභිරුචි උපදෙස් ඉවත් කරන්නද?",
+      "clearMessage": "හිස් ක්ෂේත්‍රයක් සුරැකීමෙන් මෙම සමාලෝචකයා සඳහා ගබඩා කර ඇති අභිරුචි උපදෙස් මකා දැමේ."
     },
     "repos": {
       "unavailable": "ගබඩා ලබා ගත නොහැක — kilo.ai හි Bitbucket සැකසුම අවසන් කරන්න.",
@@ -1599,11 +1605,9 @@
       "bitbucketError": "Bitbucket සැකසුම විවෘත කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න."
     },
     "overview": {
-      "reviewStyle": "සමාලෝචන විලාසය",
-      "focusAreas": "අවධානය යොමු කරන ක්ෂේත්‍ර",
       "allAreas": "සියලුම ක්ෂේත්‍ර",
-      "customInstructions": "අභිරුචි උපදෙස්",
       "set": "සකසා ඇත",
+      "notSet": "සකසා නැත",
       "nSelected": "{{displayCount}} ක් තෝරා ඇත",
       "proposedReviewMdGuidance": "යෝජිත REVIEW.md මාර්ගෝපදේශ"
     },
@@ -2067,7 +2071,8 @@
       "actionBlocked": "මෙම ක්‍රියාව සම්පූර්ණ කිරීමට නොහැකි විය. නැවත උත්සාහ කිරීමට පෙර මෙම ගැටලුව විසඳිය යුතුය.",
       "syncNoRepositories": "සමමුහුර්ත පරාසයේ රෙපොසිටරි නොමැත. ආරක්ෂක නියෝජිතයා නිරීක්ෂණය කරන රෙපොසිටරි තෝරන්න, පසුව නැවත සමමුහුර්ත කරන්න.",
       "syncIntegrationInactive": "ආරක්ෂක නියෝජිතයා සඳහා GitHub සම්බන්ධතාව ක්‍රියාකාරී නොවේ. Kilo GitHub App නැවත සම්බන්ධ කර, පසුව නැවත සමමුහුර්ත කරන්න.",
-      "syncMissingPermission": "Kilo GitHub App විසින් vulnerability alerts කියවිය නොහැක. GitHub තුළ එම අවසරය ලබා දී, නැවත සමමුහුර්ත කරන්න."
+      "syncMissingPermission": "Kilo GitHub App විසින් vulnerability alerts කියවිය නොහැක. GitHub තුළ එම අවසරය ලබා දී, නැවත සමමුහුර්ත කරන්න.",
+      "configConflict": "ආරක්ෂක නියෝජිතයාගේ සැකසුම් වෙනත් තැනක වෙනස් කර ඇත. නවතම සැකසුම් සමාලෝචනය කර නැවත සුරකින්න."
     },
     "analysisState": {
       "queued": "විශ්ලේෂණය පෝලිමේ ඇත",
@@ -2374,13 +2379,14 @@
       "forkFilesUnchangedOnComputer": "මෙම පරිගණකයේ ඇති ගොනු වෙනස් නොවේ.",
       "pickProfile": "පැතිකඩක් තෝරන්න",
       "noProfile": "පැතිකඩක් නැත",
+      "defaultProfileResolvesTo": "දැනට {{name}} වෙත සකසා ඇත",
+      "defaultProfileResolvesToAccessibility": "පෙරනිමි පැතිකඩ: {{name}}",
       "manageProfiles": "පැතිකඩ කළමනාකරණය කරන්න",
       "noProfiles": "තවම පැතිකඩ නැත. පාරිසරික විචල්‍යයන්, MCP සේවාදායකයන් සහ කුසලතා එක් කිරීමට එකක් සාදන්න.",
       "advancedConfig": "උසස් වින්යාසය",
       "advancedConfigDescription": "මෙය මෙම සැසියට අදාළ වේ. පැතිකඩක් ලෙස සුරැකීමෙන් එය ඊළඟ වතාවට රැඳේ.",
       "saveAsProfile": "පැතිකඩ ලෙස සුරකින්න",
       "saveProfileDescription": "වත්මන් පරිසර විචල්‍යයන් සහ සැකසුම් විධාන නැවත භාවිත කළ හැකි පැතිකඩක් ලෙස සුරකින්න.",
-      "profileSummary": "{{vars}} පරිසර විචල්‍යයන් · {{commands}} පිහිටුවීම් විධාන",
       "profileSaved": "පැතිකඩ \"{{name}}\" සුරකින ලදී",
       "organizationProfiles": "සංවිධානයේ පැතිකඩ",
       "personalProfiles": "පුද්ගලික පැතිකඩ",
@@ -2741,7 +2747,6 @@
     },
     "modelSelector": {
       "provider": "සැපයුම්කරු {{id}}",
-      "modelId": "මාදිලිය {{id}}",
       "unavailable": "ලබා ගත නොහැක",
       "unavailableState": "ලබා ගත නොහැක",
       "selectedState": "තෝරා ඇත",
@@ -4151,7 +4156,8 @@
     "sources": "සාක්ෂි සහ කෘතීන්",
     "timezone": "වාර්තා වේලා කලාපය",
     "deviceTimezone": "උපාංග වේලා කලාපය භාවිත කරන්න",
-    "timezoneHint": "IANA වේලා කලාපය, උදා. Europe/Berlin. කාලසටහන් වෙනස්කම් ඉදිරි වාර්තාවලට අදාළ වේ.",
+    "timezoneHint": "IANA වේලා කලාපය, උදා. Europe/Berlin.",
+    "scheduleHint": "කාලසටහන් වෙනස්කම් ඉදිරි වාර්තාවලට අදාළ වේ.",
     "nightStart": "වාර්තා කාල පරාසය ආරම්භය",
     "morningStart": "වාර්තාව සූදානම් වන වේලාව",
     "morningEnd": "වාර්තාව ලබා ගත හැකි අවසාන වේලාව",

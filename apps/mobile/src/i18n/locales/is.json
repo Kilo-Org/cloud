@@ -403,6 +403,7 @@
     "connectionExpired": "Tengingin við GitHub er útrunnin.",
     "merge": {
       "merge": "Sameining",
+      "mergeTitle": "Sameining",
       "mergeNow": "Sameina núna",
       "mergePullRequest": "Sameining beiðnar",
       "mergeTermTitle": "Sameina {{term}}",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Yfirfara merge requests í símanum",
       "bitbucketOrgOnlyDescription": "Skiptu reikningnum hér að ofan yfir í stofnun til að yfirfara sameiningarbeiðnir hennar á Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Þessi reikningur er ekki með neinar stofnanir ennþá. Hægt er að yfirfara sameiningarbeiðnir á Bitbucket um leið og þú býrð til eða þiggur boð um aðild að stofnun.",
+      "gitlabReconnectAdminOnlyDescription": "Biddu eiganda, stjórnanda eða innheimtustjóra samtakanna um að tengja það aftur.",
+      "bitbucketNotConnectedTitle": "Bitbucket er ekki tengt",
+      "bitbucketAdminOnlyDescription": "Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það.",
       "contextLine": "Fyrir {{organization}}",
       "contextLinePersonal": "Fyrir persónulegan reikning"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Sérsniðnar leiðbeiningar",
       "deprecation": "Fyrirhugað er að hætta stuðningi við sérsniðnar leiðbeiningar í stillingunum. Færðu þær í REVIEW.md-skrá í geymslunni þinni í staðinn.",
-      "placeholder": "t.d. fylgja reglum okkar um villumeðhöndlun…"
+      "placeholder": "t.d. fylgja reglum okkar um villumeðhöndlun…",
+      "clearTitle": "Fjarlægja sérsniðnar leiðbeiningar?",
+      "clearMessage": "Ef þú vistar tóman reit eyðast þær sérsniðnu leiðbeiningar sem geymdar eru fyrir þennan yfirferðaraðila."
     },
     "repos": {
       "unavailable": "Geymslur eru ekki tiltækar. Ljúktu uppsetningu Bitbucket á kilo.ai.",
@@ -1599,11 +1605,9 @@
       "bitbucketError": "Ekki tókst að opna uppsetningu Bitbucket. Reyndu aftur."
     },
     "overview": {
-      "reviewStyle": "Rýnistíll",
-      "focusAreas": "Áherslusvið",
       "allAreas": "Allir þættir",
-      "customInstructions": "Sérsniðnar leiðbeiningar",
       "set": "Stillt",
+      "notSet": "Ekki stillt",
       "nSelected": "Valið: {{displayCount}}",
       "proposedReviewMdGuidance": "Tillögur að leiðbeiningum í REVIEW.md"
     },
@@ -2061,7 +2065,8 @@
       "actionBlocked": "Ekki tókst að ljúka þessari aðgerð. Leysa verður vandamálið áður en þú getur reynt aftur.",
       "syncNoRepositories": "Engar geymslur eru í samstillingarsviðinu. Veldu geymslurnar sem Öryggiserindrekinn fylgist með og samstilltu síðan aftur.",
       "syncIntegrationInactive": "Tengingin við GitHub fyrir Öryggiserindreka er ekki virk. Tengdu Kilo GitHub App aftur og samstilltu svo aftur.",
-      "syncMissingPermission": "Kilo GitHub App getur ekki lesið vulnerability alerts. Veittu þá heimild í GitHub og samstilltu svo aftur."
+      "syncMissingPermission": "Kilo GitHub App getur ekki lesið vulnerability alerts. Veittu þá heimild í GitHub og samstilltu svo aftur.",
+      "configConflict": "Stillingar öryggiserindrekans voru breyttar annars staðar. Farðu yfir nýjustu stillingarnar og vistaðu aftur."
     },
     "analysisState": {
       "queued": "Greining í biðröð",
@@ -2368,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "Skrám á þessari tölvu er ekki breytt.",
       "pickProfile": "Veldu prófíl",
       "noProfile": "Enginn prófíll",
+      "defaultProfileResolvesTo": "Samsvarar {{name}}",
+      "defaultProfileResolvesToAccessibility": "Sjálfgefið snið: {{name}}",
       "manageProfiles": "Stjórna prófílum",
       "noProfiles": "Engir prófílar ennþá. Búðu til einn til að bæta við umhverfisbreytum, MCP netþjónum og færni.",
       "advancedConfig": "Ítarleg stilling",
       "advancedConfigDescription": "Gildir fyrir þessa lotu. Að vista sem prófíl varðveitir það fyrir næsta skipti.",
       "saveAsProfile": "Vista sem prófíl",
       "saveProfileDescription": "Vistaðu núverandi umhverfisbreytur og uppsetningarskipanir sem endurnýtanlegt snið.",
-      "profileSummary": "{{vars}} umhverfisbreytur · {{commands}} uppsetningarskipanir",
       "profileSaved": "Prófíllinn „{{name}}“ vistaður",
       "organizationProfiles": "Stofnunarsnið",
       "personalProfiles": "Persónuleg snið",
@@ -2735,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Veitandi {{id}}",
-      "modelId": "Líkan {{id}}",
       "unavailable": "Ekki tiltækt",
       "unavailableState": "ekki tiltækt",
       "selectedState": "valið",
@@ -4145,7 +4150,8 @@
     "sources": "Gögn og afurðir",
     "timezone": "Tímabelti yfirlits",
     "deviceTimezone": "Nota tímabelti tækis",
-    "timezoneHint": "IANA tímabelti, til dæmis Europe/Berlin. Breytingar á tímaáætlun gilda fyrir komandi yfirlit.",
+    "timezoneHint": "IANA tímabelti, til dæmis Europe/Berlin.",
+    "scheduleHint": "Breytingar á tímaáætlun gilda fyrir komandi yfirlit.",
     "nightStart": "Yfirlitsgluggi hefst",
     "morningStart": "Yfirlit tilbúið klukkan",
     "morningEnd": "Yfirlit tiltækt til",

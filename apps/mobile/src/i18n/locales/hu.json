@@ -403,6 +403,7 @@
     "connectionExpired": "A GitHub-kapcsolat lejárt.",
     "merge": {
       "merge": "Összevonás",
+      "mergeTitle": "Összevonás",
       "mergeNow": "Összevonás most",
       "mergePullRequest": "PR összevonása",
       "mergeTermTitle": "A {{term}} összevonása",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Merge requestek ellenőrzése mobilon",
       "bitbucketOrgOnlyDescription": "Váltsd a fenti fiókot egy szervezetre a Bitbucket-módosítási kérelmek kódellenőrzéséhez.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ez a fiók még nem tagja egyetlen szervezetnek sem. A Bitbucket-módosítási kérelmek kódellenőrzéséhez hozz létre egy szervezetet, vagy csatlakozz egyhez.",
+      "gitlabReconnectAdminOnlyDescription": "Kérd meg egy szervezet tulajdonosát, adminisztrátorát vagy számlázási felelősét, hogy újracsatlakoztassa.",
+      "bitbucketNotConnectedTitle": "A Bitbucket nincs csatlakoztatva",
+      "bitbucketAdminOnlyDescription": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
       "contextLine": "{{organization}} számára",
       "contextLinePersonal": "Személyes fiókodhoz"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Egyéni utasítások",
       "deprecation": "Az egyéni utasítások funkcióját a tervek szerint megszüntetjük. Helyezd át ezeket az irányelveket a kódtáradban lévő REVIEW.md fájlba.",
-      "placeholder": "pl. a hibakezelési szabályaink betartása…"
+      "placeholder": "pl. a hibakezelési szabályaink betartása…",
+      "clearTitle": "Eltávolítod az egyéni utasításokat?",
+      "clearMessage": "Az üres mező mentése törli az ellenőrzőhöz tárolt egyéni utasításokat."
     },
     "repos": {
       "unavailable": "A kódtárak nem érhetők el. Fejezd be a Bitbucket beállítását a kilo.ai oldalon.",
@@ -1599,11 +1605,9 @@
       "bitbucketError": "Nem sikerült megnyitni a Bitbucket beállítását. Próbáld újra."
     },
     "overview": {
-      "reviewStyle": "Ellenőrzési stílus",
-      "focusAreas": "Kiemelt területek",
       "allAreas": "Minden terület",
-      "customInstructions": "Egyéni utasítások",
       "set": "Beállítva",
+      "notSet": "Nincs beállítva",
       "nSelected": "{{displayCount}} kijelölve",
       "proposedReviewMdGuidance": "Javasolt útmutatás a REVIEW.md fájlhoz"
     },
@@ -2061,7 +2065,8 @@
       "actionBlocked": "Nem sikerült befejezni ezt a műveletet. A hibát előbb javítani kell.",
       "syncNoRepositories": "Egyetlen adattár sem esik a szinkronizálás hatókörébe. Válassza ki azokat az adattárakat, amelyeket a Biztonsági ügynök figyel, majd szinkronizáljon újra.",
       "syncIntegrationInactive": "A Biztonsági ügynök GitHub-kapcsolata nem aktív. Csatlakoztassa újra a Kilo GitHub App-ot, majd szinkronizáljon újra.",
-      "syncMissingPermission": "A Kilo GitHub-alkalmazás nem tudja olvasni a sebezhetőségi riasztásokat. Add meg ezt az engedélyt a GitHubbon, majd szinkronizálj újra."
+      "syncMissingPermission": "A Kilo GitHub-alkalmazás nem tudja olvasni a sebezhetőségi riasztásokat. Add meg ezt az engedélyt a GitHubbon, majd szinkronizálj újra.",
+      "configConflict": "A biztonsági ügynök beállításai máshol módosultak. Nézd át a legfrissebb beállításokat, és ments újra."
     },
     "analysisState": {
       "queued": "Elemzés várólistán",
@@ -2368,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "A számítógépen lévő fájlok nem változnak.",
       "pickProfile": "Válassz egy profilt",
       "noProfile": "Nincs profil",
+      "defaultProfileResolvesTo": "Jelenleg: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Alapértelmezett profil: {{name}}",
       "manageProfiles": "Profilok kezelése",
       "noProfiles": "Még nincsenek profilok. Hozz létre egyet a környezeti változók, MCP-kiszolgálók és készségek hozzáadásához.",
       "advancedConfig": "Speciális konfiguráció",
       "advancedConfigDescription": "Erre a munkamenetre érvényes. Profilként mentve a következő alkalomra is megmarad.",
       "saveAsProfile": "Mentés profilként",
       "saveProfileDescription": "Mentsd el az aktuális környezeti változókat és a beállítási parancsokat újrafelhasználható profilként.",
-      "profileSummary": "{{vars}} környezeti változó · {{commands}} beállítási parancs",
       "profileSaved": "A \"{{name}}\" profil mentve",
       "organizationProfiles": "Szervezeti profilok",
       "personalProfiles": "Személyes profilok",
@@ -2735,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Szolgáltató: {{id}}",
-      "modelId": "Modell: {{id}}",
       "unavailable": "Nem elérhető",
       "unavailableState": "nem elérhető",
       "selectedState": "kijelölve",
@@ -4145,7 +4150,8 @@
     "sources": "Bizonyítékok és artefaktumok",
     "timezone": "Jelentés időzónája",
     "deviceTimezone": "Eszköz időzónájának használata",
-    "timezoneHint": "IANA időzóna, például Europe/Berlin. Az ütemezés módosításai a következő jelentésekre érvényesek.",
+    "timezoneHint": "IANA időzóna, például Europe/Berlin.",
+    "scheduleHint": "Az ütemezés módosításai a következő jelentésekre érvényesek.",
     "nightStart": "Az időablak kezdete",
     "morningStart": "A jelentés elkészül",
     "morningEnd": "A jelentés elérhető eddig",

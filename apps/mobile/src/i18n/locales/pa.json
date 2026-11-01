@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।",
     "merge": {
       "merge": "ਮਰਜ",
+      "mergeTitle": "ਮਰਜ",
       "mergeNow": "ਹੁਣੇ ਮਰਜ ਕਰੋ",
       "mergePullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਮਰਜ ਕਰਨਾ",
       "mergeTermTitle": "{{term}} ਮਰਜ ਕਰਨਾ",
@@ -682,6 +683,9 @@
       "gitlabDescription": "ਮੋਬਾਈਲ 'ਤੇ ਮਰਜ਼ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰੋ",
       "bitbucketOrgOnlyDescription": "ਇਸ ਦੇ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਉੱਪਰ ਦਿੱਤੇ ਖਾਤੇ ਨੂੰ ਇੱਕ ਸੰਗਠਨ ਵਿੱਚ ਬਦਲੋ।",
       "bitbucketOrgOnlyNoOrganizationDescription": "ਇਸ ਖਾਤੇ ਵਿੱਚ ਹਾਲੇ ਕੋਈ ਸੰਗਠਨ ਨਹੀਂ ਹੈ। ਇੱਕ ਸੰਗਠਨ ਬਣਾਉਣ ਜਾਂ ਉਸ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਣ ਤੋਂ ਬਾਅਦ ਹੀ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕੀਤੀ ਜਾ ਸਕਦੀ ਹੈ।",
+      "gitlabReconnectAdminOnlyDescription": "ਕਿਸੇ ਸੰਗਠਨ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਇਸ ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਹੋ।",
+      "bitbucketNotConnectedTitle": "Bitbucket ਕਨੈਕਟ ਨਹੀਂ ਹੈ",
+      "bitbucketAdminOnlyDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।",
       "contextLine": "{{organization}} ਲਈ",
       "contextLinePersonal": "ਤੁਹਾਡੇ ਨਿੱਜੀ ਖਾਤੇ ਲਈ"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "ਆਪਣੀਆਂ ਹਦਾਇਤਾਂ",
       "deprecation": "ਕਸਟਮ ਹਦਾਇਤਾਂ ਦੀ ਸਹੂਲਤ ਬੰਦ ਕਰਨ ਦੀ ਯੋਜਨਾ ਹੈ। ਇਸ ਦੀ ਥਾਂ ਇਹ ਹਦਾਇਤਾਂ ਆਪਣੀ ਰਿਪੋਜ਼ਟਰੀ ਦੀ REVIEW.md ਫਾਈਲ ਵਿੱਚ ਰੱਖੋ।",
-      "placeholder": "ਜਿਵੇਂ, ਗਲਤੀਆਂ ਸੰਭਾਲਣ ਲਈ ਸਾਡੇ ਨਿਯਮ ਲਾਗੂ ਕਰੋ…"
+      "placeholder": "ਜਿਵੇਂ, ਗਲਤੀਆਂ ਸੰਭਾਲਣ ਲਈ ਸਾਡੇ ਨਿਯਮ ਲਾਗੂ ਕਰੋ…",
+      "clearTitle": "ਕੀ ਕਸਟਮ ਹਦਾਇਤਾਂ ਹਟਾਉਣੀਆਂ ਹਨ?",
+      "clearMessage": "ਖਾਲੀ ਫੀਲਡ ਸੇਵ ਕਰਨ ਨਾਲ ਇਸ ਸਮੀਖਿਅਕ ਲਈ ਸੰਭਾਲੀਆਂ ਗਈਆਂ ਕਸਟਮ ਹਦਾਇਤਾਂ ਮਿਟ ਜਾਣਗੀਆਂ।"
     },
     "repos": {
       "unavailable": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਉਪਲਬਧ ਨਹੀਂ ਹਨ — kilo.ai 'ਤੇ Bitbucket ਦਾ ਸੈੱਟਅੱਪ ਪੂਰਾ ਕਰੋ।",
@@ -1599,11 +1605,9 @@
       "bitbucketError": "Bitbucket ਸੈੱਟਅੱਪ ਖੋਲ੍ਹ ਨਹੀਂ ਸਕੇ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
     "overview": {
-      "reviewStyle": "ਸਮੀਖਿਆ ਦਾ ਢੰਗ",
-      "focusAreas": "ਧਿਆਨ ਦੇਣ ਵਾਲੇ ਖੇਤਰ",
       "allAreas": "ਸਾਰੇ ਖੇਤਰ",
-      "customInstructions": "ਆਪਣੀਆਂ ਹਦਾਇਤਾਂ",
       "set": "ਸੈੱਟ ਕੀਤਾ ਹੋਇਆ",
+      "notSet": "ਸੈੱਟ ਨਹੀਂ ਹੈ",
       "nSelected": "{{displayCount}} ਚੁਣੇ ਗਏ",
       "proposedReviewMdGuidance": "ਪ੍ਰਸਤਾਵਿਤ REVIEW.md ਦਿਸ਼ਾ-ਨਿਰਦੇਸ਼"
     },
@@ -2067,7 +2071,8 @@
       "actionBlocked": "ਇਹ ਕਾਰਵਾਈ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਸਮੱਸਿਆ ਨੂੰ ਠੀਕ ਕਰਨਾ ਜ਼ਰੂਰੀ ਹੈ।",
       "syncNoRepositories": "ਸਿੰਕ ਸਕੋਪ ਵਿੱਚ ਕੋਈ ਵੀ ਰਿਪੋਜ਼ਟਰੀ ਨਹੀਂ ਹੈ। ਉਹ ਰਿਪੋਜ਼ਟਰੀਆਂ ਚੁਣੋ ਜਿਨ੍ਹਾਂ ਦੀ ਨਿਗਰਾਨੀ ਸੁਰੱਖਿਆ ਏਜੰਟ ਕਰਦਾ ਹੈ, ਫਿਰ ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।",
       "syncIntegrationInactive": "«ਸੁਰੱਖਿਆ ਏਜੰਟ» ਲਈ GitHub ਕਨੈਕਸ਼ਨ ਸਰਗਰਮ ਨਹੀਂ ਹੈ। Kilo GitHub App ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।",
-      "syncMissingPermission": "Kilo GitHub App vulnerability alerts ਨਹੀਂ ਪੜ੍ਹ ਸਕਦੀ। GitHub ਵਿੱਚ ਇਹ ਅਨੁਮਤੀ ਦਿਓ, ਫਿਰ ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।"
+      "syncMissingPermission": "Kilo GitHub App vulnerability alerts ਨਹੀਂ ਪੜ੍ਹ ਸਕਦੀ। GitHub ਵਿੱਚ ਇਹ ਅਨੁਮਤੀ ਦਿਓ, ਫਿਰ ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।",
+      "configConflict": "ਸੁਰੱਖਿਆ ਏਜੰਟ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਕਿਤੇ ਹੋਰ ਬਦਲੀਆਂ ਗਈਆਂ ਹਨ। ਨਵੀਨਤਮ ਸੈਟਿੰਗਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਸੰਭਾਲੋ।"
     },
     "analysisState": {
       "queued": "ਵਿਸ਼ਲੇਸ਼ਣ ਕਤਾਰ ਵਿੱਚ",
@@ -2374,13 +2379,14 @@
       "forkFilesUnchangedOnComputer": "ਇਸ ਕੰਪਿਊਟਰ 'ਤੇ ਫ਼ਾਈਲਾਂ ਨਹੀਂ ਬਦਲੀਆਂ ਜਾਂਦੀਆਂ।",
       "pickProfile": "ਇੱਕ ਪ੍ਰੋਫਾਈਲ ਚੁਣੋ",
       "noProfile": "ਕੋਈ ਪ੍ਰੋਫਾਈਲ ਨਹੀਂ",
+      "defaultProfileResolvesTo": "ਮੌਜੂਦਾ ਤੌਰ ਤੇ {{name}}",
+      "defaultProfileResolvesToAccessibility": "ਪੂਰਵ-ਨਿਰਧਾਰਤ ਪ੍ਰੋਫਾਈਲ: {{name}}",
       "manageProfiles": "ਪ੍ਰੋਫਾਈਲਾਂ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰੋ",
       "noProfiles": "ਅਜੇ ਤੱਕ ਕੋਈ ਪ੍ਰੋਫਾਈਲ ਨਹੀਂ। ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ, MCP ਸਰਵਰ, ਅਤੇ ਹੁਨਰ ਜੋੜਨ ਲਈ ਇੱਕ ਬਣਾਓ।",
       "advancedConfig": "ਉੱਨਤ ਸੰਰਚਨਾ",
       "advancedConfigDescription": "ਇਹ ਇਸ ਸੈਸ਼ਨ ’ਤੇ ਲਾਗੂ ਹੁੰਦਾ ਹੈ। ਪ੍ਰੋਫਾਈਲ ਵਜੋਂ ਸੁਰੱਖਿਅਤ ਕਰਨ ਨਾਲ ਇਹ ਅਗਲੀ ਵਾਰ ਲਈ ਰਹਿੰਦਾ ਹੈ।",
       "saveAsProfile": "ਪ੍ਰੋਫਾਈਲ ਵਜੋਂ ਸੁਰੱਖਿਅਤ ਕਰੋ",
       "saveProfileDescription": "ਮੌਜੂਦਾ ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ ਅਤੇ ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਨੂੰ ਮੁੜ ਵਰਤੋਂ ਯੋਗ ਪ੍ਰੋਫਾਈਲ ਵਜੋਂ ਸੁਰੱਖਿਅਤ ਕਰੋ।",
-      "profileSummary": "{{vars}} ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ · {{commands}} ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ",
       "profileSaved": "ਪ੍ਰੋਫਾਈਲ \"{{name}}\" ਸੁਰੱਖਿਅਤ ਕੀਤੀ ਗਈ",
       "organizationProfiles": "ਸੰਗਠਨ ਪ੍ਰੋਫਾਈਲ",
       "personalProfiles": "ਨਿੱਜੀ ਪ੍ਰੋਫਾਈਲਾਂ",
@@ -2741,7 +2747,6 @@
     },
     "modelSelector": {
       "provider": "ਪ੍ਰਦਾਤਾ {{id}}",
-      "modelId": "ਮਾਡਲ {{id}}",
       "unavailable": "ਉਪਲਬਧ ਨਹੀਂ",
       "unavailableState": "ਉਪਲਬਧ ਨਹੀਂ",
       "selectedState": "ਚੁਣਿਆ ਗਿਆ",
@@ -4151,7 +4156,8 @@
     "sources": "ਸਬੂਤ ਅਤੇ ਆਰਟੀਫੈਕਟ",
     "timezone": "ਬ੍ਰੀਫਿੰਗ ਸਮਾਂ ਖੇਤਰ",
     "deviceTimezone": "ਡਿਵਾਈਸ ਦਾ ਸਮਾਂ ਖੇਤਰ ਵਰਤੋ",
-    "timezoneHint": "IANA ਸਮਾਂ ਖੇਤਰ, ਜਿਵੇਂ Europe/Berlin। ਸਮਾਂ-ਸੂਚੀ ਦੀਆਂ ਤਬਦੀਲੀਆਂ ਅਗਲੀਆਂ ਬ੍ਰੀਫਿੰਗਾਂ 'ਤੇ ਲਾਗੂ ਹੋਣਗੀਆਂ।",
+    "timezoneHint": "IANA ਸਮਾਂ ਖੇਤਰ, ਜਿਵੇਂ Europe/Berlin।",
+    "scheduleHint": "ਸਮਾਂ-ਸੂਚੀ ਦੀਆਂ ਤਬਦੀਲੀਆਂ ਅਗਲੀਆਂ ਬ੍ਰੀਫਿੰਗਾਂ 'ਤੇ ਲਾਗੂ ਹੋਣਗੀਆਂ।",
     "nightStart": "ਬ੍ਰੀਫਿੰਗ ਦੀ ਮਿਆਦ ਸ਼ੁਰੂ",
     "morningStart": "ਬ੍ਰੀਫਿੰਗ ਤਿਆਰ ਹੋਣ ਦਾ ਸਮਾਂ",
     "morningEnd": "ਬ੍ਰੀਫਿੰਗ ਉਪਲਬਧ ਰਹਿਣ ਦਾ ਅੰਤਿਮ ਸਮਾਂ",

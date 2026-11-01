@@ -403,6 +403,7 @@
     "connectionExpired": "የGitHub ግንኙነት ጊዜው አልፏል።",
     "merge": {
       "merge": "ማዋሃድ",
+      "mergeTitle": "ማዋሃድ",
       "mergeNow": "አሁን አዋህድ",
       "mergePullRequest": "የማዋሃድ ጥያቄን ማዋሃድ",
       "mergeTermTitle": "{{term}}ን ማዋሃድ",
@@ -682,6 +683,9 @@
       "gitlabDescription": "የማዋሃድ ጥያቄዎችን በሞባይል ይገምግሙ",
       "bitbucketOrgOnlyDescription": "ከላይ ያለውን መለያ ወደ ድርጅት ይቀይሩ፣ የዚህ ድርጅት የBitbucket የማዋሃድ ጥያቄዎችን ለመገምገም።",
       "bitbucketOrgOnlyNoOrganizationDescription": "ይህ መለያ እስካሁን ድርጅቶች የለውም። ድርጅት ሲፈጥሩ ወይም ሲቀላቀሉ የBitbucket የማዋሃድ ጥያቄዎችን ማገምገም ይቻላል።",
+      "gitlabReconnectAdminOnlyDescription": "የድርጅት ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።",
+      "bitbucketNotConnectedTitle": "Bitbucket አልተገናኘም",
+      "bitbucketAdminOnlyDescription": "ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
       "contextLine": "ለ{{organization}}",
       "contextLinePersonal": "ለግል መለያዎ"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "ብጁ መመሪያዎች",
       "deprecation": "ብጁ መመሪያዎችን የመጠቀም ባህሪ ከአገልግሎት ሊወጣ ታቅዷል። በምትኩ እነዚህን መመሪያዎች በማከማቻዎ ውስጥ ወዳለ REVIEW.md ፋይል ያዛውሩ።",
-      "placeholder": "ለምሳሌ፦ የስህተት አያያዝ መመሪያዎቻችን መከበራቸውን ያረጋግጡ…"
+      "placeholder": "ለምሳሌ፦ የስህተት አያያዝ መመሪያዎቻችን መከበራቸውን ያረጋግጡ…",
+      "clearTitle": "ብጁ መመሪያዎችን ማስወገድ ይፈልጋሉ?",
+      "clearMessage": "ባዶውን መስክ ማስቀመጥ ለዚህ ገምጋሚ የተከማቹትን ብጁ መመሪያዎች ይሰርዛል።"
     },
     "repos": {
       "unavailable": "ማከማቻዎች አይገኙም። በkilo.ai ላይ Bitbucketን ማዋቀር ያጠናቅቁ።",
@@ -1599,11 +1605,9 @@
       "bitbucketError": "የBitbucket ማዋቀር መክፈት አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
     },
     "overview": {
-      "reviewStyle": "የግምገማ ዘይቤ",
-      "focusAreas": "የትኩረት መስኮች",
       "allAreas": "ሁሉም ዘርፎች",
-      "customInstructions": "ብጁ መመሪያዎች",
       "set": "ተዘጋጅቷል",
+      "notSet": "አልተዘጋጀም",
       "nSelected": "{{displayCount}} የተመረጡ",
       "proposedReviewMdGuidance": "ለREVIEW.md የቀረቡ መመሪያዎች"
     },
@@ -2067,7 +2071,8 @@
       "actionBlocked": "ይህን እርምጃ ማጠናቀቅ አልተቻለም። ችግሩ ከመፍትሔ አላገኘ በፊት መልሶ መሞከር አይቻልም።",
       "syncNoRepositories": "በማመሳሰል ወሰን ውስጥ ምንም ማከማቻ የለም። የደህንነት ወኪል የሚከታተላቸውን ማከማቻዎች ይምረጡ፣ ከዚያ እንደገና ያመሳስሉ።",
       "syncIntegrationInactive": "የደህንነት ወኪል የGitHub ግንኙነት ንቁ አይደለም። የKilo GitHub መተግበሪያን እንደገና ያገናኙ፣ ከዚያ እንደገና ያመሳስሉ።",
-      "syncMissingPermission": "የKilo GitHub መተግበሪያ የተጋላጭነት ማንቂያዎችን ማንበብ አይችልም። ይህን ፈቃድ በGitHub ይስጡ፣ ከዚያ እንደገና ያመሳስሉ።"
+      "syncMissingPermission": "የKilo GitHub መተግበሪያ የተጋላጭነት ማንቂያዎችን ማንበብ አይችልም። ይህን ፈቃድ በGitHub ይስጡ፣ ከዚያ እንደገና ያመሳስሉ።",
+      "configConflict": "የደህንነት ወኪሉ ቅንብሮች በሌላ ቦታ ተቀይረዋል። የቅርብ ጊዜውን ቅንብሮች ይመልከቱ እና እንደገና ያስቀምጡ።"
     },
     "analysisState": {
       "queued": "ትንተናው ወረፋ ይዟል",
@@ -2374,13 +2379,14 @@
       "forkFilesUnchangedOnComputer": "በዚህ ኮምፒውተር ላይ ያሉ ፋይሎች አይቀየሩም።",
       "pickProfile": "መገለጫ ይምረጡ",
       "noProfile": "ምንም መገለጫ የለም።",
+      "defaultProfileResolvesTo": "አሁን ላይ {{name}} ማለት ነው",
+      "defaultProfileResolvesToAccessibility": "ነባሪ መገለጫ፦ {{name}}",
       "manageProfiles": "መገለጫዎችን ያስተዳድሩ",
       "noProfiles": "እስካሁን ምንም መገለጫዎች የሉም። የአካባቢ ተለዋዋጮችን፣ MCP አገልጋዮችን እና ክህሎቶችን ለመጨመር አንድ ይፍጠሩ።",
       "advancedConfig": "የላቀ ውቅር",
       "advancedConfigDescription": "ለዚህ ክፍለ ጊዜ ብቻ ነው። እንደ መገለጫ ካስቀመጥከው ለሚቀጥለው ጊዜ ይቆያል።",
       "saveAsProfile": "እንደ መገለጫ አስቀምጥ",
       "saveProfileDescription": "የአሁኑን የአካባቢ ተለዋዋጮች እና የማዋቀር ትዕዛዞችን እንደ እንደገና ጥቅም ላይ ሊውል የሚችል መገለጫ ያስቀምጡ።",
-      "profileSummary": "{{vars}} የአካባቢ ተለዋዋጮች · {{commands}} የማዋቀር ትዕዛዞች",
       "profileSaved": "መገለጫ {{name}} ተቀምጧል",
       "organizationProfiles": "የድርጅት መገለጫዎች",
       "personalProfiles": "የግል መገለጫዎች",
@@ -2741,7 +2747,6 @@
     },
     "modelSelector": {
       "provider": "አቅራቢ {{id}}",
-      "modelId": "ሞዴል {{id}}",
       "unavailable": "አይገኝም",
       "unavailableState": "አይገኝም",
       "selectedState": "ተመርጧል",
@@ -4151,7 +4156,8 @@
     "sources": "ማስረጃዎች እና ውጤቶች",
     "timezone": "የሪፖርት የሰዓት ሰቅ",
     "deviceTimezone": "የመሣሪያውን የሰዓት ሰቅ ተጠቀም",
-    "timezoneHint": "IANA የሰዓት ሰቅ፣ ለምሳሌ Europe/Berlin። የመርሃ ግብር ለውጦች ለወደፊት ሪፖርቶች ይተገበራሉ።",
+    "timezoneHint": "IANA የሰዓት ሰቅ፣ ለምሳሌ Europe/Berlin።",
+    "scheduleHint": "የመርሃ ግብር ለውጦች ለወደፊት ሪፖርቶች ይተገበራሉ።",
     "nightStart": "የሪፖርት ጊዜ ይጀምራል",
     "morningStart": "ሪፖርት ዝግጁ የሚሆንበት ሰዓት",
     "morningEnd": "ሪፖርቱ የሚገኝበት የመጨረሻ ሰዓት",

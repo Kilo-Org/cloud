@@ -121,6 +121,12 @@ Compact, default, and large button sizes remain unchanged for other controls.
 Verify Android targets using the clickable accessibility node bounds, not
 hitSlop alone; keep the translated label fully visible.
 
+## Mounted query tests
+
+A mutation promise can settle before React Query publishes its observer state.
+Use `waitFor` from `@/test/render-with-providers` before asserting a rendered mutation result.
+Awaiting `mutateAsync` inside `act` does not replace that wait.
+
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.

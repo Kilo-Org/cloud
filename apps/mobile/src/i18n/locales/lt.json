@@ -417,6 +417,7 @@
     "connectionExpired": "Baigėsi GitHub prieigos galiojimas.",
     "merge": {
       "merge": "Sujungimas",
+      "mergeTitle": "Sujungimas",
       "mergeNow": "Sujungti dabar",
       "mergePullRequest": "Pakeitimų užklausos sujungimas",
       "mergeTermTitle": "Sujungti {{term}}",
@@ -712,6 +713,9 @@
       "gitlabDescription": "Peržiūrėti merge requests mobiliajame įrenginyje",
       "bitbucketOrgOnlyDescription": "Perjunk aukščiau esančią paskyrą į organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ši paskyra dar neturi jokių organizacijų. Sukūręs arba prisijungęs prie organizacijos galėsi peržiūrėti Bitbucket pakeitimų užklausas.",
+      "gitlabReconnectAdminOnlyDescription": "Paprašykite organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus ją prijungti iš naujo.",
+      "bitbucketNotConnectedTitle": "Bitbucket neprijungtas",
+      "bitbucketAdminOnlyDescription": "Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
       "contextLine": "Skirta {{organization}}",
       "contextLinePersonal": "Skirta asmeninei paskyrai"
     },
@@ -1459,7 +1463,9 @@
     "instructions": {
       "title": "Individualios instrukcijos",
       "deprecation": "Pasirinktinių instrukcijų funkcijos planuojama atsisakyti. Perkelk šias gaires į saugyklos REVIEW.md failą.",
-      "placeholder": "pvz., tikrinti, ar laikomasi mūsų klaidų apdorojimo taisyklių…"
+      "placeholder": "pvz., tikrinti, ar laikomasi mūsų klaidų apdorojimo taisyklių…",
+      "clearTitle": "Pašalinti individualias instrukcijas?",
+      "clearMessage": "Išsaugojus tuščią lauką bus ištrintos šiam tikrintuvui saugomos individualios instrukcijos."
     },
     "repos": {
       "unavailable": "Saugyklos nepasiekiamos. Užbaik Bitbucket sąranką svetainėje kilo.ai.",
@@ -1643,11 +1649,9 @@
       "bitbucketError": "Nepavyko atidaryti Bitbucket sąrankos. Bandyk dar kartą."
     },
     "overview": {
-      "reviewStyle": "Peržiūros stilius",
-      "focusAreas": "Peržiūros sritys",
       "allAreas": "Visos sritys",
-      "customInstructions": "Individualios instrukcijos",
       "set": "Nustatyta",
+      "notSet": "Nenustatyta",
       "nSelected": "Pasirinkta {{displayCount}}",
       "proposedReviewMdGuidance": "Siūlomos REVIEW.md gairės"
     },
@@ -2127,7 +2131,8 @@
       "actionBlocked": "Nepavyko užbaigti šio veiksmo. Iš pradžių reikia išspręsti problemą.",
       "syncNoRepositories": "Sinchronizavimo apimtyje nėra saugyklų. Pasirinkite saugyklas, kurias stebi Saugos agentas, ir sinchronizuokite dar kartą.",
       "syncIntegrationInactive": "Saugos agento GitHub ryšys neaktyvus. Iš naujo prijunkite Kilo GitHub App, tada sinchronizuokite dar kartą.",
-      "syncMissingPermission": "Kilo GitHub programėlė negali skaityti vulnerability alerts. Suteik šį leidimą GitHub, tada sinchronizuok dar kartą."
+      "syncMissingPermission": "Kilo GitHub programėlė negali skaityti vulnerability alerts. Suteik šį leidimą GitHub, tada sinchronizuok dar kartą.",
+      "configConflict": "Saugos agento nustatymai pakeisti kitoje vietoje. Peržiūrėk naujausius nustatymus ir išsaugok dar kartą."
     },
     "analysisState": {
       "queued": "Analizė eilėje",
@@ -2442,13 +2447,14 @@
       "forkFilesUnchangedOnComputer": "Failai šiame kompiuteryje nekeičiami.",
       "pickProfile": "Pasirinkite profilį",
       "noProfile": "Nėra profilio",
+      "defaultProfileResolvesTo": "Atitinka: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Numatytasis profilis: {{name}}",
       "manageProfiles": "Tvarkyti profilius",
       "noProfiles": "Dar nėra profilių. Sukurkite vieną, kad pridėtumėte aplinkos kintamuosius, MCP serverius ir įgūdžius.",
       "advancedConfig": "Išplėstinė konfigūracija",
       "advancedConfigDescription": "Taikoma šiai sesijai. Išsaugojus kaip profilį, jis išliks kitam kartui.",
       "saveAsProfile": "Išsaugoti kaip profilį",
       "saveProfileDescription": "Išsaugokite esamus aplinkos kintamuosius ir sąrankos komandas kaip pakartotinai naudojamą profilį.",
-      "profileSummary": "{{vars}} aplinkos kintamieji · {{commands}} sąrankos komandos",
       "profileSaved": "Profilis „{{name}}“ išsaugotas",
       "organizationProfiles": "Organizacijos profiliai",
       "personalProfiles": "Asmeniniai profiliai",
@@ -2819,7 +2825,6 @@
     },
     "modelSelector": {
       "provider": "Teikėjas {{id}}",
-      "modelId": "Modelis {{id}}",
       "unavailable": "Nepasiekiama",
       "unavailableState": "nepasiekiama",
       "selectedState": "pasirinkta",
@@ -4267,7 +4272,8 @@
     "sources": "Įrodymai ir artefaktai",
     "timezone": "Suvestinės laiko juosta",
     "deviceTimezone": "Naudoti įrenginio laiko juostą",
-    "timezoneHint": "IANA laiko juosta, pvz., Europe/Berlin. Grafiko pakeitimai taikomi būsimoms suvestinėms.",
+    "timezoneHint": "IANA laiko juosta, pvz., Europe/Berlin.",
+    "scheduleHint": "Grafiko pakeitimai taikomi būsimoms suvestinėms.",
     "nightStart": "Suvestinės laikotarpis prasideda",
     "morningStart": "Suvestinė paruošta",
     "morningEnd": "Suvestinė galima iki",

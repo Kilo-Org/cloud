@@ -162,7 +162,8 @@ export function PrReviewOverview({
         return (
           <DetailScreenScrollView
             className="flex-1"
-            contentContainerClassName="p-4"
+            contentContainerClassName="px-4 pb-4 pt-3"
+            overlayRefreshProgress
             refreshControl={refreshControl}
           >
             <PrReviewReconnectNotice />
@@ -225,7 +226,8 @@ export function PrReviewOverview({
     return (
       <DetailScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-4"
+        contentContainerClassName="px-4 pt-3"
+        overlayRefreshProgress
         refreshControl={refreshControl}
       >
         <PrReviewOverviewSkeleton />
@@ -241,8 +243,9 @@ export function PrReviewOverview({
   return (
     <DetailScreenScrollView
       className="flex-1"
-      contentContainerClassName="gap-5 px-4"
+      contentContainerClassName="gap-5 px-4 pt-3"
       keyboardShouldPersistTaps="handled"
+      overlayRefreshProgress
       refreshControl={refreshControl}
     >
       <View className="gap-3">

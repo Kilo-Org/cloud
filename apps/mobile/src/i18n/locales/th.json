@@ -403,6 +403,7 @@
     "connectionExpired": "การเชื่อมต่อ GitHub หมดอายุแล้ว",
     "merge": {
       "merge": "รวม",
+      "mergeTitle": "รวม",
       "mergeNow": "รวมตอนนี้",
       "mergePullRequest": "รวม PR",
       "mergeTermTitle": "รวม {{term}}",
@@ -682,6 +683,9 @@
       "gitlabDescription": "ตรวจสอบ merge request บนมือถือ",
       "bitbucketOrgOnlyDescription": "สลับบัญชีด้านบนไปที่องค์กรเพื่อรีวิวพูลรีเควสต์บน Bitbucket ขององค์กรนั้น",
       "bitbucketOrgOnlyNoOrganizationDescription": "บัญชีนี้ยังไม่มีองค์กร คุณจะสามารถรีวิวพูลรีเควสต์บน Bitbucket ได้เมื่อสร้างหรือเข้าร่วมองค์กร",
+      "gitlabReconnectAdminOnlyDescription": "ขอให้เจ้าของ ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินขององค์กรเชื่อมต่อใหม่",
+      "bitbucketNotConnectedTitle": "Bitbucket ยังไม่เชื่อมต่อ",
+      "bitbucketAdminOnlyDescription": "เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้",
       "contextLine": "สำหรับ {{organization}}",
       "contextLinePersonal": "สำหรับบัญชีส่วนตัวของคุณ"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "คำแนะนำที่กำหนดเอง",
       "deprecation": "คำแนะนำที่กำหนดเองจะเลิกใช้งานในอนาคต ย้ายคำแนะนำเหล่านี้ไปไว้ในไฟล์ REVIEW.md ในคลังโค้ดแทน",
-      "placeholder": "เช่น ตรวจให้เป็นไปตามแนวทางการจัดการข้อผิดพลาดของเรา…"
+      "placeholder": "เช่น ตรวจให้เป็นไปตามแนวทางการจัดการข้อผิดพลาดของเรา…",
+      "clearTitle": "ลบคำแนะนำที่กำหนดเองหรือไม่",
+      "clearMessage": "การบันทึกช่องที่ว่างเปล่าจะลบคำแนะนำที่กำหนดเองที่จัดเก็บไว้สำหรับตัวตรวจสอบนี้ออก"
     },
     "repos": {
       "unavailable": "คลังโค้ดยังไม่พร้อมใช้งาน ตั้งค่า Bitbucket ให้เสร็จบน kilo.ai",
@@ -1599,11 +1605,9 @@
       "bitbucketError": "ไม่สามารถเปิดหน้าตั้งค่า Bitbucket ได้ กรุณาลองอีกครั้ง"
     },
     "overview": {
-      "reviewStyle": "รูปแบบการตรวจสอบ",
-      "focusAreas": "ประเด็นที่เน้น",
       "allAreas": "ทุกด้าน",
-      "customInstructions": "คำแนะนำที่กำหนดเอง",
       "set": "ตั้งค่าแล้ว",
+      "notSet": "ยังไม่ได้ตั้งค่า",
       "nSelected": "เลือกแล้ว {{displayCount}} รายการ",
       "proposedReviewMdGuidance": "คำแนะนำที่เสนอสำหรับ REVIEW.md"
     },
@@ -2061,7 +2065,8 @@
       "actionBlocked": "ดำเนินการนี้ให้เสร็จสมบูรณ์ไม่ได้ ต้องแก้ไขปัญหาก่อนจึงจะลองใหม่ได้",
       "syncNoRepositories": "ไม่มีรีโพซิทอรีใดอยู่ในขอบเขตการซิงค์ โปรดเลือก repositories ที่เอเจนต์ความปลอดภัยตรวจสอบ แล้วซิงค์อีกครั้ง",
       "syncIntegrationInactive": "การเชื่อมต่อ GitHub สำหรับเอเจนต์ความปลอดภัยยังไม่เปิดใช้งาน เชื่อมต่อ Kilo GitHub App ใหม่อีกครั้ง แล้วซิงค์อีกครั้ง",
-      "syncMissingPermission": "Kilo GitHub App อ่าน vulnerability alerts ไม่ได้ ให้สิทธิ์นั้นใน GitHub แล้วซิงก์อีกครั้ง"
+      "syncMissingPermission": "Kilo GitHub App อ่าน vulnerability alerts ไม่ได้ ให้สิทธิ์นั้นใน GitHub แล้วซิงก์อีกครั้ง",
+      "configConflict": "การตั้งค่าของเอเจนต์ความปลอดภัยถูกเปลี่ยนที่อื่น ตรวจสอบการตั้งค่าล่าสุดแล้วบันทึกอีกครั้ง"
     },
     "analysisState": {
       "queued": "รอคิววิเคราะห์",
@@ -2368,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "ไฟล์ในคอมพิวเตอร์เครื่องนี้จะไม่ถูกเปลี่ยนแปลง",
       "pickProfile": "เลือกโปรไฟล์",
       "noProfile": "ไม่มีโปรไฟล์",
+      "defaultProfileResolvesTo": "ใช้โปรไฟล์ {{name}}",
+      "defaultProfileResolvesToAccessibility": "โปรไฟล์เริ่มต้น: {{name}}",
       "manageProfiles": "จัดการโปรไฟล์",
       "noProfiles": "ยังไม่มีโปรไฟล์ สร้างโปรไฟล์เพื่อเพิ่มตัวแปรสภาพแวดล้อม เซิร์ฟเวอร์ MCP และทักษะ",
       "advancedConfig": "การกำหนดค่าขั้นสูง",
       "advancedConfigDescription": "ใช้กับเซสชันนี้ การบันทึกเป็นโปรไฟล์จะเก็บไว้ใช้ครั้งถัดไป",
       "saveAsProfile": "บันทึกเป็นโปรไฟล์",
       "saveProfileDescription": "บันทึกตัวแปรสภาพแวดล้อมปัจจุบันและคำสั่งการตั้งค่าเป็นโปรไฟล์ที่นำมาใช้ซ้ำได้",
-      "profileSummary": "ตัวแปรสภาพแวดล้อม {{vars}} · คำสั่งการตั้งค่า {{commands}}",
       "profileSaved": "บันทึกโปรไฟล์ \"{{name}}\" แล้ว",
       "organizationProfiles": "โปรไฟล์องค์กร",
       "personalProfiles": "โปรไฟล์ส่วนบุคคล",
@@ -2735,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "ผู้ให้บริการ {{id}}",
-      "modelId": "โมเดล {{id}}",
       "unavailable": "ไม่พร้อมใช้งาน",
       "unavailableState": "ไม่พร้อมใช้งาน",
       "selectedState": "เลือกแล้ว",
@@ -4145,7 +4150,8 @@
     "sources": "หลักฐานและอาร์ทิแฟกต์",
     "timezone": "เขตเวลาของรายงาน",
     "deviceTimezone": "ใช้เขตเวลาของอุปกรณ์",
-    "timezoneHint": "เขตเวลา IANA เช่น Europe/Berlin การเปลี่ยนกำหนดเวลาจะมีผลกับรายงานในอนาคต",
+    "timezoneHint": "เขตเวลา IANA เช่น Europe/Berlin",
+    "scheduleHint": "การเปลี่ยนกำหนดเวลาจะมีผลกับรายงานในอนาคต",
     "nightStart": "เริ่มช่วงเวลาของรายงาน",
     "morningStart": "รายงานพร้อมเมื่อ",
     "morningEnd": "รายงานพร้อมใช้งานจนถึง",

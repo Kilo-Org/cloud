@@ -410,6 +410,7 @@
     "connectionExpired": "GitHub savienojuma derīguma termiņš ir beidzies.",
     "merge": {
       "merge": "Apvienošana",
+      "mergeTitle": "Apvienošana",
       "mergeNow": "Apvienot tagad",
       "mergePullRequest": "Izmaiņu pieprasījuma apvienošana",
       "mergeTermTitle": "Apvienot {{term}}",
@@ -697,6 +698,9 @@
       "gitlabDescription": "Pārbaudīt merge requests mobilajā ierīcē",
       "bitbucketOrgOnlyDescription": "Pārslēdz augstāk redzamo kontu uz organizāciju, lai pārskatītu tās Bitbucket izmaiņu pieprasījumus.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Šim kontam vēl nav organizāciju. Bitbucket izmaiņu pieprasījumus varēs pārskatīt, kad izveidosi organizāciju vai tai pievienosies.",
+      "gitlabReconnectAdminOnlyDescription": "Lūdziet organizācijas īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot no jauna.",
+      "bitbucketNotConnectedTitle": "Bitbucket nav pievienots",
+      "bitbucketAdminOnlyDescription": "To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
       "contextLine": "Priekš {{organization}}",
       "contextLinePersonal": "Priekš personīgā konta"
     },
@@ -1437,7 +1441,9 @@
     "instructions": {
       "title": "Pielāgoti norādījumi",
       "deprecation": "Pielāgoto norādījumu funkcijas atbalstu plānots pārtraukt. Tā vietā pārvieto šos norādījumus uz REVIEW.md failu savā repozitorijā.",
-      "placeholder": "piemēram, ievērot mūsu kļūdu apstrādes noteikumus…"
+      "placeholder": "piemēram, ievērot mūsu kļūdu apstrādes noteikumus…",
+      "clearTitle": "Noņemt pielāgotos norādījumus?",
+      "clearMessage": "Saglabājot tukšu lauku, tiks dzēsti šim recenzentam saglabātie pielāgotie norādījumi."
     },
     "repos": {
       "unavailable": "Repozitoriji nav pieejami. Pabeidz Bitbucket iestatīšanu vietnē kilo.ai.",
@@ -1621,11 +1627,9 @@
       "bitbucketError": "Neizdevās atvērt Bitbucket iestatīšanu. Lūdzu, mēģini vēlreiz."
     },
     "overview": {
-      "reviewStyle": "Pārskatīšanas stils",
-      "focusAreas": "Pārskatāmās jomas",
       "allAreas": "Visas jomas",
-      "customInstructions": "Pielāgoti norādījumi",
       "set": "Iestatīts",
+      "notSet": "Nav iestatīts",
       "nSelected": "Atlasīts: {{displayCount}}",
       "proposedReviewMdGuidance": "Ieteiktie REVIEW.md norādījumi"
     },
@@ -2094,7 +2098,8 @@
       "actionBlocked": "Neizdevās pabeigt šo darbību. Vispirms jāatrisina problēma, lai varētu mēģināt vēlreiz.",
       "syncNoRepositories": "Sinhronizācijas tvērumā nav neviena repozitorija. Izvēlieties repozitorijus, kurus pārrauga Drošības aģents, un pēc tam sinhronizējiet vēlreiz.",
       "syncIntegrationInactive": "Drošības aģenta GitHub savienojums nav aktīvs. Atkārtoti pievienojiet Kilo GitHub App un pēc tam sinhronizējiet vēlreiz.",
-      "syncMissingPermission": "Kilo GitHub lietotne nevar lasīt ievainojamību brīdinājumus. Piešķir šo atļauju GitHub un pēc tam sinhronizē vēlreiz."
+      "syncMissingPermission": "Kilo GitHub lietotne nevar lasīt ievainojamību brīdinājumus. Piešķir šo atļauju GitHub un pēc tam sinhronizē vēlreiz.",
+      "configConflict": "Drošības aģenta iestatījumi ir mainīti citur. Pārskati jaunākos iestatījumus un saglabā vēlreiz."
     },
     "analysisState": {
       "queued": "Analīze rindā",
@@ -2405,13 +2410,14 @@
       "forkFilesUnchangedOnComputer": "Faili šajā datorā netiek mainīti.",
       "pickProfile": "Izvēlieties profilu",
       "noProfile": "Nav profila",
+      "defaultProfileResolvesTo": "Norāda uz {{name}}",
+      "defaultProfileResolvesToAccessibility": "Noklusējuma profils: {{name}}",
       "manageProfiles": "Pārvaldīt profilus",
       "noProfiles": "Vēl nav neviena profila. Izveidojiet vienu, lai pievienotu vides mainīgos, MCP serverus un prasmes.",
       "advancedConfig": "Papildu konfigurācija",
       "advancedConfigDescription": "Attiecas uz šo sesiju. Saglabājot kā profilu, tas paliks nākamajai reizei.",
       "saveAsProfile": "Saglabāt kā profilu",
       "saveProfileDescription": "Saglabājiet pašreizējos vides mainīgos un iestatīšanas komandas kā atkārtoti lietojamu profilu.",
-      "profileSummary": "{{vars}} vides mainīgie · {{commands}} iestatīšanas komandas",
       "profileSaved": "Profils \"{{name}}\" ir saglabāts",
       "organizationProfiles": "Organizācijas profili",
       "personalProfiles": "Personiskie profili",
@@ -2777,7 +2783,6 @@
     },
     "modelSelector": {
       "provider": "Pakalpojumu sniedzējs {{id}}",
-      "modelId": "Modelis {{id}}",
       "unavailable": "Nav pieejams",
       "unavailableState": "nav pieejams",
       "selectedState": "izvēlēts",
@@ -4206,7 +4211,8 @@
     "sources": "Pierādījumi un artefakti",
     "timezone": "Atskaites laika josla",
     "deviceTimezone": "Izmantot ierīces laika joslu",
-    "timezoneHint": "IANA laika josla, piemēram, Europe/Berlin. Grafika izmaiņas attiecas uz nākamajām atskaitēm.",
+    "timezoneHint": "IANA laika josla, piemēram, Europe/Berlin.",
+    "scheduleHint": "Grafika izmaiņas attiecas uz nākamajām atskaitēm.",
     "nightStart": "Atskaites periods sākas",
     "morningStart": "Atskaite gatava",
     "morningEnd": "Atskaite pieejama līdz",

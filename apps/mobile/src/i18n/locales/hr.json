@@ -410,6 +410,7 @@
     "connectionExpired": "Veza s GitHubom je istekla.",
     "merge": {
       "merge": "Spajanje",
+      "mergeTitle": "Spajanje",
       "mergeNow": "Spoji sada",
       "mergePullRequest": "Spajanje zahtjeva",
       "mergeTermTitle": "Spoji {{term}}",
@@ -697,6 +698,9 @@
       "gitlabDescription": "Pregledaj merge requeste na mobitelu",
       "bitbucketOrgOnlyDescription": "Prebaci račun gore na organizaciju za pregled njenih zahtjeva za spajanje na Bitbucketu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj račun još nema organizacija. Zahtjeve za spajanje na Bitbucketu moći ćeš pregledati kada stvoriš ili se pridružiš organizaciji.",
+      "gitlabReconnectAdminOnlyDescription": "Zamolite vlasnika organizacije, administratora ili upravitelja naplate da ga ponovno poveže.",
+      "bitbucketNotConnectedTitle": "Bitbucket nije povezan",
+      "bitbucketAdminOnlyDescription": "Samo vlasnici organizacije, administratori i upravitelji naplate mogu ga povezati.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za osobni račun"
     },
@@ -1437,7 +1441,9 @@
     "instructions": {
       "title": "Prilagođene upute",
       "deprecation": "Planira se ukidanje prilagođenih uputa. Premjesti ove smjernice u datoteku REVIEW.md u svom repozitoriju.",
-      "placeholder": "npr. primjena naših pravila za obradu pogrešaka…"
+      "placeholder": "npr. primjena naših pravila za obradu pogrešaka…",
+      "clearTitle": "Ukloniti prilagođene upute?",
+      "clearMessage": "Ako spremiš prazno polje, izbrisat će se prilagođene upute spremljene za ovog recenzenta."
     },
     "repos": {
       "unavailable": "Repozitoriji nisu dostupni. Dovrši postavljanje za Bitbucket na kilo.ai.",
@@ -1621,11 +1627,9 @@
       "bitbucketError": "Nije moguće otvoriti postavljanje za Bitbucket. Pokušaj ponovno."
     },
     "overview": {
-      "reviewStyle": "Stil pregleda",
-      "focusAreas": "Područja pregleda",
       "allAreas": "Sva područja",
-      "customInstructions": "Prilagođene upute",
       "set": "Postavljeno",
+      "notSet": "Nije postavljeno",
       "nSelected": "{{displayCount}} odabrano",
       "proposedReviewMdGuidance": "Predložene smjernice za REVIEW.md"
     },
@@ -2094,7 +2098,8 @@
       "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem je potrebno riješiti prije ponovnog pokušaja.",
       "syncNoRepositories": "Nijedan repozitorij nije u opsegu sinkronizacije. Odaberite repozitorije koje Sigurnosni agent nadzire, zatim ponovno sinkronizirajte.",
       "syncIntegrationInactive": "Veza s GitHubom za Sigurnosni agent nije aktivna. Ponovno povežite Kilo GitHub App, zatim ponovno sinkronizirajte.",
-      "syncMissingPermission": "Kilo GitHub App ne može čitati vulnerability alerts. Dodijeli to dopuštenje u GitHubu, pa ponovno sinkroniziraj."
+      "syncMissingPermission": "Kilo GitHub App ne može čitati vulnerability alerts. Dodijeli to dopuštenje u GitHubu, pa ponovno sinkroniziraj.",
+      "configConflict": "Postavke Sigurnosnog agenta promijenjene su negdje drugdje. Pregledaj najnovije postavke i ponovno spremi."
     },
     "analysisState": {
       "queued": "Analiza u redu čekanja",
@@ -2405,13 +2410,14 @@
       "forkFilesUnchangedOnComputer": "Datoteke na ovom računalu ostaju nepromijenjene.",
       "pickProfile": "Odaberite profil",
       "noProfile": "Bez profila",
+      "defaultProfileResolvesTo": "Odnosi se na {{name}}",
+      "defaultProfileResolvesToAccessibility": "Zadani profil: {{name}}",
       "manageProfiles": "Upravljanje profilima",
       "noProfiles": "Još nema profila. Stvorite jedan za dodavanje varijabli okoline, MCP poslužitelja i vještina.",
       "advancedConfig": "Napredna konfiguracija",
       "advancedConfigDescription": "Vrijedi za ovu sesiju. Spremanjem kao profil ostaje za sljedeći put.",
       "saveAsProfile": "Spremi kao profil",
       "saveProfileDescription": "Spremite trenutne varijable okruženja i naredbe za postavljanje kao profil za višekratnu upotrebu.",
-      "profileSummary": "{{vars}} varijable okruženja · {{commands}} naredbe za postavljanje",
       "profileSaved": "Profil \"{{name}}\" spremljen",
       "organizationProfiles": "Profili organizacije",
       "personalProfiles": "Osobni profili",
@@ -2777,7 +2783,6 @@
     },
     "modelSelector": {
       "provider": "Pružatelj {{id}}",
-      "modelId": "Model: {{id}}",
       "unavailable": "Nedostupan",
       "unavailableState": "nedostupan",
       "selectedState": "odabrano",
@@ -4206,7 +4211,8 @@
     "sources": "Dokazi i artefakti",
     "timezone": "Vremenska zona izvješća",
     "deviceTimezone": "Koristi vremensku zonu uređaja",
-    "timezoneHint": "IANA vremenska zona, npr. Europe/Berlin. Promjene rasporeda vrijede za buduća izvješća.",
+    "timezoneHint": "IANA vremenska zona, npr. Europe/Berlin.",
+    "scheduleHint": "Promjene rasporeda vrijede za buduća izvješća.",
     "nightStart": "Početak prozora izvješća",
     "morningStart": "Izvješće spremno u",
     "morningEnd": "Izvješće dostupno do",

@@ -403,6 +403,7 @@
     "connectionExpired": "ການເຊື່ອມຕໍ່ GitHub ໝົດອາຍຸແລ້ວ.",
     "merge": {
       "merge": "ລວມໂຄ້ດ",
+      "mergeTitle": "ລວມໂຄ້ດ",
       "mergeNow": "ລວມດຽວນີ້",
       "mergePullRequest": "ລວມຄຳຂໍລວມໂຄດ",
       "mergeTermTitle": "ລວມ{{term}}",
@@ -682,6 +683,9 @@
       "gitlabDescription": "ກວດສອບ merge request ໃນມືຖື",
       "bitbucketOrgOnlyDescription": "ປ່ຽນບັນຊີຂ້າງເທິງໄປຫາອົງກອນເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ຂອງມັນ.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ບັນຊີນີ້ຍັງບໍ່ມີອົງກອນ. ທ່ານສາມາດກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ໄດ້ເມື່ອທ່ານສ້າງ ຫຼື ເຂົ້າຮ່ວມອົງກອນ.",
+      "gitlabReconnectAdminOnlyDescription": "ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເຊື່ອມຕໍ່.",
+      "bitbucketNotConnectedTitle": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket",
+      "bitbucketAdminOnlyDescription": "ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້.",
       "contextLine": "ສຳລັບ {{organization}}",
       "contextLinePersonal": "ສຳລັບບັນຊີສ່ວນຕົວຂອງທ່ານ"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "ຄຳສັ່ງທີ່ກຳນົດເອງ",
       "deprecation": "ມີແຜນຈະເລີກໃຊ້ຄຳແນະນຳທີ່ກຳນົດເອງ. ຍ້າຍຄຳແນະນຳເຫຼົ່ານີ້ໄປໄວ້ໃນໄຟລ໌ REVIEW.md ໃນຄັງໂຄ້ດຂອງເຈົ້າແທນ.",
-      "placeholder": "ເຊັ່ນ: ໃຫ້ປະຕິບັດຕາມມາດຕະຖານການຈັດການຂໍ້ຜິດພາດຂອງທີມ…"
+      "placeholder": "ເຊັ່ນ: ໃຫ້ປະຕິບັດຕາມມາດຕະຖານການຈັດການຂໍ້ຜິດພາດຂອງທີມ…",
+      "clearTitle": "ເອົາຄຳສັ່ງທີ່ກຳນົດເອງອອກບໍ?",
+      "clearMessage": "ການບັນທຶກຊ່ອງຫວ່າງເປົ່າຈະລຶບຄຳສັ່ງທີ່ກຳນົດເອງທີ່ເກັບໄວ້ສຳລັບຜູ້ກວດສອບນີ້ອອກ."
     },
     "repos": {
       "unavailable": "ບໍ່ສາມາດເຂົ້າເຖິງຄັງໂຄ້ດໄດ້ — ຕັ້ງຄ່າ Bitbucket ໃຫ້ສຳເລັດໃນ kilo.ai.",
@@ -1599,11 +1605,9 @@
       "bitbucketError": "ບໍ່ສາມາດເປີດໜ້າຕັ້ງຄ່າ Bitbucket ໄດ້. ກະລຸນາລອງອີກຄັ້ງ."
     },
     "overview": {
-      "reviewStyle": "ຮູບແບບການກວດສອບ",
-      "focusAreas": "ຫົວຂໍ້ທີ່ເນັ້ນ",
       "allAreas": "ທຸກດ້ານ",
-      "customInstructions": "ຄຳສັ່ງທີ່ກຳນົດເອງ",
       "set": "ຕັ້ງຄ່າແລ້ວ",
+      "notSet": "ບໍ່ໄດ້ຕັ້ງຄ່າ",
       "nSelected": "ເລືອກແລ້ວ {{displayCount}} ລາຍການ",
       "proposedReviewMdGuidance": "ຄຳແນະນຳທີ່ສະເໜີສຳລັບ REVIEW.md"
     },
@@ -2061,7 +2065,8 @@
       "actionBlocked": "ບໍ່ສາມາດສຳເລັດການດຳເນີນການນີ້ໄດ້. ຕ້ອງແກ້ໄຂບັນຫານີ້ກ່ອນຈຶ່ງຈະລອງໃໝ່ໄດ້.",
       "syncNoRepositories": "ບໍ່ມີ repository ໃດຢູ່ໃນຂອບເຂດການຊິງຄ໌. ເລືອກ repository ທີ່ «ເອເຈນດ້ານຄວາມປອດໄພ» ຕິດຕາມ, ແລ້ວຊິງຄ໌ອີກຄັ້ງ.",
       "syncIntegrationInactive": "ການເຊື່ອມຕໍ່ GitHub ສຳລັບ ເອເຈນດ້ານຄວາມປອດໄພ ບໍ່ໄດ້ເປີດໃຊ້ງານ. ເຊື່ອມຕໍ່ Kilo GitHub App ຄືນໃໝ່, ແລ້ວຊິງຄ໌ອີກຄັ້ງ.",
-      "syncMissingPermission": "Kilo GitHub App ບໍ່ສາມາດອ່ານ vulnerability alerts ໄດ້. ໃຫ້ສິດນັ້ນໃນ GitHub, ແລ້ວຊິງຄ໌ອີກຄັ້ງ."
+      "syncMissingPermission": "Kilo GitHub App ບໍ່ສາມາດອ່ານ vulnerability alerts ໄດ້. ໃຫ້ສິດນັ້ນໃນ GitHub, ແລ້ວຊິງຄ໌ອີກຄັ້ງ.",
+      "configConflict": "ການຕັ້ງຄ່າຂອງເອເຈນດ້ານຄວາມປອດໄພຖືກປ່ຽນແປງຢູ່ບ່ອນອື່ນ. ກວດເບິ່ງການຕັ້ງຄ່າລ່າສຸດແລ້ວບັນທຶກອີກຄັ້ງ."
     },
     "analysisState": {
       "queued": "ລໍຄິວວິເຄາະ",
@@ -2368,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "ໄຟລ໌ໃນຄອມພິວເຕີນີ້ບໍ່ມີການປ່ຽນແປງ.",
       "pickProfile": "ເລືອກໂປຣໄຟລ໌",
       "noProfile": "ບໍ່ມີໂປຣໄຟລ໌",
+      "defaultProfileResolvesTo": "ຕັ້ງຄ່າເປັນ {{name}}",
+      "defaultProfileResolvesToAccessibility": "ໂປຣໄຟລ໌ເລີ່ມຕົ້ນ: {{name}}",
       "manageProfiles": "ຈັດການໂປຣໄຟລ໌",
       "noProfiles": "ບໍ່ມີໂປຣໄຟລ໌ເທື່ອ. ສ້າງອັນໜຶ່ງເພື່ອເພີ່ມຕົວແປສະພາບແວດລ້ອມ, ເຊີບເວີ MCP ແລະທັກສະ.",
       "advancedConfig": "ການຕັ້ງຄ່າຂັ້ນສູງ",
       "advancedConfigDescription": "ໃຊ້ກັບເຊສຊັນນີ້. ການບັນທຶກເປັນໂປຣໄຟລ໌ຈະເກັບໄວ້ສຳລັບຄັ້ງຕໍ່ໄປ.",
       "saveAsProfile": "ບັນທຶກເປັນໂປຣໄຟລ໌",
       "saveProfileDescription": "ບັນທຶກຕົວແປສະພາບແວດລ້ອມປັດຈຸບັນ ແລະຄຳສັ່ງຕັ້ງຄ່າເປັນໂປຣໄຟລ໌ທີ່ສາມາດໃຊ້ຄືນໄດ້.",
-      "profileSummary": "{{vars}} ຕົວແປສະພາບແວດລ້ອມ · {{commands}} ຄຳສັ່ງຕັ້ງຄ່າ",
       "profileSaved": "ບັນທຶກໂປຣໄຟລ໌ \"{{name}}\" ແລ້ວ",
       "organizationProfiles": "ໂປຣໄຟລ໌ອົງການຈັດຕັ້ງ",
       "personalProfiles": "ໂປຣໄຟລ໌ສ່ວນຕົວ",
@@ -2735,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "ຜູ້ໃຫ້ບໍລິການ {{id}}",
-      "modelId": "ໂມເດວ {{id}}",
       "unavailable": "ໃຊ້ບໍ່ໄດ້",
       "unavailableState": "ໃຊ້ບໍ່ໄດ້",
       "selectedState": "ເລືອກແລ້ວ",
@@ -4145,7 +4150,8 @@
     "sources": "ຫຼັກຖານ ແລະ ຜົນງານ",
     "timezone": "ເຂດເວລາຂອງລາຍງານ",
     "deviceTimezone": "ໃຊ້ເຂດເວລາຂອງອຸປະກອນ",
-    "timezoneHint": "ເຂດເວລາ IANA, ເຊັ່ນ Europe/Berlin. ການປ່ຽນຕາຕະລາງຈະມີຜົນກັບລາຍງານໃນອະນາຄົດ.",
+    "timezoneHint": "ເຂດເວລາ IANA, ເຊັ່ນ Europe/Berlin.",
+    "scheduleHint": "ການປ່ຽນຕາຕະລາງຈະມີຜົນກັບລາຍງານໃນອະນາຄົດ.",
     "nightStart": "ເລີ່ມຊ່ວງເວລາຂອງລາຍງານ",
     "morningStart": "ລາຍງານພ້ອມເວລາ",
     "morningEnd": "ລາຍງານມີຈົນເຖິງ",

@@ -889,7 +889,9 @@
     "instructions": {
       "title": "Hướng dẫn tùy chỉnh",
       "deprecation": "Tính năng hướng dẫn tùy chỉnh dự kiến sẽ ngừng được hỗ trợ. Hãy chuyển các hướng dẫn này vào tệp REVIEW.md trong kho lưu trữ.",
-      "placeholder": "ví dụ: Tuân thủ các quy ước xử lý lỗi của nhóm…"
+      "placeholder": "ví dụ: Tuân thủ các quy ước xử lý lỗi của nhóm…",
+      "clearTitle": "Xóa hướng dẫn tùy chỉnh?",
+      "clearMessage": "Lưu trường trống sẽ xóa hướng dẫn tùy chỉnh đã lưu cho người duyệt mã này."
     },
     "repos": {
       "unavailable": "Không thể truy cập các kho lưu trữ. Hãy hoàn tất thiết lập Bitbucket trên kilo.ai.",
@@ -1080,12 +1082,10 @@
     },
     "overview": {
       "allAreas": "Tất cả nội dung",
-      "customInstructions": "Hướng dẫn tùy chỉnh",
-      "focusAreas": "Nội dung trọng tâm",
       "nSelected": "Đã chọn {{displayCount}}",
       "proposedReviewMdGuidance": "Hướng dẫn đề xuất cho REVIEW.md",
-      "reviewStyle": "Cách rà soát",
-      "set": "Đã thiết lập"
+      "set": "Đã thiết lập",
+      "notSet": "Chưa thiết lập"
     },
     "updateFailed": "Không thể cập nhật Trình rà soát mã.",
     "configSaveFailed": "Không thể lưu cấu hình rà soát.",
@@ -1535,7 +1535,8 @@
       "actionBlocked": "Không thể hoàn tất hành động này. Bạn cần khắc phục sự cố trước khi thử lại.",
       "syncNoRepositories": "Không có kho lưu trữ nào trong phạm vi đồng bộ. Hãy chọn các kho lưu trữ mà Trợ lý bảo mật giám sát, rồi đồng bộ lại.",
       "syncIntegrationInactive": "Kết nối GitHub của Trợ lý bảo mật chưa hoạt động. Hãy kết nối lại Ứng dụng GitHub của Kilo, sau đó đồng bộ lại.",
-      "syncMissingPermission": "Kilo GitHub App không thể đọc cảnh báo lỗ hổng bảo mật. Cấp quyền đó trong GitHub, rồi đồng bộ lại."
+      "syncMissingPermission": "Kilo GitHub App không thể đọc cảnh báo lỗ hổng bảo mật. Cấp quyền đó trong GitHub, rồi đồng bộ lại.",
+      "configConflict": "Cài đặt của Trợ lý bảo mật đã bị thay đổi ở nơi khác. Hãy xem lại cài đặt mới nhất và lưu lại."
     },
     "analysisState": {
       "queued": "Đang chờ phân tích",
@@ -1842,13 +1843,14 @@
       "forkFilesUnchangedOnComputer": "Các tệp trên máy tính này không bị thay đổi.",
       "pickProfile": "Chọn một hồ sơ",
       "noProfile": "Không có hồ sơ",
+      "defaultProfileResolvesTo": "Hiện là {{name}}",
+      "defaultProfileResolvesToAccessibility": "Hồ sơ mặc định: {{name}}",
       "manageProfiles": "Quản lý hồ sơ",
       "noProfiles": "Chưa có hồ sơ nào. Tạo một cái để thêm các biến môi trường, máy chủ MCP và kỹ năng.",
       "advancedConfig": "Cấu hình nâng cao",
       "advancedConfigDescription": "Áp dụng cho phiên này. Lưu làm hồ sơ sẽ giữ lại cho lần sau.",
       "saveAsProfile": "Lưu làm hồ sơ",
       "saveProfileDescription": "Lưu các biến môi trường hiện tại và các lệnh thiết lập dưới dạng cấu hình có thể sử dụng lại.",
-      "profileSummary": "{{vars}} biến môi trường · {{commands}} lệnh thiết lập",
       "profileSaved": "Đã lưu hồ sơ \"{{name}}\"",
       "organizationProfiles": "Hồ sơ tổ chức",
       "personalProfiles": "Hồ sơ cá nhân",
@@ -2209,7 +2211,6 @@
     },
     "modelSelector": {
       "provider": "Nhà cung cấp {{id}}",
-      "modelId": "Mô hình {{id}}",
       "unavailable": "Không khả dụng",
       "unavailableState": "không khả dụng",
       "selectedState": "đã chọn",
@@ -2713,6 +2714,9 @@
       "gitlabDescription": "Rà soát merge request trên điện thoại",
       "bitbucketOrgOnlyDescription": "Chuyển tài khoản ở trên sang một tổ chức để xem các PR Bitbucket của tổ chức đó.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tài khoản này chưa có tổ chức nào. Bạn có thể xem các PR Bitbucket sau khi tạo hoặc tham gia một tổ chức.",
+      "gitlabReconnectAdminOnlyDescription": "Hãy yêu cầu Chủ sở hữu, Quản trị viên hoặc Người quản lý thanh toán của tổ chức kết nối lại.",
+      "bitbucketNotConnectedTitle": "Bitbucket chưa được kết nối",
+      "bitbucketAdminOnlyDescription": "Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể kết nối.",
       "contextLine": "Cho {{organization}}",
       "contextLinePersonal": "Cho tài khoản cá nhân"
     },
@@ -2944,6 +2948,7 @@
     "installKiloGitHubApp": "Cài đặt ứng dụng Kilo trên GitHub",
     "merge": {
       "merge": "Hợp nhất",
+      "mergeTitle": "Hợp nhất",
       "mergeNow": "Hợp nhất ngay",
       "mergePullRequest": "Hợp nhất PR",
       "mergeTermTitle": "Hợp nhất {{term}}",
@@ -4145,7 +4150,8 @@
     "sources": "Bằng chứng và tạo phẩm",
     "timezone": "Múi giờ bản tin",
     "deviceTimezone": "Dùng múi giờ của thiết bị",
-    "timezoneHint": "Múi giờ IANA, ví dụ Europe/Berlin. Thay đổi lịch sẽ áp dụng cho các bản tin sau.",
+    "timezoneHint": "Múi giờ IANA, ví dụ Europe/Berlin.",
+    "scheduleHint": "Thay đổi lịch sẽ áp dụng cho các bản tin sau.",
     "nightStart": "Khung thời gian bản tin bắt đầu",
     "morningStart": "Bản tin sẵn sàng lúc",
     "morningEnd": "Bản tin có sẵn đến",

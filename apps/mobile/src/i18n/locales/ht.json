@@ -403,6 +403,7 @@
     "connectionExpired": "Koneksyon ak GitHub la ekspire.",
     "merge": {
       "merge": "Fizyon",
+      "mergeTitle": "Fizyon",
       "mergeNow": "Fizyonnen kounye a",
       "mergePullRequest": "Fizyon demann lan",
       "mergeTermTitle": "Fizyon {{term}}",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Revize merge request yo sou mobil",
       "bitbucketOrgOnlyDescription": "Chanje kont ki anwo a pou yon òganizasyon pou w revize demann fizyon Bitbucket li.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Kont sa a pa gen òganizasyon pou kounye a. Ou ka revize demann fizyon Bitbucket lè w kreye yon òganizasyon oswa rantre nan yon sèl.",
+      "gitlabReconnectAdminOnlyDescription": "Mande yon Pwopriyetè, yon Administratè, oswa yon Responsab faktirasyon nan òganizasyon an pou rekonekte l.",
+      "bitbucketNotConnectedTitle": "Bitbucket pa konekte",
+      "bitbucketAdminOnlyDescription": "Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka konekte li.",
       "contextLine": "Pou {{organization}}",
       "contextLinePersonal": "Pou kont pèsonèl ou"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Enstriksyon pèsonalize",
       "deprecation": "Nou prevwa sispann sipòte enstriksyon pèsonalize yo. Mete direktiv sa yo nan yon fichye REVIEW.md nan depo ou a pito.",
-      "placeholder": "pa egzanp: respekte règ nou yo pou jere erè…"
+      "placeholder": "pa egzanp: respekte règ nou yo pou jere erè…",
+      "clearTitle": "Retire enstriksyon pèsonalize yo?",
+      "clearMessage": "Anrejistre yon chan vid ap efase enstriksyon pèsonalize yo ki estoke pou revizè kòd sa a."
     },
     "repos": {
       "unavailable": "Depo yo pa disponib. Fini konfigirasyon Bitbucket la sou kilo.ai.",
@@ -1599,11 +1605,9 @@
       "bitbucketError": "Nou pa t ka louvri konfigirasyon Bitbucket la. Tanpri eseye ankò."
     },
     "overview": {
-      "reviewStyle": "Estil revizyon",
-      "focusAreas": "Aspè pou konsantre sou yo",
       "allAreas": "Tout domèn",
-      "customInstructions": "Enstriksyon pèsonalize",
       "set": "Konfigire",
+      "notSet": "Pa konfigire",
       "nSelected": "{{displayCount}} chwazi",
       "proposedReviewMdGuidance": "Direktiv ki pwopoze pou REVIEW.md"
     },
@@ -2061,7 +2065,8 @@
       "actionBlocked": "Pa t ka fini aksyon sa a. Fòk ou repare pwoblèm nan anvan ou ka eseye ankò.",
       "syncNoRepositories": "Pa gen okenn depo nan sijè senkronizasyon an. Chwazi depo Ajan sekirite siveye yo, epi senkronize ankò.",
       "syncIntegrationInactive": "Koneksyon GitHub pou Ajan sekirite a pa aktif. Rekonekte GitHub App Kilo a, epi senkronize ankò.",
-      "syncMissingPermission": "Kilo GitHub App pa ka li alèt vilnerabilite yo. Bay pèmisyon sa a nan GitHub, epi senkronize ankò."
+      "syncMissingPermission": "Kilo GitHub App pa ka li alèt vilnerabilite yo. Bay pèmisyon sa a nan GitHub, epi senkronize ankò.",
+      "configConflict": "Paramèt Ajan sekirite a chanje yon lòt kote. Revize paramèt ki pi resan yo epi anrejistre ankò."
     },
     "analysisState": {
       "queued": "Analiz nan ke",
@@ -2368,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "Fichye ki sou òdinatè sa a pa chanje.",
       "pickProfile": "Chwazi yon pwofil",
       "noProfile": "Pa gen pwofil",
+      "defaultProfileResolvesTo": "Koresponn a {{name}}",
+      "defaultProfileResolvesToAccessibility": "Default pwofil: {{name}}",
       "manageProfiles": "Jere pwofil yo",
       "noProfiles": "Pa gen pwofil ankò. Kreye youn pou ajoute varyab anviwònman, sèvè MCP, ak konpetans.",
       "advancedConfig": "Konfigirasyon avanse",
       "advancedConfigDescription": "Sa aplike pou sesyon sa a. Sove l kòm pwofil kenbe l pou pwochen fwa.",
       "saveAsProfile": "Sove kòm pwofil",
       "saveProfileDescription": "Sove varyab anviwònman aktyèl yo ak kòmandman konfigirasyon kòm yon pwofil ki kapab itilize ankò.",
-      "profileSummary": "{{vars}} varyab anviwònman · {{commands}} kòmandman konfigirasyon",
       "profileSaved": "Pwofil \"{{name}}\" sove",
       "organizationProfiles": "Pwofil òganizasyon",
       "personalProfiles": "Pwofil pèsonèl",
@@ -2735,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Founisè {{id}}",
-      "modelId": "Modèl {{id}}",
       "unavailable": "Pa disponib",
       "unavailableState": "pa disponib",
       "selectedState": "chwazi",
@@ -4145,7 +4150,8 @@
     "sources": "Prèv ak atefak",
     "timezone": "Fizo orè rapò a",
     "deviceTimezone": "Sèvi ak fizo orè aparèy la",
-    "timezoneHint": "Fizo orè IANA, pa egzanp Europe/Berlin. Chanjman orè yo aplike pou rapò k ap vini yo.",
+    "timezoneHint": "Fizo orè IANA, pa egzanp Europe/Berlin.",
+    "scheduleHint": "Chanjman orè yo aplike pou rapò k ap vini yo.",
     "nightStart": "Fenèt rapò a kòmanse",
     "morningStart": "Rapò a pare a",
     "morningEnd": "Rapò a disponib jiska",

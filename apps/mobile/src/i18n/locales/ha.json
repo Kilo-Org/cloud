@@ -403,6 +403,7 @@
     "connectionExpired": "Wa'adin haɗin GitHub ya ƙare.",
     "merge": {
       "merge": "Haɗawa",
+      "mergeTitle": "Haɗawa",
       "mergeNow": "Haɗa yanzu",
       "mergePullRequest": "Haɗa buƙatar haɗawa",
       "mergeTermTitle": "Haɗa {{term}}",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Yi bitar buƙatun haɗawa a waya",
       "bitbucketOrgOnlyDescription": "Canja asusun da ke sama zuwa ƙungiya don bita buƙatun haɗa canje-canje na Bitbucket na ƙungiyar.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Wannan asusu ba shi da ƙungiyoyi har yanzu. Za a iya bita buƙatun haɗa canje-canje na Bitbucket idan ka ƙirƙiri ƙungiya ko ka shiga cikin wata.",
+      "gitlabReconnectAdminOnlyDescription": "Nemi Mai ƙungiya, Mai gudanarwa, ko Manajan biyan kuɗi ya sake haɗa shi.",
+      "bitbucketNotConnectedTitle": "Ba a haɗa Bitbucket ba",
+      "bitbucketAdminOnlyDescription": "Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya haɗa shi.",
       "contextLine": "Don {{organization}}",
       "contextLinePersonal": "Don kashin kanka"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Umarni na musamman",
       "deprecation": "Ana shirin daina amfani da umarnin musamman. Maimakon haka, mayar da waɗannan ƙa'idodin cikin fayil ɗin REVIEW.md a ma'ajiyarka.",
-      "placeholder": "misali, tabbatar da bin ƙa'idodinmu na sarrafa kurakurai…"
+      "placeholder": "misali, tabbatar da bin ƙa'idodinmu na sarrafa kurakurai…",
+      "clearTitle": "Cire umarni na musamman?",
+      "clearMessage": "Ajiye filin da babu komai ciki zai goge umarni na musamman da aka adana wa wannan mai dubawa."
     },
     "repos": {
       "unavailable": "Ba a iya samun ma'ajiyoyi. Kammala saitin Bitbucket a kilo.ai.",
@@ -1599,11 +1605,9 @@
       "bitbucketError": "An kasa buɗe saitin Bitbucket. Sake gwadawa."
     },
     "overview": {
-      "reviewStyle": "Salon bita",
-      "focusAreas": "Abubuwan da za a fi dubawa",
       "allAreas": "Duk fannoni",
-      "customInstructions": "Umarni na musamman",
       "set": "An saita",
+      "notSet": "Ba a saita ba",
       "nSelected": "An zaɓi {{displayCount}}",
       "proposedReviewMdGuidance": "Ƙa'idodin REVIEW.md da aka ba da shawara"
     },
@@ -2061,7 +2065,8 @@
       "actionBlocked": "Ba za a iya kammala wannan aikin ba. Dole a gyara matsalar kafin a sake gwadawa.",
       "syncNoRepositories": "Babu wata ma'ajiyar bayanai da ke cikin iyakar daidaitawa. Zaɓi ma'ajiyoyin bayanai da Wakilin tsaro ke sa ido a kansu, sannan a sake daidaitawa.",
       "syncIntegrationInactive": "Haɗin GitHub na Wakilin tsaro ba ya aiki. Sake haɗa Kilo GitHub App, sannan ka sake daidaitawa.",
-      "syncMissingPermission": "Kilo GitHub App ba ya iya karanta vulnerability alerts. Ba da wannan izni a GitHub, sannan ka sake daidaitawa."
+      "syncMissingPermission": "Kilo GitHub App ba ya iya karanta vulnerability alerts. Ba da wannan izni a GitHub, sannan ka sake daidaitawa.",
+      "configConflict": "An canza saitunan Wakilin tsaro a wani wuri. Duba sabbin saitunan sannan ka sake adanawa."
     },
     "analysisState": {
       "queued": "Nazarin yana layin jira",
@@ -2368,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "Ba a canza fayiloli a wannan kwamfutar ba.",
       "pickProfile": "Zaɓi bayanin martaba",
       "noProfile": "Babu bayanin martaba",
+      "defaultProfileResolvesTo": "A halin yanzu yana nufin {{name}}",
+      "defaultProfileResolvesToAccessibility": "Bayanan martaba na asali: {{name}}",
       "manageProfiles": "Sarrafa bayanan martaba",
       "noProfiles": "Babu bayanan martaba tukuna. Ƙirƙiri ɗaya don ƙara masu canjin yanayi, sabar MCP, da ƙwarewa.",
       "advancedConfig": "Babban Kanfigareshan",
       "advancedConfigDescription": "Ya shafi wannan zaman. Ajiye shi azaman bayanan martaba yana kiyaye shi don gaba.",
       "saveAsProfile": "Ajiye azaman Bayanan martaba",
       "saveProfileDescription": "Ajiye masu canjin yanayi na yanzu da saitin umarni azaman bayanin martaba mai sake amfani da shi.",
-      "profileSummary": "{{vars}} masu canjin yanayi · {{commands}} umarnin saitin",
       "profileSaved": "An adana bayanan martaba \"{{name}}\".",
       "organizationProfiles": "Bayanan Ƙungiya",
       "personalProfiles": "Bayanan sirri",
@@ -2735,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Mai ba da sabis {{id}}",
-      "modelId": "Samfuri {{id}}",
       "unavailable": "Ba a samunsa ba",
       "unavailableState": "ba a samunsa ba",
       "selectedState": "an zaɓa",
@@ -4145,7 +4150,8 @@
     "sources": "Shaidu da kayayyaki",
     "timezone": "Yankin lokaci na rahoto",
     "deviceTimezone": "Yi amfani da yankin lokaci na na'ura",
-    "timezoneHint": "Yankin lokaci na IANA, misali Europe/Berlin. Canje-canjen jadawali za su shafi rahotanni masu zuwa.",
+    "timezoneHint": "Yankin lokaci na IANA, misali Europe/Berlin.",
+    "scheduleHint": "Canje-canjen jadawali za su shafi rahotanni masu zuwa.",
     "nightStart": "Farkon lokacin rahoto",
     "morningStart": "Rahoto yana shirye da ƙarfe",
     "morningEnd": "Rahoto yana samuwa har zuwa",

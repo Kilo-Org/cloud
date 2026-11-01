@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub जोडणीची मुदत संपली.",
     "merge": {
       "merge": "मर्ज",
+      "mergeTitle": "मर्ज",
       "mergeNow": "आता मर्ज करा",
       "mergePullRequest": "पुल रिक्वेस्ट मर्ज करा",
       "mergeTermTitle": "{{term}} मर्ज करा",
@@ -682,6 +683,9 @@
       "gitlabDescription": "मोबाइलवर मर्ज रिक्वेस्टचे पुनरावलोकन करा",
       "bitbucketOrgOnlyDescription": "त्याच्या Bitbucket पुल रिक्वेस्ट तपासण्यासाठी वरील खाते एका संघटनेत बदला.",
       "bitbucketOrgOnlyNoOrganizationDescription": "या खात्याशी अजून कोणतीही संघटना जोडलेली नाही. संघटना तयार केल्यानंतर किंवा त्यात सामील झाल्यानंतर तुम्ही Bitbucket पुल रिक्वेस्ट तपासू शकता.",
+      "gitlabReconnectAdminOnlyDescription": "संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते पुन्हा जोडण्यास सांगा.",
+      "bitbucketNotConnectedTitle": "Bitbucket जोडलेले नाही",
+      "bitbucketAdminOnlyDescription": "केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात.",
       "contextLine": "{{organization}} साठी",
       "contextLinePersonal": "तुमच्या वैयक्तिक खात्यासाठी"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "सानुकूल सूचना",
       "deprecation": "सानुकूल सूचनांची सुविधा बंद करण्याचे नियोजन आहे. त्याऐवजी ही मार्गदर्शक तत्त्वे तुमच्या रिपॉझिटरीतील REVIEW.md फाइलमध्ये ठेवा.",
-      "placeholder": "उदा. त्रुटी हाताळण्यासाठीचे आमचे नियम पाळा…"
+      "placeholder": "उदा. त्रुटी हाताळण्यासाठीचे आमचे नियम पाळा…",
+      "clearTitle": "सानुकूल सूचना काढून टाकायच्या?",
+      "clearMessage": "रिक्त फील्ड जतन केल्यास या समीक्षकासाठी साठवलेल्या सानुकूल सूचना हटवल्या जातील."
     },
     "repos": {
       "unavailable": "रिपॉझिटरी उपलब्ध नाहीत — kilo.ai वर Bitbucket सेटअप पूर्ण करा.",
@@ -1599,11 +1605,9 @@
       "bitbucketError": "Bitbucket सेटअप उघडता आला नाही. कृपया पुन्हा प्रयत्न करा."
     },
     "overview": {
-      "reviewStyle": "समीक्षेची शैली",
-      "focusAreas": "लक्ष द्यायचे मुद्दे",
       "allAreas": "सर्व क्षेत्रे",
-      "customInstructions": "सानुकूल सूचना",
       "set": "ठरवलेले",
+      "notSet": "ठरवलेले नाही",
       "nSelected": "{{displayCount}} निवडले",
       "proposedReviewMdGuidance": "प्रस्तावित REVIEW.md मार्गदर्शन"
     },
@@ -2061,7 +2065,8 @@
       "actionBlocked": "ही कृती पूर्ण करता आली नाही. पुन्हा प्रयत्न करण्यापूर्वी समस्या दुरुस्त करणे आवश्यक आहे.",
       "syncNoRepositories": "सिंक स्कोपमध्ये कोणतीही रिपॉझिटरी नाही. सुरक्षा एजंट कोणत्या रिपॉझिटरींवर लक्ष ठेवते त्या निवडा, नंतर पुन्हा सिंक करा.",
       "syncIntegrationInactive": "सुरक्षा एजंटसाठीचे GitHub कनेक्शन सक्रिय नाही. Kilo GitHub App पुन्हा कनेक्ट करा, नंतर पुन्हा सिंक करा.",
-      "syncMissingPermission": "Kilo GitHub ॲप vulnerability alerts वाचू शकत नाही. GitHub मध्ये ती परवानगी द्या, नंतर पुन्हा सिंक करा."
+      "syncMissingPermission": "Kilo GitHub ॲप vulnerability alerts वाचू शकत नाही. GitHub मध्ये ती परवानगी द्या, नंतर पुन्हा सिंक करा.",
+      "configConflict": "सुरक्षा एजंटची सेटिंग्ज इतरत्र बदलली आहेत. नवीनतम सेटिंग्ज तपासा आणि पुन्हा जतन करा."
     },
     "analysisState": {
       "queued": "विश्लेषण रांगेत",
@@ -2368,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "या संगणकावरील फाइल्स बदलल्या जात नाहीत.",
       "pickProfile": "प्रोफाइल निवडा",
       "noProfile": "प्रोफाइल नाही",
+      "defaultProfileResolvesTo": "सध्या {{name}} वर सेट केले आहे",
+      "defaultProfileResolvesToAccessibility": "डीफॉल्ट प्रोफाइल: {{name}}",
       "manageProfiles": "प्रोफाइल व्यवस्थापित करा",
       "noProfiles": "अद्याप कोणतेही प्रोफाइल नाहीत. पर्यावरण व्हेरिएबल्स, MCP सर्व्हर आणि कौशल्ये जोडण्यासाठी एक तयार करा.",
       "advancedConfig": "प्रगत कॉन्फिगरेशन",
       "advancedConfigDescription": "हे या सत्रावर लागू होते. प्रोफाइल म्हणून सेव्ह केल्यास ते पुढील वेळेसाठी राहते.",
       "saveAsProfile": "प्रोफाइल म्हणून सेव्ह करा",
       "saveProfileDescription": "वर्तमान पर्यावरण व्हेरिएबल्स आणि सेटअप आदेश पुन्हा वापरता येण्याजोग्या प्रोफाइल म्हणून जतन करा.",
-      "profileSummary": "{{vars}} पर्यावरण चल · {{commands}} सेटअप आदेश",
       "profileSaved": "प्रोफाइल \"{{name}}\" जतन केले",
       "organizationProfiles": "संस्था प्रोफाइल",
       "personalProfiles": "वैयक्तिक प्रोफाइल",
@@ -2735,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "सेवा पुरवठादार {{id}}",
-      "modelId": "मॉडेल {{id}}",
       "unavailable": "अनुपलब्ध",
       "unavailableState": "अनुपलब्ध",
       "selectedState": "निवडलेले",
@@ -4145,7 +4150,8 @@
     "sources": "पुरावे आणि आर्टिफॅक्ट्स",
     "timezone": "आढावा वेळ क्षेत्र",
     "deviceTimezone": "डिव्हाइसचे वेळ क्षेत्र वापरा",
-    "timezoneHint": "IANA वेळ क्षेत्र, उदा. Europe/Berlin. वेळापत्रकातील बदल पुढील आढाव्यांना लागू होतात.",
+    "timezoneHint": "IANA वेळ क्षेत्र, उदा. Europe/Berlin.",
+    "scheduleHint": "वेळापत्रकातील बदल पुढील आढाव्यांना लागू होतात.",
     "nightStart": "आढावा कालावधी सुरू",
     "morningStart": "आढावा तयार होण्याची वेळ",
     "morningEnd": "आढावा उपलब्ध राहण्याची अंतिम वेळ",

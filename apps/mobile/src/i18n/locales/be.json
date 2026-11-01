@@ -417,6 +417,7 @@
     "connectionExpired": "Тэрмін дзеяння падключэння да GitHub скончыўся.",
     "merge": {
       "merge": "Зліццё",
+      "mergeTitle": "Зліццё",
       "mergeNow": "Зліць зараз",
       "mergePullRequest": "Зліццё запыту",
       "mergeTermTitle": "Зліць {{term}}",
@@ -712,6 +713,9 @@
       "gitlabDescription": "Правяраць merge-запыты на мабільнай прыладзе",
       "bitbucketOrgOnlyDescription": "Пераключыце ўліковы запіс, указаны вышэй, на арганізацыю, каб разглядаць яе запыты на зліццё ў Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Гэты ўліковы запіс пакуль не мае арганізацый. Запыты на зліццё ў Bitbucket можна будзе разглядаць пасля таго, як вы створыце арганізацыю або далучыцеся да яе.",
+      "gitlabReconnectAdminOnlyDescription": "Папрасіце ўладальніка арганізацыі, адміністратара або кіраўніка плацяжоў падключыць яго.",
+      "bitbucketNotConnectedTitle": "Bitbucket не падключаны",
+      "bitbucketAdminOnlyDescription": "Толькі ўладальнікі, адміністратары і кіраўнікі плацяжоў арганізацыі могуць яго падключыць.",
       "contextLine": "Для {{organization}}",
       "contextLinePersonal": "Для асабістага ўліковага запісу"
     },
@@ -1459,7 +1463,9 @@
     "instructions": {
       "title": "Уласныя інструкцыі",
       "deprecation": "Падтрымку ўласных інструкцый плануецца спыніць. Перанясіце гэтыя рэкамендацыі ў файл REVIEW.md у вашым рэпазіторыі.",
-      "placeholder": "напрыклад: правяраць выкананне нашых правілаў апрацоўкі памылак…"
+      "placeholder": "напрыклад: правяраць выкананне нашых правілаў апрацоўкі памылак…",
+      "clearTitle": "Выдаліць уласныя інструкцыі?",
+      "clearMessage": "Захаванне пустога поля выдаляе ўласныя інструкцыі, захаваныя для гэтага рэцэнзента."
     },
     "repos": {
       "unavailable": "Рэпазіторыі недаступныя. Завяршыце наладжванне Bitbucket на kilo.ai.",
@@ -1643,11 +1649,9 @@
       "bitbucketError": "Не атрымалася адкрыць наладжванне Bitbucket. Паспрабуйце яшчэ раз."
     },
     "overview": {
-      "reviewStyle": "Стыль праверкі",
-      "focusAreas": "Асноўныя напрамкі",
       "allAreas": "Усе напрамкі",
-      "customInstructions": "Уласныя інструкцыі",
       "set": "Зададзена",
+      "notSet": "Не зададзена",
       "nSelected": "{{displayCount}} выбрана",
       "proposedReviewMdGuidance": "Прапанаваныя рэкамендацыі для REVIEW.md"
     },
@@ -2127,7 +2131,8 @@
       "actionBlocked": "Не ўдалося выканаць гэта дзеянне. Праблему трэба вырашыць, перш чым паўтараць спробу.",
       "syncNoRepositories": "У межах сінхранізацыі няма ніводнага рэпазітарыя. Выберыце рэпазітарыі, якія адсочвае «Агент бяспекі», потым сінхранізуйце зноў.",
       "syncIntegrationInactive": "Злучэнне GitHub для «Агента бяспекі» не актыўнае. Падключыце Kilo GitHub App зноў, потым сінхранізуйце яшчэ раз.",
-      "syncMissingPermission": "Kilo GitHub App не можа чытаць vulnerability alerts. Дайце гэты дазвол у GitHub і паўтарыце сінхранізацыю."
+      "syncMissingPermission": "Kilo GitHub App не можа чытаць vulnerability alerts. Дайце гэты дазвол у GitHub і паўтарыце сінхранізацыю.",
+      "configConflict": "Налады Агента бяспекі зменены ў іншым месцы. Праверце апошнія налады і захавайце зноў."
     },
     "analysisState": {
       "queued": "Аналіз у чарзе",
@@ -2442,13 +2447,14 @@
       "forkFilesUnchangedOnComputer": "Файлы на гэтым камп'ютары не змяняюцца.",
       "pickProfile": "Выберыце профіль",
       "noProfile": "Няма профілю",
+      "defaultProfileResolvesTo": "Супадае з {{name}}",
+      "defaultProfileResolvesToAccessibility": "Стандартны профіль: {{name}}",
       "manageProfiles": "Кіраванне профілямі",
       "noProfiles": "Профіляў пакуль няма. Стварыце яго, каб дадаць зменныя асяроддзя, серверы MCP і навыкі.",
       "advancedConfig": "Пашыраная канфігурацыя",
       "advancedConfigDescription": "Дзейнічае для гэтай сесіі. Калі захаваць як профіль, ён застанецца на наступны раз.",
       "saveAsProfile": "Захаваць як профіль",
       "saveProfileDescription": "Захавайце бягучыя зменныя асяроддзя і каманды наладкі як шматразовы профіль.",
-      "profileSummary": "{{vars}} зменныя асяроддзя · {{commands}} каманды наладкі",
       "profileSaved": "Профіль \"{{name}}\" захаваны",
       "organizationProfiles": "Профілі арганізацыі",
       "personalProfiles": "Асабістыя профілі",
@@ -2819,7 +2825,6 @@
     },
     "modelSelector": {
       "provider": "Пастаўшчык {{id}}",
-      "modelId": "Мадэль {{id}}",
       "unavailable": "Недаступная",
       "unavailableState": "недаступная",
       "selectedState": "выбрана",
@@ -4267,7 +4272,8 @@
     "sources": "Доказы і артэфакты",
     "timezone": "Часавы пояс зводкі",
     "deviceTimezone": "Часавы пояс прылады",
-    "timezoneHint": "Часавы пояс IANA, напрыклад Europe/Berlin. Змены раскладу прымяняюцца да наступных зводак.",
+    "timezoneHint": "Часавы пояс IANA, напрыклад Europe/Berlin.",
+    "scheduleHint": "Змены раскладу прымяняюцца да наступных зводак.",
     "nightStart": "Пачатак акна зводкі",
     "morningStart": "Зводка гатовая ў",
     "morningEnd": "Зводка даступная да",

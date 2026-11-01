@@ -193,6 +193,7 @@
     "dismissed",
     "files",
     "manual review",
+    "merge",
     "open",
     "open pull request",
     "pr opened",
@@ -200,6 +201,7 @@
     "reactions",
     "remediation blocked",
     "remediation failed",
+    "search sessions",
     "session exited",
     "starting",
     "tokens"

@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub سے کنکشن کی مدت ختم ہو گئی۔",
     "merge": {
       "merge": "مرج",
+      "mergeTitle": "مرج",
       "mergeNow": "ابھی مرج کریں",
       "mergePullRequest": "پل ریکویسٹ کا مرج",
       "mergeTermTitle": "{{term}} کا مرج",
@@ -682,6 +683,9 @@
       "gitlabDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لیں",
       "bitbucketOrgOnlyDescription": "اس کی Bitbucket پل ریکویسٹس کا جائزہ لینے کے لیے اوپر موجود اکاؤنٹ کو ایک تنظیم پر تبدیل کریں۔",
       "bitbucketOrgOnlyNoOrganizationDescription": "اس اکاؤنٹ کی ابھی تک کوئی تنظیم نہیں ہے۔ ایک تنظیم بنانے یا اس میں شامل ہونے پر آپ Bitbucket پل ریکویسٹس کا جائزہ لے سکتے ہیں۔",
+      "gitlabReconnectAdminOnlyDescription": "ادارے کے کسی مالک، منتظم، یا بلنگ مینیجر سے اسے دوبارہ منسلک کرنے کی درخواست کریں۔",
+      "bitbucketNotConnectedTitle": "Bitbucket منسلک نہیں ہے",
+      "bitbucketAdminOnlyDescription": "صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
       "contextLine": "{{organization}} کے لیے",
       "contextLinePersonal": "ذاتی اکاؤنٹ کے لیے"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "اپنی ہدایات",
       "deprecation": "حسبِ ضرورت ہدایات کی سہولت ختم کرنے کا منصوبہ ہے۔ اس کے بجائے یہ ہدایات اپنی ریپوزٹری کی REVIEW.md فائل میں منتقل کریں۔",
-      "placeholder": "مثلاً خرابیوں سے نمٹنے کے ہمارے اصولوں کی پابندی…"
+      "placeholder": "مثلاً خرابیوں سے نمٹنے کے ہمارے اصولوں کی پابندی…",
+      "clearTitle": "اپنی ہدایات ہٹائیں؟",
+      "clearMessage": "خالی خانہ محفوظ کرنے سے اس جائزہ کار کے لیے محفوظ کی گئی اپنی ہدایات حذف ہو جائیں گی۔"
     },
     "repos": {
       "unavailable": "ریپوزٹریز دستیاب نہیں — kilo.ai پر Bitbucket سیٹ اپ مکمل کریں۔",
@@ -1599,11 +1605,9 @@
       "bitbucketError": "Bitbucket سیٹ اپ نہیں کھولا جا سکا۔ براہ کرم دوبارہ کوشش کریں۔"
     },
     "overview": {
-      "reviewStyle": "جائزے کا انداز",
-      "focusAreas": "توجہ کے شعبے",
       "allAreas": "تمام شعبے",
-      "customInstructions": "اپنی ہدایات",
       "set": "مقرر ہے",
+      "notSet": "مقرر نہیں",
       "nSelected": "{{displayCount}} منتخب",
       "proposedReviewMdGuidance": "REVIEW.md کے لیے تجویز کردہ ہدایات"
     },
@@ -2061,7 +2065,8 @@
       "actionBlocked": "یہ کارروائی مکمل نہیں ہو سکی۔ دوبارہ کوشش کرنے سے پہلے اس مسئلے کو حل کرنا ضروری ہے۔",
       "syncNoRepositories": "کوئی بھی ریپوزٹری سنک کے دائرہ کار میں نہیں ہے۔ وہ ریپوزٹریز منتخب کریں جن کی «سیکیورٹی ایجنٹ» نگرانی کرتا ہے، پھر دوبارہ سنک کریں۔",
       "syncIntegrationInactive": "سیکیورٹی ایجنٹ کے لیے GitHub کنکشن فعال نہیں ہے۔ Kilo GitHub App کو دوبارہ جوڑیں، پھر دوبارہ سنک کریں۔",
-      "syncMissingPermission": "Kilo GitHub App vulnerability alerts نہیں پڑھ سکتی۔ GitHub میں یہ اجازت دیں، پھر دوبارہ سنک کریں۔"
+      "syncMissingPermission": "Kilo GitHub App vulnerability alerts نہیں پڑھ سکتی۔ GitHub میں یہ اجازت دیں، پھر دوبارہ سنک کریں۔",
+      "configConflict": "سیکیورٹی ایجنٹ کی ترتیبات کہیں اور تبدیل ہو گئی ہیں۔ تازہ ترین ترتیبات کا جائزہ لیں اور دوبارہ محفوظ کریں۔"
     },
     "analysisState": {
       "queued": "تجزیہ قطار میں ہے",
@@ -2368,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "اس کمپیوٹر پر فائلیں تبدیل نہیں ہوتیں۔",
       "pickProfile": "ایک پروفائل منتخب کریں۔",
       "noProfile": "کوئی پروفائل نہیں۔",
+      "defaultProfileResolvesTo": "فی الحال {{name}} پر سیٹ ہے",
+      "defaultProfileResolvesToAccessibility": "ڈیفالٹ پروفائل: {{name}}",
       "manageProfiles": "پروفائلز کا نظم کریں۔",
       "noProfiles": "ابھی تک کوئی پروفائلز نہیں ہیں۔ ماحولیاتی متغیرات، MCP سرورز، اور مہارتیں شامل کرنے کے لیے ایک بنائیں۔",
       "advancedConfig": "اعلی درجے کی ترتیب",
       "advancedConfigDescription": "یہ اس سیشن پر لاگو ہوتا ہے۔ بطور پروفائل محفوظ کرنے سے یہ اگلی بار کے لیے رہتا ہے۔",
       "saveAsProfile": "بطور پروفائل محفوظ کریں۔",
       "saveProfileDescription": "موجودہ ماحولیاتی متغیرات اور سیٹ اپ کمانڈز کو دوبارہ قابل استعمال پروفائل کے طور پر محفوظ کریں۔",
-      "profileSummary": "{{vars}} ماحولیاتی متغیرات · {{commands}} سیٹ اپ کمانڈز",
       "profileSaved": "پروفائل \"{{name}}\" محفوظ ہو گیا۔",
       "organizationProfiles": "تنظیمی پروفائلز",
       "personalProfiles": "ذاتی پروفائلز",
@@ -2735,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "فراہم کنندہ {{id}}",
-      "modelId": "ماڈل {{id}}",
       "unavailable": "دستیاب نہیں",
       "unavailableState": "دستیاب نہیں",
       "selectedState": "منتخب شدہ",
@@ -4145,7 +4150,8 @@
     "sources": "شواہد اور آرٹیفیکٹس",
     "timezone": "بریفنگ کا ٹائم زون",
     "deviceTimezone": "ڈیوائس کا ٹائم زون استعمال کریں",
-    "timezoneHint": "IANA ٹائم زون، مثلاً Europe/Berlin۔ شیڈول کی تبدیلیاں آئندہ بریفنگز پر لاگو ہوں گی۔",
+    "timezoneHint": "IANA ٹائم زون، مثلاً Europe/Berlin۔",
+    "scheduleHint": "شیڈول کی تبدیلیاں آئندہ بریفنگز پر لاگو ہوں گی۔",
     "nightStart": "بریفنگ کی مدت کا آغاز",
     "morningStart": "بریفنگ تیار ہونے کا وقت",
     "morningEnd": "بریفنگ کی دستیابی کا اختتامی وقت",

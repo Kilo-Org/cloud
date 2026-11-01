@@ -860,7 +860,9 @@
     "instructions": {
       "title": "Instructions personnalisées",
       "deprecation": "La suppression des instructions personnalisées est prévue. Déplacez ces consignes dans un fichier REVIEW.md de votre dépôt.",
-      "placeholder": "ex. : respecter nos conventions de gestion des erreurs…"
+      "placeholder": "ex. : respecter nos conventions de gestion des erreurs…",
+      "clearTitle": "Supprimer les instructions personnalisées ?",
+      "clearMessage": "L'enregistrement d'un champ vide supprime les instructions personnalisées stockées pour ce réviseur."
     },
     "repos": {
       "unavailable": "Les dépôts sont indisponibles. Terminez la configuration de Bitbucket sur kilo.ai.",
@@ -1051,12 +1053,10 @@
     },
     "overview": {
       "allAreas": "Tous les domaines",
-      "customInstructions": "Instructions personnalisées",
-      "focusAreas": "Points à vérifier",
       "nSelected": "{{displayCount}} sélectionnés",
       "proposedReviewMdGuidance": "Consignes proposées pour REVIEW.md",
-      "reviewStyle": "Style de revue",
-      "set": "Défini"
+      "set": "Défini",
+      "notSet": "Non défini"
     },
     "updateFailed": "Impossible de mettre à jour l'agent de revue de code.",
     "configSaveFailed": "Impossible d'enregistrer la configuration de la revue.",
@@ -1523,7 +1523,8 @@
       "actionBlocked": "Impossible d'effectuer cette action. Le problème doit être résolu avant de pouvoir réessayer.",
       "syncNoRepositories": "Aucun dépôt ne fait partie du périmètre de synchronisation. Choisissez les dépôts que «Agent de sécurité» surveille, puis relancez la synchronisation.",
       "syncIntegrationInactive": "La connexion GitHub pour l'Agent de sécurité n'est pas active. Reconnectez Kilo GitHub App, puis relancez la synchronisation.",
-      "syncMissingPermission": "L'application GitHub de Kilo ne peut pas lire les alertes de vulnérabilité. Accordez cette autorisation dans GitHub, puis synchronisez à nouveau."
+      "syncMissingPermission": "L'application GitHub de Kilo ne peut pas lire les alertes de vulnérabilité. Accordez cette autorisation dans GitHub, puis synchronisez à nouveau.",
+      "configConflict": "Les paramètres de l'agent de sécurité ont été modifiés ailleurs. Vérifiez les paramètres les plus récents et enregistrez à nouveau."
     },
     "analysisState": {
       "queued": "Analyse en file d'attente",
@@ -1768,13 +1769,14 @@
       "forkFilesUnchangedOnComputer": "Les fichiers de cet ordinateur ne sont pas modifiés.",
       "pickProfile": "Choisissez un profil",
       "noProfile": "Aucun profil",
+      "defaultProfileResolvesTo": "Correspond à {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profil par défaut : {{name}}",
       "manageProfiles": "Gérer les profils",
       "noProfiles": "Aucun profil pour l'instant. Créez-en un pour ajouter des variables d'environnement, des serveurs MCP et des compétences.",
       "advancedConfig": "Configuration avancée",
       "advancedConfigDescription": "S’applique à cette session. L’enregistrer comme profil le conserve pour la prochaine fois.",
       "saveAsProfile": "Enregistrer en tant que profil",
       "saveProfileDescription": "Enregistrez les variables d'environnement et les commandes de configuration actuelles en tant que profil réutilisable.",
-      "profileSummary": "{{vars}} variables d'environnement · {{commands}} commandes de configuration",
       "profileSaved": "Profil \"{{name}}\" enregistré",
       "organizationProfiles": "Profils d'organisation",
       "personalProfiles": "Profils personnels",
@@ -2140,7 +2142,6 @@
     },
     "modelSelector": {
       "provider": "Fournisseur {{id}}",
-      "modelId": "Modèle {{id}}",
       "unavailable": "Indisponible",
       "unavailableState": "indisponible",
       "selectedState": "sélectionné",
@@ -2753,6 +2754,9 @@
       "gitlabDescription": "Examiner les merge requests sur mobile",
       "bitbucketOrgOnlyDescription": "Basculez le compte ci-dessus vers une organisation pour examiner ses PR Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ce compte n'a encore aucune organisation. Les PR Bitbucket peuvent être examinées une fois que vous créez ou rejoignez une organisation.",
+      "gitlabReconnectAdminOnlyDescription": "Demandez à un propriétaire de l'organisation, à un administrateur ou à un responsable de la facturation de la reconnecter.",
+      "bitbucketNotConnectedTitle": "Bitbucket n'est pas connecté",
+      "bitbucketAdminOnlyDescription": "Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion.",
       "contextLine": "Pour {{organization}}",
       "contextLinePersonal": "Pour votre compte personnel"
     },
@@ -2994,6 +2998,7 @@
     "installKiloGitHubApp": "Installer l'application GitHub de Kilo",
     "merge": {
       "merge": "Fusion",
+      "mergeTitle": "Fusion",
       "mergeNow": "Fusionner maintenant",
       "mergePullRequest": "Fusion de la demande",
       "mergeTermTitle": "Fusionner {{term}}",
@@ -4212,7 +4217,8 @@
     "sources": "Preuves et artefacts",
     "timezone": "Fuseau horaire du briefing",
     "deviceTimezone": "Utiliser le fuseau de l’appareil",
-    "timezoneHint": "Fuseau horaire IANA, par exemple Europe/Berlin. Les changements de programmation s’appliquent aux briefings à venir.",
+    "timezoneHint": "Fuseau horaire IANA, par exemple Europe/Berlin.",
+    "scheduleHint": "Les changements de programmation s’appliquent aux briefings à venir.",
     "nightStart": "Début de la fenêtre de briefing",
     "morningStart": "Briefing prêt à",
     "morningEnd": "Briefing disponible jusqu’à",

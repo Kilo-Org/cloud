@@ -7,6 +7,7 @@ import postcss from 'postcss';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
 
 import {
+  COMPACT_BUTTON_HIT_SLOP,
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP_DP,
   COMPACT_H11_FRAME_DP,
@@ -158,6 +159,22 @@ describe('shared tap-target geometry', () => {
     expect(tapTargetReachDp(32, COMPACT_CONTROL_HIT_SLOP_DP)).toBeGreaterThanOrEqual(
       TOUCH_TARGET_DP
     );
+  });
+
+  it('carries the compact button frame past the design target with its slop', () => {
+    // The regression this guards: the 36dp `sm` frame renders 35.81dp at
+    // density 420, so 4 per side measured 43.81dp — under `DESIGN.md`'s 44pt.
+    expect(COMPACT_BUTTON_HIT_SLOP.top).toBe(5);
+    expect(COMPACT_BUTTON_HIT_SLOP.top).toBe(COMPACT_BUTTON_HIT_SLOP.bottom);
+    expect(COMPACT_BUTTON_HIT_SLOP.left).toBe(COMPACT_BUTTON_HIT_SLOP.top);
+    expect(COMPACT_BUTTON_HIT_SLOP.right).toBe(COMPACT_BUTTON_HIT_SLOP.top);
+    const measuredFrameDp = 35.81;
+    expect(
+      measuredFrameDp + COMPACT_BUTTON_HIT_SLOP.top + COMPACT_BUTTON_HIT_SLOP.bottom
+    ).toBeGreaterThan(TOUCH_TARGET_DP);
+    expect(
+      measuredFrameDp + COMPACT_BUTTON_HIT_SLOP.left + COMPACT_BUTTON_HIT_SLOP.right
+    ).toBeGreaterThan(TOUCH_TARGET_DP);
   });
 
   it('keeps the measured h-11 frame at or above the audit floor and reaches the design target', () => {

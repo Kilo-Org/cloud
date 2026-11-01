@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub bağlantısının müddəti bitdi.",
     "merge": {
       "merge": "Birləşdirmə",
+      "mergeTitle": "Birləşdirmə",
       "mergeNow": "İndi birləşdir",
       "mergePullRequest": "Sorğunun birləşdirilməsi",
       "mergeTermTitle": "{{term}}nun birləşdirilməsi",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Merge sorğularını mobil cihazda yoxla",
       "bitbucketOrgOnlyDescription": "Yuxarıdakı hesabı təşkilata keçir ki, onun Bitbucket birləşdirmə sorğularına baxış keçirəsən.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabda hələ ki, heç bir təşkilat yoxdur. Təşkilat yaratdıqdan və ya ona qoşulduqdan sonra Bitbucket birləşdirmə sorğularına baxış keçirə bilərsən.",
+      "gitlabReconnectAdminOnlyDescription": "Onu yenidən qoşmaq üçün təşkilat sahibindən, inzibatçıdan və ya ödəniş menecerindən xahiş edin.",
+      "bitbucketNotConnectedTitle": "Bitbucket qoşulmayıb",
+      "bitbucketAdminOnlyDescription": "Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
       "contextLine": "{{organization}} üçün",
       "contextLinePersonal": "Şəxsi hesabınız üçün"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Xüsusi təlimatlar",
       "deprecation": "Xüsusi təlimatlar funksiyasının istifadədən çıxarılması planlaşdırılır. Bu təlimatları repozitoriyandakı REVIEW.md faylına köçür.",
-      "placeholder": "məsələn: xətaların emalı qaydalarımıza uyğunluq…"
+      "placeholder": "məsələn: xətaların emalı qaydalarımıza uyğunluq…",
+      "clearTitle": "Xüsusi təlimatlar silinsin?",
+      "clearMessage": "Boş sahənin yadda saxlanması bu rəyçi üçün saxlanılmış xüsusi təlimatları siləcək."
     },
     "repos": {
       "unavailable": "Repozitoriyalar əlçatan deyil. Bitbucket quraşdırmasını kilo.ai saytında tamamla.",
@@ -1599,11 +1605,9 @@
       "bitbucketError": "Bitbucket quraşdırmasını açmaq mümkün olmadı. Yenidən cəhd et."
     },
     "overview": {
-      "reviewStyle": "Yoxlama üslubu",
-      "focusAreas": "Əsas yoxlama sahələri",
       "allAreas": "Bütün sahələr",
-      "customInstructions": "Xüsusi təlimatlar",
       "set": "Təyin edilib",
+      "notSet": "Təyin edilməyib",
       "nSelected": "{{displayCount}} seçilib",
       "proposedReviewMdGuidance": "REVIEW.md üçün təklif olunan təlimatlar"
     },
@@ -2061,7 +2065,8 @@
       "actionBlocked": "Bu işi tamamlamaq mümkün olmadı. Problemi həll etmədən yenidən cəhd etmək olmaz.",
       "syncNoRepositories": "Sinxronizasiya əhatəsində repozitoriya yoxdur. Təhlükəsizlik agentinin izlədiyi repozitoriyaları seç, sonra yenidən sinxronlaşdır.",
       "syncIntegrationInactive": "Təhlükəsizlik agenti üçün GitHub bağlantısı aktiv deyil. Kilo GitHub tətbiqini yenidən qoş, sonra yenidən sinxronlaşdır.",
-      "syncMissingPermission": "Kilo GitHub tətbiqi zəiflik xəbərdarlıqlarını oxuya bilmir. Həmin icazəni GitHub-da ver, sonra yenidən sinxronlaşdır."
+      "syncMissingPermission": "Kilo GitHub tətbiqi zəiflik xəbərdarlıqlarını oxuya bilmir. Həmin icazəni GitHub-da ver, sonra yenidən sinxronlaşdır.",
+      "configConflict": "Təhlükəsizlik agentinin parametrləri başqa yerdə dəyişdirildi. Ən son parametrlərə bax və yenidən yadda saxla."
     },
     "analysisState": {
       "queued": "Təhlil növbəyə alınıb",
@@ -2368,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "Bu kompüterdəki fayllar dəyişdirilmir.",
       "pickProfile": "Profil seçin",
       "noProfile": "Profil yoxdur",
+      "defaultProfileResolvesTo": "{{name}} profilinə uyğun gəlir",
+      "defaultProfileResolvesToAccessibility": "Defolt profil: {{name}}",
       "manageProfiles": "Profilləri idarə edin",
       "noProfiles": "Hələ profil yoxdur. Ətraf mühit dəyişənləri, MCP serverləri və bacarıqları əlavə etmək üçün birini yaradın.",
       "advancedConfig": "Qabaqcıl Konfiqurasiya",
       "advancedConfigDescription": "Bu sessiya üçün keçərlidir. Profil kimi yadda saxlasanız, növbəti dəfə üçün qalır.",
       "saveAsProfile": "Profil kimi yadda saxlayın",
       "saveProfileDescription": "Cari mühit dəyişənlərini və quraşdırma əmrlərini təkrar istifadə edilə bilən profil kimi yadda saxlayın.",
-      "profileSummary": "{{vars}} mühit dəyişənləri · {{commands}} quraşdırma əmrləri",
       "profileSaved": "\"{{name}}\" profili yadda saxlanıldı",
       "organizationProfiles": "Təşkilat Profilləri",
       "personalProfiles": "Şəxsi Profillər",
@@ -2735,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Təminatçı {{id}}",
-      "modelId": "{{id}} modeli",
       "unavailable": "Mövcud deyil",
       "unavailableState": "mövcud deyil",
       "selectedState": "seçilib",
@@ -4145,7 +4150,8 @@
     "sources": "Sübutlar və artefaktlar",
     "timezone": "Hesabat saat qurşağı",
     "deviceTimezone": "Cihazın saat qurşağından istifadə et",
-    "timezoneHint": "IANA saat qurşağı, məsələn Europe/Berlin. Cədvəl dəyişiklikləri gələcək hesabatlara tətbiq olunur.",
+    "timezoneHint": "IANA saat qurşağı, məsələn Europe/Berlin.",
+    "scheduleHint": "Cədvəl dəyişiklikləri gələcək hesabatlara tətbiq olunur.",
     "nightStart": "Hesabat pəncərəsi başlayır",
     "morningStart": "Hesabatın hazır olduğu vaxt",
     "morningEnd": "Hesabatın mövcud olduğu son vaxt",

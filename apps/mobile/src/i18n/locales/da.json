@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub-forbindelsen er udløbet.",
     "merge": {
       "merge": "Fletning",
+      "mergeTitle": "Fletning",
       "mergeNow": "Flet nu",
       "mergePullRequest": "Flet pull request",
       "mergeTermTitle": "Flet {{term}}",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Gennemgå merge requests på mobilen",
       "bitbucketOrgOnlyDescription": "Skift kontoen ovenfor til en organisation for at gennemgå dens pull requests i Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Denne konto har endnu ingen organisationer. Bitbucket pull requests kan gennemgås, når du opretter eller tilslutter dig en organisation.",
+      "gitlabReconnectAdminOnlyDescription": "Bed en organisationsejer, administrator eller faktureringsansvarlig om at tilslutte den.",
+      "bitbucketNotConnectedTitle": "Bitbucket er ikke tilsluttet",
+      "bitbucketAdminOnlyDescription": "Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen.",
       "contextLine": "Til {{organization}}",
       "contextLinePersonal": "Til din personlige konto"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Brugerdefinerede instruktioner",
       "deprecation": "Brugerdefinerede instruktioner er planlagt til udfasning. Flyt i stedet retningslinjerne til en REVIEW.md-fil i dit kodelager.",
-      "placeholder": "f.eks. overhold vores regler for fejlhåndtering…"
+      "placeholder": "f.eks. overhold vores regler for fejlhåndtering…",
+      "clearTitle": "Fjern brugerdefinerede instruktioner?",
+      "clearMessage": "Når du gemmer et tomt felt, slettes de brugerdefinerede instruktioner, der er gemt for denne anmelder."
     },
     "repos": {
       "unavailable": "Kodelagrene er ikke tilgængelige. Afslut opsætningen af Bitbucket på kilo.ai.",
@@ -1599,11 +1605,9 @@
       "bitbucketError": "Opsætningen af Bitbucket kunne ikke åbnes. Prøv igen."
     },
     "overview": {
-      "reviewStyle": "Gennemgangsstil",
-      "focusAreas": "Fokusområder",
       "allAreas": "Alle områder",
-      "customInstructions": "Brugerdefinerede instruktioner",
       "set": "Angivet",
+      "notSet": "Ikke angivet",
       "nSelected": "{{displayCount}} valgt",
       "proposedReviewMdGuidance": "Forslag til retningslinjer i REVIEW.md"
     },
@@ -2061,7 +2065,8 @@
       "actionBlocked": "Handlingen kunne ikke gennemføres. Problemet skal løses, før du kan prøve igen.",
       "syncNoRepositories": "Der er ingen kodelagre i synkroniseringsomfanget. Vælg de kodelagre, som Sikkerhedsagenten overvåger, og synkroniser derefter igen.",
       "syncIntegrationInactive": "GitHub-forbindelsen for Sikkerhedsagenten er ikke aktiv. Genopret forbindelsen til Kilos GitHub-app, og synkroniser derefter igen.",
-      "syncMissingPermission": "Kilos GitHub-app kan ikke læse sårbarhedsadvarsler. Giv den tilladelse i GitHub, og synkroniser derefter igen."
+      "syncMissingPermission": "Kilos GitHub-app kan ikke læse sårbarhedsadvarsler. Giv den tilladelse i GitHub, og synkroniser derefter igen.",
+      "configConflict": "Sikkerhedsagentens indstillinger er ændret et andet sted. Gennemgå de nyeste indstillinger, og gem igen."
     },
     "analysisState": {
       "queued": "Analyse i kø",
@@ -2368,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "Filerne på denne computer ændres ikke.",
       "pickProfile": "Vælg en profil",
       "noProfile": "Ingen profil",
+      "defaultProfileResolvesTo": "Henviser til {{name}}",
+      "defaultProfileResolvesToAccessibility": "Standard profil: {{name}}",
       "manageProfiles": "Administrer profiler",
       "noProfiles": "Ingen profiler endnu. Opret en for at tilføje miljøvariabler, MCP-servere og færdigheder.",
       "advancedConfig": "Avanceret konfiguration",
       "advancedConfigDescription": "Gælder for denne session. Gemmer du den som profil, bevares den til næste gang.",
       "saveAsProfile": "Gem som profil",
       "saveProfileDescription": "Gem de aktuelle miljøvariabler og opsætningskommandoer som en genbrugelig profil.",
-      "profileSummary": "{{vars}} miljøvariabler · {{commands}} opsætningskommandoer",
       "profileSaved": "Profilen \"{{name}}\" blev gemt",
       "organizationProfiles": "Organisationsprofiler",
       "personalProfiles": "Personlige profiler",
@@ -2735,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Udbyder {{id}}",
-      "modelId": "Model-id: {{id}}",
       "unavailable": "Utilgængelig",
       "unavailableState": "utilgængelig",
       "selectedState": "valgt",
@@ -4145,7 +4150,8 @@
     "sources": "Dokumentation og artefakter",
     "timezone": "Tidszone for briefing",
     "deviceTimezone": "Brug enhedens tidszone",
-    "timezoneHint": "IANA-tidszone, for eksempel Europe/Berlin. Ændringer i tidsplanen gælder fremtidige briefinger.",
+    "timezoneHint": "IANA-tidszone, for eksempel Europe/Berlin.",
+    "scheduleHint": "Ændringer i tidsplanen gælder fremtidige briefinger.",
     "nightStart": "Briefingvinduet starter",
     "morningStart": "Briefing klar klokken",
     "morningEnd": "Briefing tilgængelig indtil",

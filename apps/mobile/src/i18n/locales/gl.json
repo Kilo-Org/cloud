@@ -403,6 +403,7 @@
     "connectionExpired": "A conexión con GitHub caducou.",
     "merge": {
       "merge": "Fusión",
+      "mergeTitle": "Fusión",
       "mergeNow": "Fusionar agora",
       "mergePullRequest": "Fusionar a solicitude de integración",
       "mergeTermTitle": "Fusionar a {{term}}",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Revisar solicitudes de fusión no móbil",
       "bitbucketOrgOnlyDescription": "Cambia a conta de arriba a unha organización para revisar as súas solicitudes de integración en Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta conta aínda non ten organizacións. As solicitudes de integración de Bitbucket pódense revisar en canto crees ou te unas a unha organización.",
+      "gitlabReconnectAdminOnlyDescription": "Pídelle ao propietario, ao administrador ou ao xestor de facturación da organización que a reconecte.",
+      "bitbucketNotConnectedTitle": "Bitbucket non está conectado",
+      "bitbucketAdminOnlyDescription": "Só os propietarios da organización, os administradores e os xestores de facturación poden conectalo.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para a túa conta persoal"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Instrucións personalizadas",
       "deprecation": "Está previsto deixar de admitir as instrucións personalizadas. Traslada estas pautas a un ficheiro REVIEW.md do teu repositorio.",
-      "placeholder": "p. ex.: aplicar as nosas convencións de xestión de erros…"
+      "placeholder": "p. ex.: aplicar as nosas convencións de xestión de erros…",
+      "clearTitle": "Eliminar as instrucións personalizadas?",
+      "clearMessage": "Gardar un campo baleiro elimina as instrucións personalizadas almacenadas para este revisor."
     },
     "repos": {
       "unavailable": "Os repositorios non están dispoñibles. Remata a configuración de Bitbucket en kilo.ai.",
@@ -1599,11 +1605,9 @@
       "bitbucketError": "Non se puido abrir a configuración de Bitbucket. Téntao de novo."
     },
     "overview": {
-      "reviewStyle": "Estilo de revisión",
-      "focusAreas": "Áreas prioritarias",
       "allAreas": "Todas as áreas",
-      "customInstructions": "Instrucións personalizadas",
       "set": "Definido",
+      "notSet": "Non definido",
       "nSelected": "{{displayCount}} seleccionados",
       "proposedReviewMdGuidance": "Pautas propostas para REVIEW.md"
     },
@@ -2061,7 +2065,8 @@
       "actionBlocked": "Non se puido completar esta acción. Tes que resolver o problema antes de tentalo de novo.",
       "syncNoRepositories": "Non hai repositorios no ámbito de sincronización. Escolle os repositorios que supervisa o axente de seguridade e volve sincronizar.",
       "syncIntegrationInactive": "A conexión de GitHub para o axente de seguridade non está activa. Volve conectar a aplicación de Kilo en GitHub e sincroniza de novo.",
-      "syncMissingPermission": "A aplicación de Kilo en GitHub non pode ler as alertas de vulnerabilidade. Concede ese permiso en GitHub e sincroniza de novo."
+      "syncMissingPermission": "A aplicación de Kilo en GitHub non pode ler as alertas de vulnerabilidade. Concede ese permiso en GitHub e sincroniza de novo.",
+      "configConflict": "Os axustes do axente de seguridade cambiáronse noutro lugar. Revisa os axustes máis recentes e garda de novo."
     },
     "analysisState": {
       "queued": "Análise na cola",
@@ -2368,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "Os ficheiros deste ordenador non se modifican.",
       "pickProfile": "Escolle un perfil",
       "noProfile": "Sen perfil",
+      "defaultProfileResolvesTo": "Corresponde a {{name}}",
+      "defaultProfileResolvesToAccessibility": "Perfil predeterminado: {{name}}",
       "manageProfiles": "Xestionar perfís",
       "noProfiles": "Aínda non hai perfís. Crea un para engadir variables de ambiente, servidores MCP e habilidades.",
       "advancedConfig": "Configuración avanzada",
       "advancedConfigDescription": "Aplícase a esta sesión. Gardalo como perfil consérvao para a próxima vez.",
       "saveAsProfile": "Gardar como perfil",
       "saveProfileDescription": "Garda as variables de ambiente actuais e os comandos de configuración como perfil reutilizable.",
-      "profileSummary": "{{vars}} variables de ambiente · {{commands}} comandos de configuración",
       "profileSaved": "Gardouse o perfil \"{{name}}\".",
       "organizationProfiles": "Perfís da organización",
       "personalProfiles": "Perfís persoais",
@@ -2735,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Provedor {{id}}",
-      "modelId": "Modelo {{id}}",
       "unavailable": "Non dispoñible",
       "unavailableState": "non dispoñible",
       "selectedState": "seleccionado",
@@ -4145,7 +4150,8 @@
     "sources": "Probas e artefactos",
     "timezone": "Fuso horario do informe",
     "deviceTimezone": "Usar o fuso horario do dispositivo",
-    "timezoneHint": "Fuso horario IANA, por exemplo Europe/Berlin. Os cambios de horario aplícanse aos informes futuros.",
+    "timezoneHint": "Fuso horario IANA, por exemplo Europe/Berlin.",
+    "scheduleHint": "Os cambios de horario aplícanse aos informes futuros.",
     "nightStart": "Comeza a xanela do informe",
     "morningStart": "Informe listo ás",
     "morningEnd": "Informe dispoñible ata",

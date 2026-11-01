@@ -403,6 +403,7 @@
     "connectionExpired": "Ukuxhumana ne-GitHub kuphelelwe yisikhathi.",
     "merge": {
       "merge": "Ukuhlanganisa",
+      "mergeTitle": "Ukuhlanganisa",
       "mergeNow": "Hlanganisa manje",
       "mergePullRequest": "Hlanganisa isicelo sokuhlanganisa",
       "mergeTermTitle": "Hlanganisa {{term}}",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Hlola izicelo zokuhlanganisa kuselula",
       "bitbucketOrgOnlyDescription": "Shintsha i-akhawunti engenhla ibe yinhlangano ukuze ubuyekeze ama-PR ayo e-Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Le akhawunti ayikaze ibe nezinhlangano. Uma usuka inhlangano noma ungena kuyinhlangano, uzokwazi ukubuyekeza ama-PR e-Bitbucket.",
+      "gitlabReconnectAdminOnlyDescription": "Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuxhuma kabusha.",
+      "bitbucketNotConnectedTitle": "I-Bitbucket ayixhunyiwe",
+      "bitbucketAdminOnlyDescription": "Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma.",
       "contextLine": "Ku-{{organization}}",
       "contextLinePersonal": "Kwokomuntu siqu"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Imiyalo oyibekayo",
       "deprecation": "Kuhlelwe ukuthi imiyalo oyenzela wena iyekwe ukusekelwa. Faka le mihlahlandlela kufayela le-REVIEW.md enqolobaneni yakho yekhodi esikhundleni salokho.",
-      "placeholder": "isb. Landela imithetho yethu yokusingatha amaphutha…"
+      "placeholder": "isb. Landela imithetho yethu yokusingatha amaphutha…",
+      "clearTitle": "Ufuna ukususa imiyalo oyibekayo?",
+      "clearMessage": "Ukugcina indawo engenalutho kususa imiyalo oyibekayo egcinelwe lo mhloli wekhodi."
     },
     "repos": {
       "unavailable": "Izinqolobane zekhodi azitholakali. Qedela ukusetha i-Bitbucket ku-kilo.ai.",
@@ -1599,11 +1605,9 @@
       "bitbucketError": "Asikwazanga ukuvula ukusetha i-Bitbucket. Sicela uzame futhi."
     },
     "overview": {
-      "reviewStyle": "Indlela yokuhlola",
-      "focusAreas": "Izindawo okugxilwa kuzo",
       "allAreas": "Zonke izindawo",
-      "customInstructions": "Imiyalo oyibekayo",
       "set": "Kusethiwe",
+      "notSet": "Akukho okusethiwe",
       "nSelected": "Kukhethwe: {{displayCount}}",
       "proposedReviewMdGuidance": "Imihlahlandlela ephakanyisiwe ye-REVIEW.md"
     },
@@ -2067,7 +2071,8 @@
       "actionBlocked": "Asikwazanga ukuqedela lesi senzo. Kumele kulungiswe le nkinga kuqala.",
       "syncNoRepositories": "Awekho amakhosombe akumkhawulo wokuvumelanisa. Khetha amakhosombe i-ejenti yezokuphepha ewabhekayo, bese uvumelanisa futhi.",
       "syncIntegrationInactive": "Ukuxhumana kwe-GitHub kwe-Ejenti yezokuphepha akusebenzi. Xhuma kabusha i-Kilo GitHub App, bese uvumelanisa futhi.",
-      "syncMissingPermission": "I-Kilo GitHub App ayikwazi ukufunda vulnerability alerts. Nika leyo mvume ku-GitHub, bese u-sync futhi."
+      "syncMissingPermission": "I-Kilo GitHub App ayikwazi ukufunda vulnerability alerts. Nika leyo mvume ku-GitHub, bese u-sync futhi.",
+      "configConflict": "Izilungiselelo ze-ejenti yezokuphepha zishintshiwe kwenye indawo. Buyekeza izilungiselelo zakamuva bese ulondoloza futhi."
     },
     "analysisState": {
       "queued": "Ukuhlaziywa kusemgqeni",
@@ -2374,13 +2379,14 @@
       "forkFilesUnchangedOnComputer": "Amafayela akule khompyutha awashintshwa.",
       "pickProfile": "Khetha iphrofayela",
       "noProfile": "Ayikho iphrofayela",
+      "defaultProfileResolvesTo": "Okwamanje kungu-{{name}}",
+      "defaultProfileResolvesToAccessibility": "Iphrofayela ezenzakalelayo: {{name}}",
       "manageProfiles": "Phatha amaphrofayili",
       "noProfiles": "Awekho amaphrofayela okwamanje. Dala eyodwa ukuze wengeze okuguquguqukayo kwendawo, amaseva e-MCP, namakhono.",
       "advancedConfig": "Ukucushwa Okuthuthukile",
       "advancedConfigDescription": "Kusebenza kulesi sikhathi. Ukulondoloza njengephrofayela kukugcina okwesikhathi esizayo.",
       "saveAsProfile": "Londoloza Njengephrofayela",
       "saveProfileDescription": "Londoloza okuguquguqukayo kwendawo yamanje kanye nemiyalelo yokusetha njengephrofayili esebenziseka kabusha.",
-      "profileSummary": "{{vars}} okuguquguqukayo kwemvelo · {{commands}} imiyalo yokusetha",
       "profileSaved": "Iphrofayela \"{{name}}\" ilondoloziwe",
       "organizationProfiles": "Amaphrofayili enhlangano",
       "personalProfiles": "Amaphrofayili Omuntu Siqu",
@@ -2741,7 +2747,6 @@
     },
     "modelSelector": {
       "provider": "Umhlinzeki {{id}}",
-      "modelId": "Imodeli {{id}}",
       "unavailable": "Ayitholakali",
       "unavailableState": "ayitholakali",
       "selectedState": "kukhethiwe",
@@ -4151,7 +4156,8 @@
     "sources": "Ubufakazi nemikhiqizo",
     "timezone": "Izoni yesikhathi yombiko",
     "deviceTimezone": "Sebenzisa izoni yesikhathi yedivayisi",
-    "timezoneHint": "Izoni yesikhathi ye-IANA, isibonelo Europe/Berlin. Izinguquko zohlelo zisebenza emibikweni ezayo.",
+    "timezoneHint": "Izoni yesikhathi ye-IANA, isibonelo Europe/Berlin.",
+    "scheduleHint": "Izinguquko zohlelo zisebenza emibikweni ezayo.",
     "nightStart": "Isikhathi sombiko siqala",
     "morningStart": "Umbiko ulungile ngo",
     "morningEnd": "Umbiko utholakala kuze kube",

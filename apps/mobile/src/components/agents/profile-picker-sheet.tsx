@@ -10,11 +10,22 @@ import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { type SheetHeaderTopInset } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
 import { cn } from '@/lib/utils';
 
 const SKELETON_ROW_COUNT = 4;
+
+/**
+ * The sheet presents at the half detent and its full detent stops below the
+ * status bar, so its header never overlaps the status bar. Reserving that
+ * inset anyway moved the title and every row by the inset height once the
+ * header measured its own position after presenting; declaring up front that
+ * the surface never reaches the window top keeps the first frame identical to
+ * the resting one.
+ */
+const SHEET_TOP_INSET: SheetHeaderTopInset = 'never';
 
 export type ProfilePickerSheetProps = {
   /** Rows offered as an override: every profile except the repo base. */
@@ -29,6 +40,12 @@ export type ProfilePickerSheetProps = {
    * runs on, so the row names the default instead of claiming no profile.
    */
   defaultProfileApplies: boolean;
+  /**
+   * The profile the effective default resolves to, when known. The no-override
+   * row names it so the checked row matches the Environment chip, which shows
+   * that same profile's name.
+   */
+  defaultProfileName?: string | null;
   isLoading: boolean;
   isError: boolean;
   /** The picked id no longer resolves to a profile. */
@@ -49,6 +66,7 @@ export function ProfilePickerSheet({
   candidates,
   hasProfiles,
   defaultProfileApplies,
+  defaultProfileName,
   selectedOverrideProfileId,
   isLoading,
   isError,
@@ -66,10 +84,20 @@ export function ProfilePickerSheet({
   const noOverrideLabelKey = defaultProfileApplies
     ? 'profiles.defaultSectionTitle'
     : 'agentChat.newSession.noProfile';
+  const noOverrideLabel = t(noOverrideLabelKey);
+  // The Environment chip names the profile the default resolves to; the row
+  // has to say the same thing, or the checked row and the chip disagree.
+  const resolvedDefaultName = defaultProfileApplies ? (defaultProfileName ?? null) : null;
+  const noOverrideAccessibilityLabel =
+    resolvedDefaultName === null
+      ? noOverrideLabel
+      : t('agentChat.newSession.defaultProfileResolvesToAccessibility', {
+          name: resolvedDefaultName,
+        });
 
   if (isLoading) {
     return (
-      <PickerSheet title={title} onDone={onClose} scrollable={false}>
+      <PickerSheet title={title} onDone={onClose} scrollable={false} topInset={SHEET_TOP_INSET}>
         <View className="bg-background">
           {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
             <View key={index} className={cn(ROW_TARGET_CLASS, 'justify-center px-4 py-3')}>
@@ -83,7 +111,7 @@ export function ProfilePickerSheet({
 
   if (isError) {
     return (
-      <PickerSheet title={title} onDone={onClose} scrollable={false}>
+      <PickerSheet title={title} onDone={onClose} scrollable={false} topInset={SHEET_TOP_INSET}>
         <EmptyState
           icon={Settings2}
           title={t('agentChat.newSession.couldNotLoadEnvironment')}
@@ -105,7 +133,7 @@ export function ProfilePickerSheet({
 
   if (!hasProfiles) {
     return (
-      <PickerSheet title={title} onDone={onClose} scrollable={false}>
+      <PickerSheet title={title} onDone={onClose} scrollable={false} topInset={SHEET_TOP_INSET}>
         <EmptyState
           icon={Settings2}
           title={title}
@@ -126,7 +154,7 @@ export function ProfilePickerSheet({
   }
 
   return (
-    <PickerSheet title={title} onDone={onClose} onCancel={onClose}>
+    <PickerSheet title={title} onDone={onClose} onCancel={onClose} topInset={SHEET_TOP_INSET}>
       {needsAttention ? (
         <Text className="px-4 pt-3 text-sm text-warn">
           {t('agentChat.newSession.configNeedsAttention')}
@@ -142,13 +170,20 @@ export function ProfilePickerSheet({
             onSelect(null);
           }}
           {...radioItemA11y({
-            label: t(noOverrideLabelKey),
+            label: noOverrideAccessibilityLabel,
             checked: selectedOverrideProfileId === null && !needsAttention,
           })}
         >
-          <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
-            {t(noOverrideLabelKey)}
-          </Text>
+          <View className="min-w-0 flex-1">
+            <Text className="text-base text-foreground" numberOfLines={1}>
+              {noOverrideLabel}
+            </Text>
+            {resolvedDefaultName === null ? null : (
+              <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+                {t('agentChat.newSession.defaultProfileResolvesTo', { name: resolvedDefaultName })}
+              </Text>
+            )}
+          </View>
           {selectedOverrideProfileId === null && !needsAttention ? (
             <Check size={18} color={colors.primary} />
           ) : null}

@@ -35,10 +35,12 @@ import {
   SECURITY_OPERATION_REPLAY_FAILED_MESSAGE,
   SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
   SECURITY_SERVICE_UNAVAILABLE_MESSAGE,
+  securityMutationCopyKey,
   securityRetainsOperationKey,
   securitySyncIntentFingerprint,
   securitySyncPreconditionFor,
 } from '@/lib/security-agent-ledger';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 import {
   useSaveSecurityAgentConfig,
   useSetSecurityAgentEnabled,
@@ -153,6 +155,10 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 }));
 
 const ORG_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+// The English catalog sentence for a lapsed organization plan.
+const TRIAL_ENDED_COPY =
+  "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.";
 
 describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
   beforeEach(() => {
@@ -269,6 +275,16 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
       mapSecuritySyncOperationError(new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE))
     );
     expect(toastErrorMock).toHaveBeenCalledWith('The security service is unavailable. Try again.');
+  });
+
+  it('onError explains a lapsed organization trial instead of the generic line', () => {
+    useTriggerSecuritySync(ORG_ID);
+    const rejection = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+      data: { code: 'FORBIDDEN' },
+    });
+    lastCapturedOptions?.onError?.(mapSecuritySyncOperationError(rejection));
+    expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_COPY);
+    expect(toastErrorMock).not.toHaveBeenCalledWith(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
   });
 
   it('stays silent for the in-progress conflict, whose screen shows the running sync', async () => {
@@ -485,7 +501,9 @@ describe('useSaveSecurityAgentConfig (generation guard + scope)', () => {
     setQueryDataMock.mockClear();
     lastCapturedOptions?.onError?.(new Error('boom'), { slaEnabled: true }, context);
     expect(setQueryDataMock).toHaveBeenCalledTimes(1);
-    expect(toastErrorMock).toHaveBeenCalledWith('boom');
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'Could not complete this action. Please try again.'
+    );
   });
 });
 
@@ -526,7 +544,101 @@ describe('useSetSecurityAgentEnabled (generation guard + scope)', () => {
     setQueryDataMock.mockClear();
     lastCapturedOptions?.onError?.(new Error('boom'), { isEnabled: true }, context);
     expect(setQueryDataMock).toHaveBeenCalledTimes(1);
-    expect(toastErrorMock).toHaveBeenCalledWith('boom');
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'Could not complete this action. Please try again.'
+    );
+  });
+});
+
+describe('config-write onError copy', () => {
+  beforeEach(() => {
+    lastCapturedOptions = null;
+    getQueryDataMock.mockReset();
+    setQueryDataMock.mockReset();
+    cancelQueriesMock.mockReset();
+    toastErrorMock.mockReset();
+  });
+
+  it('shows the reauthorize copy when enabling is refused for the missing permission', () => {
+    useSetSecurityAgentEnabled('personal');
+    lastCapturedOptions?.onError?.(
+      Object.assign(new Error('GitHub App does not have vulnerability_alerts permission'), {
+        data: { code: 'PRECONDITION_FAILED', upstreamCode: 'security_sync_missing_permission' },
+      })
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'Security Agent needs permission to read Dependabot alerts. Re-authorize the GitHub App to grant this permission.'
+    );
+    // The server's sentence carries the raw snake_case permission key.
+    expect(toastErrorMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('vulnerability_alerts')
+    );
+  });
+
+  it('shows the repository picker sentence when enabling has no repository in scope', () => {
+    useSetSecurityAgentEnabled('personal');
+    lastCapturedOptions?.onError?.(
+      Object.assign(new Error('Select at least one repository before enabling Security Agent.'), {
+        data: { code: 'PRECONDITION_FAILED', upstreamCode: 'security_sync_no_repositories' },
+      })
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith('Select at least one repository.');
+    expect(toastErrorMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('Select at least one repository before enabling')
+    );
+  });
+
+  it('shows the conflict copy when the stored config changed elsewhere', () => {
+    useSaveSecurityAgentConfig('personal');
+    lastCapturedOptions?.onError?.(
+      Object.assign(
+        new Error(
+          'This configuration changed in another tab. Review the latest settings and save again.'
+        ),
+        { data: { code: 'CONFLICT', upstreamCode: 'security_config_conflict' } }
+      )
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'Security Agent settings changed elsewhere. Review the latest settings and save again.'
+    );
+  });
+
+  it('shows the generic sentence instead of an unmarked server message', () => {
+    useSetSecurityAgentEnabled('personal');
+    lastCapturedOptions?.onError?.(new Error('GitHub integration not found or inactive'));
+
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'Could not complete this action. Please try again.'
+    );
+    expect(toastErrorMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('GitHub integration not found')
+    );
+  });
+
+  it('explains a lapsed organization trial on a settings save', () => {
+    useSaveSecurityAgentConfig(ORG_ID);
+    lastCapturedOptions?.onError?.(
+      Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+        data: { code: 'FORBIDDEN' },
+      })
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_COPY);
+    expect(toastErrorMock).not.toHaveBeenCalledWith(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+  });
+
+  it('explains a lapsed organization trial on the enable toggle too', () => {
+    useSetSecurityAgentEnabled(ORG_ID);
+    lastCapturedOptions?.onError?.(
+      Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+        data: { code: 'FORBIDDEN' },
+      })
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_COPY);
   });
 });
 
@@ -783,5 +895,20 @@ describe('ledger marker copy per surface', () => {
       'Could not complete this action. The problem needs fixing before you can retry.'
     );
     expect(isSecuritySyncRetryable(mappedForbidden)).toBe(false);
+  });
+
+  it('keeps the lapsed-trial reason on a sync and a dismissal, and stores it by key', () => {
+    for (const mapError of [mapSecuritySyncOperationError, mapSecurityDismissOperationError]) {
+      const rejection = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+        data: { code: 'FORBIDDEN' },
+      });
+      const mapped = mapError(rejection);
+      expect(mapped.message).toBe(TRIAL_ENDED_COPY);
+      // The dismissal draft stores the key and re-translates after a language
+      // change; freezing one language's sentence is the defect it avoids.
+      expect(securityMutationCopyKey(mapped)).toBe('common.organizationTrialEnded');
+      // The plan has to be fixed first, so a retry cannot succeed.
+      expect(isSecuritySyncRetryable(mapped)).toBe(false);
+    }
   });
 });

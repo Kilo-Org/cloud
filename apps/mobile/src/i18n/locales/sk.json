@@ -417,6 +417,7 @@
     "connectionExpired": "Platnosť pripojenia k službe GitHub vypršala.",
     "merge": {
       "merge": "Zlúčenie",
+      "mergeTitle": "Zlúčenie",
       "mergeNow": "Zlúčiť teraz",
       "mergePullRequest": "Zlúčenie žiadosti",
       "mergeTermTitle": "Zlúčiť {{term}}",
@@ -712,6 +713,9 @@
       "gitlabDescription": "Kontrolovať merge requesty v mobile",
       "bitbucketOrgOnlyDescription": "Prepni účet hore na organizáciu a kontroluj jej žiadosti o zlúčenie na Bitbucku.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatiaľ nemá žiadne organizácie. Žiadosti o zlúčenie na Bitbucku môžeš kontrolovať po vytvorení organizácie alebo vstúpení do nej.",
+      "gitlabReconnectAdminOnlyDescription": "Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby ho znova pripojil.",
+      "bitbucketNotConnectedTitle": "Bitbucket nie je pripojený",
+      "bitbucketAdminOnlyDescription": "Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie.",
       "contextLine": "Pre {{organization}}",
       "contextLinePersonal": "Pre osobný účet"
     },
@@ -1459,7 +1463,9 @@
     "instructions": {
       "title": "Vlastné pokyny",
       "deprecation": "Podpora vlastných pokynov sa plánuje ukončiť. Presuňte tieto pokyny do súboru REVIEW.md vo svojom repozitári.",
-      "placeholder": "napr. vyžadovať dodržiavanie našich pravidiel spracovania chýb…"
+      "placeholder": "napr. vyžadovať dodržiavanie našich pravidiel spracovania chýb…",
+      "clearTitle": "Odstrániť vlastné pokyny?",
+      "clearMessage": "Uloženie prázdneho poľa odstráni vlastné pokyny uložené pre tohto recenzenta."
     },
     "repos": {
       "unavailable": "Repozitáre nie sú dostupné. Dokončite nastavenie pripojenia k platforme Bitbucket na kilo.ai.",
@@ -1643,11 +1649,9 @@
       "bitbucketError": "Nastavenie pripojenia k platforme Bitbucket sa nepodarilo otvoriť. Skúste to znova."
     },
     "overview": {
-      "reviewStyle": "Štýl kontroly",
-      "focusAreas": "Oblasti zamerania",
       "allAreas": "Všetky oblasti",
-      "customInstructions": "Vlastné pokyny",
       "set": "Nastavené",
+      "notSet": "Nenastavené",
       "nSelected": "Vybrané: {{displayCount}}",
       "proposedReviewMdGuidance": "Navrhované pokyny do REVIEW.md"
     },
@@ -2127,7 +2131,8 @@
       "actionBlocked": "Túto akciu sa nepodarilo dokončiť. Problém je potrebné najprv vyriešiť.",
       "syncNoRepositories": "V rozsahu synchronizácie nie sú žiadne repozitáre. Vyberte repozitáre, ktoré Bezpečnostný agent monitoruje, a potom znova synchronizujte.",
       "syncIntegrationInactive": "Pripojenie GitHub pre Bezpečnostného agenta nie je aktívne. Znovu pripojte Kilo GitHub App a potom znova synchronizujte.",
-      "syncMissingPermission": "Aplikácia Kilo na GitHube nemôže čítať upozornenia na zraniteľnosti. Udeľte toto povolenie na GitHube a potom znova synchronizujte."
+      "syncMissingPermission": "Aplikácia Kilo na GitHube nemôže čítať upozornenia na zraniteľnosti. Udeľte toto povolenie na GitHube a potom znova synchronizujte.",
+      "configConflict": "Nastavenia bezpečnostného agenta sa zmenili inde. Skontrolujte najnovšie nastavenia a znova uložte."
     },
     "analysisState": {
       "queued": "Analýza čaká v poradí",
@@ -2442,13 +2447,14 @@
       "forkFilesUnchangedOnComputer": "Súbory v tomto počítači sa nezmenia.",
       "pickProfile": "Vyberte profil",
       "noProfile": "Žiadny profil",
+      "defaultProfileResolvesTo": "Aktuálne {{name}}",
+      "defaultProfileResolvesToAccessibility": "Predvolený profil: {{name}}",
       "manageProfiles": "Spravovať profily",
       "noProfiles": "Zatiaľ žiadne profily. Vytvorte jeden a pridajte premenné prostredia, servery MCP a zručnosti.",
       "advancedConfig": "Pokročilá konfigurácia",
       "advancedConfigDescription": "Platí pre toto sedenie. Uložením ako profil zostane aj nabudúce.",
       "saveAsProfile": "Uložiť ako profil",
       "saveProfileDescription": "Uložte aktuálne premenné prostredia a príkazy nastavenia ako opätovne použiteľný profil.",
-      "profileSummary": "{{vars}} premenné prostredia · {{commands}} príkazy nastavenia",
       "profileSaved": "Profil {{name}} bol uložený",
       "organizationProfiles": "Profily organizácií",
       "personalProfiles": "Osobné profily",
@@ -2819,7 +2825,6 @@
     },
     "modelSelector": {
       "provider": "Poskytovateľ {{id}}",
-      "modelId": "Identifikátor modelu: {{id}}",
       "unavailable": "Nedostupný",
       "unavailableState": "nedostupný",
       "selectedState": "vybraný",
@@ -4267,7 +4272,8 @@
     "sources": "Dôkazy a artefakty",
     "timezone": "Časové pásmo prehľadu",
     "deviceTimezone": "Použiť časové pásmo zariadenia",
-    "timezoneHint": "Časové pásmo IANA, napríklad Europe/Berlin. Zmeny rozvrhu platia pre budúce prehľady.",
+    "timezoneHint": "Časové pásmo IANA, napríklad Europe/Berlin.",
+    "scheduleHint": "Zmeny rozvrhu platia pre budúce prehľady.",
     "nightStart": "Začiatok okna prehľadu",
     "morningStart": "Prehľad pripravený o",
     "morningEnd": "Prehľad dostupný do",

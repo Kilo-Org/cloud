@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub холболтын хугацаа дууссан.",
     "merge": {
       "merge": "Нэгтгэх",
+      "mergeTitle": "Нэгтгэх",
       "mergeNow": "Одоо нэгтгэх",
       "mergePullRequest": "Нэгтгэх хүсэлтийг нэгтгэх",
       "mergeTermTitle": "{{term}}ийг нэгтгэх",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Нэгтгэх хүсэлтийг гар утаснаас хянах",
       "bitbucketOrgOnlyDescription": "Түүний Bitbucket татах хүсэлтүүдийг шалгахын тулд дээрх бүртгэлийг байгууллагад шилжүүлнэ үү.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Энэ бүртгэлд одоогоор ямар ч байгууллага алга. Байгууллага үүсгэсэн эсвэл нэгэнд нэгдсэний дараа Bitbucket татах хүсэлтийг шалгах боломжтой болно.",
+      "gitlabReconnectAdminOnlyDescription": "Дахин холбуулахын тулд байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежерт хандана уу.",
+      "bitbucketNotConnectedTitle": "Bitbucket холбогдоогүй байна",
+      "bitbucketAdminOnlyDescription": "Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй.",
       "contextLine": "{{organization}}-ийн хувьд",
       "contextLinePersonal": "Хувийн дансны хувьд"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Тусгай заавар",
       "deprecation": "Тусгай зааврын дэмжлэгийг зогсоохоор төлөвлөсөн. Эдгээр зааврыг репозиторийнхоо REVIEW.md файлд шилжүүлнэ үү.",
-      "placeholder": "жишээ нь: Алдаа боловсруулах дүрмийг мөрдүүлэх…"
+      "placeholder": "жишээ нь: Алдаа боловсруулах дүрмийг мөрдүүлэх…",
+      "clearTitle": "Тусгай зааврыг устгах уу?",
+      "clearMessage": "Хоосон талбарыг хадгалснаар энэ хянагчид хадгалагдсан тусгай зааврыг устгана."
     },
     "repos": {
       "unavailable": "Репозиториудад хандах боломжгүй байна. kilo.ai дээр Bitbucket-ийг тохируулж дуусгана уу.",
@@ -1599,11 +1605,9 @@
       "bitbucketError": "Bitbucket тохиргоог нээж чадсангүй. Дахин оролдоно уу."
     },
     "overview": {
-      "reviewStyle": "Шалгалтын хэв маяг",
-      "focusAreas": "Анхаарах чиглэлүүд",
       "allAreas": "Бүх чиглэл",
-      "customInstructions": "Тусгай заавар",
       "set": "Тохируулсан",
+      "notSet": "Тохируулаагүй",
       "nSelected": "{{displayCount}} сонгогдсон",
       "proposedReviewMdGuidance": "Санал болгосон REVIEW.md зөвлөмж"
     },
@@ -2061,7 +2065,8 @@
       "actionBlocked": "Энэ үйлдлийг дуусгаж чадсангүй. Асуудлыг эхэлж шийдвэрлэх шаардлагатай.",
       "syncNoRepositories": "Синхрончлолын хүрээнд нэг ч репозитор байхгүй. Аюулгүй байдлын агентын хянадаг репозиторуудыг сонгоод, дахин синхрончлоорой.",
       "syncIntegrationInactive": "«Аюулгүй байдлын агент»-ын GitHub холболт идэвхтэй биш байна. Kilo GitHub App-ыг дахин холбож, дараа нь дахин синхрончлоорой.",
-      "syncMissingPermission": "Kilo GitHub App нь vulnerability alerts-г уншиж чадахгүй байна. GitHub дээр тухайн зөвшөөрлийг олгоод, дахин синк хийнэ үү."
+      "syncMissingPermission": "Kilo GitHub App нь vulnerability alerts-г уншиж чадахгүй байна. GitHub дээр тухайн зөвшөөрлийг олгоод, дахин синк хийнэ үү.",
+      "configConflict": "Аюулгүй байдлын агентын тохиргоо өөр газар өөрчлөгдсөн. Хамгийн сүүлийн тохиргоог шалгаад дахин хадгална уу."
     },
     "analysisState": {
       "queued": "Шинжилгээ дараалалд",
@@ -2368,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "Энэ компьютер дээрх файлууд өөрчлөгдөхгүй.",
       "pickProfile": "Профайл сонгоно уу",
       "noProfile": "Профайл байхгүй",
+      "defaultProfileResolvesTo": "Одоо {{name}} гэж тохируулагдсан",
+      "defaultProfileResolvesToAccessibility": "Өгөгдмөл профайл: {{name}}",
       "manageProfiles": "Профайлуудыг удирдах",
       "noProfiles": "Одоогоор профайл байхгүй байна. Орчны хувьсагч, MCP сервер, ур чадвар нэмэхийн тулд нэгийг үүсгэ.",
       "advancedConfig": "Нарийвчилсан тохиргоо",
       "advancedConfigDescription": "Энэ сессэд хамаарна. Профайл болгон хадгалбал дараагийн удаад хадгалагдана.",
       "saveAsProfile": "Профайл болгон хадгалах",
       "saveProfileDescription": "Одоогийн орчны хувьсагч болон тохируулах командуудыг дахин ашиглах боломжтой профайл болгон хадгална уу.",
-      "profileSummary": "{{vars}} орчны хувьсагч · {{commands}} тохируулах командууд",
       "profileSaved": "\"{{name}}\" профайлыг хадгалсан",
       "organizationProfiles": "Байгууллагын профайл",
       "personalProfiles": "Хувийн профайл",
@@ -2735,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Үйлчилгээ үзүүлэгч {{id}}",
-      "modelId": "Загвар {{id}}",
       "unavailable": "Ашиглах боломжгүй",
       "unavailableState": "ашиглах боломжгүй",
       "selectedState": "сонгогдсон",
@@ -4145,7 +4150,8 @@
     "sources": "Нотолгоо ба артефактууд",
     "timezone": "Тоймын цагийн бүс",
     "deviceTimezone": "Төхөөрөмжийн цагийн бүсийг ашиглах",
-    "timezoneHint": "IANA цагийн бүс, жишээ нь Europe/Berlin. Хуваарийн өөрчлөлт дараагийн тоймуудад хэрэгжинэ.",
+    "timezoneHint": "IANA цагийн бүс, жишээ нь Europe/Berlin.",
+    "scheduleHint": "Хуваарийн өөрчлөлт дараагийн тоймуудад хэрэгжинэ.",
     "nightStart": "Тоймын хугацаа эхлэх",
     "morningStart": "Тойм бэлэн болох цаг",
     "morningEnd": "Тойм авах боломжтой эцсийн цаг",

@@ -20,6 +20,7 @@ import {
 import {
   isSecuritySyncInProgress,
   mapSecuritySyncOperationError,
+  securityConfigMutationMessage,
   securityRetainsOperationKey,
   securitySyncIntentFingerprint,
 } from '@/lib/security-agent-ledger';
@@ -45,7 +46,9 @@ export function useSaveSecurityAgentConfig(
   const configQueryKey = useSecurityAgentConfigQueryKey(scope);
 
   // onError policy: roll back the onMutate snapshot (latest generation only)
-  // and toast error.message.
+  // and toast the localized config-write copy. The server's own sentence is
+  // English and stays untranslated on the device, so a marked refusal reads
+  // catalog copy and anything else reads the generic sentence.
   return useMutation({
     // Reachability is the save's outcome, not a precondition: the default
     // `networkMode: 'online'` pauses the mutation while the connectivity
@@ -91,7 +94,7 @@ export function useSaveSecurityAgentConfig(
           old ? { ...old, ...restoredFields } : old
         );
       }
-      announcingToast.error(error.message);
+      announcingToast.error(securityConfigMutationMessage(error));
     },
     onSuccess: result => {
       // Saving pops the settings screen, and the screen it returns to can fail
@@ -142,7 +145,9 @@ export function useSetSecurityAgentEnabled(scope: string) {
   const configQueryKey = useSecurityAgentConfigQueryKey(scope);
 
   // onError policy: roll back the onMutate snapshot (latest generation only)
-  // and toast error.message.
+  // and toast the localized config-write copy. The server's own sentence is
+  // English and stays untranslated on the device, so a marked refusal reads
+  // catalog copy and anything else reads the generic sentence.
   return useMutation({
     // Same reason as the config save above: pausing while the connectivity
     // manager reports offline keeps the switch in its optimistic position with
@@ -176,7 +181,7 @@ export function useSetSecurityAgentEnabled(scope: string) {
           old ? { ...old, isEnabled: previous.isEnabled } : old
         );
       }
-      announcingToast.error(error.message);
+      announcingToast.error(securityConfigMutationMessage(error));
     },
     onSuccess: result => {
       if ('initialSyncAdmissionFailed' in result && result.initialSyncAdmissionFailed) {

@@ -132,27 +132,9 @@ export async function join(opts: JoinOptions): Promise<WlResult<JoinResult>> {
       // the caller. Accept it only when DoltHub proved this token may act
       // for that org: the fork was just created under it, or it is the
       // username the token belongs to.
-      if (!forkResult.created) {
-        const owner = await resolveTokenOwner(opts);
-        if (owner.status === 'unknown') {
-          return {
-            ok: false,
-            error: new WlError(
-              'Could not resolve the DoltHub account for this token — retry the join',
-              'upstream',
-              owner.cause
-            ),
-          };
-        }
-        if (!isSameDolthubOrg(owner.username, opts.dolthubOrg)) {
-          return {
-            ok: false,
-            error: new WlError(
-              `Could not confirm that DoltHub org "${opts.dolthubOrg}" belongs to you — join with a handle registered under your DoltHub username, or reconnect DoltHub and retry`,
-              'precondition'
-            ),
-          };
-        }
+      const orgError = await orgProofError(opts, forkResult.created);
+      if (orgError !== null) {
+        return { ok: false, error: orgError };
       }
       return {
         ok: true,
@@ -167,9 +149,15 @@ export async function join(opts: JoinOptions): Promise<WlResult<JoinResult>> {
     }
 
     // Step 3: if a registration PR already exists for this branch,
-    // do not write another registration commit.
+    // do not write another registration commit. This is also a success
+    // path that hands the caller the handle as their identity and skips
+    // the registration write, so the org has to be backed the same way.
     const existing = await findOpenRegistrationPr(opts, branchName);
     if (existing !== null) {
+      const prOrgError = await orgProofError(opts, forkResult.created);
+      if (prOrgError !== null) {
+        return { ok: false, error: prOrgError };
+      }
       return {
         ok: true,
         data: {
@@ -329,6 +317,31 @@ async function findRegisteredRig(opts: JoinOptions): Promise<RegisteredRig> {
 }
 
 type TokenOwner = { status: 'resolved'; username: string } | { status: 'unknown'; cause: unknown };
+
+/**
+ * Decide whether DoltHub backs the claimed org for this token, for a
+ * success path that hands the caller a rig identity without another
+ * DoltHub-authorized write. A fork the join just created under the org
+ * is proof in itself; otherwise the org must be the username the token
+ * belongs to. Returns the error to report, or null when the org is
+ * backed.
+ */
+async function orgProofError(opts: JoinOptions, forkCreated: boolean): Promise<WlError | null> {
+  if (forkCreated) return null;
+  const owner = await resolveTokenOwner(opts);
+  if (owner.status === 'unknown') {
+    return new WlError(
+      'Could not resolve the DoltHub account for this token — retry the join',
+      'upstream',
+      owner.cause
+    );
+  }
+  if (isSameDolthubOrg(owner.username, opts.dolthubOrg)) return null;
+  return new WlError(
+    `Could not confirm that DoltHub org "${opts.dolthubOrg}" belongs to you — join with a handle registered under your DoltHub username, or reconnect DoltHub and retry`,
+    'precondition'
+  );
+}
 
 /**
  * Ask DoltHub which account the token belongs to. Kept separate from the

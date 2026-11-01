@@ -301,6 +301,83 @@ describe('join', () => {
     expect(result.error.code).toBe('precondition');
   });
 
+  it('accepts an open registration PR when the token owns the claimed org', async () => {
+    const responses: MockResponse[] = [
+      { status: 400, body: { error: 'fork already exists under alice' } },
+      { status: 200, body: { query_execution_status: 'Success', rows: [] } },
+      {
+        status: 200,
+        body: {
+          pulls: [
+            {
+              pull_id: '42',
+              title: 'Register rig: alice-tools',
+              state: 'open',
+              created_at: '2026-05-16T00:00:00Z',
+              updated_at: '2026-05-16T00:00:00Z',
+              creator_name: 'alice',
+            },
+          ],
+        },
+      },
+      { status: 200, body: { status: 'Success', username: 'alice' } },
+    ];
+    const { fetch: f, calls } = makeFetch(responses);
+    const result = await join({
+      auth: { token: 't' },
+      upstream: { owner: 'hop', db: 'wl' },
+      dolthubOrg: 'alice',
+      rigHandle: 'alice-tools',
+      displayName: 'Alice tools',
+      ownerEmail: 'alice@example.com',
+      version: '0.1.0',
+      fetch: f,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.registrationPullId).toBe('42');
+    expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
+  });
+
+  it('refuses an open registration PR when the token does not own the claimed org', async () => {
+    const responses: MockResponse[] = [
+      { status: 400, body: { error: 'fork already exists under alice' } },
+      { status: 200, body: { query_execution_status: 'Success', rows: [] } },
+      {
+        status: 200,
+        body: {
+          pulls: [
+            {
+              pull_id: '42',
+              title: 'Register rig: alice-tools',
+              state: 'open',
+              created_at: '2026-05-16T00:00:00Z',
+              updated_at: '2026-05-16T00:00:00Z',
+              creator_name: 'alice',
+            },
+          ],
+        },
+      },
+      { status: 200, body: { status: 'Success', username: 'mallory' } },
+    ];
+    const { fetch: f, calls } = makeFetch(responses);
+    const result = await join({
+      auth: { token: 't' },
+      upstream: { owner: 'hop', db: 'wl' },
+      dolthubOrg: 'alice',
+      rigHandle: 'alice-tools',
+      displayName: 'Alice tools',
+      ownerEmail: 'alice@example.com',
+      version: '0.1.0',
+      fetch: f,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('precondition');
+    expect(result.error.message).toContain('Could not confirm that DoltHub org');
+    expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
+  });
+
   it('refuses a matching org the token does not belong to', async () => {
     const responses: MockResponse[] = [
       { status: 400, body: { error: 'fork already exists under alice' } },

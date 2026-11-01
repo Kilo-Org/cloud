@@ -109,6 +109,8 @@ describe('joinViaSdk', () => {
           ],
         },
       },
+      // read the token's own account → the org the caller claims.
+      { status: 200, body: { status: 'Success', username: 'alice' } },
     ]);
 
     const result = await joinViaSdk(baseCtx, fetch);

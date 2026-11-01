@@ -5,7 +5,7 @@
 // left the screen with no "Unsaved changes" confirmation, dropping the typed
 // text. The guard has to read the draft the user can see.
 
-import { type ComponentType, createElement, type ReactNode } from 'react';
+import { type ComponentType, createElement, type ReactNode, useEffect } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -56,6 +56,9 @@ vi.mock('react-native', () => ({ View: 'View', Alert: { alert: vi.fn() } }));
 vi.mock('expo-router', () => ({
   useRouter: () => router,
   useNavigation: () => navigation,
+  useFocusEffect: (effect: () => void) => {
+    useEffect(effect, [effect]);
+  },
   usePreventRemove: (
     enabled: boolean,
     handler: (options: { data: { action: unknown }; repeat: () => void }) => void

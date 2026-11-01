@@ -28,6 +28,13 @@ type ApplySharePrefillOptions = {
    * have typed over it since.
    */
   applyText?: boolean;
+  /**
+   * Whether this delivery still owns the composer. A composer that moved to a
+   * newer share makes the older delivery stale: it stops before touching the
+   * text, before attaching, and never clears the param, which now names the
+   * newer share.
+   */
+  isCurrent?: () => boolean;
 };
 
 /**
@@ -44,10 +51,21 @@ export async function applySharePrefill(options: ApplySharePrefillOptions): Prom
     return true;
   }
 
+  const isCurrent = (): boolean => options.isCurrent?.() !== false;
+
   const payload = takeSharePayload(shareId);
   if (payload === null) {
-    options.clearShareIdParam();
+    if (isCurrent()) {
+      options.clearShareIdParam();
+    }
     return true;
+  }
+
+  // A composer that already moved to a newer share delivers nothing for this
+  // one; the payload goes back so it is not lost to the take.
+  if (!isCurrent()) {
+    restoreSharePayload(shareId, payload);
+    return false;
   }
 
   // Text first and unconditionally (when non-empty) so file failures keep it.
@@ -63,6 +81,10 @@ export async function applySharePrefill(options: ApplySharePrefillOptions): Prom
   }
 
   if (payload.files.length > 0) {
+    if (!isCurrent()) {
+      restoreSharePayload(shareId, payload);
+      return false;
+    }
     try {
       await options.addCandidates(payload.files);
     } catch {
@@ -74,6 +96,12 @@ export async function applySharePrefill(options: ApplySharePrefillOptions): Prom
       restoreSharePayload(shareId, payload);
       return false;
     }
+  }
+
+  // The files landed, but the composer moved on while they were being
+  // attached: the delivery signal and the param belong to the newer share.
+  if (!isCurrent()) {
+    return true;
   }
 
   // Signal delivery before clearing the route param so the destination
@@ -169,6 +197,7 @@ export function useSharePrefill({
         },
         onDelivered: onDeliveredRef.current,
         applyText,
+        isCurrent: () => run === runRef.current,
       });
       if (run !== runRef.current) {
         return;

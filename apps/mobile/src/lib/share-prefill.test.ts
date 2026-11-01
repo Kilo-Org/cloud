@@ -284,6 +284,46 @@ describe('applySharePrefill', () => {
     expect(clearCalls).toEqual([1]);
   });
 
+  it('delivers nothing for a share whose composer moved on', async () => {
+    const id = putSharePayload({
+      text: 'stale body',
+      files: [{ name: 'stale.png', uri: 'file:///stale.png' }],
+      failedFiles: [],
+    });
+    const { input, calls: nativeCalls } = makeInput();
+    const { onChangeText, calls: changeCalls } = makeChange();
+    const addCandidates = vi.fn<() => Promise<void>>(async () => {
+      await Promise.resolve();
+    });
+    const clearCalls: number[] = [];
+    const deliveredCalls: number[] = [];
+
+    const delivered = await applySharePrefill({
+      shareId: id,
+      input,
+      maxLength: 4000,
+      onChangeText,
+      addCandidates,
+      clearShareIdParam: () => {
+        clearCalls.push(1);
+      },
+      onDelivered: () => {
+        deliveredCalls.push(1);
+      },
+      isCurrent: () => false,
+    });
+
+    expect(delivered).toBe(false);
+    expect(changeCalls).toEqual([]);
+    expect(nativeCalls).toEqual([]);
+    expect(addCandidates).not.toHaveBeenCalled();
+    // The param now names the newer share, so it must not be cleared here.
+    expect(clearCalls).toEqual([]);
+    expect(deliveredCalls).toEqual([]);
+    // The staged payload is not lost to the take.
+    expect(peekSharePayload(id)).not.toBeNull();
+  });
+
   it('with files, calls onDelivered after addCandidates and before clearShareIdParam', async () => {
     const id = putSharePayload({
       text: 'shared body',

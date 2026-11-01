@@ -59,6 +59,17 @@ const STATUS_LABEL_KEYS = {
   unknown: 'common.unknown',
 } satisfies Record<string, string>;
 
+/**
+ * The badge every status without a hue of its own wears: the gray the model
+ * badges use, which differs from the row's `bg-secondary` in both themes (the
+ * theme's `--muted` equals `--secondary`, so a `bg-muted` pill has no band on
+ * this row). `text-ink2` stays readable on it; the muted foreground does not.
+ */
+const NEUTRAL_BADGE = {
+  pillClass: 'bg-neutral-200 dark:bg-neutral-700',
+  textClass: 'text-ink2',
+} as const;
+
 const STATUS_META = {
   paid: {
     pillClass: 'bg-good',
@@ -68,10 +79,7 @@ const STATUS_META = {
     pillClass: 'bg-warn',
     textClass: 'text-warn-foreground',
   },
-  void: {
-    pillClass: 'bg-muted',
-    textClass: 'text-muted-foreground',
-  },
+  void: NEUTRAL_BADGE,
 } as const satisfies Record<string, { pillClass: string; textClass: string }>;
 
 /** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
@@ -84,8 +92,8 @@ function statusMeta(status: string) {
   const labelKey = lookup(STATUS_LABEL_KEYS, status);
   return {
     label: labelKey ? i18n.t(labelKey) : status,
-    pillClass: meta?.pillClass ?? 'bg-muted',
-    textClass: meta?.textClass ?? 'text-muted-foreground',
+    pillClass: meta?.pillClass ?? NEUTRAL_BADGE.pillClass,
+    textClass: meta?.textClass ?? NEUTRAL_BADGE.textClass,
   };
 }
 
@@ -98,12 +106,18 @@ function InvoiceRowSkeleton() {
   );
 }
 
+/**
+ * Every row reserves the action's box on the trailing edge, so the download
+ * glyph never shifts an invoice number and a row without a PDF still lines its
+ * amount up with the rows that carry the action. 20 dp is the spinner's box.
+ */
+
 function InvoiceRowContent({
   invoice,
-  trailing,
+  action,
 }: Readonly<{
   invoice: OrgInvoice;
-  trailing?: ReactNode;
+  action?: ReactNode;
 }>) {
   const { t } = useTranslation();
   const meta = statusMeta(invoice.status);
@@ -114,27 +128,27 @@ function InvoiceRowContent({
   );
 
   return (
-    <>
-      <View className="flex-row items-center justify-between gap-3">
-        <View className="min-w-0 flex-1 flex-row items-center gap-2">
-          {trailing}
+    <View className="flex-row items-center gap-3">
+      <View className="min-w-0 flex-1 gap-1">
+        <View className="flex-row items-center justify-between gap-3">
           <Text className="min-w-0 flex-1 text-sm font-medium text-foreground" numberOfLines={1}>
             {title}
           </Text>
+          <Text className="text-sm font-medium text-foreground">
+            {formatMoneyFromCents(invoice.amount_due, i18n.language)}
+          </Text>
         </View>
-        <Text className="text-sm font-medium text-foreground">
-          {formatMoneyFromCents(invoice.amount_due, i18n.language)}
-        </Text>
-      </View>
-      <View className="flex-row items-center justify-between">
-        <Text className="text-xs text-muted-foreground">
-          {formatDate(new Date(invoice.created * 1000), i18n.language)}
-        </Text>
-        <View className={cn('rounded-full px-2 py-0.5', meta.pillClass)}>
-          <Text className={cn('text-[11px] font-medium', meta.textClass)}>{meta.label}</Text>
+        <View className="flex-row items-center justify-between">
+          <Text className="text-xs text-muted-foreground">
+            {formatDate(new Date(invoice.created * 1000), i18n.language)}
+          </Text>
+          <View className={cn('rounded-full px-2 py-0.5', meta.pillClass)}>
+            <Text className={cn('text-[11px] font-medium', meta.textClass)}>{meta.label}</Text>
+          </View>
         </View>
       </View>
-    </>
+      <View className="w-5 items-center justify-center">{action}</View>
+    </View>
   );
 }
 
@@ -149,7 +163,7 @@ const InvoiceRow = memo(function InvoiceRow({ invoice }: Readonly<{ invoice: Org
 
   if (rowState === 'no-affordance') {
     return (
-      <View className="gap-1 rounded-lg bg-secondary p-3">
+      <View className="rounded-lg bg-secondary p-3">
         <InvoiceRowContent invoice={invoice} />
       </View>
     );
@@ -187,11 +201,11 @@ const InvoiceRow = memo(function InvoiceRow({ invoice }: Readonly<{ invoice: Org
       accessibilityLabel={t('organization.invoices.downloadA11y', {
         number: firstNonEmpty(invoice.number, invoice.description, invoice.id),
       })}
-      className="gap-1 rounded-lg bg-secondary p-3 active:opacity-80 disabled:opacity-60"
+      className="rounded-lg bg-secondary p-3 active:opacity-80 disabled:opacity-60"
     >
       <InvoiceRowContent
         invoice={invoice}
-        trailing={
+        action={
           busy ? (
             <ActivityIndicator size="small" color={colors.mutedForeground} />
           ) : (

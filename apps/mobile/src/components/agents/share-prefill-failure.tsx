@@ -25,7 +25,7 @@ export function SharePrefillFailure({ onRetry, onDismiss }: Props) {
         {t('chat.attachment.attachFailed')}
       </Text>
       <Pressable
-        className={cn(STATE_ACTION_CLASS, 'justify-center px-2 active:opacity-70')}
+        className={cn(STATE_ACTION_CLASS, 'min-w-[48px] justify-center px-2 active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={t('common.retry')}
         onPress={onRetry}
@@ -33,7 +33,7 @@ export function SharePrefillFailure({ onRetry, onDismiss }: Props) {
         <Text className="text-xs font-semibold text-foreground">{t('common.retry')}</Text>
       </Pressable>
       <Pressable
-        className={cn(STATE_ACTION_CLASS, 'justify-center px-2 active:opacity-70')}
+        className={cn(STATE_ACTION_CLASS, 'min-w-[48px] justify-center px-2 active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={t('common.remove')}
         onPress={onDismiss}

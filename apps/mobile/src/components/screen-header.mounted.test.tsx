@@ -9,6 +9,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
+import { HEADER_BACK_GUARD_MS } from '@/lib/hooks/header-back';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { ScreenHeader, shouldStackHeaderActions } from './screen-header';
@@ -309,6 +310,37 @@ describe('ScreenHeader mounted', () => {
     const back = findBackPressable(renderer.root);
     expect(String(back.props.className)).not.toContain('overflow-hidden');
     expect(back.props.accessibilityRole).toBe('button');
+  });
+
+  it('dispatches one back for a burst of presses on the same header', () => {
+    // One gesture owns the header's Back: four presses delivered inside the
+    // window have to pop one screen, not four. The window is per header, so the
+    // screen a dispatched back lands on starts a fresh one.
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+      routerState.routes = ['tabs', 'security-agent', 'security-agent-settings'];
+      const renderer = renderHeader({ title: 'Settings' });
+
+      const back = findBackPressable(renderer.root);
+      for (let press = 0; press < 4; press += 1) {
+        act(() => {
+          (back.props.onPress as () => void)();
+        });
+      }
+      expect(routerState.back).toHaveBeenCalledTimes(1);
+      expect(routerState.routes).toEqual(['tabs', 'security-agent']);
+
+      // A deliberate press after the window still walks the stack.
+      vi.setSystemTime(new Date(Date.now() + HEADER_BACK_GUARD_MS));
+      act(() => {
+        (back.props.onPress as () => void)();
+      });
+      expect(routerState.back).toHaveBeenCalledTimes(2);
+      expect(routerState.routes).toEqual(['tabs']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('pulls the leading controls with a logical start margin the RTL swap cannot mirror', async () => {

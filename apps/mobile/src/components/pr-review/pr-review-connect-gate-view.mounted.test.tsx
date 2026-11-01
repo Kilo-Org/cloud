@@ -7,7 +7,7 @@ import { toast } from 'sonner-native';
 
 import '@/i18n';
 import { act, TestRenderer } from '@/test/renderer';
-import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
+import { type ProviderPrPlatform, type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { PrReviewConnectGate } from './pr-review-connect-gate';
 
 const platform = vi.hoisted(() => ({ OS: 'ios' }));
@@ -182,16 +182,24 @@ async function pressConnect(renderer: TestRenderer.ReactTestRenderer) {
 }
 
 let mounted: TestRenderer.ReactTestRenderer | undefined = undefined;
-function gate(provider: ProviderPrPlatform, organizationId: string | null = 'org-1') {
+function gate(
+  provider: ProviderPrPlatform,
+  organizationId: string | null = 'org-1',
+  ref?: ProviderPrRef
+) {
   return (
-    <PrReviewConnectGate platform={provider} organizationId={organizationId}>
+    <PrReviewConnectGate platform={provider} organizationId={organizationId} prRef={ref}>
       {React.createElement('ReviewContent')}
     </PrReviewConnectGate>
   );
 }
-function mount(provider: ProviderPrPlatform, organizationId: string | null = 'org-1') {
+function mount(
+  provider: ProviderPrPlatform,
+  organizationId: string | null = 'org-1',
+  ref?: ProviderPrRef
+) {
   act(() => {
-    mounted = TestRenderer.create(gate(provider, organizationId));
+    mounted = TestRenderer.create(gate(provider, organizationId, ref));
   });
   if (!mounted) {
     throw new Error('gate did not mount');
@@ -434,5 +442,71 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
   it.each(providers)('%s names the active context on the connect view', provider => {
     const renderer = mount(provider);
     expect(renderer.root.findAllByType('PrReviewContextLine')).toHaveLength(1);
+  });
+});
+
+describe('PR-review connect gate item line', () => {
+  /** The one `Text` the gate renders for the opened PR/MR, if any. */
+  function itemLine(renderer: TestRenderer.ReactTestRenderer) {
+    return renderer.root
+      .findAllByType('Text')
+      .find(
+        node => typeof node.props.children === 'string' && /[#!]\d+$/.test(node.props.children)
+      );
+  }
+
+  const GITHUB: ProviderPrRef = {
+    platform: 'github',
+    owner: 'acme-design',
+    repo: 'atlas-redesign',
+    number: 4821,
+  };
+  const GITLAB: ProviderPrRef = {
+    platform: 'gitlab',
+    projectPath: 'group/sub/repo',
+    mrIid: 1287,
+  };
+  const BITBUCKET: ProviderPrRef = {
+    platform: 'bitbucket',
+    workspace: 'acme-design',
+    repoSlug: 'atlas-redesign',
+    prId: 42,
+  };
+
+  it('names the GitHub pull request the opened link carries', () => {
+    const line = itemLine(mount('github', null, GITHUB));
+    expect(line?.props.children).toBe('acme-design/atlas-redesign#4821');
+    // A long nested path must not wrap into a second line and push the copy
+    // and the CTA down; the ellipsis sits in the middle so the number and the
+    // last path segment stay readable.
+    expect(line?.props.numberOfLines).toBe(1);
+    expect(line?.props.ellipsizeMode).toBe('middle');
+    // An identifier keeps a left-to-right base direction under an RTL locale
+    // while it stays centered like the copy around it.
+    expect(line?.props.style).toMatchObject({ direction: 'ltr', writingDirection: 'ltr' });
+    expect(line?.props.className).toContain('text-center');
+  });
+
+  it('names the same pull request when the connection needs re-authorizing', () => {
+    queryResult.data = { connected: false, revoked: true };
+    const line = itemLine(mount('github', null, GITHUB));
+    expect(line?.props.children).toBe('acme-design/atlas-redesign#4821');
+  });
+
+  it('names a nested GitLab merge request by its full project path and iid', () => {
+    const line = itemLine(mount('gitlab', null, GITLAB));
+    expect(line?.props.children).toBe('group/sub/repo!1287');
+  });
+
+  it('names the Bitbucket pull request in the organization-only explanation', () => {
+    const renderer = mount('bitbucket', null, BITBUCKET);
+    expect(itemLine(renderer)?.props.children).toBe('acme-design/atlas-redesign#42');
+    expect(renderer.root.findAllByType('Button')).toHaveLength(0);
+  });
+
+  it('keeps the generic gate when the mount knows no item', () => {
+    const renderer = mount('github');
+    expect(itemLine(renderer)).toBeUndefined();
+    expect(renderer.root.findAllByType('EmptyState')).toHaveLength(1);
   });
 });

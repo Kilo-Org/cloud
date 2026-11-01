@@ -10,6 +10,7 @@ import { toast } from 'sonner-native';
 
 import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
 import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
+import { PrReviewGateItemLine } from '@/components/pr-review/pr-review-gate-item-line';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -20,7 +21,11 @@ import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
 import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
-import { type ProviderPrPlatform, useProviderPrScopeOrNull } from '@/lib/pr-review/provider-pr-ref';
+import {
+  type ProviderPrPlatform,
+  type ProviderPrRef,
+  useProviderPrScopeOrNull,
+} from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -78,10 +83,13 @@ function OrgOnlyDescription({
 export function ProviderConnectGate({
   platform,
   organizationId,
+  prRef,
   children,
 }: Readonly<{
   platform: Exclude<ProviderPrPlatform, 'github'>;
   organizationId: string | null;
+  /** The PR/MR the route opened; see `PrReviewGateItemLine`. */
+  prRef?: ProviderPrRef;
   children: ReactNode;
 }>) {
   const trpc = useTRPC();
@@ -192,6 +200,7 @@ export function ProviderConnectGate({
           title={t('agentChat.newSession.bitbucketOrganizationsOnly')}
           description={
             <>
+              <PrReviewGateItemLine prRef={prRef} />
               <PrReviewContextLine />
               <OrgOnlyDescription
                 membershipsError={memberships.isError}
@@ -263,6 +272,7 @@ export function ProviderConnectGate({
           title={title}
           description={
             <>
+              <PrReviewGateItemLine prRef={prRef} />
               <PrReviewContextLine instanceHint={instanceHint} />
               <Text variant="muted" className="text-center">
                 {description}

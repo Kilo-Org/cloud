@@ -34,6 +34,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 const mockedAfter = jest.mocked(after);
 const mockedRecordCharge = jest.mocked(recordEnkryptGuardrailCharge);
 const mockedScanRequest = jest.mocked(scanRequest);
+const signal = new AbortController().signal;
 
 const scan: EnkryptGuardrailScan = {
   sessionId: 'ses_guardrail',
@@ -72,15 +73,33 @@ afterEach(() => {
 });
 
 describe('startEnkryptInputGuardrail', () => {
+  it.each(['preparation', 'detection'])(
+    'fails closed when scan %s throws unexpectedly',
+    async stage => {
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      const error = new RangeError('Maximum call stack size exceeded');
+      mockedScanRequest.mockRejectedValue(error);
+
+      const guardrail = startEnkryptInputGuardrail(
+        stage === 'preparation' ? Promise.reject(error) : Promise.resolve(scan),
+        signal
+      );
+
+      expect(await guardrail.awaitVerdict()).toEqual({ action: 'unavailable' });
+      await runAfterTasks();
+      expect(mockedRecordCharge).not.toHaveBeenCalled();
+    }
+  );
+
   it('starts the request scan with a 30-second timeout', async () => {
     mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, charges: [] });
 
-    const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan));
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan), signal);
     await guardrail.awaitVerdict();
 
     expect(mockedScanRequest).toHaveBeenCalledWith(
       scan,
-      expect.objectContaining({ timeoutMs: 30_000 })
+      expect.objectContaining({ timeoutMs: 30_000, signal })
     );
   });
 
@@ -92,7 +111,7 @@ describe('startEnkryptInputGuardrail', () => {
     mockedScanRequest.mockResolvedValue(result);
     jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_237.4);
 
-    const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan));
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan), signal);
     expect(await guardrail.awaitVerdict()).toEqual({ action: 'allow' });
     await runAfterTasks();
 
@@ -105,14 +124,14 @@ describe('startEnkryptInputGuardrail', () => {
   it('records no added latency when the request never awaited the verdict', async () => {
     mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, charges: [call()] });
 
-    startEnkryptInputGuardrail(Promise.resolve(scan));
+    startEnkryptInputGuardrail(Promise.resolve(scan), signal);
     await runAfterTasks();
 
     expect(mockedRecordCharge.mock.calls).toEqual([[{ ...call(), addedLatencyMs: null }]]);
   });
 
   it('skips the scan and records nothing without a guardrail', async () => {
-    const guardrail = startEnkryptInputGuardrail(Promise.resolve(null));
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(null), signal);
 
     expect(await guardrail.awaitVerdict()).toEqual({ action: 'skip' });
     await runAfterTasks();

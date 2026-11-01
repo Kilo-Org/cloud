@@ -14,31 +14,31 @@ function partTexts(part: unknown): string[] {
   if (part.type === 'thinking') return contentTexts(part.thinking);
   if (part.type === 'reasoning.summary') return contentTexts(part.summary);
   if (part.type === 'refusal') return contentTexts(part.refusal);
-  const texts = contentTexts(part.text).concat(contentTexts(part.content));
+  let texts = contentTexts(part.text).concat(contentTexts(part.content));
   if (part.type === 'document') {
-    texts.unshift(...contentTexts([part.title, part.context]));
+    texts = contentTexts([part.title, part.context]).concat(texts);
   }
   if (part.type === 'search_result' || part.type === 'web_search_result') {
-    texts.unshift(...contentTexts(part.title));
+    texts = contentTexts(part.title).concat(texts);
   }
   if (
     part.type === 'bash_code_execution_result' ||
     part.type === 'code_execution_result' ||
     part.type === 'encrypted_code_execution_result'
   ) {
-    texts.push(...contentTexts([part.stdout, part.stderr]));
+    texts = texts.concat(contentTexts([part.stdout, part.stderr]));
   }
   if (part.type === 'text_editor_code_execution_str_replace_result') {
-    texts.push(...contentTexts(part.lines));
+    texts = texts.concat(contentTexts(part.lines));
   }
   if (typeof part.type === 'string' && part.type.endsWith('_tool_result_error')) {
-    texts.push(...contentTexts(part.error_message));
+    texts = texts.concat(contentTexts(part.error_message));
   }
   if (part.type === 'document' && isRecord(part.source)) {
     if (part.source.type === 'text' && typeof part.source.data === 'string') {
       texts.push(part.source.data);
     }
-    if (part.source.type === 'content') texts.push(...contentTexts(part.source.content));
+    if (part.source.type === 'content') texts = texts.concat(contentTexts(part.source.content));
   }
   return texts;
 }
@@ -161,41 +161,36 @@ function responsesTexts(item: unknown): RequestText[] {
   if (type === 'additional_tools') {
     return inputTexts(Array.isArray(item.tools) ? item.tools.flatMap(toolDefinitionTexts) : []);
   }
-  const texts = inputTexts(item.content);
-  if (type === 'reasoning') texts.push(...inputTexts(item.summary));
+  let texts = inputTexts(item.content);
+  if (type === 'reasoning') texts = texts.concat(inputTexts(item.summary));
   if (type === 'function_call' || type === 'custom_tool_call' || type === 'mcp_approval_request') {
-    texts.push(...inputTexts(callTexts(item)));
+    texts = texts.concat(inputTexts(callTexts(item)));
   }
   if (type === 'mcp_call') {
-    texts.push(...inputTexts(callTexts(item)), ...toolTexts([item.output, item.error]));
+    texts = texts.concat(inputTexts(callTexts(item)), toolTexts([item.output, item.error]));
   }
   if (type === 'file_search_call') {
-    texts.push(...inputTexts(item.queries), ...toolTexts(item.results));
+    texts = texts.concat(inputTexts(item.queries), toolTexts(item.results));
   }
   if (type === 'code_interpreter_call') {
-    texts.push(...inputTexts(item.code));
+    texts = texts.concat(inputTexts(item.code));
     if (Array.isArray(item.outputs)) {
-      texts.push(
-        ...item.outputs.flatMap(output =>
+      texts = texts.concat(
+        item.outputs.flatMap(output =>
           isRecord(output) && output.type === 'logs' ? toolTexts(output.logs) : []
         )
       );
     }
   }
-  if (type === 'program') texts.push(...inputTexts(item.code));
-  if (type === 'mcp_approval_response') texts.push(...inputTexts(item.reason));
+  if (type === 'program') texts = texts.concat(inputTexts(item.code));
+  if (type === 'mcp_approval_response') texts = texts.concat(inputTexts(item.reason));
   if (isRecord(item.action)) {
-    texts.push(
-      ...inputTexts([
-        item.action.command,
-        item.action.commands,
-        item.action.text,
-        item.action.query,
-      ])
+    texts = texts.concat(
+      inputTexts([item.action.command, item.action.commands, item.action.text, item.action.query])
     );
   }
   if (type === 'apply_patch_call' && isRecord(item.operation)) {
-    texts.push(...inputTexts([item.operation.path, item.operation.diff]));
+    texts = texts.concat(inputTexts([item.operation.path, item.operation.diff]));
   }
   return texts;
 }

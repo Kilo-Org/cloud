@@ -65,6 +65,7 @@ function deps(
     apiKey: 'test-enkrypt-key',
     fetch: jest.fn(fetchImpl) as unknown as typeof fetch,
     timeoutMs: 1_000,
+    signal: new AbortController().signal,
     ...overrides,
   };
 }
@@ -340,7 +341,10 @@ describe('scanRequest', () => {
         charges: [],
       });
       expect(result.verdict).toMatchObject({
-        message: expect.stringContaining('Reduce the size of the conversation or tool output'),
+        message: expect.stringContaining('Compact or prune earlier conversation history'),
+      });
+      expect(result.verdict).toMatchObject({
+        message: expect.stringContaining('Retrying the unchanged request will not help.'),
       });
       expect(dependencies.fetch).not.toHaveBeenCalled();
     });
@@ -384,6 +388,89 @@ describe('scanRequest', () => {
     } finally {
       timeout.mockRestore();
     }
+  });
+
+  describe('client cancellation', () => {
+    it('makes no call and records no charge if the client already disconnected', async () => {
+      const controller = new AbortController();
+      controller.abort();
+      const dependencies = deps(async () => detectResponse({ summary: {} }), {
+        signal: controller.signal,
+      });
+
+      const result = await scanRequest(makeScan(), dependencies);
+
+      expect(result).toEqual({ verdict: { action: 'unavailable' }, charges: [] });
+      expect(dependencies.fetch).not.toHaveBeenCalled();
+      expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+        '[enkrypt-guardrail] decision',
+        expect.objectContaining({ error: 'client_aborted', attempts: 0 })
+      );
+    });
+
+    it.each([undefined, new Error('client disconnected')])(
+      'aborts an in-flight fetch without retrying for abort reason %s',
+      async reason => {
+        const controller = new AbortController();
+        const dependencies = deps(
+          (_input, init) =>
+            new Promise<Response>((_resolve, reject) => {
+              init.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
+                once: true,
+              });
+              controller.abort(reason);
+            }),
+          { signal: controller.signal, timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS }
+        );
+
+        const result = await scanRequest(makeScan(), dependencies);
+
+        expect(result.verdict).toEqual({ action: 'unavailable' });
+        expect(dependencies.fetch).toHaveBeenCalledTimes(1);
+        expect(fetchCalls(dependencies)[0][1].signal?.aborted).toBe(true);
+        expect(fetchCalls(dependencies)[0][1].signal?.reason).toBe(controller.signal.reason);
+        expect(result.charges).toEqual([
+          expect.objectContaining({ decision: 'error', creditsCost: null }),
+        ]);
+        expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+          '[enkrypt-guardrail] decision',
+          expect.objectContaining({ error: 'client_aborted', attempts: 1 })
+        );
+      }
+    );
+
+    it('cancels response consumption but preserves already reported credits', async () => {
+      const controller = new AbortController();
+      const dependencies = deps(
+        async (_input, init) =>
+          new Response(
+            new ReadableStream({
+              start(stream) {
+                init.signal?.addEventListener('abort', () => stream.error(init.signal?.reason), {
+                  once: true,
+                });
+              },
+              pull() {
+                controller.abort();
+              },
+            }),
+            { headers: { 'content-type': 'application/json', 'x-enkrypt-credits-cost': '3' } }
+          ),
+        { signal: controller.signal, timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS }
+      );
+
+      const result = await scanRequest(makeScan(), dependencies);
+
+      expect(result.verdict).toEqual({ action: 'unavailable' });
+      expect(dependencies.fetch).toHaveBeenCalledTimes(1);
+      expect(result.charges).toEqual([
+        expect.objectContaining({ decision: 'error', creditsCost: 3 }),
+      ]);
+      expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+        '[enkrypt-guardrail] decision',
+        expect.objectContaining({ error: 'client_aborted', attempts: 1, credits_cost: 3 })
+      );
+    });
   });
 
   it('does not retry a rate-limited call', async () => {

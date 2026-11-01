@@ -33,7 +33,8 @@ export type EnkryptInputGuardrail = {
  * still pays for a scan Enkrypt performed.
  */
 export function startEnkryptInputGuardrail(
-  scan: Promise<EnkryptGuardrailScan | null>
+  scan: Promise<EnkryptGuardrailScan | null>,
+  signal: AbortSignal
 ): EnkryptInputGuardrail {
   const result = scan
     .then(resolved =>
@@ -42,14 +43,15 @@ export function startEnkryptInputGuardrail(
             apiKey: ENKRYPT_API_KEY,
             fetch,
             timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,
+            signal,
           })
         : notScanned
     )
-    .catch((error: unknown) => {
-      console.error('[enkrypt-guardrail] scan failed unexpectedly; request not scanned', {
+    .catch((error: unknown): EnkryptGuardrailScanResult => {
+      console.error('[enkrypt-guardrail] scan failed unexpectedly; request rejected', {
         error: error instanceof Error ? error.message : String(error),
       });
-      return notScanned;
+      return { verdict: { action: 'unavailable' }, charges: [] };
     });
   let addedLatencyMs: number | null = null;
   after(async () => {

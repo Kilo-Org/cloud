@@ -432,7 +432,8 @@ export async function handleLlmProxyRequest(
         }),
         config,
       };
-    })
+    }),
+    request.signal
   );
 
   const logClientDisconnect = () => {

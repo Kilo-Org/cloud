@@ -545,6 +545,130 @@ describe('structured tool results', () => {
   });
 });
 
+describe('large request arrays', () => {
+  const entries = Array.from({ length: 150_000 }, (_, index) => `entry ${index}`);
+  const expected = entries.join('\n\n');
+
+  it.each(['chat_completions', 'messages', 'responses'] as const)(
+    'does not truncate large content arrays on %s',
+    kind => {
+      const message = {
+        role: 'user',
+        content: entries.map(text => ({
+          type: kind === 'responses' ? 'input_text' : 'text',
+          text,
+        })),
+      };
+      const gatewayRequest = request(
+        kind,
+        kind === 'responses' ? { input: [message] } : { messages: [message] }
+      );
+
+      expect(extractRequestText(gatewayRequest)).toBe(expected);
+      expect(extractWithoutToolResults(gatewayRequest)).toBe(expected);
+    }
+  );
+
+  it.each([
+    {
+      name: 'document metadata',
+      block: { type: 'document', title: entries, context: 'context', text: 'text' },
+      prefix: '',
+      suffix: '\n\ncontext\n\ntext',
+      toolResult: false,
+    },
+    {
+      name: 'document source content',
+      block: {
+        type: 'document',
+        title: 'title',
+        source: { type: 'content', content: entries.map(text => ({ type: 'text', text })) },
+      },
+      prefix: 'title\n\n',
+      suffix: '',
+      toolResult: false,
+    },
+    {
+      name: 'search result titles',
+      block: { type: 'search_result', title: entries, content: 'result' },
+      prefix: '',
+      suffix: '\n\nresult',
+      toolResult: true,
+    },
+    {
+      name: 'text-editor lines',
+      block: {
+        type: 'text_editor_code_execution_tool_result',
+        content: { type: 'text_editor_code_execution_str_replace_result', lines: entries },
+      },
+      prefix: '',
+      suffix: '',
+      toolResult: true,
+    },
+  ])('does not truncate large Anthropic $name arrays', ({ block, prefix, suffix, toolResult }) => {
+    const gatewayRequest = request('messages', {
+      messages: [{ role: 'user', content: ['before', block, 'after'] }],
+    });
+    const included = `before\n\n${prefix}${expected}${suffix}\n\nafter`;
+
+    expect(extractRequestText(gatewayRequest)).toBe(included);
+    expect(extractWithoutToolResults(gatewayRequest)).toBe(
+      toolResult ? 'before\n\nafter' : included
+    );
+  });
+
+  it.each([
+    {
+      name: 'reasoning summaries',
+      item: { type: 'reasoning', summary: entries.map(text => ({ type: 'summary_text', text })) },
+      prefix: '',
+      excluded: expected,
+    },
+    {
+      name: 'file-search queries',
+      item: { type: 'file_search_call', queries: entries, results: [{ text: 'result' }] },
+      prefix: '',
+      suffix: '\n\nresult',
+      excluded: expected,
+    },
+    {
+      name: 'file-search results',
+      item: {
+        type: 'file_search_call',
+        queries: ['query'],
+        results: entries.map(text => ({ text })),
+      },
+      prefix: 'query\n\n',
+      excluded: 'query',
+    },
+    {
+      name: 'interpreter outputs',
+      item: {
+        type: 'code_interpreter_call',
+        code: 'code',
+        outputs: entries.map(logs => ({ type: 'logs', logs })),
+      },
+      prefix: 'code\n\n',
+      excluded: 'code',
+    },
+    {
+      name: 'shell commands',
+      item: { type: 'shell_call', action: { commands: entries } },
+      prefix: '',
+      excluded: expected,
+    },
+  ])('does not truncate large Responses $name arrays', ({ item, prefix, suffix, excluded }) => {
+    const gatewayRequest = request('responses', {
+      input: [{ role: 'user', content: 'before' }, item, { role: 'user', content: 'after' }],
+    });
+
+    expect(extractRequestText(gatewayRequest)).toBe(
+      `before\n\n${prefix}${expected}${suffix ?? ''}\n\nafter`
+    );
+    expect(extractWithoutToolResults(gatewayRequest)).toBe(`before\n\n${excluded}\n\nafter`);
+  });
+});
+
 describe('tool definitions and output formats', () => {
   const schema = { type: 'object', properties: { text: { description: 'edited schema text' } } };
 

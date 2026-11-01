@@ -39,7 +39,7 @@ const MAX_BLOCK_MESSAGE_LENGTH = 500;
  */
 export const MAX_ENKRYPT_CREDITS_PER_CALL = 1_000;
 
-const REQUEST_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of conversation text at once, so this request was not sent. Reduce the size of the conversation or tool output and retry.`;
+const REQUEST_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of conversation text at once, so this request was not sent. Compact or prune earlier conversation history, reduce tool output or tool definitions, or start a new session, then retry. Retrying the unchanged request will not help.`;
 
 const detectResponseSchema = z.object({
   summary: z.record(z.string(), z.unknown()),
@@ -72,6 +72,7 @@ export type EnkryptDetectDependencies = {
   apiKey: string | undefined;
   fetch: typeof fetch;
   timeoutMs: number;
+  signal: AbortSignal;
 };
 
 type DetectAttempt =
@@ -150,6 +151,9 @@ async function detectOnce(
       signal,
     });
   } catch (error) {
+    if (deps.signal.aborted) {
+      return { kind: 'failed', error: 'client_aborted', retryable: false, creditsCost: null };
+    }
     return isAbortError(error)
       ? { kind: 'failed', error: 'timeout', retryable: false, creditsCost: null }
       : { kind: 'failed', error: 'network', retryable: true, creditsCost: null };
@@ -171,7 +175,11 @@ async function detectOnce(
   } catch (error) {
     return {
       kind: 'failed',
-      error: isAbortError(error) ? 'timeout' : 'invalid_response',
+      error: deps.signal.aborted
+        ? 'client_aborted'
+        : isAbortError(error)
+          ? 'timeout'
+          : 'invalid_response',
       retryable: false,
       creditsCost,
     };
@@ -261,6 +269,10 @@ export async function scanRequest(
     detectors_blocking: config.blockingDetectors,
   };
 
+  if (deps.signal.aborted) {
+    return failedVerdict([], logFields, { error: 'client_aborted', latencyMs: 0 });
+  }
+
   if (text.length > ENKRYPT_MAX_SCAN_CHARACTERS) {
     return failedVerdict([], logFields, {
       error: 'request_too_large',
@@ -279,7 +291,7 @@ export async function scanRequest(
     detectors: config.detectors,
     user_metadata: { organization_id: scan.organizationId },
   });
-  const signal = AbortSignal.timeout(deps.timeoutMs);
+  const signal = AbortSignal.any([deps.signal, AbortSignal.timeout(deps.timeoutMs)]);
   const startedAt = performance.now();
   const attempts: DetectAttempt[] = [];
   let attempt: DetectAttempt;

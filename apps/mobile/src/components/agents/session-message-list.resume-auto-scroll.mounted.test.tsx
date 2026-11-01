@@ -72,6 +72,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/components/agents/session-pagination-header', () => ({
   SessionPaginationHeader: () => null,
 }));
+vi.mock('@/components/agents/session-detail-skeleton', () => ({
+  SessionSkeletonMessages: 'SessionSkeletonMessages',
+}));
 
 function resumeItem(id: string): SessionTranscriptItem {
   return {

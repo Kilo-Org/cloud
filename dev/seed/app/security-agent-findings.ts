@@ -128,12 +128,43 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       sla_due_at: iso(2 * DAY_MS),
       first_detected_at: iso(-5 * DAY_MS),
       updated_at: iso(-60 * 60 * 1000),
+      // The analysis tab draws the model, the analysed date and the located
+      // paths from these fields, so the fixture carries what a completed run
+      // stores rather than an empty tab.
+      analysis_status: 'completed',
+      analysis_started_at: iso(-4 * DAY_MS),
+      analysis_completed_at: iso(-4 * DAY_MS + 5 * 60 * 1000),
+      analysis: {
+        triage: {
+          needsSandboxAnalysis: true,
+          needsSandboxReasoning: 'The package is imported by the server bundle.',
+          suggestedAction: 'analyze_codebase',
+          confidence: 'medium',
+          triageAt: iso(-4 * DAY_MS + 60 * 1000),
+        },
+        sandboxAnalysis: {
+          isExploitable: true,
+          extractionStatus: 'succeeded',
+          exploitabilityReasoning: 'The options object reaches the merge from the request body.',
+          usageLocations: ['src/lib/render-template.js:24', 'package.json:17'],
+          suggestedFix: 'Upgrade left-pad to 1.3.0.',
+          suggestedAction: 'open_pr',
+          summary: 'Reachable from the report renderer with a caller-supplied options object.',
+          rawMarkdown: '## Summary\n\nThe merge is reachable from the request body.',
+          analysisAt: iso(-4 * DAY_MS + 5 * 60 * 1000),
+          modelUsed: 'kilo-auto/frontier',
+        },
+        analyzedAt: iso(-4 * DAY_MS + 5 * 60 * 1000),
+        modelUsed: 'kilo-auto/frontier',
+        analysisModel: 'kilo-auto/frontier',
+      },
     },
   ]);
 
   console.log('This fixture represents:');
   console.log('  A personal Security Agent with one dismissed finding (dismissal date with no');
-  console.log('  deadline left) and one open finding that still has an SLA deadline.');
+  console.log('  deadline left) and one open finding that still has an SLA deadline and a');
+  console.log('  completed analysis.');
   console.log('Suggested next step:');
   console.log('  Open the dismiss links below to see the header action each finding offers.');
 

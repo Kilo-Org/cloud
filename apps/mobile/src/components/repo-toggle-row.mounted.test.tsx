@@ -16,6 +16,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#777777' }),
 }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
+vi.mock('@/lib/utils', () => ({
+  cn: (...parts: unknown[]) => parts.filter(Boolean).join(' '),
+}));
 // The catalog copy itself is checked by tools/i18n; here the mock only has to
 // show which key the row names itself with and that it interpolates the name.
 vi.mock('react-i18next', () => ({
@@ -101,5 +104,22 @@ describe('<RepoToggleRow>', () => {
     );
     expect(root.findAllByType(LOCK)).toHaveLength(0);
     expect(root.findByType(CHOICE_ROW).props.accessibleName).toBeUndefined();
+  });
+
+  it('dims the name itself when the row cannot be picked', () => {
+    // This row supplies its own content, so ChoiceRow never touches its copy:
+    // the label carries the unavailable cue with the muted token.
+    const row = (disabled: boolean) =>
+      renderRow(
+        <RepoToggleRow
+          repo={{ id: 1, fullName: 'owner/repo' }}
+          selected={false}
+          disabled={disabled}
+          onPress={noop}
+        />
+      ).findByType(TEXT);
+
+    expect(String(row(true).props.className)).toContain('text-muted-foreground');
+    expect(String(row(false).props.className)).toBe('text-sm');
   });
 });

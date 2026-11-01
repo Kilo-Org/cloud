@@ -444,8 +444,8 @@ describe('FindingDetailsPanel facts card divider', () => {
     renderPanel(findingFixture(overrides));
 
     const rows = mocks.kvRows.filter(row => FACT_LABELS[row.label as string]);
-    expect(rows[rows.length - 1]?.label).toBe(lastLabel);
+    expect(rows.at(-1)?.label).toBe(lastLabel);
     expect(rows.filter(row => row.last === true)).toHaveLength(1);
-    expect(rows[rows.length - 1]?.last).toBe(true);
+    expect(rows.at(-1)?.last).toBe(true);
   });
 });

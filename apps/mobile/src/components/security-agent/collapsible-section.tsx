@@ -11,6 +11,7 @@ import Animated, {
 
 import { Text } from '@/components/ui/text';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -154,13 +155,20 @@ export function CollapsibleSection({
       className={cn('gap-2 rounded-lg bg-secondary p-3', className)}
       animateLayout={animateLayout}
     >
-      {/* The header's only visible content is a text line, so the pressable's
-          own box is what assistive technology and the design gate measure: it
-          must reach the 28 dp floor itself, not lean on hitSlop. Explicit
-          pixels, because native rem is 14 points. */}
+      {/* The header's frame is the header plus the card's own padding: the
+          pressable spans the card edge to edge and carries the `p-3` inset
+          itself, so the whole row a reader sees is the row a tap hits. Its box
+          reaches ROW_TARGET_CLASS — the shared 48 dp row frame, which also
+          clears DESIGN.md's 44 pt — instead of leaning on a hitSlop the control
+          audit cannot read. The negative margins hand that same inset back to
+          the card's layout, so the card keeps its height, this section's body
+          keeps its inset, and the title keeps its place; a title that wraps
+          grows the frame with its own text rather than squeezing the inset. */}
       <Pressable
-        className="min-h-[28px] flex-row items-center justify-between gap-2"
-        hitSlop={12}
+        className={cn(
+          ROW_TARGET_CLASS,
+          '-mx-3 -my-3 flex-row items-center justify-between gap-2 px-3 pt-3 pb-3'
+        )}
         onPress={() => {
           onToggle?.();
           if (expanded === undefined) {

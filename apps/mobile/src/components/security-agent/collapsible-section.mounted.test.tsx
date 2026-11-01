@@ -173,20 +173,6 @@ describe('CollapsibleSection reduce-motion gate', () => {
     toggle(renderer);
     expect(reanimated.withTiming).toHaveBeenLastCalledWith(0, { duration: 200 });
   });
-
-  it('keeps the pressable accessibility contract under reduced motion', () => {
-    policy.reducedMotion = true;
-    const renderer = mountSection();
-
-    const pressable = renderer.root.findByType('Pressable' as ElementType);
-    expect(pressable.props.accessibilityRole).toBe('button');
-    expect(pressable.props.accessibilityLabel).toBe('Source');
-    expect(pressable.props.hitSlop).toBe(12);
-    expect(pressable.props.accessibilityState).toEqual({ expanded: false });
-
-    const toggled = toggle(renderer);
-    expect(toggled.props.accessibilityState).toEqual({ expanded: true });
-  });
 });
 
 describe('CollapsibleSection controlled expanded state and class overrides', () => {

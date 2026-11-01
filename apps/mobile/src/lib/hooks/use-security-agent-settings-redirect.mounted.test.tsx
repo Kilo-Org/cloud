@@ -3,8 +3,8 @@
 // when the link's own navigation lands after the first replace and focuses the
 // screen over the overview: a config-keyed effect would never run again for an
 // unchanged config and would leave the reader on a screen that renders nothing.
-import { act, createElement, useEffect } from 'react';
-import { type ReactTestRenderer, TestRenderer } from '@/test/renderer';
+import { createElement, useEffect } from 'react';
+import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useSecurityAgentSettingsRedirect } from './use-settings-back-guard';

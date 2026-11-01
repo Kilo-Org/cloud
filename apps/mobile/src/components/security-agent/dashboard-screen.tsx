@@ -10,7 +10,7 @@ import {
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useFocusEffect } from 'expo-router';
 import { RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
@@ -41,7 +41,12 @@ import {
   useSecurityAgentRepositories,
   useTriggerSecuritySync,
 } from '@/lib/hooks/use-security-agent';
-import { isSecuritySyncRetryable, securitySyncReconcileCopy } from '@/lib/security-agent-ledger';
+import {
+  isSecuritySyncRetryable,
+  securitySyncPreconditionFor,
+  securitySyncReconcileCopy,
+} from '@/lib/security-agent-ledger';
+import { useManageRepositoryAccess } from '@/lib/hooks/use-manage-repository-access';
 import { useSecurityScopeTitle } from '@/lib/hooks/use-security-scope-title';
 import {
   securityDismissFailureCopy,
@@ -181,15 +186,16 @@ export function buildLocalizedMetrics(
   // Before the first sync nothing has been measured, so every tile read a zero
   // count and, under it, a line that described the zeros as a clean report
   // ("All open findings tracked", "No findings have an SLA deadline yet").
-  // A dash in the numeric slot and the screen's own not-yet-synced line state
-  // the measurement is simply absent.
+  // The filter row above already states that nothing has synced, so a dash in
+  // the numeric slot carries the measurement's absence and the tile keeps no
+  // detail line to repeat the status.
   if (!neverSynced) {
     return localized;
   }
   return localized.map(metric =>
     Object.assign(metric, {
       value: UNMEASURED_VALUE,
-      detail: i18n.t('securityAgent.dashboard.notYetSynced'),
+      detail: '',
       tone: 'neutral' as const,
     })
   );
@@ -226,14 +232,65 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // another scope must not show a card or POST this scope.
   const reconcileRows = needsReconcile.filter(row => row.scope === scope);
 
+  // React Query clears a mutation's error when the next attempt starts, so the
+  // failure copy and the retry under it blink out for the length of the retry —
+  // the screen looked like the tap did nothing. Hold the failure being retried,
+  // together with the intent that produced it, until that attempt reports its
+  // own outcome: a retry must resubmit the failed intent, not whatever filter
+  // the reader switched to meanwhile.
+  const [lastSyncAttempt, setLastSyncAttempt] = useState<{
+    error: Error | null;
+    intent: SyncIntent;
+  } | null>(null);
+
+  // A precondition rejection describes server state this screen cannot change:
+  // no repository in the sync scope, or a GitHub connection that is inactive or
+  // missing the vulnerability-alerts permission. The fix is applied in the
+  // repositories settings or on the GitHub App page, so the first return to
+  // this screen is when the controls must work again. Both readings go through
+  // refs so the focus callback and the handoff's return callback keep a stable
+  // identity — a callback that changed whenever a failure arrived would re-run
+  // the focus effect and clear the failure it had just shown.
+  const triggerSyncRef = useRef(triggerSync);
+  triggerSyncRef.current = triggerSync;
+  const lastSyncAttemptRef = useRef(lastSyncAttempt);
+  lastSyncAttemptRef.current = lastSyncAttempt;
+
+  const clearSyncPreconditionFailure = useCallback(() => {
+    const failure = triggerSyncRef.current.error ?? lastSyncAttemptRef.current?.error;
+    if (securitySyncPreconditionFor(failure) === null) {
+      return;
+    }
+    triggerSyncRef.current.reset();
+    setLastSyncAttempt(null);
+  }, []);
+
+  // The GitHub preconditions' fix lives on the GitHub App page; this is the
+  // app-wide handoff that mints the install state and waits for the return. A
+  // handoff that never opened a page clears nothing: the copy still explains
+  // what blocks the sync, and the handoff already reported its own failure.
+  const handleHandoffReturn = useCallback(
+    (opened: boolean) => {
+      if (opened) {
+        clearSyncPreconditionFailure();
+      }
+    },
+    [clearSyncPreconditionFailure]
+  );
+  const manageAccess = useManageRepositoryAccess(scope, 'github', {
+    onReturn: handleHandoffReturn,
+  });
+
   // The dashboard stays mounted while the dismiss sheet is open, so re-read
   // the failed dismiss drafts on focus: a fresh failure must show a card and
-  // an accepted dismissal must drop it.
+  // an accepted dismissal must drop it. The same focus is the return from the
+  // settings screen a precondition copy sends the reader to.
   useFocusEffect(
     useCallback(() => {
       refreshDismissFailures();
       refreshOutbox();
-    }, [refreshDismissFailures, refreshOutbox])
+      clearSyncPreconditionFailure();
+    }, [refreshDismissFailures, refreshOutbox, clearSyncPreconditionFailure])
   );
 
   // A failed repositories fetch disables the filter controls until a refetch
@@ -292,20 +349,45 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
   // A non-retryable sync outcome ended the intent, so both sync controls
   // disable and the inline copy below explains the state.
-  const syncBlocked = triggerSync.isError && !isSecuritySyncRetryable(triggerSync.error);
-  const syncDisabled = triggerSync.isPending || syncBlocked;
-  // React Query clears a mutation's error when the next attempt starts, so the
-  // failure copy and the retry under it blink out for the length of the retry —
-  // the screen looked like the tap did nothing. Hold the failure being retried,
-  // together with the intent that produced it, until that attempt reports its
-  // own outcome: a retry must resubmit the failed intent, not whatever filter
-  // the reader switched to meanwhile.
-  const [lastSyncAttempt, setLastSyncAttempt] = useState<{
-    error: Error | null;
-    intent: SyncIntent;
-  } | null>(null);
   const syncFailure = triggerSync.error ?? lastSyncAttempt?.error ?? null;
+  const syncPrecondition = securitySyncPreconditionFor(syncFailure);
+  const syncBlocked = syncFailure !== null && !isSecuritySyncRetryable(syncFailure);
+  const syncDisabled = triggerSync.isPending || syncBlocked;
   const syncRetryable = syncFailure !== null && isSecuritySyncRetryable(syncFailure);
+  // A precondition's fix is applied outside this screen, so the row offers that
+  // action instead of a Retry that would fail the same way: the in-app
+  // repository picker when nothing is in the sync scope, the GitHub App page
+  // when the connection itself is what blocks the sync.
+  let syncAction: { label: string; pending: boolean; handlePress: () => void } | null = null;
+  if (syncPrecondition === 'noRepositories') {
+    syncAction = {
+      label: t('securityAgent.dashboard.manageRepositories'),
+      pending: false,
+      handlePress: () => {
+        pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
+      },
+    };
+  } else if (syncPrecondition !== null) {
+    syncAction = {
+      label: t('securityAgent.repositories.manageAccess'),
+      pending: manageAccess?.pending === true,
+      handlePress: () => {
+        manageAccess?.handlePress();
+      },
+    };
+  } else if (syncRetryable) {
+    // The retry sits beside the sentence it retries and reports its own
+    // progress: a failed sync can settle in a blink, so the header icon's flash
+    // alone read as "nothing happened". It replays the intent that failed, not
+    // the filter the reader may have switched to since.
+    syncAction = {
+      label: t('common.retry'),
+      pending: triggerSync.isPending,
+      handlePress: () => {
+        startSync(lastSyncAttempt?.intent ?? { repoFullName });
+      },
+    };
+  }
 
   // One submit path for every control that starts a sync — the header button,
   // the empty-state action, the retry beside the failure copy, and a
@@ -463,23 +545,18 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             >
               {syncFailure.message}
             </Text>
-            {syncRetryable ? (
-              // The retry sits beside the sentence it retries and reports its
-              // own progress: a failed sync can settle in a blink, so the
-              // header icon's flash alone read as "nothing happened".
+            {syncAction ? (
               <Button
                 size="sm"
                 variant="ghost"
-                loading={triggerSync.isPending}
+                loading={syncAction.pending}
                 // A busy non-primary control dims itself, spinner included,
                 // which left the control the reader just pressed fainter than
                 // the header icon spinning beside it.
-                className={cn(triggerSync.isPending && 'opacity-100')}
-                onPress={() => {
-                  startSync(lastSyncAttempt?.intent ?? { repoFullName });
-                }}
+                className={cn(syncAction.pending && 'opacity-100')}
+                onPress={syncAction.handlePress}
               >
-                <Text>{t('common.retry')}</Text>
+                <Text>{syncAction.label}</Text>
               </Button>
             ) : null}
           </View>
@@ -516,8 +593,11 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
         {/* `isPending` rather than `isLoading`: a NetInfo-paused read is pending
             without fetching, and it must show this skeleton instead of an empty
-            metrics row. */}
-        {dashboardStats.isPending ? (
+            metrics row. The sync-status read joins it because `neverSynced`
+            decides whether a tile carries a detail line: a tile that rendered
+            the measured shape first would shrink by a line the moment the read
+            resolved, which moves the whole dashboard. */}
+        {dashboardStats.isPending || lastSync.isPending ? (
           <View className="flex-row flex-wrap gap-3">
             <Skeleton className="h-24 w-[47%] rounded-lg" />
             <Skeleton className="h-24 w-[47%] rounded-lg" />
@@ -539,9 +619,11 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 >
                   {metric.value}
                 </Text>
-                <Text variant="muted" className="text-[11px]">
-                  {metric.detail}
-                </Text>
+                {metric.detail ? (
+                  <Text variant="muted" className="text-[11px]">
+                    {metric.detail}
+                  </Text>
+                ) : null}
               </View>
             ))}
           </View>
@@ -585,7 +667,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           />
         ) : null}
 
-        {data ? (
+        {/* The Act first card's body depends on `neverSynced` too, so it waits
+            for the sync-status read rather than swapping one shape for the
+            other once the read resolves. */}
+        {data && !lastSync.isPending ? (
           <DashboardSections
             scope={scope}
             data={data}

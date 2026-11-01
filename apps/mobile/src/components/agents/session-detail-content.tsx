@@ -570,13 +570,15 @@ export function SessionDetailContent({
     if (sessionProfile) {
       // The session screen is on the root `(app)` Stack: the profile editor has
       // to join it there, or Back would land on the Profile tab root instead of
-      // this session.
+      // this session. The `openedFrom` marker also keeps Back here rather than
+      // rebuilding the profiles list under a screen the reader reached from a
+      // session (`profile-route-stack.ts`).
       router.push(
-        getProfileOverviewPath(
-          sessionProfile.id,
-          profileOrganizationId(organizationId, sessionProfile),
-          'app'
-        )
+        getProfileOverviewPath(sessionProfile.id, {
+          organizationId: profileOrganizationId(organizationId, sessionProfile),
+          stack: 'app',
+          openedFrom: 'session',
+        })
       );
     }
   };

@@ -616,7 +616,6 @@
     "entry": {
       "noRecentPrs": "Sem revisões recentes",
       "noRecentPrsDescription": "Cola uma ligação acima para iniciar uma revisão — aparecerá aqui na próxima vez.",
-      "couldNotLoad": "Não foi possível carregar os dados.",
       "removeFromRecentsTitle": "Remover dos recentes?",
       "removeFromRecentsMessage": "Esta revisão será removida da tua lista de recentes.",
       "removeRecentAccessibility": "Remover {{repo}} dos recentes",
@@ -853,7 +852,8 @@
     "liveUpdates": "Atualizações em tempo real",
     "liveUpdateSubtitle": "Mostrar agentes ativos nas suas notificações",
     "push": "Notificações push",
-    "onDescription": "As notificações push estão ativadas neste dispositivo.",
+    "deviceTitle": "Notificações push neste dispositivo",
+    "onDescription": "Os alertas seguem as categorias abaixo.",
     "offDescription": "A permissão ou o registo do dispositivo está desativado.",
     "retryPermission": "Tentar verificar a permissão de notificações novamente",
     "enable": "Ativar notificações",
@@ -1555,6 +1555,9 @@
       "offAction": "A memória de revisão está desativada. Ativa-a e tenta novamente."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Introduz um URL válido de um merge request.",
+      "mergeRequestUrl": "URL do merge request",
+      "instructionsAtLimit": "As instruções estão limitadas a {{max}} caracteres",
       "title": "Revisão manual",
       "invalidUrl": "Introduz um URL válido de um pedido de integração.",
       "couldNotCheckProviderStatus": "Não foi possível verificar o estado do fornecedor.",
@@ -1702,7 +1705,8 @@
       "sortSeverityDesc": "Gravidade: da maior para a menor",
       "sortSeverityAsc": "Gravidade: da menor para a maior",
       "sortSlaDue": "Prazo do SLA",
-      "overdueOnly": "Apenas em atraso"
+      "overdueOnly": "Apenas em atraso",
+      "noRepositories": "Ainda não há repositórios sincronizados ou selecionados. Escolha-os nas configurações do Agente de segurança."
     },
     "automation": {
       "title": "Automação",
@@ -1812,6 +1816,7 @@
       "lastSynced": "Última sincronização: {{time}}",
       "manageRepositories": "Gerir repositórios",
       "notYetSynced": "Ainda não sincronizado",
+      "priorityFindingsPending": "As ocorrências prioritárias aparecerão depois da primeira sincronização.",
       "refreshFailed": "Não foi possível atualizar os dados. São apresentados os dados da última sincronização.",
       "settings": "Definições",
       "syncNow": "Sincronizar agora",
@@ -1878,7 +1883,8 @@
     "findingDetails": {
       "supersededBy": "Substituída por uma ocorrência atual",
       "supersededByDescription": "Toca para abrir o registo atual e consultar o estado, a análise e a correção.",
-      "dismissedBecause": "Ocorrência descartada: {{reason}}.",
+      "dismissedOn": "Ignorada em",
+      "supersededOn": "Substituída em",
       "severityLabel": "Gravidade {{severity}}",
       "package": "Pacote",
       "vulnerableVersions": "Versões vulneráveis",
@@ -1895,11 +1901,6 @@
       "viewAdvisory": "Ver aviso de segurança no GitHub",
       "statusOpen": "Aberta",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "correção já iniciada",
-      "reasonNoBandwidth": "sem disponibilidade",
-      "reasonTolerableRisk": "risco aceitável",
-      "reasonInaccurate": "ocorrência imprecisa",
-      "reasonNotUsed": "código vulnerável não utilizado",
       "reasonAfterReview": "após a revisão"
     },
     "settingsOverview": {
@@ -1960,7 +1961,7 @@
       "highDescription": "Possível exposição significativa de dados.",
       "mediumDescription": "Impacto limitado ou condições específicas.",
       "lowDescription": "Impacto mínimo na segurança.",
-      "invalidDayCount": "o prazo tem de ser um número inteiro entre 1 e 365 dias.",
+      "invalidDayCount": "O prazo tem de ser um número inteiro entre 1 e 365 dias.",
       "remediationDeadlineA11y": "Prazo de correção para gravidade {{label}}, em dias",
       "enterWholeNumber": "Introduz um número inteiro entre 1 e 365",
       "permissionNote": "Apenas os proprietários da organização, os administradores e os gestores de faturação podem alterar estas definições.",
@@ -2101,7 +2102,10 @@
       "settleFailed": "A ação foi concluída, mas não foi possível registar o resultado. Tenta novamente.",
       "replayFailed": "Esta ação não foi concluída. Tenta novamente.",
       "actionFailed": "Não foi possível concluir esta ação. Tenta novamente.",
-      "actionBlocked": "Não foi possível concluir esta ação. O problema tem de ser resolvido antes de tentares novamente."
+      "actionBlocked": "Não foi possível concluir esta ação. O problema tem de ser resolvido antes de tentares novamente.",
+      "syncNoRepositories": "Nenhum repositório está no escopo de sincronização. Escolha os repositórios que o Agente de segurança monitora e sincronize novamente.",
+      "syncIntegrationInactive": "A conexão com o GitHub do Agente de segurança não está ativa. Reconecte o GitHub App do Kilo e sincronize novamente.",
+      "syncMissingPermission": "A aplicação do Kilo no GitHub não consegue ler os alertas de vulnerabilidade. Concede essa permissão no GitHub e sincroniza novamente."
     },
     "analysisState": {
       "queued": "Análise na fila",
@@ -2135,7 +2139,6 @@
       "closedOn": "{{status}} em {{date}}",
       "deadlineNotSet": "Prazo não definido",
       "noSlaDeadline": "Sem prazo do SLA",
-      "dueOn": "Prazo termina em {{date}}",
       "overdueNow": "Em atraso",
       "overdue_one": "{{count}} dia em atraso",
       "overdue_many": "{{count}} dias em atraso",
@@ -3910,6 +3913,7 @@
       "markSecret": "Marcar como secreto",
       "masked": "Valor oculto",
       "reveal": "Mostrar valor",
+      "hide": "Ocultar valor",
       "newValuePlaceholder": "Introduza um novo valor secreto",
       "valuePlaceholder": "Valor secreto (encriptado)"
     },

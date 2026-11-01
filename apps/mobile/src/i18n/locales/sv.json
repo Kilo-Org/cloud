@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Inga senaste granskningar",
       "noRecentPrsDescription": "Klistra in en länk ovan för att börja granska — den visas här nästa gång.",
-      "couldNotLoad": "Kunde inte läsa in innehållet",
       "removeFromRecentsTitle": "Ta bort från senast öppnade?",
       "removeFromRecentsMessage": "Den här granskningen tas bort från listan över senaste.",
       "removeRecentAccessibility": "Ta bort {{repo}} från senast öppnade",
@@ -834,7 +833,8 @@
     "liveUpdates": "Liveuppdateringar",
     "liveUpdateSubtitle": "Visa aktiva agenter i dina aviseringar",
     "push": "Pushaviseringar",
-    "onDescription": "Pushaviseringar är aktiverade på den här enheten.",
+    "deviceTitle": "Push på den här enheten",
+    "onDescription": "Aviseringar följer kategorierna nedan.",
     "offDescription": "Aviseringar är inte tillåtna eller enheten är inte registrerad.",
     "retryPermission": "Försök kontrollera aviseringsbehörigheten igen",
     "enable": "Aktivera aviseringar",
@@ -1533,6 +1533,9 @@
       "offAction": "Granskningsminnet är avstängt. Aktivera det och försök igen."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Ange en giltig URL till en merge request",
+      "mergeRequestUrl": "URL till merge request",
+      "instructionsAtLimit": "Instruktionerna är begränsade till {{max}} tecken",
       "title": "Manuell granskning",
       "invalidUrl": "Ange en giltig URL till en pull-begäran",
       "couldNotCheckProviderStatus": "Kunde inte kontrollera leverantörens status",
@@ -1680,7 +1683,8 @@
       "sortSeverityDesc": "Allvarlighetsgrad: hög till låg",
       "sortSeverityAsc": "Allvarlighetsgrad: låg till hög",
       "sortSlaDue": "SLA-tidsfrist",
-      "overdueOnly": "Endast försenade"
+      "overdueOnly": "Endast försenade",
+      "noRepositories": "Inga kodarkiv är synkroniserade eller valda ännu. Välj dem i Säkerhetsagentens inställningar."
     },
     "automation": {
       "title": "Automatisering",
@@ -1783,6 +1787,7 @@
       "lastSynced": "Senast synkroniserat {{time}}",
       "manageRepositories": "Hantera kodarkiv",
       "notYetSynced": "Inte synkroniserat ännu",
+      "priorityFindingsPending": "Prioriterade fynd visas här efter den första synkroniseringen.",
       "refreshFailed": "Kunde inte uppdatera. De senast synkroniserade uppgifterna visas.",
       "settings": "Inställningar",
       "syncNow": "Synkronisera nu",
@@ -1841,7 +1846,8 @@
     "findingDetails": {
       "supersededBy": "Ersatt av ett aktuellt fynd",
       "supersededByDescription": "Tryck för att öppna den aktuella posten med status, analys och åtgärd.",
-      "dismissedBecause": "Fyndet har avfärdats. Orsak: {{reason}}.",
+      "dismissedOn": "Avfärdad den",
+      "supersededOn": "Ersatt den",
       "severityLabel": "Allvarlighetsgrad: {{severity}}",
       "package": "Paket",
       "vulnerableVersions": "Sårbara versioner",
@@ -1858,11 +1864,6 @@
       "viewAdvisory": "Visa säkerhetsmeddelandet på GitHub",
       "statusOpen": "Öppet",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "en åtgärd har redan påbörjats",
-      "reasonNoBandwidth": "det finns inga resurser",
-      "reasonTolerableRisk": "risken är acceptabel",
-      "reasonInaccurate": "fyndet är felaktigt",
-      "reasonNotUsed": "sårbar kod används inte",
       "reasonAfterReview": "efter granskning"
     },
     "settingsOverview": {
@@ -2062,7 +2063,10 @@
       "settleFailed": "Åtgärden slutfördes, men vi kunde inte registrera resultatet. Försök igen.",
       "replayFailed": "Den här åtgärden slutfördes inte. Försök igen.",
       "actionFailed": "Det gick inte att slutföra den här åtgärden. Försök igen.",
-      "actionBlocked": "Det gick inte att slutföra den här åtgärden. Problemet måste åtgärdas innan du kan försöka igen."
+      "actionBlocked": "Det gick inte att slutföra den här åtgärden. Problemet måste åtgärdas innan du kan försöka igen.",
+      "syncNoRepositories": "Inga kodarkiv finns i synkroniseringsomfånget. Välj de kodarkiv som Säkerhetsagenten övervakar och synkronisera igen.",
+      "syncIntegrationInactive": "GitHub-anslutningen för Säkerhetsagenten är inte aktiv. Återanslut Kilos GitHub-app och synkronisera igen.",
+      "syncMissingPermission": "Kilos GitHub-app kan inte läsa sårbarhetsaviseringar. Bevilja behörigheten i GitHub och synkronisera igen."
     },
     "analysisState": {
       "queued": "Analys i kö",
@@ -2096,7 +2100,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Ingen tidsfrist angiven",
       "noSlaDeadline": "Ingen SLA-tidsfrist",
-      "dueOn": "Tidsfristen löper ut {{date}}",
       "overdueNow": "Försenat",
       "overdue_one": "{{count}} dag efter tidsfristen",
       "overdue_other": "{{count}} dagar efter tidsfristen",
@@ -3848,6 +3851,7 @@
       "markSecret": "Markera som hemlig",
       "masked": "Dolt värde",
       "reveal": "Avslöja värde",
+      "hide": "Dölj värde",
       "newValuePlaceholder": "Ange ett nytt hemligt värde",
       "valuePlaceholder": "Hemligt värde (krypterat)"
     },

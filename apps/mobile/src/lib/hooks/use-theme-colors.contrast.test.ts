@@ -73,6 +73,26 @@ function compositeHex(tile: string, background: string): string {
   return `#${channels.map(channel => channel.toString(16).padStart(2, '0')).join('')}`;
 }
 
+// An alpha token (`rgba(…)`) flattened onto the surface it paints on, so a
+// stroke such as `--ring-track` can be measured against the page it sits on.
+function compositeToken(token: string, background: string): string {
+  if (token.startsWith('#')) {
+    return token;
+  }
+  const match = /^rgba\((\d+), (\d+), (\d+), ([\d.]+)\)$/.exec(token);
+  if (!match) {
+    throw new Error(`expected #rrggbb or rgba(), got ${token}`);
+  }
+  const alpha = Number(match[4]);
+  const [bgR, bgG, bgB] = expandHex(background);
+  const channels = [
+    Math.round(Number(match[1]) * alpha + bgR * (1 - alpha)),
+    Math.round(Number(match[2]) * alpha + bgG * (1 - alpha)),
+    Math.round(Number(match[3]) * alpha + bgB * (1 - alpha)),
+  ];
+  return `#${channels.map(channel => channel.toString(16).padStart(2, '0')).join('')}`;
+}
+
 describe('muted-foreground token contrast (WCAG AA text)', () => {
   // `secondary` is included because it is the surface of the switch rows in
   // preferences-screen and notifications-screen, where a muted title is the
@@ -195,6 +215,34 @@ describe('disabled primary fill contrast (WCAG AA text)', () => {
     const ratio = contrastRatio(darkColors.primaryForeground, darkColors.primaryDisabled);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
+
+  it('dark theme: the disabled fill stays distinguishable from the enabled brand fill', () => {
+    // The disabled fill is a neutral grey that must read as a superseded
+    // control next to the enabled brand fill, not as a second brand colour
+    // (2.69:1 between the two fills), or a disabled Start would look tappable
+    // and an enabled one would lose its emphasis.
+    const separation = contrastRatio(darkColors.primary, darkColors.primaryDisabled);
+    expect(separation).toBeGreaterThanOrEqual(1.5);
+  });
+});
+
+describe('selected tab pill contrast (WCAG AA text)', () => {
+  // An in-page tab paints `--selection-foreground` on `--selection`. The fill is
+  // the muted olive in both themes: the dark accent (#ffdd00) as a full pill
+  // glares on the dark page, so dark mode must not fall back to it.
+  it('light theme: selectionForeground vs selection >= 4.5:1', () => {
+    const ratio = contrastRatio(lightColors.selectionForeground, lightColors.selection);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  it('dark theme: selectionForeground vs selection >= 4.5:1', () => {
+    const ratio = contrastRatio(darkColors.selectionForeground, darkColors.selection);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  it('dark theme: the selected fill is not the dark accent', () => {
+    expect(darkColors.selection).not.toBe(darkColors.primary);
+  });
 });
 
 describe('warn foreground token contrast (WCAG AA text)', () => {
@@ -234,5 +282,46 @@ describe('row palette contrast (WCAG 1.4.11 non-text)', () => {
         );
       }
     }
+  });
+});
+
+describe('idle composer control and ring track contrast (non-text)', () => {
+  // Two dark-mode surfaces the light theme already carries: the composer's send
+  // circle while there is nothing to send, and the track under the context-usage
+  // ring's arc. Both painted the light theme's neutral and hairline tint, which
+  // sit within 1.2:1 of the near-black page and left the disc and the ring
+  // invisible. The floors below are perception floors, not a WCAG bar: the fill
+  // and the track must read as objects on the page, and the ring track must stay
+  // under the neutral arc so a part-filled arc still reads as a fraction.
+  const MIN_VISIBLE_SURFACE_RATIO = 1.6;
+  const themes = [
+    ['light', lightColors],
+    ['dark', darkColors],
+  ] as const;
+
+  it('dark theme: the idle send fill clears a visible step above the page', () => {
+    expect(contrastRatio(darkColors.controlIdle, darkColors.background)).toBeGreaterThanOrEqual(
+      MIN_VISIBLE_SURFACE_RATIO
+    );
+  });
+
+  it('every theme: the idle send arrow clears 3:1 on its own fill', () => {
+    for (const [themeName, colors] of themes) {
+      expect(
+        contrastRatio(colors.mutedForeground, colors.controlIdle),
+        `muted-foreground vs control-idle (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
+    }
+  });
+
+  it('dark theme: the ring track reads on its pill and stays under the neutral arc', () => {
+    // The header pill's own surface is `secondary`, so the track is measured
+    // over that, not over the page.
+    const track = compositeToken(darkColors.ringTrack, darkColors.secondary);
+    const trackRatio = contrastRatio(track, darkColors.secondary);
+    expect(trackRatio).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    expect(trackRatio).toBeLessThan(
+      contrastRatio(darkColors.mutedForeground, darkColors.secondary)
+    );
   });
 });

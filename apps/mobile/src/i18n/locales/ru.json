@@ -305,7 +305,8 @@
     "liveUpdates": "Обновления в реальном времени",
     "liveUpdateSubtitle": "Показывать активных агентов в уведомлениях",
     "push": "Пуш-уведомления",
-    "onDescription": "Пуш-уведомления на этом устройстве включены.",
+    "deviceTitle": "Пуш-уведомления на этом устройстве",
+    "onDescription": "Оповещения приходят по категориям ниже.",
     "offDescription": "Нет разрешения на уведомления или устройство не зарегистрировано для их получения.",
     "retryPermission": "Повторить проверку разрешения на уведомления",
     "enable": "Включить уведомления",
@@ -930,6 +931,9 @@
     "followReviewMd": "Следовать инструкциям REVIEW.md",
     "followReviewMdSubtitle": "Соблюдать инструкции из файла REVIEW.md в каждом репозитории",
     "manualReview": {
+      "invalidMergeRequestUrl": "Введите корректный URL запроса на слияние.",
+      "mergeRequestUrl": "URL запроса на слияние",
+      "instructionsAtLimit": "Инструкции ограничены {{max}} символами",
       "connectProviderDescription": "Подключите GitHub, чтобы запустить проверку пул-реквеста вручную.",
       "couldNotCheckProviderStatus": "Не удалось проверить статус сервиса.",
       "couldNotLoadProviders": "Не удалось загрузить подключённые сервисы. Попробуйте снова.",
@@ -1157,7 +1161,8 @@
       "sortSeverityDesc": "Критичность: от высокой к низкой",
       "sortSlaDue": "Срок исправления по SLA",
       "statusIgnored": "Игнорируется",
-      "statusOpen": "Открыто"
+      "statusOpen": "Открыто",
+      "noRepositories": "Синхронизированных или выбранных репозиториев пока нет. Выберите их в настройках агента безопасности."
     },
     "analysis": {
       "analyzeRepository": "Проанализировать репозиторий",
@@ -1303,6 +1308,7 @@
       "notExploitable": "Эксплуатация невозможна",
       "notMeasured": "Не измерено",
       "notYetSynced": "Ещё не синхронизировано",
+      "priorityFindingsPending": "Первоочередные уязвимости появятся после первой синхронизации.",
       "refreshFailed": "Не удалось обновить — показаны данные последней синхронизации.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "Открыто: {{displayCount}}",
@@ -1393,7 +1399,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Обнаружено",
-      "dismissedBecause": "Уязвимость отклонена: {{reason}}.",
+      "dismissedOn": "Дата отклонения",
+      "supersededOn": "Дата замены",
       "ghsa": "GHSA",
       "manifest": "Манифест",
       "noPatchAvailable": "Исправления пока нет",
@@ -1410,11 +1417,6 @@
       "vulnerableVersions": "Уязвимые версии",
       "statusOpen": "Открыта",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "исправление уже начато",
-      "reasonNoBandwidth": "нет ресурсов на исправление",
-      "reasonTolerableRisk": "риск приемлем",
-      "reasonInaccurate": "замечание неточно",
-      "reasonNotUsed": "уязвимый код не используется",
       "reasonAfterReview": "после проверки"
     },
     "findingList": {
@@ -1531,7 +1533,7 @@
       "enterWholeNumber": "Введите целое число от 1 до 365",
       "high": "Высокий уровень",
       "highDescription": "Возможна утечка значительного объёма данных.",
-      "invalidDayCount": "укажите целое число дней от 1 до 365.",
+      "invalidDayCount": "Укажите целое число дней от 1 до 365.",
       "low": "Низкий уровень",
       "lowDescription": "Минимальное влияние на безопасность.",
       "medium": "Средний уровень",
@@ -1561,7 +1563,10 @@
       "settleFailed": "Действие выполнено, но нам не удалось записать результат. Попробуйте снова.",
       "replayFailed": "Это действие не было выполнено. Попробуйте снова.",
       "actionFailed": "Не удалось выполнить это действие. Попробуйте снова.",
-      "actionBlocked": "Не удалось выполнить это действие. Сначала нужно устранить проблему."
+      "actionBlocked": "Не удалось выполнить это действие. Сначала нужно устранить проблему.",
+      "syncNoRepositories": "В области синхронизации нет репозиториев. Выберите репозитории, которые отслеживает агент безопасности, и повторите синхронизацию.",
+      "syncIntegrationInactive": "Подключение GitHub для агента безопасности неактивно. Переподключите приложение Kilo для GitHub и повторите синхронизацию.",
+      "syncMissingPermission": "Приложение Kilo для GitHub не может читать оповещения об уязвимостях. Предоставьте это разрешение в GitHub и повторите синхронизацию."
     },
     "analysisState": {
       "queued": "Анализ в очереди",
@@ -1595,7 +1600,6 @@
       "closedOn": "{{status}} · {{date}}",
       "deadlineNotSet": "Срок не установлен",
       "noSlaDeadline": "Нет срока исправления по SLA",
-      "dueOn": "Срок: {{date}}",
       "overdueNow": "Просрочено",
       "overdue_one": "Просрочено на {{count}} день",
       "overdue_few": "Просрочено на {{count}} дня",
@@ -2901,7 +2905,6 @@
     "entry": {
       "noRecentPrs": "Нет недавних ревью",
       "noRecentPrsDescription": "Вставьте ссылку выше, чтобы начать ревью. В следующий раз оно появится здесь.",
-      "couldNotLoad": "Не удалось загрузить данные.",
       "removeFromRecentsTitle": "Удалить из недавних?",
       "removeFromRecentsMessage": "Это ревью будет удалено из списка недавних.",
       "removeRecentAccessibility": "Удалить {{repo}} из недавних",
@@ -3960,6 +3963,7 @@
       "markSecret": "Отметить как секретное",
       "masked": "Скрытое значение",
       "reveal": "Раскрыть ценность",
+      "hide": "Скрыть ценность",
       "newValuePlaceholder": "Введите новое секретное значение",
       "valuePlaceholder": "Секретное значение (зашифровано)"
     },

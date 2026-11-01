@@ -627,7 +627,6 @@
     "entry": {
       "noRecentPrs": "Ni nedavnih pregledov",
       "noRecentPrsDescription": "Za začetek pregleda zgoraj prilepite povezavo — naslednjič se pojavi tukaj.",
-      "couldNotLoad": "Vsebine ni bilo mogoče naložiti.",
       "removeFromRecentsTitle": "Odstranim s seznama nedavnih?",
       "removeFromRecentsMessage": "Ta pregled bo odstranjen iz nedavnih.",
       "removeRecentAccessibility": "Odstrani {{repo}} s seznama nedavnih",
@@ -872,7 +871,8 @@
     "liveUpdates": "Posodobitve v živo",
     "liveUpdateSubtitle": "Prikaži aktivne agente v obvestilih",
     "push": "Potisna obvestila",
-    "onDescription": "Potisna obvestila so vklopljena za to napravo.",
+    "deviceTitle": "Potisna obvestila na tej napravi",
+    "onDescription": "Opozorila sledijo spodnjim kategorijam.",
     "offDescription": "Obvestila niso dovoljena ali pa naprava ni registrirana za njihovo prejemanje.",
     "retryPermission": "Poskusi znova preveriti dovoljenje za obvestila",
     "enable": "Omogoči obvestila",
@@ -1577,6 +1577,9 @@
       "offAction": "Pomnjenje pregledov je izklopljeno. Vklopi ga, nato poskusi znova."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Vnesi veljaven URL merge requesta.",
+      "mergeRequestUrl": "URL merge requesta",
+      "instructionsAtLimit": "Navodila so omejena na {{max}} znakov",
       "title": "Ročni pregled",
       "invalidUrl": "Vnesi veljaven URL zahteve za združitev.",
       "couldNotCheckProviderStatus": "Stanja ponudnika ni bilo mogoče preveriti.",
@@ -1724,7 +1727,8 @@
       "sortSeverityDesc": "Resnost: od visoke do nizke",
       "sortSeverityAsc": "Resnost: od nizke do visoke",
       "sortSlaDue": "Rok SLA",
-      "overdueOnly": "Samo s pretečenim rokom"
+      "overdueOnly": "Samo s pretečenim rokom",
+      "noRepositories": "Noben repozitorij še ni sinhroniziran ali izbran. Izberite jih v nastavitvah Varnostnega agenta."
     },
     "automation": {
       "title": "Avtomatizacija",
@@ -1835,6 +1839,7 @@
       "lastSynced": "Nazadnje sinhronizirano {{time}}",
       "manageRepositories": "Upravljaj skladišča",
       "notYetSynced": "Še ni sinhronizirano",
+      "priorityFindingsPending": "Prednostne ugotovitve se bodo prikazale po prvi sinhronizaciji.",
       "refreshFailed": "Osvežitev ni uspela. Prikazani so podatki zadnje sinhronizacije.",
       "settings": "Nastavitve",
       "syncNow": "Sinhroniziraj zdaj",
@@ -1903,7 +1908,8 @@
     "findingDetails": {
       "supersededBy": "Nadomeščeno z aktualno ugotovitvijo",
       "supersededByDescription": "Tapni za prikaz aktualnega zapisa s stanjem, analizo in podatki o odpravljanju.",
-      "dismissedBecause": "Ugotovitev je zavrnjena: {{reason}}.",
+      "dismissedOn": "Datum zavrženja",
+      "supersededOn": "Datum nadomestitve",
       "severityLabel": "Resnost: {{severity}}",
       "package": "Paket",
       "vulnerableVersions": "Ranljive različice",
@@ -1920,11 +1926,6 @@
       "viewAdvisory": "Prikaži varnostno obvestilo na platformi GitHub",
       "statusOpen": "Odprto",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "odpravljanje že poteka",
-      "reasonNoBandwidth": "ni časa za odpravljanje",
-      "reasonTolerableRisk": "tveganje je sprejemljivo",
-      "reasonInaccurate": "ugotovitev je napačna",
-      "reasonNotUsed": "ranljiva koda se ne uporablja",
       "reasonAfterReview": "po pregledu"
     },
     "settingsOverview": {
@@ -1986,7 +1987,7 @@
       "highDescription": "Možnost obsežnega razkritja podatkov.",
       "mediumDescription": "Omejen vpliv ali posebni pogoji.",
       "lowDescription": "Minimalen vpliv na varnost.",
-      "invalidDayCount": "vnesi celo število dni med 1 in 365.",
+      "invalidDayCount": "Vnesi celo število dni med 1 in 365.",
       "remediationDeadlineA11y": "Rok za odpravljanje v dneh, resnost: {{label}}",
       "enterWholeNumber": "Vnesi celo število med 1 in 365",
       "permissionNote": "Te nastavitve lahko spremenijo samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
@@ -2128,7 +2129,10 @@
       "settleFailed": "Dejanje je bilo izvedeno, a rezultata nismo mogli zabeležiti. Poskusi znova.",
       "replayFailed": "To dejanje se ni izvedlo. Poskusi znova.",
       "actionFailed": "Tega dejanja ni bilo mogoče dokončati. Poskusi znova.",
-      "actionBlocked": "Tega dejanja ni bilo mogoče dokončati. Težavo je treba najprej odpraviti."
+      "actionBlocked": "Tega dejanja ni bilo mogoče dokončati. Težavo je treba najprej odpraviti.",
+      "syncNoRepositories": "V obsegu sinhronizacije ni nobenega repozitorija. Izberite repozitorije, ki jih Varnostni agent spremlja, in znova sinhronizirajte.",
+      "syncIntegrationInactive": "Povezava z GitHub za Varnostnega agenta ni aktivna. Znova povežite Kilo GitHub App in nato znova sinhronizirajte.",
+      "syncMissingPermission": "Kilo GitHub App ne more brati opozoril o ranljivostih. V GitHubu dodeli to dovoljenje in znova sinhroniziraj."
     },
     "analysisState": {
       "queued": "Analiza v čakalni vrsti",
@@ -2162,7 +2166,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Rok ni določen",
       "noSlaDeadline": "Brez roka SLA",
-      "dueOn": "Rok: {{date}}",
       "overdueNow": "Rok je potekel",
       "overdue_one": "{{count}} dan po roku",
       "overdue_two": "{{count}} dneva po roku",
@@ -3960,6 +3963,7 @@
       "markSecret": "Označi kot skrivnost",
       "masked": "Skrita vrednost",
       "reveal": "Razkrij vrednost",
+      "hide": "Skrij vrednost",
       "newValuePlaceholder": "Vnesite novo skrivno vrednost",
       "valuePlaceholder": "Skrivna vrednost (šifrirana)"
     },

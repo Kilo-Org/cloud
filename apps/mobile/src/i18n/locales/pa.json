@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "ਕੋਈ ਹਾਲੀਆ ਸਮੀਖਿਆ ਨਹੀਂ",
       "noRecentPrsDescription": "ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਉੱਤੇ ਲਿੰਕ ਪੇਸਟ ਕਰੋ — ਅਗਲੀ ਵਾਰ ਇਹ ਇੱਥੇ ਦਿਖਾਈ ਦੇਵੇਗੀ।",
-      "couldNotLoad": "ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
       "removeFromRecentsTitle": "ਹਾਲੀਆ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾਈਏ?",
       "removeFromRecentsMessage": "ਇਹ ਸਮੀਖਿਆ ਤੁਹਾਡੀ ਹਾਲੀਆ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾ ਦਿੱਤੀ ਜਾਵੇਗੀ।",
       "removeRecentAccessibility": "{{repo}} ਨੂੰ ਹਾਲੀਆ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾਓ",
@@ -834,7 +833,8 @@
     "liveUpdates": "ਲਾਈਵ ਅੱਪਡੇਟ",
     "liveUpdateSubtitle": "ਆਪਣੀਆਂ ਸੂਚਨਾਵਾਂ ਵਿੱਚ ਸਰਗਰਮ ਏਜੰਟ ਦਿਖਾਓ",
     "push": "ਪੁਸ਼ ਸੂਚਨਾਵਾਂ",
-    "onDescription": "ਇਸ ਡਿਵਾਈਸ ਲਈ ਪੁਸ਼ ਸੂਚਨਾਵਾਂ ਚਾਲੂ ਹਨ।",
+    "deviceTitle": "ਇਸ ਡਿਵਾਈਸ 'ਤੇ ਪੁਸ਼",
+    "onDescription": "ਚੇਤਾਵਨੀਆਂ ਹੇਠਾਂ ਦਿੱਤੀਆਂ ਸ਼੍ਰੇਣੀਆਂ ਅਨੁਸਾਰ ਆਉਂਦੀਆਂ ਹਨ।",
     "offDescription": "ਇਜਾਜ਼ਤ ਜਾਂ ਡਿਵਾਈਸ ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਬੰਦ ਹੈ।",
     "retryPermission": "ਸੂਚਨਾਵਾਂ ਦੀ ਇਜਾਜ਼ਤ ਮੁੜ ਜਾਂਚੋ",
     "enable": "ਸੂਚਨਾਵਾਂ ਚਾਲੂ ਕਰੋ",
@@ -1533,6 +1533,9 @@
       "offAction": "ਸਮੀਖਿਆ ਦੀ ਮੈਮੋਰੀ ਬੰਦ ਹੈ। ਇਸ ਨੂੰ ਚਾਲੂ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ ਵੈਧ URL ਦਰਜ ਕਰੋ।",
+      "mergeRequestUrl": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ URL",
+      "instructionsAtLimit": "ਹਦਾਇਤਾਂ {{max}} ਅੱਖਰਾਂ ਤੱਕ ਸੀਮਿਤ ਹਨ।",
       "title": "ਦਸਤੀ ਸਮੀਖਿਆ",
       "invalidUrl": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ ਵੈਧ URL ਦਰਜ ਕਰੋ।",
       "couldNotCheckProviderStatus": "ਪ੍ਰਦਾਤਾ ਦੀ ਸਥਿਤੀ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ।",
@@ -1680,7 +1683,8 @@
       "sortSeverityDesc": "ਗੰਭੀਰਤਾ: ਵੱਧ ਤੋਂ ਘੱਟ",
       "sortSeverityAsc": "ਗੰਭੀਰਤਾ: ਘੱਟ ਤੋਂ ਵੱਧ",
       "sortSlaDue": "SLA ਦੀ ਆਖ਼ਰੀ ਮਿਤੀ",
-      "overdueOnly": "ਸਿਰਫ਼ ਮਿਆਦ ਲੰਘੀਆਂ"
+      "overdueOnly": "ਸਿਰਫ਼ ਮਿਆਦ ਲੰਘੀਆਂ",
+      "noRepositories": "ਹਾਲੇ ਤੱਕ ਕੋਈ ਵੀ ਰਿਪੋਜ਼ਟਰੀ ਸਿੰਕ ਜਾਂ ਚੁਣੀ ਨਹੀਂ ਗਈ। ਉਹਨਾਂ ਨੂੰ ਸੁਰੱਖਿਆ ਏਜੰਟ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਚੁਣੋ।"
     },
     "automation": {
       "title": "ਸਵੈਚਾਲਨ",
@@ -1786,6 +1790,7 @@
       "lastSynced": "ਆਖ਼ਰੀ ਵਾਰ ਸਿੰਕ ਕੀਤਾ: {{time}}",
       "manageRepositories": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਦਾ ਪ੍ਰਬੰਧ ਕਰੋ",
       "notYetSynced": "ਅਜੇ ਸਿੰਕ ਨਹੀਂ ਹੋਇਆ",
+      "priorityFindingsPending": "ਪਹਿਲੇ ਸਿੰਕ ਤੋਂ ਬਾਅਦ ਤਰਜੀਹ ਵਾਲੀਆਂ ਸਮੱਸਿਆਵਾਂ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
       "refreshFailed": "ਰਿਫਰੈਸ਼ ਨਹੀਂ ਹੋ ਸਕਿਆ — ਆਖ਼ਰੀ ਵਾਰ ਸਿੰਕ ਕੀਤਾ ਡੇਟਾ ਦਿਖਾਇਆ ਜਾ ਰਿਹਾ ਹੈ।",
       "settings": "ਸੈਟਿੰਗਾਂ",
       "syncNow": "ਹੁਣੇ ਸਿੰਕ ਕਰੋ",
@@ -1847,7 +1852,8 @@
     "findingDetails": {
       "supersededBy": "ਇਸ ਦੀ ਥਾਂ ਨਵੀਂ ਸਮੱਸਿਆ ਦਰਜ ਹੈ",
       "supersededByDescription": "ਸਥਿਤੀ, ਵਿਸ਼ਲੇਸ਼ਣ ਅਤੇ ਸੁਧਾਰ ਦੇ ਵੇਰਵੇ ਦੇਖਣ ਲਈ ਮੌਜੂਦਾ ਰਿਕਾਰਡ 'ਤੇ ਟੈਪ ਕਰੋ।",
-      "dismissedBecause": "ਖਾਰਜ ਕੀਤਾ ਗਿਆ: {{reason}}।",
+      "dismissedOn": "ਖਾਰਜ ਹੋਣ ਦੀ ਤਾਰੀਖ",
+      "supersededOn": "ਨਵੇਂ ਨਤੀਜੇ ਨਾਲ ਬਦਲੇ ਜਾਣ ਦੀ ਤਾਰੀਖ",
       "severityLabel": "{{severity}} ਗੰਭੀਰਤਾ",
       "package": "ਪੈਕੇਜ",
       "vulnerableVersions": "ਸੁਰੱਖਿਆ ਖਾਮੀ ਵਾਲੇ ਵਰਜਨ",
@@ -1864,11 +1870,6 @@
       "viewAdvisory": "GitHub 'ਤੇ ਸੁਰੱਖਿਆ ਸੂਚਨਾ ਦੇਖੋ",
       "statusOpen": "ਖੁੱਲ੍ਹੀ",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ਠੀਕ ਕਰਨਾ ਸ਼ੁਰੂ ਹੋ ਗਿਆ ਹੈ",
-      "reasonNoBandwidth": "ਸਮਾਂ ਜਾਂ ਸਰੋਤ ਉਪਲਬਧ ਨਹੀਂ ਹਨ",
-      "reasonTolerableRisk": "ਜੋਖਮ ਸਵੀਕਾਰਯੋਗ ਹੈ",
-      "reasonInaccurate": "ਜਾਂਚ ਦਾ ਨਤੀਜਾ ਸਹੀ ਨਹੀਂ",
-      "reasonNotUsed": "ਸੁਰੱਖਿਆ ਖਾਮੀ ਵਾਲਾ ਕੋਡ ਵਰਤਿਆ ਨਹੀਂ ਜਾਂਦਾ",
       "reasonAfterReview": "ਸਮੀਖਿਆ ਤੋਂ ਬਾਅਦ"
     },
     "settingsOverview": {
@@ -2068,7 +2069,10 @@
       "settleFailed": "ਕਾਰਵਾਈ ਪੂਰੀ ਹੋ ਗਈ, ਪਰ ਅਸੀਂ ਨਤੀਜਾ ਰਿਕਾਰਡ ਨਹੀਂ ਕਰ ਸਕੇ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "replayFailed": "ਇਹ ਕਾਰਵਾਈ ਪੂਰੀ ਨਹੀਂ ਹੋਈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "actionFailed": "ਇਹ ਕਾਰਵਾਈ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "actionBlocked": "ਇਹ ਕਾਰਵਾਈ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਸਮੱਸਿਆ ਨੂੰ ਠੀਕ ਕਰਨਾ ਜ਼ਰੂਰੀ ਹੈ।"
+      "actionBlocked": "ਇਹ ਕਾਰਵਾਈ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਸਮੱਸਿਆ ਨੂੰ ਠੀਕ ਕਰਨਾ ਜ਼ਰੂਰੀ ਹੈ।",
+      "syncNoRepositories": "ਸਿੰਕ ਸਕੋਪ ਵਿੱਚ ਕੋਈ ਵੀ ਰਿਪੋਜ਼ਟਰੀ ਨਹੀਂ ਹੈ। ਉਹ ਰਿਪੋਜ਼ਟਰੀਆਂ ਚੁਣੋ ਜਿਨ੍ਹਾਂ ਦੀ ਨਿਗਰਾਨੀ ਸੁਰੱਖਿਆ ਏਜੰਟ ਕਰਦਾ ਹੈ, ਫਿਰ ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।",
+      "syncIntegrationInactive": "«ਸੁਰੱਖਿਆ ਏਜੰਟ» ਲਈ GitHub ਕਨੈਕਸ਼ਨ ਸਰਗਰਮ ਨਹੀਂ ਹੈ। Kilo GitHub App ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।",
+      "syncMissingPermission": "Kilo GitHub App vulnerability alerts ਨਹੀਂ ਪੜ੍ਹ ਸਕਦੀ। GitHub ਵਿੱਚ ਇਹ ਅਨੁਮਤੀ ਦਿਓ, ਫਿਰ ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।"
     },
     "analysisState": {
       "queued": "ਵਿਸ਼ਲੇਸ਼ਣ ਕਤਾਰ ਵਿੱਚ",
@@ -2102,7 +2106,6 @@
       "closedOn": "{{date}} ਨੂੰ {{status}}",
       "deadlineNotSet": "ਸਮਾਂ ਸੀਮਾ ਨਿਰਧਾਰਤ ਨਹੀਂ",
       "noSlaDeadline": "ਕੋਈ SLA ਸਮਾਂ ਸੀਮਾ ਨਹੀਂ",
-      "dueOn": "ਆਖ਼ਰੀ ਮਿਤੀ: {{date}}",
       "overdueNow": "ਮਿਆਦ ਲੰਘੀ",
       "overdue_one": "ਮਿਆਦ ਤੋਂ {{count}} ਦਿਨ ਵੱਧ",
       "overdue_other": "{{count}} ਦਿਨ ਦੀ ਦੇਰੀ",
@@ -3854,6 +3857,7 @@
       "markSecret": "ਗੁਪਤ ਵਜੋਂ ਮਾਰਕ ਕਰੋ",
       "masked": "ਲੁਕਿਆ ਹੋਇਆ ਮੁੱਲ",
       "reveal": "ਮੁੱਲ ਪ੍ਰਗਟ ਕਰੋ",
+      "hide": "ਮੁੱਲ ਲੁਕਾਓ",
       "newValuePlaceholder": "ਨਵਾਂ ਗੁਪਤ ਮੁੱਲ ਦਰਜ ਕਰੋ",
       "valuePlaceholder": "ਗੁਪਤ ਮੁੱਲ (ਐਨਕ੍ਰਿਪਟ ਕੀਤਾ)"
     },

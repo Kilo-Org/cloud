@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { ScrollView, View, type ViewStyle } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { NOTIFICATION_HISTORY_RETENTION_DAYS } from '@kilocode/notifications';
+import { NOTIFICATION_HISTORY_RETENTION_DAYS } from '@kilocode/notifications/schemas';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';

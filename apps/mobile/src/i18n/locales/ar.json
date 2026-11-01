@@ -305,7 +305,8 @@
     "liveUpdates": "التحديثات المباشرة",
     "liveUpdateSubtitle": "عرض الوكلاء النشطين في إشعاراتك",
     "push": "الإشعارات الفورية",
-    "onDescription": "الإشعارات الفورية مفعّلة على هذا الجهاز.",
+    "deviceTitle": "الإشعارات الفورية على هذا الجهاز",
+    "onDescription": "تتبع التنبيهات الفئات أدناه.",
     "offDescription": "إذن الإشعارات غير مفعّل، أو لم يُسجّل الجهاز لتلقيها.",
     "retryPermission": "إعادة محاولة التحقق من إذن الإشعارات",
     "enable": "تفعيل الإشعارات",
@@ -936,6 +937,9 @@
     "followReviewMd": "اتباع تعليمات REVIEW.md",
     "followReviewMdSubtitle": "الالتزام بملفات تعليمات REVIEW.md لكل مستودع",
     "manualReview": {
+      "invalidMergeRequestUrl": "أدخل عنوان URL صالحًا لطلب دمج.",
+      "mergeRequestUrl": "عنوان URL لطلب الدمج",
+      "instructionsAtLimit": "تقتصر التعليمات على {{max}} حرفًا",
       "connectProviderDescription": "اربط GitHub لبدء مراجعة يدوية لطلب سحب.",
       "couldNotCheckProviderStatus": "تعذّر التحقق من حالة المزوّد.",
       "couldNotLoadProviders": "تعذّر تحميل المزوّدين الذين ربطتهم بحسابك. حاول مرة أخرى.",
@@ -1163,7 +1167,8 @@
       "sortSeverityDesc": "الخطورة: من الأعلى إلى الأدنى",
       "sortSlaDue": "الموعد النهائي حسب SLA",
       "statusIgnored": "تم تجاهلها",
-      "statusOpen": "مفتوحة"
+      "statusOpen": "مفتوحة",
+      "noRepositories": "لم تتم مزامنة أي مستودعات أو تحديدها بعد. اخترها من إعدادات وكيل الأمان."
     },
     "analysis": {
       "analyzeRepository": "تحليل المستودع",
@@ -1313,6 +1318,7 @@
       "notExploitable": "غير قابلة للاستغلال",
       "notMeasured": "غير مُقاس",
       "notYetSynced": "لم تتم المزامنة بعد",
+      "priorityFindingsPending": "ستظهر نتائج الأولويات بعد أول مزامنة.",
       "refreshFailed": "تعذّر التحديث. تُعرض بيانات آخر مزامنة.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "{{displayCount}} مفتوحة",
@@ -1419,7 +1425,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "تاريخ الاكتشاف",
-      "dismissedBecause": "تم استبعاد النتيجة. السبب: {{reason}}.",
+      "dismissedOn": "مستبعدة في",
+      "supersededOn": "مستبدلة في",
       "ghsa": "GHSA",
       "manifest": "ملف تعريف الحزمة",
       "noPatchAvailable": "لا يوجد تصحيح متاح",
@@ -1436,11 +1443,6 @@
       "vulnerableVersions": "الإصدارات المتأثرة بالثغرة",
       "statusOpen": "مفتوحة",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "بدأ الإصلاح بالفعل",
-      "reasonNoBandwidth": "لا تتوفر موارد كافية",
-      "reasonTolerableRisk": "الخطر مقبول",
-      "reasonInaccurate": "النتيجة غير دقيقة",
-      "reasonNotUsed": "الشيفرة التي تحتوي على الثغرة غير مستخدمة",
       "reasonAfterReview": "بعد المراجعة"
     },
     "findingList": {
@@ -1589,7 +1591,10 @@
       "settleFailed": "اكتمل الإجراء، لكن لم نتمكن من تسجيل النتيجة. حاول مرة أخرى.",
       "replayFailed": "لم يكتمل هذا الإجراء. حاول مرة أخرى.",
       "actionFailed": "تعذّر إكمال هذا الإجراء. حاول مرة أخرى.",
-      "actionBlocked": "تعذّر إكمال هذا الإجراء. يجب إصلاح المشكلة أولاً قبل إعادة المحاولة."
+      "actionBlocked": "تعذّر إكمال هذا الإجراء. يجب إصلاح المشكلة أولاً قبل إعادة المحاولة.",
+      "syncNoRepositories": "لا توجد مستودعات ضمن نطاق المزامنة. اختر المستودعات التي يراقبها وكيل الأمان، ثم زامِن مرة أخرى.",
+      "syncIntegrationInactive": "اتصال GitHub الخاص بـ«وكيل الأمان» غير نشط. أعد ربط تطبيق Kilo على GitHub، ثم قم بالمزامنة مرة أخرى.",
+      "syncMissingPermission": "لا يستطيع تطبيق Kilo على GitHub قراءة تنبيهات الثغرات. امنح هذه الصلاحية في GitHub، ثم أعد المزامنة."
     },
     "analysisState": {
       "queued": "التحليل في قائمة الانتظار",
@@ -1623,7 +1628,6 @@
       "closedOn": "{{status}} في {{date}}",
       "deadlineNotSet": "الموعد النهائي غير محدد",
       "noSlaDeadline": "لا يوجد موعد نهائي حسب SLA",
-      "dueOn": "مستحق في {{date}}",
       "overdueNow": "متأخر",
       "overdue_zero": "أيام التأخير: {{count}}",
       "overdue_one": "متأخر بيوم واحد",
@@ -2975,7 +2979,6 @@
     "entry": {
       "noRecentPrs": "لا توجد مراجعات حديثة",
       "noRecentPrsDescription": "الصق رابطًا أعلاه لبدء المراجعة. سيظهر هنا في المرة القادمة.",
-      "couldNotLoad": "تعذّر التحميل.",
       "removeFromRecentsTitle": "إزالة الطلب من القائمة الأخيرة؟",
       "removeFromRecentsMessage": "ستتم إزالة هذه المراجعة من قائمة العناصر الأخيرة.",
       "removeRecentAccessibility": "إزالة {{repo}} من قائمة الطلبات الأخيرة",
@@ -4072,6 +4075,7 @@
       "markSecret": "ضع علامة على أنها سرية",
       "masked": "القيمة المخفية",
       "reveal": "كشف القيمة",
+      "hide": "إخفاء القيمة",
       "newValuePlaceholder": "أدخل قيمة سرية جديدة",
       "valuePlaceholder": "قيمة سرية (مشفرة)"
     },

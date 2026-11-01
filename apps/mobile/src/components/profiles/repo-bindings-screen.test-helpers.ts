@@ -85,8 +85,10 @@ export async function changeSearch(root: ReactTestInstance, value: string): Prom
 }
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
-export function mountScreen(organizationId?: string) {
-  return renderWithProviders(createElement(RepoBindingsScreen, { organizationId, stack: 'app' }));
+export function mountScreen(organizationId?: string, openedFrom?: 'session' | 'composer') {
+  return renderWithProviders(
+    createElement(RepoBindingsScreen, { organizationId, stack: 'app', openedFrom })
+  );
 }
 
 /** Re-render the mounted screen against fresh mock data, keeping the providers. */

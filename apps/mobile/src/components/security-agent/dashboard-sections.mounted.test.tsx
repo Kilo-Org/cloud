@@ -2,8 +2,8 @@
 // "All repositories". Before the first sync nothing has been measured, so the
 // priority card must not report the empty result as a clean codebase: the
 // green check and the all-clear line gave a never-synced organization a
-// verified look. The neutral state carries the screen's own not-yet-synced
-// line instead, and opens nothing.
+// verified look. The card explains what it will hold instead, and opens
+// nothing.
 
 import { type ComponentProps } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -148,9 +148,13 @@ describe('DashboardSections priority card', () => {
   it('reports no measurement while the scope has never synced', () => {
     const card = priorityCard(renderSections({ neverSynced: true }));
 
-    // The neutral state carries the screen's own not-yet-synced line; the
-    // all-clear copy and its green check belong to a measured report.
-    expect(copy(card)).toContain('securityAgent.dashboard.notYetSynced');
+    // The card is a content section, so it explains what it will hold instead
+    // of showing the lone dash a measurement row shows or repeating the status
+    // the filter above states. The all-clear copy and its green check belong to
+    // a measured report, and nothing here opens.
+    expect(copy(card)).toContain('securityAgent.dashboard.actFirst');
+    expect(copy(card)).toContain('securityAgent.dashboard.priorityFindingsPending');
+    expect(copy(card)).not.toContain('securityAgent.dashboard.notYetSynced');
     expect(copy(card)).not.toContain('securityAgent.dashboard.noOpenFindings');
     expect(card.findAllByType('ShieldCheck')).toHaveLength(0);
     expect(card.findAllByType('Pressable')).toHaveLength(0);

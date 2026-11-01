@@ -2,6 +2,7 @@
 import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH } from '@kilocode/app-shared/code-review';
 import { i18n } from '@/i18n';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -31,6 +32,7 @@ const permissionState = vi.hoisted(() => ({
 }));
 const status = vi.hoisted(() => ({
   connected: true,
+  gitlabConnected: false,
   loading: false,
   errorCode: null as string | null,
   pending: false,
@@ -133,7 +135,6 @@ vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/form-field-a11y', () => ({ formFieldA11y: () => 'a11y' }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check', GitPullRequest: 'GitPullRequest' }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: 'RadioGroup',
@@ -185,7 +186,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     refetch: status.refetch,
   }),
   useGitLabStatus: () => ({
-    data: { connected: false },
+    data: { connected: status.gitlabConnected },
     isLoading: status.loading,
     isError: status.errorCode !== null,
     error: { data: { code: status.errorCode } },
@@ -326,6 +327,7 @@ beforeEach(() => {
   permissionState.canEdit = true;
   permissionState.canManage = true;
   status.connected = true;
+  status.gitlabConnected = false;
   status.loading = false;
   status.errorCode = null;
   status.pending = false;
@@ -987,6 +989,167 @@ describe('ManualReviewScreen URL validation', () => {
     const [statusText] = findVisibleStatusTexts(renderer.root);
     expect(statusText?.props.children).toBe(i18n.t('codeReviewer.manualReview.invalidUrl'));
     expect(String(findUrlField(renderer.root).props.className)).toContain('border-destructive');
+
+    unmount();
+  });
+});
+
+/** The URL box, whichever platform's placeholder it carries. */
+function urlInput(root: TestRenderer.ReactTestInstance) {
+  return only(
+    root.findAll(node => String(node.type) === 'TextInput' && node.props.keyboardType === 'url'),
+    'URL field'
+  );
+}
+
+/** The free-text instructions box, told apart from the URL box by `multiline`. */
+function instructionsField(root: TestRenderer.ReactTestInstance) {
+  return only(
+    root.findAll(node => String(node.type) === 'TextInput' && node.props.multiline === true),
+    'instructions field'
+  );
+}
+
+/** Type into a box the way the native input reports a change. */
+function typeInto(field: TestRenderer.ReactTestInstance, value: string) {
+  act(() => {
+    (propOf(field, 'onChangeText') as (next: string) => void)(value);
+  });
+}
+
+/** The remaining-character row, found by the counted sentence it is named with. */
+function counterRow(root: TestRenderer.ReactTestInstance, remaining: number) {
+  return root.findAll(
+    node =>
+      String(node.type) === 'Text' &&
+      propOf(node, 'accessibilityLabel') ===
+        i18n.t('agentChat.composer.charactersRemaining', { count: remaining })
+  );
+}
+
+describe('ManualReviewScreen instructions limit', () => {
+  it('bounds the field at the limit the route validates', async () => {
+    const { renderer, unmount } = await renderScreen();
+
+    // The route rejects anything longer with its generic request-state line,
+    // so the field cannot let a longer draft exist in the first place.
+    expect(propOf(instructionsField(renderer.root), 'maxLength')).toBe(
+      MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH
+    );
+
+    unmount();
+  });
+
+  it('says nothing about length for an ordinary note', async () => {
+    const { renderer, unmount } = await renderScreen();
+    typeInto(instructionsField(renderer.root), 'Check the retry budget');
+
+    expect(renderedTexts(renderer.root)).not.toContain(
+      i18n.t('codeReviewer.manualReview.instructionsAtLimit', {
+        max: MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH,
+      })
+    );
+    expect(counterRow(renderer.root, MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH - 24)).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('counts the room left once the note nears the limit', async () => {
+    const { renderer, unmount } = await renderScreen();
+    typeInto(instructionsField(renderer.root), 'x'.repeat(3_500));
+
+    // The number is the visible row; the counted sentence is its accessible
+    // name, so a screen reader reads "500 characters remaining", not "500".
+    const [counter] = counterRow(renderer.root, 500);
+    expect(counter?.props.children).toBe(500);
+
+    unmount();
+  });
+
+  it('states the limit when the note reaches it, without the request-state line', async () => {
+    const { renderer, unmount } = await renderScreen();
+    typeInto(instructionsField(renderer.root), 'x'.repeat(MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH));
+
+    const atLimit = i18n.t('codeReviewer.manualReview.instructionsAtLimit', {
+      max: MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH,
+    });
+    expect(renderedTexts(renderer.root)).toContain(atLimit);
+    // The count would read zero; the sentence says what the bound is instead.
+    expect(counterRow(renderer.root, 0)).toHaveLength(0);
+
+    const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
+    act(() => {
+      (propOf(urlInput(renderer.root), 'onChangeText') as (next: string) => void)(GITHUB_PR_URL);
+    });
+    act(() => {
+      (propOf(action, 'onPress') as () => void)();
+    });
+
+    // A note at the limit is a draft the route accepts, so the start goes out
+    // unchanged and the screen never explains the length as a closed or
+    // mislinked request.
+    expect(status.mutate).toHaveBeenCalledTimes(1);
+    const [variables] = status.mutate.mock.calls[0] as [{ instructions?: string }];
+    expect(variables.instructions).toHaveLength(MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH);
+    expect(renderedTexts(renderer.root)).not.toContain(
+      i18n.t('codeReviewer.manualReview.startRejected', {
+        provider: 'GitHub',
+        requestNoun: i18n.t('common.pullRequest'),
+      })
+    );
+
+    unmount();
+  });
+});
+
+describe('ManualReviewScreen platform-shaped URL field', () => {
+  it('names the field after a pull request for GitHub', async () => {
+    const { renderer, unmount } = await renderScreen();
+    const pullRequestUrl = i18n.t('codeReviewer.manualReview.pullRequestUrl');
+
+    expect(renderedTexts(renderer.root)).toContain(pullRequestUrl);
+    expect(propOf(urlInput(renderer.root), 'accessibilityLabel')).toBe(pullRequestUrl);
+
+    unmount();
+  });
+
+  it('names the field after a merge request for GitLab', async () => {
+    // GitLab is the only connected platform in the personal scope, so the form
+    // opens on it, exactly as the finding's screen did.
+    status.connected = false;
+    status.gitlabConnected = true;
+    const { renderer, unmount } = await renderScreen();
+    const mergeRequestUrl = i18n.t('codeReviewer.manualReview.mergeRequestUrl');
+
+    expect(renderedTexts(renderer.root)).toContain(mergeRequestUrl);
+    expect(propOf(urlInput(renderer.root), 'accessibilityLabel')).toBe(mergeRequestUrl);
+    // The placeholder and the start-error copy already said merge request; the
+    // heading was the one part still calling it a pull request.
+    expect(renderedTexts(renderer.root)).not.toContain(
+      i18n.t('codeReviewer.manualReview.pullRequestUrl')
+    );
+
+    unmount();
+  });
+
+  it('explains a malformed GitLab URL as an invalid merge request URL', async () => {
+    status.connected = false;
+    status.gitlabConnected = true;
+    const { renderer, unmount } = await renderScreen();
+
+    act(() => {
+      (propOf(urlInput(renderer.root), 'onChangeText') as (next: string) => void)(
+        'https://example.com/not-an-mr'
+      );
+    });
+    const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
+    act(() => {
+      (propOf(action, 'onPress') as () => void)();
+    });
+
+    expect(renderedTexts(renderer.root)).toContain(
+      i18n.t('codeReviewer.manualReview.invalidMergeRequestUrl')
+    );
 
     unmount();
   });

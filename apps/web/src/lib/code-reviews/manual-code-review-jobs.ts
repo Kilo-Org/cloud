@@ -8,6 +8,7 @@ import {
   type CodeReviewType,
   type ManualCodeReviewConfig,
 } from '@kilocode/db/schema-types';
+import { MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH } from '@kilocode/app-shared/code-review';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { isUniqueViolation } from '@/lib/db-errors';
 import {
@@ -53,7 +54,9 @@ export const ManualCodeReviewJobInputSchema = z.object({
     .regex(/^[a-zA-Z]+$/)
     .nullable()
     .optional(),
-  instructions: z.string().max(4_000).optional(),
+  // Capped by the same constant both review forms bound their field with, so a
+  // draft a form accepts is a draft this schema accepts.
+  instructions: z.string().max(MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH).optional(),
   /**
    * Client-generated key for one manual start intent, stable across a retry of
    * the same draft (`useHoistedOperationKey` on mobile). A start whose first

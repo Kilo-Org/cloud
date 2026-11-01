@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "ยังไม่มีรีวิวล่าสุด",
       "noRecentPrsDescription": "วางลิงก์ด้านบนเพื่อเริ่มรีวิว ครั้งต่อไปจะแสดงที่นี่",
-      "couldNotLoad": "ไม่สามารถโหลดได้",
       "removeFromRecentsTitle": "ลบออกจากรายการล่าสุดหรือไม่?",
       "removeFromRecentsMessage": "รีวิวนี้จะถูกลบออกจากรายการล่าสุดของคุณ",
       "removeRecentAccessibility": "ลบ {{repo}} ออกจากรายการล่าสุด",
@@ -834,7 +833,8 @@
     "liveUpdates": "การอัปเดตสด",
     "liveUpdateSubtitle": "แสดงเอเจนต์ที่ทำงานอยู่ในการแจ้งเตือนของคุณ",
     "push": "การแจ้งเตือนแบบพุช",
-    "onDescription": "อุปกรณ์นี้เปิดการแจ้งเตือนแบบพุชแล้ว",
+    "deviceTitle": "การแจ้งเตือนแบบพุชบนอุปกรณ์นี้",
+    "onDescription": "การแจ้งเตือนจะเป็นไปตามหมวดหมู่ด้านล่าง.",
     "offDescription": "ยังไม่ได้อนุญาตการแจ้งเตือน หรือยังไม่ได้ลงทะเบียนอุปกรณ์เพื่อรับการแจ้งเตือน",
     "retryPermission": "ลองตรวจสอบสิทธิ์การแจ้งเตือนอีกครั้ง",
     "enable": "เปิดการแจ้งเตือน",
@@ -1533,6 +1533,9 @@
       "offAction": "ความจำในการตรวจสอบปิดอยู่ เปิดใช้งานแล้วลองอีกครั้ง"
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "ป้อน URL ของ merge request ที่ถูกต้อง",
+      "mergeRequestUrl": "URL ของ merge request",
+      "instructionsAtLimit": "คำแนะนำจำกัดไว้ที่ {{max}} อักขระ",
       "title": "การตรวจสอบที่เริ่มด้วยตนเอง",
       "invalidUrl": "ป้อน URL ของ PR ที่ถูกต้อง",
       "couldNotCheckProviderStatus": "ตรวจสอบสถานะผู้ให้บริการไม่สำเร็จ",
@@ -1680,7 +1683,8 @@
       "sortSeverityDesc": "ความรุนแรง: สูงไปต่ำ",
       "sortSeverityAsc": "ความรุนแรง: ต่ำไปสูง",
       "sortSlaDue": "วันที่ครบกำหนด SLA",
-      "overdueOnly": "เฉพาะที่เกินกำหนด"
+      "overdueOnly": "เฉพาะที่เกินกำหนด",
+      "noRepositories": "ยังไม่มีรีโพซิทอรีที่ซิงค์หรือเลือกไว้ โปรดเลือกในการตั้งค่าของเอเจนต์ความปลอดภัย"
     },
     "automation": {
       "title": "ระบบอัตโนมัติ",
@@ -1783,6 +1787,7 @@
       "lastSynced": "ซิงค์ล่าสุด {{time}}",
       "manageRepositories": "จัดการคลังโค้ด",
       "notYetSynced": "ยังไม่ซิงค์",
+      "priorityFindingsPending": "ข้อค้นพบตามลำดับความสำคัญจะแสดงหลังซิงค์ครั้งแรก",
       "refreshFailed": "รีเฟรชไม่สำเร็จ ขณะนี้แสดงข้อมูลที่ซิงค์ไว้ล่าสุด",
       "settings": "การตั้งค่า",
       "syncNow": "ซิงค์ตอนนี้",
@@ -1841,7 +1846,8 @@
     "findingDetails": {
       "supersededBy": "มีข้อค้นพบใหม่มาแทนที่แล้ว",
       "supersededByDescription": "แตะเพื่อเปิดรายการปัจจุบันและดูสถานะ ผลวิเคราะห์ และการแก้ไข",
-      "dismissedBecause": "ละเว้นแล้ว เนื่องจาก{{reason}}",
+      "dismissedOn": "ละเว้นแล้ว เมื่อ",
+      "supersededOn": "ถูกแทนที่แล้ว เมื่อ",
       "severityLabel": "ความรุนแรงระดับ{{severity}}",
       "package": "แพ็กเกจ",
       "vulnerableVersions": "เวอร์ชันที่มีช่องโหว่",
@@ -1858,11 +1864,6 @@
       "viewAdvisory": "ดูประกาศด้านความปลอดภัยบน GitHub",
       "statusOpen": "เปิด",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "เริ่มแก้ไขแล้ว",
-      "reasonNoBandwidth": "ไม่มีเวลาจัดการ",
-      "reasonTolerableRisk": "ยอมรับความเสี่ยงได้",
-      "reasonInaccurate": "ข้อค้นพบไม่ถูกต้อง",
-      "reasonNotUsed": "ไม่ได้ใช้โค้ดที่มีช่องโหว่",
       "reasonAfterReview": "หลังการตรวจสอบ"
     },
     "settingsOverview": {
@@ -2062,7 +2063,10 @@
       "settleFailed": "การดำเนินการเสร็จสมบูรณ์แล้ว แต่เราบันทึกผลลัพธ์ไม่สำเร็จ กรุณาลองอีกครั้ง",
       "replayFailed": "การดำเนินการนี้ยังไม่เสร็จสมบูรณ์ กรุณาลองอีกครั้ง",
       "actionFailed": "ดำเนินการนี้ให้เสร็จสมบูรณ์ไม่ได้ กรุณาลองอีกครั้ง",
-      "actionBlocked": "ดำเนินการนี้ให้เสร็จสมบูรณ์ไม่ได้ ต้องแก้ไขปัญหาก่อนจึงจะลองใหม่ได้"
+      "actionBlocked": "ดำเนินการนี้ให้เสร็จสมบูรณ์ไม่ได้ ต้องแก้ไขปัญหาก่อนจึงจะลองใหม่ได้",
+      "syncNoRepositories": "ไม่มีรีโพซิทอรีใดอยู่ในขอบเขตการซิงค์ โปรดเลือก repositories ที่เอเจนต์ความปลอดภัยตรวจสอบ แล้วซิงค์อีกครั้ง",
+      "syncIntegrationInactive": "การเชื่อมต่อ GitHub สำหรับเอเจนต์ความปลอดภัยยังไม่เปิดใช้งาน เชื่อมต่อ Kilo GitHub App ใหม่อีกครั้ง แล้วซิงค์อีกครั้ง",
+      "syncMissingPermission": "Kilo GitHub App อ่าน vulnerability alerts ไม่ได้ ให้สิทธิ์นั้นใน GitHub แล้วซิงก์อีกครั้ง"
     },
     "analysisState": {
       "queued": "รอคิววิเคราะห์",
@@ -2096,7 +2100,6 @@
       "closedOn": "{{status}} เมื่อ {{date}}",
       "deadlineNotSet": "ยังไม่ได้ตั้งกำหนดเวลา",
       "noSlaDeadline": "ไม่มีกำหนดเวลา SLA",
-      "dueOn": "ครบกำหนด {{date}}",
       "overdueNow": "เกินกำหนด",
       "overdue_other": "เกินกำหนด {{count}} วัน",
       "dueToday": "ครบกำหนดวันนี้",
@@ -3848,6 +3851,7 @@
       "markSecret": "ทำเครื่องหมายว่าเป็นความลับ",
       "masked": "ค่าที่ซ่อนอยู่",
       "reveal": "แสดงค่า",
+      "hide": "ซ่อนค่า",
       "newValuePlaceholder": "ป้อนค่าความลับใหม่",
       "valuePlaceholder": "ค่าความลับ (จะเข้ารหัส)"
     },

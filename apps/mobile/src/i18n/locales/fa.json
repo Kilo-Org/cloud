@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "بازبینی اخیری وجود ندارد",
       "noRecentPrsDescription": "برای شروع بازبینی، پیوندی را در بالا جای‌گذاری کنید. دفعهٔ بعد، اینجا نمایش داده می‌شود.",
-      "couldNotLoad": "بارگذاری ممکن نشد.",
       "removeFromRecentsTitle": "از موارد اخیر حذف شود؟",
       "removeFromRecentsMessage": "این بازبینی از فهرست موارد اخیر شما حذف می‌شود.",
       "removeRecentAccessibility": "حذف {{repo}} از موارد اخیر",
@@ -834,7 +833,8 @@
     "liveUpdates": "به‌روزرسانی‌های زنده",
     "liveUpdateSubtitle": "نمایش عامل‌های فعال در اعلان‌های شما",
     "push": "اعلان‌های ارسالی",
-    "onDescription": "اعلان‌های ارسالی برای این دستگاه فعال‌اند.",
+    "deviceTitle": "اعلان‌های ارسالی در این دستگاه",
+    "onDescription": "هشدارها بر اساس دسته‌بندی‌های زیر ارسال می‌شوند.",
     "offDescription": "مجوز اعلان‌ها غیرفعال است یا دستگاه برای دریافت آن‌ها ثبت نشده است.",
     "retryPermission": "تلاش مجدد برای بررسی مجوز اعلان",
     "enable": "فعال‌سازی اعلان‌ها",
@@ -1533,12 +1533,15 @@
       "offAction": "حافظه بررسی غیرفعال است. آن را فعال کنید، سپس دوباره تلاش کنید."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "یک URL معتبر برای درخواست ادغام وارد کنید.",
+      "mergeRequestUrl": "URL درخواست ادغام",
+      "instructionsAtLimit": "دستورالعمل‌ها به {{max}} نویسه محدود است",
       "title": "بررسی دستی",
-      "invalidUrl": "یک URL معتبر برای درخواست ادغام وارد کنید.",
+      "invalidUrl": "یک URL معتبر برای پول ریکوئست وارد کنید.",
       "couldNotCheckProviderStatus": "بررسی وضعیت ارائه‌دهنده ممکن نشد.",
       "couldNotLoadProviders": "نتوانستیم ارائه‌دهنده‌های متصل شما را بارگذاری کنیم. لطفاً دوباره تلاش کنید.",
       "connectProviderDescription": "برای شروع بررسی دستی یک درخواست ادغام، GitHub را متصل کنید.",
-      "pullRequestUrl": "URL درخواست ادغام",
+      "pullRequestUrl": "URL پول ریکوئست",
       "instructions": "دستورالعمل‌ها (اختیاری)",
       "instructionsPlaceholder": "نکات خاصی که بررسی‌کننده باید روی آن‌ها تمرکز کند…",
       "starting": "در حال شروع بررسی…",
@@ -1680,7 +1683,8 @@
       "sortSeverityDesc": "شدت: بالا به پایین",
       "sortSeverityAsc": "شدت: پایین به بالا",
       "sortSlaDue": "تاریخ سررسید SLA",
-      "overdueOnly": "فقط موارد معوق"
+      "overdueOnly": "فقط موارد معوق",
+      "noRepositories": "هنوز هیچ مخزنی همگام‌سازی یا انتخاب نشده است. آن‌ها را در تنظیمات عامل امنیتی انتخاب کنید."
     },
     "automation": {
       "title": "خودکارسازی",
@@ -1786,6 +1790,7 @@
       "lastSynced": "آخرین همگام‌سازی: {{time}}",
       "manageRepositories": "مدیریت مخازن",
       "notYetSynced": "هنوز همگام‌سازی نشده",
+      "priorityFindingsPending": "پس از اولین همگام‌سازی، یافته‌های اولویت‌دار نمایش داده می‌شوند.",
       "refreshFailed": "تازه‌سازی ممکن نشد. داده‌های آخرین همگام‌سازی نمایش داده می‌شوند.",
       "settings": "تنظیمات",
       "syncNow": "همگام‌سازی فوری",
@@ -1847,7 +1852,8 @@
     "findingDetails": {
       "supersededBy": "با یافته جدید جایگزین شده",
       "supersededByDescription": "برای دیدن وضعیت، تحلیل و اصلاح، روی این مورد بزنید تا رکورد جدید باز شود.",
-      "dismissedBecause": "به دلیل {{reason}} نادیده گرفته شده است.",
+      "dismissedOn": "نادیده‌گرفته‌شده در",
+      "supersededOn": "جایگزین‌شده در",
       "severityLabel": "شدت {{severity}}",
       "package": "بسته",
       "vulnerableVersions": "نسخه‌های آسیب‌پذیر",
@@ -1864,11 +1870,6 @@
       "viewAdvisory": "مشاهده اطلاعیه امنیتی در GitHub",
       "statusOpen": "باز",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "رفع مشکل شروع شده است",
-      "reasonNoBandwidth": "ظرفیتی برای رسیدگی نداریم",
-      "reasonTolerableRisk": "ریسک قابل تحمل است",
-      "reasonInaccurate": "یافته دقیق نیست",
-      "reasonNotUsed": "از کد آسیب‌پذیر استفاده نمی‌شود",
       "reasonAfterReview": "پس از بررسی"
     },
     "settingsOverview": {
@@ -2068,7 +2069,10 @@
       "settleFailed": "عملیات انجام شد، اما نتوانستیم نتیجه را ثبت کنیم. لطفاً دوباره تلاش کنید.",
       "replayFailed": "این عملیات کامل نشد. لطفاً دوباره تلاش کنید.",
       "actionFailed": "امکان انجام این عملیات وجود نداشت. لطفاً دوباره تلاش کنید.",
-      "actionBlocked": "امکان انجام این عملیات وجود نداشت. مشکل باید ابتدا برطرف شود تا بتوانید دوباره تلاش کنید."
+      "actionBlocked": "امکان انجام این عملیات وجود نداشت. مشکل باید ابتدا برطرف شود تا بتوانید دوباره تلاش کنید.",
+      "syncNoRepositories": "هیچ مخزنی در محدوده همگام‌سازی نیست. مخازنی را که عامل امنیتی پایش می‌کند انتخاب کنید، سپس دوباره همگام‌سازی کنید.",
+      "syncIntegrationInactive": "اتصال GitHub برای عامل امنیتی فعال نیست. برنامه Kilo در GitHub را دوباره متصل کنید، سپس دوباره همگام‌سازی کنید.",
+      "syncMissingPermission": "برنامه Kilo در GitHub نمی‌تواند هشدارهای آسیب‌پذیری را بخواند. آن مجوز را در GitHub اعطا کنید، سپس دوباره همگام‌سازی کنید."
     },
     "analysisState": {
       "queued": "تحلیل در صف",
@@ -2102,7 +2106,6 @@
       "closedOn": "{{status}} در {{date}}",
       "deadlineNotSet": "مهلتی تعیین نشده است",
       "noSlaDeadline": "بدون مهلت SLA",
-      "dueOn": "سررسید {{date}}",
       "overdueNow": "معوق",
       "overdue_one": "{{count}} روز تأخیر",
       "overdue_other": "{{count}} روز تأخیر",
@@ -3854,6 +3857,7 @@
       "markSecret": "علامت گذاری به عنوان راز",
       "masked": "ارزش پنهان",
       "reveal": "ارزش را آشکار کند",
+      "hide": "ارزش را پنهان کنید",
       "newValuePlaceholder": "مقدار مخفی جدید را وارد کنید",
       "valuePlaceholder": "مقدار مخفی (رمزگذاری شده)"
     },

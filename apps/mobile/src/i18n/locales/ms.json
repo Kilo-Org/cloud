@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Tiada semakan terkini",
       "noRecentPrsDescription": "Tampal pautan di atas untuk memulakan semakan — ia akan muncul di sini pada kali berikutnya.",
-      "couldNotLoad": "Tidak dapat memuatkan data.",
       "removeFromRecentsTitle": "Alih keluar daripada senarai terkini?",
       "removeFromRecentsMessage": "Semakan ini akan dialih keluar daripada senarai terkini anda.",
       "removeRecentAccessibility": "Alih keluar {{repo}} daripada senarai terkini",
@@ -834,7 +833,8 @@
     "liveUpdates": "Kemas kini langsung",
     "liveUpdateSubtitle": "Paparkan ejen aktif dalam pemberitahuan anda",
     "push": "Pemberitahuan tolak",
-    "onDescription": "Pemberitahuan tolak didayakan pada peranti ini.",
+    "deviceTitle": "Pemberitahuan tolak pada peranti ini",
+    "onDescription": "Amaran mengikut kategori di bawah.",
     "offDescription": "Kebenaran pemberitahuan atau pendaftaran peranti tidak aktif.",
     "retryPermission": "Cuba semak semula kebenaran pemberitahuan",
     "enable": "Dayakan pemberitahuan",
@@ -1533,6 +1533,9 @@
       "offAction": "Memori semakan dinyahdayakan. Dayakannya, kemudian cuba lagi."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Masukkan URL permintaan gabungan yang sah.",
+      "mergeRequestUrl": "URL permintaan gabungan",
+      "instructionsAtLimit": "Arahan dihadkan kepada {{max}} aksara.",
       "title": "Semakan manual",
       "invalidUrl": "Masukkan URL permintaan penarikan yang sah.",
       "couldNotCheckProviderStatus": "Tidak dapat menyemak status penyedia.",
@@ -1680,7 +1683,8 @@
       "sortSeverityDesc": "Keterukan: tertinggi ke terendah",
       "sortSeverityAsc": "Keterukan: terendah ke tertinggi",
       "sortSlaDue": "Tarikh akhir SLA",
-      "overdueOnly": "Lewat sahaja"
+      "overdueOnly": "Lewat sahaja",
+      "noRepositories": "Belum ada repositori disegerakkan atau dipilih. Pilihnya dalam tetapan Ejen Keselamatan."
     },
     "automation": {
       "title": "Automasi",
@@ -1783,6 +1787,7 @@
       "lastSynced": "Kali terakhir disegerakkan: {{time}}",
       "manageRepositories": "Urus repositori",
       "notYetSynced": "Belum disegerakkan",
+      "priorityFindingsPending": "Penemuan keutamaan akan muncul selepas penyegerakan pertama.",
       "refreshFailed": "Tidak dapat memuat semula data. Data daripada penyegerakan terakhir dipaparkan.",
       "settings": "Tetapan",
       "syncNow": "Segerakkan sekarang",
@@ -1841,7 +1846,8 @@
     "findingDetails": {
       "supersededBy": "Digantikan oleh penemuan semasa",
       "supersededByDescription": "Ketik untuk membuka rekod semasa dan melihat status, analisis serta pemulihan.",
-      "dismissedBecause": "Diketepikan kerana {{reason}}.",
+      "dismissedOn": "Diketepikan pada",
+      "supersededOn": "Digantikan pada",
       "severityLabel": "Keterukan {{severity}}",
       "package": "Pakej",
       "vulnerableVersions": "Versi yang terdedah kepada serangan",
@@ -1858,11 +1864,6 @@
       "viewAdvisory": "Lihat notis keselamatan di GitHub",
       "statusOpen": "Terbuka",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "pembetulan telah dimulakan",
-      "reasonNoBandwidth": "tiada masa atau tenaga kerja",
-      "reasonTolerableRisk": "risiko boleh diterima",
-      "reasonInaccurate": "dapatan tidak tepat",
-      "reasonNotUsed": "kod yang rentan tidak digunakan",
       "reasonAfterReview": "selepas semakan"
     },
     "settingsOverview": {
@@ -1922,7 +1923,7 @@
       "highDescription": "Potensi pendedahan data yang ketara.",
       "mediumDescription": "Kesan terhad atau keadaan tertentu.",
       "lowDescription": "Kesan minimum terhadap keselamatan.",
-      "invalidDayCount": "bilangan hari mesti antara 1 hingga 365, dalam nombor bulat sahaja.",
+      "invalidDayCount": "Bilangan hari mesti antara 1 hingga 365, dalam nombor bulat sahaja.",
       "remediationDeadlineA11y": "Tempoh pemulihan {{label}} dalam hari",
       "enterWholeNumber": "Masukkan nombor bulat antara 1 dan 365",
       "permissionNote": "Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menukar tetapan ini.",
@@ -2062,7 +2063,10 @@
       "settleFailed": "Tindakan telah selesai, tetapi kami tidak dapat merekodkan hasilnya. Sila cuba lagi.",
       "replayFailed": "Tindakan ini tidak selesai. Sila cuba lagi.",
       "actionFailed": "Tindakan ini tidak dapat disiapkan. Sila cuba lagi.",
-      "actionBlocked": "Tindakan ini tidak dapat disiapkan. Masalah ini perlu diselesaikan terlebih dahulu."
+      "actionBlocked": "Tindakan ini tidak dapat disiapkan. Masalah ini perlu diselesaikan terlebih dahulu.",
+      "syncNoRepositories": "Tiada repositori dalam skop segerak. Pilih repositori yang dipantau oleh Ejen Keselamatan, kemudian segerakkan semula.",
+      "syncIntegrationInactive": "Sambungan GitHub untuk Ejen Keselamatan tidak aktif. Sambung semula Apl GitHub Kilo, kemudian segerakkan semula.",
+      "syncMissingPermission": "Apl GitHub Kilo tidak dapat membaca makluman kerentanan. Berikan kebenaran itu dalam GitHub, kemudian segerakkan semula."
     },
     "analysisState": {
       "queued": "Analisis dalam baris gilir",
@@ -2096,7 +2100,6 @@
       "closedOn": "{{status}} pada {{date}}",
       "deadlineNotSet": "Tarikh akhir tidak ditetapkan",
       "noSlaDeadline": "Tiada tarikh akhir SLA",
-      "dueOn": "Tarikh akhir {{date}}",
       "overdueNow": "Lewat",
       "overdue_other": "Lewat {{count}} hari",
       "dueToday": "Tarikh akhir hari ini",
@@ -3848,6 +3851,7 @@
       "markSecret": "Tandakan sebagai rahsia",
       "masked": "Nilai tersembunyi",
       "reveal": "Mendedahkan nilai",
+      "hide": "Sembunyikan nilai",
       "newValuePlaceholder": "Masukkan nilai rahsia baharu",
       "valuePlaceholder": "Nilai rahsia (disulitkan)"
     },

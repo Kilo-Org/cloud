@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Hiljutisi ülevaatusi pole",
       "noRecentPrsDescription": "Ülevaatuse alustamiseks kleebi link ülalpool — järgmisel korral ilmub see siin.",
-      "couldNotLoad": "Laadimine ebaõnnestus.",
       "removeFromRecentsTitle": "Kas eemaldada hiljutiste hulgast?",
       "removeFromRecentsMessage": "See ülevaatus eemaldatakse hiljutiste nimekirjast.",
       "removeRecentAccessibility": "Eemalda {{repo}} hiljutiste hulgast",
@@ -834,7 +833,8 @@
     "liveUpdates": "Reaalajas värskendused",
     "liveUpdateSubtitle": "Näita aktiivseid agente teavitustes",
     "push": "Tõuketeavitused",
-    "onDescription": "Tõuketeavitused on selles seadmes sisse lülitatud.",
+    "deviceTitle": "Tõuketeavitused selles seadmes",
+    "onDescription": "Teavitused lähtuvad allolevatest kategooriatest.",
     "offDescription": "Teavituste luba puudub või seade pole teavituste saamiseks registreeritud.",
     "retryPermission": "Kontrolli teavituste luba uuesti",
     "enable": "Luba teavitused",
@@ -1533,6 +1533,9 @@
       "offAction": "Ülevaatuste mälu on välja lülitatud. Lülita see sisse ja proovi uuesti."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Sisesta kehtiv liitmistaotluse URL.",
+      "mergeRequestUrl": "Liitmistaotluse URL",
+      "instructionsAtLimit": "Juhised on piiratud {{max}} tähemärgiga",
       "title": "Käsitsi käivitatav ülevaatus",
       "invalidUrl": "Sisesta kehtiv tõmbetaotluse URL.",
       "couldNotCheckProviderStatus": "Teenusepakkuja olekut ei õnnestunud kontrollida.",
@@ -1680,7 +1683,8 @@
       "sortSeverityDesc": "Raskusaste: kõrgemast madalamani",
       "sortSeverityAsc": "Raskusaste: madalamast kõrgemani",
       "sortSlaDue": "SLA tähtaeg",
-      "overdueOnly": "Ainult tähtaja ületanud"
+      "overdueOnly": "Ainult tähtaja ületanud",
+      "noRepositories": "Ühtegi hoidlat ei ole veel sünkroonitud ega valitud. Valige need Turvaagendi seadetes."
     },
     "automation": {
       "title": "Automatiseerimine",
@@ -1783,6 +1787,7 @@
       "lastSynced": "Viimati sünkroonitud {{time}}",
       "manageRepositories": "Halda hoidlaid",
       "notYetSynced": "Pole veel sünkroonitud",
+      "priorityFindingsPending": "Prioriteetsed leiud ilmuvad pärast esimest sünkroonimist.",
       "refreshFailed": "Värskendamine ebaõnnestus — kuvatakse viimati sünkroonitud andmeid.",
       "settings": "Seaded",
       "syncNow": "Sünkrooni nüüd",
@@ -1841,7 +1846,8 @@
     "findingDetails": {
       "supersededBy": "Asendatud uuema leiuga",
       "supersededByDescription": "Puuduta, et avada uuem kirje ning vaadata selle olekut, analüüsi ja parandamise andmeid.",
-      "dismissedBecause": "Leid jäeti kõrvale: {{reason}}.",
+      "dismissedOn": "Kõrvale jätmise kuupäev",
+      "supersededOn": "Asendamise kuupäev",
       "severityLabel": "Raskusaste: {{severity}}",
       "package": "Pakett",
       "vulnerableVersions": "Haavatavad versioonid",
@@ -1858,11 +1864,6 @@
       "viewAdvisory": "Vaata turvateadet GitHubis",
       "statusOpen": "Avatud",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "parandamine juba käib",
-      "reasonNoBandwidth": "selleks pole aega",
-      "reasonTolerableRisk": "risk on talutav",
-      "reasonInaccurate": "leid on ebatäpne",
-      "reasonNotUsed": "haavatavat koodi ei kasutata",
       "reasonAfterReview": "pärast ülevaatamist"
     },
     "settingsOverview": {
@@ -1922,7 +1923,7 @@
       "highDescription": "Võib põhjustada ulatusliku andmelekke.",
       "mediumDescription": "Mõju on piiratud või ärakasutamine eeldab kindlaid tingimusi.",
       "lowDescription": "Mõju turvalisusele on minimaalne.",
-      "invalidDayCount": "päevade arv peab olema täisarv vahemikus 1–365.",
+      "invalidDayCount": "Päevade arv peab olema täisarv vahemikus 1–365.",
       "remediationDeadlineA11y": "{{label}}: parandamise tähtaeg päevades",
       "enterWholeNumber": "Sisesta täisarv vahemikus 1 kuni 365",
       "permissionNote": "Neid seadeid saavad muuta ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
@@ -2062,7 +2063,10 @@
       "settleFailed": "Toiming lõppes edukalt, kuid me ei suutnud tulemust salvestada. Proovi uuesti.",
       "replayFailed": "Toimingut ei lõpetatud. Proovi uuesti.",
       "actionFailed": "Seda toimingut ei õnnestunud lõpule viia. Proovi uuesti.",
-      "actionBlocked": "Seda toimingut ei õnnestunud lõpule viia. Probleem tuleb kõigepealt lahendada."
+      "actionBlocked": "Seda toimingut ei õnnestunud lõpule viia. Probleem tuleb kõigepealt lahendada.",
+      "syncNoRepositories": "Sünkroonimisalasse ei kuulu ükski hoidla. Vali hoidlad, mida Turvaagent jälgib, ja sünkrooni seejärel uuesti.",
+      "syncIntegrationInactive": "Turvaagendi GitHubi ühendus ei ole aktiivne. Ühendage Kilo GitHub App uuesti ja seejärel sünkroonige uuesti.",
+      "syncMissingPermission": "Kilo GitHub App ei saa haavatavusteateid lugeda. Andke see õigus GitHubis ja sünkroonige uuesti."
     },
     "analysisState": {
       "queued": "Analüüs järjekorras",
@@ -2096,7 +2100,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Tähtaega pole määratud",
       "noSlaDeadline": "SLA tähtaega pole määratud",
-      "dueOn": "Tähtaeg {{date}}",
       "overdueNow": "Tähtaeg ületatud",
       "overdue_one": "Tähtaeg ületatud {{count}} päeva",
       "overdue_other": "Tähtaeg ületatud {{count}} päeva",
@@ -3848,6 +3851,7 @@
       "markSecret": "Märgi salajaseks",
       "masked": "Varjatud väärtus",
       "reveal": "Avalda väärtust",
+      "hide": "Varja väärtust",
       "newValuePlaceholder": "Sisesta uus salajane väärtus",
       "valuePlaceholder": "Salajane väärtus (krüpteeritud)"
     },

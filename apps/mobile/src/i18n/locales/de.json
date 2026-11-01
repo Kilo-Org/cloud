@@ -305,7 +305,8 @@
     "liveUpdates": "Live-Updates",
     "liveUpdateSubtitle": "Aktive Agenten in deinen Benachrichtigungen anzeigen",
     "push": "Push-Benachrichtigungen",
-    "onDescription": "Push-Benachrichtigungen sind für dieses Gerät aktiviert.",
+    "deviceTitle": "Push auf diesem Gerät",
+    "onDescription": "Hinweise richten sich nach den Kategorien unten.",
     "offDescription": "Die Berechtigung für Benachrichtigungen oder die Geräteregistrierung ist deaktiviert.",
     "retryPermission": "Berechtigung für Benachrichtigungen erneut prüfen",
     "enable": "Benachrichtigungen aktivieren",
@@ -924,6 +925,9 @@
     "followReviewMd": "REVIEW.md befolgen",
     "followReviewMdSubtitle": "Anweisungen aus der REVIEW.md-Datei des jeweiligen Repositorys beachten",
     "manualReview": {
+      "invalidMergeRequestUrl": "Gib eine gültige Merge-Request-URL ein.",
+      "mergeRequestUrl": "Merge-Request-URL",
+      "instructionsAtLimit": "Die Anweisungen sind auf {{max}} Zeichen beschränkt",
       "connectProviderDescription": "Verbinde GitHub, um ein manuelles Review eines Pull-Requests zu starten.",
       "couldNotCheckProviderStatus": "Der Anbieterstatus konnte nicht geprüft werden.",
       "couldNotLoadProviders": "Deine verbundenen Anbieter konnten nicht geladen werden. Bitte versuche es erneut.",
@@ -1151,7 +1155,8 @@
       "sortSeverityDesc": "Schweregrad: absteigend",
       "sortSlaDue": "SLA-Fälligkeitsdatum",
       "statusIgnored": "Ignoriert",
-      "statusOpen": "Offen"
+      "statusOpen": "Offen",
+      "noRepositories": "Es sind noch keine Repositories synchronisiert oder ausgewählt. Wähle sie in den Einstellungen des Sicherheitsagenten aus."
     },
     "analysis": {
       "analyzeRepository": "Repository analysieren",
@@ -1293,6 +1298,7 @@
       "notExploitable": "Nicht ausnutzbar",
       "notMeasured": "Nicht gemessen",
       "notYetSynced": "Noch nicht synchronisiert",
+      "priorityFindingsPending": "Prioritäre Befunde erscheinen nach der ersten Synchronisierung.",
       "refreshFailed": "Die Daten konnten nicht aktualisiert werden. Angezeigt werden die zuletzt synchronisierten Daten.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "{{displayCount}} offen",
@@ -1367,7 +1373,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Erkannt",
-      "dismissedBecause": "Dieser Befund wurde verworfen. Grund: {{reason}}.",
+      "dismissedOn": "Verworfen am",
+      "supersededOn": "Ersetzt am",
       "ghsa": "GHSA",
       "manifest": "Manifestdatei",
       "noPatchAvailable": "Kein Patch verfügbar",
@@ -1384,11 +1391,6 @@
       "vulnerableVersions": "Verwundbare Versionen",
       "statusOpen": "Offen",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "behebung bereits begonnen",
-      "reasonNoBandwidth": "keine Kapazität verfügbar",
-      "reasonTolerableRisk": "risiko vertretbar",
-      "reasonInaccurate": "befund unzutreffend",
-      "reasonNotUsed": "verwundbarer Code nicht verwendet",
       "reasonAfterReview": "nach Prüfung"
     },
     "findingList": {
@@ -1503,7 +1505,7 @@
       "enterWholeNumber": "Gib eine ganze Zahl zwischen 1 und 365 ein",
       "high": "Hoch",
       "highDescription": "Erhebliches Risiko einer Offenlegung von Daten.",
-      "invalidDayCount": "gib eine ganze Zahl zwischen 1 und 365 Tagen ein.",
+      "invalidDayCount": "Gib eine ganze Zahl zwischen 1 und 365 Tagen ein.",
       "low": "Niedrig",
       "lowDescription": "Minimale Auswirkungen auf die Sicherheit.",
       "medium": "Mittel",
@@ -1533,7 +1535,10 @@
       "settleFailed": "Die Aktion wurde abgeschlossen, aber wir konnten das Ergebnis nicht speichern. Bitte versuche es erneut.",
       "replayFailed": "Diese Aktion wurde nicht abgeschlossen. Bitte versuche es erneut.",
       "actionFailed": "Diese Aktion konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
-      "actionBlocked": "Diese Aktion konnte nicht abgeschlossen werden. Das Problem muss behoben werden, bevor du es erneut versuchen kannst."
+      "actionBlocked": "Diese Aktion konnte nicht abgeschlossen werden. Das Problem muss behoben werden, bevor du es erneut versuchen kannst.",
+      "syncNoRepositories": "Es befinden sich keine Repositories im Sync-Bereich. Wähle die Repositories aus, die der Sicherheitsagent überwacht, und synchronisiere dann erneut.",
+      "syncIntegrationInactive": "Die GitHub-Verbindung für den Sicherheitsagenten ist nicht aktiv. Verbinde die Kilo-GitHub-App erneut und synchronisiere dann noch einmal.",
+      "syncMissingPermission": "Die Kilo-GitHub-App kann keine Schwachstellenwarnungen lesen. Erteile diese Berechtigung in GitHub und synchronisiere dann noch einmal."
     },
     "analysisState": {
       "queued": "Analyse in der Warteschlange",
@@ -1567,7 +1572,6 @@
       "closedOn": "{{status}} am {{date}}",
       "deadlineNotSet": "Keine Frist festgelegt",
       "noSlaDeadline": "Keine SLA-Frist",
-      "dueOn": "Fällig am {{date}}",
       "overdueNow": "Überfällig",
       "overdue_one": "{{count}} Tag überfällig",
       "overdue_other": "{{count}} Tage überfällig",
@@ -2827,7 +2831,6 @@
     "entry": {
       "noRecentPrs": "Noch keine aktuellen Reviews",
       "noRecentPrsDescription": "Füge oben einen Link ein, um ein Review zu starten — es erscheint beim nächsten Mal hier.",
-      "couldNotLoad": "Die Daten konnten nicht geladen werden.",
       "removeFromRecentsTitle": "Aus dem Verlauf entfernen?",
       "removeFromRecentsMessage": "Dieses Review wird aus deinem Verlauf entfernt.",
       "removeRecentAccessibility": "{{repo}} aus dem Verlauf entfernen",
@@ -3848,6 +3851,7 @@
       "markSecret": "Als geheim markieren",
       "masked": "Versteckter Wert",
       "reveal": "Wert offenbaren",
+      "hide": "Wert verbergen",
       "newValuePlaceholder": "Neuen geheimen Wert eingeben",
       "valuePlaceholder": "Geheimer Wert (verschlüsselt)"
     },

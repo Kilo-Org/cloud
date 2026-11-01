@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Nincs közelmúltbeli kódellenőrzés",
       "noRecentPrsDescription": "Illessz be fent egy hivatkozást a kódellenőrzés indításához — legközelebb itt fog megjelenni.",
-      "couldNotLoad": "Nem sikerült a betöltés.",
       "removeFromRecentsTitle": "Eltávolítod az előzményekből?",
       "removeFromRecentsMessage": "Ez a kódellenőrzés eltűnik az előzményeidből.",
       "removeRecentAccessibility": "{{repo}} eltávolítása az előzményekből",
@@ -834,7 +833,8 @@
     "liveUpdates": "Élő frissítések",
     "liveUpdateSubtitle": "Aktív ügynökök megjelenítése az értesítésekben",
     "push": "Leküldéses értesítések",
-    "onDescription": "A leküldéses értesítések be vannak kapcsolva ezen az eszközön.",
+    "deviceTitle": "Leküldés ezen az eszközön",
+    "onDescription": "Az értesítések a lenti kategóriák szerint érkeznek.",
     "offDescription": "Hiányzik az értesítési engedély vagy az eszköz regisztrációja.",
     "retryPermission": "Értesítési engedély ellenőrzésének újrapróbálása",
     "enable": "Értesítések engedélyezése",
@@ -1533,6 +1533,9 @@
       "offAction": "A kódellenőrzési memória ki van kapcsolva. Kapcsold be, majd próbáld újra."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Adj meg egy érvényes URL-t a merge request-hez.",
+      "mergeRequestUrl": "Merge request URL-címe",
+      "instructionsAtLimit": "Az utasítások legfeljebb {{max}} karakter lehetnek",
       "title": "Kézi kódellenőrzés",
       "invalidUrl": "Adj meg egy érvényes URL-t a PR-hez.",
       "couldNotCheckProviderStatus": "Nem sikerült ellenőrizni a szolgáltató állapotát.",
@@ -1680,7 +1683,8 @@
       "sortSeverityDesc": "Súlyosság: csökkenő",
       "sortSeverityAsc": "Súlyosság: növekvő",
       "sortSlaDue": "SLA-határidő",
-      "overdueOnly": "Csak a lejártak"
+      "overdueOnly": "Csak a lejártak",
+      "noRepositories": "Még nincs szinkronizált vagy kiválasztott adattár. Válassza ki őket a Biztonsági ügynök beállításaiban."
     },
     "automation": {
       "title": "Automatizálás",
@@ -1783,6 +1787,7 @@
       "lastSynced": "Utoljára szinkronizálva: {{time}}",
       "manageRepositories": "Adattárak kezelése",
       "notYetSynced": "Még nincs szinkronizálva",
+      "priorityFindingsPending": "A fontosság szerint rangsorolt találatok az első szinkronizálás után jelennek meg.",
       "refreshFailed": "Nem sikerült a frissítés. Az utolsó szinkronizálás adatai láthatók.",
       "settings": "Beállítások",
       "syncNow": "Szinkronizálás most",
@@ -1841,7 +1846,8 @@
     "findingDetails": {
       "supersededBy": "Újabb találat váltotta fel",
       "supersededByDescription": "Koppints az aktuális bejegyzésre az állapot, az elemzés és a hibajavítás megtekintéséhez.",
-      "dismissedBecause": "Elvetés indoka: {{reason}}.",
+      "dismissedOn": "Elvetés dátuma",
+      "supersededOn": "Újabbal helyettesítés dátuma",
       "severityLabel": "{{severity}} súlyosság",
       "package": "Csomag",
       "vulnerableVersions": "Sebezhető verziók",
@@ -1858,11 +1864,6 @@
       "viewAdvisory": "Biztonsági tájékoztató megtekintése a GitHubon",
       "statusOpen": "Nyitott",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "a javítás már folyamatban van",
-      "reasonNoBandwidth": "nincs szabad kapacitás",
-      "reasonTolerableRisk": "a kockázat elfogadható",
-      "reasonInaccurate": "a találat pontatlan",
-      "reasonNotUsed": "a sérülékeny kód nincs használatban",
       "reasonAfterReview": "felülvizsgálat után"
     },
     "settingsOverview": {
@@ -2062,7 +2063,10 @@
       "settleFailed": "A művelet lefutott, de nem sikerült rögzítenünk az eredményt. Próbáld újra.",
       "replayFailed": "Ez a művelet nem fejeződött be. Próbáld újra.",
       "actionFailed": "Nem sikerült befejezni ezt a műveletet. Próbáld újra.",
-      "actionBlocked": "Nem sikerült befejezni ezt a műveletet. A hibát előbb javítani kell."
+      "actionBlocked": "Nem sikerült befejezni ezt a műveletet. A hibát előbb javítani kell.",
+      "syncNoRepositories": "Egyetlen adattár sem esik a szinkronizálás hatókörébe. Válassza ki azokat az adattárakat, amelyeket a Biztonsági ügynök figyel, majd szinkronizáljon újra.",
+      "syncIntegrationInactive": "A Biztonsági ügynök GitHub-kapcsolata nem aktív. Csatlakoztassa újra a Kilo GitHub App-ot, majd szinkronizáljon újra.",
+      "syncMissingPermission": "A Kilo GitHub-alkalmazás nem tudja olvasni a sebezhetőségi riasztásokat. Add meg ezt az engedélyt a GitHubbon, majd szinkronizálj újra."
     },
     "analysisState": {
       "queued": "Elemzés várólistán",
@@ -2096,7 +2100,6 @@
       "closedOn": "{{status}}: {{date}}",
       "deadlineNotSet": "Nincs határidő beállítva",
       "noSlaDeadline": "Nincs SLA-határidő",
-      "dueOn": "Esedékes: {{date}}",
       "overdueNow": "Lejárt",
       "overdue_one": "{{count}} napja lejárt",
       "overdue_other": "{{count}} napja lejárt",
@@ -3848,6 +3851,7 @@
       "markSecret": "Jelölje meg titkosként",
       "masked": "Rejtett érték",
       "reveal": "Érték feltárása",
+      "hide": "Érték elrejtése",
       "newValuePlaceholder": "Adj meg új titkos értéket",
       "valuePlaceholder": "Titkos érték (titkosítva)"
     },

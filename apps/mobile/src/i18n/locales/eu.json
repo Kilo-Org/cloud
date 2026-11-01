@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Ez dago azkenaldiko berrikuspenik",
       "noRecentPrsDescription": "Itsatsi esteka bat goian berrikuspena hasteko — hemen agertuko da hurrengoan.",
-      "couldNotLoad": "Ezin izan da kargatu.",
       "removeFromRecentsTitle": "Azkenaldikoen zerrendatik kendu?",
       "removeFromRecentsMessage": "Berrikuspen hau azkenaldikoen zerrendatik kenduko da.",
       "removeRecentAccessibility": "Kendu {{repo}} azkenaldikoen zerrendatik",
@@ -834,7 +833,8 @@
     "liveUpdates": "Zuzeneko eguneratzeak",
     "liveUpdateSubtitle": "Erakutsi agente aktiboak zure jakinarazpenetan",
     "push": "Jakinarazpen automatikoak",
-    "onDescription": "Jakinarazpen automatikoak gaituta daude gailu honetan.",
+    "deviceTitle": "Jakinarazpenak gailu honetan",
+    "onDescription": "Alertak beheko kategorien arabera iristen dira.",
     "offDescription": "Baimena edo gailuaren erregistroa desgaituta dago.",
     "retryPermission": "Saiatu jakinarazpenen baimena berriro egiaztatzen",
     "enable": "Gaitu jakinarazpenak",
@@ -1533,6 +1533,9 @@
       "offAction": "Berrikuspen-memoria desgaituta dago. Gaitu, eta saiatu berriro."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Sartu merge-eskaera baten baliozko URL bat.",
+      "mergeRequestUrl": "Merge-eskaeraren URLa",
+      "instructionsAtLimit": "Argibideak {{max}} karakteretara mugatuta daude",
       "title": "Eskuzko berrikuspena",
       "invalidUrl": "Sartu bateratze-eskaera baten baliozko URL bat.",
       "couldNotCheckProviderStatus": "Ezin izan da hornitzailearen egoera egiaztatu.",
@@ -1680,7 +1683,8 @@
       "sortSeverityDesc": "Larritasuna: handienetik txikienera",
       "sortSeverityAsc": "Larritasuna: txikienetik handienera",
       "sortSlaDue": "SLAren epemuga",
-      "overdueOnly": "Epez kanpokoak soilik"
+      "overdueOnly": "Epez kanpokoak soilik",
+      "noRepositories": "Oraindik ez dago biltegirik sinkronizatuta edo hautatuta. Aukera itzazu Segurtasun-agentearen ezarpenetan."
     },
     "automation": {
       "title": "Automatizazioa",
@@ -1783,6 +1787,7 @@
       "lastSynced": "Azken sinkronizazioa: {{time}}",
       "manageRepositories": "Kudeatu biltegiak",
       "notYetSynced": "Oraindik ez da sinkronizatu",
+      "priorityFindingsPending": "Lehentasunezko aurkikuntzak lehen sinkronizazioaren ondoren agertuko dira.",
       "refreshFailed": "Ezin izan dira datuak eguneratu. Azken sinkronizazioko datuak erakusten dira.",
       "settings": "Ezarpenak",
       "syncNow": "Sinkronizatu orain",
@@ -1841,7 +1846,8 @@
     "findingDetails": {
       "supersededBy": "Uneko aurkikuntza batek ordezkatu du",
       "supersededByDescription": "Sakatu uneko erregistroa irekitzeko eta egoera, azterketa eta konponketa ikusteko.",
-      "dismissedBecause": "Aurkikuntza baztertu da. Arrazoia: {{reason}}.",
+      "dismissedOn": "Baztertuta geratu zen data",
+      "supersededOn": "Ordezkatuta geratu zen data",
       "severityLabel": "Larritasuna: {{severity}}",
       "package": "Paketea",
       "vulnerableVersions": "Bertsio ahulak",
@@ -1858,11 +1864,6 @@
       "viewAdvisory": "Ikusi segurtasun-abisua GitHub-en",
       "statusOpen": "Ireki",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "konponketa hasita dago",
-      "reasonNoBandwidth": "ez dago horretarako baliabiderik",
-      "reasonTolerableRisk": "arriskua onargarria da",
-      "reasonInaccurate": "antzemandako arazoa ez da zehatza",
-      "reasonNotUsed": "kode zaurgarria ez da erabiltzen",
       "reasonAfterReview": "berrikuspenaren ondoren"
     },
     "settingsOverview": {
@@ -1922,7 +1923,7 @@
       "highDescription": "Datu kopuru handia agerian geratzeko arriskua.",
       "mediumDescription": "Eragin mugatua edo baldintza zehatzak.",
       "lowDescription": "Segurtasunean eragin oso txikia.",
-      "invalidDayCount": "egun kopuruak 1 eta 365 arteko zenbaki osoa izan behar du.",
+      "invalidDayCount": "Egun kopuruak 1 eta 365 arteko zenbaki osoa izan behar du.",
       "remediationDeadlineA11y": "Konponketa-epea egunetan, larritasuna: {{label}}",
       "enterWholeNumber": "Sartu 1etik 365era bitarteko zenbaki oso bat",
       "permissionNote": "Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik alda ditzakete ezarpen hauek.",
@@ -2062,7 +2063,10 @@
       "settleFailed": "Ekintza burutu da, baina ezin izan dugu emaitza erregistratu. Saiatu berriro.",
       "replayFailed": "Ekintza hau ez da burutu. Saiatu berriro.",
       "actionFailed": "Ezin izan da ekintza hau burutu. Saiatu berriro.",
-      "actionBlocked": "Ezin izan da ekintza hau burutu. Arazoa konpondu behar da berriro saiatu aurretik."
+      "actionBlocked": "Ezin izan da ekintza hau burutu. Arazoa konpondu behar da berriro saiatu aurretik.",
+      "syncNoRepositories": "Ez dago biltegirik sinkronizazio-esparruan. Aukeratu Segurtasun-agenteak gainbegiratzen dituen biltegiak, eta gero sinkronizatu berriro.",
+      "syncIntegrationInactive": "Segurtasun-agentearen GitHub konexioa ez dago aktibo. Konektatu berriro Kilo GitHub App, eta gero sinkronizatu berriro.",
+      "syncMissingPermission": "Kilo GitHub App-ek ezin ditu vulnerability alerts irakurri. Eman baimen hori GitHub-en, eta gero sinkronizatu berriro."
     },
     "analysisState": {
       "queued": "Azterketa ilaran",
@@ -2096,7 +2100,6 @@
       "closedOn": "{{status}} · {{date}}",
       "deadlineNotSet": "Ez da eperik ezarri",
       "noSlaDeadline": "SLAren epemugarik gabe",
-      "dueOn": "Epemuga: {{date}}",
       "overdueNow": "Epez kanpo",
       "overdue_one": "{{count}} egun atzeratuta",
       "overdue_other": "{{count}} egun atzeratuta",
@@ -3848,6 +3851,7 @@
       "markSecret": "Markatu sekretu gisa",
       "masked": "Ezkutuko balioa",
       "reveal": "Erakutsi balioa",
+      "hide": "Ezkutatu balioa",
       "newValuePlaceholder": "Sartu balio sekretu berria",
       "valuePlaceholder": "Balio sekretua (zifratuta)"
     },

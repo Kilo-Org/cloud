@@ -130,6 +130,22 @@ describe('adoptPushStartedActivity', () => {
     expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({ kind: 'unreadable' });
   });
 
+  it('retries a null credential read before reporting a sign-out', async () => {
+    let authReads = 0;
+    mocks.getItemAsync.mockImplementation((key: string) => {
+      if (key !== AUTH_TOKEN_KEY) {
+        return Promise.resolve(null);
+      }
+      authReads += 1;
+      // A credential key can answer null before the device finishes unlocking.
+      return Promise.resolve(authReads === 1 ? null : 'access-token');
+    });
+
+    await adoptPushStartedActivity();
+
+    expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({ kind: 'unreadable' });
+  });
+
   it('reports a keychain that cannot answer as unreadable', async () => {
     mocks.getItemAsync.mockRejectedValue(KEYCHAIN_LOCKED);
 

@@ -1,4 +1,5 @@
 import * as SecureStore from '@/lib/auth/secure-store';
+import { readStoredValueRetryingNull } from '@/lib/auth/secure-store-read';
 
 // The adoption hands an update token straight to the delivery, and it runs from
 // the root layout's import. The route group that would otherwise install the
@@ -32,21 +33,33 @@ async function readKey(key: string): Promise<string | null | undefined> {
 }
 
 /**
+ * A credential read: `undefined` when the keychain could not answer. A `null` is
+ * retried on the credential cadence, because a credential key can answer `null`
+ * before the device finishes unlocking.
+ */
+async function readCredential(key: string): Promise<string | null | undefined> {
+  try {
+    return await readStoredValueRetryingNull(key);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Whether the keychain holds a credential, so the device is signed in.
  * `undefined` when the credential store could not be read. The identity hint is
- * written best effort (`lib/persist/cache-persistence-mount.tsx`), so a missing
- * hint on its own is not a sign-out: a signed-in device can lose the hint and
- * still hold its tokens.
+ * written best effort, so a missing hint on its own is not a sign-out: a
+ * signed-in device can lose the hint and still hold its tokens.
  */
 async function hasStoredCredential(): Promise<boolean | undefined> {
-  const authToken = await readKey(AUTH_TOKEN_KEY);
+  const authToken = await readCredential(AUTH_TOKEN_KEY);
   if (authToken === undefined) {
     return undefined;
   }
   if (authToken !== null) {
     return true;
   }
-  const refreshToken = await readKey(REFRESH_TOKEN_KEY);
+  const refreshToken = await readCredential(REFRESH_TOKEN_KEY);
   if (refreshToken === undefined) {
     return undefined;
   }

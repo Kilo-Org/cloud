@@ -1843,6 +1843,8 @@
       "forkFilesUnchangedOnComputer": "此电脑上的文件不会被更改。",
       "pickProfile": "选择配置文件",
       "noProfile": "没有配置文件",
+      "defaultProfileResolvesTo": "当前为 {{name}}",
+      "defaultProfileResolvesToAccessibility": "默认配置文件：{{name}}",
       "manageProfiles": "管理配置文件",
       "advancedConfig": "高级配置",
       "advancedConfigDescription": "仅对本次会话生效。另存为配置文件可供下次使用。",
@@ -2712,6 +2714,9 @@
       "gitlabDescription": "在手机上审查合并请求",
       "bitbucketOrgOnlyDescription": "将上方的账户切换为某个组织，以便审查其 Bitbucket 拉取请求。",
       "bitbucketOrgOnlyNoOrganizationDescription": "此账户尚未加入任何组织。创建或加入组织后，即可审查 Bitbucket 拉取请求。",
+      "gitlabReconnectAdminOnlyDescription": "请让组织所有者、管理员或账单管理员重新连接。",
+      "bitbucketNotConnectedTitle": "尚未连接 Bitbucket",
+      "bitbucketAdminOnlyDescription": "只有组织所有者、管理员和账单管理员可以完成连接。",
       "contextLine": "适用于 {{organization}}",
       "contextLinePersonal": "适用于个人账户"
     },

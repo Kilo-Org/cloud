@@ -683,6 +683,9 @@
       "gitlabDescription": "Diniho amin'ny finday ny fangatahana fampiraisana",
       "bitbucketOrgOnlyDescription": "Ampifandraiso amin'ny fikambanana ny kaonty etsy ambony mba hijerena ny fangatahana fampiraisana Bitbucket'ny.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Mbola tsy manana fikambanana ity kaonty ity. Azonao jerena ny fangatahana fampiraisana Bitbucket rehefa mamorona na miditra fikambanana.",
+      "gitlabReconnectAdminOnlyDescription": "Mangataha ny Tompony, Mpitantana, na Mpitantana faktiora ao amin'ny fikambanana mba hampifandray azy indray.",
+      "bitbucketNotConnectedTitle": "Tsy mifandray ny Bitbucket",
+      "bitbucketAdminOnlyDescription": "Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy.",
       "contextLine": "Ho an'ny {{organization}}",
       "contextLinePersonal": "Ho an'ny kaontinao manokana"
     },
@@ -2376,6 +2379,8 @@
       "forkFilesUnchangedOnComputer": "Tsy ovaina ny rakitra ao amin'ity solosaina ity.",
       "pickProfile": "Mifidiana profil",
       "noProfile": "Tsy misy mombamomba",
+      "defaultProfileResolvesTo": "Mifanaraka amin'ny {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profile default: {{name}}",
       "manageProfiles": "Tantano ny mombamomba",
       "advancedConfig": "Fandrindrana mandroso",
       "advancedConfigDescription": "Mihatra amin’ity sesiona ity. Raha tehirizina ho profile dia mitoetra ho an’ny manaraka.",

@@ -683,6 +683,9 @@
       "gitlabDescription": "Gennemgå merge requests på mobilen",
       "bitbucketOrgOnlyDescription": "Skift kontoen ovenfor til en organisation for at gennemgå dens pull requests i Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Denne konto har endnu ingen organisationer. Bitbucket pull requests kan gennemgås, når du opretter eller tilslutter dig en organisation.",
+      "gitlabReconnectAdminOnlyDescription": "Bed en organisationsejer, administrator eller faktureringsansvarlig om at tilslutte den.",
+      "bitbucketNotConnectedTitle": "Bitbucket er ikke tilsluttet",
+      "bitbucketAdminOnlyDescription": "Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen.",
       "contextLine": "Til {{organization}}",
       "contextLinePersonal": "Til din personlige konto"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Filerne på denne computer ændres ikke.",
       "pickProfile": "Vælg en profil",
       "noProfile": "Ingen profil",
+      "defaultProfileResolvesTo": "Henviser til {{name}}",
+      "defaultProfileResolvesToAccessibility": "Standard profil: {{name}}",
       "manageProfiles": "Administrer profiler",
       "advancedConfig": "Avanceret konfiguration",
       "advancedConfigDescription": "Gælder for denne session. Gemmer du den som profil, bevares den til næste gang.",

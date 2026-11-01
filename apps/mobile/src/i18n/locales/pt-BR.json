@@ -1835,6 +1835,8 @@
       "forkFilesUnchangedOnComputer": "Os arquivos neste computador não são alterados.",
       "pickProfile": "Escolha um perfil",
       "noProfile": "Sem perfil",
+      "defaultProfileResolvesTo": "Corresponde a {{name}}",
+      "defaultProfileResolvesToAccessibility": "Perfil padrão: {{name}}",
       "manageProfiles": "Gerenciar perfis",
       "advancedConfig": "Configuração avançada",
       "advancedConfigDescription": "Aplica-se a esta sessão. Salvar como perfil mantém para a próxima vez.",
@@ -2752,6 +2754,9 @@
       "gitlabDescription": "Revisar merge requests no celular",
       "bitbucketOrgOnlyDescription": "Mude a conta acima para uma organização para revisar as pull requests dela no Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta conta ainda não tem organizações. As pull requests do Bitbucket podem ser revisadas quando você criar ou entrar em uma organização.",
+      "gitlabReconnectAdminOnlyDescription": "Peça a um Proprietário, Administrador ou Gerente de cobrança da organização para reconectá-la.",
+      "bitbucketNotConnectedTitle": "O Bitbucket não está conectado",
+      "bitbucketAdminOnlyDescription": "Somente proprietários, administradores e gerentes de cobrança da organização podem conectá-lo.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para sua conta pessoal"
     },

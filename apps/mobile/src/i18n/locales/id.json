@@ -1843,6 +1843,8 @@
       "forkFilesUnchangedOnComputer": "File di komputer ini tidak diubah.",
       "pickProfile": "Pilih profil",
       "noProfile": "Tidak ada profil",
+      "defaultProfileResolvesTo": "Mengarah ke {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profil bawaan: {{name}}",
       "manageProfiles": "Kelola profil",
       "advancedConfig": "Konfigurasi Lanjutan",
       "advancedConfigDescription": "Berlaku untuk sesi ini. Menyimpannya sebagai profil akan menyimpannya untuk lain kali.",
@@ -2712,6 +2714,9 @@
       "gitlabDescription": "Tinjau merge request di perangkat seluler",
       "bitbucketOrgOnlyDescription": "Ganti akun di atas ke sebuah organisasi untuk meninjau PR Bitbucket-nya.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akun ini belum memiliki organisasi. PR Bitbucket dapat ditinjau setelah Anda membuat atau bergabung dengan organisasi.",
+      "gitlabReconnectAdminOnlyDescription": "Minta pemilik, admin, atau manajer penagihan organisasi untuk menghubungkannya.",
+      "bitbucketNotConnectedTitle": "Bitbucket tidak terhubung",
+      "bitbucketAdminOnlyDescription": "Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat menghubungkannya.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akun pribadi Anda"
     },

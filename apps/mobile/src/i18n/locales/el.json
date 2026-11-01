@@ -683,6 +683,9 @@
       "gitlabDescription": "Έλεγχος αιτημάτων συγχώνευσης στο κινητό",
       "bitbucketOrgOnlyDescription": "Άλλαξε τον λογαριασμό παραπάνω σε οργανισμό, για να αξιολογείς τα αιτήματα ενσωμάτωσής του στο Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Αυτός ο λογαριασμός δεν ανήκει ακόμα σε κανέναν οργανισμό. Μόλις δημιουργήσεις ή ενταχθείς σε οργανισμό, θα μπορείς να αξιολογείς αιτήματα ενσωμάτωσης στο Bitbucket.",
+      "gitlabReconnectAdminOnlyDescription": "Ζήτησε από έναν κάτοχο, διαχειριστή ή διαχειριστή χρέωσης του οργανισμού να το συνδέσει ξανά.",
+      "bitbucketNotConnectedTitle": "Το Bitbucket δεν είναι συνδεδεμένο",
+      "bitbucketAdminOnlyDescription": "Μόνο οι κάτοχοι του οργανισμού, οι διαχειριστές και οι διαχειριστές χρέωσης μπορούν να το συνδέσουν.",
       "contextLine": "Για {{organization}}",
       "contextLinePersonal": "Για τον προσωπικό σου χώρο"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Τα αρχεία σε αυτόν τον υπολογιστή δεν αλλάζουν.",
       "pickProfile": "Επίλεξε ένα προφίλ",
       "noProfile": "Χωρίς προφίλ",
+      "defaultProfileResolvesTo": "Αντιστοιχεί σε {{name}}",
+      "defaultProfileResolvesToAccessibility": "Προεπιλεγμένο προφίλ: {{name}}",
       "manageProfiles": "Διαχείριση προφίλ",
       "advancedConfig": "Προηγμένη διαμόρφωση",
       "advancedConfigDescription": "Ισχύει για αυτή τη συνεδρία. Η αποθήκευση ως προφίλ το διατηρεί για την επόμενη φορά.",

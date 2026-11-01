@@ -683,6 +683,9 @@
       "gitlabDescription": "Kagua maombi ya kuunganisha kwenye simu",
       "bitbucketOrgOnlyDescription": "Badilisha akaunti iliyo juu kuwa shirika ili kukagua maombi yake ya kuunganisha kwenye Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaunti hii haina shirika lolote kwa sasa. Unaweza kukagua maombi ya kuunganisha kwenye Bitbucket mara tu unapounda au kujiunga na shirika.",
+      "gitlabReconnectAdminOnlyDescription": "Omba mmiliki wa shirika, msimamizi, au msimamizi wa bili aiunganishe upya.",
+      "bitbucketNotConnectedTitle": "Bitbucket haijaunganishwa",
+      "bitbucketAdminOnlyDescription": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha.",
       "contextLine": "Kwa {{organization}}",
       "contextLinePersonal": "Kwa akaunti yako binafsi"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Faili kwenye kompyuta hii hazibadilishwi.",
       "pickProfile": "Chagua wasifu",
       "noProfile": "Hakuna wasifu",
+      "defaultProfileResolvesTo": "Imewekwa kwa {{name}}",
+      "defaultProfileResolvesToAccessibility": "Wasifu chaguomsingi: {{name}}",
       "manageProfiles": "Dhibiti wasifu",
       "advancedConfig": "Usanidi wa hali ya juu",
       "advancedConfigDescription": "Inatumika kwa kipindi hiki. Kuihifadhi kama wasifu huihifadhi kwa mara ijayo.",

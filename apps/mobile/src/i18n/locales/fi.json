@@ -683,6 +683,9 @@
       "gitlabDescription": "Katselmoi yhdistämispyyntöjä mobiililaitteella",
       "bitbucketOrgOnlyDescription": "Vaihda yllä oleva tili organisaatioon, niin voit katselmoida sen Bitbucket-muutospyyntöjä.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tällä tilillä ei ole vielä organisaatioita. Voit katselmoida Bitbucket-muutospyyntöjä, kun luot organisaation tai liityt sellaiseen.",
+      "gitlabReconnectAdminOnlyDescription": "Pyydä organisaation omistajaa, ylläpitäjää tai laskutusvastaavaa yhdistämään se.",
+      "bitbucketNotConnectedTitle": "Bitbucketia ei ole yhdistetty",
+      "bitbucketAdminOnlyDescription": "Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen.",
       "contextLine": "{{organization}}-organisaatiolle",
       "contextLinePersonal": "Henkilökohtaiselle tilillesi"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Tämän tietokoneen tiedostoja ei muuteta.",
       "pickProfile": "Valitse profiili",
       "noProfile": "Ei profiilia",
+      "defaultProfileResolvesTo": "Käytössä: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Oletusprofiili: {{name}}",
       "manageProfiles": "Hallitse profiileja",
       "advancedConfig": "Lisäasetukset",
       "advancedConfigDescription": "Koskee tätä istuntoa. Profiilina tallentaminen säilyttää sen seuraavaa kertaa varten.",

@@ -683,6 +683,9 @@
       "gitlabDescription": "Merge sorğularını mobil cihazda yoxla",
       "bitbucketOrgOnlyDescription": "Yuxarıdakı hesabı təşkilata keçir ki, onun Bitbucket birləşdirmə sorğularına baxış keçirəsən.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabda hələ ki, heç bir təşkilat yoxdur. Təşkilat yaratdıqdan və ya ona qoşulduqdan sonra Bitbucket birləşdirmə sorğularına baxış keçirə bilərsən.",
+      "gitlabReconnectAdminOnlyDescription": "Onu yenidən qoşmaq üçün təşkilat sahibindən, inzibatçıdan və ya ödəniş menecerindən xahiş edin.",
+      "bitbucketNotConnectedTitle": "Bitbucket qoşulmayıb",
+      "bitbucketAdminOnlyDescription": "Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
       "contextLine": "{{organization}} üçün",
       "contextLinePersonal": "Şəxsi hesabınız üçün"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Bu kompüterdəki fayllar dəyişdirilmir.",
       "pickProfile": "Profil seçin",
       "noProfile": "Profil yoxdur",
+      "defaultProfileResolvesTo": "{{name}} profilinə uyğun gəlir",
+      "defaultProfileResolvesToAccessibility": "Defolt profil: {{name}}",
       "manageProfiles": "Profilləri idarə edin",
       "advancedConfig": "Qabaqcıl Konfiqurasiya",
       "advancedConfigDescription": "Bu sessiya üçün keçərlidir. Profil kimi yadda saxlasanız, növbəti dəfə üçün qalır.",

@@ -713,6 +713,9 @@
       "gitlabDescription": "Peržiūrėti merge requests mobiliajame įrenginyje",
       "bitbucketOrgOnlyDescription": "Perjunk aukščiau esančią paskyrą į organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ši paskyra dar neturi jokių organizacijų. Sukūręs arba prisijungęs prie organizacijos galėsi peržiūrėti Bitbucket pakeitimų užklausas.",
+      "gitlabReconnectAdminOnlyDescription": "Paprašykite organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus ją prijungti iš naujo.",
+      "bitbucketNotConnectedTitle": "Bitbucket neprijungtas",
+      "bitbucketAdminOnlyDescription": "Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
       "contextLine": "Skirta {{organization}}",
       "contextLinePersonal": "Skirta asmeninei paskyrai"
     },
@@ -2444,6 +2447,8 @@
       "forkFilesUnchangedOnComputer": "Failai šiame kompiuteryje nekeičiami.",
       "pickProfile": "Pasirinkite profilį",
       "noProfile": "Nėra profilio",
+      "defaultProfileResolvesTo": "Atitinka: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Numatytasis profilis: {{name}}",
       "manageProfiles": "Tvarkyti profilius",
       "advancedConfig": "Išplėstinė konfigūracija",
       "advancedConfigDescription": "Taikoma šiai sesijai. Išsaugojus kaip profilį, jis išliks kitam kartui.",

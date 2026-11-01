@@ -1861,6 +1861,8 @@
       "forkFilesUnchangedOnComputer": "הקבצים במחשב הזה לא משתנים.",
       "pickProfile": "בחר פרופיל",
       "noProfile": "אין פרופיל",
+      "defaultProfileResolvesTo": "מוגדר ל-{{name}}",
+      "defaultProfileResolvesToAccessibility": "פרופיל ברירת מחדל: {{name}}",
       "manageProfiles": "נהל פרופילים",
       "advancedConfig": "תצורה מתקדמת",
       "advancedConfigDescription": "חל על ההפעלה הזו. שמירה כפרופיל שומרת אותו לפעם הבאה.",
@@ -2746,6 +2748,9 @@
       "gitlabDescription": "סקירת בקשות מיזוג בנייד",
       "bitbucketOrgOnlyDescription": "החליפו את החשבון שלמעלה לארגון כדי לסקור את בקשות המשיכה שלו ב-Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "לחשבון הזה אין עדיין ארגונים. אפשר לסקור בקשות משיכה ב-Bitbucket לאחר שתיצרו או תצטרפו לארגון.",
+      "gitlabReconnectAdminOnlyDescription": "בקש מבעלים של הארגון, מנהל או מנהל חיובים לחבר אותו מחדש.",
+      "bitbucketNotConnectedTitle": "Bitbucket לא מחובר",
+      "bitbucketAdminOnlyDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
       "contextLine": "עבור {{organization}}",
       "contextLinePersonal": "עבור החשבון האישי"
     },

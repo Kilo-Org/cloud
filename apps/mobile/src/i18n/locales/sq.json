@@ -683,6 +683,9 @@
       "gitlabDescription": "Rishiko kërkesat e integrimit në telefon",
       "bitbucketOrgOnlyDescription": "Ndrysho llogarinë e mësipërme në një organizatë për të rishikuar kërkesat për bashkim në Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Kjo llogari nuk ka ende organizata. Kërkesat për bashkim në Bitbucket mund të rishikohen sapo të krijosh ose të bëhesh pjesë e një organizate.",
+      "gitlabReconnectAdminOnlyDescription": "Kërkoni nga një pronar, administrator ose menaxher faturimi i organizatës ta rilidhë atë.",
+      "bitbucketNotConnectedTitle": "Bitbucket nuk është i lidhur",
+      "bitbucketAdminOnlyDescription": "Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund ta lidhin.",
       "contextLine": "Për {{organization}}",
       "contextLinePersonal": "Për llogarinë personale"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Skedarët në këtë kompjuter nuk ndryshohen.",
       "pickProfile": "Zgjidh një profil",
       "noProfile": "Nuk ka profil",
+      "defaultProfileResolvesTo": "Aktualisht: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profili i parazgjedhur: {{name}}",
       "manageProfiles": "Menaxho profilet",
       "advancedConfig": "Konfigurimi i avancuar",
       "advancedConfigDescription": "Vlen për këtë sesion. Ruajtja si profil e mban për herën tjetër.",

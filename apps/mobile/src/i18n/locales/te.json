@@ -683,6 +683,9 @@
       "gitlabDescription": "మొబైల్‌లో మెర్జ్ రిక్వెస్ట్‌లను సమీక్షించండి",
       "bitbucketOrgOnlyDescription": "దాని Bitbucket పుల్ రిక్వెస్ట్‌లను సమీక్షించడానికి పైన ఉన్న ఖాతాను ఒక సంస్థకు మార్చండి.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ఈ ఖాతాలో ఇంకా ఏ సంస్థా లేదు. మీరు ఒక సంస్థను సృష్టించిన లేదా అందులో చేరిన తర్వాతే Bitbucket పుల్ రిక్వెస్ట్‌లను సమీక్షించవచ్చు.",
+      "gitlabReconnectAdminOnlyDescription": "దానిని మళ్లీ కనెక్ట్ చేయమని సంస్థ యజమాని, నిర్వాహకుడు లేదా బిల్లింగ్ మేనేజర్‌ను అడగండి.",
+      "bitbucketNotConnectedTitle": "Bitbucket కనెక్ట్ కాలేదు",
+      "bitbucketAdminOnlyDescription": "దానిని సంస్థ యజమానులు, నిర్వాహకులు మరియు బిల్లింగ్ మేనేజర్లు మాత్రమే కనెక్ట్ చేయగలరు.",
       "contextLine": "{{organization}} కోసం",
       "contextLinePersonal": "మీ వ్యక్తిగత ఖాతా కోసం"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "ఈ కంప్యూటర్‌లోని ఫైల్‌లు మారవు.",
       "pickProfile": "ప్రొఫైల్‌ని ఎంచుకోండి",
       "noProfile": "ప్రొఫైల్ లేదు",
+      "defaultProfileResolvesTo": "ప్రస్తుతం {{name}}కి సెట్ చేయబడి ఉంది",
+      "defaultProfileResolvesToAccessibility": "డిఫాల్ట్ ప్రొఫైల్: {{name}}",
       "manageProfiles": "ప్రొఫైల్‌లను నిర్వహించండి",
       "advancedConfig": "అధునాతన కాన్ఫిగరేషన్",
       "advancedConfigDescription": "ఇది ఈ సెషన్‌కు వర్తిస్తుంది. ప్రొఫైల్‌గా సేవ్ చేస్తే తదుపరి సారికి ఉంటుంది.",

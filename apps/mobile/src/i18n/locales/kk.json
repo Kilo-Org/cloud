@@ -683,6 +683,9 @@
       "gitlabDescription": "Біріктіру сұрауларын мобильді құрылғыда тексеру",
       "bitbucketOrgOnlyDescription": "Жоғарыдағы тіркелгіні ұйымға ауыстырыңыз, оның Bitbucket тарту сұрауларын қарау үшін.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Бұл тіркелгіде әзірге ешбір ұйым жоқ. Ұйым құрғаннан немесе оған қосылғаннан кейін Bitbucket тарту сұрауларын қарауға болады.",
+      "gitlabReconnectAdminOnlyDescription": "Оны қайта қосу үшін ұйым иесіне, әкімшісіне немесе төлем менеджеріне жүгініңіз.",
+      "bitbucketNotConnectedTitle": "Bitbucket қосылмаған",
+      "bitbucketAdminOnlyDescription": "Оны тек ұйым иелері, әкімшілері мен төлем менеджерлері қоса алады.",
       "contextLine": "{{organization}} үшін",
       "contextLinePersonal": "Жеке аккаунтыңыз үшін"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Осы компьютердегі файлдар өзгертілмейді.",
       "pickProfile": "Профиль таңдаңыз",
       "noProfile": "Профиль жоқ",
+      "defaultProfileResolvesTo": "Қазіргі мәні: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Әдепкі профиль: {{name}}",
       "manageProfiles": "Профильдерді басқару",
       "advancedConfig": "Кеңейтілген конфигурация",
       "advancedConfigDescription": "Осы сеансқа қолданылады. Профиль ретінде сақтасаңыз, ол келесі жолы да қалады.",

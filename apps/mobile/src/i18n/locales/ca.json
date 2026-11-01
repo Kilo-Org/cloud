@@ -698,6 +698,9 @@
       "gitlabDescription": "Revisa les sol·licituds de fusió al mòbil",
       "bitbucketOrgOnlyDescription": "Canvia el compte de dalt a una organització per revisar-ne les sol·licituds d'integració a Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Aquest compte encara no té cap organització. Les sol·licituds d'integració de Bitbucket es poden revisar quan creeu o us uniu a una organització.",
+      "gitlabReconnectAdminOnlyDescription": "Demana a un Propietari, Administrador o Gestor de facturació de l'organització que la reconnecti.",
+      "bitbucketNotConnectedTitle": "Bitbucket no està connectat",
+      "bitbucketAdminOnlyDescription": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
       "contextLine": "Per a {{organization}}",
       "contextLinePersonal": "Per a ús personal"
     },
@@ -2407,6 +2410,8 @@
       "forkFilesUnchangedOnComputer": "Els fitxers d'aquest ordinador no es modifiquen.",
       "pickProfile": "Tria un perfil",
       "noProfile": "Sense perfil",
+      "defaultProfileResolvesTo": "Correspon a {{name}}",
+      "defaultProfileResolvesToAccessibility": "Perfil predeterminat: {{name}}",
       "manageProfiles": "Gestionar perfils",
       "advancedConfig": "Configuració avançada",
       "advancedConfigDescription": "S’aplica a aquesta sessió. Desar-ho com a perfil ho conserva per a la propera vegada.",

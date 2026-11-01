@@ -698,6 +698,9 @@
       "gitlabDescription": "Pārbaudīt merge requests mobilajā ierīcē",
       "bitbucketOrgOnlyDescription": "Pārslēdz augstāk redzamo kontu uz organizāciju, lai pārskatītu tās Bitbucket izmaiņu pieprasījumus.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Šim kontam vēl nav organizāciju. Bitbucket izmaiņu pieprasījumus varēs pārskatīt, kad izveidosi organizāciju vai tai pievienosies.",
+      "gitlabReconnectAdminOnlyDescription": "Lūdziet organizācijas īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot no jauna.",
+      "bitbucketNotConnectedTitle": "Bitbucket nav pievienots",
+      "bitbucketAdminOnlyDescription": "To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
       "contextLine": "Priekš {{organization}}",
       "contextLinePersonal": "Priekš personīgā konta"
     },
@@ -2407,6 +2410,8 @@
       "forkFilesUnchangedOnComputer": "Faili šajā datorā netiek mainīti.",
       "pickProfile": "Izvēlieties profilu",
       "noProfile": "Nav profila",
+      "defaultProfileResolvesTo": "Norāda uz {{name}}",
+      "defaultProfileResolvesToAccessibility": "Noklusējuma profils: {{name}}",
       "manageProfiles": "Pārvaldīt profilus",
       "advancedConfig": "Papildu konfigurācija",
       "advancedConfigDescription": "Attiecas uz šo sesiju. Saglabājot kā profilu, tas paliks nākamajai reizei.",

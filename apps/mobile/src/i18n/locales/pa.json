@@ -683,6 +683,9 @@
       "gitlabDescription": "ਮੋਬਾਈਲ 'ਤੇ ਮਰਜ਼ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰੋ",
       "bitbucketOrgOnlyDescription": "ਇਸ ਦੇ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਉੱਪਰ ਦਿੱਤੇ ਖਾਤੇ ਨੂੰ ਇੱਕ ਸੰਗਠਨ ਵਿੱਚ ਬਦਲੋ।",
       "bitbucketOrgOnlyNoOrganizationDescription": "ਇਸ ਖਾਤੇ ਵਿੱਚ ਹਾਲੇ ਕੋਈ ਸੰਗਠਨ ਨਹੀਂ ਹੈ। ਇੱਕ ਸੰਗਠਨ ਬਣਾਉਣ ਜਾਂ ਉਸ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਣ ਤੋਂ ਬਾਅਦ ਹੀ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕੀਤੀ ਜਾ ਸਕਦੀ ਹੈ।",
+      "gitlabReconnectAdminOnlyDescription": "ਕਿਸੇ ਸੰਗਠਨ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਇਸ ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਹੋ।",
+      "bitbucketNotConnectedTitle": "Bitbucket ਕਨੈਕਟ ਨਹੀਂ ਹੈ",
+      "bitbucketAdminOnlyDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।",
       "contextLine": "{{organization}} ਲਈ",
       "contextLinePersonal": "ਤੁਹਾਡੇ ਨਿੱਜੀ ਖਾਤੇ ਲਈ"
     },
@@ -2376,6 +2379,8 @@
       "forkFilesUnchangedOnComputer": "ਇਸ ਕੰਪਿਊਟਰ 'ਤੇ ਫ਼ਾਈਲਾਂ ਨਹੀਂ ਬਦਲੀਆਂ ਜਾਂਦੀਆਂ।",
       "pickProfile": "ਇੱਕ ਪ੍ਰੋਫਾਈਲ ਚੁਣੋ",
       "noProfile": "ਕੋਈ ਪ੍ਰੋਫਾਈਲ ਨਹੀਂ",
+      "defaultProfileResolvesTo": "ਮੌਜੂਦਾ ਤੌਰ ਤੇ {{name}}",
+      "defaultProfileResolvesToAccessibility": "ਪੂਰਵ-ਨਿਰਧਾਰਤ ਪ੍ਰੋਫਾਈਲ: {{name}}",
       "manageProfiles": "ਪ੍ਰੋਫਾਈਲਾਂ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰੋ",
       "advancedConfig": "ਉੱਨਤ ਸੰਰਚਨਾ",
       "advancedConfigDescription": "ਇਹ ਇਸ ਸੈਸ਼ਨ ’ਤੇ ਲਾਗੂ ਹੁੰਦਾ ਹੈ। ਪ੍ਰੋਫਾਈਲ ਵਜੋਂ ਸੁਰੱਖਿਅਤ ਕਰਨ ਨਾਲ ਇਹ ਅਗਲੀ ਵਾਰ ਲਈ ਰਹਿੰਦਾ ਹੈ।",

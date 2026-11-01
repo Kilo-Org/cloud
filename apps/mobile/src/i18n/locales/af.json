@@ -683,6 +683,9 @@
       "gitlabDescription": "Hersien merge requests op jou selfoon",
       "bitbucketOrgOnlyDescription": "Skakel die rekening hierbo oor na 'n organisasie om sy Bitbucket-trekversoeke te hersien.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Hierdie rekening het nog geen organisasies nie. Bitbucket-trekversoeke kan hersien word sodra jy 'n organisasie skep of by een aansluit.",
+      "gitlabReconnectAdminOnlyDescription": "Vra 'n organisasie-eienaar, administrateur of faktureringsbestuurder om dit weer te koppel.",
+      "bitbucketNotConnectedTitle": "Bitbucket is nie gekoppel nie",
+      "bitbucketAdminOnlyDescription": "Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel.",
       "contextLine": "Vir {{organization}}",
       "contextLinePersonal": "Vir jou persoonlike rekening"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Lêers op hierdie rekenaar word nie verander nie.",
       "pickProfile": "Kies 'n profiel",
       "noProfile": "Geen profiel nie",
+      "defaultProfileResolvesTo": "Los tans op {{name}}",
+      "defaultProfileResolvesToAccessibility": "Verstek profiel: {{name}}",
       "manageProfiles": "Bestuur profiele",
       "advancedConfig": "Gevorderde konfigurasie",
       "advancedConfigDescription": "Geld vir hierdie sessie. As jy dit as profiel stoor, bly dit vir volgende keer.",

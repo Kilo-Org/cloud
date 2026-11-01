@@ -728,6 +728,9 @@
       "gitlabDescription": "Irrevedi l-merge requests fuq il-mowbajl",
       "bitbucketOrgOnlyDescription": "Ibdel il-kont ta' fuq għal organizzazzjoni biex tirrevedi l-PRs Bitbucket tagħha.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Dan il-kont m'għandux organizzazzjonijiet għadu. Tista' tirrevedi l-PRs Bitbucket ladarba toħloq organizzazzjoni jew tingħaqad ma' waħda.",
+      "gitlabReconnectAdminOnlyDescription": "Itlob lis-sid ta' organizzazzjoni, lill-amministratur jew lill-maniġer tal-ħlasijiet biex jikkonnettjaha.",
+      "bitbucketNotConnectedTitle": "Bitbucket mhux konness",
+      "bitbucketAdminOnlyDescription": "Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh.",
       "contextLine": "Għal {{organization}}",
       "contextLinePersonal": "Għall-kont personali tiegħek"
     },
@@ -2481,6 +2484,8 @@
       "forkFilesUnchangedOnComputer": "Il-fajls fuq dan il-kompjuter ma jinbidlux.",
       "pickProfile": "Agħżel profil",
       "noProfile": "Ebda profil",
+      "defaultProfileResolvesTo": "Jikkorrispondi għal {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profil default: {{name}}",
       "manageProfiles": "Immaniġġja profili",
       "advancedConfig": "Konfigurazzjoni Avvanzata",
       "advancedConfigDescription": "Japplika għal din is-sessjoni. Is-salvataġġ bħala profil iżommu għall-ħin li jmiss.",

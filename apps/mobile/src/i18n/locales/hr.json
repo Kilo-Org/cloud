@@ -698,6 +698,9 @@
       "gitlabDescription": "Pregledaj merge requeste na mobitelu",
       "bitbucketOrgOnlyDescription": "Prebaci račun gore na organizaciju za pregled njenih zahtjeva za spajanje na Bitbucketu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj račun još nema organizacija. Zahtjeve za spajanje na Bitbucketu moći ćeš pregledati kada stvoriš ili se pridružiš organizaciji.",
+      "gitlabReconnectAdminOnlyDescription": "Zamolite vlasnika organizacije, administratora ili upravitelja naplate da ga ponovno poveže.",
+      "bitbucketNotConnectedTitle": "Bitbucket nije povezan",
+      "bitbucketAdminOnlyDescription": "Samo vlasnici organizacije, administratori i upravitelji naplate mogu ga povezati.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za osobni račun"
     },
@@ -2407,6 +2410,8 @@
       "forkFilesUnchangedOnComputer": "Datoteke na ovom računalu ostaju nepromijenjene.",
       "pickProfile": "Odaberite profil",
       "noProfile": "Bez profila",
+      "defaultProfileResolvesTo": "Odnosi se na {{name}}",
+      "defaultProfileResolvesToAccessibility": "Zadani profil: {{name}}",
       "manageProfiles": "Upravljanje profilima",
       "advancedConfig": "Napredna konfiguracija",
       "advancedConfigDescription": "Vrijedi za ovu sesiju. Spremanjem kao profil ostaje za sljedeći put.",

@@ -1843,6 +1843,8 @@
       "forkFilesUnchangedOnComputer": "このコンピューター上のファイルは変更されません。",
       "pickProfile": "プロフィールを選択してください",
       "noProfile": "プロフィールなし",
+      "defaultProfileResolvesTo": "{{name}}に対応",
+      "defaultProfileResolvesToAccessibility": "デフォルトのプロフィール：{{name}}",
       "manageProfiles": "プロフィールの管理",
       "advancedConfig": "高度な構成",
       "advancedConfigDescription": "このセッションに適用されます。プロフィールとして保存すると、次回も使えます。",
@@ -2712,6 +2714,9 @@
       "gitlabDescription": "モバイルでマージリクエストをレビュー",
       "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
       "bitbucketOrgOnlyNoOrganizationDescription": "このアカウントにはまだ組織がありません。組織を作成または参加すると、Bitbucketのプルリクエストをレビューできるようになります。",
+      "gitlabReconnectAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に再接続を依頼してください。",
+      "bitbucketNotConnectedTitle": "Bitbucketが接続されていません",
+      "bitbucketAdminOnlyDescription": "接続できるのは組織のオーナー、管理者、請求管理者のみです。",
       "contextLine": "{{organization}}用",
       "contextLinePersonal": "個人用"
     },

@@ -683,6 +683,9 @@
       "gitlabDescription": "Vaata liitmistaotlused mobiilis üle",
       "bitbucketOrgOnlyDescription": "Vaheta ülalolev konto organisatsiooni vastu, et selle Bitbucketi tõmbetaotlusi üle vaadata.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Sellel kontol pole veel organisatsioone. Bitbucketi tõmbetaotlusi saab üle vaadata, kui lood või liitud organisatsiooniga.",
+      "gitlabReconnectAdminOnlyDescription": "Palu organisatsiooni omanikul, administraatoril või arveldushalduril see uuesti ühendada.",
+      "bitbucketNotConnectedTitle": "Bitbucket pole ühendatud",
+      "bitbucketAdminOnlyDescription": "Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
       "contextLine": "{{organization}} jaoks",
       "contextLinePersonal": "Sinu isikliku konto jaoks"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Selle arvuti faile ei muudeta.",
       "pickProfile": "Vali profiil",
       "noProfile": "Profiili pole",
+      "defaultProfileResolvesTo": "Hetkel: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Vaikeprofiil: {{name}}",
       "manageProfiles": "Profiilide haldamine",
       "advancedConfig": "Täpsem konfiguratsioon",
       "advancedConfigDescription": "Kehtib selle seansi kohta. Profiilina salvestamine jätab selle järgmiseks korraks alles.",

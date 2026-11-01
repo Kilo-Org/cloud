@@ -683,6 +683,9 @@
       "gitlabDescription": "Merge so‘rovlari tekshiruvlarini mobil qurilmada bajarish",
       "bitbucketOrgOnlyDescription": "Yuqoridagi hisobni tashkilotga oʻtkazing, uning Bitbucket PRlarini koʻrib chiqish uchun.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hisobda hozircha hech qanday tashkilot yo‘q. Tashkilot yaratganingizdan yoki unga qo‘shilganingizdan so‘ng Bitbucket PRlarini ko‘rib chiqish mumkin.",
+      "gitlabReconnectAdminOnlyDescription": "Uni ulashni tashkilot Egasi, Administrator yoki To'lov menejeridan so'rang.",
+      "bitbucketNotConnectedTitle": "Bitbucket ulanmagan",
+      "bitbucketAdminOnlyDescription": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin.",
       "contextLine": "{{organization}} uchun",
       "contextLinePersonal": "Shaxsiy hisob uchun"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Bu kompyuterdagi fayllar o'zgartirilmaydi.",
       "pickProfile": "Profilni tanlang",
       "noProfile": "Profil yo'q",
+      "defaultProfileResolvesTo": "Hozir {{name}} profili",
+      "defaultProfileResolvesToAccessibility": "Standart profil: {{name}}",
       "manageProfiles": "Profillarni boshqarish",
       "advancedConfig": "Kengaytirilgan konfiguratsiya",
       "advancedConfigDescription": "Bu sessiya uchun amal qiladi. Profil sifatida saqlansa, keyingi safar uchun qoladi.",

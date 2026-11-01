@@ -683,6 +683,9 @@
       "gitlabDescription": "Hlola izicelo zokuhlanganisa kuselula",
       "bitbucketOrgOnlyDescription": "Shintsha i-akhawunti engenhla ibe yinhlangano ukuze ubuyekeze ama-PR ayo e-Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Le akhawunti ayikaze ibe nezinhlangano. Uma usuka inhlangano noma ungena kuyinhlangano, uzokwazi ukubuyekeza ama-PR e-Bitbucket.",
+      "gitlabReconnectAdminOnlyDescription": "Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuxhuma kabusha.",
+      "bitbucketNotConnectedTitle": "I-Bitbucket ayixhunyiwe",
+      "bitbucketAdminOnlyDescription": "Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma.",
       "contextLine": "Ku-{{organization}}",
       "contextLinePersonal": "Kwokomuntu siqu"
     },
@@ -2376,6 +2379,8 @@
       "forkFilesUnchangedOnComputer": "Amafayela akule khompyutha awashintshwa.",
       "pickProfile": "Khetha iphrofayela",
       "noProfile": "Ayikho iphrofayela",
+      "defaultProfileResolvesTo": "Okwamanje kungu-{{name}}",
+      "defaultProfileResolvesToAccessibility": "Iphrofayela ezenzakalelayo: {{name}}",
       "manageProfiles": "Phatha amaphrofayili",
       "advancedConfig": "Ukucushwa Okuthuthukile",
       "advancedConfigDescription": "Kusebenza kulesi sikhathi. Ukulondoloza njengephrofayela kukugcina okwesikhathi esizayo.",

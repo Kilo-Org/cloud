@@ -683,6 +683,9 @@
       "gitlabDescription": "Нэгтгэх хүсэлтийг гар утаснаас хянах",
       "bitbucketOrgOnlyDescription": "Түүний Bitbucket татах хүсэлтүүдийг шалгахын тулд дээрх бүртгэлийг байгууллагад шилжүүлнэ үү.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Энэ бүртгэлд одоогоор ямар ч байгууллага алга. Байгууллага үүсгэсэн эсвэл нэгэнд нэгдсэний дараа Bitbucket татах хүсэлтийг шалгах боломжтой болно.",
+      "gitlabReconnectAdminOnlyDescription": "Дахин холбуулахын тулд байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежерт хандана уу.",
+      "bitbucketNotConnectedTitle": "Bitbucket холбогдоогүй байна",
+      "bitbucketAdminOnlyDescription": "Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй.",
       "contextLine": "{{organization}}-ийн хувьд",
       "contextLinePersonal": "Хувийн дансны хувьд"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Энэ компьютер дээрх файлууд өөрчлөгдөхгүй.",
       "pickProfile": "Профайл сонгоно уу",
       "noProfile": "Профайл байхгүй",
+      "defaultProfileResolvesTo": "Одоо {{name}} гэж тохируулагдсан",
+      "defaultProfileResolvesToAccessibility": "Өгөгдмөл профайл: {{name}}",
       "manageProfiles": "Профайлуудыг удирдах",
       "advancedConfig": "Нарийвчилсан тохиргоо",
       "advancedConfigDescription": "Энэ сессэд хамаарна. Профайл болгон хадгалбал дараагийн удаад хадгалагдана.",

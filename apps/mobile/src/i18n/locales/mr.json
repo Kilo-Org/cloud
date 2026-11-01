@@ -683,6 +683,9 @@
       "gitlabDescription": "मोबाइलवर मर्ज रिक्वेस्टचे पुनरावलोकन करा",
       "bitbucketOrgOnlyDescription": "त्याच्या Bitbucket पुल रिक्वेस्ट तपासण्यासाठी वरील खाते एका संघटनेत बदला.",
       "bitbucketOrgOnlyNoOrganizationDescription": "या खात्याशी अजून कोणतीही संघटना जोडलेली नाही. संघटना तयार केल्यानंतर किंवा त्यात सामील झाल्यानंतर तुम्ही Bitbucket पुल रिक्वेस्ट तपासू शकता.",
+      "gitlabReconnectAdminOnlyDescription": "संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते पुन्हा जोडण्यास सांगा.",
+      "bitbucketNotConnectedTitle": "Bitbucket जोडलेले नाही",
+      "bitbucketAdminOnlyDescription": "केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात.",
       "contextLine": "{{organization}} साठी",
       "contextLinePersonal": "तुमच्या वैयक्तिक खात्यासाठी"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "या संगणकावरील फाइल्स बदलल्या जात नाहीत.",
       "pickProfile": "प्रोफाइल निवडा",
       "noProfile": "प्रोफाइल नाही",
+      "defaultProfileResolvesTo": "सध्या {{name}} वर सेट केले आहे",
+      "defaultProfileResolvesToAccessibility": "डीफॉल्ट प्रोफाइल: {{name}}",
       "manageProfiles": "प्रोफाइल व्यवस्थापित करा",
       "advancedConfig": "प्रगत कॉन्फिगरेशन",
       "advancedConfigDescription": "हे या सत्रावर लागू होते. प्रोफाइल म्हणून सेव्ह केल्यास ते पुढील वेळेसाठी राहते.",

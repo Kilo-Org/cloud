@@ -683,6 +683,9 @@
       "gitlabDescription": "Semak permintaan gabungan pada peranti mudah alih",
       "bitbucketOrgOnlyDescription": "Tukar akaun di atas kepada organisasi untuk menyemak permintaan tarik Bitbucket-nya.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaun ini belum mempunyai sebarang organisasi. Permintaan tarik Bitbucket boleh disemak setelah anda mencipta atau menyertai sebuah organisasi.",
+      "gitlabReconnectAdminOnlyDescription": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menyambungkannya.",
+      "bitbucketNotConnectedTitle": "Bitbucket tidak disambungkan",
+      "bitbucketAdminOnlyDescription": "Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akaun peribadi anda"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Fail pada komputer ini tidak diubah.",
       "pickProfile": "Pilih profil",
       "noProfile": "Tiada profil",
+      "defaultProfileResolvesTo": "Bersamaan dengan {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profil lalai: {{name}}",
       "manageProfiles": "Urus profil",
       "advancedConfig": "Konfigurasi Lanjutan",
       "advancedConfigDescription": "Terpakai untuk sesi ini. Menyimpannya sebagai profil mengekalkannya untuk kali seterusnya.",

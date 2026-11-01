@@ -683,6 +683,9 @@
       "gitlabDescription": "پێداچوونەوەی داواکارییەکانی تێکەڵکردن لە مۆبایلدا",
       "bitbucketOrgOnlyDescription": "هەژمارەی سەرەوە بگۆڕە بۆ ڕێکخراوێک بۆ پێداچوونەوەی داواکارییەکانی ڕاکێشانی Bitbucketی.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ئەم هەژمارە هێشتا هیچ ڕێکخراوێکی نییە. دوای دروستکردن یان بەشداریکردن لە ڕێکخراوێکدا، دەتوانیت پێداچوونەوەی داواکارییەکانی ڕاکێشانی Bitbucket بکەیت.",
+      "gitlabReconnectAdminOnlyDescription": "داوای لە خاوەنێکی ڕێکخراو، بەڕێوەبەرێک، یان بەڕێوەبەرێکی پارەدان بکە کە بیبەستێتەوە.",
+      "bitbucketNotConnectedTitle": "Bitbucket نەبەستراوە",
+      "bitbucketAdminOnlyDescription": "تەنها خاوەنەکانی ڕێکخراو، بەڕێوەبەران و بەڕێوەبەرانی پارەدان دەتوانن بیبەستن.",
       "contextLine": "بۆ {{organization}}",
       "contextLinePersonal": "بۆ هەژماری کەسی"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "فایلەکانی ئەم کۆمپیوتەرە ناگۆڕدرێن.",
       "pickProfile": "پڕۆفایلی هەڵبژێرە",
       "noProfile": "هیچ پڕۆفایلی نییە",
+      "defaultProfileResolvesTo": "ئێستا بۆ {{name}} دانراوە",
+      "defaultProfileResolvesToAccessibility": "پرۆفایلی پێشوەختە: {{name}}",
       "manageProfiles": "بەڕێوەبردنی پڕۆفایلی",
       "advancedConfig": "ڕێکخستنی پێشکەوتوو",
       "advancedConfigDescription": "بۆ ئەم دانیشتنە جێبەجێ دەبێت. پاشەکەوتکردن وەک پڕۆفایل بۆ جارێکی داهاتوو دەیپارێزێت.",

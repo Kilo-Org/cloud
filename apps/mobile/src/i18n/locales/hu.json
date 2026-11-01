@@ -683,6 +683,9 @@
       "gitlabDescription": "Merge requestek ellenőrzése mobilon",
       "bitbucketOrgOnlyDescription": "Váltsd a fenti fiókot egy szervezetre a Bitbucket-módosítási kérelmek kódellenőrzéséhez.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ez a fiók még nem tagja egyetlen szervezetnek sem. A Bitbucket-módosítási kérelmek kódellenőrzéséhez hozz létre egy szervezetet, vagy csatlakozz egyhez.",
+      "gitlabReconnectAdminOnlyDescription": "Kérd meg egy szervezet tulajdonosát, adminisztrátorát vagy számlázási felelősét, hogy újracsatlakoztassa.",
+      "bitbucketNotConnectedTitle": "A Bitbucket nincs csatlakoztatva",
+      "bitbucketAdminOnlyDescription": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
       "contextLine": "{{organization}} számára",
       "contextLinePersonal": "Személyes fiókodhoz"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "A számítógépen lévő fájlok nem változnak.",
       "pickProfile": "Válassz egy profilt",
       "noProfile": "Nincs profil",
+      "defaultProfileResolvesTo": "Jelenleg: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Alapértelmezett profil: {{name}}",
       "manageProfiles": "Profilok kezelése",
       "advancedConfig": "Speciális konfiguráció",
       "advancedConfigDescription": "Erre a munkamenetre érvényes. Profilként mentve a következő alkalomra is megmarad.",

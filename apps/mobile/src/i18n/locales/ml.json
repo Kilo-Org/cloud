@@ -683,6 +683,9 @@
       "gitlabDescription": "മൊബൈലിൽ മെർജ് റിക്വസ്റ്റുകൾ അവലോകനം ചെയ്യുക",
       "bitbucketOrgOnlyDescription": "അതിന്റെ Bitbucket പുൾ റിക്വസ്റ്റുകൾ പരിശോധിക്കാൻ മുകളിലുള്ള അക്കൗണ്ട് ഒരു ഓർഗനൈസേഷനിലേക്ക് മാറ്റുക.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ഈ അക്കൗണ്ടിൽ ഇതുവരെ ഓർഗനൈസേഷനുകളൊന്നുമില്ല. നിങ്ങൾ ഒരു ഓർഗനൈസേഷൻ സൃഷ്ടിക്കുകയോ ചേരുകയോ ചെയ്താൽ Bitbucket പുൾ റിക്വസ്റ്റുകൾ പരിശോധിക്കാൻ കഴിയും.",
+      "gitlabReconnectAdminOnlyDescription": "ഒരു ഓർഗനൈസേഷൻ ഉടമ, അഡ്മിൻ അല്ലെങ്കിൽ ബില്ലിംഗ് മാനേജറോട് അത് വീണ്ടും കണക്റ്റുചെയ്യാൻ ആവശ്യപ്പെടുക.",
+      "bitbucketNotConnectedTitle": "Bitbucket കണക്റ്റുചെയ്തിട്ടില്ല",
+      "bitbucketAdminOnlyDescription": "ഓർഗനൈസേഷൻ ഉടമകൾക്കും അഡ്മിനുകൾക്കും ബില്ലിംഗ് മാനേജർമാർക്കും മാത്രമേ അത് കണക്റ്റുചെയ്യാൻ കഴിയൂ.",
       "contextLine": "{{organization}}-ന്",
       "contextLinePersonal": "വ്യക്തിപരത്തിന്"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "ഈ കമ്പ്യൂട്ടറിലെ ഫയലുകൾക്ക് മാറ്റം വരുന്നില്ല.",
       "pickProfile": "ഒരു പ്രൊഫൈൽ തിരഞ്ഞെടുക്കുക",
       "noProfile": "പ്രൊഫൈൽ ഇല്ല",
+      "defaultProfileResolvesTo": "നിലവിൽ {{name}}",
+      "defaultProfileResolvesToAccessibility": "ഡിഫോൾട്ട് പ്രൊഫൈൽ: {{name}}",
       "manageProfiles": "പ്രൊഫൈലുകൾ കൈകാര്യം ചെയ്യുക",
       "advancedConfig": "വിപുലമായ കോൺഫിഗറേഷൻ",
       "advancedConfigDescription": "ഈ സെഷനിൽ ബാധകമാണ്. പ്രൊഫൈലായി സംരക്ഷിച്ചാൽ അടുത്ത തവണയ്ക്കും ഇത് നിലനിൽക്കും.",

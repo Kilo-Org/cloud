@@ -1879,6 +1879,8 @@
       "forkFilesUnchangedOnComputer": "Файлы на этом компьютере не изменятся.",
       "pickProfile": "Выберите профиль",
       "noProfile": "Нет профиля",
+      "defaultProfileResolvesTo": "Сейчас: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Профиль по умолчанию: {{name}}",
       "manageProfiles": "Управление профилями",
       "advancedConfig": "Расширенная конфигурация",
       "advancedConfigDescription": "Действует для этого сеанса. Сохранение в качестве профиля сохранит его на следующий раз.",
@@ -2780,6 +2782,9 @@
       "gitlabDescription": "Проверка запросов на слияние на телефоне",
       "bitbucketOrgOnlyDescription": "Переключите аккаунт, указанный выше, на организацию, чтобы просматривать её пул-реквесты в Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "В вашем аккаунте пока нет организаций. Пул-реквесты в Bitbucket можно просматривать после того, как вы создадите организацию или присоединитесь к ней.",
+      "gitlabReconnectAdminOnlyDescription": "Попросите Владельца, Администратора или Ответственного за оплату организации подключить его заново.",
+      "bitbucketNotConnectedTitle": "Bitbucket не подключён",
+      "bitbucketAdminOnlyDescription": "Подключить его могут только владельцы организации, администраторы и ответственные за оплату.",
       "contextLine": "Для {{organization}}",
       "contextLinePersonal": "Для личного аккаунта"
     },

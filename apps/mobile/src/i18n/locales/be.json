@@ -713,6 +713,9 @@
       "gitlabDescription": "Правяраць merge-запыты на мабільнай прыладзе",
       "bitbucketOrgOnlyDescription": "Пераключыце ўліковы запіс, указаны вышэй, на арганізацыю, каб разглядаць яе запыты на зліццё ў Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Гэты ўліковы запіс пакуль не мае арганізацый. Запыты на зліццё ў Bitbucket можна будзе разглядаць пасля таго, як вы створыце арганізацыю або далучыцеся да яе.",
+      "gitlabReconnectAdminOnlyDescription": "Папрасіце ўладальніка арганізацыі, адміністратара або кіраўніка плацяжоў падключыць яго.",
+      "bitbucketNotConnectedTitle": "Bitbucket не падключаны",
+      "bitbucketAdminOnlyDescription": "Толькі ўладальнікі, адміністратары і кіраўнікі плацяжоў арганізацыі могуць яго падключыць.",
       "contextLine": "Для {{organization}}",
       "contextLinePersonal": "Для асабістага ўліковага запісу"
     },
@@ -2444,6 +2447,8 @@
       "forkFilesUnchangedOnComputer": "Файлы на гэтым камп'ютары не змяняюцца.",
       "pickProfile": "Выберыце профіль",
       "noProfile": "Няма профілю",
+      "defaultProfileResolvesTo": "Супадае з {{name}}",
+      "defaultProfileResolvesToAccessibility": "Стандартны профіль: {{name}}",
       "manageProfiles": "Кіраванне профілямі",
       "advancedConfig": "Пашыраная канфігурацыя",
       "advancedConfigDescription": "Дзейнічае для гэтай сесіі. Калі захаваць як профіль, ён застанецца на наступны раз.",

@@ -683,6 +683,9 @@
       "gitlabDescription": "ກວດສອບ merge request ໃນມືຖື",
       "bitbucketOrgOnlyDescription": "ປ່ຽນບັນຊີຂ້າງເທິງໄປຫາອົງກອນເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ຂອງມັນ.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ບັນຊີນີ້ຍັງບໍ່ມີອົງກອນ. ທ່ານສາມາດກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ໄດ້ເມື່ອທ່ານສ້າງ ຫຼື ເຂົ້າຮ່ວມອົງກອນ.",
+      "gitlabReconnectAdminOnlyDescription": "ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເຊື່ອມຕໍ່.",
+      "bitbucketNotConnectedTitle": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket",
+      "bitbucketAdminOnlyDescription": "ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້.",
       "contextLine": "ສຳລັບ {{organization}}",
       "contextLinePersonal": "ສຳລັບບັນຊີສ່ວນຕົວຂອງທ່ານ"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "ໄຟລ໌ໃນຄອມພິວເຕີນີ້ບໍ່ມີການປ່ຽນແປງ.",
       "pickProfile": "ເລືອກໂປຣໄຟລ໌",
       "noProfile": "ບໍ່ມີໂປຣໄຟລ໌",
+      "defaultProfileResolvesTo": "ຕັ້ງຄ່າເປັນ {{name}}",
+      "defaultProfileResolvesToAccessibility": "ໂປຣໄຟລ໌ເລີ່ມຕົ້ນ: {{name}}",
       "manageProfiles": "ຈັດການໂປຣໄຟລ໌",
       "advancedConfig": "ການຕັ້ງຄ່າຂັ້ນສູງ",
       "advancedConfigDescription": "ໃຊ້ກັບເຊສຊັນນີ້. ການບັນທຶກເປັນໂປຣໄຟລ໌ຈະເກັບໄວ້ສຳລັບຄັ້ງຕໍ່ໄປ.",

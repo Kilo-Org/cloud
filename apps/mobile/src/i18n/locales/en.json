@@ -749,6 +749,9 @@
       "gitlabDescription": "Review merge requests on mobile",
       "bitbucketOrgOnlyDescription": "Switch the account above to an organization to review its Bitbucket pull requests.",
       "bitbucketOrgOnlyNoOrganizationDescription": "This account has no organizations yet. Bitbucket pull requests can be reviewed once you create or join an organization.",
+      "gitlabReconnectAdminOnlyDescription": "Ask an organization owner, admin, or billing manager to reconnect it.",
+      "bitbucketNotConnectedTitle": "Bitbucket not connected",
+      "bitbucketAdminOnlyDescription": "Only organization owners, admins, and billing managers can connect it.",
       "contextLine": "For {{organization}}",
       "contextLinePersonal": "For your personal account"
     },
@@ -2436,6 +2439,8 @@
       "forkFilesUnchangedOnComputer": "Files on this computer are not changed.",
       "pickProfile": "Pick a profile",
       "noProfile": "No profile",
+      "defaultProfileResolvesTo": "Resolves to {{name}}",
+      "defaultProfileResolvesToAccessibility": "Default profile: {{name}}",
       "manageProfiles": "Manage profiles",
       "advancedConfig": "Advanced Configuration",
       "advancedConfigDescription": "Applies to this session. Saving a profile keeps it for next time.",

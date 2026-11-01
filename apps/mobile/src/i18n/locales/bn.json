@@ -683,6 +683,9 @@
       "gitlabDescription": "মোবাইলে মার্জ রিকোয়েস্ট রিভিউ করুন",
       "bitbucketOrgOnlyDescription": "উপরে থাকা অ্যাকাউন্ট একটি অর্গানাইজেশনে সুইচ করুন তার Bitbucket পুল রিকোয়েস্ট রিভিউ করতে।",
       "bitbucketOrgOnlyNoOrganizationDescription": "এই অ্যাকাউন্টে এখনো কোনো অর্গানাইজেশন নেই। আপনি একটি অর্গানাইজেশন তৈরি করলে বা যুক্ত হলে Bitbucket পুল রিকোয়েস্ট রিভিউ করা যাবে।",
+      "gitlabReconnectAdminOnlyDescription": "এটি পুনরায় সংযুক্ত করতে একজন সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজারকে অনুরোধ করুন।",
+      "bitbucketNotConnectedTitle": "Bitbucket সংযুক্ত নয়",
+      "bitbucketAdminOnlyDescription": "শুধুমাত্র সংস্থার মালিক, অ্যাডমিন এবং বিলিং ম্যানেজাররা এটি সংযুক্ত করতে পারেন।",
       "contextLine": "{{organization}}-এর জন্য",
       "contextLinePersonal": "আপনার ব্যক্তিগত অ্যাকাউন্টের জন্য"
     },
@@ -2376,6 +2379,8 @@
       "forkFilesUnchangedOnComputer": "এই কম্পিউটারের ফাইলগুলো পরিবর্তন হবে না।",
       "pickProfile": "একটি প্রোফাইল বাছাই করুন",
       "noProfile": "কোনো প্রোফাইল নেই",
+      "defaultProfileResolvesTo": "বর্তমানে {{name}} নির্ধারিত",
+      "defaultProfileResolvesToAccessibility": "ডিফল্ট প্রোফাইল: {{name}}",
       "manageProfiles": "প্রোফাইল পরিচালনা করুন",
       "advancedConfig": "উন্নত কনফিগারেশন",
       "advancedConfigDescription": "এই সেশনের জন্য প্রযোজ্য। প্রোফাইল হিসেবে সংরক্ষণ করলে এটি পরের বারের জন্য থাকে।",

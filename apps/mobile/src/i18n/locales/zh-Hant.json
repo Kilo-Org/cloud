@@ -1843,6 +1843,8 @@
       "forkFilesUnchangedOnComputer": "此電腦上的檔案不會變更。",
       "pickProfile": "選擇個人資料",
       "noProfile": "沒有個人資料",
+      "defaultProfileResolvesTo": "目前對應 {{name}}",
+      "defaultProfileResolvesToAccessibility": "預設設定檔：{{name}}",
       "manageProfiles": "管理個人資料",
       "advancedConfig": "進階配置",
       "advancedConfigDescription": "僅對本次工作階段生效。另存為設定檔可供下次使用。",
@@ -2712,6 +2714,9 @@
       "gitlabDescription": "在行動裝置上審查合併請求",
       "bitbucketOrgOnlyDescription": "將上方的帳戶切換為某個組織，以便審查其 Bitbucket 提取請求。",
       "bitbucketOrgOnlyNoOrganizationDescription": "此帳戶尚無任何組織。建立或加入組織後，即可審查 Bitbucket 提取請求。",
+      "gitlabReconnectAdminOnlyDescription": "請要求組織的擁有者、管理員或帳單管理員重新連結。",
+      "bitbucketNotConnectedTitle": "尚未連結 Bitbucket",
+      "bitbucketAdminOnlyDescription": "只有組織擁有者、管理員和帳單管理員可以設定連結。",
       "contextLine": "適用於 {{organization}}",
       "contextLinePersonal": "適用於您的個人帳戶"
     },

@@ -683,6 +683,9 @@
       "gitlabDescription": "Taleefanka ku eeg merge request-yada",
       "bitbucketOrgOnlyDescription": "Beddel xisaabta kor ku qoran hay'ad si aad u eegto PR-yadeeda Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Xisaabtan weli ma laha hay'ado. PR-yada Bitbucket waxaad eegi kartaa marka aad abuurto ama aad ku biirto hay'ad.",
+      "gitlabReconnectAdminOnlyDescription": "Weydii mulkiile, maamule ama maareeyaha biilasha ururka si ay dib ugu xidhaan.",
+      "bitbucketNotConnectedTitle": "Bitbucket kuma xidhna",
+      "bitbucketAdminOnlyDescription": "Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa ku xidhi kara.",
       "contextLine": "{{organization}} u",
       "contextLinePersonal": "Akoonkaaga shakhsiyeed u"
     },
@@ -2370,6 +2373,8 @@
       "forkFilesUnchangedOnComputer": "Faylasha kombiyuutarkan lama beddelo.",
       "pickProfile": "Dooro profile",
       "noProfile": "Profile malaha",
+      "defaultProfileResolvesTo": "Waxay u dhigtaa {{name}}",
+      "defaultProfileResolvesToAccessibility": "Muuqaalka asalka ah: {{name}}",
       "manageProfiles": "Maamul profiles",
       "advancedConfig": "Habaynta Sare",
       "advancedConfigDescription": "Waxay khusaysaa fadhigan. Kaydinta Profile ahaan waxay u hayn doontaa marka xigta.",

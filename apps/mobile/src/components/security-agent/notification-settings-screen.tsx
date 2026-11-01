@@ -234,6 +234,10 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
           />
           {newFindingNotificationsEnabled && (
             <PillGroup
+              // Every header-shaped label carries the section gap above it
+              // (its own margin plus the section's `gap-3`), so the label
+              // groups with the list it names instead of the card before it.
+              className="mt-3"
               label={t('securityAgent.notifications.newFindingSeverityLabel')}
               options={severityOptions}
               value={newFindingNotificationMinSeverity}
@@ -272,13 +276,14 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
           {slaNotificationsEnabled && (
             <>
               <PillGroup
+                className="mt-3"
                 label={t('securityAgent.notifications.slaSeverityLabel')}
                 options={severityOptions}
                 value={slaNotificationMinSeverity}
                 disabled={!canManage}
                 onChange={setSlaNotificationMinSeverity}
               />
-              <View className="gap-2">
+              <View className="mt-3 gap-2">
                 <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
                   {t('securityAgent.notifications.slaLeadTimeLabel')}
                 </Text>

@@ -239,6 +239,11 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
           {autoAnalysisEnabled && (
             <>
               <PillGroup
+                // A picker label is a header: it takes the section gap above
+                // it (its own margin plus the section's `gap-3`), the same one
+                // the section headers above get, so every label groups with
+                // the list it names instead of the card before it.
+                className="mt-3"
                 label={t('securityAgent.automation.minimumSeverity')}
                 options={minSeverityOptions}
                 value={autoAnalysisMinSeverity}
@@ -270,6 +275,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
           {autoRemediationEnabled && (
             <>
               <PillGroup
+                className="mt-3"
                 label={t('securityAgent.automation.minimumSeverity')}
                 options={minSeverityOptions}
                 value={autoRemediationMinSeverity}
@@ -307,6 +313,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
           />
           {autoDismissEnabled && (
             <PillGroup
+              className="mt-3"
               label={t('securityAgent.automation.confidenceThreshold')}
               options={confidenceOptions}
               value={autoDismissConfidenceThreshold}

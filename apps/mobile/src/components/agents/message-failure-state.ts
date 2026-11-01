@@ -111,6 +111,45 @@ export type MessageFailure = {
   canCopy: boolean;
 };
 
+/**
+ * A sentence terminator, as the failure titles end their sentences: the Latin
+ * `.`, the Arabic and Persian `؟`, the ellipsis, and the script marks the
+ * catalogs use — Devanagari `।`, CJK `。`, Khmer `។`, Ethiopic `።`, Myanmar
+ * `။`, Urdu `۔`, Armenian `։`. Written out rather than `\p{Sentence_Terminal}`
+ * because Hermes does not promise Unicode binary property escapes, and
+ * `messageFailureLabel`'s catalog test fails when a terminator this misses
+ * reaches a label twice.
+ */
+const TRAILING_SENTENCE_TERMINATOR = /[.!?؟…।。។።။۔։]$/;
+
+/**
+ * The failed row's accessibility label: the failure title, then the retry line
+ * when the row offers one.
+ *
+ * The titles are whole sentences in most catalogs and carry their language's
+ * own terminator (`de` "Die Zustellung ist fehlgeschlagen."), while the footer
+ * templates add the terminator themselves (`{{title}}. Du kannst es erneut
+ * versuchen.`). Interpolating the title unchanged therefore printed it twice
+ * ("fehlgeschlagen.. Du kannst …") in every language whose title ends a
+ * sentence. Dropping the title's terminator here leaves the template's, which
+ * is the same character in every catalog, and keeps the visible title line —
+ * rendered from the title alone — exactly as translated.
+ *
+ * The title is resolved from `titleKey` at call time so the label follows a
+ * language switch even when a caller holds a failure selected earlier.
+ */
+export function messageFailureLabel(
+  failure: Pick<MessageFailure, 'titleKey' | 'canRetry'>
+): string {
+  const title = i18n.t(failure.titleKey).trimEnd().replace(TRAILING_SENTENCE_TERMINATOR, '');
+  return i18n.t(
+    failure.canRetry
+      ? 'agentChat.messageBubble.failureRetryAvailable'
+      : 'agentChat.messageBubble.failure',
+    { title }
+  );
+}
+
 export function selectMessageFailure(input: {
   deliveryState?: MessageDeliveryState;
   info: MessageInfo;

@@ -383,7 +383,6 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
         wastelandId,
         dolthubToken: tokenToStore,
         dolthubOrg: dolthubOrg.trim(),
-        rigHandle: rigHandle.trim(),
         isUpstreamAdmin,
       });
 

@@ -35,9 +35,10 @@ import {
 import { ReviewEventChips } from '@/components/pr-review/review-event-chips';
 import { Button } from '@/components/ui/button';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text } from '@/components/ui/text';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   focusAfterPendingCommentRemoval,
   PendingQueueHint,
@@ -183,6 +184,7 @@ type PrReviewSubmitProps = Readonly<{
 export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const { owner, repo, number, headSha, title, eyebrow, prRef, reviewEvents, onDismiss } = props;
   const router = useRouter();
+  const colors = useThemeColors();
   const pending = usePendingReview();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
@@ -212,8 +214,9 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const scrollRef = useRef<ScrollViewInstance | null>(null);
 
   // Seed the summary refs from the default-on footer preference once it
-  // resolves, before the summary field mounts, so a prefilled footer survives
-  // the async load without flashing an empty input.
+  // resolves, in the render that first sees the loaded preference and before
+  // the summary field mounts: the body below paints only after that, so its
+  // first frame already carries the prefilled footer and the settled hint.
   const footerSeededRef = useRef(false);
   const initialFooter =
     prReviewFooterLoaded && prReviewFooter ? buildReviewFooter(Platform.OS) : '';
@@ -407,6 +410,24 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
 
   const keyboardVisible = useFormSheetKeyboardVisible();
 
+  // The body paints only once both device reads it is built from have settled:
+  // the stored footer preference seeds the summary (and with it the summary
+  // field's height and whether the queue card shows the block reason or the
+  // hint) and the stored pending queue decides the card's rows. A provisional
+  // body painted first moved the queue card 8.4 dp and the submit CTA 5.7 dp
+  // under the reader when the preference arrived. The header stays, so the
+  // sheet keeps its frame while the reads resolve.
+  if (!pending.hydrated || !prReviewFooterLoaded) {
+    return (
+      <>
+        <PrFormSheetHeader title={title} eyebrow={eyebrow} onBack={onDismiss} />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="small" color={colors.mutedForeground} />
+        </View>
+      </>
+    );
+  }
+
   // Hint only when empty/stale — skips the long happy-path line that
   // pushed footer CTAs below half-detent. blockReason replaces
   // PendingQueueHint so empty-queue + COMMENT is not contradictory.
@@ -456,20 +477,16 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             <Text className="text-sm font-medium text-foreground">
               {t('prReview.submit.summaryOptional')}
             </Text>
-            {prReviewFooterLoaded ? (
-              <ReviewSummaryField
-                bodyRef={bodyRef}
-                inputRef={bodyInputRef}
-                isDisabled={isSubmitting}
-                defaultValue={initialFooter}
-                onChange={() => {
-                  setHasSummary(bodyRef.current.trim().length > 0);
-                  clearRecoverableError();
-                }}
-              />
-            ) : (
-              <Skeleton className="h-32" />
-            )}
+            <ReviewSummaryField
+              bodyRef={bodyRef}
+              inputRef={bodyInputRef}
+              isDisabled={isSubmitting}
+              defaultValue={initialFooter}
+              onChange={() => {
+                setHasSummary(bodyRef.current.trim().length > 0);
+                clearRecoverableError();
+              }}
+            />
           </View>
 
           <View className="gap-1 rounded-lg border border-hair-soft bg-secondary px-3 py-1.5">

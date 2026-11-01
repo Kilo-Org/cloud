@@ -4,8 +4,11 @@ import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
+import {
+  ProfileDescriptionField,
+  ProfileNameField,
+} from '@/components/profiles/profile-bound-field';
 import { SheetHeader } from '@/components/sheet-header';
-import { FormField } from '@/components/ui/form-field';
 import { Lock } from '@/components/ui/icons';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
@@ -118,28 +121,17 @@ export function SaveProfileSheet({
         showsVerticalScrollIndicator={false}
       >
         <Text variant="muted">{t('agentChat.newSession.saveProfileDescription')}</Text>
-        <FormField
-          label={t('profiles.nameLabel')}
+        <ProfileNameField
           defaultValue=""
-          placeholder={t('profiles.namePlaceholder')}
           error={nameField.error}
           disabled={isSubmitting}
-          required
-          autoCapitalize="sentences"
           autoCorrect={false}
-          returnKeyType="next"
           onChangeText={nameField.handleChangeText}
         />
-        <FormField
-          label={t('profiles.descriptionLabel')}
+        <ProfileDescriptionField
           defaultValue=""
-          placeholder={t('profiles.descriptionPlaceholder')}
           error={descriptionError ?? undefined}
           disabled={isSubmitting}
-          multiline
-          textAlignVertical="top"
-          className="min-h-20 leading-[1.25rem]"
-          autoCapitalize="sentences"
           autoCorrect={false}
           onChangeText={value => {
             descriptionRef.current = value;

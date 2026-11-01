@@ -154,6 +154,16 @@ type PreparedRoute = {
   home: string;
   kilo: WorktreeKiloAuth;
   env: Record<string, string>;
+  gitToken?: string;
+  redact: (text: string) => string;
+};
+
+/** Execution context for a bounded non-interactive command on a prepared route. */
+export type PreparedExecRoute = {
+  kiloSessionId: string;
+  directory: string;
+  env: Record<string, string>;
+  redact: (text: string) => string;
 };
 
 type PreparingRoute = {
@@ -186,6 +196,12 @@ export type PreparationManager = {
   preparedRoute(
     sessionId: string
   ): { runtimeKey: string; directory: string; roots: RouteRoot[] } | null;
+  /**
+   * The prepared route's environment and current output redactor for a bounded
+   * non-interactive exec, or null while the route is not attached. Credential
+   * refresh replaces the redactor along with the environment.
+   */
+  preparedExecRoute(sessionId: string): PreparedExecRoute | null;
   isPreparing(): boolean;
   /** In-flight prepares, for the native status line. */
   preparingCount(): number;
@@ -296,6 +312,26 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   // run concurrently for two sessions on the same directory. The lock is keyed
   // by directory, mirroring legacy `serializeWorkspacePreparation`.
   const workspacePreparations = new Map<string, Promise<void>>();
+
+  function createRouteRedactor(
+    spec: ControlPlaneRouteSpec,
+    env: Record<string, string>,
+    gitToken: string | undefined,
+    cloudAgentMcp: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'] | undefined
+  ): (text: string) => string {
+    return createSecretRedactor(
+      inheritedEnv,
+      [
+        spec.env ?? {},
+        {
+          ...env,
+          ...(gitToken ? { GIT_TOKEN: gitToken } : {}),
+          ...(cloudAgentMcp ? { CLOUD_AGENT_MCP_TOKEN: cloudAgentMcp.token } : {}),
+        },
+      ],
+      spec.secretEnvKeys ?? []
+    );
+  }
 
   const hasGit = deps.hasGit ?? defaultHasGit;
   const readStamp = deps.readStamp ?? readWorkspaceStamp;
@@ -1095,18 +1131,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         ),
         spec
       );
-      const redact = createSecretRedactor(
-        inheritedEnv,
-        [
-          spec.env ?? {},
-          {
-            ...builtEnv,
-            ...(credentials?.git?.token ? { GIT_TOKEN: credentials.git.token } : {}),
-            ...(cloudAgentMcp ? { CLOUD_AGENT_MCP_TOKEN: cloudAgentMcp.token } : {}),
-          },
-        ],
-        spec.secretEnvKeys ?? []
-      );
+      const redact = createRouteRedactor(spec, builtEnv, credentials?.git?.token, cloudAgentMcp);
       const needsWorkspace =
         spec.workspaceSnapshot !== undefined ||
         Boolean(spec.git) ||
@@ -1317,6 +1342,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         home,
         kilo: kiloAuth,
         env: builtEnv,
+        ...(credentials?.git?.token ? { gitToken: credentials.git.token } : {}),
+        redact,
       });
       // A credentials frame that arrived while this route was preparing is
       // applied before the route reports ready; a release during the apply
@@ -1405,6 +1432,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       route.spec
     );
     route.env = nextEnv;
+    route.gitToken = credentials.git?.token ?? route.gitToken;
+    route.redact = createRouteRedactor(route.spec, nextEnv, route.gitToken, cloudAgentMcp);
     await deps.runtimes.installCredentials(route.key, nextEnv, cloudAgentMcp);
     commitWorkspaceMcpGrant(route.key, cloudAgentMcp);
     if (credentials.git?.token && route.spec.git) {
@@ -1534,6 +1563,17 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       return route === undefined
         ? null
         : { runtimeKey: route.key, directory: route.directory, roots: routeRoots(route.spec) };
+    },
+    preparedExecRoute: sessionId => {
+      const route = prepared.get(sessionId);
+      return route === undefined
+        ? null
+        : {
+            kiloSessionId: route.spec.kiloSessionId,
+            directory: route.directory,
+            env: route.env,
+            redact: route.redact,
+          };
     },
     isPreparing: () => preparing.size > 0,
     preparingCount: () => preparing.size,

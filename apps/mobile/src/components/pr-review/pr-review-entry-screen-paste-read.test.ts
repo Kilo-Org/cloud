@@ -4,7 +4,14 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { find, flush, mocks, propsOf, renderLoaded, resetHookSlots } from './pr-review-entry-screen-test-utils';
+import {
+  find,
+  flush,
+  mocks,
+  propsOf,
+  renderLoaded,
+  resetHookSlots,
+} from './pr-review-entry-screen-test-utils';
 
 beforeEach(() => {
   vi.clearAllMocks();

@@ -100,9 +100,7 @@ export function PrReviewEntryScreen() {
       // prompt-free probe whether the clipboard still holds text before calling
       // it empty; a read that failed outright reports the same denial.
       announcingToast.error(
-        outcome.reason === 'denied'
-          ? prLinkToastPasteDeniedCopy()
-          : prLinkToastClipboardEmptyCopy()
+        outcome.reason === 'denied' ? prLinkToastPasteDeniedCopy() : prLinkToastClipboardEmptyCopy()
       );
       return;
     }

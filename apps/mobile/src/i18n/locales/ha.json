@@ -2063,7 +2063,8 @@
       "actionBlocked": "Ba za a iya kammala wannan aikin ba. Dole a gyara matsalar kafin a sake gwadawa.",
       "syncNoRepositories": "Babu wata ma'ajiyar bayanai da ke cikin iyakar daidaitawa. Zaɓi ma'ajiyoyin bayanai da Wakilin tsaro ke sa ido a kansu, sannan a sake daidaitawa.",
       "syncIntegrationInactive": "Haɗin GitHub na Wakilin tsaro ba ya aiki. Sake haɗa Kilo GitHub App, sannan ka sake daidaitawa.",
-      "syncMissingPermission": "Kilo GitHub App ba ya iya karanta vulnerability alerts. Ba da wannan izni a GitHub, sannan ka sake daidaitawa."
+      "syncMissingPermission": "Kilo GitHub App ba ya iya karanta vulnerability alerts. Ba da wannan izni a GitHub, sannan ka sake daidaitawa.",
+      "configConflict": "An canza saitunan Wakilin tsaro a wani wuri. Duba sabbin saitunan sannan ka sake adanawa."
     },
     "analysisState": {
       "queued": "Nazarin yana layin jira",

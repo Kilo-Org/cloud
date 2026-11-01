@@ -483,7 +483,9 @@ describe('useSaveSecurityAgentConfig (generation guard + scope)', () => {
     setQueryDataMock.mockClear();
     lastCapturedOptions?.onError?.(new Error('boom'), { slaEnabled: true }, context);
     expect(setQueryDataMock).toHaveBeenCalledTimes(1);
-    expect(toastErrorMock).toHaveBeenCalledWith('boom');
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'Could not complete this action. Please try again.'
+    );
   });
 });
 
@@ -524,7 +526,64 @@ describe('useSetSecurityAgentEnabled (generation guard + scope)', () => {
     setQueryDataMock.mockClear();
     lastCapturedOptions?.onError?.(new Error('boom'), { isEnabled: true }, context);
     expect(setQueryDataMock).toHaveBeenCalledTimes(1);
-    expect(toastErrorMock).toHaveBeenCalledWith('boom');
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'Could not complete this action. Please try again.'
+    );
+  });
+});
+
+describe('config-write onError copy', () => {
+  beforeEach(() => {
+    lastCapturedOptions = null;
+    getQueryDataMock.mockReset();
+    setQueryDataMock.mockReset();
+    cancelQueriesMock.mockReset();
+    toastErrorMock.mockReset();
+  });
+
+  it('shows the reauthorize copy when enabling is refused for the missing permission', () => {
+    useSetSecurityAgentEnabled('personal');
+    lastCapturedOptions?.onError?.(
+      Object.assign(new Error('GitHub App does not have vulnerability_alerts permission'), {
+        data: { code: 'PRECONDITION_FAILED', upstreamCode: 'security_sync_missing_permission' },
+      })
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'Security Agent needs permission to read Dependabot alerts. Re-authorize the GitHub App to grant this permission.'
+    );
+    // The server's sentence carries the raw snake_case permission key.
+    expect(toastErrorMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('vulnerability_alerts')
+    );
+  });
+
+  it('shows the conflict copy when the stored config changed elsewhere', () => {
+    useSaveSecurityAgentConfig('personal');
+    lastCapturedOptions?.onError?.(
+      Object.assign(
+        new Error(
+          'This configuration changed in another tab. Review the latest settings and save again.'
+        ),
+        { data: { code: 'CONFLICT', upstreamCode: 'security_config_conflict' } }
+      )
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'Security Agent settings changed elsewhere. Review the latest settings and save again.'
+    );
+  });
+
+  it('shows the generic sentence instead of an unmarked server message', () => {
+    useSetSecurityAgentEnabled('personal');
+    lastCapturedOptions?.onError?.(new Error('GitHub integration not found or inactive'));
+
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'Could not complete this action. Please try again.'
+    );
+    expect(toastErrorMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('GitHub integration not found')
+    );
   });
 });
 

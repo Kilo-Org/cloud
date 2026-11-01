@@ -2063,7 +2063,8 @@
       "actionBlocked": "Hierdie aksie kon nie voltooi word nie. Die probleem moet eers reggemaak word voordat jy weer kan probeer.",
       "syncNoRepositories": "Geen bewaarplekke is in die sinkroniseringsomvang nie. Kies die bewaarplekke wat die Sekuriteitsagent monitor en sinkroniseer dan weer.",
       "syncIntegrationInactive": "Die GitHub-verbinding vir die Sekuriteitsagent is nie aktief nie. Herkoppel die Kilo GitHub-app en sinkroniseer dan weer.",
-      "syncMissingPermission": "Die Kilo GitHub-app kan nie kwesbaarheidswaarskuwings lees nie. Verleen daardie toestemming in GitHub en sinkroniseer dan weer."
+      "syncMissingPermission": "Die Kilo GitHub-app kan nie kwesbaarheidswaarskuwings lees nie. Verleen daardie toestemming in GitHub en sinkroniseer dan weer.",
+      "configConflict": "Die Sekuriteitsagent se instellings is elders verander. Hersien die nuutste instellings en stoor weer."
     },
     "analysisState": {
       "queued": "Ontleding in die tou",

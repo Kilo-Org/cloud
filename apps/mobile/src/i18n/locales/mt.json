@@ -2162,7 +2162,8 @@
       "actionBlocked": "Ma stajniex nikkompletaw din l-azzjoni. Il-problema trid titfixxa qabel ma tista' terġa' tipprova.",
       "syncNoRepositories": "M'hemm l-ebda repożitorju fl-ambitu tas-sinkronizzazzjoni. Agħżel ir-repożitorji li jimmonitorja l-Aġent tas-sigurtà, imbagħad erġa' sinkronizza.",
       "syncIntegrationInactive": "Il-konnessjoni ma' GitHub għall-Aġent tas-sigurtà mhijiex attiva. Erġa' qabbad il-Kilo GitHub App, imbagħad erġa' sinkronizza.",
-      "syncMissingPermission": "L-app ta' Kilo fuq GitHub ma tistax taqra l-vulnerability alerts. Agħti dik il-permess f'GitHub, imbagħad erġa' sinkronizza."
+      "syncMissingPermission": "L-app ta' Kilo fuq GitHub ma tistax taqra l-vulnerability alerts. Agħti dik il-permess f'GitHub, imbagħad erġa' sinkronizza.",
+      "configConflict": "L-issettjar tal-aġent tas-sigurtà nbidlu x'imkien ieħor. Erġa' eżamina l-issettjar l-aktar riċenti u ssejvja mill-ġdid."
     },
     "analysisState": {
       "queued": "Analiżi fil-kju",

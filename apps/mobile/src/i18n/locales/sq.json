@@ -2063,7 +2063,8 @@
       "actionBlocked": "Ky veprim nuk u përfundua dot. Problemi duhet zgjidhur përpara se të provosh përsëri.",
       "syncNoRepositories": "Asnjë depo nuk është në fushëveprimin e sinkronizimit. Zgjidhni depot që monitoron Agjenti i sigurisë, më pas sinkronizoni përsëri.",
       "syncIntegrationInactive": "Lidhja e GitHub për Agjentin e sigurisë nuk është aktive. Rilidhni Kilo GitHub App, më pas sinkronizoni përsëri.",
-      "syncMissingPermission": "Aplikacioni Kilo për GitHub nuk mund të lexojë alarmet e dobësive. Jepi atë leje në GitHub, pastaj sinkronizo përsëri."
+      "syncMissingPermission": "Aplikacioni Kilo për GitHub nuk mund të lexojë alarmet e dobësive. Jepi atë leje në GitHub, pastaj sinkronizo përsëri.",
+      "configConflict": "Cilësimet e Agjentit të sigurisë u ndryshuan diku tjetër. Rishiko cilësimet më të fundit dhe ruaj përsëri."
     },
     "analysisState": {
       "queued": "Analiza në radhë",

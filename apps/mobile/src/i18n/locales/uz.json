@@ -2063,7 +2063,8 @@
       "actionBlocked": "Bu amalni tugallab bo'lmadi. Muammoni avval hal qilish kerak.",
       "syncNoRepositories": "Sinxronlash doirasida hech qanday repozitoriy yo'q. «Xavfsizlik agenti» kuzatadigan repozitoriylarni tanlang, so'ngra qayta sinxronlang.",
       "syncIntegrationInactive": "«Xavfsizlik agenti»ning GitHub ulanishi faol emas. Kilo GitHub App’ni qayta ulang, so‘ng qaytadan sinxronlang.",
-      "syncMissingPermission": "Kilo GitHub App zaiflik ogohlantirishlarini o'qiy olmaydi. GitHubda shu ruxsatni bering, so'ng yana sinxronlang."
+      "syncMissingPermission": "Kilo GitHub App zaiflik ogohlantirishlarini o'qiy olmaydi. GitHubda shu ruxsatni bering, so'ng yana sinxronlang.",
+      "configConflict": "Xavfsizlik agentining sozlamalari boshqa joyda o'zgartirildi. Eng so'nggi sozlamalarni ko'rib chiqib, qayta saqlang."
     },
     "analysisState": {
       "queued": "Tahlil navbatda",

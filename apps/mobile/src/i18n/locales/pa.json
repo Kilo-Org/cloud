@@ -2069,7 +2069,8 @@
       "actionBlocked": "ਇਹ ਕਾਰਵਾਈ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਸਮੱਸਿਆ ਨੂੰ ਠੀਕ ਕਰਨਾ ਜ਼ਰੂਰੀ ਹੈ।",
       "syncNoRepositories": "ਸਿੰਕ ਸਕੋਪ ਵਿੱਚ ਕੋਈ ਵੀ ਰਿਪੋਜ਼ਟਰੀ ਨਹੀਂ ਹੈ। ਉਹ ਰਿਪੋਜ਼ਟਰੀਆਂ ਚੁਣੋ ਜਿਨ੍ਹਾਂ ਦੀ ਨਿਗਰਾਨੀ ਸੁਰੱਖਿਆ ਏਜੰਟ ਕਰਦਾ ਹੈ, ਫਿਰ ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।",
       "syncIntegrationInactive": "«ਸੁਰੱਖਿਆ ਏਜੰਟ» ਲਈ GitHub ਕਨੈਕਸ਼ਨ ਸਰਗਰਮ ਨਹੀਂ ਹੈ। Kilo GitHub App ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।",
-      "syncMissingPermission": "Kilo GitHub App vulnerability alerts ਨਹੀਂ ਪੜ੍ਹ ਸਕਦੀ। GitHub ਵਿੱਚ ਇਹ ਅਨੁਮਤੀ ਦਿਓ, ਫਿਰ ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।"
+      "syncMissingPermission": "Kilo GitHub App vulnerability alerts ਨਹੀਂ ਪੜ੍ਹ ਸਕਦੀ। GitHub ਵਿੱਚ ਇਹ ਅਨੁਮਤੀ ਦਿਓ, ਫਿਰ ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।",
+      "configConflict": "ਸੁਰੱਖਿਆ ਏਜੰਟ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਕਿਤੇ ਹੋਰ ਬਦਲੀਆਂ ਗਈਆਂ ਹਨ। ਨਵੀਨਤਮ ਸੈਟਿੰਗਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਸੰਭਾਲੋ।"
     },
     "analysisState": {
       "queued": "ਵਿਸ਼ਲੇਸ਼ਣ ਕਤਾਰ ਵਿੱਚ",

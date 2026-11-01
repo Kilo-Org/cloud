@@ -2063,7 +2063,8 @@
       "actionBlocked": "Seda toimingut ei õnnestunud lõpule viia. Probleem tuleb kõigepealt lahendada.",
       "syncNoRepositories": "Sünkroonimisalasse ei kuulu ükski hoidla. Vali hoidlad, mida Turvaagent jälgib, ja sünkrooni seejärel uuesti.",
       "syncIntegrationInactive": "Turvaagendi GitHubi ühendus ei ole aktiivne. Ühendage Kilo GitHub App uuesti ja seejärel sünkroonige uuesti.",
-      "syncMissingPermission": "Kilo GitHub App ei saa haavatavusteateid lugeda. Andke see õigus GitHubis ja sünkroonige uuesti."
+      "syncMissingPermission": "Kilo GitHub App ei saa haavatavusteateid lugeda. Andke see õigus GitHubis ja sünkroonige uuesti.",
+      "configConflict": "Turvaagendi seadeid muudeti mujal. Vaata uusimad seaded üle ja salvesta uuesti."
     },
     "analysisState": {
       "queued": "Analüüs järjekorras",

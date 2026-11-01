@@ -2128,6 +2128,7 @@
       "syncNoRepositories": "No repositories are in the sync scope. Choose the repositories Security Agent monitors, then sync again.",
       "syncIntegrationInactive": "The GitHub connection for Security Agent is not active. Reconnect the Kilo GitHub App, then sync again.",
       "syncMissingPermission": "The Kilo GitHub App cannot read vulnerability alerts. Grant that permission in GitHub, then sync again.",
+      "configConflict": "Security Agent settings changed elsewhere. Review the latest settings and save again.",
       "actionFailed": "Could not complete this action. Please try again.",
       "actionBlocked": "Could not complete this action. The problem needs fixing before you can retry."
     },

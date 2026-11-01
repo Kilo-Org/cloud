@@ -2069,7 +2069,8 @@
       "actionBlocked": "මෙම ක්‍රියාව සම්පූර්ණ කිරීමට නොහැකි විය. නැවත උත්සාහ කිරීමට පෙර මෙම ගැටලුව විසඳිය යුතුය.",
       "syncNoRepositories": "සමමුහුර්ත පරාසයේ රෙපොසිටරි නොමැත. ආරක්ෂක නියෝජිතයා නිරීක්ෂණය කරන රෙපොසිටරි තෝරන්න, පසුව නැවත සමමුහුර්ත කරන්න.",
       "syncIntegrationInactive": "ආරක්ෂක නියෝජිතයා සඳහා GitHub සම්බන්ධතාව ක්‍රියාකාරී නොවේ. Kilo GitHub App නැවත සම්බන්ධ කර, පසුව නැවත සමමුහුර්ත කරන්න.",
-      "syncMissingPermission": "Kilo GitHub App විසින් vulnerability alerts කියවිය නොහැක. GitHub තුළ එම අවසරය ලබා දී, නැවත සමමුහුර්ත කරන්න."
+      "syncMissingPermission": "Kilo GitHub App විසින් vulnerability alerts කියවිය නොහැක. GitHub තුළ එම අවසරය ලබා දී, නැවත සමමුහුර්ත කරන්න.",
+      "configConflict": "ආරක්ෂක නියෝජිතයාගේ සැකසුම් වෙනත් තැනක වෙනස් කර ඇත. නවතම සැකසුම් සමාලෝචනය කර නැවත සුරකින්න."
     },
     "analysisState": {
       "queued": "විශ්ලේෂණය පෝලිමේ ඇත",

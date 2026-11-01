@@ -11,6 +11,8 @@
 
 import { i18n } from '@/i18n';
 import {
+  SECURITY_CONFIG_CONFLICT_CODE,
+  SECURITY_SYNC_PRECONDITION_CODES,
   type SecuritySyncPrecondition,
   securitySyncPreconditionForCode,
 } from '@kilocode/app-shared/security-agent';
@@ -268,6 +270,39 @@ export function securityMutationCopyKey(error: unknown): string | null {
 export function localizedSecurityMarkerMessage(error: unknown): string | null {
   const markerKey = error instanceof Error ? markerKeyFor(error) : null;
   return markerKey === null ? null : i18n.t(markerKey);
+}
+
+/**
+ * The catalog key a config-write refusal's copy comes from, or null when the
+ * server did not mark it. Enabling is refused for the same missing permission a
+ * manual sync is, so it reuses the scope screen's reauthorize sentence instead
+ * of the sync wording that ends "then sync again".
+ */
+function configMutationCopyKeyFor(error: unknown): string | null {
+  switch (readTrpcErrorField(error, 'upstreamCode')) {
+    case SECURITY_SYNC_PRECONDITION_CODES.missingPermission: {
+      return 'securityAgent.scopeEntry.reauthorizeDescription';
+    }
+    case SECURITY_CONFIG_CONFLICT_CODE: {
+      return 'securityAgent.mutations.configConflict';
+    }
+    default: {
+      return null;
+    }
+  }
+}
+
+/**
+ * The message a Security Agent config write shows when the server refuses it
+ * (the enable toggle and the settings save). A refusal the server marked with a
+ * stable code reads the catalog copy that names it; anything else reads the
+ * localized generic sentence, because the server's own English explanation
+ * cannot be translated on the device. The fallback follows the retry class, as
+ * the ledger mapper's does.
+ */
+export function securityConfigMutationMessage(error: unknown): string {
+  const copyKey = configMutationCopyKeyFor(error);
+  return i18n.t(copyKey ?? fallbackKeyFor(isSecuritySyncRetryable(error)));
 }
 
 /** Maps a sync failure onto retryable or terminal security copy. */

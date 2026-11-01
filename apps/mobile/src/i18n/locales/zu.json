@@ -2069,7 +2069,8 @@
       "actionBlocked": "Asikwazanga ukuqedela lesi senzo. Kumele kulungiswe le nkinga kuqala.",
       "syncNoRepositories": "Awekho amakhosombe akumkhawulo wokuvumelanisa. Khetha amakhosombe i-ejenti yezokuphepha ewabhekayo, bese uvumelanisa futhi.",
       "syncIntegrationInactive": "Ukuxhumana kwe-GitHub kwe-Ejenti yezokuphepha akusebenzi. Xhuma kabusha i-Kilo GitHub App, bese uvumelanisa futhi.",
-      "syncMissingPermission": "I-Kilo GitHub App ayikwazi ukufunda vulnerability alerts. Nika leyo mvume ku-GitHub, bese u-sync futhi."
+      "syncMissingPermission": "I-Kilo GitHub App ayikwazi ukufunda vulnerability alerts. Nika leyo mvume ku-GitHub, bese u-sync futhi.",
+      "configConflict": "Izilungiselelo ze-ejenti yezokuphepha zishintshiwe kwenye indawo. Buyekeza izilungiselelo zakamuva bese ulondoloza futhi."
     },
     "analysisState": {
       "queued": "Ukuhlaziywa kusemgqeni",

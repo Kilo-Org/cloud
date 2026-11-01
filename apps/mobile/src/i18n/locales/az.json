@@ -2063,7 +2063,8 @@
       "actionBlocked": "Bu işi tamamlamaq mümkün olmadı. Problemi həll etmədən yenidən cəhd etmək olmaz.",
       "syncNoRepositories": "Sinxronizasiya əhatəsində repozitoriya yoxdur. Təhlükəsizlik agentinin izlədiyi repozitoriyaları seç, sonra yenidən sinxronlaşdır.",
       "syncIntegrationInactive": "Təhlükəsizlik agenti üçün GitHub bağlantısı aktiv deyil. Kilo GitHub tətbiqini yenidən qoş, sonra yenidən sinxronlaşdır.",
-      "syncMissingPermission": "Kilo GitHub tətbiqi zəiflik xəbərdarlıqlarını oxuya bilmir. Həmin icazəni GitHub-da ver, sonra yenidən sinxronlaşdır."
+      "syncMissingPermission": "Kilo GitHub tətbiqi zəiflik xəbərdarlıqlarını oxuya bilmir. Həmin icazəni GitHub-da ver, sonra yenidən sinxronlaşdır.",
+      "configConflict": "Təhlükəsizlik agentinin parametrləri başqa yerdə dəyişdirildi. Ən son parametrlərə bax və yenidən yadda saxla."
     },
     "analysisState": {
       "queued": "Təhlil növbəyə alınıb",

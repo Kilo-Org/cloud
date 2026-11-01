@@ -2069,7 +2069,8 @@
       "actionBlocked": "Hindi magawang matapos ang aksyon na ito. Kailangang ayusin muna ang problema bago mo ito muling subukan.",
       "syncNoRepositories": "Walang mga repositoryo sa saklaw ng pag-sync. Piliin ang mga repositoryong sinusubaybayan ng Ahente sa seguridad, pagkatapos i-sync muli.",
       "syncIntegrationInactive": "Hindi aktibo ang koneksyon sa GitHub para sa Ahente sa seguridad. I-reconnect ang Kilo GitHub App, pagkatapos i-sync muli.",
-      "syncMissingPermission": "Hindi mabasa ng Kilo GitHub App ang vulnerability alerts. Ibigay ang pahintulot na iyon sa GitHub, pagkatapos ay mag-sync muli."
+      "syncMissingPermission": "Hindi mabasa ng Kilo GitHub App ang vulnerability alerts. Ibigay ang pahintulot na iyon sa GitHub, pagkatapos ay mag-sync muli.",
+      "configConflict": "Nagbago ang mga setting ng Ahente sa seguridad sa ibang lugar. Suriin ang pinakabagong mga setting at i-save muli."
     },
     "analysisState": {
       "queued": "Nakapila ang pagsusuri",

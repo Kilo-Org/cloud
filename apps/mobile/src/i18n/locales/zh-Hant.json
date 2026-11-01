@@ -1535,7 +1535,8 @@
       "actionBlocked": "無法完成此操作。必須先修正此問題，才能重試。",
       "syncNoRepositories": "同步範圍內沒有任何存放庫。請選擇資安代理程式要監控的存放庫，然後再次同步。",
       "syncIntegrationInactive": "資安代理程式的 GitHub 連線未啟用。請重新連線 Kilo GitHub App，然後再次同步。",
-      "syncMissingPermission": "Kilo GitHub App 無法讀取 vulnerability alerts。請在 GitHub 中授予該權限，然後再次同步。"
+      "syncMissingPermission": "Kilo GitHub App 無法讀取 vulnerability alerts。請在 GitHub 中授予該權限，然後再次同步。",
+      "configConflict": "資安代理程式的設定已在其他地方變更。請檢視最新設定並重新儲存。"
     },
     "analysisState": {
       "queued": "等待分析",

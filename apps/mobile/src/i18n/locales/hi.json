@@ -1541,7 +1541,8 @@
       "actionBlocked": "यह कार्रवाई पूरी नहीं की जा सकी। दोबारा कोशिश करने से पहले समस्या ठीक करना ज़रूरी है।",
       "syncNoRepositories": "सिंक स्कोप में कोई रिपॉज़िटरी नहीं है। जिन रिपॉज़िटरी की «सुरक्षा एजेंट» निगरानी करता है उन्हें चुनें, फिर दोबारा सिंक करें।",
       "syncIntegrationInactive": "«सुरक्षा एजेंट» के लिए GitHub कनेक्शन सक्रिय नहीं है। Kilo GitHub App को फिर से कनेक्ट करें, फिर दोबारा सिंक करें।",
-      "syncMissingPermission": "Kilo GitHub App vulnerability alerts नहीं पढ़ सकता। GitHub में वह अनुमति दें, फिर दोबारा सिंक करें।"
+      "syncMissingPermission": "Kilo GitHub App vulnerability alerts नहीं पढ़ सकता। GitHub में वह अनुमति दें, फिर दोबारा सिंक करें।",
+      "configConflict": "सुरक्षा एजेंट की सेटिंग्स कहीं और बदली गई हैं। नवीनतम सेटिंग्स देखें और फिर से सहेजें।"
     },
     "analysisState": {
       "queued": "विश्लेषण कतार में",

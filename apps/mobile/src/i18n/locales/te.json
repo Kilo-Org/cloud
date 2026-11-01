@@ -2063,7 +2063,8 @@
       "actionBlocked": "ఈ చర్యను పూర్తి చేయలేకపోయాము. మళ్లీ ప్రయత్నించే ముందు ఈ సమస్యను పరిష్కరించాలి.",
       "syncNoRepositories": "సింక్ పరిధిలో ఎలాంటి రిపాజిటరీలు లేవు. భద్రతా ఏజెంట్ పర్యవేక్షించే రిపాజిటరీలను ఎంచుకుని, ఆపై మళ్లీ సింక్ చేయండి.",
       "syncIntegrationInactive": "భద్రతా ఏజెంట్ కోసం GitHub కనెక్షన్ యాక్టివ్గా లేదు. Kilo GitHub Appను మళ్లీ కనెక్ట్ చేసి, ఆ తర్వాత మళ్లీ సింక్ చేయండి.",
-      "syncMissingPermission": "Kilo GitHub App vulnerability alertsను చదవలేదు. GitHubలో ఆ అనుమతిని ఇవ్వండి, ఆపై మళ్లీ సింక్ చేయండి."
+      "syncMissingPermission": "Kilo GitHub App vulnerability alertsను చదవలేదు. GitHubలో ఆ అనుమతిని ఇవ్వండి, ఆపై మళ్లీ సింక్ చేయండి.",
+      "configConflict": "భద్రతా ఏజెంట్ సెట్టింగ్‌లు మరో చోట మార్చబడ్డాయి. తాజా సెట్టింగ్‌లను సమీక్షించి మళ్లీ సేవ్ చేయండి."
     },
     "analysisState": {
       "queued": "విశ్లేషణ క్యూలో ఉంది",

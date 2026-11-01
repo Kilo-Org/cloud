@@ -2063,7 +2063,8 @@
       "actionBlocked": "Enweghị ike imecha omume a. A ghaghị idozi nsogbu a tupu ị nwee ike ịnwa ọzọ.",
       "syncNoRepositories": "Ọnweghị repository dị n'ime oke sync. Họrọ repositories ndị Onye enyemaka nchebe na-enyocha, wee sync ọzọ.",
       "syncIntegrationInactive": "Njikọ GitHub maka Onye enyemaka nchebe adịghị arụ ọrụ. Jikọọ Kilo GitHub App ọzọ, wee megharịa ọzọ.",
-      "syncMissingPermission": "Kilo GitHub App enweghị ike ịgụ vulnerability alerts. Nye ikike ahụ na GitHub, wee sync ọzọ."
+      "syncMissingPermission": "Kilo GitHub App enweghị ike ịgụ vulnerability alerts. Nye ikike ahụ na GitHub, wee sync ọzọ.",
+      "configConflict": "Agbanweela ntọala Onye enyemaka nchebe n'ebe ọzọ. Lelee ntọala kachasị ọhụrụ ma chekwaa ọzọ."
     },
     "analysisState": {
       "queued": "Nyocha dị n'ahịrị",

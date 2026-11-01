@@ -2069,7 +2069,8 @@
       "actionBlocked": "এই কাজটি সম্পন্ন করা যায়নি। সমস্যাটি ঠিক করা না হলে আবার চেষ্টা করা যাবে না।",
       "syncNoRepositories": "সিঙ্ক স্কোপে কোনো রিপোজিটরি নেই। নিরাপত্তা এজেন্ট যে রিপোজিটরিগুলো মনিটর করে সেগুলো বেছে নিন, তারপর আবার সিঙ্ক করুন।",
       "syncIntegrationInactive": "«নিরাপত্তা এজেন্ট»-এর জন্য GitHub সংযোগ সক্রিয় নয়। Kilo GitHub App আবার সংযুক্ত করুন, তারপর আবার সিঙ্ক করুন।",
-      "syncMissingPermission": "Kilo GitHub App vulnerability alerts পড়তে পারে না। GitHub-এ সেই অনুমতি দিন, তারপর আবার সিঙ্ক করুন।"
+      "syncMissingPermission": "Kilo GitHub App vulnerability alerts পড়তে পারে না। GitHub-এ সেই অনুমতি দিন, তারপর আবার সিঙ্ক করুন।",
+      "configConflict": "নিরাপত্তা এজেন্টের সেটিংস অন্য জায়গায় পরিবর্তিত হয়েছে। সর্বশেষ সেটিংস দেখে আবার সংরক্ষণ করুন।"
     },
     "analysisState": {
       "queued": "বিশ্লেষণ সারিতে আছে",

@@ -1535,7 +1535,8 @@
       "actionBlocked": "Diese Aktion konnte nicht abgeschlossen werden. Das Problem muss behoben werden, bevor du es erneut versuchen kannst.",
       "syncNoRepositories": "Es befinden sich keine Repositories im Sync-Bereich. Wähle die Repositories aus, die der Sicherheitsagent überwacht, und synchronisiere dann erneut.",
       "syncIntegrationInactive": "Die GitHub-Verbindung für den Sicherheitsagenten ist nicht aktiv. Verbinde die Kilo-GitHub-App erneut und synchronisiere dann noch einmal.",
-      "syncMissingPermission": "Die Kilo-GitHub-App kann keine Schwachstellenwarnungen lesen. Erteile diese Berechtigung in GitHub und synchronisiere dann noch einmal."
+      "syncMissingPermission": "Die Kilo-GitHub-App kann keine Schwachstellenwarnungen lesen. Erteile diese Berechtigung in GitHub und synchronisiere dann noch einmal.",
+      "configConflict": "Die Einstellungen des Sicherheitsagenten wurden anderswo geändert. Prüfe die neuesten Einstellungen und speichere erneut."
     },
     "analysisState": {
       "queued": "Analyse in der Warteschlange",

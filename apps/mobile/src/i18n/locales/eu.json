@@ -2063,7 +2063,8 @@
       "actionBlocked": "Ezin izan da ekintza hau burutu. Arazoa konpondu behar da berriro saiatu aurretik.",
       "syncNoRepositories": "Ez dago biltegirik sinkronizazio-esparruan. Aukeratu Segurtasun-agenteak gainbegiratzen dituen biltegiak, eta gero sinkronizatu berriro.",
       "syncIntegrationInactive": "Segurtasun-agentearen GitHub konexioa ez dago aktibo. Konektatu berriro Kilo GitHub App, eta gero sinkronizatu berriro.",
-      "syncMissingPermission": "Kilo GitHub App-ek ezin ditu vulnerability alerts irakurri. Eman baimen hori GitHub-en, eta gero sinkronizatu berriro."
+      "syncMissingPermission": "Kilo GitHub App-ek ezin ditu vulnerability alerts irakurri. Eman baimen hori GitHub-en, eta gero sinkronizatu berriro.",
+      "configConflict": "Segurtasun-agentearen ezarpenak beste leku batean aldatu dira. Berrikusi azken ezarpenak eta gorde berriro."
     },
     "analysisState": {
       "queued": "Azterketa ilaran",

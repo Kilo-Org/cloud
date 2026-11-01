@@ -21,7 +21,7 @@ import {
   SECURITY_AMBIGUOUS_MESSAGE,
   SECURITY_SERVICE_UNAVAILABLE_MESSAGE,
 } from '@/lib/security-agent-ledger';
-import { buildLocalizedMetrics, DashboardScreen } from './dashboard-screen';
+import { buildLocalizedMetrics, DashboardLoadingView, DashboardScreen } from './dashboard-screen';
 
 // The security mutation hooks hoist an operation key through
 // `@/lib/operation-key`, whose expo-crypto root import loads a native binding
@@ -270,7 +270,12 @@ vi.mock('@/lib/utils', () => ({
 // The header the dashboard paints: its title names the scope, the eyebrow the
 // product. Captured per render so a test can assert what a reader reads.
 const headers = vi.hoisted(() => ({
-  props: [] as { title?: string; eyebrow?: string }[],
+  props: [] as {
+    title?: string;
+    eyebrow?: string;
+    headerRight?: unknown;
+    headerRightWidth?: number;
+  }[],
 }));
 // The shared membership list the scope title resolves from. The title never
 // fetches it, so the mock only needs the cache key it reads.
@@ -317,6 +322,24 @@ function renderScreen(scope = 'personal', memberships?: unknown[]): R {
   const ref: { current: R | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(dashboardTree(scope, memberships));
+  });
+  const r = ref.current;
+  if (!r) {
+    throw new Error('renderer was not created');
+  }
+  return r;
+}
+
+/** A bare element inside the provider stack `DashboardScreen`'s hooks need. */
+function renderElement(element: ReactElement): R {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  const ref: { current: R | undefined } = { current: undefined };
+  act(() => {
+    ref.current = TestRenderer.create(
+      createElement(QueryClientProvider, { client: queryClient }, element)
+    );
   });
   const r = ref.current;
   if (!r) {
@@ -1664,5 +1687,41 @@ describe('DashboardScreen pending stats', () => {
     renderScreen();
 
     expect(sectionsProps.props).toHaveLength(0);
+  });
+});
+
+describe('DashboardLoadingView frame', () => {
+  // The entry paints this frame while its config read answers, so it has to be
+  // the dashboard's own layout: a placeholder that drops the header actions and
+  // the filter row moves the whole screen when the dashboard replaces it.
+  it('keeps the header actions, the filter row and one skeleton per metric card', () => {
+    capability.canManage = false;
+    headers.props = [];
+
+    const root = renderElement(createElement(DashboardLoadingView, { scope: 'personal' }));
+    const header = headers.props.at(-1);
+    if (!header) {
+      throw new Error('the loading frame rendered no header');
+    }
+    const actions = (
+      header.headerRight as ReactElement<{
+        children: (ReactElement<{ accessibilityLabel?: string }> | null)[];
+      }>
+    ).props.children;
+    const labels = actions
+      .map(action => (action ? action.props.accessibilityLabel : undefined))
+      .filter((label): label is string => label !== undefined);
+
+    expect(header.eyebrow).toBe(i18n.t('common.securityAgent'));
+    expect(labels).toEqual([i18n.t('common.findings'), i18n.t('securityAgent.dashboard.settings')]);
+    expect(renderedTexts(root.root)).toContain(i18n.t('common.allRepositories'));
+    expect(findSyncButton(root.root).props.disabled).toBe(true);
+    const skeletons = root.root.findAll(
+      n => typeof n.type === 'string' && (n.type as string) === 'Skeleton'
+    );
+    // One tile per metric card — at the cards' own width — plus the status
+    // line's placeholder, which keeps that line's height until the read lands.
+    expect(skeletons.filter(n => String(n.props.className).includes('w-[47%]'))).toHaveLength(4);
+    expect(skeletons).toHaveLength(5);
   });
 });

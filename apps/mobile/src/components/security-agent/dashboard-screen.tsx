@@ -58,7 +58,7 @@ import {
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
-import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { type SinglePushRoute, useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -217,6 +217,79 @@ export function buildLocalizedMetrics(
       detail: '',
       tone: 'neutral' as const,
     })
+  );
+}
+
+// The dashboard's own header, shared with the frame the entry paints while its
+// config read answers: the same title, the same actions and the same reserved
+// width, so a scope that lands here does not swap one header for another.
+function DashboardHeader({
+  scope,
+  scopeTitle,
+  canManage,
+  pushOnce,
+}: Readonly<{
+  scope: string;
+  scopeTitle: string;
+  canManage: boolean;
+  // The screen's one push guard. The header draws its actions but does not own
+  // the hook: a second instance would guard the same presses with a second
+  // state object and register a second focus reset.
+  pushOnce: SinglePushRoute;
+}>) {
+  const colors = useThemeColors();
+  const { t } = useTranslation();
+  return (
+    <ScreenHeader
+      className="px-6"
+      title={scopeTitle}
+      eyebrow={t('common.securityAgent')}
+      // The scope name is the one thing that tells two organizations apart,
+      // so it wraps to a second line rather than ellipsizing its tail.
+      titleNumberOfLines={2}
+      // The trailing cluster's laid-out width — 48 dp icon boxes 7 dp apart:
+      // findings and settings, plus the audit overflow when the viewer can
+      // manage the agent. Declaring 44 dp boxes understated the cluster, so
+      // the stacking decision believed the heading kept 48 dp more than it
+      // has. The widths the controls actually render are what it reserves.
+      headerRightWidth={canManage ? 3 * 48 + 2 * 7 : 2 * 48 + 7}
+      headerRight={
+        <View className="flex-row items-center gap-2">
+          <IconButton
+            onPress={() => {
+              pushOnce(getSecurityAgentPath(scope, 'findings'));
+            }}
+            accessibilityLabel={t('common.findings')}
+          >
+            <ShieldAlert size={20} color={colors.foreground} />
+          </IconButton>
+          <IconButton
+            onPress={() => {
+              pushOnce(getSecurityAgentPath(scope, 'settings'));
+            }}
+            accessibilityLabel={t('securityAgent.dashboard.settings')}
+          >
+            <Settings size={20} color={colors.foreground} />
+          </IconButton>
+          {canManage ? <AuditReportButton scope={scope} /> : null}
+        </View>
+      }
+    />
+  );
+}
+
+// One skeleton tile per metric card the loaded grid shows, on the cards' own
+// width and gap, so the grid that replaces them keeps every frame it painted.
+// The sync-status read joins the stats read here because `neverSynced` decides
+// whether a tile carries a detail line.
+function DashboardMetricsSkeleton() {
+  return (
+    <View className="flex-row flex-wrap gap-3">
+      <Skeleton className="h-24 w-[47%] rounded-lg" />
+      <Skeleton className="h-24 w-[47%] rounded-lg" />
+      <Skeleton className="h-24 w-[47%] rounded-lg" />
+      <Skeleton className="h-24 w-[47%] rounded-lg" />
+    </View>
   );
 }
 
@@ -549,40 +622,11 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        className="px-6"
-        title={scopeTitle}
-        eyebrow={t('common.securityAgent')}
-        // The scope name is the one thing that tells two organizations apart,
-        // so it wraps to a second line rather than ellipsizing its tail.
-        titleNumberOfLines={2}
-        // The trailing cluster's laid-out width — 48 dp icon boxes 7 dp apart:
-        // findings and settings, plus the audit overflow when the viewer can
-        // manage the agent. Declaring 44 dp boxes understated the cluster, so
-        // the stacking decision believed the heading kept 48 dp more than it
-        // has. The widths the controls actually render are what it reserves.
-        headerRightWidth={canManage ? 3 * 48 + 2 * 7 : 2 * 48 + 7}
-        headerRight={
-          <View className="flex-row items-center gap-2">
-            <IconButton
-              onPress={() => {
-                pushOnce(getSecurityAgentPath(scope, 'findings'));
-              }}
-              accessibilityLabel={t('common.findings')}
-            >
-              <ShieldAlert size={20} color={colors.foreground} />
-            </IconButton>
-            <IconButton
-              onPress={() => {
-                pushOnce(getSecurityAgentPath(scope, 'settings'));
-              }}
-              accessibilityLabel={t('securityAgent.dashboard.settings')}
-            >
-              <Settings size={20} color={colors.foreground} />
-            </IconButton>
-            {canManage ? <AuditReportButton scope={scope} /> : null}
-          </View>
-        }
+      <DashboardHeader
+        scope={scope}
+        scopeTitle={scopeTitle}
+        canManage={canManage}
+        pushOnce={pushOnce}
       />
       <TabScreenScrollView
         className="flex-1"
@@ -726,12 +770,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             the measured shape first would shrink by a line the moment the read
             resolved, which moves the whole dashboard. */}
         {dashboardStats.isPending || lastSync.isPending ? (
-          <View className="flex-row flex-wrap gap-3">
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-          </View>
+          <DashboardMetricsSkeleton />
         ) : (
           <View className="flex-row flex-wrap gap-3">
             {metrics.map(metric => (
@@ -804,6 +843,58 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             neverSynced={neverSynced}
           />
         ) : null}
+      </TabScreenScrollView>
+    </View>
+  );
+}
+
+// The frame a Security Agent entry paints while its config read is still
+// unanswered. A scope that lands on the dashboard must not show a centered
+// placeholder first: the header actions, the filter row and the tile frames are
+// the layout the reader is about to get, so the loading frame keeps them and
+// only the values wait. The filter names the loaded default and the sync
+// control is the same 48 dp box in its disabled state, so neither moves when
+// the reads answer.
+export function DashboardLoadingView({ scope }: Readonly<{ scope: string }>) {
+  const pushOnce = useSinglePushRoute();
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const scopeTitle = useSecurityScopeTitle(scope);
+  const capability = useSecurityAgentCapability(scope);
+  return (
+    <View className="flex-1 bg-background">
+      <DashboardHeader
+        scope={scope}
+        scopeTitle={scopeTitle}
+        canManage={capability.canManage}
+        pushOnce={pushOnce}
+      />
+      <TabScreenScrollView
+        className="flex-1"
+        contentContainerClassName="px-6 gap-4"
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="flex-row items-center justify-between gap-3">
+          <View className={cn(ROW_TARGET_CLASS, 'flex-1 justify-center')}>
+            <Text className="text-sm font-medium" numberOfLines={1}>
+              {t('common.allRepositories')}
+            </Text>
+            <Skeleton className="h-4 w-28 rounded" />
+          </View>
+          <IconButton
+            disabled
+            accessibilityLabel={t('securityAgent.dashboard.syncNow')}
+            accessibilityState={{ disabled: true }}
+          >
+            <SpinningIcon
+              icon={RefreshCw}
+              size={18}
+              color={colors.mutedForeground}
+              spinning={false}
+            />
+          </IconButton>
+        </View>
+        <DashboardMetricsSkeleton />
       </TabScreenScrollView>
     </View>
   );

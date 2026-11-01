@@ -11,7 +11,10 @@ import {
 import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
-import { DashboardScreen } from '@/components/security-agent/dashboard-screen';
+import {
+  DashboardLoadingView,
+  DashboardScreen,
+} from '@/components/security-agent/dashboard-screen';
 import { SecurityAgentSetup } from '@/components/security-agent/security-agent-setup';
 import { SettingsOverviewScreen } from '@/components/security-agent/settings-overview-screen';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,7 +36,9 @@ import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access
  * The pending body reserves the centred setup state's shape — icon circle,
  * title line, two description lines, full-width button — so the placeholder
  * names the size and the position of the content that replaces it instead of
- * painting a bar and a card at the top of the screen.
+ * painting a bar and a card at the top of the screen. The entry uses it while a
+ * resolved config already points at a setup state; an unanswered config paints
+ * the dashboard frame instead (`DashboardLoadingView`).
  *
  * Sizes are the loaded state's, in px: the `ShieldCheck` mark, the `text-base`
  * title line, two `text-sm` description lines, the `mt-3` the button carries,
@@ -217,6 +222,18 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     view === 'error' ||
     (!isDestinationKnown && isLoading && (isError || (isPaused && isConnectivityKnown)));
 
+  // What the entry paints while it waits. An unanswered config can still land on
+  // any of this screen's views, and the dashboard is the common one: its frame
+  // keeps the header actions, the filter row and the tile slots in place instead
+  // of showing a centered placeholder the destination then moves. A config that
+  // already answered and left only its gates pending points at a setup state, so
+  // that pending frame stays the neutral one.
+  const pendingView = configSettled ? (
+    <ScopeEntrySkeleton scope={scope} />
+  ) : (
+    <DashboardLoadingView scope={scope} />
+  );
+
   if (isLoadFailureView) {
     // A retry in flight must be visible: the failure screen is swapped for the
     // loading skeleton, so progress does not depend on a text-less button
@@ -226,7 +243,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     // started from. A retry that resolves the other reads still lands on their
     // own view, as before.
     if (recovery.isRetrying) {
-      return <ScopeEntrySkeleton scope={scope} />;
+      return pendingView;
     }
     // Only the reads that produced this screen carry the cause. A read that
     // still holds cached data, or that resolved, must not vote on it.
@@ -259,7 +276,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   }
 
   if (view === 'loading') {
-    return <ScopeEntrySkeleton scope={scope} />;
+    return pendingView;
   }
 
   // Audit-report access shouldn't depend on the agent being connected or

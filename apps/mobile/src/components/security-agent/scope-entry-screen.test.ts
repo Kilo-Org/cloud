@@ -90,6 +90,7 @@ vi.mock('@/components/security-agent/audit-report-button', () => ({
 }));
 vi.mock('@/components/security-agent/dashboard-screen', () => ({
   DashboardScreen: 'DashboardScreen',
+  DashboardLoadingView: 'DashboardLoadingView',
 }));
 vi.mock('@/components/security-agent/security-agent-setup', () => ({
   SecurityAgentSetup: 'SecurityAgentSetup',
@@ -413,16 +414,16 @@ describe('ScopeEntryScreen dashboard first mount', () => {
     expect(host(root, 'Animated.View')).toHaveLength(0);
   });
 
-  it('renders the loading skeleton, then the dashboard, on the first mount', async () => {
+  it('paints the dashboard frame, then the dashboard, on the first mount', async () => {
     configData.isEnabled = true;
     const held = Promise.withResolvers<boolean>();
     configHold = held.promise;
 
     const root = await mount('personal');
-    // Pending settings keep the screen on the header + skeleton, never on an
-    // empty body.
-    expect(host(root, 'ScreenHeader')).toHaveLength(1);
-    expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
+    // A pending config keeps the screen on the dashboard's own frame — the
+    // header, its actions, the filter row and the tile slots — never on an
+    // empty body or a placeholder the destination then moves.
+    expect(host(root, 'DashboardLoadingView')).toHaveLength(1);
     expect(host(root, 'DashboardScreen')).toHaveLength(0);
 
     act(() => {
@@ -433,7 +434,7 @@ describe('ScopeEntryScreen dashboard first mount', () => {
     await advanceBy();
 
     expect(host(root, 'DashboardScreen')).toHaveLength(1);
-    expect(host(root, 'Skeleton')).toHaveLength(0);
+    expect(host(root, 'DashboardLoadingView')).toHaveLength(0);
   });
 });
 
@@ -675,14 +676,16 @@ describe('ScopeEntryScreen retry recovery', () => {
     heldProcedures = new Set(['getConfig']);
     await retry(root);
     expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
-    expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
+    // An unanswered config cannot name its destination yet, so the retry shows
+    // the dashboard's own frame.
+    expect(host(root, 'DashboardLoadingView')).toHaveLength(1);
 
     releaseHeld?.();
     await advanceBy();
     await advanceBy();
     await advanceBy();
 
-    expect(host(root, 'Skeleton')).toHaveLength(0);
+    expect(host(root, 'DashboardLoadingView')).toHaveLength(0);
     expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
     expect(host(root, 'PlatformErrorScreen')[0]?.props.message).toBe(RETRY_FAILED_COPY);
   });

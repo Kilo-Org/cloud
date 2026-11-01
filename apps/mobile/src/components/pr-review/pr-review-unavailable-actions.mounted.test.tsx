@@ -23,6 +23,7 @@ const toastMock = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn() }));
 vi.mock('sonner-native', () => ({ toast: toastMock }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
+    providerReview: { pathFilter: () => ({ queryKey: [['providerReview']] }) },
     organizations: {
       reviewAgent: {
         getGitLabStatus: { queryOptions: () => ({}) },

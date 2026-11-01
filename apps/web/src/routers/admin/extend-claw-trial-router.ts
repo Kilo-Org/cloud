@@ -429,7 +429,6 @@ export const extendClawTrialRouter = createTRPCRouter({
 
       const normalizedEmails = [...new Set(emails.map(e => e.toLowerCase()))];
 
-      // Resolve emails → users in one query
       const users = await db
         .select({
           id: kilocode_users.id,
@@ -440,7 +439,6 @@ export const extendClawTrialRouter = createTRPCRouter({
 
       const usersByEmail = new Map(users.map(u => [u.email.toLowerCase(), u]));
 
-      // Fetch the most recently created subscription per user in one query
       const userIds = users.map(u => u.id);
       const latestSubByUserId = await fetchLatestSubscriptionPerUser(userIds);
 

@@ -34,8 +34,6 @@ type KiloclawInternalClientMockShape = {
 
 jest.setTimeout(15_000);
 
-// ── Mocks ──────────────────────────────────────────────────────────────────
-
 jest.mock('@kilocode/web-shared/lib/stripe-client', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
   const { errors } = require('stripe').default ?? require('stripe');
@@ -153,8 +151,6 @@ jest.mock('@kilocode/web-shared/lib/posthog', () => ({
   }),
 }));
 
-// ── Dynamic imports (after mocks) ──────────────────────────────────────────
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export let createCallerForUser: (userId: string) => Promise<any>;
 
@@ -197,8 +193,6 @@ beforeAll(async () => {
   const mod = await import('@/routers/test-utils');
   createCallerForUser = mod.createCallerForUser;
 });
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 
 export let user: User;
 

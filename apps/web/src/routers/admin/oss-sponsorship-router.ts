@@ -32,20 +32,10 @@ const OssCsvRowSchema = z.object({
   tier: z.union([z.literal(1), z.literal(2), z.literal(3)]),
 });
 
-/**
- * Escape special characters for PostgreSQL ILIKE pattern matching.
- * The % and _ characters have special meaning in ILIKE patterns.
- */
 function escapeIlikePattern(str: string): string {
   return str.replace(/[%_\\]/g, match => `\\${match}`);
 }
 
-/**
- * Extract repository name from a GitHub URL.
- * Examples:
- * - https://github.com/owner/repo -> repo
- * - https://github.com/owner/repo.git -> repo
- */
 function extractRepoNameFromUrl(githubUrl: string): string | null {
   try {
     const parsed = new URL(githubUrl);
@@ -56,7 +46,6 @@ function extractRepoNameFromUrl(githubUrl: string): string | null {
     if (pathParts.length < 2) {
       return null;
     }
-    // Get repo name (second part of path), remove .git extension if present
     const repoName = pathParts[1].replace(/\.git$/, '');
     return repoName || null;
   } catch {
@@ -73,18 +62,6 @@ type ProcessOssCsvResult = {
   error?: string;
 };
 
-/**
- * Process a single OSS sponsorship row with hybrid flow (Option A):
- * 1. Create organization with name = GitHub repository name
- * 2. Check if user with this email already exists in Kilo
- *    - If EXISTS: Directly add them to organization_memberships as Owner + send welcome email
- *    - If NOT EXISTS: Create invitation + send invite email (user must accept)
- * 3. Extend trial end date by 1 year from now
- * 4. Set require_seats to false
- * 5. Set suppress_trial_messaging to true
- * 6. Set oss_sponsorship_tier to the provided tier
- * 7. If creditsDollars > 0: grant credits using the standard credit granting function
- */
 async function processOssRow(
   adminUser: User,
   row: z.infer<typeof OssCsvRowSchema>
@@ -93,7 +70,6 @@ async function processOssRow(
   const normalizedEmail = email.toLowerCase();
 
   try {
-    // Extract org name from GitHub repository URL
     const orgName = extractRepoNameFromUrl(githubUrl);
     if (!orgName) {
       return {
@@ -104,7 +80,6 @@ async function processOssRow(
       };
     }
 
-    // Check if an OSS organization with this repo name already exists
     const [existingOssOrg] = await db
       .select({ id: organizations.id, name: organizations.name })
       .from(organizations)
@@ -126,20 +101,17 @@ async function processOssRow(
       };
     }
 
-    // Check if user with this email already exists in Kilo
     const [existingUser] = await db
       .select({ id: kilocode_users.id })
       .from(kilocode_users)
       .where(eq(kilocode_users.google_user_email, normalizedEmail))
       .limit(1);
 
-    // Calculate values
     const now = new Date();
     const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
     const creditsMicrodollars = creditsDollars > 0 ? creditsDollars * 1_000_000 : null;
 
     const result = await db.transaction(async (tx: DrizzleTransaction) => {
-      // 1. Create organization
       const [organization] = await tx
         .insert(organizations)
         .values({
@@ -164,7 +136,6 @@ async function processOssRow(
       }
 
       if (existingUser) {
-        // User EXISTS: Directly add them to the organization as Owner
         await tx.insert(organization_memberships).values({
           organization_id: organization.id,
           kilo_user_id: existingUser.id,
@@ -172,7 +143,6 @@ async function processOssRow(
           invited_by: adminUser.id,
         });
 
-        // Send welcome email (not an invite - they're already added)
         await sendOssInviteExistingUserEmail({
           to: normalizedEmail,
           organizationName: orgName,
@@ -181,9 +151,8 @@ async function processOssRow(
           monthlyCreditsUsd: creditsDollars,
         });
       } else {
-        // User does NOT exist: Create invitation for them to accept after signing up
         const inviteToken = randomUUID();
-        const inviteExpiry = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 1 year expiry for OSS invites
+        const inviteExpiry = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
 
         await tx.insert(organization_invitations).values({
           organization_id: organization.id,
@@ -194,7 +163,6 @@ async function processOssRow(
           expires_at: inviteExpiry.toISOString(),
         });
 
-        // Send invitation email
         const acceptInviteUrl = getAcceptInviteUrl(inviteToken);
         await sendOssInviteNewUserEmail({
           to: normalizedEmail,
@@ -206,7 +174,6 @@ async function processOssRow(
         });
       }
 
-      // 3. If credits > 0, grant credits using the standard function
       if (creditsDollars > 0) {
         const creditResult = await grantEntityCreditForCategory(
           { user: adminUser, organization: organization },
@@ -266,17 +233,7 @@ export const ossSponsorshipRouter = createTRPCRouter({
       return results;
     }),
 
-  /**
-   * List all OSS sponsorships (organizations with oss_sponsorship_tier set in settings).
-   * Returns organization info along with invited owner's email and account status.
-   *
-   * Email lookup strategy:
-   * 1. Check organization_invitations for owner role (used for new users invited via CSV)
-   * 2. If no invitation, check organization_memberships for owner role and get their email
-   *    (used for existing users directly added to org)
-   */
   listOssSponsorships: adminProcedure.query(async () => {
-    // Get all organizations with OSS sponsorship tier set in settings
     const ossOrgs = await db
       .select({
         id: organizations.id,
@@ -294,14 +251,12 @@ export const ossSponsorshipRouter = createTRPCRouter({
         )
       );
 
-    // For each org, find the owner email (from invitation or direct membership)
     const results = await Promise.all(
       ossOrgs.map(async org => {
         let email: string | null = null;
         let hasKiloAccount = false;
         let kiloUserId: string | null = null;
 
-        // First, check for an owner invitation (for users invited via CSV who may not have signed up yet)
         const [ownerInvitation] = await db
           .select({
             email: organization_invitations.email,
@@ -318,7 +273,6 @@ export const ossSponsorshipRouter = createTRPCRouter({
 
         if (ownerInvitation) {
           email = ownerInvitation.email;
-          // Check if user with this email exists
           const [user] = await db
             .select({ id: kilocode_users.id })
             .from(kilocode_users)
@@ -330,7 +284,6 @@ export const ossSponsorshipRouter = createTRPCRouter({
             kiloUserId = user.id;
           }
         } else {
-          // No invitation found - check for direct owner membership (existing user flow)
           const [ownerMembership] = await db
             .select({
               kilo_user_id: organization_memberships.kilo_user_id,
@@ -348,7 +301,6 @@ export const ossSponsorshipRouter = createTRPCRouter({
             kiloUserId = ownerMembership.kilo_user_id;
             hasKiloAccount = true;
 
-            // Look up the user's email
             const [user] = await db
               .select({ google_user_email: kilocode_users.google_user_email })
               .from(kilocode_users)
@@ -361,18 +313,14 @@ export const ossSponsorshipRouter = createTRPCRouter({
 
         const monthlyCredits = org.settings.oss_monthly_credit_amount_microdollars;
 
-        // Check GitHub integration status
         const githubIntegration = await getPrimaryGitHubIntegrationForOrganization(org.id);
         const hasGitHubIntegration = githubIntegration !== null;
 
-        // Check Code Reviews configuration status
         const codeReviewConfig = await getAgentConfig(org.id, 'code_review', 'github');
         const hasCodeReviewsEnabled = codeReviewConfig?.is_enabled === true;
 
-        // Onboarding is complete if both GitHub and Code Reviews are set up
         const isOnboardingComplete = hasGitHubIntegration && hasCodeReviewsEnabled;
 
-        // Check for latest completed code review for this organization
         const [latestCodeReview] = await db
           .select({
             completed_at: cloud_agent_code_reviews.completed_at,
@@ -390,7 +338,6 @@ export const ossSponsorshipRouter = createTRPCRouter({
         const hasCompletedCodeReview = !!latestCodeReview;
         const lastCodeReviewDate = latestCodeReview?.completed_at ?? null;
 
-        // Check if the owner has an active KiloClaw instance in their personal workspace
         let hasKiloClawInstance = false;
         if (kiloUserId) {
           const [kiloclawInstance] = await db
@@ -431,10 +378,6 @@ export const ossSponsorshipRouter = createTRPCRouter({
     return results;
   }),
 
-  /**
-   * Search for existing organizations by name or ID.
-   * Returns organizations that are NOT already in the OSS program.
-   */
   searchOrganizations: adminProcedure
     .input(z.object({ query: z.string().min(1) }))
     .query(async ({ input }) => {
@@ -452,9 +395,7 @@ export const ossSponsorshipRouter = createTRPCRouter({
         .where(
           and(
             isNull(organizations.deleted_at),
-            // Exclude orgs already in OSS program
             sql`${organizations.settings}->>'oss_sponsorship_tier' IS NULL`,
-            // Search by name or ID (escape ILIKE special chars %, _, \)
             or(
               ilike(organizations.name, `%${escapeIlikePattern(query)}%`),
               eq(organizations.id, query)
@@ -493,7 +434,6 @@ export const ossSponsorshipRouter = createTRPCRouter({
       const creditsMicrodollars = monthlyTopUpDollars > 0 ? monthlyTopUpDollars * 1_000_000 : null;
       const now = new Date();
 
-      // Fetch the organization
       const [existingOrg] = await db
         .select()
         .from(organizations)
@@ -506,7 +446,6 @@ export const ossSponsorshipRouter = createTRPCRouter({
         });
       }
 
-      // Check if already in OSS program
       if (
         existingOrg.settings.oss_sponsorship_tier !== null &&
         existingOrg.settings.oss_sponsorship_tier !== undefined
@@ -517,12 +456,9 @@ export const ossSponsorshipRouter = createTRPCRouter({
         });
       }
 
-      // Update organization within a transaction
       await db.transaction(async (tx: DrizzleTransaction) => {
-        // Calculate 1 year from now for trial extension
         const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
 
-        // Update the organization
         await tx
           .update(organizations)
           .set({
@@ -539,7 +475,6 @@ export const ossSponsorshipRouter = createTRPCRouter({
           })
           .where(eq(organizations.id, organizationId));
 
-        // Grant initial credits only if addInitialGrant is true and amount > 0
         if (addInitialGrant && monthlyTopUpDollars > 0) {
           const creditResult = await grantEntityCreditForCategory(
             { user: ctx.user, organization: existingOrg as Organization },
@@ -576,9 +511,7 @@ export const ossSponsorshipRouter = createTRPCRouter({
         },
       });
 
-      // Send email to org owners if requested
       if (sendEmail) {
-        // Get all owners of the organization
         const ownerMemberships = await db
           .select({
             kilo_user_id: organization_memberships.kilo_user_id,
@@ -591,7 +524,6 @@ export const ossSponsorshipRouter = createTRPCRouter({
             )
           );
 
-        // Get emails for all owners
         const ownerEmails: string[] = [];
         for (const membership of ownerMemberships) {
           if (membership.kilo_user_id) {

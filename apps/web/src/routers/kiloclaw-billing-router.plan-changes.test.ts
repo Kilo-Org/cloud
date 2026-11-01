@@ -919,8 +919,6 @@ describe('cancelPlanSwitch', () => {
   });
 });
 
-// ── org-subscription coexistence ──────────────────────────────────────────
-
 describe('personal billing mutations do not affect org subscriptions', () => {
   async function createPersonalAndOrgSubscriptions(overrides?: {
     personalCancelAtPeriodEnd?: boolean;
@@ -1103,8 +1101,6 @@ describe('personal billing mutations do not affect org subscriptions', () => {
     expect(unchangedOrg?.scheduled_plan).toBeNull();
   });
 });
-
-// ── switchPlan ─────────────────────────────────────────────────────────────
 
 describe('switchPlan', () => {
   const now = Math.floor(Date.now() / 1000);
@@ -1368,8 +1364,6 @@ describe('switchPlan', () => {
   });
 });
 
-// ── cancelPlanSwitch ───────────────────────────────────────────────────────
-
 describe('cancelPlanSwitch', () => {
   it('releases the schedule and clears DB fields on happy path', async () => {
     await insertPersonalSubscriptionFixture({
@@ -1518,8 +1512,6 @@ describe('cancelPlanSwitch', () => {
     expect(row.stripe_schedule_id).toBe('sub_sched_fail');
   });
 });
-
-// ── Pure Credit Cancel/Reactivate/SwitchPlan/CancelPlanSwitch ──────────────
 
 describe('pure credit cancel/reactivate', () => {
   async function createPureCreditSubscription(

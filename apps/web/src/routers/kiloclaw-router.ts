@@ -1457,8 +1457,6 @@ async function ensureProvisionAccess(
   });
 }
 
-// ── Personal subscription management schemas ──────────────────────────
-
 const KiloclawInstanceInputSchema = z.object({ instanceId: z.string().uuid() });
 const KiloclawOptionalInstanceInputSchema = z.object({
   instanceId: z.string().uuid().optional(),
@@ -1549,8 +1547,6 @@ type CreditReprovisionRecoveryEligibility = CreditReprovisionRecoveryPreview & {
   eligible: false;
   reason: 'no_current_subscription' | 'subscription_not_current';
 };
-
-// ── Personal subscription helpers ──────────────────────────────────────
 
 const COMMIT_ADMISSION_ERROR_MESSAGE =
   'Commit is no longer available. Choose Standard for month-to-month KiloClaw hosting.';
@@ -3105,7 +3101,6 @@ export const kiloclawRouter = createTRPCRouter({
     const instances = await listAllActiveInstances(ctx.user.id);
     if (instances.length === 0) return [];
 
-    // Build org name map for instances that belong to organizations
     const orgIds = [
       ...new Set(instances.map(i => i.organizationId).filter((id): id is string => id !== null)),
     ];
@@ -3120,7 +3115,6 @@ export const kiloclawRouter = createTRPCRouter({
       }
     }
 
-    // Fetch live status from each instance's worker in parallel
     const client = new KiloClawInternalClient();
     const results = await Promise.all(
       instances.map(async instance => {
@@ -3379,7 +3373,6 @@ export const kiloclawRouter = createTRPCRouter({
       return client.readMorningBriefing(ctx.user.id, input.day, workerInstanceId(instance));
     }),
 
-  // Instance lifecycle
   start: clawAccessProcedure.mutation(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
@@ -3543,7 +3536,6 @@ export const kiloclawRouter = createTRPCRouter({
     return result;
   }),
 
-  // Explicit lifecycle APIs
   provision: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
     const { instanceId, bootstrapSubscription } = await ensureProvisionAccess(ctx.user.id);
     return await provisionInstance(ctx.user, input, {
@@ -3658,7 +3650,6 @@ export const kiloclawRouter = createTRPCRouter({
         if (value === null) continue;
 
         if (ALL_SECRET_FIELD_KEYS.has(key)) {
-          // Catalog key — validate against catalog patterns and per-field maxLength
           const entry = FIELD_KEY_TO_ENTRY.get(key);
           const field = entry?.fields.find(f => f.key === key);
 
@@ -3679,13 +3670,11 @@ export const kiloclawRouter = createTRPCRouter({
         // Custom keys: no pattern validation — the blanket zod .max() is sufficient
       }
 
-      // 3. Encrypt non-null values
       const encryptedPatch: Record<string, ReturnType<typeof encryptKiloClawSecret> | null> = {};
       for (const [key, value] of Object.entries(secrets)) {
         encryptedPatch[key] = value === null ? null : encryptKiloClawSecret(value);
       }
 
-      // 4. Forward to worker — translate 4xx responses into TRPCErrors
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       try {
@@ -3696,7 +3685,6 @@ export const kiloclawRouter = createTRPCRouter({
         );
       } catch (err) {
         if (err instanceof KiloClawApiError && err.statusCode >= 400 && err.statusCode < 500) {
-          // Extract message from worker response body (JSON or plain text)
           let message = `Secret patch failed (${err.statusCode})`;
           try {
             const parsed = JSON.parse(err.responseBody);
@@ -4024,8 +4012,6 @@ export const kiloclawRouter = createTRPCRouter({
     const client = new KiloClawInternalClient();
     return client.runDoctor(ctx.user.id, workerInstanceId(instance));
   }),
-
-  // ── Kilo CLI Run ──────────────────────────────────────────────────
 
   startKiloCliRun: clawAccessProcedure
     .input(z.object({ prompt: z.string().min(1).max(10_000) }))
@@ -4571,7 +4557,6 @@ export const kiloclawRouter = createTRPCRouter({
       }
     }),
 
-  // ── Agent config CRUD ─────────────────────────────────────────────────
   listAgents: clawAccessProcedure.query(async ({ ctx }) => {
     try {
       const instance = await getActiveInstance(ctx.user.id);
@@ -4664,8 +4649,6 @@ export const kiloclawRouter = createTRPCRouter({
       }
     }),
 
-  // ── Billing endpoints ────────────────────────────────────────────────
-
   getBillingStatus: baseProcedure.query(async ({ ctx }) => {
     return await getPersonalBillingStatus(ctx.user);
   }),
@@ -4678,8 +4661,6 @@ export const kiloclawRouter = createTRPCRouter({
     const billing = await getPersonalBillingStatus(ctx.user);
     return summarizePersonalBillingStatus(billing);
   }),
-
-  // ── Personal subscription management ─────────────────────────────────
 
   listPersonalSubscriptions: baseProcedure
     .output(KiloclawPersonalSubscriptionsOutputSchema)

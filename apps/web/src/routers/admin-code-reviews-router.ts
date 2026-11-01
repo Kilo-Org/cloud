@@ -394,7 +394,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     };
   }),
 
-  // Get overview KPIs
   getOverviewStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const conditions = buildBaseConditions(input);
     const statusTable =
@@ -497,11 +496,8 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       inProgressCount,
       billingErrorCount,
       billingRate: terminalCount > 0 ? (billingErrorCount / terminalCount) * 100 : 0,
-      // Success rate = completed / terminal states
       successRate: terminalCount > 0 ? (completedCount / terminalCount) * 100 : 0,
-      // Failure rate = (failed + interrupted) / terminal states
       failureRate: terminalCount > 0 ? ((failedCount + interruptedCount) / terminalCount) * 100 : 0,
-      // Cancelled rate = cancelled / terminal states (the remainder to reach 100%)
       cancelledRate: terminalCount > 0 ? (cancelledCount / terminalCount) * 100 : 0,
       avgDurationSeconds: Number(stats.avg_duration_seconds) || 0,
       waitStartedCount,

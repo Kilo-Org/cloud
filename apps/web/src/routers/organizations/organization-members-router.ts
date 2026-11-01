@@ -562,7 +562,6 @@ export const organizationsMembersRouter = createTRPCRouter({
         assertOwnerAuthority(actorRole, { nextRole: role });
       }
 
-      // Get organization details
       const organization = await getOrganizationById(organizationId);
       if (!organization) {
         throw new TRPCError({

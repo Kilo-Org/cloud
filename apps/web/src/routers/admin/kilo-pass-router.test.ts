@@ -13,8 +13,6 @@ import { eq } from 'drizzle-orm';
 
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
-// ── Mocks ──────────────────────────────────────────────────────────────────
-
 jest.mock('@kilocode/web-shared/lib/stripe-client', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
   const { errors } = require('stripe').default ?? require('stripe');

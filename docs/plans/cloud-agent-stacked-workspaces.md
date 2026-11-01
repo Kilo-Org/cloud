@@ -121,13 +121,56 @@ Sources: [REST API for stacks](https://docs.github.com/en/rest/pulls/stacks),
     commits.
   - Merging a PR in the middle of a stack merges the PRs below it, and the PRs above retarget to
     the stack base.
+- **No API for "Rebase stack" (checked 2026-11-01).**
+  - The REST Stacks API only lists, gets, creates, extends (`/add`) and dissolves (`/unstack`)
+    stacks. The GraphQL `stack` and `stackEntry` fields are read-only.
+  - "Rebase stack" (a server-side cascading rebase with force-pushes) exists only as a button in
+    the PR merge box
+    ([managing stacks](https://docs.github.com/en/pull-requests/how-tos/create-pull-requests/managing-stacked-pull-requests)).
+  - The only other server-side rebase is the automatic one after the bottom PR merges.
+  - `PUT /pulls/{n}/update-branch` merges the base into the head. It is not a rebase and doesn't
+    know about stacks, so it would break the stack's required linear history.
+  - Merging a stacked PR through the API needs the asynchronous merge API
+    (`PUT /pulls/{n}/merge-async`).
+  - GitHub's docs disagree on whether server-side rebase commits are signed. The GA changelog says
+    they are; the managing-stacks page says they are not.
+- **Permissions (checked 2026-11-01)**
+  ([permissions for GitHub Apps](https://docs.github.com/en/rest/authentication/permissions-required-for-github-apps)):
+  - The Stacks endpoints fall under the repository permission **"Pull requests"**: write for
+    `POST /stacks`, `/add` and `/unstack`; read for `GET`.
+  - They accept both installation and user access tokens.
+  - No new permission is needed. The standard KiloConnect app already opens PRs with installation
+    tokens (`createGitHubPullRequest` in
+    `apps/web/src/lib/code-reviews/review-memory/change-request.ts:156`), so it has Pull
+    requests: write.
+  - The **KiloConnect-Lite** app is read-only (`app-selector.ts:5-10`). Organizations using it can
+    read stack data but not link stacks.
+  - Inside the sandbox, the git-token containment allows API calls to the session repository's
+    `/repos/{o}/{r}/...` paths and `/graphql` (`services/git-token-service/src/index.ts:568-587`).
+    So `gh pr create --base` and `gh stack link` for the session repository pass.
 - **`gh stack`**:
   - `init/add/submit/rebase` keep their tracking state in the local clone.
   - `gh stack link` links existing PRs into a stack with no local tracking. It is meant for setups
     where another tool manages the branches.
   - Kilo layers live in separate clones, so the local-tracking commands don't fit. Linking does.
-- **Sandbox images** ship `gh` 2.102.0 (`services/cloud-agent-next/Dockerfile:17` and siblings),
-  which meets the requirement. `gh-stack` is not installed.
+- **Sandbox images** ship `gh` 2.102.0 (`services/cloud-agent-next/Dockerfile:17` and siblings;
+  2.103.3 in `Dockerfile.containers.runtime-free` and the Vercel snapshot,
+  `src/shared/runtime-distribution.ts:6`), which meets the requirement. `gh-stack` is not
+  installed.
+- **Where `gh` looks for extensions at runtime (checked 2026-11-01).**
+  - `gh` keeps extensions in `$XDG_DATA_HOME/gh/extensions`, and there is no separate override for
+    that directory.
+  - The agent's Kilo process, its shell, terminals and setup commands all get `HOME` and `XDG_*`
+    from `buildWorktreeKiloEnvironment` (`wrapper/src/control/worktree-runtime.ts:171-206`):
+    `HOME=/home/<sha256(worktree directory)>` (`workspace-home.ts:30-50`) and
+    `XDG_DATA_HOME=$HOME/.local/share`.
+  - Profile env cannot override `HOME` or `XDG_*` (`src/shared/runtime-environment.ts:59`).
+  - So an extension installed at image build time under `/root/.local/share/gh/extensions` is
+    **not visible** to the agent.
+  - HOME is per worktree directory and starts empty in every new sandbox.
+  - A runtime `gh extension install` also fails: containment rejects API calls to repositories
+    other than the session's (`repository_mismatch`), and allowlist egress lacks
+    `release-assets.githubusercontent.com`.
 
 ## Concepts
 
@@ -150,7 +193,7 @@ Add these columns, all nullable and additive:
 |---|---|---|
 | `parent_worktree_id` | `text` references `cloud_agent_worktrees.worktree_id`, `onDelete: 'set null'` | The stack link. Index it. |
 | `base_branch` | `text` | Branch this worktree was created from. Null means the default branch. |
-| `base_sha` | `text` | Parent tip last created or restacked onto. |
+| `base_sha` | `text` | Parent tip last created or restacked onto. Resolved by the web router at creation; updated by Sync and Restack results (see "Base SHA"). |
 | `sidebar_position` | `text` | Fractional index for manual order within its container. Null means not positioned (see Ordering). |
 
 Constraints:
@@ -199,8 +242,10 @@ Generate migrations with `pnpm drizzle generate`, following `packages/db/AGENTS.
   - Add `repository.baseBranch?: string` and `workspace.parentWorktreeId?: string`.
   - Write them only with `metadataSchemaVersion: 2`. Legacy reads stay in
     `parseSessionMetadata`.
+- Grouped `SessionMetadata` also gets `repository.baseSha?: string`: the exact commit the new
+  working branch starts from.
 - Route spec (`src/shared/control-plane-protocol.ts:315-317`): add `baseBranch` (min 1, max 256)
-  next to `branch` and `branchMode`.
+  and `baseSha` (40 or 64 hex characters) next to `branch` and `branchMode`.
 - Sibling chats (`createWorktreeChat`) copy `baseBranch` and `parentWorktreeId` from the source
   chat. Forking (`cloud-session-fork.ts`) does not copy them, in the same way it does not copy the
   branch today.
@@ -260,13 +305,18 @@ stackOnWorktreeId?: string     // record the stack link; server derives baseBran
    branches.
 3. Copy the parent's repository input (GitHub repo with integration id, GitLab project, or
    Bitbucket repo).
-4. Pass `baseBranch` and `parentWorktreeId` to the Worker.
+4. Resolve the head SHA of the base branch on the remote (see "Preflight and base SHA"). This
+   applies to every `baseBranch`, with or without `stackOnWorktreeId`.
+5. Pass `baseBranch`, `baseSha` and `parentWorktreeId` to the Worker.
+
+`baseSha` is not a client input. The web router always resolves it, so the client cannot pin an
+arbitrary commit.
 
 **Worker**:
 - Accept the same fields on flat `prepareSession` and on grouped `start`
   (`src/router/schemas.ts:429-587, 832-855`).
 - Adapt them at the boundary into grouped metadata.
-- Pass `parentWorktreeId` and `baseBranch` through to session-ingest registration.
+- Pass `parentWorktreeId`, `baseBranch` and `baseSha` through to session-ingest registration.
 
 ### Branch creation in the wrapper
 
@@ -274,9 +324,18 @@ In `checkoutWorkspace` (`wrapper/src/control-plane/prepare.ts:593-637`), when cr
 working branch (no local branch and no `origin/<branch>`) and `spec.baseBranch` is set:
 
 ```
-git fetch origin <baseBranch>          # managed auth args as today
-git checkout --progress -b <branch> --no-track origin/<baseBranch>
+git fetch origin <baseBranch>                              # managed auth args as today
+git merge-base --is-ancestor <baseSha> origin/<baseBranch> # baseSha must still be on the branch
+git checkout --progress -b <branch> --no-track <baseSha>
 ```
+
+- **The branch starts exactly at `baseSha`.** That is the commit the web router resolved and
+  recorded, so the recorded `base_sha` is true by construction.
+  - If the parent got new commits between prepare and checkout, `baseSha` is still an ancestor.
+    The layer starts at `baseSha` and the UI shows "Behind parent".
+  - If the parent was force-pushed in between, `baseSha` is no longer on the branch. Fail with
+    subtype `base_branch_changed` and the message "Base branch `<x>` changed while the workspace
+    was starting; try again". A retry re-resolves the SHA.
 
 - **`--no-track` is required.** Without it, git makes the new branch track `origin/<baseBranch>`.
   Auto-commit would then see a tracked branch and run a plain `push`, which fails or targets the
@@ -288,16 +347,34 @@ git checkout --progress -b <branch> --no-track origin/<baseBranch>
 - **Restore is unchanged.** If the worktree's own branch already exists locally or on the remote,
   keep the existing restore path. The spec rule "Rebuilt worktrees MUST restore their pushed
   working branch" still holds.
-- **Base SHA.** Record `git rev-parse origin/<baseBranch>` as the creation base SHA (see "Base SHA
-  plumbing").
 - **Both checkout paths.** Mirror this in `wrapper/src/session-bootstrap.ts:509-574` if that path
   can still run for these sessions.
 
-### Preflight and user experience
+### Preflight and base SHA
 
-- **Server-side preflight.** At prepare time, check that the parent's branch exists on the remote
-  using the provider adapter, or `listRepositoryBranches`. If it doesn't, return a specific error
-  before the session is created. The wrapper check stays as the source of truth.
+One provider call answers both "is the base branch pushed?" and "which commit does it point to?".
+
+- **New helper.** Add `getProviderBranchHead({ platform, repository, branch, credentials })` next
+  to `listProviderRepositoryBranches` (`apps/web/src/lib/cloud-agent/provider-branch-listing.ts`).
+  It returns `{ sha } | { missing: true }`.
+  - GitHub: `GET /repos/{o}/{r}/branches/{branch}`, `commit.sha`.
+  - GitLab: `GET /projects/:id/repository/branches/:branch`, `commit.id`.
+  - Bitbucket (organizations only, as with branch listing today):
+    `GET /repositories/{ws}/{slug}/refs/branches/{name}`, `target.hash`.
+  - The existing listing returns names only and can be truncated, so it can't be reused.
+- **Credentials.** Use the same integration and credentials that `prepareSession` already resolves
+  for the repository.
+- **Missing branch.** Return a specific error before the session is created: "Base branch `<x>`
+  has not been pushed". The wrapper checks stay as the backstop.
+- **Why not have the wrapper report the SHA after checkout?**
+  - No message from the wrapper carries git data back today.
+  - `session.ready` is a strict schema, and the Sandbox DO drops frames that don't match it
+    (`sandbox-do.ts:4845-4846`). Adding a field means coordinated Worker-then-wrapper deploys.
+  - The Session DO has no session-ingest client to write Postgres.
+  - Resolving the SHA up front avoids a new channel, and the preflight needs the provider call
+    anyway.
+
+### User experience
 - **Menu item.** "New stacked workspace" appears on the worktree row menu (`ChatSidebar.tsx`) and
   the chat header menu (`ChatHeader.tsx`).
   - It is disabled with a tooltip when the parent branch isn't pushed: "Push `feat-a` first; it
@@ -312,7 +389,11 @@ git checkout --progress -b <branch> --no-track origin/<baseBranch>
 
 ### Persistence
 
-- Extend `CreateSessionForCloudAgentParams` with `parentWorktreeId` and `baseBranch`.
+- Extend `CreateSessionForCloudAgentParams`
+  (`packages/session-ingest-contracts/src/rpc-contract.ts`) with `parentWorktreeId`, `baseBranch`
+  and `baseSha`.
+- Registration runs in the Worker before any sandbox exists
+  (`src/session/session-registration.ts:951-968`), so the values are known at that point.
 - `registerCloudAgentWorktree` writes them on the first insert. Later sibling registrations don't
   overwrite them, because of `onConflictDoNothing`.
 - Re-check that the parent has the same owner and `git_url` inside the insert transaction.
@@ -349,9 +430,12 @@ git checkout --progress -b <branch> --no-track origin/<baseBranch>
 ### Tests
 
 - **Wrapper unit tests** (`prepare.test.ts`):
-  - A new working branch is created from `origin/<base>` with `--no-track`.
+  - A new working branch is created at `baseSha` with `--no-track`.
+  - A `baseSha` that is no longer on the base branch fails with `base_branch_changed`.
   - A missing base fails with `base_branch_missing`.
-  - An existing local or remote working branch still restores.
+  - An existing local or remote working branch still restores, ignoring `baseSha`.
+- **`getProviderBranchHead`**: GitHub, GitLab and Bitbucket mappings, a missing branch, and
+  credential errors.
 - **Worker**: schema validation, grouped metadata writes, and the sibling copy of `baseBranch`.
 - **Web router**: authorization of `stackOnWorktreeId`, a repository mismatch, a `baseBranch`
   mismatch, and stacking on a worktree being deleted.
@@ -399,14 +483,33 @@ breadcrumb.
 
 ## Phase 1: GitHub stacked pull requests
 
-1. **PR base.** The Phase 0 instruction tells the agent to use `--base <base_branch>`. Add the
-   `gh-stack` extension and its agent skill to the sandbox images:
-   - Pin the version.
-   - Install into a directory `gh` reads at runtime: check `XDG_DATA_HOME` against the runtime home
-     layout.
-   - Update `sandbox-image-versions.test.ts`.
-   The extension is optional for the agent. The platform does the linking.
-2. **The platform links the stack.**
+1. **PR base.** The Phase 0 instruction tells the agent to use `--base <base_branch>`. The agent
+   needs nothing else, because the platform does the linking.
+2. **Preinstall `gh-stack`** so an agent can use `gh stack link`/`view` when it wants to. It must be
+   baked in at build time, because a runtime install fails under containment (see "Current
+   state").
+   - **Build.** Every sandbox image (`Dockerfile`, `Dockerfile.containers`,
+     `Dockerfile.containers.runtime-free`, `Dockerfile.dind`, `Dockerfile.dev`) and the Vercel
+     snapshot builder (`scripts/vercel-snapshot.ts`) download the pinned, checksum-verified
+     `gh-stack` linux-amd64 release binary. They install it as
+     `/usr/local/lib/gh-extensions/gh-stack/gh-stack`. Add the version to `RUNTIME_DISTRIBUTION`
+     (`src/shared/runtime-distribution.ts`), and make `sandbox-image-versions.test.ts` assert that
+     all images match.
+   - **Runtime.** In `prepareKiloFilesystem` (`wrapper/src/control-plane/kilo-runtime.ts:525-550`),
+     which already writes into the runtime HOME before Kilo starts, create the symlink
+     `$XDG_DATA_HOME/gh/extensions/gh-stack -> /usr/local/lib/gh-extensions/gh-stack`. If it already
+     exists, leave it.
+   - `gh` treats a symlinked extension directory as a local extension, so it never prompts to
+     upgrade it. Verify this with the pinned `gh` version.
+   - **Env.** Add `GH_STACK_NO_UPDATE_NOTIFIER=1` and `GH_NO_EXTENSION_UPDATE_NOTIFIER=1` in
+     `buildWorktreeKiloEnvironment` (`worktree-runtime.ts`, where `KILO_DISABLE_AUTOUPDATE` is set),
+     so no release checks run.
+   - **Not under `/opt/kilo-cloud`.** That path is reserved for the runtime bootstrap
+     (`RUNTIME_RESERVED_ROOT`).
+   - **Optional skill.** The upstream `gh-stack` agent skill can be added as a runtime skill
+     through the existing skills.sh materializer (`wrapper/src/runtime-skills.ts`).
+   - **Test.** Add a wrapper test that the symlink is created under the runtime HOME.
+3. **The platform links the stack.**
    - When a layer's PR becomes verified and the parent worktree's PR is open with
      `child.pr_base_ref == parent head ref`:
      - If the parent PR has a `stack_number`, call `POST /repos/{o}/{r}/stacks/{n}/add` with
@@ -417,24 +520,29 @@ breadcrumb.
    - Make it idempotent with the stored `stack_number`.
    - Run it in `after()` from the webhook handler, using the installation token, in the same way
      the PR cache upsert runs.
-   - Confirm that the GitHub App's `pull_requests: write` permission covers the Stacks API.
-3. **Webhook ingestion** (`upsert-cli-session-pull-requests.ts`, `webhook-schemas.ts`):
+   - Permissions: this needs Pull requests: write, which the standard app already has. For
+     KiloConnect-Lite installations, skip linking and log at debug level. Kilo still groups the
+     stack from `parent_worktree_id`.
+4. **Webhook ingestion** (`upsert-cli-session-pull-requests.ts`, `webhook-schemas.ts`):
    - Add `stacked` to the tracked actions.
    - Parse `pull_request.stack` and `base.ref`, and store `pr_base_ref` and the stack columns.
    - On `edited` events with `changes.base`, update `pr_base_ref`. A retarget is then visible.
-4. **Refresh.** `refreshAssociatedPullRequest` (`cli-sessions-v2-router.ts:1910`) also stores
+5. **Refresh.** `refreshAssociatedPullRequest` (`cli-sessions-v2-router.ts:1910`) also stores
    `pr_base_ref` and the stack data from the REST pull request resource.
-5. **Stacks made outside Kilo.** Two worktrees that share a `stack_number` are grouped even without
+6. **Stacks made outside Kilo.** Two worktrees that share a `stack_number` are grouped even without
    `parent_worktree_id`. Layers without a Kilo worktree appear only in the breadcrumb.
-6. **Ship together with Phase 3's "remote branch changed" handling.** Once PRs are linked, GitHub
+7. **Ship together with Phase 3's "remote branch changed" handling.** Once PRs are linked, GitHub
    itself force-pushes layer branches after partial merges and on "Rebase stack". Without that
    handling, the next auto-commit push in an affected worktree fails as non-fast-forward.
 
 Tests:
 - Webhook fixtures for `stacked`, for `edited` with `changes.base`, and for a payload carrying
   `stack`.
-- Linking logic with mocked REST: create, add, `409` retry, `422` no-op.
+- Linking logic with mocked REST: create, add, `409` retry, `422` no-op, Lite installation
+  skipped.
 - Refresh mapping.
+- Wrapper: the `gh-stack` symlink is created in the runtime HOME. Image versions match across
+  Dockerfiles and the Vercel snapshot.
 
 ## Phase 3: keeping branches up to date
 
@@ -499,8 +607,13 @@ created.
   `gh stack rebase` is not used across the stack.
 - **Prefer GitHub when it has already rebased.** If GitHub has already rebased a linked stack,
   Restack becomes Sync (3a).
-- **Spike:** check whether the Stacks REST API exposes server-side "Rebase stack". If it does,
-  Restack stack for linked GitHub stacks can call it and then Sync each worktree.
+- **No GitHub rebase API.** There is no REST or GraphQL endpoint for "Rebase stack" (checked
+  2026-11-01), so Kilo cannot trigger GitHub's server-side rebase. For a linked GitHub stack, the
+  Restack menu offers two choices:
+  - **Restack in Kilo**: the operation above.
+  - **Rebase on GitHub**: a link to the top layer's PR, where the merge box shows "Rebase stack".
+    It needs no sandbox and keeps approvals. Afterwards each worktree shows "Remote branch
+    changed", and Sync (3a) brings it up to date.
 - **Waking sandboxes.** Restacking an idle worktree prepares its sandbox the same way a message
   does. The button says so, and progress uses the existing preparation steps.
 
@@ -517,17 +630,31 @@ On any conflict in Sync or Restack:
 `auto-commit` keeps its plain push. Only the Sync and Restack operations, and the agent following
 the generated message, may force-push, and only with a lease.
 
-### Base SHA plumbing
+### Base SHA
 
-`base_sha` is written at creation (the wrapper's `rev-parse` at checkout) and after each Restack.
+`cloud_agent_worktrees.base_sha` has one writer, the web router. It is set at creation and only
+moves forward after that.
 
-- **Recommended:** the wrapper returns it in the Restack or Sync operation result, which goes back
-  through the Worker to the web router. The router writes Postgres.
-- **At creation:** report it in the wrapper's checkout progress or route-ready event. The Session DO
-  stores it in `workspace.baseSha`, and the web router copies it to Postgres the first time it
-  reads worktree details.
-- **Not required for correctness.** The fallback chain above means a missing `base_sha` only
-  matters when the parent was force-pushed after the layer was created.
+| When | Value | How it gets there |
+|---|---|---|
+| Creation | The base branch head resolved by `getProviderBranchHead` | Passed as `baseSha` through `prepareSession`, the Worker and registration. The wrapper checks out exactly that commit (Phase 0), so the value is true by construction. |
+| After Restack | The new parent tip the layer was rebased onto | Returned in the Restack operation result (request and response through Worker, Session DO and Sandbox DO), then written by the web router. |
+| After Sync | `git merge-base HEAD origin/<base_branch>` after the sync | Returned in the Sync result. This covers GitHub's own rebases, after which the base is usually the trunk, which is never rewritten. |
+
+- **Restack and Sync are request and response.** They follow the worktree-changes pattern
+  (`worktree.summary` and `worktree.result`, `src/shared/worktree-changes-wire.ts`). The result
+  schema is validated, so no new frame type is added to the wrapper's protocol with the DO.
+- **Sibling chats** don't check out a new branch, so they never change `base_sha`.
+- **Rebuilt worktrees** restore their own pushed branch, which keeps its history, so `base_sha`
+  stays valid.
+- **Missing `base_sha`** (worktrees created before this change, or a failed write): Restack uses the
+  fallback chain in 3b. This only gives a wrong result if the parent was force-pushed after the
+  layer was created. In that case the rebase hits a conflict and goes to the agent; it cannot lose
+  commits.
+- **Optional refinement.** When a Changes panel result has
+  `comparison.baseRef == origin/<base_branch>` and its `mergeBase` is a descendant of the stored
+  `base_sha`, the router may move `base_sha` forward to it. This covers parent updates the agent
+  merged by hand.
 
 ### Tests
 
@@ -694,12 +821,18 @@ end checks pass.
 - **Index build on `cli_sessions_v2`.** Use the concurrent build and long-build procedure from
   `packages/db/AGENTS.md`.
 
+## Resolved questions (2026-11-01)
+
+| Question | Answer |
+|---|---|
+| Does the Stacks API have a server-side rebase endpoint? | No. The REST API only has list, get, create, add and unstack; GraphQL is read-only. "Rebase stack" is only a button in the PR merge box. Restack stays a Kilo git operation, with a "Rebase on GitHub" link as an alternative (3b). |
+| Does the GitHub App's permission cover the Stacks endpoints? | Yes. They need repository permission "Pull requests" (write to create or change, read to read) and accept installation tokens. The standard KiloConnect app already has Pull requests: write. KiloConnect-Lite is read-only, so linking is skipped for it. |
+| Where do `gh` extensions live in the sandbox? | `$XDG_DATA_HOME/gh/extensions` = `/home/<sha256(worktree directory)>/.local/share/gh/extensions`. It starts empty in each new sandbox, and an extension installed into `/root` is invisible. Bake the binary into `/usr/local/lib/gh-extensions/gh-stack` and symlink it in `prepareKiloFilesystem` (Phase 1). |
+| How is `base_sha` recorded at creation? | The web router resolves the base branch head with one provider call, which is also the preflight. It passes the SHA down, and the wrapper checks out exactly that commit. No new wrapper-to-platform channel is needed (Phase 0, "Base SHA"). |
+
 ## Open items to settle during implementation
 
-- Whether the Stacks REST API has a server-side rebase endpoint. If it does, use it in Restack
-  stack.
-- Whether `pull_requests: write` on the GitHub App covers the Stacks endpoints, or whether a new
-  permission must be requested.
-- The final plumbing for `base_sha` at creation (see "Base SHA plumbing").
-- Where `gh` extensions live in the sandbox runtime home.
+- Confirm with the pinned `gh` version that a symlinked extension directory is treated as local
+  (no upgrade prompts or checks).
+- Confirm the `gh-stack` release asset name and checksum for linux-amd64 at the pinned version.
 - Whether new users get any smart folders on by default. The current proposal is none.

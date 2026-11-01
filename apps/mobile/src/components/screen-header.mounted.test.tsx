@@ -966,7 +966,9 @@ describe('ScreenHeader mounted', () => {
 
     const placeholder = renderer.root.findAll(
       node =>
-        typeof node.type === 'string' && (node.type as string) === 'Text' && node.props.variant === 'muted'
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.variant === 'muted'
     )[0];
     expect(placeholder?.props.numberOfLines).toBe(1);
     expect(placeholder?.children).toEqual(['\u00A0']);
@@ -987,7 +989,9 @@ describe('ScreenHeader mounted', () => {
     });
     const name = renderer.root.findAll(
       node =>
-        typeof node.type === 'string' && (node.type as string) === 'Text' && node.props.variant === 'muted'
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.variant === 'muted'
     )[0];
     expect(name?.children).toEqual(['Shared Agency Review Profile']);
     expect(name?.props.className).not.toContain('opacity-0');
@@ -999,7 +1003,9 @@ describe('ScreenHeader mounted', () => {
     const renderer = renderHeader({ title: 'Profile agents' });
     const subtitles = renderer.root.findAll(
       node =>
-        typeof node.type === 'string' && (node.type as string) === 'Text' && node.props.variant === 'muted'
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.variant === 'muted'
     );
     expect(subtitles).toHaveLength(0);
     renderer.unmount();

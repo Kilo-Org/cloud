@@ -94,6 +94,12 @@ import {
 import { after, NextRequest, NextResponse } from 'next/server';
 import { handleLlmProxyRequest } from './llm-proxy';
 import { createKiloDefaultEnkryptInputDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import {
+  DEFAULT_ORGANIZATION_FEATURES,
+  type OrganizationFeatures,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import type * as GatewayConfigModule from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 
 jest.mock('next/server', () => {
   return {
@@ -154,6 +160,17 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-orde
   })),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/organization-features'
+  ),
+  getRuntimeOrganizationFeatures: jest.fn(
+    async () =>
+      jest.requireActual<typeof GatewayConfigModule>(
+        '@kilocode/web-shared/lib/ai-gateway/gateway-config'
+      ).DEFAULT_ORGANIZATION_FEATURES
+  ),
+}));
 jest.mock(
   '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server',
   () => ({
@@ -298,6 +315,7 @@ const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 const mockedDecide = jest.mocked(decide);
 const mockedIsNonTrialEnterpriseOrganization = jest.mocked(isNonTrialEnterpriseOrganization);
 const mockedFindCustomLlm = jest.mocked(findCustomLlm);
+const mockedGetRuntimeOrganizationFeatures = jest.mocked(getRuntimeOrganizationFeatures);
 function mockCustomLlm(customLlm: CustomLlm) {
   mockedFindCustomLlm.mockResolvedValue(customLlm);
   jest.mocked(isCustomLlm).mockResolvedValue(true);
@@ -1364,6 +1382,99 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(response.status).toBe(200);
     const getRoutingProviderConfig = mockedGetProvider.mock.calls[0]?.[0].getRoutingProviderConfig;
     expect((await getRoutingProviderConfig?.())?.only).toEqual(['google']);
+  });
+
+  describe('organization gateway settings', () => {
+    const vercelProvider = { ...provider, id: 'vercel' } satisfies Provider;
+
+    afterEach(() => {
+      mockedGetRuntimeOrganizationFeatures.mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
+    });
+
+    function setOrganization(
+      settings: OrganizationSettings,
+      features: Partial<OrganizationFeatures>
+    ) {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: {
+          id: 'user-123',
+          google_user_email: 'test@example.com',
+          microdollars_used: 0,
+        } as User,
+        authFailedResponse: null,
+        organizationId: 'org-1',
+      });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings,
+        plan: 'enterprise',
+      });
+      mockedGetRuntimeOrganizationFeatures.mockResolvedValue({
+        ...DEFAULT_ORGANIZATION_FEATURES,
+        ...features,
+      });
+    }
+
+    it.each([
+      ['openrouter', provider, { disable_openrouter: true }, 'OpenRouter'],
+      ['vercel', vercelProvider, { disable_vercel_ai_gateway: true }, 'the Vercel AI Gateway'],
+    ] as const)(
+      'rejects a request routed through a disabled %s gateway',
+      async (_gateway, selectedProvider, settings, gatewayName) => {
+        setOrganization(settings, { gateway_disable_toggles: ['org-1'] });
+        mockedGetProvider.mockResolvedValue({
+          kind: 'provider',
+          provider: selectedProvider,
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: false,
+        });
+
+        const { handleLlmProxyRequest } = await import('./llm-proxy');
+        const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({
+          error: `This request would be routed through ${gatewayName}, which your organization has disabled.`,
+          error_type: 'provider_not_allowed',
+        });
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      }
+    );
+
+    it('ignores a disabled gateway while the organization feature is off', async () => {
+      setOrganization({ disable_openrouter: true }, {});
+
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest).toHaveBeenCalled();
+    });
+
+    it('sends OpenRouter requests to the regional base URL', async () => {
+      setOrganization({ data_region: 'eu' }, { data_region: ['org-1'] });
+
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].provider.apiUrl).toBe(
+        'https://eu.openrouter.ai/api/v1'
+      );
+    });
+
+    it('keeps the global base URL while the data region feature is off', async () => {
+      setOrganization({ data_region: 'eu' }, {});
+
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].provider.apiUrl).toBe(
+        'https://openrouter.ai/api/v1'
+      );
+    });
   });
 
   describe('organization BYOK keys and the organization provider allow-list', () => {

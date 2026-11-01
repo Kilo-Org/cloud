@@ -58,3 +58,61 @@ export const GatewayConfigInputSchema = z.object({
   vercel_routing_opt_out_models: vercelRoutingOptOutModels,
   note: note.nullable(),
 });
+
+export const ORGANIZATION_FEATURE_ORGANIZATIONS_MAX_COUNT = 1000;
+
+const storedOrganizationIds = z.array(z.string()).default([]);
+
+/**
+ * Per-feature lists of the organizations a feature is enabled for, stored under
+ * `organization_features` in the gateway configuration. A feature missing from
+ * a saved configuration is enabled for no organization.
+ */
+export const OrganizationFeaturesSchema = z.object({
+  experimental_byok: storedOrganizationIds,
+  gateway_disable_toggles: storedOrganizationIds,
+  data_region: storedOrganizationIds,
+});
+
+export type OrganizationFeatures = z.infer<typeof OrganizationFeaturesSchema>;
+export type OrganizationFeature = keyof OrganizationFeatures;
+
+export const ORGANIZATION_FEATURES = OrganizationFeaturesSchema.keyof().options;
+
+export const ORGANIZATION_FEATURE_DESCRIPTIONS = {
+  experimental_byok: {
+    label: 'Direct Amazon Bedrock and Google Vertex AI BYOK',
+    description: 'Lets the organization add direct Amazon Bedrock and Google Vertex AI keys.',
+  },
+  gateway_disable_toggles: {
+    label: 'Disable OpenRouter or Vercel AI Gateway',
+    description:
+      'Lets the organization turn off OpenRouter or the Vercel AI Gateway on its Providers & Models page.',
+  },
+  data_region: {
+    label: 'Data region',
+    description:
+      'Lets the organization pin OpenRouter and Vercel AI Gateway requests to the EU or the US on its Providers & Models page.',
+  },
+} as const satisfies Record<OrganizationFeature, { label: string; description: string }>;
+
+export const DEFAULT_ORGANIZATION_FEATURES: OrganizationFeatures = OrganizationFeaturesSchema.parse(
+  {}
+);
+
+/** Reads the organization features from a stored gateway configuration. */
+export const GatewayOrganizationFeaturesConfigSchema = z.object({
+  organization_features: OrganizationFeaturesSchema.prefault({}),
+});
+
+const organizationIdsInput = z
+  .array(z.guid())
+  .max(ORGANIZATION_FEATURE_ORGANIZATIONS_MAX_COUNT)
+  .transform(ids => [...new Set(ids.map(id => id.toLowerCase()))]);
+
+/** Schema for the admin organization-features mutation input. */
+export const OrganizationFeaturesInputSchema = z.object({
+  experimental_byok: organizationIdsInput,
+  gateway_disable_toggles: organizationIdsInput,
+  data_region: organizationIdsInput,
+}) satisfies z.ZodType<OrganizationFeatures, unknown>;

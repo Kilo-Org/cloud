@@ -13,6 +13,7 @@ import type {
 import {
   type User,
   type Organization,
+  ai_gateway_config,
   auto_routing_custom_routers,
   organization_audit_logs,
   organization_group_memberships,
@@ -1388,6 +1389,95 @@ describe('organizations settings trpc router', () => {
       expect(result.settings.minimum_balance).toBe(100);
       expect(result.settings.minimum_balance_alert_email).toEqual(['alert@example.com']);
       expect(result.settings.recommendations_digest_enabled).toBe(true);
+    });
+  });
+
+  describe('gateway settings', () => {
+    async function enableGatewayFeatures(features: {
+      gateway_disable_toggles?: string[];
+      data_region?: string[];
+    }) {
+      const config = { organization_features: features };
+      await db
+        .insert(ai_gateway_config)
+        .values({ config })
+        .onConflictDoUpdate({ target: ai_gateway_config.id, set: { config } });
+    }
+
+    afterEach(async () => {
+      await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
+      await updateOrganizationSettings(testOrganization.id, {});
+    });
+
+    it('reports which gateway features are enabled', async () => {
+      await enableGatewayFeatures({ data_region: [testOrganization.id] });
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+      ).resolves.toEqual({
+        features: { gateway_disable_toggles: false, data_region: true },
+        disable_openrouter: false,
+        disable_vercel_ai_gateway: false,
+        data_region: null,
+      });
+    });
+
+    it('saves gateway settings for enabled features and records an audit log', async () => {
+      await enableGatewayFeatures({
+        gateway_disable_toggles: [testOrganization.id],
+        data_region: [testOrganization.id],
+      });
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await caller.organizations.settings.updateGatewaySettings({
+        organizationId: testOrganization.id,
+        disable_vercel_ai_gateway: true,
+        data_region: 'eu',
+      });
+
+      expect(result.settings).toMatchObject({ disable_vercel_ai_gateway: true, data_region: 'eu' });
+      await expect(
+        caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+      ).resolves.toMatchObject({
+        disable_openrouter: false,
+        disable_vercel_ai_gateway: true,
+        data_region: 'eu',
+      });
+      const auditLogs = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, testOrganization.id));
+      expect(auditLogs.map(log => log.message)).toContain(
+        'Updated gateway settings: Vercel AI Gateway disabled; Data region: EU'
+      );
+    });
+
+    it('rejects gateway settings whose feature is not enabled', async () => {
+      await enableGatewayFeatures({ data_region: [testOrganization.id] });
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.settings.updateGatewaySettings({
+          organizationId: testOrganization.id,
+          disable_openrouter: true,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect((await getOrganizationById(testOrganization.id))?.settings.disable_openrouter).toBe(
+        undefined
+      );
+    });
+
+    it('rejects gateway settings changes by members', async () => {
+      await enableGatewayFeatures({ data_region: [testOrganization.id] });
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.updateGatewaySettings({
+          organizationId: testOrganization.id,
+          data_region: 'us',
+        })
+      ).rejects.toThrow();
     });
   });
 });

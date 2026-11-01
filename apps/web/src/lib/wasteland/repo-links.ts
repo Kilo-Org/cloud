@@ -18,19 +18,15 @@ export function repoPathWithQuery(owner: string, repo: string, query: string): s
 }
 
 /**
- * The same address with `wastelandId` set to the chosen wasteland and the
- * rest of the current query kept, so picking a candidate in the chooser
- * does not drop a `status`, `q`, or `wantedId` the user already had.
+ * The address section the caller is on (`path`), with `wastelandId` set
+ * to the chosen wasteland and the rest of the current query kept, so
+ * picking one keeps both the section — `fork`, `pulls`, `settings` — and
+ * the intent already in the address, such as `wantedId`.
  */
-export function repoPathWithSelection(
-  owner: string,
-  repo: string,
-  query: string,
-  wastelandId: string
-): string {
+export function pathWithSelection(path: string, query: string, wastelandId: string): string {
   const params = new URLSearchParams(query);
   params.set(SELECTED_WASTELAND_PARAM, wastelandId);
-  return repoPathWithQuery(owner, repo, params.toString());
+  return `${path}?${params.toString()}`;
 }
 
 /**

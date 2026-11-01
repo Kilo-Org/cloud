@@ -15,6 +15,7 @@ import { WastelandPageHeaderProvider } from '@/app/(app)/wasteland/by-id/[wastel
 import { Skeleton } from '@/components/ui/skeleton';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { SELECTED_WASTELAND_PARAM } from '@/lib/wasteland/repo-links';
+import { selectUpstreamWasteland } from '@/lib/wasteland/upstream-selection';
 import { WastelandRepoProvider } from './WastelandRepoContext';
 import { RepoDashboardHeader } from './RepoDashboardHeader';
 import { NotConnectedShell } from './NotConnectedShell';
@@ -35,14 +36,18 @@ type RepoLayoutShellProps = {
  * Flow:
  *   1. Loading: render a skeleton with no nav, so we don't flicker the
  *      tabs into a "not connected" state and back.
- *   2. Connected (resolveOwnerRepo resolved one wasteland this user can
- *      access, or `?wastelandId=` names one of several): render the
- *      dashboard header + nav + page content.
- *   3. Ambiguous (several accessible wastelands share the upstream and
- *      none is selected): render `AmbiguousUpstreamShell` so the user
- *      picks one.
+ *   2. Connected (the answer names one wasteland this user can access,
+ *      or `?wastelandId=` names one of several): render the dashboard
+ *      header + nav + page content.
+ *   3. Ambiguous (the answer lists several accessible wastelands and none
+ *      is selected): render `AmbiguousUpstreamShell` so the user picks
+ *      one.
  *   4. Not connected (resolveOwnerRepo returned null): render the
  *      `NotConnectedShell` — Connect CTA only, no nav.
+ *
+ * The answer is read through `selectUpstreamWasteland`, which opens the
+ * identity a worker deployed before the chooser existed answers, so this
+ * bundle renders during either deployment order.
  */
 export function RepoLayoutShell({ owner, repo, children }: RepoLayoutShellProps) {
   const queryClient = useQueryClient();
@@ -85,30 +90,16 @@ function RepoLayoutShellInner({ owner, repo, children }: RepoLayoutShellProps) {
     return <NotConnectedShell owner={owner} repo={repo} />;
   }
 
-  // Several wastelands can back one upstream. `?wastelandId=` picks one
-  // of the candidates this user can reach; anything else falls back to
-  // the chooser, so the address stays usable while the choice lives in
-  // the URL instead of in a UUID route that redirects back here.
-  let wasteland;
-  if (resolved.status === 'resolved') {
-    wasteland = resolved.wasteland;
-  } else {
-    wasteland = resolved.candidates.find(
-      candidate => candidate.wastelandId === selectedWastelandId
-    );
-    if (!wasteland) {
-      return (
-        <AmbiguousUpstreamShell
-          owner={owner}
-          repo={repo}
-          candidates={resolved.candidates.map(candidate => ({
-            wastelandId: candidate.wastelandId,
-            name: candidate.name,
-          }))}
-        />
-      );
-    }
+  // The answer names one wasteland, and lists every claimant only when
+  // this caller reaches several. `?wastelandId=` picks one of them;
+  // anything else falls back to the chooser, so the address stays usable
+  // while the choice lives in the URL instead of in a UUID route that
+  // redirects back here.
+  const selection = selectUpstreamWasteland(resolved, selectedWastelandId);
+  if (selection.kind === 'choose') {
+    return <AmbiguousUpstreamShell owner={owner} repo={repo} candidates={selection.candidates} />;
   }
+  const wasteland = selection.wasteland;
 
   return (
     <WastelandRepoProvider

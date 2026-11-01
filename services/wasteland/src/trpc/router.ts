@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { router, procedure, adminProcedure } from './init';
 import { resolveWastelandOwnership } from './ownership';
 import { resolveWasteland } from './resolve-wasteland';
-import type { ResolvedWasteland } from './resolve-wasteland';
+import { OwnerRepoAnswer, toOwnerRepoAnswer } from './owner-repo-answer';
 import { getWastelandDOStub, type WastelandMemberResult } from '../dos/Wasteland.do';
 import { getWastelandRegistryStub } from '../dos/WastelandRegistry.do';
 import { createUpstream as bootstrapCreateUpstream } from '../upstream-bootstrap/create-upstream';
@@ -249,35 +249,6 @@ async function requireOwnerAccess(env: Env, ctx: TRPCContext, wastelandId: strin
   }
 
   return ownership;
-}
-
-/**
- * A wasteland reached through an `<owner>/<repo>` upstream address.
- * Only ever populated with claimants the calling user may access.
- */
-const ResolvedOwnerRepoWasteland = z.object({
-  wastelandId: z.string(),
-  ownerType: z.enum(['user', 'org']),
-  ownerUserId: z.string().nullable(),
-  organizationId: z.string().nullable(),
-  name: z.string(),
-});
-
-const ResolvedOwnerRepoOutput = z
-  .discriminatedUnion('status', [
-    z.object({ status: z.literal('resolved'), wasteland: ResolvedOwnerRepoWasteland }),
-    z.object({ status: z.literal('ambiguous'), candidates: z.array(ResolvedOwnerRepoWasteland) }),
-  ])
-  .nullable();
-
-function toResolvedOwnerRepo(wasteland: ResolvedWasteland) {
-  return {
-    wastelandId: wasteland.wastelandId,
-    ownerType: wasteland.ownerType,
-    ownerUserId: wasteland.ownerUserId,
-    organizationId: wasteland.organizationId,
-    name: wasteland.name,
-  };
 }
 
 export const wastelandRouter = router({
@@ -560,8 +531,9 @@ export const wastelandRouter = router({
   //
   // A slug can have several claimants (shared upstreams), so the
   // answer is derived from the caller's access, never from registration
-  // recency: one accessible claimant resolves, several are reported as
-  // ambiguous, and none (or only other tenants') answers null.
+  // recency: one accessible claimant opens, several are listed as
+  // `candidates`, and none (or only other tenants') answers null. See
+  // `owner-repo-answer.ts` for why the identity stays flat.
   //
   // Slug comparison is case-insensitive (DoltHub slug convention).
 
@@ -572,7 +544,7 @@ export const wastelandRouter = router({
         repo: z.string().min(1).max(64),
       })
     )
-    .output(ResolvedOwnerRepoOutput)
+    .output(OwnerRepoAnswer)
     .query(async ({ ctx, input }) => {
       const resolution = await resolveWasteland(
         ctx.env,
@@ -583,11 +555,7 @@ export const wastelandRouter = router({
         },
         input
       );
-      if (resolution.kind === 'none') return null;
-      if (resolution.kind === 'ambiguous') {
-        return { status: 'ambiguous', candidates: resolution.candidates.map(toResolvedOwnerRepo) };
-      }
-      return { status: 'resolved', wasteland: toResolvedOwnerRepo(resolution.wasteland) };
+      return toOwnerRepoAnswer(resolution);
     }),
 
   deleteWasteland: procedure

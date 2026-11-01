@@ -1,4 +1,4 @@
-import { forkItemHref, repoPathWithQuery, repoPathWithSelection } from './repo-links';
+import { forkItemHref, pathWithSelection, repoPathWithQuery } from './repo-links';
 
 describe('repoPathWithQuery', () => {
   it('leaves the address unchanged without a query', () => {
@@ -12,27 +12,39 @@ describe('repoPathWithQuery', () => {
   });
 });
 
-describe('repoPathWithSelection', () => {
-  it('adds the selection to a bare address', () => {
-    expect(repoPathWithSelection('octo', 'commons', '', 'wl-1')).toBe(
+describe('pathWithSelection', () => {
+  it('adds the selection to the root of the address', () => {
+    expect(pathWithSelection('/wasteland/octo/commons', '', 'wl-1')).toBe(
       '/wasteland/octo/commons?wastelandId=wl-1'
     );
   });
 
-  it('keeps the rest of the query string', () => {
-    expect(repoPathWithSelection('octo', 'commons', 'status=open&q=needle', 'wl-1')).toBe(
-      '/wasteland/octo/commons?status=open&q=needle&wastelandId=wl-1'
+  it('keeps the section the caller is on', () => {
+    expect(pathWithSelection('/wasteland/octo/commons/pulls', '', 'wl-1')).toBe(
+      '/wasteland/octo/commons/pulls?wastelandId=wl-1'
     );
+  });
+
+  it('keeps the fork view and the item it asked for', () => {
+    expect(pathWithSelection('/wasteland/octo/commons/fork', 'wantedId=item-1', 'wl-1')).toBe(
+      '/wasteland/octo/commons/fork?wantedId=item-1&wastelandId=wl-1'
+    );
+  });
+
+  it('keeps a nested section and its filters', () => {
+    expect(
+      pathWithSelection('/wasteland/octo/commons/settings', 'status=open&q=needle', 'wl-1')
+    ).toBe('/wasteland/octo/commons/settings?status=open&q=needle&wastelandId=wl-1');
   });
 
   it('replaces a selection that is already in the address', () => {
     expect(
-      repoPathWithSelection('octo', 'commons', 'wastelandId=wl-0&wantedId=item-1', 'wl-1')
+      pathWithSelection('/wasteland/octo/commons', 'wastelandId=wl-0&wantedId=item-1', 'wl-1')
     ).toBe('/wasteland/octo/commons?wastelandId=wl-1&wantedId=item-1');
   });
 
   it('encodes the selection', () => {
-    expect(repoPathWithSelection('octo', 'commons', '', 'a b/c')).toBe(
+    expect(pathWithSelection('/wasteland/octo/commons', '', 'a b/c')).toBe(
       '/wasteland/octo/commons?wastelandId=a+b%2Fc'
     );
   });

@@ -365,17 +365,28 @@ export async function findUserByNormalizedEmail(email: string): Promise<User | u
  * The code is delivered to one mailbox, so this match keeps a `+` suffix and
  * Gmail dots and only ignores case. An alias of another account's address is a
  * different address here and resolves to no account, unlike
- * `findUserByNormalizedEmail`, which is for duplicate detection. Legacy rows
- * that share one spelling resolve to the oldest account so the answer is stable.
+ * `findUserByNormalizedEmail`, which is for duplicate detection.
+ *
+ * The exact spelling is served by the unique index on `google_user_email`.
+ * A case-insensitive match runs only when no exact row exists, for legacy rows
+ * stored with other casing; those resolve to the oldest account so the answer is
+ * stable.
  */
 export async function findUserBySignInCodeEmail(email: string): Promise<User | undefined> {
-  const [user] = await db
+  const deliveredEmail = getDeliveredEmailAddress(email);
+
+  const exact = await db.query.kilocode_users.findFirst({
+    where: eq(kilocode_users.google_user_email, deliveredEmail),
+  });
+  if (exact) return exact;
+
+  const [caseVariant] = await db
     .select()
     .from(kilocode_users)
-    .where(eq(sql`lower(${kilocode_users.google_user_email})`, getDeliveredEmailAddress(email)))
+    .where(eq(sql`lower(${kilocode_users.google_user_email})`, deliveredEmail))
     .orderBy(kilocode_users.created_at, kilocode_users.id)
     .limit(1);
-  return user;
+  return caseVariant;
 }
 
 async function recordSignupImpactTracking(args: {

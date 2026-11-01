@@ -1295,6 +1295,7 @@
       "notExploitable": "Không thể khai thác",
       "notMeasured": "Chưa đo lường",
       "notYetSynced": "Chưa đồng bộ",
+      "priorityFindingsPending": "Các vấn đề ưu tiên sẽ xuất hiện sau lần đồng bộ đầu tiên.",
       "refreshFailed": "Không thể làm mới dữ liệu. Đang hiển thị dữ liệu từ lần đồng bộ gần nhất.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "{{displayCount}} chưa xử lý",

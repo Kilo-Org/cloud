@@ -1836,6 +1836,7 @@
       "lastSynced": "Naposledy synchronizované {{time}}",
       "manageRepositories": "Spravovať repozitáre",
       "notYetSynced": "Zatiaľ nesynchronizované",
+      "priorityFindingsPending": "Priority nálezov sa zobrazia po prvej synchronizácii.",
       "refreshFailed": "Obnovenie zlyhalo — zobrazujú sa posledné synchronizované údaje.",
       "settings": "Nastavenia",
       "syncNow": "Synchronizovať teraz",

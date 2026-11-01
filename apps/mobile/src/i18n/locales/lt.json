@@ -1836,6 +1836,7 @@
       "lastSynced": "Paskutinį kartą sinchronizuota {{time}}",
       "manageRepositories": "Tvarkyti saugyklas",
       "notYetSynced": "Dar nesinchronizuota",
+      "priorityFindingsPending": "Svarbiausi radiniai bus rodomi po pirmojo sinchronizavimo.",
       "refreshFailed": "Nepavyko atnaujinti – rodomi paskutinį kartą sinchronizuoti duomenys.",
       "settings": "Nustatymai",
       "syncNow": "Sinchronizuoti dabar",

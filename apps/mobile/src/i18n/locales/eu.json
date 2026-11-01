@@ -1784,6 +1784,7 @@
       "lastSynced": "Azken sinkronizazioa: {{time}}",
       "manageRepositories": "Kudeatu biltegiak",
       "notYetSynced": "Oraindik ez da sinkronizatu",
+      "priorityFindingsPending": "Lehentasunezko aurkikuntzak lehen sinkronizazioaren ondoren agertuko dira.",
       "refreshFailed": "Ezin izan dira datuak eguneratu. Azken sinkronizazioko datuak erakusten dira.",
       "settings": "Ezarpenak",
       "syncNow": "Sinkronizatu orain",

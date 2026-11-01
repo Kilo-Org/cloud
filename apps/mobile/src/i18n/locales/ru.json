@@ -1305,6 +1305,7 @@
       "notExploitable": "Эксплуатация невозможна",
       "notMeasured": "Не измерено",
       "notYetSynced": "Ещё не синхронизировано",
+      "priorityFindingsPending": "Первоочередные уязвимости появятся после первой синхронизации.",
       "refreshFailed": "Не удалось обновить — показаны данные последней синхронизации.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "Открыто: {{displayCount}}",

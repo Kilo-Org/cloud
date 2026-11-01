@@ -1784,6 +1784,7 @@
       "lastSynced": "An daidaita a ƙarshe {{time}}",
       "manageRepositories": "Sarrafa ma'ajiyoyi",
       "notYetSynced": "Har yanzu ba a daidaita ba",
+      "priorityFindingsPending": "Abubuwan da za a fara yi daga cikin matsalolin da aka gano za su bayyana bayan an yi daidaitawa ta farko.",
       "refreshFailed": "An kasa sabuntawa — ana nuna bayanan da aka daidaita a ƙarshe.",
       "settings": "Saituna",
       "syncNow": "Daidaita yanzu",

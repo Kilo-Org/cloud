@@ -1784,6 +1784,7 @@
       "lastSynced": "Viimeksi synkronoitu {{time}}",
       "manageRepositories": "Hallinnoi koodivarastoja",
       "notYetSynced": "Ei vielä synkronoitu",
+      "priorityFindingsPending": "Havaintojen tärkeysjärjestys näkyy ensimmäisen synkronoinnin jälkeen.",
       "refreshFailed": "Päivitys epäonnistui — näytetään viimeksi synkronoidut tiedot.",
       "settings": "Asetukset",
       "syncNow": "Synkronoi nyt",

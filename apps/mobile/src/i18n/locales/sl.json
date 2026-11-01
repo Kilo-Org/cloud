@@ -1836,6 +1836,7 @@
       "lastSynced": "Nazadnje sinhronizirano {{time}}",
       "manageRepositories": "Upravljaj skladišča",
       "notYetSynced": "Še ni sinhronizirano",
+      "priorityFindingsPending": "Prednostne ugotovitve se bodo prikazale po prvi sinhronizaciji.",
       "refreshFailed": "Osvežitev ni uspela. Prikazani so podatki zadnje sinhronizacije.",
       "settings": "Nastavitve",
       "syncNow": "Sinhroniziraj zdaj",

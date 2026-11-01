@@ -1784,6 +1784,7 @@
       "lastSynced": "Senast synkroniserat {{time}}",
       "manageRepositories": "Hantera kodarkiv",
       "notYetSynced": "Inte synkroniserat ännu",
+      "priorityFindingsPending": "Prioriterade fynd visas här efter den första synkroniseringen.",
       "refreshFailed": "Kunde inte uppdatera. De senast synkroniserade uppgifterna visas.",
       "settings": "Inställningar",
       "syncNow": "Synkronisera nu",

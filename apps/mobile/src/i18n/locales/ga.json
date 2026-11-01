@@ -1862,6 +1862,7 @@
       "lastSynced": "An sioncronú deireanach: {{time}}",
       "manageRepositories": "Bainistigh stórtha",
       "notYetSynced": "Níl sé sioncronaithe fós",
+      "priorityFindingsPending": "Beidh torthaí tosaíochta le feiceáil tar éis an chéad sioncronaithe.",
       "refreshFailed": "Níorbh fhéidir na sonraí a athnuachan. Tá sonraí ón sioncronú deireanach á dtaispeáint.",
       "settings": "Socruithe",
       "syncNow": "Sioncronaigh anois",

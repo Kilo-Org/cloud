@@ -1300,6 +1300,7 @@
       "notExploitable": "No explotable",
       "notMeasured": "Sin medir",
       "notYetSynced": "Aún no sincronizado",
+      "priorityFindingsPending": "Los hallazgos prioritarios aparecerán después de la primera sincronización.",
       "refreshFailed": "No se pudo actualizar: se muestran los últimos datos sincronizados.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "{{displayCount}} abiertos",

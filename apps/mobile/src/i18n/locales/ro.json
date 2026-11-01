@@ -1810,6 +1810,7 @@
       "lastSynced": "Ultima sincronizare: {{time}}",
       "manageRepositories": "Gestionează depozitele",
       "notYetSynced": "Încă nesincronizat",
+      "priorityFindingsPending": "Constatările prioritare vor apărea după prima sincronizare.",
       "refreshFailed": "Nu s-au putut actualiza datele. Se afișează ultimele date sincronizate.",
       "settings": "Setări",
       "syncNow": "Sincronizează acum",

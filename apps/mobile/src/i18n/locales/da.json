@@ -1784,6 +1784,7 @@
       "lastSynced": "Sidst synkroniseret {{time}}",
       "manageRepositories": "Administrér kodelagre",
       "notYetSynced": "Ikke synkroniseret endnu",
+      "priorityFindingsPending": "Prioriterede fund vises efter den første synkronisering.",
       "refreshFailed": "Data kunne ikke opdateres. De senest synkroniserede data vises.",
       "settings": "Indstillinger",
       "syncNow": "Synkronisér nu",

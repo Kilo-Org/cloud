@@ -1295,6 +1295,7 @@
       "notExploitable": "不可利用",
       "notMeasured": "尚未统计",
       "notYetSynced": "尚未同步",
+      "priorityFindingsPending": "完成首次同步后，这里将显示需要优先处理的安全问题。",
       "refreshFailed": "刷新失败，当前显示的是上次同步的数据。",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "{{displayCount}} 个未解决",

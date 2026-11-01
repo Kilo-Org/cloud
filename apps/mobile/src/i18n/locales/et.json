@@ -1784,6 +1784,7 @@
       "lastSynced": "Viimati sünkroonitud {{time}}",
       "manageRepositories": "Halda hoidlaid",
       "notYetSynced": "Pole veel sünkroonitud",
+      "priorityFindingsPending": "Prioriteetsed leiud ilmuvad pärast esimest sünkroonimist.",
       "refreshFailed": "Värskendamine ebaõnnestus — kuvatakse viimati sünkroonitud andmeid.",
       "settings": "Seaded",
       "syncNow": "Sünkrooni nüüd",

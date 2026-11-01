@@ -1854,6 +1854,7 @@
       "lastSynced": "Last synced {{time}}",
       "manageRepositories": "Manage repositories",
       "notYetSynced": "Not yet synced",
+      "priorityFindingsPending": "Priority findings will appear after the first sync.",
       "refreshFailed": "Could not refresh — showing last synced data.",
       "settings": "Settings",
       "syncNow": "Sync now",

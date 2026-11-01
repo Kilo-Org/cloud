@@ -1295,6 +1295,7 @@
       "notExploitable": "악용 불가",
       "notMeasured": "측정되지 않음",
       "notYetSynced": "아직 동기화 안 됨",
+      "priorityFindingsPending": "첫 동기화가 끝나면 우선순위가 높은 문제가 여기에 표시됩니다.",
       "refreshFailed": "새로고침하지 못했습니다. 마지막으로 동기화된 데이터를 표시합니다.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "미해결 {{displayCount}}건",

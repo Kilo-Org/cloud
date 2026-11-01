@@ -1295,6 +1295,7 @@
       "notExploitable": "Tidak dapat dieksploitasi",
       "notMeasured": "Belum diukur",
       "notYetSynced": "Belum disinkronkan",
+      "priorityFindingsPending": "Temuan prioritas akan muncul setelah sinkronisasi pertama.",
       "refreshFailed": "Tidak dapat memuat ulang data. Data dari sinkronisasi terakhir ditampilkan.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "{{displayCount}} terbuka",

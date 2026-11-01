@@ -1305,6 +1305,7 @@
       "notExploitable": "Nie można wykorzystać w ataku",
       "notMeasured": "Nie zmierzono",
       "notYetSynced": "Jeszcze nie zsynchronizowano",
+      "priorityFindingsPending": "Priorytetowe problemy pojawią się po pierwszej synchronizacji.",
       "refreshFailed": "Nie udało się odświeżyć danych. Widoczne dane pochodzą z ostatniej synchronizacji.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "Otwarte: {{displayCount}}",

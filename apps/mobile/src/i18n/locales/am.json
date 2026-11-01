@@ -1787,6 +1787,7 @@
       "lastSynced": "ለመጨረሻ ጊዜ የተመሳሰለው {{time}}",
       "manageRepositories": "ማከማቻዎችን ያስተዳድሩ",
       "notYetSynced": "እስካሁን አልተመሳሰለም",
+      "priorityFindingsPending": "ቅድሚያ የሚሰጣቸው ግኝቶች ከመጀመሪያው መመሳሰል በኋላ ይታያሉ።",
       "refreshFailed": "ማደስ አልተቻለም። ለመጨረሻ ጊዜ የተመሳሰለው ውሂብ እየታየ ነው።",
       "settings": "ቅንብሮች",
       "syncNow": "አሁን ያመሳስሉ",

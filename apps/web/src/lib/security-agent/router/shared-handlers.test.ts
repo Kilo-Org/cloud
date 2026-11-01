@@ -1188,6 +1188,33 @@ describe('setEnabled precondition markers', () => {
       createHandlers().setEnabled.handler({ ctx: context, input: { isEnabled: false } })
     ).resolves.toEqual({ success: true });
   });
+
+  it('marks the refusal that gates enabling with no repository in scope', async () => {
+    const orgError = await createHandlers()
+      .setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'selected', selectedRepositoryIds: [] },
+      })
+      .catch((thrown: unknown) => thrown);
+
+    expect(orgError).toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Select at least one repository before enabling Security Agent.',
+    });
+    expect(causeUpstreamCode(orgError)).toBe(SECURITY_SYNC_PRECONDITION_CODES.noRepositories);
+
+    // The personal router runs the same handler, so it marks the refusal too.
+    const personalError = await createPersonalHandlers()
+      .setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [] },
+      })
+      .catch((thrown: unknown) => thrown);
+    expect(causeUpstreamCode(personalError)).toBe(SECURITY_SYNC_PRECONDITION_CODES.noRepositories);
+
+    expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
+    expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
+  });
 });
 
 describe('triggerSync precondition markers', () => {

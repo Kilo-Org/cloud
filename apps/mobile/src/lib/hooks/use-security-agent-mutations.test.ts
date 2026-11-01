@@ -558,6 +558,20 @@ describe('config-write onError copy', () => {
     );
   });
 
+  it('shows the repository picker sentence when enabling has no repository in scope', () => {
+    useSetSecurityAgentEnabled('personal');
+    lastCapturedOptions?.onError?.(
+      Object.assign(new Error('Select at least one repository before enabling Security Agent.'), {
+        data: { code: 'PRECONDITION_FAILED', upstreamCode: 'security_sync_no_repositories' },
+      })
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith('Select at least one repository.');
+    expect(toastErrorMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('Select at least one repository before enabling')
+    );
+  });
+
   it('shows the conflict copy when the stored config changed elsewhere', () => {
     useSaveSecurityAgentConfig('personal');
     lastCapturedOptions?.onError?.(

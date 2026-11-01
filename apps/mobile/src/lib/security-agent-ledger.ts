@@ -276,12 +276,17 @@ export function localizedSecurityMarkerMessage(error: unknown): string | null {
  * The catalog key a config-write refusal's copy comes from, or null when the
  * server did not mark it. Enabling is refused for the same missing permission a
  * manual sync is, so it reuses the scope screen's reauthorize sentence instead
- * of the sync wording that ends "then sync again".
+ * of the sync wording that ends "then sync again". Its empty-scope refusal
+ * reuses the sync no-repositories code, but reads the sentence the repository
+ * picker itself shows rather than the one that ends "then sync again".
  */
 function configMutationCopyKeyFor(error: unknown): string | null {
   const code = readTrpcErrorField(error, 'upstreamCode');
   if (code === SECURITY_SYNC_PRECONDITION_CODES.missingPermission) {
     return 'securityAgent.scopeEntry.reauthorizeDescription';
+  }
+  if (code === SECURITY_SYNC_PRECONDITION_CODES.noRepositories) {
+    return 'securityAgent.repositories.selectAtLeastOne';
   }
   if (code === SECURITY_CONFIG_CONFLICT_CODE) {
     return 'securityAgent.mutations.configConflict';

@@ -763,11 +763,12 @@ async function getRemediationTimeline(findingId: string): Promise<RemediationTim
 }
 
 /**
- * A manual-sync precondition rejection. The English message stays the web
- * surface's copy; `upstreamCode` is the stable marker the mobile ledger maps
- * onto translated catalog copy, so the device never parses server prose.
+ * A Security Agent precondition rejection: a manual sync, or enabling the agent
+ * with no repository in scope. The English message stays the web surface's
+ * copy; `upstreamCode` is the stable marker the mobile ledger maps onto
+ * translated catalog copy, so the device never parses server prose.
  */
-function securitySyncPreconditionError(
+function securityAgentPreconditionError(
   precondition: SecuritySyncPreconditionCode,
   message: string
 ): TRPCError {
@@ -1222,7 +1223,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           if (!integration || !hasSecurityReviewPermissions(integration)) {
             // Same stable code as the manual-sync refusal below, so a device maps
             // it onto catalog copy instead of showing this English sentence.
-            throw securitySyncPreconditionError(
+            throw securityAgentPreconditionError(
               SECURITY_SYNC_PRECONDITION_CODES.missingPermission,
               'GitHub App does not have vulnerability_alerts permission'
             );
@@ -1263,13 +1264,15 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             [...new Set(repositoriesToSync)].sort().join('\n');
 
         // Refuse enabling with an empty effective repo set: no repository would
-        // be synced or analyzed, so an enabled state would be misleading.
+        // be synced or analyzed, so an enabled state would be misleading. The
+        // sync path's no-repositories code marks it, so a device tells the user
+        // to pick repositories instead of showing this English sentence.
         if (input.isEnabled) {
           if (repositoriesToSync.length === 0) {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'Select at least one repository before enabling Security Agent.',
-            });
+            throw securityAgentPreconditionError(
+              SECURITY_SYNC_PRECONDITION_CODES.noRepositories,
+              'Select at least one repository before enabling Security Agent.'
+            );
           }
         }
 
@@ -1600,14 +1603,14 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
         const integration = await deps.getIntegration(ctx, input);
         if (!integration || integration.integration_status !== 'active') {
-          throw securitySyncPreconditionError(
+          throw securityAgentPreconditionError(
             SECURITY_SYNC_PRECONDITION_CODES.integrationInactive,
             'GitHub integration not found or inactive'
           );
         }
 
         if (!hasSecurityReviewPermissions(integration)) {
-          throw securitySyncPreconditionError(
+          throw securityAgentPreconditionError(
             SECURITY_SYNC_PRECONDITION_CODES.missingPermission,
             'GitHub App does not have vulnerability_alerts permission'
           );
@@ -1617,7 +1620,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         if (!installationId) {
           // Same reader-visible state as an inactive integration: the Kilo
           // GitHub App is not usable for this owner until it is reconnected.
-          throw securitySyncPreconditionError(
+          throw securityAgentPreconditionError(
             SECURITY_SYNC_PRECONDITION_CODES.integrationInactive,
             'GitHub installation ID not found'
           );
@@ -1655,7 +1658,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
                   .filter((name): name is string => !!name);
 
           if (repositoriesToSync.length === 0) {
-            throw securitySyncPreconditionError(
+            throw securityAgentPreconditionError(
               SECURITY_SYNC_PRECONDITION_CODES.noRepositories,
               'No repositories configured for security reviews'
             );

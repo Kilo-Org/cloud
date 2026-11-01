@@ -153,6 +153,29 @@ describe('SaveProfileSheet', () => {
     expect(field(renderer, 'Profile name').props.error).toBe('Profile name is too long');
   });
 
+  it('follows the typed name after a refused submit, without waiting for another', async () => {
+    const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    const renderer = mount({ onSave });
+    const type = (value: string) => {
+      act(() => {
+        (field(renderer, 'Profile name').props.onChangeText as (value: string) => void)(value);
+      });
+    };
+
+    await submit(renderer);
+    expect(field(renderer, 'Profile name').props.error).toBe('Enter a profile name');
+
+    type('x'.repeat(101));
+    expect(field(renderer, 'Profile name').props.error).toBe('Profile name is too long');
+
+    type('My AWS');
+    expect(field(renderer, 'Profile name').props.error).toBeUndefined();
+
+    type('');
+    expect(field(renderer, 'Profile name').props.error).toBe('Enter a profile name');
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it('saves the trimmed fields and closes on success', async () => {
     const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
     const onClose = vi.fn<() => void>();

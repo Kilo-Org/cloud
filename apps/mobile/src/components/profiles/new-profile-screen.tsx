@@ -17,13 +17,10 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
-import {
-  type ProfileNameError,
-  validateProfileDescription,
-  validateProfileName,
-} from '@/lib/agent-profile-forms';
+import { validateProfileDescription } from '@/lib/agent-profile-forms';
 import { useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { useProfileNameField } from '@/lib/hooks/use-profile-name-field';
 import {
   getProfileOverviewPath,
   type ProfileManagementStack,
@@ -45,10 +42,6 @@ const OWNER_CHOICE_FALLBACK_KEYS = {
   personal: 'common.personal',
   organization: 'common.organization',
 } as const satisfies Record<ProfileOwnerChoice, string>;
-const NAME_ERROR_KEYS = {
-  empty: 'profiles.nameRequired',
-  'too-long': 'agentChat.newSession.nameTooLong',
-} as const satisfies Record<ProfileNameError, string>;
 
 /**
  * The mutation hook toasts `error.message`; this screen only supplies a
@@ -96,8 +89,7 @@ export function NewProfileScreen({
   // `organizationId` each create carries, so a personal create is never
   // rewritten to the selected organization.
   const { create } = useAgentProfileMutations();
-  const nameRef = useRef('');
-  const nameValidationStarted = useRef(false);
+  const nameField = useProfileNameField();
   const descriptionRef = useRef('');
   // `null` until the user picks: the route's request, or Personal, applies
   // while the boundary is the one being edited. A selection is stamped with its
@@ -116,15 +108,11 @@ export function NewProfileScreen({
   const selectOwner = (next: ProfileOwnerChoice) => {
     setOwnerSelection({ organizationId: boundaryOrganizationId ?? null, owner: next });
   };
-  const [nameError, setNameError] = useState<ProfileNameError | null>(null);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
 
   const submit = async () => {
-    const name = nameRef.current.trim();
-    nameValidationStarted.current = true;
-    const nameIssue = validateProfileName(name);
-    setNameError(nameIssue);
-    if (nameIssue !== null) {
+    const name = nameField.commit();
+    if (name === null) {
       return;
     }
 
@@ -171,15 +159,10 @@ export function NewProfileScreen({
         <FormField
           label={t('profiles.nameLabel')}
           placeholder={t('profiles.namePlaceholder')}
-          error={nameError === null ? undefined : t(NAME_ERROR_KEYS[nameError])}
+          error={nameField.error}
           required
           returnKeyType="next"
-          onChangeText={value => {
-            nameRef.current = value;
-            if (nameValidationStarted.current) {
-              setNameError(validateProfileName(value));
-            }
-          }}
+          onChangeText={nameField.handleChangeText}
         />
         <FormField
           label={t('profiles.descriptionLabel')}

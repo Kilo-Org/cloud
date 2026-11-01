@@ -683,6 +683,9 @@
       "gitlabDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لیں",
       "bitbucketOrgOnlyDescription": "اس کی Bitbucket پل ریکویسٹس کا جائزہ لینے کے لیے اوپر موجود اکاؤنٹ کو ایک تنظیم پر تبدیل کریں۔",
       "bitbucketOrgOnlyNoOrganizationDescription": "اس اکاؤنٹ کی ابھی تک کوئی تنظیم نہیں ہے۔ ایک تنظیم بنانے یا اس میں شامل ہونے پر آپ Bitbucket پل ریکویسٹس کا جائزہ لے سکتے ہیں۔",
+      "gitlabReconnectAdminOnlyDescription": "ادارے کے کسی مالک، منتظم، یا بلنگ مینیجر سے اسے دوبارہ منسلک کرنے کی درخواست کریں۔",
+      "bitbucketNotConnectedTitle": "Bitbucket منسلک نہیں ہے",
+      "bitbucketAdminOnlyDescription": "صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
       "contextLine": "{{organization}} کے لیے",
       "contextLinePersonal": "ذاتی اکاؤنٹ کے لیے"
     },

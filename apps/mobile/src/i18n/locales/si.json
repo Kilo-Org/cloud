@@ -683,6 +683,9 @@
       "gitlabDescription": "ජංගම දුරකථනයෙන් මර්ජ ඉල්ලීම් සමාලෝචනය කරන්න",
       "bitbucketOrgOnlyDescription": "එහි Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කිරීමට ඉහත ගිණුම සංවිධානයකට මාරු කරන්න.",
       "bitbucketOrgOnlyNoOrganizationDescription": "මෙම ගිණුමට තවම සංවිධාන කිසිවක් නොමැත. සංවිධානයක් සෑදීමෙන් හෝ එකකට සම්බන්ධ වීමෙන් පසු Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කළ හැක.",
+      "gitlabReconnectAdminOnlyDescription": "එය නැවත සම්බන්ධ කරන ලෙස සංවිධානයේ හිමිකරු, පරිපාලක හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලන්න.",
+      "bitbucketNotConnectedTitle": "Bitbucket සම්බන්ධ වී නොමැත",
+      "bitbucketAdminOnlyDescription": "එය සම්බන්ධ කළ හැක්කේ සංවිධාන හිමිකරුවන්ට, පරිපාලකවරුන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි.",
       "contextLine": "{{organization}} සඳහා",
       "contextLinePersonal": "ඔබේ පෞද්ගලික ගිණුම සඳහා"
     },

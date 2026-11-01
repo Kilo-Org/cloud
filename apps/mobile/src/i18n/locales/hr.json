@@ -698,6 +698,9 @@
       "gitlabDescription": "Pregledaj merge requeste na mobitelu",
       "bitbucketOrgOnlyDescription": "Prebaci račun gore na organizaciju za pregled njenih zahtjeva za spajanje na Bitbucketu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj račun još nema organizacija. Zahtjeve za spajanje na Bitbucketu moći ćeš pregledati kada stvoriš ili se pridružiš organizaciji.",
+      "gitlabReconnectAdminOnlyDescription": "Zamolite vlasnika organizacije, administratora ili upravitelja naplate da ga ponovno poveže.",
+      "bitbucketNotConnectedTitle": "Bitbucket nije povezan",
+      "bitbucketAdminOnlyDescription": "Samo vlasnici organizacije, administratori i upravitelji naplate mogu ga povezati.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za osobni račun"
     },

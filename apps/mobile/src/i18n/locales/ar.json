@@ -2849,6 +2849,9 @@
       "gitlabDescription": "مراجعة طلبات الدمج على الجوال",
       "bitbucketOrgOnlyDescription": "بدّل الحساب أعلاه إلى مؤسسة لمراجعة طلبات السحب الخاصة بها على Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "لا توجد مؤسسات في هذا الحساب بعد. يمكنك مراجعة طلبات السحب على Bitbucket بعد إنشاء مؤسسة أو الانضمام إلى واحدة.",
+      "gitlabReconnectAdminOnlyDescription": "اطلب من مالك مؤسسة أو مشرف أو مدير الفوترة ربطه.",
+      "bitbucketNotConnectedTitle": "Bitbucket غير متصل",
+      "bitbucketAdminOnlyDescription": "يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط ربطه.",
       "contextLine": "للمؤسسة: {{organization}}",
       "contextLinePersonal": "لحسابك الشخصي"
     },
@@ -3266,10 +3269,10 @@
     "pullRequestUnavailable": "طلب السحب غير متاح",
     "pullRequestUnavailableDescription": "لا يمكن فتح PR هذا. ربما حُذف، أو أن المستودع خاص، أو أن تطبيق Kilo على GitHub غير مثبّت فيه.",
     "reconnectNotice": {
-      "title": "انتهت صلاحية الربط مع GitHub.",
+      "title": "انتهت صلاحية الربط مع GitHub",
       "message": "أعد التحقق من الربط، وسيُطلب منك إعادة ربط الحساب إذا لزم الأمر.",
-      "gitlabTitle": "انتهت صلاحية الربط مع GitLab.",
-      "bitbucketTitle": "انتهت صلاحية الربط مع Bitbucket."
+      "gitlabTitle": "انتهت صلاحية الربط مع GitLab",
+      "bitbucketTitle": "انتهت صلاحية الربط مع Bitbucket"
     },
     "review": "مراجعة",
     "reviewPullRequest": "مراجعة طلب السحب",

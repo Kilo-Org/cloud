@@ -728,6 +728,9 @@
       "gitlabDescription": "Athbhreithnigh iarratais chumaisc ar fhón",
       "bitbucketOrgOnlyDescription": "Athraigh an cuntas thuas go heagraíocht chun iarratais tharraingthe Bitbucket na heagraíochta sin a athbhreithniú.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Níl aon eagraíocht ag an gcuntas seo fós. Is féidir iarratais tharraingthe Bitbucket a athbhreithniú nuair a chruthaíonn tú eagraíocht nó nuair a thagann tú isteach i gceann acu.",
+      "gitlabReconnectAdminOnlyDescription": "Iarr ar Úinéir eagraíochta, Riarthóir, nó Bainisteoir billeála é a athnascadh.",
+      "bitbucketNotConnectedTitle": "Níl Bitbucket nasctha",
+      "bitbucketAdminOnlyDescription": "Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal.",
       "contextLine": "Do {{organization}}",
       "contextLinePersonal": "Do do chuntas pearsanta"
     },

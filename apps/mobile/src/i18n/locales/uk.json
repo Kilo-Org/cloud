@@ -2781,6 +2781,9 @@
       "gitlabDescription": "Перевірка merge-запитів на мобільному пристрої",
       "bitbucketOrgOnlyDescription": "Перемкніть обліковий запис, вказаний вище, на організацію, щоб переглядати її запити на злиття в Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Цей обліковий запис ще не має організацій. Запити на злиття Bitbucket можна переглядати після того, як ви створите організацію або приєднаєтеся до неї.",
+      "gitlabReconnectAdminOnlyDescription": "Попросіть власника організації, адміністратора або менеджера з оплати підключити його.",
+      "bitbucketNotConnectedTitle": "Bitbucket не підключено",
+      "bitbucketAdminOnlyDescription": "Підключити його можуть лише власники організації, адміністратори та менеджери з оплати.",
       "contextLine": "Для {{organization}}",
       "contextLinePersonal": "Для особистого простору"
     },

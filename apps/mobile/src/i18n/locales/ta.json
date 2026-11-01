@@ -683,6 +683,9 @@
       "gitlabDescription": "மொபைலில் இணைப்புக் கோரிக்கைகளை மதிப்பாய்வு செய்யவும்",
       "bitbucketOrgOnlyDescription": "அதன் Bitbucket இணைப்புக் கோரிக்கைகளை மதிப்பாய்வு செய்ய மேலே உள்ள கணக்கை ஒரு நிறுவனத்திற்கு மாற்றவும்.",
       "bitbucketOrgOnlyNoOrganizationDescription": "இந்தக் கணக்கில் இன்னும் எந்த நிறுவனமும் இல்லை. ஒரு நிறுவனத்தை உருவாக்கியதும் அல்லது அதில் இணைந்ததும், Bitbucket இணைப்புக் கோரிக்கைகளை மதிப்பாய்வு செய்யலாம்.",
+      "gitlabReconnectAdminOnlyDescription": "அதை மீண்டும் இணைக்க ஒரு நிறுவன உரிமையாளர், நிர்வாகி அல்லது கட்டண மேலாளரிடம் கேட்கவும்.",
+      "bitbucketNotConnectedTitle": "Bitbucket இணைக்கப்படவில்லை",
+      "bitbucketAdminOnlyDescription": "நிறுவன உரிமையாளர்கள், நிர்வாகிகள் மற்றும் கட்டண மேலாளர்கள் மட்டுமே அதை இணைக்க முடியும்.",
       "contextLine": "{{organization}}-க்கு",
       "contextLinePersonal": "உங்கள் தனிப்பட்ட கணக்கிற்கு"
     },

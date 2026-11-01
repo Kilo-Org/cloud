@@ -683,6 +683,9 @@
       "gitlabDescription": "Granska merge requests i mobilen",
       "bitbucketOrgOnlyDescription": "Växla kontot ovan till en organisation för att granska dess PR:er i Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Det här kontot har inga organisationer ännu. Bitbucket-PR:er kan granskas när du har skapat eller gått med i en organisation.",
+      "gitlabReconnectAdminOnlyDescription": "Be en organisationsägare, administratör eller faktureringsansvarig att ansluta den på nytt.",
+      "bitbucketNotConnectedTitle": "Bitbucket är inte anslutet",
+      "bitbucketAdminOnlyDescription": "Endast organisationsägare, administratörer och faktureringsansvariga kan ansluta Bitbucket.",
       "contextLine": "För {{organization}}",
       "contextLinePersonal": "För ditt personliga konto"
     },

@@ -2713,6 +2713,9 @@
       "gitlabDescription": "Birleştirme isteklerini mobilde incele",
       "bitbucketOrgOnlyDescription": "Yukarıdaki hesabı bir kuruluşa geçir, onun Bitbucket çekme isteklerini gözden geçirmek için.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabın henüz bir kuruluşu yok. Bitbucket çekme isteklerini, bir kuruluş oluşturduktan ya da birine katıldıktan sonra gözden geçirebilirsin.",
+      "gitlabReconnectAdminOnlyDescription": "Yeniden bağlaması için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun.",
+      "bitbucketNotConnectedTitle": "Bitbucket bağlı değil",
+      "bitbucketAdminOnlyDescription": "Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
       "contextLine": "{{organization}} için",
       "contextLinePersonal": "Kişisel hesabınız için"
     },

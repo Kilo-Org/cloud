@@ -683,6 +683,9 @@
       "gitlabDescription": "မိုဘိုင်းတွင် merge request များကို သုံးသပ်ပါ",
       "bitbucketOrgOnlyDescription": "၎င်း၏ Bitbucket PR များကို သုံးသပ်ရန် အပေါ်ရှိ အကောင့်ကို အဖွဲ့တစ်ခုသို့ ပြောင်းပါ။",
       "bitbucketOrgOnlyNoOrganizationDescription": "ဤအကောင့်တွင် အဖွဲ့များ မရှိသေးပါ။ အဖွဲ့တစ်ခုကို ဖန်တီးပါ သို့မဟုတ် ပါဝင်ပါက Bitbucket PR များကို သုံးသပ်နိုင်ပါသည်။",
+      "gitlabReconnectAdminOnlyDescription": "အဖွဲ့အစည်း ပိုင်ရှင်၊ စီမံခန့်ခွဲသူ သို့မဟုတ် ငွေတောင်းခံမှုမန်နေဂျာတစ်ဦးအား ၎င်းကို ပြန်လည်ချိတ်ဆက်ပေးရန် တောင်းဆိုပါ။",
+      "bitbucketNotConnectedTitle": "Bitbucket ကို ချိတ်ဆက်မထားပါ",
+      "bitbucketAdminOnlyDescription": "အဖွဲ့အစည်း ပိုင်ရှင်များ၊ စီမံခန့်ခွဲသူများနှင့် ငွေတောင်းခံမှုမန်နေဂျာများသာ ချိတ်ဆက်နိုင်သည်။",
       "contextLine": "{{organization}} အတွက်",
       "contextLinePersonal": "ကိုယ်ပိုင်အကောင့်အတွက်"
     },

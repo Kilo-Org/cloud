@@ -2713,6 +2713,9 @@
       "gitlabDescription": "Merge requests op je mobiel beoordelen",
       "bitbucketOrgOnlyDescription": "Wissel het account hierboven naar een organisatie om diens Bitbucket-PR's te beoordelen.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Dit account heeft nog geen organisaties. Je kunt Bitbucket-PR's beoordelen zodra je een organisatie aanmaakt of er lid van wordt.",
+      "gitlabReconnectAdminOnlyDescription": "Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om het opnieuw te koppelen.",
+      "bitbucketNotConnectedTitle": "Bitbucket is niet gekoppeld",
+      "bitbucketAdminOnlyDescription": "Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen.",
       "contextLine": "Voor {{organization}}",
       "contextLinePersonal": "Voor je persoonlijke account"
     },

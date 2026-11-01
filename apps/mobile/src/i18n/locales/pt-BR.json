@@ -2753,6 +2753,9 @@
       "gitlabDescription": "Revisar merge requests no celular",
       "bitbucketOrgOnlyDescription": "Mude a conta acima para uma organização para revisar as pull requests dela no Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta conta ainda não tem organizações. As pull requests do Bitbucket podem ser revisadas quando você criar ou entrar em uma organização.",
+      "gitlabReconnectAdminOnlyDescription": "Peça a um Proprietário, Administrador ou Gerente de cobrança da organização para reconectá-la.",
+      "bitbucketNotConnectedTitle": "O Bitbucket não está conectado",
+      "bitbucketAdminOnlyDescription": "Somente proprietários, administradores e gerentes de cobrança da organização podem conectá-lo.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para sua conta pessoal"
     },

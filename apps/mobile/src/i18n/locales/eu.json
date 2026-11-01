@@ -683,6 +683,9 @@
       "gitlabDescription": "Berrikusi merge-eskaerak mugikorrean",
       "bitbucketOrgOnlyDescription": "Aldatu goiko kontua erakunde batera haren Bitbucket bateratze-eskaerak berrikusteko.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Kontu honek ez du oraindik erakunderik. Erakunde bat sortu edo batekin bat egiten duzunean, haren Bitbucket bateratze-eskaerak berrikus ditzakezu.",
+      "gitlabReconnectAdminOnlyDescription": "Eskatu erakunde bateko jabeari, administratzaileari edo fakturazio-kudeatzaileari berriro konekta dezan.",
+      "bitbucketNotConnectedTitle": "Bitbucket ez dago konektatuta",
+      "bitbucketAdminOnlyDescription": "Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
       "contextLine": "{{organization}}-rako",
       "contextLinePersonal": "Zure kontu pertsonalerako"
     },

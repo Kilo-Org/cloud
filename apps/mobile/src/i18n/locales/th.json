@@ -683,6 +683,9 @@
       "gitlabDescription": "ตรวจสอบ merge request บนมือถือ",
       "bitbucketOrgOnlyDescription": "สลับบัญชีด้านบนไปที่องค์กรเพื่อรีวิวพูลรีเควสต์บน Bitbucket ขององค์กรนั้น",
       "bitbucketOrgOnlyNoOrganizationDescription": "บัญชีนี้ยังไม่มีองค์กร คุณจะสามารถรีวิวพูลรีเควสต์บน Bitbucket ได้เมื่อสร้างหรือเข้าร่วมองค์กร",
+      "gitlabReconnectAdminOnlyDescription": "ขอให้เจ้าของ ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินขององค์กรเชื่อมต่อใหม่",
+      "bitbucketNotConnectedTitle": "Bitbucket ยังไม่เชื่อมต่อ",
+      "bitbucketAdminOnlyDescription": "เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้",
       "contextLine": "สำหรับ {{organization}}",
       "contextLinePersonal": "สำหรับบัญชีส่วนตัวของคุณ"
     },

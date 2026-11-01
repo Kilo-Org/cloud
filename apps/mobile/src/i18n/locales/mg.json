@@ -3853,6 +3853,7 @@
       "markSecret": "Mariho ho tsiambaratelo",
       "masked": "Sanda miafina",
       "reveal": "Asehoy ny sandany",
+      "hide": "Afeno ny sandany",
       "newValuePlaceholder": "Ampidiro ny sandan-tsiambaratelo vaovao",
       "valuePlaceholder": "Sanda tsiambaratelo (voaaro)"
     },

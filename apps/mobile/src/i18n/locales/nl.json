@@ -3847,6 +3847,7 @@
       "markSecret": "Markeer als geheim",
       "masked": "Verborgen waarde",
       "reveal": "Onthul waarde",
+      "hide": "Verberg waarde",
       "newValuePlaceholder": "Voer een nieuwe geheime waarde in",
       "valuePlaceholder": "Geheime waarde (versleuteld)"
     },

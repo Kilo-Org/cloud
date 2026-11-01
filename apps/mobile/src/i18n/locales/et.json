@@ -3847,6 +3847,7 @@
       "markSecret": "Märgi salajaseks",
       "masked": "Varjatud väärtus",
       "reveal": "Avalda väärtust",
+      "hide": "Varja väärtust",
       "newValuePlaceholder": "Sisesta uus salajane väärtus",
       "valuePlaceholder": "Salajane väärtus (krüpteeritud)"
     },

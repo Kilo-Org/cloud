@@ -3903,6 +3903,7 @@
       "markSecret": "סמן כסוד",
       "masked": "ערך נסתר",
       "reveal": "לחשוף ערך",
+      "hide": "הסתר ערך",
       "newValuePlaceholder": "הזן ערך סודי חדש",
       "valuePlaceholder": "ערך סודי (מוצפן)"
     },

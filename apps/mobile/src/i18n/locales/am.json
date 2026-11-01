@@ -3853,6 +3853,7 @@
       "markSecret": "እንደ ምስጢር ምልክት ያድርጉ",
       "masked": "የተደበቀ እሴት",
       "reveal": "ዋጋን አሳይ",
+      "hide": "ዋጋን ደብቅ",
       "newValuePlaceholder": "አዲስ ምስጢራዊ ዋጋ ያስገቡ",
       "valuePlaceholder": "ምስጢራዊ ዋጋ (የተመሰጠረ)"
     },

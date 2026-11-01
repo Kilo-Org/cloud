@@ -3959,6 +3959,7 @@
       "markSecret": "Pažymėti kaip paslaptį",
       "masked": "Paslėpta vertė",
       "reveal": "Atskleiskite vertę",
+      "hide": "Paslėpkite vertę",
       "newValuePlaceholder": "Įveskite naują slaptą reikšmę",
       "valuePlaceholder": "Slapta reikšmė (užšifruota)"
     },

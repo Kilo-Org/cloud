@@ -3847,6 +3847,7 @@
       "markSecret": "د پټ په توګه نښه کړئ",
       "masked": "پټ ارزښت",
       "reveal": "ارزښت څرګند کړئ",
+      "hide": "ارزښت پټ کړئ",
       "newValuePlaceholder": "نوی پټ ارزښت ولیکئ",
       "valuePlaceholder": "پټ ارزښت (کوډ شوی)"
     },

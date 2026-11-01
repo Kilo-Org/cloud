@@ -3903,6 +3903,7 @@
       "markSecret": "Označi kao tajnu",
       "masked": "Skrivena vrednost",
       "reveal": "Otkrijte vrednost",
+      "hide": "Sakrijte vrednost",
       "newValuePlaceholder": "Unesite novu tajnu vrednost",
       "valuePlaceholder": "Tajna vrednost (šifrovana)"
     },

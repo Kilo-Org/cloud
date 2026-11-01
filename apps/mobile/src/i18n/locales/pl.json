@@ -3959,6 +3959,7 @@
       "markSecret": "Oznacz jako tajne",
       "masked": "Ukryta wartość",
       "reveal": "Ujawnij wartość",
+      "hide": "Ukryj wartość",
       "newValuePlaceholder": "Wprowadź nową tajną wartość",
       "valuePlaceholder": "Tajna wartość (zaszyfrowana)"
     },

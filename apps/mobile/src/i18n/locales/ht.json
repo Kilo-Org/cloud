@@ -3847,6 +3847,7 @@
       "markSecret": "Make kòm sekrè",
       "masked": "Valè kache",
       "reveal": "Revele valè",
+      "hide": "Kache valè",
       "newValuePlaceholder": "Antre yon nouvo valè sekrè",
       "valuePlaceholder": "Valè sekrè (chifre)"
     },

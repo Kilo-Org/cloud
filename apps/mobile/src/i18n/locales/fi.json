@@ -3847,6 +3847,7 @@
       "markSecret": "Merkitse salaiseksi",
       "masked": "Piilotettu arvo",
       "reveal": "Paljasta arvo",
+      "hide": "Piilota arvo",
       "newValuePlaceholder": "Syötä uusi salainen arvo",
       "valuePlaceholder": "Salainen arvo (salattu)"
     },

@@ -4071,6 +4071,7 @@
       "markSecret": "ضع علامة على أنها سرية",
       "masked": "القيمة المخفية",
       "reveal": "كشف القيمة",
+      "hide": "إخفاء القيمة",
       "newValuePlaceholder": "أدخل قيمة سرية جديدة",
       "valuePlaceholder": "قيمة سرية (مشفرة)"
     },

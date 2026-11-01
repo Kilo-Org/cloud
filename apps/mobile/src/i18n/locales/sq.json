@@ -3847,6 +3847,7 @@
       "markSecret": "Shënoni si sekret",
       "masked": "Vlera e fshehur",
       "reveal": "Zbuloni vlerën",
+      "hide": "Fshihni vlerën",
       "newValuePlaceholder": "Vendos një vlerë të re sekrete",
       "valuePlaceholder": "Vlerë sekrete (e kriptuar)"
     },

@@ -3913,6 +3913,7 @@
       "markSecret": "Mark as secret",
       "masked": "Hidden value",
       "reveal": "Reveal value",
+      "hide": "Hide value",
       "newValuePlaceholder": "Enter new secret value",
       "valuePlaceholder": "Secret value (encrypted)"
     },

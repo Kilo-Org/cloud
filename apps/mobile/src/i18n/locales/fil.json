@@ -3853,6 +3853,7 @@
       "markSecret": "Markahan bilang sikreto",
       "masked": "Nakatagong halaga",
       "reveal": "Ipakita ang halaga",
+      "hide": "Itago ang halaga",
       "newValuePlaceholder": "Maglagay ng bagong lihim na halaga",
       "valuePlaceholder": "Lihim na halaga (naka-encrypt)"
     },

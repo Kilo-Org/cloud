@@ -3903,6 +3903,7 @@
       "markSecret": "Marcați ca secret",
       "masked": "Valoare ascunsă",
       "reveal": "Dezvăluie valoarea",
+      "hide": "Ascunde valoarea",
       "newValuePlaceholder": "Introdu o nouă valoare secretă",
       "valuePlaceholder": "Valoare secretă (criptată)"
     },

@@ -271,6 +271,8 @@ describe('Security Agent settings writes while the device is offline', () => {
       });
     });
 
+    await waitFor(() => holder.syncError !== null);
+
     // The dashboard's sync control stops spinning, and the persisted
     // reconcile-first row makes the next launch offer the same-key retry
     // instead of re-POSTing blind.

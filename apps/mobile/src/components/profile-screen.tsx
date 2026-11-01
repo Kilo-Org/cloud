@@ -325,7 +325,7 @@ export function ProfileScreen() {
           <ConfigureRow
             icon={GitMerge}
             title={t('common.prReview')}
-            subtitle={t('profile.prReviewSubtitle')}
+            subtitle={t('common.prReviewSubtitle')}
             hue="gold"
             className="rounded-lg bg-secondary px-3"
             last

@@ -112,16 +112,15 @@ function mountBriefings(reports: readonly unknown[]): TestRenderer.ReactTestRend
     pages: [{ reports, nextCursor: null }],
     pageParams: [undefined],
   });
-  let mounted: TestRenderer.ReactTestRenderer | undefined = undefined;
   act(() => {
-    mounted = TestRenderer.create(
+    renderer = TestRenderer.create(
       createElement(QueryClientProvider, { client: queryClient }, createElement(BriefingListScreen))
     );
   });
-  if (mounted === undefined) {
+  const mounted = renderer;
+  if (!mounted) {
     throw new Error('Briefing list did not mount');
   }
-  renderer = mounted;
   return mounted;
 }
 
@@ -217,9 +216,11 @@ it('explains the empty window and keeps the header action when a context is enab
   expect(emptyState.props.title).toBe('agentBriefing.empty');
   expect(emptyState.props.description).toBe('agentBriefing.emptyHint');
   expect(emptyState.props.action).toBeUndefined();
-  expect(mounted.root.findAllByType('ScreenHeader' as ElementType)[0]?.findAllByType(
-    'Button' as ElementType
-  )).toHaveLength(1);
+  expect(
+    mounted.root
+      .findAllByType('ScreenHeader' as ElementType)[0]
+      ?.findAllByType('Button' as ElementType)
+  ).toHaveLength(1);
 });
 
 it('states the history hint once: in the empty state, not above the filters', () => {

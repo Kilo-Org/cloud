@@ -194,6 +194,8 @@ describe('EmptyState presentation', () => {
 
     const full = await mount();
     expect(title(full.mounted)?.props.className).toContain('text-center');
+    // The icon bubble is present here and carries the cue, so the title stays neutral.
+    expect(title(full.mounted)?.props.className).not.toContain('text-destructive');
     full.mounted.unmount();
 
     band.short = true;

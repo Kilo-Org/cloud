@@ -57,25 +57,27 @@ export function CloudAgentBillingError({ failure, presentation }: Props) {
             <p>Your prompt did not start.</p>
           </>
         )}
-        {action && (
+        {(action || presentation.memberGuidance) && (
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={redirecting}
-              onClick={async () => {
-                if (redirecting) return;
-                setRedirecting(true);
-                await setReturnUrlAndRedirect(currentPaymentReturnPath(window.location)).catch(
-                  () => undefined
-                );
-                router.push(action.href);
-                setRedirecting(false);
-              }}
-            >
-              {redirecting ? 'Redirecting…' : action.label}
-            </Button>
-            {action.memberGuidance && (
+            {action && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={redirecting}
+                onClick={async () => {
+                  if (redirecting) return;
+                  setRedirecting(true);
+                  await setReturnUrlAndRedirect(currentPaymentReturnPath(window.location)).catch(
+                    () => undefined
+                  );
+                  router.push(action.href);
+                  setRedirecting(false);
+                }}
+              >
+                {redirecting ? 'Redirecting…' : action.label}
+              </Button>
+            )}
+            {presentation.memberGuidance && (
               <span className="text-muted-foreground text-xs">
                 An organization owner, admin, or billing manager can add credits.
               </span>

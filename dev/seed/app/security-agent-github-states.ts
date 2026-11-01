@@ -22,16 +22,10 @@ const AWAITING_APPROVAL_STATUS = 'awaiting_installation';
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:security-agent-github-states ${usage}`);
   console.log('');
-  console.log(
-    'Seeds two organizations an organization owner (and a member who cannot manage'
-  );
-  console.log(
-    'them) can open the Security Agent entry on. Both hold a GitHub App association'
-  );
+  console.log('Seeds two organizations an organization owner (and a member who cannot manage');
+  console.log('them) can open the Security Agent entry on. Both hold a GitHub App association');
   console.log('the organization cannot act on yet:');
-  console.log(
-    '  - the first has an install request awaiting a GitHub organization admin,'
-  );
+  console.log('  - the first has an install request awaiting a GitHub organization admin,');
   console.log('    with no installation id;');
   console.log('  - the second has a suspended installation GitHub will not serve.');
   console.log('');
@@ -41,11 +35,13 @@ function printUsage(): void {
   console.log('Usage:');
   console.log('  pnpm dev:seed app:create-user "GitHub Fixture Owner" owner@example.com');
   console.log('  pnpm dev:seed app:create-user "GitHub Fixture Member" member@example.com');
-  console.log('  pnpm dev:seed app:security-agent-github-states owner@example.com member@example.com');
+  console.log(
+    '  pnpm dev:seed app:security-agent-github-states owner@example.com member@example.com'
+  );
   console.log('');
   console.log('Open either entry with:');
   console.log(
-    "  adb shell \"am start -a android.intent.action.VIEW -d 'kiloapp:///(app)/security-agent/<pendingOrganizationId>' com.kilocode.kiloapp\""
+    '  adb shell "am start -a android.intent.action.VIEW -d \'kiloapp:///(app)/security-agent/<pendingOrganizationId>\' com.kilocode.kiloapp"'
   );
 }
 

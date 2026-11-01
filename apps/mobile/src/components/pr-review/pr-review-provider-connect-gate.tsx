@@ -11,6 +11,7 @@ import { toast } from 'sonner-native';
 import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
 import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
 import { PrReviewGateItemLine } from '@/components/pr-review/pr-review-gate-item-line';
+import { OrgOnlyDescription } from '@/components/pr-review/pr-review-org-only-description';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -55,34 +56,6 @@ function useInstanceHint(platform: ProviderPrPlatform): string | undefined {
   return instanceHint !== undefined && instanceHint !== 'https://gitlab.com'
     ? instanceHint
     : undefined;
-}
-
-/**
- * The one line under the Bitbucket organization-only explanation. It names the
- * account switch only when the memberships answer says there is somewhere to
- * switch to, and says so plainly when the account belongs to no organization.
- * A failed read gets no line of its own: the context line above already reports
- * the failure with a retry, and neither wording is true of an unknown list.
- */
-function OrgOnlyDescription({
-  membershipsError,
-  organizationCount,
-}: Readonly<{
-  membershipsError: boolean;
-  /** Undefined until the memberships answer lands. */
-  organizationCount: number | undefined;
-}>) {
-  const { t } = useTranslation();
-  if (membershipsError) {
-    return null;
-  }
-  return (
-    <Text variant="muted" className="text-center">
-      {organizationCount === 0
-        ? t('prReview.connect.bitbucketOrgOnlyNoOrganizationDescription')
-        : t('prReview.connect.bitbucketOrgOnlyDescription')}
-    </Text>
-  );
 }
 
 /**

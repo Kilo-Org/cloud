@@ -1,4 +1,5 @@
 import * as SecureStore from '@/lib/auth/secure-store';
+import { readStoredValueRetryingNull } from '@/lib/auth/secure-store-read';
 
 // The adoption hands an update token straight to the delivery, and it runs from
 // the root layout's import. The route group that would otherwise install the
@@ -9,27 +10,95 @@ import {
   getGlanceableSnapshotForSignedInScope,
   restorePersistedGlanceable,
 } from '@/lib/glanceable/persist';
-import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
+import {
+  ACTIVE_USER_ID_KEY,
+  AUTH_TOKEN_KEY,
+  ORGANIZATION_STORAGE_KEY,
+  REFRESH_TOKEN_KEY,
+} from '@/lib/storage-keys';
 
 import { adoptNativeActivity, sweepStrayActivities } from './ios-sink';
-import { restoreFollowedSessionCards, type SessionFollowContext } from './session-follow';
+import { restoreFollowedSessionCards, type SessionRestoreScope } from './session-follow';
 
-async function readKey(key: string): Promise<string | null> {
+/**
+ * A stored value, `null` when the keychain holds nothing under the key, or
+ * `undefined` when it could not answer at all. The two empty answers are not the
+ * same: one is a state the app may act on, the other proves nothing.
+ *
+ * The read goes through the guarded module, which owns the protected-data guard
+ * and files one report per failure. Catching here keeps that the only report:
+ * `readSignedInScope` would file a second one for the same rejection.
+ */
+async function readKey(key: string): Promise<string | null | undefined> {
   try {
     return await SecureStore.getItemAsync(key);
   } catch {
-    // An unavailable keychain only costs this adoption; the publisher retries.
-    return null;
+    // A keychain that cannot answer, like one before first unlock, only costs
+    // this adoption; the publisher retries.
+    return undefined;
   }
 }
 
-/** The stored account and scope, or null when no account can be read now. */
-async function readStoredContext(): Promise<SessionFollowContext | null> {
-  const userId = await readKey(ACTIVE_USER_ID_KEY);
-  if (userId === null) {
-    return null;
+/**
+ * A credential read: `undefined` when the keychain could not answer. A `null` is
+ * retried on the credential cadence, because a credential key can answer `null`
+ * before the device finishes unlocking.
+ */
+async function readCredential(key: string): Promise<string | null | undefined> {
+  try {
+    return await readStoredValueRetryingNull(key);
+  } catch {
+    return undefined;
   }
-  return { userId, organizationId: await readKey(ORGANIZATION_STORAGE_KEY) };
+}
+
+/**
+ * Whether the keychain holds a credential, so the device is signed in.
+ * `undefined` when the credential store could not be read. The restore reports a
+ * sign-out only for a keychain with no account hint and no credential; both keys
+ * read together, so the retry budget is spent once.
+ */
+async function hasStoredCredential(): Promise<boolean | undefined> {
+  const [authToken, refreshToken] = await Promise.all([
+    readCredential(AUTH_TOKEN_KEY),
+    readCredential(REFRESH_TOKEN_KEY),
+  ]);
+  if (authToken === undefined || refreshToken === undefined) {
+    return undefined;
+  }
+  return authToken !== null || refreshToken !== null;
+}
+
+/**
+ * The stored account and scope, as the launch and foreground restore reads it.
+ * The two hints are the pair `lib/glanceable/scope.ts` reads for the snapshot
+ * fence, and either one failing to answer is the unreadable state, so no card is
+ * treated as out of scope on a read that proved nothing.
+ *
+ * A keychain that answered with no account and no credential is a sign-out,
+ * which ends every card. A device that keeps a credential but cannot name its
+ * account, and one whose keychain could not answer at all, leave the cards as
+ * they are.
+ */
+async function readStoredContext(): Promise<SessionRestoreScope> {
+  const userId = await readKey(ACTIVE_USER_ID_KEY);
+  if (userId === undefined) {
+    return { kind: 'unreadable' };
+  }
+  if (userId === null) {
+    // Only a device with no credential either is signed out: an absent hint
+    // alone says nothing, and a signed-in scope that cannot be named is not one
+    // this restore may end a card for.
+    const signedIn = await hasStoredCredential();
+    return signedIn === false ? { kind: 'signedOut' } : { kind: 'unreadable' };
+  }
+  const organizationId = await readKey(ORGANIZATION_STORAGE_KEY);
+  if (organizationId === undefined) {
+    // A read that failed proves nothing about the selection, so no card is out
+    // of scope until the next read answers.
+    return { kind: 'unreadable' };
+  }
+  return { kind: 'account', ctx: { userId, organizationId } };
 }
 
 /**
@@ -64,10 +133,10 @@ export async function adoptPushStartedActivity(): Promise<void> {
   // return below would otherwise leave it on the Lock Screen forever.
   sweepStrayActivities();
   const snapshot = getGlanceableSnapshotForSignedInScope();
-  const ctx = await readStoredContext();
-  await restoreFollowedSessionCards(ctx);
-  if (snapshot === null || ctx === null) {
+  const scope = await readStoredContext();
+  await restoreFollowedSessionCards(scope);
+  if (snapshot === null || scope.kind !== 'account') {
     return;
   }
-  adoptNativeActivity(snapshot, ctx);
+  adoptNativeActivity(snapshot, scope.ctx);
 }

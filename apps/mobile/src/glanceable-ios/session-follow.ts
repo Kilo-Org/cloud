@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one follow controller: discovery, the scope-record restore, every end path, and the tray sync read one card map and one discovery result */
 import {
   buildSessionLiveActivityContentState,
   type SessionLiveActivityContentState,
@@ -55,10 +56,24 @@ import { liveActivitiesAllowedBySystem } from './system-switch';
  * field of its content state says which: the server rebuilds that state on
  * every push. The device keeps the scope per session in
  * `session-card-scope.ts`, writes it on Follow, and the launch/foreground
- * restore ends any card it cannot place in the current scope.
+ * restore ends any card it cannot place in the current scope. No stored account
+ * puts every card outside the scope, so a card left live by a process that did
+ * not finish its sign-out ends there too.
  */
 
 export type SessionFollowContext = { userId: string; organizationId: string | null };
+
+/**
+ * What a launch or foreground restore knows about the stored account: the scope
+ * it read, a keychain that answered with no account, or a keychain that could
+ * not answer at all. Only the first keeps a card, and only the last leaves the
+ * cards as they are (`session-stored-context.ts` reads the same three states on
+ * Android).
+ */
+export type SessionRestoreScope =
+  | { kind: 'account'; ctx: SessionFollowContext }
+  | { kind: 'signedOut' }
+  | { kind: 'unreadable' };
 
 export type FollowResult = 'started' | 'followed' | 'refused';
 
@@ -199,31 +214,51 @@ export function discoverSessionCards(): SessionActivity[] {
 }
 
 /**
+ * End every session card and its token scope, as a teardown does: the token
+ * scope retires first, so it reads each card's token before the end drops it.
+ */
+function retireEverySessionCard(): void {
+  getGlanceableDelivery().cleanupTokens('scope');
+  endAllSessionCards();
+}
+
+/**
  * Launch and foreground: rebuild the map, then register again the cards this
  * account and organization followed. A card's follow scope travels in the
  * device record (`session-card-scope.ts`), never in the card: the server
  * replaces the card's whole content state on every push, so the card cannot
  * keep it. A card whose record is absent (written by an earlier build) or names
- * another account or organization is out of scope and ends here; only a store
- * that cannot be read now, like a locked keychain, leaves the cards as they are.
+ * another account or organization is out of scope and ends here.
+ *
+ * A keychain that answered with no account is a sign-out this process did not
+ * finish: no card can be in scope, so every card ends, as it does on an in-app
+ * sign-out. Only a keychain or a record store that cannot be read now, like a
+ * locked keychain before first unlock, leaves the cards as they are.
  * A registration that failed earlier retries here (spec "Error Handling" 4).
  */
-export async function restoreFollowedSessionCards(ctx: SessionFollowContext | null): Promise<void> {
+export async function restoreFollowedSessionCards(stored: SessionRestoreScope): Promise<void> {
   if (!getLiveActivityEnabled()) {
     // The in-app switch turned off while no process ran: no card may stay.
-    // Retire the token scope first, so it reads each card's token before the
-    // end drops it.
-    getGlanceableDelivery().cleanupTokens('scope');
-    endAllSessionCards();
+    retireEverySessionCard();
     return;
   }
   const live = discoverSessionCards();
   // Capture this restore's own discovery result before the await: another
   // restore or a Follow can run a different discovery in the meantime.
   const discoveryRead = discoveryReadable;
-  if (ctx === null) {
+  if (stored.kind === 'unreadable') {
+    // A keychain that cannot answer says nothing about the stored account, so
+    // it may not cost a card: the next foreground reads it again.
     return;
   }
+  if (stored.kind === 'signedOut') {
+    // Sign-out ended the cards from its own process, so a card still live here
+    // outlived the account that followed it: a killed app, or a session
+    // removed elsewhere.
+    retireEverySessionCard();
+    return;
+  }
+  const ctx = stored.ctx;
   const records = await cardScopes.readSessionCardScopes();
   if (records === null) {
     return;

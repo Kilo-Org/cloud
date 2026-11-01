@@ -243,7 +243,7 @@ describe('the follow scope record', () => {
     // A fresh process: the native card and its record outlive the map.
     _resetSessionFollowForTests();
 
-    await restoreFollowedSessionCards(CTX);
+    await restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
 
     expect(isSessionFollowed('session-1')).toBe(true);
     expect(mocks.registerSessionActivityToken).toHaveBeenCalledWith(
@@ -302,10 +302,10 @@ describe('discoverSessionCards', () => {
     rememberSessionCardScope('session-1', CTX);
     await _settleSessionCardScopeWritesForTests();
 
-    await restoreFollowedSessionCards(null);
+    await restoreFollowedSessionCards({ kind: 'unreadable' });
     expect(mocks.registerSessionActivityToken).not.toHaveBeenCalled();
 
-    await restoreFollowedSessionCards(CTX);
+    await restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
     expect(mocks.registerSessionActivityToken).toHaveBeenCalledWith(
       'native-1',
       mocks.instances[0],
@@ -320,7 +320,7 @@ describe('discoverSessionCards', () => {
     rememberSessionCardScope('session-1', { userId: 'user-2', organizationId: 'org-1' });
     await _settleSessionCardScopeWritesForTests();
 
-    await restoreFollowedSessionCards(CTX);
+    await restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
 
     expect(card.end).toHaveBeenCalledWith('immediate', undefined, expect.any(Date), undefined);
     expect(mocks.registerSessionActivityToken).not.toHaveBeenCalled();
@@ -336,7 +336,7 @@ describe('discoverSessionCards', () => {
     rememberSessionCardScope('session-1', { userId: 'user-1', organizationId: 'org-2' });
     await _settleSessionCardScopeWritesForTests();
 
-    await restoreFollowedSessionCards(CTX);
+    await restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
 
     expect(card.end).toHaveBeenCalledWith('immediate', undefined, expect.any(Date), undefined);
     expect(mocks.registerSessionActivityToken).not.toHaveBeenCalled();
@@ -346,7 +346,7 @@ describe('discoverSessionCards', () => {
     const unrecorded = fakeActivity('native-1', { sessionId: 'session-1' });
     mocks.instances = [unrecorded];
 
-    await restoreFollowedSessionCards(CTX);
+    await restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
     expect(unrecorded.end).toHaveBeenCalledWith(
       'immediate',
       undefined,
@@ -365,7 +365,7 @@ describe('discoverSessionCards', () => {
     await _settleSessionCardScopeWritesForTests();
     scopeReadsFail = true;
 
-    await restoreFollowedSessionCards(CTX);
+    await restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
 
     expect(card.end).not.toHaveBeenCalled();
     expect(mocks.registerSessionActivityToken).not.toHaveBeenCalled();
@@ -378,7 +378,7 @@ describe('discoverSessionCards', () => {
       throw new Error('ActivityKit unavailable');
     });
 
-    await restoreFollowedSessionCards(CTX);
+    await restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
     await _settleSessionCardScopeWritesForTests();
 
     // A read that proved nothing must not cost the card its record.
@@ -405,7 +405,7 @@ describe('discoverSessionCards', () => {
       throw new Error('ActivityKit unavailable');
     });
 
-    const restoring = restoreFollowedSessionCards(CTX);
+    const restoring = restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
     // A second discovery, as a foreground restore would run, reads ActivityKit
     // successfully while the first restore still waits on its own record read.
     mocks.instances = [fakeActivity('native-9', { sessionId: 'session-9' })];
@@ -639,13 +639,52 @@ describe('session card tokens', () => {
     const [card] = mocks.instances;
     setLiveActivityEnabledValue(false);
 
-    await restoreFollowedSessionCards(CTX);
+    await restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
 
     expect(mocks.cleanupTokens).toHaveBeenCalledWith('scope');
     expect(card?.end).toHaveBeenCalledWith('immediate');
     expect(mocks.cleanupTokens.mock.invocationCallOrder[0]).toBeLessThan(
       card?.end.mock.invocationCallOrder[0] ?? 0
     );
+  });
+});
+
+describe('a restore with no stored account', () => {
+  it('ends every card, releases its token, and clears its record', async () => {
+    followSession(RUNNING, CTX, NOW);
+    await _settleSessionCardScopeWritesForTests();
+    // A fresh process: the native card and its record outlive the followed map.
+    _resetSessionFollowForTests();
+    mocks.registerSessionActivityToken.mockClear();
+    const [card] = mocks.instances;
+
+    await restoreFollowedSessionCards({ kind: 'signedOut' });
+
+    expect(card?.end).toHaveBeenCalledWith('immediate');
+    expect(mocks.releaseSessionActivity).toHaveBeenCalledWith('activity-0');
+    expect(mocks.cleanupTokens).toHaveBeenCalledWith('scope');
+    expect(mocks.registerSessionActivityToken).not.toHaveBeenCalled();
+    expect(isSessionFollowed('session-1')).toBe(false);
+    await _settleSessionCardScopeWritesForTests();
+    const cleared = await readSessionCardScopes();
+    expect(cleared?.size).toBe(0);
+  });
+
+  it('leaves every card and its record when the keychain cannot be read', async () => {
+    followSession(RUNNING, CTX, NOW);
+    await _settleSessionCardScopeWritesForTests();
+    _resetSessionFollowForTests();
+    mocks.registerSessionActivityToken.mockClear();
+    const [card] = mocks.instances;
+
+    await restoreFollowedSessionCards({ kind: 'unreadable' });
+
+    expect(card?.end).not.toHaveBeenCalled();
+    expect(mocks.cleanupTokens).not.toHaveBeenCalled();
+    expect(isSessionFollowed('session-1')).toBe(true);
+    await _settleSessionCardScopeWritesForTests();
+    const kept = await readSessionCardScopes();
+    expect(kept?.get('session-1')).toEqual(CTX);
   });
 });
 

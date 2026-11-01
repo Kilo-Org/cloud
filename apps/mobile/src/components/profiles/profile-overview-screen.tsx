@@ -16,6 +16,7 @@ import {
 import { ProfileMetadataForm } from '@/components/profiles/profile-metadata-form';
 import { ProfileOverviewSkeleton } from '@/components/profiles/profile-overview-skeleton';
 import { ProfileRepoPinsSection } from '@/components/profiles/profile-repo-pins-section';
+import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -106,6 +107,10 @@ export function ProfileOverviewScreen({
   const { update, deleteProfile, setAsDefault, clearDefault } =
     useAgentProfileMutations(organizationId);
   const canManage = useCanManageOrganizationProfiles(organizationId);
+  // Unsaved name or description edits ask before the route goes, the way the
+  // profile form sheets do. A read-only viewer cannot edit the form, so the
+  // guard stays off for them.
+  const metadataGuard = useMetadataLeaveGuard({ enabled: canManage });
 
   const profile = profileQuery.data;
   const isOrgOwned = organizationId !== undefined;
@@ -148,6 +153,9 @@ export function ProfileOverviewScreen({
     try {
       await deleteProfile.mutateAsync({ profileId });
       toast.success(t('profiles.deletedToast', { name: profileName }));
+      // The profile is gone, so there is nothing left to keep: the pop must not
+      // ask about edits to it.
+      metadataGuard.markClean();
       // Back during the delete already left this profile; a second pop would
       // remove the profiles list beneath it.
       popWhenFocused();
@@ -221,6 +229,7 @@ export function ProfileOverviewScreen({
               profile={profile}
               isSaving={update.isPending}
               onSave={saveMetadata}
+              onDirtyChange={metadataGuard.handleDirtyChange}
               disabled={!canManage}
             />
 
@@ -284,6 +293,7 @@ export function ProfileOverviewScreen({
       </TabScreenScrollView>
 
       {dialog}
+      {metadataGuard.dialog}
     </View>
   );
 }

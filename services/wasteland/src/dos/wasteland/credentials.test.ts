@@ -17,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 import {
   credentialProvesOrg,
   getCredential,
+  identityRigHandle,
   initializeDatabase,
   storeCredential,
 } from './credentials';
@@ -190,5 +191,28 @@ describe('wasteland credentials', () => {
     });
 
     expect(credentialProvesOrg(getCredential(sql, WASTELAND_ID, USER_ID), 'alice')).toBe(true);
+  });
+
+  it('uses the stored handle as identity only for the org it proves', () => {
+    const sql = freshSql();
+    storeCredential(sql, WASTELAND_ID, USER_ID, {
+      encryptedToken: 'enc-1',
+      dolthubOrg: 'alice',
+      rigHandle: 'legacy-rig',
+    });
+    const unproven = getCredential(sql, WASTELAND_ID, USER_ID);
+    expect(identityRigHandle(unproven, 'alice', 'alice')).toBe('alice');
+    expect(unproven?.rig_handle).toBe('legacy-rig');
+
+    storeCredential(sql, WASTELAND_ID, USER_ID, {
+      encryptedToken: 'enc-1',
+      dolthubOrg: 'alice',
+      rigHandle: 'alice-rig',
+      provenOrg: 'alice',
+    });
+    const proven = getCredential(sql, WASTELAND_ID, USER_ID);
+    expect(identityRigHandle(proven, 'alice', 'alice')).toBe('alice-rig');
+    expect(identityRigHandle(proven, 'other-org', 'other-org')).toBe('other-org');
+    expect(identityRigHandle(null, 'alice', 'alice')).toBe('alice');
   });
 });

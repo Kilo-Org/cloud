@@ -19,6 +19,7 @@
 
 import { WantedBoardOpError } from '../wanted-board/errors';
 import { getWastelandDOStub } from '../dos/Wasteland.do';
+import { identityRigHandle } from '../dos/wasteland/credentials';
 import { deriveEncryptionKey, decryptToken } from '../util/crypto.util';
 import { resolveSecret } from '../util/secret.util';
 import { fetchFreshDoltHubToken } from '../util/dolthub-token.util';
@@ -80,7 +81,7 @@ async function loadContext(
     );
   }
 
-  const rigHandle = credential?.rig_handle ?? dolthubOrg.slice(0, 32);
+  const rigHandle = identityRigHandle(credential, dolthubOrg, dolthubOrg.slice(0, 32));
 
   if (fresh.status === 'ok') {
     return {

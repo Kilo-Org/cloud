@@ -125,6 +125,26 @@ export function credentialProvesOrg(
   return credential !== null && isSameDolthubOrg(credential.proven_org, org);
 }
 
+/**
+ * The handle a caller's ops may present as their identity in a
+ * wasteland — branch names, `claimed_by` / `posted_by`, stamp
+ * authorship — for the org those ops resolved.
+ *
+ * A credential records a handle together with the org a verified flow
+ * established; a handle this credential does not prove is not used as
+ * identity, and the caller falls back to `fallback` (the DoltHub org
+ * name). The stored string stays on the credential, so it is used again
+ * as soon as a verified flow records the proof for that org.
+ */
+export function identityRigHandle(
+  credential: WastelandCredentialResult | null,
+  org: string | null,
+  fallback: string
+): string {
+  if (credential === null || credential.rig_handle === null || org === null) return fallback;
+  return credentialProvesOrg(credential, org) ? credential.rig_handle : fallback;
+}
+
 export function getCredential(
   sql: SqlStorage,
   wastelandId: string,

@@ -220,14 +220,23 @@ describe('joinViaSdk', () => {
   });
 
   it('reports an unrecognised fork response as an upstream failure', async () => {
-    const { fetch, calls } = makeFetch([
-      { status: 200, body: { status: 'Error', message: 'user has no access to this owner' } },
-    ]);
+    // The join hands the caller a rig identity when the fork is
+    // confirmed under its org, so a body that confirms nothing — an
+    // error envelope, an unknown status, a malformed error — must end
+    // the join before it returns a handle to persist.
+    for (const body of [
+      { status: 'Error', message: 'user has no access to this owner' },
+      { status: 'Unexpected' },
+      { status: 'Error', error: { message: 'denied' } },
+    ]) {
+      const { fetch, calls } = makeFetch([{ status: 200, body }]);
 
-    await expect(joinViaSdk(baseCtx, fetch)).rejects.toMatchObject({
-      name: 'WantedBoardOpError',
-      code: 'UPSTREAM_ERROR',
-    });
-    expect(calls).toHaveLength(1);
+      await expect(joinViaSdk(baseCtx, fetch)).rejects.toMatchObject({
+        name: 'WantedBoardOpError',
+        code: 'UPSTREAM_ERROR',
+      });
+      expect(calls).toHaveLength(1);
+      expect(calls[0].url).toContain('/fork');
+    }
   });
 });

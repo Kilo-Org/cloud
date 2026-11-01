@@ -502,6 +502,36 @@ describe('join', () => {
     ]);
   });
 
+  it('fails closed when the fork response confirms nothing', async () => {
+    // A 2xx body that neither names the fork nor reports a terminal
+    // success status is not proof that this token can act for the
+    // claimed org, so the join must refuse before it hands back and
+    // records a handle.
+    for (const body of [
+      { status: 'Unexpected' },
+      { status: 'Error', error: { message: 'denied' } },
+      {},
+    ]) {
+      const { fetch: f, calls } = makeFetch([{ status: 200, body }]);
+      const result = await join({
+        auth: { token: 't' },
+        upstream: { owner: 'hop', db: 'wl' },
+        dolthubOrg: 'alice',
+        rigHandle: 'alice-tools',
+        displayName: 'Alice tools',
+        ownerEmail: 'alice@example.com',
+        version: '0.1.0',
+        fetch: f,
+      });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe('upstream');
+      expect(calls.map(c => new URL(c.url).pathname.replace(/^.*\/api\/v1alpha1/, ''))).toEqual([
+        '/fork',
+      ]);
+    }
+  });
+
   it('accepts an org the caller already proved for its own record', async () => {
     // An org-based connection: the token belongs to member `bob`, the
     // fork and the registered row belong to org `acme`. The caller's

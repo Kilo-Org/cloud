@@ -41,8 +41,14 @@ const ForkResponse = z
     operation_name: z.string().optional(),
     message: z.string().optional(),
     error: z.string().optional(),
+    // A synchronous success names the fork it created.
+    owner_name: z.string().optional(),
+    database_name: z.string().optional(),
   })
   .passthrough();
+
+/** Statuses that confirm an operation DoltHub finished successfully. */
+const CONFIRMED_STATUS = /^(success|created|done|completed)$/i;
 
 export type CreateDatabaseOptions = {
   auth: DoltHubAuth;
@@ -75,8 +81,10 @@ export type ForkDatabaseOptions = {
 export type ForkDatabaseResult = {
   owner: string;
   db: string;
-  /** True if the fork was newly created; false if it already existed
-   *  (DoltHub returned an "already exists" response). */
+  /** True only when DoltHub confirmed the fork this call created —
+   *  synchronously by naming it or reporting a terminal success
+   *  status, or through a polled operation that completed. False when
+   *  DoltHub reported that the fork already existed. */
   created: boolean;
 };
 
@@ -139,7 +147,9 @@ export async function createDatabase(opts: CreateDatabaseOptions): Promise<Creat
  * resolves with `created: false`.
  *
  * If DoltHub returns an `operation_name`, polls the `/fork` endpoint
- * until the operation completes.
+ * until the operation completes. A response that neither names the
+ * fork nor reports a terminal success status is an error, never
+ * `created: true`.
  */
 export async function forkDatabase(opts: ForkDatabaseOptions): Promise<ForkDatabaseResult> {
   const path = '/fork';
@@ -199,11 +209,28 @@ export async function forkDatabase(opts: ForkDatabaseOptions): Promise<ForkDatab
 
   const operationName = parsed.success ? parsed.data.operation_name : undefined;
   if (!operationName) {
-    // An operation that was accepted but cannot be followed leaves the
-    // fork unconfirmed, so it is not a success either.
-    if (/^(pending|running|queued|in.?progress)$/i.test(statusField)) {
+    // No operation to follow. `created` certifies that this token made
+    // the fork under `toOwner`, so only a body that positively
+    // describes that fork resolves as new: either it names the fork, or
+    // it reports a terminal success status. A body this code cannot
+    // read, a status it does not recognize, and a body naming another
+    // owner or database all leave the fork unconfirmed — an accepted
+    // operation that cannot be followed is not a success either.
+    const reportedOwner = parsed.success ? (parsed.data.owner_name ?? '').trim() : '';
+    const reportedDb = parsed.success ? (parsed.data.database_name ?? '').trim() : '';
+    const namesTarget =
+      reportedOwner.toLowerCase() === opts.toOwner.toLowerCase() &&
+      reportedDb.toLowerCase() === targetDb.toLowerCase();
+    const namesOther =
+      (reportedOwner.length > 0 && reportedOwner.toLowerCase() !== opts.toOwner.toLowerCase()) ||
+      (reportedDb.length > 0 && reportedDb.toLowerCase() !== targetDb.toLowerCase());
+    if (!parsed.success || namesOther || !(namesTarget || CONFIRMED_STATUS.test(statusField))) {
       throw new WlDoltHubError(
-        `Fork ${opts.fromOwner}/${opts.fromDb} → ${opts.toOwner}/${targetDb} is unconfirmed: DoltHub reported "${statusField}" without an operation to follow`,
+        `Fork ${opts.fromOwner}/${opts.fromDb} → ${opts.toOwner}/${targetDb} is unconfirmed: ${
+          statusField.length > 0
+            ? `DoltHub reported "${statusField}" without confirming this fork`
+            : 'the response does not describe this fork'
+        }`,
         res.status,
         res.json ?? res.text,
         url

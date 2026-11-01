@@ -206,4 +206,68 @@ describe('forkDatabase', () => {
       })
     ).rejects.toBeInstanceOf(WlDoltHubError);
   });
+
+  it('accepts a sync body that names the fork it created', async () => {
+    const { fetch: fakeFetch } = makeFetch([
+      { status: 200, body: { owner_name: 'me', database_name: 'wl' } },
+    ]);
+    const result = await forkDatabase({
+      auth: { token: 't' },
+      fromOwner: 'upstream',
+      fromDb: 'wl',
+      toOwner: 'me',
+      sleep: noSleep,
+      fetch: fakeFetch,
+    });
+    expect(result.created).toBe(true);
+  });
+
+  it('refuses a 2xx status it does not recognize', async () => {
+    const { fetch: fakeFetch } = makeFetch([{ status: 200, body: { status: 'Unexpected' } }]);
+    await expect(
+      forkDatabase({
+        auth: { token: 't' },
+        fromOwner: 'upstream',
+        fromDb: 'wl',
+        toOwner: 'me',
+        sleep: noSleep,
+        fetch: fakeFetch,
+      })
+    ).rejects.toBeInstanceOf(WlDoltHubError);
+  });
+
+  it('refuses a sync body that names a different fork', async () => {
+    for (const body of [
+      { status: 'Success', owner_name: 'someone-else', database_name: 'wl' },
+      { owner_name: 'me', database_name: 'another-db' },
+    ]) {
+      const { fetch: fakeFetch } = makeFetch([{ status: 200, body }]);
+      await expect(
+        forkDatabase({
+          auth: { token: 't' },
+          fromOwner: 'upstream',
+          fromDb: 'wl',
+          toOwner: 'me',
+          sleep: noSleep,
+          fetch: fakeFetch,
+        })
+      ).rejects.toBeInstanceOf(WlDoltHubError);
+    }
+  });
+
+  it('refuses a malformed error envelope', async () => {
+    const { fetch: fakeFetch } = makeFetch([
+      { status: 200, body: { status: 'Error', error: { message: 'denied' } } },
+    ]);
+    await expect(
+      forkDatabase({
+        auth: { token: 't' },
+        fromOwner: 'upstream',
+        fromDb: 'wl',
+        toOwner: 'me',
+        sleep: noSleep,
+        fetch: fakeFetch,
+      })
+    ).rejects.toBeInstanceOf(WlDoltHubError);
+  });
 });

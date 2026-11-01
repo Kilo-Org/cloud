@@ -11,6 +11,7 @@ import {
   isNativeTokenAddressRateLimited,
   isNativeTokenUserRateLimited,
 } from './native-token-rate-limit';
+import { __test__ as rateLimitTest } from './firewall-rate-limit';
 
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockCaptureMessage = jest.mocked(captureMessage);
@@ -22,6 +23,7 @@ function createRequest(headers: Record<string, string> = {}): Request {
 describe('native token rate limits', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    rateLimitTest.resetReportThrottle();
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
   });
 
@@ -53,9 +55,40 @@ describe('native token rate limits', () => {
   });
 
   it('reports the address verdict', async () => {
+    expect(await isNativeTokenAddressRateLimited(createRequest())).toBe(false);
+
     mockCheckRateLimit.mockResolvedValue({ rateLimited: true });
 
     expect(await isNativeTokenAddressRateLimited(createRequest())).toBe(true);
+  });
+
+  it('refuses the exchange when the address rule is not configured', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
+
+    expect(await isNativeTokenAddressRateLimited(createRequest())).toBe(true);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "Firewall rate limit 'native-token-address' is not configured",
+      { level: 'error', tags: { source: 'native_token_rate_limit' } }
+    );
+  });
+
+  it('refuses an answer the firewall blocks and reports it', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: true, error: 'blocked' });
+
+    expect(await isNativeTokenAddressRateLimited(createRequest())).toBe(true);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "Firewall rate limit 'native-token-address' did not permit the exchange",
+      { level: 'error', tags: { source: 'native_token_rate_limit' } }
+    );
+  });
+
+  it('keeps the transient-fault behaviour of the address rule', async () => {
+    mockCheckRateLimit.mockRejectedValue(new Error('firewall unreachable'));
+
+    await expect(isNativeTokenAddressRateLimited(createRequest())).rejects.toThrow(
+      'firewall unreachable'
+    );
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
   });
 
   it('keys the account limit on an opaque digest of the user id', async () => {
@@ -79,17 +112,7 @@ describe('native token rate limits', () => {
     expect(first).not.toBe(second);
   });
 
-  it('reports a missing address rule instead of refusing the sign-in', async () => {
-    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
-
-    expect(await isNativeTokenAddressRateLimited(createRequest())).toBe(false);
-    expect(mockCaptureMessage).toHaveBeenCalledWith(
-      "Firewall rate limit 'native-token-address' is not configured",
-      { level: 'error', tags: { source: 'native_token_rate_limit' } }
-    );
-  });
-
-  it('reports a missing account rule instead of refusing the sign-in', async () => {
+  it('reports a missing account rule and lets the exchange finish', async () => {
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
 
     expect(await isNativeTokenUserRateLimited(createRequest(), 'user-1')).toBe(false);

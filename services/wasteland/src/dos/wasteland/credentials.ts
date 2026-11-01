@@ -52,15 +52,7 @@ export function storeCredential(
         ${wasteland_credentials.columns.connected_at}
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `,
-    [
-      userId,
-      wastelandId,
-      input.encryptedToken,
-      input.dolthubOrg,
-      rigHandle,
-      isAdmin,
-      timestamp,
-    ]
+    [userId, wastelandId, input.encryptedToken, input.dolthubOrg, rigHandle, isAdmin, timestamp]
   );
 
   return {

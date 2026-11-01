@@ -1053,10 +1053,8 @@
     },
     "overview": {
       "allAreas": "Todas as áreas",
-      "focusAreas": "Áreas prioritárias",
       "nSelected": "{{displayCount}} selecionados",
       "proposedReviewMdGuidance": "Orientações propostas para o REVIEW.md",
-      "reviewStyle": "Estilo de revisão",
       "set": "Configurado",
       "notSet": "Não configurado"
     },
@@ -1524,7 +1522,8 @@
       "actionBlocked": "Não foi possível concluir esta ação. É preciso corrigir o problema antes de tentar novamente.",
       "syncNoRepositories": "Nenhum repositório está no escopo de sincronização. Escolha os repositórios que o Agente de segurança monitora e sincronize novamente.",
       "syncIntegrationInactive": "A conexão do GitHub para o Agente de segurança não está ativa. Reconecte o Kilo GitHub App e sincronize novamente.",
-      "syncMissingPermission": "O Kilo GitHub App não consegue ler os vulnerability alerts. Conceda essa permissão no GitHub e sincronize novamente."
+      "syncMissingPermission": "O Kilo GitHub App não consegue ler os vulnerability alerts. Conceda essa permissão no GitHub e sincronize novamente.",
+      "configConflict": "As configurações do agente de segurança foram alteradas em outro lugar. Revise as configurações mais recentes e salve novamente."
     },
     "analysisState": {
       "queued": "Análise na fila",
@@ -2208,7 +2207,6 @@
     },
     "modelSelector": {
       "provider": "Provedor {{id}}",
-      "modelId": "Modelo {{id}}",
       "unavailable": "Indisponível",
       "unavailableState": "indisponível",
       "selectedState": "selecionado",
@@ -2996,7 +2994,7 @@
       "continueInPersonal": "Continuar na conta pessoal",
       "loading": "Carregando caixa de entrada",
       "noReviewRequests": "Nenhuma solicitação de revisão",
-      "noReviewRequestsDescription": "Os pull requests que aguardam sua revisão aparecem aqui. Você também pode colar o link de qualquer PR acima.",
+      "noReviewRequestsDescription": "Os pull requests que aguardam sua revisão aparecem aqui.",
       "title": "Caixa de entrada"
     },
     "installKiloGitHubApp": "Instalar o aplicativo do Kilo para GitHub",
@@ -3024,6 +3022,7 @@
       "deleteBranchAfterMerge": "Excluir branch após a mesclagem",
       "noEnabledMethods": "Este repositório não tem métodos de mesclagem ativados. Peça a um administrador do repositório para ativar a mesclagem com um commit de mesclagem, com agrupamento de commits ou com reaplicação de commits.",
       "confirmTitle": "Mesclar pull request?",
+      "confirmMergeTitle": "Mesclar?",
       "confirmTitleTerm": "Mesclar {{term}}?",
       "confirmMessage": "Isso mesclará suas alterações no branch de base.",
       "enableAutoMergeConfirmTitle": "Ativar mesclagem automática?",
@@ -3130,7 +3129,7 @@
       "deletedAnnouncement": "Comentário pendente excluído",
       "editA11y": "Editar comentário pendente em {{location}}",
       "editOutdatedA11y": "Editar comentário pendente desatualizado em {{location}}",
-      "noCommentsQueued": "Não há comentários na fila. A revisão será enviada apenas com o tipo selecionado acima.",
+      "noCommentsQueued": "A revisão será enviada apenas com o tipo selecionado acima.",
       "staleHint": "o PR foi atualizado depois que você escreveu este comentário.",
       "staleQueueHint": "Comentários sobre um commit mais antigo não são enviados. Eles ficam na fila para você editar ou excluir.",
       "summaryA11y": "Resumo da revisão",
@@ -3899,6 +3898,7 @@
     "organizationDefaultDescription": "Carregado automaticamente para membros que não possuem padrão pessoal.",
     "setAsDefault": "Definir como padrão",
     "saveFailed": "Não foi possível salvar o perfil",
+    "organizationRoleRequired": "Somente proprietários e administradores da organização podem alterar os perfis da organização.",
     "deleteTitle": "Excluir perfil",
     "deleteMessage": "Isso remove permanentemente o perfil e suas configurações. Isto não pode ser desfeito.",
     "deleteFailed": "Não foi possível excluir o perfil",
@@ -4221,7 +4221,8 @@
     "sources": "Evidências e artefatos",
     "timezone": "Fuso horário do relatório",
     "deviceTimezone": "Usar fuso horário do dispositivo",
-    "timezoneHint": "Fuso horário IANA, por exemplo Europe/Berlin. Alterações de horário valem para os próximos relatórios.",
+    "timezoneHint": "Fuso horário IANA, por exemplo Europe/Berlin.",
+    "scheduleHint": "Alterações de horário valem para os próximos relatórios.",
     "nightStart": "Início da janela do relatório",
     "morningStart": "Relatório pronto às",
     "morningEnd": "Relatório disponível até",

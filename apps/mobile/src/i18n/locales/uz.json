@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Birlashtirishdan keyin tarmoqni o'chirish",
       "noEnabledMethods": "Bu omborda hech bir birlashtirish usuli yoqilmagan. Ombor administratoridan oddiy birlashtirish, kommitlarni jamlash yoki asosni almashtirish usulini yoqishni so'rang.",
       "confirmTitle": "PR birlashtirilsinmi?",
+      "confirmMergeTitle": "Birlashtirilsinmi?",
       "confirmTitleTerm": "{{term}} birlashtirilsinmi?",
       "confirmMessage": "O'zgarishlaringiz asosiy tarmoqqa birlashtiriladi.",
       "enableAutoMergeConfirmTitle": "Avtomatik birlashtirish yoqilsinmi?",
@@ -644,7 +645,7 @@
       "title": "Kiruvchi so'rovlar",
       "loading": "Kiruvchi so'rovlar yuklanmoqda",
       "noReviewRequests": "Ko'rib chiqish so'rovlari yo'q",
-      "noReviewRequestsDescription": "Ko'rib chiqishingizni kutayotgan PRlar shu yerda ko'rinadi. Yuqoriga istalgan PR havolasini ham joylashtirishingiz mumkin.",
+      "noReviewRequestsDescription": "Ko'rib chiqishingizni kutayotgan PRlar shu yerda ko'rinadi.",
       "couldNotLoad": "Kiruvchi so'rovlarni yuklab bo'lmadi.",
       "accessLostTitle": "Bu tashkilotga kirish huquqi yo'q",
       "accessLostDescription": "Siz endi bu tashkilotning a'zosi emassiz, shuning uchun uning ko'rib chiqish so'rovlari yuklab olinmaydi. Ko'rib chiqishni davom ettirish uchun shaxsiy profilingizga o'ting.",
@@ -755,7 +756,7 @@
       "staleHint": "siz bu izohni yozganingizdan keyin PR yangilangan.",
       "deleteA11y": "{{location}}dagi navbatdagi izohni o'chirish",
       "deletedAnnouncement": "Navbatdagi izoh o'chirildi",
-      "noCommentsQueued": "Navbatda izohlar yo'q. Ko'rib chiqish natijasi faqat yuqoridagi amal bilan yuboriladi.",
+      "noCommentsQueued": "Ko'rib chiqish natijasi faqat yuqoridagi amal bilan yuboriladi.",
       "staleQueueHint": "Eski kommitga yozilgan izohlar yuborilmaydi. Ularni tahrirlashingiz yoki o'chirishingiz uchun navbatda qoldiramiz.",
       "allQueuedHint": "Barcha izohlar bitta so'rov bilan yuboriladi.",
       "summaryPlaceholder": "Ko'rib chiqish uchun ixtiyoriy xulosa",
@@ -1608,8 +1609,6 @@
       "bitbucketError": "Bitbucketni sozlash sahifasini ochib bo'lmadi. Iltimos, qayta urinib ko'ring."
     },
     "overview": {
-      "reviewStyle": "Ko‘rib chiqish uslubi",
-      "focusAreas": "Asosiy yo‘nalishlar",
       "allAreas": "Barcha yo'nalishlar",
       "set": "Belgilangan",
       "notSet": "Belgilanmagan",
@@ -2069,7 +2068,8 @@
       "actionBlocked": "Bu amalni tugallab bo'lmadi. Muammoni avval hal qilish kerak.",
       "syncNoRepositories": "Sinxronlash doirasida hech qanday repozitoriy yo'q. «Xavfsizlik agenti» kuzatadigan repozitoriylarni tanlang, so'ngra qayta sinxronlang.",
       "syncIntegrationInactive": "«Xavfsizlik agenti»ning GitHub ulanishi faol emas. Kilo GitHub App’ni qayta ulang, so‘ng qaytadan sinxronlang.",
-      "syncMissingPermission": "Kilo GitHub App zaiflik ogohlantirishlarini o'qiy olmaydi. GitHubda shu ruxsatni bering, so'ng yana sinxronlang."
+      "syncMissingPermission": "Kilo GitHub App zaiflik ogohlantirishlarini o'qiy olmaydi. GitHubda shu ruxsatni bering, so'ng yana sinxronlang.",
+      "configConflict": "Xavfsizlik agentining sozlamalari boshqa joyda o'zgartirildi. Eng so'nggi sozlamalarni ko'rib chiqib, qayta saqlang."
     },
     "analysisState": {
       "queued": "Tahlil navbatda",
@@ -2744,7 +2744,6 @@
     },
     "modelSelector": {
       "provider": "Provayder: {{id}}",
-      "modelId": "Model: {{id}}",
       "unavailable": "Mavjud emas",
       "unavailableState": "mavjud emas",
       "selectedState": "tanlangan",
@@ -3837,6 +3836,7 @@
     "organizationDefaultDescription": "Shaxsiy standarti bo'lmagan a'zolar uchun avtomatik yuklanadi.",
     "setAsDefault": "Standart sifatida o'rnating",
     "saveFailed": "Profilni saqlab bo‘lmadi",
+    "organizationRoleRequired": "Faqat tashkilot egalar va administratorlar tashkilot profilini o'zgartirishi mumkin.",
     "deleteTitle": "Profilni o'chirish",
     "deleteMessage": "Bu profil va uning sozlamalarini butunlay olib tashlaydi. Buni ortga qaytarib bo‘lmaydi.",
     "deleteFailed": "Profilni oʻchirib boʻlmadi",
@@ -4154,7 +4154,8 @@
     "sources": "Dalillar va artefaktlar",
     "timezone": "Brifing vaqt mintaqasi",
     "deviceTimezone": "Qurilma vaqt mintaqasidan foydalanish",
-    "timezoneHint": "IANA vaqt mintaqasi, masalan Europe/Berlin. Jadval o‘zgarishlari keyingi brifinglarga qo‘llanadi.",
+    "timezoneHint": "IANA vaqt mintaqasi, masalan Europe/Berlin.",
+    "scheduleHint": "Jadval o‘zgarishlari keyingi brifinglarga qo‘llanadi.",
     "nightStart": "Brifing davri boshlanishi",
     "morningStart": "Brifing tayyor bo‘ladigan vaqt",
     "morningEnd": "Brifing mavjud bo‘ladigan oxirgi vaqt",

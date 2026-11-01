@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Eliminar a rama tras a fusión",
       "noEnabledMethods": "Este repositorio non ten ningún método de fusión activado. Pídelle a un administrador do repositorio que active a fusión, a compactación ou o cambio de base.",
       "confirmTitle": "Fusionar a solicitude de integración?",
+      "confirmMergeTitle": "Fusionar?",
       "confirmTitleTerm": "Fusionar a {{term}}?",
       "confirmMessage": "Isto fusionará os teus cambios na rama base.",
       "enableAutoMergeConfirmTitle": "Activar a fusión automática?",
@@ -644,7 +645,7 @@
       "title": "Caixa de entrada",
       "loading": "Cargando a caixa de entrada",
       "noReviewRequests": "Non hai solicitudes de revisión",
-      "noReviewRequestsDescription": "Aquí aparecen as solicitudes de integración que agardan pola túa revisión. Tamén podes pegar arriba unha ligazón a calquera PR.",
+      "noReviewRequestsDescription": "Aquí aparecen as solicitudes de integración que agardan pola túa revisión.",
       "couldNotLoad": "Non se puido cargar a caixa de entrada.",
       "accessLostTitle": "Non tes acceso a esta organización",
       "accessLostDescription": "Xa non es membro desta organización, polo que non se poden cargar as súas solicitudes de revisión. Continúa na túa conta persoal para seguir revisando.",
@@ -755,7 +756,7 @@
       "staleHint": "a PR cambiou desde que escribiches isto.",
       "deleteA11y": "Eliminar comentario pendente en {{location}}",
       "deletedAnnouncement": "Comentario pendente eliminado",
-      "noCommentsQueued": "Non hai comentarios na cola. A revisión enviarase só co tipo seleccionado arriba.",
+      "noCommentsQueued": "A revisión enviarase só co tipo seleccionado arriba.",
       "staleQueueHint": "Os comentarios sobre unha remisión anterior non se envían. Quedan na túa cola para que poidas editalos ou eliminalos.",
       "allQueuedHint": "Todos os comentarios enviaranse xuntos nunha única solicitude.",
       "summaryPlaceholder": "Resumo opcional para a revisión",
@@ -1608,8 +1609,6 @@
       "bitbucketError": "Non se puido abrir a configuración de Bitbucket. Téntao de novo."
     },
     "overview": {
-      "reviewStyle": "Estilo de revisión",
-      "focusAreas": "Áreas prioritarias",
       "allAreas": "Todas as áreas",
       "set": "Definido",
       "notSet": "Non definido",
@@ -2069,7 +2068,8 @@
       "actionBlocked": "Non se puido completar esta acción. Tes que resolver o problema antes de tentalo de novo.",
       "syncNoRepositories": "Non hai repositorios no ámbito de sincronización. Escolle os repositorios que supervisa o axente de seguridade e volve sincronizar.",
       "syncIntegrationInactive": "A conexión de GitHub para o axente de seguridade non está activa. Volve conectar a aplicación de Kilo en GitHub e sincroniza de novo.",
-      "syncMissingPermission": "A aplicación de Kilo en GitHub non pode ler as alertas de vulnerabilidade. Concede ese permiso en GitHub e sincroniza de novo."
+      "syncMissingPermission": "A aplicación de Kilo en GitHub non pode ler as alertas de vulnerabilidade. Concede ese permiso en GitHub e sincroniza de novo.",
+      "configConflict": "Os axustes do axente de seguridade cambiáronse noutro lugar. Revisa os axustes máis recentes e garda de novo."
     },
     "analysisState": {
       "queued": "Análise na cola",
@@ -2744,7 +2744,6 @@
     },
     "modelSelector": {
       "provider": "Provedor {{id}}",
-      "modelId": "Modelo {{id}}",
       "unavailable": "Non dispoñible",
       "unavailableState": "non dispoñible",
       "selectedState": "seleccionado",
@@ -3837,6 +3836,7 @@
     "organizationDefaultDescription": "Cargado automático para membros que non teñen ningún valor predeterminado persoal.",
     "setAsDefault": "Establecer como predeterminado",
     "saveFailed": "Non se puido gardar o perfil",
+    "organizationRoleRequired": "Só os propietarios da organización e os administradores poden cambiar os perfís da organización.",
     "deleteTitle": "Eliminar perfil",
     "deleteMessage": "Isto elimina permanentemente o perfil e a súa configuración. Isto non se pode desfacer.",
     "deleteFailed": "Non se puido eliminar o perfil",
@@ -4154,7 +4154,8 @@
     "sources": "Probas e artefactos",
     "timezone": "Fuso horario do informe",
     "deviceTimezone": "Usar o fuso horario do dispositivo",
-    "timezoneHint": "Fuso horario IANA, por exemplo Europe/Berlin. Os cambios de horario aplícanse aos informes futuros.",
+    "timezoneHint": "Fuso horario IANA, por exemplo Europe/Berlin.",
+    "scheduleHint": "Os cambios de horario aplícanse aos informes futuros.",
     "nightStart": "Comeza a xanela do informe",
     "morningStart": "Informe listo ás",
     "morningEnd": "Informe dispoñible ata",

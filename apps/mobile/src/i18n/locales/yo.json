@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Pa ẹ̀ka rẹ́ lẹ́yìn ìdàpọ̀",
       "noEnabledMethods": "Kò sí ọ̀nà ìdàpọ̀ tí a ti mú ṣiṣẹ́ nínú ibi ìpamọ́ yìí. Béèrè lọ́wọ́ alábòójútó ibi ìpamọ́ láti mú ìdàpọ̀, ìṣàkópọ̀ sí ọ̀kan, tàbí ìyípadà ìpìlẹ̀ ṣiṣẹ́.",
       "confirmTitle": "Da ìbéèrè ìṣọ̀kan pọ̀?",
+      "confirmMergeTitle": "Da pọ̀?",
       "confirmTitleTerm": "Da {{term}} pọ̀?",
       "confirmMessage": "Èyí yóò da àwọn ìyípadà rẹ pọ̀ mọ́ ẹ̀ka ìpìlẹ̀.",
       "enableAutoMergeConfirmTitle": "Tan ìdàpọ̀ aládàáṣiṣẹ́?",
@@ -644,7 +645,7 @@
       "title": "Àpótí ìwọlé",
       "loading": "Ń ṣàkójọ àpótí ìwọlé",
       "noReviewRequests": "Kò sí ìbéèrè àtúnyẹ̀wò",
-      "noReviewRequestsDescription": "Àwọn ìbéèrè ìṣọ̀kan tó ń dúró de àtúnyẹ̀wò rẹ yóò hàn níbí. O ṣì lè lẹ ọ̀nà àsopọ̀ PR èyíkéyìí mọ́ lókè.",
+      "noReviewRequestsDescription": "Àwọn ìbéèrè ìṣọ̀kan tó ń dúró de àtúnyẹ̀wò rẹ yóò hàn níbí.",
       "couldNotLoad": "A kò lè ṣàkójọ àpótí ìwọlé.",
       "accessLostTitle": "Kò sí àṣẹ sí àjọ yìí mọ́",
       "accessLostDescription": "O kò ṣe ọmọ ẹgbẹ́ àjọ yìí mọ́, nítorí náà a kò lè ṣàkójọ àwọn ìbéèrè àtúnyẹ̀wò rẹ̀. Tẹ̀síwájú nínú àkáńtì ti ara rẹ láti tẹ̀síwájú pẹ̀lú àtúnyẹ̀wò.",
@@ -755,7 +756,7 @@
       "staleHint": "PR ti yí padà láti ìgbà tí o ti kọ èyí.",
       "deleteA11y": "Pa àsọyé tó ń dúró lórí {{location}} rẹ́",
       "deletedAnnouncement": "A ti pa àsọyé tó ń dúró rẹ́",
-      "noCommentsQueued": "Kò sí àsọyé tó ń dúró. A ó fi àtúnyẹ̀wò ránṣẹ́ pẹ̀lú ìgbésẹ̀ tó wà lókè nìkan.",
+      "noCommentsQueued": "A ó fi àtúnyẹ̀wò ránṣẹ́ pẹ̀lú ìgbésẹ̀ tó wà lókè nìkan.",
       "staleQueueHint": "A kì í fi àwọn àsọyé tó tọ́ka sí àkọsílẹ̀ ìyípadà àtijọ́ ránṣẹ́. Wọ́n yóò dúró nínú àkójọ rẹ kí o lè ṣàtúnṣe wọn tàbí pa wọ́n rẹ́.",
       "allQueuedHint": "A ó fi gbogbo àwọn àsọyé ránṣẹ́ pọ̀ nínú ìbéèrè kan ṣoṣo.",
       "summaryPlaceholder": "Àkótán àtúnyẹ̀wò (kò pọn dandan)",
@@ -1608,8 +1609,6 @@
       "bitbucketError": "A kò lè ṣí ìṣètò Bitbucket. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
     },
     "overview": {
-      "reviewStyle": "Ọ̀nà àtúnyẹ̀wò",
-      "focusAreas": "Àwọn apá ìfọkànsí",
       "allAreas": "Gbogbo apá",
       "set": "A ti ṣètò rẹ̀",
       "notSet": "A kò ṣètò",
@@ -2069,7 +2068,8 @@
       "actionBlocked": "A kò lè parun iṣẹ́ yìí. Ìṣòro yìí gbọ́dọ̀ túnsẹ̀ kí a tó lè gbìyànjú lẹ́ẹ̀kan sí i.",
       "syncNoRepositories": "Kò sí àwọn ibi ìpamọ́ kóòdù kankan nínú ààlà ìmúdọ́gba. Yan àwọn ibi ìpamọ́ tí Aṣojú ààbò ń bójú tó, kí o sì tún mú dọ́gba.",
       "syncIntegrationInactive": "Ìsopọ̀ GitHub fún Aṣojú ààbò kò ṣiṣẹ́. Tún ṣe ìsopọ̀ Kilo GitHub App, kí o sì tún mú dọ́gba.",
-      "syncMissingPermission": "Kilo GitHub App kò lè ka vulnerability alerts. Fún ní àṣẹ yẹn ní GitHub, kí o sì tún mú dọ́gba."
+      "syncMissingPermission": "Kilo GitHub App kò lè ka vulnerability alerts. Fún ní àṣẹ yẹn ní GitHub, kí o sì tún mú dọ́gba.",
+      "configConflict": "A ti yi ètò Aṣojú ààbò padà níbòmíràn. Ṣàyẹ̀wò àwọn ètò tuntun kí o sì tún fipamọ́."
     },
     "analysisState": {
       "queued": "Ìtúpalẹ̀ wà ní ìlà ìdúró",
@@ -2744,7 +2744,6 @@
     },
     "modelSelector": {
       "provider": "Olùpèsè {{id}}",
-      "modelId": "Àwòṣe {{id}}",
       "unavailable": "Kò sí",
       "unavailableState": "kò sí",
       "selectedState": "a ti yàn án",
@@ -3837,6 +3836,7 @@
     "organizationDefaultDescription": "Ti kojọpọ aifọwọyi fun awọn ọmọ ẹgbẹ ti ko ni aiyipada ti ara ẹni.",
     "setAsDefault": "Ṣeto bi aiyipada",
     "saveFailed": "Ko le fi profaili pamọ",
+    "organizationRoleRequired": "Àwọn ẹni tó ni àjọ àti àwọn alákòóso nìkan ló lè yí àwọn profaili àjọ padà.",
     "deleteTitle": "Pa profaili rẹ",
     "deleteMessage": "Eyi yoo yọ profaili ati awọn eto rẹ kuro patapata. Eyi ko le ṣe atunṣe.",
     "deleteFailed": "Ko le pa profaili rẹ",
@@ -4154,7 +4154,8 @@
     "sources": "Ẹ̀rí àti àwọn ohun èlò",
     "timezone": "Àgbègbè àkókò ìròyìn",
     "deviceTimezone": "Lo àgbègbè àkókò ẹ̀rọ",
-    "timezoneHint": "Àgbègbè àkókò IANA, fún àpẹẹrẹ Europe/Berlin. Àyípadà ìṣètò yóò kan àwọn ìròyìn iwájú.",
+    "timezoneHint": "Àgbègbè àkókò IANA, fún àpẹẹrẹ Europe/Berlin.",
+    "scheduleHint": "Àyípadà ìṣètò yóò kan àwọn ìròyìn iwájú.",
     "nightStart": "Àkókò ìròyìn bẹ̀rẹ̀",
     "morningStart": "Ìròyìn ti ṣetán ní",
     "morningEnd": "Ìròyìn wà títí dé",

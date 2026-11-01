@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Ezabatu adarra bateratu ondoren",
       "noEnabledMethods": "Biltegi honek ez du bateratze-metodorik gaituta. Eskatu biltegiko administratzaile bati bateratze arrunta, egikaritzeak trinkotzea edo oinarria aldatzea gaitzeko.",
       "confirmTitle": "Bateratze-eskaera bateratu?",
+      "confirmMergeTitle": "Bateratu?",
       "confirmTitleTerm": "{{term}} bateratu?",
       "confirmMessage": "Zure aldaketak oinarri-adarrean bateratuko dira.",
       "enableAutoMergeConfirmTitle": "Bateratze automatikoa gaitu?",
@@ -644,7 +645,7 @@
       "title": "Sarrera-ontzia",
       "loading": "Sarrera-ontzia kargatzen",
       "noReviewRequests": "Ez dago berrikuspen-eskaerarik",
-      "noReviewRequestsDescription": "Zure berrikuspenaren zain dauden bateratze-eskaerak hemen agertzen dira. Nahi duzun PR esteka ere itsats dezakezu goian.",
+      "noReviewRequestsDescription": "Zure berrikuspenaren zain dauden bateratze-eskaerak hemen agertzen dira.",
       "couldNotLoad": "Ezin izan da sarrera-ontzia kargatu.",
       "accessLostTitle": "Ez duzu jada erakunde honetarako sarbiderik",
       "accessLostDescription": "Jada ez zara erakunde honetako kidea, beraz haren berrikuspen-eskaerak ezin dira kargatu. Jarraitu zure kontu pertsonalean berrikusten jarraitzeko.",
@@ -755,7 +756,7 @@
       "staleHint": "PRa aldatu da hau idatzi zenuenetik.",
       "deleteA11y": "Ezabatu bidaltzeko dagoen iruzkina: {{location}}",
       "deletedAnnouncement": "Bidaltzeko zegoen iruzkina ezabatuta",
-      "noCommentsQueued": "Ez dago iruzkinik ilaran. Berrikuspena goiko gertaerarekin soilik bidaliko da.",
+      "noCommentsQueued": "Berrikuspena goiko gertaerarekin soilik bidaliko da.",
       "staleQueueHint": "Egikaritze zaharrago bati buruz idatzitako iruzkinak ez dira bidaltzen. Zure ilaran geratzen dira, editatu edo ezabatu ahal izan ditzazun.",
       "allQueuedHint": "Iruzkin guztiak eskaera bakarrean bidaliko dira.",
       "summaryPlaceholder": "Berrikuspenaren laburpena (aukerakoa)",
@@ -1608,8 +1609,6 @@
       "bitbucketError": "Ezin izan da Bitbucket-en konfigurazioa ireki. Saiatu berriro."
     },
     "overview": {
-      "reviewStyle": "Berrikuspen-estiloa",
-      "focusAreas": "Arreta-eremuak",
       "allAreas": "Eremu guztiak",
       "set": "Ezarrita",
       "notSet": "Ezarri gabe",
@@ -2069,7 +2068,8 @@
       "actionBlocked": "Ezin izan da ekintza hau burutu. Arazoa konpondu behar da berriro saiatu aurretik.",
       "syncNoRepositories": "Ez dago biltegirik sinkronizazio-esparruan. Aukeratu Segurtasun-agenteak gainbegiratzen dituen biltegiak, eta gero sinkronizatu berriro.",
       "syncIntegrationInactive": "Segurtasun-agentearen GitHub konexioa ez dago aktibo. Konektatu berriro Kilo GitHub App, eta gero sinkronizatu berriro.",
-      "syncMissingPermission": "Kilo GitHub App-ek ezin ditu vulnerability alerts irakurri. Eman baimen hori GitHub-en, eta gero sinkronizatu berriro."
+      "syncMissingPermission": "Kilo GitHub App-ek ezin ditu vulnerability alerts irakurri. Eman baimen hori GitHub-en, eta gero sinkronizatu berriro.",
+      "configConflict": "Segurtasun-agentearen ezarpenak beste leku batean aldatu dira. Berrikusi azken ezarpenak eta gorde berriro."
     },
     "analysisState": {
       "queued": "Azterketa ilaran",
@@ -2744,7 +2744,6 @@
     },
     "modelSelector": {
       "provider": "Hornitzailea: {{id}}",
-      "modelId": "Modeloa: {{id}}",
       "unavailable": "Ez dago eskuragarri",
       "unavailableState": "ez dago eskuragarri",
       "selectedState": "hautatuta",
@@ -3837,6 +3836,7 @@
     "organizationDefaultDescription": "Lehenetsi pertsonalik ez duten kideentzat automatikoki kargatu da.",
     "setAsDefault": "Ezarri lehenetsi gisa",
     "saveFailed": "Ezin izan da profila gorde",
+    "organizationRoleRequired": "Erakundeko jabeek eta administratzaileek soilik alda dezakete erakundearen profila.",
     "deleteTitle": "Ezabatu profila",
     "deleteMessage": "Honek profila eta bere ezarpenak betiko kentzen ditu. Hau ezin da desegin.",
     "deleteFailed": "Ezin izan da profila ezabatu",
@@ -4154,7 +4154,8 @@
     "sources": "Ebidentziak eta artefaktuak",
     "timezone": "Txostenaren ordu-zona",
     "deviceTimezone": "Erabili gailuaren ordu-zona",
-    "timezoneHint": "IANA ordu-zona, adibidez Europe/Berlin. Programazio-aldaketak hurrengo txostenetan aplikatuko dira.",
+    "timezoneHint": "IANA ordu-zona, adibidez Europe/Berlin.",
+    "scheduleHint": "Programazio-aldaketak hurrengo txostenetan aplikatuko dira.",
     "nightStart": "Txosten-tartea hasteko ordua",
     "morningStart": "Txostena prest egoteko ordua",
     "morningEnd": "Txostena eskuragarri egoteko azken ordua",

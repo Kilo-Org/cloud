@@ -6,6 +6,10 @@ import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import {
+  ProfileDescriptionField,
+  ProfileNameField,
+} from '@/components/profiles/profile-bound-field';
+import {
   createOrganizationId,
   hasOrganizationContext,
   ownerChoices,
@@ -14,7 +18,6 @@ import {
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { FormField } from '@/components/ui/form-field';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import {
@@ -168,12 +171,8 @@ export function NewProfileScreen({
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
-        <FormField
-          label={t('profiles.nameLabel')}
-          placeholder={t('profiles.namePlaceholder')}
+        <ProfileNameField
           error={nameError === null ? undefined : t(NAME_ERROR_KEYS[nameError])}
-          required
-          returnKeyType="next"
           onChangeText={value => {
             nameRef.current = value;
             if (nameValidationStarted.current) {
@@ -181,13 +180,8 @@ export function NewProfileScreen({
             }
           }}
         />
-        <FormField
-          label={t('profiles.descriptionLabel')}
-          placeholder={t('profiles.descriptionPlaceholder')}
+        <ProfileDescriptionField
           error={descriptionError ?? undefined}
-          multiline
-          textAlignVertical="top"
-          className="min-h-20 leading-[1.25rem]"
           onChangeText={value => {
             descriptionRef.current = value;
             if (descriptionError !== null && validateProfileDescription(value) === null) {

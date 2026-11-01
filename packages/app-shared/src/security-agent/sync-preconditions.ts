@@ -1,14 +1,14 @@
 /**
- * Stable wire codes for the `triggerSync` preconditions.
+ * Stable wire codes for the Security Agent preconditions.
  *
- * The server rejects a manual sync with `PRECONDITION_FAILED` when the Security
- * Agent cannot start one: no repository in the sync scope, a missing or
- * inactive GitHub integration, or an installation without the
- * `vulnerability_alerts` permission. The English message each rejection carries
- * is the web surface's copy; a device that has to translate it cannot match on
- * that sentence. The rejection's cause is an `UpstreamApiError`, which the tRPC
- * error formatter exposes to every client as `data.upstreamCode`, so the mobile
- * ledger maps this code onto catalog copy instead.
+ * The server rejects a manual sync, or enabling the agent, with
+ * `PRECONDITION_FAILED` when the Security Agent cannot run: no repository in
+ * scope, a missing or inactive GitHub integration, or an installation without
+ * the `vulnerability_alerts` permission. The English message each rejection
+ * carries is the web surface's copy; a device that has to translate it cannot
+ * match on that sentence. The rejection's cause is an `UpstreamApiError`, which
+ * the tRPC error formatter exposes to every client as `data.upstreamCode`, so
+ * the mobile ledger maps this code onto catalog copy instead.
  */
 export const SECURITY_SYNC_PRECONDITION_CODES = {
   noRepositories: 'security_sync_no_repositories',

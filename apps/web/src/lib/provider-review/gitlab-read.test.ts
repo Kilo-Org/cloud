@@ -807,33 +807,50 @@ describe('listChecks', () => {
 });
 
 describe('listInbox', () => {
-  it('queries opened merge requests where the acting user is the reviewer', async () => {
-    mockFetchGitLabUser.mockResolvedValue({
-      id: 1,
-      username: 'reviewer',
-      name: 'Reviewer',
-      email: 'r@example.com',
-      avatar_url: '',
-      web_url: `${INSTANCE_URL}/reviewer`,
-    });
-    const globalMrs = [
-      {
-        ...mrFixture,
-        references: { full: 'group/sub/repo!12' },
-      },
-      {
-        ...mrFixture,
-        iid: 99,
-        references: { full: 'team/other!99' },
-        updated_at: '2026-01-04T00:00:00Z',
-      },
-    ];
-    fetchMock.mockImplementation(url => {
-      if (new URL(String(url)).pathname === '/api/v4/merge_requests') {
-        return Promise.resolve(jsonResponse(globalMrs));
+  const reviewerUser = {
+    id: 1,
+    username: 'reviewer',
+    name: 'Reviewer',
+    email: 'r@example.com',
+    avatar_url: '',
+    web_url: `${INSTANCE_URL}/reviewer`,
+  };
+
+  /** A global-MR row of the fixture shape, forced onto one project path. */
+  function mrRow(iid: number, projectPath: string, overrides: Record<string, unknown> = {}) {
+    return {
+      ...mrFixture,
+      iid,
+      references: { full: `${projectPath}!${iid}` },
+      ...overrides,
+    };
+  }
+
+  /** A full provider page of rows no cached repository holds. */
+  function outOfScopePage(count: number): unknown[] {
+    return Array.from({ length: count }, (_unused, index) => mrRow(200 + index, 'team/other'));
+  }
+
+  function serveMergeRequestPages(pages: Record<string, unknown[]>) {
+    fetchMock.mockImplementation((url: string) => {
+      const parsed = new URL(url);
+      if (parsed.pathname === '/api/v4/merge_requests') {
+        return Promise.resolve(jsonResponse(pages[parsed.searchParams.get('page') ?? '1'] ?? []));
       }
       return Promise.resolve(jsonResponse([]));
     });
+  }
+
+  function requestedInboxPages(): string[] {
+    return fetchMock.mock.calls
+      .map(call => new URL(String(call[0])))
+      .filter(url => url.pathname === '/api/v4/merge_requests')
+      .map(url => url.searchParams.get('page') ?? '');
+  }
+
+  it('queries opened merge requests where the acting user is the reviewer', async () => {
+    mockFetchGitLabUser.mockResolvedValue(reviewerUser);
+    serveMergeRequestPages({ '1': [mrRow(12, 'group/sub/repo')] });
 
     const page = await listInbox(OWNER);
 
@@ -844,25 +861,110 @@ describe('listInbox', () => {
     expect(url.searchParams.get('scope')).toBe('reviews_for_me');
     expect(url.searchParams.get('reviewer_username')).toBe('reviewer');
     expect(url.searchParams.get('state')).toBe('opened');
-    expect(page.items).toHaveLength(2);
+    expect(page.items).toHaveLength(1);
     expect(page.items[0]?.ref).toEqual({
       platform: 'gitlab',
       projectPath: 'group/sub/repo',
       mrIid: 12,
       instanceHint: INSTANCE_URL,
     });
-    expect(page.items[1]?.ref).toMatchObject({ projectPath: 'team/other', mrIid: 99 });
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it('emits only rows inside the cached repositories and keeps the stored path', async () => {
+    mockFetchGitLabUser.mockResolvedValue(reviewerUser);
+    serveMergeRequestPages({
+      '1': [
+        mrRow(12, 'group/sub/repo'),
+        // The integration's catalogue stores `group/sub/repo`; a nested
+        // project, a sibling and a same-named project on another group are all
+        // outside it and cannot be opened through this layer.
+        mrRow(99, 'team/other'),
+        mrRow(100, 'group/sub/repo/nested'),
+        mrRow(101, 'other/group/sub/repo'),
+        // A different casing of a cached path is the same project: the match
+        // authorizeProject performs is case-insensitive.
+        mrRow(102, 'Group/Sub/Repo'),
+        // No `references.full` — the project path comes from the web URL.
+        {
+          ...mrFixture,
+          iid: 103,
+          references: undefined,
+          web_url: `${INSTANCE_URL}/group/sub/repo/-/merge_requests/103`,
+        },
+      ],
+    });
+
+    const page = await listInbox(OWNER);
+
+    expect(page.items.map(item => item.ref)).toEqual([
+      { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12, instanceHint: INSTANCE_URL },
+      { platform: 'gitlab', projectPath: 'Group/Sub/Repo', mrIid: 102, instanceHint: INSTANCE_URL },
+      { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 103, instanceHint: INSTANCE_URL },
+    ]);
+  });
+
+  it('reads on past a page whose rows are all outside the cached repositories', async () => {
+    mockFetchGitLabUser.mockResolvedValue(reviewerUser);
+    serveMergeRequestPages({
+      '1': outOfScopePage(50),
+      '2': [mrRow(301, 'group/sub/repo')],
+    });
+
+    const page = await listInbox(OWNER);
+
+    // A blank page would leave the reader with nothing to scroll and the row
+    // behind an unreachable cursor.
+    expect(requestedInboxPages()).toEqual(['1', '2']);
+    expect(page.items.map(item => item.ref)).toEqual([
+      { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 301, instanceHint: INSTANCE_URL },
+    ]);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it('stops at the per-load page bound and hands back the unread page', async () => {
+    mockFetchGitLabUser.mockResolvedValue(reviewerUser);
+    serveMergeRequestPages({
+      '1': outOfScopePage(50),
+      '2': outOfScopePage(50),
+      '3': outOfScopePage(50),
+      '4': outOfScopePage(50),
+      '5': outOfScopePage(50),
+      '6': [mrRow(401, 'group/sub/repo')],
+    });
+
+    const first = await listInbox(OWNER);
+
+    expect(requestedInboxPages()).toEqual(['1', '2', '3', '4', '5']);
+    expect(first.items).toEqual([]);
+    expect(first.nextCursor).toBeTruthy();
+
+    const second = await listInbox(OWNER, first.nextCursor!);
+
+    // The bounded load resumes at the page it never read: no row is skipped.
+    expect(requestedInboxPages()).toEqual(['1', '2', '3', '4', '5', '6']);
+    expect(second.items.map(item => item.ref)).toEqual([
+      { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 401, instanceHint: INSTANCE_URL },
+    ]);
+  });
+
+  it('asks the provider for nothing when the connection has no cached repository', async () => {
+    mockFetchGitLabUser.mockResolvedValue(reviewerUser);
+    mockGetIntegrationForOwner.mockResolvedValue({
+      ...integrationRow,
+      repositories: [],
+    } as unknown as PlatformIntegration);
+
+    const page = await listInbox(ORG_OWNER);
+
+    // No repository is openable through this layer, so the list is empty and
+    // the connection's own review queue is never read.
+    expect(page).toEqual({ items: [], nextCursor: null });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('skips rows with no resolvable project path instead of guessing', async () => {
-    mockFetchGitLabUser.mockResolvedValue({
-      id: 1,
-      username: 'reviewer',
-      name: 'R',
-      email: '',
-      avatar_url: '',
-      web_url: '',
-    });
+    mockFetchGitLabUser.mockResolvedValue(reviewerUser);
     fetchMock.mockImplementation(url => {
       if (new URL(String(url)).pathname === '/api/v4/merge_requests') {
         return Promise.resolve(

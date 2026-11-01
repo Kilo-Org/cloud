@@ -432,6 +432,7 @@
       "deleteBranchAfterMerge": "Șterge ramura după îmbinare",
       "noEnabledMethods": "Acest depozit nu are nicio metodă de îmbinare activată. Cere unui administrator al depozitului să activeze îmbinarea printr-un commit nou, prin comasarea commiturilor sau prin rebazare.",
       "confirmTitle": "Îmbini PR-ul?",
+      "confirmMergeTitle": "Îmbini?",
       "confirmTitleTerm": "Îmbini {{term}}-ul?",
       "confirmMessage": "Modificările tale vor fi îmbinate în ramura de bază.",
       "enableAutoMergeConfirmTitle": "Activezi îmbinarea automată?",
@@ -659,7 +660,7 @@
       "title": "Primite",
       "loading": "Se încarcă cererile primite",
       "noReviewRequests": "Nicio cerere de revizuire",
-      "noReviewRequestsDescription": "Aici apar PR-urile care așteaptă revizuirea ta. Poți lipi mai sus și o legătură către orice alt PR.",
+      "noReviewRequestsDescription": "Aici apar PR-urile care așteaptă revizuirea ta.",
       "couldNotLoad": "Nu s-au putut încărca cererile primite.",
       "accessLostTitle": "Nu ai acces la această organizație",
       "accessLostDescription": "Nu mai ești membru al acestei organizații, așa că cererile sale de revizuire nu se pot încărca. Continuă în contul personal pentru a continua revizuirile.",
@@ -773,7 +774,7 @@
       "staleHint": "PR-ul s-a modificat de când ai scris acest comentariu.",
       "deleteA11y": "Șterge comentariul în așteptare de la {{location}}",
       "deletedAnnouncement": "Comentariu în așteptare șters",
-      "noCommentsQueued": "Nu există comentarii în așteptare. Revizuirea va fi trimisă doar cu tipul selectat mai sus.",
+      "noCommentsQueued": "Revizuirea va fi trimisă doar cu tipul selectat mai sus.",
       "staleQueueHint": "Comentariile care se referă la un commit mai vechi nu sunt trimise. Ele rămân în așteptare, ca să le poți edita sau șterge.",
       "allQueuedHint": "Toate comentariile vor fi trimise împreună, într-o singură cerere.",
       "summaryPlaceholder": "Rezumat opțional pentru revizuire",
@@ -1630,8 +1631,6 @@
       "bitbucketError": "Nu s-a putut deschide configurarea Bitbucket. Încearcă din nou."
     },
     "overview": {
-      "reviewStyle": "Stil de revizuire",
-      "focusAreas": "Aspecte prioritare",
       "allAreas": "Toate domeniile",
       "set": "Configurat",
       "notSet": "Nu este configurat",
@@ -2102,7 +2101,8 @@
       "actionBlocked": "Această acțiune nu a putut fi finalizată. Problema trebuie rezolvată înainte de a încerca din nou.",
       "syncNoRepositories": "Niciun repository nu face parte din domeniul de sincronizare. Alege repository-urile monitorizate de Agentul de securitate, apoi sincronizează din nou.",
       "syncIntegrationInactive": "Conexiunea GitHub pentru Agentul de securitate nu este activă. Reconectează Kilo GitHub App, apoi sincronizează din nou.",
-      "syncMissingPermission": "Aplicația Kilo pentru GitHub nu poate citi alertele de vulnerabilitate. Acordă această permisiune în GitHub, apoi sincronizează din nou."
+      "syncMissingPermission": "Aplicația Kilo pentru GitHub nu poate citi alertele de vulnerabilitate. Acordă această permisiune în GitHub, apoi sincronizează din nou.",
+      "configConflict": "Setările Agentului de securitate au fost modificate în altă parte. Verifică cele mai recente setări și salvează din nou."
     },
     "analysisState": {
       "queued": "Analiză în coadă",
@@ -2786,7 +2786,6 @@
     },
     "modelSelector": {
       "provider": "Furnizor {{id}}",
-      "modelId": "Modelul {{id}}",
       "unavailable": "Indisponibil",
       "unavailableState": "indisponibil",
       "selectedState": "selectat",
@@ -3893,6 +3892,7 @@
     "organizationDefaultDescription": "Încărcat automat pentru membrii care nu au o valoare implicită personală.",
     "setAsDefault": "Setați ca implicit",
     "saveFailed": "Profilul nu a putut fi salvat",
+    "organizationRoleRequired": "Doar proprietarii și administratorii organizației pot modifica profilurile organizației.",
     "deleteTitle": "Ștergeți profilul",
     "deleteMessage": "Acest lucru elimină definitiv profilul și setările acestuia. Acest lucru nu poate fi anulat.",
     "deleteFailed": "Nu s-a putut șterge profilul",
@@ -4215,7 +4215,8 @@
     "sources": "Dovezi și artefacte",
     "timezone": "Fusul orar al raportului",
     "deviceTimezone": "Folosește fusul orar al dispozitivului",
-    "timezoneHint": "Fus orar IANA, de exemplu Europe/Berlin. Modificările programului se aplică rapoartelor viitoare.",
+    "timezoneHint": "Fus orar IANA, de exemplu Europe/Berlin.",
+    "scheduleHint": "Modificările programului se aplică rapoartelor viitoare.",
     "nightStart": "Începutul intervalului de raport",
     "morningStart": "Raport gata la",
     "morningEnd": "Raport disponibil până la",

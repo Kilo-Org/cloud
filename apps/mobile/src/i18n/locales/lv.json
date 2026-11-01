@@ -432,6 +432,7 @@
       "deleteBranchAfterMerge": "Dzēst zaru pēc apvienošanas",
       "noEnabledMethods": "Šajā repozitorijā nav iespējota neviena apvienošanas metode. Lūdz repozitorija administratoram iespējot apvienošanu ar apvienošanas komitu, saspiešanu vai pārbāzēšanu.",
       "confirmTitle": "Apvienot izmaiņu pieprasījumu?",
+      "confirmMergeTitle": "Apvienot?",
       "confirmTitleTerm": "Apvienot {{term}}?",
       "confirmMessage": "Tavas izmaiņas tiks apvienotas ar bāzes zaru.",
       "enableAutoMergeConfirmTitle": "Iespējot automātisko apvienošanu?",
@@ -659,7 +660,7 @@
       "title": "Iesūtne",
       "loading": "Tiek ielādēta iesūtne",
       "noReviewRequests": "Nav pārskatīšanas pieprasījumu",
-      "noReviewRequestsDescription": "Šeit būs redzami izmaiņu pieprasījumi, kas gaida tavu vērtējumu. Arī augstāk vari ielīmēt jebkuru PR saiti.",
+      "noReviewRequestsDescription": "Šeit būs redzami izmaiņu pieprasījumi, kas gaida tavu vērtējumu.",
       "couldNotLoad": "Neizdevās ielādēt iesūtni.",
       "accessLostTitle": "Nav piekļuves šai organizācijai",
       "accessLostDescription": "Tu vairs neesi šīs organizācijas dalībnieks, tāpēc tās pārskatīšanas pieprasījumus nevar ielādēt. Turpini savā personīgajā kontā, lai varētu turpināt vērtēt.",
@@ -773,7 +774,7 @@
       "staleHint": "kopš šī komentāra uzrakstīšanas PR ir mainījies.",
       "deleteA11y": "Dzēst nepublicēto komentāru: {{location}}",
       "deletedAnnouncement": "Nepublicētais komentārs dzēsts",
-      "noCommentsQueued": "Rindā nav komentāru. Vērtējums tiks iesniegts tikai ar augstāk izvēlēto veidu.",
+      "noCommentsQueued": "Vērtējums tiks iesniegts tikai ar augstāk izvēlēto veidu.",
       "staleQueueHint": "Komentāri par vecāku komitu netiek nosūtīti. Tie paliek tavā rindā, lai vari tos rediģēt vai dzēst.",
       "allQueuedHint": "Visi komentāri tiks nosūtīti kopā vienā pieprasījumā.",
       "summaryPlaceholder": "Vērtējuma kopsavilkums (nav obligāts)",
@@ -1630,8 +1631,6 @@
       "bitbucketError": "Neizdevās atvērt Bitbucket iestatīšanu. Lūdzu, mēģini vēlreiz."
     },
     "overview": {
-      "reviewStyle": "Pārskatīšanas stils",
-      "focusAreas": "Pārskatāmās jomas",
       "allAreas": "Visas jomas",
       "set": "Iestatīts",
       "notSet": "Nav iestatīts",
@@ -2102,7 +2101,8 @@
       "actionBlocked": "Neizdevās pabeigt šo darbību. Vispirms jāatrisina problēma, lai varētu mēģināt vēlreiz.",
       "syncNoRepositories": "Sinhronizācijas tvērumā nav neviena repozitorija. Izvēlieties repozitorijus, kurus pārrauga Drošības aģents, un pēc tam sinhronizējiet vēlreiz.",
       "syncIntegrationInactive": "Drošības aģenta GitHub savienojums nav aktīvs. Atkārtoti pievienojiet Kilo GitHub App un pēc tam sinhronizējiet vēlreiz.",
-      "syncMissingPermission": "Kilo GitHub lietotne nevar lasīt ievainojamību brīdinājumus. Piešķir šo atļauju GitHub un pēc tam sinhronizē vēlreiz."
+      "syncMissingPermission": "Kilo GitHub lietotne nevar lasīt ievainojamību brīdinājumus. Piešķir šo atļauju GitHub un pēc tam sinhronizē vēlreiz.",
+      "configConflict": "Drošības aģenta iestatījumi ir mainīti citur. Pārskati jaunākos iestatījumus un saglabā vēlreiz."
     },
     "analysisState": {
       "queued": "Analīze rindā",
@@ -2786,7 +2786,6 @@
     },
     "modelSelector": {
       "provider": "Pakalpojumu sniedzējs {{id}}",
-      "modelId": "Modelis {{id}}",
       "unavailable": "Nav pieejams",
       "unavailableState": "nav pieejams",
       "selectedState": "izvēlēts",
@@ -3893,6 +3892,7 @@
     "organizationDefaultDescription": "Automātiski ielādēts dalībniekiem, kuriem nav personisku noklusējuma.",
     "setAsDefault": "Iestatīt kā noklusējumu",
     "saveFailed": "Nevarēja saglabāt profilu",
+    "organizationRoleRequired": "Organizācijas profilus var mainīt tikai organizācijas īpašnieki un administratori.",
     "deleteTitle": "Dzēst profilu",
     "deleteMessage": "Tādējādi profils un tā iestatījumi tiek neatgriezeniski noņemti. Šo darbību nevar atsaukt.",
     "deleteFailed": "Nevarēja izdzēst profilu",
@@ -4215,7 +4215,8 @@
     "sources": "Pierādījumi un artefakti",
     "timezone": "Atskaites laika josla",
     "deviceTimezone": "Izmantot ierīces laika joslu",
-    "timezoneHint": "IANA laika josla, piemēram, Europe/Berlin. Grafika izmaiņas attiecas uz nākamajām atskaitēm.",
+    "timezoneHint": "IANA laika josla, piemēram, Europe/Berlin.",
+    "scheduleHint": "Grafika izmaiņas attiecas uz nākamajām atskaitēm.",
     "nightStart": "Atskaites periods sākas",
     "morningStart": "Atskaite gatava",
     "morningEnd": "Atskaite pieejama līdz",

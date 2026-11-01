@@ -1094,10 +1094,8 @@
     },
     "overview": {
       "allAreas": "جميع المجالات",
-      "focusAreas": "مجالات التركيز",
       "nSelected": "{{displayCount}} محدد",
       "proposedReviewMdGuidance": "إرشادات REVIEW.md المقترحة",
-      "reviewStyle": "أسلوب المراجعة",
       "set": "محدّد",
       "notSet": "غير محدّد"
     },
@@ -1592,7 +1590,8 @@
       "actionBlocked": "تعذّر إكمال هذا الإجراء. يجب إصلاح المشكلة أولاً قبل إعادة المحاولة.",
       "syncNoRepositories": "لا توجد مستودعات ضمن نطاق المزامنة. اختر المستودعات التي يراقبها وكيل الأمان، ثم زامِن مرة أخرى.",
       "syncIntegrationInactive": "اتصال GitHub الخاص بـ«وكيل الأمان» غير نشط. أعد ربط تطبيق Kilo على GitHub، ثم قم بالمزامنة مرة أخرى.",
-      "syncMissingPermission": "لا يستطيع تطبيق Kilo على GitHub قراءة تنبيهات الثغرات. امنح هذه الصلاحية في GitHub، ثم أعد المزامنة."
+      "syncMissingPermission": "لا يستطيع تطبيق Kilo على GitHub قراءة تنبيهات الثغرات. امنح هذه الصلاحية في GitHub، ثم أعد المزامنة.",
+      "configConflict": "تغيّرت إعدادات وكيل الأمان في مكان آخر. راجع أحدث الإعدادات واحفظ مرة أخرى."
     },
     "analysisState": {
       "queued": "التحليل في قائمة الانتظار",
@@ -2303,7 +2302,6 @@
     },
     "modelSelector": {
       "provider": "المزود {{id}}",
-      "modelId": "النموذج {{id}}",
       "unavailable": "غير متاح",
       "unavailableState": "غير متاح",
       "selectedState": "محدد",
@@ -3122,7 +3120,7 @@
       "continueInPersonal": "المتابعة في الحساب الشخصي",
       "loading": "جارٍ تحميل صندوق الوارد",
       "noReviewRequests": "لا توجد طلبات مراجعة",
-      "noReviewRequestsDescription": "تظهر هنا طلبات السحب التي تنتظر مراجعتك. ويمكنك أيضًا لصق أي رابط PR أعلاه.",
+      "noReviewRequestsDescription": "تظهر هنا طلبات السحب التي تنتظر مراجعتك.",
       "title": "صندوق الوارد"
     },
     "installKiloGitHubApp": "تثبيت تطبيق Kilo على GitHub",
@@ -3150,6 +3148,7 @@
       "deleteBranchAfterMerge": "حذف الفرع بعد الدمج",
       "noEnabledMethods": "لا توجد طرق دمج مفعّلة في هذا المستودع. اطلب من مسؤول المستودع تفعيل الدمج العادي أو الدمج المضغوط أو الدمج مع إعادة التأسيس.",
       "confirmTitle": "دمج طلب السحب؟",
+      "confirmMergeTitle": "دمج؟",
       "confirmTitleTerm": "دمج {{term}}؟",
       "confirmMessage": "ستُدمج تغييراتك في الفرع الأساسي.",
       "enableAutoMergeConfirmTitle": "تفعيل الدمج التلقائي؟",
@@ -3265,7 +3264,7 @@
       "deletedAnnouncement": "تم حذف التعليق المعلّق",
       "editA11y": "تعديل التعليق المعلّق على {{location}}",
       "editOutdatedA11y": "تعديل التعليق المعلّق القديم على {{location}}",
-      "noCommentsQueued": "لا توجد تعليقات في قائمة الانتظار. ستُرسل المراجعة بالنوع المحدد أعلاه فقط.",
+      "noCommentsQueued": "ستُرسل المراجعة بالنوع المحدد أعلاه فقط.",
       "staleHint": "تغيّر PR منذ أن كتبت هذا التعليق.",
       "staleQueueHint": "لا تُرسل التعليقات المرتبطة بإيداع أقدم. تبقى في قائمة الانتظار لتتمكن من تعديلها أو حذفها.",
       "summaryA11y": "ملخص المراجعة",
@@ -4061,6 +4060,7 @@
     "organizationDefaultDescription": "يُحمَّل تلقائيًا للأعضاء الذين ليس لديهم ملف شخصي افتراضي.",
     "setAsDefault": "تعيين كافتراضي",
     "saveFailed": "تعذر حفظ الملف الشخصي",
+    "organizationRoleRequired": "يمكن لمالكي المؤسسة والمشرفين فقط تغيير الملف الشخصي للمؤسسة.",
     "deleteTitle": "حذف الملف الشخصي",
     "deleteMessage": "يؤدي هذا إلى إزالة الملف الشخصي وإعداداته نهائيًا. لا يمكن التراجع عن هذا.",
     "deleteFailed": "تعذر حذف الملف الشخصي",
@@ -4398,7 +4398,8 @@
     "sources": "الأدلة والمخرجات",
     "timezone": "المنطقة الزمنية للتقرير",
     "deviceTimezone": "استخدام المنطقة الزمنية للجهاز",
-    "timezoneHint": "منطقة زمنية وفق IANA، مثل Europe/Berlin. تُطبّق تغييرات الجدول على التقارير القادمة.",
+    "timezoneHint": "منطقة زمنية وفق IANA، مثل Europe/Berlin.",
+    "scheduleHint": "تُطبّق تغييرات الجدول على التقارير القادمة.",
     "nightStart": "بداية نافذة التقرير",
     "morningStart": "جاهزية التقرير عند",
     "morningEnd": "التقرير متاح حتى",

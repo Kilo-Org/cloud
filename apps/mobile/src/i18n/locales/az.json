@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Birləşdirmədən sonra budağı sil",
       "noEnabledMethods": "Bu repozitoriyada heç bir birləşdirmə üsulu aktiv deyil. Repozitoriyanın inzibatçısından adi birləşdirmə, sıxlaşdırma və ya bazanı dəyişmə üsulunu aktivləşdirməsini istə.",
       "confirmTitle": "Birləşdirmə sorğusu birləşdirilsin?",
+      "confirmMergeTitle": "Birləşdirilsin?",
       "confirmTitleTerm": "{{term}} birləşdirilsin?",
       "confirmMessage": "Dəyişikliklərin əsas budağa birləşdiriləcək.",
       "enableAutoMergeConfirmTitle": "Avtomatik birləşdirmə aktivləşdirilsin?",
@@ -644,7 +645,7 @@
       "title": "Gələnlər",
       "loading": "Gələnlər yüklənir",
       "noReviewRequests": "Kod baxışı sorğusu yoxdur",
-      "noReviewRequestsDescription": "Nəzərdən keçirməyini gözləyən birləşdirmə sorğuları burada görünür. Yuxarıdakı sahəyə istənilən PR keçidini də yapışdıra bilərsən.",
+      "noReviewRequestsDescription": "Nəzərdən keçirməyini gözləyən birləşdirmə sorğuları burada görünür.",
       "couldNotLoad": "Gələnləri yükləmək mümkün olmadı.",
       "accessLostTitle": "Bu təşkilata giriş itirildi",
       "accessLostDescription": "Artıq bu təşkilatın üzvü deyilsən, ona görə də onun baxış sorğularını yükləmək mümkün deyil. Nəzərdən keçirməyə davam etmək üçün şəxsi hesabına keç.",
@@ -755,7 +756,7 @@
       "staleHint": "bunu yazdıqdan sonra PR dəyişib.",
       "deleteA11y": "{{location}} yerindəki göndərilməmiş şərhi sil",
       "deletedAnnouncement": "Göndərilməmiş şərh silindi",
-      "noCommentsQueued": "Növbədə şərh yoxdur. Kod baxışı yalnız yuxarıda seçilmiş nəticə ilə göndəriləcək.",
+      "noCommentsQueued": "Kod baxışı yalnız yuxarıda seçilmiş nəticə ilə göndəriləcək.",
       "staleQueueHint": "Əvvəlki kommitə yazılmış şərhlər göndərilmir. Onları redaktə edə və ya silə bilməyin üçün növbəndə qalırlar.",
       "allQueuedHint": "Bütün şərhlər bir sorğuda birlikdə göndəriləcək.",
       "summaryPlaceholder": "Kod baxışının xülasəsi (məcburi deyil)",
@@ -1608,8 +1609,6 @@
       "bitbucketError": "Bitbucket quraşdırmasını açmaq mümkün olmadı. Yenidən cəhd et."
     },
     "overview": {
-      "reviewStyle": "Yoxlama üslubu",
-      "focusAreas": "Əsas yoxlama sahələri",
       "allAreas": "Bütün sahələr",
       "set": "Təyin edilib",
       "notSet": "Təyin edilməyib",
@@ -2069,7 +2068,8 @@
       "actionBlocked": "Bu işi tamamlamaq mümkün olmadı. Problemi həll etmədən yenidən cəhd etmək olmaz.",
       "syncNoRepositories": "Sinxronizasiya əhatəsində repozitoriya yoxdur. Təhlükəsizlik agentinin izlədiyi repozitoriyaları seç, sonra yenidən sinxronlaşdır.",
       "syncIntegrationInactive": "Təhlükəsizlik agenti üçün GitHub bağlantısı aktiv deyil. Kilo GitHub tətbiqini yenidən qoş, sonra yenidən sinxronlaşdır.",
-      "syncMissingPermission": "Kilo GitHub tətbiqi zəiflik xəbərdarlıqlarını oxuya bilmir. Həmin icazəni GitHub-da ver, sonra yenidən sinxronlaşdır."
+      "syncMissingPermission": "Kilo GitHub tətbiqi zəiflik xəbərdarlıqlarını oxuya bilmir. Həmin icazəni GitHub-da ver, sonra yenidən sinxronlaşdır.",
+      "configConflict": "Təhlükəsizlik agentinin parametrləri başqa yerdə dəyişdirildi. Ən son parametrlərə bax və yenidən yadda saxla."
     },
     "analysisState": {
       "queued": "Təhlil növbəyə alınıb",
@@ -2744,7 +2744,6 @@
     },
     "modelSelector": {
       "provider": "Təminatçı {{id}}",
-      "modelId": "{{id}} modeli",
       "unavailable": "Mövcud deyil",
       "unavailableState": "mövcud deyil",
       "selectedState": "seçilib",
@@ -3837,6 +3836,7 @@
     "organizationDefaultDescription": "Şəxsi defoltu olmayan üzvlər üçün avtomatik yüklənir.",
     "setAsDefault": "Defolt olaraq təyin edin",
     "saveFailed": "Profili saxlamaq mümkün olmadı",
+    "organizationRoleRequired": "Təşkilat profillərini yalnız təşkilat sahibləri və inzibatçılar dəyişə bilər.",
     "deleteTitle": "Profili silin",
     "deleteMessage": "Bu, profili və onun parametrlərini həmişəlik silir. Bu geri qaytarıla bilməz.",
     "deleteFailed": "Profili silmək mümkün olmadı",
@@ -4154,7 +4154,8 @@
     "sources": "Sübutlar və artefaktlar",
     "timezone": "Hesabat saat qurşağı",
     "deviceTimezone": "Cihazın saat qurşağından istifadə et",
-    "timezoneHint": "IANA saat qurşağı, məsələn Europe/Berlin. Cədvəl dəyişiklikləri gələcək hesabatlara tətbiq olunur.",
+    "timezoneHint": "IANA saat qurşağı, məsələn Europe/Berlin.",
+    "scheduleHint": "Cədvəl dəyişiklikləri gələcək hesabatlara tətbiq olunur.",
     "nightStart": "Hesabat pəncərəsi başlayır",
     "morningStart": "Hesabatın hazır olduğu vaxt",
     "morningEnd": "Hesabatın mövcud olduğu son vaxt",

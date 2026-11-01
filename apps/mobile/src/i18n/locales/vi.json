@@ -1082,10 +1082,8 @@
     },
     "overview": {
       "allAreas": "Tất cả nội dung",
-      "focusAreas": "Nội dung trọng tâm",
       "nSelected": "Đã chọn {{displayCount}}",
       "proposedReviewMdGuidance": "Hướng dẫn đề xuất cho REVIEW.md",
-      "reviewStyle": "Cách rà soát",
       "set": "Đã thiết lập",
       "notSet": "Chưa thiết lập"
     },
@@ -1536,7 +1534,8 @@
       "actionBlocked": "Không thể hoàn tất hành động này. Bạn cần khắc phục sự cố trước khi thử lại.",
       "syncNoRepositories": "Không có kho lưu trữ nào trong phạm vi đồng bộ. Hãy chọn các kho lưu trữ mà Trợ lý bảo mật giám sát, rồi đồng bộ lại.",
       "syncIntegrationInactive": "Kết nối GitHub của Trợ lý bảo mật chưa hoạt động. Hãy kết nối lại Ứng dụng GitHub của Kilo, sau đó đồng bộ lại.",
-      "syncMissingPermission": "Kilo GitHub App không thể đọc cảnh báo lỗ hổng bảo mật. Cấp quyền đó trong GitHub, rồi đồng bộ lại."
+      "syncMissingPermission": "Kilo GitHub App không thể đọc cảnh báo lỗ hổng bảo mật. Cấp quyền đó trong GitHub, rồi đồng bộ lại.",
+      "configConflict": "Cài đặt của Trợ lý bảo mật đã bị thay đổi ở nơi khác. Hãy xem lại cài đặt mới nhất và lưu lại."
     },
     "analysisState": {
       "queued": "Đang chờ phân tích",
@@ -2211,7 +2210,6 @@
     },
     "modelSelector": {
       "provider": "Nhà cung cấp {{id}}",
-      "modelId": "Mô hình {{id}}",
       "unavailable": "Không khả dụng",
       "unavailableState": "không khả dụng",
       "selectedState": "đã chọn",
@@ -2946,7 +2944,7 @@
       "continueInPersonal": "Tiếp tục với tài khoản cá nhân",
       "loading": "Đang tải hộp thư đến",
       "noReviewRequests": "Chưa có yêu cầu đánh giá",
-      "noReviewRequestsDescription": "Các PR đang chờ bạn đánh giá sẽ xuất hiện ở đây. Bạn vẫn có thể dán liên kết của bất kỳ PR nào ở trên.",
+      "noReviewRequestsDescription": "Các PR đang chờ bạn đánh giá sẽ xuất hiện ở đây.",
       "title": "Hộp thư đến"
     },
     "installKiloGitHubApp": "Cài đặt ứng dụng Kilo trên GitHub",
@@ -2974,6 +2972,7 @@
       "deleteBranchAfterMerge": "Xóa nhánh sau khi hợp nhất",
       "noEnabledMethods": "Kho lưu trữ này chưa bật phương thức hợp nhất nào. Hãy nhờ quản trị viên bật phương thức tạo bản ghi hợp nhất, gộp bản ghi hoặc chuyển gốc.",
       "confirmTitle": "Hợp nhất PR?",
+      "confirmMergeTitle": "Hợp nhất?",
       "confirmTitleTerm": "Hợp nhất {{term}}?",
       "confirmMessage": "Thao tác này sẽ hợp nhất các thay đổi của bạn vào nhánh đích.",
       "enableAutoMergeConfirmTitle": "Bật tự động hợp nhất?",
@@ -3077,7 +3076,7 @@
       "deletedAnnouncement": "Đã xóa bình luận chờ gửi",
       "editA11y": "Chỉnh sửa bình luận chờ gửi tại {{location}}",
       "editOutdatedA11y": "Chỉnh sửa bình luận chờ gửi không còn cập nhật tại {{location}}",
-      "noCommentsQueued": "Không có bình luận nào chờ gửi. Bản đánh giá sẽ được gửi theo hình thức đã chọn ở trên mà không kèm bình luận.",
+      "noCommentsQueued": "Bản đánh giá sẽ được gửi theo hình thức đã chọn ở trên.",
       "staleHint": "PR đã thay đổi kể từ khi bạn viết bình luận này.",
       "staleQueueHint": "Các bình luận gắn với bản ghi cũ hơn sẽ không được gửi. Chúng vẫn nằm trong danh sách chờ gửi để bạn chỉnh sửa hoặc xóa.",
       "summaryA11y": "Tóm tắt đánh giá",
@@ -3837,6 +3836,7 @@
     "organizationDefaultDescription": "Tự động tải cho các thành viên không có mặc định cá nhân.",
     "setAsDefault": "Đặt làm mặc định",
     "saveFailed": "Không thể lưu hồ sơ",
+    "organizationRoleRequired": "Chỉ chủ sở hữu tổ chức và quản trị viên mới có thể thay đổi hồ sơ tổ chức.",
     "deleteTitle": "Xóa hồ sơ",
     "deleteMessage": "Thao tác này sẽ xóa vĩnh viễn hồ sơ và cài đặt của nó. Điều này không thể hoàn tác được.",
     "deleteFailed": "Không thể xóa hồ sơ",
@@ -3844,7 +3844,7 @@
     "deletedToast": "Hồ sơ \"{{name}}\" đã bị xóa",
     "variablesTitle": "Biến môi trường",
     "addVariable": "Thêm biến",
-    "keyLabel": "Chìa khóa",
+    "keyLabel": "Khóa",
     "keyTooLong": "Khóa phải có 256 ký tự hoặc ít hơn",
     "keyDuplicate": "Khóa này đã tồn tại trong hồ sơ",
     "keyWillBeSavedAs": "Sẽ được lưu thành {{key}}",
@@ -4154,7 +4154,8 @@
     "sources": "Bằng chứng và tạo phẩm",
     "timezone": "Múi giờ bản tin",
     "deviceTimezone": "Dùng múi giờ của thiết bị",
-    "timezoneHint": "Múi giờ IANA, ví dụ Europe/Berlin. Thay đổi lịch sẽ áp dụng cho các bản tin sau.",
+    "timezoneHint": "Múi giờ IANA, ví dụ Europe/Berlin.",
+    "scheduleHint": "Thay đổi lịch sẽ áp dụng cho các bản tin sau.",
     "nightStart": "Khung thời gian bản tin bắt đầu",
     "morningStart": "Bản tin sẵn sàng lúc",
     "morningEnd": "Bản tin có sẵn đến",

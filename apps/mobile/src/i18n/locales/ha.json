@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Share reshe bayan haɗawa",
       "noEnabledMethods": "Ba a kunna wata hanyar haɗawa a wannan ma'ajiyar lamba ba. Nemi mai kula da ita ya kunna haɗawa, dunƙulewa ko sake kafa tushe.",
       "confirmTitle": "A haɗa buƙatar haɗawa?",
+      "confirmMergeTitle": "A haɗa?",
       "confirmTitleTerm": "A haɗa {{term}}?",
       "confirmMessage": "Wannan zai haɗa canje-canjenka cikin reshen tushe.",
       "enableAutoMergeConfirmTitle": "A kunna haɗawa ta atomatik?",
@@ -644,7 +645,7 @@
       "title": "Saƙonnin shiga",
       "loading": "Ana loda saƙonnin shiga",
       "noReviewRequests": "Babu buƙatun bita",
-      "noReviewRequestsDescription": "Buƙatun haɗawa da ke jiran bitarka suna bayyana a nan. Har yanzu za ka iya manna kowane mahaɗin PR a sama.",
+      "noReviewRequestsDescription": "Buƙatun haɗawa da ke jiran bitarka suna bayyana a nan.",
       "couldNotLoad": "Ba a iya loda saƙonnin shiga ba.",
       "accessLostTitle": "Ba ka da damar wannan ƙungiya",
       "accessLostDescription": "Ba ka zama memba na wannan ƙungiya ba, don haka ba za a iya loda buƙatun bitanta ba. Ci gaba da bita a asusunka na kashin kai.",
@@ -755,7 +756,7 @@
       "staleHint": "an sabunta PR tun lokacin da ka rubuta wannan.",
       "deleteA11y": "Share tsokacin da ke jira a {{location}}",
       "deletedAnnouncement": "An share tsokacin da ke jira",
-      "noCommentsQueued": "Babu tsokacin da ke jira. Za a aika bitar tare da lamarin da aka zaɓa a sama kawai.",
+      "noCommentsQueued": "Za a aika bitar tare da lamarin da aka zaɓa a sama kawai.",
       "staleQueueHint": "Ba a aika tsokacin da aka rubuta kan tsohon rikodin canje-canje. Suna nan a jerin masu jira don ka gyara ko share su.",
       "allQueuedHint": "Za a aika duk tsokaci a cikin buƙata guda ɗaya.",
       "summaryPlaceholder": "Taƙaitawa na zaɓi don bita",
@@ -1608,8 +1609,6 @@
       "bitbucketError": "An kasa buɗe saitin Bitbucket. Sake gwadawa."
     },
     "overview": {
-      "reviewStyle": "Salon bita",
-      "focusAreas": "Abubuwan da za a fi dubawa",
       "allAreas": "Duk fannoni",
       "set": "An saita",
       "notSet": "Ba a saita ba",
@@ -2069,7 +2068,8 @@
       "actionBlocked": "Ba za a iya kammala wannan aikin ba. Dole a gyara matsalar kafin a sake gwadawa.",
       "syncNoRepositories": "Babu wata ma'ajiyar bayanai da ke cikin iyakar daidaitawa. Zaɓi ma'ajiyoyin bayanai da Wakilin tsaro ke sa ido a kansu, sannan a sake daidaitawa.",
       "syncIntegrationInactive": "Haɗin GitHub na Wakilin tsaro ba ya aiki. Sake haɗa Kilo GitHub App, sannan ka sake daidaitawa.",
-      "syncMissingPermission": "Kilo GitHub App ba ya iya karanta vulnerability alerts. Ba da wannan izni a GitHub, sannan ka sake daidaitawa."
+      "syncMissingPermission": "Kilo GitHub App ba ya iya karanta vulnerability alerts. Ba da wannan izni a GitHub, sannan ka sake daidaitawa.",
+      "configConflict": "An canza saitunan Wakilin tsaro a wani wuri. Duba sabbin saitunan sannan ka sake adanawa."
     },
     "analysisState": {
       "queued": "Nazarin yana layin jira",
@@ -2744,7 +2744,6 @@
     },
     "modelSelector": {
       "provider": "Mai ba da sabis {{id}}",
-      "modelId": "Samfuri {{id}}",
       "unavailable": "Ba a samunsa ba",
       "unavailableState": "ba a samunsa ba",
       "selectedState": "an zaɓa",
@@ -3837,6 +3836,7 @@
     "organizationDefaultDescription": "An ɗora ta atomatik don membobi waɗanda ba su da tsoho na sirri.",
     "setAsDefault": "Saita azaman tsoho",
     "saveFailed": "An kasa ajiye bayanan martaba",
+    "organizationRoleRequired": "Masu ƙungiya da masu gudanarwa kawai za su iya canza bayanan martaban ƙungiya.",
     "deleteTitle": "Share bayanin martaba",
     "deleteMessage": "Wannan yana cire bayanan martaba da saitunan sa har abada. Ba za a iya soke wannan ba.",
     "deleteFailed": "An kasa share bayanan martaba",
@@ -3848,7 +3848,7 @@
     "keyTooLong": "Maɓalli dole ya zama haruffa 256 ko ƙasa da haka",
     "keyDuplicate": "Wannan maɓalli ya riga ya kasance a cikin bayanin martaba",
     "keyWillBeSavedAs": "Za a ajiye shi a matsayin {{key}}",
-    "valueLabel": "Daraja",
+    "valueLabel": "Ƙima",
     "valueRequired": "Shigar da ƙima",
     "tooLong": "Yi amfani da haruffa {{max}} ko ƙasa da haka",
     "secrets": {
@@ -4154,7 +4154,8 @@
     "sources": "Shaidu da kayayyaki",
     "timezone": "Yankin lokaci na rahoto",
     "deviceTimezone": "Yi amfani da yankin lokaci na na'ura",
-    "timezoneHint": "Yankin lokaci na IANA, misali Europe/Berlin. Canje-canjen jadawali za su shafi rahotanni masu zuwa.",
+    "timezoneHint": "Yankin lokaci na IANA, misali Europe/Berlin.",
+    "scheduleHint": "Canje-canjen jadawali za su shafi rahotanni masu zuwa.",
     "nightStart": "Farkon lokacin rahoto",
     "morningStart": "Rahoto yana shirye da ƙarfe",
     "morningEnd": "Rahoto yana samuwa har zuwa",

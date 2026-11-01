@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "ከውህደቱ በኋላ ቅርንጫፉን ሰርዝ",
       "noEnabledMethods": "በዚህ ማከማቻ ላይ የነቃ የውህደት ዘዴ የለም። የማከማቻውን አስተዳዳሪ በውህደት ኮሚት፣ በማጠቃለል ወይም መሠረት በመቀየር የማዋሃድ ዘዴን እንዲያነቃ ጠይቅ።",
       "confirmTitle": "የማዋሃድ ጥያቄው ይዋሃድ?",
+      "confirmMergeTitle": "ይዋሃድ?",
       "confirmTitleTerm": "{{term}}ው ይዋሃድ?",
       "confirmMessage": "ይህ ለውጦችህን ወደ መሠረት ቅርንጫፉ ያዋህዳል።",
       "enableAutoMergeConfirmTitle": "ራስ-ሰር ማዋሃድ ይንቃ?",
@@ -644,7 +645,7 @@
       "title": "ገቢ መልእክቶች",
       "loading": "ገቢ መልእክቶችን በመጫን ላይ",
       "noReviewRequests": "ምንም የግምገማ ጥያቄዎች የሉም",
-      "noReviewRequestsDescription": "ግምገማህን የሚጠብቁ የማዋሃድ ጥያቄዎች እዚህ ይታያሉ። ማንኛውንም የPR አገናኝ ከላይ መለጠፍም ትችላለህ።",
+      "noReviewRequestsDescription": "ግምገማህን የሚጠብቁ የማዋሃድ ጥያቄዎች እዚህ ይታያሉ።",
       "couldNotLoad": "ገቢ መልእክቶችን መጫን አልተቻለም።",
       "accessLostTitle": "ለዚህ ድርጅት የመድረስ ፈቃድ የለህም",
       "accessLostDescription": "ከዚህ ድርጅት አባል አይደለህም፣ ስለዚህ የግምገማ ጥያቄዎቹን መጫን አይቻልም። ግምገማህን ለመቀጠል በየግል መለያህ ቀጥል።",
@@ -755,7 +756,7 @@
       "staleHint": "ይህን ከጻፍክ በኋላ PR ተዘምኗል።",
       "deleteA11y": "በ{{location}} ላይ ያለውን ያልተላከ አስተያየት ሰርዝ",
       "deletedAnnouncement": "ያልተላከው አስተያየት ተሰርዟል",
-      "noCommentsQueued": "በወረፋ የሚጠብቁ አስተያየቶች የሉም። ግምገማው ከላይ በተመረጠው እርምጃ ብቻ ይላካል።",
+      "noCommentsQueued": "ግምገማው ከላይ በተመረጠው እርምጃ ብቻ ይላካል።",
       "staleQueueHint": "የቀድሞ ኮሚትን መሠረት አድርገው የተጻፉ አስተያየቶች አይላኩም። እንድታርትዓቸው ወይም እንድትሰርዛቸው በወረፋህ ውስጥ ይቆያሉ።",
       "allQueuedHint": "ሁሉም አስተያየቶች በአንድ የተጠቃለለ ጥያቄ ይላካሉ።",
       "summaryPlaceholder": "የግምገማ ማጠቃለያ (አማራጭ)",
@@ -1608,8 +1609,6 @@
       "bitbucketError": "የBitbucket ማዋቀር መክፈት አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
     },
     "overview": {
-      "reviewStyle": "የግምገማ ዘይቤ",
-      "focusAreas": "የትኩረት መስኮች",
       "allAreas": "ሁሉም ዘርፎች",
       "set": "ተዘጋጅቷል",
       "notSet": "አልተዘጋጀም",
@@ -2075,7 +2074,8 @@
       "actionBlocked": "ይህን እርምጃ ማጠናቀቅ አልተቻለም። ችግሩ ከመፍትሔ አላገኘ በፊት መልሶ መሞከር አይቻልም።",
       "syncNoRepositories": "በማመሳሰል ወሰን ውስጥ ምንም ማከማቻ የለም። የደህንነት ወኪል የሚከታተላቸውን ማከማቻዎች ይምረጡ፣ ከዚያ እንደገና ያመሳስሉ።",
       "syncIntegrationInactive": "የደህንነት ወኪል የGitHub ግንኙነት ንቁ አይደለም። የKilo GitHub መተግበሪያን እንደገና ያገናኙ፣ ከዚያ እንደገና ያመሳስሉ።",
-      "syncMissingPermission": "የKilo GitHub መተግበሪያ የተጋላጭነት ማንቂያዎችን ማንበብ አይችልም። ይህን ፈቃድ በGitHub ይስጡ፣ ከዚያ እንደገና ያመሳስሉ።"
+      "syncMissingPermission": "የKilo GitHub መተግበሪያ የተጋላጭነት ማንቂያዎችን ማንበብ አይችልም። ይህን ፈቃድ በGitHub ይስጡ፣ ከዚያ እንደገና ያመሳስሉ።",
+      "configConflict": "የደህንነት ወኪሉ ቅንብሮች በሌላ ቦታ ተቀይረዋል። የቅርብ ጊዜውን ቅንብሮች ይመልከቱ እና እንደገና ያስቀምጡ።"
     },
     "analysisState": {
       "queued": "ትንተናው ወረፋ ይዟል",
@@ -2750,7 +2750,6 @@
     },
     "modelSelector": {
       "provider": "አቅራቢ {{id}}",
-      "modelId": "ሞዴል {{id}}",
       "unavailable": "አይገኝም",
       "unavailableState": "አይገኝም",
       "selectedState": "ተመርጧል",
@@ -3843,6 +3842,7 @@
     "organizationDefaultDescription": "ምንም የግል ነባሪ ለሌላቸው አባላት በራስ-የተጫነ።",
     "setAsDefault": "እንደ ነባሪ አዘጋጅ",
     "saveFailed": "መገለጫ ማስቀመጥ አልተቻለም",
+    "organizationRoleRequired": "የድርጅት መገለጫዎችን መቀየር የሚችሉት የድርጅት ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።",
     "deleteTitle": "መገለጫን ሰርዝ",
     "deleteMessage": "ይሄ መገለጫውን እና ቅንብሮቹን እስከመጨረሻው ያስወግዳል። ይህ ሊቀለበስ አይችልም።",
     "deleteFailed": "መገለጫን መሰረዝ አልተቻለም",
@@ -4160,7 +4160,8 @@
     "sources": "ማስረጃዎች እና ውጤቶች",
     "timezone": "የሪፖርት የሰዓት ሰቅ",
     "deviceTimezone": "የመሣሪያውን የሰዓት ሰቅ ተጠቀም",
-    "timezoneHint": "IANA የሰዓት ሰቅ፣ ለምሳሌ Europe/Berlin። የመርሃ ግብር ለውጦች ለወደፊት ሪፖርቶች ይተገበራሉ።",
+    "timezoneHint": "IANA የሰዓት ሰቅ፣ ለምሳሌ Europe/Berlin።",
+    "scheduleHint": "የመርሃ ግብር ለውጦች ለወደፊት ሪፖርቶች ይተገበራሉ።",
     "nightStart": "የሪፖርት ጊዜ ይጀምራል",
     "morningStart": "ሪፖርት ዝግጁ የሚሆንበት ሰዓት",
     "morningEnd": "ሪፖርቱ የሚገኝበት የመጨረሻ ሰዓት",

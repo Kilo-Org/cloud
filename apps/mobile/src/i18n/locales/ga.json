@@ -446,6 +446,7 @@
       "deleteBranchAfterMerge": "Scrios an brainse tar éis an chumaisc",
       "noEnabledMethods": "Níl aon mhodh cumaisc cumasaithe sa stór seo. Iarr ar riarthóir an stóir cumasc, comhdhlúthú nó athbhunú a chumasú.",
       "confirmTitle": "An gcumascfar an t-iarratas tarraingthe?",
+      "confirmMergeTitle": "An gcumascfar?",
       "confirmTitleTerm": "An gcumascfar an t-{{term}}?",
       "confirmMessage": "Cumascfar do chuid athruithe isteach sa bhunbrainse.",
       "enableAutoMergeConfirmTitle": "An gcumasófar cumasc uathoibríoch?",
@@ -689,7 +690,7 @@
       "title": "Bosca ionphoist",
       "loading": "Ag lódáil an bhosca ionphoist",
       "noReviewRequests": "Gan aon iarratas athbhreithnithe",
-      "noReviewRequestsDescription": "Taispeántar anseo na hiarratais tarraingthe atá ag fanacht le d'athbhreithniú. Is féidir leat nasc PR ar bith a ghreamú thuas fós.",
+      "noReviewRequestsDescription": "Taispeántar anseo na hiarratais tarraingthe atá ag fanacht le d'athbhreithniú.",
       "couldNotLoad": "Níorbh fhéidir an bosca ionphoist a lódáil.",
       "accessLostTitle": "Gan rochtain ar an eagraíocht seo",
       "accessLostDescription": "Ní ball den eagraíocht seo a thuilleadh, mar sin ní féidir na hiarratais athbhreithnithe a lódáil. Lean ar aghaidh i do chuntas pearsanta chun athbhreithniú a dhéanamh fós.",
@@ -809,7 +810,7 @@
       "staleHint": "athraíodh an PR ó scríobh tú é seo.",
       "deleteA11y": "Scrios an trácht ar feitheamh ag {{location}}",
       "deletedAnnouncement": "Scriosadh an trácht ar feitheamh",
-      "noCommentsQueued": "Níl aon trácht sa scuaine. Seolfar an t-athbhreithniú leis an ngníomh thuas amháin.",
+      "noCommentsQueued": "Seolfar an t-athbhreithniú leis an ngníomh thuas amháin.",
       "staleQueueHint": "Ní sheoltar tráchtanna a bhaineann le taifead athruithe níos sine. Fanann siad i do scuaine ionas gur féidir leat iad a chur in eagar nó a scriosadh.",
       "allQueuedHint": "Seolfar na tráchtanna go léir le chéile in aon iarratas amháin.",
       "summaryPlaceholder": "Achoimre roghnach don athbhreithniú",
@@ -1674,8 +1675,6 @@
       "bitbucketError": "Níorbh fhéidir socrú Bitbucket a oscailt. Bain triail as arís."
     },
     "overview": {
-      "reviewStyle": "Stíl athbhreithnithe",
-      "focusAreas": "Réimsí béime",
       "allAreas": "Gach réimse",
       "set": "Socraithe",
       "notSet": "Gan socrú",
@@ -2168,7 +2167,8 @@
       "actionBlocked": "Níorbh fhéidir an gníomh seo a chríochnú. Caithfear an fhadhb a réiteach ar dtús.",
       "syncNoRepositories": "Níl aon stórtha i scóip an tsioncrónaithe. Roghnaigh na stórtha a ndéanann an Gníomhaire slándála monatóireacht orthu, ansin sioncrónaigh arís.",
       "syncIntegrationInactive": "Níl an nasc GitHub don Ghníomhaire slándála gníomhach. Athcheangail Aip GitHub Kilo, ansin sioncrónaigh arís.",
-      "syncMissingPermission": "Ní féidir le Aip GitHub Kilo foláirimh leochaileachta a léamh. Deonaigh an cead sin i GitHub, ansin sioncrónaigh arís."
+      "syncMissingPermission": "Ní féidir le Aip GitHub Kilo foláirimh leochaileachta a léamh. Deonaigh an cead sin i GitHub, ansin sioncrónaigh arís.",
+      "configConflict": "Athraíodh socruithe an Ghníomhaire slándála in áit eile. Déan athbhreithniú ar na socruithe is déanaí agus sábháil arís."
     },
     "analysisState": {
       "queued": "Anailís sa scuaine",
@@ -2870,7 +2870,6 @@
     },
     "modelSelector": {
       "provider": "Soláthraí {{id}}",
-      "modelId": "Samhail {{id}}",
       "unavailable": "Níl ar fáil",
       "unavailableState": "níl ar fáil",
       "selectedState": "roghnaithe",
@@ -4005,6 +4004,7 @@
     "organizationDefaultDescription": "Uathluchtaithe do bhaill nach bhfuil réamhshocrú pearsanta acu.",
     "setAsDefault": "Socraigh mar réamhshocrú",
     "saveFailed": "Níorbh fhéidir an phróifíl a shábháil",
+    "organizationRoleRequired": "Ní féidir ach le húinéirí agus riarthóirí eagraíochta próifíl eagraíochta a athrú.",
     "deleteTitle": "Scrios próifíl",
     "deleteMessage": "Baineann sé seo an phróifíl agus a socruithe amach go buan. Ní féidir é seo a chealú.",
     "deleteFailed": "Níorbh fhéidir an phróifíl a scriosadh",
@@ -4337,7 +4337,8 @@
     "sources": "Fianaise agus déantáin",
     "timezone": "Crios ama na tuarascála",
     "deviceTimezone": "Úsáid crios ama an ghléis",
-    "timezoneHint": "Crios ama IANA, mar shampla Europe/Berlin. Bainfidh athruithe sceidil le tuarascálacha amach anseo.",
+    "timezoneHint": "Crios ama IANA, mar shampla Europe/Berlin.",
+    "scheduleHint": "Bainfidh athruithe sceidil le tuarascálacha amach anseo.",
     "nightStart": "Tosaíonn an fhuinneog tuarascála",
     "morningStart": "Tuarascáil réidh ag",
     "morningEnd": "Tuarascáil ar fáil go dtí",

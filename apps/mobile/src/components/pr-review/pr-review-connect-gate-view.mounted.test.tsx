@@ -13,6 +13,7 @@ import {
   ProviderPrScopeProvider,
 } from '@/lib/pr-review/provider-pr-ref';
 import { PrReviewConnectGate } from './pr-review-connect-gate';
+import { PrReviewOverviewSkeleton } from './pr-review-overview-skeleton';
 
 const platform = vi.hoisted(() => ({ OS: 'ios' }));
 const appState = vi.hoisted(() => ({
@@ -135,6 +136,10 @@ vi.mock('@/components/pr-review/pr-review-context-line', () => ({
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+// The gate's pending body is the detail screen's frame: the real skeleton over a
+// stubbed scroller keeps the assertion on the gate's own choice of body.
+vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'DetailScreenScrollView' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('react-native', () => ({
   AppState: { addEventListener: appState.addEventListener },
   BackHandler: { addEventListener: () => ({ remove: vi.fn() }) },
@@ -333,12 +338,16 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
     }
   );
 
-  it.each(providers)('%s shows loading, not Connect, for a paused status query', provider => {
-    queryResult.isPending = true;
-    const renderer = mount(provider);
-    expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
-    expect(renderer.root.findAllByType('EmptyState')).toHaveLength(0);
-  });
+  it.each(providers)(
+    '%s shows the review skeleton, not a spinner, for a paused status query',
+    provider => {
+      queryResult.isPending = true;
+      const renderer = mount(provider);
+      expect(renderer.root.findAllByType(PrReviewOverviewSkeleton)).toHaveLength(1);
+      expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(0);
+      expect(renderer.root.findAllByType('EmptyState')).toHaveLength(0);
+    }
+  );
 
   it.each(providers)('%s offers a working Retry for status failures', async provider => {
     queryResult.isError = true;

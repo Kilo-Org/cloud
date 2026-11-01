@@ -28,7 +28,6 @@ import {
 import {
   authorizeDiscordSessionRequester,
   DISCORD_SESSION_DENIAL_MESSAGES,
-  DISCORD_SESSION_DENIAL_PROMPT_NOTICES,
 } from '@/lib/discord-bot/discord-session-authorization';
 import {
   formatDiscordConversationContextForPrompt,
@@ -309,6 +308,26 @@ export async function processDiscordBotMessage(
     };
   }
 
+  const authorization = await authorizeDiscordSessionRequester(owner, discordEventContext?.userId);
+  console.log('[DiscordBot] Session authorization', {
+    discordUserId: authorization.discordUserId ?? null,
+    authorized: authorization.authorized,
+    reason: authorization.authorized ? undefined : authorization.reason,
+  });
+
+  if (!authorization.authorized) {
+    console.log('[DiscordBot] Refused message', {
+      discordUserId: authorization.discordUserId ?? null,
+      reason: authorization.reason,
+    });
+    return {
+      response: DISCORD_SESSION_DENIAL_MESSAGES[authorization.reason],
+      modelUsed: '',
+      toolCallsMade: [],
+      installation,
+    };
+  }
+
   // Get the configured model for this integration (validated at setup/update time)
   const selectedModel = await getModel(owner);
   if (!selectedModel) {
@@ -337,14 +356,6 @@ export async function processDiscordBotMessage(
   const authToken = authResult.authToken;
   const authUserId = authResult.userId;
 
-  const authorization = await authorizeDiscordSessionRequester(owner, discordEventContext?.userId);
-  console.log('[DiscordBot] Session authorization', {
-    discordUserId: authorization.discordUserId ?? null,
-    authorized: authorization.authorized,
-    reason: authorization.authorized ? undefined : authorization.reason,
-  });
-
-  // Gather context in parallel
   let discordContextForPrompt = '';
   let requesterInfo: DiscordRequesterInfo | undefined;
 
@@ -366,11 +377,10 @@ export async function processDiscordBotMessage(
     };
   }
 
-  const repoContext = authorization.authorized ? await getGitHubRepositoryContext(owner) : null;
+  const repoContext = await getGitHubRepositoryContext(owner);
 
   const systemPrompt =
     KILO_BOT_SYSTEM_PROMPT +
-    (authorization.authorized ? '' : DISCORD_SESSION_DENIAL_PROMPT_NOTICES[authorization.reason]) +
     (discordContextForPrompt
       ? `\n\n${formatPlatformConversationContext(PLATFORM.DISCORD, discordContextForPrompt)}`
       : '') +
@@ -381,7 +391,7 @@ export async function processDiscordBotMessage(
     model: selectedModel,
     systemPrompt,
     userMessage,
-    tools: authorization.authorized ? [SPAWN_CLOUD_AGENT_TOOL] : [],
+    tools: [SPAWN_CLOUD_AGENT_TOOL],
     logPrefix: '[DiscordBot]',
     requestOptions: {
       version: DISCORD_BOT_VERSION,
@@ -396,14 +406,6 @@ export async function processDiscordBotMessage(
 
       if (toolCall.function.name !== 'spawn_cloud_agent') {
         return { content: `Error executing tool: Unknown tool ${toolCall.function.name}` };
-      }
-
-      if (!authorization.authorized) {
-        console.log('[DiscordBot] Denied session start', {
-          discordUserId: authorization.discordUserId ?? null,
-          reason: authorization.reason,
-        });
-        return { content: DISCORD_SESSION_DENIAL_MESSAGES[authorization.reason] };
       }
 
       const args = JSON.parse(toolCall.function.arguments);

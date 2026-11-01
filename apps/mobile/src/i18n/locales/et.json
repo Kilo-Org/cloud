@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Kustuta haru pärast ühendamist",
       "noEnabledMethods": "Selles hoidlas pole ükski ühendamismeetod lubatud. Palu hoidla administraatoril lubada ühendamine ühendamiskommiti, kommitite koondamise või ümberbaseerimise abil.",
       "confirmTitle": "Kas ühendada tõmbetaotlus?",
+      "confirmMergeTitle": "Kas ühendada?",
       "confirmTitleTerm": "Kas ühendada {{term}}?",
       "confirmMessage": "Sinu muudatused ühendatakse alusharuga.",
       "enableAutoMergeConfirmTitle": "Kas lubada automaatne ühendamine?",
@@ -644,7 +645,7 @@
       "title": "Postkast",
       "loading": "Postkasti laadimine",
       "noReviewRequests": "Ülevaatustaotlusi pole",
-      "noReviewRequestsDescription": "Siin kuvatakse sinu ülevaatust ootavad tõmbetaotlused. Ülalolevale väljale saad endiselt kleepida mis tahes PR-i lingi.",
+      "noReviewRequestsDescription": "Siin kuvatakse sinu ülevaatust ootavad tõmbetaotlused.",
       "couldNotLoad": "Postkasti ei õnnestunud laadida.",
       "accessLostTitle": "Sul pole enam juurdepääsu sellele organisatsioonile",
       "accessLostDescription": "Sa pole enam selle organisatsiooni liige, seega ei saa selle ülevaatustaotlusi laadida. Ülevaatamise jätkamiseks mine üle isiklikule kontole.",
@@ -755,7 +756,7 @@
       "staleHint": "PR on pärast selle kommentaari kirjutamist muutunud.",
       "deleteA11y": "Kustuta ootel kommentaar asukohas {{location}}",
       "deletedAnnouncement": "Ootel kommentaar kustutati",
-      "noCommentsQueued": "Järjekorras pole kommentaare. Ülevaatus esitatakse ainult ülal valitud toiminguga.",
+      "noCommentsQueued": "Ülevaatus esitatakse ainult ülal valitud toiminguga.",
       "staleQueueHint": "Vanema kommiti kohta kirjutatud kommentaare ei saadeta. Need jäävad sinu järjekorda, et saaksid neid muuta või kustutada.",
       "allQueuedHint": "Kõik kommentaarid saadetakse koos ühe päringuga.",
       "summaryPlaceholder": "Ülevaatuse kokkuvõte (valikuline)",
@@ -1608,8 +1609,6 @@
       "bitbucketError": "Bitbucketi seadistamist ei õnnestunud avada. Proovi uuesti."
     },
     "overview": {
-      "reviewStyle": "Ülevaatuse stiil",
-      "focusAreas": "Fookusvaldkonnad",
       "allAreas": "Kõik valdkonnad",
       "set": "Määratud",
       "notSet": "Pole määratud",
@@ -2069,7 +2068,8 @@
       "actionBlocked": "Seda toimingut ei õnnestunud lõpule viia. Probleem tuleb kõigepealt lahendada, enne kui saad uuesti proovida.",
       "syncNoRepositories": "Sünkroonimisalasse ei kuulu ükski hoidla. Vali hoidlad, mida Turvaagent jälgib, ja sünkrooni seejärel uuesti.",
       "syncIntegrationInactive": "Turvaagendi GitHubi ühendus ei ole aktiivne. Ühenda Kilo GitHub App uuesti ja seejärel sünkrooni uuesti.",
-      "syncMissingPermission": "Kilo GitHub App ei saa haavatavusteateid lugeda. Anna see õigus GitHubis ja sünkrooni uuesti."
+      "syncMissingPermission": "Kilo GitHub App ei saa haavatavusteateid lugeda. Anna see õigus GitHubis ja sünkrooni uuesti.",
+      "configConflict": "Turvaagendi seadeid muudeti mujal. Vaata uusimad seaded üle ja salvesta uuesti."
     },
     "analysisState": {
       "queued": "Analüüs järjekorras",
@@ -2744,7 +2744,6 @@
     },
     "modelSelector": {
       "provider": "Pakkuja {{id}}",
-      "modelId": "Mudel {{id}}",
       "unavailable": "Pole saadaval",
       "unavailableState": "pole saadaval",
       "selectedState": "valitud",
@@ -3778,13 +3777,13 @@
     "openLastSession": "Ava viimane seanss"
   },
   "spendAlerts": {
-    "subtitle": "Saada faktureerimiskontaktidele e-posti või push-teavitus, kui selle konto või organisatsiooni kulutus ületab limiidi või tõuseb üle tavapärase tunnimäära.",
+    "subtitle": "Saada faktureerimiskontaktidele e-posti või push-teavitus, kui selle konto või organisatsiooni enda kulutus ületab limiidi või tõuseb üle tavapärase tunnimäära.",
     "thresholdTitle": "Lävendi ületamine",
-    "thresholdSubtitle": "Jooksev kulutus ületab sinu limiidi",
+    "thresholdSubtitle": "Selle konto või organisatsiooni jooksev kulutus valitud ajavahemikus ületab sinu limiidi",
     "anomalyTitle": "Tunnipõhine tõus",
     "anomalySubtitle": "Selle konto või organisatsiooni tunnimäär on tavapärasest p95-tasemest tunduvalt kõrgem",
     "limitLabel": "Limiit (USD)",
-    "windowLabel": "Aken",
+    "windowLabel": "Ajavahemik",
     "window24h": "24 tundi",
     "window7d": "7 päeva",
     "window30d": "30 päeva",
@@ -3799,7 +3798,7 @@
     "permissionDenied": "Sul puudub õigus kulutushoiatusi hallata.",
     "pushOffByCategory": "Teavitustes väljas",
     "multiplierMaxError": "Sisesta kordaja {{max}} või väiksem",
-    "thresholdMaxError": "Sisesta summa {{max}} või väiksem."
+    "thresholdMaxError": "Sisesta summa {{max}} või väiksem"
   },
   "profiles": {
     "title": "Profiilid",
@@ -3837,6 +3836,7 @@
     "organizationDefaultDescription": "Laaditakse automaatselt liikmetele, kellel pole isiklikku vaikeprofiili.",
     "setAsDefault": "Määra vaikeväärtuseks",
     "saveFailed": "Profiili ei saanud salvestada",
+    "organizationRoleRequired": "Organisatsiooni profiile saavad muuta ainult organisatsiooni omanikud ja administraatorid.",
     "deleteTitle": "Kustuta profiil",
     "deleteMessage": "See eemaldab jäädavalt profiili ja selle seaded. Seda ei saa tagasi võtta.",
     "deleteFailed": "Profiili ei saanud kustutada",
@@ -4154,7 +4154,8 @@
     "sources": "Tõendid ja artefaktid",
     "timezone": "Ülevaate ajavöönd",
     "deviceTimezone": "Kasuta seadme ajavööndit",
-    "timezoneHint": "IANA ajavöönd, näiteks Europe/Berlin. Ajakava muudatused kehtivad tulevastele ülevaadetele.",
+    "timezoneHint": "IANA ajavöönd, näiteks Europe/Berlin.",
+    "scheduleHint": "Ajakava muudatused kehtivad tulevastele ülevaadetele.",
     "nightStart": "Ülevaatevahemik algab",
     "morningStart": "Ülevaade valmis kell",
     "morningEnd": "Ülevaade saadaval kuni",

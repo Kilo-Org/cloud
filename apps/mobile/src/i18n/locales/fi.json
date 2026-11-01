@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Poista haara yhdistämisen jälkeen",
       "noEnabledMethods": "Tässä koodivarastossa ei ole käytössä yhtään yhdistämismenetelmää. Pyydä koodivaraston ylläpitäjää sallimaan yhdistäminen yhdistämistallennuksella, tiivistämällä tai uudelleenperustamalla.",
       "confirmTitle": "Yhdistetäänkö muutospyyntö?",
+      "confirmMergeTitle": "Yhdistetäänkö?",
       "confirmTitleTerm": "Yhdistetäänkö {{term}}?",
       "confirmMessage": "Muutoksesi yhdistetään kohdehaaraan.",
       "enableAutoMergeConfirmTitle": "Otetaanko automaattinen yhdistäminen käyttöön?",
@@ -644,7 +645,7 @@
       "title": "Saapuneet",
       "loading": "Ladataan saapuneita",
       "noReviewRequests": "Ei katselmointipyyntöjä",
-      "noReviewRequestsDescription": "Katselmointiasi odottavat muutospyynnöt näkyvät tässä. Voit myös liittää minkä tahansa PR-linkin yllä olevaan kenttään.",
+      "noReviewRequestsDescription": "Katselmointiasi odottavat muutospyynnöt näkyvät tässä.",
       "couldNotLoad": "Saapuneita ei voitu ladata",
       "accessLostTitle": "Ei pääsyä tähän organisaatioon",
       "accessLostDescription": "Et ole enää tämän organisaation jäsen, joten sen katselmointipyyntöjä ei voi ladata. Jatka henkilökohtaisessa tilissäsi jatkaaksesi katselmointia.",
@@ -755,7 +756,7 @@
       "staleHint": "PR on muuttunut tämän kommentin kirjoittamisen jälkeen.",
       "deleteA11y": "Poista lähettämätön kommentti: {{location}}",
       "deletedAnnouncement": "Lähettämätön kommentti poistettu",
-      "noCommentsQueued": "Lähetysjonossa ei ole kommentteja. Katselmointi lähetetään vain yllä valitulla tapahtumalla.",
+      "noCommentsQueued": "Katselmointi lähetetään vain yllä valitulla tapahtumalla.",
       "staleQueueHint": "Vanhempaan muutostallennukseen liittyviä kommentteja ei lähetetä. Ne jäävät lähetysjonoon, jossa voit muokata tai poistaa ne.",
       "allQueuedHint": "Kaikki kommentit lähetetään yhdessä erässä.",
       "summaryPlaceholder": "Katselmoinnin yhteenveto (valinnainen)",
@@ -1608,8 +1609,6 @@
       "bitbucketError": "Bitbucketin käyttöönottoa ei voitu avata. Yritä uudelleen."
     },
     "overview": {
-      "reviewStyle": "Katselmointityyli",
-      "focusAreas": "Painopisteet",
       "allAreas": "Kaikki osa-alueet",
       "set": "Määritetty",
       "notSet": "Ei määritetty",
@@ -2069,7 +2068,8 @@
       "actionBlocked": "Toimintoa ei voitu suorittaa loppuun. Ongelma on korjattava ensin.",
       "syncNoRepositories": "Synkronointilaajuudessa ei ole yhtään repositoriota. Valitse repositoriot, joita Tietoturva-agentti valvoo, ja synkronoi sitten uudelleen.",
       "syncIntegrationInactive": "Tietoturva-agentin GitHub-yhteys ei ole aktiivinen. Yhdistä Kilo GitHub App uudelleen ja synkronoi sitten uudelleen.",
-      "syncMissingPermission": "Kilo GitHub App ei voi lukea haavoittuvuushälytyksiä. Myönnä kyseinen käyttöoikeus GitHubissa ja synkronoi sitten uudelleen."
+      "syncMissingPermission": "Kilo GitHub App ei voi lukea haavoittuvuushälytyksiä. Myönnä kyseinen käyttöoikeus GitHubissa ja synkronoi sitten uudelleen.",
+      "configConflict": "Tietoturva-agentin asetuksia muutettiin muualla. Tarkista uusimmat asetukset ja tallenna uudelleen."
     },
     "analysisState": {
       "queued": "Analyysi jonossa",
@@ -2744,7 +2744,6 @@
     },
     "modelSelector": {
       "provider": "Palveluntarjoaja {{id}}",
-      "modelId": "Malli {{id}}",
       "unavailable": "Ei saatavilla",
       "unavailableState": "ei saatavilla",
       "selectedState": "valittu",
@@ -3837,6 +3836,7 @@
     "organizationDefaultDescription": "Ladataan automaattisesti jäsenille, joilla ei ole henkilökohtaista oletusprofiilia.",
     "setAsDefault": "Aseta oletusprofiiliksi",
     "saveFailed": "Profiilia ei voitu tallentaa",
+    "organizationRoleRequired": "Vain organisaation omistajat ja ylläpitäjät voivat muuttaa organisaation profiilia.",
     "deleteTitle": "Poista profiili",
     "deleteMessage": "Tämä poistaa profiilin ja sen asetukset pysyvästi. Tätä ei voi kumota.",
     "deleteFailed": "Profiilia ei voitu poistaa",
@@ -4154,7 +4154,8 @@
     "sources": "Todisteet ja artefaktit",
     "timezone": "Katsauksen aikavyöhyke",
     "deviceTimezone": "Käytä laitteen aikavyöhykettä",
-    "timezoneHint": "IANA-aikavyöhyke, esimerkiksi Europe/Berlin. Aikataulumuutokset koskevat tulevia katsauksia.",
+    "timezoneHint": "IANA-aikavyöhyke, esimerkiksi Europe/Berlin.",
+    "scheduleHint": "Aikataulumuutokset koskevat tulevia katsauksia.",
     "nightStart": "Katsausikkuna alkaa",
     "morningStart": "Katsaus valmiina",
     "morningEnd": "Katsauksen saatavuus päättyy",

@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Slet gren efter fletning",
       "noEnabledMethods": "Ingen flettemetoder er aktiveret for dette kodelager. Bed en administrator om at aktivere fletning, sammenlægning af commits eller flytning af basis.",
       "confirmTitle": "Flet pull request?",
+      "confirmMergeTitle": "Flet?",
       "confirmTitleTerm": "Flet {{term}}?",
       "confirmMessage": "Dine ændringer flettes ind i målgrenen.",
       "enableAutoMergeConfirmTitle": "Aktivér automatisk fletning?",
@@ -644,7 +645,7 @@
       "title": "Indbakke",
       "loading": "Indlæser indbakke",
       "noReviewRequests": "Ingen anmodninger om gennemgang",
-      "noReviewRequestsDescription": "Pull requests, der afventer din gennemgang, vises her. Du kan stadig indsætte et hvilket som helst PR-link ovenfor.",
+      "noReviewRequestsDescription": "Pull requests, der afventer din gennemgang, vises her.",
       "couldNotLoad": "Indbakken kunne ikke indlæses.",
       "accessLostTitle": "Ingen adgang til denne organisation",
       "accessLostDescription": "Du er ikke længere medlem af denne organisation, så dens anmodninger om gennemgang kan ikke indlæses. Fortsæt i din personlige konto for at fortsætte med at gennemgå.",
@@ -755,7 +756,7 @@
       "staleHint": "PR'en er blevet opdateret, siden du skrev dette.",
       "deleteA11y": "Slet ventende kommentar ved {{location}}",
       "deletedAnnouncement": "Ventende kommentar slettet",
-      "noCommentsQueued": "Der er ingen kommentarer i køen. Gennemgangen sendes kun med det valgte resultat ovenfor.",
+      "noCommentsQueued": "Gennemgangen sendes kun med det valgte resultat ovenfor.",
       "staleQueueHint": "Kommentarer til en ældre commit sendes ikke. De bliver i køen, så du kan redigere eller slette dem.",
       "allQueuedHint": "Alle kommentarer sendes samlet i én anmodning.",
       "summaryPlaceholder": "Valgfrit resumé af gennemgangen",
@@ -1608,8 +1609,6 @@
       "bitbucketError": "Opsætningen af Bitbucket kunne ikke åbnes. Prøv igen."
     },
     "overview": {
-      "reviewStyle": "Gennemgangsstil",
-      "focusAreas": "Fokusområder",
       "allAreas": "Alle områder",
       "set": "Angivet",
       "notSet": "Ikke angivet",
@@ -2069,7 +2068,8 @@
       "actionBlocked": "Handlingen kunne ikke gennemføres. Problemet skal løses, før du kan prøve igen.",
       "syncNoRepositories": "Der er ingen kodelagre i synkroniseringsomfanget. Vælg de kodelagre, som Sikkerhedsagenten overvåger, og synkroniser derefter igen.",
       "syncIntegrationInactive": "GitHub-forbindelsen for Sikkerhedsagenten er ikke aktiv. Genopret forbindelsen til Kilos GitHub-app, og synkroniser derefter igen.",
-      "syncMissingPermission": "Kilos GitHub-app kan ikke læse sårbarhedsadvarsler. Giv den tilladelse i GitHub, og synkroniser derefter igen."
+      "syncMissingPermission": "Kilos GitHub-app kan ikke læse sårbarhedsadvarsler. Giv den tilladelse i GitHub, og synkroniser derefter igen.",
+      "configConflict": "Sikkerhedsagentens indstillinger er ændret et andet sted. Gennemgå de nyeste indstillinger, og gem igen."
     },
     "analysisState": {
       "queued": "Analyse i kø",
@@ -2744,7 +2744,6 @@
     },
     "modelSelector": {
       "provider": "Udbyder {{id}}",
-      "modelId": "Model-id: {{id}}",
       "unavailable": "Utilgængelig",
       "unavailableState": "utilgængelig",
       "selectedState": "valgt",
@@ -3837,6 +3836,7 @@
     "organizationDefaultDescription": "Automatisk indlæst for medlemmer, der ikke har nogen personlig standard.",
     "setAsDefault": "Indstil som standard",
     "saveFailed": "Profilen kunne ikke gemmes",
+    "organizationRoleRequired": "Kun organisationsejere og administratorer kan ændre organisationens profiler.",
     "deleteTitle": "Slet profil",
     "deleteMessage": "Dette fjerner permanent profilen og dens indstillinger. Dette kan ikke fortrydes.",
     "deleteFailed": "Profilen kunne ikke slettes",
@@ -4154,7 +4154,8 @@
     "sources": "Dokumentation og artefakter",
     "timezone": "Tidszone for briefing",
     "deviceTimezone": "Brug enhedens tidszone",
-    "timezoneHint": "IANA-tidszone, for eksempel Europe/Berlin. Ændringer i tidsplanen gælder fremtidige briefinger.",
+    "timezoneHint": "IANA-tidszone, for eksempel Europe/Berlin.",
+    "scheduleHint": "Ændringer i tidsplanen gælder fremtidige briefinger.",
     "nightStart": "Briefingvinduet starter",
     "morningStart": "Briefing klar klokken",
     "morningEnd": "Briefing tilgængelig indtil",

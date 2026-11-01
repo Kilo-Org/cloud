@@ -1082,10 +1082,8 @@
     },
     "overview": {
       "allAreas": "모든 영역",
-      "focusAreas": "중점 리뷰 항목",
       "nSelected": "{{displayCount}}개 선택됨",
       "proposedReviewMdGuidance": "제안된 REVIEW.md 지침",
-      "reviewStyle": "리뷰 스타일",
       "set": "설정됨",
       "notSet": "설정 안 됨"
     },
@@ -1536,7 +1534,8 @@
       "actionBlocked": "이 작업을 완료하지 못했습니다. 문제를 먼저 해결해야 재시도할 수 있습니다.",
       "syncNoRepositories": "동기화 범위에 리포지토리가 없습니다. 보안 에이전트가 모니터링할 리포지토리를 선택한 후 다시 동기화하세요.",
       "syncIntegrationInactive": "보안 에이전트의 GitHub 연결이 활성화되어 있지 않습니다. Kilo GitHub App을 다시 연결한 후 다시 동기화하세요.",
-      "syncMissingPermission": "Kilo GitHub 앱이 취약점 알림을 읽을 수 없습니다. GitHub에서 해당 권한을 부여한 후 다시 동기화하세요."
+      "syncMissingPermission": "Kilo GitHub 앱이 취약점 알림을 읽을 수 없습니다. GitHub에서 해당 권한을 부여한 후 다시 동기화하세요.",
+      "configConflict": "보안 에이전트 설정이 다른 곳에서 변경되었습니다. 최신 설정을 검토하고 다시 저장하세요."
     },
     "analysisState": {
       "queued": "분석 대기 중",
@@ -2211,7 +2210,6 @@
     },
     "modelSelector": {
       "provider": "제공업체 {{id}}",
-      "modelId": "모델 {{id}}",
       "unavailable": "사용할 수 없음",
       "unavailableState": "사용할 수 없음",
       "selectedState": "선택됨",
@@ -2946,7 +2944,7 @@
       "continueInPersonal": "개인 계정으로 계속하기",
       "loading": "받은 편지함 불러오는 중",
       "noReviewRequests": "리뷰 요청 없음",
-      "noReviewRequestsDescription": "리뷰를 요청받은 풀 리퀘스트가 여기에 표시됩니다. 위에 다른 PR 링크를 붙여넣을 수도 있습니다.",
+      "noReviewRequestsDescription": "리뷰를 요청받은 풀 리퀘스트가 여기에 표시됩니다.",
       "title": "받은 편지함"
     },
     "installKiloGitHubApp": "Kilo GitHub 앱 설치",
@@ -2974,6 +2972,7 @@
       "deleteBranchAfterMerge": "병합 후 브랜치 삭제",
       "noEnabledMethods": "이 저장소에는 활성화된 병합 방식이 없습니다. 저장소 관리자에게 병합, 스쿼시 또는 리베이스 병합을 활성화해 달라고 요청하세요.",
       "confirmTitle": "풀 리퀘스트를 병합할까요?",
+      "confirmMergeTitle": "병합할까요?",
       "confirmTitleTerm": "{{term}}를 병합할까요?",
       "confirmMessage": "변경 사항이 기준 브랜치에 병합됩니다.",
       "enableAutoMergeConfirmTitle": "자동 병합을 켤까요?",
@@ -3077,7 +3076,7 @@
       "deletedAnnouncement": "제출 대기 중인 댓글 삭제됨",
       "editA11y": "{{location}}의 제출 대기 중인 댓글 수정",
       "editOutdatedA11y": "{{location}}의 이전 커밋에 작성한 제출 대기 댓글 수정",
-      "noCommentsQueued": "제출 대기 중인 댓글이 없습니다. 위에서 선택한 리뷰 유형만 제출됩니다.",
+      "noCommentsQueued": "위에서 선택한 리뷰 유형만 제출됩니다.",
       "staleHint": "이 댓글을 작성한 뒤 PR이 업데이트되었습니다.",
       "staleQueueHint": "이전 커밋을 기준으로 작성한 댓글은 전송되지 않습니다. 수정하거나 삭제할 수 있도록 대기열에 남아 있습니다.",
       "summaryA11y": "리뷰 요약",
@@ -3837,6 +3836,7 @@
     "organizationDefaultDescription": "개인 불이행이 없는 회원을 위해 자동으로 로드됩니다.",
     "setAsDefault": "기본값으로 설정",
     "saveFailed": "프로필을 저장할 수 없습니다.",
+    "organizationRoleRequired": "조직 소유자와 관리자만 조직 프로필을 변경할 수 있습니다.",
     "deleteTitle": "프로필 삭제",
     "deleteMessage": "이렇게 하면 프로필과 해당 설정이 영구적으로 제거됩니다. 이 작업은 취소할 수 없습니다.",
     "deleteFailed": "프로필을 삭제할 수 없습니다.",
@@ -3844,7 +3844,7 @@
     "deletedToast": "프로필 \"{{name}}\"이(가) 삭제되었습니다.",
     "variablesTitle": "환경변수",
     "addVariable": "변수 추가",
-    "keyLabel": "열쇠",
+    "keyLabel": "키",
     "keyTooLong": "키는 256자 이하여야 합니다",
     "keyDuplicate": "이 키는 이미 프로필에 있습니다.",
     "keyWillBeSavedAs": "{{key}}(으)로 저장됩니다",
@@ -4154,7 +4154,8 @@
     "sources": "근거 및 아티팩트",
     "timezone": "브리핑 시간대",
     "deviceTimezone": "기기 시간대 사용",
-    "timezoneHint": "IANA 시간대(예: Europe/Berlin). 일정 변경은 향후 브리핑에 적용됩니다.",
+    "timezoneHint": "IANA 시간대(예: Europe/Berlin).",
+    "scheduleHint": "일정 변경은 향후 브리핑에 적용됩니다.",
     "nightStart": "브리핑 기간 시작",
     "morningStart": "브리핑 준비 완료 시각",
     "morningEnd": "브리핑 제공 종료 시각",

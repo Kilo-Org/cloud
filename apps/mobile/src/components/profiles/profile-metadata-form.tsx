@@ -2,9 +2,12 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import {
+  ProfileDescriptionField,
+  ProfileNameField,
+} from '@/components/profiles/profile-bound-field';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
-import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { validateProfileDescription, validateProfileName } from '@/lib/agent-profile-forms';
 
@@ -56,14 +59,10 @@ export function ProfileMetadataForm({
 
   return (
     <View className="gap-4">
-      <FormField
-        label={t('profiles.nameLabel')}
-        placeholder={t('profiles.namePlaceholder')}
+      <ProfileNameField
         defaultValue={nameRef.current}
         error={nameError ?? undefined}
         disabled={disabled || isSaving}
-        required
-        returnKeyType="next"
         onChangeText={value => {
           nameRef.current = value;
           if (nameError !== null && validateProfileName(value) === null) {
@@ -71,14 +70,9 @@ export function ProfileMetadataForm({
           }
         }}
       />
-      <FormField
-        label={t('profiles.descriptionLabel')}
-        placeholder={t('profiles.descriptionPlaceholder')}
+      <ProfileDescriptionField
         defaultValue={descriptionRef.current}
         error={descriptionError ?? undefined}
-        multiline
-        textAlignVertical="top"
-        className="min-h-20 leading-[1.25rem]"
         disabled={disabled || isSaving}
         onChangeText={value => {
           descriptionRef.current = value;

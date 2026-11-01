@@ -1053,10 +1053,8 @@
     },
     "overview": {
       "allAreas": "Tutte le aree",
-      "focusAreas": "Aspetti da controllare",
       "nSelected": "Selezionati: {{displayCount}}",
       "proposedReviewMdGuidance": "Indicazioni proposte per REVIEW.md",
-      "reviewStyle": "Stile di revisione",
       "set": "Configurato",
       "notSet": "Non configurato"
     },
@@ -1518,7 +1516,8 @@
       "actionBlocked": "Impossibile completare questa operazione. Il problema deve essere risolto prima di riprovare.",
       "syncNoRepositories": "Nessun repository è incluso nell'ambito di sincronizzazione. Scegli i repository monitorati dall'Agente di sicurezza, poi sincronizza di nuovo.",
       "syncIntegrationInactive": "La connessione GitHub per l'Agente di sicurezza non è attiva. Riconnetti l'app GitHub di Kilo, poi sincronizza di nuovo.",
-      "syncMissingPermission": "L'app GitHub di Kilo non può leggere gli avvisi di vulnerabilità. Concedi questa autorizzazione in GitHub, poi sincronizza di nuovo."
+      "syncMissingPermission": "L'app GitHub di Kilo non può leggere gli avvisi di vulnerabilità. Concedi questa autorizzazione in GitHub, poi sincronizza di nuovo.",
+      "configConflict": "Le impostazioni dell'Agente di sicurezza sono state modificate altrove. Controlla le impostazioni più recenti e salva di nuovo."
     },
     "analysisState": {
       "queued": "Analisi in coda",
@@ -2202,7 +2201,6 @@
     },
     "modelSelector": {
       "provider": "Fornitore {{id}}",
-      "modelId": "Modello {{id}}",
       "unavailable": "Non disponibile",
       "unavailableState": "non disponibile",
       "selectedState": "selezionato",
@@ -2990,7 +2988,7 @@
       "continueInPersonal": "Continua con l'account personale",
       "loading": "Caricamento della posta in arrivo",
       "noReviewRequests": "Nessuna richiesta di revisione",
-      "noReviewRequestsDescription": "Qui trovi le pull request in attesa della tua revisione. Puoi comunque incollare qui sopra il collegamento a qualsiasi PR.",
+      "noReviewRequestsDescription": "Qui trovi le pull request in attesa della tua revisione.",
       "title": "Posta in arrivo"
     },
     "installKiloGitHubApp": "Installa l'app Kilo per GitHub",
@@ -3018,6 +3016,7 @@
       "deleteBranchAfterMerge": "Elimina il branch dopo l'unione",
       "noEnabledMethods": "Nessun metodo di unione è attivo in questo repository. Chiedi a un amministratore del repository di attivare l'unione con commit, l'accorpamento o il riallineamento dei commit.",
       "confirmTitle": "Unire la pull request?",
+      "confirmMergeTitle": "Unire?",
       "confirmTitleTerm": "Unire {{term}}?",
       "confirmMessage": "Le tue modifiche verranno unite al branch di base.",
       "enableAutoMergeConfirmTitle": "Attivare l'unione automatica?",
@@ -3124,7 +3123,7 @@
       "deletedAnnouncement": "Commento in attesa di invio eliminato",
       "editA11y": "Modifica il commento in attesa di invio su {{location}}",
       "editOutdatedA11y": "Modifica il commento non più attuale in attesa di invio su {{location}}",
-      "noCommentsQueued": "Non ci sono commenti in attesa di invio. La revisione verrà inviata solo con il tipo selezionato qui sopra.",
+      "noCommentsQueued": "La revisione verrà inviata solo con il tipo selezionato qui sopra.",
       "staleHint": "la PR è cambiata da quando l'hai scritto.",
       "staleQueueHint": "I commenti riferiti a un commit precedente non vengono inviati. Restano in attesa di invio, così puoi modificarli o eliminarli.",
       "summaryA11y": "Riepilogo della revisione",
@@ -3893,6 +3892,7 @@
     "organizationDefaultDescription": "Caricamento automatico per i membri che non hanno impostazioni predefinite personali.",
     "setAsDefault": "Imposta come predefinito",
     "saveFailed": "Impossibile salvare il profilo",
+    "organizationRoleRequired": "Solo i proprietari dell'organizzazione e gli amministratori possono modificare il profilo dell'organizzazione.",
     "deleteTitle": "Elimina profilo",
     "deleteMessage": "Ciò rimuove permanentemente il profilo e le sue impostazioni. Questa operazione non può essere annullata.",
     "deleteFailed": "Impossibile eliminare il profilo",
@@ -4215,7 +4215,8 @@
     "sources": "Prove e artefatti",
     "timezone": "Fuso orario briefing",
     "deviceTimezone": "Usa fuso orario del dispositivo",
-    "timezoneHint": "Fuso orario IANA, ad esempio Europe/Berlin. Le modifiche agli orari valgono per i briefing futuri.",
+    "timezoneHint": "Fuso orario IANA, ad esempio Europe/Berlin.",
+    "scheduleHint": "Le modifiche agli orari valgono per i briefing futuri.",
     "nightStart": "Inizio finestra di briefing",
     "morningStart": "Briefing pronto alle",
     "morningEnd": "Briefing disponibile fino alle",

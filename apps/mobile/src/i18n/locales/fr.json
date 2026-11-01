@@ -1053,10 +1053,8 @@
     },
     "overview": {
       "allAreas": "Tous les domaines",
-      "focusAreas": "Points à vérifier",
       "nSelected": "{{displayCount}} sélectionnés",
       "proposedReviewMdGuidance": "Consignes proposées pour REVIEW.md",
-      "reviewStyle": "Style de revue",
       "set": "Défini",
       "notSet": "Non défini"
     },
@@ -1524,7 +1522,8 @@
       "actionBlocked": "Impossible d'effectuer cette action. Le problème doit être résolu avant de pouvoir réessayer.",
       "syncNoRepositories": "Aucun dépôt ne fait partie du périmètre de synchronisation. Choisissez les dépôts que «Agent de sécurité» surveille, puis relancez la synchronisation.",
       "syncIntegrationInactive": "La connexion GitHub pour l'Agent de sécurité n'est pas active. Reconnectez Kilo GitHub App, puis relancez la synchronisation.",
-      "syncMissingPermission": "L'application GitHub de Kilo ne peut pas lire les alertes de vulnérabilité. Accordez cette autorisation dans GitHub, puis synchronisez à nouveau."
+      "syncMissingPermission": "L'application GitHub de Kilo ne peut pas lire les alertes de vulnérabilité. Accordez cette autorisation dans GitHub, puis synchronisez à nouveau.",
+      "configConflict": "Les paramètres de l'agent de sécurité ont été modifiés ailleurs. Vérifiez les paramètres les plus récents et enregistrez à nouveau."
     },
     "analysisState": {
       "queued": "Analyse en file d'attente",
@@ -2142,7 +2141,6 @@
     },
     "modelSelector": {
       "provider": "Fournisseur {{id}}",
-      "modelId": "Modèle {{id}}",
       "unavailable": "Indisponible",
       "unavailableState": "indisponible",
       "selectedState": "sélectionné",
@@ -2996,7 +2994,7 @@
       "continueInPersonal": "Continuer dans le compte personnel",
       "loading": "Chargement de la boîte de réception",
       "noReviewRequests": "Aucune demande de revue",
-      "noReviewRequestsDescription": "Les demandes de fusion en attente de votre revue apparaissent ici. Vous pouvez aussi coller n'importe quel lien de PR ci-dessus.",
+      "noReviewRequestsDescription": "Les demandes de fusion en attente de votre revue apparaissent ici.",
       "title": "Boîte de réception"
     },
     "installKiloGitHubApp": "Installer l'application GitHub de Kilo",
@@ -3024,6 +3022,7 @@
       "deleteBranchAfterMerge": "Supprimer la branche après la fusion",
       "noEnabledMethods": "Aucune méthode de fusion n'est activée pour ce dépôt. Demandez à un administrateur du dépôt d'activer la fusion classique, le regroupement des commits ou le rebasage.",
       "confirmTitle": "Fusionner la demande de fusion ?",
+      "confirmMergeTitle": "Fusionner ?",
       "confirmTitleTerm": "Fusionner {{term}} ?",
       "confirmMessage": "Vos modifications seront fusionnées dans la branche cible.",
       "enableAutoMergeConfirmTitle": "Activer la fusion automatique ?",
@@ -3130,7 +3129,7 @@
       "deletedAnnouncement": "Commentaire en attente supprimé",
       "editA11y": "Modifier le commentaire en attente sur {{location}}",
       "editOutdatedA11y": "Modifier le commentaire obsolète en attente sur {{location}}",
-      "noCommentsQueued": "Aucun commentaire n'est en attente. La revue sera envoyée avec le seul type de revue sélectionné ci-dessus.",
+      "noCommentsQueued": "La revue sera envoyée avec le seul type de revue sélectionné ci-dessus.",
       "staleHint": "la PR a été modifiée depuis la rédaction de ce commentaire.",
       "staleQueueHint": "Les commentaires qui concernent un commit plus ancien ne sont pas envoyés. Ils restent en attente pour que vous puissiez les modifier ou les supprimer.",
       "summaryA11y": "Résumé de la revue",
@@ -3899,6 +3898,7 @@
     "organizationDefaultDescription": "Chargé automatiquement pour les membres qui n’ont aucun défaut personnel.",
     "setAsDefault": "Définir par défaut",
     "saveFailed": "Impossible d'enregistrer le profil",
+    "organizationRoleRequired": "Seuls les propriétaires et les administrateurs de l'organisation peuvent modifier les profils de l'organisation.",
     "deleteTitle": "Supprimer le profil",
     "deleteMessage": "Cela supprime définitivement le profil et ses paramètres. Cela ne peut pas être annulé.",
     "deleteFailed": "Impossible de supprimer le profil",
@@ -4221,7 +4221,8 @@
     "sources": "Preuves et artefacts",
     "timezone": "Fuseau horaire du briefing",
     "deviceTimezone": "Utiliser le fuseau de l’appareil",
-    "timezoneHint": "Fuseau horaire IANA, par exemple Europe/Berlin. Les changements de programmation s’appliquent aux briefings à venir.",
+    "timezoneHint": "Fuseau horaire IANA, par exemple Europe/Berlin.",
+    "scheduleHint": "Les changements de programmation s’appliquent aux briefings à venir.",
     "nightStart": "Début de la fenêtre de briefing",
     "morningStart": "Briefing prêt à",
     "morningEnd": "Briefing disponible jusqu’à",

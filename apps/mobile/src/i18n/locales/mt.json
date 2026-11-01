@@ -446,6 +446,7 @@
       "deleteBranchAfterMerge": "Ħassar il-fergħa wara l-għaqda",
       "noEnabledMethods": "Dan ir-repożitorju m'għandu l-ebda metodu ta' għaqda attiv. Itlob lil amministratur tar-repożitorju biex jattiva l-għaqda, il-konsolidazzjoni jew it-tibdil tal-bażi.",
       "confirmTitle": "Trid tgħaqqad it-talba?",
+      "confirmMergeTitle": "Trid tgħaqqad?",
       "confirmTitleTerm": "Trid tgħaqqad il-{{term}}?",
       "confirmMessage": "Dan se jgħaqqad il-bidliet tiegħek mal-fergħa bażi.",
       "enableAutoMergeConfirmTitle": "Trid tattiva l-għaqda awtomatika?",
@@ -689,7 +690,7 @@
       "title": "Deħlin",
       "loading": "Qed jitgħabbew it-talbiet deħlin",
       "noReviewRequests": "L-ebda talba għal reviżjoni",
-      "noReviewRequestsDescription": "It-talbiet għall-għaqda li qed jistennew ir-reviżjoni tiegħek jidhru hawn. Xorta tista' twaħħal kwalunkwe ħolqa ta' PR hawn fuq.",
+      "noReviewRequestsDescription": "It-talbiet għall-għaqda li qed jistennew ir-reviżjoni tiegħek jidhru hawn.",
       "couldNotLoad": "Ma setgħux jitgħabbew it-talbiet deħlin.",
       "accessLostTitle": "M'għadekx aċċess għal din l-organizzazzjoni",
       "accessLostDescription": "M'intix għadu membru ta' din l-organizzazzjoni, allura t-talbiet għar-reviżjoni tagħha ma jistgħux jitgħabbew. Kompli fil-kont personali tiegħek biex tkompli tirrevedi.",
@@ -809,7 +810,7 @@
       "staleHint": "il-PR ġie aġġornat minn meta ktibt dan.",
       "deleteA11y": "Ħassar il-kumment pendenti fuq {{location}}",
       "deletedAnnouncement": "Il-kumment pendenti tħassar",
-      "noCommentsQueued": "Ma hemm l-ebda kumment fil-kju. Ir-reviżjoni se tintbagħat biss bit-tip magħżul hawn fuq.",
+      "noCommentsQueued": "Ir-reviżjoni se tintbagħat biss bit-tip magħżul hawn fuq.",
       "staleQueueHint": "Il-kummenti dwar reġistrazzjoni eqdem tal-bidliet ma jintbagħtux. Jibqgħu fil-kju tiegħek biex tkun tista' teditjahom jew tħassarhom.",
       "allQueuedHint": "Il-kummenti kollha se jintbagħtu flimkien f'talba waħda.",
       "summaryPlaceholder": "Sommarju fakultattiv għar-reviżjoni",
@@ -1674,8 +1675,6 @@
       "bitbucketError": "Ma setgħetx tinfetaħ il-konfigurazzjoni ta' Bitbucket. Jekk jogħġbok erġa' pprova."
     },
     "overview": {
-      "reviewStyle": "Stil ta' reviżjoni",
-      "focusAreas": "Oqsma ta' attenzjoni",
       "allAreas": "L-oqsma kollha",
       "set": "Issettjat",
       "notSet": "Mhux issettjat",
@@ -2168,7 +2167,8 @@
       "actionBlocked": "Ma stajniex nikkompletaw din l-azzjoni. Il-problema trid titfixxa qabel ma tista' terġa' tipprova.",
       "syncNoRepositories": "M'hemm l-ebda repożitorju fl-ambitu tas-sinkronizzazzjoni. Agħżel ir-repożitorji li jimmonitorja l-Aġent tas-sigurtà, imbagħad erġa' sinkronizza.",
       "syncIntegrationInactive": "Il-konnessjoni ma' GitHub għall-Aġent tas-sigurtà mhijiex attiva. Erġa' qabbad il-Kilo GitHub App, imbagħad erġa' sinkronizza.",
-      "syncMissingPermission": "L-app ta' Kilo fuq GitHub ma tistax taqra l-vulnerability alerts. Agħti dik il-permess f'GitHub, imbagħad erġa' sinkronizza."
+      "syncMissingPermission": "L-app ta' Kilo fuq GitHub ma tistax taqra l-vulnerability alerts. Agħti dik il-permess f'GitHub, imbagħad erġa' sinkronizza.",
+      "configConflict": "L-issettjar tal-aġent tas-sigurtà nbidlu x'imkien ieħor. Erġa' eżamina l-issettjar l-aktar riċenti u ssejvja mill-ġdid."
     },
     "analysisState": {
       "queued": "Analiżi fil-kju",
@@ -2870,7 +2870,6 @@
     },
     "modelSelector": {
       "provider": "Fornitur {{id}}",
-      "modelId": "Mudell {{id}}",
       "unavailable": "Mhux disponibbli",
       "unavailableState": "mhux disponibbli",
       "selectedState": "magħżul",
@@ -4005,6 +4004,7 @@
     "organizationDefaultDescription": "Auto-loaded għal membri li m'għandhom l-ebda default personali.",
     "setAsDefault": "Issettja bħala default",
     "saveFailed": "Ma setax isalva l-profil",
+    "organizationRoleRequired": "Is-sidien u l-amministraturi tal-organizzazzjoni biss jistgħu jibdlu l-profil tal-organizzazzjoni.",
     "deleteTitle": "Ħassar il-profil",
     "deleteMessage": "Dan ineħħi b'mod permanenti l-profil u s-settings tiegħu. Dan ma jistax jitneħħa.",
     "deleteFailed": "Ma setax iħassar il-profil",
@@ -4337,7 +4337,8 @@
     "sources": "Evidenza u artifacts",
     "timezone": "Żona tal-ħin tal-briefing",
     "deviceTimezone": "Uża ż-żona tal-ħin tal-apparat",
-    "timezoneHint": "Żona tal-ħin IANA, pereżempju Europe/Berlin. Il-bidliet fl-iskeda japplikaw għall-briefings li ġejjin.",
+    "timezoneHint": "Żona tal-ħin IANA, pereżempju Europe/Berlin.",
+    "scheduleHint": "Il-bidliet fl-iskeda japplikaw għall-briefings li ġejjin.",
     "nightStart": "Il-perjodu tal-briefing jibda",
     "morningStart": "Il-briefing lest fi",
     "morningEnd": "Il-briefing disponibbli sa",

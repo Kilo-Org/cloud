@@ -439,6 +439,7 @@
       "deleteBranchAfterMerge": "Smazat větev po sloučení",
       "noEnabledMethods": "V tomto repozitáři není povolená žádná metoda sloučení. Požádej správce repozitáře, aby povolil slučovací commit, sjednocení commitů nebo přesazení větve.",
       "confirmTitle": "Sloučit PR?",
+      "confirmMergeTitle": "Sloučit?",
       "confirmTitleTerm": "Sloučit {{term}}?",
       "confirmMessage": "Tím se tvé změny sloučí do cílové větve.",
       "enableAutoMergeConfirmTitle": "Zapnout automatické sloučení?",
@@ -674,7 +675,7 @@
       "title": "Doručené",
       "loading": "Načítání doručených žádostí",
       "noReviewRequests": "Žádné žádosti o revizi",
-      "noReviewRequestsDescription": "Tady se zobrazí PR, které čekají na tvou revizi. Do pole výše můžeš vložit odkaz na libovolný PR.",
+      "noReviewRequestsDescription": "Tady se zobrazí PR, které čekají na tvou revizi.",
       "couldNotLoad": "Doručené žádosti se nepodařilo načíst.",
       "accessLostTitle": "K této organizaci už nemáš přístup",
       "accessLostDescription": "Už nejsi členem této organizace, takže její žádosti o revizi se nedají načíst. Přepni se na osobní účet a pokračuj v revizích.",
@@ -791,7 +792,7 @@
       "staleHint": "od napsání komentáře se PR změnil.",
       "deleteA11y": "Smazat neodeslaný komentář: {{location}}",
       "deletedAnnouncement": "Neodeslaný komentář smazán",
-      "noCommentsQueued": "Ve frontě nejsou žádné komentáře. Revize se odešle pouze s typem vybraným výše.",
+      "noCommentsQueued": "Revize se odešle pouze s typem vybraným výše.",
       "staleQueueHint": "Komentáře ke staršímu commitu se neodešlou. Zůstanou ve frontě, kde je můžeš upravit nebo smazat.",
       "allQueuedHint": "Všechny komentáře se odešlou společně v jednom požadavku.",
       "summaryPlaceholder": "Volitelné shrnutí revize",
@@ -1652,8 +1653,6 @@
       "bitbucketError": "Nastavení služby Bitbucket se nepodařilo otevřít. Zkuste to znovu."
     },
     "overview": {
-      "reviewStyle": "Styl kontroly",
-      "focusAreas": "Oblasti zaměření",
       "allAreas": "Všechny oblasti",
       "set": "Nastaveno",
       "notSet": "Nenastaveno",
@@ -2135,7 +2134,8 @@
       "actionBlocked": "Tuto akci se nepodařilo dokončit. Problém je nutné nejprve vyřešit, teprve pak můžete akci zopakovat.",
       "syncNoRepositories": "V rozsahu synchronizace nejsou žádné repozitáře. Vyberte repozitáře, které má bezpečnostní agent sledovat, a pak synchronizujte znovu.",
       "syncIntegrationInactive": "Připojení GitHubu pro bezpečnostního agenta není aktivní. Znovu připojte aplikaci Kilo na GitHubu a pak synchronizujte znovu.",
-      "syncMissingPermission": "Aplikace Kilo na GitHubu nemůže číst upozornění na zranitelnosti. Udělte jí toto oprávnění na GitHubu a pak synchronizujte znovu."
+      "syncMissingPermission": "Aplikace Kilo na GitHubu nemůže číst upozornění na zranitelnosti. Udělte jí toto oprávnění na GitHubu a pak synchronizujte znovu.",
+      "configConflict": "Nastavení bezpečnostního agenta bylo změněno jinde. Zkontrolujte nejnovější nastavení a znovu uložte."
     },
     "analysisState": {
       "queued": "Analýza ve frontě",
@@ -2828,7 +2828,6 @@
     },
     "modelSelector": {
       "provider": "Poskytovatel {{id}}",
-      "modelId": "Model: {{id}}",
       "unavailable": "Nedostupné",
       "unavailableState": "nedostupné",
       "selectedState": "vybráno",
@@ -3949,6 +3948,7 @@
     "organizationDefaultDescription": "Automaticky načteno pro členy, kteří nemají žádné osobní výchozí nastavení.",
     "setAsDefault": "Nastavit jako výchozí",
     "saveFailed": "Profil se nepodařilo uložit",
+    "organizationRoleRequired": "Profily organizace mohou měnit pouze vlastníci organizace a správci.",
     "deleteTitle": "Smazat profil",
     "deleteMessage": "Tím se profil a jeho nastavení trvale odstraní. Toto nelze vrátit zpět.",
     "deleteFailed": "Profil se nepodařilo smazat",
@@ -4276,7 +4276,8 @@
     "sources": "Důkazy a artefakty",
     "timezone": "Časové pásmo přehledu",
     "deviceTimezone": "Použít časové pásmo zařízení",
-    "timezoneHint": "Časové pásmo IANA, například Europe/Berlin. Změny plánu platí pro další přehledy.",
+    "timezoneHint": "Časové pásmo IANA, například Europe/Berlin.",
+    "scheduleHint": "Změny plánu platí pro další přehledy.",
     "nightStart": "Začátek období přehledu",
     "morningStart": "Přehled připraven v",
     "morningEnd": "Přehled dostupný do",

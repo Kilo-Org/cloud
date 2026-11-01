@@ -453,6 +453,7 @@
       "deleteBranchAfterMerge": "Dileu'r gangen ar ôl cyfuno",
       "noEnabledMethods": "Nid oes dulliau cyfuno wedi'u galluogi yn yr ystorfa hon. Gofynnwch i weinyddwr yr ystorfa alluogi cyfuno, cywasgu neu ailsylfaenu.",
       "confirmTitle": "Cyfuno cais tynnu?",
+      "confirmMergeTitle": "Cyfuno?",
       "confirmTitleTerm": "Cyfuno {{term}}?",
       "confirmMessage": "Bydd hyn yn cyfuno'ch newidiadau â'r gangen sylfaen.",
       "enableAutoMergeConfirmTitle": "Galluogi cyfuno awtomatig?",
@@ -704,7 +705,7 @@
       "title": "Blwch derbyn",
       "loading": "Yn llwytho'r blwch derbyn",
       "noReviewRequests": "Dim ceisiadau adolygu",
-      "noReviewRequestsDescription": "Mae ceisiadau tynnu sy'n aros am eich adolygiad yn ymddangos yma. Gallwch barhau i ludo unrhyw ddolen PR uchod.",
+      "noReviewRequestsDescription": "Mae ceisiadau tynnu sy'n aros am eich adolygiad yn ymddangos yma.",
       "couldNotLoad": "Ni lwyddwyd i lwytho'r blwch derbyn.",
       "accessLostTitle": "Dim mynediad i'r sefydliad hwn",
       "accessLostDescription": "Nid ydych yn aelod o'r sefydliad hwn mwyach, felly nid oes modd llwytho'i geisiadau adolygu. Parhewch yn eich cyfrif personol i barhau i adolygu.",
@@ -827,7 +828,7 @@
       "staleHint": "mae'r PR wedi newid ers i chi ysgrifennu hyn.",
       "deleteA11y": "Dileu'r sylw sydd heb ei gyflwyno ar {{location}}",
       "deletedAnnouncement": "Wedi dileu'r sylw oedd heb ei gyflwyno",
-      "noCommentsQueued": "Nid oes sylwadau yn y ciw. Cyflwynir yr adolygiad gyda'r digwyddiad uchod yn unig.",
+      "noCommentsQueued": "Cyflwynir yr adolygiad gyda'r digwyddiad uchod yn unig.",
       "staleQueueHint": "Ni anfonir sylwadau sy'n cyfeirio at ymrwymiad hŷn. Byddant yn aros yn eich ciw er mwyn i chi allu eu golygu neu eu dileu.",
       "allQueuedHint": "Anfonir yr holl sylwadau gyda'i gilydd mewn un cais.",
       "summaryPlaceholder": "Crynodeb dewisol ar gyfer yr adolygiad",
@@ -1696,8 +1697,6 @@
       "bitbucketError": "Ni ellid agor y broses sefydlu Bitbucket. Ceisiwch eto."
     },
     "overview": {
-      "reviewStyle": "Arddull adolygu",
-      "focusAreas": "Meysydd i ganolbwyntio arnynt",
       "allAreas": "Pob maes",
       "set": "Wedi'i osod",
       "notSet": "Heb ei osod",
@@ -2201,7 +2200,8 @@
       "actionBlocked": "Ni chafodd y weithred hon ei chwblhau. Rhaid trwsio'r broblem yn gyntaf.",
       "syncNoRepositories": "Nid oes unrhyw ystorfeydd yng nghwmpas cydsynio. Dewiswch yr ystorfeydd y mae'r Asiant diogelwch yn eu monitro, yna cydsyniwch eto.",
       "syncIntegrationInactive": "Nid yw'r cysylltiad GitHub ar gyfer yr Asiant diogelwch yn weithredol. Ailgysylltwch ap GitHub Kilo, yna cydsyniwch eto.",
-      "syncMissingPermission": "Nid yw ap GitHub Kilo yn gallu darllen hysbysiadau bregusrwydd. Rhowch y caniatâd hwnnw yn GitHub, yna cydsyniwch eto."
+      "syncMissingPermission": "Nid yw ap GitHub Kilo yn gallu darllen hysbysiadau bregusrwydd. Rhowch y caniatâd hwnnw yn GitHub, yna cydsyniwch eto.",
+      "configConflict": "Mae gosodiadau'r Asiant diogelwch wedi newid yn rhywle arall. Adolygwch y gosodiadau diweddaraf a chadw eto."
     },
     "analysisState": {
       "queued": "Dadansoddiad mewn ciw",
@@ -2912,7 +2912,6 @@
     },
     "modelSelector": {
       "provider": "Darparwr {{id}}",
-      "modelId": "Y model {{id}}",
       "unavailable": "Ddim ar gael",
       "unavailableState": "ddim ar gael",
       "selectedState": "wedi'i ddewis",
@@ -4061,6 +4060,7 @@
     "organizationDefaultDescription": "Wedi'i lwytho'n awtomatig ar gyfer aelodau nad oes ganddynt unrhyw ragosodiad personol.",
     "setAsDefault": "Gosod fel rhagosodedig",
     "saveFailed": "Ni fu modd cadw'r proffil",
+    "organizationRoleRequired": "Dim ond perchnogion a gweinyddwyr y sefydliad sy'n gallu newid proffiliau'r sefydliad.",
     "deleteTitle": "Dileu proffil",
     "deleteMessage": "Mae hyn yn dileu'r proffil a'i osodiadau yn barhaol. Ni ellir dadwneud hyn.",
     "deleteFailed": "Ni fu modd dileu proffil",
@@ -4398,7 +4398,8 @@
     "sources": "Tystiolaeth ac arteffactau",
     "timezone": "Cylchfa amser y briff",
     "deviceTimezone": "Defnyddio cylchfa amser y ddyfais",
-    "timezoneHint": "Cylchfa amser IANA, er enghraifft Europe/Berlin. Bydd newidiadau i'r amserlen yn berthnasol i friffiau'r dyfodol.",
+    "timezoneHint": "Cylchfa amser IANA, er enghraifft Europe/Berlin.",
+    "scheduleHint": "Bydd newidiadau i'r amserlen yn berthnasol i friffiau'r dyfodol.",
     "nightStart": "Y cyfnod briff yn dechrau",
     "morningStart": "Y briff yn barod am",
     "morningEnd": "Y briff ar gael tan",

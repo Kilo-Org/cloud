@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Fafao ny sampana aorian'ny fampiraisana",
       "noEnabledMethods": "Tsy misy fomba fampiraisana navela ao amin'ity tahirin-kaody ity. Angataho ny mpitantana hamela ny fampiraisana tsotra, ny famintinana na ny famindrana fototra.",
       "confirmTitle": "Hampiraisina ve ny fangatahana fampiraisana?",
+      "confirmMergeTitle": "Hampiraisina ve?",
       "confirmTitleTerm": "Hampiraisina ve ny {{term}}?",
       "confirmMessage": "Hampidirina ao amin'ny sampana fototra ny fanovana nataonao.",
       "enableAutoMergeConfirmTitle": "Havelanao ve ny fampiraisana mandeha ho azy?",
@@ -644,7 +645,7 @@
       "title": "Voaray",
       "loading": "Mampiditra ny voaray",
       "noReviewRequests": "Tsy misy fangatahana fandinihana",
-      "noReviewRequestsDescription": "Hiseho eto ny fangatahana fampiraisana miandry ny fandinihanao. Mbola afaka mametaka rohy PR hafa etsy ambony ianao.",
+      "noReviewRequestsDescription": "Hiseho eto ny fangatahana fampiraisana miandry ny fandinihanao.",
       "couldNotLoad": "Tsy tafiditra ny voaray.",
       "accessLostTitle": "Tsy manana alalana intsony amin'ity fikambanana ity",
       "accessLostDescription": "Tsy mpikambana ao amin'ity fikambanana ity intsony ianao, ka tsy tafiditra ny fangatahana fandinihana. Mandehana amin'ny kaonty manokanao mba hanohy ny fandinihana.",
@@ -755,7 +756,7 @@
       "staleHint": "niova ny PR taorian'ny nanoratanao ity.",
       "deleteA11y": "Fafao ny hevitra miandry fandefasana amin'ny {{location}}",
       "deletedAnnouncement": "Voafafa ny hevitra niandry fandefasana",
-      "noCommentsQueued": "Tsy misy hevitra miandry fandefasana. Ny karazana fandinihana voafidy etsy ambony ihany no halefa.",
+      "noCommentsQueued": "Ny karazana fandinihana voafidy etsy ambony ihany no halefa.",
       "staleQueueHint": "Tsy halefa ny hevitra momba ny firaketana fanovana taloha. Hijanona ao amin'ny filaharanao izy ireo mba hahafahanao manova na mamafa azy.",
       "allQueuedHint": "Halefa miaraka amin'ny fangatahana tokana ny hevitra rehetra.",
       "summaryPlaceholder": "Famintinana tsy voatery ho an'ny fandinihana",
@@ -1608,8 +1609,6 @@
       "bitbucketError": "Tsy nety nosokafana ny fametrahana ny Bitbucket. Andramo indray azafady."
     },
     "overview": {
-      "reviewStyle": "Fomba fandinihana",
-      "focusAreas": "Lafiny ifantohana",
       "allAreas": "Lafiny rehetra",
       "set": "Voafaritra",
       "notSet": "Tsy voafaritra",
@@ -2075,7 +2074,8 @@
       "actionBlocked": "Tsy azo vitaina ity hetsika ity. Mila vahana aloha ny olana.",
       "syncNoRepositories": "Tsy misy depo ao amin'ny sehatry ny fampifanarahana. Safidio ny depo arovan'ny Mpanampy amin'ny fiarovana, dia mifanaraha indray.",
       "syncIntegrationInactive": "Tsy mavitrika ny fifandraisana amin'ny GitHub an'ny Mpanampy amin'ny fiarovana. Ampifandraiso indray ny Kilo GitHub App, dia avereno indray ny fampifanarahana.",
-      "syncMissingPermission": "Tsy afaka mamaky ny vulnerability alerts ny Kilo GitHub App. Omeo ao amin'ny GitHub io alalana io, dia avereno indray ny sync."
+      "syncMissingPermission": "Tsy afaka mamaky ny vulnerability alerts ny Kilo GitHub App. Omeo ao amin'ny GitHub io alalana io, dia avereno indray ny sync.",
+      "configConflict": "Niova tany an-kafa ny fandrindran'ny mpanampy amin'ny fiarovana. Jereo ny fandrindrana farany ary tehirizo indray."
     },
     "analysisState": {
       "queued": "Voalahatra ny famakafakana",
@@ -2750,7 +2750,6 @@
     },
     "modelSelector": {
       "provider": "Mpamatsy {{id}}",
-      "modelId": "Modely {{id}}",
       "unavailable": "Tsy azo ampiasaina",
       "unavailableState": "tsy azo ampiasaina",
       "selectedState": "voafidy",
@@ -3843,6 +3842,7 @@
     "organizationDefaultDescription": "Auto-loaded ho an'ny mpikambana tsy manana default manokana.",
     "setAsDefault": "Ataovy ho default",
     "saveFailed": "Tsy afaka mitahiry piraofilina",
+    "organizationRoleRequired": "Ny tompon'ny fikambanana sy ny mpitantana ihany no afaka manova ny piraofilin'ny fikambanana.",
     "deleteTitle": "Fafao ny mombamomba",
     "deleteMessage": "Izany dia manala tanteraka ny mombamomba sy ny firafiny. Tsy azo averina izany.",
     "deleteFailed": "Tsy afaka namafa ny mombamomba",
@@ -4160,7 +4160,8 @@
     "sources": "Porofo sy vokatra",
     "timezone": "Faritra ora amin'ny tatitra",
     "deviceTimezone": "Ampiasao ny faritra ora amin'ny fitaovana",
-    "timezoneHint": "Faritra ora IANA, ohatra Europe/Berlin. Ho an'ny tatitra ho avy ny fanovana fandaharana.",
+    "timezoneHint": "Faritra ora IANA, ohatra Europe/Berlin.",
+    "scheduleHint": "Ho an'ny tatitra ho avy ny fanovana fandaharana.",
     "nightStart": "Fanombohan'ny fe-potoana tatitra",
     "morningStart": "Tatitra vonona amin'ny",
     "morningEnd": "Tatitra azo hatramin'ny",

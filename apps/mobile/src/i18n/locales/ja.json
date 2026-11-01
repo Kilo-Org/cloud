@@ -1082,10 +1082,8 @@
     },
     "overview": {
       "allAreas": "すべての領域",
-      "focusAreas": "重点項目",
       "nSelected": "{{displayCount}}件選択中",
       "proposedReviewMdGuidance": "REVIEW.mdに記載する指針の提案",
-      "reviewStyle": "レビュースタイル",
       "set": "設定済み",
       "notSet": "未設定"
     },
@@ -1536,7 +1534,8 @@
       "actionBlocked": "この操作を完了できませんでした。再試行するには、まず問題を解決する必要があります。",
       "syncNoRepositories": "同期対象にリポジトリがありません。セキュリティエージェントが監視するリポジトリを選択してから、もう一度同期してください。",
       "syncIntegrationInactive": "セキュリティエージェントの GitHub 接続が有効になっていません。Kilo GitHub App を再接続してから、もう一度同期してください。",
-      "syncMissingPermission": "Kilo GitHub App は vulnerability alerts を読み取れません。GitHub でその権限を付与してから、もう一度同期してください。"
+      "syncMissingPermission": "Kilo GitHub App は vulnerability alerts を読み取れません。GitHub でその権限を付与してから、もう一度同期してください。",
+      "configConflict": "セキュリティエージェントの設定が別の場所で変更されました。最新の設定を確認して、もう一度保存してください。"
     },
     "analysisState": {
       "queued": "分析の順番待ち",
@@ -2211,7 +2210,6 @@
     },
     "modelSelector": {
       "provider": "プロバイダー {{id}}",
-      "modelId": "モデル {{id}}",
       "unavailable": "利用不可",
       "unavailableState": "利用不可",
       "selectedState": "選択済み",
@@ -2946,7 +2944,7 @@
       "continueInPersonal": "個人アカウントで続行",
       "loading": "受信トレイを読み込み中",
       "noReviewRequests": "レビュー依頼はありません",
-      "noReviewRequestsDescription": "レビューを依頼されたプルリクエストがここに表示されます。上の欄に任意のPRのリンクを貼り付けることもできます。",
+      "noReviewRequestsDescription": "レビューを依頼されたプルリクエストがここに表示されます。",
       "title": "受信トレイ"
     },
     "installKiloGitHubApp": "Kilo GitHub Appをインストール",
@@ -2974,6 +2972,7 @@
       "deleteBranchAfterMerge": "マージ後にブランチを削除",
       "noEnabledMethods": "このリポジトリではマージ方法が有効になっていません。リポジトリの管理者に、通常のマージ、スカッシュマージ、リベースマージのいずれかを有効にするよう依頼してください。",
       "confirmTitle": "プルリクエストをマージしますか？",
+      "confirmMergeTitle": "マージしますか？",
       "confirmTitleTerm": "{{term}}をマージしますか？",
       "confirmMessage": "変更をベースブランチにマージします。",
       "enableAutoMergeConfirmTitle": "自動マージを有効にしますか？",
@@ -3077,7 +3076,7 @@
       "deletedAnnouncement": "未送信のコメントを削除しました",
       "editA11y": "{{location}}の未送信のコメントを編集",
       "editOutdatedA11y": "{{location}}の変更前のコードに対する未送信のコメントを編集",
-      "noCommentsQueued": "未送信のコメントはありません。上で選んだレビューの種類だけを送信します。",
+      "noCommentsQueued": "上で選んだレビューの種類だけを送信します。",
       "staleHint": "このコメントの作成後にPRが更新されました。",
       "staleQueueHint": "古いコミットに対するコメントは送信されません。後で編集や削除ができるよう、未送信の一覧に残ります。",
       "summaryA11y": "レビューの総評",
@@ -3837,6 +3836,7 @@
     "organizationDefaultDescription": "個人のデフォルトがないメンバーの場合は自動ロードされます。",
     "setAsDefault": "デフォルトとして設定",
     "saveFailed": "プロフィールを保存できませんでした",
+    "organizationRoleRequired": "組織のプロフィールを変更できるのは組織のオーナーと管理者のみです。",
     "deleteTitle": "プロフィールの削除",
     "deleteMessage": "これにより、プロフィールとその設定が完全に削除されます。これを元に戻すことはできません。",
     "deleteFailed": "プロフィールを削除できませんでした",
@@ -3844,11 +3844,11 @@
     "deletedToast": "プロフィール「{{name}}」が削除されました",
     "variablesTitle": "環境変数",
     "addVariable": "変数の追加",
-    "keyLabel": "鍵",
+    "keyLabel": "キー",
     "keyTooLong": "キーは256文字以内で入力してください",
     "keyDuplicate": "このキーはすでにプロフィールに存在します",
     "keyWillBeSavedAs": "{{key}}として保存されます",
-    "valueLabel": "価値",
+    "valueLabel": "値",
     "valueRequired": "値を入力してください",
     "tooLong": "{{max}}文字以内で入力してください",
     "secrets": {
@@ -4154,7 +4154,8 @@
     "sources": "根拠と成果物",
     "timezone": "ブリーフィングのタイムゾーン",
     "deviceTimezone": "デバイスのタイムゾーンを使用",
-    "timezoneHint": "IANAタイムゾーン(例: Europe/Berlin)。スケジュールの変更は今後のブリーフに適用されます。",
+    "timezoneHint": "IANAタイムゾーン(例: Europe/Berlin)。",
+    "scheduleHint": "スケジュールの変更は今後のブリーフに適用されます。",
     "nightStart": "ブリーフ期間の開始",
     "morningStart": "ブリーフの準備完了時刻",
     "morningEnd": "ブリーフの利用可能期限",

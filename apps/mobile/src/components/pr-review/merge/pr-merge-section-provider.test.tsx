@@ -103,7 +103,7 @@ describe('PrMergeSectionProvider (s6)', () => {
 
   it('offers merge and enable-auto-merge on a GitLab merge request (capability supported)', async () => {
     const renderer = await mount(GITLAB_REF, 'open');
-    expect(findButtons(renderer, 'Merge merge request')).toBe(1);
+    expect(findButtons(renderer, 'Merge')).toBe(1);
     expect(findButtons(renderer, 'Enable auto-merge')).toBe(1);
     renderer.unmount();
   });
@@ -129,7 +129,7 @@ describe('PrMergeSectionProvider (s6)', () => {
   it('pushes the merge sheet inside the GitLab ref route on press', async () => {
     const renderer = await mount(GITLAB_REF, 'open');
     act(() => {
-      findButton(renderer, 'Merge merge request')?.();
+      findButton(renderer, 'Merge')?.();
     });
     expect(routerPush).toHaveBeenCalledWith(
       '/(app)/pr-review/gitlab/group/sub/repo/12/merge?mode=merge'

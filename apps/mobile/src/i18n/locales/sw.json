@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Futa tawi baada ya kuunganisha",
       "noEnabledMethods": "Hakuna mbinu ya kuunganisha iliyowezeshwa kwenye hazina hii ya msimbo. Mwombe msimamizi wa hazina awezeshe kuunganisha kwa rekodi ya kuunganisha, kwa rekodi moja, au kwa kuweka upya msingi.",
       "confirmTitle": "Ungependa kuunganisha ombi?",
+      "confirmMergeTitle": "Ungependa kuunganisha?",
       "confirmTitleTerm": "Ungependa kuunganisha {{term}}?",
       "confirmMessage": "Hii itaunganisha mabadiliko yako kwenye tawi la msingi.",
       "enableAutoMergeConfirmTitle": "Ungependa kuwasha muunganisho wa kiotomatiki?",
@@ -644,7 +645,7 @@
       "title": "Kikasha",
       "loading": "Inapakia kikasha",
       "noReviewRequests": "Hakuna maombi ya ukaguzi",
-      "noReviewRequestsDescription": "Maombi ya kuunganisha yanayosubiri ukaguzi wako yanaonekana hapa. Bado unaweza kubandika kiungo chochote cha PR hapo juu.",
+      "noReviewRequestsDescription": "Maombi ya kuunganisha yanayosubiri ukaguzi wako yanaonekana hapa.",
       "couldNotLoad": "Imeshindikana kupakia kikasha.",
       "accessLostTitle": "Huna ruhusa ya shirika hili",
       "accessLostDescription": "Huwi tena mwanachama wa shirika hili, hivyo maombi yake ya ukaguzi hayawezi kupakiwa. Endelea kwenye akaunti yako ya binafsi ili uendelee kukagua.",
@@ -755,7 +756,7 @@
       "staleHint": "PR imebadilika tangu ulipoandika maoni haya.",
       "deleteA11y": "Futa maoni yanayosubiri kutumwa kwenye {{location}}",
       "deletedAnnouncement": "Maoni yanayosubiri kutumwa yamefutwa",
-      "noCommentsQueued": "Hakuna maoni kwenye foleni. Ukaguzi utawasilishwa pamoja na tukio lililo hapo juu pekee.",
+      "noCommentsQueued": "Ukaguzi utawasilishwa pamoja na tukio lililo hapo juu pekee.",
       "staleQueueHint": "Maoni yanayohusu rekodi ya zamani ya mabadiliko hayatumwi. Yanabaki kwenye foleni yako ili uweze kuyahariri au kuyafuta.",
       "allQueuedHint": "Maoni yote yatatumwa pamoja katika ombi moja.",
       "summaryPlaceholder": "Muhtasari wa hiari wa ukaguzi",
@@ -1608,8 +1609,6 @@
       "bitbucketError": "Imeshindikana kufungua usanidi wa Bitbucket. Tafadhali jaribu tena."
     },
     "overview": {
-      "reviewStyle": "Mtindo wa ukaguzi",
-      "focusAreas": "Maeneo ya kuzingatia",
       "allAreas": "Maeneo yote",
       "set": "Imewekwa",
       "notSet": "Haijawekwa",
@@ -2069,7 +2068,8 @@
       "actionBlocked": "Imeshindikana kukamilisha kitendo hiki. Tatizo lazima litatuliwe kwanza.",
       "syncNoRepositories": "Hakuna hazina zilizo katika wigo wa usawazishaji. Chagua hazina ambazo Wakala wa usalama hufuatilia, kisha usawazishe tena.",
       "syncIntegrationInactive": "Muunganisho wa GitHub wa Wakala wa usalama haupo hai. Unganisha tena GitHub App ya Kilo, kisha usawazishe tena.",
-      "syncMissingPermission": "Kilo GitHub App haiwezi kusoma arifa za udhaifu. Toa ruhusa hiyo katika GitHub, kisha sinkronisha tena."
+      "syncMissingPermission": "Kilo GitHub App haiwezi kusoma arifa za udhaifu. Toa ruhusa hiyo katika GitHub, kisha sinkronisha tena.",
+      "configConflict": "Mipangilio ya Wakala wa usalama ilibadilishwa mahali pengine. Pitia mipangilio ya hivi punde na uhifadhi tena."
     },
     "analysisState": {
       "queued": "Uchambuzi uko kwenye foleni",
@@ -2744,7 +2744,6 @@
     },
     "modelSelector": {
       "provider": "Mtoa huduma {{id}}",
-      "modelId": "Modeli {{id}}",
       "unavailable": "Haipatikani",
       "unavailableState": "haipatikani",
       "selectedState": "imechaguliwa",
@@ -3837,6 +3836,7 @@
     "organizationDefaultDescription": "Imepakiwa kiotomatiki kwa wanachama ambao hawana chaguo-msingi la kibinafsi.",
     "setAsDefault": "Weka kama chaguomsingi",
     "saveFailed": "Haikuweza kuhifadhi wasifu",
+    "organizationRoleRequired": "Wamiliki na wasimamizi wa shirika pekee wanaweza kubadilisha wasifu wa shirika.",
     "deleteTitle": "Futa wasifu",
     "deleteMessage": "Hii huondoa kabisa wasifu na mipangilio yake. Hili haliwezi kutenduliwa.",
     "deleteFailed": "Haikuweza kufuta wasifu",
@@ -4154,7 +4154,8 @@
     "sources": "Ushahidi na vielelezo",
     "timezone": "Saa za eneo za ripoti",
     "deviceTimezone": "Tumia saa za eneo za kifaa",
-    "timezoneHint": "Saa za eneo za IANA, kwa mfano Europe/Berlin. Mabadiliko ya ratiba yanatumika kwa ripoti zijazo.",
+    "timezoneHint": "Saa za eneo za IANA, kwa mfano Europe/Berlin.",
+    "scheduleHint": "Mabadiliko ya ratiba yanatumika kwa ripoti zijazo.",
     "nightStart": "Kipindi cha ripoti kinaanza",
     "morningStart": "Ripoti iko tayari saa",
     "morningEnd": "Ripoti inapatikana hadi",

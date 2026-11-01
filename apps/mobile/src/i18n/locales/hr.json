@@ -432,6 +432,7 @@
       "deleteBranchAfterMerge": "Izbriši granu nakon spajanja",
       "noEnabledMethods": "U ovom repozitoriju nije omogućena nijedna metoda spajanja. Zatraži od administratora repozitorija da omogući spajanje, sažimanje revizija ili promjenu osnove.",
       "confirmTitle": "Spojiti zahtjev?",
+      "confirmMergeTitle": "Spojiti?",
       "confirmTitleTerm": "Spojiti {{term}}?",
       "confirmMessage": "Tvoje će se izmjene spojiti u osnovnu granu.",
       "enableAutoMergeConfirmTitle": "Uključiti automatsko spajanje?",
@@ -659,7 +660,7 @@
       "title": "Primljeno",
       "loading": "Učitavanje primljenih zahtjeva",
       "noReviewRequests": "Nema zahtjeva za pregled koda",
-      "noReviewRequestsDescription": "Ovdje se prikazuju zahtjevi za spajanje koji čekaju tvoj pregled koda. I dalje možeš zalijepiti bilo koju poveznicu na PR iznad.",
+      "noReviewRequestsDescription": "Ovdje se prikazuju zahtjevi za spajanje koji čekaju tvoj pregled koda.",
       "couldNotLoad": "Nije moguće učitati primljene zahtjeve.",
       "accessLostTitle": "Nemaš pristup ovoj organizaciji",
       "accessLostDescription": "Više nisi član/ica ove organizacije, pa se njezini zahtjevi za pregled koda ne mogu učitati. Prebaci se na osobni račun da i dalje pregledavaš kod.",
@@ -773,7 +774,7 @@
       "staleHint": "PR je ažuriran nakon pisanja ovog komentara.",
       "deleteA11y": "Izbriši komentar na čekanju na lokaciji {{location}}",
       "deletedAnnouncement": "Komentar na čekanju je izbrisan",
-      "noCommentsQueued": "Nema komentara na čekanju. Pregled koda poslat će se samo s gore odabranom vrstom.",
+      "noCommentsQueued": "Pregled koda poslat će se samo s gore odabranom vrstom.",
       "staleQueueHint": "Komentari koji se odnose na stariju reviziju ne šalju se. Ostaju na čekanju za uređivanje ili brisanje.",
       "allQueuedHint": "Svi će komentari biti poslani zajedno u jednom zahtjevu.",
       "summaryPlaceholder": "Sažetak pregleda koda (neobavezno)",
@@ -1630,8 +1631,6 @@
       "bitbucketError": "Nije moguće otvoriti postavljanje za Bitbucket. Pokušaj ponovno."
     },
     "overview": {
-      "reviewStyle": "Stil pregleda",
-      "focusAreas": "Područja pregleda",
       "allAreas": "Sva područja",
       "set": "Postavljeno",
       "notSet": "Nije postavljeno",
@@ -2102,7 +2101,8 @@
       "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem je potrebno riješiti prije ponovnog pokušaja.",
       "syncNoRepositories": "Nijedan repozitorij nije u opsegu sinkronizacije. Odaberite repozitorije koje Sigurnosni agent nadzire, zatim ponovno sinkronizirajte.",
       "syncIntegrationInactive": "Veza s GitHubom za Sigurnosni agent nije aktivna. Ponovno povežite Kilo GitHub App, zatim ponovno sinkronizirajte.",
-      "syncMissingPermission": "Kilo GitHub App ne može čitati vulnerability alerts. Dodijeli to dopuštenje u GitHubu, pa ponovno sinkroniziraj."
+      "syncMissingPermission": "Kilo GitHub App ne može čitati vulnerability alerts. Dodijeli to dopuštenje u GitHubu, pa ponovno sinkroniziraj.",
+      "configConflict": "Postavke Sigurnosnog agenta promijenjene su negdje drugdje. Pregledaj najnovije postavke i ponovno spremi."
     },
     "analysisState": {
       "queued": "Analiza u redu čekanja",
@@ -2786,7 +2786,6 @@
     },
     "modelSelector": {
       "provider": "Pružatelj {{id}}",
-      "modelId": "Model: {{id}}",
       "unavailable": "Nedostupan",
       "unavailableState": "nedostupan",
       "selectedState": "odabrano",
@@ -3893,6 +3892,7 @@
     "organizationDefaultDescription": "Automatski se učitava za članove koji nemaju osobne zadane postavke.",
     "setAsDefault": "Postavi kao zadano",
     "saveFailed": "Nije moguće spremiti profil",
+    "organizationRoleRequired": "Samo vlasnici organizacije i administratori mogu promijeniti profil organizacije.",
     "deleteTitle": "Izbriši profil",
     "deleteMessage": "Ovo trajno uklanja profil i njegove postavke. Ovo se ne može poništiti.",
     "deleteFailed": "Nije moguće izbrisati profil",
@@ -4215,7 +4215,8 @@
     "sources": "Dokazi i artefakti",
     "timezone": "Vremenska zona izvješća",
     "deviceTimezone": "Koristi vremensku zonu uređaja",
-    "timezoneHint": "IANA vremenska zona, npr. Europe/Berlin. Promjene rasporeda vrijede za buduća izvješća.",
+    "timezoneHint": "IANA vremenska zona, npr. Europe/Berlin.",
+    "scheduleHint": "Promjene rasporeda vrijede za buduća izvješća.",
     "nightStart": "Početak prozora izvješća",
     "morningStart": "Izvješće spremno u",
     "morningEnd": "Izvješće dostupno do",

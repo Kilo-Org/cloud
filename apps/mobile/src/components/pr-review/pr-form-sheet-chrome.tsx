@@ -8,9 +8,15 @@
 // OUTSIDE the ScrollView so keyboard focus does not scroll the title off-screen.
 //
 // collapsable={false}: keep a stable native subview at index 0 (SheetHeader
-// pattern). Scope the header's native safe area to its own view. Direct entry
-// can render the route full-screen, while a presented sheet already clears the
-// status bar. Keep `pt-5` for the grabber without adding the app inset twice.
+// pattern). Who clears the status bar depends on how the route was presented,
+// and the header decides it before its first frame: a sheet that is its stack's
+// first screen presents with the surface at the window top, so the header
+// reserves the inset itself; a sheet pushed over another screen settles at the
+// detent cap, an inset lower, so its header reserves nothing. Both come from the
+// shared rule in `lib/form-sheet`, never from a measured safe-area frame — a
+// nested provider reported 0 on the first frame and the inset once it settled,
+// which moved the whole header by the status-bar height after it landed. Keep
+// `pt-5` for the grabber space on top of the clearance.
 //
 // Keyboard: ScrollView uses automaticallyAdjustKeyboardInsets. Footers must
 // NOT re-apply the full keyboard height: an extra lift beside the native one
@@ -20,12 +26,11 @@
 
 import { type ReactNode, useEffect, useState } from 'react';
 import { Keyboard, Platform, View } from 'react-native';
-import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/screen-header';
-
-const HEADER_SAFE_AREA_STYLE = { flex: 0 };
-const HEADER_SAFE_AREA_EDGES = ['top'] as const;
+import { useSheetHeaderTopClearance } from '@/lib/form-sheet';
+import { useRouteIsStackRoot } from '@/lib/navigation/route-focus';
 
 export function useFormSheetKeyboardVisible(): boolean {
   const [visible, setVisible] = useState(false);
@@ -49,25 +54,29 @@ export function useFormSheetKeyboardVisible(): boolean {
 }
 
 export function PrFormSheetHeader(props: { title: string; eyebrow: string; onBack: () => void }) {
+  const isStackRoot = useRouteIsStackRoot();
+  const topClearance = useSheetHeaderTopClearance(
+    isStackRoot ? 'android-window-top' : 'bottom-form-sheet'
+  );
   return (
-    <SafeAreaProvider collapsable={false} style={HEADER_SAFE_AREA_STYLE}>
-      <SafeAreaView edges={HEADER_SAFE_AREA_EDGES}>
-        <View collapsable={false} className="border-b border-border bg-background">
-          {/* Left-aligned heading on the back row: `centerTitle` would split the
-              header into a centered title row and a second row holding a lone
-              dismiss chevron, which read as a stray control under the title. */}
-          <ScreenHeader
-            title={props.title}
-            eyebrow={props.eyebrow}
-            onBack={props.onBack}
-            backIcon="close"
-            showBackButton
-            safeAreaTop={false}
-            className="pt-5"
-          />
-        </View>
-      </SafeAreaView>
-    </SafeAreaProvider>
+    <View
+      collapsable={false}
+      className="border-b border-border bg-background"
+      style={topClearance > 0 ? { paddingTop: topClearance } : undefined}
+    >
+      {/* Left-aligned heading on the back row: `centerTitle` would split the
+          header into a centered title row and a second row holding a lone
+          dismiss chevron, which read as a stray control under the title. */}
+      <ScreenHeader
+        title={props.title}
+        eyebrow={props.eyebrow}
+        onBack={props.onBack}
+        backIcon="close"
+        showBackButton
+        safeAreaTop={false}
+        className="pt-5"
+      />
+    </View>
   );
 }
 

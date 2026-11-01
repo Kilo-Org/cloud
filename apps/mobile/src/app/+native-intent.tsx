@@ -6,6 +6,7 @@ import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
 import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
 import { handleHomeFixturePath } from '@/lib/home-fixture';
 import { modelPickerFixtureRoute } from '@/lib/model-picker-fixture';
+import { handlePrReviewInstanceFixturePath } from '@/lib/pr-review/pr-review-instance-fixture';
 import { profilePickerFixtureRoute } from '@/lib/profile-picker-fixture';
 import { securityAgentSingleRouteFixtureRoute } from '@/lib/security-agent-single-route-fixture';
 
@@ -42,10 +43,10 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   if (__DEV__) {
     // Dev-only link that opens the connect gate's GitLab-instance state the way
     // the paste flow reaches it: a provider route carrying the paste's
-    // `?instance=` hint. A system link cannot carry that hint through this
-    // app's resolver, so the fixture route re-navigates with the same href.
-    if (/(?:^|\/)dev\/pr-review-gitlab-instance-fixture\/?$/.test(path)) {
-      return '/(auth)/pr-review-gitlab-instance-fixture';
+    // `?instance=` hint. It returns a route itself, so this returns falsy (see
+    // `handlePrReviewInstanceFixturePath`).
+    if (handlePrReviewInstanceFixturePath(path)) {
+      return null;
     }
     // Dev-only: open a Security Agent screen as its group's only route
     // (`kiloapp:///dev/security-agent-single-route-fixture/<scope>/<route…>`).

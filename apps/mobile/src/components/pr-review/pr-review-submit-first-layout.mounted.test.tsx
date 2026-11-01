@@ -1,3 +1,5 @@
+/* eslint-disable require-await, @typescript-eslint/require-await -- the mocked hooks settle without await because they resolve immediately, matching the sibling submit suite */
+
 // Regression for the review-submit sheet's first body frame. The sheet builds
 // its body from two device reads that start on mount: the stored attribution
 // footer preference (which seeds the summary and decides whether the queue card
@@ -91,10 +93,7 @@ vi.mock('@/lib/pr-review/pending-review-provider', async () => {
   return {
     PendingReviewProvider: ({ children }: { children?: unknown }) => children ?? null,
     usePendingReview: () => {
-      const { items, hydrated } = useSyncExternalStore(
-        pendingQueue.subscribe,
-        pendingQueue.read
-      );
+      const { items, hydrated } = useSyncExternalStore(pendingQueue.subscribe, pendingQueue.read);
       return {
         items,
         hydrated,
@@ -207,20 +206,20 @@ function frames(): Frame[] {
   for (const event of record.events) {
     if (event.kind === 'frame') {
       collected.push({ ctas: [] });
-      continue;
-    }
-    const current = collected.at(-1);
-    if (!current) {
-      throw new Error(`body element rendered before its frame opened: ${event.kind}`);
-    }
-    if (event.kind === 'field') {
-      current.field = event.defaultValue;
-    } else if (event.kind === 'hint') {
-      current.hint = true;
-    } else if (event.kind === 'block-reason') {
-      current.blockReason = event.message;
     } else {
-      current.ctas.push(event.label);
+      const current = collected.at(-1);
+      if (!current) {
+        throw new Error(`body element rendered before its frame opened: ${event.kind}`);
+      }
+      if (event.kind === 'field') {
+        current.field = event.defaultValue;
+      } else if (event.kind === 'hint') {
+        current.hint = true;
+      } else if (event.kind === 'block-reason') {
+        current.blockReason = event.message;
+      } else {
+        current.ctas.push(event.label);
+      }
     }
   }
   return collected;
@@ -302,9 +301,7 @@ describe('PrReviewSubmit first body frame', () => {
       pendingQueue.write({ hydrated: true });
     });
 
-    expect(frames()).toEqual([
-      { field: FOOTER, hint: true, ctas: ['Submit review', 'Cancel'] },
-    ]);
+    expect(frames()).toEqual([{ field: FOOTER, hint: true, ctas: ['Submit review', 'Cancel'] }]);
     expect(record.events.some(event => event.kind === 'block-reason')).toBe(false);
   });
 });

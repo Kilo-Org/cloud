@@ -77,6 +77,12 @@ export type CreateUpstreamOptions = {
 export type CreateUpstreamResult = {
   /** True if we created the repo; false if it already existed. */
   databaseCreated: boolean;
+  /**
+   * Owner of the repository the bootstrap wrote to. These writes are
+   * authorized by the token on `upstreamOwner/<db>`, so this is the
+   * DoltHub org the bootstrap proved.
+   */
+  upstreamOwner: string;
 };
 
 export class CreateUpstreamError extends Error {
@@ -313,7 +319,7 @@ export async function createUpstream(opts: CreateUpstreamOptions): Promise<Creat
       error: formatError(err),
     });
   }
-  return { databaseCreated };
+  return { databaseCreated, upstreamOwner: owner };
 }
 
 function formatError(err: unknown): string {

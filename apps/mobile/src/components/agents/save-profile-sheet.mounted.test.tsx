@@ -116,7 +116,7 @@ describe('SaveProfileSheet', () => {
     const renderer = mount();
 
     expect(header(renderer).props.title).toBe('Save as Profile');
-    expect(texts(renderer)).toContain('2 environment variables · 1 setup commands');
+    expect(texts(renderer)).toContain('2 vars · 1 setup cmd');
     expect(texts(renderer)).toContain('Secrets are encrypted before storage.');
     expect(renderer.root.findByType('Lock' as never)).toBeTruthy();
   });

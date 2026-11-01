@@ -431,6 +431,7 @@
     "connectionExpired": "Mae'r cysylltiad â GitHub wedi dod i ben.",
     "merge": {
       "merge": "Cyfuno",
+      "mergeTitle": "Cyfuno",
       "mergeNow": "Cyfuno nawr",
       "mergePullRequest": "Cyfuno cais tynnu",
       "mergeTermTitle": "Cyfuno {{term}}",
@@ -742,6 +743,9 @@
       "gitlabDescription": "Adolygu ceisiadau uno ar ffôn",
       "bitbucketOrgOnlyDescription": "Newidiwch y cyfrif uchod i sefydliad i adolygu ei geisiadau tynnu ar Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Nid oes unrhyw sefydliadau gyda'r cyfrif hwn eto. Gallwch adolygu ceisiadau tynnu Bitbucket unwaith y byddwch yn creu sefydliad neu'n ymuno ag un.",
+      "gitlabReconnectAdminOnlyDescription": "Gofynnwch i berchennog sefydliad, gweinyddwr neu reolwr bilio ei ailgysylltu.",
+      "bitbucketNotConnectedTitle": "Nid yw Bitbucket wedi'i gysylltu",
+      "bitbucketAdminOnlyDescription": "Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu.",
       "contextLine": "Ar gyfer {{organization}}",
       "contextLinePersonal": "Ar gyfer eich cyfrif personol"
     },
@@ -1503,7 +1507,9 @@
     "instructions": {
       "title": "Cyfarwyddiadau personol",
       "deprecation": "Mae bwriad i roi'r gorau i gefnogi cyfarwyddiadau personol. Symudwch y canllawiau hyn i ffeil REVIEW.md yn eich ystorfa yn lle hynny.",
-      "placeholder": "e.e. Gorfodi ein rheolau trin gwallau…"
+      "placeholder": "e.e. Gorfodi ein rheolau trin gwallau…",
+      "clearTitle": "Tynnu'r cyfarwyddiadau personol?",
+      "clearMessage": "Bydd cadw maes gwag yn dileu'r cyfarwyddiadau personol sydd wedi'u cadw ar gyfer yr adolygydd hwn."
     },
     "repos": {
       "unavailable": "Nid yw'r ystorfeydd ar gael. Gorffennwch sefydlu Bitbucket ar kilo.ai.",
@@ -1538,7 +1544,7 @@
       "fixSettings": "Trwsio'r gosodiadau",
       "couldNotLoad": "Ni ellid llwytho'r adolygiad.",
       "couldNotGetLatest": "Ni ellid cael y data diweddaraf.",
-      "byline": "{{repo}} #{{number}} gan {{author}}",
+      "byline": "#{{number}} gan {{author}}",
       "noFindings": "Nid oes unrhyw ganfyddiadau.",
       "findingsUnavailable": "Nid yw'r canlyniadau ar gael oherwydd bod yr adolygiad hwn wedi methu.",
       "findingsInProgress": "Mae'r adolygiad hwn dal ar waith. Bydd y canfyddiadau'n ymddangos yma pan fydd wedi gorffen.",
@@ -1690,8 +1696,8 @@
       "reviewStyle": "Arddull adolygu",
       "focusAreas": "Meysydd i ganolbwyntio arnynt",
       "allAreas": "Pob maes",
-      "customInstructions": "Cyfarwyddiadau personol",
       "set": "Wedi'i osod",
+      "notSet": "Heb ei osod",
       "nSelected": "{{displayCount}} wedi'u dewis",
       "proposedReviewMdGuidance": "Canllawiau arfaethedig ar gyfer REVIEW.md"
     },
@@ -2192,7 +2198,8 @@
       "actionBlocked": "Ni chafodd y weithred hon ei chwblhau. Rhaid trwsio'r broblem yn gyntaf.",
       "syncNoRepositories": "Nid oes unrhyw ystorfeydd yng nghwmpas cydsynio. Dewiswch yr ystorfeydd y mae'r Asiant diogelwch yn eu monitro, yna cydsyniwch eto.",
       "syncIntegrationInactive": "Nid yw'r cysylltiad GitHub ar gyfer yr Asiant diogelwch yn weithredol. Ailgysylltwch ap GitHub Kilo, yna cydsyniwch eto.",
-      "syncMissingPermission": "Nid yw ap GitHub Kilo yn gallu darllen hysbysiadau bregusrwydd. Rhowch y caniatâd hwnnw yn GitHub, yna cydsyniwch eto."
+      "syncMissingPermission": "Nid yw ap GitHub Kilo yn gallu darllen hysbysiadau bregusrwydd. Rhowch y caniatâd hwnnw yn GitHub, yna cydsyniwch eto.",
+      "configConflict": "Mae gosodiadau'r Asiant diogelwch wedi newid yn rhywle arall. Adolygwch y gosodiadau diweddaraf a chadw eto."
     },
     "analysisState": {
       "queued": "Dadansoddiad mewn ciw",
@@ -2515,13 +2522,14 @@
       "forkFilesUnchangedOnComputer": "Nid yw'r ffeiliau ar y cyfrifiadur hwn yn cael eu newid.",
       "pickProfile": "Dewiswch broffil",
       "noProfile": "Dim proffil",
+      "defaultProfileResolvesTo": "Yn cyfeirio at {{name}}",
+      "defaultProfileResolvesToAccessibility": "Proffil diofyn: {{name}}",
       "manageProfiles": "Rheoli proffiliau",
       "noProfiles": "Dim proffiliau eto. Creu un i ychwanegu newidynnau amgylchedd, gweinyddwyr MCP, a sgiliau.",
       "advancedConfig": "Ffurfweddiad Uwch",
       "advancedConfigDescription": "Yn berthnasol i’r sesiwn hon. Mae cadw fel proffil yn ei gadw ar gyfer y tro nesaf.",
       "saveAsProfile": "Cadw fel Proffil",
       "saveProfileDescription": "Arbedwch y newidynnau amgylchedd cyfredol a'r gorchmynion gosod fel proffil y gellir ei ailddefnyddio.",
-      "profileSummary": "{{vars}} newidynnau amgylchedd · {{commands}} gorchmynion gosod",
       "profileSaved": "Proffil \"{{name}}\" wedi'i gadw",
       "organizationProfiles": "Proffiliau Sefydliad",
       "personalProfiles": "Proffiliau Personol",
@@ -2903,7 +2911,6 @@
     },
     "modelSelector": {
       "provider": "Darparwr {{id}}",
-      "modelId": "Y model {{id}}",
       "unavailable": "Ddim ar gael",
       "unavailableState": "ddim ar gael",
       "selectedState": "wedi'i ddewis",
@@ -4389,7 +4396,8 @@
     "sources": "Tystiolaeth ac arteffactau",
     "timezone": "Cylchfa amser y briff",
     "deviceTimezone": "Defnyddio cylchfa amser y ddyfais",
-    "timezoneHint": "Cylchfa amser IANA, er enghraifft Europe/Berlin. Bydd newidiadau i'r amserlen yn berthnasol i friffiau'r dyfodol.",
+    "timezoneHint": "Cylchfa amser IANA, er enghraifft Europe/Berlin.",
+    "scheduleHint": "Bydd newidiadau i'r amserlen yn berthnasol i friffiau'r dyfodol.",
     "nightStart": "Y cyfnod briff yn dechrau",
     "morningStart": "Y briff yn barod am",
     "morningEnd": "Y briff ar gael tan",

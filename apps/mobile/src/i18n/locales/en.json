@@ -23,7 +23,8 @@
     "sources": "Evidence and artifacts",
     "timezone": "Brief time zone",
     "deviceTimezone": "Use device time zone",
-    "timezoneHint": "IANA time zone, for example Europe/Berlin. Schedule changes apply to future briefs.",
+    "timezoneHint": "IANA time zone, for example Europe/Berlin.",
+    "scheduleHint": "Schedule changes apply to future briefs.",
     "nightStart": "Brief window starts",
     "morningStart": "Brief ready at",
     "morningEnd": "Brief available until",
@@ -469,6 +470,7 @@
     "connectionExpired": "GitHub connection expired.",
     "merge": {
       "merge": "Merge",
+      "mergeTitle": "Merge",
       "mergeNow": "Merge now",
       "mergePullRequest": "Merge pull request",
       "mergeTermTitle": "Merge {{term}}",
@@ -748,6 +750,9 @@
       "gitlabDescription": "Review merge requests on mobile",
       "bitbucketOrgOnlyDescription": "Switch the account above to an organization to review its Bitbucket pull requests.",
       "bitbucketOrgOnlyNoOrganizationDescription": "This account has no organizations yet. Bitbucket pull requests can be reviewed once you create or join an organization.",
+      "gitlabReconnectAdminOnlyDescription": "Ask an organization owner, admin, or billing manager to reconnect it.",
+      "bitbucketNotConnectedTitle": "Bitbucket not connected",
+      "bitbucketAdminOnlyDescription": "Only organization owners, admins, and billing managers can connect it.",
       "contextLine": "For {{organization}}",
       "contextLinePersonal": "For your personal account"
     },
@@ -1480,8 +1485,10 @@
     },
     "instructions": {
       "title": "Custom instructions",
-      "deprecation": "Custom Instructions is planned for deprecation. Move these guidelines into a REVIEW.md file in your repository instead.",
-      "placeholder": "e.g. Enforce our error-handling conventions…"
+      "deprecation": "Custom instructions is planned for deprecation. Move these guidelines into a REVIEW.md file in your repository instead.",
+      "placeholder": "e.g. Enforce our error-handling conventions…",
+      "clearTitle": "Remove custom instructions?",
+      "clearMessage": "Saving an empty field deletes the custom instructions stored for this reviewer."
     },
     "repos": {
       "unavailable": "Repositories unavailable — finish Bitbucket setup on kilo.ai.",
@@ -1516,7 +1523,7 @@
       "fixSettings": "Fix settings",
       "couldNotLoad": "Could not load review",
       "couldNotGetLatest": "Couldn't get the latest.",
-      "byline": "{{repo}} #{{number}} by {{author}}",
+      "byline": "#{{number}} by {{author}}",
       "noFindings": "No findings",
       "findingsUnavailable": "Results are unavailable because this review failed.",
       "findingsInProgress": "This review is still in progress. Findings appear here when it finishes.",
@@ -1668,8 +1675,8 @@
       "reviewStyle": "Review Style",
       "focusAreas": "Focus Areas",
       "allAreas": "All areas",
-      "customInstructions": "Custom Instructions",
       "set": "Set",
+      "notSet": "Not set",
       "nSelected": "{{displayCount}} selected",
       "proposedReviewMdGuidance": "Proposed REVIEW.md guidance"
     },
@@ -2125,6 +2132,7 @@
       "syncNoRepositories": "No repositories are in the sync scope. Choose the repositories Security Agent monitors, then sync again.",
       "syncIntegrationInactive": "The GitHub connection for Security Agent is not active. Reconnect the Kilo GitHub App, then sync again.",
       "syncMissingPermission": "The Kilo GitHub App cannot read vulnerability alerts. Grant that permission in GitHub, then sync again.",
+      "configConflict": "Security Agent settings changed elsewhere. Review the latest settings and save again.",
       "actionFailed": "Could not complete this action. Please try again.",
       "actionBlocked": "Could not complete this action. The problem needs fixing before you can retry."
     },
@@ -2433,13 +2441,14 @@
       "forkFilesUnchangedOnComputer": "Files on this computer are not changed.",
       "pickProfile": "Pick a profile",
       "noProfile": "No profile",
+      "defaultProfileResolvesTo": "Resolves to {{name}}",
+      "defaultProfileResolvesToAccessibility": "Default profile: {{name}}",
       "manageProfiles": "Manage profiles",
       "noProfiles": "No profiles yet. Create one to add environment variables, MCP servers, and skills.",
       "advancedConfig": "Advanced Configuration",
       "advancedConfigDescription": "Applies to this session. Saving a profile keeps it for next time.",
       "saveAsProfile": "Save as Profile",
       "saveProfileDescription": "Save the current environment variables and setup commands as a reusable profile.",
-      "profileSummary": "{{vars}} environment variables · {{commands}} setup commands",
       "profileSaved": "Profile \"{{name}}\" saved",
       "organizationProfiles": "Organization Profiles",
       "personalProfiles": "Personal Profiles",
@@ -2820,7 +2829,6 @@
     },
     "modelSelector": {
       "provider": "Provider {{id}}",
-      "modelId": "Model {{id}}",
       "unavailable": "Unavailable",
       "unavailableState": "unavailable",
       "selectedState": "selected",

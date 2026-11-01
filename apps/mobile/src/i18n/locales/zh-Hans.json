@@ -889,7 +889,9 @@
     "instructions": {
       "title": "自定义说明",
       "deprecation": "自定义说明功能计划停用。请将这些准则移至仓库中的 REVIEW.md 文件。",
-      "placeholder": "例如：遵循我们的错误处理规范…"
+      "placeholder": "例如：遵循我们的错误处理规范…",
+      "clearTitle": "移除自定义说明？",
+      "clearMessage": "保存空字段将删除为此审查者存储的自定义说明。"
     },
     "repos": {
       "unavailable": "仓库暂不可用。请在 kilo.ai 上完成 Bitbucket 配置。",
@@ -965,7 +967,7 @@
       "bitbucketError": "无法打开 Bitbucket 配置页面。请重试。"
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}}，作者 {{author}}",
+      "byline": "#{{number}}，作者 {{author}}",
       "cancelMessage": "这将停止正在进行的代码审查。",
       "cancelReview": "取消审查",
       "cancelTitle": "取消审查？",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "所有方面",
-      "customInstructions": "自定义说明",
       "focusAreas": "审查重点",
       "nSelected": "已选 {{displayCount}} 项",
       "proposedReviewMdGuidance": "REVIEW.md 审查准则建议",
       "reviewStyle": "审查风格",
-      "set": "已设置"
+      "set": "已设置",
+      "notSet": "未设置"
     },
     "updateFailed": "更新代码审查器失败。",
     "configSaveFailed": "保存审查配置失败。",
@@ -1534,7 +1536,8 @@
       "actionBlocked": "无法完成此操作。必须先修复此问题，才能重试。",
       "syncNoRepositories": "同步范围内没有仓库。请选择安全智能体要监控的仓库，然后再次同步。",
       "syncIntegrationInactive": "安全智能体的 GitHub 连接未激活。请重新连接 Kilo GitHub App，然后再次同步。",
-      "syncMissingPermission": "Kilo GitHub App 无法读取 vulnerability alerts。请在 GitHub 中授予该权限，然后重新同步。"
+      "syncMissingPermission": "Kilo GitHub App 无法读取 vulnerability alerts。请在 GitHub 中授予该权限，然后重新同步。",
+      "configConflict": "安全智能体的设置已在其他地方更改。请查看最新设置并重新保存。"
     },
     "analysisState": {
       "queued": "分析排队中",
@@ -1841,13 +1844,14 @@
       "forkFilesUnchangedOnComputer": "此电脑上的文件不会被更改。",
       "pickProfile": "选择配置文件",
       "noProfile": "没有配置文件",
+      "defaultProfileResolvesTo": "当前为 {{name}}",
+      "defaultProfileResolvesToAccessibility": "默认配置文件：{{name}}",
       "manageProfiles": "管理配置文件",
       "noProfiles": "还没有配置文件。创建一个以添加环境变量、MCP 服务器和技能。",
       "advancedConfig": "高级配置",
       "advancedConfigDescription": "仅对本次会话生效。另存为配置文件可供下次使用。",
       "saveAsProfile": "另存为配置文件",
       "saveProfileDescription": "将当前环境变量和设置命令保存为可重复使用的配置文件。",
-      "profileSummary": "{{vars}} 环境变量 · {{commands}} 设置命令",
       "profileSaved": "配置文件“{{name}}”已保存",
       "organizationProfiles": "组织配置文件",
       "personalProfiles": "个人配置文件",
@@ -2209,7 +2213,6 @@
     },
     "modelSelector": {
       "provider": "提供商 {{id}}",
-      "modelId": "模型 {{id}}",
       "unavailable": "不可用",
       "unavailableState": "不可用",
       "selectedState": "已选中",
@@ -2713,6 +2716,9 @@
       "gitlabDescription": "在手机上审查合并请求",
       "bitbucketOrgOnlyDescription": "将上方的账户切换为某个组织，以便审查其 Bitbucket 拉取请求。",
       "bitbucketOrgOnlyNoOrganizationDescription": "此账户尚未加入任何组织。创建或加入组织后，即可审查 Bitbucket 拉取请求。",
+      "gitlabReconnectAdminOnlyDescription": "请让组织所有者、管理员或账单管理员重新连接。",
+      "bitbucketNotConnectedTitle": "尚未连接 Bitbucket",
+      "bitbucketAdminOnlyDescription": "只有组织所有者、管理员和账单管理员可以完成连接。",
       "contextLine": "适用于 {{organization}}",
       "contextLinePersonal": "适用于个人账户"
     },
@@ -2944,6 +2950,7 @@
     "installKiloGitHubApp": "安装 Kilo GitHub 应用",
     "merge": {
       "merge": "合并",
+      "mergeTitle": "合并",
       "mergeNow": "立即合并",
       "mergePullRequest": "合并拉取请求",
       "mergeTermTitle": "合并{{term}}",
@@ -4145,7 +4152,8 @@
     "sources": "证据与产物",
     "timezone": "简报时区",
     "deviceTimezone": "使用设备时区",
-    "timezoneHint": "IANA 时区，例如 Europe/Berlin。日程更改将从之后的简报生效。",
+    "timezoneHint": "IANA 时区，例如 Europe/Berlin。",
+    "scheduleHint": "日程更改将从之后的简报生效。",
     "nightStart": "简报时段开始",
     "morningStart": "简报就绪时间",
     "morningEnd": "简报可用至",

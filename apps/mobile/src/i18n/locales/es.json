@@ -892,7 +892,9 @@
     "instructions": {
       "title": "Instrucciones personalizadas",
       "deprecation": "Está previsto retirar las instrucciones personalizadas. Traslada estas directrices a un archivo REVIEW.md de tu repositorio.",
-      "placeholder": "p. ej., aplicar nuestras convenciones de gestión de errores…"
+      "placeholder": "p. ej., aplicar nuestras convenciones de gestión de errores…",
+      "clearTitle": "¿Eliminar las instrucciones personalizadas?",
+      "clearMessage": "Si guardas un campo vacío, se eliminarán las instrucciones personalizadas almacenadas para este revisor."
     },
     "repos": {
       "unavailable": "Los repositorios no están disponibles. Completa la configuración de Bitbucket en kilo.ai.",
@@ -968,7 +970,7 @@
       "bitbucketError": "No se pudo abrir la configuración de Bitbucket. Inténtalo de nuevo."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} por {{author}}",
+      "byline": "#{{number}} por {{author}}",
       "cancelMessage": "Se detendrá la revisión de código en curso.",
       "cancelReview": "Cancelar revisión",
       "cancelTitle": "¿Cancelar la revisión?",
@@ -1083,12 +1085,12 @@
     },
     "overview": {
       "allAreas": "Todas las áreas",
-      "customInstructions": "Instrucciones personalizadas",
       "focusAreas": "Aspectos de la revisión",
       "nSelected": "{{displayCount}} seleccionados",
       "proposedReviewMdGuidance": "Directrices propuestas para REVIEW.md",
       "reviewStyle": "Estilo de revisión",
-      "set": "Configurado"
+      "set": "Configurado",
+      "notSet": "Sin configurar"
     },
     "updateFailed": "No se pudo actualizar el revisor.",
     "configSaveFailed": "No se pudo guardar la configuración de revisión.",
@@ -1548,7 +1550,8 @@
       "actionBlocked": "No se pudo completar esta acción. Hay que solucionar el problema antes de poder reintentarlo.",
       "syncNoRepositories": "No hay repositorios en el ámbito de sincronización. Elige qué repositorios supervisa el agente de seguridad y sincroniza de nuevo.",
       "syncIntegrationInactive": "La conexión de GitHub para el agente de seguridad no está activa. Vuelve a conectar la aplicación de Kilo en GitHub y sincroniza de nuevo.",
-      "syncMissingPermission": "La aplicación de Kilo en GitHub no puede leer las alertas de vulnerabilidades. Concede ese permiso en GitHub y sincroniza de nuevo."
+      "syncMissingPermission": "La aplicación de Kilo en GitHub no puede leer las alertas de vulnerabilidades. Concede ese permiso en GitHub y sincroniza de nuevo.",
+      "configConflict": "Los ajustes del agente de seguridad se cambiaron en otro lugar. Revisa los ajustes más recientes y guarda de nuevo."
     },
     "analysisState": {
       "queued": "Análisis en cola",
@@ -1859,13 +1862,14 @@
       "forkFilesUnchangedOnComputer": "Los archivos de este equipo no se modifican.",
       "pickProfile": "Elige un perfil",
       "noProfile": "Sin perfil",
+      "defaultProfileResolvesTo": "Corresponde a {{name}}",
+      "defaultProfileResolvesToAccessibility": "Perfil predeterminado: {{name}}",
       "manageProfiles": "Administrar perfiles",
       "noProfiles": "Aún no hay perfiles. Cree uno para agregar variables de entorno, servidores MCP y habilidades.",
       "advancedConfig": "Configuración avanzada",
       "advancedConfigDescription": "Se aplica a esta sesión. Guardarlo como perfil lo conserva para la próxima vez.",
       "saveAsProfile": "Guardar como perfil",
       "saveProfileDescription": "Guarde las variables de entorno actuales y los comandos de configuración como un perfil reutilizable.",
-      "profileSummary": "{{vars}} variables de entorno · {{commands}} comandos de configuración",
       "profileSaved": "Perfil \"{{name}}\" guardado",
       "organizationProfiles": "Perfiles de organización",
       "personalProfiles": "Perfiles personales",
@@ -2232,7 +2236,6 @@
     },
     "modelSelector": {
       "provider": "Proveedor {{id}}",
-      "modelId": "Modelo {{id}}",
       "unavailable": "No disponible",
       "unavailableState": "no disponible",
       "selectedState": "seleccionado",
@@ -2747,6 +2750,9 @@
       "gitlabDescription": "Revisar merge requests en el móvil",
       "bitbucketOrgOnlyDescription": "Cambia la cuenta de arriba a una organización para revisar sus PR en Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta cuenta todavía no tiene organizaciones. Podrás revisar los PR de Bitbucket cuando crees una organización o te unas a una.",
+      "gitlabReconnectAdminOnlyDescription": "Pídele a un Propietario, un Administrador o un Gestor de facturación de la organización que la vuelva a conectar.",
+      "bitbucketNotConnectedTitle": "Bitbucket no está conectado",
+      "bitbucketAdminOnlyDescription": "Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para tu cuenta personal"
     },
@@ -2988,6 +2994,7 @@
     "installKiloGitHubApp": "Instalar la aplicación de Kilo para GitHub",
     "merge": {
       "merge": "Fusión",
+      "mergeTitle": "Fusión",
       "mergeNow": "Fusionar ahora",
       "mergePullRequest": "Fusionar PR",
       "mergeTermTitle": "Fusionar {{term}}",
@@ -4206,7 +4213,8 @@
     "sources": "Evidencias y artefactos",
     "timezone": "Zona horaria del informe",
     "deviceTimezone": "Usar zona horaria del dispositivo",
-    "timezoneHint": "Zona horaria IANA, por ejemplo Europe/Berlin. Los cambios de horario se aplican a los próximos informes.",
+    "timezoneHint": "Zona horaria IANA, por ejemplo Europe/Berlin.",
+    "scheduleHint": "Los cambios de horario se aplican a los próximos informes.",
     "nightStart": "Inicio de la ventana del informe",
     "morningStart": "Informe listo a las",
     "morningEnd": "Informe disponible hasta",

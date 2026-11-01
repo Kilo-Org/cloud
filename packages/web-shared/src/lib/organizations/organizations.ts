@@ -665,9 +665,10 @@ export async function getOrganizationMembers(
         member.dailyUsageLimitUsdMicrodollars != null
           ? fromMicrodollars(member.dailyUsageLimitUsdMicrodollars)
           : null,
-      currentDailyUsageUsd: member.currentDailyUsageUsdMicrodollars
-        ? fromMicrodollars(member.currentDailyUsageUsdMicrodollars)
-        : null,
+      currentDailyUsageUsd:
+        member.currentDailyUsageUsdMicrodollars != null
+          ? fromMicrodollars(member.currentDailyUsageUsdMicrodollars)
+          : null,
     })),
     ...pendingInvitations.map(invitation => ({
       email: invitation.email,

@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub కనెక్షన్ గడువు ముగిసింది.",
     "merge": {
       "merge": "మెర్జ్",
+      "mergeTitle": "మెర్జ్",
       "mergeNow": "ఇప్పుడు మెర్జ్ చేయండి",
       "mergePullRequest": "పుల్ రిక్వెస్ట్ మెర్జ్",
       "mergeTermTitle": "{{term}} మెర్జ్",
@@ -682,6 +683,9 @@
       "gitlabDescription": "మొబైల్‌లో మెర్జ్ రిక్వెస్ట్‌లను సమీక్షించండి",
       "bitbucketOrgOnlyDescription": "దాని Bitbucket పుల్ రిక్వెస్ట్‌లను సమీక్షించడానికి పైన ఉన్న ఖాతాను ఒక సంస్థకు మార్చండి.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ఈ ఖాతాలో ఇంకా ఏ సంస్థా లేదు. మీరు ఒక సంస్థను సృష్టించిన లేదా అందులో చేరిన తర్వాతే Bitbucket పుల్ రిక్వెస్ట్‌లను సమీక్షించవచ్చు.",
+      "gitlabReconnectAdminOnlyDescription": "దానిని మళ్లీ కనెక్ట్ చేయమని సంస్థ యజమాని, నిర్వాహకుడు లేదా బిల్లింగ్ మేనేజర్‌ను అడగండి.",
+      "bitbucketNotConnectedTitle": "Bitbucket కనెక్ట్ కాలేదు",
+      "bitbucketAdminOnlyDescription": "దానిని సంస్థ యజమానులు, నిర్వాహకులు మరియు బిల్లింగ్ మేనేజర్లు మాత్రమే కనెక్ట్ చేయగలరు.",
       "contextLine": "{{organization}} కోసం",
       "contextLinePersonal": "మీ వ్యక్తిగత ఖాతా కోసం"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "ప్రత్యేక సూచనలు",
       "deprecation": "అనుకూల సూచనల ఫీచర్‌ను నిలిపివేయాలని నిర్ణయించాము. బదులుగా ఈ మార్గదర్శకాలను మీ రిపోజిటరీలోని REVIEW.md ఫైల్‌కు తరలించండి.",
-      "placeholder": "ఉదా. లోపాలను నిర్వహించడానికి మా పద్ధతులను అనుసరించండి…"
+      "placeholder": "ఉదా. లోపాలను నిర్వహించడానికి మా పద్ధతులను అనుసరించండి…",
+      "clearTitle": "ప్రత్యేక సూచనలను తీసివేయాలా?",
+      "clearMessage": "ఖాళీ ఫీల్డ్‌ను సేవ్ చేయడం వల్ల ఈ రివ్యూయర్ కోసం నిల్వ చేయబడిన ప్రత్యేక సూచనలు తొలగించబడతాయి."
     },
     "repos": {
       "unavailable": "రిపోజిటరీలు అందుబాటులో లేవు — kilo.aiలో Bitbucket సెటప్‌ను పూర్తి చేయండి.",
@@ -1450,7 +1456,7 @@
       "fixSettings": "సెట్టింగ్‌లను సరిచేయండి",
       "couldNotLoad": "సమీక్షను లోడ్ చేయలేకపోయాము.",
       "couldNotGetLatest": "తాజా వివరాలను పొందలేకపోయాము.",
-      "byline": "{{repo}} #{{number}} — {{author}}",
+      "byline": "#{{number}} — {{author}}",
       "noFindings": "సమస్యలు ఏవీ కనిపించలేదు.",
       "findingsUnavailable": "ఈ సమీక్ష విఫలమైనందున ఫలితాలు అందుబాటులో లేవు.",
       "findingsInProgress": "ఈ సమీక్ష ఇంకా పురోగతిలో ఉంది. పూర్తయిన తర్వాత సమస్యలు ఇక్కడ కనిపిస్తాయి.",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "సమీక్ష శైలి",
       "focusAreas": "దృష్టి పెట్టాల్సిన అంశాలు",
       "allAreas": "అన్ని అంశాలు",
-      "customInstructions": "ప్రత్యేక సూచనలు",
       "set": "సెట్ చేయబడింది",
+      "notSet": "సెట్ చేయబడలేదు",
       "nSelected": "{{displayCount}} ఎంచుకున్నారు",
       "proposedReviewMdGuidance": "REVIEW.md కోసం ప్రతిపాదించిన మార్గదర్శకాలు"
     },
@@ -2060,7 +2066,8 @@
       "actionBlocked": "ఈ చర్యను పూర్తి చేయలేకపోయాము. మళ్లీ ప్రయత్నించే ముందు ఈ సమస్యను పరిష్కరించాలి.",
       "syncNoRepositories": "సింక్ పరిధిలో ఎలాంటి రిపాజిటరీలు లేవు. భద్రతా ఏజెంట్ పర్యవేక్షించే రిపాజిటరీలను ఎంచుకుని, ఆపై మళ్లీ సింక్ చేయండి.",
       "syncIntegrationInactive": "భద్రతా ఏజెంట్ కోసం GitHub కనెక్షన్ యాక్టివ్గా లేదు. Kilo GitHub Appను మళ్లీ కనెక్ట్ చేసి, ఆ తర్వాత మళ్లీ సింక్ చేయండి.",
-      "syncMissingPermission": "Kilo GitHub App vulnerability alertsను చదవలేదు. GitHubలో ఆ అనుమతిని ఇవ్వండి, ఆపై మళ్లీ సింక్ చేయండి."
+      "syncMissingPermission": "Kilo GitHub App vulnerability alertsను చదవలేదు. GitHubలో ఆ అనుమతిని ఇవ్వండి, ఆపై మళ్లీ సింక్ చేయండి.",
+      "configConflict": "భద్రతా ఏజెంట్ సెట్టింగ్‌లు మరో చోట మార్చబడ్డాయి. తాజా సెట్టింగ్‌లను సమీక్షించి మళ్లీ సేవ్ చేయండి."
     },
     "analysisState": {
       "queued": "విశ్లేషణ క్యూలో ఉంది",
@@ -2367,13 +2374,14 @@
       "forkFilesUnchangedOnComputer": "ఈ కంప్యూటర్‌లోని ఫైల్‌లు మారవు.",
       "pickProfile": "ప్రొఫైల్‌ని ఎంచుకోండి",
       "noProfile": "ప్రొఫైల్ లేదు",
+      "defaultProfileResolvesTo": "ప్రస్తుతం {{name}}కి సెట్ చేయబడి ఉంది",
+      "defaultProfileResolvesToAccessibility": "డిఫాల్ట్ ప్రొఫైల్: {{name}}",
       "manageProfiles": "ప్రొఫైల్‌లను నిర్వహించండి",
       "noProfiles": "ఇంకా ప్రొఫైల్‌లు లేవు. ఎన్విరాన్మెంట్ వేరియబుల్స్, MCP సర్వర్‌లు మరియు నైపుణ్యాలను జోడించడానికి ఒకదాన్ని సృష్టించండి.",
       "advancedConfig": "అధునాతన కాన్ఫిగరేషన్",
       "advancedConfigDescription": "ఇది ఈ సెషన్‌కు వర్తిస్తుంది. ప్రొఫైల్‌గా సేవ్ చేస్తే తదుపరి సారికి ఉంటుంది.",
       "saveAsProfile": "ప్రొఫైల్‌గా సేవ్ చేయండి",
       "saveProfileDescription": "ప్రస్తుత ఎన్విరాన్మెంట్ వేరియబుల్స్ మరియు సెటప్ ఆదేశాలను పునర్వినియోగ ప్రొఫైల్‌గా సేవ్ చేయండి.",
-      "profileSummary": "{{vars}} ఎన్విరాన్మెంట్ వేరియబుల్స్ · {{commands}} సెటప్ ఆదేశాలు",
       "profileSaved": "ప్రొఫైల్ \"{{name}}\" సేవ్ చేయబడింది",
       "organizationProfiles": "సంస్థ ప్రొఫైల్స్",
       "personalProfiles": "వ్యక్తిగత ప్రొఫైల్‌లు",
@@ -2735,7 +2743,6 @@
     },
     "modelSelector": {
       "provider": "ప్రొవైడర్ {{id}}",
-      "modelId": "మోడల్ {{id}}",
       "unavailable": "అందుబాటులో లేదు",
       "unavailableState": "అందుబాటులో లేదు",
       "selectedState": "ఎంచుకున్నది",
@@ -4145,7 +4152,8 @@
     "sources": "ఆధారాలు మరియు ఆర్టిఫ్యాక్ట్‌లు",
     "timezone": "బ్రీఫింగ్ టైమ్ జోన్",
     "deviceTimezone": "పరికర టైమ్ జోన్ ఉపయోగించండి",
-    "timezoneHint": "IANA టైమ్ జోన్, ఉదాహరణకు Europe/Berlin. షెడ్యూల్ మార్పులు రాబోయే బ్రీఫింగ్‌లకు వర్తిస్తాయి.",
+    "timezoneHint": "IANA టైమ్ జోన్, ఉదాహరణకు Europe/Berlin.",
+    "scheduleHint": "షెడ్యూల్ మార్పులు రాబోయే బ్రీఫింగ్‌లకు వర్తిస్తాయి.",
     "nightStart": "బ్రీఫింగ్ కాలవ్యవధి ప్రారంభం",
     "morningStart": "బ్రీఫింగ్ సిద్ధమయ్యే సమయం",
     "morningEnd": "బ్రీఫింగ్ అందుబాటులో ఉండే చివరి సమయం",

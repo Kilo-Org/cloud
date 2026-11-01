@@ -889,7 +889,9 @@
     "instructions": {
       "title": "カスタム指示",
       "deprecation": "カスタム指示は廃止予定です。これらのガイドラインをリポジトリ内のREVIEW.mdファイルに移動してください。",
-      "placeholder": "例：エラー処理の規則に従っているか確認…"
+      "placeholder": "例：エラー処理の規則に従っているか確認…",
+      "clearTitle": "カスタム指示を削除しますか？",
+      "clearMessage": "空のフィールドを保存すると、このレビュアーに保存されているカスタム指示が削除されます。"
     },
     "repos": {
       "unavailable": "リポジトリを利用できません。kilo.aiでBitbucketのセットアップを完了してください。",
@@ -965,7 +967,7 @@
       "bitbucketError": "Bitbucketのセットアップを開けませんでした。もう一度お試しください。"
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · {{author}}",
+      "byline": "#{{number}} · {{author}}",
       "cancelMessage": "実行中のコードレビューを停止します。",
       "cancelReview": "レビューをキャンセル",
       "cancelTitle": "レビューをキャンセルしますか？",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "すべての領域",
-      "customInstructions": "カスタム指示",
       "focusAreas": "重点項目",
       "nSelected": "{{displayCount}}件選択中",
       "proposedReviewMdGuidance": "REVIEW.mdに記載する指針の提案",
       "reviewStyle": "レビュースタイル",
-      "set": "設定済み"
+      "set": "設定済み",
+      "notSet": "未設定"
     },
     "updateFailed": "レビュアーを更新できませんでした。",
     "configSaveFailed": "レビュー設定を保存できませんでした。",
@@ -1534,7 +1536,8 @@
       "actionBlocked": "この操作を完了できませんでした。再試行するには、まず問題を解決する必要があります。",
       "syncNoRepositories": "同期対象にリポジトリがありません。セキュリティエージェントが監視するリポジトリを選択してから、もう一度同期してください。",
       "syncIntegrationInactive": "セキュリティエージェントの GitHub 接続が有効になっていません。Kilo GitHub App を再接続してから、もう一度同期してください。",
-      "syncMissingPermission": "Kilo GitHub App は vulnerability alerts を読み取れません。GitHub でその権限を付与してから、もう一度同期してください。"
+      "syncMissingPermission": "Kilo GitHub App は vulnerability alerts を読み取れません。GitHub でその権限を付与してから、もう一度同期してください。",
+      "configConflict": "セキュリティエージェントの設定が別の場所で変更されました。最新の設定を確認して、もう一度保存してください。"
     },
     "analysisState": {
       "queued": "分析の順番待ち",
@@ -1841,13 +1844,14 @@
       "forkFilesUnchangedOnComputer": "このコンピューター上のファイルは変更されません。",
       "pickProfile": "プロフィールを選択してください",
       "noProfile": "プロフィールなし",
+      "defaultProfileResolvesTo": "{{name}}に対応",
+      "defaultProfileResolvesToAccessibility": "デフォルトのプロフィール：{{name}}",
       "manageProfiles": "プロフィールの管理",
       "noProfiles": "まだプロフィールはありません。環境変数、MCP サーバー、スキルを追加するために作成します。",
       "advancedConfig": "高度な構成",
       "advancedConfigDescription": "このセッションに適用されます。プロフィールとして保存すると、次回も使えます。",
       "saveAsProfile": "プロフィールとして保存",
       "saveProfileDescription": "現在の環境変数とセットアップ コマンドを再利用可能なプロフィールとして保存します。",
-      "profileSummary": "{{vars}} 環境変数 · {{commands}} セットアップ コマンド",
       "profileSaved": "プロフィール「{{name}}」が保存されました",
       "organizationProfiles": "組織プロフィール",
       "personalProfiles": "個人プロフィール",
@@ -2209,7 +2213,6 @@
     },
     "modelSelector": {
       "provider": "プロバイダー {{id}}",
-      "modelId": "モデル {{id}}",
       "unavailable": "利用不可",
       "unavailableState": "利用不可",
       "selectedState": "選択済み",
@@ -2713,6 +2716,9 @@
       "gitlabDescription": "モバイルでマージリクエストをレビュー",
       "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
       "bitbucketOrgOnlyNoOrganizationDescription": "このアカウントにはまだ組織がありません。組織を作成または参加すると、Bitbucketのプルリクエストをレビューできるようになります。",
+      "gitlabReconnectAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に再接続を依頼してください。",
+      "bitbucketNotConnectedTitle": "Bitbucketが接続されていません",
+      "bitbucketAdminOnlyDescription": "接続できるのは組織のオーナー、管理者、請求管理者のみです。",
       "contextLine": "{{organization}}用",
       "contextLinePersonal": "個人用"
     },
@@ -2944,6 +2950,7 @@
     "installKiloGitHubApp": "Kilo GitHub Appをインストール",
     "merge": {
       "merge": "マージ",
+      "mergeTitle": "マージ",
       "mergeNow": "今すぐマージ",
       "mergePullRequest": "プルリクエストのマージ",
       "mergeTermTitle": "{{term}}のマージ",
@@ -4145,7 +4152,8 @@
     "sources": "根拠と成果物",
     "timezone": "ブリーフィングのタイムゾーン",
     "deviceTimezone": "デバイスのタイムゾーンを使用",
-    "timezoneHint": "IANAタイムゾーン(例: Europe/Berlin)。スケジュールの変更は今後のブリーフに適用されます。",
+    "timezoneHint": "IANAタイムゾーン(例: Europe/Berlin)。",
+    "scheduleHint": "スケジュールの変更は今後のブリーフに適用されます。",
     "nightStart": "ブリーフ期間の開始",
     "morningStart": "ブリーフの準備完了時刻",
     "morningEnd": "ブリーフの利用可能期限",

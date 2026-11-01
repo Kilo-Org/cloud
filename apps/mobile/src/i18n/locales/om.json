@@ -403,6 +403,7 @@
     "connectionExpired": "Yeroon walitti hidhamiinsa GitHub darbeera.",
     "merge": {
       "merge": "Walitti makuu",
+      "mergeTitle": "Walitti makuu",
       "mergeNow": "Amma walitti maki",
       "mergePullRequest": "Gaaffii walitti makuu raawwachuu",
       "mergeTermTitle": "{{term}} raawwachuu",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Gaaffiiwwan walitti makuu mobaayilaan sakatta'i",
       "bitbucketOrgOnlyDescription": "Herrega gubbaa jiru gara dhaabbataatti jijjiiri, dhaabbata sanaa gaaffiiwwan walitti makuu Bitbucket ilaaluuf.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Herrega kun dhaabbilee ammas hin qabu. Dhaabbata uumtee yookiin dhaabbataatti seeteen, gaaffiiwwan walitti makuu Bitbucket ilaaluu ni dandeessa.",
+      "gitlabReconnectAdminOnlyDescription": "Isa irra deebi'ii akka walqabsiisuuf dhaabbataa abbaa dhaabbataa, bulchaa, ykn bulchaa kaffaltii tokko gaafadhu.",
+      "bitbucketNotConnectedTitle": "Bitbucket hin walqabsiifamne",
+      "bitbucketAdminOnlyDescription": "Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u.",
       "contextLine": "{{organization}}iif",
       "contextLinePersonal": "Dhuunfaa'iif"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Qajeelfamoota dhuunfaa",
       "deprecation": "Qajeelfamoota dhuunfaa hojii ala gochuuf karoorfameera. Qajeelfamoota kana bakka isaanii faayila REVIEW.md kuusaa koodii kee keessa jirutti dabarsi.",
-      "placeholder": "fkn. Akkaataa dogoggora itti qabnu kabachiisuu…"
+      "placeholder": "fkn. Akkaataa dogoggora itti qabnu kabachiisuu…",
+      "clearTitle": "Qajeelfamoota dhuunfaa keessaa baasuu barbaaddaa?",
+      "clearMessage": "Bakka duwwaa olkaa'uun qajeelfamoota dhuunfaa qorataa kanaaf kuufaman ni balleessa."
     },
     "repos": {
       "unavailable": "Kuusaawwan koodii hin argaman — qophii Bitbucket kilo.ai irratti xumuri.",
@@ -1450,7 +1456,7 @@
       "fixSettings": "Qindaa'ina sirreessi",
       "couldNotLoad": "Sakatta'a fe'uun hin danda'amne.",
       "couldNotGetLatest": "Odeeffannoo ammaa argachuun hin danda'amne.",
-      "byline": "{{repo}} #{{number}} kan {{author}}",
+      "byline": "#{{number}} kan {{author}}",
       "noFindings": "Argamni hin jiru.",
       "findingsUnavailable": "Sakatta'i kun waan hin milkoofneef bu'aawwan hin argaman.",
       "findingsInProgress": "Sakatta'i kun hojjetaa jira. Yeroo xumuru argamni asitti mul'ata.",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "Haala sakatta'aa",
       "focusAreas": "Dhimmoota xiyyeeffannoo",
       "allAreas": "Kutaa hunda",
-      "customInstructions": "Qajeelfamoota dhuunfaa",
       "set": "Qindaa'e",
+      "notSet": "Hin qindaa'e",
       "nSelected": "{{displayCount}} filatamaniiru",
       "proposedReviewMdGuidance": "Qajeelfama REVIEW.md dhihaate"
     },
@@ -2060,7 +2066,8 @@
       "actionBlocked": "Tarkaanfa kana xumuruu hin dandeenye. Rakkoon kana duraan furuu qaba.",
       "syncNoRepositories": "Kuusaawwan koodii tokkollee daangaa syncii keessa hin jiran. Kuusaawwan koodii Eejentii nageenyaa hordofu filadhu, sana booda irra deebi'ii sync godhi.",
       "syncIntegrationInactive": "Walitti hidhinni GitHub Eejentii nageenyaaf hin hojjetu. Appii GitHub Kilo irra deebi'ii walitti hidhi, sana booda irra deebi'ii sync godhi.",
-      "syncMissingPermission": "Appiin GitHub Kilo vulnerability alerts dubbisuu hin danda'u. Hayyama sana GitHub keessatti kenni, sana booda irra deebi'ii sync godhi."
+      "syncMissingPermission": "Appiin GitHub Kilo vulnerability alerts dubbisuu hin danda'u. Hayyama sana GitHub keessatti kenni, sana booda irra deebi'ii sync godhi.",
+      "configConflict": "Qindaa'inni Eejantii nageenyaa bakka biraatti jijjiirame. Qindaa'ina haaraa ilaaliitii irra deebi'ii kuusi."
     },
     "analysisState": {
       "queued": "Xiinxalli dabaree eeggachaa jira",
@@ -2367,13 +2374,14 @@
       "forkFilesUnchangedOnComputer": "Faayiloonni kompiitara kana irra jiran hin jijjiiraman.",
       "pickProfile": "Profaayila tokko filadhu",
       "noProfile": "Profaayila hin qabu",
+      "defaultProfileResolvesTo": "Amma {{name}} ti",
+      "defaultProfileResolvesToAccessibility": "Profaayilii durtii: {{name}}",
       "manageProfiles": "Profaayilii bulchuu",
       "noProfiles": "Ammatti piroofaayilii hin jiru. Jijjiiramoota naannoo, sarvaroota MCP, fi dandeettiiwwan dabaluudhaaf tokko uumi.",
       "advancedConfig": "Qindeessituu Ol'aanaa",
       "advancedConfigDescription": "Kutaa kanaaf ni hojjeta. Akka Profile tti yoo saagte yeroo itti aanuuf ni tura.",
       "saveAsProfile": "Akka Profile tti saagi",
       "saveProfileDescription": "Jijjiiramoota naannoo ammaa fi ajajoota saaguu akka piroofaayilii irra deebi'amee fayyadamuu danda'utti saagi.",
-      "profileSummary": "{{vars}} jijjiiramoota naannoo · {{commands}} ajajoota saaguu",
       "profileSaved": "Profaayilii \"{{name}}\" qusatameera",
       "organizationProfiles": "Profaayilii Jaarmiyaa",
       "personalProfiles": "Profaayilii Dhuunfaa",
@@ -2735,7 +2743,6 @@
     },
     "modelSelector": {
       "provider": "Dhiyeessaa {{id}}",
-      "modelId": "Moodela {{id}}",
       "unavailable": "Hin argamu",
       "unavailableState": "hin argamu",
       "selectedState": "filatame",
@@ -4145,7 +4152,8 @@
     "sources": "Ragaalee fi meeshaalee",
     "timezone": "Zoonii yeroo gabaasaa",
     "deviceTimezone": "Zoonii yeroo meeshaa fayyadami",
-    "timezoneHint": "Zoonii yeroo IANA, fakkeenyaaf Europe/Berlin. Jijjiiramni sagantaa gabaasota dhufaniif hojjeta.",
+    "timezoneHint": "Zoonii yeroo IANA, fakkeenyaaf Europe/Berlin.",
+    "scheduleHint": "Jijjiiramni sagantaa gabaasota dhufaniif hojjeta.",
     "nightStart": "Yeroo gabaasaa jalqaba",
     "morningStart": "Yeroo gabaasni qophaa'u",
     "morningEnd": "Gabaasni hanga yeroo jiraatu",

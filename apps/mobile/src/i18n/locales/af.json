@@ -403,6 +403,7 @@
     "connectionExpired": "Die GitHub-verbinding het verval.",
     "merge": {
       "merge": "Samevoeging",
+      "mergeTitle": "Samevoeging",
       "mergeNow": "Voeg nou saam",
       "mergePullRequest": "Voeg trekversoek saam",
       "mergeTermTitle": "Voeg {{term}} saam",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Hersien merge requests op jou selfoon",
       "bitbucketOrgOnlyDescription": "Skakel die rekening hierbo oor na 'n organisasie om sy Bitbucket-trekversoeke te hersien.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Hierdie rekening het nog geen organisasies nie. Bitbucket-trekversoeke kan hersien word sodra jy 'n organisasie skep of by een aansluit.",
+      "gitlabReconnectAdminOnlyDescription": "Vra 'n organisasie-eienaar, administrateur of faktureringsbestuurder om dit weer te koppel.",
+      "bitbucketNotConnectedTitle": "Bitbucket is nie gekoppel nie",
+      "bitbucketAdminOnlyDescription": "Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel.",
       "contextLine": "Vir {{organization}}",
       "contextLinePersonal": "Vir jou persoonlike rekening"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Pasgemaakte instruksies",
       "deprecation": "Pasgemaakte instruksies sal uitgefaseer word. Skuif hierdie riglyne eerder na 'n REVIEW.md-lêer in jou bewaarplek.",
-      "placeholder": "bv. Pas ons konvensies vir foutafhandeling toe…"
+      "placeholder": "bv. Pas ons konvensies vir foutafhandeling toe…",
+      "clearTitle": "Pasgemaakte instruksies verwyder?",
+      "clearMessage": "As jy 'n leë veld stoor, word die pasgemaakte instruksies wat vir hierdie resensent gestoor is, verwyder."
     },
     "repos": {
       "unavailable": "Die bewaarplekke is nie beskikbaar nie. Voltooi die Bitbucket-opstelling op kilo.ai.",
@@ -1450,7 +1456,7 @@
       "fixSettings": "Herstel instellings",
       "couldNotLoad": "Die hersiening kon nie gelaai word nie.",
       "couldNotGetLatest": "Die jongste data kon nie verkry word nie.",
-      "byline": "{{repo}} #{{number}} deur {{author}}",
+      "byline": "#{{number}} deur {{author}}",
       "noFindings": "Daar is geen bevindings nie.",
       "findingsUnavailable": "Resultate is nie beskikbaar nie omdat hierdie hersiening misluk het.",
       "findingsInProgress": "Hierdie hersiening is nog besig. Bevindings verskyn hier wanneer dit klaar is.",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "Hersieningstyl",
       "focusAreas": "Fokusareas",
       "allAreas": "Alle fokusareas",
-      "customInstructions": "Pasgemaakte instruksies",
       "set": "Ingestel",
+      "notSet": "Nie ingestel nie",
       "nSelected": "{{displayCount}} gekies",
       "proposedReviewMdGuidance": "Voorgestelde REVIEW.md-riglyne"
     },
@@ -2060,7 +2066,8 @@
       "actionBlocked": "Hierdie aksie kon nie voltooi word nie. Die probleem moet eers reggemaak word voordat jy weer kan probeer.",
       "syncNoRepositories": "Geen bewaarplekke is in die sinkroniseringsomvang nie. Kies die bewaarplekke wat die Sekuriteitsagent monitor en sinkroniseer dan weer.",
       "syncIntegrationInactive": "Die GitHub-verbinding vir die Sekuriteitsagent is nie aktief nie. Herkoppel die Kilo GitHub-app en sinkroniseer dan weer.",
-      "syncMissingPermission": "Die Kilo GitHub-app kan nie kwesbaarheidswaarskuwings lees nie. Verleen daardie toestemming in GitHub en sinkroniseer dan weer."
+      "syncMissingPermission": "Die Kilo GitHub-app kan nie kwesbaarheidswaarskuwings lees nie. Verleen daardie toestemming in GitHub en sinkroniseer dan weer.",
+      "configConflict": "Die Sekuriteitsagent se instellings is elders verander. Hersien die nuutste instellings en stoor weer."
     },
     "analysisState": {
       "queued": "Ontleding in die tou",
@@ -2367,13 +2374,14 @@
       "forkFilesUnchangedOnComputer": "Lêers op hierdie rekenaar word nie verander nie.",
       "pickProfile": "Kies 'n profiel",
       "noProfile": "Geen profiel nie",
+      "defaultProfileResolvesTo": "Los tans op {{name}}",
+      "defaultProfileResolvesToAccessibility": "Verstek profiel: {{name}}",
       "manageProfiles": "Bestuur profiele",
       "noProfiles": "Nog geen profiele nie. Skep een om omgewingsveranderlikes, MCP-bedieners en vaardighede by te voeg.",
       "advancedConfig": "Gevorderde konfigurasie",
       "advancedConfigDescription": "Geld vir hierdie sessie. As jy dit as profiel stoor, bly dit vir volgende keer.",
       "saveAsProfile": "Stoor as profiel",
       "saveProfileDescription": "Stoor die huidige omgewingsveranderlikes en opstelopdragte as 'n herbruikbare profiel.",
-      "profileSummary": "{{vars}} omgewingsveranderlikes · {{commands}} opstelopdragte",
       "profileSaved": "Profiel \"{{name}}\" is gestoor",
       "organizationProfiles": "Organisasie profiele",
       "personalProfiles": "Persoonlike profiele",
@@ -2735,7 +2743,6 @@
     },
     "modelSelector": {
       "provider": "Verskaffer {{id}}",
-      "modelId": "Model-ID: {{id}}",
       "unavailable": "Onbeskikbaar",
       "unavailableState": "onbeskikbaar",
       "selectedState": "gekies",
@@ -4145,7 +4152,8 @@
     "sources": "Bewyse en artefakte",
     "timezone": "Verslag-tydsone",
     "deviceTimezone": "Gebruik toestel-tydsone",
-    "timezoneHint": "IANA-tydsone, byvoorbeeld Europe/Berlin. Skedulewysigings geld vir toekomstige verslae.",
+    "timezoneHint": "IANA-tydsone, byvoorbeeld Europe/Berlin.",
+    "scheduleHint": "Skedulewysigings geld vir toekomstige verslae.",
     "nightStart": "Verslagvenster begin",
     "morningStart": "Verslag gereed om",
     "morningEnd": "Verslag beskikbaar tot",

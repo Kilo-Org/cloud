@@ -403,6 +403,7 @@
     "connectionExpired": "Sambungan GitHub telah tamat tempoh.",
     "merge": {
       "merge": "Gabungan",
+      "mergeTitle": "Gabungan",
       "mergeNow": "Gabungkan sekarang",
       "mergePullRequest": "Gabungkan permintaan tarik",
       "mergeTermTitle": "Gabungkan {{term}}",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Semak permintaan gabungan pada peranti mudah alih",
       "bitbucketOrgOnlyDescription": "Tukar akaun di atas kepada organisasi untuk menyemak permintaan tarik Bitbucket-nya.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaun ini belum mempunyai sebarang organisasi. Permintaan tarik Bitbucket boleh disemak setelah anda mencipta atau menyertai sebuah organisasi.",
+      "gitlabReconnectAdminOnlyDescription": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menyambungkannya.",
+      "bitbucketNotConnectedTitle": "Bitbucket tidak disambungkan",
+      "bitbucketAdminOnlyDescription": "Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akaun peribadi anda"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Arahan tersuai",
       "deprecation": "Ciri arahan tersuai akan dihentikan. Pindahkan garis panduan ini ke dalam fail REVIEW.md dalam repositori anda.",
-      "placeholder": "contohnya, pastikan kod mematuhi konvensyen pengendalian ralat kami…"
+      "placeholder": "contohnya, pastikan kod mematuhi konvensyen pengendalian ralat kami…",
+      "clearTitle": "Buang arahan tersuai?",
+      "clearMessage": "Menyimpan medan kosong akan memadamkan arahan tersuai yang disimpan untuk pengulas ini."
     },
     "repos": {
       "unavailable": "Repositori tidak tersedia — selesaikan persediaan Bitbucket di kilo.ai.",
@@ -1450,7 +1456,7 @@
       "fixSettings": "Betulkan tetapan",
       "couldNotLoad": "Tidak dapat memuatkan semakan.",
       "couldNotGetLatest": "Tidak dapat mendapatkan maklumat terkini.",
-      "byline": "{{repo}} #{{number}} oleh {{author}}",
+      "byline": "#{{number}} oleh {{author}}",
       "noFindings": "Tiada penemuan.",
       "findingsUnavailable": "Keputusan tidak tersedia kerana semakan ini gagal.",
       "findingsInProgress": "Semakan ini masih dijalankan. Penemuan akan dipaparkan di sini apabila ia selesai.",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "Gaya semakan",
       "focusAreas": "Bidang fokus",
       "allAreas": "Semua bidang",
-      "customInstructions": "Arahan tersuai",
       "set": "Ditetapkan",
+      "notSet": "Tidak ditetapkan",
       "nSelected": "{{displayCount}} dipilih",
       "proposedReviewMdGuidance": "Cadangan panduan REVIEW.md"
     },
@@ -2060,7 +2066,8 @@
       "actionBlocked": "Tindakan ini tidak dapat disiapkan. Masalah ini perlu diselesaikan terlebih dahulu.",
       "syncNoRepositories": "Tiada repositori dalam skop segerak. Pilih repositori yang dipantau oleh Ejen Keselamatan, kemudian segerakkan semula.",
       "syncIntegrationInactive": "Sambungan GitHub untuk Ejen Keselamatan tidak aktif. Sambung semula Apl GitHub Kilo, kemudian segerakkan semula.",
-      "syncMissingPermission": "Apl GitHub Kilo tidak dapat membaca makluman kerentanan. Berikan kebenaran itu dalam GitHub, kemudian segerakkan semula."
+      "syncMissingPermission": "Apl GitHub Kilo tidak dapat membaca makluman kerentanan. Berikan kebenaran itu dalam GitHub, kemudian segerakkan semula.",
+      "configConflict": "Tetapan Ejen Keselamatan diubah di tempat lain. Semak tetapan terkini dan simpan semula."
     },
     "analysisState": {
       "queued": "Analisis dalam baris gilir",
@@ -2367,13 +2374,14 @@
       "forkFilesUnchangedOnComputer": "Fail pada komputer ini tidak diubah.",
       "pickProfile": "Pilih profil",
       "noProfile": "Tiada profil",
+      "defaultProfileResolvesTo": "Bersamaan dengan {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profil lalai: {{name}}",
       "manageProfiles": "Urus profil",
       "noProfiles": "Tiada profil lagi. Buat satu untuk menambah pembolehubah persekitaran, pelayan MCP dan kemahiran.",
       "advancedConfig": "Konfigurasi Lanjutan",
       "advancedConfigDescription": "Terpakai untuk sesi ini. Menyimpannya sebagai profil mengekalkannya untuk kali seterusnya.",
       "saveAsProfile": "Simpan sebagai Profil",
       "saveProfileDescription": "Simpan pembolehubah persekitaran semasa dan arahan persediaan sebagai profil boleh guna semula.",
-      "profileSummary": "{{vars}} pembolehubah persekitaran · {{commands}} arahan persediaan",
       "profileSaved": "Profil \"{{name}}\" disimpan",
       "organizationProfiles": "Profil Organisasi",
       "personalProfiles": "Profil Peribadi",
@@ -2735,7 +2743,6 @@
     },
     "modelSelector": {
       "provider": "Penyedia {{id}}",
-      "modelId": "Model AI {{id}}",
       "unavailable": "Tidak tersedia",
       "unavailableState": "tidak tersedia",
       "selectedState": "dipilih",
@@ -4145,7 +4152,8 @@
     "sources": "Bukti dan artifak",
     "timezone": "Zon waktu laporan",
     "deviceTimezone": "Guna zon waktu peranti",
-    "timezoneHint": "Zon waktu IANA, contohnya Europe/Berlin. Perubahan jadual berkuat kuasa untuk laporan akan datang.",
+    "timezoneHint": "Zon waktu IANA, contohnya Europe/Berlin.",
+    "scheduleHint": "Perubahan jadual berkuat kuasa untuk laporan akan datang.",
     "nightStart": "Tempoh laporan bermula",
     "morningStart": "Laporan sedia pada",
     "morningEnd": "Laporan tersedia sehingga",

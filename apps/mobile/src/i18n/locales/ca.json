@@ -410,6 +410,7 @@
     "connectionExpired": "La connexió amb GitHub ha caducat.",
     "merge": {
       "merge": "Fusió",
+      "mergeTitle": "Fusió",
       "mergeNow": "Fusiona ara",
       "mergePullRequest": "Fusió de la sol·licitud d'integració",
       "mergeTermTitle": "Fusió de la {{term}}",
@@ -697,6 +698,9 @@
       "gitlabDescription": "Revisa les sol·licituds de fusió al mòbil",
       "bitbucketOrgOnlyDescription": "Canvia el compte de dalt a una organització per revisar-ne les sol·licituds d'integració a Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Aquest compte encara no té cap organització. Les sol·licituds d'integració de Bitbucket es poden revisar quan creeu o us uniu a una organització.",
+      "gitlabReconnectAdminOnlyDescription": "Demana a un Propietari, Administrador o Gestor de facturació de l'organització que la reconnecti.",
+      "bitbucketNotConnectedTitle": "Bitbucket no està connectat",
+      "bitbucketAdminOnlyDescription": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
       "contextLine": "Per a {{organization}}",
       "contextLinePersonal": "Per a ús personal"
     },
@@ -1437,7 +1441,9 @@
     "instructions": {
       "title": "Instruccions personalitzades",
       "deprecation": "Està previst retirar les instruccions personalitzades. Trasllada aquestes pautes a un fitxer REVIEW.md del teu repositori.",
-      "placeholder": "p. ex., aplica les nostres convencions de gestió d'errors…"
+      "placeholder": "p. ex., aplica les nostres convencions de gestió d'errors…",
+      "clearTitle": "Vols eliminar les instruccions personalitzades?",
+      "clearMessage": "Si deses el camp buit, s'eliminaran les instruccions personalitzades emmagatzemades per a aquest revisor."
     },
     "repos": {
       "unavailable": "Els repositoris no estan disponibles. Acaba la configuració de Bitbucket a kilo.ai.",
@@ -1472,7 +1478,7 @@
       "fixSettings": "Corregeix la configuració",
       "couldNotLoad": "No s'ha pogut carregar la revisió.",
       "couldNotGetLatest": "No s'han pogut obtenir les dades més recents.",
-      "byline": "{{repo}} #{{number}} · Autor: {{author}}",
+      "byline": "#{{number}} · Autor: {{author}}",
       "noFindings": "No hi ha incidències.",
       "findingsUnavailable": "Els resultats no estan disponibles perquè aquesta revisió ha fallat.",
       "findingsInProgress": "Aquesta revisió encara està en curs. Les incidències apareixeran aquí quan finalitzi.",
@@ -1624,8 +1630,8 @@
       "reviewStyle": "Estil de revisió",
       "focusAreas": "Àrees de revisió",
       "allAreas": "Totes les àrees",
-      "customInstructions": "Instruccions personalitzades",
       "set": "Definit",
+      "notSet": "No definit",
       "nSelected": "{{displayCount}} àrees seleccionades",
       "proposedReviewMdGuidance": "Pautes proposades per a REVIEW.md"
     },
@@ -2093,7 +2099,8 @@
       "actionBlocked": "No s'ha pogut completar aquesta acció. Cal resoldre el problema abans de poder tornar-ho a provar.",
       "syncNoRepositories": "No hi ha cap repositori a l'abast de la sincronització. Tria quins repositoris supervisa l'agent de seguretat i torna a sincronitzar.",
       "syncIntegrationInactive": "La connexió de GitHub per a l'agent de seguretat no està activa. Torna a connectar l'aplicació de GitHub de Kilo i torna a sincronitzar.",
-      "syncMissingPermission": "L'aplicació de GitHub de Kilo no pot llegir els avisos de vulnerabilitat. Concedeix aquest permís a GitHub i torna a sincronitzar."
+      "syncMissingPermission": "L'aplicació de GitHub de Kilo no pot llegir els avisos de vulnerabilitat. Concedeix aquest permís a GitHub i torna a sincronitzar.",
+      "configConflict": "La configuració de l'agent de seguretat s'ha canviat en un altre lloc. Revisa la configuració més recent i desa de nou."
     },
     "analysisState": {
       "queued": "Anàlisi en cua",
@@ -2404,13 +2411,14 @@
       "forkFilesUnchangedOnComputer": "Els fitxers d'aquest ordinador no es modifiquen.",
       "pickProfile": "Tria un perfil",
       "noProfile": "Sense perfil",
+      "defaultProfileResolvesTo": "Correspon a {{name}}",
+      "defaultProfileResolvesToAccessibility": "Perfil predeterminat: {{name}}",
       "manageProfiles": "Gestionar perfils",
       "noProfiles": "Encara no hi ha perfils. Creeu-ne un per afegir variables d'entorn, servidors MCP i habilitats.",
       "advancedConfig": "Configuració avançada",
       "advancedConfigDescription": "S’aplica a aquesta sessió. Desar-ho com a perfil ho conserva per a la propera vegada.",
       "saveAsProfile": "Desa com a perfil",
       "saveProfileDescription": "Deseu les variables d'entorn actuals i configureu les ordres com a perfil reutilitzable.",
-      "profileSummary": "{{vars}} variables d'entorn · {{commands}} ordres de configuració",
       "profileSaved": "S'ha desat el perfil \"{{name}}\".",
       "organizationProfiles": "Perfils de l'organització",
       "personalProfiles": "Perfils personals",
@@ -2777,7 +2785,6 @@
     },
     "modelSelector": {
       "provider": "Proveïdor {{id}}",
-      "modelId": "Model: {{id}}",
       "unavailable": "No disponible",
       "unavailableState": "no disponible",
       "selectedState": "seleccionat",
@@ -4206,7 +4213,8 @@
     "sources": "Proves i artefactes",
     "timezone": "Zona horària de l'informe",
     "deviceTimezone": "Usa la zona horària del dispositiu",
-    "timezoneHint": "Zona horària IANA, per exemple Europe/Berlin. Els canvis d'horari s'apliquen als informes futurs.",
+    "timezoneHint": "Zona horària IANA, per exemple Europe/Berlin.",
+    "scheduleHint": "Els canvis d'horari s'apliquen als informes futurs.",
     "nightStart": "Inici de la finestra de l'informe",
     "morningStart": "Informe a punt a les",
     "morningEnd": "Informe disponible fins a les",

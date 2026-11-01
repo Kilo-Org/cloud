@@ -889,7 +889,9 @@
     "instructions": {
       "title": "Eigen instructies",
       "deprecation": "De functie voor aangepaste instructies wordt op termijn uitgefaseerd. Verplaats deze richtlijnen naar een REVIEW.md-bestand in je repository.",
-      "placeholder": "bijvoorbeeld: onze afspraken over foutafhandeling controleren…"
+      "placeholder": "bijvoorbeeld: onze afspraken over foutafhandeling controleren…",
+      "clearTitle": "Eigen instructies verwijderen?",
+      "clearMessage": "Door een leeg veld op te slaan worden de eigen instructies verwijderd die voor deze reviewer zijn opgeslagen."
     },
     "repos": {
       "unavailable": "De repositories zijn niet beschikbaar. Voltooi het instellen van Bitbucket op kilo.ai.",
@@ -965,7 +967,7 @@
       "bitbucketError": "Het instellen van Bitbucket kon niet worden geopend. Probeer het opnieuw."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} door {{author}}",
+      "byline": "#{{number}} door {{author}}",
       "cancelMessage": "Dit stopt de lopende codereview.",
       "cancelReview": "Review annuleren",
       "cancelTitle": "Review annuleren?",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "Alle aandachtspunten",
-      "customInstructions": "Eigen instructies",
       "focusAreas": "Aandachtspunten",
       "nSelected": "{{displayCount}} geselecteerd",
       "proposedReviewMdGuidance": "Voorgestelde REVIEW.md-richtlijnen",
       "reviewStyle": "Beoordelingsstijl",
-      "set": "Ingesteld"
+      "set": "Ingesteld",
+      "notSet": "Niet ingesteld"
     },
     "updateFailed": "De beoordelaar kon niet worden bijgewerkt.",
     "configSaveFailed": "De reviewinstellingen konden niet worden opgeslagen.",
@@ -1534,7 +1536,8 @@
       "actionBlocked": "Deze actie kon niet worden voltooid. Het probleem moet eerst worden opgelost.",
       "syncNoRepositories": "Geen repositories in het synchronisatiebereik. Kies de repositories die de Beveiligingsagent bewaakt en synchroniseer daarna opnieuw.",
       "syncIntegrationInactive": "De GitHub-koppeling voor de Beveiligingsagent is niet actief. Verbind de Kilo GitHub-app opnieuw en synchroniseer daarna opnieuw.",
-      "syncMissingPermission": "De Kilo GitHub-app kan geen kwetsbaarheidsalerts lezen. Verleen die machtiging in GitHub en synchroniseer daarna opnieuw."
+      "syncMissingPermission": "De Kilo GitHub-app kan geen kwetsbaarheidsalerts lezen. Verleen die machtiging in GitHub en synchroniseer daarna opnieuw.",
+      "configConflict": "De instellingen van de Beveiligingsagent zijn elders gewijzigd. Controleer de nieuwste instellingen en sla opnieuw op."
     },
     "analysisState": {
       "queued": "Analyse in de wachtrij",
@@ -1841,13 +1844,14 @@
       "forkFilesUnchangedOnComputer": "Bestanden op deze computer worden niet gewijzigd.",
       "pickProfile": "Kies een profiel",
       "noProfile": "Geen profiel",
+      "defaultProfileResolvesTo": "Verwijst naar {{name}}",
+      "defaultProfileResolvesToAccessibility": "Standaardprofiel: {{name}}",
       "manageProfiles": "Beheer profielen",
       "noProfiles": "Nog geen profielen. Maak er een om omgevingsvariabelen, MCP-servers en vaardigheden toe te voegen.",
       "advancedConfig": "Geavanceerde configuratie",
       "advancedConfigDescription": "Geldt voor deze sessie. Opslaan als profiel bewaart het voor de volgende keer.",
       "saveAsProfile": "Opslaan als profiel",
       "saveProfileDescription": "Sla de huidige omgevingsvariabelen en installatieopdrachten op als een herbruikbaar profiel.",
-      "profileSummary": "{{vars}} omgevingsvariabelen · {{commands}} installatieopdrachten",
       "profileSaved": "Profiel \"{{name}}\" opgeslagen",
       "organizationProfiles": "Organisatieprofielen",
       "personalProfiles": "Persoonlijke profielen",
@@ -2209,7 +2213,6 @@
     },
     "modelSelector": {
       "provider": "Aanbieder {{id}}",
-      "modelId": "Model: {{id}}",
       "unavailable": "Niet beschikbaar",
       "unavailableState": "niet beschikbaar",
       "selectedState": "geselecteerd",
@@ -2713,6 +2716,9 @@
       "gitlabDescription": "Merge requests op je mobiel beoordelen",
       "bitbucketOrgOnlyDescription": "Wissel het account hierboven naar een organisatie om diens Bitbucket-PR's te beoordelen.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Dit account heeft nog geen organisaties. Je kunt Bitbucket-PR's beoordelen zodra je een organisatie aanmaakt of er lid van wordt.",
+      "gitlabReconnectAdminOnlyDescription": "Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om het opnieuw te koppelen.",
+      "bitbucketNotConnectedTitle": "Bitbucket is niet gekoppeld",
+      "bitbucketAdminOnlyDescription": "Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen.",
       "contextLine": "Voor {{organization}}",
       "contextLinePersonal": "Voor je persoonlijke account"
     },
@@ -2944,6 +2950,7 @@
     "installKiloGitHubApp": "Kilo GitHub-app installeren",
     "merge": {
       "merge": "Samenvoegen",
+      "mergeTitle": "Samenvoegen",
       "mergeNow": "Nu samenvoegen",
       "mergePullRequest": "PR samenvoegen",
       "mergeTermTitle": "{{term}} samenvoegen",
@@ -4145,7 +4152,8 @@
     "sources": "Bewijs en artefacten",
     "timezone": "Tijdzone briefing",
     "deviceTimezone": "Tijdzone van apparaat gebruiken",
-    "timezoneHint": "IANA-tijdzone, bijvoorbeeld Europe/Berlin. Schemawijzigingen gelden voor toekomstige briefings.",
+    "timezoneHint": "IANA-tijdzone, bijvoorbeeld Europe/Berlin.",
+    "scheduleHint": "Schemawijzigingen gelden voor toekomstige briefings.",
     "nightStart": "Briefingvenster begint",
     "morningStart": "Briefing gereed om",
     "morningEnd": "Briefing beschikbaar tot",

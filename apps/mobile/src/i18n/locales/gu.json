@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub કનેક્શનની મુદત પૂરી થઈ ગઈ છે.",
     "merge": {
       "merge": "મર્જ",
+      "mergeTitle": "મર્જ",
       "mergeNow": "હવે મર્જ કરો",
       "mergePullRequest": "પુલ રિક્વેસ્ટ મર્જ",
       "mergeTermTitle": "{{term}} મર્જ",
@@ -682,6 +683,9 @@
       "gitlabDescription": "મોબાઇલ પર મર્જ રિક્વેસ્ટની સમીક્ષા કરો",
       "bitbucketOrgOnlyDescription": "તેની Bitbucket પુલ રિક્વેસ્ટની સમીક્ષા કરવા માટે ઉપરનું એકાઉન્ટ સંસ્થામાં બદલો.",
       "bitbucketOrgOnlyNoOrganizationDescription": "આ એકાઉન્ટમાં હજુ સુધી કોઈ સંસ્થા નથી. તમે સંસ્થા બનાવો કે તેમાં જોડાઓ ત્યારે Bitbucket પુલ રિક્વેસ્ટની સમીક્ષા કરી શકાશે.",
+      "gitlabReconnectAdminOnlyDescription": "તેને ફરી જોડવા માટે સંસ્થાના માલિક, એડમિન અથવા બિલિંગ મેનેજરને વિનંતી કરો.",
+      "bitbucketNotConnectedTitle": "Bitbucket જોડાયેલું નથી",
+      "bitbucketAdminOnlyDescription": "માત્ર સંસ્થાના માલિકો, એડમિનો અને બિલિંગ મેનેજરો જ તેને જોડી શકે છે.",
       "contextLine": "{{organization}} માટે",
       "contextLinePersonal": "તમારા વ્યક્તિગત એકાઉન્ટ માટે"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "પોતાની સૂચનાઓ",
       "deprecation": "કસ્ટમ સૂચનાઓની સુવિધા બંધ કરવાની યોજના છે. તેના બદલે આ માર્ગદર્શિકા તમારી રિપોઝિટરીની REVIEW.md ફાઇલમાં મૂકો.",
-      "placeholder": "દા.ત. ભૂલો સંભાળવાના અમારા નિયમોનું પાલન…"
+      "placeholder": "દા.ત. ભૂલો સંભાળવાના અમારા નિયમોનું પાલન…",
+      "clearTitle": "શું પોતાની સૂચનાઓ દૂર કરવી છે?",
+      "clearMessage": "ખાલી ફીલ્ડ સાચવવાથી આ રિવ્યુઅર માટે સંગ્રહિત પોતાની સૂચનાઓ કાઢી નાખાય છે."
     },
     "repos": {
       "unavailable": "રિપોઝિટરીઓ ઉપલબ્ધ નથી — kilo.ai પર Bitbucket નું સેટઅપ પૂરું કરો.",
@@ -1450,7 +1456,7 @@
       "fixSettings": "સેટિંગ્સ સુધારો",
       "couldNotLoad": "સમીક્ષા લોડ કરી શકાઈ નહીં.",
       "couldNotGetLatest": "નવીનતમ માહિતી મેળવી શકાઈ નહીં.",
-      "byline": "{{author}} દ્વારા {{repo}} #{{number}}",
+      "byline": "{{author}} દ્વારા #{{number}}",
       "noFindings": "કોઈ તારણ મળ્યું નથી.",
       "findingsUnavailable": "આ સમીક્ષા નિષ્ફળ ગઈ હોવાથી પરિણામો ઉપલબ્ધ નથી.",
       "findingsInProgress": "આ સમીક્ષા હજુ પ્રગતિમાં છે. તે પૂર્ણ થતાં તારણ અહીં દેખાશે.",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "સમીક્ષાની શૈલી",
       "focusAreas": "ધ્યાન આપવાના મુદ્દા",
       "allAreas": "બધા ક્ષેત્રો",
-      "customInstructions": "પોતાની સૂચનાઓ",
       "set": "ગોઠવેલું",
+      "notSet": "ગોઠવેલું નથી",
       "nSelected": "{{displayCount}} પસંદ કરેલ",
       "proposedReviewMdGuidance": "REVIEW.md માટે સૂચવેલી માર્ગદર્શિકા"
     },
@@ -2066,7 +2072,8 @@
       "actionBlocked": "આ ક્રિયા પૂર્ણ કરી શકાઈ નહીં. ફરી પ્રયાસ કરતાં પહેલાં સમસ્યા ઠીક કરવી પડશે.",
       "syncNoRepositories": "કોઈ પણ રિપોઝિટરી સિંક સ્કોપમાં નથી. સુરક્ષા એજન્ટ કઈ રિપોઝિટરીઓ મોનિટર કરે તે પસંદ કરો, પછી ફરીથી સિંક કરો.",
       "syncIntegrationInactive": "સુરક્ષા એજન્ટ માટે GitHub કનેક્શન સક્રિય નથી. Kilo GitHub App ફરીથી જોડો, પછી ફરીથી સિંક કરો.",
-      "syncMissingPermission": "Kilo GitHub ઍપ vulnerability alerts વાંચી શકતું નથી. GitHub માં એ પરવાનગી આપો, પછી ફરી સિંક કરો."
+      "syncMissingPermission": "Kilo GitHub ઍપ vulnerability alerts વાંચી શકતું નથી. GitHub માં એ પરવાનગી આપો, પછી ફરી સિંક કરો.",
+      "configConflict": "સુરક્ષા એજન્ટની સેટિંગ્સ બીજે ક્યાંક બદલાઈ છે. નવીનતમ સેટિંગ્સ સમીક્ષા કરો અને ફરી સાચવો."
     },
     "analysisState": {
       "queued": "વિશ્લેષણ કતારમાં છે",
@@ -2373,13 +2380,14 @@
       "forkFilesUnchangedOnComputer": "આ કમ્પ્યુટર પરની ફાઇલોમાં કોઈ ફેરફાર થતો નથી.",
       "pickProfile": "પ્રોફાઇલ ચૂંટો",
       "noProfile": "કોઈ પ્રોફાઇલ નથી",
+      "defaultProfileResolvesTo": "અત્યારે {{name}} પર સેટ છે",
+      "defaultProfileResolvesToAccessibility": "ડિફૉલ્ટ પ્રોફાઇલ: {{name}}",
       "manageProfiles": "પ્રોફાઇલ મેનેજ કરો",
       "noProfiles": "હજુ સુધી કોઈ પ્રોફાઇલ નથી. પર્યાવરણ ચલો, MCP સર્વર અને કુશળતા ઉમેરવા માટે એક બનાવો.",
       "advancedConfig": "અદ્યતન રૂપરેખાંકન",
       "advancedConfigDescription": "આ સેશન પર લાગુ પડે છે. પ્રોફાઇલ તરીકે સાચવવાથી તે આગલી વખતે માટે રહે છે.",
       "saveAsProfile": "પ્રોફાઇલ તરીકે સાચવો",
       "saveProfileDescription": "વર્તમાન પર્યાવરણ ચલો અને સેટઅપ આદેશોને ફરીથી વાપરી શકાય તેવી પ્રોફાઇલ તરીકે સાચવો.",
-      "profileSummary": "{{vars}} પર્યાવરણ ચલો · {{commands}} સેટઅપ આદેશો",
       "profileSaved": "પ્રોફાઇલ \"{{name}}\" સાચવી",
       "organizationProfiles": "સંસ્થા પ્રોફાઇલ્સ",
       "personalProfiles": "વ્યક્તિગત પ્રોફાઇલ્સ",
@@ -2741,7 +2749,6 @@
     },
     "modelSelector": {
       "provider": "પ્રદાતા {{id}}",
-      "modelId": "મોડલ {{id}}",
       "unavailable": "ઉપલબ્ધ નથી",
       "unavailableState": "ઉપલબ્ધ નથી",
       "selectedState": "પસંદ કરેલ",
@@ -3080,7 +3087,7 @@
     "unavailable": "Kilo Pass ઉપલબ્ધ નથી.",
     "couldNotLoad": "Kilo Pass લોડ કરી શકાયું નહીં. ફરી પ્રયાસ કરો.",
     "retryLoading": "Kilo Pass ફરી લોડ કરવાનો પ્રયાસ કરો",
-    "productsUnavailable": "App Store નાં ઉત્પાદનો ઉપલબ્ધ નથી.",
+    "productsUnavailable": "App Store નાં ઉત્પાદનો ઉપલબ્ધ નથી",
     "completingPurchase": "ખરીદી પૂર્ણ થઈ રહી છે",
     "subscriptionLoading": "Kilo Pass નું સબસ્ક્રિપ્શન લોડ થઈ રહ્યું છે",
     "retryHint": "Kilo Pass ની સ્થિતિ ફરી મેળવવાનો પ્રયાસ કરે છે.",
@@ -3094,13 +3101,13 @@
     "opensManagementOnWeb": "વેબ પર Kilo Pass સંચાલન ખોલે છે.",
     "tryAgainFromProfile": "પ્રોફાઇલમાંથી ફરી પ્રયાસ કરો.",
     "legalTermsOfUse": "ઉપયોગની શરતો (EULA)",
-    "purchaseDifferentAccount": "App Store ની આ ખરીદી તમારા Kilo એકાઉન્ટ સાથે જોડાયેલી નથી. ખરીદી માટે વાપરેલા Apple Account માં સાઇન ઇન કરો, પછી ફરી પ્રયાસ કરો.",
+    "purchaseDifferentAccount": "આ App Store ખરીદી તમારા Kilo એકાઉન્ટ સાથે જોડાયેલી નથી. ખરીદી માટે વપરાયેલ Apple Account માં સાઇન ઇન કરો, પછી ફરી પ્રયાસ કરો.",
     "purchaseFailed": "ખરીદી પૂર્ણ કરી શકાઈ નહીં.",
     "couldNotConnectToAppStore": "App Store સાથે જોડાઈ શકાયું નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયાસ કરો.",
     "purchaseMissingSignedTransaction": "App Store ની ખરીદીમાં ડિજિટલ સહીવાળો વ્યવહારનો JWS સામેલ નહોતો.",
-    "couldNotConnectToPlay": "Google Play સાથે કનેક્ટ થઈ શક્યું નહીં. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
-    "productsUnavailablePlay": "Google Play ઉત્પાદનો ઉપલબ્ધ નથી",
-    "purchaseDifferentAccountPlay": "આ Google Play ખરીદી તમારા Kilo ખાતા સાથે લિંક થયેલી નથી. ખરીદી માટે વપરાયેલ Google એકાઉન્ટમાં સાઇન ઇન કરો, પછી ફરી પ્રયાસ કરો.",
+    "couldNotConnectToPlay": "Google Play સાથે જોડાઈ શકાયું નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયાસ કરો.",
+    "productsUnavailablePlay": "Google Play નાં ઉત્પાદનો ઉપલબ્ધ નથી",
+    "purchaseDifferentAccountPlay": "આ Google Play ખરીદી તમારા Kilo એકાઉન્ટ સાથે જોડાયેલી નથી. ખરીદી માટે વપરાયેલ Google એકાઉન્ટમાં સાઇન ઇન કરો, પછી ફરી પ્રયાસ કરો.",
     "purchaseMissingPurchaseToken": "Google Play ખરીદીમાં ખરીદી ટોકન શામેલ ન હતું."
   },
   "consent": {
@@ -3252,7 +3259,7 @@
       "sharingUnavailable": "આ ઉપકરણ પર શેર કરવાની સુવિધા ઉપલબ્ધ નથી.",
       "status": {
         "paid": "ચૂકવેલ",
-        "open": "ખોલો",
+        "open": "ખુલ્લું",
         "void": "રદ",
         "uncollectible": "વસૂલ ન થઈ શકે"
       },
@@ -3341,9 +3348,9 @@
       "paidSeat_one": "{{displayCount}} ચૂકવણી કરેલી સીટ",
       "paidSeat": "{{displayCount}} ચૂકવણી કરેલી સીટો",
       "paidSeat_other": "{{displayCount}} ચૂકવણી કરેલી સીટો",
-      "paymentNeedsAttention": "ચુકવણી પર ધ્યાન આપવાની જરૂર છે",
-      "paymentPending": "ચુકવણી બાકી",
-      "processingBlocked": "પ્રક્રિયા અટકી છે",
+      "paymentNeedsAttention": "ચૂકવણી પર ધ્યાન આપવાની જરૂર છે",
+      "paymentPending": "ચૂકવણી બાકી",
+      "processingBlocked": "પ્રક્રિયા અવરોધિત છે",
       "processingNeedsReview": "પ્રક્રિયાની સમીક્ષા જરૂરી છે",
       "retryHint": "Kilo Passની સ્થિતિ લોડ કરવા ફરી પ્રયાસ કરે છે.",
       "setupHint": "વેબ પર Kilo Pass સેટઅપ ખોલે છે."
@@ -4151,7 +4158,8 @@
     "sources": "પુરાવા અને આર્ટિફેક્ટ્સ",
     "timezone": "રિપોર્ટ સમય ઝોન",
     "deviceTimezone": "ઉપકરણનો સમય ઝોન વાપરો",
-    "timezoneHint": "IANA સમય ઝોન, ઉદાહરણ તરીકે Europe/Berlin. શેડ્યૂલ ફેરફારો આગામી રિપોર્ટ પર લાગુ થશે.",
+    "timezoneHint": "IANA સમય ઝોન, ઉદાહરણ તરીકે Europe/Berlin.",
+    "scheduleHint": "શેડ્યૂલ ફેરફારો આગામી રિપોર્ટ પર લાગુ થશે.",
     "nightStart": "રિપોર્ટ વિન્ડો શરૂ થાય",
     "morningStart": "રિપોર્ટ તૈયાર થાય તે સમયે",
     "morningEnd": "રિપોર્ટ ઉપલબ્ધ રહે તે સમય સુધી",

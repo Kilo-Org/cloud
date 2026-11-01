@@ -403,6 +403,7 @@
     "connectionExpired": "Muda wa muunganisho wa GitHub umeisha.",
     "merge": {
       "merge": "Uunganishaji",
+      "mergeTitle": "Uunganishaji",
       "mergeNow": "Unganisha sasa",
       "mergePullRequest": "Kuunganisha ombi",
       "mergeTermTitle": "Unganisha {{term}}",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Kagua maombi ya kuunganisha kwenye simu",
       "bitbucketOrgOnlyDescription": "Badilisha akaunti iliyo juu kuwa shirika ili kukagua maombi yake ya kuunganisha kwenye Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaunti hii haina shirika lolote kwa sasa. Unaweza kukagua maombi ya kuunganisha kwenye Bitbucket mara tu unapounda au kujiunga na shirika.",
+      "gitlabReconnectAdminOnlyDescription": "Omba mmiliki wa shirika, msimamizi, au msimamizi wa bili aiunganishe upya.",
+      "bitbucketNotConnectedTitle": "Bitbucket haijaunganishwa",
+      "bitbucketAdminOnlyDescription": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha.",
       "contextLine": "Kwa {{organization}}",
       "contextLinePersonal": "Kwa akaunti yako binafsi"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Maagizo maalum",
       "deprecation": "Kipengele cha maagizo maalumu kimepangiwa kuondolewa. Badala yake, hamishia miongozo hii kwenye faili ya REVIEW.md katika hazina yako.",
-      "placeholder": "mfano: Hakikisha kanuni zetu za kushughulikia hitilafu zinafuatwa…"
+      "placeholder": "mfano: Hakikisha kanuni zetu za kushughulikia hitilafu zinafuatwa…",
+      "clearTitle": "Ondoa maagizo maalum?",
+      "clearMessage": "Kuhifadhi sehemu tupu hufuta maagizo maalum yaliyohifadhiwa kwa mkaguzi huyu."
     },
     "repos": {
       "unavailable": "Hazina hazipatikani — kamilisha usanidi wa Bitbucket kwenye kilo.ai.",
@@ -1450,7 +1456,7 @@
       "fixSettings": "Rekebisha mipangilio",
       "couldNotLoad": "Imeshindikana kupakia ukaguzi.",
       "couldNotGetLatest": "Imeshindikana kupata taarifa za hivi karibuni.",
-      "byline": "{{repo}} #{{number}} na {{author}}",
+      "byline": "#{{number}} na {{author}}",
       "noFindings": "Hakuna matatizo yaliyopatikana.",
       "findingsUnavailable": "Matokeo hayapatikani kwa sababu ukaguzi huu umeshindikana.",
       "findingsInProgress": "Ukaguzi huu bado unaendelea. Matokeo yataonekana hapa ukaguzi ukikamilika.",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "Mtindo wa ukaguzi",
       "focusAreas": "Maeneo ya kuzingatia",
       "allAreas": "Maeneo yote",
-      "customInstructions": "Maagizo maalum",
       "set": "Imewekwa",
+      "notSet": "Haijawekwa",
       "nSelected": "{{displayCount}} zimechaguliwa",
       "proposedReviewMdGuidance": "Mwongozo uliopendekezwa wa REVIEW.md"
     },
@@ -2060,7 +2066,8 @@
       "actionBlocked": "Imeshindikana kukamilisha kitendo hiki. Tatizo lazima litatuliwe kwanza.",
       "syncNoRepositories": "Hakuna hazina zilizo katika wigo wa usawazishaji. Chagua hazina ambazo Wakala wa usalama hufuatilia, kisha usawazishe tena.",
       "syncIntegrationInactive": "Muunganisho wa GitHub wa Wakala wa usalama haupo hai. Unganisha tena GitHub App ya Kilo, kisha usawazishe tena.",
-      "syncMissingPermission": "Kilo GitHub App haiwezi kusoma arifa za udhaifu. Toa ruhusa hiyo katika GitHub, kisha sinkronisha tena."
+      "syncMissingPermission": "Kilo GitHub App haiwezi kusoma arifa za udhaifu. Toa ruhusa hiyo katika GitHub, kisha sinkronisha tena.",
+      "configConflict": "Mipangilio ya Wakala wa usalama ilibadilishwa mahali pengine. Pitia mipangilio ya hivi punde na uhifadhi tena."
     },
     "analysisState": {
       "queued": "Uchambuzi uko kwenye foleni",
@@ -2367,13 +2374,14 @@
       "forkFilesUnchangedOnComputer": "Faili kwenye kompyuta hii hazibadilishwi.",
       "pickProfile": "Chagua wasifu",
       "noProfile": "Hakuna wasifu",
+      "defaultProfileResolvesTo": "Imewekwa kwa {{name}}",
+      "defaultProfileResolvesToAccessibility": "Wasifu chaguomsingi: {{name}}",
       "manageProfiles": "Dhibiti wasifu",
       "noProfiles": "Bado hakuna wasifu. Unda moja ili kuongeza vigezo vya mazingira, seva za MCP na ujuzi.",
       "advancedConfig": "Usanidi wa hali ya juu",
       "advancedConfigDescription": "Inatumika kwa kipindi hiki. Kuihifadhi kama wasifu huihifadhi kwa mara ijayo.",
       "saveAsProfile": "Hifadhi kama Wasifu",
       "saveProfileDescription": "Hifadhi vigezo vya sasa vya mazingira na amri za usanidi kama wasifu unaoweza kutumika tena.",
-      "profileSummary": "{{vars}} vigezo vya mazingira · {{commands}} amri za usanidi",
       "profileSaved": "Wasifu \"{{name}}\" umehifadhiwa",
       "organizationProfiles": "Wasifu wa Shirika",
       "personalProfiles": "Wasifu wa Kibinafsi",
@@ -2735,7 +2743,6 @@
     },
     "modelSelector": {
       "provider": "Mtoa huduma {{id}}",
-      "modelId": "Modeli {{id}}",
       "unavailable": "Haipatikani",
       "unavailableState": "haipatikani",
       "selectedState": "imechaguliwa",
@@ -4145,7 +4152,8 @@
     "sources": "Ushahidi na vielelezo",
     "timezone": "Saa za eneo za ripoti",
     "deviceTimezone": "Tumia saa za eneo za kifaa",
-    "timezoneHint": "Saa za eneo za IANA, kwa mfano Europe/Berlin. Mabadiliko ya ratiba yanatumika kwa ripoti zijazo.",
+    "timezoneHint": "Saa za eneo za IANA, kwa mfano Europe/Berlin.",
+    "scheduleHint": "Mabadiliko ya ratiba yanatumika kwa ripoti zijazo.",
     "nightStart": "Kipindi cha ripoti kinaanza",
     "morningStart": "Ripoti iko tayari saa",
     "morningEnd": "Ripoti inapatikana hadi",

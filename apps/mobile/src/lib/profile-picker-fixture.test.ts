@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { profilePickerFixtureRoute } from './profile-picker-fixture';
+
 const slot = vi.hoisted(() => ({ set: vi.fn() }));
 
 vi.mock('@/lib/route-registry', () => ({
   UNFENCED_ROUTE_KEY: 'unscoped',
   profilePickerSlot: { set: slot.set },
 }));
-
-import { profilePickerFixtureRoute } from './profile-picker-fixture';
 
 beforeEach(() => {
   slot.set.mockReset();

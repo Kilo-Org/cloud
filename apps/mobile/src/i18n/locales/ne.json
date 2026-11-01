@@ -1450,7 +1450,7 @@
       "fixSettings": "सेटिङहरू मिलाउनुहोस्",
       "couldNotLoad": "समीक्षा लोड गर्न सकिएन।",
       "couldNotGetLatest": "पछिल्लो विवरण प्राप्त गर्न सकिएन।",
-      "byline": "{{repo}} #{{number}} · लेखक: {{author}}",
+      "byline": "#{{number}} · लेखक: {{author}}",
       "noFindings": "कुनै समस्या फेला परेन।",
       "findingsUnavailable": "यो समीक्षा असफल भएकाले नतिजाहरू उपलब्ध छैनन्।",
       "findingsInProgress": "यो समीक्षा अझै चालु छ। समाप्त भएपछि यहाँ समस्याहरू देखिनेछन्।",

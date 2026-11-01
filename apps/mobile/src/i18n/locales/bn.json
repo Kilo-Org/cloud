@@ -1450,7 +1450,7 @@
       "fixSettings": "সেটিংস ঠিক করুন",
       "couldNotLoad": "পর্যালোচনা লোড করা যায়নি।",
       "couldNotGetLatest": "সর্বশেষ তথ্য পাওয়া যায়নি।",
-      "byline": "{{repo}} #{{number}} — {{author}}",
+      "byline": "#{{number}} — {{author}}",
       "noFindings": "কোনো ত্রুটি পাওয়া যায়নি।",
       "findingsUnavailable": "এই পর্যালোচনা ব্যর্থ হওয়ায় ফলাফল পাওয়া যাচ্ছে না।",
       "findingsInProgress": "এই পর্যালোচনা এখনও চলছে। শেষ হলে ত্রুটিগুলি এখানে দেখা যাবে।",

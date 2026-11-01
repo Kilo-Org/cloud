@@ -1450,7 +1450,7 @@
       "fixSettings": "Sozlamalarni tuzatish",
       "couldNotLoad": "Ko'rib chiqish ma'lumotlarini yuklab bo'lmadi.",
       "couldNotGetLatest": "Eng so'nggi ma'lumotlarni olib bo'lmadi.",
-      "byline": "{{repo}} #{{number}}, muallif: {{author}}",
+      "byline": "#{{number}}, muallif: {{author}}",
       "noFindings": "Muammolar topilmadi.",
       "findingsUnavailable": "Bu ko'rib chiqish muvaffaqiyatsiz tugagani uchun natijalar mavjud emas.",
       "findingsInProgress": "Bu ko'rib chiqish hali davom etmoqda. Tugagach, muammolar shu yerda paydo bo'ladi.",

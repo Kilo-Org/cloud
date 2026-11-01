@@ -1450,7 +1450,7 @@
       "fixSettings": "Betulkan tetapan",
       "couldNotLoad": "Tidak dapat memuatkan semakan.",
       "couldNotGetLatest": "Tidak dapat mendapatkan maklumat terkini.",
-      "byline": "{{repo}} #{{number}} oleh {{author}}",
+      "byline": "#{{number}} oleh {{author}}",
       "noFindings": "Tiada penemuan.",
       "findingsUnavailable": "Keputusan tidak tersedia kerana semakan ini gagal.",
       "findingsInProgress": "Semakan ini masih dijalankan. Penemuan akan dipaparkan di sini apabila ia selesai.",

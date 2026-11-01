@@ -1450,7 +1450,7 @@
       "fixSettings": "Åtgärda inställningarna",
       "couldNotLoad": "Kunde inte läsa in granskningen",
       "couldNotGetLatest": "Kunde inte hämta de senaste uppgifterna.",
-      "byline": "{{repo}} #{{number}} av {{author}}",
+      "byline": "#{{number}} av {{author}}",
       "noFindings": "Inga fynd",
       "findingsUnavailable": "Resultaten är inte tillgängliga eftersom den här granskningen misslyckades.",
       "findingsInProgress": "Den här granskningen pågår fortfarande. Fynden visas här när den är klar.",

@@ -965,7 +965,7 @@
       "bitbucketError": "Bitbucket सेटअप नहीं खुल सका। कृपया फिर से कोशिश करें।"
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · लेखक: {{author}}",
+      "byline": "#{{number}} · लेखक: {{author}}",
       "cancelMessage": "इससे चल रही कोड समीक्षा रुक जाएगी।",
       "cancelReview": "समीक्षा रद्द करें",
       "cancelTitle": "समीक्षा रद्द करें?",

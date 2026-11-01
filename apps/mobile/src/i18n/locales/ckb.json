@@ -1540,7 +1540,6 @@
       "invalidUrl": "URLێکی دروست بۆ داواکاری یەکخستن بنووسە.",
       "couldNotCheckProviderStatus": "نەتوانرا دۆخی دابینکەر بپشکنرێت.",
       "couldNotLoadProviders": "نەمانتوانی دابینکەرە بەستراوەکانت بار بکەین. تکایە دووبارە هەوڵ بدە.",
-      "connectProviderDescription": "بۆ دەستپێکردنی پێداچوونەوەیەکی دەستی بۆ داواکاری تێکەڵکردن، پەیوەندی بە GitHub بکە.",
       "pullRequestUrl": "URLی داواکاری یەکخستن",
       "instructions": "ڕێنماییەکان (بژاردەیی)",
       "instructionsPlaceholder": "بابەتێکی تایبەت بۆ سەرنجدانی پێداچوونەوەکار…",

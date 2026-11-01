@@ -940,7 +940,6 @@
       "invalidMergeRequestUrl": "أدخل عنوان URL صالحًا لطلب دمج.",
       "mergeRequestUrl": "عنوان URL لطلب الدمج",
       "instructionsAtLimit": "تقتصر التعليمات على {{max}} حرفًا",
-      "connectProviderDescription": "اربط GitHub لبدء مراجعة يدوية لطلب سحب.",
       "couldNotCheckProviderStatus": "تعذّر التحقق من حالة المزوّد.",
       "couldNotLoadProviders": "تعذّر تحميل المزوّدين الذين ربطتهم بحسابك. حاول مرة أخرى.",
       "instructions": "تعليمات (اختيارية)",

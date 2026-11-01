@@ -1540,7 +1540,6 @@
       "invalidUrl": "Shkruaj një URL të vlefshme për PR.",
       "couldNotCheckProviderStatus": "Nuk u kontrollua statusi i ofruesit.",
       "couldNotLoadProviders": "Nuk u ngarkuan ofruesit që ke lidhur. Provo përsëri.",
-      "connectProviderDescription": "Lidh GitHub për të filluar shqyrtimin manual të një PR.",
       "pullRequestUrl": "URL-ja e PR",
       "instructions": "Udhëzimet (opsionale)",
       "instructionsPlaceholder": "Çështje të veçanta ku duhet të përqendrohet shqyrtuesi…",

@@ -38,6 +38,7 @@ import { cn } from '@/lib/utils';
 
 import { ManualReviewActionFooter } from './manual-review-action-footer';
 import { ManualReviewPlatformPicker } from './manual-review-platform-picker';
+import { ManualReviewSkeleton } from './manual-review-skeleton';
 import { connectNoticeKey } from './connect-notice-key';
 import { manualReviewStartFailure } from './manual-review-start-error';
 import { ManualReviewStartFeedback } from './manual-review-start-feedback';
@@ -212,7 +213,22 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     start.begin();
   };
 
-  if (!statusesLoading && statusesError && !isConnected('github') && !isConnected('gitlab')) {
+  if (statusesLoading) {
+    // Neither state can be rendered yet: the status decides between the
+    // connect state and the form, so the body holds the shape the status is
+    // about to fill instead of the form it may replace.
+    return (
+      <View className="flex-1 bg-background">
+        <ReviewerHeader
+          title={t('codeReviewer.manualReview.title')}
+          eyebrow={t('common.codeReviewer')}
+        />
+        <ManualReviewSkeleton />
+      </View>
+    );
+  }
+
+  if (statusesError && !isConnected('github') && !isConnected('gitlab')) {
     // A permission/not-found error can't be fixed by retrying — show the
     // permanent variant with no retry instead of a misleading "try again".
     const statusErrorCode =
@@ -243,7 +259,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     );
   }
 
-  if (!statusesLoading && !statusesError && !isConnected('github') && !isConnected('gitlab')) {
+  if (!statusesError && !isConnected('github') && !isConnected('gitlab')) {
     // The only way out of this state is installing the provider's app for the
     // scope, which the server restricts to an organization-manage role
     // (`githubApps.mintInstallState` takes `ORGANIZATION_MANAGE_ROLES`). A
@@ -263,8 +279,11 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
           icon={GitPullRequest}
           title={t('common.connectProvider')}
           description={
+            // With the action in place the title and the button already say
+            // what to do, and the old sentence repeated both; only the role
+            // notice, which the button cannot express, stays.
             canConnect
-              ? t('codeReviewer.manualReview.connectProviderDescription')
+              ? undefined
               : t(connectNoticeKey('github'), { platform: PLATFORM_CAPABILITIES.github.label })
           }
           action={
@@ -375,6 +394,13 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               // request the route would answer with its generic "can't be
               // reviewed" line.
               maxLength={MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH}
+              // The visible heading above is a separate `Text`, so without an
+              // explicit label a screen reader names this multiline field with
+              // the draft it contains. The name comes from the same catalog key
+              // the heading renders, like the URL field's does.
+              accessibilityLabel={formFieldA11y({
+                label: t('codeReviewer.manualReview.instructions'),
+              })}
               className="h-24 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
               multiline
               textAlignVertical="top"

@@ -1540,7 +1540,6 @@
       "invalidUrl": "Maglagay ng wastong URL ng pull request.",
       "couldNotCheckProviderStatus": "Hindi masuri ang katayuan ng provider.",
       "couldNotLoadProviders": "Hindi namin ma-load ang mga nakakonektang provider mo. Pakisubukang muli.",
-      "connectProviderDescription": "Ikonekta ang GitHub para magsimula ng manu-manong pagsusuri ng isang pull request.",
       "pullRequestUrl": "URL ng pull request",
       "instructions": "Mga tagubilin (opsyonal)",
       "instructionsPlaceholder": "Mga partikular na bagay na dapat pagtuunan ng pansin sa pagsusuri…",

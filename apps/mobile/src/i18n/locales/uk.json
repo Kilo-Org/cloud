@@ -934,7 +934,6 @@
       "invalidMergeRequestUrl": "Введіть коректну URL-адресу merge-запиту.",
       "mergeRequestUrl": "URL-адреса merge-запиту",
       "instructionsAtLimit": "Інструкції обмежені до {{max}} символів",
-      "connectProviderDescription": "Підключіть GitHub, щоб запустити перевірку запиту на злиття вручну.",
       "couldNotCheckProviderStatus": "Не вдалося перевірити стан сервісу.",
       "couldNotLoadProviders": "Не вдалося завантажити список підключених сервісів. Спробуйте ще раз.",
       "instructions": "Інструкції (необов'язково)",

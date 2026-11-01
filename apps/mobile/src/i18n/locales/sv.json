@@ -1540,7 +1540,6 @@
       "invalidUrl": "Ange en giltig URL till en pull-begäran",
       "couldNotCheckProviderStatus": "Kunde inte kontrollera leverantörens status",
       "couldNotLoadProviders": "Vi kunde inte läsa in dina anslutna leverantörer. Försök igen.",
-      "connectProviderDescription": "Anslut GitHub för att starta en manuell granskning av en pull-begäran.",
       "pullRequestUrl": "URL till pull-begäran",
       "instructions": "Instruktioner (valfritt)",
       "instructionsPlaceholder": "Särskilda områden för granskaren att fokusera på…",

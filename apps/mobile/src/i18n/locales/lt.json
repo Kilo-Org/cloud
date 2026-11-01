@@ -1584,7 +1584,6 @@
       "invalidUrl": "Įvesk tinkamą PR URL.",
       "couldNotCheckProviderStatus": "Nepavyko patikrinti paslaugų teikėjo būsenos.",
       "couldNotLoadProviders": "Nepavyko įkelti tavo prijungtų paslaugų teikėjų. Bandyk dar kartą.",
-      "connectProviderDescription": "Prijunk GitHub, kad galėtum rankiniu būdu pradėti PR peržiūrą.",
       "pullRequestUrl": "PR adresas (URL)",
       "instructions": "Instrukcijos (neprivaloma)",
       "instructionsPlaceholder": "Konkretūs dalykai, į kuriuos reikia atkreipti dėmesį…",

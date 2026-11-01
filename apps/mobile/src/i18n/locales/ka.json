@@ -1540,7 +1540,6 @@
       "invalidUrl": "შეიყვანე PR-ის სწორი URL.",
       "couldNotCheckProviderStatus": "პროვაიდერის სტატუსის შემოწმება ვერ მოხერხდა.",
       "couldNotLoadProviders": "დაკავშირებული პროვაიდერების ჩატვირთვა ვერ მოხერხდა. სცადე ხელახლა.",
-      "connectProviderDescription": "PR-ის ხელით შემოწმების დასაწყებად დააკავშირე GitHub.",
       "pullRequestUrl": "PR-ის URL",
       "instructions": "ინსტრუქციები (არასავალდებულო)",
       "instructionsPlaceholder": "რას უნდა მიაქციოს შემმოწმებელმა განსაკუთრებული ყურადღება…",

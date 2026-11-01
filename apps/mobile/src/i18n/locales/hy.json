@@ -1540,7 +1540,6 @@
       "invalidUrl": "Մուտքագրիր միավորման հարցման վավեր URL։",
       "couldNotCheckProviderStatus": "Չհաջողվեց ստուգել մատակարարի կարգավիճակը։",
       "couldNotLoadProviders": "Չհաջողվեց բեռնել քո միացրած մատակարարները։ Կրկին փորձիր։",
-      "connectProviderDescription": "Միացրու GitHub-ը՝ միավորման հարցման ձեռքով ստուգում սկսելու համար։",
       "pullRequestUrl": "Միավորման հարցման URL",
       "instructions": "Հրահանգներ (ըստ ցանկության)",
       "instructionsPlaceholder": "Հատուկ ուշադրություն պահանջող հարցեր…",

@@ -76,6 +76,9 @@ export function VoiceTestField(): React.ReactElement {
       <Text className="text-sm font-medium text-foreground">{t('voiceInput.testTitle')}</Text>
       <TextInput
         ref={inputRef}
+        // The visible title above is a separate `Text`, so the multiline field
+        // names itself with the same catalog key instead of the transcript.
+        accessibilityLabel={t('voiceInput.testTitle')}
         className="min-h-24 rounded-md border border-input bg-background px-3 py-2 text-base leading-[1.5rem] text-foreground"
         defaultValue=""
         multiline

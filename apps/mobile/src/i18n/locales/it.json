@@ -899,7 +899,6 @@
       "invalidMergeRequestUrl": "Inserisci un URL valido di una merge request.",
       "mergeRequestUrl": "URL della merge request",
       "instructionsAtLimit": "Le istruzioni sono limitate a {{max}} caratteri.",
-      "connectProviderDescription": "Connetti GitHub per avviare una revisione manuale di una pull request.",
       "couldNotCheckProviderStatus": "Impossibile verificare lo stato della piattaforma.",
       "couldNotLoadProviders": "Impossibile caricare le piattaforme connesse. Riprova.",
       "instructions": "Istruzioni (facoltative)",

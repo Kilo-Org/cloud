@@ -152,22 +152,21 @@ export function CollapsibleSection({
 
   return (
     <DisclosureLayout
-      className={cn('gap-2 rounded-lg bg-secondary p-3', className)}
+      className={cn('rounded-lg bg-secondary', className)}
       animateLayout={animateLayout}
     >
-      {/* The header's frame is the header plus the card's own padding: the
-          pressable spans the card edge to edge and carries the `p-3` inset
-          itself, so the whole row a reader sees is the row a tap hits. Its box
-          reaches ROW_TARGET_CLASS — the shared 48 dp row frame, which also
-          clears DESIGN.md's 44 pt — instead of leaning on a hitSlop the control
-          audit cannot read. The negative margins hand that same inset back to
-          the card's layout, so the card keeps its height, this section's body
-          keeps its inset, and the title keeps its place; a title that wraps
-          grows the frame with its own text rather than squeezing the inset. */}
+      {/* The card is the surface; this pressable's own box is the row. It
+          carries the card's inset (`px-3 pt-3 pb-3`) and ROW_TARGET_CLASS — the
+          shared 48 dp row frame, which also clears DESIGN.md's 44 pt — so the
+          whole row a reader sees is the row a tap and the control audit
+          measure, instead of a 28 dp text line leaning on a `hitSlop` the audit
+          cannot read. A title that wraps grows the frame with its own text, and
+          the inset stays a property of this box, so no caller padding can
+          desynchronise the frame from the card's edges. */}
       <Pressable
         className={cn(
           ROW_TARGET_CLASS,
-          '-mx-3 -my-3 flex-row items-center justify-between gap-2 px-3 pt-3 pb-3'
+          'flex-row items-center justify-between gap-2 px-3 pt-3 pb-3'
         )}
         onPress={() => {
           onToggle?.();
@@ -187,7 +186,7 @@ export function CollapsibleSection({
       {resolvedExpanded && (
         <Animated.View
           entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
-          className={cn('gap-2', contentClassName)}
+          className={cn('gap-2 px-3 pb-3', contentClassName)}
         >
           {children}
         </Animated.View>

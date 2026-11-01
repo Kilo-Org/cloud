@@ -212,7 +212,7 @@ export function NewSessionRepositorySection({
     }
     return (
       <CollapsibleSection
-        className="mt-3 gap-3 rounded-lg border border-border bg-card p-4"
+        className="mt-3 rounded-lg border border-border bg-card"
         contentClassName="gap-3"
         titleClassName="font-semibold"
         title={t(copy.connectTitle)}

@@ -1337,6 +1337,17 @@ export type SessionIngestRpcMethods = {
   createSessionForCloudAgent: (
     params: CreateSessionForCloudAgentParams
   ) => Promise<CreateSessionForCloudAgentResult>;
+  setGeneratedTitleForCloudAgent: (params: {
+    sessionId: string;
+    kiloUserId: string;
+    cloudAgentSessionId: string;
+    title: string;
+  }) => Promise<{ applied: boolean }>;
+  canGenerateTitleForCloudAgent: (params: {
+    sessionId: string;
+    kiloUserId: string;
+    cloudAgentSessionId: string;
+  }) => Promise<boolean>;
   deleteSessionForCloudAgent: (params: DeleteSessionForCloudAgentParams) => Promise<void>;
   deleteHostedWorkspaceSession: (
     params: DeleteHostedWorkspaceSessionParams

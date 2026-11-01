@@ -29,6 +29,7 @@ import {
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
+import { waitFor } from './wait-for.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
@@ -214,6 +215,107 @@ async function readRegistration(stub: DurableObjectStub<SandboxSessionV2>): Prom
   | undefined
 > {
   return runInDurableObject(stub, (_instance, state) => state.storage.get('control_plane_session'));
+}
+
+const GENERATED_TITLE_AI_CALLS_KEY = 'test:generated-title:ai-calls';
+const GENERATED_TITLE_PERSISTS_KEY = 'test:generated-title:persists';
+
+type GeneratedTitleAiInput = {
+  messages?: unknown;
+  max_tokens?: number;
+  temperature?: number;
+};
+
+type GeneratedTitleAiCall = { model: string; input: GeneratedTitleAiInput };
+
+type GeneratedTitlePersist = {
+  sessionId: string;
+  kiloUserId: string;
+  cloudAgentSessionId: string;
+  title: string;
+};
+
+async function installGeneratedTitleFakes(
+  stub: DurableObjectStub<SandboxSessionV2>,
+  options: { aiRejects?: boolean; ingestRejects?: boolean } = {}
+): Promise<void> {
+  await runInDurableObject(stub, async (instance, state) => {
+    await state.storage.put(GENERATED_TITLE_AI_CALLS_KEY, []);
+    await state.storage.put(GENERATED_TITLE_PERSISTS_KEY, []);
+    const AI = {
+      async run(model: string, input: GeneratedTitleAiInput) {
+        const calls =
+          (await state.storage.get<GeneratedTitleAiCall[]>(GENERATED_TITLE_AI_CALLS_KEY)) ?? [];
+        calls.push({ model, input });
+        await state.storage.put(GENERATED_TITLE_AI_CALLS_KEY, calls);
+        if (options.aiRejects === true) throw new Error('inference rejected');
+        return { response: 'Generated title' };
+      },
+    };
+    const SESSION_INGEST = {
+      async canGenerateTitleForCloudAgent() {
+        return true;
+      },
+      async setGeneratedTitleForCloudAgent(params: GeneratedTitlePersist) {
+        const persists =
+          (await state.storage.get<GeneratedTitlePersist[]>(GENERATED_TITLE_PERSISTS_KEY)) ?? [];
+        persists.push(params);
+        await state.storage.put(GENERATED_TITLE_PERSISTS_KEY, persists);
+        if (options.ingestRejects === true) throw new Error('persistence rejected');
+        return { applied: true };
+      },
+    };
+    Object.assign(instance.env, { AI, SESSION_INGEST });
+  });
+}
+
+async function readGeneratedTitleAiCalls(
+  stub: DurableObjectStub<SandboxSessionV2>
+): Promise<GeneratedTitleAiCall[]> {
+  return runInDurableObject(
+    stub,
+    async (_instance, state) =>
+      (await state.storage.get<GeneratedTitleAiCall[]>(GENERATED_TITLE_AI_CALLS_KEY)) ?? []
+  );
+}
+
+async function readGeneratedTitlePersists(
+  stub: DurableObjectStub<SandboxSessionV2>
+): Promise<GeneratedTitlePersist[]> {
+  return runInDurableObject(
+    stub,
+    async (_instance, state) =>
+      (await state.storage.get<GeneratedTitlePersist[]>(GENERATED_TITLE_PERSISTS_KEY)) ?? []
+  );
+}
+
+type GeneratedTitleSession = {
+  stub: DurableObjectStub<SandboxSessionV2>;
+  sessionId: string;
+  kiloId: string;
+  sessionMetadata: SessionMetadata;
+  sandboxSelection: { provider: 'cloudflare' };
+};
+
+async function setupGeneratedTitleSession(
+  options: { aiRejects?: boolean; ingestRejects?: boolean } = {}
+): Promise<GeneratedTitleSession> {
+  const sessionId = newSessionId();
+  const kiloId = kiloSessionId();
+  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+  const stub = sessions.getByName(sessionId);
+  const peer = new FakeSandboxPeer();
+  await runInDurableObject(stub, instance => {
+    instance.sandboxPeerFor = () => peer;
+  });
+  await installGeneratedTitleFakes(stub, options);
+  return {
+    stub,
+    sessionId,
+    kiloId,
+    sessionMetadata: metadata({ sessionId, kiloSessionId: kiloId, sandboxId }),
+    sandboxSelection: { provider: 'cloudflare' },
+  };
 }
 
 afterEach(async () => {
@@ -808,5 +910,116 @@ describe('SandboxSessionV2 worker RPC surface', () => {
   it('returns null for the latest assistant message when the session is unregistered', async () => {
     const sessionStub = sessions.getByName(newSessionId());
     await expect(sessionStub.getLatestAssistantMessage()).resolves.toBeNull();
+  });
+});
+
+describe('SandboxSessionV2 generated titles', () => {
+  it('generates and persists a title for the first admitted message', async () => {
+    const session = await setupGeneratedTitleSession();
+    const firstMessageId = messageId();
+
+    await expect(
+      session.stub.createSessionWithInitialAdmission({
+        metadata: session.sessionMetadata,
+        message: promptPayload(firstMessageId, 'Summarize this change'),
+        sandboxSelection: session.sandboxSelection,
+      })
+    ).resolves.toMatchObject({ success: true, messageId: firstMessageId });
+
+    await waitFor(async () =>
+      expect(await readGeneratedTitlePersists(session.stub)).toHaveLength(1)
+    );
+
+    const aiCalls = await readGeneratedTitleAiCalls(session.stub);
+    expect(aiCalls).toHaveLength(1);
+    expect(aiCalls[0]?.model).toContain('llama-3.2-3b-instruct');
+    expect(aiCalls[0]?.input.max_tokens).toBe(64);
+    expect(aiCalls[0]?.input.temperature).toBe(0);
+    expect(JSON.stringify(aiCalls[0]?.input.messages)).toContain('Summarize this change');
+    expect(await readGeneratedTitlePersists(session.stub)).toEqual([
+      {
+        sessionId: session.kiloId,
+        kiloUserId: USER_ID,
+        cloudAgentSessionId: session.sessionId,
+        title: 'Generated title',
+      },
+    ]);
+  });
+
+  it('does not regenerate for a create replay or a subsequent message', async () => {
+    const session = await setupGeneratedTitleSession();
+    const firstMessageId = messageId();
+    const createInput = {
+      metadata: session.sessionMetadata,
+      message: promptPayload(firstMessageId),
+      sandboxSelection: session.sandboxSelection,
+    };
+
+    await session.stub.createSessionWithInitialAdmission(createInput);
+    await waitFor(async () =>
+      expect(await readGeneratedTitlePersists(session.stub)).toHaveLength(1)
+    );
+
+    await expect(
+      session.stub.createSessionWithInitialAdmission(createInput)
+    ).resolves.toMatchObject({ success: true, messageId: firstMessageId });
+    await expect(session.stub.send(promptPayload(messageId(), 'second'))).resolves.toEqual({
+      type: 'ok',
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+    expect(await readGeneratedTitleAiCalls(session.stub)).toHaveLength(1);
+    expect(await readGeneratedTitlePersists(session.stub)).toHaveLength(1);
+  });
+
+  it('generates on the first send after an empty-chat register', async () => {
+    const session = await setupGeneratedTitleSession();
+
+    await expect(
+      session.stub.registerSessionFromMetadata({
+        metadata: session.sessionMetadata,
+        sandboxSelection: session.sandboxSelection,
+      })
+    ).resolves.toEqual({ success: true });
+
+    await new Promise(resolve => setTimeout(resolve, 250));
+    expect(await readGeneratedTitleAiCalls(session.stub)).toHaveLength(0);
+    expect(await readGeneratedTitlePersists(session.stub)).toHaveLength(0);
+
+    await expect(session.stub.send(promptPayload(messageId(), 'first prompt'))).resolves.toEqual({
+      type: 'ok',
+    });
+
+    await waitFor(async () =>
+      expect(await readGeneratedTitlePersists(session.stub)).toHaveLength(1)
+    );
+    expect(await readGeneratedTitleAiCalls(session.stub)).toHaveLength(1);
+    expect((await readGeneratedTitlePersists(session.stub))[0]).toMatchObject({
+      sessionId: session.kiloId,
+      cloudAgentSessionId: session.sessionId,
+      title: 'Generated title',
+    });
+  });
+
+  it('admits the first message when title inference rejects', async () => {
+    const session = await setupGeneratedTitleSession({ aiRejects: true });
+    const firstMessageId = messageId();
+
+    await expect(
+      session.stub.createSessionWithInitialAdmission({
+        metadata: session.sessionMetadata,
+        message: promptPayload(firstMessageId),
+        sandboxSelection: session.sandboxSelection,
+      })
+    ).resolves.toMatchObject({ success: true, messageId: firstMessageId });
+
+    await waitFor(async () =>
+      expect(await readGeneratedTitleAiCalls(session.stub)).toHaveLength(2)
+    );
+    expect(await readGeneratedTitlePersists(session.stub)).toHaveLength(0);
+    await expect(session.stub.getSession()).resolves.toMatchObject({
+      type: 'found',
+      messages: [{ messageId: firstMessageId, state: 'queued' }],
+    });
   });
 });

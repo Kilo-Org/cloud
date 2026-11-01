@@ -206,12 +206,12 @@ describe('registry-ops', () => {
         input({ dolthub_upstream: 'OctoCat/Repo' }),
         '2025-01-01T00:00:00Z'
       );
-      expect(registryOps.findAllByOwnerRepo(sql, 'octocat', 'repo').map(r => r.wasteland_id)).toEqual(
-        ['wl-1']
-      );
-      expect(registryOps.findAllByOwnerRepo(sql, 'OCTOCAT', 'REPO').map(r => r.wasteland_id)).toEqual(
-        ['wl-1']
-      );
+      expect(
+        registryOps.findAllByOwnerRepo(sql, 'octocat', 'repo').map(r => r.wasteland_id)
+      ).toEqual(['wl-1']);
+      expect(
+        registryOps.findAllByOwnerRepo(sql, 'OCTOCAT', 'REPO').map(r => r.wasteland_id)
+      ).toEqual(['wl-1']);
     });
 
     it('returns nothing for an unknown owner/repo', () => {

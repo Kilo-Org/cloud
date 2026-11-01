@@ -74,7 +74,8 @@ export function rewriteResponseMetadata(value: ResponseMetadata, context: Respon
   if (
     value.model !== undefined &&
     !context.requested_model.startsWith('~') &&
-    !context.requested_model.startsWith('openrouter/')
+    !context.requested_model.startsWith('openrouter/') &&
+    context.requested_model !== 'typesafe/jev-router'
   ) {
     value.model = context.requested_model;
   }

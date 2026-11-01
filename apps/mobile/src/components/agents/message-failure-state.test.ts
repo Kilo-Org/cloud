@@ -7,6 +7,7 @@ import { i18n } from '@/i18n';
 import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 
 import {
+  composeFailureLabel,
   messageFailureLabel,
   NON_RETRYABLE_ASSISTANT_ERRORS,
   selectMessageFailure,
@@ -179,8 +180,11 @@ describe('selectMessageFailure', () => {
  * right, so a spot check in one language could not see it.
  */
 describe('messageFailureLabel', () => {
-  const TERMINATOR = /[.!?؟…।。។።။۔։]$/;
-  const DOUBLED_TERMINATOR = /([.!?؟…।。។።။۔։])\1/u;
+  const TERMINATORS = '.!?؟…।॥。｡．！？።។။։';
+  const TERMINATOR = new RegExp(`[${TERMINATORS}]`);
+  // Any two sentence ends in a row, from the same script or not: a terminator
+  // this set omits still lands next to the template's own.
+  const ADJACENT_TERMINATORS = new RegExp(`[${TERMINATORS}]{2}`);
   const PLACEHOLDER = '{{title}}';
 
   function catalogString(catalog: unknown, path: string): string {
@@ -211,9 +215,9 @@ describe('messageFailureLabel', () => {
           'agentChat.messageFailure.assistantTitle',
         ]) {
           for (const canRetry of [true, false]) {
-            const label = messageFailureLabel({ titleKey, canRetry });
             const where = `${language} ${titleKey} canRetry=${canRetry}`;
-            expect(label, where).not.toMatch(DOUBLED_TERMINATOR);
+            const label = messageFailureLabel({ titleKey, canRetry });
+            expect(label, where).not.toMatch(ADJACENT_TERMINATORS);
 
             const template = catalogString(
               catalog,
@@ -221,14 +225,22 @@ describe('messageFailureLabel', () => {
                 ? 'agentChat.messageBubble.failureRetryAvailable'
                 : 'agentChat.messageBubble.failure'
             );
-            const stem = i18n.t(titleKey).trimEnd().replace(TERMINATOR, '');
-            const templateTail = template.slice(template.indexOf(PLACEHOLDER) + PLACEHOLDER.length);
-            // The label is the title stem, then the template's own separator and
-            // retry line exactly once: the template's terminator is the sentence
-            // end, and the title contributes nothing after its last word.
-            expect(label, where).toContain(stem);
-            const afterStem = label.slice(label.indexOf(stem) + stem.length);
-            expect(afterStem, where).toBe(templateTail);
+            const title = i18n.t(titleKey);
+            const placeholder = template.indexOf(PLACEHOLDER);
+            const head = template.slice(0, placeholder);
+            const tail = template.slice(placeholder + PLACEHOLDER.length);
+            // The label is the template's own text around the title, nothing
+            // else, so the retry line is neither lost nor duplicated.
+            expect(label.startsWith(head), where).toBe(true);
+            expect(label.endsWith(tail), where).toBe(true);
+
+            const middle = label.slice(head.length, label.length - tail.length);
+            const templateEndsTheSentence = TERMINATOR.test(tail.slice(0, 1));
+            // A template that supplies the sentence end replaces the title's
+            // own; a bare `{{title}}` template leaves the title untouched.
+            expect(middle, where).toBe(
+              templateEndsTheSentence ? title.replace(/[.!?؟…।॥。｡．！？።។။։]+$/, '') : title
+            );
           }
         }
       }
@@ -255,5 +267,38 @@ describe('messageFailureLabel', () => {
     } finally {
       await i18n.changeLanguage('en');
     }
+  });
+});
+
+describe('composeFailureLabel', () => {
+  it('leaves one terminator when the title ends its sentence and the template adds one', () => {
+    expect(composeFailureLabel('Die Zustellung ist fehlgeschlagen.', '{{title}}. Weiter.')).toBe(
+      'Die Zustellung ist fehlgeschlagen. Weiter.'
+    );
+  });
+
+  it('adds the template terminator to a title that has none', () => {
+    expect(composeFailureLabel('Failed to deliver', '{{title}}. Retry available.')).toBe(
+      'Failed to deliver. Retry available.'
+    );
+  });
+
+  it('keeps a title whose sentence end is not in Latin script', () => {
+    expect(composeFailureLabel('ส่งไม่สำเร็จ。', '{{title}}')).toBe('ส่งไม่สำเร็จ。');
+    expect(composeFailureLabel('送信に失敗しました。', '{{title}}。再試行できます。')).toBe(
+      '送信に失敗しました。再試行できます。'
+    );
+  });
+
+  it('drops a terminator the template itself replaces, whatever script it is in', () => {
+    expect(composeFailureLabel('Falha！', '{{title}}。 Tente de novo.')).toBe(
+      'Falha。 Tente de novo.'
+    );
+  });
+
+  it('keeps the template text before the title', () => {
+    expect(composeFailureLabel('تعذّر تسليم الرسالة.', 'خطأ: {{title}}.')).toBe(
+      'خطأ: تعذّر تسليم الرسالة.'
+    );
   });
 });

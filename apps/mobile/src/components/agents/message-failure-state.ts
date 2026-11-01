@@ -112,42 +112,67 @@ export type MessageFailure = {
 };
 
 /**
- * A sentence terminator, as the failure titles end their sentences: the Latin
- * `.`, the Arabic and Persian `؟`, the ellipsis, and the script marks the
- * catalogs use — Devanagari `।`, CJK `。`, Khmer `។`, Ethiopic `።`, Myanmar
- * `။`, Urdu `۔`, Armenian `։`. Written out rather than `\p{Sentence_Terminal}`
- * because Hermes does not promise Unicode binary property escapes, and
- * `messageFailureLabel`'s catalog test fails when a terminator this misses
- * reaches a label twice.
+ * The characters the failure titles and the footer templates end a sentence
+ * with: the Latin `.` `!` `?`, the ellipsis, the Arabic and Persian `؟`, the
+ * Devanagari `।` and `॥`, the CJK `。`, `．`, `！`, `？` and `｡`, the Khmer `។`,
+ * the Ethiopic `።`, the Myanmar `။`, the Urdu `۔`, and the Armenian `։`.
+ *
+ * Spelled out rather than `\p{Sentence_Terminal}` because Hermes does not
+ * promise Unicode binary property escapes. A catalog terminator this set
+ * misses still shows up as two adjacent terminator characters, which the
+ * catalog test rejects, so the set is checked rather than trusted.
  */
-const TRAILING_SENTENCE_TERMINATOR = /[.!?؟…।。។።။۔։]$/;
+const TERMINATORS = '.!?؟…।॥。｡．！？።។။։';
+const TERMINATOR_CLASS = `[${TERMINATORS}]`;
+const TRAILING_TERMINATORS = new RegExp(`${TERMINATOR_CLASS}+$`);
+const LEADING_TERMINATOR = new RegExp(`^${TERMINATOR_CLASS}`);
+const PLACEHOLDER = '{{title}}';
 
 /**
- * The failed row's accessibility label: the failure title, then the retry line
- * when the row offers one.
+ * The label for one catalog entry: the template with its title replaced by
+ * `title`, ending the sentence exactly once.
  *
  * The titles are whole sentences in most catalogs and carry their language's
  * own terminator (`de` "Die Zustellung ist fehlgeschlagen."), while the footer
  * templates add the terminator themselves (`{{title}}. Du kannst es erneut
  * versuchen.`). Interpolating the title unchanged therefore printed it twice
- * ("fehlgeschlagen.. Du kannst …") in every language whose title ends a
- * sentence. Dropping the title's terminator here leaves the template's, which
- * is the same character in every catalog, and keeps the visible title line —
- * rendered from the title alone — exactly as translated.
+ * ("fehlgeschlagen.. Du kannst …"). The title's own terminator is dropped only
+ * when the template supplies one; a template that is a bare `{{title}}`, as
+ * `th` has, keeps whatever the title carries.
+ */
+export function composeFailureLabel(title: string, template: string): string {
+  const placeholder = template.indexOf(PLACEHOLDER);
+  if (placeholder === -1) {
+    return template;
+  }
+  const head = template.slice(0, placeholder);
+  const tail = template.slice(placeholder + PLACEHOLDER.length);
+  const stem = LEADING_TERMINATOR.test(tail) ? title.replace(TRAILING_TERMINATORS, '') : title;
+  return `${head}${stem}${tail}`;
+}
+
+/**
+ * The failed row's accessibility label: the failure title, then the retry line
+ * when the row offers one.
  *
- * The title is resolved from `titleKey` at call time so the label follows a
+ * The catalog value is read before interpolation (`getResource`), so the
+ * decision to drop the title's terminator is made against the template as
+ * translated rather than against a copy of the rule.
+ *
+ * Both keys and the title are resolved at call time, so the label follows a
  * language switch even when a caller holds a failure selected earlier.
  */
 export function messageFailureLabel(
   failure: Pick<MessageFailure, 'titleKey' | 'canRetry'>
 ): string {
-  const title = i18n.t(failure.titleKey).trimEnd().replace(TRAILING_SENTENCE_TERMINATOR, '');
-  return i18n.t(
-    failure.canRetry
-      ? 'agentChat.messageBubble.failureRetryAvailable'
-      : 'agentChat.messageBubble.failure',
-    { title }
-  );
+  const key = failure.canRetry
+    ? 'agentChat.messageBubble.failureRetryAvailable'
+    : 'agentChat.messageBubble.failure';
+  const title = i18n.t(failure.titleKey);
+  // The catalogs hold a string at every key they define; an absent one falls
+  // back to i18next's own interpolation, which then keeps the title unchanged.
+  const template = (i18n.getResource(i18n.language, 'translation', key) as string | undefined) ?? '';
+  return template === '' ? i18n.t(key, { title }) : composeFailureLabel(title, template);
 }
 
 export function selectMessageFailure(input: {

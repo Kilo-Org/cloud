@@ -317,8 +317,7 @@ describe('Home live section', () => {
       pressable =>
         pressable.findAll(
           child =>
-            Object.is(child.type, 'Text') &&
-            child.children.includes(i18n.t('home.noLiveSessions'))
+            Object.is(child.type, 'Text') && child.children.includes(i18n.t('home.noLiveSessions'))
         ).length > 0
     );
     if (!zero) {

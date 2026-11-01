@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Ladataan automaattisesti jäsenille, joilla ei ole henkilökohtaista oletusprofiilia.",
     "setAsDefault": "Aseta oletusprofiiliksi",
     "saveFailed": "Profiilia ei voitu tallentaa",
+    "organizationRoleRequired": "Vain organisaation omistajat ja ylläpitäjät voivat muuttaa organisaation profiilia.",
     "deleteTitle": "Poista profiili",
     "deleteMessage": "Tämä poistaa profiilin ja sen asetukset pysyvästi. Tätä ei voi kumota.",
     "deleteFailed": "Profiilia ei voitu poistaa",

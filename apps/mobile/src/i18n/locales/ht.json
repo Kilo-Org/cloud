@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Oto-chaje pou manm ki pa gen okenn default pèsonèl.",
     "setAsDefault": "Mete kòm default",
     "saveFailed": "Pa t 'kapab sove pwofil la",
+    "organizationRoleRequired": "Se sèlman pwopriyetè òganizasyon an ak administratè yo ki ka chanje pwofil òganizasyon an.",
     "deleteTitle": "Efase pwofil",
     "deleteMessage": "Sa a pou tout tan retire pwofil la ak paramèt li yo. Sa a pa ka defèt.",
     "deleteFailed": "Pa t 'kapab efase pwofil la",

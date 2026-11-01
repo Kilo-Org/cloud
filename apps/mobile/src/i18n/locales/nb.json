@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Lastes automatisk for medlemmer som ikke har noen personlig standard.",
     "setAsDefault": "Sett som standard",
     "saveFailed": "Kunne ikke lagre profilen",
+    "organizationRoleRequired": "Bare organisasjonseiere og administratorer kan endre organisasjonsprofiler.",
     "deleteTitle": "Slett profil",
     "deleteMessage": "Dette fjerner profilen og dens innstillinger permanent. Dette kan ikke angres.",
     "deleteFailed": "Kunne ikke slette profilen",

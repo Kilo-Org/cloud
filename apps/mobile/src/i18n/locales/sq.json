@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Ngarkohet automatikisht për anëtarët që nuk kanë parazgjedhje personale.",
     "setAsDefault": "Cakto si parazgjedhje",
     "saveFailed": "Profili nuk mund të ruhej",
+    "organizationRoleRequired": "Vetëm pronarët e organizatës dhe administratorët mund të ndryshojnë profilet e organizatës.",
     "deleteTitle": "Fshi profilin",
     "deleteMessage": "Kjo heq përgjithmonë profilin dhe cilësimet e tij. Kjo nuk mund të zhbëhet.",
     "deleteFailed": "Profili nuk mund të fshihej",

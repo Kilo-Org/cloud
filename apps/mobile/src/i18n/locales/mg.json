@@ -3838,6 +3838,7 @@
     "organizationDefaultDescription": "Auto-loaded ho an'ny mpikambana tsy manana default manokana.",
     "setAsDefault": "Ataovy ho default",
     "saveFailed": "Tsy afaka mitahiry piraofilina",
+    "organizationRoleRequired": "Ny tompon'ny fikambanana sy ny mpitantana ihany no afaka manova ny piraofilin'ny fikambanana.",
     "deleteTitle": "Fafao ny mombamomba",
     "deleteMessage": "Izany dia manala tanteraka ny mombamomba sy ny firafiny. Tsy azo averina izany.",
     "deleteFailed": "Tsy afaka namafa ny mombamomba",

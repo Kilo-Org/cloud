@@ -3888,6 +3888,7 @@
     "organizationDefaultDescription": "Încărcat automat pentru membrii care nu au o valoare implicită personală.",
     "setAsDefault": "Setați ca implicit",
     "saveFailed": "Profilul nu a putut fi salvat",
+    "organizationRoleRequired": "Doar proprietarii și administratorii organizației pot modifica profilurile organizației.",
     "deleteTitle": "Ștergeți profilul",
     "deleteMessage": "Acest lucru elimină definitiv profilul și setările acestuia. Acest lucru nu poate fi anulat.",
     "deleteFailed": "Nu s-a putut șterge profilul",

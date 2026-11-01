@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "個人のデフォルトがないメンバーの場合は自動ロードされます。",
     "setAsDefault": "デフォルトとして設定",
     "saveFailed": "プロフィールを保存できませんでした",
+    "organizationRoleRequired": "組織のプロフィールを変更できるのは組織のオーナーと管理者のみです。",
     "deleteTitle": "プロフィールの削除",
     "deleteMessage": "これにより、プロフィールとその設定が完全に削除されます。これを元に戻すことはできません。",
     "deleteFailed": "プロフィールを削除できませんでした",

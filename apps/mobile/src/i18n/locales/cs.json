@@ -3944,6 +3944,7 @@
     "organizationDefaultDescription": "Automaticky načteno pro členy, kteří nemají žádné osobní výchozí nastavení.",
     "setAsDefault": "Nastavit jako výchozí",
     "saveFailed": "Profil se nepodařilo uložit",
+    "organizationRoleRequired": "Profily organizace mohou měnit pouze vlastníci organizace a správci.",
     "deleteTitle": "Smazat profil",
     "deleteMessage": "Tím se profil a jeho nastavení trvale odstraní. Toto nelze vrátit zpět.",
     "deleteFailed": "Profil se nepodařilo smazat",

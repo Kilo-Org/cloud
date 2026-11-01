@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Dimuat secara automatik untuk ahli yang tidak mempunyai lalai peribadi.",
     "setAsDefault": "Tetapkan sebagai lalai",
     "saveFailed": "Tidak dapat menyimpan profil",
+    "organizationRoleRequired": "Hanya pemilik organisasi dan pentadbir boleh mengubah profil organisasi.",
     "deleteTitle": "Padam profil",
     "deleteMessage": "Ini mengalih keluar profil dan tetapannya secara kekal. Ini tidak boleh dibuat asal.",
     "deleteFailed": "Tidak dapat memadamkan profil",

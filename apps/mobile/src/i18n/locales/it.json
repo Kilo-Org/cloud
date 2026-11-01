@@ -3888,6 +3888,7 @@
     "organizationDefaultDescription": "Caricamento automatico per i membri che non hanno impostazioni predefinite personali.",
     "setAsDefault": "Imposta come predefinito",
     "saveFailed": "Impossibile salvare il profilo",
+    "organizationRoleRequired": "Solo i proprietari dell'organizzazione e gli amministratori possono modificare il profilo dell'organizzazione.",
     "deleteTitle": "Elimina profilo",
     "deleteMessage": "Ciò rimuove permanentemente il profilo e le sue impostazioni. Questa operazione non può essere annullata.",
     "deleteFailed": "Impossibile eliminare il profilo",

@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Dimuat otomatis untuk anggota yang tidak memiliki default pribadi.",
     "setAsDefault": "Tetapkan sebagai bawaan",
     "saveFailed": "Tidak dapat menyimpan profil",
+    "organizationRoleRequired": "Hanya pemilik organisasi dan admin yang dapat mengubah profil organisasi.",
     "deleteTitle": "Hapus profil",
     "deleteMessage": "Tindakan ini akan menghapus profil dan pengaturannya secara permanen. Hal ini tidak dapat dibatalkan.",
     "deleteFailed": "Tidak dapat menghapus profil",

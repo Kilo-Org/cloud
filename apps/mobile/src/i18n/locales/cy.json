@@ -4056,6 +4056,7 @@
     "organizationDefaultDescription": "Wedi'i lwytho'n awtomatig ar gyfer aelodau nad oes ganddynt unrhyw ragosodiad personol.",
     "setAsDefault": "Gosod fel rhagosodedig",
     "saveFailed": "Ni fu modd cadw'r proffil",
+    "organizationRoleRequired": "Dim ond perchnogion a gweinyddwyr y sefydliad sy'n gallu newid proffiliau'r sefydliad.",
     "deleteTitle": "Dileu proffil",
     "deleteMessage": "Mae hyn yn dileu'r proffil a'i osodiadau yn barhaol. Ni ellir dadwneud hyn.",
     "deleteFailed": "Ni fu modd dileu proffil",

@@ -3944,6 +3944,7 @@
     "organizationDefaultDescription": "Samodejno naloženo za člane, ki nimajo osebne privzete vrednosti.",
     "setAsDefault": "Nastavi kot privzeto",
     "saveFailed": "Profila ni bilo mogoče shraniti",
+    "organizationRoleRequired": "Profile organizacije lahko spremenijo samo lastniki organizacije in skrbniki.",
     "deleteTitle": "Izbriši profil",
     "deleteMessage": "S tem trajno odstranite profil in njegove nastavitve. Tega ni mogoče razveljaviti.",
     "deleteFailed": "Profila ni bilo mogoče izbrisati",

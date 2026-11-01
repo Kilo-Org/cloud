@@ -3944,6 +3944,7 @@
     "organizationDefaultDescription": "Automatiškai įkeliama nariams, kurie neturi asmeninių įsipareigojimų.",
     "setAsDefault": "Nustatyti kaip numatytąjį",
     "saveFailed": "Nepavyko išsaugoti profilio",
+    "organizationRoleRequired": "Organizacijos profilį gali keisti tik organizacijos savininkai ir administratoriai.",
     "deleteTitle": "Ištrinti profilį",
     "deleteMessage": "Tai visam laikui pašalins profilį ir jo nustatymus. To negalima anuliuoti.",
     "deleteFailed": "Nepavyko ištrinti profilio",

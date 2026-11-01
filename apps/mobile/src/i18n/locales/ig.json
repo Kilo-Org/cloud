@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Ebudoro onwe ya maka ndị otu na-enweghị ndabara nkeonwe.",
     "setAsDefault": "Tọọ ka ndabara",
     "saveFailed": "Enweghị ike ịchekwa profaịlụ",
+    "organizationRoleRequired": "Naanị ndị nwe nzukọ na ndị nchịkwa nwere ike ịgbanwe profaịlụ nzukọ.",
     "deleteTitle": "Hichapụ profaịlụ",
     "deleteMessage": "Nke a na-ewepụ profaịlụ na ntọala ya kpamkpam. Enweghị ike imegharị nke a.",
     "deleteFailed": "Enweghị ike ihichapụ profaịlụ",

@@ -4000,6 +4000,7 @@
     "organizationDefaultDescription": "Uathluchtaithe do bhaill nach bhfuil réamhshocrú pearsanta acu.",
     "setAsDefault": "Socraigh mar réamhshocrú",
     "saveFailed": "Níorbh fhéidir an phróifíl a shábháil",
+    "organizationRoleRequired": "Ní féidir ach le húinéirí agus riarthóirí eagraíochta próifíl eagraíochta a athrú.",
     "deleteTitle": "Scrios próifíl",
     "deleteMessage": "Baineann sé seo an phróifíl agus a socruithe amach go buan. Ní féidir é seo a chealú.",
     "deleteFailed": "Níorbh fhéidir an phróifíl a scriosadh",

@@ -3899,6 +3899,7 @@
     "organizationDefaultDescription": "Auto-loaded for members who have no personal default.",
     "setAsDefault": "Set as default",
     "saveFailed": "Couldn't save profile",
+    "organizationRoleRequired": "Only organization owners and admins can change organization profiles.",
     "deleteTitle": "Delete profile",
     "deleteMessage": "This permanently removes the profile and its settings. This cannot be undone.",
     "deleteFailed": "Couldn't delete profile",

@@ -214,6 +214,10 @@ export function NewSessionRepositorySection({
       <CollapsibleSection
         className="mt-3 rounded-lg border border-border bg-card"
         contentClassName="gap-3"
+        // The connected-but-empty card below is a `p-4` surface, and the two are
+        // mutually exclusive states of the same region, so this one keeps that
+        // 14 dp inset instead of the section's 10.5 dp default.
+        inset="roomy"
         titleClassName="font-semibold"
         title={t(copy.connectTitle)}
         // The card stacks under the repository picker in a scrolling column,

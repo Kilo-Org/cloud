@@ -123,6 +123,15 @@ describe('CollapsibleSection header frame', () => {
     expect(String(body?.props.className)).toContain('gap-2');
   });
 
+  it('moves a wider inset onto the header and the body together', () => {
+    const renderer = mountSection({ inset: 'roomy', defaultExpanded: true });
+
+    // One preset feeds both boxes, so a caller can widen the card without
+    // leaving the header's frame short of its edges.
+    expect(headerNode(renderer).props.className).toContain('px-4 pt-4 pb-4');
+    expect(boxWithClass(renderer, 'px-4 pb-4')).toBeDefined();
+  });
+
   it('keeps the button role, the title as its name, and the expanded state', () => {
     const renderer = mountSection();
 

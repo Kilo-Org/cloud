@@ -3861,14 +3861,14 @@
     "variablesSaveFailed": "متغیر ذخیره نشد",
     "commandsTitle": "دستورات راه اندازی",
     "addCommand": "دستور اضافه کنید",
-    "commandLabel": "فرمان",
-    "commandLabelPosition": "فرمان {{position}}",
+    "commandLabel": "دستور",
+    "commandLabelPosition": "دستور {{position}}",
     "commandPlaceholder": "مثلاً pnpm install",
     "commandAtLimit": "دستور به {{max}} نویسه محدود است",
     "commandsEmpty": "هنوز دستور راه اندازی وجود ندارد",
     "commandsSaveFailed": "دستورات راه اندازی ذخیره نشد",
-    "moveCommandUp": "فرمان {{position}} را به بالا منتقل کنید",
-    "moveCommandDown": "فرمان {{position}} را به پایین منتقل کنید",
+    "moveCommandUp": "دستور {{position}} را به بالا منتقل کنید",
+    "moveCommandDown": "دستور {{position}} را به پایین منتقل کنید",
     "skillsTitle": "مهارت ها",
     "addSkill": "مهارت را اضافه کنید",
     "skillNameLabel": "نام مهارت",
@@ -4013,7 +4013,7 @@
     },
     "variablesDeleteFailed": "متغیر حذف نشد",
     "deleteVariable": "متغیر {{key}} را حذف کنید",
-    "deleteCommand": "فرمان {{position}} را حذف کنید"
+    "deleteCommand": "دستور {{position}} را حذف کنید"
   },
   "credits": {
     "title": "خرید اعتبار",

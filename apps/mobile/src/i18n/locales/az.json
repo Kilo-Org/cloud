@@ -3854,7 +3854,7 @@
     "variablesEmpty": "Hələ heç bir dəyişən yoxdur",
     "variablesSaveFailed": "Dəyişən yadda saxlamaq mümkün olmadı",
     "commandsTitle": "Quraşdırma əmrləri",
-    "addCommand": "Komanda əlavə edin",
+    "addCommand": "Əmr əlavə edin",
     "commandLabel": "Əmr",
     "commandLabelPosition": "Əmr {{position}}",
     "commandPlaceholder": "məs. pnpm install",

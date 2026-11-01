@@ -3855,14 +3855,14 @@
     "variablesSaveFailed": "Kon nie veranderlike stoor nie",
     "commandsTitle": "Stel opdragte op",
     "addCommand": "Voeg opdrag by",
-    "commandLabel": "Bevel",
-    "commandLabelPosition": "Bevel {{position}}",
+    "commandLabel": "Opdrag",
+    "commandLabelPosition": "Opdrag {{position}}",
     "commandPlaceholder": "bv. pnpm install",
     "commandAtLimit": "Die opdrag is beperk tot {{max}} karakters",
     "commandsEmpty": "Nog geen opstelopdragte nie",
     "commandsSaveFailed": "Kon nie opstellingopdragte stoor nie",
-    "moveCommandUp": "Skuif bevel {{position}} op",
-    "moveCommandDown": "Skuif bevel {{position}} af",
+    "moveCommandUp": "Skuif opdrag {{position}} op",
+    "moveCommandDown": "Skuif opdrag {{position}} af",
     "skillsTitle": "Vaardighede",
     "addSkill": "Voeg vaardigheid by",
     "skillNameLabel": "Vaardigheidsnaam",
@@ -4007,7 +4007,7 @@
     },
     "variablesDeleteFailed": "Kon nie veranderlike verwyder nie",
     "deleteVariable": "Skrap veranderlike {{key}}",
-    "deleteCommand": "Skrap bevel {{position}}"
+    "deleteCommand": "Skrap opdrag {{position}}"
   },
   "credits": {
     "title": "Koop krediete",

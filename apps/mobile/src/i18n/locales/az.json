@@ -2376,7 +2376,6 @@
       "advancedConfigDescription": "Bu sessiya üçün keçərlidir. Profil kimi yadda saxlasanız, növbəti dəfə üçün qalır.",
       "saveAsProfile": "Profil kimi yadda saxlayın",
       "saveProfileDescription": "Cari mühit dəyişənlərini və quraşdırma əmrlərini təkrar istifadə edilə bilən profil kimi yadda saxlayın.",
-      "profileSummary": "{{vars}} mühit dəyişənləri · {{commands}} quraşdırma əmrləri",
       "profileSaved": "\"{{name}}\" profili yadda saxlanıldı",
       "organizationProfiles": "Təşkilat Profilləri",
       "personalProfiles": "Şəxsi Profillər",

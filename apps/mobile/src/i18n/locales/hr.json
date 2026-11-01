@@ -2413,7 +2413,6 @@
       "advancedConfigDescription": "Vrijedi za ovu sesiju. Spremanjem kao profil ostaje za sljedeći put.",
       "saveAsProfile": "Spremi kao profil",
       "saveProfileDescription": "Spremite trenutne varijable okruženja i naredbe za postavljanje kao profil za višekratnu upotrebu.",
-      "profileSummary": "{{vars}} varijable okruženja · {{commands}} naredbe za postavljanje",
       "profileSaved": "Profil \"{{name}}\" spremljen",
       "organizationProfiles": "Profili organizacije",
       "personalProfiles": "Osobni profili",

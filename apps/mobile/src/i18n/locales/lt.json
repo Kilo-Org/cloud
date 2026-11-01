@@ -2450,7 +2450,6 @@
       "advancedConfigDescription": "Taikoma šiai sesijai. Išsaugojus kaip profilį, jis išliks kitam kartui.",
       "saveAsProfile": "Išsaugoti kaip profilį",
       "saveProfileDescription": "Išsaugokite esamus aplinkos kintamuosius ir sąrankos komandas kaip pakartotinai naudojamą profilį.",
-      "profileSummary": "{{vars}} aplinkos kintamieji · {{commands}} sąrankos komandos",
       "profileSaved": "Profilis „{{name}}“ išsaugotas",
       "organizationProfiles": "Organizacijos profiliai",
       "personalProfiles": "Asmeniniai profiliai",

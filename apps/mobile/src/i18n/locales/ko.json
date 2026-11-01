@@ -1849,7 +1849,6 @@
       "advancedConfigDescription": "이 세션에 적용됩니다. 프로필로 저장하면 다음에도 그대로 유지됩니다.",
       "saveAsProfile": "프로필로 저장",
       "saveProfileDescription": "현재 환경 변수와 설정 명령을 재사용 가능한 프로필로 저장합니다.",
-      "profileSummary": "{{vars}} 환경 변수 · {{commands}} 설정 명령",
       "profileSaved": "프로필 \"{{name}}\"이 저장되었습니다.",
       "organizationProfiles": "조직 프로필",
       "personalProfiles": "개인 프로필",

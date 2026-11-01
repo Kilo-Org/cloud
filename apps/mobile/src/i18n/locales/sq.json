@@ -2376,7 +2376,6 @@
       "advancedConfigDescription": "Vlen për këtë sesion. Ruajtja si profil e mban për herën tjetër.",
       "saveAsProfile": "Ruaje si profil",
       "saveProfileDescription": "Ruani variablat aktuale të mjedisit dhe komandat e konfigurimit si një profil të ripërdorshëm.",
-      "profileSummary": "{{vars}} variablat e mjedisit · {{commands}} komandat e konfigurimit",
       "profileSaved": "Profili \"{{name}}\" u ruajt",
       "organizationProfiles": "Profilet e Organizatës",
       "personalProfiles": "Profilet Personale",

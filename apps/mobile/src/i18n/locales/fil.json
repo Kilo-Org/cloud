@@ -2382,7 +2382,6 @@
       "advancedConfigDescription": "Nalalapat sa session na ito. Ang pag-save bilang profile ay nagpapanatili nito para sa susunod.",
       "saveAsProfile": "I-save bilang Profile",
       "saveProfileDescription": "I-save ang kasalukuyang mga variable ng kapaligiran at mga utos sa pag-setup bilang isang reusable na profile.",
-      "profileSummary": "{{vars}} variable ng kapaligiran · {{commands}} utos sa pag-setup",
       "profileSaved": "Na-save ang profile na \"{{name}}\".",
       "organizationProfiles": "Mga Profile ng Organisasyon",
       "personalProfiles": "Mga Personal na Profile",

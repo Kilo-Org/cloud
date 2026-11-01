@@ -2376,7 +2376,6 @@
       "advancedConfigDescription": "Gjelder for denne økten. Lagres den som profil, beholdes den til neste gang.",
       "saveAsProfile": "Lagre som profil",
       "saveProfileDescription": "Lagre gjeldende miljøvariabler og oppsettkommandoer som en gjenbrukbar profil.",
-      "profileSummary": "{{vars}} miljøvariabler · {{commands}} oppsettkommandoer",
       "profileSaved": "Profilen «{{name}}» er lagret",
       "organizationProfiles": "Organisasjonsprofiler",
       "personalProfiles": "Personlige profiler",

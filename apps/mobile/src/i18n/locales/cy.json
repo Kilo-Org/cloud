@@ -2524,7 +2524,6 @@
       "advancedConfigDescription": "Yn berthnasol i’r sesiwn hon. Mae cadw fel proffil yn ei gadw ar gyfer y tro nesaf.",
       "saveAsProfile": "Cadw fel Proffil",
       "saveProfileDescription": "Arbedwch y newidynnau amgylchedd cyfredol a'r gorchmynion gosod fel proffil y gellir ei ailddefnyddio.",
-      "profileSummary": "{{vars}} newidynnau amgylchedd · {{commands}} gorchmynion gosod",
       "profileSaved": "Proffil \"{{name}}\" wedi'i gadw",
       "organizationProfiles": "Proffiliau Sefydliad",
       "personalProfiles": "Proffiliau Personol",

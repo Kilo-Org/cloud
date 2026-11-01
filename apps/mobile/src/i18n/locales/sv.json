@@ -2376,7 +2376,6 @@
       "advancedConfigDescription": "Gäller för den här sessionen. Sparas den som profil finns den kvar nästa gång.",
       "saveAsProfile": "Spara som profil",
       "saveProfileDescription": "Spara de aktuella miljövariablerna och inställningskommandona som en återanvändbar profil.",
-      "profileSummary": "{{vars}} miljövariabler · {{commands}} inställningskommandon",
       "profileSaved": "Profilen \"{{name}}\" har sparats",
       "organizationProfiles": "Organisationsprofiler",
       "personalProfiles": "Personliga profiler",

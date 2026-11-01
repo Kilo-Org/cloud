@@ -2376,7 +2376,6 @@
       "advancedConfigDescription": "Koskee tätä istuntoa. Profiilina tallentaminen säilyttää sen seuraavaa kertaa varten.",
       "saveAsProfile": "Tallenna profiilina",
       "saveProfileDescription": "Tallenna nykyiset ympäristömuuttujat ja asetuskomennot uudelleen käytettäväksi profiiliksi.",
-      "profileSummary": "{{vars}} ympäristömuuttujat · {{commands}} asennuskomennot",
       "profileSaved": "Profiili \"{{name}}\" tallennettu",
       "organizationProfiles": "Organisaatioprofiilit",
       "personalProfiles": "Henkilökohtaiset profiilit",

@@ -1921,7 +1921,6 @@
       "advancedConfigDescription": "يُطبق على هذه الجلسة. حفظه كملف شخصي يبقيه للمرة القادمة.",
       "saveAsProfile": "حفظ كملف شخصي",
       "saveProfileDescription": "احفظ متغيرات البيئة الحالية وأوامر الإعداد كملف شخصي قابل لإعادة الاستخدام.",
-      "profileSummary": "{{vars}} متغيرات البيئة · أوامر الإعداد {{commands}}",
       "profileSaved": "تم حفظ الملف الشخصي \"{{name}}\".",
       "organizationProfiles": "ملفات المؤسسة الشخصية",
       "personalProfiles": "الملفات الشخصية",

@@ -1849,7 +1849,6 @@
       "advancedConfigDescription": "Bu oturum için geçerlidir. Profil olarak kaydetmek bir sonraki sefer için saklar.",
       "saveAsProfile": "Profil olarak kaydet",
       "saveProfileDescription": "Geçerli ortam değişkenlerini ve kurulum komutlarını yeniden kullanılabilir bir profil olarak kaydedin.",
-      "profileSummary": "{{vars}} ortam değişkenleri · {{commands}} kurulum komutları",
       "profileSaved": "\"{{name}}\" profili kaydedildi",
       "organizationProfiles": "Organizasyon Profilleri",
       "personalProfiles": "Kişisel Profiller",

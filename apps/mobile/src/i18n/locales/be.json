@@ -2450,7 +2450,6 @@
       "advancedConfigDescription": "Дзейнічае для гэтай сесіі. Калі захаваць як профіль, ён застанецца на наступны раз.",
       "saveAsProfile": "Захаваць як профіль",
       "saveProfileDescription": "Захавайце бягучыя зменныя асяроддзя і каманды наладкі як шматразовы профіль.",
-      "profileSummary": "{{vars}} зменныя асяроддзя · {{commands}} каманды наладкі",
       "profileSaved": "Профіль \"{{name}}\" захаваны",
       "organizationProfiles": "Профілі арганізацыі",
       "personalProfiles": "Асабістыя профілі",

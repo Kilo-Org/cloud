@@ -2376,7 +2376,6 @@
       "advancedConfigDescription": "Waxay khusaysaa fadhigan. Kaydinta Profile ahaan waxay u hayn doontaa marka xigta.",
       "saveAsProfile": "U keydi sidii Profile ahaan",
       "saveProfileDescription": "Keydi doorsoomayaasha deegaanka ee hadda jira iyo amarrada dejinta sidii muuqaal dib loo isticmaali karo.",
-      "profileSummary": "{{vars}} doorsoomayaasha deegaanka · {{commands}} amarrada dejinta",
       "profileSaved": "Xogta \"{{name}}\" waa la keydiyay",
       "organizationProfiles": "Profiles Ururka",
       "personalProfiles": "Profiles Shakhsiyeed",

@@ -1835,7 +1835,6 @@
       "advancedConfigDescription": "Si applica a questa sessione. Salvarlo come profilo lo conserva per la prossima volta.",
       "saveAsProfile": "Salva come profilo",
       "saveProfileDescription": "Salva le variabili di ambiente correnti e i comandi di configurazione come profilo riutilizzabile.",
-      "profileSummary": "{{vars}} variabili di ambiente · {{commands}} comandi di configurazione",
       "profileSaved": "Profilo \"{{name}}\" salvato",
       "organizationProfiles": "Profili dell'organizzazione",
       "personalProfiles": "Profili personali",

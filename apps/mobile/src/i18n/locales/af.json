@@ -2376,7 +2376,6 @@
       "advancedConfigDescription": "Geld vir hierdie sessie. As jy dit as profiel stoor, bly dit vir volgende keer.",
       "saveAsProfile": "Stoor as profiel",
       "saveProfileDescription": "Stoor die huidige omgewingsveranderlikes en opstelopdragte as 'n herbruikbare profiel.",
-      "profileSummary": "{{vars}} omgewingsveranderlikes · {{commands}} opstelopdragte",
       "profileSaved": "Profiel \"{{name}}\" is gestoor",
       "organizationProfiles": "Organisasie profiele",
       "personalProfiles": "Persoonlike profiele",

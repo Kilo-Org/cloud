@@ -1849,7 +1849,6 @@
       "advancedConfigDescription": "僅對本次工作階段生效。另存為設定檔可供下次使用。",
       "saveAsProfile": "另存為設定檔",
       "saveProfileDescription": "將目前環境變數和設定命令儲存為可重複使用的設定檔。",
-      "profileSummary": "{{vars}} 環境變數 · {{commands}} 設定命令",
       "profileSaved": "設定檔“{{name}}”已儲存",
       "organizationProfiles": "組織簡介",
       "personalProfiles": "個人簡介",

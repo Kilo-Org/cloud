@@ -2382,7 +2382,6 @@
       "advancedConfigDescription": "برای این نشست اعمال می‌شود. ذخیره به عنوان نمایه آن را برای بار بعدی نگه می‌دارد.",
       "saveAsProfile": "ذخیره به عنوان نمایه",
       "saveProfileDescription": "متغیرهای محیط فعلی و دستورات راه اندازی را به عنوان یک نمایه قابل استفاده مجدد ذخیره کنید.",
-      "profileSummary": "{{vars}} متغیرهای محیطی · دستورات تنظیم {{commands}}",
       "profileSaved": "نمایه \"{{name}}\" ذخیره شد",
       "organizationProfiles": "نمایه های سازمان",
       "personalProfiles": "پروفایل های شخصی",

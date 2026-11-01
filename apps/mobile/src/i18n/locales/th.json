@@ -2376,7 +2376,6 @@
       "advancedConfigDescription": "ใช้กับเซสชันนี้ การบันทึกเป็นโปรไฟล์จะเก็บไว้ใช้ครั้งถัดไป",
       "saveAsProfile": "บันทึกเป็นโปรไฟล์",
       "saveProfileDescription": "บันทึกตัวแปรสภาพแวดล้อมปัจจุบันและคำสั่งการตั้งค่าเป็นโปรไฟล์ที่นำมาใช้ซ้ำได้",
-      "profileSummary": "ตัวแปรสภาพแวดล้อม {{vars}} · คำสั่งการตั้งค่า {{commands}}",
       "profileSaved": "บันทึกโปรไฟล์ \"{{name}}\" แล้ว",
       "organizationProfiles": "โปรไฟล์องค์กร",
       "personalProfiles": "โปรไฟล์ส่วนบุคคล",

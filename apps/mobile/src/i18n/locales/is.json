@@ -2376,7 +2376,6 @@
       "advancedConfigDescription": "Gildir fyrir þessa lotu. Að vista sem prófíl varðveitir það fyrir næsta skipti.",
       "saveAsProfile": "Vista sem prófíl",
       "saveProfileDescription": "Vistaðu núverandi umhverfisbreytur og uppsetningarskipanir sem endurnýtanlegt snið.",
-      "profileSummary": "{{vars}} umhverfisbreytur · {{commands}} uppsetningarskipanir",
       "profileSaved": "Prófíllinn „{{name}}“ vistaður",
       "organizationProfiles": "Stofnunarsnið",
       "personalProfiles": "Persónuleg snið",

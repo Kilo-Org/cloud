@@ -2382,7 +2382,6 @@
       "advancedConfigDescription": "Mihatra amin’ity sesiona ity. Raha tehirizina ho profile dia mitoetra ho an’ny manaraka.",
       "saveAsProfile": "Tehirizo ho Profile",
       "saveProfileDescription": "Tehirizo ho profil azo ampiasaina indray ny fari-piainan'ny tontolo iainana ankehitriny sy ny baiko fanamboarana.",
-      "profileSummary": "{{vars}} fari-piainan'ny tontolo iainana · {{commands}} baiko fanamboarana",
       "profileSaved": "Voatahiry ny mombamomba \"{{name}}\".",
       "organizationProfiles": "Organisation Profiles",
       "personalProfiles": "Profil manokana",

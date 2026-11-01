@@ -2376,7 +2376,6 @@
       "advancedConfigDescription": "Gælder for denne session. Gemmer du den som profil, bevares den til næste gang.",
       "saveAsProfile": "Gem som profil",
       "saveProfileDescription": "Gem de aktuelle miljøvariabler og opsætningskommandoer som en genbrugelig profil.",
-      "profileSummary": "{{vars}} miljøvariabler · {{commands}} opsætningskommandoer",
       "profileSaved": "Profilen \"{{name}}\" blev gemt",
       "organizationProfiles": "Organisationsprofiler",
       "personalProfiles": "Personlige profiler",

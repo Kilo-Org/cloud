@@ -1849,7 +1849,6 @@
       "advancedConfigDescription": "Gilt für diese Sitzung. Als Profil gespeichert bleibt sie für das nächste Mal erhalten.",
       "saveAsProfile": "Als Profil speichern",
       "saveProfileDescription": "Speichere die aktuellen Umgebungsvariablen und Setup-Befehle als wiederverwendbares Profil.",
-      "profileSummary": "{{vars}} Umgebungsvariablen · {{commands}} Setup-Befehle",
       "profileSaved": "Profil „{{name}}“ gespeichert",
       "organizationProfiles": "Organisationsprofile",
       "personalProfiles": "Persönliche Profile",

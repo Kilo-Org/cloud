@@ -2487,7 +2487,6 @@
       "advancedConfigDescription": "Japplika għal din is-sessjoni. Is-salvataġġ bħala profil iżommu għall-ħin li jmiss.",
       "saveAsProfile": "Ħlief bħala Profil",
       "saveProfileDescription": "Issejvja l-varjabbli ambjentali attwali u l-kmandi tas-setup bħala profil li jista 'jerġa' jintuża.",
-      "profileSummary": "{{vars}} varjabbli ambjentali · {{commands}} kmandi tas-setup",
       "profileSaved": "Profil \"{{name}}\" salvat",
       "organizationProfiles": "Profili tal-Organizzazzjoni",
       "personalProfiles": "Profili Personali",

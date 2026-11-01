@@ -2487,7 +2487,6 @@
       "advancedConfigDescription": "Baineann sé leis an seisiún seo. Má shábháiltear mar phróifíl é, fanann sé don chéad uair eile.",
       "saveAsProfile": "Sábháil mar Phróifíl",
       "saveProfileDescription": "Sábháil na hathróga timpeallachta reatha agus na horduithe socraithe mar phróifíl ath-inúsáidte.",
-      "profileSummary": "{{vars}} athróga timpeallachta · {{commands}} orduithe socraithe",
       "profileSaved": "Próifíl \"{{name}}\" sábháilte",
       "organizationProfiles": "Próifílí Eagraíochta",
       "personalProfiles": "Próifílí Pearsanta",

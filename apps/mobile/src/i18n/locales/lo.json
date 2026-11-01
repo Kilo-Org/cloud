@@ -2376,7 +2376,6 @@
       "advancedConfigDescription": "ໃຊ້ກັບເຊສຊັນນີ້. ການບັນທຶກເປັນໂປຣໄຟລ໌ຈະເກັບໄວ້ສຳລັບຄັ້ງຕໍ່ໄປ.",
       "saveAsProfile": "ບັນທຶກເປັນໂປຣໄຟລ໌",
       "saveProfileDescription": "ບັນທຶກຕົວແປສະພາບແວດລ້ອມປັດຈຸບັນ ແລະຄຳສັ່ງຕັ້ງຄ່າເປັນໂປຣໄຟລ໌ທີ່ສາມາດໃຊ້ຄືນໄດ້.",
-      "profileSummary": "{{vars}} ຕົວແປສະພາບແວດລ້ອມ · {{commands}} ຄຳສັ່ງຕັ້ງຄ່າ",
       "profileSaved": "ບັນທຶກໂປຣໄຟລ໌ \"{{name}}\" ແລ້ວ",
       "organizationProfiles": "ໂປຣໄຟລ໌ອົງການຈັດຕັ້ງ",
       "personalProfiles": "ໂປຣໄຟລ໌ສ່ວນຕົວ",

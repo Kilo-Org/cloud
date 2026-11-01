@@ -2376,7 +2376,6 @@
       "advancedConfigDescription": "یہ اس سیشن پر لاگو ہوتا ہے۔ بطور پروفائل محفوظ کرنے سے یہ اگلی بار کے لیے رہتا ہے۔",
       "saveAsProfile": "بطور پروفائل محفوظ کریں۔",
       "saveProfileDescription": "موجودہ ماحولیاتی متغیرات اور سیٹ اپ کمانڈز کو دوبارہ قابل استعمال پروفائل کے طور پر محفوظ کریں۔",
-      "profileSummary": "{{vars}} ماحولیاتی متغیرات · {{commands}} سیٹ اپ کمانڈز",
       "profileSaved": "پروفائل \"{{name}}\" محفوظ ہو گیا۔",
       "organizationProfiles": "تنظیمی پروفائلز",
       "personalProfiles": "ذاتی پروفائلز",

@@ -2382,7 +2382,6 @@
       "advancedConfigDescription": "ለዚህ ክፍለ ጊዜ ብቻ ነው። እንደ መገለጫ ካስቀመጥከው ለሚቀጥለው ጊዜ ይቆያል።",
       "saveAsProfile": "እንደ መገለጫ አስቀምጥ",
       "saveProfileDescription": "የአሁኑን የአካባቢ ተለዋዋጮች እና የማዋቀር ትዕዛዞችን እንደ እንደገና ጥቅም ላይ ሊውል የሚችል መገለጫ ያስቀምጡ።",
-      "profileSummary": "{{vars}} የአካባቢ ተለዋዋጮች · {{commands}} የማዋቀር ትዕዛዞች",
       "profileSaved": "መገለጫ {{name}} ተቀምጧል",
       "organizationProfiles": "የድርጅት መገለጫዎች",
       "personalProfiles": "የግል መገለጫዎች",

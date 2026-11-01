@@ -2376,7 +2376,6 @@
       "advancedConfigDescription": "دا دې غونډې ته پلي کېږي. د پروفایل په توګه خوندي کول یې د بل ځل لپاره ساتي.",
       "saveAsProfile": "د پروفایل په توګه خوندي کړئ",
       "saveProfileDescription": "د اوسني چاپیریال متغیرات او د تنظیم کولو امرونه د بیا کارونې وړ پروفایل په توګه خوندي کړئ.",
-      "profileSummary": "{{vars}} د چاپیریال تغیرات · {{commands}} د ترتیب کولو امرونه",
       "profileSaved": "پروفایل \"{{name}}\" خوندي شو",
       "organizationProfiles": "د سازمان پروفایلونه",
       "personalProfiles": "شخصي پروفایلونه",

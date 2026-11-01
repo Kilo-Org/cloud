@@ -2372,6 +2372,8 @@
       "forkFilesUnchangedOnComputer": "Skrám á þessari tölvu er ekki breytt.",
       "pickProfile": "Veldu prófíl",
       "noProfile": "Enginn prófíll",
+      "defaultProfileResolvesTo": "samsvarar {{name}}",
+      "defaultProfileResolvesToAccessibility": "Sjálfgefið snið: {{name}}",
       "manageProfiles": "Stjórna prófílum",
       "noProfiles": "Engir prófílar ennþá. Búðu til einn til að bæta við umhverfisbreytum, MCP netþjónum og færni.",
       "advancedConfig": "Ítarleg stilling",

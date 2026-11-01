@@ -2372,6 +2372,8 @@
       "forkFilesUnchangedOnComputer": "Filerna på den här datorn ändras inte.",
       "pickProfile": "Välj en profil",
       "noProfile": "Ingen profil",
+      "defaultProfileResolvesTo": "blir {{name}}",
+      "defaultProfileResolvesToAccessibility": "Standardprofil: {{name}}",
       "manageProfiles": "Hantera profiler",
       "noProfiles": "Inga profiler än. Skapa en för att lägga till miljövariabler, MCP-servrar och färdigheter.",
       "advancedConfig": "Avancerad konfiguration",

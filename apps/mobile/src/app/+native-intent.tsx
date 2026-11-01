@@ -6,6 +6,7 @@ import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
 import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
 import { handleHomeFixturePath } from '@/lib/home-fixture';
 import { modelPickerFixtureRoute } from '@/lib/model-picker-fixture';
+import { profilePickerFixtureRoute } from '@/lib/profile-picker-fixture';
 
 // Composes the native-intent concerns in order: the share-extension check
 // returns early before web-path mapping (a share URL is never a web route), then
@@ -73,6 +74,11 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     const fixtureRoute = modelPickerFixtureRoute(path);
     if (fixtureRoute) {
       return fixtureRoute;
+    }
+    // Dev-only profile picker sheet, reached through the development fixture path.
+    const profilePickerRoute = profilePickerFixtureRoute(path);
+    if (profilePickerRoute) {
+      return profilePickerRoute;
     }
   }
   if (handleAppActionPath({ path, initial })) {

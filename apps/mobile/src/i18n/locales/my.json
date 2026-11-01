@@ -2372,6 +2372,8 @@
       "forkFilesUnchangedOnComputer": "ဤကွန်ပျူတာပေါ်ရှိ ဖိုင်များကို ပြောင်းလဲမည်မဟုတ်ပါ။",
       "pickProfile": "ပရိုဖိုင်ကို ရွေးပါ။",
       "noProfile": "ပရိုဖိုင်မရှိပါ။",
+      "defaultProfileResolvesTo": "လက်ရှိတွင် {{name}} ဖြစ်ပါသည်",
+      "defaultProfileResolvesToAccessibility": "မူရင်းပရိုဖိုင်: {{name}}",
       "manageProfiles": "ပရိုဖိုင်များကို စီမံပါ။",
       "noProfiles": "ပရိုဖိုင်များ မရှိသေးပါ။ ပတ်ဝန်းကျင်ပြောင်းလဲမှုများ၊ MCP ဆာဗာများနှင့် ကျွမ်းကျင်မှုများကို ထည့်သွင်းရန် တစ်ခုဖန်တီးပါ။",
       "advancedConfig": "အဆင့်မြင့်ဖွဲ့စည်းမှု",

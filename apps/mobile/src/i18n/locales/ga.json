@@ -2483,6 +2483,8 @@
       "forkFilesUnchangedOnComputer": "Ní athraítear na comhaid ar an ríomhaire seo.",
       "pickProfile": "Roghnaigh próifíl",
       "noProfile": "Gan próifíl",
+      "defaultProfileResolvesTo": "freagraíonn sé do {{name}}",
+      "defaultProfileResolvesToAccessibility": "Próifíl réamhshocraithe: {{name}}",
       "manageProfiles": "Bainistigh próifílí",
       "noProfiles": "Níl próifílí ann fós. Cruthaigh ceann chun athróga timpeallachta, freastalaithe MCP, agus scileanna a chur leis.",
       "advancedConfig": "Cumraíocht Casta",

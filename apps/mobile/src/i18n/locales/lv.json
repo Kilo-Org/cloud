@@ -2409,6 +2409,8 @@
       "forkFilesUnchangedOnComputer": "Faili šajā datorā netiek mainīti.",
       "pickProfile": "Izvēlieties profilu",
       "noProfile": "Nav profila",
+      "defaultProfileResolvesTo": "norāda uz {{name}}",
+      "defaultProfileResolvesToAccessibility": "Noklusējuma profils: {{name}}",
       "manageProfiles": "Pārvaldīt profilus",
       "noProfiles": "Vēl nav neviena profila. Izveidojiet vienu, lai pievienotu vides mainīgos, MCP serverus un prasmes.",
       "advancedConfig": "Papildu konfigurācija",

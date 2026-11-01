@@ -1850,6 +1850,8 @@
       "forkFilesUnchangedOnComputer": "इस कंप्यूटर पर फ़ाइलें नहीं बदली जातीं।",
       "pickProfile": "एक प्रोफ़ाइल चुनें",
       "noProfile": "कोई प्रोफ़ाइल नहीं",
+      "defaultProfileResolvesTo": "वर्तमान में {{name}} पर सेट",
+      "defaultProfileResolvesToAccessibility": "डिफ़ॉल्ट प्रोफ़ाइल: {{name}}",
       "manageProfiles": "प्रोफ़ाइल प्रबंधित करें",
       "noProfiles": "अभी तक कोई प्रोफ़ाइल नहीं। पर्यावरण चर, एमसीपी सर्वर और कौशल जोड़ने के लिए एक बनाएं।",
       "advancedConfig": "उन्नत विन्यास",

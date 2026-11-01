@@ -29,6 +29,12 @@ export type ProfilePickerSheetProps = {
    * runs on, so the row names the default instead of claiming no profile.
    */
   defaultProfileApplies: boolean;
+  /**
+   * The profile the effective default resolves to, when known. The no-override
+   * row names it so the checked row matches the Environment chip, which shows
+   * that same profile's name.
+   */
+  defaultProfileName?: string | null;
   isLoading: boolean;
   isError: boolean;
   /** The picked id no longer resolves to a profile. */
@@ -49,6 +55,7 @@ export function ProfilePickerSheet({
   candidates,
   hasProfiles,
   defaultProfileApplies,
+  defaultProfileName,
   selectedOverrideProfileId,
   isLoading,
   isError,
@@ -66,6 +73,16 @@ export function ProfilePickerSheet({
   const noOverrideLabelKey = defaultProfileApplies
     ? 'profiles.defaultSectionTitle'
     : 'agentChat.newSession.noProfile';
+  const noOverrideLabel = t(noOverrideLabelKey);
+  // The Environment chip names the profile the default resolves to; the row
+  // has to say the same thing, or the checked row and the chip disagree.
+  const resolvedDefaultName = defaultProfileApplies ? (defaultProfileName ?? null) : null;
+  const noOverrideAccessibilityLabel =
+    resolvedDefaultName === null
+      ? noOverrideLabel
+      : t('agentChat.newSession.defaultProfileResolvesToAccessibility', {
+          name: resolvedDefaultName,
+        });
 
   if (isLoading) {
     return (
@@ -142,13 +159,20 @@ export function ProfilePickerSheet({
             onSelect(null);
           }}
           {...radioItemA11y({
-            label: t(noOverrideLabelKey),
+            label: noOverrideAccessibilityLabel,
             checked: selectedOverrideProfileId === null && !needsAttention,
           })}
         >
-          <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
-            {t(noOverrideLabelKey)}
-          </Text>
+          <View className="min-w-0 flex-1">
+            <Text className="text-base text-foreground" numberOfLines={1}>
+              {noOverrideLabel}
+            </Text>
+            {resolvedDefaultName === null ? null : (
+              <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+                {t('agentChat.newSession.defaultProfileResolvesTo', { name: resolvedDefaultName })}
+              </Text>
+            )}
+          </View>
           {selectedOverrideProfileId === null && !needsAttention ? (
             <Check size={18} color={colors.primary} />
           ) : null}

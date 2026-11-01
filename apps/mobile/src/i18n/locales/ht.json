@@ -2372,6 +2372,8 @@
       "forkFilesUnchangedOnComputer": "Fichye ki sou òdinatè sa a pa chanje.",
       "pickProfile": "Chwazi yon pwofil",
       "noProfile": "Pa gen pwofil",
+      "defaultProfileResolvesTo": "Koresponn a {{name}}",
+      "defaultProfileResolvesToAccessibility": "Default pwofil: {{name}}",
       "manageProfiles": "Jere pwofil yo",
       "noProfiles": "Pa gen pwofil ankò. Kreye youn pou ajoute varyab anviwònman, sèvè MCP, ak konpetans.",
       "advancedConfig": "Konfigirasyon avanse",

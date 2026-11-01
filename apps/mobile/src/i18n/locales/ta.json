@@ -2372,6 +2372,8 @@
       "forkFilesUnchangedOnComputer": "இந்தக் கணினியில் உள்ள கோப்புகள் மாற்றப்படாது.",
       "pickProfile": "சுயவிவரத்தைத் தேர்ந்தெடுக்கவும்",
       "noProfile": "சுயவிவரம் இல்லை",
+      "defaultProfileResolvesTo": "{{name}} சுயவிவரத்தைக் குறிக்கிறது",
+      "defaultProfileResolvesToAccessibility": "இயல்புநிலை சுயவிவரம்: {{name}}",
       "manageProfiles": "சுயவிவரங்களை நிர்வகிக்கவும்",
       "noProfiles": "இதுவரை சுயவிவரங்கள் இல்லை. சூழல் மாறிகள், MCP சேவையகங்கள் மற்றும் திறன்களைச் சேர்க்க ஒன்றை உருவாக்கவும்.",
       "advancedConfig": "மேம்பட்ட கட்டமைப்பு",

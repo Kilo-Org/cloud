@@ -2409,6 +2409,8 @@
       "forkFilesUnchangedOnComputer": "Els fitxers d'aquest ordinador no es modifiquen.",
       "pickProfile": "Tria un perfil",
       "noProfile": "Sense perfil",
+      "defaultProfileResolvesTo": "Correspon a {{name}}",
+      "defaultProfileResolvesToAccessibility": "Perfil predeterminat: {{name}}",
       "manageProfiles": "Gestionar perfils",
       "noProfiles": "Encara no hi ha perfils. Creeu-ne un per afegir variables d'entorn, servidors MCP i habilitats.",
       "advancedConfig": "Configuració avançada",

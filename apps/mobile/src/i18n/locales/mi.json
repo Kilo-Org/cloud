@@ -2372,6 +2372,8 @@
       "forkFilesUnchangedOnComputer": "Kāore e panonihia ngā kōnae i tēnei rorohiko.",
       "pickProfile": "Tīpakohia he kōtaha",
       "noProfile": "Kāore he kōtaha",
+      "defaultProfileResolvesTo": "E hāngai ana ki {{name}}",
+      "defaultProfileResolvesToAccessibility": "Kōtaha taunoa: {{name}}",
       "manageProfiles": "Whakahaere pūkete",
       "noProfiles": "Karekau he pūkete. Waihangahia tetahi hei taapiri i nga taurangi taiao, nga tūmau MCP, me nga pukenga.",
       "advancedConfig": "Whirihoranga Arā Atu Anō",

@@ -2378,6 +2378,8 @@
       "forkFilesUnchangedOnComputer": "Tsy ovaina ny rakitra ao amin'ity solosaina ity.",
       "pickProfile": "Mifidiana profil",
       "noProfile": "Tsy misy mombamomba",
+      "defaultProfileResolvesTo": "Mifanaraka amin'ny {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profile default: {{name}}",
       "manageProfiles": "Tantano ny mombamomba",
       "noProfiles": "Tsy mbola misy mombamomba. Mamorona iray hanampiana ireo fari-piainan'ny tontolo iainana, mpizara MCP ary fahaiza-manao.",
       "advancedConfig": "Fandrindrana mandroso",

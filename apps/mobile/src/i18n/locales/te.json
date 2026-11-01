@@ -2372,6 +2372,8 @@
       "forkFilesUnchangedOnComputer": "ఈ కంప్యూటర్‌లోని ఫైల్‌లు మారవు.",
       "pickProfile": "ప్రొఫైల్‌ని ఎంచుకోండి",
       "noProfile": "ప్రొఫైల్ లేదు",
+      "defaultProfileResolvesTo": "ప్రస్తుతం {{name}}కి సెట్ చేయబడి ఉంది",
+      "defaultProfileResolvesToAccessibility": "డిఫాల్ట్ ప్రొఫైల్: {{name}}",
       "manageProfiles": "ప్రొఫైల్‌లను నిర్వహించండి",
       "noProfiles": "ఇంకా ప్రొఫైల్‌లు లేవు. ఎన్విరాన్మెంట్ వేరియబుల్స్, MCP సర్వర్‌లు మరియు నైపుణ్యాలను జోడించడానికి ఒకదాన్ని సృష్టించండి.",
       "advancedConfig": "అధునాతన కాన్ఫిగరేషన్",

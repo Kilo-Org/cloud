@@ -1844,6 +1844,8 @@
       "forkFilesUnchangedOnComputer": "File di komputer ini tidak diubah.",
       "pickProfile": "Pilih profil",
       "noProfile": "Tidak ada profil",
+      "defaultProfileResolvesTo": "Mengarah ke {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profil bawaan: {{name}}",
       "manageProfiles": "Kelola profil",
       "noProfiles": "Belum ada profil. Buat satu untuk menambahkan variabel lingkungan, server MCP, dan keterampilan.",
       "advancedConfig": "Konfigurasi Lanjutan",

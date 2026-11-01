@@ -1844,6 +1844,8 @@
       "forkFilesUnchangedOnComputer": "このコンピューター上のファイルは変更されません。",
       "pickProfile": "プロフィールを選択してください",
       "noProfile": "プロフィールなし",
+      "defaultProfileResolvesTo": "{{name}}に対応",
+      "defaultProfileResolvesToAccessibility": "デフォルトのプロフィール：{{name}}",
       "manageProfiles": "プロフィールの管理",
       "noProfiles": "まだプロフィールはありません。環境変数、MCP サーバー、スキルを追加するために作成します。",
       "advancedConfig": "高度な構成",

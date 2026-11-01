@@ -2372,6 +2372,8 @@
       "forkFilesUnchangedOnComputer": "Selle arvuti faile ei muudeta.",
       "pickProfile": "Valige profiil",
       "noProfile": "Profiili pole",
+      "defaultProfileResolvesTo": "Hetkel: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Vaikeprofiil: {{name}}",
       "manageProfiles": "Profiilide haldamine",
       "noProfiles": "Profiilid veel puuduvad. Looge see keskkonnamuutujate, MCP-serverite ja oskuste lisamiseks.",
       "advancedConfig": "Täpsem konfiguratsioon",

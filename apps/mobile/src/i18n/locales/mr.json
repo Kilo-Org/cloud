@@ -2372,6 +2372,8 @@
       "forkFilesUnchangedOnComputer": "या संगणकावरील फाइल्स बदलल्या जात नाहीत.",
       "pickProfile": "प्रोफाइल निवडा",
       "noProfile": "प्रोफाइल नाही",
+      "defaultProfileResolvesTo": "सध्या {{name}} वर सेट केले आहे",
+      "defaultProfileResolvesToAccessibility": "डीफॉल्ट प्रोफाइल: {{name}}",
       "manageProfiles": "प्रोफाइल व्यवस्थापित करा",
       "noProfiles": "अद्याप कोणतेही प्रोफाइल नाहीत. पर्यावरण व्हेरिएबल्स, MCP सर्व्हर आणि कौशल्ये जोडण्यासाठी एक तयार करा.",
       "advancedConfig": "प्रगत कॉन्फिगरेशन",

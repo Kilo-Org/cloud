@@ -22,10 +22,14 @@ export default function ProfilePickerScreen() {
   // "Options expired" flash before a later effect populates state.
   const [bridge] = useState(() => profilePickerSlot.get(UNFENCED_ROUTE_KEY));
 
-  const { allProfiles, effectiveDefaultId, isLoading, isError, refetch } = useEffectiveAgentProfile(
-    bridge?.organizationId,
-    bridge?.selectedOverrideProfileId ?? null
-  );
+  const {
+    allProfiles,
+    effectiveDefaultId,
+    effectiveDefaultProfile,
+    isLoading,
+    isError,
+    refetch,
+  } = useEffectiveAgentProfile(bridge?.organizationId, bridge?.selectedOverrideProfileId ?? null);
 
   if (!bridge) {
     return (
@@ -60,6 +64,9 @@ export default function ProfilePickerScreen() {
       // A default exists, so clearing the override is not "no profile": the
       // server resolves that default on top of any repository binding.
       defaultProfileApplies={effectiveDefaultId !== null}
+      // Name it, so the row that clears the override says which profile the
+      // session then runs on instead of only that some default applies.
+      defaultProfileName={effectiveDefaultProfile?.name ?? null}
       isLoading={isLoading}
       isError={isError}
       needsAttention={picker.overrideNeedsAttention}

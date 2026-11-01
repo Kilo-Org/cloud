@@ -2372,6 +2372,8 @@
       "forkFilesUnchangedOnComputer": "Faylasha kombiyuutarkan lama beddelo.",
       "pickProfile": "Dooro profile",
       "noProfile": "Profile malaha",
+      "defaultProfileResolvesTo": "Waxay u dhigtaa {{name}}",
+      "defaultProfileResolvesToAccessibility": "Muuqaalka asalka ah: {{name}}",
       "manageProfiles": "Maamul profiles",
       "noProfiles": "Weli profiles ma jiraan Abuur mid lagu daro doorsoomayaasha deegaanka, adeegayaasha MCP, iyo xirfadaha.",
       "advancedConfig": "Habaynta Sare",

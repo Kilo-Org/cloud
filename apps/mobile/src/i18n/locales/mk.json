@@ -2372,6 +2372,8 @@
       "forkFilesUnchangedOnComputer": "Датотеките на овој компјутер не се менуваат.",
       "pickProfile": "Изберете профил",
       "noProfile": "Нема профил",
+      "defaultProfileResolvesTo": "Одговара на {{name}}",
+      "defaultProfileResolvesToAccessibility": "Стандарден профил: {{name}}",
       "manageProfiles": "Управувајте со профилите",
       "noProfiles": "Сè уште нема профили. Создадете една за да додадете променливи на животната средина, MCP сервери и вештини.",
       "advancedConfig": "Напредна конфигурација",

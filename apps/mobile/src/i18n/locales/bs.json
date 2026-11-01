@@ -2409,6 +2409,8 @@
       "forkFilesUnchangedOnComputer": "Datoteke na ovom računaru se ne mijenjaju.",
       "pickProfile": "Odaberite profil",
       "noProfile": "Nema profila",
+      "defaultProfileResolvesTo": "odnosi se na {{name}}",
+      "defaultProfileResolvesToAccessibility": "Zadani profil: {{name}}",
       "manageProfiles": "Upravljajte profilima",
       "noProfiles": "Još nema profila. Napravite jedan za dodavanje varijabli okruženja, MCP servera i vještina.",
       "advancedConfig": "Napredna konfiguracija",

@@ -2378,6 +2378,8 @@
       "forkFilesUnchangedOnComputer": "ਇਸ ਕੰਪਿਊਟਰ 'ਤੇ ਫ਼ਾਈਲਾਂ ਨਹੀਂ ਬਦਲੀਆਂ ਜਾਂਦੀਆਂ।",
       "pickProfile": "ਇੱਕ ਪ੍ਰੋਫਾਈਲ ਚੁਣੋ",
       "noProfile": "ਕੋਈ ਪ੍ਰੋਫਾਈਲ ਨਹੀਂ",
+      "defaultProfileResolvesTo": "ਮੌਜੂਦਾ ਤੌਰ ਤੇ {{name}}",
+      "defaultProfileResolvesToAccessibility": "ਪੂਰਵ-ਨਿਰਧਾਰਤ ਪ੍ਰੋਫਾਈਲ: {{name}}",
       "manageProfiles": "ਪ੍ਰੋਫਾਈਲਾਂ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰੋ",
       "noProfiles": "ਅਜੇ ਤੱਕ ਕੋਈ ਪ੍ਰੋਫਾਈਲ ਨਹੀਂ। ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ, MCP ਸਰਵਰ, ਅਤੇ ਹੁਨਰ ਜੋੜਨ ਲਈ ਇੱਕ ਬਣਾਓ।",
       "advancedConfig": "ਉੱਨਤ ਸੰਰਚਨਾ",

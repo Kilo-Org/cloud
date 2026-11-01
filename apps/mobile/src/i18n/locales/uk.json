@@ -1880,6 +1880,8 @@
       "forkFilesUnchangedOnComputer": "Файли на цьому комп'ютері не змінюються.",
       "pickProfile": "Виберіть профіль",
       "noProfile": "Без профілю",
+      "defaultProfileResolvesTo": "Відповідає профілю {{name}}",
+      "defaultProfileResolvesToAccessibility": "Профіль за замовчуванням: {{name}}",
       "manageProfiles": "Керувати профілями",
       "noProfiles": "Ще немає профілів. Створіть його, щоб додати змінні середовища, сервери MCP і навички.",
       "advancedConfig": "Розширена конфігурація",

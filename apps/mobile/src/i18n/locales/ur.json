@@ -2372,6 +2372,8 @@
       "forkFilesUnchangedOnComputer": "اس کمپیوٹر پر فائلیں تبدیل نہیں ہوتیں۔",
       "pickProfile": "ایک پروفائل منتخب کریں۔",
       "noProfile": "کوئی پروفائل نہیں۔",
+      "defaultProfileResolvesTo": "فی الحال {{name}} پر سیٹ ہے",
+      "defaultProfileResolvesToAccessibility": "ڈیفالٹ پروفائل: {{name}}",
       "manageProfiles": "پروفائلز کا نظم کریں۔",
       "noProfiles": "ابھی تک کوئی پروفائلز نہیں ہیں۔ ماحولیاتی متغیرات، MCP سرورز، اور مہارتیں شامل کرنے کے لیے ایک بنائیں۔",
       "advancedConfig": "اعلی درجے کی ترتیب",

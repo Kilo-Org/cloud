@@ -2372,6 +2372,8 @@
       "forkFilesUnchangedOnComputer": "Agbanweghị faịlụ dị na kọmputa a.",
       "pickProfile": "Họrọ profaịlụ",
       "noProfile": "Enweghị profaịlụ",
+      "defaultProfileResolvesTo": "na-adaba na {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profaịlụ ezighi ezi: {{name}}",
       "manageProfiles": "Jikwaa profaịlụ",
       "noProfiles": "Enweghị profaịlụ. Mepụta otu iji gbakwunye mgbanwe gburugburu ebe obibi, sava MCP, na nka.",
       "advancedConfig": "Nhazi dị elu",

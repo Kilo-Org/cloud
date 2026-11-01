@@ -2438,6 +2438,8 @@
       "forkFilesUnchangedOnComputer": "Files on this computer are not changed.",
       "pickProfile": "Pick a profile",
       "noProfile": "No profile",
+      "defaultProfileResolvesTo": "Resolves to {{name}}",
+      "defaultProfileResolvesToAccessibility": "Default profile: {{name}}",
       "manageProfiles": "Manage profiles",
       "noProfiles": "No profiles yet. Create one to add environment variables, MCP servers, and skills.",
       "advancedConfig": "Advanced Configuration",

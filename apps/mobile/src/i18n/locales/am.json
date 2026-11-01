@@ -2378,6 +2378,8 @@
       "forkFilesUnchangedOnComputer": "በዚህ ኮምፒውተር ላይ ያሉ ፋይሎች አይቀየሩም።",
       "pickProfile": "መገለጫ ይምረጡ",
       "noProfile": "ምንም መገለጫ የለም።",
+      "defaultProfileResolvesTo": "አሁን ላይ {{name}} ማለት ነው",
+      "defaultProfileResolvesToAccessibility": "ነባሪ መገለጫ፦ {{name}}",
       "manageProfiles": "መገለጫዎችን ያስተዳድሩ",
       "noProfiles": "እስካሁን ምንም መገለጫዎች የሉም። የአካባቢ ተለዋዋጮችን፣ MCP አገልጋዮችን እና ክህሎቶችን ለመጨመር አንድ ይፍጠሩ።",
       "advancedConfig": "የላቀ ውቅር",

@@ -2372,6 +2372,8 @@
       "forkFilesUnchangedOnComputer": "ໄຟລ໌ໃນຄອມພິວເຕີນີ້ບໍ່ມີການປ່ຽນແປງ.",
       "pickProfile": "ເລືອກໂປຣໄຟລ໌",
       "noProfile": "ບໍ່ມີໂປຣໄຟລ໌",
+      "defaultProfileResolvesTo": "ຕັ້ງຄ່າເປັນ {{name}}",
+      "defaultProfileResolvesToAccessibility": "ໂປຣໄຟລ໌ເລີ່ມຕົ້ນ: {{name}}",
       "manageProfiles": "ຈັດການໂປຣໄຟລ໌",
       "noProfiles": "ບໍ່ມີໂປຣໄຟລ໌ເທື່ອ. ສ້າງອັນໜຶ່ງເພື່ອເພີ່ມຕົວແປສະພາບແວດລ້ອມ, ເຊີບເວີ MCP ແລະທັກສະ.",
       "advancedConfig": "ການຕັ້ງຄ່າຂັ້ນສູງ",

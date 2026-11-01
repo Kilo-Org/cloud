@@ -2372,6 +2372,8 @@
       "forkFilesUnchangedOnComputer": "Ordenagailu honetako fitxategiak ez dira aldatzen.",
       "pickProfile": "Aukeratu profil bat",
       "noProfile": "Ez dago profilik",
+      "defaultProfileResolvesTo": "Une honetan {{name}} da",
+      "defaultProfileResolvesToAccessibility": "Profil lehenetsia: {{name}}",
       "manageProfiles": "Kudeatu profilak",
       "noProfiles": "Oraindik ez dago profilik. Sortu bat ingurune-aldagaiak, MCP zerbitzariak eta trebetasunak gehitzeko.",
       "advancedConfig": "Konfigurazio aurreratua",

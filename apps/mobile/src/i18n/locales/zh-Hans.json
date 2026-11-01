@@ -1844,6 +1844,8 @@
       "forkFilesUnchangedOnComputer": "此电脑上的文件不会被更改。",
       "pickProfile": "选择配置文件",
       "noProfile": "没有配置文件",
+      "defaultProfileResolvesTo": "当前为 {{name}}",
+      "defaultProfileResolvesToAccessibility": "默认配置文件：{{name}}",
       "manageProfiles": "管理配置文件",
       "noProfiles": "还没有配置文件。创建一个以添加环境变量、MCP 服务器和技能。",
       "advancedConfig": "高级配置",

@@ -1844,6 +1844,8 @@
       "forkFilesUnchangedOnComputer": "Các tệp trên máy tính này không bị thay đổi.",
       "pickProfile": "Chọn một hồ sơ",
       "noProfile": "Không có hồ sơ",
+      "defaultProfileResolvesTo": "hiện là {{name}}",
+      "defaultProfileResolvesToAccessibility": "Hồ sơ mặc định: {{name}}",
       "manageProfiles": "Quản lý hồ sơ",
       "noProfiles": "Chưa có hồ sơ nào. Tạo một cái để thêm các biến môi trường, máy chủ MCP và kỹ năng.",
       "advancedConfig": "Cấu hình nâng cao",

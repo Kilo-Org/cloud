@@ -2372,6 +2372,8 @@
       "forkFilesUnchangedOnComputer": "Skedarët në këtë kompjuter nuk ndryshohen.",
       "pickProfile": "Zgjidh një profil",
       "noProfile": "Nuk ka profil",
+      "defaultProfileResolvesTo": "Aktualisht: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profili i parazgjedhur: {{name}}",
       "manageProfiles": "Menaxho profilet",
       "noProfiles": "Nuk ka ende profile. Krijo një për të shtuar variabla mjedisi, serverë MCP dhe aftësi.",
       "advancedConfig": "Konfigurimi i avancuar",

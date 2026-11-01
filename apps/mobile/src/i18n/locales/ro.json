@@ -2409,6 +2409,8 @@
       "forkFilesUnchangedOnComputer": "Fișierele de pe acest computer nu sunt modificate.",
       "pickProfile": "Alegeți un profil",
       "noProfile": "Nici un profil",
+      "defaultProfileResolvesTo": "corespunde la {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profil implicit: {{name}}",
       "manageProfiles": "Gestionați profilurile",
       "noProfiles": "Niciun profil încă. Creați unul pentru a adăuga variabile de mediu, servere MCP și abilități.",
       "advancedConfig": "Configurare avansată",

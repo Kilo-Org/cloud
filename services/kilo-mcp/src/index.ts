@@ -1,5 +1,8 @@
 import catalogJson from '../catalog.json';
-import { cloudAgentAuthorityProcedure } from '../../../packages/worker-utils/src/cloud-agent-authority';
+import {
+  cloudAgentAuthorityProcedure,
+  cloudAgentAuthorityProcedures,
+} from '../../../packages/worker-utils/src/cloud-agent-authority';
 import {
   classifyToolError,
   createMcpAnalytics,
@@ -513,7 +516,7 @@ async function runTool(
       includeGuarded: auth.adminEnabled === true,
       ...(auth.cloudAgentAuthority
         ? {
-            allowedPaths: [cloudAgentAuthorityProcedure(auth.cloudAgentAuthority)],
+            allowedPaths: cloudAgentAuthorityProcedures(auth.cloudAgentAuthority),
             cloudAgentAuthority: auth.cloudAgentAuthority,
           }
         : {}),
@@ -761,7 +764,7 @@ async function handleRpcMessage(
           ...(clientName !== undefined ? { clientName } : {}),
         });
         const childSessionInstructions = auth.cloudAgentAuthority
-          ? ` This MCP connection belongs to the workspace's canonical parent session, the original root chat that owns this workspace's runtime and MCP configuration, not to the sibling chat that invoked this tool. Launch a child Cloud Agent session only when the user explicitly asks you to spin up a new Cloud Agent session. Each child session gets its own sandbox and worktree, so use child sessions to fan out independent tasks. Do not use a child session to explore or work in this worktree; use your own tools here. To launch one, run search first, then call ${cloudAgentAuthorityProcedure(auth.cloudAgentAuthority)} with the child's task. To receive the child's completion, failure or interruption as a new message in that canonical workspace parent session, include callbackTarget: { url: "session:parent" }. Omit callbackTarget when no notification is needed. Do not poll or wait in a tool for a callback; finish your turn and resume when it arrives. Spawned children cannot spawn further children: do not launch a child from a child session, and do not ask a child to launch one.`
+          ? ` This MCP connection belongs to the workspace's canonical parent session, the original root chat that owns this workspace's runtime and MCP configuration, not to the sibling chat that invoked this tool. It may list, inspect, check status, stop, send a follow-up to, or spawn only the direct child Cloud Agent sessions this workspace's parent created, and must not access unrelated sessions. Launch a child Cloud Agent session only when the user explicitly asks you to spin up a new Cloud Agent session. Each child session gets its own sandbox and worktree, so use child sessions to fan out independent tasks. Do not use a child session to explore or work in this worktree; use your own tools here. To launch one, run search first, then call ${cloudAgentAuthorityProcedure(auth.cloudAgentAuthority)} with the child's task; use only the lifecycle paths search returns for that direct child. To receive the child's completion, failure or interruption as a new message in that canonical workspace parent session, include callbackTarget: { url: "session:parent" }. Omit callbackTarget when no notification is needed. Prefer callbacks over polling. Do not poll or wait in a tool for a callback, and keep any status check bounded instead of busy-polling. Spawned children cannot spawn further children: do not launch a child from a child session, and do not ask a child to launch one.`
           : '';
         return jsonRpcResult(id ?? 0, {
           protocolVersion,

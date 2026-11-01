@@ -293,7 +293,7 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
   }>;
   getMessageResult: (input: {
     cloudAgentSessionId: string;
-    expectedWorktreeId: `worktree_${string}`;
+    expectedWorktreeId?: `worktree_${string}`;
     messageId: string;
   }) => ReturnType<CloudAgentNextClient['getMessageResult']>;
   sendMessage: (input: {
@@ -525,6 +525,7 @@ describe('cloudAgentNextRouter worktree changes access', () => {
         cloudAgentSessionId: personalSessionId,
         messageId: reviewMessageId,
         status: 'completed',
+        createdAt: 1,
         acceptedAt: 1,
       });
       mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValue({

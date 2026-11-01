@@ -252,6 +252,7 @@ export type SendMessageInput = {
   cloudAgentSessionId: string;
   payload: SendMessagePayload;
   autoCommit?: boolean;
+  organizationId?: string;
   githubToken?: string;
   gitToken?: string;
   /** Canonical Cloud Agent attachments for the message */
@@ -316,6 +317,22 @@ export type InitiateSessionOutput = {
 /** Input for getSession procedure */
 export type GetSessionInput = {
   cloudAgentSessionId: string;
+  organizationId?: string;
+};
+
+export type ListChildSessionsInput = {
+  limit: number;
+  cursor?: string;
+  organizationId?: string;
+};
+
+export type ListChildSessionsOutput = {
+  sessions: Array<{
+    cloudAgentSessionId: string;
+    initialMessageId?: string;
+    worktreeId?: CloudAgentWorktreeId;
+  }>;
+  nextCursor?: string;
 };
 
 /** Interactions a cloud-agent session currently waits on. */
@@ -602,7 +619,7 @@ type CloudAgentNextTRPCClient = {
     mutate: (input: { sessionId: string }) => Promise<{ success: boolean; message?: string }>;
   };
   interruptSession: {
-    mutate: (input: { sessionId: string }) => Promise<InterruptResult>;
+    mutate: (input: { sessionId: string; organizationId?: string }) => Promise<InterruptResult>;
   };
   cancelQueuedMessage: {
     mutate: (input: CancelQueuedMessageInput) => Promise<{ dropped: boolean }>;
@@ -653,7 +670,14 @@ type CloudAgentNextTRPCClient = {
     mutate: (input: SendMessageInput) => Promise<InitiateSessionOutput>;
   };
   getMessageResult: {
-    query: (input: { cloudAgentSessionId: string; messageId: string }) => Promise<unknown>;
+    query: (input: {
+      cloudAgentSessionId: string;
+      messageId: string;
+      organizationId?: string;
+    }) => Promise<unknown>;
+  };
+  listChildSessions: {
+    query: (input: ListChildSessionsInput) => Promise<ListChildSessionsOutput>;
   };
   createTerminal: {
     mutate: (input: CreateTerminalInput) => Promise<CreateTerminalOutput>;
@@ -812,9 +836,12 @@ export class CloudAgentNextClient {
   /**
    * Interrupt a running session by killing all associated kilocode processes.
    */
-  async interruptSession(sessionId: string): Promise<InterruptResult> {
+  async interruptSession(sessionId: string, organizationId?: string): Promise<InterruptResult> {
     try {
-      const result = await this.client.interruptSession.mutate({ sessionId });
+      const result = await this.client.interruptSession.mutate({
+        sessionId,
+        ...(organizationId === undefined ? {} : { organizationId }),
+      });
       return result;
     } catch (error) {
       console.error(`Error interrupting session ${sessionId}:`, error);
@@ -852,13 +879,35 @@ export class CloudAgentNextClient {
   /**
    * Get session state from cloud-agent DO.
    */
-  async getSession(cloudAgentSessionId: string): Promise<GetSessionOutput> {
+  async getSession(
+    cloudAgentSessionId: string,
+    organizationId?: string
+  ): Promise<GetSessionOutput> {
     try {
-      return await this.client.getSession.query({ cloudAgentSessionId });
+      return await this.client.getSession.query({
+        cloudAgentSessionId,
+        ...(organizationId === undefined ? {} : { organizationId }),
+      });
     } catch (error) {
       captureException(error, {
         tags: { source: 'cloud-agent-next-client', endpoint: 'getSession' },
         extra: { cloudAgentSessionId },
+      });
+      throw error;
+    }
+  }
+
+  async listChildSessions(input: ListChildSessionsInput): Promise<ListChildSessionsOutput> {
+    try {
+      return await this.client.listChildSessions.query(input);
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'listChildSessions' },
+        extra: {
+          limit: input.limit,
+          cursor: input.cursor,
+          organizationId: input.organizationId,
+        },
       });
       throw error;
     }
@@ -1114,7 +1163,11 @@ export class CloudAgentNextClient {
     }
   }
 
-  async getMessageResult(input: { cloudAgentSessionId: string; messageId: string }) {
+  async getMessageResult(input: {
+    cloudAgentSessionId: string;
+    messageId: string;
+    organizationId?: string;
+  }) {
     try {
       return baseGetMessageResultNextOutputSchema.parse(
         await this.client.getMessageResult.query(input)

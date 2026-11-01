@@ -403,6 +403,7 @@
     "connectionExpired": "ການເຊື່ອມຕໍ່ GitHub ໝົດອາຍຸແລ້ວ.",
     "merge": {
       "merge": "ລວມໂຄ້ດ",
+      "mergeTitle": "ລວມໂຄ້ດ",
       "mergeNow": "ລວມດຽວນີ້",
       "mergePullRequest": "ລວມຄຳຂໍລວມໂຄດ",
       "mergeTermTitle": "ລວມ{{term}}",
@@ -685,6 +686,9 @@
       "checkActiveConnection": "ການເຊື່ອມຕໍ່ເຮັດວຽກຢູ່, ແຕ່ລາຍການນີ້ຍັງບໍ່ສາມາດໂຫຼດໄດ້.",
       "bitbucketOrgOnlyDescription": "ປ່ຽນບັນຊີຂ້າງເທິງໄປຫາອົງກອນເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ຂອງມັນ.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ບັນຊີນີ້ຍັງບໍ່ມີອົງກອນ. ທ່ານສາມາດກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ໄດ້ເມື່ອທ່ານສ້າງ ຫຼື ເຂົ້າຮ່ວມອົງກອນ.",
+      "gitlabReconnectAdminOnlyDescription": "ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເຊື່ອມຕໍ່.",
+      "bitbucketNotConnectedTitle": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket",
+      "bitbucketAdminOnlyDescription": "ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້.",
       "contextLine": "ສຳລັບ {{organization}}",
       "contextLinePersonal": "ສຳລັບບັນຊີສ່ວນຕົວຂອງທ່ານ"
     },
@@ -1418,7 +1422,9 @@
     "instructions": {
       "title": "ຄຳສັ່ງທີ່ກຳນົດເອງ",
       "deprecation": "ມີແຜນຈະເລີກໃຊ້ຄຳແນະນຳທີ່ກຳນົດເອງ. ຍ້າຍຄຳແນະນຳເຫຼົ່ານີ້ໄປໄວ້ໃນໄຟລ໌ REVIEW.md ໃນຄັງໂຄ້ດຂອງເຈົ້າແທນ.",
-      "placeholder": "ເຊັ່ນ: ໃຫ້ປະຕິບັດຕາມມາດຕະຖານການຈັດການຂໍ້ຜິດພາດຂອງທີມ…"
+      "placeholder": "ເຊັ່ນ: ໃຫ້ປະຕິບັດຕາມມາດຕະຖານການຈັດການຂໍ້ຜິດພາດຂອງທີມ…",
+      "clearTitle": "ເອົາຄຳສັ່ງທີ່ກຳນົດເອງອອກບໍ?",
+      "clearMessage": "ການບັນທຶກຊ່ອງຫວ່າງເປົ່າຈະລຶບຄຳສັ່ງທີ່ກຳນົດເອງທີ່ເກັບໄວ້ສຳລັບຜູ້ກວດສອບນີ້ອອກ."
     },
     "repos": {
       "unavailable": "ບໍ່ສາມາດເຂົ້າເຖິງຄັງໂຄ້ດໄດ້ — ຕັ້ງຄ່າ Bitbucket ໃຫ້ສຳເລັດໃນ kilo.ai.",
@@ -1453,7 +1459,7 @@
       "fixSettings": "ແກ້ໄຂການຕັ້ງຄ່າ",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການກວດທານໄດ້.",
       "couldNotGetLatest": "ບໍ່ສາມາດໂຫຼດຂໍ້ມູນລ່າສຸດໄດ້.",
-      "byline": "{{repo}} #{{number}} ໂດຍ {{author}}",
+      "byline": "#{{number}} ໂດຍ {{author}}",
       "noFindings": "ບໍ່ພົບບັນຫາ.",
       "findingsUnavailable": "ບໍ່ມີຜົນລັບໃຫ້ເບິ່ງ ເພາະການກວດທານນີ້ລົ້ມເຫຼວ.",
       "findingsInProgress": "ການກວດທານນີ້ຍັງກຳລັງດຳເນີນການຢູ່. ຜົນລັບຈະປະກົດຂຶ້ນຢູ່ບ່ອນນີ້ເມື່ອມັນແລ້ວເສັດ.",
@@ -1605,8 +1611,8 @@
       "reviewStyle": "ຮູບແບບການກວດສອບ",
       "focusAreas": "ຫົວຂໍ້ທີ່ເນັ້ນ",
       "allAreas": "ທຸກດ້ານ",
-      "customInstructions": "ຄຳສັ່ງທີ່ກຳນົດເອງ",
       "set": "ຕັ້ງຄ່າແລ້ວ",
+      "notSet": "ບໍ່ໄດ້ຕັ້ງຄ່າ",
       "nSelected": "ເລືອກແລ້ວ {{displayCount}} ລາຍການ",
       "proposedReviewMdGuidance": "ຄຳແນະນຳທີ່ສະເໜີສຳລັບ REVIEW.md"
     },
@@ -2370,13 +2376,14 @@
       "forkFilesUnchangedOnComputer": "ໄຟລ໌ໃນຄອມພິວເຕີນີ້ບໍ່ມີການປ່ຽນແປງ.",
       "pickProfile": "ເລືອກໂປຣໄຟລ໌",
       "noProfile": "ບໍ່ມີໂປຣໄຟລ໌",
+      "defaultProfileResolvesTo": "ຕັ້ງຄ່າເປັນ {{name}}",
+      "defaultProfileResolvesToAccessibility": "ໂປຣໄຟລ໌ເລີ່ມຕົ້ນ: {{name}}",
       "manageProfiles": "ຈັດການໂປຣໄຟລ໌",
       "noProfiles": "ບໍ່ມີໂປຣໄຟລ໌ເທື່ອ. ສ້າງອັນໜຶ່ງເພື່ອເພີ່ມຕົວແປສະພາບແວດລ້ອມ, ເຊີບເວີ MCP ແລະທັກສະ.",
       "advancedConfig": "ການຕັ້ງຄ່າຂັ້ນສູງ",
       "advancedConfigDescription": "ໃຊ້ກັບເຊສຊັນນີ້. ການບັນທຶກເປັນໂປຣໄຟລ໌ຈະເກັບໄວ້ສຳລັບຄັ້ງຕໍ່ໄປ.",
       "saveAsProfile": "ບັນທຶກເປັນໂປຣໄຟລ໌",
       "saveProfileDescription": "ບັນທຶກຕົວແປສະພາບແວດລ້ອມປັດຈຸບັນ ແລະຄຳສັ່ງຕັ້ງຄ່າເປັນໂປຣໄຟລ໌ທີ່ສາມາດໃຊ້ຄືນໄດ້.",
-      "profileSummary": "{{vars}} ຕົວແປສະພາບແວດລ້ອມ · {{commands}} ຄຳສັ່ງຕັ້ງຄ່າ",
       "profileSaved": "ບັນທຶກໂປຣໄຟລ໌ \"{{name}}\" ແລ້ວ",
       "organizationProfiles": "ໂປຣໄຟລ໌ອົງການຈັດຕັ້ງ",
       "personalProfiles": "ໂປຣໄຟລ໌ສ່ວນຕົວ",

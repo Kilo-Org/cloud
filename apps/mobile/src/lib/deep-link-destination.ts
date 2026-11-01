@@ -33,6 +33,7 @@ export const APP_ROUTE_ROOTS: readonly string[] = [
   '(auth)',
   'button-label-fixture',
   'force-update',
+  'security-agent-single-route-fixture',
 ];
 
 /** Route param that opens the New-session composer instead of a session. */

@@ -424,6 +424,7 @@
     "connectionExpired": "Tá an nasc GitHub imithe in éag.",
     "merge": {
       "merge": "Cumasc",
+      "mergeTitle": "Cumasc",
       "mergeNow": "Cumasc anois",
       "mergePullRequest": "Cumasc iarratais tarraingthe",
       "mergeTermTitle": "Cumasc {{term}}",
@@ -730,6 +731,9 @@
       "checkActiveConnection": "Tá an nasc gníomhach, ach ní féidir an mhír seo a lódáil fós.",
       "bitbucketOrgOnlyDescription": "Athraigh an cuntas thuas go heagraíocht chun iarratais tharraingthe Bitbucket na heagraíochta sin a athbhreithniú.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Níl aon eagraíocht ag an gcuntas seo fós. Is féidir iarratais tharraingthe Bitbucket a athbhreithniú nuair a chruthaíonn tú eagraíocht nó nuair a thagann tú isteach i gceann acu.",
+      "gitlabReconnectAdminOnlyDescription": "Iarr ar Úinéir eagraíochta, Riarthóir, nó Bainisteoir billeála é a athnascadh.",
+      "bitbucketNotConnectedTitle": "Níl Bitbucket nasctha",
+      "bitbucketAdminOnlyDescription": "Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal.",
       "contextLine": "Do {{organization}}",
       "contextLinePersonal": "Do do chuntas pearsanta"
     },
@@ -1484,7 +1488,9 @@
     "instructions": {
       "title": "Treoracha saincheaptha",
       "deprecation": "Tá sé beartaithe deireadh a chur le treoracha saincheaptha. Bog na treoirlínte seo go comhad REVIEW.md i do stór ina ionad.",
-      "placeholder": "m.sh. Ár ngnáis maidir le láimhseáil earráidí a chur i bhfeidhm…"
+      "placeholder": "m.sh. Ár ngnáis maidir le láimhseáil earráidí a chur i bhfeidhm…",
+      "clearTitle": "Bain na treoracha saincheaptha?",
+      "clearMessage": "Má shábhálann tú réimse folamh, scriostar na treoracha saincheaptha atá stóráilte don athbhreithneoir seo."
     },
     "repos": {
       "unavailable": "Níl na stórtha ar fáil. Críochnaigh socrú Bitbucket ar kilo.ai.",
@@ -1519,7 +1525,7 @@
       "fixSettings": "Ceartaigh na socruithe",
       "couldNotLoad": "Níorbh fhéidir an t-athbhreithniú a lódáil.",
       "couldNotGetLatest": "Níorbh fhéidir na sonraí is déanaí a fháil.",
-      "byline": "{{repo}} #{{number}} le {{author}}",
+      "byline": "#{{number}} le {{author}}",
       "noFindings": "Níor aimsíodh aon toradh.",
       "findingsUnavailable": "Níl na torthaí ar fáil mar gur theip ar an athbhreithniú seo.",
       "findingsInProgress": "Tá an athbhreithniú seo ar siúl fós. Tiocfaidh na torthaí le feiceáil anseo nuair a bheidh sé críochnaithe.",
@@ -1671,8 +1677,8 @@
       "reviewStyle": "Stíl athbhreithnithe",
       "focusAreas": "Réimsí béime",
       "allAreas": "Gach réimse",
-      "customInstructions": "Treoracha saincheaptha",
       "set": "Socraithe",
+      "notSet": "Gan socrú",
       "nSelected": "{{displayCount}} roghnaithe",
       "proposedReviewMdGuidance": "Treoir REVIEW.md molta"
     },
@@ -2481,13 +2487,14 @@
       "forkFilesUnchangedOnComputer": "Ní athraítear na comhaid ar an ríomhaire seo.",
       "pickProfile": "Roghnaigh próifíl",
       "noProfile": "Gan próifíl",
+      "defaultProfileResolvesTo": "Freagraíonn sé do {{name}}",
+      "defaultProfileResolvesToAccessibility": "Próifíl réamhshocraithe: {{name}}",
       "manageProfiles": "Bainistigh próifílí",
       "noProfiles": "Níl próifílí ann fós. Cruthaigh ceann chun athróga timpeallachta, freastalaithe MCP, agus scileanna a chur leis.",
       "advancedConfig": "Cumraíocht Casta",
       "advancedConfigDescription": "Baineann sé leis an seisiún seo. Má shábháiltear mar phróifíl é, fanann sé don chéad uair eile.",
       "saveAsProfile": "Sábháil mar Phróifíl",
       "saveProfileDescription": "Sábháil na hathróga timpeallachta reatha agus na horduithe socraithe mar phróifíl ath-inúsáidte.",
-      "profileSummary": "{{vars}} athróga timpeallachta · {{commands}} orduithe socraithe",
       "profileSaved": "Próifíl \"{{name}}\" sábháilte",
       "organizationProfiles": "Próifílí Eagraíochta",
       "personalProfiles": "Próifílí Pearsanta",

@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub ಸಂಪರ್ಕದ ಅವಧಿ ಮುಗಿದಿದೆ.",
     "merge": {
       "merge": "ವಿಲೀನ",
+      "mergeTitle": "ವಿಲೀನ",
       "mergeNow": "ಈಗ ವಿಲೀನಗೊಳಿಸಿ",
       "mergePullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ವಿಲೀನ",
       "mergeTermTitle": "{{term}} ವಿಲೀನ",
@@ -685,6 +686,9 @@
       "checkActiveConnection": "ಸಂಪರ್ಕ ಸಕ್ರಿಯವಾಗಿದೆ, ಆದರೆ ಈ ಐಟಂ ಅನ್ನು ಇನ್ನೂ ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ.",
       "bitbucketOrgOnlyDescription": "ಅದರ Bitbucket ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ಮೇಲಿನ ಖಾತೆಯನ್ನು ಒಂದು ಸಂಸ್ಥೆಗೆ ಬದಲಾಯಿಸಿ.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ಈ ಖಾತೆಯಲ್ಲಿ ಇನ್ನೂ ಯಾವುದೇ ಸಂಸ್ಥೆಗಳಿಲ್ಲ. ನೀವು ಒಂದು ಸಂಸ್ಥೆಯನ್ನು ರಚಿಸಿದಾಗ ಅಥವಾ ಸೇರಿದಾಗ Bitbucket ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಬಹುದು.",
+      "gitlabReconnectAdminOnlyDescription": "ಅದನ್ನು ಮತ್ತೆ ಸಂಪರ್ಕಿಸಲು ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು, ನಿರ್ವಾಹಕರು ಅಥವಾ ಬಿಲ್ಲಿಂಗ್ ವ್ಯವಸ್ಥಾಪಕರಲ್ಲಿ ಒಬ್ಬರನ್ನು ಕೇಳಿ.",
+      "bitbucketNotConnectedTitle": "Bitbucket ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ",
+      "bitbucketAdminOnlyDescription": "ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು, ನಿರ್ವಾಹಕರು ಮತ್ತು ಬಿಲ್ಲಿಂಗ್ ವ್ಯವಸ್ಥಾಪಕರು ಮಾತ್ರ ಅದನ್ನು ಸಂಪರ್ಕಿಸಬಹುದು.",
       "contextLine": "{{organization}} ಗಾಗಿ",
       "contextLinePersonal": "ನಿಮ್ಮ ವೈಯಕ್ತಿಕ ಖಾತೆಗಾಗಿ"
     },
@@ -1418,7 +1422,9 @@
     "instructions": {
       "title": "ನಿಮ್ಮ ಸೂಚನೆಗಳು",
       "deprecation": "ಕಸ್ಟಮ್ ಸೂಚನೆಗಳ ಸೌಲಭ್ಯವನ್ನು ಕೈಬಿಡಲು ಯೋಜಿಸಲಾಗಿದೆ. ಬದಲಿಗೆ ಈ ಮಾರ್ಗಸೂಚಿಗಳನ್ನು ನಿಮ್ಮ ರೆಪೊಸಿಟರಿಯ REVIEW.md ಫೈಲ್‌ಗೆ ಸರಿಸಿ.",
-      "placeholder": "ಉದಾ. ದೋಷ ನಿರ್ವಹಣೆಗಾಗಿ ನಮ್ಮ ನಿಯಮಗಳನ್ನು ಪಾಲಿಸುವುದು…"
+      "placeholder": "ಉದಾ. ದೋಷ ನಿರ್ವಹಣೆಗಾಗಿ ನಮ್ಮ ನಿಯಮಗಳನ್ನು ಪಾಲಿಸುವುದು…",
+      "clearTitle": "ಕಸ್ಟಮ್ ಸೂಚನೆಗಳನ್ನು ತೆಗೆದುಹಾಕಬೇಕೆ?",
+      "clearMessage": "ಖಾಲಿ ಜಾಗವನ್ನು ಉಳಿಸುವುದರಿಂದ ಈ ವಿಮರ್ಶಕನಿಗಾಗಿ ಸಂಗ್ರಹಿಸಲಾದ ಕಸ್ಟಮ್ ಸೂಚನೆಗಳು ಅಳಿಸಲ್ಪಡುತ್ತವೆ."
     },
     "repos": {
       "unavailable": "ರೆಪೊಸಿಟರಿಗಳು ಲಭ್ಯವಿಲ್ಲ — kilo.ai ನಲ್ಲಿ Bitbucket ಸೆಟಪ್ ಪೂರ್ಣಗೊಳಿಸಿ.",
@@ -1453,7 +1459,7 @@
       "fixSettings": "ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಸರಿಪಡಿಸಿ",
       "couldNotLoad": "ಪರಿಶೀಲನೆಯನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "couldNotGetLatest": "ಇತ್ತೀಚಿನ ವಿವರಗಳನ್ನು ಪಡೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "byline": "{{repo}} #{{number}} · ರಚಿಸಿದವರು: {{author}}",
+      "byline": "#{{number}} · ರಚಿಸಿದವರು: {{author}}",
       "noFindings": "ಯಾವುದೇ ಸಮಸ್ಯೆಗಳು ಪತ್ತೆಯಾಗಿಲ್ಲ.",
       "findingsUnavailable": "ಈ ಪರಿಶೀಲನೆ ವಿಫಲವಾದ ಕಾರಣ ಫಲಿತಾಂಶಗಳು ಲಭ್ಯವಿಲ್ಲ.",
       "findingsInProgress": "ಈ ಪರಿಶೀಲನೆ ಇನ್ನೂ ಪ್ರಗತಿಯಲ್ಲಿದೆ. ಅದು ಪೂರ್ಣಗೊಂಡ ನಂತರ ಫಲಿತಾಂಶಗಳು ಇಲ್ಲಿ ಕಾಣಿಸಿಕೊಳ್ಳುತ್ತವೆ.",
@@ -1605,8 +1611,8 @@
       "reviewStyle": "ಪರಿಶೀಲನೆಯ ಶೈಲಿ",
       "focusAreas": "ಗಮನ ಕೊಡಬೇಕಾದ ಅಂಶಗಳು",
       "allAreas": "ಎಲ್ಲ ವಿಷಯಗಳು",
-      "customInstructions": "ನಿಮ್ಮ ಸೂಚನೆಗಳು",
       "set": "ಹೊಂದಿಸಲಾಗಿದೆ",
+      "notSet": "ಹೊಂದಿಸಲಾಗಿಲ್ಲ",
       "nSelected": "{{displayCount}} ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",
       "proposedReviewMdGuidance": "ಪ್ರಸ್ತಾಪಿಸಲಾದ REVIEW.md ಮಾರ್ಗದರ್ಶನ"
     },
@@ -2376,13 +2382,14 @@
       "forkFilesUnchangedOnComputer": "ಈ ಕಂಪ್ಯೂಟರ್‌ನಲ್ಲಿರುವ ಫೈಲ್‌ಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ.",
       "pickProfile": "ಪ್ರೊಫೈಲ್ ಅನ್ನು ಆರಿಸಿ",
       "noProfile": "ಪ್ರೊಫೈಲ್ ಇಲ್ಲ",
+      "defaultProfileResolvesTo": "ಪ್ರಸ್ತುತ {{name}} ಆಗಿದೆ",
+      "defaultProfileResolvesToAccessibility": "ಡೀಫಾಲ್ಟ್ ಪ್ರೊಫೈಲ್: {{name}}",
       "manageProfiles": "ಪ್ರೊಫೈಲ್‌ಗಳನ್ನು ನಿರ್ವಹಿಸಿ",
       "noProfiles": "ಇನ್ನೂ ಯಾವುದೇ ಪ್ರೊಫೈಲ್‌ಗಳಿಲ್ಲ. ಪರಿಸರ ವೇರಿಯಬಲ್‌ಗಳು, MCP ಸರ್ವರ್‌ಗಳು ಮತ್ತು ಕೌಶಲ್ಯಗಳನ್ನು ಸೇರಿಸಲು ಒಂದನ್ನು ರಚಿಸಿ.",
       "advancedConfig": "ಸುಧಾರಿತ ಸಂರಚನೆ",
       "advancedConfigDescription": "ಇದು ಈ ಅಧಿವೇಶನಕ್ಕೆ ಅನ್ವಯಿಸುತ್ತದೆ. ಪ್ರೊಫೈಲ್ ಆಗಿ ಉಳಿಸಿದರೆ ಅದು ಮುಂದಿನ ಬಾರಿಗೂ ಉಳಿಯುತ್ತದೆ.",
       "saveAsProfile": "ಪ್ರೊಫೈಲ್ ಆಗಿ ಉಳಿಸಿ",
       "saveProfileDescription": "ಪ್ರಸ್ತುತ ಪರಿಸರ ವೇರಿಯಬಲ್‌ಗಳು ಮತ್ತು ಸೆಟಪ್ ಆಜ್ಞೆಗಳನ್ನು ಮರುಬಳಕೆ ಮಾಡಬಹುದಾದ ಪ್ರೊಫೈಲ್‌ನಂತೆ ಉಳಿಸಿ.",
-      "profileSummary": "{{vars}} ಪರಿಸರ ವೇರಿಯಬಲ್‌ಗಳು · {{commands}} ಸೆಟಪ್ ಆಜ್ಞೆಗಳು",
       "profileSaved": "ಪ್ರೊಫೈಲ್ \"{{name}}\" ಉಳಿಸಲಾಗಿದೆ",
       "organizationProfiles": "ಸಂಸ್ಥೆಯ ಪ್ರೊಫೈಲ್ಗಳು",
       "personalProfiles": "ವೈಯಕ್ತಿಕ ಪ್ರೊಫೈಲ್ಗಳು",

@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub холболтын хугацаа дууссан.",
     "merge": {
       "merge": "Нэгтгэх",
+      "mergeTitle": "Нэгтгэх",
       "mergeNow": "Одоо нэгтгэх",
       "mergePullRequest": "Нэгтгэх хүсэлтийг нэгтгэх",
       "mergeTermTitle": "{{term}}ийг нэгтгэх",
@@ -685,6 +686,9 @@
       "checkActiveConnection": "Холболт идэвхтэй боловч энэ зүйлийг ачаалж чадахгүй хэвээр байна.",
       "bitbucketOrgOnlyDescription": "Түүний Bitbucket татах хүсэлтүүдийг шалгахын тулд дээрх бүртгэлийг байгууллагад шилжүүлнэ үү.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Энэ бүртгэлд одоогоор ямар ч байгууллага алга. Байгууллага үүсгэсэн эсвэл нэгэнд нэгдсэний дараа Bitbucket татах хүсэлтийг шалгах боломжтой болно.",
+      "gitlabReconnectAdminOnlyDescription": "Дахин холбуулахын тулд байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежерт хандана уу.",
+      "bitbucketNotConnectedTitle": "Bitbucket холбогдоогүй байна",
+      "bitbucketAdminOnlyDescription": "Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй.",
       "contextLine": "{{organization}}-ийн хувьд",
       "contextLinePersonal": "Хувийн дансны хувьд"
     },
@@ -1418,7 +1422,9 @@
     "instructions": {
       "title": "Тусгай заавар",
       "deprecation": "Тусгай зааврын дэмжлэгийг зогсоохоор төлөвлөсөн. Эдгээр зааврыг репозиторийнхоо REVIEW.md файлд шилжүүлнэ үү.",
-      "placeholder": "жишээ нь: Алдаа боловсруулах дүрмийг мөрдүүлэх…"
+      "placeholder": "жишээ нь: Алдаа боловсруулах дүрмийг мөрдүүлэх…",
+      "clearTitle": "Тусгай зааврыг устгах уу?",
+      "clearMessage": "Хоосон талбарыг хадгалснаар энэ хянагчид хадгалагдсан тусгай зааврыг устгана."
     },
     "repos": {
       "unavailable": "Репозиториудад хандах боломжгүй байна. kilo.ai дээр Bitbucket-ийг тохируулж дуусгана уу.",
@@ -1453,7 +1459,7 @@
       "fixSettings": "Тохиргоог засах",
       "couldNotLoad": "Шалгалтыг ачаалж чадсангүй.",
       "couldNotGetLatest": "Сүүлийн мэдээллийг авч чадсангүй.",
-      "byline": "{{repo}} #{{number}} · Зохиогч: {{author}}",
+      "byline": "#{{number}} · Зохиогч: {{author}}",
       "noFindings": "Асуудал илрээгүй.",
       "findingsUnavailable": "Энэ шалгалт амжилтгүй болсон тул үр дүнг харах боломжгүй.",
       "findingsInProgress": "Энэ шалгалт хараахан хийгдэж байна. Дуусах үедээ илрүүлсэн асуудлууд энд харагдана.",
@@ -1605,8 +1611,8 @@
       "reviewStyle": "Шалгалтын хэв маяг",
       "focusAreas": "Анхаарах чиглэлүүд",
       "allAreas": "Бүх чиглэл",
-      "customInstructions": "Тусгай заавар",
       "set": "Тохируулсан",
+      "notSet": "Тохируулаагүй",
       "nSelected": "{{displayCount}} сонгогдсон",
       "proposedReviewMdGuidance": "Санал болгосон REVIEW.md зөвлөмж"
     },
@@ -2370,13 +2376,14 @@
       "forkFilesUnchangedOnComputer": "Энэ компьютер дээрх файлууд өөрчлөгдөхгүй.",
       "pickProfile": "Профайл сонгоно уу",
       "noProfile": "Профайл байхгүй",
+      "defaultProfileResolvesTo": "Одоо {{name}} гэж тохируулагдсан",
+      "defaultProfileResolvesToAccessibility": "Өгөгдмөл профайл: {{name}}",
       "manageProfiles": "Профайлуудыг удирдах",
       "noProfiles": "Одоогоор профайл байхгүй байна. Орчны хувьсагч, MCP сервер, ур чадвар нэмэхийн тулд нэгийг үүсгэ.",
       "advancedConfig": "Нарийвчилсан тохиргоо",
       "advancedConfigDescription": "Энэ сессэд хамаарна. Профайл болгон хадгалбал дараагийн удаад хадгалагдана.",
       "saveAsProfile": "Профайл болгон хадгалах",
       "saveProfileDescription": "Одоогийн орчны хувьсагч болон тохируулах командуудыг дахин ашиглах боломжтой профайл болгон хадгална уу.",
-      "profileSummary": "{{vars}} орчны хувьсагч · {{commands}} тохируулах командууд",
       "profileSaved": "\"{{name}}\" профайлыг хадгалсан",
       "organizationProfiles": "Байгууллагын профайл",
       "personalProfiles": "Хувийн профайл",

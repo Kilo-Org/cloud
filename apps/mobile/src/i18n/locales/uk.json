@@ -895,7 +895,9 @@
     "instructions": {
       "title": "Власні інструкції",
       "deprecation": "Підтримку власних інструкцій планують припинити. Перенесіть ці настанови у файл REVIEW.md у своєму репозиторії.",
-      "placeholder": "наприклад: дотримуватися наших правил обробки помилок…"
+      "placeholder": "наприклад: дотримуватися наших правил обробки помилок…",
+      "clearTitle": "Видалити власні інструкції?",
+      "clearMessage": "Збереження порожнього поля видалить власні інструкції, збережені для цього рецензента."
     },
     "repos": {
       "unavailable": "Репозиторії недоступні — завершіть налаштування Bitbucket на kilo.ai.",
@@ -971,7 +973,7 @@
       "bitbucketError": "Не вдалося відкрити налаштування Bitbucket. Спробуйте ще раз."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} від {{author}}",
+      "byline": "#{{number}} від {{author}}",
       "cancelMessage": "Це зупинить поточну перевірку коду.",
       "cancelReview": "Скасувати перевірку",
       "cancelTitle": "Скасувати перевірку?",
@@ -1086,12 +1088,12 @@
     },
     "overview": {
       "allAreas": "Усі напрями",
-      "customInstructions": "Власні інструкції",
       "focusAreas": "Напрями перевірки",
       "nSelected": "Вибрано: {{displayCount}}",
       "proposedReviewMdGuidance": "Запропоновані настанови для REVIEW.md",
       "reviewStyle": "Стиль перевірки",
-      "set": "Встановлено"
+      "set": "Встановлено",
+      "notSet": "Не встановлено"
     },
     "updateFailed": "Не вдалося оновити налаштування перевірки коду.",
     "configSaveFailed": "Не вдалося зберегти налаштування перевірки.",
@@ -1877,13 +1879,14 @@
       "forkFilesUnchangedOnComputer": "Файли на цьому комп'ютері не змінюються.",
       "pickProfile": "Виберіть профіль",
       "noProfile": "Без профілю",
+      "defaultProfileResolvesTo": "Відповідає профілю {{name}}",
+      "defaultProfileResolvesToAccessibility": "Профіль за замовчуванням: {{name}}",
       "manageProfiles": "Керувати профілями",
       "noProfiles": "Ще немає профілів. Створіть його, щоб додати змінні середовища, сервери MCP і навички.",
       "advancedConfig": "Розширена конфігурація",
       "advancedConfigDescription": "Діє для цього сеансу. Збереження як профіль залишить його на наступний раз.",
       "saveAsProfile": "Зберегти як профіль",
       "saveProfileDescription": "Збережіть поточні змінні середовища та команди налаштування як багаторазовий профіль.",
-      "profileSummary": "{{vars}} змінні середовища · {{commands}} команди налаштування",
       "profileSaved": "Профіль \"{{name}}\" збережено",
       "organizationProfiles": "Профілі організації",
       "personalProfiles": "Персональні профілі",
@@ -2783,6 +2786,9 @@
       "checkActiveConnection": "Підключення активне, але цей елемент досі не вдається завантажити.",
       "bitbucketOrgOnlyDescription": "Перемкніть обліковий запис, вказаний вище, на організацію, щоб переглядати її запити на злиття в Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Цей обліковий запис ще не має організацій. Запити на злиття Bitbucket можна переглядати після того, як ви створите організацію або приєднаєтеся до неї.",
+      "gitlabReconnectAdminOnlyDescription": "Попросіть власника організації, адміністратора або менеджера з оплати підключити його.",
+      "bitbucketNotConnectedTitle": "Bitbucket не підключено",
+      "bitbucketAdminOnlyDescription": "Підключити його можуть лише власники організації, адміністратори та менеджери з оплати.",
       "contextLine": "Для {{organization}}",
       "contextLinePersonal": "Для особистого простору"
     },
@@ -3034,6 +3040,7 @@
     "installKiloGitHubApp": "Установити застосунок Kilo для GitHub",
     "merge": {
       "merge": "Злиття",
+      "mergeTitle": "Злиття",
       "mergeNow": "Виконати злиття",
       "mergePullRequest": "Злиття запиту",
       "mergeTermTitle": "Злити {{term}}",

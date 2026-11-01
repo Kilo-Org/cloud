@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।",
     "merge": {
       "merge": "ਮਰਜ",
+      "mergeTitle": "ਮਰਜ",
       "mergeNow": "ਹੁਣੇ ਮਰਜ ਕਰੋ",
       "mergePullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਮਰਜ ਕਰਨਾ",
       "mergeTermTitle": "{{term}} ਮਰਜ ਕਰਨਾ",
@@ -685,6 +686,9 @@
       "checkActiveConnection": "ਕਨੈਕਸ਼ਨ ਸਰਗਰਮ ਹੈ, ਪਰ ਇਹ ਆਈਟਮ ਅਜੇ ਵੀ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਦੀ।",
       "bitbucketOrgOnlyDescription": "ਇਸ ਦੇ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਉੱਪਰ ਦਿੱਤੇ ਖਾਤੇ ਨੂੰ ਇੱਕ ਸੰਗਠਨ ਵਿੱਚ ਬਦਲੋ।",
       "bitbucketOrgOnlyNoOrganizationDescription": "ਇਸ ਖਾਤੇ ਵਿੱਚ ਹਾਲੇ ਕੋਈ ਸੰਗਠਨ ਨਹੀਂ ਹੈ। ਇੱਕ ਸੰਗਠਨ ਬਣਾਉਣ ਜਾਂ ਉਸ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਣ ਤੋਂ ਬਾਅਦ ਹੀ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕੀਤੀ ਜਾ ਸਕਦੀ ਹੈ।",
+      "gitlabReconnectAdminOnlyDescription": "ਕਿਸੇ ਸੰਗਠਨ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਇਸ ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਹੋ।",
+      "bitbucketNotConnectedTitle": "Bitbucket ਕਨੈਕਟ ਨਹੀਂ ਹੈ",
+      "bitbucketAdminOnlyDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।",
       "contextLine": "{{organization}} ਲਈ",
       "contextLinePersonal": "ਤੁਹਾਡੇ ਨਿੱਜੀ ਖਾਤੇ ਲਈ"
     },
@@ -1418,7 +1422,9 @@
     "instructions": {
       "title": "ਆਪਣੀਆਂ ਹਦਾਇਤਾਂ",
       "deprecation": "ਕਸਟਮ ਹਦਾਇਤਾਂ ਦੀ ਸਹੂਲਤ ਬੰਦ ਕਰਨ ਦੀ ਯੋਜਨਾ ਹੈ। ਇਸ ਦੀ ਥਾਂ ਇਹ ਹਦਾਇਤਾਂ ਆਪਣੀ ਰਿਪੋਜ਼ਟਰੀ ਦੀ REVIEW.md ਫਾਈਲ ਵਿੱਚ ਰੱਖੋ।",
-      "placeholder": "ਜਿਵੇਂ, ਗਲਤੀਆਂ ਸੰਭਾਲਣ ਲਈ ਸਾਡੇ ਨਿਯਮ ਲਾਗੂ ਕਰੋ…"
+      "placeholder": "ਜਿਵੇਂ, ਗਲਤੀਆਂ ਸੰਭਾਲਣ ਲਈ ਸਾਡੇ ਨਿਯਮ ਲਾਗੂ ਕਰੋ…",
+      "clearTitle": "ਕੀ ਕਸਟਮ ਹਦਾਇਤਾਂ ਹਟਾਉਣੀਆਂ ਹਨ?",
+      "clearMessage": "ਖਾਲੀ ਫੀਲਡ ਸੇਵ ਕਰਨ ਨਾਲ ਇਸ ਸਮੀਖਿਅਕ ਲਈ ਸੰਭਾਲੀਆਂ ਗਈਆਂ ਕਸਟਮ ਹਦਾਇਤਾਂ ਮਿਟ ਜਾਣਗੀਆਂ।"
     },
     "repos": {
       "unavailable": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਉਪਲਬਧ ਨਹੀਂ ਹਨ — kilo.ai 'ਤੇ Bitbucket ਦਾ ਸੈੱਟਅੱਪ ਪੂਰਾ ਕਰੋ।",
@@ -1453,7 +1459,7 @@
       "fixSettings": "ਸੈਟਿੰਗਾਂ ਠੀਕ ਕਰੋ",
       "couldNotLoad": "ਸਮੀਖਿਆ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ।",
       "couldNotGetLatest": "ਤਾਜ਼ਾ ਜਾਣਕਾਰੀ ਨਹੀਂ ਮਿਲ ਸਕੀ।",
-      "byline": "{{repo}} #{{number}} — {{author}} ਦੁਆਰਾ",
+      "byline": "#{{number}} — {{author}} ਦੁਆਰਾ",
       "noFindings": "ਕੋਈ ਸਮੱਸਿਆ ਨਹੀਂ ਮਿਲੀ।",
       "findingsUnavailable": "ਇਹ ਸਮੀਖਿਆ ਅਸਫਲ ਹੋਣ ਕਾਰਨ ਨਤੀਜੇ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",
       "findingsInProgress": "ਇਹ ਸਮੀਖਿਆ ਹਾਲੇ ਚੱਲ ਰਹੀ ਹੈ। ਪੂਰੀ ਹੋਣ 'ਤੇ ਸਮੱਸਿਆਵਾਂ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
@@ -1605,8 +1611,8 @@
       "reviewStyle": "ਸਮੀਖਿਆ ਦਾ ਢੰਗ",
       "focusAreas": "ਧਿਆਨ ਦੇਣ ਵਾਲੇ ਖੇਤਰ",
       "allAreas": "ਸਾਰੇ ਖੇਤਰ",
-      "customInstructions": "ਆਪਣੀਆਂ ਹਦਾਇਤਾਂ",
       "set": "ਸੈੱਟ ਕੀਤਾ ਹੋਇਆ",
+      "notSet": "ਸੈੱਟ ਨਹੀਂ ਹੈ",
       "nSelected": "{{displayCount}} ਚੁਣੇ ਗਏ",
       "proposedReviewMdGuidance": "ਪ੍ਰਸਤਾਵਿਤ REVIEW.md ਦਿਸ਼ਾ-ਨਿਰਦੇਸ਼"
     },
@@ -2376,13 +2382,14 @@
       "forkFilesUnchangedOnComputer": "ਇਸ ਕੰਪਿਊਟਰ 'ਤੇ ਫ਼ਾਈਲਾਂ ਨਹੀਂ ਬਦਲੀਆਂ ਜਾਂਦੀਆਂ।",
       "pickProfile": "ਇੱਕ ਪ੍ਰੋਫਾਈਲ ਚੁਣੋ",
       "noProfile": "ਕੋਈ ਪ੍ਰੋਫਾਈਲ ਨਹੀਂ",
+      "defaultProfileResolvesTo": "ਮੌਜੂਦਾ ਤੌਰ ਤੇ {{name}}",
+      "defaultProfileResolvesToAccessibility": "ਪੂਰਵ-ਨਿਰਧਾਰਤ ਪ੍ਰੋਫਾਈਲ: {{name}}",
       "manageProfiles": "ਪ੍ਰੋਫਾਈਲਾਂ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰੋ",
       "noProfiles": "ਅਜੇ ਤੱਕ ਕੋਈ ਪ੍ਰੋਫਾਈਲ ਨਹੀਂ। ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ, MCP ਸਰਵਰ, ਅਤੇ ਹੁਨਰ ਜੋੜਨ ਲਈ ਇੱਕ ਬਣਾਓ।",
       "advancedConfig": "ਉੱਨਤ ਸੰਰਚਨਾ",
       "advancedConfigDescription": "ਇਹ ਇਸ ਸੈਸ਼ਨ ’ਤੇ ਲਾਗੂ ਹੁੰਦਾ ਹੈ। ਪ੍ਰੋਫਾਈਲ ਵਜੋਂ ਸੁਰੱਖਿਅਤ ਕਰਨ ਨਾਲ ਇਹ ਅਗਲੀ ਵਾਰ ਲਈ ਰਹਿੰਦਾ ਹੈ।",
       "saveAsProfile": "ਪ੍ਰੋਫਾਈਲ ਵਜੋਂ ਸੁਰੱਖਿਅਤ ਕਰੋ",
       "saveProfileDescription": "ਮੌਜੂਦਾ ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ ਅਤੇ ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਨੂੰ ਮੁੜ ਵਰਤੋਂ ਯੋਗ ਪ੍ਰੋਫਾਈਲ ਵਜੋਂ ਸੁਰੱਖਿਅਤ ਕਰੋ।",
-      "profileSummary": "{{vars}} ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ · {{commands}} ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ",
       "profileSaved": "ਪ੍ਰੋਫਾਈਲ \"{{name}}\" ਸੁਰੱਖਿਅਤ ਕੀਤੀ ਗਈ",
       "organizationProfiles": "ਸੰਗਠਨ ਪ੍ਰੋਫਾਈਲ",
       "personalProfiles": "ਨਿੱਜੀ ਪ੍ਰੋਫਾਈਲਾਂ",

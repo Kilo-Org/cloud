@@ -251,6 +251,7 @@ export function ModelPickerOptionRow({
   selected,
   selectedVariant,
   isFavorite,
+  showProvider,
   onSelectModel,
   onSelectVariant,
   onToggleFavorite,
@@ -259,6 +260,12 @@ export function ModelPickerOptionRow({
   selected: boolean;
   selectedVariant: string;
   isFavorite: boolean;
+  /**
+   * Whether the row shows its provider line. The list turns it off inside a
+   * provider section, whose header already names the provider; the row's
+   * accessibility label keeps the name either way.
+   */
+  showProvider: boolean;
   onSelectModel: (option: SessionModelOption) => void;
   onSelectVariant: (variant: string) => void;
   onToggleFavorite: (option: SessionModelOption) => void;
@@ -324,7 +331,7 @@ export function ModelPickerOptionRow({
             >
               {name}
             </Text>
-            {option.modelRef ? (
+            {option.modelRef && showProvider ? (
               <Text selectable className="font-mono text-xs text-muted-foreground">
                 {t('agentChat.modelSelector.provider', { id: option.modelRef.providerID })}
               </Text>

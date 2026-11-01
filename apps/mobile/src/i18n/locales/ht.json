@@ -403,6 +403,7 @@
     "connectionExpired": "Koneksyon ak GitHub la ekspire.",
     "merge": {
       "merge": "Fizyon",
+      "mergeTitle": "Fizyon",
       "mergeNow": "Fizyonnen kounye a",
       "mergePullRequest": "Fizyon demann lan",
       "mergeTermTitle": "Fizyon {{term}}",
@@ -685,6 +686,9 @@
       "checkActiveConnection": "Koneksyon an aktif, men eleman sa a pa ka chaje toujou.",
       "bitbucketOrgOnlyDescription": "Chanje kont ki anwo a pou yon òganizasyon pou w revize demann fizyon Bitbucket li.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Kont sa a pa gen òganizasyon pou kounye a. Ou ka revize demann fizyon Bitbucket lè w kreye yon òganizasyon oswa rantre nan yon sèl.",
+      "gitlabReconnectAdminOnlyDescription": "Mande yon Pwopriyetè, yon Administratè, oswa yon Responsab faktirasyon nan òganizasyon an pou rekonekte l.",
+      "bitbucketNotConnectedTitle": "Bitbucket pa konekte",
+      "bitbucketAdminOnlyDescription": "Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka konekte li.",
       "contextLine": "Pou {{organization}}",
       "contextLinePersonal": "Pou kont pèsonèl ou"
     },
@@ -1418,7 +1422,9 @@
     "instructions": {
       "title": "Enstriksyon pèsonalize",
       "deprecation": "Nou prevwa sispann sipòte enstriksyon pèsonalize yo. Mete direktiv sa yo nan yon fichye REVIEW.md nan depo ou a pito.",
-      "placeholder": "pa egzanp: respekte règ nou yo pou jere erè…"
+      "placeholder": "pa egzanp: respekte règ nou yo pou jere erè…",
+      "clearTitle": "Retire enstriksyon pèsonalize yo?",
+      "clearMessage": "Anrejistre yon chan vid ap efase enstriksyon pèsonalize yo ki estoke pou revizè kòd sa a."
     },
     "repos": {
       "unavailable": "Depo yo pa disponib. Fini konfigirasyon Bitbucket la sou kilo.ai.",
@@ -1453,7 +1459,7 @@
       "fixSettings": "Ranje paramèt yo",
       "couldNotLoad": "Nou pa t ka chaje revizyon an.",
       "couldNotGetLatest": "Nou pa t ka jwenn dènye done yo.",
-      "byline": "{{repo}} #{{number}} pa {{author}}",
+      "byline": "#{{number}} pa {{author}}",
       "noFindings": "Pa gen okenn konsta.",
       "findingsUnavailable": "Rezilta yo pa disponib paske revizyon sa a echwe.",
       "findingsInProgress": "Revizyon sa a poko fini. Konsta yo ap parèt la a lè l fini.",
@@ -1605,8 +1611,8 @@
       "reviewStyle": "Estil revizyon",
       "focusAreas": "Aspè pou konsantre sou yo",
       "allAreas": "Tout domèn",
-      "customInstructions": "Enstriksyon pèsonalize",
       "set": "Konfigire",
+      "notSet": "Pa konfigire",
       "nSelected": "{{displayCount}} chwazi",
       "proposedReviewMdGuidance": "Direktiv ki pwopoze pou REVIEW.md"
     },
@@ -2370,13 +2376,14 @@
       "forkFilesUnchangedOnComputer": "Fichye ki sou òdinatè sa a pa chanje.",
       "pickProfile": "Chwazi yon pwofil",
       "noProfile": "Pa gen pwofil",
+      "defaultProfileResolvesTo": "Koresponn a {{name}}",
+      "defaultProfileResolvesToAccessibility": "Default pwofil: {{name}}",
       "manageProfiles": "Jere pwofil yo",
       "noProfiles": "Pa gen pwofil ankò. Kreye youn pou ajoute varyab anviwònman, sèvè MCP, ak konpetans.",
       "advancedConfig": "Konfigirasyon avanse",
       "advancedConfigDescription": "Sa aplike pou sesyon sa a. Sove l kòm pwofil kenbe l pou pwochen fwa.",
       "saveAsProfile": "Sove kòm pwofil",
       "saveProfileDescription": "Sove varyab anviwònman aktyèl yo ak kòmandman konfigirasyon kòm yon pwofil ki kapab itilize ankò.",
-      "profileSummary": "{{vars}} varyab anviwònman · {{commands}} kòmandman konfigirasyon",
       "profileSaved": "Pwofil \"{{name}}\" sove",
       "organizationProfiles": "Pwofil òganizasyon",
       "personalProfiles": "Pwofil pèsonèl",

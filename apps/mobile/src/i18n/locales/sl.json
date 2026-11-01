@@ -417,6 +417,7 @@
     "connectionExpired": "Povezava z računom GitHub je potekla.",
     "merge": {
       "merge": "Združitev",
+      "mergeTitle": "Združitev",
       "mergeNow": "Združi zdaj",
       "mergePullRequest": "Združitev zahtevka",
       "mergeTermTitle": "Združi {{term}}",
@@ -715,6 +716,9 @@
       "checkActiveConnection": "Povezava je aktivna, vendar tega elementa še vedno ni mogoče naložiti.",
       "bitbucketOrgOnlyDescription": "Preklopi zgornji račun na organizacijo, da lahko pregleduješ njene zahtevke za združitev na Bitbucktu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ta račun še nima nobenih organizacij. Zahtevke za združitev na Bitbucktu boš lahko pregledoval, ko ustvariš organizacijo ali se ji pridružiš.",
+      "gitlabReconnectAdminOnlyDescription": "Prosite lastnika organizacije, skrbnika ali skrbnika obračunavanja, da jo ponovno poveže.",
+      "bitbucketNotConnectedTitle": "Bitbucket ni povezan",
+      "bitbucketAdminOnlyDescription": "Povežejo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za osebni račun"
     },
@@ -1462,7 +1466,9 @@
     "instructions": {
       "title": "Navodila po meri",
       "deprecation": "Navodila po meri bodo ukinjena. Te smernice raje premakni v datoteko REVIEW.md v svojem skladišču.",
-      "placeholder": "npr. upoštevanje naših pravil za obravnavo napak…"
+      "placeholder": "npr. upoštevanje naših pravil za obravnavo napak…",
+      "clearTitle": "Odstranim navodila po meri?",
+      "clearMessage": "Če shraniš prazno polje, izbrišeš navodila po meri, shranjena za tega pregledovalca."
     },
     "repos": {
       "unavailable": "Skladišča niso na voljo. Dokončaj nastavitev povezave s platformo Bitbucket na kilo.ai.",
@@ -1497,7 +1503,7 @@
       "fixSettings": "Popravi nastavitve",
       "couldNotLoad": "Pregleda ni bilo mogoče naložiti.",
       "couldNotGetLatest": "Najnovejših podatkov ni bilo mogoče pridobiti.",
-      "byline": "{{repo}} #{{number}} · Avtor: {{author}}",
+      "byline": "#{{number}} · Avtor: {{author}}",
       "noFindings": "Ni ugotovitev.",
       "findingsUnavailable": "Rezultati niso na voljo, ker ta pregled ni uspel.",
       "findingsInProgress": "Ta pregled je še v teku. Ugotovitve se prikažejo tukaj, ko se zaključi.",
@@ -1649,8 +1655,8 @@
       "reviewStyle": "Slog pregleda",
       "focusAreas": "Prednostna področja",
       "allAreas": "Vsa področja",
-      "customInstructions": "Navodila po meri",
       "set": "Nastavljeno",
+      "notSet": "Ni nastavljeno",
       "nSelected": "Izbrano {{displayCount}}",
       "proposedReviewMdGuidance": "Predlagane smernice za REVIEW.md"
     },
@@ -2444,13 +2450,14 @@
       "forkFilesUnchangedOnComputer": "Datoteke na tem računalniku se ne spremenijo.",
       "pickProfile": "Izberite profil",
       "noProfile": "Brez profila",
+      "defaultProfileResolvesTo": "Trenutno: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Privzeti profil: {{name}}",
       "manageProfiles": "Upravljanje profilov",
       "noProfiles": "Še ni profilov. Ustvarite ga, če želite dodati spremenljivke okolja, strežnike MCP in veščine.",
       "advancedConfig": "Napredna konfiguracija",
       "advancedConfigDescription": "Velja za to sejo. Če ga shranite kot profil, ostane za naslednjič.",
       "saveAsProfile": "Shrani kot profil",
       "saveProfileDescription": "Shranite trenutne spremenljivke okolja in nastavitvene ukaze kot profil za večkratno uporabo.",
-      "profileSummary": "{{vars}} spremenljivke okolja · {{commands}} nastavitveni ukazi",
       "profileSaved": "Profil \"{{name}}\" je shranjen",
       "organizationProfiles": "Profili organizacije",
       "personalProfiles": "Osebni profili",

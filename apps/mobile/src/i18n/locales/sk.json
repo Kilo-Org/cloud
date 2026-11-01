@@ -417,6 +417,7 @@
     "connectionExpired": "Platnosť pripojenia k službe GitHub vypršala.",
     "merge": {
       "merge": "Zlúčenie",
+      "mergeTitle": "Zlúčenie",
       "mergeNow": "Zlúčiť teraz",
       "mergePullRequest": "Zlúčenie žiadosti",
       "mergeTermTitle": "Zlúčiť {{term}}",
@@ -715,6 +716,9 @@
       "checkActiveConnection": "Pripojenie je aktívne, ale táto položka sa stále nedá načítať.",
       "bitbucketOrgOnlyDescription": "Prepni účet hore na organizáciu a kontroluj jej žiadosti o zlúčenie na Bitbucku.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatiaľ nemá žiadne organizácie. Žiadosti o zlúčenie na Bitbucku môžeš kontrolovať po vytvorení organizácie alebo vstúpení do nej.",
+      "gitlabReconnectAdminOnlyDescription": "Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby ho znova pripojil.",
+      "bitbucketNotConnectedTitle": "Bitbucket nie je pripojený",
+      "bitbucketAdminOnlyDescription": "Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie.",
       "contextLine": "Pre {{organization}}",
       "contextLinePersonal": "Pre osobný účet"
     },
@@ -1462,7 +1466,9 @@
     "instructions": {
       "title": "Vlastné pokyny",
       "deprecation": "Podpora vlastných pokynov sa plánuje ukončiť. Presuňte tieto pokyny do súboru REVIEW.md vo svojom repozitári.",
-      "placeholder": "napr. vyžadovať dodržiavanie našich pravidiel spracovania chýb…"
+      "placeholder": "napr. vyžadovať dodržiavanie našich pravidiel spracovania chýb…",
+      "clearTitle": "Odstrániť vlastné pokyny?",
+      "clearMessage": "Uloženie prázdneho poľa odstráni vlastné pokyny uložené pre tohto recenzenta."
     },
     "repos": {
       "unavailable": "Repozitáre nie sú dostupné. Dokončite nastavenie pripojenia k platforme Bitbucket na kilo.ai.",
@@ -1497,7 +1503,7 @@
       "fixSettings": "Opraviť nastavenia",
       "couldNotLoad": "Kontrolu sa nepodarilo načítať.",
       "couldNotGetLatest": "Najnovšie údaje sa nepodarilo načítať.",
-      "byline": "{{repo}} #{{number}} · autor: {{author}}",
+      "byline": "#{{number}} · autor: {{author}}",
       "noFindings": "Nenašli sa žiadne nálezy.",
       "findingsUnavailable": "Výsledky nie sú k dispozícii, pretože táto kontrola zlyhala.",
       "findingsInProgress": "Táto kontrola stále prebieha. Nálezy sa tu zobrazia po jej dokončení.",
@@ -1649,8 +1655,8 @@
       "reviewStyle": "Štýl kontroly",
       "focusAreas": "Oblasti zamerania",
       "allAreas": "Všetky oblasti",
-      "customInstructions": "Vlastné pokyny",
       "set": "Nastavené",
+      "notSet": "Nenastavené",
       "nSelected": "Vybrané: {{displayCount}}",
       "proposedReviewMdGuidance": "Navrhované pokyny do REVIEW.md"
     },
@@ -2444,13 +2450,14 @@
       "forkFilesUnchangedOnComputer": "Súbory v tomto počítači sa nezmenia.",
       "pickProfile": "Vyberte profil",
       "noProfile": "Žiadny profil",
+      "defaultProfileResolvesTo": "Aktuálne {{name}}",
+      "defaultProfileResolvesToAccessibility": "Predvolený profil: {{name}}",
       "manageProfiles": "Spravovať profily",
       "noProfiles": "Zatiaľ žiadne profily. Vytvorte jeden a pridajte premenné prostredia, servery MCP a zručnosti.",
       "advancedConfig": "Pokročilá konfigurácia",
       "advancedConfigDescription": "Platí pre toto sedenie. Uložením ako profil zostane aj nabudúce.",
       "saveAsProfile": "Uložiť ako profil",
       "saveProfileDescription": "Uložte aktuálne premenné prostredia a príkazy nastavenia ako opätovne použiteľný profil.",
-      "profileSummary": "{{vars}} premenné prostredia · {{commands}} príkazy nastavenia",
       "profileSaved": "Profil {{name}} bol uložený",
       "organizationProfiles": "Profily organizácií",
       "personalProfiles": "Osobné profily",

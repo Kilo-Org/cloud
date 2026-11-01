@@ -403,6 +403,7 @@
     "connectionExpired": "Àkókò ìsopọ̀ GitHub ti parí.",
     "merge": {
       "merge": "Àkópọ̀",
+      "mergeTitle": "Àkópọ̀",
       "mergeNow": "Dà pọ̀ báyìí",
       "mergePullRequest": "Ìdàpọ̀ ìbéèrè ìṣọ̀kan",
       "mergeTermTitle": "Da {{term}} pọ̀",
@@ -685,6 +686,9 @@
       "checkActiveConnection": "Ìsopọ̀ ń ṣiṣẹ́, ṣùgbọ́n a kò lè gbé nkan yìí wọlé síbẹ̀.",
       "bitbucketOrgOnlyDescription": "Yí àkọọ́lẹ̀ tí ó wà lókè padà sí àjọ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket rẹ̀.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Àkọọ́lẹ̀ yìí kò tíì ní àjọ rárá. A ó lè ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket nígbà tí o bá dá àjọ sílẹ̀ tàbí darapọ̀ mọ́ àjọ kan.",
+      "gitlabReconnectAdminOnlyDescription": "Ẹ bẹ̀ Ẹni tó ni àjọ, Alákòóso, tàbí Olùṣàkóso ìsanwó kí wọ́n tún so ó pọ̀.",
+      "bitbucketNotConnectedTitle": "A kò tíì so Bitbucket pọ̀",
+      "bitbucketAdminOnlyDescription": "Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀.",
       "contextLine": "Fún {{organization}}",
       "contextLinePersonal": "Fún ti ara ẹni"
     },
@@ -1418,7 +1422,9 @@
     "instructions": {
       "title": "Àwọn ìtọ́sọ́nà àdáni",
       "deprecation": "A ń gbèrò láti dá àwọn ìtọ́sọ́nà àdáni dúró. Gbé àwọn ìlànà wọ̀nyí sínú fáìlì REVIEW.md nínú ibi ìpamọ́ rẹ dípò rẹ̀.",
-      "placeholder": "àpẹẹrẹ: Tẹ̀lé àwọn ìlànà wa fún bí a ṣe ń bójú tó àṣìṣe…"
+      "placeholder": "àpẹẹrẹ: Tẹ̀lé àwọn ìlànà wa fún bí a ṣe ń bójú tó àṣìṣe…",
+      "clearTitle": "Ṣé kí a yọ àwọn ìtọ́sọ́nà àdáni kúrò?",
+      "clearMessage": "Fífi àyè tó ṣòfó pamọ́ yóò pa àwọn ìtọ́sọ́nà àdáni tí a fi pamọ́ fún olùṣàyẹ̀wò yìí run."
     },
     "repos": {
       "unavailable": "Àwọn ibi ìpamọ́ kò sí — parí ìṣètò Bitbucket lórí kilo.ai.",
@@ -1453,7 +1459,7 @@
       "fixSettings": "Ṣàtúnṣe àwọn ètò",
       "couldNotLoad": "A kò lè gbé àtúnyẹ̀wò wọlé.",
       "couldNotGetLatest": "A kò lè gba dátà tuntun.",
-      "byline": "{{repo}} #{{number}} láti ọwọ́ {{author}}",
+      "byline": "#{{number}} láti ọwọ́ {{author}}",
       "noFindings": "Kò sí àbùkù.",
       "findingsUnavailable": "Àwọn àbájáde kò sí nítorí pé àtúnyẹ̀wò yìí kùnà.",
       "findingsInProgress": "Àtúnyẹ̀wò yìí ń tẹ̀ síwájú sì. Àwọn àbùkù yóò fara hàn níbí nígbà tí ó bá parí.",
@@ -1605,8 +1611,8 @@
       "reviewStyle": "Ọ̀nà àtúnyẹ̀wò",
       "focusAreas": "Àwọn apá ìfọkànsí",
       "allAreas": "Gbogbo apá",
-      "customInstructions": "Àwọn ìtọ́sọ́nà àdáni",
       "set": "A ti ṣètò rẹ̀",
+      "notSet": "A kò ṣètò",
       "nSelected": "{{displayCount}} tí a yàn",
       "proposedReviewMdGuidance": "Ìtọ́sọ́nà REVIEW.md tí a dábàá"
     },
@@ -2370,13 +2376,14 @@
       "forkFilesUnchangedOnComputer": "Àwọn fáìlì tó wà lórí kọ̀ǹpútà yìí kò ní yípadà.",
       "pickProfile": "Yan profaili kan",
       "noProfile": "Ko si profaili",
+      "defaultProfileResolvesTo": "O da sí {{name}}",
+      "defaultProfileResolvesToAccessibility": "profaili aiyipada: {{name}}",
       "manageProfiles": "Ṣakoso awọn profaili",
       "noProfiles": "Ko si awọn profaili sibẹsibẹ. Ṣẹda ọkan lati ṣafikun awọn oniyipada ayika, awọn olupin MCP, ati awọn ọgbọn.",
       "advancedConfig": "To ti ni ilọsiwaju iṣeto ni",
       "advancedConfigDescription": "Ó kan ìpàdé yìí. Fífipamọ́ gẹ́gẹ́ bi profaili yóò pa á mọ́ fún ìgbà tó ń bọ̀.",
       "saveAsProfile": "Fipamọ bi Profaili",
       "saveProfileDescription": "Ṣafipamọ awọn oniyipada ayika lọwọlọwọ ati awọn pipaṣẹ iṣeto bi profaili atunlo.",
-      "profileSummary": "{{vars}} awọn oniyipada ayika · {{commands}} Awọn aṣẹ iṣeto",
       "profileSaved": "Profaili \"{{name}}\" ti fipamọ",
       "organizationProfiles": "Awọn profaili Ajo",
       "personalProfiles": "Awọn profaili ti ara ẹni",

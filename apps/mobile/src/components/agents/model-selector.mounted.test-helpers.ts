@@ -20,7 +20,7 @@ export function cliCatalogOption(overrides: Partial<SessionModelOption> = {}): S
 
 export function renderRow(
   option: SessionModelOption,
-  overrides: Partial<{ selected: boolean; isFavorite: boolean }> = {}
+  overrides: Partial<{ selected: boolean; isFavorite: boolean; showProvider: boolean }> = {}
 ): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   TestRenderer.act(() => {
@@ -30,6 +30,7 @@ export function renderRow(
         selected: overrides.selected ?? false,
         selectedVariant: '',
         isFavorite: overrides.isFavorite ?? false,
+        showProvider: overrides.showProvider ?? true,
         onSelectModel: vi.fn<(option: SessionModelOption) => void>(),
         onSelectVariant: vi.fn<(variant: string) => void>(),
         onToggleFavorite: vi.fn<(option: SessionModelOption) => void>(),

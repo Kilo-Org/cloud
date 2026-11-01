@@ -403,6 +403,7 @@
     "connectionExpired": "Врската со GitHub истече.",
     "merge": {
       "merge": "Спојување",
+      "mergeTitle": "Спојување",
       "mergeNow": "Спој сега",
       "mergePullRequest": "Спојување на барањето",
       "mergeTermTitle": "Спој {{term}}",
@@ -685,6 +686,9 @@
       "checkActiveConnection": "Поврзувањето е активно, но оваа ставка сè уште не може да се вчита.",
       "bitbucketOrgOnlyDescription": "Префрлете ја сметката погоре на организација за преглед на нејзините барања за спојување на Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Оваа сметка сè уште нема организации. Барањата за спојување на Bitbucket може да се прегледуваат откако ќе креирате организација или ќе се приклучите кон неа.",
+      "gitlabReconnectAdminOnlyDescription": "Побарајте од Сопственик, Администратор или Одговорен за наплата на организацијата да ја поврзат повторно.",
+      "bitbucketNotConnectedTitle": "Bitbucket не е поврзан",
+      "bitbucketAdminOnlyDescription": "Само сопствениците на организацијата, администраторите и одговорните за наплата можат да го поврзат.",
       "contextLine": "За {{organization}}",
       "contextLinePersonal": "За вашиот личен простор"
     },
@@ -1418,7 +1422,9 @@
     "instructions": {
       "title": "Прилагодени упатства",
       "deprecation": "Се планира укинување на прилагодените упатства. Наместо тоа, премести ги овие насоки во датотеката REVIEW.md во твоето складиште.",
-      "placeholder": "на пр. примена на нашите правила за обработка на грешки…"
+      "placeholder": "на пр. примена на нашите правила за обработка на грешки…",
+      "clearTitle": "Да ги отстраниш прилагодените упатства?",
+      "clearMessage": "Зачувувањето на празно поле ги брише прилагодените упатства зачувани за овој рецензент."
     },
     "repos": {
       "unavailable": "Складиштата не се достапни — заврши го поставувањето на Bitbucket на kilo.ai.",
@@ -1453,7 +1459,7 @@
       "fixSettings": "Поправи ги поставките",
       "couldNotLoad": "Не успеа вчитувањето на прегледот.",
       "couldNotGetLatest": "Не можеа да се преземат најновите податоци.",
-      "byline": "{{repo}} #{{number}} од {{author}}",
+      "byline": "#{{number}} од {{author}}",
       "noFindings": "Нема наоди.",
       "findingsUnavailable": "Резултатите не се достапни бидејќи овој преглед беше неуспешен.",
       "findingsInProgress": "Овој преглед сè уште е во тек. Наодите ќе се појават тука кога ќе заврши.",
@@ -1605,8 +1611,8 @@
       "reviewStyle": "Стил на преглед",
       "focusAreas": "Приоритетни области",
       "allAreas": "Сите области",
-      "customInstructions": "Прилагодени упатства",
       "set": "Поставено",
+      "notSet": "Не е поставено",
       "nSelected": "{{displayCount}} избрани",
       "proposedReviewMdGuidance": "Предложени насоки за REVIEW.md"
     },
@@ -2370,13 +2376,14 @@
       "forkFilesUnchangedOnComputer": "Датотеките на овој компјутер не се менуваат.",
       "pickProfile": "Изберете профил",
       "noProfile": "Нема профил",
+      "defaultProfileResolvesTo": "Одговара на {{name}}",
+      "defaultProfileResolvesToAccessibility": "Стандарден профил: {{name}}",
       "manageProfiles": "Управувајте со профилите",
       "noProfiles": "Сè уште нема профили. Создадете една за да додадете променливи на животната средина, MCP сервери и вештини.",
       "advancedConfig": "Напредна конфигурација",
       "advancedConfigDescription": "Важи за оваа сесија. Зачувувањето како профил го задржува за следниот пат.",
       "saveAsProfile": "Зачувај како профил",
       "saveProfileDescription": "Зачувајте ги тековните променливи на околината и командите за поставување како профил за повеќекратна употреба.",
-      "profileSummary": "{{vars}} променливи на околината · {{commands}} команди за поставување",
       "profileSaved": "Профилот „{{name}}“ е зачуван",
       "organizationProfiles": "Профили на организацијата",
       "personalProfiles": "Лични профили",

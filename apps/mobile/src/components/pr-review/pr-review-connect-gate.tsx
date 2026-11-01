@@ -20,6 +20,10 @@ import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
+import {
+  PR_REVIEW_GATE_ICON_TILE_CLASS,
+  usePrReviewGateIconColor,
+} from '@/lib/pr-review/pr-review-gate-illustration';
 import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
 import { type ProviderPrPlatform, type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
@@ -104,6 +108,7 @@ function GitHubConnectGate({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
+  const iconColor = usePrReviewGateIconColor();
   const { t } = useTranslation();
   const authorization = useQuery(trpc.githubApps.getUserAuthorization.queryOptions());
   const connect = useMutation(
@@ -171,6 +176,10 @@ function GitHubConnectGate({
     // GitHub has one host and no per-instance connection to mismatch.
     instanceMismatch: false,
     organizationId: null,
+    // The GitHub connect is the caller's own account authorization, identical
+    // with or without an organization selected, so it never waits on that
+    // selection.
+    organizationSelectionLoaded: true,
   });
 
   if (view === 'error') {
@@ -208,11 +217,12 @@ function GitHubConnectGate({
         <PrReviewGateHeader />
         <EmptyState
           icon={revoked ? ShieldAlert : PlugZap}
+          iconContainerClassName={PR_REVIEW_GATE_ICON_TILE_CLASS}
+          iconColor={iconColor}
           title={revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
           description={
             <>
               <PrReviewGateItemLine prRef={prRef} />
-              <PrReviewContextLine />
               <Text variant="muted" className="text-center">
                 {/* The benefit line, not a second "Connect your GitHub account":
                     the title and the CTA already name the action, and the item
@@ -222,6 +232,7 @@ function GitHubConnectGate({
                   ? t('prReview.connect.reconnectDescription')
                   : t('common.prReviewSubtitle')}
               </Text>
+              <PrReviewContextLine className="mt-3" />
             </>
           }
           action={

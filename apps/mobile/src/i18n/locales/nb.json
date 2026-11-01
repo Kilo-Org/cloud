@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub-tilkoblingen er utløpt.",
     "merge": {
       "merge": "Fletting",
+      "mergeTitle": "Fletting",
       "mergeNow": "Flett nå",
       "mergePullRequest": "Flett PR",
       "mergeTermTitle": "Flett {{term}}",
@@ -685,6 +686,9 @@
       "checkActiveConnection": "Tilkoblingen er aktiv, men dette elementet kan fortsatt ikke lastes inn.",
       "bitbucketOrgOnlyDescription": "Bytt kontoen over til en organisasjon for å gå gjennom dens PR-er på Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Denne kontoen har ingen organisasjoner ennå. Du kan gå gjennom PR-er på Bitbucket når du oppretter eller blir med i en organisasjon.",
+      "gitlabReconnectAdminOnlyDescription": "Be en eier, administrator eller faktureringsansvarlig i organisasjonen om å koble den til på nytt.",
+      "bitbucketNotConnectedTitle": "Bitbucket er ikke tilkoblet",
+      "bitbucketAdminOnlyDescription": "Bare organisasjonseiere, administratorer og faktureringsansvarlige kan opprette tilkoblingen.",
       "contextLine": "For {{organization}}",
       "contextLinePersonal": "For personlig konto"
     },
@@ -1418,7 +1422,9 @@
     "instructions": {
       "title": "Egendefinerte instruksjoner",
       "deprecation": "Funksjonen for egendefinerte instruksjoner skal fases ut. Flytt disse retningslinjene til en REVIEW.md-fil i kodelageret ditt i stedet.",
-      "placeholder": "f.eks. følg reglene våre for feilhåndtering…"
+      "placeholder": "f.eks. følg reglene våre for feilhåndtering…",
+      "clearTitle": "Fjerne egendefinerte instruksjoner?",
+      "clearMessage": "Hvis du lagrer et tomt felt, slettes de egendefinerte instruksjonene som er lagret for denne anmelderen."
     },
     "repos": {
       "unavailable": "Kodelagrene er ikke tilgjengelige. Fullfør Bitbucket-oppsettet på kilo.ai.",
@@ -1453,7 +1459,7 @@
       "fixSettings": "Rett innstillingene",
       "couldNotLoad": "Kunne ikke laste inn gjennomgangen.",
       "couldNotGetLatest": "Kunne ikke hente de nyeste opplysningene.",
-      "byline": "{{repo}} #{{number}} av {{author}}",
+      "byline": "#{{number}} av {{author}}",
       "noFindings": "Ingen funn ble gjort.",
       "findingsUnavailable": "Resultatene er ikke tilgjengelige fordi denne gjennomgangen mislyktes.",
       "findingsInProgress": "Denne gjennomgangen pågår fortsatt. Funn vises her når den er fullført.",
@@ -1605,8 +1611,8 @@
       "reviewStyle": "Gjennomgangsstil",
       "focusAreas": "Fokusområder",
       "allAreas": "Alle områder",
-      "customInstructions": "Egendefinerte instruksjoner",
       "set": "Angitt",
+      "notSet": "Ikke angitt",
       "nSelected": "{{displayCount}} valgt",
       "proposedReviewMdGuidance": "Forslag til retningslinjer i REVIEW.md"
     },
@@ -2370,13 +2376,14 @@
       "forkFilesUnchangedOnComputer": "Filene på denne datamaskinen blir ikke endret.",
       "pickProfile": "Velg en profil",
       "noProfile": "Ingen profil",
+      "defaultProfileResolvesTo": "Er satt til {{name}}",
+      "defaultProfileResolvesToAccessibility": "Standard profil: {{name}}",
       "manageProfiles": "Administrer profiler",
       "noProfiles": "Ingen profiler ennå. Lag en for å legge til miljøvariabler, MCP-servere og ferdigheter.",
       "advancedConfig": "Avansert konfigurasjon",
       "advancedConfigDescription": "Gjelder for denne økten. Lagres den som profil, beholdes den til neste gang.",
       "saveAsProfile": "Lagre som profil",
       "saveProfileDescription": "Lagre gjeldende miljøvariabler og oppsettkommandoer som en gjenbrukbar profil.",
-      "profileSummary": "{{vars}} miljøvariabler · {{commands}} oppsettkommandoer",
       "profileSaved": "Profilen «{{name}}» er lagret",
       "organizationProfiles": "Organisasjonsprofiler",
       "personalProfiles": "Personlige profiler",

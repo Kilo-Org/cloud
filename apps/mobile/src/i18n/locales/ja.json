@@ -889,7 +889,9 @@
     "instructions": {
       "title": "カスタム指示",
       "deprecation": "カスタム指示は廃止予定です。これらのガイドラインをリポジトリ内のREVIEW.mdファイルに移動してください。",
-      "placeholder": "例：エラー処理の規則に従っているか確認…"
+      "placeholder": "例：エラー処理の規則に従っているか確認…",
+      "clearTitle": "カスタム指示を削除しますか？",
+      "clearMessage": "空のフィールドを保存すると、このレビュアーに保存されているカスタム指示が削除されます。"
     },
     "repos": {
       "unavailable": "リポジトリを利用できません。kilo.aiでBitbucketのセットアップを完了してください。",
@@ -965,7 +967,7 @@
       "bitbucketError": "Bitbucketのセットアップを開けませんでした。もう一度お試しください。"
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · {{author}}",
+      "byline": "#{{number}} · {{author}}",
       "cancelMessage": "実行中のコードレビューを停止します。",
       "cancelReview": "レビューをキャンセル",
       "cancelTitle": "レビューをキャンセルしますか？",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "すべての領域",
-      "customInstructions": "カスタム指示",
       "focusAreas": "重点項目",
       "nSelected": "{{displayCount}}件選択中",
       "proposedReviewMdGuidance": "REVIEW.mdに記載する指針の提案",
       "reviewStyle": "レビュースタイル",
-      "set": "設定済み"
+      "set": "設定済み",
+      "notSet": "未設定"
     },
     "updateFailed": "レビュアーを更新できませんでした。",
     "configSaveFailed": "レビュー設定を保存できませんでした。",
@@ -1841,13 +1843,14 @@
       "forkFilesUnchangedOnComputer": "このコンピューター上のファイルは変更されません。",
       "pickProfile": "プロフィールを選択してください",
       "noProfile": "プロフィールなし",
+      "defaultProfileResolvesTo": "{{name}}に対応",
+      "defaultProfileResolvesToAccessibility": "デフォルトのプロフィール：{{name}}",
       "manageProfiles": "プロフィールの管理",
       "noProfiles": "まだプロフィールはありません。環境変数、MCP サーバー、スキルを追加するために作成します。",
       "advancedConfig": "高度な構成",
       "advancedConfigDescription": "このセッションに適用されます。プロフィールとして保存すると、次回も使えます。",
       "saveAsProfile": "プロフィールとして保存",
       "saveProfileDescription": "現在の環境変数とセットアップ コマンドを再利用可能なプロフィールとして保存します。",
-      "profileSummary": "{{vars}} 環境変数 · {{commands}} セットアップ コマンド",
       "profileSaved": "プロフィール「{{name}}」が保存されました",
       "organizationProfiles": "組織プロフィール",
       "personalProfiles": "個人プロフィール",
@@ -2715,6 +2718,9 @@
       "checkActiveConnection": "接続は有効ですが、この項目はまだ読み込めません。",
       "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
       "bitbucketOrgOnlyNoOrganizationDescription": "このアカウントにはまだ組織がありません。組織を作成または参加すると、Bitbucketのプルリクエストをレビューできるようになります。",
+      "gitlabReconnectAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に再接続を依頼してください。",
+      "bitbucketNotConnectedTitle": "Bitbucketが接続されていません",
+      "bitbucketAdminOnlyDescription": "接続できるのは組織のオーナー、管理者、請求管理者のみです。",
       "contextLine": "{{organization}}用",
       "contextLinePersonal": "個人用"
     },
@@ -2946,6 +2952,7 @@
     "installKiloGitHubApp": "Kilo GitHub Appをインストール",
     "merge": {
       "merge": "マージ",
+      "mergeTitle": "マージ",
       "mergeNow": "今すぐマージ",
       "mergePullRequest": "プルリクエストのマージ",
       "mergeTermTitle": "{{term}}のマージ",

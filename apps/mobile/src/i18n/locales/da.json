@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub-forbindelsen er udløbet.",
     "merge": {
       "merge": "Fletning",
+      "mergeTitle": "Fletning",
       "mergeNow": "Flet nu",
       "mergePullRequest": "Flet pull request",
       "mergeTermTitle": "Flet {{term}}",
@@ -685,6 +686,9 @@
       "checkActiveConnection": "Forbindelsen er aktiv, men dette element kan stadig ikke indlæses.",
       "bitbucketOrgOnlyDescription": "Skift kontoen ovenfor til en organisation for at gennemgå dens pull requests i Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Denne konto har endnu ingen organisationer. Bitbucket pull requests kan gennemgås, når du opretter eller tilslutter dig en organisation.",
+      "gitlabReconnectAdminOnlyDescription": "Bed en organisationsejer, administrator eller faktureringsansvarlig om at tilslutte den.",
+      "bitbucketNotConnectedTitle": "Bitbucket er ikke tilsluttet",
+      "bitbucketAdminOnlyDescription": "Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen.",
       "contextLine": "Til {{organization}}",
       "contextLinePersonal": "Til din personlige konto"
     },
@@ -1418,7 +1422,9 @@
     "instructions": {
       "title": "Brugerdefinerede instruktioner",
       "deprecation": "Brugerdefinerede instruktioner er planlagt til udfasning. Flyt i stedet retningslinjerne til en REVIEW.md-fil i dit kodelager.",
-      "placeholder": "f.eks. overhold vores regler for fejlhåndtering…"
+      "placeholder": "f.eks. overhold vores regler for fejlhåndtering…",
+      "clearTitle": "Fjern brugerdefinerede instruktioner?",
+      "clearMessage": "Når du gemmer et tomt felt, slettes de brugerdefinerede instruktioner, der er gemt for denne anmelder."
     },
     "repos": {
       "unavailable": "Kodelagrene er ikke tilgængelige. Afslut opsætningen af Bitbucket på kilo.ai.",
@@ -1453,7 +1459,7 @@
       "fixSettings": "Ret indstillinger",
       "couldNotLoad": "Gennemgangen kunne ikke indlæses.",
       "couldNotGetLatest": "De seneste oplysninger kunne ikke hentes.",
-      "byline": "{{repo}} #{{number}} af {{author}}",
+      "byline": "#{{number}} af {{author}}",
       "noFindings": "Der er ingen fund.",
       "findingsUnavailable": "Resultaterne er ikke tilgængelige, fordi denne gennemgang mislykkedes.",
       "findingsInProgress": "Denne gennemgang er stadig i gang. Fund vises her, når den er færdig.",
@@ -1605,8 +1611,8 @@
       "reviewStyle": "Gennemgangsstil",
       "focusAreas": "Fokusområder",
       "allAreas": "Alle områder",
-      "customInstructions": "Brugerdefinerede instruktioner",
       "set": "Angivet",
+      "notSet": "Ikke angivet",
       "nSelected": "{{displayCount}} valgt",
       "proposedReviewMdGuidance": "Forslag til retningslinjer i REVIEW.md"
     },
@@ -2370,13 +2376,14 @@
       "forkFilesUnchangedOnComputer": "Filerne på denne computer ændres ikke.",
       "pickProfile": "Vælg en profil",
       "noProfile": "Ingen profil",
+      "defaultProfileResolvesTo": "Henviser til {{name}}",
+      "defaultProfileResolvesToAccessibility": "Standard profil: {{name}}",
       "manageProfiles": "Administrer profiler",
       "noProfiles": "Ingen profiler endnu. Opret en for at tilføje miljøvariabler, MCP-servere og færdigheder.",
       "advancedConfig": "Avanceret konfiguration",
       "advancedConfigDescription": "Gælder for denne session. Gemmer du den som profil, bevares den til næste gang.",
       "saveAsProfile": "Gem som profil",
       "saveProfileDescription": "Gem de aktuelle miljøvariabler og opsætningskommandoer som en genbrugelig profil.",
-      "profileSummary": "{{vars}} miljøvariabler · {{commands}} opsætningskommandoer",
       "profileSaved": "Profilen \"{{name}}\" blev gemt",
       "organizationProfiles": "Organisationsprofiler",
       "personalProfiles": "Personlige profiler",

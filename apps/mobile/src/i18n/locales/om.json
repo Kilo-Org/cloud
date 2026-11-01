@@ -403,6 +403,7 @@
     "connectionExpired": "Yeroon walitti hidhamiinsa GitHub darbeera.",
     "merge": {
       "merge": "Walitti makuu",
+      "mergeTitle": "Walitti makuu",
       "mergeNow": "Amma walitti maki",
       "mergePullRequest": "Gaaffii walitti makuu raawwachuu",
       "mergeTermTitle": "{{term}} raawwachuu",
@@ -685,6 +686,9 @@
       "checkActiveConnection": "Walqunnamtiin socho'aa jira, garuu wanti kun ammayyuu fe'amuu hin danda'u.",
       "bitbucketOrgOnlyDescription": "Herrega gubbaa jiru gara dhaabbataatti jijjiiri, dhaabbata sanaa gaaffiiwwan walitti makuu Bitbucket ilaaluuf.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Herrega kun dhaabbilee ammas hin qabu. Dhaabbata uumtee yookiin dhaabbataatti seeteen, gaaffiiwwan walitti makuu Bitbucket ilaaluu ni dandeessa.",
+      "gitlabReconnectAdminOnlyDescription": "Isa irra deebi'ii akka walqabsiisuuf dhaabbataa abbaa dhaabbataa, bulchaa, ykn bulchaa kaffaltii tokko gaafadhu.",
+      "bitbucketNotConnectedTitle": "Bitbucket hin walqabsiifamne",
+      "bitbucketAdminOnlyDescription": "Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u.",
       "contextLine": "{{organization}}iif",
       "contextLinePersonal": "Dhuunfaa'iif"
     },
@@ -1418,7 +1422,9 @@
     "instructions": {
       "title": "Qajeelfamoota dhuunfaa",
       "deprecation": "Qajeelfamoota dhuunfaa hojii ala gochuuf karoorfameera. Qajeelfamoota kana bakka isaanii faayila REVIEW.md kuusaa koodii kee keessa jirutti dabarsi.",
-      "placeholder": "fkn. Akkaataa dogoggora itti qabnu kabachiisuu…"
+      "placeholder": "fkn. Akkaataa dogoggora itti qabnu kabachiisuu…",
+      "clearTitle": "Qajeelfamoota dhuunfaa keessaa baasuu barbaaddaa?",
+      "clearMessage": "Bakka duwwaa olkaa'uun qajeelfamoota dhuunfaa qorataa kanaaf kuufaman ni balleessa."
     },
     "repos": {
       "unavailable": "Kuusaawwan koodii hin argaman — qophii Bitbucket kilo.ai irratti xumuri.",
@@ -1453,7 +1459,7 @@
       "fixSettings": "Qindaa'ina sirreessi",
       "couldNotLoad": "Sakatta'a fe'uun hin danda'amne.",
       "couldNotGetLatest": "Odeeffannoo ammaa argachuun hin danda'amne.",
-      "byline": "{{repo}} #{{number}} kan {{author}}",
+      "byline": "#{{number}} kan {{author}}",
       "noFindings": "Argamni hin jiru.",
       "findingsUnavailable": "Sakatta'i kun waan hin milkoofneef bu'aawwan hin argaman.",
       "findingsInProgress": "Sakatta'i kun hojjetaa jira. Yeroo xumuru argamni asitti mul'ata.",
@@ -1605,8 +1611,8 @@
       "reviewStyle": "Haala sakatta'aa",
       "focusAreas": "Dhimmoota xiyyeeffannoo",
       "allAreas": "Kutaa hunda",
-      "customInstructions": "Qajeelfamoota dhuunfaa",
       "set": "Qindaa'e",
+      "notSet": "Hin qindaa'e",
       "nSelected": "{{displayCount}} filatamaniiru",
       "proposedReviewMdGuidance": "Qajeelfama REVIEW.md dhihaate"
     },
@@ -2370,13 +2376,14 @@
       "forkFilesUnchangedOnComputer": "Faayiloonni kompiitara kana irra jiran hin jijjiiraman.",
       "pickProfile": "Profaayila tokko filadhu",
       "noProfile": "Profaayila hin qabu",
+      "defaultProfileResolvesTo": "Amma {{name}} ti",
+      "defaultProfileResolvesToAccessibility": "Profaayilii durtii: {{name}}",
       "manageProfiles": "Profaayilii bulchuu",
       "noProfiles": "Ammatti piroofaayilii hin jiru. Jijjiiramoota naannoo, sarvaroota MCP, fi dandeettiiwwan dabaluudhaaf tokko uumi.",
       "advancedConfig": "Qindeessituu Ol'aanaa",
       "advancedConfigDescription": "Kutaa kanaaf ni hojjeta. Akka Profile tti yoo saagte yeroo itti aanuuf ni tura.",
       "saveAsProfile": "Akka Profile tti saagi",
       "saveProfileDescription": "Jijjiiramoota naannoo ammaa fi ajajoota saaguu akka piroofaayilii irra deebi'amee fayyadamuu danda'utti saagi.",
-      "profileSummary": "{{vars}} jijjiiramoota naannoo · {{commands}} ajajoota saaguu",
       "profileSaved": "Profaayilii \"{{name}}\" qusatameera",
       "organizationProfiles": "Profaayilii Jaarmiyaa",
       "personalProfiles": "Profaayilii Dhuunfaa",

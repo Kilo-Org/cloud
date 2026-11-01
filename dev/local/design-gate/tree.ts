@@ -196,6 +196,17 @@ export function ancestors(node: LayoutNode): LayoutNode[] {
   return result;
 }
 
+/**
+ * A node's frame with every transform removed. A transform moves a node's
+ * descendants and not its own frame, so a parent's `rect` and a child's `rect`
+ * describe different spaces as soon as anything between them is transformed —
+ * a natively presented formSheet translates its whole screen. Comparing boxes
+ * only means something in this space.
+ */
+export function layoutRect(node: LayoutNode): Rect {
+  return node.probe.layoutRect ?? node.rect;
+}
+
 function numeric(style: ProbeNode['style'], ...keys: string[]): number {
   for (const key of keys) {
     const value = style?.[key];
@@ -204,7 +215,7 @@ function numeric(style: ProbeNode['style'], ...keys: string[]): number {
   return 0;
 }
 
-export function contentBox(node: LayoutNode, isRTL: boolean): Rect {
+export function contentBox(node: LayoutNode, isRTL: boolean, box: Rect = node.rect): Rect {
   const style = node.probe.style;
   const border = numeric(style, 'borderWidth');
   const top =
@@ -244,7 +255,7 @@ export function contentBox(node: LayoutNode, isRTL: boolean): Rect {
       'paddingHorizontal',
       'padding'
     );
-  const [x, y, width, height] = node.rect;
+  const [x, y, width, height] = box;
   return [
     x + left,
     y + top,

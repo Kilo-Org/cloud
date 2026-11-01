@@ -403,6 +403,7 @@
     "connectionExpired": "A GitHub-kapcsolat lejárt.",
     "merge": {
       "merge": "Összevonás",
+      "mergeTitle": "Összevonás",
       "mergeNow": "Összevonás most",
       "mergePullRequest": "PR összevonása",
       "mergeTermTitle": "A {{term}} összevonása",
@@ -685,6 +686,9 @@
       "checkActiveConnection": "A kapcsolat aktív, de ez az elem továbbra sem tölthető be.",
       "bitbucketOrgOnlyDescription": "Váltsd a fenti fiókot egy szervezetre a Bitbucket-módosítási kérelmek kódellenőrzéséhez.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ez a fiók még nem tagja egyetlen szervezetnek sem. A Bitbucket-módosítási kérelmek kódellenőrzéséhez hozz létre egy szervezetet, vagy csatlakozz egyhez.",
+      "gitlabReconnectAdminOnlyDescription": "Kérd meg egy szervezet tulajdonosát, adminisztrátorát vagy számlázási felelősét, hogy újracsatlakoztassa.",
+      "bitbucketNotConnectedTitle": "A Bitbucket nincs csatlakoztatva",
+      "bitbucketAdminOnlyDescription": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
       "contextLine": "{{organization}} számára",
       "contextLinePersonal": "Személyes fiókodhoz"
     },
@@ -1418,7 +1422,9 @@
     "instructions": {
       "title": "Egyéni utasítások",
       "deprecation": "Az egyéni utasítások funkcióját a tervek szerint megszüntetjük. Helyezd át ezeket az irányelveket a kódtáradban lévő REVIEW.md fájlba.",
-      "placeholder": "pl. a hibakezelési szabályaink betartása…"
+      "placeholder": "pl. a hibakezelési szabályaink betartása…",
+      "clearTitle": "Eltávolítod az egyéni utasításokat?",
+      "clearMessage": "Az üres mező mentése törli az ellenőrzőhöz tárolt egyéni utasításokat."
     },
     "repos": {
       "unavailable": "A kódtárak nem érhetők el. Fejezd be a Bitbucket beállítását a kilo.ai oldalon.",
@@ -1453,7 +1459,7 @@
       "fixSettings": "Beállítások javítása",
       "couldNotLoad": "Nem sikerült betölteni a kódellenőrzést.",
       "couldNotGetLatest": "Nem sikerült lekérni a legfrissebb adatokat.",
-      "byline": "{{repo}} #{{number}}, szerző: {{author}}",
+      "byline": "#{{number}}, szerző: {{author}}",
       "noFindings": "Nincsenek találatok.",
       "findingsUnavailable": "Az eredmények nem érhetők el, mert ez a kódellenőrzés sikertelen volt.",
       "findingsInProgress": "A kódellenőrzés még folyamatban van. A találatok a befejezése után jelennek meg itt.",
@@ -1605,8 +1611,8 @@
       "reviewStyle": "Ellenőrzési stílus",
       "focusAreas": "Kiemelt területek",
       "allAreas": "Minden terület",
-      "customInstructions": "Egyéni utasítások",
       "set": "Beállítva",
+      "notSet": "Nincs beállítva",
       "nSelected": "{{displayCount}} kijelölve",
       "proposedReviewMdGuidance": "Javasolt útmutatás a REVIEW.md fájlhoz"
     },
@@ -2370,13 +2376,14 @@
       "forkFilesUnchangedOnComputer": "A számítógépen lévő fájlok nem változnak.",
       "pickProfile": "Válassz egy profilt",
       "noProfile": "Nincs profil",
+      "defaultProfileResolvesTo": "Jelenleg: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Alapértelmezett profil: {{name}}",
       "manageProfiles": "Profilok kezelése",
       "noProfiles": "Még nincsenek profilok. Hozz létre egyet a környezeti változók, MCP-kiszolgálók és készségek hozzáadásához.",
       "advancedConfig": "Speciális konfiguráció",
       "advancedConfigDescription": "Erre a munkamenetre érvényes. Profilként mentve a következő alkalomra is megmarad.",
       "saveAsProfile": "Mentés profilként",
       "saveProfileDescription": "Mentsd el az aktuális környezeti változókat és a beállítási parancsokat újrafelhasználható profilként.",
-      "profileSummary": "{{vars}} környezeti változó · {{commands}} beállítási parancs",
       "profileSaved": "A \"{{name}}\" profil mentve",
       "organizationProfiles": "Szervezeti profilok",
       "personalProfiles": "Személyes profilok",

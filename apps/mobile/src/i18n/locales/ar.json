@@ -901,7 +901,9 @@
     "instructions": {
       "title": "تعليمات مخصصة",
       "deprecation": "من المقرر إيقاف ميزة التعليمات المخصصة. انقل هذه الإرشادات إلى ملف REVIEW.md في مستودعك بدلًا منها.",
-      "placeholder": "مثال: الالتزام بقواعد معالجة الأخطاء المتبعة لدينا…"
+      "placeholder": "مثال: الالتزام بقواعد معالجة الأخطاء المتبعة لدينا…",
+      "clearTitle": "إزالة التعليمات المخصصة؟",
+      "clearMessage": "سيؤدي حفظ الحقل فارغًا إلى حذف التعليمات المخصصة المخزّنة لهذا المراجع."
     },
     "repos": {
       "unavailable": "المستودعات غير متاحة — أكمل إعداد Bitbucket على kilo.ai.",
@@ -977,7 +979,7 @@
       "bitbucketError": "تعذّر فتح صفحة إعداد Bitbucket. حاول مرة أخرى."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} بواسطة {{author}}",
+      "byline": "#{{number}} بواسطة {{author}}",
       "cancelMessage": "سيؤدي هذا إلى إيقاف مراجعة الشفرة الجارية.",
       "cancelReview": "إلغاء المراجعة",
       "cancelTitle": "إلغاء المراجعة؟",
@@ -1092,12 +1094,12 @@
     },
     "overview": {
       "allAreas": "جميع المجالات",
-      "customInstructions": "تعليمات مخصصة",
       "focusAreas": "مجالات التركيز",
       "nSelected": "{{displayCount}} محدد",
       "proposedReviewMdGuidance": "إرشادات REVIEW.md المقترحة",
       "reviewStyle": "أسلوب المراجعة",
-      "set": "محدّد"
+      "set": "محدّد",
+      "notSet": "غير محدّد"
     },
     "updateFailed": "تعذّر تحديث المراجع.",
     "configSaveFailed": "تعذّر حفظ إعدادات المراجعة.",
@@ -1913,13 +1915,14 @@
       "forkFilesUnchangedOnComputer": "لن تتغير الملفات على هذا الكمبيوتر.",
       "pickProfile": "اختر ملفًا شخصيًا",
       "noProfile": "لا يوجد ملف شخصي",
+      "defaultProfileResolvesTo": "يشير إلى {{name}}",
+      "defaultProfileResolvesToAccessibility": "الملف الشخصي الافتراضي: {{name}}",
       "manageProfiles": "إدارة الملفات الشخصية",
       "noProfiles": "لا توجد ملفات شخصية حتى الآن. قم بإنشاء واحد لإضافة متغيرات البيئة وخوادم MCP والمهارات.",
       "advancedConfig": "التكوين المتقدم",
       "advancedConfigDescription": "يُطبق على هذه الجلسة. حفظه كملف شخصي يبقيه للمرة القادمة.",
       "saveAsProfile": "حفظ كملف شخصي",
       "saveProfileDescription": "احفظ متغيرات البيئة الحالية وأوامر الإعداد كملف شخصي قابل لإعادة الاستخدام.",
-      "profileSummary": "{{vars}} متغيرات البيئة · أوامر الإعداد {{commands}}",
       "profileSaved": "تم حفظ الملف الشخصي \"{{name}}\".",
       "organizationProfiles": "ملفات المؤسسة الشخصية",
       "personalProfiles": "الملفات الشخصية",
@@ -2851,6 +2854,9 @@
       "checkActiveConnection": "الاتصال نشط، لكن لا يزال يتعذر تحميل هذا العنصر.",
       "bitbucketOrgOnlyDescription": "بدّل الحساب أعلاه إلى مؤسسة لمراجعة طلبات السحب الخاصة بها على Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "لا توجد مؤسسات في هذا الحساب بعد. يمكنك مراجعة طلبات السحب على Bitbucket بعد إنشاء مؤسسة أو الانضمام إلى واحدة.",
+      "gitlabReconnectAdminOnlyDescription": "اطلب من مالك مؤسسة أو مشرف أو مدير الفوترة ربطه.",
+      "bitbucketNotConnectedTitle": "Bitbucket غير متصل",
+      "bitbucketAdminOnlyDescription": "يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط ربطه.",
       "contextLine": "للمؤسسة: {{organization}}",
       "contextLinePersonal": "لحسابك الشخصي"
     },
@@ -3122,6 +3128,7 @@
     "installKiloGitHubApp": "تثبيت تطبيق Kilo على GitHub",
     "merge": {
       "merge": "دمج",
+      "mergeTitle": "دمج",
       "mergeNow": "دمج الآن",
       "mergePullRequest": "دمج طلب السحب",
       "mergeTermTitle": "دمج {{term}}",
@@ -3267,10 +3274,10 @@
     "pullRequestUnavailable": "طلب السحب غير متاح",
     "pullRequestUnavailableDescription": "لا يمكن فتح PR هذا. ربما حُذف، أو أن المستودع خاص، أو أن تطبيق Kilo على GitHub غير مثبّت فيه.",
     "reconnectNotice": {
-      "title": "انتهت صلاحية الربط مع GitHub.",
+      "title": "انتهت صلاحية الربط مع GitHub",
       "message": "أعد التحقق من الربط، وسيُطلب منك إعادة ربط الحساب إذا لزم الأمر.",
-      "gitlabTitle": "انتهت صلاحية الربط مع GitLab.",
-      "bitbucketTitle": "انتهت صلاحية الربط مع Bitbucket."
+      "gitlabTitle": "انتهت صلاحية الربط مع GitLab",
+      "bitbucketTitle": "انتهت صلاحية الربط مع Bitbucket"
     },
     "review": "مراجعة",
     "reviewPullRequest": "مراجعة طلب السحب",

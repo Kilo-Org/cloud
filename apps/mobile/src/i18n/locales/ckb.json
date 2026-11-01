@@ -403,6 +403,7 @@
     "connectionExpired": "ماوەی پەیوەندی بە GitHub بەسەرچووە.",
     "merge": {
       "merge": "یەکخستن",
+      "mergeTitle": "یەکخستن",
       "mergeNow": "ئێستا تێکەڵ بکە",
       "mergePullRequest": "تێکەڵکردنی داواکاری ڕاکێشان",
       "mergeTermTitle": "تێکەڵکردنی {{term}}",
@@ -685,6 +686,9 @@
       "checkActiveConnection": "بەستنەوەکە چالاکە، بەڵام هێشتا ناتوانرێت ئەم بڕگەیە باربکرێت.",
       "bitbucketOrgOnlyDescription": "هەژمارەی سەرەوە بگۆڕە بۆ ڕێکخراوێک بۆ پێداچوونەوەی داواکارییەکانی ڕاکێشانی Bitbucketی.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ئەم هەژمارە هێشتا هیچ ڕێکخراوێکی نییە. دوای دروستکردن یان بەشداریکردن لە ڕێکخراوێکدا، دەتوانیت پێداچوونەوەی داواکارییەکانی ڕاکێشانی Bitbucket بکەیت.",
+      "gitlabReconnectAdminOnlyDescription": "داوای لە خاوەنێکی ڕێکخراو، بەڕێوەبەرێک، یان بەڕێوەبەرێکی پارەدان بکە کە بیبەستێتەوە.",
+      "bitbucketNotConnectedTitle": "Bitbucket نەبەستراوە",
+      "bitbucketAdminOnlyDescription": "تەنها خاوەنەکانی ڕێکخراو، بەڕێوەبەران و بەڕێوەبەرانی پارەدان دەتوانن بیبەستن.",
       "contextLine": "بۆ {{organization}}",
       "contextLinePersonal": "بۆ هەژماری کەسی"
     },
@@ -1418,7 +1422,9 @@
     "instructions": {
       "title": "ڕێنماییە تایبەتەکان",
       "deprecation": "بڕیارە ڕێنماییە تایبەتەکان لە بەکارهێنان بخرێن. لە جیاتی ئەوە، ئەم ڕێنماییانە بگوازەوە بۆ پەڕگەیەکی REVIEW.md لە کۆگاکەتدا.",
-      "placeholder": "بۆ نموونە: پابەندبوون بە ڕێساکانمان بۆ مامەڵەکردن لەگەڵ هەڵەکان…"
+      "placeholder": "بۆ نموونە: پابەندبوون بە ڕێساکانمان بۆ مامەڵەکردن لەگەڵ هەڵەکان…",
+      "clearTitle": "ڕێنماییە تایبەتەکان لابدرێن؟",
+      "clearMessage": "پاشەکەوتی خانەیەکی بەتاڵ ڕێنماییە تایبەتەکان دەسڕێتەوە کە بۆ ئەم پێداچوونەوەکارە هەڵگیراون."
     },
     "repos": {
       "unavailable": "کۆگاکان بەردەست نین — ڕێکخستنی Bitbucket لەسەر kilo.ai تەواو بکە.",
@@ -1453,7 +1459,7 @@
       "fixSettings": "ڕێکخستنەکان چاک بکە",
       "couldNotLoad": "نەتوانرا پێداچوونەوەکە بار بکرێت.",
       "couldNotGetLatest": "نەتوانرا نوێترین داتا وەربگیرێت.",
-      "byline": "{{repo}} #{{number}} لەلایەن {{author}}",
+      "byline": "#{{number}} لەلایەن {{author}}",
       "noFindings": "هیچ کێشەیەک نەدۆزرایەوە.",
       "findingsUnavailable": "ئەنجامەکان بەردەست نین چونکە ئەم پێداچوونەوەیە سەرکەوتوو نەبوو.",
       "findingsInProgress": "ئەم پێداچوونەوەیە هێشتا لە جێبەجێکردندایە. ئەنجامەکان لێرە دەردەکەون کاتێک تەواو دەبێت.",
@@ -1605,8 +1611,8 @@
       "reviewStyle": "شێوازی پێداچوونەوە",
       "focusAreas": "بوارەکانی سەرنجپێدان",
       "allAreas": "هەموو بوارەکان",
-      "customInstructions": "ڕێنماییە تایبەتەکان",
       "set": "دیاری کراوە",
+      "notSet": "دیاری نەکراوە",
       "nSelected": "{{displayCount}} هەڵبژێردراو",
       "proposedReviewMdGuidance": "ڕێنمایی پێشنیارکراوی REVIEW.md"
     },
@@ -2370,13 +2376,14 @@
       "forkFilesUnchangedOnComputer": "فایلەکانی ئەم کۆمپیوتەرە ناگۆڕدرێن.",
       "pickProfile": "پڕۆفایلی هەڵبژێرە",
       "noProfile": "هیچ پڕۆفایلی نییە",
+      "defaultProfileResolvesTo": "ئێستا بۆ {{name}} دانراوە",
+      "defaultProfileResolvesToAccessibility": "پرۆفایلی پێشوەختە: {{name}}",
       "manageProfiles": "بەڕێوەبردنی پڕۆفایلی",
       "noProfiles": "هێشتا هیچ پڕۆفایلی نییە. یەکێکیان دروست بکە بۆ زیادکردنی گۆڕاوە ژینگەییەکان، سێرڤەرەکانی MCP و کارامەییەکان.",
       "advancedConfig": "ڕێکخستنی پێشکەوتوو",
       "advancedConfigDescription": "بۆ ئەم دانیشتنە جێبەجێ دەبێت. پاشەکەوتکردن وەک پڕۆفایل بۆ جارێکی داهاتوو دەیپارێزێت.",
       "saveAsProfile": "وەک پڕۆفایلی پاشەکەوت بکە",
       "saveProfileDescription": "گۆڕاوە ژینگەییەکانی ئێستا و فەرمانەکانی ڕێکخستن وەک پرۆفایلی دووبارە بەکارهێنەرەوە هەڵبگرە.",
-      "profileSummary": "{{vars}} گۆڕاوە ژینگەییەکان · {{commands}} فەرمانەکانی ڕێکخستن",
       "profileSaved": "پڕۆفایلی \"{{name}}\" پاشەکەوت کراوە",
       "organizationProfiles": "پڕۆفایلی ڕێکخراوەکان",
       "personalProfiles": "پڕۆفایلی کەسی",

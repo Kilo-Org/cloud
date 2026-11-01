@@ -889,7 +889,9 @@
     "instructions": {
       "title": "कस्टम निर्देश",
       "deprecation": "कस्टम निर्देशों की सुविधा बंद करने की योजना है। इन दिशानिर्देशों को अपनी रिपॉज़िटरी की REVIEW.md फ़ाइल में रखें।",
-      "placeholder": "जैसे: त्रुटियों को सँभालने के हमारे नियम लागू करें…"
+      "placeholder": "जैसे: त्रुटियों को सँभालने के हमारे नियम लागू करें…",
+      "clearTitle": "कस्टम निर्देश हटाएँ?",
+      "clearMessage": "खाली फ़ील्ड सहेजने पर इस समीक्षक के लिए संग्रहीत कस्टम निर्देश हटा दिए जाएँगे।"
     },
     "repos": {
       "unavailable": "रिपॉज़िटरी उपलब्ध नहीं हैं। kilo.ai पर Bitbucket का सेटअप पूरा करें।",
@@ -965,7 +967,7 @@
       "bitbucketError": "Bitbucket सेटअप नहीं खुल सका। कृपया फिर से कोशिश करें।"
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · लेखक: {{author}}",
+      "byline": "#{{number}} · लेखक: {{author}}",
       "cancelMessage": "इससे चल रही कोड समीक्षा रुक जाएगी।",
       "cancelReview": "समीक्षा रद्द करें",
       "cancelTitle": "समीक्षा रद्द करें?",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "सभी क्षेत्र",
-      "customInstructions": "कस्टम निर्देश",
       "focusAreas": "ध्यान देने वाले क्षेत्र",
       "nSelected": "{{displayCount}} चयनित",
       "proposedReviewMdGuidance": "REVIEW.md के लिए प्रस्तावित दिशानिर्देश",
       "reviewStyle": "समीक्षा की शैली",
-      "set": "तय है"
+      "set": "तय है",
+      "notSet": "तय नहीं है"
     },
     "updateFailed": "समीक्षक अपडेट नहीं हो सका।",
     "configSaveFailed": "समीक्षा की सेटिंग सहेजी नहीं जा सकीं।",
@@ -1847,13 +1849,14 @@
       "forkFilesUnchangedOnComputer": "इस कंप्यूटर पर फ़ाइलें नहीं बदली जातीं।",
       "pickProfile": "एक प्रोफ़ाइल चुनें",
       "noProfile": "कोई प्रोफ़ाइल नहीं",
+      "defaultProfileResolvesTo": "वर्तमान में {{name}} पर सेट",
+      "defaultProfileResolvesToAccessibility": "डिफ़ॉल्ट प्रोफ़ाइल: {{name}}",
       "manageProfiles": "प्रोफ़ाइल प्रबंधित करें",
       "noProfiles": "अभी तक कोई प्रोफ़ाइल नहीं। पर्यावरण चर, एमसीपी सर्वर और कौशल जोड़ने के लिए एक बनाएं।",
       "advancedConfig": "उन्नत विन्यास",
       "advancedConfigDescription": "यह इस सत्र पर लागू होता है। प्रोफ़ाइल के रूप में सहेजने पर यह अगली बार के लिए रहता है।",
       "saveAsProfile": "प्रोफ़ाइल के रूप में सहेजें",
       "saveProfileDescription": "वर्तमान परिवेश चर और सेटअप आदेश को पुन: प्रयोज्य प्रोफ़ाइल के रूप में सहेजें।",
-      "profileSummary": "{{vars}} पर्यावरण चर · {{commands}} सेटअप आदेश",
       "profileSaved": "प्रोफ़ाइल \"{{name}}\" सहेजी गई",
       "organizationProfiles": "संगठन प्रोफ़ाइल",
       "personalProfiles": "व्यक्तिगत प्रोफ़ाइल",
@@ -2721,6 +2724,9 @@
       "checkActiveConnection": "कनेक्शन सक्रिय है, लेकिन यह आइटम अभी भी लोड नहीं हो सकता।",
       "bitbucketOrgOnlyDescription": "इसके Bitbucket पुल रिक्वेस्ट समीक्षित करने के लिए ऊपर दिए गए खाते को एक संगठन में बदलें।",
       "bitbucketOrgOnlyNoOrganizationDescription": "इस खाते में अभी तक कोई संगठन नहीं है। संगठन बनाने या किसी संगठन में शामिल होने के बाद ही Bitbucket पुल रिक्वेस्ट समीक्षित किए जा सकते हैं।",
+      "gitlabReconnectAdminOnlyDescription": "इसे फिर से कनेक्ट करने के लिए संगठन के मालिक, एडमिन या बिलिंग प्रबंधक से अनुरोध करें।",
+      "bitbucketNotConnectedTitle": "Bitbucket कनेक्ट नहीं है",
+      "bitbucketAdminOnlyDescription": "केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही इसे कनेक्ट कर सकते हैं।",
       "contextLine": "{{organization}} के लिए",
       "contextLinePersonal": "आपके व्यक्तिगत खाते के लिए"
     },
@@ -2952,6 +2958,7 @@
     "installKiloGitHubApp": "Kilo GitHub ऐप इंस्टॉल करें",
     "merge": {
       "merge": "मर्ज",
+      "mergeTitle": "मर्ज",
       "mergeNow": "अभी मर्ज करें",
       "mergePullRequest": "पुल रिक्वेस्ट मर्ज करें",
       "mergeTermTitle": "{{term}} मर्ज करें",

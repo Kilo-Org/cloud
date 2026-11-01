@@ -410,6 +410,7 @@
     "connectionExpired": "Veza s GitHubom je istekla.",
     "merge": {
       "merge": "Spajanje",
+      "mergeTitle": "Spajanje",
       "mergeNow": "Spoji sada",
       "mergePullRequest": "Spajanje zahtjeva",
       "mergeTermTitle": "Spoji {{term}}",
@@ -700,6 +701,9 @@
       "checkActiveConnection": "Konekcija je aktivna, ali se ova stavka još uvijek ne može učitati.",
       "bitbucketOrgOnlyDescription": "Prebaci račun iznad na organizaciju da pregledaš njene zahtjeve za spajanje na Bitbucketu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj račun još nema organizacije. Zahtjeve za spajanje na Bitbucketu možeš pregledati kada kreiraš ili se pridružiš organizaciji.",
+      "gitlabReconnectAdminOnlyDescription": "Zamolite vlasnika organizacije, administratora ili menadžera za naplatu da je ponovo poveže.",
+      "bitbucketNotConnectedTitle": "Bitbucket nije povezan",
+      "bitbucketAdminOnlyDescription": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu ga povezati.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za lični nalog"
     },
@@ -1440,7 +1444,9 @@
     "instructions": {
       "title": "Prilagođene upute",
       "deprecation": "Planirano je ukidanje prilagođenih uputa. Premjesti ove smjernice u datoteku REVIEW.md u svom repozitoriju.",
-      "placeholder": "npr. obavezna primjena naših pravila za obradu grešaka…"
+      "placeholder": "npr. obavezna primjena naših pravila za obradu grešaka…",
+      "clearTitle": "Ukloniti prilagođene upute?",
+      "clearMessage": "Ako sačuvaš prazno polje, izbrisat ćeš prilagođene upute pohranjene za ovog recenzenta."
     },
     "repos": {
       "unavailable": "Repozitoriji nisu dostupni. Završi podešavanje Bitbucketa na kilo.ai.",
@@ -1475,7 +1481,7 @@
       "fixSettings": "Popravi postavke",
       "couldNotLoad": "Nije moguće učitati pregled.",
       "couldNotGetLatest": "Nije moguće dohvatiti najnovije podatke.",
-      "byline": "{{repo}} #{{number}} · Autor: {{author}}",
+      "byline": "#{{number}} · Autor: {{author}}",
       "noFindings": "Nema nalaza.",
       "findingsUnavailable": "Rezultati nisu dostupni jer ovaj pregled nije uspio.",
       "findingsInProgress": "Ovaj pregled je još u toku. Nalazi će se ovdje pojaviti kad završi.",
@@ -1627,8 +1633,8 @@
       "reviewStyle": "Stil pregleda",
       "focusAreas": "Područja pregleda",
       "allAreas": "Sva područja",
-      "customInstructions": "Prilagođene upute",
       "set": "Postavljeno",
+      "notSet": "Nije postavljeno",
       "nSelected": "{{displayCount}} odabrano",
       "proposedReviewMdGuidance": "Predložene smjernice za REVIEW.md"
     },
@@ -2407,13 +2413,14 @@
       "forkFilesUnchangedOnComputer": "Datoteke na ovom računaru se ne mijenjaju.",
       "pickProfile": "Odaberite profil",
       "noProfile": "Nema profila",
+      "defaultProfileResolvesTo": "Odnosi se na {{name}}",
+      "defaultProfileResolvesToAccessibility": "Zadani profil: {{name}}",
       "manageProfiles": "Upravljajte profilima",
       "noProfiles": "Još nema profila. Napravite jedan za dodavanje varijabli okruženja, MCP servera i vještina.",
       "advancedConfig": "Napredna konfiguracija",
       "advancedConfigDescription": "Vrijedi za ovu sesiju. Čuvanje kao profil zadržava ga za sljedeći put.",
       "saveAsProfile": "Sačuvaj kao profil",
       "saveProfileDescription": "Sačuvajte trenutne varijable okruženja i naredbe za podešavanje kao profil za višekratnu upotrebu.",
-      "profileSummary": "{{vars}} varijable okruženja · {{commands}} naredbe za podešavanje",
       "profileSaved": "Profil \"{{name}}\" je sačuvan",
       "organizationProfiles": "Profili organizacije",
       "personalProfiles": "Lični profili",

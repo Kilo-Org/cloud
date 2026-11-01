@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { parseProviderPrRoute, providerPrRoutePath } from './provider-pr-ref';
 import { parseProviderPrUrl } from './provider-pr-url';
-import { gitlabInstanceMismatch, selectPrReviewGateView } from './pr-review-connect-gate-view';
+import {
+  gitlabInstanceMismatch,
+  selectPrReviewConnectAction,
+  selectPrReviewGateView,
+} from './pr-review-connect-gate-view';
 
 /** A GitHub arm with everything settled and connected. */
 const githubBase = {
@@ -13,6 +17,7 @@ const githubBase = {
   reconnectRequired: false,
   instanceMismatch: false,
   organizationId: null,
+  organizationSelectionLoaded: true,
 };
 
 describe('selectPrReviewGateView — GitHub', () => {
@@ -55,6 +60,7 @@ describe('selectPrReviewGateView — GitLab (personal and org)', () => {
       reconnectRequired: false,
       instanceMismatch: false,
       organizationId,
+      organizationSelectionLoaded: true,
     };
 
     it(`scope ${organizationId ?? 'personal'}: connected renders children`, () => {
@@ -122,6 +128,7 @@ describe('selectPrReviewGateView — Bitbucket', () => {
     reconnectRequired: false,
     instanceMismatch: false,
     organizationId: 'org_1',
+    organizationSelectionLoaded: true,
   };
 
   it('an org scope behaves like the other arms', () => {
@@ -197,8 +204,105 @@ describe('selectPrReviewGateView — Bitbucket', () => {
         reconnectRequired: false,
         instanceMismatch: false,
         organizationId: null,
+        organizationSelectionLoaded: true,
       })
     ).toBe('org-only');
+  });
+
+  it('waits for the restored account selection before answering for a scope', () => {
+    // Before the stored selection lands, `organizationId` is null for a
+    // personal reader and for one whose organization is about to be restored,
+    // so every arm would paint the wrong scope first and move the screen.
+    for (const platform of ['gitlab', 'bitbucket'] as const) {
+      for (const connected of [false, true]) {
+        expect(
+          selectPrReviewGateView({
+            platform,
+            isError: false,
+            isLoading: false,
+            connected,
+            reconnectRequired: !connected,
+            instanceMismatch: false,
+            organizationId: null,
+            organizationSelectionLoaded: false,
+          })
+        ).toBe('loading');
+      }
+    }
+  });
+});
+
+describe('selectPrReviewConnectAction', () => {
+  const base = {
+    platform: 'gitlab' as const,
+    view: 'connect' as const,
+    organizationId: 'org_1',
+    canManageOrganizationBilling: false,
+  };
+
+  it('a personal scope keeps the CTA for every role', () => {
+    for (const platform of ['gitlab', 'bitbucket'] as const) {
+      for (const view of ['connect', 'reconnect'] as const) {
+        expect(
+          selectPrReviewConnectAction({
+            ...base,
+            platform,
+            view,
+            organizationId: null,
+          })
+        ).toBe('connect');
+      }
+    }
+  });
+
+  it('a first-time GitLab connect keeps the CTA for a member', () => {
+    // The organization GitLab OAuth connect only requires a billing role when
+    // a connection already exists, so a first-time connect stays member-level.
+    expect(selectPrReviewConnectAction(base)).toBe('connect');
+  });
+
+  it('an organization GitLab re-authorization explains the role for a member', () => {
+    expect(selectPrReviewConnectAction({ ...base, view: 'reconnect' })).toBe(
+      'organization-admin-only'
+    );
+  });
+
+  it('an organization Bitbucket connect explains the role for a member', () => {
+    expect(selectPrReviewConnectAction({ ...base, platform: 'bitbucket' })).toBe(
+      'organization-admin-only'
+    );
+  });
+
+  it('a billing role keeps the CTA wherever the server accepts it', () => {
+    for (const platform of ['gitlab', 'bitbucket'] as const) {
+      for (const view of ['connect', 'reconnect'] as const) {
+        expect(
+          selectPrReviewConnectAction({
+            ...base,
+            platform,
+            view,
+            canManageOrganizationBilling: true,
+          })
+        ).toBe('connect');
+      }
+    }
+  });
+
+  it('an unsettled role read keeps the CTA where a member would lose it', () => {
+    // The provider procedures stay server-authorized, so neither a loading nor
+    // a failed memberships read may strand the reader without an action.
+    for (const platform of ['gitlab', 'bitbucket'] as const) {
+      for (const view of ['connect', 'reconnect'] as const) {
+        expect(
+          selectPrReviewConnectAction({
+            ...base,
+            platform,
+            view,
+            canManageOrganizationBilling: null,
+          })
+        ).toBe('connect');
+      }
+    }
   });
 });
 

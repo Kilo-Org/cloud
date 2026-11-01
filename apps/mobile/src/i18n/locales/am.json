@@ -403,6 +403,7 @@
     "connectionExpired": "የGitHub ግንኙነት ጊዜው አልፏል።",
     "merge": {
       "merge": "ማዋሃድ",
+      "mergeTitle": "ማዋሃድ",
       "mergeNow": "አሁን አዋህድ",
       "mergePullRequest": "የማዋሃድ ጥያቄን ማዋሃድ",
       "mergeTermTitle": "{{term}}ን ማዋሃድ",
@@ -685,6 +686,9 @@
       "checkActiveConnection": "ግንኙነቱ ገባሪ ነው፣ ነገር ግን ይህ ንጥል አሁንም ሊጫን አይችልም።",
       "bitbucketOrgOnlyDescription": "ከላይ ያለውን መለያ ወደ ድርጅት ይቀይሩ፣ የዚህ ድርጅት የBitbucket የማዋሃድ ጥያቄዎችን ለመገምገም።",
       "bitbucketOrgOnlyNoOrganizationDescription": "ይህ መለያ እስካሁን ድርጅቶች የለውም። ድርጅት ሲፈጥሩ ወይም ሲቀላቀሉ የBitbucket የማዋሃድ ጥያቄዎችን ማገምገም ይቻላል።",
+      "gitlabReconnectAdminOnlyDescription": "የድርጅት ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።",
+      "bitbucketNotConnectedTitle": "Bitbucket አልተገናኘም",
+      "bitbucketAdminOnlyDescription": "ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
       "contextLine": "ለ{{organization}}",
       "contextLinePersonal": "ለግል መለያዎ"
     },
@@ -1418,7 +1422,9 @@
     "instructions": {
       "title": "ብጁ መመሪያዎች",
       "deprecation": "ብጁ መመሪያዎችን የመጠቀም ባህሪ ከአገልግሎት ሊወጣ ታቅዷል። በምትኩ እነዚህን መመሪያዎች በማከማቻዎ ውስጥ ወዳለ REVIEW.md ፋይል ያዛውሩ።",
-      "placeholder": "ለምሳሌ፦ የስህተት አያያዝ መመሪያዎቻችን መከበራቸውን ያረጋግጡ…"
+      "placeholder": "ለምሳሌ፦ የስህተት አያያዝ መመሪያዎቻችን መከበራቸውን ያረጋግጡ…",
+      "clearTitle": "ብጁ መመሪያዎችን ማስወገድ ይፈልጋሉ?",
+      "clearMessage": "ባዶውን መስክ ማስቀመጥ ለዚህ ገምጋሚ የተከማቹትን ብጁ መመሪያዎች ይሰርዛል።"
     },
     "repos": {
       "unavailable": "ማከማቻዎች አይገኙም። በkilo.ai ላይ Bitbucketን ማዋቀር ያጠናቅቁ።",
@@ -1453,7 +1459,7 @@
       "fixSettings": "ቅንብሮችን አስተካክል",
       "couldNotLoad": "ግምገማውን መጫን አልተቻለም።",
       "couldNotGetLatest": "የቅርብ ጊዜ መረጃውን ማግኘት አልተቻለም።",
-      "byline": "{{repo}} #{{number}} በ{{author}}",
+      "byline": "#{{number}} በ{{author}}",
       "noFindings": "ምንም ግኝቶች የሉም።",
       "findingsUnavailable": "ይህ ግምገማ ስላልተሳካ ውጤቶች አይገኙም።",
       "findingsInProgress": "ይህ ግምገማ እስካሁን በሂደት ላይ ነው። ሲጠናቀቅ ግኝቶች እዚህ ይታያሉ።",
@@ -1605,8 +1611,8 @@
       "reviewStyle": "የግምገማ ዘይቤ",
       "focusAreas": "የትኩረት መስኮች",
       "allAreas": "ሁሉም ዘርፎች",
-      "customInstructions": "ብጁ መመሪያዎች",
       "set": "ተዘጋጅቷል",
+      "notSet": "አልተዘጋጀም",
       "nSelected": "{{displayCount}} የተመረጡ",
       "proposedReviewMdGuidance": "ለREVIEW.md የቀረቡ መመሪያዎች"
     },
@@ -2376,13 +2382,14 @@
       "forkFilesUnchangedOnComputer": "በዚህ ኮምፒውተር ላይ ያሉ ፋይሎች አይቀየሩም።",
       "pickProfile": "መገለጫ ይምረጡ",
       "noProfile": "ምንም መገለጫ የለም።",
+      "defaultProfileResolvesTo": "አሁን ላይ {{name}} ማለት ነው",
+      "defaultProfileResolvesToAccessibility": "ነባሪ መገለጫ፦ {{name}}",
       "manageProfiles": "መገለጫዎችን ያስተዳድሩ",
       "noProfiles": "እስካሁን ምንም መገለጫዎች የሉም። የአካባቢ ተለዋዋጮችን፣ MCP አገልጋዮችን እና ክህሎቶችን ለመጨመር አንድ ይፍጠሩ።",
       "advancedConfig": "የላቀ ውቅር",
       "advancedConfigDescription": "ለዚህ ክፍለ ጊዜ ብቻ ነው። እንደ መገለጫ ካስቀመጥከው ለሚቀጥለው ጊዜ ይቆያል።",
       "saveAsProfile": "እንደ መገለጫ አስቀምጥ",
       "saveProfileDescription": "የአሁኑን የአካባቢ ተለዋዋጮች እና የማዋቀር ትዕዛዞችን እንደ እንደገና ጥቅም ላይ ሊውል የሚችል መገለጫ ያስቀምጡ።",
-      "profileSummary": "{{vars}} የአካባቢ ተለዋዋጮች · {{commands}} የማዋቀር ትዕዛዞች",
       "profileSaved": "መገለጫ {{name}} ተቀምጧል",
       "organizationProfiles": "የድርጅት መገለጫዎች",
       "personalProfiles": "የግል መገለጫዎች",

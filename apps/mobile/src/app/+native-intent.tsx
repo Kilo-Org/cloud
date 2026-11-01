@@ -6,6 +6,8 @@ import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
 import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
 import { handleHomeFixturePath } from '@/lib/home-fixture';
 import { modelPickerFixtureRoute } from '@/lib/model-picker-fixture';
+import { profilePickerFixtureRoute } from '@/lib/profile-picker-fixture';
+import { securityAgentSingleRouteFixtureRoute } from '@/lib/security-agent-single-route-fixture';
 
 // Composes the native-intent concerns in order: the share-extension check
 // returns early before web-path mapping (a share URL is never a web route), then
@@ -45,6 +47,12 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/pr-review-gitlab-instance-fixture\/?$/.test(path)) {
       return '/(auth)/pr-review-gitlab-instance-fixture';
     }
+    // Dev-only: open a Security Agent screen as its group's only route
+    // (`kiloapp:///dev/security-agent-single-route-fixture/<scope>/<route…>`).
+    const singleRouteFixture = securityAgentSingleRouteFixtureRoute(path);
+    if (singleRouteFixture) {
+      return singleRouteFixture;
+    }
     const reviewEntryFixture = /(?:^|\/)dev\/pr-review-entry-fixture\/?(\?.*)?$/.exec(path);
     if (reviewEntryFixture) {
       return `/(app)/pr-review-entry-fixture${reviewEntryFixture[1] ?? ''}`;
@@ -65,6 +73,9 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/session-row-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/session-row-fixture';
     }
+    if (/(?:^|\/)dev\/save-profile-sheet-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/save-profile-sheet-fixture';
+    }
     if (/(?:^|\/)dev\/transcript-style-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/transcript-style-fixture';
     }
@@ -80,6 +91,11 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     const fixtureRoute = modelPickerFixtureRoute(path);
     if (fixtureRoute) {
       return fixtureRoute;
+    }
+    // Dev-only profile picker sheet, reached through the development fixture path.
+    const profilePickerRoute = profilePickerFixtureRoute(path);
+    if (profilePickerRoute) {
+      return profilePickerRoute;
     }
   }
   if (handleAppActionPath({ path, initial })) {

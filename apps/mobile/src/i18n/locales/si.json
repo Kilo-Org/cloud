@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub සම්බන්ධතාව කල් ඉකුත් වී ඇත.",
     "merge": {
       "merge": "ඒකාබද්ධ කිරීම",
+      "mergeTitle": "ඒකාබද්ධ කිරීම",
       "mergeNow": "දැන් ඒකාබද්ධ කරන්න",
       "mergePullRequest": "පුල් ඉල්ලීම ඒකාබද්ධ කිරීම",
       "mergeTermTitle": "{{term}} ඒකාබද්ධ කරන්න",
@@ -685,6 +686,9 @@
       "checkActiveConnection": "සම්බන්ධතාව සක්‍රීයයි, නමුත් මෙම අයිතමය තවමත් පූරණය කළ නොහැක.",
       "bitbucketOrgOnlyDescription": "එහි Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කිරීමට ඉහත ගිණුම සංවිධානයකට මාරු කරන්න.",
       "bitbucketOrgOnlyNoOrganizationDescription": "මෙම ගිණුමට තවම සංවිධාන කිසිවක් නොමැත. සංවිධානයක් සෑදීමෙන් හෝ එකකට සම්බන්ධ වීමෙන් පසු Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කළ හැක.",
+      "gitlabReconnectAdminOnlyDescription": "එය නැවත සම්බන්ධ කරන ලෙස සංවිධානයේ හිමිකරු, පරිපාලක හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලන්න.",
+      "bitbucketNotConnectedTitle": "Bitbucket සම්බන්ධ වී නොමැත",
+      "bitbucketAdminOnlyDescription": "එය සම්බන්ධ කළ හැක්කේ සංවිධාන හිමිකරුවන්ට, පරිපාලකවරුන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි.",
       "contextLine": "{{organization}} සඳහා",
       "contextLinePersonal": "ඔබේ පෞද්ගලික ගිණුම සඳහා"
     },
@@ -1418,7 +1422,9 @@
     "instructions": {
       "title": "අභිරුචි උපදෙස්",
       "deprecation": "අභිරුචි උපදෙස් පහසුකම ඉවත් කිරීමට සැලසුම් කර ඇත. ඒ වෙනුවට මෙම මාර්ගෝපදේශ ඔබේ ගබඩාවේ REVIEW.md ගොනුවකට ගෙන යන්න.",
-      "placeholder": "උදා. අපගේ දෝෂ හැසිරවීමේ රීති අනුගමනය කරන බව තහවුරු කරන්න…"
+      "placeholder": "උදා. අපගේ දෝෂ හැසිරවීමේ රීති අනුගමනය කරන බව තහවුරු කරන්න…",
+      "clearTitle": "අභිරුචි උපදෙස් ඉවත් කරන්නද?",
+      "clearMessage": "හිස් ක්ෂේත්‍රයක් සුරැකීමෙන් මෙම සමාලෝචකයා සඳහා ගබඩා කර ඇති අභිරුචි උපදෙස් මකා දැමේ."
     },
     "repos": {
       "unavailable": "ගබඩා ලබා ගත නොහැක — kilo.ai හි Bitbucket සැකසුම අවසන් කරන්න.",
@@ -1453,7 +1459,7 @@
       "fixSettings": "සැකසීම් නිවැරදි කරන්න",
       "couldNotLoad": "සමාලෝචනය පූරණය කළ නොහැකි විය.",
       "couldNotGetLatest": "නවතම තොරතුරු ලබාගත නොහැකි විය.",
-      "byline": "{{repo}} #{{number}} {{author}} විසින්",
+      "byline": "#{{number}} {{author}} විසින්",
       "noFindings": "සොයාගැනීම් නැත.",
       "findingsUnavailable": "මෙම සමාලෝචනය අසාර්ථක වූ නිසා ප්‍රතිඵල ලබා ගත නොහැක.",
       "findingsInProgress": "මෙම සමාලෝචනය තවමත් සිදු වෙමින් පවතී. එය අවසන් වන විට සොයාගැනීම් මෙහි දිස් වේ.",
@@ -1605,8 +1611,8 @@
       "reviewStyle": "සමාලෝචන විලාසය",
       "focusAreas": "අවධානය යොමු කරන ක්ෂේත්‍ර",
       "allAreas": "සියලුම ක්ෂේත්‍ර",
-      "customInstructions": "අභිරුචි උපදෙස්",
       "set": "සකසා ඇත",
+      "notSet": "සකසා නැත",
       "nSelected": "{{displayCount}} ක් තෝරා ඇත",
       "proposedReviewMdGuidance": "යෝජිත REVIEW.md මාර්ගෝපදේශ"
     },
@@ -2376,13 +2382,14 @@
       "forkFilesUnchangedOnComputer": "මෙම පරිගණකයේ ඇති ගොනු වෙනස් නොවේ.",
       "pickProfile": "පැතිකඩක් තෝරන්න",
       "noProfile": "පැතිකඩක් නැත",
+      "defaultProfileResolvesTo": "දැනට {{name}} වෙත සකසා ඇත",
+      "defaultProfileResolvesToAccessibility": "පෙරනිමි පැතිකඩ: {{name}}",
       "manageProfiles": "පැතිකඩ කළමනාකරණය කරන්න",
       "noProfiles": "තවම පැතිකඩ නැත. පාරිසරික විචල්‍යයන්, MCP සේවාදායකයන් සහ කුසලතා එක් කිරීමට එකක් සාදන්න.",
       "advancedConfig": "උසස් වින්යාසය",
       "advancedConfigDescription": "මෙය මෙම සැසියට අදාළ වේ. පැතිකඩක් ලෙස සුරැකීමෙන් එය ඊළඟ වතාවට රැඳේ.",
       "saveAsProfile": "පැතිකඩ ලෙස සුරකින්න",
       "saveProfileDescription": "වත්මන් පරිසර විචල්‍යයන් සහ සැකසුම් විධාන නැවත භාවිත කළ හැකි පැතිකඩක් ලෙස සුරකින්න.",
-      "profileSummary": "{{vars}} පරිසර විචල්‍යයන් · {{commands}} පිහිටුවීම් විධාන",
       "profileSaved": "පැතිකඩ \"{{name}}\" සුරකින ලදී",
       "organizationProfiles": "සංවිධානයේ පැතිකඩ",
       "personalProfiles": "පුද්ගලික පැතිකඩ",

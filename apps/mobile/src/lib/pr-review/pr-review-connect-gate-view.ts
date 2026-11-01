@@ -42,6 +42,13 @@ export type SelectPrReviewGateViewInput = {
   readonly instanceMismatch: boolean;
   /** The selected organization, or null for the personal scope. */
   readonly organizationId: string | null;
+  /**
+   * False while the stored account/organization selection has not been
+   * restored yet. A gate that runs a scope query before that lands answers for
+   * the wrong scope first and then repaints — the personal arm's Connect
+   * screen, then the organization's.
+   */
+  readonly organizationSelectionLoaded: boolean;
 };
 
 /** The hosts a GitLab instance mismatch is explained with. */
@@ -84,6 +91,13 @@ export function gitlabInstanceMismatch(input: {
  * pending forever).
  */
 export function selectPrReviewGateView(args: SelectPrReviewGateViewInput): PrReviewGateView {
+  // Until the stored selection is restored, `organizationId` is null for a
+  // personal reader AND for one about to be restored onto an organization, so
+  // every branch below would answer for the wrong scope. Wait instead: the
+  // resolved scope's own read decides the view.
+  if (!args.organizationSelectionLoaded) {
+    return 'loading';
+  }
   if (args.platform === 'bitbucket' && args.organizationId === null) {
     return 'org-only';
   }
@@ -103,4 +117,49 @@ export function selectPrReviewGateView(args: SelectPrReviewGateViewInput): PrRev
     return 'instance-mismatch';
   }
   return 'children';
+}
+
+export type PrReviewConnectAction = 'connect' | 'organization-admin-only';
+
+export type SelectPrReviewConnectActionInput = {
+  /** Which provider's connection this mount checks. */
+  readonly platform: Exclude<ProviderPrPlatform, 'github'>;
+  /** The connect state the gate selected; only these two offer the CTA. */
+  readonly view: 'connect' | 'reconnect';
+  /** The selected organization, or null for the personal scope. */
+  readonly organizationId: string | null;
+  /**
+   * Whether the caller's organization role may manage billing (`owner`,
+   * `admin`, `billing_manager`), or `null` while that read is unsettled.
+   */
+  readonly canManageOrganizationBilling: boolean | null;
+};
+
+/**
+ * Whether the gate may offer the integration-page CTA.
+ *
+ * The CTA opens the web integration page, and its server rules are narrower
+ * for an organization than for a personal account: every Bitbucket connect
+ * (`organizations.bitbucket.connect` and the Bitbucket OAuth route) and an
+ * organization GitLab *re*-authorization (an integration row already exists)
+ * require `ORGANIZATION_BILLING_ROLES`. A narrower role that presses the CTA
+ * reaches a page that refuses it, with no action of its own — so the gate says
+ * who can act instead. A first-time GitLab connect keeps member-level access
+ * on the server, and a personal scope only ever acts on the caller's own
+ * token, so both keep the CTA.
+ *
+ * An unsettled role read (`null`) keeps the CTA too: the provider procedures
+ * stay server-authorized, matching the code-reviewer screens' treatment of a
+ * permission that has not resolved.
+ */
+export function selectPrReviewConnectAction(
+  args: SelectPrReviewConnectActionInput
+): PrReviewConnectAction {
+  if (args.organizationId === null) {
+    return 'connect';
+  }
+  const billingRoleRequired = args.platform === 'bitbucket' || args.view === 'reconnect';
+  return billingRoleRequired && args.canManageOrganizationBilling === false
+    ? 'organization-admin-only'
+    : 'connect';
 }

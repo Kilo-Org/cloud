@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub সংযোগের মেয়াদ শেষ হয়েছে।",
     "merge": {
       "merge": "মার্জ",
+      "mergeTitle": "মার্জ",
       "mergeNow": "এখনই মার্জ করুন",
       "mergePullRequest": "পুল রিকোয়েস্ট মার্জ",
       "mergeTermTitle": "{{term}} মার্জ",
@@ -685,6 +686,9 @@
       "checkActiveConnection": "সংযোগ সক্রিয় আছে, তবে এই আইটেমটি এখনও লোড করা যাচ্ছে না।",
       "bitbucketOrgOnlyDescription": "উপরে থাকা অ্যাকাউন্ট একটি অর্গানাইজেশনে সুইচ করুন তার Bitbucket পুল রিকোয়েস্ট রিভিউ করতে।",
       "bitbucketOrgOnlyNoOrganizationDescription": "এই অ্যাকাউন্টে এখনো কোনো অর্গানাইজেশন নেই। আপনি একটি অর্গানাইজেশন তৈরি করলে বা যুক্ত হলে Bitbucket পুল রিকোয়েস্ট রিভিউ করা যাবে।",
+      "gitlabReconnectAdminOnlyDescription": "এটি পুনরায় সংযুক্ত করতে একজন সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজারকে অনুরোধ করুন।",
+      "bitbucketNotConnectedTitle": "Bitbucket সংযুক্ত নয়",
+      "bitbucketAdminOnlyDescription": "শুধুমাত্র সংস্থার মালিক, অ্যাডমিন এবং বিলিং ম্যানেজাররা এটি সংযুক্ত করতে পারেন।",
       "contextLine": "{{organization}}-এর জন্য",
       "contextLinePersonal": "আপনার ব্যক্তিগত অ্যাকাউন্টের জন্য"
     },
@@ -1418,7 +1422,9 @@
     "instructions": {
       "title": "নিজস্ব নির্দেশনা",
       "deprecation": "নিজস্ব নির্দেশনা দেওয়ার সুবিধাটি বন্ধ করার পরিকল্পনা রয়েছে। এর বদলে এই নির্দেশনাগুলো আপনার রিপোজিটরির একটি REVIEW.md ফাইলে রাখুন।",
-      "placeholder": "যেমন, ত্রুটি সামলানোর ক্ষেত্রে আমাদের নিয়ম অনুসরণ করা…"
+      "placeholder": "যেমন, ত্রুটি সামলানোর ক্ষেত্রে আমাদের নিয়ম অনুসরণ করা…",
+      "clearTitle": "নিজস্ব নির্দেশনা সরাতে চান?",
+      "clearMessage": "খালি ফিল্ড সংরক্ষণ করলে এই রিভিউয়ারের জন্য সংরক্ষিত নিজস্ব নির্দেশনাগুলো মুছে যাবে।"
     },
     "repos": {
       "unavailable": "রিপোজিটরিগুলো পাওয়া যাচ্ছে না — kilo.ai-এ Bitbucket সেটআপ শেষ করুন।",
@@ -1453,7 +1459,7 @@
       "fixSettings": "সেটিংস ঠিক করুন",
       "couldNotLoad": "পর্যালোচনা লোড করা যায়নি।",
       "couldNotGetLatest": "সর্বশেষ তথ্য পাওয়া যায়নি।",
-      "byline": "{{repo}} #{{number}} — {{author}}",
+      "byline": "#{{number}} — {{author}}",
       "noFindings": "কোনো ত্রুটি পাওয়া যায়নি।",
       "findingsUnavailable": "এই পর্যালোচনা ব্যর্থ হওয়ায় ফলাফল পাওয়া যাচ্ছে না।",
       "findingsInProgress": "এই পর্যালোচনা এখনও চলছে। শেষ হলে ত্রুটিগুলি এখানে দেখা যাবে।",
@@ -1605,8 +1611,8 @@
       "reviewStyle": "পর্যালোচনার ধরন",
       "focusAreas": "গুরুত্বের বিষয়",
       "allAreas": "সব বিষয়",
-      "customInstructions": "নিজস্ব নির্দেশনা",
       "set": "নির্ধারিত",
+      "notSet": "নির্ধারিত নয়",
       "nSelected": "{{displayCount}}টি নির্বাচিত",
       "proposedReviewMdGuidance": "প্রস্তাবিত REVIEW.md নির্দেশনা"
     },
@@ -2376,13 +2382,14 @@
       "forkFilesUnchangedOnComputer": "এই কম্পিউটারের ফাইলগুলো পরিবর্তন হবে না।",
       "pickProfile": "একটি প্রোফাইল বাছাই করুন",
       "noProfile": "কোনো প্রোফাইল নেই",
+      "defaultProfileResolvesTo": "বর্তমানে {{name}} নির্ধারিত",
+      "defaultProfileResolvesToAccessibility": "ডিফল্ট প্রোফাইল: {{name}}",
       "manageProfiles": "প্রোফাইল পরিচালনা করুন",
       "noProfiles": "এখনো কোনো প্রোফাইল নেই. পরিবেশ ভেরিয়েবল, MCP সার্ভার এবং দক্ষতা যোগ করতে একটি তৈরি করুন।",
       "advancedConfig": "উন্নত কনফিগারেশন",
       "advancedConfigDescription": "এই সেশনের জন্য প্রযোজ্য। প্রোফাইল হিসেবে সংরক্ষণ করলে এটি পরের বারের জন্য থাকে।",
       "saveAsProfile": "প্রোফাইল হিসাবে সংরক্ষণ করুন",
       "saveProfileDescription": "একটি পুনঃব্যবহারযোগ্য প্রোফাইল হিসাবে বর্তমান পরিবেশ ভেরিয়েবল এবং সেটআপ কমান্ড সংরক্ষণ করুন।",
-      "profileSummary": "{{vars}} পরিবেশ ভেরিয়েবল · {{commands}} সেটআপ কমান্ড",
       "profileSaved": "প্রোফাইল \"{{name}}\" সংরক্ষিত",
       "organizationProfiles": "প্রতিষ্ঠানের প্রোফাইল",
       "personalProfiles": "ব্যক্তিগত প্রোফাইল",

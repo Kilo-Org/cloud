@@ -417,6 +417,7 @@
     "connectionExpired": "Тэрмін дзеяння падключэння да GitHub скончыўся.",
     "merge": {
       "merge": "Зліццё",
+      "mergeTitle": "Зліццё",
       "mergeNow": "Зліць зараз",
       "mergePullRequest": "Зліццё запыту",
       "mergeTermTitle": "Зліць {{term}}",
@@ -715,6 +716,9 @@
       "checkActiveConnection": "Падключэнне актыўнае, але гэты элемент усё яшчэ не загружаецца.",
       "bitbucketOrgOnlyDescription": "Пераключыце ўліковы запіс, указаны вышэй, на арганізацыю, каб разглядаць яе запыты на зліццё ў Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Гэты ўліковы запіс пакуль не мае арганізацый. Запыты на зліццё ў Bitbucket можна будзе разглядаць пасля таго, як вы створыце арганізацыю або далучыцеся да яе.",
+      "gitlabReconnectAdminOnlyDescription": "Папрасіце ўладальніка арганізацыі, адміністратара або кіраўніка плацяжоў падключыць яго.",
+      "bitbucketNotConnectedTitle": "Bitbucket не падключаны",
+      "bitbucketAdminOnlyDescription": "Толькі ўладальнікі, адміністратары і кіраўнікі плацяжоў арганізацыі могуць яго падключыць.",
       "contextLine": "Для {{organization}}",
       "contextLinePersonal": "Для асабістага ўліковага запісу"
     },
@@ -1462,7 +1466,9 @@
     "instructions": {
       "title": "Уласныя інструкцыі",
       "deprecation": "Падтрымку ўласных інструкцый плануецца спыніць. Перанясіце гэтыя рэкамендацыі ў файл REVIEW.md у вашым рэпазіторыі.",
-      "placeholder": "напрыклад: правяраць выкананне нашых правілаў апрацоўкі памылак…"
+      "placeholder": "напрыклад: правяраць выкананне нашых правілаў апрацоўкі памылак…",
+      "clearTitle": "Выдаліць уласныя інструкцыі?",
+      "clearMessage": "Захаванне пустога поля выдаляе ўласныя інструкцыі, захаваныя для гэтага рэцэнзента."
     },
     "repos": {
       "unavailable": "Рэпазіторыі недаступныя. Завяршыце наладжванне Bitbucket на kilo.ai.",
@@ -1497,7 +1503,7 @@
       "fixSettings": "Выправіць налады",
       "couldNotLoad": "Не атрымалася загрузіць праверку.",
       "couldNotGetLatest": "Не атрымалася атрымаць актуальныя даныя.",
-      "byline": "{{repo}} #{{number}} · Аўтар: {{author}}",
+      "byline": "#{{number}} · Аўтар: {{author}}",
       "noFindings": "Праблем не выяўлена.",
       "findingsUnavailable": "Вынікі недаступныя, бо гэтая праверка завяршылася няўдала.",
       "findingsInProgress": "Гэтая праверка яшчэ працягваецца. Вынікі з’явяцца тут пасля яе завяршэння.",
@@ -1649,8 +1655,8 @@
       "reviewStyle": "Стыль праверкі",
       "focusAreas": "Асноўныя напрамкі",
       "allAreas": "Усе напрамкі",
-      "customInstructions": "Уласныя інструкцыі",
       "set": "Зададзена",
+      "notSet": "Не зададзена",
       "nSelected": "{{displayCount}} выбрана",
       "proposedReviewMdGuidance": "Прапанаваныя рэкамендацыі для REVIEW.md"
     },
@@ -2444,13 +2450,14 @@
       "forkFilesUnchangedOnComputer": "Файлы на гэтым камп'ютары не змяняюцца.",
       "pickProfile": "Выберыце профіль",
       "noProfile": "Няма профілю",
+      "defaultProfileResolvesTo": "Супадае з {{name}}",
+      "defaultProfileResolvesToAccessibility": "Стандартны профіль: {{name}}",
       "manageProfiles": "Кіраванне профілямі",
       "noProfiles": "Профіляў пакуль няма. Стварыце яго, каб дадаць зменныя асяроддзя, серверы MCP і навыкі.",
       "advancedConfig": "Пашыраная канфігурацыя",
       "advancedConfigDescription": "Дзейнічае для гэтай сесіі. Калі захаваць як профіль, ён застанецца на наступны раз.",
       "saveAsProfile": "Захаваць як профіль",
       "saveProfileDescription": "Захавайце бягучыя зменныя асяроддзя і каманды наладкі як шматразовы профіль.",
-      "profileSummary": "{{vars}} зменныя асяроддзя · {{commands}} каманды наладкі",
       "profileSaved": "Профіль \"{{name}}\" захаваны",
       "organizationProfiles": "Профілі арганізацыі",
       "personalProfiles": "Асабістыя профілі",

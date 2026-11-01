@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub қосылымының мерзімі аяқталды.",
     "merge": {
       "merge": "Біріктіру",
+      "mergeTitle": "Біріктіру",
       "mergeNow": "Қазір біріктіру",
       "mergePullRequest": "Біріктіру сұрауын біріктіру",
       "mergeTermTitle": "{{term}}н біріктіру",
@@ -685,6 +686,9 @@
       "checkActiveConnection": "Қосылым белсенді, бірақ бұл элемент әлі де жүктеле алмайды.",
       "bitbucketOrgOnlyDescription": "Жоғарыдағы тіркелгіні ұйымға ауыстырыңыз, оның Bitbucket тарту сұрауларын қарау үшін.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Бұл тіркелгіде әзірге ешбір ұйым жоқ. Ұйым құрғаннан немесе оған қосылғаннан кейін Bitbucket тарту сұрауларын қарауға болады.",
+      "gitlabReconnectAdminOnlyDescription": "Оны қайта қосу үшін ұйым иесіне, әкімшісіне немесе төлем менеджеріне жүгініңіз.",
+      "bitbucketNotConnectedTitle": "Bitbucket қосылмаған",
+      "bitbucketAdminOnlyDescription": "Оны тек ұйым иелері, әкімшілері мен төлем менеджерлері қоса алады.",
       "contextLine": "{{organization}} үшін",
       "contextLinePersonal": "Жеке аккаунтыңыз үшін"
     },
@@ -1418,7 +1422,9 @@
     "instructions": {
       "title": "Арнайы нұсқаулар",
       "deprecation": "Жеке нұсқаулар мүмкіндігін қолдауды тоқтату жоспарланған. Бұл нұсқауларды репозиторийіңіздегі REVIEW.md файлына көшіріңіз.",
-      "placeholder": "мысалы, қателерді өңдеу ережелерімізді сақтау…"
+      "placeholder": "мысалы, қателерді өңдеу ережелерімізді сақтау…",
+      "clearTitle": "Арнайы нұсқауларды жою керек пе?",
+      "clearMessage": "Бос өрісті сақтау осы шолушы үшін сақталған арнайы нұсқауларды жойып тастайды."
     },
     "repos": {
       "unavailable": "Репозиторийлер қолжетімсіз. Bitbucket қызметін баптауды kilo.ai сайтында аяқтаңыз.",
@@ -1453,7 +1459,7 @@
       "fixSettings": "Баптауларды түзету",
       "couldNotLoad": "Тексеруді жүктеу мүмкін болмады.",
       "couldNotGetLatest": "Соңғы деректерді алу мүмкін болмады.",
-      "byline": "{{repo}} #{{number}} авторы: {{author}}",
+      "byline": "#{{number}} авторы: {{author}}",
       "noFindings": "Мәселелер табылмады.",
       "findingsUnavailable": "Бұл тексеру сәтсіз аяқталғандықтан, нәтижелер қолжетімсіз.",
       "findingsInProgress": "Бұл тексеру әлі жүріп жатыр. Аяқталған кезде мәселелер осы жерде пайда болады.",
@@ -1605,8 +1611,8 @@
       "reviewStyle": "Тексеру мәнері",
       "focusAreas": "Басым бағыттар",
       "allAreas": "Барлық бағыттар",
-      "customInstructions": "Арнайы нұсқаулар",
       "set": "Белгіленген",
+      "notSet": "Белгіленбеген",
       "nSelected": "{{displayCount}} таңдалды",
       "proposedReviewMdGuidance": "REVIEW.md файлына ұсынылған нұсқаулар"
     },
@@ -2370,13 +2376,14 @@
       "forkFilesUnchangedOnComputer": "Осы компьютердегі файлдар өзгертілмейді.",
       "pickProfile": "Профиль таңдаңыз",
       "noProfile": "Профиль жоқ",
+      "defaultProfileResolvesTo": "Қазіргі мәні: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Әдепкі профиль: {{name}}",
       "manageProfiles": "Профильдерді басқару",
       "noProfiles": "Әзірге профильдер жоқ. Айнымалы ортаны, MCP серверлерін және дағдыларды қосу үшін біреуін жасаңыз.",
       "advancedConfig": "Кеңейтілген конфигурация",
       "advancedConfigDescription": "Осы сеансқа қолданылады. Профиль ретінде сақтасаңыз, ол келесі жолы да қалады.",
       "saveAsProfile": "Профиль ретінде сақтау",
       "saveProfileDescription": "Ағымдағы орта айнымалы мәндерін және орнату пәрмендерін қайта пайдалануға болатын профиль ретінде сақтаңыз.",
-      "profileSummary": "{{vars}} ортаның айнымалы мәндері · {{commands}} орнату пәрмендері",
       "profileSaved": "\"{{name}}\" профилі сақталды",
       "organizationProfiles": "Ұйым профильдері",
       "personalProfiles": "Жеке профильдер",

@@ -403,3 +403,49 @@ describe('FindingDetailsPanel identifier values', () => {
     ).toBeUndefined();
   });
 });
+
+describe('FindingDetailsPanel facts card divider', () => {
+  // The card's rows decide which one suppresses the hairline under it. Without
+  // the manifest, or without an advisory id, the card still has to end cleanly
+  // on whatever row it draws last.
+  const FACT_LABELS: Record<string, true> = {
+    'securityAgent.findingDetails.package': true,
+    'securityAgent.findingDetails.vulnerableVersions': true,
+    'securityAgent.findingDetails.patchedVersion': true,
+    'securityAgent.findingDetails.cve': true,
+    'securityAgent.findingDetails.ghsa': true,
+    'securityAgent.findingDetails.manifest': true,
+  };
+
+  beforeEach(() => {
+    mocks.kvRows.length = 0;
+    mocks.deadlineState = { kind: 'no-deadline' };
+    mocks.supersedingFindingId = null;
+  });
+
+  it.each([
+    { name: 'manifest row', overrides: {}, lastLabel: 'securityAgent.findingDetails.manifest' },
+    {
+      name: 'ghsa row',
+      overrides: { manifest_path: null },
+      lastLabel: 'securityAgent.findingDetails.ghsa',
+    },
+    {
+      name: 'cve row',
+      overrides: { manifest_path: null, ghsa_id: null },
+      lastLabel: 'securityAgent.findingDetails.cve',
+    },
+    {
+      name: 'patched-version row',
+      overrides: { manifest_path: null, ghsa_id: null, cve_id: null },
+      lastLabel: 'securityAgent.findingDetails.patchedVersion',
+    },
+  ])('ends the card on the $name', ({ overrides, lastLabel }) => {
+    renderPanel(findingFixture(overrides));
+
+    const rows = mocks.kvRows.filter(row => FACT_LABELS[row.label as string]);
+    expect(rows[rows.length - 1]?.label).toBe(lastLabel);
+    expect(rows.filter(row => row.last === true)).toHaveLength(1);
+    expect(rows[rows.length - 1]?.last).toBe(true);
+  });
+});

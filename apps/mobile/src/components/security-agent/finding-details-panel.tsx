@@ -74,6 +74,25 @@ function getDismissalReasonLabel(reason: string | null): string {
   return key ? i18n.t(key) : code.replaceAll('_', ' ');
 }
 
+type FactRowKey = 'patchedVersion' | 'cve' | 'ghsa' | 'manifest';
+
+// The facts card suppresses the divider under its final row. The manifest is
+// the usual last row, but a finding synced without one — or without an
+// advisory id — ends the card on the row above, so the card would otherwise
+// paint a hairline under whatever row happens to be last.
+function lastFactRowKey(finding: SecurityFinding): FactRowKey {
+  if (finding.manifest_path) {
+    return 'manifest';
+  }
+  if (finding.ghsa_id) {
+    return 'ghsa';
+  }
+  if (finding.cve_id) {
+    return 'cve';
+  }
+  return 'patchedVersion';
+}
+
 function getFindingSourceLabel(source: string): string {
   if (source === 'dependabot') {
     return i18n.t('securityAgent.findingDetails.sourceDependabot');
@@ -171,6 +190,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
   // resolution date gets its own row and the SLA row stays with a finding that
   // still has a deadline.
   const dismissedAt = finding.status === 'ignored' ? parseTimestamp(finding.updated_at) : null;
+  const lastFactRow = lastFactRowKey(finding);
   const dateRows: FindingDateRow[] = [
     {
       key: 'detected',
@@ -270,6 +290,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
           )}
           valueFace={finding.patched_version ? 'mono' : 'text'}
           valueDirection={finding.patched_version ? 'ltr' : undefined}
+          last={lastFactRow === 'patchedVersion'}
           selectable
         />
         {finding.cve_id ? (
@@ -277,6 +298,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             label={t('securityAgent.findingDetails.cve')}
             value={finding.cve_id}
             valueDirection="ltr"
+            last={lastFactRow === 'cve'}
             selectable
           />
         ) : null}
@@ -285,6 +307,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             label={t('securityAgent.findingDetails.ghsa')}
             value={finding.ghsa_id}
             valueDirection="ltr"
+            last={lastFactRow === 'ghsa'}
             selectable
           />
         ) : null}

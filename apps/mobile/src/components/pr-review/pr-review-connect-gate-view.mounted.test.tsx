@@ -593,6 +593,30 @@ describe('PR-review connect gate — GitLab instance mismatch', () => {
     expect(renderer.root.findAllByType('EmptyState')).toHaveLength(0);
   });
 
+  it('compares a gitlab.com link, which the context line never names', () => {
+    // The display hint drops the gitlab.com default, but the server still
+    // compares it: a self-managed connection cannot read a gitlab.com link.
+    queryResult.data = {
+      connected: true,
+      reconnectRequired: false,
+      integration: { instanceUrl: 'https://gitlab.example.com' },
+    };
+    const renderer = mountInScope({
+      platform: 'gitlab',
+      projectPath: 'group/sub/repo',
+      mrIid: 18,
+      instanceHint: 'https://gitlab.com',
+    });
+    expect(renderer.root.findByType('EmptyState').props.title).toBe(
+      'GitLab connection is for another instance'
+    );
+    expect(textValues(renderer)).toContain(
+      'Your GitLab connection is for gitlab.example.com, but this merge request is on ' +
+        'gitlab.com. Connect GitLab on that instance to review it.'
+    );
+    expect(renderer.root.findAllByType('ReviewContent')).toHaveLength(0);
+  });
+
   it('never compares a merge request whose link named no instance', () => {
     queryResult.data = {
       connected: true,

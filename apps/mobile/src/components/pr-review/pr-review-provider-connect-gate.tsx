@@ -80,7 +80,15 @@ export function ProviderConnectGate({
   const colors = useThemeColors();
   const iconColor = usePrReviewGateIconColor();
   const { t } = useTranslation();
+  const scope = useProviderPrScopeOrNull();
+  // Display-normalized: the hint is worth naming only when it is not the
+  // gitlab.com default the reader assumes.
   const instanceHint = useInstanceHint(platform);
+  // Decision input: the raw hint the query hands the server, which keeps the
+  // gitlab.com origin. Dropping it here would let a gitlab.com link pass a
+  // self-managed connection, which the server then refuses as not-found.
+  const requestedInstanceHint =
+    scope?.ref.platform === 'gitlab' ? scope.ref.instanceHint : undefined;
   // The org-only arm sends a personal reader to the account switch above. That
   // switch is the context line's, and it exists only when the reader has a
   // membership — so the memberships answer decides which copy is true. One
@@ -191,7 +199,7 @@ export function ProviderConnectGate({
   const instanceMismatch =
     platform === 'gitlab'
       ? gitlabInstanceMismatch({
-          instanceHint,
+          instanceHint: requestedInstanceHint,
           connectedInstanceUrl: gitlabStatus.data?.integration?.instanceUrl,
         })
       : null;

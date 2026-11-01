@@ -26,6 +26,14 @@ const dolthubConnectionErrorMessages: Record<string, string> = {
   organization_access_required: 'You do not have access to this organization',
 };
 
+function describeConnectionError(error: string): string {
+  // The code comes from the query string, so skip inherited keys.
+  const known = Object.hasOwn(dolthubConnectionErrorMessages, error)
+    ? dolthubConnectionErrorMessages[error]
+    : undefined;
+  return known ?? `Connection failed: ${error}`;
+}
+
 export function DoltHubIntegrationDetails({
   organizationId,
   success,
@@ -60,7 +68,7 @@ export function DoltHubIntegrationDetails({
       toast.success('DoltHub connected successfully!');
     }
     if (error) {
-      toast.error(dolthubConnectionErrorMessages[error] ?? `Connection failed: ${error}`);
+      toast.error(describeConnectionError(error));
     }
   }, [success, error]);
 
@@ -114,9 +122,7 @@ export function DoltHubIntegrationDetails({
         <Alert variant="destructive">
           <XCircle className="h-4 w-4" />
           <AlertTitle>Could not connect DoltHub</AlertTitle>
-          <AlertDescription>
-            {dolthubConnectionErrorMessages[error] ?? `Connection failed: ${error}`}
-          </AlertDescription>
+          <AlertDescription>{describeConnectionError(error)}</AlertDescription>
         </Alert>
       )}
 

@@ -1919,7 +1919,7 @@
       "highDescription": "Risk pou yon gwo kantite done ekspoze.",
       "mediumDescription": "Enpak limite oswa kondisyon espesifik.",
       "lowDescription": "Enpak minimòm sou sekirite.",
-      "invalidDayCount": "antre ant 1 ak 365 jou, ak yon nonb antye sèlman.",
+      "invalidDayCount": "Antre ant 1 ak 365 jou, ak yon nonb antye sèlman.",
       "remediationDeadlineA11y": "Delè koreksyon pou gravite {{label}}, an jou",
       "enterWholeNumber": "Antre yon nonb antye ant 1 ak 365",
       "permissionNote": "Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka chanje paramèt sa yo.",

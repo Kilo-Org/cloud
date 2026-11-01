@@ -1919,7 +1919,7 @@
       "highDescription": "Moontlike beduidende datablootstelling.",
       "mediumDescription": "Beperkte impak of spesifieke voorwaardes.",
       "lowDescription": "Minimale sekuriteitsimpak.",
-      "invalidDayCount": "voer 1–365 dae in, slegs heelgetalle.",
+      "invalidDayCount": "Voer 1–365 dae in, slegs heelgetalle.",
       "remediationDeadlineA11y": "Regstellingsperdatum in dae vir ernsgraad {{label}}",
       "enterWholeNumber": "Voer 'n heelgetal tussen 1 en 365 in",
       "permissionNote": "Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan hierdie instellings verander.",

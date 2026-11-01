@@ -1501,7 +1501,7 @@
       "enterWholeNumber": "Masukkan bilangan bulat antara 1 dan 365",
       "high": "Tinggi",
       "highDescription": "Berpotensi menyebabkan kebocoran data yang signifikan.",
-      "invalidDayCount": "jumlah hari harus berupa bilangan bulat dari 1 hingga 365.",
+      "invalidDayCount": "Jumlah hari harus berupa bilangan bulat dari 1 hingga 365.",
       "low": "Rendah",
       "lowDescription": "Dampak terhadap keamanan minimal.",
       "medium": "Sedang",

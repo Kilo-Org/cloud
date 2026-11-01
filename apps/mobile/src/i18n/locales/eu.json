@@ -1919,7 +1919,7 @@
       "highDescription": "Datu kopuru handia agerian geratzeko arriskua.",
       "mediumDescription": "Eragin mugatua edo baldintza zehatzak.",
       "lowDescription": "Segurtasunean eragin oso txikia.",
-      "invalidDayCount": "egun kopuruak 1 eta 365 arteko zenbaki osoa izan behar du.",
+      "invalidDayCount": "Egun kopuruak 1 eta 365 arteko zenbaki osoa izan behar du.",
       "remediationDeadlineA11y": "Konponketa-epea egunetan, larritasuna: {{label}}",
       "enterWholeNumber": "Sartu 1etik 365era bitarteko zenbaki oso bat",
       "permissionNote": "Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik alda ditzakete ezarpen hauek.",

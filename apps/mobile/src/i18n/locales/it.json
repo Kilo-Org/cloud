@@ -1483,7 +1483,7 @@
       "enterWholeNumber": "Inserisci un numero intero compreso tra 1 e 365",
       "high": "Livello alto",
       "highDescription": "Possibile esposizione di dati con conseguenze gravi.",
-      "invalidDayCount": "inserisci un numero intero di giorni compreso tra 1 e 365.",
+      "invalidDayCount": "Inserisci un numero intero di giorni compreso tra 1 e 365.",
       "low": "Livello basso",
       "lowDescription": "Impatto minimo sulla sicurezza.",
       "medium": "Livello medio",

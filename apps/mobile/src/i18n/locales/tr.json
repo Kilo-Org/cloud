@@ -1501,7 +1501,7 @@
       "enterWholeNumber": "1 İle 365 arasında bir tam sayı gir",
       "high": "Yüksek",
       "highDescription": "Ciddi veri sızıntısına yol açabilir.",
-      "invalidDayCount": "gün sayısı 1 ile 365 arasında bir tam sayı olmalıdır.",
+      "invalidDayCount": "Gün sayısı 1 ile 365 arasında bir tam sayı olmalıdır.",
       "low": "Düşük",
       "lowDescription": "Güvenliğe etkisi çok düşüktür.",
       "medium": "Orta",

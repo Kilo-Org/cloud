@@ -1489,7 +1489,7 @@
       "enterWholeNumber": "Digite um número inteiro entre 1 e 365",
       "high": "Nível alto",
       "highDescription": "Possível exposição significativa de dados.",
-      "invalidDayCount": "informe um número inteiro de dias entre 1 e 365.",
+      "invalidDayCount": "Informe um número inteiro de dias entre 1 e 365.",
       "low": "Nível baixo",
       "lowDescription": "Impacto mínimo na segurança.",
       "medium": "Nível médio",
@@ -1616,7 +1616,7 @@
       "generic": "A ação na fila falhou. Tente novamente."
     },
     "analysisMode": {
-      "auto": "Automático",
+      "auto": "Automática",
       "shallow": "Superficial",
       "deep": "Profunda"
     }

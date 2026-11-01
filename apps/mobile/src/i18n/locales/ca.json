@@ -1951,7 +1951,7 @@
       "highDescription": "Possible exposició significativa de dades.",
       "mediumDescription": "Impacte limitat o condicions específiques.",
       "lowDescription": "Impacte mínim en la seguretat.",
-      "invalidDayCount": "el termini ha de ser d'entre 1 i 365 dies, en nombres enters.",
+      "invalidDayCount": "El termini ha de ser d'entre 1 i 365 dies, en nombres enters.",
       "remediationDeadlineA11y": "Termini de correcció en dies per a la gravetat {{label}}",
       "enterWholeNumber": "Introdueix un nombre enter entre 1 i 365",
       "permissionNote": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden canviar aquesta configuració.",
@@ -2189,9 +2189,9 @@
       "generic": "L'acció en cua ha fallat. Torna a executar-la."
     },
     "analysisMode": {
-      "auto": "Automàtic",
+      "auto": "Automàtica",
       "shallow": "Superficial",
-      "deep": "Profund"
+      "deep": "Profunda"
     }
   },
   "agents": {

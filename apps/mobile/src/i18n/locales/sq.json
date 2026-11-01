@@ -1919,7 +1919,7 @@
       "highDescription": "Rrezik për ekspozim të konsiderueshëm të të dhënave.",
       "mediumDescription": "Ndikim i kufizuar ose kushte specifike.",
       "lowDescription": "Ndikim minimal në siguri.",
-      "invalidDayCount": "shkruaj një numër të plotë ditësh nga 1 deri në 365.",
+      "invalidDayCount": "Shkruaj një numër të plotë ditësh nga 1 deri në 365.",
       "remediationDeadlineA11y": "Afati i korrigjimit në ditë për nivelin {{label}}",
       "enterWholeNumber": "Shkruaj një numër të plotë nga 1 deri në 365",
       "permissionNote": "Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund t'i ndryshojnë këto cilësime.",
@@ -2154,7 +2154,7 @@
       "generic": "Veprimi në radhë dështoi. Provoje përsëri veprimin."
     },
     "analysisMode": {
-      "auto": "Automatik",
+      "auto": "Automatike",
       "shallow": "Sipërfaqësore",
       "deep": "E thellë"
     }

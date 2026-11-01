@@ -1919,7 +1919,7 @@
       "highDescription": "Risiko for omfattende datalæk.",
       "mediumDescription": "Begrænset påvirkning eller krav om særlige betingelser.",
       "lowDescription": "Minimal påvirkning af sikkerheden.",
-      "invalidDayCount": "angiv 1–365 dage som et helt tal.",
+      "invalidDayCount": "Angiv 1–365 dage som et helt tal.",
       "remediationDeadlineA11y": "Frist for udbedring i dage ved {{label}} alvorlighed",
       "enterWholeNumber": "Indtast et helt tal mellem 1 og 365",
       "permissionNote": "Kun organisationsejere, administratorer og faktureringsansvarlige kan ændre disse indstillinger.",

@@ -1919,7 +1919,7 @@
       "highDescription": "Ciddi məlumat sızması ehtimalı.",
       "mediumDescription": "Məhdud təsir və ya xüsusi şərtlər.",
       "lowDescription": "Təhlükəsizliyə minimal təsir.",
-      "invalidDayCount": "gün sayını 1–365 aralığında tam ədədlə göstər.",
+      "invalidDayCount": "Gün sayını 1–365 aralığında tam ədədlə göstər.",
       "remediationDeadlineA11y": "{{label}} üçün düzəliş müddəti, günlə",
       "enterWholeNumber": "1-Dən 365-ə qədər tam ədəd daxil et",
       "permissionNote": "Bu parametrləri yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri dəyişə bilər.",

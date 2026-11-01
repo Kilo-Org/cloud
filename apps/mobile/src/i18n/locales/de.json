@@ -1501,7 +1501,7 @@
       "enterWholeNumber": "Gib eine ganze Zahl zwischen 1 und 365 ein",
       "high": "Hoch",
       "highDescription": "Erhebliches Risiko einer Offenlegung von Daten.",
-      "invalidDayCount": "gib eine ganze Zahl zwischen 1 und 365 Tagen ein.",
+      "invalidDayCount": "Gib eine ganze Zahl zwischen 1 und 365 Tagen ein.",
       "low": "Niedrig",
       "lowDescription": "Minimale Auswirkungen auf die Sicherheit.",
       "medium": "Mittel",

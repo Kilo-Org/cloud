@@ -1919,7 +1919,7 @@
       "highDescription": "Muhim ma'lumotlarning oshkor bo'lish xavfi.",
       "mediumDescription": "Cheklangan ta'sir yoki muayyan shartlar.",
       "lowDescription": "Xavfsizlikka juda kam ta'sir.",
-      "invalidDayCount": "kunlar soni 1 dan 365 gacha bo'lgan butun son bo'lishi kerak.",
+      "invalidDayCount": "Kunlar soni 1 dan 365 gacha bo'lgan butun son bo'lishi kerak.",
       "remediationDeadlineA11y": "{{label}} darajasidagi muammoni tuzatish muddati, kun hisobida",
       "enterWholeNumber": "1 Dan 365 gacha bo‘lgan butun sonni kiriting",
       "permissionNote": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari bu sozlamalarni o'zgartira oladi.",

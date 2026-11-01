@@ -2015,7 +2015,7 @@
       "highDescription": "Possibbiltà ta' espożizzjoni sinifikanti tad-dejta.",
       "mediumDescription": "Impatt limitat jew kundizzjonijiet speċifiċi.",
       "lowDescription": "Impatt minimu fuq is-sigurtà.",
-      "invalidDayCount": "daħħal minn 1 sa 365 jum, b'numri sħaħ biss.",
+      "invalidDayCount": "Daħħal minn 1 sa 365 jum, b'numri sħaħ biss.",
       "remediationDeadlineA11y": "Skadenza tar-rimedju għal {{label}}, f'jiem",
       "enterWholeNumber": "Daħħal numru sħiħ bejn 1 u 365",
       "permissionNote": "Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jibdlu dawn l-issettjarji.",

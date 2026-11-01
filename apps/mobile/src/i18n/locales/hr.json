@@ -1951,7 +1951,7 @@
       "highDescription": "Mogućnost otkrivanja znatne količine podataka.",
       "mediumDescription": "Ograničen utjecaj ili posebni uvjeti.",
       "lowDescription": "Minimalan utjecaj na sigurnost.",
-      "invalidDayCount": "broj dana mora biti cijeli broj od 1 do 365.",
+      "invalidDayCount": "Broj dana mora biti cijeli broj od 1 do 365.",
       "remediationDeadlineA11y": "Rok za sanaciju u danima, ozbiljnost: {{label}}",
       "enterWholeNumber": "Unesi cijeli broj od 1 do 365",
       "permissionNote": "Samo vlasnici organizacije, administratori i upravitelji naplate mogu promijeniti ove postavke.",

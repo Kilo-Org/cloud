@@ -1957,7 +1957,7 @@
       "highDescription": "Possível exposição significativa de dados.",
       "mediumDescription": "Impacto limitado ou condições específicas.",
       "lowDescription": "Impacto mínimo na segurança.",
-      "invalidDayCount": "o prazo tem de ser um número inteiro entre 1 e 365 dias.",
+      "invalidDayCount": "O prazo tem de ser um número inteiro entre 1 e 365 dias.",
       "remediationDeadlineA11y": "Prazo de correção para gravidade {{label}}, em dias",
       "enterWholeNumber": "Introduz um número inteiro entre 1 e 365",
       "permissionNote": "Apenas os proprietários da organização, os administradores e os gestores de faturação podem alterar estas definições.",

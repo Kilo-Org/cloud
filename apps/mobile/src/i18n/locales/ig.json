@@ -1919,7 +1919,7 @@
       "highDescription": "Enwere ike ikpughe data dị mkpa.",
       "mediumDescription": "Mmetụta dị ntakịrị ma ọ bụ ọnọdụ akọwapụtara.",
       "lowDescription": "Mmetụta nchebe pere mpe.",
-      "invalidDayCount": "tinye ụbọchị 1–365; jiri naanị ọnụọgụ zuru ezu.",
+      "invalidDayCount": "Tinye ụbọchị 1–365; jiri naanị ọnụọgụ zuru ezu.",
       "remediationDeadlineA11y": "Oge njedebe ndozi {{label}} n'ụbọchị",
       "enterWholeNumber": "Tinye ọnụọgụ zuru ezu n'etiti 1 na 365",
       "permissionNote": "Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ịgbanwe ntọala ndị a.",

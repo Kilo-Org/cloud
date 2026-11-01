@@ -1501,7 +1501,7 @@
       "enterWholeNumber": "Voer een geheel getal in tussen 1 en 365",
       "high": "Hoog",
       "highDescription": "Risico op een groot datalek.",
-      "invalidDayCount": "voer een geheel aantal dagen in tussen 1 en 365.",
+      "invalidDayCount": "Voer een geheel aantal dagen in tussen 1 en 365.",
       "low": "Laag",
       "lowDescription": "Minimale gevolgen voor de beveiliging.",
       "medium": "Gemiddeld",

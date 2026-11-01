@@ -1983,7 +1983,7 @@
       "highDescription": "Riziko závažného úniku dat.",
       "mediumDescription": "Omezený dopad nebo specifické podmínky.",
       "lowDescription": "Minimální dopad na bezpečnost.",
-      "invalidDayCount": "zadejte počet dní od 1 do 365 jako celé číslo.",
+      "invalidDayCount": "Zadejte počet dní od 1 do 365 jako celé číslo.",
       "remediationDeadlineA11y": "Lhůta pro nápravu ve dnech, závažnost: {{label}}",
       "enterWholeNumber": "Zadej celé číslo od 1 do 365",
       "permissionNote": "Tato nastavení mohou měnit pouze vlastníci organizace, správci a správci fakturace.",

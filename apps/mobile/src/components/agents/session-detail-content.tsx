@@ -132,7 +132,10 @@ import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agen
 import { useEffectiveProfileCustomModes } from '@/components/agents/use-effective-profile-custom-modes';
 import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
 import { profileOrganizationId } from '@/components/profiles/profile-owner-model';
-import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
+import {
+  SessionReadOnlyFooterPlaceholder,
+  SessionSkeletonMessages,
+} from '@/components/agents/session-detail-skeleton';
 import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import {
   SESSION_SLOW_LOAD_MS,
@@ -2000,8 +2003,24 @@ export function SessionDetailContent({
   // background/spacer: it hosts no controls, so it deliberately carries no
   // horizontal safe-area padding — the composer's own content clears the
   // landscape sensor insets.
-  const isComposerVisible = !hasBlockingInteraction && !isReadOnlyTranscript;
+  // The bottom slot belongs to the session, and while the open still has
+  // nothing to show and no state of its own has arrived, the session's own
+  // transport has not answered: `isReadOnly` is not knowable yet, so a composer
+  // there is a control the session may not have — and it is replaced by the
+  // read-only footer as soon as the transport says so. Reserve the footer's
+  // area for that window instead, so one state ends where the other begins. A
+  // failure, an agent status or a pending ask is the session speaking, and each
+  // keeps the composer it already has.
+  const isSessionStatePending =
+    shouldShowLoading &&
+    terminalError === null &&
+    activeQuestion === null &&
+    activePermission === null;
+  const isComposerVisible =
+    !hasBlockingInteraction && !isReadOnlyTranscript && !isSessionStatePending;
   const isReadOnlyContinueVisible = isReadOnlyTranscript && !hasBlockingInteraction;
+  const isReadOnlyFooterPlaceholderVisible =
+    isSessionStatePending && !hasBlockingInteraction && !isReadOnlyTranscript;
   // Structural locks only. The live send capability is passed separately so a
   // failed turn (or a session that has not resolved yet) keeps the input
   // editable beside the error's Retry instead of locking the composer.
@@ -2409,7 +2428,11 @@ export function SessionDetailContent({
           ) : (
             <View
               style={{ height: bottom }}
-              className={isReadOnlyContinueVisible ? 'bg-secondary' : 'bg-background'}
+              className={
+                isReadOnlyContinueVisible || isReadOnlyFooterPlaceholderVisible
+                  ? 'bg-secondary'
+                  : 'bg-background'
+              }
             />
           )}
 
@@ -2637,6 +2660,8 @@ export function SessionDetailContent({
           />
         ) : null}
 
+        {isReadOnlyFooterPlaceholderVisible ? <SessionReadOnlyFooterPlaceholder /> : null}
+
         {isReadOnlyContinueVisible ? (
           <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
             <Text className="text-center text-sm text-muted-foreground">
@@ -2653,7 +2678,7 @@ export function SessionDetailContent({
           </View>
         ) : null}
 
-        {isReadOnlyTranscript ? null : (
+        {isReadOnlyTranscript || isSessionStatePending ? null : (
           <View
             className={cn(hasBlockingInteraction && 'hidden')}
             accessibilityElementsHidden={hasBlockingInteraction}

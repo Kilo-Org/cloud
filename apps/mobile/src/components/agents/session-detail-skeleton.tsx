@@ -55,6 +55,24 @@ export function SessionSkeletonMessages({ sessionId }: Readonly<{ sessionId?: st
 }
 
 /**
+ * Holds the read-only footer's place while the session's transcript and
+ * transport are still resolving. Until the transport answers, the screen cannot
+ * know whether the bottom slot ends in the composer or in the read-only footer,
+ * so the loading state reserves the footer's area — a line and a button bar in
+ * the footer's own container — instead of offering a composer that a read-only
+ * session will not have. The footer then lands on its own geometry and the
+ * transcript never moves under it.
+ */
+export function SessionReadOnlyFooterPlaceholder() {
+  return (
+    <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
+      <Skeleton className="mx-auto h-[17.5px] w-40" />
+      <Skeleton className="h-[48px]" />
+    </View>
+  );
+}
+
+/**
  * Holds the composer's place while the session loads. Without it the composer
  * pops in on resolve and shoves the transcript up by its own height.
  * Geometry follows ChatComposer: a BlurBar wrapping the input row's

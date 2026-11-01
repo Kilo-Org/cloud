@@ -81,19 +81,19 @@ export type HeaderPillContent = {
   interactive: boolean;
   /**
    * Settled without usage: the accessibility label names usage as unavailable.
-   * Stays false while the session is still loading, when the pill is a bare
-   * placeholder. Never changes the visible pill: a session that settles without
-   * usage keeps the placeholder it showed while loading, so the header pill is
-   * the same in both states.
+   * Stays false while the session is still loading. Never changes the visible
+   * pill: the placeholder's value slots are the same dash-marked ones while the
+   * session resolves and after it settles without usage, so the header pill
+   * never changes shape late.
    */
   usageUnavailable: boolean;
 };
 
 /**
- * Mark the pill shows while the model's context window is unresolved: the slot
- * keeps a visible value instead of a ring that reads as zero percent. It never
- * stands in for usage that has not arrived — a session without usage keeps the
- * same label-free placeholder whether it is still resolving or has settled.
+ * Value-slot placeholder of a session that has not reported usage yet. It marks
+ * the slot as unfilled instead of standing in for a number: the pill keeps its
+ * two slots while the session resolves, so a settled pill fills the slots it
+ * already showed rather than growing a value out of a bare ring.
  */
 const UNKNOWN_WINDOW_LABEL = '—';
 
@@ -134,12 +134,26 @@ export function getHeaderPillContent({
   }
 
   const costText = hasMessages ? formatSessionTotalCost(totalCostMicrodollars) : null;
-  // Usage unknown. The pill keeps the placeholder it shows while the session
-  // resolves — the track-only ring and, when this screen already knows it, the
-  // session's cost — and never a dash standing in for a value that has not
-  // arrived; only the dash above, for usage without a context window, is a real
-  // value. A settled session therefore looks the same as a loading one instead
-  // of changing shape late.
+  // Nothing has reported usage yet. The pill keeps both value slots, each
+  // marked with the dash, instead of collapsing to a bare ring: the header then
+  // reads as the same pill before and after the transcript resolves, and a
+  // settled pill fills the slots it already had. Neither dash stands in for a
+  // value that has arrived.
+  if (!hasMessages) {
+    return {
+      primary: UNKNOWN_WINDOW_LABEL,
+      secondary: UNKNOWN_WINDOW_LABEL,
+      hasCost: true,
+      tone: 'neutral',
+      arcFraction: 0,
+      interactive: false,
+      usageUnavailable: !loading,
+    };
+  }
+  // A transcript without usage. The pill keeps the track-only ring and, when
+  // this screen already knows it, the session's cost, and never a dash standing
+  // in for a value that has not arrived; only the dash above, for usage without
+  // a context window, is a real value.
   return {
     primary: costText,
     secondary: null,

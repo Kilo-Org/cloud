@@ -57,7 +57,10 @@ import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-ren
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { formatSessionTotalCost } from '@/components/agents/session-list-helpers';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
-import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
+import {
+  SessionReadOnlyFooterPlaceholder,
+  SessionSkeletonMessages,
+} from '@/components/agents/session-detail-skeleton';
 import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import type * as SessionTranscript from '@/components/agents/session-transcript';
@@ -324,6 +327,7 @@ vi.mock('@/components/agents/session-status-indicator', () => ({
 }));
 vi.mock('@/components/agents/session-detail-skeleton', () => ({
   SessionSkeletonMessages: 'SessionSkeletonMessages',
+  SessionReadOnlyFooterPlaceholder: 'SessionReadOnlyFooterPlaceholder',
 }));
 vi.mock('@/components/agents/transcript-time-marker', () => ({
   TranscriptTimeMarker: 'TranscriptTimeMarker',
@@ -2087,6 +2091,31 @@ describe('session detail slow load', () => {
       typeof QueryError
     >;
     expect(error.title).toBe(i18n.t('agentChat.session.couldNotLoadThisSession'));
+  });
+
+  it('holds the read-only footer area, not a composer, while the open has nothing to show', async () => {
+    const view = await mountDetails(null);
+    // The skeleton owns the body and the session's transport has not answered:
+    // no composer, and the footer's area is held instead.
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(1);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+
+    // The read-only footer takes the held area, so the transcript never moves
+    // under it when the transport turns out to have no writer.
+    await view.respond(ROOT_ID, [childMessage(ROOT_ID, 'read-only row')]);
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      view.store.set(view.manager.atoms.isReadOnly, true);
+    });
+    expect(renderedText(view.renderer.root)).toContain('read-only row');
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain(i18n.t('agentChat.session.readOnly'));
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
   });
 
   it('resolves an exhausted app-wide leg into the same retryable error', async () => {

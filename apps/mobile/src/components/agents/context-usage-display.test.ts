@@ -50,19 +50,25 @@ const trackOnly: HeaderPillContent = {
   tone: 'neutral',
   arcFraction: 0,
   interactive: false,
-  usageUnavailable: false,
+  usageUnavailable: true,
 };
 
-/** Settled without any usage: the same label-free placeholder, named in a11y. */
-const settledWithoutUsage: HeaderPillContent = {
-  primary: null,
-  secondary: null,
-  hasCost: false,
+/** A transcript without usage: the same ring, no dash slot. */
+const trackOnlyWhileLoading: HeaderPillContent = { ...trackOnly, usageUnavailable: false };
+
+/** No usage reported yet: both value slots stay open, each marked with a dash. */
+const unreported: HeaderPillContent = {
+  primary: '—',
+  secondary: '—',
+  hasCost: true,
   tone: 'neutral',
   arcFraction: 0,
   interactive: false,
   usageUnavailable: true,
 };
+
+/** The same slots while the session still resolves, before a11y names it. */
+const unreportedWhileLoading: HeaderPillContent = { ...unreported, usageUnavailable: false };
 
 describe('formatExactTokens', () => {
   it('uses grouped digit formatting', () => {
@@ -142,20 +148,18 @@ describe('formatRemainingTokens', () => {
 });
 
 describe('getHeaderPillContent', () => {
-  it('keeps the label-free placeholder, non-interactive, with no info and no transcript', () => {
-    expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false })).toEqual(
-      settledWithoutUsage
-    );
-    expect(pill({ totalCostMicrodollars: 0, hasMessages: false })).toEqual(settledWithoutUsage);
-    expect(pill({ totalCostMicrodollars: null, hasMessages: false })).toEqual(settledWithoutUsage);
+  it('keeps both value slots open, non-interactive, with no info and no transcript', () => {
+    expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false })).toEqual(unreported);
+    expect(pill({ totalCostMicrodollars: 0, hasMessages: false })).toEqual(unreported);
+    expect(pill({ totalCostMicrodollars: null, hasMessages: false })).toEqual(unreported);
   });
 
-  it('keeps the loading placeholder label-free before the session resolves', () => {
+  it('keeps the same dash-marked slots while the session resolves', () => {
     expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false, loading: true })).toEqual(
-      trackOnly
+      unreportedWhileLoading
     );
     expect(pill({ totalCostMicrodollars: null, hasMessages: false, loading: true })).toEqual(
-      trackOnly
+      unreportedWhileLoading
     );
   });
 
@@ -260,16 +264,16 @@ describe('getHeaderPillContent', () => {
     });
   });
 
-  it('keeps the label-free placeholder when a transcript exists without cost', () => {
-    expect(pill({ totalCostMicrodollars: null, hasMessages: true })).toEqual(settledWithoutUsage);
-    expect(pill({ totalCostMicrodollars: 0, hasMessages: true })).toEqual(settledWithoutUsage);
+  it('keeps the plain ring when a transcript exists without cost', () => {
+    expect(pill({ totalCostMicrodollars: null, hasMessages: true })).toEqual(trackOnly);
+    expect(pill({ totalCostMicrodollars: 0, hasMessages: true })).toEqual(trackOnly);
     expect(pill({ totalCostMicrodollars: null, hasMessages: true, loading: true })).toEqual(
-      trackOnly
+      trackOnlyWhileLoading
     );
   });
 
   it('never surfaces a bare cost before a transcript exists', () => {
-    expect(pill({ totalCostMicrodollars: 700, hasMessages: false })).toEqual(settledWithoutUsage);
+    expect(pill({ totalCostMicrodollars: 700, hasMessages: false })).toEqual(unreported);
   });
 });
 

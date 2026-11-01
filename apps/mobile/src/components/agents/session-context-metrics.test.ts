@@ -279,8 +279,8 @@ describe('SessionContextMetrics', () => {
     expect(
       (root.props as { accessibilityElementsHidden?: boolean }).accessibilityElementsHidden
     ).toBeUndefined();
-    // The settled pill is the same shape the loading one shows: no label, never
-    // a dash standing in for a value that has not arrived.
+    // A transcript that reports neither usage nor cost keeps the ring alone:
+    // there is no unresolved value to hold a slot for.
     expect(findAll(root, el => el.type === 'Text')).toHaveLength(0);
     const ring = findAll(root, el => el.type === 'ContextUsageRing')[0];
     expect(ring).toBeDefined();
@@ -290,43 +290,41 @@ describe('SessionContextMetrics', () => {
     expect((ring.props as { arcFraction?: number }).arcFraction).toBe(0);
   });
 
-  // A session whose transcript failed to load (no usage, no messages, loading
-  // finished) keeps the loading placeholder rather than changing shape late;
-  // the accessibility label is what names usage as unavailable.
-  it('load-error session keeps the placeholder ring and names usage unavailable', () => {
+  // A session that reports no usage yet — a stalled open and a load failure
+  // alike — keeps both value slots instead of a bare ring, so the pill never
+  // changes shape late; only the accessibility label names usage unavailable.
+  it('holds the dash slots over the bare ring, naming usage unavailable once settled', () => {
+    const dashes = (root: React.ReactElement) =>
+      findAll(root, el => el.type === 'Text').filter(el => {
+        const children = (el.props as { children?: unknown }).children;
+        return children === '—';
+      });
     const onPress = vi.fn<() => void>();
-    const root = render({
+
+    const settled = render({
       info: undefined,
       totalCostMicrodollars: null,
       hasMessages: false,
       onPress,
     });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as {
-      accessibilityLabel?: string;
-      className?: string;
-    };
+    const props = settled.props as { accessibilityLabel?: string; className?: string };
     expect(props.accessibilityLabel).toContain('usage unavailable');
     expect(props.accessibilityLabel).toContain('Tap to view context details.');
     expect(props.className ?? '').not.toContain('opacity-0');
     for (const token of PILL_LAYOUT_TOKENS) {
       expect(props.className ?? '').toContain(token);
     }
-    expect(findAll(root, el => el.type === 'Text')).toHaveLength(0);
-  });
+    expect(dashes(settled)).toHaveLength(2);
 
-  it('loading pill keeps the placeholder body without a label', () => {
-    const onPress = vi.fn<() => void>();
-    const root = render({
+    const loading = render({
       info: undefined,
       totalCostMicrodollars: null,
       hasMessages: false,
       loading: true,
       onPress,
     });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as { accessibilityLabel?: string };
-    expect(props.accessibilityLabel).not.toContain('usage unavailable');
-    expect(findAll(root, el => el.type === 'Text')).toHaveLength(0);
+    const loadingProps = loading.props as { accessibilityLabel?: string };
+    expect(loadingProps.accessibilityLabel).not.toContain('usage unavailable');
+    expect(dashes(loading)).toHaveLength(2);
   });
 });

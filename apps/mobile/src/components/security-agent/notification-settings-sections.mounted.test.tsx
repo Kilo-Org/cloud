@@ -127,16 +127,30 @@ function mount(scope: string): TestRenderer.ReactTestRenderer {
   return renderer;
 }
 
+/**
+ * The section headings the tree paints, in order. A switch's accessible label
+ * is composed from the same strings on separate lines, so it cannot stand in
+ * for the heading itself.
+ */
+function sectionHeadings(screen: TestRenderer.ReactTestRenderer): string[] {
+  const sectionKeys = new Set([
+    i18n.t('securityAgent.notifications.newFindingSection'),
+    i18n.t('securityAgent.notifications.slaSection'),
+  ]);
+  return screen.root
+    .findAllByType('Text')
+    .map(node => node.props.children)
+    .filter((child): child is string => typeof child === 'string' && sectionKeys.has(child));
+}
+
 describe('personal scope', () => {
   it('titles each switch after its notification and shows no section heading', () => {
-    const copy = mount(PERSONAL_SCOPE)
-      .root.findAllByType('Text')
-      .map(node => node.props.children);
+    const screen = mount(PERSONAL_SCOPE);
+    const copy = screen.root.findAllByType('Text').map(node => node.props.children);
 
     expect(copy).toContain(i18n.t('securityAgent.notifications.newFindingPersonalTitle'));
     expect(copy).toContain(i18n.t('securityAgent.notifications.slaPersonalTitle'));
-    expect(copy).not.toContain(i18n.t('securityAgent.notifications.newFindingSection'));
-    expect(copy).not.toContain(i18n.t('securityAgent.notifications.slaSection'));
+    expect(sectionHeadings(screen)).toEqual([]);
   });
 
   it('separates the two switch groups by a break wider than the steps inside one', () => {
@@ -150,14 +164,17 @@ describe('personal scope', () => {
 
 describe('organization scope', () => {
   it('heads each switch with its notification section, because both read the same recipient', () => {
-    const names = mount(ORGANIZATION_SCOPE)
-      .root.findAllByType('Switch')
-      .map(node => node.props.accessibilityLabel);
+    const screen = mount(ORGANIZATION_SCOPE);
+    const names = screen.root.findAllByType('Switch').map(node => node.props.accessibilityLabel);
 
     expect(names).toHaveLength(2);
     expect(names[0]).toContain(i18n.t('securityAgent.notifications.newFindingSection'));
     expect(names[1]).toContain(i18n.t('securityAgent.notifications.slaSection'));
     expect(names[1]).not.toContain(i18n.t('securityAgent.notifications.newFindingSection'));
+    expect(sectionHeadings(screen)).toEqual([
+      i18n.t('securityAgent.notifications.newFindingSection'),
+      i18n.t('securityAgent.notifications.slaSection'),
+    ]);
   });
 
   it('keeps the standard group gap, next to its headings', () => {

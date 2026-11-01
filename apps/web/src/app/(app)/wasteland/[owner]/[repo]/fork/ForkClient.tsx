@@ -27,6 +27,7 @@ import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import type { WastelandOutputs } from '@/lib/wasteland/trpc';
+import { repoPathWithQuery } from '@/lib/wasteland/repo-links';
 import { useWastelandRepo } from '../_components/WastelandRepoContext';
 import { useDrawerStack } from '@/components/wasteland/drawer/WastelandDrawerStack';
 import {
@@ -163,7 +164,7 @@ export function ForkClient() {
   const [closeItem, setCloseItem] = useState<WantedItem | null>(null);
   const [unclaimItem, setUnclaimItem] = useState<WantedItem | null>(null);
 
-  const upstreamPath = `/wasteland/${repo.owner}/${repo.repo}`;
+  const upstreamPath = repoPathWithQuery(repo.owner, repo.repo, searchParams.toString());
 
   const autoOpenedWantedIdRef = useRef<string | null>(null);
   const drawerActions = {

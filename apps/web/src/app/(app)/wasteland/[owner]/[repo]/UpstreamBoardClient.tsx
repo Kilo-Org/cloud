@@ -1,6 +1,8 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { WantedBoardClient } from '@/app/(app)/wasteland/by-id/[wastelandId]/wanted/WantedBoardClient';
+import { repoPathWithQuery } from '@/lib/wasteland/repo-links';
 import { useWastelandRepo } from './_components/WastelandRepoContext';
 
 /**
@@ -9,11 +11,14 @@ import { useWastelandRepo } from './_components/WastelandRepoContext';
  * affordance ("Take to my workshop") that deep-links into the fork view.
  *
  * Reads the resolved `wastelandId` out of `WastelandRepoContext`, which
- * the layout populates after `wasteland.resolveOwnerRepo`.
+ * the layout populates after `wasteland.resolveOwnerRepo`. The current
+ * query string (for example the `wastelandId` of a selected wasteland)
+ * is part of the base path, so the hand-off keeps it.
  */
 export function UpstreamBoardClient() {
   const repo = useWastelandRepo();
-  const basePath = `/wasteland/${repo.owner}/${repo.repo}`;
+  const searchParams = useSearchParams();
+  const basePath = repoPathWithQuery(repo.owner, repo.repo, searchParams.toString());
 
   return (
     <div className="flex h-full flex-col">

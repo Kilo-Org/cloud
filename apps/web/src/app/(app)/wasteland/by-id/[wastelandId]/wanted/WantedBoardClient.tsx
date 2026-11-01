@@ -32,6 +32,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { AnimatePresence, motion } from 'motion/react';
 import { toast } from 'sonner';
 import { lastActivityMs, parseDoltDate } from '@/lib/wasteland/date';
+import { forkItemHref } from '@/lib/wasteland/repo-links';
 
 type WantedItem = WastelandOutputs['wasteland']['browseWantedBoard'][number];
 type WantedBoardCounts = WastelandOutputs['wasteland']['getWantedBoardCounts'];
@@ -434,7 +435,7 @@ export function WantedBoardClient({
             },
         links:
           isUpstream && workshopBasePath
-            ? { workshopHref: `${workshopBasePath}/fork?wantedId=${encodeURIComponent(item.id)}` }
+            ? { workshopHref: forkItemHref(workshopBasePath, item.id) }
             : undefined,
         // Default-tab selection: the upstream view opens on Upstream
         // (read-only), the legacy fork view opens on My branch so the
@@ -624,7 +625,7 @@ export function WantedBoardClient({
                   </span>
                   {isUpstream && workshopBasePath && (
                     <Link
-                      href={`${workshopBasePath}/fork?wantedId=${encodeURIComponent(item.id)}`}
+                      href={forkItemHref(workshopBasePath, item.id)}
                       onClick={e => e.stopPropagation()}
                       className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[10px] font-medium text-white/55 opacity-0 transition-all group-hover:opacity-100 hover:bg-white/[0.06] hover:text-white/85 focus-visible:opacity-100"
                     >

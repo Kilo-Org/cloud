@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Enweghị nyocha ọhụrụ",
       "noRecentPrsDescription": "Mado njikọ n'elu iji malite nyocha — ọ ga-apụta ebe a oge ọzọ.",
-      "couldNotLoad": "Enweghị ike ibudata.",
       "removeFromRecentsTitle": "Wepụ na ndepụta ndị elelere nso nso a?",
       "removeFromRecentsMessage": "A ga-ewepụ nyocha a na nyocha ndị ị rụrụ n'oge na-adịbeghị anya.",
       "removeRecentAccessibility": "Wepụ {{repo}} na ndepụta ndị elelere nso nso a",
@@ -834,7 +833,8 @@
     "liveUpdates": "Mmelite ozugbo",
     "liveUpdateSubtitle": "Gosi ndị nnọchi anya na-arụ ọrụ n'ọkwa gị",
     "push": "Ọkwa ozugbo",
-    "onDescription": "Agbanyela ọkwa ozugbo maka ngwaọrụ a.",
+    "deviceTitle": "Ọkwa ozugbo na ngwaọrụ a",
+    "onDescription": "Ịdọ aka na ntị na-agbaso ụdị dị n'okpuru.",
     "offDescription": "Enyeghị ikike ma ọ bụ agbanyụrụ ndebanye aha ngwaọrụ.",
     "retryPermission": "Nwaa ịlele ikike ọkwa ọzọ",
     "enable": "Gbanye ọkwa",
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Ogo njọ: elu ruo ala",
       "sortSeverityAsc": "Ogo njọ: ala ruo elu",
       "sortSlaDue": "Ụbọchị njedebe SLA",
-      "overdueOnly": "Naanị ihe gafere oge"
+      "overdueOnly": "Naanị ihe gafere oge",
+      "noRepositories": "Enwebeghị ndebe koodu ọ bụla ejikọrọ ma ọ bụ họpụtara. Họrọ ha na ntọala Onye enyemaka nchebe."
     },
     "automation": {
       "title": "Ịrụ ọrụ na-akpaghị aka",
@@ -1841,7 +1842,8 @@
     "findingDetails": {
       "supersededBy": "Ihe achọpụtara ọhụrụ nọchiri ya",
       "supersededByDescription": "Pịa ka ị mepee ndekọ nke ugbu a maka ọnọdụ, nyocha na ndozi.",
-      "dismissedBecause": "Ihe kpatara mwepụ: {{reason}}.",
+      "dismissedOn": "Ụbọchị elegharala anya",
+      "supersededOn": "Ụbọchị edochiri",
       "severityLabel": "Ogo njọ: {{severity}}",
       "package": "Ngwugwu",
       "vulnerableVersions": "Ụdị nwere oghere nchebe",
@@ -1858,11 +1860,6 @@
       "viewAdvisory": "Lee ọkwa nchebe na GitHub",
       "statusOpen": "Meghe",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "amalitelarị ndozi",
-      "reasonNoBandwidth": "enweghị oge ma ọ bụ ndị ọrụ",
-      "reasonTolerableRisk": "enwere ike ịnabata ihe ize ndụ ahụ",
-      "reasonInaccurate": "ihe achọpụtara ezighi ezi",
-      "reasonNotUsed": "anaghị eji koodu nwere adịghị ike",
       "reasonAfterReview": "mgbe nyochachara"
     },
     "settingsOverview": {
@@ -1922,7 +1919,7 @@
       "highDescription": "Enwere ike ikpughe data dị mkpa.",
       "mediumDescription": "Mmetụta dị ntakịrị ma ọ bụ ọnọdụ akọwapụtara.",
       "lowDescription": "Mmetụta nchebe pere mpe.",
-      "invalidDayCount": "tinye ụbọchị 1–365; jiri naanị ọnụọgụ zuru ezu.",
+      "invalidDayCount": "Tinye ụbọchị 1–365; jiri naanị ọnụọgụ zuru ezu.",
       "remediationDeadlineA11y": "Oge njedebe ndozi {{label}} n'ụbọchị",
       "enterWholeNumber": "Tinye ọnụọgụ zuru ezu n'etiti 1 na 365",
       "permissionNote": "Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ịgbanwe ntọala ndị a.",
@@ -2062,7 +2059,10 @@
       "settleFailed": "Emechara omume a, mana anyị enweghị ike dekọọ nsonaazụ ya. Biko nwaa ọzọ.",
       "replayFailed": "Omume a emechaghị. Biko nwaa ọzọ.",
       "actionFailed": "Enweghị ike imecha omume a. Biko nwaa ọzọ.",
-      "actionBlocked": "Enweghị ike imecha omume a. A ghaghị idozi nsogbu a tupu ị nwee ike ịnwa ọzọ."
+      "actionBlocked": "Enweghị ike imecha omume a. A ghaghị idozi nsogbu a tupu ị nwee ike ịnwa ọzọ.",
+      "syncNoRepositories": "Ọnweghị repository dị n'ime oke sync. Họrọ repositories ndị Onye enyemaka nchebe na-enyocha, wee sync ọzọ.",
+      "syncIntegrationInactive": "Njikọ GitHub maka Onye enyemaka nchebe adịghị arụ ọrụ. Jikọọ Kilo GitHub App ọzọ, wee megharịa ọzọ.",
+      "syncMissingPermission": "Kilo GitHub App enweghị ike ịgụ vulnerability alerts. Nye ikike ahụ na GitHub, wee sync ọzọ."
     },
     "analysisState": {
       "queued": "Nyocha dị n'ahịrị",
@@ -2096,7 +2096,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Edebeghị oge njedebe",
       "noSlaDeadline": "Enweghị oge njedebe SLA",
-      "dueOn": "Oge njedebe: {{date}}",
       "overdueNow": "Gafere oge",
       "overdue_other": "Oge gafere ụbọchị {{count}}",
       "dueToday": "Oge ga-eru taa",
@@ -3848,6 +3847,7 @@
       "markSecret": "Kaa akara dị ka nzuzo",
       "masked": "Uru zoro ezo",
       "reveal": "Gosi uru",
+      "hide": "Zoo uru",
       "newValuePlaceholder": "Tinye uru nzuzo ọhụrụ",
       "valuePlaceholder": "Uru nzuzo (ezoro ezo)"
     },

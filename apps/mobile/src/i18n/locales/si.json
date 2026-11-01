@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "මෑත සමාලෝචන නොමැත",
       "noRecentPrsDescription": "සමාලෝචනයක් අරඹන්න ඉහත සබැඳියක් අලවා — ඊළඟ වරට මෙතැනින් පෙනේ.",
-      "couldNotLoad": "පූරණය කිරීමට නොහැකි විය.",
       "removeFromRecentsTitle": "මෑත ඉල්ලීම් ලැයිස්තුවෙන් ඉවත් කරන්නද?",
       "removeFromRecentsMessage": "මෙම සමාලෝචනය ඔබේ මෑත සමාලෝචන ලැයිස්තුවෙන් ඉවත් කෙරේ.",
       "removeRecentAccessibility": "මෑත ඉල්ලීම් ලැයිස්තුවෙන් {{repo}} ඉවත් කරන්න",
@@ -834,7 +833,8 @@
     "liveUpdates": "සජීවී යාවත්කාලීන",
     "liveUpdateSubtitle": "ඔබේ දැනුම්දීම්වල සක්‍රීය නියෝජිතයන් පෙන්වන්න",
     "push": "පුෂ් දැනුම්දීම්",
-    "onDescription": "මෙම උපාංගයේ පුෂ් දැනුම්දීම් සක්‍රීයයි.",
+    "deviceTitle": "මෙම උපාංගයේ පුෂ් දැනුම්දීම්",
+    "onDescription": "දැනුම්දීම් පහත වර්ග අනුව පැමිණේ.",
     "offDescription": "අවසරය හෝ උපාංග ලියාපදිංචිය අක්‍රීයයි.",
     "retryPermission": "දැනුම්දීම් අවසරය පරීක්ෂා කිරීමට නැවත උත්සාහ කරන්න",
     "enable": "දැනුම්දීම් සක්‍රීය කරන්න",
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "බරපතළකම: ඉහළ සිට පහළට",
       "sortSeverityAsc": "බරපතළකම: පහළ සිට ඉහළට",
       "sortSlaDue": "SLA නියමිත දිනය",
-      "overdueOnly": "ප්‍රමාද වූ ඒවා පමණි"
+      "overdueOnly": "ප්‍රමාද වූ ඒවා පමණි",
+      "noRepositories": "තවම කිසිදු ගබඩාවක් සමමුහුර්ත කර හෝ තෝරා නැත. ඒවා ආරක්ෂක නියෝජිතයාගේ සැකසීම් තුළ තෝරන්න."
     },
     "automation": {
       "title": "ස්වයංක්‍රීයකරණය",
@@ -1847,7 +1848,8 @@
     "findingDetails": {
       "supersededBy": "නව සොයාගැනීමකින් ප්‍රතිස්ථාපනය කර ඇත",
       "supersededByDescription": "තත්ත්වය, විශ්ලේෂණය සහ පිළියම් යෙදීම පිළිබඳ විස්තර බැලීමට වත්මන් වාර්තාව තට්ටු කර විවෘත කරන්න.",
-      "dismissedBecause": "ඉවතලා ඇත්තේ {{reason}} නිසාය.",
+      "dismissedOn": "ඉවතලා ඇති දිනය",
+      "supersededOn": "ප්‍රතිස්ථාපනය වී ඇති දිනය",
       "severityLabel": "බරපතළකම: {{severity}}",
       "package": "පැකේජය",
       "vulnerableVersions": "දුර්වලතා සහිත අනුවාද",
@@ -1864,11 +1866,6 @@
       "viewAdvisory": "GitHub හි ආරක්ෂක නිවේදනය බලන්න",
       "statusOpen": "විවෘත",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "නිවැරදි කිරීමක් දැනටමත් ආරම්භ වී ඇත",
-      "reasonNoBandwidth": "කාලය හෝ සම්පත් නැත",
-      "reasonTolerableRisk": "අවදානම පිළිගත හැකිය",
-      "reasonInaccurate": "හඳුනාගත් ගැටලුව නිවැරදි නොවේ",
-      "reasonNotUsed": "අනාරක්ෂිත කේතය භාවිත නොවේ",
       "reasonAfterReview": "සමාලෝචනයෙන් පසුව"
     },
     "settingsOverview": {
@@ -2068,7 +2065,10 @@
       "settleFailed": "ක්‍රියාව සම්පූර්ණ විය, නමුත් අපට ප්‍රතිඵලය සටහන් කිරීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
       "replayFailed": "මෙම ක්‍රියාව සම්පූර්ණ නොවිය. කරුණාකර නැවත උත්සාහ කරන්න.",
       "actionFailed": "මෙම ක්‍රියාව සම්පූර්ණ කිරීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
-      "actionBlocked": "මෙම ක්‍රියාව සම්පූර්ණ කිරීමට නොහැකි විය. නැවත උත්සාහ කිරීමට පෙර මෙම ගැටලුව විසඳිය යුතුය."
+      "actionBlocked": "මෙම ක්‍රියාව සම්පූර්ණ කිරීමට නොහැකි විය. නැවත උත්සාහ කිරීමට පෙර මෙම ගැටලුව විසඳිය යුතුය.",
+      "syncNoRepositories": "සමමුහුර්ත පරාසයේ රෙපොසිටරි නොමැත. ආරක්ෂක නියෝජිතයා නිරීක්ෂණය කරන රෙපොසිටරි තෝරන්න, පසුව නැවත සමමුහුර්ත කරන්න.",
+      "syncIntegrationInactive": "ආරක්ෂක නියෝජිතයා සඳහා GitHub සම්බන්ධතාව ක්‍රියාකාරී නොවේ. Kilo GitHub App නැවත සම්බන්ධ කර, පසුව නැවත සමමුහුර්ත කරන්න.",
+      "syncMissingPermission": "Kilo GitHub App විසින් vulnerability alerts කියවිය නොහැක. GitHub තුළ එම අවසරය ලබා දී, නැවත සමමුහුර්ත කරන්න."
     },
     "analysisState": {
       "queued": "විශ්ලේෂණය පෝලිමේ ඇත",
@@ -2102,7 +2102,6 @@
       "closedOn": "{{date}} දින {{status}}",
       "deadlineNotSet": "නියමිත කාලය සකසා නොමැත",
       "noSlaDeadline": "SLA අවසන් දිනයක් නැත",
-      "dueOn": "{{date}} දින නියමිතයි",
       "overdueNow": "ප්‍රමාදයි",
       "dueToday": "අද නියමිතයි",
       "dueTomorrow": "හෙට නියමිතයි",
@@ -3854,6 +3853,7 @@
       "markSecret": "රහසක් ලෙස සලකුණු කරන්න",
       "masked": "සැඟවුණු අගය",
       "reveal": "වටිනාකම හෙළි කරන්න",
+      "hide": "වටිනාකම සඟවන්න",
       "newValuePlaceholder": "නව රහස් අගයක් ඇතුළත් කරන්න",
       "valuePlaceholder": "රහස් අගය (සංකේතනය කළ)"
     },

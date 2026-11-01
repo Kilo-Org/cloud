@@ -2,7 +2,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as Notifications from 'expo-notifications';
 
-import { NEEDS_INPUT_ACTION_IDS, needsInputCategoryDescriptors } from '@kilocode/notifications';
+import {
+  NEEDS_INPUT_ACTION_IDS,
+  needsInputCategoryDescriptors,
+} from '@kilocode/notifications/schemas';
 
 import {
   _resetDeepLinkLaunchForTests,

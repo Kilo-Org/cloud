@@ -638,7 +638,6 @@
     "entry": {
       "noRecentPrs": "L-ebda reviżjoni riċenti",
       "noRecentPrsDescription": "Waħħal ħolqa hawn fuq biex tibda reviżjoni — id-darba li jmiss tidher hawn.",
-      "couldNotLoad": "Ma setax jitgħabba l-kontenut.",
       "removeFromRecentsTitle": "Trid tneħħiha mir-riċenti?",
       "removeFromRecentsMessage": "Din ir-reviżjoni se titneħħa mil-lista tar-riċenti tiegħek.",
       "removeRecentAccessibility": "Neħħi {{repo}} mir-riċenti",
@@ -891,7 +890,8 @@
     "liveUpdates": "Aġġornamenti f'ħin reali",
     "liveUpdateSubtitle": "Uri l-aġenti attivi fin-notifiki tiegħek",
     "push": "Notifiki awtomatiċi",
-    "onDescription": "In-notifiki awtomatiċi huma attivati għal dan l-apparat.",
+    "deviceTitle": "Push fuq dan l-apparat",
+    "onDescription": "It-twissijiet isegwu l-kategoriji hawn taħt.",
     "offDescription": "Il-permess jew ir-reġistrazzjoni tal-apparat mhumiex attivati.",
     "retryPermission": "Erġa' pprova tiċċekkja l-permess tan-notifiki",
     "enable": "Attiva n-notifiki",
@@ -1746,7 +1746,8 @@
       "sortSeverityDesc": "Severità: mill-ogħla għall-inqas",
       "sortSeverityAsc": "Severità: mill-inqas għall-ogħla",
       "sortSlaDue": "Data ta' skadenza tas-SLA",
-      "overdueOnly": "Skaduti biss"
+      "overdueOnly": "Skaduti biss",
+      "noRepositories": "Bħalissa m'hemm l-ebda repożitorju sinkronizzat jew magħżul. Agħżelhom fl-issettjar tal-Aġent tas-sigurtà."
     },
     "automation": {
       "title": "Awtomazzjoni",
@@ -1934,7 +1935,8 @@
     "findingDetails": {
       "supersededBy": "Sostitwita minn sejba attwali",
       "supersededByDescription": "Tektek biex tiftaħ ir-rekord attwali u tara l-istat, l-analiżi u r-rimedju.",
-      "dismissedBecause": "Is-sejba twarrbet minħabba {{reason}}.",
+      "dismissedOn": "Imwarrba fi",
+      "supersededOn": "Sostitwita fi",
       "severityLabel": "Severità {{severity}}",
       "package": "Pakkett",
       "vulnerableVersions": "Verżjonijiet vulnerabbli",
@@ -1951,11 +1953,6 @@
       "viewAdvisory": "Ara l-avviż fuq GitHub",
       "statusOpen": "Miftuħa",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "it-tiswija diġà bdiet",
-      "reasonNoBandwidth": "m'hemmx riżorsi disponibbli",
-      "reasonTolerableRisk": "ir-riskju huwa tollerabbli",
-      "reasonInaccurate": "is-sejba mhix preċiża",
-      "reasonNotUsed": "il-kodiċi vulnerabbli ma jintużax",
       "reasonAfterReview": "wara r-reviżjoni"
     },
     "settingsOverview": {
@@ -2018,7 +2015,7 @@
       "highDescription": "Possibbiltà ta' espożizzjoni sinifikanti tad-dejta.",
       "mediumDescription": "Impatt limitat jew kundizzjonijiet speċifiċi.",
       "lowDescription": "Impatt minimu fuq is-sigurtà.",
-      "invalidDayCount": "daħħal minn 1 sa 365 jum, b'numri sħaħ biss.",
+      "invalidDayCount": "Daħħal minn 1 sa 365 jum, b'numri sħaħ biss.",
       "remediationDeadlineA11y": "Skadenza tar-rimedju għal {{label}}, f'jiem",
       "enterWholeNumber": "Daħħal numru sħiħ bejn 1 u 365",
       "permissionNote": "Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jibdlu dawn l-issettjarji.",
@@ -2161,7 +2158,10 @@
       "settleFailed": "L-azzjoni tlestiet, imma ma stajniex nirreġistraw ir-riżultat. Jekk jogħġbok erġa' pprova.",
       "replayFailed": "Din l-azzjoni ma tlestietx. Jekk jogħġbok erġa' pprova.",
       "actionFailed": "Ma stajniex nikkompletaw din l-azzjoni. Jekk jogħġbok erġa' pprova.",
-      "actionBlocked": "Ma stajniex nikkompletaw din l-azzjoni. Il-problema trid titfixxa qabel ma tista' terġa' tipprova."
+      "actionBlocked": "Ma stajniex nikkompletaw din l-azzjoni. Il-problema trid titfixxa qabel ma tista' terġa' tipprova.",
+      "syncNoRepositories": "M'hemm l-ebda repożitorju fl-ambitu tas-sinkronizzazzjoni. Agħżel ir-repożitorji li jimmonitorja l-Aġent tas-sigurtà, imbagħad erġa' sinkronizza.",
+      "syncIntegrationInactive": "Il-konnessjoni ma' GitHub għall-Aġent tas-sigurtà mhijiex attiva. Erġa' qabbad il-Kilo GitHub App, imbagħad erġa' sinkronizza.",
+      "syncMissingPermission": "L-app ta' Kilo fuq GitHub ma tistax taqra l-vulnerability alerts. Agħti dik il-permess f'GitHub, imbagħad erġa' sinkronizza."
     },
     "analysisState": {
       "queued": "Analiżi fil-kju",
@@ -2195,7 +2195,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Skadenza mhux issettjata",
       "noSlaDeadline": "L-ebda skadenza tas-SLA",
-      "dueOn": "Skadenza: {{date}}",
       "overdueNow": "Skaduta",
       "overdue_one": "{{count}} jum wara l-iskadenza",
       "overdue_two": "{{count}} jiem tard",
@@ -4016,6 +4015,7 @@
       "markSecret": "Immarka bħala sigriet",
       "masked": "Valur moħbi",
       "reveal": "Ikxef il-valur",
+      "hide": "Aħbi l-valur",
       "newValuePlaceholder": "Daħħal valur sigriet ġdid",
       "valuePlaceholder": "Valur sigriet (inkriptat)"
     },

@@ -9,6 +9,7 @@
 // cannot turn into a destination parks too: nothing opens, and the tabs layout
 // reports the contract's refusal instead of the app arriving unexplained.
 
+import { opensDestination } from '@/lib/deep-link-destination';
 import { setPendingDeepLink, wasLaunchLinkHandled } from '@/lib/deep-link-launch';
 
 import { appActionHref, parseAppActionUrl } from './app-action-contract';
@@ -20,9 +21,10 @@ import { setPendingAppAction } from './pending-app-action';
  * `false` means the path is not an action URL and the caller keeps going — the
  * universal-link mapper resolves nothing for these paths and must own the rest.
  * `true` means it belongs to this contract, including a link the provider
- * resolvers cannot turn into a destination: nothing is opened — the request
- * parks for the tabs consumer, which reports the refusal — and the path still
- * must not be mapped as a web route.
+ * resolvers cannot turn into a destination (parked for the tabs consumer, which
+ * reports the refusal) and a session destination the route cannot open (nothing
+ * opens, and the current screen keeps its state): the path still must not be
+ * mapped as a web route.
  *
  * The stash is the identical call `deep-link-handler.ts:71,76` makes, cold-start
  * guard included: the synchronous launch capture may already have stashed this
@@ -55,6 +57,12 @@ export function handleAppActionPath({
     // silently would bring the app to the front with nothing opened and
     // nothing reported.
     setPendingAppAction(request);
+    return true;
+  }
+  if (!opensDestination(resolved)) {
+    // A session destination the route cannot open is not a destination: the
+    // same rule `deep-link-handler.ts` applies, so a hand-built action URL
+    // cannot replace the current screen with the composer. Nothing opens.
     return true;
   }
   if (initial ? !wasLaunchLinkHandled() : true) {

@@ -19,6 +19,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as SecurityAgentModule from '@kilocode/app-shared/security-agent';
+
 import type * as ReactQuery from '@tanstack/react-query';
 
 import type * as OperationKeyModule from '@/lib/operation-key';
@@ -34,6 +36,7 @@ import {
   SECURITY_SERVICE_UNAVAILABLE_MESSAGE,
   securityRetainsOperationKey,
   securitySyncIntentFingerprint,
+  securitySyncPreconditionFor,
 } from '@/lib/security-agent-ledger';
 import {
   useSaveSecurityAgentConfig,
@@ -69,7 +72,8 @@ vi.mock('@/lib/persist/use-mutation-outbox', () => ({
   useMutationOutbox: () => outboxMock,
 }));
 
-vi.mock('@kilocode/app-shared/security-agent', () => ({
+vi.mock('@kilocode/app-shared/security-agent', async importOriginal => ({
+  ...(await importOriginal<typeof SecurityAgentModule>()),
   isPersonalSecurityScope: (scope: string) => scope === 'personal',
 }));
 
@@ -695,6 +699,50 @@ describe('ledger marker copy per surface', () => {
       'Security service is not configured. Resubmitting cannot succeed until this is fixed.'
     );
     expect(isSecuritySyncRetryable(mapped)).toBe(false);
+  });
+
+  it('maps a server sync precondition onto the copy that names its fix', () => {
+    const PRECONDITION_BY_CODE = {
+      security_sync_no_repositories: 'noRepositories',
+      security_sync_integration_inactive: 'integrationInactive',
+      security_sync_missing_permission: 'missingPermission',
+    } as const;
+    const cases = [
+      [
+        'security_sync_no_repositories',
+        'No repositories are in the sync scope. Choose the repositories Security Agent monitors, then sync again.',
+      ],
+      [
+        'security_sync_integration_inactive',
+        'The GitHub connection for Security Agent is not active. Reconnect the Kilo GitHub App, then sync again.',
+      ],
+      [
+        'security_sync_missing_permission',
+        'The Kilo GitHub App cannot read vulnerability alerts. Grant that permission in GitHub, then sync again.',
+      ],
+    ] as const;
+    for (const [upstreamCode, copy] of cases) {
+      const rejection = Object.assign(new Error('server sentence'), {
+        data: { code: 'PRECONDITION_FAILED', upstreamCode },
+      });
+      const mapped = mapSecuritySyncOperationError(rejection);
+      expect(mapped.message).toBe(copy);
+      expect(securitySyncPreconditionFor(mapped)).toBe(PRECONDITION_BY_CODE[upstreamCode]);
+      // The fix is applied by the reader, not by resubmitting: the rejection
+      // ends this intent and the next attempt needs a fresh operation key.
+      expect(isSecuritySyncRetryable(mapped)).toBe(false);
+      expect(securityRetainsOperationKey(mapped)).toBe(false);
+    }
+  });
+
+  it('finds the precondition on a server-shaped error too', () => {
+    const shaped = {
+      shape: {
+        data: { code: 'PRECONDITION_FAILED', upstreamCode: 'security_sync_no_repositories' },
+      },
+    };
+    expect(securitySyncPreconditionFor(shaped)).toBe('noRepositories');
+    expect(securitySyncPreconditionFor(new Error('Network request failed'))).toBeNull();
   });
 
   it('maps an unrecognised message onto the generic copy and carries its retryability', () => {

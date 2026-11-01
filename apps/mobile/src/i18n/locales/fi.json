@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Ei viimeaikaisia katselmointeja",
       "noRecentPrsDescription": "Aloita katselmointi liittämällä linkki yllä olevaan kenttään — se näkyy tässä seuraavalla kerralla.",
-      "couldNotLoad": "Lataus epäonnistui.",
       "removeFromRecentsTitle": "Poistetaanko viimeksi avatuista?",
       "removeFromRecentsMessage": "Tämä katselmointi poistetaan viimeksi avatuista.",
       "removeRecentAccessibility": "Poista {{repo}} viimeksi avatuista",
@@ -834,7 +833,8 @@
     "liveUpdates": "Reaaliaikaiset päivitykset",
     "liveUpdateSubtitle": "Näytä aktiiviset agentit ilmoituksissa",
     "push": "Push-ilmoitukset",
-    "onDescription": "Push-ilmoitukset ovat käytössä tällä laitteella.",
+    "deviceTitle": "Push-ilmoitukset tällä laitteella",
+    "onDescription": "Ilmoitukset noudattavat alla olevia luokkia.",
     "offDescription": "Ilmoituslupa puuttuu tai laitteen rekisteröinti ei ole käytössä.",
     "retryPermission": "Yritä tarkistaa ilmoituslupa uudelleen",
     "enable": "Ota ilmoitukset käyttöön",
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Vakavuus: vakavimmasta lievimpään",
       "sortSeverityAsc": "Vakavuus: lievimmästä vakavimpaan",
       "sortSlaDue": "SLA-määräaika",
-      "overdueOnly": "Vain myöhässä olevat"
+      "overdueOnly": "Vain myöhässä olevat",
+      "noRepositories": "Yhtään repositoriota ei ole vielä synkronoitu tai valittu. Valitse ne Tietoturva-agentin asetuksista."
     },
     "automation": {
       "title": "Automaatio",
@@ -1841,7 +1842,8 @@
     "findingDetails": {
       "supersededBy": "Korvattu ajantasaisella havainnolla",
       "supersededByDescription": "Napauta nähdäksesi ajantasaisen havainnon tilan, analyysin ja korjauksen.",
-      "dismissedBecause": "Havainto hylättiin: {{reason}}.",
+      "dismissedOn": "Sivuuttamispäivä",
+      "supersededOn": "Korvaamispäivä",
       "severityLabel": "Vakavuus: {{severity}}",
       "package": "Paketti",
       "vulnerableVersions": "Haavoittuvat versiot",
@@ -1858,11 +1860,6 @@
       "viewAdvisory": "Näytä tietoturvatiedote GitHubissa",
       "statusOpen": "Avoin",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "korjaus on jo aloitettu",
-      "reasonNoBandwidth": "ei vapaita resursseja",
-      "reasonTolerableRisk": "riski on hyväksyttävä",
-      "reasonInaccurate": "havainto on virheellinen",
-      "reasonNotUsed": "haavoittuvaa koodia ei käytetä",
       "reasonAfterReview": "tarkistuksen jälkeen"
     },
     "settingsOverview": {
@@ -1922,7 +1919,7 @@
       "highDescription": "Merkittävän tietovuodon riski.",
       "mediumDescription": "Rajallinen vaikutus tai hyväksikäyttö vain tietyissä olosuhteissa.",
       "lowDescription": "Vähäinen tietoturvavaikutus.",
-      "invalidDayCount": "anna päivien määrä kokonaislukuna väliltä 1–365.",
+      "invalidDayCount": "Anna päivien määrä kokonaislukuna väliltä 1–365.",
       "remediationDeadlineA11y": "Vakavuus: {{label}}. Korjauksen määräaika päivinä",
       "enterWholeNumber": "Anna kokonaisluku välillä 1–365",
       "permissionNote": "Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat muuttaa näitä asetuksia.",
@@ -2062,7 +2059,10 @@
       "settleFailed": "Toiminto valmistui, mutta emme voineet tallentaa tulosta. Yritä uudelleen.",
       "replayFailed": "Tämä toiminto ei valmistunut. Yritä uudelleen.",
       "actionFailed": "Toimintoa ei voitu suorittaa loppuun. Yritä uudelleen.",
-      "actionBlocked": "Toimintoa ei voitu suorittaa loppuun. Ongelma on korjattava ensin."
+      "actionBlocked": "Toimintoa ei voitu suorittaa loppuun. Ongelma on korjattava ensin.",
+      "syncNoRepositories": "Synkronointilaajuudessa ei ole yhtään repositoriota. Valitse repositoriot, joita Tietoturva-agentti valvoo, ja synkronoi sitten uudelleen.",
+      "syncIntegrationInactive": "Tietoturva-agentin GitHub-yhteys ei ole aktiivinen. Yhdistä Kilo GitHub App uudelleen ja synkronoi sitten uudelleen.",
+      "syncMissingPermission": "Kilo GitHub App ei voi lukea haavoittuvuushälytyksiä. Myönnä kyseinen käyttöoikeus GitHubissa ja synkronoi sitten uudelleen."
     },
     "analysisState": {
       "queued": "Analyysi jonossa",
@@ -2096,7 +2096,6 @@
       "closedOn": "Tila: {{status}} · {{date}}",
       "deadlineNotSet": "Määräaikaa ei ole asetettu",
       "noSlaDeadline": "Ei määritettyä SLA-määräaikaa",
-      "dueOn": "Määräaika {{date}}",
       "overdueNow": "Myöhässä",
       "overdue_one": "{{count}} päivä myöhässä",
       "overdue_other": "{{count}} päivää myöhässä",
@@ -3848,6 +3847,7 @@
       "markSecret": "Merkitse salaiseksi",
       "masked": "Piilotettu arvo",
       "reveal": "Paljasta arvo",
+      "hide": "Piilota arvo",
       "newValuePlaceholder": "Syötä uusi salainen arvo",
       "valuePlaceholder": "Salainen arvo (salattu)"
     },

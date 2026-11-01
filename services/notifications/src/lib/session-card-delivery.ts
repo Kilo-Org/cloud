@@ -12,13 +12,15 @@ import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-sna
 import {
   buildSessionLiveActivityContentState,
   type PushData,
-  SESSION_LIVE_COMMAND_LIMIT,
   sessionCardStaleAtSeconds,
   sessionLiveActivityRelevance,
   type SessionLiveActivityContentState,
   type SessionCardStatusKind,
 } from '@kilocode/notifications';
-import { sessionLiveSummarySchema } from '@kilocode/session-ingest-contracts';
+import {
+  SESSION_LIVE_COMMAND_LIMIT,
+  sessionLiveSummarySchema,
+} from '@kilocode/session-ingest-contracts';
 import { z } from 'zod';
 
 import type { LiveActivityPriority } from './apns-live-activity';

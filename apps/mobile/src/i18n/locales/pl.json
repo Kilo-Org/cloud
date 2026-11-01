@@ -305,7 +305,8 @@
     "liveUpdates": "Aktualizacje na żywo",
     "liveUpdateSubtitle": "Pokazuj aktywnych agentów w powiadomieniach",
     "push": "Powiadomienia push",
-    "onDescription": "Powiadomienia push są włączone na tym urządzeniu.",
+    "deviceTitle": "Powiadomienia push na tym urządzeniu",
+    "onDescription": "Powiadomienia zależą od kategorii poniżej.",
     "offDescription": "Brakuje zgody na powiadomienia lub rejestracja urządzenia jest wyłączona.",
     "retryPermission": "Sprawdź ponownie uprawnienia do powiadomień",
     "enable": "Włącz powiadomienia",
@@ -1157,7 +1158,8 @@
       "sortSeverityDesc": "Krytyczność: od wysokiej do niskiej",
       "sortSlaDue": "Termin SLA",
       "statusIgnored": "Zignorowane",
-      "statusOpen": "Otwarte"
+      "statusOpen": "Otwarte",
+      "noRepositories": "Żadne repozytoria nie są jeszcze zsynchronizowane ani wybrane. Wybierz je w ustawieniach Agenta bezpieczeństwa."
     },
     "analysis": {
       "analyzeRepository": "Analizuj repozytorium",
@@ -1393,7 +1395,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Wykryto",
-      "dismissedBecause": "Powód odrzucenia: {{reason}}.",
+      "dismissedOn": "Data odrzucenia",
+      "supersededOn": "Data zastąpienia",
       "ghsa": "GHSA",
       "manifest": "Plik manifestu",
       "noPatchAvailable": "Brak dostępnej poprawki",
@@ -1410,11 +1413,6 @@
       "vulnerableVersions": "Podatne wersje",
       "statusOpen": "Otwarte",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "naprawa już trwa",
-      "reasonNoBandwidth": "brak wolnych zasobów",
-      "reasonTolerableRisk": "ryzyko jest akceptowalne",
-      "reasonInaccurate": "błędne wykrycie problemu",
-      "reasonNotUsed": "kod z luką nie jest używany",
       "reasonAfterReview": "po weryfikacji"
     },
     "findingList": {
@@ -1531,7 +1529,7 @@
       "enterWholeNumber": "Wpisz liczbę całkowitą od 1 do 365",
       "high": "Poziom wysoki",
       "highDescription": "Ryzyko poważnego wycieku danych.",
-      "invalidDayCount": "podaj liczbę dni od 1 do 365, bez części ułamkowej.",
+      "invalidDayCount": "Podaj liczbę dni od 1 do 365, bez części ułamkowej.",
       "low": "Poziom niski",
       "lowDescription": "Minimalny wpływ na bezpieczeństwo.",
       "medium": "Poziom średni",
@@ -1561,7 +1559,10 @@
       "settleFailed": "Akcja została wykonana, ale nie udało się nam zapisać wyniku. Spróbuj ponownie.",
       "replayFailed": "Ta akcja nie została ukończona. Spróbuj ponownie.",
       "actionFailed": "Nie udało się ukończyć tej akcji. Spróbuj ponownie.",
-      "actionBlocked": "Nie udało się ukończyć tej akcji. Najpierw należy rozwiązać problem."
+      "actionBlocked": "Nie udało się ukończyć tej akcji. Najpierw należy rozwiązać problem.",
+      "syncNoRepositories": "Żadne repozytoria nie znajdują się w zakresie synchronizacji. Wybierz repozytoria monitorowane przez Agenta bezpieczeństwa, a następnie zsynchronizuj ponownie.",
+      "syncIntegrationInactive": "Połączenie z GitHub dla Agenta bezpieczeństwa nie jest aktywne. Połącz ponownie aplikację Kilo GitHub App, a następnie zsynchronizuj ponownie.",
+      "syncMissingPermission": "Aplikacja Kilo GitHub App nie może odczytywać vulnerability alerts. Przyznaj to uprawnienie w GitHub, a następnie zsynchronizuj ponownie."
     },
     "analysisState": {
       "queued": "Analiza w kolejce",
@@ -1595,7 +1596,6 @@
       "closedOn": "{{status}} · Data: {{date}}",
       "deadlineNotSet": "Nie ustawiono terminu",
       "noSlaDeadline": "Brak terminu SLA",
-      "dueOn": "Termin: {{date}}",
       "overdueNow": "Po terminie",
       "overdue_one": "{{count}} dzień po terminie",
       "overdue_few": "{{count}} dni po terminie",
@@ -2901,7 +2901,6 @@
     "entry": {
       "noRecentPrs": "Brak ostatnich recenzji",
       "noRecentPrsDescription": "Wklej powyżej odnośnik, aby rozpocząć recenzję — następnym razem pojawi się tutaj.",
-      "couldNotLoad": "Nie udało się wczytać danych.",
       "removeFromRecentsTitle": "Usunąć z listy ostatnio otwieranych?",
       "removeFromRecentsMessage": "Ta recenzja zostanie usunięta z listy ostatnich.",
       "removeRecentAccessibility": "Usuń {{repo}} z listy ostatnio otwieranych",
@@ -3960,6 +3959,7 @@
       "markSecret": "Oznacz jako tajne",
       "masked": "Ukryta wartość",
       "reveal": "Ujawnij wartość",
+      "hide": "Ukryj wartość",
       "newValuePlaceholder": "Wprowadź nową tajną wartość",
       "valuePlaceholder": "Tajna wartość (zaszyfrowana)"
     },

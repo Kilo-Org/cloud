@@ -305,7 +305,8 @@
     "liveUpdates": "עדכונים בזמן אמת",
     "liveUpdateSubtitle": "הצגת סוכנים פעילים בהתראות שלך",
     "push": "התראות למכשיר",
-    "onDescription": "קבלת התראות מופעלת במכשיר הזה.",
+    "deviceTitle": "התראות דחיפה במכשיר הזה",
+    "onDescription": "ההתראות מגיעות לפי הקטגוריות שלמטה.",
     "offDescription": "ההרשאה לקבלת התראות או רישום המכשיר להתראות אינם פעילים.",
     "retryPermission": "בדיקה חוזרת של הרשאת ההתראות",
     "enable": "הפעלת התראות",
@@ -1154,7 +1155,8 @@
       "sortSeverityDesc": "חומרה: מהגבוהה לנמוכה",
       "sortSlaDue": "מועד אחרון לפי SLA",
       "statusIgnored": "ממצאים שהוחרגו",
-      "statusOpen": "פתוח"
+      "statusOpen": "פתוח",
+      "noRepositories": "אין עדיין מאגרים מסונכרנים או נבחרים. יש לבחור אותם בהגדרות סוכן האבטחה."
     },
     "analysis": {
       "analyzeRepository": "ניתוח המאגר",
@@ -1380,7 +1382,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "זוהה",
-      "dismissedBecause": "סיבת הדחייה: {{reason}}.",
+      "dismissedOn": "תאריך ההתעלמות",
+      "supersededOn": "תאריך ההחלפה",
       "ghsa": "GHSA",
       "manifest": "קובץ מניפסט",
       "noPatchAvailable": "אין תיקון זמין",
@@ -1397,11 +1400,6 @@
       "vulnerableVersions": "גרסאות פגיעות",
       "statusOpen": "פתוח",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "התיקון כבר התחיל",
-      "reasonNoBandwidth": "אין משאבים פנויים",
-      "reasonTolerableRisk": "הסיכון נסבל",
-      "reasonInaccurate": "הממצא אינו מדויק",
-      "reasonNotUsed": "הקוד הפגיע אינו בשימוש",
       "reasonAfterReview": "לאחר בדיקה"
     },
     "findingList": {
@@ -1547,7 +1545,10 @@
       "settleFailed": "הפעולה הושלמה, אך לא הצלחנו לתעד את התוצאה. נסה שוב.",
       "replayFailed": "הפעולה הזו לא הושלמה. נסה שוב.",
       "actionFailed": "לא ניתן להשלים את הפעולה הזו. נסה שוב.",
-      "actionBlocked": "לא ניתן להשלים את הפעולה הזו. יש לתקן את הבעיה לפני שניתן יהיה לנסות שוב."
+      "actionBlocked": "לא ניתן להשלים את הפעולה הזו. יש לתקן את הבעיה לפני שניתן יהיה לנסות שוב.",
+      "syncNoRepositories": "אין מאגרים בהיקף הסנכרון. יש לבחור את המאגרים שסוכן האבטחה עוקב אחריהם, ואז לסנכרן שוב.",
+      "syncIntegrationInactive": "החיבור של GitHub עבור סוכן האבטחה אינו פעיל. יש לחבר מחדש את אפליקציית Kilo GitHub, ואז לסנכרן שוב.",
+      "syncMissingPermission": "אפליקציית Kilo GitHub אינה יכולה לקרוא vulnerability alerts. יש להעניק הרשאה זו ב-GitHub, ואז לסנכרן שוב."
     },
     "analysisState": {
       "queued": "הניתוח ממתין בתור",
@@ -1581,7 +1582,6 @@
       "closedOn": "{{status}} ב-{{date}}",
       "deadlineNotSet": "לא הוגדר מועד אחרון",
       "noSlaDeadline": "אין מועד אחרון לפי SLA",
-      "dueOn": "מועד אחרון: {{date}}",
       "overdueNow": "באיחור",
       "overdue_one": "איחור של {{count}} יום",
       "overdue_two": "איחור של {{count}} ימים",
@@ -2864,7 +2864,6 @@
     "entry": {
       "noRecentPrs": "אין סקירות לאחרונה",
       "noRecentPrsDescription": "הדבקו קישור למעלה כדי להתחיל סקירה — הוא יופיע כאן בפעם הבאה.",
-      "couldNotLoad": "לא ניתן היה לטעון את הנתונים.",
       "removeFromRecentsTitle": "להסיר מהבקשות האחרונות?",
       "removeFromRecentsMessage": "הסקירה הזו תוסר מרשימת האחרונות שלך.",
       "removeRecentAccessibility": "הסרת {{repo}} מרשימת הבקשות האחרונות",
@@ -3904,6 +3903,7 @@
       "markSecret": "סמן כסוד",
       "masked": "ערך נסתר",
       "reveal": "לחשוף ערך",
+      "hide": "הסתר ערך",
       "newValuePlaceholder": "הזן ערך סודי חדש",
       "valuePlaceholder": "ערך סודי (מוצפן)"
     },

@@ -106,7 +106,10 @@ export function ProfilesListScreen({
 
   const openProfile = (profile: AgentProfileListItem) => {
     router.push(
-      getProfileOverviewPath(profile.id, profileOrganizationId(organizationId, profile), stack)
+      getProfileOverviewPath(profile.id, {
+        organizationId: profileOrganizationId(organizationId, profile),
+        stack,
+      })
     );
   };
 

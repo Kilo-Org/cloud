@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "የቅርብ ጊዜ ግምገማዎች የሉም",
       "noRecentPrsDescription": "ግምገማ ለመጀመር ከላይ አገናኝ ያስገቡ — ለቀጣዩ ጊዜ እዚህ ይታያል።",
-      "couldNotLoad": "መጫን አልተቻለም።",
       "removeFromRecentsTitle": "ከቅርብ ጊዜ ዝርዝሩ ይወገድ?",
       "removeFromRecentsMessage": "ይህ ግምገማ ከቅርብ ጊዜዎችዎ ውስጥ ይወገዳል።",
       "removeRecentAccessibility": "{{repo}}ን ከቅርብ ጊዜ ዝርዝሩ አስወግድ",
@@ -834,7 +833,8 @@
     "liveUpdates": "የቀጥታ ዝማኔዎች",
     "liveUpdateSubtitle": "ንቁ ወኪሎችን በማሳወቂያዎችዎ ውስጥ ያሳዩ",
     "push": "የሚላኩ ማሳወቂያዎች",
-    "onDescription": "ወደዚህ መሣሪያ የሚላኩ ማሳወቂያዎች በርተዋል።",
+    "deviceTitle": "በዚህ መሣሪያ ላይ የሚላኩ ማሳወቂያዎች",
+    "onDescription": "ማንቂያዎች ከታች ባሉት ምድቦች መሠረት ይላካሉ።",
     "offDescription": "የማሳወቂያ ፈቃድ አልተሰጠም ወይም መሣሪያው አልተመዘገበም።",
     "retryPermission": "የማሳወቂያ ፈቃድን ለመፈተሽ እንደገና ይሞክሩ",
     "enable": "ማሳወቂያዎችን ያንቁ",
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "ክብደት፦ ከከፍተኛ ወደ ዝቅተኛ",
       "sortSeverityAsc": "ክብደት፦ ከዝቅተኛ ወደ ከፍተኛ",
       "sortSlaDue": "የSLA ጊዜ ገደብ",
-      "overdueOnly": "ጊዜ ያለፈባቸው ብቻ"
+      "overdueOnly": "ጊዜ ያለፈባቸው ብቻ",
+      "noRepositories": "እስካሁን ምንም ማከማቻ አልተመሳሰለም ወይም አልተመረጠም። በደህንነት ወኪል ቅንብሮች ውስጥ ይምሯቸው።"
     },
     "automation": {
       "title": "አውቶሜሽን",
@@ -1847,7 +1848,8 @@
     "findingDetails": {
       "supersededBy": "በአሁኑ ግኝት ተተክቷል",
       "supersededByDescription": "ሁኔታውን፣ ትንታኔውን እና ጥገናውን ለማየት የአሁኑን መዝገብ ይንኩ።",
-      "dismissedBecause": "ግኝቱ ተወግዷል፦ {{reason}}።",
+      "dismissedOn": "የተወገደበት ቀን",
+      "supersededOn": "የተተካበት ቀን",
       "severityLabel": "{{severity}} ክብደት",
       "package": "ፓኬጅ",
       "vulnerableVersions": "ተጋላጭ ስሪቶች",
@@ -1864,11 +1866,6 @@
       "viewAdvisory": "የደህንነት ማስጠንቀቂያውን በGitHub ላይ ይመልከቱ",
       "statusOpen": "ክፍት",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ጥገና አስቀድሞ ተጀምሯል",
-      "reasonNoBandwidth": "ለመሥራት የሚበቃ አቅም የለም",
-      "reasonTolerableRisk": "አደጋውን መቀበል ይቻላል",
-      "reasonInaccurate": "ግኝቱ ትክክለኛ አይደለም",
-      "reasonNotUsed": "ተጋላጭ የሆነው ኮድ ጥቅም ላይ አይውልም",
       "reasonAfterReview": "ከግምገማ በኋላ"
     },
     "settingsOverview": {
@@ -2068,7 +2065,10 @@
       "settleFailed": "እርምጃው ተጠናቋል፣ ግን ውጤቱን መመዝገብ አልቻልንም። እባክዎ እንደገና ይሞክሩ።",
       "replayFailed": "ይህ እርምጃ አልተጠናቀቀም። እባክዎ እንደገና ይሞክሩ።",
       "actionFailed": "ይህን እርምጃ ማጠናቀቅ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
-      "actionBlocked": "ይህን እርምጃ ማጠናቀቅ አልተቻለም። ችግሩ ከመፍትሔ አላገኘ በፊት መልሶ መሞከር አይቻልም።"
+      "actionBlocked": "ይህን እርምጃ ማጠናቀቅ አልተቻለም። ችግሩ ከመፍትሔ አላገኘ በፊት መልሶ መሞከር አይቻልም።",
+      "syncNoRepositories": "በማመሳሰል ወሰን ውስጥ ምንም ማከማቻ የለም። የደህንነት ወኪል የሚከታተላቸውን ማከማቻዎች ይምረጡ፣ ከዚያ እንደገና ያመሳስሉ።",
+      "syncIntegrationInactive": "የደህንነት ወኪል የGitHub ግንኙነት ንቁ አይደለም። የKilo GitHub መተግበሪያን እንደገና ያገናኙ፣ ከዚያ እንደገና ያመሳስሉ።",
+      "syncMissingPermission": "የKilo GitHub መተግበሪያ የተጋላጭነት ማንቂያዎችን ማንበብ አይችልም። ይህን ፈቃድ በGitHub ይስጡ፣ ከዚያ እንደገና ያመሳስሉ።"
     },
     "analysisState": {
       "queued": "ትንተናው ወረፋ ይዟል",
@@ -2102,7 +2102,6 @@
       "closedOn": "{{date}}፦ {{status}}",
       "deadlineNotSet": "የጊዜ ገደብ አልተወሰነም",
       "noSlaDeadline": "የSLA ጊዜ ገደብ የለም",
-      "dueOn": "ጊዜው የሚያበቃው {{date}}",
       "overdueNow": "ጊዜው አልፏል",
       "overdue_one": "{{count}} ቀን ዘግይቷል",
       "overdue_other": "ቀነ ገደቡ በ{{count}} ቀናት አልፏል",
@@ -3854,6 +3853,7 @@
       "markSecret": "እንደ ምስጢር ምልክት ያድርጉ",
       "masked": "የተደበቀ እሴት",
       "reveal": "ዋጋን አሳይ",
+      "hide": "ዋጋን ደብቅ",
       "newValuePlaceholder": "አዲስ ምስጢራዊ ዋጋ ያስገቡ",
       "valuePlaceholder": "ምስጢራዊ ዋጋ (የተመሰጠረ)"
     },

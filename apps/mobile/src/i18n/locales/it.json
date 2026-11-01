@@ -311,7 +311,8 @@
     "liveUpdates": "Aggiornamenti in tempo reale",
     "liveUpdateSubtitle": "Mostra gli agenti attivi nelle notifiche",
     "push": "Notifiche push",
-    "onDescription": "Le notifiche push sono attive per questo dispositivo.",
+    "deviceTitle": "Push su questo dispositivo",
+    "onDescription": "Gli avvisi seguono le categorie qui sotto.",
     "offDescription": "Le notifiche non sono autorizzate oppure il dispositivo non è registrato per riceverle.",
     "retryPermission": "Verifica di nuovo l'autorizzazione per le notifiche",
     "enable": "Attiva le notifiche",
@@ -1122,7 +1123,8 @@
       "sortSeverityDesc": "Gravità: da alta a bassa",
       "sortSlaDue": "Scadenza SLA",
       "statusIgnored": "Ignorata",
-      "statusOpen": "Aperta"
+      "statusOpen": "Aperta",
+      "noRepositories": "Nessun repository è ancora sincronizzato o selezionato. Scegli i repository nelle impostazioni dell'Agente di sicurezza."
     },
     "analysis": {
       "analyzeRepository": "Analizza il repository",
@@ -1348,7 +1350,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Rilevata",
-      "dismissedBecause": "Segnalazione ignorata: {{reason}}.",
+      "dismissedOn": "Ignorato il",
+      "supersededOn": "Sostituito il",
       "ghsa": "GHSA",
       "manifest": "File manifest",
       "noPatchAvailable": "Nessuna patch disponibile",
@@ -1365,11 +1368,6 @@
       "vulnerableVersions": "Versioni vulnerabili",
       "statusOpen": "Aperta",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "correzione già in corso",
-      "reasonNoBandwidth": "nessuna risorsa disponibile",
-      "reasonTolerableRisk": "rischio accettabile",
-      "reasonInaccurate": "rilevazione imprecisa",
-      "reasonNotUsed": "il codice vulnerabile non viene usato",
       "reasonAfterReview": "dopo la revisione"
     },
     "findingList": {
@@ -1485,7 +1483,7 @@
       "enterWholeNumber": "Inserisci un numero intero compreso tra 1 e 365",
       "high": "Livello alto",
       "highDescription": "Possibile esposizione di dati con conseguenze gravi.",
-      "invalidDayCount": "inserisci un numero intero di giorni compreso tra 1 e 365.",
+      "invalidDayCount": "Inserisci un numero intero di giorni compreso tra 1 e 365.",
       "low": "Livello basso",
       "lowDescription": "Impatto minimo sulla sicurezza.",
       "medium": "Livello medio",
@@ -1515,7 +1513,10 @@
       "settleFailed": "L'operazione è stata completata, ma non è stato possibile registrare il risultato. Riprova.",
       "replayFailed": "Questa operazione non è stata completata. Riprova.",
       "actionFailed": "Impossibile completare questa operazione. Riprova.",
-      "actionBlocked": "Impossibile completare questa operazione. Il problema deve essere risolto prima di riprovare."
+      "actionBlocked": "Impossibile completare questa operazione. Il problema deve essere risolto prima di riprovare.",
+      "syncNoRepositories": "Nessun repository è incluso nell'ambito di sincronizzazione. Scegli i repository monitorati dall'Agente di sicurezza, poi sincronizza di nuovo.",
+      "syncIntegrationInactive": "La connessione GitHub per l'Agente di sicurezza non è attiva. Riconnetti l'app GitHub di Kilo, poi sincronizza di nuovo.",
+      "syncMissingPermission": "L'app GitHub di Kilo non può leggere gli avvisi di vulnerabilità. Concedi questa autorizzazione in GitHub, poi sincronizza di nuovo."
     },
     "analysisState": {
       "queued": "Analisi in coda",
@@ -1549,7 +1550,6 @@
       "closedOn": "{{status}} il {{date}}",
       "deadlineNotSet": "Scadenza non impostata",
       "noSlaDeadline": "Nessuna scadenza SLA",
-      "dueOn": "Scade il {{date}}",
       "overdueNow": "In ritardo",
       "overdue_one": "{{count}} giorno di ritardo",
       "overdue_many": "{{count}} giorni di ritardo",
@@ -2864,7 +2864,6 @@
     "entry": {
       "noRecentPrs": "Nessuna revisione recente",
       "noRecentPrsDescription": "Incolla qui sopra un collegamento per iniziare una revisione — la prossima volta comparirà qui.",
-      "couldNotLoad": "Impossibile caricare i dati.",
       "removeFromRecentsTitle": "Rimuovere dall'elenco delle PR recenti?",
       "removeFromRecentsMessage": "Questa revisione verrà rimossa dall'elenco delle recenti.",
       "removeRecentAccessibility": "Rimuovi {{repo}} dall'elenco delle PR recenti",
@@ -3904,6 +3903,7 @@
       "markSecret": "Contrassegna come segreto",
       "masked": "Valore nascosto",
       "reveal": "Rivela valore",
+      "hide": "Nascondi valore",
       "newValuePlaceholder": "Inserisci un nuovo valore segreto",
       "valuePlaceholder": "Valore segreto (cifrato)"
     },

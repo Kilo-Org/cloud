@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Engar nýlegar yfirferðir",
       "noRecentPrsDescription": "Límdu tengil hér að ofan til að hefja yfirferð — hún birtist hér næst.",
-      "couldNotLoad": "Ekki tókst að hlaða efni.",
       "removeFromRecentsTitle": "Fjarlægja úr nýlegum beiðnum?",
       "removeFromRecentsMessage": "Þessi yfirferð verður fjarlægð af listanum yfir nýlegar.",
       "removeRecentAccessibility": "Fjarlægja {{repo}} úr nýlegum beiðnum",
@@ -834,7 +833,8 @@
     "liveUpdates": "Uppfærslur í rauntíma",
     "liveUpdateSubtitle": "Sýna virka fulltrúa í tilkynningunum þínum",
     "push": "Ýtitilkynningar",
-    "onDescription": "Kveikt er á ýtitilkynningum fyrir þetta tæki.",
+    "deviceTitle": "Ýtitilkynningar á þessu tæki",
+    "onDescription": "Tilkynningar fylgja flokkunum hér fyrir neðan.",
     "offDescription": "Heimild vantar eða tækið er ekki skráð fyrir tilkynningum.",
     "retryPermission": "Athuga aftur heimild fyrir tilkynningum",
     "enable": "Virkja tilkynningar",
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Alvarleiki: frá hæsta til lægsta",
       "sortSeverityAsc": "Alvarleiki: frá lægsta til hæsta",
       "sortSlaDue": "Lokadagur SLA-frests",
-      "overdueOnly": "Aðeins með liðinn frest"
+      "overdueOnly": "Aðeins með liðinn frest",
+      "noRepositories": "Engar geymslur hafa enn verið samstilltar eða valdar. Veldu þær í stillingum Öryggiserindrekis."
     },
     "automation": {
       "title": "Sjálfvirkni",
@@ -1841,7 +1842,8 @@
     "findingDetails": {
       "supersededBy": "Nýrra frávik kemur í staðinn",
       "supersededByDescription": "Ýttu til að opna nýjustu færsluna og sjá stöðu, greiningu og úrbætur.",
-      "dismissedBecause": "Fráviki var vísað frá: {{reason}}.",
+      "dismissedOn": "Vísað frá þann",
+      "supersededOn": "Leyst af hólmi þann",
       "severityLabel": "Alvarleiki: {{severity}}",
       "package": "Pakki",
       "vulnerableVersions": "Útgáfur með öryggisveikleika",
@@ -1858,11 +1860,6 @@
       "viewAdvisory": "Skoða öryggistilkynningu á GitHub",
       "statusOpen": "Opið",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "lagfæring er þegar hafin",
-      "reasonNoBandwidth": "enginn tími er til ráðstöfunar",
-      "reasonTolerableRisk": "áhættan er ásættanleg",
-      "reasonInaccurate": "niðurstaðan er ónákvæm",
-      "reasonNotUsed": "kóði með veikleikanum er ekki notaður",
       "reasonAfterReview": "eftir yfirferð"
     },
     "settingsOverview": {
@@ -1922,7 +1919,7 @@
       "highDescription": "Hætta á verulegum gagnaleka.",
       "mediumDescription": "Takmörkuð áhrif eða sérstök skilyrði.",
       "lowDescription": "Óveruleg áhrif á öryggi.",
-      "invalidDayCount": "fjöldi daga verður að vera heil tala frá 1 til 365.",
+      "invalidDayCount": "Fjöldi daga verður að vera heil tala frá 1 til 365.",
       "remediationDeadlineA11y": "Úrbótafrestur í dögum fyrir {{label}}",
       "enterWholeNumber": "Sláðu inn heila tölu milli 1 og 365",
       "permissionNote": "Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta breytt þessum stillingum.",
@@ -2062,7 +2059,10 @@
       "settleFailed": "Aðgerðinni var lokið, en okkur tókst ekki að skrá niðurstöðuna. Reyndu aftur.",
       "replayFailed": "Þessari aðgerð var ekki lokið. Reyndu aftur.",
       "actionFailed": "Ekki tókst að ljúka þessari aðgerð. Reyndu aftur.",
-      "actionBlocked": "Ekki tókst að ljúka þessari aðgerð. Leysa verður vandamálið áður en þú getur reynt aftur."
+      "actionBlocked": "Ekki tókst að ljúka þessari aðgerð. Leysa verður vandamálið áður en þú getur reynt aftur.",
+      "syncNoRepositories": "Engar geymslur eru í samstillingarsviðinu. Veldu geymslurnar sem Öryggiserindrekinn fylgist með og samstilltu síðan aftur.",
+      "syncIntegrationInactive": "Tengingin við GitHub fyrir Öryggiserindreka er ekki virk. Tengdu Kilo GitHub App aftur og samstilltu svo aftur.",
+      "syncMissingPermission": "Kilo GitHub App getur ekki lesið vulnerability alerts. Veittu þá heimild í GitHub og samstilltu svo aftur."
     },
     "analysisState": {
       "queued": "Greining í biðröð",
@@ -2096,7 +2096,6 @@
       "closedOn": "{{status}} þann {{date}}",
       "deadlineNotSet": "Frestur ekki ákveðinn",
       "noSlaDeadline": "Enginn SLA-frestur",
-      "dueOn": "Frestur til {{date}}",
       "overdueNow": "Frestur liðinn",
       "overdue_one": "{{count}} dagur umfram frest",
       "overdue_other": "{{count}} dagar fram yfir frest",
@@ -3848,6 +3847,7 @@
       "markSecret": "Merktu sem leyndarmál",
       "masked": "Falið gildi",
       "reveal": "Sýndu gildi",
+      "hide": "Feldu gildi",
       "newValuePlaceholder": "Sláðu inn nýtt leynilegt gildi",
       "valuePlaceholder": "Leynilegt gildi (dulkóðað)"
     },

@@ -343,7 +343,8 @@
     "liveUpdates": "Live-updates",
     "liveUpdateSubtitle": "Actieve agents in je meldingen tonen",
     "push": "Pushmeldingen",
-    "onDescription": "Pushmeldingen staan aan voor dit apparaat.",
+    "deviceTitle": "Pushmeldingen op dit apparaat",
+    "onDescription": "Meldingen volgen de categorieën hieronder.",
     "offDescription": "Toestemming voor meldingen ontbreekt of de apparaatregistratie is uitgeschakeld.",
     "retryPermission": "Toestemming voor meldingen opnieuw controleren",
     "enable": "Meldingen inschakelen",
@@ -1151,7 +1152,8 @@
       "sortSeverityDesc": "Ernst: van hoog naar laag",
       "sortSlaDue": "SLA-deadline",
       "statusIgnored": "Genegeerd",
-      "statusOpen": "Open"
+      "statusOpen": "Open",
+      "noRepositories": "Nog geen repositories gesynchroniseerd of geselecteerd. Kies ze in de instellingen van de Beveiligingsagent."
     },
     "analysis": {
       "analyzeRepository": "Repository analyseren",
@@ -1367,7 +1369,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Gedetecteerd",
-      "dismissedBecause": "Deze bevinding is afgewezen: {{reason}}.",
+      "dismissedOn": "Genegeerd op",
+      "supersededOn": "Vervangen op",
       "ghsa": "GHSA",
       "manifest": "Manifestbestand",
       "noPatchAvailable": "Geen patch beschikbaar",
@@ -1384,11 +1387,6 @@
       "vulnerableVersions": "Kwetsbare versies",
       "statusOpen": "Open",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "er wordt al aan een oplossing gewerkt",
-      "reasonNoBandwidth": "er is geen capaciteit beschikbaar",
-      "reasonTolerableRisk": "het risico is aanvaardbaar",
-      "reasonInaccurate": "de bevinding is onjuist",
-      "reasonNotUsed": "kwetsbare code wordt niet gebruikt",
       "reasonAfterReview": "na beoordeling"
     },
     "findingList": {
@@ -1503,7 +1501,7 @@
       "enterWholeNumber": "Voer een geheel getal in tussen 1 en 365",
       "high": "Hoog",
       "highDescription": "Risico op een groot datalek.",
-      "invalidDayCount": "voer een geheel aantal dagen in tussen 1 en 365.",
+      "invalidDayCount": "Voer een geheel aantal dagen in tussen 1 en 365.",
       "low": "Laag",
       "lowDescription": "Minimale gevolgen voor de beveiliging.",
       "medium": "Gemiddeld",
@@ -1533,7 +1531,10 @@
       "settleFailed": "De actie is voltooid, maar we konden het resultaat niet vastleggen. Probeer het opnieuw.",
       "replayFailed": "Deze actie is niet voltooid. Probeer het opnieuw.",
       "actionFailed": "Deze actie kon niet worden voltooid. Probeer het opnieuw.",
-      "actionBlocked": "Deze actie kon niet worden voltooid. Het probleem moet eerst worden opgelost."
+      "actionBlocked": "Deze actie kon niet worden voltooid. Het probleem moet eerst worden opgelost.",
+      "syncNoRepositories": "Geen repositories in het synchronisatiebereik. Kies de repositories die de Beveiligingsagent bewaakt en synchroniseer daarna opnieuw.",
+      "syncIntegrationInactive": "De GitHub-koppeling voor de Beveiligingsagent is niet actief. Verbind de Kilo GitHub-app opnieuw en synchroniseer daarna opnieuw.",
+      "syncMissingPermission": "De Kilo GitHub-app kan geen kwetsbaarheidsalerts lezen. Verleen die machtiging in GitHub en synchroniseer daarna opnieuw."
     },
     "analysisState": {
       "queued": "Analyse in de wachtrij",
@@ -1567,7 +1568,6 @@
       "closedOn": "{{status}} op {{date}}",
       "deadlineNotSet": "Deadline niet ingesteld",
       "noSlaDeadline": "Geen SLA-deadline",
-      "dueOn": "Deadline: {{date}}",
       "overdueNow": "Deadline overschreden",
       "overdue_one": "Deadline {{count}} dag overschreden",
       "overdue_other": "{{count}} dagen te laat",
@@ -2827,7 +2827,6 @@
     "entry": {
       "noRecentPrs": "Geen recente beoordelingen",
       "noRecentPrsDescription": "Plak hierboven een koppeling om een beoordeling te starten — deze verschijnt de volgende keer hier.",
-      "couldNotLoad": "Het laden is mislukt.",
       "removeFromRecentsTitle": "Uit recente items verwijderen?",
       "removeFromRecentsMessage": "Deze beoordeling wordt uit je recente items verwijderd.",
       "removeRecentAccessibility": "{{repo}} uit recente items verwijderen",
@@ -3848,6 +3847,7 @@
       "markSecret": "Markeer als geheim",
       "masked": "Verborgen waarde",
       "reveal": "Onthul waarde",
+      "hide": "Verberg waarde",
       "newValuePlaceholder": "Voer een nieuwe geheime waarde in",
       "valuePlaceholder": "Geheime waarde (versleuteld)"
     },

@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "কোনও সাম্প্রতিক রিভিউ নেই",
       "noRecentPrsDescription": "রিভিউ শুরু করতে উপরে একটি লিংক পেস্ট করুন — পরের বার এটি এখানে দেখা যাবে।",
-      "couldNotLoad": "লোড করা যায়নি।",
       "removeFromRecentsTitle": "সাম্প্রতিক তালিকা থেকে সরাবেন?",
       "removeFromRecentsMessage": "এই রিভিউটি আপনার সাম্প্রতিক তালিকা থেকে সরানো হবে।",
       "removeRecentAccessibility": "সাম্প্রতিক তালিকা থেকে {{repo}} সরান",
@@ -834,7 +833,8 @@
     "liveUpdates": "লাইভ আপডেট",
     "liveUpdateSubtitle": "আপনার বিজ্ঞপ্তিতে সক্রিয় এজেন্ট দেখান",
     "push": "পুশ",
-    "onDescription": "এই ডিভাইসে পুশ বিজ্ঞপ্তি চালু আছে।",
+    "deviceTitle": "এই ডিভাইসে পুশ",
+    "onDescription": "সতর্কতাগুলি নিচের বিভাগ অনুযায়ী আসে।",
     "offDescription": "বিজ্ঞপ্তির অনুমতি বন্ধ আছে অথবা ডিভাইসটি নিবন্ধিত নয়।",
     "retryPermission": "বিজ্ঞপ্তির অনুমতি পরীক্ষা করার জন্য আবার চেষ্টা করুন",
     "enable": "বিজ্ঞপ্তি চালু করুন",
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "তীব্রতা: বেশি থেকে কম",
       "sortSeverityAsc": "তীব্রতা: কম থেকে বেশি",
       "sortSlaDue": "SLA শেষ তারিখ",
-      "overdueOnly": "শুধু সময়সীমা পেরোনো ত্রুটি"
+      "overdueOnly": "শুধু সময়সীমা পেরোনো ত্রুটি",
+      "noRepositories": "এখনও কোনো রিপোজিটরি সিঙ্ক বা নির্বাচন করা হয়নি। নিরাপত্তা এজেন্টের সেটিংসে সেগুলো বেছে নিন।"
     },
     "automation": {
       "title": "অটোমেশন",
@@ -1847,7 +1848,8 @@
     "findingDetails": {
       "supersededBy": "নতুন ত্রুটির রেকর্ড দিয়ে প্রতিস্থাপিত",
       "supersededByDescription": "অবস্থা, বিশ্লেষণ ও সমাধান দেখতে বর্তমান রেকর্ডটি ট্যাপ করে খুলুন।",
-      "dismissedBecause": "খারিজ করা হয়েছে: {{reason}}।",
+      "dismissedOn": "খারিজের তারিখ",
+      "supersededOn": "প্রতিস্থাপনের তারিখ",
       "severityLabel": "তীব্রতা: {{severity}}",
       "package": "প্যাকেজ",
       "vulnerableVersions": "নিরাপত্তা দুর্বলতাযুক্ত সংস্করণ",
@@ -1864,11 +1866,6 @@
       "viewAdvisory": "GitHub-এ নিরাপত্তা বিজ্ঞপ্তি দেখুন",
       "statusOpen": "খোলা",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "সমাধানের কাজ শুরু হয়েছে",
-      "reasonNoBandwidth": "সময় বা লোকবল নেই",
-      "reasonTolerableRisk": "ঝুঁকি সহনীয়",
-      "reasonInaccurate": "শনাক্ত সমস্যার তথ্য সঠিক নয়",
-      "reasonNotUsed": "দুর্বলতাযুক্ত কোড ব্যবহার করা হয় না",
       "reasonAfterReview": "পর্যালোচনার পরে"
     },
     "settingsOverview": {
@@ -2068,7 +2065,10 @@
       "settleFailed": "কাজটি সম্পন্ন হয়েছে, কিন্তু আমরা ফলাফল রেকর্ড করতে পারিনি। আবার চেষ্টা করুন।",
       "replayFailed": "এই কাজটি সম্পন্ন হয়নি। আবার চেষ্টা করুন।",
       "actionFailed": "এই কাজটি সম্পন্ন করা যায়নি। আবার চেষ্টা করুন।",
-      "actionBlocked": "এই কাজটি সম্পন্ন করা যায়নি। সমস্যাটি ঠিক করা না হলে আবার চেষ্টা করা যাবে না।"
+      "actionBlocked": "এই কাজটি সম্পন্ন করা যায়নি। সমস্যাটি ঠিক করা না হলে আবার চেষ্টা করা যাবে না।",
+      "syncNoRepositories": "সিঙ্ক স্কোপে কোনো রিপোজিটরি নেই। নিরাপত্তা এজেন্ট যে রিপোজিটরিগুলো মনিটর করে সেগুলো বেছে নিন, তারপর আবার সিঙ্ক করুন।",
+      "syncIntegrationInactive": "«নিরাপত্তা এজেন্ট»-এর জন্য GitHub সংযোগ সক্রিয় নয়। Kilo GitHub App আবার সংযুক্ত করুন, তারপর আবার সিঙ্ক করুন।",
+      "syncMissingPermission": "Kilo GitHub App vulnerability alerts পড়তে পারে না। GitHub-এ সেই অনুমতি দিন, তারপর আবার সিঙ্ক করুন।"
     },
     "analysisState": {
       "queued": "বিশ্লেষণ সারিতে আছে",
@@ -2102,7 +2102,6 @@
       "closedOn": "{{status}} — {{date}}",
       "deadlineNotSet": "সময়সীমা নির্ধারিত নেই",
       "noSlaDeadline": "কোনো SLA সময়সীমা নেই",
-      "dueOn": "শেষ তারিখ: {{date}}",
       "overdueNow": "সময়সীমা পেরিয়েছে",
       "overdue_one": "{{count}} দিন বিলম্বিত",
       "overdue_other": "{{count}} দিন বিলম্বিত",
@@ -3854,6 +3853,7 @@
       "markSecret": "গোপন হিসাবে চিহ্নিত করুন",
       "masked": "লুকানো মান",
       "reveal": "মান প্রকাশ করুন",
+      "hide": "মান লুকান",
       "newValuePlaceholder": "নতুন গোপন মান লিখুন",
       "valuePlaceholder": "গোপন মান (এনক্রিপ্ট করা)"
     },

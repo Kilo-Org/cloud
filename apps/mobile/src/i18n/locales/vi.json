@@ -305,7 +305,8 @@
     "liveUpdates": "Cập nhật trực tiếp",
     "liveUpdateSubtitle": "Hiển thị tác nhân đang hoạt động trong thông báo",
     "push": "Thông báo đẩy",
-    "onDescription": "Thông báo đẩy đang bật cho thiết bị này.",
+    "deviceTitle": "Thông báo đẩy trên thiết bị này",
+    "onDescription": "Cảnh báo theo từng loại bên dưới.",
     "offDescription": "Chưa cấp quyền thông báo hoặc chưa đăng ký thiết bị để nhận thông báo.",
     "retryPermission": "Thử kiểm tra lại quyền thông báo",
     "enable": "Bật thông báo",
@@ -1151,7 +1152,8 @@
       "sortSeverityDesc": "Mức độ nghiêm trọng: từ cao đến thấp",
       "sortSlaDue": "Ngày đến hạn SLA",
       "statusIgnored": "Đã bỏ qua",
-      "statusOpen": "Mở"
+      "statusOpen": "Mở",
+      "noRepositories": "Chưa có kho lưu trữ nào được đồng bộ hoặc chọn. Hãy chọn chúng trong cài đặt «Trợ lý bảo mật»."
     },
     "analysis": {
       "analyzeRepository": "Phân tích kho lưu trữ",
@@ -1367,7 +1369,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Đã phát hiện",
-      "dismissedBecause": "Đã bỏ qua vì {{reason}}.",
+      "dismissedOn": "Đã bỏ qua vào",
+      "supersededOn": "Đã thay thế vào",
       "ghsa": "GHSA",
       "manifest": "Tệp kê khai",
       "noPatchAvailable": "Chưa có bản vá",
@@ -1384,11 +1387,6 @@
       "vulnerableVersions": "Phiên bản có lỗ hổng",
       "statusOpen": "Mở",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "đã bắt đầu khắc phục",
-      "reasonNoBandwidth": "không đủ nguồn lực",
-      "reasonTolerableRisk": "rủi ro có thể chấp nhận được",
-      "reasonInaccurate": "vấn đề được xác định sai",
-      "reasonNotUsed": "không sử dụng mã có lỗ hổng",
       "reasonAfterReview": "sau khi rà soát"
     },
     "findingList": {
@@ -1503,7 +1501,7 @@
       "enterWholeNumber": "Nhập một số nguyên từ 1 đến 365",
       "high": "Cao",
       "highDescription": "Có nguy cơ rò rỉ dữ liệu ở mức đáng kể.",
-      "invalidDayCount": "số ngày phải là số nguyên từ 1 đến 365.",
+      "invalidDayCount": "Số ngày phải là số nguyên từ 1 đến 365.",
       "low": "Thấp",
       "lowDescription": "Ảnh hưởng rất ít đến bảo mật.",
       "medium": "Trung bình",
@@ -1533,7 +1531,10 @@
       "settleFailed": "Hành động đã hoàn tất, nhưng chúng tôi không thể ghi lại kết quả. Vui lòng thử lại.",
       "replayFailed": "Hành động này chưa hoàn tất. Vui lòng thử lại.",
       "actionFailed": "Không thể hoàn tất hành động này. Vui lòng thử lại.",
-      "actionBlocked": "Không thể hoàn tất hành động này. Bạn cần khắc phục sự cố trước khi thử lại."
+      "actionBlocked": "Không thể hoàn tất hành động này. Bạn cần khắc phục sự cố trước khi thử lại.",
+      "syncNoRepositories": "Không có kho lưu trữ nào trong phạm vi đồng bộ. Hãy chọn các kho lưu trữ mà Trợ lý bảo mật giám sát, rồi đồng bộ lại.",
+      "syncIntegrationInactive": "Kết nối GitHub của Trợ lý bảo mật chưa hoạt động. Hãy kết nối lại Ứng dụng GitHub của Kilo, sau đó đồng bộ lại.",
+      "syncMissingPermission": "Kilo GitHub App không thể đọc cảnh báo lỗ hổng bảo mật. Cấp quyền đó trong GitHub, rồi đồng bộ lại."
     },
     "analysisState": {
       "queued": "Đang chờ phân tích",
@@ -1567,7 +1568,6 @@
       "closedOn": "{{status}} vào {{date}}",
       "deadlineNotSet": "Chưa đặt hạn chót",
       "noSlaDeadline": "Không có hạn chót SLA",
-      "dueOn": "Đến hạn {{date}}",
       "overdueNow": "Quá hạn",
       "overdue_other": "Quá hạn {{count}} ngày",
       "dueToday": "Đến hạn hôm nay",
@@ -2827,7 +2827,6 @@
     "entry": {
       "noRecentPrs": "Chưa có đánh giá gần đây",
       "noRecentPrsDescription": "Dán liên kết ở trên để bắt đầu đánh giá — lần sau nó sẽ xuất hiện ở đây.",
-      "couldNotLoad": "Không thể tải dữ liệu.",
       "removeFromRecentsTitle": "Xóa khỏi mục gần đây?",
       "removeFromRecentsMessage": "Đánh giá này sẽ được xóa khỏi danh sách gần đây của bạn.",
       "removeRecentAccessibility": "Xóa {{repo}} khỏi mục gần đây",
@@ -3848,6 +3847,7 @@
       "markSecret": "Đánh dấu là bí mật",
       "masked": "Giá trị ẩn",
       "reveal": "Tiết lộ giá trị",
+      "hide": "Ẩn giá trị",
       "newValuePlaceholder": "Nhập giá trị bí mật mới",
       "valuePlaceholder": "Giá trị bí mật (đã mã hóa)"
     },

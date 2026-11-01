@@ -132,6 +132,11 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     // Keep a dirty draft and its controls usable if the redirect is cancelled.
     return <>{dialog}</>;
   }
+  // The draft hydrates from the config in an effect; painting the body first
+  // would show the default mode and empty model rows before the config's.
+  if (baseline === null) {
+    return <AnalysisSettingsSkeleton />;
+  }
 
   const modelName = (slug: string) => modelLabelFromCatalogue(models, slug);
   // A failed catalogue refetch keeps the last list. Hide the rows only when the

@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Ingen nylige gjennomganger",
       "noRecentPrsDescription": "Lim inn en lenke ovenfor for å starte en kodegjennomgang — den vises her neste gang.",
-      "couldNotLoad": "Kunne ikke laste inn innholdet.",
       "removeFromRecentsTitle": "Fjerne fra listen over nylige PR-er?",
       "removeFromRecentsMessage": "Denne gjennomgangen fjernes fra listen over nylige.",
       "removeRecentAccessibility": "Fjern {{repo}} fra listen over nylige PR-er",
@@ -834,7 +833,8 @@
     "liveUpdates": "Sanntidsoppdateringer",
     "liveUpdateSubtitle": "Vis aktive agenter i varslene dine",
     "push": "Push-varsler",
-    "onDescription": "Push-varsler er på for denne enheten.",
+    "deviceTitle": "Push-varsler på denne enheten",
+    "onDescription": "Varslene følger kategoriene nedenfor.",
     "offDescription": "Varslingstillatelsen eller enhetsregistreringen er deaktivert.",
     "retryPermission": "Prøv å sjekke varslingstillatelsen igjen",
     "enable": "Aktiver varsler",
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Alvorlighetsgrad: høy til lav",
       "sortSeverityAsc": "Alvorlighetsgrad: lav til høy",
       "sortSlaDue": "SLA-frist",
-      "overdueOnly": "Bare funn over fristen"
+      "overdueOnly": "Bare funn over fristen",
+      "noRepositories": "Ingen repositorier er synkronisert eller valgt ennå. Velg dem i innstillingene for Sikkerhetsagent."
     },
     "automation": {
       "title": "Automatisering",
@@ -1841,7 +1842,8 @@
     "findingDetails": {
       "supersededBy": "Erstattet av et oppdatert funn",
       "supersededByDescription": "Trykk for å se status, analyse og utbedring for det oppdaterte funnet.",
-      "dismissedBecause": "Avvist {{reason}}.",
+      "dismissedOn": "Avvisningsdato",
+      "supersededOn": "Erstatningsdato",
       "severityLabel": "Alvorlighetsgrad: {{severity}}",
       "package": "Pakke",
       "vulnerableVersions": "Sårbare versjoner",
@@ -1858,11 +1860,6 @@
       "viewAdvisory": "Vis sikkerhetsvarsel på GitHub",
       "statusOpen": "Åpent",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "retting er allerede i gang",
-      "reasonNoBandwidth": "ingen ledig kapasitet",
-      "reasonTolerableRisk": "risikoen er akseptabel",
-      "reasonInaccurate": "funnet er unøyaktig",
-      "reasonNotUsed": "sårbar kode brukes ikke",
       "reasonAfterReview": "etter gjennomgang"
     },
     "settingsOverview": {
@@ -1922,7 +1919,7 @@
       "highDescription": "Kan eksponere betydelige mengder data.",
       "mediumDescription": "Har begrensede konsekvenser eller krever bestemte forhold.",
       "lowDescription": "Har minimale konsekvenser for sikkerheten.",
-      "invalidDayCount": "angi et helt antall dager fra 1 til 365.",
+      "invalidDayCount": "Angi et helt antall dager fra 1 til 365.",
       "remediationDeadlineA11y": "Utbedringsfrist i dager for alvorlighetsgrad {{label}}",
       "enterWholeNumber": "Skriv inn et heltall mellom 1 og 365",
       "permissionNote": "Bare organisasjonseiere, administratorer og faktureringsansvarlige kan endre disse innstillingene.",
@@ -2062,7 +2059,10 @@
       "settleFailed": "Handlingen ble fullført, men vi kunne ikke registrere resultatet. Prøv igjen.",
       "replayFailed": "Denne handlingen ble ikke fullført. Prøv igjen.",
       "actionFailed": "Kunne ikke fullføre denne handlingen. Prøv igjen.",
-      "actionBlocked": "Kunne ikke fullføre denne handlingen. Problemet må løses før du kan prøve igjen."
+      "actionBlocked": "Kunne ikke fullføre denne handlingen. Problemet må løses før du kan prøve igjen.",
+      "syncNoRepositories": "Ingen repositorier er i synkroniseringsomfanget. Velg repositoriene Sikkerhetsagenten overvåker, og synkroniser på nytt.",
+      "syncIntegrationInactive": "GitHub-tilkoblingen for Sikkerhetsagenten er ikke aktiv. Koble Kilo GitHub App til på nytt, og synkroniser deretter på nytt.",
+      "syncMissingPermission": "Kilo GitHub App kan ikke lese vulnerability alerts. Gi denne tillatelsen i GitHub, og synkroniser på nytt."
     },
     "analysisState": {
       "queued": "Analyse i kø",
@@ -2096,7 +2096,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Ingen frist angitt",
       "noSlaDeadline": "Ingen SLA-frist",
-      "dueOn": "Frist {{date}}",
       "overdueNow": "Fristen er overskredet",
       "overdue_one": "{{count}} dag over fristen",
       "overdue_other": "{{count}} dager over fristen",
@@ -3848,6 +3847,7 @@
       "markSecret": "Merk som hemmelig",
       "masked": "Skjult verdi",
       "reveal": "Avslør verdi",
+      "hide": "Skjul verdi",
       "newValuePlaceholder": "Skriv inn ny hemmelig verdi",
       "valuePlaceholder": "Hemmelig verdi (kryptert)"
     },

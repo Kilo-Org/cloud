@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "કોઈ તાજેતરની સમીક્ષા નથી",
       "noRecentPrsDescription": "સમીક્ષા શરૂ કરવા ઉપર લિંક પેસ્ટ કરો — આગલી વારે તે અહીં દેખાશે.",
-      "couldNotLoad": "લોડ કરી શકાયું નહીં.",
       "removeFromRecentsTitle": "તાજેતરની યાદીમાંથી દૂર કરવી છે?",
       "removeFromRecentsMessage": "આ સમીક્ષા તમારી તાજેતરની યાદીમાંથી દૂર કરવામાં આવશે.",
       "removeRecentAccessibility": "{{repo}}ને તાજેતરની યાદીમાંથી દૂર કરો",
@@ -834,7 +833,8 @@
     "liveUpdates": "લાઇવ અપડેટ્સ",
     "liveUpdateSubtitle": "તમારી સૂચનાઓમાં સક્રિય એજન્ટો બતાવો",
     "push": "પુશ",
-    "onDescription": "આ ઉપકરણ માટે પુશ સૂચનાઓ ચાલુ છે.",
+    "deviceTitle": "આ ઉપકરણ પર પુશ",
+    "onDescription": "ચેતવણીઓ નીચેની શ્રેણીઓને અનુસરે છે.",
     "offDescription": "સૂચનાઓની પરવાનગી અથવા ઉપકરણની નોંધણી બંધ છે.",
     "retryPermission": "સૂચનાઓની પરવાનગી તપાસવા ફરી પ્રયાસ કરો",
     "enable": "સૂચનાઓ ચાલુ કરો",
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "ગંભીરતા: વધુથી ઓછી",
       "sortSeverityAsc": "ગંભીરતા: ઓછીથી વધુ",
       "sortSlaDue": "SLA ની નિયત તારીખ",
-      "overdueOnly": "માત્ર સમયમર્યાદા વટાવેલાં"
+      "overdueOnly": "માત્ર સમયમર્યાદા વટાવેલાં",
+      "noRepositories": "હજી સુધી કોઈ રિપોઝિટરી સિંક થઈ નથી કે પસંદ કરેલી નથી. તેમને સુરક્ષા એજન્ટની સેટિંગ્સમાં પસંદ કરો."
     },
     "automation": {
       "title": "ઓટોમેશન",
@@ -1847,7 +1848,8 @@
     "findingDetails": {
       "supersededBy": "આની જગ્યાએ નવું તારણ નોંધાયું છે",
       "supersededByDescription": "સ્થિતિ, વિશ્લેષણ અને સુધારણા માટે હાલનો રેકોર્ડ ખોલવા ટેપ કરો.",
-      "dismissedBecause": "આ કારણસર ખારિજ કર્યું: {{reason}}.",
+      "dismissedOn": "ખારિજ કરવાની તારીખ",
+      "supersededOn": "નવા તારણે સ્થાન લીધાની તારીખ",
       "severityLabel": "{{severity}} ગંભીરતા",
       "package": "પેકેજ",
       "vulnerableVersions": "સુરક્ષા ખામીવાળી આવૃત્તિઓ",
@@ -1864,11 +1866,6 @@
       "viewAdvisory": "GitHub પર સુરક્ષા સૂચના જુઓ",
       "statusOpen": "ખુલ્લું",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "સુધારવાનું કામ શરૂ થઈ ગયું છે",
-      "reasonNoBandwidth": "હાલ સમય કે સંસાધનો નથી",
-      "reasonTolerableRisk": "જોખમ સ્વીકાર્ય છે",
-      "reasonInaccurate": "તારણ સચોટ નથી",
-      "reasonNotUsed": "સુરક્ષાની ખામીવાળો કોડ વપરાતો નથી",
       "reasonAfterReview": "સમીક્ષા પછી"
     },
     "settingsOverview": {
@@ -2068,7 +2065,10 @@
       "settleFailed": "ક્રિયા પૂર્ણ થઈ, પરંતુ આપણે પરિણામ રેકોર્ડ કરી શક્યા નહીં. કૃપા કરીને ફરી પ્રયાસ કરો.",
       "replayFailed": "આ ક્રિયા પૂર્ણ થઈ નહીં. કૃપા કરીને ફરી પ્રયાસ કરો.",
       "actionFailed": "આ ક્રિયા પૂર્ણ કરી શકાઈ નહીં. કૃપા કરીને ફરી પ્રયાસ કરો.",
-      "actionBlocked": "આ ક્રિયા પૂર્ણ કરી શકાઈ નહીં. ફરી પ્રયાસ કરતાં પહેલાં સમસ્યા ઠીક કરવી પડશે."
+      "actionBlocked": "આ ક્રિયા પૂર્ણ કરી શકાઈ નહીં. ફરી પ્રયાસ કરતાં પહેલાં સમસ્યા ઠીક કરવી પડશે.",
+      "syncNoRepositories": "કોઈ પણ રિપોઝિટરી સિંક સ્કોપમાં નથી. સુરક્ષા એજન્ટ કઈ રિપોઝિટરીઓ મોનિટર કરે તે પસંદ કરો, પછી ફરીથી સિંક કરો.",
+      "syncIntegrationInactive": "સુરક્ષા એજન્ટ માટે GitHub કનેક્શન સક્રિય નથી. Kilo GitHub App ફરીથી જોડો, પછી ફરીથી સિંક કરો.",
+      "syncMissingPermission": "Kilo GitHub ઍપ vulnerability alerts વાંચી શકતું નથી. GitHub માં એ પરવાનગી આપો, પછી ફરી સિંક કરો."
     },
     "analysisState": {
       "queued": "વિશ્લેષણ કતારમાં છે",
@@ -2102,7 +2102,6 @@
       "closedOn": "{{date}} ના રોજ {{status}}",
       "deadlineNotSet": "સમયમર્યાદા નક્કી કરેલી નથી",
       "noSlaDeadline": "SLA ની સમયમર્યાદા નથી",
-      "dueOn": "સમયમર્યાદા: {{date}}",
       "overdueNow": "સમયમર્યાદા વટાવી",
       "overdue_one": "સમયમર્યાદા વટાવ્યાને {{count}} દિવસ",
       "overdue_other": "સમયમર્યાદા વટાવ્યાને {{count}} દિવસ",
@@ -3854,6 +3853,7 @@
       "markSecret": "ગુપ્ત તરીકે ચિહ્નિત કરો",
       "masked": "છુપાયેલ મૂલ્ય",
       "reveal": "મૂલ્ય દર્શાવો",
+      "hide": "મૂલ્ય છુપાવો",
       "newValuePlaceholder": "નવું ગુપ્ત મૂલ્ય દાખલ કરો",
       "valuePlaceholder": "ગુપ્ત મૂલ્ય (એન્ક્રિપ્ટ કરેલ)"
     },

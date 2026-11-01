@@ -1,7 +1,7 @@
 import {
   SESSION_CARD_QUIET_AFTER_MS,
   type SessionLiveActivityContentState,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 
 import { formatSessionTotalCost } from '@/components/agents/session-list-helpers';
 import { i18n } from '@/i18n';

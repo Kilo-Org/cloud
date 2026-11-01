@@ -305,7 +305,8 @@
     "liveUpdates": "लाइव अपडेट",
     "liveUpdateSubtitle": "अपनी सूचनाओं में सक्रिय एजेंट दिखाएँ",
     "push": "पुश सूचनाएँ",
-    "onDescription": "इस डिवाइस के लिए पुश सूचनाएँ चालू हैं।",
+    "deviceTitle": "इस डिवाइस पर पुश सूचनाएँ",
+    "onDescription": "सूचनाएँ नीचे की श्रेणियों के अनुसार आती हैं।",
     "offDescription": "सूचनाओं की अनुमति नहीं है या डिवाइस का पंजीकरण बंद है।",
     "retryPermission": "सूचनाओं की अनुमति फिर से जाँचें",
     "enable": "सूचनाएँ चालू करें",
@@ -1151,7 +1152,8 @@
       "sortSeverityDesc": "गंभीरता: उच्च से निम्न",
       "sortSlaDue": "SLA की अंतिम तारीख",
       "statusIgnored": "अनदेखा किया गया",
-      "statusOpen": "ओपन"
+      "statusOpen": "ओपन",
+      "noRepositories": "अभी तक कोई रिपॉज़िटरी सिंक या चयनित नहीं की गई है। उन्हें «सुरक्षा एजेंट» की सेटिंग्स में चुनें।"
     },
     "analysis": {
       "analyzeRepository": "रिपॉज़िटरी का विश्लेषण करें",
@@ -1373,7 +1375,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "पता लगाया गया",
-      "dismissedBecause": "खारिज करने का कारण: {{reason}}।",
+      "dismissedOn": "खारिज होने की तारीख",
+      "supersededOn": "नए रिकॉर्ड से बदले जाने की तारीख",
       "ghsa": "GHSA",
       "manifest": "मैनिफ़ेस्ट",
       "noPatchAvailable": "कोई पैच उपलब्ध नहीं",
@@ -1390,11 +1393,6 @@
       "vulnerableVersions": "असुरक्षित वर्ज़न",
       "statusOpen": "ओपन",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "सुधार शुरू हो चुका है",
-      "reasonNoBandwidth": "समय और संसाधन उपलब्ध नहीं हैं",
-      "reasonTolerableRisk": "जोखिम स्वीकार्य है",
-      "reasonInaccurate": "मिली समस्या की जानकारी गलत है",
-      "reasonNotUsed": "असुरक्षित कोड का इस्तेमाल नहीं होता",
       "reasonAfterReview": "समीक्षा के बाद"
     },
     "findingList": {
@@ -1539,7 +1537,10 @@
       "settleFailed": "कार्रवाई पूरी हुई, लेकिन हम परिणाम दर्ज नहीं कर सके। कृपया फिर से कोशिश करें।",
       "replayFailed": "यह कार्रवाई पूरी नहीं हुई। कृपया फिर से कोशिश करें।",
       "actionFailed": "यह कार्रवाई पूरी नहीं की जा सकी। कृपया फिर से कोशिश करें।",
-      "actionBlocked": "यह कार्रवाई पूरी नहीं की जा सकी। दोबारा कोशिश करने से पहले समस्या ठीक करना ज़रूरी है।"
+      "actionBlocked": "यह कार्रवाई पूरी नहीं की जा सकी। दोबारा कोशिश करने से पहले समस्या ठीक करना ज़रूरी है।",
+      "syncNoRepositories": "सिंक स्कोप में कोई रिपॉज़िटरी नहीं है। जिन रिपॉज़िटरी की «सुरक्षा एजेंट» निगरानी करता है उन्हें चुनें, फिर दोबारा सिंक करें।",
+      "syncIntegrationInactive": "«सुरक्षा एजेंट» के लिए GitHub कनेक्शन सक्रिय नहीं है। Kilo GitHub App को फिर से कनेक्ट करें, फिर दोबारा सिंक करें।",
+      "syncMissingPermission": "Kilo GitHub App vulnerability alerts नहीं पढ़ सकता। GitHub में वह अनुमति दें, फिर दोबारा सिंक करें।"
     },
     "analysisState": {
       "queued": "विश्लेषण कतार में",
@@ -1573,7 +1574,6 @@
       "closedOn": "{{date}} को {{status}}",
       "deadlineNotSet": "समय सीमा निर्धारित नहीं",
       "noSlaDeadline": "SLA की कोई समय सीमा नहीं",
-      "dueOn": "अंतिम तारीख: {{date}}",
       "overdueNow": "विलंबित",
       "overdue_one": "समय सीमा से {{count}} दिन की देरी",
       "overdue_other": "{{count}} दिन की देरी",
@@ -2833,7 +2833,6 @@
     "entry": {
       "noRecentPrs": "कोई हालिया समीक्षा नहीं",
       "noRecentPrsDescription": "समीक्षा शुरू करने के लिए ऊपर लिंक पेस्ट करें — यह अगली बार यहाँ दिखाई देगा।",
-      "couldNotLoad": "लोड नहीं हो सका।",
       "removeFromRecentsTitle": "हालिया सूची से हटाएँ?",
       "removeFromRecentsMessage": "यह समीक्षा आपकी हालिया सूची से हटा दी जाएगी।",
       "removeRecentAccessibility": "{{repo}} को हालिया सूची से हटाएँ",
@@ -3854,6 +3853,7 @@
       "markSecret": "रहस्य के रूप में चिह्नित करें",
       "masked": "छिपा हुआ मान",
       "reveal": "मान प्रकट करें",
+      "hide": "मान छिपाएं",
       "newValuePlaceholder": "नया गुप्त मान दर्ज करें",
       "valuePlaceholder": "गुप्त मान (एन्क्रिप्टेड)"
     },

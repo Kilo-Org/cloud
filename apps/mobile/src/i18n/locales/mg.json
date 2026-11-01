@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Tsy misy fandinihana vao haingana",
       "noRecentPrsDescription": "Apetaho ny rohy ambony mba hanombohana fandinihana — hita eto izy amin'ny manaraka.",
-      "couldNotLoad": "Tsy tafiditra ny angona.",
       "removeFromRecentsTitle": "Hesorina amin'ny lisitry ny nosokafana farany ve?",
       "removeFromRecentsMessage": "Ho esorina ao amin'ny lisitry ny vao haingana ity fandinihana ity.",
       "removeRecentAccessibility": "Esory amin'ny lisitry ny nosokafana farany ny {{repo}}",
@@ -834,7 +833,8 @@
     "liveUpdates": "Fanavaozana mivantana",
     "liveUpdateSubtitle": "Asehoy ao amin'ny fampandrenesanao ny mpanampy miasa",
     "push": "Fampandrenesana alefa mivantana",
-    "onDescription": "Mandeha amin'ity fitaovana ity ny fampandrenesana alefa mivantana.",
+    "deviceTitle": "Fampandrenesana alefa mivantana amin'ity fitaovana ity",
+    "onDescription": "Miankina amin'ny sokajy etsy ambany ny fampandrenesana.",
     "offDescription": "Tsy nomena ny alalana na tsy mandeha ny fisoratana anaran'ny fitaovana.",
     "retryPermission": "Andramo hamarinina indray ny alalana handefa fampandrenesana",
     "enable": "Alefaso ny fampandrenesana",
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Hamafy: avo mankany ambany",
       "sortSeverityAsc": "Hamafy: ambany mankany avo",
       "sortSlaDue": "Daty farany araka ny SLA",
-      "overdueOnly": "Nihoatra ny fe-potoana ihany"
+      "overdueOnly": "Nihoatra ny fe-potoana ihany",
+      "noRepositories": "Tsy mbola misy repositera voarindra na voafidy. Safidio ao amin'ny fikira ny Mpanampy amin'ny fiarovana izy ireo."
     },
     "automation": {
       "title": "Fampandehanana ho azy",
@@ -1847,7 +1848,8 @@
     "findingDetails": {
       "supersededBy": "Nosoloina olana hita vaovao",
       "supersededByDescription": "Tsindrio ny firaketana vaovao hijerena ny sata, ny famakafakana ary ny fanarenana.",
-      "dismissedBecause": "Nailika noho izao antony izao: {{reason}}.",
+      "dismissedOn": "Daty fanesorana",
+      "supersededOn": "Daty fanoloana",
       "severityLabel": "Hamafy: {{severity}}",
       "package": "Fonosana",
       "vulnerableVersions": "Dikan-teny marefo",
@@ -1864,11 +1866,6 @@
       "viewAdvisory": "Jereo ny fampitandremana ao amin'ny GitHub",
       "statusOpen": "Misokatra",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "efa nanomboka ny fanitsiana",
-      "reasonNoBandwidth": "tsy misy fotoana hanaovana azy",
-      "reasonTolerableRisk": "azo ekena ny risika",
-      "reasonInaccurate": "tsy marina ny olana voalaza",
-      "reasonNotUsed": "tsy ampiasaina ny kaody marefo",
       "reasonAfterReview": "taorian'ny fanamarinana"
     },
     "settingsOverview": {
@@ -1928,7 +1925,7 @@
       "highDescription": "Mety haharihary angona betsaka.",
       "mediumDescription": "Fiantraikany voafetra na fepetra manokana.",
       "lowDescription": "Fiantraikany tena kely amin'ny fiarovana.",
-      "invalidDayCount": "tokony ho 1–365 andro ny fe-potoana, ary isa feno ihany no ekena.",
+      "invalidDayCount": "Tokony ho 1–365 andro ny fe-potoana, ary isa feno ihany no ekena.",
       "remediationDeadlineA11y": "Fe-potoana fanarenana ho an'ny hamafy {{label}}, refesina amin'ny andro",
       "enterWholeNumber": "Ampidiro ny isa feno eo anelanelan'ny 1 sy 365",
       "permissionNote": "Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka manova ireo fikirana ireo.",
@@ -2068,7 +2065,10 @@
       "settleFailed": "Vita ny hetsika, fa tsy voatahiry ny vokatra. Andramo indray azafady.",
       "replayFailed": "Tsy vita ity hetsika ity. Andramo indray azafady.",
       "actionFailed": "Tsy azo vitaina ity hetsika ity. Andramo indray azafady.",
-      "actionBlocked": "Tsy azo vitaina ity hetsika ity. Mila vahana aloha ny olana."
+      "actionBlocked": "Tsy azo vitaina ity hetsika ity. Mila vahana aloha ny olana.",
+      "syncNoRepositories": "Tsy misy depo ao amin'ny sehatry ny fampifanarahana. Safidio ny depo arovan'ny Mpanampy amin'ny fiarovana, dia mifanaraha indray.",
+      "syncIntegrationInactive": "Tsy mavitrika ny fifandraisana amin'ny GitHub an'ny Mpanampy amin'ny fiarovana. Ampifandraiso indray ny Kilo GitHub App, dia avereno indray ny fampifanarahana.",
+      "syncMissingPermission": "Tsy afaka mamaky ny vulnerability alerts ny Kilo GitHub App. Omeo ao amin'ny GitHub io alalana io, dia avereno indray ny sync."
     },
     "analysisState": {
       "queued": "Voalahatra ny famakafakana",
@@ -2102,7 +2102,6 @@
       "closedOn": "{{status}} tamin'ny {{date}}",
       "deadlineNotSet": "Tsy voafaritra ny fe-potoana",
       "noSlaDeadline": "Tsy misy fe-potoana SLA",
-      "dueOn": "Fe-potoana farany: {{date}}",
       "overdueNow": "Nihoatra ny fe-potoana",
       "overdue_one": "Nihoatra {{count}} andro ny fe-potoana",
       "overdue_other": "Tara {{count}} andro",
@@ -3854,6 +3853,7 @@
       "markSecret": "Mariho ho tsiambaratelo",
       "masked": "Sanda miafina",
       "reveal": "Asehoy ny sandany",
+      "hide": "Afeno ny sandany",
       "newValuePlaceholder": "Ampidiro ny sandan-tsiambaratelo vaovao",
       "valuePlaceholder": "Sanda tsiambaratelo (voaaro)"
     },

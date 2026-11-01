@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Ingen seneste gennemgange",
       "noRecentPrsDescription": "Indsæt et link ovenfor for at starte en gennemgang — den vises her næste gang.",
-      "couldNotLoad": "Indholdet kunne ikke indlæses.",
       "removeFromRecentsTitle": "Fjern fra listen over seneste?",
       "removeFromRecentsMessage": "Denne gennemgang fjernes fra listen over dine seneste.",
       "removeRecentAccessibility": "Fjern {{repo}} fra listen over seneste",
@@ -834,7 +833,8 @@
     "liveUpdates": "Liveopdateringer",
     "liveUpdateSubtitle": "Vis aktive agenter i dine notifikationer",
     "push": "Pushnotifikationer",
-    "onDescription": "Pushnotifikationer er slået til på denne enhed.",
+    "deviceTitle": "Push på denne enhed",
+    "onDescription": "Notifikationer følger kategorierne nedenfor.",
     "offDescription": "Tilladelsen til notifikationer eller registreringen af enheden er slået fra.",
     "retryPermission": "Kontrollér tilladelsen til notifikationer igen",
     "enable": "Aktivér notifikationer",
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Alvorlighed: høj til lav",
       "sortSeverityAsc": "Alvorlighed: lav til høj",
       "sortSlaDue": "SLA-frist",
-      "overdueOnly": "Kun overskredne frister"
+      "overdueOnly": "Kun overskredne frister",
+      "noRepositories": "Ingen kodelagre er synkroniseret eller valgt endnu. Vælg dem i indstillingerne for Sikkerhedsagenten."
     },
     "automation": {
       "title": "Automatisering",
@@ -1841,7 +1842,8 @@
     "findingDetails": {
       "supersededBy": "Erstattet af et aktuelt fund",
       "supersededByDescription": "Tryk for at se det aktuelle funds status, analyse og udbedring.",
-      "dismissedBecause": "Fundet er afvist {{reason}}.",
+      "dismissedOn": "Afvist den",
+      "supersededOn": "Erstattet den",
       "severityLabel": "Alvorlighed: {{severity}}",
       "package": "Pakke",
       "vulnerableVersions": "Sårbare versioner",
@@ -1858,11 +1860,6 @@
       "viewAdvisory": "Se sikkerhedsbulletin på GitHub",
       "statusOpen": "Åben",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "rettelsen er allerede i gang",
-      "reasonNoBandwidth": "der er ingen ledig kapacitet",
-      "reasonTolerableRisk": "risikoen er acceptabel",
-      "reasonInaccurate": "fundet er misvisende",
-      "reasonNotUsed": "sårbar kode bruges ikke",
       "reasonAfterReview": "efter gennemgang"
     },
     "settingsOverview": {
@@ -1922,7 +1919,7 @@
       "highDescription": "Risiko for omfattende datalæk.",
       "mediumDescription": "Begrænset påvirkning eller krav om særlige betingelser.",
       "lowDescription": "Minimal påvirkning af sikkerheden.",
-      "invalidDayCount": "angiv 1–365 dage som et helt tal.",
+      "invalidDayCount": "Angiv 1–365 dage som et helt tal.",
       "remediationDeadlineA11y": "Frist for udbedring i dage ved {{label}} alvorlighed",
       "enterWholeNumber": "Indtast et helt tal mellem 1 og 365",
       "permissionNote": "Kun organisationsejere, administratorer og faktureringsansvarlige kan ændre disse indstillinger.",
@@ -2062,7 +2059,10 @@
       "settleFailed": "Handlingen blev gennemført, men vi kunne ikke registrere resultatet. Prøv igen.",
       "replayFailed": "Denne handling blev ikke gennemført. Prøv igen.",
       "actionFailed": "Handlingen kunne ikke gennemføres. Prøv igen.",
-      "actionBlocked": "Handlingen kunne ikke gennemføres. Problemet skal løses, før du kan prøve igen."
+      "actionBlocked": "Handlingen kunne ikke gennemføres. Problemet skal løses, før du kan prøve igen.",
+      "syncNoRepositories": "Der er ingen kodelagre i synkroniseringsomfanget. Vælg de kodelagre, som Sikkerhedsagenten overvåger, og synkroniser derefter igen.",
+      "syncIntegrationInactive": "GitHub-forbindelsen for Sikkerhedsagenten er ikke aktiv. Genopret forbindelsen til Kilos GitHub-app, og synkroniser derefter igen.",
+      "syncMissingPermission": "Kilos GitHub-app kan ikke læse sårbarhedsadvarsler. Giv den tilladelse i GitHub, og synkroniser derefter igen."
     },
     "analysisState": {
       "queued": "Analyse i kø",
@@ -2096,7 +2096,6 @@
       "closedOn": "{{status}} den {{date}}",
       "deadlineNotSet": "Frist ikke angivet",
       "noSlaDeadline": "Ingen SLA-frist",
-      "dueOn": "Frist den {{date}}",
       "overdueNow": "Frist overskredet",
       "overdue_one": "Frist overskredet med {{count}} dag",
       "overdue_other": "Frist overskredet med {{count}} dage",
@@ -3848,6 +3847,7 @@
       "markSecret": "Markér som hemmelig",
       "masked": "Skjult værdi",
       "reveal": "Afsløre værdi",
+      "hide": "Skjul værdi",
       "newValuePlaceholder": "Indtast ny hemmelig værdi",
       "valuePlaceholder": "Hemmelig værdi (krypteret)"
     },

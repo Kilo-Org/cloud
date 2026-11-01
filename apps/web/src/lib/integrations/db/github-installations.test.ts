@@ -2738,6 +2738,82 @@ describe('GitHub installation persistence', () => {
     expect(matched.map(row => row.id)).toEqual([organizationRow.id]);
   });
 
+  test('a non-GitHub organization association does not shadow the installation', async () => {
+    const organization = await createTestOrganization('Definition sibling', ownerId, 0);
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: organization.id,
+      platform: 'slack',
+      integration_type: 'app',
+      platform_installation_id: '777201',
+      integration_status: 'active',
+      created_at: new Date(Date.now() - 60_000).toISOString(),
+      repository_access: 'all',
+    });
+    const [githubRow] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '777201',
+        platform_account_login: 'acme',
+        integration_status: 'active',
+        github_app_type: 'standard',
+        repository_access: 'all',
+      })
+      .returning();
+
+    // The older association satisfies every health condition a shadowing
+    // sibling is ranked on, so the platform scope is what keeps the GitHub
+    // installation the organization's connection.
+    const matched = await db
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(organizationWorkflowGitHubConnectionSql());
+
+    expect(matched.map(row => row.id)).toEqual([githubRow.id]);
+    await expect(
+      getPrimaryGitHubIntegrationForOrganization(organization.id)
+    ).resolves.toMatchObject({ id: githubRow.id, github_connection_role: null });
+  });
+
+  test('a personal association that claims the installation keeps the organization roleless', async () => {
+    const organization = await createTestOrganization('Definition personal claim', ownerId, 0);
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: ownerId,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: '777202',
+      platform_account_login: 'owner',
+      integration_status: 'active',
+      github_app_type: 'standard',
+      github_connection_role: 'workflow',
+      repository_access: 'all',
+    });
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: organization.id,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: '777202',
+      platform_account_login: 'acme',
+      integration_status: 'active',
+      github_app_type: 'standard',
+      repository_access: 'all',
+    });
+
+    // Migration 0322 counted a claim from any GitHub association of the
+    // identity, personal or organization, so the definition does too: the
+    // installation already has a connection and this organization row stays a
+    // shadowed duplicate.
+    await expect(
+      db
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(organizationWorkflowGitHubConnectionSql())
+    ).resolves.toEqual([]);
+    await expect(getPrimaryGitHubIntegrationForOrganization(organization.id)).resolves.toBeNull();
+  });
+
   test('leaves a linked organization association roleless when another row claims the installation', async () => {
     const claimingOrganization = await createTestOrganization('Claimant', ownerId, 0);
     const organization = await createTestOrganization('Shadowed', ownerId, 0);

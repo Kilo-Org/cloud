@@ -147,7 +147,7 @@ describe('persistJoinCredential', () => {
     expect(await harness.decryptStoredToken()).toBe('account-a-token');
   });
 
-  it("leaves the stored org alone when the join ran on the stored token", async () => {
+  it('leaves the stored org alone when the join ran on the stored token', async () => {
     const harness = makeHarness();
     const previous = await harness.seed({
       token: 'account-a-token',

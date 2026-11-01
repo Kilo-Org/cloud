@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
+import { type SheetHeaderTopInset } from '@/components/sheet-header';
 import { type SessionProfilePickerProfile } from '@/components/agents/session-profile-picker-model';
 import { Button } from '@/components/ui/button';
 import { Check, Settings2 } from '@/components/ui/icons';
@@ -15,6 +16,16 @@ import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-
 import { cn } from '@/lib/utils';
 
 const SKELETON_ROW_COUNT = 4;
+
+/**
+ * The sheet presents at the half detent and its full detent stops below the
+ * status bar, so its header never overlaps the status bar. Reserving that
+ * inset anyway moved the title and every row by the inset height once the
+ * header measured its own position after presenting; declaring up front that
+ * the surface never reaches the window top keeps the first frame identical to
+ * the resting one.
+ */
+const SHEET_TOP_INSET: SheetHeaderTopInset = 'never';
 
 export type ProfilePickerSheetProps = {
   /** Rows offered as an override: every profile except the repo base. */
@@ -86,7 +97,7 @@ export function ProfilePickerSheet({
 
   if (isLoading) {
     return (
-      <PickerSheet title={title} onDone={onClose} scrollable={false}>
+      <PickerSheet title={title} onDone={onClose} scrollable={false} topInset={SHEET_TOP_INSET}>
         <View className="bg-background">
           {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
             <View key={index} className={cn(ROW_TARGET_CLASS, 'justify-center px-4 py-3')}>
@@ -100,7 +111,7 @@ export function ProfilePickerSheet({
 
   if (isError) {
     return (
-      <PickerSheet title={title} onDone={onClose} scrollable={false}>
+      <PickerSheet title={title} onDone={onClose} scrollable={false} topInset={SHEET_TOP_INSET}>
         <EmptyState
           icon={Settings2}
           title={t('agentChat.newSession.couldNotLoadEnvironment')}
@@ -122,7 +133,7 @@ export function ProfilePickerSheet({
 
   if (!hasProfiles) {
     return (
-      <PickerSheet title={title} onDone={onClose} scrollable={false}>
+      <PickerSheet title={title} onDone={onClose} scrollable={false} topInset={SHEET_TOP_INSET}>
         <EmptyState
           icon={Settings2}
           title={title}
@@ -143,7 +154,7 @@ export function ProfilePickerSheet({
   }
 
   return (
-    <PickerSheet title={title} onDone={onClose} onCancel={onClose}>
+    <PickerSheet title={title} onDone={onClose} onCancel={onClose} topInset={SHEET_TOP_INSET}>
       {needsAttention ? (
         <Text className="px-4 pt-3 text-sm text-warn">
           {t('agentChat.newSession.configNeedsAttention')}

@@ -33,6 +33,7 @@ export default function ProfilePickerScreen() {
           router.back();
         }}
         scrollable={false}
+        topInset="never"
         expired
       />
     );

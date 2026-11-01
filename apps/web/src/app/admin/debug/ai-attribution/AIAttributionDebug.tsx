@@ -184,20 +184,23 @@ export function AIAttributionDebug() {
               <div className="bg-muted rounded-lg p-3 font-mono text-sm">
                 DO Key: <span className="text-primary font-bold">{debugData.doKey}</span>
               </div>
-              {debugData.instance_summary.total_attributions !==
-                debugData.summary.total_attributions && (
-                <p className="text-muted-foreground mt-2 text-sm">
-                  This instance holds {debugData.instance_summary.total_attributions} attributions
-                  in total ({debugData.instance_summary.total_lines_added} lines added,{' '}
-                  {debugData.instance_summary.total_lines_removed} lines removed), including the
-                  ones the selected target does not list.
-                </p>
-              )}
+              {debugData.instance_summary !== undefined &&
+                debugData.instance_summary.total_attributions !==
+                  debugData.summary.total_attributions && (
+                  <p className="text-muted-foreground mt-2 text-sm">
+                    This instance holds {debugData.instance_summary.total_attributions} attributions
+                    in total ({debugData.instance_summary.total_lines_added} lines added,{' '}
+                    {debugData.instance_summary.total_lines_removed} lines removed), including the
+                    ones the selected target does not list.
+                  </p>
+                )}
             </CardContent>
           </Card>
 
           {/* Summary */}
-          <h2 className="text-lg font-semibold">Counts for the selected target</h2>
+          {debugData.instance_summary !== undefined && (
+            <h2 className="text-lg font-semibold">Counts for the selected target</h2>
+          )}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <Card>
               <CardContent className="pt-6 text-center">

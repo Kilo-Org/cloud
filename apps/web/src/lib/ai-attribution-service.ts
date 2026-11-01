@@ -48,7 +48,9 @@ const DebugDataResponse = z.discriminatedUnion('success', [
       doKey: z.string(),
       attributions: z.array(AttributionRecord),
       summary: DebugDataSummary,
-      instance_summary: DebugDataSummary,
+      // Optional while a deploy promotes the web app before the workers: the
+      // previous worker answers without it.
+      instance_summary: DebugDataSummary.optional(),
     }),
   }),
   z.object({

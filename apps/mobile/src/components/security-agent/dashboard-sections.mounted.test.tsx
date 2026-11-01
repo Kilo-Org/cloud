@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the placeholder suites share the sections' mock harness and card readers in this file */
 // The dashboard sections read the same sync state the filter row paints under
 // "All repositories". Before the first sync nothing has been measured, so the
 // priority card must not report the empty result as a clean codebase: the

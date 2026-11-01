@@ -20,9 +20,7 @@ export function findRestoreIncompleteStep(
  * carrying it still reads as a failed preparation, so the cause comes from
  * another step or from the attempt's own error.
  */
-export function failedStageStep(
-  attempt: PreparationAttempt
-): PreparationStepSnapshot | undefined {
+export function failedStageStep(attempt: PreparationAttempt): PreparationStepSnapshot | undefined {
   if (attempt.status !== 'failed') {
     return undefined;
   }

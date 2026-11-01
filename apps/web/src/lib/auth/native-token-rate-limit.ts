@@ -34,6 +34,23 @@ function reportMissingRule(rateLimitId: string): void {
   );
 }
 
+/**
+ * Reports the address rule's answer. A rule that is not configured and an answer
+ * that the firewall blocked both refuse the exchange, and both are reported
+ * through the shared once-per-rule-per-minute throttle.
+ */
+function reportAddressRuleIssue(error: 'not-found' | 'blocked'): void {
+  if (error === 'not-found') {
+    reportMissingRule(ADDRESS_RATE_LIMIT_ID);
+    return;
+  }
+  reportFirewallRateLimitIssue(
+    ADDRESS_RATE_LIMIT_ID,
+    'native_token_rate_limit',
+    `Firewall rate limit '${ADDRESS_RATE_LIMIT_ID}' did not permit the exchange`
+  );
+}
+
 /** True when one client address is exchanging device credentials too fast. */
 export async function isNativeTokenAddressRateLimited(request: Request): Promise<boolean> {
   const address =
@@ -44,10 +61,11 @@ export async function isNativeTokenAddressRateLimited(request: Request): Promise
     request,
     rateLimitKey: `${ADDRESS_RATE_LIMIT_ID}:${address}`,
   });
-  // A rule that is not configured cannot permit the exchange, so a request is
-  // only let through once the limiter has confirmed it may proceed.
-  if (error === 'not-found') {
-    reportMissingRule(ADDRESS_RATE_LIMIT_ID);
+  // Only a "not rate limited" answer permits the exchange. A rule that is not
+  // configured, or an answer the firewall blocks, refuses here, before the
+  // admission gate and its provider calls.
+  if (error) {
+    reportAddressRuleIssue(error);
     return true;
   }
   return rateLimited;

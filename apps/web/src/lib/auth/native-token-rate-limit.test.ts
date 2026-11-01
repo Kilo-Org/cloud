@@ -72,6 +72,16 @@ describe('native token rate limits', () => {
     );
   });
 
+  it('refuses an answer the firewall blocks and reports it', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: true, error: 'blocked' });
+
+    expect(await isNativeTokenAddressRateLimited(createRequest())).toBe(true);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "Firewall rate limit 'native-token-address' did not permit the exchange",
+      { level: 'error', tags: { source: 'native_token_rate_limit' } }
+    );
+  });
+
   it('keeps the transient-fault behaviour of the address rule', async () => {
     mockCheckRateLimit.mockRejectedValue(new Error('firewall unreachable'));
 

@@ -1,10 +1,15 @@
 import { env, reset, runInDurableObject } from 'cloudflare:test';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
+import { WIPE_LOCATOR_KEY } from '../../src/control-plane/session/session-do.js';
+import { cloudAgentChildSessions } from '../../src/control-plane/session/sqlite-schema.js';
 import { RUNTIME_AUTHORIZATION_KEY } from '../../src/session/runtime-authorization-persistence.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
+import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 
 type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
 const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDBOX_SESSION;
@@ -40,6 +45,7 @@ function metadata(input: {
   allowSubagentSessions: boolean;
   orgId?: string | null;
   worktreeId?: string;
+  parentCloudAgentSessionId?: string;
 }) {
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
@@ -52,6 +58,9 @@ function metadata(input: {
     auth: { kiloSessionId: kiloSessionId(), kilocodeToken: runtimeAuthorizedKiloToken() },
     agent: { mode: 'code', model: 'test/model' },
     allowSubagentSessions: input.allowSubagentSessions,
+    ...(input.parentCloudAgentSessionId === undefined
+      ? {}
+      : { parentCloudAgentSessionId: input.parentCloudAgentSessionId }),
     workspace: {
       sandboxId: 'ses-0123456789abcdef',
       sandboxProvider: 'cloudflare',
@@ -65,7 +74,8 @@ async function registerParent(
   parentSessionId: string,
   allowSubagentSessions: boolean,
   authorization?: { id: string; delegationExpiresAt: string; state?: 'active' | 'revoked' },
-  worktreeId?: string
+  worktreeId?: string,
+  parentCloudAgentSessionId?: string
 ): Promise<DurableObjectStub<SandboxSessionV2>> {
   let seal: string | undefined;
   if (authorization !== undefined) {
@@ -86,7 +96,7 @@ async function registerParent(
       SECRET
     );
   }
-  const stub = sessions.getByName(parentSessionId);
+  const stub = sessions.getByName(sessionDoName(USER_ID, parentSessionId));
   await runInDurableObject(stub, instance => {
     instance.env.NEXTAUTH_SECRET = SECRET;
   });
@@ -95,12 +105,19 @@ async function registerParent(
       sessionId: parentSessionId,
       allowSubagentSessions,
       ...(worktreeId === undefined ? {} : { worktreeId }),
+      ...(parentCloudAgentSessionId === undefined ? {} : { parentCloudAgentSessionId }),
     }),
     sandboxSelection: { provider: 'cloudflare' },
     ...(seal === undefined ? {} : { runtimeAuthorizationSeal: seal }),
   });
   expect(result).toEqual({ success: true });
   return stub;
+}
+
+async function childRows(stub: DurableObjectStub<SandboxSessionV2>) {
+  return runInDurableObject(stub, (_instance, state) =>
+    drizzle(state.storage, { logger: false }).select().from(cloudAgentChildSessions).all()
+  );
 }
 
 async function rejectionMessage(
@@ -171,6 +188,73 @@ describe('SandboxSessionV2 child registry', () => {
     });
     expect(pageTwo.sessions.map(session => session.cloudAgentSessionId)).toEqual(expected.slice(2));
     expect(pageTwo.nextCursor).toBeUndefined();
+  });
+
+  it('clears the child registry on a locator-preserving wipe', async () => {
+    const parentSessionId = workspaceSessionId();
+    const stub = await registerParent(parentSessionId, true);
+    const first = workspaceSessionId();
+    const second = workspaceSessionId();
+    await stub.recordCloudAgentChildSession({
+      cloudAgentSessionId: first,
+      initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+    });
+    await stub.recordCloudAgentChildSession({ cloudAgentSessionId: second });
+    expect((await childRows(stub)).map(row => row.child_session_id).sort()).toEqual(
+      [first, second].sort()
+    );
+
+    const peer = new FakeSandboxPeer();
+    peer.getAcceptedHandleIssuerLocator = async () => ({
+      scopeId: 'scope_1',
+      allocationId: 'allocation_1',
+      wrapperInstanceId: 'wrapper_1',
+      expiresAt: Date.now() + 60_000,
+    });
+    await runInDurableObject(stub, instance => {
+      instance.sandboxPeerFor = () => peer;
+    });
+
+    await stub.deleteSession();
+
+    expect(await childRows(stub)).toEqual([]);
+    await expect(stub.listCloudAgentChildSessions({ limit: 10 })).resolves.toEqual({
+      sessions: [],
+    });
+    await expect(
+      runInDurableObject(stub, (_instance, state) => state.storage.get(WIPE_LOCATOR_KEY))
+    ).resolves.toMatchObject({
+      version: 1,
+      sandboxId: 'ses-0123456789abcdef',
+      scopeId: 'scope_1',
+    });
+  });
+
+  it('prunes a deleted child from the parent registry', async () => {
+    const parentSessionId = workspaceSessionId();
+    const parent = await registerParent(parentSessionId, true);
+    const childSessionId = workspaceSessionId();
+    const child = await registerParent(
+      childSessionId,
+      false,
+      undefined,
+      undefined,
+      parentSessionId
+    );
+    await parent.recordCloudAgentChildSession({ cloudAgentSessionId: childSessionId });
+    expect((await childRows(parent)).map(row => row.child_session_id)).toEqual([childSessionId]);
+
+    const peer = new FakeSandboxPeer();
+    await runInDurableObject(child, instance => {
+      instance.sandboxPeerFor = () => peer;
+    });
+    await child.deleteSession();
+
+    await expect(child.getSession()).resolves.toEqual({ type: 'session-not-found' });
+    expect(await childRows(parent)).toEqual([]);
+    await expect(parent.listCloudAgentChildSessions({ limit: 10 })).resolves.toEqual({
+      sessions: [],
+    });
   });
 
   it('rejects registry writes when the parent has not opted in', async () => {

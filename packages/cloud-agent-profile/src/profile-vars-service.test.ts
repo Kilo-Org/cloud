@@ -23,7 +23,7 @@ describe('setVar limits', () => {
     expect(state.lockCalls).toBe(1);
   });
 
-  test('rejects a new variable at the cap without writing', async () => {
+  test('refuses a variable beyond the cap and writes nothing', async () => {
     const { db, state } = createLimitTestDb(MAX_PROFILE_VARS, storedKeys(MAX_PROFILE_VARS));
 
     await expect(
@@ -35,7 +35,7 @@ describe('setVar limits', () => {
     expect(state.lockCalls).toBe(1);
   });
 
-  test('keeps a stored variable writable at the cap', async () => {
+  test('sets a stored variable at the cap', async () => {
     const { db, state } = createLimitTestDb(MAX_PROFILE_VARS, [
       ...storedKeys(MAX_PROFILE_VARS - 1),
       'API_KEY',
@@ -50,7 +50,7 @@ describe('setVar limits', () => {
     expect(state.lockCalls).toBe(1);
   });
 
-  test('keeps concurrent new variables within the cap', async () => {
+  test('keeps concurrent writes within the cap', async () => {
     const { db, state } = createLimitTestDb(MAX_PROFILE_VARS - 1, storedKeys(MAX_PROFILE_VARS - 1));
 
     const results = await Promise.allSettled([
@@ -63,7 +63,7 @@ describe('setVar limits', () => {
     expect(state.lockCalls).toBe(2);
   });
 
-  test('rejects a new key outside the key contract without writing', async () => {
+  test('applies the key rules to a new key', async () => {
     const { db, state } = createLimitTestDb(0);
 
     await expect(
@@ -74,7 +74,7 @@ describe('setVar limits', () => {
     expect(state.lockCalls).toBe(1);
   });
 
-  test('rejects a reserved new key without writing', async () => {
+  test('applies the reserved-name rule to a new key', async () => {
     const { db, state } = createLimitTestDb(0);
 
     await expect(

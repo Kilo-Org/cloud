@@ -33,8 +33,9 @@ function encryptValue(publicKeyBase64: string, value: string): string {
  * Set or update an environment variable for a profile.
  * If isSecret is true, the value is encrypted before storage.
  *
- * The key contract and the per-profile cap apply to a key the profile does not
- * hold yet; an existing key stays updatable at and above the cap.
+ * A profile holds at most MAX_PROFILE_VARS variables, and every key the profile
+ * stores follows the package's environment-key rules. An update to a key the
+ * profile holds needs neither a free slot nor a fresh key check.
  */
 export async function setVar(
   db: WorkerDb,
@@ -50,8 +51,8 @@ export async function setVar(
   const storedValue = isSecret ? encryptValue(publicKeyBase64, value) : value;
 
   await db.transaction(async tx => {
-    // Lock the owning profile row so the existence check, the cap count and the
-    // write are one serialized unit, keeping concurrent sets within the cap.
+    // Lock the owning profile row so the key lookup, the cap check and the
+    // write are one serialized unit, keeping concurrent writes within the cap.
     await tx
       .select({ id: agent_environment_profiles.id })
       .from(agent_environment_profiles)

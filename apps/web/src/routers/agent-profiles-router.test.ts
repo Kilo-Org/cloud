@@ -729,7 +729,7 @@ describe('Agent Profiles Router', () => {
         expect(result.vars[0].isSecret).toBe(true);
       });
 
-      test('should reject a new key outside the key contract', async () => {
+      test('should apply the key rules to a new key', async () => {
         const caller = await createCallerForUser(ownerUser.id);
 
         const { id: profileId } = await caller.agentProfiles.create({
@@ -749,7 +749,7 @@ describe('Agent Profiles Router', () => {
         expect(result.vars).toHaveLength(0);
       });
 
-      test('should reject a reserved key', async () => {
+      test('should apply the reserved-name rule to a new key', async () => {
         const caller = await createCallerForUser(ownerUser.id);
 
         const { id: profileId } = await caller.agentProfiles.create({
@@ -769,7 +769,7 @@ describe('Agent Profiles Router', () => {
         expect(result.vars).toHaveLength(0);
       });
 
-      test('should reject a new key at the profile cap and keep stored keys writable', async () => {
+      test('should hold a profile at the variable cap', async () => {
         const caller = await createCallerForUser(ownerUser.id);
 
         const { id: profileId } = await caller.agentProfiles.create({

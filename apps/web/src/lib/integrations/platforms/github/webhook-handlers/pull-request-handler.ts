@@ -29,9 +29,11 @@ import type { GitHubAppType } from '@/lib/integrations/platforms/github/adapter'
 import {
   addReactionToPR,
   createCheckRun,
+  findMergeHeadContentSha,
   isMergeCommit,
   updateCheckRun,
 } from '@/lib/integrations/platforms/github/adapter';
+import { isNonTerminalCodeReviewStatus } from '@/lib/code-reviews/dispatch/dispatch-constants';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { updateCheckRunId } from '@/lib/code-reviews/db/code-reviews';
 import { resolvePullRequestCheckoutRef } from './pull-request-checkout-ref';
@@ -171,17 +173,31 @@ export async function handlePullRequestCodeReview(
     // Skip merge commits on synchronize (e.g. merging base branch into feature branch).
     // Runs before cancellation so that an in-flight review at an earlier SHA is preserved:
     // a merge commit introduces no new feature work and should not supersede the existing review.
-    if (
+    // The skip holds only while a review covers the content the head carries. A head that stacks
+    // merges on branch commits no review has covered yet must be reviewed here, or the pull request
+    // never gets a review at its head and a repository that requires the Kilo check stays blocked.
+    const isMergeHead =
       !isBotPullRequestSkip &&
-      headOwner &&
-      headRepoName &&
+      Boolean(headOwner) &&
+      Boolean(headRepoName) &&
       (await shouldSkipSynchronizeForMergeCommit({
         action: payload.action,
         installationId: integration.platform_installation_id as string,
-        headOwner,
-        headRepoName,
+        headOwner: headOwner as string,
+        headRepoName: headRepoName as string,
         headSha: pull_request.head.sha,
         appType,
+      }));
+
+    if (
+      isMergeHead &&
+      (await mergeHeadContentIsReviewed({
+        appType,
+        headOwner: headOwner as string,
+        headRepoName: headRepoName as string,
+        headSha: pull_request.head.sha,
+        installationId: integration.platform_installation_id as string,
+        reviewScope,
       }))
     ) {
       logExceptInTest('Skipping merge commit:', {
@@ -209,6 +225,14 @@ export async function handlePullRequestCodeReview(
       });
 
       return NextResponse.json({ message: 'Skipped merge commit' }, { status: 200 });
+    }
+
+    if (isMergeHead) {
+      logExceptInTest('Reviewing merge commit whose content no review covers:', {
+        pr_number: pull_request.number,
+        repo: repository.full_name,
+        head_sha: pull_request.head.sha,
+      });
     }
 
     // Cancel any existing reviews for this PR (different SHA).
@@ -521,6 +545,42 @@ export async function shouldSkipSynchronizeForMergeCommit(args: {
   if (args.action !== GITHUB_ACTION.SYNCHRONIZE) return false;
   const check = args.isMergeCommitFn ?? isMergeCommit;
   return check(args.installationId, args.headOwner, args.headRepoName, args.headSha, args.appType);
+}
+
+/**
+ * Whether a review already covers the content a merge head carries: one that
+ * finished, or one still in flight, which the migration repoints at the head.
+ * No review, or one that ended cancelled or failed, leaves the head unreviewed,
+ * so the synchronize starts a review instead of migrating one.
+ */
+async function mergeHeadContentIsReviewed(args: {
+  appType: GitHubAppType;
+  headOwner: string;
+  headRepoName: string;
+  headSha: string;
+  installationId: string;
+  reviewScope: ReviewScope;
+}): Promise<boolean> {
+  const contentSha = await findMergeHeadContentSha(
+    args.installationId,
+    args.headOwner,
+    args.headRepoName,
+    args.headSha,
+    args.appType
+  );
+  if (contentSha === undefined) {
+    return false;
+  }
+  try {
+    const review = await findExistingReview(args.reviewScope, contentSha);
+    if (review === null) {
+      return false;
+    }
+    return review.status === 'completed' || isNonTerminalCodeReviewStatus(review.status);
+  } catch (error) {
+    logExceptInTest('Failed to read the review of the merge head content commit:', error);
+    return false;
+  }
 }
 
 /**

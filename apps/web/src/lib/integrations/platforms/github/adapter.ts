@@ -1643,6 +1643,56 @@ export async function isMergeCommit(
   }
 }
 
+// How many merges a head may stack before its branch content is treated as unknown.
+const mergeHeadWalkLimit = 10;
+
+/**
+ * Resolves the branch commit a merge head carries: the first-parent ancestor
+ * below every merge. A synchronize whose head only stacks merges of the base
+ * branch introduces no new branch content, so the commit it stacks on is what a
+ * review has to cover.
+ *
+ * Returns undefined when the chain cannot be read, so the caller reviews the
+ * head instead of waiting for coverage it cannot confirm.
+ */
+export async function findMergeHeadContentSha(
+  installationId: string,
+  owner: string,
+  repo: string,
+  commitSha: string,
+  appType: GitHubAppType = 'standard'
+): Promise<string | undefined> {
+  try {
+    const tokenData = await generateGitHubInstallationToken(installationId, appType);
+    const octokit = new Octokit({ auth: tokenData.token });
+
+    let current = commitSha;
+    for (let depth = 0; depth <= mergeHeadWalkLimit; depth += 1) {
+      // oxlint-disable-next-line no-await-in-loop -- Each parent names the next commit to read.
+      const { data } = await octokit.git.getCommit({
+        owner,
+        repo,
+        commit_sha: current,
+      });
+      const [firstParent] = data.parents;
+      if (data.parents.length < 2 || firstParent === undefined) {
+        return current;
+      }
+      current = firstParent.sha;
+    }
+
+    logExceptInTest('[findMergeHeadContentSha] Merge chain exceeds the walk limit', {
+      owner,
+      repo,
+      sha: commitSha.substring(0, 8),
+    });
+    return undefined;
+  } catch (error) {
+    logExceptInTest('[findMergeHeadContentSha] Failed to walk the merge chain:', error);
+    return undefined;
+  }
+}
+
 /**
  * Conclusion values for a completed GitHub Check Run.
  * @see https://docs.github.com/en/rest/checks/runs#create-a-check-run

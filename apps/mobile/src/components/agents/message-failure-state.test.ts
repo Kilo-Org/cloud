@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import { type MessageInfo } from '@kilocode/cloud-agent-sdk';
 
-import { NON_RETRYABLE_ASSISTANT_ERRORS, selectMessageFailure } from './message-failure-state';
+import { CATALOG_LOADERS } from '@/i18n/catalogs';
+import { i18n } from '@/i18n';
+import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
+
+import {
+  messageFailureLabel,
+  NON_RETRYABLE_ASSISTANT_ERRORS,
+  selectMessageFailure,
+} from './message-failure-state';
 
 function userInfo(): MessageInfo {
   return {
@@ -160,5 +168,92 @@ describe('selectMessageFailure', () => {
       const result = selectMessageFailure({ info: assistantInfo('APIError') });
       expect(result?.canCopy).toBe(false);
     });
+  });
+});
+
+/**
+ * The failed row's label is the one place the footer copy and a failure title
+ * meet, and the titles end their own sentence in most catalogs. Every language
+ * is checked here because the doubled stop was a per-catalog property: `de`
+ * shipped "fehlgeschlagen.. Du kannst es erneut versuchen." while `en` was
+ * right, so a spot check in one language could not see it.
+ */
+describe('messageFailureLabel', () => {
+  const TERMINATOR = /[.!?؟…।。។።။۔։]$/;
+  const DOUBLED_TERMINATOR = /([.!?؟…।。។።။۔։])\1/u;
+  const PLACEHOLDER = '{{title}}';
+
+  function catalogString(catalog: unknown, path: string): string {
+    let value: unknown = catalog;
+    for (const key of path.split('.')) {
+      if (value === null || typeof value !== 'object') {
+        value = undefined;
+        break;
+      }
+      value = (value as Record<string, unknown>)[key];
+    }
+    if (typeof value !== 'string') {
+      throw new TypeError(`no catalog string at ${path}`);
+    }
+    return value;
+  }
+
+  it('states the failure once, in one terminator, in every catalog', async () => {
+    try {
+      for (const language of SUPPORTED_LANGUAGES) {
+        // The active language is one piece of global i18next state, so each
+        // catalog has to be measured before the next one is selected.
+        // eslint-disable-next-line no-await-in-loop
+        await i18n.changeLanguage(language);
+        const catalog: unknown = CATALOG_LOADERS[language]();
+        for (const titleKey of [
+          'agentChat.messageFailure.deliveryTitle',
+          'agentChat.messageFailure.assistantTitle',
+        ]) {
+          for (const canRetry of [true, false]) {
+            const label = messageFailureLabel({ titleKey, canRetry });
+            const where = `${language} ${titleKey} canRetry=${canRetry}`;
+            expect(label, where).not.toMatch(DOUBLED_TERMINATOR);
+
+            const template = catalogString(
+              catalog,
+              canRetry
+                ? 'agentChat.messageBubble.failureRetryAvailable'
+                : 'agentChat.messageBubble.failure'
+            );
+            const stem = i18n.t(titleKey).trimEnd().replace(TERMINATOR, '');
+            const templateTail = template.slice(template.indexOf(PLACEHOLDER) + PLACEHOLDER.length);
+            // The label is the title stem, then the template's own separator and
+            // retry line exactly once: the template's terminator is the sentence
+            // end, and the title contributes nothing after its last word.
+            expect(label, where).toContain(stem);
+            const afterStem = label.slice(label.indexOf(stem) + stem.length);
+            expect(afterStem, where).toBe(templateTail);
+          }
+        }
+      }
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
+  it('keeps the German delivery failure to one full stop', async () => {
+    await i18n.changeLanguage('de');
+    try {
+      expect(
+        messageFailureLabel({
+          titleKey: 'agentChat.messageFailure.deliveryTitle',
+          canRetry: true,
+        })
+      ).toBe('Die Zustellung ist fehlgeschlagen. Du kannst es erneut versuchen.');
+      expect(
+        messageFailureLabel({
+          titleKey: 'agentChat.messageFailure.assistantTitle',
+          canRetry: false,
+        })
+      ).toBe('Die Antwort konnte nicht erstellt werden.');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });

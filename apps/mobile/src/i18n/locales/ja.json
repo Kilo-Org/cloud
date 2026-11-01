@@ -2945,6 +2945,7 @@
     "installKiloGitHubApp": "Kilo GitHub Appをインストール",
     "merge": {
       "merge": "マージ",
+      "mergeTitle": "マージ",
       "mergeNow": "今すぐマージ",
       "mergePullRequest": "プルリクエストのマージ",
       "mergeTermTitle": "{{term}}のマージ",

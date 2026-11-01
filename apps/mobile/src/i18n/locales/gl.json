@@ -403,6 +403,7 @@
     "connectionExpired": "A conexión con GitHub caducou.",
     "merge": {
       "merge": "Fusión",
+      "mergeTitle": "Fusión",
       "mergeNow": "Fusionar agora",
       "mergePullRequest": "Fusionar a solicitude de integración",
       "mergeTermTitle": "Fusionar a {{term}}",

@@ -2945,6 +2945,7 @@
     "installKiloGitHubApp": "安裝 Kilo GitHub App",
     "merge": {
       "merge": "合併",
+      "mergeTitle": "合併",
       "mergeNow": "立即合併",
       "mergePullRequest": "合併提取請求",
       "mergeTermTitle": "合併{{term}}",

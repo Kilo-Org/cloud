@@ -417,6 +417,7 @@
     "connectionExpired": "Povezava z računom GitHub je potekla.",
     "merge": {
       "merge": "Združitev",
+      "mergeTitle": "Združitev",
       "mergeNow": "Združi zdaj",
       "mergePullRequest": "Združitev zahtevka",
       "mergeTermTitle": "Združi {{term}}",

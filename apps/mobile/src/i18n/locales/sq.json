@@ -403,6 +403,7 @@
     "connectionExpired": "Lidhja me GitHub skadoi.",
     "merge": {
       "merge": "Bashkimi",
+      "mergeTitle": "Bashkimi",
       "mergeNow": "Bashko tani",
       "mergePullRequest": "Bashkimi i kërkesës",
       "mergeTermTitle": "Bashko {{term}}",

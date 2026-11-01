@@ -403,6 +403,7 @@
     "connectionExpired": "Koneksyon ak GitHub la ekspire.",
     "merge": {
       "merge": "Fizyon",
+      "mergeTitle": "Fizyon",
       "mergeNow": "Fizyonnen kounye a",
       "mergePullRequest": "Fizyon demann lan",
       "mergeTermTitle": "Fizyon {{term}}",

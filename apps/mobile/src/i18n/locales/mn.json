@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub холболтын хугацаа дууссан.",
     "merge": {
       "merge": "Нэгтгэх",
+      "mergeTitle": "Нэгтгэх",
       "mergeNow": "Одоо нэгтгэх",
       "mergePullRequest": "Нэгтгэх хүсэлтийг нэгтгэх",
       "mergeTermTitle": "{{term}}ийг нэгтгэх",

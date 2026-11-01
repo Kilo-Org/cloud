@@ -410,6 +410,7 @@
     "connectionExpired": "Veza s GitHubom je istekla.",
     "merge": {
       "merge": "Spajanje",
+      "mergeTitle": "Spajanje",
       "mergeNow": "Spoji sada",
       "mergePullRequest": "Spajanje zahtjeva",
       "mergeTermTitle": "Spoji {{term}}",

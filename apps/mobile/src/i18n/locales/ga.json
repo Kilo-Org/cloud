@@ -424,6 +424,7 @@
     "connectionExpired": "Tá an nasc GitHub imithe in éag.",
     "merge": {
       "merge": "Cumasc",
+      "mergeTitle": "Cumasc",
       "mergeNow": "Cumasc anois",
       "mergePullRequest": "Cumasc iarratais tarraingthe",
       "mergeTermTitle": "Cumasc {{term}}",

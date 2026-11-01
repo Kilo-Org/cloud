@@ -403,6 +403,7 @@
     "connectionExpired": "Kua pau te wā o te hononga GitHub.",
     "merge": {
       "merge": "Whakakotahitanga",
+      "mergeTitle": "Whakakotahitanga",
       "mergeNow": "Whakakotahitia ināianei",
       "mergePullRequest": "Whakakotahi tono kume",
       "mergeTermTitle": "Whakakotahi {{term}}",

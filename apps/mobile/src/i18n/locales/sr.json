@@ -410,6 +410,7 @@
     "connectionExpired": "Veza sa GitHub nalogom je istekla.",
     "merge": {
       "merge": "Spajanje",
+      "mergeTitle": "Spajanje",
       "mergeNow": "Spoji sada",
       "mergePullRequest": "Spajanje zahteva",
       "mergeTermTitle": "Spoji {{term}}",

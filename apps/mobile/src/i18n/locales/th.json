@@ -403,6 +403,7 @@
     "connectionExpired": "การเชื่อมต่อ GitHub หมดอายุแล้ว",
     "merge": {
       "merge": "รวม",
+      "mergeTitle": "รวม",
       "mergeNow": "รวมตอนนี้",
       "mergePullRequest": "รวม PR",
       "mergeTermTitle": "รวม {{term}}",

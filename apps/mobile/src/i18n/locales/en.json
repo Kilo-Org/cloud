@@ -469,6 +469,7 @@
     "connectionExpired": "GitHub connection expired.",
     "merge": {
       "merge": "Merge",
+      "mergeTitle": "Merge",
       "mergeNow": "Merge now",
       "mergePullRequest": "Merge pull request",
       "mergeTermTitle": "Merge {{term}}",

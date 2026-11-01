@@ -403,6 +403,7 @@
     "connectionExpired": "اعتبار اتصال به GitHub تمام شده است.",
     "merge": {
       "merge": "ادغام",
+      "mergeTitle": "ادغام",
       "mergeNow": "ادغام فوری",
       "mergePullRequest": "ادغام درخواست",
       "mergeTermTitle": "ادغام {{term}}",

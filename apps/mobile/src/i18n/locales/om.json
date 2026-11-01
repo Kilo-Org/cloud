@@ -403,6 +403,7 @@
     "connectionExpired": "Yeroon walitti hidhamiinsa GitHub darbeera.",
     "merge": {
       "merge": "Walitti makuu",
+      "mergeTitle": "Walitti makuu",
       "mergeNow": "Amma walitti maki",
       "mergePullRequest": "Gaaffii walitti makuu raawwachuu",
       "mergeTermTitle": "{{term}} raawwachuu",

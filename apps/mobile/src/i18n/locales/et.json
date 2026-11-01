@@ -320,7 +320,7 @@
       "retryLoadingFiles": "Proovi failide laadimist uuesti",
       "filterPlaceholder": "Failide otsing tee järgi",
       "viewedCount": "{{viewed}}/{{total}} vaadatud",
-      "viewedOfListed": "loetletud failidest {{viewed}}/{{total}} vaadatud",
+      "viewedOfListed": "Loetletud failidest {{viewed}}/{{total}} vaadatud",
       "loadingFiles": "Laaditakse {{loaded}}/{{total}}…",
       "failedToLoadAllFiles": "Kõiki faile ei õnnestunud laadida.",
       "couldNotLoadMoreFiles": "Lisafaile ei õnnestunud laadida.",
@@ -337,7 +337,7 @@
       "unmarkViewed": "Eemalda faililt {{path}} vaadatuks märgistus",
       "collapseFile": "Ahenda fail",
       "expandFile": "Laienda fail",
-      "diffTooLarge": "Muudatusi on kuvamiseks liiga palju.",
+      "diffTooLarge": "Muudatusi on kuvamiseks liiga palju",
       "noPreview": "Selle faili eelvaade pole saadaval",
       "openOnGitHub": "Ava GitHubis",
       "openDiffOnGitHub": "Ava selle faili muudatuste vaade GitHubis",
@@ -356,7 +356,7 @@
       "retryLoadingContext": "Proovi konteksti laadimist uuesti",
       "failedToLoadContext": "Konteksti laadimine ebaõnnestus — puuduta, et uuesti proovida",
       "loadingContext": "Konteksti laadimine…",
-      "loadingLines": "Laaditakse {{loaded}}/{{total}} rida…",
+      "loadingLines": "Ridade laadimine — {{loaded}}/{{total}}…",
       "expandContext": "Näita konteksti",
       "expandMoreContext": "Näita rohkem konteksti",
       "expandLines": "Näita {{displayCount}} rida ({{start}}–{{end}})",
@@ -393,7 +393,7 @@
       "loadedOfTotalFiles_other": "{{loaded}}/{{total}} faili laaditud"
     },
     "sideBySide": {
-      "noNewlineAtEndOfFile": "faili lõpus puudub reavahetus.",
+      "noNewlineAtEndOfFile": "⚠️ faili lõpus puudub reavahetus",
       "emptyDiffColumn": "tühi veerg muudatuste vaates",
       "oldNew": "Vana: {{old}} | Uus: {{new}}",
       "oldOnly": "Ainult vana: {{text}}",
@@ -402,7 +402,8 @@
     },
     "connectionExpired": "GitHubi ühendus aegus.",
     "merge": {
-      "merge": "Mestimine",
+      "merge": "Ühenda",
+      "mergeTitle": "Ühendamine",
       "mergeNow": "Ühenda kohe",
       "mergePullRequest": "Tõmbetaotluse ühendamine",
       "mergeTermTitle": "{{term}}e ühendamine",
@@ -428,13 +429,13 @@
       "confirmMessage": "Sinu muudatused ühendatakse alusharuga.",
       "enableAutoMergeConfirmTitle": "Kas lubada automaatne ühendamine?",
       "enableAutoMergeConfirmMessage": "GitHub ühendab selle tõmbetaotluse automaatselt, kui kõik nõutud kontrollid on edukalt läbitud.",
-      "enableAutoMergeConfirmMessageTerm": "Kui pipeline õnnestub, liidetakse {{term}} automaatselt.",
-      "enableAutoMergeDescriptionTerm": "GitLab liidab {{term}} automaatselt, kui pipeline õnnestub.",
+      "enableAutoMergeConfirmMessageTerm": "Kui pipeline õnnestub, ühendatakse {{term}} automaatselt.",
+      "enableAutoMergeDescriptionTerm": "Kui GitLabi pipeline õnnestub, ühendatakse {{term}} automaatselt.",
       "forbidden": "Sul pole õigust seda tõmbetaotlust ühendada.",
       "cannotMerge": "Seda tõmbetaotlust ei saa praegusel kujul ühendada.",
       "couldNotMerge": "Tõmbetaotlust ei õnnestunud ühendada.",
       "methods": {
-        "merge": "Mestimine",
+        "merge": "Ühendamine",
         "squash": "Koondamine",
         "rebase": "Ümberbaseerimine"
       },
@@ -468,14 +469,14 @@
         "notMergeableDetail": "GitHub teatas ühendatavuse olekust {{state}}."
       },
       "restrictions": {
-        "title": "Liitmise tingimused",
+        "title": "Ühendamise tingimused",
         "approvalsRequired_one": "Vajalik on {{displayCount}} heakskiit",
         "approvalsRequired_other": "Vajalikud on {{displayCount}} heakskiitu",
-        "pipelineMustSucceed": "Enne liitmist peab pipeline õnnestuma."
+        "pipelineMustSucceed": "Enne ühendamist peab pipeline õnnestuma."
       },
       "providerBlocked": {
-        "failingPipeline": "Pipeline ebaõnnestub viimase commitiga.",
-        "pendingPipeline": "Pipeline on viimase commitiga veel käimas.",
+        "failingPipeline": "Pipeline ebaõnnestub viimasel kommitil.",
+        "pendingPipeline": "Pipeline on viimasel kommitil veel käimas.",
         "permission": "Sul pole õigust seda {{term}}t ühendada.",
         "draft": "Märgi {{term}} enne ühendamist ülevaatuseks valmis."
       },
@@ -550,9 +551,9 @@
         }
       },
       "accessDeniedMessage": "Sul puudub õigus selle PR-i arutelu vaadata.",
-      "unavailable": "Arutelu pole saadaval.",
+      "unavailable": "Arutelu pole saadaval",
       "unavailableMessage": "See tõmbetaotlus võib olla eemaldatud.",
-      "couldNotLoad": "Arutelu ei õnnestunud laadida.",
+      "couldNotLoad": "Arutelu ei õnnestunud laadida",
       "loading": "Arutelu laadimine",
       "noDiscussion": "Arutelu veel pole",
       "noDiscussionDescription": "Selle tõmbetaotluse juures pole veel ülevaatuslõime ega arutelukommentaare.",
@@ -567,7 +568,7 @@
         "thumbsDown": "Pöial alla",
         "laugh": "Naer",
         "hooray": "Hurraa",
-        "confused": "Segaduses",
+        "confused": "Segadus",
         "heart": "Süda",
         "rocket": "Rakett",
         "eyes": "Silmad"
@@ -580,7 +581,7 @@
         "outdatedOnPath": "Aegunud: {{path}}"
       },
       "deletedUser": "kustutatud kasutaja",
-      "replyForbiddenTerm": "Sul pole õigust sellele {{term}}ele vastata.",
+      "replyForbiddenTerm": "See {{term}} ei luba sul vastata.",
       "moreLinesAbove_one": "Ülal on veel {{displayCount}} rida.",
       "moreLinesAbove_other": "Ülal on veel {{displayCount}} rida.",
       "deleteComment": "Kustuta kommentaar",
@@ -680,7 +681,7 @@
       "reconnectTitle": "Ühenda GitHub uuesti",
       "reconnectDescription": "Sinu GitHubi ühendus on tühistatud.",
       "gitlabDescription": "Vaata liitmistaotlused mobiilis üle",
-      "bitbucketOrgOnlyDescription": "Vaheta ülalolev konto organisatsioonile, et selle Bitbucketi tõmbetaotlusi üle vaadata.",
+      "bitbucketOrgOnlyDescription": "Vaheta ülalolev konto organisatsiooni vastu, et selle Bitbucketi tõmbetaotlusi üle vaadata.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Sellel kontol pole veel organisatsioone. Bitbucketi tõmbetaotlusi saab üle vaadata, kui lood või liitud organisatsiooniga.",
       "contextLine": "{{organization}} jaoks",
       "contextLinePersonal": "Sinu isikliku konto jaoks"
@@ -715,8 +716,8 @@
       "label": "Ülevaatuse toiming"
     },
     "overview": {
-      "stateMerged": "Mestitud",
-      "stateOpenApproved": "Avatud · Kinnitatud",
+      "stateMerged": "Ühendatud",
+      "stateOpenApproved": "Avatud · Heaks kiidetud",
       "stateOpenChangesRequested": "Avatud · Muudatusi nõutud",
       "stateOpenReviewRequired": "Avatud · Ülevaatus nõutud",
       "stateOpen": "Avatud",
@@ -729,8 +730,8 @@
       "file_other": "faili",
       "openedAgo": "Avatud {{time}}",
       "updatedAgo": "Uuendatud {{time}}",
-      "mergedAgo": "Liidetud {{time}}",
-      "mergedByAgo": "{{login}} liitis {{time}}",
+      "mergedAgo": "Ühendatud {{time}}",
+      "mergedByAgo": "{{login}} ühendas {{time}}",
       "closedAgo": "Suletud {{time}}",
       "labels": "Sildid",
       "reviewers": "Ülevaatajad",
@@ -763,7 +764,7 @@
       "modified": "Muudetud",
       "renamed": "Ümber nimetatud",
       "copied": "Kopeeritud",
-      "changed": "Muudetud"
+      "changed": "Muutunud"
     },
     "diff": {
       "selectedTapToChange": "Valitud {{label}}, puuduta valiku muutmiseks",
@@ -789,7 +790,7 @@
     "mutationError": {
       "commentNotPosted": "Seda kommentaari ei saa postitada. Valitud rida võib olla muutunud või PR-i võib olla värskendatud.",
       "reviewNotSubmitted": "Seda ülevaatust ei saa praegusel kujul esitada. PR võib olla muutunud või proovid üle vaadata enda tõmbetaotlust, mis pole lubatud.",
-      "reviewNotSubmittedTerm": "Seda ülevaatust ei saa praegusel kujul esitada. {{term}} võib olla muutunud või ei tohi omaenda {{term}} üle vaadata.",
+      "reviewNotSubmittedTerm": "Seda ülevaatust ei saa praegusel kujul esitada. {{term}} võib olla muutunud või kuulub {{term}} sulle.",
       "couldNotPostComment": "Kommentaari ei õnnestunud postitada.",
       "couldNotSubmitReview": "Ülevaatuse esitamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti.",
       "rateLimited": "Liiga palju päringuid. Proovi hiljem uuesti.",
@@ -799,7 +800,7 @@
       "couldNotReply": "Vastamine ebaõnnestus.",
       "couldNotCompleteAction": "Seda toimingut ei õnnestunud lõpule viia.",
       "mergeResultDefaultError": "GitHub ei lõpetanud ühendamist.",
-      "mergeResultNotCompleted": "{{term}} ei liidetud. Kontrolli olekut ja proovi uuesti.",
+      "mergeResultNotCompleted": "{{term}} ei ühendatud. Kontrolli olekut ja proovi uuesti.",
       "ambiguous": "Toimingu õnnestumist ei õnnestunud kinnitada — kontrolli PR-i enne uuesti proovimist.",
       "forbidden": "See toiming pole lubatud."
     },
@@ -814,7 +815,7 @@
       "mergeRequest": "Liitmistaotlus",
       "mergeRequestNumber": "Liitmistaotlus !{{number}}",
       "shareMergeRequest": "Jaga liitmistaotlust",
-      "viewOnProvider": "Kuva {{provider}}",
+      "viewOnProvider": "Vaata teenuses {{provider}}",
       "mergeRequestUnavailable": "Liitmistaotlus pole saadaval",
       "unavailableDescription": "See võib olla kustutatud või sul puudub ligipääs.",
       "accessDeniedMergeRequest": "Sul pole õigust seda liitmistaotlust vaadata.",
@@ -1406,7 +1407,7 @@
       "hint": "Kõige ülevaatamiseks jäta kõik valikud märkimata."
     },
     "gate": {
-      "title": "Mestimistingimused",
+      "title": "Ühendamise reeglid",
       "all": "Märgi kontroll ebaõnnestunuks iga leiu korral",
       "critical": "Märgi kontroll ebaõnnestunuks ainult kriitiliste leidude korral",
       "off": "Ära märgi PR-i kontrolli kunagi ebaõnnestunuks",

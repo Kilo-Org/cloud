@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub-ի հետ կապի ժամկետը լրացել է։",
     "merge": {
       "merge": "Միավորում",
+      "mergeTitle": "Միավորում",
       "mergeNow": "Միավորել հիմա",
       "mergePullRequest": "Միավորման հարցման միավորում",
       "mergeTermTitle": "Միավորել {{term}}-ը",

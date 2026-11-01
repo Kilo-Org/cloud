@@ -403,6 +403,7 @@
     "connectionExpired": "Врската со GitHub истече.",
     "merge": {
       "merge": "Спојување",
+      "mergeTitle": "Спојување",
       "mergeNow": "Спој сега",
       "mergePullRequest": "Спојување на барањето",
       "mergeTermTitle": "Спој {{term}}",

@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub-erako konexioa iraungi da.",
     "merge": {
       "merge": "Bateratzea",
+      "mergeTitle": "Bateratzea",
       "mergeNow": "Bateratu orain",
       "mergePullRequest": "Bateratze-eskaera bateratzea",
       "mergeTermTitle": "{{term}} bateratzea",

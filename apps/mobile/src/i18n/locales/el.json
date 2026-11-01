@@ -403,6 +403,7 @@
     "connectionExpired": "Η σύνδεση με το GitHub έληξε.",
     "merge": {
       "merge": "Συγχώνευση",
+      "mergeTitle": "Συγχώνευση",
       "mergeNow": "Συγχώνευση τώρα",
       "mergePullRequest": "Συγχώνευση αιτήματος ενσωμάτωσης",
       "mergeTermTitle": "Συγχώνευση {{term}}",

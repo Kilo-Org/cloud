@@ -403,6 +403,7 @@
     "connectionExpired": "Nag-expire ang koneksyon sa GitHub.",
     "merge": {
       "merge": "Pagsasama",
+      "mergeTitle": "Pagsasama",
       "mergeNow": "I-merge ngayon",
       "mergePullRequest": "Pag-merge ng pull request",
       "mergeTermTitle": "Pag-merge ng {{term}}",

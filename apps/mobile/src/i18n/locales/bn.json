@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub সংযোগের মেয়াদ শেষ হয়েছে।",
     "merge": {
       "merge": "মার্জ",
+      "mergeTitle": "মার্জ",
       "mergeNow": "এখনই মার্জ করুন",
       "mergePullRequest": "পুল রিকোয়েস্ট মার্জ",
       "mergeTermTitle": "{{term}} মার্জ",

@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub-anslutningen har upphört att gälla.",
     "merge": {
       "merge": "Slå samman",
+      "mergeTitle": "Slå samman",
       "mergeNow": "Slå samman nu",
       "mergePullRequest": "Slå samman PR",
       "mergeTermTitle": "Slå samman {{term}}",

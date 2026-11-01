@@ -3033,6 +3033,7 @@
     "installKiloGitHubApp": "Установити застосунок Kilo для GitHub",
     "merge": {
       "merge": "Злиття",
+      "mergeTitle": "Злиття",
       "mergeNow": "Виконати злиття",
       "mergePullRequest": "Злиття запиту",
       "mergeTermTitle": "Злити {{term}}",

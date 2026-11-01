@@ -417,6 +417,7 @@
     "connectionExpired": "Platnost připojení ke službě GitHub vypršela.",
     "merge": {
       "merge": "Sloučení",
+      "mergeTitle": "Sloučení",
       "mergeNow": "Sloučit nyní",
       "mergePullRequest": "Sloučení PR",
       "mergeTermTitle": "Sloučení {{term}}",

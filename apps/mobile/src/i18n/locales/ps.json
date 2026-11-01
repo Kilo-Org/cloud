@@ -403,6 +403,7 @@
     "connectionExpired": "له GitHub سره د اړیکې موده پای ته ورسېده.",
     "merge": {
       "merge": "یوځای کول",
+      "mergeTitle": "یوځای کول",
       "mergeNow": "همدا اوس یوځای کړئ",
       "mergePullRequest": "د پل ریکویسټ یوځای کول",
       "mergeTermTitle": "د {{term}} یوځای کول",

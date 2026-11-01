@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub ಸಂಪರ್ಕದ ಅವಧಿ ಮುಗಿದಿದೆ.",
     "merge": {
       "merge": "ವಿಲೀನ",
+      "mergeTitle": "ವಿಲೀನ",
       "mergeNow": "ಈಗ ವಿಲೀನಗೊಳಿಸಿ",
       "mergePullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ವಿಲೀನ",
       "mergeTermTitle": "{{term}} ವಿಲೀನ",

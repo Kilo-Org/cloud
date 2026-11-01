@@ -2945,6 +2945,7 @@
     "installKiloGitHubApp": "Kilo GitHub 앱 설치",
     "merge": {
       "merge": "병합",
+      "mergeTitle": "병합",
       "mergeNow": "지금 병합",
       "mergePullRequest": "풀 리퀘스트 병합",
       "mergeTermTitle": "{{term}} 병합",

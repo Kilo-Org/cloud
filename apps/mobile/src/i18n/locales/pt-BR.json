@@ -2995,6 +2995,7 @@
     "installKiloGitHubApp": "Instalar o aplicativo do Kilo para GitHub",
     "merge": {
       "merge": "Mesclagem",
+      "mergeTitle": "Mesclagem",
       "mergeNow": "Mesclar agora",
       "mergePullRequest": "Mesclagem do pull request",
       "mergeTermTitle": "Mesclar {{term}}",

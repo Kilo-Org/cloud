@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub जोडणीची मुदत संपली.",
     "merge": {
       "merge": "मर्ज",
+      "mergeTitle": "मर्ज",
       "mergeNow": "आता मर्ज करा",
       "mergePullRequest": "पुल रिक्वेस्ट मर्ज करा",
       "mergeTermTitle": "{{term}} मर्ज करा",

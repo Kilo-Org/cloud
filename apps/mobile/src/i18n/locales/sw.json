@@ -403,6 +403,7 @@
     "connectionExpired": "Muda wa muunganisho wa GitHub umeisha.",
     "merge": {
       "merge": "Uunganishaji",
+      "mergeTitle": "Uunganishaji",
       "mergeNow": "Unganisha sasa",
       "mergePullRequest": "Kuunganisha ombi",
       "mergeTermTitle": "Unganisha {{term}}",

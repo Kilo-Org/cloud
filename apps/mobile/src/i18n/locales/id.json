@@ -2945,6 +2945,7 @@
     "installKiloGitHubApp": "Pasang aplikasi Kilo untuk GitHub",
     "merge": {
       "merge": "Penggabungan",
+      "mergeTitle": "Penggabungan",
       "mergeNow": "Gabungkan sekarang",
       "mergePullRequest": "Gabungkan PR",
       "mergeTermTitle": "Gabungkan {{term}}",

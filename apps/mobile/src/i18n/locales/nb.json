@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub-tilkoblingen er utløpt.",
     "merge": {
       "merge": "Fletting",
+      "mergeTitle": "Fletting",
       "mergeNow": "Flett nå",
       "mergePullRequest": "Flett PR",
       "mergeTermTitle": "Flett {{term}}",

@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub سے کنکشن کی مدت ختم ہو گئی۔",
     "merge": {
       "merge": "مرج",
+      "mergeTitle": "مرج",
       "mergeNow": "ابھی مرج کریں",
       "mergePullRequest": "پل ریکویسٹ کا مرج",
       "mergeTermTitle": "{{term}} کا مرج",

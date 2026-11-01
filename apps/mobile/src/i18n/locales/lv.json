@@ -410,6 +410,7 @@
     "connectionExpired": "GitHub savienojuma derīguma termiņš ir beidzies.",
     "merge": {
       "merge": "Apvienošana",
+      "mergeTitle": "Apvienošana",
       "mergeNow": "Apvienot tagad",
       "mergePullRequest": "Izmaiņu pieprasījuma apvienošana",
       "mergeTermTitle": "Apvienot {{term}}",

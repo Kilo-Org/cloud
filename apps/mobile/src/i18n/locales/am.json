@@ -403,6 +403,7 @@
     "connectionExpired": "የGitHub ግንኙነት ጊዜው አልፏል።",
     "merge": {
       "merge": "ማዋሃድ",
+      "mergeTitle": "ማዋሃድ",
       "mergeNow": "አሁን አዋህድ",
       "mergePullRequest": "የማዋሃድ ጥያቄን ማዋሃድ",
       "mergeTermTitle": "{{term}}ን ማዋሃድ",

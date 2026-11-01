@@ -403,6 +403,7 @@
     "connectionExpired": "Lany daty ny fifandraisana amin'ny GitHub.",
     "merge": {
       "merge": "Fampiraisana",
+      "mergeTitle": "Fampiraisana",
       "mergeNow": "Ampiraiso izao",
       "mergePullRequest": "Fampiraisana ny fangatahana",
       "mergeTermTitle": "Fampiraisana ny {{term}}",

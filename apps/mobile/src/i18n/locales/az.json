@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub bağlantısının müddəti bitdi.",
     "merge": {
       "merge": "Birləşdirmə",
+      "mergeTitle": "Birləşdirmə",
       "mergeNow": "İndi birləşdir",
       "mergePullRequest": "Sorğunun birləşdirilməsi",
       "mergeTermTitle": "{{term}}nun birləşdirilməsi",

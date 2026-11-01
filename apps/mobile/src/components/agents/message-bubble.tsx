@@ -23,7 +23,7 @@ import { FilePartRenderer } from './file-part-renderer';
 import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
 import { MessageErrorBoundary } from './message-error-boundary';
 import { MessageLongPressProvider } from './message-long-press-context';
-import { selectMessageFailure } from './message-failure-state';
+import { messageFailureLabel, selectMessageFailure } from './message-failure-state';
 import { partRendersContent } from './message-visibility';
 import { PartRenderer } from './part-renderer';
 import { firstHumanText, isFilePart, isTextPart } from './part-types';
@@ -160,11 +160,7 @@ function MessageBubbleImpl({
       <View className="gap-1 px-4 py-1">
         <Text
           className="text-sm text-destructive"
-          accessibilityLabel={
-            failure.canRetry
-              ? t('agentChat.messageBubble.failureRetryAvailable', { title: failure.title })
-              : t('agentChat.messageBubble.failure', { title: failure.title })
-          }
+          accessibilityLabel={messageFailureLabel(failure)}
         >
           {failure.title}
         </Text>

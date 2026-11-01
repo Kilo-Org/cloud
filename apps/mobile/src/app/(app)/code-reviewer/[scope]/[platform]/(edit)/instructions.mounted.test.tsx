@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 
+import { enteringAncestors } from '@/components/code-reviewer/entering-animation.test-helpers';
 import { ReviewerRouteParamsProvider } from '@/lib/hooks/use-reviewer-route-params';
 import InstructionsRoute from './instructions';
 
@@ -617,6 +618,28 @@ describe('InstructionsRoute config read states', () => {
     mount();
 
     expect(queryError.props).toHaveLength(0);
+    expect(latestInput().defaultValue).toBe(STORED);
+  });
+
+  it('paints the landed body with no entering animation above it', () => {
+    config.data = { customInstructions: STORED };
+    const renderer = mount();
+
+    const note = renderer.root.findAll(
+      node =>
+        String(node.type) === 'Text' &&
+        node.props.children === i18n.t('codeReviewer.instructions.deprecation')
+    )[0];
+    if (!note) {
+      throw new Error('the deprecation note was not rendered');
+    }
+    // A Reanimated entering animation carries `initialValues: { opacity: 0 }`.
+    // Above the loaded body it leaves the note, the field and Save mounted at
+    // opacity 0 under the painted header — an empty body with no skeleton, no
+    // error and no retry — whenever that entrance is cancelled or overwritten
+    // (Android report, 2026-10-31). The body must paint in the frame the read
+    // lands, with no ancestor holding an entering animation.
+    expect(enteringAncestors(note)).toEqual([]);
     expect(latestInput().defaultValue).toBe(STORED);
   });
 

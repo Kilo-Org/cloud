@@ -728,7 +728,7 @@ export function NotificationsScreen() {
             {masterLeading === 'on' && <Bell size={18} color={colors.secondaryForeground} />}
             {masterLeading === 'off' && <BellOff size={18} color={colors.secondaryForeground} />}
             <View className="flex-1">
-              <Text className="text-sm font-medium">{t('common.notifications')}</Text>
+              <Text className="text-sm font-medium">{t('notifications.deviceTitle')}</Text>
               {masterLeading === 'neutral' && <Skeleton className="mt-0.5 h-4 w-52" />}
               {masterLeading === 'on' && (
                 <Text variant="muted" className="mt-0.5 text-xs">
@@ -763,7 +763,7 @@ export function NotificationsScreen() {
                 <Switch
                   value={notificationsEnabled}
                   disabled={isMasterBusy}
-                  accessibilityLabel={t('common.notifications')}
+                  accessibilityLabel={t('notifications.deviceTitle')}
                   accessibilityState={{ disabled: isMasterBusy, busy: isMasterBusy }}
                   onValueChange={value => {
                     if (value) {

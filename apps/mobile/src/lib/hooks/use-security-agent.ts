@@ -2,6 +2,7 @@ import {
   canManageSecurityAgent,
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 
@@ -219,6 +220,11 @@ export function useSecurityAgentCapability(scope: string) {
   const { role, error, isLoading, isError, isFetching, refetch, hasData, isPending, fetchStatus } =
     useSecurityAgentOrgRoleQuery(scope);
   const canManage = canManageSecurityAgent(scope, role);
+  // Starting a GitHub installation is narrower than managing the agent:
+  // `githubApps.mintInstallState` takes an organization-manage role, and a
+  // billing manager's `canManage` is refused there. A screen that offers the
+  // press must ask this narrower question.
+  const canManageGitHub = isPersonalSecurityScope(scope) || canManageOrganization(role);
 
   let status: SecurityAgentCapabilityStatus = 'loading';
   if (isPersonalSecurityScope(scope)) {
@@ -237,6 +243,7 @@ export function useSecurityAgentCapability(scope: string) {
 
   return {
     canManage,
+    canManageGitHub,
     status,
     /** The unread role list's own error, so a load-failure surface can name its cause. */
     error,

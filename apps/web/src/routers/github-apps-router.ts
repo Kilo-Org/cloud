@@ -6,6 +6,7 @@ import {
   findIntegrationByInstallationId,
   getIntegrationForOwner,
   getGitHubIntegrationById,
+  getPrimaryGitHubIntegrationForOrganization,
   upsertPlatformIntegrationForOwner,
   updateRepositoriesForIntegration,
   syncIntegrationInstallationDetails,
@@ -340,13 +341,16 @@ export const githubAppsRouter = createTRPCRouter({
         input.organizationId ? ORGANIZATION_MANAGE_ROLES : undefined
       );
       if (owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id)) {
-        const integrations = await githubAppsService.listIntegrations(owner);
-        // A locally disconnected connection has relinquished its slot and
-        // must not block starting a fresh installation.
-        const hasActiveIntegration = integrations.some(
-          integration => !integration.github_disconnected_at
-        );
-        if (hasActiveIntegration) {
+        // The single-installation slot belongs to the organization's live
+        // workflow connection. Anything else still leaves the slot free to
+        // start an installation from: a pending request awaiting a GitHub
+        // organization admin's approval carries no installation id yet, and a
+        // suspended association is a connection GitHub will not serve until it
+        // is restored, so neither is a reason to refuse the install page. A
+        // locally disconnected row keeps relinquishing its slot, which the
+        // connection's health predicate already expresses.
+        const workflowConnection = await getPrimaryGitHubIntegrationForOrganization(owner.id);
+        if (workflowConnection) {
           throw new TRPCError({
             code: 'FORBIDDEN',
             message: 'This organization already has a GitHub installation',

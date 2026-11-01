@@ -163,12 +163,22 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
 
   const reauthUrl = permission.data?.reauthorizeUrl;
 
+  // Starting a GitHub installation for an organization is an organization-manage
+  // role's action: `githubApps.mintInstallState` refuses a billing manager with
+  // `UNAUTHORIZED`, so a screen that offered the press to every `canManage`
+  // reader would end in `setupFailed` with nothing the reader could do. The
+  // connect view only renders once the role read has settled — a pending or
+  // failed one holds the screen on its skeleton or its load failure — so the
+  // capability here is the resolved answer.
+  const canInstallGitHub = capability.canManageGitHub;
+
   // Mint only when the entry view actually needs a fresh GitHub install URL:
   // connect-github always, reauthorize only when the server offered no
   // reauthorize URL. Dashboard and disabled-settings mounts must not mint —
   // the token is a bearer credential and churning it on every visit is
   // wasteful.
-  const shouldMint = view === 'connect-github' || (view === 'reauthorize' && !reauthUrl);
+  const shouldMint =
+    (view === 'connect-github' && canInstallGitHub) || (view === 'reauthorize' && !reauthUrl);
 
   useEffect(() => {
     cancelledRef.current = false;
@@ -288,6 +298,14 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
               title={t('securityAgent.scopeEntry.connectTitle')}
               description={t('securityAgent.scopeEntry.connectDescription')}
               buttonLabel={t('securityAgent.scopeEntry.installApp')}
+              // The Code Reviewer's connect gates already say this sentence to
+              // a narrower role, and identical copy has one key, so the entry
+              // reuses it instead of adding a second.
+              readOnlyNotice={
+                canInstallGitHub
+                  ? undefined
+                  : t('codeReviewer.notConnectedReadOnly', { platform: t('common.github') })
+              }
               url={connectUrl ?? undefined}
               resolveUrl={async () => {
                 const minted = await performMint();

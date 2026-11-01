@@ -128,16 +128,24 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
         />
       }
       ListFooterComponent={
-        <View className={`gap-6 px-6 pb-12 ${PR_REVIEW_SECTION_BREAK.padding}`}>
-          {inbox.githubNeedsReconnect &&
-          view.kind !== 'reconnect' &&
-          !isOrganizationAccessView(view) ? (
-            <PrReviewReconnectNotice />
-          ) : null}
-          {showLoadMoreRetry ? <LoadMoreRetry onRetry={handleRetryMore} /> : null}
-          <RecentEyebrow />
-          {recents}
-        </View>
+        // RECENT waits for the inbox to settle. While the skeletons are up the
+        // section would sit under a placeholder that is taller than most
+        // settled bodies, so the section either reserves that air (and lands
+        // under the tab bar on a compact phone) or jumps up when the inbox
+        // settles. Left out, nothing below the skeletons can move, and the
+        // section appears at the height the settled body leaves it.
+        view.kind === 'loading' ? null : (
+          <View className={`gap-6 px-6 pb-12 ${PR_REVIEW_SECTION_BREAK.padding}`}>
+            {inbox.githubNeedsReconnect &&
+            view.kind !== 'reconnect' &&
+            !isOrganizationAccessView(view) ? (
+              <PrReviewReconnectNotice />
+            ) : null}
+            {showLoadMoreRetry ? <LoadMoreRetry onRetry={handleRetryMore} /> : null}
+            <RecentEyebrow />
+            {recents}
+          </View>
+        )
       }
       onEndReached={() => {
         if (inbox.hasNextPage && !inbox.isFetchingNextPage) {

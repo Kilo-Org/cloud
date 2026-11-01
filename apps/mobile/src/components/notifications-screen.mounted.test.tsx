@@ -32,6 +32,10 @@ vi.mock('@/lib/hooks/use-kiloclaw-tab-visible', () => ({
   useKiloClawTabVisible,
 }));
 
+// The suite runs on iOS like the real screen does, so the live-activity copy
+// stays covered. A test that needs the Android paint sets this and restores it.
+const platform = vi.hoisted(() => ({ os: 'ios' as 'ios' | 'android' }));
+
 const { openSettings, setLiveActivityEnabled, liveActivityEnabled, systemAllowsLiveActivities } =
   vi.hoisted(() => ({
     openSettings: vi.fn(),
@@ -48,7 +52,11 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
   Linking: { openSettings: openSettings },
-  Platform: { OS: 'android' },
+  Platform: {
+    get OS() {
+      return platform.os;
+    },
+  },
   useColorScheme: () => 'light',
 }));
 // The Live Activity row: the preference is SecureStore-backed and the system
@@ -560,6 +568,7 @@ describe('NotificationsScreen category availability', () => {
   });
 
   afterEach(async () => {
+    platform.os = 'ios';
     await i18n.changeLanguage('en');
   });
 
@@ -614,8 +623,9 @@ describe('NotificationsScreen category availability', () => {
     // A dimmed title beside a full-strength accent track reads as both
     // unavailable and on: Android folds the colours into the switch drawables
     // and draws no unavailable appearance of its own. The shared switch paints
-    // the palette's muted pair for every disabled control, so the unavailable
-    // row loses the accent while an available row beside it keeps it.
+    // the palette's muted pair there, so the unavailable row loses the accent
+    // while an available row beside it keeps it.
+    platform.os = 'android';
     prefsQueryFn.mockResolvedValue(
       fullPrefs({
         capabilities: fullCapabilities({

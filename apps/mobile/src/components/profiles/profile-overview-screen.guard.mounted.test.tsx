@@ -22,6 +22,8 @@ const h = vi.hoisted(() => ({
   error: vi.fn(),
   confirm: vi.fn(),
   repeat: vi.fn(),
+  /** The guard flag the replay saw, so a replay before the disarm is visible. */
+  repeatSawEnabled: [] as boolean[],
   guard: {
     enabled: false as boolean,
     handler: undefined as
@@ -138,8 +140,7 @@ function discardRequest() {
 }
 
 /** Hand the guard the removal the navigator produces for a Back press. */
-function pressBack() {
-  const handler = h.guard.handler;
+function pressBack(handler = h.guard.handler) {
   if (!handler) {
     throw new Error('the metadata guard did not register a removal handler');
   }
@@ -147,6 +148,7 @@ function pressBack() {
     handler({
       data: { action: { type: 'GO_BACK' } },
       repeat: () => {
+        h.repeatSawEnabled.push(h.guard.enabled);
         h.repeat();
       },
     });
@@ -156,6 +158,7 @@ function pressBack() {
 describe('ProfileOverviewScreen unsaved metadata guard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    h.repeatSawEnabled = [];
     h.guard.enabled = false;
     h.guard.handler = undefined;
     resetOverviewState(h);
@@ -209,8 +212,9 @@ describe('ProfileOverviewScreen unsaved metadata guard', () => {
     });
 
     expect(h.repeat).toHaveBeenCalledTimes(1);
-    // The replayed action runs against the render that dropped the
-    // prevention, so the listener cannot intercept it a second time.
+    // The replayed action dispatched only after the render that dropped the
+    // prevention, so the listener could not intercept it a second time.
+    expect(h.repeatSawEnabled).toEqual([false]);
     expect(h.guard.enabled).toBe(false);
   });
 
@@ -233,10 +237,20 @@ describe('ProfileOverviewScreen unsaved metadata guard', () => {
 
     changeText(renderer.root, 'Profile description', 'Unsaved description');
     expect(h.guard.enabled).toBe(true);
+    // The pop the delete dispatches reaches the listener that was armed for
+    // the render before the flag cleared, so keep that handler.
+    const armed = h.guard.handler;
 
     await pressDelete(renderer.root, h.confirm);
 
     await waitFor(() => h.back.mock.calls.length > 0);
     expect(h.guard.enabled).toBe(false);
+
+    // The removal the pop triggers leaves instead of asking about a profile
+    // the server no longer has.
+    h.confirm.mockClear();
+    pressBack(armed);
+    expect(h.confirm).not.toHaveBeenCalled();
+    expect(h.repeatSawEnabled).toEqual([false]);
   });
 });

@@ -366,7 +366,20 @@ class PatternParser {
   }
 }
 
+const emptiness = new WeakMap<PatternNode, boolean>();
+const firstSets = new WeakMap<PatternNode, CharSet>();
+const lastSets = new WeakMap<PatternNode, CharSet>();
+const consumers = new WeakMap<PatternNode, boolean>();
+
 function canBeEmpty(node: PatternNode): boolean {
+  const cached = emptiness.get(node);
+  if (cached !== undefined) return cached;
+  const empty = computeCanBeEmpty(node);
+  emptiness.set(node, empty);
+  return empty;
+}
+
+function computeCanBeEmpty(node: PatternNode): boolean {
   switch (node.kind) {
     case 'zero':
     case 'lookaround':
@@ -384,6 +397,14 @@ function canBeEmpty(node: PatternNode): boolean {
 }
 
 function firstSet(node: PatternNode): CharSet {
+  const cached = firstSets.get(node);
+  if (cached !== undefined) return cached;
+  const first = computeFirstSet(node);
+  firstSets.set(node, first);
+  return first;
+}
+
+function computeFirstSet(node: PatternNode): CharSet {
   switch (node.kind) {
     case 'zero':
     case 'lookaround':
@@ -409,6 +430,14 @@ function firstSet(node: PatternNode): CharSet {
 
 /** Characters a node can consume last, mirroring `firstSet`. */
 function lastSet(node: PatternNode): CharSet {
+  const cached = lastSets.get(node);
+  if (cached !== undefined) return cached;
+  const last = computeLastSet(node);
+  lastSets.set(node, last);
+  return last;
+}
+
+function computeLastSet(node: PatternNode): CharSet {
   switch (node.kind) {
     case 'zero':
     case 'lookaround':
@@ -436,6 +465,14 @@ function lastSet(node: PatternNode): CharSet {
 
 /** Whether the node consumes characters. */
 function consumesChars(node: PatternNode): boolean {
+  const cached = consumers.get(node);
+  if (cached !== undefined) return cached;
+  const consumes = computeConsumesChars(node);
+  consumers.set(node, consumes);
+  return consumes;
+}
+
+function computeConsumesChars(node: PatternNode): boolean {
   switch (node.kind) {
     case 'zero':
     case 'lookaround':
@@ -458,8 +495,19 @@ function product(left: number, right: number): number {
   return Math.min(left * right, Number.MAX_SAFE_INTEGER);
 }
 
+const repeatFactors = new WeakMap<PatternNode, number>();
+const concatenatedRepeatFactors = new WeakMap<PatternNode, number>();
+
 /** Combined repetition count within the node, saturated at Infinity. */
 function repeatFactor(node: PatternNode): number {
+  const cached = repeatFactors.get(node);
+  if (cached !== undefined) return cached;
+  const factor = computeRepeatFactor(node);
+  repeatFactors.set(node, factor);
+  return factor;
+}
+
+function computeRepeatFactor(node: PatternNode): number {
   switch (node.kind) {
     case 'zero':
     case 'atom':
@@ -481,17 +529,19 @@ function repeatFactor(node: PatternNode): number {
 
 function concatenatedRepeatFactor(node: PatternNode): number {
   if (node.kind !== 'sequence') return 1;
+  const cached = concatenatedRepeatFactors.get(node);
+  if (cached !== undefined) return cached;
   let combined = 1;
   let multiplied = 0;
   let run = 1;
-  let previous: PatternNode | undefined;
+  let boundary: CharSet | undefined;
   const closeRun = () => {
     if (multiplied > 1) combined = Math.max(combined, run);
   };
   for (const item of node.items) {
     if (!consumesChars(item)) continue;
     const factor = repeatFactor(item);
-    if (previous !== undefined && overlaps(lastSet(previous), firstSet(item))) {
+    if (boundary !== undefined && overlaps(boundary, firstSet(item))) {
       run = product(run, factor);
     } else {
       closeRun();
@@ -499,9 +549,12 @@ function concatenatedRepeatFactor(node: PatternNode): number {
       multiplied = 0;
     }
     if (factor > 1) multiplied++;
-    previous = item;
+    boundary = canBeEmpty(item)
+      ? union([boundary ?? new Set<string>(), lastSet(item)])
+      : lastSet(item);
   }
   closeRun();
+  concatenatedRepeatFactors.set(node, combined);
   return combined;
 }
 

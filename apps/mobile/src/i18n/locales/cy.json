@@ -2163,6 +2163,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Gosodwch ap GitHub Kilo i gysoni rhybuddion Dependabot yn awtomatig a rheoli canfyddiadau diogelwch yn eich ystorfeydd.",
+      "connectOwnerOnly": "Dim ond perchnogion a gweinyddwyr y sefydliad sy'n gallu cysylltu {{platform}}.",
       "connectTitle": "Cysylltu GitHub i ddechrau",
       "couldNotLoad": "Ni ellid llwytho'r Asiant diogelwch.",
       "installApp": "Gosod ap GitHub",

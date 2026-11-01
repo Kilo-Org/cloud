@@ -2031,6 +2031,7 @@
     },
     "scopeEntry": {
       "connectDescription": "اپنی ریپوزٹریز میں Dependabot کی اطلاعات خود بخود ہم آہنگ کرنے اور سکیورٹی مسائل کا انتظام کرنے کے لیے Kilo کی GitHub ایپ انسٹال کریں۔",
+      "connectOwnerOnly": "صرف تنظیم کے مالک اور منتظم ہی {{platform}} منسلک کر سکتے ہیں۔",
       "connectTitle": "شروع کرنے کے لیے GitHub منسلک کریں",
       "couldNotLoad": "سیکیورٹی ایجنٹ لوڈ نہیں ہو سکا۔",
       "installApp": "GitHub ایپ انسٹال کریں",

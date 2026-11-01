@@ -2130,6 +2130,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Installa l-app ta' Kilo fuq GitHub biex tissinkronizza awtomatikament l-allerti ta' Dependabot u timmaniġġja s-sejbiet tas-sigurtà fir-repożitorji tiegħek.",
+      "connectOwnerOnly": "Is-sidien u l-amministraturi tal-organizzazzjoni biss jistgħu jikkonnettjaw {{platform}}.",
       "connectTitle": "Ikkonnettja GitHub biex tibda",
       "couldNotLoad": "Ma setax jitgħabba l-aġent tas-sigurtà.",
       "installApp": "Installa l-app ta' GitHub",

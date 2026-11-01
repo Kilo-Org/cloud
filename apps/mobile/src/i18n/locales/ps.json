@@ -2031,6 +2031,7 @@
     },
     "scopeEntry": {
       "connectDescription": "د Kilo د GitHub اپ نصب کړئ، څو د Dependabot خبرتیاوې په اتوماتیک ډول هممهاله او په خپلو ټولو ذخیرو کې امنیتي موندنې مدیریت کړئ.",
+      "connectOwnerOnly": "یوازې د سازمان مالکان او مدیران کولی شي {{platform}} ونښلوي.",
       "connectTitle": "د پیل لپاره GitHub ونښلوئ",
       "couldNotLoad": "امنیتي اجنټ بار نه شو.",
       "installApp": "د GitHub اپ نصب کړئ",

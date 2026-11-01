@@ -2031,6 +2031,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Telepítsd a Kilo GitHub-alkalmazást a Dependabot-riasztások automatikus szinkronizálásához és az adattáraid biztonsági találatainak kezeléséhez.",
+      "connectOwnerOnly": "Csak a szervezet tulajdonosai és adminisztrátorai csatlakoztathatják a {{platform}}ot.",
       "connectTitle": "GitHub csatlakoztatása a kezdéshez",
       "couldNotLoad": "Nem sikerült betölteni a biztonsági ügynököt.",
       "installApp": "GitHub-alkalmazás telepítése",

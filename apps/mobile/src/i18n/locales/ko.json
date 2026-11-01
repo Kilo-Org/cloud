@@ -1458,6 +1458,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Kilo GitHub 앱을 설치하여 모든 저장소의 Dependabot 알림을 자동으로 동기화하고 보안 문제를 관리하세요.",
+      "connectOwnerOnly": "조직 소유자 및 관리자만 {{platform}}을(를) 연결할 수 있습니다.",
       "connectTitle": "GitHub 연결로 시작하기",
       "couldNotLoad": "보안 에이전트를 불러올 수 없습니다.",
       "installApp": "GitHub 앱 설치",

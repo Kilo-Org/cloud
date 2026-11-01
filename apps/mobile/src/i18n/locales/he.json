@@ -1471,6 +1471,7 @@
     },
     "scopeEntry": {
       "connectDescription": "התקן את אפליקציית Kilo ב-GitHub כדי לסנכרן אוטומטית התראות Dependabot ולנהל ממצאי אבטחה בכל המאגרים שלך.",
+      "connectOwnerOnly": "רק בעלי הארגון ומנהלים יכולים לחבר את {{platform}}.",
       "connectTitle": "חיבור GitHub לתחילת העבודה",
       "couldNotLoad": "לא ניתן לטעון את סוכן האבטחה.",
       "installApp": "התקנת אפליקציית GitHub",

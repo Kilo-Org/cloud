@@ -334,8 +334,7 @@ describe('ScopeEntryScreen GitHub install capability', () => {
   // `githubApps.mintInstallState` takes an organization-manage role, so the
   // entry must not offer its press to a reader the server will refuse: that
   // press can only end in the setup failure line. A resolved narrower role gets
-  // the Code Reviewer's read-only notice instead, and no install state is
-  // minted for it.
+  // the role notice instead, and no install state is minted for it.
   it.each(['member', 'billing_manager'])(
     'offers the read-only notice to a %s instead of the install press',
     async role => {
@@ -346,7 +345,7 @@ describe('ScopeEntryScreen GitHub install capability', () => {
       const setup = host(root, 'SecurityAgentSetup')[0];
 
       expect(setup?.props.readOnlyNotice).toBe(
-        "GitHub isn't connected. Only organization owners and admins can connect it."
+        'Only organization owners and admins can connect GitHub.'
       );
       expect(setup?.props.url).toBeUndefined();
       expect(

@@ -2097,6 +2097,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Nainstalujte aplikaci Kilo na GitHubu. Umožní vám automaticky synchronizovat upozornění Dependabot a spravovat bezpečnostní nálezy ve vašich repozitářích.",
+      "connectOwnerOnly": "Připojit {{platform}} mohou pouze vlastníci organizace a správci.",
       "connectTitle": "Začněte připojením GitHubu",
       "couldNotLoad": "Bezpečnostního agenta se nepodařilo načíst.",
       "installApp": "Nainstalovat aplikaci GitHub",

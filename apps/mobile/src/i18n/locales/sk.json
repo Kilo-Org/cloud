@@ -2097,6 +2097,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Nainštalujte aplikáciu Kilo na platforme GitHub na automatickú synchronizáciu upozornení zo služby Dependabot a správu bezpečnostných nálezov vo vašich repozitároch.",
+      "connectOwnerOnly": "Pripojiť {{platform}} môžu iba vlastníci organizácie a správcovia.",
       "connectTitle": "Pripojte GitHub a začnite",
       "couldNotLoad": "Bezpečnostného agenta sa nepodarilo načítať.",
       "installApp": "Nainštalovať aplikáciu GitHub",

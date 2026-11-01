@@ -2031,6 +2031,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Fi ohun èlò Kilo fún GitHub sí ẹ̀rọ láti mú àwọn ìkìlọ̀ Dependabot ṣiṣẹ́pọ̀ láìfọwọ́ṣe àti láti ṣàkóso àwọn àbùkù ààbò nínú àwọn ibi ìpamọ́ rẹ.",
+      "connectOwnerOnly": "Àwọn ẹni tó ni àjọ àti àwọn alákòóso nìkan ló lè so {{platform}} pọ̀.",
       "connectTitle": "So GitHub pọ̀ láti bẹ̀rẹ̀",
       "couldNotLoad": "A kò lè gbé Aṣojú ààbò wọlé.",
       "installApp": "Fi ohun èlò GitHub sí ẹ̀rọ",

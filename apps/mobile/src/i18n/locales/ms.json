@@ -2031,6 +2031,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Pasang apl GitHub Kilo untuk menyegerakkan amaran Dependabot secara automatik dan mengurus penemuan keselamatan dalam semua repositori anda.",
+      "connectOwnerOnly": "Hanya pemilik dan pentadbir organisasi boleh menyambungkan {{platform}}.",
       "connectTitle": "Sambungkan GitHub untuk bermula",
       "couldNotLoad": "Tidak dapat memuatkan Ejen Keselamatan.",
       "installApp": "Pasang apl GitHub",

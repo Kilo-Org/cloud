@@ -1458,6 +1458,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Kilo GitHub Appをインストールすると、Dependabotアラートを自動で同期し、各リポジトリのセキュリティの検出結果をまとめて管理できます。",
+      "connectOwnerOnly": "組織のオーナーと管理者のみが{{platform}}を接続できます。",
       "connectTitle": "GitHubを接続して始める",
       "couldNotLoad": "セキュリティエージェントを読み込めませんでした。",
       "installApp": "GitHub Appをインストール",

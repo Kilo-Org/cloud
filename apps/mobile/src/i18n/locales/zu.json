@@ -2037,6 +2037,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Faka uhlelo lokusebenza lwe-Kilo ku-GitHub ukuze uvumelanise izexwayiso ze-Dependabot ngokuzenzakalelayo futhi uphathe okutholakele kwezokuphepha ezinqolobaneni zakho zekhodi.",
+      "connectOwnerOnly": "Abanikazi benhlangano nabalawuli kuphela abangayixhuma {{platform}}.",
       "connectTitle": "Xhuma ku-GitHub ukuze uqale",
       "couldNotLoad": "Asikwazanga ukulayisha i-ejenti yezokuphepha.",
       "installApp": "Faka uhlelo lokusebenza lwe-GitHub",

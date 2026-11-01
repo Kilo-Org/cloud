@@ -2037,6 +2037,7 @@
     },
     "scopeEntry": {
       "connectDescription": "I-install ang Kilo GitHub App para awtomatikong i-sync ang mga alerto ng Dependabot at pamahalaan ang mga natukoy na isyu sa seguridad sa iyong mga repository.",
+      "connectOwnerOnly": "Mga may-ari ng organisasyon at admin lang ang makakakonekta ng {{platform}}.",
       "connectTitle": "Ikonekta ang GitHub para magsimula",
       "couldNotLoad": "Hindi ma-load ang Ahente sa seguridad.",
       "installApp": "I-install ang GitHub App",

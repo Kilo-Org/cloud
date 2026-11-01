@@ -2037,6 +2037,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਆਪਣੇ ਆਪ ਸਿੰਕ ਕਰਨ ਅਤੇ ਆਪਣੀਆਂ ਰਿਪੋਜ਼ਟਰੀਆਂ ਦੀਆਂ ਸੁਰੱਖਿਆ ਸਮੱਸਿਆਵਾਂ ਦਾ ਪ੍ਰਬੰਧ ਕਰਨ ਲਈ Kilo GitHub ਐਪ ਸਥਾਪਤ ਕਰੋ।",
+      "connectOwnerOnly": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਅਤੇ ਐਡਮਿਨ {{platform}} ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।",
       "connectTitle": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ GitHub ਕਨੈਕਟ ਕਰੋ",
       "couldNotLoad": "ਸੁਰੱਖਿਆ ਏਜੰਟ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
       "installApp": "GitHub ਐਪ ਸਥਾਪਤ ਕਰੋ",

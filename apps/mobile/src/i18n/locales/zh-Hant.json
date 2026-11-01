@@ -1458,6 +1458,7 @@
     },
     "scopeEntry": {
       "connectDescription": "安裝 Kilo GitHub App，即可自動同步 Dependabot 警報，並管理各個存放庫的資安問題。",
+      "connectOwnerOnly": "只有組織擁有者和管理員可以連結 {{platform}}。",
       "connectTitle": "連結 GitHub 即可開始使用",
       "couldNotLoad": "無法載入資安代理程式。",
       "installApp": "安裝 GitHub App",

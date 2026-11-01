@@ -2031,6 +2031,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Sakinisha programu ya Kilo ya GitHub ili kusawazisha arifa za Dependabot kiotomatiki na kusimamia matatizo ya usalama katika hazina zako.",
+      "connectOwnerOnly": "Wamiliki na wasimamizi wa shirika pekee wanaweza kuiunganisha {{platform}}.",
       "connectTitle": "Unganisha GitHub ili kuanza",
       "couldNotLoad": "Imeshindikana kupakia wakala wa usalama.",
       "installApp": "Sakinisha programu ya GitHub",

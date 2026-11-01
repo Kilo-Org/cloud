@@ -2031,6 +2031,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Asenna Kilon GitHub-sovellus, niin voit synkronoida Dependabot-hälytykset automaattisesti ja hallinnoida koodivarastojesi tietoturvahavaintoja.",
+      "connectOwnerOnly": "Vain organisaation omistajat ja ylläpitäjät voivat yhdistää {{platform}}.",
       "connectTitle": "Aloita yhdistämällä GitHub",
       "couldNotLoad": "Tietoturva-agenttia ei voitu ladata",
       "installApp": "Asenna GitHub-sovellus",

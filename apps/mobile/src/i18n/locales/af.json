@@ -2031,6 +2031,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Installeer die Kilo GitHub-app om Dependabot-waarskuwings outomaties te sinkroniseer en sekuriteitsbevindings in jou bewaarplekke te bestuur.",
+      "connectOwnerOnly": "Slegs organisasie-eienaars en administrateurs kan {{platform}} koppel.",
       "connectTitle": "Koppel GitHub om te begin",
       "couldNotLoad": "Die Sekuriteitsagent kon nie gelaai word nie.",
       "installApp": "Installeer die GitHub-app",

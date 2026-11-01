@@ -2031,6 +2031,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Shigar da manhajar Kilo ta GitHub don daidaita faɗakarwar Dependabot ta atomatik da sarrafa matsalolin tsaro da aka gano a ma'ajiyoyinka.",
+      "connectOwnerOnly": "Masu ƙungiya da masu gudanarwa kawai za su iya haɗa {{platform}}.",
       "connectTitle": "Haɗa GitHub domin farawa",
       "couldNotLoad": "An kasa loda Wakilin tsaro.",
       "installApp": "Shigar da manhajar GitHub",

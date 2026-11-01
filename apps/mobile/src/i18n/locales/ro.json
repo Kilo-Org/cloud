@@ -2064,6 +2064,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Instalează aplicația Kilo pentru GitHub ca să sincronizezi automat alertele Dependabot și să gestionezi constatările de securitate din depozitele tale.",
+      "connectOwnerOnly": "Doar proprietarii și administratorii organizației pot conecta {{platform}}.",
       "connectTitle": "Conectează GitHub pentru a începe",
       "couldNotLoad": "Nu s-a putut încărca agentul de securitate.",
       "installApp": "Instalează aplicația GitHub",

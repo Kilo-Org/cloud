@@ -299,13 +299,14 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
               title={t('securityAgent.scopeEntry.connectTitle')}
               description={t('securityAgent.scopeEntry.connectDescription')}
               buttonLabel={t('securityAgent.scopeEntry.installApp')}
-              // The Code Reviewer's connect gates already say this sentence to
-              // a narrower role, and identical copy has one key, so the entry
-              // reuses it instead of adding a second.
+              // The Code Reviewer's connect gate shows the same role rule, but
+              // its sentence also restates that the provider is unconnected,
+              // which this heading already says; the narrower notice leaves one
+              // message on the screen.
               readOnlyNotice={
                 canInstallGitHub
                   ? undefined
-                  : t('codeReviewer.notConnectedReadOnly', { platform: t('common.github') })
+                  : t('securityAgent.scopeEntry.connectOwnerOnly', { platform: t('common.github') })
               }
               url={connectUrl ?? undefined}
               resolveUrl={async () => {

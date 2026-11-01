@@ -2031,6 +2031,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot bildirişlərini avtomatik sinxronlaşdırmaq və repozitoriyalarındakı təhlükəsizlik tapıntılarını idarə etmək üçün Kilo GitHub tətbiqini quraşdır.",
+      "connectOwnerOnly": "Yalnız təşkilat sahibləri və inzibatçılar {{platform}} qoşa bilər.",
       "connectTitle": "Başlamaq üçün GitHub-u qoş",
       "couldNotLoad": "Təhlükəsizlik agentini yükləmək mümkün olmadı.",
       "installApp": "GitHub tətbiqini quraşdır",

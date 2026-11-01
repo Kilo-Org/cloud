@@ -93,8 +93,8 @@ export function GlanceablePublisherMount(): null {
       return undefined;
     }
 
-    const publisher = createGlanceablePublisher();
     const ctx = { userId, organizationId };
+    const publisher = createGlanceablePublisher({ context: ctx });
     live.current = { publisher, ctx };
     if (__DEV__) {
       setGlanceableFixtureScope(ctx);

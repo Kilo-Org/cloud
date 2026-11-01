@@ -971,7 +971,7 @@
       "bitbucketError": "Nie udało się otworzyć konfiguracji Bitbucket. Spróbuj ponownie."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · Autor: {{author}}",
+      "byline": "#{{number}} · Autor: {{author}}",
       "cancelMessage": "Spowoduje to zatrzymanie trwającego przeglądu kodu.",
       "cancelReview": "Anuluj przegląd",
       "cancelTitle": "Anulować przegląd?",

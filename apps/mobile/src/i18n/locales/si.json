@@ -1450,7 +1450,7 @@
       "fixSettings": "සැකසීම් නිවැරදි කරන්න",
       "couldNotLoad": "සමාලෝචනය පූරණය කළ නොහැකි විය.",
       "couldNotGetLatest": "නවතම තොරතුරු ලබාගත නොහැකි විය.",
-      "byline": "{{repo}} #{{number}} {{author}} විසින්",
+      "byline": "#{{number}} {{author}} විසින්",
       "noFindings": "සොයාගැනීම් නැත.",
       "findingsUnavailable": "මෙම සමාලෝචනය අසාර්ථක වූ නිසා ප්‍රතිඵල ලබා ගත නොහැක.",
       "findingsInProgress": "මෙම සමාලෝචනය තවමත් සිදු වෙමින් පවතී. එය අවසන් වන විට සොයාගැනීම් මෙහි දිස් වේ.",

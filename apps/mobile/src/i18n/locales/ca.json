@@ -1472,7 +1472,7 @@
       "fixSettings": "Corregeix la configuració",
       "couldNotLoad": "No s'ha pogut carregar la revisió.",
       "couldNotGetLatest": "No s'han pogut obtenir les dades més recents.",
-      "byline": "{{repo}} #{{number}} · Autor: {{author}}",
+      "byline": "#{{number}} · Autor: {{author}}",
       "noFindings": "No hi ha incidències.",
       "findingsUnavailable": "Els resultats no estan disponibles perquè aquesta revisió ha fallat.",
       "findingsInProgress": "Aquesta revisió encara està en curs. Les incidències apareixeran aquí quan finalitzi.",

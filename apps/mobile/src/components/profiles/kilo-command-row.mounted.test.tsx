@@ -153,7 +153,7 @@ describe('KiloCommandRowView template preview', () => {
     const [toggle] = root.findAll(node => Object.is(node.type, 'Switch'));
     const presses = root.findAll(node => Object.is(node.type, 'Pressable'));
 
-    expect(toggle?.props.accessibilityLabel).toBe('review');
+    expect(toggle?.props.accessibilityLabel).toBe('/review');
     expect(presses.map(node => node.props.accessibilityLabel)).toEqual([
       'Move slash command review up',
       'Move slash command review down',
@@ -184,6 +184,7 @@ describe('KiloCommandRowView template preview', () => {
     });
 
     const [toggle] = root.findAll(node => Object.is(node.type, 'Switch'));
-    expect(toggle?.props.accessibilityLabel).toBe('review');
+    // The announced name is the label on screen, slash included.
+    expect(toggle?.props.accessibilityLabel).toBe('/review');
   });
 });

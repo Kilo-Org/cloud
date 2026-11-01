@@ -60,9 +60,9 @@ function templatePreview(template: string): string | null {
 /**
  * One slash command row: the `/name`, optional subtask/agent/model metadata, the
  * template preview, the enabled switch, and up/down/edit/delete controls. The
- * row carries no container `accessibilityLabel`, and the visible `/name` is
- * painted only, so the switch's label is the single element a screen reader
- * matches by the command's name.
+ * row carries no container `accessibilityLabel`; the visible `/name` is painted
+ * only and the switch carries that same visible form, so the switch's label is
+ * the single element a screen reader matches by the command's name.
  */
 export function KiloCommandRowView({
   name,
@@ -92,6 +92,7 @@ export function KiloCommandRowView({
   const offThumbColor = isDark ? colors.foreground : colors.primaryForeground;
   const controlClass = (disabled: boolean) =>
     cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70', disabled && 'opacity-40');
+  const visibleName = `/${name}`;
   return (
     <View className="gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="flex-row items-center gap-1">
@@ -99,7 +100,7 @@ export function KiloCommandRowView({
           <View className="flex-row flex-wrap items-center gap-2">
             <Terminal size={16} color={colors.mutedForeground} />
             <Text variant="mono" className="text-sm" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
-              {`/${name}`}
+              {visibleName}
             </Text>
             {subtask ? (
               <Text className="rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -127,7 +128,9 @@ export function KiloCommandRowView({
         </View>
         <Switch
           value={enabled}
-          accessibilityLabel={name}
+          // The row's only element carrying the name, so it takes the visible
+          // form: the announced name matches the label on screen.
+          accessibilityLabel={visibleName}
           disabled={onToggle === undefined}
           onValueChange={onToggle}
           trackColor={{ false: offTrackColor, true: colors.primary }}

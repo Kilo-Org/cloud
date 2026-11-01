@@ -417,6 +417,7 @@
     "connectionExpired": "Baigėsi GitHub prieigos galiojimas.",
     "merge": {
       "merge": "Sujungimas",
+      "mergeTitle": "Sujungimas",
       "mergeNow": "Sujungti dabar",
       "mergePullRequest": "Pakeitimų užklausos sujungimas",
       "mergeTermTitle": "Sujungti {{term}}",

@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub-yhteys on vanhentunut.",
     "merge": {
       "merge": "Yhdistä",
+      "mergeTitle": "Yhdistä",
       "mergeNow": "Yhdistä nyt",
       "mergePullRequest": "Yhdistä muutospyyntö",
       "mergeTermTitle": "Yhdistä {{term}}",

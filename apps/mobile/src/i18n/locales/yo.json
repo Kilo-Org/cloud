@@ -403,6 +403,7 @@
     "connectionExpired": "Àkókò ìsopọ̀ GitHub ti parí.",
     "merge": {
       "merge": "Àkópọ̀",
+      "mergeTitle": "Àkópọ̀",
       "mergeNow": "Dà pọ̀ báyìí",
       "mergePullRequest": "Ìdàpọ̀ ìbéèrè ìṣọ̀kan",
       "mergeTermTitle": "Da {{term}} pọ̀",

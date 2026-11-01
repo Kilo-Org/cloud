@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub కనెక్షన్ గడువు ముగిసింది.",
     "merge": {
       "merge": "మెర్జ్",
+      "mergeTitle": "మెర్జ్",
       "mergeNow": "ఇప్పుడు మెర్జ్ చేయండి",
       "mergePullRequest": "పుల్ రిక్వెస్ట్ మెర్జ్",
       "mergeTermTitle": "{{term}} మెర్జ్",

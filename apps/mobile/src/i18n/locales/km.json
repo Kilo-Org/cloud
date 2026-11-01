@@ -403,6 +403,7 @@
     "connectionExpired": "ការតភ្ជាប់ទៅ GitHub បានផុតកំណត់ហើយ។",
     "merge": {
       "merge": "បញ្ចូលគ្នា",
+      "mergeTitle": "បញ្ចូលគ្នា",
       "mergeNow": "បញ្ចូលឥឡូវនេះ",
       "mergePullRequest": "បញ្ចូលសំណើបញ្ចូលកូដ",
       "mergeTermTitle": "បញ្ចូល{{term}}",

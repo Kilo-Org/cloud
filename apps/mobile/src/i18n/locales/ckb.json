@@ -403,6 +403,7 @@
     "connectionExpired": "ماوەی پەیوەندی بە GitHub بەسەرچووە.",
     "merge": {
       "merge": "یەکخستن",
+      "mergeTitle": "یەکخستن",
       "mergeNow": "ئێستا تێکەڵ بکە",
       "mergePullRequest": "تێکەڵکردنی داواکاری ڕاکێشان",
       "mergeTermTitle": "تێکەڵکردنی {{term}}",

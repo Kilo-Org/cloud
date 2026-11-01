@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub ချိတ်ဆက်မှု သက်တမ်းကုန်သွားပါပြီ။",
     "merge": {
       "merge": "ပေါင်းစည်းခြင်း",
+      "mergeTitle": "ပေါင်းစည်းခြင်း",
       "mergeNow": "ယခု ပေါင်းစည်းပါ",
       "mergePullRequest": "PR ပေါင်းစည်းခြင်း",
       "mergeTermTitle": "{{term}} ပေါင်းစည်းခြင်း",

@@ -403,6 +403,7 @@
     "connectionExpired": "ການເຊື່ອມຕໍ່ GitHub ໝົດອາຍຸແລ້ວ.",
     "merge": {
       "merge": "ລວມໂຄ້ດ",
+      "mergeTitle": "ລວມໂຄ້ດ",
       "mergeNow": "ລວມດຽວນີ້",
       "mergePullRequest": "ລວມຄຳຂໍລວມໂຄດ",
       "mergeTermTitle": "ລວມ{{term}}",

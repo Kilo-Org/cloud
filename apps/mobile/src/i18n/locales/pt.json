@@ -410,6 +410,7 @@
     "connectionExpired": "A ligação ao GitHub expirou.",
     "merge": {
       "merge": "Fusão",
+      "mergeTitle": "Fusão",
       "mergeNow": "Integrar agora",
       "mergePullRequest": "Integrar PR",
       "mergeTermTitle": "Integrar {{term}}",

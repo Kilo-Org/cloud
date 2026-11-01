@@ -403,6 +403,7 @@
     "connectionExpired": "Oge njikọ GitHub agwụla.",
     "merge": {
       "merge": "Njikọta",
+      "mergeTitle": "Njikọta",
       "mergeNow": "Jikọta ugbu a",
       "mergePullRequest": "Njikọta arịrịọ",
       "mergeTermTitle": "Jikọta {{term}}",

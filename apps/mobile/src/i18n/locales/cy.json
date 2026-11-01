@@ -431,6 +431,7 @@
     "connectionExpired": "Mae'r cysylltiad â GitHub wedi dod i ben.",
     "merge": {
       "merge": "Cyfuno",
+      "mergeTitle": "Cyfuno",
       "mergeNow": "Cyfuno nawr",
       "mergePullRequest": "Cyfuno cais tynnu",
       "mergeTermTitle": "Cyfuno {{term}}",

@@ -2993,6 +2993,7 @@
     "installKiloGitHubApp": "Installer l'application GitHub de Kilo",
     "merge": {
       "merge": "Fusion",
+      "mergeTitle": "Fusion",
       "mergeNow": "Fusionner maintenant",
       "mergePullRequest": "Fusion de la demande",
       "mergeTermTitle": "Fusionner {{term}}",

@@ -3119,6 +3119,7 @@
     "installKiloGitHubApp": "تثبيت تطبيق Kilo على GitHub",
     "merge": {
       "merge": "دمج",
+      "mergeTitle": "دمج",
       "mergeNow": "دمج الآن",
       "mergePullRequest": "دمج طلب السحب",
       "mergeTermTitle": "دمج {{term}}",

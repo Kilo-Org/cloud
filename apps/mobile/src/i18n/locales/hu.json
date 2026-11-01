@@ -403,6 +403,7 @@
     "connectionExpired": "A GitHub-kapcsolat lejárt.",
     "merge": {
       "merge": "Összevonás",
+      "mergeTitle": "Összevonás",
       "mergeNow": "Összevonás most",
       "mergePullRequest": "PR összevonása",
       "mergeTermTitle": "A {{term}} összevonása",

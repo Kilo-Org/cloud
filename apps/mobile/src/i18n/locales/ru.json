@@ -3031,6 +3031,7 @@
     "installKiloGitHubApp": "Установить приложение Kilo для GitHub",
     "merge": {
       "merge": "Объединение",
+      "mergeTitle": "Объединение",
       "mergeNow": "Выполнить слияние сейчас",
       "mergePullRequest": "Слияние запроса",
       "mergeTermTitle": "Слить {{term}}",

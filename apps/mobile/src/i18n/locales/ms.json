@@ -403,6 +403,7 @@
     "connectionExpired": "Sambungan GitHub telah tamat tempoh.",
     "merge": {
       "merge": "Gabungan",
+      "mergeTitle": "Gabungan",
       "mergeNow": "Gabungkan sekarang",
       "mergePullRequest": "Gabungkan permintaan tarik",
       "mergeTermTitle": "Gabungkan {{term}}",

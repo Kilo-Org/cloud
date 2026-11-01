@@ -2943,6 +2943,7 @@
     "installKiloGitHubApp": "Cài đặt ứng dụng Kilo trên GitHub",
     "merge": {
       "merge": "Hợp nhất",
+      "mergeTitle": "Hợp nhất",
       "mergeNow": "Hợp nhất ngay",
       "mergePullRequest": "Hợp nhất PR",
       "mergeTermTitle": "Hợp nhất {{term}}",

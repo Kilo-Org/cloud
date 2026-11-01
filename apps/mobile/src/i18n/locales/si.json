@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub සම්බන්ධතාව කල් ඉකුත් වී ඇත.",
     "merge": {
       "merge": "ඒකාබද්ධ කිරීම",
+      "mergeTitle": "ඒකාබද්ධ කිරීම",
       "mergeNow": "දැන් ඒකාබද්ධ කරන්න",
       "mergePullRequest": "පුල් ඉල්ලීම ඒකාබද්ධ කිරීම",
       "mergeTermTitle": "{{term}} ඒකාබද්ධ කරන්න",

@@ -403,6 +403,7 @@
     "connectionExpired": "Ukuxhumana ne-GitHub kuphelelwe yisikhathi.",
     "merge": {
       "merge": "Ukuhlanganisa",
+      "mergeTitle": "Ukuhlanganisa",
       "mergeNow": "Hlanganisa manje",
       "mergePullRequest": "Hlanganisa isicelo sokuhlanganisa",
       "mergeTermTitle": "Hlanganisa {{term}}",

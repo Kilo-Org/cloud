@@ -3031,6 +3031,7 @@
     "installKiloGitHubApp": "Zainstaluj aplikację Kilo dla GitHub",
     "merge": {
       "merge": "Scalanie",
+      "mergeTitle": "Scalanie",
       "mergeNow": "Scal teraz",
       "mergePullRequest": "Scalanie PR",
       "mergeTermTitle": "Scalanie {{term}}",

@@ -2943,6 +2943,7 @@
     "installKiloGitHubApp": "Kilo GitHub-app installeren",
     "merge": {
       "merge": "Samenvoegen",
+      "mergeTitle": "Samenvoegen",
       "mergeNow": "Nu samenvoegen",
       "mergePullRequest": "PR samenvoegen",
       "mergeTermTitle": "{{term}} samenvoegen",

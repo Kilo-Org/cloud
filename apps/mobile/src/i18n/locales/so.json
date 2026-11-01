@@ -403,6 +403,7 @@
     "connectionExpired": "Muddadii xiriirka GitHub way dhammaatay.",
     "merge": {
       "merge": "Isku-darid",
+      "mergeTitle": "Isku-darid",
       "mergeNow": "Hadda isku dar",
       "mergePullRequest": "Isku-darka codsiga",
       "mergeTermTitle": "Isku-dar {{term}}",

@@ -410,6 +410,7 @@
     "connectionExpired": "Conexiunea la GitHub a expirat.",
     "merge": {
       "merge": "Îmbinare",
+      "mergeTitle": "Îmbinare",
       "mergeNow": "Îmbină acum",
       "mergePullRequest": "Îmbinarea PR-ului",
       "mergeTermTitle": "Îmbinarea {{term}}-ului",

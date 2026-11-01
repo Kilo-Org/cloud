@@ -2949,6 +2949,7 @@
     "installKiloGitHubApp": "Kilo GitHub ऐप इंस्टॉल करें",
     "merge": {
       "merge": "मर्ज",
+      "mergeTitle": "मर्ज",
       "mergeNow": "अभी मर्ज करें",
       "mergePullRequest": "पुल रिक्वेस्ट मर्ज करें",
       "mergeTermTitle": "{{term}} मर्ज करें",

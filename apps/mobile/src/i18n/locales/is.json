@@ -403,6 +403,7 @@
     "connectionExpired": "Tengingin við GitHub er útrunnin.",
     "merge": {
       "merge": "Sameining",
+      "mergeTitle": "Sameining",
       "mergeNow": "Sameina núna",
       "mergePullRequest": "Sameining beiðnar",
       "mergeTermTitle": "Sameina {{term}}",

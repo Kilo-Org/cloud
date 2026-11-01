@@ -2943,6 +2943,7 @@
     "installKiloGitHubApp": "安装 Kilo GitHub 应用",
     "merge": {
       "merge": "合并",
+      "mergeTitle": "合并",
       "mergeNow": "立即合并",
       "mergePullRequest": "合并拉取请求",
       "mergeTermTitle": "合并{{term}}",

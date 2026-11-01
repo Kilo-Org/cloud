@@ -424,6 +424,7 @@
     "connectionExpired": "Il-konnessjoni ma' GitHub skadiet.",
     "merge": {
       "merge": "Għaqda",
+      "mergeTitle": "Għaqda",
       "mergeNow": "Għaqqad issa",
       "mergePullRequest": "Għaqda tat-talba",
       "mergeTermTitle": "Għaqda tal-{{term}}",

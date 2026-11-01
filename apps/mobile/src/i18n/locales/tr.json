@@ -2943,6 +2943,7 @@
     "installKiloGitHubApp": "Kilo GitHub uygulamasını yükle",
     "merge": {
       "merge": "Birleştirme",
+      "mergeTitle": "Birleştirme",
       "mergeNow": "Şimdi birleştir",
       "mergePullRequest": "Çekme isteğini birleştirme",
       "mergeTermTitle": "{{term}}ni birleştirme",

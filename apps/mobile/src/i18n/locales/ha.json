@@ -403,6 +403,7 @@
     "connectionExpired": "Wa'adin haɗin GitHub ya ƙare.",
     "merge": {
       "merge": "Haɗawa",
+      "mergeTitle": "Haɗawa",
       "mergeNow": "Haɗa yanzu",
       "mergePullRequest": "Haɗa buƙatar haɗawa",
       "mergeTermTitle": "Haɗa {{term}}",

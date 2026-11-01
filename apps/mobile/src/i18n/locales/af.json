@@ -403,6 +403,7 @@
     "connectionExpired": "Die GitHub-verbinding het verval.",
     "merge": {
       "merge": "Samevoeging",
+      "mergeTitle": "Samevoeging",
       "mergeNow": "Voeg nou saam",
       "mergePullRequest": "Voeg trekversoek saam",
       "mergeTermTitle": "Voeg {{term}} saam",

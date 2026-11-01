@@ -417,6 +417,7 @@
     "connectionExpired": "Тэрмін дзеяння падключэння да GitHub скончыўся.",
     "merge": {
       "merge": "Зліццё",
+      "mergeTitle": "Зліццё",
       "mergeNow": "Зліць зараз",
       "mergePullRequest": "Зліццё запыту",
       "mergeTermTitle": "Зліць {{term}}",

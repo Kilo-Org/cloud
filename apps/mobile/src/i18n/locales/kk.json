@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub қосылымының мерзімі аяқталды.",
     "merge": {
       "merge": "Біріктіру",
+      "mergeTitle": "Біріктіру",
       "mergeNow": "Қазір біріктіру",
       "mergePullRequest": "Біріктіру сұрауын біріктіру",
       "mergeTermTitle": "{{term}}н біріктіру",

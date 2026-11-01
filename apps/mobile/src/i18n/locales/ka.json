@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub-თან კავშირს ვადა გაუვიდა.",
     "merge": {
       "merge": "შერწყმა",
+      "mergeTitle": "შერწყმა",
       "mergeNow": "ახლავე შერწყმა",
       "mergePullRequest": "შერწყმის მოთხოვნის შერწყმა",
       "mergeTermTitle": "{{term}}-ის შერწყმა",

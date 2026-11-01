@@ -743,6 +743,56 @@ describe('ScreenHeader mounted', () => {
     }
   });
 
+  it('reserves the title cap in a band beside the heading, not around the title', () => {
+    const renderer = renderHeader({
+      title: 'Harbor Analytics',
+      eyebrow: 'RECENT REVIEWS',
+      titleNumberOfLines: 2,
+      reserveTitleSpace: true,
+    });
+
+    const band = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        String(node.props.className ?? '')
+          .split(' ')
+          .includes('w-0')
+    );
+    // The band holds one eyebrow line and the title's two-line cap, so the row
+    // keeps its height for a title that paints one line: the body below never
+    // moves when the name arrives and wraps.
+    expect(band.findAll(node => String(node.type) === 'Eyebrow')).toHaveLength(1);
+    const capBox = band.findAll(
+      node => typeof node.type === 'string' && String(node.props.className ?? '').includes('min-h')
+    );
+    expect(capBox.map(node => node.props.className)).toEqual(['min-h-14']);
+    // The band is clipped to no width, so it holds height only: it never takes
+    // space from the heading or paints beside the title.
+    expect(String(band.props.className)).toContain('w-0');
+
+    // The visible title keeps its own height, so the eyebrow sits right above
+    // it instead of above the empty line the cap reserves.
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.props.className).toBe('min-w-0 flex-1');
+    renderer.unmount();
+  });
+
+  it('reserves no band on a header whose title has a single fixed line', () => {
+    const renderer = renderHeader({
+      title: 'Personal',
+      eyebrow: 'RECENT REVIEWS',
+      titleNumberOfLines: 1,
+    });
+
+    expect(
+      renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' && String(node.props.className ?? '').startsWith('w-0')
+      )
+    ).toHaveLength(0);
+    renderer.unmount();
+  });
+
   it('keeps the close control on the title row when the sheet skips the safe-area inset', () => {
     const renderer = renderHeader({
       title: 'Submit review',

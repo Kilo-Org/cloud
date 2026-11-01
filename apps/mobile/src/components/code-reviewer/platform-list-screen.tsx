@@ -126,8 +126,13 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
       <ReviewerHeader
         title={scopeTitle}
         // An organization name is user prose, not a UI label, so it keeps a
-        // second line for a natural break.
-        titleNumberOfLines={2}
+        // second line for a natural break. Both lines are reserved, as the
+        // review list for the same scope reserves them: the name arrives with
+        // the membership read, and the header holds its height so the platform
+        // rows below never move. `Personal` is a fixed label that can never
+        // wrap, so it keeps the single line it fills.
+        titleNumberOfLines={isPersonal ? 1 : 2}
+        reserveTitleSpace={!isPersonal}
         eyebrow={t('common.codeReviewer')}
       />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">

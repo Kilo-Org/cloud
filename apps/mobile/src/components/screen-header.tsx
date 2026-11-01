@@ -84,6 +84,12 @@ export function shouldStackHeaderActions(
  */
 const MAX_TITLE_LINES = 3;
 
+/**
+ * What a reserved band's eyebrow twin lays out with: a space, so the twin
+ * holds one eyebrow line without painting a label that is not on screen.
+ */
+const blankEyebrow = '\u00A0';
+
 type ScreenHeaderProps = {
   /** Omit to render a bare back-button bar (e.g. when the screen body provides its own title). */
   title?: string;
@@ -195,6 +201,12 @@ type ScreenHeaderProps = {
  * the body below the header — and a one-line cap reserves one line, not the
  * two-line default it replaced, or the header keeps a blank line it can never
  * fill.
+ *
+ * The box is the measure the header's reserved band keeps its height by (see
+ * `reservedTitleBand`): an empty box at the title's own position, so a title
+ * that grows a line cannot move the body below the header — and a one-line cap
+ * reserves one line, not the two-line default it replaced, or the band keeps a
+ * blank line it can never fill.
  *
  * The large branches stay in px: NativeWind's rem is 14pt, so `min-h-9` would
  * be 31.5pt under the 36px the large title paints.
@@ -368,13 +380,9 @@ export function ScreenHeader({
         {title}
       </Text>
     );
-    const titleLayout = reserveTitleSpace ? (
-      <View className={cn(reservedTitleHeightClass(size, titleLines), 'justify-center')}>
-        {titleText}
-      </View>
-    ) : (
-      titleText
-    );
+    // The visible title paints at its own height: the reserved line lives in
+    // the band beside the heading (see `reservedTitleBand`), never around the
+    // text, so the eyebrow keeps its tight pair with the title's first line.
     // Title caret removed: rename stays available via the pressable title
     // itself. The backIcon === 'close' ChevronDown on the back control is
     // unrelated and stays. The label is the title text, never the action: a
@@ -390,10 +398,10 @@ export function ScreenHeader({
         accessibilityHint={titlePressHint}
         className="active:opacity-70"
       >
-        {titleLayout}
+        {titleText}
       </Pressable>
     ) : (
-      titleLayout
+      titleText
     );
   }
 
@@ -422,6 +430,23 @@ export function ScreenHeader({
   // A spacer opposite the back control keeps the title centered on the full
   // width without placing either control out of flow.
   const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow));
+
+  // The reserve, as a band rather than a box around the title: a zero-width,
+  // clipped twin of the eyebrow and the title's line cap holds the header's text
+  // area to one height for every line count the cap allows, so a title that
+  // grows a line cannot move the body below. The visible text stays at its
+  // natural height and centers on the band, which is what lines the leading
+  // control up with the text rather than with the empty line the reserve keeps.
+  // The twin lays out with the same eyebrow style and the same cap box as the
+  // visible title, so the band follows the font scale, and it needs no measured
+  // height and no line-height constant.
+  const showBandEyebrow = Boolean(eyebrow) || reserveEyebrow;
+  const reservedTitleBand = reserveTitleSpace ? (
+    <View className="w-0 overflow-hidden" importantForAccessibility="no-hide-descendants">
+      {showBandEyebrow ? <Eyebrow className="mb-0.5">{blankEyebrow}</Eyebrow> : null}
+      <View className={reservedTitleHeightClass(size, titleLines)} />
+    </View>
+  ) : null;
 
   // The leading control's pull into the gutter is a START-side margin, never a
   // hand-picked `mr` under RTL. With `I18nManager.doLeftAndRightSwapInRTL` on
@@ -533,6 +558,7 @@ export function ScreenHeader({
             <View className="min-h-11 flex-row items-center">
               {backControl}
               <View className="min-w-0 flex-1 flex-row items-center justify-center">{heading}</View>
+              {reservedTitleBand}
               {headerRight && !stackActions ? (
                 <View className={headerRightSlotClassName}>{headerRight}</View>
               ) : (
@@ -556,6 +582,7 @@ export function ScreenHeader({
                 {backControl}
                 {heading}
               </View>
+              {reservedTitleBand}
               {headerRight && !stackActions ? (
                 <View className={headerRightSlotClassName}>{headerRight}</View>
               ) : null}

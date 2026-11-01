@@ -1423,7 +1423,7 @@
       "manageAccess": "Halda juurdepääsu",
       "bitbucketNoRepositoriesDescription": "Selles Bitbucketi tööruumis pole hoidlaid saadaval.",
       "gitlabNoRepositoriesDescription": "Võimalik, et pead GitLabis andma juurdepääsu veel mõnele rühmale või projektile.",
-      "installGithubApp": "GitHubi rakenduse paigaldamine hoidlatele",
+      "installGithubApp": "GitHubi rakenduse paigaldamine",
       "installGithubAppDescription": "Anna Kilo GitHubi rakendusele juurdepääs hoidlatele, mille koodi soovid üle vaadata.",
       "repositoryAccess": "juurdepääs hoidlatele",
       "allModePersonal": "Kõik hoidlad, millele Kilol on sinu GitHubi ühenduse kaudu juurdepääs, vaadatakse automaatselt üle.",
@@ -1448,13 +1448,13 @@
       "retryNeedsSettings": "Koodiülevaataja on välja lülitatud või selle seaded vajavad tähelepanu. Paranda seaded ja proovi seejärel seda ülevaatust uuesti.",
       "retryNotStarted": "Uuestiproovimist ei õnnestunud alustada.",
       "fixSettings": "Paranda seaded",
-      "couldNotLoad": "Ülevaatust ei õnnestunud laadida.",
+      "couldNotLoad": "Ülevaatust ei õnnestunud laadida",
       "couldNotGetLatest": "Uusimaid andmeid ei õnnestunud laadida.",
       "byline": "#{{number}}, autor {{author}}",
       "noFindings": "Leide ei leitud.",
       "findingsUnavailable": "Tulemused pole saadaval, sest see ülevaatus ebaõnnestus.",
       "findingsInProgress": "See ülevaatus on veel käimas. Leiud ilmuvad siia, kui see lõpeb.",
-      "findingsEndedWithoutResults": "See ülevaatus lõppes, enne kui ilmus ühtegi leidu.",
+      "findingsEndedWithoutResults": "See ülevaatus lõppes, ilma et ühtegi leidu oleks ilmnenud.",
       "serviceUnavailable": "Koodi ülevaatuse teenusega ei õnnestunud ühendust luua. Proovi ülevaatust uuesti, kui teenus on saadaval.",
       "reviewFailed": "Ülevaatus ebaõnnestus. Palun proovi uuesti.",
       "showMore": "Kuva rohkem",
@@ -1496,22 +1496,22 @@
     "reviewMemory": {
       "title": "Ülevaatuste mälu",
       "loading": "Ülevaatuste mälu laadimine",
-      "couldNotLoad": "Ülevaatuste mälu ei õnnestunud laadida.",
-      "off": "Ülevaatuste mälu on välja lülitatud.",
-      "on": "Ülevaatuste mälu on sisse lülitatud.",
+      "couldNotLoad": "Ülevaatuste mälu ei õnnestunud laadida",
+      "off": "Ülevaatuste mälu on välja lülitatud",
+      "on": "Ülevaatuste mälu on sisse lülitatud",
       "offDescription": "Lülita see sisse, et Kilo saaks hooldajate vastustest õppida ja pakkuda juhiseid faili REVIEW.md.",
       "readOnlyDescription": "Ülevaatuste mälu saavad muuta ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
       "enable": "Luba ülevaatuste mälu",
       "loadingProposals": "Ettepanekute laadimine",
-      "couldNotLoadProposals": "Ettepanekuid ei õnnestunud laadida.",
+      "couldNotLoadProposals": "Ettepanekuid ei õnnestunud laadida",
       "noProposals": "Ettepanekuid pole",
       "proposalDetails": "Ettepaneku üksikasjad",
       "proposalTitle": "Ettepaneku pealkiri",
       "rationale": "Põhjendus",
       "saveFirst": "Salvesta muudatused enne tõmbetaotluse avamist.",
       "proposalSaved": "Ettepanek salvestatud",
-      "proposalDismissed": "Ettepanek tagasi lükatud",
-      "dismissProposalTitle": "Kas lükata ettepanek tagasi?",
+      "proposalDismissed": "Ettepanek hüljatud",
+      "dismissProposalTitle": "Kas hüljata ettepanek?",
       "dismissProposalMessage": "See ettepanek eemaldatakse aktiivsete ettepanekute loendist ja seda ei saa taastada.",
       "prOpened": "Faili REVIEW.md tõmbetaotlus avatud",
       "alreadyPresent": "Juhised on failis REVIEW.md juba olemas",
@@ -1527,7 +1527,7 @@
       "changeRequestNoGitHubAccess": "Ühelgi GitHubi ühendusel ei ole sellele hoidlale juurdepääsu. Ühenda GitHub uuesti nii, et sellel on juurdepääs sellele hoidlale, ja proovi seejärel uuesti.",
       "changeRequestMissingPermissions": "Kilo GitHubi rakendus ei saa selles hoidlas tõmbetaotlusi avada. Hoidla omanik peab andma rakendusele kirjutamisõiguse sisule ja tõmbetaotlustele, seejärel proovi uuesti.",
       "changeRequestFailed": "Kilol ei õnnestunud tõmbetaotlust avada. Proovi hetke pärast uuesti.",
-      "proposalConflict": "Selle sama hoidla jaoks on veel üks ülevaatuste mälu ettepanek endiselt aktiivne, mistõttu ei saa seda veel salvestada.",
+      "proposalConflict": "Selle sama hoidla jaoks on veel üks ülevaatuste mälu ettepanek endiselt aktiivne.",
       "offAction": "Ülevaatuste mälu on välja lülitatud. Lülita see sisse ja proovi uuesti."
     },
     "manualReview": {
@@ -1556,7 +1556,7 @@
     "gitlab": {
       "notConnectedReadOnly": "{{platform}} pole ühendatud. Palu organisatsiooni omanikul, administraatoril või arveldushalduril see ühendada."
     },
-    "webhookSetup": "Veebihaagi seadistamine pole lõpetatud.",
+    "webhookSetup": "Veebihaagi seadistamine pole lõpetatud",
     "webhookSetupDescription": "Mõnes hoidlas ei pruugi automaatsed ülevaatused toimuda.",
     "autoReviews": "Automaatsed ülevaatused",
     "selectRepository": "Automaatsete ülevaatuste lubamiseks vali vähemalt üks hoidla.",
@@ -1609,11 +1609,11 @@
     },
     "decision": {
       "pass": "Läbitud",
-      "block": "Blokeeri",
+      "block": "Blokeeritud",
       "noDecision": "Otsust pole",
       "noResult": "Tulemust pole"
     },
-    "updateFailed": "Koodiülevaataja uuendamine ebaõnnestus.",
+    "updateFailed": "Koodiülevaataja uuendamine ebaõnnestus",
     "configSaveFailed": "Ülevaatuse seadete salvestamine ebaõnnestus.",
     "status": {
       "interrupted": "Katkestatud"
@@ -1657,7 +1657,7 @@
       "repeatedRepositoryCloneTimeout": {
         "description": "Koodiülevaataja lülitati välja, sest hoidla kloonimine ületas täna kolm korda ajalimiidi. Küsi abi aadressil {{supportEmail}} ja lülita seejärel koodiülevaataja uuesti sisse."
       },
-      "title": "Koodiülevaataja vajab tähelepanu.",
+      "title": "Koodiülevaataja vajab tähelepanu",
       "recoveryLabel": "Võta ühendust toega"
     },
     "unknownError": "Tundmatu viga"

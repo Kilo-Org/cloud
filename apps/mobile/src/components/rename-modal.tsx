@@ -49,7 +49,14 @@ export function RenameModal<TSaveResult>({
 }: Readonly<RenameModalProps<TSaveResult>>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const nameRef = useRef(initialValue);
+  // The field owns what the user typed, as its value. Its seed is the value the
+  // dialog opened with, captured once: a caller that writes the typed name into
+  // its cache on save and restores the old one when the save is refused
+  // re-renders this component with a different `initialValue`, and the native
+  // field re-applies the text it is given on each of those updates, so neither
+  // the seed nor the text may come from the caller's changing data.
+  const [openingValue] = useState(initialValue);
+  const [text, setText] = useState(openingValue);
   const inputRef = useRef<TextInput>(null);
   const [canSave, setCanSave] = useState(false);
   const [pending, setPending] = useState(false);
@@ -77,7 +84,7 @@ export function RenameModal<TSaveResult>({
   };
 
   const handleSave = async () => {
-    const trimmed = nameRef.current.trim();
+    const trimmed = text.trim();
     setPending(true);
     setSaveInFlight(true);
     setErrorText(null);
@@ -135,13 +142,13 @@ export function RenameModal<TSaveResult>({
         )}
         placeholder={placeholder}
         placeholderTextColor={colors.mutedForeground}
-        defaultValue={initialValue}
+        value={text}
         multiline={multiline}
         textAlignVertical={multiline ? 'top' : undefined}
         onChangeText={val => {
-          nameRef.current = val;
+          setText(val);
           const trimmed = val.trim();
-          setCanSave(trimmed.length > 0 && trimmed !== initialValue);
+          setCanSave(trimmed.length > 0 && trimmed !== openingValue);
         }}
         autoFocus={Platform.OS !== 'android'}
         maxLength={maxLength}

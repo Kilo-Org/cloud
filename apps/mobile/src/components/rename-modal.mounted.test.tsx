@@ -4,9 +4,11 @@
 // dialog opts into the wrapping field. These tests pin both field contracts:
 // multi-line wraps with a bounded height, single-line keeps its old styling,
 // and only the single-line field submits from the keyboard's Done key with the
-// same guards as the Save button.
+// same guards as the Save button. The field also owns what the user typed: a
+// caller's cache write and its rollback never re-seed it, so a refused save
+// leaves the typed name in place beside the inline error.
 
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -59,19 +61,27 @@ type MountOverrides = {
   initialValue?: string;
 };
 
+function modalElement(
+  initialValue: string,
+  multiline: boolean,
+  overrides: MountOverrides
+): ReactElement {
+  return createElement(RenameModal, {
+    title: 'Edit goal',
+    placeholder: 'Describe the goal',
+    initialValue,
+    multiline,
+    maxLength: 500,
+    onSave: overrides.onSave ?? resolveSave,
+    onClose: overrides.onClose ?? (() => undefined),
+  });
+}
+
 function mount(multiline: boolean, overrides: MountOverrides = {}): TestRenderer.ReactTestRenderer {
   const holder: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     holder.current = TestRenderer.create(
-      createElement(RenameModal, {
-        title: 'Edit goal',
-        placeholder: 'Describe the goal',
-        initialValue: overrides.initialValue ?? LONG_GOAL,
-        multiline,
-        maxLength: 500,
-        onSave: overrides.onSave ?? resolveSave,
-        onClose: overrides.onClose ?? (() => undefined),
-      })
+      modalElement(overrides.initialValue ?? LONG_GOAL, multiline, overrides)
     );
   });
   const renderer = holder.current;
@@ -87,6 +97,7 @@ function fieldProps(renderer: TestRenderer.ReactTestRenderer) {
     multiline?: boolean;
     textAlignVertical?: string;
     defaultValue?: string;
+    value?: string;
     returnKeyType?: string;
     onChangeText?: (value: string) => void;
     onSubmitEditing?: () => void;
@@ -100,12 +111,68 @@ describe('RenameModal field wrapping', () => {
     // scrolling horizontally and hiding the start of the value.
     expect(props.multiline).toBe(true);
     expect(props.textAlignVertical).toBe('top');
-    expect(props.defaultValue).toBe(LONG_GOAL);
+    expect(props.value).toBe(LONG_GOAL);
   });
 
   it('keeps the rename field single-line', () => {
     const props = fieldProps(mount(false));
     expect(props.multiline).toBeFalsy();
+  });
+});
+
+describe('RenameModal typed value', () => {
+  it('keeps the typed name when the caller writes and rolls back its data', () => {
+    const overrides: MountOverrides = { initialValue: 'Old name' };
+    const renderer = mount(false, overrides);
+    expect(fieldProps(renderer).value).toBe('Old name');
+
+    act(() => {
+      fieldProps(renderer).onChangeText?.('Neue Organisation');
+    });
+    expect(fieldProps(renderer).value).toBe('Neue Organisation');
+
+    // A refused save first writes the typed name into the caller's cache, which
+    // re-renders the dialog with that name as the initial value.
+    act(() => {
+      renderer.update(modalElement('Neue Organisation', false, overrides));
+    });
+    expect(fieldProps(renderer).value).toBe('Neue Organisation');
+
+    // Then the failed write rolls the cache back to the old name.
+    act(() => {
+      renderer.update(modalElement('Old name', false, overrides));
+    });
+    expect(fieldProps(renderer).value).toBe('Neue Organisation');
+  });
+
+  it('keeps the typed name beside the inline error after a refused save', async () => {
+    const onSave = vi
+      .fn<(name: string) => Promise<void>>()
+      .mockRejectedValueOnce(new Error('Rename refused'))
+      .mockResolvedValueOnce(undefined);
+    const onClose = vi.fn<() => void>();
+    const renderer = mount(false, { onSave, onClose, initialValue: 'Old name' });
+    act(() => {
+      fieldProps(renderer).onChangeText?.('Neue Organisation');
+    });
+
+    await act(async () => {
+      fieldProps(renderer).onSubmitEditing?.();
+      await Promise.resolve();
+    });
+    expect(onSave).toHaveBeenCalledWith('Neue Organisation');
+    expect(onClose).not.toHaveBeenCalled();
+    const copies = renderer.root.findAllByType('Text').map(node => node.props.children);
+    expect(copies).toContain('Rename refused');
+    expect(fieldProps(renderer).value).toBe('Neue Organisation');
+
+    // The same typed name is still what a retry submits.
+    await act(async () => {
+      fieldProps(renderer).onSubmitEditing?.();
+      await Promise.resolve();
+    });
+    expect(onSave).toHaveBeenNthCalledWith(2, 'Neue Organisation');
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });
 

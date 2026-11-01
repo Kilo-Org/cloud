@@ -60,14 +60,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * matches `SECRET_NAME`, plus the values of `secretEnvKeys` regardless of name.
  * Later environments override earlier ones for a named key, mirroring how the
  * caller layers them.
+ * Reusing `retainedSecrets` preserves credentials still held by in-flight commands.
  */
 export function createSecretRedactor(
   environment: Record<string, string | undefined>,
   additionalEnvironments: readonly Record<string, string | undefined>[] = [],
-  secretEnvKeys: readonly string[] = []
+  secretEnvKeys: readonly string[] = [],
+  retainedSecrets: Set<string> = new Set<string>()
 ): (text: string) => string {
   const sources = [environment, ...additionalEnvironments];
-  const secrets = new Set<string>();
+  const secrets = retainedSecrets;
   const remember = (value: string): void => {
     if (!value) return;
     secrets.add(value);

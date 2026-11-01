@@ -1153,15 +1153,17 @@ only to a wrapper that advertised it; the legacy fallback hello keeps its origin
 
 - **Request.** `{ type: 'exec.request', requestId, session: { sessionId, kiloSessionId,
   directory }, payload: { command, timeoutMs } }`. `command` is 1-10,000 characters and
-  `timeoutMs` is 1,000-60,000 ms. The Sandbox DO must first confirm the route is ready; this frame
-  does not prepare one.
+  `timeoutMs` is 1,000-60,000 ms. The Session DO confirms the route is ready before forwarding;
+  the Sandbox DO only requires a live bound wrapper that advertised `execCommand`. This frame
+  does not prepare a route.
 - **Execution.** The wrapper requires the prepared route's `kiloSessionId` and `directory` to
   match the frame, then runs `bash -c <command>` in that directory with the route's workspace
   environment, stdin closed and `inheritEnv: false`. Commands run in the `kilo-setup` workload
   cgroup.
 - **Limits.** At most two commands run concurrently per session; a third fails `busy`. Each
   stream captures at most 64 KiB before redaction. The result returns the route-redacted final
-  6 KiB of each stream, cut on a UTF-8 character boundary.
+  6 KiB of each stream, cut on a UTF-8 character boundary. The route retains known secrets across
+  credential rotations so output from commands started with earlier credentials stays redacted.
 - **Result.** Success is `{ type: 'exec.result', requestId, ok: true, result }` where `result` is
   `{ exitCode, timedOut, durationMs, stdoutTruncated, stderrTruncated, stdout, stderr }` in that
   key order, so metadata precedes the streams under an outer byte truncation. A timeout keeps
@@ -1188,6 +1190,15 @@ codes: `not_found` is NOT_FOUND; `not_ready`, `sleeping`, `wrapper_not_connected
 `exec_failed` is INTERNAL_SERVER_ERROR. A thrown Session DO call is also SERVICE_UNAVAILABLE
 because its outcome is unknown. The Worker calls the Session DO once and never replays a
 non-idempotent command.
+
+**MCP trust model.** `execCommand` intentionally gives the authenticated caller direct shell access
+to sessions they are authorized to control, without the native agent's tool-permission flow.
+Ordinary Kilo MCP connections already have equivalent shell authority through `createTerminal`
+and its returned connection ticket, and can answer agent permission requests. Trust these
+connections as coding controllers, not read-only integrations. MCP OTP gates admin/debug endpoints;
+narrowly delegated Cloud Agent authority tokens cannot call `execCommand`. Execution limits and
+output redaction are operational safeguards, not a security boundary against malicious commands
+or confinement to the working directory.
 
 ### Startup mode rollout
 

@@ -2243,6 +2243,47 @@ describe('createPreparationManager', () => {
     expect(route?.redact('kilo-token-2')).toBe('[REDACTED]');
   });
 
+  it.each([false, true])(
+    'redacts every issued token across rotations (runtime recovery: %s)',
+    async recoverRuntime => {
+      const harness = createHarness();
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git' },
+        runtimeIsolation: 'per-session',
+      });
+      const issuedTokens: string[] = [];
+      for (let generation = 1; generation <= 3; generation++) {
+        const tokens = [
+          `git-rotation-${generation}`,
+          `mcp-rotation-${generation}`,
+          `kilo-rotation-${generation}`,
+        ];
+        const credentials: ControlPlaneSessionCredentialsPayload = {
+          sessionId: spec.sessionId,
+          git: { token: tokens[0], platform: 'github' },
+          cloudAgentMcp: {
+            url: 'https://mcp.kiloapps.io/mcp',
+            token: tokens[1],
+            expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+          },
+          kilo: { token: tokens[2] },
+        };
+        if (generation === 1) await harness.manager.prepare(spec, credentials);
+        else if (recoverRuntime) {
+          harness.setUnavailable(spec.sessionId, true);
+          await harness.manager.prepare(spec, credentials);
+        } else await harness.manager.installCredentials(credentials);
+        issuedTokens.push(...tokens);
+
+        const route = harness.manager.preparedExecRoute(spec.sessionId);
+        expect(route?.env.KILOCODE_TOKEN).toBe(tokens[2]);
+        expect(route?.redact(`safe output ${issuedTokens.join(' ')}`)).toBe(
+          `safe output ${issuedTokens.map(() => '[REDACTED]').join(' ')}`
+        );
+      }
+    }
+  );
+
   it('prefers the runtime-proxy handle and facade targets over the spec alias', async () => {
     const harness = createHarness();
     const spec = routeSpec();

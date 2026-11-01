@@ -1,5 +1,7 @@
+import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import { type SessionContextInfo } from '@/lib/session-context-info';
@@ -82,6 +84,34 @@ export function SessionContextMetrics({
   const pillClassName =
     'h-[44px] shrink min-w-0 flex-row items-center gap-2 rounded-full border border-border bg-secondary px-3';
 
+  // The pill's second value slot: the session cost once it exists, a loading
+  // bar at that label's width while it does not, nothing when the session has no
+  // cost to show. The bar keeps the header still: before usage arrives the pill
+  // painted a second dash, which read as missing data and was narrower than the
+  // cost it later held, so the pill grew a value out of a smaller pill.
+  // `bg-muted-soft` is the one gray that stands off this pill's own
+  // `bg-secondary` fill — the theme's `muted` equals `secondary` in both
+  // palettes.
+  let costSlot: ReactNode = null;
+  if (content.hasCost && content.secondary) {
+    costSlot = (
+      <Text
+        numberOfLines={1}
+        className="min-w-0 shrink text-xs tabular-nums text-muted-foreground"
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        {content.secondary}
+      </Text>
+    );
+  } else if (content.costPending) {
+    costSlot = (
+      <View accessibilityElementsHidden importantForAccessibility="no">
+        <Skeleton className="h-2 w-8 rounded-[2px] bg-muted-soft" />
+      </View>
+    );
+  }
+
   const body = (
     <>
       <ContextUsageRing
@@ -101,16 +131,7 @@ export function SessionContextMetrics({
           >
             {content.primary}
           </Text>
-          {content.hasCost && content.secondary ? (
-            <Text
-              numberOfLines={1}
-              className="min-w-0 shrink text-xs tabular-nums text-muted-foreground"
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            >
-              {content.secondary}
-            </Text>
-          ) : null}
+          {costSlot}
         </View>
       ) : null}
     </>

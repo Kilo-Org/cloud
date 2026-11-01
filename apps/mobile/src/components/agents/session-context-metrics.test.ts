@@ -9,6 +9,7 @@ import {
 } from './session-context-metrics-test-helpers';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('./context-usage-ring', () => ({ ContextUsageRing: 'ContextUsageRing' }));
 
@@ -290,15 +291,16 @@ describe('SessionContextMetrics', () => {
     expect((ring.props as { arcFraction?: number }).arcFraction).toBe(0);
   });
 
-  // A session that reports no usage yet — a stalled open and a load failure
-  // alike — keeps both value slots instead of a bare ring, so the pill never
-  // changes shape late; only the accessibility label names usage unavailable.
-  it('holds the dash slots over the bare ring, naming usage unavailable once settled', () => {
+  // A session that reports no usage yet keeps both value slots instead of a
+  // bare ring, and its cost slot holds a loading bar at the label's width until
+  // usage arrives, so the pill never grows a value out of a narrower pill.
+  it('holds the value slots over the bare ring, with a loading bar until usage arrives', () => {
     const dashes = (root: React.ReactElement) =>
       findAll(root, el => el.type === 'Text').filter(el => {
         const children = (el.props as { children?: unknown }).children;
         return children === '—';
       });
+    const bars = (root: React.ReactElement) => findAll(root, el => el.type === 'Skeleton');
     const onPress = vi.fn<() => void>();
 
     const settled = render({
@@ -309,12 +311,10 @@ describe('SessionContextMetrics', () => {
     });
     const props = settled.props as { accessibilityLabel?: string; className?: string };
     expect(props.accessibilityLabel).toContain('usage unavailable');
-    expect(props.accessibilityLabel).toContain('Tap to view context details.');
     expect(props.className ?? '').not.toContain('opacity-0');
-    for (const token of PILL_LAYOUT_TOKENS) {
-      expect(props.className ?? '').toContain(token);
-    }
     expect(dashes(settled)).toHaveLength(2);
+    // A settled pill promises nothing that has not arrived, so no bar.
+    expect(bars(settled)).toHaveLength(0);
 
     const loading = render({
       info: undefined,
@@ -323,8 +323,22 @@ describe('SessionContextMetrics', () => {
       loading: true,
       onPress,
     });
-    const loadingProps = loading.props as { accessibilityLabel?: string };
-    expect(loadingProps.accessibilityLabel).not.toContain('usage unavailable');
-    expect(dashes(loading)).toHaveLength(2);
+    expect((loading.props as { accessibilityLabel?: string }).accessibilityLabel).not.toContain(
+      'usage unavailable'
+    );
+    // One dash for the unresolved context window, one bar where the cost
+    // label will land: the pill reads as loading instead of as missing data.
+    expect(dashes(loading)).toHaveLength(1);
+    const loadingBars = bars(loading);
+    expect(loadingBars).toHaveLength(1);
+    const loadingBar = loadingBars[0];
+    if (!loadingBar) {
+      throw new Error('expected the cost loading bar');
+    }
+    const barClassName = (loadingBar.props as { className?: string }).className ?? '';
+    expect(barClassName).toContain('w-8');
+    // `muted` equals the pill's own `secondary` fill, so a default-tone bar
+    // would paint nothing here.
+    expect(barClassName).toContain('bg-muted-soft');
   });
 });

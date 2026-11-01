@@ -75,6 +75,13 @@ export type HeaderPillContent = {
   primary: string | null;
   secondary: string | null;
   hasCost: boolean;
+  /**
+   * The cost slot holds a value that has not arrived yet. The pill paints a
+   * loading bar at the cost label's width instead of a dash, so it keeps the
+   * width its loaded form needs and reads as loading rather than as missing
+   * data.
+   */
+  costPending: boolean;
   tone: ContextTone;
   /** `undefined` = indeterminate arc; `0` = track only (no usage asserted). */
   arcFraction: number | undefined;
@@ -126,6 +133,7 @@ export function getHeaderPillContent({
       primary,
       secondary,
       hasCost: secondary !== null,
+      costPending: false,
       tone,
       arcFraction: getArcFraction(info.percentage),
       interactive: true,
@@ -142,8 +150,13 @@ export function getHeaderPillContent({
   if (!hasMessages) {
     return {
       primary: UNKNOWN_WINDOW_LABEL,
-      secondary: UNKNOWN_WINDOW_LABEL,
+      secondary: loading ? null : UNKNOWN_WINDOW_LABEL,
       hasCost: true,
+      // A value is still on its way while the session resolves, so the cost
+      // slot holds a loading bar at the label's width instead of a second dash:
+      // the dash read as missing data, and it was narrower than the cost the
+      // pill paints once usage arrives.
+      costPending: loading,
       tone: 'neutral',
       arcFraction: 0,
       interactive: false,
@@ -158,6 +171,7 @@ export function getHeaderPillContent({
     primary: costText,
     secondary: null,
     hasCost: costText !== null,
+    costPending: false,
     tone: 'neutral',
     arcFraction: 0,
     interactive: false,

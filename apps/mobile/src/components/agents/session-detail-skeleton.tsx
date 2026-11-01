@@ -62,12 +62,17 @@ export function SessionSkeletonMessages({ sessionId }: Readonly<{ sessionId?: st
  * the footer's own container — instead of offering a composer that a read-only
  * session will not have. The footer then lands on its own geometry and the
  * transcript never moves under it.
+ *
+ * The bars take `bg-muted-soft`: the theme's `muted` equals `secondary` in both
+ * palettes, so default-tone bars on this footer's own fill paint nothing and
+ * the reserved area read as a blank tinted block. The line is the footer note's
+ * `text-sm` line box and the bar its `action` button's 48pt floor.
  */
 export function SessionReadOnlyFooterPlaceholder() {
   return (
     <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
-      <Skeleton className="mx-auto h-[17.5px] w-40" />
-      <Skeleton className="h-[48px]" />
+      <Skeleton className="mx-auto h-[17.5px] w-40 bg-muted-soft" />
+      <Skeleton className="h-[48px] bg-muted-soft" />
     </View>
   );
 }

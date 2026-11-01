@@ -47,6 +47,7 @@ const trackOnly: HeaderPillContent = {
   primary: null,
   secondary: null,
   hasCost: false,
+  costPending: false,
   tone: 'neutral',
   arcFraction: 0,
   interactive: false,
@@ -61,14 +62,23 @@ const unreported: HeaderPillContent = {
   primary: '—',
   secondary: '—',
   hasCost: true,
+  costPending: false,
   tone: 'neutral',
   arcFraction: 0,
   interactive: false,
   usageUnavailable: true,
 };
 
-/** The same slots while the session still resolves, before a11y names it. */
-const unreportedWhileLoading: HeaderPillContent = { ...unreported, usageUnavailable: false };
+/**
+ * The same pill while the session still resolves: the cost slot holds a loading
+ * bar instead of a dash, so the pill is already as wide as its loaded form.
+ */
+const unreportedWhileLoading: HeaderPillContent = {
+  ...unreported,
+  secondary: null,
+  costPending: true,
+  usageUnavailable: false,
+};
 
 describe('formatExactTokens', () => {
   it('uses grouped digit formatting', () => {
@@ -154,7 +164,7 @@ describe('getHeaderPillContent', () => {
     expect(pill({ totalCostMicrodollars: null, hasMessages: false })).toEqual(unreported);
   });
 
-  it('keeps the same dash-marked slots while the session resolves', () => {
+  it('holds a loading bar in the cost slot while the session resolves', () => {
     expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false, loading: true })).toEqual(
       unreportedWhileLoading
     );
@@ -257,6 +267,7 @@ describe('getHeaderPillContent', () => {
       primary: '$0.08',
       secondary: null,
       hasCost: true,
+      costPending: false,
       tone: 'neutral',
       arcFraction: 0,
       interactive: false,

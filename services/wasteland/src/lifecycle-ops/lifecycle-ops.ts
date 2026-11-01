@@ -18,7 +18,7 @@ import { WantedBoardOpError } from '../wanted-board/errors';
 import { rigHandleFormatError } from '@kilocode/wl-sdk';
 import { credentialProvesOrg } from '../dos/wasteland/credentials';
 import { getWastelandDOStub } from '../dos/Wasteland.do';
-import { deriveEncryptionKey, encryptToken, decryptToken } from '../util/crypto.util';
+import { deriveEncryptionKey, decryptToken } from '../util/crypto.util';
 import { resolveSecret } from '../util/secret.util';
 import { fetchFreshDoltHubToken } from '../util/dolthub-token.util';
 import { meterEvent } from '../util/billing.util';
@@ -27,6 +27,7 @@ import {
   type JoinOpResult,
   type LifecycleOpsInnerContext,
 } from './lifecycle-ops-inner';
+import { persistJoinCredential } from './persist-credential';
 
 export type { JoinOpResult, LifecycleOpsInnerContext } from './lifecycle-ops-inner';
 
@@ -171,11 +172,10 @@ export async function joinWasteland(
   const ctx = await loadContext(env, wastelandId, userId, input);
   const result = await joinViaSdk(ctx);
 
-  // Persist credential update with the verified rig handle. We keep
-  // the same encrypted_token if one was already stored; for the
-  // OAuth-only path we encrypt and store the OAuth token so the
-  // fallback path works after the OAuth session expires.
-  await persistCredential(env, ctx, userId, result.rigHandle);
+  // Persist the verified rig handle together with a token/org pair that
+  // agree: the fresh OAuth token under the org it joined as, or the
+  // stored token under the org it was decrypted for.
+  await persistJoinCredential(env, ctx, userId, result.rigHandle);
 
   meterEvent(env, {
     event: 'billing.api_operation',
@@ -185,47 +185,4 @@ export async function joinWasteland(
   });
 
   return result;
-}
-
-async function persistCredential(
-  env: Env,
-  ctx: LifecycleContext,
-  userId: string,
-  rigHandle: string
-): Promise<void> {
-  const existing = await ctx.doStub.getCredential(userId);
-  // We always need an encrypted_token to persist — re-use the existing
-  // one when present, otherwise encrypt the OAuth token we just used.
-  let encryptedToken: string;
-  if (existing) {
-    encryptedToken = existing.encrypted_token;
-  } else {
-    const rawKey = await resolveSecret(env.WASTELAND_ENCRYPTION_KEY);
-    if (!rawKey) {
-      // Without an encryption key we can't persist. Surface as a
-      // soft warning rather than failing the whole join — the user
-      // already has the PR, and the fallback path will prompt them
-      // to reconnect later.
-      console.warn(
-        '[lifecycle-ops:persistCredential] encryption key unavailable; skipping credential save',
-        { wastelandId: ctx.upstream, userId }
-      );
-      return;
-    }
-    const cryptoKey = await deriveEncryptionKey(rawKey);
-    encryptedToken = await encryptToken(ctx.token, cryptoKey);
-  }
-
-  await ctx.doStub.storeCredential({
-    userId,
-    encryptedToken,
-    dolthubOrg: ctx.forkOrg,
-    rigHandle,
-    // A successful join established this org with DoltHub: the fork was
-    // created under it, the registration write landed in its fork, or
-    // the credential already carried that proof. Record it so later
-    // joins can reuse it, and so nothing trusts a handle alone.
-    provenOrg: ctx.forkOrg,
-    isUpstreamAdmin: existing?.is_upstream_admin ?? false,
-  });
 }

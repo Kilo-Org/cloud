@@ -1846,7 +1846,6 @@
       "defaultProfileResolvesTo": "Entspricht {{name}}",
       "defaultProfileResolvesToAccessibility": "Standardprofil: {{name}}",
       "manageProfiles": "Profile verwalten",
-      "noProfiles": "Noch keine Profile. Erstelle eins, um Umgebungsvariablen, MCP-Server und Fähigkeiten hinzuzufügen.",
       "advancedConfig": "Erweiterte Konfiguration",
       "advancedConfigDescription": "Gilt für diese Sitzung. Als Profil gespeichert bleibt sie für das nächste Mal erhalten.",
       "saveAsProfile": "Als Profil speichern",

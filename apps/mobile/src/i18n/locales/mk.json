@@ -2376,7 +2376,6 @@
       "defaultProfileResolvesTo": "Одговара на {{name}}",
       "defaultProfileResolvesToAccessibility": "Стандарден профил: {{name}}",
       "manageProfiles": "Управувајте со профилите",
-      "noProfiles": "Сè уште нема профили. Создадете една за да додадете променливи на животната средина, MCP сервери и вештини.",
       "advancedConfig": "Напредна конфигурација",
       "advancedConfigDescription": "Важи за оваа сесија. Зачувувањето како профил го задржува за следниот пат.",
       "saveAsProfile": "Зачувај како профил",

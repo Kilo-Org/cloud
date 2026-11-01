@@ -2376,7 +2376,6 @@
       "defaultProfileResolvesTo": "လက်ရှိတွင် {{name}} ဖြစ်ပါသည်",
       "defaultProfileResolvesToAccessibility": "မူရင်းပရိုဖိုင်: {{name}}",
       "manageProfiles": "ပရိုဖိုင်များကို စီမံပါ။",
-      "noProfiles": "ပရိုဖိုင်များ မရှိသေးပါ။ ပတ်ဝန်းကျင်ပြောင်းလဲမှုများ၊ MCP ဆာဗာများနှင့် ကျွမ်းကျင်မှုများကို ထည့်သွင်းရန် တစ်ခုဖန်တီးပါ။",
       "advancedConfig": "အဆင့်မြင့်ဖွဲ့စည်းမှု",
       "advancedConfigDescription": "ဤစက်ရှင်အတွက် သက်ဆိုင်ပါသည်။ Profile အဖြစ် သိမ်းဆည်းပါက နောက်တစ်ကြိမ်အတွက် ကျန်ရှိပါမည်။",
       "saveAsProfile": "Profile အဖြစ် သိမ်းဆည်းပါ။",

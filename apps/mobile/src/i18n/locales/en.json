@@ -2442,7 +2442,6 @@
       "defaultProfileResolvesTo": "Resolves to {{name}}",
       "defaultProfileResolvesToAccessibility": "Default profile: {{name}}",
       "manageProfiles": "Manage profiles",
-      "noProfiles": "No profiles yet. Create one to add environment variables, MCP servers, and skills.",
       "advancedConfig": "Advanced Configuration",
       "advancedConfigDescription": "Applies to this session. Saving a profile keeps it for next time.",
       "saveAsProfile": "Save as Profile",

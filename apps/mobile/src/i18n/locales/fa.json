@@ -2382,7 +2382,6 @@
       "defaultProfileResolvesTo": "در حال حاضر {{name}}",
       "defaultProfileResolvesToAccessibility": "نمایه پیش فرض: {{name}}",
       "manageProfiles": "مدیریت پروفایل ها",
-      "noProfiles": "هنوز پروفایلی وجود ندارد یکی برای اضافه کردن متغیرهای محیطی، سرورهای MCP و مهارت‌ها ایجاد کنید.",
       "advancedConfig": "پیکربندی پیشرفته",
       "advancedConfigDescription": "برای این نشست اعمال می‌شود. ذخیره به عنوان نمایه آن را برای بار بعدی نگه می‌دارد.",
       "saveAsProfile": "ذخیره به عنوان نمایه",

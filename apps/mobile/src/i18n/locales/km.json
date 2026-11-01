@@ -2376,7 +2376,6 @@
       "defaultProfileResolvesTo": "ស្មើនឹង {{name}}",
       "defaultProfileResolvesToAccessibility": "កម្រងព័ត៌មានលំនាំដើម៖ {{name}}",
       "manageProfiles": "គ្រប់គ្រងកម្រងព័ត៌មាន",
-      "noProfiles": "មិនទាន់មានកម្រងព័ត៌មានទេ។ បង្កើតមួយដើម្បីបន្ថែមអថេរបរិស្ថាន ម៉ាស៊ីនមេ MCP និងជំនាញ។",
       "advancedConfig": "ការកំណត់រចនាសម្ព័ន្ធកម្រិតខ្ពស់",
       "advancedConfigDescription": "អនុវត្តចំពោះវគ្គនេះ។ ការរក្សាទុកជាកម្រងព័ត៌មាននឹងរក្សាទុកវាសម្រាប់លើកក្រោយ។",
       "saveAsProfile": "រក្សាទុកជាកម្រងព័ត៌មាន",

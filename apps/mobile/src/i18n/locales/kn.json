@@ -2382,7 +2382,6 @@
       "defaultProfileResolvesTo": "ಪ್ರಸ್ತುತ {{name}} ಆಗಿದೆ",
       "defaultProfileResolvesToAccessibility": "ಡೀಫಾಲ್ಟ್ ಪ್ರೊಫೈಲ್: {{name}}",
       "manageProfiles": "ಪ್ರೊಫೈಲ್‌ಗಳನ್ನು ನಿರ್ವಹಿಸಿ",
-      "noProfiles": "ಇನ್ನೂ ಯಾವುದೇ ಪ್ರೊಫೈಲ್‌ಗಳಿಲ್ಲ. ಪರಿಸರ ವೇರಿಯಬಲ್‌ಗಳು, MCP ಸರ್ವರ್‌ಗಳು ಮತ್ತು ಕೌಶಲ್ಯಗಳನ್ನು ಸೇರಿಸಲು ಒಂದನ್ನು ರಚಿಸಿ.",
       "advancedConfig": "ಸುಧಾರಿತ ಸಂರಚನೆ",
       "advancedConfigDescription": "ಇದು ಈ ಅಧಿವೇಶನಕ್ಕೆ ಅನ್ವಯಿಸುತ್ತದೆ. ಪ್ರೊಫೈಲ್ ಆಗಿ ಉಳಿಸಿದರೆ ಅದು ಮುಂದಿನ ಬಾರಿಗೂ ಉಳಿಯುತ್ತದೆ.",
       "saveAsProfile": "ಪ್ರೊಫೈಲ್ ಆಗಿ ಉಳಿಸಿ",

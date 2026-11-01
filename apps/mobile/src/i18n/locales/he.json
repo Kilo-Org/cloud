@@ -1864,7 +1864,6 @@
       "defaultProfileResolvesTo": "מוגדר ל-{{name}}",
       "defaultProfileResolvesToAccessibility": "פרופיל ברירת מחדל: {{name}}",
       "manageProfiles": "נהל פרופילים",
-      "noProfiles": "עדיין אין פרופילים. צור אחד כדי להוסיף משתני סביבה, שרתי MCP ומיומנויות.",
       "advancedConfig": "תצורה מתקדמת",
       "advancedConfigDescription": "חל על ההפעלה הזו. שמירה כפרופיל שומרת אותו לפעם הבאה.",
       "saveAsProfile": "שמור כפרופיל",

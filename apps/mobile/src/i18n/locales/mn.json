@@ -2376,7 +2376,6 @@
       "defaultProfileResolvesTo": "Одоо {{name}} гэж тохируулагдсан",
       "defaultProfileResolvesToAccessibility": "Өгөгдмөл профайл: {{name}}",
       "manageProfiles": "Профайлуудыг удирдах",
-      "noProfiles": "Одоогоор профайл байхгүй байна. Орчны хувьсагч, MCP сервер, ур чадвар нэмэхийн тулд нэгийг үүсгэ.",
       "advancedConfig": "Нарийвчилсан тохиргоо",
       "advancedConfigDescription": "Энэ сессэд хамаарна. Профайл болгон хадгалбал дараагийн удаад хадгалагдана.",
       "saveAsProfile": "Профайл болгон хадгалах",

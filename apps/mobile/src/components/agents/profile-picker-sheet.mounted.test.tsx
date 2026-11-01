@@ -234,6 +234,28 @@ describe('ProfilePickerSheet', () => {
     expect(radios(renderer)).toHaveLength(0);
   });
 
+  // SheetHeader centres the title only between a leading and a trailing
+  // control, so a state without Cancel would redraw the sheet with a
+  // leading-aligned title and shift the header between states.
+  it('keeps the same header in every state', () => {
+    for (const state of [
+      { name: 'list', props: {} },
+      { name: 'empty', props: { hasProfiles: false, candidates: [] } },
+      { name: 'loading', props: { isLoading: true } },
+      { name: 'error', props: { isError: true } },
+    ] as const) {
+      const onClose = vi.fn<() => void>();
+      const header = mount({ ...state.props, onClose }).root.findByType('PickerSheet' as never);
+
+      expect(header.props.title, state.name).toBe('Pick a profile');
+      expect(typeof header.props.onCancel, state.name).toBe('function');
+      act(() => {
+        (header.props.onCancel as () => void)();
+      });
+      expect(onClose, state.name).toHaveBeenCalledTimes(1);
+    }
+  });
+
   it('renders the retryable failure with Retry and refetches', () => {
     const onRetry = vi.fn<() => void>();
     const renderer = mount({ isError: true, onRetry });
@@ -252,8 +274,11 @@ describe('ProfilePickerSheet', () => {
     const renderer = mount({ hasProfiles: false, candidates: [], onManageProfiles });
 
     const empty = renderer.root.findByType('EmptyState' as never);
+    // The header already shows the sheet title, so the body names the
+    // condition rather than repeating it.
+    expect(empty.props.title).toBe('No profiles yet');
     expect(empty.props.description).toBe(
-      'No profiles yet. Create one to add environment variables, MCP servers, and skills.'
+      'Create a profile to reuse environment variables, setup commands, and skills across sessions.'
     );
     const manage = renderer.root.findByType('Button' as never);
     expect(manage.props.accessibilityLabel).toBe('Manage profiles');

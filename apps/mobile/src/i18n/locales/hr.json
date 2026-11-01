@@ -2413,7 +2413,6 @@
       "defaultProfileResolvesTo": "Odnosi se na {{name}}",
       "defaultProfileResolvesToAccessibility": "Zadani profil: {{name}}",
       "manageProfiles": "Upravljanje profilima",
-      "noProfiles": "Još nema profila. Stvorite jedan za dodavanje varijabli okoline, MCP poslužitelja i vještina.",
       "advancedConfig": "Napredna konfiguracija",
       "advancedConfigDescription": "Vrijedi za ovu sesiju. Spremanjem kao profil ostaje za sljedeći put.",
       "saveAsProfile": "Spremi kao profil",

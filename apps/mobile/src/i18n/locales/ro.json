@@ -2413,7 +2413,6 @@
       "defaultProfileResolvesTo": "Corespunde la {{name}}",
       "defaultProfileResolvesToAccessibility": "Profil implicit: {{name}}",
       "manageProfiles": "Gestionați profilurile",
-      "noProfiles": "Niciun profil încă. Creați unul pentru a adăuga variabile de mediu, servere MCP și abilități.",
       "advancedConfig": "Configurare avansată",
       "advancedConfigDescription": "Se aplică acestei sesiuni. Salvarea ca profil îl păstrează pentru data viitoare.",
       "saveAsProfile": "Salvați ca profil",

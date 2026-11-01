@@ -2413,7 +2413,6 @@
       "defaultProfileResolvesTo": "Norāda uz {{name}}",
       "defaultProfileResolvesToAccessibility": "Noklusējuma profils: {{name}}",
       "manageProfiles": "Pārvaldīt profilus",
-      "noProfiles": "Vēl nav neviena profila. Izveidojiet vienu, lai pievienotu vides mainīgos, MCP serverus un prasmes.",
       "advancedConfig": "Papildu konfigurācija",
       "advancedConfigDescription": "Attiecas uz šo sesiju. Saglabājot kā profilu, tas paliks nākamajai reizei.",
       "saveAsProfile": "Saglabāt kā profilu",

@@ -2376,7 +2376,6 @@
       "defaultProfileResolvesTo": "{{name}} profilinə uyğun gəlir",
       "defaultProfileResolvesToAccessibility": "Defolt profil: {{name}}",
       "manageProfiles": "Profilləri idarə edin",
-      "noProfiles": "Hələ profil yoxdur. Ətraf mühit dəyişənləri, MCP serverləri və bacarıqları əlavə etmək üçün birini yaradın.",
       "advancedConfig": "Qabaqcıl Konfiqurasiya",
       "advancedConfigDescription": "Bu sessiya üçün keçərlidir. Profil kimi yadda saxlasanız, növbəti dəfə üçün qalır.",
       "saveAsProfile": "Profil kimi yadda saxlayın",

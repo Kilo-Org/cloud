@@ -2376,7 +2376,6 @@
       "defaultProfileResolvesTo": "Käytössä: {{name}}",
       "defaultProfileResolvesToAccessibility": "Oletusprofiili: {{name}}",
       "manageProfiles": "Hallitse profiileja",
-      "noProfiles": "Ei vielä profiileja. Luo sellainen, jonka avulla voit lisätä ympäristömuuttujia, MCP-palvelimia ja taitoja.",
       "advancedConfig": "Lisäasetukset",
       "advancedConfigDescription": "Koskee tätä istuntoa. Profiilina tallentaminen säilyttää sen seuraavaa kertaa varten.",
       "saveAsProfile": "Tallenna profiilina",

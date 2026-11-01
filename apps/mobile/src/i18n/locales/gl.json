@@ -2376,7 +2376,6 @@
       "defaultProfileResolvesTo": "Corresponde a {{name}}",
       "defaultProfileResolvesToAccessibility": "Perfil predeterminado: {{name}}",
       "manageProfiles": "Xestionar perfís",
-      "noProfiles": "Aínda non hai perfís. Crea un para engadir variables de ambiente, servidores MCP e habilidades.",
       "advancedConfig": "Configuración avanzada",
       "advancedConfigDescription": "Aplícase a esta sesión. Gardalo como perfil consérvao para a próxima vez.",
       "saveAsProfile": "Gardar como perfil",

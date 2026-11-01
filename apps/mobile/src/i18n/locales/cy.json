@@ -2524,7 +2524,6 @@
       "defaultProfileResolvesTo": "Yn cyfeirio at {{name}}",
       "defaultProfileResolvesToAccessibility": "Proffil diofyn: {{name}}",
       "manageProfiles": "Rheoli proffiliau",
-      "noProfiles": "Dim proffiliau eto. Creu un i ychwanegu newidynnau amgylchedd, gweinyddwyr MCP, a sgiliau.",
       "advancedConfig": "Ffurfweddiad Uwch",
       "advancedConfigDescription": "Yn berthnasol i’r sesiwn hon. Mae cadw fel proffil yn ei gadw ar gyfer y tro nesaf.",
       "saveAsProfile": "Cadw fel Proffil",

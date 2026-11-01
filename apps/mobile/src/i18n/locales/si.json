@@ -2382,7 +2382,6 @@
       "defaultProfileResolvesTo": "දැනට {{name}} වෙත සකසා ඇත",
       "defaultProfileResolvesToAccessibility": "පෙරනිමි පැතිකඩ: {{name}}",
       "manageProfiles": "පැතිකඩ කළමනාකරණය කරන්න",
-      "noProfiles": "තවම පැතිකඩ නැත. පාරිසරික විචල්‍යයන්, MCP සේවාදායකයන් සහ කුසලතා එක් කිරීමට එකක් සාදන්න.",
       "advancedConfig": "උසස් වින්යාසය",
       "advancedConfigDescription": "මෙය මෙම සැසියට අදාළ වේ. පැතිකඩක් ලෙස සුරැකීමෙන් එය ඊළඟ වතාවට රැඳේ.",
       "saveAsProfile": "පැතිකඩ ලෙස සුරකින්න",

@@ -61,6 +61,11 @@ export type ProfilePickerSheetProps = {
  * candidate, with the manage-profiles entry. Presented by
  * `agent-chat/profile-picker` inside the app's standard native formSheet, so
  * dismissal is the sheet's swipe-down or this header's Cancel.
+ *
+ * Every state renders the same header: Cancel leading, the centred title and
+ * Done trailing. Without Cancel the title falls back to leading alignment
+ * (SheetHeader centres it between the two controls), so a state that omitted
+ * Cancel would redraw the same sheet with a different header.
  */
 export function ProfilePickerSheet({
   candidates,
@@ -97,7 +102,13 @@ export function ProfilePickerSheet({
 
   if (isLoading) {
     return (
-      <PickerSheet title={title} onDone={onClose} scrollable={false} topInset={SHEET_TOP_INSET}>
+      <PickerSheet
+        title={title}
+        onDone={onClose}
+        onCancel={onClose}
+        scrollable={false}
+        topInset={SHEET_TOP_INSET}
+      >
         <View className="bg-background">
           {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
             <View key={index} className={cn(ROW_TARGET_CLASS, 'justify-center px-4 py-3')}>
@@ -111,7 +122,13 @@ export function ProfilePickerSheet({
 
   if (isError) {
     return (
-      <PickerSheet title={title} onDone={onClose} scrollable={false} topInset={SHEET_TOP_INSET}>
+      <PickerSheet
+        title={title}
+        onDone={onClose}
+        onCancel={onClose}
+        scrollable={false}
+        topInset={SHEET_TOP_INSET}
+      >
         <EmptyState
           icon={Settings2}
           title={t('agentChat.newSession.couldNotLoadEnvironment')}
@@ -133,11 +150,19 @@ export function ProfilePickerSheet({
 
   if (!hasProfiles) {
     return (
-      <PickerSheet title={title} onDone={onClose} scrollable={false} topInset={SHEET_TOP_INSET}>
+      <PickerSheet
+        title={title}
+        onDone={onClose}
+        onCancel={onClose}
+        scrollable={false}
+        topInset={SHEET_TOP_INSET}
+      >
         <EmptyState
           icon={Settings2}
-          title={title}
-          description={t('agentChat.newSession.noProfiles')}
+          // The header already carries the sheet title, so the empty state
+          // names the condition instead of repeating it.
+          title={t('profiles.emptyTitle')}
+          description={t('profiles.emptyDescription')}
           action={
             <Button
               variant="outline"

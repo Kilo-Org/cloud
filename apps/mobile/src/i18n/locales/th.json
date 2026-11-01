@@ -2376,7 +2376,6 @@
       "defaultProfileResolvesTo": "ใช้โปรไฟล์ {{name}}",
       "defaultProfileResolvesToAccessibility": "โปรไฟล์เริ่มต้น: {{name}}",
       "manageProfiles": "จัดการโปรไฟล์",
-      "noProfiles": "ยังไม่มีโปรไฟล์ สร้างโปรไฟล์เพื่อเพิ่มตัวแปรสภาพแวดล้อม เซิร์ฟเวอร์ MCP และทักษะ",
       "advancedConfig": "การกำหนดค่าขั้นสูง",
       "advancedConfigDescription": "ใช้กับเซสชันนี้ การบันทึกเป็นโปรไฟล์จะเก็บไว้ใช้ครั้งถัดไป",
       "saveAsProfile": "บันทึกเป็นโปรไฟล์",

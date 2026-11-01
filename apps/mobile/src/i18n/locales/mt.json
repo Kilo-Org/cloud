@@ -2487,7 +2487,6 @@
       "defaultProfileResolvesTo": "Jikkorrispondi għal {{name}}",
       "defaultProfileResolvesToAccessibility": "Profil default: {{name}}",
       "manageProfiles": "Immaniġġja profili",
-      "noProfiles": "Għadu l-ebda profil. Oħloq wieħed biex iżżid varjabbli ambjentali, servers MCP, u ħiliet.",
       "advancedConfig": "Konfigurazzjoni Avvanzata",
       "advancedConfigDescription": "Japplika għal din is-sessjoni. Is-salvataġġ bħala profil iżommu għall-ħin li jmiss.",
       "saveAsProfile": "Ħlief bħala Profil",

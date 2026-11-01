@@ -2376,7 +2376,6 @@
       "defaultProfileResolvesTo": "{{name}} ଅଟେ",
       "defaultProfileResolvesToAccessibility": "ଡିଫଲ୍ଟ ପ୍ରୋଫାଇଲ୍: {{name}}",
       "manageProfiles": "ପ୍ରୋଫାଇଲ୍ ପରିଚାଳନା କରନ୍ତୁ।",
-      "noProfiles": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ପ୍ରୋଫାଇଲ୍ ନାହିଁ। ପରିବେଶ ଭେରିଏବଲ୍, MCP ସର୍ଭର, ଏବଂ କୌଶଳ ଯୋଗ କରିବାକୁ ଗୋଟିଏ ସୃଷ୍ଟି କରନ୍ତୁ।",
       "advancedConfig": "ଉନ୍ନତ ବିନ୍ୟାସ",
       "advancedConfigDescription": "ଏହା ଏହି ସେସନ୍ ପାଇଁ ପ୍ରଯୁଜ୍ୟ। ପ୍ରୋଫାଇଲ୍ ଭାବରେ ସେଭ୍ କଲେ ଏହା ପରବର୍ତ୍ତୀ ଥର ପାଇଁ ରହେ।",
       "saveAsProfile": "ପ୍ରୋଫାଇଲ୍ ଭାବରେ ସେଭ୍ କରନ୍ତୁ।",

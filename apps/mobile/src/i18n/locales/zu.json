@@ -2382,7 +2382,6 @@
       "defaultProfileResolvesTo": "Okwamanje kungu-{{name}}",
       "defaultProfileResolvesToAccessibility": "Iphrofayela ezenzakalelayo: {{name}}",
       "manageProfiles": "Phatha amaphrofayili",
-      "noProfiles": "Awekho amaphrofayela okwamanje. Dala eyodwa ukuze wengeze okuguquguqukayo kwendawo, amaseva e-MCP, namakhono.",
       "advancedConfig": "Ukucushwa Okuthuthukile",
       "advancedConfigDescription": "Kusebenza kulesi sikhathi. Ukulondoloza njengephrofayela kukugcina okwesikhathi esizayo.",
       "saveAsProfile": "Londoloza Njengephrofayela",

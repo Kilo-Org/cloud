@@ -2376,7 +2376,6 @@
       "defaultProfileResolvesTo": "Bersamaan dengan {{name}}",
       "defaultProfileResolvesToAccessibility": "Profil lalai: {{name}}",
       "manageProfiles": "Urus profil",
-      "noProfiles": "Tiada profil lagi. Buat satu untuk menambah pembolehubah persekitaran, pelayan MCP dan kemahiran.",
       "advancedConfig": "Konfigurasi Lanjutan",
       "advancedConfigDescription": "Terpakai untuk sesi ini. Menyimpannya sebagai profil mengekalkannya untuk kali seterusnya.",
       "saveAsProfile": "Simpan sebagai Profil",

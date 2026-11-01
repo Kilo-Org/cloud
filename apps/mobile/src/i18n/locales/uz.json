@@ -2376,7 +2376,6 @@
       "defaultProfileResolvesTo": "Hozir {{name}} profili",
       "defaultProfileResolvesToAccessibility": "Standart profil: {{name}}",
       "manageProfiles": "Profillarni boshqarish",
-      "noProfiles": "Hozircha profil yo'q. Atrof-muhit o'zgaruvchilari, MCP serverlari va ko'nikmalarini qo'shish uchun bitta yarating.",
       "advancedConfig": "Kengaytirilgan konfiguratsiya",
       "advancedConfigDescription": "Bu sessiya uchun amal qiladi. Profil sifatida saqlansa, keyingi safar uchun qoladi.",
       "saveAsProfile": "Profil sifatida saqlash",

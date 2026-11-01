@@ -2450,7 +2450,6 @@
       "defaultProfileResolvesTo": "Atitinka: {{name}}",
       "defaultProfileResolvesToAccessibility": "Numatytasis profilis: {{name}}",
       "manageProfiles": "Tvarkyti profilius",
-      "noProfiles": "Dar nėra profilių. Sukurkite vieną, kad pridėtumėte aplinkos kintamuosius, MCP serverius ir įgūdžius.",
       "advancedConfig": "Išplėstinė konfigūracija",
       "advancedConfigDescription": "Taikoma šiai sesijai. Išsaugojus kaip profilį, jis išliks kitam kartui.",
       "saveAsProfile": "Išsaugoti kaip profilį",

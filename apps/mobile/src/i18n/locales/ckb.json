@@ -2376,7 +2376,6 @@
       "defaultProfileResolvesTo": "ئێستا بۆ {{name}} دانراوە",
       "defaultProfileResolvesToAccessibility": "پرۆفایلی پێشوەختە: {{name}}",
       "manageProfiles": "بەڕێوەبردنی پڕۆفایلی",
-      "noProfiles": "هێشتا هیچ پڕۆفایلی نییە. یەکێکیان دروست بکە بۆ زیادکردنی گۆڕاوە ژینگەییەکان، سێرڤەرەکانی MCP و کارامەییەکان.",
       "advancedConfig": "ڕێکخستنی پێشکەوتوو",
       "advancedConfigDescription": "بۆ ئەم دانیشتنە جێبەجێ دەبێت. پاشەکەوتکردن وەک پڕۆفایل بۆ جارێکی داهاتوو دەیپارێزێت.",
       "saveAsProfile": "وەک پڕۆفایلی پاشەکەوت بکە",

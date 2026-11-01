@@ -1882,7 +1882,6 @@
       "defaultProfileResolvesTo": "Сейчас: {{name}}",
       "defaultProfileResolvesToAccessibility": "Профиль по умолчанию: {{name}}",
       "manageProfiles": "Управление профилями",
-      "noProfiles": "Профилей пока нет. Создайте его, чтобы добавить переменные среды, серверы MCP и навыки.",
       "advancedConfig": "Расширенная конфигурация",
       "advancedConfigDescription": "Действует для этого сеанса. Сохранение в качестве профиля сохранит его на следующий раз.",
       "saveAsProfile": "Сохранить как профиль",

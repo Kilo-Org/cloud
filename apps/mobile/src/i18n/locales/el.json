@@ -2376,7 +2376,6 @@
       "defaultProfileResolvesTo": "Αντιστοιχεί σε {{name}}",
       "defaultProfileResolvesToAccessibility": "Προεπιλεγμένο προφίλ: {{name}}",
       "manageProfiles": "Διαχείριση προφίλ",
-      "noProfiles": "Δεν υπάρχουν ακόμα προφίλ. Δημιούργησε ένα για να προσθέσεις μεταβλητές περιβάλλοντος, διακομιστές MCP και δεξιότητες.",
       "advancedConfig": "Προηγμένη διαμόρφωση",
       "advancedConfigDescription": "Ισχύει για αυτή τη συνεδρία. Η αποθήκευση ως προφίλ το διατηρεί για την επόμενη φορά.",
       "saveAsProfile": "Αποθήκευση ως προφίλ",

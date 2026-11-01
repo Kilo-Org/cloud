@@ -2376,7 +2376,6 @@
       "defaultProfileResolvesTo": "اوس مهال {{name}} ته ټاکل شوی",
       "defaultProfileResolvesToAccessibility": "ډیفالټ پروفایل: {{name}}",
       "manageProfiles": "پروفایلونه اداره کړئ",
-      "noProfiles": "تراوسه هیڅ پروفایل نشته. د چاپیریال متغیرونو، MCP سرورونو، او مهارتونو اضافه کولو لپاره یو جوړ کړئ.",
       "advancedConfig": "پرمختللی ترتیب",
       "advancedConfigDescription": "دا دې غونډې ته پلي کېږي. د پروفایل په توګه خوندي کول یې د بل ځل لپاره ساتي.",
       "saveAsProfile": "د پروفایل په توګه خوندي کړئ",

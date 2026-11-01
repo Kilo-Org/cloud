@@ -2376,7 +2376,6 @@
       "defaultProfileResolvesTo": "Henviser til {{name}}",
       "defaultProfileResolvesToAccessibility": "Standard profil: {{name}}",
       "manageProfiles": "Administrer profiler",
-      "noProfiles": "Ingen profiler endnu. Opret en for at tilføje miljøvariabler, MCP-servere og færdigheder.",
       "advancedConfig": "Avanceret konfiguration",
       "advancedConfigDescription": "Gælder for denne session. Gemmer du den som profil, bevares den til næste gang.",
       "saveAsProfile": "Gem som profil",

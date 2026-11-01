@@ -2376,7 +2376,6 @@
       "defaultProfileResolvesTo": "Hetkel: {{name}}",
       "defaultProfileResolvesToAccessibility": "Vaikeprofiil: {{name}}",
       "manageProfiles": "Profiilide haldamine",
-      "noProfiles": "Profiilid veel puuduvad. Loo profiil, et lisada keskkonnamuutujaid, MCP-servereid ja oskusi.",
       "advancedConfig": "Täpsem konfiguratsioon",
       "advancedConfigDescription": "Kehtib selle seansi kohta. Profiilina salvestamine jätab selle järgmiseks korraks alles.",
       "saveAsProfile": "Salvesta profiilina",

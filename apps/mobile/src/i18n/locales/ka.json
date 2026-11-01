@@ -2376,7 +2376,6 @@
       "defaultProfileResolvesTo": "ახლა {{name}}-ია",
       "defaultProfileResolvesToAccessibility": "ნაგულისხმევი პროფილი: {{name}}",
       "manageProfiles": "პროფილების მართვა",
-      "noProfiles": "ჯერ არ არის პროფილები. შექმენით ერთი გარემოს ცვლადების, MCP სერვერების და უნარების დასამატებლად.",
       "advancedConfig": "გაფართოებული კონფიგურაცია",
       "advancedConfigDescription": "ვრცელდება ამ სესიაზე. პროფილად შენახვისას ის შემდეგ ჯერზეც დარჩება.",
       "saveAsProfile": "პროფილად შენახვა",

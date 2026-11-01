@@ -43,6 +43,7 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileCommands: () => h.query,
+  useAgentProfileOverview: () => ({ data: { name: 'Team profile' } }),
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('expo-router', () => ({

@@ -51,6 +51,7 @@ import { toast } from 'sonner-native';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { i18n } from '@/i18n';
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
+import { SharePrefillFailure } from '@/components/agents/share-prefill-failure';
 import { ChatToolbar, type ChatToolbarModeControl } from '@/components/agents/chat-toolbar';
 import { pickAgentAttachments, pickAgentImages } from '@/components/agents/attachment-picker';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -110,7 +111,7 @@ import { describeClassificationFailure } from '@/lib/agent-attachments/validate'
 import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
 import { composerPromptText, hasVisibleComposerText } from '@/lib/composer-text';
 import {
-  clipboardPasteEmptyMessage,
+  clipboardPasteFailureMessage,
   useClipboardPaste,
 } from '@/lib/agent-attachments/use-clipboard-paste';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
@@ -729,7 +730,7 @@ export function ChatComposer({
     addCandidates,
   });
 
-  useSharePrefill({
+  const sharePrefill = useSharePrefill({
     shareId,
     inputRef,
     maxLength: CLOUD_AGENT_PROMPT_MAX_LENGTH,
@@ -866,9 +867,7 @@ export function ChatComposer({
       });
     },
     onFailure: reason => {
-      toast.error(
-        reason === 'empty' ? clipboardPasteEmptyMessage() : describeClassificationFailure(reason)
-      );
+      toast.error(clipboardPasteFailureMessage(reason) ?? describeClassificationFailure(reason));
     },
     maxBytes: AGENT_ATTACHMENT_MAX_BYTES,
   });
@@ -1430,6 +1429,17 @@ export function ChatComposer({
               />
             </Animated.View>
           </Animated.View>
+        ) : null}
+
+        {sharePrefill.failed ? (
+          <SharePrefillFailure
+            onRetry={() => {
+              sharePrefill.retry();
+            }}
+            onDismiss={() => {
+              sharePrefill.dismiss();
+            }}
+          />
         ) : null}
 
         {showAttachments ? (

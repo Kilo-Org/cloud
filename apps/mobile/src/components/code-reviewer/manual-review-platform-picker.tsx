@@ -45,28 +45,46 @@ export function ManualReviewPlatformPicker({
     <RadioGroup label={t('common.platform')} className="overflow-hidden rounded-lg bg-secondary">
       {MANUAL_REVIEW_PLATFORMS.map((option, index) => {
         const connected = isConnected(option);
+        const platformLabel = PLATFORM_CAPABILITIES[option].label;
         return (
           <Pressable
             key={option}
             disabled={!connected}
             className={cn(
               'flex-row items-center justify-between px-4 py-3 active:opacity-70',
-              index < MANUAL_REVIEW_PLATFORMS.length - 1 && 'border-b-[0.5px] border-hair-soft',
-              !connected && 'opacity-50'
+              index < MANUAL_REVIEW_PLATFORMS.length - 1 && 'border-b-[0.5px] border-hair-soft'
             )}
             onPress={() => {
               selectionHaptic();
               onSelect(option);
             }}
             {...radioItemA11y({
-              label: PLATFORM_CAPABILITIES[option].label,
+              // A disabled radio keeps its reason in its own name: the visible
+              // `Not connected` line below is a sibling of the control, not
+              // part of it, so a screen reader would otherwise announce the
+              // platform and its disabled state with no explanation. The row's
+              // children are hidden from accessibility below, so the reason is
+              // announced once, from inside the control.
+              label: connected ? platformLabel : `${platformLabel}, ${t('common.notConnected')}`,
               checked: connected && platform === option,
               disabled: !connected,
             })}
           >
-            <View>
-              <Text className="text-sm font-medium">{PLATFORM_CAPABILITIES[option].label}</Text>
+            <View
+              // The control above owns this row's accessible name; leaving the
+              // visible label and its reason focusable too would read the
+              // platform name and the reason a second time.
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              <Text className={cn('text-sm font-medium', !connected && 'text-muted-foreground')}>
+                {platformLabel}
+              </Text>
               {!connected && (
+                // The row dims only its label. This line is the only place
+                // that says why the option cannot be picked, so it keeps the
+                // muted token's own 4.5:1 on the `bg-secondary` card instead
+                // of inheriting a row-level opacity that halves it.
                 <Text variant="muted" className="text-xs">
                   {t('common.notConnected')}
                 </Text>

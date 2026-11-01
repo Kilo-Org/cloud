@@ -271,14 +271,23 @@ describe('Security Agent settings writes while the device is offline', () => {
       });
     });
 
+    await waitFor(() => holder.syncError !== null);
+
     // The dashboard's sync control stops spinning, and the persisted
     // reconcile-first row makes the next launch offer the same-key retry
     // instead of re-POSTing blind.
+    //
+    // The error the control reads is a TanStack Query observer value, flushed
+    // through its scheduler, so a render can land after this act() returns.
+    // Waiting for the committed message keeps the assertion about what the
+    // control shows instead of which render act() happened to flush.
+    const actionFailed = i18n.t('securityAgent.mutations.actionFailed');
+    await waitFor(() => holder.syncError === actionFailed);
     expect(callsTo('securityAgent.triggerSync')).toBe(1);
     expect(holder.syncPending).toBe(false);
-    expect(holder.syncError).toBe(i18n.t('securityAgent.mutations.actionFailed'));
+    expect(holder.syncError).toBe(actionFailed);
     expect(failure).toBeInstanceOf(Error);
-    expect((failure as Error).message).toBe(holder.syncError);
+    expect((failure as Error).message).toBe(actionFailed);
     expect(outbox.writeReconcileFirst).toHaveBeenCalledTimes(1);
     expect(outbox.remove).not.toHaveBeenCalled();
     view.unmount();

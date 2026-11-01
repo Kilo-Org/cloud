@@ -183,7 +183,7 @@ vi.mock('@/lib/persist/use-draft-flush', () => ({
   useDraftFlushOnBackground: vi.fn(),
 }));
 vi.mock('@/lib/share-prefill', () => ({
-  useSharePrefill: vi.fn(),
+  useSharePrefill: () => ({ failed: false, retry: () => undefined, dismiss: () => undefined }),
 }));
 
 const uploadMock = vi.hoisted(() => ({
@@ -209,7 +209,7 @@ vi.mock('@/lib/agent-attachments/use-android-pending-picker-recovery', () => ({
   useAndroidPendingPickerRecovery: vi.fn(),
 }));
 vi.mock('@/lib/agent-attachments/use-clipboard-paste', () => ({
-  clipboardPasteEmptyMessage: () => 'Clipboard is empty',
+  clipboardPasteFailureMessage: () => 'Clipboard is empty',
   useClipboardPaste: () => ({ paste: vi.fn() }),
 }));
 

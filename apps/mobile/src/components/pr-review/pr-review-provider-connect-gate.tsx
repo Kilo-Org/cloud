@@ -10,17 +10,32 @@ import { toast } from 'sonner-native';
 
 import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
 import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
+import { PrReviewGateItemLine } from '@/components/pr-review/pr-review-gate-item-line';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 import { WEB_BASE_URL } from '@/lib/config';
-import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
+import { useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
+import { useOrganization } from '@/lib/organization-context';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
-import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
-import { type ProviderPrPlatform, useProviderPrScopeOrNull } from '@/lib/pr-review/provider-pr-ref';
+import {
+  PR_REVIEW_GATE_ICON_TILE_CLASS,
+  usePrReviewGateIconColor,
+} from '@/lib/pr-review/pr-review-gate-illustration';
+import {
+  selectPrReviewConnectAction,
+  selectPrReviewGateView,
+} from '@/lib/pr-review/pr-review-connect-gate-view';
+import {
+  type ProviderPrPlatform,
+  type ProviderPrRef,
+  useProviderPrScopeOrNull,
+} from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -78,14 +93,18 @@ function OrgOnlyDescription({
 export function ProviderConnectGate({
   platform,
   organizationId,
+  prRef,
   children,
 }: Readonly<{
   platform: Exclude<ProviderPrPlatform, 'github'>;
   organizationId: string | null;
+  /** The PR/MR the route opened; see `PrReviewGateItemLine`. */
+  prRef?: ProviderPrRef;
   children: ReactNode;
 }>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
+  const iconColor = usePrReviewGateIconColor();
   const { t } = useTranslation();
   const instanceHint = useInstanceHint(platform);
   // The org-only arm sends a personal reader to the account switch above. That
@@ -93,6 +112,32 @@ export function ProviderConnectGate({
   // membership — so the memberships answer decides which copy is true. One
   // cache entry serves this and the context line; nothing refetches.
   const memberships = useOrganizationsList();
+  // The connect CTA opens the web integration page, which refuses some
+  // organization roles for some providers (see `selectPrReviewConnectAction`).
+  // Read the caller's role the way the code-reviewer screens do, from the same
+  // cached memberships answer.
+  const permission = useReviewerPermission(organizationId ?? PERSONAL_SCOPE);
+  // Whether the stored account selection has been restored. Until it has, the
+  // `organizationId` prop is null even for a reader whose organization is being
+  // restored, so the gate must not answer for the personal scope yet.
+  const organization = useOrganization();
+  // The restore reports a failure through `error` without ever reporting
+  // `isLoaded`, so its failure is the other settled signal — otherwise the gate
+  // would wait for a selection that will never arrive. And a restore re-runs on
+  // a token change, briefly reporting the selection as unrestored again, so
+  // once it has landed this keeps that answer: the review subtree must not be
+  // replaced by the spinner under a reader who is already reviewing.
+  //
+  // The latch is state, adjusted synchronously during render (React's "adjust
+  // state when props change" pattern, as in `agents/markdown-image.tsx`): a
+  // render React discards drops the adjustment with it, and the re-render it
+  // schedules happens before the selector below runs, so no frame shows the
+  // spinner for a selection that has already landed.
+  const selectionSettledNow = organization.isLoaded || organization.error !== null;
+  const [selectionSettled, setSelectionSettled] = useState(selectionSettledNow);
+  if (selectionSettledNow && !selectionSettled) {
+    setSelectionSettled(true);
+  }
 
   // The providers — and the two GitLab scopes, whose payloads now differ by
   // the personal reconnect marker — answer with different status shapes, so
@@ -176,6 +221,11 @@ export function ProviderConnectGate({
     reconnectRequired:
       platform === 'gitlab' ? gitlabStatus.data?.reconnectRequired === true : false,
     organizationId,
+    // The layout hands this gate `useOrganization()`'s value, so the two agree
+    // on when the stored selection has landed. Reading it here too keeps the
+    // gate from asking the personal scope for an organization reader's first
+    // answer.
+    organizationSelectionLoaded: selectionSettled,
   });
 
   if (view === 'org-only') {
@@ -189,9 +239,15 @@ export function ProviderConnectGate({
         <PrReviewGateHeader />
         <EmptyState
           icon={ShieldAlert}
+          iconContainerClassName={PR_REVIEW_GATE_ICON_TILE_CLASS}
+          iconColor={iconColor}
           title={t('agentChat.newSession.bitbucketOrganizationsOnly')}
           description={
             <>
+              <PrReviewGateItemLine prRef={prRef} />
+              {/* The switcher stays above this arm's explanation: its copy tells
+                  the reader to switch "the account above", so the control has to
+                  be the line they read first. */}
               <PrReviewContextLine />
               <OrgOnlyDescription
                 membershipsError={memberships.isError}
@@ -238,52 +294,88 @@ export function ProviderConnectGate({
 
   if (view === 'connect' || view === 'reconnect') {
     const reconnect = view === 'reconnect';
+    const action = selectPrReviewConnectAction({
+      platform,
+      view,
+      organizationId,
+      canManageOrganizationBilling: permission.status === 'ready' ? permission.canEdit : null,
+    });
     // Reused translated copy: the title above already names the expired
     // provider connection, so the description carries only the re-check
     // instruction and never restates the title. One key serves both the
     // provider gate and the mid-session notice, so the two surfaces cannot
     // drift apart.
+    //
+    // The first-time connect description is the benefit alone, never a second
+    // "Connect your … account": the title and the CTA already say that, and the
+    // context line above names the scope. GitHub and Bitbucket review pull
+    // requests, so both arms share one key; GitLab names merge requests.
     const connectTitle =
       platform === 'gitlab' ? t('common.connectGitlab') : t('common.connectBitbucket');
     const connectDescription =
       platform === 'gitlab'
         ? t('prReview.connect.gitlabDescription')
-        : t('prReview.connect.bitbucketDescription');
+        : t('common.prReviewSubtitle');
     const reconnectTitle =
       platform === 'gitlab'
         ? t('prReview.reconnectNotice.gitlabTitle')
         : t('prReview.reconnectNotice.bitbucketTitle');
-    const title = reconnect ? reconnectTitle : connectTitle;
-    const description = reconnect ? t('prReview.reconnectNotice.message') : connectDescription;
+    let title = reconnect ? reconnectTitle : connectTitle;
+    let description = connectDescription;
+    if (reconnect) {
+      // The title above already names the expired provider connection, so the
+      // description carries only the re-check instruction and never restates
+      // the title. One key serves both the provider gate and the mid-session
+      // notice, so the two surfaces cannot drift apart.
+      description = t('prReview.reconnectNotice.message');
+    }
+    if (action === 'organization-admin-only') {
+      // The reader cannot complete the integration page's action from this
+      // role, so the state names the roles that can and carries no action. An
+      // expired GitLab connection keeps its title and asks for a reconnection;
+      // an absent Bitbucket connection cannot make the connect call its title
+      // no longer offers, so that title states the absence instead.
+      if (platform === 'gitlab') {
+        description = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
+      } else {
+        title = t('prReview.connect.bitbucketNotConnectedTitle');
+        description = t('prReview.connect.bitbucketAdminOnlyDescription');
+      }
+    }
     return (
       <View className="flex-1 bg-background">
         <PrReviewGateHeader />
         <EmptyState
           icon={reconnect ? ShieldAlert : PlugZap}
+          iconContainerClassName={PR_REVIEW_GATE_ICON_TILE_CLASS}
+          iconColor={iconColor}
           title={title}
           description={
             <>
-              <PrReviewContextLine instanceHint={instanceHint} />
+              <PrReviewGateItemLine prRef={prRef} />
               <Text variant="muted" className="text-center">
                 {description}
               </Text>
+              <PrReviewContextLine instanceHint={instanceHint} className="mt-3" />
             </>
           }
           action={
-            <Button
-              className={cn('mt-3 w-full flex-row gap-2', STATE_ACTION_CLASS)}
-              disabled={connecting}
-              onPress={() => {
-                void handleConnect();
-              }}
-            >
-              {connecting ? (
-                <ActivityIndicator size="small" color={colors.primaryForeground} />
-              ) : (
-                <RefreshCcw size={16} color={colors.primaryForeground} />
-              )}
-              <Text>{connectTitle}</Text>
-            </Button>
+            action === 'connect' ? (
+              <Button
+                className={cn('mt-3 w-full flex-row gap-2', STATE_ACTION_CLASS)}
+                disabled={connecting}
+                onPress={() => {
+                  void handleConnect();
+                }}
+              >
+                {connecting ? (
+                  <ActivityIndicator size="small" color={colors.primaryForeground} />
+                ) : (
+                  <RefreshCcw size={16} color={colors.primaryForeground} />
+                )}
+                <Text>{connectTitle}</Text>
+              </Button>
+            ) : undefined
           }
         />
       </View>

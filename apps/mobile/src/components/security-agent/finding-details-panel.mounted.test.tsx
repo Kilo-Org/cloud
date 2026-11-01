@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted harness covers the panel's advisory routing, chip row, dismissal copy, dates block and identifier rows */
 // The details panel's advisory control uses the same link route as the other
 // finding surfaces: a supported review link navigates in-app, everything else
 // goes through the shared external-link helper.
@@ -345,5 +346,54 @@ describe('FindingDetailsPanel dates block', () => {
       'securityAgent.findingDetails.detected',
       'common.updated',
     ]);
+  });
+});
+
+describe('FindingDetailsPanel identifier values', () => {
+  beforeEach(() => {
+    mocks.kvRows.length = 0;
+    mocks.deadlineState = { kind: 'no-deadline' };
+    mocks.supersedingFindingId = null;
+  });
+
+  /** The captured row for a label; fails the test when the panel did not draw it. */
+  function identifierRow(label: string): Record<string, unknown> {
+    const row = mocks.kvRows.find(candidate => candidate.label === label);
+    expect(row, `the panel draws the ${label} row`).toBeDefined();
+    return row as Record<string, unknown>;
+  }
+
+  // A version range's `<` is neutral, so every row that carries a technical
+  // token names its own base direction; the labels beside them keep the
+  // interface direction.
+  it('names the left-to-right direction of every identifier row', () => {
+    renderPanel(findingFixture());
+
+    for (const label of [
+      'securityAgent.findingDetails.package',
+      'securityAgent.findingDetails.vulnerableVersions',
+      'securityAgent.findingDetails.patchedVersion',
+      'securityAgent.findingDetails.cve',
+      'securityAgent.findingDetails.ghsa',
+      'common.repository',
+      'securityAgent.findingDetails.manifest',
+      'securityAgent.findingDetails.sourceId',
+    ]) {
+      expect(identifierRow(label).valueDirection).toBe('ltr');
+    }
+  });
+
+  // The absence of a version renders as translated copy, which keeps the
+  // interface's own direction. Both rows still render, so a regression that
+  // hides them when the value is absent fails here instead of passing.
+  it('keeps the translated absence of a version in the interface direction', () => {
+    renderPanel(findingFixture({ vulnerable_version_range: null, patched_version: null }));
+
+    expect(
+      identifierRow('securityAgent.findingDetails.vulnerableVersions').valueDirection
+    ).toBeUndefined();
+    expect(
+      identifierRow('securityAgent.findingDetails.patchedVersion').valueDirection
+    ).toBeUndefined();
   });
 });

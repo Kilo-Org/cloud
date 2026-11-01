@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the details groups (identity, versions, advisories, dates, source) stay in one panel so their row order, dividers and tones read together */
 import {
   getFindingLifecycleStatusPresentation,
   getFindingSeverityPresentation,
@@ -251,11 +252,12 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         <KvRow
           label={t('securityAgent.findingDetails.package')}
           value={`${finding.package_name} (${finding.package_ecosystem})`}
+          valueDirection="ltr"
         />
         <KvRow
           label={t('securityAgent.findingDetails.vulnerableVersions')}
           value={firstNonEmpty(finding.vulnerable_version_range, t('common.unknown'))}
-          valueDirection="ltr"
+          valueDirection={finding.vulnerable_version_range ? 'ltr' : undefined}
           selectable
         />
         <KvRow
@@ -264,7 +266,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             finding.patched_version,
             t('securityAgent.findingDetails.noPatchAvailable')
           )}
-          valueDirection="ltr"
+          valueDirection={finding.patched_version ? 'ltr' : undefined}
           selectable
         />
         {finding.cve_id ? (
@@ -287,6 +289,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
           label={t('common.repository')}
           value={finding.repo_full_name}
           last={!finding.manifest_path}
+          valueDirection="ltr"
           selectable
         />
         {finding.manifest_path ? (
@@ -294,6 +297,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             label={t('securityAgent.findingDetails.manifest')}
             value={finding.manifest_path}
             last
+            valueDirection="ltr"
             selectable
           />
         ) : null}
@@ -319,6 +323,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         <KvRow
           label={t('securityAgent.findingDetails.sourceId')}
           value={finding.source_id}
+          valueDirection="ltr"
           last
           selectable
         />

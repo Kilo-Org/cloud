@@ -6,8 +6,10 @@ import { act, TestRenderer } from '@/test/renderer';
 
 import { KvRow } from './kv-row';
 
+const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+
 vi.mock('react-native', () => ({
-  I18nManager: { isRTL: false },
+  I18nManager: i18nManager,
   Text: 'Text',
   View: 'View',
 }));
@@ -38,6 +40,21 @@ function renderRow(props: { value: string; selectable?: boolean; valueDirection?
 /** The value Text, identified by its rendered string. */
 function valueText(root: TestRenderer.ReactTestInstance, value: string) {
   return root.find(node => Object.is(node.type, 'Text') && node.children.includes(value));
+}
+
+/** The value's effective style: the shared RTL direction first, the row's own last. */
+function valueStyle(node: TestRenderer.ReactTestInstance): Record<string, unknown> {
+  const style: unknown = node.props.style;
+  if (!Array.isArray(style)) {
+    return typeof style === 'object' && style !== null ? { ...style } : {};
+  }
+  const flattened: Record<string, unknown> = {};
+  for (const entry of style as unknown[]) {
+    if (typeof entry === 'object' && entry !== null) {
+      Object.assign(flattened, entry);
+    }
+  }
+  return flattened;
 }
 
 afterEach(() => {
@@ -71,5 +88,27 @@ describe('KvRow mounted layout', () => {
   it('pins a value that names a version to a left-to-right run', () => {
     const text = valueText(renderRow({ value: '< 6.13.0', valueDirection: 'ltr' }), '< 6.13.0');
     expect(text.props.style).toEqual({ direction: 'ltr', writingDirection: 'ltr' });
+  });
+
+  it('keeps that run left-to-right in a right-to-left interface', () => {
+    i18nManager.isRTL = true;
+    try {
+      const text = valueText(renderRow({ value: '< 6.13.0', valueDirection: 'ltr' }), '< 6.13.0');
+
+      expect(valueStyle(text)).toMatchObject({ direction: 'ltr', writingDirection: 'ltr' });
+    } finally {
+      i18nManager.isRTL = false;
+    }
+  });
+
+  it('leaves a row without the direction in the interface direction', () => {
+    i18nManager.isRTL = true;
+    try {
+      const text = valueText(renderRow({ value: 'لا يوجد تصحيح متاح' }), 'لا يوجد تصحيح متاح');
+
+      expect(valueStyle(text).writingDirection).toBe('rtl');
+    } finally {
+      i18nManager.isRTL = false;
+    }
   });
 });

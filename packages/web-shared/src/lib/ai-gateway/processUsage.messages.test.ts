@@ -392,7 +392,7 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       stream,
       'fake-user-id',
       undefined,
-      'martian',
+      'direct-byok',
       200,
       false
     );
@@ -417,7 +417,7 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       stream,
       'fake-user-id',
       undefined,
-      'martian',
+      'direct-byok',
       200,
       false
     );
@@ -442,7 +442,7 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       stream,
       'fake-user-id',
       undefined,
-      'martian',
+      'direct-byok',
       200,
       false
     );

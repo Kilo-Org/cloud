@@ -190,7 +190,7 @@ describe('processOpenRouterUsage', () => {
     );
 
     test('bills the reported cost from providers that never report is_byok', () => {
-      const result = processOpenRouterUsage(usage, coreProps, 'martian');
+      const result = processOpenRouterUsage(usage, coreProps, 'direct-byok');
 
       expect(result.cost_mUsd).toBe(75966);
       expect(result.is_byok).toBeNull();

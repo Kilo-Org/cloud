@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { SECURITY_LIFECYCLE_EVENTS } from '@kilocode/notifications';
+import { SECURITY_LIFECYCLE_EVENTS } from '@kilocode/notifications/schemas';
 
 import { notificationPathForData, prPathForData } from './notification-path';
 

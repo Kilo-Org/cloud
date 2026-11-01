@@ -20,6 +20,7 @@ import {
   textValues,
 } from './pr-review-entry-screen-test-utils';
 import { recentPrKey } from '@/lib/pr-review/recent-prs';
+import { PrReviewRecentsPending } from './pr-review-recents-pending';
 import { type ConfirmDialogRequest } from '@/components/ui/dialog';
 
 const SAME_TRIPLE = { owner: 'acme', repo: 'api', number: 7, lastOpenedAt: 1_700_000_000_000 };
@@ -113,7 +114,7 @@ describe('recents identity across providers', () => {
     expect(storedRecents().map(entry => entry.platform)).toEqual(['gitlab', 'bitbucket']);
   });
 
-  it('a failed row keeps the retry CTA and provider label', async () => {
+  it('a failed row names what could not be opened in its provider vocabulary', async () => {
     store.clear();
     seedRecents([
       {
@@ -123,9 +124,32 @@ describe('recents identity across providers', () => {
         instanceHint: 'https://gl.acme.dev',
         lastResult: 'failed',
       },
+      {
+        ...SAME_TRIPLE,
+        owner: 'kilo',
+        title: 'Broken PR',
+        platform: 'github',
+        lastResult: 'failed',
+      },
     ]);
     const tree = await renderLoaded();
-    expect(textValues(tree)).toContain("Couldn't load");
+    const rows = findAll(tree, 'View').filter(
+      candidate => candidate.props?.testID === 'recent-row'
+    );
+    // Each row's own copy, read inside that row: both rows stand for a review
+    // request, so a check over the whole tree would pass with the two nouns
+    // swapped. The filter keeps only the failure line, never the title or ref.
+    const failureCopy = (title: string) => {
+      const row = rows.find(candidate =>
+        findAll(candidate, 'Text').some(el => el.props?.children === title)
+      );
+      if (!row) {
+        throw new Error(`no recents row titled ${title}`);
+      }
+      return textValues(row).filter(value => value.includes('request'));
+    };
+    expect(failureCopy('Broken MR')).toEqual(['Could not open merge request']);
+    expect(failureCopy('Broken PR')).toEqual(['Could not open pull request']);
     const retry = find(tree, 'Button', p => p.accessibilityLabel === 'Retry');
     (propsOf(retry).onPress as () => void)();
     expect(mocks.push).toHaveBeenCalledWith(
@@ -144,11 +168,20 @@ describe('recents identity across providers', () => {
     );
   });
 
-  it('the recents load renders into an indicator while pending', () => {
-    // getRecentPrs is still in flight on the first call: the body is the
-    // spinner, never a blank that would jump the layout on arrival.
+  it('the recents load renders one row-shaped card while pending', () => {
+    // getRecentPrs is still in flight on the first call: the body is a card
+    // with a recent row's own shape, never a blank or a bare spinner that
+    // would read as a clipped fragment and jump the section on arrival.
     store.set('pr-review-recents', JSON.stringify([{ ...SAME_TRIPLE, title: 'X' }]));
     const tree = render();
-    expect(findAll(tree, 'ActivityIndicator').length).toBeGreaterThan(0);
+    expect(findAll(tree, PrReviewRecentsPending)).toHaveLength(1);
+    // The loaded rows wait for the read: no row is drawn beside the card.
+    expect(findAll(tree, 'View').filter(p => p.props?.testID === 'recent-row')).toHaveLength(0);
+
+    // eslint-disable-next-line new-cap -- called as a plain function, like the screen harness
+    const card = PrReviewRecentsPending();
+    const frame = find(card, 'View', p => p.accessibilityRole === 'progressbar');
+    expect(propsOf(frame).accessibilityLabel).toBe('Loading…');
+    expect(findAll(frame, 'Skeleton')).toHaveLength(4);
   });
 });

@@ -68,6 +68,7 @@ vi.mock('react-native', async () => {
   return {
     ActivityIndicator: 'ActivityIndicator',
     I18nManager: i18nManager,
+    Keyboard: { dismiss: () => undefined },
     TextInput: MockTextInput,
     View: 'View',
   };

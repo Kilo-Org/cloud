@@ -69,6 +69,7 @@
     "organization": "Байгууллага",
     "platform": "Платформ",
     "prReview": "PR шалгалт",
+    "prReviewSubtitle": "Өөрчлөлт нэгтгэх хүсэлтийг гар утаснаас хянах",
     "queued": "Дараалалд",
     "remove": "Устгах",
     "repository": "Кодын сан",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "PR-ийн автомат хяналт",
     "securityAgentSubtitle": "Эмзэг байдлыг олж, арилгах",
     "reviews": "Кодын хяналт",
-    "prReviewSubtitle": "Өөрчлөлт нэгтгэх хүсэлтийг гар утаснаас хянах",
     "couldNotLoadOrganization": "Байгууллагыг ачаалж чадсангүй.",
     "couldNotLoadOrganizationDescription": "Энэ мэдээллийг ачаалж дуустал байгууллага болон агентын тохиргоог ашиглах боломжгүй.",
     "linkedAccounts": "Холбогдсон бүртгэлүүд",
@@ -330,7 +330,7 @@
       "diffTooLarge": "өөрчлөлтийн хэмжээ хэт их",
       "openFile": "{{path}} нээх",
       "openFileViewed": "{{path}} нээх (үзсэн)",
-      "title": "Файл"
+      "title": "Файлууд"
     },
     "fileRows": {
       "markViewed": "{{path}}-ыг үзсэн гэж тэмдэглэх",
@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub холболтын хугацаа дууссан.",
     "merge": {
       "merge": "Нэгтгэх",
+      "mergeTitle": "Нэгтгэх",
       "mergeNow": "Одоо нэгтгэх",
       "mergePullRequest": "Нэгтгэх хүсэлтийг нэгтгэх",
       "mergeTermTitle": "{{term}}ийг нэгтгэх",
@@ -605,7 +606,6 @@
     "entry": {
       "noRecentPrs": "Саяхны шалгалт алга",
       "noRecentPrsDescription": "Шалгалт эхлэхийн тулд холбоосыг дээр буулгана уу — дараагийн удаа тэр энд харагдана.",
-      "couldNotLoad": "Ачаалж чадсангүй.",
       "removeFromRecentsTitle": "Саяхан үзсэн жагсаалтаас хасах уу?",
       "removeFromRecentsMessage": "Энэ шалгалт таны саяхны жагсаалтаас хасагдана.",
       "removeRecentAccessibility": "{{repo}}-г саяхан үзсэн жагсаалтаас хасах",
@@ -679,12 +679,13 @@
       "checkFailedTitleBitbucket": "Bitbucket холболтыг шалгаж чадсангүй.",
       "providerCheckFailedMessage": "Ачаалагдах хүртэл холболтын төлөв харагдахгүй.",
       "reconnectTitle": "GitHub-ыг дахин холбох",
-      "reconnectDescription": "Таны GitHub холболтын зөвшөөрлийг цуцалсан байна. Гар утаснаасаа нэгтгэх хүсэлтүүдийг үргэлжлүүлэн хянахын тулд дахин холбоно уу.",
-      "description": "Гар утаснаасаа нэгтгэх хүсэлтүүдийг хянахын тулд GitHub бүртгэлээ холбоно уу.",
-      "gitlabDescription": "Гар утаснаас нэгтгэх хүсэлтүүдийг шалгахын тулд GitLab бүртгэлээ холбоно уу.",
-      "bitbucketDescription": "Гар утаснаас татах хүсэлтүүдийг шалгахын тулд Bitbucket-ийг энэ байгууллагад холбоно уу.",
+      "reconnectDescription": "Таны GitHub холболтын зөвшөөрлийг цуцалсан байна.",
+      "gitlabDescription": "Нэгтгэх хүсэлтийг гар утаснаас хянах",
       "bitbucketOrgOnlyDescription": "Түүний Bitbucket татах хүсэлтүүдийг шалгахын тулд дээрх бүртгэлийг байгууллагад шилжүүлнэ үү.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Энэ бүртгэлд одоогоор ямар ч байгууллага алга. Байгууллага үүсгэсэн эсвэл нэгэнд нэгдсэний дараа Bitbucket татах хүсэлтийг шалгах боломжтой болно.",
+      "gitlabReconnectAdminOnlyDescription": "Дахин холбуулахын тулд байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежерт хандана уу.",
+      "bitbucketNotConnectedTitle": "Bitbucket холбогдоогүй байна",
+      "bitbucketAdminOnlyDescription": "Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй.",
       "contextLine": "{{organization}}-ийн хувьд",
       "contextLinePersonal": "Хувийн дансны хувьд"
     },
@@ -759,7 +760,7 @@
     },
     "tabs": {
       "overview": "Тойм",
-      "files": "Файл",
+      "files": "Файлууд",
       "discussion": "Хэлэлцүүлэг"
     },
     "fileStatus": {
@@ -834,7 +835,8 @@
     "liveUpdates": "Шууд шинэчлэлтүүд",
     "liveUpdateSubtitle": "Мэдэгдэлд идэвхтэй агентуудыг харуулах",
     "push": "Түлхэх мэдэгдэл",
-    "onDescription": "Энэ төхөөрөмж дээр түлхэх мэдэгдэл асаалттай байна.",
+    "deviceTitle": "Энэ төхөөрөмж дээр түлхэх мэдэгдэл",
+    "onDescription": "Анхааруулга доорх ангиллуудыг дагана.",
     "offDescription": "Мэдэгдлийн зөвшөөрөл эсвэл төхөөрөмжийн бүртгэл идэвхгүй байна.",
     "retryPermission": "Мэдэгдлийн зөвшөөрлийг дахин шалгах",
     "enable": "Мэдэгдэл идэвхжүүлэх",
@@ -1019,7 +1021,7 @@
     "attachmentPicker": {
       "takePhoto": "Зураг авах",
       "photoLibrary": "Зургийн сан",
-      "files": "Файл",
+      "files": "Файлууд",
       "cameraAccessMessage": "Зураг авахын тулд тохиргооноос камер ашиглах эрхийг зөвшөөрнө үү."
     },
     "typingIndicator": {
@@ -1417,7 +1419,9 @@
     "instructions": {
       "title": "Тусгай заавар",
       "deprecation": "Тусгай зааврын дэмжлэгийг зогсоохоор төлөвлөсөн. Эдгээр зааврыг репозиторийнхоо REVIEW.md файлд шилжүүлнэ үү.",
-      "placeholder": "жишээ нь: Алдаа боловсруулах дүрмийг мөрдүүлэх…"
+      "placeholder": "жишээ нь: Алдаа боловсруулах дүрмийг мөрдүүлэх…",
+      "clearTitle": "Тусгай зааврыг устгах уу?",
+      "clearMessage": "Хоосон талбарыг хадгалснаар энэ хянагчид хадгалагдсан тусгай зааврыг устгана."
     },
     "repos": {
       "unavailable": "Репозиториудад хандах боломжгүй байна. kilo.ai дээр Bitbucket-ийг тохируулж дуусгана уу.",
@@ -1452,7 +1456,7 @@
       "fixSettings": "Тохиргоог засах",
       "couldNotLoad": "Шалгалтыг ачаалж чадсангүй.",
       "couldNotGetLatest": "Сүүлийн мэдээллийг авч чадсангүй.",
-      "byline": "{{repo}} #{{number}} · Зохиогч: {{author}}",
+      "byline": "#{{number}} · Зохиогч: {{author}}",
       "noFindings": "Асуудал илрээгүй.",
       "findingsUnavailable": "Энэ шалгалт амжилтгүй болсон тул үр дүнг харах боломжгүй.",
       "findingsInProgress": "Энэ шалгалт хараахан хийгдэж байна. Дуусах үедээ илрүүлсэн асуудлууд энд харагдана.",
@@ -1533,11 +1537,13 @@
       "offAction": "Шалгалтын санах ой идэвхгүй байна. Санах ойг идэвхжүүлээд дахин оролдоно уу."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Нэгтгэх хүсэлтийн хүчинтэй URL оруулна уу.",
+      "mergeRequestUrl": "Нэгтгэх хүсэлтийн URL",
+      "instructionsAtLimit": "Заавар нь {{max}} тэмдэгтээр хязгаарлагдана",
       "title": "Гараар эхлүүлэх шалгалт",
       "invalidUrl": "Нэгтгэх хүсэлтийн хүчинтэй URL оруулна уу.",
       "couldNotCheckProviderStatus": "Үйлчилгээ үзүүлэгчийн төлөвийг шалгаж чадсангүй.",
       "couldNotLoadProviders": "Холбосон үйлчилгээ үзүүлэгчдийн мэдээллийг ачаалж чадсангүй. Дахин оролдоно уу.",
-      "connectProviderDescription": "Нэгтгэх хүсэлтийн шалгалтыг гараар эхлүүлэхийн тулд GitHub-ыг холбоно уу.",
       "pullRequestUrl": "Нэгтгэх хүсэлтийн URL",
       "instructions": "Заавар (заавал биш)",
       "instructionsPlaceholder": "Шалгагчийн онцлон анхаарах зүйл…",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "Шалгалтын хэв маяг",
       "focusAreas": "Анхаарах чиглэлүүд",
       "allAreas": "Бүх чиглэл",
-      "customInstructions": "Тусгай заавар",
       "set": "Тохируулсан",
+      "notSet": "Тохируулаагүй",
       "nSelected": "{{displayCount}} сонгогдсон",
       "proposedReviewMdGuidance": "Санал болгосон REVIEW.md зөвлөмж"
     },
@@ -1680,7 +1686,8 @@
       "sortSeverityDesc": "Ноцтой байдлын зэрэг: ихээс бага руу",
       "sortSeverityAsc": "Ноцтой байдлын зэрэг: багаас их рүү",
       "sortSlaDue": "SLA эцсийн хугацаа",
-      "overdueOnly": "Зөвхөн хугацаа хэтэрсэн"
+      "overdueOnly": "Зөвхөн хугацаа хэтэрсэн",
+      "noRepositories": "Одоогоор синклэгдсэн эсвэл сонгосон репозитор байхгүй. «Аюулгүй байдлын агент»-ын тохиргооноос сонгоно уу."
     },
     "automation": {
       "title": "Автоматжуулалт",
@@ -1765,7 +1772,6 @@
       "noImmediateAction": "Яаралтай арга хэмжээ шаардлагагүй",
       "notExploitable": "Халдлагад ашиглах боломжгүй",
       "needsYourReview": "Та шалгах шаардлагатай",
-      "noSlaDeadline": "SLA эцсийн хугацаа тогтоогоогүй",
       "noRepositoryData": "Репозиторийн мэдээлэл хараахан байхгүй",
       "noRepositoryDataDescription": "Илэрсэн асуудлыг синхрончилсны дараа репозиториудын ач холбогдлын эрэмбэ харагдана.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
@@ -1783,6 +1789,7 @@
       "lastSynced": "Сүүлд синхрончилсон: {{time}}",
       "manageRepositories": "Репозиториудыг удирдах",
       "notYetSynced": "Хараахан синхрончлоогүй",
+      "priorityFindingsPending": "Нэн түрүүнд шийдэх асуудлууд анхны синхрончлолын дараа энд харагдана.",
       "refreshFailed": "Шинэчилж чадсангүй. Сүүлд синхрончилсон өгөгдлийг харуулж байна.",
       "settings": "Тохиргоо",
       "syncNow": "Одоо синхрончлох",
@@ -1828,7 +1835,6 @@
       "reasonInaccurate": "Асуудлыг буруу илрүүлсэн",
       "reasonNotUsed": "Эмзэг кодыг ашигладаггүй",
       "commentLabel": "Тайлбар (заавал биш)",
-      "commentAccessibility": "Хассан шалтгааны тайлбар",
       "commentPlaceholder": "Хасаж буй шалтгааны дэлгэрэнгүй тайлбар…",
       "notFoundTitle": "Илэрсэн асуудал олдсонгүй",
       "notFoundDescription": "Энэ асуудлыг устгасан эсвэл таны хандах эрхийг цуцалсан байж болзошгүй.",
@@ -1841,7 +1847,8 @@
     "findingDetails": {
       "supersededBy": "Шинэ асуудлаар орлуулсан",
       "supersededByDescription": "Шинэ бүртгэлийн төлөв, шинжилгээ, засварыг харахын тулд товшино уу.",
-      "dismissedBecause": "Хассан шалтгаан: {{reason}}.",
+      "dismissedOn": "Хасагдсан огноо",
+      "supersededOn": "Орлогдсон огноо",
       "severityLabel": "Ноцтой байдлын зэрэг: {{severity}}",
       "package": "Багц",
       "vulnerableVersions": "Эмзэг байдалтай хувилбарууд",
@@ -1858,11 +1865,6 @@
       "viewAdvisory": "GitHub дээр аюулгүй байдлын зөвлөмжийг үзэх",
       "statusOpen": "Нээлттэй",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "засвар аль хэдийн эхэлсэн",
-      "reasonNoBandwidth": "цаг, нөөц хүрэлцэхгүй",
-      "reasonTolerableRisk": "эрсдэлийг хүлээн зөвшөөрөх боломжтой",
-      "reasonInaccurate": "асуудлыг буруу илрүүлсэн",
-      "reasonNotUsed": "эмзэг кодыг ашигладаггүй",
       "reasonAfterReview": "шалгалтын дараа"
     },
     "settingsOverview": {
@@ -1872,7 +1874,6 @@
       "repositoriesCount_one": "{{displayCount}} репозитори сонгогдсон",
       "repositoriesCount": "{{displayCount}} кодын сан сонгосон",
       "repositoriesCount_other": "{{displayCount}} кодын сан сонгосон",
-      "selectRepositoriesSubtitle": "Аюулгүй байдлын агентаар хянуулах репозиториудыг сонгох",
       "analysisModeSubtitle": "{{mode}} шинжилгээ",
       "automationAllOff": "Бүгд идэвхгүй",
       "automationCount": "3-аас {{displayCount}} нь идэвхтэй",
@@ -1923,7 +1924,7 @@
       "highDescription": "Их хэмжээний өгөгдөл задрах эрсдэлтэй.",
       "mediumDescription": "Нөлөө нь хязгаарлагдмал эсвэл зөвхөн тодорхой нөхцөлд илэрнэ.",
       "lowDescription": "Аюулгүй байдалд маш бага нөлөөтэй.",
-      "invalidDayCount": "хоногийн тоог 1–365 хүртэлх бүхэл тоогоор оруулна уу.",
+      "invalidDayCount": "Хоногийн тоог 1–365 хүртэлх бүхэл тоогоор оруулна уу.",
       "remediationDeadlineA11y": "{{label}} зэргийн асуудлыг засах хугацаа, хоногоор",
       "enterWholeNumber": "1-Ээс 365 хүртэлх бүхэл тоог оруулна уу",
       "permissionNote": "Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер эдгээр тохиргоог өөрчлөх эрхтэй.",
@@ -2015,7 +2016,6 @@
       "newFindingSection": "Шинээр илэрсэн асуудлын мэдэгдэл",
       "newFindingSeverityLabel": "Шинэ асуудлын ноцтой байдлын доод зэрэг",
       "newFindingSubtitle": "Шинээр илэрсэн асуудлыг синхрончлох бүрд, анхны синхрончлолыг оролцуулан мэдэгдэл илгээнэ.",
-      "slaLeadTimeAccessibility": "SLA хугацаа дуусахаас хэдэн хоногийн өмнө анхааруулах",
       "slaLeadTimeError": "Хоногийн тоог 1–365 хүртэлх бүхэл тоогоор оруулна уу.",
       "slaLeadTimeLabel": "SLA хугацаанаас өмнө анхааруулах (хоног)",
       "slaPersonalTitle": "SLA анхааруулгыг надад имэйлээр илгээх",
@@ -2063,7 +2063,10 @@
       "settleFailed": "Үйлдэл бүрэн дууслаа, гэхдээ бид үр дүнг бүртгэж чадсангүй. Дахин оролдоно уу.",
       "replayFailed": "Энэ үйлдэл дууссангүй. Дахин оролдоно уу.",
       "actionFailed": "Энэ үйлдлийг дуусгаж чадсангүй. Дахин оролдоно уу.",
-      "actionBlocked": "Энэ үйлдлийг дуусгаж чадсангүй. Асуудлыг эхэлж шийдвэрлэх шаардлагатай."
+      "actionBlocked": "Энэ үйлдлийг дуусгаж чадсангүй. Асуудлыг эхэлж шийдвэрлэх шаардлагатай.",
+      "syncNoRepositories": "Синхрончлолын хүрээнд нэг ч репозитор байхгүй. Аюулгүй байдлын агентын хянадаг репозиторуудыг сонгоод, дахин синхрончлоорой.",
+      "syncIntegrationInactive": "«Аюулгүй байдлын агент»-ын GitHub холболт идэвхтэй биш байна. Kilo GitHub App-ыг дахин холбож, дараа нь дахин синхрончлоорой.",
+      "syncMissingPermission": "Kilo GitHub App нь vulnerability alerts-г уншиж чадахгүй байна. GitHub дээр тухайн зөвшөөрлийг олгоод, дахин синк хийнэ үү."
     },
     "analysisState": {
       "queued": "Шинжилгээ дараалалд",
@@ -2097,7 +2100,6 @@
       "closedOn": "{{date}} · {{status}}",
       "deadlineNotSet": "Эцсийн хугацаа тогтоогоогүй",
       "noSlaDeadline": "SLA эцсийн хугацаагүй",
-      "dueOn": "{{date}} хүртэл",
       "overdueNow": "Хугацаа хэтэрсэн",
       "overdue_one": "Хугацаа {{count}} хоногоор хэтэрсэн",
       "overdue_other": "{{count}} өдөр хоцорсон",
@@ -2371,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "Энэ компьютер дээрх файлууд өөрчлөгдөхгүй.",
       "pickProfile": "Профайл сонгоно уу",
       "noProfile": "Профайл байхгүй",
+      "defaultProfileResolvesTo": "Одоо {{name}} гэж тохируулагдсан",
+      "defaultProfileResolvesToAccessibility": "Өгөгдмөл профайл: {{name}}",
       "manageProfiles": "Профайлуудыг удирдах",
       "noProfiles": "Одоогоор профайл байхгүй байна. Орчны хувьсагч, MCP сервер, ур чадвар нэмэхийн тулд нэгийг үүсгэ.",
       "advancedConfig": "Нарийвчилсан тохиргоо",
       "advancedConfigDescription": "Энэ сессэд хамаарна. Профайл болгон хадгалбал дараагийн удаад хадгалагдана.",
       "saveAsProfile": "Профайл болгон хадгалах",
       "saveProfileDescription": "Одоогийн орчны хувьсагч болон тохируулах командуудыг дахин ашиглах боломжтой профайл болгон хадгална уу.",
-      "profileSummary": "{{vars}} орчны хувьсагч · {{commands}} тохируулах командууд",
       "profileSaved": "\"{{name}}\" профайлыг хадгалсан",
       "organizationProfiles": "Байгууллагын профайл",
       "personalProfiles": "Хувийн профайл",
@@ -2768,7 +2771,7 @@
     "attachmentPicker": {
       "camera": "Камер",
       "photoLibrary": "Зургийн сан",
-      "files": "Файл",
+      "files": "Файлууд",
       "couldNotOpenPhotoPicker": "Зураг сонгох цонхыг нээж чадсангүй. Kilo-г дахин эхлүүлээд оролдоно уу.",
       "maxFilesAllowed": "Хамгийн ихдээ {{displayCount}} файл хавсаргах боломжтой.",
       "onlyAddingFiles": "Нийт {{total}} файлаас зөвхөн {{accepted}} файлыг нэмж байна (дээд хязгаар {{max}})",
@@ -3151,7 +3154,7 @@
     "couldNotSaveChoice": "Сонголтыг хадгалж чадсангүй. Дахин оролдоно уу.",
     "onlineAllowed": "Онлайн, зөвшөөрөгдсөн",
     "onlineNotAllowed": "Онлайн, зөвшөөрөгдөөгүй",
-    "optionalReview": "Заавал биш — тохиргооноос хүссэн үедээ өөрчилж болно",
+    "optionalReview": "Заавал биш",
     "optionalOnboarding": "Заавал биш — унтраагаагүй бол асаалттай",
     "aiProvidersWhat": "Таны заавар, харилцан ярианы түүх болон хавсаргасан файлууд.",
     "aiProvidersWhy": "AI хариулт үүсгэхийн тулд.",
@@ -3849,6 +3852,7 @@
       "markSecret": "Нууц гэж тэмдэглэ",
       "masked": "Нуугдсан үнэ цэнэ",
       "reveal": "Үнэ цэнийг илчлэх",
+      "hide": "Үнэ цэнийг нуух",
       "newValuePlaceholder": "Шинэ нууц утгыг оруулна уу",
       "valuePlaceholder": "Нууц утга (шифрлэгдсэн)"
     },
@@ -3856,8 +3860,8 @@
     "variablesSaveFailed": "Хувьсагчийг хадгалж чадсангүй",
     "commandsTitle": "Тохируулах командууд",
     "addCommand": "Команд нэмэх",
-    "commandLabel": "Тушаал",
-    "commandLabelPosition": "Тушаал {{position}}",
+    "commandLabel": "Команд",
+    "commandLabelPosition": "Команд {{position}}",
     "commandPlaceholder": "жишээ нь pnpm install",
     "commandAtLimit": "Команд нь {{max}} тэмдэгтээр хязгаарлагдана",
     "commandsEmpty": "Одоогоор тохируулах команд алга",
@@ -3977,7 +3981,8 @@
       "nameRequired": "Тушаалын нэрийг оруулна уу",
       "nameInvalid": "Нэр нь жижиг үсгээр эхэлж, зөвхөн жижиг үсэг, цифр, зураас ашиглана",
       "templateRequired": "Тушаалын загварыг оруулна уу",
-      "nameConflict": "Энэ нэрийг суулгасан тушаалаар хадгалдаг"
+      "nameConflict": "Энэ нэрийг суулгасан тушаалаар хадгалдаг",
+      "duplicateName": "Энэ профайлд ийм нэртэй тушаал аль хэдийн байна"
     },
     "repoBindings": {
       "title": "Репогийн өгөгдмөл профайл",
@@ -3986,7 +3991,7 @@
       "emptyDescription": "Репо хийх сессүүдийг эхлүүлэх үед автоматаар профайлыг ашиглах үндсэн тохиргоог нэмнэ үү.",
       "repo": "Хадгалах газрыг сонгох...",
       "profile": "Профайл сонгоно уу",
-      "remove": "Тайлах",
+      "removeForRepo": "{{repo}}-г тайлах",
       "search": "Хадгалах газраас хайх...",
       "addedToast": "\"{{repo}}\"-д зориулсан өгөгдмөл профайлыг тохируулсан",
       "addFailed": "Өгөгдмөл профайлыг тохируулж чадсангүй",

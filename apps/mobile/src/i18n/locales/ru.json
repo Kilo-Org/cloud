@@ -69,6 +69,7 @@
     "organization": "Организация",
     "platform": "Платформа",
     "prReview": "Проверка PR",
+    "prReviewSubtitle": "Проверка запросов на слияние на телефоне",
     "queued": "В очереди",
     "remove": "Удалить",
     "repository": "Репозиторий",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "Автоматические проверки PR",
     "securityAgentSubtitle": "Поиск и устранение уязвимостей",
     "reviews": "Проверки",
-    "prReviewSubtitle": "Проверка запросов на слияние на телефоне",
     "couldNotLoadOrganization": "Не удалось загрузить организацию.",
     "couldNotLoadOrganizationDescription": "Настройки организации и агентов будут доступны после загрузки данных организации.",
     "linkedAccounts": "Подключённые аккаунты",
@@ -305,7 +305,8 @@
     "liveUpdates": "Обновления в реальном времени",
     "liveUpdateSubtitle": "Показывать активных агентов в уведомлениях",
     "push": "Пуш-уведомления",
-    "onDescription": "Пуш-уведомления на этом устройстве включены.",
+    "deviceTitle": "Пуш-уведомления на этом устройстве",
+    "onDescription": "Оповещения приходят по категориям ниже.",
     "offDescription": "Нет разрешения на уведомления или устройство не зарегистрировано для их получения.",
     "retryPermission": "Повторить проверку разрешения на уведомления",
     "enable": "Включить уведомления",
@@ -894,7 +895,9 @@
     "instructions": {
       "title": "Пользовательские инструкции",
       "deprecation": "Поддержку пользовательских инструкций планируется прекратить. Перенесите эти рекомендации в файл REVIEW.md в вашем репозитории.",
-      "placeholder": "например: проверять соблюдение наших правил обработки ошибок…"
+      "placeholder": "например: проверять соблюдение наших правил обработки ошибок…",
+      "clearTitle": "Удалить пользовательские инструкции?",
+      "clearMessage": "Сохранение пустого поля удалит пользовательские инструкции, заданные для этого ревьюера."
     },
     "repos": {
       "unavailable": "Репозитории недоступны — завершите настройку Bitbucket на kilo.ai.",
@@ -930,7 +933,9 @@
     "followReviewMd": "Следовать инструкциям REVIEW.md",
     "followReviewMdSubtitle": "Соблюдать инструкции из файла REVIEW.md в каждом репозитории",
     "manualReview": {
-      "connectProviderDescription": "Подключите GitHub, чтобы запустить проверку пул-реквеста вручную.",
+      "invalidMergeRequestUrl": "Введите корректный URL запроса на слияние.",
+      "mergeRequestUrl": "URL запроса на слияние",
+      "instructionsAtLimit": "Инструкции ограничены {{max}} символами",
       "couldNotCheckProviderStatus": "Не удалось проверить статус сервиса.",
       "couldNotLoadProviders": "Не удалось загрузить подключённые сервисы. Попробуйте снова.",
       "instructions": "Инструкции (необязательно)",
@@ -968,7 +973,7 @@
       "bitbucketError": "Не удалось открыть настройку Bitbucket. Попробуйте снова."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · Автор: {{author}}",
+      "byline": "#{{number}} · Автор: {{author}}",
       "cancelMessage": "Это остановит текущую проверку кода.",
       "cancelReview": "Отменить проверку",
       "cancelTitle": "Отменить проверку?",
@@ -1083,12 +1088,12 @@
     },
     "overview": {
       "allAreas": "Все области",
-      "customInstructions": "Пользовательские инструкции",
       "focusAreas": "Приоритеты проверки",
       "nSelected": "Выбрано: {{displayCount}}",
       "proposedReviewMdGuidance": "Предложения для REVIEW.md",
       "reviewStyle": "Стиль проверки",
-      "set": "Задано"
+      "set": "Задано",
+      "notSet": "Не задано"
     },
     "updateFailed": "Не удалось обновить настройки проверки кода.",
     "configSaveFailed": "Не удалось сохранить настройки проверки.",
@@ -1157,7 +1162,8 @@
       "sortSeverityDesc": "Критичность: от высокой к низкой",
       "sortSlaDue": "Срок исправления по SLA",
       "statusIgnored": "Игнорируется",
-      "statusOpen": "Открыто"
+      "statusOpen": "Открыто",
+      "noRepositories": "Синхронизированных или выбранных репозиториев пока нет. Выберите их в настройках агента безопасности."
     },
     "analysis": {
       "analyzeRepository": "Проанализировать репозиторий",
@@ -1299,10 +1305,10 @@
       "noOpenFindings": "Нет открытых уязвимостей, требующих внимания",
       "noRepositoryData": "Данных по репозиториям пока нет",
       "noRepositoryDataDescription": "Приоритеты репозиториев появятся после синхронизации уязвимостей.",
-      "noSlaDeadline": "Срок исправления по SLA не задан",
       "notExploitable": "Эксплуатация невозможна",
       "notMeasured": "Не измерено",
       "notYetSynced": "Ещё не синхронизировано",
+      "priorityFindingsPending": "Первоочередные уязвимости появятся после первой синхронизации.",
       "refreshFailed": "Не удалось обновить — показаны данные последней синхронизации.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "Открыто: {{displayCount}}",
@@ -1370,7 +1376,6 @@
       "alreadyResolvedDescription": "Эта уязвимость уже устранена, поэтому отклонить её нельзя.",
       "cannotDismissDescription": "Только владельцы организации, администраторы и ответственные за оплату могут отклонять уязвимости.",
       "cannotDismissTitle": "Нельзя отклонить эту уязвимость",
-      "commentAccessibility": "Комментарий к отклонению",
       "commentLabel": "Комментарий (необязательно)",
       "commentPlaceholder": "Дополнительные сведения об отклонении…",
       "couldNotCheckPermissions": "Не удалось проверить права на отклонение.",
@@ -1393,7 +1398,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Обнаружено",
-      "dismissedBecause": "Уязвимость отклонена: {{reason}}.",
+      "dismissedOn": "Дата отклонения",
+      "supersededOn": "Дата замены",
       "ghsa": "GHSA",
       "manifest": "Манифест",
       "noPatchAvailable": "Исправления пока нет",
@@ -1410,11 +1416,6 @@
       "vulnerableVersions": "Уязвимые версии",
       "statusOpen": "Открыта",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "исправление уже начато",
-      "reasonNoBandwidth": "нет ресурсов на исправление",
-      "reasonTolerableRisk": "риск приемлем",
-      "reasonInaccurate": "замечание неточно",
-      "reasonNotUsed": "уязвимый код не используется",
       "reasonAfterReview": "после проверки"
     },
     "findingList": {
@@ -1444,7 +1445,6 @@
       "newFindingSection": "Уведомления о новых уязвимостях",
       "newFindingSeverityLabel": "Минимальная критичность новых уязвимостей",
       "newFindingSubtitle": "Уведомление отправляется при синхронизации каждой новой уязвимости, в том числе при первой синхронизации.",
-      "slaLeadTimeAccessibility": "За сколько дней предупреждать об истечении срока SLA",
       "slaLeadTimeError": "Введите целое число дней от 1 до 365.",
       "slaLeadTimeLabel": "Предупреждать за (дней до срока SLA)",
       "slaPersonalTitle": "Получать письма о сроках SLA",
@@ -1509,7 +1509,6 @@
       "repositoriesCount": "Выбрано репозиториев: {{displayCount}}",
       "repositoriesCount_other": "Выбрано репозиториев: {{displayCount}}",
       "repositoriesCount_one": "Выбран {{displayCount}} репозиторий",
-      "selectRepositoriesSubtitle": "Выберите репозитории для отслеживания агентом безопасности",
       "repositoriesCount_few": "Выбрано {{displayCount}} репозитория",
       "repositoriesCount_many": "Выбрано {{displayCount}} репозиториев"
     },
@@ -1532,7 +1531,7 @@
       "enterWholeNumber": "Введите целое число от 1 до 365",
       "high": "Высокий уровень",
       "highDescription": "Возможна утечка значительного объёма данных.",
-      "invalidDayCount": "укажите целое число дней от 1 до 365.",
+      "invalidDayCount": "Укажите целое число дней от 1 до 365.",
       "low": "Низкий уровень",
       "lowDescription": "Минимальное влияние на безопасность.",
       "medium": "Средний уровень",
@@ -1562,7 +1561,10 @@
       "settleFailed": "Действие выполнено, но нам не удалось записать результат. Попробуйте снова.",
       "replayFailed": "Это действие не было выполнено. Попробуйте снова.",
       "actionFailed": "Не удалось выполнить это действие. Попробуйте снова.",
-      "actionBlocked": "Не удалось выполнить это действие. Сначала нужно устранить проблему."
+      "actionBlocked": "Не удалось выполнить это действие. Сначала нужно устранить проблему.",
+      "syncNoRepositories": "В области синхронизации нет репозиториев. Выберите репозитории, которые отслеживает агент безопасности, и повторите синхронизацию.",
+      "syncIntegrationInactive": "Подключение GitHub для агента безопасности неактивно. Переподключите приложение Kilo для GitHub и повторите синхронизацию.",
+      "syncMissingPermission": "Приложение Kilo для GitHub не может читать оповещения об уязвимостях. Предоставьте это разрешение в GitHub и повторите синхронизацию."
     },
     "analysisState": {
       "queued": "Анализ в очереди",
@@ -1596,7 +1598,6 @@
       "closedOn": "{{status}} · {{date}}",
       "deadlineNotSet": "Срок не установлен",
       "noSlaDeadline": "Нет срока исправления по SLA",
-      "dueOn": "Срок: {{date}}",
       "overdueNow": "Просрочено",
       "overdue_one": "Просрочено на {{count}} день",
       "overdue_few": "Просрочено на {{count}} дня",
@@ -1878,13 +1879,14 @@
       "forkFilesUnchangedOnComputer": "Файлы на этом компьютере не изменятся.",
       "pickProfile": "Выберите профиль",
       "noProfile": "Нет профиля",
+      "defaultProfileResolvesTo": "Сейчас: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Профиль по умолчанию: {{name}}",
       "manageProfiles": "Управление профилями",
       "noProfiles": "Профилей пока нет. Создайте его, чтобы добавить переменные среды, серверы MCP и навыки.",
       "advancedConfig": "Расширенная конфигурация",
       "advancedConfigDescription": "Действует для этого сеанса. Сохранение в качестве профиля сохранит его на следующий раз.",
       "saveAsProfile": "Сохранить как профиль",
       "saveProfileDescription": "Сохраните текущие переменные среды и команды настройки как профиль многократного использования.",
-      "profileSummary": "{{vars}} переменные среды · {{commands}} команды настройки",
       "profileSaved": "Профиль \"{{name}}\" сохранен.",
       "organizationProfiles": "Профили организаций",
       "personalProfiles": "Личные профили",
@@ -2682,7 +2684,7 @@
     "couldNotSaveChoice": "Не удалось сохранить ваш выбор. Попробуйте снова.",
     "onlineAllowed": "Через интернет: разрешено",
     "onlineNotAllowed": "Через интернет: запрещено",
-    "optionalReview": "Необязательно — можно изменить в настройках в любой момент",
+    "optionalReview": "Необязательно",
     "optionalOnboarding": "Необязательно — включено по умолчанию, можно отключить",
     "aiProvidersWhat": "Ваши запросы, история переписки и прикреплённые файлы.",
     "aiProvidersWhy": "Для генерации ответов ИИ.",
@@ -2777,12 +2779,13 @@
       "checkFailedTitleBitbucket": "Не удалось проверить подключение к Bitbucket",
       "providerCheckFailedMessage": "Статус подключения недоступен до загрузки.",
       "reconnectTitle": "Подключить GitHub снова",
-      "reconnectDescription": "Доступ к вашему аккаунту GitHub отозван. Подключитесь снова, чтобы продолжить ревью запросов на слияние в мобильном приложении.",
-      "description": "Подключите аккаунт GitHub, чтобы проводить ревью запросов на слияние в мобильном приложении.",
-      "gitlabDescription": "Подключите аккаунт GitLab, чтобы просматривать запросы на слияние с мобильного.",
-      "bitbucketDescription": "Подключите Bitbucket к этой организации, чтобы просматривать пул-реквесты с мобильного.",
+      "reconnectDescription": "Доступ к вашему аккаунту GitHub отозван.",
+      "gitlabDescription": "Проверка запросов на слияние на телефоне",
       "bitbucketOrgOnlyDescription": "Переключите аккаунт, указанный выше, на организацию, чтобы просматривать её пул-реквесты в Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "В вашем аккаунте пока нет организаций. Пул-реквесты в Bitbucket можно просматривать после того, как вы создадите организацию или присоединитесь к ней.",
+      "gitlabReconnectAdminOnlyDescription": "Попросите Владельца, Администратора или Ответственного за оплату организации подключить его заново.",
+      "bitbucketNotConnectedTitle": "Bitbucket не подключён",
+      "bitbucketAdminOnlyDescription": "Подключить его могут только владельцы организации, администраторы и ответственные за оплату.",
       "contextLine": "Для {{organization}}",
       "contextLinePersonal": "Для личного аккаунта"
     },
@@ -2902,7 +2905,6 @@
     "entry": {
       "noRecentPrs": "Нет недавних ревью",
       "noRecentPrsDescription": "Вставьте ссылку выше, чтобы начать ревью. В следующий раз оно появится здесь.",
-      "couldNotLoad": "Не удалось загрузить данные.",
       "removeFromRecentsTitle": "Удалить из недавних?",
       "removeFromRecentsMessage": "Это ревью будет удалено из списка недавних.",
       "removeRecentAccessibility": "Удалить {{repo}} из недавних",
@@ -3035,6 +3037,7 @@
     "installKiloGitHubApp": "Установить приложение Kilo для GitHub",
     "merge": {
       "merge": "Объединение",
+      "mergeTitle": "Объединение",
       "mergeNow": "Выполнить слияние сейчас",
       "mergePullRequest": "Слияние запроса",
       "mergeTermTitle": "Слить {{term}}",
@@ -3961,6 +3964,7 @@
       "markSecret": "Отметить как секретное",
       "masked": "Скрытое значение",
       "reveal": "Раскрыть ценность",
+      "hide": "Скрыть ценность",
       "newValuePlaceholder": "Введите новое секретное значение",
       "valuePlaceholder": "Секретное значение (зашифровано)"
     },
@@ -4091,7 +4095,8 @@
       "nameRequired": "Введите имя команды",
       "nameInvalid": "Имя должно начинаться со строчной буквы и использовать только строчные буквы, цифры и тире.",
       "templateRequired": "Введите шаблон команды",
-      "nameConflict": "Это имя зарезервировано встроенной командой"
+      "nameConflict": "Это имя зарезервировано встроенной командой",
+      "duplicateName": "Команда с таким именем уже существует в этом профиле"
     },
     "repoBindings": {
       "title": "Профили по умолчанию для репозиториев",
@@ -4100,7 +4105,7 @@
       "emptyDescription": "Добавьте значение по умолчанию для автоматического применения профиля при запуске сеансов репозитория.",
       "repo": "Выберите репозиторий…",
       "profile": "Выберите профиль",
-      "remove": "Отвязать",
+      "removeForRepo": "Отвязать {{repo}}",
       "search": "Поиск в репозиториях…",
       "addedToast": "Профиль по умолчанию установлен для «{{repo}}»",
       "addFailed": "Не удалось установить профиль по умолчанию",

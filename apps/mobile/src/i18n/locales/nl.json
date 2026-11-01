@@ -69,6 +69,7 @@
     "organization": "Organisatie",
     "platform": "Codeplatform",
     "prReview": "PR-beoordeling",
+    "prReviewSubtitle": "PR's op je mobiel beoordelen",
     "queued": "In de wachtrij",
     "remove": "Verwijderen",
     "repository": "Coderepository",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "Automatische PR-beoordelingen",
     "securityAgentSubtitle": "Kwetsbaarheden vinden en verhelpen",
     "reviews": "Beoordelingen",
-    "prReviewSubtitle": "PR's op je mobiel beoordelen",
     "couldNotLoadOrganization": "De organisatie kon niet worden geladen.",
     "couldNotLoadOrganizationDescription": "De organisatie- en agentinstellingen zijn pas beschikbaar nadat de organisatie is geladen.",
     "linkedAccounts": "Gekoppelde accounts",
@@ -343,7 +343,8 @@
     "liveUpdates": "Live-updates",
     "liveUpdateSubtitle": "Actieve agents in je meldingen tonen",
     "push": "Pushmeldingen",
-    "onDescription": "Pushmeldingen staan aan voor dit apparaat.",
+    "deviceTitle": "Pushmeldingen op dit apparaat",
+    "onDescription": "Meldingen volgen de categorieën hieronder.",
     "offDescription": "Toestemming voor meldingen ontbreekt of de apparaatregistratie is uitgeschakeld.",
     "retryPermission": "Toestemming voor meldingen opnieuw controleren",
     "enable": "Meldingen inschakelen",
@@ -888,7 +889,9 @@
     "instructions": {
       "title": "Eigen instructies",
       "deprecation": "De functie voor aangepaste instructies wordt op termijn uitgefaseerd. Verplaats deze richtlijnen naar een REVIEW.md-bestand in je repository.",
-      "placeholder": "bijvoorbeeld: onze afspraken over foutafhandeling controleren…"
+      "placeholder": "bijvoorbeeld: onze afspraken over foutafhandeling controleren…",
+      "clearTitle": "Eigen instructies verwijderen?",
+      "clearMessage": "Door een leeg veld op te slaan worden de eigen instructies verwijderd die voor deze reviewer zijn opgeslagen."
     },
     "repos": {
       "unavailable": "De repositories zijn niet beschikbaar. Voltooi het instellen van Bitbucket op kilo.ai.",
@@ -924,7 +927,9 @@
     "followReviewMd": "REVIEW.md volgen",
     "followReviewMdSubtitle": "Volg de REVIEW.md-instructiebestanden per repository",
     "manualReview": {
-      "connectProviderDescription": "Koppel GitHub om een handmatige review van een PR te starten.",
+      "invalidMergeRequestUrl": "Voer een geldige URL van een merge request in.",
+      "mergeRequestUrl": "URL van de merge request",
+      "instructionsAtLimit": "Instructies zijn beperkt tot {{max}} tekens",
       "couldNotCheckProviderStatus": "De platformstatus kon niet worden gecontroleerd.",
       "couldNotLoadProviders": "Je gekoppelde platformen konden niet worden geladen. Probeer het opnieuw.",
       "instructions": "Instructies (optioneel)",
@@ -962,7 +967,7 @@
       "bitbucketError": "Het instellen van Bitbucket kon niet worden geopend. Probeer het opnieuw."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} door {{author}}",
+      "byline": "#{{number}} door {{author}}",
       "cancelMessage": "Dit stopt de lopende codereview.",
       "cancelReview": "Review annuleren",
       "cancelTitle": "Review annuleren?",
@@ -1077,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "Alle aandachtspunten",
-      "customInstructions": "Eigen instructies",
       "focusAreas": "Aandachtspunten",
       "nSelected": "{{displayCount}} geselecteerd",
       "proposedReviewMdGuidance": "Voorgestelde REVIEW.md-richtlijnen",
       "reviewStyle": "Beoordelingsstijl",
-      "set": "Ingesteld"
+      "set": "Ingesteld",
+      "notSet": "Niet ingesteld"
     },
     "updateFailed": "De beoordelaar kon niet worden bijgewerkt.",
     "configSaveFailed": "De reviewinstellingen konden niet worden opgeslagen.",
@@ -1151,7 +1156,8 @@
       "sortSeverityDesc": "Ernst: van hoog naar laag",
       "sortSlaDue": "SLA-deadline",
       "statusIgnored": "Genegeerd",
-      "statusOpen": "Open"
+      "statusOpen": "Open",
+      "noRepositories": "Nog geen repositories gesynchroniseerd of geselecteerd. Kies ze in de instellingen van de Beveiligingsagent."
     },
     "analysis": {
       "analyzeRepository": "Repository analyseren",
@@ -1289,10 +1295,10 @@
       "noOpenFindings": "Geen open bevindingen die aandacht vragen",
       "noRepositoryData": "Nog geen repositorygegevens",
       "noRepositoryDataDescription": "De prioriteiten per repository verschijnen zodra de bevindingen zijn gesynchroniseerd.",
-      "noSlaDeadline": "Geen SLA-deadline ingesteld",
       "notExploitable": "Niet misbruikbaar",
       "notMeasured": "Niet gemeten",
       "notYetSynced": "Nog niet gesynchroniseerd",
+      "priorityFindingsPending": "De prioritaire bevindingen verschijnen na de eerste synchronisatie.",
       "refreshFailed": "Vernieuwen is mislukt. Je ziet de laatst gesynchroniseerde gegevens.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "{{displayCount}} open",
@@ -1344,7 +1350,6 @@
       "alreadyResolvedDescription": "Deze bevinding is al opgelost en kan niet meer worden afgewezen.",
       "cannotDismissDescription": "Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen bevindingen afwijzen.",
       "cannotDismissTitle": "Deze bevinding kan niet worden afgewezen",
-      "commentAccessibility": "Toelichting bij de afwijzing",
       "commentLabel": "Opmerking (optioneel)",
       "commentPlaceholder": "Toelichting bij deze afwijzing…",
       "couldNotCheckPermissions": "Je rechten om bevindingen af te wijzen konden niet worden gecontroleerd.",
@@ -1367,7 +1372,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Gedetecteerd",
-      "dismissedBecause": "Deze bevinding is afgewezen: {{reason}}.",
+      "dismissedOn": "Genegeerd op",
+      "supersededOn": "Vervangen op",
       "ghsa": "GHSA",
       "manifest": "Manifestbestand",
       "noPatchAvailable": "Geen patch beschikbaar",
@@ -1384,11 +1390,6 @@
       "vulnerableVersions": "Kwetsbare versies",
       "statusOpen": "Open",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "er wordt al aan een oplossing gewerkt",
-      "reasonNoBandwidth": "er is geen capaciteit beschikbaar",
-      "reasonTolerableRisk": "het risico is aanvaardbaar",
-      "reasonInaccurate": "de bevinding is onjuist",
-      "reasonNotUsed": "kwetsbare code wordt niet gebruikt",
       "reasonAfterReview": "na beoordeling"
     },
     "findingList": {
@@ -1418,7 +1419,6 @@
       "newFindingSection": "Meldingen over nieuwe bevindingen",
       "newFindingSeverityLabel": "Minimale ernst voor meldingen over nieuwe bevindingen",
       "newFindingSubtitle": "Je ontvangt een e-mail zodra een nieuwe bevinding wordt gesynchroniseerd, ook bij de eerste synchronisatie.",
-      "slaLeadTimeAccessibility": "Aantal dagen voor de SLA-deadline waarop je een waarschuwing ontvangt",
       "slaLeadTimeError": "Voer een geheel aantal dagen in tussen 1 en 365.",
       "slaLeadTimeLabel": "Dagen voor de SLA-deadline waarschuwen",
       "slaPersonalTitle": "E-mails met SLA-waarschuwingen ontvangen",
@@ -1482,8 +1482,7 @@
       "on": "Aan",
       "repositoriesCount": "{{displayCount}} coderepository's geselecteerd",
       "repositoriesCount_other": "{{displayCount}} coderepository's geselecteerd",
-      "repositoriesCount_one": "{{displayCount}} repository geselecteerd",
-      "selectRepositoriesSubtitle": "Kies welke repositories de Beveiligingsagent bewaakt"
+      "repositoriesCount_one": "{{displayCount}} repository geselecteerd"
     },
     "settingsSave": {
       "saveChanges": "Wijzigingen opslaan",
@@ -1504,7 +1503,7 @@
       "enterWholeNumber": "Voer een geheel getal in tussen 1 en 365",
       "high": "Hoog",
       "highDescription": "Risico op een groot datalek.",
-      "invalidDayCount": "voer een geheel aantal dagen in tussen 1 en 365.",
+      "invalidDayCount": "Voer een geheel aantal dagen in tussen 1 en 365.",
       "low": "Laag",
       "lowDescription": "Minimale gevolgen voor de beveiliging.",
       "medium": "Gemiddeld",
@@ -1534,7 +1533,10 @@
       "settleFailed": "De actie is voltooid, maar we konden het resultaat niet vastleggen. Probeer het opnieuw.",
       "replayFailed": "Deze actie is niet voltooid. Probeer het opnieuw.",
       "actionFailed": "Deze actie kon niet worden voltooid. Probeer het opnieuw.",
-      "actionBlocked": "Deze actie kon niet worden voltooid. Het probleem moet eerst worden opgelost."
+      "actionBlocked": "Deze actie kon niet worden voltooid. Het probleem moet eerst worden opgelost.",
+      "syncNoRepositories": "Geen repositories in het synchronisatiebereik. Kies de repositories die de Beveiligingsagent bewaakt en synchroniseer daarna opnieuw.",
+      "syncIntegrationInactive": "De GitHub-koppeling voor de Beveiligingsagent is niet actief. Verbind de Kilo GitHub-app opnieuw en synchroniseer daarna opnieuw.",
+      "syncMissingPermission": "De Kilo GitHub-app kan geen kwetsbaarheidsalerts lezen. Verleen die machtiging in GitHub en synchroniseer daarna opnieuw."
     },
     "analysisState": {
       "queued": "Analyse in de wachtrij",
@@ -1568,7 +1570,6 @@
       "closedOn": "{{status}} op {{date}}",
       "deadlineNotSet": "Deadline niet ingesteld",
       "noSlaDeadline": "Geen SLA-deadline",
-      "dueOn": "Deadline: {{date}}",
       "overdueNow": "Deadline overschreden",
       "overdue_one": "Deadline {{count}} dag overschreden",
       "overdue_other": "{{count}} dagen te laat",
@@ -1842,13 +1843,14 @@
       "forkFilesUnchangedOnComputer": "Bestanden op deze computer worden niet gewijzigd.",
       "pickProfile": "Kies een profiel",
       "noProfile": "Geen profiel",
+      "defaultProfileResolvesTo": "Verwijst naar {{name}}",
+      "defaultProfileResolvesToAccessibility": "Standaardprofiel: {{name}}",
       "manageProfiles": "Beheer profielen",
       "noProfiles": "Nog geen profielen. Maak er een om omgevingsvariabelen, MCP-servers en vaardigheden toe te voegen.",
       "advancedConfig": "Geavanceerde configuratie",
       "advancedConfigDescription": "Geldt voor deze sessie. Opslaan als profiel bewaart het voor de volgende keer.",
       "saveAsProfile": "Opslaan als profiel",
       "saveProfileDescription": "Sla de huidige omgevingsvariabelen en installatieopdrachten op als een herbruikbaar profiel.",
-      "profileSummary": "{{vars}} omgevingsvariabelen · {{commands}} installatieopdrachten",
       "profileSaved": "Profiel \"{{name}}\" opgeslagen",
       "organizationProfiles": "Organisatieprofielen",
       "personalProfiles": "Persoonlijke profielen",
@@ -2622,7 +2624,7 @@
     "couldNotSaveChoice": "Je keuze kon niet worden opgeslagen. Probeer het opnieuw.",
     "onlineAllowed": "Online, toegestaan",
     "onlineNotAllowed": "Online, niet toegestaan",
-    "optionalReview": "Optioneel — je kunt dit op elk moment wijzigen in de instellingen",
+    "optionalReview": "Optioneel",
     "optionalOnboarding": "Optioneel — aan, tenzij je het uitschakelt",
     "aiProvidersWhat": "Je prompts, gespreksgeschiedenis en alle bestanden die je bijvoegt.",
     "aiProvidersWhy": "Om AI-antwoorden te genereren.",
@@ -2709,12 +2711,13 @@
       "checkFailedTitleBitbucket": "De Bitbucket-verbinding kon niet worden gecontroleerd.",
       "providerCheckFailedMessage": "De verbindingsstatus is pas beschikbaar zodra het laden is voltooid.",
       "reconnectTitle": "GitHub opnieuw verbinden",
-      "reconnectDescription": "De toegang tot je GitHub-account is ingetrokken. Maak opnieuw verbinding om PR's op je telefoon te blijven beoordelen.",
-      "description": "Koppel je GitHub-account om PR's op je telefoon te beoordelen.",
-      "gitlabDescription": "Koppel je GitLab-account om merge requests op je telefoon te beoordelen.",
-      "bitbucketDescription": "Koppel Bitbucket aan deze organisatie om PR's op je telefoon te beoordelen.",
+      "reconnectDescription": "De toegang tot je GitHub-account is ingetrokken.",
+      "gitlabDescription": "Merge requests op je mobiel beoordelen",
       "bitbucketOrgOnlyDescription": "Wissel het account hierboven naar een organisatie om diens Bitbucket-PR's te beoordelen.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Dit account heeft nog geen organisaties. Je kunt Bitbucket-PR's beoordelen zodra je een organisatie aanmaakt of er lid van wordt.",
+      "gitlabReconnectAdminOnlyDescription": "Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om het opnieuw te koppelen.",
+      "bitbucketNotConnectedTitle": "Bitbucket is niet gekoppeld",
+      "bitbucketAdminOnlyDescription": "Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen.",
       "contextLine": "Voor {{organization}}",
       "contextLinePersonal": "Voor je persoonlijke account"
     },
@@ -2828,7 +2831,6 @@
     "entry": {
       "noRecentPrs": "Geen recente beoordelingen",
       "noRecentPrsDescription": "Plak hierboven een koppeling om een beoordeling te starten — deze verschijnt de volgende keer hier.",
-      "couldNotLoad": "Het laden is mislukt.",
       "removeFromRecentsTitle": "Uit recente items verwijderen?",
       "removeFromRecentsMessage": "Deze beoordeling wordt uit je recente items verwijderd.",
       "removeRecentAccessibility": "{{repo}} uit recente items verwijderen",
@@ -2947,6 +2949,7 @@
     "installKiloGitHubApp": "Kilo GitHub-app installeren",
     "merge": {
       "merge": "Samenvoegen",
+      "mergeTitle": "Samenvoegen",
       "mergeNow": "Nu samenvoegen",
       "mergePullRequest": "PR samenvoegen",
       "mergeTermTitle": "{{term}} samenvoegen",
@@ -3849,21 +3852,22 @@
       "markSecret": "Markeer als geheim",
       "masked": "Verborgen waarde",
       "reveal": "Onthul waarde",
+      "hide": "Verberg waarde",
       "newValuePlaceholder": "Voer een nieuwe geheime waarde in",
       "valuePlaceholder": "Geheime waarde (versleuteld)"
     },
     "variablesEmpty": "Nog geen variabelen",
     "variablesSaveFailed": "Kan variabele niet opslaan",
     "commandsTitle": "Instelopdrachten",
-    "addCommand": "Commando toevoegen",
-    "commandLabel": "Commando",
-    "commandLabelPosition": "Commando {{position}}",
+    "addCommand": "Opdracht toevoegen",
+    "commandLabel": "Opdracht",
+    "commandLabelPosition": "Opdracht {{position}}",
     "commandPlaceholder": "bijv. pnpm install",
-    "commandAtLimit": "Het commando is beperkt tot {{max}} tekens",
+    "commandAtLimit": "De opdracht is beperkt tot {{max}} tekens",
     "commandsEmpty": "Nog geen installatieopdrachten",
     "commandsSaveFailed": "Kan installatieopdrachten niet opslaan",
-    "moveCommandUp": "Commando {{position}} omhoog verplaatsen",
-    "moveCommandDown": "Commando {{position}} omlaag verplaatsen",
+    "moveCommandUp": "Opdracht {{position}} omhoog verplaatsen",
+    "moveCommandDown": "Opdracht {{position}} omlaag verplaatsen",
     "skillsTitle": "Vaardigheden",
     "addSkill": "Vaardigheid toevoegen",
     "skillNameLabel": "Vaardigheidsnaam",
@@ -3977,7 +3981,8 @@
       "nameRequired": "Voer een opdrachtnaam in",
       "nameInvalid": "De naam moet beginnen met een kleine letter en mag alleen kleine letters, cijfers en streepjes bevatten",
       "templateRequired": "Voer een opdrachtsjabloon in",
-      "nameConflict": "Die naam is gereserveerd door een ingebouwd commando"
+      "nameConflict": "Die naam is gereserveerd door een ingebouwd commando",
+      "duplicateName": "Er bestaat al een opdracht met deze naam in dit profiel"
     },
     "repoBindings": {
       "title": "Standaardprofielen voor repo's",
@@ -3986,7 +3991,7 @@
       "emptyDescription": "Voeg een standaard toe om automatisch een profiel toe te passen bij het starten van sessies voor een opslagplaats.",
       "repo": "Selecteer opslagplaats…",
       "profile": "Selecteer profiel",
-      "remove": "Ontbinden",
+      "removeForRepo": "{{repo}} ontbinden",
       "search": "Zoek opslagplaatsen…",
       "addedToast": "Standaardprofiel ingesteld op \"{{repo}}\"",
       "addFailed": "Kan standaardprofiel niet instellen",
@@ -4007,7 +4012,7 @@
     },
     "variablesDeleteFailed": "Kan variabele niet verwijderen",
     "deleteVariable": "Variabele {{key}} verwijderen",
-    "deleteCommand": "Commando {{position}} verwijderen"
+    "deleteCommand": "Opdracht {{position}} verwijderen"
   },
   "credits": {
     "title": "Credits kopen",

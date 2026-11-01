@@ -134,7 +134,11 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
       ? slaNotificationWarningDays
       : (baseline?.slaNotificationWarningDays ?? slaNotificationWarningDays),
   };
-  const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
+  // Same split as the SLA screen: the save payload falls back to the saved
+  // lead time, while the back guard reads the draft the user can see so an
+  // invalid-only edit is not silently classified as clean.
+  const draft = slaNotificationsEnabled ? { ...patch, slaNotificationWarningDays } : patch;
+  const dirty = baseline !== null && getSettingsDirtyState(baseline, draft, valid) !== 'clean';
   useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
   const handleSave = async () => {
@@ -145,7 +149,12 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
     dirty,
     valid,
-    onSave: handleSave,
+    // These screens never ask a destructive question of their own: a save
+    // here always persists.
+    onSave: async () => {
+      await handleSave();
+      return 'saved';
+    },
   });
 
   const severityOptions = NOTIFICATION_SEVERITY_OPTIONS.map(option => ({
@@ -169,6 +178,12 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   if (!config.data.isEnabled && !dirty) {
     // Keep a dirty draft and its controls usable if the redirect is cancelled.
     return <>{dialog}</>;
+  }
+  // The draft hydrates from the config in an effect; painting the body first
+  // would show the default toggles and then push every control below them down
+  // when their pickers appear.
+  if (baseline === null) {
+    return <NotificationSettingsSkeleton />;
   }
 
   return (
@@ -204,109 +219,113 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('securityAgent.notifications.newFindingSection')}
           </Text>
-          <ToggleRow
-            title={
-              personal
-                ? t('securityAgent.notifications.newFindingPersonalTitle')
-                : t('securityAgent.notifications.emailOwners')
-            }
-            accessibilityLabel={
-              personal
-                ? undefined
-                : formatList(
-                    [
-                      t('securityAgent.notifications.newFindingSection'),
-                      t('securityAgent.notifications.emailOwners'),
-                    ],
-                    i18n.language
-                  )
-            }
-            subtitle={t('securityAgent.notifications.newFindingSubtitle')}
-            value={newFindingNotificationsEnabled}
-            disabled={!canManage}
-            onValueChange={setNewFindingNotificationsEnabled}
-          />
-          {newFindingNotificationsEnabled && (
-            <PillGroup
-              label={t('securityAgent.notifications.newFindingSeverityLabel')}
-              options={severityOptions}
-              value={newFindingNotificationMinSeverity}
+          <View className="gap-2">
+            <ToggleRow
+              title={
+                personal
+                  ? t('securityAgent.notifications.newFindingPersonalTitle')
+                  : t('securityAgent.notifications.emailOwners')
+              }
+              accessibilityLabel={
+                personal
+                  ? undefined
+                  : formatList(
+                      [
+                        t('securityAgent.notifications.newFindingSection'),
+                        t('securityAgent.notifications.emailOwners'),
+                      ],
+                      i18n.language
+                    )
+              }
+              subtitle={t('securityAgent.notifications.newFindingSubtitle')}
+              value={newFindingNotificationsEnabled}
               disabled={!canManage}
-              onChange={setNewFindingNotificationMinSeverity}
+              onValueChange={setNewFindingNotificationsEnabled}
             />
-          )}
+            {newFindingNotificationsEnabled && (
+              <PillGroup
+                label={t('securityAgent.notifications.newFindingSeverityLabel')}
+                options={severityOptions}
+                value={newFindingNotificationMinSeverity}
+                disabled={!canManage}
+                onChange={setNewFindingNotificationMinSeverity}
+              />
+            )}
+          </View>
         </View>
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('securityAgent.notifications.slaSection')}
           </Text>
-          <ToggleRow
-            title={
-              personal
-                ? t('securityAgent.notifications.slaPersonalTitle')
-                : t('securityAgent.notifications.emailOwners')
-            }
-            accessibilityLabel={
-              personal
-                ? undefined
-                : formatList(
-                    [
-                      t('securityAgent.notifications.slaSection'),
-                      t('securityAgent.notifications.emailOwners'),
-                    ],
-                    i18n.language
-                  )
-            }
-            subtitle={t('securityAgent.notifications.slaSubtitle')}
-            value={slaNotificationsEnabled}
-            disabled={!canManage}
-            onValueChange={setSlaNotificationsEnabled}
-          />
-          {slaNotificationsEnabled && (
-            <>
-              <PillGroup
-                label={t('securityAgent.notifications.slaSeverityLabel')}
-                options={severityOptions}
-                value={slaNotificationMinSeverity}
-                disabled={!canManage}
-                onChange={setSlaNotificationMinSeverity}
-              />
-              <View className="gap-2">
-                <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-                  {t('securityAgent.notifications.slaLeadTimeLabel')}
-                </Text>
-                <Input
-                  accessibilityLabel={t('securityAgent.notifications.slaLeadTimeAccessibility')}
-                  accessibilityHint={
-                    isValidDayCount(slaNotificationWarningDays)
-                      ? undefined
-                      : t('securityAgent.sla.enterWholeNumber')
-                  }
-                  className={cn(
-                    'rounded-lg bg-secondary pl-3 pr-3 text-sm text-foreground',
-                    !canManage && 'opacity-50'
-                  )}
-                  editable={canManage}
-                  keyboardType="number-pad"
-                  defaultValue={warningDaysRef.current}
-                  placeholderTextColor={colors.mutedForeground}
-                  onChangeText={text => {
-                    warningDaysRef.current = text;
-                    const value = parseLocalizedNumber(text, i18n.language);
-                    setSlaNotificationWarningDays(
-                      value !== null && Number.isInteger(value) ? value : Number.NaN
-                    );
-                  }}
+          <View className="gap-2">
+            <ToggleRow
+              title={
+                personal
+                  ? t('securityAgent.notifications.slaPersonalTitle')
+                  : t('securityAgent.notifications.emailOwners')
+              }
+              accessibilityLabel={
+                personal
+                  ? undefined
+                  : formatList(
+                      [
+                        t('securityAgent.notifications.slaSection'),
+                        t('securityAgent.notifications.emailOwners'),
+                      ],
+                      i18n.language
+                    )
+              }
+              subtitle={t('securityAgent.notifications.slaSubtitle')}
+              value={slaNotificationsEnabled}
+              disabled={!canManage}
+              onValueChange={setSlaNotificationsEnabled}
+            />
+            {slaNotificationsEnabled && (
+              <>
+                <PillGroup
+                  label={t('securityAgent.notifications.slaSeverityLabel')}
+                  options={severityOptions}
+                  value={slaNotificationMinSeverity}
+                  disabled={!canManage}
+                  onChange={setSlaNotificationMinSeverity}
                 />
-                {!isValidDayCount(slaNotificationWarningDays) && (
-                  <Text className="text-xs text-destructive">
-                    {t('securityAgent.notifications.slaLeadTimeError')}
+                <View className="gap-1.5">
+                  <Text className="text-sm font-medium text-muted-foreground">
+                    {t('securityAgent.notifications.slaLeadTimeLabel')}
                   </Text>
-                )}
-              </View>
-            </>
-          )}
+                  <Input
+                    accessibilityLabel={t('securityAgent.notifications.slaLeadTimeLabel')}
+                    accessibilityHint={
+                      isValidDayCount(slaNotificationWarningDays)
+                        ? undefined
+                        : t('securityAgent.sla.enterWholeNumber')
+                    }
+                    className={cn(
+                      'rounded-lg bg-secondary pl-3 pr-3 text-sm text-foreground',
+                      !canManage && 'opacity-50'
+                    )}
+                    editable={canManage}
+                    keyboardType="number-pad"
+                    defaultValue={warningDaysRef.current}
+                    placeholderTextColor={colors.mutedForeground}
+                    onChangeText={text => {
+                      warningDaysRef.current = text;
+                      const value = parseLocalizedNumber(text, i18n.language);
+                      setSlaNotificationWarningDays(
+                        value !== null && Number.isInteger(value) ? value : Number.NaN
+                      );
+                    }}
+                  />
+                  {!isValidDayCount(slaNotificationWarningDays) && (
+                    <Text className="text-xs text-destructive">
+                      {t('securityAgent.notifications.slaLeadTimeError')}
+                    </Text>
+                  )}
+                </View>
+              </>
+            )}
+          </View>
         </View>
       </TabScreenScrollView>
       {dialog}

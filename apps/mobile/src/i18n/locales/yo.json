@@ -69,6 +69,7 @@
     "organization": "Àjọ",
     "platform": "Pẹpẹ̀",
     "prReview": "Àtúnyẹ̀wò PR",
+    "prReviewSubtitle": "Ṣe àtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan kóòdù lórí fóònù",
     "queued": "Wà ní ìlà ìdúró",
     "remove": "Yọ kúrò",
     "repository": "Ibi ìpamọ́ kóòdù",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "Àtúnyẹ̀wò PR láìfọwọ́yí",
     "securityAgentSubtitle": "Wá àwọn àlàfo ààbò kí o sì ṣàtúnṣe wọn",
     "reviews": "Àwọn àtúnyẹ̀wò",
-    "prReviewSubtitle": "Ṣe àtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan kóòdù lórí fóònù",
     "couldNotLoadOrganization": "A kò lè gbé àjọ wọlé.",
     "couldNotLoadOrganizationDescription": "Àwọn ètò àjọ àti aṣojú kò ní wà lárọ̀ọ́wọ́tó títí a ó fi gbé èyí wọlé.",
     "linkedAccounts": "Àwọn àkọọ́lẹ̀ tí a sopọ̀",
@@ -330,7 +330,7 @@
       "diffTooLarge": "ìyàtọ̀ náà tóbi jù",
       "openFile": "Ṣí {{path}}",
       "openFileViewed": "Ṣí {{path}} (a ti wò ó)",
-      "title": "Fáìlì"
+      "title": "Àwọn fáìlì"
     },
     "fileRows": {
       "markViewed": "Sàmì sí {{path}} pé o ti wò ó",
@@ -403,6 +403,7 @@
     "connectionExpired": "Àkókò ìsopọ̀ GitHub ti parí.",
     "merge": {
       "merge": "Àkópọ̀",
+      "mergeTitle": "Àkópọ̀",
       "mergeNow": "Dà pọ̀ báyìí",
       "mergePullRequest": "Ìdàpọ̀ ìbéèrè ìṣọ̀kan",
       "mergeTermTitle": "Da {{term}} pọ̀",
@@ -605,7 +606,6 @@
     "entry": {
       "noRecentPrs": "Kò sí àtúnyẹ̀wò àìpẹ́",
       "noRecentPrsDescription": "Lẹ̀ mọ́ ọ̀nà àsopọ̀ lókè láti bẹ̀rẹ̀ àtúnyẹ̀wò — yóò fara hàn níbí nígbà mìíràn.",
-      "couldNotLoad": "A kò lè ṣàkójọ rẹ̀.",
       "removeFromRecentsTitle": "Yọ kúrò nínú àkójọ àìpẹ́?",
       "removeFromRecentsMessage": "A ó yọ àtúnyẹ̀wò yìí kúrò nínú àwọn àìpẹ́ rẹ.",
       "removeRecentAccessibility": "Yọ {{repo}} kúrò nínú àkójọ àìpẹ́",
@@ -679,12 +679,13 @@
       "checkFailedTitleBitbucket": "A kò lè ṣàyẹ̀wò àsopọ̀ Bitbucket.",
       "providerCheckFailedMessage": "Ipò ìsopọ̀ kò wà títí èyí yóò fi gbé wọlé.",
       "reconnectTitle": "Àtúnsopọ̀ GitHub",
-      "reconnectDescription": "A ti fagilé àsopọ̀ GitHub rẹ. Tún sopọ̀ láti máa ṣe àtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan lórí fóònù.",
-      "description": "So àkọọ́lẹ̀ GitHub rẹ pọ̀ láti ṣe àtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan lórí fóònù.",
-      "gitlabDescription": "So àkọọ́lẹ̀ GitLab rẹ pọ̀ láti ṣàtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan lórí fónù.",
-      "bitbucketDescription": "So Bitbucket pọ̀ mọ́ àjọ yìí láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ lórí fónù.",
+      "reconnectDescription": "A ti fagilé àsopọ̀ GitHub rẹ.",
+      "gitlabDescription": "Ṣe àtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan lórí fóònù",
       "bitbucketOrgOnlyDescription": "Yí àkọọ́lẹ̀ tí ó wà lókè padà sí àjọ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket rẹ̀.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Àkọọ́lẹ̀ yìí kò tíì ní àjọ rárá. A ó lè ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket nígbà tí o bá dá àjọ sílẹ̀ tàbí darapọ̀ mọ́ àjọ kan.",
+      "gitlabReconnectAdminOnlyDescription": "Ẹ bẹ̀ Ẹni tó ni àjọ, Alákòóso, tàbí Olùṣàkóso ìsanwó kí wọ́n tún so ó pọ̀.",
+      "bitbucketNotConnectedTitle": "A kò tíì so Bitbucket pọ̀",
+      "bitbucketAdminOnlyDescription": "Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀.",
       "contextLine": "Fún {{organization}}",
       "contextLinePersonal": "Fún ti ara ẹni"
     },
@@ -759,7 +760,7 @@
     },
     "tabs": {
       "overview": "Àkópọ̀",
-      "files": "Fáìlì",
+      "files": "Àwọn fáìlì",
       "discussion": "Ìjíròrò"
     },
     "fileStatus": {
@@ -834,7 +835,8 @@
     "liveUpdates": "Àwọn ìmúdójúìwọ̀n lẹ́sẹ̀kẹsẹ̀",
     "liveUpdateSubtitle": "Fi àwọn aṣojú tó ń ṣiṣẹ́ hàn nínú àwọn ìfitónilétí rẹ",
     "push": "Ìfitónilétí sí ẹ̀rọ",
-    "onDescription": "Ìfitónilétí sí ẹ̀rọ ti tàn fún ẹ̀rọ yìí.",
+    "deviceTitle": "Ìfitónilétí lórí ẹ̀rọ yìí",
+    "onDescription": "Ìkìlọ̀ ń tẹ̀lé àwọn ẹ̀ka tó wà nísàlẹ̀.",
     "offDescription": "Ìyọ̀ǹda tàbí ìforúkọsílẹ̀ ẹ̀rọ ti wà ní pípa.",
     "retryPermission": "Gbìyànjú láti tún ìyọ̀ǹda ìfitónilétí ṣàyẹ̀wò",
     "enable": "Tan ìfitónilétí",
@@ -1019,7 +1021,7 @@
     "attachmentPicker": {
       "takePhoto": "Ya fọ́tò",
       "photoLibrary": "Àkójọpọ̀ fọ́tò",
-      "files": "Fáìlì",
+      "files": "Àwọn fáìlì",
       "cameraAccessMessage": "Gba lílo kámẹ́rà láyè nínú àwọn ètò kí o lè ya fọ́tò."
     },
     "typingIndicator": {
@@ -1417,7 +1419,9 @@
     "instructions": {
       "title": "Àwọn ìtọ́sọ́nà àdáni",
       "deprecation": "A ń gbèrò láti dá àwọn ìtọ́sọ́nà àdáni dúró. Gbé àwọn ìlànà wọ̀nyí sínú fáìlì REVIEW.md nínú ibi ìpamọ́ rẹ dípò rẹ̀.",
-      "placeholder": "àpẹẹrẹ: Tẹ̀lé àwọn ìlànà wa fún bí a ṣe ń bójú tó àṣìṣe…"
+      "placeholder": "àpẹẹrẹ: Tẹ̀lé àwọn ìlànà wa fún bí a ṣe ń bójú tó àṣìṣe…",
+      "clearTitle": "Ṣé kí a yọ àwọn ìtọ́sọ́nà àdáni kúrò?",
+      "clearMessage": "Fífi àyè tó ṣòfó pamọ́ yóò pa àwọn ìtọ́sọ́nà àdáni tí a fi pamọ́ fún olùṣàyẹ̀wò yìí run."
     },
     "repos": {
       "unavailable": "Àwọn ibi ìpamọ́ kò sí — parí ìṣètò Bitbucket lórí kilo.ai.",
@@ -1452,7 +1456,7 @@
       "fixSettings": "Ṣàtúnṣe àwọn ètò",
       "couldNotLoad": "A kò lè gbé àtúnyẹ̀wò wọlé.",
       "couldNotGetLatest": "A kò lè gba dátà tuntun.",
-      "byline": "{{repo}} #{{number}} láti ọwọ́ {{author}}",
+      "byline": "#{{number}} láti ọwọ́ {{author}}",
       "noFindings": "Kò sí àbùkù.",
       "findingsUnavailable": "Àwọn àbájáde kò sí nítorí pé àtúnyẹ̀wò yìí kùnà.",
       "findingsInProgress": "Àtúnyẹ̀wò yìí ń tẹ̀ síwájú sì. Àwọn àbùkù yóò fara hàn níbí nígbà tí ó bá parí.",
@@ -1533,11 +1537,13 @@
       "offAction": "A ti pa ìrántí àtúnyẹ̀wò. Mú un ṣiṣẹ́, kí o sì gbìyànjú lẹ́ẹ̀kan si."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Tẹ URL ìbéèrè ìṣọ̀kan tó tọ́ sí i.",
+      "mergeRequestUrl": "URL ìbéèrè ìṣọ̀kan",
+      "instructionsAtLimit": "Àlàyé naa ní ààlà {{max}} àmì",
       "title": "Àtúnyẹ̀wò tí o bẹ̀rẹ̀ fúnra rẹ",
       "invalidUrl": "Tẹ URL ìbéèrè àkópọ̀ tó tọ́ sí i.",
       "couldNotCheckProviderStatus": "A kò lè ṣàyẹ̀wò ipò olùpèsè.",
       "couldNotLoadProviders": "A kò lè gbé àwọn olùpèsè tí o ti so pọ̀ wọlé. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
-      "connectProviderDescription": "So GitHub pọ̀ láti bẹ̀rẹ̀ àtúnyẹ̀wò ìbéèrè àkópọ̀ fúnra rẹ.",
       "pullRequestUrl": "URL ìbéèrè àkópọ̀",
       "instructions": "Àwọn ìtọ́sọ́nà (kò pọn dandan)",
       "instructionsPlaceholder": "Ohun pàtó tí olùṣàtúnyẹ̀wò gbọdọ̀ dojú kọ…",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "Ọ̀nà àtúnyẹ̀wò",
       "focusAreas": "Àwọn apá ìfọkànsí",
       "allAreas": "Gbogbo apá",
-      "customInstructions": "Àwọn ìtọ́sọ́nà àdáni",
       "set": "A ti ṣètò rẹ̀",
+      "notSet": "A kò ṣètò",
       "nSelected": "{{displayCount}} tí a yàn",
       "proposedReviewMdGuidance": "Ìtọ́sọ́nà REVIEW.md tí a dábàá"
     },
@@ -1680,7 +1686,8 @@
       "sortSeverityDesc": "Ìwọ̀n ewu: gíga sí kékeré",
       "sortSeverityAsc": "Ìwọ̀n ewu: kékeré sí gíga",
       "sortSlaDue": "Ọjọ́ ìparí SLA",
-      "overdueOnly": "Tí ọjọ́ ìparí ti kọjá nìkan"
+      "overdueOnly": "Tí ọjọ́ ìparí ti kọjá nìkan",
+      "noRepositories": "A kò tíì mú àwọn ibi ìpamọ́ kóòdù dọ́gba tàbí yan wọ́n. Yan wọ́n nínú ètó Aṣojú ààbò."
     },
     "automation": {
       "title": "Ìṣiṣẹ́ aládàáṣiṣẹ́",
@@ -1765,7 +1772,6 @@
       "noImmediateAction": "Kò nílò ìgbésẹ̀ lẹ́sẹ̀kẹsẹ̀",
       "notExploitable": "A kò lè lò fún ìkọlù",
       "needsYourReview": "Nílò àtúnyẹ̀wò rẹ",
-      "noSlaDeadline": "A kò tíì yan ọjọ́ ìparí SLA",
       "noRepositoryData": "Kò sí dátà ibi ìpamọ́ síbẹ̀",
       "noRepositoryDataDescription": "Àwọn ibi ìpamọ́ tí a gbọdọ̀ kọ́kọ́ bójú tó yóò hàn lẹ́yìn tí a bá mú àwọn àbùkù ṣiṣẹ́pọ̀.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
@@ -1783,6 +1789,7 @@
       "lastSynced": "Ìmúṣiṣẹ́pọ̀ tó kẹ́yìn: {{time}}",
       "manageRepositories": "Ṣàkóso àwọn ibi ìpamọ́",
       "notYetSynced": "A kò tíì mú ṣiṣẹ́pọ̀",
+      "priorityFindingsPending": "Àwọn àbùkù pàtàkì yóò hàn lẹ́yìn tí a bá ti mú wọn ṣiṣẹ́pọ̀ lẹ́kẹ̀kọ̀",
       "refreshFailed": "A kò lè sọ dátà di tuntun — dátà ìmúṣiṣẹ́pọ̀ tó kẹ́yìn ni a ń fi hàn.",
       "settings": "Àwọn ètò",
       "syncNow": "Mú ṣiṣẹ́pọ̀ báyìí",
@@ -1828,7 +1835,6 @@
       "reasonInaccurate": "Àwárí náà kò péye",
       "reasonNotUsed": "A kò lo kóòdù tó ní àbùkù ààbò",
       "commentLabel": "Ọ̀rọ̀ ìwòye (kò pọn dandan)",
-      "commentAccessibility": "Ọ̀rọ̀ ìwòye nípa ìkọ̀sílẹ̀",
       "commentPlaceholder": "Àlàyé sí i nípa ìkọ̀sílẹ̀ yìí…",
       "notFoundTitle": "A kò rí àwárí náà",
       "notFoundDescription": "Ó ṣeé ṣe kí a ti yọ àbùkù yìí kúrò, tàbí kí o má ní àṣẹ láti wọlé sí i mọ́.",
@@ -1841,7 +1847,8 @@
     "findingDetails": {
       "supersededBy": "Àbùkù tuntun ti rọ́pò rẹ̀",
       "supersededByDescription": "Tẹ̀ ẹ́ láti ṣí àkọsílẹ̀ tuntun fún ipò, ìtúpalẹ̀ àti àtúnṣe.",
-      "dismissedBecause": "A kọ̀ ọ́ sílẹ̀ nítorí {{reason}}.",
+      "dismissedOn": "A ti kọ̀ sílẹ̀ ní",
+      "supersededOn": "A ti fi òmíràn rọ́pò rẹ̀ ní",
       "severityLabel": "ìwọ̀n ewu: {{severity}}",
       "package": "Àkójọpọ̀ sọ́fitiwia",
       "vulnerableVersions": "Àwọn ẹ̀yà tó ní àbùkù ààbò",
@@ -1858,11 +1865,6 @@
       "viewAdvisory": "Wo ìkìlọ̀ ààbò lórí GitHub",
       "statusOpen": "Ṣí",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "a ti bẹ̀rẹ̀ àtúnṣe tẹ́lẹ̀",
-      "reasonNoBandwidth": "kò sí àkókò fún un",
-      "reasonTolerableRisk": "a lè fara da ewu náà",
-      "reasonInaccurate": "àwárí náà kò péye",
-      "reasonNotUsed": "a kò lo kóòdù tó ní àbùkù ààbò",
       "reasonAfterReview": "lẹ́yìn àtúnyẹ̀wò"
     },
     "settingsOverview": {
@@ -1872,7 +1874,6 @@
       "repositoriesCount_one": "ibi ìpamọ́ {{displayCount}} tí a yàn",
       "repositoriesCount": "A ti yan ibi ìpamọ́ kóòdù {{displayCount}}",
       "repositoriesCount_other": "A ti yan ibi ìpamọ́ kóòdù {{displayCount}}",
-      "selectRepositoriesSubtitle": "Yan àwọn ibi ìpamọ́ tí Aṣojú ààbò ń bójú tó",
       "analysisModeSubtitle": "ìtúpalẹ̀ {{mode}}",
       "automationAllOff": "Gbogbo rẹ̀ ti pa",
       "automationCount": "{{displayCount}} nínú 3 ń ṣiṣẹ́",
@@ -1923,7 +1924,7 @@
       "highDescription": "Ó ṣeé ṣe kí dátà pàtàkì farahàn sí ẹni tí kò ní àṣẹ.",
       "mediumDescription": "Ipa tó ní ààlà tàbí tó dá lórí àwọn ipò pàtó.",
       "lowDescription": "Ipa kékeré lórí ààbò.",
-      "invalidDayCount": "lo odindi nọ́ńbà ọjọ́ láàárín 1 àti 365.",
+      "invalidDayCount": "Lo odindi nọ́ńbà ọjọ́ láàárín 1 àti 365.",
       "remediationDeadlineA11y": "Ọjọ́ ìparí àtúnṣe {{label}}, ní iye ọjọ́",
       "enterWholeNumber": "Tẹ nọ́ńbà odidi láàárín 1 àti 365 sí i",
       "permissionNote": "Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè yí àwọn ètò wọ̀nyí padà.",
@@ -2015,7 +2016,6 @@
       "newFindingSection": "Ìfitónilétí àbùkù tuntun",
       "newFindingSeverityLabel": "Ìwọ̀n ewu tó kéré jù fún àbùkù tuntun",
       "newFindingSubtitle": "A máa ń fi ránṣẹ́ nígbàkúgbà tí a bá mú àbùkù tuntun ṣiṣẹ́pọ̀, títí kan ìmúṣiṣẹ́pọ̀ àkọ́kọ́.",
-      "slaLeadTimeAccessibility": "Iye ọjọ́ ṣáájú ọjọ́ ìparí SLA fún ìkìlọ̀",
       "slaLeadTimeError": "Tẹ odindi nọ́ńbà ọjọ́ láàárín 1 àti 365 sí i.",
       "slaLeadTimeLabel": "Ìkìlọ̀ ṣáájú ọjọ́ ìparí SLA (iye ọjọ́)",
       "slaPersonalTitle": "Fi ímeèlì ránṣẹ́ sí mi nípa àwọn ìkìlọ̀ SLA",
@@ -2063,7 +2063,10 @@
       "settleFailed": "A ti parun iṣẹ́ náà, ṣùgbọ́n a kò lè ṣàkósílẹ̀ èrè rẹ̀. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "replayFailed": "Iṣẹ́ yìí kò parun. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "actionFailed": "A kò lè parun iṣẹ́ yìí. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
-      "actionBlocked": "A kò lè parun iṣẹ́ yìí. Ìṣòro yìí gbọ́dọ̀ túnsẹ̀ kí a tó lè gbìyànjú lẹ́ẹ̀kan sí i."
+      "actionBlocked": "A kò lè parun iṣẹ́ yìí. Ìṣòro yìí gbọ́dọ̀ túnsẹ̀ kí a tó lè gbìyànjú lẹ́ẹ̀kan sí i.",
+      "syncNoRepositories": "Kò sí àwọn ibi ìpamọ́ kóòdù kankan nínú ààlà ìmúdọ́gba. Yan àwọn ibi ìpamọ́ tí Aṣojú ààbò ń bójú tó, kí o sì tún mú dọ́gba.",
+      "syncIntegrationInactive": "Ìsopọ̀ GitHub fún Aṣojú ààbò kò ṣiṣẹ́. Tún ṣe ìsopọ̀ Kilo GitHub App, kí o sì tún mú dọ́gba.",
+      "syncMissingPermission": "Kilo GitHub App kò lè ka vulnerability alerts. Fún ní àṣẹ yẹn ní GitHub, kí o sì tún mú dọ́gba."
     },
     "analysisState": {
       "queued": "Ìtúpalẹ̀ wà ní ìlà ìdúró",
@@ -2097,7 +2100,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "A kò tíì ṣètò ọjọ́ ìparí",
       "noSlaDeadline": "Kò sí ọjọ́ ìparí SLA",
-      "dueOn": "Ọjọ́ ìparí: {{date}}",
       "overdueNow": "Ọjọ́ ìparí ti kọjá",
       "overdue_other": "Ọjọ́ ìparí ti kọjá ní ọjọ́ {{count}}",
       "dueToday": "Ọjọ́ ìparí dé lónìí",
@@ -2371,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "Àwọn fáìlì tó wà lórí kọ̀ǹpútà yìí kò ní yípadà.",
       "pickProfile": "Yan profaili kan",
       "noProfile": "Ko si profaili",
+      "defaultProfileResolvesTo": "O da sí {{name}}",
+      "defaultProfileResolvesToAccessibility": "profaili aiyipada: {{name}}",
       "manageProfiles": "Ṣakoso awọn profaili",
       "noProfiles": "Ko si awọn profaili sibẹsibẹ. Ṣẹda ọkan lati ṣafikun awọn oniyipada ayika, awọn olupin MCP, ati awọn ọgbọn.",
       "advancedConfig": "To ti ni ilọsiwaju iṣeto ni",
       "advancedConfigDescription": "Ó kan ìpàdé yìí. Fífipamọ́ gẹ́gẹ́ bi profaili yóò pa á mọ́ fún ìgbà tó ń bọ̀.",
       "saveAsProfile": "Fipamọ bi Profaili",
       "saveProfileDescription": "Ṣafipamọ awọn oniyipada ayika lọwọlọwọ ati awọn pipaṣẹ iṣeto bi profaili atunlo.",
-      "profileSummary": "{{vars}} awọn oniyipada ayika · {{commands}} Awọn aṣẹ iṣeto",
       "profileSaved": "Profaili \"{{name}}\" ti fipamọ",
       "organizationProfiles": "Awọn profaili Ajo",
       "personalProfiles": "Awọn profaili ti ara ẹni",
@@ -2768,7 +2771,7 @@
     "attachmentPicker": {
       "camera": "Kámẹ́rà",
       "photoLibrary": "Àkójọpọ̀ fọ́tò",
-      "files": "Fáìlì",
+      "files": "Àwọn fáìlì",
       "couldNotOpenPhotoPicker": "A kò lè ṣí ààyè yíyan àwòrán. Tún Kilo bẹ̀rẹ̀ kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
       "maxFilesAllowed": "Fáìlì {{displayCount}} ni ó pọ̀ jù tí o lè fi kún un.",
       "onlyAddingFiles": "Ń fi fáìlì {{accepted}} nínú {{total}} kún un nìkan (ó pọ̀ jù: {{max}})",
@@ -3151,7 +3154,7 @@
     "couldNotSaveChoice": "A kò lè fi àṣàyàn rẹ pamọ́. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
     "onlineAllowed": "Lórí ayélujára, a yọ̀ǹda",
     "onlineNotAllowed": "Lórí ayélujára, a kò yọ̀ǹda",
-    "optionalReview": "Kì í ṣe dandan — o lè yí èyí padà nígbàkigbà nínú Àwọn ètò",
+    "optionalReview": "Kì í ṣe dandan",
     "optionalOnboarding": "Kì í ṣe dandan — ó ti tàn àyàfi tí o bá pa á",
     "aiProvidersWhat": "Àwọn ọ̀rọ̀ ìtọ́ni rẹ, ìtàn ìjíròrò àti fáìlì èyíkéyìí tí o so mọ́ ọn.",
     "aiProvidersWhy": "Láti ṣe àwọn ìdáhùn AI.",
@@ -3849,6 +3852,7 @@
       "markSecret": "Samisi bi asiri",
       "masked": "Iye farasin",
       "reveal": "Iye ifihan",
+      "hide": "Fi iye pamọ́",
       "newValuePlaceholder": "Tẹ iye asiri tuntun sii",
       "valuePlaceholder": "Iye asiri (ti a fi pamọ́)"
     },
@@ -3977,7 +3981,8 @@
       "nameRequired": "Tẹ orukọ aṣẹ sii",
       "nameInvalid": "Orukọ gbọdọ bẹrẹ pẹlu lẹta kekere ati lo awọn lẹta kekere nikan, awọn nọmba, ati dashes",
       "templateRequired": "Tẹ awoṣe aṣẹ sii",
-      "nameConflict": "Orukọ yẹn wa ni ipamọ nipasẹ aṣẹ ti a ṣe sinu"
+      "nameConflict": "Orukọ yẹn wa ni ipamọ nipasẹ aṣẹ ti a ṣe sinu",
+      "duplicateName": "Aṣẹ miiran ti o ni orukọ yẹn wa ninu profaili yii tẹlẹ"
     },
     "repoBindings": {
       "title": "Awọn profaili Aiyipada fun Repos",
@@ -3986,7 +3991,7 @@
       "emptyDescription": "Ṣafikun aiyipada lati kan profaili laifọwọyi nigbati o bẹrẹ awọn akoko fun atunto kan.",
       "repo": "Yan ibi ipamọ…",
       "profile": "Yan profaili",
-      "remove": "Yọọ",
+      "removeForRepo": "Yọ {{repo}} kúrò",
       "search": "Ṣewadii awọn ibi ipamọ…",
       "addedToast": "Eto profaili aiyipada fun \"{{repo}}\"",
       "addFailed": "Ko le ṣeto profaili aiyipada",

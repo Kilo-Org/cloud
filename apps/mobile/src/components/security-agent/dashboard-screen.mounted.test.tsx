@@ -2,12 +2,11 @@
 
 // Dashboard sync-control terminal-state contract: a non-retryable sync outcome
 // (missing-configuration rejection, persistence failure) ends the intent — the
-// hook rotates the operation key, so both sync controls ("Sync now" header
-// button and the "Sync findings" empty-state action) must disable and the
-// inline copy must explain the state. The hook maps every failure onto catalog
-// copy before it reaches the screen, so the banner renders the mapped message;
-// these cases feed the real mapper's output.
-// Retryable failures keep both controls enabled so the user can retry under the
+// hook rotates the operation key, so the header's "Sync now" control must
+// disable and the inline copy must explain the state. The hook maps every
+// failure onto catalog copy before it reaches the screen, so the banner renders
+// the mapped message; these cases feed the real mapper's output.
+// Retryable failures keep the control enabled so the user can retry under the
 // same hoisted key.
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -15,6 +14,7 @@ import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as SecurityAgentModule from '@kilocode/app-shared/security-agent';
 import { i18n } from '@/i18n';
 import {
   mapSecuritySyncOperationError,
@@ -44,6 +44,7 @@ const RECONCILE_COPY = vi.hoisted(
 
 const triggerSync = vi.hoisted(() => ({
   mutate: vi.fn(),
+  reset: vi.fn(),
   isPending: false,
   isError: false,
   error: null as Error | null,
@@ -61,6 +62,7 @@ const dashboardStats = vi.hoisted(() => ({
 const lastSync = vi.hoisted(() => ({
   data: undefined as { lastSyncTime?: string | null } | undefined,
   isError: false,
+  isPending: false,
   refetch: vi.fn(),
 }));
 const repositories = vi.hoisted(() => ({
@@ -119,6 +121,17 @@ const focusEffect = vi.hoisted(() => ({
   effect: undefined as (() => void) | undefined,
 }));
 
+// The dashboard navigates to the repository settings from a precondition row.
+const router = vi.hoisted(() => ({ push: vi.fn() }));
+
+// The GitHub handoff the dashboard renders for a connection precondition. The
+// real hook opens a browser; the suite owns only what the row does with it.
+const manageAccess = vi.hoisted(() => ({
+  handlePress: vi.fn(),
+  pending: false,
+  onReturn: undefined as ((opened: boolean) => void) | undefined,
+}));
+
 // Captures the refresh control element the dashboard passes to the scroll view.
 const tabScreen = vi.hoisted(() => ({
   refreshControl: undefined as unknown,
@@ -140,6 +153,12 @@ const sectionsProps = vi.hoisted(() => ({
   props: [] as { data?: unknown; slaEnabled?: boolean; neverSynced?: boolean }[],
 }));
 
+// Captures the sections placeholder's props, so a test can assert the loading
+// state stands in for the cards the same owner renders.
+const sectionsSkeletonProps = vi.hoisted(() => ({
+  props: [] as { slaEnabled?: boolean; neverSynced?: boolean }[],
+}));
+
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
   View: 'View',
@@ -152,9 +171,19 @@ vi.mock('@/components/ui/icons', () => ({
   ShieldAlert: 'ShieldAlert',
 }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => router,
   useFocusEffect: (effect: () => void) => {
     focusEffect.effect = effect;
+  },
+}));
+vi.mock('@/lib/hooks/use-manage-repository-access', () => ({
+  useManageRepositoryAccess: (
+    _scope: string,
+    _platform: string,
+    handlers?: { onReturn?: (opened: boolean) => void }
+  ) => {
+    manageAccess.onReturn = handlers?.onReturn;
+    return { handlePress: manageAccess.handlePress, pending: manageAccess.pending };
   },
 }));
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({
@@ -207,17 +236,21 @@ vi.mock('@/components/security-agent/security-command-retry-card', () => ({
     return null;
   },
 }));
-vi.mock('@kilocode/app-shared/security-agent', () => ({
-  buildSecurityDashboardMetrics: sharedMetrics.build,
-  getAnalysisIncompleteCount: (analysis: {
-    triageComplete: number;
-    analyzing: number;
-    notAnalyzed: number;
-    failed: number;
-  }) => analysis.triageComplete + analysis.analyzing + analysis.notAnalyzed + analysis.failed,
-  getSecurityRepositoriesInScope: () => [],
-  isPersonalSecurityScope: (scope: string) => scope === 'personal',
-}));
+vi.mock('@kilocode/app-shared/security-agent', async importOriginal => {
+  const actual = await importOriginal<typeof SecurityAgentModule>();
+  return {
+    ...actual,
+    buildSecurityDashboardMetrics: sharedMetrics.build,
+    getAnalysisIncompleteCount: (analysis: {
+      triageComplete: number;
+      analyzing: number;
+      notAnalyzed: number;
+      failed: number;
+    }) => analysis.triageComplete + analysis.analyzing + analysis.notAnalyzed + analysis.failed,
+    getSecurityRepositoriesInScope: () => [],
+    isPersonalSecurityScope: (scope: string) => scope === 'personal',
+  };
+});
 vi.mock('@/lib/security-agent', () => ({
   getSecurityAgentPath: (scope: string, section: string) => `/security/${scope}/${section}`,
 }));
@@ -255,6 +288,10 @@ vi.mock('@/components/security-agent/audit-report-button', () => ({
 vi.mock('@/components/security-agent/dashboard-sections', () => ({
   DashboardSections: (props: { data?: unknown; slaEnabled?: boolean; neverSynced?: boolean }) => {
     sectionsProps.props.push(props);
+    return null;
+  },
+  DashboardSectionsSkeleton: (props: { slaEnabled?: boolean }) => {
+    sectionsSkeletonProps.props.push(props);
     return null;
   },
 }));
@@ -299,7 +336,6 @@ function dashboardTree(scope = 'personal', memberships?: unknown[]): ReactElemen
     createElement(DashboardScreen, { scope })
   );
 }
-
 function syncButtons(root: I): I[] {
   const syncNow = i18n.t('securityAgent.dashboard.syncNow');
   return root.findAll(
@@ -336,14 +372,15 @@ function syncDisabledStates(root: I): boolean[] {
   return syncButtons(root).map(n => n.props.disabled as boolean);
 }
 
-// The one Button the dashboard renders on its own: the retry beside a failed
-// sync's copy. Every other failure renders through the shared retry card.
-function syncRetries(root: I): I[] {
+// The one Button the dashboard renders on its own: the retry or the fix action
+// beside a failed sync's copy. Every other failure renders through the shared
+// retry card.
+function syncFailureActions(root: I): I[] {
   return root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Button');
 }
 
 function pressSyncRetry(root: I): void {
-  const retry = syncRetries(root)[0];
+  const retry = syncFailureActions(root)[0];
   if (!retry) {
     throw new Error('no sync retry control rendered');
   }
@@ -361,6 +398,19 @@ function renderedTexts(root: I): string[] {
         typeof n.props.children === 'string'
     )
     .map(n => n.props.children as string);
+}
+
+/**
+ * A manual-sync rejection from the real server contract: `PRECONDITION_FAILED`
+ * carrying the stable `upstreamCode` the mobile ledger maps onto catalog copy.
+ * The literals are the wire values both sides share.
+ */
+function preconditionError(upstreamCode: string): Error {
+  return mapSecuritySyncOperationError(
+    Object.assign(new Error('server sentence the device cannot translate'), {
+      data: { code: 'PRECONDITION_FAILED', upstreamCode },
+    })
+  );
 }
 
 function dashboardMetric(id: string) {
@@ -426,9 +476,14 @@ describe('DashboardScreen before the first sync', () => {
 describe('DashboardScreen sync control terminal states', () => {
   beforeEach(() => {
     triggerSync.mutate.mockClear();
+    triggerSync.reset.mockClear();
     triggerSync.isPending = false;
     triggerSync.isError = false;
     triggerSync.error = null;
+    router.push.mockClear();
+    manageAccess.handlePress.mockClear();
+    manageAccess.pending = false;
+    manageAccess.onReturn = undefined;
     config.data = { slaEnabled: true };
     dashboardStats.isLoading = false;
     dashboardStats.isPending = false;
@@ -517,8 +572,8 @@ describe('DashboardScreen sync control terminal states', () => {
     );
     const root = renderScreen();
 
-    expect(syncRetries(root.root)).toHaveLength(1);
-    expect(syncRetries(root.root)[0]?.props.loading).toBe(false);
+    expect(syncFailureActions(root.root)).toHaveLength(1);
+    expect(syncFailureActions(root.root)[0]?.props.loading).toBe(false);
 
     pressSyncRetry(root.root);
 
@@ -571,14 +626,14 @@ describe('DashboardScreen sync control terminal states', () => {
       root.update(dashboardTree());
     });
 
-    expect(syncRetries(root.root)).toHaveLength(1);
-    expect(syncRetries(root.root)[0]?.props.loading).toBe(true);
+    expect(syncFailureActions(root.root)).toHaveLength(1);
+    expect(syncFailureActions(root.root)[0]?.props.loading).toBe(true);
     expect(renderedTexts(root.root)).toContain(
       i18n.t('securityAgent.mutations.serviceUnavailable')
     );
     // The pressed control keeps its own spinner visible, and the sentence it is
     // retrying steps back so it does not read as a fresh failure.
-    expect(syncRetries(root.root)[0]?.props.className).toContain('opacity-100');
+    expect(syncFailureActions(root.root)[0]?.props.className).toContain('opacity-100');
     const message = root.root.findAll(
       n =>
         typeof n.type === 'string' &&
@@ -604,7 +659,7 @@ describe('DashboardScreen sync control terminal states', () => {
       root.update(dashboardTree());
     });
 
-    expect(syncRetries(root.root)).toHaveLength(0);
+    expect(syncFailureActions(root.root)).toHaveLength(0);
     expect(renderedTexts(root.root)).not.toContain(
       i18n.t('securityAgent.mutations.serviceUnavailable')
     );
@@ -615,7 +670,117 @@ describe('DashboardScreen sync control terminal states', () => {
     triggerSync.error = mapSecuritySyncOperationError(new Error(CONFIGURATION_ERROR_MESSAGE));
     const root = renderScreen();
 
-    expect(syncRetries(root.root)).toHaveLength(0);
+    expect(syncFailureActions(root.root)).toHaveLength(0);
+  });
+
+  it('names a rejection with no repository in scope and opens the repository picker', () => {
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_no_repositories');
+    const root = renderScreen();
+
+    expect(syncDisabledStates(root.root)).toEqual([true]);
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.mutations.syncNoRepositories')
+    );
+    expect(renderedTexts(root.root)).not.toContain(i18n.t('securityAgent.mutations.actionBlocked'));
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+
+    pressSyncRetry(root.root);
+
+    expect(router.push).toHaveBeenCalledWith('/security/personal/settings/repositories');
+    expect(manageAccess.handlePress).not.toHaveBeenCalled();
+  });
+
+  it('names a broken GitHub connection and hands the reader to the GitHub App page', () => {
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_missing_permission');
+    const root = renderScreen();
+
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.mutations.syncMissingPermission')
+    );
+    expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.repositories.manageAccess'));
+
+    pressSyncRetry(root.root);
+
+    expect(manageAccess.handlePress).toHaveBeenCalledTimes(1);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('lets the sync control work again when the dashboard regains focus after a rejection', () => {
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_no_repositories');
+    const root = renderScreen();
+    expect(syncDisabledStates(root.root)).toEqual([true]);
+
+    // Returning from the settings screen: a changed repository selection is a
+    // new intent, so the rejection that described the old one no longer holds.
+    act(() => {
+      focusEffect.effect?.();
+    });
+    expect(triggerSync.reset).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      triggerSync.isError = false;
+      triggerSync.error = null;
+      root.update(dashboardTree('personal'));
+    });
+
+    expect(syncDisabledStates(root.root)).toEqual([false]);
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.mutations.syncNoRepositories')
+    );
+  });
+
+  it('lets the sync control work again when the GitHub handoff returns', () => {
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_integration_inactive');
+    const root = renderScreen();
+    expect(syncDisabledStates(root.root)).toEqual([true]);
+
+    act(() => {
+      manageAccess.onReturn?.(true);
+    });
+    expect(triggerSync.reset).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      triggerSync.isError = false;
+      triggerSync.error = null;
+      root.update(dashboardTree('personal'));
+    });
+
+    expect(syncDisabledStates(root.root)).toEqual([false]);
+  });
+
+  it('keeps the precondition copy when the GitHub handoff never opened a page', () => {
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_integration_inactive');
+    const root = renderScreen();
+
+    act(() => {
+      manageAccess.onReturn?.(false);
+    });
+
+    expect(triggerSync.reset).not.toHaveBeenCalled();
+    expect(syncDisabledStates(root.root)).toEqual([true]);
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.mutations.syncIntegrationInactive')
+    );
+  });
+
+  it('keeps the controls down on focus for a terminal failure that is not a precondition', () => {
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(new Error(CONFIGURATION_ERROR_MESSAGE));
+    const root = renderScreen();
+
+    act(() => {
+      focusEffect.effect?.();
+    });
+
+    expect(triggerSync.reset).not.toHaveBeenCalled();
+    expect(syncDisabledStates(root.root)).toEqual([true]);
   });
 
   it('keeps the last risk breakdown on screen while a sync failure is shown', () => {
@@ -887,13 +1052,10 @@ describe('buildLocalizedMetrics', () => {
     const metrics = buildLocalizedMetrics(data, true, true);
 
     // Zero counts and the line that read the zeros as a clean report both
-    // became a dash and the screen's own not-yet-synced state.
+    // became a dash; the filter row above the tiles states the not-yet-synced
+    // status once, so a tile keeps no detail line to repeat it.
     expect(metrics.map(metric => metric.value)).toEqual(['—', '—', '—']);
-    expect(metrics.map(metric => metric.detail)).toEqual([
-      i18n.t('securityAgent.dashboard.notYetSynced'),
-      i18n.t('securityAgent.dashboard.notYetSynced'),
-      i18n.t('securityAgent.dashboard.notYetSynced'),
-    ]);
+    expect(metrics.map(metric => metric.detail)).toEqual(['', '', '']);
     expect(metrics.every(metric => metric.tone === 'neutral')).toBe(true);
   });
 
@@ -1172,6 +1334,35 @@ describe('DashboardScreen pending stats', () => {
     },
   };
 
+  // Each case decides for itself whether the sync-status read has settled.
+  beforeEach(() => {
+    lastSync.isPending = false;
+    lastSync.data = undefined;
+    config.data = { slaEnabled: true };
+    sectionsProps.props = [];
+    sectionsSkeletonProps.props = [];
+  });
+
+  /**
+   * The line boxes the loading state paints: three per metric tile, or two
+   * once the sync-status read has said the tiles carry no detail line.
+   */
+  function skeletonBars(root: I): I[] {
+    return root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton');
+  }
+
+  /** Every view carrying the metric card's frame, placeholder or loaded. */
+  function tileFrames(root: I): string[] {
+    return root
+      .findAll(
+        n =>
+          typeof n.type === 'string' &&
+          (n.type as string) === 'View' &&
+          String(n.props.className ?? '').includes('rounded-lg bg-secondary p-3')
+      )
+      .map(n => String(n.props.className));
+  }
+
   it('paints the metric skeleton while a paused stats read is still pending', () => {
     // A NetInfo-paused read is pending without fetching, so `isLoading` is
     // false. The body must still show its loading state instead of an empty
@@ -1183,12 +1374,33 @@ describe('DashboardScreen pending stats', () => {
 
     const root = renderScreen();
 
-    expect(
-      root.root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton')
-    ).toHaveLength(4);
+    expect(tileFrames(root.root)).toHaveLength(4);
+    expect(skeletonBars(root.root)).toHaveLength(12);
     expect(renderedTexts(root.root)).not.toContain(
       i18n.t('securityAgent.dashboardMetrics.openFindings')
     );
+  });
+
+  it('draws the pending tiles in the frame the loaded cards use', () => {
+    // The placeholder's height comes from the card's own frame and three line
+    // boxes; a hand-sized bar is what made the tiles taller than the cards they
+    // replaced.
+    dashboardStats.isPending = true;
+    dashboardStats.data = undefined;
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+    const pending = tileFrames(renderScreen().root);
+
+    dashboardStats.isPending = false;
+    dashboardStats.data = resolvedData;
+    sharedMetrics.build.mockReturnValue(
+      ['openFindings', 'exploitable', 'needsReview', 'analysisIncomplete'].map(id =>
+        Object.assign(dashboardMetric(id), { label: id })
+      )
+    );
+    const loaded = tileFrames(renderScreen().root);
+
+    expect(loaded).toHaveLength(4);
+    expect(new Set(pending)).toEqual(new Set(loaded));
   });
 
   it('replaces the skeleton with the metric once the read resolves', () => {
@@ -1199,11 +1411,112 @@ describe('DashboardScreen pending stats', () => {
 
     const root = renderScreen();
 
-    expect(
-      root.root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton')
-    ).toHaveLength(0);
+    expect(skeletonBars(root.root)).toHaveLength(0);
     expect(renderedTexts(root.root)).toContain(
       i18n.t('securityAgent.dashboardMetrics.openFindings')
     );
+  });
+
+  // `neverSynced` decides whether a tile carries a detail line, so a tile drawn
+  // before that read settles would shrink by a line the moment it resolves and
+  // move everything below it. The tiles wait for the read instead, and the
+  // section cards wait with them: they render below the tiles only once both
+  // reads settle, so their placeholders hold that space until then.
+  it('keeps the tiles in the skeleton state while the sync-status read is pending', () => {
+    dashboardStats.isPending = false;
+    dashboardStats.data = resolvedData;
+    lastSync.isPending = true;
+    lastSync.data = undefined;
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+
+    expect(skeletonBars(root.root)).toHaveLength(12);
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboardMetrics.openFindings')
+    );
+    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, neverSynced: false }]);
+    expect(sectionsProps.props).toHaveLength(0);
+  });
+
+  it('paints the tiles and the link a never-synced scope loads once that read has answered', () => {
+    // The tiles wait for the sync-status read, and a scope that has never
+    // synced drops their detail line and shows the Manage repositories link
+    // under them. When the stats read outlasts that read, the placeholder
+    // already knows both shapes and must hold them: a three-line placeholder
+    // and a missing link moved every card below when the reads resolved.
+    dashboardStats.isPending = true;
+    dashboardStats.data = undefined;
+    lastSync.isPending = false;
+    lastSync.data = { lastSyncTime: null };
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+    const bars = skeletonBars(root.root);
+
+    expect(tileFrames(root.root)).toHaveLength(4);
+    // Four two-line tiles, then the link's own box.
+    expect(bars).toHaveLength(9);
+    expect(bars.at(-1)?.props.className).toContain('min-h-[28px]');
+    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, neverSynced: true }]);
+    expect(sectionsProps.props).toHaveLength(0);
+  });
+
+  it('keeps the link out of the placeholder while SLA tracking is off', () => {
+    // The link is the empty state's way to the repositories, and a scope
+    // without SLA tracking has no deadline column to explain: the loaded
+    // screen does not draw it either.
+    config.data = { slaEnabled: false };
+    dashboardStats.isPending = true;
+    dashboardStats.data = undefined;
+    lastSync.isPending = false;
+    lastSync.data = { lastSyncTime: null };
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+
+    expect(skeletonBars(root.root)).toHaveLength(8);
+  });
+
+  it('loads a never-synced scope without the detail line the placeholder dropped', () => {
+    dashboardStats.isPending = false;
+    dashboardStats.data = resolvedData;
+    lastSync.isPending = false;
+    lastSync.data = { lastSyncTime: null };
+    sharedMetrics.build.mockReturnValue(
+      ['openFindings', 'exploitable', 'needsReview', 'analysisIncomplete'].map(id =>
+        Object.assign(dashboardMetric(id), { label: id })
+      )
+    );
+
+    const root = renderScreen();
+
+    expect(skeletonBars(root.root)).toHaveLength(0);
+    expect(tileFrames(root.root)).toHaveLength(4);
+    expect(sectionsProps.props.at(-1)?.neverSynced).toBe(true);
+  });
+
+  it('renders the sections only after the sync-status read settles', () => {
+    dashboardStats.isPending = false;
+    dashboardStats.data = resolvedData;
+    lastSync.isPending = true;
+    lastSync.data = undefined;
+
+    renderScreen();
+
+    expect(sectionsProps.props).toHaveLength(0);
+  });
+
+  it('drops the sections placeholder once the sections render', () => {
+    dashboardStats.isPending = false;
+    dashboardStats.data = resolvedData;
+    lastSync.isPending = false;
+    lastSync.data = { lastSyncTime: '2026-10-01T00:00:00.000Z' };
+
+    const root = renderScreen();
+
+    expect(sectionsProps.props).toHaveLength(1);
+    expect(sectionsSkeletonProps.props).toHaveLength(0);
+    expect(skeletonBars(root.root)).toHaveLength(0);
   });
 });

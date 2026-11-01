@@ -40,6 +40,9 @@ const state = vi.hoisted(() => ({
 export { state };
 
 vi.mock('react-native', () => ({
+  // The commit fields render the shared Input, whose alignment helper reads
+  // `I18nManager.isRTL` on every render.
+  I18nManager: { isRTL: false },
   ScrollView: 'ScrollView',
   View: 'View',
   TextInput: 'TextInput',

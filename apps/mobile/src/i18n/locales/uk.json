@@ -69,6 +69,7 @@
     "organization": "Організація",
     "platform": "Платформа",
     "prReview": "Перевірка PR",
+    "prReviewSubtitle": "Перевірка запитів на злиття на мобільному пристрої",
     "queued": "У черзі",
     "remove": "Видалити",
     "repository": "Репозиторій",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "Автоматичні перевірки PR",
     "securityAgentSubtitle": "Пошук і усунення вразливостей",
     "reviews": "Перевірки",
-    "prReviewSubtitle": "Перевірка запитів на злиття на мобільному пристрої",
     "couldNotLoadOrganization": "Не вдалося завантажити організацію.",
     "couldNotLoadOrganizationDescription": "Налаштування організації та агентів будуть доступні після завантаження даних організації.",
     "linkedAccounts": "Підключені облікові записи",
@@ -305,7 +305,8 @@
     "liveUpdates": "Оновлення в реальному часі",
     "liveUpdateSubtitle": "Показувати активних агентів у сповіщеннях",
     "push": "Пуш-сповіщення",
-    "onDescription": "Пуш-сповіщення на цьому пристрої ввімкнено.",
+    "deviceTitle": "Пуш-сповіщення на цьому пристрої",
+    "onDescription": "Сповіщення залежать від категорій нижче.",
     "offDescription": "Дозвіл на сповіщення не надано або пристрій не зареєстровано.",
     "retryPermission": "Повторити перевірку дозволу на сповіщення",
     "enable": "Увімкнути сповіщення",
@@ -894,7 +895,9 @@
     "instructions": {
       "title": "Власні інструкції",
       "deprecation": "Підтримку власних інструкцій планують припинити. Перенесіть ці настанови у файл REVIEW.md у своєму репозиторії.",
-      "placeholder": "наприклад: дотримуватися наших правил обробки помилок…"
+      "placeholder": "наприклад: дотримуватися наших правил обробки помилок…",
+      "clearTitle": "Видалити власні інструкції?",
+      "clearMessage": "Збереження порожнього поля видалить власні інструкції, збережені для цього рецензента."
     },
     "repos": {
       "unavailable": "Репозиторії недоступні — завершіть налаштування Bitbucket на kilo.ai.",
@@ -930,7 +933,9 @@
     "followReviewMd": "Дотримуватися інструкцій REVIEW.md",
     "followReviewMdSubtitle": "Враховувати файли інструкцій REVIEW.md для кожного репозиторію",
     "manualReview": {
-      "connectProviderDescription": "Підключіть GitHub, щоб запустити перевірку запиту на злиття вручну.",
+      "invalidMergeRequestUrl": "Введіть коректну URL-адресу merge-запиту.",
+      "mergeRequestUrl": "URL-адреса merge-запиту",
+      "instructionsAtLimit": "Інструкції обмежені до {{max}} символів",
       "couldNotCheckProviderStatus": "Не вдалося перевірити стан сервісу.",
       "couldNotLoadProviders": "Не вдалося завантажити список підключених сервісів. Спробуйте ще раз.",
       "instructions": "Інструкції (необов'язково)",
@@ -968,7 +973,7 @@
       "bitbucketError": "Не вдалося відкрити налаштування Bitbucket. Спробуйте ще раз."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} від {{author}}",
+      "byline": "#{{number}} від {{author}}",
       "cancelMessage": "Це зупинить поточну перевірку коду.",
       "cancelReview": "Скасувати перевірку",
       "cancelTitle": "Скасувати перевірку?",
@@ -1083,12 +1088,12 @@
     },
     "overview": {
       "allAreas": "Усі напрями",
-      "customInstructions": "Власні інструкції",
       "focusAreas": "Напрями перевірки",
       "nSelected": "Вибрано: {{displayCount}}",
       "proposedReviewMdGuidance": "Запропоновані настанови для REVIEW.md",
       "reviewStyle": "Стиль перевірки",
-      "set": "Встановлено"
+      "set": "Встановлено",
+      "notSet": "Не встановлено"
     },
     "updateFailed": "Не вдалося оновити налаштування перевірки коду.",
     "configSaveFailed": "Не вдалося зберегти налаштування перевірки.",
@@ -1157,7 +1162,8 @@
       "sortSeverityDesc": "Критичність: від високої до низької",
       "sortSlaDue": "Термін за SLA",
       "statusIgnored": "Проігноровано",
-      "statusOpen": "Відкрито"
+      "statusOpen": "Відкрито",
+      "noRepositories": "Жодного репозиторію ще не синхронізовано або не вибрано. Виберіть їх у налаштуваннях Агента безпеки."
     },
     "analysis": {
       "analyzeRepository": "Проаналізувати репозиторій",
@@ -1299,10 +1305,10 @@
       "noOpenFindings": "Немає відкритих проблем, що потребують уваги",
       "noRepositoryData": "Даних про репозиторії ще немає",
       "noRepositoryDataDescription": "Пріоритети репозиторіїв з'являться після синхронізації проблем.",
-      "noSlaDeadline": "Термін за SLA не встановлено",
       "notExploitable": "Експлуатація неможлива",
       "notMeasured": "Не виміряно",
       "notYetSynced": "Ще не синхронізовано",
+      "priorityFindingsPending": "Пріоритетні проблеми з'являться після першої синхронізації.",
       "refreshFailed": "Не вдалося оновити — показано останні синхронізовані дані.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "Відкриті: {{displayCount}}",
@@ -1370,7 +1376,6 @@
       "alreadyResolvedDescription": "Цю проблему вже закрито, тому відхилити її неможливо.",
       "cannotDismissDescription": "Відхиляти проблеми можуть лише власники організації, адміністратори та менеджери з оплати.",
       "cannotDismissTitle": "Неможливо відхилити цю проблему",
-      "commentAccessibility": "Коментар до відхилення",
       "commentLabel": "Коментар (необов'язково)",
       "commentPlaceholder": "Додаткові відомості про причину відхилення…",
       "couldNotCheckPermissions": "Не вдалося перевірити дозволи на відхилення.",
@@ -1393,7 +1398,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Виявлено",
-      "dismissedBecause": "Відхилено: {{reason}}.",
+      "dismissedOn": "Дата відхилення",
+      "supersededOn": "Дата заміни",
       "ghsa": "GHSA",
       "manifest": "Маніфест",
       "noPatchAvailable": "Виправлення ще немає",
@@ -1410,11 +1416,6 @@
       "vulnerableVersions": "Уразливі версії",
       "statusOpen": "Відкрито",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "виправлення вже розпочато",
-      "reasonNoBandwidth": "немає ресурсів на виправлення",
-      "reasonTolerableRisk": "ризик прийнятний",
-      "reasonInaccurate": "проблему визначено неточно",
-      "reasonNotUsed": "уразливий код не використовується",
       "reasonAfterReview": "після перевірки"
     },
     "findingList": {
@@ -1444,7 +1445,6 @@
       "newFindingSection": "Сповіщення про нові проблеми",
       "newFindingSeverityLabel": "Мінімальна критичність нових проблем",
       "newFindingSubtitle": "Лист надсилається під час синхронізації кожної нової проблеми, зокрема й під час першої синхронізації.",
-      "slaLeadTimeAccessibility": "За скільки днів до терміну за SLA надсилати попередження",
       "slaLeadTimeError": "Введіть ціле число днів від 1 до 365.",
       "slaLeadTimeLabel": "Попереджати за стільки днів до терміну за SLA",
       "slaPersonalTitle": "Надсилати мені попередження щодо SLA поштою",
@@ -1509,7 +1509,6 @@
       "repositoriesCount": "Вибрано репозиторіїв: {{displayCount}}",
       "repositoriesCount_other": "Вибрано репозиторіїв: {{displayCount}}",
       "repositoriesCount_one": "вибрано {{displayCount}} репозиторій",
-      "selectRepositoriesSubtitle": "Виберіть, які репозиторії відстежує Агент безпеки",
       "repositoriesCount_few": "вибрано {{displayCount}} репозиторії",
       "repositoriesCount_many": "вибрано {{displayCount}} репозиторіїв"
     },
@@ -1532,7 +1531,7 @@
       "enterWholeNumber": "Введи ціле число від 1 до 365",
       "high": "Високий",
       "highDescription": "Можливий значний витік даних.",
-      "invalidDayCount": "укажіть цілу кількість днів від 1 до 365.",
+      "invalidDayCount": "Укажіть цілу кількість днів від 1 до 365.",
       "low": "Низький",
       "lowDescription": "Мінімальний вплив на безпеку.",
       "medium": "Середній",
@@ -1562,7 +1561,10 @@
       "settleFailed": "Дію виконано, але ми не змогли записати результат. Спробуйте ще раз.",
       "replayFailed": "Цю дію не виконано. Спробуйте ще раз.",
       "actionFailed": "Не вдалося виконати цю дію. Спробуйте ще раз.",
-      "actionBlocked": "Не вдалося виконати цю дію. Спочатку потрібно усунути проблему."
+      "actionBlocked": "Не вдалося виконати цю дію. Спочатку потрібно усунути проблему.",
+      "syncNoRepositories": "Жодного репозиторію немає в області синхронізації. Виберіть репозиторії, які відстежує Агент безпеки, а потім синхронізуйте ще раз.",
+      "syncIntegrationInactive": "Підключення GitHub для Агента безпеки неактивне. Повторно підключіть застосунок Kilo для GitHub, а потім синхронізуйте ще раз.",
+      "syncMissingPermission": "Застосунок Kilo для GitHub не може читати оповіщення про вразливості. Надайте цей дозвіл у GitHub, а потім синхронізуйте ще раз."
     },
     "analysisState": {
       "queued": "Аналіз у черзі",
@@ -1596,7 +1598,6 @@
       "closedOn": "{{status}}: {{date}}",
       "deadlineNotSet": "Термін не встановлено",
       "noSlaDeadline": "Терміну за SLA немає",
-      "dueOn": "Термін: {{date}}",
       "overdueNow": "Прострочено",
       "overdue_one": "прострочено на {{count}} день",
       "overdue_few": "прострочено на {{count}} дні",
@@ -1878,13 +1879,14 @@
       "forkFilesUnchangedOnComputer": "Файли на цьому комп'ютері не змінюються.",
       "pickProfile": "Виберіть профіль",
       "noProfile": "Без профілю",
+      "defaultProfileResolvesTo": "Відповідає профілю {{name}}",
+      "defaultProfileResolvesToAccessibility": "Профіль за замовчуванням: {{name}}",
       "manageProfiles": "Керувати профілями",
       "noProfiles": "Ще немає профілів. Створіть його, щоб додати змінні середовища, сервери MCP і навички.",
       "advancedConfig": "Розширена конфігурація",
       "advancedConfigDescription": "Діє для цього сеансу. Збереження як профіль залишить його на наступний раз.",
       "saveAsProfile": "Зберегти як профіль",
       "saveProfileDescription": "Збережіть поточні змінні середовища та команди налаштування як багаторазовий профіль.",
-      "profileSummary": "{{vars}} змінні середовища · {{commands}} команди налаштування",
       "profileSaved": "Профіль \"{{name}}\" збережено",
       "organizationProfiles": "Профілі організації",
       "personalProfiles": "Персональні профілі",
@@ -2682,7 +2684,7 @@
     "couldNotSaveChoice": "Не вдалося зберегти ваш вибір. Спробуйте ще раз.",
     "onlineAllowed": "Онлайн, дозволено",
     "onlineNotAllowed": "Онлайн, заборонено",
-    "optionalReview": "Необов'язково — цей вибір можна будь-коли змінити в налаштуваннях",
+    "optionalReview": "Необов'язково",
     "optionalOnboarding": "Необов'язково — увімкнено, але можна вимкнути",
     "aiProvidersWhat": "Ваші запити, історія розмов і будь-які файли, які ви прикріплюєте.",
     "aiProvidersWhy": "Для створення відповідей ШІ.",
@@ -2777,12 +2779,13 @@
       "checkFailedTitleBitbucket": "Не вдалося перевірити підключення до Bitbucket",
       "providerCheckFailedMessage": "Стан підключення недоступний, доки це завантажиться.",
       "reconnectTitle": "Підключити GitHub знову",
-      "reconnectDescription": "Доступ до GitHub відкликано. Підключіться знову, щоб і далі перевіряти запити на злиття в мобільному застосунку.",
-      "description": "Підключіть обліковий запис GitHub, щоб перевіряти запити на злиття в мобільному застосунку.",
-      "gitlabDescription": "Підключіть обліковий запис GitLab, щоб переглядати merge-запити з мобільного.",
-      "bitbucketDescription": "Підключіть Bitbucket до цієї організації, щоб переглядати запити на злиття з мобільного.",
+      "reconnectDescription": "Доступ до GitHub відкликано.",
+      "gitlabDescription": "Перевірка merge-запитів на мобільному пристрої",
       "bitbucketOrgOnlyDescription": "Перемкніть обліковий запис, вказаний вище, на організацію, щоб переглядати її запити на злиття в Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Цей обліковий запис ще не має організацій. Запити на злиття Bitbucket можна переглядати після того, як ви створите організацію або приєднаєтеся до неї.",
+      "gitlabReconnectAdminOnlyDescription": "Попросіть власника організації, адміністратора або менеджера з оплати підключити його.",
+      "bitbucketNotConnectedTitle": "Bitbucket не підключено",
+      "bitbucketAdminOnlyDescription": "Підключити його можуть лише власники організації, адміністратори та менеджери з оплати.",
       "contextLine": "Для {{organization}}",
       "contextLinePersonal": "Для особистого простору"
     },
@@ -2902,7 +2905,6 @@
     "entry": {
       "noRecentPrs": "Немає нещодавніх рев'ю",
       "noRecentPrsDescription": "Щоб розпочати рев'ю, вставте посилання вище — наступного разу воно з'явиться тут.",
-      "couldNotLoad": "Не вдалося завантажити дані.",
       "removeFromRecentsTitle": "Видалити з нещодавніх?",
       "removeFromRecentsMessage": "Це рев'ю буде видалено зі списку нещодавніх.",
       "removeRecentAccessibility": "Видалити {{repo}} з нещодавніх",
@@ -3035,6 +3037,7 @@
     "installKiloGitHubApp": "Установити застосунок Kilo для GitHub",
     "merge": {
       "merge": "Злиття",
+      "mergeTitle": "Злиття",
       "mergeNow": "Виконати злиття",
       "mergePullRequest": "Злиття запиту",
       "mergeTermTitle": "Злити {{term}}",
@@ -3961,6 +3964,7 @@
       "markSecret": "Позначити як секрет",
       "masked": "Прихована цінність",
       "reveal": "Розкрийте значення",
+      "hide": "Приховайте значення",
       "newValuePlaceholder": "Введіть нове секретне значення",
       "valuePlaceholder": "Секретне значення (зашифровано)"
     },
@@ -4091,7 +4095,8 @@
       "nameRequired": "Введіть назву команди",
       "nameInvalid": "Ім’я має починатися з малої літери та використовувати лише малі літери, цифри та тире",
       "templateRequired": "Введіть шаблон команди",
-      "nameConflict": "Це ім’я зарезервовано вбудованою командою"
+      "nameConflict": "Це ім’я зарезервовано вбудованою командою",
+      "duplicateName": "Команда з такою назвою вже існує в цьому профілі"
     },
     "repoBindings": {
       "title": "Профілі за замовчуванням для репозиторіїв",
@@ -4100,7 +4105,7 @@
       "emptyDescription": "Додайте параметр за замовчуванням для автоматичного застосування профілю під час запуску сеансів для репо.",
       "repo": "Виберіть сховище…",
       "profile": "Виберіть профіль",
-      "remove": "Розв'язати",
+      "removeForRepo": "Розв'язати {{repo}}",
       "search": "Пошук у сховищах…",
       "addedToast": "Для \"{{repo}}\" встановлено профіль за умовчанням",
       "addFailed": "Не вдалося встановити профіль за умовчанням",

@@ -69,6 +69,7 @@
     "organization": "Organizacja",
     "platform": "Platforma",
     "prReview": "Przegląd PR",
+    "prReviewSubtitle": "Przeglądaj PR na telefonie",
     "queued": "W kolejce",
     "remove": "Usuń",
     "repository": "Repozytorium",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "Automatyczne przeglądy PR",
     "securityAgentSubtitle": "Znajduj i usuwaj luki w zabezpieczeniach",
     "reviews": "Przeglądy kodu",
-    "prReviewSubtitle": "Przeglądaj PR na telefonie",
     "couldNotLoadOrganization": "Nie udało się wczytać organizacji.",
     "couldNotLoadOrganizationDescription": "Ustawienia organizacji i agentów będą dostępne po wczytaniu danych organizacji.",
     "linkedAccounts": "Połączone konta",
@@ -305,7 +305,8 @@
     "liveUpdates": "Aktualizacje na żywo",
     "liveUpdateSubtitle": "Pokazuj aktywnych agentów w powiadomieniach",
     "push": "Powiadomienia push",
-    "onDescription": "Powiadomienia push są włączone na tym urządzeniu.",
+    "deviceTitle": "Powiadomienia push na tym urządzeniu",
+    "onDescription": "Powiadomienia zależą od kategorii poniżej.",
     "offDescription": "Brakuje zgody na powiadomienia lub rejestracja urządzenia jest wyłączona.",
     "retryPermission": "Sprawdź ponownie uprawnienia do powiadomień",
     "enable": "Włącz powiadomienia",
@@ -894,7 +895,9 @@
     "instructions": {
       "title": "Własne instrukcje",
       "deprecation": "Planowane jest wycofanie obsługi niestandardowych instrukcji. Przenieś te wytyczne do pliku REVIEW.md w swoim repozytorium.",
-      "placeholder": "np. sprawdzaj zgodność z naszymi zasadami obsługi błędów…"
+      "placeholder": "np. sprawdzaj zgodność z naszymi zasadami obsługi błędów…",
+      "clearTitle": "Usunąć własne instrukcje?",
+      "clearMessage": "Zapisanie pustego pola usuwa własne instrukcje zapisane dla tego recenzenta."
     },
     "repos": {
       "unavailable": "Repozytoria są niedostępne. Dokończ konfigurację Bitbucket na kilo.ai.",
@@ -930,7 +933,9 @@
     "followReviewMd": "Postępuj zgodnie z REVIEW.md",
     "followReviewMdSubtitle": "Przestrzegaj instrukcji z pliku REVIEW.md w każdym repozytorium",
     "manualReview": {
-      "connectProviderDescription": "Połącz konto GitHub, aby rozpocząć ręczny przegląd PR.",
+      "invalidMergeRequestUrl": "Wpisz prawidłowy adres URL merge request.",
+      "mergeRequestUrl": "Adres URL merge request",
+      "instructionsAtLimit": "Instrukcje mogą mieć maksymalnie {{max}} znaków",
       "couldNotCheckProviderStatus": "Nie udało się sprawdzić statusu dostawcy.",
       "couldNotLoadProviders": "Nie udało się wczytać połączonych dostawców. Spróbuj ponownie.",
       "instructions": "Instrukcje (opcjonalne)",
@@ -968,7 +973,7 @@
       "bitbucketError": "Nie udało się otworzyć konfiguracji Bitbucket. Spróbuj ponownie."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · Autor: {{author}}",
+      "byline": "#{{number}} · Autor: {{author}}",
       "cancelMessage": "Spowoduje to zatrzymanie trwającego przeglądu kodu.",
       "cancelReview": "Anuluj przegląd",
       "cancelTitle": "Anulować przegląd?",
@@ -1083,12 +1088,12 @@
     },
     "overview": {
       "allAreas": "Wszystkie obszary",
-      "customInstructions": "Własne instrukcje",
       "focusAreas": "Obszary przeglądu",
       "nSelected": "Wybrano: {{displayCount}}",
       "proposedReviewMdGuidance": "Proponowane wytyczne do pliku REVIEW.md",
       "reviewStyle": "Styl przeglądu",
-      "set": "Ustawiono"
+      "set": "Ustawiono",
+      "notSet": "Nie ustawiono"
     },
     "updateFailed": "Nie udało się zaktualizować recenzenta kodu.",
     "configSaveFailed": "Nie udało się zapisać konfiguracji przeglądu.",
@@ -1157,7 +1162,8 @@
       "sortSeverityDesc": "Krytyczność: od wysokiej do niskiej",
       "sortSlaDue": "Termin SLA",
       "statusIgnored": "Zignorowane",
-      "statusOpen": "Otwarte"
+      "statusOpen": "Otwarte",
+      "noRepositories": "Żadne repozytoria nie są jeszcze zsynchronizowane ani wybrane. Wybierz je w ustawieniach Agenta bezpieczeństwa."
     },
     "analysis": {
       "analyzeRepository": "Analizuj repozytorium",
@@ -1299,10 +1305,10 @@
       "noOpenFindings": "Żadne otwarte problemy nie wymagają uwagi",
       "noRepositoryData": "Brak danych o repozytoriach",
       "noRepositoryDataDescription": "Priorytety repozytoriów pojawią się po zsynchronizowaniu problemów.",
-      "noSlaDeadline": "Brak przypisanego terminu SLA",
       "notExploitable": "Nie można wykorzystać w ataku",
       "notMeasured": "Nie zmierzono",
       "notYetSynced": "Jeszcze nie zsynchronizowano",
+      "priorityFindingsPending": "Priorytetowe problemy pojawią się po pierwszej synchronizacji.",
       "refreshFailed": "Nie udało się odświeżyć danych. Widoczne dane pochodzą z ostatniej synchronizacji.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "Otwarte: {{displayCount}}",
@@ -1370,7 +1376,6 @@
       "alreadyResolvedDescription": "Ten problem został już rozwiązany i nie można go odrzucić.",
       "cannotDismissDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą odrzucać problemy.",
       "cannotDismissTitle": "Nie można odrzucić tego problemu",
-      "commentAccessibility": "Komentarz do odrzucenia",
       "commentLabel": "Komentarz (opcjonalnie)",
       "commentPlaceholder": "Dodatkowe informacje o odrzuceniu…",
       "couldNotCheckPermissions": "Nie udało się sprawdzić uprawnień do odrzucania.",
@@ -1393,7 +1398,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Wykryto",
-      "dismissedBecause": "Powód odrzucenia: {{reason}}.",
+      "dismissedOn": "Data odrzucenia",
+      "supersededOn": "Data zastąpienia",
       "ghsa": "GHSA",
       "manifest": "Plik manifestu",
       "noPatchAvailable": "Brak dostępnej poprawki",
@@ -1410,11 +1416,6 @@
       "vulnerableVersions": "Podatne wersje",
       "statusOpen": "Otwarte",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "naprawa już trwa",
-      "reasonNoBandwidth": "brak wolnych zasobów",
-      "reasonTolerableRisk": "ryzyko jest akceptowalne",
-      "reasonInaccurate": "błędne wykrycie problemu",
-      "reasonNotUsed": "kod z luką nie jest używany",
       "reasonAfterReview": "po weryfikacji"
     },
     "findingList": {
@@ -1444,7 +1445,6 @@
       "newFindingSection": "Powiadomienia o nowych problemach",
       "newFindingSeverityLabel": "Minimalna krytyczność nowych problemów",
       "newFindingSubtitle": "Powiadomienie jest wysyłane przy synchronizacji każdego nowego problemu, także podczas pierwszej synchronizacji.",
-      "slaLeadTimeAccessibility": "Liczba dni przed terminem SLA, kiedy ma zostać wysłane ostrzeżenie",
       "slaLeadTimeError": "Wpisz całkowitą liczbę dni od 1 do 365.",
       "slaLeadTimeLabel": "Ostrzeżenie przed terminem SLA (dni)",
       "slaPersonalTitle": "Wysyłaj mi e-maile o ostrzeżeniach SLA",
@@ -1509,7 +1509,6 @@
       "repositoriesCount": "Wybrano {{displayCount}} repozytorium",
       "repositoriesCount_other": "Wybrano {{displayCount}} repozytorium",
       "repositoriesCount_one": "Wybrano {{displayCount}} repozytorium",
-      "selectRepositoriesSubtitle": "Wybierz repozytoria monitorowane przez agenta bezpieczeństwa",
       "repositoriesCount_few": "Wybrano {{displayCount}} repozytoria",
       "repositoriesCount_many": "Wybrano {{displayCount}} repozytoriów"
     },
@@ -1532,7 +1531,7 @@
       "enterWholeNumber": "Wpisz liczbę całkowitą od 1 do 365",
       "high": "Poziom wysoki",
       "highDescription": "Ryzyko poważnego wycieku danych.",
-      "invalidDayCount": "podaj liczbę dni od 1 do 365, bez części ułamkowej.",
+      "invalidDayCount": "Podaj liczbę dni od 1 do 365, bez części ułamkowej.",
       "low": "Poziom niski",
       "lowDescription": "Minimalny wpływ na bezpieczeństwo.",
       "medium": "Poziom średni",
@@ -1562,7 +1561,10 @@
       "settleFailed": "Akcja została wykonana, ale nie udało się nam zapisać wyniku. Spróbuj ponownie.",
       "replayFailed": "Ta akcja nie została ukończona. Spróbuj ponownie.",
       "actionFailed": "Nie udało się ukończyć tej akcji. Spróbuj ponownie.",
-      "actionBlocked": "Nie udało się ukończyć tej akcji. Najpierw należy rozwiązać problem."
+      "actionBlocked": "Nie udało się ukończyć tej akcji. Najpierw należy rozwiązać problem.",
+      "syncNoRepositories": "Żadne repozytoria nie znajdują się w zakresie synchronizacji. Wybierz repozytoria monitorowane przez Agenta bezpieczeństwa, a następnie zsynchronizuj ponownie.",
+      "syncIntegrationInactive": "Połączenie z GitHub dla Agenta bezpieczeństwa nie jest aktywne. Połącz ponownie aplikację Kilo GitHub App, a następnie zsynchronizuj ponownie.",
+      "syncMissingPermission": "Aplikacja Kilo GitHub App nie może odczytywać vulnerability alerts. Przyznaj to uprawnienie w GitHub, a następnie zsynchronizuj ponownie."
     },
     "analysisState": {
       "queued": "Analiza w kolejce",
@@ -1596,7 +1598,6 @@
       "closedOn": "{{status}} · Data: {{date}}",
       "deadlineNotSet": "Nie ustawiono terminu",
       "noSlaDeadline": "Brak terminu SLA",
-      "dueOn": "Termin: {{date}}",
       "overdueNow": "Po terminie",
       "overdue_one": "{{count}} dzień po terminie",
       "overdue_few": "{{count}} dni po terminie",
@@ -1878,13 +1879,14 @@
       "forkFilesUnchangedOnComputer": "Pliki na tym komputerze nie zostaną zmienione.",
       "pickProfile": "Wybierz profil",
       "noProfile": "Brak profilu",
+      "defaultProfileResolvesTo": "Wskazuje na {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profil domyślny: {{name}}",
       "manageProfiles": "Zarządzaj profilami",
       "noProfiles": "Nie ma jeszcze profili. Utwórz go, aby dodać zmienne środowiskowe, serwery MCP i umiejętności.",
       "advancedConfig": "Zaawansowana konfiguracja",
       "advancedConfigDescription": "Dotyczy tej sesji. Zapisanie jako profil zachowuje go na następny raz.",
       "saveAsProfile": "Zapisz jako profil",
       "saveProfileDescription": "Zapisz bieżące zmienne środowiskowe i polecenia instalacyjne jako profil do wielokrotnego użytku.",
-      "profileSummary": "{{vars}} zmienne środowiskowe · {{commands}} polecenia konfiguracyjne",
       "profileSaved": "Profil „{{name}}” został zapisany",
       "organizationProfiles": "Profile organizacji",
       "personalProfiles": "Profile osobiste",
@@ -2682,7 +2684,7 @@
     "couldNotSaveChoice": "Nie udało się zapisać twojego wyboru. Spróbuj ponownie.",
     "onlineAllowed": "Transkrypcja online dozwolona",
     "onlineNotAllowed": "Transkrypcja online niedozwolona",
-    "optionalReview": "Opcjonalne — możesz to zmienić w każdej chwili w ustawieniach",
+    "optionalReview": "Opcjonalne",
     "optionalOnboarding": "Opcjonalne — domyślnie włączone",
     "aiProvidersWhat": "Twoje polecenia, historia rozmów i wszystkie dołączane pliki.",
     "aiProvidersWhy": "Aby generować odpowiedzi AI.",
@@ -2777,12 +2779,13 @@
       "checkFailedTitleBitbucket": "Nie udało się sprawdzić połączenia z kontem Bitbucket.",
       "providerCheckFailedMessage": "Status połączenia będzie dostępny po wczytaniu danych.",
       "reconnectTitle": "Połącz ponownie konto GitHub",
-      "reconnectDescription": "Cofnięto dostęp do konta GitHub. Połącz je ponownie, aby nadal przeglądać PR na telefonie.",
-      "description": "Połącz konto GitHub, aby przeglądać PR na telefonie.",
-      "gitlabDescription": "Połącz konto GitLab, aby przeglądać merge requesty na telefonie.",
-      "bitbucketDescription": "Połącz Bitbucket z tą organizacją, aby przeglądać PR-y na telefonie.",
+      "reconnectDescription": "Cofnięto dostęp do konta GitHub.",
+      "gitlabDescription": "Przeglądaj merge requesty na telefonie",
       "bitbucketOrgOnlyDescription": "Przełącz konto powyżej na organizację, aby przeglądać jej PR-y na Bitbucketu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "To konto nie ma jeszcze żadnych organizacji. PR-y na Bitbucketu będzie można przeglądać po utworzeniu organizacji lub dołączeniu do niej.",
+      "gitlabReconnectAdminOnlyDescription": "Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby je ponownie połączyć.",
+      "bitbucketNotConnectedTitle": "Brak połączenia z Bitbucket",
+      "bitbucketAdminOnlyDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je połączyć.",
       "contextLine": "Dla {{organization}}",
       "contextLinePersonal": "Dla konta osobistego"
     },
@@ -2902,7 +2905,6 @@
     "entry": {
       "noRecentPrs": "Brak ostatnich recenzji",
       "noRecentPrsDescription": "Wklej powyżej odnośnik, aby rozpocząć recenzję — następnym razem pojawi się tutaj.",
-      "couldNotLoad": "Nie udało się wczytać danych.",
       "removeFromRecentsTitle": "Usunąć z listy ostatnio otwieranych?",
       "removeFromRecentsMessage": "Ta recenzja zostanie usunięta z listy ostatnich.",
       "removeRecentAccessibility": "Usuń {{repo}} z listy ostatnio otwieranych",
@@ -3035,6 +3037,7 @@
     "installKiloGitHubApp": "Zainstaluj aplikację Kilo dla GitHub",
     "merge": {
       "merge": "Scalanie",
+      "mergeTitle": "Scalanie",
       "mergeNow": "Scal teraz",
       "mergePullRequest": "Scalanie PR",
       "mergeTermTitle": "Scalanie {{term}}",
@@ -3961,6 +3964,7 @@
       "markSecret": "Oznacz jako tajne",
       "masked": "Ukryta wartość",
       "reveal": "Ujawnij wartość",
+      "hide": "Ukryj wartość",
       "newValuePlaceholder": "Wprowadź nową tajną wartość",
       "valuePlaceholder": "Tajna wartość (zaszyfrowana)"
     },
@@ -3968,8 +3972,8 @@
     "variablesSaveFailed": "Nie udało się zapisać zmiennej",
     "commandsTitle": "Polecenia konfiguracyjne",
     "addCommand": "Dodaj polecenie",
-    "commandLabel": "Rozkaz",
-    "commandLabelPosition": "Rozkaz {{position}}",
+    "commandLabel": "Polecenie",
+    "commandLabelPosition": "Polecenie {{position}}",
     "commandPlaceholder": "np. pnpm install",
     "commandAtLimit": "Polecenie może mieć maksymalnie {{max}} znaków",
     "commandsEmpty": "Nie ma jeszcze żadnych poleceń konfiguracyjnych",
@@ -4091,7 +4095,8 @@
       "nameRequired": "Wprowadź nazwę polecenia",
       "nameInvalid": "Nazwa musi zaczynać się od małej litery i zawierać wyłącznie małe litery, cyfry i myślniki",
       "templateRequired": "Wprowadź szablon polecenia",
-      "nameConflict": "Nazwa ta jest zarezerwowana przez wbudowane polecenie"
+      "nameConflict": "Nazwa ta jest zarezerwowana przez wbudowane polecenie",
+      "duplicateName": "Polecenie o tej nazwie już istnieje w tym profilu"
     },
     "repoBindings": {
       "title": "Domyślne profile dla repozytoriów",
@@ -4100,7 +4105,7 @@
       "emptyDescription": "Dodaj ustawienie domyślne, aby automatycznie stosować profil podczas rozpoczynania sesji dla repozytorium.",
       "repo": "Wybierz repozytorium…",
       "profile": "Wybierz profil",
-      "remove": "Rozwiązać",
+      "removeForRepo": "Rozwiązać {{repo}}",
       "search": "Przeszukaj repozytoria…",
       "addedToast": "Domyślny profil ustawiony na „{{repo}}”",
       "addFailed": "Nie można ustawić profilu domyślnego",

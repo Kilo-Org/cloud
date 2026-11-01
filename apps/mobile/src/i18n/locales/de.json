@@ -69,6 +69,7 @@
     "organization": "Organisation",
     "platform": "Plattform",
     "prReview": "PR-Prüfung",
+    "prReviewSubtitle": "Pull-Requests mobil prüfen",
     "queued": "In der Warteschlange",
     "remove": "Entfernen",
     "repository": "Code-Repository",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "Automatische PR-Prüfungen",
     "securityAgentSubtitle": "Schwachstellen finden und beheben",
     "reviews": "Code-Prüfungen",
-    "prReviewSubtitle": "Pull-Requests mobil prüfen",
     "couldNotLoadOrganization": "Die Organisation konnte nicht geladen werden.",
     "couldNotLoadOrganizationDescription": "Die Einstellungen für Organisation und Agenten sind erst verfügbar, wenn die Organisation geladen wurde.",
     "linkedAccounts": "Verknüpfte Konten",
@@ -305,7 +305,8 @@
     "liveUpdates": "Live-Updates",
     "liveUpdateSubtitle": "Aktive Agenten in deinen Benachrichtigungen anzeigen",
     "push": "Push-Benachrichtigungen",
-    "onDescription": "Push-Benachrichtigungen sind für dieses Gerät aktiviert.",
+    "deviceTitle": "Push auf diesem Gerät",
+    "onDescription": "Hinweise richten sich nach den Kategorien unten.",
     "offDescription": "Die Berechtigung für Benachrichtigungen oder die Geräteregistrierung ist deaktiviert.",
     "retryPermission": "Berechtigung für Benachrichtigungen erneut prüfen",
     "enable": "Benachrichtigungen aktivieren",
@@ -888,7 +889,9 @@
     "instructions": {
       "title": "Benutzerdefinierte Anweisungen",
       "deprecation": "Benutzerdefinierte Anweisungen sollen künftig entfallen. Verschiebe diese Richtlinien stattdessen in eine REVIEW.md-Datei in deinem Repository.",
-      "placeholder": "z. B. auf die Einhaltung unserer Regeln zur Fehlerbehandlung achten …"
+      "placeholder": "z. B. auf die Einhaltung unserer Regeln zur Fehlerbehandlung achten …",
+      "clearTitle": "Benutzerdefinierte Anweisungen entfernen?",
+      "clearMessage": "Wenn du ein leeres Feld speicherst, werden die für diesen Reviewer gespeicherten benutzerdefinierten Anweisungen gelöscht."
     },
     "repos": {
       "unavailable": "Die Repositories sind nicht verfügbar. Schließe die Bitbucket-Einrichtung auf kilo.ai ab.",
@@ -924,7 +927,9 @@
     "followReviewMd": "REVIEW.md befolgen",
     "followReviewMdSubtitle": "Anweisungen aus der REVIEW.md-Datei des jeweiligen Repositorys beachten",
     "manualReview": {
-      "connectProviderDescription": "Verbinde GitHub, um ein manuelles Review eines Pull-Requests zu starten.",
+      "invalidMergeRequestUrl": "Gib eine gültige Merge-Request-URL ein.",
+      "mergeRequestUrl": "Merge-Request-URL",
+      "instructionsAtLimit": "Die Anweisungen sind auf {{max}} Zeichen beschränkt",
       "couldNotCheckProviderStatus": "Der Anbieterstatus konnte nicht geprüft werden.",
       "couldNotLoadProviders": "Deine verbundenen Anbieter konnten nicht geladen werden. Bitte versuche es erneut.",
       "instructions": "Anweisungen (optional)",
@@ -962,7 +967,7 @@
       "bitbucketError": "Die Bitbucket-Einrichtung konnte nicht geöffnet werden. Bitte versuche es erneut."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} von {{author}}",
+      "byline": "#{{number}} von {{author}}",
       "cancelMessage": "Das laufende Code-Review wird abgebrochen.",
       "cancelReview": "Review abbrechen",
       "cancelTitle": "Review abbrechen?",
@@ -1077,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "Alle Bereiche",
-      "customInstructions": "Benutzerdefinierte Anweisungen",
       "focusAreas": "Schwerpunkte",
       "nSelected": "{{displayCount}} ausgewählt",
       "proposedReviewMdGuidance": "Vorgeschlagene Richtlinien für REVIEW.md",
       "reviewStyle": "Art der Prüfung",
-      "set": "Festgelegt"
+      "set": "Festgelegt",
+      "notSet": "Nicht festgelegt"
     },
     "updateFailed": "Code Reviewer konnte nicht aktualisiert werden.",
     "configSaveFailed": "Die Review-Einstellungen konnten nicht gespeichert werden.",
@@ -1151,7 +1156,8 @@
       "sortSeverityDesc": "Schweregrad: absteigend",
       "sortSlaDue": "SLA-Fälligkeitsdatum",
       "statusIgnored": "Ignoriert",
-      "statusOpen": "Offen"
+      "statusOpen": "Offen",
+      "noRepositories": "Es sind noch keine Repositories synchronisiert oder ausgewählt. Wähle sie in den Einstellungen des Sicherheitsagenten aus."
     },
     "analysis": {
       "analyzeRepository": "Repository analysieren",
@@ -1289,10 +1295,10 @@
       "noOpenFindings": "Keine offenen Befunde erfordern Maßnahmen",
       "noRepositoryData": "Noch keine Repository-Daten",
       "noRepositoryDataDescription": "Die Prioritäten der Repositories werden angezeigt, sobald die Befunde synchronisiert sind.",
-      "noSlaDeadline": "Keine SLA-Frist zugewiesen",
       "notExploitable": "Nicht ausnutzbar",
       "notMeasured": "Nicht gemessen",
       "notYetSynced": "Noch nicht synchronisiert",
+      "priorityFindingsPending": "Prioritäre Befunde erscheinen nach der ersten Synchronisierung.",
       "refreshFailed": "Die Daten konnten nicht aktualisiert werden. Angezeigt werden die zuletzt synchronisierten Daten.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "{{displayCount}} offen",
@@ -1344,7 +1350,6 @@
       "alreadyResolvedDescription": "Dieser Befund wurde bereits behoben und kann nicht mehr verworfen werden.",
       "cannotDismissDescription": "Nur Organisationsinhaber, Admins und Abrechnungsmanager können Befunde verwerfen.",
       "cannotDismissTitle": "Dieser Befund kann nicht verworfen werden",
-      "commentAccessibility": "Kommentar zum Verwerfen",
       "commentLabel": "Kommentar (optional)",
       "commentPlaceholder": "Weitere Angaben zum Verwerfen …",
       "couldNotCheckPermissions": "Die Berechtigungen zum Verwerfen konnten nicht geprüft werden.",
@@ -1367,7 +1372,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Erkannt",
-      "dismissedBecause": "Dieser Befund wurde verworfen. Grund: {{reason}}.",
+      "dismissedOn": "Verworfen am",
+      "supersededOn": "Ersetzt am",
       "ghsa": "GHSA",
       "manifest": "Manifestdatei",
       "noPatchAvailable": "Kein Patch verfügbar",
@@ -1384,11 +1390,6 @@
       "vulnerableVersions": "Verwundbare Versionen",
       "statusOpen": "Offen",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "behebung bereits begonnen",
-      "reasonNoBandwidth": "keine Kapazität verfügbar",
-      "reasonTolerableRisk": "risiko vertretbar",
-      "reasonInaccurate": "befund unzutreffend",
-      "reasonNotUsed": "verwundbarer Code nicht verwendet",
       "reasonAfterReview": "nach Prüfung"
     },
     "findingList": {
@@ -1418,7 +1419,6 @@
       "newFindingSection": "Benachrichtigung bei neuen Befunden",
       "newFindingSeverityLabel": "Mindestschweregrad für neue Befunde",
       "newFindingSubtitle": "Die Benachrichtigung wird bei jedem neu synchronisierten Befund gesendet, auch bei der ersten Synchronisierung.",
-      "slaLeadTimeAccessibility": "Vorlauf für SLA-Warnungen in Tagen",
       "slaLeadTimeError": "Gib die Anzahl der Tage als ganze Zahl zwischen 1 und 365 ein.",
       "slaLeadTimeLabel": "Vorlauf für SLA-Warnungen (Tage)",
       "slaPersonalTitle": "Mich bei SLA-Warnungen per E-Mail benachrichtigen",
@@ -1482,8 +1482,7 @@
       "on": "Ein",
       "repositoriesCount": "{{displayCount}} Code-Repositories ausgewählt",
       "repositoriesCount_other": "{{displayCount}} Code-Repositories ausgewählt",
-      "repositoriesCount_one": "{{displayCount}} Repository ausgewählt",
-      "selectRepositoriesSubtitle": "Wähle aus, welche Repositories der Sicherheitsagent überwacht"
+      "repositoriesCount_one": "{{displayCount}} Repository ausgewählt"
     },
     "settingsSave": {
       "saveChanges": "Änderungen speichern",
@@ -1504,7 +1503,7 @@
       "enterWholeNumber": "Gib eine ganze Zahl zwischen 1 und 365 ein",
       "high": "Hoch",
       "highDescription": "Erhebliches Risiko einer Offenlegung von Daten.",
-      "invalidDayCount": "gib eine ganze Zahl zwischen 1 und 365 Tagen ein.",
+      "invalidDayCount": "Gib eine ganze Zahl zwischen 1 und 365 Tagen ein.",
       "low": "Niedrig",
       "lowDescription": "Minimale Auswirkungen auf die Sicherheit.",
       "medium": "Mittel",
@@ -1534,7 +1533,10 @@
       "settleFailed": "Die Aktion wurde abgeschlossen, aber wir konnten das Ergebnis nicht speichern. Bitte versuche es erneut.",
       "replayFailed": "Diese Aktion wurde nicht abgeschlossen. Bitte versuche es erneut.",
       "actionFailed": "Diese Aktion konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
-      "actionBlocked": "Diese Aktion konnte nicht abgeschlossen werden. Das Problem muss behoben werden, bevor du es erneut versuchen kannst."
+      "actionBlocked": "Diese Aktion konnte nicht abgeschlossen werden. Das Problem muss behoben werden, bevor du es erneut versuchen kannst.",
+      "syncNoRepositories": "Es befinden sich keine Repositories im Sync-Bereich. Wähle die Repositories aus, die der Sicherheitsagent überwacht, und synchronisiere dann erneut.",
+      "syncIntegrationInactive": "Die GitHub-Verbindung für den Sicherheitsagenten ist nicht aktiv. Verbinde die Kilo-GitHub-App erneut und synchronisiere dann noch einmal.",
+      "syncMissingPermission": "Die Kilo-GitHub-App kann keine Schwachstellenwarnungen lesen. Erteile diese Berechtigung in GitHub und synchronisiere dann noch einmal."
     },
     "analysisState": {
       "queued": "Analyse in der Warteschlange",
@@ -1568,7 +1570,6 @@
       "closedOn": "{{status}} am {{date}}",
       "deadlineNotSet": "Keine Frist festgelegt",
       "noSlaDeadline": "Keine SLA-Frist",
-      "dueOn": "Fällig am {{date}}",
       "overdueNow": "Überfällig",
       "overdue_one": "{{count}} Tag überfällig",
       "overdue_other": "{{count}} Tage überfällig",
@@ -1842,13 +1843,14 @@
       "forkFilesUnchangedOnComputer": "Die Dateien auf diesem Computer werden nicht geändert.",
       "pickProfile": "Wähle ein Profil",
       "noProfile": "Kein Profil",
+      "defaultProfileResolvesTo": "Entspricht {{name}}",
+      "defaultProfileResolvesToAccessibility": "Standardprofil: {{name}}",
       "manageProfiles": "Profile verwalten",
       "noProfiles": "Noch keine Profile. Erstelle eins, um Umgebungsvariablen, MCP-Server und Fähigkeiten hinzuzufügen.",
       "advancedConfig": "Erweiterte Konfiguration",
       "advancedConfigDescription": "Gilt für diese Sitzung. Als Profil gespeichert bleibt sie für das nächste Mal erhalten.",
       "saveAsProfile": "Als Profil speichern",
       "saveProfileDescription": "Speichere die aktuellen Umgebungsvariablen und Setup-Befehle als wiederverwendbares Profil.",
-      "profileSummary": "{{vars}} Umgebungsvariablen · {{commands}} Setup-Befehle",
       "profileSaved": "Profil „{{name}}“ gespeichert",
       "organizationProfiles": "Organisationsprofile",
       "personalProfiles": "Persönliche Profile",
@@ -2622,7 +2624,7 @@
     "couldNotSaveChoice": "Deine Auswahl konnte nicht gespeichert werden. Bitte versuche es erneut.",
     "onlineAllowed": "Online, erlaubt",
     "onlineNotAllowed": "Online, nicht erlaubt",
-    "optionalReview": "Freiwillig – jederzeit in den Einstellungen änderbar",
+    "optionalReview": "Freiwillig",
     "optionalOnboarding": "Freiwillig – aktiviert, solange du es nicht ausschaltest",
     "aiProvidersWhat": "Deine Prompts, dein Unterhaltungsverlauf und alle Dateien, die du anhängst.",
     "aiProvidersWhy": "Um KI-Antworten zu erstellen.",
@@ -2709,12 +2711,13 @@
       "checkFailedTitleBitbucket": "Die Bitbucket-Verbindung konnte nicht geprüft werden.",
       "providerCheckFailedMessage": "Der Verbindungsstatus ist erst verfügbar, wenn die Prüfung abgeschlossen ist.",
       "reconnectTitle": "GitHub erneut verbinden",
-      "reconnectDescription": "Deine GitHub-Verbindung wurde widerrufen. Stelle sie erneut her, um Pull-Requests weiterhin in der App zu prüfen.",
-      "description": "Verbinde dein GitHub-Konto, um Pull-Requests in der App zu prüfen.",
-      "gitlabDescription": "Verbinde dein GitLab-Konto, um Merge-Requests in der App zu prüfen.",
-      "bitbucketDescription": "Verbinde Bitbucket mit dieser Organisation, um Pull-Requests in der App zu prüfen.",
+      "reconnectDescription": "Deine GitHub-Verbindung wurde widerrufen.",
+      "gitlabDescription": "Merge-Requests mobil prüfen",
       "bitbucketOrgOnlyDescription": "Wechsle das Konto oben zu einer Organisation, um deren Pull-Requests in Bitbucket zu prüfen.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Diesem Konto ist noch keine Organisation zugeordnet. Du kannst Bitbucket-Pull-Requests prüfen, sobald du eine Organisation erstellst oder einer beitrittst.",
+      "gitlabReconnectAdminOnlyDescription": "Bitte einen Inhaber, Admin oder Abrechnungsmanager, sie wiederherzustellen.",
+      "bitbucketNotConnectedTitle": "Bitbucket ist nicht verbunden",
+      "bitbucketAdminOnlyDescription": "Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen.",
       "contextLine": "Für {{organization}}",
       "contextLinePersonal": "Für den persönlichen Bereich"
     },
@@ -2828,7 +2831,6 @@
     "entry": {
       "noRecentPrs": "Noch keine aktuellen Reviews",
       "noRecentPrsDescription": "Füge oben einen Link ein, um ein Review zu starten — es erscheint beim nächsten Mal hier.",
-      "couldNotLoad": "Die Daten konnten nicht geladen werden.",
       "removeFromRecentsTitle": "Aus dem Verlauf entfernen?",
       "removeFromRecentsMessage": "Dieses Review wird aus deinem Verlauf entfernt.",
       "removeRecentAccessibility": "{{repo}} aus dem Verlauf entfernen",
@@ -2947,6 +2949,7 @@
     "installKiloGitHubApp": "GitHub-App von Kilo installieren",
     "merge": {
       "merge": "Zusammenführen",
+      "mergeTitle": "Zusammenführen",
       "mergeNow": "Jetzt zusammenführen",
       "mergePullRequest": "Pull-Request zusammenführen",
       "mergeTermTitle": "{{term}} zusammenführen",
@@ -3849,6 +3852,7 @@
       "markSecret": "Als geheim markieren",
       "masked": "Versteckter Wert",
       "reveal": "Wert offenbaren",
+      "hide": "Wert verbergen",
       "newValuePlaceholder": "Neuen geheimen Wert eingeben",
       "valuePlaceholder": "Geheimer Wert (verschlüsselt)"
     },
@@ -3977,7 +3981,8 @@
       "nameRequired": "Gib einen Befehlsnamen ein",
       "nameInvalid": "Der Name muss mit einem Kleinbuchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten",
       "templateRequired": "Gib eine Befehlsvorlage ein",
-      "nameConflict": "Dieser Name wird durch einen integrierten Befehl reserviert"
+      "nameConflict": "Dieser Name wird durch einen integrierten Befehl reserviert",
+      "duplicateName": "Ein Befehl mit diesem Namen ist in diesem Profil bereits vorhanden"
     },
     "repoBindings": {
       "title": "Standardprofile für Repos",
@@ -3986,7 +3991,7 @@
       "emptyDescription": "Füge einen Standard hinzu, um beim Starten von Sitzungen für ein Repo automatisch ein Profil anzuwenden.",
       "repo": "Repository auswählen…",
       "profile": "Profil auswählen",
-      "remove": "Lösen",
+      "removeForRepo": "Bindung von {{repo}} lösen",
       "search": "Repositories durchsuchen…",
       "addedToast": "Standardprofil für „{{repo}}“ festgelegt",
       "addFailed": "Das Standardprofil konnte nicht festgelegt werden",

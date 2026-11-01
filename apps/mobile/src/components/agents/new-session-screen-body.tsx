@@ -108,7 +108,7 @@ import {
   shouldRestorePersistedRunOn,
 } from '@/lib/run-on-destination';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
-import { peekSharePayload } from '@/lib/share-payload';
+import { clearSharePayload, peekSharePayload } from '@/lib/share-payload';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
@@ -268,10 +268,13 @@ export function NewSessionScreenBody() {
   );
   // Stacked like the Run on and Repository sections below it: one label above
   // one full-width picker, so the form's label-value relation keeps one shape.
-  const organizationSection = (
+  // The label names the account, not the organization: the picker holds either
+  // the personal account or one of the reader's organizations, and its sheet is
+  // titled "Select account" (`profile.selectAccount`).
+  const accountSection = (
     <View className="mt-5">
       <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('common.organization')}
+        {t('preferences.account')}
       </Text>
       {isCloneEntry ? (
         <ContextControl
@@ -553,7 +556,7 @@ export function NewSessionScreenBody() {
   const handleOpenRepoDefaults = useCallback(() => {
     // The composer's own Stack, so Back returns here with the draft instead of
     // landing on the Profile tab root.
-    router.push(getRepoBindingsPath(organizationId, 'app'));
+    router.push(getRepoBindingsPath({ organizationId, stack: 'app', openedFrom: 'composer' }));
   }, [organizationId, router]);
 
   // Keep the inline selector and picker list in sync.
@@ -920,10 +923,14 @@ export function NewSessionScreenBody() {
       }
     }
     promptRef.current = '';
+    // A staged payload a failed delivery put back is abandoned with the draft.
+    if (shareId !== undefined) {
+      clearSharePayload(shareId);
+    }
     // Release only after the discard is committed (clearDraft succeeded): a
     // failed clear keeps the composer mounted, so the uploads stay recoverable.
     attachments.releaseUnclaimedUploads();
-  }, [attachments, promptRef, repositoryDraftKey, userId]);
+  }, [attachments, promptRef, repositoryDraftKey, shareId, userId]);
 
   // "Save as to-do" keeps the leave the confirm intercepted until a list is
   // picked; saving then discards the draft and replays that leave.
@@ -1354,7 +1361,7 @@ export function NewSessionScreenBody() {
         onManualVarsChange={setManualVars}
         onManualCommandsChange={setManualCommands}
         onOpenRepoDefaults={handleOpenRepoDefaults}
-        organizationSection={organizationSection}
+        accountSection={accountSection}
         autoCommit={autoCommit}
         onAutoCommitChange={setAutoCommit}
         isStartDisabled={isStartDisabled}

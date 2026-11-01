@@ -926,6 +926,76 @@ describe('Agent Profiles Router', () => {
       });
     });
 
+    describe('kiloCommandNameConflicts', () => {
+      test('refuses a second command under a name the profile already uses', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Command Dup Test' });
+
+        await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'release-notes',
+          template: 'Draft the notes',
+        });
+
+        await expect(
+          caller.agentProfiles.createKiloCommand({
+            profileId,
+            name: 'release-notes',
+            template: 'Draft the notes again',
+          })
+        ).rejects.toMatchObject({
+          code: 'CONFLICT',
+          message: 'A command with this name already exists in this profile',
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.kiloCommands.map(command => command.name)).toEqual(['release-notes']);
+      });
+
+      test('refuses a rename onto a name another command owns and keeps the old name', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'Command Rename Test',
+        });
+
+        const { id: commandId } = await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'release-notes',
+          template: 'Draft the notes',
+        });
+        const { id: otherId } = await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'deploy',
+          template: 'Ship it',
+        });
+
+        await expect(
+          caller.agentProfiles.updateKiloCommand({
+            profileId,
+            commandId,
+            name: 'deploy',
+          })
+        ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+        // Saving a command under its own name stays allowed.
+        await caller.agentProfiles.updateKiloCommand({
+          profileId,
+          commandId,
+          name: 'release-notes',
+          template: 'Draft the notes for the next release',
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.kiloCommands.map(command => [command.id, command.name])).toEqual([
+          [otherId, 'deploy'],
+          [commandId, 'release-notes'],
+        ]);
+        expect(result.kiloCommands.find(command => command.id === commandId)?.template).toBe(
+          'Draft the notes for the next release'
+        );
+      });
+    });
+
     describe('mcpServers', () => {
       test('refuses a second server under a name the profile already uses', async () => {
         const caller = await createCallerForUser(ownerUser.id);

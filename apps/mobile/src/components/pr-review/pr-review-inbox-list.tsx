@@ -15,24 +15,20 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { EmptyState } from '@/components/empty-state';
-import { QueryError } from '@/components/query-error';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import { InboxEmpty } from '@/components/pr-review/pr-review-inbox-empty';
 import {
   isOrganizationAccessView,
-  type PrInboxView,
   selectPrInboxView,
 } from '@/components/pr-review/pr-review-inbox-view';
 import { Button } from '@/components/ui/button';
-import { Clock, GitPullRequest, Inbox } from '@/components/ui/icons';
+import { Clock, Inbox } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useOrganization } from '@/lib/organization-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
-  type ProviderPrPlatform,
   providerPrRefLabel,
   providerPrRoutePath,
   providerPrTermKey,
@@ -41,12 +37,24 @@ import { type ProviderInboxRow, useProviderInbox } from '@/lib/pr-review/use-pro
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
-const SKELETON_ROW_COUNT = 5;
-
 type InboxItem = ProviderInboxRow;
 
+/**
+ * The one spacing both section headers of this screen sit under.
+ *
+ * The INBOX header follows the paste block (and its own reserved link-error
+ * line) and the RECENT header follows the inbox body; the two breaks are the
+ * same section-to-section relation, so they share one token instead of each
+ * picking its own.
+ */
+const PR_REVIEW_SECTION_BREAK = { padding: 'pt-6' } as const;
+
 type PrReviewInboxListProps = {
-  /** The "Paste a PR link" block, rendered above the Inbox eyebrow. */
+  /**
+   * The "Paste a PR link" block, rendered above the Inbox eyebrow and ending
+   * in its own reserved link-error slot. The list applies the section break
+   * above the eyebrow, so the paste block does not carry one.
+   */
   header: ReactNode;
   /** The recents body, rendered below the pagination footer. */
   recents: ReactNode;
@@ -102,9 +110,11 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
       keyExtractor={item => item.key}
       renderItem={({ item }) => <InboxRow item={item} />}
       ListHeaderComponent={
-        <View className="gap-6 px-6 pt-4">
+        <View className="px-6 pt-4">
           {header}
-          <InboxEyebrow />
+          <View className={PR_REVIEW_SECTION_BREAK.padding}>
+            <InboxEyebrow />
+          </View>
         </View>
       }
       ListEmptyComponent={
@@ -118,7 +128,7 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
         />
       }
       ListFooterComponent={
-        <View className="gap-6 px-6 pb-12 pt-4">
+        <View className={`gap-6 px-6 pb-12 ${PR_REVIEW_SECTION_BREAK.padding}`}>
           {inbox.githubNeedsReconnect &&
           view.kind !== 'reconnect' &&
           !isOrganizationAccessView(view) ? (
@@ -221,122 +231,6 @@ function InboxChip({ label }: Readonly<{ label: string }>) {
         {label}
       </Text>
     </View>
-  );
-}
-
-function InboxEmpty({
-  view,
-  onRetry,
-  isRetrying,
-  reconnectPlatform,
-  organizationId,
-  onContinueInPersonal,
-}: Readonly<{
-  view: PrInboxView;
-  onRetry: () => void;
-  isRetrying: boolean;
-  /** The provider whose failure produced the reconnect view, when known. */
-  reconnectPlatform: ProviderPrPlatform | null;
-  /** The organization scope the inbox read failed in; null for personal. */
-  organizationId: string | null;
-  /** Leaves a refused organization for the personal scope. */
-  onContinueInPersonal: () => void;
-}>) {
-  const { t } = useTranslation();
-  if (view.kind === 'loading') {
-    return (
-      <View accessibilityLabel={t('prReview.inbox.loading')}>
-        {Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
-          // eslint-disable-next-line react/no-array-index-key -- skeleton placeholders have no stable id
-          <View key={index} className="gap-2 border-b-[0.5px] border-hair-soft px-6 py-3">
-            <Skeleton className="h-3.5 w-2/3" />
-            <Skeleton className="h-3 w-1/3" />
-          </View>
-        ))}
-      </View>
-    );
-  }
-
-  if (view.kind === 'empty') {
-    return (
-      <EmptyState
-        icon={GitPullRequest}
-        title={t('prReview.inbox.noReviewRequests')}
-        description={t('prReview.inbox.noReviewRequestsDescription')}
-        placement="top"
-      />
-    );
-  }
-
-  if (view.kind === 'permission') {
-    return <QueryError variant="permission" placement="top" />;
-  }
-
-  if (view.kind === 'not-found') {
-    return <QueryError variant="not-found" placement="top" />;
-  }
-
-  if (view.kind === 'access-denied' || view.kind === 'organization-unavailable') {
-    const unavailable = view.kind === 'organization-unavailable';
-    return (
-      <QueryError
-        variant={unavailable ? 'not-found' : 'permission'}
-        title={t(
-          unavailable
-            ? 'prReview.inbox.organizationUnavailableTitle'
-            : 'prReview.inbox.accessLostTitle'
-        )}
-        message={t(
-          unavailable
-            ? 'prReview.inbox.organizationUnavailableDescription'
-            : 'prReview.inbox.accessLostDescription'
-        )}
-        placement="top"
-        action={
-          // No retry here: the server refuses this organization, so repeating
-          // the same read can only be refused again. The way out is the
-          // personal scope, which needs no organization membership.
-          <Button
-            className={STATE_ACTION_CLASS}
-            variant="outline"
-            onPress={onContinueInPersonal}
-            accessibilityLabel={t('prReview.inbox.continueInPersonal')}
-          >
-            <Text>{t('prReview.inbox.continueInPersonal')}</Text>
-          </Button>
-        }
-      />
-    );
-  }
-
-  if (view.kind === 'reconnect') {
-    return (
-      <View className="px-6 py-6">
-        <PrReviewReconnectNotice
-          platform={reconnectPlatform ?? undefined}
-          organizationId={organizationId}
-        />
-      </View>
-    );
-  }
-
-  // retryable / service-unavailable: a BAD_GATEWAY names its own cause (the
-  // review service is temporarily unavailable); every other failure keeps the
-  // generic could-not-load copy. Both offer Retry.
-  const isServiceUnavailable = view.kind === 'service-unavailable';
-  return (
-    <QueryError
-      variant="server"
-      title={
-        isServiceUnavailable
-          ? t('prReview.reviewServiceUnavailable')
-          : t('prReview.inbox.couldNotLoad')
-      }
-      message={isServiceUnavailable ? t('prReview.reviewServiceUnavailableDescription') : undefined}
-      placement="top"
-      onRetry={onRetry}
-      isRetrying={isRetrying}
-    />
   );
 }
 

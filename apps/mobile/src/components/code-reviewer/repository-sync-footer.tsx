@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { type ManageRepositoryAccess } from '@/lib/hooks/use-code-reviewer-manage-access';
+import { type ManageRepositoryAccess } from '@/lib/hooks/use-manage-repository-access';
 import { cn } from '@/lib/utils';
 
 /**

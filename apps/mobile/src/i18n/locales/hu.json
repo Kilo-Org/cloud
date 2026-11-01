@@ -69,6 +69,7 @@
     "organization": "Szervezet",
     "platform": "Platform",
     "prReview": "PR-ellenőrzés",
+    "prReviewSubtitle": "PR-ek ellenőrzése mobilon",
     "queued": "Várólistán",
     "remove": "Eltávolítás",
     "repository": "Adattár",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "Automatikus PR-ellenőrzések",
     "securityAgentSubtitle": "Sérülékenységek keresése és javítása",
     "reviews": "Ellenőrzések",
-    "prReviewSubtitle": "PR-ek ellenőrzése mobilon",
     "couldNotLoadOrganization": "Nem sikerült betölteni a szervezetet.",
     "couldNotLoadOrganizationDescription": "A szervezet adatainak betöltéséig a szervezet és az ügynökök beállításai nem érhetők el.",
     "linkedAccounts": "Összekapcsolt fiókok",
@@ -403,6 +403,7 @@
     "connectionExpired": "A GitHub-kapcsolat lejárt.",
     "merge": {
       "merge": "Összevonás",
+      "mergeTitle": "Összevonás",
       "mergeNow": "Összevonás most",
       "mergePullRequest": "PR összevonása",
       "mergeTermTitle": "A {{term}} összevonása",
@@ -605,7 +606,6 @@
     "entry": {
       "noRecentPrs": "Nincs közelmúltbeli kódellenőrzés",
       "noRecentPrsDescription": "Illessz be fent egy hivatkozást a kódellenőrzés indításához — legközelebb itt fog megjelenni.",
-      "couldNotLoad": "Nem sikerült a betöltés.",
       "removeFromRecentsTitle": "Eltávolítod az előzményekből?",
       "removeFromRecentsMessage": "Ez a kódellenőrzés eltűnik az előzményeidből.",
       "removeRecentAccessibility": "{{repo}} eltávolítása az előzményekből",
@@ -679,12 +679,13 @@
       "checkFailedTitleBitbucket": "Nem sikerült ellenőrizni a Bitbucket-kapcsolatot",
       "providerCheckFailedMessage": "A kapcsolódási állapot csak a betöltés után érhető el.",
       "reconnectTitle": "Újracsatlakozás a GitHubhoz",
-      "reconnectDescription": "Visszavonták a GitHub-kapcsolatod engedélyét. Csatlakozz újra, hogy mobilon is folytathasd a módosítási kérelmek kódellenőrzését.",
-      "description": "Csatlakoztasd a GitHub-fiókodat a módosítási kérelmek mobilos kódellenőrzéséhez.",
-      "gitlabDescription": "Csatlakoztasd a GitLab-fiókodat a merge requestek kódellenőrzéséhez mobilon.",
-      "bitbucketDescription": "Csatlakoztasd a Bitbucketot ehhez a szervezethez a módosítási kérelmek mobilos kódellenőrzéséhez.",
+      "reconnectDescription": "Visszavonták a GitHub-kapcsolatod engedélyét.",
+      "gitlabDescription": "Merge requestek ellenőrzése mobilon",
       "bitbucketOrgOnlyDescription": "Váltsd a fenti fiókot egy szervezetre a Bitbucket-módosítási kérelmek kódellenőrzéséhez.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ez a fiók még nem tagja egyetlen szervezetnek sem. A Bitbucket-módosítási kérelmek kódellenőrzéséhez hozz létre egy szervezetet, vagy csatlakozz egyhez.",
+      "gitlabReconnectAdminOnlyDescription": "Kérd meg egy szervezet tulajdonosát, adminisztrátorát vagy számlázási felelősét, hogy újracsatlakoztassa.",
+      "bitbucketNotConnectedTitle": "A Bitbucket nincs csatlakoztatva",
+      "bitbucketAdminOnlyDescription": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
       "contextLine": "{{organization}} számára",
       "contextLinePersonal": "Személyes fiókodhoz"
     },
@@ -834,7 +835,8 @@
     "liveUpdates": "Élő frissítések",
     "liveUpdateSubtitle": "Aktív ügynökök megjelenítése az értesítésekben",
     "push": "Leküldéses értesítések",
-    "onDescription": "A leküldéses értesítések be vannak kapcsolva ezen az eszközön.",
+    "deviceTitle": "Leküldés ezen az eszközön",
+    "onDescription": "Az értesítések a lenti kategóriák szerint érkeznek.",
     "offDescription": "Hiányzik az értesítési engedély vagy az eszköz regisztrációja.",
     "retryPermission": "Értesítési engedély ellenőrzésének újrapróbálása",
     "enable": "Értesítések engedélyezése",
@@ -1019,7 +1021,7 @@
     "attachmentPicker": {
       "takePhoto": "Fotó készítése",
       "photoLibrary": "Fotótár",
-      "files": "Fájl",
+      "files": "Fájlok",
       "cameraAccessMessage": "Fotó készítéséhez engedélyezd a kamera használatát a Beállításokban."
     },
     "typingIndicator": {
@@ -1417,7 +1419,9 @@
     "instructions": {
       "title": "Egyéni utasítások",
       "deprecation": "Az egyéni utasítások funkcióját a tervek szerint megszüntetjük. Helyezd át ezeket az irányelveket a kódtáradban lévő REVIEW.md fájlba.",
-      "placeholder": "pl. a hibakezelési szabályaink betartása…"
+      "placeholder": "pl. a hibakezelési szabályaink betartása…",
+      "clearTitle": "Eltávolítod az egyéni utasításokat?",
+      "clearMessage": "Az üres mező mentése törli az ellenőrzőhöz tárolt egyéni utasításokat."
     },
     "repos": {
       "unavailable": "A kódtárak nem érhetők el. Fejezd be a Bitbucket beállítását a kilo.ai oldalon.",
@@ -1452,7 +1456,7 @@
       "fixSettings": "Beállítások javítása",
       "couldNotLoad": "Nem sikerült betölteni a kódellenőrzést.",
       "couldNotGetLatest": "Nem sikerült lekérni a legfrissebb adatokat.",
-      "byline": "{{repo}} #{{number}}, szerző: {{author}}",
+      "byline": "#{{number}}, szerző: {{author}}",
       "noFindings": "Nincsenek találatok.",
       "findingsUnavailable": "Az eredmények nem érhetők el, mert ez a kódellenőrzés sikertelen volt.",
       "findingsInProgress": "A kódellenőrzés még folyamatban van. A találatok a befejezése után jelennek meg itt.",
@@ -1533,11 +1537,13 @@
       "offAction": "A kódellenőrzési memória ki van kapcsolva. Kapcsold be, majd próbáld újra."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Adj meg egy érvényes URL-t a merge request-hez.",
+      "mergeRequestUrl": "Merge request URL-címe",
+      "instructionsAtLimit": "Az utasítások legfeljebb {{max}} karakter lehetnek",
       "title": "Kézi kódellenőrzés",
       "invalidUrl": "Adj meg egy érvényes URL-t a PR-hez.",
       "couldNotCheckProviderStatus": "Nem sikerült ellenőrizni a szolgáltató állapotát.",
       "couldNotLoadProviders": "Nem sikerült betölteni a csatlakoztatott szolgáltatóidat. Próbáld újra.",
-      "connectProviderDescription": "Csatlakoztasd a GitHubot egy PR kézi kódellenőrzésének indításához.",
       "pullRequestUrl": "PR URL-címe",
       "instructions": "Utasítások (nem kötelező)",
       "instructionsPlaceholder": "Az ellenőrzés kiemelt szempontjai…",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "Ellenőrzési stílus",
       "focusAreas": "Kiemelt területek",
       "allAreas": "Minden terület",
-      "customInstructions": "Egyéni utasítások",
       "set": "Beállítva",
+      "notSet": "Nincs beállítva",
       "nSelected": "{{displayCount}} kijelölve",
       "proposedReviewMdGuidance": "Javasolt útmutatás a REVIEW.md fájlhoz"
     },
@@ -1680,7 +1686,8 @@
       "sortSeverityDesc": "Súlyosság: csökkenő",
       "sortSeverityAsc": "Súlyosság: növekvő",
       "sortSlaDue": "SLA-határidő",
-      "overdueOnly": "Csak a lejártak"
+      "overdueOnly": "Csak a lejártak",
+      "noRepositories": "Még nincs szinkronizált vagy kiválasztott adattár. Válassza ki őket a Biztonsági ügynök beállításaiban."
     },
     "automation": {
       "title": "Automatizálás",
@@ -1765,7 +1772,6 @@
       "noImmediateAction": "Nincs azonnali teendő",
       "notExploitable": "Nem kihasználható",
       "needsYourReview": "Ellenőrizned kell",
-      "noSlaDeadline": "Nincs hozzárendelt SLA-határidő",
       "noRepositoryData": "Még nincsenek adatok az adattárakról",
       "noRepositoryDataDescription": "Az adattárak fontossági sorrendje a találatok szinkronizálása után jelenik meg.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
@@ -1783,6 +1789,7 @@
       "lastSynced": "Utoljára szinkronizálva: {{time}}",
       "manageRepositories": "Adattárak kezelése",
       "notYetSynced": "Még nincs szinkronizálva",
+      "priorityFindingsPending": "A fontosság szerint rangsorolt találatok az első szinkronizálás után jelennek meg.",
       "refreshFailed": "Nem sikerült a frissítés. Az utolsó szinkronizálás adatai láthatók.",
       "settings": "Beállítások",
       "syncNow": "Szinkronizálás most",
@@ -1828,7 +1835,6 @@
       "reasonInaccurate": "A találat pontatlan",
       "reasonNotUsed": "A sérülékeny kód nincs használatban",
       "commentLabel": "Megjegyzés (nem kötelező)",
-      "commentAccessibility": "Megjegyzés az elvetéshez",
       "commentPlaceholder": "További részletek az elvetés okáról…",
       "notFoundTitle": "A találat nem található",
       "notFoundDescription": "Lehet, hogy a találatot eltávolították, vagy már nincs hozzáférésed.",
@@ -1841,7 +1847,8 @@
     "findingDetails": {
       "supersededBy": "Újabb találat váltotta fel",
       "supersededByDescription": "Koppints az aktuális bejegyzésre az állapot, az elemzés és a hibajavítás megtekintéséhez.",
-      "dismissedBecause": "Elvetés indoka: {{reason}}.",
+      "dismissedOn": "Elvetés dátuma",
+      "supersededOn": "Újabbal helyettesítés dátuma",
       "severityLabel": "{{severity}} súlyosság",
       "package": "Csomag",
       "vulnerableVersions": "Sebezhető verziók",
@@ -1858,11 +1865,6 @@
       "viewAdvisory": "Biztonsági tájékoztató megtekintése a GitHubon",
       "statusOpen": "Nyitott",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "a javítás már folyamatban van",
-      "reasonNoBandwidth": "nincs szabad kapacitás",
-      "reasonTolerableRisk": "a kockázat elfogadható",
-      "reasonInaccurate": "a találat pontatlan",
-      "reasonNotUsed": "a sérülékeny kód nincs használatban",
       "reasonAfterReview": "felülvizsgálat után"
     },
     "settingsOverview": {
@@ -1872,7 +1874,6 @@
       "repositoriesCount_one": "{{displayCount}} adattár kiválasztva",
       "repositoriesCount": "{{displayCount}} adattár kiválasztva",
       "repositoriesCount_other": "{{displayCount}} adattár kiválasztva",
-      "selectRepositoriesSubtitle": "Válaszd ki, mely adattárakat figyelje a biztonsági ügynök",
       "analysisModeSubtitle": "{{mode}} elemzés",
       "automationAllOff": "Mind kikapcsolva",
       "automationCount": "3 közül {{displayCount}} engedélyezve",
@@ -2015,7 +2016,6 @@
       "newFindingSection": "Értesítés az új találatokról",
       "newFindingSeverityLabel": "Új találatok minimális súlyossága",
       "newFindingSubtitle": "Minden új találat szinkronizálásakor értesítést küld, az első szinkronizáláskor is.",
-      "slaLeadTimeAccessibility": "SLA-figyelmeztetés ennyi nappal a határidő előtt",
       "slaLeadTimeError": "Adj meg egy egész számot 1 és 365 között a napok számához.",
       "slaLeadTimeLabel": "SLA-figyelmeztetés a határidő előtt (nap)",
       "slaPersonalTitle": "E-mailt kérek az SLA-figyelmeztetésekről",
@@ -2063,7 +2063,10 @@
       "settleFailed": "A művelet lefutott, de nem sikerült rögzítenünk az eredményt. Próbáld újra.",
       "replayFailed": "Ez a művelet nem fejeződött be. Próbáld újra.",
       "actionFailed": "Nem sikerült befejezni ezt a műveletet. Próbáld újra.",
-      "actionBlocked": "Nem sikerült befejezni ezt a műveletet. A hibát előbb javítani kell."
+      "actionBlocked": "Nem sikerült befejezni ezt a műveletet. A hibát előbb javítani kell.",
+      "syncNoRepositories": "Egyetlen adattár sem esik a szinkronizálás hatókörébe. Válassza ki azokat az adattárakat, amelyeket a Biztonsági ügynök figyel, majd szinkronizáljon újra.",
+      "syncIntegrationInactive": "A Biztonsági ügynök GitHub-kapcsolata nem aktív. Csatlakoztassa újra a Kilo GitHub App-ot, majd szinkronizáljon újra.",
+      "syncMissingPermission": "A Kilo GitHub-alkalmazás nem tudja olvasni a sebezhetőségi riasztásokat. Add meg ezt az engedélyt a GitHubbon, majd szinkronizálj újra."
     },
     "analysisState": {
       "queued": "Elemzés várólistán",
@@ -2097,7 +2100,6 @@
       "closedOn": "{{status}}: {{date}}",
       "deadlineNotSet": "Nincs határidő beállítva",
       "noSlaDeadline": "Nincs SLA-határidő",
-      "dueOn": "Esedékes: {{date}}",
       "overdueNow": "Lejárt",
       "overdue_one": "{{count}} napja lejárt",
       "overdue_other": "{{count}} napja lejárt",
@@ -2371,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "A számítógépen lévő fájlok nem változnak.",
       "pickProfile": "Válassz egy profilt",
       "noProfile": "Nincs profil",
+      "defaultProfileResolvesTo": "Jelenleg: {{name}}",
+      "defaultProfileResolvesToAccessibility": "Alapértelmezett profil: {{name}}",
       "manageProfiles": "Profilok kezelése",
       "noProfiles": "Még nincsenek profilok. Hozz létre egyet a környezeti változók, MCP-kiszolgálók és készségek hozzáadásához.",
       "advancedConfig": "Speciális konfiguráció",
       "advancedConfigDescription": "Erre a munkamenetre érvényes. Profilként mentve a következő alkalomra is megmarad.",
       "saveAsProfile": "Mentés profilként",
       "saveProfileDescription": "Mentsd el az aktuális környezeti változókat és a beállítási parancsokat újrafelhasználható profilként.",
-      "profileSummary": "{{vars}} környezeti változó · {{commands}} beállítási parancs",
       "profileSaved": "A \"{{name}}\" profil mentve",
       "organizationProfiles": "Szervezeti profilok",
       "personalProfiles": "Személyes profilok",
@@ -3151,7 +3154,7 @@
     "couldNotSaveChoice": "A választásod mentése nem sikerült. Próbáld újra.",
     "onlineAllowed": "Online, engedélyezve",
     "onlineNotAllowed": "Online, nem engedélyezve",
-    "optionalReview": "Opcionális – a beállításokban bármikor módosíthatod",
+    "optionalReview": "Opcionális",
     "optionalOnboarding": "Opcionális – alapértelmezetten bekapcsolva",
     "aiProvidersWhat": "Az utasításaid, a beszélgetési előzményeid és minden csatolt fájlod.",
     "aiProvidersWhy": "Az AI-válaszok létrehozásához.",
@@ -3849,6 +3852,7 @@
       "markSecret": "Jelölje meg titkosként",
       "masked": "Rejtett érték",
       "reveal": "Érték feltárása",
+      "hide": "Érték elrejtése",
       "newValuePlaceholder": "Adj meg új titkos értéket",
       "valuePlaceholder": "Titkos érték (titkosítva)"
     },
@@ -3977,7 +3981,8 @@
       "nameRequired": "Adja meg a parancs nevét",
       "nameInvalid": "A névnek kisbetűvel kell kezdődnie, és csak kisbetűket, számjegyeket és kötőjeleket kell használnia",
       "templateRequired": "Írjon be egy parancssablont",
-      "nameConflict": "Ezt a nevet egy beépített parancs foglalja le"
+      "nameConflict": "Ezt a nevet egy beépített parancs foglalja le",
+      "duplicateName": "Ezt a nevet már egy másik parancs használja ebben a profilban"
     },
     "repoBindings": {
       "title": "Alapértelmezett profilok adattárakhoz",
@@ -3986,7 +3991,7 @@
       "emptyDescription": "Adjon hozzá egy alapértelmezett profilt, amely automatikusan alkalmazza a profilt az adattár munkameneteinek indításakor.",
       "repo": "Adattár kiválasztása…",
       "profile": "Profil kiválasztása",
-      "remove": "Kötés feloldása",
+      "removeForRepo": "Kötés feloldása: {{repo}}",
       "search": "Adattárak keresése…",
       "addedToast": "Alapértelmezett profil beállítva az adattárhoz: „{{repo}}”",
       "addFailed": "Nem sikerült beállítani az alapértelmezett profilt",

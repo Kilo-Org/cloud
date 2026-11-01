@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -11,8 +11,8 @@ import {
   mcpServerRows,
   type McpServerSource,
 } from '@/components/profiles/profile-mcp-model';
+import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -25,6 +25,7 @@ import {
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
+import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { readTrpcErrorField } from '@/lib/trpc-error';
@@ -58,47 +59,48 @@ export function ProfileMcpScreen({
   const { createMcp, updateMcp, deleteMcp, setMcpEnabled } =
     useAgentProfileSectionMutations(organizationId);
   const canManage = useCanManageOrganizationProfiles(organizationId);
-
   const servers = profileQuery.data ?? NO_MCP_SERVERS;
   const rows = mcpServerRows(servers);
-  // `null` = closed, `{ server: null }` = add, `{ server }` = edit that server.
-  const [form, setForm] = useState<{ server: McpServerSource | null } | null>(null);
-  // A save the server refused on the name index shows the inline conflict
-  // instead of a toast the open sheet covers; any other refusal shows one line
-  // inside the sheet. Both reset when the form opens and each save starts.
-  const [serverNameConflict, setServerNameConflict] = useState(false);
-  const [saveFailure, setSaveFailure] = useState<string | null>(null);
+  // The open form, its fields and the refusal the sheet shows are one draft, so
+  // opening or closing the form resets the refusal with everything else.
+  const draftScope = `profiles:mcp:${profileId}`;
+  const form = useProfileFormDraft(draftScope, servers, {
+    conflict: false,
+    failure: null as string | null,
+  });
   // The list sits underneath the sheet, and a sheet dismisses natively, so the
   // second tap of a Save double tap would land on the row just saved.
   const { markClosed: markSheetClosed, guard: guardRowPress } = useSheetRowTapGuard();
+  const { startAdd: handleStartAdd } = form;
 
-  const startAdd = () => {
-    setForm({ server: null });
-    setServerNameConflict(false);
-    setSaveFailure(null);
-  };
-
-  const closeForm = () => {
+  const handleClose = () => {
     markSheetClosed();
-    setForm(null);
+    form.close();
   };
 
   const saveServer = async (target: McpServerSource | null, payload: McpServerPayload) => {
-    setServerNameConflict(false);
-    setSaveFailure(null);
+    // The form this save belongs to. A remount keeps it alive; a later open or
+    // close replaces it, and this attempt must then leave the new form alone.
+    const generation = form.generation();
+    form.setNotes({ conflict: false, failure: null });
     try {
       await (target === null
         ? createMcp.mutateAsync({ profileId, server: payload })
         : updateMcp.mutateAsync({ profileId, mcpServerId: target.id, server: payload }));
     } catch (error) {
-      if (readTrpcErrorField(error, 'code') === 'CONFLICT') {
-        setServerNameConflict(true);
+      if (!form.isCurrent(generation)) {
         return;
       }
-      setSaveFailure(t('profiles.mcp.saveFailed'));
+      if (readTrpcErrorField(error, 'code') === 'CONFLICT') {
+        form.setNotes({ conflict: true, failure: null });
+        return;
+      }
+      form.setNotes({ conflict: false, failure: t('profiles.mcp.saveFailed') });
       return;
     }
-    closeForm();
+    if (form.isCurrent(generation)) {
+      handleClose();
+    }
   };
 
   const runDelete = async (mcpServerId: string) => {
@@ -144,7 +146,7 @@ export function ProfileMcpScreen({
         placement="top"
         action={
           canManage ? (
-            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
+            <Button className={STATE_ACTION_CLASS} onPress={handleStartAdd}>
               <Text>{t('profiles.mcp.add')}</Text>
             </Button>
           ) : null
@@ -184,9 +186,7 @@ export function ProfileMcpScreen({
               onEdit={
                 canManage
                   ? guardRowPress(() => {
-                      setForm({ server });
-                      setServerNameConflict(false);
-                      setSaveFailure(null);
+                      form.startEdit(server);
                     })
                   : undefined
               }
@@ -201,7 +201,7 @@ export function ProfileMcpScreen({
           );
         })}
         {canManage ? (
-          <Button onPress={startAdd}>
+          <Button onPress={handleStartAdd}>
             <Text>{t('profiles.mcp.add')}</Text>
           </Button>
         ) : null}
@@ -211,7 +211,11 @@ export function ProfileMcpScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profiles.mcp.title')} />
+      <ProfileSectionHeader
+        profileId={profileId}
+        organizationId={organizationId}
+        title={t('profiles.mcp.title')}
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"
@@ -222,18 +226,19 @@ export function ProfileMcpScreen({
         {content}
       </TabScreenScrollView>
 
-      {form !== null ? (
+      {form.isOpen ? (
         <McpFormSheet
-          server={form.server}
+          draftScope={draftScope}
+          server={form.editing}
           existingNames={servers
-            .filter(candidate => candidate.id !== form.server?.id)
+            .filter(candidate => candidate.id !== form.editing?.id)
             .map(candidate => candidate.name)}
           isSaving={createMcp.isPending || updateMcp.isPending}
-          nameConflictFromServer={serverNameConflict}
-          saveFailure={saveFailure}
-          onClose={closeForm}
+          nameConflictFromServer={form.notes.conflict}
+          saveFailure={form.notes.failure}
+          onClose={handleClose}
           onSave={payload => {
-            void saveServer(form.server, payload);
+            void saveServer(form.editing, payload);
           }}
         />
       ) : null}

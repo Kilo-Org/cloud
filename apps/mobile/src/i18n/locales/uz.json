@@ -69,6 +69,7 @@
     "organization": "Tashkilot",
     "platform": "Platforma",
     "prReview": "PRni ko‘rib chiqish",
+    "prReviewSubtitle": "PR tekshiruvlarini mobil qurilmada bajarish",
     "queued": "Navbatda",
     "remove": "Olib tashlash",
     "repository": "Repozitoriy",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "PR tekshiruvlarini avtomatik bajarish",
     "securityAgentSubtitle": "Zaifliklarni topish va bartaraf etish",
     "reviews": "Tekshiruvlar",
-    "prReviewSubtitle": "PR tekshiruvlarini mobil qurilmada bajarish",
     "couldNotLoadOrganization": "Tashkilotni yuklab bo'lmadi.",
     "couldNotLoadOrganizationDescription": "Ma'lumotlar yuklanmaguncha tashkilot va agent sozlamalarini ochib bo'lmaydi.",
     "linkedAccounts": "Bog'langan hisoblar",
@@ -330,7 +330,7 @@
       "diffTooLarge": "farqlar hajmi juda katta",
       "openFile": "{{path}}ni ochish",
       "openFileViewed": "{{path}}ni ochish (ko'rilgan)",
-      "title": "Fayl"
+      "title": "Fayllar"
     },
     "fileRows": {
       "markViewed": "{{path}}ni ko'rilgan deb belgilash",
@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub bilan ulanish muddati tugadi.",
     "merge": {
       "merge": "Birlashtirish",
+      "mergeTitle": "Birlashtirish",
       "mergeNow": "Hozir birlashtirish",
       "mergePullRequest": "PRni birlashtirish",
       "mergeTermTitle": "{{term}}ni birlashtirish",
@@ -605,7 +606,6 @@
     "entry": {
       "noRecentPrs": "Oxirgi ko‘rib chiqishlar yo‘q",
       "noRecentPrsDescription": "Ko‘rib chiqishni boshlash uchun yuqoriga havolani joylashtiring — keyingi safar u shu yerda ko‘rinadi.",
-      "couldNotLoad": "Yuklab bo'lmadi.",
       "removeFromRecentsTitle": "Oxirgilar ro'yxatidan olib tashlansinmi?",
       "removeFromRecentsMessage": "Bu ko‘rib chiqish oxirgilar ro‘yxatidan olib tashlanadi.",
       "removeRecentAccessibility": "{{repo}}ni oxirgilar ro'yxatidan olib tashlash",
@@ -679,12 +679,13 @@
       "checkFailedTitleBitbucket": "Bitbucket ulanishini tekshirib bo'lmadi.",
       "providerCheckFailedMessage": "Yuklanmaguncha ulanish holati mavjud emas.",
       "reconnectTitle": "GitHubga qayta ulanish",
-      "reconnectDescription": "GitHub ulanishingiz bekor qilingan. Mobil qurilmada PRlarni ko'rib chiqishni davom ettirish uchun qayta ulaning.",
-      "description": "Mobil qurilmada PRlarni ko'rib chiqish uchun GitHub hisobingizni ulang.",
-      "gitlabDescription": "Telefonda merge so‘rovlarini ko‘rib chiqish uchun GitLab hisobingizni ulang.",
-      "bitbucketDescription": "Telefonda PRlarni ko‘rib chiqish uchun Bitbucketni ushbu tashkilotga ulang.",
+      "reconnectDescription": "GitHub ulanishingiz bekor qilingan.",
+      "gitlabDescription": "Merge so‘rovlari tekshiruvlarini mobil qurilmada bajarish",
       "bitbucketOrgOnlyDescription": "Yuqoridagi hisobni tashkilotga oʻtkazing, uning Bitbucket PRlarini koʻrib chiqish uchun.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hisobda hozircha hech qanday tashkilot yo‘q. Tashkilot yaratganingizdan yoki unga qo‘shilganingizdan so‘ng Bitbucket PRlarini ko‘rib chiqish mumkin.",
+      "gitlabReconnectAdminOnlyDescription": "Uni ulashni tashkilot Egasi, Administrator yoki To'lov menejeridan so'rang.",
+      "bitbucketNotConnectedTitle": "Bitbucket ulanmagan",
+      "bitbucketAdminOnlyDescription": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin.",
       "contextLine": "{{organization}} uchun",
       "contextLinePersonal": "Shaxsiy hisob uchun"
     },
@@ -759,7 +760,7 @@
     },
     "tabs": {
       "overview": "Umumiy ko'rinish",
-      "files": "Fayl",
+      "files": "Fayllar",
       "discussion": "Muhokama"
     },
     "fileStatus": {
@@ -834,7 +835,8 @@
     "liveUpdates": "Jonli yangilanishlar",
     "liveUpdateSubtitle": "Faol agentlarni bildirishnomalaringizda ko'rsatish",
     "push": "Bildirishnomalar",
-    "onDescription": "Bu qurilmada bildirishnomalar yoqilgan.",
+    "deviceTitle": "Bu qurilmada push-bildirishnomalar",
+    "onDescription": "Ogohlantirishlar quyidagi toifalar bo'yicha yuboriladi.",
     "offDescription": "Bildirishnomalarga ruxsat berilmagan yoki qurilma ularni olish uchun ro'yxatdan o'tmagan.",
     "retryPermission": "Bildirishnomalarga ruxsatni qayta tekshirish",
     "enable": "Bildirishnomalarni yoqish",
@@ -1019,7 +1021,7 @@
     "attachmentPicker": {
       "takePhoto": "Rasmga olish",
       "photoLibrary": "Rasmlar kutubxonasi",
-      "files": "Fayl",
+      "files": "Fayllar",
       "cameraAccessMessage": "Suratga olish uchun sozlamalarda kameradan foydalanishga ruxsat bering."
     },
     "typingIndicator": {
@@ -1417,7 +1419,9 @@
     "instructions": {
       "title": "Maxsus ko‘rsatmalar",
       "deprecation": "Maxsus ko'rsatmalar funksiyasini bekor qilish rejalashtirilgan. Bu ko'rsatmalarni repozitoriyangizdagi REVIEW.md fayliga ko'chiring.",
-      "placeholder": "masalan, xatolarni qayta ishlash qoidalarimizga rioya qilinishini tekshiring…"
+      "placeholder": "masalan, xatolarni qayta ishlash qoidalarimizga rioya qilinishini tekshiring…",
+      "clearTitle": "Maxsus ko‘rsatmalar olib tashlansinmi?",
+      "clearMessage": "Bo'sh maydonni saqlash ushbu ko'rib chiquvchi uchun saqlangan maxsus ko'rsatmalarni o'chiradi."
     },
     "repos": {
       "unavailable": "Repozitoriyalar mavjud emas. Bitbucketni sozlashni kilo.ai saytida yakunlang.",
@@ -1452,7 +1456,7 @@
       "fixSettings": "Sozlamalarni tuzatish",
       "couldNotLoad": "Ko'rib chiqish ma'lumotlarini yuklab bo'lmadi.",
       "couldNotGetLatest": "Eng so'nggi ma'lumotlarni olib bo'lmadi.",
-      "byline": "{{repo}} #{{number}}, muallif: {{author}}",
+      "byline": "#{{number}}, muallif: {{author}}",
       "noFindings": "Muammolar topilmadi.",
       "findingsUnavailable": "Bu ko'rib chiqish muvaffaqiyatsiz tugagani uchun natijalar mavjud emas.",
       "findingsInProgress": "Bu ko'rib chiqish hali davom etmoqda. Tugagach, muammolar shu yerda paydo bo'ladi.",
@@ -1533,11 +1537,13 @@
       "offAction": "Ko'rib chiqish xotirasi o'chiq. Uni yoqing, so'ng qayta urinib ko'ring."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Merge so‘rovi uchun to'g'ri URL manzilini kiriting.",
+      "mergeRequestUrl": "Merge so‘rovi manzili (URL)",
+      "instructionsAtLimit": "Ko‘rsatmalar {{max}} ta belgi bilan cheklangan",
       "title": "Qo'lda ko'rib chiqish",
       "invalidUrl": "PR uchun to'g'ri URL manzilini kiriting.",
       "couldNotCheckProviderStatus": "Provayder holatini tekshirib bo'lmadi.",
       "couldNotLoadProviders": "Ulangan provayderlaringizni yuklay olmadik. Iltimos, qayta urinib ko'ring.",
-      "connectProviderDescription": "PRni qo'lda ko'rib chiqishni boshlash uchun GitHubni ulang.",
       "pullRequestUrl": "PR manzili (URL)",
       "instructions": "Ko'rsatmalar (ixtiyoriy)",
       "instructionsPlaceholder": "Ko'rib chiqishda alohida e'tibor beriladigan jihatlar…",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "Ko‘rib chiqish uslubi",
       "focusAreas": "Asosiy yo‘nalishlar",
       "allAreas": "Barcha yo'nalishlar",
-      "customInstructions": "Maxsus ko‘rsatmalar",
       "set": "Belgilangan",
+      "notSet": "Belgilanmagan",
       "nSelected": "{{displayCount}} ta tanlangan",
       "proposedReviewMdGuidance": "Taklif etilgan REVIEW.md yo'riqnomasi"
     },
@@ -1680,7 +1686,8 @@
       "sortSeverityDesc": "Xavf darajasi: yuqoridan pastga",
       "sortSeverityAsc": "Xavf darajasi: pastdan yuqoriga",
       "sortSlaDue": "SLA muddati",
-      "overdueOnly": "Faqat muddati o'tganlar"
+      "overdueOnly": "Faqat muddati o'tganlar",
+      "noRepositories": "Hozircha hech qanday repozitoriy sinxronlanmagan yoki tanlanmagan. Ularni «Xavfsizlik agenti» sozlamalarida tanlang."
     },
     "automation": {
       "title": "Avtomatlashtirish",
@@ -1765,7 +1772,6 @@
       "noImmediateAction": "Zudlik bilan chora ko'rish shart emas",
       "notExploitable": "Hujumda foydalanib bo‘lmaydi",
       "needsYourReview": "Ko‘rib chiqishingiz kerak",
-      "noSlaDeadline": "SLA muddati belgilanmagan",
       "noRepositoryData": "Hali repozitoriya ma'lumotlari yo'q",
       "noRepositoryDataDescription": "Muammolar sinxronlangach, repozitoriyalar ustuvorligi ko'rsatiladi.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
@@ -1783,6 +1789,7 @@
       "lastSynced": "Oxirgi sinxronlash: {{time}}",
       "manageRepositories": "Repozitoriyalarni boshqarish",
       "notYetSynced": "Hali sinxronlanmagan",
+      "priorityFindingsPending": "Birinchi sinxronlashdan so'ng ustuvor muammolar ko'rsatiladi.",
       "refreshFailed": "Yangilash imkoni bo'lmadi — oxirgi sinxronlangan ma'lumotlar ko'rsatilmoqda.",
       "settings": "Sozlamalar",
       "syncNow": "Hozir sinxronlash",
@@ -1828,7 +1835,6 @@
       "reasonInaccurate": "Muammo noto‘g‘ri aniqlangan",
       "reasonNotUsed": "Zaiflik bor kod ishlatilmaydi",
       "commentLabel": "Izoh (ixtiyoriy)",
-      "commentAccessibility": "Rad etish izohi",
       "commentPlaceholder": "Rad etish haqida qo'shimcha izoh…",
       "notFoundTitle": "Muammo topilmadi",
       "notFoundDescription": "Bu muammo o'chirilgan yoki uni ko'rish huquqingiz bekor qilingan bo'lishi mumkin.",
@@ -1841,7 +1847,8 @@
     "findingDetails": {
       "supersededBy": "O'rniga dolzarb muammo qayd etilgan",
       "supersededByDescription": "Holat, tahlil va tuzatish ma'lumotlarini ko'rish uchun dolzarb yozuvni bosing.",
-      "dismissedBecause": "Rad etish sababi: {{reason}}.",
+      "dismissedOn": "E’tiborsiz qoldirilgan sana",
+      "supersededOn": "Almashtirilgan sana",
       "severityLabel": "Xavf darajasi: {{severity}}",
       "package": "Paket",
       "vulnerableVersions": "Zaiflik mavjud versiyalar",
@@ -1858,11 +1865,6 @@
       "viewAdvisory": "GitHubda xavfsizlik xabarnomasini ko'rish",
       "statusOpen": "Ochiq",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "tuzatish allaqachon boshlangan",
-      "reasonNoBandwidth": "vaqt va resurs yetarli emas",
-      "reasonTolerableRisk": "xavf maqbul darajada",
-      "reasonInaccurate": "muammo noto‘g‘ri aniqlangan",
-      "reasonNotUsed": "zaiflik bor kod ishlatilmaydi",
       "reasonAfterReview": "ko'rib chiqilgach"
     },
     "settingsOverview": {
@@ -1872,7 +1874,6 @@
       "repositoriesCount_one": "{{displayCount}} ta repozitoriya tanlangan",
       "repositoriesCount": "{{displayCount}} ta repozitoriy tanlangan",
       "repositoriesCount_other": "{{displayCount}} ta repozitoriy tanlangan",
-      "selectRepositoriesSubtitle": "Xavfsizlik agenti kuzatadigan repozitoriyalarni tanlang",
       "analysisModeSubtitle": "{{mode}} tahlil",
       "automationAllOff": "Hammasi o'chiq",
       "automationCount": "3 tadan {{displayCount}} tasi yoqilgan",
@@ -1923,7 +1924,7 @@
       "highDescription": "Muhim ma'lumotlarning oshkor bo'lish xavfi.",
       "mediumDescription": "Cheklangan ta'sir yoki muayyan shartlar.",
       "lowDescription": "Xavfsizlikka juda kam ta'sir.",
-      "invalidDayCount": "kunlar soni 1 dan 365 gacha bo'lgan butun son bo'lishi kerak.",
+      "invalidDayCount": "Kunlar soni 1 dan 365 gacha bo'lgan butun son bo'lishi kerak.",
       "remediationDeadlineA11y": "{{label}} darajasidagi muammoni tuzatish muddati, kun hisobida",
       "enterWholeNumber": "1 Dan 365 gacha bo‘lgan butun sonni kiriting",
       "permissionNote": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari bu sozlamalarni o'zgartira oladi.",
@@ -2015,7 +2016,6 @@
       "newFindingSection": "Yangi muammo haqida bildirishnoma",
       "newFindingSeverityLabel": "Yangi muammolar uchun eng past xavf darajasi",
       "newFindingSubtitle": "Har safar yangi muammo sinxronlanganda, jumladan, birinchi sinxronlashda ham yuboriladi.",
-      "slaLeadTimeAccessibility": "SLA muddati tugashidan necha kun oldin ogohlantirish",
       "slaLeadTimeError": "Kunlar sonini 1 dan 365 gacha bo'lgan butun son bilan kiriting.",
       "slaLeadTimeLabel": "SLA muddati tugashidan oldin ogohlantirish (kun)",
       "slaPersonalTitle": "SLA ogohlantirishlari haqida menga elektron xat yuborish",
@@ -2063,7 +2063,10 @@
       "settleFailed": "Amal bajarildi, ammo natijani qayd etishimiz mumkin bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "replayFailed": "Bu amal tugallanmadi. Iltimos, qayta urinib ko'ring.",
       "actionFailed": "Bu amalni tugallab bo'lmadi. Iltimos, qayta urinib ko'ring.",
-      "actionBlocked": "Bu amalni tugallab bo'lmadi. Muammoni avval hal qilish kerak."
+      "actionBlocked": "Bu amalni tugallab bo'lmadi. Muammoni avval hal qilish kerak.",
+      "syncNoRepositories": "Sinxronlash doirasida hech qanday repozitoriy yo'q. «Xavfsizlik agenti» kuzatadigan repozitoriylarni tanlang, so'ngra qayta sinxronlang.",
+      "syncIntegrationInactive": "«Xavfsizlik agenti»ning GitHub ulanishi faol emas. Kilo GitHub App’ni qayta ulang, so‘ng qaytadan sinxronlang.",
+      "syncMissingPermission": "Kilo GitHub App zaiflik ogohlantirishlarini o'qiy olmaydi. GitHubda shu ruxsatni bering, so'ng yana sinxronlang."
     },
     "analysisState": {
       "queued": "Tahlil navbatda",
@@ -2097,7 +2100,6 @@
       "closedOn": "{{date}}: {{status}}",
       "deadlineNotSet": "Muddat belgilanmagan",
       "noSlaDeadline": "SLA muddati belgilanmagan",
-      "dueOn": "Muddati: {{date}}",
       "overdueNow": "Muddati o'tgan",
       "overdue_one": "Muddati {{count}} kun o'tgan",
       "overdue_other": "{{count}} kun kechikdi",
@@ -2371,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "Bu kompyuterdagi fayllar o'zgartirilmaydi.",
       "pickProfile": "Profilni tanlang",
       "noProfile": "Profil yo'q",
+      "defaultProfileResolvesTo": "Hozir {{name}} profili",
+      "defaultProfileResolvesToAccessibility": "Standart profil: {{name}}",
       "manageProfiles": "Profillarni boshqarish",
       "noProfiles": "Hozircha profil yo'q. Atrof-muhit o'zgaruvchilari, MCP serverlari va ko'nikmalarini qo'shish uchun bitta yarating.",
       "advancedConfig": "Kengaytirilgan konfiguratsiya",
       "advancedConfigDescription": "Bu sessiya uchun amal qiladi. Profil sifatida saqlansa, keyingi safar uchun qoladi.",
       "saveAsProfile": "Profil sifatida saqlash",
       "saveProfileDescription": "Joriy muhit o'zgaruvchilari va sozlash buyruqlarini qayta foydalanish mumkin bo'lgan profil sifatida saqlang.",
-      "profileSummary": "{{vars}} muhit o'zgaruvchilari · {{commands}} sozlash buyruqlari",
       "profileSaved": "“{{name}}” profili saqlandi",
       "organizationProfiles": "Tashkilot profillari",
       "personalProfiles": "Shaxsiy profillar",
@@ -2768,7 +2771,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Rasmlar kutubxonasi",
-      "files": "Fayl",
+      "files": "Fayllar",
       "couldNotOpenPhotoPicker": "Rasm tanlash oynasini ochib bo'lmadi. Kilo ilovasini qayta ishga tushiring va yana urinib ko'ring.",
       "maxFilesAllowed": "Ko'pi bilan {{displayCount}} ta fayl qo'shish mumkin.",
       "onlyAddingFiles": "{{total}} ta fayldan faqat {{accepted}} tasi qo'shilmoqda (ko'pi bilan {{max}} ta)",
@@ -3151,7 +3154,7 @@
     "couldNotSaveChoice": "Tanlovingizni saqlab bo'lmadi. Iltimos, qayta urinib ko'ring.",
     "onlineAllowed": "Onlayn, ruxsat berilgan",
     "onlineNotAllowed": "Onlayn, ruxsat berilmagan",
-    "optionalReview": "Ixtiyoriy — istalgan vaqtda sozlamalarda o'zgartirishingiz mumkin",
+    "optionalReview": "Ixtiyoriy",
     "optionalOnboarding": "Ixtiyoriy — o'chirmaguningizcha yoqilgan",
     "aiProvidersWhat": "So'rovlaringiz, suhbat tarixi va biriktirgan fayllaringiz.",
     "aiProvidersWhy": "AI javoblarini yaratish uchun.",
@@ -3849,6 +3852,7 @@
       "markSecret": "Sir sifatida belgilang",
       "masked": "Yashirin qiymat",
       "reveal": "Qiymatni oshkor qilish",
+      "hide": "Qiymatni yashirish",
       "newValuePlaceholder": "Yangi maxfiy qiymatni kiriting",
       "valuePlaceholder": "Maxfiy qiymat (shifrlangan)"
     },
@@ -3977,7 +3981,8 @@
       "nameRequired": "Buyruq nomini kiriting",
       "nameInvalid": "Ism kichik harf bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
       "templateRequired": "Buyruq shablonini kiriting",
-      "nameConflict": "Bu nom o'rnatilgan buyruq bilan saqlangan"
+      "nameConflict": "Bu nom o'rnatilgan buyruq bilan saqlangan",
+      "duplicateName": "Bu profilda bu nom bilan buyruq allaqachon mavjud"
     },
     "repoBindings": {
       "title": "Repos uchun standart profillar",
@@ -3986,7 +3991,7 @@
       "emptyDescription": "Repo uchun seanslarni boshlashda profilni avtomatik ravishda qo'llash uchun standartni qo'shing.",
       "repo": "Repozitoriyni tanlang…",
       "profile": "Profilni tanlang",
-      "remove": "Bog'lash",
+      "removeForRepo": "{{repo}} bog'lovini olib tashlash",
       "search": "Repozitariylarni qidirish…",
       "addedToast": "“{{repo}}” uchun birlamchi profil oʻrnatilgan",
       "addFailed": "Standart profilni o‘rnatib bo‘lmadi",

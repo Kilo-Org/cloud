@@ -7,6 +7,7 @@ import { View } from 'react-native';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
+import { SettingsOverviewSkeleton } from '@/components/security-agent/settings-overview-skeleton';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -33,19 +34,8 @@ const ANALYSIS_MODE_KEYS = {
   deep: 'securityAgent.analysisMode.deep',
 };
 
-function SettingsOverviewSkeleton() {
-  const { t } = useTranslation();
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={t('securityAgent.dashboard.settings')} />
-      <View className="gap-3 px-6 pt-4">
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
-      </View>
-    </View>
-  );
-}
+// The loading state lives in its own module (`settings-overview-skeleton`) so
+// the settled screen keeps under the file-length cap.
 
 function getDisabledCopy(canManage: boolean, hasEffectiveRepo: boolean): string {
   if (!canManage) {
@@ -126,12 +116,16 @@ export function SettingsOverviewScreen({
     );
   }
   if (config.isLoading || !config.data || capability.status === 'loading') {
-    return <SettingsOverviewSkeleton />;
+    return <SettingsOverviewSkeleton scope={scope} />;
   }
 
   const data = config.data;
   // A loading or failed repository query must not read as zero repositories.
   const repositoriesEmpty = repositories.data?.length === 0;
+  // Only a settled empty answer names the grant as the next step: a stale `[]`
+  // under a failed refetch, or a read still in flight, keeps the recovery
+  // status and the generic picker copy instead.
+  const repositoriesSettledEmpty = repositoriesEmpty && !repositoriesLoading && !repositoriesError;
   // An enable attempt with no effective repository would be refused by the
   // server, so the switch is disabled up front under the same rule: `selected`
   // mode with zero selected ids, or `all` mode with zero integration repos.
@@ -139,14 +133,14 @@ export function SettingsOverviewScreen({
     data.repositorySelectionMode === 'all'
       ? (repositories.data?.length ?? 0) > 0
       : data.selectedRepositoryIds.length > 0;
-  // A disabled agent with integration repos but no effective selection is the
-  // first-enable deadlock: the switch is disabled (the server would refuse an
-  // empty effective set) and the Repositories row only renders when enabled, so
-  // offer a direct path to the repo picker. Hide the CTA only when the repo set
-  // is settled and empty (nothing to select); a loading or failed repo query
-  // keeps the CTA reachable.
-  const showRepoCta =
-    !data.isEnabled && capability.canManage && !hasEffectiveRepo && !repositoriesEmpty;
+  // A disabled agent with no effective selection is the first-enable deadlock:
+  // the switch is disabled (the server would refuse an empty effective set) and
+  // the Repositories row only renders when enabled, so offer a direct path to
+  // the repo picker. That path must stay reachable when the GitHub App grant is
+  // settled and empty — there is nothing to select yet, and widening the grant
+  // is the only way out, so hiding the CTA there left the page with no way to
+  // grant repositories and no way to turn the agent back on.
+  const showRepoCta = !data.isEnabled && capability.canManage && !hasEffectiveRepo;
   let repoCountLabel = t('securityAgent.settingsOverview.repositoriesCount', {
     count: data.selectedRepositoryIds.length,
     displayCount: formatNumber(data.selectedRepositoryIds.length, i18n.language),
@@ -268,7 +262,16 @@ export function SettingsOverviewScreen({
                 <ConfigureRow
                   icon={FolderGit2}
                   title={t('common.selectRepositories')}
-                  subtitle={t('securityAgent.settingsOverview.selectRepositoriesSubtitle')}
+                  // No count subtitle: this row renders only without an
+                  // effective selection, so a saved count would always read
+                  // zero. A settled empty grant is the one state that names the
+                  // real next step instead — there is nothing to select, so
+                  // widening the GitHub App grant is the only way out.
+                  subtitle={
+                    repositoriesSettledEmpty
+                      ? t('securityAgent.repositories.noRepositoriesDescription')
+                      : undefined
+                  }
                   onPress={() => {
                     pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
                   }}

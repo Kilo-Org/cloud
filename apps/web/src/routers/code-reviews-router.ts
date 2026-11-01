@@ -242,7 +242,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
         accountLogin: integration.platform_account_login,
         repositorySelection: integration.repository_access,
         installedAt: integration.installed_at,
-        isValid: true, // GitLab OAuth doesn't have suspension concept
         instanceUrl: (metadata?.gitlab_instance_url as string) || 'https://gitlab.com',
       },
     };

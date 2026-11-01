@@ -5,12 +5,13 @@ import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { ContextControl } from '@/components/context-control';
 import { EmptyState } from '@/components/empty-state';
 import { PrLinkPlaceholder } from '@/components/pr-review/pr-link-placeholder';
 import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
+import { PrReviewRecentsPending } from '@/components/pr-review/pr-review-recents-pending';
+import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { selectRecentPrRowState } from '@/lib/pr-review/recent-pr-row-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -19,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { providerPrRefLabel, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import {
@@ -140,7 +141,7 @@ export function PrReviewEntryScreen() {
 
   let recentsBody: ReactNode = null;
   if (recent === null) {
-    recentsBody = <ActivityIndicator size="small" color={colors.mutedForeground} />;
+    recentsBody = <PrReviewRecentsPending />;
   } else if (recent.length === 0) {
     recentsBody = (
       <EmptyState
@@ -204,20 +205,36 @@ export function PrReviewEntryScreen() {
                 <DirectionalChevronRight size={16} color={colors.mutedForeground} />
               </Pressable>
               {rowState.failed ? (
-                <View className="flex-row items-center justify-between gap-3 border-t border-hair-soft px-3 py-2">
+                // The footer names the item that failed, not just "couldn't
+                // load": the row stands for one pull/merge request, so the
+                // provider's own noun says what to retry. The retry keeps the
+                // link treatment — a bordered control beside the card's plain
+                // lines read as a piece of another surface — while its own node
+                // still carries the state-action box, because `hitSlop` widens
+                // the touch region without enlarging the rect an audit reads.
+                <View className="flex-row items-center justify-between gap-3 border-t border-hair-soft px-3 py-1">
                   <Text variant="muted" className="min-w-0 flex-1 text-xs">
-                    {t('prReview.entry.couldNotLoad')}
+                    {t('common.couldNotOpen', {
+                      label: t(providerPrNounKey(entry.platform ?? 'github')),
+                    })}
                   </Text>
                   <Button
-                    size="sm"
-                    variant="outline"
-                    className={STATE_ACTION_CLASS}
+                    size="action"
+                    variant="link"
+                    className="px-0"
+                    hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}
                     onPress={() => {
                       handleRecentPress(entry);
                     }}
                     accessibilityLabel={t('common.retry')}
                   >
-                    <Text>{t('common.retry')}</Text>
+                    {/* The card's own ink, not the link accent: this retry sits
+                        in a footer under a row's plain lines, and the accent is
+                        the loudest colour the dark card can carry, so it read
+                        as a second primary action over the screen's own Open
+                        button. The link affordance (the press underline) and
+                        the action box stay. */}
+                    <Text className="text-foreground">{t('common.retry')}</Text>
                   </Button>
                 </View>
               ) : null}
@@ -229,65 +246,87 @@ export function PrReviewEntryScreen() {
   }
 
   const pasteBlock = (
-    <View className="gap-3">
-      <View className="flex-row items-center gap-2">
-        <View
-          className="min-h-14 min-w-0 flex-1 flex-row items-center rounded-md border border-border bg-card"
-          testID="pr-link-input-row"
-          collapsable={false}
-        >
-          <Input
-            ref={inputRef}
-            defaultValue={initialText}
-            placeholder={urlPlaceholder}
-            // The native hint is not reliably one line: Android lays it out
-            // on a second line the one-line field clips. Both platforms draw
-            // the visible placeholder with the one-line PrLinkPlaceholder
-            // overlay instead; the hint stays set for the digest and
-            // accessibility text but is invisible.
-            placeholderTextColor="transparent"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            numberOfLines={1}
-            onChangeText={handleFieldChange}
-            // The shared single-line box (`@/components/ui/input`) supplies the
-            // height floor, the one line box for the placeholder and the value,
-            // and the RTL content alignment, so this field keeps only its own
-            // chrome and text size.
-            className="min-w-0 flex-1 bg-transparent pl-3 pr-1 text-base text-foreground"
-            accessibilityLabel={t('prReview.entry.urlAccessibility')}
-            returnKeyType="go"
-            onSubmitEditing={handleSubmit}
-          />
-          {!hasInput ? <PrLinkPlaceholder label={urlPlaceholder} /> : null}
-          {showClearButton ? (
-            // The clear control is icon-only like the paste control beside it,
-            // so it carries the same shared 48dp target; the 45pt box it used
-            // to render (`h-13`, which is 45pt at this app's 14pt rem) sits
-            // under Android's minimum.
-            <Pressable
-              onPress={clearField}
-              accessibilityRole="button"
-              accessibilityLabel={t('prReview.entry.clearLink')}
-              className={`${ICON_TARGET_BOX_CLASS} active:opacity-70`}
-            >
-              <X size={16} color={colors.mutedForeground} />
-            </Pressable>
-          ) : null}
+    <View>
+      <View className="gap-4">
+        <View className="flex-row items-center gap-2">
+          <View
+            className="min-h-14 min-w-0 flex-1 flex-row items-center rounded-md border border-border bg-card"
+            testID="pr-link-input-row"
+            collapsable={false}
+          >
+            <Input
+              ref={inputRef}
+              defaultValue={initialText}
+              placeholder={urlPlaceholder}
+              // The native hint is not reliably one line: Android lays it out
+              // on a second line the one-line field clips. Both platforms draw
+              // the visible placeholder with the one-line PrLinkPlaceholder
+              // overlay instead; the hint stays set for the digest and
+              // accessibility text but is invisible.
+              placeholderTextColor="transparent"
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              numberOfLines={1}
+              onChangeText={handleFieldChange}
+              // The shared single-line box (`@/components/ui/input`) supplies the
+              // height floor, the one line box for the placeholder and the value,
+              // and the RTL content alignment, so this field keeps only its own
+              // chrome and text size.
+              className="min-w-0 flex-1 bg-transparent pl-3 pr-1 text-base text-foreground"
+              accessibilityLabel={t('prReview.entry.urlAccessibility')}
+              returnKeyType="go"
+              onSubmitEditing={handleSubmit}
+            />
+            {!hasInput ? <PrLinkPlaceholder label={urlPlaceholder} /> : null}
+            {showClearButton ? (
+              // The clear control is icon-only like the paste control beside it,
+              // so it carries the same shared 48dp target; the 45pt box it used
+              // to render (`h-13`, which is 45pt at this app's 14pt rem) sits
+              // under Android's minimum.
+              <Pressable
+                onPress={clearField}
+                accessibilityRole="button"
+                accessibilityLabel={t('prReview.entry.clearLink')}
+                className={`${ICON_TARGET_BOX_CLASS} active:opacity-70`}
+              >
+                <X size={16} color={colors.mutedForeground} />
+              </Pressable>
+            ) : null}
+          </View>
+          <Pressable
+            onPress={() => {
+              void handlePaste();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('prReview.entry.pasteLink')}
+            className={`${ICON_TARGET_BOX_CLASS} rounded-md border border-border bg-card active:opacity-70`}
+          >
+            <ClipboardIcon size={18} color={colors.mutedForeground} />
+          </Pressable>
         </View>
-        <Pressable
-          onPress={() => {
-            void handlePaste();
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={t('prReview.entry.pasteLink')}
-          className={`${ICON_TARGET_BOX_CLASS} rounded-md border border-border bg-card active:opacity-70`}
+        <Button
+          disabled={linkState !== 'valid'}
+          onPress={handleSubmit}
+          accessibilityLabel={t('prReview.entry.openAccessibility')}
         >
-          <ClipboardIcon size={18} color={colors.mutedForeground} />
-        </Pressable>
+          <Text>{t('prReview.entry.open')}</Text>
+        </Button>
       </View>
-      <View>
+      {/* The invalid-link notice is the field's own error and sits under the
+          field's action, not between the field and Open: a line there pushed
+          Open 38.5 dp away from the field and the two stopped reading as one
+          group. It keeps a one-line slot of its own, held apart from Open by
+          the form's small gap; the INBOX header then takes the section break
+          from the inbox list, the same token the RECENT header gets, so the
+          error reads as the form's last line and never as the first item of
+          the inbox.
+          The invisible copy holds the line's real box in BOTH states — a
+          wrapped sentence in a long locale or a larger text scale grows the
+          slot by the same amount with or without the error, so a pasted
+          non-PR link never moves the INBOX or RECENT headers, and the visible
+          line (drawn over the same slot) never spills into the INBOX header. */}
+      <View className="relative mt-2">
         <Text
           className="text-sm opacity-0"
           accessibilityElementsHidden
@@ -302,13 +341,6 @@ export function PrReviewEntryScreen() {
           />
         </View>
       </View>
-      <Button
-        disabled={linkState !== 'valid'}
-        onPress={handleSubmit}
-        accessibilityLabel={t('prReview.entry.openAccessibility')}
-      >
-        <Text>{t('prReview.entry.open')}</Text>
-      </Button>
     </View>
   );
 

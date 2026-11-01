@@ -32,6 +32,10 @@ vi.mock('@/lib/hooks/use-kiloclaw-tab-visible', () => ({
   useKiloClawTabVisible,
 }));
 
+// The suite runs on iOS like the real screen does, so the live-activity copy
+// stays covered. A test that needs the Android paint sets this and restores it.
+const platform = vi.hoisted(() => ({ os: 'ios' as 'ios' | 'android' }));
+
 const { openSettings, setLiveActivityEnabled, liveActivityEnabled, systemAllowsLiveActivities } =
   vi.hoisted(() => ({
     openSettings: vi.fn(),
@@ -48,7 +52,11 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
   Linking: { openSettings: openSettings },
-  Platform: { OS: 'ios' },
+  Platform: {
+    get OS() {
+      return platform.os;
+    },
+  },
   useColorScheme: () => 'light',
 }));
 // The Live Activity row: the preference is SecureStore-backed and the system
@@ -106,6 +114,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     mutedForeground: '#666',
     destructive: '#B0483A',
     primaryForeground: '#fff',
+    primary: '#4F5A10',
+    primaryDisabled: '#6F6A61',
+    mutedSoft: '#A9A39A',
   }),
 }));
 vi.mock('@/lib/notifications', () => ({
@@ -218,6 +229,25 @@ function skeletonCount(root: I): number {
 function switchOnValueChange(root: I, label: string): ((value: boolean) => void) | undefined {
   const sw = switchesByLabel(root, label)[0];
   return sw ? (sw.props as { onValueChange?: (value: boolean) => void }).onValueChange : undefined;
+}
+
+// The wrapper's paint props, as the native control receives them.
+type SwitchPaint = {
+  disabled?: boolean;
+  trackColor?: { false?: string; true?: string };
+  thumbColor?: string;
+  value?: boolean;
+};
+
+function switchPaint(root: I, label: string): SwitchPaint | undefined {
+  const sw = switchesByLabel(root, label)[0];
+  if (!sw) {
+    return undefined;
+  }
+  // The test renderer types host props as `unknown`; `SwitchPaint` names the
+  // wrapper's native-control props this suite reads.
+  const paint = sw.props as SwitchPaint;
+  return paint;
 }
 
 function textWithChildren(root: I, content: string): I[] {
@@ -538,6 +568,7 @@ describe('NotificationsScreen category availability', () => {
   });
 
   afterEach(async () => {
+    platform.os = 'ios';
     await i18n.changeLanguage('en');
   });
 
@@ -586,6 +617,35 @@ describe('NotificationsScreen category availability', () => {
       textWithChildren(renderer.root, en.notifications.category.balanceAlertsUnavailable).length
     ).toBe(1);
     expect(textWithChildren(renderer.root, 'SERVER PROSE SENTINEL').length).toBe(0);
+  });
+
+  it('paints the unavailable row with the muted switch pair, and keeps the accent beside it', async () => {
+    // A dimmed title beside a full-strength accent track reads as both
+    // unavailable and on: Android folds the colours into the switch drawables
+    // and draws no unavailable appearance of its own. The shared switch paints
+    // the palette's muted pair there, so the unavailable row loses the accent
+    // while an available row beside it keeps it.
+    platform.os = 'android';
+    prefsQueryFn.mockResolvedValue(
+      fullPrefs({
+        capabilities: fullCapabilities({
+          balanceAlerts: { available: false, unavailableReasonCode: 'organizationRequired' },
+        }),
+      })
+    );
+    const { renderer } = await renderScreen();
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    const unavailable = switchPaint(renderer.root, 'Balance alerts');
+    expect(unavailable?.disabled).toBe(true);
+    expect(unavailable?.value).toBe(true);
+    expect(unavailable?.trackColor).toEqual({ false: '#A9A39A', true: '#6F6A61' });
+    expect(unavailable?.thumbColor).toBe('#fff');
+
+    const available = switchPaint(renderer.root, 'Chat messages');
+    expect(available?.disabled).toBe(false);
+    expect(available?.trackColor).toEqual({ false: '#A9A39A', true: '#4F5A10' });
+    expect(available?.thumbColor).toBe('#fff');
   });
 
   it('non-retryable unhappy: an unavailable category keeps its translated description, never the response sentence', async () => {

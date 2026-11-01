@@ -8,12 +8,13 @@
 // only the native surfaces they render through, so the screen-to-dialog
 // wiring is exercised for real.
 
-import { createElement, type ReactNode, useState } from 'react';
+import { createElement, Fragment, type ReactElement, type ReactNode, useState } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 
+import { enteringAncestors } from '@/components/code-reviewer/entering-animation.test-helpers';
 import { ReviewerRouteParamsProvider } from '@/lib/hooks/use-reviewer-route-params';
 import InstructionsRoute from './instructions';
 
@@ -46,6 +47,7 @@ type RecordedInput = {
   placeholder?: string;
   accessibilityLabel?: string;
   onChangeText: (text: string) => void;
+  inputAccessoryViewID?: string;
   multiline?: boolean;
   ref?: { current: { setSelection: (start: number, end: number) => void } | null };
   onLayout?: (event: { nativeEvent: { layout: { height: number } } }) => void;
@@ -61,6 +63,8 @@ const textInputs = vi.hoisted(() => ({
 const fieldHandle = vi.hoisted(() => ({ setSelection: vi.fn() }));
 const confirmDialog = vi.hoisted(() => ({
   current: null as {
+    title?: string;
+    message?: string;
     cancelLabel?: string;
     confirmLabel?: string;
     extraAction?: { label: string; onPress: () => void };
@@ -123,6 +127,8 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/sheet', () => ({ Sheet: 'Sheet' }));
 vi.mock('@/components/destructive-confirm-dialog', () => ({
   DestructiveConfirmDialog: (props: {
+    title?: string;
+    message?: string;
     cancelLabel?: string;
     confirmLabel?: string;
     extraAction?: { label: string; onPress: () => void };
@@ -137,6 +143,10 @@ vi.mock('@/components/destructive-confirm-dialog', () => ({
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/icons', () => ({ AlertTriangle: 'AlertTriangle' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ warn: '#f2b05f' }),
+}));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: Record<string, unknown>): ReactNode => createElement('ScreenHeader', props),
@@ -163,10 +173,10 @@ function Harness() {
   );
 }
 
-function mount(): TestRenderer.ReactTestRenderer {
+function mount(element: ReactElement = createElement(Harness)): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(Harness));
+    ref.current = TestRenderer.create(element);
   });
   const renderer = ref.current;
   if (!renderer) {
@@ -208,6 +218,32 @@ function latestInput() {
     throw new Error('instructions input not found');
   }
   return input;
+}
+
+// The editor's Save is the screen's: the button only asks for the save, so the
+// test presses the same last `Button` the editor renders.
+function pressSaveButton(renderer: TestRenderer.ReactTestRenderer) {
+  const saveButton = renderer.root.findAll(node => String(node.type) === 'Button').at(-1);
+  if (!saveButton) {
+    throw new Error('save button not found');
+  }
+  const onPress = (saveButton.props as Record<string, unknown>).onPress;
+  if (typeof onPress !== 'function') {
+    throw new TypeError('save button onPress is not a function');
+  }
+  // typeof narrowing proves callable, not zero-arg; the screen's own Button
+  // calls it the same way.
+  (onPress as () => void)();
+}
+
+// Runs `trigger` inside act and lets the screen's async save (mutation, then
+// navigation, or a pending confirmation) settle before the assertions.
+async function flush(trigger: () => void) {
+  await act(async () => {
+    trigger();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 }
 
 beforeEach(() => {
@@ -412,44 +448,18 @@ describe('InstructionsRoute editor', () => {
     expect(navigation.dispatch).toHaveBeenCalledTimes(1);
   });
 
-  it('persists the trimmed draft from the save button and bypasses the guard on its own back', () => {
+  it('persists the trimmed draft from the save button and bypasses the guard on its own back', async () => {
     config.data = { customInstructions: STORED };
     const renderer = mount();
 
-    const input = latestInput();
     act(() => {
-      input.onChangeText('  rewritten draft\n');
+      latestInput().onChangeText('  rewritten draft\n');
     });
 
-    const buttons = renderer.root.findAll(node => String(node.type) === 'Button');
-    const saveButton = buttons.at(-1);
-    if (!saveButton) {
-      throw new Error('save button not found');
-    }
-    const saveProps = saveButton.props as Record<string, unknown>;
-    const saveOnPress = saveProps.onPress;
-    if (typeof saveOnPress !== 'function') {
-      throw new TypeError('save button onPress is not a function');
-    }
-    // typeof narrowing proves callable, not zero-arg; the screen's own
-    // Button calls it the same way.
-    const pressSave = saveOnPress as () => void;
-    act(() => {
-      pressSave();
+    await flush(() => {
+      pressSaveButton(renderer);
     });
-    expect(save.mutate).toHaveBeenCalledWith(
-      { customInstructions: 'rewritten draft' },
-      expect.objectContaining({ onSuccess: expect.any(Function) })
-    );
-
-    const options = save.mutate.mock.calls.at(-1)?.[1] as { onSuccess?: () => void } | undefined;
-    const onSuccess = options?.onSuccess;
-    if (!onSuccess) {
-      throw new Error('save onSuccess not captured');
-    }
-    act(() => {
-      onSuccess();
-    });
+    expect(save.mutateAsync).toHaveBeenCalledWith({ customInstructions: 'rewritten draft' });
     expect(router.back).toHaveBeenCalledTimes(1);
     // The next navigation is the screen's own back: the guard must let it
     // through without a confirm, then re-arm for later edits.
@@ -458,6 +468,126 @@ describe('InstructionsRoute editor', () => {
     });
     expect(navigation.dispatch).toHaveBeenCalledTimes(1);
     expect(visibleConfirmationCount(renderer)).toBe(0);
+  });
+
+  it('asks before an empty field removes the stored instructions, and keeps the editor on cancel', async () => {
+    config.data = { customInstructions: STORED };
+    const renderer = mount();
+
+    act(() => {
+      latestInput().onChangeText('');
+    });
+
+    await flush(() => {
+      pressSaveButton(renderer);
+    });
+    expect(visibleConfirmationCount(renderer)).toBe(1);
+    const removal = confirmDialog.current;
+    expect(removal?.title).toBe(i18n.t('codeReviewer.instructions.clearTitle'));
+    expect(removal?.message).toBe(i18n.t('codeReviewer.instructions.clearMessage'));
+    expect(removal?.confirmLabel).toBe(i18n.t('common.remove'));
+    expect(removal?.cancelLabel).toBe(i18n.t('common.keepEditing'));
+    // The question is a yes/no about the removal, with no third choice.
+    expect(removal?.extraAction).toBeUndefined();
+    expect(save.mutateAsync).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+
+    await flush(() => {
+      removal?.onCancel();
+    });
+    expect(visibleConfirmationCount(renderer)).toBe(0);
+    expect(save.mutateAsync).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+    // The edited draft is still unsaved, so the guard still holds the exit.
+    expect(preventRemove.enabled).toBe(true);
+  });
+
+  it('removes the stored instructions once the reader confirms it', async () => {
+    config.data = { customInstructions: STORED };
+    const renderer = mount();
+
+    act(() => {
+      latestInput().onChangeText('   ');
+    });
+
+    await flush(() => {
+      pressSaveButton(renderer);
+    });
+    expect(save.mutateAsync).not.toHaveBeenCalled();
+
+    await flush(() => {
+      confirmDialog.current?.onConfirm();
+    });
+    expect(save.mutateAsync).toHaveBeenCalledWith({ customInstructions: '' });
+    expect(router.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('saves an empty field with no confirmation when nothing is stored', async () => {
+    config.data = { customInstructions: '' };
+    const renderer = mount();
+
+    await flush(() => {
+      pressSaveButton(renderer);
+    });
+    expect(visibleConfirmationCount(renderer)).toBe(0);
+    expect(save.mutateAsync).toHaveBeenCalledWith({ customInstructions: '' });
+    expect(router.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks the same question from the back guard save and stays when it is declined', async () => {
+    config.data = { customInstructions: STORED };
+    const renderer = mount();
+
+    act(() => {
+      latestInput().onChangeText('');
+    });
+    act(() => {
+      triggerPreventRemove();
+    });
+    const saveChanges = confirmDialog.current?.extraAction;
+    expect(saveChanges?.label).toBe(i18n.t('securityAgent.settingsSave.saveChanges'));
+
+    await flush(() => {
+      saveChanges?.onPress();
+    });
+    // The guard's own sheet stays mounted while the removal question is
+    // presented over it (the emulator shows one native sheet, the removal
+    // one), so the save does not run straight through.
+    expect(visibleConfirmationCount(renderer)).toBe(2);
+    expect(confirmDialog.current?.title).toBe(i18n.t('codeReviewer.instructions.clearTitle'));
+    expect(confirmDialog.current?.message).toBe(i18n.t('codeReviewer.instructions.clearMessage'));
+    expect(save.mutateAsync).not.toHaveBeenCalled();
+
+    await flush(() => {
+      confirmDialog.current?.onCancel();
+    });
+    // Declining puts the unsaved-changes sheet back in front: the leave is
+    // dropped and the draft is still there to discard or save.
+    expect(confirmDialog.current?.title).toBe(i18n.t('securityAgent.settingsSave.unsavedTitle'));
+    expect(save.mutateAsync).not.toHaveBeenCalled();
+    expect(navigation.dispatch).not.toHaveBeenCalled();
+    expect(preventRemove.enabled).toBe(true);
+  });
+
+  it('removes the stored instructions from the back guard save once it is confirmed', async () => {
+    config.data = { customInstructions: STORED };
+    mount();
+
+    act(() => {
+      latestInput().onChangeText('');
+    });
+    act(() => {
+      triggerPreventRemove();
+    });
+    await flush(() => {
+      confirmDialog.current?.extraAction?.onPress();
+    });
+    await flush(() => {
+      confirmDialog.current?.onConfirm();
+    });
+
+    expect(save.mutateAsync).toHaveBeenCalledWith({ customInstructions: '' });
+    expect(navigation.dispatch).toHaveBeenCalledTimes(1);
   });
 
   it('does not clobber an in-progress edit when the query refetches', async () => {
@@ -504,6 +634,23 @@ describe('InstructionsRoute editor', () => {
     expect(latestInput().accessibilityLabel).toBe(i18n.t('codeReviewer.instructions.title'));
   });
 
+  // As body-coloured copy the deprecation note read as a description of the
+  // field under it. It is now a notice of its own: a tinted block with its
+  // warning mark, in the warning ink rather than the muted one.
+  it('renders the deprecation note as a warning notice of its own', () => {
+    config.data = { customInstructions: STORED };
+    const renderer = mount();
+
+    const noticeCopy = findByHostType(renderer, 'Text').filter(node => {
+      const props = node.props as { className?: string };
+      return props.className?.includes('text-warn') === true;
+    });
+    expect(noticeCopy).toHaveLength(1);
+    const copy = noticeCopy[0]?.props as { children?: string } | undefined;
+    expect(copy?.children).toBe(i18n.t('codeReviewer.instructions.deprecation'));
+    expect(findByHostType(renderer, 'AlertTriangle')).toHaveLength(1);
+  });
+
   it('reads the editor name from the active catalog', async () => {
     await act(async () => {
       await i18n.changeLanguage('ar');
@@ -514,6 +661,52 @@ describe('InstructionsRoute editor', () => {
     const input = latestInput();
     expect(input.accessibilityLabel).toBe(i18n.t('codeReviewer.instructions.title'));
     expect(input.accessibilityLabel).not.toBe('Custom instructions');
+  });
+});
+
+// The iOS accessory bar is the only keyboard-adjacent way out of this
+// multiline field, and iOS binds it to the first text input in the window whose
+// `inputAccessoryViewID` matches the bar's `nativeID`, once, when the bar enters
+// the window. A field and a bar that carry one id for the whole module let a
+// second mounted editor take the first editor's bar and leave its own keyboard
+// with no labeled control above it, so the id belongs to the mount.
+describe('InstructionsRoute keyboard Done bar', () => {
+  it('pairs the field with the bar that carries the Done control', () => {
+    config.data = { customInstructions: STORED };
+    const renderer = mount();
+
+    const bars = findByHostType(renderer, 'InputAccessoryView');
+    expect(bars).toHaveLength(1);
+    const nativeId = bars[0]?.props.nativeID;
+    expect(typeof nativeId).toBe('string');
+    expect(latestInput().inputAccessoryViewID).toBe(nativeId);
+
+    // The bar's one control is the labeled Done button the accessibility tree
+    // reports above the IME.
+    const controls = findByHostType(renderer, 'Pressable');
+    expect(controls).toHaveLength(1);
+    expect(controls[0]?.props.accessibilityLabel).toBe(i18n.t('common.done'));
+  });
+
+  it('gives every mounted editor its own bar', () => {
+    config.data = { customInstructions: STORED };
+    // Two live copies of the editor, the state a visit leaves behind while its
+    // screens are still on the stack.
+    const renderer = mount(
+      createElement(Fragment, null, [
+        createElement(Harness, { key: 'first' }),
+        createElement(Harness, { key: 'second' }),
+      ])
+    );
+
+    const nativeIds = findByHostType(renderer, 'InputAccessoryView').map(
+      node => node.props.nativeID
+    );
+    expect(nativeIds).toHaveLength(2);
+    expect(nativeIds[0]).not.toBe(nativeIds[1]);
+    expect(new Set(textInputs.inputs.map(input => input.inputAccessoryViewID))).toEqual(
+      new Set(nativeIds)
+    );
   });
 });
 
@@ -570,6 +763,28 @@ describe('InstructionsRoute config read states', () => {
     mount();
 
     expect(queryError.props).toHaveLength(0);
+    expect(latestInput().defaultValue).toBe(STORED);
+  });
+
+  it('paints the landed body with no entering animation above it', () => {
+    config.data = { customInstructions: STORED };
+    const renderer = mount();
+
+    const note = renderer.root.findAll(
+      node =>
+        String(node.type) === 'Text' &&
+        node.props.children === i18n.t('codeReviewer.instructions.deprecation')
+    )[0];
+    if (!note) {
+      throw new Error('the deprecation note was not rendered');
+    }
+    // A Reanimated entering animation carries `initialValues: { opacity: 0 }`.
+    // Above the loaded body it leaves the note, the field and Save mounted at
+    // opacity 0 under the painted header — an empty body with no skeleton, no
+    // error and no retry — whenever that entrance is cancelled or overwritten
+    // (Android report, 2026-10-31). The body must paint in the frame the read
+    // lands, with no ancestor holding an entering animation.
+    expect(enteringAncestors(note)).toEqual([]);
     expect(latestInput().defaultValue).toBe(STORED);
   });
 

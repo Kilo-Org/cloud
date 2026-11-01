@@ -13,7 +13,7 @@ import {
   type AndroidNotificationChannelId,
   type PushData,
   pushDataSchema,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 import {
   NOTIFICATION_PERMISSION_RESPONDED_EVENT,
   NOTIFICATION_TOKEN_UPDATED_EVENT,
@@ -43,6 +43,7 @@ import {
   setHomeWidgetDetails,
 } from '@/lib/glanceable/home-widget-data';
 import {
+  getGlanceableSnapshotForSignedInScope,
   getLastGlanceableSnapshot,
   getLocalScopeKey,
   persistGlanceableSink,
@@ -65,6 +66,7 @@ import { BACKGROUND_NOTIFICATION_TASK } from './notification-background-task';
 import {
   handleNeedsInputNotificationResponse,
   isNeedsInputActionIdentifier,
+  type NeedsInputActionDeps,
   pendingDeepLinkOptionsForData,
 } from './notification-actions';
 import { isAgentProgressAllowedInActiveFocus } from './notification-focus-filter';
@@ -181,7 +183,7 @@ function scheduleGlanceableTerminalEnd(): void {
     // Eligible work published during the window restarted the activity (the
     // in-app publisher owns the foreground path and never cancels this timer);
     // do not end a restarted activity.
-    const last = getLastGlanceableSnapshot();
+    const last = getGlanceableSnapshotForSignedInScope();
     if (last !== null && isEligibleGlanceableWork(last)) {
       return;
     }
@@ -330,7 +332,7 @@ export function setupNotificationHandler() {
             // unchanged. Re-asserting it here would undo a badge iOS applied
             // from a later visible push (the same e7 clobber as an unchanged
             // re-publication), so it goes through the guarded write too.
-            syncAppBadge(getLastGlanceableSnapshot()?.needsInput ?? 0);
+            syncAppBadge(getGlanceableSnapshotForSignedInScope()?.needsInput ?? 0);
           }, 0);
         }
         return { ...suppressed, shouldSetBadge: applied };
@@ -621,11 +623,11 @@ export function setupNotificationBackgroundHandler(): void {
   void registerBackgroundNotificationTask();
 }
 
-export function setupNotificationResponseHandler() {
+export function setupNotificationResponseHandler(deps: NeedsInputActionDeps = {}) {
   const subscription = Notifications.addNotificationResponseReceivedListener(response => {
     // Our four action ids run headless or stash the deep link; any other
     // identifier keeps the tap path inside the handler.
-    void handleNeedsInputNotificationResponse(response);
+    void handleNeedsInputNotificationResponse(response, deps);
   });
 
   return subscription;

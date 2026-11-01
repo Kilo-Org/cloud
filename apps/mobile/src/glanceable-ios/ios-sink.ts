@@ -11,7 +11,7 @@ import {
   oldestNeedsInputSince,
   soonestScheduledAt,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { aggregateLiveActivityRelevance } from '@kilocode/notifications';
+import { aggregateLiveActivityRelevance } from '@kilocode/notifications/schemas';
 
 import { i18n } from '@/i18n';
 import {
@@ -23,7 +23,7 @@ import {
 } from '@/lib/glanceable/followed-sessions';
 import { getHomeWidgetDataForSnapshot } from '@/lib/glanceable/home-widget-data';
 import {
-  getLastGlanceableSnapshot,
+  getGlanceableSnapshotForSignedInScope,
   isGlanceableRestoreSettled,
   isGlanceableRestoreUnavailable,
   restorePersistedGlanceable,
@@ -506,7 +506,7 @@ export function sweepStrayActivities(): void {
     void endNow();
     return;
   }
-  const snapshot = getLastGlanceableSnapshot();
+  const snapshot = getGlanceableSnapshotForSignedInScope();
   if (snapshot === null && !isGlanceableRestoreSettled()) {
     // The read has not finished yet, so a null snapshot means "unknown", not
     // "nothing can own the surface". This runs at import in the headless push
@@ -604,7 +604,7 @@ let lastSinkContext: GlanceableSinkContext | null = null;
  * unfollow that changes nothing else, so the card has to come back here.
  */
 export function republishAggregateCard(): void {
-  const snapshot = getLastGlanceableSnapshot();
+  const snapshot = getGlanceableSnapshotForSignedInScope();
   if (snapshot === null) {
     return;
   }
@@ -774,7 +774,7 @@ export const iosSink: GlanceableSink = {
  */
 export async function renderStoredSnapshotWithNotice(): Promise<void> {
   await restorePersistedGlanceable();
-  const snapshot = getLastGlanceableSnapshot();
+  const snapshot = getGlanceableSnapshotForSignedInScope();
   if (snapshot === null) {
     return;
   }

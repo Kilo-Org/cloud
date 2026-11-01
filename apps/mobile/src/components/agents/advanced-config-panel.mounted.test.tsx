@@ -447,7 +447,7 @@ describe('AdvancedConfigPanel', () => {
     addVariable(renderer, 'API_KEY', 'abc');
 
     expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
-    expect(texts(renderer)).toContain('1 environment variables · 0 setup commands');
+    expect(texts(renderer)).toContain('1 var');
   });
 
   it('accepts an empty value in the session draft, matching prepare-session', () => {
@@ -460,7 +460,23 @@ describe('AdvancedConfigPanel', () => {
     expect(
       renderer.root.findAllByType('FormField' as never).filter(node => node.props.label === 'Value')
     ).toHaveLength(0);
-    expect(texts(renderer)).toContain('1 environment variables · 0 setup commands');
+    expect(texts(renderer)).toContain('1 var');
+  });
+
+  it('starts an abandoned session variable empty the next time the form opens', () => {
+    const renderer = mount();
+    press(byLabel(renderer, 'Advanced Configuration'));
+
+    press(buttonByText(renderer, 'Add variable'));
+    typeInto(renderer, 'Key', 'ABANDONED_KEY');
+    typeInto(renderer, 'Value', 'abandoned-value');
+    press(buttonByText(renderer, 'Cancel'));
+
+    press(buttonByText(renderer, 'Add variable'));
+    // A session draft belongs to the compose that opened it: the key and the
+    // value of the cancelled attempt must not come back.
+    expect(field(renderer, 'Key').props.defaultValue).toBe('');
+    expect(field(renderer, 'Value').props.defaultValue).toBe('');
   });
 
   it('names the row reveal control after its action and reveals the draft value', () => {
@@ -473,15 +489,20 @@ describe('AdvancedConfigPanel', () => {
     // kind, not the action, and no control carries it.
     expect(byLabel(renderer, 'Secret')).toBeUndefined();
     const reveal = byLabel(renderer, 'Reveal value');
-    expect(reveal?.props.accessibilityState).toMatchObject({ selected: false });
+    // The name carries the state, so the control reports no separate
+    // selection a reader would hear as "Reveal value, selected".
+    expect(reveal?.props.accessibilityState).toBeUndefined();
     expect(texts(renderer)).not.toContain('s3cretdraft');
 
     press(reveal);
 
     expect(texts(renderer)).toContain('s3cretdraft');
-    expect(byLabel(renderer, 'Reveal value')?.props.accessibilityState).toMatchObject({
-      selected: true,
-    });
+    // The same control now hides the value it is showing.
+    expect(byLabel(renderer, 'Reveal value')).toBeUndefined();
+    press(byLabel(renderer, 'Hide value'));
+
+    expect(texts(renderer)).not.toContain('s3cretdraft');
+    expect(byLabel(renderer, 'Reveal value')).toBeDefined();
   });
 
   it('caps manual setup commands at the server list and row bounds', () => {
@@ -544,7 +565,7 @@ describe('AdvancedConfigPanel', () => {
     const renderer = mount({ selectedProfileId: 'backend' });
     press(byLabel(renderer, 'Advanced Configuration'));
 
-    expect(texts(renderer)).toContain('3 environment variables · 1 setup commands');
+    expect(texts(renderer)).toContain('3 vars · 1 setup cmd');
   });
 
   it('saves the manual config in the web order and selects the new profile', async () => {
@@ -597,7 +618,7 @@ describe('AdvancedConfigPanel', () => {
     // setup commands to the inline ones, so a kept draft would run them twice.
     expect(texts(renderer)).not.toContain('API_KEY');
     expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
-    expect(texts(renderer)).toContain('1 environment variables · 1 setup commands');
+    expect(texts(renderer)).toContain('1 var · 1 setup cmd');
   });
 
   it('keeps the save sheet open and the typed name when the save fails', async () => {

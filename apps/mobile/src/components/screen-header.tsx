@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one header contract: the title, eyebrow and subtitle slots, the back control, the action reflow, and the safe-area and offline-banner rules must stay in step */
 import { type Href, useNavigationContainerRef, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
@@ -9,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
 import { useOfflineBannerSpace } from '@/components/offline-banner-space';
+import { useHeaderBack } from '@/lib/hooks/use-header-back';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { offlineHeaderReservation } from '@/lib/offline-banner-state';
 import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
@@ -84,6 +86,12 @@ export function shouldStackHeaderActions(
  */
 const MAX_TITLE_LINES = 3;
 
+/**
+ * What a reserved band's eyebrow twin lays out with: a space, so the twin
+ * holds one eyebrow line without painting a label that is not on screen.
+ */
+const blankEyebrow = '\u00A0';
+
 type ScreenHeaderProps = {
   /** Omit to render a bare back-button bar (e.g. when the screen body provides its own title). */
   title?: string;
@@ -99,6 +107,25 @@ type ScreenHeaderProps = {
    * (session headers: `SESSION_HEADER_TITLE_LINES`, todos: 2).
    */
   titleNumberOfLines?: number;
+  /**
+   * One line of context under the title, in the muted body style. The title
+   * stays the screen's name and its accessible header; the subtitle is read
+   * after it, never instead of it.
+   *
+   * Kept to a single line with a tail ellipsis: it carries context such as the
+   * profile a section edits, so a wrapped line would grow the header and move
+   * the body below it. It is not the `eyebrow`, which is a category label the
+   * text style uppercases; a user-authored name in that slot renders as
+   * letterspaced small capitals.
+   */
+  subtitle?: string;
+  /**
+   * Reserve the subtitle's line even when there is none yet, so a name that
+   * arrives after the first render (a cold deep link's profile read) cannot
+   * change the header's height. The reserved line is the same style as the
+   * text, so it scales with the font size the way the real line does.
+   */
+  reserveSubtitle?: boolean;
   /**
    * Cap the eyebrow to this many lines, overriding the header's default single
    * line. When set the eyebrow ellipsizes in the middle: the repo name is the
@@ -196,6 +223,12 @@ type ScreenHeaderProps = {
  * two-line default it replaced, or the header keeps a blank line it can never
  * fill.
  *
+ * The box is the measure the header's reserved band keeps its height by (see
+ * `reservedTitleBand`): an empty box at the title's own position, so a title
+ * that grows a line cannot move the body below the header — and a one-line cap
+ * reserves one line, not the two-line default it replaced, or the band keeps a
+ * blank line it can never fill.
+ *
  * The large branches stay in px: NativeWind's rem is 14pt, so `min-h-9` would
  * be 31.5pt under the 36px the large title paints.
  */
@@ -245,6 +278,8 @@ export function ScreenHeader({
   title,
   titleContent,
   titleNumberOfLines = 1,
+  subtitle,
+  reserveSubtitle = false,
   eyebrowNumberOfLines,
   reserveTitleSpace = false,
   eyebrow,
@@ -269,13 +304,13 @@ export function ScreenHeader({
   className,
 }: Readonly<ScreenHeaderProps>) {
   const insets = useScreenInsets();
-  const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { width: windowWidth } = useWindowDimensions();
   const fontScale = useLiveFontScale();
   const historyCanGoBack = useCanGoBack();
   const canGoBack = showBackButton ?? (historyCanGoBack || backFallback !== undefined);
+  const handleBack = useHeaderBack({ onBack, backFallback, canGoBack: historyCanGoBack });
   const isOfflineBannerVisible = useOfflineBannerSpace();
   // A window too narrow to hold the title beside its actions drops the actions
   // to their own row instead of squeezing the title into a single-letter
@@ -368,13 +403,9 @@ export function ScreenHeader({
         {title}
       </Text>
     );
-    const titleLayout = reserveTitleSpace ? (
-      <View className={cn(reservedTitleHeightClass(size, titleLines), 'justify-center')}>
-        {titleText}
-      </View>
-    ) : (
-      titleText
-    );
+    // The visible title paints at its own height: the reserved line lives in
+    // the band beside the heading (see `reservedTitleBand`), never around the
+    // text, so the eyebrow keeps its tight pair with the title's first line.
     // Title caret removed: rename stays available via the pressable title
     // itself. The backIcon === 'close' ChevronDown on the back control is
     // unrelated and stays. The label is the title text, never the action: a
@@ -388,12 +419,12 @@ export function ScreenHeader({
         accessibilityRole="button"
         accessibilityLabel={title}
         accessibilityHint={titlePressHint}
-        className="active:opacity-70"
+        className="min-h-[48px] justify-center active:opacity-70"
       >
-        {titleLayout}
+        {titleText}
       </Pressable>
     ) : (
-      titleLayout
+      titleText
     );
   }
 
@@ -416,12 +447,45 @@ export function ScreenHeader({
         </Eyebrow>
       ) : null}
       {titleNode}
+      {subtitle || reserveSubtitle ? (
+        <Text
+          variant="muted"
+          className={cn('mt-0.5', centerTitle && 'text-center', !subtitle && 'opacity-0')}
+          // One line: the subtitle is context for the title, so it truncates at
+          // its tail instead of taking a second line and moving the body. The
+          // reserved copy is a no-break space in the same style, so the height
+          // it holds is the height the name will take.
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          accessible={Boolean(subtitle)}
+          accessibilityElementsHidden={!subtitle}
+          importantForAccessibility={subtitle ? 'auto' : 'no-hide-descendants'}
+        >
+          {subtitle ?? '\u00A0'}
+        </Text>
+      ) : null}
     </View>
   );
   // A centered title shares its row with the leading and trailing controls.
   // A spacer opposite the back control keeps the title centered on the full
   // width without placing either control out of flow.
   const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow));
+
+  // The reserve, as a band rather than a box around the title: a zero-width,
+  // clipped twin of the eyebrow and the title's line cap holds the header's text
+  // area to one height for every line count the cap allows, so a title that
+  // grows a line cannot move the body below. The visible text stays at its
+  // natural height and centers on the band, which is what lines the leading
+  // control up with the text rather than with the empty line the reserve keeps.
+  // The twin lays out with the same eyebrow style and the same cap box as the
+  // visible title, so the band follows the font scale, and it needs no measured
+  // height and no line-height constant.
+  const reservedTitleBand = reserveTitleSpace ? (
+    <View className="w-0 overflow-hidden" aria-hidden>
+      {eyebrow || reserveEyebrow ? <Eyebrow className="mb-0.5">{blankEyebrow}</Eyebrow> : null}
+      <View className={reservedTitleHeightClass(size, titleLines)} />
+    </View>
+  ) : null;
 
   // The leading control's pull into the gutter is a START-side margin, never a
   // hand-picked `mr` under RTL. With `I18nManager.doLeftAndRightSwapInRTL` on
@@ -450,18 +514,7 @@ export function ScreenHeader({
   const backControl = canGoBack ? (
     <View className={cn('shrink-0 overflow-hidden rounded-full', !separateHeading && '-ms-4')}>
       <Pressable
-        onPress={() => {
-          if (onBack) {
-            onBack();
-          } else if (backFallback !== undefined && !router.canGoBack()) {
-            // POP_TO keeps the fallback's contract (land on this destination)
-            // while truncating any routes the app left above the destination;
-            // with no history it still creates the destination, as replace did.
-            router.dismissTo(backFallback);
-          } else {
-            router.back();
-          }
-        }}
+        onPress={handleBack}
         accessibilityRole="button"
         accessibilityLabel={resolvedBackIcon === 'close' ? t('common.close') : t('common.goBack')}
         className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
@@ -533,6 +586,7 @@ export function ScreenHeader({
             <View className="min-h-11 flex-row items-center">
               {backControl}
               <View className="min-w-0 flex-1 flex-row items-center justify-center">{heading}</View>
+              {reservedTitleBand}
               {headerRight && !stackActions ? (
                 <View className={headerRightSlotClassName}>{headerRight}</View>
               ) : (
@@ -556,6 +610,7 @@ export function ScreenHeader({
                 {backControl}
                 {heading}
               </View>
+              {reservedTitleBand}
               {headerRight && !stackActions ? (
                 <View className={headerRightSlotClassName}>{headerRight}</View>
               ) : null}

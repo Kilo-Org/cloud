@@ -30,15 +30,39 @@
   --primary-disabled: #6f6a61;
   --destructive: #b0483a;
   --destructive-foreground: #ffffff;
+  /* Solid destructive control fill. Separate from `--destructive` because the
+   * dark scheme's pale pastel is legible as error ink on the near-black
+   * background but reads as a washed-out, disabled-looking control when it
+   * fills a button, and its near-black label cannot carry the label weight.
+   * `--destructive` therefore stays the ink pastel, and a filled control takes
+   * this pair — white on the deep red — in both schemes. */
+  --destructive-solid: #b0483a;
+  --destructive-solid-foreground: #ffffff;
   --border: rgba(20, 15, 10, 0.09);
   --input: rgba(20, 15, 10, 0.45);
   --ring: #4f5a10;
   --radius: 0.625rem;
 
+  /* Selected-state fill of an in-page tab pill, and its label. The fill is the
+   * accent at the luminance its own label carries: the muted olive in both
+   * themes, because the dark accent (#ffdd00) as a full pill glares on the dark
+   * page and pulls focus from the panel the tab selects. */
+  --selection: #4f5a10;
+  --selection-foreground: #ffffff;
+
   /* Focus-only tokens */
   --ink2: #3c382f;
   --muted-soft: #a9a39a;
   --hair-soft: rgba(20, 15, 10, 0.05);
+  /* Fill of an inactive icon control — the composer's send circle until there
+   * is something to send. Light keeps the muted neutral it has always painted;
+   * the dark block needs a step above the near-black page, where that neutral
+   * (1.18:1) left the disc invisible. */
+  --control-idle: #f0eee6;
+  /* Track under the context-usage ring's arc. Light keeps the hairline tint;
+   * the dark block raises it so the ring reads as a circle, still below the
+   * neutral arc so a part-filled arc still reads as a fraction. */
+  --ring-track: rgba(20, 15, 10, 0.05);
   --accent-soft: #ffdd00;
   --accent-soft-foreground: #1a1a10;
   --good: #24784a;
@@ -127,19 +151,39 @@
     --accent-foreground: #1a1a10;
     --primary: #ffdd00;
     --primary-foreground: #1a1a10;
-    /* Dark counterpart of the disabled primary fill; near-black ink clears 4.5:1. */
+    /* Dark counterpart of the disabled primary fill; near-black ink clears 4.5:1.
+     * The fill stays neutral and muted: a tinted fill reads as a second brand
+     * colour and competes with the enabled #ffdd00 it replaces. */
     --primary-disabled: #8a8680;
     --destructive: #f28b7a;
     --destructive-foreground: #1a1a10;
+    /* The deep red the light scheme fills with, lifted just enough to stand off
+     * the near-black background: 3.5:1 against `--background`, and white on it
+     * is 5.1:1. */
+    --destructive-solid: #b84a3c;
+    --destructive-solid-foreground: #ffffff;
     --border: rgba(255, 255, 255, 0.07);
     --input: rgba(255, 255, 255, 0.35);
     --ring: #ffdd00;
     --radius: 0.625rem;
 
+    /* The muted olive on the dark page: the dark accent (#ffdd00) as a full
+     * pill glares and pulls focus from the panel the tab selects. */
+    --selection: #4f5a10;
+    --selection-foreground: #f2f0eb;
+
     /* Focus-only tokens */
     --ink2: #c4c1b8;
     --muted-soft: #56544f;
     --hair-soft: rgba(255, 255, 255, 0.04);
+    /* Dark counterpart of an inactive icon control's fill: 18% white over the
+     * page, so the send circle stays a visible disc while its muted ink keeps
+     * 3:1 on it and the control still reads as inactive beside the accent fill. */
+    --control-idle: #39393b;
+    /* Dark counterpart of the ring track: 20% white over the page. The ring is
+     * invisible at the hairline tint (1.09:1) here, and the neutral arc keeps
+     * 5.3:1, so the track still reads under it without swallowing the arc. */
+    --ring-track: rgba(255, 255, 255, 0.2);
     --accent-soft: #ffdd00;
     --accent-soft-foreground: #1a1a10;
     --good: #5fcb8e;
@@ -218,14 +262,20 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-solid: var(--destructive-solid);
+  --color-destructive-solid-foreground: var(--destructive-solid-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-selection: var(--selection);
+  --color-selection-foreground: var(--selection-foreground);
 
   /* Focus-only */
   --color-ink2: var(--ink2);
   --color-muted-soft: var(--muted-soft);
   --color-hair-soft: var(--hair-soft);
+  --color-control-idle: var(--control-idle);
+  --color-ring-track: var(--ring-track);
   --color-accent-soft: var(--accent-soft);
   --color-accent-soft-foreground: var(--accent-soft-foreground);
   --color-good: var(--good);

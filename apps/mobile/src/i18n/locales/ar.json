@@ -69,6 +69,7 @@
     "organization": "المؤسسة",
     "platform": "المنصة",
     "prReview": "مراجعة PR",
+    "prReviewSubtitle": "مراجعة طلبات السحب على الجوال",
     "queued": "في قائمة الانتظار",
     "remove": "إزالة",
     "repository": "المستودع",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "مراجعات PR تلقائية",
     "securityAgentSubtitle": "اكتشاف الثغرات ومعالجتها",
     "reviews": "المراجعات",
-    "prReviewSubtitle": "مراجعة طلبات السحب على الجوال",
     "couldNotLoadOrganization": "تعذّر تحميل المؤسسة.",
     "couldNotLoadOrganizationDescription": "إعدادات المؤسسة والوكيل غير متاحة حتى يكتمل تحميل بيانات المؤسسة.",
     "linkedAccounts": "الحسابات المرتبطة",
@@ -305,7 +305,8 @@
     "liveUpdates": "التحديثات المباشرة",
     "liveUpdateSubtitle": "عرض الوكلاء النشطين في إشعاراتك",
     "push": "الإشعارات الفورية",
-    "onDescription": "الإشعارات الفورية مفعّلة على هذا الجهاز.",
+    "deviceTitle": "الإشعارات الفورية على هذا الجهاز",
+    "onDescription": "تتبع التنبيهات الفئات أدناه.",
     "offDescription": "إذن الإشعارات غير مفعّل، أو لم يُسجّل الجهاز لتلقيها.",
     "retryPermission": "إعادة محاولة التحقق من إذن الإشعارات",
     "enable": "تفعيل الإشعارات",
@@ -494,7 +495,7 @@
     "attachmentPicker": {
       "takePhoto": "التقاط صورة",
       "photoLibrary": "مكتبة الصور",
-      "files": "ملف",
+      "files": "الملفات",
       "cameraAccessMessage": "اسمح بالوصول إلى الكاميرا في الإعدادات لالتقاط صورة."
     },
     "typingIndicator": {
@@ -900,7 +901,9 @@
     "instructions": {
       "title": "تعليمات مخصصة",
       "deprecation": "من المقرر إيقاف ميزة التعليمات المخصصة. انقل هذه الإرشادات إلى ملف REVIEW.md في مستودعك بدلًا منها.",
-      "placeholder": "مثال: الالتزام بقواعد معالجة الأخطاء المتبعة لدينا…"
+      "placeholder": "مثال: الالتزام بقواعد معالجة الأخطاء المتبعة لدينا…",
+      "clearTitle": "إزالة التعليمات المخصصة؟",
+      "clearMessage": "سيؤدي حفظ الحقل فارغًا إلى حذف التعليمات المخصصة المخزّنة لهذا المراجع."
     },
     "repos": {
       "unavailable": "المستودعات غير متاحة — أكمل إعداد Bitbucket على kilo.ai.",
@@ -936,7 +939,9 @@
     "followReviewMd": "اتباع تعليمات REVIEW.md",
     "followReviewMdSubtitle": "الالتزام بملفات تعليمات REVIEW.md لكل مستودع",
     "manualReview": {
-      "connectProviderDescription": "اربط GitHub لبدء مراجعة يدوية لطلب سحب.",
+      "invalidMergeRequestUrl": "أدخل عنوان URL صالحًا لطلب دمج.",
+      "mergeRequestUrl": "عنوان URL لطلب الدمج",
+      "instructionsAtLimit": "تقتصر التعليمات على {{max}} حرفًا",
       "couldNotCheckProviderStatus": "تعذّر التحقق من حالة المزوّد.",
       "couldNotLoadProviders": "تعذّر تحميل المزوّدين الذين ربطتهم بحسابك. حاول مرة أخرى.",
       "instructions": "تعليمات (اختيارية)",
@@ -974,7 +979,7 @@
       "bitbucketError": "تعذّر فتح صفحة إعداد Bitbucket. حاول مرة أخرى."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} بواسطة {{author}}",
+      "byline": "#{{number}} بواسطة {{author}}",
       "cancelMessage": "سيؤدي هذا إلى إيقاف مراجعة الشفرة الجارية.",
       "cancelReview": "إلغاء المراجعة",
       "cancelTitle": "إلغاء المراجعة؟",
@@ -1089,12 +1094,12 @@
     },
     "overview": {
       "allAreas": "جميع المجالات",
-      "customInstructions": "تعليمات مخصصة",
       "focusAreas": "مجالات التركيز",
       "nSelected": "{{displayCount}} محدد",
       "proposedReviewMdGuidance": "إرشادات REVIEW.md المقترحة",
       "reviewStyle": "أسلوب المراجعة",
-      "set": "محدّد"
+      "set": "محدّد",
+      "notSet": "غير محدّد"
     },
     "updateFailed": "تعذّر تحديث المراجع.",
     "configSaveFailed": "تعذّر حفظ إعدادات المراجعة.",
@@ -1163,7 +1168,8 @@
       "sortSeverityDesc": "الخطورة: من الأعلى إلى الأدنى",
       "sortSlaDue": "الموعد النهائي حسب SLA",
       "statusIgnored": "تم تجاهلها",
-      "statusOpen": "مفتوحة"
+      "statusOpen": "مفتوحة",
+      "noRepositories": "لم تتم مزامنة أي مستودعات أو تحديدها بعد. اخترها من إعدادات وكيل الأمان."
     },
     "analysis": {
       "analyzeRepository": "تحليل المستودع",
@@ -1309,10 +1315,10 @@
       "noOpenFindings": "لا توجد نتائج مفتوحة تستدعي الاهتمام",
       "noRepositoryData": "لا توجد بيانات للمستودعات بعد",
       "noRepositoryDataDescription": "ستظهر أولويات المستودعات بعد مزامنة النتائج.",
-      "noSlaDeadline": "لم يُحدَّد موعد نهائي حسب SLA",
       "notExploitable": "غير قابلة للاستغلال",
       "notMeasured": "غير مُقاس",
       "notYetSynced": "لم تتم المزامنة بعد",
+      "priorityFindingsPending": "ستظهر نتائج الأولويات بعد أول مزامنة.",
       "refreshFailed": "تعذّر التحديث. تُعرض بيانات آخر مزامنة.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "{{displayCount}} مفتوحة",
@@ -1396,7 +1402,6 @@
       "alreadyResolvedDescription": "عولجت هذه النتيجة بالفعل، ولم يعد من الممكن استبعادها.",
       "cannotDismissDescription": "يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط استبعاد النتائج.",
       "cannotDismissTitle": "لا يمكن استبعاد هذه النتيجة",
-      "commentAccessibility": "تعليق الاستبعاد",
       "commentLabel": "التعليق (اختياري)",
       "commentPlaceholder": "تفاصيل إضافية عن سبب الاستبعاد…",
       "couldNotCheckPermissions": "تعذّر التحقق من صلاحيات الاستبعاد.",
@@ -1419,7 +1424,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "تاريخ الاكتشاف",
-      "dismissedBecause": "تم استبعاد النتيجة. السبب: {{reason}}.",
+      "dismissedOn": "مستبعدة في",
+      "supersededOn": "مستبدلة في",
       "ghsa": "GHSA",
       "manifest": "ملف تعريف الحزمة",
       "noPatchAvailable": "لا يوجد تصحيح متاح",
@@ -1436,11 +1442,6 @@
       "vulnerableVersions": "الإصدارات المتأثرة بالثغرة",
       "statusOpen": "مفتوحة",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "بدأ الإصلاح بالفعل",
-      "reasonNoBandwidth": "لا تتوفر موارد كافية",
-      "reasonTolerableRisk": "الخطر مقبول",
-      "reasonInaccurate": "النتيجة غير دقيقة",
-      "reasonNotUsed": "الشيفرة التي تحتوي على الثغرة غير مستخدمة",
       "reasonAfterReview": "بعد المراجعة"
     },
     "findingList": {
@@ -1470,7 +1471,6 @@
       "newFindingSection": "إشعارات النتائج الجديدة",
       "newFindingSeverityLabel": "الحد الأدنى للخطورة لإشعارات النتائج الجديدة",
       "newFindingSubtitle": "يُرسل عند مزامنة نتيجة جديدة، بما في ذلك عند أول مزامنة.",
-      "slaLeadTimeAccessibility": "عدد الأيام قبل الموعد النهائي لإرسال تحذير SLA",
       "slaLeadTimeError": "أدخل عددًا صحيحًا من الأيام بين 1 و365.",
       "slaLeadTimeLabel": "وقت إرسال تحذير SLA قبل الموعد النهائي (بالأيام)",
       "slaPersonalTitle": "إشعاري بتحذيرات SLA عبر البريد الإلكتروني",
@@ -1535,7 +1535,6 @@
       "repositoriesCount": "المستودعات المحددة: {{displayCount}}",
       "repositoriesCount_other": "المستودعات المحددة: {{displayCount}}",
       "repositoriesCount_one": "مستودع واحد محدد",
-      "selectRepositoriesSubtitle": "اختر المستودعات التي يراقبها وكيل الأمان",
       "repositoriesCount_zero": "عدد المستودعات المحددة: {{displayCount}}",
       "repositoriesCount_two": "مستودعان محددان",
       "repositoriesCount_few": "تم تحديد {{displayCount}} مستودعات",
@@ -1590,7 +1589,10 @@
       "settleFailed": "اكتمل الإجراء، لكن لم نتمكن من تسجيل النتيجة. حاول مرة أخرى.",
       "replayFailed": "لم يكتمل هذا الإجراء. حاول مرة أخرى.",
       "actionFailed": "تعذّر إكمال هذا الإجراء. حاول مرة أخرى.",
-      "actionBlocked": "تعذّر إكمال هذا الإجراء. يجب إصلاح المشكلة أولاً قبل إعادة المحاولة."
+      "actionBlocked": "تعذّر إكمال هذا الإجراء. يجب إصلاح المشكلة أولاً قبل إعادة المحاولة.",
+      "syncNoRepositories": "لا توجد مستودعات ضمن نطاق المزامنة. اختر المستودعات التي يراقبها وكيل الأمان، ثم زامِن مرة أخرى.",
+      "syncIntegrationInactive": "اتصال GitHub الخاص بـ«وكيل الأمان» غير نشط. أعد ربط تطبيق Kilo على GitHub، ثم قم بالمزامنة مرة أخرى.",
+      "syncMissingPermission": "لا يستطيع تطبيق Kilo على GitHub قراءة تنبيهات الثغرات. امنح هذه الصلاحية في GitHub، ثم أعد المزامنة."
     },
     "analysisState": {
       "queued": "التحليل في قائمة الانتظار",
@@ -1624,7 +1626,6 @@
       "closedOn": "{{status}} في {{date}}",
       "deadlineNotSet": "الموعد النهائي غير محدد",
       "noSlaDeadline": "لا يوجد موعد نهائي حسب SLA",
-      "dueOn": "مستحق في {{date}}",
       "overdueNow": "متأخر",
       "overdue_zero": "أيام التأخير: {{count}}",
       "overdue_one": "متأخر بيوم واحد",
@@ -1914,13 +1915,14 @@
       "forkFilesUnchangedOnComputer": "لن تتغير الملفات على هذا الكمبيوتر.",
       "pickProfile": "اختر ملفًا شخصيًا",
       "noProfile": "لا يوجد ملف شخصي",
+      "defaultProfileResolvesTo": "يشير إلى {{name}}",
+      "defaultProfileResolvesToAccessibility": "الملف الشخصي الافتراضي: {{name}}",
       "manageProfiles": "إدارة الملفات الشخصية",
       "noProfiles": "لا توجد ملفات شخصية حتى الآن. قم بإنشاء واحد لإضافة متغيرات البيئة وخوادم MCP والمهارات.",
       "advancedConfig": "التكوين المتقدم",
       "advancedConfigDescription": "يُطبق على هذه الجلسة. حفظه كملف شخصي يبقيه للمرة القادمة.",
       "saveAsProfile": "حفظ كملف شخصي",
       "saveProfileDescription": "احفظ متغيرات البيئة الحالية وأوامر الإعداد كملف شخصي قابل لإعادة الاستخدام.",
-      "profileSummary": "{{vars}} متغيرات البيئة · أوامر الإعداد {{commands}}",
       "profileSaved": "تم حفظ الملف الشخصي \"{{name}}\".",
       "organizationProfiles": "ملفات المؤسسة الشخصية",
       "personalProfiles": "الملفات الشخصية",
@@ -2331,7 +2333,7 @@
     "attachmentPicker": {
       "camera": "الكاميرا",
       "photoLibrary": "مكتبة الصور",
-      "files": "ملف",
+      "files": "الملفات",
       "couldNotOpenPhotoPicker": "تعذّر فتح نافذة اختيار الصور. أعد تشغيل Kilo وحاول مرة أخرى.",
       "maxFilesAllowed": "الحد الأقصى لعدد الملفات هو {{displayCount}}.",
       "onlyAddingFiles": "ستُضاف {{accepted}} فقط من إجمالي الملفات البالغ {{total}} (الحد الأقصى: {{max}})",
@@ -2742,7 +2744,7 @@
     "couldNotSaveChoice": "تعذّر حفظ اختيارك. حاول مرة أخرى.",
     "onlineAllowed": "عبر الإنترنت، مسموح",
     "onlineNotAllowed": "عبر الإنترنت، غير مسموح",
-    "optionalReview": "اختياري — يمكنك تغيير هذا الخيار في أي وقت من الإعدادات",
+    "optionalReview": "اختياري",
     "optionalOnboarding": "اختياري — مفعّل ما لم تعطّله",
     "aiProvidersWhat": "تعليماتك وسجل محادثاتك وأي ملفات ترفقها.",
     "aiProvidersWhy": "لإنشاء ردود الذكاء الاصطناعي.",
@@ -2845,12 +2847,13 @@
       "checkFailedTitleBitbucket": "تعذّر التحقق من ربط حساب Bitbucket.",
       "providerCheckFailedMessage": "حالة الاتصال غير متاحة حتى يتم تحميلها.",
       "reconnectTitle": "إعادة ربط GitHub",
-      "reconnectDescription": "أُلغي ربط حسابك على GitHub. أعد ربطه لمواصلة مراجعة طلبات السحب على الجوال.",
-      "description": "اربط حسابك على GitHub لمراجعة طلبات السحب على الجوال.",
-      "gitlabDescription": "اربط حسابك في GitLab لمراجعة طلبات الدمج على الجوال.",
-      "bitbucketDescription": "اربط Bitbucket بهذه المؤسسة لمراجعة طلبات السحب على الجوال.",
+      "reconnectDescription": "أُلغي ربط حسابك على GitHub.",
+      "gitlabDescription": "مراجعة طلبات الدمج على الجوال",
       "bitbucketOrgOnlyDescription": "بدّل الحساب أعلاه إلى مؤسسة لمراجعة طلبات السحب الخاصة بها على Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "لا توجد مؤسسات في هذا الحساب بعد. يمكنك مراجعة طلبات السحب على Bitbucket بعد إنشاء مؤسسة أو الانضمام إلى واحدة.",
+      "gitlabReconnectAdminOnlyDescription": "اطلب من مالك مؤسسة أو مشرف أو مدير الفوترة ربطه.",
+      "bitbucketNotConnectedTitle": "Bitbucket غير متصل",
+      "bitbucketAdminOnlyDescription": "يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط ربطه.",
       "contextLine": "للمؤسسة: {{organization}}",
       "contextLinePersonal": "لحسابك الشخصي"
     },
@@ -2976,7 +2979,6 @@
     "entry": {
       "noRecentPrs": "لا توجد مراجعات حديثة",
       "noRecentPrsDescription": "الصق رابطًا أعلاه لبدء المراجعة. سيظهر هنا في المرة القادمة.",
-      "couldNotLoad": "تعذّر التحميل.",
       "removeFromRecentsTitle": "إزالة الطلب من القائمة الأخيرة؟",
       "removeFromRecentsMessage": "ستتم إزالة هذه المراجعة من قائمة العناصر الأخيرة.",
       "removeRecentAccessibility": "إزالة {{repo}} من قائمة الطلبات الأخيرة",
@@ -3015,7 +3017,7 @@
       "retryLoadingAllFiles": "إعادة محاولة تحميل جميع الملفات",
       "retryLoadingFiles": "إعادة محاولة تحميل الملفات",
       "retryLoadingMoreFiles": "إعادة محاولة تحميل المزيد من الملفات",
-      "title": "ملف",
+      "title": "الملفات",
       "viewedCount": "تم الاطلاع على {{viewed}} من {{total}}",
       "viewedOfListed": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات"
     },
@@ -3123,6 +3125,7 @@
     "installKiloGitHubApp": "تثبيت تطبيق Kilo على GitHub",
     "merge": {
       "merge": "دمج",
+      "mergeTitle": "دمج",
       "mergeNow": "دمج الآن",
       "mergePullRequest": "دمج طلب السحب",
       "mergeTermTitle": "دمج {{term}}",
@@ -3268,10 +3271,10 @@
     "pullRequestUnavailable": "طلب السحب غير متاح",
     "pullRequestUnavailableDescription": "لا يمكن فتح PR هذا. ربما حُذف، أو أن المستودع خاص، أو أن تطبيق Kilo على GitHub غير مثبّت فيه.",
     "reconnectNotice": {
-      "title": "انتهت صلاحية الربط مع GitHub.",
+      "title": "انتهت صلاحية الربط مع GitHub",
       "message": "أعد التحقق من الربط، وسيُطلب منك إعادة ربط الحساب إذا لزم الأمر.",
-      "gitlabTitle": "انتهت صلاحية الربط مع GitLab.",
-      "bitbucketTitle": "انتهت صلاحية الربط مع Bitbucket."
+      "gitlabTitle": "انتهت صلاحية الربط مع GitLab",
+      "bitbucketTitle": "انتهت صلاحية الربط مع Bitbucket"
     },
     "review": "مراجعة",
     "reviewPullRequest": "مراجعة طلب السحب",
@@ -3313,7 +3316,7 @@
     },
     "tabs": {
       "discussion": "المناقشة",
-      "files": "ملف",
+      "files": "الملفات",
       "overview": "نظرة عامة"
     },
     "diff": {
@@ -4073,6 +4076,7 @@
       "markSecret": "ضع علامة على أنها سرية",
       "masked": "القيمة المخفية",
       "reveal": "كشف القيمة",
+      "hide": "إخفاء القيمة",
       "newValuePlaceholder": "أدخل قيمة سرية جديدة",
       "valuePlaceholder": "قيمة سرية (مشفرة)"
     },
@@ -4205,7 +4209,8 @@
       "nameRequired": "أدخل اسم الأمر",
       "nameInvalid": "يجب أن يبدأ الاسم بحرف صغير ويستخدم فقط الأحرف الصغيرة والأرقام والشرطات",
       "templateRequired": "أدخل قالب الأمر",
-      "nameConflict": "هذا الاسم محجوز بواسطة أمر مضمن"
+      "nameConflict": "هذا الاسم محجوز بواسطة أمر مضمن",
+      "duplicateName": "هذا الاسم مستخدم بالفعل بواسطة أمر آخر في هذا الملف الشخصي"
     },
     "repoBindings": {
       "title": "الملفات الشخصية الافتراضية للمستودعات",
@@ -4214,7 +4219,7 @@
       "emptyDescription": "أضف افتراضيًا لتطبيق ملف شخصي تلقائيًا عند بدء جلسات المستودعات.",
       "repo": "حدد المستودع…",
       "profile": "حدد الملف الشخصي",
-      "remove": "فك الارتباط",
+      "removeForRepo": "فك الارتباط عن {{repo}}",
       "search": "بحث في المستودعات...",
       "addedToast": "تم تعيين الملف الشخصي الافتراضي لـ \"{{repo}}\"",
       "addFailed": "لا يمكن تعيين الملف الشخصي الافتراضي",

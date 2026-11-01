@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, TextInput, View } from 'react-native';
+import { Pressable, type TextInput, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { Input } from '@/components/ui/input';
 import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
 import { resolveVoiceInputFeedbackPresentation } from '@/lib/voice-input/voice-input-feedback';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
@@ -26,7 +26,6 @@ import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
  */
 export function VoiceTestField(): React.ReactElement {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const inputRef = useRef<TextInput>(null);
   const textRef = useRef('');
   const [hasText, setHasText] = useState(false);
@@ -74,14 +73,19 @@ export function VoiceTestField(): React.ReactElement {
   return (
     <View className="gap-2 rounded-lg bg-secondary px-3 py-3">
       <Text className="text-sm font-medium text-foreground">{t('voiceInput.testTitle')}</Text>
-      <TextInput
+      <Input
         ref={inputRef}
-        className="min-h-24 rounded-md border border-input bg-background px-3 py-2 text-base leading-[1.5rem] text-foreground"
+        // The visible title above is a separate `Text`, so the multiline field
+        // names itself with the same catalog key instead of the transcript. The
+        // shared Input owns the box's inner padding: Android drops the logical
+        // `px-*` inset a raw TextInput would carry, so the placeholder and the
+        // text would sit against the border there.
+        accessibilityLabel={t('voiceInput.testTitle')}
+        className="min-h-24 rounded-md border border-input bg-background text-base leading-[1.5rem] text-foreground"
         defaultValue=""
         multiline
         onChangeText={handleTextChange}
         placeholder={t('voiceInput.testPlaceholder')}
-        placeholderTextColor={colors.mutedForeground}
         textAlignVertical="top"
       />
       <View className="flex-row items-center gap-3">

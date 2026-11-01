@@ -61,6 +61,7 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: routerPush }) }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('react-native', () => ({
+  Keyboard: { dismiss: () => undefined },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -208,6 +209,26 @@ describe('RepoBindingsScreen add form', () => {
     expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
     expect(routerPush).toHaveBeenCalledWith(
       '/(app)/profile-management/new?owner=personal&returnTo=back'
+    );
+
+    unmount();
+  });
+
+  it('empty picker: a screen opened from the composer hands the opener to the create form', async () => {
+    Object.assign(h.profileList, { orgProfiles: [], personalProfiles: [PROFILE] });
+
+    const { renderer, unmount } = await mountScreen('org-1', 'composer');
+    pressButton(renderer.root, 'Add default');
+    pressPressable(renderer.root, 'Select profile');
+
+    const empty = emptyStateProps(renderer.root, 'No profiles yet');
+    act(() => {
+      empty.action?.props.onPress();
+    });
+    // The form carries the marker, so Back returns to this screen with its
+    // picker state instead of a profiles list this screen never had.
+    expect(routerPush).toHaveBeenCalledWith(
+      '/(app)/profile-management/new?owner=organization&returnTo=back&organizationId=org-1&openedFrom=composer'
     );
 
     unmount();

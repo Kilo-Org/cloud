@@ -8,7 +8,9 @@ import {
   cancelSupersededReviewsForPR,
   findExistingReview,
   findActiveReviewsForPR,
+  findReviewCoveringHeads,
   updateReviewHeadShaAndCheckRun,
+  type CoveringReview,
   type ReviewScope,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
@@ -29,9 +31,11 @@ import type { GitHubAppType } from '@/lib/integrations/platforms/github/adapter'
 import {
   addReactionToPR,
   createCheckRun,
-  isMergeCommit,
+  getCheckRunConclusion,
+  resolveMergeHeadContent,
   updateCheckRun,
 } from '@/lib/integrations/platforms/github/adapter';
+import { isNonTerminalCodeReviewStatus } from '@/lib/code-reviews/dispatch/dispatch-constants';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { updateCheckRunId } from '@/lib/code-reviews/db/code-reviews';
 import { resolvePullRequestCheckoutRef } from './pull-request-checkout-ref';
@@ -171,44 +175,74 @@ export async function handlePullRequestCodeReview(
     // Skip merge commits on synchronize (e.g. merging base branch into feature branch).
     // Runs before cancellation so that an in-flight review at an earlier SHA is preserved:
     // a merge commit introduces no new feature work and should not supersede the existing review.
-    if (
+    // The skip holds only while a review covers the content the head carries. A head that stacks
+    // merges on branch commits no review has covered yet, or that takes code from outside the base
+    // branch, must be reviewed here, or the pull request never gets a review at its head and a
+    // repository that requires the Kilo check stays blocked.
+    const mergeHeadContent =
+      payload.action === GITHUB_ACTION.SYNCHRONIZE &&
       !isBotPullRequestSkip &&
       headOwner &&
-      headRepoName &&
-      (await shouldSkipSynchronizeForMergeCommit({
-        action: payload.action,
-        installationId: integration.platform_installation_id as string,
-        headOwner,
-        headRepoName,
-        headSha: pull_request.head.sha,
-        appType,
-      }))
-    ) {
+      headRepoName
+        ? await resolveMergeHeadContent({
+            appType,
+            baseSha: pull_request.base.sha,
+            headSha: pull_request.head.sha,
+            installationId: integration.platform_installation_id as string,
+            owner: headOwner,
+            repo: headRepoName,
+          })
+        : { kind: 'not_merge' as const };
+
+    const coveringReview =
+      mergeHeadContent.kind === 'review_content'
+        ? await coveringReviewFor(reviewScope, mergeHeadContent.shas)
+        : null;
+
+    if (coveringReview !== null) {
       logExceptInTest('Skipping merge commit:', {
         pr_number: pull_request.number,
         repo: repository.full_name,
         head_sha: pull_request.head.sha,
       });
 
-      // The preserved review's check run still sits on the prior SHA, so
-      // branch protection that requires the Kilo check would stay blocked
-      // on the merge-commit head. Drop a fresh check run on the new HEAD
-      // and repoint the review at it so its eventual completion callback
-      // updates the gate on the commit GitHub actually evaluates. Note
-      // the check run goes on the *base* repo (where branch protection
-      // lives and where the app is installed), not the head/fork repo.
+      // Branch protection evaluates the merge-commit head, where no check run exists yet. Note
+      // the check run goes on the *base* repo (where branch protection lives and where the app is
+      // installed), not the head/fork repo.
       const [baseOwner, baseRepoName] = repository.full_name.split('/');
-      await migrateInFlightReviewsToMergeCommitHead({
-        newHeadSha: pull_request.head.sha,
-        integrationId: integration.id,
-        installationId: integration.platform_installation_id as string,
-        baseOwner,
-        baseRepoName,
-        appType,
-        reviewScope,
-      });
+      if (isNonTerminalCodeReviewStatus(coveringReview.status)) {
+        // The preserved review's check run still sits on the prior SHA. Drop a fresh check run on
+        // the new HEAD and repoint the review at it so its eventual completion callback updates the
+        // gate on the commit GitHub actually evaluates.
+        await migrateInFlightReviewsToMergeCommitHead({
+          newHeadSha: pull_request.head.sha,
+          integrationId: integration.id,
+          installationId: integration.platform_installation_id as string,
+          baseOwner,
+          baseRepoName,
+          appType,
+          reviewScope,
+        });
+      } else {
+        await gateMergeHeadFromCoveringReview({
+          appType,
+          baseOwner,
+          baseRepoName,
+          coveringReview,
+          headSha: pull_request.head.sha,
+          installationId: integration.platform_installation_id as string,
+        });
+      }
 
       return NextResponse.json({ message: 'Skipped merge commit' }, { status: 200 });
+    }
+
+    if (mergeHeadContent.kind !== 'not_merge') {
+      logExceptInTest('Reviewing merge commit whose content no review covers:', {
+        pr_number: pull_request.number,
+        repo: repository.full_name,
+        head_sha: pull_request.head.sha,
+      });
     }
 
     // Cancel any existing reviews for this PR (different SHA).
@@ -496,31 +530,74 @@ export async function handlePullRequestCodeReview(
 }
 
 /**
- * Decides whether a pull_request webhook should bail out because its head
- * commit is a merge commit (e.g. produced by GitHub's "Update branch" button
- * or a manual `git merge main`). Only applies to synchronize events.
- *
- * Extracted so tests can inject a fake `isMergeCommitFn` without mocking the
- * GitHub adapter module.
+ * The review that covers the content a merge commit carries, or null when none
+ * does. A read failure answers null, so an unreadable history reviews the head
+ * instead of skipping it.
  */
-export async function shouldSkipSynchronizeForMergeCommit(args: {
-  action: string;
-  installationId: string;
-  headOwner: string;
-  headRepoName: string;
-  headSha: string;
+async function coveringReviewFor(
+  scope: ReviewScope,
+  headShas: readonly string[]
+): Promise<CoveringReview | null> {
+  try {
+    return await findReviewCoveringHeads(scope, headShas);
+  } catch (error) {
+    logExceptInTest('Failed to read reviews of the merge head content:', error);
+    return null;
+  }
+}
+
+/**
+ * A finished review of the same content leaves no check run on this head, so
+ * branch protection that requires the Kilo check stays blocked here. Create the
+ * head's check run with the verdict the review finished with, so the gate on the
+ * merge head matches the gate on the content it carries. A verdict that cannot
+ * be read is logged and leaves the head without a run instead of inventing one.
+ */
+async function gateMergeHeadFromCoveringReview(args: {
   appType: GitHubAppType;
-  isMergeCommitFn?: (
-    installationId: string,
-    owner: string,
-    repo: string,
-    sha: string,
-    appType: GitHubAppType
-  ) => Promise<boolean>;
-}): Promise<boolean> {
-  if (args.action !== GITHUB_ACTION.SYNCHRONIZE) return false;
-  const check = args.isMergeCommitFn ?? isMergeCommit;
-  return check(args.installationId, args.headOwner, args.headRepoName, args.headSha, args.appType);
+  baseOwner: string;
+  baseRepoName: string;
+  coveringReview: Readonly<{ checkRunId: number | null; headSha: string; id: string }>;
+  headSha: string;
+  installationId: string;
+}): Promise<void> {
+  if (args.appType === 'lite' || args.coveringReview.checkRunId === null) {
+    return;
+  }
+  const conclusion = await getCheckRunConclusion(
+    args.installationId,
+    args.baseOwner,
+    args.baseRepoName,
+    args.coveringReview.checkRunId,
+    args.appType
+  );
+  if (conclusion === undefined) {
+    logExceptInTest('No verdict to carry to the merge-commit head:', {
+      head_sha: args.headSha,
+      review_id: args.coveringReview.id,
+      reviewed_sha: args.coveringReview.headSha,
+    });
+    return;
+  }
+  try {
+    await createCheckRun(
+      args.installationId,
+      args.baseOwner,
+      args.baseRepoName,
+      args.headSha,
+      {
+        conclusion,
+        detailsUrl: `${APP_URL}/code-reviews/${args.coveringReview.id}`,
+        output: {
+          title: 'Kilo Code Review',
+          summary: `Reviewed at ${args.coveringReview.headSha.substring(0, 7)}; this head merges no new branch content.`,
+        },
+      },
+      args.appType
+    );
+  } catch (error) {
+    logExceptInTest('Failed to create the merge-commit check run:', error);
+  }
 }
 
 /**

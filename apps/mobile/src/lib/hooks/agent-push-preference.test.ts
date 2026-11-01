@@ -11,6 +11,7 @@ import {
   type NotificationPreferences,
   readAgentPushPreference,
   readAgentPushPreferenceIfLoaded,
+  readNotificationPreviewsIfLoaded,
   rollbackAgentPushOptimistic,
 } from './agent-push-preference';
 
@@ -215,5 +216,24 @@ describe('readAgentPushPreferenceIfLoaded', () => {
     expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentAttention')).toBe(
       DEFAULT_NOTIFICATION_PREFERENCE
     );
+  });
+});
+
+describe('readNotificationPreviewsIfLoaded', () => {
+  it('reports the choice as unknown while the cache is empty', () => {
+    const qc = makeQueryClient();
+    expect(readNotificationPreviewsIfLoaded(qc, key)).toBeUndefined();
+  });
+
+  it('returns the server-resolved choice', () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(key, fullRow({ notificationPreviews: 'full' }));
+    expect(readNotificationPreviewsIfLoaded(qc, key)).toBe('full');
+  });
+
+  it('reports a legacy snapshot as unknown rather than claiming full previews', () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(key, { agentPushEnabled: true });
+    expect(readNotificationPreviewsIfLoaded(qc, key)).toBeUndefined();
   });
 });

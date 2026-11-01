@@ -69,6 +69,7 @@
     "organization": "Erakundea",
     "platform": "Plataforma",
     "prReview": "PR-en berrikuspena",
+    "prReviewSubtitle": "Berrikusi bateratze-eskaerak mugikorrean",
     "queued": "Ilaran",
     "remove": "Kendu",
     "repository": "Biltegia",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "PR-ak automatikoki berrikustea",
     "securityAgentSubtitle": "Aurkitu eta konpondu ahultasunak",
     "reviews": "Berrikuspenak",
-    "prReviewSubtitle": "Berrikusi bateratze-eskaerak mugikorrean",
     "couldNotLoadOrganization": "Ezin izan da erakundea kargatu.",
     "couldNotLoadOrganizationDescription": "Erakundearen datuak kargatu arte, erakundearen eta agenteen ezarpenak ez daude erabilgarri.",
     "linkedAccounts": "Estekatutako kontuak",
@@ -330,7 +330,7 @@
       "diffTooLarge": "diferentziak handiegiak dira",
       "openFile": "Ireki {{path}}",
       "openFileViewed": "Ireki {{path}} (ikusita)",
-      "title": "Fitxategi"
+      "title": "Fitxategiak"
     },
     "fileRows": {
       "markViewed": "Markatu {{path}} ikusitako gisa",
@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub-erako konexioa iraungi da.",
     "merge": {
       "merge": "Bateratzea",
+      "mergeTitle": "Bateratzea",
       "mergeNow": "Bateratu orain",
       "mergePullRequest": "Bateratze-eskaera bateratzea",
       "mergeTermTitle": "{{term}} bateratzea",
@@ -605,7 +606,6 @@
     "entry": {
       "noRecentPrs": "Ez dago azkenaldiko berrikuspenik",
       "noRecentPrsDescription": "Itsatsi esteka bat goian berrikuspena hasteko — hemen agertuko da hurrengoan.",
-      "couldNotLoad": "Ezin izan da kargatu.",
       "removeFromRecentsTitle": "Azkenaldikoen zerrendatik kendu?",
       "removeFromRecentsMessage": "Berrikuspen hau azkenaldikoen zerrendatik kenduko da.",
       "removeRecentAccessibility": "Kendu {{repo}} azkenaldikoen zerrendatik",
@@ -679,12 +679,13 @@
       "checkFailedTitleBitbucket": "Ezin izan da Bitbucket-ekiko konexioa egiaztatu.",
       "providerCheckFailedMessage": "Konexio-egoera ez dago eskuragarri kargatu arte.",
       "reconnectTitle": "Konektatu GitHub berriro",
-      "reconnectDescription": "GitHub-ekiko konexioa baliogabetu da. Konektatu berriro bateratze-eskaerak mugikorrean berrikusten jarraitzeko.",
-      "description": "Konektatu zure GitHub kontua bateratze-eskaerak mugikorrean berrikusteko.",
-      "gitlabDescription": "Konektatu zure GitLab kontua merge-eskaerak mugikorrean berrikusteko.",
-      "bitbucketDescription": "Konektatu Bitbucket erakunde honetara bateratze-eskaerak mugikorrean berrikusteko.",
+      "reconnectDescription": "GitHub-ekiko konexioa baliogabetu da.",
+      "gitlabDescription": "Berrikusi merge-eskaerak mugikorrean",
       "bitbucketOrgOnlyDescription": "Aldatu goiko kontua erakunde batera haren Bitbucket bateratze-eskaerak berrikusteko.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Kontu honek ez du oraindik erakunderik. Erakunde bat sortu edo batekin bat egiten duzunean, haren Bitbucket bateratze-eskaerak berrikus ditzakezu.",
+      "gitlabReconnectAdminOnlyDescription": "Eskatu erakunde bateko jabeari, administratzaileari edo fakturazio-kudeatzaileari berriro konekta dezan.",
+      "bitbucketNotConnectedTitle": "Bitbucket ez dago konektatuta",
+      "bitbucketAdminOnlyDescription": "Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
       "contextLine": "{{organization}}-rako",
       "contextLinePersonal": "Zure kontu pertsonalerako"
     },
@@ -759,7 +760,7 @@
     },
     "tabs": {
       "overview": "Ikuspegi orokorra",
-      "files": "Fitxategi",
+      "files": "Fitxategiak",
       "discussion": "Eztabaida"
     },
     "fileStatus": {
@@ -834,7 +835,8 @@
     "liveUpdates": "Zuzeneko eguneratzeak",
     "liveUpdateSubtitle": "Erakutsi agente aktiboak zure jakinarazpenetan",
     "push": "Jakinarazpen automatikoak",
-    "onDescription": "Jakinarazpen automatikoak gaituta daude gailu honetan.",
+    "deviceTitle": "Jakinarazpenak gailu honetan",
+    "onDescription": "Alertak beheko kategorien arabera iristen dira.",
     "offDescription": "Baimena edo gailuaren erregistroa desgaituta dago.",
     "retryPermission": "Saiatu jakinarazpenen baimena berriro egiaztatzen",
     "enable": "Gaitu jakinarazpenak",
@@ -1019,7 +1021,7 @@
     "attachmentPicker": {
       "takePhoto": "Atera argazkia",
       "photoLibrary": "Argazki-bilduma",
-      "files": "Fitxategi",
+      "files": "Fitxategiak",
       "cameraAccessMessage": "Eman kamera erabiltzeko baimena ezarpenetan, argazki bat ateratzeko."
     },
     "typingIndicator": {
@@ -1417,7 +1419,9 @@
     "instructions": {
       "title": "Pertsonalizatutako argibideak",
       "deprecation": "Argibide pertsonalizatuen aukera kentzea aurreikusten da. Eraman jarraibide hauek zure biltegiko REVIEW.md fitxategi batera.",
-      "placeholder": "adib.: gure errore-kudeaketako arauak betearaztea…"
+      "placeholder": "adib.: gure errore-kudeaketako arauak betearaztea…",
+      "clearTitle": "Kendu pertsonalizatutako argibideak?",
+      "clearMessage": "Eremu huts bat gordetzen baduzu, berrikusle honentzat gordetako argibide pertsonalizatuak ezabatzen dira."
     },
     "repos": {
       "unavailable": "Biltegiak ez daude erabilgarri. Amaitu Bitbucket-en konfigurazioa kilo.ai-n.",
@@ -1452,7 +1456,7 @@
       "fixSettings": "Konpondu ezarpenak",
       "couldNotLoad": "Ezin izan da berrikuspena kargatu.",
       "couldNotGetLatest": "Ezin izan da azken egoera lortu.",
-      "byline": "{{repo}} #{{number}} · Egilea: {{author}}",
+      "byline": "#{{number}} · Egilea: {{author}}",
       "noFindings": "Ez dago aurkikuntzarik.",
       "findingsUnavailable": "Emaitzak ez daude erabilgarri, berrikuspen honek huts egin duelako.",
       "findingsInProgress": "Berrikuspen hau oraindik abian da. Aurkikuntzak hemen agertuko dira amaitzean.",
@@ -1533,11 +1537,13 @@
       "offAction": "Berrikuspen-memoria desgaituta dago. Gaitu, eta saiatu berriro."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Sartu merge-eskaera baten baliozko URL bat.",
+      "mergeRequestUrl": "Merge-eskaeraren URLa",
+      "instructionsAtLimit": "Argibideak {{max}} karakteretara mugatuta daude",
       "title": "Eskuzko berrikuspena",
       "invalidUrl": "Sartu bateratze-eskaera baten baliozko URL bat.",
       "couldNotCheckProviderStatus": "Ezin izan da hornitzailearen egoera egiaztatu.",
       "couldNotLoadProviders": "Ezin izan ditugu konektatu dituzun hornitzaileak kargatu. Saiatu berriro.",
-      "connectProviderDescription": "Konektatu GitHub bateratze-eskaera baten eskuzko berrikuspena hasteko.",
       "pullRequestUrl": "Bateratze-eskaeraren URLa",
       "instructions": "Argibideak (aukerakoak)",
       "instructionsPlaceholder": "Berrikusleak aztertu beharreko zerbait zehatza…",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "Berrikuspen-estiloa",
       "focusAreas": "Arreta-eremuak",
       "allAreas": "Eremu guztiak",
-      "customInstructions": "Pertsonalizatutako argibideak",
       "set": "Ezarrita",
+      "notSet": "Ezarri gabe",
       "nSelected": "{{displayCount}} hautatuta",
       "proposedReviewMdGuidance": "REVIEW.md fitxategirako proposatutako jarraibideak"
     },
@@ -1680,7 +1686,8 @@
       "sortSeverityDesc": "Larritasuna: handienetik txikienera",
       "sortSeverityAsc": "Larritasuna: txikienetik handienera",
       "sortSlaDue": "SLAren epemuga",
-      "overdueOnly": "Epez kanpokoak soilik"
+      "overdueOnly": "Epez kanpokoak soilik",
+      "noRepositories": "Oraindik ez dago biltegirik sinkronizatuta edo hautatuta. Aukera itzazu Segurtasun-agentearen ezarpenetan."
     },
     "automation": {
       "title": "Automatizazioa",
@@ -1765,7 +1772,6 @@
       "noImmediateAction": "Ez dago berehalako ekintzarik",
       "notExploitable": "Ezin da ustiatu",
       "needsYourReview": "Berrikusi behar duzu",
-      "noSlaDeadline": "Ez dago SLAren epemugarik esleituta",
       "noRepositoryData": "Oraindik ez dago biltegi-daturik",
       "noRepositoryDataDescription": "Biltegien lehentasunak aurkikuntzak sinkronizatu ondoren agertuko dira.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
@@ -1783,6 +1789,7 @@
       "lastSynced": "Azken sinkronizazioa: {{time}}",
       "manageRepositories": "Kudeatu biltegiak",
       "notYetSynced": "Oraindik ez da sinkronizatu",
+      "priorityFindingsPending": "Lehentasunezko aurkikuntzak lehen sinkronizazioaren ondoren agertuko dira.",
       "refreshFailed": "Ezin izan dira datuak eguneratu. Azken sinkronizazioko datuak erakusten dira.",
       "settings": "Ezarpenak",
       "syncNow": "Sinkronizatu orain",
@@ -1828,7 +1835,6 @@
       "reasonInaccurate": "Antzemandako arazoa ez da zehatza",
       "reasonNotUsed": "Kode zaurgarria ez da erabiltzen",
       "commentLabel": "Iruzkina (aukerakoa)",
-      "commentAccessibility": "Baztertze-iruzkina",
       "commentPlaceholder": "Baztertzeari buruzko xehetasunak…",
       "notFoundTitle": "Ez da antzemandako arazoa aurkitu",
       "notFoundDescription": "Baliteke aurkikuntza hau kendu izana edo jada hura ikusteko sarbiderik ez izatea.",
@@ -1841,7 +1847,8 @@
     "findingDetails": {
       "supersededBy": "Uneko aurkikuntza batek ordezkatu du",
       "supersededByDescription": "Sakatu uneko erregistroa irekitzeko eta egoera, azterketa eta konponketa ikusteko.",
-      "dismissedBecause": "Aurkikuntza baztertu da. Arrazoia: {{reason}}.",
+      "dismissedOn": "Baztertuta geratu zen data",
+      "supersededOn": "Ordezkatuta geratu zen data",
       "severityLabel": "Larritasuna: {{severity}}",
       "package": "Paketea",
       "vulnerableVersions": "Bertsio ahulak",
@@ -1858,11 +1865,6 @@
       "viewAdvisory": "Ikusi segurtasun-abisua GitHub-en",
       "statusOpen": "Ireki",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "konponketa hasita dago",
-      "reasonNoBandwidth": "ez dago horretarako baliabiderik",
-      "reasonTolerableRisk": "arriskua onargarria da",
-      "reasonInaccurate": "antzemandako arazoa ez da zehatza",
-      "reasonNotUsed": "kode zaurgarria ez da erabiltzen",
       "reasonAfterReview": "berrikuspenaren ondoren"
     },
     "settingsOverview": {
@@ -1872,7 +1874,6 @@
       "repositoriesCount_one": "{{displayCount}} biltegi hautatuta",
       "repositoriesCount": "{{displayCount}} biltegi hautatuta",
       "repositoriesCount_other": "{{displayCount}} biltegi hautatuta",
-      "selectRepositoriesSubtitle": "Hautatu segurtasun-agenteak zein biltegiren jarraipena egingo duen",
       "analysisModeSubtitle": "Azterketa: {{mode}}",
       "automationAllOff": "Guztiak desgaituta",
       "automationCount": "3tik {{displayCount}} gaituta",
@@ -1923,7 +1924,7 @@
       "highDescription": "Datu kopuru handia agerian geratzeko arriskua.",
       "mediumDescription": "Eragin mugatua edo baldintza zehatzak.",
       "lowDescription": "Segurtasunean eragin oso txikia.",
-      "invalidDayCount": "egun kopuruak 1 eta 365 arteko zenbaki osoa izan behar du.",
+      "invalidDayCount": "Egun kopuruak 1 eta 365 arteko zenbaki osoa izan behar du.",
       "remediationDeadlineA11y": "Konponketa-epea egunetan, larritasuna: {{label}}",
       "enterWholeNumber": "Sartu 1etik 365era bitarteko zenbaki oso bat",
       "permissionNote": "Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik alda ditzakete ezarpen hauek.",
@@ -2015,7 +2016,6 @@
       "newFindingSection": "Aurkikuntza berrien jakinarazpena",
       "newFindingSeverityLabel": "Aurkikuntza berrien gutxieneko larritasuna",
       "newFindingSubtitle": "Aurkikuntza berri bat sinkronizatzen den bakoitzean bidaltzen da, lehen sinkronizazioan ere bai.",
-      "slaLeadTimeAccessibility": "SLAren abisua zenbat egun lehenago bidali",
       "slaLeadTimeError": "Sartu 1 eta 365 arteko zenbaki oso bat egun kopururako.",
       "slaLeadTimeLabel": "SLAren abisuaren aurrerapena (egunak)",
       "slaPersonalTitle": "Bidali niri SLAren abisuak posta elektronikoz",
@@ -2063,7 +2063,10 @@
       "settleFailed": "Ekintza burutu da, baina ezin izan dugu emaitza erregistratu. Saiatu berriro.",
       "replayFailed": "Ekintza hau ez da burutu. Saiatu berriro.",
       "actionFailed": "Ezin izan da ekintza hau burutu. Saiatu berriro.",
-      "actionBlocked": "Ezin izan da ekintza hau burutu. Arazoa konpondu behar da berriro saiatu aurretik."
+      "actionBlocked": "Ezin izan da ekintza hau burutu. Arazoa konpondu behar da berriro saiatu aurretik.",
+      "syncNoRepositories": "Ez dago biltegirik sinkronizazio-esparruan. Aukeratu Segurtasun-agenteak gainbegiratzen dituen biltegiak, eta gero sinkronizatu berriro.",
+      "syncIntegrationInactive": "Segurtasun-agentearen GitHub konexioa ez dago aktibo. Konektatu berriro Kilo GitHub App, eta gero sinkronizatu berriro.",
+      "syncMissingPermission": "Kilo GitHub App-ek ezin ditu vulnerability alerts irakurri. Eman baimen hori GitHub-en, eta gero sinkronizatu berriro."
     },
     "analysisState": {
       "queued": "Azterketa ilaran",
@@ -2097,7 +2100,6 @@
       "closedOn": "{{status}} · {{date}}",
       "deadlineNotSet": "Ez da eperik ezarri",
       "noSlaDeadline": "SLAren epemugarik gabe",
-      "dueOn": "Epemuga: {{date}}",
       "overdueNow": "Epez kanpo",
       "overdue_one": "{{count}} egun atzeratuta",
       "overdue_other": "{{count}} egun atzeratuta",
@@ -2371,13 +2373,14 @@
       "forkFilesUnchangedOnComputer": "Ordenagailu honetako fitxategiak ez dira aldatzen.",
       "pickProfile": "Aukeratu profil bat",
       "noProfile": "Ez dago profilik",
+      "defaultProfileResolvesTo": "Une honetan {{name}} da",
+      "defaultProfileResolvesToAccessibility": "Profil lehenetsia: {{name}}",
       "manageProfiles": "Kudeatu profilak",
       "noProfiles": "Oraindik ez dago profilik. Sortu bat ingurune-aldagaiak, MCP zerbitzariak eta trebetasunak gehitzeko.",
       "advancedConfig": "Konfigurazio aurreratua",
       "advancedConfigDescription": "Saio honetarako balio du. Profil gisa gordez gero, hurrengorako gordeko da.",
       "saveAsProfile": "Gorde profil gisa",
       "saveProfileDescription": "Gorde uneko ingurune-aldagaiak eta konfiguratu komandoak profil berrerabilgarri gisa.",
-      "profileSummary": "{{vars}} ingurune-aldagaiak · {{commands}} konfigurazio komandoak",
       "profileSaved": "\"{{name}}\" profila gorde da",
       "organizationProfiles": "Erakundeen profilak",
       "personalProfiles": "Profil pertsonalak",
@@ -2768,7 +2771,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Argazki-bilduma",
-      "files": "Fitxategi",
+      "files": "Fitxategiak",
       "couldNotOpenPhotoPicker": "Ezin izan da argazki-hautatzailea ireki. Berrabiarazi Kilo eta saiatu berriro.",
       "maxFilesAllowed": "Gehienez {{displayCount}} fitxategi onartzen dira.",
       "onlyAddingFiles": "{{total}} fitxategietatik {{accepted}} bakarrik gehitzen (gehienez {{max}})",
@@ -3151,7 +3154,7 @@
     "couldNotSaveChoice": "Ezin izan da zure aukera gorde. Saiatu berriro.",
     "onlineAllowed": "Linean, baimenduta",
     "onlineNotAllowed": "Linean, baimendu gabe",
-    "optionalReview": "Aukerakoa — edonoiz alda dezakezu ezarpenetan",
+    "optionalReview": "Aukerakoa",
     "optionalOnboarding": "Aukerakoa — gaituta, zuk desgaitzen ez baduzu",
     "aiProvidersWhat": "Zure eskaerak, elkarrizketa-historia eta erantsitako fitxategi guztiak.",
     "aiProvidersWhy": "AI erantzunak sortzeko.",
@@ -3849,6 +3852,7 @@
       "markSecret": "Markatu sekretu gisa",
       "masked": "Ezkutuko balioa",
       "reveal": "Erakutsi balioa",
+      "hide": "Ezkutatu balioa",
       "newValuePlaceholder": "Sartu balio sekretu berria",
       "valuePlaceholder": "Balio sekretua (zifratuta)"
     },
@@ -3856,8 +3860,8 @@
     "variablesSaveFailed": "Ezin izan da aldagaia gorde",
     "commandsTitle": "Konfiguratu komandoak",
     "addCommand": "Gehitu komandoa",
-    "commandLabel": "Agindua",
-    "commandLabelPosition": "{{position}}. agindua",
+    "commandLabel": "Komandoa",
+    "commandLabelPosition": "{{position}}. komandoa",
     "commandPlaceholder": "adib. pnpm install",
     "commandAtLimit": "Komandoa {{max}} karakteretara mugatuta dago",
     "commandsEmpty": "Oraindik ez dago konfigurazio komandorik",
@@ -3977,7 +3981,8 @@
       "nameRequired": "Sartu komando-izen bat",
       "nameInvalid": "Izenak letra xehe batekin hasi behar du eta letra xeheak, zifrak eta marra baino ez ditu erabili",
       "templateRequired": "Sartu komando txantiloia",
-      "nameConflict": "Izen hori barneko komando batek erreserbatzen du"
+      "nameConflict": "Izen hori barneko komando batek erreserbatzen du",
+      "duplicateName": "Izen hori duen komando bat badago lehendik profil honetan"
     },
     "repoBindings": {
       "title": "Repos-en profil lehenetsiak",
@@ -3986,7 +3991,7 @@
       "emptyDescription": "Gehitu lehenetsitako profil bat automatikoki aplikatzeko repositegi baterako saioak hastean.",
       "repo": "Hautatu biltegia…",
       "profile": "Hautatu profila",
-      "remove": "Askatu",
+      "removeForRepo": "Askatu {{repo}}",
       "search": "Bilatu biltegiak...",
       "addedToast": "\"{{repo}}\"-ren profil lehenetsia ezarri da",
       "addFailed": "Ezin izan da profil lehenetsia ezarri",

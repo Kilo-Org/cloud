@@ -5,16 +5,23 @@ import { CONTROL_PLANE_TIMEOUT_MESSAGE } from '@kilocode/app-shared/control-plan
 import { isRequestDeadlineError } from '@/lib/telemetry/abort-classification';
 
 // Shared tRPC error helpers. tRPC v11 client errors expose `data.code` /
-// `data.message`; server-shaped errors expose `shape.data.code` /
-// `shape.data.message`. Anything else is treated as an unknown transient
-// error.
+// `data.message` / `data.upstreamCode`; server-shaped errors expose the same
+// under `shape.data`. Anything else is treated as an unknown transient error.
 
 const DirectErrorSchema = z.looseObject({
-  data: z.looseObject({ code: z.string().optional(), message: z.string().optional() }),
+  data: z.looseObject({
+    code: z.string().optional(),
+    message: z.string().optional(),
+    upstreamCode: z.string().optional(),
+  }),
 });
 const ShapedErrorSchema = z.looseObject({
   shape: z.looseObject({
-    data: z.looseObject({ code: z.string().optional(), message: z.string().optional() }),
+    data: z.looseObject({
+      code: z.string().optional(),
+      message: z.string().optional(),
+      upstreamCode: z.string().optional(),
+    }),
   }),
 });
 const TopLevelCodeSchema = z.looseObject({ code: z.string() });
@@ -25,7 +32,10 @@ const TopLevelCodeSchema = z.looseObject({ code: z.string() });
  * (for `message`) `Error.message`. Returns `undefined` when no string value
  * exists.
  */
-export function readTrpcErrorField(error: unknown, field: 'code' | 'message'): string | undefined {
+export function readTrpcErrorField(
+  error: unknown,
+  field: 'code' | 'message' | 'upstreamCode'
+): string | undefined {
   const direct = DirectErrorSchema.safeParse(error);
   if (direct.success && direct.data.data[field] !== undefined) {
     return direct.data.data[field];

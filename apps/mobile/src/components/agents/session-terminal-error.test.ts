@@ -100,6 +100,7 @@ describe('describeTerminalFailure', () => {
       variant,
       message: i18n.t(key),
       retryable,
+      retryWith: 'session',
       detail: message,
       title: expect.any(String),
     });
@@ -185,6 +186,7 @@ describe('resolveSessionTerminalError', () => {
       title: "Couldn't load this session",
       message: 'Failed to load session details',
       retryable: true,
+      retryWith: 'session',
       detail: 'boom',
     });
   });
@@ -198,6 +200,7 @@ describe('resolveSessionTerminalError', () => {
       title: "Couldn't load this session",
       message: 'Connection trouble. Please retry in a moment.',
       retryable: true,
+      retryWith: 'session',
       detail: 'Connection failed. Please retry in a moment.',
     });
   });
@@ -210,6 +213,7 @@ describe('resolveSessionTerminalError', () => {
       title: 'Access denied',
       message: "You don't have permission to view this.",
       retryable: false,
+      retryWith: 'session',
       detail: 'You are not authorized to use the Cloud Agent.',
     });
   });
@@ -226,6 +230,7 @@ describe('resolveSessionTerminalError', () => {
       title: "Couldn't load this session",
       message: 'Connection trouble. Please retry in a moment.',
       retryable: true,
+      retryWith: 'session',
       detail: 'Connection lost. Please retry in a moment.',
     });
   });
@@ -238,6 +243,7 @@ describe('resolveSessionTerminalError', () => {
       title: "Couldn't load this session",
       message: 'Failed to load session details',
       retryable: false,
+      retryWith: 'session',
       detail: 'Session terminated',
     });
   });
@@ -263,6 +269,7 @@ describe('resolveSessionTerminalError', () => {
         title: "Couldn't load this session",
         message: 'Connection trouble. Please retry in a moment.',
         retryable: true,
+        retryWith: 'connection',
         detail: 'Agent connection lost',
       });
     }
@@ -281,6 +288,7 @@ describe('resolveSessionTerminalError', () => {
       title: "Couldn't load this session",
       message: 'Connection trouble. Please retry in a moment.',
       retryable: true,
+      retryWith: 'connection',
       detail: '',
     });
   });
@@ -330,6 +338,7 @@ describe('resolveSessionTerminalError', () => {
       title: "Couldn't load this session",
       message: "This model isn't available for Cloud Agent. Choose another model and try again.",
       retryable: false,
+      retryWith: 'session',
       detail:
         'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.',
     });
@@ -343,6 +352,7 @@ describe('resolveSessionTerminalError', () => {
       title: 'Not found',
       message: 'This item may have been removed or is no longer available.',
       retryable: false,
+      retryWith: 'session',
       detail: 'This session is no longer available.',
     });
   });

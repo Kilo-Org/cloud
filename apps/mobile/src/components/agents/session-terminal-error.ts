@@ -205,6 +205,7 @@ function connectionLostFailure(detail: string): SessionTerminalError {
     title: i18n.t('agentChat.session.couldNotLoadThisSession'),
     message: i18n.t('agentChat.session.connectionTrouble'),
     retryable: true,
+    retryWith: 'connection',
     detail,
   };
 }
@@ -302,6 +303,13 @@ export type SessionTerminalError = {
   title: string;
   message: string;
   retryable: boolean;
+  /**
+   * Which recovery a Retry runs: reopening the session (`session`) recovers a
+   * failure the session's own transport or fetch reported, while `connection`
+   * resets the shared transport leg — the only thing that clears its spent
+   * reconnect budget, so an app-wide outage needs that one.
+   */
+  retryWith: 'session' | 'connection';
   /** The untranslated original, for the clipboard. Empty when there was none. */
   detail: string;
 };
@@ -321,6 +329,7 @@ export function describeTerminalFailure(message: string): SessionTerminalError {
     title: titleForClass(cls),
     message: messageForClass(cls),
     retryable: retryableClass(cls),
+    retryWith: 'session',
     detail: message,
   };
 }
@@ -399,6 +408,7 @@ export function resolveSessionTerminalError(input: {
       title: i18n.t('agentChat.session.couldNotLoadThisSession'),
       message: i18n.t('agentChat.session.failedToLoadDetails'),
       retryable: true,
+      retryWith: 'session',
       detail: input.error,
     };
   }
@@ -427,6 +437,7 @@ export function resolveSessionTerminalError(input: {
       title: titleForClass(codedClass),
       message: messageForClass(codedClass),
       retryable: retryableClass(codedClass),
+      retryWith: 'session',
       detail,
     };
   }

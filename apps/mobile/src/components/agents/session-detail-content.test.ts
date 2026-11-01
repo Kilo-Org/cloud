@@ -2099,6 +2099,14 @@ describe('session detail slow load', () => {
     >;
     expect(error.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
     expect(error.onRetry).toBeDefined();
+    // A spent reconnect budget is only cleared by resetting the shared
+    // transport leg; reopening over the same dead socket would return here.
+    const switchSession = vi.spyOn(view.manager, 'switchSession');
+    act(() => {
+      (error.onRetry as () => void)();
+    });
+    expect(connectionHealth.retryConnection).toHaveBeenCalledTimes(1);
+    expect(switchSession).not.toHaveBeenCalled();
   });
 
   it('keeps a terminal error ahead of the slow state', async () => {

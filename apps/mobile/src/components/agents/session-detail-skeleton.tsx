@@ -33,24 +33,23 @@ function shapeFor(sessionId: string) {
  * `justify-end` matters: the real list is a FlashList with
  * `startRenderingFromBottom`, so a top-anchored placeholder would drop the
  * whole transcript from the top of the screen to the bottom on first paint.
+ *
+ * The bubbles are the list's flex items, not the rows of a nested column: each
+ * one carries its own margin and alignment, so `shrink` acts on a definite
+ * height. A body shorter than the three bubbles then compresses them, and
+ * `overflow-hidden` keeps whatever is left inside the body instead of painting
+ * over the row below it — a placeholder is never sliced by the status line.
  */
 export function SessionSkeletonMessages({ sessionId }: Readonly<{ sessionId?: string }>) {
   const [first, second, third] = shapeFor(sessionId ?? '');
-  // `shrink` on each bubble keeps the placeholder inside a body shorter than the
-  // three bubbles (a short viewport, or the frame after a footer row appears):
-  // the shapes compress instead of overflowing the region, so no bubble is ever
-  // sliced by the row below it.
   return (
-    <Animated.View exiting={FadeOut.duration(150)} className="flex-1 justify-end pb-2">
-      <View className="items-start px-4 py-1">
-        <Skeleton className={`w-3/4 shrink rounded-2xl rounded-tl-sm ${first}`} />
-      </View>
-      <View className="items-end px-4 py-1">
-        <Skeleton className={`w-1/2 shrink rounded-2xl rounded-tr-sm ${second}`} />
-      </View>
-      <View className="items-start px-4 py-1">
-        <Skeleton className={`w-2/3 shrink rounded-2xl rounded-tl-sm ${third}`} />
-      </View>
+    <Animated.View
+      exiting={FadeOut.duration(150)}
+      className="flex-1 justify-end overflow-hidden px-4 pb-2"
+    >
+      <Skeleton className={`my-1 w-3/4 shrink self-start rounded-2xl rounded-tl-sm ${first}`} />
+      <Skeleton className={`my-1 w-1/2 shrink self-end rounded-2xl rounded-tr-sm ${second}`} />
+      <Skeleton className={`my-1 w-2/3 shrink self-start rounded-2xl rounded-tl-sm ${third}`} />
     </Animated.View>
   );
 }

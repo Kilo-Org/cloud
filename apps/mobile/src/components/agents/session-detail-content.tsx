@@ -2747,6 +2747,13 @@ export function SessionDetailContent({
               onRetry={
                 terminalError.retryable
                   ? () => {
+                      // A spent reconnect budget on the shared transport leg is
+                      // only cleared by resetting that leg; reopening the
+                      // session over the same dead socket would return here.
+                      if (terminalError.retryWith === 'connection') {
+                        retrySessionConnection();
+                        return;
+                      }
                       void manager.switchSession(sessionId);
                     }
                   : undefined

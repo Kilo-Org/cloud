@@ -41,6 +41,7 @@ vi.mock('@/components/app-screen-layout', () => ({
 }));
 vi.mock('@/lib/form-sheet', () => ({
   useFormSheetDetents: () => ({ fullSheetDetent: 1 }),
+  useSheetHeaderTopClearance: () => 0,
   useFormSheetScreenOptions: () => ({
     presentation: 'formSheet',
     sheetAllowedDetents: [0.5, 1],

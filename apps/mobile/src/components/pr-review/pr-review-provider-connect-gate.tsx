@@ -20,7 +20,10 @@ import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integ
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
-import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
+import {
+  gitlabInstanceMismatch,
+  selectPrReviewGateView,
+} from '@/lib/pr-review/pr-review-connect-gate-view';
 import {
   type ProviderPrPlatform,
   type ProviderPrRef,
@@ -173,6 +176,18 @@ export function ProviderConnectGate({
     }
   };
 
+  // A GitLab connection serves exactly one instance, and the status read names
+  // it. When the opened merge request lives on another host the server refuses
+  // every read as not-found (its own origin guard), so `connected` alone is not
+  // the answer — the mismatch decides the gate.
+  const instanceMismatch =
+    platform === 'gitlab'
+      ? gitlabInstanceMismatch({
+          instanceHint,
+          connectedInstanceUrl: gitlabStatus.data?.integration?.instanceUrl,
+        })
+      : null;
+
   const view = selectPrReviewGateView({
     platform,
     isError: status.isError,
@@ -183,6 +198,7 @@ export function ProviderConnectGate({
     // organization status reads each report the marker for their own row.
     reconnectRequired:
       platform === 'gitlab' ? gitlabStatus.data?.reconnectRequired === true : false,
+    instanceMismatch: instanceMismatch !== null,
     organizationId,
   });
 
@@ -245,8 +261,12 @@ export function ProviderConnectGate({
     );
   }
 
-  if (view === 'connect' || view === 'reconnect') {
+  if (view === 'connect' || view === 'reconnect' || view === 'instance-mismatch') {
     const reconnect = view === 'reconnect';
+    // The mismatch arm lists in `instance-mismatch`: the connection is live,
+    // on another instance than the opened merge request, so no read can
+    // succeed and nothing about the item is being claimed.
+    const mismatch = view === 'instance-mismatch' ? instanceMismatch : null;
     // Reused translated copy: the title above already names the expired
     // provider connection, so the description carries only the re-check
     // instruction and never restates the title. One key serves both the
@@ -267,18 +287,34 @@ export function ProviderConnectGate({
       platform === 'gitlab'
         ? t('prReview.reconnectNotice.gitlabTitle')
         : t('prReview.reconnectNotice.bitbucketTitle');
-    const title = reconnect ? reconnectTitle : connectTitle;
-    const description = reconnect ? t('prReview.reconnectNotice.message') : connectDescription;
+    // The mismatch description names both hosts, because they are the whole
+    // difference the reader has to act on and both are the account's own data:
+    // the status read that supplied one belongs to the same reader.
+    let title = connectTitle;
+    let description = connectDescription;
+    if (reconnect) {
+      title = reconnectTitle;
+      description = t('prReview.reconnectNotice.message');
+    }
+    if (mismatch) {
+      title = t('prReview.connect.gitlabInstanceMismatchTitle');
+      description = t('prReview.connect.gitlabInstanceMismatchDescription', {
+        connected: mismatch.connectedHost,
+        requested: mismatch.requestedHost,
+      });
+    }
     return (
       <View className="flex-1 bg-background">
         <PrReviewGateHeader />
         <EmptyState
-          icon={reconnect ? ShieldAlert : PlugZap}
+          icon={reconnect || mismatch ? ShieldAlert : PlugZap}
           title={title}
           description={
             <>
               <PrReviewGateItemLine prRef={prRef} />
-              <PrReviewContextLine instanceHint={instanceHint} />
+              {/* The mismatch copy already names the requested host, so the
+                  context line keeps naming only the scope. */}
+              <PrReviewContextLine instanceHint={mismatch ? undefined : instanceHint} />
               <Text variant="muted" className="text-center">
                 {description}
               </Text>

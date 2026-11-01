@@ -38,6 +38,13 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     return null;
   }
   if (__DEV__) {
+    // Dev-only link that opens the connect gate's GitLab-instance state the way
+    // the paste flow reaches it: a provider route carrying the paste's
+    // `?instance=` hint. A system link cannot carry that hint through this
+    // app's resolver, so the fixture route re-navigates with the same href.
+    if (/(?:^|\/)dev\/pr-review-gitlab-instance-fixture\/?$/.test(path)) {
+      return '/(auth)/pr-review-gitlab-instance-fixture';
+    }
     const reviewEntryFixture = /(?:^|\/)dev\/pr-review-entry-fixture\/?(\?.*)?$/.exec(path);
     if (reviewEntryFixture) {
       return `/(app)/pr-review-entry-fixture${reviewEntryFixture[1] ?? ''}`;

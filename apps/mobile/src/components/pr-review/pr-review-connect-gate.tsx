@@ -168,6 +168,8 @@ function GitHubConnectGate({
     isLoading: authorization.isPending,
     connected: authorization.data?.connected === true,
     reconnectRequired: authorization.data?.revoked === true,
+    // GitHub has one host and no per-instance connection to mismatch.
+    instanceMismatch: false,
     organizationId: null,
   });
 

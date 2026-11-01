@@ -6,7 +6,10 @@
 // Connect — and every non-happy outcome lands in a fixed set of
 // header-bearing states.
 
-import { type ProviderPrPlatform } from '@kilocode/app-shared/provider-review';
+import {
+  gitlabInstanceOrigin,
+  type ProviderPrPlatform,
+} from '@kilocode/app-shared/provider-review';
 
 export type PrReviewGateView =
   | 'error'
@@ -14,6 +17,7 @@ export type PrReviewGateView =
   | 'org-only'
   | 'connect'
   | 'reconnect'
+  | 'instance-mismatch'
   | 'children';
 
 export type SelectPrReviewGateViewInput = {
@@ -29,9 +33,46 @@ export type SelectPrReviewGateViewInput = {
    * re-authorizing the existing connection can fix it.
    */
   readonly reconnectRequired: boolean;
+  /**
+   * The connection is active, but on a different GitLab instance than the one
+   * the opened merge request lives on, so no read can succeed: the server
+   * refuses a hint whose origin differs from the connected instance as
+   * not-found, exactly as it refuses a deleted merge request.
+   */
+  readonly instanceMismatch: boolean;
   /** The selected organization, or null for the personal scope. */
   readonly organizationId: string | null;
 };
+
+/** The hosts a GitLab instance mismatch is explained with. */
+export type GitLabInstanceMismatch = {
+  /** The instance the account's connection serves. */
+  readonly connectedHost: string;
+  /** The instance the opened merge request lives on. */
+  readonly requestedHost: string;
+};
+
+/**
+ * The instance mismatch a GitLab ref carries, or null when the connection can
+ * serve it.
+ *
+ * The comparison is the server's own: `gitlabInstanceOrigin` folds each URL to
+ * host and port, and `gitlab-authorization.ts` refuses the read when the two
+ * differ. An absent hint is the account's connected instance by definition (the
+ * route only carries one when the link named a host), so it never mismatches,
+ * and so does a connected answer that names no URL.
+ */
+export function gitlabInstanceMismatch(input: {
+  readonly instanceHint: string | undefined;
+  readonly connectedInstanceUrl: string | undefined;
+}): GitLabInstanceMismatch | null {
+  const requestedHost = gitlabInstanceOrigin(input.instanceHint);
+  const connectedHost = gitlabInstanceOrigin(input.connectedInstanceUrl);
+  if (!requestedHost || !connectedHost || requestedHost === connectedHost) {
+    return null;
+  }
+  return { connectedHost, requestedHost };
+}
 
 /**
  * Decide the gate's view.
@@ -54,6 +95,12 @@ export function selectPrReviewGateView(args: SelectPrReviewGateViewInput): PrRev
   }
   if (!args.connected) {
     return args.reconnectRequired ? 'reconnect' : 'connect';
+  }
+  // Only a live connection can be the wrong one: an inactive or missing
+  // connection has no instance to compare, so Connect or Reconnect already
+  // names the remedy.
+  if (args.instanceMismatch) {
+    return 'instance-mismatch';
   }
   return 'children';
 }

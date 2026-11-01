@@ -644,7 +644,7 @@
       "title": "Kikasha",
       "loading": "Inapakia kikasha",
       "noReviewRequests": "Hakuna maombi ya ukaguzi",
-      "noReviewRequestsDescription": "Maombi ya kuunganisha yanayosubiri ukaguzi wako yanaonekana hapa. Bado unaweza kubandika kiungo chochote cha PR hapo juu.",
+      "noReviewRequestsDescription": "Maombi ya kuunganisha yanayosubiri ukaguzi wako yanaonekana hapa.",
       "couldNotLoad": "Imeshindikana kupakia kikasha.",
       "accessLostTitle": "Huna ruhusa ya shirika hili",
       "accessLostDescription": "Huwi tena mwanachama wa shirika hili, hivyo maombi yake ya ukaguzi hayawezi kupakiwa. Endelea kwenye akaunti yako ya binafsi ili uendelee kukagua.",

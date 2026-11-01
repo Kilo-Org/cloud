@@ -659,7 +659,7 @@
       "title": "Safata d'entrada",
       "loading": "S'està carregant la safata d'entrada",
       "noReviewRequests": "Cap sol·licitud de revisió",
-      "noReviewRequestsDescription": "Aquí apareixen les sol·licituds d'integració que has de revisar. També pots enganxar qualsevol enllaç de PR al camp de dalt.",
+      "noReviewRequestsDescription": "Aquí apareixen les sol·licituds d'integració que has de revisar.",
       "couldNotLoad": "No s'ha pogut carregar la safata d'entrada.",
       "accessLostTitle": "No tens accés a aquesta organització",
       "accessLostDescription": "Ja no ets membre d'aquesta organització, així que no es poden carregar les seves sol·licituds de revisió. Continua al teu compte d'ús personal per seguir revisant.",

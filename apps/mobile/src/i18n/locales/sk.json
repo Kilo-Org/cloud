@@ -674,7 +674,7 @@
       "title": "Doručené",
       "loading": "Načítavajú sa doručené žiadosti",
       "noReviewRequests": "Žiadne žiadosti o kontrolu kódu",
-      "noReviewRequestsDescription": "Tu sa zobrazia žiadosti o zlúčenie, ktoré čakajú na tvoju kontrolu kódu. Vyššie môžeš vložiť aj odkaz na ľubovoľný PR.",
+      "noReviewRequestsDescription": "Tu sa zobrazia žiadosti o zlúčenie, ktoré čakajú na tvoju kontrolu kódu.",
       "couldNotLoad": "Doručené žiadosti sa nepodarilo načítať.",
       "accessLostTitle": "Nemáš prístup k tejto organizácii",
       "accessLostDescription": "Už nie si členom tejto organizácie, takže sa jej žiadosti o kontrolu nedajú načítať. Pokračuj v osobnom účte a kontroluj ďalej.",

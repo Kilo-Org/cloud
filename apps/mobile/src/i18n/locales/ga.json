@@ -689,7 +689,7 @@
       "title": "Bosca ionphoist",
       "loading": "Ag lódáil an bhosca ionphoist",
       "noReviewRequests": "Gan aon iarratas athbhreithnithe",
-      "noReviewRequestsDescription": "Taispeántar anseo na hiarratais tarraingthe atá ag fanacht le d'athbhreithniú. Is féidir leat nasc PR ar bith a ghreamú thuas fós.",
+      "noReviewRequestsDescription": "Taispeántar anseo na hiarratais tarraingthe atá ag fanacht le d'athbhreithniú.",
       "couldNotLoad": "Níorbh fhéidir an bosca ionphoist a lódáil.",
       "accessLostTitle": "Gan rochtain ar an eagraíocht seo",
       "accessLostDescription": "Ní ball den eagraíocht seo a thuilleadh, mar sin ní féidir na hiarratais athbhreithnithe a lódáil. Lean ar aghaidh i do chuntas pearsanta chun athbhreithniú a dhéanamh fós.",

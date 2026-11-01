@@ -644,7 +644,7 @@
       "title": "Inkas",
       "loading": "Laai inkas",
       "noReviewRequests": "Geen hersieningsversoeke nie",
-      "noReviewRequestsDescription": "Trekversoeke wat op jou hersiening wag, verskyn hier. Jy kan steeds enige PR-skakel hierbo plak.",
+      "noReviewRequestsDescription": "Trekversoeke wat op jou hersiening wag, verskyn hier.",
       "couldNotLoad": "Kon nie die inkas laai nie.",
       "accessLostTitle": "Geen toegang tot hierdie organisasie nie",
       "accessLostDescription": "Jy is nie meer 'n lid van hierdie organisasie nie, so sy hersieningsversoeke kan nie laai nie. Gaan voort in jou persoonlike rekening om aan te gaan hersien.",

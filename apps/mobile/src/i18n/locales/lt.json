@@ -674,7 +674,7 @@
       "title": "Gautos užklausos",
       "loading": "Įkeliamos gautos užklausos",
       "noReviewRequests": "Nėra prašymų peržiūrėti",
-      "noReviewRequestsDescription": "Čia rodomos tavo peržiūros laukiančios pakeitimų užklausos. Viršuje taip pat gali įklijuoti bet kurio PR nuorodą.",
+      "noReviewRequestsDescription": "Čia rodomos tavo peržiūros laukiančios pakeitimų užklausos.",
       "couldNotLoad": "Nepavyko įkelti gautų užklausų.",
       "accessLostTitle": "Nėra prieigos prie šios organizacijos",
       "accessLostDescription": "Tu nebesi šios organizacijos narys, todėl jos peržiūros prašymų įkelti nepavyks. Tęsk savo asmeninėje paskyroje ir toliau peržiūrėk.",

@@ -2941,7 +2941,7 @@
       "continueInPersonal": "Im persönlichen Account fortfahren",
       "loading": "Posteingang wird geladen",
       "noReviewRequests": "Keine Review-Anfragen",
-      "noReviewRequestsDescription": "Hier erscheinen Pull-Requests, die auf dein Review warten. Du kannst oben auch einen beliebigen PR-Link einfügen.",
+      "noReviewRequestsDescription": "Hier erscheinen Pull-Requests, die auf dein Review warten.",
       "title": "Posteingang"
     },
     "installKiloGitHubApp": "GitHub-App von Kilo installieren",

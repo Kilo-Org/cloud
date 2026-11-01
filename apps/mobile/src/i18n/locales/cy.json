@@ -704,7 +704,7 @@
       "title": "Blwch derbyn",
       "loading": "Yn llwytho'r blwch derbyn",
       "noReviewRequests": "Dim ceisiadau adolygu",
-      "noReviewRequestsDescription": "Mae ceisiadau tynnu sy'n aros am eich adolygiad yn ymddangos yma. Gallwch barhau i ludo unrhyw ddolen PR uchod.",
+      "noReviewRequestsDescription": "Mae ceisiadau tynnu sy'n aros am eich adolygiad yn ymddangos yma.",
       "couldNotLoad": "Ni lwyddwyd i lwytho'r blwch derbyn.",
       "accessLostTitle": "Dim mynediad i'r sefydliad hwn",
       "accessLostDescription": "Nid ydych yn aelod o'r sefydliad hwn mwyach, felly nid oes modd llwytho'i geisiadau adolygu. Parhewch yn eich cyfrif personol i barhau i adolygu.",

@@ -2941,7 +2941,7 @@
       "continueInPersonal": "個人アカウントで続行",
       "loading": "受信トレイを読み込み中",
       "noReviewRequests": "レビュー依頼はありません",
-      "noReviewRequestsDescription": "レビューを依頼されたプルリクエストがここに表示されます。上の欄に任意のPRのリンクを貼り付けることもできます。",
+      "noReviewRequestsDescription": "レビューを依頼されたプルリクエストがここに表示されます。",
       "title": "受信トレイ"
     },
     "installKiloGitHubApp": "Kilo GitHub Appをインストール",

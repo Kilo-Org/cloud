@@ -2985,7 +2985,7 @@
       "continueInPersonal": "Continua con l'account personale",
       "loading": "Caricamento della posta in arrivo",
       "noReviewRequests": "Nessuna richiesta di revisione",
-      "noReviewRequestsDescription": "Qui trovi le pull request in attesa della tua revisione. Puoi comunque incollare qui sopra il collegamento a qualsiasi PR.",
+      "noReviewRequestsDescription": "Qui trovi le pull request in attesa della tua revisione.",
       "title": "Posta in arrivo"
     },
     "installKiloGitHubApp": "Installa l'app Kilo per GitHub",

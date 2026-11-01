@@ -644,7 +644,7 @@
       "title": "Ibhokisi lokungenayo",
       "loading": "Kulayishwa ibhokisi lokungenayo",
       "noReviewRequests": "Azikho izicelo zokubuyekeza",
-      "noReviewRequestsDescription": "Izicelo zokuhlanganisa ezilinde ukubuyekezwa nguwe zivela lapha. Usengakwazi ukunamathisela noma yisiphi isixhumanisi se-PR ngenhla.",
+      "noReviewRequestsDescription": "Izicelo zokuhlanganisa ezilinde ukubuyekezwa nguwe zivela lapha.",
       "couldNotLoad": "Asikwazanga ukulayisha ibhokisi lokungenayo.",
       "accessLostTitle": "Awunakho ukufinyelela kule nhlangano",
       "accessLostDescription": "Awusaseyilungu le nhlangano, ngakho-ke izicelo zokubuyekeza zayo azikwazi ukulayisha. Qhubeka ku-akhawunti yakho oyisisebenzisi siqu ukuze uqhubeke nokubuyekeza.",

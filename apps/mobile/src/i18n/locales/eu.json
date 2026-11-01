@@ -644,7 +644,7 @@
       "title": "Sarrera-ontzia",
       "loading": "Sarrera-ontzia kargatzen",
       "noReviewRequests": "Ez dago berrikuspen-eskaerarik",
-      "noReviewRequestsDescription": "Zure berrikuspenaren zain dauden bateratze-eskaerak hemen agertzen dira. Nahi duzun PR esteka ere itsats dezakezu goian.",
+      "noReviewRequestsDescription": "Zure berrikuspenaren zain dauden bateratze-eskaerak hemen agertzen dira.",
       "couldNotLoad": "Ezin izan da sarrera-ontzia kargatu.",
       "accessLostTitle": "Ez duzu jada erakunde honetarako sarbiderik",
       "accessLostDescription": "Jada ez zara erakunde honetako kidea, beraz haren berrikuspen-eskaerak ezin dira kargatu. Jarraitu zure kontu pertsonalean berrikusten jarraitzeko.",

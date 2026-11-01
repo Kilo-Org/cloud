@@ -659,7 +659,7 @@
       "title": "Primite",
       "loading": "Se încarcă cererile primite",
       "noReviewRequests": "Nicio cerere de revizuire",
-      "noReviewRequestsDescription": "Aici apar PR-urile care așteaptă revizuirea ta. Poți lipi mai sus și o legătură către orice alt PR.",
+      "noReviewRequestsDescription": "Aici apar PR-urile care așteaptă revizuirea ta.",
       "couldNotLoad": "Nu s-au putut încărca cererile primite.",
       "accessLostTitle": "Nu ai acces la această organizație",
       "accessLostDescription": "Nu mai ești membru al acestei organizații, așa că cererile sale de revizuire nu se pot încărca. Continuă în contul personal pentru a continua revizuirile.",

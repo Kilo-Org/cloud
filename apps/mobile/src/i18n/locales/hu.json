@@ -644,7 +644,7 @@
       "title": "Beérkezett kérelmek",
       "loading": "Beérkezett kérelmek betöltése",
       "noReviewRequests": "Nincs kódellenőrzési felkérés",
-      "noReviewRequestsDescription": "Itt jelennek meg a kódellenőrzésedre váró módosítási kérelmek. Fent továbbra is beilleszthetsz bármilyen PR-hivatkozást.",
+      "noReviewRequestsDescription": "Itt jelennek meg a kódellenőrzésedre váró módosítási kérelmek.",
       "couldNotLoad": "Nem sikerült betölteni a beérkezett kérelmeket.",
       "accessLostTitle": "Nincs hozzáférésed ehhez a szervezethez",
       "accessLostDescription": "Már nem vagy tagja ennek a szervezetnek, ezért a kérelmei nem tölthetők be. A folytatáshoz válts át a személyes fiókodra.",

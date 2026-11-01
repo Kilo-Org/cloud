@@ -689,7 +689,7 @@
       "title": "Deħlin",
       "loading": "Qed jitgħabbew it-talbiet deħlin",
       "noReviewRequests": "L-ebda talba għal reviżjoni",
-      "noReviewRequestsDescription": "It-talbiet għall-għaqda li qed jistennew ir-reviżjoni tiegħek jidhru hawn. Xorta tista' twaħħal kwalunkwe ħolqa ta' PR hawn fuq.",
+      "noReviewRequestsDescription": "It-talbiet għall-għaqda li qed jistennew ir-reviżjoni tiegħek jidhru hawn.",
       "couldNotLoad": "Ma setgħux jitgħabbew it-talbiet deħlin.",
       "accessLostTitle": "M'għadekx aċċess għal din l-organizzazzjoni",
       "accessLostDescription": "M'intix għadu membru ta' din l-organizzazzjoni, allura t-talbiet għar-reviżjoni tagħha ma jistgħux jitgħabbew. Kompli fil-kont personali tiegħek biex tkompli tirrevedi.",

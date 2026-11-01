@@ -2941,7 +2941,7 @@
       "continueInPersonal": "繼續使用個人帳號",
       "loading": "正在載入收件匣",
       "noReviewRequests": "尚無審查請求",
-      "noReviewRequestsDescription": "等待你審查的提取請求會顯示在這裡。你也可以在上方貼上任何 PR 連結。",
+      "noReviewRequestsDescription": "等待你審查的提取請求會顯示在這裡。",
       "title": "收件匣"
     },
     "installKiloGitHubApp": "安裝 Kilo GitHub App",

@@ -2941,7 +2941,7 @@
       "continueInPersonal": "Doorgaan in persoonlijk account",
       "loading": "Postvak IN laden",
       "noReviewRequests": "Geen beoordelingsverzoeken",
-      "noReviewRequestsDescription": "Hier verschijnen PR's die op je beoordeling wachten. Je kunt hierboven ook een andere PR-koppeling plakken.",
+      "noReviewRequestsDescription": "Hier verschijnen PR's die op je beoordeling wachten.",
       "title": "Postvak IN"
     },
     "installKiloGitHubApp": "Kilo GitHub-app installeren",

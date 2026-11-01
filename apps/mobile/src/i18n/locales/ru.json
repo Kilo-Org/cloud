@@ -3029,7 +3029,7 @@
       "continueInPersonal": "Продолжить в личном аккаунте",
       "loading": "Загрузка входящих",
       "noReviewRequests": "Нет запросов на ревью",
-      "noReviewRequestsDescription": "Здесь появятся запросы на слияние, ожидающие вашего ревью. Вы также можете вставить выше ссылку на любой PR.",
+      "noReviewRequestsDescription": "Здесь появятся запросы на слияние, ожидающие вашего ревью.",
       "title": "Входящие"
     },
     "installKiloGitHubApp": "Установить приложение Kilo для GitHub",

@@ -644,7 +644,7 @@
       "title": "Innhólf",
       "loading": "Hleð innhólfi",
       "noReviewRequests": "Engar beiðnir um yfirferð",
-      "noReviewRequestsDescription": "Hér birtast sameiningarbeiðnir sem bíða eftir yfirferð þinni. Þú getur líka límt hvaða PR-tengil sem er hér að ofan.",
+      "noReviewRequestsDescription": "Hér birtast sameiningarbeiðnir sem bíða eftir yfirferð þinni.",
       "couldNotLoad": "Ekki tókst að hlaða innhólfinu.",
       "accessLostTitle": "Enginn aðgangur að þessu félagi",
       "accessLostDescription": "Þú ert ekki lengur meðlimi þessa félags, svo ekki er hægt að sækja beiðnir þess um yfirferð. Haltu áfram í persónulega reikningnum þínum til að halda áfram að yfirfara.",

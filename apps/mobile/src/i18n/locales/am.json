@@ -644,7 +644,7 @@
       "title": "ገቢ መልእክቶች",
       "loading": "ገቢ መልእክቶችን በመጫን ላይ",
       "noReviewRequests": "ምንም የግምገማ ጥያቄዎች የሉም",
-      "noReviewRequestsDescription": "ግምገማህን የሚጠብቁ የማዋሃድ ጥያቄዎች እዚህ ይታያሉ። ማንኛውንም የPR አገናኝ ከላይ መለጠፍም ትችላለህ።",
+      "noReviewRequestsDescription": "ግምገማህን የሚጠብቁ የማዋሃድ ጥያቄዎች እዚህ ይታያሉ።",
       "couldNotLoad": "ገቢ መልእክቶችን መጫን አልተቻለም።",
       "accessLostTitle": "ለዚህ ድርጅት የመድረስ ፈቃድ የለህም",
       "accessLostDescription": "ከዚህ ድርጅት አባል አይደለህም፣ ስለዚህ የግምገማ ጥያቄዎቹን መጫን አይቻልም። ግምገማህን ለመቀጠል በየግል መለያህ ቀጥል።",

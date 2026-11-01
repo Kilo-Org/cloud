@@ -3117,7 +3117,7 @@
       "continueInPersonal": "المتابعة في الحساب الشخصي",
       "loading": "جارٍ تحميل صندوق الوارد",
       "noReviewRequests": "لا توجد طلبات مراجعة",
-      "noReviewRequestsDescription": "تظهر هنا طلبات السحب التي تنتظر مراجعتك. ويمكنك أيضًا لصق أي رابط PR أعلاه.",
+      "noReviewRequestsDescription": "تظهر هنا طلبات السحب التي تنتظر مراجعتك.",
       "title": "صندوق الوارد"
     },
     "installKiloGitHubApp": "تثبيت تطبيق Kilo على GitHub",

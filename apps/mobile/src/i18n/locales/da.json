@@ -644,7 +644,7 @@
       "title": "Indbakke",
       "loading": "Indlæser indbakke",
       "noReviewRequests": "Ingen anmodninger om gennemgang",
-      "noReviewRequestsDescription": "Pull requests, der afventer din gennemgang, vises her. Du kan stadig indsætte et hvilket som helst PR-link ovenfor.",
+      "noReviewRequestsDescription": "Pull requests, der afventer din gennemgang, vises her.",
       "couldNotLoad": "Indbakken kunne ikke indlæses.",
       "accessLostTitle": "Ingen adgang til denne organisation",
       "accessLostDescription": "Du er ikke længere medlem af denne organisation, så dens anmodninger om gennemgang kan ikke indlæses. Fortsæt i din personlige konto for at fortsætte med at gennemgå.",

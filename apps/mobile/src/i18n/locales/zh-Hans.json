@@ -2941,7 +2941,7 @@
       "continueInPersonal": "继续使用个人账户",
       "loading": "正在加载收件箱",
       "noReviewRequests": "暂无审查请求",
-      "noReviewRequestsDescription": "等待你审查的拉取请求会显示在这里。你也可以在上方粘贴任意 PR 链接。",
+      "noReviewRequestsDescription": "等待你审查的拉取请求会显示在这里。",
       "title": "收件箱"
     },
     "installKiloGitHubApp": "安装 Kilo GitHub 应用",

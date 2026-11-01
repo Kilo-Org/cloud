@@ -264,7 +264,9 @@ describe('PreferenceRow', () => {
 
     expect(toggle.props.thumbColor).toBe(darkColors.foreground);
     expect(trackColor.false).toBe(darkColors.mutedForeground);
-    expect(trackColor.true).toBe(darkColors.primary);
+    // The shared switch fills the dark on track with the muted olive, not the
+    // brand yellow its accent token carries.
+    expect(trackColor.true).toBe(darkColors.selection);
     expect(contrast(toggle.props.thumbColor as string, trackColor.false)).toBeGreaterThanOrEqual(3);
     expect(contrast(trackColor.false, darkColors.secondary)).toBeGreaterThanOrEqual(3);
   });

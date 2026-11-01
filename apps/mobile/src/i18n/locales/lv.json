@@ -1555,6 +1555,9 @@
       "offAction": "Koda pārskatīšanas atmiņa ir izslēgta. Ieslēdz to, tad mēģini vēlreiz."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Ievadi derīgu merge request URL.",
+      "mergeRequestUrl": "Merge request URL",
+      "instructionsAtLimit": "Instrukcijas ir ierobežotas līdz {{max}} rakstzīmēm.",
       "title": "Manuāla koda pārskatīšana",
       "invalidUrl": "Ievadi derīgu izmaiņu pieprasījuma URL.",
       "couldNotCheckProviderStatus": "Neizdevās pārbaudīt pakalpojuma sniedzēja statusu.",

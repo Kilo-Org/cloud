@@ -1533,6 +1533,9 @@
       "offAction": "Kujtesa e shqyrtimit është e çaktivizuar. Aktivizoje dhe pastaj provo përsëri."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Shkruaj një URL të vlefshme për kërkesën e integrimit.",
+      "mergeRequestUrl": "URL-ja e kërkesës së integrimit",
+      "instructionsAtLimit": "Udhëzimet janë të kufizuara në {{max}} karaktere.",
       "title": "Shqyrtimi manual",
       "invalidUrl": "Shkruaj një URL të vlefshme për PR.",
       "couldNotCheckProviderStatus": "Nuk u kontrollua statusi i ofruesit.",

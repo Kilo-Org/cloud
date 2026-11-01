@@ -1533,6 +1533,9 @@
       "offAction": "સમીક્ષા મેમરી બંધ છે. તેને ચાલુ કરો, પછી ફરી પ્રયાસ કરો."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "મર્જ રિક્વેસ્ટનું માન્ય URL દાખલ કરો.",
+      "mergeRequestUrl": "મર્જ રિક્વેસ્ટનું URL",
+      "instructionsAtLimit": "સૂચનાઓ {{max}} અક્ષરો સુધી મર્યાદિત છે",
       "title": "જાતે શરૂ કરેલી સમીક્ષા",
       "invalidUrl": "પુલ રિક્વેસ્ટનું માન્ય URL દાખલ કરો.",
       "couldNotCheckProviderStatus": "સેવા પ્રદાતાની સ્થિતિ ચકાસી શકાઈ નહીં.",

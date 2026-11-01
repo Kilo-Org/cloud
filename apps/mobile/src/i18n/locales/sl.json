@@ -1577,6 +1577,9 @@
       "offAction": "Pomnjenje pregledov je izklopljeno. Vklopi ga, nato poskusi znova."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Vnesi veljaven URL merge requesta.",
+      "mergeRequestUrl": "URL merge requesta",
+      "instructionsAtLimit": "Navodila so omejena na {{max}} znakov",
       "title": "Ročni pregled",
       "invalidUrl": "Vnesi veljaven URL zahteve za združitev.",
       "couldNotCheckProviderStatus": "Stanja ponudnika ni bilo mogoče preveriti.",

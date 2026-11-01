@@ -1533,6 +1533,9 @@
       "offAction": "ความจำในการตรวจสอบปิดอยู่ เปิดใช้งานแล้วลองอีกครั้ง"
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "ป้อน URL ของ merge request ที่ถูกต้อง",
+      "mergeRequestUrl": "URL ของ merge request",
+      "instructionsAtLimit": "คำแนะนำจำกัดไว้ที่ {{max}} อักขระ",
       "title": "การตรวจสอบที่เริ่มด้วยตนเอง",
       "invalidUrl": "ป้อน URL ของ PR ที่ถูกต้อง",
       "couldNotCheckProviderStatus": "ตรวจสอบสถานะผู้ให้บริการไม่สำเร็จ",

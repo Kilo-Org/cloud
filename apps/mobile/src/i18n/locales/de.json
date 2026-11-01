@@ -925,6 +925,9 @@
     "followReviewMd": "REVIEW.md befolgen",
     "followReviewMdSubtitle": "Anweisungen aus der REVIEW.md-Datei des jeweiligen Repositorys beachten",
     "manualReview": {
+      "invalidMergeRequestUrl": "Gib eine gültige Merge-Request-URL ein.",
+      "mergeRequestUrl": "Merge-Request-URL",
+      "instructionsAtLimit": "Die Anweisungen sind auf {{max}} Zeichen beschränkt",
       "connectProviderDescription": "Verbinde GitHub, um ein manuelles Review eines Pull-Requests zu starten.",
       "couldNotCheckProviderStatus": "Der Anbieterstatus konnte nicht geprüft werden.",
       "couldNotLoadProviders": "Deine verbundenen Anbieter konnten nicht geladen werden. Bitte versuche es erneut.",

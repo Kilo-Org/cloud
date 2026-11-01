@@ -1533,6 +1533,9 @@
       "offAction": "A ti pa ìrántí àtúnyẹ̀wò. Mú un ṣiṣẹ́, kí o sì gbìyànjú lẹ́ẹ̀kan si."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Tẹ URL ìbéèrè ìṣọ̀kan tó tọ́ sí i.",
+      "mergeRequestUrl": "URL ìbéèrè ìṣọ̀kan",
+      "instructionsAtLimit": "Àlàyé naa ní ààlà {{max}} àmì",
       "title": "Àtúnyẹ̀wò tí o bẹ̀rẹ̀ fúnra rẹ",
       "invalidUrl": "Tẹ URL ìbéèrè àkópọ̀ tó tọ́ sí i.",
       "couldNotCheckProviderStatus": "A kò lè ṣàyẹ̀wò ipò olùpèsè.",

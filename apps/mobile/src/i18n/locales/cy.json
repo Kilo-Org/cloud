@@ -1621,6 +1621,9 @@
       "offAction": "Mae'r cof adolygu wedi'i ddiffodd. Trowch ef ymlaen, yna rhowch gynnig arall arni."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Rhowch URL dilys ar gyfer cais uno.",
+      "mergeRequestUrl": "URL cais uno",
+      "instructionsAtLimit": "Mae'r cyfarwyddiadau wedi'u cyfyngu i {{max}} nod.",
       "title": "Adolygiad â llaw",
       "invalidUrl": "Rhowch URL dilys ar gyfer cais tynnu.",
       "couldNotCheckProviderStatus": "Ni ellid gwirio statws y darparwr.",

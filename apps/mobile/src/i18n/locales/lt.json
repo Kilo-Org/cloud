@@ -1577,6 +1577,9 @@
       "offAction": "Peržiūros atmintis išjungta. Įjunk ją, tada bandyk dar kartą."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Įvesk tinkamą merge request URL.",
+      "mergeRequestUrl": "Merge request adresas (URL)",
+      "instructionsAtLimit": "Instrukcijos ribojamos iki {{max}} simbolių.",
       "title": "Rankinė peržiūra",
       "invalidUrl": "Įvesk tinkamą PR URL.",
       "couldNotCheckProviderStatus": "Nepavyko patikrinti paslaugų teikėjo būsenos.",

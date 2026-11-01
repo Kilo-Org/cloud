@@ -1533,6 +1533,9 @@
       "offAction": "စစ်ဆေးမှုမှတ်ဉာဏ်ကို ပိတ်ထားသည်။ ဖွင့်ပြီးနောက် ထပ်မံကြိုးစားပါ။"
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "မှန်ကန်သော merge request URL ကို ထည့်ပါ။",
+      "mergeRequestUrl": "merge request ၏ URL",
+      "instructionsAtLimit": "ညွှန်ကြားချက်ကို စာလုံး {{max}} လုံးအထိ ကန့်သတ်ထားသည်။",
       "title": "ကိုယ်တိုင် စတင်သည့် စစ်ဆေးမှု",
       "invalidUrl": "မှန်ကန်သော PR URL ကို ထည့်ပါ။",
       "couldNotCheckProviderStatus": "ဝန်ဆောင်မှုပေးသူ၏ အခြေအနေကို စစ်ဆေး၍ မရပါ။",

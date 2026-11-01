@@ -1533,6 +1533,9 @@
       "offAction": "Ստուգման հիշողությունն անջատված է։ Միացրու այն, ապա փորձիր նորից։"
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Մուտքագրիր միաձուլման հարցման վավեր URL։",
+      "mergeRequestUrl": "Միաձուլման հարցման URL",
+      "instructionsAtLimit": "Հրահանգները սահմանափակված են {{max}} նիշով",
       "title": "Ձեռքով ստուգում",
       "invalidUrl": "Մուտքագրիր միավորման հարցման վավեր URL։",
       "couldNotCheckProviderStatus": "Չհաջողվեց ստուգել մատակարարի կարգավիճակը։",

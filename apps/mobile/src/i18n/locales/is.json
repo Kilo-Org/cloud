@@ -1533,6 +1533,9 @@
       "offAction": "Slökkt er á yfirferðarminni. Kveiktu á því og reyndu aftur."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Sláðu inn gilda URL-slóð á merge request.",
+      "mergeRequestUrl": "URL-slóð merge request",
+      "instructionsAtLimit": "Leiðbeiningarnar eru takmörkuðar við {{max}} stafi",
       "title": "Handvirk yfirferð",
       "invalidUrl": "Sláðu inn gilda URL-slóð á samrunabeiðni.",
       "couldNotCheckProviderStatus": "Ekki tókst að athuga stöðu þjónustuveitanda.",

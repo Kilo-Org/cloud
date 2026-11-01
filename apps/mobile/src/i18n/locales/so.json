@@ -1533,6 +1533,9 @@
       "offAction": "Xusuusta dib-u-eegistu way dansan tahay. Shid, ka dibna isku day mar kale."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Geli URL ansax ah oo merge request ah.",
+      "mergeRequestUrl": "URL-ka merge request",
+      "instructionsAtLimit": "Tilmaamuhu wuxuu ku xaddidan yahay {{max}} xaraf",
       "title": "Dib-u-eegis gacmeed",
       "invalidUrl": "Geli URL ansax ah oo codsi isku dar ah.",
       "couldNotCheckProviderStatus": "Xaaladda bixiyaha lama hubin karin.",

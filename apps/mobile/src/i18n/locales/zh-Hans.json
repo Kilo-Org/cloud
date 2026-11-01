@@ -925,6 +925,9 @@
     "followReviewMd": "遵循 REVIEW.md",
     "followReviewMdSubtitle": "遵循各仓库 REVIEW.md 文件中的说明",
     "manualReview": {
+      "invalidMergeRequestUrl": "请输入有效的合并请求 URL。",
+      "mergeRequestUrl": "合并请求 URL",
+      "instructionsAtLimit": "说明最多使用 {{max}} 个字符",
       "connectProviderDescription": "连接 GitHub，即可手动发起拉取请求审查。",
       "couldNotCheckProviderStatus": "无法检查代码托管平台的状态",
       "couldNotLoadProviders": "无法加载已连接的代码托管平台。请重试。",

@@ -1533,6 +1533,9 @@
       "offAction": "Memori semakan dinyahdayakan. Dayakannya, kemudian cuba lagi."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Masukkan URL permintaan gabungan yang sah.",
+      "mergeRequestUrl": "URL permintaan gabungan",
+      "instructionsAtLimit": "Arahan dihadkan kepada {{max}} aksara.",
       "title": "Semakan manual",
       "invalidUrl": "Masukkan URL permintaan penarikan yang sah.",
       "couldNotCheckProviderStatus": "Tidak dapat menyemak status penyedia.",

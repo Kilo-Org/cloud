@@ -1599,6 +1599,9 @@
       "offAction": "Il-memorja tar-reviżjoni hija diżattivata. Attivaha, mbagħad erġa' pprova."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Daħħal URL validu għal merge request.",
+      "mergeRequestUrl": "URL tal-merge request",
+      "instructionsAtLimit": "L-istruzzjonijiet huma limitati għal {{max}} karattru.",
       "title": "Reviżjoni manwali",
       "invalidUrl": "Daħħal URL validu għal PR.",
       "couldNotCheckProviderStatus": "Ma setax jiġi ċċekkjat l-istat tal-fornitur.",

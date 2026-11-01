@@ -1533,6 +1533,9 @@
       "offAction": "Kod yoxlaması yaddaşı deaktivdir. Onu aktivləşdir, sonra yenidən cəhd et."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Etibarlı merge sorğusu URL-i daxil et.",
+      "mergeRequestUrl": "Merge sorğusu URL-i",
+      "instructionsAtLimit": "Təlimatlar {{max}} simvolla məhduddur",
       "title": "Əl ilə kod yoxlaması",
       "invalidUrl": "Etibarlı PR URL-i daxil et.",
       "couldNotCheckProviderStatus": "Provayderin statusunu yoxlamaq mümkün olmadı.",

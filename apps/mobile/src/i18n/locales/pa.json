@@ -1533,6 +1533,9 @@
       "offAction": "ਸਮੀਖਿਆ ਦੀ ਮੈਮੋਰੀ ਬੰਦ ਹੈ। ਇਸ ਨੂੰ ਚਾਲੂ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ ਵੈਧ URL ਦਰਜ ਕਰੋ।",
+      "mergeRequestUrl": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ URL",
+      "instructionsAtLimit": "ਹਦਾਇਤਾਂ {{max}} ਅੱਖਰਾਂ ਤੱਕ ਸੀਮਿਤ ਹਨ।",
       "title": "ਦਸਤੀ ਸਮੀਖਿਆ",
       "invalidUrl": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ ਵੈਧ URL ਦਰਜ ਕਰੋ।",
       "couldNotCheckProviderStatus": "ਪ੍ਰਦਾਤਾ ਦੀ ਸਥਿਤੀ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ।",

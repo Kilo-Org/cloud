@@ -1533,6 +1533,9 @@
       "offAction": "An kashe ƙwaƙwalwar bita. Kunna ta, sannan sake gwadawa."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Shigar da ingantaccen URL na buƙatar haɗawa.",
+      "mergeRequestUrl": "URL na buƙatar haɗawa",
+      "instructionsAtLimit": "An iyakance umarnai zuwa haruffa {{max}}",
       "title": "Bita da hannu",
       "invalidUrl": "Shigar da ingantaccen URL na buƙatar haɗa canje-canje.",
       "couldNotCheckProviderStatus": "An kasa duba halin mai ba da sabis.",

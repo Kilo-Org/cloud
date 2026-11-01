@@ -1555,6 +1555,9 @@
       "offAction": "La memòria de revisió està desactivada. Activa-la i torna-ho a provar."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Introdueix una URL vàlida d'una sol·licitud de fusió.",
+      "mergeRequestUrl": "URL de la sol·licitud de fusió",
+      "instructionsAtLimit": "Les instruccions estan limitades a {{max}} caràcters.",
       "title": "Revisió manual",
       "invalidUrl": "Introdueix una URL vàlida d'una sol·licitud d'integració.",
       "couldNotCheckProviderStatus": "No s'ha pogut comprovar l'estat del proveïdor.",

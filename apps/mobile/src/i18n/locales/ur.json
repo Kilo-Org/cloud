@@ -1533,6 +1533,9 @@
       "offAction": "جائزے کی یادداشت بند ہے۔ اسے فعال کریں، پھر دوبارہ کوشش کریں۔"
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "مرج ریکویسٹ کا درست URL درج کریں۔",
+      "mergeRequestUrl": "مرج ریکویسٹ کا URL",
+      "instructionsAtLimit": "ہدایات {{max}} حروف تک محدود ہیں۔",
       "title": "دستی جائزہ",
       "invalidUrl": "پل ریکویسٹ کا درست URL درج کریں۔",
       "couldNotCheckProviderStatus": "فراہم کنندہ کی حالت کی جانچ نہیں ہو سکی۔",

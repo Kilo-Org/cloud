@@ -1533,6 +1533,9 @@
       "offAction": "পর্যালোচনার মেমরি বন্ধ আছে। এটি চালু করুন, তারপর আবার চেষ্টা করুন।"
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "মার্জ রিকোয়েস্টের একটি সঠিক URL লিখুন।",
+      "mergeRequestUrl": "মার্জ রিকোয়েস্টের URL",
+      "instructionsAtLimit": "নির্দেশনা সর্বাধিক {{max}}টি অক্ষরের মধ্যে সীমাবদ্ধ",
       "title": "ম্যানুয়াল পর্যালোচনা",
       "invalidUrl": "পুল রিকোয়েস্টের একটি সঠিক URL লিখুন।",
       "couldNotCheckProviderStatus": "প্রোভাইডারের অবস্থা পরীক্ষা করা যায়নি।",

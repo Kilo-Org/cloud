@@ -1533,6 +1533,9 @@
       "offAction": "Паметта за прегледи е изключена. Активирай я и опитай отново."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Въведи валиден URL адрес на merge заявка.",
+      "mergeRequestUrl": "URL адрес на merge заявка",
+      "instructionsAtLimit": "Инструкциите са ограничени до {{max}} знака",
       "title": "Ръчен преглед",
       "invalidUrl": "Въведи валиден URL адрес на заявка за сливане.",
       "couldNotCheckProviderStatus": "Не успяхме да проверим състоянието на доставчика.",

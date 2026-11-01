@@ -1599,6 +1599,9 @@
       "offAction": "Tá cuimhne athbhreithnithe múchta. Cumasaigh í, ansin bain triail eile as."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Cuir isteach URL bailí d'iarratas cumaisc.",
+      "mergeRequestUrl": "URL an iarratais cumaisc",
+      "instructionsAtLimit": "Tá na treoracha teoranta do {{max}} carachtar",
       "title": "Athbhreithniú de láimh",
       "invalidUrl": "Cuir isteach URL bailí d'iarratas tarraingthe.",
       "couldNotCheckProviderStatus": "Níorbh fhéidir stádas an tsoláthraí a sheiceáil.",

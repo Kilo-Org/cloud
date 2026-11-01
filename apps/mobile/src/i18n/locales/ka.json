@@ -1533,6 +1533,9 @@
       "offAction": "შემოწმების მეხსიერება გამორთულია. ჩართე და ისევ სცადე."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "შეიყვანე შერწყმის მოთხოვნის სწორი URL.",
+      "mergeRequestUrl": "შერწყმის მოთხოვნის URL",
+      "instructionsAtLimit": "მითითებები შემოიფარგლება {{max}} სიმბოლოთი",
       "title": "ხელით შემოწმება",
       "invalidUrl": "შეიყვანე PR-ის სწორი URL.",
       "couldNotCheckProviderStatus": "პროვაიდერის სტატუსის შემოწმება ვერ მოხერხდა.",

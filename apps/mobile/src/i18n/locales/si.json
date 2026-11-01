@@ -1533,6 +1533,9 @@
       "offAction": "සමාලෝචන මතකය අක්‍රීයයි. එය සක්‍රීය කර නැවත උත්සාහ කරන්න."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "වලංගු මර්ජ ඉල්ලීම URL එකක් ඇතුළත් කරන්න.",
+      "mergeRequestUrl": "මර්ජ ඉල්ලීම සඳහා URL",
+      "instructionsAtLimit": "උපදෙස් අක්ෂර {{max}}කට සීමා වේ",
       "title": "ඔබ විසින් ආරම්භ කරන සමාලෝචනය",
       "invalidUrl": "වලංගු PR URL එකක් ඇතුළත් කරන්න.",
       "couldNotCheckProviderStatus": "සැපයුම්කරුගේ තත්ත්වය පරීක්ෂා කළ නොහැකි විය.",

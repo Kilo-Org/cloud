@@ -1533,6 +1533,9 @@
       "offAction": "ຄວາມຈຳການກວດສອບປິດຢູ່. ເປີດໃຊ້ມັນ, ແລ້ວລອງອີກຄັ້ງ."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "ໃສ່ URL ຂອງ merge request ທີ່ຖືກຕ້ອງ.",
+      "mergeRequestUrl": "URL ຂອງ merge request",
+      "instructionsAtLimit": "ຄຳແນະນຳຈຳກັດບໍ່ເກີນ {{max}} ຕົວອັກສອນ",
       "title": "ການກວດສອບທີ່ເລີ່ມເອງ",
       "invalidUrl": "ໃສ່ URL ຂອງຄຳຂໍລວມໂຄ້ດທີ່ຖືກຕ້ອງ.",
       "couldNotCheckProviderStatus": "ບໍ່ສາມາດກວດສອບສະຖານະຂອງຜູ້ໃຫ້ບໍລິການໄດ້.",

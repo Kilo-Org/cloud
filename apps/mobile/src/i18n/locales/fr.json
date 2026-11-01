@@ -896,6 +896,9 @@
     "followReviewMd": "Suivre les consignes de REVIEW.md",
     "followReviewMdSubtitle": "Respecter les fichiers d'instructions REVIEW.md de chaque dépôt",
     "manualReview": {
+      "invalidMergeRequestUrl": "Saisissez une URL de merge request valide.",
+      "mergeRequestUrl": "URL de la merge request",
+      "instructionsAtLimit": "Les instructions sont limitées à {{max}} caractères.",
       "connectProviderDescription": "Connectez GitHub pour lancer une revue manuelle d'une demande de fusion.",
       "couldNotCheckProviderStatus": "Impossible de vérifier l'état du fournisseur.",
       "couldNotLoadProviders": "Impossible de charger les fournisseurs connectés à votre compte. Réessayez.",

@@ -1533,6 +1533,9 @@
       "offAction": "पुनरावलोकन मेमरी बंद आहे. ती चालू करा, नंतर पुन्हा प्रयत्न करा."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "मर्ज रिक्वेस्टचा वैध URL टाका.",
+      "mergeRequestUrl": "मर्ज रिक्वेस्टचा URL",
+      "instructionsAtLimit": "सूचना {{max}} अक्षरांपुरता मर्यादित आहे",
       "title": "मागणीनुसार पुनरावलोकन",
       "invalidUrl": "पुल रिक्वेस्टचा वैध URL टाका.",
       "couldNotCheckProviderStatus": "सेवा पुरवठादाराची स्थिती तपासता आली नाही.",

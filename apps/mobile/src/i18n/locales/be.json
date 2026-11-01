@@ -1577,6 +1577,9 @@
       "offAction": "Памяць праверак выключана. Уключыце яе, затым паспрабуйце яшчэ раз."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Увайдзіце карэктны URL merge-запыту.",
+      "mergeRequestUrl": "URL merge-запыту",
+      "instructionsAtLimit": "Інструкцыі абмежаваны {{max}} сімваламі",
       "title": "Ручная праверка",
       "invalidUrl": "Увядзіце карэктны URL запыту на зліццё.",
       "couldNotCheckProviderStatus": "Не атрымалася праверыць стан платформы.",

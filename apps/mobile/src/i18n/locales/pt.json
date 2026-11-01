@@ -1555,6 +1555,9 @@
       "offAction": "A memória de revisão está desativada. Ativa-a e tenta novamente."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Introduz um URL válido de um merge request.",
+      "mergeRequestUrl": "URL do merge request",
+      "instructionsAtLimit": "As instruções estão limitadas a {{max}} caracteres",
       "title": "Revisão manual",
       "invalidUrl": "Introduz um URL válido de um pedido de integração.",
       "couldNotCheckProviderStatus": "Não foi possível verificar o estado do fornecedor.",

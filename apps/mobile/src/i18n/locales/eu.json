@@ -1533,6 +1533,9 @@
       "offAction": "Berrikuspen-memoria desgaituta dago. Gaitu, eta saiatu berriro."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Sartu merge-eskaera baten baliozko URL bat.",
+      "mergeRequestUrl": "Merge-eskaeraren URLa",
+      "instructionsAtLimit": "Argibideak {{max}} karakteretara mugatuta daude",
       "title": "Eskuzko berrikuspena",
       "invalidUrl": "Sartu bateratze-eskaera baten baliozko URL bat.",
       "couldNotCheckProviderStatus": "Ezin izan da hornitzailearen egoera egiaztatu.",

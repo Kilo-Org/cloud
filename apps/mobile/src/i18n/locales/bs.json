@@ -1555,6 +1555,9 @@
       "offAction": "Memorija pregleda je isključena. Uključi je, pa pokušaj ponovo."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Unesi važeći URL merge requesta.",
+      "mergeRequestUrl": "URL merge requesta",
+      "instructionsAtLimit": "Upute su ograničene na {{max}} znakova.",
       "title": "Ručni pregled",
       "invalidUrl": "Unesi važeći URL zahtjeva za spajanje.",
       "couldNotCheckProviderStatus": "Nije moguće provjeriti status platforme.",

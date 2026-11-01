@@ -1533,6 +1533,9 @@
       "offAction": "Katselmointimuisti on pois käytöstä. Ota se käyttöön ja yritä uudelleen."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Anna kelvollinen yhdistämispyynnön URL-osoite.",
+      "mergeRequestUrl": "Yhdistämispyynnön URL-osoite",
+      "instructionsAtLimit": "Ohjeet saavat olla enintään {{max}} merkkiä.",
       "title": "Manuaalinen katselmointi",
       "invalidUrl": "Anna kelvollinen muutospyynnön URL-osoite.",
       "couldNotCheckProviderStatus": "Palveluntarjoajan tilaa ei voitu tarkistaa.",

@@ -181,15 +181,39 @@ describe('redirectSystemPath', () => {
   });
 
   describe('app route links', () => {
-    // Dev, E2E and system-search links address the app's own routes; the
-    // navigator owns them and `redirectSystemPath` passes them through.
+    // Dev, E2E and system-search links address the app's own routes. A route
+    // inside the signed-in shell is stashed like a universal link, so the
+    // layout's consumer navigates it with `withAnchor` and every stack keeps its
+    // layout anchor beneath the target; a route the shell gates own is left to
+    // the navigator exactly as before.
     it.each([
+      'kiloapp:///(app)/(tabs)/(3_profile)/organization/invoices',
+      'kiloapp:///(app)/(tabs)/(3_profile)/organization/credit-activity',
+      'kiloapp:///(app)/(tabs)/(2_agents)',
       'kiloapp:///(app)/profile-management/34d743e6-7bb8-4dd1-880c-580bd8d907d5/variables',
       'kiloapp:///(app)/(tabs)/(3_profile)/preferences',
+      '/(app)/agent-chat/new?mode=code',
+      'kiloapp:///(app)/agent-chat/new?mode=code',
+    ])('stashes %s for the anchored navigation', path => {
+      const href = path.slice(path.indexOf('/('));
+      for (const initial of [true, false]) {
+        _resetDeepLinkLaunchForTests();
+        const result = redirectSystemPath({ path, initial });
+        expect(result).toBeNull();
+        expect(getPendingDeepLink()).toBe(href);
+        expect(resolvePendingNavigation(href)).toEqual({
+          href,
+          method: 'navigate',
+          withAnchor: true,
+        });
+        expect(mocks.navigate).not.toHaveBeenCalled();
+      }
+    });
+
+    it.each([
       'kiloapp:///(auth)/session-row-fixture',
       'kiloapp:///force-update',
       'kiloapp:///button-label-fixture',
-      '/(app)/agent-chat/new?mode=code',
       '/(auth)/login',
       'kiloapp://agent-chat/ses_0123456789abcdefghijklmnop',
       'kiloapp://security-agent/personal',
@@ -198,6 +222,14 @@ describe('redirectSystemPath', () => {
       expect(redirectSystemPath({ path, initial: false })).toBe(path);
       expect(getPendingDeepLink()).toBeNull();
       expect(mocks.navigate).not.toHaveBeenCalled();
+    });
+
+    it('leaves the route a moved search family names with the search slot', () => {
+      // Ids indexed before the security-agent route moved keep the profile
+      // tab's group segment; they are search taps, not links handed to the app.
+      const path = 'kiloapp:///(app)/(tabs)/(3_profile)/security-agent/finding-1';
+      expect(redirectSystemPath({ path, initial: false })).toBe(path);
+      expect(getPendingDeepLink()).toBeNull();
     });
   });
 

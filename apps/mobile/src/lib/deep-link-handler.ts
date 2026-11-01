@@ -1,6 +1,6 @@
 import { resolveIncomingResume } from '@kilocode/app-shared/universal-links';
 
-import { opensAppRoutePath, opensDestination } from './deep-link-destination';
+import { opensAppRoutePath, opensDestination, shellRouteHref } from './deep-link-destination';
 import { resumeDeepLinkHref, setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
 import { parseGitHubReturnParams, setGitHubInstallReturnOutcome } from './github-install-return';
 import { isSystemSearchFamilyLink } from './system-search-families';
@@ -55,6 +55,17 @@ export function redirectSystemPath({
     // screen — and with it unsaved state such as an open form — with whatever
     // the resolver makes of it. A link that opens nothing leaves the screen be.
     if (resume == null) {
+      // A link that opens a screen inside the signed-in shell travels the same
+      // way a universal link does: stashed, then navigated by the root layout
+      // with `withAnchor`, which puts each Stack's layout anchor beneath the
+      // target. Handing it to expo-router's resolver instead builds the target
+      // as its stack's only route, so Back leaves the tab and the tab itself
+      // reopens the linked screen (see `shellRouteHref`).
+      const shellRoute = shellRouteHref(path);
+      if (shellRoute !== null) {
+        setPendingDeepLink(shellRoute, 'universal-link');
+        return null;
+      }
       return opensAppRoutePath(path) ? path : null;
     }
     const { href, anchorMessageId } = resume;

@@ -1374,7 +1374,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "पता लगाया गया",
-      "dismissedBecause": "खारिज करने का कारण: {{reason}}।",
+      "dismissedOn": "खारिज होने की तारीख",
+      "supersededOn": "नए रिकॉर्ड से बदले जाने की तारीख",
       "ghsa": "GHSA",
       "manifest": "मैनिफ़ेस्ट",
       "noPatchAvailable": "कोई पैच उपलब्ध नहीं",
@@ -1391,11 +1392,6 @@
       "vulnerableVersions": "असुरक्षित वर्ज़न",
       "statusOpen": "ओपन",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "सुधार शुरू हो चुका है",
-      "reasonNoBandwidth": "समय और संसाधन उपलब्ध नहीं हैं",
-      "reasonTolerableRisk": "जोखिम स्वीकार्य है",
-      "reasonInaccurate": "मिली समस्या की जानकारी गलत है",
-      "reasonNotUsed": "असुरक्षित कोड का इस्तेमाल नहीं होता",
       "reasonAfterReview": "समीक्षा के बाद"
     },
     "findingList": {
@@ -1577,7 +1573,6 @@
       "closedOn": "{{date}} को {{status}}",
       "deadlineNotSet": "समय सीमा निर्धारित नहीं",
       "noSlaDeadline": "SLA की कोई समय सीमा नहीं",
-      "dueOn": "अंतिम तारीख: {{date}}",
       "overdueNow": "विलंबित",
       "overdue_one": "समय सीमा से {{count}} दिन की देरी",
       "overdue_other": "{{count}} दिन की देरी",

@@ -1841,7 +1841,8 @@
     "findingDetails": {
       "supersededBy": "ఈ సమస్య స్థానంలో తాజా సమస్య నమోదైంది",
       "supersededByDescription": "స్థితి, విశ్లేషణ, పరిష్కారం వివరాలను చూడటానికి తాజా రికార్డును నొక్కండి.",
-      "dismissedBecause": "తీసివేయడానికి కారణం: {{reason}}.",
+      "dismissedOn": "విస్మరణ తేదీ",
+      "supersededOn": "భర్తీ తేదీ",
       "severityLabel": "{{severity}} తీవ్రత",
       "package": "ప్యాకేజీ",
       "vulnerableVersions": "భద్రతా లోపం ఉన్న వెర్షన్‌లు",
@@ -1858,11 +1859,6 @@
       "viewAdvisory": "GitHubలో భద్రతా సూచనను చూడండి",
       "statusOpen": "ఓపెన్",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ఇప్పటికే పరిష్కరించడం మొదలైంది",
-      "reasonNoBandwidth": "పరిష్కరించేందుకు సమయం లేదు",
-      "reasonTolerableRisk": "ప్రమాద స్థాయి ఆమోదయోగ్యం",
-      "reasonInaccurate": "గుర్తించిన సమస్య వివరాలు సరికావు",
-      "reasonNotUsed": "భద్రతా లోపం ఉన్న కోడ్ వాడటం లేదు",
       "reasonAfterReview": "సమీక్ష తర్వాత"
     },
     "settingsOverview": {
@@ -2099,7 +2095,6 @@
       "closedOn": "{{date}}: {{status}}",
       "deadlineNotSet": "గడువు నిర్ణయించబడలేదు",
       "noSlaDeadline": "SLA గడువు లేదు",
-      "dueOn": "గడువు: {{date}}",
       "overdueNow": "గడువు దాటింది",
       "overdue_one": "గడువు దాటి {{count}} రోజు",
       "overdue_other": "గడువు దాటి {{count}} రోజులు",

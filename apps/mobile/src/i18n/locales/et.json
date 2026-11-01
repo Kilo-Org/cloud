@@ -1841,7 +1841,8 @@
     "findingDetails": {
       "supersededBy": "Asendatud uuema leiuga",
       "supersededByDescription": "Puuduta, et avada uuem kirje ning vaadata selle olekut, analüüsi ja parandamise andmeid.",
-      "dismissedBecause": "Leid jäeti kõrvale: {{reason}}.",
+      "dismissedOn": "Kõrvale jätmise kuupäev",
+      "supersededOn": "Asendamise kuupäev",
       "severityLabel": "Raskusaste: {{severity}}",
       "package": "Pakett",
       "vulnerableVersions": "Haavatavad versioonid",
@@ -1858,11 +1859,6 @@
       "viewAdvisory": "Vaata turvateadet GitHubis",
       "statusOpen": "Avatud",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "parandamine juba käib",
-      "reasonNoBandwidth": "selleks pole aega",
-      "reasonTolerableRisk": "risk on talutav",
-      "reasonInaccurate": "leid on ebatäpne",
-      "reasonNotUsed": "haavatavat koodi ei kasutata",
       "reasonAfterReview": "pärast ülevaatamist"
     },
     "settingsOverview": {
@@ -2099,7 +2095,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Tähtaega pole määratud",
       "noSlaDeadline": "SLA tähtaega pole määratud",
-      "dueOn": "Tähtaeg {{date}}",
       "overdueNow": "Tähtaeg ületatud",
       "overdue_one": "Tähtaeg ületatud {{count}} päeva",
       "overdue_other": "Tähtaeg ületatud {{count}} päeva",

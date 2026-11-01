@@ -1355,7 +1355,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Detectada",
-      "dismissedBecause": "A ocorrência foi descartada {{reason}}.",
+      "dismissedOn": "Ignorado em",
+      "supersededOn": "Substituído em",
       "ghsa": "GHSA",
       "manifest": "Manifesto",
       "noPatchAvailable": "Nenhuma correção disponível",
@@ -1372,11 +1373,6 @@
       "vulnerableVersions": "Versões vulneráveis",
       "statusOpen": "Em aberto",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "correção já iniciada",
-      "reasonNoBandwidth": "sem tempo disponível",
-      "reasonTolerableRisk": "risco tolerável",
-      "reasonInaccurate": "problema identificado incorretamente",
-      "reasonNotUsed": "código vulnerável sem uso",
       "reasonAfterReview": "após a revisão"
     },
     "findingList": {
@@ -1559,7 +1555,6 @@
       "closedOn": "{{status}} em {{date}}",
       "deadlineNotSet": "Prazo não definido",
       "noSlaDeadline": "Nenhum prazo de SLA",
-      "dueOn": "Vence em {{date}}",
       "overdueNow": "Em atraso",
       "overdue_one": "{{count}} dia em atraso",
       "overdue_many": "{{count}} dias em atraso",

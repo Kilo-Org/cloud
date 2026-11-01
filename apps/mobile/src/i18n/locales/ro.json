@@ -1872,7 +1872,8 @@
     "findingDetails": {
       "supersededBy": "Înlocuită de o constatare actuală",
       "supersededByDescription": "Atinge pentru a deschide înregistrarea actuală și a vedea starea, analiza și remedierea.",
-      "dismissedBecause": "Constatarea a fost respinsă {{reason}}.",
+      "dismissedOn": "Ignorată la",
+      "supersededOn": "Înlocuită la",
       "severityLabel": "Gravitate: {{severity}}",
       "package": "Pachet",
       "vulnerableVersions": "Versiuni vulnerabile",
@@ -1889,11 +1890,6 @@
       "viewAdvisory": "Vezi buletinul de securitate pe GitHub",
       "statusOpen": "Deschisă",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "remedierea a început deja",
-      "reasonNoBandwidth": "nu sunt resurse disponibile",
-      "reasonTolerableRisk": "riscul este acceptabil",
-      "reasonInaccurate": "problema a fost detectată incorect",
-      "reasonNotUsed": "codul vulnerabil nu este utilizat",
       "reasonAfterReview": "după revizuire"
     },
     "settingsOverview": {
@@ -2132,7 +2128,6 @@
       "closedOn": "{{status}} la {{date}}",
       "deadlineNotSet": "Termen limită nestabilit",
       "noSlaDeadline": "Fără termen limită SLA",
-      "dueOn": "Termen limită: {{date}}",
       "overdueNow": "Termen depășit",
       "overdue_one": "{{count}} zi întârziere",
       "overdue_few": "{{count}} zile întârziere",

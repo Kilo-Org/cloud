@@ -1841,7 +1841,8 @@
     "findingDetails": {
       "supersededBy": "പകരം പുതിയ കണ്ടെത്തൽ നിലവിലുണ്ട്",
       "supersededByDescription": "നില, വിശകലനം, പരിഹാരം എന്നിവ കാണാൻ നിലവിലെ രേഖ ടാപ്പ് ചെയ്ത് തുറക്കുക.",
-      "dismissedBecause": "നിരസിച്ചു. കാരണം: {{reason}}.",
+      "dismissedOn": "ഒഴിവാക്കിയ തീയതി",
+      "supersededOn": "മാറ്റിസ്ഥാപിച്ച തീയതി",
       "severityLabel": "ഗുരുതരത്വം: {{severity}}",
       "package": "പാക്കേജ്",
       "vulnerableVersions": "സുരക്ഷാ ദൗർബല്യമുള്ള പതിപ്പുകൾ",
@@ -1858,11 +1859,6 @@
       "viewAdvisory": "GitHub-ൽ സുരക്ഷാ അറിയിപ്പ് കാണുക",
       "statusOpen": "ഓപ്പൺ",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "പരിഹരിക്കാൻ തുടങ്ങിയിട്ടുണ്ട്",
-      "reasonNoBandwidth": "ഇതിനായി സമയം മാറ്റിവയ്ക്കാനില്ല",
-      "reasonTolerableRisk": "സ്വീകരിക്കാവുന്ന അപകടസാധ്യത",
-      "reasonInaccurate": "കണ്ടെത്തൽ കൃത്യമല്ല",
-      "reasonNotUsed": "സുരക്ഷാ ദൗർബല്യമുള്ള കോഡ് ഉപയോഗിക്കുന്നില്ല",
       "reasonAfterReview": "അവലോകനത്തിന് ശേഷം"
     },
     "settingsOverview": {
@@ -2099,7 +2095,6 @@
       "closedOn": "{{date}}: {{status}}",
       "deadlineNotSet": "സമയപരിധി സജ്ജീകരിച്ചിട്ടില്ല",
       "noSlaDeadline": "SLA സമയപരിധിയില്ല",
-      "dueOn": "സമയപരിധി: {{date}}",
       "overdueNow": "സമയപരിധി കഴിഞ്ഞു",
       "overdue_one": "സമയപരിധി കഴിഞ്ഞിട്ട് {{count}} ദിവസം",
       "overdue_other": "സമയപരിധി കഴിഞ്ഞിട്ട് {{count}} ദിവസം",

@@ -1841,7 +1841,8 @@
     "findingDetails": {
       "supersededBy": "Жаңа мәселемен ауыстырылған",
       "supersededByDescription": "Күйін, талдауын және түзетуін көру үшін жаңа жазбаны түртіп ашыңыз.",
-      "dismissedBecause": "Мәселе еленбеді. Себебі: {{reason}}.",
+      "dismissedOn": "Еленбеу күні",
+      "supersededOn": "Жаңасымен ауыстырылу күні",
       "severityLabel": "Қауіп деңгейі: {{severity}}",
       "package": "Пакет",
       "vulnerableVersions": "Осал нұсқалар",
@@ -1858,11 +1859,6 @@
       "viewAdvisory": "GitHub-тағы қауіпсіздік хабарламасын қарау",
       "statusOpen": "Ашық",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "түзету басталып кетті",
-      "reasonNoBandwidth": "бос ресурс жоқ",
-      "reasonTolerableRisk": "тәуекел деңгейі қолайлы",
-      "reasonInaccurate": "мәселе қате анықталған",
-      "reasonNotUsed": "осал код пайдаланылмайды",
       "reasonAfterReview": "тексеру нәтижесі"
     },
     "settingsOverview": {
@@ -2099,7 +2095,6 @@
       "closedOn": "{{date}} күні: {{status}}",
       "deadlineNotSet": "Мерзім белгіленбеген",
       "noSlaDeadline": "SLA мерзімі жоқ",
-      "dueOn": "Мерзімі: {{date}}",
       "overdueNow": "Мерзімі өткен",
       "overdue_one": "Мерзімі {{count}} күнге өтіп кеткен",
       "overdue_other": "Мерзімі {{count}} күн бұрын өтті",

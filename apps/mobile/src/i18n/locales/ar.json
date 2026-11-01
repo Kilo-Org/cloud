@@ -1420,7 +1420,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "تاريخ الاكتشاف",
-      "dismissedBecause": "تم استبعاد النتيجة. السبب: {{reason}}.",
+      "dismissedOn": "مستبعدة في",
+      "supersededOn": "مستبدلة في",
       "ghsa": "GHSA",
       "manifest": "ملف تعريف الحزمة",
       "noPatchAvailable": "لا يوجد تصحيح متاح",
@@ -1437,11 +1438,6 @@
       "vulnerableVersions": "الإصدارات المتأثرة بالثغرة",
       "statusOpen": "مفتوحة",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "بدأ الإصلاح بالفعل",
-      "reasonNoBandwidth": "لا تتوفر موارد كافية",
-      "reasonTolerableRisk": "الخطر مقبول",
-      "reasonInaccurate": "النتيجة غير دقيقة",
-      "reasonNotUsed": "الشيفرة التي تحتوي على الثغرة غير مستخدمة",
       "reasonAfterReview": "بعد المراجعة"
     },
     "findingList": {
@@ -1627,7 +1623,6 @@
       "closedOn": "{{status}} في {{date}}",
       "deadlineNotSet": "الموعد النهائي غير محدد",
       "noSlaDeadline": "لا يوجد موعد نهائي حسب SLA",
-      "dueOn": "مستحق في {{date}}",
       "overdueNow": "متأخر",
       "overdue_zero": "أيام التأخير: {{count}}",
       "overdue_one": "متأخر بيوم واحد",

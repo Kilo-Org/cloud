@@ -1847,7 +1847,8 @@
     "findingDetails": {
       "supersededBy": "આની જગ્યાએ નવું તારણ નોંધાયું છે",
       "supersededByDescription": "સ્થિતિ, વિશ્લેષણ અને સુધારણા માટે હાલનો રેકોર્ડ ખોલવા ટેપ કરો.",
-      "dismissedBecause": "આ કારણસર ખારિજ કર્યું: {{reason}}.",
+      "dismissedOn": "ખારિજ કરવાની તારીખ",
+      "supersededOn": "નવા તારણે સ્થાન લીધાની તારીખ",
       "severityLabel": "{{severity}} ગંભીરતા",
       "package": "પેકેજ",
       "vulnerableVersions": "સુરક્ષા ખામીવાળી આવૃત્તિઓ",
@@ -1864,11 +1865,6 @@
       "viewAdvisory": "GitHub પર સુરક્ષા સૂચના જુઓ",
       "statusOpen": "ખુલ્લું",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "સુધારવાનું કામ શરૂ થઈ ગયું છે",
-      "reasonNoBandwidth": "હાલ સમય કે સંસાધનો નથી",
-      "reasonTolerableRisk": "જોખમ સ્વીકાર્ય છે",
-      "reasonInaccurate": "તારણ સચોટ નથી",
-      "reasonNotUsed": "સુરક્ષાની ખામીવાળો કોડ વપરાતો નથી",
       "reasonAfterReview": "સમીક્ષા પછી"
     },
     "settingsOverview": {
@@ -2105,7 +2101,6 @@
       "closedOn": "{{date}} ના રોજ {{status}}",
       "deadlineNotSet": "સમયમર્યાદા નક્કી કરેલી નથી",
       "noSlaDeadline": "SLA ની સમયમર્યાદા નથી",
-      "dueOn": "સમયમર્યાદા: {{date}}",
       "overdueNow": "સમયમર્યાદા વટાવી",
       "overdue_one": "સમયમર્યાદા વટાવ્યાને {{count}} દિવસ",
       "overdue_other": "સમયમર્યાદા વટાવ્યાને {{count}} દિવસ",

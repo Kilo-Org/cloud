@@ -93,6 +93,16 @@ describe('catalog copy', () => {
     expect(sr.home.noLiveSessions).not.toMatch(/\p{Script=Cyrillic}/u);
   });
 
+  // The empty state and the screen header name the same record. Arabic's
+  // heading called it a "note" while the header and body called it a
+  // "finding", so one screen used two names for one object.
+  it('names the missing record the same way as the screen title in Arabic', async () => {
+    await i18n.changeLanguage('ar');
+    expect(i18n.t('securityAgent.dismiss.notFoundTitle')).toContain(
+      i18n.t('securityAgent.findingDetail.title')
+    );
+  });
+
   it.each(SUPPORTED_LANGUAGES)('keeps label case separate from fragment case in %s', async tag => {
     await i18n.changeLanguage(tag);
     if (tag === 'ka') {
@@ -130,11 +140,6 @@ describe('catalog copy', () => {
     for (const key of [
       'agentChat.toolCard.toolEdit',
       'agentChat.toolCard.toolTask',
-      'securityAgent.findingDetails.reasonFixStarted',
-      'securityAgent.findingDetails.reasonNoBandwidth',
-      'securityAgent.findingDetails.reasonTolerableRisk',
-      'securityAgent.findingDetails.reasonInaccurate',
-      'securityAgent.findingDetails.reasonNotUsed',
       'securityAgent.findingDetails.reasonAfterReview',
     ] as const) {
       expect(i18n.t(key), key).not.toMatch(/^\p{Lu}/u);

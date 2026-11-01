@@ -1841,7 +1841,8 @@
     "findingDetails": {
       "supersededBy": "Korvattu ajantasaisella havainnolla",
       "supersededByDescription": "Napauta nähdäksesi ajantasaisen havainnon tilan, analyysin ja korjauksen.",
-      "dismissedBecause": "Havainto hylättiin: {{reason}}.",
+      "dismissedOn": "Sivuuttamispäivä",
+      "supersededOn": "Korvaamispäivä",
       "severityLabel": "Vakavuus: {{severity}}",
       "package": "Paketti",
       "vulnerableVersions": "Haavoittuvat versiot",
@@ -1858,11 +1859,6 @@
       "viewAdvisory": "Näytä tietoturvatiedote GitHubissa",
       "statusOpen": "Avoin",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "korjaus on jo aloitettu",
-      "reasonNoBandwidth": "ei vapaita resursseja",
-      "reasonTolerableRisk": "riski on hyväksyttävä",
-      "reasonInaccurate": "havainto on virheellinen",
-      "reasonNotUsed": "haavoittuvaa koodia ei käytetä",
       "reasonAfterReview": "tarkistuksen jälkeen"
     },
     "settingsOverview": {
@@ -2099,7 +2095,6 @@
       "closedOn": "Tila: {{status}} · {{date}}",
       "deadlineNotSet": "Määräaikaa ei ole asetettu",
       "noSlaDeadline": "Ei määritettyä SLA-määräaikaa",
-      "dueOn": "Määräaika {{date}}",
       "overdueNow": "Myöhässä",
       "overdue_one": "{{count}} päivä myöhässä",
       "overdue_other": "{{count}} päivää myöhässä",

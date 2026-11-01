@@ -1368,7 +1368,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Tespit tarihi",
-      "dismissedBecause": "Şu nedenle yok sayıldı: {{reason}}.",
+      "dismissedOn": "Yok sayılma tarihi",
+      "supersededOn": "Yerini yenisi alma tarihi",
       "ghsa": "GHSA",
       "manifest": "Bildirim dosyası",
       "noPatchAvailable": "Yama yok",
@@ -1385,11 +1386,6 @@
       "vulnerableVersions": "Güvenlik açığı içeren sürümler",
       "statusOpen": "Açık",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "düzeltmeye başlandı",
-      "reasonNoBandwidth": "yeterli kaynak yok",
-      "reasonTolerableRisk": "risk kabul edilebilir",
-      "reasonInaccurate": "bulgu hatalı",
-      "reasonNotUsed": "açık içeren kod kullanılmıyor",
       "reasonAfterReview": "incelemeden sonra"
     },
     "findingList": {
@@ -1571,7 +1567,6 @@
       "closedOn": "{{date}} tarihindeki durum: {{status}}",
       "deadlineNotSet": "Son tarih belirtilmedi",
       "noSlaDeadline": "SLA son tarihi yok",
-      "dueOn": "Son tarih: {{date}}",
       "overdueNow": "Gecikmiş",
       "overdue_one": "{{count}} gün gecikmiş",
       "overdue_other": "{{count}} gün gecikti",

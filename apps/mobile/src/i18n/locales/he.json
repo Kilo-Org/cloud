@@ -1381,7 +1381,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "זוהה",
-      "dismissedBecause": "סיבת הדחייה: {{reason}}.",
+      "dismissedOn": "תאריך ההתעלמות",
+      "supersededOn": "תאריך ההחלפה",
       "ghsa": "GHSA",
       "manifest": "קובץ מניפסט",
       "noPatchAvailable": "אין תיקון זמין",
@@ -1398,11 +1399,6 @@
       "vulnerableVersions": "גרסאות פגיעות",
       "statusOpen": "פתוח",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "התיקון כבר התחיל",
-      "reasonNoBandwidth": "אין משאבים פנויים",
-      "reasonTolerableRisk": "הסיכון נסבל",
-      "reasonInaccurate": "הממצא אינו מדויק",
-      "reasonNotUsed": "הקוד הפגיע אינו בשימוש",
       "reasonAfterReview": "לאחר בדיקה"
     },
     "findingList": {
@@ -1585,7 +1581,6 @@
       "closedOn": "{{status}} ב-{{date}}",
       "deadlineNotSet": "לא הוגדר מועד אחרון",
       "noSlaDeadline": "אין מועד אחרון לפי SLA",
-      "dueOn": "מועד אחרון: {{date}}",
       "overdueNow": "באיחור",
       "overdue_one": "איחור של {{count}} יום",
       "overdue_two": "איחור של {{count}} ימים",

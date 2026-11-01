@@ -1903,7 +1903,8 @@
     "findingDetails": {
       "supersededBy": "Заменена актуальнай праблемай",
       "supersededByDescription": "Націсніце, каб адкрыць актуальны запіс са станам, аналізам і выпраўленнем.",
-      "dismissedBecause": "Праблема адхілена: {{reason}}.",
+      "dismissedOn": "Дата адхілення",
+      "supersededOn": "Дата замены",
       "severityLabel": "Узровень небяспекі: {{severity}}",
       "package": "Пакет",
       "vulnerableVersions": "Уразлівыя версіі",
@@ -1920,11 +1921,6 @@
       "viewAdvisory": "Праглядзець бюлетэнь бяспекі на GitHub",
       "statusOpen": "Адкрыта",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "выпраўленне ўжо пачата",
-      "reasonNoBandwidth": "няма рэсурсаў на выпраўленне",
-      "reasonTolerableRisk": "рызыка прымальная",
-      "reasonInaccurate": "праблема вызначана недакладна",
-      "reasonNotUsed": "уразлівы код не выкарыстоўваецца",
       "reasonAfterReview": "пасля праверкі"
     },
     "settingsOverview": {
@@ -2165,7 +2161,6 @@
       "closedOn": "{{status}} · {{date}}",
       "deadlineNotSet": "Тэрмін не ўстаноўлены",
       "noSlaDeadline": "Тэрмін SLA не прызначаны",
-      "dueOn": "Тэрмін: {{date}}",
       "overdueNow": "Пратэрмінавана",
       "overdue_one": "Пратэрмінавана на {{count}} дзень",
       "overdue_few": "пратэрмінавана на {{count}} дні",

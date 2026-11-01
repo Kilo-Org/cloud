@@ -1841,7 +1841,8 @@
     "findingDetails": {
       "supersededBy": "E zëvendësuar nga një gjetje aktuale",
       "supersededByDescription": "Prek për të hapur regjistrimin aktual dhe për të parë statusin, analizën dhe korrigjimin.",
-      "dismissedBecause": "U hodh poshtë {{reason}}.",
+      "dismissedOn": "E hedhur poshtë më",
+      "supersededOn": "E zëvendësuar më",
       "severityLabel": "Niveli i rrezikut: {{severity}}",
       "package": "Paketa",
       "vulnerableVersions": "Versionet me cenueshmëri",
@@ -1858,11 +1859,6 @@
       "viewAdvisory": "Shiko njoftimin e sigurisë në GitHub",
       "statusOpen": "Hapur",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "rregullimi ka filluar tashmë",
-      "reasonNoBandwidth": "mungojnë burimet për ta trajtuar",
-      "reasonTolerableRisk": "rreziku është i pranueshëm",
-      "reasonInaccurate": "gjetja është e pasaktë",
-      "reasonNotUsed": "kodi me dobësi sigurie nuk përdoret",
       "reasonAfterReview": "pas shqyrtimit"
     },
     "settingsOverview": {
@@ -2099,7 +2095,6 @@
       "closedOn": "{{status}} më {{date}}",
       "deadlineNotSet": "Afati nuk është caktuar",
       "noSlaDeadline": "Pa afat SLA",
-      "dueOn": "Afati më {{date}}",
       "overdueNow": "Me afat të kaluar",
       "overdue_one": "{{count}} ditë me vonesë",
       "overdue_other": "{{count}} ditë me vonesë",

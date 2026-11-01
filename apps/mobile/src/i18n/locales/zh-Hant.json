@@ -1368,7 +1368,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "偵測時間",
-      "dismissedBecause": "已忽略，原因：{{reason}}。",
+      "dismissedOn": "忽略日期",
+      "supersededOn": "取代日期",
       "ghsa": "GHSA",
       "manifest": "套件清單檔",
       "noPatchAvailable": "沒有可用的修補程式",
@@ -1385,11 +1386,6 @@
       "vulnerableVersions": "有漏洞的版本",
       "statusOpen": "開啟",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "已開始修復",
-      "reasonNoBandwidth": "無暇處理",
-      "reasonTolerableRisk": "風險可以接受",
-      "reasonInaccurate": "問題判定不準確",
-      "reasonNotUsed": "未使用有漏洞的程式碼",
       "reasonAfterReview": "經審查後決定忽略"
     },
     "findingList": {
@@ -1571,7 +1567,6 @@
       "closedOn": "{{date}}：{{status}}",
       "deadlineNotSet": "未設定期限",
       "noSlaDeadline": "無 SLA 期限",
-      "dueOn": "{{date}} 到期",
       "overdueNow": "已逾期",
       "overdue_other": "逾期 {{count}} 天",
       "dueToday": "今天到期",

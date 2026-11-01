@@ -1847,7 +1847,8 @@
     "findingDetails": {
       "supersededBy": "নতুন ত্রুটির রেকর্ড দিয়ে প্রতিস্থাপিত",
       "supersededByDescription": "অবস্থা, বিশ্লেষণ ও সমাধান দেখতে বর্তমান রেকর্ডটি ট্যাপ করে খুলুন।",
-      "dismissedBecause": "খারিজ করা হয়েছে: {{reason}}।",
+      "dismissedOn": "খারিজের তারিখ",
+      "supersededOn": "প্রতিস্থাপনের তারিখ",
       "severityLabel": "তীব্রতা: {{severity}}",
       "package": "প্যাকেজ",
       "vulnerableVersions": "নিরাপত্তা দুর্বলতাযুক্ত সংস্করণ",
@@ -1864,11 +1865,6 @@
       "viewAdvisory": "GitHub-এ নিরাপত্তা বিজ্ঞপ্তি দেখুন",
       "statusOpen": "খোলা",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "সমাধানের কাজ শুরু হয়েছে",
-      "reasonNoBandwidth": "সময় বা লোকবল নেই",
-      "reasonTolerableRisk": "ঝুঁকি সহনীয়",
-      "reasonInaccurate": "শনাক্ত সমস্যার তথ্য সঠিক নয়",
-      "reasonNotUsed": "দুর্বলতাযুক্ত কোড ব্যবহার করা হয় না",
       "reasonAfterReview": "পর্যালোচনার পরে"
     },
     "settingsOverview": {
@@ -2105,7 +2101,6 @@
       "closedOn": "{{status}} — {{date}}",
       "deadlineNotSet": "সময়সীমা নির্ধারিত নেই",
       "noSlaDeadline": "কোনো SLA সময়সীমা নেই",
-      "dueOn": "শেষ তারিখ: {{date}}",
       "overdueNow": "সময়সীমা পেরিয়েছে",
       "overdue_one": "{{count}} দিন বিলম্বিত",
       "overdue_other": "{{count}} দিন বিলম্বিত",

@@ -1841,7 +1841,8 @@
     "findingDetails": {
       "supersededBy": "လက်ရှိတွေ့ရှိချက်ဖြင့် အစားထိုးထား",
       "supersededByDescription": "အခြေအနေ၊ ခွဲခြမ်းစိတ်ဖြာမှုနှင့် ပြုပြင်မှုတို့ကို ကြည့်ရန် လက်ရှိမှတ်တမ်းကို နှိပ်ဖွင့်ပါ။",
-      "dismissedBecause": "{{reason}} ကြောင့် ပယ်ထားသည်။",
+      "dismissedOn": "ပယ်ချသည့်ရက်စွဲ",
+      "supersededOn": "အသစ်ဖြင့် အစားထိုးသည့်ရက်စွဲ",
       "severityLabel": "ပြင်းထန်မှု {{severity}} အဆင့်",
       "package": "ပက်ကေ့ဂျ်",
       "vulnerableVersions": "အားနည်းချက်ရှိသော ဗားရှင်းများ",
@@ -1858,11 +1859,6 @@
       "viewAdvisory": "GitHub တွင် လုံခြုံရေးသတိပေးချက်ကို ကြည့်ရန်",
       "statusOpen": "ဖွင့်",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ပြင်ဆင်မှု စတင်ပြီး",
-      "reasonNoBandwidth": "အချိန်နှင့် လူအင်အား မရှိ",
-      "reasonTolerableRisk": "လက်ခံနိုင်သော အန္တရာယ်အဆင့်",
-      "reasonInaccurate": "တွေ့ရှိချက် မမှန်ကန်",
-      "reasonNotUsed": "အားနည်းချက်ရှိသော ကုဒ်ကို အသုံးမပြု",
       "reasonAfterReview": "ပြန်လည်သုံးသပ်ပြီးနောက်"
     },
     "settingsOverview": {
@@ -2099,7 +2095,6 @@
       "closedOn": "{{date}} တွင် {{status}}",
       "deadlineNotSet": "သတ်မှတ်ရက် သတ်မှတ်မထား",
       "noSlaDeadline": "SLA သတ်မှတ်ရက် မရှိ",
-      "dueOn": "{{date}} တွင် သတ်မှတ်ရက်စေ့မည်",
       "overdueNow": "သတ်မှတ်ရက်ကျော်နေ",
       "overdue_other": "သတ်မှတ်ရက်ထက် {{count}} ရက် ကျော်နေ",
       "dueToday": "ယနေ့ သတ်မှတ်ရက်စေ့မည်",

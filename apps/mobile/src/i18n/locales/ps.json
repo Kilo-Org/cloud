@@ -1841,7 +1841,8 @@
     "findingDetails": {
       "supersededBy": "اوسنۍ موندنه یې ځایناستې ده",
       "supersededByDescription": "د حالت، تحلیل او اصلاح د لیدلو لپاره پر اوسني ریکارډ ټک وکړئ.",
-      "dismissedBecause": "له پامه غورځول شوې ده، ځکه چې {{reason}}.",
+      "dismissedOn": "د پامه غورځولو نېټه",
+      "supersededOn": "د ځای نیولو نېټه",
       "severityLabel": "شدت: {{severity}}",
       "package": "بسته",
       "vulnerableVersions": "د امنیتي نیمګړتیا لرونکې نسخې",
@@ -1858,11 +1859,6 @@
       "viewAdvisory": "په GitHub کې امنیتي خبرتیا وګورئ",
       "statusOpen": "خلاص",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "سمون لا دمخه پیل شوی",
-      "reasonNoBandwidth": "کاري ظرفیت نشته",
-      "reasonTolerableRisk": "خطر د زغملو وړ دی",
-      "reasonInaccurate": "موندنه ناسمه ده",
-      "reasonNotUsed": "زیان منونکی کوډ نه کارول کېږي",
       "reasonAfterReview": "له بیاکتنې وروسته"
     },
     "settingsOverview": {
@@ -2099,7 +2095,6 @@
       "closedOn": "په {{date}} {{status}}",
       "deadlineNotSet": "وروستۍ نېټه نه ده ټاکل شوې",
       "noSlaDeadline": "د SLA وروستۍ نېټه نشته",
-      "dueOn": "وروستۍ نېټه: {{date}}",
       "overdueNow": "له مهلته تېر",
       "overdue_one": "{{count}} ورځ له مهلته تېر",
       "overdue_other": "{{count}} ورځې له ټاکلي وخت تېرې دي",

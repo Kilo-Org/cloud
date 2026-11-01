@@ -1841,7 +1841,8 @@
     "findingDetails": {
       "supersededBy": "Argamni ammaa bakka isaa bu'eera",
       "supersededByDescription": "Haala, xiinxalaa fi sirreeffama ilaaluuf galmee ammaa tuqiitii bani.",
-      "dismissedBecause": "Sababa dhiifameef: {{reason}}.",
+      "dismissedOn": "Guyyaa itti dhiifame",
+      "supersededOn": "Guyyaa itti bakka bu'ame",
       "severityLabel": "Cimina {{severity}}",
       "package": "Paakeejii",
       "vulnerableVersions": "Fooyya'inoota saaxilamoo",
@@ -1858,11 +1859,6 @@
       "viewAdvisory": "Beeksisa nageenyaa GitHub irratti ilaali",
       "statusOpen": "Banaa",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "sirreeffamni jalqabameera",
-      "reasonNoBandwidth": "yeroon itti hojjetamu hin jiru",
-      "reasonTolerableRisk": "balaan fudhatama qaba",
-      "reasonInaccurate": "argannoon sirrii miti",
-      "reasonNotUsed": "koodiin saaxilamaan hojii irra hin oolu",
       "reasonAfterReview": "sakatta'a booda"
     },
     "settingsOverview": {
@@ -2099,7 +2095,6 @@
       "closedOn": "{{date}} irratti {{status}}",
       "deadlineNotSet": "Guyyaan xumuraa hin murtoofne",
       "noSlaDeadline": "Guyyaan xumuraa SLA hin jiru",
-      "dueOn": "Guyyaa xumuraa: {{date}}",
       "overdueNow": "Yeroon itti darbe",
       "overdue_one": "Yeroon isaa guyyaa {{count}} darbeera",
       "overdue_other": "Yeroon isaa guyyaa {{count}} darbe",

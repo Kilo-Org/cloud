@@ -1841,7 +1841,8 @@
     "findingDetails": {
       "supersededBy": "Waxaa beddelay natiijo hadda jirta",
       "supersededByDescription": "Taabo si aad u furto diiwaanka hadda jira oo aad u aragto xaaladda, falanqaynta iyo hagaajinta.",
-      "dismissedBecause": "Waa la iska dhaafay sababtoo ah {{reason}}.",
+      "dismissedOn": "Taariikhda la iska dhaafay",
+      "supersededOn": "Taariikhda la beddelay",
       "severityLabel": "Heerka halista: {{severity}}",
       "package": "Xirmo",
       "vulnerableVersions": "Noocyo nugul",
@@ -1858,11 +1859,6 @@
       "viewAdvisory": "GitHub ka eeg ogeysiiska amniga",
       "statusOpen": "Furan",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "hagaajin ayaa mar hore bilaabatay",
-      "reasonNoBandwidth": "awood shaqo lama hayo",
-      "reasonTolerableRisk": "khatarta waa loo dulqaadan karaa",
-      "reasonInaccurate": "natiijadu sax ma aha",
-      "reasonNotUsed": "koodhka nugul lama isticmaalo",
       "reasonAfterReview": "dib-u-eegis ka dib"
     },
     "settingsOverview": {
@@ -2099,7 +2095,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Waqtiga kama-dambaysta ah lama dejin",
       "noSlaDeadline": "Ma jiro waqti kama-dambays ah oo SLA ah",
-      "dueOn": "Waqtigu wuxuu dhammaanayaa {{date}}",
       "overdueNow": "Waqtigii dhaafay",
       "overdue_one": "Waqtigii dhaafay {{count}} maalin",
       "overdue_other": "{{count}} maalmood ayaa muddadii laga gudbay",

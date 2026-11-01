@@ -1841,7 +1841,8 @@
     "findingDetails": {
       "supersededBy": "Erstattet av et oppdatert funn",
       "supersededByDescription": "Trykk for å se status, analyse og utbedring for det oppdaterte funnet.",
-      "dismissedBecause": "Avvist {{reason}}.",
+      "dismissedOn": "Avvisningsdato",
+      "supersededOn": "Erstatningsdato",
       "severityLabel": "Alvorlighetsgrad: {{severity}}",
       "package": "Pakke",
       "vulnerableVersions": "Sårbare versjoner",
@@ -1858,11 +1859,6 @@
       "viewAdvisory": "Vis sikkerhetsvarsel på GitHub",
       "statusOpen": "Åpent",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "retting er allerede i gang",
-      "reasonNoBandwidth": "ingen ledig kapasitet",
-      "reasonTolerableRisk": "risikoen er akseptabel",
-      "reasonInaccurate": "funnet er unøyaktig",
-      "reasonNotUsed": "sårbar kode brukes ikke",
       "reasonAfterReview": "etter gjennomgang"
     },
     "settingsOverview": {
@@ -2099,7 +2095,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Ingen frist angitt",
       "noSlaDeadline": "Ingen SLA-frist",
-      "dueOn": "Frist {{date}}",
       "overdueNow": "Fristen er overskredet",
       "overdue_one": "{{count}} dag over fristen",
       "overdue_other": "{{count}} dager over fristen",

@@ -1368,7 +1368,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Terdeteksi",
-      "dismissedBecause": "Diabaikan karena {{reason}}.",
+      "dismissedOn": "Diabaikan pada",
+      "supersededOn": "Digantikan pada",
       "ghsa": "GHSA",
       "manifest": "Manifes",
       "noPatchAvailable": "Belum ada perbaikan",
@@ -1385,11 +1386,6 @@
       "vulnerableVersions": "Versi rentan",
       "statusOpen": "Terbuka",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "perbaikan sudah dimulai",
-      "reasonNoBandwidth": "tidak ada kapasitas untuk menangani",
-      "reasonTolerableRisk": "risikonya dapat diterima",
-      "reasonInaccurate": "temuannya tidak akurat",
-      "reasonNotUsed": "kode yang rentan tidak digunakan",
       "reasonAfterReview": "setelah ditinjau"
     },
     "findingList": {
@@ -1571,7 +1567,6 @@
       "closedOn": "{{status}} pada {{date}}",
       "deadlineNotSet": "Tenggat belum ditetapkan",
       "noSlaDeadline": "Tidak ada tenggat SLA",
-      "dueOn": "Jatuh tempo {{date}}",
       "overdueNow": "Terlambat",
       "overdue_other": "Terlambat {{count}} hari",
       "dueToday": "Jatuh tempo hari ini",

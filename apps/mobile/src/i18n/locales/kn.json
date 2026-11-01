@@ -1847,7 +1847,8 @@
     "findingDetails": {
       "supersededBy": "ಪತ್ತೆಯಾದ ಹೊಸ ಸಮಸ್ಯೆಯ ದಾಖಲೆ ಇದನ್ನು ಬದಲಿಸಿದೆ",
       "supersededByDescription": "ಸ್ಥಿತಿ, ವಿಶ್ಲೇಷಣೆ ಮತ್ತು ಪರಿಹಾರವನ್ನು ನೋಡಲು ಪ್ರಸ್ತುತ ದಾಖಲೆಯನ್ನು ಟ್ಯಾಪ್ ಮಾಡಿ.",
-      "dismissedBecause": "ವಜಾಗೊಳಿಸಲಾಗಿದೆ: {{reason}}.",
+      "dismissedOn": "ಕಡೆಗಣಿಸಿದ ದಿನಾಂಕ",
+      "supersededOn": "ಹೊಸದು ಬದಲಿಗೆ ಬಂದ ದಿನಾಂಕ",
       "severityLabel": "{{severity}} ತೀವ್ರತೆ",
       "package": "ಪ್ಯಾಕೇಜ್",
       "vulnerableVersions": "ಭದ್ರತಾ ದೋಷವಿರುವ ಆವೃತ್ತಿಗಳು",
@@ -1864,11 +1865,6 @@
       "viewAdvisory": "GitHub ನಲ್ಲಿ ಭದ್ರತಾ ಸೂಚನೆಯನ್ನು ನೋಡಿ",
       "statusOpen": "ಓಪನ್",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ಸರಿಪಡಿಸುವ ಕೆಲಸ ಈಗಾಗಲೇ ಪ್ರಾರಂಭವಾಗಿದೆ",
-      "reasonNoBandwidth": "ಇದಕ್ಕೆ ಸಮಯ ಮೀಸಲಿಡಲು ಸಾಧ್ಯವಿಲ್ಲ",
-      "reasonTolerableRisk": "ಅಪಾಯವನ್ನು ಒಪ್ಪಿಕೊಳ್ಳಬಹುದು",
-      "reasonInaccurate": "ಪತ್ತೆಯಾದ ಸಮಸ್ಯೆಯ ವಿವರಗಳು ನಿಖರವಾಗಿಲ್ಲ",
-      "reasonNotUsed": "ಭದ್ರತಾ ದೋಷವಿರುವ ಕೋಡ್ ಬಳಕೆಯಲ್ಲಿಲ್ಲ",
       "reasonAfterReview": "ಪರಿಶೀಲನೆಯ ನಂತರ"
     },
     "settingsOverview": {
@@ -2105,7 +2101,6 @@
       "closedOn": "{{date}} ರಂದು {{status}}",
       "deadlineNotSet": "ಗಡುವು ನಿಗದಿಯಾಗಿಲ್ಲ",
       "noSlaDeadline": "SLA ಗಡುವು ನಿಗದಿಯಾಗಿಲ್ಲ",
-      "dueOn": "{{date}} ರಂದು ಗಡುವು",
       "overdueNow": "ಗಡುವು ಮೀರಿದೆ",
       "overdue_one": "ಗಡುವು ಮೀರಿ {{count}} ದಿನವಾಗಿದೆ",
       "overdue_other": "ಗಡುವು ಮೀರಿ {{count}} ದಿನಗಳಾಗಿವೆ",

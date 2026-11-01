@@ -1368,7 +1368,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Erkannt",
-      "dismissedBecause": "Dieser Befund wurde verworfen. Grund: {{reason}}.",
+      "dismissedOn": "Verworfen am",
+      "supersededOn": "Ersetzt am",
       "ghsa": "GHSA",
       "manifest": "Manifestdatei",
       "noPatchAvailable": "Kein Patch verfügbar",
@@ -1385,11 +1386,6 @@
       "vulnerableVersions": "Verwundbare Versionen",
       "statusOpen": "Offen",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "behebung bereits begonnen",
-      "reasonNoBandwidth": "keine Kapazität verfügbar",
-      "reasonTolerableRisk": "risiko vertretbar",
-      "reasonInaccurate": "befund unzutreffend",
-      "reasonNotUsed": "verwundbarer Code nicht verwendet",
       "reasonAfterReview": "nach Prüfung"
     },
     "findingList": {
@@ -1571,7 +1567,6 @@
       "closedOn": "{{status}} am {{date}}",
       "deadlineNotSet": "Keine Frist festgelegt",
       "noSlaDeadline": "Keine SLA-Frist",
-      "dueOn": "Fällig am {{date}}",
       "overdueNow": "Überfällig",
       "overdue_one": "{{count}} Tag überfällig",
       "overdue_other": "{{count}} Tage überfällig",

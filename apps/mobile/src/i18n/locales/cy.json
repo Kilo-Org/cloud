@@ -1965,7 +1965,8 @@
     "findingDetails": {
       "supersededBy": "Wedi'i ddisodli gan ganfyddiad cyfredol",
       "supersededByDescription": "Tapiwch i agor y cofnod cyfredol a gweld y statws, y dadansoddiad a'r gwaith cywiro.",
-      "dismissedBecause": "Diystyrwyd y canfyddiad: {{reason}}.",
+      "dismissedOn": "Wedi'i ddiystyru ar",
+      "supersededOn": "Wedi'i ddisodli ar",
       "severityLabel": "Difrifoldeb {{severity}}",
       "package": "Pecyn",
       "vulnerableVersions": "Fersiynau bregus",
@@ -1982,11 +1983,6 @@
       "viewAdvisory": "Gweld yr hysbysiad diogelwch ar GitHub",
       "statusOpen": "Agored",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "mae'r gwaith trwsio eisoes wedi dechrau",
-      "reasonNoBandwidth": "dim capasiti ar gael",
-      "reasonTolerableRisk": "mae'r risg yn oddefadwy",
-      "reasonInaccurate": "mae'r canfyddiad yn anghywir",
-      "reasonNotUsed": "nid yw'r cod bregus yn cael ei ddefnyddio",
       "reasonAfterReview": "ar ôl adolygiad"
     },
     "settingsOverview": {
@@ -2231,7 +2227,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Dyddiad terfyn heb ei osod",
       "noSlaDeadline": "Dim dyddiad terfyn SLA",
-      "dueOn": "I'w gwblhau erbyn {{date}}",
       "overdueNow": "Hwyr",
       "overdue_zero": "{{count}} diwrnod yn hwyr",
       "overdue_one": "{{count}} diwrnod yn hwyr",

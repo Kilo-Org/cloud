@@ -116,6 +116,16 @@ export const COMPACT_CONTROL_BOX_CLASS = 'h-[32px] w-[32px] items-center justify
 export const COMPACT_CONTROL_HIT_SLOP_DP = 8;
 
 /**
+ * Per-side `hitSlop` of the shared `Button`'s compact size (`sm`), whose
+ * `min-h-[36px]` frame stays the visual height. 5, not 4: a 36dp frame at
+ * density 420 renders 35.81dp, and 4 per side then lands on 43.81dp — under
+ * `DESIGN.md:364`'s 44pt, not on it. 36 + 5 + 5 = 46pt keeps a margin on both
+ * axes without the extra band two buttons on a `gap-2` row would each claim at
+ * 6 per side.
+ */
+export const COMPACT_BUTTON_HIT_SLOP = { top: 5, bottom: 5, left: 5, right: 5 } as const;
+
+/**
  * The frame a compact `h-11` control renders, in pt. NativeWind's rem is 14pt
  * here, so `h-11` (2.75rem) measures 38.5pt on device: above the
  * {@link MIN_TAP_TARGET_DP} floor a control-size audit accepts, and

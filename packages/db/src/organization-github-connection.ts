@@ -129,9 +129,11 @@ export function organizationWorkflowGitHubPreferenceSql(): SQL {
 }
 
 /**
- * Scope shared by every relation of the definition: a GitHub association that
- * an organization owns. Relation-parameterized so the aliased relations of
- * {@link organizationWorkflowGitHubConnectionSql} carry it as well.
+ * Scope of the association under test: a GitHub association that an
+ * organization owns. Applied to the outer row and, through
+ * {@link eligibleRolelessOrganizationGitHubAppSql}, to a shadowing sibling.
+ * The claiming relation carries the platform filter alone, because a claim can
+ * come from a personal association as well.
  */
 function organizationGitHubAppSql(connection: ConnectionRelation): SQL {
   return sql`(

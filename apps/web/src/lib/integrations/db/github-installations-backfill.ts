@@ -1,4 +1,5 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { organizationWorkflowGitHubConnectionSql } from '@kilocode/db';
 import { github_app_installations, platform_integrations } from '@kilocode/db/schema';
 import { and, asc, eq, gt, isNull, sql } from 'drizzle-orm';
 
@@ -126,13 +127,7 @@ export async function backfillGitHubInstallations(
         .returning({ id: github_app_installations.id });
       if (inserted.length > 0) result.canonicalCreated++;
       const [canonical] = await tx
-        .select({
-          id: github_app_installations.id,
-          lifecycle_state: github_app_installations.lifecycle_state,
-          suspended_at: github_app_installations.suspended_at,
-          deleted_at: github_app_installations.deleted_at,
-          auth_invalid_at: github_app_installations.auth_invalid_at,
-        })
+        .select({ id: github_app_installations.id })
         .from(github_app_installations)
         .where(
           and(
@@ -142,53 +137,9 @@ export async function backfillGitHubInstallations(
         )
         .limit(1);
       if (!canonical) return;
-      // The role is the stored half of the shared organization workflow
-      // connection definition, whose canonical check only accepts the active
-      // record of this identity. Linking to a canonical record that is
-      // suspended, deleted or auth-invalid is a repair the organizations that
-      // read this row still need, so the link happens either way, but such a
-      // row keeps its role: a stored `workflow` would otherwise report the
-      // organization connected with an installation no lookup will use.
-      const canonicalIsUsable =
-        canonical.lifecycle_state === 'active' &&
-        !canonical.suspended_at &&
-        !canonical.deleted_at &&
-        !canonical.auth_invalid_at;
-      const updated = await tx
+      const linked = await tx
         .update(platform_integrations)
-        .set({
-          github_installation_id: canonical.id,
-          // Linking a legacy row to its canonical installation is the last
-          // writer that could leave a real organization installation without a
-          // connection role, which the organization Security Agent reads to
-          // decide between its setup state and its dashboard. Give the role to
-          // the same rows migration 0322 classified — a healthy, organization
-          // owned GitHub App association whose installation identity no other
-          // row claims — and leave every other row exactly as it is.
-          ...(canonicalIsUsable
-            ? {
-                github_connection_role: sql`
-            CASE WHEN (
-              ${platform_integrations.github_connection_role} IS NULL
-              AND ${platform_integrations.owned_by_organization_id} IS NOT NULL
-              AND ${platform_integrations.integration_type} = 'app'
-              AND NOT (COALESCE(${platform_integrations.metadata}, '{}'::jsonb) ? 'github_dedup')
-              AND NOT EXISTS (
-                SELECT 1
-                FROM platform_integrations claimed
-                WHERE claimed.github_connection_role = 'workflow'
-                  AND claimed.id <> ${platform_integrations.id}
-                  AND claimed.platform_installation_id = ${platform_integrations.platform_installation_id}
-                  AND COALESCE(claimed.github_app_type, 'standard') =
-                    COALESCE(${platform_integrations.github_app_type}, 'standard')
-              )
-            ) THEN 'workflow'
-            ELSE ${platform_integrations.github_connection_role}
-            END
-          `,
-              }
-            : {}),
-        })
+        .set({ github_installation_id: canonical.id })
         .where(
           and(
             eq(platform_integrations.id, row.id),
@@ -199,12 +150,25 @@ export async function backfillGitHubInstallations(
             isNull(platform_integrations.auth_invalid_at)
           )
         )
+        .returning({ id: platform_integrations.id });
+      if (linked.length !== 1) return;
+      result.linked++;
+      // Linking a legacy row to its canonical installation is the last writer
+      // that could leave a real organization installation without a connection
+      // role, which the organization Security Agent reads to decide between its
+      // setup state and its dashboard. The row is classified by the shared
+      // definition once the link exists: its canonical clause reads the linked
+      // record, so a link to a suspended, deleted or auth-invalid record keeps
+      // the row roleless, and the claim and sibling rules apply unchanged. The
+      // pre-link row cannot be classified by that clause, which is why the
+      // definition is evaluated after the link instead of inside its SET.
+      const [classified] = await tx
+        .update(platform_integrations)
+        .set({ github_connection_role: 'workflow' })
+        .where(and(eq(platform_integrations.id, row.id), organizationWorkflowGitHubConnectionSql()))
         .returning({ role: platform_integrations.github_connection_role });
-      if (updated.length === 1) {
-        result.linked++;
-        if (row.github_connection_role === null && updated[0]?.role === 'workflow') {
-          result.roleAssigned++;
-        }
+      if (row.github_connection_role === null && classified?.role === 'workflow') {
+        result.roleAssigned++;
       }
     });
   }

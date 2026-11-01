@@ -246,7 +246,7 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 - Exit code 2 is an environment failure (no device, no Metro page, no probe), not a pass.
 - Attach `contact-sheet.png` from the output directory to the pull request with `gh pr comment --attach`. Never commit it.
 - A separate reviewer judges the per-screen sheets in `sheets/` for what numbers cannot measure. Never grade your own screenshots.
-- For an Android release build, `pnpm dev:mobile:design-gate scan --source agent-device` checks the current screen from the accessibility tree of an open `agent-device` session, and `--source uiautomator` does the same without one.
+- For an Android release build, `pnpm dev:mobile:design-gate scan --source agent-device` checks the current screen from the accessibility tree of an open `agent-device` session, and `--source uiautomator` does the same without one. Both read the tree until its layout repeats and measure that read; a screen that never settles is not measured and the command exits 2.
 - For an interaction, `pnpm dev:mobile:design-gate motion --link <deep link> --tap <label>` presses the control, reports any layout shift it causes, and records the motion. The press runs the real handler: tap only an action with no effect outside the app, never one that opens a browser, pays, or sends data. The Android emulator renders in software, so judge animation feel on the iOS simulator or a device.
 
 ## Debugging

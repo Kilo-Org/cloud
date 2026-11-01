@@ -412,7 +412,7 @@ async function scanOutcome(
   device: Device,
   deps: CliDeps,
   out: string
-): Promise<RunOutcome> {
+): Promise<RunOutcome & { unmeasured?: true }> {
   const readAccessibilityDump = (): ProbeDump => {
     if (args.source === 'uiautomator') {
       if (device.uiSnapshot === undefined)
@@ -474,6 +474,7 @@ async function scanOutcome(
       },
     ],
     findings,
+    ...(settled ? {} : { unmeasured: true as const }),
   };
 }
 
@@ -541,6 +542,7 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
       });
     };
     let outcome: RunOutcome;
+    let unmeasured = false;
     if (args.command === 'run') {
       const targetsJson =
         args.targets === undefined ? undefined : fs.readFileSync(args.targets, 'utf8');
@@ -568,7 +570,9 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
       }
       outcome = result;
     } else {
-      outcome = await scanOutcome(args, device, deps, out);
+      const scanned = await scanOutcome(args, device, deps, out);
+      outcome = scanned;
+      unmeasured = scanned.unmeasured === true;
       write(outcome, `scan:${args.source}`);
     }
     const counts = summarize(outcome.findings);
@@ -576,6 +580,10 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
     deps.log(
       `design-gate: ${counts.errors} errors, ${counts.warnings} warnings across ${outcome.cells.length} cells`
     );
+    if (unmeasured) {
+      deps.log('design-gate: the screen did not settle, so nothing was measured; exit 2');
+      return 2;
+    }
     return counts.errors > 0 ? 1 : 0;
   } catch (error) {
     deps.log(

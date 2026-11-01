@@ -1,4 +1,25 @@
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
+
 import { composerPromptText, hasVisibleComposerText } from '@/lib/composer-text';
+
+/**
+ * Hide the remaining-characters counter until the draft nears the limit.
+ */
+export const PROMPT_COUNTER_VISIBLE_REMAINING = 1000;
+
+/**
+ * The counter's remaining count for a draft of `length` characters, or `null`
+ * while the counter stays hidden.
+ *
+ * The prompt card renders this and nothing else about the draft's length, so a
+ * keystroke that keeps the result `null` publishes no state and re-renders
+ * nothing: a draft that never nears the limit costs one comparison per change
+ * rather than a card render.
+ */
+export function resolvePromptCounterRemaining(length: number): number | null {
+  const remaining = CLOUD_AGENT_PROMPT_MAX_LENGTH - length;
+  return remaining <= PROMPT_COUNTER_VISIBLE_REMAINING ? remaining : null;
+}
 
 type NewSessionPromptControlInput = {
   attachmentsCount: number;

@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
+
 import {
+  PROMPT_COUNTER_VISIBLE_REMAINING,
   resolveNewSessionPromptControlState,
   resolveNewSessionPromptForCreate,
+  resolvePromptCounterRemaining,
 } from './new-session-prompt-state';
 
 describe('resolveNewSessionPromptForCreate', () => {
@@ -114,5 +118,30 @@ describe('resolveNewSessionPromptControlState', () => {
     });
 
     expect(state.paperclipDisabled).toBe(true);
+  });
+});
+
+describe('resolvePromptCounterRemaining', () => {
+  it('stays hidden for the whole draft range that never nears the limit', () => {
+    // The counter is the only thing the prompt card renders from the draft's
+    // length, so this range has to reproject to nothing: a composer that
+    // republished the raw length re-rendered its card — toolbar, attachment
+    // strip, controls, voice surface — on every one of these keystrokes.
+    const hiddenThrough = CLOUD_AGENT_PROMPT_MAX_LENGTH - PROMPT_COUNTER_VISIBLE_REMAINING - 1;
+    const drafts = Array.from({ length: hiddenThrough + 1 }, (_, length) => length);
+    const published = drafts.map(length => resolvePromptCounterRemaining(length));
+    expect(Math.max(...drafts)).toBe(hiddenThrough);
+    expect(published.every(value => value === null)).toBe(true);
+  });
+
+  it('counts down the remaining characters once the draft nears the limit', () => {
+    const atLimit = CLOUD_AGENT_PROMPT_MAX_LENGTH - PROMPT_COUNTER_VISIBLE_REMAINING;
+    expect(resolvePromptCounterRemaining(atLimit)).toBe(PROMPT_COUNTER_VISIBLE_REMAINING);
+    expect(resolvePromptCounterRemaining(atLimit + 1)).toBe(PROMPT_COUNTER_VISIBLE_REMAINING - 1);
+    expect(resolvePromptCounterRemaining(CLOUD_AGENT_PROMPT_MAX_LENGTH)).toBe(0);
+  });
+
+  it('reports the overshoot rather than clamping a paste past the limit', () => {
+    expect(resolvePromptCounterRemaining(CLOUD_AGENT_PROMPT_MAX_LENGTH + 25)).toBe(-25);
   });
 });

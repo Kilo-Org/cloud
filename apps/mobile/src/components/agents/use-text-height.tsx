@@ -57,6 +57,12 @@ const NATIVE_PITCH_STABLE_STEP = 0.5;
  * so a burst of reports at one line count — every native content-size event
  * while the draft and the transcript stream — never re-renders the caller, and
  * re-renders only this leaf once when the draft grows a line.
+ *
+ * The mirror is also frozen while the draft only grows past the cap: the
+ * published height is the cap for any taller content, so an append there is
+ * measured by nothing, and laying a long draft out again on every keystroke is
+ * the one cost in this path that grows with the draft's length. `setText`
+ * describes the exact rule.
  */
 export function useTextHeight({
   minHeight,
@@ -69,6 +75,12 @@ export function useTextHeight({
   initialText = '',
 }: UseTextHeightOptions) {
   const [text, setMeasuredText] = useState(initialText);
+  // The draft the caller last pushed in, and the text the mirror actually
+  // renders. They diverge while the mirror is frozen for an append that cannot
+  // change the published height (see `setText`), so a native report can tell
+  // whether its line count still describes the text the mirror measured.
+  const draftTextRef = useRef(initialText);
+  const mirrorTextRef = useRef(initialText);
   // The padded, unclamped mirror height, measured by the hidden Text node.
   const [contentHeight, setContentHeight] = useState(minHeight);
   // The content height the caller's real `TextInput` last reported through
@@ -122,6 +134,14 @@ export function useTextHeight({
    * when the pitch it implies is unchanged.
    */
   function setNativeContentHeight(nextContentHeight: number): void {
+    // The report describes the live input's own draft. While the mirror is
+    // frozen for an append past the cap it holds an older, shorter text, and
+    // the report's height divided by that shorter text's line count would
+    // estimate a pitch several times too large, which unsnaps the cap. Keep the
+    // pitch the last exact measurement accepted instead.
+    if (mirrorTextRef.current !== draftTextRef.current) {
+      return;
+    }
     const nextPitch =
       nextContentHeight > verticalPadding && mirrorLineCount > 0
         ? (nextContentHeight - verticalPadding) / mirrorLineCount
@@ -179,13 +199,48 @@ export function useTextHeight({
   const height = Math.min(Math.max(contentHeight, minHeight), effectiveMaxHeight);
 
   function setText(nextText: string) {
-    setMeasuredText(nextText);
+    draftTextRef.current = nextText;
     if (nextText.length === 0) {
+      mirrorTextRef.current = '';
+      setMeasuredText('');
       setContentHeight(minHeight);
+      return;
     }
+    if (changeKeepsPublishedHeight(nextText)) {
+      return;
+    }
+    mirrorTextRef.current = nextText;
+    setMeasuredText(nextText);
+  }
+
+  /**
+   * True when laying `nextText` out again cannot change the height this hook
+   * publishes, so the mirror keeps the text it has.
+   *
+   * The published height clamps the measured content into `[minHeight, cap]`,
+   * so a draft whose measured content already fills the cap publishes the cap
+   * whatever a taller layout would measure. And text wrapping is monotone in
+   * the prefix: text that keeps the measured draft at its start and is no
+   * shorter never wraps into fewer lines. So a change like that, on a draft the
+   * mirror already measured at or past the cap, cannot move the height the
+   * caller renders — re-measuring it would lay the whole draft out again on
+   * every keystroke, work that grows with the draft's length while the result
+   * cannot change. Any other edit (a delete that cuts into the measured text, a
+   * replacement, a cleared draft) or a new cap measures the exact new text, so
+   * the mirror is never stale in a way the caller can see.
+   */
+  function changeKeepsPublishedHeight(nextText: string): boolean {
+    const mirroredText = mirrorTextRef.current;
+    return (
+      contentHeight >= effectiveMaxHeight &&
+      nextText.length >= mirroredText.length &&
+      nextText.startsWith(mirroredText)
+    );
   }
 
   function reset() {
+    draftTextRef.current = '';
+    mirrorTextRef.current = '';
     setMeasuredText('');
     setContentHeight(minHeight);
   }

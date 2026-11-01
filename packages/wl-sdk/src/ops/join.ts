@@ -12,7 +12,11 @@
  *      Idempotent — DoltHub returns "already exists" on a re-fork,
  *      which `forkDatabase` resolves as `created: false`.
  *   2. If the rig is already present on upstream `main`, return without
- *      creating a registration branch or PR.
+ *      creating a registration branch or PR — but only when the
+ *      registered row's `dolthub_org` is the caller's own org. A handle
+ *      registered to another org is refused (`precondition`) and an
+ *      unreadable `rigs` table is an upstream error, so the caller can
+ *      never adopt a rig identity they do not own.
  *   3. If an open registration PR already exists for this rig, return
  *      it without writing another registration commit.
  *   4. Run the registration INSERT through the DoltHub write API,
@@ -32,6 +36,7 @@ import { createPull, listPulls } from '../dolthub/pulls';
 import { buildRegistrationDML } from '../commons/registration';
 import { escapeSqlString } from '../commons/escape';
 import { makeRegisterBranch } from './branch';
+import { isSameDolthubOrg, rigHandleFormatError } from './rig-handle';
 import { WlDoltHubError, type DoltHubAuth, type DoltFetchHooks } from '../dolthub/api';
 import type { RigHandle, WastelandRef, WlResult } from './types';
 import { WlError } from './types';
@@ -77,6 +82,11 @@ export type JoinResult = {
 
 export async function join(opts: JoinOptions): Promise<WlResult<JoinResult>> {
   try {
+    const handleError = rigHandleFormatError(opts.rigHandle);
+    if (handleError !== null) {
+      return { ok: false, error: new WlError(handleError, 'precondition') };
+    }
+
     // Step 1: fork upstream → user's org.
     const forkResult = await forkDatabase({
       auth: opts.auth,
@@ -93,8 +103,30 @@ export async function join(opts: JoinOptions): Promise<WlResult<JoinResult>> {
     const forkUrl = `${DOLTHUB_WEB_BASE}/repositories/${encodeURIComponent(forkResult.owner)}/${encodeURIComponent(forkResult.db)}`;
 
     // Step 2: if the rig is already on upstream main, there is nothing
-    // to register and no PR should be opened.
-    if (await rigAlreadyRegistered(opts)) {
+    // to register and no PR should be opened — but the caller may only
+    // take the handle as their identity when the registered row belongs
+    // to their own DoltHub org.
+    const registration = await findRegisteredRig(opts);
+    if (registration.status === 'unknown') {
+      return {
+        ok: false,
+        error: new WlError(
+          'Could not verify rig ownership on the upstream — retry the join',
+          'upstream',
+          registration.cause
+        ),
+      };
+    }
+    if (registration.status === 'found') {
+      if (!isSameDolthubOrg(registration.dolthubOrg, opts.dolthubOrg)) {
+        return {
+          ok: false,
+          error: new WlError(
+            `Rig handle "${opts.rigHandle}" is registered to another DoltHub org — choose your own handle and retry`,
+            'precondition'
+          ),
+        };
+      }
       return {
         ok: true,
         data: {
@@ -240,20 +272,39 @@ function isTransientRegistrationWriteError(err: unknown): boolean {
   return /branch|database|repo|not found|not ready|already exists|timeout|temporar/i.test(bodyText);
 }
 
-async function rigAlreadyRegistered(opts: JoinOptions): Promise<boolean> {
+type RegisteredRig =
+  | { status: 'absent' }
+  | { status: 'found'; dolthubOrg: string | null }
+  | { status: 'unknown'; cause: unknown };
+
+/**
+ * Read the upstream `rigs` row for a handle, including the DoltHub org
+ * that registered it. The org is what proves the caller may operate
+ * under this handle, so a failed read is reported separately instead of
+ * being treated as "not registered".
+ */
+async function findRegisteredRig(opts: JoinOptions): Promise<RegisteredRig> {
   try {
     const res = await doltRead({
       auth: opts.auth,
       owner: opts.upstream.owner,
       db: opts.upstream.db,
-      query: `SELECT handle FROM rigs WHERE handle = '${escapeSqlString(opts.rigHandle)}' LIMIT 1`,
+      query: `SELECT handle, dolthub_org FROM rigs WHERE handle = '${escapeSqlString(opts.rigHandle)}' LIMIT 1`,
       fetch: opts.fetch,
       hooks: opts.hooks,
     });
-    return res.rows.length > 0;
-  } catch {
-    return false;
+    const row = res.rows[0];
+    if (row === undefined) return { status: 'absent' };
+    return { status: 'found', dolthubOrg: readDolthubOrg(row) };
+  } catch (cause) {
+    return { status: 'unknown', cause };
   }
+}
+
+function readDolthubOrg(row: unknown): string | null {
+  if (typeof row !== 'object' || row === null) return null;
+  const value = (row as Record<string, unknown>).dolthub_org;
+  return typeof value === 'string' ? value : null;
 }
 
 async function findOpenRegistrationPr(

@@ -51,7 +51,7 @@ describe('joinViaSdk', () => {
     //   1. POST /fork → sync success body (no operation_name → no polling)
     //                   The SDK treats `status: 'Success'` as
     //                   `created: true` (forkResult.created).
-    //   2. GET upstream rigs read (rigAlreadyRegistered) — empty rows
+    //   2. GET upstream rigs read (findRegisteredRig) — empty rows
     //   3. GET listPulls (open) — empty so we fall through to write+create
     //   4. POST /write registration on wl/register/alice
     //   5. POST /pulls → returns pull_id
@@ -86,7 +86,7 @@ describe('joinViaSdk', () => {
     //   1. POST /fork → DoltHub returns a 2xx body with an "already
     //      exists" message, which `forkDatabase` resolves as
     //      `created: false` (see dolthub/database.ts).
-    //   2. GET upstream rigs read (rigAlreadyRegistered) — empty rows so
+    //   2. GET upstream rigs read (findRegisteredRig) — empty rows so
     //      we keep going down the PR-detection path.
     //   3. GET listPulls → returns the prior PR with matching title
     //                      "Register rig: alice"; we return it instead
@@ -124,5 +124,46 @@ describe('joinViaSdk', () => {
       c => c.method === 'POST' && c.url.endsWith('/hop/wl/pulls')
     );
     expect(createPullCalls).toHaveLength(0);
+  });
+
+  it('accepts a re-join with a handle the caller already registered without any write', async () => {
+    const { fetch, calls } = makeFetch([
+      { status: 200, body: { message: 'database already exists' } },
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [{ handle: 'alice', dolthub_org: 'alice' }],
+        },
+      },
+    ]);
+
+    const result = await joinViaSdk(baseCtx, fetch);
+
+    expect(result.rigHandle).toBe('alice');
+    expect(result.registrationPullId).toBeNull();
+    expect(result.registrationPullUrl).toBeNull();
+    expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
+  });
+
+  it('refuses a handle registered by another org and reports a precondition failure', async () => {
+    const { fetch, calls } = makeFetch([
+      { status: 200, body: { message: 'database already exists' } },
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [{ handle: 'bob', dolthub_org: 'bob' }],
+        },
+      },
+    ]);
+
+    const ctx = { ...baseCtx, rigHandle: 'bob' };
+    await expect(joinViaSdk(ctx, fetch)).rejects.toMatchObject({
+      name: 'WantedBoardOpError',
+      code: 'PRECONDITION_FAILED',
+    });
+    expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
+    expect(calls.some(c => c.url.includes('/pulls'))).toBe(false);
   });
 });

@@ -102,8 +102,14 @@ describe('join', () => {
     const responses: MockResponse[] = [
       // POST /fork → already existed.
       { status: 400, body: { error: 'fork already exists under alice' } },
-      // read upstream rigs → already registered.
-      { status: 200, body: { query_execution_status: 'Success', rows: [{ handle: 'alice' }] } },
+      // read upstream rigs → already registered by the caller's org.
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [{ handle: 'alice', dolthub_org: 'alice' }],
+        },
+      },
     ];
     const { fetch: f, calls } = makeFetch(responses);
     const result = await join({
@@ -178,5 +184,153 @@ describe('join', () => {
     expect(result.ok).toBe(false);
     const writes = calls.filter(c => c.url.includes('/write/'));
     expect(writes).toHaveLength(1);
+  });
+
+  it('registers a new handle with the caller as its DoltHub org', async () => {
+    const responses: MockResponse[] = [
+      { status: 200, body: { status: 'Success' } },
+      { status: 200, body: { query_execution_status: 'Success', rows: [] } },
+      { status: 200, body: { pulls: [] } },
+      syncWriteOk(),
+      { status: 200, body: { pull_id: '7' } },
+    ];
+    const { fetch: f, calls } = makeFetch(responses);
+    const result = await join({
+      auth: { token: 't' },
+      upstream: { owner: 'hop', db: 'wl' },
+      dolthubOrg: 'alice',
+      rigHandle: 'alice-tools',
+      displayName: 'Alice tools',
+      ownerEmail: 'alice@example.com',
+      version: '0.1.0',
+      fetch: f,
+    });
+    expect(result.ok).toBe(true);
+    const write = calls.find(c => c.url.includes('/write/'));
+    expect(write?.url).toContain('/alice/wl/write/main/wl%2Fregister%2Falice-tools');
+    expect(decodeURIComponent(write?.url ?? '')).toContain(
+      "VALUES ('alice-tools', 'Alice tools', 'alice'"
+    );
+  });
+
+  it('accepts a re-join with a handle the caller already registered', async () => {
+    const responses: MockResponse[] = [
+      { status: 400, body: { error: 'fork already exists under alice' } },
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [{ handle: 'alice-tools', dolthub_org: 'Alice' }],
+        },
+      },
+    ];
+    const { fetch: f, calls } = makeFetch(responses);
+    const result = await join({
+      auth: { token: 't' },
+      upstream: { owner: 'hop', db: 'wl' },
+      dolthubOrg: 'alice',
+      rigHandle: 'alice-tools',
+      displayName: 'Alice tools',
+      ownerEmail: 'alice@example.com',
+      version: '0.1.0',
+      fetch: f,
+    });
+    expect(result.ok).toBe(true);
+    expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
+    expect(calls.some(c => c.url.includes('/pulls'))).toBe(false);
+  });
+
+  it('refuses a handle registered to another DoltHub org', async () => {
+    const responses: MockResponse[] = [
+      { status: 400, body: { error: 'fork already exists under alice' } },
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [{ handle: 'bob', dolthub_org: 'bob' }],
+        },
+      },
+    ];
+    const { fetch: f, calls } = makeFetch(responses);
+    const result = await join({
+      auth: { token: 't' },
+      upstream: { owner: 'hop', db: 'wl' },
+      dolthubOrg: 'alice',
+      rigHandle: 'bob',
+      displayName: 'Alice',
+      ownerEmail: 'alice@example.com',
+      version: '0.1.0',
+      fetch: f,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('precondition');
+    expect(result.error.message).toContain('registered to another DoltHub org');
+    expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
+    expect(calls.some(c => c.url.includes('/pulls'))).toBe(false);
+  });
+
+  it('refuses a registered handle whose org is missing', async () => {
+    const responses: MockResponse[] = [
+      { status: 400, body: { error: 'fork already exists under alice' } },
+      {
+        status: 200,
+        body: { query_execution_status: 'Success', rows: [{ handle: 'bob', dolthub_org: null }] },
+      },
+    ];
+    const { fetch: f } = makeFetch(responses);
+    const result = await join({
+      auth: { token: 't' },
+      upstream: { owner: 'hop', db: 'wl' },
+      dolthubOrg: 'alice',
+      rigHandle: 'bob',
+      displayName: 'Alice',
+      ownerEmail: 'alice@example.com',
+      version: '0.1.0',
+      fetch: f,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('precondition');
+  });
+
+  it('fails closed when the upstream rigs read fails', async () => {
+    const responses: MockResponse[] = [
+      { status: 400, body: { error: 'fork already exists under alice' } },
+      { status: 500, body: { error: 'upstream unavailable' } },
+    ];
+    const { fetch: f, calls } = makeFetch(responses);
+    const result = await join({
+      auth: { token: 't' },
+      upstream: { owner: 'hop', db: 'wl' },
+      dolthubOrg: 'alice',
+      rigHandle: 'alice',
+      displayName: 'Alice',
+      ownerEmail: 'alice@example.com',
+      version: '0.1.0',
+      fetch: f,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('upstream');
+    expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
+  });
+
+  it('rejects a malformed handle before touching DoltHub', async () => {
+    const { fetch: f, calls } = makeFetch([]);
+    const result = await join({
+      auth: { token: 't' },
+      upstream: { owner: 'hop', db: 'wl' },
+      dolthubOrg: 'alice',
+      rigHandle: 'Bob Tools',
+      displayName: 'Bob',
+      ownerEmail: 'bob@example.com',
+      version: '0.1.0',
+      fetch: f,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('precondition');
+    expect(calls).toHaveLength(0);
   });
 });

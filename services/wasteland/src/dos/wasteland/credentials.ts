@@ -33,6 +33,12 @@ export function storeCredential(
 ): WastelandCredentialResult {
   const timestamp = new Date().toISOString();
   const isAdmin = input.isUpstreamAdmin ? 1 : 0;
+  // Only a verified flow (join, createUpstream) may set the handle. A
+  // caller that does not supply one — a reconnect that swaps the token
+  // or org — keeps whatever handle the row already carries, so identity
+  // is never dropped by re-storing credentials.
+  const existing = input.rigHandle === undefined ? getCredential(sql, wastelandId, userId) : null;
+  const rigHandle = input.rigHandle ?? existing?.rig_handle ?? null;
   query(
     sql,
     /* sql */ `
@@ -51,7 +57,7 @@ export function storeCredential(
       wastelandId,
       input.encryptedToken,
       input.dolthubOrg,
-      input.rigHandle ?? null,
+      rigHandle,
       isAdmin,
       timestamp,
     ]
@@ -61,7 +67,7 @@ export function storeCredential(
     user_id: userId,
     encrypted_token: input.encryptedToken,
     dolthub_org: input.dolthubOrg,
-    rig_handle: input.rigHandle ?? null,
+    rig_handle: rigHandle,
     is_upstream_admin: input.isUpstreamAdmin === true,
     connected_at: timestamp,
   };

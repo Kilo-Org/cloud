@@ -7,13 +7,15 @@
  *  1. Resolves DoltHub auth + fork coordinates via the local
  *     `loadContext` helper.
  *  2. Calls the matching `*ViaSdk` inner function.
- *  3. Persists the resolved `rig_handle` (and DoltHub username) onto
+ *  3. Persists the verified `rig_handle` (and DoltHub username) onto
  *     the wasteland's stored credential so subsequent ops resolve the
- *     same handle the join PR was opened under.
+ *     same handle the join PR was opened under. The handle is only
+ *     written after the SDK join proved the caller owns it.
  *  4. Emits a billing meter event.
  */
 
 import { WantedBoardOpError } from '../wanted-board/errors';
+import { rigHandleFormatError } from '@kilocode/wl-sdk';
 import { getWastelandDOStub } from '../dos/Wasteland.do';
 import { deriveEncryptionKey, encryptToken, decryptToken } from '../util/crypto.util';
 import { resolveSecret } from '../util/secret.util';
@@ -78,9 +80,13 @@ async function loadContext(
     );
   }
 
+  // The handle becomes the caller's identity once the join persists it:
+  // validate the format here so a malformed value never reaches the
+  // registration DML or a credential row.
   const trimmedHandle = input.rigHandle.trim();
-  if (trimmedHandle.length === 0) {
-    throw new WantedBoardOpError('Rig handle is required', 'PRECONDITION_FAILED');
+  const handleError = rigHandleFormatError(trimmedHandle);
+  if (handleError !== null) {
+    throw new WantedBoardOpError(handleError, 'PRECONDITION_FAILED');
   }
 
   const displayName = input.rigDisplayName?.trim() || trimmedHandle;

@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from './finding-detail-back';
 import { getSecurityAgentPath } from './security-agent';
+import { type TabPressAction } from './tab-press';
 import { profileTabPressListeners } from './tab-press-listeners';
 import { __resetTabSwitchInputForTests } from './tab-switch-input-gate';
 
@@ -49,18 +50,36 @@ describe('findingDetailBackTarget', () => {
 
 describe('finding detail back control wiring', () => {
   // Source-read fallback: the pure project cannot mount the screen, so pin the
-  // forced back control by reading the source and asserting every `ScreenHeader`
-  // usage passes `showBackButton`. This fails if the control is removed from any
-  // of the four states (loaded, notFound, error, loading).
+  // forced back control by reading the source. The loaded state renders its own
+  // `ScreenHeader`; the loading state renders the one that reserves the eyebrow
+  // line, and the failure and not-found states share the one that does not, so
+  // neither of those can gain a blank line above its title. This fails if a
+  // state stops rendering a header, or if its back control is removed.
   const screenPath = fileURLToPath(
     new URL('../components/security-agent/finding-detail-screen.tsx', import.meta.url)
   );
   const source = readFileSync(screenPath, 'utf8');
   const screenHeaderCount = (source.match(/<ScreenHeader\b/g) ?? []).length;
   const showBackButtonCount = (source.match(/\bshowBackButton\b/g) ?? []).length;
+  const loadingHeaderCount = (source.match(/\{loadingHeader\}/g) ?? []).length;
+  const pendingHeaderCount = (source.match(/\{pendingHeader\}/g) ?? []).length;
+  const loadingHeaderSource = /const loadingHeader = \(([\s\S]*?)\n {2}\);/.exec(source)?.[1] ?? '';
+  const pendingHeaderSource = /const pendingHeader = \(([\s\S]*?)\n {2}\);/.exec(source)?.[1] ?? '';
 
-  it('renders a ScreenHeader in all four states', () => {
-    expect(screenHeaderCount).toBe(4);
+  it('renders the loading, failure and not-found states through a header', () => {
+    expect(screenHeaderCount).toBe(3);
+    expect(loadingHeaderCount).toBe(1);
+    expect(pendingHeaderCount).toBe(2);
+  });
+
+  it('reserves the eyebrow line only while the load can still gain a repository', () => {
+    // The payload draws the finding's repository on the eyebrow line above the
+    // title, which pushes the title down half a line when it lands. Reserving
+    // the line while the load is pending keeps the title still. A finding that
+    // does not exist and a failed load never gain a repository, so a reserved
+    // line there would leave the title above a gap no label ever fills.
+    expect(loadingHeaderSource).toMatch(/\breserveEyebrow\b/);
+    expect(pendingHeaderSource).not.toMatch(/\breserveEyebrow\b/);
   });
 
   it('passes showBackButton on every ScreenHeader usage', () => {
@@ -86,9 +105,15 @@ describe('profile tab press', () => {
   // The re-press resets through the shared plan (`planProfileTabPress`), which
   // dispatches a targeted stack pop so the unsaved-changes guard can intercept
   // it; a cross-tab press and a form-sheet leaf are left to the navigator, which
-  // keeps the tab's stack.
+  // keeps the tab's stack. Every press also selects its own tab (`JUMP_TO`), so
+  // a press the bar's render still calls focused is not dropped.
   const PROFILE_SEGMENTS = ['(app)', '(tabs)', '(3_profile)'];
   const HOME_SEGMENTS = ['(app)', '(tabs)', '(0_home)'];
+  const PROFILE_ROUTE = { name: '(3_profile)' };
+  const JUMP_TO_PROFILE = {
+    type: 'JUMP_TO',
+    payload: { name: '(3_profile)', params: undefined },
+  };
 
   function pressProfileTab({
     segments,
@@ -96,7 +121,7 @@ describe('profile tab press', () => {
     stackIndex = 0,
   }: Readonly<{ segments: string[]; stackKey?: string; stackIndex?: number }>) {
     const preventDefault = vi.fn<() => void>();
-    const dispatch = vi.fn<(action: { type: string; target?: string }) => void>();
+    const dispatch = vi.fn<(action: TabPressAction) => void>();
 
     profileTabPressListeners(segments)({
       navigation: {
@@ -106,6 +131,7 @@ describe('profile tab press', () => {
         }),
         dispatch,
       },
+      route: PROFILE_ROUTE,
     }).tabPress({ preventDefault });
 
     return { preventDefault, dispatch };
@@ -115,21 +141,21 @@ describe('profile tab press', () => {
     __resetTabSwitchInputForTests();
   });
 
-  it('leaves a cross-tab press to the navigator so the tab keeps its stack', () => {
+  it('selects the profile tab on a cross-tab press and leaves its stack to the navigator', () => {
     const { preventDefault, dispatch } = pressProfileTab({
       segments: HOME_SEGMENTS,
       stackIndex: 2,
     });
 
     expect(preventDefault).not.toHaveBeenCalled();
-    expect(dispatch).not.toHaveBeenCalled();
+    expect(dispatch.mock.calls).toEqual([[JUMP_TO_PROFILE]]);
   });
 
-  it('leaves a re-press at the profile root to the navigator', () => {
+  it('selects the profile tab on a re-press at the profile root', () => {
     const { preventDefault, dispatch } = pressProfileTab({ segments: PROFILE_SEGMENTS });
 
     expect(preventDefault).not.toHaveBeenCalled();
-    expect(dispatch).not.toHaveBeenCalled();
+    expect(dispatch.mock.calls).toEqual([[JUMP_TO_PROFILE]]);
   });
 
   it('pops back to the profile root from a screen above it', () => {
@@ -139,6 +165,9 @@ describe('profile tab press', () => {
     });
 
     expect(preventDefault).toHaveBeenCalledTimes(1);
-    expect(dispatch).toHaveBeenCalledWith({ type: 'POP_TO_TOP', target: 'profile-stack' });
+    expect(dispatch.mock.calls).toEqual([
+      [JUMP_TO_PROFILE],
+      [{ type: 'POP_TO_TOP', target: 'profile-stack' }],
+    ]);
   });
 });

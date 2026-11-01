@@ -80,7 +80,9 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
         : `Uses the default: ${MODE_OPTIONS.find(option => option.value === query.data?.defaultMode)?.label ?? 'Best accuracy per dollar'}.`
       : selectedMode === 'best_accuracy'
         ? 'Chooses the highest-accuracy model in the platform pool.'
-        : 'Chooses the model that passes the accuracy threshold and delivers the best accuracy per dollar.';
+        : selectedMode === 'cheapest'
+          ? 'Chooses the cheapest model that passes the accuracy threshold.'
+          : 'Chooses the model that passes the accuracy threshold and delivers the best accuracy per dollar.';
 
   return (
     <Card className="w-full" id={`platform-routing-mode-${organizationId ? 'org' : 'user'}`}>
@@ -91,7 +93,8 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
         </CardTitle>
         <CardDescription>
           Kilo chooses the model pools for Efficient and Frontier. You choose Best accuracy per
-          dollar or Best accuracy. This mode applies to both platform routers, not custom routers.
+          dollar, Best accuracy, or Cheapest. This mode applies to both platform routers, not custom
+          routers.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

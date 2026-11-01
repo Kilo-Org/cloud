@@ -499,6 +499,43 @@ describe('StoredSessionRow live speech', () => {
   });
 });
 
+describe('StoredSessionRow section heading', () => {
+  const yesterdaySession: StoredSession = {
+    ...session,
+    created_at: '2026-08-27T09:00:00.000Z',
+    updated_at: '2026-08-27T11:55:00.000Z',
+  };
+  const yesterdayMeta = new Intl.DateTimeFormat('en', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date('2026-08-27T11:55:00.000Z'));
+
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    __resetSessionAttentionForTests();
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-28T12:00:00.000Z'));
+  });
+
+  it('shows the clock time instead of restating the Yesterday heading, visibly and in speech', () => {
+    const renderer = mount(row({ session: yesterdaySession, sectionTitle: 'Yesterday' }));
+    expect(texts(renderer)).toContain(`$0.12 · ${yesterdayMeta}`);
+    expect(texts(renderer)).not.toContain('$0.12 · YESTERDAY');
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      `Fix login bug, feature/live, CLI, and cost 12 cents, ${yesterdayMeta}`
+    );
+  });
+
+  it('keeps the relative label under a heading it does not repeat', () => {
+    const renderer = mount(row({ session: yesterdaySession, sectionTitle: 'Today' }));
+    expect(texts(renderer)).toContain('$0.12 · YESTERDAY');
+  });
+
+  it('keeps the relative label when the caller supplies no section', () => {
+    const renderer = mount(row({ session: yesterdaySession }));
+    expect(texts(renderer)).toContain('$0.12 · YESTERDAY');
+  });
+});
+
 describe('StoredSessionRow long-press preview', () => {
   const onDelete = vi.fn<() => void>();
   const onRename = vi.fn<(newTitle: string) => void>();

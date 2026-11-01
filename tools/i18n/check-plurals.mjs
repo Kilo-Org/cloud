@@ -33,6 +33,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { endOfComment, endOfQuotedOrComment } from '../lib/js-scan.mjs';
+import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 const SOURCE_DIR = join(ROOT, 'apps/mobile/src');
@@ -70,6 +71,10 @@ export const NO_AGREEMENT = new Map([
     'bare count after a label: "{{emoji}} reaction, {{displayCount}}"',
   ],
   ['codeReviewer.overview.nSelected', 'participle: "{{displayCount}} selected" has no count form'],
+  [
+    'codeReviewer.repos.allModeCount',
+    'bare count after a label: "Repositories available: {{displayCount}}" names no inflected word',
+  ],
   ['prReview.checks.pending', 'participle: "{{displayCount}} pending" has no count form'],
   [
     'prReview.discussion.reactionPill',
@@ -146,25 +151,6 @@ export const NO_AGREEMENT = new Map([
   ],
   ['profiles.counts.mcp', 'initialism, not agreement: "{{count}} MCP" names no inflected word'],
 ]);
-
-/** The source files the audit scans: app code, not tests or mounted harnesses. */
-function sourceFiles(dir, out = []) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name !== 'node_modules') {
-        sourceFiles(path, out);
-      }
-    } else if (
-      /\.tsx?$/.test(entry.name) &&
-      !entry.name.includes('.test.') &&
-      !entry.name.includes('.mounted.')
-    ) {
-      out.push(path);
-    }
-  }
-  return out;
-}
 
 /** Whether the character opens/closes a bracket that changes nesting depth. */
 const OPENERS = '([{';
@@ -382,7 +368,7 @@ function dynamicCallsFrom(calls) {
 function collectCountedCalls(rootDir) {
   const calls = [];
   const callPattern = /(?<![\w.$])(?:i18n\.)?t\s*\(/g;
-  for (const file of sourceFiles(rootDir)) {
+  for (const file of sourceFiles(rootDir, isTestArtifact)) {
     const text = readFileSync(file, 'utf8');
     for (const match of text.matchAll(callPattern)) {
       const call = countedCall(text, match.index);
@@ -471,6 +457,21 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
       ],
       reason:
         'STATUS_LABEL_KEY map in pr-review-checks-status-row.tsx; passed, failed and skipped use plural families; pending remains invariant',
+    },
+  ],
+  [
+    'BUCKET_KEYS[bucket]',
+    {
+      keys: [
+        'securityAgent.dashboard.repoSummaryOpen',
+        'securityAgent.dashboard.repoSummaryCritical',
+        'securityAgent.dashboard.repoSummaryHigh',
+        'securityAgent.dashboardMetrics.breakdownCritical',
+        'securityAgent.dashboardMetrics.breakdownHigh',
+        'securityAgent.dashboardMetrics.breakdownMediumLow',
+      ],
+      reason:
+        'BUCKET_KEYS map in severity-count-phrase.ts; each bucket of a dashboard line agrees with its own count',
     },
   ],
 ]);

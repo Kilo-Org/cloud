@@ -9,6 +9,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
+import { HEADER_BACK_GUARD_MS } from '@/lib/hooks/header-back';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { ScreenHeader, shouldStackHeaderActions } from './screen-header';
@@ -89,6 +90,20 @@ function isBackPressable(node: TestInstance): boolean {
 
 function findBackPressable(root: TestInstance): TestInstance {
   return root.find(node => isBackPressable(node));
+}
+
+/**
+ * The circle that clips the back target's press and focus surface. Android
+ * paints that surface across the whole target, so the clipping frame — not the
+ * `Pressable` — is what keeps it from reading as a bare square at the screen
+ * edge.
+ */
+function findBackFrame(root: TestInstance): TestInstance {
+  const frame = findBackPressable(root).parent;
+  if (!frame || String(frame.type) !== 'View') {
+    throw new Error('back control frame not found');
+  }
+  return frame;
 }
 
 function backPressableCount(root: TestInstance): number {
@@ -209,7 +224,7 @@ function findHeaderRight(root: TestInstance): TestInstance {
       typeof node.type === 'string' &&
       (node.type as string) === 'View' &&
       typeof node.props.className === 'string' &&
-      /(^|\s)-?m[slre]-[0-9]/.test(node.props.className)
+      /(^|\s)ms-3(\s|$)/.test(node.props.className)
   )[0];
   if (!headerRight) {
     throw new Error('headerRight view not found');
@@ -275,11 +290,57 @@ describe('ScreenHeader mounted', () => {
 
     const back = findBackPressable(renderer.root);
     expect(back.props.className).toContain(ICON_TARGET_BOX_CLASS);
-    expect(back.props.className).toContain('-ms-4');
-    expect(back.props.className).toContain('shrink-0');
     expect(back.props.className).toContain('active:opacity-70');
     expect(back.props.className).not.toContain('mr-1');
     expect(back.props.hitSlop).toBeUndefined();
+    expect(findBackFrame(renderer.root).props.className).toContain('shrink-0');
+    expect(findBackFrame(renderer.root).props.className).toContain('-ms-4');
+  });
+
+  it('clips the back control to a circle instead of letting the platform surface fill its box', () => {
+    // Android draws the press and focus surface across the target's whole rect,
+    // so a bare 48dp target pulled flush against the screen edge read as a hard
+    // gray square taller than the title row. The frame rounds that surface; the
+    // target keeps its rect, focusability and label.
+    const renderer = renderHeader({ title: 'Sessions' });
+
+    const frame = findBackFrame(renderer.root);
+    expect(frame.props.className).toContain('rounded-full');
+    expect(frame.props.className).toContain('overflow-hidden');
+    const back = findBackPressable(renderer.root);
+    expect(String(back.props.className)).not.toContain('overflow-hidden');
+    expect(back.props.accessibilityRole).toBe('button');
+  });
+
+  it('dispatches one back for a burst of presses on the same header', () => {
+    // One gesture owns the header's Back: four presses delivered inside the
+    // window have to pop one screen, not four. The window is per header, so the
+    // screen a dispatched back lands on starts a fresh one.
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+      routerState.routes = ['tabs', 'security-agent', 'security-agent-settings'];
+      const renderer = renderHeader({ title: 'Settings' });
+
+      const back = findBackPressable(renderer.root);
+      for (let press = 0; press < 4; press += 1) {
+        act(() => {
+          (back.props.onPress as () => void)();
+        });
+      }
+      expect(routerState.back).toHaveBeenCalledTimes(1);
+      expect(routerState.routes).toEqual(['tabs', 'security-agent']);
+
+      // A deliberate press after the window still walks the stack.
+      vi.setSystemTime(new Date(Date.now() + HEADER_BACK_GUARD_MS));
+      act(() => {
+        (back.props.onPress as () => void)();
+      });
+      expect(routerState.back).toHaveBeenCalledTimes(2);
+      expect(routerState.routes).toEqual(['tabs']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('pulls the leading controls with a logical start margin the RTL swap cannot mirror', async () => {
@@ -292,10 +353,10 @@ describe('ScreenHeader mounted', () => {
     // points under the 44-point back target and the title's box covered 0.27 of
     // it — the "two controls cover each other" finding (the scan reports above
     // 0.25). `-ms-4` keeps a real 4-point `gap-1` between the two controls in
-    // both writing directions.
-    const back = findBackPressable(renderer.root);
-    expect(back.props.className).toContain('-ms-4');
-    expect(await compiledMarginProperties(back.props.className as string)).toEqual([
+    // both writing directions. It rides on the frame, which is the row's child.
+    const frame = findBackFrame(renderer.root);
+    expect(frame.props.className).toContain('-ms-4');
+    expect(await compiledMarginProperties(frame.props.className as string)).toEqual([
       'marginInlineStart',
     ]);
 
@@ -697,7 +758,6 @@ describe('ScreenHeader mounted', () => {
 
     for (const props of variants) {
       const renderer = renderHeader(props);
-      const back = findBackPressable(renderer.root);
       const title = renderer.root.findByProps({ accessibilityRole: 'header' });
       // The cap is clamped to the three lines the reserved box covers, so a
       // title can never paint a line the reserve does not hold. The default
@@ -710,7 +770,7 @@ describe('ScreenHeader mounted', () => {
         expect(title.props.className).toContain('text-center');
         // The centered title shares one row with the leading control, so the
         // control lines up with the title instead of drawing on its own row.
-        expect(title.parent?.parent?.parent).toBe(back.parent);
+        expect(title.parent?.parent?.parent).toBe(findBackFrame(renderer.root).parent);
       }
     }
   });
@@ -725,9 +785,8 @@ describe('ScreenHeader mounted', () => {
       safeAreaTop: false,
       className: 'pt-3',
     });
-    const back = findBackPressable(renderer.root);
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.parent).toBe(back.parent);
+    expect(title.parent?.parent).toBe(findBackFrame(renderer.root).parent);
     expect(renderer.root.props.style).toBeUndefined();
     expect(renderer.root.props.className).toContain('pt-3');
   });
@@ -735,8 +794,7 @@ describe('ScreenHeader mounted', () => {
   it('keeps the modal close control on the centered title row with a mirroring spacer', () => {
     const renderer = renderHeader({ title: 'Kilo Pass', modal: true });
 
-    const back = findBackPressable(renderer.root);
-    const row = back.parent;
+    const row = findBackFrame(renderer.root).parent;
     if (!row || typeof row.props.className !== 'string') {
       throw new Error('back control row not found');
     }
@@ -745,7 +803,7 @@ describe('ScreenHeader mounted', () => {
 
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
     expect(title.props.className).toContain('text-center');
-    expect(title.parent?.parent?.parent).toBe(back.parent);
+    expect(title.parent?.parent?.parent).toBe(row);
 
     const spacer = row.find(
       node =>
@@ -867,7 +925,7 @@ describe('ScreenHeader mounted', () => {
       paddingLeft: 47,
       paddingRight: 59,
     });
-    expect(findBackPressable(renderer.root).props.className).toContain('-ms-4');
+    expect(findBackFrame(renderer.root).props.className).toContain('-ms-4');
   });
 
   it('keeps the container style a portrait no-op with zero side insets', () => {
@@ -1017,7 +1075,7 @@ describe('header actions row', () => {
     ).toHaveLength(0);
     // The title still shares its row with the back control; only the actions moved.
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.parent).toBe(findBackPressable(renderer.root).parent);
+    expect(title.parent?.parent).toBe(findBackFrame(renderer.root).parent);
   });
 
   it('reflows a centered modal header the same way', () => {
@@ -1027,7 +1085,7 @@ describe('header actions row', () => {
 
     expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.parent?.parent).toBe(findBackPressable(renderer.root).parent);
+    expect(title.parent?.parent?.parent).toBe(findBackFrame(renderer.root).parent);
   });
 
   it('leaves a header without actions on its single row', () => {

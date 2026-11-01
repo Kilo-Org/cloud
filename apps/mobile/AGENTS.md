@@ -146,8 +146,8 @@ Direct full-screen entry clears the status bar; presented sheets do not add a se
 - Default exports only where Expo Router requires them, in `src/app/`.
 - Import React Native primitives from `react-native`; NativeWind adds `className`.
 - Import `Image` from `@/components/ui/image` and other UI primitives from `@/components/ui/<component>`.
-- Import `Switch` from `@/components/ui/switch`. It mirrors `disabled` into `accessibilityState`, which iOS needs to report the control as disabled to assistive technology.
-- Add reusables with `pnpm dlx @react-native-reusables/cli@latest add <component> --styling-library nativewind -y`.
+- Import `Switch` from `@/components/ui/switch`. It mirrors `disabled` into `accessibilityState`, which iOS needs to report the control as disabled to assistive technology, and paints the palette's muted pair on Android, where the platform draws no disabled appearance of its own. Mute the row's title beside it; never dim a whole row with opacity.
+- Add reusables with `pnpm reusables add <component> --styling-library nativewind`, in a terminal: it asks before overwriting a file you edited. It runs the version pinned in `package.json`; bump it there, never through a moving tag or `dlx`/`npx`, and never pass `-y`, which auto-answers setup and dependency prompts.
 - Style with Tailwind `className`. No inline styles, no `StyleSheet.create`. Merge classes with `cn()` from `@/lib/utils`.
 - Opacity modifiers do not work on theme colors (CSS variables): `bg-destructive/10` is dropped. Where a `*-tile-bg` / `*-tile-border` pair exists — `danger` for `destructive`, plus `good`, `warn`, `info`, the agent colors and the row hues — use it; otherwise use a concrete color with a dark variant. `<utility>-black/<alpha>` compiles to an unparseable `#NaN` color and paints nothing either; use a concrete value, for example `bg-[#0000000d]` for 5%. `pnpm check:classes` enforces both.
 - Type dynamic Expo Router paths as `Href`. Never silence route types with `as never`.
@@ -246,7 +246,7 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 - Exit code 2 is an environment failure (no device, no Metro page, no probe), not a pass.
 - Attach `contact-sheet.png` from the output directory to the pull request with `gh pr comment --attach`. Never commit it.
 - A separate reviewer judges the per-screen sheets in `sheets/` for what numbers cannot measure. Never grade your own screenshots.
-- For an Android release build, `pnpm dev:mobile:design-gate scan --source agent-device` checks the current screen from the accessibility tree of an open `agent-device` session, and `--source uiautomator` does the same without one.
+- For an Android release build, `pnpm dev:mobile:design-gate scan --source agent-device` checks the current screen from the accessibility tree of an open `agent-device` session, and `--source uiautomator` does the same without one. Both read the tree until its layout repeats and measure that read; a screen that never settles is not measured and the command exits 2.
 - For an interaction, `pnpm dev:mobile:design-gate motion --link <deep link> --tap <label>` presses the control, reports any layout shift it causes, and records the motion. The press runs the real handler: tap only an action with no effect outside the app, never one that opens a browser, pays, or sends data. The Android emulator renders in software, so judge animation feel on the iOS simulator or a device.
 
 ## Debugging

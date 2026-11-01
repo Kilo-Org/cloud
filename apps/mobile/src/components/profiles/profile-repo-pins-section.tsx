@@ -4,11 +4,13 @@ import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { RepoPickerSheet } from '@/components/profiles/repo-picker-sheet';
+import { ProfileRowIdentity, profileRowLabel } from '@/components/profiles/profile-row-identity';
 import {
   bindingsForProfile,
   type RepoBindingPlatform,
   type RepoOption,
   repoPlatformBadge,
+  repoPlatformLabelKey,
 } from '@/components/profiles/repo-bindings-model';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
@@ -150,17 +152,32 @@ export function ProfileRepoPinsSection({
               className="min-h-11 flex-row items-center gap-2 rounded-md border border-border bg-background px-3 py-2"
             >
               <Link2 size={14} color={colors.mutedForeground} />
-              <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
-                {binding.repoFullName}
-              </Text>
-              <Text className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              {/* One identity element, first, as the profile's bindings rows read:
+                  the repository and its provider, then the control that unbinds it. */}
+              <ProfileRowIdentity
+                label={profileRowLabel(
+                  binding.repoFullName,
+                  t(repoPlatformLabelKey(binding.platform))
+                )}
+              >
+                <Text variant="mono" className="text-xs" numberOfLines={1}>
+                  {binding.repoFullName}
+                </Text>
+              </ProfileRowIdentity>
+              <Text
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                className="text-[10px] uppercase tracking-wider text-muted-foreground"
+              >
                 {repoPlatformBadge(binding.platform)}
               </Text>
               {canManage ? (
                 <Pressable
                   className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
                   accessibilityRole="button"
-                  accessibilityLabel={t('profiles.repoBindings.remove')}
+                  accessibilityLabel={t('profiles.repoBindings.removeForRepo', {
+                    repo: binding.repoFullName,
+                  })}
                   disabled={unbind.isPending}
                   onPress={() => {
                     void handleUnbind(
@@ -169,7 +186,7 @@ export function ProfileRepoPinsSection({
                     );
                   }}
                 >
-                  <Trash2 size={16} color={colors.destructive} />
+                  <Trash2 size={16} color={colors.mutedForeground} />
                 </Pressable>
               ) : null}
             </View>

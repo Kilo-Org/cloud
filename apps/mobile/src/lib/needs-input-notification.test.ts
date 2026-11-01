@@ -36,6 +36,7 @@ function notifiedRow(over: Partial<NeedsInputNotificationRow> = {}): NeedsInputN
     kind: 'question',
     prUrl: null,
     organizationId: null,
+    previews: 'generic',
     ...over,
   };
 }
@@ -109,6 +110,7 @@ describe('planNeedsInputNotifications', () => {
           kind: 'question',
           prUrl: null,
           organizationId: null,
+          previews: 'generic',
         },
       ],
       dismiss: [],
@@ -137,6 +139,7 @@ describe('planNeedsInputNotifications', () => {
         kind: 'question',
         prUrl: null,
         organizationId: null,
+        previews: 'generic',
       },
     ]);
   });
@@ -173,6 +176,7 @@ describe('planNeedsInputNotifications', () => {
         kind: 'permission',
         prUrl: 'https://github.com/org/repo/pull/7',
         organizationId: null,
+        previews: 'generic',
       },
     ]);
     expect(plan.dismiss).toEqual([]);
@@ -232,6 +236,91 @@ describe('planNeedsInputNotifications', () => {
     });
     expect(plan.publish).toEqual([notifiedRow({ kind: 'permission' })]);
     expect(plan.dismiss).toEqual([]);
+  });
+
+  it('remembers the preview choice the notification was posted under', () => {
+    const plan = planNeedsInputNotifications({
+      previous: [],
+      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+      previews: 'full',
+    });
+    expect(plan.publish).toEqual([notifiedRow({ previews: 'full' })]);
+  });
+
+  it('re-publishes in place when the user switches to generic previews', () => {
+    // The raise still waits under a notification posted with its title. Turning
+    // previews off must take that title off the shade now, not at the next
+    // status change — the same identifier, quietly, so no second alert fires.
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow({ previews: 'full' })],
+      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+      previews: 'generic',
+    });
+    expect(plan.publish).toEqual([notifiedRow({ previews: 'generic' })]);
+    expect(plan.dismiss).toEqual([]);
+    expect(plan.updates).toEqual(['ses_1']);
+  });
+
+  it('re-publishes in place when the user switches to full previews', () => {
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow({ previews: 'generic' })],
+      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+      previews: 'full',
+    });
+    expect(plan.publish).toEqual([notifiedRow({ previews: 'full' })]);
+    expect(plan.updates).toEqual(['ses_1']);
+  });
+
+  it('reads an unloaded preview preference as generic, so a generic post stands', () => {
+    // The server's own default is `generic`; a plan that never saw the row
+    // matches that default and does not re-post the same notification on every
+    // run.
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow()],
+      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+      previews: undefined,
+    });
+    expect(plan).toEqual({ publish: [], dismiss: [], updates: [] });
+  });
+
+  it('re-publishes in place when the shown title changes under full previews', () => {
+    // The raise first posted while the backend default title stood in; the
+    // notification displays that fallback, so the real title must replace it
+    // under `full` without waiting for a kind or PR change.
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow({ title: 'Untitled session', previews: 'full' })],
+      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+      previews: 'full',
+    });
+    expect(plan.publish).toEqual([notifiedRow({ title: 'Fix the bug', previews: 'full' })]);
+    expect(plan.updates).toEqual(['ses_1']);
+  });
+
+  it('does not re-post on a title change while the generic copy is shown', () => {
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow({ title: 'Untitled session', previews: 'generic' })],
+      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+      previews: 'generic',
+    });
+    expect(plan).toEqual({ publish: [], dismiss: [], updates: [] });
   });
 
   it('alerts again when a raise it dismisses is re-posted under a new organization', () => {
@@ -444,7 +533,7 @@ describe('applyNeedsInputNotifications', () => {
 
   it('posts the shared category, channel, payload and time-sensitive level', async () => {
     await applyNeedsInputNotifications({
-      publish: [notifiedRow({ title: 'Fix the bug' })],
+      publish: [notifiedRow({ title: 'Fix the bug', previews: 'full' })],
       dismiss: [],
       updates: [],
     });
@@ -465,6 +554,22 @@ describe('applyNeedsInputNotifications', () => {
       },
       trigger: { channelId: 'needs-input' },
     });
+  });
+
+  it('posts the shared generic copy unless the user chose full previews', async () => {
+    await applyNeedsInputNotifications({
+      publish: [notifiedRow({ title: 'Fix the bug', previews: 'generic' })],
+      dismiss: [],
+      updates: [],
+    });
+
+    const [request] = mocks.scheduleNotificationAsync.mock.calls[0] as [
+      { content: { title: string; body: string; data: Record<string, unknown> } },
+    ];
+    // The same copy the server push sends in the same mode.
+    expect(request.content.title).toBe('Kilo');
+    expect(request.content.body).toBe('Your agent session has an update');
+    expect(JSON.stringify(request.content)).not.toContain('Fix the bug');
   });
 
   it('derives the -pr category and payload from the session PR', async () => {
@@ -547,6 +652,7 @@ describe('applyNeedsInputNotifications', () => {
       pathname: AWAY,
       appState: ACTIVE,
       attentionEnabled: true,
+      previews: 'full',
     });
     expect(plan.updates).toEqual([]);
 

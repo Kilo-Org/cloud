@@ -149,6 +149,7 @@ vi.mock('react-native', () => ({
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   // The header reads the window to decide whether its actions share the title
   // row; this phone is wide enough for them to.
   useWindowDimensions: () => ({ width: 390, fontScale: 1, height: 844 }),
@@ -1191,7 +1192,7 @@ describe('session detail active-profile indicator', () => {
     act(() => {
       (chip.props.onPress as () => void)();
     });
-    expect(navigationRoutes.at(-1)).toBe('/(app)/profile-management/p1');
+    expect(navigationRoutes.at(-1)).toBe('/(app)/profile-management/p1?openedFrom=session');
   });
 
   it.each(['user', 'organization'] as const)(
@@ -1216,7 +1217,11 @@ describe('session detail active-profile indicator', () => {
         (chip.props.onPress as () => void)();
       });
       expect(navigationRoutes.at(-1)).toBe(
-        `/(app)/profile-management/p1${ownerType === 'organization' ? '?organizationId=org-a' : ''}`
+        `/(app)/profile-management/p1${
+          ownerType === 'organization'
+            ? '?organizationId=org-a&openedFrom=session'
+            : '?openedFrom=session'
+        }`
       );
     }
   );
@@ -1244,7 +1249,7 @@ describe('session detail active-profile indicator', () => {
     act(() => {
       (chip.props.onPress as () => void)();
     });
-    expect(navigationRoutes.at(-1)).toBe('/(app)/profile-management/p-recorded');
+    expect(navigationRoutes.at(-1)).toBe('/(app)/profile-management/p-recorded?openedFrom=session');
   });
 
   it('falls back to the effective default only when the session recorded no profile', async () => {

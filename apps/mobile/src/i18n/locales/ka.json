@@ -163,7 +163,7 @@
     "allLanguages": "ყველა ენა"
   },
   "login": {
-    "welcome": "კეთილი იყოს შენი მობრძანება Kilo-ში",
+    "welcome": "კეთილი იყოს შენი მობრძანება",
     "retrySignIn": "შესვლის ხელახლა ცდა",
     "logo": "Kilo-ს ლოგო",
     "continuingSignIn": "შესვლის პროცესი გრძელდება.",
@@ -330,7 +330,7 @@
       "diffTooLarge": "ცვლილებების მოცულობა ზედმეტად დიდია",
       "openFile": "{{path}}-ის გახსნა",
       "openFileViewed": "{{path}}-ის გახსნა (ნანახია)",
-      "title": "ფაილი"
+      "title": "ფაილები"
     },
     "fileRows": {
       "markViewed": "{{path}}-ის ნანახად მონიშვნა",
@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "ბოლოს განხილული არ არის",
       "noRecentPrsDescription": "განხილვის დასაწყებად ზემოთ ჩასვით ბმული — შემდეგ ჯერზე ის აქ გამოჩნდება.",
-      "couldNotLoad": "ჩატვირთვა ვერ მოხერხდა.",
       "removeFromRecentsTitle": "წაიშალოს ბოლოს ნანახების სიიდან?",
       "removeFromRecentsMessage": "ეს მიმოხილვა ბოლო ნანახების სიიდან წაიშლება.",
       "removeRecentAccessibility": "{{repo}}-ის წაშლა ბოლოს ნანახების სიიდან",
@@ -684,6 +683,7 @@
       "gitlabDescription": "დააკავშირეთ თქვენი GitLab ანგარიში, შერწყმის მოთხოვნების მობილურში განსახილველად.",
       "bitbucketDescription": "დააკავშირეთ Bitbucket ამ ორგანიზაციას, PR-ების მობილურში განსახილველად.",
       "bitbucketOrgOnlyDescription": "ზემოთ მყოფი ანგარიში გადართეთ ორგანიზაციაზე, მისი Bitbucket-ის PR-ების განსახილველად.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "ამ ანგარიშს ჯერ არ ჰყავს ორგანიზაციები. შექმენით ორგანიზაცია ან შეუერთდით მას, Bitbucket-ის PR-ების განსახილველად.",
       "contextLine": "{{organization}}-სთვის",
       "contextLinePersonal": "პირადი ანგარიშისთვის"
     },
@@ -707,10 +707,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub-თან კავშირს ვადა გაუვიდა.",
-      "message": "GitHub-თან კავშირი აღარ მოქმედებს. ხელახლა შეამოწმე კავშირი — საჭიროების შემთხვევაში აპი ხელახლა დაკავშირებას მოგთხოვს.",
+      "message": "ხელახლა შეამოწმე კავშირი — საჭიროების შემთხვევაში აპი ხელახლა დაკავშირებას მოგთხოვს.",
       "gitlabTitle": "GitLab-თან კავშირს ვადა გაუვიდა.",
-      "bitbucketTitle": "Bitbucket-თან კავშირს ვადა გაუვიდა.",
-      "providerMessage": "{{provider}}-თან კავშირი აღარ მოქმედებს. ხელახლა შეამოწმე კავშირი — საჭიროების შემთხვევაში აპი ხელახლა დაკავშირებას მოგთხოვს."
+      "bitbucketTitle": "Bitbucket-თან კავშირს ვადა გაუვიდა."
     },
     "eventChips": {
       "comment": "კომენტარი",
@@ -759,7 +758,7 @@
     },
     "tabs": {
       "overview": "მიმოხილვა",
-      "files": "ფაილი",
+      "files": "ფაილები",
       "discussion": "დისკუსია"
     },
     "fileStatus": {
@@ -815,7 +814,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Შერწყმის მოთხოვნა",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Შერწყმის მოთხოვნა !{{number}}",
       "shareMergeRequest": "შერწყმის მოთხოვნის გაზიარება",
       "viewOnProvider": "ნახვა {{provider}}-ში",
       "mergeRequestUnavailable": "შერწყმის მოთხოვნა მიუწვდომელია",
@@ -834,7 +833,8 @@
     "liveUpdates": "განახლებები რეალურ დროში",
     "liveUpdateSubtitle": "აქტიური აგენტების ჩვენება შეტყობინებებში",
     "push": "პუშ-შეტყობინებები",
-    "onDescription": "ამ მოწყობილობაზე პუშ-შეტყობინებები ჩართულია.",
+    "deviceTitle": "პუშ-შეტყობინებები ამ მოწყობილობაზე",
+    "onDescription": "შეტყობინებები ქვემოთ მოცემულ კატეგორიებს მიჰყვება.",
     "offDescription": "შეტყობინებების ნებართვა ან მოწყობილობის რეგისტრაცია გამორთულია.",
     "retryPermission": "შეტყობინებების ნებართვის ხელახლა შემოწმება",
     "enable": "შეტყობინებების ჩართვა",
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "ფოტოს გადაღება",
       "photoLibrary": "ფოტოგალერეა",
-      "files": "ფაილი",
+      "files": "ფაილები",
       "cameraAccessMessage": "ფოტოს გადასაღებად პარამეტრებში კამერაზე წვდომა დაუშვი."
     },
     "typingIndicator": {
@@ -1427,7 +1427,10 @@
       "gitlabNoRepositoriesDescription": "შესაძლოა საჭირო იყოს GitLab-ზე დამატებით ჯგუფებსა და პროექტებზე წვდომის მინიჭება.",
       "installGithubApp": "GitHub აპის დაყენება რეპოზიტორებზე",
       "installGithubAppDescription": "მიანიჭე Kilo-ს GitHub აპს წვდომა იმ რეპოზიტორებზე, რომელთა შემოწმებაც გსურს.",
-      "repositoryAccess": "რეპოზიტორზე წვდომა"
+      "repositoryAccess": "რეპოზიტორზე წვდომა",
+      "allModePersonal": "ყველა რეპოზიტორი, რომელზეც Kilo-ს წვდომა აქვს თქვენი GitHub კავშირის მეშვეობით, ავტომატურად შემოწმდება.",
+      "allModeOrganization": "ყველა რეპოზიტორი, რომელზეც Kilo-ს წვდომა აქვს ორგანიზაციის GitHub კავშირის მეშვეობით, ავტომატურად შემოწმდება.",
+      "allModeCount": "ხელმისაწვდომი რეპოზიტორები: {{displayCount}}"
     },
     "style": {
       "title": "შემოწმების სტილი",
@@ -1530,11 +1533,13 @@
       "offAction": "შემოწმების მეხსიერება გამორთულია. ჩართე და ისევ სცადე."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "შეიყვანე შერწყმის მოთხოვნის სწორი URL.",
+      "mergeRequestUrl": "შერწყმის მოთხოვნის URL",
+      "instructionsAtLimit": "მითითებები შემოიფარგლება {{max}} სიმბოლოთი",
       "title": "ხელით შემოწმება",
       "invalidUrl": "შეიყვანე PR-ის სწორი URL.",
       "couldNotCheckProviderStatus": "პროვაიდერის სტატუსის შემოწმება ვერ მოხერხდა.",
       "couldNotLoadProviders": "დაკავშირებული პროვაიდერების ჩატვირთვა ვერ მოხერხდა. სცადე ხელახლა.",
-      "connectProviderDescription": "PR-ის ხელით შემოწმების დასაწყებად დააკავშირე GitHub.",
       "pullRequestUrl": "PR-ის URL",
       "instructions": "ინსტრუქციები (არასავალდებულო)",
       "instructionsPlaceholder": "რას უნდა მიაქციოს შემმოწმებელმა განსაკუთრებული ყურადღება…",
@@ -1677,7 +1682,8 @@
       "sortSeverityDesc": "სიმძიმე: მაღალიდან დაბალამდე",
       "sortSeverityAsc": "სიმძიმე: დაბალიდან მაღალამდე",
       "sortSlaDue": "SLA-ის ვადა",
-      "overdueOnly": "მხოლოდ ვადაგადაცილებული"
+      "overdueOnly": "მხოლოდ ვადაგადაცილებული",
+      "noRepositories": "ჯერ არც ერთი რეპოზიტორია არ არის დასინქრონებული ან არჩეული. აირჩიე ისინი უსაფრთხოების აგენტის პარამეტრებში."
     },
     "automation": {
       "title": "ავტომატიზაცია",
@@ -1750,17 +1756,12 @@
       "findingsCount": "{{displayCount}} მიგნება",
       "notMeasured": "არ არის გაზომილი",
       "actFirst": "პირველ რიგში გასაკეთებელი",
-      "slaPosture": "SLA-ის მდგომარეობა",
       "actionPosture": "რეაგირების მდგომარეობა",
       "codebaseRisk": "კოდის ბაზის რისკი",
       "repositoryActionPlan": "რეპოზიტორის სამოქმედო გეგმა",
       "noOpenFindings": "ყურადღების საჭიროების მქონე ღია მიგნებები არ არის",
       "deadlineToday": "ვადა დღეს ამოიწურა",
       "daysOverdue": "ვადას გადაცილებულია {{displayCount}} დღით",
-      "withinDeadline": "ვადაშია",
-      "criticalOverdue": "ვადაგადაცილებული — კრიტიკული",
-      "highOverdue": "ვადაგადაცილებული — მაღალი",
-      "mediumLowOverdue": "ვადაგადაცილებული — საშუალო და დაბალი",
       "confirmedExploitable": "ექსპლუატაციის შესაძლებლობა დადასტურებულია",
       "needsEvidenceReview": "საჭიროა მტკიცებულებების შემოწმება",
       "analysisNotComplete": "ანალიზი დაუსრულებელია",
@@ -1770,15 +1771,24 @@
       "noSlaDeadline": "SLA-ის ვადა არ არის განსაზღვრული",
       "noRepositoryData": "რეპოზიტორის მონაცემები ჯერ არ არის",
       "noRepositoryDataDescription": "რეპოზიტორების პრიორიტეტები მიგნებების სინქრონიზაციის შემდეგ გამოჩნდება.",
-      "repoSummary": "{{open}} ღია · {{critical}} კრიტიკული · {{high}} მაღალი",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "{{displayCount}} ღია",
+      "repoSummaryOpen_one": "{{displayCount}} ღია",
+      "repoSummaryOpen_other": "{{displayCount}} ღია",
+      "repoSummaryCritical": "{{displayCount}} კრიტიკული",
+      "repoSummaryCritical_one": "{{displayCount}} კრიტიკული",
+      "repoSummaryCritical_other": "{{displayCount}} კრიტიკული",
+      "repoSummaryHigh": "{{displayCount}} მაღალი",
+      "repoSummaryHigh_one": "{{displayCount}} მაღალი",
+      "repoSummaryHigh_other": "{{displayCount}} მაღალი",
       "couldNotLoad": "მიმოხილვის პანელის მონაცემების ჩატვირთვა ვერ მოხერხდა.",
       "filterByRepository": "რეპოზიტორის მიხედვით გაფილტვრა",
       "lastSynced": "ბოლო სინქრონიზაცია: {{time}}",
       "manageRepositories": "რეპოზიტორების მართვა",
       "notYetSynced": "ჯერ არ არის სინქრონიზებული",
+      "priorityFindingsPending": "პრიორიტეტული მიგნებები პირველი სინქრონიზაციის შემდეგ გამოჩნდება.",
       "refreshFailed": "განახლება ვერ მოხერხდა — ნაჩვენებია ბოლო სინქრონიზებული მონაცემები.",
       "settings": "პარამეტრები",
-      "syncFindings": "მიგნებების სინქრონიზაცია",
       "syncNow": "ახლავე სინქრონიზაცია",
       "syncQueued": "სინქრონიზაცია რიგშია",
       "syncStatusUnavailable": "სინქრონიზაციის სტატუსი მიუწვდომელია.",
@@ -1796,8 +1806,17 @@
       "withinDeadlineDetail": "{{total}}-დან {{within}} ვადაშია",
       "noDeadlineData": "არცერთ მიგნებას ჯერ არ აქვს SLA-ის ვადა",
       "deadlinePassed": "ვადა ამოიწურა",
-      "deadlinePassedDetail": "{{critical}} კრიტიკული, {{high}} მაღალი",
-      "deadlinePassedDetailWithMediumLow": "{{critical}} კრიტიკული, {{high}} მაღალი, {{mediumLow}} საშუალო და დაბალი",
+      "deadlinePassedDetail": "{{critical}}, {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
+      "breakdownCritical": "{{displayCount}} კრიტიკული",
+      "breakdownCritical_one": "{{displayCount}} კრიტიკული",
+      "breakdownCritical_other": "{{displayCount}} კრიტიკული",
+      "breakdownHigh": "{{displayCount}} მაღალი",
+      "breakdownHigh_one": "{{displayCount}} მაღალი",
+      "breakdownHigh_other": "{{displayCount}} მაღალი",
+      "breakdownMediumLow": "{{displayCount}} საშუალო და დაბალი",
+      "breakdownMediumLow_one": "{{displayCount}} საშუალო და დაბალი",
+      "breakdownMediumLow_other": "{{displayCount}} საშუალო და დაბალი",
       "dueThisWeek": "ვადა ამ კვირაშია",
       "dueThisWeekDetail": "{{exploitable}} ამათგან ბოროტად გამოყენების შესაძლებლობა დადასტურებულია",
       "noDeadline": "ვადის გარეშე",
@@ -1813,7 +1832,6 @@
       "reasonInaccurate": "პრობლემა არასწორადაა გამოვლენილი",
       "reasonNotUsed": "მოწყვლადი კოდი არ გამოიყენება",
       "commentLabel": "კომენტარი (არასავალდებულო)",
-      "commentAccessibility": "უარყოფის კომენტარი",
       "commentPlaceholder": "დამატებითი ინფორმაცია უარყოფის შესახებ…",
       "notFoundTitle": "პრობლემა ვერ მოიძებნა",
       "notFoundDescription": "ეს მიგნება შესაძლოა წაშლილია, ან მასზე წვდომა აღარ გაქვს.",
@@ -1826,7 +1844,8 @@
     "findingDetails": {
       "supersededBy": "ჩანაცვლებულია აქტუალური მიგნებით",
       "supersededByDescription": "შეეხე აქტუალურ ჩანაწერს სტატუსის, ანალიზისა და გამოსწორების სანახავად.",
-      "dismissedBecause": "უარყოფის მიზეზი: {{reason}}.",
+      "dismissedOn": "უგულებელყოფის თარიღი",
+      "supersededOn": "ჩანაცვლების თარიღი",
       "severityLabel": "სიმძიმე: {{severity}}",
       "package": "პაკეტი",
       "vulnerableVersions": "მოწყვლადი ვერსიები",
@@ -1843,11 +1862,6 @@
       "viewAdvisory": "უსაფრთხოების ცნობარის ნახვა GitHub-ზე",
       "statusOpen": "ღია",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "შესწორება უკვე დაწყებულია",
-      "reasonNoBandwidth": "თავისუფალი რესურსი არ არის",
-      "reasonTolerableRisk": "რისკი მისაღებია",
-      "reasonInaccurate": "პრობლემა არასწორადაა გამოვლენილი",
-      "reasonNotUsed": "მოწყვლადი კოდი არ გამოიყენება",
       "reasonAfterReview": "შემოწმების შემდეგ"
     },
     "settingsOverview": {
@@ -1857,7 +1871,6 @@
       "repositoriesCount_one": "არჩეულია {{displayCount}} რეპოზიტორი",
       "repositoriesCount": "არჩეულია {{displayCount}} რეპოზიტორია",
       "repositoriesCount_other": "არჩეულია {{displayCount}} რეპოზიტორია",
-      "selectRepositoriesSubtitle": "აირჩიე, რომელ რეპოზიტორებს აკონტროლებს უსაფრთხოების აგენტი",
       "analysisModeSubtitle": "ანალიზის რეჟიმი: {{mode}}",
       "automationAllOff": "ყველა გამორთულია",
       "automationCount": "ჩართულია 3-დან {{displayCount}}",
@@ -2000,7 +2013,6 @@
       "newFindingSection": "შეტყობინება ახალი მიგნების შესახებ",
       "newFindingSeverityLabel": "ახალი მიგნების მინიმალური სიმძიმე",
       "newFindingSubtitle": "იგზავნება ყოველი ახალი მიგნების სინქრონიზაციისას, მათ შორის პირველი სინქრონიზაციის დროსაც.",
-      "slaLeadTimeAccessibility": "SLA-ის ვადამდე გაფრთხილების დრო დღეებში",
       "slaLeadTimeError": "შეიყვანე დღეების რაოდენობა 1-დან 365-მდე, მხოლოდ მთელი რიცხვით.",
       "slaLeadTimeLabel": "SLA-ის ვადამდე გაფრთხილება (დღეებში)",
       "slaPersonalTitle": "SLA-ის გაფრთხილებების ელფოსტით მიღება",
@@ -2048,7 +2060,10 @@
       "settleFailed": "მოქმედება დასრულდა, მაგრამ შედეგის ჩაწერა ვერ მოხერხდა. სცადე ხელახლა.",
       "replayFailed": "ეს მოქმედება არ დასრულდა. სცადე ხელახლა.",
       "actionFailed": "ეს მოქმედება ვერ დასრულდა. სცადე ხელახლა.",
-      "actionBlocked": "ეს მოქმედება ვერ დასრულდა. ხელახლა ცდამდე პრობლემა ჯერ უნდა მოგვარდეს."
+      "actionBlocked": "ეს მოქმედება ვერ დასრულდა. ხელახლა ცდამდე პრობლემა ჯერ უნდა მოგვარდეს.",
+      "syncNoRepositories": "სინქრონიზაციის არეალში რეპოზიტორიები არ არის. აირჩიე რეპოზიტორიები, რომლებსაც უსაფრთხოების აგენტი აკონტროლებს, შემდეგ კვლავ დაასინქრონე.",
+      "syncIntegrationInactive": "უსაფრთხოების აგენტის GitHub კავშირი აქტიური არ არის. ხელახლა დაუკავშირე Kilo GitHub აპი, შემდეგ კვლავ დაასინქრონე.",
+      "syncMissingPermission": "Kilo GitHub აპი მოწყვლადობის შეტყობინებებს ვერ კითხულობს. მიანიჭე ეს ნებართვა GitHub-ში, შემდეგ კვლავ დაასინქრონე."
     },
     "analysisState": {
       "queued": "ანალიზი რიგშია",
@@ -2082,7 +2097,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "ვადა დაუდგენელია",
       "noSlaDeadline": "SLA ვადა არ არის",
-      "dueOn": "ვადა: {{date}}",
       "overdueNow": "ვადაგადაცილებული",
       "overdue_one": "ვადას გადაცილებულია {{count}} დღით",
       "overdue_other": "ვადა {{count}} დღით გადაცილებულია",
@@ -2155,7 +2169,7 @@
     "sessionList": {
       "couldNotLoadActive": "აქტიური სესიების ჩატვირთვა ვერ მოხერხდა.",
       "couldNotRefresh": "განახლება ვერ მოხერხდა",
-      "noSessionsYetDescription": "დაიწყე კოდის წერის დავალება ტელეფონიდან. შენი სესიები აქ გამოჩნდება.",
+      "noSessionsYetDescription": "დაიწყე კოდის წერის დავალება ტელეფონიდან.",
       "viewHistory": "სესიების ისტორია",
       "noMatches": "შესაბამისი სესიები არ არის",
       "tryDifferentSearch": "სხვა საძიებო სიტყვა სცადე.",
@@ -2293,9 +2307,9 @@
       "couldNotLoadGithubRepositories": "GitHub-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
       "couldNotLoadGitlabRepositories": "GitLab-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
       "couldNotLoadBitbucketRepositories": "Bitbucket-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
-      "connectGithubDescription": "ბრაუზერში დააკავშირეთ GitHub-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",
-      "connectGitlabDescription": "ბრაუზერში დააკავშირეთ GitLab-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",
-      "connectBitbucketDescription": "ბრაუზერში დააკავშირეთ Bitbucket-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",
+      "connectGithubDescription": "შედით ბრაუზერში, შემდეგ აქ დაბრუნდით GitHub-ის რეპოზიტორიის ასარჩევად.",
+      "connectGitlabDescription": "შედით ბრაუზერში, შემდეგ აქ დაბრუნდით GitLab-ის რეპოზიტორიის ასარჩევად.",
+      "connectBitbucketDescription": "შედით ბრაუზერში, შემდეგ აქ დაბრუნდით Bitbucket-ის რეპოზიტორიის ასარჩევად.",
       "openGithub": "GitHub-ის გახსნა",
       "openGitlab": "GitLab-ის გახსნა",
       "openBitbucket": "Bitbucket-ის გახსნა",
@@ -2753,7 +2767,7 @@
     "attachmentPicker": {
       "camera": "კამერა",
       "photoLibrary": "ფოტოგალერეა",
-      "files": "ფაილი",
+      "files": "ფაილები",
       "couldNotOpenPhotoPicker": "ფოტოების არჩევის ფანჯრის გახსნა ვერ მოხერხდა. ხელახლა გაუშვით Kilo და სცადეთ კიდევ ერთხელ.",
       "maxFilesAllowed": "შეგიძლიათ დაამატოთ მაქსიმუმ {{displayCount}} ფაილი.",
       "onlyAddingFiles": "{{total}} ფაილიდან ემატება მხოლოდ {{accepted}} (მაქსიმუმ {{max}})",
@@ -3136,7 +3150,7 @@
     "couldNotSaveChoice": "თქვენი არჩევანის შენახვა ვერ მოხერხდა. სცადეთ ხელახლა.",
     "onlineAllowed": "ონლაინ, ნებადართულია",
     "onlineNotAllowed": "ონლაინ, ნებადართული არ არის",
-    "optionalReview": "სურვილისამებრ — შეცვლა პარამეტრებში ნებისმიერ დროს შეგიძლიათ",
+    "optionalReview": "სურვილისამებრ",
     "optionalOnboarding": "სურვილისამებრ — ჩართულია, თუ არ გამორთავთ",
     "aiProvidersWhat": "თქვენი მოთხოვნები, საუბრის ისტორია და ნებისმიერი მიმაგრებული ფაილი.",
     "aiProvidersWhy": "AI-ის პასუხების შესაქმნელად.",
@@ -3834,6 +3848,7 @@
       "markSecret": "საიდუმლოდ მონიშვნა",
       "masked": "ფარული ღირებულება",
       "reveal": "გამოავლინე ღირებულება",
+      "hide": "დამალე ღირებულება",
       "newValuePlaceholder": "შეიყვანეთ ახალი საიდუმლო მნიშვნელობა",
       "valuePlaceholder": "საიდუმლო მნიშვნელობა (დაშიფრული)"
     },
@@ -3847,8 +3862,6 @@
     "commandAtLimit": "ბრძანება შემოიფარგლება {{max}} სიმბოლოთი",
     "commandsEmpty": "დაყენების ბრძანებები ჯერ არ არის",
     "commandsSaveFailed": "დაყენების ბრძანებების შენახვა ვერ მოხერხდა",
-    "moveUp": "ზევით გადაადგილება",
-    "moveDown": "ქვევით გადაადგილება",
     "moveCommandUp": "გადაიტანე ბრძანება {{position}} ზემოთ",
     "moveCommandDown": "გადაიტანე ბრძანება {{position}} ქვემოთ",
     "skillsTitle": "უნარები",
@@ -3857,9 +3870,13 @@
     "skillMarkdownLabel": "უნარის შინაარსი",
     "skillsEmpty": "ჯერ არ არის უნარები",
     "skillNameRequired": "შეიყვანეთ უნარის სახელი",
+    "skillNameTooLong": "უნარის სახელი უნდა შედგებოდეს არაუმეტეს {{max}} სიმბოლოსგან",
     "skillNameInvalid": "უნარის სახელი უნდა დაიწყოს ასოთი ან ციფრით და გამოიყენოს მხოლოდ მცირე ასოები, ციფრები და ტირეები",
     "skillContentRequired": "საჭიროა უნარების შინაარსი",
-    "skillSaveFailed": "უნარების შენახვა ვერ მოხერხდა",
+    "skillSaveFailed": "უნარების შენახვა ვერ მოხერხდა. სცადეთ ხელახლა.",
+    "skillDeleteFailed": "უნარის წაშლა ვერ მოხერხდა. სცადეთ ხელახლა.",
+    "skillToggleFailed": "უნარის განახლება ვერ მოხერხდა. სცადეთ ხელახლა.",
+    "skillLimitReached": "პროფილს შეიძლება ჰქონდეს {{max}}-მდე უნარი. სხვის დასამატებლად წაშალეთ ერთი.",
     "skillSourceCustom": "საკუთარი",
     "skillSourceMarketplace": "ბაზარი",
     "skillSourceSkillsSh": "skills.sh",
@@ -3960,7 +3977,8 @@
       "nameRequired": "შეიყვანეთ ბრძანების სახელი",
       "nameInvalid": "სახელი უნდა იწყებოდეს მცირე ასოებით და გამოიყენოს მხოლოდ მცირე ასოები, ციფრები და ტირეები",
       "templateRequired": "შეიყვანეთ ბრძანების შაბლონი",
-      "nameConflict": "ეს სახელი დაცულია ჩაშენებული ბრძანებით"
+      "nameConflict": "ეს სახელი დაცულია ჩაშენებული ბრძანებით",
+      "duplicateName": "ამ პროფილში ამ სახელით ბრძანება უკვე არსებობს"
     },
     "repoBindings": {
       "title": "ნაგულისხმევი პროფილები რეპოსთვის",
@@ -3969,7 +3987,7 @@
       "emptyDescription": "დაამატეთ ნაგულისხმევი პროფილის ავტომატურად გამოსაყენებლად რეპოს სესიების დაწყებისას.",
       "repo": "აირჩიეთ საცავი…",
       "profile": "აირჩიეთ პროფილი",
-      "remove": "მოხსნა",
+      "removeForRepo": "{{repo}}-ის მოხსნა",
       "search": "საცავების ძიება…",
       "addedToast": "ნაგულისხმევი პროფილი დაყენებულია „{{repo}}“-ისთვის",
       "addFailed": "ნაგულისხმევი პროფილის დაყენება ვერ მოხერხდა",

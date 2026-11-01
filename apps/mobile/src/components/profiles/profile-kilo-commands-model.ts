@@ -128,6 +128,7 @@ export type KiloCommandFormError =
   | 'name-required'
   | 'name-invalid'
   | 'name-conflict'
+  | 'duplicate-name'
   | 'template-required';
 
 /**
@@ -138,8 +139,16 @@ export type KiloCommandFormError =
  * server's name/template/description length bounds are enforced by the form
  * fields' `maxLength` (see the `MAX_KILO_COMMAND_*` constants), so an over-long
  * value cannot be typed in the first place.
+ *
+ * `otherNames` are the profile's other commands, so a name the unique index on
+ * `(profile_id, name)` would refuse fails here instead of on the wire. The
+ * comparison is trimmed and case-sensitive, exactly like the index; the caller
+ * leaves out the command being edited.
  */
-export function validateKiloCommandForm(state: KiloCommandFormState): KiloCommandFormError | null {
+export function validateKiloCommandForm(
+  state: KiloCommandFormState,
+  otherNames: readonly string[] = []
+): KiloCommandFormError | null {
   const name = state.name.trim();
   if (name.length === 0) {
     return 'name-required';
@@ -149,6 +158,9 @@ export function validateKiloCommandForm(state: KiloCommandFormState): KiloComman
   }
   if (BUILTIN_COMMAND_NAMES.has(name)) {
     return 'name-conflict';
+  }
+  if (otherNames.some(other => other === name)) {
+    return 'duplicate-name';
   }
   if (state.template.trim().length === 0) {
     return 'template-required';

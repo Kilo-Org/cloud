@@ -13,8 +13,19 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: 'bg-primary active:opacity-80 shadow-sm shadow-[#0000000D]',
-        destructive: 'bg-destructive active:opacity-80 shadow-sm shadow-[#0000000D]',
-        outline: 'border-border bg-card active:opacity-80 border shadow-sm shadow-[#0000000D]',
+        destructive: 'bg-destructive-solid active:opacity-80 shadow-sm shadow-[#0000000D]',
+        // The dark card surface sits a step above the near-black background, and
+        // the default hairline (7% white) is too faint to separate the control
+        // from it, so an outlined control would read as unpainted black-on-black
+        // in dark mode. Same surface/border pair the app's other dark cards use.
+        outline:
+          'border-border bg-card dark:border-neutral-700 dark:bg-secondary active:opacity-80 border shadow-sm shadow-[#0000000D]',
+        // A destructive action that shares a footer with a filled primary must
+        // not compete with it for attention: the fill stays with the safe,
+        // forward action, so the destructive one keeps its warning ink and
+        // outline and paints no fill of its own.
+        'outline-destructive':
+          'border-destructive bg-card dark:bg-secondary active:opacity-80 border shadow-sm shadow-[#0000000D]',
         secondary: 'bg-secondary active:opacity-80 shadow-sm shadow-[#0000000D]',
         ghost: 'active:opacity-60',
         link: '',
@@ -115,7 +126,13 @@ function spinnerColor(variant: ButtonProps['variant'], colors: ThemeColors): str
   if (variant === 'accent-soft') {
     return '#1A1A10';
   }
-  // default, destructive
+  if (variant === 'destructive') {
+    return colors.destructiveSolidForeground;
+  }
+  if (variant === 'outline-destructive') {
+    return colors.destructive;
+  }
+  // default
   return colors.primaryForeground;
 }
 
@@ -123,8 +140,9 @@ const buttonTextVariants = cva('text-foreground text-center text-sm font-semibol
   variants: {
     variant: {
       default: 'text-primary-foreground',
-      destructive: 'text-destructive-foreground',
+      destructive: 'text-destructive-solid-foreground',
       outline: 'text-foreground',
+      'outline-destructive': 'text-destructive',
       secondary: 'text-secondary-foreground',
       ghost: 'text-foreground',
       link: 'text-primary group-active:underline',
@@ -175,7 +193,12 @@ function Button({
   // contrasts with the ink label, so the label stays legible. A busy primary
   // keeps the brand fill and its spinner so it still reads as working.
   const isMutedDisabled = isDisabled && !loading && isPrimary;
-  const isDimmed = isDisabled && !isPrimary;
+  // Dimming is a disabled signal, and a busy control has nothing visible to
+  // signal with: the label is already transparent and the spinner sits alone in
+  // the slot. Halving the control's opacity then halves the indicator too, which
+  // leaves an icon-only button looking empty on a dark surface. Keep the busy
+  // control at full strength in both themes.
+  const isDimmed = isDisabled && !isPrimary && !loading;
   // On Android, a node's accessible name is only rewritten while the incoming
   // state still carries `busy`. A loading button therefore keeps announcing its
   // busy state after the request settles unless its label prop holds a real
@@ -235,7 +258,14 @@ function Button({
         role="button"
         disabled={isDisabled}
         accessibilityLabel={resolvedLabel}
-        accessibilityState={{ ...accessibilityState, disabled: isDisabled, busy: loading }}
+        accessibilityState={{
+          ...accessibilityState,
+          disabled: isDisabled,
+          // A caller that shows its own busy response (for example an icon that
+          // spins while the same glyph stays drawn) declares `busy` without
+          // opting into the loading layout; `loading` still wins when it is set.
+          busy: loading ?? accessibilityState?.busy,
+        }}
         hitSlop={hitSlop ?? (size === 'sm' ? SM_HIT_SLOP : undefined)}
         {...props}
       >

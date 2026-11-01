@@ -113,7 +113,7 @@ describe('recents identity across providers', () => {
     expect(storedRecents().map(entry => entry.platform)).toEqual(['gitlab', 'bitbucket']);
   });
 
-  it('a failed row keeps the retry CTA and provider label', async () => {
+  it('a failed row names what could not be opened in its provider vocabulary', async () => {
     store.clear();
     seedRecents([
       {
@@ -123,9 +123,32 @@ describe('recents identity across providers', () => {
         instanceHint: 'https://gl.acme.dev',
         lastResult: 'failed',
       },
+      {
+        ...SAME_TRIPLE,
+        owner: 'kilo',
+        title: 'Broken PR',
+        platform: 'github',
+        lastResult: 'failed',
+      },
     ]);
     const tree = await renderLoaded();
-    expect(textValues(tree)).toContain("Couldn't load");
+    const rows = findAll(tree, 'View').filter(
+      candidate => candidate.props?.testID === 'recent-row'
+    );
+    // Each row's own copy, read inside that row: both rows stand for a review
+    // request, so a check over the whole tree would pass with the two nouns
+    // swapped. The filter keeps only the failure line, never the title or ref.
+    const failureCopy = (title: string) => {
+      const row = rows.find(candidate =>
+        findAll(candidate, 'Text').some(el => el.props?.children === title)
+      );
+      if (!row) {
+        throw new Error(`no recents row titled ${title}`);
+      }
+      return textValues(row).filter(value => value.includes('request'));
+    };
+    expect(failureCopy('Broken MR')).toEqual(['Could not open merge request']);
+    expect(failureCopy('Broken PR')).toEqual(['Could not open pull request']);
     const retry = find(tree, 'Button', p => p.accessibilityLabel === 'Retry');
     (propsOf(retry).onPress as () => void)();
     expect(mocks.push).toHaveBeenCalledWith(

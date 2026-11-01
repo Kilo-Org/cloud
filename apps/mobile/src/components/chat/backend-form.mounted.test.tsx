@@ -98,6 +98,15 @@ async function toggleHeaders() {
   });
 }
 
+/** The reveal control's accessible and visible copy: the key the shared toggle resolves. */
+function revealLabel() {
+  return root().find(
+    node =>
+      String(node.type) === 'Pressable' &&
+      /^profiles\.secrets\.(reveal|hide)$/.test(String(node.props.accessibilityLabel))
+  ).props.accessibilityLabel;
+}
+
 async function pressSave() {
   await act(async () => {
     callHandler(
@@ -138,7 +147,10 @@ describe('backend header credentials', () => {
 
   it('reveals editable multiline JSON only on request and retains edits after hiding', async () => {
     await mount();
+    expect(revealLabel()).toBe('profiles.secrets.reveal');
     await toggleHeaders();
+    // The same control now names the action it performs: hiding what it shows.
+    expect(revealLabel()).toBe('profiles.secrets.hide');
     expect(headersField()[0]?.props).toMatchObject({
       defaultValue: JSON.stringify(backend.headers, null, 2),
       multiline: true,
@@ -151,6 +163,7 @@ describe('backend header credentials', () => {
     });
     await toggleHeaders();
     expect(headersField()).toHaveLength(0);
+    expect(revealLabel()).toBe('profiles.secrets.reveal');
     expect(JSON.stringify(renderer?.toJSON())).not.toContain('edited-secret');
     await checkModel();
     expect(requests.check.mock.calls[0]?.[0]).toMatchObject({ headers: edited });

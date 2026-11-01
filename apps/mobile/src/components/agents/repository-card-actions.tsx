@@ -16,6 +16,12 @@ import { type RepositoryPlatform } from './new-session-repository-state';
 type RepositoryCardActionsProps = {
   platform: RepositoryPlatform;
   onConnect: (platform: RepositoryPlatform) => void;
+  /**
+   * The provider's connect flow is running. The open control disables and shows
+   * its spinner: the flow's first step is a network round trip, and without the
+   * busy state the tap reads as inert until that round trip settles.
+   */
+  isConnecting?: boolean;
   onRefreshRepos: () => void;
   isRetrying: boolean;
 };
@@ -56,6 +62,7 @@ export function RepositoryActionRow({
   platform,
   labelKey,
   onConnect,
+  isConnecting = false,
   onRefreshRepos,
   isRetrying,
 }: RepositoryCardActionsProps & { labelKey: string }) {
@@ -75,6 +82,10 @@ export function RepositoryActionRow({
         onPress={() => {
           onConnect(platform);
         }}
+        // `loading` paints the spinner over the label, so the row keeps exactly
+        // its width while the connect flow runs.
+        disabled={isConnecting}
+        loading={isConnecting}
       >
         <ExternalLink size={16} color={colors.foreground} />
         <Text className="me-[24px] flex-1 text-center" numberOfLines={1}>
@@ -94,6 +105,7 @@ export function RepositoryActionRow({
 export function RepositoryUnavailableCard({
   platform,
   onConnect,
+  isConnecting = false,
   onRefreshRepos,
   isRetrying,
 }: RepositoryCardActionsProps) {
@@ -112,6 +124,7 @@ export function RepositoryUnavailableCard({
         platform={platform}
         labelKey={PROVIDER_COPY[platform].openLabel}
         onConnect={onConnect}
+        isConnecting={isConnecting}
         onRefreshRepos={onRefreshRepos}
         isRetrying={isRetrying}
       />

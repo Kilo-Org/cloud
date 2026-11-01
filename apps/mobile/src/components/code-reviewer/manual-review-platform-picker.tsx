@@ -45,6 +45,7 @@ export function ManualReviewPlatformPicker({
     <RadioGroup label={t('common.platform')} className="overflow-hidden rounded-lg bg-secondary">
       {MANUAL_REVIEW_PLATFORMS.map((option, index) => {
         const connected = isConnected(option);
+        const platformLabel = PLATFORM_CAPABILITIES[option].label;
         return (
           <Pressable
             key={option}
@@ -59,13 +60,25 @@ export function ManualReviewPlatformPicker({
               onSelect(option);
             }}
             {...radioItemA11y({
-              label: PLATFORM_CAPABILITIES[option].label,
+              // A disabled radio keeps its reason in its own name: the visible
+              // `Not connected` line below is a sibling of the control, not
+              // part of it, so a screen reader would otherwise announce the
+              // platform and its disabled state with no explanation. The row's
+              // children are hidden from accessibility below, so the reason is
+              // announced once, from inside the control.
+              label: connected ? platformLabel : `${platformLabel}, ${t('common.notConnected')}`,
               checked: connected && platform === option,
               disabled: !connected,
             })}
           >
-            <View>
-              <Text className="text-sm font-medium">{PLATFORM_CAPABILITIES[option].label}</Text>
+            <View
+              // The control above owns this row's accessible name; leaving the
+              // visible label and its reason focusable too would read the
+              // platform name and the reason a second time.
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              <Text className="text-sm font-medium">{platformLabel}</Text>
               {!connected && (
                 <Text variant="muted" className="text-xs">
                   {t('common.notConnected')}

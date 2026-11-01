@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { ScrollView, View, type ViewStyle } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { NOTIFICATION_HISTORY_RETENTION_DAYS } from '@kilocode/notifications';
+import { NOTIFICATION_HISTORY_RETENTION_DAYS } from '@kilocode/notifications/schemas';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -14,6 +14,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { BellOff } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
+import { FilterChip } from '@/components/ui/filter-chip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
@@ -46,26 +47,6 @@ const MAX_PAGES = 10;
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = { paddingHorizontal: 16 } satisfies ViewStyle;
-
-/** One filter chip. Single-select, so the active one carries `selected`. */
-function FilterChip({
-  label,
-  active,
-  onPress,
-}: Readonly<{ label: string; active: boolean; onPress: () => void }>) {
-  return (
-    <Button
-      variant={active ? 'secondary' : 'ghost'}
-      size="sm"
-      // `Button` pins `role="button"`; a real role must replace it, because
-      // `role` outranks `accessibilityRole`.
-      {...tabEntryA11y({ selected: active })}
-      onPress={onPress}
-    >
-      <Text>{label}</Text>
-    </Button>
-  );
-}
 
 /**
  * The pushes this account received, newest first: one row per recorded
@@ -131,14 +112,20 @@ export function NotificationHistoryScreen() {
     () => query.data?.pages.flatMap(page => page.items) ?? [],
     [query.data?.pages]
   );
-  // `reconcileFirstPage` empties the cached pages before page one refetches, so
-  // the rows a refresh started from stay on screen until it delivers. Without
-  // the hold the list would flash its empty state and lose its scroll.
-  const [refreshHold, setRefreshHold] = useState<HistoryRow[] | null>(null);
-  const items = flatItems.length > 0 ? flatItems : (refreshHold ?? []);
+  // `reconcileFirstPage` keeps the retained pages until page one arrives, so
+  // the rows a refresh started from stay on screen (and scroll survives) even
+  // when the refetch is paused by lost connectivity or fails.
+  const items = flatItems;
   const hasListContent = items.length > 0 || query.isFetchNextPageError;
   // A query that is disabled never leaves `pending`; only a signed-in read can.
-  const loading = authToken != null && query.isPending && !query.isError;
+  // The push banner and the filter chips both sit above the list, so the list
+  // waits for the same reads they do: a row that settles first is pushed down
+  // by whichever of them mounts later. The banner is the late one: it mounts
+  // when the push gate answers, its height follows the copy and the wrap, so
+  // nothing can reserve it in advance.
+  const gatePending = authToken != null && !gate.settled;
+  const bodyPending = authToken != null && (gatePending || preferences.isPending);
+  const loading = authToken != null && !query.isError && (bodyPending || query.isPending);
   const failure = !loading && query.isError && !hasListContent;
 
   const openRow = useCallback(
@@ -162,7 +149,6 @@ export function NotificationHistoryScreen() {
   const handleRefresh = () => {
     void (async () => {
       setRefreshing(true);
-      setRefreshHold(items);
       try {
         // A retained page is a keyset window that only stays contiguous with
         // the page above it while page one's newest row is unchanged. Rows that
@@ -178,19 +164,12 @@ export function NotificationHistoryScreen() {
           category: category ?? undefined,
           limit: PAGE_SIZE,
         });
-        reconcileFirstPage(queryClient, path);
-        await queryClient.refetchQueries(
-          { queryKey: key, type: 'active' },
-          // `cancelRefetch: false` awaits the page-one fetch the invalidate
-          // started instead of cancelling it and issuing a second one.
-          { cancelRefetch: false }
-        );
+        await reconcileFirstPage(queryClient, path);
         if (queryClient.getQueryState(key)?.status === 'error') {
           toast.error(t('common.couldNotRefresh'));
         }
       } finally {
         setRefreshing(false);
-        setRefreshHold(null);
       }
     })();
   };
@@ -232,7 +211,7 @@ export function NotificationHistoryScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('notifications.history.title')} showBackButton />
       <View className="flex-1">
-        {gate.settled && !gate.pushEnabled ? (
+        {gate.settled && gate.answered && !gate.pushEnabled ? (
           <View className="mx-4 mb-3 gap-2 rounded-lg border border-border bg-card p-3">
             <View className="flex-row items-center gap-2">
               <BellOff size={16} color={colors.mutedForeground} />
@@ -250,7 +229,7 @@ export function NotificationHistoryScreen() {
           </View>
         ) : null}
 
-        {preferences.isPending && authToken != null ? (
+        {bodyPending ? (
           <View className="mx-4 mb-3 flex-row gap-2">
             <Skeleton className="h-8 w-16 rounded-full" />
             <Skeleton className="h-8 w-24 rounded-full" />
@@ -267,8 +246,11 @@ export function NotificationHistoryScreen() {
             {filters.map(filter => (
               <FilterChip
                 key={filter.category ?? 'all'}
+                // `Button` pins `role="button"`; a real role must replace it,
+                // because `role` outranks `accessibilityRole`.
+                {...tabEntryA11y({ selected: filter.category === category })}
+                selected={filter.category === category}
                 label={t(filter.labelKey)}
-                active={filter.category === category}
                 onPress={() => {
                   setCategory(filter.category);
                 }}

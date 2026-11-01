@@ -52,6 +52,7 @@ import { hasVisibleComposerText } from '@/lib/composer-text';
 import { QueryError } from '@/components/query-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSharePrefill } from '@/lib/share-prefill';
+import { SharePrefillFailure } from '@/components/agents/share-prefill-failure';
 import { cn } from '@/lib/utils';
 import {
   applyVoiceDraftAtSelection,
@@ -262,7 +263,7 @@ export function NewSessionPrompt({
     [onChangeText, promptMeasure]
   );
 
-  useSharePrefill({
+  const sharePrefill = useSharePrefill({
     shareId,
     inputRef: promptInputRef,
     maxLength: PROMPT_INPUT_MAX_CHARS,
@@ -455,6 +456,16 @@ export function NewSessionPrompt({
           className="border-b border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
         />
       )}
+      {sharePrefill.failed ? (
+        <SharePrefillFailure
+          onRetry={() => {
+            sharePrefill.retry();
+          }}
+          onDismiss={() => {
+            sharePrefill.dismiss();
+          }}
+        />
+      ) : null}
       <AttachmentPreviewStrip
         attachments={attachments}
         onRemove={onRemoveAttachment}

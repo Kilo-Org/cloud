@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,15 +6,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 import { skillErrorKey } from '@/components/profiles/skill-markdown';
 import { SheetHeader } from '@/components/sheet-header';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import {
+  SKILL_NAME_MAX_LENGTH,
   type SkillInputError,
   skillNameFromMarkdown,
   validateSkillInput,
 } from '@/lib/agent-profile-forms';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
+import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 
 /** The validated fields a saved skill is built from. */
 export type SkillFormSubmission = {
@@ -24,6 +27,12 @@ export type SkillFormSubmission = {
 };
 
 type SkillFormSheetProps = Readonly<{
+  /**
+   * The form draft the fields belong to (see `lib/form-draft`). The screen
+   * passes a scope scoped to its profile, so a remount reopens the sheet on
+   * what was typed; a caller without one gets fresh fields every mount.
+   */
+  draftScope?: string;
   /** The skill being edited, or `null` when adding a new one. */
   skill: { name: string; rawMarkdown: string } | null;
   isSaving: boolean;
@@ -33,6 +42,13 @@ type SkillFormSheetProps = Readonly<{
    * the sheet on success; on failure it returns with the sheet still open.
    */
   onSave: (submission: SkillFormSubmission) => void;
+  /** A refused save, shown inside the sheet instead of only a toast it covers. */
+  saveFailure?: string | null;
+  /**
+   * Whether that failure is an error or an expected limit. A limit is a
+   * warning, not a failure, so the two read differently on screen.
+   */
+  saveFailureTone?: 'error' | 'warn';
 }>;
 
 /**
@@ -45,24 +61,36 @@ type SkillFormSheetProps = Readonly<{
  *
  * Save validates through `validateSkillInput`; a refused input shows the
  * matching `profiles.skill*` message under the field at fault and persists
- * nothing.
+ * nothing. A save the server refused arrives as `saveFailure` and renders one
+ * line at the top of the form, scrolled into view, so the open sheet never
+ * swallows the reason.
  */
 export function SkillFormSheet({
+  draftScope,
   skill,
   isSaving,
   onClose,
   onSave,
+  saveFailure = null,
+  saveFailureTone = 'error',
 }: Readonly<SkillFormSheetProps>) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const nameRef = useRef(skill?.name ?? '');
-  const contentRef = useRef(skill?.rawMarkdown ?? '');
-  const nameEditedRef = useRef(false);
-  const [prefill, setPrefill] = useState(skill?.name ?? '');
+  const scope = draftScope;
+  const nameRef = useFormDraftRef(scope, 'name', skill?.name ?? '');
+  const contentRef = useFormDraftRef(scope, 'content', skill?.rawMarkdown ?? '');
+  const nameEditedRef = useFormDraftRef(scope, 'nameEdited', false);
+  const [prefill, setPrefill] = useFormDraftState(scope, 'prefill', skill?.name ?? '');
   const [error, setError] = useState<SkillInputError | null>(null);
-  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<'name' | 'content'>();
+  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
+    'status' | 'name' | 'content'
+  >();
 
-  const nameError = error === 'empty' || error === 'bad-name' ? t(skillErrorKey(error)) : undefined;
+  /** The codes that belong under the name field; `no-content` is the content one. */
+  const nameErrorShown = error === 'empty' || error === 'too-long' || error === 'bad-name';
+  const nameError = nameErrorShown
+    ? t(skillErrorKey(error), { max: SKILL_NAME_MAX_LENGTH })
+    : undefined;
   const contentError = error === 'no-content' ? t(skillErrorKey(error)) : undefined;
 
   const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
@@ -79,6 +107,11 @@ export function SkillFormSheet({
       return;
     }
     setError(null);
+    // A refusal that is already on screen stays mounted, so its layout does not
+    // fire again; scroll it back into view for this attempt.
+    if (saveFailure !== null) {
+      scrollToField('status');
+    }
     onSave({
       name: nameRef.current.trim(),
       rawMarkdown: contentRef.current,
@@ -104,11 +137,21 @@ export function SkillFormSheet({
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
+        {saveFailure === null ? null : (
+          <View
+            onLayout={event => {
+              fieldLayout('status')(event);
+              scrollToField('status');
+            }}
+          >
+            <AccessibleStatus message={saveFailure} tone={saveFailureTone} className="text-sm" />
+          </View>
+        )}
         <Text variant="muted">{t('profiles.skillsHint')}</Text>
         <FormField
           key={`skill-name-${prefill}`}
           label={t('profiles.skillNameLabel')}
-          defaultValue={prefill}
+          defaultValue={nameRef.current}
           error={nameError}
           disabled={isSaving}
           required
@@ -119,14 +162,14 @@ export function SkillFormSheet({
           onChangeText={value => {
             nameEditedRef.current = true;
             nameRef.current = value;
-            if (error === 'empty' || error === 'bad-name') {
+            if (error !== 'no-content') {
               setError(null);
             }
           }}
         />
         <FormField
           label={t('profiles.skillMarkdownLabel')}
-          defaultValue={skill?.rawMarkdown ?? ''}
+          defaultValue={contentRef.current}
           error={contentError}
           disabled={isSaving}
           multiline
@@ -151,7 +194,7 @@ export function SkillFormSheet({
             setPrefill(derived);
             // The field now holds a name the validator accepts, so an error the
             // last save left on the empty field no longer describes it.
-            if (error === 'empty' || error === 'bad-name') {
+            if (error !== 'no-content') {
               setError(null);
             }
           }}

@@ -12,9 +12,11 @@ import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
+import {
+  AllRepositoriesSummary,
+  RepositoryModeChoice,
+} from '@/components/code-reviewer/repository-selection-mode';
 import { Button } from '@/components/ui/button';
-import { ChoiceRow } from '@/components/ui/choice-row';
-import { RadioGroup } from '@/components/ui/radio-group';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -24,13 +26,14 @@ import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewe
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import {
+  isPersonal,
   useBitbucketReadiness,
   useGitHubRepositories,
   useGitLabRepositories,
   useReviewConfig,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
-import { useManageRepositoryAccess } from '@/lib/hooks/use-code-reviewer-manage-access';
+import { useManageRepositoryAccess } from '@/lib/hooks/use-manage-repository-access';
 import {
   type SyncedRepoPlatform,
   useReviewerRepositoriesResync,
@@ -61,7 +64,7 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
   const { t } = useTranslation();
   const capabilities = PLATFORM_CAPABILITIES[platform];
   const mode = data?.repositorySelectionMode ?? 'all';
-  const githubRepos = useGitHubRepositories(scope, platform === 'github' && mode === 'selected');
+  const githubRepos = useGitHubRepositories(scope, platform === 'github');
   const gitlabRepos = useGitLabRepositories(scope, platform === 'gitlab');
   const bitbucketReadiness = useBitbucketReadiness(scope);
   const bitbucketRepos =
@@ -97,10 +100,21 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
 
   const selectedIds = data?.selectedRepositoryIds ?? [];
   const configDisabled = data == null;
+  // Only GitHub offers the all/selected choice, and the config read decides
+  // which body is real: an explanation shown while it is pending would
+  // describe a mode the saved config may not be in.
+  const allMode = capabilities.selectionModePicker && mode === 'all';
+  const allModeBody = allMode && !configDisabled;
   const bitbucketNotReady =
     platform === 'bitbucket' && bitbucketReadiness.data?.repositoryCache.status !== 'available';
   const confirmedEmpty =
     !reposLoading && !reposError && !bitbucketNotReady && repoRows.length === 0;
+  // Without the GitHub app the account can review nothing, so the two modes
+  // differ only in a setting nobody can act on: their picker above an install
+  // prompt offers a choice that changes nothing. The prompt owns the body, as
+  // it does for the other platforms' empty surfaces.
+  const githubAppMissing =
+    platform === 'github' && githubRepos.data?.integrationInstalled === false;
   const resyncPlatform: SyncedRepoPlatform = platform === 'gitlab' ? 'gitlab' : 'github';
   const { resync, resyncing } = useReviewerRepositoriesResync(scope, resyncPlatform);
   // Set on the way to the provider's settings page, where installation access
@@ -161,6 +175,7 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
   // its failure paints the whole surface and the repositories read stays below.
   const fullBodyState =
     configFailure != null ||
+    githubAppMissing ||
     (!capabilities.selectionModePicker && !reposLoading && repoRows.length === 0);
   let repoState: ReactNode = null;
   if (configFailure) {
@@ -178,6 +193,10 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
       <QueryError
         variant={trpcErrorVariant(reposQuery.error)}
         placement={fullBodyState ? 'center' : 'top'}
+        // In all mode the state follows the explanation and the reserved count
+        // row, so the surface-level top air of a 'top' placement only doubles
+        // the gap above it.
+        className={allMode ? 'pt-4' : undefined}
         title={t('common.couldNotLoadRepositories')}
         onRetry={isRetryableTrpcError(reposQuery.error) ? refetchRepos : undefined}
         isRetrying={reposFetching}
@@ -208,6 +227,9 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     repoState = (
       <EmptyState
         placement={fullBodyState ? 'center' : 'top'}
+        // Only an in-body state drops the surface-level air; the install prompt
+        // that replaces the whole body keeps it.
+        className={allMode && !fullBodyState ? 'pt-4' : undefined}
         icon={FolderGit2}
         title={emptyStateCopy.title}
         description={emptyStateCopy.description}
@@ -215,7 +237,6 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
           manageAccess ? (
             <Button
               className={STATE_ACTION_CLASS}
-              variant="outline"
               loading={manageAccess.pending}
               disabled={manageAccess.pending}
               onPress={manageAccess.handlePress}
@@ -228,8 +249,15 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     );
   }
 
-  const showRepositoryFooter =
-    !reposLoading && !reposError && !bitbucketNotReady && repoRows.length > 0;
+  // In all mode the footer follows the explanation, so it waits for the config
+  // read with it: a footer that appeared first would be pushed down when the
+  // block above it arrives.
+  const showFooter =
+    !reposLoading &&
+    !reposError &&
+    !bitbucketNotReady &&
+    repoRows.length > 0 &&
+    (!allMode || !configDisabled);
 
   return (
     <View className="flex-1 bg-background">
@@ -245,31 +273,23 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
           }
         >
           {capabilities.selectionModePicker && (
-            <RadioGroup label={t('common.repositories')}>
-              {(['all', 'selected'] as const).map(option => (
-                <ChoiceRow
-                  key={option}
-                  label={
-                    option === 'all'
-                      ? t('common.allRepositories')
-                      : t('common.selectedRepositories')
-                  }
-                  selected={mode === option}
-                  disabled={configDisabled}
-                  className="border-b-[0.5px] border-hair-soft"
-                  onPress={() => {
-                    setMode(option);
-                  }}
-                />
-              ))}
-            </RadioGroup>
+            <RepositoryModeChoice mode={mode} disabled={configDisabled} onSelect={setMode} />
+          )}
+
+          {allModeBody && (
+            <AllRepositoriesSummary
+              personal={isPersonal(scope)}
+              loading={reposLoading}
+              // The skeleton, the error and the empty state own the body when
+              // the snapshot is not a count yet.
+              count={reposLoading || reposError || confirmedEmpty ? null : repoRows.length}
+            >
+              {repoState}
+            </AllRepositoriesSummary>
           )}
 
           {(!capabilities.selectionModePicker || mode === 'selected') && (
             <View className={capabilities.selectionModePicker ? 'mt-6' : undefined}>
-              <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
-                {t('common.repositories')}
-              </Text>
               {reposLoading && (
                 <View className="gap-3 pt-2">
                   <Skeleton className="h-12 w-full rounded-lg" />
@@ -291,16 +311,20 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
                   }}
                 />
               ))}
-
-              {showRepositoryFooter && (
-                <RepositorySyncFooter
-                  syncedLabel={syncedLabel}
-                  refreshing={refreshing}
-                  onRefresh={refreshRepositories}
-                  manageAccess={manageAccess}
-                />
-              )}
             </View>
+          )}
+
+          {showFooter && (
+            <RepositorySyncFooter
+              // All mode already ended on the status block above, so the sync
+              // line continues it at the small gap the explanation and the
+              // count share; selected mode starts a section below its list.
+              className={allMode ? 'mt-2' : 'mt-6'}
+              syncedLabel={syncedLabel}
+              refreshing={refreshing}
+              onRefresh={refreshRepositories}
+              manageAccess={manageAccess}
+            />
           )}
         </TabScreenScrollView>
       )}

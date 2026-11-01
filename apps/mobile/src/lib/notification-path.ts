@@ -1,4 +1,4 @@
-import { type PushData } from '@kilocode/notifications';
+import { type PushData } from '@kilocode/notifications/schemas';
 
 import { chatConversationRoute, chatSandboxRoute } from './kilo-chat-routes';
 import { providerPrRoutePath } from './pr-review/provider-pr-ref';

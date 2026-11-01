@@ -23,6 +23,9 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/lib/a11y/tap-target', () => ({ STATE_ACTION_CLASS: 'min-h-[48px]' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ destructive: '#ff0000' }),
+}));
 
 /** The retry button's props, including the label it renders. */
 type RetryButtonProps = { onPress: () => void; children: { props: { children: string } } };

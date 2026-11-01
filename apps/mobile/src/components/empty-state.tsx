@@ -113,7 +113,7 @@ function EmptyStateBody({
         </View>
       )}
       <View className="items-center gap-1">
-        <Text variant="large" accessibilityRole={titleAccessibilityRole}>
+        <Text variant="large" className="text-center" accessibilityRole={titleAccessibilityRole}>
           {title}
         </Text>
         {

@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "هیچ پێداچوونەوەیەکی دوایین نییە",
       "noRecentPrsDescription": "بۆ دەستپێکردنی پێداچوونەوە بەستەرێک لە سەرەوە بلکێنە — جاری داهاتوو لێرە دەردەکەوێت.",
-      "couldNotLoad": "نەتوانرا بار بکرێت.",
       "removeFromRecentsTitle": "لە لیستی دوایینەکان لاببرێت؟",
       "removeFromRecentsMessage": "ئەم پێداچوونەوەیە لە لیستی دوایینەکانت لادەبرێت.",
       "removeRecentAccessibility": "{{repo}} لە لیستی دوایینەکان لاببە",
@@ -834,7 +833,8 @@
     "liveUpdates": "نوێکردنەوە ڕاستەوخۆکان",
     "liveUpdateSubtitle": "نیشاندانی ئەجێنتە چالاکەکان لە ئاگادارکردنەوەکانتدا",
     "push": "ئاگادارکردنەوەی پاڵنراو",
-    "onDescription": "ئاگادارکردنەوە پاڵنراوەکان بۆ ئەم ئامێرە چالاکن.",
+    "deviceTitle": "ئاگادارکردنەوەی پاڵنراو لەسەر ئەم ئامێرە",
+    "onDescription": "ئاگادارکردنەوەکان بەپێی پۆلەکانی خوارەوە دێن.",
     "offDescription": "مۆڵەت یان تۆمارکردنی ئامێر ناچالاکە.",
     "retryPermission": "دووبارە پشکنینی مۆڵەتی ئاگادارکردنەوە",
     "enable": "چالاککردنی ئاگادارکردنەوەکان",
@@ -1842,7 +1842,8 @@
     "findingDetails": {
       "supersededBy": "دۆزینەوەیەکی نوێ جێگەی گرتووەتەوە",
       "supersededByDescription": "لێی بدە بۆ کردنەوەی تۆماری ئێستا و بینینی دۆخ، شیکاری و چارەسەر.",
-      "dismissedBecause": "هۆکاری ڕەتکردنەوە: {{reason}}.",
+      "dismissedOn": "پشتگوێخراو لە",
+      "supersededOn": "جێگەی گیراوەتەوە لە",
       "severityLabel": "ئاستی مەترسی: {{severity}}",
       "package": "پاکێج",
       "vulnerableVersions": "وەشانە کەلێندارەکان",
@@ -1859,11 +1860,6 @@
       "viewAdvisory": "ڕاگەیەنراوی ئاسایش لە GitHub ببینە",
       "statusOpen": "کراوە",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "دەست بە چارەسەرکردن کراوە",
-      "reasonNoBandwidth": "کات و توانای پێویست نییە",
-      "reasonTolerableRisk": "مەترسییەکە جێگەی قبووڵە",
-      "reasonInaccurate": "دۆزینەوەکە دروست نییە",
-      "reasonNotUsed": "کۆدی کەلێندار بەکارناهێنرێت",
       "reasonAfterReview": "دوای پێداچوونەوە"
     },
     "settingsOverview": {
@@ -2100,7 +2096,6 @@
       "closedOn": "{{status}} لە {{date}}",
       "deadlineNotSet": "مۆڵەت دیارینەکراوە",
       "noSlaDeadline": "هیچ مۆڵەتێکی SLA نییە",
-      "dueOn": "کۆتایی مۆڵەت: {{date}}",
       "overdueNow": "دواکەوتوو",
       "overdue_one": "{{count}} ڕۆژ دواکەوتوو",
       "overdue_other": "{{count}} ڕۆژ دواکەوتوو",
@@ -3852,6 +3847,7 @@
       "markSecret": "وەک نهێنی مارک بکە",
       "masked": "بەهای شاراوە",
       "reveal": "بەها ئاشکرا بکە",
+      "hide": "بەها بشارەوە",
       "newValuePlaceholder": "بەهای نهێنی نوێ بنووسە",
       "valuePlaceholder": "بەهای نهێنی (شێفرکراو)"
     },

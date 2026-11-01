@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Nincs közelmúltbeli kódellenőrzés",
       "noRecentPrsDescription": "Illessz be fent egy hivatkozást a kódellenőrzés indításához — legközelebb itt fog megjelenni.",
-      "couldNotLoad": "Nem sikerült a betöltés.",
       "removeFromRecentsTitle": "Eltávolítod az előzményekből?",
       "removeFromRecentsMessage": "Ez a kódellenőrzés eltűnik az előzményeidből.",
       "removeRecentAccessibility": "{{repo}} eltávolítása az előzményekből",
@@ -834,7 +833,8 @@
     "liveUpdates": "Élő frissítések",
     "liveUpdateSubtitle": "Aktív ügynökök megjelenítése az értesítésekben",
     "push": "Leküldéses értesítések",
-    "onDescription": "A leküldéses értesítések be vannak kapcsolva ezen az eszközön.",
+    "deviceTitle": "Leküldés ezen az eszközön",
+    "onDescription": "Az értesítések a lenti kategóriák szerint érkeznek.",
     "offDescription": "Hiányzik az értesítési engedély vagy az eszköz regisztrációja.",
     "retryPermission": "Értesítési engedély ellenőrzésének újrapróbálása",
     "enable": "Értesítések engedélyezése",
@@ -1842,7 +1842,8 @@
     "findingDetails": {
       "supersededBy": "Újabb találat váltotta fel",
       "supersededByDescription": "Koppints az aktuális bejegyzésre az állapot, az elemzés és a hibajavítás megtekintéséhez.",
-      "dismissedBecause": "Elvetés indoka: {{reason}}.",
+      "dismissedOn": "Elvetés dátuma",
+      "supersededOn": "Újabbal helyettesítés dátuma",
       "severityLabel": "{{severity}} súlyosság",
       "package": "Csomag",
       "vulnerableVersions": "Sebezhető verziók",
@@ -1859,11 +1860,6 @@
       "viewAdvisory": "Biztonsági tájékoztató megtekintése a GitHubon",
       "statusOpen": "Nyitott",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "a javítás már folyamatban van",
-      "reasonNoBandwidth": "nincs szabad kapacitás",
-      "reasonTolerableRisk": "a kockázat elfogadható",
-      "reasonInaccurate": "a találat pontatlan",
-      "reasonNotUsed": "a sérülékeny kód nincs használatban",
       "reasonAfterReview": "felülvizsgálat után"
     },
     "settingsOverview": {
@@ -2100,7 +2096,6 @@
       "closedOn": "{{status}}: {{date}}",
       "deadlineNotSet": "Nincs határidő beállítva",
       "noSlaDeadline": "Nincs SLA-határidő",
-      "dueOn": "Esedékes: {{date}}",
       "overdueNow": "Lejárt",
       "overdue_one": "{{count}} napja lejárt",
       "overdue_other": "{{count}} napja lejárt",
@@ -3852,6 +3847,7 @@
       "markSecret": "Jelölje meg titkosként",
       "masked": "Rejtett érték",
       "reveal": "Érték feltárása",
+      "hide": "Érték elrejtése",
       "newValuePlaceholder": "Adj meg új titkos értéket",
       "valuePlaceholder": "Titkos érték (titkosítva)"
     },

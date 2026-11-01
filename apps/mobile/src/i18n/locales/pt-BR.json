@@ -282,7 +282,8 @@
     "liveUpdates": "Atualizações em tempo real",
     "liveUpdateSubtitle": "Mostrar agentes ativos nas suas notificações",
     "push": "Notificações push",
-    "onDescription": "As notificações push estão ativadas para este dispositivo.",
+    "deviceTitle": "Push neste dispositivo",
+    "onDescription": "Os alertas seguem as categorias abaixo.",
     "offDescription": "A permissão de notificação ou o registro do dispositivo está desativado.",
     "retryPermission": "Tentar verificar a permissão de notificação novamente",
     "enable": "Ativar notificações",
@@ -1355,7 +1356,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Detectada",
-      "dismissedBecause": "A ocorrência foi descartada {{reason}}.",
+      "dismissedOn": "Ignorado em",
+      "supersededOn": "Substituído em",
       "ghsa": "GHSA",
       "manifest": "Manifesto",
       "noPatchAvailable": "Nenhuma correção disponível",
@@ -1372,11 +1374,6 @@
       "vulnerableVersions": "Versões vulneráveis",
       "statusOpen": "Em aberto",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "correção já iniciada",
-      "reasonNoBandwidth": "sem tempo disponível",
-      "reasonTolerableRisk": "risco tolerável",
-      "reasonInaccurate": "problema identificado incorretamente",
-      "reasonNotUsed": "código vulnerável sem uso",
       "reasonAfterReview": "após a revisão"
     },
     "findingList": {
@@ -1492,7 +1489,7 @@
       "enterWholeNumber": "Digite um número inteiro entre 1 e 365",
       "high": "Nível alto",
       "highDescription": "Possível exposição significativa de dados.",
-      "invalidDayCount": "informe um número inteiro de dias entre 1 e 365.",
+      "invalidDayCount": "Informe um número inteiro de dias entre 1 e 365.",
       "low": "Nível baixo",
       "lowDescription": "Impacto mínimo na segurança.",
       "medium": "Nível médio",
@@ -1559,7 +1556,6 @@
       "closedOn": "{{status}} em {{date}}",
       "deadlineNotSet": "Prazo não definido",
       "noSlaDeadline": "Nenhum prazo de SLA",
-      "dueOn": "Vence em {{date}}",
       "overdueNow": "Em atraso",
       "overdue_one": "{{count}} dia em atraso",
       "overdue_many": "{{count}} dias em atraso",
@@ -1620,7 +1616,7 @@
       "generic": "A ação na fila falhou. Tente novamente."
     },
     "analysisMode": {
-      "auto": "Automático",
+      "auto": "Automática",
       "shallow": "Superficial",
       "deep": "Profunda"
     }
@@ -2874,7 +2870,6 @@
     "entry": {
       "noRecentPrs": "Nenhuma revisão recente",
       "noRecentPrsDescription": "Cole um link acima para iniciar uma revisão — ele aparecerá aqui na próxima vez.",
-      "couldNotLoad": "Não foi possível carregar.",
       "removeFromRecentsTitle": "Remover da lista de recentes?",
       "removeFromRecentsMessage": "Esta revisão será removida da sua lista de recentes.",
       "removeRecentAccessibility": "Remover {{repo}} da lista de recentes",
@@ -3914,6 +3909,7 @@
       "markSecret": "Marcar como secreto",
       "masked": "Valor oculto",
       "reveal": "Revelar valor",
+      "hide": "Ocultar valor",
       "newValuePlaceholder": "Insira um novo valor secreto",
       "valuePlaceholder": "Valor secreto (criptografado)"
     },

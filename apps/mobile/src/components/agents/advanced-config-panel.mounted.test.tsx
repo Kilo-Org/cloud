@@ -489,15 +489,20 @@ describe('AdvancedConfigPanel', () => {
     // kind, not the action, and no control carries it.
     expect(byLabel(renderer, 'Secret')).toBeUndefined();
     const reveal = byLabel(renderer, 'Reveal value');
-    expect(reveal?.props.accessibilityState).toMatchObject({ selected: false });
+    // The name carries the state, so the control reports no separate
+    // selection a reader would hear as "Reveal value, selected".
+    expect(reveal?.props.accessibilityState).toBeUndefined();
     expect(texts(renderer)).not.toContain('s3cretdraft');
 
     press(reveal);
 
     expect(texts(renderer)).toContain('s3cretdraft');
-    expect(byLabel(renderer, 'Reveal value')?.props.accessibilityState).toMatchObject({
-      selected: true,
-    });
+    // The same control now hides the value it is showing.
+    expect(byLabel(renderer, 'Reveal value')).toBeUndefined();
+    press(byLabel(renderer, 'Hide value'));
+
+    expect(texts(renderer)).not.toContain('s3cretdraft');
+    expect(byLabel(renderer, 'Reveal value')).toBeDefined();
   });
 
   it('caps manual setup commands at the server list and row bounds', () => {

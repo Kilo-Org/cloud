@@ -290,7 +290,11 @@ export function FindingAnalysisPanel({
                 analysis.analysis?.analysisModel,
                 t('securityAgent.analysis.notRecorded')
               )}
-              valueLtr={firstNonEmpty(sandbox.modelUsed, analysis.analysis?.analysisModel) !== ''}
+              valueDirection={
+                firstNonEmpty(sandbox.modelUsed, analysis.analysis?.analysisModel) !== ''
+                  ? 'ltr'
+                  : undefined
+              }
               selectable
             />
             <KvRow

@@ -22,7 +22,7 @@ import { type SecurityAnalysis } from '@/lib/security-agent';
 
 const texts = vi.hoisted(() => ({ items: [] as string[] }));
 const kvRows = vi.hoisted(() => ({
-  rows: [] as { label: string; value: unknown; valueLtr: boolean | undefined }[],
+  rows: [] as { label: string; value: unknown; valueDirection: string | undefined }[],
 }));
 const mocks = vi.hoisted(() => ({
   routerPush: vi.fn(),
@@ -62,8 +62,12 @@ vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/kv-row', () => ({
-  KvRow: (props: { label: string; value: unknown; valueLtr?: boolean }) => {
-    kvRows.rows.push({ label: props.label, value: props.value, valueLtr: props.valueLtr });
+  KvRow: (props: { label: string; value: unknown; valueDirection?: string }) => {
+    kvRows.rows.push({
+      label: props.label,
+      value: props.value,
+      valueDirection: props.valueDirection,
+    });
     return null;
   },
 }));
@@ -446,8 +450,8 @@ describe('FindingRemediationPanel stored payload tolerance', () => {
   it('isolates the model slug and branch name left-to-right', () => {
     renderPanel(analysisFixture({ remediationAttempts: [attempt] }));
 
-    expect(kvRows.rows.find(row => row.label === 'Model')?.valueLtr).toBe(true);
-    expect(kvRows.rows.find(row => row.label === 'Branch')?.valueLtr).toBe(true);
-    expect(kvRows.rows.find(row => row.label === 'Started by')?.valueLtr).toBeUndefined();
+    expect(kvRows.rows.find(row => row.label === 'Model')?.valueDirection).toBe('ltr');
+    expect(kvRows.rows.find(row => row.label === 'Branch')?.valueDirection).toBe('ltr');
+    expect(kvRows.rows.find(row => row.label === 'Started by')?.valueDirection).toBeUndefined();
   });
 });

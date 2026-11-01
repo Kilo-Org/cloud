@@ -33,17 +33,15 @@ type KvRowProps = {
   className?: string;
   /** Allow the value text to be selected/copied (e.g. identifiers, versions, paths). */
   selectable?: boolean;
-  /**
-   * Draw the value as left-to-right text: an identifier, version range or path
-   * reads in one direction whatever the interface language. Without it a value
-   * that starts with a neutral character (`< 4.17.21`) takes an RTL paragraph's
-   * direction, which moves the operator to the end of the run and mirrors it.
-   * Translated copy never sets it — the label and the interface stay in their
-   * own direction.
-   */
-  valueLtr?: boolean;
   /** Extra classes for the value text only (e.g. `uppercase` for a status readout). */
   valueClassName?: string;
+  /**
+   * Render the value as a left-to-right run whatever the interface direction is.
+   * A version, a version range and a CVE or GHSA id are written left to right,
+   * so the bidi algorithm otherwise reverses a range in a right-to-left locale:
+   * `< 6.13.0` paints as `6.13.0 >`, which inverts its meaning.
+   */
+  valueDirection?: 'ltr';
 };
 
 const VALUE_TONE = {
@@ -72,8 +70,8 @@ export function KvRow({
   last,
   className,
   selectable,
-  valueLtr,
   valueClassName,
+  valueDirection,
 }: Readonly<KvRowProps>) {
   const colors = useThemeColors();
   // Android's `selectable` routes the value through ReactTextView, which
@@ -83,10 +81,10 @@ export function KvRow({
   // row). Clamp the values that can hold it; a selectable value wraps inside
   // the row and the row grows to fit it, so no glyph is cut off.
   const valueLineLimit = selectable ? undefined : 1;
-  // The value keeps the row's outer edge. The mirrored row already puts it on
-  // the left in an RTL interface, so `text-right` alone would pull a wrapped
-  // value back toward the label.
-  const valueAlignment = valueLtr && I18nManager.isRTL ? 'text-left' : 'text-right';
+  // A left-to-right value keeps the row's outer edge. The mirrored row already
+  // puts it on the physical left in a right-to-left interface, so `text-right`
+  // alone would pull a wrapped value back toward the label.
+  const valueAlignment = valueDirection === 'ltr' && I18nManager.isRTL ? 'text-left' : 'text-right';
   return (
     <View
       className={cn(
@@ -107,7 +105,7 @@ export function KvRow({
         selectable={selectable}
         numberOfLines={valueLineLimit}
         ellipsizeMode={valueLineLimit ? 'middle' : undefined}
-        style={valueLtr ? LTR_TEXT_DIRECTION : undefined}
+        style={valueDirection === 'ltr' ? LTR_TEXT_DIRECTION : undefined}
         className={cn(
           'min-w-0 shrink text-[13px]',
           valueAlignment,

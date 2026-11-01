@@ -39,7 +39,7 @@ const startAnalysis = vi.hoisted(() => ({
 const kvRows = vi.hoisted(() => ({
   labels: [] as string[],
   values: new Map<string, unknown>(),
-  props: [] as { label: string; valueLtr: boolean | undefined }[],
+  props: [] as { label: string; valueDirection: string | undefined }[],
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -83,10 +83,10 @@ vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/kv-row', () => ({
-  KvRow: (props: { label: string; value: unknown; valueLtr?: boolean }) => {
+  KvRow: (props: { label: string; value: unknown; valueDirection?: string }) => {
     kvRows.labels.push(props.label);
     kvRows.values.set(props.label, props.value);
-    kvRows.props.push({ label: props.label, valueLtr: props.valueLtr });
+    kvRows.props.push({ label: props.label, valueDirection: props.valueDirection });
     return null;
   },
 }));
@@ -475,7 +475,9 @@ describe('FindingAnalysisPanel identifier values', () => {
   it('isolates the analysed model left-to-right', () => {
     renderPanel(analysisFixture({ status: 'completed', analysis: staleAnalysis() }));
 
-    expect(kvRows.props.find(row => row.label === i18n.t('common.model'))?.valueLtr).toBe(true);
+    expect(kvRows.props.find(row => row.label === i18n.t('common.model'))?.valueDirection).toBe(
+      'ltr'
+    );
   });
 
   it('keeps the unrecorded model copy in the interface direction', () => {
@@ -488,7 +490,9 @@ describe('FindingAnalysisPanel identifier values', () => {
       })
     );
 
-    expect(kvRows.props.find(row => row.label === i18n.t('common.model'))?.valueLtr).toBe(false);
+    expect(
+      kvRows.props.find(row => row.label === i18n.t('common.model'))?.valueDirection
+    ).toBeUndefined();
   });
 
   // A path's leading separator is neutral, so an RTL paragraph would move it

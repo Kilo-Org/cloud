@@ -442,14 +442,14 @@ export function FindingRemediationPanel({
                   <KvRow
                     label={t('common.model')}
                     value={attempt.remediationModelSlug}
-                    valueLtr
+                    valueDirection="ltr"
                     selectable
                   />
                   <KvRow
                     label={t('common.branch')}
                     value={attempt.branchName}
                     last
-                    valueLtr
+                    valueDirection="ltr"
                     selectable
                   />
                   {outcome ? (

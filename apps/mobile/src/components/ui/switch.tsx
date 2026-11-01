@@ -9,8 +9,14 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * Untinted, the control draws its on-track with the platform accent, a
  * saturated teal on Android that belongs to no palette entry. In a list row
  * that outranks the row title and the screen's own button, so the track takes
- * the scheme's `primary` and the grip its `primaryForeground`, which keeps the
- * two legible against each other in light and dark.
+ * the palette's olive accent and the grip its foreground, which keeps the two
+ * legible against each other in light and dark.
+ *
+ * The olive is `primary` in light and `selection` in dark: dark's `primary`
+ * is the brand yellow (#ffdd00), which glares on the near-black page and pulls
+ * the eye harder than the row title it sits beside, so dark takes the muted
+ * olive the palette keeps for the same theme (`selection`, #4f5a10 — the light
+ * primary's own hue) rather than the accent.
  *
  * The off pair follows the scheme as well, because a grip that always takes
  * `primaryForeground` is near-black in dark mode and vanishes into the off
@@ -37,7 +43,11 @@ export function Switch({
   const colors = useThemeColors();
   const dark = useColorScheme() === 'dark';
   const resolvedDisabled = disabled ?? accessibilityState?.disabled;
-  // The on grip sits on `primary`, the off grip on the off track.
+  // The on pair is the olive accent at the luminance its grip needs: light
+  // fills with `primary`, dark with the muted olive `selection`.
+  const onTrack = dark ? colors.selection : colors.primary;
+  const onGrip = dark ? colors.selectionForeground : colors.primaryForeground;
+  // The off grip sits on the off track.
   const offGrip = dark ? colors.foreground : colors.primaryForeground;
 
   return (
@@ -47,10 +57,10 @@ export function Switch({
       trackColor={
         trackColor ?? {
           false: dark ? colors.mutedForeground : colors.mutedSoft,
-          true: colors.primary,
+          true: onTrack,
         }
       }
-      thumbColor={thumbColor ?? (value ? colors.primaryForeground : offGrip)}
+      thumbColor={thumbColor ?? (value ? onGrip : offGrip)}
       disabled={resolvedDisabled}
       accessibilityState={
         Platform.OS === 'ios'

@@ -105,21 +105,24 @@ describe('Switch', () => {
     const props = nativeProps(renderSwitch({ value: false }).root);
     expect(props.trackColor).toEqual({
       false: darkColors.mutedForeground,
-      true: darkColors.primary,
+      true: darkColors.selection,
     });
     expect(props.thumbColor).toBe(darkColors.foreground);
     expect(props.thumbColor).not.toBe(darkColors.primaryForeground);
   });
 
-  it('paints the dark on grip from the primary foreground', () => {
+  // Dark's accent is the brand yellow, which glares on the near-black page; the
+  // on pair takes the muted olive both schemes share instead.
+  it('paints the dark on track with the muted olive, not the accent', () => {
     native.os = 'android';
     native.scheme = 'dark';
     const props = nativeProps(renderSwitch({ value: true }).root);
     expect(props.trackColor).toEqual({
       false: darkColors.mutedForeground,
-      true: darkColors.primary,
+      true: darkColors.selection,
     });
-    expect(props.thumbColor).toBe(darkColors.primaryForeground);
+    expect(props.trackColor?.true).not.toBe(darkColors.primary);
+    expect(props.thumbColor).toBe(darkColors.selectionForeground);
   });
 
   it('keeps track and grip colors a caller supplies', () => {

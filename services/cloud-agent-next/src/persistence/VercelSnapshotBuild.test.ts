@@ -12,6 +12,7 @@ import {
   verifySandboxLaunchCredential,
 } from '../sandbox-control/credential.js';
 import { encodeVercelProviderRef } from '../sandbox-control/vercel-provider.js';
+import { RUNTIME_TOOLCHAIN } from '../shared/runtime-toolchain.js';
 
 const mocks = vi.hoisted(() => {
   class CredentialMissingError extends Error {}
@@ -2207,6 +2208,46 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     expect(command.args[1]).toContain('sudo mkdir -p /workspace');
     expect(command.args[1]).toContain('sudo chown "$(id -u):$(id -g)" /workspace');
     expect(command.args[1]).toContain('test -w /workspace');
+  });
+
+  it('installs the base toolchain from pinned bytes and re-checks it by digest', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, {
+      step: 'install_node_dependencies',
+      builder_session_id: 'builder-session',
+    });
+
+    await fixture.build.alarm();
+
+    const command = mocks.client.executeCommand.mock.calls[0]?.[1];
+    expect(command.args[1]).toContain(RUNTIME_TOOLCHAIN.bun.url);
+    expect(command.args[1]).toContain(RUNTIME_TOOLCHAIN.bun.sha256);
+    expect(command.args[1]).toContain(RUNTIME_TOOLCHAIN.kilo.url);
+    expect(command.args[1]).toContain(RUNTIME_TOOLCHAIN.kilo.sha256);
+    expect(command.args[1]).toContain("check_sha256 '/usr/local/bin/bun'");
+    expect(command.args[1]).toContain('npm install -g --loglevel=error "$work/package.tgz"');
+    expect(command.args[1]).not.toContain('| bash');
+  });
+
+  it('verifies the installed toolchain by digest before the snapshot is created', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, {
+      step: 'verify_runtime_artifacts',
+      builder_session_id: 'builder-session',
+    });
+
+    await fixture.build.alarm();
+
+    const command = mocks.client.executeCommand.mock.calls[0]?.[1];
+    expect(command.args[1]).toContain(
+      `check_sha256 '/usr/local/bin/bun' '${RUNTIME_TOOLCHAIN.bun.installedSha256[0]}'`
+    );
+    expect(command.args[1]).toContain(
+      `check_sha256 "$npm_root/@kilocode/cli/bin/.kilo" '${RUNTIME_TOOLCHAIN.kilo.installedSha256[0]}'`
+    );
+    expect(storedRow(fixture)).toMatchObject({ step: 'snapshot_builder' });
   });
 
   it('stages runtime artifacts in tmp and installs validated root-owned files with sudo', async () => {

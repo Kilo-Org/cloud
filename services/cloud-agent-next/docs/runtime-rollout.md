@@ -15,7 +15,12 @@ The runtime-free/preinstalled pair is invalid in the shared configuration schema
 Downloaded startup supports native Cloudflare Containers and BYOC Vercel. SDK pins keep preinstalled startup.
 
 BYOC Vercel uses its customer-owned snapshot as the base. The snapshot setup provides the fixed Node
-path and Bun version required by the bootstrap. Downloaded startup installs the selected immutable CLI
+path and Bun version required by the bootstrap. `src/shared/runtime-toolchain.ts` pins every base tool
+(`bun`, `rg`, `gh`, `glab`, `pnpm`, `kilo`) to a release archive or registry tarball whose SHA-256 sits
+next to `RUNTIME_DISTRIBUTION`; both the operator build (`scripts/vercel-snapshot.ts`) and the Durable
+Object build install from those pins, check the downloaded bytes before unpacking or installing, and
+re-check the installed toolchain by version and digest before the snapshot is created or accepted.
+Downloaded startup installs the selected immutable CLI
 and control release as root. The base digest covers the ABI, Node major, Bun, and base setup commands;
 CLI and wrapper changes do not change that digest or require a new snapshot. Existing allocations keep
 their installed release until a new allocation starts. Base dependency changes still require a snapshot

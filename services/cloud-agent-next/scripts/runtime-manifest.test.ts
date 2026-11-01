@@ -7,6 +7,7 @@ import {
   WRAPPER_BUNDLES,
   runtimeInstallPath,
 } from '../src/shared/runtime-distribution.js';
+import { RUNTIME_TOOLCHAIN } from '../src/shared/runtime-toolchain.js';
 import {
   hashRuntimeArtifacts,
   runtimeDistributionSourceFiles,
@@ -72,15 +73,28 @@ describe('runtime distribution contract', () => {
       }))
     );
     const script = runtimeVerificationScript(artifacts);
-    expect(script).toContain(`test "$(bun --version)" = '1.4.4'`);
-    expect(script).toContain(`test "$(pnpm --version)" = '12.14.0'`);
+    for (const version of [
+      RUNTIME_DISTRIBUTION.bun,
+      RUNTIME_DISTRIBUTION.pnpm,
+      RUNTIME_DISTRIBUTION.gh,
+      RUNTIME_DISTRIBUTION.glab,
+      RUNTIME_TOOLCHAIN.rg.version,
+      RUNTIME_TOOLCHAIN.kilo.version,
+    ]) {
+      expect(script).toContain(`= '${version}'`);
+    }
     expect(script).toContain('grep -oE');
     expect(script).not.toContain('grep -qF');
-    expect(script).toContain(`= '1.124.0'`);
-    expect(script).toContain(`= '2.103.3'`);
     for (const binary of RUNTIME_REQUIRED_BINARIES) {
       expect(script).toContain(`command -v ${binary} >/dev/null`);
     }
+    for (const tool of ['bun', 'rg', 'gh', 'glab', 'pnpm', 'kilo'] as const) {
+      const pin = RUNTIME_TOOLCHAIN[tool];
+      expect(script).toContain(pin.installedSha256[0]);
+    }
+    expect(script).toContain(`check_sha256 '/usr/local/bin/bun'`);
+    expect(script).toContain(`check_sha256 "$npm_root/pnpm/pnpm"`);
+    expect(script).toContain(`check_sha256 "$npm_root/@kilocode/cli/bin/.kilo"`);
     for (const artifact of artifacts) {
       expect(script).toContain(`sha256sum '${artifact.installPath}'`);
     }

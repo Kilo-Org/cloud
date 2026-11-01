@@ -6,7 +6,7 @@ import {
   GLANCEABLE_STALE_MS,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
+import { type GlanceableLiveActivityContentState } from '@kilocode/notifications/schemas';
 import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
 import {
   _resetHomeWidgetDataForTests,

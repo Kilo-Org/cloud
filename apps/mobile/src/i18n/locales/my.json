@@ -330,7 +330,7 @@
       "diffTooLarge": "ကွာခြားချက် ကြီးလွန်းသည်",
       "openFile": "{{path}} ကို ဖွင့်ပါ",
       "openFileViewed": "{{path}} ကို ဖွင့်ပါ (ကြည့်ပြီး)",
-      "title": "ဖိုင်"
+      "title": "ဖိုင်များ"
     },
     "fileRows": {
       "markViewed": "{{path}} ကို ကြည့်ပြီးအဖြစ် မှတ်သားပါ",
@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "မကြာသေးမီက သုံးသပ်ချက်များ မရှိပါ",
       "noRecentPrsDescription": "သုံးသပ်မှုစရန် အပေါ်တွင် လင့်ခ်ကို ကူးထည့်ပါ — နောက်တစ်ကြိမ်တွင် ဤနေရာ၌ ပေါ်လာမည်။",
-      "couldNotLoad": "ရယူ၍မရပါ။",
       "removeFromRecentsTitle": "မကြာသေးမီက ကြည့်ထားသော စာရင်းမှ ဖယ်ရှားမလား",
       "removeFromRecentsMessage": "ဤသုံးသပ်ချက်ကို သင့်မကြာသေးမီက စာရင်းမှ ဖယ်ရှားပါမည်။",
       "removeRecentAccessibility": "{{repo}} ကို မကြာသေးမီက ကြည့်ထားသော စာရင်းမှ ဖယ်ရှားပါ",
@@ -759,7 +758,7 @@
     },
     "tabs": {
       "overview": "ခြုံငုံချက်",
-      "files": "ဖိုင်",
+      "files": "ဖိုင်များ",
       "discussion": "ဆွေးနွေးချက်"
     },
     "fileStatus": {
@@ -834,7 +833,8 @@
     "liveUpdates": "အချိန်နှင့်တစ်ပြေးညီ အခြေအနေများ",
     "liveUpdateSubtitle": "အကြောင်းကြားချက်များတွင် လုပ်ဆောင်နေသော အေးဂျင့်များကို ပြပါ",
     "push": "အလိုအလျောက်အကြောင်းကြားချက်များ",
-    "onDescription": "ဤစက်အတွက် အလိုအလျောက်အကြောင်းကြားချက်များကို ဖွင့်ထားပါသည်။",
+    "deviceTitle": "ဤစက်ရှိ အလိုအလျောက်အကြောင်းကြားချက်များ",
+    "onDescription": "အောက်ပါ အမျိုးအစားများအလိုက် သတိပေးချက်များ ရရှိမည်။",
     "offDescription": "အကြောင်းကြားချက်ခွင့်ပြုချက် သို့မဟုတ် စက်မှတ်ပုံတင်ခြင်းကို ပိတ်ထားပါသည်။",
     "retryPermission": "အကြောင်းကြားချက်ခွင့်ပြုချက်ကို ထပ်စစ်ဆေးပါ",
     "enable": "အကြောင်းကြားချက်များ ဖွင့်ပါ",
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "ဓာတ်ပုံရိုက်ရန်",
       "photoLibrary": "ဓာတ်ပုံစုစည်းမှု",
-      "files": "ဖိုင်",
+      "files": "ဖိုင်များ",
       "cameraAccessMessage": "ဓာတ်ပုံရိုက်ရန် ဆက်တင်များတွင် ကင်မရာ အသုံးပြုခွင့် ပေးပါ။"
     },
     "typingIndicator": {
@@ -1533,11 +1533,13 @@
       "offAction": "စစ်ဆေးမှုမှတ်ဉာဏ်ကို ပိတ်ထားသည်။ ဖွင့်ပြီးနောက် ထပ်မံကြိုးစားပါ။"
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "မှန်ကန်သော merge request URL ကို ထည့်ပါ။",
+      "mergeRequestUrl": "merge request ၏ URL",
+      "instructionsAtLimit": "ညွှန်ကြားချက်ကို စာလုံး {{max}} လုံးအထိ ကန့်သတ်ထားသည်။",
       "title": "ကိုယ်တိုင် စတင်သည့် စစ်ဆေးမှု",
       "invalidUrl": "မှန်ကန်သော PR URL ကို ထည့်ပါ။",
       "couldNotCheckProviderStatus": "ဝန်ဆောင်မှုပေးသူ၏ အခြေအနေကို စစ်ဆေး၍ မရပါ။",
       "couldNotLoadProviders": "ချိတ်ဆက်ထားသော ဝန်ဆောင်မှုပေးသူများကို ရယူ၍ မရပါ။ ထပ်ကြိုးစားပါ။",
-      "connectProviderDescription": "PR စစ်ဆေးမှုကို ကိုယ်တိုင် စတင်ရန် GitHub ကို ချိတ်ဆက်ပါ။",
       "pullRequestUrl": "PR ၏ URL",
       "instructions": "ညွှန်ကြားချက်များ (မထည့်လည်းရ)",
       "instructionsPlaceholder": "စစ်ဆေးသူ အလေးပေးသင့်သော သီးခြားအချက်များ…",
@@ -1680,7 +1682,8 @@
       "sortSeverityDesc": "ပြင်းထန်မှု: မြင့်မှ နိမ့်သို့",
       "sortSeverityAsc": "ပြင်းထန်မှု: နိမ့်မှ မြင့်သို့",
       "sortSlaDue": "SLA သတ်မှတ်ရက်",
-      "overdueOnly": "သတ်မှတ်ရက်ကျော်သည်များသာ"
+      "overdueOnly": "သတ်မှတ်ရက်ကျော်သည်များသာ",
+      "noRepositories": "repository များ မညှိနှိုင်းရသေးပါ သို့မဟုတ် မရွေးချယ်ရသေးပါ။ «လုံခြုံရေးအေးဂျင့်» ဆက်တင်များတွင် ရွေးချယ်ပါ။"
     },
     "automation": {
       "title": "အလိုအလျောက် လုပ်ဆောင်မှု",
@@ -1753,17 +1756,12 @@
       "findingsCount": "တွေ့ရှိချက် {{displayCount}} ခု",
       "notMeasured": "တိုင်းတာမထား",
       "actFirst": "ဦးစားပေး လုပ်ဆောင်ရန်",
-      "slaPosture": "SLA လိုက်နာမှုအခြေအနေ",
       "actionPosture": "လုပ်ဆောင်မှုအခြေအနေ",
       "codebaseRisk": "ကုဒ်စု၏ အန္တရာယ်အဆင့်",
       "repositoryActionPlan": "ကုဒ်သိုလှောင်ရာအလိုက် လုပ်ဆောင်မည့်အစီအစဉ်",
       "noOpenFindings": "ကိုင်တွယ်ရန် လိုအပ်သော မဖြေရှင်းရသေးသည့် တွေ့ရှိချက် မရှိပါ",
       "deadlineToday": "ယနေ့ သတ်မှတ်ရက် ရောက်ပြီ",
       "daysOverdue": "သတ်မှတ်ရက်ထက် {{displayCount}} ရက် ကျော်နေ",
-      "withinDeadline": "သတ်မှတ်ရက်အတွင်း",
-      "criticalOverdue": "သတ်မှတ်ရက်ကျော်သော အလွန်ပြင်းထန်အဆင့်",
-      "highOverdue": "သတ်မှတ်ရက်ကျော်သော မြင့်အဆင့်",
-      "mediumLowOverdue": "သတ်မှတ်ရက်ကျော်သော အလယ်အလတ်နှင့် နိမ့်အဆင့်",
       "confirmedExploitable": "တိုက်ခိုက်ရန် အသုံးချနိုင်ကြောင်း အတည်ပြုပြီး",
       "needsEvidenceReview": "သက်သေအထောက်အထား ပြန်လည်သုံးသပ်ရန် လိုအပ်",
       "analysisNotComplete": "ခွဲခြမ်းစိတ်ဖြာမှု မပြီးသေး",
@@ -1773,12 +1771,22 @@
       "noSlaDeadline": "SLA သတ်မှတ်ရက် သတ်မှတ်မထား",
       "noRepositoryData": "ကုဒ်သိုလှောင်ရာဒေတာ မရှိသေးပါ",
       "noRepositoryDataDescription": "တွေ့ရှိချက်များကို ထပ်တူပြုပြီးနောက် ကုဒ်သိုလှောင်ရာများ၏ ဦးစားပေးအစီအစဉ် ပေါ်လာမည်။",
-      "repoSummary": "မဖြေရှင်းရသေး {{open}} · အလွန်ပြင်းထန် {{critical}} · မြင့် {{high}}",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "မဖြေရှင်းရသေး {{displayCount}}",
+      "repoSummaryOpen_one": "မဖြေရှင်းရသေး {{displayCount}}",
+      "repoSummaryOpen_other": "မဖြေရှင်းရသေး {{displayCount}}",
+      "repoSummaryCritical": "အလွန်ပြင်းထန် {{displayCount}}",
+      "repoSummaryCritical_one": "အလွန်ပြင်းထန် {{displayCount}}",
+      "repoSummaryCritical_other": "အလွန်ပြင်းထန် {{displayCount}}",
+      "repoSummaryHigh": "မြင့် {{displayCount}}",
+      "repoSummaryHigh_one": "မြင့် {{displayCount}}",
+      "repoSummaryHigh_other": "မြင့် {{displayCount}}",
       "couldNotLoad": "ဒက်ရှ်ဘုတ်ဒေတာကို ရယူ၍ မရပါ။",
       "filterByRepository": "ကုဒ်သိုလှောင်ရာအလိုက် စစ်ထုတ်ပါ",
       "lastSynced": "နောက်ဆုံး ထပ်တူပြုချိန်: {{time}}",
       "manageRepositories": "ကုဒ်သိုလှောင်ရာများကို စီမံရန်",
       "notYetSynced": "ထပ်တူမပြုရသေး",
+      "priorityFindingsPending": "ပထမဆုံး ထပ်တူပြုပြီးနောက် ဦးစားပေး တွေ့ရှိချက်များ ပေါ်လာမည်။",
       "refreshFailed": "ဒေတာအသစ်ကို ရယူ၍ မရပါ။ နောက်ဆုံး ထပ်တူပြုထားသော ဒေတာကို ပြထားသည်။",
       "settings": "ဆက်တင်များ",
       "syncNow": "ယခု ထပ်တူပြုပါ",
@@ -1798,8 +1806,17 @@
       "withinDeadlineDetail": "{{total}} ခုအနက် {{within}} ခု သတ်မှတ်ရက်အတွင်းရှိ",
       "noDeadlineData": "မည်သည့်တွေ့ရှိချက်အတွက်မျှ SLA သတ်မှတ်ရက် မရှိသေးပါ",
       "deadlinePassed": "သတ်မှတ်ရက် ကျော်လွန်ပြီး",
-      "deadlinePassedDetail": "အလွန်ပြင်းထန် {{critical}} ခု၊ မြင့် {{high}} ခု",
-      "deadlinePassedDetailWithMediumLow": "အလွန်ပြင်းထန် {{critical}} ခု၊ မြင့် {{high}} ခု၊ အလယ်အလတ်နှင့် နိမ့် {{mediumLow}} ခု",
+      "deadlinePassedDetail": "{{critical}}၊ {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}၊ {{high}}၊ {{mediumLow}}",
+      "breakdownCritical": "အလွန်ပြင်းထန် {{displayCount}} ခု",
+      "breakdownCritical_one": "အလွန်ပြင်းထန် {{displayCount}} ခု",
+      "breakdownCritical_other": "အလွန်ပြင်းထန် {{displayCount}} ခု",
+      "breakdownHigh": "မြင့် {{displayCount}} ခု",
+      "breakdownHigh_one": "မြင့် {{displayCount}} ခု",
+      "breakdownHigh_other": "မြင့် {{displayCount}} ခု",
+      "breakdownMediumLow": "အလယ်အလတ်နှင့် နိမ့် {{displayCount}} ခု",
+      "breakdownMediumLow_one": "အလယ်အလတ်နှင့် နိမ့် {{displayCount}} ခု",
+      "breakdownMediumLow_other": "အလယ်အလတ်နှင့် နိမ့် {{displayCount}} ခု",
       "dueThisWeek": "ယခုအပတ်အတွင်း သတ်မှတ်ရက်စေ့မည်",
       "dueThisWeekDetail": "ယင်းအနက် {{exploitable}} ခုကို တိုက်ခိုက်အသုံးချနိုင်ကြောင်း အတည်ပြုပြီး",
       "noDeadline": "သတ်မှတ်ရက် မရှိ",
@@ -1827,7 +1844,8 @@
     "findingDetails": {
       "supersededBy": "လက်ရှိတွေ့ရှိချက်ဖြင့် အစားထိုးထား",
       "supersededByDescription": "အခြေအနေ၊ ခွဲခြမ်းစိတ်ဖြာမှုနှင့် ပြုပြင်မှုတို့ကို ကြည့်ရန် လက်ရှိမှတ်တမ်းကို နှိပ်ဖွင့်ပါ။",
-      "dismissedBecause": "{{reason}} ကြောင့် ပယ်ထားသည်။",
+      "dismissedOn": "ပယ်ချသည့်ရက်စွဲ",
+      "supersededOn": "အသစ်ဖြင့် အစားထိုးသည့်ရက်စွဲ",
       "severityLabel": "ပြင်းထန်မှု {{severity}} အဆင့်",
       "package": "ပက်ကေ့ဂျ်",
       "vulnerableVersions": "အားနည်းချက်ရှိသော ဗားရှင်းများ",
@@ -1844,11 +1862,6 @@
       "viewAdvisory": "GitHub တွင် လုံခြုံရေးသတိပေးချက်ကို ကြည့်ရန်",
       "statusOpen": "ဖွင့်",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ပြင်ဆင်မှု စတင်ပြီး",
-      "reasonNoBandwidth": "အချိန်နှင့် လူအင်အား မရှိ",
-      "reasonTolerableRisk": "လက်ခံနိုင်သော အန္တရာယ်အဆင့်",
-      "reasonInaccurate": "တွေ့ရှိချက် မမှန်ကန်",
-      "reasonNotUsed": "အားနည်းချက်ရှိသော ကုဒ်ကို အသုံးမပြု",
       "reasonAfterReview": "ပြန်လည်သုံးသပ်ပြီးနောက်"
     },
     "settingsOverview": {
@@ -1858,7 +1871,6 @@
       "repositoriesCount_one": "ကုဒ်သိုလှောင်ရာ {{displayCount}} ခု ရွေးထား",
       "repositoriesCount": "ကုဒ်သိုလှောင်ရာ {{displayCount}} ခု ရွေးချယ်ထား",
       "repositoriesCount_other": "ကုဒ်သိုလှောင်ရာ {{displayCount}} ခု ရွေးချယ်ထား",
-      "selectRepositoriesSubtitle": "လုံခြုံရေးအေးဂျင့် စောင့်ကြည့်မည့် ကုဒ်သိုလှောင်ရာများကို ရွေးပါ",
       "analysisModeSubtitle": "{{mode}} ခွဲခြမ်းစိတ်ဖြာမှု",
       "automationAllOff": "အားလုံး ပိတ်ထား",
       "automationCount": "3 ခုတွင် {{displayCount}} ခု ဖွင့်ထား",
@@ -2048,7 +2060,10 @@
       "settleFailed": "လုပ်ဆောင်မှု ပြီးမြောက်သွားပါသည်၊ သို့ရာတွင် ရလဒ်ကို မှတ်တမ်းမတင်နိုင်ပါ။ ထပ်ကြိုးစားပါ။",
       "replayFailed": "ဤလုပ်ဆောင်မှု မပြီးမြောက်ပါ။ ထပ်ကြိုးစားပါ။",
       "actionFailed": "ဤလုပ်ဆောင်မှုကို ပြီးမြောက်အောင် မလုပ်နိုင်ပါ။ ထပ်ကြိုးစားပါ။",
-      "actionBlocked": "ဤလုပ်ဆောင်မှုကို ပြီးမြောက်အောင် မလုပ်နိုင်ပါ။ ပြန်လုပ်နိုင်ရန် ပြဿနာကို အရင်ဖြေရှင်းရမည်။"
+      "actionBlocked": "ဤလုပ်ဆောင်မှုကို ပြီးမြောက်အောင် မလုပ်နိုင်ပါ။ ပြန်လုပ်နိုင်ရန် ပြဿနာကို အရင်ဖြေရှင်းရမည်။",
+      "syncNoRepositories": "ထပ်တူပြုမှုနယ်ပယ်အတွင်း repository များ မရှိပါ။ «လုံခြုံရေးအေးဂျင့်» စောင့်ကြည့်သည့် repository များကို ရွေးချယ်ပြီး ထပ်မံထပ်တူပြုပါ။",
+      "syncIntegrationInactive": "«လုံခြုံရေးအေးဂျင့်» အတွက် GitHub ချိတ်ဆက်မှုသည် အသက်ဝင်မနေပါ။ Kilo GitHub App ကို ပြန်လည်ချိတ်ဆက်ပြီးနောက် ထပ်မံစင့်ခ်လုပ်ပါ။",
+      "syncMissingPermission": "Kilo GitHub App သည် vulnerability alerts များကို ဖတ်၍မရပါ။ GitHub တွင် ထို ခွင့်ပြုချက်ကို ပေးပြီးမှ ထပ်မံ sync လုပ်ပါ။"
     },
     "analysisState": {
       "queued": "ခွဲခြမ်းစိတ်ဖြာရန် တန်းစီထား",
@@ -2082,7 +2097,6 @@
       "closedOn": "{{date}} တွင် {{status}}",
       "deadlineNotSet": "သတ်မှတ်ရက် သတ်မှတ်မထား",
       "noSlaDeadline": "SLA သတ်မှတ်ရက် မရှိ",
-      "dueOn": "{{date}} တွင် သတ်မှတ်ရက်စေ့မည်",
       "overdueNow": "သတ်မှတ်ရက်ကျော်နေ",
       "overdue_other": "သတ်မှတ်ရက်ထက် {{count}} ရက် ကျော်နေ",
       "dueToday": "ယနေ့ သတ်မှတ်ရက်စေ့မည်",
@@ -2753,7 +2767,7 @@
     "attachmentPicker": {
       "camera": "ကင်မရာ",
       "photoLibrary": "ဓာတ်ပုံစုစည်းမှု",
-      "files": "ဖိုင်",
+      "files": "ဖိုင်များ",
       "couldNotOpenPhotoPicker": "ဓာတ်ပုံရွေးသည့်အကွက်ကို ဖွင့်၍မရပါ။ Kilo ကို ပြန်ဖွင့်ပြီး ထပ်ကြိုးစားပါ။",
       "maxFilesAllowed": "ဖိုင်အများဆုံး {{displayCount}} ခုသာ ထည့်နိုင်ပါသည်။",
       "onlyAddingFiles": "ဖိုင် {{total}} ခုမှ {{accepted}} ခုသာ ထည့်နေသည် (အများဆုံး {{max}})",
@@ -3136,7 +3150,7 @@
     "couldNotSaveChoice": "သင့်ရွေးချယ်မှုကို သိမ်းဆည်း၍မရပါ။ ထပ်ကြိုးစားပါ။",
     "onlineAllowed": "အွန်လိုင်း၊ ခွင့်ပြုထားသည်",
     "onlineNotAllowed": "အွန်လိုင်း၊ ခွင့်မပြုထားပါ",
-    "optionalReview": "မဖြစ်မနေ မလိုအပ်ပါ — ဆက်တင်များတွင် အချိန်မရွေး ပြောင်းလဲနိုင်ပါသည်",
+    "optionalReview": "မဖြစ်မနေ မလိုအပ်ပါ",
     "optionalOnboarding": "မဖြစ်မနေ မလိုအပ်ပါ — သင်မပိတ်သရွေ့ ဖွင့်ထားပါသည်",
     "aiProvidersWhat": "သင့်ညွှန်ကြားချက်များ၊ စကားဝိုင်းမှတ်တမ်းနှင့် သင်ပူးတွဲထားသော ဖိုင်များ။",
     "aiProvidersWhy": "AI တုံ့ပြန်ချက်များ ဖန်တီးရန်။",
@@ -3834,6 +3848,7 @@
       "markSecret": "လျှို့ဝှက်ချက်အဖြစ် အမှတ်အသားပြုပါ။",
       "masked": "ဝှက်ထားသောတန်ဖိုး",
       "reveal": "တန်ဖိုးကိုထုတ်ဖော်ပါ။",
+      "hide": "တန်ဖိုးကို ဝှက်ပါ",
       "newValuePlaceholder": "လျှို့ဝှက်တန်ဖိုးအသစ် ထည့်ပါ",
       "valuePlaceholder": "လျှို့ဝှက်တန်ဖိုး (စာဝှက်ထားသည်)"
     },
@@ -3962,7 +3977,8 @@
       "nameRequired": "အမိန့်အမည်တစ်ခုထည့်ပါ။",
       "nameInvalid": "အမည်သည် စာလုံးအသေးဖြင့် စတင်ရမည်ဖြစ်ပြီး စာလုံးသေးများ၊ ဂဏန်းများနှင့် ဒက်ရှ်များကိုသာ အသုံးပြုရပါမည်။",
       "templateRequired": "အမိန့်ပေးပုံစံကို ထည့်သွင်းပါ။",
-      "nameConflict": "ထိုအမည်ကို built-in command ဖြင့် သိမ်းဆည်းထားသည်။"
+      "nameConflict": "ထိုအမည်ကို built-in command ဖြင့် သိမ်းဆည်းထားသည်။",
+      "duplicateName": "ဤ profile တွင် ဤအမည်ဖြင့် တည်ရှိပြီးသော command ရှိပါသည်။"
     },
     "repoBindings": {
       "title": "Repos အတွက် မူရင်းပရိုဖိုင်များ",
@@ -3971,7 +3987,7 @@
       "emptyDescription": "repo အတွက် ဆက်ရှင်များ စတင်သောအခါ ပရိုဖိုင်တစ်ခု အလိုအလျောက် အသုံးချရန် ပုံသေကို ထည့်ပါ။",
       "repo": "သိုလှောင်မှုကို ရွေးပါ...",
       "profile": "ပရိုဖိုင်ကို ရွေးပါ။",
-      "remove": "စည်းဖြုတ်ပါ။",
+      "removeForRepo": "{{repo}} ကို စည်းဖြုတ်ပါ",
       "search": "သိုလှောင်မှုများကို ရှာဖွေပါ...",
       "addedToast": "\"{{repo}}\" အတွက် မူရင်းပရိုဖိုင် သတ်မှတ်ပြီးပါပြီ။",
       "addFailed": "မူရင်းပရိုဖိုင်ကို သတ်မှတ်၍မရပါ။",

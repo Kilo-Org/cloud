@@ -1,5 +1,22 @@
 import { createHmac } from 'crypto';
 import { NextRequest } from 'next/server';
+import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
+import { LEGACY_BOT_CALLBACK_TOKEN_CUTOFF_MS } from '@/lib/bot/callback-token';
+
+const BOT_CALLBACK_SECRET = 'callback-secret';
+const BOT_CALLBACK_TOKEN_SCOPE = 'bot-session-callback';
+
+async function botCallbackToken(botRequestId: string, secret = BOT_CALLBACK_SECRET) {
+  return deriveCallbackToken({
+    secret,
+    scope: BOT_CALLBACK_TOKEN_SCOPE,
+    resourceParts: [botRequestId],
+  });
+}
+
+function legacyBotCallbackToken(botRequestId: string, secret = BOT_CALLBACK_SECRET) {
+  return createHmac('sha256', secret).update(`bot-callback:${botRequestId}`).digest('hex');
+}
 
 const afterCallbacks: Array<() => Promise<void> | void> = [];
 const mockMarkTerminal = jest.fn<Promise<boolean>, [unknown]>(async () => true);
@@ -9,6 +26,7 @@ const mockGetPlatformIntegration = jest.fn();
 const mockStartProcessingIndicator = jest.fn();
 let platformIntegrationId: string | null = '00000000-0000-4000-8000-000000000002';
 let requestUserMessage = 'Fix the flaky test';
+let requestCreatedAt: string | Date = '2026-09-07T00:00:00.000Z';
 
 class MockPlatformIntegrationUnavailableError extends Error {}
 
@@ -31,7 +49,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
             {
               id: '00000000-0000-4000-8000-000000000001',
               status: 'pending',
-              created_at: '2026-09-07T00:00:00.000Z',
+              created_at: requestCreatedAt,
               cloud_agent_session_id: 'session-1',
               platform_integration_id: platformIntegrationId,
               platform_thread_id: 'github:thread',
@@ -115,6 +133,7 @@ beforeEach(() => {
   } as BotRequestCloudAgentSession);
   mockBotInitialize.mockClear();
   platformIntegrationId = '00000000-0000-4000-8000-000000000002';
+  requestCreatedAt = '2026-09-07T00:00:00.000Z';
   mockGetPlatformIntegration.mockRejectedValue(
     new MockPlatformIntegrationUnavailableError('disconnected')
   );
@@ -143,9 +162,7 @@ describe('completed callback continuation', () => {
 
   async function deliver(payload: Record<string, unknown>, currentStep = 1) {
     const botRequestId = '00000000-0000-4000-8000-000000000001';
-    const token = createHmac('sha256', 'callback-secret')
-      .update(`bot-callback:${botRequestId}`)
-      .digest('hex');
+    const token = await botCallbackToken(botRequestId);
     const request = new NextRequest(`http://localhost/callback?currentStep=${currentStep}`, {
       method: 'POST',
       headers: { 'X-Bot-Callback-Token': token, 'content-type': 'application/json' },
@@ -558,9 +575,7 @@ describe('completed callback continuation', () => {
 
 test('persists terminal callback state and finalizes without publishing after disconnect', async () => {
   const botRequestId = '00000000-0000-4000-8000-000000000001';
-  const token = createHmac('sha256', 'callback-secret')
-    .update(`bot-callback:${botRequestId}`)
-    .digest('hex');
+  const token = await botCallbackToken(botRequestId);
   const request = new NextRequest(`http://localhost/callback?currentStep=1`, {
     method: 'POST',
     headers: { 'X-Bot-Callback-Token': token, 'content-type': 'application/json' },
@@ -594,9 +609,7 @@ test('finalizes when disconnect is detected by the processing indicator after he
   });
   mockStartProcessingIndicator.mockRejectedValue(new GitHubRuntimeAuthorizationError());
   const botRequestId = '00000000-0000-4000-8000-000000000001';
-  const token = createHmac('sha256', 'callback-secret')
-    .update(`bot-callback:${botRequestId}`)
-    .digest('hex');
+  const token = await botCallbackToken(botRequestId);
   const request = new NextRequest('http://localhost/callback?currentStep=1', {
     method: 'POST',
     headers: { 'X-Bot-Callback-Token': token, 'content-type': 'application/json' },
@@ -617,9 +630,7 @@ test('finalizes when disconnect is detected by the processing indicator after he
 test('finalizes without publishing when the integration was deleted before callback', async () => {
   platformIntegrationId = null;
   const botRequestId = '00000000-0000-4000-8000-000000000001';
-  const token = createHmac('sha256', 'callback-secret')
-    .update(`bot-callback:${botRequestId}`)
-    .digest('hex');
+  const token = await botCallbackToken(botRequestId);
   const request = new NextRequest('http://localhost/callback?currentStep=1', {
     method: 'POST',
     headers: { 'X-Bot-Callback-Token': token, 'content-type': 'application/json' },
@@ -637,4 +648,61 @@ test('finalizes without publishing when the integration was deleted before callb
     })
   );
   expect(mockBotInitialize).not.toHaveBeenCalled();
+});
+
+describe('callback authentication', () => {
+  const botRequestId = '00000000-0000-4000-8000-000000000001';
+
+  async function post(token: string | null) {
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (token !== null) {
+      headers['X-Bot-Callback-Token'] = token;
+    }
+    const request = new NextRequest('http://localhost/callback?currentStep=1', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        status: 'completed',
+        cloudAgentSessionId: 'session-1',
+        executionId: 'execution-1',
+      }),
+    });
+    const { POST } = await import('./route');
+    const response = await POST(request, { params: Promise.resolve({ botRequestId }) });
+    await Promise.all(afterCallbacks.splice(0).map(callback => callback()));
+    return response.status;
+  }
+
+  test('accepts a token scoped to this callback and bot request', async () => {
+    await expect(post(await botCallbackToken(botRequestId))).resolves.toBe(200);
+  });
+
+  test('rejects a token scoped to a different bot request', async () => {
+    await expect(
+      post(await botCallbackToken('00000000-0000-4000-8000-000000000002'))
+    ).resolves.toBe(401);
+  });
+
+  test('rejects a token minted under another secret', async () => {
+    await expect(
+      post(await botCallbackToken(botRequestId, 'unrelated-callback-secret'))
+    ).resolves.toBe(401);
+    await expect(
+      post(legacyBotCallbackToken(botRequestId, 'unrelated-callback-secret'))
+    ).resolves.toBe(401);
+  });
+
+  test('rejects a missing token', async () => {
+    await expect(post(null)).resolves.toBe(401);
+  });
+
+  test('accepts the compatibility derivation for requests created before the cutover', async () => {
+    requestCreatedAt = new Date(LEGACY_BOT_CALLBACK_TOKEN_CUTOFF_MS - 24 * 60 * 60 * 1000);
+    await expect(post(legacyBotCallbackToken(botRequestId))).resolves.toBe(200);
+  });
+
+  test('rejects the compatibility derivation for requests created after the cutover', async () => {
+    requestCreatedAt = new Date(LEGACY_BOT_CALLBACK_TOKEN_CUTOFF_MS + 24 * 60 * 60 * 1000);
+    await expect(post(legacyBotCallbackToken(botRequestId))).resolves.toBe(401);
+  });
 });

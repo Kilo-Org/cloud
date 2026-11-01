@@ -12,13 +12,16 @@ import {
   pressAddButton,
   pressEmptyAction,
   pressPressable,
+  pressSheetCancel,
   pressSheetDone,
   rerenderScreen,
+  type TestConfirmMock,
   testProfile,
   testServer,
 } from '@/components/profiles/profile-mcp-screen.test-helpers';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -92,6 +95,7 @@ type ToggleProps = { onValueChange: (value: boolean) => void };
 describe('ProfileMcpScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -381,26 +385,24 @@ describe('ProfileMcpScreen', () => {
     unmount();
   });
 
-  it('a11y: the secret badge is one counted node and the lock glyph is hidden', async () => {
+  it('a11y: the row identity names the server and its secret count before the controls', async () => {
     h.query.data = testProfile([testServer()]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
 
-    const badge = findAll(renderer.root, 'View').find(node =>
-      /^\d+ secrets?$/.test(String(node.props.accessibilityLabel ?? ''))
+    const identity = findAll(renderer.root, 'View').find(
+      node => node.props.accessibilityRole === 'text'
     );
-    expect(badge?.props.accessibilityLabel).toBe('1 secret');
-    expect(badge?.props.accessible).toBe(true);
-    expect(findOne(renderer.root, 'Lock').parent?.props).toMatchObject({
-      accessibilityElementsHidden: true,
-      importantForAccessibility: 'no-hide-descendants',
-    });
+    expect(identity?.props.accessibilityLabel).toBe('docs, Local, npx @example/mcp, 1 secret');
+    expect(identity?.props.accessible).toBe(true);
+    // The counted glyphs stay decorative: the identity carries their meaning.
+    expect(findOne(renderer.root, 'Lock').parent?.props.accessibilityLabel).toBeUndefined();
 
     unmount();
   });
 
-  it('a11y: the secret badge names the count in the plural form', async () => {
+  it('a11y: the row identity names the count in the plural form', async () => {
     h.query.data = testProfile([
       testServer({
         type: 'remote',
@@ -414,10 +416,12 @@ describe('ProfileMcpScreen', () => {
 
     const { renderer, unmount } = await mountScreen();
 
-    const badge = findAll(renderer.root, 'View').find(node =>
-      /^\d+ secrets?$/.test(String(node.props.accessibilityLabel ?? ''))
+    const identity = findAll(renderer.root, 'View').find(
+      node => node.props.accessibilityRole === 'text'
     );
-    expect(badge?.props.accessibilityLabel).toBe('3 secrets');
+    expect(identity?.props.accessibilityLabel).toBe(
+      'docs, Remote, https://example.com/mcp, 3 secrets'
+    );
 
     unmount();
   });
@@ -497,6 +501,77 @@ describe('ProfileMcpScreen', () => {
 
     unmount();
   });
+  it('reopens the add sheet with its typed fields after a remount', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressEmptyAction(first.renderer);
+    changeText(first.renderer.root, 'Server name', 'portal-server');
+    changeText(first.renderer.root, 'Command line', 'npx portal-mcp');
+    first.unmount();
+
+    const second = await mountScreen();
+    expect(findOne(second.renderer.root, 'SheetHeader')).toBeTruthy();
+    expect(findField(second.renderer.root, 'Server name').props.defaultValue).toBe('portal-server');
+    expect(findField(second.renderer.root, 'Command line').props.defaultValue).toBe(
+      'npx portal-mcp'
+    );
+    second.unmount();
+  });
+
+  it('starts a later add empty once the draft was saved', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+    h.mutations.createMcp.mutateAsync.mockResolvedValue({ id: 'mcp-2' });
+
+    const first = await mountScreen();
+    pressEmptyAction(first.renderer);
+    changeText(first.renderer.root, 'Server name', 'portal-server');
+    changeText(first.renderer.root, 'Command line', 'npx portal-mcp');
+    pressSheetDone(first.renderer.root);
+    await waitFor(() => h.mutations.createMcp.mutateAsync.mock.calls.length > 0);
+    first.unmount();
+
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'SheetHeader')).toHaveLength(0);
+    pressEmptyAction(second.renderer);
+    expect(findField(second.renderer.root, 'Server name').props.defaultValue).toBe('');
+    second.unmount();
+  });
+  it('leaves the form opened after a failed save alone when that save settles', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+    const pendingSave = Promise.withResolvers<unknown>();
+    h.mutations.createMcp.mutateAsync.mockImplementation(() => pendingSave.promise);
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Server name', 'first-server');
+    changeText(renderer.root, 'Command line', 'npx first-mcp');
+    pressSheetDone(renderer.root);
+    expect(h.mutations.createMcp.mutateAsync).toHaveBeenCalledTimes(1);
+
+    // Dismiss that attempt and open a different form: the refusal of the first
+    // save belongs to the first form and must not appear under the second.
+    pressSheetCancel(renderer.root);
+    await act(async () => {
+      confirmRequest(h.confirm as TestConfirmMock);
+      await Promise.resolve();
+    });
+    pressEmptyAction(renderer);
+
+    await act(async () => {
+      pendingSave.reject(new Error('late failure'));
+      await Promise.resolve();
+    });
+
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('profiles.mcp.saveFailed')
+    );
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+    unmount();
+  });
 
   it('drops the row presses of the burst that saved the sheet', async () => {
     h.query.data = testProfile([testServer()]);
@@ -519,7 +594,6 @@ describe('ProfileMcpScreen', () => {
     expect(h.confirm).not.toHaveBeenCalled();
     expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
     expect(h.mutations.setMcpEnabled.mutate).not.toHaveBeenCalled();
-
     unmount();
   });
 });

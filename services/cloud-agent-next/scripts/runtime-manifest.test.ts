@@ -20,7 +20,7 @@ describe('runtime distribution contract', () => {
       bun: '1.4.4',
       pnpm: '12.14.0',
       glab: '1.124.0',
-      gh: '2.102.0',
+      gh: '2.103.3',
     });
   });
 
@@ -77,7 +77,7 @@ describe('runtime distribution contract', () => {
     expect(script).toContain('grep -oE');
     expect(script).not.toContain('grep -qF');
     expect(script).toContain(`= '1.124.0'`);
-    expect(script).toContain(`= '2.102.0'`);
+    expect(script).toContain(`= '2.103.3'`);
     for (const binary of RUNTIME_REQUIRED_BINARIES) {
       expect(script).toContain(`command -v ${binary} >/dev/null`);
     }

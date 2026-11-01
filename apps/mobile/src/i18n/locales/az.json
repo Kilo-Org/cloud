@@ -330,7 +330,7 @@
       "diffTooLarge": "dəyişikliklərin həcmi çox böyükdür",
       "openFile": "{{path}} faylını aç",
       "openFileViewed": "{{path}} faylını aç (baxılıb)",
-      "title": "Fayl"
+      "title": "Fayllar"
     },
     "fileRows": {
       "markViewed": "{{path}} faylını baxılmış kimi işarələ",
@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Son baxış yoxdur",
       "noRecentPrsDescription": "Kod baxışına başlamaq üçün yuxarıya keçid yapışdır — növbəti dəfə burada görünəcək.",
-      "couldNotLoad": "Yükləmək mümkün olmadı.",
       "removeFromRecentsTitle": "Son baxılanlardan silinsin?",
       "removeFromRecentsMessage": "Bu baxış son baxılanlar siyahısından silinəcək.",
       "removeRecentAccessibility": "{{repo}} repozitoriyasını son baxılanlardan sil",
@@ -759,7 +758,7 @@
     },
     "tabs": {
       "overview": "Xülasə",
-      "files": "Fayl",
+      "files": "Fayllar",
       "discussion": "Müzakirə"
     },
     "fileStatus": {
@@ -834,7 +833,8 @@
     "liveUpdates": "Canlı yeniləmələr",
     "liveUpdateSubtitle": "Aktiv agentləri bildirişlərində göstər",
     "push": "Ani bildirişlər",
-    "onDescription": "Bu cihazda ani bildirişlər aktivdir.",
+    "deviceTitle": "Bu cihazda ani bildirişlər",
+    "onDescription": "Xəbərdarlıqlar aşağıdakı kateqoriyalara uyğun gəlir.",
     "offDescription": "Bildiriş icazəsi verilməyib və ya cihaz qeydiyyatı deaktivdir.",
     "retryPermission": "Bildiriş icazəsini yenidən yoxla",
     "enable": "Bildirişləri aktivləşdir",
@@ -1019,7 +1019,7 @@
     "attachmentPicker": {
       "takePhoto": "Şəkil çək",
       "photoLibrary": "Qalereya",
-      "files": "Fayl",
+      "files": "Fayllar",
       "cameraAccessMessage": "Şəkil çəkmək üçün parametrlərdə kameraya girişə icazə ver."
     },
     "typingIndicator": {
@@ -1533,11 +1533,13 @@
       "offAction": "Kod yoxlaması yaddaşı deaktivdir. Onu aktivləşdir, sonra yenidən cəhd et."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Etibarlı merge sorğusu URL-i daxil et.",
+      "mergeRequestUrl": "Merge sorğusu URL-i",
+      "instructionsAtLimit": "Təlimatlar {{max}} simvolla məhduddur",
       "title": "Əl ilə kod yoxlaması",
       "invalidUrl": "Etibarlı PR URL-i daxil et.",
       "couldNotCheckProviderStatus": "Provayderin statusunu yoxlamaq mümkün olmadı.",
       "couldNotLoadProviders": "Qoşduğun provayderləri yükləmək mümkün olmadı. Yenidən cəhd et.",
-      "connectProviderDescription": "PR üçün kod yoxlamasını əl ilə başlatmaq üçün GitHub-u qoş.",
       "pullRequestUrl": "PR URL-i",
       "instructions": "Təlimatlar (istəyə bağlı)",
       "instructionsPlaceholder": "Yoxlama zamanı xüsusi diqqət tələb edən məqamlar…",
@@ -1680,7 +1682,8 @@
       "sortSeverityDesc": "Ciddilik: yüksəkdən aşağıya",
       "sortSeverityAsc": "Ciddilik: aşağıdan yüksəyə",
       "sortSlaDue": "SLA üzrə son tarix",
-      "overdueOnly": "Yalnız gecikənlər"
+      "overdueOnly": "Yalnız gecikənlər",
+      "noRepositories": "Hələ heç bir repozitoriya sinxronlaşdırılmayıb və ya seçilməyib. Onları Təhlükəsizlik agentinin parametrlərində seç."
     },
     "automation": {
       "title": "Avtomatlaşdırma",
@@ -1753,17 +1756,12 @@
       "findingsCount": "{{displayCount}} tapıntı",
       "notMeasured": "Ölçülməyib",
       "actFirst": "İlk növbədə görüləcək işlər",
-      "slaPosture": "SLA üzrə vəziyyət",
       "actionPosture": "Tədbirlər üzrə vəziyyət",
       "codebaseRisk": "Kod bazasının riski",
       "repositoryActionPlan": "Repozitoriya üzrə tədbirlər planı",
       "noOpenFindings": "Diqqət tələb edən açıq tapıntı yoxdur",
       "deadlineToday": "Müddət bu gün başa çatıb",
       "daysOverdue": "{{displayCount}} gün gecikib",
-      "withinDeadline": "Müddəti keçməyib",
-      "criticalOverdue": "Gecikən kritik tapıntılar",
-      "highOverdue": "Gecikən yüksək dərəcəli tapıntılar",
-      "mediumLowOverdue": "Gecikən orta və aşağı dərəcəli tapıntılar",
       "confirmedExploitable": "İstismar oluna bildiyi təsdiqlənib",
       "needsEvidenceReview": "Sübutlar yoxlanmalıdır",
       "analysisNotComplete": "Təhlil tamamlanmayıb",
@@ -1773,12 +1771,22 @@
       "noSlaDeadline": "SLA müddəti təyin edilməyib",
       "noRepositoryData": "Hələ repozitoriya məlumatı yoxdur",
       "noRepositoryDataDescription": "Tapıntılar sinxronlaşdırıldıqdan sonra repozitoriya prioritetləri görünəcək.",
-      "repoSummary": "{{open}} açıq · {{critical}} kritik · {{high}} yüksək",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "{{displayCount}} açıq",
+      "repoSummaryOpen_one": "{{displayCount}} açıq",
+      "repoSummaryOpen_other": "{{displayCount}} açıq",
+      "repoSummaryCritical": "{{displayCount}} kritik",
+      "repoSummaryCritical_one": "{{displayCount}} kritik",
+      "repoSummaryCritical_other": "{{displayCount}} kritik",
+      "repoSummaryHigh": "{{displayCount}} yüksək",
+      "repoSummaryHigh_one": "{{displayCount}} yüksək",
+      "repoSummaryHigh_other": "{{displayCount}} yüksək",
       "couldNotLoad": "Panel məlumatlarını yükləmək mümkün olmadı.",
       "filterByRepository": "Repozitoriyaya görə filtrlə",
       "lastSynced": "Son sinxronlaşdırma: {{time}}",
       "manageRepositories": "Repozitoriyaları idarə et",
       "notYetSynced": "Hələ sinxronlaşdırılmayıb",
+      "priorityFindingsPending": "İlk sinxronlaşdırmadan sonra prioritet tapıntıları görünəcək.",
       "refreshFailed": "Məlumatları yeniləmək mümkün olmadı. Son sinxronlaşdırılmış məlumatlar göstərilir.",
       "settings": "Parametrlər",
       "syncNow": "İndi sinxronlaşdır",
@@ -1798,8 +1806,17 @@
       "withinDeadlineDetail": "{{total}} tapıntıdan {{within}} tapıntının müddəti keçməyib",
       "noDeadlineData": "Hələ heç bir tapıntının SLA müddəti yoxdur",
       "deadlinePassed": "Müddət başa çatıb",
-      "deadlinePassedDetail": "{{critical}} kritik, {{high}} yüksək",
-      "deadlinePassedDetailWithMediumLow": "{{critical}} kritik, {{high}} yüksək, {{mediumLow}} orta və aşağı",
+      "deadlinePassedDetail": "{{critical}}, {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
+      "breakdownCritical": "{{displayCount}} kritik",
+      "breakdownCritical_one": "{{displayCount}} kritik",
+      "breakdownCritical_other": "{{displayCount}} kritik",
+      "breakdownHigh": "{{displayCount}} yüksək",
+      "breakdownHigh_one": "{{displayCount}} yüksək",
+      "breakdownHigh_other": "{{displayCount}} yüksək",
+      "breakdownMediumLow": "{{displayCount}} orta və aşağı",
+      "breakdownMediumLow_one": "{{displayCount}} orta və aşağı",
+      "breakdownMediumLow_other": "{{displayCount}} orta və aşağı",
       "dueThisWeek": "Bu həftə bitir",
       "dueThisWeekDetail": "Bunlardan {{exploitable}} tapıntının istismar edilə bildiyi təsdiqlənib",
       "noDeadline": "Müddət yoxdur",
@@ -1827,7 +1844,8 @@
     "findingDetails": {
       "supersededBy": "Cari tapıntı ilə əvəz edilib",
       "supersededByDescription": "Cari qeydin statusuna, təhlilinə və düzəlişinə baxmaq üçün toxun.",
-      "dismissedBecause": "Rədd edilib: {{reason}}.",
+      "dismissedOn": "Rədd edilmə tarixi",
+      "supersededOn": "Əvəz edilmə tarixi",
       "severityLabel": "Ciddilik dərəcəsi: {{severity}}",
       "package": "Paket",
       "vulnerableVersions": "Boşluq olan versiyalar",
@@ -1844,11 +1862,6 @@
       "viewAdvisory": "GitHub-da təhlükəsizlik bildirişinə bax",
       "statusOpen": "Açıq",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "düzəlişə artıq başlanıb",
-      "reasonNoBandwidth": "vaxt və resurs yoxdur",
-      "reasonTolerableRisk": "risk məqbuldur",
-      "reasonInaccurate": "problem səhv müəyyən edilib",
-      "reasonNotUsed": "boşluq olan koddan istifadə edilmir",
       "reasonAfterReview": "yoxlamadan sonra"
     },
     "settingsOverview": {
@@ -1858,7 +1871,6 @@
       "repositoriesCount_one": "{{displayCount}} repozitoriya seçilib",
       "repositoriesCount": "{{displayCount}} repozitoriya seçilib",
       "repositoriesCount_other": "{{displayCount}} repozitoriya seçilib",
-      "selectRepositoriesSubtitle": "Təhlükəsizlik agentinin izləyəcəyi repozitoriyaları seç",
       "analysisModeSubtitle": "{{mode}} təhlil",
       "automationAllOff": "Hamısı deaktivdir",
       "automationCount": "3 seçimdən {{displayCount}} seçim aktivdir",
@@ -1909,7 +1921,7 @@
       "highDescription": "Ciddi məlumat sızması ehtimalı.",
       "mediumDescription": "Məhdud təsir və ya xüsusi şərtlər.",
       "lowDescription": "Təhlükəsizliyə minimal təsir.",
-      "invalidDayCount": "gün sayını 1–365 aralığında tam ədədlə göstər.",
+      "invalidDayCount": "Gün sayını 1–365 aralığında tam ədədlə göstər.",
       "remediationDeadlineA11y": "{{label}} üçün düzəliş müddəti, günlə",
       "enterWholeNumber": "1-Dən 365-ə qədər tam ədəd daxil et",
       "permissionNote": "Bu parametrləri yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri dəyişə bilər.",
@@ -2048,7 +2060,10 @@
       "settleFailed": "İş tamamlandı, lakin nəticəni qeyd edə bilmədik. Yenidən cəhd et.",
       "replayFailed": "Bu iş tamamlanmadı. Yenidən cəhd et.",
       "actionFailed": "Bu işi tamamlamaq mümkün olmadı. Yenidən cəhd et.",
-      "actionBlocked": "Bu işi tamamlamaq mümkün olmadı. Problemi həll etmədən yenidən cəhd etmək olmaz."
+      "actionBlocked": "Bu işi tamamlamaq mümkün olmadı. Problemi həll etmədən yenidən cəhd etmək olmaz.",
+      "syncNoRepositories": "Sinxronizasiya əhatəsində repozitoriya yoxdur. Təhlükəsizlik agentinin izlədiyi repozitoriyaları seç, sonra yenidən sinxronlaşdır.",
+      "syncIntegrationInactive": "Təhlükəsizlik agenti üçün GitHub bağlantısı aktiv deyil. Kilo GitHub tətbiqini yenidən qoş, sonra yenidən sinxronlaşdır.",
+      "syncMissingPermission": "Kilo GitHub tətbiqi zəiflik xəbərdarlıqlarını oxuya bilmir. Həmin icazəni GitHub-da ver, sonra yenidən sinxronlaşdır."
     },
     "analysisState": {
       "queued": "Təhlil növbəyə alınıb",
@@ -2082,7 +2097,6 @@
       "closedOn": "{{date}} — {{status}}",
       "deadlineNotSet": "Müddət təyin edilməyib",
       "noSlaDeadline": "SLA müddəti yoxdur",
-      "dueOn": "{{date}} tarixində bitir",
       "overdueNow": "Gecikib",
       "overdue_one": "{{count}} gün gecikib",
       "overdue_other": "{{count}} gün gecikib",
@@ -2753,7 +2767,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Qalereya",
-      "files": "Fayl",
+      "files": "Fayllar",
       "couldNotOpenPhotoPicker": "Şəkil seçicisini açmaq mümkün olmadı. Kilo-nu yenidən başlat və yenidən cəhd et.",
       "maxFilesAllowed": "Ən çox {{displayCount}} fayl əlavə etmək olar.",
       "onlyAddingFiles": "{{total}} fayldan yalnız {{accepted}} fayl əlavə olunur (ən çox {{max}})",
@@ -3136,7 +3150,7 @@
     "couldNotSaveChoice": "Seçimini saxlamaq mümkün olmadı. Yenidən cəhd et.",
     "onlineAllowed": "Onlayn, icazə verilib",
     "onlineNotAllowed": "Onlayn, icazə verilməyib",
-    "optionalReview": "İstəyə bağlı — istənilən vaxt parametrlərdə dəyişə bilərsən",
+    "optionalReview": "İstəyə bağlı",
     "optionalOnboarding": "İstəyə bağlı — söndürməsən, aktiv qalır",
     "aiProvidersWhat": "Sorğuların, söhbət tarixçən və əlavə etdiyin bütün fayllar.",
     "aiProvidersWhy": "AI cavabları yaratmaq üçün.",
@@ -3834,6 +3848,7 @@
       "markSecret": "Gizli olaraq qeyd edin",
       "masked": "Gizli dəyər",
       "reveal": "Dəyəri aşkar etmək",
+      "hide": "Dəyəri gizlətmək",
       "newValuePlaceholder": "Yeni gizli dəyər daxil edin",
       "valuePlaceholder": "Gizli dəyər (şifrələnmiş)"
     },
@@ -3962,7 +3977,8 @@
       "nameRequired": "Komanda adını daxil edin",
       "nameInvalid": "Ad kiçik hərflə başlamalı və yalnız kiçik hərflərdən, rəqəmlərdən və tirelərdən istifadə etməlidir",
       "templateRequired": "Komanda şablonu daxil edin",
-      "nameConflict": "Bu ad daxili əmrlə qorunur"
+      "nameConflict": "Bu ad daxili əmrlə qorunur",
+      "duplicateName": "Bu profildə bu adda komanda artıq mövcuddur"
     },
     "repoBindings": {
       "title": "Repos üçün defolt profillər",
@@ -3971,7 +3987,7 @@
       "emptyDescription": "Repo üçün sessiyalara başladıqda profili avtomatik tətbiq etmək üçün defolt əlavə edin.",
       "repo": "Repozitoru seçin...",
       "profile": "Profil seçin",
-      "remove": "Açın",
+      "removeForRepo": "{{repo}} üçün bağlantını açın",
       "search": "Repozitoriyaları axtarın...",
       "addedToast": "\"{{repo}}\" üçün defolt profil ayarlandı",
       "addFailed": "Defolt profili qurmaq mümkün olmadı",

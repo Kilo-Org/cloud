@@ -61,6 +61,42 @@ export const STATE_ACTION_CLASS = 'min-h-[48px]';
 export const ROW_TARGET_CLASS = 'min-h-[48px]';
 
 /**
+ * The box a profile row's identity block renders: the item's name and what
+ * qualifies it, declared first in the row. It spans {@link ICON_TARGET_DP}, the
+ * height of the controls beside it, so its frame is the row's leading top
+ * corner rather than a shorter block the taller control boxes start above.
+ * Assistive technology focuses a row from its layout, so a block that starts
+ * higher is reached before those controls. Explicit px, because NativeWind's
+ * rem is 14pt here.
+ */
+export const ROW_IDENTITY_CLASS = 'min-h-[48px] min-w-0 flex-1 justify-center';
+
+/**
+ * The frame a dense interactive row renders when it keeps the group's own
+ * rhythm instead of {@link ROW_TARGET_CLASS}: `py-3` top and bottom plus the
+ * row's 13px value line. Measured on the Android emulator at font scale 1, a
+ * `KvRow` reads 38.9–39.6 dp tall — the rhythm every `KvRow` group already
+ * uses. A list of counts reads as one column, so its rows keep that rhythm
+ * rather than the taller interactive frame.
+ */
+export const DENSE_ROW_FRAME_DP = 39;
+
+/**
+ * Per-side vertical `hitSlop` of a row on {@link DENSE_ROW_FRAME_DP}:
+ * `39 + 3 + 3 = 45 dp`, past `DESIGN.md:364`'s 44pt design target, so even the
+ * shortest measured frame (38.9 dp) reaches 44.9 dp. Stacked rows share the
+ * boundary between them, so two neighbours' reaches meet instead of leaving a
+ * dead strip, and neither reaches another control.
+ */
+export const DENSE_ROW_HIT_SLOP_DP = 3;
+
+/** The `hitSlop` a row on {@link DENSE_ROW_FRAME_DP} renders, as {@link DENSE_ROW_HIT_SLOP_DP}. */
+export const DENSE_ROW_HIT_SLOP = {
+  top: DENSE_ROW_HIT_SLOP_DP,
+  bottom: DENSE_ROW_HIT_SLOP_DP,
+} as const;
+
+/**
  * The box every icon-only control renders. Its own node carries the target, as
  * a control-size audit measures, and 32pt clears the audit's
  * {@link MIN_TAP_TARGET_DP} floor while fitting the agents header row's

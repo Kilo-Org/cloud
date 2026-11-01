@@ -28,6 +28,19 @@ type SectionHeaderProps = {
    * visible action. Pass null while there is nothing to report.
    */
   notice?: ReactNode;
+  /**
+   * Reserves the action frame's height above the label line, so the label keeps
+   * the same leading air whether or not the row carries an action.
+   *
+   * A row with an action is as tall as the action's touch frame, and its label
+   * sits on the row's content bottom edge, so that frame already holds the label
+   * its whole height below the row's top edge. A row without an action is one
+   * label line tall, which puts its label much closer to the block above it and
+   * reads as a second rhythm on one screen (home-header-section-gap). Home passes
+   * this for its sections, whose rows sit both directly under the brand row and
+   * under the sections column's `gap-2`.
+   */
+  reserveLabelAir?: boolean;
 };
 
 export function SectionHeader({
@@ -36,21 +49,51 @@ export function SectionHeader({
   onActionPress,
   actionHidden = false,
   notice,
+  reserveLabelAir = false,
 }: Readonly<SectionHeaderProps>) {
   const hasAction = Boolean(actionLabel && onActionPress) && !(actionHidden && notice);
+  // With a notice the label keeps its own width, so the notice takes all the
+  // free space on the line instead of an equal share of it.
+  const labelText = (
+    <Text variant="eyebrow" className={cn('max-w-full', !reserveLabelAir && !notice && 'grow')}>
+      {label}
+    </Text>
+  );
   return (
-    <View className="flex-row flex-wrap items-center justify-end gap-2 px-4 pb-2 pt-2">
+    // The label sits on the row's content bottom edge (`items-end`), not on its
+    // vertical centre. An action's touch box is 48 dp tall while the label is
+    // one 11 px line, so a centred row holds the label 17 dp above the rows and
+    // cards it names — twice the gap a header without an action has — and the
+    // same label-to-content relation then reads as two different spacings
+    // (home section-label gap). The box still sets the row's height, so the air
+    // sits above the line instead of between the label and its content, which
+    // is the header's own `pb-2` everywhere.
+    //
+    // With `reserveLabelAir` the label reserves that same frame height on its
+    // own, so a row without an action holds its label as far below the row's top
+    // edge as a row with one, and neither form needs leading padding on the row
+    // (home-header-section-gap).
+    <View
+      className={cn(
+        'flex-row flex-wrap items-end justify-end gap-2 px-4 pb-2',
+        reserveLabelAir ? 'pt-0' : 'pt-2'
+      )}
+    >
       {/* With a notice the label keeps its own width, so the notice takes all
           the free space on the line instead of an equal share of it. */}
-      <Text variant="eyebrow" className={cn('max-w-full', !notice && 'grow')}>
-        {label}
-      </Text>
+      {reserveLabelAir ? (
+        <View className={cn('flex-col justify-end', !notice && 'grow', textActionTargetClass())}>
+          {labelText}
+        </View>
+      ) : (
+        labelText
+      )}
       {notice ? (
         <View className="min-w-0 shrink grow basis-0 flex-row items-center justify-end gap-2">
           {notice}
         </View>
       ) : null}
-      {notice && hasAction ? <View className="h-3 w-px bg-border" /> : null}
+      {notice && hasAction ? <View className="h-3 w-px self-center bg-border" /> : null}
       {hasAction ? (
         <Pressable
           onPress={onActionPress}
@@ -78,9 +121,13 @@ export function SectionHeader({
           // parent, so a shrunk layout box would leave part of the target dead
           // (`textActionTargetClass`, `comment-row.tsx`). The hidden action keeps
           // the same box, so hiding it still cannot resize the header.
+          // Its copy sits on the box's bottom edge (`items-end`, the row's own
+          // cross-axis rule), so the action and the section label share one
+          // baseline instead of the action holding the label half a box away
+          // from the content it names.
           className={cn(
             textActionTargetClass(),
-            'max-w-full shrink-0 flex-row items-center justify-center active:opacity-70',
+            'max-w-full shrink-0 flex-row items-end justify-center active:opacity-70',
             actionHidden && 'opacity-0'
           )}
         >

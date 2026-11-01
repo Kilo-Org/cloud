@@ -6,13 +6,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { AgentSessionsSection } from '@/components/home/home-agent-sessions-section';
+import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 
 const navigateSpy = vi.hoisted(() => vi.fn());
 const dismissToSpy = vi.hoisted(() => vi.fn());
 const sessionDestination = vi.hoisted(() => ({ id: '' }));
-const connectivity = vi.hoisted(() => ({ offline: false }));
+const connectivity = vi.hoisted(() => ({ offline: false, connected: true, exhausted: false }));
 const queryClient = new ReactQuery.QueryClient();
 vi.mock('expo-router', () => ({
   useRouter: () => ({ navigate: navigateSpy, dismissTo: dismissToSpy }),
@@ -98,7 +99,7 @@ vi.mock('@/components/home/section-header', async () => {
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: () => null }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: vi.fn() }));
@@ -111,8 +112,8 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
   useUserWebConnectionHealth: () => ({
-    isConnected: !connectivity.offline,
-    reconnectExhausted: false,
+    isConnected: connectivity.connected && !connectivity.offline,
+    reconnectExhausted: connectivity.exhausted,
   }),
 }));
 vi.mock('@/components/agents/user-web-connection-provider', () => ({
@@ -196,6 +197,8 @@ beforeEach(() => {
   dismissToSpy.mockClear();
   sessionDestination.id = '';
   connectivity.offline = false;
+  connectivity.connected = true;
+  connectivity.exhausted = false;
 });
 afterEach(() => {
   act(() => renderer?.unmount());
@@ -333,5 +336,92 @@ describe('Home live section', () => {
         candidate.children.includes('No internet connection')
       )
     ).not.toHaveLength(0);
+  });
+});
+
+describe('Home live section status box', () => {
+  // Home reports the live facts in the section header, so the feedback column
+  // must add no box of its own: the card column's `gap-2` would then place the
+  // card below an invisible child, twice as far from the section label as the
+  // Explore rows are from theirs (home section-label gap).
+  function mountFeedback(
+    sessions: Props['sessions'] = settled,
+    contextOverride: Props['context'] = context
+  ) {
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(LiveSessionFeedback, {
+          context: contextOverride,
+          sessions,
+          failureLabel: "Couldn't load active sessions",
+          inlineNotices: false,
+        })
+      );
+    });
+  }
+
+  it.each([
+    ['the accepted list is empty', settled, context],
+    [
+      'the list is still resolving',
+      { ...settled, hasAcceptedSuccess: false },
+      { ...context, isResolving: true },
+    ],
+    [
+      'rows are shown',
+      {
+        ...settled,
+        activeSessions: [session('a1', 'running', { statusUpdatedAt: new Date().toISOString() })],
+      },
+      context,
+    ],
+  ])('draws no box between the label and the card while %s', (_state, sessions, ctx) => {
+    mountFeedback(sessions, ctx);
+    expect(nodes('View')).toHaveLength(0);
+  });
+
+  it('keeps announcing a pending list without drawing a box', () => {
+    mountFeedback({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
+    expect(nodes('AccessibleStatus').map(status => status.props.message)).toContain(
+      i18n.t('common.loading')
+    );
+    expect(nodes('View')).toHaveLength(0);
+  });
+
+  it('draws the column when the failure block owns the surface', () => {
+    mountFeedback(settled, { ...context, isError: true });
+    expect(nodes('View').length).toBeGreaterThan(0);
+    expect(nodes('QueryError')).toHaveLength(1);
+  });
+
+  it('keeps the status announcement mounted when the visible column appears', () => {
+    // Home flips this way while the socket still reports the same connection
+    // state: the load fails and the column is drawn. A remounted announcement
+    // starts its dedupe from nothing and speaks the unchanged message again, so
+    // the node has to survive the flip.
+    connectivity.connected = false;
+    mountFeedback();
+    const before = nodes('AccessibleStatus').find(
+      status => status.props.message === i18n.t('agentChat.sessionConnection.connecting')
+    );
+    expect(before).toBeDefined();
+    expect(nodes('QueryError')).toHaveLength(0);
+
+    act(() => {
+      renderer?.update(
+        createElement(LiveSessionFeedback, {
+          context: { ...context, isError: true },
+          sessions: settled,
+          failureLabel: "Couldn't load active sessions",
+          inlineNotices: false,
+        })
+      );
+    });
+    expect(nodes('QueryError')).toHaveLength(1);
+    const after = nodes('AccessibleStatus').filter(
+      status => status.props.message === i18n.t('agentChat.sessionConnection.connecting')
+    );
+    expect(after).toHaveLength(1);
+    expect(after[0]).toBe(before);
   });
 });

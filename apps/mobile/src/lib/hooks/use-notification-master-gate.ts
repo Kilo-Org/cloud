@@ -18,6 +18,12 @@ export type NotificationMasterGate = Readonly<{
   loading: boolean;
   /** Every input answered, including by failing. */
   settled: boolean;
+  /**
+   * Every input answered with data rather than failing. A surface may only
+   * claim pushes are off when this is true: a read that failed leaves the
+   * answer unknown.
+   */
+  answered: boolean;
   /** The OS allows this app to post notifications. */
   permissionGranted: boolean;
   /** OS permission granted and this device's token is registered on the account. */
@@ -52,6 +58,14 @@ export function useNotificationMasterGate(): NotificationMasterGate {
   const pushTokens = useQuery({
     ...trpc.user.getMyPushTokens.queryOptions(),
     enabled: authToken != null,
+    // The history screen shows its push banner above content that must not
+    // move once it has settled, so it waits for this gate. A read started
+    // offline must therefore settle into its error instead of pausing in
+    // `pending`, which would hold that content behind a gate that never
+    // answers; `networkMode: 'always'` also drops the derived reconnect
+    // refetch, so ask for it back.
+    networkMode: 'always',
+    refetchOnReconnect: true,
   });
 
   const settled = deriveGateSettled({
@@ -68,6 +82,9 @@ export function useNotificationMasterGate(): NotificationMasterGate {
   return {
     loading: !settled,
     settled,
+    answered:
+      permission.isSuccess &&
+      (!permissionGranted || (pushTokens.isSuccess && deviceToken.isSuccess)),
     permissionGranted,
     pushEnabled: permissionGranted && serverRegistered,
   };

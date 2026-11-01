@@ -52,11 +52,12 @@ type NewSessionProfileOverrideProps = {
   /** Opens the repo default-profile bindings screen from the advanced config. */
   onOpenRepoDefaults?: () => void;
   /**
-   * The Organization section above Run on: the active account the create is
-   * attributed to. The body renders it for every entry point — switchable on
-   * the ordinary entry, a read-only scope row on the clone entry.
+   * The Account section above Run on: the active account the create is
+   * attributed to, personal or organization. The body renders it for every
+   * entry point — switchable on the ordinary entry, a read-only scope row on
+   * the clone entry.
    */
-  organizationSection?: React.ReactNode;
+  accountSection?: React.ReactNode;
 };
 
 /**
@@ -135,7 +136,7 @@ export function NewSessionConfigureForm({
   onManualVarsChange,
   onManualCommandsChange,
   onOpenRepoDefaults,
-  organizationSection,
+  accountSection,
   autoCommit,
   onAutoCommitChange,
   isSpawningRemote,
@@ -257,7 +258,7 @@ export function NewSessionConfigureForm({
         />
       </View>
 
-      {/* The block under the card the frame must still show: the Organization
+      {/* The block under the card the frame must still show: the Account
           section when the entry point renders one, then the Run on row and its
           refresh control. Each child's own `mt-*` lives inside this wrapper, so
           the prompt's frame fit reserves the block's whole footprint. */}
@@ -267,7 +268,7 @@ export function NewSessionConfigureForm({
           setRunTargetHeight(current => (current === next ? current : next));
         }}
       >
-        {organizationSection}
+        {accountSection}
         <NewSessionRunTarget
           showRunOnSelector={showRunOnSelector}
           runOnInstance={runOnInstance}

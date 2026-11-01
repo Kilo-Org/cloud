@@ -217,19 +217,40 @@ describe('ConsentCard', () => {
     expect(t).toContain('Before we get started');
     expect(t).toContain('Optional — on unless you turn it off');
     expect(t).not.toContain('Data sharing preferences');
-    expect(t).not.toContain('Optional — you can change this any time in Settings');
+    expect(t).not.toContain('Optional');
     expect(t).toContain('Help improve Kilo');
     expect(t).toContain('Accept and continue');
     expect(t).toContain('Decline');
+  });
+
+  it('names the brand with the header mark instead of repeating it as text', () => {
+    const renderer = mountCard('onboarding');
+    expect(texts(renderer.root)).not.toContain(i18n.t('consent.kilo'));
+    const marks = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' && node.props.accessibilityLabel === i18n.t('consent.kilo')
+    );
+    expect(marks).toHaveLength(1);
+    expect(marks[0]?.props.accessibilityRole).toBe('image');
   });
 
   it('renders review wording in review mode', () => {
     const renderer = mountCard('review');
     const t = texts(renderer.root);
     expect(t).toContain('Data sharing preferences');
-    expect(t).toContain('Optional — you can change this any time in Settings');
+    // The optional section header is the headword alone: the toggle card's own
+    // description already says the choice can be changed in Settings.
+    expect(t).toContain('Optional');
+    expect(t).not.toContain('Optional — you can change this any time in Settings');
     expect(t).not.toContain('Before we get started');
     expect(t).not.toContain('Optional — on unless you turn it off');
+
+    // One filled action per footer: the safe way out keeps the fill, and the
+    // destructive one is outlined so it cannot compete with it.
+    const back = findButton(renderer.root, 'Back');
+    const revoke = findButton(renderer.root, 'Revoke consent');
+    expect(back.props.variant ?? 'default').toBe('default');
+    expect(revoke.props.variant).toBe('outline-destructive');
   });
 
   it('defaults the optional switch to on', () => {

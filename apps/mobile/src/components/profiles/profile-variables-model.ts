@@ -28,7 +28,7 @@ export type VariableRow = Readonly<{
 }>;
 
 /** The dot run a hidden secret renders instead of its value. */
-export const SECRET_MASK = '••••••••';
+export const SECRET_MASK = '••••••';
 
 /**
  * Render rows from the profile's variables. A secret is masked by default: the

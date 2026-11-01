@@ -522,6 +522,7 @@ export type GitTokenService = {
 };
 
 export type Env = {
+  AI?: Ai;
   CLOUD_AGENT_CONTAINER_BILLING_ENABLED?: string;
   CLOUD_AGENT_CONTAINER_BILLING_USER_IDS?: string;
   CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS?: string;

@@ -145,6 +145,48 @@ type WorkspaceRow = {
   lastActivityAt: string;
 };
 
+type SessionTitleRow = {
+  session_id: string;
+  kilo_user_id: string;
+  title: string | null;
+  updated_at: string;
+};
+
+function makeSessionTitleDbFakes(params: {
+  existing?: SessionTitleRow;
+  updated?: SessionTitleRow;
+}) {
+  let selectCondition: SQL | undefined;
+  let updateCondition: SQL | undefined;
+  const select = {
+    from: vi.fn(() => select),
+    where: vi.fn((condition: SQL) => {
+      selectCondition = condition;
+      return select;
+    }),
+    limit: vi.fn(async () => (params.existing ? [params.existing] : [])),
+  };
+  const updateSet = vi.fn((_values: unknown) => update);
+  const update = {
+    set: updateSet,
+    where: vi.fn((condition: SQL) => {
+      updateCondition = condition;
+      return update;
+    }),
+    returning: vi.fn(async () => (params.updated ? [params.updated] : [])),
+  };
+  const db = {
+    select: vi.fn(() => select),
+    update: vi.fn(() => update),
+  };
+  return {
+    db,
+    selectCondition: () => selectCondition,
+    updateCondition: () => updateCondition,
+    updateSet,
+  };
+}
+
 function makeWorkspaceDbFakes(results: unknown[][]) {
   const queuedResults = [...results];
   const whereConditions: SQL[] = [];
@@ -664,6 +706,164 @@ describe('createSessionForCloudAgent', () => {
       rpc.createSessionForCloudAgent({ ...params, gitUrl: 'https://github.com/other/repo' })
     ).rejects.toThrow('Cloud Agent root session identity conflict');
   });
+});
+
+describe('setGeneratedTitleForCloudAgent', () => {
+  const sessionId = sdkSessionInfoFixture.id;
+  const cloudAgentSessionId = 'workspace_11111111-1111-4111-8111-111111111111';
+  const existingRow: SessionTitleRow = {
+    session_id: sessionId,
+    kilo_user_id: 'usr_owner',
+    title: 'New session - 2026-08-04T10:00:00.000Z',
+    updated_at: '2026-08-04T10:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('applies a generated title scoped to the Cloud Agent session and emits session.updated', async () => {
+    const fake = makeSessionTitleDbFakes({
+      existing: existingRow,
+      updated: { ...existingRow, title: 'Fix the login redirect' },
+    });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(
+      rpc.setGeneratedTitleForCloudAgent({
+        sessionId,
+        kiloUserId: 'usr_owner',
+        cloudAgentSessionId,
+        title: 'Fix the login redirect',
+      })
+    ).resolves.toEqual({ applied: true });
+
+    expect(fake.updateSet).toHaveBeenCalledWith({
+      title: 'Fix the login redirect',
+      updated_at: existingRow.updated_at,
+    });
+    const selectQuery = new PgDialect().sqlToQuery(fake.selectCondition()!);
+    expect(selectQuery.sql).toContain('"cli_sessions_v2"."cloud_agent_session_id" = $');
+    expect(selectQuery.params).toEqual(
+      expect.arrayContaining([sessionId, 'usr_owner', cloudAgentSessionId])
+    );
+    const updateQuery = new PgDialect().sqlToQuery(fake.updateCondition()!);
+    expect(updateQuery.sql).toContain('"cli_sessions_v2"."cloud_agent_session_id" = $');
+    expect(updateQuery.sql).toContain('"cli_sessions_v2"."title" = $');
+    expect(updateQuery.params).toEqual(
+      expect.arrayContaining([sessionId, 'usr_owner', cloudAgentSessionId, existingRow.title])
+    );
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      'usr_owner',
+      {
+        type: 'session.updated',
+        data: {
+          source: 'v2',
+          session: { id: sessionId, updatedAt: existingRow.updated_at },
+          changedAt: existingRow.updated_at,
+        },
+      },
+      expect.anything()
+    );
+  });
+
+  it('trims the generated title before persisting it', async () => {
+    const fake = makeSessionTitleDbFakes({
+      existing: existingRow,
+      updated: { ...existingRow, title: 'Fix the login redirect' },
+    });
+    const rpc = makeRpc(fake.db as never);
+
+    await rpc.setGeneratedTitleForCloudAgent({
+      sessionId,
+      kiloUserId: 'usr_owner',
+      cloudAgentSessionId,
+      title: '  Fix the login redirect  ',
+    });
+
+    expect(fake.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Fix the login redirect' })
+    );
+  });
+
+  it('returns applied false without a write or event when the session is not found', async () => {
+    const fake = makeSessionTitleDbFakes({});
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(
+      rpc.setGeneratedTitleForCloudAgent({
+        sessionId,
+        kiloUserId: 'usr_owner',
+        cloudAgentSessionId,
+        title: 'Fix the login redirect',
+      })
+    ).resolves.toEqual({ applied: false });
+
+    expect(fake.db.update).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('returns applied false when the title is no longer the creation placeholder', async () => {
+    const fake = makeSessionTitleDbFakes({
+      existing: { ...existingRow, title: 'User chosen title' },
+    });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(
+      rpc.setGeneratedTitleForCloudAgent({
+        sessionId,
+        kiloUserId: 'usr_owner',
+        cloudAgentSessionId,
+        title: 'Fix the login redirect',
+      })
+    ).resolves.toEqual({ applied: false });
+
+    expect(fake.db.update).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('returns applied false without an event when the guarded write loses the race', async () => {
+    const fake = makeSessionTitleDbFakes({ existing: existingRow });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(
+      rpc.setGeneratedTitleForCloudAgent({
+        sessionId,
+        kiloUserId: 'usr_owner',
+        cloudAgentSessionId,
+        title: 'Fix the login redirect',
+      })
+    ).resolves.toEqual({ applied: false });
+
+    expect(fake.db.update).toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['not-a-session', cloudAgentSessionId, 'Title'],
+    [sessionId, 'workspace_not-a-uuid', 'Title'],
+    [sessionId, cloudAgentSessionId, ''],
+    [sessionId, cloudAgentSessionId, 'x'.repeat(201)],
+  ])(
+    'rejects invalid input before opening the database',
+    async (badSessionId, badCloudId, title) => {
+      const fake = makeSessionTitleDbFakes({ existing: existingRow });
+      const rpc = makeRpc(fake.db as never);
+      vi.mocked(getWorkerDb).mockClear();
+
+      await expect(
+        rpc.setGeneratedTitleForCloudAgent({
+          sessionId: badSessionId,
+          kiloUserId: 'usr_owner',
+          cloudAgentSessionId: badCloudId,
+          title,
+        })
+      ).rejects.toThrow();
+
+      expect(getWorkerDb).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('createSessionForCloudAgent clone path', () => {

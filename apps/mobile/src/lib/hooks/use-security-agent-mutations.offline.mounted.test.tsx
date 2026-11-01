@@ -275,8 +275,13 @@ describe('Security Agent settings writes while the device is offline', () => {
     // reconcile-first row makes the next launch offer the same-key retry
     // instead of re-POSTing blind.
     expect(callsTo('securityAgent.triggerSync')).toBe(1);
-    expect(holder.syncPending).toBe(false);
+    // TanStack settles `mutateAsync` before its `setTimeout`-scheduled observer
+    // batch re-renders the probe, so a busy runner can still read the previous
+    // render here: the mutation's error and its cleared pending state are both
+    // one batch behind the rejection. Wait for that render before asserting it.
+    await waitFor(() => holder.syncError !== null && !holder.syncPending);
     expect(holder.syncError).toBe(i18n.t('securityAgent.mutations.actionFailed'));
+    expect(holder.syncPending).toBe(false);
     expect(failure).toBeInstanceOf(Error);
     expect((failure as Error).message).toBe(holder.syncError);
     expect(outbox.writeReconcileFirst).toHaveBeenCalledTimes(1);

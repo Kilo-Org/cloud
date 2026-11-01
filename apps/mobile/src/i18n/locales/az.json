@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Şəxsi defoltu olmayan üzvlər üçün avtomatik yüklənir.",
     "setAsDefault": "Defolt olaraq təyin edin",
     "saveFailed": "Profili saxlamaq mümkün olmadı",
+    "organizationRoleRequired": "Təşkilat profillərini yalnız təşkilat sahibləri və inzibatçılar dəyişə bilər.",
     "deleteTitle": "Profili silin",
     "deleteMessage": "Bu, profili və onun parametrlərini həmişəlik silir. Bu geri qaytarıla bilməz.",
     "deleteFailed": "Profili silmək mümkün olmadı",

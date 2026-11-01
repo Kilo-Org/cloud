@@ -3838,6 +3838,7 @@
     "organizationDefaultDescription": "ምንም የግል ነባሪ ለሌላቸው አባላት በራስ-የተጫነ።",
     "setAsDefault": "እንደ ነባሪ አዘጋጅ",
     "saveFailed": "መገለጫ ማስቀመጥ አልተቻለም",
+    "organizationRoleRequired": "የድርጅት መገለጫዎችን መቀየር የሚችሉት የድርጅት ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።",
     "deleteTitle": "መገለጫን ሰርዝ",
     "deleteMessage": "ይሄ መገለጫውን እና ቅንብሮቹን እስከመጨረሻው ያስወግዳል። ይህ ሊቀለበስ አይችልም።",
     "deleteFailed": "መገለጫን መሰረዝ አልተቻለም",

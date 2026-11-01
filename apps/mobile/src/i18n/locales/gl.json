@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Cargado automático para membros que non teñen ningún valor predeterminado persoal.",
     "setAsDefault": "Establecer como predeterminado",
     "saveFailed": "Non se puido gardar o perfil",
+    "organizationRoleRequired": "Só os propietarios da organización e os administradores poden cambiar os perfís da organización.",
     "deleteTitle": "Eliminar perfil",
     "deleteMessage": "Isto elimina permanentemente o perfil e a súa configuración. Isto non se pode desfacer.",
     "deleteFailed": "Non se puido eliminar o perfil",

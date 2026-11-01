@@ -3888,6 +3888,7 @@
     "organizationDefaultDescription": "Automatski se učitava za članove koji nemaju lične podrazumevane vrednosti.",
     "setAsDefault": "Postavi kao podrazumevano",
     "saveFailed": "Nije moguće sačuvati profil",
+    "organizationRoleRequired": "Samo vlasnici organizacije i administratori mogu da promene profil organizacije.",
     "deleteTitle": "Izbriši profil",
     "deleteMessage": "Ovo trajno uklanja profil i njegova podešavanja. Ovo se ne može poništiti.",
     "deleteFailed": "Brisanje profila nije uspelo",

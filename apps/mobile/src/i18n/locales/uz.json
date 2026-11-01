@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Shaxsiy standarti bo'lmagan a'zolar uchun avtomatik yuklanadi.",
     "setAsDefault": "Standart sifatida o'rnating",
     "saveFailed": "Profilni saqlab bo‘lmadi",
+    "organizationRoleRequired": "Faqat tashkilot egalar va administratorlar tashkilot profilini o'zgartirishi mumkin.",
     "deleteTitle": "Profilni o'chirish",
     "deleteMessage": "Bu profil va uning sozlamalarini butunlay olib tashlaydi. Buni ortga qaytarib bo‘lmaydi.",
     "deleteFailed": "Profilni oʻchirib boʻlmadi",

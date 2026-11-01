@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Ka utaina aunoa mo nga mema karekau he taunoa.",
     "setAsDefault": "Tautuhi hei taunoa",
     "saveFailed": "Kāore i taea te tiaki kōtaha",
+    "organizationRoleRequired": "Ko ngā rangatira o te rōpū me ngā kaiwhakahaere anake ka āhei ki te huri i ngā kōtaha rōpū.",
     "deleteTitle": "Mukua te kōtaha",
     "deleteMessage": "Ka tangohia tonutia te kōtaha me ona tautuhinga. Kaore e taea te whakakore i tenei.",
     "deleteFailed": "Kāore i taea te muku kōtaha",

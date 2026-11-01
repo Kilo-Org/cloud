@@ -3894,6 +3894,7 @@
     "organizationDefaultDescription": "Carregado automaticamente para membros que não têm predefinição pessoal.",
     "setAsDefault": "Definir como predefinido",
     "saveFailed": "Não foi possível guardar o perfil",
+    "organizationRoleRequired": "Apenas os proprietários da organização e os administradores podem alterar os perfis da organização.",
     "deleteTitle": "Eliminar perfil",
     "deleteMessage": "Elimina permanentemente o perfil e as respetivas definições. Esta ação não pode ser anulada.",
     "deleteFailed": "Não foi possível eliminar o perfil",

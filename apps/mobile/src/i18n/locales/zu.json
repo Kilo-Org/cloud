@@ -3838,6 +3838,7 @@
     "organizationDefaultDescription": "Kulayishwa ngokuzenzakalelayo kumalungu angenakho okumisiwe komuntu siqu.",
     "setAsDefault": "Setha njengokuzenzakalelayo",
     "saveFailed": "Ayikwazanga ukulondoloza iphrofayela",
+    "organizationRoleRequired": "Abanikazi benhlangano nabalawuli kuphela abangashintsha iphrofayela yenhlangano.",
     "deleteTitle": "Susa iphrofayela",
     "deleteMessage": "Lokhu kususa iphrofayela nezilungiselelo zayo unomphela. Lokhu akukwazi ukuhlehliswa.",
     "deleteFailed": "Ayikwazanga ukususa iphrofayela",

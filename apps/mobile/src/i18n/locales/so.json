@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Si otomaatig ah ayaa loogu shubay xubnaha aan lahayn khaladka gaarka ah.",
     "setAsDefault": "U deji sidii hore",
     "saveFailed": "Waa la kaydin kari waayay astaanta guud",
+    "organizationRoleRequired": "Milkiilayaasha ururka iyo maamulayaasha oo keliya ayaa bedeli kara astaanta guud ee ururka.",
     "deleteTitle": "Tirtir astaanta guud",
     "deleteMessage": "Tani waxay si joogto ah meesha uga saaraysaa astaanta guud iyo dejinta Tan lama celin karo.",
     "deleteFailed": "Waa la tirtiri waayay astaanta guud",

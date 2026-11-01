@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Tự động tải cho các thành viên không có mặc định cá nhân.",
     "setAsDefault": "Đặt làm mặc định",
     "saveFailed": "Không thể lưu hồ sơ",
+    "organizationRoleRequired": "Chỉ chủ sở hữu tổ chức và quản trị viên mới có thể thay đổi hồ sơ tổ chức.",
     "deleteTitle": "Xóa hồ sơ",
     "deleteMessage": "Thao tác này sẽ xóa vĩnh viễn hồ sơ và cài đặt của nó. Điều này không thể hoàn tác được.",
     "deleteFailed": "Không thể xóa hồ sơ",

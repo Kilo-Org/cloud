@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Miseensoota durtii dhuunfaa hin qabneef ofumaan fe'ameera.",
     "setAsDefault": "Akka durtiitti saagi",
     "saveFailed": "Profaayilii qusachuu hin dandeenye",
+    "organizationRoleRequired": "Abbootiin dhaabbataa fi bulchitootaa qofa profaayilii dhaabbataa jiijjiiruu danda'u.",
     "deleteTitle": "Profaayilii haquu",
     "deleteMessage": "Kunis dhaabbataadhaan piroofaayilii fi qindaa'inoota isaa ni haqa. Kun duubatti deebi’uu hin danda’u.",
     "deleteFailed": "Profaayila haquu hin dandeenye",

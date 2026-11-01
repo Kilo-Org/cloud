@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Automatikusan betöltve azon tagok számára, akiknek nincs személyes alapértelmezésük.",
     "setAsDefault": "Beállítás alapértelmezettként",
     "saveFailed": "Nem sikerült menteni a profilt",
+    "organizationRoleRequired": "Csak a szervezet tulajdonosai és adminisztrátorai módosíthatják a szervezeti profilokat.",
     "deleteTitle": "Profil törlése",
     "deleteMessage": "Ezzel véglegesen eltávolítja a profilt és beállításait. Ezt nem lehet visszavonni.",
     "deleteFailed": "Nem sikerült törölni a profilt",

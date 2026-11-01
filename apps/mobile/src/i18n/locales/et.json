@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Laaditakse automaatselt liikmetele, kellel pole isiklikku vaikeprofiili.",
     "setAsDefault": "Määra vaikeväärtuseks",
     "saveFailed": "Profiili ei saanud salvestada",
+    "organizationRoleRequired": "Organisatsiooni profiile saavad muuta ainult organisatsiooni omanikud ja administraatorid.",
     "deleteTitle": "Kustuta profiil",
     "deleteMessage": "See eemaldab jäädavalt profiili ja selle seaded. Seda ei saa tagasi võtta.",
     "deleteFailed": "Profiili ei saanud kustutada",

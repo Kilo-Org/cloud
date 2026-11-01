@@ -4000,6 +4000,7 @@
     "organizationDefaultDescription": "Auto-loaded għal membri li m'għandhom l-ebda default personali.",
     "setAsDefault": "Issettja bħala default",
     "saveFailed": "Ma setax isalva l-profil",
+    "organizationRoleRequired": "Is-sidien u l-amministraturi tal-organizzazzjoni biss jistgħu jibdlu l-profil tal-organizzazzjoni.",
     "deleteTitle": "Ħassar il-profil",
     "deleteMessage": "Dan ineħħi b'mod permanenti l-profil u s-settings tiegħu. Dan ma jistax jitneħħa.",
     "deleteFailed": "Ma setax iħassar il-profil",

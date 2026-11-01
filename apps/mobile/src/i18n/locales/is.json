@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Sjálfvirkt hlaðið fyrir meðlimi sem hafa engin persónuleg vanskil.",
     "setAsDefault": "Stillt sem sjálfgefið",
     "saveFailed": "Ekki tókst að vista prófílinn",
+    "organizationRoleRequired": "Aðeins eigendur fyrirtækisins og stjórnendur geta breytt prófílum fyrirtækisins.",
     "deleteTitle": "Eyða prófíl",
     "deleteMessage": "Þetta fjarlægir prófílinn og stillingar hans varanlega. Þetta er ekki hægt að afturkalla.",
     "deleteFailed": "Ekki tókst að eyða prófílnum",

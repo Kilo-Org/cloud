@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "An ɗora ta atomatik don membobi waɗanda ba su da tsoho na sirri.",
     "setAsDefault": "Saita azaman tsoho",
     "saveFailed": "An kasa ajiye bayanan martaba",
+    "organizationRoleRequired": "Masu ƙungiya da masu gudanarwa kawai za su iya canza bayanan martaban ƙungiya.",
     "deleteTitle": "Share bayanin martaba",
     "deleteMessage": "Wannan yana cire bayanan martaba da saitunan sa har abada. Ba za a iya soke wannan ba.",
     "deleteFailed": "An kasa share bayanan martaba",

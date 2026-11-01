@@ -3944,6 +3944,7 @@
     "organizationDefaultDescription": "Ładowane automatycznie dla członków, którzy nie mają domyślnych ustawień osobistych.",
     "setAsDefault": "Ustaw jako domyślny",
     "saveFailed": "Nie udało się zapisać profilu",
+    "organizationRoleRequired": "Tylko właściciele organizacji i administratorzy mogą zmieniać profile organizacji.",
     "deleteTitle": "Usuń profil",
     "deleteMessage": "Spowoduje to trwałe usunięcie profilu i jego ustawień. Tego nie można cofnąć.",
     "deleteFailed": "Nie udało się usunąć profilu",

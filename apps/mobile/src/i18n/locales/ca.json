@@ -3888,6 +3888,7 @@
     "organizationDefaultDescription": "Es carrega automàticament per als membres que no tenen cap predeterminat personal.",
     "setAsDefault": "Estableix com a predeterminat",
     "saveFailed": "No s'ha pogut desar el perfil",
+    "organizationRoleRequired": "Només els propietaris i els administradors de l'organització poden canviar els perfils de l'organització.",
     "deleteTitle": "Suprimeix el perfil",
     "deleteMessage": "Això elimina permanentment el perfil i la seva configuració. Això no es pot desfer.",
     "deleteFailed": "No s'ha pogut suprimir el perfil",

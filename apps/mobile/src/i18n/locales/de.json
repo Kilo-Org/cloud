@@ -3832,6 +3832,7 @@
     "organizationDefaultDescription": "Wird automatisch für Mitglieder geladen, die keinen persönlichen Standard haben.",
     "setAsDefault": "Als Standard festlegen",
     "saveFailed": "Profil konnte nicht gespeichert werden",
+    "organizationRoleRequired": "Nur Organisationsinhaber und Admins können Organisationsprofile ändern.",
     "deleteTitle": "Profil löschen",
     "deleteMessage": "Dadurch werden das Profil und seine Einstellungen dauerhaft entfernt. Dies kann nicht rückgängig gemacht werden.",
     "deleteFailed": "Profil konnte nicht gelöscht werden",

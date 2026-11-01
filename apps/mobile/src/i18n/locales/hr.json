@@ -3888,6 +3888,7 @@
     "organizationDefaultDescription": "Automatski se učitava za članove koji nemaju osobne zadane postavke.",
     "setAsDefault": "Postavi kao zadano",
     "saveFailed": "Nije moguće spremiti profil",
+    "organizationRoleRequired": "Samo vlasnici organizacije i administratori mogu promijeniti profil organizacije.",
     "deleteTitle": "Izbriši profil",
     "deleteMessage": "Ovo trajno uklanja profil i njegove postavke. Ovo se ne može poništiti.",
     "deleteFailed": "Nije moguće izbrisati profil",

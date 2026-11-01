@@ -3,7 +3,7 @@ import { selectionHaptic } from '@/lib/haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, Info, Search, SearchX, X } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, type TextInput, View, type ViewStyle } from 'react-native';
+import { Keyboard, Pressable, type TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -166,6 +166,10 @@ export function ModelPickerContent() {
       selectedVariantRef.current = selection.variant;
       setSelectedModel(option.id);
       setSelectedVariant(selection.variant);
+      // The row press must leave the search keyboard behind: a model with
+      // variants keeps this sheet open on the selection, and the composer's
+      // own screen shows the pick as soon as the sheet closes.
+      Keyboard.dismiss();
       if (option.variants.length <= 1) {
         closePicker();
       }
@@ -332,7 +336,7 @@ export function ModelPickerContent() {
           // callbacks are absent.
           keyExtractor={(item: ModelPickerRow | undefined, index) => item?.key ?? String(index)}
           getItemType={(item: ModelPickerRow | undefined) => item?.type}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
           keyboardDismissMode="on-drag"
           renderItem={renderItem}
         />

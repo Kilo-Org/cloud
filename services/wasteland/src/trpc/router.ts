@@ -428,8 +428,8 @@ export const wastelandRouter = router({
       // that is the org DoltHub proved for this token. The credential's
       // rig handle is the caller's identity, and its org has to be that
       // same proven org; when it is not, this call records no new handle
-      // or proof — the credential keeps only what it already proved for
-      // that same org — and a flow that establishes this org (the join)
+      // or proof — the credential keeps what it already held for that
+      // same org — and a flow that establishes this org (the join)
       // records them later.
       const orgProven = isSameDolthubOrg(result.upstreamOwner, dolthubOrg);
       await doStub.storeCredential({
@@ -796,8 +796,7 @@ export const wastelandRouter = router({
   // written: the handle is the caller's identity inside the wasteland, so
   // only a flow that proved ownership (joinWasteland, or createUpstream
   // for an upstream the caller just created) sets it. Re-storing
-  // credentials keeps the stored handle only through a credential that
-  // still proves the same org.
+  // credentials keeps a stored handle for the org it was recorded for.
   storeCredential: procedure
     .input(
       z.object({

@@ -4,8 +4,9 @@
  * `storeCredential` is reachable from the connect flows, while the rig
  * handle and the org proof are only written by a flow that established
  * the org with DoltHub. These tests pin the split: an explicit handle
- * wins, an omitted handle survives only through a credential that still
- * proves the same org, and a handle on its own proves nothing.
+ * wins, an omitted handle survives only for the org it was recorded for
+ * (with or without a recorded proof), and a handle on its own proves
+ * nothing.
  *
  * Runs against a real SQLite database through a minimal `SqlStorage`
  * shim, because the module only uses `exec(query, ...bindings)`.
@@ -79,7 +80,7 @@ describe('wasteland credentials', () => {
     expect(row?.rig_handle).toBe('alice-rig');
   });
 
-  it('drops a handle that no verified flow backed when credentials are re-stored for the same org', () => {
+  it('keeps a handle recorded before proofs existed while the org is unchanged', () => {
     const sql = freshSql();
     // The shape older rows have: a handle written without a proof.
     storeCredential(sql, WASTELAND_ID, USER_ID, {
@@ -90,13 +91,13 @@ describe('wasteland credentials', () => {
 
     const restored = storeCredential(sql, WASTELAND_ID, USER_ID, {
       encryptedToken: 'enc-2',
-      dolthubOrg: 'alice',
+      dolthubOrg: 'Alice',
     });
 
-    expect(restored.rig_handle).toBeNull();
+    expect(restored.rig_handle).toBe('legacy-rig');
     const row = getCredential(sql, WASTELAND_ID, USER_ID);
     expect(row?.encrypted_token).toBe('enc-2');
-    expect(row?.rig_handle).toBeNull();
+    expect(row?.rig_handle).toBe('legacy-rig');
     expect(row?.proven_org).toBeNull();
   });
 

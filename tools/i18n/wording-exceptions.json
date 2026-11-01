@@ -199,6 +199,7 @@
     "reactions",
     "remediation blocked",
     "remediation failed",
+    "search sessions",
     "session exited",
     "starting",
     "tokens"

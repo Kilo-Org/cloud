@@ -2161,17 +2161,17 @@
     "search": {
       "searching": "Otsimine",
       "searchSessions": "Otsi seansse",
-      "searchSessionsPlaceholder": "Otsi seansse"
+      "searchSessionsPlaceholder": "Otsi seansse…"
     },
     "sessionList": {
-      "couldNotLoadActive": "Aktiivseid seansse ei õnnestunud laadida.",
+      "couldNotLoadActive": "Aktiivseid seansse ei õnnestunud laadida",
       "couldNotRefresh": "Värskendamine ebaõnnestus",
       "noSessionsYetDescription": "Alusta telefonis programmeerimisülesannet.",
       "viewHistory": "Seansside ajalugu",
       "noMatches": "Sobivaid seansse ei leitud",
       "tryDifferentSearch": "Proovi teistsugust otsingusõna.",
       "tryAdjustFilters": "Proovi filtreid muuta või eemaldada.",
-      "couldNotSearch": "Seansse ei õnnestunud otsida.",
+      "couldNotSearch": "Seansse ei õnnestunud otsida",
       "completedWillAppear": "Lõpetatud seansid ilmuvad siia.",
       "noPastSessions": "Varasemaid seansse pole",
       "pastSessions": "Varasemad seansid",
@@ -2436,12 +2436,12 @@
       "runOnAccessibility": "Käivituskoht: {{label}}",
       "couldNotLoad": "Eksemplaride laadimine ebaõnnestus",
       "cloudAgent": "Cloud Agent",
-      "cloudAgentDescription": "Käita Kilo pilve liivakastis",
+      "cloudAgentDescription": "Käivita Kilo pilve liivakastis",
       "noCliInstances": "Ühtegi CLI-eksemplari pole ühendatud",
       "noCliInstancesDescription": "Käivita oma arvutis projekti kaustas `kilo remote` või uuenda Kilo CLI-d, kui see juba töötab.",
       "instanceOnProject": "{{name}} projektis {{project}}",
       "instanceOnProjectSuffix": "{{name}} projektis {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Käita Cloud Agentis",
+      "runOnCloudAgent": "Käivita Cloud Agentis",
       "terminals": "Terminalid",
       "remotes": "Kaugeksemplarid"
     },
@@ -2454,7 +2454,7 @@
       "accessibility": "Režiim: {{label}}"
     },
     "modeOptions": {
-      "code": "Kirjuta koodi",
+      "code": "Kood",
       "plan": "Plaan",
       "debug": "Silu",
       "orchestrator": "Korraldaja",
@@ -2503,7 +2503,7 @@
       "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
     },
     "partDetail": {
-      "detailsUnavailable": "Üksikasjad pole saadaval.",
+      "detailsUnavailable": "Üksikasjad pole saadaval",
       "textDisplay": "Tekstikuva",
       "thinking": "Mõtlemine",
       "thought": "Mõttekäik",
@@ -2515,13 +2515,13 @@
       "failedToRender": "Sisu kuvamine ebaõnnestus."
     },
     "messageFailure": {
-      "deliveryTitle": "Kohaletoimetamine ebaõnnestus.",
+      "deliveryTitle": "Kohaletoimetamine ebaõnnestus",
       "deliveryInterrupted": "Peatasid selle sõnumi saatmise.",
       "deliveryExhausted": "Pärast mitut katset ei õnnestunud seda sõnumit kohale toimetada.",
       "deliveryExecution": "Agent ei saanud selles sõnumis antud ülesannet täita.",
-      "assistantTitle": "Vastuse koostamine ebaõnnestus.",
+      "assistantTitle": "Vastus ebaõnnestus",
       "assistantProviderRejected": "Pakkuja lükkas päringu tagasi.",
-      "assistantStopped": "Vastuse koostamine peatati.",
+      "assistantStopped": "Vastus peatati.",
       "assistantContextOverflow": "Vestlus on mudeli jaoks liiga pikk.",
       "assistantProviderError": "Pakkuja tagastas vea.",
       "assistantOutputLimit": "Vastus jõudis mudeli väljundi piirini.",
@@ -2679,8 +2679,8 @@
       "waitingForActivity": "Ootab tegevust"
     },
     "childSessionSheet": {
-      "couldNotLoad": "Alamagendi seanssi ei õnnestunud laadida.",
-      "failed": "Alamagendi seanss ebaõnnestus.",
+      "couldNotLoad": "Alamagendi seanssi ei õnnestunud laadida",
+      "failed": "Alamagendi seanss ebaõnnestus",
       "noMessages": "Alamagendi sõnumeid pole",
       "noMessagesDescription": "See alamagendi seanss lõppes ilma vestlusajaloota.",
       "loading": "Alamagendi seansi laadimine",
@@ -2697,7 +2697,7 @@
       "cancelQueued": "Tühista sõnum",
       "cancelQueuedAccessibility": "Tühista ootel sõnum",
       "restoreQueued": "Taasta",
-      "restoreQueuedAccessibility": "Taasta tühistatud sõnum sõnumi sisestusväljal"
+      "restoreQueuedAccessibility": "Taasta tühistatud sõnum sõnumi sisestusväljale"
     },
     "olderMessages": {
       "arrived": "Varasemad sõnumid laaditud",
@@ -2742,7 +2742,7 @@
       "thinkingEffortAccessibility": "Mõtlemise põhjalikkus: {{label}}",
       "thinkingEffortSelected": "Mõtlemise põhjalikkus: {{label}}, valitud",
       "thinkingEffortWithModel": "{{model}}, mõtlemise põhjalikkus: {{variant}}",
-      "lockedByAgent": ", Lukustanud agent „{{agent}}“",
+      "lockedByAgent": ", lukustatud agendi „{{agent}}“ poolt",
       "addToFavorites": "Lisa {{name}} lemmikutesse",
       "removeFromFavorites": "Eemalda {{name}} lemmikutest",
       "sessionModel": "Seansi mudel"
@@ -2830,7 +2830,7 @@
       "exitSession": "Välju seansist",
       "clearSession": "Lõpeta see seanss ja alusta uut",
       "compactDescription": "tihenda praeguse seansi kontekst",
-      "goalDescription": "Jätka töötamist seansi eesmärgi suunas. /goal <objective> või pause, resume, clear",
+      "goalDescription": "Jätka töötamist seansi eesmärgi suunas. /goal <objective> või pause, resume, clear. Eesmärk võib oodata ajastatud äratust, cron-ülesannet või taustaprotsessi: ootamine peatab eesmärgi, kuni see käivitub, ja seejärel jätkab eesmärk ise; /goal pause ja /goal clear tühistavad selle seatud taimerid. Kui eesmärk on oodata juurutust, ehitust või CI-tööd, ajasta see ootamine kohe; ära uuri enne hoidlat.",
       "initDescription": "juhitud AGENTS.md seadistamine",
       "resumeClaudeDescription": "impordi Claude Code'i seansi transkript",
       "resumeCodexDescription": "impordi OpenAI Codexi seansi transkript",
@@ -2884,13 +2884,13 @@
     },
     "autoApprove": {
       "title": "Automaatne kinnitamine",
-      "description": "Kinnita selle seansi loaduste taotlused automaatselt. Tööriistad käivituvad seejärel ilma küsimuseta.",
-      "unavailable": "See seanss ei saa loaduste taotlusi vastu võtta."
+      "description": "Kinnita selle seansi loataotlused automaatselt. Tööriistad käivituvad seejärel ilma küsimuseta.",
+      "unavailable": "See seanss ei saa loataotlusi vastu võtta."
     },
     "prBadge": {
       "open": "avatud tõmbetaotlus",
-      "closed": "suletud liitmistaotlus",
-      "merged": "liidetud liitmistaotlus",
+      "closed": "suletud tõmbetaotlus",
+      "merged": "liidetud tõmbetaotlus",
       "draft": "tõmbetaotluse mustand",
       "updating": "Uuendamine, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
@@ -3761,7 +3761,7 @@
       "promptRequired": "Agendi käivitamiseks on vaja viipa. Lisa viip ja käivita see uuesti.",
       "repositoryRequired": "Agendi käivitamiseks on vaja hoidlat. Ava Kilo, vali hoidla ja käivita see uuesti.",
       "repositoryUnknown": "Kilo ei tunne {{repository}} ära GitHubi ega GitLabi hoidlana. Vali Kilos teine hoidla.",
-      "repositoryUnsupported": "{{repository}} on Bitbucketi hoidla — Käivita agent ei saa seda veel kasutada. Vali Kilos teine hoidla."
+      "repositoryUnsupported": "{{repository}} on Bitbucketi hoidla — agent ei saa seda veel kasutada. Vali Kilos teine hoidla."
     }
   },
   "launcher": {

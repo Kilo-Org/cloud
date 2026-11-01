@@ -104,26 +104,32 @@ describe('organization guardrails router', () => {
     expect(saved.detectors.policy_violation.policy_text).toBe('Never share customer records.');
   });
 
-  it('writes a content-free audit entry', async () => {
-    const caller = await createCallerForUser(owner.id);
-    const config = savedConfig();
-    config.scan_tool_results = true;
+  it.each([
+    { scanToolResults: true, scope: 'every input' },
+    { scanToolResults: false, scope: 'conversation without tool results' },
+  ])(
+    'writes a content-free audit entry with scan_tool_results=$scanToolResults',
+    async ({ scanToolResults, scope }) => {
+      const caller = await createCallerForUser(owner.id);
+      const config = savedConfig();
+      config.scan_tool_results = scanToolResults;
 
-    await caller.organizations.guardrails.update({ organizationId: organization.id, ...config });
+      await caller.organizations.guardrails.update({ organizationId: organization.id, ...config });
 
-    const [auditLog] = await db
-      .select()
-      .from(organization_audit_logs)
-      .where(eq(organization_audit_logs.organization_id, organization.id))
-      .orderBy(desc(organization_audit_logs.created_at))
-      .limit(1);
-    expect(auditLog.action).toBe('organization.settings.change');
-    expect(auditLog.message).toBe(
-      'Updated AI guardrails: enabled; checking every input; detectors: injection_attack, pii (log, secrets), keyword_detector (block, 2 keywords), policy_violation (policy text)'
-    );
-    expect(auditLog.message).not.toContain('Phoenix');
-    expect(auditLog.message).not.toContain('customer records');
-  });
+      const [auditLog] = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organization.id))
+        .orderBy(desc(organization_audit_logs.created_at))
+        .limit(1);
+      expect(auditLog.action).toBe('organization.settings.change');
+      expect(auditLog.message).toBe(
+        `Updated AI guardrails: enabled; checking ${scope}; detectors: injection_attack, pii (log, secrets), keyword_detector (block, 2 keywords), policy_violation (policy text)`
+      );
+      expect(auditLog.message).not.toContain('Phoenix');
+      expect(auditLog.message).not.toContain('customer records');
+    }
+  );
 
   it('rejects enabling guardrails with no detector', async () => {
     const caller = await createCallerForUser(owner.id);

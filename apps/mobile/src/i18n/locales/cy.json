@@ -4105,6 +4105,7 @@
     "skillDeleteFailed": "Methu dileu sgil. Rhowch gynnig arall arni.",
     "skillToggleFailed": "Methu diweddaru sgil. Rhowch gynnig arall arni.",
     "skillLimitReached": "Gall proffil ddal hyd at {{max}} o sgiliau. Dilëwch un i ychwanegu un arall.",
+    "variableLimitReached": "Gall proffil ddal hyd at {{max}} o newidynnau. Dilëwch un i ychwanegu un arall.",
     "skillSourceCustom": "Personol",
     "skillSourceMarketplace": "Marchnad",
     "skillSourceSkillsSh": "skills.sh",

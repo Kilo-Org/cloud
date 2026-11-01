@@ -3937,6 +3937,7 @@
     "skillDeleteFailed": "Nevarēja dzēst prasmi. Mēģiniet vēlreiz.",
     "skillToggleFailed": "Nevarēja atjaunināt prasmi. Mēģiniet vēlreiz.",
     "skillLimitReached": "Profilā var saglabāt līdz {{max}} prasmēm. Dzēsiet vienu, lai pievienotu citu.",
+    "variableLimitReached": "Profilā var saglabāt līdz {{max}} mainīgajiem. Dzēsiet vienu, lai pievienotu citu.",
     "skillSourceCustom": "Pielāgots",
     "skillSourceMarketplace": "Tirgus",
     "skillSourceSkillsSh": "skills.sh",

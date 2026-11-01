@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Không thể xóa kỹ năng. Vui lòng thử lại.",
     "skillToggleFailed": "Không thể cập nhật kỹ năng. Vui lòng thử lại.",
     "skillLimitReached": "Hồ sơ có thể chứa tối đa {{max}} kỹ năng. Hãy xóa một kỹ năng để thêm kỹ năng khác.",
+    "variableLimitReached": "Hồ sơ có thể chứa tối đa {{max}} biến. Hãy xóa một biến để thêm biến khác.",
     "skillSourceCustom": "Tùy chỉnh",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

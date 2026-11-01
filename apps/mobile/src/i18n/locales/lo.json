@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "ບໍ່ສາມາດລຶບທັກສະໄດ້ ກະລຸນາລອງໃໝ່ອີກຄັ້ງ",
     "skillToggleFailed": "ບໍ່ສາມາດອັບເດດທັກສະໄດ້ ກະລຸນາລອງໃໝ່ອີກຄັ້ງ",
     "skillLimitReached": "ໂປຣໄຟລ໌ສາມາດມີທັກສະໄດ້ສູງສຸດ {{max}} ທັກສະ. ລຶບໜຶ່ງອັນເພື່ອເພີ່ມອັນອື່ນ.",
+    "variableLimitReached": "ໂປຣໄຟລ໌ສາມາດມີຕົວແປໄດ້ສູງສຸດ {{max}} ຕົວແປ. ລຶບໜຶ່ງອັນເພື່ອເພີ່ມອັນອື່ນ.",
     "skillSourceCustom": "ກຳນົດເອງ",
     "skillSourceMarketplace": "ຕະຫຼາດ",
     "skillSourceSkillsSh": "skills.sh",

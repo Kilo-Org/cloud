@@ -3937,6 +3937,7 @@
     "skillDeleteFailed": "Nije moguće izbrisati vještinu. Pokušajte ponovo.",
     "skillToggleFailed": "Nije moguće ažurirati vještinu. Pokušajte ponovo.",
     "skillLimitReached": "Profil može sadržavati najviše {{max}} vještina. Izbrišite jednu da biste dodali drugu.",
+    "variableLimitReached": "Profil može sadržavati najviše {{max}} varijabli. Izbrišite jednu da biste dodali drugu.",
     "skillSourceCustom": "Prilagođeno",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

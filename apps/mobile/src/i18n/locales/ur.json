@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "مہارت حذف نہیں کر سکا۔ دوبارہ کوشش کریں۔",
     "skillToggleFailed": "مہارت اپ ڈیٹ نہیں کر سکا۔ دوبارہ کوشش کریں۔",
     "skillLimitReached": "ایک پروفائل میں زیادہ سے زیادہ {{max}} مہارتیں رکھی جا سکتی ہیں۔ ایک کو حذف کریں تاکہ دوسری شامل کریں۔",
+    "variableLimitReached": "ایک پروفائل میں زیادہ سے زیادہ {{max}} متغیرات رکھے جا سکتے ہیں۔ ایک کو حذف کریں تاکہ دوسرا شامل کریں۔",
     "skillSourceCustom": "حسبِ ضرورت",
     "skillSourceMarketplace": "مارکیٹ پلیس",
     "skillSourceSkillsSh": "skills.sh",

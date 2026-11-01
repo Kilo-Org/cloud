@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Nem sikerült törölni a készséget. Próbálja újra.",
     "skillToggleFailed": "Nem sikerült frissíteni a készséget. Próbálja újra.",
     "skillLimitReached": "A profil legfeljebb {{max}} készséget tartalmazhat. Töröljön egyet, hogy egy másikat hozzáadhasson.",
+    "variableLimitReached": "A profil legfeljebb {{max}} változót tartalmazhat. Töröljön egyet, hogy egy másikat hozzáadhasson.",
     "skillSourceCustom": "Egyéni",
     "skillSourceMarketplace": "Piactér",
     "skillSourceSkillsSh": "skills.sh",

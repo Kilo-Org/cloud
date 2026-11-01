@@ -3887,6 +3887,7 @@
     "skillDeleteFailed": "Tsy afaka namafa fahaizana. Andramo indray.",
     "skillToggleFailed": "Tsy afaka nanavao fahaizana. Andramo indray.",
     "skillLimitReached": "Ny mombamomba dia afaka mitazona fahaiza-manao hatramin'ny {{max}}. Fafao ny iray mba hampiana iray hafa.",
+    "variableLimitReached": "Ny mombamomba dia afaka mitazona miovaova hatramin'ny {{max}}. Fafao ny iray mba hampiana iray hafa.",
     "skillSourceCustom": "Namboarinao",
     "skillSourceMarketplace": "Tsena",
     "skillSourceSkillsSh": "skills.sh",

@@ -3993,6 +3993,7 @@
     "skillDeleteFailed": "Nepodarilo sa odstrániť zručnosť. Skúste to znova.",
     "skillToggleFailed": "Nepodarilo sa aktualizovať zručnosť. Skúste to znova.",
     "skillLimitReached": "Profil môže obsahovať až {{max}} zručností. Vymažte jednu, aby ste pridali ďalšiu.",
+    "variableLimitReached": "Profil môže obsahovať až {{max}} premenných. Vymažte jednu, aby ste pridali ďalšiu.",
     "skillSourceCustom": "Vlastné",
     "skillSourceMarketplace": "Obchod",
     "skillSourceSkillsSh": "skills.sh",

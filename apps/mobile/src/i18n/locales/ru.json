@@ -3993,6 +3993,7 @@
     "skillDeleteFailed": "Не удалось удалить навык. Попробуйте ещё раз.",
     "skillToggleFailed": "Не удалось обновить навык. Попробуйте ещё раз.",
     "skillLimitReached": "В одном профиле может храниться до {{max}} навыков. Удалите один, чтобы добавить ещё один.",
+    "variableLimitReached": "В одном профиле может храниться до {{max}} переменных. Удалите одну, чтобы добавить ещё одну.",
     "skillSourceCustom": "Собственный",
     "skillSourceMarketplace": "Магазин",
     "skillSourceSkillsSh": "skills.sh",

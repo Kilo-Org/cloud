@@ -3887,6 +3887,7 @@
     "skillDeleteFailed": "ਹੁਨਰ ਨੂੰ ਮਿਟਾ ਨਹੀਂ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "skillToggleFailed": "ਹੁਨਰ ਨੂੰ ਅੱਪਡੇਟ ਨਹੀਂ ਕਰ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "skillLimitReached": "ਇੱਕ ਪ੍ਰੋਫ਼ਾਈਲ ਵਿੱਚ ਵੱਧ ਤੋਂ ਵੱਧ {{max}} ਹੁਨਰ ਹੋ ਸਕਦੇ ਹਨ। ਇੱਕ ਹੋਰ ਸ਼ਾਮਲ ਕਰਨ ਲਈ ਇੱਕ ਹਟਾਓ।",
+    "variableLimitReached": "ਇੱਕ ਪ੍ਰੋਫ਼ਾਈਲ ਵਿੱਚ ਵੱਧ ਤੋਂ ਵੱਧ {{max}} ਵੇਰੀਏਬਲ ਹੋ ਸਕਦੇ ਹਨ। ਇੱਕ ਹੋਰ ਸ਼ਾਮਲ ਕਰਨ ਲਈ ਇੱਕ ਹਟਾਓ।",
     "skillSourceCustom": "ਕਸਟਮ",
     "skillSourceMarketplace": "ਮਾਰਕੀਟਪਲੇਸ",
     "skillSourceSkillsSh": "skills.sh",

@@ -3993,6 +3993,7 @@
     "skillDeleteFailed": "Nepavyko ištrinti įgūdžio. Bandykite dar kartą.",
     "skillToggleFailed": "Nepavyko atnaujinti įgūdžio. Bandykite dar kartą.",
     "skillLimitReached": "Profilis gali turėti iki {{max}} įgūdžių. Ištrinkite vieną, kad pridėtumėte kitą.",
+    "variableLimitReached": "Profilis gali turėti iki {{max}} kintamųjų. Ištrinkite vieną, kad pridėtumėte kitą.",
     "skillSourceCustom": "Pasirinktinis",
     "skillSourceMarketplace": "Parduotuvė",
     "skillSourceSkillsSh": "skills.sh",

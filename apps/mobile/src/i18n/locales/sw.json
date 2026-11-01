@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Haikuweza kufuta ujuzi. Jaribu tena.",
     "skillToggleFailed": "Haikuweza kusasisha ujuzi. Jaribu tena.",
     "skillLimitReached": "Wasifu unaweza kubeba hadi {{max}} ujuzi. Futa mmoja ili kuongeza mwingine.",
+    "variableLimitReached": "Wasifu unaweza kubeba hadi {{max}} vigezo. Futa kimoja ili kuongeza kingine.",
     "skillSourceCustom": "Maalum",
     "skillSourceMarketplace": "Soko",
     "skillSourceSkillsSh": "skills.sh",

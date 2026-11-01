@@ -3887,6 +3887,7 @@
     "skillDeleteFailed": "দক্ষতা মুছতে পারেনি। আবার চেষ্টা করুন।",
     "skillToggleFailed": "দক্ষতা আপডেট করতে পারেনি। আবার চেষ্টা করুন।",
     "skillLimitReached": "একটি প্রোফাইলে সর্বোচ্চ {{max}}টি দক্ষতা রাখা যায়। আরেকটি যোগ করতে একটি মুছুন।",
+    "variableLimitReached": "একটি প্রোফাইলে সর্বোচ্চ {{max}}টি পরিবর্তনশীল রাখা যায়। আরেকটি যোগ করতে একটি মুছুন।",
     "skillSourceCustom": "কাস্টম",
     "skillSourceMarketplace": "মার্কেটপ্লেস",
     "skillSourceSkillsSh": "skills.sh",

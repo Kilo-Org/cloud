@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Ekki tókst að eyða færni. Reyndu aftur.",
     "skillToggleFailed": "Ekki tókst að uppfæra færni. Reyndu aftur.",
     "skillLimitReached": "Prófíll getur haft allt að {{max}} færni. Eyddu einni til að bæta við annarri.",
+    "variableLimitReached": "Prófíll getur haft allt að {{max}} umhverfisbreytur. Eyddu einni til að bæta við annarri.",
     "skillSourceCustom": "Sérsniðið",
     "skillSourceMarketplace": "Markaður",
     "skillSourceSkillsSh": "skills.sh",

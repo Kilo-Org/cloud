@@ -38,6 +38,13 @@ const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 export const SKILL_NAME_MAX_LENGTH = 100;
 
 /**
+ * Server cap: `profile-vars-service.ts`'s `MAX_PROFILE_VARS`. The profile
+ * variables screen compares the loaded list's length against it before a new
+ * variable goes out, and names the cap in the reader's language.
+ */
+export const MAX_PROFILE_VARS = 50;
+
+/**
  * Server cap: `contracts/skills.ts`'s `MAX_PROFILE_SKILLS`. The server counts
  * every row of a profile, enabled or not, so the screen compares the loaded
  * list's length against it before a create goes out.

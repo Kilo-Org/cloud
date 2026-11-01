@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "कौशल्य हटवू शकलो नाही. पुन्हा प्रयत्न करा.",
     "skillToggleFailed": "कौशल्य अद्ययावत करू शकलो नाही. पुन्हा प्रयत्न करा.",
     "skillLimitReached": "एका प्रोफाइलमध्ये जास्तीत जास्त {{max}} कौशल्ये असू शकतात. आणखी एक जोडण्यासाठी एक हटवा.",
+    "variableLimitReached": "एका प्रोफाइलमध्ये जास्तीत जास्त {{max}} व्हेरिएबल्स असू शकतात. आणखी एक जोडण्यासाठी एक हटवा.",
     "skillSourceCustom": "कस्टम",
     "skillSourceMarketplace": "मार्केटप्लेस",
     "skillSourceSkillsSh": "skills.sh",

@@ -3937,6 +3937,7 @@
     "skillDeleteFailed": "No s'ha pogut eliminar l'habilitat. Torna-ho a provar.",
     "skillToggleFailed": "No s'ha pogut actualitzar l'habilitat. Torna-ho a provar.",
     "skillLimitReached": "Un perfil pot tenir fins a {{max}} habilitats. Elimina'n una per afegir-ne una altra.",
+    "variableLimitReached": "Un perfil pot tenir fins a {{max}} variables. Elimina'n una per afegir-ne una altra.",
     "skillSourceCustom": "Personalitzada",
     "skillSourceMarketplace": "Mercat",
     "skillSourceSkillsSh": "skills.sh",

@@ -3887,6 +3887,7 @@
     "skillDeleteFailed": "Ayikwazanga ukususa ikhono. Zama futhi.",
     "skillToggleFailed": "Ayikwazanga ukubuyekeza ikhono. Zama futhi.",
     "skillLimitReached": "Iphrofayela ingaba namakhono angafika ku-{{max}}. Susa elilodwa ukuze wengeze elinye.",
+    "variableLimitReached": "Iphrofayela ingaba nokuguquguqukayo okungafika ku-{{max}}. Susa okukodwa ukuze wengeze okunye.",
     "skillSourceCustom": "Ngokwezifiso",
     "skillSourceMarketplace": "Imakethe",
     "skillSourceSkillsSh": "skills.sh",

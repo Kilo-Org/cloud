@@ -3937,6 +3937,7 @@
     "skillDeleteFailed": "לא ניתן היה למחוק את המיומנות. נסה שוב.",
     "skillToggleFailed": "לא ניתן היה לעדכן את המיומנות. נסה שוב.",
     "skillLimitReached": "פרופיל יכול להכיל עד {{max}} מיומנויות. מחק אחת כדי להוסיף אחרת.",
+    "variableLimitReached": "פרופיל יכול להכיל עד {{max}} משתנים. מחק אחד כדי להוסיף אחר.",
     "skillSourceCustom": "מותאם אישית",
     "skillSourceMarketplace": "חנות",
     "skillSourceSkillsSh": "skills.sh",

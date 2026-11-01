@@ -3887,6 +3887,7 @@
     "skillDeleteFailed": "ಕೌಶಲ್ಯವನ್ನು ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "skillToggleFailed": "ಕೌಶಲ್ಯವನ್ನು ನವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "skillLimitReached": "ಪ್ರೊಫೈಲ್ ಗರಿಷ್ಠ {{max}} ಕೌಶಲ್ಯಗಳನ್ನು ಹೊಂದಿರಬಹುದು. ಇನ್ನೊಂದನ್ನು ಸೇರಿಸಲು ಒಂದನ್ನು ಅಳಿಸಿ.",
+    "variableLimitReached": "ಪ್ರೊಫೈಲ್ ಗರಿಷ್ಠ {{max}} ಅಸ್ಥಿರಗಳನ್ನು ಹೊಂದಿರಬಹುದು. ಇನ್ನೊಂದನ್ನು ಸೇರಿಸಲು ಒಂದನ್ನು ಅಳಿಸಿ.",
     "skillSourceCustom": "ಕಸ್ಟಮ್",
     "skillSourceMarketplace": "ಮಾರುಕಟ್ಟೆ",
     "skillSourceSkillsSh": "skills.sh",

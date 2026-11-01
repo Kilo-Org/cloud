@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "ไม่สามารถลบทักษะได้ โปรดลองอีกครั้ง",
     "skillToggleFailed": "ไม่สามารถอัปเดตทักษะได้ โปรดลองอีกครั้ง",
     "skillLimitReached": "โปรไฟล์สามารถมีทักษะได้สูงสุด {{max}} ทักษะ ลบหนึ่งรายการเพื่อเพิ่มอีกรายการ",
+    "variableLimitReached": "โปรไฟล์สามารถมีตัวแปรได้สูงสุด {{max}} ตัวแปร ลบหนึ่งรายการเพื่อเพิ่มอีกรายการ",
     "skillSourceCustom": "กำหนดเอง",
     "skillSourceMarketplace": "ตลาด",
     "skillSourceSkillsSh": "skills.sh",

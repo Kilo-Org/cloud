@@ -4049,6 +4049,7 @@
     "skillDeleteFailed": "Ma setgħetx tħassar il-ħila. Erġa' pprova.",
     "skillToggleFailed": "Ma setgħetx taġġorna l-ħila. Erġa' pprova.",
     "skillLimitReached": "Profil jista' jżomm sa {{max}} ħiliet. Ħassar waħda biex iżżid oħra.",
+    "variableLimitReached": "Profil jista' jżomm sa {{max}} varjabbli. Ħassar waħda biex iżżid oħra.",
     "skillSourceCustom": "Personalizzat",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

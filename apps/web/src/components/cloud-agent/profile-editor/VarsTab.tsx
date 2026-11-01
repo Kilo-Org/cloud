@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { ENVIRONMENT_LIMITS } from '@kilocode/cloud-agent-profile';
 import { v4 as uuidv4 } from 'uuid';
 import { Plus, Loader2, Eye, EyeOff, Lock, Trash2, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
 import { cn } from '@/lib/utils';
+import { profileVarKeyError } from '@/lib/profile-var-key';
 import type {
   useProfileMutations,
   useCombinedProfileMutations,
@@ -118,6 +120,11 @@ export function VarsTab({
         return;
       }
       seen.add(e.key);
+      const keyError = profileVarKeyError(e.key);
+      if (keyError !== null) {
+        toast.error(keyError);
+        return;
+      }
     }
     setSavingKey('__new__');
     let succeeded = 0;
@@ -303,6 +310,7 @@ export function VarsTab({
                 <Input
                   aria-label="Variable name"
                   value={draft.key}
+                  maxLength={ENVIRONMENT_LIMITS.MAX_KEY_LENGTH}
                   onChange={e => updateDraft(draft.id, { key: cleanKey(e.target.value) })}
                   onPaste={e => {
                     if (handleDraftPaste(draft.id, e.clipboardData.getData('text'))) {

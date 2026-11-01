@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "ଦକ୍ଷତା ବିଲୋପ କରିପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "skillToggleFailed": "ଦକ୍ଷତା ଅଦ୍ୟତନ କରିପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "skillLimitReached": "ଏକ ପ୍ରୋଫାଇଲ୍ {{max}} ପର୍ଯ୍ୟନ୍ତ ଦକ୍ଷତା ରଖିପାରେ। ଅନ୍ୟଟି ଯୋଡିବା ପାଇଁ ଗୋଟିଏ ଡିଲିଟ୍ କରନ୍ତୁ।",
+    "variableLimitReached": "ଏକ ପ୍ରୋଫାଇଲ୍ {{max}} ପର୍ଯ୍ୟନ୍ତ ଭେରିଏବଲ୍ ରଖିପାରେ। ଅନ୍ୟଟି ଯୋଡିବା ପାଇଁ ଗୋଟିଏ ଡିଲିଟ୍ କରନ୍ତୁ।",
     "skillSourceCustom": "କଷ୍ଟମ୍",
     "skillSourceMarketplace": "ମାର୍କେଟପ୍ଲେସ୍",
     "skillSourceSkillsSh": "skills.sh",

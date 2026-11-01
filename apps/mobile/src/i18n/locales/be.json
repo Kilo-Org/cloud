@@ -3993,6 +3993,7 @@
     "skillDeleteFailed": "Не ўдалося выдаліць навык. Паспрабуйце яшчэ раз.",
     "skillToggleFailed": "Не ўдалося абнавіць навык. Паспрабуйце яшчэ раз.",
     "skillLimitReached": "У профілі можа быць да {{max}} навыкаў. Выдаліце адзін, каб дадаць яшчэ адзін.",
+    "variableLimitReached": "У профілі можа быць да {{max}} зменных. Выдаліце адну, каб дадаць яшчэ адну.",
     "skillSourceCustom": "Карыстацкі",
     "skillSourceMarketplace": "Маркетплэйс",
     "skillSourceSkillsSh": "skills.sh",

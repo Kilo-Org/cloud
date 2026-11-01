@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "An kasa share fasaha. Sake gwadawa.",
     "skillToggleFailed": "An kasa sabunta fasaha. Sake gwadawa.",
     "skillLimitReached": "Bayanan martaba na iya ɗaukar ƙwarewa har {{max}}. Share ɗaya don ƙara wata.",
+    "variableLimitReached": "Bayanan martaba na iya ɗaukar masu canjin yanayi har {{max}}. Share ɗaya don ƙara wani.",
     "skillSourceCustom": "Al'ada",
     "skillSourceMarketplace": "Kasuwa",
     "skillSourceSkillsSh": "skills.sh",

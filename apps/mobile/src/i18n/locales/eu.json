@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Ezin izan da trebetasuna ezabatu. Saiatu berriro.",
     "skillToggleFailed": "Ezin izan da trebetasuna eguneratu. Saiatu berriro.",
     "skillLimitReached": "Profil batek gehienez {{max}} trebetasun izan ditzake. Ezabatu bat beste bat gehitzeko.",
+    "variableLimitReached": "Profil batek gehienez {{max}} aldagai izan ditzake. Ezabatu bat beste bat gehitzeko.",
     "skillSourceCustom": "Pertsonalizatua",
     "skillSourceMarketplace": "Merkatua",
     "skillSourceSkillsSh": "skills.sh",

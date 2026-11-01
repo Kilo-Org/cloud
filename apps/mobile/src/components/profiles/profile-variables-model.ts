@@ -58,9 +58,10 @@ export type VariableInputRules = Readonly<{
 }>;
 
 /**
- * Validate the edited variable before a save. Matches the server's
- * `VarSchema` key bound (`z.string().min(1).max(256)`) and, when `requireValue`
- * is set, refuses a blank value. `takenKeys` are the
+ * Validate the edited variable before a save. Measures the key the save will
+ * store, because the form adds a leading `_` to a digit-initial key, and the
+ * server bound applies to what it stores. When `requireValue` is set, a blank
+ * value is refused too. `takenKeys` are the
  * profile's stored keys: the server upserts on `(profile_id, key)` with the
  * cleaned key the form sends, so a new key that normalizes onto an existing one
  * would silently replace that variable. Returns an error code, or `null` when
@@ -75,7 +76,7 @@ export function validateVariableInput(
   if (key.length === 0) {
     return 'empty';
   }
-  if (key.length > VARIABLE_KEY_MAX_LENGTH) {
+  if (savedVariableKey(key).length > VARIABLE_KEY_MAX_LENGTH) {
     return 'too-long';
   }
   if (takenKeys.includes(cleanVariableKey(key))) {

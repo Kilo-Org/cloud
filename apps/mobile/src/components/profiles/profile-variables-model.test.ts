@@ -104,6 +104,12 @@ describe('validateVariableInput', () => {
     expect(validateVariableInput({ key: 'a'.repeat(129), value: 'x' })).toBe('too-long');
   });
 
+  it('measures the key the save stores, including the leading underscore', () => {
+    // 128 characters exactly, but the stored key gains a leading `_`.
+    expect(validateVariableInput({ key: `1${'a'.repeat(127)}`, value: 'x' })).toBe('too-long');
+    expect(validateVariableInput({ key: `_${'a'.repeat(127)}`, value: 'x' })).toBeNull();
+  });
+
   it('reports a key that cleans onto an existing stored key', () => {
     expect(validateVariableInput({ key: 'foo-bar', value: 'x' }, ['FOO_BAR'])).toBe('duplicate');
     expect(validateVariableInput({ key: 'FOO_BAR', value: 'x' }, ['FOO_BAR'])).toBe('duplicate');

@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Non se puido eliminar a habilidade. Téntao de novo.",
     "skillToggleFailed": "Non se puido actualizar a habilidade. Téntao de novo.",
     "skillLimitReached": "Un perfil pode ter ata {{max}} habilidades. Elimina unha para engadir outra.",
+    "variableLimitReached": "Un perfil pode ter ata {{max}} variables. Elimina unha para engadir outra.",
     "skillSourceCustom": "Personalizada",
     "skillSourceMarketplace": "Mercado",
     "skillSourceSkillsSh": "skills.sh",

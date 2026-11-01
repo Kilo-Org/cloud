@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Ko le pa ogbon rẹ. Gbiyanju lẹẹkansi.",
     "skillToggleFailed": "Ko le ṣe imudojuiwọn ogbon. Gbiyanju lẹẹkansi.",
     "skillLimitReached": "Profaili le gba awọn ogbon to {{max}}. Paarẹ ọkan lati fi omiran kun.",
+    "variableLimitReached": "Profaili le gba awọn oniyipada to {{max}}. Paarẹ ọkan lati fi omiran kun.",
     "skillSourceCustom": "Ti ara rẹ",
     "skillSourceMarketplace": "Ọjà",
     "skillSourceSkillsSh": "skills.sh",

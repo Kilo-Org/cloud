@@ -4105,6 +4105,7 @@
     "skillDeleteFailed": "لا يمكن حذف المهارة. حاول مرة أخرى.",
     "skillToggleFailed": "لا يمكن تحديث المهارة. حاول مرة أخرى.",
     "skillLimitReached": "يمكن أن يستوعب الملف الشخصي حتى {{max}} مهارة. احذف واحدة لإضافة أخرى.",
+    "variableLimitReached": "يمكن أن يستوعب الملف الشخصي حتى {{max}} متغير. احذف واحدًا لإضافة آخر.",
     "skillSourceCustom": "مخصص",
     "skillSourceMarketplace": "المتجر",
     "skillSourceSkillsSh": "skills.sh",

@@ -3887,6 +3887,7 @@
     "skillDeleteFailed": "Չհաջողվեց ջնջել հմտությունը։ Փորձեք կրկին։",
     "skillToggleFailed": "Չհաջողվեց թարմացնել հմտությունը։ Փորձեք կրկին։",
     "skillLimitReached": "Պրոֆիլում կարող է լինել մինչև {{max}} հմտություն։ Ջնջեք մեկը՝ մյուսն ավելացնելու համար։",
+    "variableLimitReached": "Պրոֆիլում կարող է լինել մինչև {{max}} փոփոխական։ Ջնջեք մեկը՝ մյուսն ավելացնելու համար։",
     "skillSourceCustom": "սեփական",
     "skillSourceMarketplace": "շուկա",
     "skillSourceSkillsSh": "skills.sh",

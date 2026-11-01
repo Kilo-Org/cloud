@@ -3887,6 +3887,7 @@
     "skillDeleteFailed": "مهارت حذف نشد. دوباره امتحان کنید.",
     "skillToggleFailed": "مهارت به‌روزرسانی نشد. دوباره امتحان کنید.",
     "skillLimitReached": "هر پروفایل می‌تواند تا {{max}} مهارت داشته باشد. برای افزودن مهارت دیگر، یکی را حذف کنید.",
+    "variableLimitReached": "هر پروفایل می‌تواند تا {{max}} متغیر داشته باشد. برای افزودن متغیر دیگر، یکی را حذف کنید.",
     "skillSourceCustom": "سفارشی",
     "skillSourceMarketplace": "بازار",
     "skillSourceSkillsSh": "skills.sh",

@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Aftësia nuk mund të fshihej. Provoni përsëri.",
     "skillToggleFailed": "Aftësia nuk mund të përditësohej. Provoni përsëri.",
     "skillLimitReached": "Një profil mund të mbajë deri në {{max}} aftësi. Fshini një për të shtuar një tjetër.",
+    "variableLimitReached": "Një profil mund të mbajë deri në {{max}} variabla. Fshini një për të shtuar një tjetër.",
     "skillSourceCustom": "E personalizuar",
     "skillSourceMarketplace": "Tregu",
     "skillSourceSkillsSh": "skills.sh",

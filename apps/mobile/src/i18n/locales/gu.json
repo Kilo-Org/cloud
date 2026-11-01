@@ -3887,6 +3887,7 @@
     "skillDeleteFailed": "કૌશલ્ય ડિલીટ કરી શક્યા નથી. ફરી પ્રયાસ કરો.",
     "skillToggleFailed": "કૌશલ્ય અપડેટ કરી શક્યા નથી. ફરી પ્રયાસ કરો.",
     "skillLimitReached": "પ્રોફાઇલમાં વધુમાં વધુ {{max}} કૌશલ્ય રાખી શકાય છે. બીજું ઉમેરવા માટે એક કાઢી નાખો.",
+    "variableLimitReached": "પ્રોફાઇલમાં વધુમાં વધુ {{max}} ચલો રાખી શકાય છે. બીજું ઉમેરવા માટે એક કાઢી નાખો.",
     "skillSourceCustom": "કસ્ટમ",
     "skillSourceMarketplace": "માર્કેટપ્લેસ",
     "skillSourceSkillsSh": "skills.sh",

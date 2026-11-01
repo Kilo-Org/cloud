@@ -3993,6 +3993,7 @@
     "skillDeleteFailed": "Spretnosti ni bilo mogoče izbrisati. Poskusite znova.",
     "skillToggleFailed": "Spretnosti ni bilo mogoče posodobiti. Poskusite znova.",
     "skillLimitReached": "Profil lahko vsebuje največ {{max}} spretnosti. Izbrišite eno, da dodate drugo.",
+    "variableLimitReached": "Profil lahko vsebuje največ {{max}} spremenljivk. Izbrišite eno, da dodate drugo.",
     "skillSourceCustom": "Po meri",
     "skillSourceMarketplace": "Tržnica",
     "skillSourceSkillsSh": "skills.sh",

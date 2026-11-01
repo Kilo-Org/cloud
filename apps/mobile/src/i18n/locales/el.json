@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Δεν ήταν δυνατή η διαγραφή της δεξιότητας. Δοκιμάστε ξανά.",
     "skillToggleFailed": "Δεν ήταν δυνατή η ενημέρωση της δεξιότητας. Δοκιμάστε ξανά.",
     "skillLimitReached": "Ένα προφίλ μπορεί να περιέχει έως {{max}} δεξιότητες. Διαγράψτε μία για να προσθέσετε άλλη.",
+    "variableLimitReached": "Ένα προφίλ μπορεί να περιέχει έως {{max}} μεταβλητές. Διαγράψτε μία για να προσθέσετε άλλη.",
     "skillSourceCustom": "Προσαρμοσμένο",
     "skillSourceMarketplace": "Αγορά",
     "skillSourceSkillsSh": "skills.sh",

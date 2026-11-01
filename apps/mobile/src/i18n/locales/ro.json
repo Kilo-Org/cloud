@@ -3937,6 +3937,7 @@
     "skillDeleteFailed": "Nu s-a putut șterge calificarea. Încearcă din nou.",
     "skillToggleFailed": "Nu s-a putut actualiza calificarea. Încearcă din nou.",
     "skillLimitReached": "Un profil poate conține până la {{max}} abilități. Șterge una pentru a adăuga alta.",
+    "variableLimitReached": "Un profil poate conține până la {{max}} variabile. Șterge una pentru a adăuga alta.",
     "skillSourceCustom": "Personalizat",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

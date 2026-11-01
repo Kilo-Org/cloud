@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "無法刪除技能。請重試。",
     "skillToggleFailed": "無法更新技能。請重試。",
     "skillLimitReached": "一個設定檔最多可容納 {{max}} 個技能。刪除一個才能新增另一個。",
+    "variableLimitReached": "一個設定檔最多可容納 {{max}} 個變數。刪除一個才能新增另一個。",
     "skillSourceCustom": "自訂",
     "skillSourceMarketplace": "市集",
     "skillSourceSkillsSh": "skills.sh",

@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Не може да се избрише вештината. Обидете се повторно.",
     "skillToggleFailed": "Не може да се ажурира вештината. Обидете се повторно.",
     "skillLimitReached": "Профилот може да содржи до {{max}} вештини. Избришете една за да додадете друга.",
+    "variableLimitReached": "Профилот може да содржи до {{max}} променливи. Избришете една за да додадете друга.",
     "skillSourceCustom": "Прилагодено",
     "skillSourceMarketplace": "Пазар",
     "skillSourceSkillsSh": "skills.sh",

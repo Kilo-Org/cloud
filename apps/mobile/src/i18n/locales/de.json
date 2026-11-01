@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Fertigkeit konnte nicht gelöscht werden. Versuche es erneut.",
     "skillToggleFailed": "Fertigkeit konnte nicht aktualisiert werden. Versuche es erneut.",
     "skillLimitReached": "Ein Profil kann bis zu {{max}} Fähigkeiten enthalten. Lösche eine, um eine weitere hinzuzufügen.",
+    "variableLimitReached": "Ein Profil kann bis zu {{max}} Umgebungsvariablen enthalten. Lösche eine, um eine weitere hinzuzufügen.",
     "skillSourceCustom": "Benutzerdefiniert",
     "skillSourceMarketplace": "Marktplatz",
     "skillSourceSkillsSh": "skills.sh",

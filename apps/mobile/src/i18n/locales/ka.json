@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "უნარის წაშლა ვერ მოხერხდა. სცადეთ ხელახლა.",
     "skillToggleFailed": "უნარის განახლება ვერ მოხერხდა. სცადეთ ხელახლა.",
     "skillLimitReached": "პროფილს შეიძლება ჰქონდეს {{max}}-მდე უნარი. სხვის დასამატებლად წაშალეთ ერთი.",
+    "variableLimitReached": "პროფილს შეიძლება ჰქონდეს {{max}}-მდე ცვლადი. სხვის დასამატებლად წაშალეთ ერთი.",
     "skillSourceCustom": "საკუთარი",
     "skillSourceMarketplace": "ბაზარი",
     "skillSourceSkillsSh": "skills.sh",

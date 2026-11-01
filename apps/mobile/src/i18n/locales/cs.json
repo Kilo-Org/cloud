@@ -3993,6 +3993,7 @@
     "skillDeleteFailed": "Nepodařilo se smazat dovednost. Zkuste to znovu.",
     "skillToggleFailed": "Nepodařilo se aktualizovat dovednost. Zkuste to znovu.",
     "skillLimitReached": "Profil může obsahovat až {{max}} dovedností. Chcete-li přidat další, smažte jednu.",
+    "variableLimitReached": "Profil může obsahovat až {{max}} proměnných. Chcete-li přidat další, smažte jednu.",
     "skillSourceCustom": "Vlastní",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

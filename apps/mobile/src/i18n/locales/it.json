@@ -3937,6 +3937,7 @@
     "skillDeleteFailed": "Impossibile eliminare l'abilità. Riprova.",
     "skillToggleFailed": "Impossibile aggiornare l'abilità. Riprova.",
     "skillLimitReached": "Un profilo può contenere fino a {{max}} abilità. Eliminane una per aggiungerne un'altra.",
+    "variableLimitReached": "Un profilo può contenere fino a {{max}} variabili. Eliminane una per aggiungerne un'altra.",
     "skillSourceCustom": "Personalizzata",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

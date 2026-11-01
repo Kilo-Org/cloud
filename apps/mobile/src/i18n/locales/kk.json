@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Шеберлікті жою мүмкін болмады. Қайталап көріңіз.",
     "skillToggleFailed": "Шеберлікті жаңарту мүмкін болмады. Қайталап көріңіз.",
     "skillLimitReached": "Профиль {{max}} дағдыға дейін сақтай алады. Басқасын қосу үшін біреуін жойыңыз.",
+    "variableLimitReached": "Профиль {{max}} айнымалыға дейін сақтай алады. Басқасын қосу үшін біреуін жойыңыз.",
     "skillSourceCustom": "Арнайы",
     "skillSourceMarketplace": "Market",
     "skillSourceSkillsSh": "skills.sh",

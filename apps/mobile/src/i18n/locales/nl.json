@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Kan vaardigheid niet verwijderen. Probeer het opnieuw.",
     "skillToggleFailed": "Kan vaardigheid niet bijwerken. Probeer het opnieuw.",
     "skillLimitReached": "Een profiel kan maximaal {{max}} vaardigheden bevatten. Verwijder er een om een andere toe te voegen.",
+    "variableLimitReached": "Een profiel kan maximaal {{max}} variabelen bevatten. Verwijder er een om een andere toe te voegen.",
     "skillSourceCustom": "Aangepast",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

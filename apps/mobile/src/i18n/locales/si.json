@@ -3887,6 +3887,7 @@
     "skillDeleteFailed": "කුසලතා මැකීමට නොහැකි විය. නැවත උත්සාහ කරන්න.",
     "skillToggleFailed": "කුසලතා යාවත්කාලීන කිරීමට නොහැකි විය. නැවත උත්සාහ කරන්න.",
     "skillLimitReached": "පැතිකඩකට කුසලතා {{max}}ක් දක්වා තබා ගත හැක. තවත් එකක් එකතු කිරීමට එකක් මකන්න.",
+    "variableLimitReached": "පැතිකඩකට විචල්යයන් {{max}}ක් දක්වා තබා ගත හැක. තවත් එකක් එකතු කිරීමට එකක් මකන්න.",
     "skillSourceCustom": "අභිරුචි",
     "skillSourceMarketplace": "වෙළඳපොළ",
     "skillSourceSkillsSh": "skills.sh",

@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Bacarıq silmək mümkün olmadı. Yenidən cəhd edin.",
     "skillToggleFailed": "Bacarıq yeniləmək mümkün olmadı. Yenidən cəhd edin.",
     "skillLimitReached": "Profil maksimum {{max}} bacarıq saxlaya bilər. Başqa bir bacarıq əlavə etmək üçün birini silin.",
+    "variableLimitReached": "Profil maksimum {{max}} dəyişən saxlaya bilər. Başqa bir dəyişən əlavə etmək üçün birini silin.",
     "skillSourceCustom": "Fərdi",
     "skillSourceMarketplace": "Marketpleys",
     "skillSourceSkillsSh": "skills.sh",

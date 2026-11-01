@@ -3948,6 +3948,7 @@
     "skillDeleteFailed": "Couldn't delete skill. Try again.",
     "skillToggleFailed": "Couldn't update skill. Try again.",
     "skillLimitReached": "A profile can hold up to {{max}} skills. Delete one to add another.",
+    "variableLimitReached": "A profile can hold up to {{max}} variables. Delete one to add another.",
     "skillSourceCustom": "Custom",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

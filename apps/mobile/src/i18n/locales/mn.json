@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Ур чадвараа устгаж чадсангүй. Дахин оролдоно уу.",
     "skillToggleFailed": "Ур чадвараа шинэчлэж чадсангүй. Дахин оролдоно уу.",
     "skillLimitReached": "Профайлд хамгийн ихдээ {{max}} ур чадвар байж болно. Өөр нэмэхийн тулд нэгийг нь устгана уу.",
+    "variableLimitReached": "Профайлд хамгийн ихдээ {{max}} хувьсагч байж болно. Өөр нэмэхийн тулд нэгийг нь устгана уу.",
     "skillSourceCustom": "Өөрийн",
     "skillSourceMarketplace": "Маркет",
     "skillSourceSkillsSh": "skills.sh",

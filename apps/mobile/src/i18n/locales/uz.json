@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Mahorat o'chirilmadi. Qayta urinib ko'ring.",
     "skillToggleFailed": "Mahorat yangilanmadi. Qayta urinib ko'ring.",
     "skillLimitReached": "Profil {{max}} tagacha ko'nikmani saqlashi mumkin. Boshqasini qo'shish uchun bittasini o'chiring.",
+    "variableLimitReached": "Profil {{max}} tagacha o'zgaruvchilarni saqlashi mumkin. Boshqasini qo'shish uchun bittasini o'chiring.",
     "skillSourceCustom": "Maxsus",
     "skillSourceMarketplace": "Bozor",
     "skillSourceSkillsSh": "skills.sh",

@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Умението не можа да бъде изтрито. Опитайте отново.",
     "skillToggleFailed": "Умението не можа да бъде обновено. Опитайте отново.",
     "skillLimitReached": "Един профил може да съдържа до {{max}} умения. Изтрийте едно, за да добавите друго.",
+    "variableLimitReached": "Един профил може да съдържа до {{max}} променливи. Изтрийте една, за да добавите друга.",
     "skillSourceCustom": "Персонализирано",
     "skillSourceMarketplace": "Магазин",
     "skillSourceSkillsSh": "skills.sh",

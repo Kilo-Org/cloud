@@ -3887,6 +3887,7 @@
     "skillDeleteFailed": "कौशल हटाया नहीं जा सका। फिर से प्रयास करें।",
     "skillToggleFailed": "कौशल अद्यतन नहीं किया जा सका। फिर से प्रयास करें।",
     "skillLimitReached": "एक प्रोफ़ाइल में अधिकतम {{max}} कौशल रखे जा सकते हैं। एक और जोड़ने के लिए एक हटाएँ।",
+    "variableLimitReached": "एक प्रोफ़ाइल में अधिकतम {{max}} चर रखे जा सकते हैं। एक और जोड़ने के लिए एक हटाएँ।",
     "skillSourceCustom": "कस्टम",
     "skillSourceMarketplace": "मार्केटप्लेस",
     "skillSourceSkillsSh": "skills.sh",

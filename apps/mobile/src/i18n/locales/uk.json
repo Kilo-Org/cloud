@@ -3993,6 +3993,7 @@
     "skillDeleteFailed": "Не вдалося видалити навичку. Спробуйте ще раз.",
     "skillToggleFailed": "Не вдалося оновити навичку. Спробуйте ще раз.",
     "skillLimitReached": "Профіль може містити до {{max}} навичок. Видаліть одну, щоб додати ще.",
+    "variableLimitReached": "Профіль може містити до {{max}} змінних. Видаліть одну, щоб додати ще.",
     "skillSourceCustom": "Власна",
     "skillSourceMarketplace": "Маркетплейс",
     "skillSourceSkillsSh": "skills.sh",

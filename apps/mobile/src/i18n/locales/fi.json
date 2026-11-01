@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Taitoa ei voitu poistaa. Yritä uudelleen.",
     "skillToggleFailed": "Taitoa ei voitu päivittää. Yritä uudelleen.",
     "skillLimitReached": "Profiiliin mahtuu enintään {{max}} taitoa. Poista yksi, jotta voit lisätä toisen.",
+    "variableLimitReached": "Profiiliin mahtuu enintään {{max}} muuttujaa. Poista yksi, jotta voit lisätä toisen.",
     "skillSourceCustom": "Mukautettu",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

@@ -20,6 +20,7 @@ import {
   toggleSecret,
 } from '@/components/profiles/profile-variables-screen.test-helpers';
 import { SECRET_MASK } from '@/components/profiles/profile-variables-model';
+import { MAX_PROFILE_VARS } from '@/lib/agent-profile-forms';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
@@ -167,6 +168,85 @@ describe('ProfileVariablesScreen', () => {
     await waitFor(() =>
       findAll(renderer.root, 'Pressable').some(node => node.props.accessibilityLabel === 'API_KEY')
     );
+
+    unmount();
+  });
+
+  it('names the profile variable limit and refuses a new key at it without a request', async () => {
+    h.query.data = testVars(
+      Array.from({ length: MAX_PROFILE_VARS }, (_, index) => ({
+        key: `VAR_${String(index)}`,
+        value: 'v',
+        isSecret: false,
+      }))
+    );
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    const limitCopy = i18n.t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS });
+    expect(
+      findAll(renderer.root, 'Text')
+        .map(node => node.props.children)
+        .includes(limitCopy)
+    ).toBe(true);
+
+    pressButton(renderer.root, 'Add variable');
+    changeText(renderer.root, 'Key', 'NEW_VAR');
+    changeText(renderer.root, 'Value', 'v');
+    pressButton(renderer.root, 'Save');
+
+    expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
+    expect(h.error).toHaveBeenCalledWith(limitCopy);
+
+    unmount();
+  });
+
+  const atVariableLimit = (): TestVars =>
+    testVars([
+      { key: 'API_KEY', value: 'old', isSecret: false },
+      ...Array.from({ length: MAX_PROFILE_VARS - 1 }, (_, index) => ({
+        key: `VAR_${String(index)}`,
+        value: 'v',
+        isSecret: false,
+      })),
+    ]);
+
+  it('still fills a stored variable at the limit', async () => {
+    h.query.data = atVariableLimit();
+    h.query.isPending = false;
+    h.mutations.setVar.mutateAsync.mockResolvedValue({ success: true });
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'API_KEY');
+    changeText(renderer.root, 'Value', 'new');
+    pressButton(renderer.root, 'Save');
+
+    await waitFor(() => h.mutations.setVar.mutateAsync.mock.calls.length > 0);
+    expect(h.mutations.setVar.mutateAsync.mock.calls[0]?.[0]).toMatchObject({
+      key: 'API_KEY',
+      value: 'new',
+    });
+    expect(h.error).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it("names the limit in the reader's language when the server refuses a save", async () => {
+    h.query.data = atVariableLimit();
+    h.query.isPending = false;
+    h.mutations.setVar.mutateAsync.mockRejectedValue(
+      Object.assign(new Error(`Profiles are limited to ${MAX_PROFILE_VARS} variables`), {
+        data: { code: 'PRECONDITION_FAILED' },
+      })
+    );
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'API_KEY');
+    changeText(renderer.root, 'Value', 'again');
+    pressButton(renderer.root, 'Save');
+
+    const limitCopy = i18n.t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS });
+    await waitFor(() => h.error.mock.calls.some(call => call[0] === limitCopy));
 
     unmount();
   });

@@ -4049,6 +4049,7 @@
     "skillDeleteFailed": "Níorbh fhéidir an scil a scriosadh. Bain triail eile as.",
     "skillToggleFailed": "Níorbh fhéidir an scil a nuashonrú. Bain triail eile as.",
     "skillLimitReached": "Is féidir le próifíl suas le {{max}} scil a choinneáil. Scrios ceann amháin chun scil eile a chur leis.",
+    "variableLimitReached": "Is féidir le próifíl suas le {{max}} athróg a choinneáil. Scrios ceann amháin chun athróg eile a chur leis.",
     "skillSourceCustom": "Saincheaptha",
     "skillSourceMarketplace": "Margadh",
     "skillSourceSkillsSh": "skills.sh",

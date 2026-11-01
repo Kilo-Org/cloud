@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "कौशल मेटाउन सकेन। फेरि प्रयास गर्नुहोस्।",
     "skillToggleFailed": "कौशल अपडेट गर्न सकेन। फेरि प्रयास गर्नुहोस्।",
     "skillLimitReached": "प्रोफाइलमा बढीमा {{max}} सीपहरू राख्न सकिन्छ। अर्को थप्न एउटा मेटाउनुहोस्।",
+    "variableLimitReached": "प्रोफाइलमा बढीमा {{max}} चरहरू राख्न सकिन्छ। अर्को थप्न एउटा मेटाउनुहोस्।",
     "skillSourceCustom": "कस्टम",
     "skillSourceMarketplace": "मार्केटप्लेस",
     "skillSourceSkillsSh": "skills.sh",

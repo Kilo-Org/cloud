@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "스킬 삭제가 안되네요. 다시 시도해 주세요.",
     "skillToggleFailed": "스킬 수정이 안되네요. 다시 시도해 주세요.",
     "skillLimitReached": "프로필에는 최대 {{max}}개의 스킬을 보관할 수 있습니다. 다른 스킬을 추가하려면 하나를 삭제하세요.",
+    "variableLimitReached": "프로필에는 최대 {{max}}개의 환경변수를 보관할 수 있습니다. 다른 환경변수를 추가하려면 하나를 삭제하세요.",
     "skillSourceCustom": "커스텀",
     "skillSourceMarketplace": "마켓플레이스",
     "skillSourceSkillsSh": "skills.sh",

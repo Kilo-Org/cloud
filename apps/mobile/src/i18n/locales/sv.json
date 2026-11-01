@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Det gick inte att ta bort färdigheten. Försök igen.",
     "skillToggleFailed": "Det gick inte att uppdatera färdigheten. Försök igen.",
     "skillLimitReached": "En profil kan innehålla upp till {{max}} färdigheter. Ta bort en för att lägga till en till.",
+    "variableLimitReached": "En profil kan innehålla upp till {{max}} variabler. Ta bort en för att lägga till en till.",
     "skillSourceCustom": "Anpassad",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

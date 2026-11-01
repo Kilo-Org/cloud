@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Tidak dapat menghapus keterampilan. Coba lagi.",
     "skillToggleFailed": "Tidak dapat memperbarui keterampilan. Coba lagi.",
     "skillLimitReached": "Profil dapat menampung hingga {{max}} keterampilan. Hapus satu untuk menambahkan yang lain.",
+    "variableLimitReached": "Profil dapat menampung hingga {{max}} variabel. Hapus satu untuk menambahkan yang lain.",
     "skillSourceCustom": "Kustom",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

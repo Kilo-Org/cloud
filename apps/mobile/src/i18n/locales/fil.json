@@ -3887,6 +3887,7 @@
     "skillDeleteFailed": "Hindi makapag-delete ng kasanayan. Subukan muli.",
     "skillToggleFailed": "Hindi makapag-update ng kasanayan. Subukan muli.",
     "skillLimitReached": "Maaaring maglaman ang isang profile ng hanggang {{max}} kasanayan. Mag-alis ng isa para makapagdagdag ng iba.",
+    "variableLimitReached": "Maaaring maglaman ang isang profile ng hanggang {{max}} variable. Mag-alis ng isa para makapagdagdag ng iba.",
     "skillSourceCustom": "Custom",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

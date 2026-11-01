@@ -3881,6 +3881,7 @@
     "skillDeleteFailed": "Kunne ikke slette ferdigheter. Prøv igjen.",
     "skillToggleFailed": "Kunne ikke oppdatere ferdigheter. Prøv igjen.",
     "skillLimitReached": "En profil kan ha opptil {{max}} ferdigheter. Slett én for å legge til en ny.",
+    "variableLimitReached": "En profil kan ha opptil {{max}} variabler. Slett én for å legge til en ny.",
     "skillSourceCustom": "Egendefinert",
     "skillSourceMarketplace": "Markedsplass",
     "skillSourceSkillsSh": "skills.sh",

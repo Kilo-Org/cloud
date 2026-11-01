@@ -3943,6 +3943,7 @@
     "skillDeleteFailed": "Não foi possível eliminar a competência. Tente novamente.",
     "skillToggleFailed": "Não foi possível atualizar a competência. Tente novamente.",
     "skillLimitReached": "Um perfil pode conter até {{max}} competências. Elimine uma para adicionar outra.",
+    "variableLimitReached": "Um perfil pode conter até {{max}} variáveis. Elimine uma para adicionar outra.",
     "skillSourceCustom": "Personalizado",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

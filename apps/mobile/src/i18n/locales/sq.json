@@ -4012,7 +4012,6 @@
     "title": "Bli kredite",
     "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",
     "nextExpiry": "Kredite në vlerën {{amount}} skadojnë më {{date}} (UTC). Kreditet që skadojnë më herët përdoren të parat.",
-    "nextExpiryDate": "Kreditet skadojnë më {{date}} (UTC). Kreditet që skadojnë më herët përdoren të parat.",
     "noExpiringCredits": "Nuk ka kredite që skadojnë.",
     "expiryUnavailable": "Informacioni për skadimin e krediteve nuk disponohet.",
     "appStoreExpiry": "Kreditet e blera përmes App Store nuk skadojnë.",

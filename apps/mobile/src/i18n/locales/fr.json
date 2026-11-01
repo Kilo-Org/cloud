@@ -4075,7 +4075,6 @@
     "title": "Acheter des crédits",
     "description": "Les crédits sont un achat unique ajouté à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App. La boutique débite votre compte et les crédits sont ajoutés après confirmation du paiement par la boutique.",
     "nextExpiry": "{{amount}} de crédits expirent le {{date}} (UTC). Les crédits dont l'expiration est la plus proche sont utilisés en premier.",
-    "nextExpiryDate": "Les crédits expirent le {{date}} (UTC). Les crédits dont l'expiration est la plus proche sont utilisés en premier.",
     "noExpiringCredits": "Aucun crédit avec une date d'expiration.",
     "expiryUnavailable": "Informations sur l'expiration des crédits indisponibles.",
     "appStoreExpiry": "Les crédits achetés via l'App Store n'expirent pas.",

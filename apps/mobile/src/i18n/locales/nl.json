@@ -4012,7 +4012,6 @@
     "title": "Credits kopen",
     "description": "Credits zijn een eenmalige aankoop die aan je Kilo-saldo wordt toegevoegd voor AI-coderingssessies in Kilo App. De store belast je account en de credits worden toegevoegd nadat de store de betaling bevestigt.",
     "nextExpiry": "{{amount}} aan credits verloopt op {{date}} (UTC). Credits die het eerst verlopen, worden eerst gebruikt.",
-    "nextExpiryDate": "Credits verlopen op {{date}} (UTC). Credits die het eerst verlopen, worden eerst gebruikt.",
     "noExpiringCredits": "Geen credits die verlopen.",
     "expiryUnavailable": "Vervalinformatie voor credits niet beschikbaar.",
     "appStoreExpiry": "Credits die via de App Store zijn gekocht, verlopen niet.",

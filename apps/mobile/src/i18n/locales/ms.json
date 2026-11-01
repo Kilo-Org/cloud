@@ -4012,7 +4012,6 @@
     "title": "Beli kredit",
     "description": "Kredit ialah pembelian sekali sahaja yang ditambah pada baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo. Kedai mengenakan caj pada akaun anda dan kredit ditambah selepas kedai mengesahkan pembayaran.",
     "nextExpiry": "Kredit sebanyak {{amount}} akan tamat tempoh pada {{date}} (UTC). Kredit yang paling awal tamat tempoh digunakan dahulu.",
-    "nextExpiryDate": "Kredit akan tamat tempoh pada {{date}} (UTC). Kredit yang paling awal tamat tempoh digunakan dahulu.",
     "noExpiringCredits": "Tiada kredit yang akan tamat tempoh.",
     "expiryUnavailable": "Maklumat tamat tempoh kredit tidak tersedia.",
     "appStoreExpiry": "Kredit yang dibeli melalui App Store tidak tamat tempoh.",

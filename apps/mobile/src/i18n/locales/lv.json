@@ -4069,7 +4069,6 @@
     "title": "Pirkt kredītus",
     "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",
     "nextExpiry": "Kredītu {{amount}} apmērā derīguma termiņš beidzas {{date}} (UTC). Vispirms tiek izmantoti kredīti ar agrāko derīguma termiņu.",
-    "nextExpiryDate": "Kredītu derīguma termiņš beidzas {{date}} (UTC). Vispirms tiek izmantoti kredīti ar agrāko derīguma termiņu.",
     "noExpiringCredits": "Nav kredītu ar derīguma termiņu.",
     "expiryUnavailable": "Informācija par kredītu derīguma termiņu nav pieejama.",
     "appStoreExpiry": "Ar App Store starpniecību iegādātajiem kredītiem nav derīguma termiņa.",

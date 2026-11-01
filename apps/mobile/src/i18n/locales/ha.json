@@ -4012,7 +4012,6 @@
     "title": "Sayi kuɗin amfani",
     "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",
     "nextExpiry": "Kuɗin amfani {{amount}} za su ƙare {{date}} (UTC). Ana fara amfani da kuɗin amfani da za su fi saurin ƙarewa.",
-    "nextExpiryDate": "Kuɗin amfani za su ƙare {{date}} (UTC). Ana fara amfani da kuɗin amfani da za su fi saurin ƙarewa.",
     "noExpiringCredits": "Babu kuɗin amfani da za su ƙare.",
     "expiryUnavailable": "Bayanin ƙarewar kuɗin amfani ba ya nan.",
     "appStoreExpiry": "Kuɗin amfani da aka saya ta App Store ba sa ƙarewa.",

@@ -4126,7 +4126,6 @@
     "title": "Kúpiť kredity",
     "description": "Kredity sú jednorazový nákup pridaný do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo. Obchod vám strhne platbu z účtu a kredity sa pripíšu po potvrdení platby obchodom.",
     "nextExpiry": "Platnosť kreditov v hodnote {{amount}} sa skončí {{date}} (UTC). Najprv sa čerpajú kredity s najskorším koncom platnosti.",
-    "nextExpiryDate": "Platnosť kreditov sa skončí {{date}} (UTC). Najprv sa čerpajú kredity s najskorším koncom platnosti.",
     "noExpiringCredits": "Žiadne kredity s obmedzenou platnosťou.",
     "expiryUnavailable": "Informácie o platnosti kreditov nie sú k dispozícii.",
     "appStoreExpiry": "Kredity zakúpené cez App Store nestrácajú platnosť.",

@@ -4126,7 +4126,6 @@
     "title": "Kup kredyty",
     "description": "Kredyty to jednorazowy zakup dodawany do Twojego salda Kilo na potrzeby sesji kodowania AI w aplikacji Kilo. Sklep obciąża Twoje konto, a kredyty są dodawane po potwierdzeniu płatności przez sklep.",
     "nextExpiry": "Kredyty w kwocie {{amount}} stracą ważność {{date}} (UTC). Najpierw wykorzystywane są kredyty z najwcześniejszym terminem ważności.",
-    "nextExpiryDate": "Kredyty stracą ważność {{date}} (UTC). Najpierw wykorzystywane są kredyty z najwcześniejszym terminem ważności.",
     "noExpiringCredits": "Brak kredytów z terminem ważności.",
     "expiryUnavailable": "Informacje o terminie ważności kredytów są niedostępne.",
     "appStoreExpiry": "Kredyty kupione przez App Store nie tracą ważności.",

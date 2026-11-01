@@ -248,76 +248,78 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         />
       )}
       {!showBalanceSkeleton && !balanceFailed && (
-        <View className="min-h-16 gap-1 rounded-lg bg-secondary px-3 py-2">
-          <View className={cn('gap-2', stackBalance ? 'items-stretch' : 'flex-row items-center')}>
-            <Animated.View
-              className={cn('min-w-0 flex-row items-center gap-1', !stackBalance && 'flex-1')}
-              layout={LinearTransition.duration(200)}
+        <View
+          className={cn(
+            'min-h-16 gap-2 rounded-lg bg-secondary px-3 py-2',
+            stackBalance ? 'items-stretch' : 'flex-row items-center'
+          )}
+        >
+          <Animated.View
+            className={cn('min-w-0 flex-row items-center gap-1', !stackBalance && 'flex-1')}
+            layout={LinearTransition.duration(200)}
+          >
+            <View className="min-w-0 flex-1 gap-1">
+              <ScrollView horizontal className="min-w-0">
+                <Text
+                  className="text-2xl font-bold tabular-nums"
+                  accessibilityLabel={hideBalance ? t('profile.balanceHidden') : undefined}
+                >
+                  {hideBalance ? HIDDEN_BALANCE : formatMoney(balanceDollars, i18n.language)}
+                </Text>
+              </ScrollView>
+              {creditsFailed && (
+                <Text className="text-xs text-muted-foreground">
+                  {t('credits.expiryUnavailable')}
+                </Text>
+              )}
+              {!creditsFailed && creditsPending && (
+                <Animated.View exiting={FadeOut.duration(150)}>
+                  <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
+                </Animated.View>
+              )}
+              {!creditsFailed && !creditsPending && (
+                <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
+                  <CreditExpiryNote
+                    creditBlocks={creditData.creditBlocks}
+                    hiddenAmount={hideBalance ? HIDDEN_BALANCE : undefined}
+                    emptyMessage={t('credits.noExpiringCredits')}
+                  />
+                </Animated.View>
+              )}
+            </View>
+            <Pressable
+              className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0 active:opacity-70')}
+              onPress={() => {
+                selectionHaptic();
+                setHideBalance(!hideBalance);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={hideBalance ? t('profile.showBalance') : t('profile.hideBalance')}
             >
-              <View className="min-w-0 flex-1 gap-1">
-                <ScrollView horizontal className="min-w-0">
-                  <Text
-                    className="text-2xl font-bold tabular-nums"
-                    accessibilityLabel={hideBalance ? t('profile.balanceHidden') : undefined}
-                  >
-                    {hideBalance ? HIDDEN_BALANCE : formatMoney(balanceDollars, i18n.language)}
-                  </Text>
-                </ScrollView>
-              </View>
-              <Pressable
-                className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0 active:opacity-70')}
-                onPress={() => {
-                  selectionHaptic();
-                  setHideBalance(!hideBalance);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  hideBalance ? t('profile.showBalance') : t('profile.hideBalance')
-                }
-              >
-                {hideBalance ? (
-                  <Eye size={18} color={colors.mutedForeground} />
-                ) : (
-                  <EyeOff size={18} color={colors.mutedForeground} />
-                )}
-              </Pressable>
-            </Animated.View>
-            <View className="max-w-full flex-row flex-wrap items-center gap-2">
-              {/* No in-progress indicator here: this row paints a balance that
+              {hideBalance ? (
+                <Eye size={18} color={colors.mutedForeground} />
+              ) : (
+                <EyeOff size={18} color={colors.mutedForeground} />
+              )}
+            </Pressable>
+          </Animated.View>
+          <View className="max-w-full flex-row flex-wrap items-center gap-2">
+            {/* No in-progress indicator here: this row paints a balance that
                 belongs to the selected account, and a background refresh may
                 legitimately take a while or never finish. The first load and a
                 context switch own the skeleton above; a refresh that fails owns
                 the retry surface. An indicator tied to every in-flight refresh
                 spun for as long as a stalled one lasted (and announced itself
                 as "In progress"). */}
-              {selectedOrgId == null && (
-                <AddCreditsButton
-                  className={cn('h-auto min-h-11 max-w-full py-2', stackBalance && 'flex-1')}
-                  onPress={() => {
-                    router.push('/(app)/credits' as Href);
-                  }}
-                />
-              )}
-            </View>
-          </View>
-          {creditsFailed && (
-            <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
-          )}
-          {!creditsFailed && creditsPending && (
-            <Animated.View exiting={FadeOut.duration(150)}>
-              <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
-            </Animated.View>
-          )}
-          {!creditsFailed && !creditsPending && (
-            <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
-              <CreditExpiryNote
-                creditBlocks={creditData.creditBlocks}
-                shownBalanceDollars={balanceDollars}
-                hiddenAmount={hideBalance ? HIDDEN_BALANCE : undefined}
-                emptyMessage={t('credits.noExpiringCredits')}
+            {selectedOrgId == null && (
+              <AddCreditsButton
+                className={cn('h-auto min-h-11 max-w-full py-2', stackBalance && 'flex-1')}
+                onPress={() => {
+                  router.push('/(app)/credits' as Href);
+                }}
               />
-            </Animated.View>
-          )}
+            )}
+          </View>
         </View>
       )}
       {selectedOrgId != null &&

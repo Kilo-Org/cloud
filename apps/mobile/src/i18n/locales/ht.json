@@ -4012,7 +4012,6 @@
     "title": "Achte kredi",
     "description": "Kredi se yon acha yon sèl fwa ki ajoute nan balans Kilo ou pou kouri sesyon kodaj AI nan Kilo App. Magazen an chaje kont ou epi kredi yo ajoute apre magazen an konfime peman an.",
     "nextExpiry": "{{amount}} nan kredi ap ekspire {{date}} (UTC). Kredi ki ekspire pi bonè yo itilize an premye.",
-    "nextExpiryDate": "Kredi ap ekspire {{date}} (UTC). Kredi ki ekspire pi bonè yo itilize an premye.",
     "noExpiringCredits": "Pa gen kredi k ap ekspire.",
     "expiryUnavailable": "Enfòmasyon sou ekspirasyon kredi yo pa disponib.",
     "appStoreExpiry": "Kredi ou achte nan App Store pa ekspire.",

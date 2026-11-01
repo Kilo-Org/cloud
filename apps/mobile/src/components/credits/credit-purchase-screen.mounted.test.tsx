@@ -14,10 +14,6 @@ import { CreditPurchaseScreen } from './credit-purchase-screen';
 
 // ── Mutable state ────────────────────────────────────────────────────
 
-// The expiry sentence joins its zone marker to the date with a no-break space,
-// inside an isolate, so a wrap can never start a line with the marker alone.
-const UTC_MARKER = `\u00A0\u2068(UTC)\u2069`;
-
 const mockedPlatform = vi.hoisted(() => ({ OS: 'ios' as string }));
 
 const backend = vi.hoisted(() => ({
@@ -302,11 +298,8 @@ describe('CreditPurchaseScreen', () => {
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => allText(renderer).includes('$10.00 in credits expires'));
     expect(allText(renderer)).not.toContain('$60.00 in credits');
-    expect(allText(renderer)).not.toContain('10/15/2028');
     expect(allText(renderer)).not.toContain('bonus credits');
-    expect(allText(renderer)).toContain(
-      `${UTC_MARKER}. Credits with the earliest expiry are used first.`
-    );
+    expect(allText(renderer)).toContain('(UTC). Credits with the earliest expiry are used first.');
     unmount();
   });
 

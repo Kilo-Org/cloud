@@ -4012,7 +4012,6 @@
     "title": "Mua tín dụng",
     "description": "Tín dụng là giao dịch mua một lần được thêm vào số dư Kilo của bạn để chạy các phiên lập trình AI trong Kilo App. Cửa hàng tính phí vào tài khoản của bạn và tín dụng được thêm sau khi cửa hàng xác nhận thanh toán.",
     "nextExpiry": "Khoản tín dụng {{amount}} sẽ hết hạn vào {{date}} (UTC). Tín dụng hết hạn sớm nhất sẽ được dùng trước.",
-    "nextExpiryDate": "Tín dụng sẽ hết hạn vào {{date}} (UTC). Tín dụng hết hạn sớm nhất sẽ được dùng trước.",
     "noExpiringCredits": "Không có tín dụng nào có thời hạn.",
     "expiryUnavailable": "Không tải được thông tin hết hạn của tín dụng.",
     "appStoreExpiry": "Tín dụng mua qua App Store không hết hạn.",

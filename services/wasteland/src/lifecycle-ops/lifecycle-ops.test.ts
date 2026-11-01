@@ -136,6 +136,7 @@ describe('joinViaSdk', () => {
           rows: [{ handle: 'alice', dolthub_org: 'alice' }],
         },
       },
+      { status: 200, body: { status: 'Success', username: 'alice' } },
     ]);
 
     const result = await joinViaSdk(baseCtx, fetch);

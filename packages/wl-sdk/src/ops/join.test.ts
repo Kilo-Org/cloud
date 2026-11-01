@@ -110,6 +110,8 @@ describe('join', () => {
           rows: [{ handle: 'alice', dolthub_org: 'alice' }],
         },
       },
+      // read the token's own account → the org above.
+      { status: 200, body: { status: 'Success', username: 'alice' } },
     ];
     const { fetch: f, calls } = makeFetch(responses);
     const result = await join({
@@ -126,7 +128,11 @@ describe('join', () => {
     if (!result.ok) return;
     expect(result.data.forkCreated).toBe(false);
     expect(result.data.registrationPullId).toBe('');
-    expect(calls).toHaveLength(2);
+    expect(calls.map(c => new URL(c.url).pathname.replace(/^.*\/api\/v1alpha1/, ''))).toEqual([
+      '/fork',
+      '/hop/wl',
+      '/user',
+    ]);
     expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
     expect(calls.some(c => c.url.includes('/pulls'))).toBe(false);
   });
@@ -223,6 +229,7 @@ describe('join', () => {
           rows: [{ handle: 'alice-tools', dolthub_org: 'Alice' }],
         },
       },
+      { status: 200, body: { status: 'Success', username: 'alice' } },
     ];
     const { fetch: f, calls } = makeFetch(responses);
     const result = await join({
@@ -292,6 +299,64 @@ describe('join', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.code).toBe('precondition');
+  });
+
+  it('refuses a matching org the token does not belong to', async () => {
+    const responses: MockResponse[] = [
+      { status: 400, body: { error: 'fork already exists under alice' } },
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [{ handle: 'alice-tools', dolthub_org: 'alice' }],
+        },
+      },
+      { status: 200, body: { status: 'Success', username: 'mallory' } },
+    ];
+    const { fetch: f, calls } = makeFetch(responses);
+    const result = await join({
+      auth: { token: 't' },
+      upstream: { owner: 'hop', db: 'wl' },
+      dolthubOrg: 'alice',
+      rigHandle: 'alice-tools',
+      displayName: 'Alice tools',
+      ownerEmail: 'alice@example.com',
+      version: '0.1.0',
+      fetch: f,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('precondition');
+    expect(result.error.message).toContain('Could not confirm that DoltHub org');
+    expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
+  });
+
+  it('fails closed when the DoltHub account behind the token cannot be resolved', async () => {
+    const responses: MockResponse[] = [
+      { status: 400, body: { error: 'fork already exists under alice' } },
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [{ handle: 'alice-tools', dolthub_org: 'alice' }],
+        },
+      },
+      { status: 401, body: { status: 'Error', message: 'Not authenticated' } },
+    ];
+    const { fetch: f } = makeFetch(responses);
+    const result = await join({
+      auth: { token: 't' },
+      upstream: { owner: 'hop', db: 'wl' },
+      dolthubOrg: 'alice',
+      rigHandle: 'alice-tools',
+      displayName: 'Alice tools',
+      ownerEmail: 'alice@example.com',
+      version: '0.1.0',
+      fetch: f,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('upstream');
   });
 
   it('fails closed when the upstream rigs read fails', async () => {

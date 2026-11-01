@@ -35,6 +35,7 @@ import { doltWrite } from '../dolthub/write';
 import { createPull, listPulls } from '../dolthub/pulls';
 import { buildRegistrationDML } from '../commons/registration';
 import { escapeSqlString } from '../commons/escape';
+import { getAuthenticatedUsername } from '../dolthub/user';
 import { makeRegisterBranch } from './branch';
 import { isSameDolthubOrg, rigHandleFormatError } from './rig-handle';
 import { WlDoltHubError, type DoltHubAuth, type DoltFetchHooks } from '../dolthub/api';
@@ -126,6 +127,32 @@ export async function join(opts: JoinOptions): Promise<WlResult<JoinResult>> {
             'precondition'
           ),
         };
+      }
+      // The registered org matched, but the org itself can be asserted by
+      // the caller. Accept it only when DoltHub proved this token may act
+      // for that org: the fork was just created under it, or it is the
+      // username the token belongs to.
+      if (!forkResult.created) {
+        const owner = await resolveTokenOwner(opts);
+        if (owner.status === 'unknown') {
+          return {
+            ok: false,
+            error: new WlError(
+              'Could not resolve the DoltHub account for this token — retry the join',
+              'upstream',
+              owner.cause
+            ),
+          };
+        }
+        if (!isSameDolthubOrg(owner.username, opts.dolthubOrg)) {
+          return {
+            ok: false,
+            error: new WlError(
+              `Could not confirm that DoltHub org "${opts.dolthubOrg}" belongs to you — join with a handle registered under your DoltHub username, or reconnect DoltHub and retry`,
+              'precondition'
+            ),
+          };
+        }
       }
       return {
         ok: true,
@@ -296,6 +323,26 @@ async function findRegisteredRig(opts: JoinOptions): Promise<RegisteredRig> {
     const row = res.rows[0];
     if (row === undefined) return { status: 'absent' };
     return { status: 'found', dolthubOrg: readDolthubOrg(row) };
+  } catch (cause) {
+    return { status: 'unknown', cause };
+  }
+}
+
+type TokenOwner = { status: 'resolved'; username: string } | { status: 'unknown'; cause: unknown };
+
+/**
+ * Ask DoltHub which account the token belongs to. Kept separate from the
+ * org comparison so a failed lookup is reported as an upstream problem
+ * rather than being read as "the org is not yours".
+ */
+async function resolveTokenOwner(opts: JoinOptions): Promise<TokenOwner> {
+  try {
+    const username = await getAuthenticatedUsername({
+      auth: opts.auth,
+      fetch: opts.fetch,
+      hooks: opts.hooks,
+    });
+    return { status: 'resolved', username };
   } catch (cause) {
     return { status: 'unknown', cause };
   }

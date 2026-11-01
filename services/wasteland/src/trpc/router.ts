@@ -390,11 +390,15 @@ export const wastelandRouter = router({
 
       const config = await doStub.getConfig();
       const handle = input.rigHandle ?? credential.rig_handle ?? dolthubOrg;
-      // This handle becomes the credential's identity right after the
-      // bootstrap, so it has to be a well-formed rig handle.
-      const handleError = rigHandleFormatError(handle);
-      if (handleError !== null) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: handleError });
+      // A handle the caller picked becomes the credential's identity right
+      // after the bootstrap, so it has to be well formed. The derived
+      // fallbacks are a DoltHub username/org and an already stored handle,
+      // which are used as they are.
+      if (input.rigHandle !== undefined) {
+        const handleError = rigHandleFormatError(input.rigHandle);
+        if (handleError !== null) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: handleError });
+        }
       }
       const displayName = input.rigDisplayName ?? config?.name ?? handle;
       const ownerEmail = input.rigEmail ?? `${handle}@kilo.local`;

@@ -17,7 +17,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatMoney } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
@@ -288,14 +288,13 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
               )}
             </View>
             <Pressable
-              className="min-h-11 min-w-11 items-center justify-center active:opacity-70"
+              className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0 active:opacity-70')}
               onPress={() => {
                 selectionHaptic();
                 setHideBalance(!hideBalance);
               }}
               accessibilityRole="button"
               accessibilityLabel={hideBalance ? t('profile.showBalance') : t('profile.hideBalance')}
-              hitSlop={4}
             >
               {hideBalance ? (
                 <Eye size={18} color={colors.mutedForeground} />

@@ -12,12 +12,18 @@ import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/rend
 import { onlineManager, type QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { CreditsCard } from './profile-credits-card';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { OrganizationProvider } from '@/lib/organization-context';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
+
+// The expiry sentence keeps its zone marker on the date's line with a no-break
+// space inside a bidi isolate. Content assertions compare the readable text;
+// the marker itself is asserted only where the wrapping behavior is under test.
+const readable = (text: string) => text.replaceAll(/[\u2068\u2069]/g, '').replaceAll('\u00A0', ' ');
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -417,14 +423,18 @@ describe('CreditsCard balance state', () => {
     const { renderer, texts, unmount } = await mountCard();
     const explanation =
       ' in credits expires 12/17/2099 (UTC). Credits with the earliest expiry are used first.';
-    await waitFor(() => texts().includes(`$2.00${explanation}`));
+    await waitFor(() =>
+      texts()
+        .map(text => readable(text))
+        .includes(`$2.00${explanation}`)
+    );
 
     await choose(renderer, 'Hide balance');
-    expect(texts()).toContain(`*****${explanation}`);
-    expect(texts()).not.toContain(`$2.00${explanation}`);
+    expect(texts().map(text => readable(text))).toContain(`*****${explanation}`);
+    expect(texts().map(text => readable(text))).not.toContain(`$2.00${explanation}`);
     expect(texts()).not.toContain('$10.00');
     await choose(renderer, 'Show balance');
-    expect(texts()).toContain(`$2.00${explanation}`);
+    expect(texts().map(text => readable(text))).toContain(`$2.00${explanation}`);
     expect(texts()).toContain('$10.00');
     unmount();
   });
@@ -489,7 +499,11 @@ describe('CreditsCard balance state', () => {
     const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
     const previousNote =
       '$2.00 in credits expires 12/17/2099 (UTC). Credits with the earliest expiry are used first.';
-    await waitFor(() => texts().includes(previousNote));
+    await waitFor(() =>
+      texts()
+        .map(text => readable(text))
+        .includes(previousNote)
+    );
     const pending = Promise.withResolvers<{ creditBlocks: [] }>();
     orgCreditBlocksQueryFn.mockReturnValue(pending.promise);
     await openSheet(renderer);
@@ -528,7 +542,7 @@ describe('CreditsCard balance state', () => {
       try {
         await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
         const notes = texts().filter(text => text.includes('in credits expires'));
-        expect(notes).toEqual(
+        expect(notes.map(text => readable(text))).toEqual(
           future
             ? [
                 '$2.00 in credits expires 12/17/2026 (UTC). Credits with the earliest expiry are used first.',
@@ -568,7 +582,11 @@ describe('CreditsCard balance state', () => {
       const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
       try {
         await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
-        expect(texts().filter(text => text.includes('in credits expires'))).toEqual([
+        expect(
+          texts()
+            .filter(text => text.includes('in credits expires'))
+            .map(text => readable(text))
+        ).toEqual([
           '$2.00 in credits expires 12/17/2026 (UTC). Credits with the earliest expiry are used first.',
         ]);
       } finally {
@@ -820,6 +838,48 @@ describe('CreditsCard balance state', () => {
     unmount();
   });
 
+  it('gives the balance toggle the shared 48dp icon box as its own target', async () => {
+    currentUser.userId = 'user-A';
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData([...BALANCE_KEY], { balance: 10 });
+
+    const { renderer, texts, unmount } = await mountCard(queryClient);
+    await waitFor(() => texts().includes('$10.00'));
+
+    // The audit reads the button's own node rect: `min-h-11` is 38.5pt under
+    // NativeWind's 14pt rem, and `hitSlop` never widens that rect.
+    const toggle = renderer.root.findByProps({ accessibilityLabel: 'Hide balance' });
+    expect(String(toggle.props.className)).toContain(ICON_TARGET_BOX_CLASS);
+    expect(toggle.props.hitSlop).toBeUndefined();
+
+    unmount();
+  });
+
+  it('keeps the expiry zone on its date when the sentence wraps in a right-to-left language', async () => {
+    currentUser.userId = 'user-A';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 2 });
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2027-08-27T12:00:00Z' }],
+    });
+    await i18n.changeLanguage('ar');
+    try {
+      const { texts, unmount } = await mountCard();
+      // A breakable space let the wrapped zone marker start the next line, where
+      // a right-to-left sentence reads it after the following sentence, detached
+      // from the date it belongs to.
+      let note = '';
+      await waitFor(() => {
+        note = texts().find(text => text.includes('UTC')) ?? '';
+        return note.includes('\u00A0');
+      });
+      expect(note).toContain('\u00A0\u2068(UTC)\u2069');
+      expect(note).not.toContain(' (UTC)');
+      unmount();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
   it('shows the nearest paid or bonus deadline and masks its amount with the balance', async () => {
     currentUser.userId = 'user-A';
     getContextBalanceQueryFn.mockResolvedValue({ balance: 65 });
@@ -839,7 +899,7 @@ describe('CreditsCard balance state', () => {
     await act(() => {
       (hide.props.onPress as () => void)();
     });
-    expect(texts()).toContain(
+    expect(texts().map(text => readable(text))).toContain(
       '***** in credits expires 10/15/2027 (UTC). Credits with the earliest expiry are used first.'
     );
     unmount();

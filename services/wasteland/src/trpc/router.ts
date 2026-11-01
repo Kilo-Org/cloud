@@ -12,7 +12,6 @@ import { resolveWastelandOwnership } from './ownership';
 import { resolveWasteland } from './resolve-wasteland';
 import { getWastelandDOStub, type WastelandMemberResult } from '../dos/Wasteland.do';
 import { getWastelandRegistryStub } from '../dos/WastelandRegistry.do';
-import { identityRigHandle } from '../dos/wasteland/credentials';
 import { createUpstream as bootstrapCreateUpstream } from '../upstream-bootstrap/create-upstream';
 import { deriveEncryptionKey, encryptToken, decryptToken } from '../util/crypto.util';
 import { resolveSecret } from '../util/secret.util';
@@ -174,13 +173,11 @@ async function loadAdminContext(
   const fresh = await fetchFreshDoltHubToken(env, { userId });
   const credential = await doStub.getCredential(userId);
 
-  // Resolve the rig handle. A stored handle is used only when the
-  // credential proves the org it was recorded for; otherwise the
-  // DoltHub username (from either source) keeps OAuth-only users and
-  // unproven rows on a non-UUID handle.
+  // Resolve the rig handle. Falls back to the DoltHub username (from
+  // either source) so OAuth-only users still get a non-UUID handle.
   const dolthubOrg =
     (fresh.status === 'ok' ? fresh.data.dolthubUsername : null) ?? credential?.dolthub_org ?? null;
-  const rigHandle = identityRigHandle(credential, dolthubOrg, userId);
+  const rigHandle = credential?.rig_handle ?? dolthubOrg ?? userId;
   const isUpstreamAdmin = credential?.is_upstream_admin ?? false;
 
   if (fresh.status === 'ok') {

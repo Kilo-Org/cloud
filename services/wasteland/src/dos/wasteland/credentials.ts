@@ -125,24 +125,6 @@ export function credentialProvesOrg(
   return credential !== null && isSameDolthubOrg(credential.proven_org, org);
 }
 
-/**
- * The handle a caller's ops may present as their identity in a
- * wasteland — branch names, `claimed_by` / `posted_by`, stamp
- * authorship — for the org those ops resolved.
- *
- * The stored handle is used when the credential proves the org it was
- * recorded for, and `fallback` otherwise. Callers pass that caller's own
- * id as `fallback`, so the identity stays per caller.
- */
-export function identityRigHandle(
-  credential: WastelandCredentialResult | null,
-  org: string | null,
-  fallback: string
-): string {
-  if (credential === null || credential.rig_handle === null || org === null) return fallback;
-  return credentialProvesOrg(credential, org) ? credential.rig_handle : fallback;
-}
-
 export function getCredential(
   sql: SqlStorage,
   wastelandId: string,

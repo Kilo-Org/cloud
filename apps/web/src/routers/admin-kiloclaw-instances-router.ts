@@ -1122,7 +1122,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
   stats: adminProcedure.input(StatsSchema).query(async ({ input }) => {
     const { days } = input;
 
-    // Overview counts (join subscriptions to derive suspended state)
     const [overview] = await db
       .select({
         total_instances: sql<number>`COUNT(*)::int`,
@@ -1138,7 +1137,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
       );
 
-    // Time-windowed counts
     const [last24h] = await db
       .select({ count: sql<number>`COUNT(*)::int` })
       .from(kiloclaw_instances)
@@ -1161,7 +1159,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         )
       );
 
-    // Average lifespan of destroyed instances
     const [lifespan] = await db
       .select({
         avg_lifespan_minutes: sql<
@@ -1171,7 +1168,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       .from(kiloclaw_instances)
       .where(isNotNull(kiloclaw_instances.destroyed_at));
 
-    // Daily stats for chart
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
@@ -1200,7 +1196,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       .groupBy(sql`DATE(${kiloclaw_instances.destroyed_at})`)
       .orderBy(sql`DATE(${kiloclaw_instances.destroyed_at})`);
 
-    // Merge created and destroyed into a single daily series
     const destroyedByDate = new Map(dailyDestroyed.map(d => [d.date, d.destroyed]));
     const createdByDate = new Map(dailyStats.map(d => [d.date, d.created]));
 
@@ -2033,8 +2028,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           : [];
       const ownerUserById = new Map(ownerUsers.map(u => [u.id, u]));
 
-      // 3. Partition. Order: destroyed → pinned_by_admin → pinned_by_user →
-      // already_on_target → apply.
       type ApplyTarget = (typeof rows)[number] & { ownerUserRecord: (typeof ownerUsers)[number] };
       type SkipReason =
         | 'destroyed'
@@ -2086,8 +2079,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         applyQueue.push({ ...row, ownerUserRecord });
       }
 
-      // 4. Apply with bounded concurrency. Manual chunking matches the
-      // detectOrphans pattern already in this router.
       const CONCURRENCY = 10;
 
       const applyOne = async (target: ApplyTarget): Promise<ApplyOutcome> => {
@@ -3767,8 +3758,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
     }),
 
-  // ── Orphan detection ──────────────────────────────────────────────────
-
   detectOrphans: adminProcedure.input(DetectOrphansSchema).mutation(async ({ input }) => {
     // 1. Fetch all active (non-destroyed) instances created within the date range.
     //    Cap at 1000 to avoid excessively long fan-outs; the UI shows when capped.
@@ -3941,7 +3930,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  // ── Orphan-volume reaper ──────────────────────────────────────────────
   //
   // Finds Fly volumes left behind by destroyed instances and lets an admin
   // reap them one row at a time. Detection is anchored on the (soft-deleted,

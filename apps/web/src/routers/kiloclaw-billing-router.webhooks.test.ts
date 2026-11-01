@@ -1984,8 +1984,6 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
   });
 });
 
-// ── Stripe-Funded Credit Settlement ─────────────────────────────────────────
-
 describe('applyStripeFundedKiloClawPeriod', () => {
   async function giveUserCredits(userId: string, microdollars: number) {
     await db

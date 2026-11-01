@@ -347,14 +347,11 @@ export const codeReviewRouter = createTRPCRouter({
         });
       }
 
-      // Authorization check based on owner type
       let canSeeRawIds = true;
       if (review.owned_by_organization_id) {
-        // Organization review: verify user is org member
         const callerRole = await ensureOrganizationAccess(ctx, review.owned_by_organization_id);
         canSeeRawIds = callerRole === 'owner' || callerRole === 'admin';
       } else if (review.owned_by_user_id) {
-        // Personal review: verify user owns it
         if (review.owned_by_user_id !== ctx.user.id) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -495,12 +492,9 @@ export const codeReviewRouter = createTRPCRouter({
         });
       }
 
-      // Authorization check based on owner type
       if (review.owned_by_organization_id) {
-        // Organization review: verify user is org member
         await ensureOrganizationAccess(ctx, review.owned_by_organization_id);
       } else if (review.owned_by_user_id) {
-        // Personal review: verify user owns it
         if (review.owned_by_user_id !== ctx.user.id) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -629,12 +623,9 @@ export const codeReviewRouter = createTRPCRouter({
           });
         }
 
-        // Authorization check based on owner type
         if (review.owned_by_organization_id) {
-          // Organization review: verify user is org member
           await ensureOrganizationAccess(ctx, review.owned_by_organization_id);
         } else if (review.owned_by_user_id) {
-          // Personal review: verify user owns it
           if (review.owned_by_user_id !== ctx.user.id) {
             throw new TRPCError({
               code: 'FORBIDDEN',
@@ -782,7 +773,6 @@ export const codeReviewRouter = createTRPCRouter({
           });
         }
 
-        // Authorization check based on owner type
         if (review.owned_by_organization_id) {
           await ensureOrganizationAccess(ctx, review.owned_by_organization_id);
         } else if (review.owned_by_user_id) {
@@ -843,7 +833,6 @@ export const codeReviewRouter = createTRPCRouter({
           });
         }
 
-        // Authorization check based on owner type
         if (review.owned_by_organization_id) {
           await ensureOrganizationAccess(ctx, review.owned_by_organization_id);
         } else if (review.owned_by_user_id) {

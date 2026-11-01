@@ -131,7 +131,6 @@ describe('user router - updateProfile', () => {
   });
 
   afterEach(async () => {
-    // Reset profile URLs between tests
     await db
       .update(kilocode_users)
       .set({ linkedin_url: null, github_url: null })
@@ -185,7 +184,6 @@ describe('user router - updateProfile', () => {
   });
 
   it('clears a URL by passing null', async () => {
-    // First set a value
     await db
       .update(kilocode_users)
       .set({ linkedin_url: 'https://linkedin.com/in/testuser' })

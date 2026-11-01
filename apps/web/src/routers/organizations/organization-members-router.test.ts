@@ -65,7 +65,6 @@ let testOrganization: Organization;
 
 describe('organizations members trpc router', () => {
   beforeAll(async () => {
-    // Create test users using the helper function
     regularUser = await insertTestUser({
       google_user_email: 'regular-members@example.com',
       google_user_name: 'Regular Members User',
@@ -102,10 +101,8 @@ describe('organizations members trpc router', () => {
       is_admin: false,
     });
 
-    // Create test organization using the CRUD method
     testOrganization = await createOrganization('Test Members Organization', regularUser.id);
 
-    // Add member user to organization using CRUD method
     await addUserToOrganization(testOrganization.id, memberUser.id, 'member');
     await addUserToOrganization(testOrganization.id, billingManagerUser.id, 'billing_manager');
     await addUserToOrganization(testOrganization.id, orgAdminUser.id, 'admin');
@@ -510,7 +507,6 @@ describe('organizations members trpc router', () => {
     });
 
     it('should throw FORBIDDEN error when non-owner tries to assign owner role', async () => {
-      // Create a test user to be the target of the role update
       const targetUser = await insertTestUser({
         google_user_email: 'target-role-update@example.com',
         google_user_name: 'Target Role Update User',
@@ -587,7 +583,6 @@ describe('organizations members trpc router', () => {
     it('should validate input schema', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
-      // Test invalid UUID
       await expect(
         caller.organizations.members.update({
           organizationId: 'invalid-uuid',
@@ -596,7 +591,6 @@ describe('organizations members trpc router', () => {
         })
       ).rejects.toThrow();
 
-      // Test invalid daily usage limit (too high)
       await expect(
         caller.organizations.members.update({
           organizationId: testOrganization.id,
@@ -605,7 +599,6 @@ describe('organizations members trpc router', () => {
         })
       ).rejects.toThrow();
 
-      // Test invalid daily usage limit (negative)
       await expect(
         caller.organizations.members.update({
           organizationId: testOrganization.id,
@@ -811,7 +804,6 @@ describe('organizations members trpc router', () => {
         is_admin: false,
       });
 
-      // Add them to the organization
       await addUserToOrganization(testOrganization.id, testMemberUser.id, 'member');
     });
 
@@ -832,7 +824,6 @@ describe('organizations members trpc router', () => {
         testOrganization.id
       );
 
-      // Add the user back for other tests
       await addUserToOrganization(testOrganization.id, testMemberUser.id, 'member');
     });
 
@@ -881,7 +872,6 @@ describe('organizations members trpc router', () => {
         updated: testMemberUser.id,
       });
 
-      // Add the user back for other tests
       await addUserToOrganization(testOrganization.id, testMemberUser.id, 'member');
     });
 
@@ -1038,7 +1028,6 @@ describe('organizations members trpc router', () => {
     it('should validate input schema', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
-      // Test invalid UUID
       await expect(
         caller.organizations.members.remove({
           organizationId: 'invalid-uuid',
@@ -1527,7 +1516,6 @@ describe('organizations members trpc router', () => {
     it('should validate input schema', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
-      // Test invalid UUID
       await expect(
         caller.organizations.members.invite({
           organizationId: 'invalid-uuid',
@@ -1782,7 +1770,6 @@ describe('organizations members trpc router', () => {
     it('should validate input schema', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
-      // Test invalid UUID
       await expect(
         caller.organizations.members.deleteInvite({
           organizationId: 'invalid-uuid',

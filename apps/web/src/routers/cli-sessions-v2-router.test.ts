@@ -1280,7 +1280,6 @@ describe('cli-sessions-v2-router', () => {
           preparationAttempts: [],
         });
         expect(mockGetSession).toHaveBeenCalledWith(cloudAgentSessionId);
-        // Verify both the watermark and the page were fetched.
         expect(fetchSessionMessagesPage).toHaveBeenCalled();
       });
 

@@ -34,6 +34,7 @@ import {
 import { queryAccessibleKiloSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 import {
   createSessionForCloudAgentSchema,
+  cloudAgentSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeDeletionManifestSchema,
   cloudAgentWorktreeDeletionSchema,
@@ -124,10 +125,18 @@ import {
   HostedWorkspaceSessionDeleteError,
 } from './services/hosted-workspace-session';
 import { clearSessionLocalState } from './services/session-local-state';
+import { applyReportedSessionTitle, reportSessionTitleSchema } from './services/session-title';
 
 const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 const CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR =
   'Cloud Agent root session identity conflict';
+
+const setGeneratedTitleForCloudAgentSchema = z.object({
+  sessionId: sessionIdSchema,
+  kiloUserId: z.string().min(1),
+  cloudAgentSessionId: cloudAgentSessionIdSchema,
+  title: reportSessionTitleSchema.shape.title,
+});
 
 type CliSessionsV2Row = typeof cli_sessions_v2.$inferSelect;
 
@@ -535,6 +544,36 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     const existing = rows[0];
     if (!existing) return 'missing';
     return destinationIdentityConflicts(existing, parsed) ? 'conflict' : 'matching';
+  }
+
+  async setGeneratedTitleForCloudAgent(params: {
+    sessionId: string;
+    kiloUserId: string;
+    cloudAgentSessionId: string;
+    title: string;
+  }): Promise<{ applied: boolean }> {
+    const parsed = setGeneratedTitleForCloudAgentSchema.parse(params);
+    const input = reportSessionTitleSchema.parse({ title: parsed.title, generated: true });
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    const result = await applyReportedSessionTitle(db, {
+      sessionId: parsed.sessionId,
+      kiloUserId: parsed.kiloUserId,
+      input,
+      scope: eq(cli_sessions_v2.cloud_agent_session_id, parsed.cloudAgentSessionId),
+    });
+    if (result.kind !== 'applied') return { applied: false };
+
+    const session = mapSessionEventRow(result.row);
+    notifyUserSessionEvent(
+      this.env,
+      parsed.kiloUserId,
+      {
+        type: 'session.updated',
+        data: { source: 'v2', session, changedAt: session.updatedAt },
+      },
+      this.ctx
+    );
+    return { applied: true };
   }
 
   async resolveCloudAgentRootSessionForKiloSession(

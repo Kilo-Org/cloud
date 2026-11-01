@@ -73,7 +73,11 @@ export function HomeScreen() {
         // The logo is the header's only visible child, so this is the brand
         // mark's leading edge: it must be the page gutter the sections, cards
         // and actions use (`mx-4`), not a wider header-only gutter.
-        className="px-4 pb-1"
+        // No bottom padding either: the first section header already holds its
+        // label as far below this row as every later section label sits below
+        // the block above it, so padding here would widen the LIVE NOW gap
+        // alone (home-header-section-gap).
+        className="px-4 pb-0"
       />
       <View className="flex-1" style={centerFeedback ? sideInsetStyle : undefined}>
         {centerFeedback ? (

@@ -30,6 +30,19 @@ type SectionHeaderProps = {
   notice?: ReactNode;
 };
 
+/**
+ * Leading air above the label line when the row has no action.
+ *
+ * A row with an action is as tall as the action's 48 dp frame and the label sits
+ * on the row's content bottom edge, so that frame already holds the label about
+ * 34 dp below the row's top edge. A row without an action is one label line
+ * tall, so it pads the same air instead; the Home sections column separates its
+ * children by `gap-2` (7 dp), and 27 dp brings the label to the same distance
+ * below the previous block as an action row's frame does
+ * (home-header-section-gap).
+ */
+const NO_ACTION_LEADING_AIR_CLASS = 'pt-[27px]';
+
 export function SectionHeader({
   label,
   actionLabel,
@@ -47,7 +60,18 @@ export function SectionHeader({
     // (home section-label gap). The box still sets the row's height, so the air
     // sits above the line instead of between the label and its content, which
     // is the header's own `pb-2` everywhere.
-    <View className="flex-row flex-wrap items-end justify-end gap-2 px-4 pb-2 pt-2">
+    //
+    // That frame air is also why the leading padding is not the same in both
+    // forms: an action row's frame supplies it, so the row keeps none, and an
+    // action-less row pads the same amount. A label then sits the same distance
+    // below the block above it whether or not its row carries an action
+    // (home-header-section-gap).
+    <View
+      className={cn(
+        'flex-row flex-wrap items-end justify-end gap-2 px-4 pb-2',
+        hasAction ? 'pt-0' : NO_ACTION_LEADING_AIR_CLASS
+      )}
+    >
       {/* With a notice the label keeps its own width, so the notice takes all
           the free space on the line instead of an equal share of it. */}
       <Text variant="eyebrow" className={cn('max-w-full', !notice && 'grow')}>

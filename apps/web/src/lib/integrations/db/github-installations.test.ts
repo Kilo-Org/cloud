@@ -2644,7 +2644,9 @@ describe('GitHub installation persistence', () => {
 
     // The organization's entry gate and its operational lookups resolve the
     // row, so the installation surfaces and the Security Agent agree.
-    await expect(getPrimaryGitHubIntegrationForOrganization(organization.id)).resolves.toMatchObject({
+    await expect(
+      getPrimaryGitHubIntegrationForOrganization(organization.id)
+    ).resolves.toMatchObject({
       id: legacy.id,
       github_connection_role: 'workflow',
       github_installation_id: expect.any(String),

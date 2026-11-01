@@ -1,6 +1,9 @@
 import { randomUUID } from 'crypto';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
-import { organizationWorkflowGitHubConnectionSql, transitionSecurityAgentCommand } from '@kilocode/db';
+import {
+  organizationWorkflowGitHubConnectionSql,
+  transitionSecurityAgentCommand,
+} from '@kilocode/db';
 import {
   agent_configs,
   kilocode_users,

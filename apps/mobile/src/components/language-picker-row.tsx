@@ -72,7 +72,9 @@ export const LanguagePickerRow = memo(function LanguagePickerRow({
         }}
       >
         <View className={textClass}>
-          <Text className={cn('text-sm font-medium', alignClass)}>
+          <Text
+            className={cn('text-sm font-medium', disabled && 'text-muted-foreground', alignClass)}
+          >
             {t('language.deviceLanguage')}
           </Text>
           <Text variant="muted" className={cn('mt-0.5 text-xs', alignClass)}>
@@ -97,7 +99,11 @@ export const LanguagePickerRow = memo(function LanguagePickerRow({
             a Latin name under a right-aligned row must not jump to the left
             edge. Unicode bidi already renders each script correctly inside
             the line. */}
-        <Text className={cn('text-sm font-medium', alignClass)}>{item.row.endonym}</Text>
+        <Text
+          className={cn('text-sm font-medium', disabled && 'text-muted-foreground', alignClass)}
+        >
+          {item.row.endonym}
+        </Text>
         {item.row.englishName !== item.row.endonym ? (
           <Text variant="muted" className={cn('mt-0.5 text-xs', alignClass)}>
             {item.row.englishName}

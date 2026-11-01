@@ -383,10 +383,18 @@ describe('FindingDetailsPanel identifier values', () => {
     }
   });
 
-  it('draws no row for the repository the header already names', () => {
+  // The header eyebrow directly above the card already names the repository,
+  // so the details list does not repeat it in a row of its own.
+  it('leaves the repository to the header eyebrow', () => {
     renderPanel(findingFixture());
 
-    expect(mocks.kvRows.some(row => row.label === 'common.repository')).toBe(false);
+    expect(mocks.kvRows.map(row => row.label)).not.toContain('common.repository');
+    for (const label of [
+      'securityAgent.findingDetails.package',
+      'securityAgent.findingDetails.manifest',
+    ]) {
+      identifierRow(label);
+    }
   });
 
   // The absence of a version renders as translated copy, which keeps the

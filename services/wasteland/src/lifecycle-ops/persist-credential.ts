@@ -50,8 +50,7 @@ export async function persistJoinCredential(
   rigHandle: string
 ): Promise<void> {
   const existing = await ctx.doStub.getCredential(userId);
-  const org =
-    ctx.tokenSource === 'oauth' ? ctx.forkOrg : (existing?.dolthub_org ?? ctx.forkOrg);
+  const org = ctx.tokenSource === 'oauth' ? ctx.forkOrg : (existing?.dolthub_org ?? ctx.forkOrg);
 
   const binding = await bindCredentialToken(env, { existing, org, token: ctx.token });
   if (binding.status === 'key-unavailable') {

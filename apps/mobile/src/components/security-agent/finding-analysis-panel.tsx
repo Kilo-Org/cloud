@@ -251,10 +251,12 @@ export function FindingAnalysisPanel({
             <KvRow
               label={t('securityAgent.analysis.triageConfidence')}
               value={formatConfidence(triage.confidence)}
+              valueFace="text"
             />
             <KvRow
               label={t('securityAgent.analysis.suggestedAction')}
               value={formatSuggestedAction(triage.suggestedAction)}
+              valueFace="text"
               last
             />
           </View>
@@ -277,10 +279,12 @@ export function FindingAnalysisPanel({
             <KvRow
               label={t('securityAgent.analysis.exploitable')}
               value={formatExploitable(sandbox.isExploitable)}
+              valueFace="text"
             />
             <KvRow
               label={t('securityAgent.analysis.suggestedAction')}
               value={formatSuggestedAction(sandbox.suggestedAction)}
+              valueFace="text"
             />
             <KvRow
               label={t('common.model')}
@@ -289,11 +293,13 @@ export function FindingAnalysisPanel({
                 analysis.analysis?.analysisModel,
                 t('securityAgent.analysis.notRecorded')
               )}
+              valueFace={sandbox.modelUsed || analysis.analysis?.analysisModel ? 'mono' : 'text'}
               selectable
             />
             <KvRow
               label={t('securityAgent.analysis.analyzed')}
               value={analyzedLabel}
+              valueFace="text"
               last
               selectable
             />

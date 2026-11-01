@@ -191,28 +191,28 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
         label={t('securityAgent.dashboard.confirmedExploitable')}
         value={rowValue(neverSynced, formatNumber(data.analysis.exploitable, i18n.language))}
         valueTone="muted"
-        valueNumeric
+        valueFace="numeric"
         dotTone={rowTone(neverSynced, 'danger')}
       />
       <KvRow
         label={t('securityAgent.dashboard.needsEvidenceReview')}
         value={rowValue(neverSynced, formatNumber(data.analysis.needsReview, i18n.language))}
         valueTone="muted"
-        valueNumeric
+        valueFace="numeric"
         dotTone={rowTone(neverSynced, 'warn')}
       />
       <KvRow
         label={t('securityAgent.dashboard.analysisNotComplete')}
         value={rowValue(neverSynced, formatNumber(analysisIncomplete, i18n.language))}
         valueTone="muted"
-        valueNumeric
+        valueFace="numeric"
         dotTone="muted"
       />
       <KvRow
         label={t('securityAgent.dashboard.noImmediateAction')}
         value={rowValue(neverSynced, formatNumber(noImmediateAction, i18n.language))}
         valueTone="muted"
-        valueNumeric
+        valueFace="numeric"
         dotTone={rowTone(neverSynced, 'good')}
         last
       />
@@ -284,7 +284,7 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName, neverSynced }:
             label={row.label}
             value={rowValue(neverSynced, formatNumber(row.value, i18n.language))}
             valueTone="muted"
-            valueNumeric
+            valueFace="numeric"
             dotTone={rowTone(neverSynced, row.tone)}
             last={index === rows.length - 1}
           />

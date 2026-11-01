@@ -438,6 +438,7 @@ export function FindingRemediationPanel({
                         ? t(originKey)
                         : (storedText(attempt.origin)?.replaceAll('_', ' ') ?? t('common.unknown'))
                     }
+                    valueFace="text"
                   />
                   <KvRow
                     label={t('common.model')}

@@ -125,9 +125,10 @@ function DismissalOrSupersessionNote({
 }
 
 // Ported from FindingDetailDialog.tsx:552 (getFindingDetailsPresentation) —
-// source, package, repository, severity/status, timestamps, and
-// dismissal/supersession context as plain facts rather than the web's
-// hero + next-step action card (Task 7 owns actions).
+// source, package, severity/status, timestamps, and dismissal/supersession
+// context as plain facts rather than the web's hero + next-step action card
+// (Task 7 owns actions). The repository is the screen header's eyebrow, so this
+// card does not repeat it.
 export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsPanelProps>) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -255,6 +256,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         <KvRow
           label={t('securityAgent.findingDetails.vulnerableVersions')}
           value={firstNonEmpty(finding.vulnerable_version_range, t('common.unknown'))}
+          valueFace={finding.vulnerable_version_range ? 'mono' : 'text'}
           valueDirection="ltr"
           selectable
         />
@@ -264,6 +266,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             finding.patched_version,
             t('securityAgent.findingDetails.noPatchAvailable')
           )}
+          valueFace={finding.patched_version ? 'mono' : 'text'}
           valueDirection="ltr"
           selectable
         />
@@ -283,12 +286,6 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             selectable
           />
         ) : null}
-        <KvRow
-          label={t('common.repository')}
-          value={finding.repo_full_name}
-          last={!finding.manifest_path}
-          selectable
-        />
         {finding.manifest_path ? (
           <KvRow
             label={t('securityAgent.findingDetails.manifest')}
@@ -305,6 +302,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             key={row.key}
             label={row.label}
             value={row.value}
+            valueFace="text"
             valueTone={row.tone}
             last={index === dateRows.length - 1}
           />
@@ -315,6 +313,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         <KvRow
           label={t('securityAgent.findingDetails.source')}
           value={getFindingSourceLabel(finding.source)}
+          valueFace="text"
         />
         <KvRow
           label={t('securityAgent.findingDetails.sourceId')}

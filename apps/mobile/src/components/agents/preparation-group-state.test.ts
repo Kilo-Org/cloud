@@ -93,6 +93,25 @@ describe('failedStageStep', () => {
     expect(failedStageStep(candidate)).toBe(failed);
   });
 
+  it('prefers the failed setup command over the phase it ran under', () => {
+    const phase = step({ id: 'commands', key: 'setup_commands', status: 'failed' });
+    const command = step({
+      id: 'command',
+      key: 'setup_commands',
+      kind: 'setup_command',
+      status: 'failed',
+    });
+    expect(failedStageStep(attempt({ status: 'failed', steps: [phase, command] }))).toBe(command);
+  });
+
+  it('skips the setup-command phase when no command under it failed', () => {
+    const candidate = attempt({
+      status: 'failed',
+      steps: [step({ id: 'commands', key: 'setup_commands', status: 'failed' })],
+    });
+    expect(failedStageStep(candidate)).toBeUndefined();
+  });
+
   it('does not count the incomplete-restore report as a failed stage', () => {
     const candidate = attempt({
       status: 'failed',

@@ -252,8 +252,9 @@ describe('PreparationGroup incomplete restore', () => {
       restoreAttempt({
         status: 'failed',
         steps: [
+          incompleteStep({ id: 'commands', key: 'setup_commands', status: 'failed' }),
           incompleteStep({
-            id: 'commands',
+            id: 'command',
             key: 'setup_commands',
             kind: 'setup_command',
             commandIndex: 1,

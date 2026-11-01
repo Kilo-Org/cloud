@@ -4239,7 +4239,8 @@
   "credits": {
     "title": "Prynu credydau",
     "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",
-    "nextExpiry": "Mae'r credydau'n dod i ben ar {{date}} (UTC). Defnyddir y credydau sy'n dod i ben gyntaf yn gyntaf.",
+    "nextExpiry": "Mae {{amount}} o gredydau yn dod i ben ar {{date}} (UTC). Defnyddir y credydau sy'n dod i ben gyntaf yn gyntaf.",
+    "nextExpiryDate": "Mae'r credydau'n dod i ben ar {{date}} (UTC). Defnyddir y credydau sy'n dod i ben gyntaf yn gyntaf.",
     "noExpiringCredits": "Nid oes credydau sy'n dod i ben.",
     "expiryUnavailable": "Nid yw manylion dod i ben y credydau ar gael.",
     "appStoreExpiry": "Nid yw credydau a brynwyd drwy'r App Store yn dod i ben.",

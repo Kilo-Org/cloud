@@ -4011,7 +4011,8 @@
   "credits": {
     "title": "Köp krediter",
     "description": "Krediter är ett engångsköp som läggs till på ditt Kilo-saldo för att köra AI-kodningssessioner i Kilo-appen. Butiken debiterar ditt konto och krediterna läggs till efter att butiken bekräftar betalningen.",
-    "nextExpiry": "Krediterna går ut {{date}} (UTC). Krediter som går ut först används först.",
+    "nextExpiry": "{{amount}} i krediter går ut {{date}} (UTC). Krediter som går ut först används först.",
+    "nextExpiryDate": "Krediterna går ut {{date}} (UTC). Krediter som går ut först används först.",
     "noExpiringCredits": "Inga krediter som går ut.",
     "expiryUnavailable": "Information om krediternas utgångsdatum är inte tillgänglig.",
     "appStoreExpiry": "Krediter som köpts via App Store går inte ut.",

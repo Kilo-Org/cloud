@@ -147,7 +147,10 @@ export function CreditPurchaseScreen() {
             </Text>
             {renderBalanceValue()}
             {!balancePending && !balanceFailed && (
-              <CreditExpiryNote creditBlocks={creditBlocksQuery.data?.creditBlocks ?? []} />
+              <CreditExpiryNote
+                creditBlocks={creditBlocksQuery.data?.creditBlocks ?? []}
+                shownBalanceDollars={balanceQuery.data.balance}
+              />
             )}
           </View>
 

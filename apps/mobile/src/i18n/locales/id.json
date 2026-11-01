@@ -4011,7 +4011,8 @@
   "credits": {
     "title": "Beli kredit",
     "description": "Kredit adalah pembelian satu kali yang ditambahkan ke saldo Kilo Anda untuk menjalankan sesi coding AI di Kilo App. Toko menagih akun Anda dan kredit ditambahkan setelah toko mengonfirmasi pembayaran.",
-    "nextExpiry": "Kredit akan kedaluwarsa pada {{date}} (UTC). Kredit dengan masa berlaku paling awal digunakan lebih dulu.",
+    "nextExpiry": "Kredit senilai {{amount}} akan kedaluwarsa pada {{date}} (UTC). Kredit dengan masa berlaku paling awal digunakan lebih dulu.",
+    "nextExpiryDate": "Kredit akan kedaluwarsa pada {{date}} (UTC). Kredit dengan masa berlaku paling awal digunakan lebih dulu.",
     "noExpiringCredits": "Tidak ada kredit yang akan kedaluwarsa.",
     "expiryUnavailable": "Informasi kedaluwarsa kredit tidak tersedia.",
     "appStoreExpiry": "Kredit yang dibeli melalui App Store tidak kedaluwarsa.",

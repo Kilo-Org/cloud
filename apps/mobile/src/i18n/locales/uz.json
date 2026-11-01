@@ -4011,7 +4011,8 @@
   "credits": {
     "title": "Kredit sotib olish",
     "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",
-    "nextExpiry": "Kreditlarning muddati {{date}} (UTC) sanasida tugaydi. Muddati eng erta tugaydigan kreditlar birinchi sarflanadi.",
+    "nextExpiry": "{{amount}} miqdoridagi kreditlarning muddati {{date}} (UTC) sanasida tugaydi. Muddati eng erta tugaydigan kreditlar birinchi sarflanadi.",
+    "nextExpiryDate": "Kreditlarning muddati {{date}} (UTC) sanasida tugaydi. Muddati eng erta tugaydigan kreditlar birinchi sarflanadi.",
     "noExpiringCredits": "Muddati tugaydigan kreditlar yo'q.",
     "expiryUnavailable": "Kreditlarning muddati haqida ma'lumot mavjud emas.",
     "appStoreExpiry": "App Store orqali sotib olingan kreditlarning muddati tugamaydi.",

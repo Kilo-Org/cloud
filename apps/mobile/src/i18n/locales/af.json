@@ -4011,7 +4011,8 @@
   "credits": {
     "title": "Koop krediete",
     "description": "Krediete is 'n eenmalige aankoop wat by jou Kilo-saldo gevoeg word om AI-koderingsessies in Kilo App te laat loop. Die winkel hef jou rekening en krediete word bygevoeg nadat die winkel betaling bevestig.",
-    "nextExpiry": "Krediete verval op {{date}} (UTC). Krediete met die vroegste vervaldatum word eerste gebruik.",
+    "nextExpiry": "{{amount}} aan krediete verval op {{date}} (UTC). Krediete met die vroegste vervaldatum word eerste gebruik.",
+    "nextExpiryDate": "Krediete verval op {{date}} (UTC). Krediete met die vroegste vervaldatum word eerste gebruik.",
     "noExpiringCredits": "Geen krediete wat verval nie.",
     "expiryUnavailable": "Vervalinligting vir krediete is nie beskikbaar nie.",
     "appStoreExpiry": "Krediete wat deur die App Store gekoop is, verval nie.",

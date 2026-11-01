@@ -413,11 +413,11 @@ describe('CreditsCard balance state', () => {
     }
   );
 
-  it('shows the expiry date and explanation without repeating the balance', async () => {
+  it('drops the amount when the expiring credits are the whole balance', async () => {
     currentUser.userId = 'user-a';
     getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
     personalCreditBlocksQueryFn.mockResolvedValue({
-      creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
+      creditBlocks: [{ balance_mUsd: 10_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
     });
     const { renderer, texts, unmount } = await mountCard();
     // The expected sentence pins the zone marker on the date's line: a breakable
@@ -427,11 +427,28 @@ describe('CreditsCard balance state', () => {
     const expiryNotes = () => texts().filter(text => text.includes('Credits with the earliest'));
 
     await waitFor(() => expiryNotes().includes(note));
-    // The balance sits directly above the note, so the note carries no amount.
+    // The balance above already reads $10.00, so the note does not repeat it.
     expect(expiryNotes()).toEqual([note]);
 
     await choose(renderer, 'Hide balance');
     expect(expiryNotes()).toEqual([note]);
+    unmount();
+  });
+
+  it('keeps the expiring amount below the balance and masks it with the balance', async () => {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
+    });
+    const { renderer, texts, unmount } = await mountCard();
+    const note = `$2.00 in credits expires 12/17/2099${UTC_MARKER}. Credits with the earliest expiry are used first.`;
+    await waitFor(() => texts().includes(note));
+
+    await choose(renderer, 'Hide balance');
+    expect(texts()).toContain(
+      `***** in credits expires 12/17/2099${UTC_MARKER}. Credits with the earliest expiry are used first.`
+    );
     expect(texts()).not.toContain('$2.00');
     unmount();
   });
@@ -494,7 +511,7 @@ describe('CreditsCard balance state', () => {
       creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
     });
     const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
-    const previousNote = `Expires 12/17/2099${UTC_MARKER}. Credits with the earliest expiry are used first.`;
+    const previousNote = `$2.00 in credits expires 12/17/2099${UTC_MARKER}. Credits with the earliest expiry are used first.`;
     await waitFor(() => texts().includes(previousNote));
     const pending = Promise.withResolvers<{ creditBlocks: [] }>();
     orgCreditBlocksQueryFn.mockReturnValue(pending.promise);
@@ -533,10 +550,12 @@ describe('CreditsCard balance state', () => {
       const { texts, unmount } = await mountCard();
       try {
         await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
-        const notes = texts().filter(text => text.includes('Credits with the earliest'));
+        const notes = texts().filter(text => text.includes('in credits expires'));
         expect(notes).toEqual(
           future
-            ? [`Expires 12/17/2026${UTC_MARKER}. Credits with the earliest expiry are used first.`]
+            ? [
+                `$2.00 in credits expires 12/17/2026${UTC_MARKER}. Credits with the earliest expiry are used first.`,
+              ]
             : []
         );
       } finally {
@@ -572,8 +591,8 @@ describe('CreditsCard balance state', () => {
       const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
       try {
         await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
-        expect(texts().filter(text => text.includes('Credits with the earliest'))).toEqual([
-          `Expires 12/17/2026${UTC_MARKER}. Credits with the earliest expiry are used first.`,
+        expect(texts().filter(text => text.includes('in credits expires'))).toEqual([
+          `$2.00 in credits expires 12/17/2026${UTC_MARKER}. Credits with the earliest expiry are used first.`,
         ]);
       } finally {
         unmount();
@@ -852,10 +871,11 @@ describe('CreditsCard balance state', () => {
       ],
     });
     const { texts, unmount } = await mountCard();
-    const note = `Expires 10/15/2027${UTC_MARKER}. Credits with the earliest expiry are used first.`;
+    const note = `$15.00 in credits expires 10/15/2027${UTC_MARKER}. Credits with the earliest expiry are used first.`;
     await waitFor(() => texts().includes(note));
-    // The later grant's date never reaches the note, and neither source is
-    // renamed: paid and bonus credits share the one sentence.
+    // The note names the amount that expires on that date, never the account
+    // balance, and the later grant's date never reaches it.
+    expect(texts().filter(text => text.includes('$65.00 in credits'))).toEqual([]);
     expect(texts().filter(text => text.includes('10/15/2028'))).toEqual([]);
     expect(texts().some(text => text.includes('bonus credits'))).toBe(false);
     unmount();

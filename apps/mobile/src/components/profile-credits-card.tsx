@@ -312,6 +312,8 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
             <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
               <CreditExpiryNote
                 creditBlocks={creditData.creditBlocks}
+                shownBalanceDollars={balanceDollars}
+                hiddenAmount={hideBalance ? HIDDEN_BALANCE : undefined}
                 emptyMessage={t('credits.noExpiringCredits')}
               />
             </Animated.View>

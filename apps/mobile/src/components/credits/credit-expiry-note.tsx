@@ -1,13 +1,23 @@
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { isolateBidiText } from '@/lib/bidi';
 import { getNextCreditExpiry } from '@/lib/credits/credit-expiry';
-import { formatDate } from '@/lib/format';
+import { formatDate, formatMoney } from '@/lib/format';
 import { parseTimestamp } from '@/lib/utils';
 
 type CreditExpiryNoteProps = {
   creditBlocks: Parameters<typeof getNextCreditExpiry>[0];
+  /**
+   * The balance the surface renders directly above the note, in dollars. When
+   * the earliest-expiring credits add up to exactly that balance, naming the
+   * amount again would only repeat the large number above it, so the note drops
+   * it. When they do not, the amount is the only place that says how much of the
+   * balance expires on this date, so the note keeps it.
+   */
+  shownBalanceDollars?: number;
+  hiddenAmount?: string;
   emptyMessage?: string;
 };
 
@@ -29,7 +39,12 @@ function bindUtcMarker(sentence: string): string {
   return sentence.replace(UTC_MARKER, `\u00A0${isolateBidiText('(UTC)')}`);
 }
 
-export function CreditExpiryNote({ creditBlocks, emptyMessage }: Readonly<CreditExpiryNoteProps>) {
+export function CreditExpiryNote({
+  creditBlocks,
+  shownBalanceDollars,
+  hiddenAmount,
+  emptyMessage,
+}: Readonly<CreditExpiryNoteProps>) {
   const { t, i18n } = useTranslation();
   const nextExpiry = getNextCreditExpiry(creditBlocks);
   if (!nextExpiry) {
@@ -38,14 +53,24 @@ export function CreditExpiryNote({ creditBlocks, emptyMessage }: Readonly<Credit
     ) : null;
   }
 
+  const date = formatDate(parseTimestamp(nextExpiry.expiryDate), i18n.language, {
+    timeZone: 'UTC',
+  });
+  const repeatsBalance =
+    shownBalanceDollars !== undefined &&
+    nextExpiry.balanceMicrodollars === Math.round(shownBalanceDollars * 1_000_000);
+
   return (
     <Text className="text-xs text-muted-foreground">
       {bindUtcMarker(
-        t('credits.nextExpiry', {
-          date: formatDate(parseTimestamp(nextExpiry.expiryDate), i18n.language, {
-            timeZone: 'UTC',
-          }),
-        })
+        repeatsBalance
+          ? t('credits.nextExpiryDate', { date })
+          : t('credits.nextExpiry', {
+              amount:
+                hiddenAmount ??
+                formatMoney(fromMicrodollars(nextExpiry.balanceMicrodollars), i18n.language),
+              date,
+            })
       )}
     </Text>
   );

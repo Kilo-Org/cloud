@@ -4074,7 +4074,8 @@
   "credits": {
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de programação com IA na aplicação Kilo. A loja cobra na sua conta e os créditos são adicionados depois de a loja confirmar o pagamento.",
-    "nextExpiry": "Os créditos expiram em {{date}} (UTC). Os créditos com a data de expiração mais próxima são utilizados primeiro.",
+    "nextExpiry": "Os créditos no valor de {{amount}} expiram em {{date}} (UTC). Os créditos com a data de expiração mais próxima são utilizados primeiro.",
+    "nextExpiryDate": "Os créditos expiram em {{date}} (UTC). Os créditos com a data de expiração mais próxima são utilizados primeiro.",
     "noExpiringCredits": "Não há créditos a expirar.",
     "expiryUnavailable": "Informação sobre a expiração dos créditos indisponível.",
     "appStoreExpiry": "Os créditos comprados através da App Store não expiram.",

@@ -293,20 +293,20 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
-  it('shows the actual next expiry date without calling purchased credits a bonus', async () => {
+  it('shows the actual next expiring balance without calling purchased credits a bonus', async () => {
     creditBlocks.entries = [
       { balance_mUsd: 10_000_000, expiry_date: '2027-10-15T00:00:00Z' },
       { balance_mUsd: 50_000_000, expiry_date: '2028-10-15T00:00:00Z' },
       { balance_mUsd: 500_000_000, expiry_date: null },
     ];
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
-    await waitFor(() =>
-      allText(renderer).includes(
-        `Expires 10/15/2027${UTC_MARKER}. Credits with the earliest expiry are used first.`
-      )
-    );
+    await waitFor(() => allText(renderer).includes('$10.00 in credits expires'));
+    expect(allText(renderer)).not.toContain('$60.00 in credits');
     expect(allText(renderer)).not.toContain('10/15/2028');
     expect(allText(renderer)).not.toContain('bonus credits');
+    expect(allText(renderer)).toContain(
+      `${UTC_MARKER}. Credits with the earliest expiry are used first.`
+    );
     unmount();
   });
 

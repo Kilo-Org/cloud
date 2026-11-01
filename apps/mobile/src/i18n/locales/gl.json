@@ -4011,7 +4011,8 @@
   "credits": {
     "title": "Mercar créditos",
     "description": "Os créditos son unha compra única que se engade ao teu saldo de Kilo para executar sesións de codificación con IA na app de Kilo. A tenda cobra na túa conta e os créditos engádense despois de que a tenda confirme o pagamento.",
-    "nextExpiry": "Os créditos caducan o {{date}} (UTC). Os créditos coa caducidade máis próxima úsanse primeiro.",
+    "nextExpiry": "{{amount}} en créditos caducan o {{date}} (UTC). Os créditos coa caducidade máis próxima úsanse primeiro.",
+    "nextExpiryDate": "Os créditos caducan o {{date}} (UTC). Os créditos coa caducidade máis próxima úsanse primeiro.",
     "noExpiringCredits": "Non hai créditos pendentes de caducar.",
     "expiryUnavailable": "Caducidade dos créditos non dispoñible.",
     "appStoreExpiry": "Os créditos mercados a través da App Store non caducan.",

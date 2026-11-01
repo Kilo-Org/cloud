@@ -4125,7 +4125,8 @@
   "credits": {
     "title": "Kupi kredite",
     "description": "Krediti so enkraten nakup, ki se doda tvojemu Kilo stanju za izvajanje sej kodiranja z umetno inteligenco v aplikaciji Kilo. Trgovina obremeni tvoj račun in krediti se dodajo, ko trgovina potrdi plačilo.",
-    "nextExpiry": "Veljavnost kreditov poteče {{date}} (UTC). Najprej se porabijo krediti z najzgodnejšim potekom veljavnosti.",
+    "nextExpiry": "Veljavnost kreditov v vrednosti {{amount}} poteče {{date}} (UTC). Najprej se porabijo krediti z najzgodnejšim potekom veljavnosti.",
+    "nextExpiryDate": "Veljavnost kreditov poteče {{date}} (UTC). Najprej se porabijo krediti z najzgodnejšim potekom veljavnosti.",
     "noExpiringCredits": "Ni kreditov z omejeno veljavnostjo.",
     "expiryUnavailable": "Podatki o poteku veljavnosti kreditov niso na voljo.",
     "appStoreExpiry": "Krediti, kupljeni prek trgovine App Store, ne potečejo.",

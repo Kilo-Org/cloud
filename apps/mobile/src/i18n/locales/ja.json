@@ -4011,7 +4011,8 @@
   "credits": {
     "title": "クレジットを購入",
     "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",
-    "nextExpiry": "クレジットが{{date}}（UTC）に失効します。有効期限が早いクレジットから先に使用されます。",
+    "nextExpiry": "{{amount}}のクレジットが{{date}}（UTC）に失効します。有効期限が早いクレジットから先に使用されます。",
+    "nextExpiryDate": "クレジットが{{date}}（UTC）に失効します。有効期限が早いクレジットから先に使用されます。",
     "noExpiringCredits": "失効予定のクレジットはありません。",
     "expiryUnavailable": "クレジットの有効期限を取得できません。",
     "appStoreExpiry": "App Storeで購入したクレジットは失効しません。",

@@ -438,18 +438,50 @@ describe('PrReviewChecksSection loading state mirrors the settled card', () => {
     query.isLoading = previous.isLoading;
   });
 
-  function mountLoading() {
+  function mountLoading(serverWebUrl: string | null = 'https://github.com/group/sub/repo/pull/12') {
     const renderer: { current: TestRenderer.ReactTestRenderer | undefined } = {
       current: undefined,
     };
     act(() => {
       renderer.current = TestRenderer.create(
-        createElement(PrReviewChecksSection, {
-          owner: 'group/sub',
-          repo: 'repo',
-          number: 12,
-          headSha: 'head',
-        })
+        <ProviderPrWebUrlProvider value={serverWebUrl}>
+          {createElement(PrReviewChecksSection, {
+            owner: 'group/sub',
+            repo: 'repo',
+            number: 12,
+            headSha: 'head',
+          })}
+        </ProviderPrWebUrlProvider>
+      );
+    });
+    const created = renderer.current;
+    if (!created) {
+      throw new Error('renderer was not created');
+    }
+    return created;
+  }
+
+  function mountSettledEmpty(
+    serverWebUrl: string | null = 'https://github.com/group/sub/repo/pull/12'
+  ) {
+    query.isLoading = false;
+    query.data = {
+      checkRuns: [],
+      rollup: { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 },
+    };
+    const renderer: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    act(() => {
+      renderer.current = TestRenderer.create(
+        <ProviderPrWebUrlProvider value={serverWebUrl}>
+          {createElement(PrReviewChecksSection, {
+            owner: 'group/sub',
+            repo: 'repo',
+            number: 12,
+            headSha: 'head',
+          })}
+        </ProviderPrWebUrlProvider>
       );
     });
     const created = renderer.current;
@@ -504,19 +536,16 @@ describe('PrReviewChecksSection loading state mirrors the settled card', () => {
     });
   });
 
-  it('mirrors the settled card: one padded card with a copy bar and the button floor', () => {
+  it('mirrors the settled card: one padded card with a copy bar and the button bar', () => {
     const loadingRenderer = mountLoading();
     const loadingCard = findCard(loadingRenderer);
 
     // The card that settles for a head with no runs is the compact one, so its
     // shell — padding and the gap between the copy line and the button — is
     // what the placeholder has to reproduce to keep the page still.
-    query.isLoading = false;
-    query.data = {
-      checkRuns: [],
-      rollup: { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 },
-    };
-    const settledCard = findCard(mountSection());
+    const settledRenderer = mountSettledEmpty();
+    const settledCard = findCard(settledRenderer);
+    expect(settledCard.findAllByType('Button' as never)).toHaveLength(1);
     for (const token of ['rounded-lg', 'bg-secondary', 'p-4', 'gap-3']) {
       expect(tokens(settledCard)).toContain(token);
       expect(tokens(loadingCard)).toContain(token);
@@ -533,6 +562,26 @@ describe('PrReviewChecksSection loading state mirrors the settled card', () => {
 
     act(() => {
       loadingRenderer.unmount();
+      settledRenderer.unmount();
+    });
+  });
+
+  it('reserves no button bar for a card whose provider URL never arrived', () => {
+    // `useProviderPrWebUrl()` is null when the screen publishes no URL, and the
+    // settled card then renders only its copy line. A reserved control there
+    // would leave a 56 dp gap the settled card collapses.
+    const loadingRenderer = mountLoading(null);
+    const settledRenderer = mountSettledEmpty(null);
+
+    expect(findCard(settledRenderer).findAllByType('Button' as never)).toHaveLength(0);
+    const bars = findCard(loadingRenderer).findAll(node => String(node.type) === 'Skeleton');
+    expect(bars.map(bar => tokens(bar))).toEqual([
+      expect.arrayContaining(['h-[18px]', 'w-2/3', 'bg-muted-soft']),
+    ]);
+
+    act(() => {
+      loadingRenderer.unmount();
+      settledRenderer.unmount();
     });
   });
 

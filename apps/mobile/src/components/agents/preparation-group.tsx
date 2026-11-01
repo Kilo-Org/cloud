@@ -236,7 +236,9 @@ function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {
           <View style={{ width: STEP_CARET_SIZE }} />
         )}
         {step.kind === 'setup_command' ? (
-          <Terminal size={STEP_CARET_SIZE} color={colors.mutedForeground} />
+          // A command's own glyph fills the status column too, so a command row
+          // and a phase row start their labels at the same inset.
+          <Terminal size={STEP_STATUS_SIZE} color={colors.mutedForeground} />
         ) : (
           // A running step draws a spinner at the settled glyphs' own size, so
           // the status column keeps one width across rows.

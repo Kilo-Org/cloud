@@ -3956,7 +3956,7 @@
     "keyTooLong": "Ключ должен содержать не более 256 символов",
     "keyDuplicate": "Этот ключ уже существует в профиле",
     "keyWillBeSavedAs": "Будет сохранён как {{key}}",
-    "valueLabel": "Ценить",
+    "valueLabel": "Значение",
     "valueRequired": "Введите значение",
     "tooLong": "Используйте не более {{max}} символов",
     "secrets": {

@@ -3840,7 +3840,7 @@
     "deletedToast": "Hồ sơ \"{{name}}\" đã bị xóa",
     "variablesTitle": "Biến môi trường",
     "addVariable": "Thêm biến",
-    "keyLabel": "Chìa khóa",
+    "keyLabel": "Khóa",
     "keyTooLong": "Khóa phải có 256 ký tự hoặc ít hơn",
     "keyDuplicate": "Khóa này đã tồn tại trong hồ sơ",
     "keyWillBeSavedAs": "Sẽ được lưu thành {{key}}",

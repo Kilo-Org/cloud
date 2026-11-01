@@ -3840,7 +3840,7 @@
     "deletedToast": "Profil \"{{name}}\" dipadamkan",
     "variablesTitle": "Pembolehubah persekitaran",
     "addVariable": "Tambah pembolehubah",
-    "keyLabel": "kunci",
+    "keyLabel": "Kunci",
     "keyTooLong": "Kunci mestilah 256 aksara atau kurang",
     "keyDuplicate": "Kunci ini sudah ada dalam profil",
     "keyWillBeSavedAs": "Akan disimpan sebagai {{key}}",

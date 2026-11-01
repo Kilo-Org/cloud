@@ -3840,7 +3840,7 @@
     "deletedToast": "프로필 \"{{name}}\"이(가) 삭제되었습니다.",
     "variablesTitle": "환경변수",
     "addVariable": "변수 추가",
-    "keyLabel": "열쇠",
+    "keyLabel": "키",
     "keyTooLong": "키는 256자 이하여야 합니다",
     "keyDuplicate": "이 키는 이미 프로필에 있습니다.",
     "keyWillBeSavedAs": "{{key}}(으)로 저장됩니다",

@@ -3864,7 +3864,7 @@
       "commands_few": "{{count}} komande",
       "commands_other": "{{count}} komandi",
       "setupCommands_one": "{{count}} naredba za podešavanje",
-      "setupCommands_few": "{{count}} komande za podešavanje",
+      "setupCommands_few": "{{count}} naredbe za podešavanje",
       "setupCommands_other": "{{count}} naredbi za podešavanje",
       "agents_one": "{{count}} agent",
       "agents_few": "{{count}} agenta",

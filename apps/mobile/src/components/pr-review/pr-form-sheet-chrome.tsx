@@ -8,13 +8,15 @@
 // OUTSIDE the ScrollView so keyboard focus does not scroll the title off-screen.
 //
 // collapsable={false}: keep a stable native subview at index 0 (SheetHeader
-// pattern). The header clears the status bar itself on Android: these routes
-// open with their sheet surface at the window top, so reserving the inset here
-// is what puts the title below the status bar. The clearance comes from the
-// shared rule in `lib/form-sheet`, not from a measured safe-area frame — a
-// nested provider reported 0 on the first frame and the status-bar inset once
-// it settled, which moved the whole header 51.8 dp after it landed. Keep
-// `pt-5` for the grabber space on top of it.
+// pattern). Who clears the status bar depends on how the route was presented,
+// and the header decides it before its first frame: a sheet that is its stack's
+// first screen presents with the surface at the window top, so the header
+// reserves the inset itself; a sheet pushed over another screen settles at the
+// detent cap, an inset lower, so its header reserves nothing. Both come from the
+// shared rule in `lib/form-sheet`, never from a measured safe-area frame — a
+// nested provider reported 0 on the first frame and the inset once it settled,
+// which moved the whole header by the status-bar height after it landed. Keep
+// `pt-5` for the grabber space on top of the clearance.
 //
 // Keyboard: ScrollView uses automaticallyAdjustKeyboardInsets. Footers must
 // NOT re-apply the full keyboard height: an extra lift beside the native one
@@ -28,6 +30,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { useSheetHeaderTopClearance } from '@/lib/form-sheet';
+import { useRouteIsStackRoot } from '@/lib/navigation/route-focus';
 
 export function useFormSheetKeyboardVisible(): boolean {
   const [visible, setVisible] = useState(false);
@@ -51,7 +54,10 @@ export function useFormSheetKeyboardVisible(): boolean {
 }
 
 export function PrFormSheetHeader(props: { title: string; eyebrow: string; onBack: () => void }) {
-  const topClearance = useSheetHeaderTopClearance('android-window-top');
+  const isStackRoot = useRouteIsStackRoot();
+  const topClearance = useSheetHeaderTopClearance(
+    isStackRoot ? 'android-window-top' : 'bottom-form-sheet'
+  );
   return (
     <View
       collapsable={false}

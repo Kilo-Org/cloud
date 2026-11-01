@@ -7,6 +7,7 @@ import { PrFormSheetFooter, PrFormSheetHeader } from './pr-form-sheet-chrome';
 const platformState = vi.hoisted(() => ({ OS: 'ios' as string }));
 const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const statusBarState = vi.hoisted(() => ({ currentHeight: null as number | null }));
+const stackRootState = vi.hoisted(() => ({ isRoot: true }));
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -24,6 +25,9 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: 'ScreenHeader',
+}));
+vi.mock('@/lib/navigation/route-focus', () => ({
+  useRouteIsStackRoot: () => stackRootState.isRoot,
 }));
 
 function mountFooter(): TestRenderer.ReactTestRenderer {
@@ -153,11 +157,13 @@ describe('PrFormSheetFooter side insets (landscape)', () => {
 });
 
 /**
- * The sheet surface reaches the window top on Android, so the header clears
- * the status bar itself — from the window inset the app boots with, so its
- * first frame is the settled one. A nested safe-area provider measured the
- * header instead, reported 0 before the sheet presented and the inset after,
- * and moved the whole header by the status-bar height once it landed.
+ * Who clears the status bar depends on how the sheet was presented: a sheet
+ * that is its stack's first screen presents with the surface at the window top
+ * and the header reserves the inset; a sheet pushed over another screen settles
+ * at the detent cap, an inset lower, and reserves nothing. Both come from the
+ * window inset the app boots with, so the first frame is the settled one — a
+ * nested safe-area provider reported 0 before the sheet presented and the inset
+ * after, which moved the whole header by the status-bar height once it landed.
  */
 describe('PrFormSheetHeader top clearance', () => {
   beforeEach(() => {
@@ -166,20 +172,29 @@ describe('PrFormSheetHeader top clearance', () => {
     insetsState.bottom = 0;
     insetsState.left = 0;
     insetsState.right = 0;
-    statusBarState.currentHeight = 51.81;
+    statusBarState.currentHeight = 44;
+    stackRootState.isRoot = true;
   });
 
   it('reserves the status-bar height before the window inset resolves', () => {
     const renderer = mountHeader();
 
-    expect(headerPaddingTop(renderer)).toBe(51.81);
+    expect(headerPaddingTop(renderer)).toBe(44);
   });
 
   it('keeps the resolved window inset instead of flipping the reserve', () => {
-    insetsState.top = 51.81;
+    insetsState.top = 44;
     const renderer = mountHeader();
 
-    expect(headerPaddingTop(renderer)).toBe(51.81);
+    expect(headerPaddingTop(renderer)).toBe(44);
+  });
+
+  it('leaves a pushed sheet, whose edge already clears the status bar, with no reserve', () => {
+    stackRootState.isRoot = false;
+    insetsState.top = 44;
+    const renderer = mountHeader();
+
+    expect(headerPaddingTop(renderer)).toBeUndefined();
   });
 
   it('leaves the iOS sheet, which presents below the status bar, with no reserve', () => {

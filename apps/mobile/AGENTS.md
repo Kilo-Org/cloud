@@ -130,7 +130,10 @@ A sheet header takes its top clearance from `useSheetHeaderTopClearance` (`@/lib
 its own safe-area provider: a nested provider reports zero for the header's first frame and the window inset
 once the sheet presents, so the header moves by the status-bar height after it lands. The `SheetHeaderTopInset`
 mode names which surface owns the top of the window (`always` for a full-screen surface that may apply its own
-top edge, `bottom-form-sheet`, `android-window-top`, `ios-page-sheet`, `never`).
+top edge, `bottom-form-sheet`, `android-window-top`, `ios-page-sheet`, `never`). A formSheet that is its stack's
+first screen presents at the window top and its header reserves the inset; a sheet pushed over another screen
+settles an inset lower, so it reserves nothing — `useRouteIsStackRoot` (`@/lib/navigation/route-focus`) answers
+which, before the first frame.
 Keep `pt-5` for the sheet grabber on top of that clearance.
 
 ## Implementation Rules

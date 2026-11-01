@@ -1577,6 +1577,9 @@
       "offAction": "Paměť kontrol je vypnutá. Zapněte ji a zkuste to znovu."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Zadejte platnou URL adresu merge request.",
+      "mergeRequestUrl": "URL adresa merge request",
+      "instructionsAtLimit": "Instrukce jsou omezeny na {{max}} znaků.",
       "title": "Ruční kontrola",
       "invalidUrl": "Zadejte platnou URL adresu PR.",
       "couldNotCheckProviderStatus": "Stav poskytovatele se nepodařilo ověřit.",
@@ -1836,6 +1839,7 @@
       "lastSynced": "Naposledy synchronizováno {{time}}",
       "manageRepositories": "Spravovat repozitáře",
       "notYetSynced": "Zatím nesynchronizováno",
+      "priorityFindingsPending": "Prioritní nálezy se zobrazí po první synchronizaci.",
       "refreshFailed": "Obnovení se nezdařilo — zobrazují se poslední synchronizovaná data.",
       "settings": "Nastavení",
       "syncNow": "Synchronizovat nyní",
@@ -4100,7 +4104,7 @@
       "emptyDescription": "Přidejte výchozí nastavení pro automatické použití profilu při zahájení relací pro repo.",
       "repo": "Vyberte úložiště…",
       "profile": "Vyberte profil",
-      "remove": "Zrušit vazbu",
+      "removeForRepo": "Zrušit vazbu {{repo}}",
       "search": "Prohledat úložiště…",
       "addedToast": "Výchozí profil nastavený pro „{{repo}}“",
       "addFailed": "Nepodařilo se nastavit výchozí profil",

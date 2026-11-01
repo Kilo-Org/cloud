@@ -1533,6 +1533,9 @@
       "offAction": "Hukommelsen for gennemgange er slået fra. Slå den til, og prøv igen."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Indtast en gyldig URL til en merge request.",
+      "mergeRequestUrl": "URL til merge request",
+      "instructionsAtLimit": "Instruktionerne er begrænset til {{max}} tegn",
       "title": "Manuel gennemgang",
       "invalidUrl": "Indtast en gyldig URL til en pull request.",
       "couldNotCheckProviderStatus": "Udbyderens status kunne ikke kontrolleres.",
@@ -1784,6 +1787,7 @@
       "lastSynced": "Sidst synkroniseret {{time}}",
       "manageRepositories": "Administrér kodelagre",
       "notYetSynced": "Ikke synkroniseret endnu",
+      "priorityFindingsPending": "Prioriterede fund vises efter den første synkronisering.",
       "refreshFailed": "Data kunne ikke opdateres. De senest synkroniserede data vises.",
       "settings": "Indstillinger",
       "syncNow": "Synkronisér nu",
@@ -3986,7 +3990,7 @@
       "emptyDescription": "Tilføj en standard for automatisk at anvende en profil, når du starter sessioner for en repo.",
       "repo": "Vælg lager...",
       "profile": "Vælg profil",
-      "remove": "Afbind",
+      "removeForRepo": "Afbind {{repo}}",
       "search": "Søg i lagre...",
       "addedToast": "Standardprofilen er indstillet til \"{{repo}}\"",
       "addFailed": "Standardprofilen kunne ikke indstilles",

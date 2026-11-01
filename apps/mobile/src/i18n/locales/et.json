@@ -1533,6 +1533,9 @@
       "offAction": "Ülevaatuste mälu on välja lülitatud. Lülita see sisse ja proovi uuesti."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Sisesta kehtiv liitmistaotluse URL.",
+      "mergeRequestUrl": "Liitmistaotluse URL",
+      "instructionsAtLimit": "Juhised on piiratud {{max}} tähemärgiga",
       "title": "Käsitsi käivitatav ülevaatus",
       "invalidUrl": "Sisesta kehtiv tõmbetaotluse URL.",
       "couldNotCheckProviderStatus": "Teenusepakkuja olekut ei õnnestunud kontrollida.",
@@ -1784,6 +1787,7 @@
       "lastSynced": "Viimati sünkroonitud {{time}}",
       "manageRepositories": "Halda hoidlaid",
       "notYetSynced": "Pole veel sünkroonitud",
+      "priorityFindingsPending": "Prioriteetsed leiud ilmuvad pärast esimest sünkroonimist.",
       "refreshFailed": "Värskendamine ebaõnnestus — kuvatakse viimati sünkroonitud andmeid.",
       "settings": "Seaded",
       "syncNow": "Sünkrooni nüüd",
@@ -3986,7 +3990,7 @@
       "emptyDescription": "Lisage vaikeseade profiili automaatseks rakendamiseks repo seansside alustamisel.",
       "repo": "Valige hoidla…",
       "profile": "Valige profiil",
-      "remove": "Vabasta sidumine",
+      "removeForRepo": "Vabasta {{repo}} sidumine",
       "search": "Otsi hoidlaid…",
       "addedToast": "Vaikeprofiil on seatud \"{{repo}}\" jaoks",
       "addFailed": "Vaikeprofiili ei saanud määrata",

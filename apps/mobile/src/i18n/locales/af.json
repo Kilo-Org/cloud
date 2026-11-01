@@ -1533,6 +1533,9 @@
       "offAction": "Die hersieningsgeheue is af. Skakel dit aan en probeer dan weer."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Voer 'n geldige URL vir 'n merge request in.",
+      "mergeRequestUrl": "Merge request-URL",
+      "instructionsAtLimit": "Instruksies is beperk tot {{max}} karakters",
       "title": "Handmatige hersiening",
       "invalidUrl": "Voer 'n geldige URL vir 'n trekversoek in.",
       "couldNotCheckProviderStatus": "Die verskafferstatus kon nie nagegaan word nie.",
@@ -1784,6 +1787,7 @@
       "lastSynced": "Laas gesinkroniseer: {{time}}",
       "manageRepositories": "Bestuur bewaarplekke",
       "notYetSynced": "Nog nie gesinkroniseer nie",
+      "priorityFindingsPending": "Prioriteitsbevindings sal verskyn nadat die eerste sinkronisasie voltooi is.",
       "refreshFailed": "Die data kon nie verfris word nie. Die laaste gesinkroniseerde data word gewys.",
       "settings": "Instellings",
       "syncNow": "Sinkroniseer nou",
@@ -3986,7 +3990,7 @@
       "emptyDescription": "Voeg 'n verstek by om 'n profiel outomaties toe te pas wanneer sessies vir 'n repo begin.",
       "repo": "Kies bewaarplek …",
       "profile": "Kies profiel",
-      "remove": "Ontbind",
+      "removeForRepo": "Ontbind {{repo}}",
       "search": "Soek bewaarplekke …",
       "addedToast": "Verstekprofiel gestel vir \"{{repo}}\"",
       "addFailed": "Kon nie verstekprofiel stel nie",

@@ -1533,6 +1533,9 @@
       "offAction": "Granskningsminnet är avstängt. Aktivera det och försök igen."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Ange en giltig URL till en merge request",
+      "mergeRequestUrl": "URL till merge request",
+      "instructionsAtLimit": "Instruktionerna är begränsade till {{max}} tecken",
       "title": "Manuell granskning",
       "invalidUrl": "Ange en giltig URL till en pull-begäran",
       "couldNotCheckProviderStatus": "Kunde inte kontrollera leverantörens status",
@@ -1784,6 +1787,7 @@
       "lastSynced": "Senast synkroniserat {{time}}",
       "manageRepositories": "Hantera kodarkiv",
       "notYetSynced": "Inte synkroniserat ännu",
+      "priorityFindingsPending": "Prioriterade fynd visas här efter den första synkroniseringen.",
       "refreshFailed": "Kunde inte uppdatera. De senast synkroniserade uppgifterna visas.",
       "settings": "Inställningar",
       "syncNow": "Synkronisera nu",
@@ -3986,7 +3990,7 @@
       "emptyDescription": "Lägg till en standard för att automatiskt tillämpa en profil när du startar sessioner för ett kodarkiv.",
       "repo": "Välj kodarkiv…",
       "profile": "Välj profil",
-      "remove": "Koppla från",
+      "removeForRepo": "Koppla från {{repo}}",
       "search": "Sök kodarkiv…",
       "addedToast": "Standardprofil inställd för \"{{repo}}\"",
       "addFailed": "Det gick inte att ange standardprofil",

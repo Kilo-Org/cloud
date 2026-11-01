@@ -1533,6 +1533,9 @@
       "offAction": "Katselmointimuisti on pois käytöstä. Ota se käyttöön ja yritä uudelleen."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Anna kelvollinen yhdistämispyynnön URL-osoite.",
+      "mergeRequestUrl": "Yhdistämispyynnön URL-osoite",
+      "instructionsAtLimit": "Ohjeet saavat olla enintään {{max}} merkkiä.",
       "title": "Manuaalinen katselmointi",
       "invalidUrl": "Anna kelvollinen muutospyynnön URL-osoite.",
       "couldNotCheckProviderStatus": "Palveluntarjoajan tilaa ei voitu tarkistaa.",
@@ -1784,6 +1787,7 @@
       "lastSynced": "Viimeksi synkronoitu {{time}}",
       "manageRepositories": "Hallinnoi koodivarastoja",
       "notYetSynced": "Ei vielä synkronoitu",
+      "priorityFindingsPending": "Havaintojen tärkeysjärjestys näkyy ensimmäisen synkronoinnin jälkeen.",
       "refreshFailed": "Päivitys epäonnistui — näytetään viimeksi synkronoidut tiedot.",
       "settings": "Asetukset",
       "syncNow": "Synkronoi nyt",
@@ -3986,7 +3990,7 @@
       "emptyDescription": "Lisää oletusprofiili, joka ottaa profiilin käyttöön automaattisesti, kun koodivarastolle aloitetaan istuntoja.",
       "repo": "Valitse koodivarasto…",
       "profile": "Valitse profiili",
-      "remove": "Pura sidonta",
+      "removeForRepo": "Pura kohteen {{repo}} sidonta",
       "search": "Hae koodivarastoja…",
       "addedToast": "Oletusprofiili asetettu kohteelle \"{{repo}}\"",
       "addFailed": "Oletusprofiilia ei voitu asettaa",

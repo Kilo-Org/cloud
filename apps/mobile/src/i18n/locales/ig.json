@@ -1533,6 +1533,9 @@
       "offAction": "A gbanyụrụ ebe nchekwa nyocha. Gbanye ya, wee nwaa ọzọ."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Tinye URL arịrịọ njikọta dị irè.",
+      "mergeRequestUrl": "URL arịrịọ njikọta",
+      "instructionsAtLimit": "Ntụziaka ahụ nwere oke mkpụrụedemede {{max}}",
       "title": "Nyocha a na-amalite n'aka",
       "invalidUrl": "Tinye URL arịrịọ njikọ dị irè.",
       "couldNotCheckProviderStatus": "Enweghị ike ịlele ọnọdụ onye na-enye ọrụ.",
@@ -1784,6 +1787,7 @@
       "lastSynced": "Mmekọrịta data ikpeazụ: {{time}}",
       "manageRepositories": "Jikwaa ebe nchekwa",
       "notYetSynced": "E mekọrịtabeghị data",
+      "priorityFindingsPending": "Ihe achọpụtara ndị a ga-ebu ụzọ mee ga-apụta mgbe e mekọrịtachara data oge mbụ.",
       "refreshFailed": "Enweghị ike ime ka data dị ọhụrụ. A na-egosi data sitere na mmekọrịta ikpeazụ.",
       "settings": "Ntọala",
       "syncNow": "Mekọrịta data ugbu a",
@@ -3986,7 +3990,7 @@
       "emptyDescription": "Tinye ndabara ka itinye profaịlụ na-akpaghị aka mgbe ịmalite nnọkọ maka repo.",
       "repo": "Họrọ ebe nchekwa…",
       "profile": "Họrọ profaịlụ",
-      "remove": "Kwụpụ",
+      "removeForRepo": "Kwụpụ {{repo}}",
       "search": "Chọọ ebe nchekwa…",
       "addedToast": "Profaịlụ ahaziri maka \"{{repo}}\"",
       "addFailed": "Enweghị ike ịtọ profaịlụ ndabere",

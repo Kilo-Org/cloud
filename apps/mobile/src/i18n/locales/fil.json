@@ -1533,6 +1533,9 @@
       "offAction": "Hindi pinagana ang memorya ng pagsusuri. Paganahin ito, pagkatapos subukan ulit."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Maglagay ng wastong URL ng merge request.",
+      "mergeRequestUrl": "URL ng merge request",
+      "instructionsAtLimit": "Ang mga instruksyon ay limitado sa {{max}} na character.",
       "title": "Manu-manong pagsusuri",
       "invalidUrl": "Maglagay ng wastong URL ng pull request.",
       "couldNotCheckProviderStatus": "Hindi masuri ang katayuan ng provider.",
@@ -1787,6 +1790,7 @@
       "lastSynced": "Huling na-sync {{time}}",
       "manageRepositories": "Pamahalaan ang mga repository",
       "notYetSynced": "Hindi pa na-sync",
+      "priorityFindingsPending": "Lalabas ang mga natukoy na isyung dapat unahin pagkatapos ng unang sync",
       "refreshFailed": "Hindi ma-refresh — ipinapakita ang huling na-sync na data.",
       "settings": "Mga setting",
       "syncNow": "I-sync ngayon",
@@ -3992,7 +3996,7 @@
       "emptyDescription": "Magdagdag ng default para awtomatikong maglapat ng profile kapag nagsisimula ng mga session para sa isang repo.",
       "repo": "Pumili ng repositoryo...",
       "profile": "Pumili ng profile",
-      "remove": "Alisin ang pagkakatali",
+      "removeForRepo": "Alisin ang pagkakatali ng {{repo}}",
       "search": "Maghanap ng mga repositoryo...",
       "addedToast": "Itinakda ang default na profile para sa \"{{repo}}\"",
       "addFailed": "Hindi maitakda ang default na profile",

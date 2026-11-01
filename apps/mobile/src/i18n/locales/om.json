@@ -1533,6 +1533,9 @@
       "offAction": "Yaadannoon sakatta'aa cufameera. Isa bani, sana booda irra deebi'ii yaali."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "URL gaaffii makuu sirrii galchi.",
+      "mergeRequestUrl": "URL gaaffii makuu",
+      "instructionsAtLimit": "Ajajni arfiilee {{max}}tti daangeffama",
       "title": "Sakatta'a harkaa",
       "invalidUrl": "URL gaaffii makuu sirrii galchi.",
       "couldNotCheckProviderStatus": "Haala waltajjii mirkaneessuun hin danda'amne.",
@@ -1784,6 +1787,7 @@
       "lastSynced": "Yeroo dhumaaf walsimsiifame: {{time}}",
       "manageRepositories": "Kuusaawwan koodii bulchi",
       "notYetSynced": "Ammaaf hin walsimsiifamne",
+      "priorityFindingsPending": "Argamoonni dursaa qaban erga yeroo jalqabaatti walsimsiifamanii booda ni mul'ata.",
       "refreshFailed": "Haaromsuun hin danda'amne — daataan yeroo dhumaaf walsimsiifame mul'achaa jira.",
       "settings": "Qindaa'ina",
       "syncNow": "Amma walsimsiisi",
@@ -3986,7 +3990,7 @@
       "emptyDescription": "Yeroo turtii repo'f jalqabdu ofumaan piroofaayilii hojii irra oolchuuf durtii dabali.",
       "repo": "Kuusaa filadhu...",
       "profile": "Profaayilii filadhu",
-      "remove": "Hidhaa hiikaa",
+      "removeForRepo": "Hidhaa {{repo}} hiikaa",
       "search": "Kuusaawwan barbaadi...",
       "addedToast": "Profaayilii durtii \"{{repo}}\" tiif saagame.",
       "addFailed": "Profaayilii durtii saaguu hin dandeenye",

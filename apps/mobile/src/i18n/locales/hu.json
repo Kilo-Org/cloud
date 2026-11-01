@@ -1533,6 +1533,9 @@
       "offAction": "A kódellenőrzési memória ki van kapcsolva. Kapcsold be, majd próbáld újra."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Adj meg egy érvényes URL-t a merge request-hez.",
+      "mergeRequestUrl": "Merge request URL-címe",
+      "instructionsAtLimit": "Az utasítások legfeljebb {{max}} karakter lehetnek",
       "title": "Kézi kódellenőrzés",
       "invalidUrl": "Adj meg egy érvényes URL-t a PR-hez.",
       "couldNotCheckProviderStatus": "Nem sikerült ellenőrizni a szolgáltató állapotát.",
@@ -1784,6 +1787,7 @@
       "lastSynced": "Utoljára szinkronizálva: {{time}}",
       "manageRepositories": "Adattárak kezelése",
       "notYetSynced": "Még nincs szinkronizálva",
+      "priorityFindingsPending": "A fontosság szerint rangsorolt találatok az első szinkronizálás után jelennek meg.",
       "refreshFailed": "Nem sikerült a frissítés. Az utolsó szinkronizálás adatai láthatók.",
       "settings": "Beállítások",
       "syncNow": "Szinkronizálás most",
@@ -3986,7 +3990,7 @@
       "emptyDescription": "Adjon hozzá egy alapértelmezett profilt, amely automatikusan alkalmazza a profilt az adattár munkameneteinek indításakor.",
       "repo": "Adattár kiválasztása…",
       "profile": "Profil kiválasztása",
-      "remove": "Kötés feloldása",
+      "removeForRepo": "Kötés feloldása: {{repo}}",
       "search": "Adattárak keresése…",
       "addedToast": "Alapértelmezett profil beállítva az adattárhoz: „{{repo}}”",
       "addFailed": "Nem sikerült beállítani az alapértelmezett profilt",

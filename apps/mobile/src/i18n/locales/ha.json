@@ -1533,6 +1533,9 @@
       "offAction": "An kashe ƙwaƙwalwar bita. Kunna ta, sannan sake gwadawa."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Shigar da ingantaccen URL na buƙatar haɗawa.",
+      "mergeRequestUrl": "URL na buƙatar haɗawa",
+      "instructionsAtLimit": "An iyakance umarnai zuwa haruffa {{max}}",
       "title": "Bita da hannu",
       "invalidUrl": "Shigar da ingantaccen URL na buƙatar haɗa canje-canje.",
       "couldNotCheckProviderStatus": "An kasa duba halin mai ba da sabis.",
@@ -1784,6 +1787,7 @@
       "lastSynced": "An daidaita a ƙarshe {{time}}",
       "manageRepositories": "Sarrafa ma'ajiyoyi",
       "notYetSynced": "Har yanzu ba a daidaita ba",
+      "priorityFindingsPending": "Abubuwan da za a fara yi daga cikin matsalolin da aka gano za su bayyana bayan an yi daidaitawa ta farko.",
       "refreshFailed": "An kasa sabuntawa — ana nuna bayanan da aka daidaita a ƙarshe.",
       "settings": "Saituna",
       "syncNow": "Daidaita yanzu",
@@ -3986,7 +3990,7 @@
       "emptyDescription": "Ƙara tsoho don amfani da bayanin martaba ta atomatik lokacin fara zama don repo.",
       "repo": "Zaɓi wurin ajiya…",
       "profile": "Zaɓi bayanin martaba",
-      "remove": "Cire daurin",
+      "removeForRepo": "Cire daurin {{repo}}",
       "search": "Bincika wuraren ajiya…",
       "addedToast": "An saita tsoffin bayanan martaba don \"{{repo}}\"",
       "addFailed": "An kasa saita bayanan martaba na asali",

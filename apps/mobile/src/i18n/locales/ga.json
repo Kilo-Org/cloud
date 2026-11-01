@@ -1599,6 +1599,9 @@
       "offAction": "Tá cuimhne athbhreithnithe múchta. Cumasaigh í, ansin bain triail eile as."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Cuir isteach URL bailí d'iarratas cumaisc.",
+      "mergeRequestUrl": "URL an iarratais cumaisc",
+      "instructionsAtLimit": "Tá na treoracha teoranta do {{max}} carachtar",
       "title": "Athbhreithniú de láimh",
       "invalidUrl": "Cuir isteach URL bailí d'iarratas tarraingthe.",
       "couldNotCheckProviderStatus": "Níorbh fhéidir stádas an tsoláthraí a sheiceáil.",
@@ -1862,6 +1865,7 @@
       "lastSynced": "An sioncronú deireanach: {{time}}",
       "manageRepositories": "Bainistigh stórtha",
       "notYetSynced": "Níl sé sioncronaithe fós",
+      "priorityFindingsPending": "Beidh torthaí tosaíochta le feiceáil tar éis an chéad sioncronaithe.",
       "refreshFailed": "Níorbh fhéidir na sonraí a athnuachan. Tá sonraí ón sioncronú deireanach á dtaispeáint.",
       "settings": "Socruithe",
       "syncNow": "Sioncronaigh anois",
@@ -4157,7 +4161,7 @@
       "emptyDescription": "Cuir réamhshocrú leis chun próifíl a chur i bhfeidhm go huathoibríoch agus seisiúin á gcur ar bun le haghaidh repo.",
       "repo": "Roghnaigh stór…",
       "profile": "Roghnaigh próifíl",
-      "remove": "Dícheangail",
+      "removeForRepo": "Dícheangail {{repo}}",
       "search": "Cuardaigh stórtha…",
       "addedToast": "Socraíodh próifíl réamhshocraithe do \"{{repo}}\"",
       "addFailed": "Níorbh fhéidir an phróifíl réamhshocraithe a shocrú",

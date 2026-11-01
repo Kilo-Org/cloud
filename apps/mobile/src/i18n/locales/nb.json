@@ -1533,6 +1533,9 @@
       "offAction": "Minnet for kodegjennomganger er deaktivert. Aktiver det, og prøv igjen."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Skriv inn en gyldig URL til en merge request.",
+      "mergeRequestUrl": "URL til merge request",
+      "instructionsAtLimit": "Instruksjonene er begrenset til {{max}} tegn",
       "title": "Manuell gjennomgang",
       "invalidUrl": "Skriv inn en gyldig URL til en PR.",
       "couldNotCheckProviderStatus": "Kunne ikke sjekke leverandørstatusen.",
@@ -1784,6 +1787,7 @@
       "lastSynced": "Sist synkronisert {{time}}",
       "manageRepositories": "Administrer kodelagre",
       "notYetSynced": "Ikke synkronisert ennå",
+      "priorityFindingsPending": "Prioriterte funn vises etter den første synkroniseringen.",
       "refreshFailed": "Kunne ikke oppdatere. Viser de sist synkroniserte dataene.",
       "settings": "Innstillinger",
       "syncNow": "Synkroniser nå",
@@ -3986,7 +3990,7 @@
       "emptyDescription": "Legg til en standard for automatisk å bruke en profil når du starter økter for en repo.",
       "repo": "Velg depot...",
       "profile": "Velg profil",
-      "remove": "Avbind",
+      "removeForRepo": "Avbind «{{repo}}»",
       "search": "Søk i depoter...",
       "addedToast": "Standard profil satt for «{{repo}}»",
       "addFailed": "Kunne ikke angi standardprofil",

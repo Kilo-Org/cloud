@@ -1533,6 +1533,9 @@
       "offAction": "የግምገማ ትውስታ ተሰናክሏል። ያንቁት፣ ከዚያ እንደገና ይሞክሩ።"
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "ትክክለኛ የማዋሃድ ጥያቄ URL ያስገቡ።",
+      "mergeRequestUrl": "የማዋሃድ ጥያቄ URL",
+      "instructionsAtLimit": "መመሪያዎቹ በ{{max}} ቁምፊዎች የተገደቡ ናቸው",
       "title": "በተጠቃሚ የሚጀመር ግምገማ",
       "invalidUrl": "ትክክለኛ የኮድ ውህደት ጥያቄ URL ያስገቡ።",
       "couldNotCheckProviderStatus": "የአቅራቢውን ሁኔታ መፈተሽ አልተቻለም።",
@@ -1787,6 +1790,7 @@
       "lastSynced": "ለመጨረሻ ጊዜ የተመሳሰለው {{time}}",
       "manageRepositories": "ማከማቻዎችን ያስተዳድሩ",
       "notYetSynced": "እስካሁን አልተመሳሰለም",
+      "priorityFindingsPending": "ቅድሚያ የሚሰጣቸው ግኝቶች ከመጀመሪያው መመሳሰል በኋላ ይታያሉ።",
       "refreshFailed": "ማደስ አልተቻለም። ለመጨረሻ ጊዜ የተመሳሰለው ውሂብ እየታየ ነው።",
       "settings": "ቅንብሮች",
       "syncNow": "አሁን ያመሳስሉ",
@@ -3992,7 +3996,7 @@
       "emptyDescription": "ለሪፖ ክፍለ ጊዜዎችን ሲጀምሩ መገለጫን በራስ-ሰር ለመተግበር ነባሪ ያክሉ።",
       "repo": "ማከማቻ ምረጥ…",
       "profile": "መገለጫ ይምረጡ",
-      "remove": "ንቀል",
+      "removeForRepo": "የ{{repo}} ግንኙነት ንቀል",
       "search": "ማከማቻዎችን ፈልግ…",
       "addedToast": "ለ\"{{repo}}\" ነባሪ መገለጫ ተቀናብሯል",
       "addFailed": "ነባሪ መገለጫ ማዘጋጀት አልተቻለም",

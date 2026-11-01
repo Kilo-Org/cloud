@@ -71,18 +71,22 @@ function AgentRowView({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const visibilityLabel = t(AGENT_VISIBILITY_LABEL_KEYS[visibility]);
+  // The name owns its row, so an agent name is ellipsized only when it alone is
+  // wider than the card; the mode label never takes the room a short name needs.
+  // The label is metadata, so it leads the column under the name at the same
+  // 2 dp gap the card uses between its meta lines.
   return (
     <View className="min-h-16 flex-row items-start gap-1 rounded-lg bg-secondary px-3 py-2">
       <ProfileRowIdentity label={profileRowLabel(name, visibilityLabel, model, description)}>
-        <View className="flex-row flex-wrap items-center gap-2">
+        <View className="flex-row items-center gap-2">
           <Bot size={16} color={colors.mutedForeground} />
-          <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+          <Text className="min-w-0 shrink text-sm font-medium text-foreground" numberOfLines={1}>
             {name}
           </Text>
-          <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-            {visibilityLabel}
-          </Text>
         </View>
+        <Text className="text-xs uppercase tracking-wide text-muted-foreground">
+          {visibilityLabel}
+        </Text>
         {model.length > 0 ? (
           <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
             {model}

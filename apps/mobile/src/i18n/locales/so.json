@@ -1533,6 +1533,9 @@
       "offAction": "Xusuusta dib-u-eegistu way dansan tahay. Shid, ka dibna isku day mar kale."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Geli URL ansax ah oo merge request ah.",
+      "mergeRequestUrl": "URL-ka merge request",
+      "instructionsAtLimit": "Tilmaamuhu wuxuu ku xaddidan yahay {{max}} xaraf",
       "title": "Dib-u-eegis gacmeed",
       "invalidUrl": "Geli URL ansax ah oo codsi isku dar ah.",
       "couldNotCheckProviderStatus": "Xaaladda bixiyaha lama hubin karin.",
@@ -1784,6 +1787,7 @@
       "lastSynced": "Markii ugu dambaysay ee la isku waafajiyay: {{time}}",
       "manageRepositories": "Maamul kaydadka",
       "notYetSynced": "Weli lama isku waafajin",
+      "priorityFindingsPending": "Natiijooyinka mudnaanta waxay soo muuqan doonaan kadib isku waafajintii ugu horreysay.",
       "refreshFailed": "Lama cusboonaysiin karin. Waxaa la muujinayaa xogtii ugu dambaysay ee la isku waafajiyay.",
       "settings": "Dejinta",
       "syncNow": "Hadda isku waafaji",
@@ -3986,7 +3990,7 @@
       "emptyDescription": "Ku dar default si toos ah u codso profile marka la bilaabayo fadhiyada repo.",
       "repo": "Dooro kaydka…",
       "profile": "Dooro astaanta",
-      "remove": "Ka fur",
+      "removeForRepo": "Ka fur {{repo}}",
       "search": "Raadi meelaha kaydka ah…",
       "addedToast": "Astaanta asalka ah waxaa loo dejiyay \"{{repo}}\"",
       "addFailed": "Waa la dejin kari waayay astaanta guud",

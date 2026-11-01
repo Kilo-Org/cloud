@@ -1533,6 +1533,9 @@
       "offAction": "Inkumbulo yokuhlola ivaliwe. Yivule, bese uzama futhi."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Faka i-URL evumelekile yesicelo sokuhlanganisa.",
+      "mergeRequestUrl": "I-URL yesicelo sokuhlanganisa",
+      "instructionsAtLimit": "Imiyalo ilinganiselwe ezinhlamvini ezingu-{{max}}",
       "title": "Ukuhlola okuqalwa nguwe",
       "invalidUrl": "Faka i-URL evumelekile yesicelo sokuhlanganisa ikhodi.",
       "couldNotCheckProviderStatus": "Asikwazanga ukuhlola isimo somhlinzeki.",
@@ -1787,6 +1790,7 @@
       "lastSynced": "Kuvumelaniswe okokugcina {{time}}",
       "manageRepositories": "Phatha izinqolobane zekhodi",
       "notYetSynced": "Akukavumelaniswa",
+      "priorityFindingsPending": "Okutholakele okubalulekile kuzovela ngemva kokuvumelanisa okokuqala.",
       "refreshFailed": "Asikwazanga ukuvuselela idatha. Kuboniswa idatha egcine ukuvumelaniswa.",
       "settings": "Izilungiselelo",
       "syncNow": "Vumelanisa manje",
@@ -3992,7 +3996,7 @@
       "emptyDescription": "Engeza okuzenzakalelayo ukuze usebenzise ngokuzenzakalelayo iphrofayela lapho uqala izikhathi ze-repo.",
       "repo": "Khetha inqolobane...",
       "profile": "Khetha iphrofayela",
-      "remove": "Khipha",
+      "removeForRepo": "Khipha {{repo}}",
       "search": "Sesha amaqoqo...",
       "addedToast": "Iphrofayela ezenzakalelayo isethelwe \"{{repo}}\"",
       "addFailed": "Ayikwazanga ukusetha iphrofayela ezenzakalelayo",

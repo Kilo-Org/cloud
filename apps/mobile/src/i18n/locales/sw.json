@@ -1533,6 +1533,9 @@
       "offAction": "Kumbukumbu ya ukaguzi imezimwa. Iwashe, kisha jaribu tena."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Ingiza URL halali ya ombi la kuunganisha.",
+      "mergeRequestUrl": "URL ya ombi la kuunganisha",
+      "instructionsAtLimit": "Maagizo yana kikomo cha vibambo {{max}}",
       "title": "Ukaguzi unaoanzishwa na mtumiaji",
       "invalidUrl": "Ingiza URL halali ya ombi la kuunganisha.",
       "couldNotCheckProviderStatus": "Imeshindikana kuangalia hali ya mtoa huduma.",
@@ -1784,6 +1787,7 @@
       "lastSynced": "Ilisawazishwa mwisho {{time}}",
       "manageRepositories": "Simamia hazina",
       "notYetSynced": "Haijasawazishwa bado",
+      "priorityFindingsPending": "Vipaumbele vitaonekana baada ya usawazishaji wa kwanza.",
       "refreshFailed": "Imeshindikana kuonyesha upya data — data iliyosawazishwa mara ya mwisho ndiyo inayoonyeshwa.",
       "settings": "Mipangilio",
       "syncNow": "Sawazisha sasa",
@@ -3986,7 +3990,7 @@
       "emptyDescription": "Ongeza chaguomsingi ili kutumia wasifu kiotomatiki unapoanzisha vipindi vya repo.",
       "repo": "Chagua hazina...",
       "profile": "Chagua wasifu",
-      "remove": "Tendua",
+      "removeForRepo": "Tendua {{repo}}",
       "search": "Tafuta hazina...",
       "addedToast": "Wasifu chaguomsingi umewekwa kwa ajili ya \"{{repo}}\"",
       "addFailed": "Haikuweza kuweka wasifu chaguomsingi",

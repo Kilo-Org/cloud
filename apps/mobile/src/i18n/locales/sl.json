@@ -1577,6 +1577,9 @@
       "offAction": "Pomnjenje pregledov je izklopljeno. Vklopi ga, nato poskusi znova."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Vnesi veljaven URL merge requesta.",
+      "mergeRequestUrl": "URL merge requesta",
+      "instructionsAtLimit": "Navodila so omejena na {{max}} znakov",
       "title": "Ročni pregled",
       "invalidUrl": "Vnesi veljaven URL zahteve za združitev.",
       "couldNotCheckProviderStatus": "Stanja ponudnika ni bilo mogoče preveriti.",
@@ -1836,6 +1839,7 @@
       "lastSynced": "Nazadnje sinhronizirano {{time}}",
       "manageRepositories": "Upravljaj skladišča",
       "notYetSynced": "Še ni sinhronizirano",
+      "priorityFindingsPending": "Prednostne ugotovitve se bodo prikazale po prvi sinhronizaciji.",
       "refreshFailed": "Osvežitev ni uspela. Prikazani so podatki zadnje sinhronizacije.",
       "settings": "Nastavitve",
       "syncNow": "Sinhroniziraj zdaj",
@@ -4100,7 +4104,7 @@
       "emptyDescription": "Dodajte privzeto za samodejno uporabo profila ob zagonu sej za repo.",
       "repo": "Izberite repozitorij ...",
       "profile": "Izberite profil",
-      "remove": "Odveži",
+      "removeForRepo": "Odveži {{repo}}",
       "search": "Iskanje po skladiščih ...",
       "addedToast": "Privzeti profil nastavljen za \"{{repo}}\"",
       "addFailed": "Privzetega profila ni bilo mogoče nastaviti",

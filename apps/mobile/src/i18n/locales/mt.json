@@ -1599,6 +1599,9 @@
       "offAction": "Il-memorja tar-reviżjoni hija diżattivata. Attivaha, mbagħad erġa' pprova."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Daħħal URL validu għal merge request.",
+      "mergeRequestUrl": "URL tal-merge request",
+      "instructionsAtLimit": "L-istruzzjonijiet huma limitati għal {{max}} karattru.",
       "title": "Reviżjoni manwali",
       "invalidUrl": "Daħħal URL validu għal PR.",
       "couldNotCheckProviderStatus": "Ma setax jiġi ċċekkjat l-istat tal-fornitur.",
@@ -1862,6 +1865,7 @@
       "lastSynced": "L-aħħar sinkronizzazzjoni: {{time}}",
       "manageRepositories": "Immaniġġja r-repożitorji",
       "notYetSynced": "Għadu mhux sinkronizzat",
+      "priorityFindingsPending": "Is-sejbiet ta' prijorità se jidhru wara l-ewwel sinkronizzazzjoni.",
       "refreshFailed": "Ma setgħetx tiġi aġġornata d-dejta. Qed tintwera d-dejta tal-aħħar sinkronizzazzjoni.",
       "settings": "Issettjar",
       "syncNow": "Sinkronizza issa",
@@ -4157,7 +4161,7 @@
       "emptyDescription": "Żid default biex tapplika profil awtomatikament meta tibda sessjonijiet għal repo.",
       "repo": "Agħżel repożitorju...",
       "profile": "Agħżel il-profil",
-      "remove": "Ħoll",
+      "removeForRepo": "Ħoll {{repo}}",
       "search": "Fittex repożitorji...",
       "addedToast": "Profil default issettjat għal \"{{repo}}\"",
       "addFailed": "Ma setax jissettja l-profil default",

@@ -1555,6 +1555,9 @@
       "offAction": "Memorija pregleda je isključena. Uključi je, pa pokušaj ponovo."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Unesi važeći URL merge requesta.",
+      "mergeRequestUrl": "URL merge requesta",
+      "instructionsAtLimit": "Upute su ograničene na {{max}} znakova.",
       "title": "Ručni pregled",
       "invalidUrl": "Unesi važeći URL zahtjeva za spajanje.",
       "couldNotCheckProviderStatus": "Nije moguće provjeriti status platforme.",
@@ -1810,6 +1813,7 @@
       "lastSynced": "Posljednja sinhronizacija: {{time}}",
       "manageRepositories": "Upravljaj repozitorijima",
       "notYetSynced": "Još nije sinhronizirano",
+      "priorityFindingsPending": "Prioritetni nalazi pojavit će se nakon prve sinhronizacije.",
       "refreshFailed": "Osvježavanje nije uspjelo. Prikazuju se posljednji sinhronizirani podaci.",
       "settings": "Postavke",
       "syncNow": "Sinhroniziraj sada",
@@ -4043,7 +4047,7 @@
       "emptyDescription": "Dodajte zadano za automatsku primjenu profila pri pokretanju sesija za repo.",
       "repo": "Odaberite spremište…",
       "profile": "Odaberite profil",
-      "remove": "Odveži",
+      "removeForRepo": "Odveži {{repo}}",
       "search": "Pretražite spremišta…",
       "addedToast": "Zadani profil postavljen za \"{{repo}}\"",
       "addFailed": "Nije moguće postaviti zadani profil",

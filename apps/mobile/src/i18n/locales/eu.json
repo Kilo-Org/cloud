@@ -1533,6 +1533,9 @@
       "offAction": "Berrikuspen-memoria desgaituta dago. Gaitu, eta saiatu berriro."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Sartu merge-eskaera baten baliozko URL bat.",
+      "mergeRequestUrl": "Merge-eskaeraren URLa",
+      "instructionsAtLimit": "Argibideak {{max}} karakteretara mugatuta daude",
       "title": "Eskuzko berrikuspena",
       "invalidUrl": "Sartu bateratze-eskaera baten baliozko URL bat.",
       "couldNotCheckProviderStatus": "Ezin izan da hornitzailearen egoera egiaztatu.",
@@ -1784,6 +1787,7 @@
       "lastSynced": "Azken sinkronizazioa: {{time}}",
       "manageRepositories": "Kudeatu biltegiak",
       "notYetSynced": "Oraindik ez da sinkronizatu",
+      "priorityFindingsPending": "Lehentasunezko aurkikuntzak lehen sinkronizazioaren ondoren agertuko dira.",
       "refreshFailed": "Ezin izan dira datuak eguneratu. Azken sinkronizazioko datuak erakusten dira.",
       "settings": "Ezarpenak",
       "syncNow": "Sinkronizatu orain",
@@ -3986,7 +3990,7 @@
       "emptyDescription": "Gehitu lehenetsitako profil bat automatikoki aplikatzeko repositegi baterako saioak hastean.",
       "repo": "Hautatu biltegia…",
       "profile": "Hautatu profila",
-      "remove": "Askatu",
+      "removeForRepo": "Askatu {{repo}}",
       "search": "Bilatu biltegiak...",
       "addedToast": "\"{{repo}}\"-ren profil lehenetsia ezarri da",
       "addFailed": "Ezin izan da profil lehenetsia ezarri",

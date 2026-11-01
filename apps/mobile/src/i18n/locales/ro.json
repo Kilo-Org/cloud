@@ -1555,6 +1555,9 @@
       "offAction": "Memoria de revizuire este dezactivată. Activeaz-o, apoi încearcă din nou."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Introdu o adresă URL validă pentru un merge request.",
+      "mergeRequestUrl": "Adresa URL a merge request-ului",
+      "instructionsAtLimit": "Instrucțiunile sunt limitate la {{max}} caractere",
       "title": "Revizuire manuală",
       "invalidUrl": "Introdu o adresă URL validă pentru un PR.",
       "couldNotCheckProviderStatus": "Nu s-a putut verifica starea furnizorului.",
@@ -1810,6 +1813,7 @@
       "lastSynced": "Ultima sincronizare: {{time}}",
       "manageRepositories": "Gestionează depozitele",
       "notYetSynced": "Încă nesincronizat",
+      "priorityFindingsPending": "Constatările prioritare vor apărea după prima sincronizare.",
       "refreshFailed": "Nu s-au putut actualiza datele. Se afișează ultimele date sincronizate.",
       "settings": "Setări",
       "syncNow": "Sincronizează acum",
@@ -4043,7 +4047,7 @@
       "emptyDescription": "Adăugați o valoare prestabilită pentru a aplica automat un profil la pornirea sesiunilor pentru un depozit.",
       "repo": "Selectați depozitul...",
       "profile": "Selectați profilul",
-      "remove": "Desface",
+      "removeForRepo": "Desface {{repo}}",
       "search": "Căutați în depozite...",
       "addedToast": "Profil implicit setat pentru „{{repo}}”",
       "addFailed": "Nu s-a putut seta profilul implicit",

@@ -1533,6 +1533,9 @@
       "offAction": "Ko'rib chiqish xotirasi o'chiq. Uni yoqing, so'ng qayta urinib ko'ring."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Merge so‘rovi uchun to'g'ri URL manzilini kiriting.",
+      "mergeRequestUrl": "Merge so‘rovi manzili (URL)",
+      "instructionsAtLimit": "Ko‘rsatmalar {{max}} ta belgi bilan cheklangan",
       "title": "Qo'lda ko'rib chiqish",
       "invalidUrl": "PR uchun to'g'ri URL manzilini kiriting.",
       "couldNotCheckProviderStatus": "Provayder holatini tekshirib bo'lmadi.",
@@ -1784,6 +1787,7 @@
       "lastSynced": "Oxirgi sinxronlash: {{time}}",
       "manageRepositories": "Repozitoriyalarni boshqarish",
       "notYetSynced": "Hali sinxronlanmagan",
+      "priorityFindingsPending": "Birinchi sinxronlashdan so'ng ustuvor muammolar ko'rsatiladi.",
       "refreshFailed": "Yangilash imkoni bo'lmadi — oxirgi sinxronlangan ma'lumotlar ko'rsatilmoqda.",
       "settings": "Sozlamalar",
       "syncNow": "Hozir sinxronlash",
@@ -3986,7 +3990,7 @@
       "emptyDescription": "Repo uchun seanslarni boshlashda profilni avtomatik ravishda qo'llash uchun standartni qo'shing.",
       "repo": "Repozitoriyni tanlang…",
       "profile": "Profilni tanlang",
-      "remove": "Bog'lash",
+      "removeForRepo": "{{repo}} bog'lovini olib tashlash",
       "search": "Repozitariylarni qidirish…",
       "addedToast": "“{{repo}}” uchun birlamchi profil oʻrnatilgan",
       "addFailed": "Standart profilni o‘rnatib bo‘lmadi",

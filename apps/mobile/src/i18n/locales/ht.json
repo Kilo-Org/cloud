@@ -1533,6 +1533,9 @@
       "offAction": "Memwa revizyon an dezaktive. Aktive li, epi eseye ankò."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Antre yon URL valab pou merge request la.",
+      "mergeRequestUrl": "URL merge request la",
+      "instructionsAtLimit": "Enstriksyon yo limite a {{max}} karaktè",
       "title": "Revizyon manyèl",
       "invalidUrl": "Antre yon URL valab pou demann fizyon an.",
       "couldNotCheckProviderStatus": "Nou pa t ka verifye estati founisè a.",
@@ -1784,6 +1787,7 @@
       "lastSynced": "Dènye senkronizasyon: {{time}}",
       "manageRepositories": "Jere depo yo",
       "notYetSynced": "Poko senkronize",
+      "priorityFindingsPending": "Konsta priyorite yo ap parèt apre premye senkronizasyon an.",
       "refreshFailed": "Nou pa t ka rafrechi done yo. N ap montre done ki te senkronize dènye fwa yo.",
       "settings": "Paramèt",
       "syncNow": "Senkronize kounye a",
@@ -3986,7 +3990,7 @@
       "emptyDescription": "Ajoute yon default pou aplike otomatikman yon pwofil lè w kòmanse sesyon yo pou yon repo.",
       "repo": "Chwazi depo...",
       "profile": "Chwazi pwofil",
-      "remove": "Demare",
+      "removeForRepo": "Demare {{repo}}",
       "search": "Chèche depo...",
       "addedToast": "Default pwofil mete pou \"{{repo}}\"",
       "addFailed": "Pa t 'kapab mete pwofil default",

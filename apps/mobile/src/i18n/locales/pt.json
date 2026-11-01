@@ -1555,6 +1555,9 @@
       "offAction": "A memória de revisão está desativada. Ativa-a e tenta novamente."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Introduz um URL válido de um merge request.",
+      "mergeRequestUrl": "URL do merge request",
+      "instructionsAtLimit": "As instruções estão limitadas a {{max}} caracteres",
       "title": "Revisão manual",
       "invalidUrl": "Introduz um URL válido de um pedido de integração.",
       "couldNotCheckProviderStatus": "Não foi possível verificar o estado do fornecedor.",
@@ -1813,6 +1816,7 @@
       "lastSynced": "Última sincronização: {{time}}",
       "manageRepositories": "Gerir repositórios",
       "notYetSynced": "Ainda não sincronizado",
+      "priorityFindingsPending": "As ocorrências prioritárias aparecerão depois da primeira sincronização.",
       "refreshFailed": "Não foi possível atualizar os dados. São apresentados os dados da última sincronização.",
       "settings": "Definições",
       "syncNow": "Sincronizar agora",
@@ -4049,7 +4053,7 @@
       "emptyDescription": "Adicione um padrão para aplicar automaticamente um perfil ao iniciar sessões de um repositório.",
       "repo": "Selecione o repositório…",
       "profile": "Selecione o perfil",
-      "remove": "Desvincular",
+      "removeForRepo": "Desvincular {{repo}}",
       "search": "Pesquisar repositórios…",
       "addedToast": "Perfil predefinido definido para \"{{repo}}\"",
       "addFailed": "Não foi possível definir o perfil predefinido",

@@ -1533,6 +1533,9 @@
       "offAction": "A ti pa ìrántí àtúnyẹ̀wò. Mú un ṣiṣẹ́, kí o sì gbìyànjú lẹ́ẹ̀kan si."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Tẹ URL ìbéèrè ìṣọ̀kan tó tọ́ sí i.",
+      "mergeRequestUrl": "URL ìbéèrè ìṣọ̀kan",
+      "instructionsAtLimit": "Àlàyé naa ní ààlà {{max}} àmì",
       "title": "Àtúnyẹ̀wò tí o bẹ̀rẹ̀ fúnra rẹ",
       "invalidUrl": "Tẹ URL ìbéèrè àkópọ̀ tó tọ́ sí i.",
       "couldNotCheckProviderStatus": "A kò lè ṣàyẹ̀wò ipò olùpèsè.",
@@ -1784,6 +1787,7 @@
       "lastSynced": "Ìmúṣiṣẹ́pọ̀ tó kẹ́yìn: {{time}}",
       "manageRepositories": "Ṣàkóso àwọn ibi ìpamọ́",
       "notYetSynced": "A kò tíì mú ṣiṣẹ́pọ̀",
+      "priorityFindingsPending": "Àwọn àbùkù pàtàkì yóò hàn lẹ́yìn tí a bá ti mú wọn ṣiṣẹ́pọ̀ lẹ́kẹ̀kọ̀",
       "refreshFailed": "A kò lè sọ dátà di tuntun — dátà ìmúṣiṣẹ́pọ̀ tó kẹ́yìn ni a ń fi hàn.",
       "settings": "Àwọn ètò",
       "syncNow": "Mú ṣiṣẹ́pọ̀ báyìí",
@@ -3986,7 +3990,7 @@
       "emptyDescription": "Ṣafikun aiyipada lati kan profaili laifọwọyi nigbati o bẹrẹ awọn akoko fun atunto kan.",
       "repo": "Yan ibi ipamọ…",
       "profile": "Yan profaili",
-      "remove": "Yọọ",
+      "removeForRepo": "Yọ {{repo}} kúrò",
       "search": "Ṣewadii awọn ibi ipamọ…",
       "addedToast": "Eto profaili aiyipada fun \"{{repo}}\"",
       "addFailed": "Ko le ṣeto profaili aiyipada",

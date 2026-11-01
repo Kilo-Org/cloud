@@ -1533,6 +1533,9 @@
       "offAction": "Kod yoxlaması yaddaşı deaktivdir. Onu aktivləşdir, sonra yenidən cəhd et."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Etibarlı merge sorğusu URL-i daxil et.",
+      "mergeRequestUrl": "Merge sorğusu URL-i",
+      "instructionsAtLimit": "Təlimatlar {{max}} simvolla məhduddur",
       "title": "Əl ilə kod yoxlaması",
       "invalidUrl": "Etibarlı PR URL-i daxil et.",
       "couldNotCheckProviderStatus": "Provayderin statusunu yoxlamaq mümkün olmadı.",
@@ -1784,6 +1787,7 @@
       "lastSynced": "Son sinxronlaşdırma: {{time}}",
       "manageRepositories": "Repozitoriyaları idarə et",
       "notYetSynced": "Hələ sinxronlaşdırılmayıb",
+      "priorityFindingsPending": "İlk sinxronlaşdırmadan sonra prioritet tapıntıları görünəcək.",
       "refreshFailed": "Məlumatları yeniləmək mümkün olmadı. Son sinxronlaşdırılmış məlumatlar göstərilir.",
       "settings": "Parametrlər",
       "syncNow": "İndi sinxronlaşdır",
@@ -3986,7 +3990,7 @@
       "emptyDescription": "Repo üçün sessiyalara başladıqda profili avtomatik tətbiq etmək üçün defolt əlavə edin.",
       "repo": "Repozitoru seçin...",
       "profile": "Profil seçin",
-      "remove": "Açın",
+      "removeForRepo": "{{repo}} üçün bağlantını açın",
       "search": "Repozitoriyaları axtarın...",
       "addedToast": "\"{{repo}}\" üçün defolt profil ayarlandı",
       "addFailed": "Defolt profili qurmaq mümkün olmadı",

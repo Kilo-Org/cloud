@@ -14,7 +14,8 @@ import {
 } from './auth.js';
 import { validateKiloToken } from './validate-kilo-token.js';
 import { consumeStreamTicketNonce } from './persistence/StreamTicketNonceDO.js';
-import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
+import { createNotFoundHandler } from '@kilocode/worker-utils';
+import { createWorkerErrorHandler } from './error-handler.js';
 import { createCallbackQueueConsumer } from './callbacks/index.js';
 import type { CallbackJob } from './callbacks/index.js';
 import {
@@ -924,7 +925,7 @@ app.use(
 );
 
 app.notFound(createNotFoundHandler());
-app.onError(createErrorHandler(logger, { includeMessage: false }));
+app.onError(createWorkerErrorHandler(logger));
 
 export const REPORT_RETENTION_CRON = '17 2 * * *';
 export const OUTCOME_AGGREGATE_CRON = '*/5 * * * *';

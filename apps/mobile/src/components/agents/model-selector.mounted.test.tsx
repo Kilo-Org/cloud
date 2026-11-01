@@ -155,7 +155,10 @@ describe('ModelPickerOptionRow unavailable row', () => {
   // 2:1 on the picker surface. The name carries the dim now.
   const nameClass = (renderer: TestRenderer.ReactTestRenderer, text: string) =>
     renderer.root.findAll(
-      node => typeof node.type === 'string' && node.type === 'Text' && node.props.children === text
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === text
     )[0]?.props.className;
 
   it('dims the name and keeps the reason at full contrast', () => {

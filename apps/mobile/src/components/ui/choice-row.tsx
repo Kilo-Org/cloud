@@ -58,6 +58,12 @@ export function ChoiceRow({
   // not restore the derived name once the state clears.
   const namedParts =
     children == null ? [label, description].flatMap(part => (part ? [part] : [])) : [];
+  // The check is the row's only non-text affordance, so a disabled row dims it
+  // instead of dimming the copy, whose caption is read.
+  let checkColor = 'transparent';
+  if (selected) {
+    checkColor = disabled ? colors.mutedForeground : colors.foreground;
+  }
 
   return (
     <Pressable
@@ -97,10 +103,7 @@ export function ChoiceRow({
           ) : null}
         </View>
       )}
-      <Check
-        size={18}
-        color={selected ? (disabled ? colors.mutedForeground : colors.foreground) : 'transparent'}
-      />
+      <Check size={18} color={checkColor} />
     </Pressable>
   );
 }

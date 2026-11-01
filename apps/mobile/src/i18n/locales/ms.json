@@ -1766,7 +1766,6 @@
       "noImmediateAction": "Tiada tindakan segera",
       "notExploitable": "Tidak boleh dieksploitasi",
       "needsYourReview": "Perlu disemak oleh anda",
-      "noSlaDeadline": "Tiada tarikh akhir SLA ditetapkan",
       "noRepositoryData": "Belum ada data repositori",
       "noRepositoryDataDescription": "Keutamaan repositori akan muncul selepas penemuan disegerakkan.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

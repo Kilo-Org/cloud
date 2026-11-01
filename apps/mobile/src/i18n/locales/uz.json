@@ -1766,7 +1766,6 @@
       "noImmediateAction": "Zudlik bilan chora ko'rish shart emas",
       "notExploitable": "Hujumda foydalanib bo‘lmaydi",
       "needsYourReview": "Ko‘rib chiqishingiz kerak",
-      "noSlaDeadline": "SLA muddati belgilanmagan",
       "noRepositoryData": "Hali repozitoriya ma'lumotlari yo'q",
       "noRepositoryDataDescription": "Muammolar sinxronlangach, repozitoriyalar ustuvorligi ko'rsatiladi.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

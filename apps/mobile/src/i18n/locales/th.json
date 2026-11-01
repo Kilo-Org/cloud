@@ -1766,7 +1766,6 @@
       "noImmediateAction": "ไม่ต้องดำเนินการทันที",
       "notExploitable": "ใช้โจมตีไม่ได้",
       "needsYourReview": "รอคุณตรวจสอบ",
-      "noSlaDeadline": "ยังไม่ได้กำหนดเวลา SLA",
       "noRepositoryData": "ยังไม่มีข้อมูลคลังโค้ด",
       "noRepositoryDataDescription": "ลำดับความสำคัญของคลังโค้ดจะแสดงหลังซิงค์ข้อค้นพบแล้ว",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

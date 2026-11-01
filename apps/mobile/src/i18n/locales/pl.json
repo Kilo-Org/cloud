@@ -1303,7 +1303,6 @@
       "noOpenFindings": "Żadne otwarte problemy nie wymagają uwagi",
       "noRepositoryData": "Brak danych o repozytoriach",
       "noRepositoryDataDescription": "Priorytety repozytoriów pojawią się po zsynchronizowaniu problemów.",
-      "noSlaDeadline": "Brak przypisanego terminu SLA",
       "notExploitable": "Nie można wykorzystać w ataku",
       "notMeasured": "Nie zmierzono",
       "notYetSynced": "Jeszcze nie zsynchronizowano",

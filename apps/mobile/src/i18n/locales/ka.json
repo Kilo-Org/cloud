@@ -1766,7 +1766,6 @@
       "noImmediateAction": "დაუყოვნებლივი რეაგირება არ სჭირდება",
       "notExploitable": "არ არის ექსპლუატირებადი",
       "needsYourReview": "შენ უნდა შეამოწმო",
-      "noSlaDeadline": "SLA-ის ვადა არ არის განსაზღვრული",
       "noRepositoryData": "რეპოზიტორის მონაცემები ჯერ არ არის",
       "noRepositoryDataDescription": "რეპოზიტორების პრიორიტეტები მიგნებების სინქრონიზაციის შემდეგ გამოჩნდება.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

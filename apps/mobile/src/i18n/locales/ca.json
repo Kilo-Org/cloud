@@ -1789,7 +1789,6 @@
       "noImmediateAction": "Cap acció immediata",
       "notExploitable": "No explotable",
       "needsYourReview": "Pendent que ho revisis",
-      "noSlaDeadline": "Sense termini de l'SLA assignat",
       "noRepositoryData": "Encara no hi ha dades del repositori",
       "noRepositoryDataDescription": "Les prioritats del repositori apareixeran després de sincronitzar les incidències.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

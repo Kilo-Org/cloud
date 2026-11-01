@@ -1766,7 +1766,6 @@
       "noImmediateAction": "වහාම ගත යුතු ක්‍රියාමාර්ගයක් නැත",
       "notExploitable": "ප්‍රහාරයකට යොදාගත නොහැකි",
       "needsYourReview": "ඔබේ සමාලෝචනය අවශ්‍යයි",
-      "noSlaDeadline": "SLA අවසන් දිනයක් නියම කර නැත",
       "noRepositoryData": "තවම ගබඩා දත්ත නැත",
       "noRepositoryDataDescription": "සොයාගැනීම් සමමුහුර්ත කළ පසු ගබඩාවල ප්‍රමුඛතා මෙහි දිස් වේ.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

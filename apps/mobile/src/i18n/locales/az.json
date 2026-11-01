@@ -1766,7 +1766,6 @@
       "noImmediateAction": "Təcili tədbir tələb olunmur",
       "notExploitable": "İstismar edilə bilməz",
       "needsYourReview": "Yoxlamanı gözləyir",
-      "noSlaDeadline": "SLA müddəti təyin edilməyib",
       "noRepositoryData": "Hələ repozitoriya məlumatı yoxdur",
       "noRepositoryDataDescription": "Tapıntılar sinxronlaşdırıldıqdan sonra repozitoriya prioritetləri görünəcək.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

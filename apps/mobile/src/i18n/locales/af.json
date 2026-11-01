@@ -1766,7 +1766,6 @@
       "noImmediateAction": "Geen onmiddellike aksie nie",
       "notExploitable": "Nie uitbuitbaar nie",
       "needsYourReview": "Moet deur jou hersien word",
-      "noSlaDeadline": "Geen SLA-sperdatum toegewys nie",
       "noRepositoryData": "Nog geen bewaarplekdata nie",
       "noRepositoryDataDescription": "Bewaarplekprioriteite sal verskyn nadat bevindings gesinkroniseer is.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

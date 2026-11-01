@@ -144,6 +144,17 @@ function priorityCard(renderer: TestRenderer.ReactTestRenderer): Instance {
   return card;
 }
 
+/** The Codebase risk card, found by its title line. */
+function coverageCard(renderer: TestRenderer.ReactTestRenderer): Instance {
+  const card = renderer.root
+    .findAllByType('View')
+    .find(node => copy(node).includes('securityAgent.dashboard.codebaseRisk'));
+  if (!card) {
+    throw new Error('coverage card not found');
+  }
+  return card;
+}
+
 describe('DashboardSections priority card', () => {
   it('reports no measurement while the scope has never synced', () => {
     const card = priorityCard(renderSections({ neverSynced: true }));
@@ -253,5 +264,32 @@ describe('DashboardSections SLA posture', () => {
 
     expect(labels).toContain('securityAgent.dashboard.confirmedExploitable');
     expect(labels).toContain('securityAgent.dashboard.noImmediateAction');
+  });
+});
+
+describe('DashboardSections Codebase risk card', () => {
+  // The untracked count is already the "No deadline" tile above these cards, so
+  // the risk card carried the same number a second time under its own label.
+  // The rows here are the analysis outcomes, and they do not depend on SLA
+  // tracking: the card reads the same with it on and off.
+  it('keeps the same outcome rows with and without SLA tracking', () => {
+    const labels = (slaEnabled: boolean) =>
+      coverageCard(
+        renderSections({
+          neverSynced: false,
+          slaEnabled,
+          data: dashboardData({
+            sla: {
+              ...dashboardData().sla,
+              untrackedCount: 5,
+            },
+          }),
+        })
+      )
+        .findAllByType('KvRow')
+        .map(row => row.props.label);
+
+    expect(labels(true)).toHaveLength(4);
+    expect(labels(true)).toEqual(labels(false));
   });
 });

@@ -1766,7 +1766,6 @@
       "noImmediateAction": "ບໍ່ຕ້ອງດຳເນີນການທັນທີ",
       "notExploitable": "ໃຊ້ໂຈມຕີບໍ່ໄດ້",
       "needsYourReview": "ທ່ານຕ້ອງກວດສອບ",
-      "noSlaDeadline": "ຍັງບໍ່ໄດ້ຕັ້ງວັນຄົບກຳນົດ SLA",
       "noRepositoryData": "ຍັງບໍ່ມີຂໍ້ມູນຄັງໂຄ້ດ",
       "noRepositoryDataDescription": "ລຳດັບຄວາມສຳຄັນຂອງຄັງໂຄ້ດຈະປາກົດຫຼັງຈາກຊິງຂໍ້ມູນບັນຫາທີ່ກວດພົບ.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

@@ -1766,7 +1766,6 @@
       "noImmediateAction": "Ez dago berehalako ekintzarik",
       "notExploitable": "Ezin da ustiatu",
       "needsYourReview": "Berrikusi behar duzu",
-      "noSlaDeadline": "Ez dago SLAren epemugarik esleituta",
       "noRepositoryData": "Oraindik ez dago biltegi-daturik",
       "noRepositoryDataDescription": "Biltegien lehentasunak aurkikuntzak sinkronizatu ondoren agertuko dira.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

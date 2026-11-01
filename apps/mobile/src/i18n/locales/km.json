@@ -1766,7 +1766,6 @@
       "noImmediateAction": "មិនត្រូវការសកម្មភាពភ្លាមៗ",
       "notExploitable": "មិនអាចកេងប្រវ័ញ្ចបាន",
       "needsYourReview": "ត្រូវការឱ្យអ្នកពិនិត្យ",
-      "noSlaDeadline": "មិនបានកំណត់ថ្ងៃកំណត់ SLA",
       "noRepositoryData": "មិនទាន់មានទិន្នន័យឃ្លាំងកូដ",
       "noRepositoryDataDescription": "អាទិភាពរបស់ឃ្លាំងកូដនឹងបង្ហាញបន្ទាប់ពីធ្វើសមកាលកម្មបញ្ហាដែលរកឃើញ។",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

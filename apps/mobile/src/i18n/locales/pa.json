@@ -1766,7 +1766,6 @@
       "noImmediateAction": "ਕੋਈ ਤੁਰੰਤ ਕਾਰਵਾਈ ਨਹੀਂ",
       "notExploitable": "ਹਮਲੇ ਲਈ ਵਰਤਣਯੋਗ ਨਹੀਂ",
       "needsYourReview": "ਤੁਹਾਡੀ ਸਮੀਖਿਆ ਦੀ ਲੋੜ ਹੈ",
-      "noSlaDeadline": "ਕੋਈ SLA ਸਮਾਂ ਸੀਮਾ ਨਿਰਧਾਰਤ ਨਹੀਂ",
       "noRepositoryData": "ਅਜੇ ਰਿਪੋਜ਼ਟਰੀਆਂ ਦਾ ਕੋਈ ਡੇਟਾ ਨਹੀਂ",
       "noRepositoryDataDescription": "ਸਮੱਸਿਆਵਾਂ ਸਿੰਕ ਹੋਣ ਤੋਂ ਬਾਅਦ ਰਿਪੋਜ਼ਟਰੀਆਂ ਦੀਆਂ ਤਰਜੀਹਾਂ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

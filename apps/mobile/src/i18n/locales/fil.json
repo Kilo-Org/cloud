@@ -1766,7 +1766,6 @@
       "noImmediateAction": "Walang agarang aksiyon",
       "notExploitable": "Hindi maaaring samantalahin",
       "needsYourReview": "Kailangan mong suriin",
-      "noSlaDeadline": "Walang nakatalagang takdang petsa ng SLA",
       "noRepositoryData": "Wala pang data ng repository",
       "noRepositoryDataDescription": "Lalabas ang mga priyoridad ng repository kapag na-sync na ang mga natukoy na isyu.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

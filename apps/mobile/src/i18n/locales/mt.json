@@ -1835,7 +1835,6 @@
       "noImmediateAction": "L-ebda azzjoni immedjata",
       "notExploitable": "Mhux sfruttabbli",
       "needsYourReview": "Teħtieġ ir-reviżjoni tiegħek",
-      "noSlaDeadline": "L-ebda skadenza tas-SLA assenjata",
       "noRepositoryData": "L-ebda dejta tar-repożitorju s'issa",
       "noRepositoryDataDescription": "Il-prijoritajiet tar-repożitorju se jidhru wara li s-sejbiet jiġu sinkronizzati.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

@@ -1789,7 +1789,6 @@
       "noImmediateAction": "Nicio acțiune imediată",
       "notExploitable": "Neexploatabilă",
       "needsYourReview": "Necesită verificarea ta",
-      "noSlaDeadline": "Niciun termen limită SLA atribuit",
       "noRepositoryData": "Nu există încă date despre depozite",
       "noRepositoryDataDescription": "Prioritățile depozitelor vor apărea după sincronizarea constatărilor.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

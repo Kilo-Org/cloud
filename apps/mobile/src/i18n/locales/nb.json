@@ -1766,7 +1766,6 @@
       "noImmediateAction": "Ingen umiddelbare tiltak",
       "notExploitable": "Kan ikke utnyttes",
       "needsYourReview": "Må gjennomgås av deg",
-      "noSlaDeadline": "Ingen SLA-frist angitt",
       "noRepositoryData": "Ingen data om kodelagre ennå",
       "noRepositoryDataDescription": "Prioriteringer for kodelagrene vises når funnene er synkronisert.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

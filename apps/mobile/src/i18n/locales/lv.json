@@ -1789,7 +1789,6 @@
       "noImmediateAction": "Tūlītēja rīcība nav vajadzīga",
       "notExploitable": "Nav izmantojams uzbrukumam",
       "needsYourReview": "Tev jāpārskata",
-      "noSlaDeadline": "SLA termiņš nav noteikts",
       "noRepositoryData": "Repozitorija datu vēl nav",
       "noRepositoryDataDescription": "Repozitoriju prioritātes būs redzamas pēc konstatējumu sinhronizēšanas.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

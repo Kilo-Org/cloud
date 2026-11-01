@@ -1766,7 +1766,6 @@
       "noImmediateAction": "Engin bráð aðgerð nauðsynleg",
       "notExploitable": "Ekki hægt að misnota",
       "needsYourReview": "Þú þarft að rýna þetta",
-      "noSlaDeadline": "Enginn SLA-frestur ákveðinn",
       "noRepositoryData": "Engin geymslugögn ennþá",
       "noRepositoryDataDescription": "Forgangsröðun geymslna birtist þegar frávik hafa verið samstillt.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

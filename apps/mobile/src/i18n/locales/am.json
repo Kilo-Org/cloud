@@ -1766,7 +1766,6 @@
       "noImmediateAction": "ምንም አፋጣኝ እርምጃ የለም",
       "notExploitable": "ለጥቃት ሊውል የማይችል",
       "needsYourReview": "በአንተ መገምገም ያስፈልገዋል",
-      "noSlaDeadline": "የSLA ጊዜ ገደብ አልተወሰነም",
       "noRepositoryData": "እስካሁን የማከማቻ ውሂብ የለም",
       "noRepositoryDataDescription": "የማከማቻ ቅድሚያዎች ግኝቶች ከተመሳሰሉ በኋላ ይታያሉ።",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

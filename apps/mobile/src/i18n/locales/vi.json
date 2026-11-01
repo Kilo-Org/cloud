@@ -1293,7 +1293,6 @@
       "noOpenFindings": "Không có vấn đề chưa xử lý nào cần chú ý",
       "noRepositoryData": "Chưa có dữ liệu kho lưu trữ",
       "noRepositoryDataDescription": "Mức độ ưu tiên của từng kho lưu trữ sẽ xuất hiện sau khi các vấn đề được đồng bộ.",
-      "noSlaDeadline": "Chưa đặt hạn chót SLA",
       "notExploitable": "Không thể khai thác",
       "notMeasured": "Chưa đo lường",
       "notYetSynced": "Chưa đồng bộ",

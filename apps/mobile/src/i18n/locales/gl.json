@@ -1766,7 +1766,6 @@
       "noImmediateAction": "Sen acción inmediata",
       "notExploitable": "Non explotable",
       "needsYourReview": "Require a túa revisión",
-      "noSlaDeadline": "Sen prazo do SLA asignado",
       "noRepositoryData": "Aínda non hai datos do repositorio",
       "noRepositoryDataDescription": "As prioridades do repositorio aparecerán despois de sincronizarse os achados.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

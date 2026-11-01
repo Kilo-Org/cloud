@@ -1812,7 +1812,6 @@
       "noImmediateAction": "Тэрміновых дзеянняў не патрабуецца",
       "notExploitable": "Эксплуатацыя немагчымая",
       "needsYourReview": "Патрабуе тваёй праверкі",
-      "noSlaDeadline": "Тэрмін SLA не прызначаны",
       "noRepositoryData": "Даных пра рэпазіторыі яшчэ няма",
       "noRepositoryDataDescription": "Прыярытэты рэпазіторыяў з'явяцца пасля сінхранізацыі праблем.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

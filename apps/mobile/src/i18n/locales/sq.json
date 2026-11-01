@@ -1766,7 +1766,6 @@
       "noImmediateAction": "Asnjë veprim i menjëhershëm",
       "notExploitable": "E pashfrytëzueshme",
       "needsYourReview": "Kërkon shqyrtimin tënd",
-      "noSlaDeadline": "Nuk është caktuar afat SLA",
       "noRepositoryData": "Ende nuk ka të dhëna për depot",
       "noRepositoryDataDescription": "Prioritetet e depove do të shfaqen pasi gjetjet të sinkronizohen.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

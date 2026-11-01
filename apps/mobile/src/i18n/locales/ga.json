@@ -1835,7 +1835,6 @@
       "noImmediateAction": "Gan ghníomh láithreach",
       "notExploitable": "Neamh-inshaothraithe",
       "needsYourReview": "Athbhreithniú uait de dhíth",
-      "noSlaDeadline": "Níl aon spriocdháta SLA sannta",
       "noRepositoryData": "Níl aon sonraí stóir fós",
       "noRepositoryDataDescription": "Beidh tosaíochtaí na stórtha le feiceáil tar éis na torthaí a shioncronú.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

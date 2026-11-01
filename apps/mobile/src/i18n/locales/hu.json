@@ -1766,7 +1766,6 @@
       "noImmediateAction": "Nincs azonnali teendő",
       "notExploitable": "Nem kihasználható",
       "needsYourReview": "Ellenőrizned kell",
-      "noSlaDeadline": "Nincs hozzárendelt SLA-határidő",
       "noRepositoryData": "Még nincsenek adatok az adattárakról",
       "noRepositoryDataDescription": "Az adattárak fontossági sorrendje a találatok szinkronizálása után jelenik meg.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

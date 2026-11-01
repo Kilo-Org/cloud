@@ -1766,7 +1766,6 @@
       "noImmediateAction": "Ei välittömiä toimenpiteitä",
       "notExploitable": "Ei hyödynnettävissä",
       "needsYourReview": "Odottaa tarkistustasi",
-      "noSlaDeadline": "Ei määritettyä SLA-määräaikaa",
       "noRepositoryData": "Ei vielä koodivarastojen tietoja",
       "noRepositoryDataDescription": "Koodivarastojen tärkeysjärjestys näkyy, kun havainnot on synkronoitu.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

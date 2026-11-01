@@ -1812,7 +1812,6 @@
       "noImmediateAction": "Takojšnje ukrepanje ni potrebno",
       "notExploitable": "Ni izkoristljivo",
       "needsYourReview": "Potreben je tvoj pregled",
-      "noSlaDeadline": "Rok SLA ni določen",
       "noRepositoryData": "Še ni podatkov o skladišču",
       "noRepositoryDataDescription": "Prednostni ukrepi za skladišča se bodo prikazali po sinhronizaciji ugotovitev.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

@@ -1766,7 +1766,6 @@
       "noImmediateAction": "Καμία άμεση ενέργεια",
       "notExploitable": "Μη εκμεταλλεύσιμο",
       "needsYourReview": "Χρειάζεται τον έλεγχό σου",
-      "noSlaDeadline": "Δεν έχει οριστεί προθεσμία SLA",
       "noRepositoryData": "Δεν υπάρχουν ακόμα δεδομένα αποθετηρίου",
       "noRepositoryDataDescription": "Οι προτεραιότητες του αποθετηρίου θα εμφανιστούν μετά τον συγχρονισμό των ευρημάτων.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

@@ -103,9 +103,7 @@ vi.mock('@/components/platform-error-screen', () => ({
 vi.mock('@/components/security-agent/settings-save-button', () => ({
   SettingsSaveButton: () => null,
 }));
-vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: (props: { children?: unknown }) => props.children ?? null,
-}));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 
 const PERSONAL_SCOPE = 'personal';
 const ORGANIZATION_SCOPE = '00000000-0000-4000-8000-000000000001';
@@ -140,6 +138,14 @@ describe('personal scope', () => {
     expect(copy).not.toContain(i18n.t('securityAgent.notifications.newFindingSection'));
     expect(copy).not.toContain(i18n.t('securityAgent.notifications.slaSection'));
   });
+
+  it('spaces the two switch groups wider, because no heading separates them here', () => {
+    const screen = mount(PERSONAL_SCOPE);
+
+    expect(screen.root.findByType('TabScreenScrollView').props.contentContainerClassName).toBe(
+      'px-6 pt-4 gap-12'
+    );
+  });
 });
 
 describe('organization scope', () => {
@@ -152,5 +158,13 @@ describe('organization scope', () => {
     expect(names[0]).toContain(i18n.t('securityAgent.notifications.newFindingSection'));
     expect(names[1]).toContain(i18n.t('securityAgent.notifications.slaSection'));
     expect(names[1]).not.toContain(i18n.t('securityAgent.notifications.newFindingSection'));
+  });
+
+  it('keeps the standard group gap, next to its headings', () => {
+    const screen = mount(ORGANIZATION_SCOPE);
+
+    expect(screen.root.findByType('TabScreenScrollView').props.contentContainerClassName).toBe(
+      'px-6 pt-4 gap-6'
+    );
   });
 });

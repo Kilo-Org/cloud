@@ -284,13 +284,14 @@ describe('Security Agent settings writes while the device is offline', () => {
     const actionFailed = i18n.t('securityAgent.mutations.actionFailed');
     await waitFor(() => holder.syncError === actionFailed);
     expect(callsTo('securityAgent.triggerSync')).toBe(1);
-    // TanStack settles `mutateAsync` before its `setTimeout`-scheduled observer
-    // batch re-renders the probe, so a busy runner can still read the previous
-    // render here: the mutation's error and its cleared pending state are both
-    // one batch behind the rejection. Wait for that render before asserting it.
-    await waitFor(() => holder.syncError !== null && !holder.syncPending);
-    expect(holder.syncError).toBe(i18n.t('securityAgent.mutations.actionFailed'));
+    // The rejection settles the mutation, but the observer notification that
+    // renders the error row and clears the pending flag runs through TanStack
+    // Query's scheduler on a later macrotask. Waiting for the observable state
+    // keeps the assertion off the flush that happens to be first on a loaded
+    // runner.
+    await waitFor(() => holder.syncError !== null);
     expect(holder.syncPending).toBe(false);
+    expect(holder.syncError).toBe(actionFailed);
     expect(failure).toBeInstanceOf(Error);
     expect((failure as Error).message).toBe(actionFailed);
     expect(outbox.writeReconcileFirst).toHaveBeenCalledTimes(1);

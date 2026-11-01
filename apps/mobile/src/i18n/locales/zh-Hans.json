@@ -1082,10 +1082,8 @@
     },
     "overview": {
       "allAreas": "所有方面",
-      "focusAreas": "审查重点",
       "nSelected": "已选 {{displayCount}} 项",
       "proposedReviewMdGuidance": "REVIEW.md 审查准则建议",
-      "reviewStyle": "审查风格",
       "set": "已设置",
       "notSet": "未设置"
     },

@@ -1082,10 +1082,8 @@
     },
     "overview": {
       "allAreas": "Alle aandachtspunten",
-      "focusAreas": "Aandachtspunten",
       "nSelected": "{{displayCount}} geselecteerd",
       "proposedReviewMdGuidance": "Voorgestelde REVIEW.md-richtlijnen",
-      "reviewStyle": "Beoordelingsstijl",
       "set": "Ingesteld",
       "notSet": "Niet ingesteld"
     },

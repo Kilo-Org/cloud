@@ -1082,10 +1082,8 @@
     },
     "overview": {
       "allAreas": "Alle Bereiche",
-      "focusAreas": "Schwerpunkte",
       "nSelected": "{{displayCount}} ausgewählt",
       "proposedReviewMdGuidance": "Vorgeschlagene Richtlinien für REVIEW.md",
-      "reviewStyle": "Art der Prüfung",
       "set": "Festgelegt",
       "notSet": "Nicht festgelegt"
     },

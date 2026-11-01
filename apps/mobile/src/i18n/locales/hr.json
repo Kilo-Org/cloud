@@ -1627,8 +1627,6 @@
       "bitbucketError": "Nije moguće otvoriti postavljanje za Bitbucket. Pokušaj ponovno."
     },
     "overview": {
-      "reviewStyle": "Stil pregleda",
-      "focusAreas": "Područja pregleda",
       "allAreas": "Sva područja",
       "set": "Postavljeno",
       "notSet": "Nije postavljeno",

@@ -1605,8 +1605,6 @@
       "bitbucketError": "Nuk u hap konfigurimi i Bitbucket. Provo përsëri."
     },
     "overview": {
-      "reviewStyle": "Stili i shqyrtimit",
-      "focusAreas": "Fushat e përqendrimit",
       "allAreas": "Të gjitha fushat",
       "set": "I caktuar",
       "notSet": "I pacaktuar",

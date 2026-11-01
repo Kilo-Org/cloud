@@ -1082,10 +1082,8 @@
     },
     "overview": {
       "allAreas": "Tüm alanlar",
-      "focusAreas": "Odak alanları",
       "nSelected": "{{displayCount}} seçili",
       "proposedReviewMdGuidance": "Önerilen REVIEW.md yönergeleri",
-      "reviewStyle": "İnceleme stili",
       "set": "Belirlendi",
       "notSet": "Belirlenmedi"
     },

@@ -1088,10 +1088,8 @@
     },
     "overview": {
       "allAreas": "Wszystkie obszary",
-      "focusAreas": "Obszary przeglądu",
       "nSelected": "Wybrano: {{displayCount}}",
       "proposedReviewMdGuidance": "Proponowane wytyczne do pliku REVIEW.md",
-      "reviewStyle": "Styl przeglądu",
       "set": "Ustawiono",
       "notSet": "Nie ustawiono"
     },

@@ -1605,8 +1605,6 @@
       "bitbucketError": "Kon nie Bitbucket-opstelling oopmaak nie. Probeer asseblief weer."
     },
     "overview": {
-      "reviewStyle": "Hersieningstyl",
-      "focusAreas": "Fokusareas",
       "allAreas": "Alle fokusareas",
       "set": "Ingestel",
       "notSet": "Nie ingestel nie",

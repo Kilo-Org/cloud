@@ -1082,10 +1082,8 @@
     },
     "overview": {
       "allAreas": "सभी क्षेत्र",
-      "focusAreas": "ध्यान देने वाले क्षेत्र",
       "nSelected": "{{displayCount}} चयनित",
       "proposedReviewMdGuidance": "REVIEW.md के लिए प्रस्तावित दिशानिर्देश",
-      "reviewStyle": "समीक्षा की शैली",
       "set": "तय है",
       "notSet": "तय नहीं है"
     },

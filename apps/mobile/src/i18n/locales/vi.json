@@ -1082,10 +1082,8 @@
     },
     "overview": {
       "allAreas": "Tất cả nội dung",
-      "focusAreas": "Nội dung trọng tâm",
       "nSelected": "Đã chọn {{displayCount}}",
       "proposedReviewMdGuidance": "Hướng dẫn đề xuất cho REVIEW.md",
-      "reviewStyle": "Cách rà soát",
       "set": "Đã thiết lập",
       "notSet": "Chưa thiết lập"
     },

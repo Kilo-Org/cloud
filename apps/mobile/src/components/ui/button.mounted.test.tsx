@@ -110,10 +110,10 @@ describe('Button native target contract', () => {
     expect(await nativeDimensions(button)).toEqual([{ minHeight: 48 }]);
   });
 
-  it('keeps a 36-point compact minimum plus four-point hitSlop on every edge', async () => {
+  it('keeps a 36-point compact minimum plus five-point hitSlop on every edge', async () => {
     const button = renderButton({ size: 'sm' });
     expect(await nativeDimensions(button)).toEqual([{ minHeight: 36 }]);
-    expect(button.props.hitSlop).toEqual({ top: 4, bottom: 4, left: 4, right: 4 });
+    expect(button.props.hitSlop).toEqual({ top: 5, bottom: 5, left: 5, right: 5 });
   });
 
   it('keeps an icon target 44 points wide and tall without requiring label content', async () => {

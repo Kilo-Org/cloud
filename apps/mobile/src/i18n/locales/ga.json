@@ -1671,8 +1671,6 @@
       "bitbucketError": "Níorbh fhéidir socrú Bitbucket a oscailt. Bain triail as arís."
     },
     "overview": {
-      "reviewStyle": "Stíl athbhreithnithe",
-      "focusAreas": "Réimsí béime",
       "allAreas": "Gach réimse",
       "set": "Socraithe",
       "notSet": "Gan socrú",

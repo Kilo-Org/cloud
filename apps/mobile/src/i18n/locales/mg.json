@@ -1605,8 +1605,6 @@
       "bitbucketError": "Tsy nety nosokafana ny fametrahana ny Bitbucket. Andramo indray azafady."
     },
     "overview": {
-      "reviewStyle": "Fomba fandinihana",
-      "focusAreas": "Lafiny ifantohana",
       "allAreas": "Lafiny rehetra",
       "set": "Voafaritra",
       "notSet": "Tsy voafaritra",

@@ -198,4 +198,24 @@ describe('PrReviewOverview action hierarchy', () => {
 
     unmount();
   });
+
+  it('starts the loaded body one section gap below the tab selector', async () => {
+    // The band under the Overview/Files/Discussion tabs measured 56 dp against
+    // the overview's 17.5 dp section gap: the scroll view renders its
+    // reduced-motion progress row as the first child, so the body's `gap-5`
+    // landed after that row, and the row reserves its 31.5 dp whenever reduced
+    // motion is on. `pt-3` (10.5 dp) under the tab wrapper's `pb-2` (7 dp) is
+    // the 17.5 dp rhythm the discussion tab already starts with, and the band
+    // is out of flow so the first block keeps that edge in both motion modes.
+    query.data = MERGEABLE_OVERVIEW;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PrReviewOverview, overviewProps)
+    );
+
+    const scroller = renderer.root.find(node => String(node.type) === 'ScrollView');
+    expect(scroller.props.contentContainerClassName).toBe('gap-5 px-4 pt-3');
+    expect(scroller.props.overlayRefreshProgress).toBe(true);
+
+    unmount();
+  });
 });

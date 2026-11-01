@@ -22,14 +22,8 @@ export default function ProfilePickerScreen() {
   // "Options expired" flash before a later effect populates state.
   const [bridge] = useState(() => profilePickerSlot.get(UNFENCED_ROUTE_KEY));
 
-  const {
-    allProfiles,
-    effectiveDefaultId,
-    effectiveDefaultProfile,
-    isLoading,
-    isError,
-    refetch,
-  } = useEffectiveAgentProfile(bridge?.organizationId, bridge?.selectedOverrideProfileId ?? null);
+  const { allProfiles, effectiveDefaultId, effectiveDefaultProfile, isLoading, isError, refetch } =
+    useEffectiveAgentProfile(bridge?.organizationId, bridge?.selectedOverrideProfileId ?? null);
 
   if (!bridge) {
     return (

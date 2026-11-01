@@ -965,7 +965,7 @@
       "bitbucketError": "无法打开 Bitbucket 配置页面。请重试。"
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}}，作者 {{author}}",
+      "byline": "#{{number}}，作者 {{author}}",
       "cancelMessage": "这将停止正在进行的代码审查。",
       "cancelReview": "取消审查",
       "cancelTitle": "取消审查？",
@@ -1293,7 +1293,6 @@
       "noOpenFindings": "暂无需要关注的未解决安全问题",
       "noRepositoryData": "暂无仓库数据",
       "noRepositoryDataDescription": "同步安全问题后，这里将显示各仓库的处理优先级。",
-      "noSlaDeadline": "未设置 SLA 截止时间",
       "notExploitable": "不可利用",
       "notMeasured": "尚未统计",
       "notYetSynced": "尚未同步",

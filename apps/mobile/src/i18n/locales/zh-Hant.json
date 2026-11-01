@@ -965,7 +965,7 @@
       "bitbucketError": "無法開啟 Bitbucket 設定。請再試一次。"
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}}，作者 {{author}}",
+      "byline": "#{{number}}，作者 {{author}}",
       "cancelMessage": "這會停止進行中的程式碼審查。",
       "cancelReview": "取消審查",
       "cancelTitle": "要取消審查嗎？",
@@ -1293,7 +1293,6 @@
       "noOpenFindings": "沒有需要處理的未解決資安問題",
       "noRepositoryData": "尚無存放庫資料",
       "noRepositoryDataDescription": "同步資安問題後，這裡會顯示存放庫的處理優先順序。",
-      "noSlaDeadline": "未設定 SLA 期限",
       "notExploitable": "無法被利用",
       "notMeasured": "尚未評估",
       "notYetSynced": "尚未同步",

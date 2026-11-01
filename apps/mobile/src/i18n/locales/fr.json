@@ -936,7 +936,7 @@
       "bitbucketError": "Impossible d'ouvrir la configuration de Bitbucket. Réessayez."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} par {{author}}",
+      "byline": "#{{number}} par {{author}}",
       "cancelMessage": "Cela arrêtera la revue de code en cours.",
       "cancelReview": "Annuler la revue",
       "cancelTitle": "Annuler la revue ?",
@@ -1266,7 +1266,6 @@
       "noOpenFindings": "Aucun signalement ouvert ne nécessite d'intervention",
       "noRepositoryData": "Aucune donnée sur les dépôts pour le moment",
       "noRepositoryDataDescription": "Les priorités par dépôt apparaîtront après la synchronisation des signalements.",
-      "noSlaDeadline": "Aucune échéance de SLA attribuée",
       "notExploitable": "Non exploitable",
       "notMeasured": "Non mesuré",
       "notYetSynced": "Pas encore synchronisé",

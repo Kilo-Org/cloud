@@ -208,7 +208,22 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     slaMediumDays: daysValid.medium ? slaDays.medium : (baseline?.slaMediumDays ?? slaDays.medium),
     slaLowDays: daysValid.low ? slaDays.low : (baseline?.slaLowDays ?? slaDays.low),
   };
-  const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
+  // `patch` is the save payload, so it carries the saved value in place of an
+  // invalid day. The back guard must read the draft the user can see instead:
+  // an invalid-only edit would compare equal to the baseline and read as
+  // clean, and Back would discard it with no confirmation. While the toggle is
+  // off the rows are unmounted, so a hidden invalid day stays out of the
+  // comparison.
+  const draft = slaEnabled
+    ? {
+        ...patch,
+        slaCriticalDays: slaDays.critical,
+        slaHighDays: slaDays.high,
+        slaMediumDays: slaDays.medium,
+        slaLowDays: slaDays.low,
+      }
+    : patch;
+  const dirty = baseline !== null && getSettingsDirtyState(baseline, draft, valid) !== 'clean';
   useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
   const handleSave = async () => {

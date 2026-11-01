@@ -965,7 +965,7 @@
       "bitbucketError": "Bitbucket सेटअप नहीं खुल सका। कृपया फिर से कोशिश करें।"
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · लेखक: {{author}}",
+      "byline": "#{{number}} · लेखक: {{author}}",
       "cancelMessage": "इससे चल रही कोड समीक्षा रुक जाएगी।",
       "cancelReview": "समीक्षा रद्द करें",
       "cancelTitle": "समीक्षा रद्द करें?",
@@ -1293,7 +1293,6 @@
       "noOpenFindings": "ध्यान देने योग्य कोई अनसुलझी समस्या नहीं",
       "noRepositoryData": "अभी कोई रिपॉज़िटरी डेटा नहीं",
       "noRepositoryDataDescription": "समस्याएँ सिंक होने के बाद रिपॉज़िटरी की प्राथमिकताएँ दिखाई देंगी।",
-      "noSlaDeadline": "SLA की कोई समय सीमा तय नहीं",
       "notExploitable": "दुरुपयोग संभव नहीं",
       "notMeasured": "मापा नहीं गया",
       "notYetSynced": "अभी सिंक नहीं हुआ",

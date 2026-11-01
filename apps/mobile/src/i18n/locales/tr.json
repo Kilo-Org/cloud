@@ -965,7 +965,7 @@
       "bitbucketError": "Bitbucket kurulumu açılamadı. Lütfen tekrar dene."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · Oluşturan: {{author}}",
+      "byline": "#{{number}} · Oluşturan: {{author}}",
       "cancelMessage": "Devam eden kod incelemesi durdurulacak.",
       "cancelReview": "İncelemeyi iptal et",
       "cancelTitle": "İnceleme iptal edilsin mi?",
@@ -1293,7 +1293,6 @@
       "noOpenFindings": "Müdahale gerektiren açık bulgu yok",
       "noRepositoryData": "Henüz depo verisi yok",
       "noRepositoryDataDescription": "Depo öncelikleri, bulgular eşitlendikten sonra görünür.",
-      "noSlaDeadline": "SLA son tarihi belirlenmedi",
       "notExploitable": "İstismar edilemez",
       "notMeasured": "Ölçülmedi",
       "notYetSynced": "Henüz eşitlenmedi",

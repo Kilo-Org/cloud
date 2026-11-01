@@ -977,7 +977,7 @@
       "bitbucketError": "تعذّر فتح صفحة إعداد Bitbucket. حاول مرة أخرى."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} بواسطة {{author}}",
+      "byline": "#{{number}} بواسطة {{author}}",
       "cancelMessage": "سيؤدي هذا إلى إيقاف مراجعة الشفرة الجارية.",
       "cancelReview": "إلغاء المراجعة",
       "cancelTitle": "إلغاء المراجعة؟",
@@ -1313,7 +1313,6 @@
       "noOpenFindings": "لا توجد نتائج مفتوحة تستدعي الاهتمام",
       "noRepositoryData": "لا توجد بيانات للمستودعات بعد",
       "noRepositoryDataDescription": "ستظهر أولويات المستودعات بعد مزامنة النتائج.",
-      "noSlaDeadline": "لم يُحدَّد موعد نهائي حسب SLA",
       "notExploitable": "غير قابلة للاستغلال",
       "notMeasured": "غير مُقاس",
       "notYetSynced": "لم تتم المزامنة بعد",

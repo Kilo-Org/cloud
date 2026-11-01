@@ -6,7 +6,10 @@ import { readStoredValueRetryingNull } from '@/lib/auth/secure-store-read';
 // delivery is evaluated later, so without this side-effect import the token
 // would reach the no-op delivery and the card would stay orphaned.
 import '@/lib/glanceable/delivery-registration';
-import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/glanceable/persist';
+import {
+  getGlanceableSnapshotForSignedInScope,
+  restorePersistedGlanceable,
+} from '@/lib/glanceable/persist';
 import {
   ACTIVE_USER_ID_KEY,
   AUTH_TOKEN_KEY,
@@ -121,7 +124,7 @@ export async function adoptPushStartedActivity(): Promise<void> {
   // state a stray from a killed or replaced process is left in, and the early
   // return below would otherwise leave it on the Lock Screen forever.
   sweepStrayActivities();
-  const snapshot = getLastGlanceableSnapshot();
+  const snapshot = getGlanceableSnapshotForSignedInScope();
   const scope = await readStoredContext();
   await restoreFollowedSessionCards(scope);
   if (snapshot === null || scope.kind !== 'account') {

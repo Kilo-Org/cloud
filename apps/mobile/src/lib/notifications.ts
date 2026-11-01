@@ -43,6 +43,7 @@ import {
   setHomeWidgetDetails,
 } from '@/lib/glanceable/home-widget-data';
 import {
+  getGlanceableSnapshotForSignedInScope,
   getLastGlanceableSnapshot,
   getLocalScopeKey,
   persistGlanceableSink,
@@ -182,7 +183,7 @@ function scheduleGlanceableTerminalEnd(): void {
     // Eligible work published during the window restarted the activity (the
     // in-app publisher owns the foreground path and never cancels this timer);
     // do not end a restarted activity.
-    const last = getLastGlanceableSnapshot();
+    const last = getGlanceableSnapshotForSignedInScope();
     if (last !== null && isEligibleGlanceableWork(last)) {
       return;
     }
@@ -331,7 +332,7 @@ export function setupNotificationHandler() {
             // unchanged. Re-asserting it here would undo a badge iOS applied
             // from a later visible push (the same e7 clobber as an unchanged
             // re-publication), so it goes through the guarded write too.
-            syncAppBadge(getLastGlanceableSnapshot()?.needsInput ?? 0);
+            syncAppBadge(getGlanceableSnapshotForSignedInScope()?.needsInput ?? 0);
           }, 0);
         }
         return { ...suppressed, shouldSetBadge: applied };

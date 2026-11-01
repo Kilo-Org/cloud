@@ -1423,7 +1423,7 @@
       "manageAccess": "Halda juurdepääsu",
       "bitbucketNoRepositoriesDescription": "Selles Bitbucketi tööruumis pole hoidlaid saadaval.",
       "gitlabNoRepositoriesDescription": "Võimalik, et pead GitLabis andma juurdepääsu veel mõnele rühmale või projektile.",
-      "installGithubApp": "GitHubi rakenduse paigaldamine hoidlatele",
+      "installGithubApp": "GitHubi rakenduse paigaldamine",
       "installGithubAppDescription": "Anna Kilo GitHubi rakendusele juurdepääs hoidlatele, mille koodi soovid üle vaadata.",
       "repositoryAccess": "juurdepääs hoidlatele",
       "allModePersonal": "Kõik hoidlad, millele Kilol on sinu GitHubi ühenduse kaudu juurdepääs, vaadatakse automaatselt üle.",
@@ -1448,13 +1448,13 @@
       "retryNeedsSettings": "Koodiülevaataja on välja lülitatud või selle seaded vajavad tähelepanu. Paranda seaded ja proovi seejärel seda ülevaatust uuesti.",
       "retryNotStarted": "Uuestiproovimist ei õnnestunud alustada.",
       "fixSettings": "Paranda seaded",
-      "couldNotLoad": "Ülevaatust ei õnnestunud laadida.",
+      "couldNotLoad": "Ülevaatust ei õnnestunud laadida",
       "couldNotGetLatest": "Uusimaid andmeid ei õnnestunud laadida.",
-      "byline": "{{repo}} #{{number}}, autor {{author}}",
+      "byline": "#{{number}}, autor {{author}}",
       "noFindings": "Leide ei leitud.",
       "findingsUnavailable": "Tulemused pole saadaval, sest see ülevaatus ebaõnnestus.",
       "findingsInProgress": "See ülevaatus on veel käimas. Leiud ilmuvad siia, kui see lõpeb.",
-      "findingsEndedWithoutResults": "See ülevaatus lõppes, enne kui ilmus ühtegi leidu.",
+      "findingsEndedWithoutResults": "See ülevaatus lõppes, ilma et ühtegi leidu oleks ilmnenud.",
       "serviceUnavailable": "Koodi ülevaatuse teenusega ei õnnestunud ühendust luua. Proovi ülevaatust uuesti, kui teenus on saadaval.",
       "reviewFailed": "Ülevaatus ebaõnnestus. Palun proovi uuesti.",
       "showMore": "Kuva rohkem",
@@ -1496,22 +1496,22 @@
     "reviewMemory": {
       "title": "Ülevaatuste mälu",
       "loading": "Ülevaatuste mälu laadimine",
-      "couldNotLoad": "Ülevaatuste mälu ei õnnestunud laadida.",
-      "off": "Ülevaatuste mälu on välja lülitatud.",
-      "on": "Ülevaatuste mälu on sisse lülitatud.",
+      "couldNotLoad": "Ülevaatuste mälu ei õnnestunud laadida",
+      "off": "Ülevaatuste mälu on välja lülitatud",
+      "on": "Ülevaatuste mälu on sisse lülitatud",
       "offDescription": "Lülita see sisse, et Kilo saaks hooldajate vastustest õppida ja pakkuda juhiseid faili REVIEW.md.",
       "readOnlyDescription": "Ülevaatuste mälu saavad muuta ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
       "enable": "Luba ülevaatuste mälu",
       "loadingProposals": "Ettepanekute laadimine",
-      "couldNotLoadProposals": "Ettepanekuid ei õnnestunud laadida.",
+      "couldNotLoadProposals": "Ettepanekuid ei õnnestunud laadida",
       "noProposals": "Ettepanekuid pole",
       "proposalDetails": "Ettepaneku üksikasjad",
       "proposalTitle": "Ettepaneku pealkiri",
       "rationale": "Põhjendus",
       "saveFirst": "Salvesta muudatused enne tõmbetaotluse avamist.",
       "proposalSaved": "Ettepanek salvestatud",
-      "proposalDismissed": "Ettepanek tagasi lükatud",
-      "dismissProposalTitle": "Kas lükata ettepanek tagasi?",
+      "proposalDismissed": "Ettepanek hüljatud",
+      "dismissProposalTitle": "Kas hüljata ettepanek?",
       "dismissProposalMessage": "See ettepanek eemaldatakse aktiivsete ettepanekute loendist ja seda ei saa taastada.",
       "prOpened": "Faili REVIEW.md tõmbetaotlus avatud",
       "alreadyPresent": "Juhised on failis REVIEW.md juba olemas",
@@ -1527,7 +1527,7 @@
       "changeRequestNoGitHubAccess": "Ühelgi GitHubi ühendusel ei ole sellele hoidlale juurdepääsu. Ühenda GitHub uuesti nii, et sellel on juurdepääs sellele hoidlale, ja proovi seejärel uuesti.",
       "changeRequestMissingPermissions": "Kilo GitHubi rakendus ei saa selles hoidlas tõmbetaotlusi avada. Hoidla omanik peab andma rakendusele kirjutamisõiguse sisule ja tõmbetaotlustele, seejärel proovi uuesti.",
       "changeRequestFailed": "Kilol ei õnnestunud tõmbetaotlust avada. Proovi hetke pärast uuesti.",
-      "proposalConflict": "Selle sama hoidla jaoks on veel üks ülevaatuste mälu ettepanek endiselt aktiivne, mistõttu ei saa seda veel salvestada.",
+      "proposalConflict": "Selle sama hoidla jaoks on veel üks ülevaatuste mälu ettepanek endiselt aktiivne.",
       "offAction": "Ülevaatuste mälu on välja lülitatud. Lülita see sisse ja proovi uuesti."
     },
     "manualReview": {
@@ -1556,7 +1556,7 @@
     "gitlab": {
       "notConnectedReadOnly": "{{platform}} pole ühendatud. Palu organisatsiooni omanikul, administraatoril või arveldushalduril see ühendada."
     },
-    "webhookSetup": "Veebihaagi seadistamine pole lõpetatud.",
+    "webhookSetup": "Veebihaagi seadistamine pole lõpetatud",
     "webhookSetupDescription": "Mõnes hoidlas ei pruugi automaatsed ülevaatused toimuda.",
     "autoReviews": "Automaatsed ülevaatused",
     "selectRepository": "Automaatsete ülevaatuste lubamiseks vali vähemalt üks hoidla.",
@@ -1609,11 +1609,11 @@
     },
     "decision": {
       "pass": "Läbitud",
-      "block": "Blokeeri",
+      "block": "Blokeeritud",
       "noDecision": "Otsust pole",
       "noResult": "Tulemust pole"
     },
-    "updateFailed": "Koodiülevaataja uuendamine ebaõnnestus.",
+    "updateFailed": "Koodiülevaataja uuendamine ebaõnnestus",
     "configSaveFailed": "Ülevaatuse seadete salvestamine ebaõnnestus.",
     "status": {
       "interrupted": "Katkestatud"
@@ -1657,7 +1657,7 @@
       "repeatedRepositoryCloneTimeout": {
         "description": "Koodiülevaataja lülitati välja, sest hoidla kloonimine ületas täna kolm korda ajalimiidi. Küsi abi aadressil {{supportEmail}} ja lülita seejärel koodiülevaataja uuesti sisse."
       },
-      "title": "Koodiülevaataja vajab tähelepanu.",
+      "title": "Koodiülevaataja vajab tähelepanu",
       "recoveryLabel": "Võta ühendust toega"
     },
     "unknownError": "Tundmatu viga"
@@ -1766,7 +1766,6 @@
       "noImmediateAction": "Kohest tegevust pole vaja",
       "notExploitable": "Pole ärakasutatav",
       "needsYourReview": "Vajab sinu ülevaatamist",
-      "noSlaDeadline": "SLA tähtaega pole määratud",
       "noRepositoryData": "Hoidla andmeid pole veel",
       "noRepositoryDataDescription": "Hoidla prioriteedid ilmuvad pärast leidude sünkroonimist.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
@@ -3371,11 +3370,11 @@
   },
   "models": {
     "auto": {
-      "frontier": "Automaatne Tipptasemel",
-      "balanced": "Automaatne Tasakaalustatud",
-      "efficient": "Automaatne Tõhus",
-      "small": "Automaatne Väike",
-      "free": "Automaatne Tasuta",
+      "frontier": "Automaatne tipptasemel",
+      "balanced": "Automaatne tasakaalustatud",
+      "efficient": "Automaatne tõhus",
+      "small": "Automaatne väike",
+      "free": "Automaatne tasuta",
       "organization": "Organisatsiooni automaatne"
     },
     "dataCollected": "Andmeid kogutakse",
@@ -3612,7 +3611,7 @@
       "discoverySucceeded": "Mudelid leitud. Vali allpool, millised lisada.",
       "discoveryFailed": "Mudelite otsimine ebaõnnestus või pole toetatud. Sinu käsitsi lisatud mudelid jäid muutmata.",
       "checkConnection": "Testi ühendust mudeliga",
-      "checkHelp": "$t(modelChat.backends.checkConnection) saadab sellele lõpp-punktile lühikese järelduspäringu, kasutades valitud protokolli ja mudelit. Teenusepakkuja võib selle eest tasu küsida.",
+      "checkHelp": "Nupp „$t(modelChat.backends.checkConnection)“ saadab sellele lõpp-punktile lühikese järelduspäringu, kasutades valitud protokolli ja mudelit. Teenusepakkuja võib selle eest tasu küsida.",
       "connectionSucceeded": "Mudel täitis päringu selle protokolli abil.",
       "connectionFailed": "Mudel ei suutnud päringut täita. Kontrolli API juur-URL-i, protokolli, autentimisandmeid ja mudeli ID-d.",
       "invalidInput": "Sisesta taustsüsteemi nimi, kehtivad päised ja vähemalt üks kordumatu ID ja nimega mudel. Tokenite piirangud peavad olema positiivsed täisarvud.",
@@ -3637,7 +3636,7 @@
     },
     "gguf": {
       "title": "Allalaaditavad mudelid",
-      "help": "Laadi avatud mudel alla ja käivita see selles telefonis programmiga llama.cpp. Sinu päringud ja vastused jäävad seadmesse. Mudelid on suured, seega kasuta Wi-Fi-t.",
+      "help": "Laadi avatud mudel alla ja käivita see selles telefonis programmiga llama.cpp. Sinu viibad ja vastused jäävad seadmesse. Mudelid on suured, seega kasuta Wi-Fi-t.",
       "download": "Laadi mudel alla",
       "pause": "Peata allalaadimine",
       "resume": "Jätka allalaadimist",
@@ -3661,7 +3660,7 @@
         "space": "Selle mudeli jaoks pole piisavalt vaba salvestusruumi. Vabasta ruumi ja proovi uuesti.",
         "network": "Allalaadimine ei lõppenud. Kontrolli ühendust ja proovi uuesti.",
         "invalidFile": "Allalaaditud fail ei ole mudel, mida see rakendus saab käivitada, seega see eemaldati.",
-        "checksum": "Allalaaditud fail ei vasta avaldatud kontrollsummale, seega see eemaldati. Proovige uuesti alla laadida."
+        "checksum": "Allalaaditud fail ei vasta avaldatud kontrollsummale, seega see eemaldati. Proovi uuesti alla laadida."
       }
     },
     "catalog": {
@@ -3708,14 +3707,14 @@
       "loadingModel": "Mudeli üksikasjade laadimine",
       "couldNotLoadModel": "Seda mudelit ei õnnestunud laadida",
       "noFiles": "Pole faile, mida see rakendus käitada saaks",
-      "noFilesDescription": "See rakendus käitab mudeleid, mis koosnevad ühest GGUF-failist.",
+      "noFilesDescription": "See rakendus käitab mudeleid, mis koosnevad ühest täielikust GGUF-failist, ja see hoidla ei paku ühtegi sellist faili.",
       "tooLargeTitle": "See mudel ei pruugi töötada",
       "tooLargeMessage": "{{name}} vajab tõenäoliselt rohkem mälu, kui selles seadmes on. Rakendus võib mudeli vastamise ajal sulguda. Kas laadida see ikkagi alla?",
       "downloadAnyway": "Laadi ikkagi alla"
     },
     "localModels": {
       "title": "Seadmesisesed mudelid",
-      "help": "Seadmesisesed mudelid töötavad selles telefonis. Sinu päringud ja vastused jäävad seadmesse.",
+      "help": "Seadmesisesed mudelid töötavad selles telefonis. Sinu viibad ja vastused jäävad seadmesse.",
       "switchTitle": "Kas minna üle seadmesisesele mudelile?",
       "switchMessage": "Mudelile {{name}} üleminekul töödeldakse selle vestluse viipasid ja konteksti selles telefonis, mitte kaugserveris.",
       "switchConfirm": "Vaheta mudelit",
@@ -3731,7 +3730,7 @@
         "unsupportedOs": "See mudel nõuab iOS 26 või uuemat versiooni.",
         "unknown": "Süsteem ei teatanud, miks see mudel pole saadaval.",
         "androidUnsupportedOs": "Gemini Nano ei toeta seda Androidi versiooni.",
-        "androidModelUnavailable": "See seade ei toeta Gemini Nanot või AICore'i süsteemirakendust alles seadistatakse. Proovi hiljem uuesti.",
+        "androidModelUnavailable": "See seade ei toeta Gemini Nanot või on AICore'i süsteemirakendus alles seadistamisel. Proovi hiljem uuesti.",
         "aicoreUpdateRequired": "Selle mudeli kasutamiseks värskenda AICore'i rakendust ja süsteemitarkvara.",
         "downloadable": "Enne kasutamist tuleb see mudel ühekordselt alla laadida.",
         "downloading": "Mudelit laaditakse alla. See on kasutusvalmis, kui allalaadimine lõpeb."

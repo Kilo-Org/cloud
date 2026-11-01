@@ -20,11 +20,13 @@ type McpServerRowProps = Readonly<{
 }>;
 
 /**
- * One MCP server row: the name in mono, its type, the command/URL summary, the
- * enabled switch and a lock badge with the masked env/header key count. The
- * name is painted only and hidden from assistive technology, so the switch's
- * label stays the only element a screen reader matches by the server's name;
- * the type, summary and key count keep their own stops because they say what
+ * One MCP server row: the name in mono, its type and key count on the line under
+ * it, the command/URL summary, the enabled switch and the edit/delete controls.
+ * The name owns its line, so it is ellipsized only when it alone is wider than the
+ * card; the type and the count are metadata and never take the room a short name
+ * needs. The name is painted only and hidden from assistive technology, so the
+ * switch's label stays the only element a screen reader matches by the server's
+ * name; the type, summary and key count keep their own stops because they say what
  * the name does not.
  */
 export function McpServerRowView({
@@ -44,10 +46,10 @@ export function McpServerRowView({
   return (
     <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="min-w-0 flex-1 gap-0.5">
+        <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS} className="min-w-0 shrink">
+          {server.name}
+        </Text>
         <View className="flex-row items-center gap-2">
-          <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS} className="shrink">
-            {server.name}
-          </Text>
           <Text className="text-xs uppercase tracking-wide text-muted-foreground">{typeLabel}</Text>
           {secretLabel === null ? null : (
             <View className="flex-row items-center gap-0.5">

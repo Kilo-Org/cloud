@@ -936,7 +936,7 @@
       "bitbucketError": "Não foi possível abrir a configuração do Bitbucket. Tente novamente."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} por {{author}}",
+      "byline": "#{{number}} por {{author}}",
       "cancelMessage": "Isso interromperá a revisão de código em andamento.",
       "cancelReview": "Cancelar revisão",
       "cancelTitle": "Cancelar revisão?",
@@ -1266,7 +1266,6 @@
       "noOpenFindings": "Nenhuma ocorrência em aberto precisa de atenção",
       "noRepositoryData": "Ainda não há dados dos repositórios",
       "noRepositoryDataDescription": "As prioridades dos repositórios aparecerão após a sincronização das ocorrências.",
-      "noSlaDeadline": "Nenhum prazo de SLA definido",
       "notExploitable": "Não explorável",
       "notMeasured": "Não medido",
       "notYetSynced": "Ainda não sincronizado",

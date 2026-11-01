@@ -971,7 +971,7 @@
       "bitbucketError": "Не вдалося відкрити налаштування Bitbucket. Спробуйте ще раз."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} від {{author}}",
+      "byline": "#{{number}} від {{author}}",
       "cancelMessage": "Це зупинить поточну перевірку коду.",
       "cancelReview": "Скасувати перевірку",
       "cancelTitle": "Скасувати перевірку?",
@@ -1303,7 +1303,6 @@
       "noOpenFindings": "Немає відкритих проблем, що потребують уваги",
       "noRepositoryData": "Даних про репозиторії ще немає",
       "noRepositoryDataDescription": "Пріоритети репозиторіїв з'являться після синхронізації проблем.",
-      "noSlaDeadline": "Термін за SLA не встановлено",
       "notExploitable": "Експлуатація неможлива",
       "notMeasured": "Не виміряно",
       "notYetSynced": "Ще не синхронізовано",

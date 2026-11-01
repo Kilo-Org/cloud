@@ -965,7 +965,7 @@
       "bitbucketError": "Bitbucket 설정을 열 수 없습니다. 다시 시도하세요."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · {{author}}",
+      "byline": "#{{number}} · {{author}}",
       "cancelMessage": "진행 중인 코드 리뷰가 중지됩니다.",
       "cancelReview": "리뷰 취소",
       "cancelTitle": "리뷰를 취소할까요?",
@@ -1293,7 +1293,6 @@
       "noOpenFindings": "조치가 필요한 미해결 문제 없음",
       "noRepositoryData": "아직 저장소 데이터 없음",
       "noRepositoryDataDescription": "발견된 문제가 동기화되면 저장소별 우선순위가 표시됩니다.",
-      "noSlaDeadline": "SLA 마감일 미지정",
       "notExploitable": "악용 불가",
       "notMeasured": "측정되지 않음",
       "notYetSynced": "아직 동기화 안 됨",

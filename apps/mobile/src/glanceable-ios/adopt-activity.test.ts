@@ -26,6 +26,7 @@ vi.mock('@/lib/glanceable/delivery-registration', () => ({}));
 vi.mock('expo-secure-store', () => ({ getItemAsync: mocks.getItemAsync }));
 vi.mock('@/lib/glanceable/persist', () => ({
   getLastGlanceableSnapshot: mocks.getLastGlanceableSnapshot,
+  getGlanceableSnapshotForSignedInScope: mocks.getLastGlanceableSnapshot,
   restorePersistedGlanceable: mocks.restorePersistedGlanceable,
 }));
 vi.mock('./ios-sink', () => ({

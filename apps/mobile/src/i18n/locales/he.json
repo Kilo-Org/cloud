@@ -968,7 +968,7 @@
       "bitbucketError": "לא ניתן לפתוח את הגדרות Bitbucket. נסה שוב."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} מאת {{author}}",
+      "byline": "#{{number}} מאת {{author}}",
       "cancelMessage": "הפעולה תעצור את סקירת הקוד שמתבצעת כעת.",
       "cancelReview": "ביטול הסקירה",
       "cancelTitle": "לבטל את הסקירה?",
@@ -1298,7 +1298,6 @@
       "noOpenFindings": "אין ממצאים פתוחים שדורשים טיפול",
       "noRepositoryData": "אין עדיין נתוני מאגר",
       "noRepositoryDataDescription": "סדרי העדיפויות לטיפול במאגרים יופיעו לאחר סנכרון הממצאים.",
-      "noSlaDeadline": "לא נקבע מועד אחרון לפי SLA",
       "notExploitable": "לא ניתן לניצול",
       "notMeasured": "לא נמדד",
       "notYetSynced": "עדיין לא סונכרן",

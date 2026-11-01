@@ -11,6 +11,7 @@ const githubBase = {
   isLoading: false,
   connected: true,
   reconnectRequired: false,
+  instanceMismatch: false,
   organizationId: null,
   organizationSelectionLoaded: true,
 };
@@ -53,6 +54,7 @@ describe('selectPrReviewGateView — GitLab (personal and org)', () => {
       isLoading: false,
       connected: true,
       reconnectRequired: false,
+      instanceMismatch: false,
       organizationId,
       organizationSelectionLoaded: true,
     };
@@ -91,6 +93,25 @@ describe('selectPrReviewGateView — GitLab (personal and org)', () => {
         'loading'
       );
     });
+
+    it(`scope ${organizationId ?? 'personal'}: a live connection to another instance explains the mismatch`, () => {
+      expect(selectPrReviewGateView({ ...base, instanceMismatch: true })).toBe('instance-mismatch');
+    });
+
+    it(`scope ${organizationId ?? 'personal'}: the mismatch never outranks a failed or pending check`, () => {
+      expect(selectPrReviewGateView({ ...base, instanceMismatch: true, isError: true })).toBe(
+        'error'
+      );
+      expect(selectPrReviewGateView({ ...base, instanceMismatch: true, isLoading: true })).toBe(
+        'loading'
+      );
+    });
+
+    it(`scope ${organizationId ?? 'personal'}: a missing connection asks to connect, not about an instance`, () => {
+      expect(selectPrReviewGateView({ ...base, instanceMismatch: true, connected: false })).toBe(
+        'connect'
+      );
+    });
   }
 });
 
@@ -101,6 +122,7 @@ describe('selectPrReviewGateView — Bitbucket', () => {
     isLoading: false,
     connected: true,
     reconnectRequired: false,
+    instanceMismatch: false,
     organizationId: 'org_1',
     organizationSelectionLoaded: true,
   };
@@ -176,6 +198,7 @@ describe('selectPrReviewGateView — Bitbucket', () => {
         isLoading: true,
         connected: false,
         reconnectRequired: false,
+        instanceMismatch: false,
         organizationId: null,
         organizationSelectionLoaded: true,
       })
@@ -195,6 +218,7 @@ describe('selectPrReviewGateView — Bitbucket', () => {
             isLoading: false,
             connected,
             reconnectRequired: !connected,
+            instanceMismatch: false,
             organizationId: null,
             organizationSelectionLoaded: false,
           })

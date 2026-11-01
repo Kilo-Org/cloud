@@ -1069,14 +1069,16 @@ export async function getIntegrationForOwner(
   return integration || null;
 }
 
-/** Connection-status shape consumed by the reviewer status surfaces. */
+/**
+ * Connection-status shape consumed by the reviewer status surfaces. `connected`
+ * already implies health: an unhealthy row resolves to `integration: null`.
+ */
 export type GitHubConnectionStatus = {
   connected: boolean;
   integration: {
     accountLogin: string | null;
     repositorySelection: string | null;
     installedAt: string | null;
-    isValid: boolean;
   } | null;
 };
 
@@ -1122,7 +1124,6 @@ export async function getGitHubConnectionStatusForOwner(
       accountLogin: integration.platform_account_login,
       repositorySelection: integration.repository_access,
       installedAt: integration.installed_at,
-      isValid: !integration.suspended_at,
     },
   };
 }

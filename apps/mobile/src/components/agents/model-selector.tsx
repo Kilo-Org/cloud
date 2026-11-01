@@ -343,15 +343,10 @@ export function ModelPickerOptionRow({
               </Text>
             ) : null}
             {showFreeBadge || byok || collectsData || tools || images ? (
-              // The badges are decoration on the row's identity, so an
-              // unavailable row still dims them; the name and the
-              // `unavailable` line above stay at full contrast.
-              <View
-                className={cn(
-                  'mt-1 flex-row items-center gap-1 self-start',
-                  option.unavailable && 'opacity-50'
-                )}
-              >
+              // The badges state facts about the model, not an affordance, so
+              // an unavailable row leaves their copy at full contrast: the
+              // row's cue is its muted name and the `unavailable` line.
+              <View className="mt-1 flex-row items-center gap-1 self-start">
                 {showFreeBadge ? (
                   <View className="rounded-full bg-good px-2 py-0.5">
                     <Text className="text-[11px] font-medium text-good-foreground">

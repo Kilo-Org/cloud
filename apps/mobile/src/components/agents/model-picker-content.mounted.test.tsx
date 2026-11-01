@@ -31,6 +31,9 @@ const slotState = vi.hoisted(() => ({ bridge: undefined as unknown }));
 const safeAreaInsets = vi.hoisted(() => ({ bottom: 0 }));
 
 const routerBack = vi.hoisted(() => vi.fn());
+// The keyboard the applied pick closes. Recorded so a test can prove the pick
+// takes the search field's keyboard with it instead of leaving it up.
+const keyboardDismiss = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/model-picker-rows', async importOriginal => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -107,6 +110,7 @@ vi.mock('@shopify/flash-list', async () => {
 vi.mock('react-native', () => ({
   // `withRtlInputAlignment` reads I18nManager on every render.
   I18nManager: { isRTL: false },
+  Keyboard: { dismiss: keyboardDismiss },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
@@ -546,6 +550,68 @@ describe('ModelPickerContent deferred search', () => {
     // would double the reserved space.
     expect(list.props.contentContainerStyle).toBeUndefined();
     /* eslint-enable typescript-eslint/no-unsafe-member-access */
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+// A row press taken from filtered results must apply in one press, with the
+// search field's keyboard closed as part of the pick — the same outcome as a
+// pick taken with the keyboard already dismissed.
+/**
+ * The press the real row's Pressable performs, and the option it belongs to.
+ * One named narrow of react-test-renderer's index-signature props.
+ */
+function rowProps(node: TestRenderer.ReactTestInstance): {
+  option: SessionModelOption;
+  onSelectModel: (option: SessionModelOption) => void;
+} {
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  return {
+    option: node.props.option as SessionModelOption,
+    onSelectModel: node.props.onSelectModel as (option: SessionModelOption) => void,
+  };
+  /* eslint-enable typescript-eslint/no-unsafe-member-access */
+}
+
+describe('ModelPickerContent pick while searching', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    buildSearchCalls.values.length = 0;
+    listCommitLengths.values.length = 0;
+    slotState.bridge = { ...makeBridge(), currentValue: 'remote-model-0' };
+    safeAreaInsets.bottom = 0;
+    routerBack.mockClear();
+    keyboardDismiss.mockClear();
+  });
+
+  it('applies the row it was pressed on and closes the keyboard with it', async () => {
+    const renderer = await mount();
+
+    await act(async () => {
+      typeSearch(renderer, FINAL_QUERY);
+      await Promise.resolve();
+    });
+    expect(listedDisplayIds(renderer)).toHaveLength(FINAL_MATCH_COUNT);
+
+    const target = findByType(renderer.root, 'ModelPickerOptionRow').find(
+      node => rowProps(node).option.displayId === 'model-170'
+    );
+    if (!target) {
+      throw new Error('the searched row was not rendered');
+    }
+
+    await act(async () => {
+      rowProps(target).onSelectModel(rowProps(target).option);
+      await Promise.resolve();
+    });
+
+    // One press applies the choice: a single-variant model closes the sheet,
+    // and the keyboard that was up for the search goes with the pick.
+    expect(routerBack).toHaveBeenCalledTimes(1);
+    expect(keyboardDismiss).toHaveBeenCalledTimes(1);
 
     act(() => {
       renderer.unmount();

@@ -59,7 +59,10 @@ unavailable signing secret returns 503, so ordinary bounded-backoff reconnect re
   New allocations with a compatible wrapper share one Kilo runtime per directory.
   Existing allocations retain their original `runtimeIsolation` and HOME keys until normal replacement.
   Profile MCP, environment values, secrets, skills, agents, commands and setup commands
-  initialize once per shared runtime. Sibling attachments reuse that configuration.
+  belong to the workspace runtime. MCP and the other workspace configuration initialize once,
+  when the workspace is created; a rehydrated workspace restores its stored configuration.
+  Sibling chats attach to that configuration and do not get a per-chat copy. Independent
+  workspaces remain isolated.
 - Compatible routes reference one Sandbox-owned credential scope. Scope membership includes every
   eligible root Kilo session. Shared runtimes use **one handle per worktree scope**.
   Existing allocations retain per-session handles. A modern grant never merges with a legacy grant.
@@ -1126,17 +1129,38 @@ before queuing work. Contained SCM resolution and Vercel policy remain enforced.
 Every `session.attach` carries the route's workspace configuration. The wrapper's preparation
 manager owns the decision: while another route holds the runtime key, the attachment uses the
 retained configuration and the offered one is ignored. When no route holds the key, the offered
-configuration replaces the retained one. The last route's release drops it. The Sandbox DO keeps no
-per-socket record of sent configuration, so hibernation does not change the result.
+configuration establishes the workspace configuration, or restores it when the workspace is
+rehydrated. Every later sibling attachment reuses that configuration and does not reconfigure it
+per chat. The last route's release drops the runtime's in-memory copy. The Sandbox DO keeps no
+per-socket record of sent configuration, so hibernation does not change the result. Independent
+workspace runtime keys remain isolated.
 The runtime still rejects profile MCP drift on legacy preparation paths.
 
 The built-in `kilo-cloud-agent` MCP server uses workspace authority. The worktree UUID identifies
-its original root chat, which remains the authorization anchor for the existing child-session API.
-Every grant renewal checks that root's authorization and its owner, organization and worktree.
-Deleting or revoking the root disables new grants; another sibling never becomes the anchor.
-Children and parent callbacks belong to that root, not necessarily the chat invoking MCP.
-The MCP transport does not send the invoking chat's identity. Built-in credential rotation is
-not profile MCP drift.
+the canonical workspace parent, the original root chat that remains the authorization anchor for
+the existing child-session API. Every grant renewal checks that root's authorization and its owner,
+organization and worktree. Deleting or revoking the root disables new grants; another sibling never
+becomes the anchor. Children and parent callbacks belong to that root, not necessarily the chat
+invoking MCP. The MCP transport does not send the invoking chat's identity. Built-in credential
+refresh rotates the workspace MCP credential; it is not profile MCP drift and does not reconfigure
+the workspace's MCP set.
+
+The scoped connection can create children, list direct children, inspect a child, read an exact
+message result, interrupt a child, and send a prompt follow-up. The personal and organization
+procedures are `prepareSession`, `listChildSessions`, `getSession`, `getMessageResult`,
+`interruptSession`, and `sendMessage`. Management revalidates the canonical parent's current
+authorization and the target's persisted spawn lineage, owner and organization; the parent itself,
+sibling chats and unrelated sessions are not valid targets. Follow-ups require a stable message ID
+and cannot change callbacks, runtime configuration or delegation lifetime. Interrupt stops work;
+it does not delete the child workspace.
+
+The parent Session DO durably indexes newly created children for bounded, cursor-paginated listing.
+Registry entries are discovery hints: every returned child is reauthorized, and database or DO
+outages fail the query rather than reporting an empty list. An empty page can still have a
+`nextCursor` when its entries no longer authorize. Children created before this index was introduced
+are not backfilled; explicit management by ID still checks their lineage and remains supported.
+Message-result queries preserve terminal assistant output and safe failure details. Prefer completion
+callbacks; bounded status checks are supported, but busy polling is not needed.
 
 Sandbox DO ↔ wrapper (WebSocket frames): `hello`, `welcome`, `shutdown`, `heartbeat`, `heartbeat_ack`,
 `session.prepare`, `session.progress`, `session.ready`, `session.failed`, `workspace.capture` and

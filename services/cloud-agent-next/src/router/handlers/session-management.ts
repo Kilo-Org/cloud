@@ -8,7 +8,12 @@ import { fetchSessionMetadata } from '../../session/metadata.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { interruptControlSession } from '../control-plane-session.js';
-import { protectedProcedure, publicProcedure, internalApiProtectedProcedure } from '../auth.js';
+import {
+  protectedProcedure,
+  publicProcedure,
+  internalApiProtectedProcedure,
+  cloudAgentManagedProcedure,
+} from '../auth.js';
 import {
   sessionIdSchema,
   MessageIdSchema,
@@ -241,7 +246,7 @@ export function createSessionManagementHandlers() {
      * The DO may signal a connected wrapper immediately and durably supervises
      * physical cleanup without letting this route issue provider teardown.
      */
-    interruptSession: protectedProcedure
+    interruptSession: cloudAgentManagedProcedure
       .input(
         z.object({
           sessionId: sessionIdSchema.describe('Session ID to interrupt'),
@@ -365,7 +370,7 @@ export function createSessionManagementHandlers() {
      * - Excludes: githubToken, gitToken, envVars values, setupCommands, mcpServers configs
      * - Includes: counts of envVars, setupCommands, mcpServers for debugging
      */
-    getSession: protectedProcedure
+    getSession: cloudAgentManagedProcedure
       .input(GetSessionInput)
       .output(GetSessionOutput)
       .query(async ({ input, ctx }) => {
@@ -688,7 +693,7 @@ export function createSessionManagementHandlers() {
         });
       }),
 
-    getMessageResult: protectedProcedure
+    getMessageResult: cloudAgentManagedProcedure
       .input(GetMessageResultInput)
       .output(GetMessageResultOutput)
       .query(async ({ input, ctx }) => {

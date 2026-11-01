@@ -6,6 +6,7 @@ import type { HonoContext } from '../hono-context.js';
 import type { Env } from '../types.js';
 import type * as BalanceValidationModule from '../balance-validation.js';
 import type * as LoggerModule from '../logger.js';
+import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 
 const { requireCurrentSessionAccessMock } = vi.hoisted(() => ({
   requireCurrentSessionAccessMock: vi.fn(),
@@ -37,12 +38,28 @@ const { balanceMiddleware } = await import('./balance.js');
 const { fetchOrgIdForSession, validateBalanceOnly } = await import('../balance-validation.js');
 const { createSessionManagementHandlers } =
   await import('../router/handlers/session-management.js');
-const { protectedProcedure, router } = await import('../router/auth.js');
+const { protectedProcedure, router, t } = await import('../router/auth.js');
 
 const INTERNAL_API_SECRET = 'internal-api-secret';
 
 describe('balanceMiddleware', () => {
   const env = {} as Env;
+  const authority = (overrides: Partial<CloudAgentAuthority> = {}): CloudAgentAuthority => ({
+    version: 1,
+    ownerId: 'user-123',
+    parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+    organizationId: null,
+    authorizationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    ...overrides,
+  });
+  const parentTokenEnv = (getToken: ReturnType<typeof vi.fn>) =>
+    ({
+      SANDBOX_SESSION: {
+        idFromName: (name: string) => name,
+        get: () => ({ getCloudAgentSpawnRuntimeToken: getToken }),
+      },
+    }) as unknown as Env;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -53,11 +70,12 @@ describe('balanceMiddleware', () => {
     });
   });
 
-  function createApp() {
+  function createApp(authority?: CloudAgentAuthority) {
     const app = new Hono<HonoContext>();
     app.use('/trpc/*', async (c, next) => {
       c.set('userId', 'user-123');
       c.set('authToken', 'token-123');
+      if (authority) c.set('cloudAgentAuthority', authority);
       await next();
     });
     app.use('/trpc/*', balanceMiddleware);
@@ -78,7 +96,7 @@ describe('balanceMiddleware', () => {
     );
   }
 
-  function createTrpcApp() {
+  function createTrpcApp(authority?: CloudAgentAuthority) {
     const calls: string[] = [];
     const sendInputs: unknown[] = [];
     const testRouter = router({
@@ -90,6 +108,13 @@ describe('balanceMiddleware', () => {
         .input(value => value)
         .mutation(({ ctx, input }) => {
           calls.push('send');
+          sendInputs.push(input);
+          return { ok: true, validatedSessionAccess: ctx.validatedSessionAccess };
+        }),
+      sendMessageV2: t.procedure
+        .input(value => value)
+        .mutation(({ ctx, input }) => {
+          calls.push('sendMessageV2');
           sendInputs.push(input);
           return { ok: true, validatedSessionAccess: ctx.validatedSessionAccess };
         }),
@@ -107,6 +132,7 @@ describe('balanceMiddleware', () => {
     app.use('/trpc/*', async (c, next) => {
       c.set('userId', 'user-123');
       c.set('authToken', 'token-123');
+      if (authority) c.set('cloudAgentAuthority', authority);
       await next();
     });
     app.use('/trpc/*', balanceMiddleware);
@@ -118,6 +144,7 @@ describe('balanceMiddleware', () => {
           env: c.env,
           userId: c.get('userId'),
           authToken: c.get('authToken'),
+          cloudAgentAuthority: c.get('cloudAgentAuthority'),
           request: c.req.raw,
         }),
       })
@@ -140,6 +167,104 @@ describe('balanceMiddleware', () => {
       options.requestEnv ?? env
     );
   }
+
+  it('uses the current parent runtime token for a scoped follow-up balance check', async () => {
+    const getToken = vi.fn().mockResolvedValue('parent-runtime-token');
+    const scoped = authority();
+    const { app, calls } = createTrpcApp(scoped);
+    const requestEnv = parentTokenEnv(getToken);
+
+    const response = await postTrpcApp(
+      app,
+      '/trpc/sendMessageV2',
+      {
+        cloudAgentSessionId: 'workspace_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+        payload: { type: 'prompt', prompt: 'follow up', mode: 'code', model: 'test/model' },
+      },
+      { requestEnv }
+    );
+
+    expect(response.status).toBe(200);
+    expect(calls).toEqual(['sendMessageV2']);
+    expect(getToken).toHaveBeenCalledWith(scoped);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('parent-runtime-token', undefined, requestEnv);
+  });
+
+  it('uses the exact organization and parent token for an organization follow-up', async () => {
+    const scoped = authority({ organizationId: 'org-scoped' });
+    requireCurrentSessionAccessMock.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      organizationId: 'org-scoped',
+    });
+    const getToken = vi.fn().mockResolvedValue('parent-runtime-token');
+    const { app, calls } = createTrpcApp(scoped);
+    const requestEnv = parentTokenEnv(getToken);
+
+    const response = await postTrpcApp(
+      app,
+      '/trpc/sendMessageV2',
+      {
+        cloudAgentSessionId: 'workspace_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+        payload: { type: 'prompt', prompt: 'follow up', mode: 'code', model: 'test/model' },
+        organizationId: 'org-scoped',
+      },
+      { requestEnv }
+    );
+
+    expect(response.status).toBe(200);
+    expect(calls).toEqual(['sendMessageV2']);
+    expect(validateBalanceOnly).toHaveBeenCalledWith(
+      'parent-runtime-token',
+      'org-scoped',
+      requestEnv
+    );
+  });
+
+  it.each([
+    ['denied', new Error('Cloud Agent parent authority denied'), 403],
+    ['revoked', new Error('Cloud Agent parent authority denied'), 403],
+    ['transient', new Error('Durable Object unavailable'), 503],
+  ])('does not send when the parent token is %s', async (_name, error, status) => {
+    const getToken = vi.fn().mockRejectedValue(error);
+    const { app, calls } = createTrpcApp(authority());
+
+    const response = await postTrpcApp(
+      app,
+      '/trpc/sendMessageV2',
+      {
+        cloudAgentSessionId: 'workspace_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+        payload: { type: 'prompt', prompt: 'follow up', mode: 'code', model: 'test/model' },
+      },
+      { requestEnv: parentTokenEnv(getToken) }
+    );
+
+    expect(response.status).toBe(status);
+    expect(calls).toEqual([]);
+    expect(validateBalanceOnly).not.toHaveBeenCalled();
+  });
+
+  it('rejects a scoped follow-up whose context user is not the authority owner', async () => {
+    const getToken = vi.fn().mockResolvedValue('parent-runtime-token');
+    const { app, calls } = createTrpcApp(authority({ ownerId: 'other-user' }));
+
+    const response = await postTrpcApp(
+      app,
+      '/trpc/sendMessageV2',
+      {
+        cloudAgentSessionId: 'workspace_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+        payload: { type: 'prompt', prompt: 'follow up', mode: 'code', model: 'test/model' },
+      },
+      { requestEnv: parentTokenEnv(getToken) }
+    );
+
+    expect(response.status).toBe(403);
+    expect(calls).toEqual([]);
+    expect(getToken).not.toHaveBeenCalled();
+  });
 
   it('rejects a public balance bypass header before checking a paid mutation', async () => {
     vi.mocked(validateBalanceOnly).mockResolvedValue({

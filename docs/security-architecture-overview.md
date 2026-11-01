@@ -60,7 +60,7 @@ Kilo Cloud combines a web control plane with Cloudflare-hosted service component
 - A Vercel-hosted Next.js application provides account management, organization authorization, billing, product configuration, and API orchestration.
 - Cloudflare Workers provide feature-specific ingress, authenticated internal service communication, queue-backed workflows, durable coordination, real-time streams, and selected sandbox orchestration.
 - Managed PostgreSQL stores relational control-plane records. Cloudflare Durable Objects, queues, KV, R2 object storage, and optional specialized stores support scoped state, event processing, caching, and feature-specific content storage.
-- Cloud Agent coding sessions execute in isolated Cloudflare sandbox containers coordinated on a per-session basis.
+- Cloud Agent coding sessions execute in Cloudflare sandbox containers coordinated per session. Sibling chats in one workspace share its runtime and MCP configuration. Independent workspaces have separate runtimes and HOME directories; isolated allocations also use separate containers, while shared allocations can host multiple workspaces.
 - KiloClaw assistant instances run in owner-scoped, provider-backed runtimes with instance-scoped persistent storage and encrypted configuration delivery.
 - External providers may be invoked as platform dependencies, operational services, enabled product capabilities, or customer-selected integrations. Active providers and processing paths must be validated against the live production inventory.
 
@@ -141,7 +141,7 @@ flowchart LR
 | Web control plane | Next.js application hosted on Vercel | Identity, organization authorization, billing, configuration, and API orchestration |
 | Cloud service layer | Cloudflare Workers connected through feature-specific ingress and service bindings | Authenticated APIs, asynchronous workflows, durable coordination, streaming, and integration delivery |
 | Managed persistence | PostgreSQL, Durable Object storage, queues, object storage, caches, and feature-specific analytical stores | Scoped application records, durable state, reliable background processing, and operational telemetry |
-| Cloud Agent execution | Session-scoped sandbox containers | Isolated coding-task execution with authorized repository and model access |
+| Cloud Agent execution | Sandbox containers with workspace-scoped runtimes | Authorized repository and model access; sibling chats share runtime and MCP configuration; shared allocations can host multiple workspaces |
 | KiloClaw execution | Owner-scoped provider-backed runtimes with persistent storage | Dedicated assistant runtime with scoped configuration and lifecycle coordination |
 | External providers | Identity, source-control, model, billing, messaging, telemetry, and optional tool providers | Explicit third-party trust boundaries invoked by enabled capabilities |
 
@@ -167,7 +167,7 @@ flowchart TB
   end
 
   subgraph boundaryD["Boundary D: Scoped Execution"]
-    sandbox["Session-scoped Cloud Agent sandbox"]
+    sandbox["Cloud Agent sandbox with workspace-scoped runtimes"]
     assistantRuntime["Owner-scoped assistant runtime"]
   end
 
@@ -392,7 +392,7 @@ Externally reachable ingestion exists only for feature-specific purposes. Exampl
 | Authorization | User, organization, role, and administrative checks applied according to the operation |
 | Abuse prevention | Turnstile login checks, fraud telemetry, client blocking logic, bounded payload handling on selected external ingress, and deployment threat scanning |
 | Internal service separation | Cloudflare service bindings, scoped callback tokens, and service credentials separate public access from internal orchestration |
-| Execution isolation | Session-scoped Cloud Agent sandboxes and owner-scoped KiloClaw runtimes separate untrusted task execution from the web control plane |
+| Execution isolation | Cloud Agent sandbox containers with workspace-scoped runtimes and owner-scoped KiloClaw runtimes separate untrusted task execution from the web control plane |
 | Secret handling | Protected configuration storage, encrypted delivery for supported runtime secrets, fail-closed bootstrap behavior, and logging prohibitions for sensitive values |
 | Data minimization and privacy | Soft-delete and anonymization workflows, redacted webhook headers, explicit experiment opt-in paths, and retention exceptions documented by purpose |
 | Reliability and integrity | Durable coordination, queue-backed workflows, retries, dead-letter patterns, idempotency handling, and instance reconciliation where applicable |

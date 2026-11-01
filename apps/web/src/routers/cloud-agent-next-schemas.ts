@@ -3,6 +3,7 @@ import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { ParentSessionCallbackTargetSchema } from '@kilocode/worker-utils/cloud-agent-authority';
+import { CloudAgentSafeFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
@@ -169,7 +170,7 @@ export const cloudAgentReleasePendingUploadsSchema = z.object({
  * - build, architect: Backward-compatible aliases (build → code, architect → plan)
  * - custom: Custom mode (requires appendSystemPrompt)
  */
-const messageIdNextSchema = z
+export const messageIdNextSchema = z
   .string()
   .regex(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/, 'Invalid message ID format');
 
@@ -579,16 +580,67 @@ export const baseSendMessageNextSchema = z
 
 export const baseGetMessageResultNextSchema = z.object({
   cloudAgentSessionId: controlPlaneSessionIdNextSchema,
-  expectedWorktreeId: cloudAgentWorktreeIdSchema,
+  expectedWorktreeId: cloudAgentWorktreeIdSchema
+    .optional()
+    .describe(
+      'Required for ordinary user calls; optional only for delegated Cloud Agent authority.'
+    ),
   messageId: messageIdNextSchema,
 });
 
+const sessionMessageCompletionSourceNextSchema = z.enum([
+  'assistant_message_event',
+  'manual_compact_summarize',
+  'idle_reconciliation',
+  'wrapper_failure',
+  'interrupt',
+  'delivery_failure',
+  'canceled',
+]);
+
+// Mirrors the Worker's public result contract without duplicating its strict
+// validation. Non-strict here keeps web-first deploy rolling reads forward
+// compatible; the Worker remains the authority for the full shape.
 export const baseGetMessageResultNextOutputSchema = z.object({
   cloudAgentSessionId: controlPlaneSessionIdNextSchema,
   messageId: messageIdNextSchema,
   status: z.enum(['queued', 'running', 'completed', 'failed', 'interrupted']),
+  createdAt: z.number(),
+  queuedAt: z.number().optional(),
   acceptedAt: z.number().optional(),
+  terminalAt: z.number().optional(),
+  completionSource: sessionMessageCompletionSourceNextSchema.optional(),
+  failure: CloudAgentSafeFailureSchema.extend({ retryable: z.boolean() }).optional(),
+  gateResult: z.enum(['pass', 'fail']).optional(),
+  assistant: z
+    .object({
+      messageId: z.string(),
+      text: z.string().optional(),
+    })
+    .optional(),
 });
+
+export const baseListChildSessionsNextSchema = z
+  .object({
+    limit: z.number().int().min(1).max(50).default(20),
+    cursor: z.uuid().optional(),
+  })
+  .strict();
+
+export const baseListChildSessionsNextOutputSchema = z
+  .object({
+    sessions: z.array(
+      z
+        .object({
+          cloudAgentSessionId: controlPlaneSessionIdNextSchema,
+          initialMessageId: messageIdNextSchema.optional(),
+          worktreeId: cloudAgentWorktreeIdSchema.optional(),
+        })
+        .strict()
+    ),
+    nextCursor: z.uuid().optional(),
+  })
+  .strict();
 
 // Schema for interrupting a session
 export const baseInterruptSessionNextSchema = z.object({

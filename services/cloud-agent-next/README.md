@@ -826,7 +826,7 @@ pnpm --filter cloud-agent-next lint:fix
 - **Session**: one Session DO per `workspace_*` session ID. It owns the message queue and states, route view, event log, questions, callbacks and the client stream.
 - **Sandbox**: one Sandbox DO per sandbox ID. It owns the physical allocation, provider lease, wrapper socket, credentials and idle stop.
   - The default control-plane allocation is an isolated per-session `ses-*` sandbox.
-  - A shared allocation (`org-*`, `usr-*`, `bot-*`, `ubt-*`) hosts multiple worktrees and chats in one runtime.
+  - A shared allocation (`org-*`, `usr-*`, `bot-*`, `ubt-*`) hosts multiple worktrees and chats, with one runtime per worktree directory. Sibling chats in one worktree share its runtime and MCP configuration; independent worktrees stay isolated.
 - **Worktree**: a shared checkout and chat group. A worktree chat gets a `worktree_*` ID and the path `/workspace/<org>/<user>/worktrees/<worktreeId>`; isolated sessions use `/workspace/app`.
 - **Wrapper**: one control wrapper per sandbox. It connects to the Sandbox DO, prepares routes, supervises Kilo, submits prompts and reports turn outcomes.
 

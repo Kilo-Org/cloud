@@ -1223,6 +1223,16 @@ export const GetMessageResultInput = z
   .object({
     cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to inspect'),
     messageId: MessageIdSchema.describe('Exact submitted message ID to inspect'),
+    expectedWorktreeId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Optional expected worktree identity for a scoped Cloud Agent parent'),
+    organizationId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Organization pinned by a scoped Cloud Agent parent authority'),
   })
   .strict();
 

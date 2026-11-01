@@ -145,7 +145,6 @@ export type PrepareDeps = {
 };
 
 type PreparedRoute = {
-  cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'];
   key: string;
   spec: ControlPlaneRouteSpec;
   directory: string;
@@ -236,18 +235,6 @@ async function defaultSessionExists(
 /** Keep existing allocations on their original runtime and HOME identities. */
 export function runtimeKey(spec: ControlPlaneRouteSpec): string {
   return workspaceConfigRuntimeKey(spec);
-}
-
-/**
- * The scoped Cloud Agent MCP grant carries a session-specific token. Only a
- * per-session runtime may receive it; a runtime shared by a worktree must keep
- * one MCP configuration for every member.
- */
-function scopedCloudAgentMcp(
-  spec: ControlPlaneRouteSpec,
-  cloudAgentMcp: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'] | undefined
-): ControlPlaneSessionCredentialsPayload['cloudAgentMcp'] | undefined {
-  return spec.runtimeIsolation === 'per-session' ? cloudAgentMcp : undefined;
 }
 
 function isTimeoutMessage(step: ControlPlanePreparationStep, error: unknown): boolean {
@@ -366,6 +353,38 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   const inheritedEnv = deps.inheritedEnv ?? process.env;
   const profileMaterializer = createRuntimeProfileMaterializer();
   const workspaceConfigurations = new Map<string, WorkspaceConfig>();
+  const workspaceMcpGrants = new Map<
+    string,
+    NonNullable<ControlPlaneSessionCredentialsPayload['cloudAgentMcp']>
+  >();
+
+  function workspaceMcpGrant(
+    key: string,
+    offered: ControlPlaneSessionCredentialsPayload['cloudAgentMcp']
+  ): ControlPlaneSessionCredentialsPayload['cloudAgentMcp'] {
+    const retained = workspaceMcpGrants.get(key);
+    if (offered && (!retained || offered.expiresAt >= retained.expiresAt)) return offered;
+    return retained;
+  }
+
+  function commitWorkspaceMcpGrant(
+    key: string,
+    grant: ControlPlaneSessionCredentialsPayload['cloudAgentMcp']
+  ): void {
+    if (!grant) return;
+    const retained = workspaceMcpGrants.get(key);
+    if (!retained || grant.expiresAt >= retained.expiresAt) workspaceMcpGrants.set(key, grant);
+  }
+
+  function newestMcpGrant(
+    first: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'],
+    second: ControlPlaneSessionCredentialsPayload['cloudAgentMcp']
+  ): ControlPlaneSessionCredentialsPayload['cloudAgentMcp'] {
+    if (!first) return second;
+    if (!second) return first;
+    return second.expiresAt >= first.expiresAt ? second : first;
+  }
+
   const runGit = deps.runGit ?? ((args, options) => git(args, options));
   const runSetup =
     deps.runSetup ??
@@ -928,6 +947,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       deps.runtimes.release(input.key);
       profileMaterializer.release(routeHome(input.spec, homeRoots));
       workspaceConfigurations.delete(input.key);
+      workspaceMcpGrants.delete(input.key);
       return;
     }
     // Resolve the CURRENT live client: a restart replaces the runtime on a new
@@ -1035,7 +1055,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       // Built inside the failure scope: an over-limit CLI config must surface as
       // `session.failed`, not reject the prepare promise (which the caller
       // swallows while the route waits out its timeout).
-      const cloudAgentMcp = scopedCloudAgentMcp(spec, credentials?.cloudAgentMcp);
+      const previousMcpGrant = workspaceMcpGrants.get(key);
+      const cloudAgentMcp = workspaceMcpGrant(key, credentials?.cloudAgentMcp);
       const builtEnv = withRuntimeProfileEnvironment(
         buildWorktreeKiloEnvironment(
           directory,
@@ -1068,6 +1089,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       let replacementWorkspace = false;
       let localRecoveryApplied = false;
       let deferredRuntimeStarted = false;
+      let runtimeWasReused = false;
       const recovery = spec.worktreeRecovery;
       // Older ingest restoration must not overwrite newer local recovery. That is
       // proven for a replacement workspace whose recovery applied, and for a
@@ -1097,6 +1119,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         if (owner.released) return;
         currentStep = 'kilo_runtime';
         emitProgress(sessionId, 'kilo_runtime');
+        runtimeWasReused = !deps.runtimes.isUnavailable(key);
         const client = await withRuntimeStartRetry(
           key,
           () =>
@@ -1105,6 +1128,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
             ),
           () => !owner.released
         );
+        if (!runtimeWasReused) commitWorkspaceMcpGrant(key, cloudAgentMcp);
         if (owner.released) return;
         currentStep = 'kilo_session';
         emitProgress(sessionId, 'kilo_session');
@@ -1200,16 +1224,28 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         home,
         kilo: kiloAuth,
         env: builtEnv,
-        cloudAgentMcp,
       });
       // A credentials frame that arrived while this route was preparing is
       // applied before the route reports ready; a release during the apply
       // suppresses ready and leaves the already-released route torn down.
       const pending = owner.pendingCredentials;
       owner.pendingCredentials = undefined;
-      if (pending) {
+      const grantChanged = cloudAgentMcp !== previousMcpGrant;
+      if (pending || (grantChanged && (runtimeWasReused || hasRoutesForKey(key, sessionId)))) {
+        const installCredentials = pending ?? {
+          ...credentials,
+          sessionId,
+          kilo: credentials?.kilo ?? { token: kiloToken },
+          cloudAgentMcp: undefined,
+        };
+        const retainedGrant = workspaceMcpGrants.get(key);
+        const prepareGrant = newestMcpGrant(cloudAgentMcp, pending?.cloudAgentMcp);
+        const installGrant =
+          retainedGrant === previousMcpGrant
+            ? prepareGrant
+            : newestMcpGrant(prepareGrant, retainedGrant);
         try {
-          await installCredentialsFor(pending);
+          await applyCredentialsFor(installCredentials, installGrant);
         } catch (error) {
           log(
             `control-plane buffered credential apply failed session=${sessionId} error=${
@@ -1245,11 +1281,19 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       if (preparation && !preparation.released) preparation.pendingCredentials = credentials;
       return;
     }
-    const cloudAgentMcp = scopedCloudAgentMcp(
-      route.spec,
-      credentials.cloudAgentMcp ?? route.cloudAgentMcp
-    );
-    route.cloudAgentMcp = cloudAgentMcp;
+    await applyCredentialsFor(credentials, workspaceMcpGrant(route.key, credentials.cloudAgentMcp));
+  }
+
+  async function applyCredentialsFor(
+    credentials: ControlPlaneSessionCredentialsPayload,
+    cloudAgentMcp: ControlPlaneSessionCredentialsPayload['cloudAgentMcp']
+  ): Promise<void> {
+    const route = prepared.get(credentials.sessionId);
+    if (!route) {
+      const preparation = preparing.get(credentials.sessionId);
+      if (preparation && !preparation.released) preparation.pendingCredentials = credentials;
+      return;
+    }
     const nextEnv = withRuntimeProfileEnvironment(
       buildWorktreeKiloEnvironment(
         route.directory,
@@ -1268,6 +1312,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     );
     route.env = nextEnv;
     await deps.runtimes.installCredentials(route.key, nextEnv, cloudAgentMcp);
+    commitWorkspaceMcpGrant(route.key, cloudAgentMcp);
     if (credentials.git?.token && route.spec.git) {
       // The helper re-reads the record on the next git command, so the agent's
       // push/fetch picks up the renewed token while `origin` stays credential-free.

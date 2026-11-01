@@ -20,7 +20,8 @@ status contract alongside shared worktree navigation and durability; revised
 revised 2026-10-07 to add the optional repository environment; revised
 2026-10-21 to apply the repository environment automatically and move the
 sandbox size into it; revised 2026-10-22 to simplify environment editing and
-show profile conflicts before saving.
+show profile conflicts before saving; revised 2026-10-31 to define
+worktree-owned shared runtime and MCP configuration.
 
 ## Conventions
 
@@ -322,6 +323,19 @@ repository.
     and current personal or organization access MUST be checked server-side.
     Incomplete cleanup MUST remain recoverable, MUST NOT report success, and
     MUST NOT permit late creation or ingestion to resurrect the worktree.
+14. Chats in one worktree MUST share one runtime and one MCP configuration.
+    Runtime and MCP configuration MUST NOT be isolated per chat, and a sibling
+    MUST NOT replace the worktree's configuration. Independent worktrees MUST
+    remain isolated. The worktree's MCP configuration MUST be established when
+    the worktree is created, MAY be restored when its runtime is rehydrated, and
+    MUST be reused by later chats.
+15. A workspace's delegated Cloud Agent MCP connection MAY create independent
+    child sessions and list, inspect, check exact message results, interrupt, or
+    send prompt follow-ups to its direct children. Each management operation
+    MUST check current canonical-parent authorization and persisted child
+    lineage, owner and organization. It MUST NOT manage the parent itself,
+    sibling chats or unrelated sessions. Child completion callbacks MUST target
+    the canonical workspace parent, not an arbitrary invoking sibling.
 
 ### Sandbox Status
 
@@ -509,6 +523,13 @@ The following use SHOULD and are not enforced today:
    ready with setup half-done.)
 
 ## Changelog
+
+### 2026-10-31 -- Worktree-owned runtime and MCP configuration
+
+- Chats in one worktree share the worktree's runtime and MCP configuration; they
+  are not isolated from each other per chat.
+- Independent worktrees remain isolated. MCP configuration is established when
+  the worktree is created or rehydrated and is reused by later chats.
 
 ### 2026-10-22 -- Environment editor and profile transition
 

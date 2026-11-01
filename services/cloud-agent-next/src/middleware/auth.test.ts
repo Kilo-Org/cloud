@@ -97,7 +97,7 @@ describe('authMiddleware', () => {
     });
   });
 
-  it('preserves verified scope for prepareSession and rejects every other Worker tRPC path', async () => {
+  it('preserves verified scope for preparation and management and rejects unrelated Worker paths', async () => {
     const cloudAgentAuthority = {
       version: 1 as const,
       ownerId: 'user-1',
@@ -119,12 +119,21 @@ describe('authMiddleware', () => {
       NEXTAUTH_SECRET: 'secret',
       HYPERDRIVE: { connectionString: 'postgres://fixture' },
     } as Env;
-    const allowed = await app.fetch(
-      new Request('https://worker.test/trpc/prepareSession', { method: 'POST' }),
-      env
-    );
-    expect(allowed.status).toBe(200);
-    expect(await allowed.json()).toEqual({ authority: cloudAgentAuthority });
+    for (const path of [
+      'prepareSession',
+      'listChildSessions',
+      'getSession',
+      'getMessageResult',
+      'interruptSession',
+      'sendMessageV2',
+    ]) {
+      const allowed = await app.fetch(
+        new Request(`https://worker.test/trpc/${path}`, { method: 'POST' }),
+        env
+      );
+      expect(allowed.status).toBe(200);
+      expect(await allowed.json()).toEqual({ authority: cloudAgentAuthority });
+    }
     expect(validateKiloToken).toHaveBeenCalledWith(
       null,
       expect.objectContaining({ allowCloudAgentAuthority: true })
@@ -133,7 +142,7 @@ describe('authMiddleware', () => {
       'start',
       'send',
       'updateSession',
-      'getSession',
+      'deleteSession',
       'createWorktreeChat',
       'prepareSession,send',
     ]) {

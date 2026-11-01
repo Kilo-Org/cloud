@@ -40,6 +40,20 @@ import { preflightRuntimeAuthorizationRecovery } from './queue-message.js';
 
 // A decodable token so the preflight treats the request as a delegated grant.
 const delegatedToken = jwt.sign({ tokenPurpose: 'cloud-agent' }, 'test-secret');
+const scopedToken = jwt.sign(
+  {
+    tokenPurpose: 'delegated-workload',
+    cloudAgentAuthority: {
+      version: 1,
+      ownerId: 'usr_1',
+      parentSessionId: 'workspace_parent',
+      organizationId: null,
+      authorizationId: 'authorization-1',
+      expiresAt: Math.floor(Date.now() / 1000) + 60,
+    },
+  },
+  'test-secret'
+);
 
 const ctx = {
   env: { HYPERDRIVE: { connectionString: 'postgres://test' } } as never,
@@ -71,6 +85,17 @@ describe('preflightRuntimeAuthorizationRecovery', () => {
     await expect(preflightRuntimeAuthorizationRecovery('workspace_a', ctx)).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
+  });
+
+  it('does not extend a scoped delegation on expiry recovery', async () => {
+    getRuntimeAuthorizationStatus.mockResolvedValue({
+      state: 'expired',
+      id: 'authorization-1',
+    });
+    await expect(
+      preflightRuntimeAuthorizationRecovery('workspace_a', { ...ctx, authToken: scopedToken })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(recoverExpiredRuntimeAuthorization).not.toHaveBeenCalled();
   });
 
   it('mints and commits a fresh authorization when the delegation expired', async () => {

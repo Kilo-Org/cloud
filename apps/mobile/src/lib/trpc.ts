@@ -13,11 +13,13 @@ import { createNetworkErrorFetch, readTrpcResponseError } from '@/lib/telemetry/
 import { postLatencyBatch } from '@/lib/telemetry/latency-ingest';
 import { createLatencyBuffer, createLatencyFetch } from '@/lib/telemetry/request-latency';
 import {
+  type ActiveTokenSnapshot,
   getActiveToken,
   getActiveTokenSnapshot,
   getAuthTokenForRequest,
   publishActiveTokenExpiry,
 } from '@/lib/auth/token-owner';
+import { isProtectedDataAvailable } from '@/lib/protected-data';
 import { TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
 
 export const { TRPCProvider, useTRPC } = createTRPCContext<MobileRouter>();
@@ -161,6 +163,31 @@ const measuredFetch = createLatencyFetch(withJsonBody, latencyBuffer, {
   newId: newRequestId,
 });
 
+/**
+ * The cold expiry read, as the owner has no expiry yet. While iOS protected
+ * data is unavailable the keychain refuses every read and that refusal is the
+ * documented, unreported state (see `lib/protected-data`): the read is skipped
+ * and the expiry stays unknown, so the request goes out on the held token and
+ * a later unlocked request resolves the expiry. Nothing is published on that
+ * path — an unknown expiry must not become a known-`null` one. The guard's own
+ * check runs synchronously inside `SecureStore.getItemAsync`, so the check here
+ * decides the call it wraps. Any other rejection keeps the caller's behavior.
+ */
+async function readColdExpiry(active: ActiveTokenSnapshot | null): Promise<number | null> {
+  if (!isProtectedDataAvailable()) {
+    return null;
+  }
+  const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
+  const resolvedExpiresAtMs = expiresAtStr ? Number(expiresAtStr) : null;
+  // Publish the resolved expiry into the owner that the cold read warmed.
+  // A newer owner published while the expiry was read keeps its own token
+  // and expiry.
+  if (active) {
+    publishActiveTokenExpiry(active, resolvedExpiresAtMs);
+  }
+  return resolvedExpiresAtMs;
+}
+
 async function getAuthHeaders() {
   const token = await getAuthTokenForRequest();
   if (!token) {
@@ -173,20 +200,10 @@ async function getAuthHeaders() {
   // in-memory owner when available; only the cold path (owner warmed by
   // getAuthTokenForRequest without an expiry) reads TOKEN_EXPIRES_AT_KEY,
   // and the resolved value is published back into the owner so normal
-  // requests never reread it.
+  // requests never reread it. A refused read leaves the expiry unknown, so no
+  // rotation is attempted and the held token is used as it is.
   const active = getActiveTokenSnapshot();
-  let expiresAtMs = active?.expiresAtMs ?? null;
-  if (expiresAtMs === null) {
-    const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
-    const resolvedExpiresAtMs = expiresAtStr ? Number(expiresAtStr) : null;
-    // Publish the resolved expiry into the owner that the cold read warmed.
-    // A newer owner published while the expiry was read keeps its own token
-    // and expiry.
-    if (active) {
-      publishActiveTokenExpiry(active, resolvedExpiresAtMs);
-    }
-    expiresAtMs = resolvedExpiresAtMs;
-  }
+  const expiresAtMs = active?.expiresAtMs ?? (await readColdExpiry(active));
   // Prefer the newest owner token: a sign-in or refresh may have published a
   // newer one while the cold reads were in flight.
   const newest = getActiveToken();

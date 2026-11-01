@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "സമീപകാല റിവ്യൂുകളൊന്നുമില്ല",
       "noRecentPrsDescription": "രിവ്യൂ ആരംഭിക്കാൻ മുകളിൽ ഒരു ലിങ്ക് ഒട്ടിക്കുക — അടുത്ത തവണ ഇത് ഇവിടെ കാണിക്കും.",
-      "couldNotLoad": "ലോഡ് ചെയ്യാനായില്ല.",
       "removeFromRecentsTitle": "അടുത്തിടെ തുറന്നവയുടെ പട്ടികയിൽ നിന്ന് നീക്കണോ?",
       "removeFromRecentsMessage": "ഈ റിവ്യൂ നിങ്ങളുടെ സമീപകാല പട്ടികയിൽനിന്ന് നീക്കം ചെയ്യും.",
       "removeRecentAccessibility": "അടുത്തിടെ തുറന്നവയുടെ പട്ടികയിൽ നിന്ന് {{repo}} നീക്കം ചെയ്യുക",
@@ -834,7 +833,8 @@
     "liveUpdates": "തത്സമയ അപ്‌ഡേറ്റുകൾ",
     "liveUpdateSubtitle": "നിങ്ങളുടെ അറിയിപ്പുകളിൽ സജീവ ഏജന്റുകളെ കാണിക്കുക",
     "push": "പുഷ്",
-    "onDescription": "ഈ ഉപകരണത്തിനായി പുഷ് അറിയിപ്പുകൾ ഓണാണ്.",
+    "deviceTitle": "ഈ ഉപകരണത്തിലെ പുഷ്",
+    "onDescription": "അറിയിപ്പുകൾ താഴെയുള്ള വിഭാഗങ്ങൾ അനുസരിച്ച് ലഭിക്കും.",
     "offDescription": "അറിയിപ്പുകൾക്കുള്ള അനുമതിയോ ഉപകരണ രജിസ്ട്രേഷനോ പ്രവർത്തനക്ഷമമല്ല.",
     "retryPermission": "അറിയിപ്പ് അനുമതി പരിശോധിക്കാൻ വീണ്ടും ശ്രമിക്കുക",
     "enable": "അറിയിപ്പുകൾ പ്രവർത്തനക്ഷമമാക്കുക",
@@ -1842,7 +1842,8 @@
     "findingDetails": {
       "supersededBy": "പകരം പുതിയ കണ്ടെത്തൽ നിലവിലുണ്ട്",
       "supersededByDescription": "നില, വിശകലനം, പരിഹാരം എന്നിവ കാണാൻ നിലവിലെ രേഖ ടാപ്പ് ചെയ്ത് തുറക്കുക.",
-      "dismissedBecause": "നിരസിച്ചു. കാരണം: {{reason}}.",
+      "dismissedOn": "ഒഴിവാക്കിയ തീയതി",
+      "supersededOn": "മാറ്റിസ്ഥാപിച്ച തീയതി",
       "severityLabel": "ഗുരുതരത്വം: {{severity}}",
       "package": "പാക്കേജ്",
       "vulnerableVersions": "സുരക്ഷാ ദൗർബല്യമുള്ള പതിപ്പുകൾ",
@@ -1859,11 +1860,6 @@
       "viewAdvisory": "GitHub-ൽ സുരക്ഷാ അറിയിപ്പ് കാണുക",
       "statusOpen": "ഓപ്പൺ",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "പരിഹരിക്കാൻ തുടങ്ങിയിട്ടുണ്ട്",
-      "reasonNoBandwidth": "ഇതിനായി സമയം മാറ്റിവയ്ക്കാനില്ല",
-      "reasonTolerableRisk": "സ്വീകരിക്കാവുന്ന അപകടസാധ്യത",
-      "reasonInaccurate": "കണ്ടെത്തൽ കൃത്യമല്ല",
-      "reasonNotUsed": "സുരക്ഷാ ദൗർബല്യമുള്ള കോഡ് ഉപയോഗിക്കുന്നില്ല",
       "reasonAfterReview": "അവലോകനത്തിന് ശേഷം"
     },
     "settingsOverview": {
@@ -2100,7 +2096,6 @@
       "closedOn": "{{date}}: {{status}}",
       "deadlineNotSet": "സമയപരിധി സജ്ജീകരിച്ചിട്ടില്ല",
       "noSlaDeadline": "SLA സമയപരിധിയില്ല",
-      "dueOn": "സമയപരിധി: {{date}}",
       "overdueNow": "സമയപരിധി കഴിഞ്ഞു",
       "overdue_one": "സമയപരിധി കഴിഞ്ഞിട്ട് {{count}} ദിവസം",
       "overdue_other": "സമയപരിധി കഴിഞ്ഞിട്ട് {{count}} ദിവസം",
@@ -3852,6 +3847,7 @@
       "markSecret": "രഹസ്യമായി അടയാളപ്പെടുത്തുക",
       "masked": "മറഞ്ഞിരിക്കുന്ന മൂല്യം",
       "reveal": "മൂല്യം വെളിപ്പെടുത്തുക",
+      "hide": "മൂല്യം മറയ്ക്കുക",
       "newValuePlaceholder": "പുതിയ രഹസ്യ മൂല്യം നൽകുക",
       "valuePlaceholder": "രഹസ്യ മൂല്യം (എൻക്രിപ്റ്റ് ചെയ്തത്)"
     },

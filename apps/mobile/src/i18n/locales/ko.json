@@ -305,7 +305,8 @@
     "liveUpdates": "실시간 업데이트",
     "liveUpdateSubtitle": "알림에 실행 중인 에이전트 표시",
     "push": "푸시 알림",
-    "onDescription": "이 기기에서 푸시 알림이 켜져 있습니다.",
+    "deviceTitle": "이 기기의 푸시 알림",
+    "onDescription": "알림은 아래 유형 설정을 따릅니다.",
     "offDescription": "알림 권한이 없거나 기기가 등록되지 않았습니다.",
     "retryPermission": "알림 권한 확인 다시 시도",
     "enable": "알림 켜기",
@@ -1368,7 +1369,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "감지됨",
-      "dismissedBecause": "무시 처리했습니다. 사유: {{reason}}.",
+      "dismissedOn": "무시된 날짜",
+      "supersededOn": "대체된 날짜",
       "ghsa": "GHSA",
       "manifest": "매니페스트",
       "noPatchAvailable": "사용 가능한 패치 없음",
@@ -1385,11 +1387,6 @@
       "vulnerableVersions": "취약점이 있는 버전",
       "statusOpen": "오픈",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "이미 수정 중",
-      "reasonNoBandwidth": "처리 여력 없음",
-      "reasonTolerableRisk": "위험 감수 가능",
-      "reasonInaccurate": "진단 결과 부정확",
-      "reasonNotUsed": "취약한 코드 사용 안 함",
       "reasonAfterReview": "검토 결과에 따른 판단"
     },
     "findingList": {
@@ -1571,7 +1568,6 @@
       "closedOn": "{{date}} · {{status}}",
       "deadlineNotSet": "마감일 미설정",
       "noSlaDeadline": "SLA 마감일 미지정",
-      "dueOn": "{{date}} 마감",
       "overdueNow": "기한 초과",
       "overdue_other": "기한 {{count}}일 초과",
       "dueToday": "오늘 마감",
@@ -2831,7 +2827,6 @@
     "entry": {
       "noRecentPrs": "최근 리뷰 없음",
       "noRecentPrsDescription": "위에 링크를 붙여넣어 리뷰를 시작하세요. 다음부터는 여기에 표시됩니다.",
-      "couldNotLoad": "불러오지 못했습니다.",
       "removeFromRecentsTitle": "최근 항목에서 제거할까요?",
       "removeFromRecentsMessage": "이 리뷰는 최근 항목에서 제거됩니다.",
       "removeRecentAccessibility": "최근 항목에서 {{repo}} 제거",
@@ -3852,6 +3847,7 @@
       "markSecret": "비밀로 표시",
       "masked": "숨겨진 가치",
       "reveal": "가치 공개",
+      "hide": "가치 숨기기",
       "newValuePlaceholder": "새 비밀 값 입력",
       "valuePlaceholder": "비밀 값(암호화됨)"
     },

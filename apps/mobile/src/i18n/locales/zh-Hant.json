@@ -305,7 +305,8 @@
     "liveUpdates": "即時更新",
     "liveUpdateSubtitle": "在通知中顯示執行中的智慧代理",
     "push": "推播",
-    "onDescription": "此裝置的推播通知已開啟。",
+    "deviceTitle": "此裝置推播",
+    "onDescription": "提醒會依下方類別設定。",
     "offDescription": "尚未開啟通知權限或啟用裝置註冊。",
     "retryPermission": "重新檢查通知權限",
     "enable": "啟用通知",
@@ -1368,7 +1369,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "偵測時間",
-      "dismissedBecause": "已忽略，原因：{{reason}}。",
+      "dismissedOn": "忽略日期",
+      "supersededOn": "取代日期",
       "ghsa": "GHSA",
       "manifest": "套件清單檔",
       "noPatchAvailable": "沒有可用的修補程式",
@@ -1385,11 +1387,6 @@
       "vulnerableVersions": "有漏洞的版本",
       "statusOpen": "開啟",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "已開始修復",
-      "reasonNoBandwidth": "無暇處理",
-      "reasonTolerableRisk": "風險可以接受",
-      "reasonInaccurate": "問題判定不準確",
-      "reasonNotUsed": "未使用有漏洞的程式碼",
       "reasonAfterReview": "經審查後決定忽略"
     },
     "findingList": {
@@ -1571,7 +1568,6 @@
       "closedOn": "{{date}}：{{status}}",
       "deadlineNotSet": "未設定期限",
       "noSlaDeadline": "無 SLA 期限",
-      "dueOn": "{{date}} 到期",
       "overdueNow": "已逾期",
       "overdue_other": "逾期 {{count}} 天",
       "dueToday": "今天到期",
@@ -2831,7 +2827,6 @@
     "entry": {
       "noRecentPrs": "尚無最近審查",
       "noRecentPrsDescription": "在上方貼上連結即可開始審查，下次就會在這裡看到。",
-      "couldNotLoad": "無法載入。",
       "removeFromRecentsTitle": "要從最近項目移除嗎？",
       "removeFromRecentsMessage": "此審查將從你的最近項目中移除。",
       "removeRecentAccessibility": "從最近項目移除 {{repo}}",
@@ -3852,6 +3847,7 @@
       "markSecret": "標記為秘密",
       "masked": "隱藏值",
       "reveal": "顯示值",
+      "hide": "隱藏此值",
       "newValuePlaceholder": "輸入新的秘密值",
       "valuePlaceholder": "秘密值（已加密）"
     },

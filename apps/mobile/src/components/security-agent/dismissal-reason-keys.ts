@@ -11,13 +11,3 @@ export const DISMISSAL_REASON_LABEL_KEYS = {
   inaccurate: 'securityAgent.dismiss.reasonInaccurate',
   not_used: 'securityAgent.dismiss.reasonNotUsed',
 } satisfies Record<string, string>;
-
-// Mid-sentence forms, for "Dismissed because {{reason}}." in the finding
-// details panel, where the phrase continues the sentence.
-export const DISMISSAL_REASON_PHRASE_KEYS = {
-  fix_started: 'securityAgent.findingDetails.reasonFixStarted',
-  no_bandwidth: 'securityAgent.findingDetails.reasonNoBandwidth',
-  tolerable_risk: 'securityAgent.findingDetails.reasonTolerableRisk',
-  inaccurate: 'securityAgent.findingDetails.reasonInaccurate',
-  not_used: 'securityAgent.findingDetails.reasonNotUsed',
-} satisfies Record<string, string>;

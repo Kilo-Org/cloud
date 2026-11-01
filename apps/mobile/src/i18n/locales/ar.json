@@ -305,7 +305,8 @@
     "liveUpdates": "التحديثات المباشرة",
     "liveUpdateSubtitle": "عرض الوكلاء النشطين في إشعاراتك",
     "push": "الإشعارات الفورية",
-    "onDescription": "الإشعارات الفورية مفعّلة على هذا الجهاز.",
+    "deviceTitle": "الإشعارات الفورية على هذا الجهاز",
+    "onDescription": "تتبع التنبيهات الفئات أدناه.",
     "offDescription": "إذن الإشعارات غير مفعّل، أو لم يُسجّل الجهاز لتلقيها.",
     "retryPermission": "إعادة محاولة التحقق من إذن الإشعارات",
     "enable": "تفعيل الإشعارات",
@@ -1420,7 +1421,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "تاريخ الاكتشاف",
-      "dismissedBecause": "تم استبعاد النتيجة. السبب: {{reason}}.",
+      "dismissedOn": "مستبعدة في",
+      "supersededOn": "مستبدلة في",
       "ghsa": "GHSA",
       "manifest": "ملف تعريف الحزمة",
       "noPatchAvailable": "لا يوجد تصحيح متاح",
@@ -1437,11 +1439,6 @@
       "vulnerableVersions": "الإصدارات المتأثرة بالثغرة",
       "statusOpen": "مفتوحة",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "بدأ الإصلاح بالفعل",
-      "reasonNoBandwidth": "لا تتوفر موارد كافية",
-      "reasonTolerableRisk": "الخطر مقبول",
-      "reasonInaccurate": "النتيجة غير دقيقة",
-      "reasonNotUsed": "الشيفرة التي تحتوي على الثغرة غير مستخدمة",
       "reasonAfterReview": "بعد المراجعة"
     },
     "findingList": {
@@ -1627,7 +1624,6 @@
       "closedOn": "{{status}} في {{date}}",
       "deadlineNotSet": "الموعد النهائي غير محدد",
       "noSlaDeadline": "لا يوجد موعد نهائي حسب SLA",
-      "dueOn": "مستحق في {{date}}",
       "overdueNow": "متأخر",
       "overdue_zero": "أيام التأخير: {{count}}",
       "overdue_one": "متأخر بيوم واحد",
@@ -2979,7 +2975,6 @@
     "entry": {
       "noRecentPrs": "لا توجد مراجعات حديثة",
       "noRecentPrsDescription": "الصق رابطًا أعلاه لبدء المراجعة. سيظهر هنا في المرة القادمة.",
-      "couldNotLoad": "تعذّر التحميل.",
       "removeFromRecentsTitle": "إزالة الطلب من القائمة الأخيرة؟",
       "removeFromRecentsMessage": "ستتم إزالة هذه المراجعة من قائمة العناصر الأخيرة.",
       "removeRecentAccessibility": "إزالة {{repo}} من قائمة الطلبات الأخيرة",
@@ -4076,6 +4071,7 @@
       "markSecret": "ضع علامة على أنها سرية",
       "masked": "القيمة المخفية",
       "reveal": "كشف القيمة",
+      "hide": "إخفاء القيمة",
       "newValuePlaceholder": "أدخل قيمة سرية جديدة",
       "valuePlaceholder": "قيمة سرية (مشفرة)"
     },

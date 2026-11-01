@@ -13,10 +13,12 @@ import { type SecurityFinding } from '@/lib/security-agent';
 
 const mocks = vi.hoisted(() => {
   const deadlineState: Record<string, unknown> = { kind: 'no-deadline' };
-  const interpolations: { key: string; params: Record<string, unknown> }[] = [];
+  const kvRows: Record<string, unknown>[] = [];
   return {
     deadlineState,
-    interpolations,
+    deadlineTone: 'neutral' as string,
+    kvRows,
+    supersedingFindingId: null as string | null,
     routerPush: vi.fn(),
     openBrowser: vi.fn(),
     linkingOpenUrl: vi.fn(),
@@ -37,12 +39,7 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, params?: Record<string, unknown>) => {
-      if (params) {
-        mocks.interpolations.push({ key, params });
-      }
-      return key;
-    },
+    t: (key: string) => key,
   }),
 }));
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
@@ -61,7 +58,12 @@ vi.mock('@/components/security-agent/finding-tone', () => ({
   },
   findingToneColor: () => '#666',
 }));
-vi.mock('@/components/ui/kv-row', () => ({ KvRow: () => null }));
+vi.mock('@/components/ui/kv-row', () => ({
+  KvRow: (props: Record<string, unknown>) => {
+    mocks.kvRows.push(props);
+    return null;
+  },
+}));
 vi.mock('@/components/security-agent/collapsible-section', () => ({
   CollapsibleSection: (props: { children?: unknown }) => props.children ?? null,
 }));
@@ -71,16 +73,13 @@ vi.mock('@/components/security-agent/finding-status-badge', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666' }),
 }));
-vi.mock('@/lib/security-agent-copy', () => ({
-  getDeadlineCopy: (state: { kind: string }) => ({
-    label: `${state.kind} deadline`,
-    detail: `${state.kind} detail`,
-  }),
+vi.mock('@/lib/format', () => ({
+  formatDate: (date: Date) => date.toISOString(),
 }));
 vi.mock('@/lib/utils', () => ({
   cn: (...classes: unknown[]) => classes.join(' '),
   firstNonEmpty: (value: string | null, fallback: string) => value ?? fallback,
-  parseTimestamp: () => 0,
+  parseTimestamp: (value: string | null) => new Date(value ?? 0),
   timeAgo: () => 'a while ago',
 }));
 vi.mock('@kilocode/app-shared/security-agent', () => ({
@@ -88,10 +87,10 @@ vi.mock('@kilocode/app-shared/security-agent', () => ({
   getFindingSeverityPresentation: () => ({ tone: 'danger' }),
   getSecurityDeadlinePresentation: () => ({
     state: mocks.deadlineState,
-    tone: 'neutral',
+    tone: mocks.deadlineTone,
     icon: 'clock',
   }),
-  getSupersedingFindingId: () => null,
+  getSupersedingFindingId: () => mocks.supersedingFindingId,
 }));
 
 type R = TestRenderer.ReactTestRenderer;
@@ -135,6 +134,11 @@ function renderPanel(finding: SecurityFinding): R {
     throw new Error('renderer was not created');
   }
   return r;
+}
+
+/** Every string the panel painted, in tree order. */
+function panelTexts(r: R): unknown[] {
+  return r.root.findAllByType(Text).map(node => node.props.children);
 }
 
 function pressAdvisory(r: R): void {
@@ -191,30 +195,28 @@ describe('FindingDetailsPanel advisory link routing', () => {
 });
 
 describe('FindingDetailsPanel chip row', () => {
-  it('drops the deadline chip that repeats a dismissed status', () => {
-    mocks.deadlineState = { kind: 'closed', superseded: false, at: new Date(0) };
-    const tree = renderPanel(findingFixture({ status: 'ignored' }));
+  it.each([
+    {
+      state: { kind: 'closed', superseded: false, at: new Date(0) },
+      fixture: { status: 'ignored', ignored_reason: 'not_used' },
+      // The dismissal card names what it holds; only the chip row lost a control.
+      texts: ['securityAgent.dismiss.reason', 'securityAgent.dismiss.reasonNotUsed'],
+    },
+    {
+      state: { kind: 'fixed', beforeDeadline: false, fixedAt: new Date(0) },
+      fixture: { status: 'fixed' },
+      texts: ['securityAgent.filter.fixed'],
+    },
+  ])(
+    'drops the deadline chip that repeats the status ($fixture.status)',
+    ({ state, fixture, texts }) => {
+      mocks.deadlineState = state;
+      const tree = renderPanel(findingFixture(fixture));
 
-    expect(tree.root.findAllByType(FindingStatusBadge)).toHaveLength(0);
-    // The dismissal card still explains the reason; only the row lost a chip.
-    const rendered = tree.root.findAllByType(Text);
-    expect(
-      rendered.filter(
-        node => node.props.children === 'securityAgent.findingDetails.dismissedBecause'
-      )
-    ).toHaveLength(1);
-  });
-
-  it('drops the deadline chip that repeats a fixed status after the deadline', () => {
-    mocks.deadlineState = { kind: 'fixed', beforeDeadline: false, fixedAt: new Date(0) };
-    const tree = renderPanel(findingFixture({ status: 'fixed' }));
-
-    expect(tree.root.findAllByType(FindingStatusBadge)).toHaveLength(0);
-    const rendered = tree.root.findAllByType(Text);
-    expect(
-      rendered.filter(node => node.props.children === 'securityAgent.filter.fixed')
-    ).toHaveLength(1);
-  });
+      expect(tree.root.findAllByType(FindingStatusBadge)).toHaveLength(0);
+      expect(panelTexts(tree)).toEqual(expect.arrayContaining(texts));
+    }
+  );
 
   it.each([
     { state: { kind: 'fixed', beforeDeadline: true, fixedAt: new Date(0) }, status: 'fixed' },
@@ -229,22 +231,119 @@ describe('FindingDetailsPanel chip row', () => {
 });
 
 describe('FindingDetailsPanel stored dismissal values', () => {
-  beforeEach(() => {
-    mocks.deadlineState = { kind: 'closed', superseded: false, at: new Date(0) };
-    mocks.interpolations.length = 0;
-  });
-
-  // A dismissed row reads `ignored_reason` from the stored record, and the
-  // column's type does not guarantee it is still a string.
+  // The column's type does not guarantee `ignored_reason` is still a string.
   it.each([{ ignored_reason: 7 }, { ignored_reason: true }, { ignored_reason: '  ' }])(
     'falls back to the review wording for an unusable reason (%j)',
     override => {
-      renderPanel(findingFixture({ status: 'ignored', ...override }));
-
-      expect(mocks.interpolations).toContainEqual({
-        key: 'securityAgent.findingDetails.dismissedBecause',
-        params: { reason: 'securityAgent.findingDetails.reasonAfterReview' },
-      });
+      mocks.deadlineState = { kind: 'closed', superseded: false, at: new Date(0) };
+      const tree = renderPanel(findingFixture({ status: 'ignored', ...override }));
+      expect(panelTexts(tree)).toContain('securityAgent.findingDetails.reasonAfterReview');
     }
   );
+});
+
+describe('FindingDetailsPanel description paragraph', () => {
+  // Provider markdown wraps its lines; a plain Text paints the newlines and
+  // the next line's indentation as ragged fragments.
+  it('collapses the wrapped source lines into one paragraph', () => {
+    const description = (value: string) =>
+      panelTexts(renderPanel(findingFixture({ description: value })));
+
+    const wrapped = 'A crafted input\r\n    overflows the parser\n  and crashes.';
+    expect(description(wrapped)).toContain('A crafted input overflows the parser and crashes.');
+    expect(description(' \n\t ')).not.toContain('');
+  });
+});
+
+describe('FindingDetailsPanel dates block', () => {
+  // The labels the dates group can render; any other KvRow belongs to another
+  // group on the panel.
+  const DATE_LABEL_KEYS: Record<string, true> = {
+    'securityAgent.findingDetails.detected': true,
+    'common.updated': true,
+    'securityAgent.filter.fixed': true,
+    'securityAgent.findingDetails.slaDeadline': true,
+    'securityAgent.findingDetails.dismissedOn': true,
+    'securityAgent.findingDetails.supersededOn': true,
+  };
+
+  function dateRows() {
+    return mocks.kvRows.filter(row => DATE_LABEL_KEYS[row.label as string]);
+  }
+
+  beforeEach(() => {
+    mocks.kvRows.length = 0;
+    mocks.deadlineState = { kind: 'no-deadline' };
+    mocks.supersedingFindingId = null;
+  });
+
+  // An ignored finding has no deadline left to meet: the date it carries is
+  // the day it left the open set, so it gets its own label instead of the
+  // deadline label it used to sit under.
+  it('labels the resolution date with the status that closed the finding', () => {
+    mocks.deadlineState = { kind: 'closed', superseded: false, at: new Date(0) };
+    renderPanel(
+      findingFixture({
+        status: 'ignored',
+        sla_due_at: '2026-11-02T00:00:00.000Z',
+        updated_at: '2026-10-30T00:00:00.000Z',
+      })
+    );
+
+    expect(dateRows().map(row => row.label)).toEqual([
+      'securityAgent.findingDetails.detected',
+      'securityAgent.findingDetails.dismissedOn',
+    ]);
+    expect(dateRows()[1]).toMatchObject({ value: '2026-10-30T00:00:00.000Z', last: true });
+
+    mocks.kvRows.length = 0;
+    mocks.supersedingFindingId = 'finding-2';
+    renderPanel(findingFixture({ status: 'ignored' }));
+    expect(dateRows()[1]).toMatchObject({ label: 'securityAgent.findingDetails.supersededOn' });
+  });
+
+  it('keeps the fixed date row and drops the deadline row once the source reports the finding fixed', () => {
+    mocks.deadlineState = { kind: 'fixed', beforeDeadline: true, fixedAt: new Date(0) };
+    renderPanel(
+      findingFixture({
+        status: 'fixed',
+        sla_due_at: '2026-11-02T00:00:00.000Z',
+        fixed_at: '2026-10-05T00:00:00.000Z',
+      })
+    );
+
+    expect(dateRows().map(row => row.label)).toEqual([
+      'securityAgent.findingDetails.detected',
+      'common.updated',
+      'securityAgent.filter.fixed',
+    ]);
+  });
+
+  // The row's own label names the deadline, so the value is the date alone: a
+  // "Due 11/2/2026" under "SLA deadline" says the same thing twice.
+  it('keeps the deadline row on an open finding that still has one', () => {
+    mocks.deadlineState = { kind: 'due-in', days: 12, deadline: new Date(0) };
+    mocks.deadlineTone = 'warning';
+    renderPanel(findingFixture({ status: 'open', sla_due_at: '2026-11-02T00:00:00.000Z' }));
+
+    expect(dateRows().map(row => row.label)).toEqual([
+      'securityAgent.findingDetails.detected',
+      'common.updated',
+      'securityAgent.findingDetails.slaDeadline',
+    ]);
+    expect(dateRows()[2]).toMatchObject({
+      value: '1970-01-01T00:00:00.000Z',
+      valueTone: 'warn',
+      last: true,
+    });
+  });
+
+  it('renders no deadline row for an open finding without one', () => {
+    renderPanel(findingFixture({ status: 'open', sla_due_at: null }));
+
+    expect(dateRows().map(row => row.label)).toEqual([
+      'securityAgent.findingDetails.detected',
+      'common.updated',
+    ]);
+  });
 });

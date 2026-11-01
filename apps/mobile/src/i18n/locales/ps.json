@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "وروستۍ بیاکتنې نشته",
       "noRecentPrsDescription": "د بیاکتنې پیلولو لپاره پورته لینک ونښلوئ — بل ځل به دلته ښکاره شي.",
-      "couldNotLoad": "بار نه شو.",
       "removeFromRecentsTitle": "له وروستي لړلیک څخه لرې شي؟",
       "removeFromRecentsMessage": "دا بیاکتنه به ستاسو له وروستي لړلیک څخه لرې شي.",
       "removeRecentAccessibility": "{{repo}} له وروستي لړلیک څخه لرې کړئ",
@@ -834,7 +833,8 @@
     "liveUpdates": "ژوندي تازه معلومات",
     "liveUpdateSubtitle": "فعال ایجنټونه په خپلو خبرتیاوو کې وښیئ",
     "push": "پش خبرتیاوې",
-    "onDescription": "د دې وسیلې لپاره پش خبرتیاوې فعالې دي.",
+    "deviceTitle": "په دې وسیله پش خبرتیاوې",
+    "onDescription": "خبرتیاوې د لاندې کټګوریو له مخې دي.",
     "offDescription": "اجازه نه ده ورکړل شوې یا وسیله نه ده ثبت شوې.",
     "retryPermission": "د خبرتیاوو د اجازې د کتلو بیا هڅه وکړئ",
     "enable": "خبرتیاوې فعالې کړئ",
@@ -1842,7 +1842,8 @@
     "findingDetails": {
       "supersededBy": "اوسنۍ موندنه یې ځایناستې ده",
       "supersededByDescription": "د حالت، تحلیل او اصلاح د لیدلو لپاره پر اوسني ریکارډ ټک وکړئ.",
-      "dismissedBecause": "له پامه غورځول شوې ده، ځکه چې {{reason}}.",
+      "dismissedOn": "د پامه غورځولو نېټه",
+      "supersededOn": "د ځای نیولو نېټه",
       "severityLabel": "شدت: {{severity}}",
       "package": "بسته",
       "vulnerableVersions": "د امنیتي نیمګړتیا لرونکې نسخې",
@@ -1859,11 +1860,6 @@
       "viewAdvisory": "په GitHub کې امنیتي خبرتیا وګورئ",
       "statusOpen": "خلاص",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "سمون لا دمخه پیل شوی",
-      "reasonNoBandwidth": "کاري ظرفیت نشته",
-      "reasonTolerableRisk": "خطر د زغملو وړ دی",
-      "reasonInaccurate": "موندنه ناسمه ده",
-      "reasonNotUsed": "زیان منونکی کوډ نه کارول کېږي",
       "reasonAfterReview": "له بیاکتنې وروسته"
     },
     "settingsOverview": {
@@ -2100,7 +2096,6 @@
       "closedOn": "په {{date}} {{status}}",
       "deadlineNotSet": "وروستۍ نېټه نه ده ټاکل شوې",
       "noSlaDeadline": "د SLA وروستۍ نېټه نشته",
-      "dueOn": "وروستۍ نېټه: {{date}}",
       "overdueNow": "له مهلته تېر",
       "overdue_one": "{{count}} ورځ له مهلته تېر",
       "overdue_other": "{{count}} ورځې له ټاکلي وخت تېرې دي",
@@ -3852,6 +3847,7 @@
       "markSecret": "د پټ په توګه نښه کړئ",
       "masked": "پټ ارزښت",
       "reveal": "ارزښت څرګند کړئ",
+      "hide": "ارزښت پټ کړئ",
       "newValuePlaceholder": "نوی پټ ارزښت ولیکئ",
       "valuePlaceholder": "پټ ارزښت (کوډ شوی)"
     },

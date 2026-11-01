@@ -20,6 +20,8 @@ const colors = {
   border: 'rgba(20, 15, 10, 0.09)',
   switchTrack: '#8A8680',
   card: '#FFFFFF',
+  selection: '#4F5A10',
+  selectionForeground: '#FFFFFF',
   ink2: '#3C382F',
   mutedSoft: '#A9A39A',
   hairSoft: 'rgba(20, 15, 10, 0.05)',

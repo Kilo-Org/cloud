@@ -410,6 +410,14 @@ describe('ProfileVariablesScreen', () => {
 
     pressPressable(renderer.root, 'Reveal value');
     expect(findField(renderer.root, 'Value').props.secureTextEntry).toBe(false);
+    // The revealed value's control names what it does now: it hides it again.
+    expect(
+      findAll(renderer.root, 'Pressable').some(
+        node => node.props.accessibilityLabel === 'Reveal value'
+      )
+    ).toBe(false);
+    pressPressable(renderer.root, 'Hide value');
+    expect(findField(renderer.root, 'Value').props.secureTextEntry).toBe(true);
 
     unmount();
   });

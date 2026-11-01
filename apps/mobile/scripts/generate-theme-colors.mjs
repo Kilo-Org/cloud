@@ -29,6 +29,8 @@ export const TOKEN_KEYS = [
   ['border', '--border'],
   ['switchTrack', '--switch-track'],
   ['card', '--card'],
+  ['selection', '--selection'],
+  ['selectionForeground', '--selection-foreground'],
   ['ink2', '--ink2'],
   ['mutedSoft', '--muted-soft'],
   ['hairSoft', '--hair-soft'],

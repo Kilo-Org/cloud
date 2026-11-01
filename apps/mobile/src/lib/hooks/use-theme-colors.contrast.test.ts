@@ -215,6 +215,34 @@ describe('disabled primary fill contrast (WCAG AA text)', () => {
     const ratio = contrastRatio(darkColors.primaryForeground, darkColors.primaryDisabled);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
+
+  it('dark theme: the disabled fill stays distinguishable from the enabled brand fill', () => {
+    // The disabled fill is a neutral grey that must read as a superseded
+    // control next to the enabled brand fill, not as a second brand colour
+    // (2.69:1 between the two fills), or a disabled Start would look tappable
+    // and an enabled one would lose its emphasis.
+    const separation = contrastRatio(darkColors.primary, darkColors.primaryDisabled);
+    expect(separation).toBeGreaterThanOrEqual(1.5);
+  });
+});
+
+describe('selected tab pill contrast (WCAG AA text)', () => {
+  // An in-page tab paints `--selection-foreground` on `--selection`. The fill is
+  // the muted olive in both themes: the dark accent (#ffdd00) as a full pill
+  // glares on the dark page, so dark mode must not fall back to it.
+  it('light theme: selectionForeground vs selection >= 4.5:1', () => {
+    const ratio = contrastRatio(lightColors.selectionForeground, lightColors.selection);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  it('dark theme: selectionForeground vs selection >= 4.5:1', () => {
+    const ratio = contrastRatio(darkColors.selectionForeground, darkColors.selection);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  it('dark theme: the selected fill is not the dark accent', () => {
+    expect(darkColors.selection).not.toBe(darkColors.primary);
+  });
 });
 
 describe('warn foreground token contrast (WCAG AA text)', () => {

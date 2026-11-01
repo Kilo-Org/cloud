@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "ఇటీవలి సమీక్షలు లేవు",
       "noRecentPrsDescription": "సమీక్ష ప్రారంభించడానికి పైన లింక్‌ను పేస్ట్ చేయండి — తదుపరి సారి అది ఇక్కడ కనిపిస్తుంది.",
-      "couldNotLoad": "లోడ్ చేయలేకపోయాము.",
       "removeFromRecentsTitle": "ఇటీవలి జాబితా నుంచి తీసివేయాలా?",
       "removeFromRecentsMessage": "ఈ సమీక్ష మీ ఇటీవలి జాబితా నుండి తొలగించబడుతుంది.",
       "removeRecentAccessibility": "{{repo}}ను ఇటీవలి జాబితా నుంచి తీసివేయండి",
@@ -834,7 +833,8 @@
     "liveUpdates": "లైవ్ అప్‌డేట్‌లు",
     "liveUpdateSubtitle": "నడుస్తున్న ఏజెంట్లను మీ నోటిఫికేషన్‌లలో చూపించండి",
     "push": "పుష్",
-    "onDescription": "ఈ పరికరంలో పుష్ నోటిఫికేషన్‌లు ఆన్‌లో ఉన్నాయి.",
+    "deviceTitle": "ఈ పరికరంలో పుష్",
+    "onDescription": "హెచ్చరికలు క్రింది వర్గాలను అనుసరిస్తాయి.",
     "offDescription": "అనుమతి లేదా పరికర నమోదు ఆఫ్‌లో ఉంది.",
     "retryPermission": "నోటిఫికేషన్ అనుమతిని మళ్లీ తనిఖీ చేయండి",
     "enable": "నోటిఫికేషన్‌లను ఆన్ చేయండి",
@@ -1842,7 +1842,8 @@
     "findingDetails": {
       "supersededBy": "ఈ సమస్య స్థానంలో తాజా సమస్య నమోదైంది",
       "supersededByDescription": "స్థితి, విశ్లేషణ, పరిష్కారం వివరాలను చూడటానికి తాజా రికార్డును నొక్కండి.",
-      "dismissedBecause": "తీసివేయడానికి కారణం: {{reason}}.",
+      "dismissedOn": "విస్మరణ తేదీ",
+      "supersededOn": "భర్తీ తేదీ",
       "severityLabel": "{{severity}} తీవ్రత",
       "package": "ప్యాకేజీ",
       "vulnerableVersions": "భద్రతా లోపం ఉన్న వెర్షన్‌లు",
@@ -1859,11 +1860,6 @@
       "viewAdvisory": "GitHubలో భద్రతా సూచనను చూడండి",
       "statusOpen": "ఓపెన్",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ఇప్పటికే పరిష్కరించడం మొదలైంది",
-      "reasonNoBandwidth": "పరిష్కరించేందుకు సమయం లేదు",
-      "reasonTolerableRisk": "ప్రమాద స్థాయి ఆమోదయోగ్యం",
-      "reasonInaccurate": "గుర్తించిన సమస్య వివరాలు సరికావు",
-      "reasonNotUsed": "భద్రతా లోపం ఉన్న కోడ్ వాడటం లేదు",
       "reasonAfterReview": "సమీక్ష తర్వాత"
     },
     "settingsOverview": {
@@ -2100,7 +2096,6 @@
       "closedOn": "{{date}}: {{status}}",
       "deadlineNotSet": "గడువు నిర్ణయించబడలేదు",
       "noSlaDeadline": "SLA గడువు లేదు",
-      "dueOn": "గడువు: {{date}}",
       "overdueNow": "గడువు దాటింది",
       "overdue_one": "గడువు దాటి {{count}} రోజు",
       "overdue_other": "గడువు దాటి {{count}} రోజులు",
@@ -3852,6 +3847,7 @@
       "markSecret": "రహస్యంగా గుర్తించండి",
       "masked": "దాచిన విలువ",
       "reveal": "విలువను బహిర్గతం చేయండి",
+      "hide": "విలువను దాచండి",
       "newValuePlaceholder": "కొత్త రహస్య విలువను నమోదు చేయండి",
       "valuePlaceholder": "రహస్య విలువ (ఎన్క్రిప్ట్ చేయబడింది)"
     },

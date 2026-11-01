@@ -1601,95 +1601,89 @@ export async function checkExistingFork(
   }
 }
 
-/**
- * Checks whether a commit is a merge commit (has 2+ parents).
- * Used to skip code reviews triggered by "merge base into feature" pushes.
- * Returns false if the API call fails so the review proceeds (fail-open).
- */
-export async function isMergeCommit(
-  installationId: string,
-  owner: string,
-  repo: string,
-  commitSha: string,
-  appType: GitHubAppType = 'standard'
-): Promise<boolean> {
-  try {
-    const tokenData = await generateGitHubInstallationToken(installationId, appType);
-    const octokit = new Octokit({ auth: tokenData.token });
-
-    const { data } = await octokit.git.getCommit({
-      owner,
-      repo,
-      commit_sha: commitSha,
-    });
-
-    const result = data.parents.length > 1;
-
-    logExceptInTest('[isMergeCommit] Checked commit parents', {
-      owner,
-      repo,
-      sha: commitSha.substring(0, 8),
-      parentCount: data.parents.length,
-      isMergeCommit: result,
-    });
-
-    return result;
-  } catch (error) {
-    logExceptInTest(
-      '[isMergeCommit] Failed to check commit parents, proceeding with review:',
-      error
-    );
-    return false;
-  }
-}
-
 // How many merges a head may stack before its branch content is treated as unknown.
 const mergeHeadWalkLimit = 10;
 
-/**
- * Resolves the branch commit a merge head carries: the first-parent ancestor
- * below every merge. A synchronize whose head only stacks merges of the base
- * branch introduces no new branch content, so the commit it stacks on is what a
- * review has to cover.
- *
- * Returns undefined when the chain cannot be read, so the caller reviews the
- * head instead of waiting for coverage it cannot confirm.
- */
-export async function findMergeHeadContentSha(
-  installationId: string,
-  owner: string,
-  repo: string,
-  commitSha: string,
-  appType: GitHubAppType = 'standard'
-): Promise<string | undefined> {
-  try {
-    const tokenData = await generateGitHubInstallationToken(installationId, appType);
-    const octokit = new Octokit({ auth: tokenData.token });
+export type MergeHeadContent =
+  | Readonly<{ kind: 'not_merge' }>
+  // The heads a review of the merge head can cover: every merge head on its first-parent chain, then
+  // the branch commit the chain ends on, which all of them carry.
+  | Readonly<{ kind: 'review_content'; shas: readonly string[] }>
+  // A merge that takes code from outside the base branch, or a chain that cannot be read.
+  | Readonly<{ kind: 'unreviewed_content' }>;
 
-    let current = commitSha;
+/**
+ * Resolves what a synchronize head carries. A head that stacks merges of the
+ * base branch carries the branch commit its first-parent chain ends on, and each
+ * merge head on that chain carries the same content, so the chain names the
+ * heads a review of any of them covers. A merge whose second parent is not base
+ * content brings in code no branch review covers, and an unreadable chain is
+ * treated the same way, so both fall through to a review instead of a skip.
+ */
+export async function resolveMergeHeadContent(args: {
+  appType: GitHubAppType;
+  baseSha: string;
+  headSha: string;
+  installationId: string;
+  owner: string;
+  repo: string;
+}): Promise<MergeHeadContent> {
+  try {
+    const tokenData = await generateGitHubInstallationToken(args.installationId, args.appType);
+    const octokit = new Octokit({ auth: tokenData.token });
+    const shas: string[] = [];
+    let current = args.headSha;
+
     for (let depth = 0; depth <= mergeHeadWalkLimit; depth += 1) {
       // oxlint-disable-next-line no-await-in-loop -- Each parent names the next commit to read.
       const { data } = await octokit.git.getCommit({
-        owner,
-        repo,
+        owner: args.owner,
+        repo: args.repo,
         commit_sha: current,
       });
-      const [firstParent] = data.parents;
-      if (data.parents.length < 2 || firstParent === undefined) {
-        return current;
+      const [firstParent, secondParent] = data.parents;
+      if (data.parents.length < 2) {
+        if (depth === 0) {
+          return { kind: 'not_merge' };
+        }
+        return { kind: 'review_content', shas: shas.concat(current) };
       }
+      if (firstParent === undefined || secondParent === undefined) {
+        return { kind: 'unreviewed_content' };
+      }
+      // oxlint-disable-next-line no-await-in-loop -- The comparison decides whether this merge is base content.
+      const comparison = await octokit.repos.compareCommits({
+        owner: args.owner,
+        repo: args.repo,
+        base: args.baseSha,
+        head: secondParent.sha,
+      });
+      if (comparison.data.status !== 'behind' && comparison.data.status !== 'identical') {
+        logExceptInTest(
+          '[resolveMergeHeadContent] Merge takes content from outside the base branch',
+          {
+            owner: args.owner,
+            repo: args.repo,
+            sha: current.substring(0, 8),
+            secondParent: secondParent.sha.substring(0, 8),
+            status: comparison.data.status,
+          }
+        );
+        return { kind: 'unreviewed_content' };
+      }
+      shas.push(current);
       current = firstParent.sha;
     }
 
-    logExceptInTest('[findMergeHeadContentSha] Merge chain exceeds the walk limit', {
-      owner,
-      repo,
-      sha: commitSha.substring(0, 8),
+    logExceptInTest('[resolveMergeHeadContent] Merge chain exceeds the walk limit', {
+      owner: args.owner,
+      repo: args.repo,
+      sha: args.headSha.substring(0, 8),
     });
-    return undefined;
+    return { kind: 'unreviewed_content' };
   } catch (error) {
-    logExceptInTest('[findMergeHeadContentSha] Failed to walk the merge chain:', error);
-    return undefined;
+    logExceptInTest('[resolveMergeHeadContent] Failed to walk the merge chain:', error);
+    return { kind: 'unreviewed_content' };
   }
 }
 

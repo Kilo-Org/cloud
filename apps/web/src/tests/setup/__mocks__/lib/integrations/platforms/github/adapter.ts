@@ -35,24 +35,15 @@ export async function getCollaboratorPermissionLevel(
   return 'write';
 }
 
-export async function isMergeCommit(
-  _installationId: string,
-  _owner: string,
-  _repo: string,
-  _commitSha: string,
-  _appType: GitHubAppType = 'standard'
-): Promise<boolean> {
-  return false;
-}
-
-export async function findMergeHeadContentSha(
-  _installationId: string,
-  _owner: string,
-  _repo: string,
-  commitSha: string,
-  _appType: GitHubAppType = 'standard'
-): Promise<string | undefined> {
-  return commitSha;
+export async function resolveMergeHeadContent(_args: {
+  appType: GitHubAppType;
+  baseSha: string;
+  headSha: string;
+  installationId: string;
+  owner: string;
+  repo: string;
+}): Promise<{ kind: 'not_merge' }> {
+  return { kind: 'not_merge' };
 }
 
 export async function addReactionToPR(

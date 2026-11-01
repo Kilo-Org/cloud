@@ -56,10 +56,10 @@ import {
   reconsiderableCodeReviewWorkCondition,
   FUNDED_CODE_REVIEW_BALANCE_THRESHOLD_MICRODOLLARS,
   isTerminalCodeReviewStatus,
+  NON_TERMINAL_CODE_REVIEW_STATUSES,
   MAX_CONCURRENT_CODE_REVIEWS_PER_DEFAULT_USER,
   MAX_CONCURRENT_CODE_REVIEWS_PER_FUNDED_USER,
   MAX_CONCURRENT_CODE_REVIEWS_PER_ORG,
-  NON_TERMINAL_CODE_REVIEW_STATUSES,
   nonTerminalCodeReviewStatusListSql,
   staleQueuedCodeReviewCutoffSql,
   staleRunningCodeReviewCutoffSql,
@@ -1698,6 +1698,44 @@ export function findExistingReviewInTransaction(
   headSha: string
 ): Promise<CloudAgentCodeReview | null> {
   return findExistingReviewWithDatabase(tx, scope, headSha);
+}
+
+/**
+ * Whether a review of any of these heads covers the scope: one that finished, or
+ * one still in flight. A cancelled or failed review covers nothing, and neither
+ * does an empty list.
+ */
+export async function hasReviewCoveringHeads(
+  scope: ReviewScope,
+  headShas: readonly string[]
+): Promise<boolean> {
+  if (headShas.length === 0) {
+    return false;
+  }
+  try {
+    const [review] = await db
+      .select({ id: cloud_agent_code_reviews.id })
+      .from(cloud_agent_code_reviews)
+      .where(
+        and(
+          ...reviewScopeConditions(scope),
+          inArray(cloud_agent_code_reviews.head_sha, [...headShas]),
+          inArray(cloud_agent_code_reviews.status, [
+            'completed',
+            ...NON_TERMINAL_CODE_REVIEW_STATUSES,
+          ])
+        )
+      )
+      .limit(1);
+
+    return review !== undefined;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'hasReviewCoveringHeads' },
+      extra: { scope, headShas },
+    });
+    throw error;
+  }
 }
 
 export async function createCodeReviewIfAbsentInTransaction(

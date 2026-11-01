@@ -48,7 +48,7 @@ const SELF_MANAGED_ORG: GitLabReviewOwner = {
 
 function integrationRow(overrides: {
   gitlab_instance_url?: string;
-  repositories?: { id: number; name: string; full_name: string; private: boolean }[];
+  repositories?: { id: number | string; name: string; full_name: string; private: boolean }[];
   status?: string;
 }): PlatformIntegration {
   return {
@@ -217,13 +217,33 @@ describe('authorizeProject — repository matching', () => {
 });
 
 describe('authorizeOwner', () => {
-  it('returns token and server-derived instance without a project check', async () => {
+  it('returns token, server-derived instance and the cached repository scope', async () => {
     mockActiveIntegration(integrationRow({ gitlab_instance_url: 'https://gitlab.example.com' }));
 
     const access = await authorizeOwner(SELF_MANAGED_USER);
 
     expect(access.accessToken).toBe('glpat-mock-token');
     expect(access.instanceUrl).toBe('https://gitlab.example.com');
+    // The owner-level read has no project to match, so it carries the whole
+    // catalogue its callers intersect their rows with.
+    expect(access.repositoryFullNames).toEqual(['group/sub/repo', 'group/other']);
+  });
+
+  it('reports an empty scope rather than widening when the catalogue cannot be read', async () => {
+    mockActiveIntegration(
+      integrationRow({
+        repositories: [
+          { id: 'string-id', name: 'repo', full_name: 'group/sub/repo', private: true },
+        ],
+      })
+    );
+
+    const access = await authorizeOwner(SELF_MANAGED_USER);
+
+    // Unreadable ids are the same fail-closed case authorizeProject treats as
+    // "no repository": an owner-level read must not fall back to the whole
+    // instance.
+    expect(access.repositoryFullNames).toEqual([]);
   });
 
   it('applies the same instance-hint guard', async () => {

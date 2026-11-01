@@ -27,22 +27,27 @@ type Published = { height: number; maxHeight: number };
 
 let published: Published = { height: 0, maxHeight: 0 };
 let reportContentSize: ((contentHeight: number) => void) | null = null;
+let pushText: ((text: string) => void) | null = null;
 let harnessRenders = 0;
 let cap = OPTIONS.maxHeight;
+let width = OPTIONS.textContentWidth;
 
 function Harness() {
   harnessRenders += 1;
-  const measure = useTextHeight({ ...OPTIONS, maxHeight: cap });
+  const measure = useTextHeight({ ...OPTIONS, maxHeight: cap, textContentWidth: width });
   published = { height: measure.height, maxHeight: measure.maxHeight };
   reportContentSize = measure.setNativeContentHeight;
+  pushText = measure.setText;
   return measure.measureElement;
 }
 
 async function mount(capOverride?: number) {
   published = { height: 0, maxHeight: 0 };
   reportContentSize = null;
+  pushText = null;
   harnessRenders = 0;
   cap = capOverride ?? OPTIONS.maxHeight;
+  width = OPTIONS.textContentWidth;
   const holder: { current?: TestRenderer.ReactTestRenderer } = {};
   await act(async () => {
     await Promise.resolve();
@@ -67,6 +72,17 @@ function reportNativeContentSize(height: number): number {
     reportContentSize?.(height);
   });
   return harnessRenders - before;
+}
+
+/** The text the hidden mirror currently renders. */
+function findMirrorText(renderer: TestRenderer.ReactTestRenderer): unknown {
+  const mirror = renderer.root.find(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Text' &&
+      typeof node.props.onLayout === 'function'
+  );
+  return mirror.children[0];
 }
 
 /** The hidden mirror's measured text height, before the padding is added. */
@@ -245,6 +261,135 @@ describe('useTextHeight pitch snapping', () => {
     const renders = reportNativeContentSize(24 + 6 * 22);
     expect(renders).toBeGreaterThan(0);
     expect(published.maxHeight).toBeCloseTo(24 + 4 * 22, 2);
+    renderer.unmount();
+  });
+});
+
+describe('useTextHeight long-draft measurement', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  });
+
+  /**
+   * Push text into the hook and report the hook's own render count, so a caller
+   * can assert whether the change cost a mirror layout.
+   */
+  function typeText(text: string): number {
+    const before = harnessRenders;
+    act(() => {
+      pushText?.(text);
+    });
+    return harnessRenders - before;
+  }
+
+  it('measures an append until the draft fills the cap, then stops re-laying it out', async () => {
+    // Text layout runs over the whole draft on every measured change, so a
+    // composer that measured each keystroke laid a long draft out again and
+    // again as it grew — the work that stalled typing a long message. Once the
+    // measured content fills the cap, a longer draft publishes the same cap, so
+    // the append cannot change anything the caller renders.
+    const renderer = await mount();
+    // An empty draft lays its one line out at the one-line floor.
+    layoutMirror(renderer, 20);
+    expect(published.height).toBe(44);
+
+    // Below the cap every change is measured: the published height follows the
+    // lines the mirror reports.
+    expect(typeText('first line')).toBe(1);
+    layoutMirror(renderer, 40);
+    expect(published.height).toBe(64);
+    expect(typeText('first line\nsecond')).toBe(1);
+
+    // The draft fills the cap; from here an append is not measured.
+    const draft = 'first line\nsecond';
+    expect(typeText(`${draft}\nthird`)).toBe(1);
+    layoutMirror(renderer, 100);
+    expect(published.height).toBe(124);
+
+    const grown = `${draft}\nthird`;
+    const appends = Array.from({ length: 50 }, (_, index) => `${grown}${'x'.repeat(index + 1)}`);
+    const cost = appends.map(append => typeText(append));
+    expect(cost).toEqual(Array.from({ length: 50 }, () => 0));
+    // The published height is still the cap the caller renders.
+    expect(published.height).toBe(124);
+
+    // Positive control: a change that can shrink the layout measures the exact
+    // new text again, so the mirror is never left holding a stale draft.
+    const shorter = grown.slice(0, 10);
+    expect(typeText(shorter)).toBe(1);
+    layoutMirror(renderer, 20);
+    expect(published.height).toBe(44);
+    renderer.unmount();
+  });
+
+  it('ignores the input report while the mirror holds an older draft', async () => {
+    // The report carries the live input's own content height. Divided by the
+    // frozen mirror's shorter line count it would estimate a pitch several times
+    // too large, which unsnaps the cap while a long draft is typed.
+    const renderer = await mount();
+    layoutMirror(renderer, 20);
+    const draft = 'x'.repeat(200);
+    expect(typeText(draft)).toBe(1);
+    // Five mirror lines fill the sample composer's 124pt cap.
+    layoutMirror(renderer, 100);
+    expect(published.height).toBe(124);
+    // The input's own report establishes the pitch the cap snaps to.
+    reportNativeContentSize(24 + 5 * 18.667);
+    expect(published.maxHeight).toBeCloseTo(24 + 5 * 18.667, 2);
+
+    expect(typeText(`${draft}y`)).toBe(0);
+    const renders = reportNativeContentSize(24 + 60 * 18.667);
+    expect(renders).toBe(0);
+    expect(published.maxHeight).toBeCloseTo(24 + 5 * 18.667, 2);
+    expect(published.height).toBeCloseTo(24 + 5 * 18.667, 2);
+    renderer.unmount();
+  });
+
+  it('measures the live draft again when the wrapping it was measured under changes', async () => {
+    // A rotation or a font scale change re-wraps the draft: the frozen
+    // measurement was taken at a width and line box that no longer hold, and no
+    // text change reports it.
+    const renderer = await mount();
+    layoutMirror(renderer, 20);
+    const draft = 'x'.repeat(200);
+    expect(typeText(draft)).toBe(1);
+    layoutMirror(renderer, 100);
+    expect(published.height).toBe(124);
+    expect(typeText(`${draft}y`)).toBe(0);
+
+    width = 120;
+    await act(async () => {
+      renderer.update(createElement(Harness));
+      await Promise.resolve();
+    });
+    // The mirror holds the live draft again, so the next layout measures it.
+    expect(findMirrorText(renderer)).toBe(`${draft}y`);
+    layoutMirror(renderer, 80);
+    expect(published.height).toBe(104);
+    renderer.unmount();
+  });
+
+  it('measures an append again when the cap it was clamped to changes', async () => {
+    // A keyboard closing raises the cap, so the frozen measurement no longer
+    // stands in for the draft: the composer must be able to grow again.
+    const renderer = await mount();
+    layoutMirror(renderer, 20);
+    const draft = 'x'.repeat(200);
+    expect(typeText(draft)).toBe(1);
+    layoutMirror(renderer, 100);
+    expect(published.height).toBe(124);
+    expect(typeText(`${draft}y`)).toBe(0);
+
+    // The frame grows: same draft, a taller cap.
+    cap = 200;
+    await act(async () => {
+      renderer.update(createElement(Harness));
+      await Promise.resolve();
+    });
+    expect(published.maxHeight).toBe(200);
+    expect(typeText(`${draft}yz`)).toBe(1);
+    layoutMirror(renderer, 160);
+    expect(published.height).toBe(184);
     renderer.unmount();
   });
 });

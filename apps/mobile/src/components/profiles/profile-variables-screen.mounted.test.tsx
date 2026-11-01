@@ -20,6 +20,7 @@ import {
   toggleSecret,
 } from '@/components/profiles/profile-variables-screen.test-helpers';
 import { SECRET_MASK } from '@/components/profiles/profile-variables-model';
+import { MAX_PROFILE_VARS } from '@/lib/agent-profile-forms';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
@@ -171,6 +172,81 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
+  it('names the profile variable limit and refuses a new key at it without a request', async () => {
+    h.query.data = testVars(
+      Array.from({ length: MAX_PROFILE_VARS }, (_, index) => ({
+        key: `VAR_${String(index)}`,
+        value: 'v',
+        isSecret: false,
+      }))
+    );
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    const limitCopy = i18n.t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS });
+    expect(
+      findAll(renderer.root, 'Text')
+        .map(node => node.props.children)
+        .includes(limitCopy)
+    ).toBe(true);
+
+    pressButton(renderer.root, 'Add variable');
+    changeText(renderer.root, 'Key', 'NEW_VAR');
+    changeText(renderer.root, 'Value', 'v');
+    pressButton(renderer.root, 'Save');
+
+    expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
+    expect(h.error).toHaveBeenCalledWith(limitCopy);
+
+    unmount();
+  });
+
+  const atVariableLimit = (): TestVars =>
+    testVars([
+      { key: 'API_KEY', value: 'old', isSecret: false },
+      ...Array.from({ length: MAX_PROFILE_VARS - 1 }, (_, index) => ({
+        key: `VAR_${String(index)}`,
+        value: 'v',
+        isSecret: false,
+      })),
+    ]);
+
+  it('still fills a stored variable at the limit', async () => {
+    h.query.data = atVariableLimit();
+    h.query.isPending = false;
+    h.mutations.setVar.mutateAsync.mockResolvedValue({ success: true });
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'API_KEY');
+    changeText(renderer.root, 'Value', 'new');
+    pressButton(renderer.root, 'Save');
+
+    await waitFor(() => h.mutations.setVar.mutateAsync.mock.calls.length > 0);
+    expect(h.mutations.setVar.mutateAsync.mock.calls[0]?.[0]).toMatchObject({
+      key: 'API_KEY',
+      value: 'new',
+    });
+    expect(h.error).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('states the limit only for a reader who can add variables', async () => {
+    h.query.data = atVariableLimit();
+    h.query.isPending = false;
+    h.canManage = false;
+
+    const { renderer, unmount } = await mountScreen();
+    const limitCopy = i18n.t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS });
+    expect(
+      findAll(renderer.root, 'Text')
+        .map(node => node.props.children)
+        .includes(limitCopy)
+    ).toBe(false);
+
+    unmount();
+  });
+
   it('reaches a screen reader as the mark-secret switch alone, without a duplicate label stop', async () => {
     h.query.data = testVars();
     h.query.isPending = false;
@@ -262,11 +338,11 @@ describe('ProfileVariablesScreen', () => {
     expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
     expect(findField(renderer.root, 'Key').props.error).toBe('required');
 
-    changeText(renderer.root, 'Key', 'a'.repeat(257));
+    changeText(renderer.root, 'Key', 'a'.repeat(129));
     pressButton(renderer.root, 'Save');
 
     expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
-    expect(findField(renderer.root, 'Key').props.error).toBe('Key must be 256 characters or fewer');
+    expect(findField(renderer.root, 'Key').props.error).toBe('Key must be 128 characters or fewer');
 
     unmount();
   });

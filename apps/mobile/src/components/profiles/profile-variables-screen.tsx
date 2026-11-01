@@ -18,6 +18,7 @@ import {
   VariablesSkeleton,
 } from '@/components/profiles/profile-variables-rows';
 import { QueryError } from '@/components/query-error';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -25,6 +26,7 @@ import { KeyRound } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileMutations, useAgentProfileVars } from '@/lib/hooks/use-agent-profiles';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { MAX_PROFILE_VARS } from '@/lib/agent-profile-forms';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 
@@ -93,6 +95,7 @@ export function ProfileVariablesScreen({
     editingKey !== null && editingKey !== '' && !rows.some(row => row.key === editingKey);
   const isAdding = editingKey === '';
   const isEditing = editingKey !== null && !isAdding && !orphanedEdit;
+  const atVariableCap = vars.length >= MAX_PROFILE_VARS;
   // The add control is what an orphaned edit would otherwise leave the reader
   // without, so it renders for that state exactly as it does when closed.
   const showAdd = editingKey === null || orphanedEdit;
@@ -113,6 +116,11 @@ export function ProfileVariablesScreen({
   };
 
   const saveEdit = async (edit: VariableEdit): Promise<boolean> => {
+    const isNewKey = !vars.some(variable => variable.key === edit.key);
+    if (isNewKey && atVariableCap) {
+      toast.error(t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS }));
+      return false;
+    }
     try {
       await setVar.mutateAsync({
         profileId,
@@ -239,6 +247,14 @@ export function ProfileVariablesScreen({
           <Button onPress={startAdd}>
             <Text>{t('profiles.addVariable')}</Text>
           </Button>
+        ) : null}
+
+        {atVariableCap && canManage ? (
+          <AccessibleStatus
+            message={t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS })}
+            tone="warn"
+            className="text-sm"
+          />
         ) : null}
       </>
     );

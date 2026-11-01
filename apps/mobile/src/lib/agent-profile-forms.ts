@@ -15,8 +15,12 @@ export const PROFILE_NAME_MAX_LENGTH = 100;
 /** Server bound: `agent-profiles-router.ts`'s `description: z.string().max(500)`. */
 export const PROFILE_DESCRIPTION_MAX_LENGTH = 500;
 
-/** Server bound: `VarSchema`'s `z.string().min(1).max(256)`. */
-export const VARIABLE_KEY_MAX_LENGTH = 256;
+/**
+ * Server bound: the profile variable key contract, mirrored from
+ * `ENVIRONMENT_LIMITS.MAX_KEY_LENGTH` in
+ * `packages/cloud-agent-profile/src/environment-contracts.ts`.
+ */
+export const VARIABLE_KEY_MAX_LENGTH = 128;
 
 /**
  * Server bound: the inline session layer's env-var values. The prepare-session
@@ -32,6 +36,44 @@ const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
 /** Server bound: `contracts/skills.ts`'s `MAX_SKILL_NAME_LENGTH`. */
 export const SKILL_NAME_MAX_LENGTH = 100;
+
+/**
+ * Server rule: `environment-contracts.ts`'s reserved names and prefixes. A key
+ * the sandbox runtime owns is refused when a profile stores it, so the form
+ * refuses it before the request. The form stores keys upper-cased, and the
+ * package list holds one lower-case name (`pnpm_config_store_dir`) that no
+ * upper-cased key can equal, so that name is left out rather than refusing a
+ * key the package accepts.
+ */
+const RESERVED_VARIABLE_KEY_NAMES: ReadonlySet<string> = new Set([
+  'HOME',
+  'SESSION_ID',
+  'SESSION_HOME',
+  'SANDBOX_CONTROL_CREDENTIAL',
+  'SANDBOX_CONTROL_URL',
+  'PROVIDER_INSTANCE_ID',
+  'CONTROL_LOG_UPLOAD_URL',
+  'CONTROL_LOG_UPLOAD_GRANT',
+  'CONTROL_WRAPPER_INSTANCE_ID',
+]);
+
+const RESERVED_VARIABLE_KEY_PREFIXES = ['XDG_', 'KILO', 'OPENCODE'] as const;
+
+/** Whether the sandbox runtime owns this key. */
+export function isReservedVariableKey(key: string): boolean {
+  const stored = key.toUpperCase();
+  return (
+    RESERVED_VARIABLE_KEY_NAMES.has(stored) ||
+    RESERVED_VARIABLE_KEY_PREFIXES.some(prefix => stored.startsWith(prefix))
+  );
+}
+
+/**
+ * Server cap: `profile-vars-service.ts`'s `MAX_PROFILE_VARS`. The profile
+ * variables screen compares the loaded list's length against it before a new
+ * variable goes out, and names the cap in the reader's language.
+ */
+export const MAX_PROFILE_VARS = 50;
 
 /**
  * Server cap: `contracts/skills.ts`'s `MAX_PROFILE_SKILLS`. The server counts
@@ -155,14 +197,16 @@ export function validateSkillInput(input: { name: string; content: string }): Sk
 
 /**
  * Normalize a typed environment variable key to the shape the server stores:
- * upper case, with anything outside `A-Z0-9_` replaced by `_`. Matches the web
- * editor's `cleanKey`.
+ * upper case, with anything outside `A-Z0-9_` replaced by `_`, and a leading
+ * `_` when the result would start with a digit, so the stored key satisfies the
+ * server's key contract. Matches the web editor's `cleanKey`.
  */
 export function cleanVariableKey(value: string): string {
-  return value.toUpperCase().replaceAll(/[^A-Z0-9_]/g, '_');
+  const cleaned = value.toUpperCase().replaceAll(/[^A-Z0-9_]/g, '_');
+  return /^\d/.test(cleaned) ? `_${cleaned}` : cleaned;
 }
 
-/** A key is valid when its trimmed length is within the server's 1..256 bound. */
+/** A key is valid when its trimmed length is within the server's 1..128 bound. */
 export function isValidVariableKey(value: string): boolean {
   const trimmed = value.trim();
   return trimmed.length > 0 && trimmed.length <= VARIABLE_KEY_MAX_LENGTH;

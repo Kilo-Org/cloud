@@ -65,11 +65,11 @@ export {
 
 // Var CRUD
 export {
+  MAX_PROFILE_VARS,
   setVar,
   deleteVar,
   listVars,
   getVarsForSession,
-  setVars,
   type VarForSession,
 } from './profile-vars-service';
 

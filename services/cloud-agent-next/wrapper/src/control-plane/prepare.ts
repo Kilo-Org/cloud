@@ -154,7 +154,7 @@ type PreparedRoute = {
   home: string;
   kilo: WorktreeKiloAuth;
   env: Record<string, string>;
-  gitToken?: string;
+  redactionSecrets: Set<string>;
   redact: (text: string) => string;
 };
 
@@ -317,7 +317,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     spec: ControlPlaneRouteSpec,
     env: Record<string, string>,
     gitToken: string | undefined,
-    cloudAgentMcp: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'] | undefined
+    cloudAgentMcp: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'] | undefined,
+    retainedSecrets: Set<string>
   ): (text: string) => string {
     return createSecretRedactor(
       inheritedEnv,
@@ -329,7 +330,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           ...(cloudAgentMcp ? { CLOUD_AGENT_MCP_TOKEN: cloudAgentMcp.token } : {}),
         },
       ],
-      spec.secretEnvKeys ?? []
+      spec.secretEnvKeys ?? [],
+      retainedSecrets
     );
   }
 
@@ -1080,7 +1082,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   async function runPrepare(
     spec: ControlPlaneRouteSpec,
     credentials: ControlPlaneSessionCredentialsPayload | undefined,
-    owner: PreparingRoute
+    owner: PreparingRoute,
+    redactionSecrets = new Set<string>()
   ): Promise<void> {
     const sessionId = spec.sessionId;
     let currentStep: ControlPlanePreparationStep = 'kilo_runtime';
@@ -1131,7 +1134,13 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         ),
         spec
       );
-      const redact = createRouteRedactor(spec, builtEnv, credentials?.git?.token, cloudAgentMcp);
+      const redact = createRouteRedactor(
+        spec,
+        builtEnv,
+        credentials?.git?.token,
+        cloudAgentMcp,
+        redactionSecrets
+      );
       const needsWorkspace =
         spec.workspaceSnapshot !== undefined ||
         Boolean(spec.git) ||
@@ -1342,7 +1351,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         home,
         kilo: kiloAuth,
         env: builtEnv,
-        ...(credentials?.git?.token ? { gitToken: credentials.git.token } : {}),
+        redactionSecrets,
         redact,
       });
       // A credentials frame that arrived while this route was preparing is
@@ -1432,8 +1441,13 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       route.spec
     );
     route.env = nextEnv;
-    route.gitToken = credentials.git?.token ?? route.gitToken;
-    route.redact = createRouteRedactor(route.spec, nextEnv, route.gitToken, cloudAgentMcp);
+    route.redact = createRouteRedactor(
+      route.spec,
+      nextEnv,
+      credentials.git?.token,
+      cloudAgentMcp,
+      route.redactionSecrets
+    );
     await deps.runtimes.installCredentials(route.key, nextEnv, cloudAgentMcp);
     commitWorkspaceMcpGrant(route.key, cloudAgentMcp);
     if (credentials.git?.token && route.spec.git) {
@@ -1530,7 +1544,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           return running;
         }
       }
-      const running = runPrepare(spec, credentials, owner).finally(() =>
+      const running = runPrepare(spec, credentials, owner, route?.redactionSecrets).finally(() =>
         finalizePreparingOwner(owner, spec)
       );
       owner.promise = running;

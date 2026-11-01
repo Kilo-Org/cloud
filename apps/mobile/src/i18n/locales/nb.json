@@ -4011,7 +4011,7 @@
   "credits": {
     "title": "Kjøp kreditter",
     "description": "Kreditter er et engangskjøp som legges til Kilo-saldoen din for å kjøre AI-kodeøkter i Kilo App. Butikken belaster kontoen din, og kredittene legges til etter at butikken bekrefter betalingen.",
-    "nextExpiry": "{{amount}} i kreditter utløper {{date}} (UTC). Kreditter med tidligst utløpsdato brukes først.",
+    "nextExpiry": "Kreditter utløper {{date}} (UTC). Kreditter med tidligst utløpsdato brukes først.",
     "noExpiringCredits": "Ingen kreditter med utløpsdato.",
     "expiryUnavailable": "Informasjon om kredittenes utløp er ikke tilgjengelig.",
     "appStoreExpiry": "Kreditter kjøpt via App Store utløper ikke.",

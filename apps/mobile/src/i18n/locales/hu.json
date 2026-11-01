@@ -4011,7 +4011,7 @@
   "credits": {
     "title": "Kreditek vásárlása",
     "description": "A kreditek egyszeri vásárlás, amely a Kilo egyenlegedhez adódik AI kódolási munkamenetek futtatásához a Kilo alkalmazásban. Az áruház terheli a fiókodat, és a kreditek az áruház fizetésigazolása után kerülnek jóváírásra.",
-    "nextExpiry": "{{amount}} értékű kredit lejárati ideje: {{date}} (UTC). A legkorábban lejáró kreditek használódnak fel először.",
+    "nextExpiry": "A kreditek lejárati ideje: {{date}} (UTC). A legkorábban lejáró kreditek használódnak fel először.",
     "noExpiringCredits": "Nincsenek lejáró kreditek.",
     "expiryUnavailable": "A kreditek lejárati adatai nem érhetők el.",
     "appStoreExpiry": "Az App Store-on keresztül vásárolt kreditek nem járnak le.",

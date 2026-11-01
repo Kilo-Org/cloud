@@ -4182,7 +4182,7 @@
   "credits": {
     "title": "Ixtri krediti",
     "description": "Il-krediti huma xiri ta' darba li jiżdied mal-bilanċ Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo. Il-ħanut jaddebita l-kont tiegħek u l-krediti jiżdiedu wara li l-ħanut jikkonferma l-ħlas.",
-    "nextExpiry": "{{amount}} fi krediti jiskadu: {{date}} (UTC). Il-krediti li jiskadu l-ewwel jintużaw l-ewwel.",
+    "nextExpiry": "Il-krediti jiskadu: {{date}} (UTC). Il-krediti li jiskadu l-ewwel jintużaw l-ewwel.",
     "noExpiringCredits": "M'hemmx krediti li se jiskadu.",
     "expiryUnavailable": "Id-dettalji tal-iskadenza tal-krediti mhumiex disponibbli.",
     "appStoreExpiry": "Il-krediti mixtrija permezz tal-App Store ma jiskadux.",

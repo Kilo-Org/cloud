@@ -4011,7 +4011,7 @@
   "credits": {
     "title": "Kredi satın al",
     "description": "Krediler, Kilo App'te AI kodlama oturumları yürütmek için Kilo bakiyenize eklenen tek seferlik bir satın alımdır. Mağaza hesabınızdan ücret alır ve mağaza ödemeyi onayladıktan sonra krediler eklenir.",
-    "nextExpiry": "{{amount}} tutarındaki kredinin süresi {{date}} (UTC) tarihinde dolacak. Süresi en erken dolan krediler önce kullanılır.",
+    "nextExpiry": "Kredinin süresi {{date}} (UTC) tarihinde dolacak. Süresi en erken dolan krediler önce kullanılır.",
     "noExpiringCredits": "Süresi dolacak kredi yok.",
     "expiryUnavailable": "Kredilerin süre sonu bilgisi alınamıyor.",
     "appStoreExpiry": "App Store üzerinden satın alınan kredilerin süresi dolmaz.",

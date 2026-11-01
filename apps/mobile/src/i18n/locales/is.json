@@ -4011,7 +4011,7 @@
   "credits": {
     "title": "Kaupa inneign",
     "description": "Inneign er einstakt kaup sem bætist við Kilo-stöðuna þína til að keyra AI-forritunarlotur í Kilo App. Verslunin rukkar reikninginn þinn og inneign bætist við eftir að verslunin staðfestir greiðsluna.",
-    "nextExpiry": "Inneign að upphæð {{amount}} rennur út {{date}} (UTC). Inneign sem rennur fyrst út er notuð fyrst.",
+    "nextExpiry": "Inneign rennur út {{date}} (UTC). Inneign sem rennur fyrst út er notuð fyrst.",
     "noExpiringCredits": "Engin inneign sem rennur út.",
     "expiryUnavailable": "Upplýsingar um gildistíma inneignar eru ekki tiltækar.",
     "appStoreExpiry": "Inneign sem keypt er í App Store rennur ekki út.",

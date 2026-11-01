@@ -4017,7 +4017,7 @@
   "credits": {
     "title": "Hividy kireditra",
     "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",
-    "nextExpiry": "Kireditra {{amount}} ho lany daty amin'ny {{date}} (UTC). Ny kireditra ho lany daty voalohany no ampiasaina aloha.",
+    "nextExpiry": "Kireditra ho lany daty amin'ny {{date}} (UTC). Ny kireditra ho lany daty voalohany no ampiasaina aloha.",
     "noExpiringCredits": "Tsy misy kireditra ho lany daty.",
     "expiryUnavailable": "Tsy azo alaina ny antsipirian'ny fahataperan'ny datin'ny kireditra.",
     "appStoreExpiry": "Tsy lany daty ny kireditra novidiana tamin'ny App Store.",

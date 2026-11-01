@@ -4011,7 +4011,7 @@
   "credits": {
     "title": "Kireedita bituu",
     "description": "Kireeditiin bittaa yeroo tokkoo kan baalansii Kilo kee irratti dabalame ta'ee, shumarra code AI Kilo App keessatti hojjechuuf oola. Suuqii ammaataa kee irraa kaffaltii fudhata, suuqiin kaffaltii erga mirkaneesse booda kireeditiin dabalama.",
-    "nextExpiry": "Kireeditiin {{amount}} gaafa {{date}} (UTC) yeroon isaa darba. Kireeditiin dursee yeroon isaa darbu dursa itti fayyadamama.",
+    "nextExpiry": "Kireetiin gaafa {{date}} (UTC) yeroon isaa darba. Kireetiin dursee yeroon isaa darbu dursa itti fayyadamama.",
     "noExpiringCredits": "Kireeditiin yeroon isaa darbu hin jiru.",
     "expiryUnavailable": "Odeeffannoon yeroo kireeditiin itti darbu hin argamu.",
     "appStoreExpiry": "Kireeditiin App Store irraa bitame yeroon isaa hin darbu.",

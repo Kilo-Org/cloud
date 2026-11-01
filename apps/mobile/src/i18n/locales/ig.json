@@ -4011,7 +4011,7 @@
   "credits": {
     "title": "Zụta ego ojiji",
     "description": "Ego ojiji bụ azụmahịa otu oge nke a na-agbakwunye na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App. Ụlọ ahịa na-akwụ ụgwọ na akaụntụ gị, a na-agbakwunye ego ojiji mgbe ụlọ ahịa kwadoro ịkwụ ụgwọ ahụ.",
-    "nextExpiry": "Ego ojiji ruru {{amount}} ga-agwụ na {{date}} (UTC). A na-ebu ụzọ jiri ego ojiji nke ga-akacha agwụ ngwa ngwa.",
+    "nextExpiry": "Ego ojiji ga-agwụ na {{date}} (UTC). A na-ebu ụzọ jiri ego ojiji nke ga-akacha agwụ ngwa ngwa.",
     "noExpiringCredits": "Enweghị ego ojiji nke ga-agwụ.",
     "expiryUnavailable": "Nkọwa oge ego ojiji ga-agwụ adịghị.",
     "appStoreExpiry": "Ego ojiji e ji App Store zụta anaghị agwụ.",

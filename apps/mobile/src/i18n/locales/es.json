@@ -4068,7 +4068,7 @@
   "credits": {
     "title": "Comprar créditos",
     "description": "Los créditos son una compra única que se añade a tu saldo de Kilo para ejecutar sesiones de codificación con IA en Kilo App. La tienda cobra en tu cuenta y los créditos se añaden cuando la tienda confirma el pago.",
-    "nextExpiry": "{{amount}} en créditos caducan el {{date}} (UTC). Los créditos con la caducidad más próxima se usan primero.",
+    "nextExpiry": "Los créditos caducan el {{date}} (UTC). Los créditos con la caducidad más próxima se usan primero.",
     "noExpiringCredits": "No hay créditos pendientes de caducar.",
     "expiryUnavailable": "Información de caducidad de los créditos no disponible.",
     "appStoreExpiry": "Los créditos comprados a través de la App Store no caducan.",

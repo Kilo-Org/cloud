@@ -4017,7 +4017,7 @@
   "credits": {
     "title": "Thenga amakhredithi",
     "description": "Amakhredithi ukuthenga kwesikhathi esisodwa okwengezwa kubhalansi yakho ye-Kilo ukuze usebenzise amaseshini okubhala ikhodi e-AI ku-Kilo App. Isitolo sikhokhisa i-akhawunti yakho futhi amakhredithi engezwa ngemva kokuba isitolo siqinisekise inkokhelo.",
-    "nextExpiry": "Amakhredithi angu-{{amount}} aphelelwa yisikhathi ngo-{{date}} (UTC). Amakhredithi aphelelwa yisikhathi kuqala asetshenziswa kuqala.",
+    "nextExpiry": "Amakhredithi aphelelwa yisikhathi ngo-{{date}} (UTC). Amakhredithi aphelelwa yisikhathi kuqala asetshenziswa kuqala.",
     "noExpiringCredits": "Awekho amakhredithi azophelelwa yisikhathi.",
     "expiryUnavailable": "Imininingwane yokuphelelwa yisikhathi kwamakhredithi ayitholakali.",
     "appStoreExpiry": "Amakhredithi athengwe nge-App Store awaphelelwa yisikhathi.",

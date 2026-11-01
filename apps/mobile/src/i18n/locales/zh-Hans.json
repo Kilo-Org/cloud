@@ -4011,7 +4011,7 @@
   "credits": {
     "title": "购买额度",
     "description": "额度是一次性购买，会添加到你的 Kilo 余额中，用于在 Kilo App 中运行 AI 编程会话。商店会向你的账户收费，商店确认付款后额度才会到账。",
-    "nextExpiry": "{{amount}} 的额度将于 {{date}}（UTC）到期。最早到期的额度会优先使用。",
+    "nextExpiry": "额度将于 {{date}}（UTC）到期。最早到期的额度会优先使用。",
     "noExpiringCredits": "目前没有会到期的额度。",
     "expiryUnavailable": "无法获取额度到期信息。",
     "appStoreExpiry": "通过 App Store 购买的额度不会过期。",

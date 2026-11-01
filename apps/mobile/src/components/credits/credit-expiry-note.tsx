@@ -1,15 +1,13 @@
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { isolateBidiText } from '@/lib/bidi';
 import { getNextCreditExpiry } from '@/lib/credits/credit-expiry';
-import { formatDate, formatMoney } from '@/lib/format';
+import { formatDate } from '@/lib/format';
 import { parseTimestamp } from '@/lib/utils';
 
 type CreditExpiryNoteProps = {
   creditBlocks: Parameters<typeof getNextCreditExpiry>[0];
-  hiddenAmount?: string;
   emptyMessage?: string;
 };
 
@@ -31,11 +29,7 @@ function bindUtcMarker(sentence: string): string {
   return sentence.replace(UTC_MARKER, `\u00A0${isolateBidiText('(UTC)')}`);
 }
 
-export function CreditExpiryNote({
-  creditBlocks,
-  hiddenAmount,
-  emptyMessage,
-}: Readonly<CreditExpiryNoteProps>) {
+export function CreditExpiryNote({ creditBlocks, emptyMessage }: Readonly<CreditExpiryNoteProps>) {
   const { t, i18n } = useTranslation();
   const nextExpiry = getNextCreditExpiry(creditBlocks);
   if (!nextExpiry) {
@@ -48,9 +42,6 @@ export function CreditExpiryNote({
     <Text className="text-xs text-muted-foreground">
       {bindUtcMarker(
         t('credits.nextExpiry', {
-          amount:
-            hiddenAmount ??
-            formatMoney(fromMicrodollars(nextExpiry.balanceMicrodollars), i18n.language),
           date: formatDate(parseTimestamp(nextExpiry.expiryDate), i18n.language, {
             timeZone: 'UTC',
           }),

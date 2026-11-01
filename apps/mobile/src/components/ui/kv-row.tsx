@@ -1,8 +1,9 @@
 import { type LucideIcon } from '@/components/ui/icons';
-import { View } from 'react-native';
+import { I18nManager, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 type KvTone = 'good' | 'warn' | 'danger' | 'muted';
@@ -32,6 +33,15 @@ type KvRowProps = {
   className?: string;
   /** Allow the value text to be selected/copied (e.g. identifiers, versions, paths). */
   selectable?: boolean;
+  /**
+   * Draw the value as left-to-right text: an identifier, version range or path
+   * reads in one direction whatever the interface language. Without it a value
+   * that starts with a neutral character (`< 4.17.21`) takes an RTL paragraph's
+   * direction, which moves the operator to the end of the run and mirrors it.
+   * Translated copy never sets it — the label and the interface stay in their
+   * own direction.
+   */
+  valueLtr?: boolean;
   /** Extra classes for the value text only (e.g. `uppercase` for a status readout). */
   valueClassName?: string;
 };
@@ -62,6 +72,7 @@ export function KvRow({
   last,
   className,
   selectable,
+  valueLtr,
   valueClassName,
 }: Readonly<KvRowProps>) {
   const colors = useThemeColors();
@@ -72,6 +83,10 @@ export function KvRow({
   // row). Clamp the values that can hold it; a selectable value wraps inside
   // the row and the row grows to fit it, so no glyph is cut off.
   const valueLineLimit = selectable ? undefined : 1;
+  // The value keeps the row's outer edge. The mirrored row already puts it on
+  // the left in an RTL interface, so `text-right` alone would pull a wrapped
+  // value back toward the label.
+  const valueAlignment = valueLtr && I18nManager.isRTL ? 'text-left' : 'text-right';
   return (
     <View
       className={cn(
@@ -92,8 +107,10 @@ export function KvRow({
         selectable={selectable}
         numberOfLines={valueLineLimit}
         ellipsizeMode={valueLineLimit ? 'middle' : undefined}
+        style={valueLtr ? LTR_TEXT_DIRECTION : undefined}
         className={cn(
-          'min-w-0 shrink text-right text-[13px]',
+          'min-w-0 shrink text-[13px]',
+          valueAlignment,
           valueNumeric && 'tabular-nums',
           VALUE_TONE[valueTone],
           valueClassName

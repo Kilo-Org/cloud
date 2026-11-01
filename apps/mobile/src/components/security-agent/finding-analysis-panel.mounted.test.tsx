@@ -39,6 +39,7 @@ const startAnalysis = vi.hoisted(() => ({
 const kvRows = vi.hoisted(() => ({
   labels: [] as string[],
   values: new Map<string, unknown>(),
+  props: [] as { label: string; valueLtr: boolean | undefined }[],
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -82,9 +83,10 @@ vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/kv-row', () => ({
-  KvRow: (props: { label: string; value: unknown }) => {
+  KvRow: (props: { label: string; value: unknown; valueLtr?: boolean }) => {
     kvRows.labels.push(props.label);
     kvRows.values.set(props.label, props.value);
+    kvRows.props.push({ label: props.label, valueLtr: props.valueLtr });
     return null;
   },
 }));
@@ -461,5 +463,42 @@ describe('FindingAnalysisPanel stale analysis action', () => {
     )[0];
     act(retry?.props.onPress as () => void);
     expect(capacity.refetch).toHaveBeenCalledOnce();
+  });
+});
+
+describe('FindingAnalysisPanel identifier values', () => {
+  beforeEach(() => {
+    kvRows.labels = [];
+    kvRows.props = [];
+  });
+
+  it('isolates the analysed model left-to-right', () => {
+    renderPanel(analysisFixture({ status: 'completed', analysis: staleAnalysis() }));
+
+    expect(kvRows.props.find(row => row.label === i18n.t('common.model'))?.valueLtr).toBe(true);
+  });
+
+  it('keeps the unrecorded model copy in the interface direction', () => {
+    renderPanel(
+      analysisFixture({
+        status: 'completed',
+        analysis: {
+          sandboxAnalysis: { ...staleAnalysis().sandboxAnalysis, modelUsed: undefined },
+        },
+      })
+    );
+
+    expect(kvRows.props.find(row => row.label === i18n.t('common.model'))?.valueLtr).toBe(false);
+  });
+
+  // A path's leading separator is neutral, so an RTL paragraph would move it
+  // to the end of the run and draw the rest of the path back to front.
+  it('isolates a located path left-to-right', () => {
+    const tree = renderPanel(analysisFixture({ status: 'completed', analysis: staleAnalysis() }));
+
+    const [location] = tree.root.findAll(
+      node => Object.is(node.type, 'Text') && node.props.children === 'src/a.ts'
+    );
+    expect(location?.props.style).toMatchObject({ direction: 'ltr', writingDirection: 'ltr' });
   });
 });

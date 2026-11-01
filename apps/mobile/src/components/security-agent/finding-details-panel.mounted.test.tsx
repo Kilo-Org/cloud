@@ -14,9 +14,11 @@ import { type SecurityFinding } from '@/lib/security-agent';
 const mocks = vi.hoisted(() => {
   const deadlineState: Record<string, unknown> = { kind: 'no-deadline' };
   const interpolations: { key: string; params: Record<string, unknown> }[] = [];
+  const kvRows: { label: string; value: unknown; valueLtr: boolean | undefined }[] = [];
   return {
     deadlineState,
     interpolations,
+    kvRows,
     routerPush: vi.fn(),
     openBrowser: vi.fn(),
     linkingOpenUrl: vi.fn(),
@@ -61,7 +63,12 @@ vi.mock('@/components/security-agent/finding-tone', () => ({
   },
   findingToneColor: () => '#666',
 }));
-vi.mock('@/components/ui/kv-row', () => ({ KvRow: () => null }));
+vi.mock('@/components/ui/kv-row', () => ({
+  KvRow: (props: { label: string; value: unknown; valueLtr?: boolean }) => {
+    mocks.kvRows.push({ label: props.label, value: props.value, valueLtr: props.valueLtr });
+    return null;
+  },
+}));
 vi.mock('@/components/security-agent/collapsible-section', () => ({
   CollapsibleSection: (props: { children?: unknown }) => props.children ?? null,
 }));
@@ -225,6 +232,46 @@ describe('FindingDetailsPanel chip row', () => {
     const tree = renderPanel(findingFixture({ status }));
 
     expect(tree.root.findAllByType(FindingStatusBadge)).toHaveLength(1);
+  });
+});
+
+describe('FindingDetailsPanel identifier values', () => {
+  beforeEach(() => {
+    mocks.deadlineState = { kind: 'no-deadline' };
+    mocks.kvRows.length = 0;
+  });
+
+  // A version range's `<` is neutral, so the details rows that carry a
+  // technical token name their own base direction; the label beside them keeps
+  // the interface direction.
+  it('isolates every identifier value left-to-right', () => {
+    renderPanel(findingFixture());
+
+    const labels = mocks.kvRows.map(row => row.label);
+    for (const label of [
+      'securityAgent.findingDetails.package',
+      'securityAgent.findingDetails.vulnerableVersions',
+      'securityAgent.findingDetails.patchedVersion',
+      'securityAgent.findingDetails.cve',
+      'securityAgent.findingDetails.ghsa',
+      'common.repository',
+      'securityAgent.findingDetails.manifest',
+      'securityAgent.findingDetails.sourceId',
+    ]) {
+      expect(labels).toContain(label);
+      expect(mocks.kvRows.find(row => row.label === label)?.valueLtr).toBe(true);
+    }
+  });
+
+  it('leaves the translated absence of a version in the interface direction', () => {
+    renderPanel(findingFixture({ vulnerable_version_range: null, patched_version: null }));
+
+    for (const label of [
+      'securityAgent.findingDetails.vulnerableVersions',
+      'securityAgent.findingDetails.patchedVersion',
+    ]) {
+      expect(mocks.kvRows.find(row => row.label === label)?.valueLtr).toBe(false);
+    }
   });
 });
 

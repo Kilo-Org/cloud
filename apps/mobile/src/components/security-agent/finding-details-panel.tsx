@@ -191,10 +191,12 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         <KvRow
           label={t('securityAgent.findingDetails.package')}
           value={`${finding.package_name} (${finding.package_ecosystem})`}
+          valueLtr
         />
         <KvRow
           label={t('securityAgent.findingDetails.vulnerableVersions')}
           value={firstNonEmpty(finding.vulnerable_version_range, t('common.unknown'))}
+          valueLtr={Boolean(finding.vulnerable_version_range)}
           selectable
         />
         <KvRow
@@ -203,15 +205,22 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             finding.patched_version,
             t('securityAgent.findingDetails.noPatchAvailable')
           )}
+          valueLtr={Boolean(finding.patched_version)}
           selectable
         />
         {finding.cve_id ? (
-          <KvRow label={t('securityAgent.findingDetails.cve')} value={finding.cve_id} selectable />
+          <KvRow
+            label={t('securityAgent.findingDetails.cve')}
+            value={finding.cve_id}
+            valueLtr
+            selectable
+          />
         ) : null}
         {finding.ghsa_id ? (
           <KvRow
             label={t('securityAgent.findingDetails.ghsa')}
             value={finding.ghsa_id}
+            valueLtr
             selectable
           />
         ) : null}
@@ -219,6 +228,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
           label={t('common.repository')}
           value={finding.repo_full_name}
           last={!finding.manifest_path}
+          valueLtr
           selectable
         />
         {finding.manifest_path ? (
@@ -226,6 +236,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             label={t('securityAgent.findingDetails.manifest')}
             value={finding.manifest_path}
             last
+            valueLtr
             selectable
           />
         ) : null}
@@ -266,6 +277,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         <KvRow
           label={t('securityAgent.findingDetails.sourceId')}
           value={finding.source_id}
+          valueLtr
           last
           selectable
         />

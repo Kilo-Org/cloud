@@ -34,6 +34,7 @@ import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
 import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
 import {
   getAnalysisCapacityBlockedHint,
@@ -289,6 +290,7 @@ export function FindingAnalysisPanel({
                 analysis.analysis?.analysisModel,
                 t('securityAgent.analysis.notRecorded')
               )}
+              valueLtr={firstNonEmpty(sandbox.modelUsed, analysis.analysis?.analysisModel) !== ''}
               selectable
             />
             <KvRow
@@ -327,7 +329,13 @@ export function FindingAnalysisPanel({
               defaultExpanded={uniqueLocations.length <= 2}
             >
               {uniqueLocations.map(location => (
-                <Text key={location} variant="mono" className="text-xs" selectable>
+                <Text
+                  key={location}
+                  variant="mono"
+                  className="text-xs"
+                  selectable
+                  style={LTR_TEXT_DIRECTION}
+                >
                   {location}
                 </Text>
               ))}

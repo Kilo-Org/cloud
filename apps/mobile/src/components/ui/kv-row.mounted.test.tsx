@@ -6,8 +6,10 @@ import { act, TestRenderer } from '@/test/renderer';
 
 import { KvRow } from './kv-row';
 
+const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+
 vi.mock('react-native', () => ({
-  I18nManager: { isRTL: false },
+  I18nManager: i18nManager,
   Text: 'Text',
   View: 'View',
 }));
@@ -20,7 +22,7 @@ const longRepository = 'iscekic/kilo-e2e-pr-review-sandbox-86773';
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function renderRow(props: { value: string; selectable?: boolean }) {
+function renderRow(props: { value: string; selectable?: boolean; valueLtr?: boolean }) {
   act(() => {
     const element = createElement(KvRow, { label: 'Repository', ...props });
     if (renderer) {
@@ -38,6 +40,21 @@ function renderRow(props: { value: string; selectable?: boolean }) {
 /** The value Text, identified by its rendered string. */
 function valueText(root: TestRenderer.ReactTestInstance, value: string) {
   return root.find(node => Object.is(node.type, 'Text') && node.children.includes(value));
+}
+
+/** The value Text's effective style: the shared RTL direction first, the row's own last. */
+function valueStyle(node: TestRenderer.ReactTestInstance): Record<string, unknown> {
+  const style: unknown = node.props.style;
+  if (!Array.isArray(style)) {
+    return typeof style === 'object' && style !== null ? { ...style } : {};
+  }
+  const flattened: Record<string, unknown> = {};
+  for (const entry of style as unknown[]) {
+    if (typeof entry === 'object' && entry !== null) {
+      Object.assign(flattened, entry);
+    }
+  }
+  return flattened;
 }
 
 afterEach(() => {
@@ -64,5 +81,46 @@ describe('KvRow mounted layout', () => {
     );
     expect(text.props.numberOfLines).toBe(1);
     expect(text.props.ellipsizeMode).toBe('middle');
+  });
+});
+
+describe('KvRow value direction', () => {
+  afterEach(() => {
+    i18nManager.isRTL = false;
+  });
+
+  // A version range's `<` is neutral, so an RTL paragraph moves it to the end
+  // of the run and mirrors it (`< 1.3.0` reads `1.3.0 >`). Naming the base
+  // direction on the value keeps the operator in front of the version.
+  it('names the left-to-right base direction of an identifier in an RTL interface', () => {
+    i18nManager.isRTL = true;
+    const text = valueText(renderRow({ value: '< 1.3.0', valueLtr: true }), '< 1.3.0');
+
+    expect(valueStyle(text)).toMatchObject({ direction: 'ltr', writingDirection: 'ltr' });
+  });
+
+  // The mirrored row puts the value on the left, so its own alignment has to
+  // follow or a wrapped value hangs back toward the label.
+  it('keeps an identifier on the row outer edge in an RTL interface', () => {
+    i18nManager.isRTL = true;
+    const text = valueText(renderRow({ value: '< 1.3.0', valueLtr: true }), '< 1.3.0');
+
+    expect(text.props.className).toContain('text-left');
+    expect(text.props.className).not.toContain('text-right');
+  });
+
+  it('keeps an identifier on the row outer edge in a left-to-right interface', () => {
+    const text = valueText(renderRow({ value: 'CVE-2026-0001', valueLtr: true }), 'CVE-2026-0001');
+
+    expect(text.props.className).toContain('text-right');
+    expect(text.props.className).not.toContain('text-left');
+  });
+
+  it('leaves a row without the flag in the interface direction', () => {
+    i18nManager.isRTL = true;
+    const text = valueText(renderRow({ value: 'لا يوجد تصحيح متاح' }), 'لا يوجد تصحيح متاح');
+
+    expect(valueStyle(text).writingDirection).toBe('rtl');
+    expect(text.props.className).toContain('text-right');
   });
 });

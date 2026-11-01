@@ -14,6 +14,7 @@ import { renderWastelandDrawerContent } from '@/components/wasteland/drawer/rend
 import { WastelandPageHeaderProvider } from '@/app/(app)/wasteland/by-id/[wastelandId]/WastelandPageHeaderContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { SELECTED_WASTELAND_PARAM } from '@/lib/wasteland/repo-links';
 import { WastelandRepoProvider } from './WastelandRepoContext';
 import { RepoDashboardHeader } from './RepoDashboardHeader';
 import { NotConnectedShell } from './NotConnectedShell';
@@ -24,9 +25,6 @@ type RepoLayoutShellProps = {
   repo: string;
   children: ReactNode;
 };
-
-/** Query parameter that picks one of several wastelands behind an upstream. */
-const SELECTED_WASTELAND_PARAM = 'wastelandId';
 
 /**
  * The top-level shell for /wasteland/[owner]/[repo]. Owns the tRPC

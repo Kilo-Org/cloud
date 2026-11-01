@@ -8,10 +8,29 @@
  * as `wantedId`) is dropped on the next click.
  */
 
+/** Query parameter that picks one of several wastelands behind an upstream. */
+export const SELECTED_WASTELAND_PARAM = 'wastelandId';
+
 /** `<owner>/<repo>` address with a query string appended when present. */
 export function repoPathWithQuery(owner: string, repo: string, query: string): string {
   const path = `/wasteland/${owner}/${repo}`;
   return query ? `${path}?${query}` : path;
+}
+
+/**
+ * The same address with `wastelandId` set to the chosen wasteland and the
+ * rest of the current query kept, so picking a candidate in the chooser
+ * does not drop a `status`, `q`, or `wantedId` the user already had.
+ */
+export function repoPathWithSelection(
+  owner: string,
+  repo: string,
+  query: string,
+  wastelandId: string
+): string {
+  const params = new URLSearchParams(query);
+  params.set(SELECTED_WASTELAND_PARAM, wastelandId);
+  return repoPathWithQuery(owner, repo, params.toString());
 }
 
 /**

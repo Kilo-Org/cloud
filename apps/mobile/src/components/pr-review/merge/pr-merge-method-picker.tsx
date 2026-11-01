@@ -51,9 +51,10 @@ export function MethodPicker({
                 // The selected chip is a selection state, not a call to action:
                 // light fills with `primary`, dark with the muted `selection`
                 // olive, because dark's `primary` is the brand yellow
-                // (#ffdd00), which glares as a full pill on the near-black page
-                // (global.css: `--selection`). The Merge button keeps the brand
-                // fill.
+                // (#ffdd00), which glares as a full pill on the near-black
+                // page. Dark's `selection` is the same olive hue lifted for the
+                // dark page (global.css), so it still stands 3.6:1 off the
+                // background. The Merge button keeps the brand fill.
                 active && 'border-primary bg-primary dark:border-selection dark:bg-selection',
                 !active && isDisabled && 'border-hair-soft bg-secondary',
                 !active && !isDisabled && 'border-border bg-secondary'

@@ -125,6 +125,10 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     creditData === undefined || (Boolean(selectedOrgId) && orgCreditsPlaceholder);
 
   const balanceDollars = balance?.balance ?? 0;
+  // One formatted amount for the painted value and its spoken label: a label
+  // that stops being passed keeps its old native value, so the shown amount
+  // would otherwise still be announced as the hidden one.
+  const balanceText = formatMoney(balanceDollars, i18n.language);
   // A read that has not answered yet is pending without fetching while the
   // owner is still unresolved (the balance query is gated on the identity), so
   // `balanceLoading` (isLoading) is false while `balance` is still undefined.
@@ -262,9 +266,9 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
               <ScrollView horizontal className="min-w-0">
                 <Text
                   className="text-2xl font-bold tabular-nums"
-                  accessibilityLabel={hideBalance ? t('profile.balanceHidden') : undefined}
+                  accessibilityLabel={hideBalance ? t('profile.balanceHidden') : balanceText}
                 >
-                  {hideBalance ? HIDDEN_BALANCE : formatMoney(balanceDollars, i18n.language)}
+                  {hideBalance ? HIDDEN_BALANCE : balanceText}
                 </Text>
               </ScrollView>
               {creditsFailed && (

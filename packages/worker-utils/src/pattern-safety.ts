@@ -2,19 +2,19 @@
  * Grammar check for the `pattern` keyword of a webhook body schema.
  *
  * The accepted subset is literals, classes, groups, alternation, lookarounds, quantifiers, and
- * established escapes. Backreferences, quantifiers nested beyond the repetition budget, and a
- * repeated alternation whose branches are not disjoint are outside it and are refused with a
+ * established escapes. Backreferences, quantifiers whose combined repetition exceeds the budget,
+ * and a repeated alternation whose branches are not disjoint are outside it and are refused with a
  * message that names the rule.
  */
 
-/** Combined repetitions of nested quantifiers, above which the nesting is outside the subset. */
+/** Combined repetitions of quantifiers, above which the pattern is outside the subset. */
 const MAX_NESTED_REPEAT = 64;
 /** Characters a class may expand to before its content is treated as unconstrained. */
 const MAX_CLASS_EXPANSION = 128;
 
 export const PATTERN_ISSUE_MESSAGES = {
   backreference: 'Pattern must not use backreferences',
-  nested: 'Pattern must not nest quantifiers that exceed 64 combined repetitions',
+  nested: 'Pattern must not combine quantifiers that exceed 64 combined repetitions',
   ambiguous: 'Pattern must not repeat alternatives that can match the same characters',
   unsupported: 'Pattern must use supported regular expression syntax',
 } as const;
@@ -366,30 +366,6 @@ class PatternParser {
   }
 }
 
-/** Largest product of nested quantifier bounds within the node, saturated at Infinity. */
-function nestedRepeatFactor(node: PatternNode): number {
-  switch (node.kind) {
-    case 'zero':
-    case 'atom':
-    case 'reference':
-      return 1;
-    case 'lookaround':
-      return nestedRepeatFactor(node.body);
-    case 'sequence':
-      return node.items.reduce((factor, item) => Math.max(factor, nestedRepeatFactor(item)), 1);
-    case 'alternation':
-      return node.branches.reduce(
-        (factor, branch) => Math.max(factor, nestedRepeatFactor(branch)),
-        1
-      );
-    case 'repeat': {
-      const inner = nestedRepeatFactor(node.body);
-      if (node.max === Infinity || inner === Infinity) return Infinity;
-      return Math.min(node.max * inner, Number.MAX_SAFE_INTEGER);
-    }
-  }
-}
-
 function canBeEmpty(node: PatternNode): boolean {
   switch (node.kind) {
     case 'zero':
@@ -429,6 +405,107 @@ function firstSet(node: PatternNode): CharSet {
       return first;
     }
   }
+}
+
+/** Characters a node can consume last, mirroring `firstSet`. */
+function lastSet(node: PatternNode): CharSet {
+  switch (node.kind) {
+    case 'zero':
+    case 'lookaround':
+      return new Set<string>();
+    case 'atom':
+      return node.first;
+    case 'reference':
+      return 'any';
+    case 'repeat':
+      return lastSet(node.body);
+    case 'alternation':
+      return union(node.branches.map(lastSet));
+    case 'sequence': {
+      let last: CharSet = new Set<string>();
+      for (let index = node.items.length - 1; index >= 0; index--) {
+        const item = node.items[index];
+        if (item === undefined) continue;
+        last = union([last, lastSet(item)]);
+        if (!canBeEmpty(item)) break;
+      }
+      return last;
+    }
+  }
+}
+
+/** Whether the node consumes characters. */
+function consumesChars(node: PatternNode): boolean {
+  switch (node.kind) {
+    case 'zero':
+    case 'lookaround':
+      return false;
+    case 'atom':
+    case 'reference':
+      return true;
+    case 'repeat':
+      return consumesChars(node.body);
+    case 'alternation':
+      return node.branches.some(consumesChars);
+    case 'sequence':
+      return node.items.some(consumesChars);
+  }
+}
+
+/** Product of two repetition counts, saturated at Infinity. */
+function product(left: number, right: number): number {
+  if (left === Infinity || right === Infinity) return Infinity;
+  return Math.min(left * right, Number.MAX_SAFE_INTEGER);
+}
+
+/** Combined repetition count within the node, saturated at Infinity. */
+function repeatFactor(node: PatternNode): number {
+  switch (node.kind) {
+    case 'zero':
+    case 'atom':
+    case 'reference':
+      return 1;
+    case 'lookaround':
+      return repeatFactor(node.body);
+    case 'sequence':
+      return node.items.reduce(
+        (factor, item) => Math.max(factor, repeatFactor(item)),
+        concatenatedRepeatFactor(node)
+      );
+    case 'alternation':
+      return node.branches.reduce(
+        (factor, branch) => Math.max(factor, repeatFactor(branch)),
+        1
+      );
+    case 'repeat':
+      return product(node.max, repeatFactor(node.body));
+  }
+}
+
+function concatenatedRepeatFactor(node: PatternNode): number {
+  if (node.kind !== 'sequence') return 1;
+  let combined = 1;
+  let multiplied = 0;
+  let run = 1;
+  let previous: PatternNode | undefined;
+  const closeRun = () => {
+    if (multiplied > 1) combined = Math.max(combined, run);
+  };
+  for (const item of node.items) {
+    if (!consumesChars(item)) continue;
+    const factor = repeatFactor(item);
+    if (previous !== undefined && overlaps(lastSet(previous), firstSet(item))) {
+      run = product(run, factor);
+    } else {
+      closeRun();
+      run = factor;
+      multiplied = 0;
+    }
+    if (factor > 1) multiplied++;
+    previous = item;
+  }
+  closeRun();
+  return combined;
 }
 
 /**
@@ -507,7 +584,7 @@ function firstIssue(node: PatternNode): string | null {
     case 'reference':
       return PATTERN_ISSUE_MESSAGES.backreference;
     case 'repeat': {
-      const inner = nestedRepeatFactor(node.body);
+      const inner = repeatFactor(node.body);
       if (
         node.max > 1 &&
         inner > 1 &&
@@ -522,6 +599,9 @@ function firstIssue(node: PatternNode): string | null {
       for (const item of node.items) {
         const issue = firstIssue(item);
         if (issue) return issue;
+      }
+      if (concatenatedRepeatFactor(node) > MAX_NESTED_REPEAT) {
+        return PATTERN_ISSUE_MESSAGES.nested;
       }
       return null;
     }

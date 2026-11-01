@@ -64,7 +64,6 @@ export function ChoiceRow({
       className={cn(
         ROW_TARGET_CLASS,
         'flex-row items-center justify-between py-3 active:opacity-70',
-        disabled && 'opacity-50',
         className
       )}
       disabled={disabled}
@@ -85,15 +84,23 @@ export function ChoiceRow({
     >
       {children ?? (
         <View className="flex-1 pe-3">
-          <Text className="text-sm font-medium">{label}</Text>
+          <Text className={cn('text-sm font-medium', disabled && 'text-muted-foreground')}>
+            {label}
+          </Text>
           {description ? (
+            // The disabled cue is the label's muted token, not a row opacity:
+            // a caption under a dimmed row drops to roughly 2:1 on the row
+            // surface, and this one is read, not decorative.
             <Text variant="muted" className="mt-0.5 text-xs">
               {description}
             </Text>
           ) : null}
         </View>
       )}
-      <Check size={18} color={selected ? colors.foreground : 'transparent'} />
+      <Check
+        size={18}
+        color={selected ? (disabled ? colors.mutedForeground : colors.foreground) : 'transparent'}
+      />
     </Pressable>
   );
 }

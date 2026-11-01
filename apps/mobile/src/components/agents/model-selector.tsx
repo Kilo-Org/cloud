@@ -301,7 +301,7 @@ export function ModelPickerOptionRow({
   // it.
   return (
     <View className="border-b border-border">
-      <View className={cn('flex-row items-center gap-3 pr-4', option.unavailable && 'opacity-50')}>
+      <View className="flex-row items-center gap-3 pr-4">
         <Pressable
           className="min-h-9 flex-1 flex-row items-center py-3 pl-4 active:bg-secondary"
           onPress={() => {
@@ -313,7 +313,12 @@ export function ModelPickerOptionRow({
           accessibilityState={{ disabled: option.unavailable, selected }}
         >
           <View className="flex-1">
-            <Text className="text-base text-foreground">{name}</Text>
+            {/* The disabled cue is the name's muted token, not a row opacity:
+             * the metadata below and the `unavailable` line stay readable,
+             * which a row-level 50% opacity took below 4.5:1. */}
+            <Text className={cn('text-base', option.unavailable ? 'text-muted-foreground' : 'text-foreground')}>
+              {name}
+            </Text>
             {option.modelRef ? (
               <Text selectable className="font-mono text-xs text-muted-foreground">
                 {t('agentChat.modelSelector.provider', { id: option.modelRef.providerID })}

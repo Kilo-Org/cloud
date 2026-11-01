@@ -149,6 +149,34 @@ describe('ModelPickerOptionRow free badge', () => {
   );
 });
 
+describe('ModelPickerOptionRow unavailable row', () => {
+  // The row dimmed itself with a row-level opacity, which multiplied the
+  // reasons it carries: the `unavailable` line and the metadata fell to about
+  // 2:1 on the picker surface. The name carries the dim now.
+  const nameClass = (renderer: TestRenderer.ReactTestRenderer, text: string) =>
+    renderer.root.findAll(
+      node => typeof node.type === 'string' && node.type === 'Text' && node.props.children === text
+    )[0]?.props.className;
+
+  it('dims the name and keeps the reason at full contrast', () => {
+    const renderer = renderRow(
+      cliCatalogOption({ unavailable: true, name: 'Minimax M2.5', displayId: 'minimax/m2.5' })
+    );
+
+    expect(String(rowContainer(renderer).props.className)).not.toContain('opacity-50');
+    expect(nameClass(renderer, 'Minimax M2.5')).toContain('text-muted-foreground');
+    expect(nameClass(renderer, i18n.t('agentChat.modelSelector.unavailable'))).toBe(
+      'mt-1 text-xs text-muted-foreground'
+    );
+  });
+
+  it('keeps an available row name at full contrast', () => {
+    const renderer = renderRow(cliCatalogOption({ name: 'Minimax M2.5' }));
+
+    expect(nameClass(renderer, 'Minimax M2.5')).toBe('text-base text-foreground');
+  });
+});
+
 describe('Auto model labels', () => {
   // The backend names Kilo's own Auto models in English ("Auto Efficient"),
   // which no catalog translates; the chip and the picker row must show the

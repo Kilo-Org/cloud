@@ -1082,10 +1082,8 @@
     },
     "overview": {
       "allAreas": "すべての領域",
-      "focusAreas": "重点項目",
       "nSelected": "{{displayCount}}件選択中",
       "proposedReviewMdGuidance": "REVIEW.mdに記載する指針の提案",
-      "reviewStyle": "レビュースタイル",
       "set": "設定済み",
       "notSet": "未設定"
     },

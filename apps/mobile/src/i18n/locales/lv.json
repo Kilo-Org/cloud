@@ -1627,8 +1627,6 @@
       "bitbucketError": "Neizdevās atvērt Bitbucket iestatīšanu. Lūdzu, mēģini vēlreiz."
     },
     "overview": {
-      "reviewStyle": "Pārskatīšanas stils",
-      "focusAreas": "Pārskatāmās jomas",
       "allAreas": "Visas jomas",
       "set": "Iestatīts",
       "notSet": "Nav iestatīts",

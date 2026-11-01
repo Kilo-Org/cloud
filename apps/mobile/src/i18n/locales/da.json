@@ -1605,8 +1605,6 @@
       "bitbucketError": "Opsætningen af Bitbucket kunne ikke åbnes. Prøv igen."
     },
     "overview": {
-      "reviewStyle": "Gennemgangsstil",
-      "focusAreas": "Fokusområder",
       "allAreas": "Alle områder",
       "set": "Angivet",
       "notSet": "Ikke angivet",

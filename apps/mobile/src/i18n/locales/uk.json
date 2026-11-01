@@ -1088,10 +1088,8 @@
     },
     "overview": {
       "allAreas": "Усі напрями",
-      "focusAreas": "Напрями перевірки",
       "nSelected": "Вибрано: {{displayCount}}",
       "proposedReviewMdGuidance": "Запропоновані настанови для REVIEW.md",
-      "reviewStyle": "Стиль перевірки",
       "set": "Встановлено",
       "notSet": "Не встановлено"
     },

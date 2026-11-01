@@ -1605,8 +1605,6 @@
       "bitbucketError": "Asikwazanga ukuvula ukusetha i-Bitbucket. Sicela uzame futhi."
     },
     "overview": {
-      "reviewStyle": "Indlela yokuhlola",
-      "focusAreas": "Izindawo okugxilwa kuzo",
       "allAreas": "Zonke izindawo",
       "set": "Kusethiwe",
       "notSet": "Akukho okusethiwe",

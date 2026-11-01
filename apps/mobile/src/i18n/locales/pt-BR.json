@@ -1053,10 +1053,8 @@
     },
     "overview": {
       "allAreas": "Todas as áreas",
-      "focusAreas": "Áreas prioritárias",
       "nSelected": "{{displayCount}} selecionados",
       "proposedReviewMdGuidance": "Orientações propostas para o REVIEW.md",
-      "reviewStyle": "Estilo de revisão",
       "set": "Configurado",
       "notSet": "Não configurado"
     },

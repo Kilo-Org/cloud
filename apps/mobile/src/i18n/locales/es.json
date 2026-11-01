@@ -1085,10 +1085,8 @@
     },
     "overview": {
       "allAreas": "Todas las áreas",
-      "focusAreas": "Aspectos de la revisión",
       "nSelected": "{{displayCount}} seleccionados",
       "proposedReviewMdGuidance": "Directrices propuestas para REVIEW.md",
-      "reviewStyle": "Estilo de revisión",
       "set": "Configurado",
       "notSet": "Sin configurar"
     },

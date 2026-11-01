@@ -1605,8 +1605,6 @@
       "bitbucketError": "د Bitbucket د تنظیم پاڼه پرانیستل نه شوه. مهرباني وکړئ بیا هڅه وکړئ."
     },
     "overview": {
-      "reviewStyle": "د بیاکتنې بڼه",
-      "focusAreas": "د تمرکز ساحې",
       "allAreas": "ټولې ساحې",
       "set": "ټاکل شوی",
       "notSet": "ټاکل شوی نه دی",

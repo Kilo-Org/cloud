@@ -1605,8 +1605,6 @@
       "bitbucketError": "Imeshindikana kufungua usanidi wa Bitbucket. Tafadhali jaribu tena."
     },
     "overview": {
-      "reviewStyle": "Mtindo wa ukaguzi",
-      "focusAreas": "Maeneo ya kuzingatia",
       "allAreas": "Maeneo yote",
       "set": "Imewekwa",
       "notSet": "Haijawekwa",

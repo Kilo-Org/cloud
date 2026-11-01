@@ -1605,8 +1605,6 @@
       "bitbucketError": "Ekki tókst að opna uppsetningu Bitbucket. Reyndu aftur."
     },
     "overview": {
-      "reviewStyle": "Rýnistíll",
-      "focusAreas": "Áherslusvið",
       "allAreas": "Allir þættir",
       "set": "Stillt",
       "notSet": "Ekki stillt",

@@ -1671,8 +1671,6 @@
       "bitbucketError": "Ma setgħetx tinfetaħ il-konfigurazzjoni ta' Bitbucket. Jekk jogħġbok erġa' pprova."
     },
     "overview": {
-      "reviewStyle": "Stil ta' reviżjoni",
-      "focusAreas": "Oqsma ta' attenzjoni",
       "allAreas": "L-oqsma kollha",
       "set": "Issettjat",
       "notSet": "Mhux issettjat",

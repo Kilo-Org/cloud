@@ -1672,8 +1672,6 @@
       "description": "Connect the Kilo {{label}} to review pull requests automatically."
     },
     "overview": {
-      "reviewStyle": "Review Style",
-      "focusAreas": "Focus Areas",
       "allAreas": "All areas",
       "set": "Set",
       "notSet": "Not set",

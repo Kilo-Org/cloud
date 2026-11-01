@@ -1627,8 +1627,6 @@
       "bitbucketError": "Não foi possível abrir a configuração do Bitbucket. Tenta novamente."
     },
     "overview": {
-      "reviewStyle": "Estilo de revisão",
-      "focusAreas": "Áreas prioritárias",
       "allAreas": "Todas as áreas",
       "set": "Definido",
       "notSet": "Não definido",

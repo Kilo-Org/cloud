@@ -1605,8 +1605,6 @@
       "bitbucketError": "Bitbucket সেটআপ খোলা যায়নি। আবার চেষ্টা করুন।"
     },
     "overview": {
-      "reviewStyle": "পর্যালোচনার ধরন",
-      "focusAreas": "গুরুত্বের বিষয়",
       "allAreas": "সব বিষয়",
       "set": "নির্ধারিত",
       "notSet": "নির্ধারিত নয়",

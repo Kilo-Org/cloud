@@ -1053,10 +1053,8 @@
     },
     "overview": {
       "allAreas": "Tous les domaines",
-      "focusAreas": "Points à vérifier",
       "nSelected": "{{displayCount}} sélectionnés",
       "proposedReviewMdGuidance": "Consignes proposées pour REVIEW.md",
-      "reviewStyle": "Style de revue",
       "set": "Défini",
       "notSet": "Non défini"
     },

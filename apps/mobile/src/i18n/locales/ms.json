@@ -1605,8 +1605,6 @@
       "bitbucketError": "Tidak dapat membuka persediaan Bitbucket. Sila cuba lagi."
     },
     "overview": {
-      "reviewStyle": "Gaya semakan",
-      "focusAreas": "Bidang fokus",
       "allAreas": "Semua bidang",
       "set": "Ditetapkan",
       "notSet": "Tidak ditetapkan",

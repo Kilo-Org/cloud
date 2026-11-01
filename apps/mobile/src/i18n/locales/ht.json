@@ -1605,8 +1605,6 @@
       "bitbucketError": "Nou pa t ka louvri konfigirasyon Bitbucket la. Tanpri eseye ankò."
     },
     "overview": {
-      "reviewStyle": "Estil revizyon",
-      "focusAreas": "Aspè pou konsantre sou yo",
       "allAreas": "Tout domèn",
       "set": "Konfigire",
       "notSet": "Pa konfigire",

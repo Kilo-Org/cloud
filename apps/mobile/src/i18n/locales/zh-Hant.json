@@ -1082,10 +1082,8 @@
     },
     "overview": {
       "allAreas": "所有面向",
-      "focusAreas": "審查重點",
       "nSelected": "已選取 {{displayCount}} 項",
       "proposedReviewMdGuidance": "建議的 REVIEW.md 指引",
-      "reviewStyle": "審查風格",
       "set": "已設定",
       "notSet": "未設定"
     },

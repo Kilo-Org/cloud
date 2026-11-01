@@ -1605,8 +1605,6 @@
       "bitbucketError": "Ezin izan da Bitbucket-en konfigurazioa ireki. Saiatu berriro."
     },
     "overview": {
-      "reviewStyle": "Berrikuspen-estiloa",
-      "focusAreas": "Arreta-eremuak",
       "allAreas": "Eremu guztiak",
       "set": "Ezarrita",
       "notSet": "Ezarri gabe",

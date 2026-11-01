@@ -1605,8 +1605,6 @@
       "bitbucketError": "Bitbucketni sozlash sahifasini ochib bo'lmadi. Iltimos, qayta urinib ko'ring."
     },
     "overview": {
-      "reviewStyle": "Ko‘rib chiqish uslubi",
-      "focusAreas": "Asosiy yo‘nalishlar",
       "allAreas": "Barcha yo'nalishlar",
       "set": "Belgilangan",
       "notSet": "Belgilanmagan",

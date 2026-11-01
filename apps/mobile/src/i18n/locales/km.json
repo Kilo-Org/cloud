@@ -1605,8 +1605,6 @@
       "bitbucketError": "មិនអាចបើកការរៀបចំ Bitbucket បានទេ។ សូមព្យាយាមម្តងទៀត។"
     },
     "overview": {
-      "reviewStyle": "របៀបពិនិត្យ",
-      "focusAreas": "ចំណុចផ្តោតសំខាន់",
       "allAreas": "គ្រប់ផ្នែក",
       "set": "បានកំណត់",
       "notSet": "មិនបានកំណត់",

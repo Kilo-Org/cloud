@@ -1649,8 +1649,6 @@
       "bitbucketError": "Nastavenie pripojenia k platforme Bitbucket sa nepodarilo otvoriť. Skúste to znova."
     },
     "overview": {
-      "reviewStyle": "Štýl kontroly",
-      "focusAreas": "Oblasti zamerania",
       "allAreas": "Všetky oblasti",
       "set": "Nastavené",
       "notSet": "Nenastavené",

@@ -7,6 +7,7 @@ jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server'
   isOrganizationModelUpdateAllowed: jest.fn(async () => true),
 }));
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { organizationWorkflowGitHubConnectionSql } from '@kilocode/db';
 import {
   agent_configs,
   cloud_agent_code_review_attempts,
@@ -2602,6 +2603,7 @@ describe('GitHub installation persistence', () => {
       scanned: 1,
       canonicalCreated: 0,
       linked: 0,
+      roleAssigned: 0,
       skipped: 1,
       skippedInvalid: 0,
       skippedDeduplicated: 1,
@@ -2613,6 +2615,296 @@ describe('GitHub installation persistence', () => {
     await expect(
       db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, loser.id) })
     ).resolves.toMatchObject({ github_installation_id: null, integration_status: 'suspended' });
+  });
+
+  test('gives a linked organization association its connection role', async () => {
+    const organization = await createTestOrganization('Backfill role', ownerId, 0);
+    const [legacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '777001',
+        platform_account_login: 'acme',
+        integration_status: 'active',
+        github_app_type: 'standard',
+        permissions: { vulnerability_alerts: 'read' },
+        repository_access: 'all',
+        repositories: [{ id: 1, name: 'repo', full_name: 'acme/repo', private: true }],
+      })
+      .returning();
+    expect(legacy.github_connection_role).toBeNull();
+
+    await expect(backfillGitHubInstallations()).resolves.toMatchObject({
+      scanned: 1,
+      canonicalCreated: 1,
+      linked: 1,
+      roleAssigned: 1,
+    });
+
+    // The organization's entry gate and its operational lookups resolve the
+    // row, so the installation surfaces and the Security Agent agree.
+    await expect(
+      getPrimaryGitHubIntegrationForOrganization(organization.id)
+    ).resolves.toMatchObject({
+      id: legacy.id,
+      github_connection_role: 'workflow',
+      github_installation_id: expect.any(String),
+    });
+  });
+
+  test('leaves a linked organization association roleless when its canonical record is unusable', async () => {
+    const organization = await createTestOrganization('Backfill stale canonical', ownerId, 0);
+    await db.insert(github_app_installations).values({
+      installation_id: '777003',
+      github_app_type: 'standard',
+      lifecycle_state: 'suspended',
+    });
+    const [legacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '777003',
+        platform_account_login: 'acme',
+        integration_status: 'active',
+        github_app_type: 'standard',
+        repository_access: 'all',
+      })
+      .returning();
+
+    await expect(backfillGitHubInstallations()).resolves.toMatchObject({
+      scanned: 1,
+      canonicalCreated: 0,
+      linked: 1,
+      roleAssigned: 0,
+    });
+
+    // The link is repaired, but a stored role here would report the
+    // organization connected through an installation no lookup accepts.
+    await expect(
+      db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, legacy.id) })
+    ).resolves.toMatchObject({
+      github_installation_id: expect.any(String),
+      github_connection_role: null,
+    });
+    await expect(getPrimaryGitHubIntegrationForOrganization(organization.id)).resolves.toBeNull();
+  });
+
+  test('the organization workflow connection definition only matches GitHub rows owned by an organization', async () => {
+    const organization = await createTestOrganization('Definition scope', ownerId, 0);
+    const [organizationRow] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '777101',
+        platform_account_login: 'acme',
+        integration_status: 'active',
+        github_app_type: 'standard',
+        repository_access: 'all',
+      })
+      .returning();
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: ownerId,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: '777102',
+      platform_account_login: 'owner',
+      integration_status: 'active',
+      github_app_type: 'standard',
+      repository_access: 'all',
+    });
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: organization.id,
+      platform: 'slack',
+      integration_type: 'app',
+      platform_installation_id: '777103',
+      integration_status: 'active',
+      repository_access: 'all',
+    });
+
+    // The definition is the work item's single contract for "the organization's
+    // workflow connection", so it carries its own scope instead of trusting
+    // every call site to add the platform and ownership filters.
+    const matched = await db
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(organizationWorkflowGitHubConnectionSql());
+
+    expect(matched.map(row => row.id)).toEqual([organizationRow.id]);
+  });
+
+  test('a non-GitHub organization association does not shadow the installation', async () => {
+    const organization = await createTestOrganization('Definition sibling', ownerId, 0);
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: organization.id,
+      platform: 'slack',
+      integration_type: 'app',
+      platform_installation_id: '777201',
+      integration_status: 'active',
+      created_at: new Date(Date.now() - 60_000).toISOString(),
+      repository_access: 'all',
+    });
+    const [githubRow] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '777201',
+        platform_account_login: 'acme',
+        integration_status: 'active',
+        github_app_type: 'standard',
+        repository_access: 'all',
+      })
+      .returning();
+
+    // The older association satisfies every health condition a shadowing
+    // sibling is ranked on, so the platform scope is what keeps the GitHub
+    // installation the organization's connection.
+    const matched = await db
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(organizationWorkflowGitHubConnectionSql());
+
+    expect(matched.map(row => row.id)).toEqual([githubRow.id]);
+    await expect(
+      getPrimaryGitHubIntegrationForOrganization(organization.id)
+    ).resolves.toMatchObject({ id: githubRow.id, github_connection_role: null });
+  });
+
+  test('a personal association that claims the installation keeps the organization roleless', async () => {
+    const organization = await createTestOrganization('Definition personal claim', ownerId, 0);
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: ownerId,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: '777202',
+      platform_account_login: 'owner',
+      integration_status: 'active',
+      github_app_type: 'standard',
+      github_connection_role: 'workflow',
+      repository_access: 'all',
+    });
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: organization.id,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: '777202',
+      platform_account_login: 'acme',
+      integration_status: 'active',
+      github_app_type: 'standard',
+      repository_access: 'all',
+    });
+
+    // Migration 0322 counted a claim from any GitHub association of the
+    // identity, personal or organization, so the definition does too: the
+    // installation already has a connection and this organization row stays a
+    // shadowed duplicate.
+    await expect(
+      db
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(organizationWorkflowGitHubConnectionSql())
+    ).resolves.toEqual([]);
+    await expect(getPrimaryGitHubIntegrationForOrganization(organization.id)).resolves.toBeNull();
+  });
+
+  test('leaves a linked organization association roleless when another row claims the installation', async () => {
+    const claimingOrganization = await createTestOrganization('Claimant', ownerId, 0);
+    const organization = await createTestOrganization('Shadowed', ownerId, 0);
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: claimingOrganization.id,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: '777002',
+      platform_account_login: 'acme',
+      integration_status: 'active',
+      github_connection_role: 'workflow',
+      github_app_type: 'standard',
+      auth_invalid_at: new Date().toISOString(),
+      repository_access: 'all',
+    });
+    const [shadow] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '777002',
+        platform_account_login: 'acme',
+        integration_status: 'active',
+        github_app_type: 'standard',
+        repository_access: 'all',
+      })
+      .returning();
+
+    await expect(backfillGitHubInstallations()).resolves.toMatchObject({ roleAssigned: 0 });
+
+    await expect(
+      db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, shadow.id) })
+    ).resolves.toMatchObject({
+      github_installation_id: expect.any(String),
+      github_connection_role: null,
+    });
+  });
+
+  test('leaves a linked organization association roleless when a stale identity already claims its canonical installation', async () => {
+    const claimant = await createTestOrganization('Canonical claimant', ownerId, 0);
+    const organization = await createTestOrganization('Canonical shadowed', otherOwnerId, 0);
+    const [canonical] = await db
+      .insert(github_app_installations)
+      .values({ installation_id: '777005', github_app_type: 'standard', lifecycle_state: 'active' })
+      .returning();
+    // The claim is held through the canonical link while the stored identity is
+    // the association's own, so the identity exclusion alone does not see it.
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: claimant.id,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: '777901',
+      platform_account_login: 'acme',
+      integration_status: 'active',
+      github_connection_role: 'workflow',
+      github_installation_id: canonical.id,
+      github_app_type: 'standard',
+      repository_access: 'all',
+    });
+    const [shadow] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '777005',
+        platform_account_login: 'acme',
+        integration_status: 'active',
+        github_app_type: 'standard',
+        repository_access: 'all',
+      })
+      .returning();
+
+    // The link is repaired, but the canonical installation already has its
+    // workflow connection, so a second role here would violate
+    // UQ_platform_integrations_github_workflow_canonical and abort the batch.
+    await expect(backfillGitHubInstallations()).resolves.toMatchObject({
+      scanned: 1,
+      canonicalCreated: 0,
+      linked: 1,
+      roleAssigned: 0,
+    });
+
+    await expect(
+      db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, shadow.id) })
+    ).resolves.toMatchObject({
+      github_installation_id: canonical.id,
+      github_connection_role: null,
+    });
+    await expect(getPrimaryGitHubIntegrationForOrganization(organization.id)).resolves.toBeNull();
   });
 });
 

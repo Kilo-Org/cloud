@@ -10,30 +10,11 @@ import {
   getGlanceableSnapshotForSignedInScope,
   restorePersistedGlanceable,
 } from '@/lib/glanceable/persist';
-import {
-  ACTIVE_USER_ID_KEY,
-  AUTH_TOKEN_KEY,
-  ORGANIZATION_STORAGE_KEY,
-  REFRESH_TOKEN_KEY,
-} from '@/lib/storage-keys';
+import { readSignedInScope } from '@/lib/glanceable/scope';
+import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY } from '@/lib/storage-keys';
 
 import { adoptNativeActivity, sweepStrayActivities } from './ios-sink';
 import { restoreFollowedSessionCards, type SessionRestoreScope } from './session-follow';
-
-/**
- * A stored value, `null` when the keychain holds nothing under the key, or
- * `undefined` when it could not answer at all. The two empty answers are not the
- * same: one is a state the app may act on, the other proves nothing.
- */
-async function readKey(key: string): Promise<string | null | undefined> {
-  try {
-    return await SecureStore.getItemAsync(key);
-  } catch {
-    // A keychain that cannot answer, like one before first unlock, only costs
-    // this adoption; the publisher retries.
-    return undefined;
-  }
-}
 
 /**
  * A credential read: `undefined` when the keychain could not answer. A `null` is
@@ -67,30 +48,33 @@ async function hasStoredCredential(): Promise<boolean | undefined> {
 
 /**
  * The stored account and scope, as the launch and foreground restore reads it.
+ * The account and organization come from the shared signed-in scope read
+ * (`lib/glanceable/scope.ts`), so the restore and the snapshot fence cannot
+ * disagree about which account is current.
+ *
  * A keychain that answered with no account and no credential is a sign-out,
  * which ends every card. A device that keeps a credential but cannot name its
  * account, and one whose keychain could not answer at all, leave the cards as
  * they are.
  */
 async function readStoredContext(): Promise<SessionRestoreScope> {
-  const userId = await readKey(ACTIVE_USER_ID_KEY);
-  if (userId === undefined) {
+  const scope = await readSignedInScope(SecureStore);
+  if (scope.status === 'unavailable') {
+    // A read that did not complete proves nothing: no card is out of scope
+    // until the next read answers.
     return { kind: 'unreadable' };
   }
-  if (userId === null) {
-    // Only a device with no credential either is signed out: an absent hint
-    // alone says nothing, and a signed-in scope that cannot be named is not one
-    // this restore may end a card for.
-    const signedIn = await hasStoredCredential();
-    return signedIn === false ? { kind: 'signedOut' } : { kind: 'unreadable' };
+  if (scope.status === 'known') {
+    return {
+      kind: 'account',
+      ctx: { userId: scope.userId, organizationId: scope.organizationId },
+    };
   }
-  const organizationId = await readKey(ORGANIZATION_STORAGE_KEY);
-  if (organizationId === undefined) {
-    // A read that failed proves nothing about the selection, so no card is out
-    // of scope until the next read answers.
-    return { kind: 'unreadable' };
-  }
-  return { kind: 'account', ctx: { userId, organizationId } };
+  // Only a device with no credential either is signed out: an absent hint alone
+  // says nothing, and a signed-in scope that cannot be named is not one this
+  // restore may end a card for.
+  const signedIn = await hasStoredCredential();
+  return signedIn === false ? { kind: 'signedOut' } : { kind: 'unreadable' };
 }
 
 /**

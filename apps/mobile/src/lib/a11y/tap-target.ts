@@ -289,6 +289,28 @@ export const INLINE_LINK_ROW_MARGIN_DP = 5;
 export const INLINE_LINK_ROW_CLASS = 'my-[5px] gap-y-[7px]';
 
 /**
+ * The box a text action renders at the end of a line of copy — the code
+ * reviewer's sync line is its snapshot's age with Refresh at the line's end.
+ *
+ * `sm` draws a 36dp frame, and the line it shares with the copy is one text
+ * line tall (14dp at `text-xs`). A frame that cancels its own layout height and
+ * floats over the line reaches `(36 - 14) / 2 = 11dp` past it, which is more
+ * than the 7dp gap the line keeps above it: the frame then covers the last
+ * 1.9dp of the copy above, and a box collides with a line it does not own. The
+ * 28dp box is the audit floor ({@link MIN_TAP_TARGET_DP}) and reaches
+ * `(28 - 14) / 2 = 7dp` past the line, which that gap absorbs. The vertical
+ * slop carries the rest of the 44pt target, as {@link INLINE_LINK_BOX_CLASS}
+ * does for prose; it is 9dp rather than the inline link's 8dp because a
+ * `min-h-[28px]` box measures 27.8dp on Android, and 8dp a side would then
+ * land a fifth of a dp short of 44. A call site keeps a 36dp minimum width, so
+ * the horizontal reach is 36 + 4 + 4 = 44dp.
+ */
+export const LINE_ACTION_BOX_CLASS = 'min-h-[28px] -my-[7px]';
+
+/** The `hitSlop` {@link LINE_ACTION_BOX_CLASS} renders, reaching past 44dp each way. */
+export const LINE_ACTION_HIT_SLOP = { top: 9, bottom: 9, left: 4, right: 4 } as const;
+
+/**
  * The class an inline-link connector carries so the two links' facing reaches do
  * not overlap. The connector node is the only thing between them, so its floor
  * is `2 * {@link INLINE_LINK_FACING_HIT_SLOP_DP}` = 8dp plus 2dp of headroom, so

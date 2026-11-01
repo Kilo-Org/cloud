@@ -210,7 +210,12 @@ export async function getIntegrationForOrganization(
             asc(platform_integrations.created_at),
             asc(platform_integrations.id),
           ]
-        : [desc(platform_integrations.updated_at), asc(platform_integrations.id)])
+        : [
+            platform === PLATFORM.GITHUB
+              ? asc(platform_integrations.created_at)
+              : desc(platform_integrations.updated_at),
+            asc(platform_integrations.id),
+          ])
     )
     .limit(1);
 

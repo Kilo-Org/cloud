@@ -304,8 +304,9 @@ export const INLINE_LINK_ROW_CLASS = 'my-[5px] gap-y-[7px]';
  * `min-h-[28px]` box measures 27.8dp on Android, and 8dp a side would then
  * land a fifth of a dp short of 44. The horizontal side is 5dp for the same
  * reason: a call site keeps a 36dp minimum width for a short label in another
- * locale, and a 36dp floor can lay out at 43.81dp, so 36 + 5 + 5 = 46dp holds
- * the reach past 44 whatever the pixel rounding does.
+ * locale, and that floor can lay out at about 35.81dp, so 4dp a side reached
+ * 43.81dp. 36 + 5 + 5 = 46dp holds the reach past 44 whatever the pixel
+ * rounding does.
  */
 export const LINE_ACTION_BOX_CLASS = 'min-h-[28px] -my-[7px]';
 

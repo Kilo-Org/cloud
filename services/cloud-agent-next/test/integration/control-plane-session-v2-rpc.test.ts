@@ -253,6 +253,9 @@ async function installGeneratedTitleFakes(
       },
     };
     const SESSION_INGEST = {
+      async canGenerateTitleForCloudAgent() {
+        return true;
+      },
       async setGeneratedTitleForCloudAgent(params: GeneratedTitlePersist) {
         const persists =
           (await state.storage.get<GeneratedTitlePersist[]>(GENERATED_TITLE_PERSISTS_KEY)) ?? [];

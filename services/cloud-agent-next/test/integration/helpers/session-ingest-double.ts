@@ -229,6 +229,9 @@ export function createTestSessionIngestDouble(storage: StorageLike): SessionInge
     async setGeneratedTitleForCloudAgent(): Promise<never> {
       throw new Error(UNSUPPORTED_METHOD);
     },
+    async canGenerateTitleForCloudAgent(): Promise<never> {
+      throw new Error(UNSUPPORTED_METHOD);
+    },
     async deleteSessionForCloudAgent(): Promise<never> {
       throw new Error(UNSUPPORTED_METHOD);
     },

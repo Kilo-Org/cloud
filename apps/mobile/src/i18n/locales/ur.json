@@ -1605,8 +1605,6 @@
       "bitbucketError": "Bitbucket سیٹ اپ نہیں کھولا جا سکا۔ براہ کرم دوبارہ کوشش کریں۔"
     },
     "overview": {
-      "reviewStyle": "جائزے کا انداز",
-      "focusAreas": "توجہ کے شعبے",
       "allAreas": "تمام شعبے",
       "set": "مقرر ہے",
       "notSet": "مقرر نہیں",

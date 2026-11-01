@@ -1605,8 +1605,6 @@
       "bitbucketError": "Bitbucketin käyttöönottoa ei voitu avata. Yritä uudelleen."
     },
     "overview": {
-      "reviewStyle": "Katselmointityyli",
-      "focusAreas": "Painopisteet",
       "allAreas": "Kaikki osa-alueet",
       "set": "Määritetty",
       "notSet": "Ei määritetty",

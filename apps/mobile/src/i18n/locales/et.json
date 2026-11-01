@@ -1605,8 +1605,6 @@
       "bitbucketError": "Bitbucketi seadistamist ei õnnestunud avada. Proovi uuesti."
     },
     "overview": {
-      "reviewStyle": "Ülevaatuse stiil",
-      "focusAreas": "Fookusvaldkonnad",
       "allAreas": "Kõik valdkonnad",
       "set": "Määratud",
       "notSet": "Pole määratud",

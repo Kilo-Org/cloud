@@ -1094,10 +1094,8 @@
     },
     "overview": {
       "allAreas": "جميع المجالات",
-      "focusAreas": "مجالات التركيز",
       "nSelected": "{{displayCount}} محدد",
       "proposedReviewMdGuidance": "إرشادات REVIEW.md المقترحة",
-      "reviewStyle": "أسلوب المراجعة",
       "set": "محدّد",
       "notSet": "غير محدّد"
     },

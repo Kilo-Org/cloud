@@ -1082,10 +1082,8 @@
     },
     "overview": {
       "allAreas": "모든 영역",
-      "focusAreas": "중점 리뷰 항목",
       "nSelected": "{{displayCount}}개 선택됨",
       "proposedReviewMdGuidance": "제안된 REVIEW.md 지침",
-      "reviewStyle": "리뷰 스타일",
       "set": "설정됨",
       "notSet": "설정 안 됨"
     },

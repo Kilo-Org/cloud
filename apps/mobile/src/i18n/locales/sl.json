@@ -1649,8 +1649,6 @@
       "bitbucketError": "Nastavitve povezave s platformo Bitbucket ni bilo mogoče odpreti. Poskusi znova."
     },
     "overview": {
-      "reviewStyle": "Slog pregleda",
-      "focusAreas": "Prednostna področja",
       "allAreas": "Vsa področja",
       "set": "Nastavljeno",
       "notSet": "Ni nastavljeno",

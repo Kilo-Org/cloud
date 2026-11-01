@@ -1605,8 +1605,6 @@
       "bitbucketError": "Kāore i taea te whakatuwhera i te whakarite Bitbucket. Whakamātau anō."
     },
     "overview": {
-      "reviewStyle": "Te āhua arotake",
-      "focusAreas": "Ngā wāhanga arotahi",
       "allAreas": "Ngā wāhanga katoa",
       "set": "Kua whakaritea",
       "notSet": "Kāore i whakaritea",

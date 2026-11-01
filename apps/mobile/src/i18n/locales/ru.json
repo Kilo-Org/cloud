@@ -1088,10 +1088,8 @@
     },
     "overview": {
       "allAreas": "Все области",
-      "focusAreas": "Приоритеты проверки",
       "nSelected": "Выбрано: {{displayCount}}",
       "proposedReviewMdGuidance": "Предложения для REVIEW.md",
-      "reviewStyle": "Стиль проверки",
       "set": "Задано",
       "notSet": "Не задано"
     },

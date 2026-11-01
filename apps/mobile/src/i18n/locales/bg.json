@@ -1605,8 +1605,6 @@
       "bitbucketError": "Не успяхме да отворим настройката на Bitbucket. Опитай отново."
     },
     "overview": {
-      "reviewStyle": "Стил на прегледа",
-      "focusAreas": "Акценти",
       "allAreas": "Всички области",
       "set": "Зададено",
       "notSet": "Не е зададено",

@@ -1605,8 +1605,6 @@
       "bitbucketError": "Nem sikerült megnyitni a Bitbucket beállítását. Próbáld újra."
     },
     "overview": {
-      "reviewStyle": "Ellenőrzési stílus",
-      "focusAreas": "Kiemelt területek",
       "allAreas": "Minden terület",
       "set": "Beállítva",
       "notSet": "Nincs beállítva",

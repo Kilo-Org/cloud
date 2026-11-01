@@ -1605,8 +1605,6 @@
       "bitbucketError": "Hindi mabuksan ang setup ng Bitbucket. Pakisubukang muli."
     },
     "overview": {
-      "reviewStyle": "Estilo ng pagsusuri",
-      "focusAreas": "Mga pagtutuunan",
       "allAreas": "Lahat ng aspeto",
       "set": "Nakatakda",
       "notSet": "Hindi nakatakda",

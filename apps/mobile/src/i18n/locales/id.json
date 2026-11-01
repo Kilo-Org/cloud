@@ -1082,10 +1082,8 @@
     },
     "overview": {
       "allAreas": "Semua area",
-      "focusAreas": "Area fokus",
       "nSelected": "{{displayCount}} dipilih",
       "proposedReviewMdGuidance": "Panduan REVIEW.md yang diusulkan",
-      "reviewStyle": "Gaya tinjauan",
       "set": "Sudah diatur",
       "notSet": "Belum diatur"
     },

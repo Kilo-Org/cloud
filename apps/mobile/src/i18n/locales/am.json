@@ -1605,8 +1605,6 @@
       "bitbucketError": "የBitbucket ማዋቀር መክፈት አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
     },
     "overview": {
-      "reviewStyle": "የግምገማ ዘይቤ",
-      "focusAreas": "የትኩረት መስኮች",
       "allAreas": "ሁሉም ዘርፎች",
       "set": "ተዘጋጅቷል",
       "notSet": "አልተዘጋጀም",

@@ -1605,8 +1605,6 @@
       "bitbucketError": "Bitbucket quraşdırmasını açmaq mümkün olmadı. Yenidən cəhd et."
     },
     "overview": {
-      "reviewStyle": "Yoxlama üslubu",
-      "focusAreas": "Əsas yoxlama sahələri",
       "allAreas": "Bütün sahələr",
       "set": "Təyin edilib",
       "notSet": "Təyin edilməyib",

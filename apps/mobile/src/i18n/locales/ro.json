@@ -1627,8 +1627,6 @@
       "bitbucketError": "Nu s-a putut deschide configurarea Bitbucket. Încearcă din nou."
     },
     "overview": {
-      "reviewStyle": "Stil de revizuire",
-      "focusAreas": "Aspecte prioritare",
       "allAreas": "Toate domeniile",
       "set": "Configurat",
       "notSet": "Nu este configurat",

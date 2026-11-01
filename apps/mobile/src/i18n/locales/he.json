@@ -1085,10 +1085,8 @@
     },
     "overview": {
       "allAreas": "כל התחומים",
-      "focusAreas": "תחומי מיקוד",
       "nSelected": "{{displayCount}} נבחרו",
       "proposedReviewMdGuidance": "הנחיות מוצעות לקובץ REVIEW.md",
-      "reviewStyle": "סגנון סקירה",
       "set": "הוגדר",
       "notSet": "לא הוגדר"
     },

@@ -1649,8 +1649,6 @@
       "bitbucketError": "Nastavení služby Bitbucket se nepodařilo otevřít. Zkuste to znovu."
     },
     "overview": {
-      "reviewStyle": "Styl kontroly",
-      "focusAreas": "Oblasti zaměření",
       "allAreas": "Všechny oblasti",
       "set": "Nastaveno",
       "notSet": "Nenastaveno",

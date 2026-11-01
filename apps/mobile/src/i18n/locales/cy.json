@@ -1693,8 +1693,6 @@
       "bitbucketError": "Ni ellid agor y broses sefydlu Bitbucket. Ceisiwch eto."
     },
     "overview": {
-      "reviewStyle": "Arddull adolygu",
-      "focusAreas": "Meysydd i ganolbwyntio arnynt",
       "allAreas": "Pob maes",
       "set": "Wedi'i osod",
       "notSet": "Heb ei osod",

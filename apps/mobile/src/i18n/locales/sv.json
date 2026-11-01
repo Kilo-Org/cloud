@@ -1605,8 +1605,6 @@
       "bitbucketError": "Kunde inte öppna konfigurationen för Bitbucket. Försök igen."
     },
     "overview": {
-      "reviewStyle": "Granskningsstil",
-      "focusAreas": "Fokusområden",
       "allAreas": "Alla områden",
       "set": "Angivet",
       "notSet": "Ej angivet",

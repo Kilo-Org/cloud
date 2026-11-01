@@ -2867,7 +2867,6 @@
     },
     "modelSelector": {
       "provider": "Soláthraí {{id}}",
-      "modelId": "Samhail {{id}}",
       "unavailable": "Níl ar fáil",
       "unavailableState": "níl ar fáil",
       "selectedState": "roghnaithe",

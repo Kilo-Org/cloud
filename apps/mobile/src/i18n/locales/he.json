@@ -2234,7 +2234,6 @@
     },
     "modelSelector": {
       "provider": "ספק {{id}}",
-      "modelId": "מודל {{id}}",
       "unavailable": "לא זמין",
       "unavailableState": "לא זמין",
       "selectedState": "נבחר",

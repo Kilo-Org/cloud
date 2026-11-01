@@ -2747,7 +2747,6 @@
     },
     "modelSelector": {
       "provider": "ಪೂರೈಕೆದಾರ {{id}}",
-      "modelId": "ಮಾದರಿ {{id}}",
       "unavailable": "ಲಭ್ಯವಿಲ್ಲ",
       "unavailableState": "ಲಭ್ಯವಿಲ್ಲ",
       "selectedState": "ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",

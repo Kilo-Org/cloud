@@ -2825,7 +2825,6 @@
     },
     "modelSelector": {
       "provider": "Пастаўшчык {{id}}",
-      "modelId": "Мадэль {{id}}",
       "unavailable": "Недаступная",
       "unavailableState": "недаступная",
       "selectedState": "выбрана",

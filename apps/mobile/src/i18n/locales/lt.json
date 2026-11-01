@@ -2825,7 +2825,6 @@
     },
     "modelSelector": {
       "provider": "Teikėjas {{id}}",
-      "modelId": "Modelis {{id}}",
       "unavailable": "Nepasiekiama",
       "unavailableState": "nepasiekiama",
       "selectedState": "pasirinkta",

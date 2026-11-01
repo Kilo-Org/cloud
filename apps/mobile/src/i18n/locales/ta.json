@@ -2741,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "வழங்குநர் {{id}}",
-      "modelId": "மாதிரி {{id}}",
       "unavailable": "கிடைக்கவில்லை",
       "unavailableState": "கிடைக்கவில்லை",
       "selectedState": "தேர்ந்தெடுக்கப்பட்டது",

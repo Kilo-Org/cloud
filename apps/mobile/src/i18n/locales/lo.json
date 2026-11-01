@@ -2741,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "ຜູ້ໃຫ້ບໍລິການ {{id}}",
-      "modelId": "ໂມເດວ {{id}}",
       "unavailable": "ໃຊ້ບໍ່ໄດ້",
       "unavailableState": "ໃຊ້ບໍ່ໄດ້",
       "selectedState": "ເລືອກແລ້ວ",

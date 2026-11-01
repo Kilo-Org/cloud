@@ -2741,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Leverandør {{id}}",
-      "modelId": "Modell {{id}}",
       "unavailable": "Utilgjengelig",
       "unavailableState": "utilgjengelig",
       "selectedState": "valgt",

@@ -2747,7 +2747,6 @@
     },
     "modelSelector": {
       "provider": "Umhlinzeki {{id}}",
-      "modelId": "Imodeli {{id}}",
       "unavailable": "Ayitholakali",
       "unavailableState": "ayitholakali",
       "selectedState": "kukhethiwe",

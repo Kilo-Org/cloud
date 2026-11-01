@@ -2825,7 +2825,6 @@
     },
     "modelSelector": {
       "provider": "Ponudnik {{id}}",
-      "modelId": "Model z oznako {{id}}",
       "unavailable": "Ni na voljo",
       "unavailableState": "ni na voljo",
       "selectedState": "izbran",

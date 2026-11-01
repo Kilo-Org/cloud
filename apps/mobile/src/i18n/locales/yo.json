@@ -2741,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Olùpèsè {{id}}",
-      "modelId": "Àwòṣe {{id}}",
       "unavailable": "Kò sí",
       "unavailableState": "kò sí",
       "selectedState": "a ti yàn án",

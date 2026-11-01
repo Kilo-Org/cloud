@@ -2741,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Palveluntarjoaja {{id}}",
-      "modelId": "Malli {{id}}",
       "unavailable": "Ei saatavilla",
       "unavailableState": "ei saatavilla",
       "selectedState": "valittu",

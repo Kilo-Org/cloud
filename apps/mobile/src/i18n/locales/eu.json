@@ -2741,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Hornitzailea: {{id}}",
-      "modelId": "Modeloa: {{id}}",
       "unavailable": "Ez dago eskuragarri",
       "unavailableState": "ez dago eskuragarri",
       "selectedState": "hautatuta",

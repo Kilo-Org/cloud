@@ -2741,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Үйлчилгээ үзүүлэгч {{id}}",
-      "modelId": "Загвар {{id}}",
       "unavailable": "Ашиглах боломжгүй",
       "unavailableState": "ашиглах боломжгүй",
       "selectedState": "сонгогдсон",

@@ -2741,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "ప్రొవైడర్ {{id}}",
-      "modelId": "మోడల్ {{id}}",
       "unavailable": "అందుబాటులో లేదు",
       "unavailableState": "అందుబాటులో లేదు",
       "selectedState": "ఎంచుకున్నది",

@@ -2747,7 +2747,6 @@
     },
     "modelSelector": {
       "provider": "ਪ੍ਰਦਾਤਾ {{id}}",
-      "modelId": "ਮਾਡਲ {{id}}",
       "unavailable": "ਉਪਲਬਧ ਨਹੀਂ",
       "unavailableState": "ਉਪਲਬਧ ਨਹੀਂ",
       "selectedState": "ਚੁਣਿਆ ਗਿਆ",

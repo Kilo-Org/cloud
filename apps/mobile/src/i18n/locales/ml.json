@@ -2741,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "ദാതാവ് {{id}}",
-      "modelId": "മോഡൽ {{id}}",
       "unavailable": "ലഭ്യമല്ല",
       "unavailableState": "ലഭ്യമല്ല",
       "selectedState": "തിരഞ്ഞെടുത്തത്",

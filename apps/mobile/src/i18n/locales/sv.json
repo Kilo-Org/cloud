@@ -2741,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Leverantör {{id}}",
-      "modelId": "Modell {{id}}",
       "unavailable": "Inte tillgänglig",
       "unavailableState": "inte tillgänglig",
       "selectedState": "vald",

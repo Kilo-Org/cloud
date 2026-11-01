@@ -2183,7 +2183,6 @@
     },
     "modelSelector": {
       "provider": "प्रदाता {{id}}",
-      "modelId": "मॉडल {{id}}",
       "unavailable": "अनुपलब्ध",
       "unavailableState": "अनुपलब्ध",
       "selectedState": "चयनित",

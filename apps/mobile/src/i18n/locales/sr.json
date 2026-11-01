@@ -2783,7 +2783,6 @@
     },
     "modelSelector": {
       "provider": "Provajder {{id}}",
-      "modelId": "Model sa oznakom {{id}}",
       "unavailable": "Nedostupno",
       "unavailableState": "nedostupno",
       "selectedState": "izabrano",

@@ -2825,7 +2825,6 @@
     },
     "modelSelector": {
       "provider": "Poskytovatel {{id}}",
-      "modelId": "Model: {{id}}",
       "unavailable": "Nedostupné",
       "unavailableState": "nedostupné",
       "selectedState": "vybráno",

@@ -2741,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "ผู้ให้บริการ {{id}}",
-      "modelId": "โมเดล {{id}}",
       "unavailable": "ไม่พร้อมใช้งาน",
       "unavailableState": "ไม่พร้อมใช้งาน",
       "selectedState": "เลือกแล้ว",

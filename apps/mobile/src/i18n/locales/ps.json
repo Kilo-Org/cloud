@@ -2741,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "چمتو کوونکی {{id}}",
-      "modelId": "ماډل {{id}}",
       "unavailable": "نشته",
       "unavailableState": "نشته",
       "selectedState": "غوره شوی",

@@ -2211,7 +2211,6 @@
     },
     "modelSelector": {
       "provider": "プロバイダー {{id}}",
-      "modelId": "モデル {{id}}",
       "unavailable": "利用不可",
       "unavailableState": "利用不可",
       "selectedState": "選択済み",

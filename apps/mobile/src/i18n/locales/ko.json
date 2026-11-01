@@ -2211,7 +2211,6 @@
     },
     "modelSelector": {
       "provider": "제공업체 {{id}}",
-      "modelId": "모델 {{id}}",
       "unavailable": "사용할 수 없음",
       "unavailableState": "사용할 수 없음",
       "selectedState": "선택됨",

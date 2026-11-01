@@ -2741,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Pakkuja {{id}}",
-      "modelId": "Mudel {{id}}",
       "unavailable": "Pole saadaval",
       "unavailableState": "pole saadaval",
       "selectedState": "valitud",

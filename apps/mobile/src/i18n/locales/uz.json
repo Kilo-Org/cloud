@@ -2741,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Provayder: {{id}}",
-      "modelId": "Model: {{id}}",
       "unavailable": "Mavjud emas",
       "unavailableState": "mavjud emas",
       "selectedState": "tanlangan",

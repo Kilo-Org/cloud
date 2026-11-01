@@ -2789,7 +2789,6 @@
     },
     "modelSelector": {
       "provider": "Fornecedor {{id}}",
-      "modelId": "Modelo {{id}}",
       "unavailable": "Indisponível",
       "unavailableState": "indisponível",
       "selectedState": "selecionado",

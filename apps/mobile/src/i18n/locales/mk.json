@@ -2741,7 +2741,6 @@
     },
     "modelSelector": {
       "provider": "Давател {{id}}",
-      "modelId": "Модел {{id}}",
       "unavailable": "Недостапен",
       "unavailableState": "недостапен",
       "selectedState": "избран",

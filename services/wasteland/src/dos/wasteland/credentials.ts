@@ -46,10 +46,10 @@ export function storeCredential(
   const isAdmin = input.isUpstreamAdmin ? 1 : 0;
   // Only a verified flow (join, createUpstream) may set the handle. A
   // caller that does not supply one — a reconnect that swaps the token
-  // — keeps the stored handle while it still belongs to the same org,
-  // because that handle was proved against that org. An org change
-  // drops it instead of carrying an identity over to another org; it
-  // stays null until a verified flow sets it.
+  // — keeps the stored handle and its proof while both still belong to
+  // the same org. An org change drops them instead of carrying an
+  // identity over to another org; they stay null until a verified flow
+  // sets them.
   const existing = input.rigHandle === undefined ? getCredential(sql, wastelandId, userId) : null;
   const keepsHandle = existing !== null && isSameDolthubOrg(existing.dolthub_org, input.dolthubOrg);
   const rigHandle = input.rigHandle ?? (keepsHandle ? existing.rig_handle : null);

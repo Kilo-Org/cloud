@@ -81,12 +81,12 @@ async function loadContext(
     );
   }
 
-  // A credential that carries a rig handle for this same org is an
-  // identity an earlier DoltHub-authorized write established, so a
-  // re-join may reuse that proof — the only way a connection made under
-  // a DoltHub org, whose token belongs to a member username, can join
-  // again once its fork exists. The fresh-username path needs none:
-  // there the org is the token's own account.
+  // A credential whose recorded proof covers this same org already
+  // established it with a DoltHub write, so a re-join may reuse that
+  // proof — the only way a connection made under a DoltHub org, whose
+  // token belongs to a member username, can join again once its fork
+  // exists. The fresh-username path needs none: there the org is the
+  // token's own account.
   const orgProven = fresh.status !== 'ok' && credentialProvesOrg(credential, dolthubOrg);
 
   // The handle becomes the caller's identity once the join persists it:

@@ -6,7 +6,12 @@ import * as SecureStore from '@/lib/auth/secure-store';
 // would reach the no-op delivery and the card would stay orphaned.
 import '@/lib/glanceable/delivery-registration';
 import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/glanceable/persist';
-import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
+import {
+  ACTIVE_USER_ID_KEY,
+  AUTH_TOKEN_KEY,
+  ORGANIZATION_STORAGE_KEY,
+  REFRESH_TOKEN_KEY,
+} from '@/lib/storage-keys';
 
 import { adoptNativeActivity, sweepStrayActivities } from './ios-sink';
 import { restoreFollowedSessionCards, type SessionRestoreScope } from './session-follow';
@@ -27,9 +32,33 @@ async function readKey(key: string): Promise<string | null | undefined> {
 }
 
 /**
+ * Whether the keychain holds a credential, so the device is signed in.
+ * `undefined` when the credential store could not be read. The identity hint is
+ * written best effort (`lib/persist/cache-persistence-mount.tsx`), so a missing
+ * hint on its own is not a sign-out: a signed-in device can lose the hint and
+ * still hold its tokens.
+ */
+async function hasStoredCredential(): Promise<boolean | undefined> {
+  const authToken = await readKey(AUTH_TOKEN_KEY);
+  if (authToken === undefined) {
+    return undefined;
+  }
+  if (authToken !== null) {
+    return true;
+  }
+  const refreshToken = await readKey(REFRESH_TOKEN_KEY);
+  if (refreshToken === undefined) {
+    return undefined;
+  }
+  return refreshToken !== null;
+}
+
+/**
  * The stored account and scope, as the launch and foreground restore reads it.
- * A keychain that answered with no account is a sign-out, which ends every card;
- * one that could not answer leaves the cards as they are.
+ * A keychain that answered with no account and no credential is a sign-out,
+ * which ends every card. A device that keeps a credential but cannot name its
+ * account, and one whose keychain could not answer at all, leave the cards as
+ * they are.
  */
 async function readStoredContext(): Promise<SessionRestoreScope> {
   const userId = await readKey(ACTIVE_USER_ID_KEY);
@@ -37,7 +66,11 @@ async function readStoredContext(): Promise<SessionRestoreScope> {
     return { kind: 'unreadable' };
   }
   if (userId === null) {
-    return { kind: 'signedOut' };
+    // Only a device with no credential either is signed out: an absent hint
+    // alone says nothing, and a signed-in scope that cannot be named is not one
+    // this restore may end a card for.
+    const signedIn = await hasStoredCredential();
+    return signedIn === false ? { kind: 'signedOut' } : { kind: 'unreadable' };
   }
   const organizationId = await readKey(ORGANIZATION_STORAGE_KEY);
   if (organizationId === undefined) {

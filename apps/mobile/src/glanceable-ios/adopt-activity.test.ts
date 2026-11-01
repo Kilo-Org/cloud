@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
-import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
+import {
+  ACTIVE_USER_ID_KEY,
+  AUTH_TOKEN_KEY,
+  ORGANIZATION_STORAGE_KEY,
+  REFRESH_TOKEN_KEY,
+} from '@/lib/storage-keys';
 
 const mocks = vi.hoisted(() => ({
   sweepStrayActivities: vi.fn(),
@@ -83,13 +88,46 @@ describe('adoptPushStartedActivity', () => {
     });
   });
 
-  it('reports a keychain with no account as signed out, not as unreadable', async () => {
+  it('reports a keychain with no account and no credential as signed out', async () => {
     await adoptPushStartedActivity();
     expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({ kind: 'signedOut' });
     expect(mocks.adoptNativeActivity).not.toHaveBeenCalled();
 
     await restoreStoredSessionCards();
     expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({ kind: 'signedOut' });
+  });
+
+  it('keeps the cards when a credential is stored but the account hint is not', async () => {
+    // The hint is written best effort, so a signed-in device can hold its
+    // tokens without the hint.
+    mocks.getItemAsync.mockImplementation((key: string) =>
+      Promise.resolve(key === AUTH_TOKEN_KEY ? 'access-token' : null)
+    );
+
+    await adoptPushStartedActivity();
+
+    expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({ kind: 'unreadable' });
+    expect(mocks.adoptNativeActivity).not.toHaveBeenCalled();
+  });
+
+  it('counts a refresh token alone as a stored credential', async () => {
+    mocks.getItemAsync.mockImplementation((key: string) =>
+      Promise.resolve(key === REFRESH_TOKEN_KEY ? 'refresh-token' : null)
+    );
+
+    await adoptPushStartedActivity();
+
+    expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({ kind: 'unreadable' });
+  });
+
+  it('keeps the cards when the credential read cannot answer', async () => {
+    mocks.getItemAsync.mockImplementation((key: string) =>
+      key === AUTH_TOKEN_KEY ? Promise.reject(KEYCHAIN_LOCKED) : Promise.resolve(null)
+    );
+
+    await adoptPushStartedActivity();
+
+    expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({ kind: 'unreadable' });
   });
 
   it('reports a keychain that cannot answer as unreadable', async () => {

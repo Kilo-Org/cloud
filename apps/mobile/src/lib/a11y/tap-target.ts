@@ -302,13 +302,15 @@ export const INLINE_LINK_ROW_CLASS = 'my-[5px] gap-y-[7px]';
  * slop carries the rest of the 44pt target, as {@link INLINE_LINK_BOX_CLASS}
  * does for prose; it is 9dp rather than the inline link's 8dp because a
  * `min-h-[28px]` box measures 27.8dp on Android, and 8dp a side would then
- * land a fifth of a dp short of 44. A call site keeps a 36dp minimum width, so
- * the horizontal reach is 36 + 4 + 4 = 44dp.
+ * land a fifth of a dp short of 44. The horizontal side is 5dp for the same
+ * reason: a call site keeps a 36dp minimum width for a short label in another
+ * locale, and a 36dp floor can lay out at 43.81dp, so 36 + 5 + 5 = 46dp holds
+ * the reach past 44 whatever the pixel rounding does.
  */
 export const LINE_ACTION_BOX_CLASS = 'min-h-[28px] -my-[7px]';
 
 /** The `hitSlop` {@link LINE_ACTION_BOX_CLASS} renders, reaching past 44dp each way. */
-export const LINE_ACTION_HIT_SLOP = { top: 9, bottom: 9, left: 4, right: 4 } as const;
+export const LINE_ACTION_HIT_SLOP = { top: 9, bottom: 9, left: 5, right: 5 } as const;
 
 /**
  * The class an inline-link connector carries so the two links' facing reaches do

@@ -4,11 +4,24 @@ import { autoModelLabel } from '@/lib/auto-model-name';
 
 export type ModelPickerRow =
   | { key: string; title: string; type: 'header' }
-  | { key: string; model: SessionModelOption; isFavorite: boolean; type: 'model' };
+  | {
+      key: string;
+      model: SessionModelOption;
+      isFavorite: boolean;
+      /**
+       * Whether the row still shows the provider line. A provider group's header
+       * already names the provider, so its rows drop the line; the FAVORITES,
+       * recommended and all-models sections do not name one, and a favorite list
+       * spans providers, so their rows keep it.
+       */
+      showsProvider: boolean;
+      type: 'model';
+    };
 
 type ModelGroup = {
   key: string;
   title: string;
+  namesProvider: boolean;
   models: SessionModelOption[];
 };
 
@@ -98,7 +111,13 @@ export function buildModelPickerRows({
       type: 'header',
     });
     for (const model of favorites) {
-      rows.push({ key: `model:${model.id}`, model, isFavorite: true, type: 'model' });
+      rows.push({
+        key: `model:${model.id}`,
+        model,
+        isFavorite: true,
+        showsProvider: true,
+        type: 'model',
+      });
     }
   }
 
@@ -116,7 +135,13 @@ export function buildModelPickerRows({
   for (const group of groups.values()) {
     rows.push({ key: group.key, title: group.title, type: 'header' });
     for (const model of group.models) {
-      rows.push({ key: `model:${model.id}`, model, isFavorite: false, type: 'model' });
+      rows.push({
+        key: `model:${model.id}`,
+        model,
+        isFavorite: false,
+        showsProvider: !group.namesProvider,
+        type: 'model',
+      });
     }
   }
 
@@ -140,16 +165,19 @@ function searchableText(model: SessionModelOption): string {
     .toLowerCase();
 }
 
-function groupForModel(model: SessionModelOption): Pick<ModelGroup, 'key' | 'title'> {
+function groupForModel(
+  model: SessionModelOption
+): Pick<ModelGroup, 'key' | 'namesProvider' | 'title'> {
   if (model.provider) {
     return {
       key: `provider:${model.provider.id}`,
+      namesProvider: true,
       // Locale-aware: a Turkish provider name uppercases `i` to `İ`.
       title: model.provider.name.toLocaleUpperCase(i18n.language),
     };
   }
   if (model.isPreferred) {
-    return { key: 'recommended', title: i18n.t('common.recommended') };
+    return { key: 'recommended', namesProvider: false, title: i18n.t('common.recommended') };
   }
-  return { key: 'all', title: i18n.t('common.allModels') };
+  return { key: 'all', namesProvider: false, title: i18n.t('common.allModels') };
 }

@@ -205,6 +205,7 @@ export function ModelPickerContent() {
           selected={item.model.id === selectedModel}
           selectedVariant={selectedVariant}
           isFavorite={item.isFavorite}
+          showProvider={item.showsProvider}
           onSelectModel={handleSelectModel}
           onSelectVariant={handleSelectVariant}
           onToggleFavorite={handleToggleFavorite}

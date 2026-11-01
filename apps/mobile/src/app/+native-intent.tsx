@@ -61,6 +61,9 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/transcript-style-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/transcript-style-fixture';
     }
+    if (/(?:^|\/)dev\/preparation-copy-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/preparation-copy-fixture';
+    }
     if (/(?:^|\/)dev\/question-card-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/question-card-fixture';
     }

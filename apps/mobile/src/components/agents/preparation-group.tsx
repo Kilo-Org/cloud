@@ -52,7 +52,11 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
         )}
         <AttemptIcon status={attempt.status} incomplete={incomplete !== undefined} />
         <Text
-          className={incomplete ? 'text-sm font-medium text-destructive' : 'text-sm font-medium'}
+          className={
+            incomplete
+              ? 'min-w-0 flex-1 text-sm font-medium text-destructive'
+              : 'min-w-0 flex-1 text-sm font-medium'
+          }
         >
           {title}
         </Text>

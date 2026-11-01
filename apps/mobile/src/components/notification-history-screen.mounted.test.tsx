@@ -366,8 +366,7 @@ describe('NotificationHistoryScreen', () => {
     view = await renderWithProviders(<Harness />);
     // Both reads under the banner answer first; only the gate is still out.
     await waitFor(() => {
-      const history =
-        view?.queryClient.getQueryCache().findAll({ queryKey: [HISTORY_PATH] }) ?? [];
+      const history = view?.queryClient.getQueryCache().findAll({ queryKey: [HISTORY_PATH] }) ?? [];
       return (
         history.length > 0 &&
         history.every(entry => entry.state.status === 'success') &&

@@ -10,6 +10,7 @@ import { toast } from 'sonner-native';
 
 import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
 import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
+import { PrReviewGateItemLine } from '@/components/pr-review/pr-review-gate-item-line';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -30,7 +31,11 @@ import {
   selectPrReviewConnectAction,
   selectPrReviewGateView,
 } from '@/lib/pr-review/pr-review-connect-gate-view';
-import { type ProviderPrPlatform, useProviderPrScopeOrNull } from '@/lib/pr-review/provider-pr-ref';
+import {
+  type ProviderPrPlatform,
+  type ProviderPrRef,
+  useProviderPrScopeOrNull,
+} from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -88,10 +93,13 @@ function OrgOnlyDescription({
 export function ProviderConnectGate({
   platform,
   organizationId,
+  prRef,
   children,
 }: Readonly<{
   platform: Exclude<ProviderPrPlatform, 'github'>;
   organizationId: string | null;
+  /** The PR/MR the route opened; see `PrReviewGateItemLine`. */
+  prRef?: ProviderPrRef;
   children: ReactNode;
 }>) {
   const trpc = useTRPC();
@@ -236,6 +244,7 @@ export function ProviderConnectGate({
           title={t('agentChat.newSession.bitbucketOrganizationsOnly')}
           description={
             <>
+              <PrReviewGateItemLine prRef={prRef} />
               {/* The switcher stays above this arm's explanation: its copy tells
                   the reader to switch "the account above", so the control has to
                   be the line they read first. */}
@@ -338,6 +347,7 @@ export function ProviderConnectGate({
           title={title}
           description={
             <>
+              <PrReviewGateItemLine prRef={prRef} />
               <Text variant="muted" className="text-center">
                 {description}
               </Text>

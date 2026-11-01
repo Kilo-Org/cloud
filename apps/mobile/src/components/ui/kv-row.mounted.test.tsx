@@ -20,7 +20,7 @@ const longRepository = 'iscekic/kilo-e2e-pr-review-sandbox-86773';
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function renderRow(props: { value: string; selectable?: boolean }) {
+function renderRow(props: { value: string; selectable?: boolean; valueDirection?: 'ltr' }) {
   act(() => {
     const element = createElement(KvRow, { label: 'Repository', ...props });
     if (renderer) {
@@ -64,5 +64,12 @@ describe('KvRow mounted layout', () => {
     );
     expect(text.props.numberOfLines).toBe(1);
     expect(text.props.ellipsizeMode).toBe('middle');
+  });
+
+  // A version range is written left to right, so a right-to-left interface lets
+  // the bidi algorithm paint `< 6.13.0` as `6.13.0 >` and invert its meaning.
+  it('pins a value that names a version to a left-to-right run', () => {
+    const text = valueText(renderRow({ value: '< 6.13.0', valueDirection: 'ltr' }), '< 6.13.0');
+    expect(text.props.style).toEqual({ direction: 'ltr', writingDirection: 'ltr' });
   });
 });

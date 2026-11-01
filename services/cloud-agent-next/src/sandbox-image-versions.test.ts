@@ -70,7 +70,7 @@ describe('runtime distribution packaging', () => {
     expect(RUNTIME_DISTRIBUTION.bun).toBe('1.4.4');
     expect(RUNTIME_DISTRIBUTION.pnpm).toBe('12.14.0');
     expect(RUNTIME_DISTRIBUTION.glab).toBe('1.124.0');
-    expect(RUNTIME_DISTRIBUTION.gh).toBe('2.102.0');
+    expect(RUNTIME_DISTRIBUTION.gh).toBe('2.103.3');
     expect(RUNTIME_DISTRIBUTION.nodeMajor).toBe('24');
   });
 
@@ -99,7 +99,6 @@ describe('runtime distribution packaging', () => {
       expect(dockerfile).toContain(`ARG BUN_VERSION="${RUNTIME_DISTRIBUTION.bun}"`);
       expect(dockerfile).toContain(`ARG PNPM_VERSION="${RUNTIME_DISTRIBUTION.pnpm}"`);
       expect(dockerfile).toContain(`ARG GLAB_VERSION="${RUNTIME_DISTRIBUTION.glab}"`);
-      expect(dockerfile).toContain(`ARG GH_VERSION="${RUNTIME_DISTRIBUTION.gh}"`);
     }
     const runtimeFree = readServiceFile('../Dockerfile.containers.runtime-free');
     const containers = readServiceFile('../Dockerfile.containers');
@@ -121,6 +120,15 @@ describe('runtime distribution packaging', () => {
       expect(dockerfile).toContain(
         'COPY --from=node-runtime /usr/local/lib/node_modules /usr/local/lib/node_modules'
       );
+    }
+  });
+
+  it('updates gh in the runtime-free image without changing the legacy images', () => {
+    expect(readServiceFile('../Dockerfile.containers.runtime-free')).toContain(
+      `ARG GH_VERSION="${RUNTIME_DISTRIBUTION.gh}"`
+    );
+    for (const file of dockerfiles) {
+      expect(readServiceFile(`../${file}`)).toContain('ARG GH_VERSION="2.102.0"');
     }
   });
 

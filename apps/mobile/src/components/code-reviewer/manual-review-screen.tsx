@@ -8,7 +8,10 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, type ScrollViewInstance, TextInput, View } from 'react-native';
 
-import { matchesCodeReviewUrlSuffix } from '@kilocode/app-shared/code-review';
+import {
+  MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH,
+  matchesCodeReviewUrlSuffix,
+} from '@kilocode/app-shared/code-review';
 import { ModelSelector } from '@/components/agents/model-selector';
 import { EmptyState } from '@/components/empty-state';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -90,6 +93,12 @@ function isDeadlineStall(error: unknown): boolean {
 // the field label is not flush against the header.
 const FORM_EDGE_GAP = 16;
 
+// How close to the instructions bound the remaining-character count appears:
+// the same rule the chat composer uses, so an ordinary short note shows no
+// count and a long draft counts down. At the bound the count would read zero,
+// which the sentence stating the limit says instead.
+const INSTRUCTIONS_COUNTER_VISIBLE_REMAINING = 1_000;
+
 export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const pushOnce = useSinglePushRoute();
@@ -105,11 +114,24 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const permission = useReviewerPermission(scope);
   const [platformChoice, setPlatformChoice] = useState<ManualReviewPlatform | null>(null);
   const platform = platformChoice ?? firstConnected ?? 'github';
+  // The field names the request the selected platform serves: GitHub calls it a
+  // pull request and GitLab a merge request, and the placeholder and the start
+  // error already follow that split. One label feeds both the visible heading
+  // and the field's accessible name, so the two cannot disagree.
+  const urlLabel = t(
+    platform === 'gitlab'
+      ? 'codeReviewer.manualReview.mergeRequestUrl'
+      : 'codeReviewer.manualReview.pullRequestUrl'
+  );
   const urlRef = useRef('');
   const instructionsRef = useRef('');
   const scrollRef = useRef<ScrollViewInstance | null>(null);
   const urlSectionY = useRef(0);
   const [urlError, setUrlError] = useState<string | null>(null);
+  // The instructions box stays uncontrolled (its text lives in the ref), but
+  // the counter under it has to re-render on every edit.
+  const [instructionsLength, setInstructionsLength] = useState(0);
+  const instructionsRemaining = MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH - instructionsLength;
   const config = useReviewConfig(scope, platform);
   // The screen renders the create's failure inline (stall or settled error),
   // so the hook's toast stays off for it. The watchdog fires at the
@@ -122,7 +144,13 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     settle => {
       const url = urlRef.current.trim();
       if (!isValidManualReviewUrl(platform, url)) {
-        setUrlError(t('codeReviewer.manualReview.invalidUrl'));
+        setUrlError(
+          t(
+            platform === 'gitlab'
+              ? 'codeReviewer.manualReview.invalidMergeRequestUrl'
+              : 'codeReviewer.manualReview.invalidUrl'
+          )
+        );
         // The action is pinned outside the scroll body, so the URL section can
         // be above the fold when Start is pressed (a short viewport, a raised
         // keyboard). Bring that section back on screen with the message; the
@@ -299,7 +327,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             }}
           >
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('codeReviewer.manualReview.pullRequestUrl')}
+              {urlLabel}
             </Text>
             <Input
               key={platform}
@@ -318,7 +346,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               autoCorrect={false}
               keyboardType="url"
               accessibilityLabel={formFieldA11y({
-                label: t('codeReviewer.manualReview.pullRequestUrl'),
+                label: urlLabel,
                 error: urlError,
               })}
               onChangeText={value => {
@@ -341,6 +369,12 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               {t('codeReviewer.manualReview.instructions')}
             </Text>
             <TextInput
+              // The route caps this at the same constant (its zod schema), and
+              // the native input clips a longer value (a paste) at `maxLength`
+              // before the change reaches JS, so the form cannot produce the
+              // request the route would answer with its generic "can't be
+              // reviewed" line.
+              maxLength={MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH}
               className="h-24 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
               multiline
               textAlignVertical="top"
@@ -348,9 +382,36 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               placeholderTextColor={colors.mutedForeground}
               onChangeText={value => {
                 instructionsRef.current = value;
+                setInstructionsLength(value.length);
                 start.reset();
               }}
             />
+            {/* One line at a time: the room left while the draft nears the
+                bound, the bound itself once it is reached. The counted sentence
+                is the row's accessible name, so the number is not read alone. */}
+            {instructionsRemaining > 0 &&
+            instructionsRemaining <= INSTRUCTIONS_COUNTER_VISIBLE_REMAINING ? (
+              <View className="flex-row justify-end">
+                {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
+                <Text
+                  className="text-xs font-normal text-muted-foreground"
+                  accessibilityLabel={t('agentChat.composer.charactersRemaining', {
+                    count: instructionsRemaining,
+                  })}
+                >
+                  {instructionsRemaining}
+                </Text>
+              </View>
+            ) : null}
+            {instructionsRemaining <= 0 ? (
+              <AccessibleStatus
+                message={t('codeReviewer.manualReview.instructionsAtLimit', {
+                  max: MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH,
+                })}
+                tone="status"
+                className="text-xs"
+              />
+            ) : null}
           </View>
 
           <View className="gap-3">

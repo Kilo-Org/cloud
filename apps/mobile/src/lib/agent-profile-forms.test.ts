@@ -9,6 +9,7 @@ import {
   parseSkillFrontmatter,
   removeCommand,
   replaceCommand,
+  SKILL_NAME_MAX_LENGTH,
   skillNameFromMarkdown,
   validateProfileDescription,
   validateProfileName,
@@ -116,6 +117,22 @@ describe('validateSkillInput', () => {
     expect(validateSkillInput({ name: 'My Skill', content })).toEqual({ error: 'bad-name' });
     expect(validateSkillInput({ name: '-leading-dash', content })).toEqual({ error: 'bad-name' });
     expect(validateSkillInput({ name: 'Upper', content })).toEqual({ error: 'bad-name' });
+  });
+
+  it('reports a name over the server length bound', () => {
+    expect(validateSkillInput({ name: 'a'.repeat(101), content })).toEqual({ error: 'too-long' });
+    expect(validateSkillInput({ name: 'a'.repeat(120), content })).toEqual({ error: 'too-long' });
+  });
+
+  it('accepts a name at the server length bound', () => {
+    expect(validateSkillInput({ name: 'a'.repeat(SKILL_NAME_MAX_LENGTH), content })).toEqual({
+      error: null,
+      description: 'Does a thing',
+    });
+  });
+
+  it('reports the length rule, not the pattern, for an over-long name the pattern also rejects', () => {
+    expect(validateSkillInput({ name: 'A'.repeat(120), content })).toEqual({ error: 'too-long' });
   });
 
   it('reports empty content', () => {

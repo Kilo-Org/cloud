@@ -17,6 +17,7 @@ export function ReviewerHeader({
   title,
   titleNumberOfLines,
   eyebrow,
+  reserveEyebrow = false,
   backFallback = CODE_REVIEWER_HOME_PATH,
   onBack,
 }: Readonly<{
@@ -32,6 +33,13 @@ export function ReviewerHeader({
    * header they had.
    */
   eyebrow?: string;
+  /**
+   * Keep the eyebrow's line in the layout while it has no label yet. A screen
+   * whose eyebrow arrives with a query reserves it so the title above the body
+   * does not move when the payload lands; screens that paint an eyebrow from
+   * their first frame leave it off.
+   */
+  reserveEyebrow?: boolean;
   /** Where Back lands when the screen has no history to pop. */
   backFallback?: Href;
   /** Run this instead of navigating, e.g. while a form confirms a discard. */
@@ -42,6 +50,7 @@ export function ReviewerHeader({
       title={title}
       titleNumberOfLines={titleNumberOfLines}
       eyebrow={eyebrow}
+      reserveEyebrow={reserveEyebrow}
       backFallback={backFallback}
       onBack={onBack}
     />

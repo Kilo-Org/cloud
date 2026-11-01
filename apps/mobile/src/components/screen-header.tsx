@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
 import { useOfflineBannerSpace } from '@/components/offline-banner-space';
+import { useHeaderBack } from '@/lib/hooks/use-header-back';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { offlineHeaderReservation } from '@/lib/offline-banner-state';
 import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
@@ -269,13 +270,13 @@ export function ScreenHeader({
   className,
 }: Readonly<ScreenHeaderProps>) {
   const insets = useScreenInsets();
-  const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { width: windowWidth } = useWindowDimensions();
   const fontScale = useLiveFontScale();
   const historyCanGoBack = useCanGoBack();
   const canGoBack = showBackButton ?? (historyCanGoBack || backFallback !== undefined);
+  const handleBack = useHeaderBack({ onBack, backFallback, canGoBack: historyCanGoBack });
   const isOfflineBannerVisible = useOfflineBannerSpace();
   // A window too narrow to hold the title beside its actions drops the actions
   // to their own row instead of squeezing the title into a single-letter
@@ -438,34 +439,30 @@ export function ScreenHeader({
   // The control's box is the shared 48dp icon target (`ICON_TARGET_BOX_CLASS`):
   // the audit reads the node's view rect, so `hitSlop` cannot carry an
   // `h-11` frame to Android's 48dp minimum.
+  //
+  // Frame and target are separate views because Android paints the press and
+  // focus surface across the whole target: a bare 48dp target flush against the
+  // screen edge showed up as a hard gray square taller than the title row
+  // whenever the device had keyboard or D-pad focus (measured on the emulator:
+  // `#E8E7E3` over the target's full rect, sharp corners, from the first TAB
+  // press). The frame clips that surface to a circle, so the control reads as an
+  // icon button while it stays focusable and keeps the same rect, gutter pull
+  // and label.
   const backControl = canGoBack ? (
-    <Pressable
-      onPress={() => {
-        if (onBack) {
-          onBack();
-        } else if (backFallback !== undefined && !router.canGoBack()) {
-          // POP_TO keeps the fallback's contract (land on this destination)
-          // while truncating any routes the app left above the destination;
-          // with no history it still creates the destination, as replace did.
-          router.dismissTo(backFallback);
-        } else {
-          router.back();
-        }
-      }}
-      accessibilityRole="button"
-      accessibilityLabel={resolvedBackIcon === 'close' ? t('common.close') : t('common.goBack')}
-      className={cn(
-        ICON_TARGET_BOX_CLASS,
-        'shrink-0 active:opacity-70',
-        !separateHeading && '-ms-4'
-      )}
-    >
-      {resolvedBackIcon === 'close' ? (
-        <ChevronDown size={24} color={colors.foreground} />
-      ) : (
-        <DirectionalChevronLeft size={24} color={colors.foreground} />
-      )}
-    </Pressable>
+    <View className={cn('shrink-0 overflow-hidden rounded-full', !separateHeading && '-ms-4')}>
+      <Pressable
+        onPress={handleBack}
+        accessibilityRole="button"
+        accessibilityLabel={resolvedBackIcon === 'close' ? t('common.close') : t('common.goBack')}
+        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+      >
+        {resolvedBackIcon === 'close' ? (
+          <ChevronDown size={24} color={colors.foreground} />
+        ) : (
+          <DirectionalChevronLeft size={24} color={colors.foreground} />
+        )}
+      </Pressable>
+    </View>
   ) : null;
   // A fixed-width trailing cluster sizes to its content and never shrinks
   // (`shrink-0`). A `max-w-[50%] shrink` cap clamped the cluster's box on

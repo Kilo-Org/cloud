@@ -12,6 +12,7 @@ import {
   resolvePrefillModel,
   resolvePrefillRepo,
   resolvePrefillRepoSelection,
+  resolveStoredRepoSelection,
 } from './new-session-prefill';
 
 vi.mock('@/components/ui/icons', () => ({
@@ -335,6 +336,45 @@ describe('resolvePrefillRepoSelection', () => {
     { repo: '', desc: 'empty string' },
   ])('returns null when repo is $desc', ({ repo }) => {
     expect(resolvePrefillRepoSelection(repos, { mode: 'code', repo })).toBeNull();
+  });
+});
+
+describe('resolveStoredRepoSelection', () => {
+  const storedRepo = 'github:drain-team/kilo-backend';
+
+  it('seeds the durable draft into an empty form', () => {
+    expect(
+      resolveStoredRepoSelection({ prefill: { mode: 'code' }, selectedRepo: '', storedRepo })
+    ).toBe(storedRepo);
+  });
+
+  it('leaves an explicit route prefill in charge', () => {
+    expect(
+      resolveStoredRepoSelection({
+        prefill: { mode: 'code', repo: 'drain-team/kilo-app' },
+        selectedRepo: '',
+        storedRepo,
+      })
+    ).toBeNull();
+  });
+
+  it('never overwrites a choice the person already made', () => {
+    expect(
+      resolveStoredRepoSelection({
+        prefill: { mode: 'code' },
+        selectedRepo: 'gitlab:team/other',
+        storedRepo,
+      })
+    ).toBeNull();
+  });
+
+  it('seeds nothing when no draft is stored or it has not loaded', () => {
+    expect(
+      resolveStoredRepoSelection({ prefill: { mode: 'code' }, selectedRepo: '', storedRepo: null })
+    ).toBeNull();
+    expect(
+      resolveStoredRepoSelection({ prefill: { mode: 'code' }, selectedRepo: '', storedRepo: '' })
+    ).toBeNull();
   });
 });
 

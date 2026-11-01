@@ -10,6 +10,7 @@ import {
   pendingReviewDraftKey,
   PendingReviewProvider,
 } from '@/lib/pr-review/pending-review-provider';
+import { githubPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { parseParam, parsePositiveIntParam } from '@/lib/route-params';
 
@@ -59,7 +60,7 @@ export default function PrReviewNumberLayout() {
   // stay mounted across that sheet's dismissal (see `FeedbackPromptProvider`).
   return (
     <FeedbackPromptProvider>
-      <PrReviewConnectGate>
+      <PrReviewConnectGate prRef={githubPrRef(owner, repo, number)}>
         <PendingReviewProvider
           key={`${draftEntityKey}:${userId ?? ''}`}
           userId={userId}

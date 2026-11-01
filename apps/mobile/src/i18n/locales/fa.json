@@ -330,7 +330,7 @@
       "diffTooLarge": "حجم تغییرات بیش از حد است",
       "openFile": "باز کردن {{path}}",
       "openFileViewed": "باز کردن {{path}} (مشاهده‌شده)",
-      "title": "فایل"
+      "title": "فایل‌ها"
     },
     "fileRows": {
       "markViewed": "علامت‌گذاری {{path}} به‌عنوان مشاهده‌شده",
@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "بازبینی اخیری وجود ندارد",
       "noRecentPrsDescription": "برای شروع بازبینی، پیوندی را در بالا جای‌گذاری کنید. دفعهٔ بعد، اینجا نمایش داده می‌شود.",
-      "couldNotLoad": "بارگذاری ممکن نشد.",
       "removeFromRecentsTitle": "از موارد اخیر حذف شود؟",
       "removeFromRecentsMessage": "این بازبینی از فهرست موارد اخیر شما حذف می‌شود.",
       "removeRecentAccessibility": "حذف {{repo}} از موارد اخیر",
@@ -762,7 +761,7 @@
     },
     "tabs": {
       "overview": "مرور کلی",
-      "files": "فایل",
+      "files": "فایل‌ها",
       "discussion": "گفت‌وگو"
     },
     "fileStatus": {
@@ -837,7 +836,8 @@
     "liveUpdates": "به‌روزرسانی‌های زنده",
     "liveUpdateSubtitle": "نمایش عامل‌های فعال در اعلان‌های شما",
     "push": "اعلان‌های ارسالی",
-    "onDescription": "اعلان‌های ارسالی برای این دستگاه فعال‌اند.",
+    "deviceTitle": "اعلان‌های ارسالی در این دستگاه",
+    "onDescription": "هشدارها بر اساس دسته‌بندی‌های زیر ارسال می‌شوند.",
     "offDescription": "مجوز اعلان‌ها غیرفعال است یا دستگاه برای دریافت آن‌ها ثبت نشده است.",
     "retryPermission": "تلاش مجدد برای بررسی مجوز اعلان",
     "enable": "فعال‌سازی اعلان‌ها",
@@ -1022,7 +1022,7 @@
     "attachmentPicker": {
       "takePhoto": "گرفتن عکس",
       "photoLibrary": "گالری عکس",
-      "files": "فایل",
+      "files": "فایل‌ها",
       "cameraAccessMessage": "برای گرفتن عکس، دسترسی به دوربین را در تنظیمات فعال کنید."
     },
     "typingIndicator": {
@@ -1430,7 +1430,10 @@
       "gitlabNoRepositoriesDescription": "ممکن است لازم باشد در GitLab به گروه‌ها یا پروژه‌های بیشتری دسترسی بدهید.",
       "installGithubApp": "برنامه GitHub را روی مخازن نصب کنید",
       "installGithubAppDescription": "به برنامه Kilo در GitHub اجازه دسترسی به مخازنی را بدهید که می‌خواهید بررسی شوند.",
-      "repositoryAccess": "دسترسی به مخزن"
+      "repositoryAccess": "دسترسی به مخزن",
+      "allModePersonal": "هر مخزنی که Kilo می‌تواند از طریق اتصال GitHub شما به آن دسترسی داشته باشد، به‌طور خودکار بررسی می‌شود.",
+      "allModeOrganization": "هر مخزنی که Kilo می‌تواند از طریق اتصال GitHub سازمان به آن دسترسی داشته باشد، به‌طور خودکار بررسی می‌شود.",
+      "allModeCount": "مخازن موجود: {{displayCount}}"
     },
     "style": {
       "title": "سبک بازبینی",
@@ -1533,12 +1536,15 @@
       "offAction": "حافظه بررسی غیرفعال است. آن را فعال کنید، سپس دوباره تلاش کنید."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "یک URL معتبر برای درخواست ادغام وارد کنید.",
+      "mergeRequestUrl": "URL درخواست ادغام",
+      "instructionsAtLimit": "دستورالعمل‌ها به {{max}} نویسه محدود است",
       "title": "بررسی دستی",
-      "invalidUrl": "یک URL معتبر برای درخواست ادغام وارد کنید.",
+      "invalidUrl": "یک URL معتبر برای پول ریکوئست وارد کنید.",
       "couldNotCheckProviderStatus": "بررسی وضعیت ارائه‌دهنده ممکن نشد.",
       "couldNotLoadProviders": "نتوانستیم ارائه‌دهنده‌های متصل شما را بارگذاری کنیم. لطفاً دوباره تلاش کنید.",
       "connectProviderDescription": "برای شروع بررسی دستی یک درخواست ادغام، GitHub را متصل کنید.",
-      "pullRequestUrl": "URL درخواست ادغام",
+      "pullRequestUrl": "URL پول ریکوئست",
       "instructions": "دستورالعمل‌ها (اختیاری)",
       "instructionsPlaceholder": "نکات خاصی که بررسی‌کننده باید روی آن‌ها تمرکز کند…",
       "starting": "در حال شروع بررسی…",
@@ -1680,7 +1686,8 @@
       "sortSeverityDesc": "شدت: بالا به پایین",
       "sortSeverityAsc": "شدت: پایین به بالا",
       "sortSlaDue": "تاریخ سررسید SLA",
-      "overdueOnly": "فقط موارد معوق"
+      "overdueOnly": "فقط موارد معوق",
+      "noRepositories": "هنوز هیچ مخزنی همگام‌سازی یا انتخاب نشده است. آن‌ها را در تنظیمات عامل امنیتی انتخاب کنید."
     },
     "automation": {
       "title": "خودکارسازی",
@@ -1753,17 +1760,12 @@
       "findingsCount": "{{displayCount}} یافته",
       "notMeasured": "اندازه‌گیری‌نشده",
       "actFirst": "اقدامات اولویت‌دار",
-      "slaPosture": "وضعیت رعایت SLA",
       "actionPosture": "وضعیت اقدامات",
       "codebaseRisk": "ریسک مجموعه کد",
       "repositoryActionPlan": "برنامه اقدام مخزن",
       "noOpenFindings": "هیچ یافته بازی به رسیدگی نیاز ندارد",
       "deadlineToday": "مهلت امروز به پایان می‌رسد",
       "daysOverdue": "{{displayCount}} روز تأخیر",
-      "withinDeadline": "در مهلت مقرر",
-      "criticalOverdue": "معوق با شدت بحرانی",
-      "highOverdue": "معوق با شدت بالا",
-      "mediumLowOverdue": "معوق با شدت متوسط و پایین",
       "confirmedExploitable": "بهره‌برداری‌پذیری تأییدشده",
       "needsEvidenceReview": "نیاز به بررسی شواهد",
       "analysisNotComplete": "تحلیل ناتمام",
@@ -1773,15 +1775,27 @@
       "noSlaDeadline": "مهلت SLA تعیین نشده",
       "noRepositoryData": "هنوز داده‌ای از مخازن وجود ندارد",
       "noRepositoryDataDescription": "پس از همگام‌سازی یافته‌ها، اولویت‌های مخازن نمایش داده می‌شوند.",
-      "repoSummary": "{{open}} باز · {{critical}} بحرانی · {{high}} با شدت بالا",
+      "repoSummary": "{{open}} · {{critical}} · {{high}}",
+      "repoSummaryOpen": "{{displayCount}} باز",
+      "repoSummaryOpen_one": "{{displayCount}} باز",
+      "repoSummaryOpen_other": "{{displayCount}} باز",
+      "repoSummaryOpen_zero": "{{displayCount}} باز",
+      "repoSummaryCritical": "{{displayCount}} بحرانی",
+      "repoSummaryCritical_one": "{{displayCount}} بحرانی",
+      "repoSummaryCritical_other": "{{displayCount}} بحرانی",
+      "repoSummaryCritical_zero": "{{displayCount}} بحرانی",
+      "repoSummaryHigh": "{{displayCount}} با شدت بالا",
+      "repoSummaryHigh_one": "{{displayCount}} با شدت بالا",
+      "repoSummaryHigh_other": "{{displayCount}} با شدت بالا",
+      "repoSummaryHigh_zero": "{{displayCount}} با شدت بالا",
       "couldNotLoad": "بارگذاری داده‌های داشبورد ممکن نشد.",
       "filterByRepository": "فیلتر بر اساس مخزن",
       "lastSynced": "آخرین همگام‌سازی: {{time}}",
       "manageRepositories": "مدیریت مخازن",
       "notYetSynced": "هنوز همگام‌سازی نشده",
+      "priorityFindingsPending": "پس از اولین همگام‌سازی، یافته‌های اولویت‌دار نمایش داده می‌شوند.",
       "refreshFailed": "تازه‌سازی ممکن نشد. داده‌های آخرین همگام‌سازی نمایش داده می‌شوند.",
       "settings": "تنظیمات",
-      "syncFindings": "همگام‌سازی یافته‌ها",
       "syncNow": "همگام‌سازی فوری",
       "syncQueued": "همگام‌سازی در صف قرار گرفت",
       "syncStatusUnavailable": "وضعیت همگام‌سازی در دسترس نیست.",
@@ -1799,8 +1813,20 @@
       "withinDeadlineDetail": "{{within}} مورد از {{total}} مورد در مهلت مقرر",
       "noDeadlineData": "هنوز هیچ یافته‌ای مهلت SLA ندارد",
       "deadlinePassed": "مهلت گذشته است",
-      "deadlinePassedDetail": "{{critical}} بحرانی، {{high}} بالا",
-      "deadlinePassedDetailWithMediumLow": "{{critical}} بحرانی، {{high}} بالا، {{mediumLow}} متوسط و پایین",
+      "deadlinePassedDetail": "{{critical}}، {{high}}",
+      "deadlinePassedDetailWithMediumLow": "{{critical}}، {{high}}، {{mediumLow}}",
+      "breakdownCritical": "{{displayCount}} بحرانی",
+      "breakdownCritical_one": "{{displayCount}} بحرانی",
+      "breakdownCritical_other": "{{displayCount}} بحرانی",
+      "breakdownCritical_zero": "{{displayCount}} بحرانی",
+      "breakdownHigh": "{{displayCount}} بالا",
+      "breakdownHigh_one": "{{displayCount}} بالا",
+      "breakdownHigh_other": "{{displayCount}} بالا",
+      "breakdownHigh_zero": "{{displayCount}} بالا",
+      "breakdownMediumLow": "{{displayCount}} متوسط و پایین",
+      "breakdownMediumLow_one": "{{displayCount}} متوسط و پایین",
+      "breakdownMediumLow_other": "{{displayCount}} متوسط و پایین",
+      "breakdownMediumLow_zero": "{{displayCount}} متوسط و پایین",
       "dueThisWeek": "سررسید این هفته",
       "dueThisWeekDetail": "{{exploitable}} مورد از این‌ها با قابلیت بهره‌برداری تأییدشده",
       "noDeadline": "بدون مهلت",
@@ -1829,7 +1855,8 @@
     "findingDetails": {
       "supersededBy": "با یافته جدید جایگزین شده",
       "supersededByDescription": "برای دیدن وضعیت، تحلیل و اصلاح، روی این مورد بزنید تا رکورد جدید باز شود.",
-      "dismissedBecause": "به دلیل {{reason}} نادیده گرفته شده است.",
+      "dismissedOn": "نادیده‌گرفته‌شده در",
+      "supersededOn": "جایگزین‌شده در",
       "severityLabel": "شدت {{severity}}",
       "package": "بسته",
       "vulnerableVersions": "نسخه‌های آسیب‌پذیر",
@@ -1846,11 +1873,6 @@
       "viewAdvisory": "مشاهده اطلاعیه امنیتی در GitHub",
       "statusOpen": "باز",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "رفع مشکل شروع شده است",
-      "reasonNoBandwidth": "ظرفیتی برای رسیدگی نداریم",
-      "reasonTolerableRisk": "ریسک قابل تحمل است",
-      "reasonInaccurate": "یافته دقیق نیست",
-      "reasonNotUsed": "از کد آسیب‌پذیر استفاده نمی‌شود",
       "reasonAfterReview": "پس از بررسی"
     },
     "settingsOverview": {
@@ -1860,7 +1882,6 @@
       "repositoriesCount_one": "{{displayCount}} مخزن انتخاب‌شده",
       "repositoriesCount": "{{displayCount}} مخزن انتخاب‌شده",
       "repositoriesCount_other": "{{displayCount}} مخزن انتخاب‌شده",
-      "selectRepositoriesSubtitle": "مخازنی را که عامل امنیتی پایش می‌کند انتخاب کنید",
       "analysisModeSubtitle": "تحلیل {{mode}}",
       "automationAllOff": "همه غیرفعال",
       "automationCount": "{{displayCount}} مورد از ۳ مورد فعال",
@@ -2051,7 +2072,10 @@
       "settleFailed": "عملیات انجام شد، اما نتوانستیم نتیجه را ثبت کنیم. لطفاً دوباره تلاش کنید.",
       "replayFailed": "این عملیات کامل نشد. لطفاً دوباره تلاش کنید.",
       "actionFailed": "امکان انجام این عملیات وجود نداشت. لطفاً دوباره تلاش کنید.",
-      "actionBlocked": "امکان انجام این عملیات وجود نداشت. مشکل باید ابتدا برطرف شود تا بتوانید دوباره تلاش کنید."
+      "actionBlocked": "امکان انجام این عملیات وجود نداشت. مشکل باید ابتدا برطرف شود تا بتوانید دوباره تلاش کنید.",
+      "syncNoRepositories": "هیچ مخزنی در محدوده همگام‌سازی نیست. مخازنی را که عامل امنیتی پایش می‌کند انتخاب کنید، سپس دوباره همگام‌سازی کنید.",
+      "syncIntegrationInactive": "اتصال GitHub برای عامل امنیتی فعال نیست. برنامه Kilo در GitHub را دوباره متصل کنید، سپس دوباره همگام‌سازی کنید.",
+      "syncMissingPermission": "برنامه Kilo در GitHub نمی‌تواند هشدارهای آسیب‌پذیری را بخواند. آن مجوز را در GitHub اعطا کنید، سپس دوباره همگام‌سازی کنید."
     },
     "analysisState": {
       "queued": "تحلیل در صف",
@@ -2085,7 +2109,6 @@
       "closedOn": "{{status}} در {{date}}",
       "deadlineNotSet": "مهلتی تعیین نشده است",
       "noSlaDeadline": "بدون مهلت SLA",
-      "dueOn": "سررسید {{date}}",
       "overdueNow": "معوق",
       "overdue_one": "{{count}} روز تأخیر",
       "overdue_other": "{{count}} روز تأخیر",
@@ -2158,7 +2181,7 @@
     "sessionList": {
       "couldNotLoadActive": "بارگذاری نشست‌های فعال ممکن نشد.",
       "couldNotRefresh": "بازخوانی ممکن نشد",
-      "noSessionsYetDescription": "با گوشی خود یک کار کدنویسی شروع کنید. نشست‌های شما اینجا نمایش داده می‌شوند.",
+      "noSessionsYetDescription": "با گوشی خود یک کار کدنویسی شروع کنید.",
       "viewHistory": "تاریخچه نشست‌ها",
       "noMatches": "نشستی مطابق با فیلترها پیدا نشد",
       "tryDifferentSearch": "عبارت دیگری را جست‌وجو کنید.",
@@ -2756,7 +2779,7 @@
     "attachmentPicker": {
       "camera": "دوربین",
       "photoLibrary": "گالری عکس",
-      "files": "فایل",
+      "files": "فایل‌ها",
       "couldNotOpenPhotoPicker": "انتخاب‌گر عکس باز نشد. Kilo را ببندید و دوباره باز کنید، سپس دوباره تلاش کنید.",
       "maxFilesAllowed": "حداکثر {{displayCount}} فایل مجاز است.",
       "onlyAddingFiles": "فقط {{accepted}} فایل از {{total}} فایل اضافه می‌شود (سقف مجاز: {{max}})",
@@ -3139,7 +3162,7 @@
     "couldNotSaveChoice": "انتخاب شما ذخیره نشد. لطفاً دوباره تلاش کنید.",
     "onlineAllowed": "آنلاین، مجاز",
     "onlineNotAllowed": "آنلاین، غیرمجاز",
-    "optionalReview": "اختیاری — قابل تغییر در تنظیمات در هر زمان",
+    "optionalReview": "اختیاری",
     "optionalOnboarding": "اختیاری — فعال تا زمانی که آن را غیرفعال کنید",
     "aiProvidersWhat": "پیام‌های شما، تاریخچهٔ گفت‌وگو و هر فایلی که پیوست می‌کنید.",
     "aiProvidersWhy": "برای تولید پاسخ‌های هوش مصنوعی.",
@@ -3837,6 +3860,7 @@
       "markSecret": "علامت گذاری به عنوان راز",
       "masked": "ارزش پنهان",
       "reveal": "ارزش را آشکار کند",
+      "hide": "ارزش را پنهان کنید",
       "newValuePlaceholder": "مقدار مخفی جدید را وارد کنید",
       "valuePlaceholder": "مقدار مخفی (رمزگذاری شده)"
     },
@@ -3858,6 +3882,7 @@
     "skillMarkdownLabel": "محتوای مهارتی",
     "skillsEmpty": "هنوز هیچ مهارتی وجود ندارد",
     "skillNameRequired": "یک نام مهارت وارد کنید",
+    "skillNameTooLong": "نام مهارت باید {{max}} کاراکتر یا کمتر باشد",
     "skillNameInvalid": "نام مهارت باید با یک حرف یا رقم شروع شود و فقط از حروف کوچک، ارقام و خط تیره استفاده کند.",
     "skillContentRequired": "محتوای مهارتی مورد نیاز است",
     "skillSaveFailed": "مهارت ذخیره نشد. دوباره امتحان کنید.",
@@ -3964,7 +3989,8 @@
       "nameRequired": "یک نام فرمان وارد کنید",
       "nameInvalid": "نام باید با یک حرف کوچک شروع شود و فقط از حروف کوچک، ارقام و خط تیره استفاده کند",
       "templateRequired": "یک قالب فرمان را وارد کنید",
-      "nameConflict": "این نام توسط یک دستور داخلی رزرو شده است"
+      "nameConflict": "این نام توسط یک دستور داخلی رزرو شده است",
+      "duplicateName": "فرمانی با این نام از قبل در این نمایه وجود دارد"
     },
     "repoBindings": {
       "title": "نمایه های پیش فرض برای مخازن",

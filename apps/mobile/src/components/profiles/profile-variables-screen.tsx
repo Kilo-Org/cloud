@@ -25,6 +25,7 @@ import { KeyRound } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileMutations, useAgentProfileVars } from '@/lib/hooks/use-agent-profiles';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -75,17 +76,40 @@ export function ProfileVariablesScreen({
   }
 
   // `null` = closed, `''` = the add form, any other value = the key being edited.
-  const [editingKey, setEditingKey] = useState<string | null>(null);
+  // The form it opens is a draft: it and its fields survive a remount (see
+  // `lib/form-draft`), and saving or cancelling clears it.
+  const draftScope = `profiles:variables:${profileId}`;
+  const [editingKey, setEditingKey] = useFormDraftState<string | null>(
+    draftScope,
+    'editingKey',
+    null
+  );
 
   const rows = variableRows(vars);
+  // A restored edit whose row is gone, e.g. deleted on another device while
+  // this screen was away, must not leave the screen with no way back to the
+  // add control: it reads as closed, so the form and the add button render.
+  const orphanedEdit =
+    editingKey !== null && editingKey !== '' && !rows.some(row => row.key === editingKey);
   const isAdding = editingKey === '';
+  const isEditing = editingKey !== null && !isAdding && !orphanedEdit;
+  // The add control is what an orphaned edit would otherwise leave the reader
+  // without, so it renders for that state exactly as it does when closed.
+  const showAdd = editingKey === null || orphanedEdit;
 
   const startAdd = () => {
+    clearFormDraft(draftScope);
     setEditingKey('');
+  };
+
+  const beginEdit = (key: string) => {
+    clearFormDraft(draftScope);
+    setEditingKey(key);
   };
 
   const closeForm = () => {
     setEditingKey(null);
+    clearFormDraft(draftScope);
   };
 
   const saveEdit = async (edit: VariableEdit): Promise<boolean> => {
@@ -104,6 +128,7 @@ export function ProfileVariablesScreen({
     }
     setVars(current => applyVariableEdit(current, edit));
     setEditingKey(null);
+    clearFormDraft(draftScope);
     return true;
   };
 
@@ -139,6 +164,7 @@ export function ProfileVariablesScreen({
   const renderEditForm = (isNew: boolean, initial: VariableEdit) => (
     <VariableEditForm
       key={editingKey ?? 'new'}
+      draftScope={draftScope}
       isNew={isNew}
       initial={initial}
       existingKeys={vars.map(variable => variable.key)}
@@ -182,7 +208,7 @@ export function ProfileVariablesScreen({
     content = (
       <>
         {rows.map(row =>
-          row.key === editingKey ? (
+          isEditing && row.key === editingKey ? (
             renderEditForm(false, initialVariableEdit(row))
           ) : (
             <VariableRowView
@@ -192,7 +218,7 @@ export function ProfileVariablesScreen({
               onEdit={
                 canManage
                   ? () => {
-                      setEditingKey(row.key);
+                      beginEdit(row.key);
                     }
                   : undefined
               }
@@ -209,7 +235,7 @@ export function ProfileVariablesScreen({
 
         {isAdding ? renderEditForm(true, initialVariableEdit(undefined)) : null}
 
-        {editingKey === null && canManage ? (
+        {showAdd && canManage ? (
           <Button onPress={startAdd}>
             <Text>{t('profiles.addVariable')}</Text>
           </Button>

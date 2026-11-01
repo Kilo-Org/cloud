@@ -9,7 +9,10 @@ import { toast } from 'sonner-native';
 import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
-import { resetSelectedBranchOverrides } from '@/components/agents/new-session-repository-state';
+import {
+  isStoredRepoSelectionGone,
+  resetSelectedBranchOverrides,
+} from '@/components/agents/new-session-repository-state';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
 import {
   type NewSessionPromptSeed,
@@ -89,6 +92,7 @@ import {
   clearDraft,
   flushDraft,
   NEW_SESSION_DRAFT_KEY,
+  newSessionRepositoryDraftKey,
   resolvePrefillOverDraft,
   saveDraft,
 } from '@/lib/persist/drafts';
@@ -264,10 +268,13 @@ export function NewSessionScreenBody() {
   );
   // Stacked like the Run on and Repository sections below it: one label above
   // one full-width picker, so the form's label-value relation keeps one shape.
-  const organizationSection = (
+  // The label names the account, not the organization: the picker holds either
+  // the personal account or one of the reader's organizations, and its sheet is
+  // titled "Select account" (`profile.selectAccount`).
+  const accountSection = (
     <View className="mt-5">
       <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('common.organization')}
+        {t('preferences.account')}
       </Text>
       {isCloneEntry ? (
         <ContextControl
@@ -443,11 +450,24 @@ export function NewSessionScreenBody() {
     refreshReposForceFresh,
   } = useNewSessionRepos({ organizationId });
 
+  // The repository the account last chose in this organization, so a form
+  // reopened after a process restart or an Activity recreation shows the same
+  // target the person had, next to the durable prompt. A clone entry keeps the
+  // source session's own repository and never reads or writes this draft,
+  // exactly like the prompt draft.
+  const repositoryDraftKey = newSessionRepositoryDraftKey(organizationId ?? null);
+  const repositoryDraft = useFencedDraftLoad({
+    userId: isCloneEntry ? undefined : userId,
+    isIdentityLoading,
+    entityKey: repositoryDraftKey,
+  });
+
   const { selectedRepo, setSelectedRepo } = useNewSessionPrefillTargets({
     repositories,
     reposSettled,
     models,
     modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
+    storedRepo: repositoryDraft.settled ? repositoryDraft.value : null,
   });
 
   // The branch pick belongs to THIS screen, not to the repository section: the
@@ -474,6 +494,39 @@ export function NewSessionScreenBody() {
       ) ?? null
     );
   }, [repositories, selectedRepo]);
+
+  // A repository is one discrete choice, not a keystroke burst, so it is
+  // written through the debounce immediately: a restart in the next half second
+  // must still reopen the form on the target the person had just picked.
+  const handleRepoChange = useCallback(
+    (next: string) => {
+      setSelectedRepo(next);
+      if (!userId || isCloneEntry) {
+        return;
+      }
+      saveDraft(userId, repositoryDraftKey, next);
+      void flushDraft(userId, repositoryDraftKey);
+    },
+    [isCloneEntry, repositoryDraftKey, setSelectedRepo, userId]
+  );
+
+  // A selection its provider's complete list does not contain belongs to a
+  // repository that is no longer connected (or to another scope's list): the
+  // row would read as chosen while Start refuses it. Drop it and its stored
+  // copy, so the next visit starts from the picker instead of a dead key. A
+  // provider that is loading, failed, answered partially, or cannot be read
+  // leaves the selection alone (see `isStoredRepoSelectionGone`).
+  const dropUnresolvedRepo =
+    !isCloneEntry && isStoredRepoSelectionGone({ groups, repositories, selectedRepo });
+  useEffect(() => {
+    if (!dropUnresolvedRepo) {
+      return;
+    }
+    setSelectedRepo('');
+    if (userId) {
+      void clearDraft(userId, repositoryDraftKey);
+    }
+  }, [dropUnresolvedRepo, repositoryDraftKey, setSelectedRepo, userId]);
 
   const {
     profile,
@@ -503,7 +556,7 @@ export function NewSessionScreenBody() {
   const handleOpenRepoDefaults = useCallback(() => {
     // The composer's own Stack, so Back returns here with the draft instead of
     // landing on the Profile tab root.
-    router.push(getRepoBindingsPath(organizationId, 'app'));
+    router.push(getRepoBindingsPath({ organizationId, stack: 'app', openedFrom: 'composer' }));
   }, [organizationId, router]);
 
   // Keep the inline selector and picker list in sync.
@@ -584,9 +637,10 @@ export function NewSessionScreenBody() {
   const handleCreated = useCallback(() => {
     if (userId) {
       void clearDraft(userId, NEW_SESSION_DRAFT_KEY);
+      void clearDraft(userId, repositoryDraftKey);
     }
     skipDiscardGuardRef.current = true;
-  }, [userId]);
+  }, [repositoryDraftKey, userId]);
 
   // The form owns the cloud-create failure feedback (a persistent inline
   // error), so the creator hook does not also toast the same rejection.
@@ -603,6 +657,7 @@ export function NewSessionScreenBody() {
   // the unmount flush preserves the draft.
   const { markRemoteSpawnAttempted, markRemoteSpawnFailed } = useRemoteSpawnDraftCleanup({
     userId: isCloneEntry ? undefined : userId,
+    repositoryDraftKey,
   });
 
   // A committed remote spawn arms the discard-confirm bypass alongside the
@@ -860,7 +915,8 @@ export function NewSessionScreenBody() {
   const handleDiscardDraft = useCallback(async () => {
     if (userId) {
       const cleared = await clearDraft(userId, NEW_SESSION_DRAFT_KEY);
-      if (!cleared) {
+      const clearedRepository = await clearDraft(userId, repositoryDraftKey);
+      if (!cleared || !clearedRepository) {
         // The stored draft could not be removed: stay on the screen so the
         // guard keeps the draft and toasts instead of navigating away.
         throw new Error('Failed to clear the new-session draft');
@@ -870,7 +926,7 @@ export function NewSessionScreenBody() {
     // Release only after the discard is committed (clearDraft succeeded): a
     // failed clear keeps the composer mounted, so the uploads stay recoverable.
     attachments.releaseUnclaimedUploads();
-  }, [userId, promptRef, attachments]);
+  }, [attachments, promptRef, repositoryDraftKey, userId]);
 
   // "Save as to-do" keeps the leave the confirm intercepted until a list is
   // picked; saving then discards the draft and replays that leave.
@@ -1280,7 +1336,7 @@ export function NewSessionScreenBody() {
         autoFocusPrompt={autoFocusPrompt}
         groups={groups}
         isRetrying={isRetrying}
-        onChangeRepo={setSelectedRepo}
+        onChangeRepo={handleRepoChange}
         onConnectProvider={openIntegration}
         connectingProvider={connectingProvider}
         onRefreshRepos={() => void refreshReposForceFresh()}
@@ -1301,7 +1357,7 @@ export function NewSessionScreenBody() {
         onManualVarsChange={setManualVars}
         onManualCommandsChange={setManualCommands}
         onOpenRepoDefaults={handleOpenRepoDefaults}
-        organizationSection={organizationSection}
+        accountSection={accountSection}
         autoCommit={autoCommit}
         onAutoCommitChange={setAutoCommit}
         isStartDisabled={isStartDisabled}

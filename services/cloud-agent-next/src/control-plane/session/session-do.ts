@@ -94,6 +94,8 @@ import {
   controlPlaneAnswerPayloadSchema,
   controlPlaneCredentialSourceSchema,
   controlPlaneEventsNotificationSchema,
+  controlPlaneExecPayloadSchema,
+  controlPlaneExecResultSchema,
   controlPlaneNativeOperationSchema,
   controlPlaneOutcomeSchema,
   controlPlanePromptPayloadSchema,
@@ -108,6 +110,9 @@ import {
   type ControlPlaneDeliverResult,
   type ControlPlaneDispatchResult,
   type ControlPlaneEventsNotification,
+  type ControlPlaneExecCommandInput,
+  type ControlPlaneExecCommandResult,
+  type ControlPlaneExecPayload,
   type ControlPlaneKiloRequestInput,
   type ControlPlaneNativeOperation,
   type ControlPlaneOutcome,
@@ -141,6 +146,7 @@ import {
   toNativePublicEvent,
 } from '../../kilo-facade/native-event-source.js';
 import { sandboxControlPeerNamespace } from '../peer-bindings.js';
+import { executionUnknownFailure } from '../exec-errors.js';
 import migrations from './drizzle/migrations';
 import {
   acceptMessages,
@@ -404,6 +410,8 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   terminal(input: ControlPlaneTerminalInput): Promise<ControlPlaneControlResult>;
   /** B10: forwards one allowlisted native read to the live wrapper. */
   kiloRequest(input: ControlPlaneKiloRequestInput): Promise<ControlPlaneControlResult>;
+  /** Forwards one bounded non-interactive command to the live wrapper. */
+  execCommand(input: ControlPlaneExecCommandInput): Promise<ControlPlaneControlResult>;
   /** Resolves the preview provider coordinates for this sandbox (off the op queue). */
   previewTarget(sessionId: string): Promise<PreviewTargetResult>;
   /** B10: the wrapper identity bound to the connected allocation. */
@@ -1522,6 +1530,115 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             }
           : parsed,
     });
+  }
+
+  /**
+   * Worker-facing bounded command execution (spec §10). The route identity
+   * comes from this DO's own registration, never from the caller. A route that
+   * is not ready returns `not_ready` or `sleeping` without preparing or waking
+   * the sandbox. The accepted-message check is point-in-time: a message can be
+   * accepted while a command is already running, and the command holds no
+   * session lock.
+   */
+  async execCommand(payload: ControlPlaneExecPayload): Promise<ControlPlaneExecCommandResult> {
+    await this.initialized;
+    const parsed = controlPlaneExecPayloadSchema.parse(payload);
+    if (this.registration === null) {
+      return {
+        ok: false,
+        error: { code: 'not_found', message: 'Session not found', retryable: false },
+      };
+    }
+    if (this.messages.some(message => message.state === 'accepted')) {
+      return {
+        ok: false,
+        error: {
+          code: 'message_running',
+          message: 'A message is running in this session',
+          retryable: true,
+        },
+      };
+    }
+    if (this.route.state !== 'ready') {
+      if (this.route.state === 'reconnecting') {
+        return {
+          ok: false,
+          error: {
+            code: 'wrapper_not_connected',
+            message: 'The sandbox runtime is not connected',
+            retryable: true,
+          },
+        };
+      }
+      return {
+        ok: false,
+        error: (await this.isSandboxSleeping())
+          ? {
+              code: 'sleeping',
+              message: 'The sandbox is sleeping',
+              retryable: true,
+            }
+          : {
+              code: 'not_ready',
+              message: 'The workspace is not ready',
+              retryable: true,
+            },
+      };
+    }
+    const peer = this.sandboxPeer();
+    if (peer === null) {
+      return {
+        ok: false,
+        error: { code: 'not_ready', message: 'Sandbox is not available', retryable: true },
+      };
+    }
+    let forwarded: ControlPlaneControlResult;
+    try {
+      forwarded = await peer.execCommand({
+        session: {
+          sessionId: this.sessionId,
+          kiloSessionId: this.registration.spec.kiloSessionId,
+          directory: this.registration.spec.directory,
+        },
+        payload: parsed,
+      });
+    } catch {
+      return executionUnknownFailure();
+    }
+    if (!forwarded.ok) {
+      const error = forwarded.error;
+      return error.code === 'not_ready' && error.message === 'Wrapper is not connected'
+        ? {
+            ok: false,
+            error: {
+              code: 'wrapper_not_connected',
+              message: 'The sandbox runtime is not connected',
+              retryable: error.retryable,
+            },
+          }
+        : forwarded;
+    }
+    const result = controlPlaneExecResultSchema.safeParse(forwarded.result);
+    if (!result.success) {
+      return {
+        ok: false,
+        error: {
+          code: 'exec_failed',
+          message: 'The command result was invalid',
+          retryable: false,
+        },
+      };
+    }
+    return { ok: true, result: result.data };
+  }
+
+  private async isSandboxSleeping(): Promise<boolean> {
+    try {
+      const status = await this.getSandboxStatus();
+      return status.detailCode === 'sandbox_stopped';
+    } catch {
+      return false;
+    }
   }
 
   /**

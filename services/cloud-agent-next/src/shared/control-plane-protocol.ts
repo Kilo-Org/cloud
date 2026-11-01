@@ -810,6 +810,8 @@ const controlPlaneHelloFrameSchema = z
      * sent to a wrapper that did not advertise it.
      */
     installsSkillsSh: z.literal(true).optional(),
+    /** Optional capability: the wrapper runs bounded non-interactive `exec.request` commands. */
+    execCommand: z.literal(true).optional(),
   })
   .strict();
 
@@ -1232,6 +1234,78 @@ const controlPlaneKiloResultFrameSchema = z.discriminatedUnion('ok', [
     .strict(),
 ]);
 
+/**
+ * Upper bound on the per-stream tail an `exec.request` returns. Metadata is
+ * written before the streams, so an outer MCP-level truncation keeps the exit
+ * code, timeout and truncation facts visible.
+ */
+export const EXEC_COMMAND_OUTPUT_TAIL_BYTES = 6 * 1024;
+
+/** Bound on each captured stream before redaction and tail selection. */
+export const EXEC_COMMAND_CAPTURE_BYTES = 64 * 1024;
+
+export const controlPlaneExecPayloadSchema = z
+  .object({
+    command: z.string().min(1).max(10_000),
+    timeoutMs: z.number().int().min(1_000).max(60_000),
+  })
+  .strict();
+
+/**
+ * Field order is part of the contract: metadata precedes the streams so an
+ * outer byte truncation keeps the bounded facts.
+ */
+export const controlPlaneExecResultSchema = z
+  .object({
+    exitCode: z.number().int(),
+    timedOut: z.boolean(),
+    durationMs: z.number().int().nonnegative(),
+    stdoutTruncated: z.boolean(),
+    stderrTruncated: z.boolean(),
+    stdout: z.string(),
+    stderr: z.string(),
+  })
+  .strict();
+
+export const controlPlaneExecCommandInputSchema = z
+  .object({
+    session: controlPlaneControlSessionSchema,
+    payload: controlPlaneExecPayloadSchema,
+  })
+  .strict();
+
+export type ControlPlaneExecCommandResult =
+  | { ok: true; result: ControlPlaneExecResult }
+  | { ok: false; error: ControlPlaneRequestError };
+
+const controlPlaneExecRequestFrameSchema = z
+  .object({
+    type: z.literal('exec.request'),
+    requestId: z.string().min(1).max(128),
+    session: controlPlaneControlSessionSchema,
+    payload: controlPlaneExecPayloadSchema,
+  })
+  .strict();
+
+const controlPlaneExecResultFrameSchema = z.discriminatedUnion('ok', [
+  z
+    .object({
+      type: z.literal('exec.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(true),
+      result: controlPlaneExecResultSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('exec.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(false),
+      error: controlPlaneRequestErrorSchema,
+    })
+    .strict(),
+]);
+
 export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneHelloFrameSchema,
   controlPlaneWelcomeFrameSchema,
@@ -1265,6 +1339,8 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneTerminalResultFrameSchema,
   controlPlaneKiloRequestFrameSchema,
   controlPlaneKiloResultFrameSchema,
+  controlPlaneExecRequestFrameSchema,
+  controlPlaneExecResultFrameSchema,
 ]);
 
 export type ControlPlaneRouteGit = z.infer<typeof controlPlaneRouteGitSchema>;
@@ -1357,4 +1433,9 @@ export type ControlPlaneNativeOperation = z.infer<typeof controlPlaneNativeOpera
 export type ControlPlaneKiloRequestInput = z.infer<typeof controlPlaneKiloRequestInputSchema>;
 export type ControlPlaneKiloRequestFrame = z.infer<typeof controlPlaneKiloRequestFrameSchema>;
 export type ControlPlaneKiloResultFrame = z.infer<typeof controlPlaneKiloResultFrameSchema>;
+export type ControlPlaneExecPayload = z.infer<typeof controlPlaneExecPayloadSchema>;
+export type ControlPlaneExecResult = z.infer<typeof controlPlaneExecResultSchema>;
+export type ControlPlaneExecRequestFrame = z.infer<typeof controlPlaneExecRequestFrameSchema>;
+export type ControlPlaneExecResultFrame = z.infer<typeof controlPlaneExecResultFrameSchema>;
+export type ControlPlaneExecCommandInput = z.infer<typeof controlPlaneExecCommandInputSchema>;
 export type ControlPlaneWrapperFrame = z.infer<typeof controlPlaneWrapperFrameSchema>;

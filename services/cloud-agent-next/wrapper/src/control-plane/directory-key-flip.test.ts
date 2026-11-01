@@ -222,6 +222,7 @@ function createHarness() {
     worktreeChanges: { current: undefined },
     worktreeDeletion: { current: undefined },
     kiloRequests: { current: undefined },
+    execRequests: { current: undefined },
     send,
     log: () => undefined,
   });

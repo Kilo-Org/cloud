@@ -187,6 +187,188 @@ describe('CloudAgentNextClient review message results', () => {
   });
 });
 
+describe('CloudAgentNextClient waitForMessageResult', () => {
+  const input = {
+    cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    messageId: 'msg_123456789abc123456789ABCDE',
+    timeoutSeconds: 30,
+  };
+  const query = jest.fn<(request: typeof input) => Promise<unknown>>();
+
+  beforeEach(() => {
+    query.mockReset();
+    mockCreateTRPCClient.mockReturnValueOnce({ waitForMessageResult: { query } });
+  });
+
+  it('projects the result, pending interactions, and timeout and forwards only the timeout', async () => {
+    query.mockResolvedValue({
+      result: {
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        messageId: input.messageId,
+        status: 'failed',
+        acceptedAt: 1,
+        terminalAt: 2,
+        failure: { message: 'private diagnostic' },
+        assistant: { text: 'source code' },
+      },
+      pendingInteractions: { questions: [{ id: 'q_1' }], permissions: [] },
+      timedOut: false,
+    });
+
+    await expect(new CloudAgentNextClient('token').waitForMessageResult(input)).resolves.toEqual({
+      result: {
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        messageId: input.messageId,
+        status: 'failed',
+        acceptedAt: 1,
+      },
+      pendingInteractions: { questions: [{ id: 'q_1' }], permissions: [] },
+      timedOut: false,
+    });
+    expect(query).toHaveBeenCalledWith(input);
+  });
+
+  it.each(['Message not found', 'Session not found'])(
+    'preserves the worker NOT_FOUND for %s',
+    async message => {
+      query.mockRejectedValueOnce(
+        new TRPCClientError(message, {
+          result: {
+            error: {
+              message,
+              code: -32004,
+              data: { code: 'NOT_FOUND', httpStatus: 404 },
+            },
+          },
+        })
+      );
+
+      await expect(new CloudAgentNextClient('token').waitForMessageResult(input)).rejects.toEqual(
+        expect.objectContaining({ code: 'NOT_FOUND', message })
+      );
+    }
+  );
+
+  it('rejects an unrecognized output instead of returning a partial result', async () => {
+    query.mockResolvedValue({
+      result: { ...input, status: 'running' },
+      pendingInteractions: { questions: [], permissions: [] },
+    });
+
+    await expect(new CloudAgentNextClient('token').waitForMessageResult(input)).rejects.toThrow();
+  });
+});
+
+describe('CloudAgentNextClient execCommand', () => {
+  const input = {
+    cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    command: 'printf hello',
+    timeoutSeconds: 30,
+  };
+  const mutate = jest.fn<(request: typeof input) => Promise<unknown>>();
+
+  beforeEach(() => {
+    mutate.mockReset();
+    mockCreateTRPCClient.mockReturnValueOnce({ execCommand: { mutate } });
+  });
+
+  it('forwards the command and parses the outcome in the worker key order', async () => {
+    mutate.mockResolvedValue({
+      exitCode: 7,
+      timedOut: false,
+      durationMs: 12,
+      stdoutTruncated: false,
+      stderrTruncated: true,
+      stdout: 'hello',
+      stderr: 'warning',
+      unreviewed: 'dropped',
+    });
+
+    const result = await new CloudAgentNextClient('token').execCommand(input);
+
+    expect(result).toEqual({
+      exitCode: 7,
+      timedOut: false,
+      durationMs: 12,
+      stdoutTruncated: false,
+      stderrTruncated: true,
+      stdout: 'hello',
+      stderr: 'warning',
+    });
+    expect(Object.keys(result)).toEqual([
+      'exitCode',
+      'timedOut',
+      'durationMs',
+      'stdoutTruncated',
+      'stderrTruncated',
+      'stdout',
+      'stderr',
+    ]);
+    expect(mutate).toHaveBeenCalledWith(input);
+  });
+
+  it.each([
+    [
+      'busy',
+      'TOO_MANY_REQUESTS',
+      429,
+      'Too many commands are running in this session. Wait for them to finish, then retry.',
+    ],
+    [
+      'a running message',
+      'PRECONDITION_FAILED',
+      412,
+      'A message is running in this session. Wait for it to finish (waitForMessageResult), then retry.',
+    ],
+    [
+      'an unknown outcome',
+      'SERVICE_UNAVAILABLE',
+      503,
+      'The command outcome is unknown because the sandbox connection was lost. Inspect the workspace before retrying.',
+    ],
+    [
+      'an interrupted outcome',
+      'SERVICE_UNAVAILABLE',
+      503,
+      'The command was interrupted after it started. Inspect the workspace before retrying.',
+    ],
+  ])('preserves %s with its worker message', async (_case, code, httpStatus, message) => {
+    mutate.mockRejectedValueOnce(
+      new TRPCClientError(message, {
+        result: { error: { code: -32000, message, data: { code, httpStatus } } },
+      })
+    );
+
+    await expect(new CloudAgentNextClient('token').execCommand(input)).rejects.toMatchObject({
+      code,
+      message,
+    });
+  });
+
+  it('rejects an unrecognized outcome instead of returning a partial result', async () => {
+    mutate.mockResolvedValue({ exitCode: 0 });
+
+    await expect(new CloudAgentNextClient('token').execCommand(input)).rejects.toThrow();
+  });
+
+  it('reports only the session identity, never the command or its output', async () => {
+    const failure = new Error('Worker unavailable');
+    const privateInput = {
+      ...input,
+      command: 'curl -H "Authorization: Bearer private-command-secret"',
+    };
+    mutate.mockRejectedValueOnce(failure);
+
+    await expect(new CloudAgentNextClient('token').execCommand(privateInput)).rejects.toBe(failure);
+
+    expect(mockCaptureException).toHaveBeenCalledWith(failure, {
+      tags: { source: 'cloud-agent-next-client', endpoint: 'execCommand' },
+      extra: { cloudAgentSessionId: input.cloudAgentSessionId },
+    });
+    expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain('private-command-secret');
+  });
+});
+
 describe('CloudAgentNextClient worktree changes', () => {
   const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
   const snapshot: WorktreeChangesSnapshot = {

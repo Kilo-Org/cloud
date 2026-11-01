@@ -165,6 +165,7 @@ it('advertises worktree support without changing the strict legacy hello', () =>
       heartbeatAck: true,
       redactsNamedSecrets: true,
       installsSkillsSh: true,
+      execCommand: true,
     });
   });
 });
@@ -888,6 +889,7 @@ describe('createControlPlaneConnection', () => {
         heartbeatAck: true,
         redactsNamedSecrets: true,
         installsSkillsSh: true,
+        execCommand: true,
       });
       expect(sandbox.authorizations[0]).toBe('Bearer secret-credential');
 

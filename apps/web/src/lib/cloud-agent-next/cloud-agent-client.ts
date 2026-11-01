@@ -29,7 +29,9 @@ import {
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { SendMessagePayload } from './types.js';
 import {
+  baseExecCommandNextOutputSchema,
   baseGetMessageResultNextOutputSchema,
+  baseWaitForMessageResultNextOutputSchema,
   workerPreviewOptionsSchema,
 } from '@/routers/cloud-agent-next-schemas';
 import {
@@ -489,9 +491,13 @@ function isTRPCErrorCode(code: unknown): code is TRPC_ERROR_CODE_KEY {
 /**
  * Re-throws a Cloud Agent error as a TRPCError for the web tRPC response.
  * Billing errors keep their billing status. A worker 4xx error keeps its tRPC
- * code and message; tRPC reports any other error as a 500.
+ * code and message; tRPC reports any other error as a 500 unless the caller
+ * asks to preserve SERVICE_UNAVAILABLE.
  */
-export function rethrowCloudAgentError(error: unknown): never {
+export function rethrowCloudAgentError(
+  error: unknown,
+  options: { preserveServiceUnavailable?: boolean } = {}
+): never {
   if (error instanceof CloudAgentBillingError) {
     throw new TRPCError({
       code:
@@ -513,6 +519,9 @@ export function rethrowCloudAgentError(error: unknown): never {
   if (error instanceof TRPCClientError) {
     const code: unknown = error.data?.code ?? error.shape?.data?.code;
     if (isTRPCErrorCode(code)) {
+      if (options.preserveServiceUnavailable && code === 'SERVICE_UNAVAILABLE') {
+        throw new TRPCError({ code, message: error.message, cause: error });
+      }
       const workerError = new TRPCError({ code, message: error.message, cause: error });
       if (getHTTPStatusCodeFromError(workerError) < 500) {
         throw workerError;
@@ -644,6 +653,20 @@ type CloudAgentNextTRPCClient = {
   };
   getMessageResult: {
     query: (input: { cloudAgentSessionId: string; messageId: string }) => Promise<unknown>;
+  };
+  waitForMessageResult: {
+    query: (input: {
+      cloudAgentSessionId: string;
+      messageId: string;
+      timeoutSeconds: number;
+    }) => Promise<unknown>;
+  };
+  execCommand: {
+    mutate: (input: {
+      cloudAgentSessionId: string;
+      command: string;
+      timeoutSeconds: number;
+    }) => Promise<unknown>;
   };
   createTerminal: {
     mutate: (input: CreateTerminalInput) => Promise<CreateTerminalOutput>;
@@ -1121,6 +1144,43 @@ export class CloudAgentNextClient {
         message: 'Message result unavailable',
         cause: error,
       });
+    }
+  }
+
+  async waitForMessageResult(input: {
+    cloudAgentSessionId: string;
+    messageId: string;
+    timeoutSeconds: number;
+  }) {
+    try {
+      return baseWaitForMessageResultNextOutputSchema.parse(
+        await this.client.waitForMessageResult.query(input)
+      );
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'waitForMessageResult' },
+        extra: {
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          messageId: input.messageId,
+        },
+      });
+      rethrowCloudAgentError(error);
+    }
+  }
+
+  async execCommand(input: {
+    cloudAgentSessionId: string;
+    command: string;
+    timeoutSeconds: number;
+  }) {
+    try {
+      return baseExecCommandNextOutputSchema.parse(await this.client.execCommand.mutate(input));
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'execCommand' },
+        extra: { cloudAgentSessionId: input.cloudAgentSessionId },
+      });
+      rethrowCloudAgentError(error, { preserveServiceUnavailable: true });
     }
   }
 

@@ -9,6 +9,7 @@ import {
   type ControlPlaneProcess,
 } from './main.js';
 import type { PreparationManager } from './prepare.js';
+import type { ControlPlaneExecRequests } from './exec-requests.js';
 import type {
   ControlPlaneRouteSpec,
   ControlPlaneWrapperFrame,
@@ -162,6 +163,7 @@ describe('workspace session attachment', () => {
       release: () => undefined,
       isPrepared: () => false,
       preparedRoute: () => null,
+      preparedExecRoute: () => null,
       isPreparing: () => false,
       preparingCount: () => 0,
       sessionCount: () => 0,
@@ -174,6 +176,7 @@ describe('workspace session attachment', () => {
       worktreeChanges: {},
       worktreeDeletion: {},
       kiloRequests: {},
+      execRequests: {},
       send: frame => frames.push(frame),
       log: () => undefined,
     });
@@ -195,6 +198,76 @@ describe('workspace session attachment', () => {
     });
     expect(h.prepared).toEqual([{ ...h.spec, ...h.retained }]);
     expect(h.frames).toEqual([]);
+  });
+});
+
+describe('exec command dispatch', () => {
+  function createDispatcher() {
+    const handled: string[] = [];
+    const cancelled: string[] = [];
+    const order: string[] = [];
+    const execRequests: ControlPlaneExecRequests = {
+      handle: async frame => {
+        handled.push(frame.requestId);
+      },
+      hasActive: () => false,
+      cancelSession: sessionId => {
+        cancelled.push(`session:${sessionId}`);
+      },
+      cancelDirectory: directory => {
+        order.push(`cancel:${directory}`);
+      },
+      cancelAll: async () => undefined,
+    };
+    const dispatch = createControlPlaneFrameDispatcher({
+      preparation: {},
+      turns: {},
+      terminals: {},
+      worktreeChanges: {},
+      worktreeDeletion: {
+        current: {
+          handle: async () => {
+            order.push('delete');
+          },
+        },
+      },
+      kiloRequests: {},
+      execRequests: { current: execRequests },
+      send: () => undefined,
+      log: () => undefined,
+    });
+    return { dispatch, handled, cancelled, order };
+  }
+
+  it('forwards exec.request to the exec receiver', () => {
+    const h = createDispatcher();
+    h.dispatch({
+      type: 'exec.request',
+      requestId: 'exec_1',
+      session: {
+        sessionId: 'workspace_first',
+        kiloSessionId: 'ses_first',
+        directory: '/workspace/app',
+      },
+      payload: { command: 'printf ok', timeoutMs: 1_000 },
+    });
+    expect(h.handled).toEqual(['exec_1']);
+  });
+
+  it('cancels a session on release and a directory before deletion preparation', () => {
+    const h = createDispatcher();
+    h.dispatch({ type: 'session.release', sessionId: 'workspace_first' });
+    h.dispatch({
+      type: 'worktree.prepareDeletion',
+      requestId: 'delete_1',
+      payload: {
+        worktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+        directory: '/workspace/app',
+        sessionIds: ['ses_12345678901234567890123456'],
+      },
+    });
+    expect(h.cancelled).toEqual(['session:workspace_first']);
+    expect(h.order).toEqual(['cancel:/workspace/app', 'delete']);
   });
 });
 

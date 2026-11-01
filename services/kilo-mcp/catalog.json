@@ -5768,7 +5768,7 @@
   "cloudAgentNext.createWorktreeChat": {
     "path": "cloudAgentNext.createWorktreeChat",
     "kind": "mutation",
-    "summary": "Create a new chat session backed by a git worktree for a cloud agent.",
+    "summary": "Create a new chat session backed by a git worktree for a cloud agent. operationKey is a client-generated UUID idempotency key; reuse it when retrying.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -5803,12 +5803,55 @@
       "operationkey",
       "kilosessionid"
     ],
-    "searchBlob": "cloudAgentNext.createWorktreeChat Create a new chat session backed by a git worktree for a cloud agent. cloudagentnext createworktreechat sourcekilosessionid operationkey kilosessionid sourceKiloSessionId operationKey kiloSessionId"
+    "searchBlob": "cloudAgentNext.createWorktreeChat Create a new chat session backed by a git worktree for a cloud agent. operationKey is a client-generated UUID idempotency key; reuse it when retrying. cloudagentnext createworktreechat sourcekilosessionid operationkey kilosessionid sourceKiloSessionId operationKey kiloSessionId"
+  },
+  "cloudAgentNext.execCommand": {
+    "path": "cloudAgentNext.execCommand",
+    "kind": "mutation",
+    "summary": "Run a non-interactive shell command (bash -c) in a Cloud Agent session's worktree and return exit code, stdout and stderr (last ~6 KiB of each). The session must have a running sandbox and be idle when the call starts; it never wakes a sleeping sandbox and refuses if a message is running when it starts (a message started meanwhile may run concurrently), timing out after timeoutSeconds (max 60). Inspect the workspace before retrying if the outcome is reported unknown or the command was interrupted.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "expectedWorktreeId": {
+          "type": "string",
+          "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        },
+        "timeoutSeconds": {
+          "default": 30,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        }
+      },
+      "required": [
+        "cloudAgentSessionId",
+        "command"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "execcommand",
+      "cloudagentsessionid",
+      "expectedworktreeid",
+      "command",
+      "timeoutseconds"
+    ],
+    "searchBlob": "cloudAgentNext.execCommand Run a non-interactive shell command (bash -c) in a Cloud Agent session's worktree and return exit code, stdout and stderr (last ~6 KiB of each). The session must have a running sandbox and be idle when the call starts; it never wakes a sleeping sandbox and refuses if a message is running when it starts (a message started meanwhile may run concurrently), timing out after timeoutSeconds (max 60). Inspect the workspace before retrying if the outcome is reported unknown or the command was interrupted. cloudagentnext execcommand cloudagentsessionid expectedworktreeid command timeoutseconds cloudAgentSessionId expectedWorktreeId command timeoutSeconds"
   },
   "cloudAgentNext.getAttachmentDownloadUrl": {
     "path": "cloudAgentNext.getAttachmentDownloadUrl",
     "kind": "mutation",
-    "summary": "Get a URL to download a file attachment from a cloud agent session.",
+    "summary": "Get a URL to download a file attachment from a cloud agent session. Also serves attachments in organization sessions because files are keyed by the uploading user.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -5833,7 +5876,7 @@
       "messageuuid",
       "filename"
     ],
-    "searchBlob": "cloudAgentNext.getAttachmentDownloadUrl Get a URL to download a file attachment from a cloud agent session. cloudagentnext getattachmentdownloadurl messageuuid filename messageUuid filename"
+    "searchBlob": "cloudAgentNext.getAttachmentDownloadUrl Get a URL to download a file attachment from a cloud agent session. Also serves attachments in organization sessions because files are keyed by the uploading user. cloudagentnext getattachmentdownloadurl messageuuid filename messageUuid filename"
   },
   "cloudAgentNext.getAttachmentUploadUrl": {
     "path": "cloudAgentNext.getAttachmentUploadUrl",
@@ -5889,7 +5932,7 @@
   "cloudAgentNext.getMessageResult": {
     "path": "cloudAgentNext.getMessageResult",
     "kind": "query",
-    "summary": "Check the processing status and outcome of a specific message sent to a cloud agent session, such as whether it is queued, running, completed, failed, or interrupted.",
+    "summary": "Check the processing status and outcome of a specific message sent to a cloud agent session, such as whether it is queued, running, completed, failed, or interrupted. expectedWorktreeId comes from getSession; prefer waitForMessageResult over repeated polling.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -5920,7 +5963,7 @@
       "expectedworktreeid",
       "messageid"
     ],
-    "searchBlob": "cloudAgentNext.getMessageResult Check the processing status and outcome of a specific message sent to a cloud agent session, such as whether it is queued, running, completed, failed, or interrupted. cloudagentnext getmessageresult cloudagentsessionid expectedworktreeid messageid cloudAgentSessionId expectedWorktreeId messageId"
+    "searchBlob": "cloudAgentNext.getMessageResult Check the processing status and outcome of a specific message sent to a cloud agent session, such as whether it is queued, running, completed, failed, or interrupted. expectedWorktreeId comes from getSession; prefer waitForMessageResult over repeated polling. cloudagentnext getmessageresult cloudagentsessionid expectedworktreeid messageid cloudAgentSessionId expectedWorktreeId messageId"
   },
   "cloudAgentNext.getPendingInteractions": {
     "path": "cloudAgentNext.getPendingInteractions",
@@ -5948,7 +5991,7 @@
   "cloudAgentNext.getPreviewOptions": {
     "path": "cloudAgentNext.getPreviewOptions",
     "kind": "query",
-    "summary": "Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization.",
+    "summary": "Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization. Also serves organization sessions via the optional organizationId.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -5973,7 +6016,7 @@
       "cloudagentsessionid",
       "organizationid"
     ],
-    "searchBlob": "cloudAgentNext.getPreviewOptions Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization. cloudagentnext getpreviewoptions cloudagentsessionid organizationid cloudAgentSessionId organizationId"
+    "searchBlob": "cloudAgentNext.getPreviewOptions Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization. Also serves organization sessions via the optional organizationId. cloudagentnext getpreviewoptions cloudagentsessionid organizationid cloudAgentSessionId organizationId"
   },
   "cloudAgentNext.getSandboxSelectionOptions": {
     "path": "cloudAgentNext.getSandboxSelectionOptions",
@@ -6276,7 +6319,7 @@
   "cloudAgentNext.prepareSession": {
     "path": "cloudAgentNext.prepareSession",
     "kind": "mutation",
-    "summary": "Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images.",
+    "summary": "Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. When initialMessageId is supplied, it uses the same `msg_` + 12 lowercase hexadecimal + 14 alphanumeric idempotency-key format as sendMessage.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "anyOf": [
@@ -7603,7 +7646,7 @@
       "cloudagentnext",
       "preparesession"
     ],
-    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession"
+    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. When initialMessageId is supplied, it uses the same `msg_` + 12 lowercase hexadecimal + 14 alphanumeric idempotency-key format as sendMessage. cloudagentnext preparesession"
   },
   "cloudAgentNext.refreshTerminalTicket": {
     "path": "cloudAgentNext.refreshTerminalTicket",
@@ -7768,7 +7811,7 @@
   "cloudAgentNext.sendMessage": {
     "path": "cloudAgentNext.sendMessage",
     "kind": "mutation",
-    "summary": "Send a follow-up prompt, command, or attachment to an existing cloud agent session.",
+    "summary": "Send a follow-up prompt, command, or attachment to an existing cloud agent session. messageId is client-generated in the format `msg_` followed by 12 lowercase hexadecimal characters and 14 characters from [0-9A-Za-z] (^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$); it acts as an idempotency key, so reuse it when retrying, then use waitForMessageResult to wait for the outcome.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -7886,7 +7929,50 @@
       "messageid",
       "attachments"
     ],
-    "searchBlob": "cloudAgentNext.sendMessage Send a follow-up prompt, command, or attachment to an existing cloud agent session. cloudagentnext sendmessage cloudagentsessionid payload expectedworktreeid autocommit messageid attachments cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments"
+    "searchBlob": "cloudAgentNext.sendMessage Send a follow-up prompt, command, or attachment to an existing cloud agent session. messageId is client-generated in the format `msg_` followed by 12 lowercase hexadecimal characters and 14 characters from [0-9A-Za-z] (^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$); it acts as an idempotency key, so reuse it when retrying, then use waitForMessageResult to wait for the outcome. cloudagentnext sendmessage cloudagentsessionid payload expectedworktreeid autocommit messageid attachments cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments"
+  },
+  "cloudAgentNext.waitForMessageResult": {
+    "path": "cloudAgentNext.waitForMessageResult",
+    "kind": "query",
+    "summary": "Wait up to timeoutSeconds (max 50) for a message sent to a Cloud Agent session to finish or to need input; returns early when the message completes, fails or is interrupted, or when the agent asks a question or permission. Use after sendMessage instead of polling getMessageResult; call again when timedOut is true.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "expectedWorktreeId": {
+          "type": "string",
+          "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "messageId": {
+          "type": "string",
+          "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
+        },
+        "timeoutSeconds": {
+          "default": 30,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      },
+      "required": [
+        "cloudAgentSessionId",
+        "expectedWorktreeId",
+        "messageId"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "waitformessageresult",
+      "cloudagentsessionid",
+      "expectedworktreeid",
+      "messageid",
+      "timeoutseconds"
+    ],
+    "searchBlob": "cloudAgentNext.waitForMessageResult Wait up to timeoutSeconds (max 50) for a message sent to a Cloud Agent session to finish or to need input; returns early when the message completes, fails or is interrupted, or when the agent asks a question or permission. Use after sendMessage instead of polling getMessageResult; call again when timedOut is true. cloudagentnext waitformessageresult cloudagentsessionid expectedworktreeid messageid timeoutseconds cloudAgentSessionId expectedWorktreeId messageId timeoutSeconds"
   },
   "cloudAgentNextFeedback.create": {
     "path": "cloudAgentNextFeedback.create",
@@ -16575,7 +16661,7 @@
   "organizations.cloudAgentNext.createWorktreeChat": {
     "path": "organizations.cloudAgentNext.createWorktreeChat",
     "kind": "mutation",
-    "summary": "Create a worktree-based chat from an existing cloud agent session. Use to branch a session into a new worktree.",
+    "summary": "Create a worktree-based chat from an existing cloud agent session to branch the session into a new worktree. operationKey is a client-generated UUID idempotency key; reuse it when retrying.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "allOf": [
@@ -16635,7 +16721,58 @@
       "operationkey",
       "kilosessionid"
     ],
-    "searchBlob": "organizations.cloudAgentNext.createWorktreeChat Create a worktree-based chat from an existing cloud agent session. Use to branch a session into a new worktree. organizations cloudagentnext createworktreechat organizationid sourcekilosessionid operationkey kilosessionid organizationId sourceKiloSessionId operationKey kiloSessionId"
+    "searchBlob": "organizations.cloudAgentNext.createWorktreeChat Create a worktree-based chat from an existing cloud agent session to branch the session into a new worktree. operationKey is a client-generated UUID idempotency key; reuse it when retrying. organizations cloudagentnext createworktreechat organizationid sourcekilosessionid operationkey kilosessionid organizationId sourceKiloSessionId operationKey kiloSessionId"
+  },
+  "organizations.cloudAgentNext.execCommand": {
+    "path": "organizations.cloudAgentNext.execCommand",
+    "kind": "mutation",
+    "summary": "Run a non-interactive shell command (bash -c) in an organization's Cloud Agent session worktree and return exit code, stdout and stderr (last ~6 KiB of each). The session must have a running sandbox and be idle when the call starts; it never wakes a sleeping sandbox and refuses if a message is running when it starts (a message started meanwhile may run concurrently), timing out after timeoutSeconds (max 60). Inspect the workspace before retrying if the outcome is reported unknown or the command was interrupted. Requires the organizationId that owns the session.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "expectedWorktreeId": {
+          "type": "string",
+          "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        },
+        "timeoutSeconds": {
+          "default": 30,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        }
+      },
+      "required": [
+        "organizationId",
+        "cloudAgentSessionId",
+        "command"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "execcommand",
+      "organizationid",
+      "cloudagentsessionid",
+      "expectedworktreeid",
+      "command",
+      "timeoutseconds"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.execCommand Run a non-interactive shell command (bash -c) in an organization's Cloud Agent session worktree and return exit code, stdout and stderr (last ~6 KiB of each). The session must have a running sandbox and be idle when the call starts; it never wakes a sleeping sandbox and refuses if a message is running when it starts (a message started meanwhile may run concurrently), timing out after timeoutSeconds (max 60). Inspect the workspace before retrying if the outcome is reported unknown or the command was interrupted. Requires the organizationId that owns the session. organizations cloudagentnext execcommand organizationid cloudagentsessionid expectedworktreeid command timeoutseconds organizationId cloudAgentSessionId expectedWorktreeId command timeoutSeconds"
   },
   "organizations.cloudAgentNext.getAttachmentUploadUrl": {
     "path": "organizations.cloudAgentNext.getAttachmentUploadUrl",
@@ -16699,7 +16836,7 @@
   "organizations.cloudAgentNext.getMessageResult": {
     "path": "organizations.cloudAgentNext.getMessageResult",
     "kind": "query",
-    "summary": "Fetch the result and status of a specific message in an organization's cloud agent session, returning null if the result is not yet available.",
+    "summary": "Fetch the result and status of a specific message in an organization's cloud agent session, returning null if the result is not yet available. expectedWorktreeId comes from getSession; prefer waitForMessageResult over repeated polling. Requires the organizationId that owns the session.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -16738,7 +16875,7 @@
       "expectedworktreeid",
       "messageid"
     ],
-    "searchBlob": "organizations.cloudAgentNext.getMessageResult Fetch the result and status of a specific message in an organization's cloud agent session, returning null if the result is not yet available. organizations cloudagentnext getmessageresult organizationid cloudagentsessionid expectedworktreeid messageid organizationId cloudAgentSessionId expectedWorktreeId messageId"
+    "searchBlob": "organizations.cloudAgentNext.getMessageResult Fetch the result and status of a specific message in an organization's cloud agent session, returning null if the result is not yet available. expectedWorktreeId comes from getSession; prefer waitForMessageResult over repeated polling. Requires the organizationId that owns the session. organizations cloudagentnext getmessageresult organizationid cloudagentsessionid expectedworktreeid messageid organizationId cloudAgentSessionId expectedWorktreeId messageId"
   },
   "organizations.cloudAgentNext.getPendingInteractions": {
     "path": "organizations.cloudAgentNext.getPendingInteractions",
@@ -17257,7 +17394,7 @@
   "organizations.cloudAgentNext.prepareSession": {
     "path": "organizations.cloudAgentNext.prepareSession",
     "kind": "mutation",
-    "summary": "Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository.",
+    "summary": "Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. When initialMessageId is supplied, it uses the same `msg_` + 12 lowercase hexadecimal + 14 alphanumeric idempotency-key format as sendMessage.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "allOf": [
@@ -18615,7 +18752,7 @@
       "preparesession",
       "organizationid"
     ],
-    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid organizationId"
+    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. When initialMessageId is supplied, it uses the same `msg_` + 12 lowercase hexadecimal + 14 alphanumeric idempotency-key format as sendMessage. organizations cloudagentnext preparesession organizationid organizationId"
   },
   "organizations.cloudAgentNext.refreshTerminalTicket": {
     "path": "organizations.cloudAgentNext.refreshTerminalTicket",
@@ -18837,7 +18974,7 @@
   "organizations.cloudAgentNext.sendMessage": {
     "path": "organizations.cloudAgentNext.sendMessage",
     "kind": "mutation",
-    "summary": "Send a prompt or command to a running cloud agent session. Use to continue the conversation with the agent.",
+    "summary": "Send a prompt, command, or attachment to an organization's running cloud agent session to continue the conversation. messageId is client-generated in the format `msg_` followed by 12 lowercase hexadecimal characters and 14 characters from [0-9A-Za-z] (^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$); it acts as an idempotency key, so reuse it when retrying, then use waitForMessageResult. Requires the organizationId that owns the session.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -18963,7 +19100,58 @@
       "messageid",
       "attachments"
     ],
-    "searchBlob": "organizations.cloudAgentNext.sendMessage Send a prompt or command to a running cloud agent session. Use to continue the conversation with the agent. organizations cloudagentnext sendmessage organizationid cloudagentsessionid payload expectedworktreeid autocommit messageid attachments organizationId cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments"
+    "searchBlob": "organizations.cloudAgentNext.sendMessage Send a prompt, command, or attachment to an organization's running cloud agent session to continue the conversation. messageId is client-generated in the format `msg_` followed by 12 lowercase hexadecimal characters and 14 characters from [0-9A-Za-z] (^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$); it acts as an idempotency key, so reuse it when retrying, then use waitForMessageResult. Requires the organizationId that owns the session. organizations cloudagentnext sendmessage organizationid cloudagentsessionid payload expectedworktreeid autocommit messageid attachments organizationId cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments"
+  },
+  "organizations.cloudAgentNext.waitForMessageResult": {
+    "path": "organizations.cloudAgentNext.waitForMessageResult",
+    "kind": "query",
+    "summary": "Wait up to timeoutSeconds (max 50) for a message sent to an organization's Cloud Agent session to finish or to need input; returns early when the message completes, fails or is interrupted, or when the agent asks a question or permission. Use after sendMessage instead of polling getMessageResult; call again when timedOut is true. Requires the organizationId that owns the session.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "expectedWorktreeId": {
+          "type": "string",
+          "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "messageId": {
+          "type": "string",
+          "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
+        },
+        "timeoutSeconds": {
+          "default": 30,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      },
+      "required": [
+        "organizationId",
+        "cloudAgentSessionId",
+        "expectedWorktreeId",
+        "messageId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "waitformessageresult",
+      "organizationid",
+      "cloudagentsessionid",
+      "expectedworktreeid",
+      "messageid",
+      "timeoutseconds"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.waitForMessageResult Wait up to timeoutSeconds (max 50) for a message sent to an organization's Cloud Agent session to finish or to need input; returns early when the message completes, fails or is interrupted, or when the agent asks a question or permission. Use after sendMessage instead of polling getMessageResult; call again when timedOut is true. Requires the organizationId that owns the session. organizations cloudagentnext waitformessageresult organizationid cloudagentsessionid expectedworktreeid messageid timeoutseconds organizationId cloudAgentSessionId expectedWorktreeId messageId timeoutSeconds"
   },
   "organizations.create": {
     "path": "organizations.create",

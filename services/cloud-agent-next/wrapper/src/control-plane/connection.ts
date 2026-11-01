@@ -408,6 +408,7 @@ export function createControlPlaneConnection(
           heartbeatAck: true,
           redactsNamedSecrets: true,
           installsSkillsSh: true,
+          execCommand: true,
         })
       )
         return;

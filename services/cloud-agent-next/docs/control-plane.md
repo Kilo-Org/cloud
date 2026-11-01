@@ -1143,7 +1143,62 @@ Sandbox DO ↔ wrapper (WebSocket frames): `hello`, `welcome`, `shutdown`, `hear
 `workspace.captured` (legacy wrappers only; always answered `ok: false`), `session.credentials`, `session.prompt`, `session.abort`, `session.answer`, `session.release`, `session.events`,
 `session.outcome`, `events_dropped`, terminal control requests, worktree-change requests,
 worktree-deletion requests (`worktree.prepareDeletion`, `worktree.delete`; both answer with
-`worktree.result`). Terminal bytes use the existing wrapper-to-Session-DO terminal socket.
+`worktree.result`), and bounded exec requests (`exec.request` → `exec.result`). Terminal bytes use
+the existing wrapper-to-Session-DO terminal socket.
+
+### Exec command (bounded, non-interactive)
+
+A wrapper advertises optional `execCommand: true` in `hello`. A Sandbox DO sends `exec.request`
+only to a wrapper that advertised it; the legacy fallback hello keeps its original shape.
+
+- **Request.** `{ type: 'exec.request', requestId, session: { sessionId, kiloSessionId,
+  directory }, payload: { command, timeoutMs } }`. `command` is 1-10,000 characters and
+  `timeoutMs` is 1,000-60,000 ms. The Session DO confirms the route is ready before forwarding;
+  the Sandbox DO only requires a live bound wrapper that advertised `execCommand`. This frame
+  does not prepare a route.
+- **Execution.** The wrapper requires the prepared route's `kiloSessionId` and `directory` to
+  match the frame, then runs `bash -c <command>` in that directory with the route's workspace
+  environment, stdin closed and `inheritEnv: false`. Commands run in the `kilo-setup` workload
+  cgroup.
+- **Limits.** At most two commands run concurrently per session; a third fails `busy`. Each
+  stream captures at most 64 KiB before redaction. The result returns the route-redacted final
+  6 KiB of each stream, cut on a UTF-8 character boundary. The route retains known secrets across
+  credential rotations so output from commands started with earlier credentials stays redacted.
+- **Result.** Success is `{ type: 'exec.result', requestId, ok: true, result }` where `result` is
+  `{ exitCode, timedOut, durationMs, stdoutTruncated, stderrTruncated, stdout, stderr }` in that
+  key order, so metadata precedes the streams under an outer byte truncation. A timeout keeps
+  `exitCode: 124` and sets `timedOut: true`; `*Truncated` is true when the capture was bounded or
+  the returned tail was shortened.
+- **Errors.** `route_mismatch` (the prepared route is missing or its identity differs), `busy`,
+  `worktree_deleting` (the directory is being deleted), `cancelled` (the route was released or
+  the wrapper shut down after the command started), and `exec_failed` (spawn failure). Error
+  messages never include the command, output or a raw spawn error. Releasing a route, preparing
+  worktree deletion and wrapper shutdown cancel the affected commands; shutdown waits for the
+  active commands to drain, bounded at 3 seconds.
+
+**Worker surface.** `execCommand` is a protected tRPC mutation taking `{ cloudAgentSessionId,
+command, timeoutSeconds? }` (`command` 1-10,000 characters, `timeoutSeconds` 1-60, default 30) and
+returning the exec result above. The Session DO resolves the route identity from its registration
+and never prepares or wakes a sandbox. Its `accepted`-message check is point-in-time: a message can
+be accepted while a command is already running, and the command holds no session lock. The Sandbox
+DO reports `unsupported` when the bound wrapper did not advertise `execCommand`, keeps the request
+timeout at `timeoutMs + 5 s`, and reports non-retryable `execution_unknown` instead of `not_ready`
+when the socket or its backstop fails after the frame was dispatched. The Worker maps structured
+codes: `not_found` is NOT_FOUND; `not_ready`, `sleeping`, `wrapper_not_connected`,
+`message_running`, `unsupported`, `route_mismatch` and `worktree_deleting` are PRECONDITION_FAILED;
+`busy` is TOO_MANY_REQUESTS; `execution_unknown` and `cancelled` are SERVICE_UNAVAILABLE;
+`exec_failed` is INTERNAL_SERVER_ERROR. A thrown Session DO call is also SERVICE_UNAVAILABLE
+because its outcome is unknown. The Worker calls the Session DO once and never replays a
+non-idempotent command.
+
+**MCP trust model.** `execCommand` intentionally gives the authenticated caller direct shell access
+to sessions they are authorized to control, without the native agent's tool-permission flow.
+Ordinary Kilo MCP connections already have equivalent shell authority through `createTerminal`
+and its returned connection ticket, and can answer agent permission requests. Trust these
+connections as coding controllers, not read-only integrations. MCP OTP gates admin/debug endpoints;
+narrowly delegated Cloud Agent authority tokens cannot call `execCommand`. Execution limits and
+output redaction are operational safeguards, not a security boundary against malicious commands
+or confinement to the working directory.
 
 ### Startup mode rollout
 

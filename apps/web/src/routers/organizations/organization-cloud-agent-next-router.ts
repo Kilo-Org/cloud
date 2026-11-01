@@ -48,6 +48,10 @@ import {
   baseSendMessageNextSchema,
   baseGetMessageResultNextSchema,
   baseGetMessageResultNextOutputSchema,
+  baseWaitForMessageResultNextSchema,
+  baseWaitForMessageResultNextOutputSchema,
+  baseExecCommandNextSchema,
+  baseExecCommandNextOutputSchema,
   baseInterruptSessionNextSchema,
   baseCancelQueuedMessageNextSchema,
   baseGetSessionNextSchema,
@@ -607,6 +611,46 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       return await client.getMessageResult({
         cloudAgentSessionId: input.cloudAgentSessionId,
         messageId: input.messageId,
+      });
+    }),
+
+  waitForMessageResult: organizationMemberProcedure
+    .input(baseWaitForMessageResultNextSchema.extend({ organizationId: z.uuid() }))
+    .output(baseWaitForMessageResultNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        expectedWorktreeId: input.expectedWorktreeId,
+      });
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
+      );
+      return await client.waitForMessageResult({
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        messageId: input.messageId,
+        timeoutSeconds: input.timeoutSeconds,
+      });
+    }),
+
+  execCommand: organizationMemberMutationProcedure
+    .input(baseExecCommandNextSchema.extend({ organizationId: z.uuid() }))
+    .output(baseExecCommandNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        expectedWorktreeId: input.expectedWorktreeId,
+      });
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
+      );
+      return await client.execCommand({
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        command: input.command,
+        timeoutSeconds: input.timeoutSeconds,
       });
     }),
 

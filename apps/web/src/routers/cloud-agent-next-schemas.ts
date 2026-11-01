@@ -621,6 +621,33 @@ export const baseGetPendingInteractionsNextOutputSchema = z.object({
   permissions: z.array(z.unknown()),
 });
 
+export const baseWaitForMessageResultNextSchema = baseGetMessageResultNextSchema.extend({
+  timeoutSeconds: z.number().int().min(1).max(50).default(30),
+});
+
+export const baseWaitForMessageResultNextOutputSchema = z.object({
+  result: baseGetMessageResultNextOutputSchema,
+  pendingInteractions: baseGetPendingInteractionsNextOutputSchema,
+  timedOut: z.boolean(),
+});
+
+export const baseExecCommandNextSchema = z.object({
+  cloudAgentSessionId: controlPlaneSessionIdNextSchema,
+  expectedWorktreeId: cloudAgentWorktreeIdSchema.optional(),
+  command: z.string().min(1).max(10_000),
+  timeoutSeconds: z.number().int().min(1).max(60).default(30),
+});
+
+export const baseExecCommandNextOutputSchema = z.object({
+  exitCode: z.number().int(),
+  timedOut: z.boolean(),
+  durationMs: z.number().int().min(0),
+  stdoutTruncated: z.boolean(),
+  stderrTruncated: z.boolean(),
+  stdout: z.string(),
+  stderr: z.string(),
+});
+
 export const baseWorktreeChangesNextSchema = z
   .object({
     cloudAgentSessionId: z

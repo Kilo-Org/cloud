@@ -37,6 +37,10 @@ import {
   baseSendMessageNextSchema,
   baseGetMessageResultNextSchema,
   baseGetMessageResultNextOutputSchema,
+  baseWaitForMessageResultNextSchema,
+  baseWaitForMessageResultNextOutputSchema,
+  baseExecCommandNextSchema,
+  baseExecCommandNextOutputSchema,
   baseInterruptSessionNextSchema,
   baseCancelQueuedMessageNextSchema,
   baseGetSessionNextSchema,
@@ -427,6 +431,36 @@ export const cloudAgentNextRouter = createTRPCRouter({
       });
     }),
 
+  waitForMessageResult: baseProcedure
+    .input(baseWaitForMessageResultNextSchema)
+    .output(baseWaitForMessageResultNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId, input.expectedWorktreeId);
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList)
+      );
+      return await client.waitForMessageResult({
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        messageId: input.messageId,
+        timeoutSeconds: input.timeoutSeconds,
+      });
+    }),
+
+  execCommand: baseProcedure
+    .input(baseExecCommandNextSchema)
+    .output(baseExecCommandNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId, input.expectedWorktreeId);
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList)
+      );
+      return await client.execCommand({
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        command: input.command,
+        timeoutSeconds: input.timeoutSeconds,
+      });
+    }),
+
   getWorktreeChanges: baseProcedure
     .input(baseWorktreeChangesNextSchema)
     .output(getWorktreeChangesOutputSchema)
@@ -583,8 +617,8 @@ export const cloudAgentNextRouter = createTRPCRouter({
 
   /**
    * Generate a presigned download URL for a stored Cloud Agent attachment.
-   * Personal scope only: the key prefix is derived from the caller (author).
-   * No org mirror — remote CLI sessions are personal.
+   * Files are keyed by the uploading user, so this also serves attachments the
+   * caller uploaded into organization sessions.
    */
   getAttachmentDownloadUrl: baseProcedure
     .input(cloudAgentGetAttachmentDownloadUrlSchema)

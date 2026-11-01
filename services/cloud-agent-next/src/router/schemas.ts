@@ -37,6 +37,10 @@ import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/me
 import { SessionMessageCompletionSourceSchema } from '../session/session-message-state.js';
 import { SafeFailureProjectionSchema } from '../session/safe-failure-projection.js';
 import { SandboxStatusSessionIdSchema } from '../shared/sandbox-status.js';
+import {
+  controlPlaneExecPayloadSchema,
+  controlPlaneExecResultSchema,
+} from '../shared/control-plane-protocol.js';
 
 export { SandboxStatusSnapshotSchema as GetSandboxStatusOutput } from '../shared/sandbox-status.js';
 export type { SandboxStatusSnapshot as GetSandboxStatusResponse } from '../shared/sandbox-status.js';
@@ -1301,6 +1305,35 @@ export const GetMessageResultOutput = z
   });
 
 export type GetMessageResultResponse = z.infer<typeof GetMessageResultOutput>;
+
+export const ExecCommandInput = z
+  .object({
+    cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to run in'),
+    command: controlPlaneExecPayloadSchema.shape.command.describe(
+      'Non-interactive shell command to run in the workspace'
+    ),
+    timeoutSeconds: z.number().int().min(1).max(60).default(30),
+  })
+  .strict();
+
+export const ExecCommandOutput = controlPlaneExecResultSchema;
+
+export const PendingInteractionsOutput = z.object({
+  questions: z.array(z.unknown()),
+  permissions: z.array(z.unknown()),
+});
+
+export const WaitForMessageResultInput = GetMessageResultInput.extend({
+  timeoutSeconds: z.number().int().min(1).max(50).default(30),
+});
+
+export const WaitForMessageResultOutput = z
+  .object({
+    result: GetMessageResultOutput,
+    pendingInteractions: PendingInteractionsOutput,
+    timedOut: z.boolean(),
+  })
+  .strict();
 
 export const GetLatestAssistantMessageInput = z.object({
   cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to inspect'),

@@ -12,6 +12,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { sanitizeJsonbValue } from '@kilocode/web-shared/lib/sanitize-jsonb';
 import { uploadApiRequestLogBlobs } from '@kilocode/web-shared/lib/r2/api-request-log';
+import { createVercelProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/vercel-provider-metadata';
 import { after, type NextResponse } from 'next/server';
 import type {
   RequestLogCapture,
@@ -219,6 +220,8 @@ export async function rewriteModelResponse({
     is_free: isFree,
     user_byok: userByok,
     custom_pricing_config: await getCustomPricingConfig(),
+    captureProviderMetadata:
+      providerId === 'vercel' ? createVercelProviderMetadataCapture() : undefined,
   };
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);

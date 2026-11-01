@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { GitFork, GitPullRequest, ScrollText, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -29,10 +29,17 @@ const TABS: readonly TabDef[] = [
  * `usePathname` rather than the Radix `Tabs` primitive because each tab
  * is a distinct URL — we want real navigation, browser back, and shareable
  * links, not a controlled tabs widget.
+ *
+ * The current query string is carried across tabs so an address that
+ * selects one of several wastelands (`?wastelandId=`) keeps that
+ * selection while the user moves between sections.
  */
 export function RepoNavTabs({ owner, repo }: RepoNavTabsProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const base = `/wasteland/${owner}/${repo}`;
+  const query = searchParams.toString();
+  const suffix = query ? `?${query}` : '';
 
   return (
     <nav
@@ -40,7 +47,7 @@ export function RepoNavTabs({ owner, repo }: RepoNavTabsProps) {
       className="flex items-center gap-1 border-b border-white/[0.06] px-4"
     >
       {TABS.map(tab => {
-        const href = tab.segment ? `${base}/${tab.segment}` : base;
+        const href = `${tab.segment ? `${base}/${tab.segment}` : base}${suffix}`;
         const active = isActive(pathname, base, tab.segment);
         const Icon = tab.icon;
         return (

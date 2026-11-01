@@ -76,11 +76,18 @@ describe('resolveWastelandWith', () => {
     ).toEqual({ kind: 'none' });
   });
 
-  it('skips a row whose upstream reads back as null', async () => {
-    const registry = fakeRegistry([ownerRow({ dolthub_upstream: null })]);
-    expect(
-      await resolveWastelandWith(registry, viewer, { owner: 'octo', repo: 'commons' })
-    ).toEqual({ kind: 'none' });
+  it('skips a claimant whose upstream reads back as null', async () => {
+    // The registry query never returns a null upstream, so hand the
+    // resolver such a row directly: without the guard this row would be
+    // reported as the resolved claimant.
+    const registry = {
+      findAllByOwnerRepo: vi.fn(async () => [ownerRow({ dolthub_upstream: null })]),
+    };
+    const resolution = await resolveWastelandWith(registry, viewer, {
+      owner: 'octo',
+      repo: 'commons',
+    });
+    expect(resolution).toEqual({ kind: 'none' });
   });
 
   it('forwards the owner/repo pair to the registry verbatim', async () => {

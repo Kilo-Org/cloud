@@ -118,48 +118,60 @@ class FakeSqlStorage {
     }
 
     if (/^select \* from/i.test(trimmed)) {
+      const [binding] = bindings as [string];
+      let rows = this.rows;
+
       if (/lower\(.*dolthub_upstream\)/i.test(trimmed)) {
-        // Mirrors `ORDER BY wasteland_registry.wasteland_id ASC`: the
-        // slug lookup is ordered by primary key, never by created_at.
-        const [target] = bindings as [string];
-        const matches = this.rows
-          .filter(
-            r =>
-              r.dolthub_upstream !== null &&
-              r.dolthub_upstream.toLowerCase() === target.toLowerCase()
-          )
-          .sort((a, b) => (a.wasteland_id < b.wasteland_id ? -1 : 1));
-        return new FakeCursor(matches as unknown as Record<string, unknown>[]);
-      }
-
-      // Plain `SELECT * ... ORDER BY created_at DESC` (listAll and the
-      // owner-scoped listings).
-      const sorted = [...this.rows].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
-
-      if (/owner_type\s*=\s*'user'/i.test(trimmed)) {
-        const [user_id] = bindings as [string];
-        return new FakeCursor(
-          sorted.filter(
-            r => r.owner_type === 'user' && r.owner_user_id === user_id
-          ) as unknown as Record<string, unknown>[]
+        rows = rows.filter(
+          r =>
+            r.dolthub_upstream !== null &&
+            r.dolthub_upstream.toLowerCase() === binding.toLowerCase()
         );
+      } else if (/owner_type\s*=\s*'user'/i.test(trimmed)) {
+        rows = rows.filter(r => r.owner_type === 'user' && r.owner_user_id === binding);
+      } else if (/owner_type\s*=\s*'org'/i.test(trimmed)) {
+        rows = rows.filter(r => r.owner_type === 'org' && r.organization_id === binding);
       }
 
-      if (/owner_type\s*=\s*'org'/i.test(trimmed)) {
-        const [org_id] = bindings as [string];
-        return new FakeCursor(
-          sorted.filter(
-            r => r.owner_type === 'org' && r.organization_id === org_id
-          ) as unknown as Record<string, unknown>[]
-        );
-      }
-
-      // Plain `SELECT * ... ORDER BY created_at DESC` (listAll).
-      return new FakeCursor(sorted as unknown as Record<string, unknown>[]);
+      // Apply the statement's own ordering and limit so a change to the
+      // query changes the result instead of being masked by the shim.
+      const ordered = applyOrderBy(trimmed, rows);
+      return new FakeCursor(applyLimit(trimmed, ordered) as unknown as Record<string, unknown>[]);
     }
 
     throw new Error(`FakeSqlStorage: unhandled query\n${sql}`);
   }
+}
+
+function compareText(a: string, b: string): number {
+  if (a < b) return -1;
+  return a > b ? 1 : 0;
+}
+
+/**
+ * Honour `ORDER BY <column> [ASC|DESC]`. Only the columns this module
+ * orders by are modelled; anything else fails loudly rather than
+ * returning an order the test would silently accept.
+ */
+function applyOrderBy(sql: string, rows: Row[]): Row[] {
+  const order = /order by\s+(?:\w+\.)?(\w+)(?:\s+(asc|desc))?/i.exec(sql);
+  if (!order) return rows;
+
+  const [, column, direction] = order;
+  const compare = (a: Row, b: Row) => {
+    if (column === 'created_at') return compareText(a.created_at, b.created_at);
+    if (column === 'wasteland_id') return compareText(a.wasteland_id, b.wasteland_id);
+    throw new Error(`FakeSqlStorage: unsupported ORDER BY column ${column}`);
+  };
+
+  const descending = (direction ?? '').toLowerCase() === 'desc';
+  return [...rows].sort((a, b) => (descending ? compare(b, a) : compare(a, b)));
+}
+
+function applyLimit(sql: string, rows: Row[]): Row[] {
+  const limit = /\blimit\s+(\d+)/i.exec(sql);
+  if (!limit) return rows;
+  return rows.slice(0, Number(limit[1]));
 }
 
 function freshSql() {

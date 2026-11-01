@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   WastelandTRPCProvider,
@@ -24,6 +25,9 @@ type RepoLayoutShellProps = {
   children: ReactNode;
 };
 
+/** Query parameter that picks one of several wastelands behind an upstream. */
+const SELECTED_WASTELAND_PARAM = 'wastelandId';
+
 /**
  * The top-level shell for /wasteland/[owner]/[repo]. Owns the tRPC
  * client, drawer stack, and page-header context, then resolves
@@ -34,9 +38,11 @@ type RepoLayoutShellProps = {
  *   1. Loading: render a skeleton with no nav, so we don't flicker the
  *      tabs into a "not connected" state and back.
  *   2. Connected (resolveOwnerRepo resolved one wasteland this user can
- *      access): render the dashboard header + nav + page content.
- *   3. Ambiguous (several accessible wastelands share the upstream):
- *      render `AmbiguousUpstreamShell` so the user picks one.
+ *      access, or `?wastelandId=` names one of several): render the
+ *      dashboard header + nav + page content.
+ *   3. Ambiguous (several accessible wastelands share the upstream and
+ *      none is selected): render `AmbiguousUpstreamShell` so the user
+ *      picks one.
  *   4. Not connected (resolveOwnerRepo returned null): render the
  *      `NotConnectedShell` — Connect CTA only, no nav.
  */
@@ -60,6 +66,8 @@ export function RepoLayoutShell({ owner, repo, children }: RepoLayoutShellProps)
 
 function RepoLayoutShellInner({ owner, repo, children }: RepoLayoutShellProps) {
   const trpc = useWastelandTRPC();
+  const searchParams = useSearchParams();
+  const selectedWastelandId = searchParams.get(SELECTED_WASTELAND_PARAM);
   const resolveQuery = useQuery(trpc.wasteland.resolveOwnerRepo.queryOptions({ owner, repo }));
 
   if (resolveQuery.isLoading) {
@@ -79,20 +87,31 @@ function RepoLayoutShellInner({ owner, repo, children }: RepoLayoutShellProps) {
     return <NotConnectedShell owner={owner} repo={repo} />;
   }
 
-  if (resolved.status === 'ambiguous') {
-    return (
-      <AmbiguousUpstreamShell
-        owner={owner}
-        repo={repo}
-        candidates={resolved.candidates.map(candidate => ({
-          wastelandId: candidate.wastelandId,
-          name: candidate.name,
-        }))}
-      />
+  // Several wastelands can back one upstream. `?wastelandId=` picks one
+  // of the candidates this user can reach; anything else falls back to
+  // the chooser, so the address stays usable while the choice lives in
+  // the URL instead of in a UUID route that redirects back here.
+  let wasteland;
+  if (resolved.status === 'resolved') {
+    wasteland = resolved.wasteland;
+  } else {
+    wasteland = resolved.candidates.find(
+      candidate => candidate.wastelandId === selectedWastelandId
     );
+    if (!wasteland) {
+      return (
+        <AmbiguousUpstreamShell
+          owner={owner}
+          repo={repo}
+          candidates={resolved.candidates.map(candidate => ({
+            wastelandId: candidate.wastelandId,
+            name: candidate.name,
+          }))}
+        />
+      );
+    }
   }
 
-  const wasteland = resolved.wasteland;
   return (
     <WastelandRepoProvider
       value={{

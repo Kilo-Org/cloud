@@ -3,6 +3,7 @@ import { query } from '../../util/query.util';
 import {
   createTableWastelandCredentials,
   migrateAddIsUpstreamAdmin,
+  migrateAddProvenOrg,
   wasteland_credentials,
   WastelandCredentialRecord,
 } from '../../db/tables/wasteland-credentials.table';
@@ -12,6 +13,7 @@ export type WastelandCredentialResult = {
   encrypted_token: string;
   dolthub_org: string;
   rig_handle: string | null;
+  proven_org: string | null;
   is_upstream_admin: boolean;
   connected_at: string;
 };
@@ -19,6 +21,7 @@ export type WastelandCredentialResult = {
 export function initializeDatabase(sql: SqlStorage): void {
   query(sql, createTableWastelandCredentials(), []);
   migrateAddIsUpstreamAdmin(sql);
+  migrateAddProvenOrg(sql);
 }
 
 export function storeCredential(
@@ -29,6 +32,13 @@ export function storeCredential(
     encryptedToken: string;
     dolthubOrg: string;
     rigHandle?: string;
+    /**
+     * The org a verified flow just established with DoltHub. Only the
+     * worker's own flows pass it (a join after its registration write,
+     * a bootstrap that wrote to the org's own repository); the public
+     * `storeCredential` mutation never does.
+     */
+    provenOrg?: string;
     isUpstreamAdmin?: boolean;
   }
 ): WastelandCredentialResult {
@@ -43,6 +53,17 @@ export function storeCredential(
   const existing = input.rigHandle === undefined ? getCredential(sql, wastelandId, userId) : null;
   const keepsHandle = existing !== null && isSameDolthubOrg(existing.dolthub_org, input.dolthubOrg);
   const rigHandle = input.rigHandle ?? (keepsHandle ? existing.rig_handle : null);
+  // The proof travels with the org it was recorded for; it is set by a
+  // verified flow only, and otherwise kept only while the org is
+  // unchanged.
+  const provenOrg =
+    input.provenOrg !== undefined
+      ? isSameDolthubOrg(input.provenOrg, input.dolthubOrg)
+        ? input.dolthubOrg
+        : null
+      : existing !== null && isSameDolthubOrg(existing.proven_org, input.dolthubOrg)
+        ? existing.proven_org
+        : null;
   query(
     sql,
     /* sql */ `
@@ -52,11 +73,21 @@ export function storeCredential(
         ${wasteland_credentials.columns.encrypted_token},
         ${wasteland_credentials.columns.dolthub_org},
         ${wasteland_credentials.columns.rig_handle},
+        ${wasteland_credentials.columns.proven_org},
         ${wasteland_credentials.columns.is_upstream_admin},
         ${wasteland_credentials.columns.connected_at}
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `,
-    [userId, wastelandId, input.encryptedToken, input.dolthubOrg, rigHandle, isAdmin, timestamp]
+    [
+      userId,
+      wastelandId,
+      input.encryptedToken,
+      input.dolthubOrg,
+      rigHandle,
+      provenOrg,
+      isAdmin,
+      timestamp,
+    ]
   );
 
   return {
@@ -64,6 +95,7 @@ export function storeCredential(
     encrypted_token: input.encryptedToken,
     dolthub_org: input.dolthubOrg,
     rig_handle: rigHandle,
+    proven_org: provenOrg,
     is_upstream_admin: input.isUpstreamAdmin === true,
     connected_at: timestamp,
   };
@@ -72,22 +104,18 @@ export function storeCredential(
 /**
  * Whether a stored credential already proves `org` for its user.
  *
- * A rig handle is written only by flows that proved the org through a
- * DoltHub write — a join (fork created under the org, or a
- * registration write into its fork), or a `createUpstream` bootstrap
- * that wrote to that org's repository — and `storeCredential` drops the
- * handle when the org changes. So a handle recorded together with this
- * same org stands for that proof.
+ * `proven_org` is written only by flows that established the org with a
+ * DoltHub write — a join (fork created under it, or a registration
+ * write into its fork), or a `createUpstream` bootstrap that wrote to
+ * that org's own repository — and it is dropped when the org changes.
+ * A credential with no recorded proof (including every row written
+ * before this column existed) proves nothing.
  */
 export function credentialProvesOrg(
   credential: WastelandCredentialResult | null,
   org: string
 ): boolean {
-  return (
-    credential !== null &&
-    credential.rig_handle !== null &&
-    isSameDolthubOrg(credential.dolthub_org, org)
-  );
+  return credential !== null && isSameDolthubOrg(credential.proven_org, org);
 }
 
 export function getCredential(
@@ -113,6 +141,7 @@ export function getCredential(
     encrypted_token: parsed.encrypted_token,
     dolthub_org: parsed.dolthub_org,
     rig_handle: parsed.rig_handle,
+    proven_org: parsed.proven_org,
     is_upstream_admin: parsed.is_upstream_admin,
     connected_at: parsed.connected_at,
   };

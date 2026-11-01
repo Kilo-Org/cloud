@@ -427,13 +427,16 @@ export const wastelandRouter = router({
       // The bootstrap wrote to `result.upstreamOwner`'s repository, so
       // that is the org DoltHub proved for this token. The credential's
       // rig handle is the caller's identity, and its org has to be that
-      // same proven org; when it is not, the credential keeps no handle
-      // and a flow that proves the org (the join) sets one later.
+      // same proven org; when it is not, the credential records neither
+      // the handle nor a proof, and a flow that establishes the org (the
+      // join) records them later.
+      const orgProven = isSameDolthubOrg(result.upstreamOwner, dolthubOrg);
       await doStub.storeCredential({
         userId: ctx.userId,
         encryptedToken: credential.encrypted_token,
         dolthubOrg,
-        rigHandle: isSameDolthubOrg(result.upstreamOwner, dolthubOrg) ? handle : undefined,
+        rigHandle: orgProven ? handle : undefined,
+        provenOrg: orgProven ? result.upstreamOwner : undefined,
         isUpstreamAdmin: credential.is_upstream_admin,
       });
 

@@ -2,9 +2,10 @@
  * Behaviour of the credential row that holds the caller's rig identity.
  *
  * `storeCredential` is reachable from the connect flows, while the rig
- * handle is only written by a flow that proved ownership. These tests
- * pin the split: an explicit handle wins, an omitted handle never
- * clears the stored one.
+ * handle and the org proof are only written by a flow that established
+ * the org with DoltHub. These tests pin the split: an explicit handle
+ * wins, an omitted handle is kept only while the org is unchanged, and
+ * a handle on its own proves nothing.
  *
  * Runs against a real SQLite database through a minimal `SqlStorage`
  * shim, because the module only uses `exec(query, ...bindings)`.
@@ -107,24 +108,64 @@ describe('wasteland credentials', () => {
     expect(stored.rig_handle).toBeNull();
   });
 
-  it('proves an org only through a handle recorded for that org', () => {
+  it('proves an org only through a recorded proof for that org', () => {
     const sql = freshSql();
 
     expect(credentialProvesOrg(getCredential(sql, WASTELAND_ID, USER_ID), 'alice')).toBe(false);
 
+    // A handle without a proof — the shape older rows have — proves
+    // nothing, because no flow established that org with DoltHub.
     storeCredential(sql, WASTELAND_ID, USER_ID, {
       encryptedToken: 'enc-1',
       dolthubOrg: 'alice',
+      rigHandle: 'legacy-rig',
     });
     expect(credentialProvesOrg(getCredential(sql, WASTELAND_ID, USER_ID), 'alice')).toBe(false);
 
     storeCredential(sql, WASTELAND_ID, USER_ID, {
       encryptedToken: 'enc-1',
       dolthubOrg: 'alice',
-      rigHandle: 'acme-rig',
+      rigHandle: 'alice-rig',
+      provenOrg: 'alice',
     });
     const verified = getCredential(sql, WASTELAND_ID, USER_ID);
+    expect(verified?.proven_org).toBe('alice');
     expect(credentialProvesOrg(verified, 'Alice')).toBe(true);
     expect(credentialProvesOrg(verified, 'other-org')).toBe(false);
+  });
+
+  it('drops the recorded proof when credentials are re-stored for another org', () => {
+    const sql = freshSql();
+    storeCredential(sql, WASTELAND_ID, USER_ID, {
+      encryptedToken: 'enc-1',
+      dolthubOrg: 'alice',
+      rigHandle: 'alice-rig',
+      provenOrg: 'alice',
+    });
+
+    const restored = storeCredential(sql, WASTELAND_ID, USER_ID, {
+      encryptedToken: 'enc-2',
+      dolthubOrg: 'other-org',
+    });
+
+    expect(restored.proven_org).toBeNull();
+    expect(credentialProvesOrg(getCredential(sql, WASTELAND_ID, USER_ID), 'alice')).toBe(false);
+  });
+
+  it('keeps the recorded proof when credentials are re-stored for the same org', () => {
+    const sql = freshSql();
+    storeCredential(sql, WASTELAND_ID, USER_ID, {
+      encryptedToken: 'enc-1',
+      dolthubOrg: 'alice',
+      rigHandle: 'alice-rig',
+      provenOrg: 'alice',
+    });
+
+    storeCredential(sql, WASTELAND_ID, USER_ID, {
+      encryptedToken: 'enc-2',
+      dolthubOrg: 'Alice',
+    });
+
+    expect(credentialProvesOrg(getCredential(sql, WASTELAND_ID, USER_ID), 'alice')).toBe(true);
   });
 });

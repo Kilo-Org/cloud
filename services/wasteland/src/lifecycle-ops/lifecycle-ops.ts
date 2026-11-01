@@ -221,6 +221,11 @@ async function persistCredential(
     encryptedToken,
     dolthubOrg: ctx.forkOrg,
     rigHandle,
+    // A successful join established this org with DoltHub: the fork was
+    // created under it, the registration write landed in its fork, or
+    // the credential already carried that proof. Record it so later
+    // joins can reuse it, and so nothing trusts a handle alone.
+    provenOrg: ctx.forkOrg,
     isUpstreamAdmin: existing?.is_upstream_admin ?? false,
   });
 }

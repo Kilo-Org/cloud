@@ -3858,14 +3858,14 @@
     "variablesSaveFailed": "Ma keydin karin doorsoomayaasha",
     "commandsTitle": "Dejinta amarrada",
     "addCommand": "Ku dar amar",
-    "commandLabel": "Taliska",
-    "commandLabelPosition": "Taliska {{position}}",
+    "commandLabel": "Amar",
+    "commandLabelPosition": "Amar {{position}}",
     "commandPlaceholder": "tus. pnpm install",
     "commandAtLimit": "Amarku wuxuu ku xaddidan yahay {{max}} xaraf",
     "commandsEmpty": "Ma jiro amar dejin weli",
     "commandsSaveFailed": "Ma kaydin kari waayay amarrada dejinta",
-    "moveCommandUp": "U rari taliska {{position}} kor",
-    "moveCommandDown": "U rari taliska {{position}} hoos",
+    "moveCommandUp": "U rari amarka {{position}} kor",
+    "moveCommandDown": "U rari amarka {{position}} hoos",
     "skillsTitle": "Xirfadaha",
     "addSkill": "Ku dar xirfad",
     "skillNameLabel": "Magaca xirfada",
@@ -4010,7 +4010,7 @@
     },
     "variablesDeleteFailed": "Way tirtiran kari wayday doorsoomaha",
     "deleteVariable": "Tirtir doorsoomaha {{key}}",
-    "deleteCommand": "Tirtir taliska {{position}}"
+    "deleteCommand": "Tirtir amarka {{position}}"
   },
   "credits": {
     "title": "Iibso lacag adeeg",

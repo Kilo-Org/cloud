@@ -33,9 +33,6 @@ export type { JoinOpResult, LifecycleOpsInnerContext } from './lifecycle-ops-inn
 
 type LifecycleContext = LifecycleOpsInnerContext & {
   doStub: ReturnType<typeof getWastelandDOStub>;
-  /** Whether the auth token came from a fresh OAuth refresh — informs
-   *  whether we re-encrypt-and-store the token after the join. */
-  tokenSource: 'oauth' | 'stored';
 };
 
 export type JoinWastelandInput = {
@@ -114,7 +111,6 @@ async function loadContext(
       displayName,
       ownerEmail,
       token: fresh.data.token,
-      tokenSource: 'oauth',
     };
   }
 
@@ -148,7 +144,6 @@ async function loadContext(
     displayName,
     ownerEmail,
     token,
-    tokenSource: 'stored',
     orgProven,
   };
 }

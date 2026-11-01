@@ -40,11 +40,7 @@ function makeSql(): SqlStorage {
 type Harness = {
   sql: SqlStorage;
   env: Pick<Env, 'WASTELAND_ENCRYPTION_KEY'>;
-  makeContext: (input: {
-    forkOrg: string;
-    token: string;
-    tokenSource: 'oauth' | 'stored';
-  }) => JoinCredentialContext;
+  makeContext: (input: { forkOrg: string; token: string }) => JoinCredentialContext;
   seed: (input: {
     token: string;
     org: string;
@@ -70,7 +66,7 @@ function makeHarness(input: { withKey?: boolean } = {}): Harness {
   return {
     sql,
     env,
-    makeContext: ({ forkOrg, token, tokenSource }) => ({
+    makeContext: ({ forkOrg, token }) => ({
       doStub: {
         getCredential: async userId => getCredential(sql, WASTELAND_ID, userId),
         storeCredential: async credentialInput =>
@@ -79,7 +75,6 @@ function makeHarness(input: { withKey?: boolean } = {}): Harness {
       upstream: 'hop/wl',
       forkOrg,
       token,
-      tokenSource,
     }),
     seed: async seedInput =>
       storeCredential(sql, WASTELAND_ID, USER_ID, {
@@ -110,7 +105,7 @@ describe('persistJoinCredential', () => {
 
     await persistJoinCredential(
       harness.env,
-      harness.makeContext({ forkOrg: 'bob', token: 'account-b-token', tokenSource: 'oauth' }),
+      harness.makeContext({ forkOrg: 'bob', token: 'account-b-token' }),
       USER_ID,
       'bob-rig'
     );
@@ -136,7 +131,7 @@ describe('persistJoinCredential', () => {
 
     await persistJoinCredential(
       harness.env,
-      harness.makeContext({ forkOrg: 'alice', token: 'refreshed-token', tokenSource: 'oauth' }),
+      harness.makeContext({ forkOrg: 'alice', token: 'refreshed-token' }),
       USER_ID,
       'alice-rig'
     );
@@ -147,26 +142,31 @@ describe('persistJoinCredential', () => {
     expect(await harness.decryptStoredToken()).toBe('account-a-token');
   });
 
-  it('leaves the stored org alone when the join ran on the stored token', async () => {
+  it('records the credential under the org the join resolved', async () => {
     const harness = makeHarness();
-    const previous = await harness.seed({
+    await harness.seed({
       token: 'account-a-token',
       org: 'alice',
       rigHandle: 'alice-rig',
       provenOrg: 'alice',
     });
+    const ctx = harness.makeContext({ forkOrg: 'alice', token: 'account-a-token' });
+    const stored = getCredential(harness.sql, WASTELAND_ID, USER_ID);
+    if (stored === null) throw new Error('no credential stored');
+    // The org the join resolved is the one its token acts for, so that is
+    // the org the credential is recorded under.
+    ctx.doStub.getCredential = async () => ({
+      ...stored,
+      dolthub_org: 'carol',
+      encrypted_token: 'ciphertext-of-carol',
+    });
 
-    await persistJoinCredential(
-      harness.env,
-      harness.makeContext({ forkOrg: 'alice', token: 'account-a-token', tokenSource: 'stored' }),
-      USER_ID,
-      'rejoined-rig'
-    );
+    await persistJoinCredential(harness.env, ctx, USER_ID, 'rejoined-rig');
 
     const row = getCredential(harness.sql, WASTELAND_ID, USER_ID);
     expect(row?.dolthub_org).toBe('alice');
     expect(row?.rig_handle).toBe('rejoined-rig');
-    expect(row?.encrypted_token).toBe(previous.encrypted_token);
+    expect(row?.proven_org).toBe('alice');
     expect(await harness.decryptStoredToken()).toBe('account-a-token');
   });
 
@@ -182,7 +182,7 @@ describe('persistJoinCredential', () => {
 
     await persistJoinCredential(
       harness.env,
-      harness.makeContext({ forkOrg: 'bob', token: 'account-b-token', tokenSource: 'oauth' }),
+      harness.makeContext({ forkOrg: 'bob', token: 'account-b-token' }),
       USER_ID,
       'bob-rig'
     );
@@ -200,7 +200,7 @@ describe('persistJoinCredential', () => {
 
     await persistJoinCredential(
       harness.env,
-      harness.makeContext({ forkOrg: 'bob', token: 'account-b-token', tokenSource: 'oauth' }),
+      harness.makeContext({ forkOrg: 'bob', token: 'account-b-token' }),
       USER_ID,
       'bob-rig'
     );

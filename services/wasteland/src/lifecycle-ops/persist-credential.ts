@@ -24,24 +24,21 @@ export type JoinCredentialContext = {
   };
   /** Upstream `owner/db` — only used to label the log line. */
   upstream: string;
-  /** The org the join ran under: the fresh OAuth account, or the org
-   *  the stored token was decrypted for. */
+  /** The org this join resolved for {@link token}: the fresh OAuth
+   *  account, or the org the stored token was decrypted for. */
   forkOrg: string;
   /** The token that drove the join. */
   token: string;
-  /** Where {@link token} came from, which decides whether the row's org
-   *  may follow it. */
-  tokenSource: 'oauth' | 'stored';
 };
 
 /**
  * Persist the verified `rig_handle` together with a token/org pair that
  * agree with each other.
  *
- * A join on a fresh OAuth token records that token under the org it just
- * joined as, and a join on the stored token leaves the row's org as it
- * is; either way the stored ciphertext is kept only while the row already
- * names the org being recorded.
+ * The org written is the one this join resolved for its token, so a join
+ * on a fresh OAuth token records that token under the org it joined as
+ * and a join on the stored token keeps the row's org. Either way the
+ * stored ciphertext is kept only while the row already names that org.
  */
 export async function persistJoinCredential(
   env: Pick<Env, 'WASTELAND_ENCRYPTION_KEY'>,
@@ -50,9 +47,12 @@ export async function persistJoinCredential(
   rigHandle: string
 ): Promise<void> {
   const existing = await ctx.doStub.getCredential(userId);
-  const org = ctx.tokenSource === 'oauth' ? ctx.forkOrg : (existing?.dolthub_org ?? ctx.forkOrg);
 
-  const binding = await bindCredentialToken(env, { existing, org, token: ctx.token });
+  const binding = await bindCredentialToken(env, {
+    existing,
+    org: ctx.forkOrg,
+    token: ctx.token,
+  });
   if (binding.status === 'key-unavailable') {
     // Without an encryption key we can't persist. Surface as a soft
     // warning rather than failing the whole join — the user already has

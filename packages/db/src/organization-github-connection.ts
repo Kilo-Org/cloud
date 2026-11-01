@@ -37,10 +37,16 @@ import { platform_integrations } from './schema';
  *     shadowed duplicate stay exactly as they are.
  *
  * Personal associations are out of scope: they always carry their role, and
- * their lookups keep the stored role.
+ * their lookups keep the stored role. The predicate carries that scope itself —
+ * it only matches a GitHub row owned by an organization — so a caller cannot
+ * widen it to a personal or non-GitHub association by forgetting a filter, and
+ * the planner can use the platform index.
  */
 export function organizationWorkflowGitHubConnectionSql(): SQL {
   return sql`(
+    ${platform_integrations.platform} = 'github'
+    AND ${platform_integrations.owned_by_organization_id} IS NOT NULL
+    AND (
     ${platform_integrations.github_connection_role} = 'workflow'
     OR (
       ${platform_integrations.github_connection_role} IS NULL
@@ -129,6 +135,7 @@ export function organizationWorkflowGitHubConnectionSql(): SQL {
             ${platform_integrations.id}
           )
       )
+    )
     )
   )`;
 }

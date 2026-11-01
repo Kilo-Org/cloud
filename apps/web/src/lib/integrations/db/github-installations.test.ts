@@ -7,6 +7,7 @@ jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server'
   isOrganizationModelUpdateAllowed: jest.fn(async () => true),
 }));
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { organizationWorkflowGitHubConnectionSql } from '@kilocode/db';
 import {
   agent_configs,
   cloud_agent_code_review_attempts,
@@ -2690,6 +2691,51 @@ describe('GitHub installation persistence', () => {
       github_connection_role: null,
     });
     await expect(getPrimaryGitHubIntegrationForOrganization(organization.id)).resolves.toBeNull();
+  });
+
+  test('the organization workflow connection definition only matches GitHub rows owned by an organization', async () => {
+    const organization = await createTestOrganization('Definition scope', ownerId, 0);
+    const [organizationRow] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '777101',
+        platform_account_login: 'acme',
+        integration_status: 'active',
+        github_app_type: 'standard',
+        repository_access: 'all',
+      })
+      .returning();
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: ownerId,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: '777102',
+      platform_account_login: 'owner',
+      integration_status: 'active',
+      github_app_type: 'standard',
+      repository_access: 'all',
+    });
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: organization.id,
+      platform: 'slack',
+      integration_type: 'app',
+      platform_installation_id: '777103',
+      integration_status: 'active',
+      repository_access: 'all',
+    });
+
+    // The definition is the work item's single contract for "the organization's
+    // workflow connection", so it carries its own scope instead of trusting
+    // every call site to add the platform and ownership filters.
+    const matched = await db
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(organizationWorkflowGitHubConnectionSql());
+
+    expect(matched.map(row => row.id)).toEqual([organizationRow.id]);
   });
 
   test('leaves a linked organization association roleless when another row claims the installation', async () => {

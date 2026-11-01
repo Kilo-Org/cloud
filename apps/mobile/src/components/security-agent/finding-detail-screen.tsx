@@ -13,7 +13,7 @@ import { FindingRemediationPanel } from '@/components/security-agent/finding-rem
 import { PanelErrorBoundary } from '@/components/security-agent/panel-error-boundary';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
-import { IconButton } from '@/components/ui/icon-button';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -30,6 +30,7 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/finding-detail-back';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { cn } from '@/lib/utils';
 
@@ -153,15 +154,39 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   }, [loadFailed, findingId]);
   const showLoadFailure = !findingQuery.data && (loadFailed || failedFindingId === findingId);
 
+  // The not-found and load-failure states share a header without an eyebrow
+  // line. Neither ever gains a repository, so the title belongs on the back
+  // control's row, centred on the chevron, rather than half a line below it
+  // above a gap no label ever fills.
+  const pendingHeader = (
+    <ScreenHeader
+      className="px-6"
+      title={t('securityAgent.findingDetail.title')}
+      showBackButton
+      onBack={handleBack}
+    />
+  );
+
+  // Loading does gain the repository: the loaded header draws it on an eyebrow
+  // line above the title. The row centres the heading column against the back
+  // control, so that line moves the title down by half its height — 7.6 dp
+  // measured on the Android emulator — in the frame the payload lands. Reserving
+  // the line here puts the title where the payload will leave it, so it holds
+  // still from the first paint instead of being pushed down later.
+  const loadingHeader = (
+    <ScreenHeader
+      className="px-6"
+      title={t('securityAgent.findingDetail.title')}
+      reserveEyebrow
+      showBackButton
+      onBack={handleBack}
+    />
+  );
+
   if (notFound) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
-          className="px-6"
-          title={t('securityAgent.findingDetail.title')}
-          showBackButton
-          onBack={handleBack}
-        />
+        {pendingHeader}
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.notFoundTitle')}
@@ -174,12 +199,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   if (showLoadFailure) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
-          className="px-6"
-          title={t('securityAgent.findingDetail.title')}
-          showBackButton
-          onBack={handleBack}
-        />
+        {pendingHeader}
         <QueryError
           message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
@@ -192,12 +212,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   if (findingQuery.isLoading || !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
-          className="px-6"
-          title={t('securityAgent.findingDetail.title')}
-          showBackButton
-          onBack={handleBack}
-        />
+        {loadingHeader}
         <View className="flex-1 gap-3 px-6 pt-4">
           <Skeleton className="h-6 w-2/3 rounded" />
           <Skeleton className="h-4 w-1/3 rounded" />
@@ -226,14 +241,24 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         onBack={handleBack}
         headerRight={
           canDismiss ? (
-            <IconButton
+            <Button
+              variant="secondary"
+              size="sm"
               onPress={() => {
                 pushOnce(getSecurityAgentPath(scope, `dismiss/${findingId}`));
               }}
               accessibilityLabel={t('securityAgent.dismiss.title')}
+              // A labelled header action is variable width, so it bounds itself
+              // the way the settings Save button does: the label shrinks inside
+              // the cap instead of taking the title's room (see the trailing
+              // cluster note in screen-header.tsx).
+              className="min-w-0 max-w-[140px] shrink"
             >
-              <Ban size={20} color={colors.mutedForeground} />
-            </IconButton>
+              <Ban size={16} color={colors.secondaryForeground} />
+              <Text className="shrink text-center">
+                {t('securityAgent.analysis.action.dismiss')}
+              </Text>
+            </Button>
           ) : undefined
         }
       />
@@ -267,8 +292,12 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
             <Pressable
               key={key}
               className={cn(
-                'min-h-11 flex-1 items-center justify-center rounded-lg py-2 active:opacity-80',
-                selected ? 'bg-primary' : 'bg-secondary'
+                // The strip is a segmented row: each tab carries the shared
+                // row floor on its own node so a tap anywhere in the tab's
+                // height lands, not just the label line.
+                ROW_TARGET_CLASS,
+                'flex-1 items-center justify-center rounded-lg py-2 active:opacity-80',
+                selected ? 'bg-selection' : 'bg-secondary'
               )}
               onPress={() => {
                 setTab(key);
@@ -278,7 +307,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
               <Text
                 className={cn(
                   'text-xs font-medium',
-                  selected ? 'text-primary-foreground' : 'text-foreground'
+                  selected ? 'text-selection-foreground' : 'text-foreground'
                 )}
               >
                 {t(labelKey)}

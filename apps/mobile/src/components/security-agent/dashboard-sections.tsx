@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- The dashboard sections share one data contract and navigation scope. */
 import { getAnalysisIncompleteCount } from '@kilocode/app-shared/security-agent';
 import { type Href } from 'expo-router';
-import { Clock, FolderGit2, ShieldCheck } from '@/components/ui/icons';
+import { FolderGit2, ShieldCheck } from '@/components/ui/icons';
 import { DirectionalArrowRight } from '@/components/ui/directional-icons';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
@@ -102,15 +102,16 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
 
   // A scope that has never synced has found nothing yet because nothing ran,
   // not because the codebase is clean: the green check and the all-clear line
-  // read as a verified result. The neutral row states the same not-yet-synced
-  // fact the filter above shows, and opens nothing.
+  // read as a verified result. The filter above already states that nothing
+  // has synced, so this card explains what it will hold instead of repeating
+  // the status, and it opens nothing: a lone dash left a content section
+  // looking broken.
   if (neverSynced) {
     return (
       <SectionCard title={t('securityAgent.dashboard.actFirst')}>
-        <View className="flex-row items-center gap-2 py-3">
-          <Clock size={16} color={colors.mutedForeground} />
+        <View className="py-3">
           <Text variant="muted" className="text-sm">
-            {t('securityAgent.dashboard.notYetSynced')}
+            {t('securityAgent.dashboard.priorityFindingsPending')}
           </Text>
         </View>
       </SectionCard>
@@ -186,28 +187,28 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
         label={t('securityAgent.dashboard.confirmedExploitable')}
         value={rowValue(neverSynced, formatNumber(data.analysis.exploitable, i18n.language))}
         valueTone="muted"
-        valueNumeric
+        valueFace="numeric"
         dotTone={rowTone(neverSynced, data.analysis.exploitable > 0 ? 'danger' : 'muted')}
       />
       <KvRow
         label={t('securityAgent.dashboard.needsEvidenceReview')}
         value={rowValue(neverSynced, formatNumber(data.analysis.needsReview, i18n.language))}
         valueTone="muted"
-        valueNumeric
+        valueFace="numeric"
         dotTone={rowTone(neverSynced, data.analysis.needsReview > 0 ? 'warn' : 'muted')}
       />
       <KvRow
         label={t('securityAgent.dashboard.analysisNotComplete')}
         value={rowValue(neverSynced, formatNumber(analysisIncomplete, i18n.language))}
         valueTone="muted"
-        valueNumeric
+        valueFace="numeric"
         dotTone="muted"
       />
       <KvRow
         label={t('securityAgent.dashboard.noImmediateAction')}
         value={rowValue(neverSynced, formatNumber(noImmediateAction, i18n.language))}
         valueTone="muted"
-        valueNumeric
+        valueFace="numeric"
         dotTone={rowTone(neverSynced, noImmediateAction > 0 ? 'good' : 'muted')}
         last
       />
@@ -215,7 +216,7 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
   );
 }
 
-function CoverageSection({ scope, data, slaEnabled, repoFullName, neverSynced }: SectionProps) {
+function CoverageSection({ scope, data, repoFullName, neverSynced }: SectionProps) {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const analysisIncomplete = getAnalysisIncompleteCount(data.analysis);
@@ -251,14 +252,6 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName, neverSynced }:
       href: findingsHref(scope, { status: 'open', repoFullName }),
     },
   ];
-  if (slaEnabled) {
-    rows.push({
-      label: t('securityAgent.dashboard.noSlaDeadline'),
-      value: data.sla.untrackedCount,
-      tone: 'muted',
-      href: findingsHref(scope, { status: 'open', repoFullName }),
-    });
-  }
 
   return (
     <SectionCard title={t('securityAgent.dashboard.codebaseRisk')}>
@@ -279,7 +272,7 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName, neverSynced }:
             label={row.label}
             value={rowValue(neverSynced, formatNumber(row.value, i18n.language))}
             valueTone="muted"
-            valueNumeric
+            valueFace="numeric"
             dotTone={rowTone(neverSynced, row.value > 0 ? row.tone : 'muted')}
             last={index === rows.length - 1}
           />

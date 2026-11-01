@@ -10,7 +10,11 @@ import { ReviewerRouteParamsProvider } from '@/lib/hooks/use-reviewer-route-para
 import { resetNowTickersForTests } from '@/lib/hooks/now-ticker-store';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 import { ReviewListScreen } from './review-list-screen';
-import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
+import {
+  renderWithProviders,
+  type RenderWithProvidersResult,
+  waitFor,
+} from '@/test/render-with-providers';
 
 type ReviewStub = {
   id: string;
@@ -37,6 +41,7 @@ const state = vi.hoisted(() => ({
   platform: 'gitlab',
   connected: false,
   scope: 'personal',
+  organizations: [] as { organizationId: string; organizationName: string }[],
   repositories: {
     data: { repositories: [] } as unknown,
     isLoading: false,
@@ -152,6 +157,12 @@ vi.mock('@/lib/trpc', () => ({
       },
     },
     organizations: {
+      list: {
+        queryOptions: () => ({
+          queryKey: ['organizations', 'list'],
+          queryFn: () => Promise.resolve(state.organizations),
+        }),
+      },
       reviewAgent: {
         listGitHubRepositories: {
           queryOptions: (input: unknown) => ({ queryKey: ['org-github', input] }),
@@ -199,6 +210,7 @@ beforeEach(() => {
   state.platform = 'gitlab';
   state.connected = false;
   state.scope = 'personal';
+  state.organizations = [];
   state.repositories.data = { repositories: [] };
   state.repositories.isError = false;
   state.bitbucket.data = { repositoryCache: { status: 'available', repositories: [] } };
@@ -617,5 +629,43 @@ describe('Recent review bodies', () => {
       resetNowTickersForTests();
       vi.useRealTimers();
     }
+  });
+});
+
+// A reader who belongs to several organizations must be able to tell whose
+// reviews are listed, the way the platform list for the same scope already
+// names them.
+describe('Recent review header', () => {
+  it('names the organization scope that owns the listed reviews', async () => {
+    state.organizations = [{ organizationId: 'org-1', organizationName: 'Drain Labs' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: 'org-1' })
+    );
+    const findHeader = () => renderer.root.find(node => String(node.type) === 'ScreenHeader');
+    await waitFor(() => findHeader().props.title === 'Drain Labs');
+
+    expect(findHeader().props.eyebrow).toBe('Recent reviews');
+    // The scope name is prose, but the header paints it on the one line the
+    // personal scope uses: a second line reserved for it made this header
+    // taller than the Personal one, pushing the eyebrow down and opening a
+    // wider gap above the first review. One line needs no reserved blank line —
+    // a name that arrives later still paints on that same line — so the header
+    // keeps the personal header's height instead of outgrowing it.
+    expect(findHeader().props.titleNumberOfLines).toBe(1);
+    expect(findHeader().props.reserveTitleSpace).toBe(false);
+    unmount();
+  });
+
+  it('names the personal scope, on the single line it always fills', async () => {
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: 'personal' })
+    );
+
+    const node = renderer.root.find(candidate => String(candidate.type) === 'ScreenHeader');
+    expect(node.props.title).toBe('Personal');
+    expect(node.props.eyebrow).toBe('Recent reviews');
+    expect(node.props.titleNumberOfLines).toBe(1);
+    expect(node.props.reserveTitleSpace).toBe(false);
+    unmount();
   });
 });

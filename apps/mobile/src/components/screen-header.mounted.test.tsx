@@ -9,6 +9,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
+import { HEADER_BACK_GUARD_MS } from '@/lib/hooks/header-back';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { ScreenHeader, shouldStackHeaderActions } from './screen-header';
@@ -309,6 +310,37 @@ describe('ScreenHeader mounted', () => {
     const back = findBackPressable(renderer.root);
     expect(String(back.props.className)).not.toContain('overflow-hidden');
     expect(back.props.accessibilityRole).toBe('button');
+  });
+
+  it('dispatches one back for a burst of presses on the same header', () => {
+    // One gesture owns the header's Back: four presses delivered inside the
+    // window have to pop one screen, not four. The window is per header, so the
+    // screen a dispatched back lands on starts a fresh one.
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+      routerState.routes = ['tabs', 'security-agent', 'security-agent-settings'];
+      const renderer = renderHeader({ title: 'Settings' });
+
+      const back = findBackPressable(renderer.root);
+      for (let press = 0; press < 4; press += 1) {
+        act(() => {
+          (back.props.onPress as () => void)();
+        });
+      }
+      expect(routerState.back).toHaveBeenCalledTimes(1);
+      expect(routerState.routes).toEqual(['tabs', 'security-agent']);
+
+      // A deliberate press after the window still walks the stack.
+      vi.setSystemTime(new Date(Date.now() + HEADER_BACK_GUARD_MS));
+      act(() => {
+        (back.props.onPress as () => void)();
+      });
+      expect(routerState.back).toHaveBeenCalledTimes(2);
+      expect(routerState.routes).toEqual(['tabs']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('pulls the leading controls with a logical start margin the RTL swap cannot mirror', async () => {
@@ -741,6 +773,56 @@ describe('ScreenHeader mounted', () => {
         expect(title.parent?.parent?.parent).toBe(findBackFrame(renderer.root).parent);
       }
     }
+  });
+
+  it('reserves the title cap in a band beside the heading, not around the title', () => {
+    const renderer = renderHeader({
+      title: 'Harbor Analytics',
+      eyebrow: 'RECENT REVIEWS',
+      titleNumberOfLines: 2,
+      reserveTitleSpace: true,
+    });
+
+    const band = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        String(node.props.className ?? '')
+          .split(' ')
+          .includes('w-0')
+    );
+    // The band holds one eyebrow line and the title's two-line cap, so the row
+    // keeps its height for a title that paints one line: the body below never
+    // moves when the name arrives and wraps.
+    expect(band.findAll(node => String(node.type) === 'Eyebrow')).toHaveLength(1);
+    const capBox = band.findAll(
+      node => typeof node.type === 'string' && String(node.props.className ?? '').includes('min-h')
+    );
+    expect(capBox.map(node => node.props.className)).toEqual(['min-h-14']);
+    // The band is clipped to no width, so it holds height only: it never takes
+    // space from the heading or paints beside the title.
+    expect(String(band.props.className)).toContain('w-0');
+
+    // The visible title keeps its own height, so the eyebrow sits right above
+    // it instead of above the empty line the cap reserves.
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.props.className).toBe('min-w-0 flex-1');
+    renderer.unmount();
+  });
+
+  it('reserves no band on a header whose title has a single fixed line', () => {
+    const renderer = renderHeader({
+      title: 'Personal',
+      eyebrow: 'RECENT REVIEWS',
+      titleNumberOfLines: 1,
+    });
+
+    expect(
+      renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' && String(node.props.className ?? '').startsWith('w-0')
+      )
+    ).toHaveLength(0);
+    renderer.unmount();
   });
 
   it('keeps the close control on the title row when the sheet skips the safe-area inset', () => {

@@ -6,13 +6,36 @@ import { i18n } from '@/i18n';
 import {
   type ClipboardImageFile,
   hasClipboardImage,
+  hasClipboardText,
   hasClipboardUrl,
   readClipboardImageFile,
   readClipboardText,
 } from './clipboard-image';
 
+/** Why a paste produced neither an attachment nor text. */
+export type ClipboardPasteFailure = 'empty' | 'denied' | 'unreadable' | 'too-large';
+
+/** Toast copy when a paste finds an empty clipboard. */
 export function clipboardPasteEmptyMessage(): string {
   return i18n.t('chat.attachment.nothingToPaste');
+}
+
+/**
+ * Toast copy for a paste that found nothing usable, or `null` for the reasons
+ * each composer words in its own attachment vocabulary (`'too-large'`,
+ * `'unreadable'`).
+ *
+ * `'denied'` reuses the PR link paste copy: both controls hit the same paste
+ * permission, so one already-translated message keeps them consistent.
+ */
+export function clipboardPasteFailureMessage(reason: ClipboardPasteFailure): string | null {
+  if (reason === 'empty') {
+    return clipboardPasteEmptyMessage();
+  }
+  if (reason === 'denied') {
+    return i18n.t('prReview.linkPasteDenied');
+  }
+  return null;
 }
 
 type UseClipboardPasteOptions = {
@@ -29,13 +52,14 @@ type UseClipboardPasteOptions = {
    *  wrong there. Omit it to keep the image-only behavior. */
   addText?: (text: string) => void;
   /** Called when neither an image nor text could be used. `'empty'` means no
-   *  image, no readable text, and no URL on the clipboard. `'unreadable'` means
-   *  an image or URL was present but the read failed or was denied. A denied
-   *  text read is indistinguishable from empty and reports 'empty'. `'too-large'`
-   *  means the clipboard image exceeds `maxBytes`; nothing was written to disk.
-   *  The caller supplies its own toast copy to match that composer's existing
+   *  image, no readable text, and no URL on the clipboard. `'denied'` means a
+   *  text read came back empty while the prompt-free probe still sees text: the
+   *  user declined the iOS paste prompt. `'unreadable'` means an image or URL
+   *  was present but the read failed or was denied. `'too-large'` means the
+   *  clipboard image exceeds `maxBytes`; nothing was written to disk. The
+   *  caller supplies its own toast copy to match that composer's existing
    *  pick-path message. */
-  onFailure: (reason: 'empty' | 'unreadable' | 'too-large') => void;
+  onFailure: (reason: ClipboardPasteFailure) => void;
   /** Reject a clipboard image whose decoded byte length exceeds this bound
    *  before any file is written. Omit to skip the bound (kilo-chat). */
   maxBytes?: number;
@@ -172,6 +196,13 @@ export function useClipboardPaste(options: UseClipboardPasteOptions): UseClipboa
             const text = await readClipboardText();
             if (text !== '') {
               addText(text);
+              return;
+            }
+            // iOS answers a declined paste prompt with an empty read while the
+            // prompt-free probe still sees the text. Report the denial rather
+            // than claiming the clipboard is empty.
+            if (await hasClipboardText()) {
+              onFailureRef.current('denied');
               return;
             }
           }

@@ -215,6 +215,34 @@ describe('disabled primary fill contrast (WCAG AA text)', () => {
     const ratio = contrastRatio(darkColors.primaryForeground, darkColors.primaryDisabled);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
+
+  it('dark theme: the disabled fill stays distinguishable from the enabled brand fill', () => {
+    // The disabled fill is a neutral grey that must read as a superseded
+    // control next to the enabled brand fill, not as a second brand colour
+    // (2.69:1 between the two fills), or a disabled Start would look tappable
+    // and an enabled one would lose its emphasis.
+    const separation = contrastRatio(darkColors.primary, darkColors.primaryDisabled);
+    expect(separation).toBeGreaterThanOrEqual(1.5);
+  });
+});
+
+describe('selected tab pill contrast (WCAG AA text)', () => {
+  // An in-page tab paints `--selection-foreground` on `--selection`. The fill is
+  // the muted olive in both themes: the dark accent (#ffdd00) as a full pill
+  // glares on the dark page, so dark mode must not fall back to it.
+  it('light theme: selectionForeground vs selection >= 4.5:1', () => {
+    const ratio = contrastRatio(lightColors.selectionForeground, lightColors.selection);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  it('dark theme: selectionForeground vs selection >= 4.5:1', () => {
+    const ratio = contrastRatio(darkColors.selectionForeground, darkColors.selection);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  it('dark theme: the selected fill is not the dark accent', () => {
+    expect(darkColors.selection).not.toBe(darkColors.primary);
+  });
 });
 
 describe('warn foreground token contrast (WCAG AA text)', () => {
@@ -295,5 +323,49 @@ describe('idle composer control and ring track contrast (non-text)', () => {
     expect(trackRatio).toBeLessThan(
       contrastRatio(darkColors.mutedForeground, darkColors.secondary)
     );
+  });
+});
+
+describe('disabled switch pair contrast (non-text)', () => {
+  // The shared switch paints this pair for a disabled control on Android, in
+  // place of the brand on-track: `primary-disabled` under the regular grip for
+  // the on position, `muted-soft` with the mid neutral grip for the off one.
+  // iOS keeps the brand pair and fades it itself. The switch sits on a
+  // `secondary` row, so its tracks are measured over that. The floors are
+  // perception floors: the pair has to read as a control and the two positions
+  // have to stay apart. Light has no third neutral for the off track —
+  // `control-idle` equals `secondary` there — so the disabled off track is the
+  // same neutral as the enabled off track, and only its grip dims.
+  const MIN_VISIBLE_SURFACE_RATIO = 1.6;
+  const themes = [
+    ['light', lightColors],
+    ['dark', darkColors],
+  ] as const;
+
+  it('every theme: the disabled off track reads on the row surface', () => {
+    for (const [themeName, colors] of themes) {
+      expect(
+        contrastRatio(colors.mutedSoft, colors.secondary),
+        `muted-soft vs secondary (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    }
+  });
+
+  it('every theme: the disabled on track stays apart from the disabled off track', () => {
+    for (const [themeName, colors] of themes) {
+      expect(
+        contrastRatio(colors.primaryDisabled, colors.mutedSoft),
+        `primary-disabled vs muted-soft (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    }
+  });
+
+  it('every theme: the disabled off grip reads on its own track', () => {
+    for (const [themeName, colors] of themes) {
+      expect(
+        contrastRatio(colors.mutedForeground, colors.mutedSoft),
+        `muted-foreground vs muted-soft (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    }
   });
 });

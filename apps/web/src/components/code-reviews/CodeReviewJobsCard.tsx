@@ -81,6 +81,7 @@ import { getCodeReviewCancellationCopy } from '@/lib/code-reviews/cancellation-c
 import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
 import {
   CODE_REVIEW_STATUS_LABELS,
+  MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH,
   hasInFlightReview,
   isCancellableReviewStatus,
   isRetriggerableReviewStatus,
@@ -101,7 +102,6 @@ type CodeReviewJobsCardProps = {
 
 const PAGE_SIZE = 10;
 const DEFAULT_THINKING_EFFORT_VALUE = '__default__';
-const MANUAL_INSTRUCTIONS_MAX_LENGTH = 4_000;
 
 function getManualJobUrlError(
   value: string,
@@ -601,14 +601,14 @@ export function CodeReviewJobsCard({
                 id="manual-code-review-instructions"
                 value={manualJobInstructions}
                 onChange={event => setManualJobInstructions(event.target.value)}
-                maxLength={MANUAL_INSTRUCTIONS_MAX_LENGTH}
+                maxLength={MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH}
                 placeholder="Focus on the risk areas that matter for this change."
                 className="min-h-28 resize-none"
                 disabled={isManualJobSubmitting}
               />
               <p className="text-muted-foreground text-sm">
                 Optional one-off instructions for this review. {manualJobInstructions.length}/
-                {MANUAL_INSTRUCTIONS_MAX_LENGTH} characters.
+                {MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH} characters.
               </p>
             </div>
 

@@ -34,6 +34,7 @@ import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
 import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
 import {
   getAnalysisCapacityBlockedHint,
@@ -121,6 +122,10 @@ export function FindingAnalysisPanel({
     triageReasoning: triage?.needsSandboxReasoning,
   });
   const technicalMarkdown = firstNonEmpty(sandbox?.rawMarkdown, analysis.analysis?.rawMarkdown);
+  // The model slug is an identifier, so its row names a left-to-right run; the
+  // fallback below is copy and keeps the interface direction. Both read this
+  // one value so they cannot drift apart.
+  const analysisModel = firstNonEmpty(sandbox?.modelUsed, analysis.analysis?.analysisModel);
   const uniqueLocations = sandbox ? [...new Set(sandbox.usageLocations)] : [];
   const exploitabilityReasoning = sandbox
     ? firstNonEmpty(sandbox.summary, sandbox.exploitabilityReasoning)
@@ -251,10 +256,12 @@ export function FindingAnalysisPanel({
             <KvRow
               label={t('securityAgent.analysis.triageConfidence')}
               value={formatConfidence(triage.confidence)}
+              valueFace="text"
             />
             <KvRow
               label={t('securityAgent.analysis.suggestedAction')}
               value={formatSuggestedAction(triage.suggestedAction)}
+              valueFace="text"
               last
             />
           </View>
@@ -277,23 +284,24 @@ export function FindingAnalysisPanel({
             <KvRow
               label={t('securityAgent.analysis.exploitable')}
               value={formatExploitable(sandbox.isExploitable)}
+              valueFace="text"
             />
             <KvRow
               label={t('securityAgent.analysis.suggestedAction')}
               value={formatSuggestedAction(sandbox.suggestedAction)}
+              valueFace="text"
             />
             <KvRow
               label={t('common.model')}
-              value={firstNonEmpty(
-                sandbox.modelUsed,
-                analysis.analysis?.analysisModel,
-                t('securityAgent.analysis.notRecorded')
-              )}
+              value={firstNonEmpty(analysisModel, t('securityAgent.analysis.notRecorded'))}
+              valueFace={analysisModel === '' ? 'text' : 'mono'}
+              valueDirection={analysisModel === '' ? undefined : 'ltr'}
               selectable
             />
             <KvRow
               label={t('securityAgent.analysis.analyzed')}
               value={analyzedLabel}
+              valueFace="text"
               last
               selectable
             />
@@ -327,7 +335,13 @@ export function FindingAnalysisPanel({
               defaultExpanded={uniqueLocations.length <= 2}
             >
               {uniqueLocations.map(location => (
-                <Text key={location} variant="mono" className="text-xs" selectable>
+                <Text
+                  key={location}
+                  variant="mono"
+                  className="text-xs"
+                  selectable
+                  style={LTR_TEXT_DIRECTION}
+                >
                   {location}
                 </Text>
               ))}

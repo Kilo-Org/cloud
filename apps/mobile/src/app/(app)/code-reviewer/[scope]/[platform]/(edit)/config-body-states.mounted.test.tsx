@@ -12,6 +12,8 @@ import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vite
 
 import { i18n } from '@/i18n';
 
+import { enteringAncestors } from '@/components/code-reviewer/entering-animation.test-helpers';
+
 import FocusAreasRoute from './focus-areas';
 import GateThresholdRoute from './gate';
 import ReviewStyleRoute from './style';
@@ -252,5 +254,27 @@ describe('focus areas screen config states', () => {
     expect(last(queryError.props)).toBeUndefined();
     const security = choiceRows.rows.find(row => row.selected);
     expect(security?.disabled).toBe(false);
+  });
+});
+
+// A Reanimated entering animation carries `initialValues: { opacity: 0 }`, so a
+// body mounted under one stays invisible whenever that entrance is cancelled or
+// overwritten, and the screen header paints over an empty body with no skeleton,
+// no error and no retry (Android profile-error, 2026-09-22). The rows a config
+// read fills in must therefore paint with no `entering` ancestor.
+describe('reviewer config bodies carry no entering animation', () => {
+  it.each([
+    ['gate threshold', GateThresholdRoute, 'OptionList'],
+    ['review style', ReviewStyleRoute, 'OptionList'],
+    ['focus areas', FocusAreasRoute, 'ChoiceRow'],
+  ] as const)('paints the %s body without an entering ancestor', (_name, route, hostType) => {
+    config.data = { gateThreshold: 'warning', reviewStyle: 'strict', focusAreas: ['security'] };
+    const renderer = mount(createElement(route));
+
+    const body = renderer.root.findAll(node => String(node.type) === hostType)[0];
+    if (!body) {
+      throw new Error(`the ${hostType} body was not rendered`);
+    }
+    expect(enteringAncestors(body)).toEqual([]);
   });
 });

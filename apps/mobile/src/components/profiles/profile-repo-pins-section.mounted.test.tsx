@@ -192,7 +192,7 @@ describe('ProfileRepoPinsSection', () => {
     expect(texts).toContain('acme/api');
     expect(texts).not.toContain('acme/other');
 
-    pressPressable(renderer.root, 'Unbind');
+    pressPressable(renderer.root, 'Unbind acme/api');
     await waitFor(() => h.mutations.unbind.mutateAsync.mock.calls.length > 0);
     expect(h.mutations.unbind.mutateAsync.mock.calls[0]?.[0]).toEqual({
       repoFullName: 'acme/api',
@@ -221,6 +221,41 @@ describe('ProfileRepoPinsSection', () => {
 
     unmount();
   });
+  it('names each pinned row and its own unbind control', async () => {
+    Object.assign(h.bindingsQuery, {
+      isLoading: false,
+      bindings: [
+        {
+          repoFullName: 'acme/api',
+          platform: 'github',
+          profileId: 'profile-1',
+          profileName: 'Mine',
+        },
+        {
+          repoFullName: 'acme/infra',
+          platform: 'gitlab',
+          profileId: 'profile-1',
+          profileName: 'Mine',
+        },
+      ],
+    });
+
+    const { renderer, unmount } = await mountSection();
+
+    expect(
+      findAll(renderer.root, 'View')
+        .filter(node => node.props.accessibilityRole === 'text' && node.props.accessible === true)
+        .map(node => node.props.accessibilityLabel)
+    ).toEqual(['acme/api, GitHub', 'acme/infra, GitLab']);
+    expect(
+      findAll(renderer.root, 'Pressable')
+        .filter(node => node.props.accessibilityRole === 'button')
+        .map(node => node.props.accessibilityLabel)
+    ).toEqual(['Unbind acme/api', 'Unbind acme/infra']);
+
+    unmount();
+  });
+
   it('read-only: keeps existing repository bindings without change controls', async () => {
     Object.assign(h.bindingsQuery, {
       isLoading: false,
@@ -239,7 +274,9 @@ describe('ProfileRepoPinsSection', () => {
     expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain('acme/api');
     expect(findAll(renderer.root, 'Button')).toHaveLength(0);
     expect(
-      findAll(renderer.root, 'Pressable').some(node => node.props.accessibilityLabel === 'Unbind')
+      findAll(renderer.root, 'Pressable').some(node =>
+        String(node.props.accessibilityLabel).startsWith('Unbind ')
+      )
     ).toBe(false);
     expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
 

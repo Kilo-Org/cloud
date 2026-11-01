@@ -24,6 +24,10 @@ import { cn } from '@/lib/utils';
  * shape `PreferenceRow` and the review memory row already use. The switch is a
  * sibling of the text instead of living inside it: a tap reaches one of the two
  * and flips the value once.
+ *
+ * A disabled row mutes its title and paints the shared switch's muted pair, the
+ * same cue `PreferenceRow` and the Notifications category rows use. The subtitle
+ * already reads as secondary copy, so dimming it would only cost contrast.
  */
 export function ToggleRow({
   title,
@@ -65,7 +69,9 @@ export function ToggleRow({
           !disabled && 'active:opacity-70'
         )}
       >
-        <Text className="text-sm font-medium">{title}</Text>
+        <Text className={cn('text-sm font-medium', disabled && 'text-muted-foreground')}>
+          {title}
+        </Text>
         {subtitle === undefined ? null : (
           <Text variant="muted" className="text-xs">
             {subtitle}

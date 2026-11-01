@@ -47,23 +47,19 @@ async function readCredential(key: string): Promise<string | null | undefined> {
 
 /**
  * Whether the keychain holds a credential, so the device is signed in.
- * `undefined` when the credential store could not be read. The identity hint is
- * written best effort, so a missing hint on its own is not a sign-out: a
- * signed-in device can lose the hint and still hold its tokens.
+ * `undefined` when the credential store could not be read. The restore reports a
+ * sign-out only for a keychain with no account hint and no credential; both keys
+ * read together, so the retry budget is spent once.
  */
 async function hasStoredCredential(): Promise<boolean | undefined> {
-  const authToken = await readCredential(AUTH_TOKEN_KEY);
-  if (authToken === undefined) {
+  const [authToken, refreshToken] = await Promise.all([
+    readCredential(AUTH_TOKEN_KEY),
+    readCredential(REFRESH_TOKEN_KEY),
+  ]);
+  if (authToken === undefined || refreshToken === undefined) {
     return undefined;
   }
-  if (authToken !== null) {
-    return true;
-  }
-  const refreshToken = await readCredential(REFRESH_TOKEN_KEY);
-  if (refreshToken === undefined) {
-    return undefined;
-  }
-  return refreshToken !== null;
+  return authToken !== null || refreshToken !== null;
 }
 
 /**

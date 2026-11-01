@@ -3951,7 +3951,7 @@
     "deletedToast": "Профіль \"{{name}}\" выдалены",
     "variablesTitle": "Зменныя асяроддзя",
     "addVariable": "Дадаць зменную",
-    "keyLabel": "ключ",
+    "keyLabel": "Ключ",
     "keyTooLong": "Ключ павінен змяшчаць не больш за 256 сімвалаў",
     "keyDuplicate": "Гэты ключ ужо існуе ў профілі",
     "keyWillBeSavedAs": "Будзе захаваны як {{key}}",

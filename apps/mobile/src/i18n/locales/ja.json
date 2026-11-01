@@ -3839,11 +3839,11 @@
     "deletedToast": "プロフィール「{{name}}」が削除されました",
     "variablesTitle": "環境変数",
     "addVariable": "変数の追加",
-    "keyLabel": "鍵",
+    "keyLabel": "キー",
     "keyTooLong": "キーは256文字以内で入力してください",
     "keyDuplicate": "このキーはすでにプロフィールに存在します",
     "keyWillBeSavedAs": "{{key}}として保存されます",
-    "valueLabel": "価値",
+    "valueLabel": "値",
     "valueRequired": "値を入力してください",
     "tooLong": "{{max}}文字以内で入力してください",
     "secrets": {

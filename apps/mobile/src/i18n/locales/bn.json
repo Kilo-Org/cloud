@@ -3845,7 +3845,7 @@
     "deletedToast": "প্রোফাইল \"{{name}}\" মুছে ফেলা হয়েছে৷",
     "variablesTitle": "পরিবেশ পরিবর্তনশীল",
     "addVariable": "পরিবর্তনশীল যোগ করুন",
-    "keyLabel": "চাবি",
+    "keyLabel": "কী",
     "keyTooLong": "কী 256টি অক্ষর বা তার কম হতে হবে",
     "keyDuplicate": "এই কীটি ইতিমধ্যে প্রোফাইলে বিদ্যমান",
     "keyWillBeSavedAs": "{{key}} হিসেবে সংরক্ষিত হবে",

@@ -48,6 +48,7 @@ const DebugDataResponse = z.discriminatedUnion('success', [
       doKey: z.string(),
       attributions: z.array(AttributionRecord),
       summary: DebugDataSummary,
+      instance_summary: DebugDataSummary,
     }),
   }),
   z.object({

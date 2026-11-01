@@ -27,6 +27,62 @@ export type AttributionTarget = {
   file_path: string;
 };
 
+/** Totals over a set of stored attributions. */
+export type AttributionSummary = {
+  total_attributions: number;
+  total_lines_added: number;
+  total_lines_removed: number;
+  by_status: Record<string, number>;
+  by_branch: Record<string, number>;
+};
+
+/** One stored attribution with its line records, as the debug listing serves it. */
+export type AttributionDebugRow = AttributionsMetadataSelect & {
+  lines_added: LinesAddedSelect[];
+  lines_removed: LinesRemovedSelect[];
+};
+
+type SummaryCounts = {
+  attributions: number;
+  linesAdded: number;
+  linesRemoved: number;
+  byStatus: Map<string, number>;
+  byBranch: Map<string, number>;
+};
+
+function emptyCounts(): SummaryCounts {
+  return {
+    attributions: 0,
+    linesAdded: 0,
+    linesRemoved: 0,
+    byStatus: new Map(),
+    byBranch: new Map(),
+  };
+}
+
+function countRow(
+  counts: SummaryCounts,
+  metadata: AttributionsMetadataSelect,
+  linesAddedCount: number,
+  linesRemovedCount: number
+): void {
+  counts.attributions += 1;
+  counts.linesAdded += linesAddedCount;
+  counts.linesRemoved += linesRemovedCount;
+  counts.byStatus.set(metadata.status, (counts.byStatus.get(metadata.status) ?? 0) + 1);
+  counts.byBranch.set(metadata.branch, (counts.byBranch.get(metadata.branch) ?? 0) + 1);
+}
+
+function summarize(counts: SummaryCounts): AttributionSummary {
+  return {
+    total_attributions: counts.attributions,
+    total_lines_added: counts.linesAdded,
+    total_lines_removed: counts.linesRemoved,
+    by_status: Object.fromEntries(counts.byStatus),
+    by_branch: Object.fromEntries(counts.byBranch),
+  };
+}
+
 /** True when a stored row carries exactly this target's labels. */
 function matchesTarget(
   row: {
@@ -220,23 +276,15 @@ export class AttributionTrackerDO extends DurableObject<Env> {
   }
 
   /**
-   * The listed attributions belong to `target`; the summary still describes the
-   * whole object, so the admin panel keeps its instance totals.
+   * The listed attributions belong to `target`, and so does `summary`, so the
+   * admin panel's totals describe the rows it shows. `instance_summary` keeps the
+   * totals of the whole object, which another target sharing this instance
+   * contributes to.
    */
   getDebugData(target: AttributionTarget): {
-    attributions: Array<
-      AttributionsMetadataSelect & {
-        lines_added: LinesAddedSelect[];
-        lines_removed: LinesRemovedSelect[];
-      }
-    >;
-    summary: {
-      total_attributions: number;
-      total_lines_added: number;
-      total_lines_removed: number;
-      by_status: Record<string, number>;
-      by_branch: Record<string, number>;
-    };
+    attributions: AttributionDebugRow[];
+    summary: AttributionSummary;
+    instance_summary: AttributionSummary;
   } {
     const metadataRows = this.db
       .select()
@@ -244,30 +292,17 @@ export class AttributionTrackerDO extends DurableObject<Env> {
       .orderBy(desc(attributionsMetadata.created_at))
       .all();
 
-    const attributions: Array<
-      AttributionsMetadataSelect & {
-        lines_added: LinesAddedSelect[];
-        lines_removed: LinesRemovedSelect[];
-      }
-    > = [];
-
-    let totalLinesAdded = 0;
-    let totalLinesRemoved = 0;
-    const statusCounts = new Map<string, number>();
-    const branchCounts = new Map<string, number>();
+    const attributions: AttributionDebugRow[] = [];
+    const targetCounts = emptyCounts();
+    const instanceCounts = emptyCounts();
 
     for (const metadata of metadataRows) {
-      statusCounts.set(metadata.status, (statusCounts.get(metadata.status) ?? 0) + 1);
-      branchCounts.set(metadata.branch, (branchCounts.get(metadata.branch) ?? 0) + 1);
-
       const linesAddedRows = this.db
         .select()
         .from(linesAdded)
         .where(eq(linesAdded.attributions_metadata_id, metadata.id))
         .orderBy(linesAdded.line_number)
         .all();
-
-      totalLinesAdded += linesAddedRows.length;
 
       const linesRemovedRows = this.db
         .select()
@@ -276,11 +311,13 @@ export class AttributionTrackerDO extends DurableObject<Env> {
         .orderBy(linesRemoved.line_number)
         .all();
 
-      totalLinesRemoved += linesRemovedRows.length;
+      countRow(instanceCounts, metadata, linesAddedRows.length, linesRemovedRows.length);
 
       if (!matchesTarget(metadata, target)) {
         continue;
       }
+
+      countRow(targetCounts, metadata, linesAddedRows.length, linesRemovedRows.length);
 
       attributions.push({
         ...metadata,
@@ -291,13 +328,8 @@ export class AttributionTrackerDO extends DurableObject<Env> {
 
     return {
       attributions,
-      summary: {
-        total_attributions: metadataRows.length,
-        total_lines_added: totalLinesAdded,
-        total_lines_removed: totalLinesRemoved,
-        by_status: Object.fromEntries(statusCounts),
-        by_branch: Object.fromEntries(branchCounts),
-      },
+      summary: summarize(targetCounts),
+      instance_summary: summarize(instanceCounts),
     };
   }
 }

@@ -202,7 +202,7 @@ describe('attribution target scoping', () => {
     ]);
   });
 
-  it('lists only the requested target in the debug data and the whole instance in the summary', async () => {
+  it('lists and summarizes only the requested target, and keeps the instance totals apart', async () => {
     const { tracker } = await sharedInstance();
 
     const debugA = tracker.getDebugData(TARGET_A);
@@ -210,9 +210,21 @@ describe('attribution target scoping', () => {
 
     expect(debugA.attributions.map(row => row.task_id)).toEqual(['task-a-feature', 'task-a']);
     expect(debugB.attributions.map(row => row.task_id)).toEqual(['task-b']);
-    expect(debugA.summary.total_attributions).toBe(3);
-    expect(debugA.summary.total_lines_added).toBe(3);
-    expect(debugB.summary).toEqual(debugA.summary);
+
+    expect(debugA.summary).toEqual({
+      total_attributions: 2,
+      total_lines_added: 2,
+      total_lines_removed: 0,
+      by_status: { accepted: 2 },
+      by_branch: { main: 1, feature: 1 },
+    });
+    expect(debugB.summary.total_attributions).toBe(1);
+    expect(debugB.summary.by_branch).toEqual({ main: 1 });
+
+    expect(debugA.instance_summary.total_attributions).toBe(3);
+    expect(debugA.instance_summary.total_lines_added).toBe(3);
+    expect(debugA.instance_summary.by_status).toEqual({ accepted: 3 });
+    expect(debugB.instance_summary).toEqual(debugA.instance_summary);
   });
 
   it('refuses to delete a row through another target and leaves it in place', async () => {

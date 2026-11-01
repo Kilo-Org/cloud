@@ -158,6 +158,62 @@ describe('useSharePrefill control', () => {
     });
   });
 
+  it('still applies the text of a later share after an earlier one failed', async () => {
+    const firstId = putSharePayload({
+      text: 'first body',
+      files: [{ name: 'first.jpg', uri: 'file:///cache/first.jpg' }],
+      failedFiles: [],
+    });
+    const secondId = putSharePayload({
+      text: 'second body',
+      files: [],
+      failedFiles: [],
+    });
+    const input = makeInput();
+    const changed: string[] = [];
+    const reject = async (): Promise<void> => {
+      await Promise.resolve();
+      throw new Error('attach failed');
+    };
+
+    const renderer = await mount({
+      shareId: firstId,
+      input: input.ref,
+      addCandidates: reject,
+      onChangeText: text => {
+        changed.push(text);
+      },
+    });
+    expect(currentControl().failed).toBe(true);
+
+    // A second share arrives on the same mounted composer.
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(
+        <Harness
+          shareId={secondId}
+          input={input.ref}
+          addCandidates={async () => {
+            await Promise.resolve();
+            // nothing to attach in the second share
+          }}
+          onChangeText={text => {
+            changed.push(text);
+          }}
+          onControl={next => {
+            control = next;
+          }}
+        />
+      );
+    });
+    await settle();
+
+    expect(changed).toEqual(['first body', 'second body']);
+    expect(currentControl().failed).toBe(false);
+    expect(peekSharePayload(firstId)).not.toBeNull();
+    expect(peekSharePayload(secondId)).toBeNull();
+  });
+
   it('dismiss abandons the staged payload and clears the param', async () => {
     const id = putSharePayload({
       text: '',

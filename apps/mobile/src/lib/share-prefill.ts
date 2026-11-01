@@ -124,7 +124,10 @@ export function useSharePrefill({
   onDelivered,
 }: UseSharePrefillOptions): SharePrefillControl {
   const router = useRouter();
-  const [failed, setFailed] = useState(false);
+  // The share whose delivery failed. Keyed on the id so a later share never
+  // inherits the row, and a retry of this one still shows it after the state
+  // that re-runs the effect moves.
+  const [failedShareId, setFailedShareId] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const onChangeTextRef = useRef(onChangeText);
   onChangeTextRef.current = onChangeText;
@@ -134,17 +137,22 @@ export function useSharePrefill({
   maxLengthRef.current = maxLength;
   const onDeliveredRef = useRef(onDelivered);
   onDeliveredRef.current = onDelivered;
-
-  // A delivery that settles after this composer unmounts must not publish
-  // `failed` into a tree that is gone.
-  const activeRef = useRef(true);
+  // The share whose text already landed. A later share has its own id, so it
+  // still gets its text; a retry of the same share does not re-apply it.
+  const textAppliedForRef = useRef<string | null>(null);
+  // Token of the live delivery. A run invalidates the previous one, so a
+  // superseded attempt can neither publish state nor count as the text's
+  // landing, and one that settles after unmount publishes nothing.
+  const runRef = useRef(0);
 
   useEffect(() => {
     if (shareId === undefined || shareId === '') {
       return undefined;
     }
 
-    activeRef.current = true;
+    runRef.current += 1;
+    const run = runRef.current;
+    const applyText = textAppliedForRef.current !== shareId;
     void (async () => {
       const delivered = await applySharePrefill({
         shareId,
@@ -160,19 +168,27 @@ export function useSharePrefill({
           router.setParams({ shareId: undefined, autoSend: undefined });
         },
         onDelivered: onDeliveredRef.current,
-        applyText: attempt === 0,
+        applyText,
       });
-      if (activeRef.current) {
-        setFailed(!delivered);
+      if (run !== runRef.current) {
+        return;
       }
+      if (applyText) {
+        textAppliedForRef.current = shareId;
+      }
+      setFailedShareId(delivered ? null : shareId);
     })();
     return () => {
-      activeRef.current = false;
+      if (runRef.current === run) {
+        runRef.current += 1;
+      }
     };
   }, [shareId, inputRef, router, attempt]);
 
+  const failed = failedShareId !== null && failedShareId === shareId;
+
   const retry = useCallback((): void => {
-    setFailed(false);
+    setFailedShareId(null);
     setAttempt(previous => previous + 1);
   }, []);
 
@@ -180,7 +196,7 @@ export function useSharePrefill({
     if (shareId !== undefined && shareId !== '') {
       clearSharePayload(shareId);
     }
-    setFailed(false);
+    setFailedShareId(null);
     router.setParams({ shareId: undefined, autoSend: undefined });
   }, [router, shareId]);
 

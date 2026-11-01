@@ -1,12 +1,13 @@
 import { type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TextInput, View } from 'react-native';
+import { type TextInput, View } from 'react-native';
 
 import {
   PrFormSheetFooter,
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
@@ -33,7 +34,7 @@ function CommitTitleField({
   return (
     <View className="gap-1.5">
       <Text className="text-sm font-medium text-foreground">{t('prReview.merge.commitTitle')}</Text>
-      <TextInput
+      <Input
         ref={inputRef}
         defaultValue={titleRef.current}
         editable={!isDisabled}
@@ -44,7 +45,7 @@ function CommitTitleField({
           titleRef.current = value;
         }}
         className={cn(
-          'min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm leading-[1.25rem] text-foreground',
+          'min-h-11 rounded-md border border-input bg-background text-sm leading-[1.25rem] text-foreground',
           'focus:border-ring'
         )}
         multiline
@@ -74,7 +75,7 @@ function CommitMessageField({
       <Text className="text-sm font-medium text-foreground">
         {t('prReview.merge.commitMessage')}
       </Text>
-      <TextInput
+      <Input
         ref={inputRef}
         defaultValue={messageRef.current}
         editable={!isDisabled}
@@ -85,7 +86,7 @@ function CommitMessageField({
           messageRef.current = value;
         }}
         className={cn(
-          'rounded-md border border-input bg-background px-3 py-2 text-sm leading-[1.25rem] text-foreground',
+          'rounded-md border border-input bg-background text-sm leading-[1.25rem] text-foreground',
           'focus:border-ring',
           tight ? 'max-h-16 min-h-11' : 'min-h-24 max-h-40'
         )}

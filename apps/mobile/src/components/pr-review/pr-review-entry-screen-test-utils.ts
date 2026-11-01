@@ -23,6 +23,10 @@ const harnessMocks = vi.hoisted(() => ({
   toastError: vi.fn(),
   clipboard: { current: '' as string },
   clipboardHasString: { current: false },
+  // A clipboard read the platform refuses: the mocks below throw these so a
+  // test can prove the tap still ends in a visible result.
+  clipboardFailure: { current: null as Error | null },
+  clipboardHasStringFailure: { current: null as Error | null },
 }));
 
 // A hoisted binding cannot be exported directly; alias it for the test files.
@@ -53,10 +57,16 @@ vi.mock('expo-router', () => ({
 vi.mock('expo-clipboard', () => ({
   getStringAsync: async () => {
     await Promise.resolve();
+    if (harnessMocks.clipboardFailure.current) {
+      throw harnessMocks.clipboardFailure.current;
+    }
     return harnessMocks.clipboard.current;
   },
   hasStringAsync: async () => {
     await Promise.resolve();
+    if (harnessMocks.clipboardHasStringFailure.current) {
+      throw harnessMocks.clipboardHasStringFailure.current;
+    }
     return harnessMocks.clipboardHasString.current;
   },
 }));

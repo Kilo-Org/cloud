@@ -15,7 +15,7 @@ import { profilePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
  * one. The fixture never presses a row, so the bridge's `onSelect` has nothing
  * to report.
  */
-const FIXTURE_PATH = /(?:^|\/)dev\/profile-picker-fixture(?:[?#]|$)/;
+const FIXTURE_PATH = /(?:^|\/)dev\/profile-picker-fixture\/?(?:[?#]|$)/;
 
 export function profilePickerFixtureRoute(path: string): string | null {
   if (!FIXTURE_PATH.test(path)) {

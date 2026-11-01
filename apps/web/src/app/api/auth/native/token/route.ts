@@ -22,11 +22,12 @@ import { consumeSignInTicket } from '@/lib/auth/passkey';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   createOrUpdateUser,
-  findUserByNormalizedEmail,
+  findUserBySignInCodeEmail,
   findUserIdByAuthProvider,
   type CreateOrUpdateUserArgs,
   type CreateOrUpdateUserResult,
 } from '@/lib/user';
+import { getDeliveredEmailAddress } from '@kilocode/web-shared/lib/email-address';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import type { User } from '@kilocode/db/schema';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
@@ -398,8 +399,12 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     autoLinkToExistingUser = true;
   } else {
     // Email sign-in code path: reserve → settle → commit.
-    const existingUser = await findUserByNormalizedEmail(data.email);
-    const email = existingUser?.google_user_email ?? data.email.toLowerCase();
+    // The code is bound to the address it was delivered to, so the account is
+    // resolved for that same address. An alias of another account's address is
+    // a different address: it settles the alias, and the signup rules refuse it
+    // when the normalized address is already taken.
+    const existingUser = await findUserBySignInCodeEmail(data.email);
+    const email = existingUser?.google_user_email ?? getDeliveredEmailAddress(data.email);
 
     const reserveResult = await reserveSignInCode(data.email, data.code, data.challengeId);
     if (reserveResult === 'invalid') {

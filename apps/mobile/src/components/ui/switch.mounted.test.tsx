@@ -22,7 +22,7 @@ type I = TestRenderer.ReactTestInstance;
 
 type SwitchFixture = {
   disabled?: boolean;
-  accessibilityState?: { busy?: boolean };
+  accessibilityState?: { busy?: boolean; disabled?: boolean };
   trackColor?: { false?: string; true?: string };
   thumbColor?: string;
   value?: boolean;
@@ -128,6 +128,66 @@ describe('Switch', () => {
     const props = nativeProps(
       renderSwitch({ trackColor: { false: '#222222', true: '#111111' }, thumbColor: '#333333' })
         .root
+    );
+    expect(props.trackColor).toEqual({ false: '#222222', true: '#111111' });
+    expect(props.thumbColor).toBe('#333333');
+  });
+
+  it('paints the muted pair on a disabled on switch and keeps it on', () => {
+    native.os = 'android';
+    native.scheme = 'light';
+    const props = nativeProps(renderSwitch({ disabled: true, value: true }).root);
+    expect(props.value).toBe(true);
+    expect(props.trackColor).toEqual({
+      false: lightColors.mutedSoft,
+      true: lightColors.primaryDisabled,
+    });
+    expect(props.thumbColor).toBe(lightColors.primaryForeground);
+    expect(props.trackColor?.true).not.toBe(lightColors.primary);
+  });
+
+  it('paints the muted grip on a disabled off switch', () => {
+    native.os = 'android';
+    native.scheme = 'light';
+    const props = nativeProps(renderSwitch({ disabled: true, value: false }).root);
+    expect(props.trackColor).toEqual({
+      false: lightColors.mutedSoft,
+      true: lightColors.primaryDisabled,
+    });
+    expect(props.thumbColor).toBe(lightColors.mutedForeground);
+  });
+
+  it('keeps the disabled pair off the brand accent in dark mode', () => {
+    native.os = 'android';
+    native.scheme = 'dark';
+    const on = nativeProps(renderSwitch({ disabled: true, value: true }).root);
+    const off = nativeProps(renderSwitch({ disabled: true, value: false }).root);
+    expect(on.trackColor).toEqual({
+      false: darkColors.mutedSoft,
+      true: darkColors.primaryDisabled,
+    });
+    expect(on.thumbColor).toBe(darkColors.primaryForeground);
+    expect(off.trackColor).toEqual(on.trackColor);
+    expect(off.thumbColor).toBe(darkColors.mutedForeground);
+    expect(on.trackColor?.true).not.toBe(darkColors.primary);
+  });
+
+  it('takes the disabled state from the accessibility state', () => {
+    native.os = 'android';
+    native.scheme = 'light';
+    const props = nativeProps(renderSwitch({ accessibilityState: { disabled: true } }).root);
+    expect(props.trackColor?.true).toBe(lightColors.primaryDisabled);
+  });
+
+  it('keeps a caller pair on a disabled switch', () => {
+    native.os = 'android';
+    native.scheme = 'light';
+    const props = nativeProps(
+      renderSwitch({
+        disabled: true,
+        trackColor: { false: '#222222', true: '#111111' },
+        thumbColor: '#333333',
+      }).root
     );
     expect(props.trackColor).toEqual({ false: '#222222', true: '#111111' });
     expect(props.thumbColor).toBe('#333333');

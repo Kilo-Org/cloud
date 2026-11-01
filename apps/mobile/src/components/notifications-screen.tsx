@@ -280,8 +280,9 @@ function CategoryRow({
       <Icon size={18} color={colors.secondaryForeground} />
       <View className="flex-1">
         {/* Disabled cue is the muted title, not row opacity: blanket opacity
-            drops every label below the 4.5:1 text minimum. The Switch renders
-            its own disabled appearance. */}
+            drops every label below the 4.5:1 text minimum. The switch carries
+            the other half: a disabled `Switch` paints the palette's muted pair,
+            so an unavailable row never shows a full-strength accent beside it. */}
         <Text className={cn('text-sm font-medium', isDisabled && 'text-muted-foreground')}>
           {title}
         </Text>

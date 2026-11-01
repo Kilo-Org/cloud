@@ -1220,10 +1220,12 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
         if (input.isEnabled) {
           if (!integration || !hasSecurityReviewPermissions(integration)) {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'GitHub App does not have vulnerability_alerts permission',
-            });
+            // Same stable code as the manual-sync refusal below, so a device maps
+            // it onto catalog copy instead of showing this English sentence.
+            throw securitySyncPreconditionError(
+              SECURITY_SYNC_PRECONDITION_CODES.missingPermission,
+              'GitHub App does not have vulnerability_alerts permission'
+            );
           }
         }
 

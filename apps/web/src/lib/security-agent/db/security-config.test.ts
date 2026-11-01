@@ -3,6 +3,9 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { agent_configs, security_agent_commands, type User } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { SECURITY_CONFIG_CONFLICT_CODE } from '@kilocode/app-shared/security-agent';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
+import type { TRPCError } from '@trpc/server';
 
 const mockEnqueueBacklogFindings = jest.fn<(params: { tx?: unknown }) => Promise<number>>();
 const mockResetOwnerAutoAnalysisEnabledAt =
@@ -112,15 +115,19 @@ describe('saveSecurityAgentConfigWithRevision', () => {
       expectedRevision: 1,
     });
 
-    // A second writer still holds revision 1, so its save must lose.
-    await expect(
-      saveSecurityAgentConfigWithRevision({
-        owner: owner(),
-        config: { auto_analysis_enabled: true },
-        createdBy: user.id,
-        expectedRevision: 1,
-      })
-    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    // A second writer still holds revision 1, so its save must lose, and the
+    // refusal carries the stable code a device maps onto its own copy.
+    const error = await saveSecurityAgentConfigWithRevision({
+      owner: owner(),
+      config: { auto_analysis_enabled: true },
+      createdBy: user.id,
+      expectedRevision: 1,
+    }).catch((thrown: unknown) => thrown);
+
+    expect(error).toMatchObject({ code: 'CONFLICT' });
+    const cause = (error as TRPCError).cause;
+    expect(cause).toBeInstanceOf(UpstreamApiError);
+    expect((cause as UpstreamApiError).upstreamCode).toBe(SECURITY_CONFIG_CONFLICT_CODE);
 
     expect(await readRevision()).toBe(2);
   });

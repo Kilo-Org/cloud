@@ -12,6 +12,7 @@ import {
   getPendingDeepLink,
   getPendingDeepLinkSnapshot,
   setCurrentDeepLinkUserId,
+  subscribeToPendingDeepLink,
 } from './deep-link-launch';
 import { setGitHubInstallReturnOutcome } from './github-install-return';
 import { resolvePendingNavigation } from './pending-navigation';
@@ -222,6 +223,27 @@ describe('redirectSystemPath', () => {
       expect(redirectSystemPath({ path, initial: false })).toBe(path);
       expect(getPendingDeepLink()).toBeNull();
       expect(mocks.navigate).not.toHaveBeenCalled();
+    });
+
+    it('keeps the launch capture as the only stash of a cold launch URL', () => {
+      const path = 'kiloapp:///(app)/(tabs)/(3_profile)/organization/invoices';
+      const notifications: (string | null)[] = [];
+      const unsubscribe = subscribeToPendingDeepLink(() => {
+        notifications.push(getPendingDeepLinkSnapshot());
+      });
+      _setGetLinkingURLForTests(() => path);
+      captureLaunchDeepLink();
+      expect(notifications).toEqual(['/(app)/(tabs)/(3_profile)/organization/invoices']);
+
+      expect(redirectSystemPath({ path, initial: true })).toBeNull();
+      // The capture already owns this launch URL: a second stash would rewrite
+      // the durable mirror for the same link.
+      expect(notifications).toHaveLength(1);
+
+      // A warm arrival of the same link is a fresh tap and stashes again.
+      expect(redirectSystemPath({ path, initial: false })).toBeNull();
+      expect(notifications).toHaveLength(2);
+      unsubscribe();
     });
 
     it('leaves the route a moved search family names with the search slot', () => {

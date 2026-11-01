@@ -63,7 +63,12 @@ export function redirectSystemPath({
       // reopens the linked screen (see `shellRouteHref`).
       const shellRoute = shellRouteHref(path);
       if (shellRoute !== null) {
-        setPendingDeepLink(shellRoute, 'universal-link');
+        // The cold-launch capture may have stashed this very launch URL
+        // already; only a later arrival restashes, so consuming the slot once
+        // is enough and the durable mirror is not rewritten for the same link.
+        if (!initial || wasLaunchLinkHandled() !== shellRoute) {
+          setPendingDeepLink(shellRoute, 'universal-link');
+        }
         return null;
       }
       return opensAppRoutePath(path) ? path : null;

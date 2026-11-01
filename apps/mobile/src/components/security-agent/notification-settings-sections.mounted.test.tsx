@@ -139,11 +139,11 @@ describe('personal scope', () => {
     expect(copy).not.toContain(i18n.t('securityAgent.notifications.slaSection'));
   });
 
-  it('spaces the two switch groups like the space above the first one', () => {
+  it('separates the two switch groups by a break wider than the steps inside one', () => {
     const screen = mount(PERSONAL_SCOPE);
 
     expect(screen.root.findByType('TabScreenScrollView').props.contentContainerClassName).toBe(
-      'px-6 pt-4 gap-4'
+      'px-6 pt-4 gap-7'
     );
   });
 });

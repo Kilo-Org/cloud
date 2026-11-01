@@ -204,12 +204,13 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
         automaticallyAdjustKeyboardInsets
         className="flex-1"
         // The personal scope has no section heading between its two switches, so
-        // the gap between the groups has to match the space above the first one,
-        // or the larger break reads as a heading that went missing. The
-        // organization scope keeps the standard gap, next to its headings. The
-        // permission note above the groups only renders for a scope that cannot
-        // manage, which the personal scope never is.
-        contentContainerClassName={cn('px-6 pt-4', personal ? 'gap-4' : 'gap-6')}
+        // the break between the two groups carries their separation: it has to
+        // read as a group break, not as the 7dp and 5.25dp steps inside a group,
+        // and not as the void a removed heading would leave. The organization
+        // scope keeps the standard gap, next to its headings. The permission
+        // note above the groups only renders for a scope that cannot manage,
+        // which the personal scope never is.
+        contentContainerClassName={cn('px-6 pt-4', personal ? 'gap-7' : 'gap-6')}
       >
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">

@@ -67,21 +67,14 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
           <DirectionalChevronRight size={16} color={colors.mutedForeground} />
         )}
         <AttemptIcon status={attempt.status} incomplete={incompleteReport !== undefined} />
-        <Text
-          numberOfLines={1}
-          className={
-            incompleteReport
-              ? 'min-w-0 flex-1 text-sm font-medium text-destructive'
-              : 'min-w-0 flex-1 text-sm font-medium'
-          }
-        >
+        <Text numberOfLines={1} className="min-w-0 flex-1 text-sm font-medium">
           {copy.title}
         </Text>
       </Pressable>
       {expanded && (
         <View className="gap-2 border-t border-border px-3 py-2">
           {copy.detail !== undefined ? (
-            <Text selectable className="text-sm text-destructive">
+            <Text selectable className="text-sm text-muted-foreground">
               {copy.detail}
             </Text>
           ) : null}
@@ -294,7 +287,7 @@ function PreparationStepDetails({
         </Text>
       ) : null}
       {step.safeError ? (
-        <Text selectable className="text-sm text-destructive">
+        <Text selectable className="text-sm text-muted-foreground">
           {preparationErrorText(step.safeError, t)}
         </Text>
       ) : null}

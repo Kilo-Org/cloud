@@ -179,6 +179,7 @@ import {
   CONTROL_PLANE_REQUEST_TIMEOUT_MS,
   controlPlaneAnswerPayloadSchema,
   controlPlaneDeliverPayloadSchema,
+  controlPlaneExecCommandInputSchema,
   controlPlaneKiloRequestInputSchema,
   controlPlanePrepareInputSchema,
   controlPlaneRouteSpecSchema,
@@ -196,6 +197,7 @@ import {
   type ControlPlaneDeliverResult,
   type ControlPlaneDispatchResult,
   type ControlPlaneEventsNotification,
+  type ControlPlaneExecCommandInput,
   type ControlPlaneFailureReason,
   type ControlPlaneKiloRequestInput,
   type ControlPlaneOutcome,
@@ -304,6 +306,7 @@ import {
 import { projectAllocationStatusSnapshot } from './status-snapshot.js';
 import { createSandboxNotificationDispatcher, type SandboxNotification } from './notifications.js';
 import { resolvePreviewTarget, type PreviewTargetResult } from './preview-target.js';
+import { executionUnknownFailure } from '../exec-errors.js';
 import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
 import type { WorkspaceBillingProjection } from '../../shared/workspace-runtime-status.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
@@ -377,6 +380,7 @@ const wrapperSocketAttachmentSchema = z.object({
   heartbeatAck: z.literal(true).optional(),
   redactsNamedSecrets: z.literal(true).optional(),
   installsSkillsSh: z.literal(true).optional(),
+  execCommand: z.literal(true).optional(),
   workspaceConfiguration: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
   billingCheckedAt: z.number().finite().nonnegative().optional(),
@@ -601,11 +605,12 @@ const CORRELATED_RESULT_FRAME_TYPES = new Set<string>([
   'worktree.result',
   'terminal.result',
   'kilo.result',
+  'exec.result',
 ]);
 
 type CorrelatedResultFrame = Extract<
   ControlPlaneWrapperFrame,
-  { type: 'worktree.result' | 'terminal.result' | 'kilo.result' }
+  { type: 'worktree.result' | 'terminal.result' | 'kilo.result' | 'exec.result' }
 >;
 
 function isCorrelatedResultFrame(frame: unknown): frame is CorrelatedResultFrame {
@@ -653,6 +658,8 @@ function terminalRequestFrame(
   }
 }
 
+type ControlRequestKind = 'control' | 'exec';
+
 export class SandboxControlV2 extends DurableObject<Env> {
   readonly sandboxId: string;
   private readonly db: ReturnType<typeof drizzle>;
@@ -690,6 +697,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     string,
     {
       socket: WebSocket;
+      kind: ControlRequestKind;
       resolve: (result: ControlPlaneControlResult) => void;
       timer: ReturnType<typeof setTimeout>;
     }
@@ -1344,6 +1352,42 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
+   * Session DO -> Sandbox DO (spec §10). Forwards one bounded non-interactive
+   * command to the live wrapper. Only a bound socket that advertised the
+   * `execCommand` hello capability accepts it; a stopped allocation or an older
+   * runtime fails before any frame is registered or sent. The reply is awaited
+   * outside the serial queue.
+   */
+  async execCommand(input: ControlPlaneExecCommandInput): Promise<ControlPlaneControlResult> {
+    await this.initialized;
+    const parsed = controlPlaneExecCommandInputSchema.parse(input);
+    const handoff = await this.enqueue(() => this.beginExecRequest(parsed));
+    return 'error' in handoff ? handoff.error : handoff.promise;
+  }
+
+  private async beginExecRequest(
+    input: ControlPlaneExecCommandInput
+  ): Promise<ControlRequestHandoff> {
+    const state = await this.readAllocation();
+    const socket = this.boundWrapperSocket(state);
+    if (socket === null) {
+      return { error: controlRequestFailure('not_ready', 'Wrapper is not connected', true) };
+    }
+    if (this.readAttachment(socket)?.execCommand !== true) {
+      return {
+        error: controlRequestFailure('unsupported', 'Wrapper does not support execCommand', false),
+      };
+    }
+    const frame: ControlPlaneWrapperFrame = {
+      type: 'exec.request',
+      requestId: crypto.randomUUID(),
+      session: input.session,
+      payload: input.payload,
+    };
+    return this.beginWrapperControlRequestOnSocket(frame, socket, input.payload.timeoutMs + 5_000);
+  }
+
+  /**
    * Off-queue read the Session DO uses to resolve one preview's provider
    * coordinates. It never enqueues, so a preview never waits behind the control
    * operation queue. The allocation and route are two separate reads, not one
@@ -1383,12 +1427,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (socket === null) {
       return { error: controlRequestFailure('not_ready', 'Wrapper is not connected', true) };
     }
+    return this.beginWrapperControlRequestOnSocket(frame, socket, timeoutMs);
+  }
+
+  private beginWrapperControlRequestOnSocket(
+    frame: Extract<ControlPlaneWrapperFrame, { requestId: string }>,
+    socket: WebSocket,
+    timeoutMs: number
+  ): ControlRequestHandoff {
     if (this.pendingControlRequests.size >= MAX_PENDING_CONTROL_REQUESTS) {
       return {
         error: controlRequestFailure('busy', 'Too many outstanding control requests', true),
       };
     }
-    const promise = this.registerPendingControlRequest(frame.requestId, socket, timeoutMs);
+    const promise = this.registerPendingControlRequest(
+      frame.requestId,
+      socket,
+      frame.type === 'exec.request' ? 'exec' : 'control',
+      timeoutMs
+    );
     if (!this.trySendFrame(socket, frame)) {
       this.settlePendingControlRequest(
         frame.requestId,
@@ -1402,14 +1459,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private registerPendingControlRequest(
     requestId: string,
     socket: WebSocket,
+    kind: ControlRequestKind,
     timeoutMs: number = this.controlRequestTimeoutMs
   ): Promise<ControlPlaneControlResult> {
     return new Promise<ControlPlaneControlResult>(resolve => {
       const timer = setTimeout(() => {
         this.pendingControlRequests.delete(requestId);
-        resolve(controlRequestFailure('not_ready', 'Wrapper request timed out', true));
+        resolve(
+          kind === 'exec'
+            ? executionUnknownFailure()
+            : controlRequestFailure('not_ready', 'Wrapper request timed out', true)
+        );
       }, timeoutMs);
-      this.pendingControlRequests.set(requestId, { socket, resolve, timer });
+      this.pendingControlRequests.set(requestId, { socket, kind, resolve, timer });
     });
   }
 
@@ -1423,11 +1485,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   /**
    * Resolves every request bound to a closed socket at once, so a dropped
-   * wrapper does not leave callers waiting the full request timeout.
+   * wrapper does not leave callers waiting the full request timeout. An exec
+   * command has already been dispatched, so its outcome is unknown rather than
+   * retryable as a plain transport failure.
    */
-  private settlePendingForSocket(socket: WebSocket, result: ControlPlaneControlResult): void {
+  private settlePendingForSocket(socket: WebSocket, message: string): void {
     for (const [requestId, pending] of this.pendingControlRequests) {
-      if (pending.socket === socket) this.settlePendingControlRequest(requestId, result);
+      if (pending.socket !== socket) continue;
+      this.settlePendingControlRequest(
+        requestId,
+        pending.kind === 'exec'
+          ? executionUnknownFailure()
+          : controlRequestFailure('not_ready', message, true)
+      );
     }
   }
 
@@ -1923,10 +1993,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       return;
     }
     // Fail every request bound to this socket at once; do not wait the timeout.
-    this.settlePendingForSocket(
-      ws,
-      controlRequestFailure('not_ready', 'Wrapper disconnected', true)
-    );
+    this.settlePendingForSocket(ws, 'Wrapper disconnected');
     await this.enqueue(async () => {
       const attachment = this.readAttachment(ws);
       if (attachment?.allocationId === undefined || attachment.connectionId === undefined) {
@@ -4766,10 +4833,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         // A server-side close drops the wrapper without a `webSocketClose`, so
         // settle its outstanding control requests here instead of waiting out
         // the full request timeout.
-        this.settlePendingForSocket(
-          ws,
-          controlRequestFailure('not_ready', 'Wrapper disconnected', true)
-        );
+        this.settlePendingForSocket(ws, 'Wrapper disconnected');
         ws.serializeAttachment({ credential: attachment.credential ?? null });
         try {
           ws.close(1000, 'heartbeat timeout');
@@ -4880,6 +4944,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
         ...(frame.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
         ...(frame.installsSkillsSh ? { installsSkillsSh: true } : {}),
+        ...(frame.execCommand ? { execCommand: true } : {}),
         ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
       });
       // Welcome first, then route effects: a re-prepared route resends
@@ -4926,10 +4991,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ).catch(() => false);
       if (blocked) {
         await this.applyEvent({ type: 'stop-requested', at: now, reason: 'billing_blocked' });
-        this.settlePendingForSocket(
-          ws,
-          controlRequestFailure('not_ready', 'Wrapper disconnected', true)
-        );
+        this.settlePendingForSocket(ws, 'Wrapper disconnected');
         ws.close(4402, 'Container billing blocked');
         return;
       }
@@ -5058,10 +5120,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         continue;
       // A replaced wrapper is about to be closed by `other.close`; settle its
       // outstanding control requests now (the close handler may not run).
-      this.settlePendingForSocket(
-        other,
-        controlRequestFailure('not_ready', 'Wrapper disconnected', true)
-      );
+      this.settlePendingForSocket(other, 'Wrapper disconnected');
       // The attachment stays: the connectionId fence, not the cleared binding,
       // is what stops a replaced socket's late close from disconnecting.
       try {

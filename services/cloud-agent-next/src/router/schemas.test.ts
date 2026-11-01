@@ -15,6 +15,10 @@ import {
   SendMessageV2Input,
   StartSessionOutput,
   StartSessionInput,
+  ExecCommandInput,
+  ExecCommandOutput,
+  WaitForMessageResultInput,
+  WaitForMessageResultOutput,
   branchNameSchema,
 } from './schemas.js';
 import { parseCanonicalBitbucketCloneUrl } from '../types.js';
@@ -1092,6 +1096,109 @@ describe('getMessageResult contract', () => {
       GetMessageResultOutput.safeParse({ ...baseOutput, assistant: { parts: [], info: {} } })
         .success
     ).toBe(false);
+  });
+});
+
+describe('waitForMessageResult contract', () => {
+  const baseResult = {
+    cloudAgentSessionId: validSessionId,
+    messageId: validMessageId,
+    status: 'completed' as const,
+    createdAt: 1,
+  };
+
+  it('defaults the timeout and bounds it to 1..50 whole seconds', () => {
+    const minimal = { cloudAgentSessionId: validSessionId, messageId: validMessageId };
+    expect(WaitForMessageResultInput.parse(minimal).timeoutSeconds).toBe(30);
+    expect(WaitForMessageResultInput.safeParse({ ...minimal, timeoutSeconds: 1 }).success).toBe(
+      true
+    );
+    expect(WaitForMessageResultInput.safeParse({ ...minimal, timeoutSeconds: 50 }).success).toBe(
+      true
+    );
+    for (const timeoutSeconds of [0, 51, 1.5]) {
+      expect(WaitForMessageResultInput.safeParse({ ...minimal, timeoutSeconds }).success).toBe(
+        false
+      );
+    }
+    expect(WaitForMessageResultInput.safeParse({ ...minimal, unknown: true }).success).toBe(false);
+  });
+
+  it('requires a non-null result, pending interactions, and the timeout flag', () => {
+    const base = {
+      result: baseResult,
+      pendingInteractions: { questions: [], permissions: [] },
+      timedOut: false,
+    };
+    expect(WaitForMessageResultOutput.safeParse(base).success).toBe(true);
+    expect(WaitForMessageResultOutput.safeParse({ ...base, result: null }).success).toBe(false);
+    expect(
+      WaitForMessageResultOutput.safeParse({
+        ...base,
+        pendingInteractions: { questions: [], permissions: [{ id: 'perm_1' }] },
+        timedOut: true,
+      }).success
+    ).toBe(true);
+    for (const output of [
+      { result: baseResult, pendingInteractions: { questions: [] }, timedOut: false },
+      { result: baseResult, pendingInteractions: { questions: [], permissions: [] } },
+      { ...base, unknown: true },
+    ]) {
+      expect(WaitForMessageResultOutput.safeParse(output).success).toBe(false);
+    }
+  });
+});
+
+describe('execCommand contract', () => {
+  const execResult = {
+    exitCode: 0,
+    timedOut: false,
+    durationMs: 12,
+    stdoutTruncated: false,
+    stderrTruncated: false,
+    stdout: 'ok\n',
+    stderr: '',
+  };
+
+  it('defaults timeoutSeconds to 30 and bounds command and timeout', () => {
+    expect(
+      ExecCommandInput.parse({ cloudAgentSessionId: validSessionId, command: 'echo hi' })
+    ).toEqual({
+      cloudAgentSessionId: validSessionId,
+      command: 'echo hi',
+      timeoutSeconds: 30,
+    });
+    expect(
+      ExecCommandInput.safeParse({
+        cloudAgentSessionId: validSessionId,
+        command: 'echo hi',
+        timeoutSeconds: 60,
+      }).success
+    ).toBe(true);
+    for (const input of [
+      { cloudAgentSessionId: validSessionId, command: '' },
+      { cloudAgentSessionId: validSessionId, command: 'x'.repeat(10_001) },
+      { cloudAgentSessionId: validSessionId, command: 'x', timeoutSeconds: 0 },
+      { cloudAgentSessionId: validSessionId, command: 'x', timeoutSeconds: 61 },
+      { cloudAgentSessionId: validSessionId, command: 'x', timeoutSeconds: 1.5 },
+      { cloudAgentSessionId: validSessionId, command: 'x', unknown: true },
+    ]) {
+      expect(ExecCommandInput.safeParse(input).success).toBe(false);
+    }
+  });
+
+  it('accepts only the exact result shape', () => {
+    expect(ExecCommandOutput.safeParse(execResult).success).toBe(true);
+    expect(
+      ExecCommandOutput.safeParse({ ...execResult, exitCode: 124, timedOut: true }).success
+    ).toBe(true);
+    for (const output of [
+      { ...execResult, stdout: undefined },
+      { ...execResult, unknown: true },
+      { ...execResult, exitCode: '0' },
+    ]) {
+      expect(ExecCommandOutput.safeParse(output).success).toBe(false);
+    }
   });
 });
 

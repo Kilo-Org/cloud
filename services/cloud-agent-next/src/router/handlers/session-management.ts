@@ -29,7 +29,7 @@ import type {
   ControlPlaneSessionSnapshot,
   SandboxSessionV2,
 } from '../../control-plane/session/session-do.js';
-import type { MessageResultRPCResponse } from '../../session/message-result.js';
+import { readMessageResult } from './session-wait.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import { getPgDb } from '../../db/pg.js';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
@@ -700,27 +700,10 @@ export function createSessionManagementHandlers() {
             kiloUserId: userId,
             cloudAgentSessionId: sessionId,
           });
-          const getStub = () => getSandboxSessionStub(env, userId, sessionId);
-
-          const response: MessageResultRPCResponse = await withDORetry(
-            getStub,
-            async stub => await stub.getMessageResult(input.messageId),
-            'getMessageResult'
+          return await readMessageResult(
+            () => getSandboxSessionStub(env, userId, sessionId),
+            input.messageId
           );
-          if (response.type === 'session-not-found') {
-            throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
-          }
-          if (response.type === 'message-not-found') {
-            throw new TRPCError({ code: 'NOT_FOUND', message: 'Message not found' });
-          }
-          if (response.type === 'state-invalid') {
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: 'Message result unavailable',
-            });
-          }
-
-          return response.result;
         });
       }),
 

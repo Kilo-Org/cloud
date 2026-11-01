@@ -2223,6 +2223,26 @@ describe('createPreparationManager', () => {
     expect(harness.gitCalls).toEqual([]);
   });
 
+  it('keeps an earlier Git token redacted when a refresh omits git', async () => {
+    const harness = createHarness();
+    const spec = routeSpec({ git: { url: 'https://github.com/acme/repo.git', token: 'git-1' } });
+    await harness.manager.prepare(spec, {
+      sessionId: spec.sessionId,
+      git: { token: 'git-1', platform: 'github' },
+      kilo: { token: 'kilo-token-1' },
+    });
+    expect(harness.manager.preparedExecRoute(spec.sessionId)?.redact('git-1')).toBe('[REDACTED]');
+
+    await harness.manager.installCredentials({
+      sessionId: spec.sessionId,
+      kilo: { token: 'kilo-token-2' },
+    });
+
+    const route = harness.manager.preparedExecRoute(spec.sessionId);
+    expect(route?.redact('git-1')).toBe('[REDACTED]');
+    expect(route?.redact('kilo-token-2')).toBe('[REDACTED]');
+  });
+
   it('prefers the runtime-proxy handle and facade targets over the spec alias', async () => {
     const harness = createHarness();
     const spec = routeSpec();

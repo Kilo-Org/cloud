@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Hichapụ alaka mgbe ejikọtachara",
       "noEnabledMethods": "Enweghị usoro njikọta agbanyere na ebe nchekwa a. Rịọ onye nchịkwa ebe nchekwa ka ọ gbanye njikọta, nchịkọta ndekọ mgbanwe, ma ọ bụ mgbanwe ntọala.",
       "confirmTitle": "Jikọta arịrịọ njikọta?",
+      "confirmMergeTitle": "Jikọta?",
       "confirmTitleTerm": "Jikọta {{term}}?",
       "confirmMessage": "Nke a ga-ejikọta mgbanwe gị n'ime alaka isi.",
       "enableAutoMergeConfirmTitle": "Gbanye njikọta akpaghị aka?",

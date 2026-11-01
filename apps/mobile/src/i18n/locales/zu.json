@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Susa igatsha ngemva kokuhlanganisa",
       "noEnabledMethods": "Le nqolobane yekhodi ayinazo izindlela zokuhlanganisa ezivuliwe. Cela umphathi wayo avule ukuhlanganisa, ukuhlanganisa amarekhodi abe linye, noma ukubeka amarekhodi esisekelweni esisha.",
       "confirmTitle": "Uyasihlanganisa isicelo sokuhlanganisa?",
+      "confirmMergeTitle": "Uyahlanganisa?",
       "confirmTitleTerm": "Uyasihlanganisa {{term}}?",
       "confirmMessage": "Lokhu kuzohlanganisa izinguquko zakho egatsheni eliyisisekelo.",
       "enableAutoMergeConfirmTitle": "Uyavula ukuhlanganisa okuzenzakalelayo?",

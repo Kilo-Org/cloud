@@ -439,6 +439,7 @@
       "deleteBranchAfterMerge": "Smazat větev po sloučení",
       "noEnabledMethods": "V tomto repozitáři není povolená žádná metoda sloučení. Požádej správce repozitáře, aby povolil slučovací commit, sjednocení commitů nebo přesazení větve.",
       "confirmTitle": "Sloučit PR?",
+      "confirmMergeTitle": "Sloučit?",
       "confirmTitleTerm": "Sloučit {{term}}?",
       "confirmMessage": "Tím se tvé změny sloučí do cílové větve.",
       "enableAutoMergeConfirmTitle": "Zapnout automatické sloučení?",

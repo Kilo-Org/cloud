@@ -439,6 +439,7 @@
       "deleteBranchAfterMerge": "Izbriši vejo po združitvi",
       "noEnabledMethods": "V tem repozitoriju ni omogočen noben način združitve. Prosi skrbnika, naj omogoči združevanje s potrditvijo, strnitvijo potrditev ali prestavitvijo osnove.",
       "confirmTitle": "Združim zahtevek?",
+      "confirmMergeTitle": "Združim?",
       "confirmTitleTerm": "Združim {{term}}?",
       "confirmMessage": "Tvoje spremembe bodo združene v osnovno vejo.",
       "enableAutoMergeConfirmTitle": "Omogočim samodejno združevanje?",

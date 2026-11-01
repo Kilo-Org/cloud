@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Share reshe bayan haɗawa",
       "noEnabledMethods": "Ba a kunna wata hanyar haɗawa a wannan ma'ajiyar lamba ba. Nemi mai kula da ita ya kunna haɗawa, dunƙulewa ko sake kafa tushe.",
       "confirmTitle": "A haɗa buƙatar haɗawa?",
+      "confirmMergeTitle": "A haɗa?",
       "confirmTitleTerm": "A haɗa {{term}}?",
       "confirmMessage": "Wannan zai haɗa canje-canjenka cikin reshen tushe.",
       "enableAutoMergeConfirmTitle": "A kunna haɗawa ta atomatik?",

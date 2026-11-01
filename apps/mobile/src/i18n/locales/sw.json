@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Futa tawi baada ya kuunganisha",
       "noEnabledMethods": "Hakuna mbinu ya kuunganisha iliyowezeshwa kwenye hazina hii ya msimbo. Mwombe msimamizi wa hazina awezeshe kuunganisha kwa rekodi ya kuunganisha, kwa rekodi moja, au kwa kuweka upya msingi.",
       "confirmTitle": "Ungependa kuunganisha ombi?",
+      "confirmMergeTitle": "Ungependa kuunganisha?",
       "confirmTitleTerm": "Ungependa kuunganisha {{term}}?",
       "confirmMessage": "Hii itaunganisha mabadiliko yako kwenye tawi la msingi.",
       "enableAutoMergeConfirmTitle": "Ungependa kuwasha muunganisho wa kiotomatiki?",

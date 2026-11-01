@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Poista haara yhdistämisen jälkeen",
       "noEnabledMethods": "Tässä koodivarastossa ei ole käytössä yhtään yhdistämismenetelmää. Pyydä koodivaraston ylläpitäjää sallimaan yhdistäminen yhdistämistallennuksella, tiivistämällä tai uudelleenperustamalla.",
       "confirmTitle": "Yhdistetäänkö muutospyyntö?",
+      "confirmMergeTitle": "Yhdistetäänkö?",
       "confirmTitleTerm": "Yhdistetäänkö {{term}}?",
       "confirmMessage": "Muutoksesi yhdistetään kohdehaaraan.",
       "enableAutoMergeConfirmTitle": "Otetaanko automaattinen yhdistäminen käyttöön?",

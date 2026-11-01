@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "মার্জের পর ব্রাঞ্চ মুছুন",
       "noEnabledMethods": "এই রিপোজিটরিতে মার্জ করার কোনো পদ্ধতি চালু নেই। রিপোজিটরির অ্যাডমিনকে মার্জ, স্কোয়াশ বা রিবেস পদ্ধতি চালু করতে বলুন।",
       "confirmTitle": "পুল রিকোয়েস্ট মার্জ করবেন?",
+      "confirmMergeTitle": "মার্জ করবেন?",
       "confirmTitleTerm": "{{term}} মার্জ করবেন?",
       "confirmMessage": "এতে আপনার পরিবর্তনগুলো বেস ব্রাঞ্চে মার্জ হবে।",
       "enableAutoMergeConfirmTitle": "অটো-মার্জ চালু করবেন?",

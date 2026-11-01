@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Eyða grein eftir sameiningu",
       "noEnabledMethods": "Engar sameiningaraðferðir eru virkar í þessari kóðageymslu. Biddu stjórnanda kóðageymslunnar um að virkja sameiningu, samþjöppun eða endurgrunnun.",
       "confirmTitle": "Sameina sameiningarbeiðni?",
+      "confirmMergeTitle": "Sameina?",
       "confirmTitleTerm": "Sameina {{term}}?",
       "confirmMessage": "Breytingarnar þínar verða sameinaðar grunngreininni.",
       "enableAutoMergeConfirmTitle": "Virkja sjálfvirka sameiningu?",

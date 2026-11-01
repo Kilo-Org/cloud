@@ -432,6 +432,7 @@
       "deleteBranchAfterMerge": "Dzēst zaru pēc apvienošanas",
       "noEnabledMethods": "Šajā repozitorijā nav iespējota neviena apvienošanas metode. Lūdz repozitorija administratoram iespējot apvienošanu ar apvienošanas komitu, saspiešanu vai pārbāzēšanu.",
       "confirmTitle": "Apvienot izmaiņu pieprasījumu?",
+      "confirmMergeTitle": "Apvienot?",
       "confirmTitleTerm": "Apvienot {{term}}?",
       "confirmMessage": "Tavas izmaiņas tiks apvienotas ar bāzes zaru.",
       "enableAutoMergeConfirmTitle": "Iespējot automātisko apvienošanu?",

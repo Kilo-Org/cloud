@@ -2969,6 +2969,7 @@
       "deleteBranchAfterMerge": "Branch verwijderen na samenvoegen",
       "noEnabledMethods": "Voor deze repository zijn geen samenvoegmethoden ingeschakeld. Vraag een repositorybeheerder om samenvoegen met een merge-commit, squashen of rebasen in te schakelen.",
       "confirmTitle": "PR samenvoegen?",
+      "confirmMergeTitle": "Samenvoegen?",
       "confirmTitleTerm": "{{term}} samenvoegen?",
       "confirmMessage": "Je wijzigingen worden hiermee in de basisbranch opgenomen.",
       "enableAutoMergeConfirmTitle": "Automatisch samenvoegen inschakelen?",

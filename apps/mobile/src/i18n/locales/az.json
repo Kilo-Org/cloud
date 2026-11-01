@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Birləşdirmədən sonra budağı sil",
       "noEnabledMethods": "Bu repozitoriyada heç bir birləşdirmə üsulu aktiv deyil. Repozitoriyanın inzibatçısından adi birləşdirmə, sıxlaşdırma və ya bazanı dəyişmə üsulunu aktivləşdirməsini istə.",
       "confirmTitle": "Birləşdirmə sorğusu birləşdirilsin?",
+      "confirmMergeTitle": "Birləşdirilsin?",
       "confirmTitleTerm": "{{term}} birləşdirilsin?",
       "confirmMessage": "Dəyişikliklərin əsas budağa birləşdiriləcək.",
       "enableAutoMergeConfirmTitle": "Avtomatik birləşdirmə aktivləşdirilsin?",

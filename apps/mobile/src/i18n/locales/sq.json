@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Fshi degën pas bashkimit",
       "noEnabledMethods": "Kjo depo nuk ka asnjë metodë bashkimi të aktivizuar. Kërkoji një administratori të depos të aktivizojë bashkimin e zakonshëm, bashkimin me ngjeshje ose bashkimin me ribazim.",
       "confirmTitle": "Të bashkohet kërkesa?",
+      "confirmMergeTitle": "Të bashkohet?",
       "confirmTitleTerm": "Të bashkohet {{term}}?",
       "confirmMessage": "Kjo do t'i bashkojë ndryshimet e tua me degën bazë.",
       "enableAutoMergeConfirmTitle": "Të aktivizohet bashkimi automatik?",

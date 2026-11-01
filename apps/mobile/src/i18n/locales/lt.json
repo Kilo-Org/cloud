@@ -439,6 +439,7 @@
       "deleteBranchAfterMerge": "Ištrinti šaką po sujungimo",
       "noEnabledMethods": "Šioje saugykloje neįjungtas nė vienas sujungimo būdas. Paprašyk saugyklos administratoriaus įjungti įprastą sujungimą, įrašų sutraukimą arba perkėlimą į kitą bazę.",
       "confirmTitle": "Sujungti pakeitimų užklausą?",
+      "confirmMergeTitle": "Sujungti?",
       "confirmTitleTerm": "Sujungti {{term}}?",
       "confirmMessage": "Tavo pakeitimai bus sujungti su bazine šaka.",
       "enableAutoMergeConfirmTitle": "Įjungti automatinį sujungimą?",

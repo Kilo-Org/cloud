@@ -2969,6 +2969,7 @@
       "deleteBranchAfterMerge": "Xóa nhánh sau khi hợp nhất",
       "noEnabledMethods": "Kho lưu trữ này chưa bật phương thức hợp nhất nào. Hãy nhờ quản trị viên bật phương thức tạo bản ghi hợp nhất, gộp bản ghi hoặc chuyển gốc.",
       "confirmTitle": "Hợp nhất PR?",
+      "confirmMergeTitle": "Hợp nhất?",
       "confirmTitleTerm": "Hợp nhất {{term}}?",
       "confirmMessage": "Thao tác này sẽ hợp nhất các thay đổi của bạn vào nhánh đích.",
       "enableAutoMergeConfirmTitle": "Bật tự động hợp nhất?",

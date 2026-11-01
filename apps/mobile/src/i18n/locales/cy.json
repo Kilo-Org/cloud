@@ -453,6 +453,7 @@
       "deleteBranchAfterMerge": "Dileu'r gangen ar ôl cyfuno",
       "noEnabledMethods": "Nid oes dulliau cyfuno wedi'u galluogi yn yr ystorfa hon. Gofynnwch i weinyddwr yr ystorfa alluogi cyfuno, cywasgu neu ailsylfaenu.",
       "confirmTitle": "Cyfuno cais tynnu?",
+      "confirmMergeTitle": "Cyfuno?",
       "confirmTitleTerm": "Cyfuno {{term}}?",
       "confirmMessage": "Bydd hyn yn cyfuno'ch newidiadau â'r gangen sylfaen.",
       "enableAutoMergeConfirmTitle": "Galluogi cyfuno awtomatig?",

@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Ezabatu adarra bateratu ondoren",
       "noEnabledMethods": "Biltegi honek ez du bateratze-metodorik gaituta. Eskatu biltegiko administratzaile bati bateratze arrunta, egikaritzeak trinkotzea edo oinarria aldatzea gaitzeko.",
       "confirmTitle": "Bateratze-eskaera bateratu?",
+      "confirmMergeTitle": "Bateratu?",
       "confirmTitleTerm": "{{term}} bateratu?",
       "confirmMessage": "Zure aldaketak oinarri-adarrean bateratuko dira.",
       "enableAutoMergeConfirmTitle": "Bateratze automatikoa gaitu?",

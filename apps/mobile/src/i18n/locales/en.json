@@ -492,6 +492,7 @@
       "deleteBranchAfterMerge": "Delete branch after merge",
       "noEnabledMethods": "This repository has no enabled merge methods. Ask a repository admin to enable merge, squash, or rebase merging.",
       "confirmTitle": "Merge pull request?",
+      "confirmMergeTitle": "Merge?",
       "confirmTitleTerm": "Merge {{term}}?",
       "confirmMessage": "This will merge your changes into the base branch.",
       "enableAutoMergeConfirmTitle": "Enable auto-merge?",

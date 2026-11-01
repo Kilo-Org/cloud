@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "حذف شاخه پس از ادغام",
       "noEnabledMethods": "هیچ روش ادغامی برای این مخزن فعال نیست. از مدیر مخزن بخواهید ادغام معمولی، اسکواش یا ری‌بیس را فعال کند.",
       "confirmTitle": "درخواست ادغام شود؟",
+      "confirmMergeTitle": "ادغام شود؟",
       "confirmTitleTerm": "{{term}} ادغام شود؟",
       "confirmMessage": "این کار تغییرات شما را در شاخهٔ پایه ادغام می‌کند.",
       "enableAutoMergeConfirmTitle": "ادغام خودکار فعال شود؟",

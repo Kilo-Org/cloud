@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Padam cabang selepas penggabungan",
       "noEnabledMethods": "Tiada kaedah penggabungan yang didayakan untuk repositori ini. Minta pentadbir repositori mendayakan penggabungan biasa, pemadatan komit, atau pengasasan semula.",
       "confirmTitle": "Gabungkan permintaan tarik?",
+      "confirmMergeTitle": "Gabungkan?",
       "confirmTitleTerm": "Gabungkan {{term}}?",
       "confirmMessage": "Perubahan anda akan digabungkan ke dalam cabang asas.",
       "enableAutoMergeConfirmTitle": "Dayakan penggabungan automatik?",

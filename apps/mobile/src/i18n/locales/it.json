@@ -3013,6 +3013,7 @@
       "deleteBranchAfterMerge": "Elimina il branch dopo l'unione",
       "noEnabledMethods": "Nessun metodo di unione è attivo in questo repository. Chiedi a un amministratore del repository di attivare l'unione con commit, l'accorpamento o il riallineamento dei commit.",
       "confirmTitle": "Unire la pull request?",
+      "confirmMergeTitle": "Unire?",
       "confirmTitleTerm": "Unire {{term}}?",
       "confirmMessage": "Le tue modifiche verranno unite al branch di base.",
       "enableAutoMergeConfirmTitle": "Attivare l'unione automatica?",

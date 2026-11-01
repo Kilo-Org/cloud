@@ -446,6 +446,7 @@
       "deleteBranchAfterMerge": "Scrios an brainse tar éis an chumaisc",
       "noEnabledMethods": "Níl aon mhodh cumaisc cumasaithe sa stór seo. Iarr ar riarthóir an stóir cumasc, comhdhlúthú nó athbhunú a chumasú.",
       "confirmTitle": "An gcumascfar an t-iarratas tarraingthe?",
+      "confirmMergeTitle": "An gcumascfar?",
       "confirmTitleTerm": "An gcumascfar an t-{{term}}?",
       "confirmMessage": "Cumascfar do chuid athruithe isteach sa bhunbrainse.",
       "enableAutoMergeConfirmTitle": "An gcumasófar cumasc uathoibríoch?",

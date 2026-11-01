@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Birlashtirishdan keyin tarmoqni o'chirish",
       "noEnabledMethods": "Bu omborda hech bir birlashtirish usuli yoqilmagan. Ombor administratoridan oddiy birlashtirish, kommitlarni jamlash yoki asosni almashtirish usulini yoqishni so'rang.",
       "confirmTitle": "PR birlashtirilsinmi?",
+      "confirmMergeTitle": "Birlashtirilsinmi?",
       "confirmTitleTerm": "{{term}} birlashtirilsinmi?",
       "confirmMessage": "O'zgarishlaringiz asosiy tarmoqqa birlashtiriladi.",
       "enableAutoMergeConfirmTitle": "Avtomatik birlashtirish yoqilsinmi?",

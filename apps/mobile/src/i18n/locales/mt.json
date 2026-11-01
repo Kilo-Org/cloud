@@ -446,6 +446,7 @@
       "deleteBranchAfterMerge": "Ħassar il-fergħa wara l-għaqda",
       "noEnabledMethods": "Dan ir-repożitorju m'għandu l-ebda metodu ta' għaqda attiv. Itlob lil amministratur tar-repożitorju biex jattiva l-għaqda, il-konsolidazzjoni jew it-tibdil tal-bażi.",
       "confirmTitle": "Trid tgħaqqad it-talba?",
+      "confirmMergeTitle": "Trid tgħaqqad?",
       "confirmTitleTerm": "Trid tgħaqqad il-{{term}}?",
       "confirmMessage": "Dan se jgħaqqad il-bidliet tiegħek mal-fergħa bażi.",
       "enableAutoMergeConfirmTitle": "Trid tattiva l-għaqda awtomatika?",

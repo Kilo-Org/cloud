@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Kustuta haru pärast ühendamist",
       "noEnabledMethods": "Selles hoidlas pole ükski ühendamismeetod lubatud. Palu hoidla administraatoril lubada ühendamine ühendamiskommiti, kommitite koondamise või ümberbaseerimise abil.",
       "confirmTitle": "Kas ühendada tõmbetaotlus?",
+      "confirmMergeTitle": "Kas ühendada?",
       "confirmTitleTerm": "Kas ühendada {{term}}?",
       "confirmMessage": "Sinu muudatused ühendatakse alusharuga.",
       "enableAutoMergeConfirmTitle": "Kas lubada automaatne ühendamine?",

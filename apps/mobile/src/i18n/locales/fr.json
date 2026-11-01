@@ -3019,6 +3019,7 @@
       "deleteBranchAfterMerge": "Supprimer la branche après la fusion",
       "noEnabledMethods": "Aucune méthode de fusion n'est activée pour ce dépôt. Demandez à un administrateur du dépôt d'activer la fusion classique, le regroupement des commits ou le rebasage.",
       "confirmTitle": "Fusionner la demande de fusion ?",
+      "confirmMergeTitle": "Fusionner ?",
       "confirmTitleTerm": "Fusionner {{term}} ?",
       "confirmMessage": "Vos modifications seront fusionnées dans la branche cible.",
       "enableAutoMergeConfirmTitle": "Activer la fusion automatique ?",

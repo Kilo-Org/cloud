@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Efase branch lan apre fizyon an",
       "noEnabledMethods": "Pa gen metòd fizyon ki aktive nan depo sa a. Mande yon administratè depo a pou aktive fizyon nòmal, fizyon ak gwoupman komit oswa fizyon ak chanjman baz.",
       "confirmTitle": "Fizyonnen demann lan?",
+      "confirmMergeTitle": "Fizyonnen?",
       "confirmTitleTerm": "Fizyonnen {{term}} lan?",
       "confirmMessage": "Sa ap fizyonnen chanjman ou yo nan branch baz la.",
       "enableAutoMergeConfirmTitle": "Aktive fizyon otomatik?",

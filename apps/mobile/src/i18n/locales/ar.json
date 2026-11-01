@@ -3145,6 +3145,7 @@
       "deleteBranchAfterMerge": "حذف الفرع بعد الدمج",
       "noEnabledMethods": "لا توجد طرق دمج مفعّلة في هذا المستودع. اطلب من مسؤول المستودع تفعيل الدمج العادي أو الدمج المضغوط أو الدمج مع إعادة التأسيس.",
       "confirmTitle": "دمج طلب السحب؟",
+      "confirmMergeTitle": "دمج؟",
       "confirmTitleTerm": "دمج {{term}}؟",
       "confirmMessage": "ستُدمج تغييراتك في الفرع الأساسي.",
       "enableAutoMergeConfirmTitle": "تفعيل الدمج التلقائي؟",

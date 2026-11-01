@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Pa ẹ̀ka rẹ́ lẹ́yìn ìdàpọ̀",
       "noEnabledMethods": "Kò sí ọ̀nà ìdàpọ̀ tí a ti mú ṣiṣẹ́ nínú ibi ìpamọ́ yìí. Béèrè lọ́wọ́ alábòójútó ibi ìpamọ́ láti mú ìdàpọ̀, ìṣàkópọ̀ sí ọ̀kan, tàbí ìyípadà ìpìlẹ̀ ṣiṣẹ́.",
       "confirmTitle": "Da ìbéèrè ìṣọ̀kan pọ̀?",
+      "confirmMergeTitle": "Da pọ̀?",
       "confirmTitleTerm": "Da {{term}} pọ̀?",
       "confirmMessage": "Èyí yóò da àwọn ìyípadà rẹ pọ̀ mọ́ ẹ̀ka ìpìlẹ̀.",
       "enableAutoMergeConfirmTitle": "Tan ìdàpọ̀ aládàáṣiṣẹ́?",

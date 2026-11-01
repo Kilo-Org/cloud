@@ -432,6 +432,7 @@
       "deleteBranchAfterMerge": "Izbriši granu nakon spajanja",
       "noEnabledMethods": "U ovom repozitoriju nije omogućena nijedna metoda spajanja. Zatraži od administratora repozitorija da omogući spajanje, sažimanje revizija ili promjenu osnove.",
       "confirmTitle": "Spojiti zahtjev?",
+      "confirmMergeTitle": "Spojiti?",
       "confirmTitleTerm": "Spojiti {{term}}?",
       "confirmMessage": "Tvoje će se izmjene spojiti u osnovnu granu.",
       "enableAutoMergeConfirmTitle": "Uključiti automatsko spajanje?",

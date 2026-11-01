@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Slet gren efter fletning",
       "noEnabledMethods": "Ingen flettemetoder er aktiveret for dette kodelager. Bed en administrator om at aktivere fletning, sammenlægning af commits eller flytning af basis.",
       "confirmTitle": "Flet pull request?",
+      "confirmMergeTitle": "Flet?",
       "confirmTitleTerm": "Flet {{term}}?",
       "confirmMessage": "Dine ændringer flettes ind i målgrenen.",
       "enableAutoMergeConfirmTitle": "Aktivér automatisk fletning?",

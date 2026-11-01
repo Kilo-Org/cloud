@@ -3019,6 +3019,7 @@
       "deleteBranchAfterMerge": "Excluir branch após a mesclagem",
       "noEnabledMethods": "Este repositório não tem métodos de mesclagem ativados. Peça a um administrador do repositório para ativar a mesclagem com um commit de mesclagem, com agrupamento de commits ou com reaplicação de commits.",
       "confirmTitle": "Mesclar pull request?",
+      "confirmMergeTitle": "Mesclar?",
       "confirmTitleTerm": "Mesclar {{term}}?",
       "confirmMessage": "Isso mesclará suas alterações no branch de base.",
       "enableAutoMergeConfirmTitle": "Ativar mesclagem automática?",

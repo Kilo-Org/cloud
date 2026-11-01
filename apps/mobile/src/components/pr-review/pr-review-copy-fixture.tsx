@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { PrReviewFileList } from '@/components/pr-review/diff/pr-diff-file-list';
 import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-navigator';
 import { PrMergeSheet } from '@/components/pr-review/merge/pr-merge-sheet';
-import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
+import { providerPrMergeTitles } from '@/components/pr-review/merge/pr-merge-titles';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
 import {
   PrReviewOverviewCopyFixture,
@@ -220,7 +220,7 @@ export function PrReviewCopyFixture() {
             conflicts: false,
             blockedReasons: [],
           }}
-          sheetTitle={t('prReview.merge.mergeTermTitle', { term: t(providerPrNounKey('gitlab')) })}
+          sheetTitle={providerPrMergeTitles(t, scope.ref.platform).action}
           eyebrow="sample/review-copy!1"
           onRefetch={async () => {
             await queryClient.invalidateQueries();

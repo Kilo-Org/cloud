@@ -664,6 +664,7 @@ function effectiveSessionRegistrationInput(
   };
 }
 
+// Discovery hints must not fail an authorized create; ledger retries repair missed writes.
 async function recordParentChildSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
@@ -675,18 +676,43 @@ async function recordParentChildSession(
 ): Promise<void> {
   const parentSessionId = input.parentCloudAgentSessionId;
   if (parentSessionId === undefined) return;
-  await withDORetry(
-    () => getSandboxSessionStub(ctx.env, ctx.userId, parentSessionId),
-    stub =>
-      stub.recordCloudAgentChildSession({
+  try {
+    await withDORetry(
+      () => getSandboxSessionStub(ctx.env, ctx.userId, parentSessionId),
+      stub =>
+        stub.recordCloudAgentChildSession({
+          cloudAgentSessionId: child.cloudAgentSessionId,
+          ...(child.initialMessageId === undefined
+            ? {}
+            : { initialMessageId: child.initialMessageId }),
+          ...(child.worktreeId === undefined ? {} : { worktreeId: child.worktreeId }),
+        }),
+      'recordCloudAgentChildSession'
+    );
+  } catch (error) {
+    logger
+      .withFields({
+        parentCloudAgentSessionId: parentSessionId,
         cloudAgentSessionId: child.cloudAgentSessionId,
         ...(child.initialMessageId === undefined
           ? {}
           : { initialMessageId: child.initialMessageId }),
         ...(child.worktreeId === undefined ? {} : { worktreeId: child.worktreeId }),
-      }),
-    'recordCloudAgentChildSession'
+        error: error instanceof Error ? error.message : String(error),
+      })
+      .warn('Failed to record Cloud Agent child session registry hint');
+  }
+}
+
+function recordedChildWorktreeId(
+  row: OperationLedgerRow,
+  cloudAgentSessionId: string
+): CloudAgentWorktreeId | undefined {
+  if (row.canonical_result?.[SESSION_CREATE_WORKTREE_ENABLED_KEY] !== true) return undefined;
+  const parsed = cloudAgentWorktreeIdSchema.safeParse(
+    `worktree_${cloudAgentSessionId.slice('workspace_'.length)}`
   );
+  return parsed.success ? parsed.data : undefined;
 }
 
 async function issueSessionRuntimeAuthorization(
@@ -1527,18 +1553,11 @@ async function registerAndAdmitInitialTurn(
     throwAdmissionError(admission);
   }
 
-  try {
-    await recordParentChildSession(input, ctx, {
-      cloudAgentSessionId: allocation.cloudAgentSessionId,
-      initialMessageId: admission.messageId,
-      ...(allocation.worktreeId === undefined ? {} : { worktreeId: allocation.worktreeId }),
-    });
-  } catch (error) {
-    if (ledger) {
-      await ledger.onTransportFailure();
-    }
-    throw error;
-  }
+  await recordParentChildSession(input, ctx, {
+    cloudAgentSessionId: allocation.cloudAgentSessionId,
+    initialMessageId: admission.messageId,
+    ...(allocation.worktreeId === undefined ? {} : { worktreeId: allocation.worktreeId }),
+  });
 
   logger.info('Session registered with initial message admitted');
   const result: StartedSessionResult = {
@@ -1649,20 +1668,13 @@ async function registerAllocatedSession(
   // `rebuildRecordedSessionAllocation`, so the DO belongs to the same ledger row. Keep that
   // property if either entry changes; otherwise an unrelated conflict would be
   // swallowed as success here.
-  try {
-    await recordParentChildSession(input, ctx, {
-      cloudAgentSessionId: allocation.cloudAgentSessionId,
-      ...(allocation.initialTurn === undefined
-        ? {}
-        : { initialMessageId: allocation.initialTurn.messageId }),
-      ...(allocation.worktreeId === undefined ? {} : { worktreeId: allocation.worktreeId }),
-    });
-  } catch (error) {
-    if (ledger) {
-      await ledger.onTransportFailure();
-    }
-    throw error;
-  }
+  await recordParentChildSession(input, ctx, {
+    cloudAgentSessionId: allocation.cloudAgentSessionId,
+    ...(allocation.initialTurn === undefined
+      ? {}
+      : { initialMessageId: allocation.initialTurn.messageId }),
+    ...(allocation.worktreeId === undefined ? {} : { worktreeId: allocation.worktreeId }),
+  });
 
   logger.info('Session registered for lazy preparation');
   const result = {
@@ -2134,9 +2146,11 @@ async function replaySettledCreate(
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
   }
   const initialMessage = canonicalInitialMessage(row);
+  const worktreeId = recordedChildWorktreeId(row, ids.cloudAgentSessionId);
   await recordParentChildSession(input, ctx, {
     cloudAgentSessionId: ids.cloudAgentSessionId,
     ...(initialMessage === undefined ? {} : { initialMessageId: initialMessage.messageId }),
+    ...(worktreeId === undefined ? {} : { worktreeId }),
   });
   return {
     ...ids,
@@ -2672,6 +2686,7 @@ async function reconcileLedgerCreate(
 
   const confirm = () =>
     confirmInitialMessageAdmitted({
+      input,
       ctx,
       db,
       row,
@@ -2732,6 +2747,11 @@ async function reconcileLedgerCreate(
         inOrganization: input.options?.kilocodeOrganizationId != null,
       }),
     });
+    const worktreeId = recordedChildWorktreeId(row, ids.cloudAgentSessionId);
+    await recordParentChildSession(input, ctx, {
+      cloudAgentSessionId: ids.cloudAgentSessionId,
+      ...(worktreeId === undefined ? {} : { worktreeId }),
+    });
     return {
       ...ids,
       ...(options.includeInitialMessage ? (canonicalInitialMessage(row) ?? {}) : {}),
@@ -2742,6 +2762,7 @@ async function reconcileLedgerCreate(
 }
 
 async function confirmInitialMessageAdmitted(args: {
+  input: SessionRegistrationInput;
   ctx: SessionRegistrationContext;
   db: WorkerDb;
   row: OperationLedgerRow;
@@ -2797,6 +2818,12 @@ async function confirmInitialMessageAdmitted(args: {
   if (failed) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
   }
+  const worktreeId = recordedChildWorktreeId(row, ids.cloudAgentSessionId);
+  await recordParentChildSession(args.input, ctx, {
+    cloudAgentSessionId: ids.cloudAgentSessionId,
+    initialMessageId,
+    ...(worktreeId === undefined ? {} : { worktreeId }),
+  });
   return {
     ...ids,
     ...(args.includeInitialMessage ? (canonicalInitialMessage(row) ?? {}) : {}),

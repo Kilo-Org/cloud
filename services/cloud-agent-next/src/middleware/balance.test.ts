@@ -170,7 +170,8 @@ describe('balanceMiddleware', () => {
 
   it('uses the current parent runtime token for a scoped follow-up balance check', async () => {
     const getToken = vi.fn().mockResolvedValue('parent-runtime-token');
-    const { app, calls } = createTrpcApp(authority());
+    const scoped = authority();
+    const { app, calls } = createTrpcApp(scoped);
     const requestEnv = parentTokenEnv(getToken);
 
     const response = await postTrpcApp(
@@ -186,7 +187,7 @@ describe('balanceMiddleware', () => {
 
     expect(response.status).toBe(200);
     expect(calls).toEqual(['sendMessageV2']);
-    expect(getToken).toHaveBeenCalledWith(authority());
+    expect(getToken).toHaveBeenCalledWith(scoped);
     expect(validateBalanceOnly).toHaveBeenCalledWith('parent-runtime-token', undefined, requestEnv);
   });
 

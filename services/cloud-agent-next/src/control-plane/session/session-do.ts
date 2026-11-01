@@ -27,7 +27,7 @@ import {
   type CloudAgentChildSessionLineage,
   type CloudAgentWorktreeLocation,
 } from '@kilocode/session-ingest-contracts';
-import { asc, gt } from 'drizzle-orm';
+import { asc, eq, gt } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
@@ -60,6 +60,7 @@ import {
 import { sessionRuntimeLocator } from '../../sandbox-control/worktree-ownership.js';
 import { logRuntimeAuthorizationDiagnostic } from '../../session/runtime-authorization-diagnostics.js';
 import { applyControlPlanePreparingEvent } from '../../sandbox-session/control-plane-preparing.js';
+import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import {
   applyPendingInteractionEvent,
   pendingInteractionsSchema,
@@ -972,6 +973,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         created_at: Date.now(),
       })
       .onConflictDoNothing()
+      .run();
+    return { success: true };
+  }
+
+  async forgetCloudAgentChildSession(input: unknown): Promise<{ success: true }> {
+    await this.initialized;
+    const childSessionId = cloudAgentChildSessionIdSchema.parse(input);
+    this.db
+      .delete(cloudAgentChildSessions)
+      .where(eq(cloudAgentChildSessions.child_session_id, childSessionId))
       .run();
     return { success: true };
   }
@@ -2309,6 +2320,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * runs under the serial queue.
    */
   private async tearDownSession(): Promise<void> {
+    const parentSessionId = this.metadata?.parentCloudAgentSessionId;
+    const ownerId = this.metadata?.identity.userId;
     for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Session deleted');
     // A late capture after this must not write the deleted worktree's diff.
     this.worktreeChanges.suppress();
@@ -2319,6 +2332,31 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.repairOutboxes(Number.MAX_SAFE_INTEGER);
     this.logDiscardedObligations();
     await this.resetSessionStorage();
+    if (
+      parentSessionId !== undefined &&
+      parentSessionId !== this.sessionId &&
+      ownerId !== undefined
+    ) {
+      await this.pruneChildRegistryEntry(ownerId, parentSessionId);
+    }
+  }
+
+  private async pruneChildRegistryEntry(ownerId: string, parentSessionId: string): Promise<void> {
+    try {
+      await withDORetry(
+        () => getSandboxSessionStub(this.env, ownerId, parentSessionId),
+        stub => stub.forgetCloudAgentChildSession(this.sessionId),
+        'forgetCloudAgentChildSession'
+      );
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          parentSessionId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('Failed to prune deleted child from parent session registry');
+    }
   }
 
   /** Names the obligations a delete could not deliver; never logs secrets. */
@@ -2339,9 +2377,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   /**
    * Wipe this DO back to its fresh V2 state: no registration, no messages, no
-   * events, no outbox, and the V2 migrations re-applied. The generation key is
-   * restored so a later instance runs the normal V2 init rather than the
-   * old-plane wipe.
+   * events, no child registry, no outbox, and the V2 migrations re-applied. The
+   * generation key is restored so a later instance runs the normal V2 init
+   * rather than the old-plane wipe.
    *
    * An issuer whose handle was accepted on a shared scope keeps a locator
    * tombstone so the facade can still resolve that handle through a survivor;
@@ -2364,7 +2402,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   /**
-   * Tombstone-first transactional wipe: write the locator, delete the two
+   * Tombstone-first transactional wipe: write the locator, delete the
    * application tables through Drizzle, delete every other KV key, and restore
    * the generation in one synchronous transaction. The schema and the
    * `__drizzle_migrations` bookkeeping survive, so no re-migration is needed.
@@ -2381,6 +2419,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       deleteApplicationTables: () => {
         this.db.delete(controlPlaneMessages).run();
         this.db.delete(events).run();
+        this.db.delete(cloudAgentChildSessions).run();
       },
     });
     this.clearSessionInMemoryState();

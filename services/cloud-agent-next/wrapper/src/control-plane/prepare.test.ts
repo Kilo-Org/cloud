@@ -642,6 +642,7 @@ type Harness = {
   setEnsureError: (value: unknown) => void;
   setEnsureHung: (value: boolean) => void;
   setUnavailable: (key: string, value: boolean) => void;
+  setRuntimeRestarting: (value: boolean) => void;
   setStamp: (value: WorkspaceStamp | null) => void;
   stamp: () => WorkspaceStamp | null;
   setHasGit: (value: boolean) => void;
@@ -718,11 +719,14 @@ function createHarness(
   let activeClones = 0;
   let maxActiveClones = 0;
   let currentClient: WrapperKiloClient | undefined;
+  const runtimeKeys = new Set<string>();
+  let runtimeRestarting = false;
 
   const defaultRuntimes: PrepareRuntimePort = {
     ensure: async input => {
       ensureCalls += 1;
       ensureInputs.push({ key: input.key, directory: input.directory, env: input.env });
+      runtimeKeys.add(input.key);
       await options.beforeEnsure?.();
       if (ensureHung) return new Promise<WrapperKiloClient>(() => undefined);
       if (ensureError !== undefined) throw ensureError;
@@ -787,13 +791,15 @@ function createHarness(
       installCalls.push({ key, env, cloudAgentMcp });
       await options.beforeInstall?.();
     },
-    isUnavailable: key => unavailableKeys.has(key),
-    getLiveClient: () => currentClient,
+    isUnavailable: key => unavailableKeys.has(key) || !runtimeKeys.has(key),
+    getLiveClient: () => (runtimeRestarting ? undefined : currentClient),
     remove: key => {
       removeCalls.push(key);
+      runtimeKeys.delete(key);
     },
     release: key => {
       releaseCalls.push(key);
+      runtimeKeys.delete(key);
     },
   };
   const runtimes = options.runtimes ?? defaultRuntimes;
@@ -921,6 +927,9 @@ function createHarness(
     setUnavailable: (key, value) => {
       if (value) unavailableKeys.add(key);
       else unavailableKeys.delete(key);
+    },
+    setRuntimeRestarting: value => {
+      runtimeRestarting = value;
     },
     setStamp: value => {
       stamp = value;
@@ -2461,6 +2470,100 @@ describe('createPreparationManager', () => {
       JSON.parse(harness.installCalls[0]?.env.KILO_CONFIG_CONTENT ?? '{}').mcp['kilo-cloud-agent']
         .headers.Authorization
     ).toBe(`Bearer ${grant.token}`);
+  });
+
+  it('installs a recovered workspace MCP grant after the last sibling releases during prepare', async () => {
+    let releaseFirst: () => void = () => undefined;
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        releaseFirst();
+      },
+    });
+    const first = routeSpec();
+    await harness.manager.prepare(first);
+    releaseFirst = () => harness.manager.release(first.sessionId);
+    const sibling = routeSpec({
+      sessionId: 'workspace_sibling',
+      kiloSessionId: 'ses_22222222222222222222222222',
+    });
+    const grant = {
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'recovered-during-release-grant',
+      expiresAt: 1_900_000_000,
+    };
+    await harness.manager.prepare(sibling, {
+      sessionId: sibling.sessionId,
+      kilo: { token: 'model-alias' },
+      cloudAgentMcp: grant,
+    });
+    expect(harness.releaseCalls).toEqual([]);
+    expect(harness.installCalls).toHaveLength(1);
+    expect(harness.installCalls[0]?.key).toBe(first.directory);
+    expect(harness.installCalls[0]?.cloudAgentMcp).toEqual(grant);
+  });
+
+  it('installs a recovered workspace MCP grant on a restarting runtime after the last sibling releases', async () => {
+    let releaseFirst: () => void = () => undefined;
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        releaseFirst();
+      },
+    });
+    const first = routeSpec();
+    await harness.manager.prepare(first);
+    harness.setRuntimeRestarting(true);
+    releaseFirst = () => harness.manager.release(first.sessionId);
+    const sibling = routeSpec({
+      sessionId: 'workspace_sibling',
+      kiloSessionId: 'ses_22222222222222222222222222',
+    });
+    const grant = {
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'recovered-during-restart-grant',
+      expiresAt: 1_900_000_000,
+    };
+    await harness.manager.prepare(sibling, {
+      sessionId: sibling.sessionId,
+      kilo: { token: 'model-alias' },
+      cloudAgentMcp: grant,
+    });
+    expect(harness.releaseCalls).toEqual([]);
+    expect(harness.installCalls).toHaveLength(1);
+    expect(harness.installCalls[0]?.cloudAgentMcp).toEqual(grant);
+  });
+
+  it('does not retain a failed prepare MCP grant ahead of the runtime', async () => {
+    const harness = createHarness();
+    const first = routeSpec();
+    await harness.manager.prepare(first);
+    const sibling = routeSpec({
+      sessionId: 'workspace_sibling',
+      kiloSessionId: 'ses_22222222222222222222222222',
+    });
+    const grant = {
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'failed-prepare-grant',
+      expiresAt: 1_900_000_000,
+    };
+    harness.setSessionExists(false);
+    harness.setEnsureSessionError(new Error('kilo session failed'));
+    await harness.manager.prepare(sibling, {
+      sessionId: sibling.sessionId,
+      kilo: { token: 'model-alias' },
+      cloudAgentMcp: grant,
+    });
+    expect(harness.frames.some(frame => frame.type === 'session.failed')).toBe(true);
+    expect(harness.installCalls).toHaveLength(0);
+
+    harness.setEnsureSessionError(undefined);
+    harness.setSessionExists(true);
+    await harness.manager.prepare(sibling, {
+      sessionId: sibling.sessionId,
+      kilo: { token: 'model-alias' },
+      cloudAgentMcp: grant,
+    });
+    expect(harness.installCalls).toHaveLength(1);
+    expect(harness.installCalls[0]?.cloudAgentMcp).toEqual(grant);
   });
 
   it('does not replay a prepare-time MCP grant over a credential renewed during sibling preparation', async () => {

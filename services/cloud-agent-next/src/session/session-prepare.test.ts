@@ -601,6 +601,26 @@ describe('explicit sandbox session creation', () => {
     );
   });
 
+  it('does not fail a registered spawn when the parent registry hint write fails', async () => {
+    // Registry entries are discovery hints, not authority. A transient parent-DO
+    // failure after the session already registered must not turn the create into
+    // an unacknowledgeable error.
+    const doStub = makeDoStub({
+      recordCloudAgentChildSession: vi
+        .fn()
+        .mockRejectedValue(new Error('Cloud Agent child registry denied')),
+    });
+    const ctx = modernContext(makeContext(doStub));
+    const parentSessionId = 'workspace_12345678-1234-4234-8234-123456789abc';
+
+    await expect(
+      registerNewSession(makeRequest({ parentCloudAgentSessionId: parentSessionId }), ctx)
+    ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+
+    expect(doStub.registerSessionFromMetadata).toHaveBeenCalledTimes(1);
+    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledTimes(1);
+  });
+
   it.each(['vercel-small', 'cloudflare-shared'] as const)(
     'rejects an unsupported saved %s policy allocation',
     async savedSandboxAllocation => {
@@ -3605,6 +3625,66 @@ describe('createSessionWithLedger admission ladder', () => {
     expect(settleOperationMock).not.toHaveBeenCalled();
   });
 
+  it('rewrites the parent child registry hint on a completed replay', async () => {
+    const parentSessionId = 'workspace_parent';
+    const request = makeRequest({
+      parentCloudAgentSessionId: parentSessionId,
+      options: { operationKey: OPERATION_KEY },
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: makeLedgerRow({
+        status: 'completed',
+        canonical_result: {
+          cloudAgentSessionId: WORKSPACE_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+          initialMessageId: INITIAL_MESSAGE_ID,
+          [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
+        },
+      }),
+    });
+    const doStub = makeDoStub();
+
+    await expect(runCreate(makeContext(doStub), request)).resolves.toEqual({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      initialMessageId: INITIAL_MESSAGE_ID,
+      worktreeId: WORKTREE_ID,
+    });
+  });
+
+  it('replays a completed spawn when the parent registry hint write fails', async () => {
+    const request = makeRequest({
+      parentCloudAgentSessionId: 'workspace_parent',
+      options: { operationKey: OPERATION_KEY },
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: makeLedgerRow({
+        status: 'completed',
+        canonical_result: {
+          cloudAgentSessionId: SANDBOX_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+          initialMessageId: INITIAL_MESSAGE_ID,
+        },
+      }),
+    });
+    const doStub = makeDoStub({
+      recordCloudAgentChildSession: vi.fn().mockRejectedValue(new Error('parent DO unavailable')),
+    });
+
+    await expect(runCreate(makeContext(doStub), request)).resolves.toEqual({
+      cloudAgentSessionId: SANDBOX_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(settleOperationMock).not.toHaveBeenCalled();
+  });
+
   it('rejects a settled row without canonical IDs as a non-retryable failure', async () => {
     admitOperationMock.mockResolvedValueOnce({
       admission: 'duplicate_settled',
@@ -4010,6 +4090,58 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
       kiloSessionId: KILO_SESSION_ID,
       replayed: true,
     });
+  });
+
+  it('(d) rewrites the parent child registry hint when reconciling a completed spawn', async () => {
+    const request = makeRequest({
+      parentCloudAgentSessionId: 'workspace_parent',
+      options: { operationKey: OPERATION_KEY },
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({ canonical_result: canonicalIds }),
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ sessionId: KILO_SESSION_ID }], [{ email: 'test@example.com' }]])
+    );
+    const doStub = makeDoStub();
+
+    await expect(runCreate(makeContext(doStub), request)).resolves.toEqual({
+      cloudAgentSessionId: SANDBOX_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith({
+      cloudAgentSessionId: SANDBOX_SESSION_ID,
+      initialMessageId: INITIAL_MESSAGE_ID,
+    });
+  });
+
+  it('(d) replays a reconciled spawn when the parent registry hint write fails', async () => {
+    const request = makeRequest({
+      parentCloudAgentSessionId: 'workspace_parent',
+      options: { operationKey: OPERATION_KEY },
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({ canonical_result: canonicalIds }),
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ sessionId: KILO_SESSION_ID }], [{ email: 'test@example.com' }]])
+    );
+    const doStub = makeDoStub({
+      recordCloudAgentChildSession: vi.fn().mockRejectedValue(new Error('parent DO unavailable')),
+    });
+
+    await expect(runCreate(makeContext(doStub), request)).resolves.toEqual({
+      cloudAgentSessionId: SANDBOX_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ rowId: ROW_ID, status: 'completed', outcomeCode: 'ok' })
+    );
   });
 
   it('(d) settles failed and surfaces session_creation_failed when the found initial message status is failed', async () => {
@@ -6764,6 +6896,28 @@ describe('createSessionWithLedger clone reconciliation', () => {
       cloudAgentSessionId: SANDBOX_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
       replayed: true,
+    });
+  });
+
+  it('reconciles the parent registry hint when a clone-only create settles completed', async () => {
+    const parentSessionId = 'workspace_parent';
+    const request = cloneRequest({ parentCloudAgentSessionId: parentSessionId });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: await cloneRow({}, request),
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ sessionId: KILO_SESSION_ID }], [{ email: 'test@example.com' }]])
+    );
+    const doStub = makeDoStub();
+
+    await expect(runCreate(makeContext(doStub), request)).resolves.toEqual({
+      cloudAgentSessionId: SANDBOX_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith({
+      cloudAgentSessionId: SANDBOX_SESSION_ID,
     });
   });
 

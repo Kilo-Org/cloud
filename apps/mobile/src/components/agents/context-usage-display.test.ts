@@ -46,8 +46,7 @@ function pill(args: {
 const trackOnly: HeaderPillContent = {
   primary: null,
   secondary: null,
-  hasCost: false,
-  costPending: false,
+  costSlot: 'none',
   tone: 'neutral',
   arcFraction: 0,
   interactive: false,
@@ -57,12 +56,11 @@ const trackOnly: HeaderPillContent = {
 /** A transcript without usage: the same ring, no dash slot. */
 const trackOnlyWhileLoading: HeaderPillContent = { ...trackOnly, usageUnavailable: false };
 
-/** No usage reported yet: both value slots stay open, each marked with a dash. */
+/** No usage reported yet: both value slots stay open, the cost one with a dash. */
 const unreported: HeaderPillContent = {
   primary: '—',
   secondary: '—',
-  hasCost: true,
-  costPending: false,
+  costSlot: 'unreported',
   tone: 'neutral',
   arcFraction: 0,
   interactive: false,
@@ -76,7 +74,7 @@ const unreported: HeaderPillContent = {
 const unreportedWhileLoading: HeaderPillContent = {
   ...unreported,
   secondary: null,
-  costPending: true,
+  costSlot: 'loading',
   usageUnavailable: false,
 };
 
@@ -181,7 +179,7 @@ describe('getHeaderPillContent', () => {
     });
     expect(result).toMatchObject({
       secondary: '$0.08',
-      hasCost: true,
+      costSlot: 'label',
       tone: 'primary',
       arcFraction: 0.42,
       interactive: true,
@@ -192,7 +190,7 @@ describe('getHeaderPillContent', () => {
   it('omits secondary cost when cost is zero or null', () => {
     const base = {
       secondary: null,
-      hasCost: false,
+      costSlot: 'none',
       tone: 'primary' as const,
       arcFraction: 0.1,
       interactive: true,
@@ -237,7 +235,7 @@ describe('getHeaderPillContent', () => {
     });
     expect(result).toMatchObject({
       secondary: '$0.12',
-      hasCost: true,
+      costSlot: 'label',
       tone: 'neutral',
       arcFraction: undefined,
       interactive: true,
@@ -254,7 +252,7 @@ describe('getHeaderPillContent', () => {
       })
     ).toMatchObject({
       secondary: null,
-      hasCost: false,
+      costSlot: 'none',
       tone: 'neutral',
       arcFraction: undefined,
       interactive: true,
@@ -266,8 +264,7 @@ describe('getHeaderPillContent', () => {
     expect(pill({ totalCostMicrodollars: 80_000, hasMessages: true })).toEqual({
       primary: '$0.08',
       secondary: null,
-      hasCost: true,
-      costPending: false,
+      costSlot: 'none',
       tone: 'neutral',
       arcFraction: 0,
       interactive: false,

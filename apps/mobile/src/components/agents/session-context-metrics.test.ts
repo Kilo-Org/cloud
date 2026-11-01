@@ -296,10 +296,7 @@ describe('SessionContextMetrics', () => {
   // usage arrives, so the pill never grows a value out of a narrower pill.
   it('holds the value slots over the bare ring, with a loading bar until usage arrives', () => {
     const dashes = (root: React.ReactElement) =>
-      findAll(root, el => el.type === 'Text').filter(el => {
-        const children = (el.props as { children?: unknown }).children;
-        return children === '—';
-      });
+      findAll(root, el => (el.props as { children?: unknown }).children === '—');
     const bars = (root: React.ReactElement) => findAll(root, el => el.type === 'Skeleton');
     const onPress = vi.fn<() => void>();
 
@@ -309,11 +306,13 @@ describe('SessionContextMetrics', () => {
       hasMessages: false,
       onPress,
     });
-    const props = settled.props as { accessibilityLabel?: string; className?: string };
+    const props = settled.props as { accessibilityLabel?: string };
     expect(props.accessibilityLabel).toContain('usage unavailable');
-    expect(props.className ?? '').not.toContain('opacity-0');
     expect(dashes(settled)).toHaveLength(2);
-    // A settled pill promises nothing that has not arrived, so no bar.
+    // A settled pill keeps the cost dash in the label's width — no bar, and no
+    // narrowing from the width the loading pill already held.
+    const dashClasses = dashes(settled).map(el => (el.props as { className?: string }).className);
+    expect(dashClasses[1]).toEqual(expect.stringContaining('w-8'));
     expect(bars(settled)).toHaveLength(0);
 
     const loading = render({

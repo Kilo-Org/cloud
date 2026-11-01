@@ -84,16 +84,13 @@ export function SessionContextMetrics({
   const pillClassName =
     'h-[44px] shrink min-w-0 flex-row items-center gap-2 rounded-full border border-border bg-secondary px-3';
 
-  // The pill's second value slot: the session cost once it exists, a loading
-  // bar at that label's width while it does not, nothing when the session has no
-  // cost to show. The bar keeps the header still: before usage arrives the pill
-  // painted a second dash, which read as missing data and was narrower than the
-  // cost it later held, so the pill grew a value out of a smaller pill.
-  // `bg-muted-soft` is the one gray that stands off this pill's own
-  // `bg-secondary` fill — the theme's `muted` equals `secondary` in both
-  // palettes.
+  // The pill's second value slot. `bg-muted-soft` is the one gray that stands
+  // off this pill's own `bg-secondary` fill — the theme's `muted` equals
+  // `secondary` in both palettes — and the slot keeps the cost label's width in
+  // every placeholder state, so the pill never grows a value out of a smaller
+  // pill and never shrinks when a session settles without one.
   let costSlot: ReactNode = null;
-  if (content.hasCost && content.secondary) {
+  if (content.costSlot === 'label' && content.secondary !== null) {
     costSlot = (
       <Text
         numberOfLines={1}
@@ -104,11 +101,22 @@ export function SessionContextMetrics({
         {content.secondary}
       </Text>
     );
-  } else if (content.costPending) {
+  } else if (content.costSlot === 'loading') {
     costSlot = (
       <View accessibilityElementsHidden importantForAccessibility="no">
         <Skeleton className="h-2 w-8 rounded-[2px] bg-muted-soft" />
       </View>
+    );
+  } else if (content.costSlot === 'unreported') {
+    costSlot = (
+      <Text
+        numberOfLines={1}
+        className="w-8 text-center text-xs tabular-nums text-muted-foreground"
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        {content.secondary}
+      </Text>
     );
   }
 

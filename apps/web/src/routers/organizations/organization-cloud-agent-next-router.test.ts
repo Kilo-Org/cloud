@@ -354,7 +354,7 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
   getMessageResult: (input: {
     organizationId: string;
     cloudAgentSessionId: string;
-    expectedWorktreeId: `worktree_${string}`;
+    expectedWorktreeId?: `worktree_${string}`;
     messageId: string;
   }) => ReturnType<CloudAgentNextClient['getMessageResult']>;
   sendMessage: (input: {
@@ -763,6 +763,7 @@ describe('organizationCloudAgentNextRouter worktree changes access', () => {
         cloudAgentSessionId: orgSessionId,
         messageId: reviewMessageId,
         status: 'queued',
+        createdAt: 1,
       });
       mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValue({
         isFree: false,
@@ -789,11 +790,13 @@ describe('organizationCloudAgentNextRouter worktree changes access', () => {
           })
         );
         expect(mockSendMessage.mock.calls[0]?.[0]).not.toHaveProperty('expectedWorktreeId');
+        expect(mockSendMessage.mock.calls[0]?.[0]).not.toHaveProperty('organizationId');
       } else {
         expect(mockGetMessageResult).toHaveBeenCalledWith({
           cloudAgentSessionId: orgSessionId,
           messageId: reviewMessageId,
         });
+        expect(mockGetMessageResult.mock.calls[0]?.[0]).not.toHaveProperty('organizationId');
         expect(mockRequireActiveSubscription).not.toHaveBeenCalled();
         expect(mockComputeCloudAgentNextBalanceCheckEligibility).not.toHaveBeenCalled();
         expect(mockSendMessage).not.toHaveBeenCalled();

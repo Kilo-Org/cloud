@@ -141,6 +141,7 @@ export async function preflightRuntimeAuthorizationRecovery(
   ) {
     return;
   }
+  const cloudAgentScoped = 'cloudAgentAuthority' in claims;
   const sessionId = cloudAgentSessionId as SessionId;
   const state = await withDORetry(
     () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
@@ -157,6 +158,10 @@ export async function preflightRuntimeAuthorizationRecovery(
       'stored_authorization_revoked'
     );
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
+  }
+  if (cloudAgentScoped) {
+    logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'preflight', 'delegation_expired');
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization expired' });
   }
   if (!state.id) return;
   const expectedOldId = state.id;

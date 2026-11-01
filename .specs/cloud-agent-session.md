@@ -329,6 +329,13 @@ repository.
     remain isolated. The worktree's MCP configuration MUST be established when
     the worktree is created, MAY be restored when its runtime is rehydrated, and
     MUST be reused by later chats.
+15. A workspace's delegated Cloud Agent MCP connection MAY create independent
+    child sessions and list, inspect, check exact message results, interrupt, or
+    send prompt follow-ups to its direct children. Each management operation
+    MUST check current canonical-parent authorization and persisted child
+    lineage, owner and organization. It MUST NOT manage the parent itself,
+    sibling chats or unrelated sessions. Child completion callbacks MUST target
+    the canonical workspace parent, not an arbitrary invoking sibling.
 
 ### Sandbox Status
 

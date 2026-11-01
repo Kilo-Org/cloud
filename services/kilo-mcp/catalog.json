@@ -5899,6 +5899,7 @@
           "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         },
         "expectedWorktreeId": {
+          "description": "Required for ordinary user calls; optional only for delegated Cloud Agent authority.",
           "type": "string",
           "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         },
@@ -5909,7 +5910,6 @@
       },
       "required": [
         "cloudAgentSessionId",
-        "expectedWorktreeId",
         "messageId"
       ]
     },
@@ -6185,6 +6185,36 @@
       "sessionid"
     ],
     "searchBlob": "cloudAgentNext.interruptSession Stop a running cloud agent session and cancel its active work. cloudagentnext interruptsession sessionid sessionId"
+  },
+  "cloudAgentNext.listChildSessions": {
+    "path": "cloudAgentNext.listChildSessions",
+    "kind": "query",
+    "summary": "List the direct child Cloud Agent sessions created by this workspace's parent session, with a bounded page size.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "cursor": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "listchildsessions",
+      "limit",
+      "cursor"
+    ],
+    "searchBlob": "cloudAgentNext.listChildSessions List the direct child Cloud Agent sessions created by this workspace's parent session, with a bounded page size. cloudagentnext listchildsessions limit cursor limit cursor"
   },
   "cloudAgentNext.listGitHubRepositories": {
     "path": "cloudAgentNext.listGitHubRepositories",
@@ -16714,6 +16744,7 @@
           "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         },
         "expectedWorktreeId": {
+          "description": "Required for ordinary user calls; optional only for delegated Cloud Agent authority.",
           "type": "string",
           "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         },
@@ -16725,7 +16756,6 @@
       "required": [
         "organizationId",
         "cloudAgentSessionId",
-        "expectedWorktreeId",
         "messageId"
       ]
     },
@@ -17121,6 +17151,63 @@
       "forcerefresh"
     ],
     "searchBlob": "organizations.cloudAgentNext.listBitbucketRepositories List Bitbucket repositories available to the organization for Cloud Agent, ordered by recent usage. organizations cloudagentnext listbitbucketrepositories organizationid forcerefresh organizationId forceRefresh"
+  },
+  "organizations.cloudAgentNext.listChildSessions": {
+    "path": "organizations.cloudAgentNext.listChildSessions",
+    "kind": "query",
+    "summary": "List the direct child Cloud Agent sessions created by this organization's parent session, with a bounded page size.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "cursor": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "listchildsessions",
+      "organizationid",
+      "limit",
+      "cursor"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.listChildSessions List the direct child Cloud Agent sessions created by this organization's parent session, with a bounded page size. organizations cloudagentnext listchildsessions organizationid limit cursor organizationId limit cursor"
   },
   "organizations.cloudAgentNext.listGitHubRepositories": {
     "path": "organizations.cloudAgentNext.listGitHubRepositories",

@@ -196,7 +196,7 @@ export async function searchCatalogDetailed(
       tags: row.tags,
       score,
       inputSchema: options.cloudAgentAuthority
-        ? cloudAgentAuthorityInputSchema(options.cloudAgentAuthority)
+        ? cloudAgentAuthorityInputSchema(options.cloudAgentAuthority, row.path)
         : row.inputSchema,
       blobTokens,
       ...(isGuardedRow(row) ? { requiresApproval: true as const } : {}),
@@ -245,7 +245,7 @@ export async function searchCatalogDetailed(
         tags: row.tags,
         score: candidate.score * minLexicalScore * 0.5,
         inputSchema: options.cloudAgentAuthority
-          ? cloudAgentAuthorityInputSchema(options.cloudAgentAuthority)
+          ? cloudAgentAuthorityInputSchema(options.cloudAgentAuthority, row.path)
           : row.inputSchema,
         blobTokens: new Set(),
         ...(isGuardedRow(row) ? { requiresApproval: true as const } : {}),

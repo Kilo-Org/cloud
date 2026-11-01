@@ -273,6 +273,7 @@ type DoStubOverrides = {
   createSessionWithInitialAdmission?: ReturnType<typeof vi.fn>;
   getMetadata?: ReturnType<typeof vi.fn>;
   getMessageResult?: ReturnType<typeof vi.fn>;
+  recordCloudAgentChildSession?: ReturnType<typeof vi.fn>;
 };
 
 function makeDoStub(overrides: DoStubOverrides = {}) {
@@ -288,6 +289,8 @@ function makeDoStub(overrides: DoStubOverrides = {}) {
         messageId: INITIAL_MESSAGE_ID,
         compatibilityDelivery: 'queued',
       } satisfies SessionMessageAdmissionResult),
+    recordCloudAgentChildSession:
+      overrides.recordCloudAgentChildSession ?? vi.fn().mockResolvedValue({ success: true }),
     getMetadata:
       overrides.getMetadata ??
       vi.fn().mockResolvedValue({
@@ -584,6 +587,17 @@ describe('explicit sandbox session creation', () => {
           egressAllowlist: [],
         }),
       })
+    );
+  });
+
+  it('records a spawned child in the parent registry before returning', async () => {
+    const doStub = makeDoStub();
+    const ctx = modernContext(makeContext(doStub));
+    const parentSessionId = 'workspace_12345678-1234-4234-8234-123456789abc';
+    await registerNewSession(makeRequest({ parentCloudAgentSessionId: parentSessionId }), ctx);
+    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledTimes(1);
+    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: WORKSPACE_SESSION_ID })
     );
   });
 

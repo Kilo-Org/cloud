@@ -664,6 +664,31 @@ function effectiveSessionRegistrationInput(
   };
 }
 
+async function recordParentChildSession(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  child: {
+    cloudAgentSessionId: string;
+    initialMessageId?: string;
+    worktreeId?: string;
+  }
+): Promise<void> {
+  const parentSessionId = input.parentCloudAgentSessionId;
+  if (parentSessionId === undefined) return;
+  await withDORetry(
+    () => getSandboxSessionStub(ctx.env, ctx.userId, parentSessionId),
+    stub =>
+      stub.recordCloudAgentChildSession({
+        cloudAgentSessionId: child.cloudAgentSessionId,
+        ...(child.initialMessageId === undefined
+          ? {}
+          : { initialMessageId: child.initialMessageId }),
+        ...(child.worktreeId === undefined ? {} : { worktreeId: child.worktreeId }),
+      }),
+    'recordCloudAgentChildSession'
+  );
+}
+
 async function issueSessionRuntimeAuthorization(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
@@ -1372,6 +1397,13 @@ export async function registerNewSession(
     });
   }
 
+  await recordParentChildSession(input, ctx, {
+    cloudAgentSessionId: allocation.cloudAgentSessionId,
+    ...(allocation.initialTurn === undefined
+      ? {}
+      : { initialMessageId: allocation.initialTurn.messageId }),
+    ...(allocation.worktreeId === undefined ? {} : { worktreeId: allocation.worktreeId }),
+  });
   logger.info('Session registered for lazy preparation');
   return allocation;
 }
@@ -1495,6 +1527,19 @@ async function registerAndAdmitInitialTurn(
     throwAdmissionError(admission);
   }
 
+  try {
+    await recordParentChildSession(input, ctx, {
+      cloudAgentSessionId: allocation.cloudAgentSessionId,
+      initialMessageId: admission.messageId,
+      ...(allocation.worktreeId === undefined ? {} : { worktreeId: allocation.worktreeId }),
+    });
+  } catch (error) {
+    if (ledger) {
+      await ledger.onTransportFailure();
+    }
+    throw error;
+  }
+
   logger.info('Session registered with initial message admitted');
   const result: StartedSessionResult = {
     cloudAgentSessionId: allocation.cloudAgentSessionId,
@@ -1604,6 +1649,21 @@ async function registerAllocatedSession(
   // `rebuildRecordedSessionAllocation`, so the DO belongs to the same ledger row. Keep that
   // property if either entry changes; otherwise an unrelated conflict would be
   // swallowed as success here.
+  try {
+    await recordParentChildSession(input, ctx, {
+      cloudAgentSessionId: allocation.cloudAgentSessionId,
+      ...(allocation.initialTurn === undefined
+        ? {}
+        : { initialMessageId: allocation.initialTurn.messageId }),
+      ...(allocation.worktreeId === undefined ? {} : { worktreeId: allocation.worktreeId }),
+    });
+  } catch (error) {
+    if (ledger) {
+      await ledger.onTransportFailure();
+    }
+    throw error;
+  }
+
   logger.info('Session registered for lazy preparation');
   const result = {
     cloudAgentSessionId: allocation.cloudAgentSessionId,
@@ -2073,9 +2133,14 @@ async function replaySettledCreate(
     // so the client clears the key.
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
   }
+  const initialMessage = canonicalInitialMessage(row);
+  await recordParentChildSession(input, ctx, {
+    cloudAgentSessionId: ids.cloudAgentSessionId,
+    ...(initialMessage === undefined ? {} : { initialMessageId: initialMessage.messageId }),
+  });
   return {
     ...ids,
-    ...(options?.includeInitialMessage ? (canonicalInitialMessage(row) ?? {}) : {}),
+    ...(options?.includeInitialMessage ? (initialMessage ?? {}) : {}),
     replayed: true,
   };
 }

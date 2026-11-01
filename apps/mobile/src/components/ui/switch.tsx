@@ -31,6 +31,10 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * 4.5:1 dark for on; 2.2:1 for off) and stay apart from each other (2.2:1
  * light, 2.1:1 dark), so a disabled switch still says which way it points.
  *
+ * iOS is left alone: UIKit fades a disabled `UISwitch` itself, so painting the
+ * muted pair there would dim the control twice. Android is the platform that
+ * needs the pair, and only it takes it.
+ *
  * Fabric derives the accessibility traits from the role and
  * `accessibilityState`, then assigns them to the native control, replacing the
  * traits the control reports for itself. React Native's iOS bridge passes
@@ -49,7 +53,8 @@ export function Switch({
   const colors = useThemeColors();
   const dark = useColorScheme() === 'dark';
   const resolvedDisabled = disabled ?? accessibilityState?.disabled;
-  const inactive = resolvedDisabled === true;
+  // Only Android needs the muted pair: iOS fades a disabled `UISwitch` itself.
+  const inactive = resolvedDisabled === true && Platform.OS === 'android';
   const enabledOffGrip = dark ? colors.foreground : colors.primaryForeground;
   const enabledOffTrack = dark ? colors.mutedForeground : colors.mutedSoft;
   // The on grip sits on `primary`, the off grip on the off track; the off grip

@@ -48,7 +48,7 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
   Linking: { openSettings: openSettings },
-  Platform: { OS: 'ios' },
+  Platform: { OS: 'android' },
   useColorScheme: () => 'light',
 }));
 // The Live Activity row: the preference is SecureStore-backed and the system

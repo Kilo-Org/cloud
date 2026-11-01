@@ -179,6 +179,16 @@ describe('Switch', () => {
     expect(props.trackColor?.true).toBe(lightColors.primaryDisabled);
   });
 
+  it('leaves the pair to the platform on iOS, which fades a disabled switch itself', () => {
+    native.os = 'ios';
+    native.scheme = 'light';
+    const props = nativeProps(renderSwitch({ disabled: true, value: true }).root);
+    expect(props.disabled).toBe(true);
+    expect(props.accessibilityState?.disabled).toBe(true);
+    expect(props.trackColor).toEqual({ false: lightColors.mutedSoft, true: lightColors.primary });
+    expect(props.thumbColor).toBe(lightColors.primaryForeground);
+  });
+
   it('keeps a caller pair on a disabled switch', () => {
     native.os = 'android';
     native.scheme = 'light';

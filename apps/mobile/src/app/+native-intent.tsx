@@ -43,8 +43,8 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   if (__DEV__) {
     // Dev-only link that opens the connect gate's GitLab-instance state the way
     // the paste flow reaches it: a provider route carrying the paste's
-    // `?instance=` hint. It returns a route itself, so this returns falsy (see
-    // `handlePrReviewInstanceFixturePath`).
+    // `?instance=` hint. The handler navigates itself, so this returns falsy —
+    // never a route, which the resolver would re-dispatch.
     if (handlePrReviewInstanceFixturePath(path)) {
       return null;
     }

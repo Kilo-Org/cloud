@@ -36,6 +36,7 @@ import { useSessionComposerFocus } from './useSessionComposerFocus';
 import {
   dedupeCustomModeOptions,
   ensureSelectedCustomOption,
+  filterSessionCustomModeOptions,
   modeControlValue,
   normalizeAlias,
   type CustomModeOption,
@@ -1386,15 +1387,6 @@ export default function CloudChatPage({
     [activeWorkspaceTabId, changesViewOpen, fileScope]
   );
 
-  // Surface the session's custom agents plus the current visible profile
-  // agents to the chat picker. `runtimeAgents` are the agents active when the
-  // session was created; the profile list enriches those same agents with
-  // their current descriptions, filtered to slugs the session can still run.
-  //
-  // Only agents that would surface in NewSessionPanel's picker are included
-  // (not disabled, not hidden, not subagent-only). Built-in slugs are dropped
-  // and the selected slug is appended once when it is neither built-in nor
-  // already listed, so an inherited custom slug stays visible.
   const { data: combinedProfilesData } = useCombinedProfiles({
     organizationId: organizationId ?? '',
     enabled: !!organizationId,
@@ -1436,9 +1428,12 @@ export default function CloudChatPage({
     label: a.name,
     description: a.config.description ?? '',
   }));
-  const combinedCustomOptions = ensureSelectedCustomOption(
-    dedupeCustomModeOptions([...runtimeCustomOptions, ...profileCustomOptions]),
-    sessionConfig?.mode ?? ''
+  const combinedCustomOptions = filterSessionCustomModeOptions(
+    ensureSelectedCustomOption(
+      dedupeCustomModeOptions([...runtimeCustomOptions, ...profileCustomOptions]),
+      sessionConfig?.mode ?? ''
+    ),
+    sessionConfig?.runtimeAgents
   );
   const customModeOptions: CustomModeOption[] | undefined =
     combinedCustomOptions.length > 0 ? combinedCustomOptions : undefined;

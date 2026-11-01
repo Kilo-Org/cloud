@@ -2,6 +2,7 @@ import { describe, it, expect } from '@jest/globals';
 import {
   dedupeCustomModeOptions,
   ensureSelectedCustomOption,
+  filterSessionCustomModeOptions,
   isValidSessionConfig,
   modeControlValue,
   needsResumeConfiguration,
@@ -315,5 +316,63 @@ describe('dedupeCustomModeOptions', () => {
   it('drops an empty slug', () => {
     const options: CustomModeOption[] = [{ value: '', label: '', description: '' }];
     expect(dedupeCustomModeOptions(options)).toEqual([]);
+  });
+});
+
+describe('filterSessionCustomModeOptions', () => {
+  const option = (slug: string): CustomModeOption => ({
+    value: slug,
+    label: slug,
+    description: '',
+  });
+
+  it('excludes subagent-only, hidden, and disabled runtime agents', () => {
+    const runtimeAgents: NonNullable<SessionConfig['runtimeAgents']> = [
+      { slug: 'primary', name: 'Primary', mode: 'primary' },
+      { slug: 'all', name: 'All', mode: 'all' },
+      { slug: 'default', name: 'Default' },
+      { slug: 'visible', name: 'Visible', hidden: false, disable: false },
+      { slug: 'subagent', name: 'Subagent', mode: 'subagent' },
+      { slug: 'hidden', name: 'Hidden', hidden: true },
+      { slug: 'disabled', name: 'Disabled', disable: true },
+    ];
+
+    expect(
+      filterSessionCustomModeOptions(
+        runtimeAgents.map(agent => option(agent.slug)),
+        runtimeAgents
+      )
+    ).toEqual(['primary', 'all', 'default', 'visible'].map(option));
+    expect(runtimeAgents).toHaveLength(7);
+  });
+
+  it.each([{ mode: 'subagent' as const }, { hidden: true }, { disable: true }])(
+    'does not reintroduce an excluded selected mode: %p',
+    visibility => {
+      const options = ensureSelectedCustomOption([option('visible')], 'excluded');
+
+      expect(
+        filterSessionCustomModeOptions(options, [
+          { slug: 'excluded', name: 'Excluded', ...visibility },
+        ])
+      ).toEqual([option('visible')]);
+    }
+  );
+
+  it('uses session visibility even when a profile contributes the same slug', () => {
+    const options = dedupeCustomModeOptions([option('reviewer'), option('runtime-only')]);
+
+    expect(
+      filterSessionCustomModeOptions(options, [
+        { slug: 'reviewer', name: 'Reviewer', mode: 'subagent' },
+        { slug: 'runtime-only', name: 'Runtime Only', mode: 'primary' },
+      ])
+    ).toEqual([option('runtime-only')]);
+  });
+
+  it('preserves inherited custom modes when runtime metadata is unavailable', () => {
+    const options = ensureSelectedCustomOption([], 'inherited');
+
+    expect(filterSessionCustomModeOptions(options, undefined)).toEqual([option('inherited')]);
   });
 });

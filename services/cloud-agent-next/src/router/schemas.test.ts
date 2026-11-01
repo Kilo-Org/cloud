@@ -47,6 +47,29 @@ const baseStartInput = {
   repository: { type: 'github' as const, repo: 'acme/repo' },
 };
 
+describe('GetSessionOutput runtime agents', () => {
+  it('preserves picker visibility without removing agents used for delegation', () => {
+    const runtimeAgents = [
+      { slug: 'primary', name: 'Primary', mode: 'primary', hidden: false, disable: false },
+      { slug: 'subagent', name: 'Subagent', mode: 'subagent' },
+      { slug: 'hidden', name: 'Hidden', mode: 'all', hidden: true },
+      { slug: 'disabled', name: 'Disabled', disable: true },
+      { slug: 'legacy', name: 'Legacy' },
+    ];
+
+    const response = GetSessionOutput.parse({
+      sessionId: validSessionId,
+      userId: 'user_test',
+      execution: null,
+      timestamp: 1,
+      version: 1,
+      runtimeAgents,
+    });
+
+    expect(response.runtimeAgents).toEqual(runtimeAgents);
+  });
+});
+
 describe('grouped unified session input contracts', () => {
   it('accepts an optional operation key on start for any client origin', () => {
     const valid = {

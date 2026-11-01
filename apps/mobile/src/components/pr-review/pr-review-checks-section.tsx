@@ -18,6 +18,7 @@ import {
   PrReviewChecksStatusRow,
 } from '@/components/pr-review/pr-review-checks-status-row';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
@@ -252,9 +253,7 @@ export function PrReviewChecksSection({
   if (checks.isLoading) {
     return (
       <View className="gap-2">
-        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-          {t('prReview.checks.title')}
-        </Text>
+        <PrReviewSectionLabel label={t('prReview.checks.title')} />
         <View
           key={LOADING_CARD_KEY}
           className="overflow-hidden rounded-lg bg-secondary"
@@ -291,9 +290,7 @@ export function PrReviewChecksSection({
       // installed on the head repo). No retry — just the message.
       return (
         <View className="gap-2">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('prReview.checks.title')}
-          </Text>
+          <PrReviewSectionLabel label={t('prReview.checks.title')} />
           <View key={CONTENT_CARD_KEY} className="gap-2 rounded-lg bg-secondary p-4">
             <Text className="text-sm text-muted-foreground">
               {t('prReview.checks.notAvailable')}
@@ -305,9 +302,7 @@ export function PrReviewChecksSection({
     if (state.kind === 'permission') {
       return (
         <View className="gap-2">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('prReview.checks.title')}
-          </Text>
+          <PrReviewSectionLabel label={t('prReview.checks.title')} />
           <View key={CONTENT_CARD_KEY} className="gap-2 rounded-lg bg-secondary p-4">
             <Text className="text-sm text-muted-foreground">{t('prReview.checks.noAccess')}</Text>
           </View>
@@ -317,9 +312,7 @@ export function PrReviewChecksSection({
     if (state.kind === 'reconnect') {
       return (
         <View className="gap-2">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('prReview.checks.title')}
-          </Text>
+          <PrReviewSectionLabel label={t('prReview.checks.title')} />
           <PrReviewReconnectNotice />
         </View>
       );
@@ -330,9 +323,7 @@ export function PrReviewChecksSection({
     // the generic could-not-load copy.
     return (
       <View className="gap-2">
-        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-          {t('prReview.checks.title')}
-        </Text>
+        <PrReviewSectionLabel label={t('prReview.checks.title')} />
         <View key={CONTENT_CARD_KEY} className="gap-3 rounded-lg bg-secondary p-4">
           <Text className="text-sm text-muted-foreground">
             {state.kind === 'service-unavailable'
@@ -373,9 +364,7 @@ export function PrReviewChecksSection({
   if (runList.length === 0) {
     return (
       <View className="gap-2">
-        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-          {t('prReview.checks.title')}
-        </Text>
+        <PrReviewSectionLabel label={t('prReview.checks.title')} />
         <View key={CONTENT_CARD_KEY} className="gap-3 rounded-lg bg-secondary p-4">
           <Text className="text-sm text-muted-foreground">
             {t('prReview.checks.noChecksReported')}
@@ -405,9 +394,7 @@ export function PrReviewChecksSection({
   // with a plural stem, not two keys for one string.
   return (
     <View className="gap-2">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('prReview.checks.title')}
-      </Text>
+      <PrReviewSectionLabel label={t('prReview.checks.title')} />
       <View key={CONTENT_CARD_KEY} className="overflow-hidden rounded-lg bg-secondary">
         <View className="border-b-[0.5px] border-hair-soft px-4 py-2">
           <Text variant="muted" className="text-xs">

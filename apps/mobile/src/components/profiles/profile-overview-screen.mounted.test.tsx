@@ -55,6 +55,7 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
 vi.mock('expo-router', () => ({
+  usePreventRemove: () => undefined,
   useRouter: () => ({ back: h.back, push: h.push, replace: h.replace }),
 }));
 vi.mock('@/lib/navigation/pop-when-focused', () => ({ usePopWhenFocused: () => h.back }));

@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "Inatayarisha mazingira",
       "preparationComplete": "Utayarishaji umekamilika",
       "preparationFailed": "Utayarishaji umeshindikana",
-      "preparationStageFailed": "Hatua iliyoitwa {{stage}} imeshindikana",
+      "preparationStageFailed": "{{stage}}: Imeshindikana",
       "setupCommand": "Amri ya usanidi {{index}}",
       "setupCommandOf": "Amri ya usanidi {{index}} kati ya {{displayCount}}",
       "stepWorkspaceSetup": "Usanidi wa eneo la kazi",

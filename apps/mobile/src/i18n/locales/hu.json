@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "Környezet előkészítése",
       "preparationComplete": "Az előkészítés befejeződött",
       "preparationFailed": "Az előkészítés meghiúsult",
-      "preparationStageFailed": "A(z) {{stage}} nevű lépés meghiúsult",
+      "preparationStageFailed": "{{stage}} meghiúsult",
       "setupCommand": "{{index}}. beállítási parancs",
       "setupCommandOf": "{{index}}. beállítási parancs (összesen {{displayCount}})",
       "stepWorkspaceSetup": "Munkaterület beállítása",

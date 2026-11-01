@@ -2030,7 +2030,7 @@
       "preparingEnvironment": "準備環境中",
       "preparationComplete": "準備完成",
       "preparationFailed": "準備失敗",
-      "preparationStageFailed": "名為 {{stage}} 的階段失敗",
+      "preparationStageFailed": "{{stage}}失敗",
       "setupCommand": "設定命令 {{index}}",
       "setupCommandOf": "設定命令 {{index}}，共 {{displayCount}} 個",
       "stepWorkspaceSetup": "工作區設定",

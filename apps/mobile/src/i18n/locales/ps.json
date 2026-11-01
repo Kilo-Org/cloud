@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "چاپېریال چمتو کېږي",
       "preparationComplete": "چمتوالی بشپړ شو",
       "preparationFailed": "چمتوالی ناکام شو",
-      "preparationStageFailed": "د {{stage}} په نامه مرحله ناکامه شوه",
+      "preparationStageFailed": "ناکام: {{stage}}",
       "setupCommand": "د چمتو کولو امر {{index}}",
       "setupCommandOf": "د چمتو کولو امر {{index}} له {{displayCount}} څخه",
       "stepWorkspaceSetup": "د کار ځای چمتو کول",

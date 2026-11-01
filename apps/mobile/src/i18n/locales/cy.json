@@ -2720,7 +2720,7 @@
       "preparingEnvironment": "Yn paratoi'r amgylchedd",
       "preparationComplete": "Wedi gorffen paratoi",
       "preparationFailed": "Methodd y paratoi",
-      "preparationStageFailed": "Methodd y cam o'r enw {{stage}}",
+      "preparationStageFailed": "{{stage}} wedi methu",
       "setupCommand": "Gorchymyn gosod {{index}}",
       "setupCommandOf": "Gorchymyn gosod {{index}} o {{displayCount}}",
       "stepWorkspaceSetup": "Gosod gweithfan",

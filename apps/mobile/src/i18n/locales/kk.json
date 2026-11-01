@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "Орта дайындалуда",
       "preparationComplete": "Дайындық аяқталды",
       "preparationFailed": "Дайындық сәтсіз аяқталды",
-      "preparationStageFailed": "{{stage}} кезеңі сәтсіз аяқталды",
+      "preparationStageFailed": "{{stage}} сәтсіз аяқталды",
       "setupCommand": "Баптау пәрмені: {{index}}",
       "setupCommandOf": "Баптау пәрмені: {{index}} / {{displayCount}}",
       "stepWorkspaceSetup": "Жұмыс кеңістігін баптау",

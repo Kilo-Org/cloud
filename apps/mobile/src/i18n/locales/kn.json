@@ -2562,7 +2562,7 @@
       "preparingEnvironment": "ಪರಿಸರವನ್ನು ಸಿದ್ಧಪಡಿಸುತ್ತಿದೆ",
       "preparationComplete": "ಸಿದ್ಧತೆ ಪೂರ್ಣಗೊಂಡಿದೆ",
       "preparationFailed": "ಸಿದ್ಧತೆ ವಿಫಲವಾಗಿದೆ",
-      "preparationStageFailed": "{{stage}} ಎಂಬ ಹಂತವು ವಿಫಲವಾಗಿದೆ",
+      "preparationStageFailed": "{{stage}}: ವಿಫಲವಾಗಿದೆ",
       "setupCommand": "ಸೆಟಪ್ ಆಜ್ಞೆ {{index}}",
       "setupCommandOf": "ಒಟ್ಟು {{displayCount}} ಸೆಟಪ್ ಆಜ್ಞೆಗಳಲ್ಲಿ {{index}} ನೇ ಆಜ್ಞೆ",
       "stepWorkspaceSetup": "ವರ್ಕ್‌ಸ್ಪೇಸ್ ಸೆಟಪ್",

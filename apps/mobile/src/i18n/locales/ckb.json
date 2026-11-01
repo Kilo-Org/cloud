@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "ئامادەکردنی ژینگە",
       "preparationComplete": "ئامادەکاری تەواو بوو",
       "preparationFailed": "ئامادەکاری سەرکەوتوو نەبوو",
-      "preparationStageFailed": "قۆناغەکە بە ناوی {{stage}} سەرکەوتوو نەبوو",
+      "preparationStageFailed": "{{stage}} سەرکەوتوو نەبوو",
       "setupCommand": "فەرمانی ئامادەکردنی {{index}}",
       "setupCommandOf": "فەرمانی ئامادەکردنی {{index}} لە {{displayCount}}",
       "stepWorkspaceSetup": "ڕێکخستنی بۆشایی کار",

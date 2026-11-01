@@ -2679,7 +2679,7 @@
       "preparingEnvironment": "Ag ullmhú na timpeallachta",
       "preparationComplete": "Ullmhú críochnaithe",
       "preparationFailed": "Theip ar an ullmhú",
-      "preparationStageFailed": "Theip ar an gcéim darb ainm {{stage}}",
+      "preparationStageFailed": "Theip ar {{stage}}",
       "setupCommand": "Ordú socraithe {{index}}",
       "setupCommandOf": "Ordú socraithe {{index}} de {{displayCount}}",
       "stepWorkspaceSetup": "Socrú an spáis oibre",

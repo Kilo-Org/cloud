@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "Ap prepare anviwònman an",
       "preparationComplete": "Preparasyon fini",
       "preparationFailed": "Preparasyon echwe",
-      "preparationStageFailed": "Etap ki rele {{stage}} echwe",
+      "preparationStageFailed": "{{stage}} echwe",
       "setupCommand": "Kòmandman konfigirasyon {{index}}",
       "setupCommandOf": "Kòmandman konfigirasyon {{index}} sou {{displayCount}}",
       "stepWorkspaceSetup": "Konfigirasyon espas travay",

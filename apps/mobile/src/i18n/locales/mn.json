@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "Орчныг бэлдэж байна",
       "preparationComplete": "Бэлтгэл дууссан",
       "preparationFailed": "Бэлтгэл амжилтгүй болсон",
-      "preparationStageFailed": "{{stage}} нэртэй шат амжилтгүй болсон",
+      "preparationStageFailed": "{{stage}} амжилтгүй боллоо",
       "setupCommand": "Бэлтгэх команд {{index}}",
       "setupCommandOf": "Бэлтгэх команд {{index}} / {{displayCount}}",
       "stepWorkspaceSetup": "Ажлын талбарын тохируулга",

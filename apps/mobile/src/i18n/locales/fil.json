@@ -2562,7 +2562,7 @@
       "preparingEnvironment": "Inihahanda ang kapaligiran",
       "preparationComplete": "Kumpleto ang paghahanda",
       "preparationFailed": "Nabigo ang paghahanda",
-      "preparationStageFailed": "Nabigo ang yugto na pinangalanang {{stage}}",
+      "preparationStageFailed": "Nabigo: {{stage}}",
       "setupCommand": "Utos sa paghahanda {{index}}",
       "setupCommandOf": "Utos sa paghahanda {{index}} sa {{displayCount}}",
       "stepWorkspaceSetup": "Pag-setup ng workspace",

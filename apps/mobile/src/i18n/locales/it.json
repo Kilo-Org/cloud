@@ -2020,7 +2020,7 @@
       "preparingEnvironment": "Preparazione dell'ambiente",
       "preparationComplete": "Preparazione completata",
       "preparationFailed": "Preparazione non riuscita",
-      "preparationStageFailed": "La fase denominata {{stage}} non è riuscita",
+      "preparationStageFailed": "{{stage}}: operazione non riuscita",
       "setupCommand": "Comando di configurazione {{index}}",
       "setupCommandOf": "Comando di configurazione {{index}} su {{displayCount}}",
       "stepWorkspaceSetup": "Configurazione dello spazio di lavoro",

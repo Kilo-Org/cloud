@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "გარემოს მომზადება",
       "preparationComplete": "მომზადება დასრულდა",
       "preparationFailed": "მომზადება ვერ მოხერხდა",
-      "preparationStageFailed": "ეტაპი სახელწოდებით {{stage}} ვერ მოხერხდა",
+      "preparationStageFailed": "{{stage}} ვერ მოხერხდა",
       "setupCommand": "გამართვის ბრძანება {{index}}",
       "setupCommandOf": "გამართვის ბრძანება {{index}}, სულ {{displayCount}}",
       "stepWorkspaceSetup": "სამუშაო სივრცის მომზადება",

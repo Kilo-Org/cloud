@@ -2597,7 +2597,7 @@
       "preparingEnvironment": "Preparant l'entorn",
       "preparationComplete": "Preparació completada",
       "preparationFailed": "La preparació ha fallat",
-      "preparationStageFailed": "L'etapa anomenada {{stage}} ha fallat",
+      "preparationStageFailed": "{{stage}} ha fallat",
       "setupCommand": "Ordre de configuració {{index}}",
       "setupCommandOf": "Ordre de configuració {{index}} de {{displayCount}}",
       "stepWorkspaceSetup": "Configuració de l'espai de treball",

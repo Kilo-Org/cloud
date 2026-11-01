@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "Forbereder miljøet",
       "preparationComplete": "Forberedelsen er fullført",
       "preparationFailed": "Forberedelsen mislyktes",
-      "preparationStageFailed": "Stadiet med navnet {{stage}} mislyktes",
+      "preparationStageFailed": "{{stage}} mislyktes",
       "setupCommand": "Oppsettskommando {{index}}",
       "setupCommandOf": "Oppsettskommando {{index}} av {{displayCount}}",
       "stepWorkspaceSetup": "Oppsett av arbeidsområde",

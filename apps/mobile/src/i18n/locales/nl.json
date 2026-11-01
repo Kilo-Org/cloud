@@ -2030,7 +2030,7 @@
       "preparingEnvironment": "Omgeving voorbereiden",
       "preparationComplete": "Voorbereiding voltooid",
       "preparationFailed": "Voorbereiding mislukt",
-      "preparationStageFailed": "De fase {{stage}} is mislukt",
+      "preparationStageFailed": "{{stage}} mislukt",
       "setupCommand": "Voorbereidingsopdracht {{index}}",
       "setupCommandOf": "Voorbereidingsopdracht {{index}} van {{displayCount}}",
       "stepWorkspaceSetup": "Workspace instellen",

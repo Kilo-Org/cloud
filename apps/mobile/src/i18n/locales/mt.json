@@ -2679,7 +2679,7 @@
       "preparingEnvironment": "Qed jitħejja l-ambjent",
       "preparationComplete": "It-tħejjija tlestiet",
       "preparationFailed": "It-tħejjija falliet",
-      "preparationStageFailed": "Il-fażi bl-isem {{stage}} falliet",
+      "preparationStageFailed": "Falliment ta' {{stage}}",
       "setupCommand": "Kmand tat-tħejjija {{index}}",
       "setupCommandOf": "Kmand tat-tħejjija {{index}} minn {{displayCount}}",
       "stepWorkspaceSetup": "Tħejjija tal-workspace",

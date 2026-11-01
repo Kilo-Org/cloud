@@ -2052,7 +2052,7 @@
       "preparingEnvironment": "Preparando el entorno",
       "preparationComplete": "Preparación completada",
       "preparationFailed": "Error de preparación",
-      "preparationStageFailed": "Error en la etapa {{stage}}",
+      "preparationStageFailed": "{{stage}}: error",
       "setupCommand": "Comando de configuración {{index}}",
       "setupCommandOf": "Comando de configuración {{index}} de {{displayCount}}",
       "stepWorkspaceSetup": "Configuración del espacio de trabajo",

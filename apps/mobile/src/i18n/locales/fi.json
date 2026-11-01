@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "Valmistellaan ympäristöä",
       "preparationComplete": "Valmistelu valmis",
       "preparationFailed": "Valmistelu epäonnistui",
-      "preparationStageFailed": "Vaihe {{stage}} epäonnistui",
+      "preparationStageFailed": "{{stage}}: epäonnistui",
       "setupCommand": "Valmistelukomento {{index}}",
       "setupCommandOf": "Valmistelukomento {{index}} / {{displayCount}}",
       "stepWorkspaceSetup": "Työtilan valmistelu",

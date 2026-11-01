@@ -2603,7 +2603,7 @@
       "preparingEnvironment": "A preparar o ambiente",
       "preparationComplete": "Preparação concluída",
       "preparationFailed": "Falha na preparação",
-      "preparationStageFailed": "A etapa {{stage}} falhou",
+      "preparationStageFailed": "{{stage}} falhou",
       "setupCommand": "Comando de configuração {{index}}",
       "setupCommandOf": "Comando de configuração {{index}} de {{displayCount}}",
       "stepWorkspaceSetup": "Configuração da área de trabalho",

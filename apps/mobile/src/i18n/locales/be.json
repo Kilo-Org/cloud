@@ -2638,7 +2638,7 @@
       "preparingEnvironment": "Падрыхтоўка асяроддзя",
       "preparationComplete": "Падрыхтоўка завершана",
       "preparationFailed": "Памылка падрыхтоўкі",
-      "preparationStageFailed": "Стадыя «{{stage}}» завяршылася з памылкай",
+      "preparationStageFailed": "{{stage}}: памылка",
       "setupCommand": "Каманда налады {{index}}",
       "setupCommandOf": "Каманда налады {{index}} з {{displayCount}}",
       "stepWorkspaceSetup": "Налада працоўнай прасторы",

@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "Na-akwadebe ebe ọrụ",
       "preparationComplete": "Nkwadebe agwụla",
       "preparationFailed": "Nkwadebe agaghị nke ọma",
-      "preparationStageFailed": "Ọkwa aha ya bụ {{stage}} agaghị nke ọma",
+      "preparationStageFailed": "{{stage}} agaghị nke ọma",
       "setupCommand": "Iwu nhazi {{index}}",
       "setupCommandOf": "Iwu nhazi {{index}} n'ime {{displayCount}}",
       "stepWorkspaceSetup": "Nhazi ọrụ",

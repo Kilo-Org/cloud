@@ -2597,7 +2597,7 @@
       "preparingEnvironment": "Sagatavo vidi",
       "preparationComplete": "Sagatavošana pabeigta",
       "preparationFailed": "Sagatavošana neizdevās",
-      "preparationStageFailed": "Posms {{stage}} neizdevās",
+      "preparationStageFailed": "Neizdevās: {{stage}}",
       "setupCommand": "Sagatavošanas komanda {{index}}",
       "setupCommandOf": "Sagatavošanas komanda {{index}} no {{displayCount}}",
       "stepWorkspaceSetup": "Darbvietas iestatīšana",

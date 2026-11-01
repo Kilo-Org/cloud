@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "Naannoo qopheessaa jira",
       "preparationComplete": "Qophiin xumurame",
       "preparationFailed": "Qophiin hin milkoofne",
-      "preparationStageFailed": "Hatni {{stage}} jedhamu hin milkoofne",
+      "preparationStageFailed": "{{stage}} hin milkoofne",
       "setupCommand": "Ajaja qophii {{index}}",
       "setupCommandOf": "Ajaja qophii {{displayCount}} keessaa {{index}}",
       "stepWorkspaceSetup": "Qophii iddoo hojii",

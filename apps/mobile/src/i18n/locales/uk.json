@@ -2074,7 +2074,7 @@
       "preparingEnvironment": "Підготовка середовища",
       "preparationComplete": "Підготовку завершено",
       "preparationFailed": "Помилка підготовки",
-      "preparationStageFailed": "Помилка на етапі {{stage}}",
+      "preparationStageFailed": "Помилка: {{stage}}",
       "setupCommand": "Команда налаштування {{index}}",
       "setupCommandOf": "Команда налаштування {{index}} з {{displayCount}}",
       "stepWorkspaceSetup": "Налаштування робочого простору",

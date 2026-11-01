@@ -2052,7 +2052,7 @@
       "preparingEnvironment": "מכין את הסביבה",
       "preparationComplete": "ההכנה הושלמה",
       "preparationFailed": "ההכנה נכשלה",
-      "preparationStageFailed": "השלב {{stage}} נכשל",
+      "preparationStageFailed": "{{stage}} נכשל",
       "setupCommand": "פקודת הכנה {{index}}",
       "setupCommandOf": "פקודת הכנה {{index}} מתוך {{displayCount}}",
       "stepWorkspaceSetup": "מגדיר את סביבת העבודה",

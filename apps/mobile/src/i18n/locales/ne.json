@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "वातावरण तयार गर्दै",
       "preparationComplete": "तयारी पूरा भयो",
       "preparationFailed": "तयारी असफल",
-      "preparationStageFailed": "{{stage}} नामको चरण असफल भयो",
+      "preparationStageFailed": "{{stage}} असफल",
       "setupCommand": "सेटअप आदेश {{index}}",
       "setupCommandOf": "{{displayCount}} मध्ये सेटअप आदेश {{index}}",
       "stepWorkspaceSetup": "वर्कस्पेस सेटअप",

@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "ກຳລັງກຽມສະພາບແວດລ້ອມ",
       "preparationComplete": "ກຽມພ້ອມແລ້ວ",
       "preparationFailed": "ກຽມບໍ່ສຳເລັດ",
-      "preparationStageFailed": "ຂັ້ນຕອນທີ່ຊື່ {{stage}} ລົ້ມເຫຼວ",
+      "preparationStageFailed": "{{stage}} ບໍ່ສຳເລັດ",
       "setupCommand": "ຄຳສັ່ງຕັ້ງຄ່າທີ {{index}}",
       "setupCommandOf": "ຄຳສັ່ງຕັ້ງຄ່າທີ {{index}} ຈາກທັງໝົດ {{displayCount}}",
       "stepWorkspaceSetup": "ການຕັ້ງຄ່າ Workspace",

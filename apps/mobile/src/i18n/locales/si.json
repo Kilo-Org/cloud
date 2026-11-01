@@ -2562,7 +2562,7 @@
       "preparingEnvironment": "පරිසරය සූදානම් කරමින්",
       "preparationComplete": "සූදානම සම්පූර්ණයි",
       "preparationFailed": "සූදානම අසාර්ථක විය",
-      "preparationStageFailed": "{{stage}} නම් අදියර අසාර්ථක විය",
+      "preparationStageFailed": "{{stage}} අසාර්ථක විය",
       "setupCommand": "සැකසුම් විධානය {{index}}",
       "setupCommandOf": "සැකසුම් විධාන {{displayCount}} න් {{index}}",
       "stepWorkspaceSetup": "වර්ක්ස්පේස් සැකසුම",

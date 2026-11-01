@@ -2562,7 +2562,7 @@
       "preparingEnvironment": "Manomana ny tontolo fiasana",
       "preparationComplete": "Vita ny fanomanana",
       "preparationFailed": "Tsy nahomby ny fanomanana",
-      "preparationStageFailed": "Tsy nahomby ny dingana atao hoe {{stage}}",
+      "preparationStageFailed": "Tsy nahomby ny {{stage}}",
       "setupCommand": "Baiko fanomanana {{index}}",
       "setupCommandOf": "Baiko fanomanana {{index}} amin'ny {{displayCount}}",
       "stepWorkspaceSetup": "Fanamboarana ny toeram-piasana",

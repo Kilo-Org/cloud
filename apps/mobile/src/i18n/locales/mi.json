@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "Kei te whakarite i te taiao",
       "preparationComplete": "Kua oti te whakaritenga",
       "preparationFailed": "I rahua te whakaritenga",
-      "preparationStageFailed": "I rahua te wāhanga {{stage}}",
+      "preparationStageFailed": "I rahua: {{stage}}",
       "setupCommand": "Te whakahau whirihora {{index}}",
       "setupCommandOf": "Te whakahau whirihora {{index}} o {{displayCount}}",
       "stepWorkspaceSetup": "Whakaritenga wāhi mahi",

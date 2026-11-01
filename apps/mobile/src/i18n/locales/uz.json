@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "Muhit tayyorlanmoqda",
       "preparationComplete": "Tayyorlash tugallandi",
       "preparationFailed": "Tayyorlashda xatolik yuz berdi",
-      "preparationStageFailed": "{{stage}} nomli bosqichda xatolik yuz berdi",
+      "preparationStageFailed": "Xatolik: {{stage}}",
       "setupCommand": "{{index}}-sozlash buyrug'i",
       "setupCommandOf": "{{index}}-sozlash buyrug'i, jami {{displayCount}} ta",
       "stepWorkspaceSetup": "Workspace sozlanmoqda",

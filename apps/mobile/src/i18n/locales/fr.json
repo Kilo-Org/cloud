@@ -1960,7 +1960,7 @@
       "preparingEnvironment": "Préparation de l'environnement",
       "preparationComplete": "Préparation terminée",
       "preparationFailed": "Échec de la préparation",
-      "preparationStageFailed": "Échec de l'étape {{stage}}",
+      "preparationStageFailed": "Échec : {{stage}}",
       "setupCommand": "Commande de configuration {{index}}",
       "setupCommandOf": "Commande de configuration {{index}} sur {{displayCount}}",
       "stepWorkspaceSetup": "Configuration de l'espace de travail",

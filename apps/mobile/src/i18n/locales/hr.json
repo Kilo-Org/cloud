@@ -2597,7 +2597,7 @@
       "preparingEnvironment": "Priprema okruženja",
       "preparationComplete": "Priprema dovršena",
       "preparationFailed": "Priprema nije uspjela",
-      "preparationStageFailed": "Faza {{stage}} nije uspjela",
+      "preparationStageFailed": "{{stage}} nije uspjelo",
       "setupCommand": "Naredba za postavljanje {{index}}",
       "setupCommandOf": "Naredba za postavljanje {{index}} od {{displayCount}}",
       "stepWorkspaceSetup": "Postavljanje radnog prostora",

@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "Προετοιμασία περιβάλλοντος",
       "preparationComplete": "Η προετοιμασία ολοκληρώθηκε",
       "preparationFailed": "Η προετοιμασία απέτυχε",
-      "preparationStageFailed": "Το στάδιο {{stage}} απέτυχε",
+      "preparationStageFailed": "Αποτυχία: {{stage}}",
       "setupCommand": "Εντολή ρύθμισης {{index}}",
       "setupCommandOf": "Εντολή ρύθμισης {{index}} από {{displayCount}}",
       "stepWorkspaceSetup": "Ρύθμιση χώρου εργασίας",

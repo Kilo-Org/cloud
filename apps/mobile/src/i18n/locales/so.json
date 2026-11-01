@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "Deegaanka waa la diyaarinayaa",
       "preparationComplete": "Diyaarintu way dhammaysantay",
       "preparationFailed": "Diyaarintu way fashilantay",
-      "preparationStageFailed": "Marxaladda lagu magacaabo {{stage}} way fashilantay",
+      "preparationStageFailed": "{{stage}} way fashilantay",
       "setupCommand": "Amarka dejinta {{index}}",
       "setupCommandOf": "Amarka dejinta {{index}} ee {{displayCount}}",
       "stepWorkspaceSetup": "Dejinta hawlwadeenka",

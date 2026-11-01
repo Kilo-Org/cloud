@@ -2556,7 +2556,7 @@
       "preparingEnvironment": "Ana shirya muhallin aiki",
       "preparationComplete": "An gama shiri",
       "preparationFailed": "An kasa shirya muhallin aiki",
-      "preparationStageFailed": "Matakin da ake kira {{stage}} ya kasa",
+      "preparationStageFailed": "{{stage}} – an kasa",
       "setupCommand": "Umarnin shiri {{index}}",
       "setupCommandOf": "Umarnin shiri {{index}} cikin {{displayCount}}",
       "stepWorkspaceSetup": "Saitin sararin aiki",

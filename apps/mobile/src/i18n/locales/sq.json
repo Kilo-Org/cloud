@@ -644,7 +644,7 @@
       "title": "Kutia hyrëse",
       "loading": "Po ngarkohet kutia hyrëse",
       "noReviewRequests": "Asnjë kërkesë rishikimi",
-      "noReviewRequestsDescription": "Kërkesat për bashkim që presin rishikimin tënd shfaqen këtu. Mund të ngjitësh edhe lidhjen e çdo PR-je më sipër.",
+      "noReviewRequestsDescription": "Kërkesat për bashkim që presin rishikimin tënd shfaqen këtu.",
       "couldNotLoad": "Nuk u ngarkua kutia hyrëse.",
       "accessLostTitle": "Nuk ke qasje në këtë organizatë",
       "accessLostDescription": "Nuk je më anëtar i kësaj organizate, ndaj kërkesat e saj për rishikim nuk mund të ngarkohen. Vazhdo në llogarinë tënde personale për të vazhduar rishikimin.",

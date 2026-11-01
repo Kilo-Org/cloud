@@ -2944,7 +2944,7 @@
       "continueInPersonal": "개인 계정으로 계속하기",
       "loading": "받은 편지함 불러오는 중",
       "noReviewRequests": "리뷰 요청 없음",
-      "noReviewRequestsDescription": "리뷰를 요청받은 풀 리퀘스트가 여기에 표시됩니다. 위에 다른 PR 링크를 붙여넣을 수도 있습니다.",
+      "noReviewRequestsDescription": "리뷰를 요청받은 풀 리퀘스트가 여기에 표시됩니다.",
       "title": "받은 편지함"
     },
     "installKiloGitHubApp": "Kilo GitHub 앱 설치",

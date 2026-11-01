@@ -659,7 +659,7 @@
       "title": "Pristigle poruke",
       "loading": "Učitavanje pristiglih poruka",
       "noReviewRequests": "Nema zahtjeva za pregled",
-      "noReviewRequestsDescription": "Ovdje se pojavljuju zahtjevi za spajanje koji čekaju tvoj pregled. I dalje možeš zalijepiti bilo koju poveznicu na PR iznad.",
+      "noReviewRequestsDescription": "Ovdje se pojavljuju zahtjevi za spajanje koji čekaju tvoj pregled.",
       "couldNotLoad": "Učitavanje pristiglih poruka nije uspjelo.",
       "accessLostTitle": "Nemaš pristup ovoj organizaciji",
       "accessLostDescription": "Više nisi član ove organizacije, pa se njeni zahtjevi za pregled ne mogu učitati. Nastavi u svom ličnom računu za nastavak pregleda.",

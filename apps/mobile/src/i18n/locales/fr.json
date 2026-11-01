@@ -2994,7 +2994,7 @@
       "continueInPersonal": "Continuer dans le compte personnel",
       "loading": "Chargement de la boîte de réception",
       "noReviewRequests": "Aucune demande de revue",
-      "noReviewRequestsDescription": "Les demandes de fusion en attente de votre revue apparaissent ici. Vous pouvez aussi coller n'importe quel lien de PR ci-dessus.",
+      "noReviewRequestsDescription": "Les demandes de fusion en attente de votre revue apparaissent ici.",
       "title": "Boîte de réception"
     },
     "installKiloGitHubApp": "Installer l'application GitHub de Kilo",

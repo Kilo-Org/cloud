@@ -166,6 +166,11 @@ describe('recents identity across providers', () => {
     expect(empty.props?.description).toBe(
       "Paste a link above to start a review — it'll show up here next time."
     );
+    // The RECENT body is the tail of the inbox scroll, so its full-size stack
+    // (a 56 dp bubble over a 64 dp pin) fell under the tab bar on a compact
+    // phone. It always shares the screen with the INBOX section above it, so it
+    // always takes the compact form.
+    expect(empty.props?.compact).toBe(true);
   });
 
   it('the recents load renders one row-shaped card while pending', () => {

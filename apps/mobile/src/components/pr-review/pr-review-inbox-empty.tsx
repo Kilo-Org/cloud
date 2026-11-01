@@ -79,12 +79,20 @@ function InboxBody({
   }
 
   if (view.kind === 'empty') {
+    // Both empty states of this screen are section bodies of one scroll: this
+    // one always has the RECENT section below it, so it never owns a clear
+    // region of its own. The full-size `top` form put a 56 dp bubble over a
+    // 64 dp pin, which held the title 133 dp under the INBOX eyebrow and pushed
+    // the RECENT state under the tab bar on a compact phone. Compact drops both;
+    // `pt-4` is the separation the dropped pin used to give the eyebrow.
     return (
       <EmptyState
         icon={GitPullRequest}
         title={t('prReview.inbox.noReviewRequests')}
         description={t('prReview.inbox.noReviewRequestsDescription')}
         placement="top"
+        compact
+        className="pt-4"
       />
     );
   }

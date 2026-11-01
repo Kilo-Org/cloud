@@ -2950,7 +2950,7 @@
       "continueInPersonal": "व्यक्तिगत अकाउंट में जारी रखें",
       "loading": "इनबॉक्स लोड हो रहा है",
       "noReviewRequests": "कोई समीक्षा अनुरोध नहीं",
-      "noReviewRequestsDescription": "जिन पुल रिक्वेस्ट की समीक्षा आपको करनी है, वे यहाँ दिखाई देती हैं। आप ऊपर कोई भी PR लिंक पेस्ट कर सकते हैं।",
+      "noReviewRequestsDescription": "जिन पुल रिक्वेस्ट की समीक्षा आपको करनी है, वे यहाँ दिखाई देती हैं।",
       "title": "इनबॉक्स"
     },
     "installKiloGitHubApp": "Kilo GitHub ऐप इंस्टॉल करें",

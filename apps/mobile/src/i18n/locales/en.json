@@ -710,7 +710,7 @@
       "title": "Inbox",
       "loading": "Loading inbox",
       "noReviewRequests": "No review requests",
-      "noReviewRequestsDescription": "Pull requests waiting on your review show up here. You can still paste any PR link above.",
+      "noReviewRequestsDescription": "Pull requests waiting on your review show up here.",
       "couldNotLoad": "Could not load inbox",
       "accessLostTitle": "No access to this organization",
       "accessLostDescription": "You're no longer a member of this organization, so its review requests can't load. Continue in your personal account to keep reviewing.",

@@ -2944,7 +2944,7 @@
       "continueInPersonal": "Lanjut di akun Pribadi",
       "loading": "Memuat kotak masuk",
       "noReviewRequests": "Tidak ada permintaan tinjauan",
-      "noReviewRequestsDescription": "PR yang menunggu tinjauanmu muncul di sini. Kamu tetap dapat menempelkan tautan PR apa pun di atas.",
+      "noReviewRequestsDescription": "PR yang menunggu tinjauanmu muncul di sini.",
       "title": "Kotak masuk"
     },
     "installKiloGitHubApp": "Pasang aplikasi Kilo untuk GitHub",

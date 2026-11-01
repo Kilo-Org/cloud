@@ -644,7 +644,7 @@
       "title": "Mga natanggap",
       "loading": "Nilo-load ang mga natanggap",
       "noReviewRequests": "Walang kahilingang magsuri",
-      "noReviewRequestsDescription": "Lalabas dito ang mga pull request na naghihintay ng pagsusuri mo. Puwede ka pa ring mag-paste ng anumang link ng PR sa itaas.",
+      "noReviewRequestsDescription": "Lalabas dito ang mga pull request na naghihintay ng pagsusuri mo.",
       "couldNotLoad": "Hindi ma-load ang mga natanggap.",
       "accessLostTitle": "Walang access sa organisasyong ito",
       "accessLostDescription": "Hindi ka na miyembro ng organisasyong ito, kaya hindi ma-load ang mga kahilingang pagsusuri nito. Magpatuloy sa iyong pansariling account para magpatuloy sa pagsusuri.",

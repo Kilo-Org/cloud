@@ -644,7 +644,7 @@
       "title": "Peti masuk",
       "loading": "Memuatkan peti masuk",
       "noReviewRequests": "Tiada permintaan semakan",
-      "noReviewRequestsDescription": "Permintaan tarik yang menunggu semakan anda akan muncul di sini. Anda juga boleh menampal sebarang pautan PR di atas.",
+      "noReviewRequestsDescription": "Permintaan tarik yang menunggu semakan anda akan muncul di sini.",
       "couldNotLoad": "Tidak dapat memuatkan peti masuk.",
       "accessLostTitle": "Tiada akses kepada organisasi ini",
       "accessLostDescription": "Anda tidak lagi menjadi ahli organisasi ini, jadi permintaan semakannya tidak dapat dimuatkan. Teruskan dalam akaun peribadi anda untuk terus menyemak.",

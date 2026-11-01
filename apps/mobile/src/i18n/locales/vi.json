@@ -2944,7 +2944,7 @@
       "continueInPersonal": "Tiếp tục với tài khoản cá nhân",
       "loading": "Đang tải hộp thư đến",
       "noReviewRequests": "Chưa có yêu cầu đánh giá",
-      "noReviewRequestsDescription": "Các PR đang chờ bạn đánh giá sẽ xuất hiện ở đây. Bạn vẫn có thể dán liên kết của bất kỳ PR nào ở trên.",
+      "noReviewRequestsDescription": "Các PR đang chờ bạn đánh giá sẽ xuất hiện ở đây.",
       "title": "Hộp thư đến"
     },
     "installKiloGitHubApp": "Cài đặt ứng dụng Kilo trên GitHub",

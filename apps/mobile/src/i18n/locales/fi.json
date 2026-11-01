@@ -644,7 +644,7 @@
       "title": "Saapuneet",
       "loading": "Ladataan saapuneita",
       "noReviewRequests": "Ei katselmointipyyntöjä",
-      "noReviewRequestsDescription": "Katselmointiasi odottavat muutospyynnöt näkyvät tässä. Voit myös liittää minkä tahansa PR-linkin yllä olevaan kenttään.",
+      "noReviewRequestsDescription": "Katselmointiasi odottavat muutospyynnöt näkyvät tässä.",
       "couldNotLoad": "Saapuneita ei voitu ladata",
       "accessLostTitle": "Ei pääsyä tähän organisaatioon",
       "accessLostDescription": "Et ole enää tämän organisaation jäsen, joten sen katselmointipyyntöjä ei voi ladata. Jatka henkilökohtaisessa tilissäsi jatkaaksesi katselmointia.",

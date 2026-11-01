@@ -158,6 +158,20 @@ describe('PrReviewInboxList empty-state accessibility identity', () => {
     ).toHaveLength(0);
   });
 
+  it('paints the empty section body in the compact form, off its eyebrow', () => {
+    // The INBOX state always has the RECENT section below it, so it never owns
+    // a clear region: the full-size `top` form put a 56 dp bubble over a 64 dp
+    // pin, holding its title 133 dp under the eyebrow and pushing the RECENT
+    // state under the tab bar on a compact phone. Compact drops both, and the
+    // caller's `pt-4` is the separation the dropped pin used to give.
+    inboxState.isPending = false;
+    const renderer = mountInboxList();
+    const [empty] = renderer.root.findAll(node => String(node.type) === 'EmptyState');
+    expect(empty?.props.compact).toBe(true);
+    expect(empty?.props.className).toBe('pt-4');
+    expect(empty?.props.placement).toBe('top');
+  });
+
   it('gives the reconnect notice its own container instead of the loading one', () => {
     const renderer = mountInboxList();
     const loading = renderer.root.findAll(node => node.props.accessibilityLabel === LOADING_LABEL);

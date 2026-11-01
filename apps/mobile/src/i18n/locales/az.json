@@ -644,7 +644,7 @@
       "title": "Gələnlər",
       "loading": "Gələnlər yüklənir",
       "noReviewRequests": "Kod baxışı sorğusu yoxdur",
-      "noReviewRequestsDescription": "Nəzərdən keçirməyini gözləyən birləşdirmə sorğuları burada görünür. Yuxarıdakı sahəyə istənilən PR keçidini də yapışdıra bilərsən.",
+      "noReviewRequestsDescription": "Nəzərdən keçirməyini gözləyən birləşdirmə sorğuları burada görünür.",
       "couldNotLoad": "Gələnləri yükləmək mümkün olmadı.",
       "accessLostTitle": "Bu təşkilata giriş itirildi",
       "accessLostDescription": "Artıq bu təşkilatın üzvü deyilsən, ona görə də onun baxış sorğularını yükləmək mümkün deyil. Nəzərdən keçirməyə davam etmək üçün şəxsi hesabına keç.",

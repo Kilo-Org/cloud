@@ -3032,7 +3032,7 @@
       "continueInPersonal": "Przejdź na konto osobiste",
       "loading": "Wczytywanie skrzynki",
       "noReviewRequests": "Brak próśb o przegląd",
-      "noReviewRequestsDescription": "Tutaj pojawią się PR oczekujące na twój przegląd. Powyżej możesz też wkleić odnośnik do dowolnego PR.",
+      "noReviewRequestsDescription": "Tutaj pojawią się PR oczekujące na twój przegląd.",
       "title": "Skrzynka"
     },
     "installKiloGitHubApp": "Zainstaluj aplikację Kilo dla GitHub",

@@ -2994,7 +2994,7 @@
       "continueInPersonal": "Continuar na conta pessoal",
       "loading": "Carregando caixa de entrada",
       "noReviewRequests": "Nenhuma solicitação de revisão",
-      "noReviewRequestsDescription": "Os pull requests que aguardam sua revisão aparecem aqui. Você também pode colar o link de qualquer PR acima.",
+      "noReviewRequestsDescription": "Os pull requests que aguardam sua revisão aparecem aqui.",
       "title": "Caixa de entrada"
     },
     "installKiloGitHubApp": "Instalar o aplicativo do Kilo para GitHub",

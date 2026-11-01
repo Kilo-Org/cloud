@@ -644,7 +644,7 @@
       "title": "Kiruvchi so'rovlar",
       "loading": "Kiruvchi so'rovlar yuklanmoqda",
       "noReviewRequests": "Ko'rib chiqish so'rovlari yo'q",
-      "noReviewRequestsDescription": "Ko'rib chiqishingizni kutayotgan PRlar shu yerda ko'rinadi. Yuqoriga istalgan PR havolasini ham joylashtirishingiz mumkin.",
+      "noReviewRequestsDescription": "Ko'rib chiqishingizni kutayotgan PRlar shu yerda ko'rinadi.",
       "couldNotLoad": "Kiruvchi so'rovlarni yuklab bo'lmadi.",
       "accessLostTitle": "Bu tashkilotga kirish huquqi yo'q",
       "accessLostDescription": "Siz endi bu tashkilotning a'zosi emassiz, shuning uchun uning ko'rib chiqish so'rovlari yuklab olinmaydi. Ko'rib chiqishni davom ettirish uchun shaxsiy profilingizga o'ting.",

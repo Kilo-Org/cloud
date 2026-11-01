@@ -2988,7 +2988,7 @@
       "continueInPersonal": "Continuar en la cuenta personal",
       "loading": "Cargando la bandeja de entrada",
       "noReviewRequests": "No hay solicitudes de revisión",
-      "noReviewRequestsDescription": "Aquí aparecen las PR pendientes de tu revisión. También puedes pegar cualquier enlace de PR arriba.",
+      "noReviewRequestsDescription": "Aquí aparecen las PR pendientes de tu revisión.",
       "title": "Bandeja de entrada"
     },
     "installKiloGitHubApp": "Instalar la aplicación de Kilo para GitHub",

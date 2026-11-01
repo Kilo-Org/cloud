@@ -2944,7 +2944,7 @@
       "continueInPersonal": "Kişisel hesapla devam et",
       "loading": "Gelen kutusu yükleniyor",
       "noReviewRequests": "İnceleme isteği yok",
-      "noReviewRequestsDescription": "İncelemeni bekleyen çekme istekleri burada görünür. Yukarıya herhangi bir PR bağlantısı da yapıştırabilirsin.",
+      "noReviewRequestsDescription": "İncelemeni bekleyen çekme istekleri burada görünür.",
       "title": "Gelen kutusu"
     },
     "installKiloGitHubApp": "Kilo GitHub uygulamasını yükle",

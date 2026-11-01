@@ -2988,7 +2988,7 @@
       "continueInPersonal": "המשך בחשבון האישי",
       "loading": "הבקשות הנכנסות נטענות",
       "noReviewRequests": "אין בקשות לסקירה",
-      "noReviewRequestsDescription": "כאן יופיעו בקשות משיכה שממתינות לסקירה שלך. אפשר גם להדביק למעלה קישור לכל PR.",
+      "noReviewRequestsDescription": "כאן יופיעו בקשות משיכה שממתינות לסקירה שלך.",
       "title": "בקשות נכנסות"
     },
     "installKiloGitHubApp": "התקנת אפליקציית Kilo ל-GitHub",

@@ -242,6 +242,64 @@ describe('resolveSessionTerminalError', () => {
     });
   });
 
+  // The SDK's own lost-transport code is a retryable failure whatever type the
+  // indicator carries: a screen that kept the skeleton beside the status line
+  // showed a loading state and a failure in the same frame.
+  it.each(['error', 'info', 'progress', 'warning'] as const)(
+    'resolves the lost-transport code carried by a %s indicator',
+    type => {
+      expect(
+        resolveSessionTerminalError({
+          error: null,
+          statusIndicator: {
+            type,
+            message: 'Agent connection lost',
+            code: 'agent-connection-lost',
+          },
+          messageCount: 0,
+        })
+      ).toEqual({
+        variant: 'server',
+        title: "Couldn't load this session",
+        message: 'Connection trouble. Please retry in a moment.',
+        retryable: true,
+        detail: 'Agent connection lost',
+      });
+    }
+  );
+
+  it('resolves an exhausted app-wide leg while the open still has nothing to show', () => {
+    expect(
+      resolveSessionTerminalError({
+        error: null,
+        statusIndicator: null,
+        messageCount: 0,
+        connectionLost: true,
+      })
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: 'Connection trouble. Please retry in a moment.',
+      retryable: true,
+      detail: '',
+    });
+  });
+
+  it('leaves a loaded transcript to its own status line when the connection is lost', () => {
+    expect(
+      resolveSessionTerminalError({
+        error: null,
+        statusIndicator: {
+          type: 'error',
+          message: 'Agent connection lost',
+          code: 'agent-connection-lost',
+        },
+        messageCount: 2,
+        connectionLost: true,
+      })
+    ).toBeNull();
+  });
+
   it.each([
     ['Connection lost. Please retry in a moment.', true],
     ['Previous task is still finishing up. Please wait a moment.', true],

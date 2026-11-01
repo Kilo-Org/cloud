@@ -1769,6 +1769,24 @@ export function SessionDetailContent({
     isStreaming,
     pendingMessageCount: inFlightMessageCount,
   });
+  // One failure owns the screen. The body's terminal error is resolved here,
+  // before the footer rows, so the footer never restates a failure the body
+  // already states and the loading skeleton never paints beside a lost
+  // connection. `connectionLost` is the app-wide leg's answer for a session
+  // whose own status atom carries nothing yet, and it only counts while the
+  // open still has nothing to show: a settled empty session keeps its empty
+  // state instead of a Retry it cannot use.
+  const connectionLost = connectionState === 'exhausted' && shouldShowLoading;
+  const terminalError = useMemo(
+    () =>
+      resolveSessionTerminalError({
+        error,
+        statusIndicator,
+        messageCount: messages.length,
+        connectionLost,
+      }),
+    [error, statusIndicator, messages.length, connectionLost]
+  );
   // A failed last row states its own failure and carries the action. The fixed
   // footer's error line must not state the same failure a second time (explorer
   // finding: the same failure stated three times), so a status error the row
@@ -1798,6 +1816,7 @@ export function SessionDetailContent({
     ]
   );
   const footerStatusIndicator =
+    terminalError === null &&
     statusIndicator !== null &&
     !statusIndicatorDuplicatesMessageFailure({
       indicator: statusIndicator,
@@ -1831,24 +1850,34 @@ export function SessionDetailContent({
   // the reason must not restate that sentence beside it. Dropping it here keeps
   // the reason's lower branches alive — a read-only session then names read-only
   // instead of repeating the failed row.
-  const sendDisabledReason = resolveComposerSendDisabledReason({
-    canSend,
-    isReadOnly,
-    error,
-    statusIndicator: footerStatusIndicator,
-    cloudStatus,
-    messageCount: messages.length,
-  });
+  // The body already states this failure once, with the action that resolves
+  // it, so the reason beside send stays silent instead of naming the same
+  // failure a second time (mobile-app gate finding: the load-error card and
+  // "The session could not be loaded. Retry first." on one screen).
+  const sendDisabledReason =
+    terminalError === null
+      ? resolveComposerSendDisabledReason({
+          canSend,
+          isReadOnly,
+          error,
+          statusIndicator: footerStatusIndicator,
+          cloudStatus,
+          messageCount: messages.length,
+        })
+      : null;
   // The tone rides the same inputs, so a progress phase ("Setting up
   // environment…") never renders in the destructive error color.
-  const sendDisabledReasonTone = resolveComposerSendDisabledReasonTone({
-    canSend,
-    isReadOnly,
-    error,
-    statusIndicator: footerStatusIndicator,
-    cloudStatus,
-    messageCount: messages.length,
-  });
+  const sendDisabledReasonTone =
+    terminalError === null
+      ? resolveComposerSendDisabledReasonTone({
+          canSend,
+          isReadOnly,
+          error,
+          statusIndicator: footerStatusIndicator,
+          cloudStatus,
+          messageCount: messages.length,
+        })
+      : null;
   // A read-only transcript ends in the continue section, which states the
   // read-only fact once and replaces the composer and its send reason.
   const isReadOnlyTranscript = isReadOnly && messages.length > 0;
@@ -2699,11 +2728,6 @@ export function SessionDetailContent({
   }
 
   function renderContent() {
-    const terminalError = resolveSessionTerminalError({
-      error,
-      statusIndicator,
-      messageCount: messages.length,
-    });
     if (terminalError) {
       const copyText = buildTerminalErrorCopyText({
         sessionId,

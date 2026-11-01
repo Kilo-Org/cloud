@@ -185,6 +185,31 @@ function errorClassForCode(code: SdkStatusMessageCode): TerminalErrorClass | und
 }
 
 /**
+ * The SDK's own code for an agent transport that is gone. It carries catalog
+ * copy (the status line's `Connection lost`) instead of a class, so it never
+ * reaches the classifier above; every surface that has to decide whether the
+ * failure can recover reads it here. A lost transport is transient: the same
+ * session reconnects when the socket comes back.
+ */
+const CONNECTION_LOST_CODE: SdkStatusMessageCode = 'agent-connection-lost';
+
+/**
+ * The reader's copy and retryability for a lost agent transport. The body
+ * states it once, behind the same Retry the reconstructing open uses, so a
+ * session that lost its connection never reads as an unexplained loading
+ * state.
+ */
+function connectionLostFailure(detail: string): SessionTerminalError {
+  return {
+    variant: 'server',
+    title: i18n.t('agentChat.session.couldNotLoadThisSession'),
+    message: i18n.t('agentChat.session.connectionTrouble'),
+    retryable: true,
+    detail,
+  };
+}
+
+/**
  * The reader's own copy for a session error in the transcript's status slot
  * (session-status-indicator.tsx). A code the SDK attaches to its own fixed copy
  * maps straight to catalog copy; a code for a failure the app can name maps to
@@ -312,6 +337,9 @@ export function isRetryableTerminalFailure(input: {
   message: string;
   code?: SdkStatusMessageCode;
 }): boolean {
+  if (input.code === CONNECTION_LOST_CODE) {
+    return true;
+  }
   const codedClass = input.code === undefined ? undefined : errorClassForCode(input.code);
   return retryableClass(codedClass ?? classifyTerminalError(input.message));
 }
@@ -345,13 +373,20 @@ export function describeSessionRuntimeFailure(message: string): SessionRuntimeFa
  * when there is nothing terminal to show (loading, empty, or a live session).
  *
  * Precedence: a populated transcript never shows a terminal error; an
- * `errorAtom` value is a retryable server failure; a `statusIndicator` of type
- * `error` is classified by its message.
+ * `errorAtom` value is a retryable server failure; a lost agent transport is a
+ * retryable connection failure; any other `statusIndicator` of type `error` is
+ * classified by its message.
+ *
+ * `connectionLost` is the app-wide transport leg's answer (`reconnectExhausted`)
+ * for a session whose own status atom carries nothing yet. It only counts while
+ * nothing has loaded: a transcript already on screen keeps its rows and its own
+ * status line instead of being replaced by a full-screen error.
  */
 export function resolveSessionTerminalError(input: {
   error: string | null;
   statusIndicator: { type: string; message: string; code?: SdkStatusMessageCode } | null;
   messageCount: number;
+  connectionLost?: boolean;
 }): SessionTerminalError | null {
   if (input.messageCount > 0) {
     return null;
@@ -366,6 +401,16 @@ export function resolveSessionTerminalError(input: {
       retryable: true,
       detail: input.error,
     };
+  }
+  // The code names the failure whatever the indicator's own type is: the SDK
+  // writes `agent-connection-lost` for a transport that is gone, and a screen
+  // that kept the skeleton beside it would show a loading state and a failure
+  // in the same frame.
+  if (input.statusIndicator?.code === CONNECTION_LOST_CODE) {
+    return connectionLostFailure(input.statusIndicator.message);
+  }
+  if (input.connectionLost === true) {
+    return connectionLostFailure('');
   }
   if (input.statusIndicator?.type === 'error') {
     const detail = input.statusIndicator.message;

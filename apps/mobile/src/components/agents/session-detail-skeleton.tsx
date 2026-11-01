@@ -36,16 +36,20 @@ function shapeFor(sessionId: string) {
  */
 export function SessionSkeletonMessages({ sessionId }: Readonly<{ sessionId?: string }>) {
   const [first, second, third] = shapeFor(sessionId ?? '');
+  // `shrink` on each bubble keeps the placeholder inside a body shorter than the
+  // three bubbles (a short viewport, or the frame after a footer row appears):
+  // the shapes compress instead of overflowing the region, so no bubble is ever
+  // sliced by the row below it.
   return (
     <Animated.View exiting={FadeOut.duration(150)} className="flex-1 justify-end pb-2">
       <View className="items-start px-4 py-1">
-        <Skeleton className={`w-3/4 rounded-2xl rounded-tl-sm ${first}`} />
+        <Skeleton className={`w-3/4 shrink rounded-2xl rounded-tl-sm ${first}`} />
       </View>
       <View className="items-end px-4 py-1">
-        <Skeleton className={`w-1/2 rounded-2xl rounded-tr-sm ${second}`} />
+        <Skeleton className={`w-1/2 shrink rounded-2xl rounded-tr-sm ${second}`} />
       </View>
       <View className="items-start px-4 py-1">
-        <Skeleton className={`w-2/3 rounded-2xl rounded-tl-sm ${third}`} />
+        <Skeleton className={`w-2/3 shrink rounded-2xl rounded-tl-sm ${third}`} />
       </View>
     </Animated.View>
   );

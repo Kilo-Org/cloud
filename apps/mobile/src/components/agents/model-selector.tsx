@@ -316,7 +316,12 @@ export function ModelPickerOptionRow({
             {/* The disabled cue is the name's muted token, not a row opacity:
              * the metadata below and the `unavailable` line stay readable,
              * which a row-level 50% opacity took below 4.5:1. */}
-            <Text className={cn('text-base', option.unavailable ? 'text-muted-foreground' : 'text-foreground')}>
+            <Text
+              className={cn(
+                'text-base',
+                option.unavailable ? 'text-muted-foreground' : 'text-foreground'
+              )}
+            >
               {name}
             </Text>
             {option.modelRef ? (

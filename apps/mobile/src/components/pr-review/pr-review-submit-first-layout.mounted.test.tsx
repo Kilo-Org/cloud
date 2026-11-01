@@ -260,7 +260,21 @@ afterEach(() => {
 });
 
 describe('PrReviewSubmit first body frame', () => {
-  it('paints no body until the stored queue has settled', () => {
+  it('keeps the body gated while the stored queue is the only read still pending', () => {
+    mount();
+
+    expect(frames()).toHaveLength(0);
+
+    // The footer preference settles on its own: the queue half must still
+    // hold the body, or the cards would repaint when the rows arrive.
+    act(() => {
+      footerPreference.write({ hasLoaded: true });
+    });
+    expect(frames()).toHaveLength(0);
+    expect(record.events).toEqual([]);
+  });
+
+  it('keeps the body gated while the footer preference is the only read still pending', () => {
     const renderer = mount();
 
     expect(frames()).toHaveLength(0);
@@ -271,34 +285,29 @@ describe('PrReviewSubmit first body frame', () => {
     act(() => {
       pendingQueue.write({ hydrated: true });
     });
-
-    // The queue settled, the footer preference has not: still no body.
     expect(frames()).toHaveLength(0);
+    expect(record.events).toEqual([]);
   });
 
   it('paints one body frame that already carries both settled reads', () => {
     mount();
 
     act(() => {
-      pendingQueue.write({ hydrated: true });
       footerPreference.write({ hasLoaded: true });
     });
-
-    const painted = frames();
-    expect(painted).toHaveLength(1);
-    expect(painted[0]).toEqual({
-      field: FOOTER,
-      hint: true,
-      ctas: ['Submit review', 'Cancel'],
+    act(() => {
+      pendingQueue.write({ hydrated: true });
     });
+
+    expect(frames()).toEqual([{ field: FOOTER, hint: true, ctas: ['Submit review', 'Cancel'] }]);
   });
 
   it('never paints the block reason or a field-less body on the way to the settled frame', () => {
     mount();
 
     act(() => {
-      footerPreference.write({ hasLoaded: true });
       pendingQueue.write({ hydrated: true });
+      footerPreference.write({ hasLoaded: true });
     });
 
     expect(frames()).toEqual([{ field: FOOTER, hint: true, ctas: ['Submit review', 'Cancel'] }]);

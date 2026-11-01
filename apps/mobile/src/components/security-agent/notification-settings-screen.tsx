@@ -208,7 +208,14 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
         className="flex-1"
-        contentContainerClassName="px-6 gap-6 pt-4"
+        // The personal scope has no section heading between its two switches, so
+        // the break between the two groups carries their separation: it has to
+        // read as a group break, not as the 7dp and 5.25dp steps inside a group,
+        // and not as the void a removed heading would leave. The organization
+        // scope keeps the standard gap, next to its headings. The permission
+        // note above the groups only renders for a scope that cannot manage,
+        // which the personal scope never is.
+        contentContainerClassName={cn('px-6 pt-4', personal ? 'gap-7' : 'gap-6')}
       >
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">
@@ -216,9 +223,11 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
           </Text>
         )}
         <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('securityAgent.notifications.newFindingSection')}
-          </Text>
+          {!personal && (
+            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+              {t('securityAgent.notifications.newFindingSection')}
+            </Text>
+          )}
           <View className="gap-2">
             <ToggleRow
               title={
@@ -255,9 +264,11 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
         </View>
 
         <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('securityAgent.notifications.slaSection')}
-          </Text>
+          {!personal && (
+            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+              {t('securityAgent.notifications.slaSection')}
+            </Text>
+          )}
           <View className="gap-2">
             <ToggleRow
               title={

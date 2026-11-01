@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
-import { type SheetHeaderTopInset } from '@/components/sheet-header';
 import { type SessionProfilePickerProfile } from '@/components/agents/session-profile-picker-model';
 import { Button } from '@/components/ui/button';
 import { Check, Settings2 } from '@/components/ui/icons';
@@ -11,6 +10,7 @@ import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { type SheetHeaderTopInset } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
 import { cn } from '@/lib/utils';

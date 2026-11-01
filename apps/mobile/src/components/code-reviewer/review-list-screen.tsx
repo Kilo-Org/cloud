@@ -263,12 +263,13 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
     <View className="flex-1 bg-background">
       <ReviewerHeader
         title={scopeTitle}
-        // The scope name is the one thing that tells two organizations apart, so
-        // it keeps the platform list's second line for a natural break — and
-        // both lines are reserved: the name arrives with the membership read, so
-        // its placeholder must not push the list down when it lands. `Personal`
-        // is a fixed label, so it keeps one line and reserves no blank one.
-        titleNumberOfLines={isPersonal ? 1 : 2}
+        // One line on both scopes: the personal and the organization list are
+        // the same header over the same list, so they must keep one height, or
+        // the organization one paints its eyebrow lower and leaves a wider gap
+        // above the first review. The line is reserved for an organization
+        // because the name arrives with the membership read; a name wider than
+        // the row tail-truncates rather than pushing the list down when it lands.
+        titleNumberOfLines={1}
         reserveTitleSpace={!isPersonal}
         // The scope now titles the screen, so the eyebrow keeps the screen's own
         // name where the header's category label goes — the org name is user

@@ -645,9 +645,12 @@ describe('Recent review header', () => {
     await waitFor(() => findHeader().props.title === 'Drain Labs');
 
     expect(findHeader().props.eyebrow).toBe('Recent reviews');
-    // An organization name is prose, so it keeps a second line — reserved from
-    // the first frame, or the body moves one line when the name lands.
-    expect(findHeader().props.titleNumberOfLines).toBe(2);
+    // The scope name is prose, but the header paints it on the one line the
+    // personal scope uses: a second line reserved for it made this header
+    // taller than the Personal one, pushing the eyebrow down and opening a
+    // wider gap above the first review. Its single line is still reserved from
+    // the first frame, so the body does not move when the name lands.
+    expect(findHeader().props.titleNumberOfLines).toBe(1);
     expect(findHeader().props.reserveTitleSpace).toBe(true);
     unmount();
   });

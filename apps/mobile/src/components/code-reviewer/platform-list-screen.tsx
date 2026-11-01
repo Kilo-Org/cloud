@@ -125,13 +125,11 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
     <View className="flex-1 bg-background">
       <ReviewerHeader
         title={scopeTitle}
-        // An organization name is user prose, not a UI label, so it keeps a
-        // second line for a natural break. Both lines are reserved, as the
-        // review list for the same scope reserves them: the name arrives with
-        // the membership read, and the header holds its height so the platform
-        // rows below never move. `Personal` is a fixed label that can never
-        // wrap, so it keeps the single line it fills.
-        titleNumberOfLines={isPersonal ? 1 : 2}
+        // The same one-line header the review list for this scope paints: the
+        // name arrives with the membership read, so its line is reserved and the
+        // platform rows below never move, and `Personal` keeps the same single
+        // line so both scopes report one header height.
+        titleNumberOfLines={1}
         reserveTitleSpace={!isPersonal}
         eyebrow={t('common.codeReviewer')}
       />

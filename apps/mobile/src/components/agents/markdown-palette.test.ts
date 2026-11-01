@@ -18,7 +18,6 @@ const colors = {
   destructiveSolid: '#C25647',
   destructiveSolidForeground: '#FFFFFF',
   border: 'rgba(20, 15, 10, 0.09)',
-  switchTrack: '#8A8680',
   card: '#FFFFFF',
   selection: '#4F5A10',
   selectionForeground: '#FFFFFF',

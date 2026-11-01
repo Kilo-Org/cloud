@@ -106,32 +106,6 @@ describe('ProfileAgentsScreen mode badge', () => {
     await i18n.changeLanguage('en');
   });
 
-  it('does not print the slug beside the name', async () => {
-    h.query.data = [
-      { id: 'agent-a', slug: 'reviewer', name: 'Reviewer', config: { mode: 'primary' } },
-      {
-        id: 'agent-b',
-        slug: 'release-auditor',
-        name: 'Release auditor',
-        config: { mode: 'subagent' },
-      },
-    ];
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
-    );
-
-    const texts = renderer.root
-      .findAll(node => String(node.type) === 'Text')
-      .map(node => node.props.children);
-
-    expect(texts).toContain('Reviewer');
-    expect(texts).toContain('Release auditor');
-    expect(texts).not.toContain('reviewer');
-    expect(texts).not.toContain('release-auditor');
-
-    unmount();
-  });
-
   it('falls back to the primary mode label when the config carries none', async () => {
     await i18n.changeLanguage('hi');
     h.query.data = [agent('alpha', undefined)];

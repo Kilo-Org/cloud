@@ -71,7 +71,6 @@ const THEME = vi.hoisted(() => ({
   mutedSoft: '#A9A39A',
   primary: '#4F5A10',
   primaryForeground: '#FFFFFF',
-  switchTrack: '#8A8680',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => THEME,
@@ -137,15 +136,13 @@ function findOne(root: ReactTestInstance, type: string): ReactTestInstance {
   return node;
 }
 
-/**
- * The track each row's switch was handed. The grip is not part of it: the
- * shared `Switch` (covered by its own suite) picks the thumb from the value and
- * the scheme, so a row only decides the track it names.
- */
-function switchTracks(root: ReactTestInstance) {
+function switchColors(root: ReactTestInstance) {
   return findAll(root, 'Switch').map(node => {
-    const props = node.props as { trackColor?: { false?: string; true?: string } };
-    return props.trackColor;
+    const props = node.props as {
+      trackColor?: { false?: string; true?: string };
+      thumbColor?: string;
+    };
+    return { track: props.trackColor, thumb: props.thumbColor };
   });
 }
 
@@ -377,26 +374,29 @@ describe('ProfileKiloCommandsScreen row controls', () => {
     h.query.data = [testCommand({ enabled: false }), testCommand({ id: 'cmd-2', name: 'deploy' })];
     const { renderer, unmount } = await mountScreen();
 
-    // Both halves are named: a track object that carries only the off half
-    // drops this `true` entry and paints the on state in the platform accent.
-    expect(switchTracks(renderer.root)).toEqual([
-      { false: THEME.switchTrack, true: THEME.primary },
-      { false: THEME.switchTrack, true: THEME.primary },
+    // Both states keep the white thumb and the gray track; the dark pair here
+    // would be the regression the dark case above also catches from its side.
+    expect(switchColors(renderer.root)).toEqual([
+      { track: { false: THEME.mutedSoft, true: THEME.primary }, thumb: THEME.primaryForeground },
+      { track: { false: THEME.mutedSoft, true: THEME.primary }, thumb: THEME.primaryForeground },
     ]);
 
     unmount();
   });
 
-  // The dark palette's `primaryForeground` is near-black, so an off switch drawn
-  // from it put a dark thumb on the dark track over the dark card.
+  // The dark palette's `primaryForeground` is near-black, so reusing it for the
+  // off state put a dark thumb on the dark track over the dark card.
   it('keeps the off switch readable on the dark palette', async () => {
     h.colorScheme.current = 'dark';
     h.query.data = [testCommand({ enabled: false }), testCommand({ id: 'cmd-2', name: 'deploy' })];
     const { renderer, unmount } = await mountScreen();
 
-    expect(switchTracks(renderer.root)).toEqual([
-      { false: THEME.switchTrack, true: THEME.primary },
-      { false: THEME.switchTrack, true: THEME.primary },
+    expect(switchColors(renderer.root)).toEqual([
+      { track: { false: THEME.mutedForeground, true: THEME.primary }, thumb: THEME.foreground },
+      {
+        track: { false: THEME.mutedForeground, true: THEME.primary },
+        thumb: THEME.primaryForeground,
+      },
     ]);
 
     unmount();

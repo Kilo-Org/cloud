@@ -25,7 +25,7 @@ vi.mock('@/components/ui/icons', () => ({
   Trash2: 'Trash2',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#777777', switchTrack: '#767470' }),
+  useThemeColors: () => ({ mutedForeground: '#777777' }),
 }));
 
 const TEXT = 'Text' as ElementType;

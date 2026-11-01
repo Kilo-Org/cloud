@@ -1,16 +1,14 @@
 import { sessionLiveText } from '@kilocode/session-ingest-contracts';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Pressable, useColorScheme, View } from 'react-native';
 
-import { InlineBadge } from '@/components/ui/inline-badge';
-import { ProfileSwitch } from '@/components/profiles/profile-switch';
 import { ChevronDown, ChevronUp, Pencil, Terminal, Trash2 } from '@/components/ui/icons';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
-import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
-import { COMPACT_CONTROL_BOX_CLASS, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+import { COMPACT_CONTROL_BOX_CLASS, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 
 type KiloCommandRowProps = Readonly<{
   name: string;
@@ -59,12 +57,10 @@ function templatePreview(template: string): string | null {
 }
 
 /**
- * One slash command row: the `/name`, optional subtask/agent/model metadata and
- * the template preview, then one control row that spans the card: the enabled
- * switch on the leading edge, the up/down and edit/delete actions on the
- * trailing edge. The row carries no container `accessibilityLabel`, and the
- * visible `/name` is hidden from assistive technology, so the switch carries
- * that same visible name as the row's single accessible one.
+ * One slash command row: the `/name`, optional subtask/agent/model metadata, the
+ * template preview, the enabled switch, and up/down/edit/delete controls. The
+ * row carries no container `accessibilityLabel`, so the switch's label stays the
+ * only element a screen reader matches by the command's name.
  */
 export function KiloCommandRowView({
   name,
@@ -85,49 +81,62 @@ export function KiloCommandRowView({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const preview = useMemo(() => templatePreview(template), [template]);
-  // The slash form is the command's visible name; the row renders it once and
-  // hands it to the switch when the visible copy leaves the accessibility tree.
-  const visibleName = `/${name}`;
+  // Same signal `useThemeColors` reads. The dark palette's `primaryForeground`
+  // is near-black, so an off switch drawn from it put a dark thumb on a dark
+  // track over the dark card; the off state asks for a light thumb on a track
+  // that stands off the card in both schemes.
+  const isDark = useColorScheme() === 'dark';
+  const offTrackColor = isDark ? colors.mutedForeground : colors.mutedSoft;
+  const offThumbColor = isDark ? colors.foreground : colors.primaryForeground;
   const controlClass = (disabled: boolean) =>
     cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70', disabled && 'opacity-40');
   return (
     <View className="gap-1 rounded-lg bg-secondary px-3 py-2">
-      <View className="min-w-0 gap-0.5">
-        <View className="flex-row flex-wrap items-center gap-2">
-          <Terminal size={16} color={colors.mutedForeground} />
-          <Text variant="mono" className="text-sm" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
-            {visibleName}
-          </Text>
-          {subtask ? <InlineBadge>{t('profiles.slashCommands.subtask')}</InlineBadge> : null}
+      <View className="flex-row items-center gap-1">
+        <View className="min-w-0 flex-1 gap-0.5">
+          <View className="flex-row flex-wrap items-center gap-2">
+            <Terminal size={16} color={colors.mutedForeground} />
+            <Text variant="mono" className="text-sm" numberOfLines={1}>
+              {`/${name}`}
+            </Text>
+            {subtask ? (
+              <Text className="rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                {t('profiles.slashCommands.subtask')}
+              </Text>
+            ) : null}
+          </View>
+          {description.length > 0 ? (
+            <Text className="text-xs text-muted-foreground" numberOfLines={2}>
+              {description}
+            </Text>
+          ) : null}
+          {preview === null ? null : (
+            <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
+              {preview}
+            </Text>
+          )}
+          {agent.length > 0 || model.length > 0 ? (
+            <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+              {[agent.length > 0 ? `${t('common.agent')}: ${agent}` : '', model]
+                .filter(Boolean)
+                .join('  ')}
+            </Text>
+          ) : null}
         </View>
-        {description.length > 0 ? (
-          <Text className="text-xs text-muted-foreground" numberOfLines={2}>
-            {description}
-          </Text>
-        ) : null}
-        {preview === null ? null : (
-          <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
-            {preview}
-          </Text>
-        )}
-        {agent.length > 0 || model.length > 0 ? (
-          <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-            {[agent.length > 0 ? `${t('common.agent')}: ${agent}` : '', model]
-              .filter(Boolean)
-              .join('  ')}
-          </Text>
-        ) : null}
-      </View>
-      <View className="flex-row items-center justify-between gap-2">
-        <ProfileSwitch
+        <Switch
           value={enabled}
-          // The only element carrying the row's name, so it takes the visible
-          // form: a screen reader hears the command as the slash command it is.
-          accessibilityLabel={visibleName}
+          accessibilityLabel={name}
           disabled={onToggle === undefined}
           onValueChange={onToggle}
+          trackColor={{ false: offTrackColor, true: colors.primary }}
+          thumbColor={enabled ? colors.primaryForeground : offThumbColor}
         />
-        <View className="flex-row items-center gap-1">
+      </View>
+      {onMoveUp !== undefined ||
+      onMoveDown !== undefined ||
+      onEdit !== undefined ||
+      onDelete !== undefined ? (
+        <View className="flex-row items-center justify-end gap-5">
           {onMoveUp !== undefined ? (
             <Pressable
               className={controlClass(isFirst)}
@@ -175,7 +184,7 @@ export function KiloCommandRowView({
             </Pressable>
           ) : null}
         </View>
-      </View>
+      ) : null}
     </View>
   );
 }

@@ -21,7 +21,7 @@ import {
 import { SheetHeader } from '@/components/sheet-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
-import { ProfileSwitch } from '@/components/profiles/profile-switch';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
@@ -253,7 +253,7 @@ export function KiloCommandFormSheet({
           <Text {...HIDDEN_LABEL_PROPS} className="flex-1 text-sm font-medium text-foreground">
             {t('profiles.slashCommands.subtask')}
           </Text>
-          <ProfileSwitch
+          <Switch
             value={subtask}
             disabled={isSaving}
             accessibilityLabel={t('profiles.slashCommands.subtask')}

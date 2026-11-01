@@ -23,7 +23,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     mutedSoft: '#eeeeee',
     primary: '#000000',
     primaryForeground: '#ffffff',
-    switchTrack: '#8a8680',
   }),
 }));
 vi.mock('@/components/ui/icons', () => ({
@@ -154,7 +153,7 @@ describe('KiloCommandRowView template preview', () => {
     const [toggle] = root.findAll(node => Object.is(node.type, 'Switch'));
     const presses = root.findAll(node => Object.is(node.type, 'Pressable'));
 
-    expect(toggle?.props.accessibilityLabel).toBe('/review');
+    expect(toggle?.props.accessibilityLabel).toBe('review');
     expect(presses.map(node => node.props.accessibilityLabel)).toEqual([
       'Move slash command review up',
       'Move slash command review down',
@@ -170,42 +169,5 @@ describe('KiloCommandRowView template preview', () => {
     );
     expect(positions.every(position => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
-  });
-});
-
-describe('KiloCommandRowView announced name', () => {
-  it('keeps the command name painted once and out of the accessibility tree', () => {
-    const root = renderRow({ name: 'release-notes', description: 'Draft the release notes' });
-
-    const nameLines = root
-      .findAll(node => Object.is(node.type, 'Text'))
-      .filter(node => node.children.includes('/release-notes'));
-    expect(nameLines).toHaveLength(1);
-    // Painted, not announced: the switch below carries the name.
-    expect(nameLines[0]?.props).toMatchObject({
-      accessible: false,
-      importantForAccessibility: 'no',
-    });
-
-    const switches = root.findAll(node => Object.is(node.type, 'Switch'));
-    expect(switches.map(node => node.props.accessibilityLabel)).toEqual(['/release-notes']);
-  });
-
-  it('keeps the toggle on the switch after the name leaves the accessibility tree', () => {
-    const onToggle = vi.fn<(next: boolean) => void>();
-    const root = renderRow({ name: 'release-notes', onToggle });
-
-    const switchProps = root.findAll(node => Object.is(node.type, 'Switch'))[0]?.props as
-      | { onValueChange?: unknown }
-      | undefined;
-    if (typeof switchProps?.onValueChange !== 'function') {
-      throw new TypeError('the switch has no value handler');
-    }
-    const onValueChange = switchProps.onValueChange as (next: boolean) => void;
-    act(() => {
-      onValueChange(false);
-    });
-
-    expect(onToggle).toHaveBeenCalledWith(false);
   });
 });

@@ -2,8 +2,8 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { type McpServerSource } from '@/components/profiles/profile-mcp-model';
-import { ProfileSwitch } from '@/components/profiles/profile-switch';
 import { Lock, Pencil, Trash2 } from '@/components/ui/icons';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
@@ -20,17 +20,12 @@ type McpServerRowProps = Readonly<{
 }>;
 
 /**
- * A server row's URL or command line truncates in the middle: its tail is what
- * tells one endpoint apart from another, so the head alone does not carry it.
- */
-const SUMMARY_PROPS = { numberOfLines: 1, ellipsizeMode: 'middle' } as const;
-
-/**
  * One MCP server row: the name in mono, its type, the command/URL summary, the
  * enabled switch and a lock badge with the masked env/header key count. The
- * name is hidden from assistive technology, so the switch's label stays the
- * only element a screen reader matches by the server's name; the type, summary
- * and key count keep their own stops because they say what the name does not.
+ * name is painted only and hidden from assistive technology, so the switch's
+ * label stays the only element a screen reader matches by the server's name;
+ * the type, summary and key count keep their own stops because they say what
+ * the name does not.
  */
 export function McpServerRowView({
   server,
@@ -67,12 +62,12 @@ export function McpServerRowView({
           )}
         </View>
         {summary.length > 0 ? (
-          <Text variant="mono" className="text-xs text-muted-foreground" {...SUMMARY_PROPS}>
+          <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
             {summary}
           </Text>
         ) : null}
       </View>
-      <ProfileSwitch
+      <Switch
         value={server.enabled}
         accessibilityLabel={server.name}
         disabled={onToggle === undefined}

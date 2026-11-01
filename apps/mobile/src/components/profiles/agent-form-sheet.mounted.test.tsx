@@ -45,9 +45,6 @@ vi.mock('react-native', async () => {
     }),
   };
 });
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ switchTrack: '#767470' }),
-}));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));

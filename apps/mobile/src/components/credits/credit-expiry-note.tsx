@@ -56,22 +56,35 @@ export function CreditExpiryNote({
   const date = formatDate(parseTimestamp(nextExpiry.expiryDate), i18n.language, {
     timeZone: 'UTC',
   });
-  const repeatsBalance =
-    shownBalanceDollars !== undefined &&
-    nextExpiry.balanceMicrodollars === Math.round(shownBalanceDollars * 1_000_000);
+  // Decide from what the reader sees: `formatMoney` pins two decimals, so a
+  // sub-cent residual must not turn into "$0.00 in credits expires", and a
+  // balance and an expiring sum that render the same must not be repeated.
+  const expiringAmount = formatMoney(
+    fromMicrodollars(nextExpiry.balanceMicrodollars),
+    i18n.language
+  );
+  const showsAmount =
+    expiringAmount !== formatMoney(0, i18n.language) &&
+    (shownBalanceDollars === undefined ||
+      expiringAmount !== formatMoney(shownBalanceDollars, i18n.language));
+  const dateOnlySentence = bindUtcMarker(t('credits.nextExpiryDate', { date }));
+  // The mask is for the reader's eyes only: a screen reader hears the date
+  // sentence instead of the asterisks, matching the balance above it.
+  const masked = showsAmount && hiddenAmount !== undefined;
 
   return (
-    <Text className="text-xs text-muted-foreground">
-      {bindUtcMarker(
-        repeatsBalance
-          ? t('credits.nextExpiryDate', { date })
-          : t('credits.nextExpiry', {
-              amount:
-                hiddenAmount ??
-                formatMoney(fromMicrodollars(nextExpiry.balanceMicrodollars), i18n.language),
+    <Text
+      className="text-xs text-muted-foreground"
+      accessibilityLabel={masked ? t('credits.nextExpiryDate', { date }) : undefined}
+    >
+      {showsAmount
+        ? bindUtcMarker(
+            t('credits.nextExpiry', {
+              amount: hiddenAmount ?? expiringAmount,
               date,
             })
-      )}
+          )
+        : dateOnlySentence}
     </Text>
   );
 }

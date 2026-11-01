@@ -450,6 +450,46 @@ describe('CreditsCard balance state', () => {
       `***** in credits expires 12/17/2099${UTC_MARKER}. Credits with the earliest expiry are used first.`
     );
     expect(texts()).not.toContain('$2.00');
+    // The mask is visual only: a screen reader hears the date sentence.
+    expect(
+      renderer.root.findAllByProps({
+        accessibilityLabel:
+          'Expires 12/17/2099 (UTC). Credits with the earliest expiry are used first.',
+      })
+    ).toHaveLength(1);
+    unmount();
+  });
+
+  it('drops the amount when the expiring credits render as no money', async () => {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [{ balance_mUsd: 4_000, expiry_date: '2099-12-17T12:00:00Z' }],
+    });
+    const { texts, unmount } = await mountCard();
+    await waitFor(() =>
+      texts().includes(
+        `Expires 12/17/2099${UTC_MARKER}. Credits with the earliest expiry are used first.`
+      )
+    );
+    expect(texts().some(text => text.includes('$0.00 in credits'))).toBe(false);
+    unmount();
+  });
+
+  it('drops the amount when it renders like the balance although the sums differ', async () => {
+    currentUser.userId = 'user-a';
+    // The balance carries a sub-cent residual, so both sides read $10.00.
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 10.004 });
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [{ balance_mUsd: 10_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
+    });
+    const { texts, unmount } = await mountCard();
+    await waitFor(() =>
+      texts().includes(
+        `Expires 12/17/2099${UTC_MARKER}. Credits with the earliest expiry are used first.`
+      )
+    );
+    expect(texts().some(text => text.includes('in credits expires'))).toBe(false);
     unmount();
   });
 

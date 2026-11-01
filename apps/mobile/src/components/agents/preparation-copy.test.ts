@@ -2,11 +2,13 @@ import { type PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 
 import {
   preparationDetailText,
   preparationErrorText,
   preparationStepLabel,
+  splitFailureSentence,
 } from './preparation-copy';
 
 const { t } = i18n;
@@ -133,6 +135,57 @@ describe('preparationErrorText', () => {
   });
 });
 
+describe('splitFailureSentence', () => {
+  it('splits a two-sentence cause into what failed and what to do', () => {
+    expect(
+      splitFailureSentence(
+        'Container limit reached. Stop an existing container before starting another.'
+      )
+    ).toEqual({
+      title: 'Container limit reached.',
+      detail: 'Stop an existing container before starting another.',
+    });
+  });
+
+  it('keeps a one-sentence cause whole and never breaks at a decimal point', () => {
+    expect(splitFailureSentence('Environment preparation timed out')).toEqual({
+      title: 'Environment preparation timed out',
+    });
+    expect(splitFailureSentence('Restored 1.5 files after the retry')).toEqual({
+      title: 'Restored 1.5 files after the retry',
+    });
+  });
+
+  it('breaks at the stop a script writes, not only the Latin one', () => {
+    expect(splitFailureSentence('कंटेनर सीमा तक पहुँच गई। नया कंटेनर शुरू करने से पहले रोकें।')).toEqual({
+      title: 'कंटेनर सीमा तक पहुँच गई।',
+      detail: 'नया कंटेनर शुरू करने से पहले रोकें।',
+    });
+    expect(splitFailureSentence('เซสชันนี้ขาดการอัปเกรดที่จำเป็น เริ่มเซสชันใหม่เพื่อดำเนินการต่อ')).toEqual({
+      title: 'เซสชันนี้ขาดการอัปเกรดที่จำเป็น',
+      detail: 'เริ่มเซสชันใหม่เพื่อดำเนินการต่อ',
+    });
+  });
+
+  // A catalog loads on `changeLanguage`, not on `getFixedT`, so each tag is
+  // activated by its own case before its sentence stops are the ones under test.
+  it.each(SUPPORTED_LANGUAGES)('splits the two-sentence failure copy in %s', async tag => {
+    await i18n.changeLanguage(tag);
+    for (const [code, key] of [
+      ['container_limit_reached', 'agentChat.preparation.errorContainerLimitReached'],
+      ['credential_upgrade_required', 'agentChat.preparation.errorCredentialUpgradeRequired'],
+    ] as const) {
+      const catalogValue = i18n.getResource(tag, 'translation', key);
+      expect(catalogValue, `${tag} did not load its own catalog`).toBeTypeOf('string');
+      const text = preparationErrorText(code, i18n.t);
+      expect(text, `${tag} ${code} is not its catalog value`).toBe(catalogValue);
+      const sentence = splitFailureSentence(text);
+      expect(sentence.title.length, `${tag} ${code} has no headline`).toBeGreaterThan(0);
+      expect(sentence.detail, `${tag} ${code} lost its second sentence`).toBeTruthy();
+    }
+  });
+});
+
 describe('restore-incomplete report', () => {
   it('localizes the counts, the reason words and the missing paths', () => {
     expect(
@@ -141,7 +194,7 @@ describe('restore-incomplete report', () => {
         t
       )
     ).toBe(
-      'Session restore incomplete: 2 of 5 files were not restored (the patch did not apply, the file could not be written). Missing: a.ts, b.ts'
+      '2 of 5 files were not restored (the patch did not apply, the file could not be written). Missing: a.ts, b.ts'
     );
   });
 
@@ -152,7 +205,7 @@ describe('restore-incomplete report', () => {
         t
       )
     ).toBe(
-      'Session restore incomplete: 12 of 20 files were not restored (the path is outside the workspace). Missing: a.ts, b.ts and 10 more'
+      '12 of 20 files were not restored (the path is outside the workspace). Missing: a.ts, b.ts and 10 more'
     );
   });
 
@@ -162,7 +215,7 @@ describe('restore-incomplete report', () => {
         'Session restore incomplete: 1 of 5 files were not restored (binary file).',
         t
       )
-    ).toBe('Session restore incomplete: 1 of 5 files were not restored (an unknown reason).');
+    ).toBe('1 of 5 files were not restored (an unknown reason).');
   });
 });
 

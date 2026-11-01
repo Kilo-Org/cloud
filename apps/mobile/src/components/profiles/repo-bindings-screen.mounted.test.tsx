@@ -69,6 +69,7 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
 vi.mock('react-native', () => ({
+  Keyboard: { dismiss: () => undefined },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -144,7 +145,9 @@ describe('RepoBindingsScreen', () => {
 
     expect(findAll(renderer.root, 'Skeleton').length).toBeGreaterThan(0);
     expect(
-      findAll(renderer.root, 'Pressable').some(n => n.props.accessibilityLabel === 'Unbind')
+      findAll(renderer.root, 'Pressable').some(n =>
+        String(n.props.accessibilityLabel).startsWith('Unbind ')
+      )
     ).toBe(false);
 
     unmount();
@@ -188,7 +191,7 @@ describe('RepoBindingsScreen', () => {
     expect(texts).toContain('Backend debugging');
     expect(texts).toContain('GH');
 
-    pressPressable(renderer.root, 'Unbind');
+    pressPressable(renderer.root, 'Unbind acme/api');
     await waitFor(() => h.mutations.unbind.mutateAsync.mock.calls.length > 0);
     expect(h.mutations.unbind.mutateAsync.mock.calls[0]?.[0]).toEqual({
       repoFullName: 'acme/api',

@@ -1,15 +1,16 @@
+/* eslint-disable max-lines -- the placeholder suites share the sections' mock harness and card readers in this file */
 // The dashboard sections read the same sync state the filter row paints under
 // "All repositories". Before the first sync nothing has been measured, so the
 // priority card must not report the empty result as a clean codebase: the
 // green check and the all-clear line gave a never-synced organization a
-// verified look. The neutral state carries the screen's own not-yet-synced
-// line instead, and opens nothing.
+// verified look. The card explains what it will hold instead, and opens
+// nothing.
 
 import { type ComponentProps } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { DashboardSections } from './dashboard-sections';
+import { DashboardSections, DashboardSectionsSkeleton } from './dashboard-sections';
 
 // The counted bucket helper is spied on: a line that names three counts can
 // only agree them if each bucket is handed to its own plural family with its
@@ -29,6 +30,7 @@ vi.mock('@/i18n', () => ({
   i18n: { language: 'en', t: (key: string) => key },
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/icons', () => ({
@@ -144,13 +146,28 @@ function priorityCard(renderer: TestRenderer.ReactTestRenderer): Instance {
   return card;
 }
 
+/** The Codebase risk card, found by its title line. */
+function coverageCard(renderer: TestRenderer.ReactTestRenderer): Instance {
+  const card = renderer.root
+    .findAllByType('View')
+    .find(node => copy(node).includes('securityAgent.dashboard.codebaseRisk'));
+  if (!card) {
+    throw new Error('coverage card not found');
+  }
+  return card;
+}
+
 describe('DashboardSections priority card', () => {
   it('reports no measurement while the scope has never synced', () => {
     const card = priorityCard(renderSections({ neverSynced: true }));
 
-    // The neutral state carries the screen's own not-yet-synced line; the
-    // all-clear copy and its green check belong to a measured report.
-    expect(copy(card)).toContain('securityAgent.dashboard.notYetSynced');
+    // The card is a content section, so it explains what it will hold instead
+    // of showing the lone dash a measurement row shows or repeating the status
+    // the filter above states. The all-clear copy and its green check belong to
+    // a measured report, and nothing here opens.
+    expect(copy(card)).toContain('securityAgent.dashboard.actFirst');
+    expect(copy(card)).toContain('securityAgent.dashboard.priorityFindingsPending');
+    expect(copy(card)).not.toContain('securityAgent.dashboard.notYetSynced');
     expect(copy(card)).not.toContain('securityAgent.dashboard.noOpenFindings');
     expect(card.findAllByType('ShieldCheck')).toHaveLength(0);
     expect(card.findAllByType('Pressable')).toHaveLength(0);
@@ -249,5 +266,146 @@ describe('DashboardSections SLA posture', () => {
 
     expect(labels).toContain('securityAgent.dashboard.confirmedExploitable');
     expect(labels).toContain('securityAgent.dashboard.noImmediateAction');
+  });
+});
+
+describe('DashboardSectionsSkeleton', () => {
+  // The dashboard paints these placeholders while it reads, so they stand in
+  // for the cards the same owner renders: one per card, in the card's own
+  // frame, holding the loaded line boxes. A hand-sized bar instead made the
+  // loading state taller than the content that replaced it.
+  function renderSkeleton(
+    slaEnabled: boolean,
+    neverSynced = false
+  ): TestRenderer.ReactTestRenderer {
+    const slot: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    act(() => {
+      slot.current = TestRenderer.create(
+        <DashboardSectionsSkeleton slaEnabled={slaEnabled} neverSynced={neverSynced} />
+      );
+    });
+    const renderer = slot.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    return renderer;
+  }
+
+  /** The section cards: the views that carry the card frame. */
+  function cards(instance: Instance): Instance[] {
+    return instance.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'View' &&
+        String(n.props.className ?? '').includes('bg-secondary')
+    );
+  }
+
+  /** The row blocks of a placeholder card, one per loaded row. */
+  function rowBlocks(card: Instance): Instance[] {
+    return card.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'View' &&
+        String(n.props.className ?? '').includes('py-3')
+    );
+  }
+
+  it.each([true, false])(
+    'draws one placeholder per loaded card, in the card frame (slaEnabled=%s)',
+    slaEnabled => {
+      const loaded = cards(renderSections({ slaEnabled }).root);
+      const placeholders = cards(renderSkeleton(slaEnabled).root);
+
+      expect(placeholders).toHaveLength(loaded.length);
+      expect(new Set(placeholders.map(card => card.props.className))).toEqual(
+        new Set(loaded.map(card => card.props.className))
+      );
+    }
+  );
+
+  it('names nothing it has not measured', () => {
+    const placeholders = cards(renderSkeleton(true).root);
+
+    expect(placeholders.every(card => copy(card).length === 0)).toBe(true);
+    expect(placeholders.every(card => card.findAllByType('Skeleton').length > 0)).toBe(true);
+  });
+
+  it('draws the Act-first placeholder at the height of the card a never-synced scope loads', () => {
+    // Before the first sync that card holds one line of pending copy instead of
+    // a title over its repository, so the placeholder that has the read's
+    // answer draws that single line and does not lose a second one when the
+    // cards replace it.
+    const placeholderLines = (neverSynced: boolean) => {
+      const card = cards(renderSkeleton(true, neverSynced).root)[0];
+      if (!card) {
+        throw new Error('priority placeholder not found');
+      }
+      return card.findAllByType('Skeleton').length;
+    };
+    const loadedLines = (neverSynced: boolean) => {
+      const card = cards(renderSections({ slaEnabled: true, neverSynced }).root)[0];
+      if (!card) {
+        throw new Error('priority card not found');
+      }
+      return copy(card).length;
+    };
+
+    expect(placeholderLines(true)).toBe(loadedLines(true));
+    expect(placeholderLines(false)).toBe(placeholderLines(true) + 1);
+  });
+
+  it('draws the risk placeholder at the row count the loaded card shows', () => {
+    // The skeleton card order mirrors the sections': priority, posture (only
+    // without SLA tracking), risk, repositories. The risk card's rows are the
+    // analysis outcomes, so they read the same with SLA tracking on and off and
+    // the placeholder must not carry a row the loaded card has dropped.
+    const loadedRows = (slaEnabled: boolean) => {
+      const risk = cards(renderSections({ slaEnabled }).root).find(card =>
+        copy(card).includes('securityAgent.dashboard.codebaseRisk')
+      );
+      if (!risk) {
+        throw new Error('risk card not found');
+      }
+      return risk.findAllByType('KvRow').length;
+    };
+    const placeholderRows = (slaEnabled: boolean) => {
+      const card = cards(renderSkeleton(slaEnabled).root)[slaEnabled ? 1 : 2];
+      if (!card) {
+        throw new Error('risk placeholder not found');
+      }
+      return rowBlocks(card).length;
+    };
+
+    expect(placeholderRows(true)).toBe(loadedRows(true));
+    expect(placeholderRows(false)).toBe(loadedRows(false));
+    expect(placeholderRows(true)).toBe(placeholderRows(false));
+  });
+});
+
+describe('DashboardSections Codebase risk card', () => {
+  // The untracked count is already the "No deadline" tile above these cards, so
+  // the risk card carried the same number a second time under its own label.
+  // The rows here are the analysis outcomes, and they do not depend on SLA
+  // tracking: the card reads the same with it on and off.
+  it('keeps the same outcome rows with and without SLA tracking', () => {
+    const labels = (slaEnabled: boolean) =>
+      coverageCard(
+        renderSections({
+          neverSynced: false,
+          slaEnabled,
+          data: dashboardData({
+            sla: {
+              ...dashboardData().sla,
+              untrackedCount: 5,
+            },
+          }),
+        })
+      )
+        .findAllByType('KvRow')
+        .map(row => row.props.label);
+
+    expect(labels(true)).toHaveLength(4);
+    expect(labels(true)).toEqual(labels(false));
   });
 });

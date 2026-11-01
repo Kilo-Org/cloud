@@ -64,7 +64,10 @@ vi.mock('./home-widget-refresh', () => ({
     await Promise.resolve();
   }),
 }));
-vi.mock('./persist', () => ({ getLastGlanceableSnapshot: () => null }));
+vi.mock('./persist', () => ({
+  getLastGlanceableSnapshot: () => null,
+  getGlanceableSnapshotForSignedInScope: () => null,
+}));
 
 const CTX = { userId: 'user-1', organizationId: 'org-1' };
 

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the row's disclosure contracts (badges, dimming, trailing columns, provider line) share one native mock harness. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TestRenderer } from '@/test/renderer';
@@ -149,6 +150,52 @@ describe('ModelPickerOptionRow free badge', () => {
   );
 });
 
+describe('ModelPickerOptionRow unavailable row', () => {
+  // The row dimmed itself with a row-level opacity, which multiplied the
+  // reasons it carries: the `unavailable` line and the metadata fell to about
+  // 2:1 on the picker surface. The name carries the dim now.
+  const nameClass = (renderer: TestRenderer.ReactTestRenderer, text: string) =>
+    renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === text
+    )[0]?.props.className;
+
+  it('dims the name and keeps the reason at full contrast', () => {
+    const renderer = renderRow(
+      cliCatalogOption({ unavailable: true, name: 'Minimax M2.5', displayId: 'minimax/m2.5' })
+    );
+
+    expect(String(rowContainer(renderer).props.className)).not.toContain('opacity-50');
+    expect(nameClass(renderer, 'Minimax M2.5')).toContain('text-muted-foreground');
+    expect(nameClass(renderer, i18n.t('agentChat.modelSelector.unavailable'))).toBe(
+      'mt-1 text-xs text-muted-foreground'
+    );
+  });
+
+  it('keeps an available row name at full contrast', () => {
+    const renderer = renderRow(cliCatalogOption({ name: 'Minimax M2.5' }));
+
+    expect(nameClass(renderer, 'Minimax M2.5')).toBe('text-base text-foreground');
+  });
+
+  it('dims the selected check and leaves the badge copy readable', () => {
+    const renderer = renderRow(
+      cliCatalogOption({ unavailable: true, hasUserByokAvailable: true, name: 'Minimax M2.5' }),
+      { selected: true }
+    );
+
+    // A container opacity would re-multiply the badge copy, which is the
+    // defect this change removes; only the non-text check carries the dim.
+    const views = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'View'
+    );
+    expect(views.some(node => String(node.props.className).includes('opacity-50'))).toBe(false);
+    expect(checkAccessories(renderer)).toEqual([{ color: '#6F6A61', size: 18 }]);
+  });
+});
+
 describe('Auto model labels', () => {
   // The backend names Kilo's own Auto models in English ("Auto Efficient"),
   // which no catalog translates; the chip and the picker row must show the
@@ -230,6 +277,46 @@ describe('ModelPickerOptionRow trailing alignment', () => {
 
     const plainRow = renderRow(cliCatalogOption());
     expect(trailingIconTypes(plainRow.root)).toEqual(['Star']);
+  });
+});
+
+// A provider section's header already names the provider, so its rows drop the
+// line that repeats it and keep the model id. Rows in FAVORITES, recommended and
+// all-models have no provider header above them and keep the line.
+describe('ModelPickerOptionRow provider line', () => {
+  const providerOption = cliCatalogOption({
+    displayId: 'anthropic-model-00',
+    modelRef: { providerID: 'anthropic', modelID: 'anthropic-model-00' },
+    provider: { id: 'anthropic', name: 'Anthropic' },
+  });
+  const providerLine = i18n.t('agentChat.modelSelector.provider', { id: 'anthropic' });
+  const modelIdLine = i18n.t('agentChat.modelSelector.modelId', { id: 'anthropic-model-00' });
+
+  it('omits the provider line under a provider section and keeps the model id', () => {
+    const texts = textStrings(renderRow(providerOption, { showProvider: false }).root);
+
+    expect(texts).not.toContain(providerLine);
+    expect(texts).toContain(modelIdLine);
+  });
+
+  it('keeps the provider line where no section names the provider', () => {
+    const texts = textStrings(renderRow(providerOption, { showProvider: true }).root);
+
+    expect(texts).toContain(providerLine);
+    expect(texts).toContain(modelIdLine);
+  });
+
+  // The visible line is the duplicate, not the fact: a screen reader that lands
+  // on a row without the header still hears the provider.
+  it('names the provider in the accessibility label either way', () => {
+    const labelTextsOf = (showProvider: boolean) =>
+      renderRow(providerOption, { showProvider })
+        .root.findAll(node => typeof node.props.accessibilityLabel === 'string')
+        .map(node => node.props.accessibilityLabel as string);
+    const expected = 'Anthropic, Minimax M2.5, and anthropic-model-00';
+
+    expect(labelTextsOf(false)).toContain(expected);
+    expect(labelTextsOf(true)).toContain(expected);
   });
 });
 

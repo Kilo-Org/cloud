@@ -315,8 +315,8 @@ const SYNTHETIC_ERROR_NAME = 'NetworkError';
  * A real `Error` with a stable message for a context that carries no `Error`
  * of its own. Never a plain object: Sentry titles such an event from an SDK
  * frame (`Scope#captureException`) instead of the defect. The message holds
- * only the normalized path and the specific status/code, never the ephemeral
- * port or the query string.
+ * only the endpoint form of {@link failureIdentity} and the specific
+ * status/code, never the ephemeral port or the query string.
  */
 function buildSyntheticError(
   context: NetworkErrorContext,
@@ -348,6 +348,52 @@ function trpcPayload(trpc: TrpcErrorContext): TrpcErrorContext | undefined {
 }
 
 /**
+ * The procedure the response body names as failing: `data.path` is the one
+ * item of a batch that failed, while the request URL names every procedure the
+ * batch carries. Redacted like the other emitted text, since the value comes
+ * from the response, and ignored when blank so an empty path cannot empty the
+ * tag.
+ */
+function bodyProcedure(trpc: TrpcErrorContext): string | undefined {
+  if (trpc.path === undefined) {
+    return undefined;
+  }
+  const path = redactUrlText(trpc.path).trim();
+  return path.length === 0 ? undefined : path;
+}
+
+/**
+ * How a failure is named: the procedure ({@link bodyProcedure}, else the URL's
+ * path remainder) and the endpoint form the synthesized message uses.
+ */
+type FailureIdentity = {
+  procedure: string | undefined;
+  messagePath: string;
+};
+
+/**
+ * Name a failure after the procedure its body reports, else after the URL. The
+ * message keeps the `/api/trpc/<procedure>` form a tRPC request URL uses, so a
+ * batched call's title names the item that failed instead of the whole batch; a
+ * body that names no procedure keeps the normalized URL path, as before.
+ */
+function failureIdentity(
+  context: NetworkErrorContext,
+  trpc: TrpcErrorContext,
+  normalizedPath: string
+): FailureIdentity {
+  const urlProcedure = trpcProcedureFromUrl(context.url);
+  const bodyPath = bodyProcedure(trpc);
+  if (bodyPath === undefined) {
+    return { procedure: urlProcedure, messagePath: normalizedPath };
+  }
+  return {
+    procedure: bodyPath,
+    messagePath: urlProcedure === undefined ? bodyPath : `${TRPC_PATH}${bodyPath}`,
+  };
+}
+
+/**
  * Build and emit one warning-level telemetry event for a network error.
  * Never throws; never includes headers, body text, or query strings. A parsed
  * error body contributes only its tRPC metadata (code, HTTP status, procedure
@@ -358,18 +404,19 @@ export function reportNetworkError(context: NetworkErrorContext): void {
     if (isBatchEnvelopeWithoutError(context)) {
       return;
     }
-    // One origin-and-path form for the fingerprint key, the synthesized
-    // message, and the context URL. The app-set tRPC procedure stays readable.
+    // The context URL keeps origin and path; the failing procedure, not the
+    // request's whole path remainder, names the fingerprint key and the title
+    // (see {@link failureIdentity}). The app-set tRPC procedure stays readable.
     const pathOnly = redactUrlText(context.url);
     const normalizedPath = redactUrlText(normalizeUrlPath(context.url));
-    const procedure = trpcProcedureFromUrl(context.url);
     const trpc = readTrpcErrorContext(context.error);
+    const { procedure, messagePath } = failureIdentity(context, trpc, normalizedPath);
     const trpcCode = trpc.code;
     const statusClass = statusClassFor(context.status);
     const outcome = networkOutcome(context);
     const passedError = context.error instanceof Error ? context.error : undefined;
     const bodyMetadata = passedError === undefined ? trpcPayload(trpc) : undefined;
-    const error = passedError ?? buildSyntheticError(context, normalizedPath, trpc);
+    const error = passedError ?? buildSyntheticError(context, messagePath, trpc);
 
     const tags = {
       'error.subsystem': 'network',
@@ -447,12 +494,12 @@ function isExpectedResponse(context: NetworkErrorContext): boolean {
 function recordExpectedResponse(context: NetworkErrorContext): void {
   try {
     const trpc = readTrpcErrorContext(context.error);
-    const path = redactUrlText(normalizeUrlPath(context.url));
-    const procedure = trpcProcedureFromUrl(context.url);
+    const normalizedPath = redactUrlText(normalizeUrlPath(context.url));
+    const { procedure, messagePath } = failureIdentity(context, trpc, normalizedPath);
     addTelemetryBreadcrumb({
       category: 'network',
       level: 'warning',
-      message: buildSyntheticError(context, path, trpc).message,
+      message: buildSyntheticError(context, messagePath, trpc).message,
       data: {
         'error.source': context.source,
         'network.outcome': networkOutcome(context),

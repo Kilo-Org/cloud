@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { cn } from '@/lib/utils';
 
 type RepoPickerSheetProps = Readonly<{
@@ -151,6 +152,7 @@ export function RepoPickerSheet({
         repo={repo}
         isSelected={repositoryOptionKey(repo) === selectedKey}
         onSelect={() => {
+          dismissSearchPickerKeyboard();
           onSelect(repo);
         }}
       />
@@ -184,7 +186,7 @@ export function RepoPickerSheet({
       <ScrollView
         className="flex-1"
         contentContainerClassName="pb-4"
-        keyboardShouldPersistTaps="handled"
+        {...SEARCHABLE_PICKER_LIST_PROPS}
         showsVerticalScrollIndicator={false}
       >
         {body}

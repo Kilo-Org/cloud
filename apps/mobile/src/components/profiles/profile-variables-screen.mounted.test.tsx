@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- one mounted harness pins the form, secret-masking, delete flows, and the inline refusals for the variables screen */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import {
   changeText,
   confirmRequest,
@@ -47,6 +47,7 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileVars: () => h.query,
+  useAgentProfileOverview: () => ({ data: { name: 'Team profile' } }),
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
@@ -166,6 +167,27 @@ describe('ProfileVariablesScreen', () => {
     await waitFor(() =>
       findAll(renderer.root, 'Pressable').some(node => node.props.accessibilityLabel === 'API_KEY')
     );
+
+    unmount();
+  });
+
+  it('reaches a screen reader as the mark-secret switch alone, without a duplicate label stop', async () => {
+    h.query.data = testVars();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+
+    const label = i18n.t('profiles.secrets.markSecret');
+    const labels = findAll(renderer.root, 'Text').filter(node => node.props.children === label);
+    expect(labels).toHaveLength(1);
+    expect(labels[0]?.props).toMatchObject({
+      accessible: false,
+      importantForAccessibility: 'no',
+    });
+    expect(findAll(renderer.root, 'Switch').map(node => node.props.accessibilityLabel)).toEqual([
+      label,
+    ]);
 
     unmount();
   });

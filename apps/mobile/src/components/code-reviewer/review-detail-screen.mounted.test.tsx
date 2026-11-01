@@ -73,6 +73,10 @@ const reviewConfig = vi.hoisted(() => ({
   calls: [] as { scope: string; platform: string; enabled: boolean | undefined }[],
 }));
 const routerMock = vi.hoisted(() => ({ push: vi.fn() }));
+const githubAuthorization = vi.hoisted(() => ({
+  data: undefined as { connected: boolean } | undefined,
+  enabled: [] as (boolean | undefined)[],
+}));
 const spectatorStream = vi.hoisted(() => ({
   createReviewSpectatorStream: vi.fn(),
 }));
@@ -175,6 +179,11 @@ vi.mock('@/lib/utils', () => ({
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
+    githubApps: {
+      getUserAuthorization: {
+        queryOptions: () => ({ queryKey: ['githubApps.getUserAuthorization'] }),
+      },
+    },
     codeReviews: {
       getReviewStreamInfo: {
         queryOptions: () => ({ queryKey: ['codeReviews.getReviewStreamInfo'] }),
@@ -188,6 +197,10 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@tanstack/react-query', () => ({
   useQuery: (options: { queryKey?: unknown[]; enabled?: boolean; refetchInterval?: unknown }) => {
     const key = options.queryKey?.[0];
+    if (key === 'githubApps.getUserAuthorization') {
+      githubAuthorization.enabled.push(options.enabled);
+      return { data: githubAuthorization.data };
+    }
     if (key === 'codeReviews.getReviewStreamInfo') {
       return spectatorQueries.streamInfo;
     }
@@ -313,6 +326,8 @@ beforeEach(() => {
   reviewConfig.query = { isPending: false, data: undefined };
   reviewConfig.calls = [];
   routerMock.push.mockClear();
+  githubAuthorization.data = undefined;
+  githubAuthorization.enabled = [];
   vi.mocked(openExternalUrl).mockClear();
   nativePlatform.OS = 'ios';
   sessionListRenders.list = [];
@@ -377,6 +392,25 @@ describe('ReviewDetailScreen outcome-first order', () => {
     expect(idx('Gate')).toBeGreaterThan(idx('Council'));
     expect(idx('Details')).toBeGreaterThan(idx('Gate'));
     expect(texts).toContain('$123.00');
+  });
+
+  it('states the review status once, above the findings', () => {
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'completed', completed_at: '2024-01-01T00:05:00.000Z' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+    const findingsIndex = texts.indexOf('Findings');
+    const detailsIndex = texts.indexOf('Details');
+    expect(findingsIndex).toBeGreaterThanOrEqual(0);
+    expect(detailsIndex).toBeGreaterThan(findingsIndex);
+
+    // The conclusion above the findings owns the status word; the council and
+    // gate cards never repeat it.
+    expect(texts.slice(0, findingsIndex)).toContain('Completed');
+    expect(texts.slice(findingsIndex, detailsIndex)).not.toContain('Completed');
   });
 
   it.each([
@@ -524,8 +558,9 @@ describe('ReviewDetailScreen details metadata', () => {
     // screen passes.
     expect(collectText(completionRows[0]?.children ?? [])).toEqual([completedLabel, 'now']);
 
-    // The row belongs to the Details card, not the Gate's status row, which
-    // also shows "Completed" but as the value under the "Status" label.
+    // The row belongs to the Details card. The Gate card carries the check run
+    // and the threshold only, so the review status paints once, as the
+    // conclusion above the findings.
     const texts = collectText(renderer.toJSON());
     const completionRowIndex = texts.findIndex(
       (text, index) => text === completedLabel && texts[index + 1] === 'now'
@@ -759,9 +794,94 @@ describe('ReviewDetailScreen pull request destination', () => {
     expect(routerMock.push).not.toHaveBeenCalled();
   });
 
-  it('keeps personal GitHub reviews in app', () => {
+  it('opens a personal GitHub review in app when the user connection is live', () => {
+    detail.data = { success: true, review: makeReview(), tokenUsage: { input: 0, output: 0 } };
+    githubAuthorization.data = { connected: true };
+    mountScreen();
+    const button = buttons.rendered.find(
+      candidate => buttonText(candidate) === i18n.t('common.openPullRequest')
+    );
+    expect(button?.onPress).toBeDefined();
+    act(() => button?.onPress?.());
+    expect(routerMock.push).toHaveBeenCalledWith('/(app)/pr-review/org/repo/42');
+    expect(openExternalUrl).not.toHaveBeenCalled();
+  });
+
+  it('opens a personal GitHub review in the browser when the user connection is missing', () => {
+    const prUrl = 'https://github.com/org/repo/pull/42';
+    detail.data = {
+      success: true,
+      review: makeReview({ pr_url: prUrl }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    githubAuthorization.data = { connected: false };
+    mountScreen();
+    const button = buttons.rendered.find(
+      candidate => buttonText(candidate) === i18n.t('common.openPullRequest')
+    );
+    expect(button?.onPress).toBeDefined();
+    act(() => button?.onPress?.());
+    expect(openExternalUrl).toHaveBeenCalledWith(prUrl, { label: i18n.t('common.pullRequest') });
+    expect(routerMock.push).not.toHaveBeenCalled();
+  });
+
+  it('opens a personal GitHub review in the browser before the connection read answers', () => {
+    const prUrl = 'https://github.com/org/repo/pull/42';
+    detail.data = {
+      success: true,
+      review: makeReview({ pr_url: prUrl }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    // No data: the read is pending or failed, neither of which answers
+    // `connected: true`, so the pull request opens in the browser.
+    githubAuthorization.data = undefined;
+    mountScreen();
+    const button = buttons.rendered.find(
+      candidate => buttonText(candidate) === i18n.t('common.openPullRequest')
+    );
+    act(() => button?.onPress?.());
+    expect(openExternalUrl).toHaveBeenCalledWith(prUrl, { label: i18n.t('common.pullRequest') });
+    expect(routerMock.push).not.toHaveBeenCalled();
+  });
+
+  it('reads the GitHub connection only for a personal GitHub review', () => {
     detail.data = { success: true, review: makeReview(), tokenUsage: { input: 0, output: 0 } };
     mountScreen();
+    expect(githubAuthorization.enabled).toContain(true);
+
+    githubAuthorization.enabled = [];
+    mountScreen(false, 'org-1');
+    expect(githubAuthorization.enabled).toContain(false);
+
+    githubAuthorization.enabled = [];
+    detail.data = {
+      success: true,
+      review: makeReview({
+        platform: 'gitlab',
+        pr_url: 'https://gitlab.com/org/repo/-/merge_requests/42',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    mountScreen();
+    expect(githubAuthorization.enabled).toContain(false);
+  });
+
+  it('decides on the URL provider when the row column disagrees', () => {
+    // The row says gitlab but its URL is a github.com pull request. The button
+    // and the connection read both follow the URL, so a connected user still
+    // reads in the app.
+    detail.data = {
+      success: true,
+      review: makeReview({
+        platform: 'gitlab',
+        pr_url: 'https://github.com/org/repo/pull/42',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    githubAuthorization.data = { connected: true };
+    mountScreen();
+    expect(githubAuthorization.enabled).toContain(true);
+
     const button = buttons.rendered.find(
       candidate => buttonText(candidate) === i18n.t('common.openPullRequest')
     );
@@ -938,6 +1058,26 @@ describe('ReviewDetailScreen transcript sheet', () => {
     expect(transcriptSheets(renderer)).toHaveLength(0);
     expect(sessionListRenders.list).toHaveLength(0);
     expect(spectatorStream.createReviewSpectatorStream).not.toHaveBeenCalled();
+  });
+
+  it('follows the review content and the primary action instead of leading the screen', () => {
+    // The transcript is a secondary way to read the review: the title and the
+    // outcome lead, and the entry sits among the actions after Open pull request.
+    const renderer = mountScreen();
+    const texts = collectText(renderer.toJSON());
+    const transcriptIndex = texts.indexOf('Session transcript');
+    const titleIndex = texts.indexOf('Fix login');
+    const detailsIndex = texts.indexOf('Details');
+    const primaryIndex = texts.indexOf('Open pull request');
+
+    // A missing label is `-1`, which every ordering check below would satisfy,
+    // so each reference is asserted present before the order is compared.
+    expect(titleIndex).toBeGreaterThanOrEqual(0);
+    expect(detailsIndex).toBeGreaterThanOrEqual(0);
+    expect(primaryIndex).toBeGreaterThanOrEqual(0);
+    expect(transcriptIndex).toBeGreaterThan(titleIndex);
+    expect(transcriptIndex).toBeGreaterThan(detailsIndex);
+    expect(transcriptIndex).toBeGreaterThan(primaryIndex);
   });
 
   it.each(['ios', 'android'])(

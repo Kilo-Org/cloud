@@ -4,11 +4,10 @@ import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
-import { ProfileRowIdentity, profileRowLabel } from '@/components/profiles/profile-row-identity';
+import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { skillRowSubtitle } from '@/components/profiles/skill-markdown';
 import { SkillFormSheet, type SkillFormSubmission } from '@/components/profiles/skill-form-sheet';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
@@ -24,6 +23,7 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_SKILLS } from '@/lib/agent-profile-forms';
@@ -56,10 +56,11 @@ function hasUsableMessage(error: unknown): boolean {
 }
 
 /**
- * One skill row: the name in mono, its source type, the enabled switch,
- * and delete plus edit for local skills. The name and its source type are one
- * identity element declared first, so a screen reader hears what the row is
- * before the controls that change it.
+ * One skill row: the name in mono, its source type, the enabled switch, and
+ * delete plus edit for local skills. The name is painted only and hidden from
+ * assistive technology, so the switch's label stays the only element a screen
+ * reader matches by the skill's name; the source type keeps its own stop
+ * because it says what the name does not.
  */
 function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>) {
   const { t } = useTranslation();
@@ -69,14 +70,14 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
   const canEdit = skill.sourceType !== 'skills-sh';
   return (
     <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
-      <ProfileRowIdentity label={profileRowLabel(skill.name, subtitle)}>
-        <Text variant="mono" numberOfLines={1}>
+      <View className="min-w-0 flex-1 gap-0.5">
+        <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
           {skill.name}
         </Text>
         <Text variant="muted" className="text-xs">
           {subtitle}
         </Text>
-      </ProfileRowIdentity>
+      </View>
       <Switch
         value={skill.enabled}
         accessibilityLabel={skill.name}
@@ -310,7 +311,11 @@ export function ProfileSkillsScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profiles.skillsTitle')} />
+      <ProfileSectionHeader
+        profileId={profileId}
+        organizationId={organizationId}
+        title={t('profiles.skillsTitle')}
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"

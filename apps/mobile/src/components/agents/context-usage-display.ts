@@ -74,26 +74,38 @@ export function formatRemainingTokens(remaining: number): string {
 export type HeaderPillContent = {
   primary: string | null;
   secondary: string | null;
-  hasCost: boolean;
+  /**
+   * What the cost slot paints:
+   *
+   * - `label`: the session's cost, as text.
+   * - `loading`: the same dashes, laid out but painted invisible, with one bar
+   *   across the row they take. A bar of fixed width matched the settled row
+   *   only at the default font scale, and a dash beside a bar read as
+   *   half-painted content.
+   * - `unreported`: the dash, in the label's width. The session settled without
+   *   a cost, so nothing will fill the slot; it keeps the width so the pill does
+   *   not shrink when it settles.
+   * - `none`: no cost slot at all.
+   */
+  costSlot: PillCostSlot;
   tone: ContextTone;
   /** `undefined` = indeterminate arc; `0` = track only (no usage asserted). */
   arcFraction: number | undefined;
   interactive: boolean;
   /**
    * Settled without usage: the accessibility label names usage as unavailable.
-   * Stays false while the session is still loading, when the pill is a bare
-   * placeholder. Never changes the visible pill: a session that settles without
-   * usage keeps the placeholder it showed while loading, so the header pill is
-   * the same in both states.
+   * Stays false while the session is still loading.
    */
   usageUnavailable: boolean;
 };
 
+type PillCostSlot = 'label' | 'loading' | 'unreported' | 'none';
+
 /**
- * Mark the pill shows while the model's context window is unresolved: the slot
- * keeps a visible value instead of a ring that reads as zero percent. It never
- * stands in for usage that has not arrived — a session without usage keeps the
- * same label-free placeholder whether it is still resolving or has settled.
+ * Value-slot placeholder of a session that has not reported usage yet. It marks
+ * the slot as unfilled instead of standing in for a number: the pill keeps its
+ * two slots while the session resolves, so a settled pill fills the slots it
+ * already showed rather than growing a value out of a bare ring.
  */
 const UNKNOWN_WINDOW_LABEL = '—';
 
@@ -125,7 +137,7 @@ export function getHeaderPillContent({
     return {
       primary,
       secondary,
-      hasCost: secondary !== null,
+      costSlot: secondary !== null ? 'label' : 'none',
       tone,
       arcFraction: getArcFraction(info.percentage),
       interactive: true,
@@ -134,16 +146,31 @@ export function getHeaderPillContent({
   }
 
   const costText = hasMessages ? formatSessionTotalCost(totalCostMicrodollars) : null;
-  // Usage unknown. The pill keeps the placeholder it shows while the session
-  // resolves — the track-only ring and, when this screen already knows it, the
-  // session's cost — and never a dash standing in for a value that has not
-  // arrived; only the dash above, for usage without a context window, is a real
-  // value. A settled session therefore looks the same as a loading one instead
-  // of changing shape late.
+  // Nothing has reported usage yet. A settled pill keeps both value slots, each
+  // marked with the dash, instead of collapsing to a bare ring: the header then
+  // reads as the same pill before and after the transcript resolves, and the
+  // slots it showed fill in place. Neither dash stands in for a value that has
+  // arrived; while the open resolves they lay out the row the values will take
+  // and the pill paints one bar across it.
+  if (!hasMessages) {
+    return {
+      primary: UNKNOWN_WINDOW_LABEL,
+      secondary: UNKNOWN_WINDOW_LABEL,
+      costSlot: loading ? 'loading' : 'unreported',
+      tone: 'neutral',
+      arcFraction: 0,
+      interactive: false,
+      usageUnavailable: !loading,
+    };
+  }
+  // A transcript without usage. The pill keeps the track-only ring and, when
+  // this screen already knows it, the session's cost, and never a dash standing
+  // in for a value that has not arrived; only the dash above, for usage without
+  // a context window, is a real value.
   return {
     primary: costText,
     secondary: null,
-    hasCost: costText !== null,
+    costSlot: 'none',
     tone: 'neutral',
     arcFraction: 0,
     interactive: false,

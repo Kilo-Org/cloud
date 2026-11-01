@@ -57,7 +57,10 @@ import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-ren
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { formatSessionTotalCost } from '@/components/agents/session-list-helpers';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
-import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
+import {
+  SessionReadOnlyFooterPlaceholder,
+  SessionSkeletonMessages,
+} from '@/components/agents/session-detail-skeleton';
 import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import type * as SessionTranscript from '@/components/agents/session-transcript';
@@ -324,6 +327,7 @@ vi.mock('@/components/agents/session-status-indicator', () => ({
 }));
 vi.mock('@/components/agents/session-detail-skeleton', () => ({
   SessionSkeletonMessages: 'SessionSkeletonMessages',
+  SessionReadOnlyFooterPlaceholder: 'SessionReadOnlyFooterPlaceholder',
 }));
 vi.mock('@/components/agents/transcript-time-marker', () => ({
   TranscriptTimeMarker: 'TranscriptTimeMarker',
@@ -2032,6 +2036,124 @@ describe('session detail slow load', () => {
     }
   });
 
+  // The explorer finding this suite guards: the skeleton and a "Connection
+  // lost" line painted in the same frame, with the last bubble sliced by the
+  // row. A lost transport now owns the body, so the skeleton is gone and the
+  // failure is stated once, with the Retry that resolves it.
+  it('replaces the skeleton with one retryable error when the agent transport is lost', async () => {
+    const view = await mountDetails(null);
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+
+    act(() => {
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Agent connection lost',
+          code: 'agent-connection-lost',
+          timestamp: 0,
+        }
+      );
+    });
+
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+    const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+      typeof QueryError
+    >;
+    expect(error.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
+    expect(error.onRetry).toBeDefined();
+    // The failure is stated once: no footer status line and no send reason
+    // naming the same thing beside the card.
+    expect(indicatorNodes(view)).toHaveLength(0);
+    expect(composerProps(view).sendDisabledReason).toBeNull();
+    // The session's own transport dropped, so its Retry reopens the session;
+    // the shared leg is not the cause here.
+    const switchSession = vi.spyOn(view.manager, 'switchSession').mockResolvedValue(undefined);
+    act(() => {
+      (error.onRetry as () => void)();
+    });
+    expect(switchSession).toHaveBeenCalledWith(ROOT_ID);
+    expect(connectionHealth.retryConnection).not.toHaveBeenCalled();
+  });
+
+  it('resolves a lost transport whose indicator carries no error type', async () => {
+    // The SDK's own code names the failure; the indicator's type must not decide
+    // whether the skeleton keeps painting beside the connection-lost line.
+    const view = await mountDetails(null);
+    act(() => {
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'progress',
+          message: 'Agent connection lost',
+          code: 'agent-connection-lost',
+          timestamp: 0,
+        }
+      );
+    });
+
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+    expect(indicatorNodes(view)).toHaveLength(0);
+    expect(composerProps(view).sendDisabledReason).toBeNull();
+    const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+      typeof QueryError
+    >;
+    expect(error.title).toBe(i18n.t('agentChat.session.couldNotLoadThisSession'));
+  });
+
+  it('holds the read-only footer area, not a composer, while the open has nothing to show', async () => {
+    const view = await mountDetails(null);
+    // The skeleton owns the body and the session's transport has not answered:
+    // no composer, and the footer's area is held instead.
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(1);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+
+    // The read-only footer takes the held area, so the transcript never moves
+    // under it when the transport turns out to have no writer.
+    await view.respond(ROOT_ID, [childMessage(ROOT_ID, 'read-only row')]);
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      view.store.set(view.manager.atoms.isReadOnly, true);
+    });
+    expect(renderedText(view.renderer.root)).toContain('read-only row');
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain(i18n.t('agentChat.session.readOnly'));
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+  });
+
+  it('resolves an exhausted app-wide leg into the same retryable error', async () => {
+    connectionHealth.isConnected = false;
+    connectionHealth.reconnectExhausted = true;
+    const view = await mountDetails(null);
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, 'remote');
+    });
+
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+    const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+      typeof QueryError
+    >;
+    expect(error.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
+    expect(error.onRetry).toBeDefined();
+    // A spent reconnect budget is only cleared by resetting the shared
+    // transport leg; reopening over the same dead socket would return here.
+    const switchSession = vi.spyOn(view.manager, 'switchSession');
+    act(() => {
+      (error.onRetry as () => void)();
+    });
+    expect(connectionHealth.retryConnection).toHaveBeenCalledTimes(1);
+    expect(switchSession).not.toHaveBeenCalled();
+  });
+
   it('keeps a terminal error ahead of the slow state', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
@@ -3497,10 +3619,10 @@ describe('session detail composer after a failed turn', () => {
 });
 
 describe('session detail composer cannot-send reason', () => {
-  it('states the load-failure reason beside send in the load-error state', async () => {
-    // The audit's state (owner evidence A4/A12): the open fails, the transcript
-    // is empty and the manager cannot send, but the input stays editable. The
-    // reason beside send must name the load failure, not a runtime class.
+  it('leaves the load-failure statement to the error card in the body', async () => {
+    // The open fails, the transcript is empty and the manager cannot send. The
+    // body states the failure once with the Retry that resolves it, so the
+    // reason beside send does not name the same failure a second time.
     const view = await mountDetails([]);
     act(() => {
       view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
@@ -3517,8 +3639,10 @@ describe('session detail composer cannot-send reason', () => {
 
     const props = composerProps(view);
     expect(props.sendDisabled).toBe(true);
-    expect(props.sendDisabledReason).toBe(i18n.t('agentChat.composer.sessionLoadFailed'));
-    expect(props.sendDisabledReason).not.toBe(i18n.t('agentChat.session.connectionTrouble'));
+    expect(props.sendDisabledReason).toBeNull();
+    expect(view.renderer.root.findByType(QueryError).props.message).toBe(
+      i18n.t('agentChat.session.connectionTrouble')
+    );
   });
 
   it('states the class reason for a running session that cannot send', async () => {
@@ -4124,7 +4248,7 @@ describe('SessionDetailContent fixed indicator row', () => {
     }
   );
 
-  it('renders no progress item for an empty transcript, keeping only the send reason', async () => {
+  it('renders no footer item while the error card owns the empty transcript', async () => {
     const view = await mountDetails([]);
     act(() => {
       view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
@@ -4138,13 +4262,18 @@ describe('SessionDetailContent fixed indicator row', () => {
       );
       view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
     });
-    // The empty/connecting body states progress itself, so the row drops it and
-    // keeps the one line only it can state: why send is unavailable. The
-    // has-messages gate must not take the load-failure line with it.
+    // One failure, one statement: the body states it with the Retry that
+    // resolves it, so the row states neither the progress nor the send reason.
     expect(view.renderer.root.findAllByType(WorkingIndicator)).toHaveLength(0);
-    const items = footerRowItems(view);
-    expect(items).toHaveLength(1);
-    expect(items[0]?.props.message).toBe(i18n.t('agentChat.composer.sessionLoadFailed'));
+    expect(indicatorNodes(view)).toHaveLength(0);
+    expect(
+      view.renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'AnimatedView') &&
+          String(node.props.className ?? '') === 'bg-background'
+      )
+    ).toHaveLength(0);
+    expect(composerProps(view).sendDisabledReason).toBeNull();
   });
 
   it('states the cannot-send reason in the row with the row item typography', async () => {

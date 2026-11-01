@@ -233,15 +233,14 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
             />
             {autoAnalysisEnabled && (
               <>
-                <View className="ps-3">
-                  <PillGroup
-                    label={t('securityAgent.automation.minimumSeverity')}
-                    options={minSeverityOptions}
-                    value={autoAnalysisMinSeverity}
-                    disabled={!canManage}
-                    onChange={setAutoAnalysisMinSeverity}
-                  />
-                </View>
+                <PillGroup
+                  className="ps-3"
+                  label={t('securityAgent.automation.minimumSeverity')}
+                  options={minSeverityOptions}
+                  value={autoAnalysisMinSeverity}
+                  disabled={!canManage}
+                  onChange={setAutoAnalysisMinSeverity}
+                />
                 <ToggleRow
                   title={t('securityAgent.automation.includeExistingFindings')}
                   subtitle={t('securityAgent.automation.includeExistingFindingsAnalysisSubtitle')}
@@ -268,15 +267,14 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
             />
             {autoRemediationEnabled && (
               <>
-                <View className="ps-3">
-                  <PillGroup
-                    label={t('securityAgent.automation.minimumSeverity')}
-                    options={minSeverityOptions}
-                    value={autoRemediationMinSeverity}
-                    disabled={!canManage}
-                    onChange={setAutoRemediationMinSeverity}
-                  />
-                </View>
+                <PillGroup
+                  className="ps-3"
+                  label={t('securityAgent.automation.minimumSeverity')}
+                  options={minSeverityOptions}
+                  value={autoRemediationMinSeverity}
+                  disabled={!canManage}
+                  onChange={setAutoRemediationMinSeverity}
+                />
                 <ToggleRow
                   title={t('securityAgent.automation.includeExistingFindings')}
                   subtitle={t(
@@ -311,15 +309,14 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
               onValueChange={setAutoDismissEnabled}
             />
             {autoDismissEnabled && (
-              <View className="ps-3">
-                <PillGroup
-                  label={t('securityAgent.automation.confidenceThreshold')}
-                  options={confidenceOptions}
-                  value={autoDismissConfidenceThreshold}
-                  disabled={!canManage}
-                  onChange={setAutoDismissConfidenceThreshold}
-                />
-              </View>
+              <PillGroup
+                className="ps-3"
+                label={t('securityAgent.automation.confidenceThreshold')}
+                options={confidenceOptions}
+                value={autoDismissConfidenceThreshold}
+                disabled={!canManage}
+                onChange={setAutoDismissConfidenceThreshold}
+              />
             )}
           </View>
         </View>

@@ -20,6 +20,7 @@ export function PillGroup<T extends string>({
   value,
   disabled,
   onChange,
+  className,
 }: Readonly<{
   label: string;
   options: readonly { value: T; label: string }[];
@@ -27,10 +28,12 @@ export function PillGroup<T extends string>({
   value: T | null;
   disabled: boolean;
   onChange: (value: T) => void;
+  /** Placement of the picker inside its section. */
+  className?: string;
 }>) {
   const colors = useThemeColors();
   return (
-    <View className="gap-1.5">
+    <View className={cn('gap-1.5', className)}>
       <Text className="text-xs font-medium">{label}</Text>
       <RadioGroup label={label} className="overflow-hidden rounded-lg bg-secondary">
         {options.map((option, index) => {

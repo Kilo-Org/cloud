@@ -228,17 +228,14 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
               onValueChange={setNewFindingNotificationsEnabled}
             />
             {newFindingNotificationsEnabled && (
-              // The revealed field steps in from the toggle that owns it, so it
-              // reads as part of this section instead of a second heading.
-              <View className="ps-3">
-                <PillGroup
-                  label={t('securityAgent.notifications.newFindingSeverityLabel')}
-                  options={severityOptions}
-                  value={newFindingNotificationMinSeverity}
-                  disabled={!canManage}
-                  onChange={setNewFindingNotificationMinSeverity}
-                />
-              </View>
+              <PillGroup
+                className="ps-3"
+                label={t('securityAgent.notifications.newFindingSeverityLabel')}
+                options={severityOptions}
+                value={newFindingNotificationMinSeverity}
+                disabled={!canManage}
+                onChange={setNewFindingNotificationMinSeverity}
+              />
             )}
           </View>
         </View>
@@ -271,15 +268,16 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
               onValueChange={setSlaNotificationsEnabled}
             />
             {slaNotificationsEnabled && (
-              <View className="gap-2 ps-3">
+              <>
                 <PillGroup
+                  className="ps-3"
                   label={t('securityAgent.notifications.slaSeverityLabel')}
                   options={severityOptions}
                   value={slaNotificationMinSeverity}
                   disabled={!canManage}
                   onChange={setSlaNotificationMinSeverity}
                 />
-                <View className="gap-1.5">
+                <View className="gap-1.5 ps-3">
                   <Text className="text-xs font-medium">
                     {t('securityAgent.notifications.slaLeadTimeLabel')}
                   </Text>
@@ -312,7 +310,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                     </Text>
                   )}
                 </View>
-              </View>
+              </>
             )}
           </View>
         </View>

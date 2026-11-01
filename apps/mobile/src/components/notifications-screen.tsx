@@ -731,12 +731,12 @@ export function NotificationsScreen() {
               <Text className="text-sm font-medium">{t('notifications.deviceTitle')}</Text>
               {masterLeading === 'neutral' && <Skeleton className="mt-0.5 h-4 w-52" />}
               {masterLeading === 'on' && (
-                <Text variant="muted" className="mt-0.5 text-xs" numberOfLines={1}>
+                <Text variant="muted" className="mt-0.5 text-xs">
                   {t('notifications.onDescription')}
                 </Text>
               )}
               {masterLeading === 'off' && (
-                <Text variant="muted" className="mt-0.5 text-xs" numberOfLines={1}>
+                <Text variant="muted" className="mt-0.5 text-xs">
                   {t('notifications.offDescription')}
                 </Text>
               )}
@@ -763,7 +763,7 @@ export function NotificationsScreen() {
                 <Switch
                   value={notificationsEnabled}
                   disabled={isMasterBusy}
-                  accessibilityLabel={t('common.notifications')}
+                  accessibilityLabel={t('notifications.deviceTitle')}
                   accessibilityState={{ disabled: isMasterBusy, busy: isMasterBusy }}
                   onValueChange={value => {
                     if (value) {

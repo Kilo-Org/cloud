@@ -299,14 +299,15 @@ describe('idle composer control and ring track contrast (non-text)', () => {
 });
 
 describe('disabled switch pair contrast (non-text)', () => {
-  // The shared switch paints this pair on every disabled control in place of
-  // the brand on-track: `primary-disabled` under the regular grip for the on
-  // position, `muted-soft` with the mid neutral grip for the off one. The
-  // switch sits on a `secondary` row, so its tracks are measured over that.
-  // The floors are perception floors: the pair has to read as a control and the
-  // two positions have to stay apart. Light has no third neutral for the off
-  // track — `control-idle` equals `secondary` there — so the disabled off track
-  // is the same neutral as the enabled off track, and only its grip dims.
+  // The shared switch paints this pair for a disabled control on Android, in
+  // place of the brand on-track: `primary-disabled` under the regular grip for
+  // the on position, `muted-soft` with the mid neutral grip for the off one.
+  // iOS keeps the brand pair and fades it itself. The switch sits on a
+  // `secondary` row, so its tracks are measured over that. The floors are
+  // perception floors: the pair has to read as a control and the two positions
+  // have to stay apart. Light has no third neutral for the off track —
+  // `control-idle` equals `secondary` there — so the disabled off track is the
+  // same neutral as the enabled off track, and only its grip dims.
   const MIN_VISIBLE_SURFACE_RATIO = 1.6;
   const themes = [
     ['light', lightColors],

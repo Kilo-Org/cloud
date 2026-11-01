@@ -1814,7 +1814,6 @@
       "noImmediateAction": "Bez potreby okamžitého zásahu",
       "notExploitable": "Nezneužiteľné",
       "needsYourReview": "Vyžaduje tvoju kontrolu",
-      "noSlaDeadline": "Nie je priradený termín SLA",
       "noRepositoryData": "Zatiaľ žiadne údaje o repozitári",
       "noRepositoryDataDescription": "Priority repozitára sa zobrazia po synchronizácii nálezov.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

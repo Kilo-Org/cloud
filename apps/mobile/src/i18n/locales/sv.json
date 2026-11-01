@@ -1768,7 +1768,6 @@
       "noImmediateAction": "Ingen omedelbar åtgärd",
       "notExploitable": "Inte utnyttjbar",
       "needsYourReview": "Väntar på din granskning",
-      "noSlaDeadline": "Ingen SLA-tidsfrist angiven",
       "noRepositoryData": "Inga uppgifter om kodarkiv ännu",
       "noRepositoryDataDescription": "Prioriteringar för kodarkiven visas när fynden har synkroniserats.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

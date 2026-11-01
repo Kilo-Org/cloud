@@ -1768,7 +1768,6 @@
       "noImmediateAction": "اقدام فوری لازم نیست",
       "notExploitable": "غیرقابل بهره‌برداری",
       "needsYourReview": "نیازمند بازبینی شما",
-      "noSlaDeadline": "مهلت SLA تعیین نشده",
       "noRepositoryData": "هنوز داده‌ای از مخازن وجود ندارد",
       "noRepositoryDataDescription": "پس از همگام‌سازی یافته‌ها، اولویت‌های مخازن نمایش داده می‌شوند.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

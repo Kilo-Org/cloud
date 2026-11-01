@@ -1768,7 +1768,6 @@
       "noImmediateAction": "Անհապաղ գործողություն պետք չէ",
       "notExploitable": "Շահագործելի չէ",
       "needsYourReview": "Քո ստուգումն է պահանջում",
-      "noSlaDeadline": "SLA-ի վերջնաժամկետ սահմանված չէ",
       "noRepositoryData": "Դեռևս պահոցի տվյալներ չկան",
       "noRepositoryDataDescription": "Պահոցի առաջնահերթությունները կհայտնվեն խնդիրների համաժամեցումից հետո։",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

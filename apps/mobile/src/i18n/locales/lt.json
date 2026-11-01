@@ -1814,7 +1814,6 @@
       "noImmediateAction": "Skubių veiksmų nereikia",
       "notExploitable": "Negalima išnaudoti",
       "needsYourReview": "Laukia tavo peržiūros",
-      "noSlaDeadline": "SLA terminas nenustatytas",
       "noRepositoryData": "Saugyklos duomenų dar nėra",
       "noRepositoryDataDescription": "Saugyklų prioritetai bus rodomi sinchronizavus radinius.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

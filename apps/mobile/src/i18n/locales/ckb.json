@@ -1768,7 +1768,6 @@
       "noImmediateAction": "پێویستی بە کرداری دەستبەجێ نییە",
       "notExploitable": "ناشیاوی خراپ بەکارهێنان",
       "needsYourReview": "پێویستی بە پێداچوونەوەی تۆ هەیە",
-      "noSlaDeadline": "هیچ مۆڵەتێکی SLA دیاری نەکراوە",
       "noRepositoryData": "هێشتا هیچ داتای کۆگا نییە",
       "noRepositoryDataDescription": "دوای هاوکاتکردنی دۆزینەوەکان، کارە پێشینەکانی کۆگا دەردەکەون.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

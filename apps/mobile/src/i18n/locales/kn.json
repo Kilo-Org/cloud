@@ -1768,7 +1768,6 @@
       "noImmediateAction": "ತಕ್ಷಣದ ಕ್ರಮ ಅಗತ್ಯವಿಲ್ಲ",
       "notExploitable": "ದುರ್ಬಳಕೆ ಸಾಧ್ಯವಿಲ್ಲ",
       "needsYourReview": "ನಿಮ್ಮ ಪರಿಶೀಲನೆ ಅಗತ್ಯ",
-      "noSlaDeadline": "SLA ಗಡುವು ನಿಗದಿಯಾಗಿಲ್ಲ",
       "noRepositoryData": "ಇನ್ನೂ ರೆಪೊಸಿಟರಿ ಡೇಟಾ ಇಲ್ಲ",
       "noRepositoryDataDescription": "ಪತ್ತೆಯಾದ ಸಮಸ್ಯೆಗಳು ಸಿಂಕ್ ಆದ ನಂತರ ರೆಪೊಸಿಟರಿಗಳ ಆದ್ಯತೆಗಳು ಕಾಣಿಸುತ್ತವೆ.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

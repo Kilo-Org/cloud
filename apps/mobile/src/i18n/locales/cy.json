@@ -1860,7 +1860,6 @@
       "noImmediateAction": "Dim angen gweithredu ar unwaith",
       "notExploitable": "Ni ellir manteisio arno",
       "needsYourReview": "Angen dy adolygiad",
-      "noSlaDeadline": "Heb bennu dyddiad terfyn SLA",
       "noRepositoryData": "Dim data ystorfa eto",
       "noRepositoryDataDescription": "Bydd blaenoriaethau'r ystorfeydd yn ymddangos ar ôl cysoni'r canfyddiadau.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

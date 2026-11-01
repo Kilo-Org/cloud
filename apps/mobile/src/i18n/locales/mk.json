@@ -1768,7 +1768,6 @@
       "noImmediateAction": "Нема потреба од итно дејство",
       "notExploitable": "Не може да се искористи",
       "needsYourReview": "Потребен е твој преглед",
-      "noSlaDeadline": "Нема одреден рок според SLA",
       "noRepositoryData": "Сè уште нема податоци за складиштето",
       "noRepositoryDataDescription": "Приоритетите на складиштето ќе се појават откако наодите ќе се синхронизираат.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

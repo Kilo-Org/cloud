@@ -1791,7 +1791,6 @@
       "noImmediateAction": "Nije potrebna hitna radnja",
       "notExploitable": "Nije iskoristivo",
       "needsYourReview": "Čeka tvoj pregled",
-      "noSlaDeadline": "Rok prema SLA nije određen",
       "noRepositoryData": "Još nema podataka o repozitorijumu",
       "noRepositoryDataDescription": "Prioriteti za repozitorijume prikazaće se nakon sinhronizacije nalaza.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

@@ -1768,7 +1768,6 @@
       "noImmediateAction": "کوئی فوری اقدام نہیں",
       "notExploitable": "قابلِ استحصال نہیں",
       "needsYourReview": "آپ کے جائزے کی ضرورت ہے",
-      "noSlaDeadline": "SLA کی آخری تاریخ مقرر نہیں",
       "noRepositoryData": "ابھی ریپوزٹری کا کوئی ڈیٹا نہیں",
       "noRepositoryDataDescription": "مسائل ہم آہنگ ہونے کے بعد ریپوزٹری کی ترجیحات ظاہر ہوں گی۔",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

@@ -1768,7 +1768,6 @@
       "noImmediateAction": "سمدستي اقدام نشته",
       "notExploitable": "د ناوړه ګټې اخیستنې وړ نه دی",
       "needsYourReview": "ستاسو بیاکتنې ته اړتیا لري",
-      "noSlaDeadline": "د SLA وروستۍ نېټه نه ده ټاکل شوې",
       "noRepositoryData": "تر اوسه د ذخیرې معلومات نشته",
       "noRepositoryDataDescription": "د موندنو له هممهاله کېدو وروسته به د ذخیرې لومړیتوبونه ښکاره شي.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

@@ -1768,7 +1768,6 @@
       "noImmediateAction": "Не се изисква незабавно действие",
       "notExploitable": "Не може да се използва за атака",
       "needsYourReview": "Изисква преглед от теб",
-      "noSlaDeadline": "Няма зададен краен срок по SLA",
       "noRepositoryData": "Все още няма данни за хранилището",
       "noRepositoryDataDescription": "Приоритетите за хранилището ще се появят след синхронизирането на проблемите.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

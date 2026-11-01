@@ -1768,7 +1768,6 @@
       "noImmediateAction": "तातडीची कृती आवश्यक नाही",
       "notExploitable": "गैरवापर शक्य नाही",
       "needsYourReview": "तुमची समीक्षा आवश्यक",
-      "noSlaDeadline": "SLA ची मुदत ठरवलेली नाही",
       "noRepositoryData": "रिपॉझिटरीचा डेटा अद्याप नाही",
       "noRepositoryDataDescription": "निष्कर्ष सिंक झाल्यावर रिपॉझिटरींचा प्राधान्यक्रम दिसेल.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

@@ -1768,7 +1768,6 @@
       "noImmediateAction": "तत्काल कार्य आवश्यक छैन",
       "notExploitable": "आक्रमणमा प्रयोग गर्न नसकिने",
       "needsYourReview": "तपाईंको समीक्षा आवश्यक छ",
-      "noSlaDeadline": "SLA म्याद तोकिएको छैन",
       "noRepositoryData": "अहिलेसम्म रिपोजिटरीको डेटा छैन",
       "noRepositoryDataDescription": "सुरक्षा समस्याहरू सिंक भएपछि रिपोजिटरीका प्राथमिकताहरू देखिनेछन्।",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

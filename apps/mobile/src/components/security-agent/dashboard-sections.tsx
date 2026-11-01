@@ -221,7 +221,7 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
   );
 }
 
-function CoverageSection({ scope, data, slaEnabled, repoFullName, neverSynced }: SectionProps) {
+function CoverageSection({ scope, data, repoFullName, neverSynced }: SectionProps) {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const analysisIncomplete = getAnalysisIncompleteCount(data.analysis);
@@ -257,14 +257,6 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName, neverSynced }:
       href: findingsHref(scope, { status: 'open', repoFullName }),
     },
   ];
-  if (slaEnabled) {
-    rows.push({
-      label: t('securityAgent.dashboard.noSlaDeadline'),
-      value: data.sla.untrackedCount,
-      tone: 'muted',
-      href: findingsHref(scope, { status: 'open', repoFullName }),
-    });
-  }
 
   return (
     <SectionCard title={t('securityAgent.dashboard.codebaseRisk')}>

@@ -1266,7 +1266,6 @@
       "noOpenFindings": "Aucun signalement ouvert ne nécessite d'intervention",
       "noRepositoryData": "Aucune donnée sur les dépôts pour le moment",
       "noRepositoryDataDescription": "Les priorités par dépôt apparaîtront après la synchronisation des signalements.",
-      "noSlaDeadline": "Aucune échéance de SLA attribuée",
       "notExploitable": "Non exploitable",
       "notMeasured": "Non mesuré",
       "notYetSynced": "Pas encore synchronisé",

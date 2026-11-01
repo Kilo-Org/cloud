@@ -1768,7 +1768,6 @@
       "noImmediateAction": "তাৎক্ষণিক পদক্ষেপের প্রয়োজন নেই",
       "notExploitable": "আক্রমণে ব্যবহারযোগ্য নয়",
       "needsYourReview": "আপনার পর্যালোচনা প্রয়োজন",
-      "noSlaDeadline": "SLA সময়সীমা নির্ধারিত নেই",
       "noRepositoryData": "এখনো কোনো রিপোজিটরির তথ্য নেই",
       "noRepositoryDataDescription": "ত্রুটিগুলো সিঙ্ক হলে রিপোজিটরিগুলোর অগ্রাধিকার দেখা যাবে।",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

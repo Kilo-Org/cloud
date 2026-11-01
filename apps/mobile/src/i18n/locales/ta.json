@@ -1768,7 +1768,6 @@
       "noImmediateAction": "உடனடி நடவடிக்கை தேவையில்லை",
       "notExploitable": "தாக்குதலுக்குப் பயன்படுத்த முடியாதது",
       "needsYourReview": "உங்கள் மதிப்பாய்வு தேவை",
-      "noSlaDeadline": "SLA காலக்கெடு ஒதுக்கப்படவில்லை",
       "noRepositoryData": "களஞ்சியத் தரவு இன்னும் இல்லை",
       "noRepositoryDataDescription": "சிக்கல்கள் ஒத்திசைக்கப்பட்ட பிறகு களஞ்சியங்களின் முன்னுரிமைகள் காட்டப்படும்.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

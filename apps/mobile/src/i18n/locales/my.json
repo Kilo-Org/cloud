@@ -1768,7 +1768,6 @@
       "noImmediateAction": "ချက်ချင်းလုပ်ဆောင်ရန် မလို",
       "notExploitable": "တိုက်ခိုက်ရန် အသုံးမချနိုင်",
       "needsYourReview": "သင် စစ်ဆေးရန် လိုအပ်",
-      "noSlaDeadline": "SLA သတ်မှတ်ရက် သတ်မှတ်မထား",
       "noRepositoryData": "ကုဒ်သိုလှောင်ရာဒေတာ မရှိသေးပါ",
       "noRepositoryDataDescription": "တွေ့ရှိချက်များကို ထပ်တူပြုပြီးနောက် ကုဒ်သိုလှောင်ရာများ၏ ဦးစားပေးအစီအစဉ် ပေါ်လာမည်။",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

@@ -1768,7 +1768,6 @@
       "noImmediateAction": "Шұғыл әрекет қажет емес",
       "notExploitable": "Шабуылда пайдалану мүмкін емес",
       "needsYourReview": "Тексеруіңіз қажет",
-      "noSlaDeadline": "SLA мерзімі белгіленбеген",
       "noRepositoryData": "Әзірге репозиторий деректері жоқ",
       "noRepositoryDataDescription": "Мәселелер синхрондалғаннан кейін репозиторийлердің басымдықтары көрсетіледі.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

@@ -1293,7 +1293,6 @@
       "noOpenFindings": "対応が必要な未解決の検出結果はありません",
       "noRepositoryData": "まだリポジトリデータがありません",
       "noRepositoryDataDescription": "検出結果を同期すると、リポジトリの優先度が表示されます。",
-      "noSlaDeadline": "SLA期限未設定",
       "notExploitable": "悪用不可",
       "notMeasured": "未測定",
       "notYetSynced": "未同期",

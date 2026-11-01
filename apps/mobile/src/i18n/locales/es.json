@@ -1298,7 +1298,6 @@
       "noOpenFindings": "Ningún hallazgo abierto necesita atención",
       "noRepositoryData": "Aún no hay datos del repositorio",
       "noRepositoryDataDescription": "Las prioridades del repositorio aparecerán después de sincronizar los hallazgos.",
-      "noSlaDeadline": "Sin plazo del SLA asignado",
       "notExploitable": "No explotable",
       "notMeasured": "Sin medir",
       "notYetSynced": "Aún no sincronizado",

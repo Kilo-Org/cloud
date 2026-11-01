@@ -1768,7 +1768,6 @@
       "noImmediateAction": "Kohest tegevust pole vaja",
       "notExploitable": "Pole ärakasutatav",
       "needsYourReview": "Vajab sinu ülevaatamist",
-      "noSlaDeadline": "SLA tähtaega pole määratud",
       "noRepositoryData": "Hoidla andmeid pole veel",
       "noRepositoryDataDescription": "Hoidla prioriteedid ilmuvad pärast leidude sünkroonimist.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

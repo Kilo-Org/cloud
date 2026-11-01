@@ -1768,7 +1768,6 @@
       "noImmediateAction": "తక్షణ చర్య అవసరం లేదు",
       "notExploitable": "దాడికి వాడుకోలేనిది",
       "needsYourReview": "మీ సమీక్ష అవసరం",
-      "noSlaDeadline": "SLA గడువు కేటాయించబడలేదు",
       "noRepositoryData": "ఇంకా రిపోజిటరీ డేటా లేదు",
       "noRepositoryDataDescription": "సమస్యలు సింక్ అయిన తర్వాత రిపోజిటరీల ప్రాధాన్యతలు కనిపిస్తాయి.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

@@ -1838,7 +1838,6 @@
       "noImmediateAction": "No immediate action",
       "notExploitable": "Not exploitable",
       "needsYourReview": "Needs your review",
-      "noSlaDeadline": "No SLA deadline assigned",
       "noRepositoryData": "No repository data yet",
       "noRepositoryDataDescription": "Repository priorities will appear after findings are synced.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

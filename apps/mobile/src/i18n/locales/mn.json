@@ -1768,7 +1768,6 @@
       "noImmediateAction": "Яаралтай арга хэмжээ шаардлагагүй",
       "notExploitable": "Халдлагад ашиглах боломжгүй",
       "needsYourReview": "Та шалгах шаардлагатай",
-      "noSlaDeadline": "SLA эцсийн хугацаа тогтоогоогүй",
       "noRepositoryData": "Репозиторийн мэдээлэл хараахан байхгүй",
       "noRepositoryDataDescription": "Илэрсэн асуудлыг синхрончилсны дараа репозиториудын ач холбогдлын эрэмбэ харагдана.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",

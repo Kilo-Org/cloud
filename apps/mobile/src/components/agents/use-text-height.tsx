@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { type LayoutChangeEvent, Text, type TextStyle, View, type ViewStyle } from 'react-native';
 
 import { alignComposerInputHeightToLines } from '@/components/agents/chat-composer-input-height';
@@ -237,6 +237,27 @@ export function useTextHeight({
       nextText.startsWith(mirroredText)
     );
   }
+
+  // The wrapping the frozen measurement was taken under. A rotation, a font
+  // scale change, or any other move of the width, font or line box re-wraps the
+  // draft, so a measurement taken under the old one no longer describes it — and
+  // a change of the text is not what moves these, so `setText` cannot notice.
+  // Measure the live draft again whenever one of them moves while the mirror is
+  // frozen.
+  const wrappingKey = `${measurementWidth}|${scaledFontSize}|${scaledLineHeight}|${verticalPadding}`;
+  const measuredWrappingKeyRef = useRef(wrappingKey);
+  useEffect(() => {
+    if (measuredWrappingKeyRef.current === wrappingKey) {
+      return;
+    }
+    measuredWrappingKeyRef.current = wrappingKey;
+    const draft = draftTextRef.current;
+    if (draft === '' || mirrorTextRef.current === draft) {
+      return;
+    }
+    mirrorTextRef.current = draft;
+    setMeasuredText(draft);
+  }, [wrappingKey]);
 
   function reset() {
     draftTextRef.current = '';

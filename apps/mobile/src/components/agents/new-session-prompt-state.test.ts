@@ -128,10 +128,14 @@ describe('resolvePromptCounterRemaining', () => {
     // republished the raw length re-rendered its card — toolbar, attachment
     // strip, controls, voice surface — on every one of these keystrokes.
     const hiddenThrough = CLOUD_AGENT_PROMPT_MAX_LENGTH - PROMPT_COUNTER_VISIBLE_REMAINING - 1;
-    const drafts = Array.from({ length: hiddenThrough + 1 }, (_, length) => length);
-    const published = drafts.map(length => resolvePromptCounterRemaining(length));
-    expect(Math.max(...drafts)).toBe(hiddenThrough);
-    expect(published.every(value => value === null)).toBe(true);
+    // The whole range, not a sample of it: every length below the threshold is
+    // one a keystroke can land on, and each has to reproject to nothing.
+    for (let length = 0; length <= hiddenThrough; length += 1) {
+      expect(resolvePromptCounterRemaining(length)).toBeNull();
+    }
+    // The first length that shows the counter, so the range above cannot pass by
+    // being empty.
+    expect(resolvePromptCounterRemaining(hiddenThrough + 1)).toBe(PROMPT_COUNTER_VISIBLE_REMAINING);
   });
 
   it('counts down the remaining characters once the draft nears the limit', () => {

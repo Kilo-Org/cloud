@@ -30,10 +30,11 @@ let reportContentSize: ((contentHeight: number) => void) | null = null;
 let pushText: ((text: string) => void) | null = null;
 let harnessRenders = 0;
 let cap = OPTIONS.maxHeight;
+let width = OPTIONS.textContentWidth;
 
 function Harness() {
   harnessRenders += 1;
-  const measure = useTextHeight({ ...OPTIONS, maxHeight: cap });
+  const measure = useTextHeight({ ...OPTIONS, maxHeight: cap, textContentWidth: width });
   published = { height: measure.height, maxHeight: measure.maxHeight };
   reportContentSize = measure.setNativeContentHeight;
   pushText = measure.setText;
@@ -46,6 +47,7 @@ async function mount(capOverride?: number) {
   pushText = null;
   harnessRenders = 0;
   cap = capOverride ?? OPTIONS.maxHeight;
+  width = OPTIONS.textContentWidth;
   const holder: { current?: TestRenderer.ReactTestRenderer } = {};
   await act(async () => {
     await Promise.resolve();
@@ -70,6 +72,17 @@ function reportNativeContentSize(height: number): number {
     reportContentSize?.(height);
   });
   return harnessRenders - before;
+}
+
+/** The text the hidden mirror currently renders. */
+function findMirrorText(renderer: TestRenderer.ReactTestRenderer): unknown {
+  const mirror = renderer.root.find(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Text' &&
+      typeof node.props.onLayout === 'function'
+  );
+  return mirror.children[0];
 }
 
 /** The hidden mirror's measured text height, before the padding is added. */
@@ -329,6 +342,30 @@ describe('useTextHeight long-draft measurement', () => {
     expect(renders).toBe(0);
     expect(published.maxHeight).toBeCloseTo(24 + 5 * 18.667, 2);
     expect(published.height).toBeCloseTo(24 + 5 * 18.667, 2);
+    renderer.unmount();
+  });
+
+  it('measures the live draft again when the wrapping it was measured under changes', async () => {
+    // A rotation or a font scale change re-wraps the draft: the frozen
+    // measurement was taken at a width and line box that no longer hold, and no
+    // text change reports it.
+    const renderer = await mount();
+    layoutMirror(renderer, 20);
+    const draft = 'x'.repeat(200);
+    expect(typeText(draft)).toBe(1);
+    layoutMirror(renderer, 100);
+    expect(published.height).toBe(124);
+    expect(typeText(`${draft}y`)).toBe(0);
+
+    width = 120;
+    await act(async () => {
+      renderer.update(createElement(Harness));
+      await Promise.resolve();
+    });
+    // The mirror holds the live draft again, so the next layout measures it.
+    expect(findMirrorText(renderer)).toBe(`${draft}y`);
+    layoutMirror(renderer, 80);
+    expect(published.height).toBe(104);
     renderer.unmount();
   });
 

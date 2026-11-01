@@ -488,22 +488,57 @@ breadcrumb.
 2. **Preinstall `gh-stack`** so an agent can use `gh stack link`/`view` when it wants to. It must be
    baked in at build time, because a runtime install fails under containment (see "Current
    state").
+   - **Release to pin** (checked 2026-11-01): `gh-stack` **v0.3.0**, the latest release.
+     - Assets are bare binaries named `<os>-<arch>`, with no archive and no checksums file. The
+       linux-amd64 URL is
+       `https://github.com/github/gh-stack/releases/download/v0.3.0/linux-amd64`.
+     - SHA-256: `957e822cfa7e435cd84a297cd96c419b58e51e3ac58be249762c24bd9e45099b`. This matches
+       the digest GitHub shows on the release page and a local download.
+     - It is a statically linked x86-64 ELF of about 26.9 MB, so it also runs on the musl
+       `Dockerfile.dind` image.
+     - Requirements: `gh` ≥ 2.0 (the images ship 2.102.0 and 2.103.3) and git ≥ 2.36. The Ubuntu
+       images install git from the git-core PPA and the trixie images ship git 2.47, so both
+       qualify.
    - **Build.** Every sandbox image (`Dockerfile`, `Dockerfile.containers`,
      `Dockerfile.containers.runtime-free`, `Dockerfile.dind`, `Dockerfile.dev`) and the Vercel
-     snapshot builder (`scripts/vercel-snapshot.ts`) download the pinned, checksum-verified
-     `gh-stack` linux-amd64 release binary. They install it as
-     `/usr/local/lib/gh-extensions/gh-stack/gh-stack`. Add the version to `RUNTIME_DISTRIBUTION`
-     (`src/shared/runtime-distribution.ts`), and make `sandbox-image-versions.test.ts` assert that
-     all images match.
+     snapshot builder (`scripts/vercel-snapshot.ts`) install it the same way:
+     ```
+     ARG GH_STACK_VERSION="0.3.0"
+     ARG GH_STACK_SHA256="957e822cfa7e435cd84a297cd96c419b58e51e3ac58be249762c24bd9e45099b"
+     RUN wget -nv -O /tmp/gh-stack "https://github.com/github/gh-stack/releases/download/v${GH_STACK_VERSION}/linux-amd64" \
+       && echo "${GH_STACK_SHA256}  /tmp/gh-stack" | sha256sum -c - \
+       && install -D -m 0755 /tmp/gh-stack /usr/local/lib/gh-extensions/gh-stack/gh-stack \
+       && rm /tmp/gh-stack
+     ```
+     Add the version and digest to `RUNTIME_DISTRIBUTION` (`src/shared/runtime-distribution.ts`),
+     and make `sandbox-image-versions.test.ts` assert that all images match. The directory must be
+     named `gh-stack` and the executable inside it `gh-stack`, which is how `gh` finds a local
+     extension.
    - **Runtime.** In `prepareKiloFilesystem` (`wrapper/src/control-plane/kilo-runtime.ts:525-550`),
      which already writes into the runtime HOME before Kilo starts, create the symlink
      `$XDG_DATA_HOME/gh/extensions/gh-stack -> /usr/local/lib/gh-extensions/gh-stack`. If it already
      exists, leave it.
-   - `gh` treats a symlinked extension directory as a local extension, so it never prompts to
-     upgrade it. Verify this with the pinned `gh` version.
-   - **Env.** Add `GH_STACK_NO_UPDATE_NOTIFIER=1` and `GH_NO_EXTENSION_UPDATE_NOTIFIER=1` in
-     `buildWorktreeKiloEnvironment` (`worktree-runtime.ts`, where `KILO_DISABLE_AUTOUPDATE` is set),
-     so no release checks run.
+   - **Verified: a symlinked extension never updates itself** (2026-11-01). Tested with `gh` 2.102.0
+     and 2.103.3 and `gh-stack` v0.3.0, using an isolated HOME and `XDG_*` laid out like the
+     runtime HOME:
+     - `gh extension list` shows `gh stack` with an empty repository and version, which is how
+       `gh` lists a local extension.
+     - `gh extension upgrade stack` refuses: "local extensions can not be upgraded".
+     - `gh stack --version` and `gh stack view` run under a real TTY, with `GH_DEBUG=api`, make
+       **zero** HTTP requests and write no update state.
+     - Control: a normally installed copy (a directory with `manifest.yml`) runs `gh`'s extension
+       update check, `GET /repos/github/gh-stack/releases/latest`, four requests per run. It caches
+       the result for 24 hours in `$XDG_STATE_HOME/gh/extensions/gh-stack/state.yml`. The check
+       only runs when stdout and stderr are terminals.
+     - `GH_NO_EXTENSION_UPDATE_NOTIFIER=1` stops that check. `GH_STACK_NO_UPDATE_NOTIFIER=1` alone
+       does not.
+     - `gh-stack`'s own notifier reads the manifest (in debug output: "extension manifest tag ...
+       does not match running version") and does nothing for a symlinked copy.
+   - **Env.** As a backstop in case the layout changes, still set
+     `GH_NO_EXTENSION_UPDATE_NOTIFIER=1` and `GH_STACK_NO_UPDATE_NOTIFIER=1` in
+     `buildWorktreeKiloEnvironment` (`worktree-runtime.ts`, where `KILO_DISABLE_AUTOUPDATE` is set).
+     The agent's terminals are real TTYs, so a non-local install would otherwise call the GitHub
+     API with the session token on every run.
    - **Not under `/opt/kilo-cloud`.** That path is reserved for the runtime bootstrap
      (`RUNTIME_RESERVED_ROOT`).
    - **Optional skill.** The upstream `gh-stack` agent skill can be added as a runtime skill
@@ -829,10 +864,9 @@ end checks pass.
 | Does the GitHub App's permission cover the Stacks endpoints? | Yes. They need repository permission "Pull requests" (write to create or change, read to read) and accept installation tokens. The standard KiloConnect app already has Pull requests: write. KiloConnect-Lite is read-only, so linking is skipped for it. |
 | Where do `gh` extensions live in the sandbox? | `$XDG_DATA_HOME/gh/extensions` = `/home/<sha256(worktree directory)>/.local/share/gh/extensions`. It starts empty in each new sandbox, and an extension installed into `/root` is invisible. Bake the binary into `/usr/local/lib/gh-extensions/gh-stack` and symlink it in `prepareKiloFilesystem` (Phase 1). |
 | How is `base_sha` recorded at creation? | The web router resolves the base branch head with one provider call, which is also the preflight. It passes the SHA down, and the wrapper checks out exactly that commit. No new wrapper-to-platform channel is needed (Phase 0, "Base SHA"). |
+| Does `gh` treat a symlinked extension directory as local? | Yes, tested with `gh` 2.102.0 and 2.103.3. It is listed without a repository or version, refuses to upgrade, and makes no update-check requests even under a TTY. A normal install makes four requests per run and is only stopped by `GH_NO_EXTENSION_UPDATE_NOTIFIER=1`. |
+| Which `gh-stack` asset and checksum? | v0.3.0 (latest). The asset is the bare binary `.../releases/download/v0.3.0/linux-amd64`, SHA-256 `957e822cfa7e435cd84a297cd96c419b58e51e3ac58be249762c24bd9e45099b`, statically linked. There is no checksums file; the digest matches the one GitHub shows on the release page. |
 
 ## Open items to settle during implementation
 
-- Confirm with the pinned `gh` version that a symlinked extension directory is treated as local
-  (no upgrade prompts or checks).
-- Confirm the `gh-stack` release asset name and checksum for linux-amd64 at the pinned version.
 - Whether new users get any smart folders on by default. The current proposal is none.

@@ -2,12 +2,13 @@ import { type PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 
 import {
   preparationDetailText,
-  preparationErrorHeadline,
   preparationErrorText,
   preparationStepLabel,
+  splitFailureSentence,
 } from './preparation-copy';
 
 const { t } = i18n;
@@ -134,31 +135,47 @@ describe('preparationErrorText', () => {
   });
 });
 
-describe('preparationErrorHeadline', () => {
+describe('splitFailureSentence', () => {
   it('splits a two-sentence cause into what failed and what to do', () => {
-    expect(preparationErrorHeadline('container_limit_reached', t)).toEqual({
+    expect(
+      splitFailureSentence(
+        'Container limit reached. Stop an existing container before starting another.'
+      )
+    ).toEqual({
       title: 'Container limit reached.',
       detail: 'Stop an existing container before starting another.',
     });
-    expect(preparationErrorHeadline('credential_upgrade_required', t)).toEqual({
-      title: 'This session is missing a required credential upgrade.',
-      detail: 'Start a new session to continue.',
-    });
   });
 
-  it('keeps a one-sentence cause whole', () => {
-    expect(preparationErrorHeadline('preparation_timeout', t)).toEqual({
+  it('keeps a one-sentence cause whole and never breaks at a decimal point', () => {
+    expect(splitFailureSentence('Environment preparation timed out')).toEqual({
       title: 'Environment preparation timed out',
     });
+    expect(splitFailureSentence('Restored 1.5 files after the retry')).toEqual({
+      title: 'Restored 1.5 files after the retry',
+    });
   });
 
-  it('breaks at the active catalog sentence stop, including a CJK one', async () => {
-    await i18n.changeLanguage('ja');
-    expect(preparationErrorHeadline('container_limit_reached', t)).toEqual({
-      title: 'コンテナの上限に達しました。',
-      detail: '別のコンテナを開始する前に、既存のコンテナを停止してください。',
+  it('breaks at the stop a script writes, not only the Latin one', () => {
+    expect(splitFailureSentence('कंटेनर सीमा तक पहुँच गई। नया कंटेनर शुरू करने से पहले रोकें।')).toEqual({
+      title: 'कंटेनर सीमा तक पहुँच गई।',
+      detail: 'नया कंटेनर शुरू करने से पहले रोकें।',
     });
-    await i18n.changeLanguage('en');
+    expect(splitFailureSentence('เซสชันนี้ขาดการอัปเกรดที่จำเป็น เริ่มเซสชันใหม่เพื่อดำเนินการต่อ')).toEqual({
+      title: 'เซสชันนี้ขาดการอัปเกรดที่จำเป็น',
+      detail: 'เริ่มเซสชันใหม่เพื่อดำเนินการต่อ',
+    });
+  });
+
+  it('splits the two-sentence failure copy in every catalog', () => {
+    for (const tag of SUPPORTED_LANGUAGES) {
+      const fixed = i18n.getFixedT(tag);
+      for (const code of ['container_limit_reached', 'credential_upgrade_required'] as const) {
+        const sentence = splitFailureSentence(preparationErrorText(code, fixed));
+        expect(sentence.title.length, `${tag} ${code} has no headline`).toBeGreaterThan(0);
+        expect(sentence.detail, `${tag} ${code} lost its second sentence`).toBeTruthy();
+      }
+    }
   });
 });
 

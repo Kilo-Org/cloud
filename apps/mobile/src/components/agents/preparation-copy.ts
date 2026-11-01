@@ -115,7 +115,20 @@ const SETUP_COMMAND_FAILED_PATTERN = /^Setup command (\d+) failed$/u;
 const SETUP_COMMAND_TIMED_OUT_PATTERN = /^Setup command (\d+) timed out$/u;
 const COLD_RESTORE_PATTERN = /^Cold restore, snapshot applied, (\d+)\/(\d+) files restored$/u;
 const GIT_PROGRESS_PATTERN = /(\d{1,3})%$/u;
-const SENTENCE_BREAK_PATTERN = /^([\s\S]*?[.!?](?=\s)|[\s\S]*?[。．！？])\s*([\s\S]+)$/u;
+
+/**
+ * The sentence stops the catalogs actually spell a two-sentence failure with:
+ * the Latin marks, which only break before whitespace, and the stops of the
+ * Indic, Arabic-script, Armenian, Ethiopic, Myanmar, Khmer and CJK catalogs,
+ * which stand on their own.
+ */
+const SENTENCE_STOPS = '।॥۔؟։።፧။၊។៕。．！？';
+const SENTENCE_BREAK_PATTERN = new RegExp(
+  `^([\\s\\S]*?(?:[.!?](?=\\s)|[${SENTENCE_STOPS}]))\\s*([\\s\\S]+)$`,
+  'u'
+);
+/** Thai writes no full stop, so a Thai sentence meets the next one at a space. */
+const THAI_BREAK_PATTERN = /^([\s\S]*?[\u0E00-\u0E7F])\s+([\s\S]+)$/u;
 
 /**
  * Looks up a possibly-unknown key in a literal dictionary without widening its
@@ -170,13 +183,11 @@ type FailureHeadline = {
  * A localized failure cut after its first sentence: the first sentence is what
  * failed, the second what to do about it. A group with no failed stage titles
  * itself with the first, because that is the only thing that tells two
- * stage-less failures apart, and keeps the rest in the body. Latin punctuation
- * only breaks before whitespace, so `1.5` never splits a sentence, and the CJK
- * stops break on their own. A one-sentence cause yields no body text.
+ * stage-less failures apart, and keeps the rest in the body. A one-sentence
+ * cause yields no body text.
  */
-export function preparationErrorHeadline(error: string, t: TFunction): FailureHeadline {
-  const text = preparationErrorText(error, t);
-  const sentence = SENTENCE_BREAK_PATTERN.exec(text);
+export function splitFailureSentence(text: string): FailureHeadline {
+  const sentence = SENTENCE_BREAK_PATTERN.exec(text) ?? THAI_BREAK_PATTERN.exec(text);
   if (sentence === null) {
     return { title: text };
   }

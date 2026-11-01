@@ -15,9 +15,9 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { MonoScrollBlock } from './mono-scroll-block';
 import {
   preparationDetailText,
-  preparationErrorHeadline,
   preparationErrorText,
   preparationStepLabel,
+  splitFailureSentence,
 } from './preparation-copy';
 import {
   failedStageStep,
@@ -178,7 +178,7 @@ function groupCopy(
       namedStep: undefined,
     };
   }
-  const sentence = preparationErrorHeadline(attempt.safeError, t);
+  const sentence = splitFailureSentence(preparationErrorText(attempt.safeError, t));
   return { title: sentence.title, detail: sentence.detail, namedStep: undefined };
 }
 

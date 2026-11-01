@@ -259,6 +259,25 @@ describe('processDiscordBotMessage session start authorization', () => {
     });
   }
 
+  it.each([
+    { label: 'a blocked account', state: { blocked_at: new Date().toISOString() } },
+    { label: 'a disabled personal account', state: { personal_account_disabled: true } },
+  ])('keeps the account state out of the public reply for $label', async ({ state }) => {
+    const unavailableUser = await insertTestUser(state);
+    const discordUserId = nextSnowflake();
+    await linkDiscordAccount(unavailableUser.id, discordUserId);
+
+    const result = await processDiscordBotMessage(
+      `Change something in ${CONNECTED_REPOSITORY}`,
+      guildId,
+      eventContext(discordUserId)
+    );
+
+    expect(mockRunBot).not.toHaveBeenCalled();
+    expect(result.response).toBe(DISCORD_SESSION_DENIAL_MESSAGES.account_unavailable);
+    expect(result.response).not.toMatch(/block|disabl|suspend|bann/i);
+  });
+
   it('refuses a message that carries no Discord author context', async () => {
     const result = await processDiscordBotMessage(
       `Change something in ${CONNECTED_REPOSITORY}`,

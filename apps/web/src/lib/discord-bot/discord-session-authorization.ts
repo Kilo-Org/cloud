@@ -40,13 +40,17 @@ const INSTALLATION_OWNER_MESSAGE =
   'This Discord server is connected to a different Kilo account, and only its owner can start sessions from it. Use the Kilo account that owns the installation, or ask the owner to connect the installation to an organization you belong to.';
 const ORGANIZATION_MEMBER_MESSAGE =
   'Your linked Kilo account is not a member of this organization. Ask an organization owner or admin to add you, then mention the bot again.';
+/**
+ * The refusal reply is posted in the channel, so it gives the next step and
+ * names no account condition; the precise denial reason stays in the server log.
+ */
+const ACCOUNT_UNAVAILABLE_MESSAGE = `A Cloud Agent session cannot be started from this Discord account. Check the Discord connection of the Kilo account you use here at ${APP_URL}/connected-accounts, or contact Kilo support.`;
 
 /** Reply text for each denial reason, so the guidance matches what can unblock it. */
 export const DISCORD_SESSION_DENIAL_MESSAGES: Record<DiscordSessionDenialReason, string> = {
   unknown_requester: LINK_ACCOUNT_MESSAGE,
   unlinked_account: LINK_ACCOUNT_MESSAGE,
-  account_unavailable:
-    'This Kilo account cannot start Cloud Agent sessions. Contact Kilo support if you believe this is a mistake.',
+  account_unavailable: ACCOUNT_UNAVAILABLE_MESSAGE,
   not_installation_owner: INSTALLATION_OWNER_MESSAGE,
   not_organization_member: ORGANIZATION_MEMBER_MESSAGE,
 };

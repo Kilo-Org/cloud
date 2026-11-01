@@ -18,6 +18,7 @@ import {
   Users,
 } from '@/components/ui/icons';
 import { PrAvatar } from '@/components/pr-review/pr-review-overview-parts';
+import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
 import { Text } from '@/components/ui/text';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrOverviewDto } from '@/lib/pr-review/merge/merge-blocked-reasons';
@@ -61,9 +62,7 @@ function SectionHeading({ icon: Icon, label }: Readonly<{ icon?: LucideIcon; lab
   return (
     <View className="flex-row items-center gap-1.5">
       {Icon ? <Icon size={12} color={colors.mutedForeground} /> : null}
-      <Text variant="eyebrow" className="uppercase tracking-wide text-muted-foreground">
-        {label}
-      </Text>
+      <PrReviewSectionLabel label={label} />
     </View>
   );
 }

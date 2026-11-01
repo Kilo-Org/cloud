@@ -9,7 +9,7 @@
 // was a bare `null`, which dropped the dialog and stranded the user with an
 // unanswerable navigation.
 
-import { type ComponentType, createElement, type ReactNode, useState } from 'react';
+import { type ComponentType, createElement, type ReactNode, useEffect, useState } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -86,6 +86,9 @@ vi.mock('react-native', () => ({
 vi.mock('expo-router', () => ({
   useRouter: () => router,
   useNavigation: () => navigation,
+  useFocusEffect: (effect: () => void) => {
+    useEffect(effect, [effect]);
+  },
   usePreventRemove: (
     enabled: boolean,
     handler: (options: { data: { action: unknown }; repeat: () => void }) => void

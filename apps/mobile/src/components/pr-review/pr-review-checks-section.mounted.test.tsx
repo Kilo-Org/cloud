@@ -416,14 +416,18 @@ describe('PrReviewChecksSection view-on-provider link', () => {
 // carried `bg-muted` inside a `bg-secondary` card, and `--muted` equals
 // `--secondary` in BOTH themes (apps/mobile/src/global.css), so the bars
 // painted the card's own colour. This suite pins the fixed render path: the
-// card reserves the loaded card's shape — a header strip plus one placeholder
-// row per status the card can show — and every bar keeps `bg-muted-soft`, the
-// one gray that differs from the card in both themes. The CSS guard below
-// proves the collision is real (`--muted` == `--secondary`) and that the token
-// the bars now use is not the collision token, so a future theme change that
+// placeholder mirrors the card that settles here, the compact "no checks
+// reported" body — one `p-4` card, a copy-line bar and a bar at the button's
+// 44 dp floor — so the Review button and the merge section below keep their
+// place at the swap; and every bar keeps `bg-muted-soft`, the one gray that
+// differs from the card in both themes. The CSS guard below proves the
+// collision is real (`--muted` == `--secondary`) and that the token the bars
+// now use is not the collision token, so a future theme change that
 // reintroduces the collision fails here instead of shipping another empty gray
-// block.
-describe('PrReviewChecksSection loading state reserves the loaded card', () => {
+// block. The design review at a36db10 measured what the previous four-row
+// reservation cost: a head with no checks pulled the two actions ~100 dp up
+// when the read answered.
+describe('PrReviewChecksSection loading state mirrors the settled card', () => {
   const previous = { isLoading: false };
 
   beforeEach(() => {
@@ -500,47 +504,49 @@ describe('PrReviewChecksSection loading state reserves the loaded card', () => {
     });
   });
 
-  it('mirrors the loaded card: a header strip plus one row per status', () => {
+  it('mirrors the settled card: one padded card with a copy bar and the button floor', () => {
+    const loadingRenderer = mountLoading();
+    const loadingCard = findCard(loadingRenderer);
+
+    // The card that settles for a head with no runs is the compact one, so its
+    // shell — padding and the gap between the copy line and the button — is
+    // what the placeholder has to reproduce to keep the page still.
+    query.isLoading = false;
+    query.data = {
+      checkRuns: [],
+      rollup: { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 },
+    };
+    const settledCard = findCard(mountSection());
+    for (const token of ['rounded-lg', 'bg-secondary', 'p-4', 'gap-3']) {
+      expect(tokens(settledCard)).toContain(token);
+      expect(tokens(loadingCard)).toContain(token);
+    }
+
+    // One bar per line of that card: the copy line, then the view-on-provider
+    // button at its default 44 dp floor. A bar taller than its line — or an
+    // extra row — is what moved the Review button and the merge section below.
+    const bars = loadingCard.findAll(node => String(node.type) === 'Skeleton');
+    expect(bars.map(bar => tokens(bar))).toEqual([
+      expect.arrayContaining(['h-[18px]', 'w-2/3', 'bg-muted-soft']),
+      expect.arrayContaining(['h-[44px]', 'w-full', 'bg-muted-soft']),
+    ]);
+
+    act(() => {
+      loadingRenderer.unmount();
+    });
+  });
+
+  it('renders no placeholder rows or hairlines, so it cannot outgrow the settled card', () => {
     const renderer = mountLoading();
     const card = findCard(renderer);
 
-    const headerStrips = card.findAll(
-      node =>
-        tokens(node).includes('border-b-[0.5px]') &&
-        tokens(node).includes('px-4') &&
-        tokens(node).includes('py-2')
-    );
-    expect(headerStrips).toHaveLength(1);
-    const headerStrip = headerStrips[0];
-    if (!headerStrip) {
-      throw new Error('the header strip did not render');
-    }
-    expect(headerStrip.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(1);
-
-    expect(rowShells(card)).toHaveLength(4);
-
-    // The card hairline sits between rows, never after the last one: the
-    // header strip's own border plus one between each pair of four rows.
-    const hairlines = card.findAll(node => tokens(node).includes('border-b-[0.5px]'));
-    expect(hairlines).toHaveLength(4);
+    expect(rowShells(card)).toHaveLength(0);
+    expect(card.findAll(node => tokens(node).includes('border-b-[0.5px]'))).toHaveLength(0);
+    expect(card.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(2);
 
     act(() => {
       renderer.unmount();
     });
-  });
-
-  it('reserves as many placeholder rows as the loaded card can show', () => {
-    const loadingRenderer = mountLoading();
-    const reserved = rowShells(findCard(loadingRenderer)).length;
-    act(() => {
-      loadingRenderer.unmount();
-    });
-
-    // The loaded card can never exceed one row per status; the fixture spans
-    // all four, so it settles into exactly the reserved rows.
-    query.isLoading = false;
-    const loaded = mountSection();
-    expect(groupRows(loaded)).toHaveLength(reserved);
   });
 
   it('keeps the CHECKS heading rendered while loading, so the block is labelled', () => {

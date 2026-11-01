@@ -23,7 +23,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -233,16 +232,17 @@ export function PrReviewChecksSection({
 
   const checks = useQuery(queries.checksOptions(headSha));
 
-  // Loading (first time, no cached data): reserve the loaded card's shape so
-  // the swap cannot move the page. The loaded card is a header strip
-  // (`border-b-[0.5px] border-hair-soft px-4 py-2`) plus one row per present
-  // status at the shared row floor, and STATUS_ORDER holds exactly four
-  // statuses with no row for an absent one, so the card tops out at four rows.
-  // Reserving
-  // four means a mixed-status PR (the case this feature targets) is shift-free
-  // and the Review button, PrMergeSection and the head line below never get
-  // pushed down while the user is on the page; an empty or single-status card
-  // settles upward instead of growing under the user.
+  // Loading (first time, no cached data): the card that settles here is the
+  // compact body — the "no checks reported" card, one copy line and the
+  // view-on-provider button — because a head commit right after a push
+  // reports no runs and that is the shape the read usually answers with. The
+  // placeholder mirrors that card's box exactly: the same `p-4` padding and
+  // `gap-3` line gap, a bar the height of the `text-sm` line, and a bar at the
+  // button's 44 dp floor. The Review button and PrMergeSection below stay put
+  // at the swap, and a card that does report runs grows downward from here,
+  // which is the direction the page absorbs; reserving four status rows up
+  // front instead pulled those two actions ~100 dp upward whenever the head
+  // had no checks (`pr-review-acme-widgets-1`, design review at a36db10).
   // The bars must NOT be `bg-muted` here: `--muted` and `--secondary` are
   // the same colour in both themes (apps/mobile/src/global.css), so a
   // `bg-muted` bar inside this `bg-secondary` card paints nothing and the
@@ -257,27 +257,12 @@ export function PrReviewChecksSection({
         </Text>
         <View
           key={LOADING_CARD_KEY}
-          className="overflow-hidden rounded-lg bg-secondary"
+          className="gap-3 rounded-lg bg-secondary p-4"
           accessibilityRole="progressbar"
           accessibilityLabel={t('common.loading')}
         >
-          <View className="border-b-[0.5px] border-hair-soft px-4 py-2">
-            <Skeleton className="h-3 w-24 rounded-md bg-muted-soft" />
-          </View>
-          {STATUS_ORDER.map((status, rowIndex) => (
-            <View key={status}>
-              <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}>
-                <Skeleton className="h-4 w-4 rounded-full bg-muted-soft" />
-                <View className="flex-1">
-                  <Skeleton className="h-3.5 w-24 rounded-md bg-muted-soft" />
-                </View>
-                <Skeleton className="h-4 w-4 rounded-md bg-muted-soft" />
-              </View>
-              {rowIndex < STATUS_ORDER.length - 1 ? (
-                <View className="border-b-[0.5px] border-hair-soft" />
-              ) : null}
-            </View>
-          ))}
+          <Skeleton className="h-[18px] w-2/3 rounded-md bg-muted-soft" />
+          <Skeleton className="h-[44px] w-full rounded-md bg-muted-soft" />
         </View>
       </View>
     );

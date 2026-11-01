@@ -473,10 +473,7 @@ function repeatFactor(node: PatternNode): number {
         concatenatedRepeatFactor(node)
       );
     case 'alternation':
-      return node.branches.reduce(
-        (factor, branch) => Math.max(factor, repeatFactor(branch)),
-        1
-      );
+      return node.branches.reduce((factor, branch) => Math.max(factor, repeatFactor(branch)), 1);
     case 'repeat':
       return product(node.max, repeatFactor(node.body));
   }

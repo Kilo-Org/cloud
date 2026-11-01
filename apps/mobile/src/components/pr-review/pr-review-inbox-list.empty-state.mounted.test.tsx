@@ -1,5 +1,5 @@
-// The empty slot has two jobs: it must never speak another state's
-// accessibility label, and it must not resize under the sections below it.
+// The empty slot has one job: it must never speak another state's accessibility
+// label.
 //
 // The explorer opened PR Review on Android and TalkBack announced "Loading
 // inbox" over the reconnecting provider's error card. Both states drew a plain
@@ -7,9 +7,9 @@
 // into ONE host view and the loading state's label stayed on it while its
 // children became the notice and its button. Each state renders under its own
 // element identity now; this suite pins that on the loading -> reconnect edge.
-// The same settling also shrank the slot by ~69 dp and pulled the RECENT
-// section up (design-gate layout shift), so the slot keeps the height of the
-// skeleton it replaced.
+// The RECENT section no longer sits below the loading slot at all: the list
+// leaves it out until the inbox settles, so the section can appear at the
+// height the settled body leaves it instead of reserving the placeholder's.
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';

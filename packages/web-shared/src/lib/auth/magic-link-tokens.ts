@@ -5,7 +5,7 @@ import * as z from 'zod';
 import 'server-only';
 import { NEXTAUTH_SECRET, NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
 import { randomBytes, randomInt, randomUUID, createHash, createHmac } from 'crypto';
-import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import { getDeliveredEmailAddress } from '@kilocode/web-shared/lib/email-address';
 import { captureMessage } from '@sentry/nextjs';
 
 const SIGN_IN_CODE_EXPIRY_MINUTES = 10;
@@ -109,34 +109,39 @@ export async function verifyAndConsumeMagicLinkToken(
  * must present it when verifying, so that attempts against challenge A do
  * not spend challenge B's budget.
  *
- * @param email - The email address to send the code to (case-insensitive)
+ * The code is bound to the address it is delivered to: the trimmed, lowercased
+ * address including any `+` suffix and Gmail dots. Only that address can redeem
+ * it, so a delivery to an alias of another address authenticates the alias and
+ * never the account that address belongs to.
+ *
+ * @param email - The address the code is sent to
  * @returns The plaintext 6-digit code and an opaque challenge identifier
  */
 export async function createSignInCode(
   email: string
 ): Promise<{ code: string; challengeId: string }> {
-  const normalizedEmail = normalizeEmail(email);
+  const codeEmail = getDeliveredEmailAddress(email);
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
-  const token_hash = hashSignInCode(normalizedEmail, code);
+  const token_hash = hashSignInCode(codeEmail, code);
   const challengeId = randomUUID();
   const expires_at = new Date(Date.now() + SIGN_IN_CODE_EXPIRY_MINUTES * 60 * 1000).toISOString();
 
   await db.transaction(async tx => {
     await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${`sign-in-code:${normalizedEmail}`}, 0))`
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${`sign-in-code:${codeEmail}`}, 0))`
     );
     await tx
       .delete(magic_link_tokens)
       .where(
         and(
-          eq(magic_link_tokens.email, normalizedEmail),
+          eq(magic_link_tokens.email, codeEmail),
           eq(magic_link_tokens.purpose, 'sign_in_code'),
           isNull(magic_link_tokens.consumed_at)
         )
       );
     await tx.insert(magic_link_tokens).values({
       token_hash,
-      email: normalizedEmail,
+      email: codeEmail,
       expires_at,
       purpose: 'sign_in_code',
       challenge_id: challengeId,
@@ -156,7 +161,7 @@ export type ReserveSignInCodeResult = 'ok' | 'invalid' | 'too_many_attempts' | '
  * Challenge verification counts in attempts; compatibility verification counts
  * in legacy_attempts. Wrong guesses draw on one allowance shared by both modes,
  * so alternating them cannot buy a second allowance. Lookups follow the
- * supplied challenge when present, otherwise the normalized email.
+ * supplied challenge when present, otherwise the delivered address.
  *
  * Returns 'ok' when the code is reserved, 'invalid' for a wrong/expired/consumed
  * code, 'too_many_attempts' when the attempt budget is exhausted, and
@@ -167,7 +172,7 @@ export async function reserveSignInCode(
   code: string,
   challengeId?: string
 ): Promise<ReserveSignInCodeResult> {
-  const normalizedEmail = normalizeEmail(email);
+  const codeEmail = getDeliveredEmailAddress(email);
   const attemptsKey = challengeId ? 'attempts' : 'legacy_attempts';
   const attemptsColumn = magic_link_tokens[attemptsKey];
 
@@ -179,7 +184,7 @@ export async function reserveSignInCode(
         sql`${magic_link_tokens.expires_at} > NOW()`
       )
     : and(
-        eq(magic_link_tokens.email, normalizedEmail),
+        eq(magic_link_tokens.email, codeEmail),
         eq(magic_link_tokens.purpose, 'sign_in_code'),
         isNull(magic_link_tokens.consumed_at),
         sql`${magic_link_tokens.expires_at} > NOW()`
@@ -187,7 +192,7 @@ export async function reserveSignInCode(
 
   return db.transaction(async tx => {
     await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${`sign-in-code:${normalizedEmail}`}, 0))`
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${`sign-in-code:${codeEmail}`}, 0))`
     );
 
     const [row] = await tx
@@ -201,7 +206,7 @@ export async function reserveSignInCode(
       return 'invalid';
     }
 
-    const token_hash = hashSignInCode(normalizedEmail, code);
+    const token_hash = hashSignInCode(codeEmail, code);
     const isCandidateCode = row.token_hash === token_hash;
 
     // A wrong guess is refused once the allowance is spent, whichever mode
@@ -224,7 +229,7 @@ export async function reserveSignInCode(
         .where(
           and(
             eq(magic_link_tokens.token_hash, token_hash),
-            eq(magic_link_tokens.email, normalizedEmail),
+            eq(magic_link_tokens.email, codeEmail),
             eq(magic_link_tokens.purpose, 'sign_in_code'),
             isNull(magic_link_tokens.consumed_at),
             sql`${magic_link_tokens.expires_at} > NOW()`,
@@ -254,7 +259,7 @@ export async function reserveSignInCode(
           attemptGuard
         )
       : and(
-          eq(magic_link_tokens.email, normalizedEmail),
+          eq(magic_link_tokens.email, codeEmail),
           eq(magic_link_tokens.purpose, 'sign_in_code'),
           isNull(magic_link_tokens.consumed_at),
           attemptGuard
@@ -291,12 +296,12 @@ export async function commitSignInCode(
   code: string,
   challengeId?: string
 ): Promise<boolean> {
-  const normalizedEmail = normalizeEmail(email);
-  const token_hash = hashSignInCode(normalizedEmail, code);
+  const codeEmail = getDeliveredEmailAddress(email);
+  const token_hash = hashSignInCode(codeEmail, code);
 
   const whereClauses = [
     eq(magic_link_tokens.token_hash, token_hash),
-    eq(magic_link_tokens.email, normalizedEmail),
+    eq(magic_link_tokens.email, codeEmail),
     eq(magic_link_tokens.purpose, 'sign_in_code'),
     isNull(magic_link_tokens.consumed_at),
     sql`${magic_link_tokens.reserved_until} > NOW()`,
@@ -325,12 +330,12 @@ export async function releaseSignInCode(
   code: string,
   challengeId?: string
 ): Promise<void> {
-  const normalizedEmail = normalizeEmail(email);
-  const token_hash = hashSignInCode(normalizedEmail, code);
+  const codeEmail = getDeliveredEmailAddress(email);
+  const token_hash = hashSignInCode(codeEmail, code);
 
   const whereClauses = [
     eq(magic_link_tokens.token_hash, token_hash),
-    eq(magic_link_tokens.email, normalizedEmail),
+    eq(magic_link_tokens.email, codeEmail),
     eq(magic_link_tokens.purpose, 'sign_in_code'),
     isNull(magic_link_tokens.consumed_at),
   ];
@@ -356,12 +361,12 @@ export async function consumeSignInCode(
   code: string,
   challengeId?: string
 ): Promise<boolean> {
-  const normalizedEmail = normalizeEmail(email);
-  const token_hash = hashSignInCode(normalizedEmail, code);
+  const codeEmail = getDeliveredEmailAddress(email);
+  const token_hash = hashSignInCode(codeEmail, code);
 
   const whereClauses = [
     eq(magic_link_tokens.token_hash, token_hash),
-    eq(magic_link_tokens.email, normalizedEmail),
+    eq(magic_link_tokens.email, codeEmail),
     eq(magic_link_tokens.purpose, 'sign_in_code'),
     isNull(magic_link_tokens.consumed_at),
   ];
@@ -379,13 +384,13 @@ export async function consumeSignInCode(
 }
 
 export async function deleteSignInCode(email: string, code: string): Promise<void> {
-  const normalizedEmail = normalizeEmail(email);
+  const codeEmail = getDeliveredEmailAddress(email);
   await db
     .delete(magic_link_tokens)
     .where(
       and(
-        eq(magic_link_tokens.token_hash, hashSignInCode(normalizedEmail, code)),
-        eq(magic_link_tokens.email, normalizedEmail),
+        eq(magic_link_tokens.token_hash, hashSignInCode(codeEmail, code)),
+        eq(magic_link_tokens.email, codeEmail),
         eq(magic_link_tokens.purpose, 'sign_in_code'),
         isNull(magic_link_tokens.consumed_at)
       )

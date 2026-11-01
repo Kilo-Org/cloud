@@ -29,7 +29,7 @@ export default function ApiRequestLogPage() {
   const [errorsOnly, setErrorsOnly] = useState(false);
 
   const trpc = useTRPC();
-  const { canViewSessions, isPermissionResolved, isError } = useAdminPermissions();
+  const { canViewSessions, isPermissionResolved, isError, refetch } = useAdminPermissions();
   const summaryQuery = useQuery(
     trpc.admin.apiRequestLog.getSummary.queryOptions(undefined, {
       enabled: canViewSessions,
@@ -75,7 +75,30 @@ export default function ApiRequestLogPage() {
 
   const breadcrumbs = <BreadcrumbItem className="hidden md:block">API Request Log</BreadcrumbItem>;
 
-  if (!isPermissionResolved && !isError) {
+  if (isError) {
+    return (
+      <AdminPage breadcrumbs={breadcrumbs}>
+        <Card className="max-w-xl">
+          <CardHeader>
+            <CardTitle>Could not check session viewing access</CardTitle>
+            <CardDescription>The permission check request failed.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              onClick={() => {
+                void refetch();
+              }}
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </AdminPage>
+    );
+  }
+
+  if (!isPermissionResolved) {
     return (
       <AdminPage breadcrumbs={breadcrumbs}>
         <Card className="max-w-xl">

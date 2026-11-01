@@ -92,13 +92,35 @@ function describeStepReason(
       }
       break;
     }
-    case 'chatgpt':
-      return {
-        title: 'Sign in with ChatGPT',
-        detail: isOrganization
-          ? 'Used when the member sending the request has connected ChatGPT for this organization.'
-          : 'Used when your ChatGPT connection is active.',
-      };
+    case 'chatgpt': {
+      const title = 'ChatGPT subscription';
+      switch (step.reason) {
+        case 'serves':
+          return {
+            title,
+            detail: isOrganization
+              ? 'Used when the member sending the request has connected ChatGPT for this organization.'
+              : 'Uses your ChatGPT subscription instead of API keys or Kilo credits.',
+          };
+        case 'not-connected':
+          return { title, detail: 'Skipped: no ChatGPT connection for your personal account.' };
+        case 'disabled':
+          return {
+            title,
+            detail: 'Skipped: your ChatGPT connection is disabled or needs reconnecting.',
+          };
+        case 'unsupported-api-kind':
+          return {
+            title,
+            detail: 'Skipped: ChatGPT subscriptions support the Responses API only.',
+          };
+        case 'model-unavailable':
+          return { title, detail: 'Skipped: this model is not available through ChatGPT.' };
+        case 'unavailable':
+          return { title, detail: 'Skipped: ChatGPT subscription routing is not available.' };
+      }
+      break;
+    }
     case 'vercel-byok': {
       const title = `${keyLabel(step.providerIds.map(getProviderName))} via Vercel AI Gateway`;
       if (step.reason === 'disabled') return { title, detail: 'Skipped: the key is disabled.' };
@@ -252,8 +274,8 @@ export function BYOKRoutingPreview({
       <CardHeader className="pb-4">
         <CardTitle>Routing preview</CardTitle>
         <CardDescription>
-          Pick a model to see which {organizationId ? 'organization ' : ''}keys serve it, in the
-          order requests try them.
+          Pick a model to see which {organizationId ? 'organization ' : ''}keys and ChatGPT
+          connections serve it, in the order requests try them.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -289,6 +311,10 @@ export function BYOKRoutingPreview({
             </Select>
           </div>
         </div>
+        <p className="text-muted-foreground text-xs">
+          ChatGPT subscriptions apply only to Responses API requests. Select Responses to preview
+          that route.
+        </p>
         {modelId === '' ? null : previewError ? (
           <p className="text-status-destructive text-sm">
             The routing preview could not be loaded. Try again in a moment.

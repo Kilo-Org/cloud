@@ -29,7 +29,7 @@ import {
   type ByokOwner,
   type ByokSourceDb,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import type { User } from '@kilocode/db/schema';
+import { openai_chatgpt_connections, type User } from '@kilocode/db/schema';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { AnonymousUserContext } from '@kilocode/web-shared/lib/anonymous';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
@@ -61,7 +61,11 @@ import type {
 import {
   checkOpenAiChatGptByok,
   getOpenAiChatGptCandidateModel,
+  OPENAI_CHATGPT_API_KEY_ENV,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { openAiChatGptOwnerWhere } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import { isOpenAiModelServed } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import * as z from 'zod';
 import { CustomLlmCredentialsSchema, type CustomLlmCredentials } from '@kilocode/db/schema-types';
@@ -639,7 +643,18 @@ export const ByokRoutePreviewStepSchema = z.discriminatedUnion('route', [
     reason: z.enum(['serves', 'unsupported-api-kind', 'disabled', 'not-catalog-mode']),
     supportedApiKinds: z.array(GatewayChatApiKindSchema),
   }),
-  z.object({ route: z.literal('chatgpt'), outcome: ByokRoutePreviewOutcomeSchema }),
+  z.object({
+    route: z.literal('chatgpt'),
+    outcome: ByokRoutePreviewOutcomeSchema,
+    reason: z.enum([
+      'serves',
+      'not-connected',
+      'disabled',
+      'unsupported-api-kind',
+      'model-unavailable',
+      'unavailable',
+    ]),
+  }),
   z.object({
     route: z.literal('vercel-byok'),
     outcome: ByokRoutePreviewOutcomeSchema,
@@ -696,8 +711,9 @@ function markUnreachedSteps(steps: ByokRoutePreviewStep[]): ByokRoutePreviewStep
  * The routes `getProvider` would try for a catalog model, in order, for the BYOK settings page.
  * Reads key metadata only: it never decrypts a key or calls KMS. Organization model and provider
  * policies are not applied, so Kilo's gateway and the Vercel AI Gateway key assume no provider
- * restrictions. A ChatGPT connection is personal and its state is encrypted, so it is reported as
- * conditional.
+ * restrictions. Personal ChatGPT connections use their enabled metadata; organization connections
+ * remain conditional because they belong to the member making the request. Credential validity is
+ * checked only when a real request is routed.
  *
  * KEEP IN SYNC WITH `getProvider` above: mirror any change to its step order or key decisions.
  */
@@ -737,8 +753,30 @@ export async function previewByokRouting({
     });
   }
 
-  if (await getOpenAiChatGptCandidateModel(apiKind, requestedModel)) {
-    steps.push({ route: 'chatgpt', outcome: 'conditional' });
+  const chatGptModel = await getOpenAiChatGptCandidateModel('responses', requestedModel);
+  if (chatGptModel) {
+    let reason: Extract<ByokRoutePreviewStep, { route: 'chatgpt' }>['reason'] = 'serves';
+    if (apiKind !== 'responses') {
+      reason = 'unsupported-api-kind';
+    } else if (owner.type === 'user') {
+      const [connection] = await fromDb
+        .select({ isEnabled: openai_chatgpt_connections.is_enabled })
+        .from(openai_chatgpt_connections)
+        .where(openAiChatGptOwnerWhere({ kiloUserId: owner.id, organizationId: null }))
+        .limit(1);
+      if (!connection) reason = 'not-connected';
+      else if (!connection.isEnabled) reason = 'disabled';
+    }
+    if (reason === 'serves') {
+      const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
+      if (!apiKey.trim()) reason = 'unavailable';
+      else if (!(await isOpenAiModelServed(apiKey, chatGptModel))) reason = 'model-unavailable';
+    }
+    steps.push({
+      route: 'chatgpt',
+      outcome: reason !== 'serves' ? 'skipped' : owner.type === 'user' ? 'used' : 'conditional',
+      reason,
+    });
   }
 
   const candidateProviders = await getGatewayRoutedByokCandidateProviders(requestedModel, {

@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { beforeEach, describe, expect, test } from '@jest/globals';
+import { afterAll, beforeEach, describe, expect, test } from '@jest/globals';
 import {
   getProvider,
   previewByokRouting,
@@ -21,8 +21,11 @@ import {
 import type * as byokModule from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type * as directByokModule from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import type * as encryptionModule from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import type * as configModule from '@kilocode/web-shared/lib/config.server';
 import type * as chatGptRoutingModule from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { getOpenAiChatGptCandidateModel } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { isOpenAiModelServed } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models';
+import type { OpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/types';
 import type * as gatewayModelsCacheModule from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import {
@@ -39,7 +42,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { byok_api_keys, type User } from '@kilocode/db/schema';
+import { byok_api_keys, openai_chatgpt_connections, type User } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 
@@ -86,8 +89,43 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   canRouteToVercel: jest.fn(),
   shouldRouteToVercel: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models', () => ({
+  isOpenAiModelServed: jest.fn(async () => true),
+}));
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual<typeof configModule>('@kilocode/web-shared/lib/config.server'),
+  OPENAI_CLIENT_ID: 'chatgpt-test-client',
+  OPENAI_CLIENT_SECRET: 'chatgpt-test-client-secret',
+}));
 
 const MODEL = 'moonshotai/kimi-k2.6';
+const OPENAI_MODEL = 'openai/gpt-5-nano';
+const originalChatGptApiKey = process.env.OPENAI_CHATGPT_API_KEY;
+
+async function createChatGptConnection(
+  user: User,
+  {
+    organizationId = null,
+    isEnabled = true,
+  }: { organizationId?: string | null; isEnabled?: boolean } = {}
+) {
+  const connection: OpenAiChatGptConnection = {
+    access_token: 'chatgpt-test-token',
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    issuer: 'https://auth.openai.com',
+    client_id: 'test-client',
+    subject: 'test-subject',
+    connected_at: new Date().toISOString(),
+    status: isEnabled ? 'connected' : 'error',
+  };
+  await db.insert(openai_chatgpt_connections).values({
+    kilo_user_id: user.id,
+    organization_id: organizationId,
+    encrypted_connection: encryptApiKey(JSON.stringify(connection), BYOK_ENCRYPTION_KEY),
+    is_enabled: isEnabled,
+    created_by: user.id,
+  });
+}
 
 function catalogModel(
   id: 'synthetic' | 'zai-coding',
@@ -166,11 +204,13 @@ type RouteSignature =
   | { route: 'direct-byok' | 'unsupported-api-kind'; providerId: string }
   | { route: 'vercel-byok'; providerIds: string[] }
   | { route: 'gateway-byok'; providerId: string }
+  | { route: 'chatgpt' }
   | { route: 'kilo'; gateway: 'vercel' | 'openrouter' };
 
 function routeOf(result: GetProviderResult, apiKind: GatewayChatApiKind): RouteSignature {
   if (result.kind !== 'provider') throw new Error(`unexpected ${result.kind} result`);
   const { provider, userByok } = result;
+  if (provider.id === 'openai-chatgpt') return { route: 'chatgpt' };
   if (provider.id === 'direct-byok') {
     const providerId = userByok?.[0]?.providerId ?? '';
     return provider.supportedChatApis.includes(apiKind)
@@ -202,7 +242,7 @@ function previewRouteOf(steps: ByokRoutePreviewStep[]): RouteSignature {
     case 'kilo':
       return { route: step.route, gateway: step.gateway };
     case 'chatgpt':
-      throw new Error('a ChatGPT step is never used');
+      return { route: 'chatgpt' };
   }
 }
 
@@ -213,8 +253,15 @@ async function createOwner(user: User, index: number): Promise<ByokOwner> {
 }
 
 beforeEach(() => {
+  process.env.OPENAI_CHATGPT_API_KEY = 'chatgpt-project-test-key';
+  jest.mocked(isOpenAiModelServed).mockReset().mockResolvedValue(true);
   jest.mocked(findDirectByokCatalogModels).mockResolvedValue(CATALOG_MODELS);
   jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['moonshotai']);
+});
+
+afterAll(() => {
+  if (originalChatGptApiKey === undefined) delete process.env.OPENAI_CHATGPT_API_KEY;
+  else process.env.OPENAI_CHATGPT_API_KEY = originalChatGptApiKey;
 });
 
 describe('previewByokRouting', () => {
@@ -279,6 +326,7 @@ describe('previewByokRouting', () => {
 
   test('marks the ChatGPT connection as not tried below a serving key', async () => {
     const user = await insertTestUser();
+    await createChatGptConnection(user);
     await db.insert(byok_api_keys).values({
       kilo_user_id: user.id,
       provider_id: 'zai-coding',
@@ -302,6 +350,142 @@ describe('previewByokRouting', () => {
       { route: 'chatgpt', outcome: 'unreached' },
       { route: 'kilo', outcome: 'unreached' },
     ]);
+  });
+
+  describe('personal ChatGPT connections', () => {
+    beforeEach(() => {
+      jest.mocked(findDirectByokCatalogModels).mockResolvedValue([]);
+      jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['openai']);
+      jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue(['openrouter']);
+      jest.mocked(canRouteToVercel).mockResolvedValue(false);
+      jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+    });
+
+    async function previewSteps(user: User, apiKind: GatewayChatApiKind = 'responses') {
+      jest.mocked(decryptApiKey).mockClear();
+      const preview = await previewByokRouting({
+        fromDb: db,
+        owner: { type: 'user', id: user.id },
+        requestedModel: OPENAI_MODEL,
+        apiKind,
+      });
+      expect(decryptApiKey).not.toHaveBeenCalled();
+      if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
+      return preview.steps;
+    }
+
+    test('uses a connected subscription ahead of API keys and Kilo credits', async () => {
+      const user = await insertTestUser();
+      await createChatGptConnection(user);
+      await db.insert(byok_api_keys).values({
+        kilo_user_id: user.id,
+        provider_id: 'openai',
+        encrypted_api_key: encryptApiKey('openai-test-key', BYOK_ENCRYPTION_KEY),
+        created_by: user.id,
+      });
+      const routed = await getProvider({
+        requestedModel: OPENAI_MODEL,
+        request: { kind: 'responses', body: { model: OPENAI_MODEL, input: 'hello' } },
+        user,
+        organizationId: undefined,
+      });
+      const steps = await previewSteps(user);
+      expect(steps).toEqual([
+        { route: 'chatgpt', outcome: 'used', reason: 'serves' },
+        { route: 'vercel-byok', outcome: 'unreached', providerIds: ['openai'], reason: 'serves' },
+        { route: 'kilo', outcome: 'unreached', gateway: 'openrouter' },
+      ]);
+      expect(previewRouteOf(steps)).toEqual(routeOf(routed, 'responses'));
+      expect(isOpenAiModelServed).toHaveBeenCalledWith('chatgpt-project-test-key', 'gpt-5-nano');
+    });
+
+    test('shows the ChatGPT route when no pasted keys are configured', async () => {
+      const user = await insertTestUser();
+      await createChatGptConnection(user);
+      expect(await previewSteps(user)).toEqual([
+        { route: 'chatgpt', outcome: 'used', reason: 'serves' },
+        { route: 'kilo', outcome: 'unreached', gateway: 'openrouter' },
+      ]);
+    });
+
+    test.each(['absent', 'disabled', 'organization-only', 'another-user'] as const)(
+      'skips a connection that is %s',
+      async state => {
+        const user = await insertTestUser();
+        if (state === 'disabled') await createChatGptConnection(user, { isEnabled: false });
+        if (state === 'organization-only') {
+          const organization = await createTestOrganization(
+            `ChatGPT ${crypto.randomUUID()}`,
+            user.id,
+            0
+          );
+          await createChatGptConnection(user, { organizationId: organization.id });
+        }
+        if (state === 'another-user') await createChatGptConnection(await insertTestUser());
+        expect(await previewSteps(user)).toEqual([
+          {
+            route: 'chatgpt',
+            outcome: 'skipped',
+            reason: state === 'disabled' ? 'disabled' : 'not-connected',
+          },
+          { route: 'kilo', outcome: 'used', gateway: 'openrouter' },
+        ]);
+      }
+    );
+
+    test.each(['chat_completions', 'messages'] as const)(
+      'explains why ChatGPT is skipped for %s',
+      async apiKind => {
+        const user = await insertTestUser();
+        await createChatGptConnection(user);
+        expect(await previewSteps(user, apiKind)).toEqual([
+          { route: 'chatgpt', outcome: 'skipped', reason: 'unsupported-api-kind' },
+          { route: 'kilo', outcome: 'used', gateway: 'openrouter' },
+        ]);
+      }
+    );
+
+    test('skips models the delegated project does not serve', async () => {
+      const user = await insertTestUser();
+      await createChatGptConnection(user);
+      jest.mocked(isOpenAiModelServed).mockResolvedValue(false);
+      expect(await previewSteps(user)).toEqual([
+        { route: 'chatgpt', outcome: 'skipped', reason: 'model-unavailable' },
+        { route: 'kilo', outcome: 'used', gateway: 'openrouter' },
+      ]);
+    });
+
+    test('skips ChatGPT when the deployment is not configured for it', async () => {
+      const user = await insertTestUser();
+      await createChatGptConnection(user);
+      delete process.env.OPENAI_CHATGPT_API_KEY;
+      expect(await previewSteps(user)).toEqual([
+        { route: 'chatgpt', outcome: 'skipped', reason: 'unavailable' },
+        { route: 'kilo', outcome: 'used', gateway: 'openrouter' },
+      ]);
+    });
+
+    test('keeps organization connections conditional on the requesting member', async () => {
+      const user = await insertTestUser();
+      const organization = await createTestOrganization(
+        `ChatGPT ${crypto.randomUUID()}`,
+        user.id,
+        0
+      );
+      const preview = await previewByokRouting({
+        fromDb: db,
+        owner: { type: 'organization', id: organization.id },
+        requestedModel: OPENAI_MODEL,
+        apiKind: 'responses',
+      });
+      expect(preview).toEqual({
+        kind: 'routes',
+        steps: [
+          { route: 'chatgpt', outcome: 'conditional', reason: 'serves' },
+          { route: 'kilo', outcome: 'used', gateway: 'openrouter' },
+        ],
+      });
+    });
   });
 });
 

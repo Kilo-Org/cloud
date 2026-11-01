@@ -1155,12 +1155,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
           <BYOKSetupGuideLink />
         </CardFooter>
       </Card>
-      {listedKeys && listedKeys.length > 0 ? (
-        <BYOKRoutingPreview
-          organizationId={organizationId}
-          getProviderName={getProviderDisplayName}
-        />
-      ) : null}
+      <BYOKRoutingPreview
+        organizationId={organizationId}
+        getProviderName={getProviderDisplayName}
+      />
     </div>
   );
 }

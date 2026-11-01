@@ -65,13 +65,25 @@ describe('describeRouteStep', () => {
   });
 
   it('describes the ChatGPT connection for the owner', () => {
-    const step = { route: 'chatgpt', outcome: 'conditional' } as const;
+    const step = { route: 'chatgpt', outcome: 'used', reason: 'serves' } as const;
     expect(describeRouteStep(step, getProviderName, false).detail).toBe(
-      'Used when your ChatGPT connection is active.'
+      'Uses your ChatGPT subscription instead of API keys or Kilo credits.'
     );
     expect(describeRouteStep(step, getProviderName, true).detail).toBe(
       'Used when the member sending the request has connected ChatGPT for this organization.'
     );
+  });
+
+  it.each([
+    ['not-connected', 'Skipped: no ChatGPT connection for your personal account.'],
+    ['disabled', 'Skipped: your ChatGPT connection is disabled or needs reconnecting.'],
+    ['unsupported-api-kind', 'Skipped: ChatGPT subscriptions support the Responses API only.'],
+    ['model-unavailable', 'Skipped: this model is not available through ChatGPT.'],
+    ['unavailable', 'Skipped: ChatGPT subscription routing is not available.'],
+  ] as const)('explains the skipped ChatGPT route: %s', (reason, detail) => {
+    expect(
+      describeRouteStep({ route: 'chatgpt', outcome: 'skipped', reason }, getProviderName, false)
+    ).toEqual({ title: 'ChatGPT subscription', detail });
   });
 
   it('names the gateway of the Kilo route', () => {

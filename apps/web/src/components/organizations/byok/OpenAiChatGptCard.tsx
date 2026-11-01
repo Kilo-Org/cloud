@@ -421,6 +421,8 @@ function OpenAiChatGptCardConnected({ organizationId }: { organizationId?: strin
         void queryClient.invalidateQueries({
           queryKey: trpc.openAiChatGpt.status.queryKey(ownerInput),
         });
+        void queryClient.invalidateQueries(trpc.byok.previewRouting.pathFilter());
+        void queryClient.invalidateQueries({ queryKey: ['openrouter-models'] });
       },
       onError: () => {
         setHasDisconnectError(true);

@@ -65,7 +65,7 @@ import {
   isAnyAttachmentUploading,
 } from '@/lib/agent-attachments/agent-attachment-types';
 import {
-  clipboardPasteEmptyMessage,
+  clipboardPasteFailureMessage,
   useClipboardPaste,
 } from '@/lib/agent-attachments/use-clipboard-paste';
 
@@ -342,9 +342,7 @@ export function NewSessionPrompt({
       });
     },
     onFailure: reason => {
-      toast.error(
-        reason === 'empty' ? clipboardPasteEmptyMessage() : describeClassificationFailure(reason)
-      );
+      toast.error(clipboardPasteFailureMessage(reason) ?? describeClassificationFailure(reason));
     },
     maxBytes: AGENT_ATTACHMENT_MAX_BYTES,
   });

@@ -110,7 +110,7 @@ import { describeClassificationFailure } from '@/lib/agent-attachments/validate'
 import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
 import { composerPromptText, hasVisibleComposerText } from '@/lib/composer-text';
 import {
-  clipboardPasteEmptyMessage,
+  clipboardPasteFailureMessage,
   useClipboardPaste,
 } from '@/lib/agent-attachments/use-clipboard-paste';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
@@ -866,9 +866,7 @@ export function ChatComposer({
       });
     },
     onFailure: reason => {
-      toast.error(
-        reason === 'empty' ? clipboardPasteEmptyMessage() : describeClassificationFailure(reason)
-      );
+      toast.error(clipboardPasteFailureMessage(reason) ?? describeClassificationFailure(reason));
     },
     maxBytes: AGENT_ATTACHMENT_MAX_BYTES,
   });

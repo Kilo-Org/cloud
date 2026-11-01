@@ -70,14 +70,17 @@ export type ResponseMetadata = {
   providerMetadata?: VercelProviderMetaData;
 };
 
+function isModelRewriteExempt(model: string): boolean {
+  return (
+    model.startsWith('~') ||
+    model.startsWith('openrouter/') ||
+    model === 'typesafe/jev-router' ||
+    model === 'nvidia/switchyard'
+  );
+}
+
 export function rewriteResponseMetadata(value: ResponseMetadata, context: ResponseUsageContext) {
-  if (
-    value.model !== undefined &&
-    !context.requested_model.startsWith('~') &&
-    !context.requested_model.startsWith('openrouter/') &&
-    context.requested_model !== 'typesafe/jev-router' &&
-    context.requested_model !== 'nvidia/switchyard'
-  ) {
+  if (value.model !== undefined && !isModelRewriteExempt(context.requested_model)) {
     value.model = context.requested_model;
   }
   if (value.provider_metadata !== undefined || value.providerMetadata !== undefined) {

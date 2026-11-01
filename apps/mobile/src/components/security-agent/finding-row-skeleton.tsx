@@ -13,10 +13,17 @@ const REPO_WIDTHS = ['w-1/3', 'w-2/5', 'w-1/4'] as const;
 /**
  * The line boxes a finding card gives its text at the app's 14pt rem: the 11px
  * severity label, a one-line `text-sm` title, the `text-xs` repository, the meta
- * row beside it behind `pt-0.5`, and the 36px quick action behind `mt-1`. Each
- * box holds a bar of its own, so the placeholder takes the card's height and the
- * cards replace it in place. A card whose title wraps to its second line grows by
- * one `text-sm` box.
+ * row beside it behind `pt-0.5`, and the quick action behind `mt-1`, which is the
+ * card's button. Each box holds a bar of its own, so the placeholder stands in
+ * the card's frame and the cards replace it in place.
+ *
+ * A card is content-sized, so the frame covers the shape the list shows for a
+ * finding that offers an action: 143.6 points measured against the card's own
+ * 144.0. Three variants differ, and neither is reserved because a placeholder
+ * cannot stand for all of them: a card whose quick action is the one-line
+ * `text-xs` label is shorter by the button's height, a card with no action
+ * measured 99.0 points, and a title that wraps to its second line adds one
+ * `text-sm` box while a meta row that wraps adds one `text-xs` box.
  */
 const SEVERITY_LINE_CLASS = 'h-[15px] justify-center';
 const TITLE_LINE_CLASS = 'h-[17.5px] justify-center';

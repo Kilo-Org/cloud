@@ -273,9 +273,7 @@ describe('applySharePrefill', () => {
         deliveredCalls.push(1);
       },
     });
-    expect(retried).toHaveBeenCalledExactlyOnceWith([
-      { name: 'bad.png', uri: 'file:///bad.png' },
-    ]);
+    expect(retried).toHaveBeenCalledExactlyOnceWith([{ name: 'bad.png', uri: 'file:///bad.png' }]);
     expect(deliveredCalls).toEqual([1]);
     expect(clearCalls).toEqual([1]);
   });

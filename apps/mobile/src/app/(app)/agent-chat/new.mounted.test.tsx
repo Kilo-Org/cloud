@@ -22,9 +22,12 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock('expo-router', () => ({ useRouter: () => state.router }));
 vi.mock('@sentry/react-native', () => ({
-  wrapExpoRouterErrorBoundary: <T,>(component: T): T => component,
+  wrapExpoRouterErrorBoundary: (boundary: unknown) => boundary,
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
+}));
 vi.mock('@/components/agents/use-new-session-organization', () => ({
   useNewSessionOrganization: () => ({ isCloneEntry: false, ...state.organization }),
 }));

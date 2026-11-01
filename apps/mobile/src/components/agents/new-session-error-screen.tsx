@@ -36,7 +36,10 @@ export function NewSessionErrorScreen({ onRetry }: Props) {
       </View>
       <View className="px-4" style={{ paddingBottom: insets.bottom + BACK_GAP }}>
         <Pressable
-          className={cn(STATE_ACTION_CLASS, 'flex-row items-center justify-center active:opacity-70')}
+          className={cn(
+            STATE_ACTION_CLASS,
+            'flex-row items-center justify-center active:opacity-70'
+          )}
           accessibilityRole="button"
           accessibilityLabel={t('common.back')}
           onPress={() => {

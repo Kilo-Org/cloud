@@ -9,10 +9,12 @@ import { __resetTabSwitchInputForTests, isTabSwitchPending } from '@/lib/tab-swi
 
 import { TabBarButton } from './tab-bar-button';
 
+const platform = vi.hoisted(() => ({ OS: 'android' as 'android' | 'ios' }));
+
 vi.mock('react-native', () => ({
-  // The Android case on purpose: the cursor is one value for both platforms, so
+  // The Android case by default: the cursor is one value for both platforms, so
   // the entry must not fall back to `auto` here.
-  Platform: { OS: 'android' },
+  Platform: platform,
   Pressable: 'Pressable',
 }));
 
@@ -37,6 +39,7 @@ function renderButton(props: Partial<BottomTabBarButtonProps>) {
 }
 
 beforeEach(() => {
+  platform.OS = 'android';
   __resetTabSwitchInputForTests();
 });
 
@@ -75,6 +78,48 @@ describe('TabBarButton mounted layout', () => {
     const button = renderButton({ style: { opacity: 1 } });
     expect(button.props.style).toEqual(expect.arrayContaining([{ cursor: 'pointer' }]));
   });
+});
+
+// One tab, one announced element. `accessible` groups an entry's icon and label
+// into the entry itself, so its name is the only carrier of the tab's meaning in
+// that subtree: dropping it, or labelling a second element with the same string,
+// splits a tab into a container that is announced on its own and repeats it in
+// the tree (explorer finding: a tab's position label read around content that
+// does not belong to that tab). The shape holds on both platforms, so the button
+// role this entry keeps on Android cannot cost the grouping.
+describe('TabBarButton announced entry', () => {
+  it.each(['ios', 'android'] as const)(
+    'keeps the tab label on the one entry element (%s)',
+    os => {
+      platform.OS = os;
+      const label = 'Home, tab, 1 of 4';
+      renderButton({
+        'aria-label': label,
+        'aria-selected': true,
+        role: os === 'ios' ? 'button' : 'tab',
+        children: createElement('Text', null, 'HOME'),
+      });
+      if (!renderer) {
+        throw new Error('Missing TabBarButton renderer');
+      }
+      const button = renderer.root.findByType('Pressable' as unknown as React.ElementType);
+
+      expect(button.props).toMatchObject({
+        'aria-label': label,
+        'aria-selected': true,
+        accessible: true,
+        role: 'button',
+      });
+
+      const carriers = renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' &&
+          (node.props['aria-label'] === label || node.props.accessibilityLabel === label)
+      );
+      expect(carriers).toHaveLength(1);
+      expect(carriers[0]).toBe(button);
+    }
+  );
 });
 
 type PressProps = {

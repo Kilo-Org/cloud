@@ -252,7 +252,9 @@ its turn, or when the user loses access to the session.
    keep it — is outside that scope and MUST end at the next restore.
 4. A restore that cannot read the keychain or the records themselves MUST
    leave the cards as they are: only a scope the app can read may end a
-   card.
+   card. A keychain that reads and holds no account is not unreadable: it
+   is a sign-out the process did not finish, so every card is outside the
+   scope and ends (rule 2).
 5. An Approve on a session notification MUST answer under the account and
    the organization recorded on that card, read from the persisted card
    set, and MUST answer nothing when that scope cannot be read or does

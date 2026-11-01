@@ -9,24 +9,43 @@ import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/gla
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 import { adoptNativeActivity, sweepStrayActivities } from './ios-sink';
-import { restoreFollowedSessionCards, type SessionFollowContext } from './session-follow';
+import { restoreFollowedSessionCards, type SessionRestoreScope } from './session-follow';
 
-async function readKey(key: string): Promise<string | null> {
+/**
+ * A stored value, `null` when the keychain holds nothing under the key, or
+ * `undefined` when it could not answer at all. The two empty answers are not the
+ * same: one is a state the app may act on, the other proves nothing.
+ */
+async function readKey(key: string): Promise<string | null | undefined> {
   try {
     return await SecureStore.getItemAsync(key);
   } catch {
-    // An unavailable keychain only costs this adoption; the publisher retries.
-    return null;
+    // A keychain that cannot answer, like one before first unlock, only costs
+    // this adoption; the publisher retries.
+    return undefined;
   }
 }
 
-/** The stored account and scope, or null when no account can be read now. */
-async function readStoredContext(): Promise<SessionFollowContext | null> {
+/**
+ * The stored account and scope, as the launch and foreground restore reads it.
+ * A keychain that answered with no account is a sign-out, which ends every card;
+ * one that could not answer leaves the cards as they are.
+ */
+async function readStoredContext(): Promise<SessionRestoreScope> {
   const userId = await readKey(ACTIVE_USER_ID_KEY);
-  if (userId === null) {
-    return null;
+  if (userId === undefined) {
+    return { kind: 'unreadable' };
   }
-  return { userId, organizationId: await readKey(ORGANIZATION_STORAGE_KEY) };
+  if (userId === null) {
+    return { kind: 'signedOut' };
+  }
+  const organizationId = await readKey(ORGANIZATION_STORAGE_KEY);
+  if (organizationId === undefined) {
+    // A read that failed proves nothing about the selection, so no card is out
+    // of scope until the next read answers.
+    return { kind: 'unreadable' };
+  }
+  return { kind: 'account', ctx: { userId, organizationId } };
 }
 
 /**
@@ -61,10 +80,10 @@ export async function adoptPushStartedActivity(): Promise<void> {
   // return below would otherwise leave it on the Lock Screen forever.
   sweepStrayActivities();
   const snapshot = getLastGlanceableSnapshot();
-  const ctx = await readStoredContext();
-  await restoreFollowedSessionCards(ctx);
-  if (snapshot === null || ctx === null) {
+  const scope = await readStoredContext();
+  await restoreFollowedSessionCards(scope);
+  if (snapshot === null || scope.kind !== 'account') {
     return;
   }
-  adoptNativeActivity(snapshot, ctx);
+  adoptNativeActivity(snapshot, scope.ctx);
 }

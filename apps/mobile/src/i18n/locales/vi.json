@@ -3986,7 +3986,7 @@
       "emptyDescription": "Thêm mặc định để tự động áp dụng cấu hình khi bắt đầu phiên cho kho lưu trữ.",
       "repo": "Chọn kho lưu trữ…",
       "profile": "Chọn hồ sơ",
-      "remove": "Hủy liên kết",
+      "removeForRepo": "Hủy liên kết {{repo}}",
       "search": "Tìm kiếm kho lưu trữ…",
       "addedToast": "Đã đặt cấu hình mặc định cho \"{{repo}}\"",
       "addFailed": "Không thể đặt hồ sơ mặc định",

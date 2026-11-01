@@ -3986,7 +3986,7 @@
       "emptyDescription": "Adjon hozzá egy alapértelmezett profilt, amely automatikusan alkalmazza a profilt az adattár munkameneteinek indításakor.",
       "repo": "Adattár kiválasztása…",
       "profile": "Profil kiválasztása",
-      "remove": "Kötés feloldása",
+      "removeForRepo": "Kötés feloldása: {{repo}}",
       "search": "Adattárak keresése…",
       "addedToast": "Alapértelmezett profil beállítva az adattárhoz: „{{repo}}”",
       "addFailed": "Nem sikerült beállítani az alapértelmezett profilt",

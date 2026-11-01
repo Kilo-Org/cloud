@@ -3986,7 +3986,7 @@
       "emptyDescription": "添加默认值以在启动仓库会话时自动应用配置文件。",
       "repo": "选择仓库…",
       "profile": "选择配置文件",
-      "remove": "解绑",
+      "removeForRepo": "解绑 {{repo}}",
       "search": "搜索仓库…",
       "addedToast": "已为“{{repo}}”设置默认配置文件",
       "addFailed": "无法设置默认配置文件",

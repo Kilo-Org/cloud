@@ -3986,7 +3986,7 @@
       "emptyDescription": "Tilføj en standard for automatisk at anvende en profil, når du starter sessioner for en repo.",
       "repo": "Vælg lager...",
       "profile": "Vælg profil",
-      "remove": "Afbind",
+      "removeForRepo": "Afbind {{repo}}",
       "search": "Søg i lagre...",
       "addedToast": "Standardprofilen er indstillet til \"{{repo}}\"",
       "addFailed": "Standardprofilen kunne ikke indstilles",

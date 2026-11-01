@@ -4043,7 +4043,7 @@
       "emptyDescription": "Afegiu un valor predeterminat per aplicar automàticament un perfil quan inicieu sessions per a un repo.",
       "repo": "Seleccioneu el repositori...",
       "profile": "Seleccioneu el perfil",
-      "remove": "Desvincular",
+      "removeForRepo": "Desvincular {{repo}}",
       "search": "Cerca repositoris...",
       "addedToast": "Perfil predeterminat definit per a \"{{repo}}\"",
       "addFailed": "No s'ha pogut establir el perfil predeterminat",

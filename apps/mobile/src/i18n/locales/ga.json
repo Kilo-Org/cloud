@@ -4157,7 +4157,7 @@
       "emptyDescription": "Cuir réamhshocrú leis chun próifíl a chur i bhfeidhm go huathoibríoch agus seisiúin á gcur ar bun le haghaidh repo.",
       "repo": "Roghnaigh stór…",
       "profile": "Roghnaigh próifíl",
-      "remove": "Dícheangail",
+      "removeForRepo": "Dícheangail {{repo}}",
       "search": "Cuardaigh stórtha…",
       "addedToast": "Socraíodh próifíl réamhshocraithe do \"{{repo}}\"",
       "addFailed": "Níorbh fhéidir an phróifíl réamhshocraithe a shocrú",

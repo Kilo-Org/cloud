@@ -4043,7 +4043,7 @@
       "emptyDescription": "Agregue un valor predeterminado para aplicar automáticamente un perfil al iniciar sesiones para un repositorio.",
       "repo": "Seleccionar repositorio…",
       "profile": "Seleccionar perfil",
-      "remove": "Desatar",
+      "removeForRepo": "Desatar {{repo}}",
       "search": "Buscar repositorios…",
       "addedToast": "Perfil predeterminado establecido para \"{{repo}}\"",
       "addFailed": "No se pudo establecer el perfil predeterminado",

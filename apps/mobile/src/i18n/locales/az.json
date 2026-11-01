@@ -3986,7 +3986,7 @@
       "emptyDescription": "Repo üçün sessiyalara başladıqda profili avtomatik tətbiq etmək üçün defolt əlavə edin.",
       "repo": "Repozitoru seçin...",
       "profile": "Profil seçin",
-      "remove": "Açın",
+      "removeForRepo": "{{repo}} üçün bağlantını açın",
       "search": "Repozitoriyaları axtarın...",
       "addedToast": "\"{{repo}}\" üçün defolt profil ayarlandı",
       "addFailed": "Defolt profili qurmaq mümkün olmadı",

@@ -4043,7 +4043,7 @@
       "emptyDescription": "Pievienojiet noklusējuma iestatījumu, lai automātiski lietotu profilu, sākot repo sesijas.",
       "repo": "Atlasīt repozitoriju…",
       "profile": "Izvēlieties profilu",
-      "remove": "Atsaistīt",
+      "removeForRepo": "Atsaistīt {{repo}}",
       "search": "Meklēt repozitorijās…",
       "addedToast": "Noklusējuma profils iestatīts uz \"{{repo}}\"",
       "addFailed": "Nevarēja iestatīt noklusējuma profilu",

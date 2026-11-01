@@ -4043,7 +4043,7 @@
       "emptyDescription": "Dodajte zadano za automatsku primjenu profila pri pokretanju sesija za repo.",
       "repo": "Odaberite spremište…",
       "profile": "Odaberite profil",
-      "remove": "Odveži",
+      "removeForRepo": "Odveži {{repo}}",
       "search": "Pretražite spremišta…",
       "addedToast": "Zadani profil postavljen za \"{{repo}}\"",
       "addFailed": "Nije moguće postaviti zadani profil",

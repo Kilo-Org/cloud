@@ -3986,7 +3986,7 @@
       "emptyDescription": "新增預設值以在啟動儲存庫會話時自動套用設定檔。",
       "repo": "選擇存儲庫...",
       "profile": "選擇個人資料",
-      "remove": "解綁",
+      "removeForRepo": "解綁 {{repo}}",
       "search": "搜尋儲存庫...",
       "addedToast": "為“{{repo}}”設定的預設設定文件",
       "addFailed": "無法設定預設設定檔",

@@ -3986,7 +3986,7 @@
       "emptyDescription": "Füge einen Standard hinzu, um beim Starten von Sitzungen für ein Repo automatisch ein Profil anzuwenden.",
       "repo": "Repository auswählen…",
       "profile": "Profil auswählen",
-      "remove": "Lösen",
+      "removeForRepo": "Bindung von {{repo}} lösen",
       "search": "Repositories durchsuchen…",
       "addedToast": "Standardprofil für „{{repo}}“ festgelegt",
       "addFailed": "Das Standardprofil konnte nicht festgelegt werden",

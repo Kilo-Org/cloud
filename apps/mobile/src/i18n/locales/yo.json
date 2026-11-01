@@ -3986,7 +3986,7 @@
       "emptyDescription": "Ṣafikun aiyipada lati kan profaili laifọwọyi nigbati o bẹrẹ awọn akoko fun atunto kan.",
       "repo": "Yan ibi ipamọ…",
       "profile": "Yan profaili",
-      "remove": "Yọọ",
+      "removeForRepo": "Yọ {{repo}} kúrò",
       "search": "Ṣewadii awọn ibi ipamọ…",
       "addedToast": "Eto profaili aiyipada fun \"{{repo}}\"",
       "addFailed": "Ko le ṣeto profaili aiyipada",

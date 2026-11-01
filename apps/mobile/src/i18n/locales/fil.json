@@ -3992,7 +3992,7 @@
       "emptyDescription": "Magdagdag ng default para awtomatikong maglapat ng profile kapag nagsisimula ng mga session para sa isang repo.",
       "repo": "Pumili ng repositoryo...",
       "profile": "Pumili ng profile",
-      "remove": "Alisin ang pagkakatali",
+      "removeForRepo": "Alisin ang pagkakatali ng {{repo}}",
       "search": "Maghanap ng mga repositoryo...",
       "addedToast": "Itinakda ang default na profile para sa \"{{repo}}\"",
       "addFailed": "Hindi maitakda ang default na profile",

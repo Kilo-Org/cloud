@@ -3986,7 +3986,7 @@
       "emptyDescription": "Ƙara tsoho don amfani da bayanin martaba ta atomatik lokacin fara zama don repo.",
       "repo": "Zaɓi wurin ajiya…",
       "profile": "Zaɓi bayanin martaba",
-      "remove": "Cire daurin",
+      "removeForRepo": "Cire daurin {{repo}}",
       "search": "Bincika wuraren ajiya…",
       "addedToast": "An saita tsoffin bayanan martaba don \"{{repo}}\"",
       "addFailed": "An kasa saita bayanan martaba na asali",

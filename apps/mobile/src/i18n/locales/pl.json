@@ -4100,7 +4100,7 @@
       "emptyDescription": "Dodaj ustawienie domyślne, aby automatycznie stosować profil podczas rozpoczynania sesji dla repozytorium.",
       "repo": "Wybierz repozytorium…",
       "profile": "Wybierz profil",
-      "remove": "Rozwiązać",
+      "removeForRepo": "Rozwiązać {{repo}}",
       "search": "Przeszukaj repozytoria…",
       "addedToast": "Domyślny profil ustawiony na „{{repo}}”",
       "addFailed": "Nie można ustawić profilu domyślnego",

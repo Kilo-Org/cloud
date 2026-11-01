@@ -4100,7 +4100,7 @@
       "emptyDescription": "Pridajte predvolené nastavenie na automatické použitie profilu pri spustení relácií pre repo.",
       "repo": "Vybrať úložisko…",
       "profile": "Vyberte profil",
-      "remove": "Odviazať",
+      "removeForRepo": "Odviazať {{repo}}",
       "search": "Hľadať v úložiskách…",
       "addedToast": "Predvolený profil nastavený pre „{{repo}}“",
       "addFailed": "Nepodarilo sa nastaviť predvolený profil",

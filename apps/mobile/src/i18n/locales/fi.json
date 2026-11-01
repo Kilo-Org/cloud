@@ -3986,7 +3986,7 @@
       "emptyDescription": "Lisää oletusprofiili, joka ottaa profiilin käyttöön automaattisesti, kun koodivarastolle aloitetaan istuntoja.",
       "repo": "Valitse koodivarasto…",
       "profile": "Valitse profiili",
-      "remove": "Pura sidonta",
+      "removeForRepo": "Pura kohteen {{repo}} sidonta",
       "search": "Hae koodivarastoja…",
       "addedToast": "Oletusprofiili asetettu kohteelle \"{{repo}}\"",
       "addFailed": "Oletusprofiilia ei voitu asettaa",

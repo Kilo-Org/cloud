@@ -3986,7 +3986,7 @@
       "emptyDescription": "Voeg 'n verstek by om 'n profiel outomaties toe te pas wanneer sessies vir 'n repo begin.",
       "repo": "Kies bewaarplek …",
       "profile": "Kies profiel",
-      "remove": "Ontbind",
+      "removeForRepo": "Ontbind {{repo}}",
       "search": "Soek bewaarplekke …",
       "addedToast": "Verstekprofiel gestel vir \"{{repo}}\"",
       "addFailed": "Kon nie verstekprofiel stel nie",

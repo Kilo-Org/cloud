@@ -3986,7 +3986,7 @@
       "emptyDescription": "Lisage vaikeseade profiili automaatseks rakendamiseks repo seansside alustamisel.",
       "repo": "Valige hoidla…",
       "profile": "Valige profiil",
-      "remove": "Vabasta sidumine",
+      "removeForRepo": "Vabasta {{repo}} sidumine",
       "search": "Otsi hoidlaid…",
       "addedToast": "Vaikeprofiil on seatud \"{{repo}}\" jaoks",
       "addFailed": "Vaikeprofiili ei saanud määrata",

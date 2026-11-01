@@ -4100,7 +4100,7 @@
       "emptyDescription": "Dodajte privzeto za samodejno uporabo profila ob zagonu sej za repo.",
       "repo": "Izberite repozitorij ...",
       "profile": "Izberite profil",
-      "remove": "Odveži",
+      "removeForRepo": "Odveži {{repo}}",
       "search": "Iskanje po skladiščih ...",
       "addedToast": "Privzeti profil nastavljen za \"{{repo}}\"",
       "addFailed": "Privzetega profila ni bilo mogoče nastaviti",

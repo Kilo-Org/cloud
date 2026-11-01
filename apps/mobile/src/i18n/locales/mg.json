@@ -3992,7 +3992,7 @@
       "emptyDescription": "Manampia default hampihatra ho azy ny mombamomba rehefa manomboka fivoriana ho an'ny repo.",
       "repo": "Safidio ny tahiry…",
       "profile": "Fidio ny mombamomba",
-      "remove": "Esory",
+      "removeForRepo": "Esory ny {{repo}}",
       "search": "Hikaroka tahiry…",
       "addedToast": "piraofilina voafantina ho an'ny \"{{repo}}\"",
       "addFailed": "Tsy afaka nametraka ny mombamomba azy",

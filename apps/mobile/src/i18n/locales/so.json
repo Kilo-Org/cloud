@@ -403,6 +403,7 @@
     "connectionExpired": "Muddadii xiriirka GitHub way dhammaatay.",
     "merge": {
       "merge": "Isku-darid",
+      "mergeTitle": "Isku-darid",
       "mergeNow": "Hadda isku dar",
       "mergePullRequest": "Isku-darka codsiga",
       "mergeTermTitle": "Isku-dar {{term}}",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Taleefanka ku eeg merge request-yada",
       "bitbucketOrgOnlyDescription": "Beddel xisaabta kor ku qoran hay'ad si aad u eegto PR-yadeeda Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Xisaabtan weli ma laha hay'ado. PR-yada Bitbucket waxaad eegi kartaa marka aad abuurto ama aad ku biirto hay'ad.",
+      "gitlabReconnectAdminOnlyDescription": "Weydii mulkiile, maamule ama maareeyaha biilasha ururka si ay dib ugu xidhaan.",
+      "bitbucketNotConnectedTitle": "Bitbucket kuma xidhna",
+      "bitbucketAdminOnlyDescription": "Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa ku xidhi kara.",
       "contextLine": "{{organization}} u",
       "contextLinePersonal": "Akoonkaaga shakhsiyeed u"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Tilmaamo gaar ah",
       "deprecation": "Taageerada tilmaamaha gaarka ah waxaa la qorshaynayaa in la joojiyo. Tilmaamahan u rar faylka REVIEW.md ee kaydkaaga.",
-      "placeholder": "tusaale: Raac habraacayaga maaraynta khaladaadka…"
+      "placeholder": "tusaale: Raac habraacayaga maaraynta khaladaadka…",
+      "clearTitle": "Ka saar tilmaamaha gaarka ah?",
+      "clearMessage": "Kaydinta beer madhan waxay tirtiraysaa tilmaamaha gaarka ah ee lagu kaydiyay fiiriyahan."
     },
     "repos": {
       "unavailable": "Kaydadka lama heli karo. Ku dhammaystir dejinta Bitbucket bogga kilo.ai.",
@@ -1450,7 +1456,7 @@
       "fixSettings": "Hagaaji dejinta",
       "couldNotLoad": "Dib-u-eegista lama soo dejin karin.",
       "couldNotGetLatest": "Xogta ugu dambaysa lama heli karin.",
-      "byline": "{{repo}} #{{number}} oo uu qoray {{author}}",
+      "byline": "#{{number}} oo uu qoray {{author}}",
       "noFindings": "Ma jiraan natiijooyin.",
       "findingsUnavailable": "Natiijooyinka lama heli karo sababtoo ah dib-u-eegistan way fashilantay.",
       "findingsInProgress": "Dib-u-eegistan wali way socotaa. Natiijooyinku halkan ayay ka soo baxaan markay dhammaato.",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "Qaabka dib-u-eegista",
       "focusAreas": "Qaybaha xoogga la saarayo",
       "allAreas": "Dhammaan meelaha",
-      "customInstructions": "Tilmaamo gaar ah",
       "set": "La dejiyay",
+      "notSet": "Lama dejin",
       "nSelected": "{{displayCount}} ayaa la doortay",
       "proposedReviewMdGuidance": "Hagaha REVIEW.md ee la soo jeediyay"
     },
@@ -2060,7 +2066,8 @@
       "actionBlocked": "Ficilkan lama dhammeeyi karin. Waa in dhibaatadan horay loo xalliyo.",
       "syncNoRepositories": "Ma jiro kayd-baakhaaro ku jira baaxadda is-waafajinta. Dooro kayd-baakhaarada uu Wakiilka amniga ilaaliyo, ka dibna mar kale is-waafaji.",
       "syncIntegrationInactive": "Isku xirka GitHub ee Wakiilka amniga ma firfircoona. Dib u xir Kilo GitHub App, ka dibna mar kale isku dubarid.",
-      "syncMissingPermission": "Kilo GitHub App ma akhrin karo digniinaha nuglaanta. Sii ogolaanshahaas gudaha GitHub, ka dibna mar kale isku-dhaji."
+      "syncMissingPermission": "Kilo GitHub App ma akhrin karo digniinaha nuglaanta. Sii ogolaanshahaas gudaha GitHub, ka dibna mar kale isku-dhaji.",
+      "configConflict": "Dejinta Wakiilka amniga ayaa meel kale laga beddelay. Dib u eeg dejinta ugu dambeysa oo mar kale kaydi."
     },
     "analysisState": {
       "queued": "Falanqaynta ayaa safan",
@@ -2367,13 +2374,14 @@
       "forkFilesUnchangedOnComputer": "Faylasha kombiyuutarkan lama beddelo.",
       "pickProfile": "Dooro profile",
       "noProfile": "Profile malaha",
+      "defaultProfileResolvesTo": "Waxay u dhigtaa {{name}}",
+      "defaultProfileResolvesToAccessibility": "Muuqaalka asalka ah: {{name}}",
       "manageProfiles": "Maamul profiles",
       "noProfiles": "Weli profiles ma jiraan Abuur mid lagu daro doorsoomayaasha deegaanka, adeegayaasha MCP, iyo xirfadaha.",
       "advancedConfig": "Habaynta Sare",
       "advancedConfigDescription": "Waxay khusaysaa fadhigan. Kaydinta Profile ahaan waxay u hayn doontaa marka xigta.",
       "saveAsProfile": "U keydi sidii Profile ahaan",
       "saveProfileDescription": "Keydi doorsoomayaasha deegaanka ee hadda jira iyo amarrada dejinta sidii muuqaal dib loo isticmaali karo.",
-      "profileSummary": "{{vars}} doorsoomayaasha deegaanka · {{commands}} amarrada dejinta",
       "profileSaved": "Xogta \"{{name}}\" waa la keydiyay",
       "organizationProfiles": "Profiles Ururka",
       "personalProfiles": "Profiles Shakhsiyeed",

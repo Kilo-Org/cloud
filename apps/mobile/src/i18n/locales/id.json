@@ -889,7 +889,9 @@
     "instructions": {
       "title": "Instruksi kustom",
       "deprecation": "Fitur instruksi khusus akan dihentikan. Pindahkan panduan ini ke berkas REVIEW.md di repositorimu.",
-      "placeholder": "contoh: Terapkan aturan penanganan kesalahan kami…"
+      "placeholder": "contoh: Terapkan aturan penanganan kesalahan kami…",
+      "clearTitle": "Hapus instruksi kustom?",
+      "clearMessage": "Menyimpan kolom yang kosong akan menghapus instruksi kustom yang tersimpan untuk peninjau ini."
     },
     "repos": {
       "unavailable": "Repositori tidak tersedia — selesaikan penyiapan Bitbucket di kilo.ai.",
@@ -965,7 +967,7 @@
       "bitbucketError": "Tidak dapat membuka penyiapan Bitbucket. Coba lagi."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} oleh {{author}}",
+      "byline": "#{{number}} oleh {{author}}",
       "cancelMessage": "Ini akan menghentikan tinjauan kode yang sedang berjalan.",
       "cancelReview": "Batalkan tinjauan",
       "cancelTitle": "Batalkan tinjauan?",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "Semua area",
-      "customInstructions": "Instruksi kustom",
       "focusAreas": "Area fokus",
       "nSelected": "{{displayCount}} dipilih",
       "proposedReviewMdGuidance": "Panduan REVIEW.md yang diusulkan",
       "reviewStyle": "Gaya tinjauan",
-      "set": "Sudah diatur"
+      "set": "Sudah diatur",
+      "notSet": "Belum diatur"
     },
     "updateFailed": "Gagal memperbarui peninjau.",
     "configSaveFailed": "Gagal menyimpan konfigurasi tinjauan.",
@@ -1534,7 +1536,8 @@
       "actionBlocked": "Tindakan ini tidak dapat diselesaikan. Masalahnya harus diperbaiki terlebih dahulu sebelum mencoba lagi.",
       "syncNoRepositories": "Tidak ada repositori dalam cakupan sinkronisasi. Pilih repositori yang dipantau Agen keamanan, lalu sinkronkan lagi.",
       "syncIntegrationInactive": "Koneksi GitHub untuk Agen keamanan tidak aktif. Hubungkan ulang Aplikasi GitHub Kilo, lalu sinkronkan lagi.",
-      "syncMissingPermission": "Aplikasi GitHub Kilo tidak dapat membaca vulnerability alerts. Berikan izin tersebut di GitHub, lalu sinkronkan lagi."
+      "syncMissingPermission": "Aplikasi GitHub Kilo tidak dapat membaca vulnerability alerts. Berikan izin tersebut di GitHub, lalu sinkronkan lagi.",
+      "configConflict": "Pengaturan Agen keamanan diubah di tempat lain. Tinjau pengaturan terbaru dan simpan lagi."
     },
     "analysisState": {
       "queued": "Analisis dalam antrean",
@@ -1841,13 +1844,14 @@
       "forkFilesUnchangedOnComputer": "File di komputer ini tidak diubah.",
       "pickProfile": "Pilih profil",
       "noProfile": "Tidak ada profil",
+      "defaultProfileResolvesTo": "Mengarah ke {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profil bawaan: {{name}}",
       "manageProfiles": "Kelola profil",
       "noProfiles": "Belum ada profil. Buat satu untuk menambahkan variabel lingkungan, server MCP, dan keterampilan.",
       "advancedConfig": "Konfigurasi Lanjutan",
       "advancedConfigDescription": "Berlaku untuk sesi ini. Menyimpannya sebagai profil akan menyimpannya untuk lain kali.",
       "saveAsProfile": "Simpan sebagai Profil",
       "saveProfileDescription": "Simpan variabel lingkungan saat ini dan perintah pengaturan sebagai profil yang dapat digunakan kembali.",
-      "profileSummary": "{{vars}} variabel lingkungan · {{commands}} perintah pengaturan",
       "profileSaved": "Profil \"{{name}}\" disimpan",
       "organizationProfiles": "Profil Organisasi",
       "personalProfiles": "Profil Pribadi",
@@ -2712,6 +2716,9 @@
       "gitlabDescription": "Tinjau merge request di perangkat seluler",
       "bitbucketOrgOnlyDescription": "Ganti akun di atas ke sebuah organisasi untuk meninjau PR Bitbucket-nya.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akun ini belum memiliki organisasi. PR Bitbucket dapat ditinjau setelah Anda membuat atau bergabung dengan organisasi.",
+      "gitlabReconnectAdminOnlyDescription": "Minta pemilik, admin, atau manajer penagihan organisasi untuk menghubungkannya.",
+      "bitbucketNotConnectedTitle": "Bitbucket tidak terhubung",
+      "bitbucketAdminOnlyDescription": "Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat menghubungkannya.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akun pribadi Anda"
     },
@@ -2943,6 +2950,7 @@
     "installKiloGitHubApp": "Pasang aplikasi Kilo untuk GitHub",
     "merge": {
       "merge": "Penggabungan",
+      "mergeTitle": "Penggabungan",
       "mergeNow": "Gabungkan sekarang",
       "mergePullRequest": "Gabungkan PR",
       "mergeTermTitle": "Gabungkan {{term}}",

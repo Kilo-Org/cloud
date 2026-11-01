@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub-erako konexioa iraungi da.",
     "merge": {
       "merge": "Bateratzea",
+      "mergeTitle": "Bateratzea",
       "mergeNow": "Bateratu orain",
       "mergePullRequest": "Bateratze-eskaera bateratzea",
       "mergeTermTitle": "{{term}} bateratzea",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Berrikusi merge-eskaerak mugikorrean",
       "bitbucketOrgOnlyDescription": "Aldatu goiko kontua erakunde batera haren Bitbucket bateratze-eskaerak berrikusteko.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Kontu honek ez du oraindik erakunderik. Erakunde bat sortu edo batekin bat egiten duzunean, haren Bitbucket bateratze-eskaerak berrikus ditzakezu.",
+      "gitlabReconnectAdminOnlyDescription": "Eskatu erakunde bateko jabeari, administratzaileari edo fakturazio-kudeatzaileari berriro konekta dezan.",
+      "bitbucketNotConnectedTitle": "Bitbucket ez dago konektatuta",
+      "bitbucketAdminOnlyDescription": "Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
       "contextLine": "{{organization}}-rako",
       "contextLinePersonal": "Zure kontu pertsonalerako"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Pertsonalizatutako argibideak",
       "deprecation": "Argibide pertsonalizatuen aukera kentzea aurreikusten da. Eraman jarraibide hauek zure biltegiko REVIEW.md fitxategi batera.",
-      "placeholder": "adib.: gure errore-kudeaketako arauak betearaztea…"
+      "placeholder": "adib.: gure errore-kudeaketako arauak betearaztea…",
+      "clearTitle": "Kendu pertsonalizatutako argibideak?",
+      "clearMessage": "Eremu huts bat gordetzen baduzu, berrikusle honentzat gordetako argibide pertsonalizatuak ezabatzen dira."
     },
     "repos": {
       "unavailable": "Biltegiak ez daude erabilgarri. Amaitu Bitbucket-en konfigurazioa kilo.ai-n.",
@@ -1450,7 +1456,7 @@
       "fixSettings": "Konpondu ezarpenak",
       "couldNotLoad": "Ezin izan da berrikuspena kargatu.",
       "couldNotGetLatest": "Ezin izan da azken egoera lortu.",
-      "byline": "{{repo}} #{{number}} · Egilea: {{author}}",
+      "byline": "#{{number}} · Egilea: {{author}}",
       "noFindings": "Ez dago aurkikuntzarik.",
       "findingsUnavailable": "Emaitzak ez daude erabilgarri, berrikuspen honek huts egin duelako.",
       "findingsInProgress": "Berrikuspen hau oraindik abian da. Aurkikuntzak hemen agertuko dira amaitzean.",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "Berrikuspen-estiloa",
       "focusAreas": "Arreta-eremuak",
       "allAreas": "Eremu guztiak",
-      "customInstructions": "Pertsonalizatutako argibideak",
       "set": "Ezarrita",
+      "notSet": "Ezarri gabe",
       "nSelected": "{{displayCount}} hautatuta",
       "proposedReviewMdGuidance": "REVIEW.md fitxategirako proposatutako jarraibideak"
     },
@@ -2060,7 +2066,8 @@
       "actionBlocked": "Ezin izan da ekintza hau burutu. Arazoa konpondu behar da berriro saiatu aurretik.",
       "syncNoRepositories": "Ez dago biltegirik sinkronizazio-esparruan. Aukeratu Segurtasun-agenteak gainbegiratzen dituen biltegiak, eta gero sinkronizatu berriro.",
       "syncIntegrationInactive": "Segurtasun-agentearen GitHub konexioa ez dago aktibo. Konektatu berriro Kilo GitHub App, eta gero sinkronizatu berriro.",
-      "syncMissingPermission": "Kilo GitHub App-ek ezin ditu vulnerability alerts irakurri. Eman baimen hori GitHub-en, eta gero sinkronizatu berriro."
+      "syncMissingPermission": "Kilo GitHub App-ek ezin ditu vulnerability alerts irakurri. Eman baimen hori GitHub-en, eta gero sinkronizatu berriro.",
+      "configConflict": "Segurtasun-agentearen ezarpenak beste leku batean aldatu dira. Berrikusi azken ezarpenak eta gorde berriro."
     },
     "analysisState": {
       "queued": "Azterketa ilaran",
@@ -2367,13 +2374,14 @@
       "forkFilesUnchangedOnComputer": "Ordenagailu honetako fitxategiak ez dira aldatzen.",
       "pickProfile": "Aukeratu profil bat",
       "noProfile": "Ez dago profilik",
+      "defaultProfileResolvesTo": "Une honetan {{name}} da",
+      "defaultProfileResolvesToAccessibility": "Profil lehenetsia: {{name}}",
       "manageProfiles": "Kudeatu profilak",
       "noProfiles": "Oraindik ez dago profilik. Sortu bat ingurune-aldagaiak, MCP zerbitzariak eta trebetasunak gehitzeko.",
       "advancedConfig": "Konfigurazio aurreratua",
       "advancedConfigDescription": "Saio honetarako balio du. Profil gisa gordez gero, hurrengorako gordeko da.",
       "saveAsProfile": "Gorde profil gisa",
       "saveProfileDescription": "Gorde uneko ingurune-aldagaiak eta konfiguratu komandoak profil berrerabilgarri gisa.",
-      "profileSummary": "{{vars}} ingurune-aldagaiak · {{commands}} konfigurazio komandoak",
       "profileSaved": "\"{{name}}\" profila gorde da",
       "organizationProfiles": "Erakundeen profilak",
       "personalProfiles": "Profil pertsonalak",

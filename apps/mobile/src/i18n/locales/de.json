@@ -889,7 +889,9 @@
     "instructions": {
       "title": "Benutzerdefinierte Anweisungen",
       "deprecation": "Benutzerdefinierte Anweisungen sollen künftig entfallen. Verschiebe diese Richtlinien stattdessen in eine REVIEW.md-Datei in deinem Repository.",
-      "placeholder": "z. B. auf die Einhaltung unserer Regeln zur Fehlerbehandlung achten …"
+      "placeholder": "z. B. auf die Einhaltung unserer Regeln zur Fehlerbehandlung achten …",
+      "clearTitle": "Benutzerdefinierte Anweisungen entfernen?",
+      "clearMessage": "Wenn du ein leeres Feld speicherst, werden die für diesen Reviewer gespeicherten benutzerdefinierten Anweisungen gelöscht."
     },
     "repos": {
       "unavailable": "Die Repositories sind nicht verfügbar. Schließe die Bitbucket-Einrichtung auf kilo.ai ab.",
@@ -965,7 +967,7 @@
       "bitbucketError": "Die Bitbucket-Einrichtung konnte nicht geöffnet werden. Bitte versuche es erneut."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} von {{author}}",
+      "byline": "#{{number}} von {{author}}",
       "cancelMessage": "Das laufende Code-Review wird abgebrochen.",
       "cancelReview": "Review abbrechen",
       "cancelTitle": "Review abbrechen?",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "Alle Bereiche",
-      "customInstructions": "Benutzerdefinierte Anweisungen",
       "focusAreas": "Schwerpunkte",
       "nSelected": "{{displayCount}} ausgewählt",
       "proposedReviewMdGuidance": "Vorgeschlagene Richtlinien für REVIEW.md",
       "reviewStyle": "Art der Prüfung",
-      "set": "Festgelegt"
+      "set": "Festgelegt",
+      "notSet": "Nicht festgelegt"
     },
     "updateFailed": "Code Reviewer konnte nicht aktualisiert werden.",
     "configSaveFailed": "Die Review-Einstellungen konnten nicht gespeichert werden.",
@@ -1534,7 +1536,8 @@
       "actionBlocked": "Diese Aktion konnte nicht abgeschlossen werden. Das Problem muss behoben werden, bevor du es erneut versuchen kannst.",
       "syncNoRepositories": "Es befinden sich keine Repositories im Sync-Bereich. Wähle die Repositories aus, die der Sicherheitsagent überwacht, und synchronisiere dann erneut.",
       "syncIntegrationInactive": "Die GitHub-Verbindung für den Sicherheitsagenten ist nicht aktiv. Verbinde die Kilo-GitHub-App erneut und synchronisiere dann noch einmal.",
-      "syncMissingPermission": "Die Kilo-GitHub-App kann keine Schwachstellenwarnungen lesen. Erteile diese Berechtigung in GitHub und synchronisiere dann noch einmal."
+      "syncMissingPermission": "Die Kilo-GitHub-App kann keine Schwachstellenwarnungen lesen. Erteile diese Berechtigung in GitHub und synchronisiere dann noch einmal.",
+      "configConflict": "Die Einstellungen des Sicherheitsagenten wurden anderswo geändert. Prüfe die neuesten Einstellungen und speichere erneut."
     },
     "analysisState": {
       "queued": "Analyse in der Warteschlange",
@@ -1841,13 +1844,14 @@
       "forkFilesUnchangedOnComputer": "Die Dateien auf diesem Computer werden nicht geändert.",
       "pickProfile": "Wähle ein Profil",
       "noProfile": "Kein Profil",
+      "defaultProfileResolvesTo": "Entspricht {{name}}",
+      "defaultProfileResolvesToAccessibility": "Standardprofil: {{name}}",
       "manageProfiles": "Profile verwalten",
       "noProfiles": "Noch keine Profile. Erstelle eins, um Umgebungsvariablen, MCP-Server und Fähigkeiten hinzuzufügen.",
       "advancedConfig": "Erweiterte Konfiguration",
       "advancedConfigDescription": "Gilt für diese Sitzung. Als Profil gespeichert bleibt sie für das nächste Mal erhalten.",
       "saveAsProfile": "Als Profil speichern",
       "saveProfileDescription": "Speichere die aktuellen Umgebungsvariablen und Setup-Befehle als wiederverwendbares Profil.",
-      "profileSummary": "{{vars}} Umgebungsvariablen · {{commands}} Setup-Befehle",
       "profileSaved": "Profil „{{name}}“ gespeichert",
       "organizationProfiles": "Organisationsprofile",
       "personalProfiles": "Persönliche Profile",
@@ -2712,6 +2716,9 @@
       "gitlabDescription": "Merge-Requests mobil prüfen",
       "bitbucketOrgOnlyDescription": "Wechsle das Konto oben zu einer Organisation, um deren Pull-Requests in Bitbucket zu prüfen.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Diesem Konto ist noch keine Organisation zugeordnet. Du kannst Bitbucket-Pull-Requests prüfen, sobald du eine Organisation erstellst oder einer beitrittst.",
+      "gitlabReconnectAdminOnlyDescription": "Bitte einen Inhaber, Admin oder Abrechnungsmanager, sie wiederherzustellen.",
+      "bitbucketNotConnectedTitle": "Bitbucket ist nicht verbunden",
+      "bitbucketAdminOnlyDescription": "Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen.",
       "contextLine": "Für {{organization}}",
       "contextLinePersonal": "Für den persönlichen Bereich"
     },
@@ -2943,6 +2950,7 @@
     "installKiloGitHubApp": "GitHub-App von Kilo installieren",
     "merge": {
       "merge": "Zusammenführen",
+      "mergeTitle": "Zusammenführen",
       "mergeNow": "Jetzt zusammenführen",
       "mergePullRequest": "Pull-Request zusammenführen",
       "mergeTermTitle": "{{term}} zusammenführen",

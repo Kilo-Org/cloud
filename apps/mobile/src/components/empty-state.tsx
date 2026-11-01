@@ -28,6 +28,10 @@ type EmptyStateProps = {
   refreshControl?: ScrollViewProps['refreshControl'];
   /** Overrides the icon bubble's container classes (size/shape/background). Defaults to the card-style bubble. */
   iconContainerClassName?: string;
+  /** Overrides the glyph color. Defaults to the muted token, which reads a step
+   *  dimmer on a near-black dark tile than on the light one; a caller that keeps
+   *  the illustration as visible as its light cell passes its own token. */
+  iconColor?: string;
   iconSize?: number;
   iconStrokeWidth?: number;
   /** Set to 'header' when the title acts as the screen's heading (QueryError does). */
@@ -64,6 +68,7 @@ function EmptyStateBody({
   placement,
   compact: compactOverride,
   iconContainerClassName = DEFAULT_ICON_CONTAINER_CLASS,
+  iconColor,
   iconSize = 24,
   iconStrokeWidth = 1.5,
   titleAccessibilityRole,
@@ -100,7 +105,11 @@ function EmptyStateBody({
     >
       {compact ? null : (
         <View className={cn('items-center justify-center', iconContainerClassName)}>
-          <Icon size={iconSize} color={colors.mutedForeground} strokeWidth={iconStrokeWidth} />
+          <Icon
+            size={iconSize}
+            color={iconColor ?? colors.mutedForeground}
+            strokeWidth={iconStrokeWidth}
+          />
         </View>
       )}
       <View className="items-center gap-1">

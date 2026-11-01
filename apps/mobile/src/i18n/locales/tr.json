@@ -889,7 +889,9 @@
     "instructions": {
       "title": "Özel talimatlar",
       "deprecation": "Özel talimatlar özelliğinin kullanımdan kaldırılması planlanıyor. Bu yönergeleri depondaki bir REVIEW.md dosyasına taşı.",
-      "placeholder": "örn. Hata işleme kurallarımıza uy…"
+      "placeholder": "örn. Hata işleme kurallarımıza uy…",
+      "clearTitle": "Özel talimatlar kaldırılsın mı?",
+      "clearMessage": "Boş bir alanı kaydetmek, bu inceleyici için depolanan özel talimatları siler."
     },
     "repos": {
       "unavailable": "Depolara erişilemiyor. Bitbucket kurulumunu kilo.ai üzerinden tamamla.",
@@ -965,7 +967,7 @@
       "bitbucketError": "Bitbucket kurulumu açılamadı. Lütfen tekrar dene."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · Oluşturan: {{author}}",
+      "byline": "#{{number}} · Oluşturan: {{author}}",
       "cancelMessage": "Devam eden kod incelemesi durdurulacak.",
       "cancelReview": "İncelemeyi iptal et",
       "cancelTitle": "İnceleme iptal edilsin mi?",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "Tüm alanlar",
-      "customInstructions": "Özel talimatlar",
       "focusAreas": "Odak alanları",
       "nSelected": "{{displayCount}} seçili",
       "proposedReviewMdGuidance": "Önerilen REVIEW.md yönergeleri",
       "reviewStyle": "İnceleme stili",
-      "set": "Belirlendi"
+      "set": "Belirlendi",
+      "notSet": "Belirlenmedi"
     },
     "updateFailed": "Kod inceleyici güncellenemedi.",
     "configSaveFailed": "İnceleme ayarları kaydedilemedi.",
@@ -1534,7 +1536,8 @@
       "actionBlocked": "Bu işlem tamamlanamadı. Yeniden denemeden önce sorunun düzeltilmesi gerekiyor.",
       "syncNoRepositories": "Eşitleme kapsamında hiçbir depo yok. Güvenlik ajanının izleyeceği depoları seç, ardından yeniden eşitle.",
       "syncIntegrationInactive": "Güvenlik ajanının GitHub bağlantısı etkin değil. Kilo GitHub uygulamasını yeniden bağla, ardından yeniden eşitle.",
-      "syncMissingPermission": "Kilo GitHub uygulaması güvenlik açığı uyarılarını okuyamıyor. Bu izni GitHub'da ver, ardından yeniden eşitle."
+      "syncMissingPermission": "Kilo GitHub uygulaması güvenlik açığı uyarılarını okuyamıyor. Bu izni GitHub'da ver, ardından yeniden eşitle.",
+      "configConflict": "Güvenlik ajanının ayarları başka bir yerde değiştirildi. En son ayarları gözden geçirip yeniden kaydet."
     },
     "analysisState": {
       "queued": "Analiz kuyruğa alındı",
@@ -1841,13 +1844,14 @@
       "forkFilesUnchangedOnComputer": "Bu bilgisayardaki dosyalar değiştirilmez.",
       "pickProfile": "Bir profil seç",
       "noProfile": "Profil yok",
+      "defaultProfileResolvesTo": "Şu an {{name}} profiline karşılık gelir",
+      "defaultProfileResolvesToAccessibility": "Varsayılan profil: {{name}}",
       "manageProfiles": "Profilleri yönet",
       "noProfiles": "Henüz profil yok. Ortam değişkenleri, MCP sunucuları ve beceriler eklemek için bir tane oluşturun.",
       "advancedConfig": "Gelişmiş Yapılandırma",
       "advancedConfigDescription": "Bu oturum için geçerlidir. Profil olarak kaydetmek bir sonraki sefer için saklar.",
       "saveAsProfile": "Profil olarak kaydet",
       "saveProfileDescription": "Geçerli ortam değişkenlerini ve kurulum komutlarını yeniden kullanılabilir bir profil olarak kaydedin.",
-      "profileSummary": "{{vars}} ortam değişkenleri · {{commands}} kurulum komutları",
       "profileSaved": "\"{{name}}\" profili kaydedildi",
       "organizationProfiles": "Organizasyon Profilleri",
       "personalProfiles": "Kişisel Profiller",
@@ -2712,6 +2716,9 @@
       "gitlabDescription": "Birleştirme isteklerini mobilde incele",
       "bitbucketOrgOnlyDescription": "Yukarıdaki hesabı bir kuruluşa geçir, onun Bitbucket çekme isteklerini gözden geçirmek için.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabın henüz bir kuruluşu yok. Bitbucket çekme isteklerini, bir kuruluş oluşturduktan ya da birine katıldıktan sonra gözden geçirebilirsin.",
+      "gitlabReconnectAdminOnlyDescription": "Yeniden bağlaması için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun.",
+      "bitbucketNotConnectedTitle": "Bitbucket bağlı değil",
+      "bitbucketAdminOnlyDescription": "Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
       "contextLine": "{{organization}} için",
       "contextLinePersonal": "Kişisel hesabınız için"
     },
@@ -2943,6 +2950,7 @@
     "installKiloGitHubApp": "Kilo GitHub uygulamasını yükle",
     "merge": {
       "merge": "Birleştirme",
+      "mergeTitle": "Birleştirme",
       "mergeNow": "Şimdi birleştir",
       "mergePullRequest": "Çekme isteğini birleştirme",
       "mergeTermTitle": "{{term}}ni birleştirme",

@@ -410,6 +410,7 @@
     "connectionExpired": "Veza sa GitHub nalogom je istekla.",
     "merge": {
       "merge": "Spajanje",
+      "mergeTitle": "Spajanje",
       "mergeNow": "Spoji sada",
       "mergePullRequest": "Spajanje zahteva",
       "mergeTermTitle": "Spoji {{term}}",
@@ -697,6 +698,9 @@
       "gitlabDescription": "Pregledaj merge requeste na mobilnom uređaju",
       "bitbucketOrgOnlyDescription": "Prebaci nalog gore na organizaciju da pregledaš njene zahteve za spajanje na Bitbucktu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj nalog još nema organizacije. Zahteve za spajanje na Bitbucktu možeš pregledati kada kreiraš ili se pridružiš organizaciji.",
+      "gitlabReconnectAdminOnlyDescription": "Zamoli vlasnika organizacije, administratora ili menadžera za naplatu da ga ponovo poveže.",
+      "bitbucketNotConnectedTitle": "Bitbucket nije povezan",
+      "bitbucketAdminOnlyDescription": "Samo vlasnici organizacije, administratori i menadžeri naplate mogu da ga povežu.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za lični nalog"
     },
@@ -1437,7 +1441,9 @@
     "instructions": {
       "title": "Prilagođena uputstva",
       "deprecation": "Planirano je ukidanje prilagođenih uputstava. Premesti ove smernice u datoteku REVIEW.md u svom repozitorijumu.",
-      "placeholder": "npr. primeni naše konvencije za obradu grešaka…"
+      "placeholder": "npr. primeni naše konvencije za obradu grešaka…",
+      "clearTitle": "Ukloniti prilagođena uputstva?",
+      "clearMessage": "Čuvanjem praznog polja brišu se prilagođena uputstva sačuvana za ovog recenzenta."
     },
     "repos": {
       "unavailable": "Repozitorijumi nisu dostupni. Završi podešavanje za Bitbucket na kilo.ai.",
@@ -1472,7 +1478,7 @@
       "fixSettings": "Popravi podešavanja",
       "couldNotLoad": "Nije moguće učitati pregled.",
       "couldNotGetLatest": "Nije moguće učitati najnovije podatke.",
-      "byline": "{{repo}} #{{number}} · Autor: {{author}}",
+      "byline": "#{{number}} · Autor: {{author}}",
       "noFindings": "Nema nalaza.",
       "findingsUnavailable": "Rezultati nisu dostupni jer ovaj pregled nije uspeo.",
       "findingsInProgress": "Ovaj pregled je još u toku. Nalazi će se pojaviti ovde kada se završi.",
@@ -1624,8 +1630,8 @@
       "reviewStyle": "Stil pregleda",
       "focusAreas": "Oblasti pregleda",
       "allAreas": "Sve oblasti",
-      "customInstructions": "Prilagođena uputstva",
       "set": "Podešeno",
+      "notSet": "Nije podešeno",
       "nSelected": "{{displayCount}} izabrano",
       "proposedReviewMdGuidance": "Predložene smernice za REVIEW.md"
     },
@@ -2093,7 +2099,8 @@
       "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem mora biti rešen pre nego što pokušaš ponovo.",
       "syncNoRepositories": "Nijedan repozitorijum nije u opsegu sinhronizacije. Izaberite repozitorijume koje Bezbednosni agent nadgleda, pa ponovo sinhronizujte.",
       "syncIntegrationInactive": "GitHub veza za Bezbednosni agent nije aktivna. Ponovo povežite Kilo GitHub App, zatim ponovo sinhronizujte.",
-      "syncMissingPermission": "Kilo GitHub aplikacija ne može da čita upozorenja o ranjivostima. Dodeli to ovlašćenje na GitHub-u, pa sinhronizuj ponovo."
+      "syncMissingPermission": "Kilo GitHub aplikacija ne može da čita upozorenja o ranjivostima. Dodeli to ovlašćenje na GitHub-u, pa sinhronizuj ponovo.",
+      "configConflict": "Podešavanja Bezbednosnog agenta promenjena su na drugom mestu. Pregledaj najnovija podešavanja i ponovo sačuvaj."
     },
     "analysisState": {
       "queued": "Analiza u redu čekanja",
@@ -2404,13 +2411,14 @@
       "forkFilesUnchangedOnComputer": "Fajlovi na ovom računaru se ne menjaju.",
       "pickProfile": "Izaberite profil",
       "noProfile": "Nema profila",
+      "defaultProfileResolvesTo": "Trenutno podešeno na {{name}}",
+      "defaultProfileResolvesToAccessibility": "Podrazumevani profil: {{name}}",
       "manageProfiles": "Upravljajte profilima",
       "noProfiles": "Još nema profila. Napravite jedan da biste dodali promenljive okruženja, MCP servere i veštine.",
       "advancedConfig": "Napredna konfiguracija",
       "advancedConfigDescription": "Važi za ovu sesiju. Čuvanje kao profil ostaje za sledeći put.",
       "saveAsProfile": "Sačuvaj kao profil",
       "saveProfileDescription": "Sačuvajte trenutne promenljive okruženja i komande za podešavanje kao profil za višekratnu upotrebu.",
-      "profileSummary": "{{vars}} promenljivih okruženja · {{commands}} komandi za podešavanje",
       "profileSaved": "Profil \"{{name}}\" je sačuvan",
       "organizationProfiles": "Profili organizacije",
       "personalProfiles": "Lični profili",

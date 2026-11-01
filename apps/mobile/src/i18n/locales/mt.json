@@ -424,6 +424,7 @@
     "connectionExpired": "Il-konnessjoni ma' GitHub skadiet.",
     "merge": {
       "merge": "Għaqda",
+      "mergeTitle": "Għaqda",
       "mergeNow": "Għaqqad issa",
       "mergePullRequest": "Għaqda tat-talba",
       "mergeTermTitle": "Għaqda tal-{{term}}",
@@ -727,6 +728,9 @@
       "gitlabDescription": "Irrevedi l-merge requests fuq il-mowbajl",
       "bitbucketOrgOnlyDescription": "Ibdel il-kont ta' fuq għal organizzazzjoni biex tirrevedi l-PRs Bitbucket tagħha.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Dan il-kont m'għandux organizzazzjonijiet għadu. Tista' tirrevedi l-PRs Bitbucket ladarba toħloq organizzazzjoni jew tingħaqad ma' waħda.",
+      "gitlabReconnectAdminOnlyDescription": "Itlob lis-sid ta' organizzazzjoni, lill-amministratur jew lill-maniġer tal-ħlasijiet biex jikkonnettjaha.",
+      "bitbucketNotConnectedTitle": "Bitbucket mhux konness",
+      "bitbucketAdminOnlyDescription": "Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh.",
       "contextLine": "Għal {{organization}}",
       "contextLinePersonal": "Għall-kont personali tiegħek"
     },
@@ -1481,7 +1485,9 @@
     "instructions": {
       "title": "Struzzjonijiet personalizzati",
       "deprecation": "Il-funzjoni tal-istruzzjonijiet personalizzati se titneħħa fil-futur. Minflok, mexxi dawn il-linji gwida f'fajl REVIEW.md fir-repożitorju tiegħek.",
-      "placeholder": "eż. Infurza l-konvenzjonijiet tagħna għall-immaniġġjar tal-iżbalji…"
+      "placeholder": "eż. Infurza l-konvenzjonijiet tagħna għall-immaniġġjar tal-iżbalji…",
+      "clearTitle": "Trid tneħħi l-istruzzjonijiet personalizzati?",
+      "clearMessage": "Jekk tissejvja kampt vojt, tiddelimina l-istruzzjonijiet personalizzati maħżuna għal dan ir-reviżur."
     },
     "repos": {
       "unavailable": "Ir-repożitorji mhux disponibbli. Lesti l-konfigurazzjoni ta' Bitbucket fuq kilo.ai.",
@@ -1516,7 +1522,7 @@
       "fixSettings": "Irranġa s-settings",
       "couldNotLoad": "Ma setgħetx titgħabba r-reviżjoni.",
       "couldNotGetLatest": "Ma setgħetx tinkiseb l-aħħar dejta.",
-      "byline": "{{repo}} #{{number}} minn {{author}}",
+      "byline": "#{{number}} minn {{author}}",
       "noFindings": "M'hemm l-ebda sejba.",
       "findingsUnavailable": "Ir-riżultati mhumiex disponibbli għax din ir-reviżjoni falliet.",
       "findingsInProgress": "Din ir-reviżjoni għadha għaddejja. Is-sejbiet jidhru hawn meta tispiċċa.",
@@ -1668,8 +1674,8 @@
       "reviewStyle": "Stil ta' reviżjoni",
       "focusAreas": "Oqsma ta' attenzjoni",
       "allAreas": "L-oqsma kollha",
-      "customInstructions": "Struzzjonijiet personalizzati",
       "set": "Issettjat",
+      "notSet": "Mhux issettjat",
       "nSelected": "{{displayCount}} magħżula",
       "proposedReviewMdGuidance": "Linji gwida proposti għal REVIEW.md"
     },
@@ -2159,7 +2165,8 @@
       "actionBlocked": "Ma stajniex nikkompletaw din l-azzjoni. Il-problema trid titfixxa qabel ma tista' terġa' tipprova.",
       "syncNoRepositories": "M'hemm l-ebda repożitorju fl-ambitu tas-sinkronizzazzjoni. Agħżel ir-repożitorji li jimmonitorja l-Aġent tas-sigurtà, imbagħad erġa' sinkronizza.",
       "syncIntegrationInactive": "Il-konnessjoni ma' GitHub għall-Aġent tas-sigurtà mhijiex attiva. Erġa' qabbad il-Kilo GitHub App, imbagħad erġa' sinkronizza.",
-      "syncMissingPermission": "L-app ta' Kilo fuq GitHub ma tistax taqra l-vulnerability alerts. Agħti dik il-permess f'GitHub, imbagħad erġa' sinkronizza."
+      "syncMissingPermission": "L-app ta' Kilo fuq GitHub ma tistax taqra l-vulnerability alerts. Agħti dik il-permess f'GitHub, imbagħad erġa' sinkronizza.",
+      "configConflict": "L-issettjar tal-aġent tas-sigurtà nbidlu x'imkien ieħor. Erġa' eżamina l-issettjar l-aktar riċenti u ssejvja mill-ġdid."
     },
     "analysisState": {
       "queued": "Analiżi fil-kju",
@@ -2478,13 +2485,14 @@
       "forkFilesUnchangedOnComputer": "Il-fajls fuq dan il-kompjuter ma jinbidlux.",
       "pickProfile": "Agħżel profil",
       "noProfile": "Ebda profil",
+      "defaultProfileResolvesTo": "Jikkorrispondi għal {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profil default: {{name}}",
       "manageProfiles": "Immaniġġja profili",
       "noProfiles": "Għadu l-ebda profil. Oħloq wieħed biex iżżid varjabbli ambjentali, servers MCP, u ħiliet.",
       "advancedConfig": "Konfigurazzjoni Avvanzata",
       "advancedConfigDescription": "Japplika għal din is-sessjoni. Is-salvataġġ bħala profil iżommu għall-ħin li jmiss.",
       "saveAsProfile": "Ħlief bħala Profil",
       "saveProfileDescription": "Issejvja l-varjabbli ambjentali attwali u l-kmandi tas-setup bħala profil li jista 'jerġa' jintuża.",
-      "profileSummary": "{{vars}} varjabbli ambjentali · {{commands}} kmandi tas-setup",
       "profileSaved": "Profil \"{{name}}\" salvat",
       "organizationProfiles": "Profili tal-Organizzazzjoni",
       "personalProfiles": "Profili Personali",

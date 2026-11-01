@@ -403,6 +403,7 @@
     "connectionExpired": "Kua pau te wā o te hononga GitHub.",
     "merge": {
       "merge": "Whakakotahitanga",
+      "mergeTitle": "Whakakotahitanga",
       "mergeNow": "Whakakotahitia ināianei",
       "mergePullRequest": "Whakakotahi tono kume",
       "mergeTermTitle": "Whakakotahi {{term}}",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Arotakengia ngā tono whakakotahi mā te pūrere pūkoro",
       "bitbucketOrgOnlyDescription": "Whakawhiti te pūkete kei runga ake nei ki tētahi whakahaere kia arotakehia ōna tono kume Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Kāore anake he whakahaere ō tēnei pūkete. Ka arotakehia ngā tono kume Bitbucket inā waihanga rānei koe i tētahi whakahaere, inā uru rānei koe ki tētahi.",
+      "gitlabReconnectAdminOnlyDescription": "Tonoa tētahi Rangatira, Kaiwhakahaere, Kaiwhakahaere utu rānei o te whakahaere kia honoa anō ia.",
+      "bitbucketNotConnectedTitle": "Kāore anō kia honoa a Bitbucket",
+      "bitbucketAdminOnlyDescription": "Ko ngā rangatira o te rōpū, ngā kaiwhakahaere me ngā kaiwhakahaere utu anake ka āhei ki te hono.",
       "contextLine": "Mō {{organization}}",
       "contextLinePersonal": "Mō tō whaiaro"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Ngā tohutohu ake",
       "deprecation": "Ka whakamutua te tautoko mō ngā tohutohu ritenga ā tōna wā. Nekehia ēnei aratohu ki tētahi kōnae REVIEW.md i tō pūranga.",
-      "placeholder": "hei tauira, kia ū ki ā mātou tikanga whakahaere hapa…"
+      "placeholder": "hei tauira, kia ū ki ā mātou tikanga whakahaere hapa…",
+      "clearTitle": "Tangohia ngā tohutohu ake?",
+      "clearMessage": "Ki te tiakia he āpure tuatau, ka mukua ngā tohutohu ake kua penapenatia mō tēnei kaiarotake."
     },
     "repos": {
       "unavailable": "Kāore e wātea ana ngā pūranga — whakaotia te whakarite i Bitbucket i kilo.ai.",
@@ -1450,7 +1456,7 @@
       "fixSettings": "Whakatikahia ngā tautuhinga",
       "couldNotLoad": "Kāore i taea te uta i te arotake.",
       "couldNotGetLatest": "Kāore i taea te tiki i ngā mōhiohio hou rawa.",
-      "byline": "{{repo}} #{{number}} nā {{author}}",
+      "byline": "#{{number}} nā {{author}}",
       "noFindings": "Kāore he kitenga.",
       "findingsUnavailable": "Kāore ngā hua i te wātea nā te mea i rahua tēnei arotake.",
       "findingsInProgress": "Kei te haere tonu tēnei arotake. Ka puta ngā kitenga i konei ina oti.",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "Te āhua arotake",
       "focusAreas": "Ngā wāhanga arotahi",
       "allAreas": "Ngā wāhanga katoa",
-      "customInstructions": "Ngā tohutohu ake",
       "set": "Kua whakaritea",
+      "notSet": "Kāore i whakaritea",
       "nSelected": "{{displayCount}} kua kōwhiria",
       "proposedReviewMdGuidance": "Ngā aratohu REVIEW.md e tūtohutia ana"
     },
@@ -2060,7 +2066,8 @@
       "actionBlocked": "Kāore i taea te oti i tēnei mahi. Me whakatika te raru i te tuatahi.",
       "syncNoRepositories": "Kāore he pūranga waehere i roto i te awhe tukutuku. Kōwhiria ngā pūranga waehere e aroturukitia ana e te Kaiāwhina haumarutanga, kātahi ka tukutuku anō.",
       "syncIntegrationInactive": "Kāore te hononga GitHub mō te Kaiāwhina haumarutanga i te hohe. Honoa anō te Taupānga GitHub a Kilo, kātahi ka tukutuku anō.",
-      "syncMissingPermission": "Kāore te Taupānga GitHub a Kilo e taea te pānui i ngā whakamōhiotanga whakaraerae. Tukuna tērā whakaaetanga i GitHub, kātahi ka tukutuku anō."
+      "syncMissingPermission": "Kāore te Taupānga GitHub a Kilo e taea te pānui i ngā whakamōhiotanga whakaraerae. Tukuna tērā whakaaetanga i GitHub, kātahi ka tukutuku anō.",
+      "configConflict": "Kua hurihia ngā tautuhinga o te Kaiāwhina haumarutanga ki wāhi kē. Arotakehia ngā tautuhinga hou, ka tiaki anō."
     },
     "analysisState": {
       "queued": "Kei te rārangi tatari te tātari",
@@ -2367,13 +2374,14 @@
       "forkFilesUnchangedOnComputer": "Kāore e panonihia ngā kōnae i tēnei rorohiko.",
       "pickProfile": "Tīpakohia he kōtaha",
       "noProfile": "Kāore he kōtaha",
+      "defaultProfileResolvesTo": "E hāngai ana ki {{name}}",
+      "defaultProfileResolvesToAccessibility": "Kōtaha taunoa: {{name}}",
       "manageProfiles": "Whakahaere pūkete",
       "noProfiles": "Karekau he pūkete. Waihangahia tetahi hei taapiri i nga taurangi taiao, nga tūmau MCP, me nga pukenga.",
       "advancedConfig": "Whirihoranga Arā Atu Anō",
       "advancedConfigDescription": "E hāngai ana ki tēnei wātū. Mā te tiaki hei kōtaha ka pupuri mō tērā wā.",
       "saveAsProfile": "Tiaki hei Kōtaha",
       "saveProfileDescription": "Tiakina nga taurangi taiao o naianei me nga whakahau tatūnga hei kōtaha ka taea te whakamahi.",
-      "profileSummary": "{{vars}} taurangi taiao · {{commands}} whakahau tatūnga",
       "profileSaved": "Kōtaha \"{{name}}\" kua tiakina",
       "organizationProfiles": "Ngā Kōtaha Whakahaere",
       "personalProfiles": "Whaiaro Whaiaro",

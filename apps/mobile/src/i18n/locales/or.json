@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub ସଂଯୋଗର ଅବଧି ଶେଷ ହୋଇଛି।",
     "merge": {
       "merge": "ମର୍ଜ୍",
+      "mergeTitle": "ମର୍ଜ୍",
       "mergeNow": "ଏବେ ମର୍ଜ୍ କରନ୍ତୁ",
       "mergePullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ମର୍ଜ୍",
       "mergeTermTitle": "{{term}} ମର୍ଜ୍",
@@ -682,6 +683,9 @@
       "gitlabDescription": "ମୋବାଇଲରେ ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ସମୀକ୍ଷା କରନ୍ତୁ",
       "bitbucketOrgOnlyDescription": "ଏହାର Bitbucket ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକୁ ସମୀକ୍ଷା କରିବାକୁ ଉପର ଖାତାକୁ ଏକ ସଂଗଠନକୁ ବଦଳାନ୍ତୁ।",
       "bitbucketOrgOnlyNoOrganizationDescription": "ଏହି ଖାତାରେ ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସଂଗଠନ ନାହିଁ। ଆପଣ ଏକ ସଂଗଠନ ସୃଷ୍ଟି କଲାପରେ କିମ୍ବା ଯୋଗ ଦେଲାପରେ Bitbucket ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକ ସମୀକ୍ଷା କରାଯାଇପାରିବ।",
+      "gitlabReconnectAdminOnlyDescription": "ଏହାକୁ ପୁଣି ସଂଯୋଗ କରିବା ପାଇଁ ଜଣେ ସଂଗଠନ ମାଲିକ, ପ୍ରଶାସକ କିମ୍ବା ବିଲିଂ ପରିଚାଳକଙ୍କୁ ଅନୁରୋଧ କରନ୍ତୁ।",
+      "bitbucketNotConnectedTitle": "Bitbucket ସଂଯୋଗ ହୋଇନାହିଁ",
+      "bitbucketAdminOnlyDescription": "କେବଳ ସଂଗଠନର ମାଲିକ, ପ୍ରଶାସକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଏହାକୁ ସଂଯୋଗ କରିପାରିବେ।",
       "contextLine": "{{organization}} ପାଇଁ",
       "contextLinePersonal": "ଆପଣଙ୍କ ବ୍ୟକ୍ତିଗତ ଖାତା ପାଇଁ"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "ନିଜସ୍ୱ ନିର୍ଦ୍ଦେଶ",
       "deprecation": "ନିଜସ୍ୱ ନିର୍ଦ୍ଦେଶ ସୁବିଧାର ବ୍ୟବହାର ବନ୍ଦ କରିବାକୁ ଯୋଜନା ଅଛି। ଏହା ବଦଳରେ ଏହି ନିର୍ଦ୍ଦେଶାବଳୀ ଆପଣଙ୍କ ରିପୋଜିଟୋରୀର ଏକ REVIEW.md ଫାଇଲ୍‌ରେ ରଖନ୍ତୁ।",
-      "placeholder": "ଉଦାହରଣ: ତ୍ରୁଟି ପରିଚାଳନା ପାଇଁ ଆମ ନିୟମ ମାନନ୍ତୁ…"
+      "placeholder": "ଉଦାହରଣ: ତ୍ରୁଟି ପରିଚାଳନା ପାଇଁ ଆମ ନିୟମ ମାନନ୍ତୁ…",
+      "clearTitle": "ନିଜସ୍ୱ ନିର୍ଦ୍ଦେଶ ହଟାଇବେ କି?",
+      "clearMessage": "ଖାଲି କ୍ଷେତ୍ର ସଞ୍ଚୟ କଲେ ଏହି ସମୀକ୍ଷକ ପାଇଁ ସଂରକ୍ଷିତ ନିଜସ୍ୱ ନିର୍ଦ୍ଦେଶ ହଟିଯିବ।"
     },
     "repos": {
       "unavailable": "ରିପୋଜିଟୋରୀ ଉପଲବ୍ଧ ନାହିଁ — kilo.ai ରେ Bitbucket ସେଟଅପ୍ ସମାପ୍ତ କରନ୍ତୁ।",
@@ -1450,7 +1456,7 @@
       "fixSettings": "ସେଟିଂସ୍ ଠିକ୍ କରନ୍ତୁ",
       "couldNotLoad": "ସମୀକ୍ଷା ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotGetLatest": "ସବୁଠାରୁ ନୂଆ ତଥ୍ୟ ଆଣିହେଲା ନାହିଁ।",
-      "byline": "{{repo}} #{{number}} · ଲେଖକ: {{author}}",
+      "byline": "#{{number}} · ଲେଖକ: {{author}}",
       "noFindings": "କୌଣସି ସମସ୍ୟା ଚିହ୍ନଟ ହୋଇନାହିଁ।",
       "findingsUnavailable": "ଏହି ସମୀକ୍ଷା ବିଫଳ ହୋଇଥିବାରୁ ଫଳାଫଳ ଉପଲବ୍ଧ ନାହିଁ।",
       "findingsInProgress": "ଏହି ସମୀକ୍ଷା ଏପର୍ଯ୍ୟନ୍ତ ଚାଲୁଅଛି। ଏହା ସମ୍ପୂର୍ଣ୍ଣ ହେଲେ ସମସ୍ୟା ଚିହ୍ନଟ ଏଠାରେ ଦେଖାଯିବ।",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "ସମୀକ୍ଷା ଶୈଳୀ",
       "focusAreas": "ଧ୍ୟାନ ଦେବାର କ୍ଷେତ୍ର",
       "allAreas": "ସମସ୍ତ କ୍ଷେତ୍ର",
-      "customInstructions": "ନିଜସ୍ୱ ନିର୍ଦ୍ଦେଶ",
       "set": "ନିର୍ଦ୍ଧାରିତ",
+      "notSet": "ନିର୍ଦ୍ଧାରିତ ନୁହେଁ",
       "nSelected": "{{displayCount}}ଟି ଚୟନ କରାଯାଇଛି",
       "proposedReviewMdGuidance": "ପ୍ରସ୍ତାବିତ REVIEW.md ନିର୍ଦ୍ଦେଶାବଳୀ"
     },
@@ -2060,7 +2066,8 @@
       "actionBlocked": "ଏହି କାର୍ଯ୍ୟଟି ସମ୍ପୂର୍ଣ୍ଣ କରିପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବା ପୂର୍ବରୁ ସମସ୍ୟାଟି ସମାଧାନ କରିବାକୁ ହେବ।",
       "syncNoRepositories": "ସିଙ୍କ୍ ପରିସରରେ କୌଣସି ରିପୋଜିଟୋରୀ ନାହିଁ। ସୁରକ୍ଷା ଏଜେଣ୍ଟ ଯେଉଁ ରିପୋଜିଟୋରୀଗୁଡ଼ିକୁ ନଜରରେ ରଖେ ସେଗୁଡ଼ିକୁ ବାଛନ୍ତୁ, ତାପରେ ପୁଣି ସିଙ୍କ୍ କରନ୍ତୁ।",
       "syncIntegrationInactive": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ ପାଇଁ GitHub ସଂଯୋଗ ସକ୍ରିୟ ନାହିଁ। Kilo GitHub App କୁ ପୁଣି ସଂଯୋଗ କରନ୍ତୁ, ତାପରେ ପୁଣି ସିଙ୍କ୍ କରନ୍ତୁ।",
-      "syncMissingPermission": "Kilo GitHub App vulnerability alerts ପଢ଼ିପାରିବ ନାହିଁ। GitHub ରେ ସେହି ଅନୁମତି ଦିଅନ୍ତୁ, ତାପରେ ପୁଣି ସିଙ୍କ୍ କରନ୍ତୁ।"
+      "syncMissingPermission": "Kilo GitHub App vulnerability alerts ପଢ଼ିପାରିବ ନାହିଁ। GitHub ରେ ସେହି ଅନୁମତି ଦିଅନ୍ତୁ, ତାପରେ ପୁଣି ସିଙ୍କ୍ କରନ୍ତୁ।",
+      "configConflict": "ସୁରକ୍ଷା ଏଜେଣ୍ଟର ସେଟିଂସ ଅନ୍ୟଠାରେ ବଦଳିଛି। ସାମ୍ପ୍ରତିକ ସେଟିଂସ ସମୀକ୍ଷା କରି ପୁଣି ସଂରକ୍ଷଣ କରନ୍ତୁ।"
     },
     "analysisState": {
       "queued": "ବିଶ୍ଳେଷଣ ଅପେକ୍ଷା ତାଲିକାରେ",
@@ -2367,13 +2374,14 @@
       "forkFilesUnchangedOnComputer": "ଏହି କମ୍ପ୍ୟୁଟରରେ ଥିବା ଫାଇଲଗୁଡ଼ିକ ବଦଳାଯାଏ ନାହିଁ।",
       "pickProfile": "ଏକ ପ୍ରୋଫାଇଲ୍ ବାଛନ୍ତୁ।",
       "noProfile": "କୌଣସି ପ୍ରୋଫାଇଲ୍ ନାହିଁ।",
+      "defaultProfileResolvesTo": "{{name}} ଅଟେ",
+      "defaultProfileResolvesToAccessibility": "ଡିଫଲ୍ଟ ପ୍ରୋଫାଇଲ୍: {{name}}",
       "manageProfiles": "ପ୍ରୋଫାଇଲ୍ ପରିଚାଳନା କରନ୍ତୁ।",
       "noProfiles": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ପ୍ରୋଫାଇଲ୍ ନାହିଁ। ପରିବେଶ ଭେରିଏବଲ୍, MCP ସର୍ଭର, ଏବଂ କୌଶଳ ଯୋଗ କରିବାକୁ ଗୋଟିଏ ସୃଷ୍ଟି କରନ୍ତୁ।",
       "advancedConfig": "ଉନ୍ନତ ବିନ୍ୟାସ",
       "advancedConfigDescription": "ଏହା ଏହି ସେସନ୍ ପାଇଁ ପ୍ରଯୁଜ୍ୟ। ପ୍ରୋଫାଇଲ୍ ଭାବରେ ସେଭ୍ କଲେ ଏହା ପରବର୍ତ୍ତୀ ଥର ପାଇଁ ରହେ।",
       "saveAsProfile": "ପ୍ରୋଫାଇଲ୍ ଭାବରେ ସେଭ୍ କରନ୍ତୁ।",
       "saveProfileDescription": "ପୁନଃ ବ୍ୟବହାର ଯୋଗ୍ୟ ପ୍ରୋଫାଇଲ୍ ଭାବରେ ସାମ୍ପ୍ରତିକ ପରିବେଶ ଭେରିଏବଲ୍ ଏବଂ ସେଟଅପ୍ କମାଣ୍ଡଗୁଡ଼ିକୁ ସେଭ୍ କରନ୍ତୁ।",
-      "profileSummary": "{{vars}} ପରିବେଶ ଭେରିଏବଲ୍ · {{commands}} ସେଟଅପ୍ କମାଣ୍ଡ।",
       "profileSaved": "ପ୍ରୋଫାଇଲ୍ \"{{name}}\" ସଞ୍ଚୟ ହୋଇଛି।",
       "organizationProfiles": "ସଂଗଠନ ପ୍ରୋଫାଇଲ୍।",
       "personalProfiles": "ବ୍ୟକ୍ତିଗତ ପ୍ରୋଫାଇଲ୍।",

@@ -410,6 +410,7 @@
     "connectionExpired": "A ligação ao GitHub expirou.",
     "merge": {
       "merge": "Fusão",
+      "mergeTitle": "Fusão",
       "mergeNow": "Integrar agora",
       "mergePullRequest": "Integrar PR",
       "mergeTermTitle": "Integrar {{term}}",
@@ -697,6 +698,9 @@
       "gitlabDescription": "Rever merge requests no telemóvel",
       "bitbucketOrgOnlyDescription": "Muda a conta acima para uma organização para rever os respetivos PRs no Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta conta ainda não tem organizações. Os PRs do Bitbucket podem ser revistos depois de criares ou aderires a uma organização.",
+      "gitlabReconnectAdminOnlyDescription": "Peça a um proprietário, administrador ou gestor de faturação da organização que a volte a ligar.",
+      "bitbucketNotConnectedTitle": "O Bitbucket não está ligado",
+      "bitbucketAdminOnlyDescription": "Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para a sua conta pessoal"
     },
@@ -1437,7 +1441,9 @@
     "instructions": {
       "title": "Instruções personalizadas",
       "deprecation": "As instruções personalizadas vão ser descontinuadas. Transfere estas orientações para um ficheiro REVIEW.md no teu repositório.",
-      "placeholder": "por exemplo: exigir o cumprimento das nossas regras de tratamento de erros…"
+      "placeholder": "por exemplo: exigir o cumprimento das nossas regras de tratamento de erros…",
+      "clearTitle": "Remover instruções personalizadas?",
+      "clearMessage": "Ao guardares um campo vazio, eliminas as instruções personalizadas armazenadas para este revisor."
     },
     "repos": {
       "unavailable": "Os repositórios não estão disponíveis. Conclui a configuração do Bitbucket em kilo.ai.",
@@ -1472,7 +1478,7 @@
       "fixSettings": "Corrigir definições",
       "couldNotLoad": "Não foi possível carregar a revisão.",
       "couldNotGetLatest": "Não foi possível obter os dados mais recentes.",
-      "byline": "{{repo}} #{{number}} por {{author}}",
+      "byline": "#{{number}} por {{author}}",
       "noFindings": "Não foram detetadas ocorrências.",
       "findingsUnavailable": "Os resultados não estão disponíveis porque esta revisão falhou.",
       "findingsInProgress": "Esta revisão ainda está em curso. As ocorrências aparecem aqui quando terminar.",
@@ -1624,8 +1630,8 @@
       "reviewStyle": "Estilo de revisão",
       "focusAreas": "Áreas prioritárias",
       "allAreas": "Todas as áreas",
-      "customInstructions": "Instruções personalizadas",
       "set": "Definido",
+      "notSet": "Não definido",
       "nSelected": "{{displayCount}} selecionados",
       "proposedReviewMdGuidance": "Orientações propostas para o ficheiro REVIEW.md"
     },
@@ -2099,7 +2105,8 @@
       "actionBlocked": "Não foi possível concluir esta ação. O problema tem de ser resolvido antes de tentares novamente.",
       "syncNoRepositories": "Nenhum repositório está no escopo de sincronização. Escolha os repositórios que o Agente de segurança monitora e sincronize novamente.",
       "syncIntegrationInactive": "A conexão com o GitHub do Agente de segurança não está ativa. Reconecte o GitHub App do Kilo e sincronize novamente.",
-      "syncMissingPermission": "A aplicação do Kilo no GitHub não consegue ler os alertas de vulnerabilidade. Concede essa permissão no GitHub e sincroniza novamente."
+      "syncMissingPermission": "A aplicação do Kilo no GitHub não consegue ler os alertas de vulnerabilidade. Concede essa permissão no GitHub e sincroniza novamente.",
+      "configConflict": "As definições do agente de segurança foram alteradas noutro local. Revê as definições mais recentes e guarda novamente."
     },
     "analysisState": {
       "queued": "Análise na fila",
@@ -2410,13 +2417,14 @@
       "forkFilesUnchangedOnComputer": "Os ficheiros neste computador não são alterados.",
       "pickProfile": "Escolha um perfil",
       "noProfile": "Sem perfil",
+      "defaultProfileResolvesTo": "Corresponde a {{name}}",
+      "defaultProfileResolvesToAccessibility": "Perfil predefinido: {{name}}",
       "manageProfiles": "Gerir perfis",
       "noProfiles": "Ainda não há perfis. Crie um para adicionar variáveis de ambiente, servidores MCP e competências.",
       "advancedConfig": "Configuração avançada",
       "advancedConfigDescription": "Aplica-se a esta sessão. Guardar como perfil mantém-no para a próxima vez.",
       "saveAsProfile": "Guardar como perfil",
       "saveProfileDescription": "Guarde as variáveis de ambiente e os comandos de configuração atuais como um perfil reutilizável.",
-      "profileSummary": "{{vars}} variáveis de ambiente · {{commands}} comandos de configuração",
       "profileSaved": "Perfil \"{{name}}\" guardado",
       "organizationProfiles": "Perfis da organização",
       "personalProfiles": "Perfis pessoais",

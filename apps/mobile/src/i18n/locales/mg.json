@@ -403,6 +403,7 @@
     "connectionExpired": "Lany daty ny fifandraisana amin'ny GitHub.",
     "merge": {
       "merge": "Fampiraisana",
+      "mergeTitle": "Fampiraisana",
       "mergeNow": "Ampiraiso izao",
       "mergePullRequest": "Fampiraisana ny fangatahana",
       "mergeTermTitle": "Fampiraisana ny {{term}}",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Diniho amin'ny finday ny fangatahana fampiraisana",
       "bitbucketOrgOnlyDescription": "Ampifandraiso amin'ny fikambanana ny kaonty etsy ambony mba hijerena ny fangatahana fampiraisana Bitbucket'ny.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Mbola tsy manana fikambanana ity kaonty ity. Azonao jerena ny fangatahana fampiraisana Bitbucket rehefa mamorona na miditra fikambanana.",
+      "gitlabReconnectAdminOnlyDescription": "Mangataha ny Tompony, Mpitantana, na Mpitantana faktiora ao amin'ny fikambanana mba hampifandray azy indray.",
+      "bitbucketNotConnectedTitle": "Tsy mifandray ny Bitbucket",
+      "bitbucketAdminOnlyDescription": "Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy.",
       "contextLine": "Ho an'ny {{organization}}",
       "contextLinePersonal": "Ho an'ny kaontinao manokana"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Toromarika manokana",
       "deprecation": "Kasaina hatsahatra ny fampiasana torolalana manokana. Afindrao ao anaty rakitra REVIEW.md ao amin'ny tahirin-kaodinao ireo torolalana ireo.",
-      "placeholder": "ohatra: Fanarahana ny fitsipika momba ny fitantanana hadisoana…"
+      "placeholder": "ohatra: Fanarahana ny fitsipika momba ny fitantanana hadisoana…",
+      "clearTitle": "Esory ny toromarika manokana?",
+      "clearMessage": "Raha tahirizinao saha tsy misy votoaty, dia voafafa ny toromarika manokana voatahiry ho an'ity mpandinika ity."
     },
     "repos": {
       "unavailable": "Tsy azo ampiasaina ny tahirin-kaody. Vitao ao amin'ny kilo.ai ny fametrahana ny Bitbucket.",
@@ -1450,7 +1456,7 @@
       "fixSettings": "Amboary ny fikirana",
       "couldNotLoad": "Tsy nety nampidirina ny fanamarinana.",
       "couldNotGetLatest": "Tsy nety nalaina ny angona farany.",
-      "byline": "{{repo}} #{{number}} nataon'i {{author}}",
+      "byline": "#{{number}} nataon'i {{author}}",
       "noFindings": "Tsy misy olana hita.",
       "findingsUnavailable": "Tsy misy valiny azo jerena satria tsy nahomby ity fanamarinana ity.",
       "findingsInProgress": "Mbola mandeha ity fanamarinana ity. Hiseho eto ny olana hita rehefa vita izy.",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "Fomba fandinihana",
       "focusAreas": "Lafiny ifantohana",
       "allAreas": "Lafiny rehetra",
-      "customInstructions": "Toromarika manokana",
       "set": "Voafaritra",
+      "notSet": "Tsy voafaritra",
       "nSelected": "{{displayCount}} voafidy",
       "proposedReviewMdGuidance": "Torolalana naroso ho an'ny REVIEW.md"
     },
@@ -2066,7 +2072,8 @@
       "actionBlocked": "Tsy azo vitaina ity hetsika ity. Mila vahana aloha ny olana.",
       "syncNoRepositories": "Tsy misy depo ao amin'ny sehatry ny fampifanarahana. Safidio ny depo arovan'ny Mpanampy amin'ny fiarovana, dia mifanaraha indray.",
       "syncIntegrationInactive": "Tsy mavitrika ny fifandraisana amin'ny GitHub an'ny Mpanampy amin'ny fiarovana. Ampifandraiso indray ny Kilo GitHub App, dia avereno indray ny fampifanarahana.",
-      "syncMissingPermission": "Tsy afaka mamaky ny vulnerability alerts ny Kilo GitHub App. Omeo ao amin'ny GitHub io alalana io, dia avereno indray ny sync."
+      "syncMissingPermission": "Tsy afaka mamaky ny vulnerability alerts ny Kilo GitHub App. Omeo ao amin'ny GitHub io alalana io, dia avereno indray ny sync.",
+      "configConflict": "Niova tany an-kafa ny fandrindran'ny mpanampy amin'ny fiarovana. Jereo ny fandrindrana farany ary tehirizo indray."
     },
     "analysisState": {
       "queued": "Voalahatra ny famakafakana",
@@ -2373,13 +2380,14 @@
       "forkFilesUnchangedOnComputer": "Tsy ovaina ny rakitra ao amin'ity solosaina ity.",
       "pickProfile": "Mifidiana profil",
       "noProfile": "Tsy misy mombamomba",
+      "defaultProfileResolvesTo": "Mifanaraka amin'ny {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profile default: {{name}}",
       "manageProfiles": "Tantano ny mombamomba",
       "noProfiles": "Tsy mbola misy mombamomba. Mamorona iray hanampiana ireo fari-piainan'ny tontolo iainana, mpizara MCP ary fahaiza-manao.",
       "advancedConfig": "Fandrindrana mandroso",
       "advancedConfigDescription": "Mihatra amin’ity sesiona ity. Raha tehirizina ho profile dia mitoetra ho an’ny manaraka.",
       "saveAsProfile": "Tehirizo ho Profile",
       "saveProfileDescription": "Tehirizo ho profil azo ampiasaina indray ny fari-piainan'ny tontolo iainana ankehitriny sy ny baiko fanamboarana.",
-      "profileSummary": "{{vars}} fari-piainan'ny tontolo iainana · {{commands}} baiko fanamboarana",
       "profileSaved": "Voatahiry ny mombamomba \"{{name}}\".",
       "organizationProfiles": "Organisation Profiles",
       "personalProfiles": "Profil manokana",

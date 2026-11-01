@@ -15,7 +15,7 @@ const root = process.cwd();
 const trpc = resolve(root, 'packages/trpc');
 const listed = execFileSync(
   resolve(root, 'node_modules/.bin/tsgo'),
-  ['-p', 'tsconfig.json', '--listFilesOnly'],
+  ['-p', 'tsconfig.build.json', '--listFilesOnly'],
   { cwd: trpc, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
 )
   .split('\n')
@@ -27,6 +27,7 @@ const files = new Set([
   'pnpm-lock.yaml',
   'packages/trpc/package.json',
   'packages/trpc/tsconfig.json',
+  'packages/trpc/tsconfig.build.json',
   'packages/trpc/rollup.config.mjs',
   // The action holds the build command, and this script decides the inputs:
   // a change to either must not reuse declarations built the old way.

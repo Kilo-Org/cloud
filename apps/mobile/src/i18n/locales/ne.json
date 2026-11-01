@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub जडानको म्याद सकियो।",
     "merge": {
       "merge": "मर्ज",
+      "mergeTitle": "मर्ज",
       "mergeNow": "अहिले मर्ज गर्नुहोस्",
       "mergePullRequest": "पुल रिक्वेस्ट मर्ज",
       "mergeTermTitle": "{{term}} मर्ज",
@@ -682,6 +683,9 @@
       "gitlabDescription": "मोबाइलमा मर्ज रिक्वेस्टहरूको समीक्षा गर्नुहोस्",
       "bitbucketOrgOnlyDescription": "यसको Bitbucket पुल रिक्वेस्टहरू समीक्षा गर्न माथिको खाता एउटा संस्थामा स्विच गर्नुहोस्।",
       "bitbucketOrgOnlyNoOrganizationDescription": "यो खातामा हालसम्म कुनै संस्था छैन। तपाईंले संस्था सिर्जना गर्नुभएको वा सामेल हुनुभएपछि Bitbucket पुल रिक्वेस्टहरू समीक्षा गर्न सकिन्छ।",
+      "gitlabReconnectAdminOnlyDescription": "यसलाई फेरि जडान गर्न संस्थाको मालिक, प्रशासक वा बिलिङ व्यवस्थापकलाई अनुरोध गर्नुहोस्।",
+      "bitbucketNotConnectedTitle": "Bitbucket जडान भएको छैन",
+      "bitbucketAdminOnlyDescription": "संस्थाका मालिक, प्रशासक र बिलिङ व्यवस्थापकहरूले मात्र यसलाई जडान गर्न सक्छन्।",
       "contextLine": "{{organization}} का लागि",
       "contextLinePersonal": "तपाईंको व्यक्तिगत खाताका लागि"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "आफ्नै निर्देशनहरू",
       "deprecation": "आफूले तोकेका निर्देशनहरूको सुविधा हटाउने योजना छ। यसको सट्टा यी निर्देशनहरू आफ्नो रिपोजिटरीको REVIEW.md फाइलमा सार्नुहोस्।",
-      "placeholder": "जस्तै, त्रुटि सम्हाल्ने हाम्रा नियमहरू लागू गर्नुहोस्…"
+      "placeholder": "जस्तै, त्रुटि सम्हाल्ने हाम्रा नियमहरू लागू गर्नुहोस्…",
+      "clearTitle": "आफ्नै निर्देशनहरू हटाउने?",
+      "clearMessage": "खाली फिल्ड सुरक्षित गर्दा यस समीक्षकका लागि भण्डारण गरिएका आफ्नै निर्देशनहरू मेटिइन्छन्।"
     },
     "repos": {
       "unavailable": "रिपोजिटरीहरू उपलब्ध छैनन् — kilo.ai मा Bitbucket को सेटअप पूरा गर्नुहोस्।",
@@ -1450,7 +1456,7 @@
       "fixSettings": "सेटिङहरू मिलाउनुहोस्",
       "couldNotLoad": "समीक्षा लोड गर्न सकिएन।",
       "couldNotGetLatest": "पछिल्लो विवरण प्राप्त गर्न सकिएन।",
-      "byline": "{{repo}} #{{number}} · लेखक: {{author}}",
+      "byline": "#{{number}} · लेखक: {{author}}",
       "noFindings": "कुनै समस्या फेला परेन।",
       "findingsUnavailable": "यो समीक्षा असफल भएकाले नतिजाहरू उपलब्ध छैनन्।",
       "findingsInProgress": "यो समीक्षा अझै चालु छ। समाप्त भएपछि यहाँ समस्याहरू देखिनेछन्।",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "समीक्षा शैली",
       "focusAreas": "ध्यान दिनुपर्ने क्षेत्रहरू",
       "allAreas": "सबै क्षेत्रहरू",
-      "customInstructions": "आफ्नै निर्देशनहरू",
       "set": "तोकिएको",
+      "notSet": "तोकिएको छैन",
       "nSelected": "{{displayCount}} चयन गरिएको",
       "proposedReviewMdGuidance": "REVIEW.md का लागि प्रस्तावित निर्देशनहरू"
     },
@@ -2060,7 +2066,8 @@
       "actionBlocked": "यो कार्य सम्पन्न गर्न सकिएन। फेरि प्रयास गर्नुअघि समस्या समाधान गर्नुपर्छ।",
       "syncNoRepositories": "सिङ्क स्कोपमा कुनै रिपोजिटोरी छैनन्। सुरक्षा एजेन्टले निगरानी गर्ने रिपोजिटोरीहरू छान्नुहोस्, त्यसपछि फेरि सिङ्क गर्नुहोस्।",
       "syncIntegrationInactive": "«सुरक्षा एजेन्ट» को GitHub जडान सक्रिय छैन। Kilo GitHub App पुनः जोड्नुहोस्, त्यसपछि फेरि सिङ्क गर्नुहोस्।",
-      "syncMissingPermission": "Kilo GitHub एपले vulnerability alerts पढ्न सक्दैन। GitHub मा त्यो अनुमति दिनुहोस्, त्यसपछि फेरि सिङ्क गर्नुहोस्।"
+      "syncMissingPermission": "Kilo GitHub एपले vulnerability alerts पढ्न सक्दैन। GitHub मा त्यो अनुमति दिनुहोस्, त्यसपछि फेरि सिङ्क गर्नुहोस्।",
+      "configConflict": "सुरक्षा एजेन्टका सेटिङहरू अन्तै परिवर्तन भएका छन्। नवीनतम सेटिङहरू समीक्षा गर्नुहोस् र फेरि सेभ गर्नुहोस्।"
     },
     "analysisState": {
       "queued": "विश्लेषण कतारमा",
@@ -2367,13 +2374,14 @@
       "forkFilesUnchangedOnComputer": "यो कम्प्युटरका फाइलहरू परिवर्तन हुँदैनन्।",
       "pickProfile": "प्रोफाइल छान्नुहोस्",
       "noProfile": "प्रोफाइल छैन",
+      "defaultProfileResolvesTo": "अहिले {{name}} मा सेट छ",
+      "defaultProfileResolvesToAccessibility": "पूर्वनिर्धारित प्रोफाइल: {{name}}",
       "manageProfiles": "प्रोफाइलहरू प्रबन्ध गर्नुहोस्",
       "noProfiles": "अहिलेसम्म कुनै प्रोफाइल छैन। वातावरणीय चरहरू, MCP सर्भरहरू, र सीपहरू थप्न एउटा सिर्जना गर्नुहोस्।",
       "advancedConfig": "उन्नत कन्फिगरेसन",
       "advancedConfigDescription": "यो सत्रमा लागू हुन्छ। प्रोफाइलको रूपमा बचत गर्दा यो अर्को पटकका लागि रहन्छ।",
       "saveAsProfile": "प्रोफाइलको रूपमा बचत गर्नुहोस्",
       "saveProfileDescription": "पुन: प्रयोज्य प्रोफाइलको रूपमा हालको वातावरण चर र सेटअप आदेशहरू बचत गर्नुहोस्।",
-      "profileSummary": "{{vars}} वातावरण चर · {{commands}} सेटअप आदेशहरू",
       "profileSaved": "प्रोफाइल \"{{name}}\" बचत गरियो",
       "organizationProfiles": "संगठन प्रोफाइल",
       "personalProfiles": "व्यक्तिगत प्रोफाइलहरू",

@@ -24,6 +24,7 @@ import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useAgentProfileList, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { draftProfileCountItems, formatProfileCountItems } from '@/lib/profile-count-labels';
 import { cn } from '@/lib/utils';
 
 /** Structural view of a list row, so both the personal and combined shapes fit. */
@@ -168,6 +169,13 @@ export function AdvancedConfigPanel({
   const hasManualConfig = manualVars.length > 0 || setupCommands.length > 0;
   const effectiveVars = (selectedProfile?.varCount ?? 0) + manualVars.length;
   const effectiveCommands = (selectedProfile?.commandCount ?? 0) + setupCommands.length;
+  const profileSummary = useMemo(
+    () =>
+      formatProfileCountItems(t, draftProfileCountItems(effectiveVars, effectiveCommands)).join(
+        ' · '
+      ),
+    [t, effectiveVars, effectiveCommands]
+  );
 
   const handleSaveProfile = async (submission: SaveProfileSubmission): Promise<boolean> => {
     try {
@@ -277,12 +285,7 @@ export function AdvancedConfigPanel({
           />
 
           {effectiveVars > 0 || effectiveCommands > 0 ? (
-            <Text className="text-xs text-muted-foreground">
-              {t('agentChat.newSession.profileSummary', {
-                vars: effectiveVars,
-                commands: effectiveCommands,
-              })}
-            </Text>
+            <Text className="text-xs text-muted-foreground">{profileSummary}</Text>
           ) : null}
 
           <ManualEnvVarsEditor

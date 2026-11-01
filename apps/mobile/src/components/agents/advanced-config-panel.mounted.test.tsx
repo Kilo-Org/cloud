@@ -447,7 +447,7 @@ describe('AdvancedConfigPanel', () => {
     addVariable(renderer, 'API_KEY', 'abc');
 
     expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
-    expect(texts(renderer)).toContain('1 environment variables · 0 setup commands');
+    expect(texts(renderer)).toContain('1 var');
   });
 
   it('accepts an empty value in the session draft, matching prepare-session', () => {
@@ -460,7 +460,7 @@ describe('AdvancedConfigPanel', () => {
     expect(
       renderer.root.findAllByType('FormField' as never).filter(node => node.props.label === 'Value')
     ).toHaveLength(0);
-    expect(texts(renderer)).toContain('1 environment variables · 0 setup commands');
+    expect(texts(renderer)).toContain('1 var');
   });
 
   it('starts an abandoned session variable empty the next time the form opens', () => {
@@ -565,7 +565,7 @@ describe('AdvancedConfigPanel', () => {
     const renderer = mount({ selectedProfileId: 'backend' });
     press(byLabel(renderer, 'Advanced Configuration'));
 
-    expect(texts(renderer)).toContain('3 environment variables · 1 setup commands');
+    expect(texts(renderer)).toContain('3 vars · 1 setup cmd');
   });
 
   it('saves the manual config in the web order and selects the new profile', async () => {
@@ -618,7 +618,7 @@ describe('AdvancedConfigPanel', () => {
     // setup commands to the inline ones, so a kept draft would run them twice.
     expect(texts(renderer)).not.toContain('API_KEY');
     expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
-    expect(texts(renderer)).toContain('1 environment variables · 1 setup commands');
+    expect(texts(renderer)).toContain('1 var · 1 setup cmd');
   });
 
   it('keeps the save sheet open and the typed name when the save fails', async () => {

@@ -12,6 +12,7 @@ import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { validateProfileDescription, validateProfileName } from '@/lib/agent-profile-forms';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { draftProfileCountItems, formatProfileCountItems } from '@/lib/profile-count-labels';
 
 /** One manual environment variable as the sheet saves it. */
 type SaveProfileVar = Readonly<{ key: string; value: string; isSecret: boolean }>;
@@ -58,6 +59,12 @@ export function SaveProfileSheet({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const hasSecrets = envVars.some(envVar => envVar.isSecret);
+  // Both numbers are counted messages, so the line agrees with each one instead
+  // of naming a fixed plural; it shares the wording of every profile surface.
+  const summary = formatProfileCountItems(
+    t,
+    draftProfileCountItems(envVars.length, setupCommands.length)
+  ).join(' · ');
 
   const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
     isDirty: () =>
@@ -162,22 +169,21 @@ export function SaveProfileSheet({
           />
         </View>
 
-        <View className="gap-1 rounded-lg bg-muted p-3">
-          <Text className="text-sm font-medium text-foreground">
-            {t('agentChat.newSession.profileSummary', {
-              vars: envVars.length,
-              commands: setupCommands.length,
-            })}
-          </Text>
-          {hasSecrets ? (
-            <View className="mt-1 flex-row items-center gap-1.5">
-              <Lock size={12} color={colors.mutedForeground} />
-              <Text className="text-xs text-muted-foreground">
-                {t('agentChat.newSession.secretsEncrypted')}
-              </Text>
-            </View>
-          ) : null}
-        </View>
+        {summary.length > 0 || hasSecrets ? (
+          <View className="gap-1 rounded-lg bg-muted p-3">
+            {summary.length > 0 ? (
+              <Text className="text-sm font-medium text-foreground">{summary}</Text>
+            ) : null}
+            {hasSecrets ? (
+              <View className="mt-1 flex-row items-center gap-1.5">
+                <Lock size={12} color={colors.mutedForeground} />
+                <Text className="text-xs text-muted-foreground">
+                  {t('agentChat.newSession.secretsEncrypted')}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
       {dialog}

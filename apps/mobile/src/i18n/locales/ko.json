@@ -889,7 +889,9 @@
     "instructions": {
       "title": "사용자 지정 지침",
       "deprecation": "사용자 지정 지침 기능은 지원이 중단될 예정입니다. 이 지침을 저장소의 REVIEW.md 파일로 옮기세요.",
-      "placeholder": "예: 오류 처리 규칙 적용…"
+      "placeholder": "예: 오류 처리 규칙 적용…",
+      "clearTitle": "사용자 지정 지침을 제거하시겠습니까?",
+      "clearMessage": "빈 필드를 저장하면 이 검토자에 대해 저장된 사용자 지정 지침이 삭제됩니다."
     },
     "repos": {
       "unavailable": "저장소를 사용할 수 없습니다. kilo.ai에서 Bitbucket 설정을 완료하세요.",
@@ -965,7 +967,7 @@
       "bitbucketError": "Bitbucket 설정을 열 수 없습니다. 다시 시도하세요."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · {{author}}",
+      "byline": "#{{number}} · {{author}}",
       "cancelMessage": "진행 중인 코드 리뷰가 중지됩니다.",
       "cancelReview": "리뷰 취소",
       "cancelTitle": "리뷰를 취소할까요?",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "모든 영역",
-      "customInstructions": "사용자 지정 지침",
       "focusAreas": "중점 리뷰 항목",
       "nSelected": "{{displayCount}}개 선택됨",
       "proposedReviewMdGuidance": "제안된 REVIEW.md 지침",
       "reviewStyle": "리뷰 스타일",
-      "set": "설정됨"
+      "set": "설정됨",
+      "notSet": "설정 안 됨"
     },
     "updateFailed": "리뷰어를 업데이트하지 못했습니다.",
     "configSaveFailed": "리뷰 설정을 저장하지 못했습니다.",
@@ -1534,7 +1536,8 @@
       "actionBlocked": "이 작업을 완료하지 못했습니다. 문제를 먼저 해결해야 재시도할 수 있습니다.",
       "syncNoRepositories": "동기화 범위에 리포지토리가 없습니다. 보안 에이전트가 모니터링할 리포지토리를 선택한 후 다시 동기화하세요.",
       "syncIntegrationInactive": "보안 에이전트의 GitHub 연결이 활성화되어 있지 않습니다. Kilo GitHub App을 다시 연결한 후 다시 동기화하세요.",
-      "syncMissingPermission": "Kilo GitHub 앱이 취약점 알림을 읽을 수 없습니다. GitHub에서 해당 권한을 부여한 후 다시 동기화하세요."
+      "syncMissingPermission": "Kilo GitHub 앱이 취약점 알림을 읽을 수 없습니다. GitHub에서 해당 권한을 부여한 후 다시 동기화하세요.",
+      "configConflict": "보안 에이전트 설정이 다른 곳에서 변경되었습니다. 최신 설정을 검토하고 다시 저장하세요."
     },
     "analysisState": {
       "queued": "분석 대기 중",
@@ -1841,13 +1844,14 @@
       "forkFilesUnchangedOnComputer": "이 컴퓨터의 파일은 변경되지 않습니다.",
       "pickProfile": "프로필을 선택하세요",
       "noProfile": "프로필 없음",
+      "defaultProfileResolvesTo": "{{name}}(으)로 설정됨",
+      "defaultProfileResolvesToAccessibility": "기본 프로필: {{name}}",
       "manageProfiles": "프로필 관리",
       "noProfiles": "아직 프로필이 없습니다. 환경 변수, MCP 서버 및 기술을 추가하려면 하나를 만드십시오.",
       "advancedConfig": "고급 구성",
       "advancedConfigDescription": "이 세션에 적용됩니다. 프로필로 저장하면 다음에도 그대로 유지됩니다.",
       "saveAsProfile": "프로필로 저장",
       "saveProfileDescription": "현재 환경 변수와 설정 명령을 재사용 가능한 프로필로 저장합니다.",
-      "profileSummary": "{{vars}} 환경 변수 · {{commands}} 설정 명령",
       "profileSaved": "프로필 \"{{name}}\"이 저장되었습니다.",
       "organizationProfiles": "조직 프로필",
       "personalProfiles": "개인 프로필",
@@ -2712,6 +2716,9 @@
       "gitlabDescription": "모바일에서 머지 요청 리뷰",
       "bitbucketOrgOnlyDescription": "Bitbucket 풀 리퀘스트를 검토하려면 위의 계정을 조직으로 전환하세요.",
       "bitbucketOrgOnlyNoOrganizationDescription": "이 계정에는 아직 조직이 없습니다. 조직을 만들거나 참여하면 Bitbucket 풀 리퀘스트를 검토할 수 있습니다.",
+      "gitlabReconnectAdminOnlyDescription": "조직 소유자, 관리자 또는 결제 관리자에게 다시 연결해 달라고 요청하세요.",
+      "bitbucketNotConnectedTitle": "Bitbucket이 연결되지 않았습니다",
+      "bitbucketAdminOnlyDescription": "조직 소유자, 관리자, 결제 관리자만 연결할 수 있습니다.",
       "contextLine": "{{organization}}용",
       "contextLinePersonal": "개인용"
     },
@@ -2943,6 +2950,7 @@
     "installKiloGitHubApp": "Kilo GitHub 앱 설치",
     "merge": {
       "merge": "병합",
+      "mergeTitle": "병합",
       "mergeNow": "지금 병합",
       "mergePullRequest": "풀 리퀘스트 병합",
       "mergeTermTitle": "{{term}} 병합",

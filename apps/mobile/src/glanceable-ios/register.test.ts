@@ -50,7 +50,10 @@ vi.mock('./session-follow', () => ({
 }));
 vi.mock('./session-live-activity', () => ({ refreshSessionLiveActivityCopy: vi.fn() }));
 vi.mock('@/lib/glanceable/cleanup', () => ({ subscribeGlanceableTerminalEnd: vi.fn() }));
-vi.mock('@/lib/glanceable/persist', () => ({ getLastGlanceableSnapshot: () => null }));
+vi.mock('@/lib/glanceable/persist', () => ({
+  getLastGlanceableSnapshot: () => null,
+  getGlanceableSnapshotForSignedInScope: () => null,
+}));
 vi.mock('./active-agents-live-activity', () => ({
   refreshActiveAgentsLiveActivityCopy: vi.fn(),
 }));

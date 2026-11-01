@@ -403,6 +403,7 @@
     "connectionExpired": "GitHub-anslutningen har upphört att gälla.",
     "merge": {
       "merge": "Slå samman",
+      "mergeTitle": "Slå samman",
       "mergeNow": "Slå samman nu",
       "mergePullRequest": "Slå samman PR",
       "mergeTermTitle": "Slå samman {{term}}",
@@ -682,6 +683,9 @@
       "gitlabDescription": "Granska merge requests i mobilen",
       "bitbucketOrgOnlyDescription": "Växla kontot ovan till en organisation för att granska dess PR:er i Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Det här kontot har inga organisationer ännu. Bitbucket-PR:er kan granskas när du har skapat eller gått med i en organisation.",
+      "gitlabReconnectAdminOnlyDescription": "Be en organisationsägare, administratör eller faktureringsansvarig att ansluta den på nytt.",
+      "bitbucketNotConnectedTitle": "Bitbucket är inte anslutet",
+      "bitbucketAdminOnlyDescription": "Endast organisationsägare, administratörer och faktureringsansvariga kan ansluta Bitbucket.",
       "contextLine": "För {{organization}}",
       "contextLinePersonal": "För ditt personliga konto"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "Anpassade instruktioner",
       "deprecation": "Funktionen för anpassade instruktioner ska fasas ut. Flytta riktlinjerna till en REVIEW.md-fil i kodarkivet i stället.",
-      "placeholder": "t.ex. följ våra regler för felhantering…"
+      "placeholder": "t.ex. följ våra regler för felhantering…",
+      "clearTitle": "Ta bort anpassade instruktioner?",
+      "clearMessage": "Om du sparar ett tomt fält tas de anpassade instruktioner som sparats för den här granskaren bort."
     },
     "repos": {
       "unavailable": "Kodarkiven är inte tillgängliga. Slutför konfigurationen av Bitbucket på kilo.ai.",
@@ -1450,7 +1456,7 @@
       "fixSettings": "Åtgärda inställningarna",
       "couldNotLoad": "Kunde inte läsa in granskningen",
       "couldNotGetLatest": "Kunde inte hämta de senaste uppgifterna.",
-      "byline": "{{repo}} #{{number}} av {{author}}",
+      "byline": "#{{number}} av {{author}}",
       "noFindings": "Inga fynd",
       "findingsUnavailable": "Resultaten är inte tillgängliga eftersom den här granskningen misslyckades.",
       "findingsInProgress": "Den här granskningen pågår fortfarande. Fynden visas här när den är klar.",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "Granskningsstil",
       "focusAreas": "Fokusområden",
       "allAreas": "Alla områden",
-      "customInstructions": "Anpassade instruktioner",
       "set": "Angivet",
+      "notSet": "Ej angivet",
       "nSelected": "Valda: {{displayCount}}",
       "proposedReviewMdGuidance": "Föreslagna riktlinjer för REVIEW.md"
     },
@@ -2060,7 +2066,8 @@
       "actionBlocked": "Det gick inte att slutföra den här åtgärden. Problemet måste åtgärdas innan du kan försöka igen.",
       "syncNoRepositories": "Inga kodarkiv finns i synkroniseringsomfånget. Välj de kodarkiv som Säkerhetsagenten övervakar och synkronisera igen.",
       "syncIntegrationInactive": "GitHub-anslutningen för Säkerhetsagenten är inte aktiv. Återanslut Kilos GitHub-app och synkronisera igen.",
-      "syncMissingPermission": "Kilos GitHub-app kan inte läsa sårbarhetsaviseringar. Bevilja behörigheten i GitHub och synkronisera igen."
+      "syncMissingPermission": "Kilos GitHub-app kan inte läsa sårbarhetsaviseringar. Bevilja behörigheten i GitHub och synkronisera igen.",
+      "configConflict": "Säkerhetsagentens inställningar ändrades någon annanstans. Granska de senaste inställningarna och spara igen."
     },
     "analysisState": {
       "queued": "Analys i kö",
@@ -2367,13 +2374,14 @@
       "forkFilesUnchangedOnComputer": "Filerna på den här datorn ändras inte.",
       "pickProfile": "Välj en profil",
       "noProfile": "Ingen profil",
+      "defaultProfileResolvesTo": "Blir {{name}}",
+      "defaultProfileResolvesToAccessibility": "Standardprofil: {{name}}",
       "manageProfiles": "Hantera profiler",
       "noProfiles": "Inga profiler än. Skapa en för att lägga till miljövariabler, MCP-servrar och färdigheter.",
       "advancedConfig": "Avancerad konfiguration",
       "advancedConfigDescription": "Gäller för den här sessionen. Sparas den som profil finns den kvar nästa gång.",
       "saveAsProfile": "Spara som profil",
       "saveProfileDescription": "Spara de aktuella miljövariablerna och inställningskommandona som en återanvändbar profil.",
-      "profileSummary": "{{vars}} miljövariabler · {{commands}} inställningskommandon",
       "profileSaved": "Profilen \"{{name}}\" har sparats",
       "organizationProfiles": "Organisationsprofiler",
       "personalProfiles": "Personliga profiler",

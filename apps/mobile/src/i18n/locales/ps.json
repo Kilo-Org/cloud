@@ -403,6 +403,7 @@
     "connectionExpired": "له GitHub سره د اړیکې موده پای ته ورسېده.",
     "merge": {
       "merge": "یوځای کول",
+      "mergeTitle": "یوځای کول",
       "mergeNow": "همدا اوس یوځای کړئ",
       "mergePullRequest": "د پل ریکویسټ یوځای کول",
       "mergeTermTitle": "د {{term}} یوځای کول",
@@ -682,6 +683,9 @@
       "gitlabDescription": "په موبایل کې د یوځای کولو د غوښتنو بیاکتنه وکړئ",
       "bitbucketOrgOnlyDescription": "د هغې د Bitbucket پول ریکویسټونو د بیاکتنې لپاره پورته حساب یو بنسټ ته وبدلئ.",
       "bitbucketOrgOnlyNoOrganizationDescription": "دا حساب تر اوسه هېڅ بنسټ نه لري. د Bitbucket پول ریکویسټونو بیاکتنه به وشي چې یو وخت تاسو یو بنسټ جوړ کړئ یا یو بنسټ ته ورشئ.",
+      "gitlabReconnectAdminOnlyDescription": "له یو سازمان مالک، مدیر، یا د بلونو مدیر څخه وغواړئ چې دا ونښلوي.",
+      "bitbucketNotConnectedTitle": "Bitbucket نښلول شوی نه دی",
+      "bitbucketAdminOnlyDescription": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي.",
       "contextLine": "{{organization}} لپاره",
       "contextLinePersonal": "د ستاسې د شخصي حساب لپاره"
     },
@@ -1415,7 +1419,9 @@
     "instructions": {
       "title": "ځانګړې لارښوونې",
       "deprecation": "د ځانګړو لارښوونو د بندولو پلان شته. پر ځای یې دا لارښوونې په خپله ذخیره کې د REVIEW.md فایل ته ولېږدوئ.",
-      "placeholder": "د بېلګې په توګه: د تېروتنو د سمبالولو زموږ اصول پلي کړئ…"
+      "placeholder": "د بېلګې په توګه: د تېروتنو د سمبالولو زموږ اصول پلي کړئ…",
+      "clearTitle": "ځانګړې لارښوونې لرې کړئ؟",
+      "clearMessage": "د تش ډګر خوندي کول د دې بیاکتونکي لپاره ذخیره شوې ځانګړې لارښوونې له منځه وړي."
     },
     "repos": {
       "unavailable": "ذخیرې د لاسرسي وړ نه دي — په kilo.ai کې د Bitbucket تنظیم بشپړ کړئ.",
@@ -1450,7 +1456,7 @@
       "fixSettings": "تنظیمات سم کړئ",
       "couldNotLoad": "بیاکتنه بار نه شوه.",
       "couldNotGetLatest": "وروستي معلومات ترلاسه نه شول.",
-      "byline": "{{repo}} #{{number}} د {{author}} لخوا",
+      "byline": "#{{number}} د {{author}} لخوا",
       "noFindings": "هېڅ موندنه نشته.",
       "findingsUnavailable": "پایلې شتون نه لري ځکه چې دا بیاکتنه ناکامه شوه.",
       "findingsInProgress": "دا بیاکتنه لاهم روانه ده. کله چې پای ته ورسېشي، موندنې به دلته ښکاره شي.",
@@ -1602,8 +1608,8 @@
       "reviewStyle": "د بیاکتنې بڼه",
       "focusAreas": "د تمرکز ساحې",
       "allAreas": "ټولې ساحې",
-      "customInstructions": "ځانګړې لارښوونې",
       "set": "ټاکل شوی",
+      "notSet": "ټاکل شوی نه دی",
       "nSelected": "{{displayCount}} غوره شوي",
       "proposedReviewMdGuidance": "د REVIEW.md لپاره وړاندیز شوې لارښوونې"
     },
@@ -2060,7 +2066,8 @@
       "actionBlocked": "د دې کړنې بشپړول ممکن نه وو. د بیا هڅې دمخه باید دا ستونزه حل شي.",
       "syncNoRepositories": "هیڅ زېرمتون د همغږۍ په حد کې نه دی. هغه زېرمتونونه وټاکئ چې امنیتي اجنټ یې څاري، بیا همغږي وکړئ.",
       "syncIntegrationInactive": "د امنیتي اجنټ لپاره GitHub اړیکه فعاله نه ده. د Kilo GitHub اپ بیا وصل کړئ، بیا همغږي وکړئ.",
-      "syncMissingPermission": "د Kilo GitHub اپ د زیانمنتیا خبرتیاوې لوستلای نشي. په GitHub کې هغه اجازه ورکړئ، بیا همغږي وکړئ."
+      "syncMissingPermission": "د Kilo GitHub اپ د زیانمنتیا خبرتیاوې لوستلای نشي. په GitHub کې هغه اجازه ورکړئ، بیا همغږي وکړئ.",
+      "configConflict": "د امنیتي اجنټ امستنې بل ځای کې بدلې شوې. وروستي امستنې وګورئ او بیا خوندي کړئ."
     },
     "analysisState": {
       "queued": "شننه په کتار کې ده",
@@ -2367,13 +2374,14 @@
       "forkFilesUnchangedOnComputer": "په دې کمپیوټر کې فایلونه نه بدلېږي.",
       "pickProfile": "یو پروفایل غوره کړئ",
       "noProfile": "هیڅ پروفایل نشته",
+      "defaultProfileResolvesTo": "اوس مهال {{name}} ته ټاکل شوی",
+      "defaultProfileResolvesToAccessibility": "ډیفالټ پروفایل: {{name}}",
       "manageProfiles": "پروفایلونه اداره کړئ",
       "noProfiles": "تراوسه هیڅ پروفایل نشته. د چاپیریال متغیرونو، MCP سرورونو، او مهارتونو اضافه کولو لپاره یو جوړ کړئ.",
       "advancedConfig": "پرمختللی ترتیب",
       "advancedConfigDescription": "دا دې غونډې ته پلي کېږي. د پروفایل په توګه خوندي کول یې د بل ځل لپاره ساتي.",
       "saveAsProfile": "د پروفایل په توګه خوندي کړئ",
       "saveProfileDescription": "د اوسني چاپیریال متغیرات او د تنظیم کولو امرونه د بیا کارونې وړ پروفایل په توګه خوندي کړئ.",
-      "profileSummary": "{{vars}} د چاپیریال تغیرات · {{commands}} د ترتیب کولو امرونه",
       "profileSaved": "پروفایل \"{{name}}\" خوندي شو",
       "organizationProfiles": "د سازمان پروفایلونه",
       "personalProfiles": "شخصي پروفایلونه",

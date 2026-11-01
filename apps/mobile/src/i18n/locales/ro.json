@@ -410,6 +410,7 @@
     "connectionExpired": "Conexiunea la GitHub a expirat.",
     "merge": {
       "merge": "Îmbinare",
+      "mergeTitle": "Îmbinare",
       "mergeNow": "Îmbină acum",
       "mergePullRequest": "Îmbinarea PR-ului",
       "mergeTermTitle": "Îmbinarea {{term}}-ului",
@@ -697,6 +698,9 @@
       "gitlabDescription": "Revizuiește merge requesturi pe mobil",
       "bitbucketOrgOnlyDescription": "Comută contul de mai sus pe o organizație pentru a revizui PR-urile Bitbucket ale acesteia.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Acest cont nu are încă nicio organizație. PR-urile Bitbucket pot fi revizuite după ce creezi o organizație sau te alături uneia.",
+      "gitlabReconnectAdminOnlyDescription": "Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să o reconecteze.",
+      "bitbucketNotConnectedTitle": "Bitbucket nu este conectat",
+      "bitbucketAdminOnlyDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
       "contextLine": "Pentru {{organization}}",
       "contextLinePersonal": "Pentru contul personal"
     },
@@ -1437,7 +1441,9 @@
     "instructions": {
       "title": "Instrucțiuni personalizate",
       "deprecation": "Funcția de instrucțiuni personalizate urmează să fie retrasă. Mută aceste instrucțiuni într-un fișier REVIEW.md din depozitul tău.",
-      "placeholder": "de exemplu: respectarea convențiilor noastre de gestionare a erorilor…"
+      "placeholder": "de exemplu: respectarea convențiilor noastre de gestionare a erorilor…",
+      "clearTitle": "Elimini instrucțiunile personalizate?",
+      "clearMessage": "Salvând un câmp gol, ștergi instrucțiunile personalizate stocate pentru acest recenzor."
     },
     "repos": {
       "unavailable": "Depozitele nu sunt disponibile. Finalizează configurarea Bitbucket pe kilo.ai.",
@@ -1472,7 +1478,7 @@
       "fixSettings": "Corectează setările",
       "couldNotLoad": "Nu s-a putut încărca revizuirea.",
       "couldNotGetLatest": "Nu s-au putut obține cele mai recente date.",
-      "byline": "{{repo}} #{{number}}, autor: {{author}}",
+      "byline": "#{{number}}, autor: {{author}}",
       "noFindings": "Nu există constatări.",
       "findingsUnavailable": "Rezultatele nu sunt disponibile deoarece această revizuire a eșuat.",
       "findingsInProgress": "Această revizuire este încă în desfășurare. Constatările vor apărea aici la finalizarea ei.",
@@ -1624,8 +1630,8 @@
       "reviewStyle": "Stil de revizuire",
       "focusAreas": "Aspecte prioritare",
       "allAreas": "Toate domeniile",
-      "customInstructions": "Instrucțiuni personalizate",
       "set": "Configurat",
+      "notSet": "Nu este configurat",
       "nSelected": "{{displayCount}} selectate",
       "proposedReviewMdGuidance": "Instrucțiuni propuse pentru REVIEW.md"
     },
@@ -2093,7 +2099,8 @@
       "actionBlocked": "Această acțiune nu a putut fi finalizată. Problema trebuie rezolvată înainte de a încerca din nou.",
       "syncNoRepositories": "Niciun repository nu face parte din domeniul de sincronizare. Alege repository-urile monitorizate de Agentul de securitate, apoi sincronizează din nou.",
       "syncIntegrationInactive": "Conexiunea GitHub pentru Agentul de securitate nu este activă. Reconectează Kilo GitHub App, apoi sincronizează din nou.",
-      "syncMissingPermission": "Aplicația Kilo pentru GitHub nu poate citi alertele de vulnerabilitate. Acordă această permisiune în GitHub, apoi sincronizează din nou."
+      "syncMissingPermission": "Aplicația Kilo pentru GitHub nu poate citi alertele de vulnerabilitate. Acordă această permisiune în GitHub, apoi sincronizează din nou.",
+      "configConflict": "Setările Agentului de securitate au fost modificate în altă parte. Verifică cele mai recente setări și salvează din nou."
     },
     "analysisState": {
       "queued": "Analiză în coadă",
@@ -2404,13 +2411,14 @@
       "forkFilesUnchangedOnComputer": "Fișierele de pe acest computer nu sunt modificate.",
       "pickProfile": "Alegeți un profil",
       "noProfile": "Nici un profil",
+      "defaultProfileResolvesTo": "Corespunde la {{name}}",
+      "defaultProfileResolvesToAccessibility": "Profil implicit: {{name}}",
       "manageProfiles": "Gestionați profilurile",
       "noProfiles": "Niciun profil încă. Creați unul pentru a adăuga variabile de mediu, servere MCP și abilități.",
       "advancedConfig": "Configurare avansată",
       "advancedConfigDescription": "Se aplică acestei sesiuni. Salvarea ca profil îl păstrează pentru data viitoare.",
       "saveAsProfile": "Salvați ca profil",
       "saveProfileDescription": "Salvați variabilele de mediu curente și setați comenzile ca profil reutilizabil.",
-      "profileSummary": "{{vars}} variabile de mediu · {{commands}} comenzi de configurare",
       "profileSaved": "Profilul „{{name}}” a fost salvat",
       "organizationProfiles": "Profiluri organizației",
       "personalProfiles": "Profiluri personale",

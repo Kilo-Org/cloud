@@ -15,22 +15,21 @@ import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
+import { AlertTriangle } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { instructionsFieldOverflows } from '@/lib/code-reviewer-instructions-field';
-import {
-  type SaveReviewConfigMutation,
-  useReviewConfig,
-  useSaveReviewConfig,
-} from '@/lib/hooks/use-code-reviewer';
+import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
 import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import {
-  type SettingsBackGuardResult,
+  type SettingsBackGuardSaveOutcome,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 // The multiline editor's keyboard has no Done key on iOS (return inserts a
 // newline), so a covered Save left no keyboard-adjacent way out. The accessory
@@ -47,9 +46,8 @@ const INSTRUCTIONS_DONE_ACCESSORY_ID = 'instructions-editor-done';
 function InstructionsEditor({
   initial,
   onDirty,
-  save,
-  onSaved,
-  skipNextGuardRef,
+  pending,
+  onSave,
   draftRef,
 }: Readonly<{
   // Uncontrolled per apps/mobile/AGENTS.md "Text inputs": iOS text is never
@@ -57,12 +55,14 @@ function InstructionsEditor({
   // only the derived dirty flag reaches state.
   initial: string;
   onDirty: (text: string) => void;
-  save: SaveReviewConfigMutation;
-  onSaved: () => void;
-  skipNextGuardRef: SettingsBackGuardResult['skipNextGuardRef'];
+  pending: boolean;
+  // The screen owns the save: it may have to ask before an emptied field
+  // replaces stored instructions, and the back guard saves through it too.
+  onSave: () => void;
   draftRef: { current: string };
 }>) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   // Stable for this mount and distinct from every other mounted editor, so the
   // bar below can only bind to this editor's field.
   const accessoryId = `${INSTRUCTIONS_DONE_ACCESSORY_ID}${useId()}`;
@@ -107,9 +107,15 @@ function InstructionsEditor({
     // header, with no skeleton, no error and no retry. The body paints in the
     // frame the read lands; only the skeleton's exit fade remains.
     <View className="gap-4">
-      <Text className="text-sm text-muted-foreground">
-        {t('codeReviewer.instructions.deprecation')}
-      </Text>
+      {/* The deprecation note asks the reader to move the guidelines elsewhere;
+          as body-coloured text it read as a field description. A tinted notice
+          with its own mark separates it from the field below. */}
+      <View className="flex-row items-start gap-2 rounded-xl border border-warn-tile-border bg-warn-tile-bg p-3">
+        <AlertTriangle size={16} color={colors.warn} />
+        <Text className="min-w-0 flex-1 text-sm text-warn">
+          {t('codeReviewer.instructions.deprecation')}
+        </Text>
+      </View>
       {/* A multiline field takes the platform's generic text-view name on iOS,
           so the accessible name is the localized heading this screen renders.
           `max-h-[196px]` is the `p-3` padding (2 × 10.5) plus ten
@@ -158,23 +164,7 @@ function InstructionsEditor({
           </Pressable>
         </View>
       </InputAccessoryView>
-      <Button
-        disabled={save.isPending}
-        onPress={() => {
-          save.mutate(
-            { customInstructions: draftRef.current.trim() },
-            {
-              onSuccess: () => {
-                // The router.back() this triggers must not be intercepted by
-                // the dirty guard: `dirty` is still computed from the previous
-                // render's state at that point.
-                skipNextGuardRef.current = true;
-                onSaved();
-              },
-            }
-          );
-        }}
-      >
+      <Button disabled={pending} onPress={onSave}>
         <Text>{t('common.save')}</Text>
       </Button>
     </View>
@@ -199,6 +189,7 @@ function InstructionsScreen({
   const { data } = config;
   const failure = reviewConfigFailure(configBody, config.isFetching);
   const save = useSaveReviewConfig(scope, platform);
+  const { confirm, dialog: removalDialog } = useConfirmDialog();
   const { t } = useTranslation();
 
   // Draft in a ref over an uncontrolled defaultValue (apps/mobile/AGENTS.md
@@ -218,10 +209,36 @@ function InstructionsScreen({
     draftRef.current = initialRef.current;
   }, [data]);
 
-  const handleSave = async () => {
-    await save.mutateAsync({ customInstructions: draftRef.current.trim() });
-    initialRef.current = draftRef.current.trim();
+  // An emptied field is a removal: the stored text is the only copy, and the
+  // save that replaces it with nothing is the one action the screen cannot
+  // undo. The back guard's Save arrives here too, so the question lives with
+  // the save instead of with either control.
+  const handleSave = async (): Promise<SettingsBackGuardSaveOutcome> => {
+    if (draftRef.current.trim() === '' && initialRef.current.trim() !== '') {
+      const { promise, resolve } = Promise.withResolvers<boolean>();
+      confirm({
+        title: t('codeReviewer.instructions.clearTitle'),
+        message: t('codeReviewer.instructions.clearMessage'),
+        confirmLabel: t('common.remove'),
+        cancelLabel: t('common.keepEditing'),
+        onConfirm: () => {
+          resolve(true);
+        },
+        onCancel: () => {
+          resolve(false);
+        },
+      });
+      // Declining keeps the editor open with the draft; the back guard reads
+      // the outcome as "do not leave" and stays with it too.
+      if (!(await promise)) {
+        return 'declined';
+      }
+    }
+    const draft = draftRef.current.trim();
+    await save.mutateAsync({ customInstructions: draft });
+    initialRef.current = draft;
     setDirty(false);
+    return 'saved';
   };
 
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
@@ -230,10 +247,29 @@ function InstructionsScreen({
     onSave: handleSave,
   });
 
+  const handlePressSave = () => {
+    void (async () => {
+      try {
+        if ((await handleSave()) === 'declined') {
+          return;
+        }
+        // The router.back() this triggers must not be intercepted by the dirty
+        // guard: `dirty` is still computed from the previous render's state at
+        // that point.
+        skipNextGuardRef.current = true;
+        router.back();
+      } catch {
+        // The save mutation's centralized onError already toasted; the editor
+        // stays mounted with the draft.
+      }
+    })();
+  };
+
   return (
     <View className="flex-1 bg-background">
       <ReviewerHeader title={t('codeReviewer.instructions.title')} onBack={onBack} />
       {dialog}
+      {removalDialog}
       {failure ? (
         // A config read that failed, or one that stayed pending with nothing
         // in flight even after its automatic restart, gets the action that can
@@ -267,11 +303,8 @@ function InstructionsScreen({
                 onDirty={text => {
                   setDirty(text.trim() !== initialRef.current.trim());
                 }}
-                save={save}
-                onSaved={() => {
-                  router.back();
-                }}
-                skipNextGuardRef={skipNextGuardRef}
+                pending={save.isPending}
+                onSave={handlePressSave}
                 draftRef={draftRef}
               />
             )}

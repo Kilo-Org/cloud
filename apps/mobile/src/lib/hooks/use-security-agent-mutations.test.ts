@@ -34,10 +34,12 @@ import {
   SECURITY_OPERATION_REPLAY_FAILED_MESSAGE,
   SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
   SECURITY_SERVICE_UNAVAILABLE_MESSAGE,
+  securityMutationCopyKey,
   securityRetainsOperationKey,
   securitySyncIntentFingerprint,
   securitySyncPreconditionFor,
 } from '@/lib/security-agent-ledger';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 import {
   useSaveSecurityAgentConfig,
   useSetSecurityAgentEnabled,
@@ -152,6 +154,10 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 }));
 
 const ORG_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+// The English catalog sentence for a lapsed organization plan.
+const TRIAL_ENDED_COPY =
+  "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.";
 
 describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
   beforeEach(() => {
@@ -270,6 +276,16 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     expect(toastErrorMock).toHaveBeenCalledWith(
       'A security sync is already in progress. Please try again.'
     );
+  });
+
+  it('onError explains a lapsed organization trial instead of the generic line', () => {
+    useTriggerSecuritySync(ORG_ID);
+    const rejection = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+      data: { code: 'FORBIDDEN' },
+    });
+    lastCapturedOptions?.onError?.(mapSecuritySyncOperationError(rejection));
+    expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_COPY);
+    expect(toastErrorMock).not.toHaveBeenCalledWith(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
   });
 
   it('surfaces the in-progress copy and sends no app-error event for it', async () => {
@@ -599,6 +615,29 @@ describe('config-write onError copy', () => {
       expect.stringContaining('GitHub integration not found')
     );
   });
+
+  it('explains a lapsed organization trial on a settings save', () => {
+    useSaveSecurityAgentConfig(ORG_ID);
+    lastCapturedOptions?.onError?.(
+      Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+        data: { code: 'FORBIDDEN' },
+      })
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_COPY);
+    expect(toastErrorMock).not.toHaveBeenCalledWith(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+  });
+
+  it('explains a lapsed organization trial on the enable toggle too', () => {
+    useSetSecurityAgentEnabled(ORG_ID);
+    lastCapturedOptions?.onError?.(
+      Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+        data: { code: 'FORBIDDEN' },
+      })
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_COPY);
+  });
 });
 
 describe('scope.id network serialization (real MutationCache)', () => {
@@ -831,5 +870,20 @@ describe('ledger marker copy per surface', () => {
       'Could not complete this action. The problem needs fixing before you can retry.'
     );
     expect(isSecuritySyncRetryable(mappedForbidden)).toBe(false);
+  });
+
+  it('keeps the lapsed-trial reason on a sync and a dismissal, and stores it by key', () => {
+    for (const mapError of [mapSecuritySyncOperationError, mapSecurityDismissOperationError]) {
+      const rejection = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+        data: { code: 'FORBIDDEN' },
+      });
+      const mapped = mapError(rejection);
+      expect(mapped.message).toBe(TRIAL_ENDED_COPY);
+      // The dismissal draft stores the key and re-translates after a language
+      // change; freezing one language's sentence is the defect it avoids.
+      expect(securityMutationCopyKey(mapped)).toBe('common.organizationTrialEnded');
+      // The plan has to be fixed first, so a retry cannot succeed.
+      expect(isSecuritySyncRetryable(mapped)).toBe(false);
+    }
   });
 });

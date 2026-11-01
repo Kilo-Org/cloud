@@ -17,7 +17,8 @@ export const usage = '<fake-email>';
  * The organization this fixture owns. The trial is hard-expired (no seat
  * purchase, seats still required) so every organization mutation is refused
  * with `FORBIDDEN` / `Organization trial has expired.` — the state a mobile
- * code-reviewer config save has to explain.
+ * settings save has to explain, whether it writes the code-reviewer config or
+ * the Security Agent's (SLA, notifications, automation, enable toggle).
  */
 const ORGANIZATION_ID = 'd4f3b5c1-0000-4000-8000-6a7b8c9d0e01';
 
@@ -119,11 +120,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   console.log('This fixture represents: an organization whose trial ended, seen by its owner.');
   console.log('Supported saves are refused with the trial sentence; reads still work.');
-  console.log('Suggested next step: open the gate screen deep link on the signed-in app.');
+  console.log('Suggested next step: open a returned deep link on the signed-in mobile app.');
   return {
     userId,
     organizationId: ORGANIZATION_ID,
     organizationName: 'Reviewer trial gate lab',
     deepLink: `kiloapp:///(app)/code-reviewer/${ORGANIZATION_ID}/github/gate`,
+    securitySlaSettingsDeepLink: `kiloapp:///(app)/security-agent/${ORGANIZATION_ID}/settings/sla`,
+    securityOverviewDeepLink: `kiloapp:///(app)/security-agent/${ORGANIZATION_ID}`,
   };
 }

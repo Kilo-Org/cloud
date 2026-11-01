@@ -10,15 +10,15 @@ import {
 
 export { ReasoningDetailsTransform };
 
-export type ProviderId =
+export type ProviderType =
   | 'openrouter'
   | 'direct-byok'
   | 'inception'
-  | 'martian'
   | 'mistral'
   | 'vercel'
   | 'openai-chatgpt'
   | 'custom'
+  | 'custom-public'
   | 'dev-tools';
 
 export type BYOKResult = {
@@ -52,7 +52,7 @@ export type SecureProxyRoute = {
 };
 
 export type Provider = {
-  id: ProviderId;
+  id: ProviderType;
   /**
    * The ChatGPT connection that serves this provider. Set only on the delegated
    * "Sign in with ChatGPT" route, and it names the exact connection that paid

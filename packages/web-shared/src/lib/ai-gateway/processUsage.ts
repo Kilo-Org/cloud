@@ -48,7 +48,7 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import type { Provider, ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { Provider, ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
@@ -1254,7 +1254,7 @@ export function countAndStoreUsage(
 export function processOpenRouterUsage(
   usage: OpenRouterUsage | null | undefined,
   coreProps: NotYetCostedUsageStats,
-  provider: ProviderId,
+  provider: ProviderType,
   vercelProviderMetadata?: VercelProviderMetaData | null
 ): JustTheCostsUsageStats {
   // usage may be null when there's no response (e.g. error), so default to empty object
@@ -1284,7 +1284,7 @@ export async function parseMicrodollarUsageFromStream(
   stream: ReadableStream<Uint8Array>,
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
-  provider: ProviderId,
+  provider: ProviderType,
   statusCode: number,
   usesUserCredentials: boolean,
   requestStartedAt?: number
@@ -1415,7 +1415,7 @@ export function parseMicrodollarUsageFromString(
   fullResponse: string,
   kiloUserId: string,
   statusCode: number,
-  provider: ProviderId
+  provider: ProviderType
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as
     | (OpenAI.Chat.Completions.ChatCompletion &
@@ -1564,7 +1564,8 @@ export async function processTokenData(
 
   if (
     !usageStats.model || // fallback for failure cases
-    usageContext.provider === 'custom' // custom LLMs do not reveal their upstream model
+    usageContext.provider === 'custom' ||
+    usageContext.provider === 'custom-public' // custom LLMs do not reveal their upstream model
   ) {
     usageStats.model = usageContext.requested_model;
   }
@@ -1699,7 +1700,7 @@ export const mapToUsageStats = (
   { data }: OpenRouterGeneration,
   responseContent: string,
   kiloUserId: string,
-  provider: ProviderId
+  provider: ProviderType
 ): MicrodollarUsageStats => {
   let llmCostUsd;
   let nonInferenceCost_mUsd: number | undefined;

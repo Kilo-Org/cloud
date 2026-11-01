@@ -326,13 +326,13 @@ async function resolveCustomLlmProvider(
   }
 
   const { definition } = customLlm;
+  const isPublic = isPublicCustomLlm(definition);
   const provider = buildDirectProvider(
-    'custom',
+    isPublic ? 'custom-public' : 'custom',
     getCustomLlmApiKinds(definition),
     definition,
     await resolveCustomLlmAuth(credentials)
   );
-  const isPublic = isPublicCustomLlm(definition);
   return {
     kind: 'provider',
     provider: isPublic ? withoutPaidServerFeatures(provider) : provider,

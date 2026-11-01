@@ -41,7 +41,7 @@ import {
 import type {
   GatewayChatApiKind,
   Provider,
-  ProviderId,
+  ProviderType,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   computeOpenRouterCostFields,
@@ -400,7 +400,7 @@ const openRouterErrorResponseSchema = z.object({
   metadata: z.unknown().optional(),
 });
 
-async function providerNotAllowedResponse(providerId: ProviderId, response: Response) {
+async function providerNotAllowedResponse(providerId: ProviderType, response: Response) {
   if (providerId !== 'openrouter' || response.status !== 404) return undefined;
 
   let body: unknown;
@@ -434,7 +434,7 @@ export async function makeErrorReadable({
   response,
   userByokProviderIds,
 }: {
-  providerId: ProviderId;
+  providerId: ProviderType;
   requestedModel: string;
   request: GatewayRequest;
   response: Response;
@@ -1029,7 +1029,7 @@ function computeInceptionFimMicrodollarCost(usage: FimUsage): number {
   return Math.round(usage.prompt_tokens * 0.25 + usage.completion_tokens * 0.75);
 }
 
-function computeFimMicrodollarCost(usage: FimUsage, provider: ProviderId): number {
+function computeFimMicrodollarCost(usage: FimUsage, provider: ProviderType): number {
   switch (provider) {
     case 'mistral':
       return Math.round(usage.prompt_tokens * 0.3 + usage.completion_tokens * 0.9);
@@ -1043,7 +1043,7 @@ function computeFimMicrodollarCost(usage: FimUsage, provider: ProviderId): numbe
 
 function parseMistralFimUsageFromString(
   response: string,
-  provider: ProviderId,
+  provider: ProviderType,
   statusCode: number
 ): MicrodollarUsageStats {
   const json = JSON.parse(response) as MistralFimCompletion;
@@ -1075,7 +1075,7 @@ function parseMistralFimUsageFromString(
 async function parseMistralFimUsageFromStream(
   stream: ReadableStream<Uint8Array>,
   requestSpan: Span | undefined,
-  provider: ProviderId,
+  provider: ProviderType,
   statusCode: number,
   requestStartedAt: number | undefined
 ): Promise<MicrodollarUsageStats> {
@@ -1258,7 +1258,7 @@ function getEditCacheHitTokens(usage: EditUsage): number {
   return Math.min(usage.prompt_tokens, Math.max(usage.cached_input_tokens ?? 0, 0));
 }
 
-function computeEditMicrodollarCost(usage: EditUsage, provider: ProviderId): number {
+function computeEditMicrodollarCost(usage: EditUsage, provider: ProviderType): number {
   switch (provider) {
     case 'inception': {
       // Inception Mercury Edit 2 published rates (per 1M tokens):
@@ -1283,7 +1283,7 @@ function computeEditMicrodollarCost(usage: EditUsage, provider: ProviderId): num
 
 export function parseEditUsageFromResponse(
   response: string,
-  provider: ProviderId,
+  provider: ProviderType,
   statusCode: number
 ): MicrodollarUsageStats {
   const json = JSON.parse(response) as MercuryEditCompletionResponse;
@@ -1421,7 +1421,7 @@ function embeddingVercelCosts(vercelGateway: NonNullable<VercelProviderMetaData[
 export function parseEmbeddingUsageFromResponse(
   responseText: string,
   statusCode: number,
-  provider: ProviderId
+  provider: ProviderType
 ): MicrodollarUsageStats {
   const json = parseEmbeddingResponse(responseText, statusCode);
   const usage = json.usage;
@@ -1487,7 +1487,7 @@ export function parseTranscriptionUsageFromResponse(
   responseText: string,
   statusCode: number,
   requestedModel: string,
-  provider: ProviderId,
+  provider: ProviderType,
   generationId: string | null
 ): MicrodollarUsageStats {
   const json = JSON.parse(responseText) as TranscriptionResponse;

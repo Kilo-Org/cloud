@@ -25,6 +25,7 @@ where
     mu.usage_date >= dateadd(week, -1, current_date())
     and mu.usage_date < current_date()
     and mu.total_input_tokens > 0
+    -- Keep private/legacy custom usage excluded; public usage is persisted as 'custom-public'.
     and mu.provider != 'custom'
 group by 1, 2, 3
 order by 1 desc, 4 desc;

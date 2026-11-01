@@ -3,7 +3,7 @@ import type { EventSourceMessage } from 'eventsource-parser';
 import { captureException, captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { sentryRootSpan } from '../getRootSpan';
-import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type {
   JustTheCostsUsageStats,
   MicrodollarUsageStats,
@@ -49,7 +49,7 @@ export function processResponsesApiUsage(
   usage: ResponsesApiUsage | null | undefined,
   providerMetadata: VercelProviderMetaData | null | undefined,
   coreProps: NotYetCostedUsageStats,
-  provider: ProviderId
+  provider: ProviderType
 ): JustTheCostsUsageStats {
   // OpenAI-style input_tokens already includes cached and cache-write tokens.
   const inputTokens = usage?.input_tokens ?? 0;
@@ -83,7 +83,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
   stream: ReadableStream<Uint8Array>,
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
-  provider: ProviderId,
+  provider: ProviderType,
   statusCode: number,
   usesUserCredentials: boolean,
   requestStartedAt?: number
@@ -209,7 +209,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
 export function parseResponsesMicrodollarUsageFromString(
   fullResponse: string,
   statusCode: number,
-  provider: ProviderId
+  provider: ProviderType
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as ResponsesApiResponse | null;
 

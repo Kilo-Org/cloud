@@ -212,7 +212,7 @@ describe('a settings draft whose only change is invalid', () => {
   const criticalField = i18n.t('securityAgent.sla.remediationDeadlineA11y', {
     label: i18n.t('common.critical'),
   });
-  const leadTimeField = i18n.t('securityAgent.notifications.slaLeadTimeAccessibility');
+  const leadTimeField = i18n.t('securityAgent.notifications.slaLeadTimeLabel');
 
   it('confirms Back on the SLA screen and offers discard or keep editing', () => {
     config.data = configData;

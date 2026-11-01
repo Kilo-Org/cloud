@@ -40,14 +40,15 @@ export const SKILL_NAME_MAX_LENGTH = 100;
 /**
  * Server rule: `environment-contracts.ts`'s reserved names and prefixes. A key
  * the sandbox runtime owns is refused when a profile stores it, so the form
- * refuses it before the request. Keys reach this check upper-cased, and the
- * names are compared the same way.
+ * refuses it before the request. The form stores keys upper-cased, and the
+ * package list holds one lower-case name (`pnpm_config_store_dir`) that no
+ * upper-cased key can equal, so that name is left out rather than refusing a
+ * key the package accepts.
  */
 const RESERVED_VARIABLE_KEY_NAMES: ReadonlySet<string> = new Set([
   'HOME',
   'SESSION_ID',
   'SESSION_HOME',
-  'PNPM_CONFIG_STORE_DIR',
   'SANDBOX_CONTROL_CREDENTIAL',
   'SANDBOX_CONTROL_URL',
   'PROVIDER_INSTANCE_ID',

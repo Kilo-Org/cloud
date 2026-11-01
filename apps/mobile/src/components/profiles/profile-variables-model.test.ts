@@ -115,6 +115,8 @@ describe('validateVariableInput', () => {
     expect(validateVariableInput({ key: 'kilo_token', value: 'x' })).toBe('reserved');
     expect(validateVariableInput({ key: 'xdg_cache', value: 'x' })).toBe('reserved');
     expect(validateVariableInput({ key: 'API_KEY', value: 'x' })).toBeNull();
+    // The package list holds one lower-case name; an upper-cased key is not it.
+    expect(validateVariableInput({ key: 'PNPM_CONFIG_STORE_DIR', value: 'x' })).toBeNull();
     // An edit resends the stored key, so the rule applies to a new key only.
     expect(validateVariableInput({ key: 'HOME', value: 'x' }, [], { newKey: false })).toBeNull();
   });

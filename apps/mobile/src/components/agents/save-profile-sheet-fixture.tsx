@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRouter } from 'expo-router';
 
 import { SaveProfileSheet } from '@/components/agents/save-profile-sheet';
 
@@ -9,18 +9,17 @@ import { SaveProfileSheet } from '@/components/agents/save-profile-sheet';
  * Advanced Configuration panel, two editors and a save, so the design gate
  * opens it through this link instead.
  *
- * Saving is refused on purpose: the fixture must not create a profile on the
- * account that runs it.
+ * Closing leaves the route, and saving is refused on purpose: the fixture must
+ * not create a profile on the account that runs it.
  */
 export function SaveProfileSheetFixture() {
-  const [open, setOpen] = useState(true);
+  const router = useRouter();
   return (
     <SaveProfileSheet
-      visible={open}
       envVars={[{ key: 'DEMO_KEY', value: '1', isSecret: false }]}
       setupCommands={['npm ci']}
       onClose={() => {
-        setOpen(false);
+        router.back();
       }}
       onSave={() => Promise.resolve(false)}
     />

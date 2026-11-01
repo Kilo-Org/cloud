@@ -234,7 +234,6 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
             {autoAnalysisEnabled && (
               <>
                 <PillGroup
-                  className="ps-3"
                   label={t('securityAgent.automation.minimumSeverity')}
                   options={minSeverityOptions}
                   value={autoAnalysisMinSeverity}
@@ -268,7 +267,6 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
             {autoRemediationEnabled && (
               <>
                 <PillGroup
-                  className="ps-3"
                   label={t('securityAgent.automation.minimumSeverity')}
                   options={minSeverityOptions}
                   value={autoRemediationMinSeverity}
@@ -310,7 +308,6 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
             />
             {autoDismissEnabled && (
               <PillGroup
-                className="ps-3"
                 label={t('securityAgent.automation.confidenceThreshold')}
                 options={confidenceOptions}
                 value={autoDismissConfidenceThreshold}

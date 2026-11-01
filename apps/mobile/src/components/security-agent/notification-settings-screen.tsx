@@ -229,7 +229,6 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
             />
             {newFindingNotificationsEnabled && (
               <PillGroup
-                className="ps-3"
                 label={t('securityAgent.notifications.newFindingSeverityLabel')}
                 options={severityOptions}
                 value={newFindingNotificationMinSeverity}
@@ -270,15 +269,14 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
             {slaNotificationsEnabled && (
               <>
                 <PillGroup
-                  className="ps-3"
                   label={t('securityAgent.notifications.slaSeverityLabel')}
                   options={severityOptions}
                   value={slaNotificationMinSeverity}
                   disabled={!canManage}
                   onChange={setSlaNotificationMinSeverity}
                 />
-                <View className="gap-1.5 ps-3">
-                  <Text className="text-xs font-medium">
+                <View className="gap-1.5">
+                  <Text className="text-sm font-medium text-muted-foreground">
                     {t('securityAgent.notifications.slaLeadTimeLabel')}
                   </Text>
                   <Input

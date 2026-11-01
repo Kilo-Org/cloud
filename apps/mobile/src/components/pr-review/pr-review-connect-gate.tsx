@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/empty-state';
 import { GitHubIcon } from '@/components/icons/github-icon';
 import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
 import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
+import { PrReviewGateItemLine } from '@/components/pr-review/pr-review-gate-item-line';
 import { ProviderConnectGate } from '@/components/pr-review/pr-review-provider-connect-gate';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,7 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
 import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
-import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
+import { type ProviderPrPlatform, type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -34,6 +35,12 @@ type PrReviewConnectGateProps = {
   readonly platform?: ProviderPrPlatform;
   /** The selected organization for a provider check; null = personal scope. */
   readonly organizationId?: string | null;
+  /**
+   * The PR/MR the route opened, when it names one. The gate prints it above
+   * the account line so the reader can tell which item they are connecting
+   * for; a mount with no known item (the entry route) keeps the generic copy.
+   */
+  readonly prRef?: ProviderPrRef;
 };
 
 /**
@@ -71,6 +78,7 @@ export function PrReviewConnectGate({
   children,
   platform = 'github',
   organizationId = null,
+  prRef,
 }: PrReviewConnectGateProps) {
   const pathname = usePathname();
   // The entry route (`(app)/pr-review` → pathname `/pr-review`) is the one
@@ -80,16 +88,19 @@ export function PrReviewConnectGate({
     return <>{children}</>;
   }
   if (platform === 'github') {
-    return <GitHubConnectGate>{children}</GitHubConnectGate>;
+    return <GitHubConnectGate prRef={prRef}>{children}</GitHubConnectGate>;
   }
   return (
-    <ProviderConnectGate platform={platform} organizationId={organizationId}>
+    <ProviderConnectGate platform={platform} organizationId={organizationId} prRef={prRef}>
       {children}
     </ProviderConnectGate>
   );
 }
 
-function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
+function GitHubConnectGate({
+  children,
+  prRef,
+}: Readonly<{ children: ReactNode; prRef?: ProviderPrRef }>) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
@@ -198,6 +209,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
           title={revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
           description={
             <>
+              <PrReviewGateItemLine prRef={prRef} />
               <PrReviewContextLine />
               <Text variant="muted" className="text-center">
                 {revoked

@@ -9,7 +9,7 @@ import {
   type TextInputInstance,
   View,
 } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
@@ -99,7 +99,14 @@ function InstructionsEditor({
   };
 
   return (
-    <Animated.View entering={FadeIn.duration(200)} className="gap-4">
+    // No entrance animation on the loaded body: a Reanimated `entering` fade
+    // carries `initialValues: { opacity: 0 }`, so a cancelled or overwritten
+    // entrance (the app leaving the foreground mid-fade, a connection hiccup
+    // that remounts the editor, a layout animation taking the same property)
+    // leaves the note, the field and Save mounted at opacity 0 under a painted
+    // header, with no skeleton, no error and no retry. The body paints in the
+    // frame the read lands; only the skeleton's exit fade remains.
+    <View className="gap-4">
       {/* The deprecation note asks the reader to move the guidelines elsewhere;
           as body-coloured text it read as a field description. A tinted notice
           with its own mark separates it from the field below. */}
@@ -160,7 +167,7 @@ function InstructionsEditor({
       <Button disabled={pending} onPress={onSave}>
         <Text>{t('common.save')}</Text>
       </Button>
-    </Animated.View>
+    </View>
   );
 }
 

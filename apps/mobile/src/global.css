@@ -43,6 +43,13 @@
   --ring: #4f5a10;
   --radius: 0.625rem;
 
+  /* Selected-state fill of an in-page tab pill, and its label. The fill is the
+   * accent at the luminance its own label carries: the muted olive in both
+   * themes, because the dark accent (#ffdd00) as a full pill glares on the dark
+   * page and pulls focus from the panel the tab selects. */
+  --selection: #4f5a10;
+  --selection-foreground: #ffffff;
+
   /* Focus-only tokens */
   --ink2: #3c382f;
   --muted-soft: #a9a39a;
@@ -144,7 +151,9 @@
     --accent-foreground: #1a1a10;
     --primary: #ffdd00;
     --primary-foreground: #1a1a10;
-    /* Dark counterpart of the disabled primary fill; near-black ink clears 4.5:1. */
+    /* Dark counterpart of the disabled primary fill; near-black ink clears 4.5:1.
+     * The fill stays neutral and muted: a tinted fill reads as a second brand
+     * colour and competes with the enabled #ffdd00 it replaces. */
     --primary-disabled: #8a8680;
     --destructive: #f28b7a;
     --destructive-foreground: #1a1a10;
@@ -157,6 +166,11 @@
     --input: rgba(255, 255, 255, 0.35);
     --ring: #ffdd00;
     --radius: 0.625rem;
+
+    /* The muted olive on the dark page: the dark accent (#ffdd00) as a full
+     * pill glares and pulls focus from the panel the tab selects. */
+    --selection: #4f5a10;
+    --selection-foreground: #f2f0eb;
 
     /* Focus-only tokens */
     --ink2: #c4c1b8;
@@ -253,6 +267,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-selection: var(--selection);
+  --color-selection-foreground: var(--selection-foreground);
 
   /* Focus-only */
   --color-ink2: var(--ink2);

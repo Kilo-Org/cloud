@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AlertCircle, File as FileIcon, RotateCcw, X } from '@/components/ui/icons';
 import { requestA11yFocus } from '@/lib/a11y/announce';
+import { AttachmentChipErrorBoundary } from '@/components/agents/attachment-chip-error-boundary';
 
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
@@ -597,18 +598,24 @@ export function AttachmentPreviewStrip({
       keyboardShouldPersistTaps="handled"
     >
       {attachments.map((attachment, index) => (
-        <AttachmentChip
+        <AttachmentChipErrorBoundary
           key={attachment.id}
-          attachment={attachment}
-          index={index}
-          count={attachments.length}
+          attachmentId={attachment.id}
+          filename={attachment.filename}
           onRemove={removeChip}
-          onRetry={retryChip}
-          onMove={moveChip}
-          onReorder={reorderChips}
-          getOrderedWidths={getOrderedWidths}
-          onLayoutWidth={recordChipWidth}
-        />
+        >
+          <AttachmentChip
+            attachment={attachment}
+            index={index}
+            count={attachments.length}
+            onRemove={removeChip}
+            onRetry={retryChip}
+            onMove={moveChip}
+            onReorder={reorderChips}
+            getOrderedWidths={getOrderedWidths}
+            onLayoutWidth={recordChipWidth}
+          />
+        </AttachmentChipErrorBoundary>
       ))}
     </GestureScrollView>
   );

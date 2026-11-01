@@ -1,5 +1,6 @@
 import { resolveIncomingResume } from '@kilocode/app-shared/universal-links';
 
+import { opensAppRoutePath, opensDestination } from './deep-link-destination';
 import { resumeDeepLinkHref, setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
 import { parseGitHubReturnParams, setGitHubInstallReturnOutcome } from './github-install-return';
 import { isSystemSearchFamilyLink } from './system-search-families';
@@ -35,6 +36,9 @@ function getQueryFromRaw(raw: string): string | null {
  * 3. `initial` is the cold/warm discriminator — never try/catch around navigate
  *    as a readiness probe; `router.navigate` queues rather than throws when the
  *    router is unmounted, so try/catch silently drops cold deep links.
+ * 4. A link that names no screen the app can open returns FALSY, like a handled
+ *    one: the resolver must not run for it, because resolving a link replaces
+ *    the visible route and unmounts the screen beneath it, losing unsaved state.
  */
 export function redirectSystemPath({
   path,
@@ -45,11 +49,22 @@ export function redirectSystemPath({
 }): string | null {
   try {
     const resume = resolveIncomingResume(path);
-    // Untouched → default handling (and future share intent).
+    // Not a universal-link route: only the app's own route namespace reaches the
+    // navigator. Anything else (a bare `kiloapp:///`, an unknown path, another
+    // host) names no screen, and handing it over would replace the current
+    // screen — and with it unsaved state such as an open form — with whatever
+    // the resolver makes of it. A link that opens nothing leaves the screen be.
     if (resume == null) {
-      return path;
+      return opensAppRoutePath(path) ? path : null;
     }
     const { href, anchorMessageId } = resume;
+    // A table route that cannot open its destination is not a link either: the
+    // session row accepts any capture, and the session route answers an id that
+    // can never be a session with the composer, which is not what the link
+    // named and not a reason to leave the current screen.
+    if (!opensDestination(href)) {
+      return null;
+    }
     // A resume link carries `?at=<message id>`: stash it on the href so the
     // session screen can land on the recorded position. Links without an
     // anchor keep their href byte-identical (the AGENTS_TAB_HREF check below

@@ -119,6 +119,9 @@ describe('VoiceTestField', () => {
       placeholder: 'Tap the microphone and start speaking.',
       textAlignVertical: 'top',
     });
+    // The visible title above the field is a sibling `Text`, so without a name
+    // of its own the native node is named after the transcript it holds.
+    expect(input.props.accessibilityLabel).toBe('Test voice input');
     // Uncontrolled on iOS: text flows through the native draft writes, never a
     // controlled `value` prop.
     expect(input.props.value).toBeUndefined();

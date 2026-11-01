@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the details groups (identity, versions, advisories, dates, source) stay in one panel so their row order, dividers and tones read together */
 import {
   getFindingLifecycleStatusPresentation,
   getFindingSeverityPresentation,
@@ -14,13 +15,14 @@ import {
   FINDING_TONE_TO_KV_ROW_TONE,
 } from '@/components/security-agent/finding-tone';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
-import { DISMISSAL_REASON_PHRASE_KEYS } from '@/components/security-agent/dismissal-reason-keys';
+import { DISMISSAL_REASON_LABEL_KEYS } from '@/components/security-agent/dismissal-reason-keys';
 import { storedText } from '@/components/security-agent/stored-text';
-import { getDeadlineCopy } from '@/lib/security-agent-copy';
+import { getDeadlineCopy, isOpenDeadline } from '@/lib/security-agent-copy';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { formatDate } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
@@ -31,6 +33,14 @@ import { cn, firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
 type FindingDetailsPanelProps = {
   finding: SecurityFinding;
   scope: string;
+};
+
+/** One row of the dates group, before the group decides which row is the last. */
+type FindingDateRow = {
+  key: string;
+  label: string;
+  value: string;
+  tone?: 'default' | 'good' | 'warn' | 'danger' | 'muted';
 };
 
 // Catalog keys for app-shared presentation codes. The mobile app maps a
@@ -60,7 +70,7 @@ function getDismissalReasonLabel(reason: string | null): string {
   if (code === null) {
     return i18n.t('securityAgent.findingDetails.reasonAfterReview');
   }
-  const key = lookup(DISMISSAL_REASON_PHRASE_KEYS, code);
+  const key = lookup(DISMISSAL_REASON_LABEL_KEYS, code);
   return key ? i18n.t(key) : code.replaceAll('_', ' ');
 }
 
@@ -107,11 +117,9 @@ function DismissalOrSupersessionNote({
 
   return (
     <View className="gap-1 rounded-lg bg-secondary p-3">
-      <Text className="text-sm font-medium">{t('common.dismissed')}</Text>
+      <Text className="text-sm font-medium">{t('securityAgent.dismiss.reason')}</Text>
       <Text variant="muted" className="text-xs" selectable>
-        {t('securityAgent.findingDetails.dismissedBecause', {
-          reason: getDismissalReasonLabel(finding.ignored_reason),
-        })}
+        {getDismissalReasonLabel(finding.ignored_reason)}
       </Text>
     </View>
   );
@@ -152,6 +160,59 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
   const statusKey = supersedingFindingId ? FINDING_STATUS_KEYS.superseded : knownStatusKey;
   const statusLabel = statusKey ? t(statusKey) : finding.status;
   const advisoryUrl = finding.dependabot_html_url;
+  // An advisory description arrives as provider markdown: wrapped source lines
+  // carry a newline plus the indentation of the next line, which a plain Text
+  // paints as ragged, indented fragments instead of a paragraph. Collapsing the
+  // whitespace runs leaves one block that wraps to the card width.
+  const description = finding.description?.replaceAll(/\s+/g, ' ').trim() ?? '';
+  // Each instant the dates group shows carries the label that names it. A
+  // dismissed or superseded finding has no deadline left to meet, so its
+  // resolution date gets its own row and the SLA row stays with a finding that
+  // still has a deadline.
+  const dismissedAt = finding.status === 'ignored' ? parseTimestamp(finding.updated_at) : null;
+  const dateRows: FindingDateRow[] = [
+    {
+      key: 'detected',
+      label: t('securityAgent.findingDetails.detected'),
+      value: timeAgo(parseTimestamp(finding.first_detected_at), undefined, now),
+    },
+    ...(dismissedAt
+      ? [
+          {
+            key: 'dismissed',
+            label: supersedingFindingId
+              ? t('securityAgent.findingDetails.supersededOn')
+              : t('securityAgent.findingDetails.dismissedOn'),
+            value: formatDate(dismissedAt, i18n.language),
+          },
+        ]
+      : [
+          {
+            key: 'updated',
+            label: t('common.updated'),
+            value: timeAgo(parseTimestamp(finding.updated_at), undefined, now),
+          },
+        ]),
+    ...(finding.fixed_at
+      ? [
+          {
+            key: 'fixed',
+            label: t('securityAgent.filter.fixed'),
+            value: timeAgo(parseTimestamp(finding.fixed_at), undefined, now),
+          },
+        ]
+      : []),
+    ...(isOpenDeadline(deadline.state)
+      ? [
+          {
+            key: 'sla',
+            label: t('securityAgent.findingDetails.slaDeadline'),
+            value: deadlineCopy.detail,
+            tone: FINDING_TONE_TO_KV_ROW_TONE[deadline.tone],
+          },
+        ]
+      : []),
+  ];
 
   return (
     <View className="gap-4">
@@ -174,9 +235,9 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             />
           ) : null}
         </View>
-        {finding.description ? (
+        {description ? (
           <Text variant="muted" className="text-sm" selectable>
-            {finding.description}
+            {description}
           </Text>
         ) : null}
       </View>
@@ -191,10 +252,12 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         <KvRow
           label={t('securityAgent.findingDetails.package')}
           value={`${finding.package_name} (${finding.package_ecosystem})`}
+          valueDirection="ltr"
         />
         <KvRow
           label={t('securityAgent.findingDetails.vulnerableVersions')}
           value={firstNonEmpty(finding.vulnerable_version_range, t('common.unknown'))}
+          valueDirection={finding.vulnerable_version_range ? 'ltr' : undefined}
           selectable
         />
         <KvRow
@@ -203,15 +266,22 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             finding.patched_version,
             t('securityAgent.findingDetails.noPatchAvailable')
           )}
+          valueDirection={finding.patched_version ? 'ltr' : undefined}
           selectable
         />
         {finding.cve_id ? (
-          <KvRow label={t('securityAgent.findingDetails.cve')} value={finding.cve_id} selectable />
+          <KvRow
+            label={t('securityAgent.findingDetails.cve')}
+            value={finding.cve_id}
+            valueDirection="ltr"
+            selectable
+          />
         ) : null}
         {finding.ghsa_id ? (
           <KvRow
             label={t('securityAgent.findingDetails.ghsa')}
             value={finding.ghsa_id}
+            valueDirection="ltr"
             selectable
           />
         ) : null}
@@ -219,6 +289,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
           label={t('common.repository')}
           value={finding.repo_full_name}
           last={!finding.manifest_path}
+          valueDirection="ltr"
           selectable
         />
         {finding.manifest_path ? (
@@ -226,36 +297,22 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             label={t('securityAgent.findingDetails.manifest')}
             value={finding.manifest_path}
             last
+            valueDirection="ltr"
             selectable
           />
         ) : null}
       </View>
 
       <View className="rounded-lg bg-secondary px-3">
-        <KvRow
-          label={t('securityAgent.findingDetails.detected')}
-          value={timeAgo(parseTimestamp(finding.first_detected_at), undefined, now)}
-        />
-        <KvRow
-          label={t('common.updated')}
-          value={timeAgo(parseTimestamp(finding.updated_at), undefined, now)}
-          last={!finding.fixed_at && !finding.sla_due_at}
-        />
-        {finding.fixed_at ? (
+        {dateRows.map((row, index) => (
           <KvRow
-            label={t('securityAgent.filter.fixed')}
-            value={timeAgo(parseTimestamp(finding.fixed_at), undefined, now)}
-            last={!finding.sla_due_at}
+            key={row.key}
+            label={row.label}
+            value={row.value}
+            valueTone={row.tone}
+            last={index === dateRows.length - 1}
           />
-        ) : null}
-        {finding.sla_due_at ? (
-          <KvRow
-            label={t('securityAgent.findingDetails.slaDeadline')}
-            value={deadlineCopy.detail}
-            valueTone={FINDING_TONE_TO_KV_ROW_TONE[deadline.tone]}
-            last
-          />
-        ) : null}
+        ))}
       </View>
 
       <CollapsibleSection title={t('securityAgent.findingDetails.sourceRecord')}>
@@ -266,6 +323,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         <KvRow
           label={t('securityAgent.findingDetails.sourceId')}
           value={finding.source_id}
+          valueDirection="ltr"
           last
           selectable
         />

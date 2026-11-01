@@ -199,6 +199,35 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
 vi.mock('@/lib/hooks/use-code-reviews', () => ({
   useCreateManualReview: () => ({ mutate: status.mutate, isPending: status.pending }),
 }));
+// The real hook's contract, without expo-crypto: one key per fingerprint,
+// rotated when the fingerprint changes or when the caller rotates it. The
+// suite asserts which key each start carried.
+const operationKey = vi.hoisted(() => {
+  let current: { fingerprint: string; key: string } | null = null;
+  let minted = 0;
+  return {
+    reset() {
+      current = null;
+      minted = 0;
+    },
+    getKey: vi.fn((fingerprint: string) => {
+      if (current !== null && current.fingerprint !== fingerprint) {
+        current = null;
+      }
+      current ??= { fingerprint, key: `op-key-${(minted += 1)}` };
+      return current.key;
+    }),
+    rotateKey: vi.fn(() => {
+      current = null;
+    }),
+  };
+});
+vi.mock('@/lib/operation-key', () => ({
+  useHoistedOperationKey: () => ({
+    getKey: operationKey.getKey,
+    rotateKey: operationKey.rotateKey,
+  }),
+}));
 
 function findAllOfType(root: TestRenderer.ReactTestInstance, type: string) {
   return root.findAll(node => String(node.type) === type);
@@ -302,9 +331,12 @@ beforeEach(() => {
   status.loading = false;
   status.errorCode = null;
   status.pending = false;
-  status.mutate.mockClear();
+  status.mutate.mockReset();
   status.refetch.mockClear();
   status.push.mockClear();
+  operationKey.reset();
+  operationKey.getKey.mockClear();
+  operationKey.rotateKey.mockClear();
   scrollToSpy.mockClear();
 });
 
@@ -639,6 +671,220 @@ describe('ManualReviewScreen failed start', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('ManualReviewScreen start operation key', () => {
+  /** The client transport deadline, as the tRPC client reports it. */
+  function deadlineStall() {
+    return Object.assign(new Error('Request timed out after 15000ms'), {
+      name: 'RequestDeadlineError',
+    });
+  }
+
+  /** A refusal resending cannot fix (a lost role), so the intent ends. */
+  function terminalFailure() {
+    return Object.assign(new Error('Only members may start a review'), {
+      data: { code: 'FORBIDDEN', message: 'Only members may start a review' },
+    });
+  }
+
+  function primaryAction(root: TestRenderer.ReactTestInstance) {
+    return only(
+      findAllOfType(root, 'Button').filter(node => propOf(node, 'variant') !== 'outline'),
+      'primary action'
+    );
+  }
+
+  function retryAction(root: TestRenderer.ReactTestInstance) {
+    return only(
+      findAllOfType(root, 'Button').filter(node => propOf(node, 'variant') === 'outline'),
+      'retry action'
+    );
+  }
+
+  function press(node: TestRenderer.ReactTestInstance) {
+    act(() => {
+      (propOf(node, 'onPress') as () => void)();
+    });
+  }
+
+  type StartCallbacks = {
+    onSuccess?: (result: { reviewId: string }) => void;
+    onError?: (error: Error) => void;
+  };
+
+  type StartCall = { vars: unknown; callbacks: StartCallbacks };
+
+  /** Records each start's input and callbacks so the test can settle the call. */
+  function captureStarts(): StartCall[] {
+    const calls: StartCall[] = [];
+    status.mutate.mockImplementation((vars: unknown, callbacks: StartCallbacks) => {
+      calls.push({ vars, callbacks });
+      return undefined;
+    });
+    return calls;
+  }
+
+  /** The operation key a start carried, or '' when it carried none. */
+  function operationKeyOf(vars: unknown): string {
+    if (vars === null || typeof vars !== 'object' || !('operationKey' in vars)) {
+      return '';
+    }
+    const { operationKey: key } = vars;
+    return typeof key === 'string' ? key : '';
+  }
+
+  function sentOperationKeys(calls: StartCall[]): string[] {
+    return calls.map(call => operationKeyOf(call.vars));
+  }
+
+  it('reuses the draft key when a stalled start is retried', async () => {
+    const { renderer, unmount } = await renderScreen();
+    const starts = captureStarts();
+
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(GITHUB_PR_URL);
+    });
+    press(primaryAction(renderer.root));
+
+    // The control-plane deadline abandons the create; the retry control offers
+    // the same draft again.
+    act(() => starts[0]?.callbacks.onError?.(deadlineStall()));
+    press(retryAction(renderer.root));
+
+    expect(status.mutate).toHaveBeenCalledTimes(2);
+    const [first, retry] = sentOperationKeys(starts);
+    // The retry replays the create the server may already have accepted: same
+    // key, so the server resolves it to one review instead of creating a second.
+    expect(first).toBeTruthy();
+    expect(retry).toBe(first);
+
+    unmount();
+  });
+
+  it('mints a new key after the draft changes', async () => {
+    const { renderer, unmount } = await renderScreen();
+    const starts = captureStarts();
+
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(GITHUB_PR_URL);
+    });
+    press(primaryAction(renderer.root));
+
+    // A different draft is a different intent, even while the first request is
+    // still out: the edit withdraws that attempt.
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(
+        'https://github.com/drain-e2e-labs/notes/pull/43'
+      );
+    });
+    press(primaryAction(renderer.root));
+
+    const [first, second] = sentOperationKeys(starts);
+    expect(first).toBeTruthy();
+    expect(second).not.toBe(first);
+
+    unmount();
+  });
+
+  it('rotates the key after a start succeeds', async () => {
+    const { renderer, unmount } = await renderScreen();
+    const starts = captureStarts();
+
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(GITHUB_PR_URL);
+    });
+    press(primaryAction(renderer.root));
+    operationKey.rotateKey.mockClear();
+
+    act(() => starts[0]?.callbacks.onSuccess?.({ reviewId: 'review-1' }));
+
+    // The fulfilled intent ends, so a later Start of the same draft is a new
+    // review rather than a replay of this one.
+    expect(operationKey.rotateKey).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('leaves the current key alone when a withdrawn attempt fails late', async () => {
+    const { renderer, unmount } = await renderScreen();
+    const starts = captureStarts();
+
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(GITHUB_PR_URL);
+    });
+    press(primaryAction(renderer.root));
+    // The user edits the draft and starts again, which withdraws the first
+    // attempt and mints the second one's key.
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(
+        'https://github.com/drain-e2e-labs/notes/pull/43'
+      );
+    });
+    press(primaryAction(renderer.root));
+    operationKey.rotateKey.mockClear();
+    const [, currentKey] = sentOperationKeys(starts);
+
+    // The withdrawn attempt's terminal failure describes a draft that is no
+    // longer on screen: ending the current intent's key here would let its
+    // retry mint a third key and duplicate the review.
+    act(() => starts[0]?.callbacks.onError?.(terminalFailure()));
+    expect(operationKey.rotateKey).not.toHaveBeenCalled();
+
+    // The current draft's own stall keeps its key, so its retry replays.
+    act(() => starts[1]?.callbacks.onError?.(deadlineStall()));
+    press(retryAction(renderer.root));
+    const keys = sentOperationKeys(starts);
+    expect(keys[2]).toBe(currentKey);
+
+    unmount();
+  });
+
+  it('leaves the current key alone when a withdrawn attempt succeeds late', async () => {
+    const { renderer, unmount } = await renderScreen();
+    const starts = captureStarts();
+
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(GITHUB_PR_URL);
+    });
+    press(primaryAction(renderer.root));
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(
+        'https://github.com/drain-e2e-labs/notes/pull/43'
+      );
+    });
+    press(primaryAction(renderer.root));
+    operationKey.rotateKey.mockClear();
+
+    act(() => starts[0]?.callbacks.onSuccess?.({ reviewId: 'review-old-draft' }));
+
+    expect(operationKey.rotateKey).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('keeps the key for a retryable refusal and rotates it for a terminal one', async () => {
+    const { renderer, unmount } = await renderScreen();
+    const starts = captureStarts();
+
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(GITHUB_PR_URL);
+    });
+    press(primaryAction(renderer.root));
+    operationKey.rotateKey.mockClear();
+
+    act(() => starts[0]?.callbacks.onError?.(startFailure()));
+    expect(operationKey.rotateKey).not.toHaveBeenCalled();
+
+    press(retryAction(renderer.root));
+    const [first, retry] = sentOperationKeys(starts);
+    expect(retry).toBe(first);
+
+    act(() => starts[1]?.callbacks.onError?.(terminalFailure()));
+    expect(operationKey.rotateKey).toHaveBeenCalledTimes(1);
+
+    unmount();
   });
 });
 

@@ -24121,6 +24121,11 @@
           "type": "string",
           "maxLength": 4000
         },
+        "operationKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
         "council": {
           "type": "object",
           "properties": {
@@ -24245,9 +24250,10 @@
       "modelslug",
       "thinkingeffort",
       "instructions",
+      "operationkey",
       "council"
     ],
-    "searchBlob": "organizations.reviewAgent.createManualReviewJob Start a manual code review on a pull request or merge request for an organization. Use to request an on-demand review. organizations reviewagent createmanualreviewjob organizationid platform url modelslug thinkingeffort instructions council organizationId platform url modelSlug thinkingEffort instructions council"
+    "searchBlob": "organizations.reviewAgent.createManualReviewJob Start a manual code review on a pull request or merge request for an organization. Use to request an on-demand review. organizations reviewagent createmanualreviewjob organizationid platform url modelslug thinkingeffort instructions operationkey council organizationId platform url modelSlug thinkingEffort instructions operationKey council"
   },
   "organizations.reviewAgent.getBitbucketReadiness": {
     "path": "organizations.reviewAgent.getBitbucketReadiness",
@@ -28183,6 +28189,11 @@
           "type": "string",
           "maxLength": 4000
         },
+        "operationKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
         "council": {
           "type": "object",
           "properties": {
@@ -28304,9 +28315,10 @@
       "modelslug",
       "thinkingeffort",
       "instructions",
+      "operationkey",
       "council"
     ],
-    "searchBlob": "personalReviewAgent.createManualReviewJob Manually start a code review on a repository, pull request, or commit instead of waiting for an automatic trigger. Use it to run the AI review agent on demand. personalreviewagent createmanualreviewjob platform url modelslug thinkingeffort instructions council platform url modelSlug thinkingEffort instructions council"
+    "searchBlob": "personalReviewAgent.createManualReviewJob Manually start a code review on a repository, pull request, or commit instead of waiting for an automatic trigger. Use it to run the AI review agent on demand. personalreviewagent createmanualreviewjob platform url modelslug thinkingeffort instructions operationkey council platform url modelSlug thinkingEffort instructions operationKey council"
   },
   "personalReviewAgent.getGitHubStatus": {
     "path": "personalReviewAgent.getGitHubStatus",

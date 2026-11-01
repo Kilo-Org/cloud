@@ -531,29 +531,32 @@ function concatenatedRepeatFactor(node: PatternNode): number {
   if (node.kind !== 'sequence') return 1;
   const cached = concatenatedRepeatFactors.get(node);
   if (cached !== undefined) return cached;
+  const items = node.items.filter(consumesChars);
+  const one: number[] = [];
+  const two: number[] = [];
   let combined = 1;
-  let multiplied = 0;
-  let run = 1;
-  let boundary: CharSet | undefined;
-  const closeRun = () => {
-    if (multiplied > 1) combined = Math.max(combined, run);
-  };
-  for (const item of node.items) {
-    if (!consumesChars(item)) continue;
+  for (const [index, item] of items.entries()) {
     const factor = repeatFactor(item);
-    if (boundary !== undefined && overlaps(boundary, firstSet(item))) {
-      run = product(run, factor);
-    } else {
-      closeRun();
-      run = factor;
-      multiplied = 0;
+    let bestOne = factor > 1 ? factor : 0;
+    let bestTwo = 0;
+    for (let left = index - 1; left >= 0; left--) {
+      const previous = items[left];
+      if (previous === undefined) continue;
+      if (overlaps(lastSet(previous), firstSet(item))) {
+        const beforeTwo = two[left] ?? 0;
+        const beforeOne = one[left] ?? 0;
+        if (beforeTwo > 0) bestTwo = Math.max(bestTwo, product(beforeTwo, factor));
+        if (beforeOne > 0) {
+          if (factor > 1) bestTwo = Math.max(bestTwo, product(beforeOne, factor));
+          else bestOne = Math.max(bestOne, beforeOne);
+        }
+      }
+      if (!canBeEmpty(previous)) break;
     }
-    if (factor > 1) multiplied++;
-    boundary = canBeEmpty(item)
-      ? union([boundary ?? new Set<string>(), lastSet(item)])
-      : lastSet(item);
+    one.push(bestOne);
+    two.push(bestTwo);
+    combined = Math.max(combined, bestTwo);
   }
-  closeRun();
   concatenatedRepeatFactors.set(node, combined);
   return combined;
 }

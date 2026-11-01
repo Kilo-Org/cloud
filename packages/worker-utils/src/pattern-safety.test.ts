@@ -33,6 +33,7 @@ describe('pattern safety', () => {
     '(?=a{1,4}a{1,4}b)x',
     '(?:ab)+a+',
     '^(?:\\d{3}-)?\\d{3}$',
+    'a{1,4}b?a{1,4}',
   ])('accepts %s', pattern => {
     expect(patternSafetyIssue(pattern)).toBeNull();
   });
@@ -51,6 +52,8 @@ describe('pattern safety', () => {
     ['a{1,4}a{1,4}a{1,5}b', PATTERN_ISSUE_MESSAGES.nested],
     ['(a{1,8}a{1,8}){2}', PATTERN_ISSUE_MESSAGES.nested],
     ['a{1,100}(?:b{1,100})?a{1,100}', PATTERN_ISSUE_MESSAGES.nested],
+    ['a{1,100}b?a{1,100}', PATTERN_ISSUE_MESSAGES.nested],
+    ['a{1,100}b?a{1,100}b?a{1,100}', PATTERN_ISSUE_MESSAGES.nested],
     ['(a|a)+', PATTERN_ISSUE_MESSAGES.ambiguous],
     ['(a|aa)+', PATTERN_ISSUE_MESSAGES.ambiguous],
     ['(a|b|a)+', PATTERN_ISSUE_MESSAGES.ambiguous],

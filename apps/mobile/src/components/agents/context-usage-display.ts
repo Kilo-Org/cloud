@@ -78,9 +78,9 @@ export type HeaderPillContent = {
    * What the cost slot paints:
    *
    * - `label`: the session's cost, as text.
-   * - `loading`: a bar the width of that label, while the value is still on its
-   *   way. The dash it replaces read as missing data and was narrower than the
-   *   label, so the pill grew a value out of a smaller pill.
+   * - `loading`: one bar over the whole value row, while the value is still on
+   *   its way. A dash beside the bar read as half-painted content, and the bar
+   *   alone holds the width the dash and the label will take.
    * - `unreported`: the dash, in the label's width. The session settled without
    *   a cost, so nothing will fill the slot; it keeps the width so the pill does
    *   not shrink when it settles.
@@ -145,14 +145,15 @@ export function getHeaderPillContent({
   }
 
   const costText = hasMessages ? formatSessionTotalCost(totalCostMicrodollars) : null;
-  // Nothing has reported usage yet. The pill keeps both value slots, each
+  // Nothing has reported usage yet. A settled pill keeps both value slots, each
   // marked with the dash, instead of collapsing to a bare ring: the header then
-  // reads as the same pill before and after the transcript resolves, and a
-  // settled pill fills the slots it already had. Neither dash stands in for a
-  // value that has arrived.
+  // reads as the same pill before and after the transcript resolves, and the
+  // slots it showed fill in place. Neither dash stands in for a value that has
+  // arrived, so the pill while it still resolves paints one bar across the row
+  // instead of a dash beside it.
   if (!hasMessages) {
     return {
-      primary: UNKNOWN_WINDOW_LABEL,
+      primary: loading ? null : UNKNOWN_WINDOW_LABEL,
       secondary: loading ? null : UNKNOWN_WINDOW_LABEL,
       costSlot: loading ? 'loading' : 'unreported',
       tone: 'neutral',

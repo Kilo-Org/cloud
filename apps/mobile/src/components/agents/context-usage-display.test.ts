@@ -68,11 +68,13 @@ const unreported: HeaderPillContent = {
 };
 
 /**
- * The same pill while the session still resolves: the cost slot holds a loading
- * bar instead of a dash, so the pill is already as wide as its loaded form.
+ * The same pill while the session still resolves: no dash is painted, and the
+ * cost slot is one bar across the row the dash and the label will take, so the
+ * pill is already as wide as its loaded form.
  */
 const unreportedWhileLoading: HeaderPillContent = {
   ...unreported,
+  primary: null,
   secondary: null,
   costSlot: 'loading',
   usageUnavailable: false,

@@ -325,9 +325,9 @@ describe('SessionContextMetrics', () => {
     expect((loading.props as { accessibilityLabel?: string }).accessibilityLabel).not.toContain(
       'usage unavailable'
     );
-    // One dash for the unresolved context window, one bar where the cost
-    // label will land: the pill reads as loading instead of as missing data.
-    expect(dashes(loading)).toHaveLength(1);
+    // No dash while the row loads: the pill reads as a clean skeleton instead of
+    // a dash with half-painted content beside it.
+    expect(dashes(loading)).toHaveLength(0);
     const loadingBars = bars(loading);
     expect(loadingBars).toHaveLength(1);
     const loadingBar = loadingBars[0];
@@ -335,7 +335,9 @@ describe('SessionContextMetrics', () => {
       throw new Error('expected the cost loading bar');
     }
     const barClassName = (loadingBar.props as { className?: string }).className ?? '';
-    expect(barClassName).toContain('w-8');
+    // One bar over the width the settled `— $0.40` row takes, so the pill keeps
+    // its width across the settle.
+    expect(barClassName).toContain('w-11');
     // `muted` equals the pill's own `secondary` fill, so a default-tone bar
     // would paint nothing here.
     expect(barClassName).toContain('bg-muted-soft');

@@ -104,7 +104,7 @@ export function SessionContextMetrics({
   } else if (content.costSlot === 'loading') {
     costSlot = (
       <View accessibilityElementsHidden importantForAccessibility="no">
-        <Skeleton className="h-2 w-8 rounded-[2px] bg-muted-soft" />
+        <Skeleton className="h-2 w-11 rounded-[2px] bg-muted-soft" />
       </View>
     );
   } else if (content.costSlot === 'unreported') {
@@ -128,17 +128,19 @@ export function SessionContextMetrics({
         arcFraction={content.arcFraction}
         tone={content.tone}
       />
-      {content.primary != null ? (
+      {content.primary != null || costSlot != null ? (
         <View className="min-w-0 shrink flex-row items-baseline gap-1">
-          <Text
-            numberOfLines={1}
-            className={cn(
-              'min-w-0 shrink text-xs font-semibold tabular-nums',
-              toneTextClass(content.tone)
-            )}
-          >
-            {content.primary}
-          </Text>
+          {content.primary != null ? (
+            <Text
+              numberOfLines={1}
+              className={cn(
+                'min-w-0 shrink text-xs font-semibold tabular-nums',
+                toneTextClass(content.tone)
+              )}
+            >
+              {content.primary}
+            </Text>
+          ) : null}
           {costSlot}
         </View>
       ) : null}

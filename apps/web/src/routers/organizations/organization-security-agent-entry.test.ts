@@ -295,6 +295,36 @@ describe('organization Security Agent entry for the organization workflow connec
     ]);
   });
 
+  test('does not let an ineligible older roleless row shadow a valid one', async () => {
+    // The older association is not eligible itself (its canonical row is gone),
+    // so the organization that owns the valid association keeps the dashboard.
+    const shadowOrganizationId = (await createTestOrganization('Shadow', userId, 0)).id;
+    const organizationId = await createOrganization('Security entry, after an invalid sibling');
+    const staleCanonical = await insertCanonicalInstallation('889012');
+    await db
+      .update(github_app_installations)
+      .set({ lifecycle_state: 'suspended', suspended_at: new Date().toISOString() })
+      .where(eq(github_app_installations.id, staleCanonical.id));
+    await insertOrganizationInstallation({
+      organizationId: shadowOrganizationId,
+      installationId: '889013',
+      canonicalId: staleCanonical.id,
+      overrides: { created_at: '2026-01-01T00:00:00.000Z' },
+    });
+    const canonical = await insertCanonicalInstallation('889013');
+    await insertOrganizationInstallation({
+      organizationId,
+      installationId: '889013',
+      canonicalId: canonical.id,
+      overrides: { created_at: '2026-02-01T00:00:00.000Z' },
+    });
+
+    const caller = await createCallerForUser(userId);
+    expect(
+      await caller.organizations.securityAgent.getPermissionStatus({ organizationId })
+    ).toMatchObject({ hasIntegration: true });
+  });
+
   test('keeps the setup state for a roleless installation that is not healthy', async () => {
     const organizationId = await createOrganization('Security entry, unhealthy');
     await insertOrganizationInstallation({

@@ -93,12 +93,37 @@ export function organizationWorkflowGitHubConnectionSql(): SQL {
           AND COALESCE(sibling.github_app_type, 'standard') =
             COALESCE(${platform_integrations.github_app_type}, 'standard')
           AND sibling.github_connection_role IS NULL
+          AND sibling.owned_by_organization_id IS NOT NULL
           AND sibling.integration_type = 'app'
+          AND sibling.platform_installation_id ~ '^[1-9][0-9]*$'
+          AND COALESCE(sibling.github_app_type, 'standard') IN ('standard', 'lite')
           AND sibling.integration_status = 'active'
           AND sibling.suspended_at IS NULL
           AND sibling.auth_invalid_at IS NULL
           AND sibling.github_disconnected_at IS NULL
           AND NOT (COALESCE(sibling.metadata, '{}'::jsonb) ? 'github_dedup')
+          AND (
+            EXISTS (
+              SELECT 1
+              FROM github_app_installations canonical
+              WHERE canonical.id = sibling.github_installation_id
+                AND canonical.installation_id = sibling.platform_installation_id
+                AND canonical.github_app_type = COALESCE(sibling.github_app_type, 'standard')
+                AND canonical.lifecycle_state = 'active'
+                AND canonical.suspended_at IS NULL
+                AND canonical.deleted_at IS NULL
+                AND canonical.auth_invalid_at IS NULL
+            )
+            OR (
+              sibling.github_installation_id IS NULL
+              AND NOT EXISTS (
+                SELECT 1
+                FROM github_app_installations canonical
+                WHERE canonical.installation_id = sibling.platform_installation_id
+                  AND canonical.github_app_type = COALESCE(sibling.github_app_type, 'standard')
+              )
+            )
+          )
           AND (sibling.created_at, sibling.id) < (
             ${platform_integrations.created_at},
             ${platform_integrations.id}

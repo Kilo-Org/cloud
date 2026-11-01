@@ -3956,6 +3956,7 @@
     "keyLabel": "Kľúč",
     "keyTooLong": "Kľúč môže mať maximálne 128 znakov",
     "keyDuplicate": "Tento kľúč už v profile existuje",
+    "keyReserved": "Tento kľúč je vyhradený",
     "keyWillBeSavedAs": "Uloží sa ako {{key}}",
     "valueLabel": "Hodnota",
     "valueRequired": "Zadajte hodnotu",

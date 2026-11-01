@@ -3956,6 +3956,7 @@
     "keyLabel": "Raktas",
     "keyTooLong": "Raktas gali būti ne ilgesnis kaip 128 simboliai",
     "keyDuplicate": "Šis raktas jau yra profilyje",
+    "keyReserved": "Šis raktas yra rezervuotas",
     "keyWillBeSavedAs": "Bus išsaugota kaip {{key}}",
     "valueLabel": "Vertė",
     "valueRequired": "Įveskite reikšmę",

@@ -8,7 +8,11 @@
  * edit applies.
  */
 
-import { cleanVariableKey, VARIABLE_KEY_MAX_LENGTH } from '@/lib/agent-profile-forms';
+import {
+  cleanVariableKey,
+  isReservedVariableKey,
+  VARIABLE_KEY_MAX_LENGTH,
+} from '@/lib/agent-profile-forms';
 
 /** The fields of a variable the screen reads. Structural, so a test needs no tRPC type. */
 export type ProfileVarSource = Readonly<{
@@ -44,7 +48,7 @@ export function variableRows(vars: readonly ProfileVarSource[]): VariableRow[] {
   }));
 }
 
-export type VariableInputError = 'empty' | 'too-long' | 'duplicate' | 'value-required';
+export type VariableInputError = 'empty' | 'too-long' | 'duplicate' | 'reserved' | 'value-required';
 
 /** Options the caller's surface adds to the shared key rules. */
 export type VariableInputRules = Readonly<{
@@ -55,6 +59,12 @@ export type VariableInputRules = Readonly<{
    * editor saves `KEY=` too.
    */
   requireValue?: boolean;
+  /**
+   * Refuse a key the sandbox runtime owns. A stored key keeps saving: the
+   * package applies the rule when a profile stores a key for the first time, so
+   * an edit of an older row must not be blocked here.
+   */
+  newKey?: boolean;
 }>;
 
 /**
@@ -64,8 +74,8 @@ export type VariableInputRules = Readonly<{
  * value is refused too. `takenKeys` are the
  * profile's stored keys: the server upserts on `(profile_id, key)` with the
  * cleaned key the form sends, so a new key that normalizes onto an existing one
- * would silently replace that variable. Returns an error code, or `null` when
- * valid.
+ * would silently replace that variable. `newKey` (on by default) also applies
+ * the reserved-name rule. Returns an error code, or `null` when valid.
  */
 export function validateVariableInput(
   input: Readonly<{ key: string; value: string }>,
@@ -81,6 +91,9 @@ export function validateVariableInput(
   }
   if (takenKeys.includes(cleanVariableKey(key))) {
     return 'duplicate';
+  }
+  if (rules.newKey !== false && isReservedVariableKey(savedVariableKey(key))) {
+    return 'reserved';
   }
   if (rules.requireValue === true && input.value.trim().length === 0) {
     return 'value-required';

@@ -3844,6 +3844,7 @@
     "keyLabel": "Çelësi",
     "keyTooLong": "Çelësi duhet të ketë 128 karaktere ose më pak",
     "keyDuplicate": "Ky çelës ekziston tashmë në profil",
+    "keyReserved": "Ky çelës është i rezervuar",
     "keyWillBeSavedAs": "Do të ruhet si {{key}}",
     "valueLabel": "Vlera",
     "valueRequired": "Futni një vlerë",

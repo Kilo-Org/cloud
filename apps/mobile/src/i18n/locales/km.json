@@ -3844,6 +3844,7 @@
     "keyLabel": "សោ",
     "keyTooLong": "សោត្រូវតែមាន 128 តួអក្សរ ឬតិចជាងនេះ",
     "keyDuplicate": "សោនេះមានរួចហើយនៅក្នុងកម្រងព័ត៌មាន",
+    "keyReserved": "សោនេះត្រូវបានបម្រុងទុក",
     "keyWillBeSavedAs": "នឹងត្រូវរក្សាទុកជា {{key}}",
     "valueLabel": "តម្លៃ",
     "valueRequired": "បញ្ចូលតម្លៃ",

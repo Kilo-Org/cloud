@@ -3900,6 +3900,7 @@
     "keyLabel": "מַפְתֵחַ",
     "keyTooLong": "המפתח חייב להכיל 128 תווים או פחות",
     "keyDuplicate": "המפתח הזה כבר קיים בפרופיל",
+    "keyReserved": "המפתח הזה שמור",
     "keyWillBeSavedAs": "יישמר כ-{{key}}",
     "valueLabel": "עֵרֶך",
     "valueRequired": "הזן ערך",

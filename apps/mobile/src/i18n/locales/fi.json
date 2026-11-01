@@ -3844,6 +3844,7 @@
     "keyLabel": "Avain",
     "keyTooLong": "Avaimessa saa olla enintään 128 merkkiä",
     "keyDuplicate": "Tämä avain on jo profiilissa",
+    "keyReserved": "Tämä avain on varattu",
     "keyWillBeSavedAs": "Tallennetaan nimellä {{key}}",
     "valueLabel": "Arvo",
     "valueRequired": "Anna arvo",

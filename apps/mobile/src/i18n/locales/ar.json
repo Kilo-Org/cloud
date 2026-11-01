@@ -4068,6 +4068,7 @@
     "keyLabel": "مفتاح",
     "keyTooLong": "يجب ألا يزيد المفتاح عن 128 حرفًا",
     "keyDuplicate": "هذا المفتاح موجود بالفعل في الملف الشخصي",
+    "keyReserved": "هذا المفتاح محجوز",
     "keyWillBeSavedAs": "سيُحفظ باسم {{key}}",
     "valueLabel": "قيمة",
     "valueRequired": "أدخل قيمة",

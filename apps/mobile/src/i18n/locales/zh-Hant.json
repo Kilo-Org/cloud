@@ -3844,6 +3844,7 @@
     "keyLabel": "鍵",
     "keyTooLong": "鍵不能超過 128 個字元",
     "keyDuplicate": "此鍵已存在於設定檔中",
+    "keyReserved": "此鍵為系統保留",
     "keyWillBeSavedAs": "將儲存為 {{key}}",
     "valueLabel": "值",
     "valueRequired": "輸入值",

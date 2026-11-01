@@ -3844,6 +3844,7 @@
     "keyLabel": "Kī",
     "keyTooLong": "Kia 128 pūāhua iti iho rānei te kī",
     "keyDuplicate": "Kua noho kē tēnei kī i te kōtaha",
+    "keyReserved": "Kua rāhuitia tēnei kī",
     "keyWillBeSavedAs": "Ka penapenatia hei {{key}}",
     "valueLabel": "Uara",
     "valueRequired": "Whakauruhia he uara",

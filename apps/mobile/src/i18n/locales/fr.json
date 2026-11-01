@@ -3906,6 +3906,7 @@
     "keyLabel": "Clé",
     "keyTooLong": "La clé doit contenir 128 caractères ou moins",
     "keyDuplicate": "Cette clé existe déjà dans le profil",
+    "keyReserved": "Cette clé est réservée",
     "keyWillBeSavedAs": "Sera enregistrée sous {{key}}",
     "valueLabel": "Valeur",
     "valueRequired": "Entrez une valeur",

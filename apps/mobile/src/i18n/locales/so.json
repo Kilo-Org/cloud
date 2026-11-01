@@ -3844,6 +3844,7 @@
     "keyLabel": "Furaha",
     "keyTooLong": "Furaha waa inuu ahaadaa 128 xaraf ama ka yar",
     "keyDuplicate": "Furahan hore ayuu ugu jiraa borofiilka",
+    "keyReserved": "Furahan waa la hayaa",
     "keyWillBeSavedAs": "Waxaa lagu kaydin doonaa {{key}}",
     "valueLabel": "Qiimaha",
     "valueRequired": "Geli qiimo",

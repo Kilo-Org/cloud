@@ -3844,6 +3844,7 @@
     "keyLabel": "Sleutel",
     "keyTooLong": "Sleutel moet 128 karakters of minder wees",
     "keyDuplicate": "Hierdie sleutel bestaan reeds in die profiel",
+    "keyReserved": "Hierdie sleutel is gereserveer",
     "keyWillBeSavedAs": "Sal as {{key}} gestoor word",
     "valueLabel": "Waarde",
     "valueRequired": "Voer 'n waarde in",

@@ -3844,6 +3844,7 @@
     "keyLabel": "की",
     "keyTooLong": "की 128 अक्षरे किंवा कमी असावी",
     "keyDuplicate": "ही की आधीपासून प्रोफाइलमध्ये आहे",
+    "keyReserved": "ही की राखीव आहे",
     "keyWillBeSavedAs": "{{key}} म्हणून जतन होईल",
     "valueLabel": "मूल्य",
     "valueRequired": "मूल्य एंटर करा",

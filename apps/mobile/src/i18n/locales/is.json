@@ -3844,6 +3844,7 @@
     "keyLabel": "Lykill",
     "keyTooLong": "Lykillinn má vera að hámarki 128 stafir",
     "keyDuplicate": "Þessi lykill er þegar til í prófílnum",
+    "keyReserved": "Þessi lykill er frátekinn",
     "keyWillBeSavedAs": "Verður vistað sem {{key}}",
     "valueLabel": "Gildi",
     "valueRequired": "Sláðu inn gildi",

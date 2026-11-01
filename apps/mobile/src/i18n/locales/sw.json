@@ -3844,6 +3844,7 @@
     "keyLabel": "Ufunguo",
     "keyTooLong": "Ufunguo lazima uwe na vibambo 128 au chini yake",
     "keyDuplicate": "Ufunguo huu tayari upo katika wasifu",
+    "keyReserved": "Ufunguo huu umehifadhiwa",
     "keyWillBeSavedAs": "Itahifadhiwa kama {{key}}",
     "valueLabel": "Thamani",
     "valueRequired": "Ingiza thamani",

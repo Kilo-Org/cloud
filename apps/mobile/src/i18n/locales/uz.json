@@ -3844,6 +3844,7 @@
     "keyLabel": "Kalit",
     "keyTooLong": "Kalit 128 ta belgi yoki undan kam bo'lishi kerak",
     "keyDuplicate": "Bu kalit profilda allaqachon mavjud",
+    "keyReserved": "Bu kalit band qilingan",
     "keyWillBeSavedAs": "{{key}} sifatida saqlanadi",
     "valueLabel": "Qiymat",
     "valueRequired": "Qiymatni kiriting",

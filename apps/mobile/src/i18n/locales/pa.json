@@ -3850,6 +3850,7 @@
     "keyLabel": "ਕੁੰਜੀ",
     "keyTooLong": "ਕੁੰਜੀ 128 ਅੱਖਰਾਂ ਜਾਂ ਘੱਟ ਦੀ ਹੋਣੀ ਚਾਹੀਦੀ ਹੈ",
     "keyDuplicate": "ਇਹ ਕੁੰਜੀ ਪਹਿਲਾਂ ਹੀ ਪ੍ਰੋਫਾਈਲ ਵਿੱਚ ਮੌਜੂਦ ਹੈ",
+    "keyReserved": "ਇਹ ਕੁੰਜੀ ਰਾਖਵੀਂ ਹੈ",
     "keyWillBeSavedAs": "{{key}} ਵਜੋਂ ਸੰਭਾਲਿਆ ਜਾਵੇਗਾ",
     "valueLabel": "ਮੁੱਲ",
     "valueRequired": "ਇੱਕ ਮੁੱਲ ਦਰਜ ਕਰੋ",

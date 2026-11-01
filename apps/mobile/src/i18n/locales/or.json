@@ -3844,6 +3844,7 @@
     "keyLabel": "ଚାବି",
     "keyTooLong": "ଚାବି 128 ଅକ୍ଷର କିମ୍ବା କମ୍ ହେବା ଉଚିତ୍",
     "keyDuplicate": "ଏହି ଚାବି ପୂର୍ବରୁ ପ୍ରୋଫାଇଲରେ ଅଛି",
+    "keyReserved": "ଏହି ଚାବି ସଂରକ୍ଷିତ ଅଛି",
     "keyWillBeSavedAs": "{{key}} ଭାବରେ ସଞ୍ଚୟ ହେବ",
     "valueLabel": "ମୂଲ୍ୟ",
     "valueRequired": "ଏକ ମୂଲ୍ୟ ପ୍ରବେଶ କରନ୍ତୁ।",

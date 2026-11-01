@@ -3844,6 +3844,7 @@
     "keyLabel": "چابی",
     "keyTooLong": "چابی 128 حروف یا اس سے کم ہونی چاہیے",
     "keyDuplicate": "یہ چابی پہلے سے پروفائل میں موجود ہے",
+    "keyReserved": "یہ چابی مخصوص ہے",
     "keyWillBeSavedAs": "{{key}} کے طور پر محفوظ ہوگی",
     "valueLabel": "قدر",
     "valueRequired": "قدر درج کریں۔",

@@ -3844,6 +3844,7 @@
     "keyLabel": "کلید",
     "keyTooLong": "کلید باید 128 توري یا لږ وي",
     "keyDuplicate": "دا کلید دمخه په پروفایل کې شته",
+    "keyReserved": "دا کلید ریزرو شوی دی",
     "keyWillBeSavedAs": "د {{key}} په توګه به خوندي شي",
     "valueLabel": "ارزښت",
     "valueRequired": "ارزښت دننه کړئ",

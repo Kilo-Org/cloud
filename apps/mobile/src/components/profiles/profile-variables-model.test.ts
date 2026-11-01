@@ -110,6 +110,15 @@ describe('validateVariableInput', () => {
     expect(validateVariableInput({ key: `_${'a'.repeat(127)}`, value: 'x' })).toBeNull();
   });
 
+  it('reports a key the sandbox runtime reserves, and accepts a stored one', () => {
+    expect(validateVariableInput({ key: 'HOME', value: 'x' })).toBe('reserved');
+    expect(validateVariableInput({ key: 'kilo_token', value: 'x' })).toBe('reserved');
+    expect(validateVariableInput({ key: 'xdg_cache', value: 'x' })).toBe('reserved');
+    expect(validateVariableInput({ key: 'API_KEY', value: 'x' })).toBeNull();
+    // An edit resends the stored key, so the rule applies to a new key only.
+    expect(validateVariableInput({ key: 'HOME', value: 'x' }, [], { newKey: false })).toBeNull();
+  });
+
   it('reports a key that cleans onto an existing stored key', () => {
     expect(validateVariableInput({ key: 'foo-bar', value: 'x' }, ['FOO_BAR'])).toBe('duplicate');
     expect(validateVariableInput({ key: 'FOO_BAR', value: 'x' }, ['FOO_BAR'])).toBe('duplicate');

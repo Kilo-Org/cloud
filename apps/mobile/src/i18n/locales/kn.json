@@ -3850,6 +3850,7 @@
     "keyLabel": "ಕೀ",
     "keyTooLong": "ಕೀಯು 128 ಅಕ್ಷರಗಳು ಅಥವಾ ಕಡಿಮೆ ಇರಬೇಕು",
     "keyDuplicate": "ಈ ಕೀ ಈಗಾಗಲೇ ಪ್ರೊಫೈಲ್ನಲ್ಲಿದೆ",
+    "keyReserved": "ಈ ಕೀ ಮೀಸಲಾಗಿದೆ",
     "keyWillBeSavedAs": "{{key}} ಎಂದು ಉಳಿಸಲಾಗುತ್ತದೆ",
     "valueLabel": "ಮೌಲ್ಯ",
     "valueRequired": "ಮೌಲ್ಯವನ್ನು ನಮೂದಿಸಿ",

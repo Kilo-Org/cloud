@@ -3844,6 +3844,7 @@
     "keyLabel": "Võti",
     "keyTooLong": "Võti võib olla kuni 128 tähemärki",
     "keyDuplicate": "See võti on profiilis juba olemas",
+    "keyReserved": "See võti on reserveeritud",
     "keyWillBeSavedAs": "Salvestatakse kui {{key}}",
     "valueLabel": "Väärtus",
     "valueRequired": "Sisesta väärtus",

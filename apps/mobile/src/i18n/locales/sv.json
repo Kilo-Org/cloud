@@ -3844,6 +3844,7 @@
     "keyLabel": "Nyckel",
     "keyTooLong": "Nyckeln får innehålla högst 128 tecken",
     "keyDuplicate": "Den här nyckeln finns redan i profilen",
+    "keyReserved": "Nyckeln är reserverad",
     "keyWillBeSavedAs": "Sparas som {{key}}",
     "valueLabel": "Värde",
     "valueRequired": "Ange ett värde",

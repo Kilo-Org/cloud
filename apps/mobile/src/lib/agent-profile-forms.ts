@@ -38,6 +38,36 @@ const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 export const SKILL_NAME_MAX_LENGTH = 100;
 
 /**
+ * Server rule: `environment-contracts.ts`'s reserved names and prefixes. A key
+ * the sandbox runtime owns is refused when a profile stores it, so the form
+ * refuses it before the request. Keys reach this check upper-cased, and the
+ * names are compared the same way.
+ */
+const RESERVED_VARIABLE_KEY_NAMES: ReadonlySet<string> = new Set([
+  'HOME',
+  'SESSION_ID',
+  'SESSION_HOME',
+  'PNPM_CONFIG_STORE_DIR',
+  'SANDBOX_CONTROL_CREDENTIAL',
+  'SANDBOX_CONTROL_URL',
+  'PROVIDER_INSTANCE_ID',
+  'CONTROL_LOG_UPLOAD_URL',
+  'CONTROL_LOG_UPLOAD_GRANT',
+  'CONTROL_WRAPPER_INSTANCE_ID',
+]);
+
+const RESERVED_VARIABLE_KEY_PREFIXES = ['XDG_', 'KILO', 'OPENCODE'] as const;
+
+/** Whether the sandbox runtime owns this key. */
+export function isReservedVariableKey(key: string): boolean {
+  const stored = key.toUpperCase();
+  return (
+    RESERVED_VARIABLE_KEY_NAMES.has(stored) ||
+    RESERVED_VARIABLE_KEY_PREFIXES.some(prefix => stored.startsWith(prefix))
+  );
+}
+
+/**
  * Server cap: `profile-vars-service.ts`'s `MAX_PROFILE_VARS`. The profile
  * variables screen compares the loaded list's length against it before a new
  * variable goes out, and names the cap in the reader's language.

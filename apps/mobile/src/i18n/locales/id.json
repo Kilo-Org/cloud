@@ -3844,6 +3844,7 @@
     "keyLabel": "Kunci",
     "keyTooLong": "Kunci harus 128 karakter atau kurang",
     "keyDuplicate": "Kunci ini sudah ada di profil",
+    "keyReserved": "Kunci ini sudah dicadangkan",
     "keyWillBeSavedAs": "Akan disimpan sebagai {{key}}",
     "valueLabel": "Nilai",
     "valueRequired": "Masukkan nilai",

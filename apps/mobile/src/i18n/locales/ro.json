@@ -3900,6 +3900,7 @@
     "keyLabel": "Cheie",
     "keyTooLong": "Cheia trebuie să aibă 128 de caractere sau mai puțin",
     "keyDuplicate": "Această cheie există deja în profil",
+    "keyReserved": "Această cheie este rezervată",
     "keyWillBeSavedAs": "Va fi salvată ca {{key}}",
     "valueLabel": "Valoare",
     "valueRequired": "Introduceți o valoare",

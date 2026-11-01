@@ -3911,6 +3911,7 @@
     "keyLabel": "Key",
     "keyTooLong": "Key must be 128 characters or fewer",
     "keyDuplicate": "This key already exists in the profile",
+    "keyReserved": "This key is reserved",
     "keyWillBeSavedAs": "Will be saved as {{key}}",
     "valueLabel": "Value",
     "valueRequired": "Enter a value",

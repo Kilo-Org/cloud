@@ -47,6 +47,9 @@ function variableInputErrorMessage(t: (key: string) => string, error: VariableIn
   if (error === 'value-required') {
     return t('profiles.valueRequired');
   }
+  if (error === 'reserved') {
+    return t('profiles.keyReserved');
+  }
   return error === 'duplicate' ? t('profiles.keyDuplicate') : t('profiles.keyTooLong');
 }
 
@@ -243,7 +246,10 @@ export function VariableEditForm({
   const revealLabel = revealed ? t('profiles.secrets.hide') : t('profiles.secrets.reveal');
   // An edit's key is stored, so only an add can collide with the profile's keys.
   const validate = (key: string, value: string): VariableInputError | null =>
-    validateVariableInput({ key, value }, isNew ? existingKeys : [], { requireValue });
+    validateVariableInput({ key, value }, isNew ? existingKeys : [], {
+      requireValue,
+      newKey: isNew,
+    });
 
   const submit = async () => {
     const key = keyRef.current;

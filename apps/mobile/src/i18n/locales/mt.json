@@ -4012,6 +4012,7 @@
     "keyLabel": "Ewlenin",
     "keyTooLong": "L-ewlenin irid ikun 128 karattru jew inqas",
     "keyDuplicate": "Dan l-ewlenin diġà jeżisti fil-profil",
+    "keyReserved": "Dan l-ewlenin huwa riżervat",
     "keyWillBeSavedAs": "Se jiġi salvat bħala {{key}}",
     "valueLabel": "Valur",
     "valueRequired": "Daħħal valur",

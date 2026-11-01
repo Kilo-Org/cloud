@@ -3850,6 +3850,7 @@
     "keyLabel": "কী",
     "keyTooLong": "কী 128টি অক্ষর বা তার কম হতে হবে",
     "keyDuplicate": "এই কীটি ইতিমধ্যে প্রোফাইলে বিদ্যমান",
+    "keyReserved": "এই কীটি সংরক্ষিত",
     "keyWillBeSavedAs": "{{key}} হিসেবে সংরক্ষিত হবে",
     "valueLabel": "মান",
     "valueRequired": "একটি মান লিখুন",

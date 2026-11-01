@@ -3850,6 +3850,7 @@
     "keyLabel": "Fanalahidy",
     "keyTooLong": "Tokony tsy mihoatra ny 128 tarehintsoratra ny fanalahidy",
     "keyDuplicate": "Efa ao amin'ny profil ity fanalahidy ity",
+    "keyReserved": "Voatokana ity fanalahidy ity",
     "keyWillBeSavedAs": "Voatahiry ho {{key}}",
     "valueLabel": "Sanda",
     "valueRequired": "Ampidiro sanda",

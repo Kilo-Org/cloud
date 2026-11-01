@@ -3844,6 +3844,7 @@
     "keyLabel": "कुञ्जी",
     "keyTooLong": "कुञ्जी 128 अक्षर वा कम हुनुपर्छ",
     "keyDuplicate": "यो कुञ्जी पहिले नै प्रोफाइलमा छ",
+    "keyReserved": "यो कुञ्जी आरक्षित छ",
     "keyWillBeSavedAs": "{{key}} को रूपमा सुरक्षित गरिनेछ",
     "valueLabel": "मूल्य",
     "valueRequired": "मूल्य प्रविष्ट गर्नुहोस्",

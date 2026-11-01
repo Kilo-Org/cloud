@@ -3850,6 +3850,7 @@
     "keyLabel": "Susi",
     "keyTooLong": "Ang susi ay dapat 128 na character o mas kaunti",
     "keyDuplicate": "Umiiral na ang key na ito sa profile",
+    "keyReserved": "Nakareserba ang susing ito",
     "keyWillBeSavedAs": "Ise-save bilang {{key}}",
     "valueLabel": "Halaga",
     "valueRequired": "Maglagay ng halaga",

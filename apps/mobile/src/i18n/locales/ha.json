@@ -3844,6 +3844,7 @@
     "keyLabel": "Maɓalli",
     "keyTooLong": "Maɓalli dole ya zama haruffa 128 ko ƙasa da haka",
     "keyDuplicate": "Wannan maɓalli ya riga ya kasance a cikin bayanin martaba",
+    "keyReserved": "An keɓe wannan maɓalli",
     "keyWillBeSavedAs": "Za a ajiye shi a matsayin {{key}}",
     "valueLabel": "Ƙima",
     "valueRequired": "Shigar da ƙima",

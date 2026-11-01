@@ -3844,6 +3844,7 @@
     "keyLabel": "Клуч",
     "keyTooLong": "Клучот мора да има 128 знаци или помалку",
     "keyDuplicate": "Овој клуч веќе постои во профилот",
+    "keyReserved": "Овој клуч е резервиран",
     "keyWillBeSavedAs": "Ќе биде зачувано како {{key}}",
     "valueLabel": "Вредност",
     "valueRequired": "Внесете вредност",

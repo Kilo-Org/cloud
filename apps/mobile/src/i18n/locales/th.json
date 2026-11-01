@@ -3844,6 +3844,7 @@
     "keyLabel": "คีย์",
     "keyTooLong": "คีย์ต้องมี 128 อักขระหรือน้อยกว่า",
     "keyDuplicate": "คีย์นี้มีอยู่ในโปรไฟล์แล้ว",
+    "keyReserved": "คีย์นี้ถูกสงวนไว้",
     "keyWillBeSavedAs": "จะถูกบันทึกเป็น {{key}}",
     "valueLabel": "ค่า",
     "valueRequired": "ป้อนค่า",

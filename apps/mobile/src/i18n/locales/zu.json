@@ -3850,6 +3850,7 @@
     "keyLabel": "Ukhiye",
     "keyTooLong": "Ukhiye kufanele ube yizinhlamvu ezingu-128 noma ngaphansi",
     "keyDuplicate": "Lolu khi selukhona kuphrofayela",
+    "keyReserved": "Lolu khi lugcinelwe",
     "keyWillBeSavedAs": "Kuzogcinwa njenge-{{key}}",
     "valueLabel": "Inani",
     "valueRequired": "Faka inani",

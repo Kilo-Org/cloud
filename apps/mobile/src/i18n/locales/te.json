@@ -3844,6 +3844,7 @@
     "keyLabel": "కీ",
     "keyTooLong": "కీ 128 అక్షరాలు లేదా తక్కువ ఉండాలి",
     "keyDuplicate": "ఈ కీ ఇప్పటికే ప్రొఫైల్లో ఉంది",
+    "keyReserved": "ఈ కీ రిజర్వ్ చేయబడింది",
     "keyWillBeSavedAs": "{{key}} గా సేవ్ చేయబడుతుంది",
     "valueLabel": "విలువ",
     "valueRequired": "విలువను నమోదు చేయండి",

@@ -3844,6 +3844,7 @@
     "keyLabel": "Kle",
     "keyTooLong": "Kle a dwe gen 128 karaktè oswa mwens",
     "keyDuplicate": "Kle sa a deja egziste nan pwofil la",
+    "keyReserved": "Kle sa a rezève",
     "keyWillBeSavedAs": "Ap sove kòm {{key}}",
     "valueLabel": "Valè",
     "valueRequired": "Antre yon valè",

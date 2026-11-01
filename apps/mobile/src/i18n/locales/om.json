@@ -3844,6 +3844,7 @@
     "keyLabel": "Furtuu",
     "keyTooLong": "Furtuun 128 arfii ykn isaa gadi ta'uu qaba",
     "keyDuplicate": "Furtuun kun duraanuu piroofaayilii keessa jira",
+    "keyReserved": "Furtuun kun qusatamee jira",
     "keyWillBeSavedAs": "{{key}}tti olkaa'ama",
     "valueLabel": "Gatii",
     "valueRequired": "Gatii galchi",

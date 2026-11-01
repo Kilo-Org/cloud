@@ -3956,6 +3956,7 @@
     "keyLabel": "Klíč",
     "keyTooLong": "Klíč musí mít 128 znaků nebo méně",
     "keyDuplicate": "Tento klíč už v profilu existuje",
+    "keyReserved": "Tento klíč je vyhrazen",
     "keyWillBeSavedAs": "Bude uložen jako {{key}}",
     "valueLabel": "Hodnota",
     "valueRequired": "Zadejte hodnotu",

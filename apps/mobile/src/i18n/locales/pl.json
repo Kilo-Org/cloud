@@ -3956,6 +3956,7 @@
     "keyLabel": "Klucz",
     "keyTooLong": "Klucz może mieć maksymalnie 128 znaków",
     "keyDuplicate": "Ten klucz już istnieje w profilu",
+    "keyReserved": "Ten klucz jest zarezerwowany",
     "keyWillBeSavedAs": "Zostanie zapisany jako {{key}}",
     "valueLabel": "Wartość",
     "valueRequired": "Wprowadź wartość",

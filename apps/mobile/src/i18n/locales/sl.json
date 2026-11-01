@@ -3956,6 +3956,7 @@
     "keyLabel": "Ključ",
     "keyTooLong": "Ključ ima lahko največ 128 znakov",
     "keyDuplicate": "Ta ključ že obstaja v profilu",
+    "keyReserved": "Ta ključ je rezerviran",
     "keyWillBeSavedAs": "Shranjeno bo kot {{key}}",
     "valueLabel": "Vrednost",
     "valueRequired": "Vnesite vrednost",

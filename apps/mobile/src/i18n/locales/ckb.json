@@ -3844,6 +3844,7 @@
     "keyLabel": "کلیل",
     "keyTooLong": "کلیلەکە دەبێت 128 نووسە یان کەمتر بێت",
     "keyDuplicate": "ئەم کلیلە پێشتر لە پڕۆفایلەکەدا هەیە",
+    "keyReserved": "ئەم کلیلە پارێزراوە",
     "keyWillBeSavedAs": "وەک {{key}} پاشەکەوت دەکرێت",
     "valueLabel": "بەها",
     "valueRequired": "بەهایەک دابنێ",

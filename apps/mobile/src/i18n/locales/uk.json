@@ -3956,6 +3956,7 @@
     "keyLabel": "Ключ",
     "keyTooLong": "Ключ має містити не більше 128 символів",
     "keyDuplicate": "Цей ключ уже існує в профілі",
+    "keyReserved": "Цей ключ зарезервовано",
     "keyWillBeSavedAs": "Буде збережено як {{key}}",
     "valueLabel": "Значення",
     "valueRequired": "Введіть значення",

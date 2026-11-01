@@ -4012,6 +4012,7 @@
     "keyLabel": "eochair",
     "keyTooLong": "Caithfidh an eochair a bheith 128 carachtar nó níos lú",
     "keyDuplicate": "Tá an eochair seo ann cheana sa phróifíl",
+    "keyReserved": "Tá an eochair seo in áirithe",
     "keyWillBeSavedAs": "Sábhálfar mar {{key}}",
     "valueLabel": "Luach",
     "valueRequired": "Cuir isteach luach",

@@ -119,6 +119,7 @@ export function QueryError({
       iconSize={32}
       iconStrokeWidth={2}
       titleAccessibilityRole="header"
+      compactTitleClassName="text-destructive"
       action={
         action ??
         (onRetry && (

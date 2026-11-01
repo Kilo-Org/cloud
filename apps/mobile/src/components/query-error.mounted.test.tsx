@@ -1,15 +1,25 @@
-import { createElement, type ReactNode } from 'react';
+import { createElement, type ReactElement, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { renderWithProviders } from '@/test/render-with-providers';
+import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 
 import { QueryError } from './query-error';
 
-// The retry action is the only stateful part under test: EmptyState (and its
-// measured placement) and the primitives are stubbed so the label and the
-// press handler are asserted on the button the component itself builds.
+// The retry action and the contract props the state hands to EmptyState are
+// the parts under test: EmptyState (and its measured placement) and the
+// primitives are stubbed so the label, the press handler, the destructive icon
+// and the muted description tone are asserted on what the component itself
+// builds.
+type EmptyStateProps = {
+  action?: ReactNode;
+  iconColor?: string;
+  compactTitleClassName?: string;
+  description?: ReactElement<{ tone?: string }>;
+};
+
 vi.mock('@/components/empty-state', () => ({
-  EmptyState: ({ action }: { action?: ReactNode }) => createElement('EmptyState', null, action),
+  EmptyState: (props: EmptyStateProps) =>
+    createElement('EmptyState', props, props.description, props.action),
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -29,6 +39,10 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 
 /** The retry button's props, including the label it renders. */
 type RetryButtonProps = { onPress: () => void; children: { props: { children: string } } };
+
+function emptyStateProps(mounted: RenderWithProvidersResult): EmptyStateProps {
+  return mounted.renderer.root.findByType('EmptyState' as never).props as EmptyStateProps;
+}
 
 describe('QueryError retry action', () => {
   it('defaults the label to the generic Retry for callers that pass none', async () => {
@@ -55,6 +69,25 @@ describe('QueryError retry action', () => {
     expect(
       mounted.renderer.root.findAllByProps({ accessibilityLabel: 'common.retry' })
     ).toHaveLength(0);
+    mounted.unmount();
+  });
+});
+
+describe('QueryError state emphasis', () => {
+  it('keeps the message secondary and puts the error cue on the icon', async () => {
+    const mounted = await renderWithProviders(<QueryError onRetry={vi.fn<() => void>()} />);
+
+    const props = emptyStateProps(mounted);
+    // The explanatory line is muted ink; the announcement tone stays separate.
+    expect(props.description?.props.tone).toBe('status');
+    expect(props.iconColor).toBe('#ff0000');
+    mounted.unmount();
+  });
+
+  it('hands the compact form its own title tint, because that form drops the icon', async () => {
+    const mounted = await renderWithProviders(<QueryError onRetry={vi.fn<() => void>()} />);
+
+    expect(emptyStateProps(mounted).compactTitleClassName).toBe('text-destructive');
     mounted.unmount();
   });
 });

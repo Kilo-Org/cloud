@@ -51,6 +51,7 @@ async function mount() {
       icon={SearchX}
       title="No sessions match"
       description="Try a different search term."
+      compactTitleClassName="text-destructive"
       action={action}
     />
   );
@@ -183,6 +184,23 @@ describe('EmptyState presentation', () => {
     );
     expect(mounted.renderer.root.findAllByType('AccessibleStatus')).toHaveLength(1);
     mounted.unmount();
+  });
+
+  it('centres the title and tints it only in the compact form', async () => {
+    const title = (mounted: Mounted) =>
+      mounted.renderer.root
+        .findAllByType('Text')
+        .find(node => node.props.children === 'No sessions match');
+
+    const full = await mount();
+    expect(title(full.mounted)?.props.className).toContain('text-center');
+    full.mounted.unmount();
+
+    band.short = true;
+    const compact = await mount();
+    expect(title(compact.mounted)?.props.className).toContain('text-center');
+    expect(title(compact.mounted)?.props.className).toContain('text-destructive');
+    compact.mounted.unmount();
   });
 
   it('lets a caller that measured its own clear region override a tall band', async () => {

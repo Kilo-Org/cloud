@@ -36,6 +36,10 @@ type EmptyStateProps = {
   iconStrokeWidth?: number;
   /** Set to 'header' when the title acts as the screen's heading (QueryError does). */
   titleAccessibilityRole?: 'header';
+  /** Title classes for the compact form only, which drops the icon bubble. A
+   *  caller whose state the icon would otherwise carry — an error — tints the
+   *  title here so the short form keeps the cue. */
+  compactTitleClassName?: string;
   /** Renders the short presentation (no icon bubble, tighter block gaps, and
    *  no top pin air above a `top`-placed stack) for a caller whose clear region
    *  cannot hold the full height; the title, the description and the action all
@@ -72,6 +76,7 @@ function EmptyStateBody({
   iconSize = 24,
   iconStrokeWidth = 1.5,
   titleAccessibilityRole,
+  compactTitleClassName,
 }: Readonly<EmptyStateProps>) {
   const colors = useThemeColors();
   // A centered state is handed the band between the page header and the fixed
@@ -113,7 +118,11 @@ function EmptyStateBody({
         </View>
       )}
       <View className="items-center gap-1">
-        <Text variant="large" className="text-center" accessibilityRole={titleAccessibilityRole}>
+        <Text
+          variant="large"
+          className={cn('text-center', compact ? compactTitleClassName : undefined)}
+          accessibilityRole={titleAccessibilityRole}
+        >
           {title}
         </Text>
         {

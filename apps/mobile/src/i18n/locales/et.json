@@ -3770,13 +3770,13 @@
     "openLastSession": "Ava viimane seanss"
   },
   "spendAlerts": {
-    "subtitle": "Saada faktureerimiskontaktidele e-posti või push-teavitus, kui selle konto või organisatsiooni kulutus ületab limiidi või tõuseb üle tavapärase tunnimäära.",
+    "subtitle": "Saada faktureerimiskontaktidele e-posti või push-teavitus, kui selle konto või organisatsiooni enda kulutus ületab limiidi või tõuseb üle tavapärase tunnimäära.",
     "thresholdTitle": "Lävendi ületamine",
-    "thresholdSubtitle": "Jooksev kulutus ületab sinu limiidi",
+    "thresholdSubtitle": "Selle konto või organisatsiooni jooksev kulutus valitud ajavahemikus ületab sinu limiidi",
     "anomalyTitle": "Tunnipõhine tõus",
     "anomalySubtitle": "Selle konto või organisatsiooni tunnimäär on tavapärasest p95-tasemest tunduvalt kõrgem",
     "limitLabel": "Limiit (USD)",
-    "windowLabel": "Aken",
+    "windowLabel": "Ajavahemik",
     "window24h": "24 tundi",
     "window7d": "7 päeva",
     "window30d": "30 päeva",
@@ -3791,7 +3791,7 @@
     "permissionDenied": "Sul puudub õigus kulutushoiatusi hallata.",
     "pushOffByCategory": "Teavitustes väljas",
     "multiplierMaxError": "Sisesta kordaja {{max}} või väiksem",
-    "thresholdMaxError": "Sisesta summa {{max}} või väiksem."
+    "thresholdMaxError": "Sisesta summa {{max}} või väiksem"
   },
   "profiles": {
     "title": "Profiilid",

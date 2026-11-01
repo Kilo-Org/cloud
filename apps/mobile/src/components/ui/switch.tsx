@@ -1,5 +1,6 @@
 import { Switch as NativeSwitch, Platform, type SwitchProps, useColorScheme } from 'react-native';
 
+import { TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 /**
@@ -25,6 +26,14 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * `disabled` but not the matching state, so a switch that cannot be toggled
  * still announces itself as enabled. Android already folds `disabled` into that
  * state; doing it here keeps both platforms honest.
+ *
+ * The control draws at the platform's own size — about 46.5x27dp on Android,
+ * 51x31pt on iOS — which is under `DESIGN.md:364`'s 44pt touch target, and the
+ * audit reads the control's own node rect, so a caller's row or `hitSlop` does
+ * not lift it. Every caller gets the target here instead: the node renders at
+ * least {@link TOUCH_TARGET_DP} on both axes and a caller's `style` is applied
+ * last, so a row grows to the control it hosts rather than the control
+ * shrinking to the row.
  */
 export function Switch({
   disabled,
@@ -32,6 +41,7 @@ export function Switch({
   trackColor,
   thumbColor,
   value,
+  style,
   ...props
 }: SwitchProps) {
   const colors = useThemeColors();
@@ -43,6 +53,7 @@ export function Switch({
   return (
     <NativeSwitch
       {...props}
+      style={[{ minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP }, style]}
       value={value}
       trackColor={
         trackColor ?? {

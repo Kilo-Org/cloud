@@ -752,7 +752,7 @@
       "staleHint": "PR on muuttunut tämän kommentin kirjoittamisen jälkeen.",
       "deleteA11y": "Poista lähettämätön kommentti: {{location}}",
       "deletedAnnouncement": "Lähettämätön kommentti poistettu",
-      "noCommentsQueued": "Lähetysjonossa ei ole kommentteja. Katselmointi lähetetään vain yllä valitulla tapahtumalla.",
+      "noCommentsQueued": "Katselmointi lähetetään vain yllä valitulla tapahtumalla.",
       "staleQueueHint": "Vanhempaan muutostallennukseen liittyviä kommentteja ei lähetetä. Ne jäävät lähetysjonoon, jossa voit muokata tai poistaa ne.",
       "allQueuedHint": "Kaikki kommentit lähetetään yhdessä erässä.",
       "summaryPlaceholder": "Katselmoinnin yhteenveto (valinnainen)",

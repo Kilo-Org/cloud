@@ -806,7 +806,7 @@
       "staleHint": "il-PR ġie aġġornat minn meta ktibt dan.",
       "deleteA11y": "Ħassar il-kumment pendenti fuq {{location}}",
       "deletedAnnouncement": "Il-kumment pendenti tħassar",
-      "noCommentsQueued": "Ma hemm l-ebda kumment fil-kju. Ir-reviżjoni se tintbagħat biss bit-tip magħżul hawn fuq.",
+      "noCommentsQueued": "Ir-reviżjoni se tintbagħat biss bit-tip magħżul hawn fuq.",
       "staleQueueHint": "Il-kummenti dwar reġistrazzjoni eqdem tal-bidliet ma jintbagħtux. Jibqgħu fil-kju tiegħek biex tkun tista' teditjahom jew tħassarhom.",
       "allQueuedHint": "Il-kummenti kollha se jintbagħtu flimkien f'talba waħda.",
       "summaryPlaceholder": "Sommarju fakultattiv għar-reviżjoni",

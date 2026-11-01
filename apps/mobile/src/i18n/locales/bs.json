@@ -770,7 +770,7 @@
       "staleHint": "PR je promijenjen nakon pisanja ovog komentara.",
       "deleteA11y": "Obriši komentar na čekanju na {{location}}",
       "deletedAnnouncement": "Komentar na čekanju obrisan",
-      "noCommentsQueued": "Nema komentara na čekanju. Poslat će se samo odabrana vrsta pregleda.",
+      "noCommentsQueued": "Poslat će se samo odabrana vrsta pregleda.",
       "staleQueueHint": "Komentari koji se odnose na stariju reviziju ne šalju se. Ostaju na čekanju da ih možeš urediti ili obrisati.",
       "allQueuedHint": "Svi komentari će se poslati zajedno u jednom zahtjevu.",
       "summaryPlaceholder": "Sažetak pregleda (nije obavezno)",

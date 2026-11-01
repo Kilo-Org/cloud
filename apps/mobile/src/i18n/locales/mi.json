@@ -752,7 +752,7 @@
       "staleHint": "kua whakahoutia te PR mai i tō tuhi i tēnei kōrero.",
       "deleteA11y": "Mukua te kōrero e tatari ana mō {{location}}",
       "deletedAnnouncement": "Kua mukua te kōrero e tatari ana",
-      "noCommentsQueued": "Kāore he kōrero i te tūtira. Ka tukuna te arotake me te momo arotake kua kōwhiria i runga anake.",
+      "noCommentsQueued": "Ka tukuna te arotake me te momo arotake kua kōwhiria i runga anake.",
       "staleQueueHint": "Kāore e tukuna ngā kōrero mō tētahi tāpaetanga tawhito. Ka noho ēnei ki tō tūtira kia taea ai e koe te whakatika, te muku rānei.",
       "allQueuedHint": "Ka tukuna tahitia ngā kōrero katoa mā te tono kotahi.",
       "summaryPlaceholder": "Whakarāpopototanga mō te arotake (he kōwhiringa)",

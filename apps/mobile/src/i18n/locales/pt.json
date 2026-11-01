@@ -770,7 +770,7 @@
       "staleHint": "o PR foi atualizado depois de escreveres este comentário.",
       "deleteA11y": "Eliminar comentário pendente em {{location}}",
       "deletedAnnouncement": "Comentário pendente eliminado",
-      "noCommentsQueued": "Não há comentários na fila. A revisão será enviada apenas com o tipo selecionado acima.",
+      "noCommentsQueued": "A revisão será enviada apenas com o tipo selecionado acima.",
       "staleQueueHint": "Os comentários sobre um commit anterior não são enviados. Ficam na tua fila para os poderes editar ou eliminar.",
       "allQueuedHint": "Todos os comentários serão enviados num único pedido.",
       "summaryPlaceholder": "Resumo opcional para a revisão",

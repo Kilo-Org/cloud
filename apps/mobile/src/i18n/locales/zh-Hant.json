@@ -3072,7 +3072,7 @@
       "deletedAnnouncement": "待送出留言已刪除",
       "editA11y": "編輯 {{location}} 上的待送出留言",
       "editOutdatedA11y": "編輯 {{location}} 上已過時的待送出留言",
-      "noCommentsQueued": "目前沒有待送出留言。這次審查只會送出上方選取的審查類型。",
+      "noCommentsQueued": "這次審查只會送出上方選取的審查類型。",
       "staleHint": "你撰寫此留言後，PR 已更新。",
       "staleQueueHint": "針對舊版提交撰寫的留言不會送出，會保留在待送出清單中，供你編輯或刪除。",
       "summaryA11y": "審查摘要",

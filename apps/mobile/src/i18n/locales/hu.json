@@ -752,7 +752,7 @@
       "staleHint": "a PR azóta megváltozott, hogy ezt írtad.",
       "deleteA11y": "Függőben lévő hozzászólás törlése: {{location}}",
       "deletedAnnouncement": "Függőben lévő hozzászólás törölve",
-      "noCommentsQueued": "Nincs küldésre váró hozzászólás. A kódellenőrzést csak a fent kiválasztott eredménnyel küldjük el.",
+      "noCommentsQueued": "A kódellenőrzést csak a fent kiválasztott eredménnyel küldjük el.",
       "staleQueueHint": "A korábbi véglegesítéshez írt hozzászólásokat nem küldjük el. A küldésre váró hozzászólások között maradnak, így szerkesztheted vagy törölheted őket.",
       "allQueuedHint": "Az összes hozzászólást egyszerre, egyetlen kérésben küldjük el.",
       "summaryPlaceholder": "A kódellenőrzés összefoglalója (nem kötelező)",

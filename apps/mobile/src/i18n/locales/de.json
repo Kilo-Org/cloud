@@ -3072,7 +3072,7 @@
       "deletedAnnouncement": "Ausstehender Kommentar gelöscht",
       "editA11y": "Ausstehenden Kommentar zu {{location}} bearbeiten",
       "editOutdatedA11y": "Veralteten ausstehenden Kommentar zu {{location}} bearbeiten",
-      "noCommentsQueued": "Es sind keine Kommentare vorgemerkt. Das Review wird nur mit dem oben gewählten Ereignis gesendet.",
+      "noCommentsQueued": "Das Review wird nur mit dem oben gewählten Ereignis gesendet.",
       "staleHint": "der PR wurde aktualisiert, seit du diesen Kommentar geschrieben hast.",
       "staleQueueHint": "Kommentare zu einem älteren Commit werden nicht gesendet. Sie bleiben vorgemerkt, damit du sie bearbeiten oder löschen kannst.",
       "summaryA11y": "Review-Zusammenfassung",

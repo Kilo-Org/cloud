@@ -752,7 +752,7 @@
       "staleHint": "PR on pärast selle kommentaari kirjutamist muutunud.",
       "deleteA11y": "Kustuta ootel kommentaar asukohas {{location}}",
       "deletedAnnouncement": "Ootel kommentaar kustutati",
-      "noCommentsQueued": "Järjekorras pole kommentaare. Ülevaatus esitatakse ainult ülal valitud toiminguga.",
+      "noCommentsQueued": "Ülevaatus esitatakse ainult ülal valitud toiminguga.",
       "staleQueueHint": "Vanema kommiti kohta kirjutatud kommentaare ei saadeta. Need jäävad sinu järjekorda, et saaksid neid muuta või kustutada.",
       "allQueuedHint": "Kõik kommentaarid saadetakse koos ühe päringuga.",
       "summaryPlaceholder": "Ülevaatuse kokkuvõte (valikuline)",

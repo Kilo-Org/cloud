@@ -3072,7 +3072,7 @@
       "deletedAnnouncement": "Nog niet verzonden opmerking verwijderd",
       "editA11y": "Nog niet verzonden opmerking bij {{location}} bewerken",
       "editOutdatedA11y": "Verouderde, nog niet verzonden opmerking bij {{location}} bewerken",
-      "noCommentsQueued": "Er staan geen opmerkingen in de wachtrij. De beoordeling wordt alleen met de hierboven gekozen actie verzonden.",
+      "noCommentsQueued": "De beoordeling wordt alleen met de hierboven gekozen actie verzonden.",
       "staleHint": "de PR is gewijzigd sinds je dit schreef.",
       "staleQueueHint": "Opmerkingen die bij een oudere commit zijn geschreven, worden niet verzonden. Ze blijven in je wachtrij zodat je ze kunt bewerken of verwijderen.",
       "summaryA11y": "Samenvatting van de beoordeling",

@@ -3072,7 +3072,7 @@
       "deletedAnnouncement": "未送信のコメントを削除しました",
       "editA11y": "{{location}}の未送信のコメントを編集",
       "editOutdatedA11y": "{{location}}の変更前のコードに対する未送信のコメントを編集",
-      "noCommentsQueued": "未送信のコメントはありません。上で選んだレビューの種類だけを送信します。",
+      "noCommentsQueued": "上で選んだレビューの種類だけを送信します。",
       "staleHint": "このコメントの作成後にPRが更新されました。",
       "staleQueueHint": "古いコミットに対するコメントは送信されません。後で編集や削除ができるよう、未送信の一覧に残ります。",
       "summaryA11y": "レビューの総評",

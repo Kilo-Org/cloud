@@ -3125,7 +3125,7 @@
       "deletedAnnouncement": "Comentário pendente excluído",
       "editA11y": "Editar comentário pendente em {{location}}",
       "editOutdatedA11y": "Editar comentário pendente desatualizado em {{location}}",
-      "noCommentsQueued": "Não há comentários na fila. A revisão será enviada apenas com o tipo selecionado acima.",
+      "noCommentsQueued": "A revisão será enviada apenas com o tipo selecionado acima.",
       "staleHint": "o PR foi atualizado depois que você escreveu este comentário.",
       "staleQueueHint": "Comentários sobre um commit mais antigo não são enviados. Eles ficam na fila para você editar ou excluir.",
       "summaryA11y": "Resumo da revisão",

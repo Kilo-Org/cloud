@@ -752,7 +752,7 @@
       "staleHint": "PR a chanje depi ou te ekri sa a.",
       "deleteA11y": "Efase kòmantè ki poko voye sou {{location}}",
       "deletedAnnouncement": "Kòmantè ki t ap tann pou voye a efase",
-      "noCommentsQueued": "Pa gen kòmantè nan lis atant lan. Revizyon an ap soumèt avèk sèlman aksyon revizyon ki pi wo a.",
+      "noCommentsQueued": "Revizyon an ap soumèt avèk sèlman aksyon revizyon ki pi wo a.",
       "staleQueueHint": "Kòmantè ki fè referans ak yon komit ki pi ansyen p ap voye. Yo rete nan lis atant ou a pou ou ka modifye oswa efase yo.",
       "allQueuedHint": "Tout kòmantè yo ap voye ansanm nan yon sèl demann.",
       "summaryPlaceholder": "Rezime opsyonèl pou revizyon an",

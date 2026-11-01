@@ -770,7 +770,7 @@
       "staleHint": "PR-ul s-a modificat de când ai scris acest comentariu.",
       "deleteA11y": "Șterge comentariul în așteptare de la {{location}}",
       "deletedAnnouncement": "Comentariu în așteptare șters",
-      "noCommentsQueued": "Nu există comentarii în așteptare. Revizuirea va fi trimisă doar cu tipul selectat mai sus.",
+      "noCommentsQueued": "Revizuirea va fi trimisă doar cu tipul selectat mai sus.",
       "staleQueueHint": "Comentariile care se referă la un commit mai vechi nu sunt trimise. Ele rămân în așteptare, ca să le poți edita sau șterge.",
       "allQueuedHint": "Toate comentariile vor fi trimise împreună, într-o singură cerere.",
       "summaryPlaceholder": "Rezumat opțional pentru revizuire",

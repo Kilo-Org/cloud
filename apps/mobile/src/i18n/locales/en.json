@@ -819,7 +819,7 @@
       "staleHint": "the PR moved since you wrote this.",
       "deleteA11y": "Delete pending comment on {{location}}",
       "deletedAnnouncement": "Pending comment deleted",
-      "noCommentsQueued": "No comments queued. The review will be submitted with just the event above.",
+      "noCommentsQueued": "The review will be submitted with just the event above.",
       "staleQueueHint": "Comments written against an older commit are not sent. They stay in your queue so you can edit or delete them.",
       "allQueuedHint": "All comments will be sent in a single batched request.",
       "summaryPlaceholder": "Optional summary for the review",

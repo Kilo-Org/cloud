@@ -3072,7 +3072,7 @@
       "deletedAnnouncement": "Bekleyen yorum silindi",
       "editA11y": "{{location}} konumundaki bekleyen yorumu düzenle",
       "editOutdatedA11y": "{{location}} konumundaki güncel olmayan bekleyen yorumu düzenle",
-      "noCommentsQueued": "Kuyrukta yorum yok. İnceleme yalnızca yukarıda seçilen türle gönderilecek.",
+      "noCommentsQueued": "İnceleme yalnızca yukarıda seçilen türle gönderilecek.",
       "staleHint": "bu yorumu yazdığından beri PR değişti.",
       "staleQueueHint": "Eski bir işlemeyle ilgili yorumlar gönderilmez. Düzenleyebilmen veya silebilmen için kuyrukta kalır.",
       "summaryA11y": "İnceleme özeti",

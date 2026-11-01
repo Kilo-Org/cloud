@@ -752,7 +752,7 @@
       "staleHint": "PR telah dikemas kini sejak anda menulis komen ini.",
       "deleteA11y": "Padam komen belum dihantar pada {{location}}",
       "deletedAnnouncement": "Komen belum dihantar telah dipadam",
-      "noCommentsQueued": "Tiada komen dalam senarai menunggu. Semakan akan dihantar dengan jenis semakan yang dipilih di atas sahaja.",
+      "noCommentsQueued": "Semakan akan dihantar dengan jenis semakan yang dipilih di atas sahaja.",
       "staleQueueHint": "Komen yang merujuk kepada komit lama tidak dihantar. Komen itu kekal dalam senarai menunggu anda untuk disunting atau dipadam.",
       "allQueuedHint": "Semua komen akan dihantar bersama dalam satu permintaan.",
       "summaryPlaceholder": "Ringkasan semakan (pilihan)",

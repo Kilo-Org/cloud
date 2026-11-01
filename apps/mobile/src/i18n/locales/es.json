@@ -3119,7 +3119,7 @@
       "deletedAnnouncement": "Comentario pendiente eliminado",
       "editA11y": "Editar el comentario pendiente en {{location}}",
       "editOutdatedA11y": "Editar el comentario pendiente desactualizado en {{location}}",
-      "noCommentsQueued": "No hay comentarios pendientes de envío. La revisión se enviará solo con el tipo seleccionado arriba.",
+      "noCommentsQueued": "La revisión se enviará solo con el tipo seleccionado arriba.",
       "staleHint": "la PR cambió desde que escribiste esto.",
       "staleQueueHint": "Los comentarios sobre una confirmación anterior no se envían. Quedan pendientes para que puedas editarlos o eliminarlos.",
       "summaryA11y": "Resumen de la revisión",

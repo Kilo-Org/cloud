@@ -752,7 +752,7 @@
       "staleHint": "a PR cambiou desde que escribiches isto.",
       "deleteA11y": "Eliminar comentario pendente en {{location}}",
       "deletedAnnouncement": "Comentario pendente eliminado",
-      "noCommentsQueued": "Non hai comentarios na cola. A revisión enviarase só co tipo seleccionado arriba.",
+      "noCommentsQueued": "A revisión enviarase só co tipo seleccionado arriba.",
       "staleQueueHint": "Os comentarios sobre unha remisión anterior non se envían. Quedan na túa cola para que poidas editalos ou eliminalos.",
       "allQueuedHint": "Todos os comentarios enviaranse xuntos nunha única solicitude.",
       "summaryPlaceholder": "Resumo opcional para a revisión",

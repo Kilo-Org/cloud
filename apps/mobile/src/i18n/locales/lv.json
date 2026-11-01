@@ -770,7 +770,7 @@
       "staleHint": "kopš šī komentāra uzrakstīšanas PR ir mainījies.",
       "deleteA11y": "Dzēst nepublicēto komentāru: {{location}}",
       "deletedAnnouncement": "Nepublicētais komentārs dzēsts",
-      "noCommentsQueued": "Rindā nav komentāru. Vērtējums tiks iesniegts tikai ar augstāk izvēlēto veidu.",
+      "noCommentsQueued": "Vērtējums tiks iesniegts tikai ar augstāk izvēlēto veidu.",
       "staleQueueHint": "Komentāri par vecāku komitu netiek nosūtīti. Tie paliek tavā rindā, lai vari tos rediģēt vai dzēst.",
       "allQueuedHint": "Visi komentāri tiks nosūtīti kopā vienā pieprasījumā.",
       "summaryPlaceholder": "Vērtējuma kopsavilkums (nav obligāts)",

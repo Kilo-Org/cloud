@@ -752,7 +752,7 @@
       "staleHint": "PR-ja ka ndryshuar që kur e shkrove këtë koment.",
       "deleteA11y": "Fshi komentin në pritje te {{location}}",
       "deletedAnnouncement": "Komenti në pritje u fshi",
-      "noCommentsQueued": "Nuk ka komente në radhë. Rishikimi do të dërgohet vetëm me llojin e zgjedhur më sipër.",
+      "noCommentsQueued": "Rishikimi do të dërgohet vetëm me llojin e zgjedhur më sipër.",
       "staleQueueHint": "Komentet e shkruara për një depozitim më të vjetër nuk dërgohen. Ato mbeten në radhën tënde që t'i redaktosh ose t'i fshish.",
       "allQueuedHint": "Të gjitha komentet do të dërgohen së bashku në një kërkesë të vetme.",
       "summaryPlaceholder": "Përmbledhje opsionale për rishikimin",

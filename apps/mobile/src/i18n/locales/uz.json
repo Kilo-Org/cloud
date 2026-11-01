@@ -752,7 +752,7 @@
       "staleHint": "siz bu izohni yozganingizdan keyin PR yangilangan.",
       "deleteA11y": "{{location}}dagi navbatdagi izohni o'chirish",
       "deletedAnnouncement": "Navbatdagi izoh o'chirildi",
-      "noCommentsQueued": "Navbatda izohlar yo'q. Ko'rib chiqish natijasi faqat yuqoridagi amal bilan yuboriladi.",
+      "noCommentsQueued": "Ko'rib chiqish natijasi faqat yuqoridagi amal bilan yuboriladi.",
       "staleQueueHint": "Eski kommitga yozilgan izohlar yuborilmaydi. Ularni tahrirlashingiz yoki o'chirishingiz uchun navbatda qoldiramiz.",
       "allQueuedHint": "Barcha izohlar bitta so'rov bilan yuboriladi.",
       "summaryPlaceholder": "Ko'rib chiqish uchun ixtiyoriy xulosa",

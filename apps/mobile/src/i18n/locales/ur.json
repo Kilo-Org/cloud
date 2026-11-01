@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "مرج کے بعد برانچ حذف کریں",
       "noEnabledMethods": "اس ریپوزٹری میں مرج کا کوئی طریقہ فعال نہیں ہے۔ ریپوزٹری کے منتظم سے مرج، اسکواش یا ریبیس کا طریقہ فعال کرنے کو کہیں۔",
       "confirmTitle": "پل ریکویسٹ مرج کریں؟",
+      "confirmMergeTitle": "مرج کریں؟",
       "confirmTitleTerm": "{{term}} مرج کریں؟",
       "confirmMessage": "اس سے آپ کی تبدیلیاں بنیادی برانچ میں مرج ہو جائیں گی۔",
       "enableAutoMergeConfirmTitle": "خودکار مرج فعال کریں؟",

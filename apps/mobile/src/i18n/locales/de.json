@@ -2969,6 +2969,7 @@
       "deleteBranchAfterMerge": "Branch nach dem Zusammenführen löschen",
       "noEnabledMethods": "Für dieses Repository sind keine Methoden zum Zusammenführen aktiviert. Bitte einen Repository-Administrator, Merge, Squash oder Rebase als Methode zu aktivieren.",
       "confirmTitle": "Pull-Request zusammenführen?",
+      "confirmMergeTitle": "Zusammenführen?",
       "confirmTitleTerm": "{{term}} zusammenführen?",
       "confirmMessage": "Deine Änderungen werden in den Basis-Branch übernommen.",
       "enableAutoMergeConfirmTitle": "Automatisches Zusammenführen aktivieren?",

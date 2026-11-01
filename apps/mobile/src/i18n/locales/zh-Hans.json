@@ -2969,6 +2969,7 @@
       "deleteBranchAfterMerge": "合并后删除分支",
       "noEnabledMethods": "此仓库尚未启用任何合并方式。请联系仓库管理员启用普通合并、压缩合并或变基合并。",
       "confirmTitle": "合并拉取请求？",
+      "confirmMergeTitle": "合并？",
       "confirmTitleTerm": "合并{{term}}？",
       "confirmMessage": "这会将你的更改合并到基础分支。",
       "enableAutoMergeConfirmTitle": "开启自动合并？",

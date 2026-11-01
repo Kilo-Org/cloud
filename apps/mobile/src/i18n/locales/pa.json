@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "ਮਰਜ ਤੋਂ ਬਾਅਦ ਬ੍ਰਾਂਚ ਮਿਟਾਓ",
       "noEnabledMethods": "ਇਸ ਰਿਪੋਜ਼ਿਟਰੀ ਵਿੱਚ ਮਰਜ ਕਰਨ ਦੀ ਕੋਈ ਵਿਧੀ ਚਾਲੂ ਨਹੀਂ ਹੈ। ਰਿਪੋਜ਼ਿਟਰੀ ਦੇ ਪ੍ਰਸ਼ਾਸਕ ਨੂੰ ਮਰਜ, ਸਕੁਐਸ਼ ਜਾਂ ਰੀਬੇਸ ਵਿਧੀ ਚਾਲੂ ਕਰਨ ਲਈ ਕਹੋ।",
       "confirmTitle": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਮਰਜ ਕਰੀਏ?",
+      "confirmMergeTitle": "ਮਰਜ ਕਰੀਏ?",
       "confirmTitleTerm": "{{term}} ਮਰਜ ਕਰੀਏ?",
       "confirmMessage": "ਇਸ ਨਾਲ ਤੁਹਾਡੇ ਬਦਲਾਅ ਬੇਸ ਬ੍ਰਾਂਚ ਵਿੱਚ ਮਰਜ ਹੋ ਜਾਣਗੇ।",
       "enableAutoMergeConfirmTitle": "ਆਟੋ-ਮਰਜ ਚਾਲੂ ਕਰੀਏ?",

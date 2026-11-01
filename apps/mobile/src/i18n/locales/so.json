@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Tirtir laanta isku-darka ka dib",
       "noEnabledMethods": "Kaydkan kama daarna hab isku-dar ah. Ka codso maamulaha kaydka inuu daaro isku-darka caadiga ah, isku-ururinta ama saldhig-beddelka.",
       "confirmTitle": "Ma la isku daraa codsiga?",
+      "confirmMergeTitle": "Ma la isku daraa?",
       "confirmTitleTerm": "Ma la isku daraa {{term}}?",
       "confirmMessage": "Tani waxay isbeddelladaada ku dari doontaa laanta saldhigga.",
       "enableAutoMergeConfirmTitle": "Ma la daaraa isku-darka tooska ah?",

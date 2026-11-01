@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "મર્જ પછી બ્રાન્ચ કાઢી નાખો",
       "noEnabledMethods": "આ રિપોઝિટરીમાં મર્જ કરવાની કોઈ પદ્ધતિ ચાલુ નથી. રિપોઝિટરીના એડમિનને મર્જ, સ્ક્વોશ અથવા રીબેઝ પદ્ધતિ ચાલુ કરવા કહો.",
       "confirmTitle": "પુલ રિક્વેસ્ટ મર્જ કરવી છે?",
+      "confirmMergeTitle": "મર્જ કરવી છે?",
       "confirmTitleTerm": "{{term}} મર્જ કરવી છે?",
       "confirmMessage": "તમારા ફેરફારો બેઝ બ્રાન્ચમાં મર્જ થશે.",
       "enableAutoMergeConfirmTitle": "ઓટો-મર્જ ચાલુ કરવું છે?",

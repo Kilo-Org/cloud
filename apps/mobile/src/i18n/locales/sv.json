@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Ta bort grenen efter sammanslagning",
       "noEnabledMethods": "Det här kodarkivet har inga aktiverade sammanslagningsmetoder. Be en administratör för kodarkivet att aktivera sammanslagning med en separat incheckning, hopslagning av incheckningar eller ombasering.",
       "confirmTitle": "Slå samman PR:en?",
+      "confirmMergeTitle": "Slå samman?",
       "confirmTitleTerm": "Slå samman {{term}}?",
       "confirmMessage": "Dina ändringar slås samman med basgrenen.",
       "enableAutoMergeConfirmTitle": "Aktivera automatisk sammanslagning?",

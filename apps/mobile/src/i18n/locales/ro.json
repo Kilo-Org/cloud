@@ -432,6 +432,7 @@
       "deleteBranchAfterMerge": "Șterge ramura după îmbinare",
       "noEnabledMethods": "Acest depozit nu are nicio metodă de îmbinare activată. Cere unui administrator al depozitului să activeze îmbinarea printr-un commit nou, prin comasarea commiturilor sau prin rebazare.",
       "confirmTitle": "Îmbini PR-ul?",
+      "confirmMergeTitle": "Îmbini?",
       "confirmTitleTerm": "Îmbini {{term}}-ul?",
       "confirmMessage": "Modificările tale vor fi îmbinate în ramura de bază.",
       "enableAutoMergeConfirmTitle": "Activezi îmbinarea automată?",

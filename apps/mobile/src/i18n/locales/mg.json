@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Fafao ny sampana aorian'ny fampiraisana",
       "noEnabledMethods": "Tsy misy fomba fampiraisana navela ao amin'ity tahirin-kaody ity. Angataho ny mpitantana hamela ny fampiraisana tsotra, ny famintinana na ny famindrana fototra.",
       "confirmTitle": "Hampiraisina ve ny fangatahana fampiraisana?",
+      "confirmMergeTitle": "Hampiraisina ve?",
       "confirmTitleTerm": "Hampiraisina ve ny {{term}}?",
       "confirmMessage": "Hampidirina ao amin'ny sampana fototra ny fanovana nataonao.",
       "enableAutoMergeConfirmTitle": "Havelanao ve ny fampiraisana mandeha ho azy?",

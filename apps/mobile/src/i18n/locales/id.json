@@ -2969,6 +2969,7 @@
       "deleteBranchAfterMerge": "Hapus cabang setelah digabungkan",
       "noEnabledMethods": "Belum ada metode penggabungan yang aktif di repositori ini. Minta admin repositori mengaktifkan penggabungan dengan commit penggabungan, peringkasan commit, atau perubahan basis.",
       "confirmTitle": "Gabungkan PR?",
+      "confirmMergeTitle": "Gabungkan?",
       "confirmTitleTerm": "Gabungkan {{term}}?",
       "confirmMessage": "Perubahanmu akan digabungkan ke cabang tujuan.",
       "enableAutoMergeConfirmTitle": "Aktifkan penggabungan otomatis?",

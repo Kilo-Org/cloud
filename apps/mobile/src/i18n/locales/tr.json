@@ -2969,6 +2969,7 @@
       "deleteBranchAfterMerge": "Birleştirmeden sonra dalı sil",
       "noEnabledMethods": "Bu depoda etkin bir birleştirme yöntemi yok. Bir depo yöneticisinden birleştirme, sıkıştırma veya yeniden temellendirme yöntemlerinden birini etkinleştirmesini iste.",
       "confirmTitle": "Çekme isteği birleştirilsin mi?",
+      "confirmMergeTitle": "Birleştirilsin mi?",
       "confirmTitleTerm": "{{term}} birleştirilsin mi?",
       "confirmMessage": "Değişikliklerin hedef dala birleştirilecek.",
       "enableAutoMergeConfirmTitle": "Otomatik birleştirme açılsın mı?",

@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Ág törlése az összevonás után",
       "noEnabledMethods": "Ebben a tárolóban nincs engedélyezett összevonási módszer. Kérd meg a tároló egyik adminisztrátorát, hogy engedélyezze az összevonást, az egyesítést vagy az újraalapozást.",
       "confirmTitle": "Összevonod a módosítási kérelmet?",
+      "confirmMergeTitle": "Összevonod?",
       "confirmTitleTerm": "Összevonod a {{term}}?",
       "confirmMessage": "Ezzel a módosításaid bekerülnek az alapágba.",
       "enableAutoMergeConfirmTitle": "Engedélyezed az automatikus összevonást?",

@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Mukua te peka i muri i te whakakotahitanga",
       "noEnabledMethods": "Kāore he tikanga whakakotahi kua whakahohea mō tēnei pātaka waehere. Tonoa tētahi kaiwhakahaere o te pātaka waehere kia whakahohe i te whakakotahi, te kōpeke, te whakapūtake anō rānei.",
       "confirmTitle": "Whakakotahitia te tono kume?",
+      "confirmMergeTitle": "Whakakotahitia?",
       "confirmTitleTerm": "Whakakotahitia te {{term}}?",
       "confirmMessage": "Ka whakakotahitia ō huringa ki te peka pūtake.",
       "enableAutoMergeConfirmTitle": "Whakahohehia te whakakotahi aunoa?",

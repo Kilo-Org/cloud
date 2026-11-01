@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Walitti makuu booda damee haqi",
       "noEnabledMethods": "Kuusaan koodii kun mala walitti makuu hojii irra jiru hin qabu. Bulchaa kuusaa koodii mala walitti makuu, galmee tokkootti cuunfuu ykn bu'uura jijjiiruu akka hojii irra oolchu gaafadhu.",
       "confirmTitle": "Gaaffii walitti makuu raawwatamuu?",
+      "confirmMergeTitle": "Walitti makuu raawwatamuu?",
       "confirmTitleTerm": "{{term}} raawwatamuu?",
       "confirmMessage": "Kun jijjiiramoota kee damee bu'uuraatti walitti maka.",
       "enableAutoMergeConfirmTitle": "Ofumaan walitti makuun hojii irra haa oolu?",

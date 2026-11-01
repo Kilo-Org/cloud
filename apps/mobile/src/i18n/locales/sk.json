@@ -439,6 +439,7 @@
       "deleteBranchAfterMerge": "Odstrániť vetvu po zlúčení",
       "noEnabledMethods": "V tomto repozitári nie je povolená žiadna metóda zlúčenia. Požiadaj správcu, aby povolil zlučovací commit, zlúčenie commitov do jedného alebo presadenie commitov.",
       "confirmTitle": "Zlúčiť žiadosť?",
+      "confirmMergeTitle": "Zlúčiť?",
       "confirmTitleTerm": "Zlúčiť {{term}}?",
       "confirmMessage": "Tvoje zmeny sa zlúčia do cieľovej vetvy.",
       "enableAutoMergeConfirmTitle": "Zapnúť automatické zlúčenie?",

@@ -2969,6 +2969,7 @@
       "deleteBranchAfterMerge": "マージ後にブランチを削除",
       "noEnabledMethods": "このリポジトリではマージ方法が有効になっていません。リポジトリの管理者に、通常のマージ、スカッシュマージ、リベースマージのいずれかを有効にするよう依頼してください。",
       "confirmTitle": "プルリクエストをマージしますか？",
+      "confirmMergeTitle": "マージしますか？",
       "confirmTitleTerm": "{{term}}をマージしますか？",
       "confirmMessage": "変更をベースブランチにマージします。",
       "enableAutoMergeConfirmTitle": "自動マージを有効にしますか？",

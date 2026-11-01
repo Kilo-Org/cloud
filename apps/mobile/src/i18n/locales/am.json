@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "ከውህደቱ በኋላ ቅርንጫፉን ሰርዝ",
       "noEnabledMethods": "በዚህ ማከማቻ ላይ የነቃ የውህደት ዘዴ የለም። የማከማቻውን አስተዳዳሪ በውህደት ኮሚት፣ በማጠቃለል ወይም መሠረት በመቀየር የማዋሃድ ዘዴን እንዲያነቃ ጠይቅ።",
       "confirmTitle": "የማዋሃድ ጥያቄው ይዋሃድ?",
+      "confirmMergeTitle": "ይዋሃድ?",
       "confirmTitleTerm": "{{term}}ው ይዋሃድ?",
       "confirmMessage": "ይህ ለውጦችህን ወደ መሠረት ቅርንጫፉ ያዋህዳል።",
       "enableAutoMergeConfirmTitle": "ራስ-ሰር ማዋሃድ ይንቃ?",

@@ -432,6 +432,7 @@
       "deleteBranchAfterMerge": "Elimina la branca després de fusionar",
       "noEnabledMethods": "Aquest repositori no té cap mètode de fusió activat. Demana a un administrador del repositori que activi la fusió, l'agrupació de comissions o el canvi de base.",
       "confirmTitle": "Vols fusionar la sol·licitud d'integració?",
+      "confirmMergeTitle": "Vols fusionar?",
       "confirmTitleTerm": "Vols fusionar la {{term}}?",
       "confirmMessage": "Això fusionarà els teus canvis a la branca base.",
       "enableAutoMergeConfirmTitle": "Vols activar la fusió automàtica?",

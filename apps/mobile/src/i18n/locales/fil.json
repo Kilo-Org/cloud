@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Burahin ang branch pagkatapos i-merge",
       "noEnabledMethods": "Walang aktibong paraan ng pag-merge sa repository na ito. Hilingin sa admin ng repository na paganahin ang merge, squash, o rebase.",
       "confirmTitle": "I-merge ang pull request?",
+      "confirmMergeTitle": "I-merge?",
       "confirmTitleTerm": "I-merge ang {{term}}?",
       "confirmMessage": "Ime-merge nito ang mga pagbabago mo sa base branch.",
       "enableAutoMergeConfirmTitle": "Paganahin ang awtomatikong pag-merge?",

@@ -432,6 +432,7 @@
       "deleteBranchAfterMerge": "Eliminar o ramo após a integração",
       "noEnabledMethods": "Este repositório não tem métodos de integração ativos. Pede a um administrador do repositório para ativar a integração com um commit, a combinação de commits ou a reaplicação de commits.",
       "confirmTitle": "Integrar PR?",
+      "confirmMergeTitle": "Integrar?",
       "confirmTitleTerm": "Integrar {{term}}?",
       "confirmMessage": "As tuas alterações serão integradas no ramo base.",
       "enableAutoMergeConfirmTitle": "Ativar integração automática?",

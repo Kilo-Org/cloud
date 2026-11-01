@@ -3013,6 +3013,7 @@
       "deleteBranchAfterMerge": "Eliminar la rama después de la fusión",
       "noEnabledMethods": "Este repositorio no tiene ningún método de fusión activado. Pide a un administrador del repositorio que active la fusión, la compactación o la reorganización.",
       "confirmTitle": "¿Fusionar la PR?",
+      "confirmMergeTitle": "¿Fusionar?",
       "confirmTitleTerm": "¿Fusionar {{term}}?",
       "confirmMessage": "Esto fusionará tus cambios en la rama base.",
       "enableAutoMergeConfirmTitle": "¿Activar la fusión automática?",

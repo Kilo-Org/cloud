@@ -2969,6 +2969,7 @@
       "deleteBranchAfterMerge": "合併後刪除分支",
       "noEnabledMethods": "此存放庫未啟用任何合併方式。請存放庫管理員啟用一般合併、壓縮合併或變基合併。",
       "confirmTitle": "要合併提取請求嗎？",
+      "confirmMergeTitle": "要合併嗎？",
       "confirmTitleTerm": "要合併{{term}}嗎？",
       "confirmMessage": "這會將你的變更合併到基礎分支。",
       "enableAutoMergeConfirmTitle": "要啟用自動合併嗎？",

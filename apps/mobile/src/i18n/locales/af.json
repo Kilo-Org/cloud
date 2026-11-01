@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Skrap die tak ná samevoeging",
       "noEnabledMethods": "Geen samevoegingsmetodes is vir hierdie bewaarplek geaktiveer nie. Vra 'n administrateur van die bewaarplek om gewone samevoeging, saampersing of herbasering te aktiveer.",
       "confirmTitle": "Voeg trekversoek saam?",
+      "confirmMergeTitle": "Voeg saam?",
       "confirmTitleTerm": "Voeg {{term}} saam?",
       "confirmMessage": "Dit sal jou veranderings met die basistak saamvoeg.",
       "enableAutoMergeConfirmTitle": "Aktiveer outomatiese samevoeging?",

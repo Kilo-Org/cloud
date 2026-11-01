@@ -2975,6 +2975,7 @@
       "deleteBranchAfterMerge": "मर्ज के बाद ब्रांच हटाएँ",
       "noEnabledMethods": "इस रिपॉज़िटरी में मर्ज की कोई विधि चालू नहीं है। रिपॉज़िटरी के एडमिन से मर्ज, स्क्वैश या रीबेस से मर्ज करने की सुविधा चालू करने को कहें।",
       "confirmTitle": "पुल रिक्वेस्ट मर्ज करें?",
+      "confirmMergeTitle": "मर्ज करें?",
       "confirmTitleTerm": "{{term}} मर्ज करें?",
       "confirmMessage": "इससे आपके बदलाव बेस ब्रांच में मर्ज हो जाएँगे।",
       "enableAutoMergeConfirmTitle": "ऑटो-मर्ज चालू करें?",

@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Slett gren etter fletting",
       "noEnabledMethods": "Ingen flettemetoder er aktivert for dette kodelageret. Be en administrator aktivere vanlig fletting, sammenslåing eller ombasering.",
       "confirmTitle": "Flette PR-en?",
+      "confirmMergeTitle": "Flette?",
       "confirmTitleTerm": "Flette {{term}}?",
       "confirmMessage": "Dette fletter endringene dine inn i målgrenen.",
       "enableAutoMergeConfirmTitle": "Aktivere automatisk fletting?",

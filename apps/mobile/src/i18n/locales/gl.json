@@ -425,6 +425,7 @@
       "deleteBranchAfterMerge": "Eliminar a rama tras a fusión",
       "noEnabledMethods": "Este repositorio non ten ningún método de fusión activado. Pídelle a un administrador do repositorio que active a fusión, a compactación ou o cambio de base.",
       "confirmTitle": "Fusionar a solicitude de integración?",
+      "confirmMergeTitle": "Fusionar?",
       "confirmTitleTerm": "Fusionar a {{term}}?",
       "confirmMessage": "Isto fusionará os teus cambios na rama base.",
       "enableAutoMergeConfirmTitle": "Activar a fusión automática?",

@@ -3057,6 +3057,7 @@
       "deleteBranchAfterMerge": "Usuń gałąź po scaleniu",
       "noEnabledMethods": "W tym repozytorium nie włączono żadnej metody scalania. Poproś administratora o włączenie scalania z commitem scalającym, połączeniem commitów lub zmianą bazy.",
       "confirmTitle": "Scalić PR?",
+      "confirmMergeTitle": "Scalić?",
       "confirmTitleTerm": "Scalić {{term}}?",
       "confirmMessage": "Twoje zmiany zostaną scalone z gałęzią bazową.",
       "enableAutoMergeConfirmTitle": "Włączyć automatyczne scalanie?",

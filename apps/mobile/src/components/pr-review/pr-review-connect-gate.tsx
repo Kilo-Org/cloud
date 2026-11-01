@@ -10,7 +10,7 @@ import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { GitHubIcon } from '@/components/icons/github-icon';
-import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
+import { PrReviewGateActionGroup } from '@/components/pr-review/pr-review-gate-action-group';
 import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
 import { PrReviewGateItemLine } from '@/components/pr-review/pr-review-gate-item-line';
 import { ProviderConnectGate } from '@/components/pr-review/pr-review-provider-connect-gate';
@@ -232,28 +232,29 @@ function GitHubConnectGate({
                   ? t('prReview.connect.reconnectDescription')
                   : t('common.prReviewSubtitle')}
               </Text>
-              <PrReviewContextLine className="mt-3" />
             </>
           }
           action={
-            <Button
-              className={cn('mt-3 w-full flex-row gap-2', STATE_ACTION_CLASS)}
-              disabled={connecting}
-              onPress={() => {
-                void handleConnect();
-              }}
-            >
-              <View className="size-4 items-center justify-center">
-                {connecting ? (
-                  <ActivityIndicator size="small" color={colors.primaryForeground} />
-                ) : (
-                  <GitHubIcon size={16} color={colors.primaryForeground} />
-                )}
-              </View>
-              <Text>
-                {revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
-              </Text>
-            </Button>
+            <PrReviewGateActionGroup>
+              <Button
+                className={cn('w-full flex-row gap-2', STATE_ACTION_CLASS)}
+                disabled={connecting}
+                onPress={() => {
+                  void handleConnect();
+                }}
+              >
+                <View className="size-4 items-center justify-center">
+                  {connecting ? (
+                    <ActivityIndicator size="small" color={colors.primaryForeground} />
+                  ) : (
+                    <GitHubIcon size={16} color={colors.primaryForeground} />
+                  )}
+                </View>
+                <Text>
+                  {revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
+                </Text>
+              </Button>
+            </PrReviewGateActionGroup>
           }
         />
       </View>

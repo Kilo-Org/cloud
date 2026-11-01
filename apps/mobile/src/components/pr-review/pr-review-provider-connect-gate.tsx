@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/empty-state';
 import { toast } from 'sonner-native';
 
 import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
+import { PrReviewGateActionGroup } from '@/components/pr-review/pr-review-gate-action-group';
 import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
 import { PrReviewGateItemLine } from '@/components/pr-review/pr-review-gate-item-line';
 import { OrgOnlyDescription } from '@/components/pr-review/pr-review-org-only-description';
@@ -375,31 +376,29 @@ export function ProviderConnectGate({
                   {t('prReview.connect.gitlabReconnectAdminOnlyDescription')}
                 </Text>
               ) : null}
-              {/* The mismatch copy already names the requested host, so the
-                  context line keeps naming only the scope. */}
-              <PrReviewContextLine
-                instanceHint={mismatch === null ? instanceHint : undefined}
-                className="mt-3"
-              />
             </>
           }
           action={
-            action === 'connect' ? (
-              <Button
-                className={cn('mt-3 w-full flex-row gap-2', STATE_ACTION_CLASS)}
-                disabled={connecting}
-                onPress={() => {
-                  void handleConnect();
-                }}
-              >
-                {connecting ? (
-                  <ActivityIndicator size="small" color={colors.primaryForeground} />
-                ) : (
-                  <RefreshCcw size={16} color={colors.primaryForeground} />
-                )}
-                <Text>{connectTitle}</Text>
-              </Button>
-            ) : undefined
+            // The mismatch copy already names the requested host, so the
+            // caption keeps naming only the scope.
+            <PrReviewGateActionGroup instanceHint={mismatch === null ? instanceHint : undefined}>
+              {action === 'connect' ? (
+                <Button
+                  className={cn('w-full flex-row gap-2', STATE_ACTION_CLASS)}
+                  disabled={connecting}
+                  onPress={() => {
+                    void handleConnect();
+                  }}
+                >
+                  {connecting ? (
+                    <ActivityIndicator size="small" color={colors.primaryForeground} />
+                  ) : (
+                    <RefreshCcw size={16} color={colors.primaryForeground} />
+                  )}
+                  <Text>{connectTitle}</Text>
+                </Button>
+              ) : null}
+            </PrReviewGateActionGroup>
           }
         />
       </View>

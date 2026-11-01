@@ -1459,7 +1459,9 @@
     "instructions": {
       "title": "Vlastní pokyny",
       "deprecation": "Podporu vlastních pokynů plánujeme ukončit. Přesuňte tyto pokyny do souboru REVIEW.md ve svém repozitáři.",
-      "placeholder": "např. vyžadovat dodržování našich pravidel pro zpracování chyb…"
+      "placeholder": "např. vyžadovat dodržování našich pravidel pro zpracování chyb…",
+      "clearTitle": "Odebrat vlastní pokyny?",
+      "clearMessage": "Uložení prázdného pole smaže vlastní pokyny uložené pro tohoto recenzenta."
     },
     "repos": {
       "unavailable": "Repozitáře nejsou k dispozici. Dokončete nastavení služby Bitbucket na kilo.ai.",
@@ -1646,8 +1648,8 @@
       "reviewStyle": "Styl kontroly",
       "focusAreas": "Oblasti zaměření",
       "allAreas": "Všechny oblasti",
-      "customInstructions": "Vlastní pokyny",
       "set": "Nastaveno",
+      "notSet": "Nenastaveno",
       "nSelected": "{{displayCount}} vybráno",
       "proposedReviewMdGuidance": "Návrhy pokynů do REVIEW.md"
     },

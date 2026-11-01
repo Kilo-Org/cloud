@@ -259,9 +259,6 @@ export function useGitLabWebhookWarning(scope: string, platform: ReviewerPlatfor
   return { hasWebhookSyncWarning: data };
 }
 
-// Named contract for consumers that receive the save mutation as a prop.
-export type SaveReviewConfigMutation = ReturnType<typeof useSaveReviewConfig>;
-
 export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
   const queryClient = useQueryClient();
   const queryKey = useReviewConfigQueryKey(scope, platform);

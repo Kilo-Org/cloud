@@ -889,7 +889,9 @@
     "instructions": {
       "title": "Benutzerdefinierte Anweisungen",
       "deprecation": "Benutzerdefinierte Anweisungen sollen künftig entfallen. Verschiebe diese Richtlinien stattdessen in eine REVIEW.md-Datei in deinem Repository.",
-      "placeholder": "z. B. auf die Einhaltung unserer Regeln zur Fehlerbehandlung achten …"
+      "placeholder": "z. B. auf die Einhaltung unserer Regeln zur Fehlerbehandlung achten …",
+      "clearTitle": "Benutzerdefinierte Anweisungen entfernen?",
+      "clearMessage": "Wenn du ein leeres Feld speicherst, werden die für diesen Reviewer gespeicherten benutzerdefinierten Anweisungen gelöscht."
     },
     "repos": {
       "unavailable": "Die Repositories sind nicht verfügbar. Schließe die Bitbucket-Einrichtung auf kilo.ai ab.",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "Alle Bereiche",
-      "customInstructions": "Benutzerdefinierte Anweisungen",
       "focusAreas": "Schwerpunkte",
       "nSelected": "{{displayCount}} ausgewählt",
       "proposedReviewMdGuidance": "Vorgeschlagene Richtlinien für REVIEW.md",
       "reviewStyle": "Art der Prüfung",
-      "set": "Festgelegt"
+      "set": "Festgelegt",
+      "notSet": "Nicht festgelegt"
     },
     "updateFailed": "Code Reviewer konnte nicht aktualisiert werden.",
     "configSaveFailed": "Die Review-Einstellungen konnten nicht gespeichert werden.",

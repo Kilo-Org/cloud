@@ -1459,7 +1459,9 @@
     "instructions": {
       "title": "Navodila po meri",
       "deprecation": "Navodila po meri bodo ukinjena. Te smernice raje premakni v datoteko REVIEW.md v svojem skladišču.",
-      "placeholder": "npr. upoštevanje naših pravil za obravnavo napak…"
+      "placeholder": "npr. upoštevanje naših pravil za obravnavo napak…",
+      "clearTitle": "Odstranim navodila po meri?",
+      "clearMessage": "Če shraniš prazno polje, izbrišeš navodila po meri, shranjena za tega pregledovalca."
     },
     "repos": {
       "unavailable": "Skladišča niso na voljo. Dokončaj nastavitev povezave s platformo Bitbucket na kilo.ai.",
@@ -1646,8 +1648,8 @@
       "reviewStyle": "Slog pregleda",
       "focusAreas": "Prednostna področja",
       "allAreas": "Vsa področja",
-      "customInstructions": "Navodila po meri",
       "set": "Nastavljeno",
+      "notSet": "Ni nastavljeno",
       "nSelected": "Izbrano {{displayCount}}",
       "proposedReviewMdGuidance": "Predlagane smernice za REVIEW.md"
     },

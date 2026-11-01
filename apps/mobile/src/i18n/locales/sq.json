@@ -1415,7 +1415,9 @@
     "instructions": {
       "title": "Udhëzime të personalizuara",
       "deprecation": "Funksioni i udhëzimeve të personalizuara do të hiqet nga përdorimi. Zhvendosi këto udhëzime në një skedar REVIEW.md në depon tënde.",
-      "placeholder": "p.sh. respektimi i rregullave tona për trajtimin e gabimeve…"
+      "placeholder": "p.sh. respektimi i rregullave tona për trajtimin e gabimeve…",
+      "clearTitle": "Të hiqen udhëzimet e personalizuara?",
+      "clearMessage": "Ruajtja e një fushe bosh do të fshijë udhëzimet e personalizuara të ruajtura për këtë recensues kodi."
     },
     "repos": {
       "unavailable": "Depot nuk janë të disponueshme. Përfundo konfigurimin e Bitbucket në kilo.ai.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Stili i shqyrtimit",
       "focusAreas": "Fushat e përqendrimit",
       "allAreas": "Të gjitha fushat",
-      "customInstructions": "Udhëzime të personalizuara",
       "set": "I caktuar",
+      "notSet": "I pacaktuar",
       "nSelected": "{{displayCount}} të zgjedhura",
       "proposedReviewMdGuidance": "Udhëzime të propozuara për REVIEW.md"
     },

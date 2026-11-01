@@ -1415,7 +1415,9 @@
     "instructions": {
       "title": "Arahan tersuai",
       "deprecation": "Ciri arahan tersuai akan dihentikan. Pindahkan garis panduan ini ke dalam fail REVIEW.md dalam repositori anda.",
-      "placeholder": "contohnya, pastikan kod mematuhi konvensyen pengendalian ralat kami…"
+      "placeholder": "contohnya, pastikan kod mematuhi konvensyen pengendalian ralat kami…",
+      "clearTitle": "Buang arahan tersuai?",
+      "clearMessage": "Menyimpan medan kosong akan memadamkan arahan tersuai yang disimpan untuk pengulas ini."
     },
     "repos": {
       "unavailable": "Repositori tidak tersedia — selesaikan persediaan Bitbucket di kilo.ai.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Gaya semakan",
       "focusAreas": "Bidang fokus",
       "allAreas": "Semua bidang",
-      "customInstructions": "Arahan tersuai",
       "set": "Ditetapkan",
+      "notSet": "Tidak ditetapkan",
       "nSelected": "{{displayCount}} dipilih",
       "proposedReviewMdGuidance": "Cadangan panduan REVIEW.md"
     },

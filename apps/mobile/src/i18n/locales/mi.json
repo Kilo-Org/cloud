@@ -1415,7 +1415,9 @@
     "instructions": {
       "title": "Ngā tohutohu ake",
       "deprecation": "Ka whakamutua te tautoko mō ngā tohutohu ritenga ā tōna wā. Nekehia ēnei aratohu ki tētahi kōnae REVIEW.md i tō pūranga.",
-      "placeholder": "hei tauira, kia ū ki ā mātou tikanga whakahaere hapa…"
+      "placeholder": "hei tauira, kia ū ki ā mātou tikanga whakahaere hapa…",
+      "clearTitle": "Tangohia ngā tohutohu ake?",
+      "clearMessage": "Ki te tiakia he āpure tuatau, ka mukua ngā tohutohu ake kua penapenatia mō tēnei kaiarotake."
     },
     "repos": {
       "unavailable": "Kāore e wātea ana ngā pūranga — whakaotia te whakarite i Bitbucket i kilo.ai.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Te āhua arotake",
       "focusAreas": "Ngā wāhanga arotahi",
       "allAreas": "Ngā wāhanga katoa",
-      "customInstructions": "Ngā tohutohu ake",
       "set": "Kua whakaritea",
+      "notSet": "Kāore i whakaritea",
       "nSelected": "{{displayCount}} kua kōwhiria",
       "proposedReviewMdGuidance": "Ngā aratohu REVIEW.md e tūtohutia ana"
     },

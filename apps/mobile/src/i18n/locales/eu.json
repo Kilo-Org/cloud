@@ -1415,7 +1415,9 @@
     "instructions": {
       "title": "Pertsonalizatutako argibideak",
       "deprecation": "Argibide pertsonalizatuen aukera kentzea aurreikusten da. Eraman jarraibide hauek zure biltegiko REVIEW.md fitxategi batera.",
-      "placeholder": "adib.: gure errore-kudeaketako arauak betearaztea…"
+      "placeholder": "adib.: gure errore-kudeaketako arauak betearaztea…",
+      "clearTitle": "Kendu pertsonalizatutako argibideak?",
+      "clearMessage": "Eremu huts bat gordetzen baduzu, berrikusle honentzat gordetako argibide pertsonalizatuak ezabatzen dira."
     },
     "repos": {
       "unavailable": "Biltegiak ez daude erabilgarri. Amaitu Bitbucket-en konfigurazioa kilo.ai-n.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Berrikuspen-estiloa",
       "focusAreas": "Arreta-eremuak",
       "allAreas": "Eremu guztiak",
-      "customInstructions": "Pertsonalizatutako argibideak",
       "set": "Ezarrita",
+      "notSet": "Ezarri gabe",
       "nSelected": "{{displayCount}} hautatuta",
       "proposedReviewMdGuidance": "REVIEW.md fitxategirako proposatutako jarraibideak"
     },

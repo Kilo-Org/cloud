@@ -1481,7 +1481,9 @@
     "instructions": {
       "title": "Struzzjonijiet personalizzati",
       "deprecation": "Il-funzjoni tal-istruzzjonijiet personalizzati se titneħħa fil-futur. Minflok, mexxi dawn il-linji gwida f'fajl REVIEW.md fir-repożitorju tiegħek.",
-      "placeholder": "eż. Infurza l-konvenzjonijiet tagħna għall-immaniġġjar tal-iżbalji…"
+      "placeholder": "eż. Infurza l-konvenzjonijiet tagħna għall-immaniġġjar tal-iżbalji…",
+      "clearTitle": "Trid tneħħi l-istruzzjonijiet personalizzati?",
+      "clearMessage": "Jekk tissejvja kampt vojt, tiddelimina l-istruzzjonijiet personalizzati maħżuna għal dan ir-reviżur."
     },
     "repos": {
       "unavailable": "Ir-repożitorji mhux disponibbli. Lesti l-konfigurazzjoni ta' Bitbucket fuq kilo.ai.",
@@ -1668,8 +1670,8 @@
       "reviewStyle": "Stil ta' reviżjoni",
       "focusAreas": "Oqsma ta' attenzjoni",
       "allAreas": "L-oqsma kollha",
-      "customInstructions": "Struzzjonijiet personalizzati",
       "set": "Issettjat",
+      "notSet": "Mhux issettjat",
       "nSelected": "{{displayCount}} magħżula",
       "proposedReviewMdGuidance": "Linji gwida proposti għal REVIEW.md"
     },

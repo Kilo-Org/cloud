@@ -901,7 +901,9 @@
     "instructions": {
       "title": "تعليمات مخصصة",
       "deprecation": "من المقرر إيقاف ميزة التعليمات المخصصة. انقل هذه الإرشادات إلى ملف REVIEW.md في مستودعك بدلًا منها.",
-      "placeholder": "مثال: الالتزام بقواعد معالجة الأخطاء المتبعة لدينا…"
+      "placeholder": "مثال: الالتزام بقواعد معالجة الأخطاء المتبعة لدينا…",
+      "clearTitle": "إزالة التعليمات المخصصة؟",
+      "clearMessage": "سيؤدي حفظ الحقل فارغًا إلى حذف التعليمات المخصصة المخزّنة لهذا المراجع."
     },
     "repos": {
       "unavailable": "المستودعات غير متاحة — أكمل إعداد Bitbucket على kilo.ai.",
@@ -1092,12 +1094,12 @@
     },
     "overview": {
       "allAreas": "جميع المجالات",
-      "customInstructions": "تعليمات مخصصة",
       "focusAreas": "مجالات التركيز",
       "nSelected": "{{displayCount}} محدد",
       "proposedReviewMdGuidance": "إرشادات REVIEW.md المقترحة",
       "reviewStyle": "أسلوب المراجعة",
-      "set": "محدّد"
+      "set": "محدّد",
+      "notSet": "غير محدّد"
     },
     "updateFailed": "تعذّر تحديث المراجع.",
     "configSaveFailed": "تعذّر حفظ إعدادات المراجعة.",

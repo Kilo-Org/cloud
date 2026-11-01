@@ -17,7 +17,7 @@
  * installation surface reported it as connected, and its findings were
  * unreachable.
  */
-import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, test } from '@jest/globals';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -98,19 +98,25 @@ async function insertSecurityAgentConfig(organizationId: string, userId: string)
 
 describe('organization Security Agent entry for the organization workflow connection', () => {
   let userId: string;
-  let organizationId: string;
 
-  beforeEach(async () => {
+  // One truncation for the whole file, and a fresh organization per test, so a
+  // parallel suite is not blocked by a truncate between each case.
+  beforeAll(async () => {
     await cleanupDbForTest();
     const user = await insertTestUser({ google_user_email: 'security-entry@example.com' });
     userId = user.id;
-    organizationId = (await createTestOrganization('Security entry', userId, 0)).id;
-    await insertSecurityAgentConfig(organizationId, userId);
   });
 
-  afterEach(cleanupDbForTest);
+  afterAll(cleanupDbForTest);
+
+  async function createOrganization(name: string): Promise<string> {
+    const organizationId = (await createTestOrganization(name, userId, 0)).id;
+    await insertSecurityAgentConfig(organizationId, userId);
+    return organizationId;
+  }
 
   test('opens the dashboard for a healthy installation written without a role', async () => {
+    const organizationId = await createOrganization('Security entry, roleless install');
     const integration = await insertOrganizationInstallation({
       organizationId,
       installationId: '889001',
@@ -139,6 +145,7 @@ describe('organization Security Agent entry for the organization workflow connec
   });
 
   test('opens the dashboard for a roleless installation written after the role backfill', async () => {
+    const organizationId = await createOrganization('Security entry, after the backfill');
     await applyConnectionRoleBackfill();
     const integration = await insertOrganizationInstallation({
       organizationId,
@@ -155,7 +162,8 @@ describe('organization Security Agent entry for the organization workflow connec
     // The other owner holds this installation's workflow claim, so this
     // organization's association is an `agent_only` sharing row and the
     // Security Agent does not run for it.
-    const primaryOrganizationId = (await createTestOrganization('Primary', userId, 0)).id;
+    const organizationId = await createOrganization('Security entry, shared install');
+    const primaryOrganizationId = await createOrganization('Security entry, shared primary');
     const canonical = await insertCanonicalInstallation('889003');
     await insertOrganizationInstallation({
       organizationId: primaryOrganizationId,
@@ -163,7 +171,6 @@ describe('organization Security Agent entry for the organization workflow connec
       canonicalId: canonical.id,
       overrides: { github_connection_role: 'workflow' },
     });
-    await insertSecurityAgentConfig(primaryOrganizationId, userId);
     await insertOrganizationInstallation({
       organizationId,
       installationId: '889003',
@@ -185,6 +192,7 @@ describe('organization Security Agent entry for the organization workflow connec
   test('keeps the setup state for a roleless row another association claims', async () => {
     // A shadowed duplicate: the claim belongs to the other owner, so this
     // association stays out of the workflow lookups.
+    const organizationId = await createOrganization('Security entry, shadowed');
     const primaryOrganizationId = (await createTestOrganization('Primary', userId, 0)).id;
     const canonical = await insertCanonicalInstallation('889004');
     await insertOrganizationInstallation({
@@ -205,7 +213,90 @@ describe('organization Security Agent entry for the organization workflow connec
     ).toMatchObject({ hasIntegration: false });
   });
 
+  test('resolves one roleless owner per installation, the oldest association', async () => {
+    // Two roleless associations for one installation: a single owner is the
+    // workflow connection, so the later organization stays on setup.
+    const organizationId = await createOrganization('Security entry, oldest roleless');
+    const otherOrganizationId = (await createTestOrganization('Later', userId, 0)).id;
+    const canonical = await insertCanonicalInstallation('889008');
+    await insertOrganizationInstallation({
+      organizationId,
+      installationId: '889008',
+      canonicalId: canonical.id,
+      overrides: { created_at: '2026-01-01T00:00:00.000Z' },
+    });
+    await insertOrganizationInstallation({
+      organizationId: otherOrganizationId,
+      installationId: '889008',
+      canonicalId: canonical.id,
+      overrides: { created_at: '2026-02-01T00:00:00.000Z' },
+    });
+
+    const caller = await createCallerForUser(userId);
+    expect(
+      await caller.organizations.securityAgent.getPermissionStatus({ organizationId })
+    ).toMatchObject({ hasIntegration: true });
+    expect(
+      await caller.organizations.securityAgent.getPermissionStatus({
+        organizationId: otherOrganizationId,
+      })
+    ).toMatchObject({ hasIntegration: false });
+  });
+
+  test('keeps the setup state when the canonical installation is gone', async () => {
+    const organizationId = await createOrganization('Security entry, canonical gone');
+    const canonical = await insertCanonicalInstallation('889009');
+    await db
+      .update(github_app_installations)
+      .set({ lifecycle_state: 'suspended', suspended_at: new Date().toISOString() })
+      .where(eq(github_app_installations.id, canonical.id));
+    await insertOrganizationInstallation({
+      organizationId,
+      installationId: '889009',
+      canonicalId: canonical.id,
+    });
+
+    const caller = await createCallerForUser(userId);
+    expect(
+      await caller.organizations.securityAgent.getPermissionStatus({ organizationId })
+    ).toMatchObject({ hasIntegration: false });
+  });
+
+  test('names the stored workflow association over an older roleless one', async () => {
+    // The organization's real workflow connection is the row the connection
+    // writers wrote, even when a legacy association is older.
+    const organizationId = await createOrganization('Security entry, workflow preference');
+    const workflowInstallation = await insertOrganizationInstallation({
+      organizationId,
+      installationId: '889011',
+      overrides: {
+        created_at: '2026-02-01T00:00:00.000Z',
+        github_connection_role: 'workflow',
+        repositories: [{ id: 2, name: 'workflow-repo', full_name: 'acme/workflow', private: true }],
+      },
+    });
+    await insertOrganizationInstallation({
+      organizationId,
+      installationId: '889010',
+      overrides: {
+        created_at: '2026-01-01T00:00:00.000Z',
+        repositories: [{ id: 1, name: 'legacy-repo', full_name: 'acme/legacy', private: true }],
+      },
+    });
+
+    const caller = await createCallerForUser(userId);
+    const input = { organizationId };
+    expect(await caller.organizations.securityAgent.getPermissionStatus(input)).toMatchObject({
+      integrationId: workflowInstallation.id,
+    });
+    // The operation behind the dashboard names the same association.
+    expect(await caller.organizations.securityAgent.getRepositories(input)).toMatchObject([
+      { fullName: 'acme/workflow' },
+    ]);
+  });
+
   test('keeps the setup state for a roleless installation that is not healthy', async () => {
+    const organizationId = await createOrganization('Security entry, unhealthy');
     await insertOrganizationInstallation({
       organizationId,
       installationId: '889005',
@@ -241,6 +332,7 @@ describe('organization Security Agent entry for the organization workflow connec
   });
 
   test('gives the row its stored role when the connection role backfill runs', async () => {
+    const organizationId = await createOrganization('Security entry, backfill role');
     const integration = await insertOrganizationInstallation({
       organizationId,
       installationId: '889007',

@@ -6,9 +6,10 @@
  */
 
 import { z } from 'zod';
-import { eq, and, asc, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { eq, and, asc, desc, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import {
   organizationWorkflowGitHubConnectionSql,
+  organizationWorkflowGitHubPreferenceSql,
   recordSecurityAgentRepositorySyncAttempt,
   recordSecurityAgentRepositorySyncFailure,
   recordSecurityAgentRepositorySyncSuccess,
@@ -851,7 +852,11 @@ export async function getOwnerConfig(
       eq(platform_integrations.github_installation_id, github_app_installations.id)
     )
     .where(eligibleSecuritySyncIntegration(owner))
-    .orderBy(asc(platform_integrations.created_at), asc(platform_integrations.id))
+    .orderBy(
+      desc(organizationWorkflowGitHubPreferenceSql()),
+      asc(platform_integrations.created_at),
+      asc(platform_integrations.id)
+    )
     .limit(1);
 
   if (integrations.length === 0) return { unavailable: 'GITHUB_TOKEN_UNAVAILABLE' };

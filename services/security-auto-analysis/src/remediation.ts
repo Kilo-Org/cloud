@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import {
   organizationWorkflowGitHubConnectionSql,
+  organizationWorkflowGitHubPreferenceSql,
   transitionSecurityAgentCommand,
 } from '@kilocode/db';
 import {
@@ -407,6 +408,11 @@ async function getRuntimeConfig(db: WorkerDb, owner: QueueOwner): Promise<Runtim
         isNull(platform_integrations.github_disconnected_at),
         eq(platform_integrations.integration_status, 'active')
       )
+    )
+    .orderBy(
+      desc(organizationWorkflowGitHubPreferenceSql()),
+      asc(platform_integrations.created_at),
+      asc(platform_integrations.id)
     )
     .limit(1);
 

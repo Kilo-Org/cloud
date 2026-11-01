@@ -1865,7 +1865,6 @@
       "advancedConfigDescription": "חל על ההפעלה הזו. שמירה כפרופיל שומרת אותו לפעם הבאה.",
       "saveAsProfile": "שמור כפרופיל",
       "saveProfileDescription": "שמור את משתני הסביבה הנוכחיים ואת פקודות ההגדרה כפרופיל לשימוש חוזר.",
-      "profileSummary": "{{vars}} משתני סביבה · {{commands}} פקודות הגדרה",
       "profileSaved": "הפרופיל \"{{name}}\" נשמר",
       "organizationProfiles": "פרופילי ארגון",
       "personalProfiles": "פרופילים אישיים",

@@ -1847,7 +1847,6 @@
       "advancedConfigDescription": "仅对本次会话生效。另存为配置文件可供下次使用。",
       "saveAsProfile": "另存为配置文件",
       "saveProfileDescription": "将当前环境变量和设置命令保存为可重复使用的配置文件。",
-      "profileSummary": "{{vars}} 环境变量 · {{commands}} 设置命令",
       "profileSaved": "配置文件“{{name}}”已保存",
       "organizationProfiles": "组织配置文件",
       "personalProfiles": "个人配置文件",

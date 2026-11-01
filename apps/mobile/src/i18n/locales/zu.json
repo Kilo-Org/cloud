@@ -2379,7 +2379,6 @@
       "advancedConfigDescription": "Kusebenza kulesi sikhathi. Ukulondoloza njengephrofayela kukugcina okwesikhathi esizayo.",
       "saveAsProfile": "Londoloza Njengephrofayela",
       "saveProfileDescription": "Londoloza okuguquguqukayo kwendawo yamanje kanye nemiyalelo yokusetha njengephrofayili esebenziseka kabusha.",
-      "profileSummary": "{{vars}} okuguquguqukayo kwemvelo · {{commands}} imiyalo yokusetha",
       "profileSaved": "Iphrofayela \"{{name}}\" ilondoloziwe",
       "organizationProfiles": "Amaphrofayili enhlangano",
       "personalProfiles": "Amaphrofayili Omuntu Siqu",

@@ -2373,7 +2373,6 @@
       "advancedConfigDescription": "Saio honetarako balio du. Profil gisa gordez gero, hurrengorako gordeko da.",
       "saveAsProfile": "Gorde profil gisa",
       "saveProfileDescription": "Gorde uneko ingurune-aldagaiak eta konfiguratu komandoak profil berrerabilgarri gisa.",
-      "profileSummary": "{{vars}} ingurune-aldagaiak · {{commands}} konfigurazio komandoak",
       "profileSaved": "\"{{name}}\" profila gorde da",
       "organizationProfiles": "Erakundeen profilak",
       "personalProfiles": "Profil pertsonalak",

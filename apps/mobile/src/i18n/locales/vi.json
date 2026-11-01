@@ -1847,7 +1847,6 @@
       "advancedConfigDescription": "Áp dụng cho phiên này. Lưu làm hồ sơ sẽ giữ lại cho lần sau.",
       "saveAsProfile": "Lưu làm hồ sơ",
       "saveProfileDescription": "Lưu các biến môi trường hiện tại và các lệnh thiết lập dưới dạng cấu hình có thể sử dụng lại.",
-      "profileSummary": "{{vars}} biến môi trường · {{commands}} lệnh thiết lập",
       "profileSaved": "Đã lưu hồ sơ \"{{name}}\"",
       "organizationProfiles": "Hồ sơ tổ chức",
       "personalProfiles": "Hồ sơ cá nhân",

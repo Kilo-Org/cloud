@@ -1853,7 +1853,6 @@
       "advancedConfigDescription": "यह इस सत्र पर लागू होता है। प्रोफ़ाइल के रूप में सहेजने पर यह अगली बार के लिए रहता है।",
       "saveAsProfile": "प्रोफ़ाइल के रूप में सहेजें",
       "saveProfileDescription": "वर्तमान परिवेश चर और सेटअप आदेश को पुन: प्रयोज्य प्रोफ़ाइल के रूप में सहेजें।",
-      "profileSummary": "{{vars}} पर्यावरण चर · {{commands}} सेटअप आदेश",
       "profileSaved": "प्रोफ़ाइल \"{{name}}\" सहेजी गई",
       "organizationProfiles": "संगठन प्रोफ़ाइल",
       "personalProfiles": "व्यक्तिगत प्रोफ़ाइल",

@@ -2379,7 +2379,6 @@
       "advancedConfigDescription": "මෙය මෙම සැසියට අදාළ වේ. පැතිකඩක් ලෙස සුරැකීමෙන් එය ඊළඟ වතාවට රැඳේ.",
       "saveAsProfile": "පැතිකඩ ලෙස සුරකින්න",
       "saveProfileDescription": "වත්මන් පරිසර විචල්‍යයන් සහ සැකසුම් විධාන නැවත භාවිත කළ හැකි පැතිකඩක් ලෙස සුරකින්න.",
-      "profileSummary": "{{vars}} පරිසර විචල්‍යයන් · {{commands}} පිහිටුවීම් විධාන",
       "profileSaved": "පැතිකඩ \"{{name}}\" සුරකින ලදී",
       "organizationProfiles": "සංවිධානයේ පැතිකඩ",
       "personalProfiles": "පුද්ගලික පැතිකඩ",

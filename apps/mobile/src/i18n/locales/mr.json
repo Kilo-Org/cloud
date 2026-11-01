@@ -2373,7 +2373,6 @@
       "advancedConfigDescription": "हे या सत्रावर लागू होते. प्रोफाइल म्हणून सेव्ह केल्यास ते पुढील वेळेसाठी राहते.",
       "saveAsProfile": "प्रोफाइल म्हणून सेव्ह करा",
       "saveProfileDescription": "वर्तमान पर्यावरण व्हेरिएबल्स आणि सेटअप आदेश पुन्हा वापरता येण्याजोग्या प्रोफाइल म्हणून जतन करा.",
-      "profileSummary": "{{vars}} पर्यावरण चल · {{commands}} सेटअप आदेश",
       "profileSaved": "प्रोफाइल \"{{name}}\" जतन केले",
       "organizationProfiles": "संस्था प्रोफाइल",
       "personalProfiles": "वैयक्तिक प्रोफाइल",

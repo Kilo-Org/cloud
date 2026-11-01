@@ -2439,7 +2439,6 @@
       "advancedConfigDescription": "Applies to this session. Saving a profile keeps it for next time.",
       "saveAsProfile": "Save as Profile",
       "saveProfileDescription": "Save the current environment variables and setup commands as a reusable profile.",
-      "profileSummary": "{{vars}} environment variables · {{commands}} setup commands",
       "profileSaved": "Profile \"{{name}}\" saved",
       "organizationProfiles": "Organization Profiles",
       "personalProfiles": "Personal Profiles",

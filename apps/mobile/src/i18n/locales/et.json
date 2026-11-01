@@ -635,7 +635,7 @@
       "skipped_one": "{{displayCount}} vahele jäetud",
       "skipped_other": "{{displayCount}} vahele jäetud",
       "checksCount": "{{displayCount}} kontrolli",
-      "checksCount_one": "{{displayCount}} kontrolli",
+      "checksCount_one": "{{displayCount}} kontroll",
       "checksCount_other": "{{displayCount}} kontrolli",
       "checkDetails": "kontrolli üksikasjad"
     },
@@ -980,7 +980,7 @@
       "uploadFailed": "Üleslaadimine ebaõnnestus.",
       "nothingToPaste": "Lõikelaual pole midagi kleepimiseks.",
       "metadataStripFailed": "Foto metaandmete eemaldamine ebaõnnestus.",
-      "limit_one": "Võid lisada kuni {{displayCount}} faili.",
+      "limit_one": "Võid lisada kuni {{displayCount}} fail.",
       "limit_other": "Võid lisada kuni {{displayCount}} faili."
     },
     "attachmentPreview": {
@@ -1791,7 +1791,7 @@
       "syncStatusUnavailable": "Sünkroonimise olek pole saadaval.",
       "daysOverdue_one": "Tähtaeg ületatud {{displayCount}} päeva",
       "daysOverdue_other": "Tähtaeg ületatud {{displayCount}} päeva",
-      "findingsCount_one": "{{displayCount}} leidu",
+      "findingsCount_one": "{{displayCount}} leid",
       "findingsCount_other": "{{displayCount}} leidu"
     },
     "dashboardMetrics": {
@@ -1972,7 +1972,7 @@
       "events": "Sündmused",
       "eventConfidence": "Usaldus: {{confidence}}",
       "eventReason": "Põhjus: {{reason}}",
-      "eventsCount_one": "{{displayCount}} sündmust",
+      "eventsCount_one": "{{displayCount}} sündmus",
       "eventsCount_other": "{{displayCount}} sündmust",
       "generated": "Aruanne on loodud {{generatedAt}}.",
       "noActivity": "Salvestatud tegevust pole",
@@ -2194,7 +2194,7 @@
       "cent_one": "sent",
       "cent": "senti",
       "cent_other": "senti",
-      "dollar_one": "uSA dollar",
+      "dollar_one": "dollar",
       "dollar": "dollarit",
       "dollar_other": "dollarit",
       "costSpoken": "kulu {{cost}}",
@@ -2373,7 +2373,6 @@
       "advancedConfigDescription": "Kehtib selle seansi kohta. Profiilina salvestamine jätab selle järgmiseks korraks alles.",
       "saveAsProfile": "Salvesta profiilina",
       "saveProfileDescription": "Salvestage praegused keskkonnamuutujad ja häälestuskäsud korduvkasutatava profiilina.",
-      "profileSummary": "{{vars}} keskkonnamuutujad · {{commands}} häälestuskäsud",
       "profileSaved": "Profiil \"{{name}}\" on salvestatud",
       "organizationProfiles": "Organisatsiooni profiilid",
       "personalProfiles": "Isiklikud profiilid",
@@ -2414,11 +2413,11 @@
       "linesBadge": "{{displayCount}} rida",
       "filesBadge": "{{displayCount}} faili",
       "matchesBadge": "{{displayCount}} vastet",
-      "filesBadge_one": "{{displayCount}} faili",
+      "filesBadge_one": "{{displayCount}} fail",
       "filesBadge_other": "{{displayCount}} faili",
       "linesBadge_one": "{{displayCount}} rida",
       "linesBadge_other": "{{displayCount}} rida",
-      "matchesBadge_one": "{{displayCount}} vastet",
+      "matchesBadge_one": "{{displayCount}} vaste",
       "matchesBadge_other": "{{displayCount}} vastet",
       "noOutput": "Väljund puudub.",
       "translationFailed": "Tõlge ebaõnnestus"
@@ -2768,9 +2767,9 @@
       "couldNotOpenPhotoPicker": "Fotovalijat ei õnnestunud avada. Taaskäivita Kilo ja proovi uuesti.",
       "maxFilesAllowed": "Lisada saab kuni {{displayCount}} faili.",
       "onlyAddingFiles": "Lisatakse ainult {{accepted}} faili {{total}} failist (kuni {{max}})",
-      "maxFilesAllowed_one": "Lisada saab kuni {{displayCount}} faili.",
+      "maxFilesAllowed_one": "Lisada saab kuni {{displayCount}} fail.",
       "maxFilesAllowed_other": "Lisada saab kuni {{displayCount}} faili.",
-      "onlyAddingFiles_one": "Lisatakse ainult {{accepted}} faili {{total}} failist (kuni {{max}})",
+      "onlyAddingFiles_one": "Lisatakse ainult {{accepted}} fail {{total}} failist (kuni {{max}})",
       "onlyAddingFiles_other": "Lisatakse ainult {{accepted}} faili {{total}} failist (kuni {{max}})"
     },
     "composer": {
@@ -2795,7 +2794,7 @@
       "discardAttachmentsTitle": "Kas loobuda manustest?",
       "charactersRemaining": "{{count}} tähemärki jäänud",
       "insertNewline": "Lisa reavahetus",
-      "charactersRemaining_one": "{{count}} tähemärki jäänud",
+      "charactersRemaining_one": "{{count}} tähemärk jäänud",
       "charactersRemaining_other": "{{count}} tähemärki jäänud"
     },
     "chatLink": {
@@ -2924,7 +2923,7 @@
     "toolRun": {
       "sheetTitle": "Tööriistakutsed",
       "condensedLabel": "{{itemCount}} üksust; {{last}}",
-      "condensedLabel_one": "{{itemCount}} üksust; {{last}}",
+      "condensedLabel_one": "{{itemCount}} üksus; {{last}}",
       "condensedLabel_other": "{{itemCount}} üksust; {{last}}"
     }
   },
@@ -3065,7 +3064,7 @@
     "cliCantReceiveFilesMessage": "Seda seanssi käitav Kilo CLI ei saa faile vastu võtta. Uuenda selle arvuti CLI-d või jaga faile hoopis uude seanssi.",
     "contentlessMessage": "Jagada pole midagi — teksti ega faile ei lisatud.",
     "couldNotReadContent": "Jagatud sisu ei õnnestunud lugeda.",
-    "onlyFirstFilesAttached_one": "Lisatakse ainult esimesed {{displayCount}} faili.",
+    "onlyFirstFilesAttached_one": "Lisatakse ainult esimene {{displayCount}} fail.",
     "onlyFirstFilesAttached_other": "Lisatakse ainult esimesed {{displayCount}} faili."
   },
   "kiloPass": {
@@ -4075,7 +4074,7 @@
       "deleted": "Ülesanne kustutatud",
       "undo": "Võta tagasi",
       "runCount_one": "{{count}} käivitus",
-      "runCount_other": "{{count}} käivitus",
+      "runCount_other": "{{count}} käivitust",
       "startNow": "Käivita ilma ülevaatuseta",
       "startNowHint": "Ülevaatuseta käivitamiseks vajuta pikalt",
       "titleLabel": "Ülesande pealkiri",

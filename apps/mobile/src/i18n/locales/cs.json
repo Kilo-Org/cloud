@@ -2447,7 +2447,6 @@
       "advancedConfigDescription": "Platí pro toto sezení. Uložením jako profil zůstane i pro příště.",
       "saveAsProfile": "Uložit jako profil",
       "saveProfileDescription": "Uložte aktuální proměnné prostředí a příkazy nastavení jako opakovaně použitelný profil.",
-      "profileSummary": "Proměnné prostředí {{vars}} · Příkazy nastavení {{commands}}",
       "profileSaved": "Profil „{{name}}“ byl uložen",
       "organizationProfiles": "Profily organizací",
       "personalProfiles": "Osobní profily",

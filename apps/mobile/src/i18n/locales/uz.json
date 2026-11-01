@@ -2373,7 +2373,6 @@
       "advancedConfigDescription": "Bu sessiya uchun amal qiladi. Profil sifatida saqlansa, keyingi safar uchun qoladi.",
       "saveAsProfile": "Profil sifatida saqlash",
       "saveProfileDescription": "Joriy muhit o'zgaruvchilari va sozlash buyruqlarini qayta foydalanish mumkin bo'lgan profil sifatida saqlang.",
-      "profileSummary": "{{vars}} muhit o'zgaruvchilari · {{commands}} sozlash buyruqlari",
       "profileSaved": "“{{name}}” profili saqlandi",
       "organizationProfiles": "Tashkilot profillari",
       "personalProfiles": "Shaxsiy profillar",

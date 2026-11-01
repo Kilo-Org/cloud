@@ -2416,7 +2416,6 @@
       "advancedConfigDescription": "Aplica-se a esta sessão. Guardar como perfil mantém-no para a próxima vez.",
       "saveAsProfile": "Guardar como perfil",
       "saveProfileDescription": "Guarde as variáveis de ambiente e os comandos de configuração atuais como um perfil reutilizável.",
-      "profileSummary": "{{vars}} variáveis de ambiente · {{commands}} comandos de configuração",
       "profileSaved": "Perfil \"{{name}}\" guardado",
       "organizationProfiles": "Perfis da organização",
       "personalProfiles": "Perfis pessoais",

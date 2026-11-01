@@ -2379,7 +2379,6 @@
       "advancedConfigDescription": "આ સેશન પર લાગુ પડે છે. પ્રોફાઇલ તરીકે સાચવવાથી તે આગલી વખતે માટે રહે છે.",
       "saveAsProfile": "પ્રોફાઇલ તરીકે સાચવો",
       "saveProfileDescription": "વર્તમાન પર્યાવરણ ચલો અને સેટઅપ આદેશોને ફરીથી વાપરી શકાય તેવી પ્રોફાઇલ તરીકે સાચવો.",
-      "profileSummary": "{{vars}} પર્યાવરણ ચલો · {{commands}} સેટઅપ આદેશો",
       "profileSaved": "પ્રોફાઇલ \"{{name}}\" સાચવી",
       "organizationProfiles": "સંસ્થા પ્રોફાઇલ્સ",
       "personalProfiles": "વ્યક્તિગત પ્રોફાઇલ્સ",

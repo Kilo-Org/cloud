@@ -2410,7 +2410,6 @@
       "advancedConfigDescription": "Attiecas uz šo sesiju. Saglabājot kā profilu, tas paliks nākamajai reizei.",
       "saveAsProfile": "Saglabāt kā profilu",
       "saveProfileDescription": "Saglabājiet pašreizējos vides mainīgos un iestatīšanas komandas kā atkārtoti lietojamu profilu.",
-      "profileSummary": "{{vars}} vides mainīgie · {{commands}} iestatīšanas komandas",
       "profileSaved": "Profils \"{{name}}\" ir saglabāts",
       "organizationProfiles": "Organizācijas profili",
       "personalProfiles": "Personiskie profili",

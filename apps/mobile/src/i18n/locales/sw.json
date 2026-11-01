@@ -2373,7 +2373,6 @@
       "advancedConfigDescription": "Inatumika kwa kipindi hiki. Kuihifadhi kama wasifu huihifadhi kwa mara ijayo.",
       "saveAsProfile": "Hifadhi kama Wasifu",
       "saveProfileDescription": "Hifadhi vigezo vya sasa vya mazingira na amri za usanidi kama wasifu unaoweza kutumika tena.",
-      "profileSummary": "{{vars}} vigezo vya mazingira · {{commands}} amri za usanidi",
       "profileSaved": "Wasifu \"{{name}}\" umehifadhiwa",
       "organizationProfiles": "Wasifu wa Shirika",
       "personalProfiles": "Wasifu wa Kibinafsi",

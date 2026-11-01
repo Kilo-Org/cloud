@@ -2373,7 +2373,6 @@
       "advancedConfigDescription": "यो सत्रमा लागू हुन्छ। प्रोफाइलको रूपमा बचत गर्दा यो अर्को पटकका लागि रहन्छ।",
       "saveAsProfile": "प्रोफाइलको रूपमा बचत गर्नुहोस्",
       "saveProfileDescription": "पुन: प्रयोज्य प्रोफाइलको रूपमा हालको वातावरण चर र सेटअप आदेशहरू बचत गर्नुहोस्।",
-      "profileSummary": "{{vars}} वातावरण चर · {{commands}} सेटअप आदेशहरू",
       "profileSaved": "प्रोफाइल \"{{name}}\" बचत गरियो",
       "organizationProfiles": "संगठन प्रोफाइल",
       "personalProfiles": "व्यक्तिगत प्रोफाइलहरू",

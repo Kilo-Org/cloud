@@ -2410,7 +2410,6 @@
       "advancedConfigDescription": "Se aplică acestei sesiuni. Salvarea ca profil îl păstrează pentru data viitoare.",
       "saveAsProfile": "Salvați ca profil",
       "saveProfileDescription": "Salvați variabilele de mediu curente și setați comenzile ca profil reutilizabil.",
-      "profileSummary": "{{vars}} variabile de mediu · {{commands}} comenzi de configurare",
       "profileSaved": "Profilul „{{name}}” a fost salvat",
       "organizationProfiles": "Profiluri organizației",
       "personalProfiles": "Profiluri personale",

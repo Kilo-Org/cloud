@@ -2373,7 +2373,6 @@
       "advancedConfigDescription": "Erre a munkamenetre érvényes. Profilként mentve a következő alkalomra is megmarad.",
       "saveAsProfile": "Mentés profilként",
       "saveProfileDescription": "Mentsd el az aktuális környezeti változókat és a beállítási parancsokat újrafelhasználható profilként.",
-      "profileSummary": "{{vars}} környezeti változó · {{commands}} beállítási parancs",
       "profileSaved": "A \"{{name}}\" profil mentve",
       "organizationProfiles": "Szervezeti profilok",
       "personalProfiles": "Személyes profilok",

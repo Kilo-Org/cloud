@@ -1883,7 +1883,6 @@
       "advancedConfigDescription": "Dotyczy tej sesji. Zapisanie jako profil zachowuje go na następny raz.",
       "saveAsProfile": "Zapisz jako profil",
       "saveProfileDescription": "Zapisz bieżące zmienne środowiskowe i polecenia instalacyjne jako profil do wielokrotnego użytku.",
-      "profileSummary": "{{vars}} zmienne środowiskowe · {{commands}} polecenia konfiguracyjne",
       "profileSaved": "Profil „{{name}}” został zapisany",
       "organizationProfiles": "Profile organizacji",
       "personalProfiles": "Profile osobiste",

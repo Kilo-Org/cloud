@@ -1773,7 +1773,6 @@
       "advancedConfigDescription": "S’applique à cette session. L’enregistrer comme profil le conserve pour la prochaine fois.",
       "saveAsProfile": "Enregistrer en tant que profil",
       "saveProfileDescription": "Enregistrez les variables d'environnement et les commandes de configuration actuelles en tant que profil réutilisable.",
-      "profileSummary": "{{vars}} variables d'environnement · {{commands}} commandes de configuration",
       "profileSaved": "Profil \"{{name}}\" enregistré",
       "organizationProfiles": "Profils d'organisation",
       "personalProfiles": "Profils personnels",

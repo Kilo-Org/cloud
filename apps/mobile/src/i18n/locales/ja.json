@@ -1847,7 +1847,6 @@
       "advancedConfigDescription": "このセッションに適用されます。プロフィールとして保存すると、次回も使えます。",
       "saveAsProfile": "プロフィールとして保存",
       "saveProfileDescription": "現在の環境変数とセットアップ コマンドを再利用可能なプロフィールとして保存します。",
-      "profileSummary": "{{vars}} 環境変数 · {{commands}} セットアップ コマンド",
       "profileSaved": "プロフィール「{{name}}」が保存されました",
       "organizationProfiles": "組織プロフィール",
       "personalProfiles": "個人プロフィール",

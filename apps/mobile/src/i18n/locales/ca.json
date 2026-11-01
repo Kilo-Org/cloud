@@ -2410,7 +2410,6 @@
       "advancedConfigDescription": "S’aplica a aquesta sessió. Desar-ho com a perfil ho conserva per a la propera vegada.",
       "saveAsProfile": "Desa com a perfil",
       "saveProfileDescription": "Deseu les variables d'entorn actuals i configureu les ordres com a perfil reutilitzable.",
-      "profileSummary": "{{vars}} variables d'entorn · {{commands}} ordres de configuració",
       "profileSaved": "S'ha desat el perfil \"{{name}}\".",
       "organizationProfiles": "Perfils de l'organització",
       "personalProfiles": "Perfils personals",

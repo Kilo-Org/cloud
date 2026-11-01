@@ -2373,7 +2373,6 @@
       "advancedConfigDescription": "Sa aplike pou sesyon sa a. Sove l kòm pwofil kenbe l pou pwochen fwa.",
       "saveAsProfile": "Sove kòm pwofil",
       "saveProfileDescription": "Sove varyab anviwònman aktyèl yo ak kòmandman konfigirasyon kòm yon pwofil ki kapab itilize ankò.",
-      "profileSummary": "{{vars}} varyab anviwònman · {{commands}} kòmandman konfigirasyon",
       "profileSaved": "Pwofil \"{{name}}\" sove",
       "organizationProfiles": "Pwofil òganizasyon",
       "personalProfiles": "Pwofil pèsonèl",

@@ -291,55 +291,49 @@ describe('SessionContextMetrics', () => {
     expect((ring.props as { arcFraction?: number }).arcFraction).toBe(0);
   });
 
-  // A session that reports no usage yet keeps both value slots instead of a
-  // bare ring, and its cost slot holds a loading bar at the label's width until
-  // usage arrives, so the pill never grows a value out of a narrower pill.
-  it('holds the value slots over the bare ring, with a loading bar until usage arrives', () => {
+  // No usage yet: both value slots stay, dashes while settled, one bar while loading.
+  it('holds the value slots over the bare ring, loading them as one bar', () => {
+    const classOf = (el: React.ReactElement) =>
+      (el.props as { className?: string }).className ?? '';
     const dashes = (root: React.ReactElement) =>
       findAll(root, el => (el.props as { children?: unknown }).children === '—');
     const bars = (root: React.ReactElement) => findAll(root, el => el.type === 'Skeleton');
     const onPress = vi.fn<() => void>();
 
-    const settled = render({
-      info: undefined,
-      totalCostMicrodollars: null,
-      hasMessages: false,
-      onPress,
-    });
+    const bare = (loading = false) =>
+      render({
+        info: undefined,
+        totalCostMicrodollars: null,
+        hasMessages: false,
+        loading,
+        onPress,
+      });
+    const settled = bare();
     const props = settled.props as { accessibilityLabel?: string };
     expect(props.accessibilityLabel).toContain('usage unavailable');
     expect(dashes(settled)).toHaveLength(2);
-    // A settled pill keeps the cost dash in the label's width — no bar, and no
-    // narrowing from the width the loading pill already held.
-    const dashClasses = dashes(settled).map(el => (el.props as { className?: string }).className);
-    expect(dashClasses[1]).toEqual(expect.stringContaining('w-8'));
+    // The settled cost dash holds the label's width.
+    expect(classOf(dashes(settled)[1] ?? settled)).toContain('w-8');
     expect(bars(settled)).toHaveLength(0);
 
-    const loading = render({
-      info: undefined,
-      totalCostMicrodollars: null,
-      hasMessages: false,
-      loading: true,
-      onPress,
-    });
+    const loading = bare(true);
     expect((loading.props as { accessibilityLabel?: string }).accessibilityLabel).not.toContain(
       'usage unavailable'
     );
-    // No dash while the row loads: the pill reads as a clean skeleton instead of
-    // a dash with half-painted content beside it.
-    expect(dashes(loading)).toHaveLength(0);
-    const loadingBars = bars(loading);
-    expect(loadingBars).toHaveLength(1);
-    const loadingBar = loadingBars[0];
+    const hiddenRows = findAll(loading, el => classOf(el).includes('opacity-0'));
+    expect(hiddenRows).toHaveLength(1);
+    expect(findAll(hiddenRows[0] ?? loading, el => el.type === 'Text')).toHaveLength(2);
+    const [loadingBar] = bars(loading);
     if (!loadingBar) {
-      throw new Error('expected the cost loading bar');
+      throw new Error('expected the value-row bar');
     }
-    const barClassName = (loadingBar.props as { className?: string }).className ?? '';
-    // One bar over the width the settled `— $0.40` row takes, so the pill keeps
-    // its width across the settle.
-    expect(barClassName).toContain('w-11');
-    // `muted` equals the pill's own `secondary` fill, so a default-tone bar
-    // would paint nothing here.
-    expect(barClassName).toContain('bg-muted-soft');
+    // A box over the row, not a fixed width that fits only the default font scale.
+    expect(classOf(loadingBar)).toContain('w-full');
+    expect(classOf(loadingBar)).toContain('bg-muted-soft');
+    const overlays = findAll(
+      loading,
+      el => (el.props as { style?: { position?: string } }).style?.position === 'absolute'
+    );
+    expect(overlays).toHaveLength(1);
   });
 });

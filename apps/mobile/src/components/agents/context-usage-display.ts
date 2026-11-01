@@ -78,9 +78,10 @@ export type HeaderPillContent = {
    * What the cost slot paints:
    *
    * - `label`: the session's cost, as text.
-   * - `loading`: one bar over the whole value row, while the value is still on
-   *   its way. A dash beside the bar read as half-painted content, and the bar
-   *   alone holds the width the dash and the label will take.
+   * - `loading`: the same dashes, laid out but painted invisible, with one bar
+   *   across the row they take. A bar of fixed width matched the settled row
+   *   only at the default font scale, and a dash beside a bar read as
+   *   half-painted content.
    * - `unreported`: the dash, in the label's width. The session settled without
    *   a cost, so nothing will fill the slot; it keeps the width so the pill does
    *   not shrink when it settles.
@@ -149,12 +150,12 @@ export function getHeaderPillContent({
   // marked with the dash, instead of collapsing to a bare ring: the header then
   // reads as the same pill before and after the transcript resolves, and the
   // slots it showed fill in place. Neither dash stands in for a value that has
-  // arrived, so the pill while it still resolves paints one bar across the row
-  // instead of a dash beside it.
+  // arrived; while the open resolves they lay out the row the values will take
+  // and the pill paints one bar across it.
   if (!hasMessages) {
     return {
-      primary: loading ? null : UNKNOWN_WINDOW_LABEL,
-      secondary: loading ? null : UNKNOWN_WINDOW_LABEL,
+      primary: UNKNOWN_WINDOW_LABEL,
+      secondary: UNKNOWN_WINDOW_LABEL,
       costSlot: loading ? 'loading' : 'unreported',
       tone: 'neutral',
       arcFraction: 0,

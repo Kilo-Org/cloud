@@ -319,15 +319,28 @@ export function PrReviewEntryScreen() {
       {/* The invalid-link notice is the field's own error and sits under the
           field's action, not between the field and Open: a line there pushed
           Open 38.5 dp away from the field and the two stopped reading as one
-          group. Its line occupies the section break above the INBOX header
-          instead of a block of its own, so the break is the one section-gap
-          token in either state and a pasted non-PR link never moves the
-          sections below the form. */}
-      <View className={PR_REVIEW_SECTION_BREAK.room}>
-        <AccessibleStatus
-          className="text-sm"
-          message={linkState === 'invalid' ? t('prReview.linkPasteNotAPullRequest') : null}
-        />
+          group. Its line lives in the section break above the INBOX header
+          instead of in a block of its own, so the break is the one section-gap
+          token whether or not the line shows.
+          The room is floored at that token and otherwise holds the line's real
+          box through an invisible copy — a wrapped sentence in a long locale or
+          a larger text scale grows it in BOTH states, so a pasted non-PR link
+          never moves the INBOX or RECENT headers, and the visible line (drawn
+          over the same room) never spills into the INBOX header. */}
+      <View className={`relative ${PR_REVIEW_SECTION_BREAK.room}`}>
+        <Text
+          className="text-sm opacity-0"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {t('prReview.linkPasteNotAPullRequest')}
+        </Text>
+        <View className="absolute inset-0">
+          <AccessibleStatus
+            className="text-sm"
+            message={linkState === 'invalid' ? t('prReview.linkPasteNotAPullRequest') : null}
+          />
+        </View>
       </View>
     </View>
   );

@@ -180,11 +180,13 @@ describe('selectMessageFailure', () => {
  * right, so a spot check in one language could not see it.
  */
 describe('messageFailureLabel', () => {
-  const TERMINATORS = '.!?؟…।॥。｡．！？።។။։';
-  const TERMINATOR = new RegExp(`[${TERMINATORS}]`);
+  // Unicode's own sentence-ending class, plus the ellipsis the catalogs use, so
+  // a terminator the implementation's set misses is judged a terminator here.
+  const TERMINATOR = /[\p{Sentence_Terminal}\u2026]/u;
+  const TRAILING_TERMINATORS = /[\p{Sentence_Terminal}\u2026]+$/u;
   // Any two sentence ends in a row, from the same script or not: a terminator
-  // this set omits still lands next to the template's own.
-  const ADJACENT_TERMINATORS = new RegExp(`[${TERMINATORS}]{2}`);
+  // the implementation misses still lands next to the template's own.
+  const ADJACENT_TERMINATORS = /[\p{Sentence_Terminal}\u2026]{2}/u;
   const PLACEHOLDER = '{{title}}';
 
   function catalogString(catalog: unknown, path: string): string {
@@ -239,7 +241,7 @@ describe('messageFailureLabel', () => {
             // A template that supplies the sentence end replaces the title's
             // own; a bare `{{title}}` template leaves the title untouched.
             expect(middle, where).toBe(
-              templateEndsTheSentence ? title.replace(/[.!?؟…।॥。｡．！？።។။։]+$/, '') : title
+              templateEndsTheSentence ? title.replace(TRAILING_TERMINATORS, '') : title
             );
           }
         }

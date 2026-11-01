@@ -118,11 +118,13 @@ export type MessageFailure = {
  * the Ethiopic `።`, the Myanmar `။`, the Urdu `۔`, and the Armenian `։`.
  *
  * Spelled out rather than `\p{Sentence_Terminal}` because Hermes does not
- * promise Unicode binary property escapes. A catalog terminator this set
- * misses still shows up as two adjacent terminator characters, which the
- * catalog test rejects, so the set is checked rather than trusted.
+ * promise Unicode binary property escapes. Non-ASCII members are escapes so a
+ * look-alike character cannot slip in, and the catalog test judges them with
+ * Unicode's own `Sentence_Terminal` property: a terminator this set misses
+ * lands next to the template's own and fails that test.
  */
-const TERMINATORS = '.!?؟…।॥。｡．！？።។။։';
+const TERMINATORS =
+  '.!?\u061F\u2026\u0964\u0965\u3002\uFF61\uFF0E\uFF01\uFF1F\u1362\u17D4\u104B\u06D4\u0589';
 const TERMINATOR_CLASS = `[${TERMINATORS}]`;
 const TRAILING_TERMINATORS = new RegExp(`${TERMINATOR_CLASS}+$`);
 const LEADING_TERMINATOR = new RegExp(`^${TERMINATOR_CLASS}`);
@@ -171,7 +173,8 @@ export function messageFailureLabel(
   const title = i18n.t(failure.titleKey);
   // The catalogs hold a string at every key they define; an absent one falls
   // back to i18next's own interpolation, which then keeps the title unchanged.
-  const template = (i18n.getResource(i18n.language, 'translation', key) as string | undefined) ?? '';
+  const template =
+    (i18n.getResource(i18n.language, 'translation', key) as string | undefined) ?? '';
   return template === '' ? i18n.t(key, { title }) : composeFailureLabel(title, template);
 }
 

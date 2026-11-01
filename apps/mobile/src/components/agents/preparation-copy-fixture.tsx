@@ -7,11 +7,12 @@ import { ScreenHeader } from '@/components/screen-header';
 import { PreparationGroup } from './preparation-group';
 
 /**
- * Development-only fixture for the preparation rows' copy, reached through the
- * dev preparation-copy fixture link. Reaching these rows on a device needs a
- * live session whose sandbox is actually preparing, so this screen renders the
- * real `PreparationGroup` from snapshots shaped exactly like the ones
- * `@kilocode/cloud-agent-sdk` emits. It sends no requests.
+ * Development-only fixture for the preparation rows' copy. The dev
+ * preparation-copy fixture path in `+native-intent.tsx` maps straight to this
+ * screen. Reaching these rows on a device needs a live session whose sandbox is
+ * actually preparing, so this screen renders the real `PreparationGroup` from
+ * snapshots shaped exactly like the ones `@kilocode/cloud-agent-sdk` emits. It
+ * sends no requests.
  */
 const ATTEMPTS: PreparationAttempt[] = [
   {

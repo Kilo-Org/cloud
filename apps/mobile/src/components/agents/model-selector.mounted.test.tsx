@@ -149,6 +149,52 @@ describe('ModelPickerOptionRow free badge', () => {
   );
 });
 
+describe('ModelPickerOptionRow unavailable row', () => {
+  // The row dimmed itself with a row-level opacity, which multiplied the
+  // reasons it carries: the `unavailable` line and the metadata fell to about
+  // 2:1 on the picker surface. The name carries the dim now.
+  const nameClass = (renderer: TestRenderer.ReactTestRenderer, text: string) =>
+    renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === text
+    )[0]?.props.className;
+
+  it('dims the name and keeps the reason at full contrast', () => {
+    const renderer = renderRow(
+      cliCatalogOption({ unavailable: true, name: 'Minimax M2.5', displayId: 'minimax/m2.5' })
+    );
+
+    expect(String(rowContainer(renderer).props.className)).not.toContain('opacity-50');
+    expect(nameClass(renderer, 'Minimax M2.5')).toContain('text-muted-foreground');
+    expect(nameClass(renderer, i18n.t('agentChat.modelSelector.unavailable'))).toBe(
+      'mt-1 text-xs text-muted-foreground'
+    );
+  });
+
+  it('keeps an available row name at full contrast', () => {
+    const renderer = renderRow(cliCatalogOption({ name: 'Minimax M2.5' }));
+
+    expect(nameClass(renderer, 'Minimax M2.5')).toBe('text-base text-foreground');
+  });
+
+  it('dims the selected check and leaves the badge copy readable', () => {
+    const renderer = renderRow(
+      cliCatalogOption({ unavailable: true, hasUserByokAvailable: true, name: 'Minimax M2.5' }),
+      { selected: true }
+    );
+
+    // A container opacity would re-multiply the badge copy, which is the
+    // defect this change removes; only the non-text check carries the dim.
+    const views = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'View'
+    );
+    expect(views.some(node => String(node.props.className).includes('opacity-50'))).toBe(false);
+    expect(checkAccessories(renderer)).toEqual([{ color: '#6F6A61', size: 18 }]);
+  });
+});
+
 describe('Auto model labels', () => {
   // The backend names Kilo's own Auto models in English ("Auto Efficient"),
   // which no catalog translates; the chip and the picker row must show the

@@ -113,12 +113,12 @@ function InstructionsEditor({
     <View className="gap-4">
       {/* The deprecation note asks the reader to move the guidelines elsewhere;
           as body-coloured text it read as a field description. A tinted notice
-          with its own mark separates it from the field below. The action beside
+          with its own mark separates it from the field below. The action under
           it hands over the whole stored value: the field shows at most ten
           lines and scrolls the rest, so selecting the text by hand meant
           dragging through a window that never shows it all. */}
-      <View className="flex-row items-center gap-3 rounded-xl border border-warn-tile-border bg-warn-tile-bg p-3">
-        <View className="min-w-0 flex-1 flex-row items-start gap-2">
+      <View className="gap-2 rounded-xl border border-warn-tile-border bg-warn-tile-bg p-3">
+        <View className="flex-row items-start gap-2">
           <AlertTriangle size={16} color={colors.warn} />
           <Text className="min-w-0 flex-1 text-sm text-warn">
             {t('codeReviewer.instructions.deprecation')}
@@ -128,16 +128,24 @@ function InstructionsEditor({
           // What is copied is the value the notice retires — what the backend
           // holds and a save writes — not the draft under it. With nothing
           // stored there is no action rather than one that copies nothing.
-          <Button
-            variant="outline"
-            size="sm"
-            onPress={() => {
-              void performCopy(storedValue);
-            }}
-          >
-            <Copy size={14} color={colors.foreground} />
-            <Text>{t('common.copy')}</Text>
-          </Button>
+          // The action takes its own row under the notice: beside the text it
+          // narrowed the message to a four-line column on a compact phone and
+          // left a one-word last line in RTL, and it grew the banner taller
+          // than the message needs. `justify-end` packs the row to the end in
+          // either direction, so the action keeps the margin the text above it
+          // shares instead of a physical edge.
+          <View className="flex-row justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onPress={() => {
+                void performCopy(storedValue);
+              }}
+            >
+              <Copy size={14} color={colors.foreground} />
+              <Text>{t('common.copy')}</Text>
+            </Button>
+          </View>
         )}
       </View>
       {/* A multiline field takes the platform's generic text-view name on iOS,

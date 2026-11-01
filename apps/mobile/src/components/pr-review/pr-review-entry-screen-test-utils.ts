@@ -87,7 +87,6 @@ vi.mock('@/lib/auth/account-metadata-write', () => ({
 }));
 
 vi.mock('react-native', () => ({
-  ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'android' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
@@ -111,7 +110,7 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
-vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/icons', () => ({
   Clipboard: 'ClipboardIcon',
   Link2: 'Link2',
@@ -185,7 +184,7 @@ function isElement(value: unknown): value is El {
   return typeof value === 'object' && value !== null && 'type' in value && 'props' in value;
 }
 
-function collect(node: unknown, typeName: string, out: El[]): void {
+function collect(node: unknown, typeName: unknown, out: El[]): void {
   if (node == null) {
     return;
   }
@@ -206,7 +205,7 @@ function collect(node: unknown, typeName: string, out: El[]): void {
   }
 }
 
-export function findAll(tree: unknown, typeName: string): El[] {
+export function findAll(tree: unknown, typeName: unknown): El[] {
   const out: El[] = [];
   collect(tree, typeName, out);
   return out;
@@ -214,12 +213,12 @@ export function findAll(tree: unknown, typeName: string): El[] {
 
 export function find(
   tree: unknown,
-  typeName: string,
+  typeName: unknown,
   where: (props: Record<string, unknown>) => boolean
 ): El {
   const match = findAll(tree, typeName).find(el => where(el.props ?? {}));
   if (!match) {
-    throw new Error(`no ${typeName} matched the predicate`);
+    throw new Error(`no ${String(typeName)} matched the predicate`);
   }
   return match;
 }

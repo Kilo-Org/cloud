@@ -5,12 +5,12 @@ import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { ContextControl } from '@/components/context-control';
 import { EmptyState } from '@/components/empty-state';
 import { PrLinkPlaceholder } from '@/components/pr-review/pr-link-placeholder';
 import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
+import { PrReviewRecentsPending } from '@/components/pr-review/pr-review-recents-pending';
 import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { selectRecentPrRowState } from '@/lib/pr-review/recent-pr-row-state';
 import { ScreenHeader } from '@/components/screen-header';
@@ -141,7 +141,7 @@ export function PrReviewEntryScreen() {
 
   let recentsBody: ReactNode = null;
   if (recent === null) {
-    recentsBody = <ActivityIndicator size="small" color={colors.mutedForeground} />;
+    recentsBody = <PrReviewRecentsPending />;
   } else if (recent.length === 0) {
     recentsBody = (
       <EmptyState

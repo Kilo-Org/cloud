@@ -778,12 +778,15 @@ export const baseGetSessionNextOutputSchema = z.object({
   upstreamBranch: z.string().optional(),
   branchName: z.string().optional(),
 
-  /** Custom agents stored on this session (shown in the chat picker). */
+  /** Custom agents stored on this session, including agents excluded from the chat picker. */
   runtimeAgents: z
     .array(
       z.object({
         slug: z.string(),
         name: z.string(),
+        mode: z.enum(['primary', 'subagent', 'all']).optional(),
+        hidden: z.boolean().optional(),
+        disable: z.boolean().optional(),
         /** Optional model override so the chat UI can lock its model picker. */
         model: z.string().optional(),
         /** Optional thinking-effort variant override so the chat UI can lock its variant picker. */

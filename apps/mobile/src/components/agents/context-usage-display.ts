@@ -98,7 +98,7 @@ export type HeaderPillContent = {
   usageUnavailable: boolean;
 };
 
-export type PillCostSlot = 'label' | 'loading' | 'unreported' | 'none';
+type PillCostSlot = 'label' | 'loading' | 'unreported' | 'none';
 
 /**
  * Value-slot placeholder of a session that has not reported usage yet. It marks

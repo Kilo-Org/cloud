@@ -12,6 +12,16 @@ const MODERN_KILO_TOKEN =
   'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln';
 
 describe('buildControlPlanePromptPayload', () => {
+  it('preserves a repository agent slug without runtimeAgents', () => {
+    const payload = buildControlPlanePromptPayload({
+      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      turn: { type: 'prompt', prompt: 'Use foreman' },
+      attachments: [],
+      agent: { mode: 'foreman', model: FULL_MODEL },
+    });
+    expect(payload.agent).toEqual({ mode: 'foreman', model: 'fake-deterministic' });
+  });
+
   it('strips the kilo provider prefix from the wrapper-facing model', () => {
     const payload = buildControlPlanePromptPayload({
       messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',

@@ -1,5 +1,15 @@
 import * as z from 'zod';
 
+export const webhookTriggerModeSchema = z
+  .string()
+  .min(1, 'Agent mode is required')
+  .max(50, 'Agent mode must be 50 characters or less')
+  .regex(
+    /^[a-z][a-z0-9-]*$/,
+    'Agent mode must start with a lowercase letter and contain only lowercase letters, numbers, and hyphens'
+  )
+  .refine(mode => mode !== 'custom', 'The custom mode is reserved; use a named custom agent');
+
 /**
  * Reserved trigger IDs that cannot be used by users.
  * These are reserved for routing purposes in the UI.

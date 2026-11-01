@@ -66,6 +66,39 @@ const GITHUB_REPOSITORY = {
 };
 
 describe('session registration repository metadata', () => {
+  it.each(['webhook', 'scheduled'])(
+    'preserves a repository agent without runtimeAgents for %s',
+    async createdOnPlatform => {
+      const result = await buildSessionMetadataFromRegistration({
+        identity: { sessionId: 'workspace_probe', userId: 'user_fixture', createdOnPlatform },
+        auth: {},
+        agent: { mode: 'foreman', model: 'kilo/test-model' },
+        repository: GITHUB_REPOSITORY,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error(result.error);
+      expect(result.metadata.agent?.mode).toBe('foreman');
+      expect(result.metadata.profile?.runtimeAgents).toBeUndefined();
+    }
+  );
+
+  it.each(['cloud-agent-web', 'discord', 'slack', 'code-review', undefined])(
+    'retains missing custom-agent rejection for %s',
+    async createdOnPlatform => {
+      const result = await buildSessionMetadataFromRegistration({
+        identity: { sessionId: 'workspace_probe', userId: 'user_fixture', createdOnPlatform },
+        auth: {},
+        agent: { mode: 'foreman', model: 'kilo/test-model' },
+        repository: GITHUB_REPOSITORY,
+      });
+      expect(result).toEqual({
+        ok: false,
+        error:
+          'Mode "foreman" is not a built-in and does not match any runtimeAgents on this session',
+      });
+    }
+  );
+
   it('stores opt-in and server-authoritative child lineage outside the profile bundle', async () => {
     for (const scope of [
       { allowSubagentSessions: true },

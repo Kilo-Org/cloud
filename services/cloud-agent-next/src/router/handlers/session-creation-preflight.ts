@@ -32,6 +32,7 @@ import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { validateBalanceOnly } from '../../balance-validation.js';
 import { timingSafeEqual } from '@kilocode/encryption';
+import { isRepositoryAgentOrigin } from '../../shared/agent-modes.js';
 
 const IMPLICIT_PROFILE_RESOLUTION_ORIGINS: ReadonlySet<string> = new Set([
   'cloud-agent-web',
@@ -265,8 +266,13 @@ export async function resolveEffectiveSessionConfiguration(
   };
 }
 
-export function assertModeAvailableForProfile(mode: string, profile: SessionProfileBundle): void {
-  if (isBuiltinMode(mode)) return;
+export function assertModeAvailableForProfile(
+  mode: string,
+  profile: SessionProfileBundle,
+  createdOnPlatform?: string
+): void {
+  // Automation repositories are cloned later; Kilo resolves their agent files at execution.
+  if (isBuiltinMode(mode) || isRepositoryAgentOrigin(createdOnPlatform)) return;
   const slugs = new Set((profile.runtimeAgents ?? []).map(a => a.slug));
   if (slugs.has(mode)) return;
 
@@ -349,7 +355,8 @@ export async function preflightSessionCreation(
   const resolvedRequest = await resolveEffectiveSessionConfiguration(ctx, request, policy, db);
   assertModeAvailableForProfile(
     resolvedRequest.agent.mode,
-    resolvedRequest.profile?.resolved ?? {}
+    resolvedRequest.profile?.resolved ?? {},
+    resolvedRequest.options?.createdOnPlatform
   );
   await validateEndpoint?.(resolvedRequest);
 

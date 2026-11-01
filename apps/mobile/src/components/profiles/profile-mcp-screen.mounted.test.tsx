@@ -385,24 +385,29 @@ describe('ProfileMcpScreen', () => {
     unmount();
   });
 
-  it('a11y: the row identity names the server and its secret count before the controls', async () => {
+  it('a11y: the switch is the row element named after the server, and the count names itself', async () => {
     h.query.data = testProfile([testServer()]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
 
-    const identity = findAll(renderer.root, 'View').find(
-      node => node.props.accessibilityRole === 'text'
+    // The visible name is painted only, so the switch beside it is the single
+    // stop that speaks the server's name.
+    expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('docs');
+    const nameLine = findAll(renderer.root, 'Text').find(
+      node => node.props.children === 'docs' && node.props.variant === 'mono'
     );
-    expect(identity?.props.accessibilityLabel).toBe('docs, Local, npx @example/mcp, 1 secret');
-    expect(identity?.props.accessible).toBe(true);
-    // The counted glyphs stay decorative: the identity carries their meaning.
+    expect(nameLine?.props).toMatchObject({
+      accessible: false,
+      importantForAccessibility: 'no',
+    });
+    // The counted glyphs stay decorative; the count line carries their meaning.
     expect(findOne(renderer.root, 'Lock').parent?.props.accessibilityLabel).toBeUndefined();
 
     unmount();
   });
 
-  it('a11y: the row identity names the count in the plural form', async () => {
+  it('a11y: the count names itself in the plural form', async () => {
     h.query.data = testProfile([
       testServer({
         type: 'remote',
@@ -416,12 +421,10 @@ describe('ProfileMcpScreen', () => {
 
     const { renderer, unmount } = await mountScreen();
 
-    const identity = findAll(renderer.root, 'View').find(
-      node => node.props.accessibilityRole === 'text'
-    );
-    expect(identity?.props.accessibilityLabel).toBe(
-      'docs, Remote, https://example.com/mcp, 3 secrets'
-    );
+    const counts = findAll(renderer.root, 'Text').filter(node => node.props.children === 3);
+    expect(counts).toHaveLength(1);
+    expect(counts[0]?.props.accessibilityLabel).toBe('3 secrets');
+    expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('docs');
 
     unmount();
   });

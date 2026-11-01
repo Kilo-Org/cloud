@@ -21,7 +21,6 @@ export function PillGroup<T extends string>({
   value,
   disabled,
   onChange,
-  className,
 }: Readonly<{
   label: string;
   options: readonly { value: T; label: string }[];
@@ -29,19 +28,11 @@ export function PillGroup<T extends string>({
   value: T | null;
   disabled: boolean;
   onChange: (value: T) => void;
-  /**
-   * Classes for the picker block. A caller places its picker inside a group of
-   * rows by passing the section spacing here, so the label keeps the gap a
-   * section header gets above it instead of the row gap it inherits.
-   */
-  className?: string;
 }>) {
   const colors = useThemeColors();
   return (
-    <View className={cn('gap-2', className)}>
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {label}
-      </Text>
+    <View className="gap-1.5">
+      <Text className="text-sm font-medium text-muted-foreground">{label}</Text>
       <RadioGroup label={label} className="overflow-hidden rounded-lg bg-secondary">
         {options.map((option, index) => {
           const active = value === option.value;

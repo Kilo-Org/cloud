@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted case per slash-command sheet state: bounds, name, duplicate, dismissal, refused save, and the subtask row */
 import { createElement, type ReactNode, type Ref } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -363,6 +364,25 @@ describe('KiloCommandFormSheet refused save', () => {
     callHandler(findOne(renderer.root, 'SheetHeader'), 'onDone');
 
     expect(h.scrollTo).toHaveBeenCalledWith({ y: 628, animated: true });
+
+    unmount();
+  });
+});
+
+describe('KiloCommandFormSheet subtask row', () => {
+  it('reaches a screen reader as the switch alone, without a duplicate label stop', async () => {
+    const { renderer, unmount } = await mountSheet();
+
+    const label = i18n.t('profiles.slashCommands.subtask');
+    const labels = findAll(renderer.root, 'Text').filter(node => node.props.children === label);
+    expect(labels).toHaveLength(1);
+    expect(labels[0]?.props).toMatchObject({
+      accessible: false,
+      importantForAccessibility: 'no',
+    });
+
+    const toggles = findAll(renderer.root, 'Switch');
+    expect(toggles.map(node => node.props.accessibilityLabel)).toEqual([label]);
 
     unmount();
   });

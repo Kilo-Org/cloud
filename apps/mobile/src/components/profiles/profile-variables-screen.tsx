@@ -42,19 +42,6 @@ function hasUsableMessage(error: unknown): boolean {
 }
 
 /**
- * The server refuses a key past the profile's variable cap with
- * `PRECONDITION_FAILED`; the screen names the cap in the reader's language
- * instead of showing that message verbatim.
- */
-function isVariableCapError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-  const code = (error as { data?: { code?: string } }).data?.code;
-  return code === 'PRECONDITION_FAILED' || /limited to \d+ variables/u.test(error.message);
-}
-
-/**
  * The edit the inline form seeds from. A secret's value is never seeded: the
  * server returns a masked `***`, and saving that back would overwrite the
  * secret, so the user must enter a new value.
@@ -142,9 +129,7 @@ export function ProfileVariablesScreen({
         isSecret: edit.isSecret,
       });
     } catch (error) {
-      if (isVariableCapError(error)) {
-        toast.error(t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS }));
-      } else if (!hasUsableMessage(error)) {
+      if (!hasUsableMessage(error)) {
         toast.error(t('profiles.variablesSaveFailed'));
       }
       return false;
@@ -264,7 +249,7 @@ export function ProfileVariablesScreen({
           </Button>
         ) : null}
 
-        {atVariableCap ? (
+        {atVariableCap && canManage ? (
           <AccessibleStatus
             message={t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS })}
             tone="warn"

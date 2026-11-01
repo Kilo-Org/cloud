@@ -99,12 +99,12 @@ export function SaveProfileDialog({
       setErrors(fieldErrors);
       return false;
     }
+    setErrors({});
     const invalidVar = envVars.find(envVar => profileVarKeyError(envVar.key) !== null);
     if (invalidVar !== undefined) {
       toast.error(profileVarKeyError(invalidVar.key));
       return false;
     }
-    setErrors({});
     return true;
   };
 

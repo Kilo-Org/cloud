@@ -231,22 +231,18 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
-  it("names the limit in the reader's language when the server refuses a save", async () => {
+  it('states the limit only for a reader who can add variables', async () => {
     h.query.data = atVariableLimit();
     h.query.isPending = false;
-    h.mutations.setVar.mutateAsync.mockRejectedValue(
-      Object.assign(new Error(`Profiles are limited to ${MAX_PROFILE_VARS} variables`), {
-        data: { code: 'PRECONDITION_FAILED' },
-      })
-    );
+    h.canManage = false;
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'API_KEY');
-    changeText(renderer.root, 'Value', 'again');
-    pressButton(renderer.root, 'Save');
-
     const limitCopy = i18n.t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS });
-    await waitFor(() => h.error.mock.calls.some(call => call[0] === limitCopy));
+    expect(
+      findAll(renderer.root, 'Text')
+        .map(node => node.props.children)
+        .includes(limitCopy)
+    ).toBe(false);
 
     unmount();
   });

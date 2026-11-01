@@ -15,7 +15,7 @@ import { ScheduledTaskToolCard } from './ScheduledTaskToolCard';
 import { ApplyPatchToolCard } from './ApplyPatchToolCard';
 import { WebFetchToolCard } from './WebFetchToolCard';
 import { ToolErrorCard } from './ToolErrorCard';
-import { ToolMarkdown } from './ToolOutput';
+import { ToolCodeBlock, ToolMarkdown } from './ToolOutput';
 import { shouldRenderToolPart } from './message-presentation';
 import { getReasoningHeader, getReasoningPresentation } from './reasoning-presentation';
 import { GlobToolCard } from './GlobToolCard';
@@ -124,6 +124,19 @@ function MarkdownImageRenderer({ src, alt }: ComponentProps<'img'>) {
 const markdownComponents: Components = {
   a: LinkRenderer,
   img: MarkdownImageRenderer,
+  pre: ({ node, children }) => {
+    const code = node?.children[0];
+    if (code?.type !== 'element' || code.tagName !== 'code') return <pre>{children}</pre>;
+    const content = code.children.map(child => (child.type === 'text' ? child.value : '')).join('');
+    return (
+      <ToolCodeBlock
+        content={content.replace(/\n$/, '')}
+        label="Code"
+        className="my-2"
+        maxHeightClassName=""
+      />
+    );
+  },
 };
 const remarkPlugins = [remarkGfm];
 

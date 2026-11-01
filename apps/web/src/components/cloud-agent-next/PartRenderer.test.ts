@@ -36,11 +36,59 @@ function imageFilePart(url: string): FilePart {
   };
 }
 
-function renderText(text: string): string {
+function renderText(text: string, isStreaming = false): string {
   return renderToStaticMarkup(
-    React.createElement(PartRenderer, { part: textPart(text), isStreaming: false })
+    React.createElement(PartRenderer, { part: textPart(text), isStreaming })
   );
 }
+
+describe('TextPartRenderer code blocks', () => {
+  it.each(['', 'markdown', 'sh'])(
+    'provides a copy control for a fenced block with language %j',
+    language => {
+      const markup = renderText(
+        `Before\n\n\`\`\`${language}\nfirst line\n  <tag> & value\n\`\`\`\n\nAfter`
+      );
+
+      expect(markup).toContain('aria-label="Copy code"');
+      expect(markup).toContain('<code>first line\n  &lt;tag&gt; &amp; value</code>');
+      expect(markup).toContain('<p>Before</p>');
+      expect(markup).toContain('<p>After</p>');
+      expect(markup).not.toMatch(/<pre\b[^>]*>(?:(?!<\/pre>)[\s\S])*<button\b/);
+    }
+  );
+
+  it('keeps long snippets fully expanded', () => {
+    const content = 'line\n'.repeat(200) + 'last line';
+    const markup = renderText(`\`\`\`\n${content}\n\`\`\``);
+
+    expect(markup).toContain(`<code>${content}</code>`);
+    expect(markup).not.toContain('max-h-80');
+  });
+
+  it('provides a separate copy control for each block, including indented code', () => {
+    const markup = renderText('```\nfirst\n```\n\n    second\n');
+
+    expect(markup.match(/aria-label="Copy code"/g)).toHaveLength(2);
+    expect(markup).toContain('<code>first</code>');
+    expect(markup).toContain('<code>second</code>');
+  });
+
+  it('renders a copyable incomplete fence while streaming', () => {
+    const markup = renderText('```sh\nprintf hello\n  pwd', true);
+
+    expect(markup).toContain('aria-label="Copy code"');
+    expect(markup).toContain('<code>printf hello\n  pwd</code>');
+  });
+
+  it('leaves inline code and ordinary blockquotes unchanged', () => {
+    const markup = renderText('Use `value` here.\n\n> A quoted sentence');
+
+    expect(markup).toContain('<code>value</code>');
+    expect(markup).toContain('<blockquote>');
+    expect(markup).not.toContain('Copy code');
+  });
+});
 
 describe('TextPartRenderer markdown images', () => {
   it('renders a markdown image as a link to its source, labeled with the alt text', () => {

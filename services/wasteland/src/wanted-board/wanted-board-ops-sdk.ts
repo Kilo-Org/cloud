@@ -76,7 +76,7 @@ export async function loadSdkContext(
     );
   }
 
-  const rigHandle = identityRigHandle(credential, dolthubOrg, dolthubOrg.slice(0, 32));
+  const rigHandle = identityRigHandle(credential, dolthubOrg, userId);
 
   if (fresh.status === 'ok') {
     return {

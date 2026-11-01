@@ -180,7 +180,7 @@ async function loadAdminContext(
   // unproven rows on a non-UUID handle.
   const dolthubOrg =
     (fresh.status === 'ok' ? fresh.data.dolthubUsername : null) ?? credential?.dolthub_org ?? null;
-  const rigHandle = identityRigHandle(credential, dolthubOrg, dolthubOrg ?? userId);
+  const rigHandle = identityRigHandle(credential, dolthubOrg, userId);
   const isUpstreamAdmin = credential?.is_upstream_admin ?? false;
 
   if (fresh.status === 'ok') {

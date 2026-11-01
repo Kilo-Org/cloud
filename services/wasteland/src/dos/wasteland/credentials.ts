@@ -130,11 +130,9 @@ export function credentialProvesOrg(
  * wasteland — branch names, `claimed_by` / `posted_by`, stamp
  * authorship — for the org those ops resolved.
  *
- * A credential records a handle together with the org a verified flow
- * established; a handle this credential does not prove is not used as
- * identity, and the caller falls back to `fallback` (the DoltHub org
- * name). The stored string stays on the credential, so it is used again
- * as soon as a verified flow records the proof for that org.
+ * The stored handle is used when the credential proves the org it was
+ * recorded for, and `fallback` otherwise. Callers pass that caller's own
+ * id as `fallback`, so the identity stays per caller.
  */
 export function identityRigHandle(
   credential: WastelandCredentialResult | null,

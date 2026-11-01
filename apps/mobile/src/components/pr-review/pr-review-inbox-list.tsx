@@ -42,13 +42,12 @@ type InboxItem = ProviderInboxRow;
 /**
  * The one spacing both section headers of this screen sit under.
  *
- * The INBOX header follows the paste block and the RECENT header follows the
- * inbox body; the two breaks are the same section-to-section relation, so they
- * share one token instead of each picking its own. The field's inline link
- * error lives inside the INBOX break (`room`), which is why the header side
- * reserves a height rather than adding a padding on top of one.
+ * The INBOX header follows the paste block (and its own reserved link-error
+ * line) and the RECENT header follows the inbox body; the two breaks are the
+ * same section-to-section relation, so they share one token instead of each
+ * picking its own.
  */
-export const PR_REVIEW_SECTION_BREAK = { room: 'min-h-6', padding: 'pt-6' } as const;
+export const PR_REVIEW_SECTION_BREAK = { padding: 'pt-6' } as const;
 
 type PrReviewInboxListProps = {
   /**
@@ -112,7 +111,9 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
       ListHeaderComponent={
         <View className="px-6 pt-4">
           {header}
-          <InboxEyebrow />
+          <View className={PR_REVIEW_SECTION_BREAK.padding}>
+            <InboxEyebrow />
+          </View>
         </View>
       }
       ListEmptyComponent={

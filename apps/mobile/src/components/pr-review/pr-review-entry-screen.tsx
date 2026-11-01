@@ -10,10 +10,7 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { ContextControl } from '@/components/context-control';
 import { EmptyState } from '@/components/empty-state';
 import { PrLinkPlaceholder } from '@/components/pr-review/pr-link-placeholder';
-import {
-  PR_REVIEW_SECTION_BREAK,
-  PrReviewInboxList,
-} from '@/components/pr-review/pr-review-inbox-list';
+import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
 import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { selectRecentPrRowState } from '@/lib/pr-review/recent-pr-row-state';
 import { ScreenHeader } from '@/components/screen-header';
@@ -319,15 +316,17 @@ export function PrReviewEntryScreen() {
       {/* The invalid-link notice is the field's own error and sits under the
           field's action, not between the field and Open: a line there pushed
           Open 38.5 dp away from the field and the two stopped reading as one
-          group. Its line lives in the section break above the INBOX header
-          instead of in a block of its own, so the break is the one section-gap
-          token whether or not the line shows.
-          The room is floored at that token and otherwise holds the line's real
-          box through an invisible copy — a wrapped sentence in a long locale or
-          a larger text scale grows it in BOTH states, so a pasted non-PR link
-          never moves the INBOX or RECENT headers, and the visible line (drawn
-          over the same room) never spills into the INBOX header. */}
-      <View className={`relative ${PR_REVIEW_SECTION_BREAK.room}`}>
+          group. It keeps a one-line slot of its own, held apart from Open by
+          the form's small gap; the INBOX header then takes the section break
+          from the inbox list, the same token the RECENT header gets, so the
+          error reads as the form's last line and never as the first item of
+          the inbox.
+          The invisible copy holds the line's real box in BOTH states — a
+          wrapped sentence in a long locale or a larger text scale grows the
+          slot by the same amount with or without the error, so a pasted
+          non-PR link never moves the INBOX or RECENT headers, and the visible
+          line (drawn over the same slot) never spills into the INBOX header. */}
+      <View className="relative mt-2">
         <Text
           className="text-sm opacity-0"
           accessibilityElementsHidden

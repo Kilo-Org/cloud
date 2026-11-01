@@ -123,9 +123,6 @@ vi.mock('@/components/ui/directional-icons', () => ({
 }));
 vi.mock('@/components/pr-review/pr-review-inbox-list', () => ({
   PrReviewInboxList: 'PrReviewInboxList',
-  // The screen composes the section break under its paste block, so the mock
-  // must answer it; the behaviour under test is not the spacing value.
-  PR_REVIEW_SECTION_BREAK: { room: 'min-h-6', padding: 'pt-6' },
 }));
 vi.mock('@/components/pr-review/pr-link-placeholder', () => ({
   PrLinkPlaceholder: 'PrLinkPlaceholder',

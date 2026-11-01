@@ -1415,7 +1415,9 @@
     "instructions": {
       "title": "Mukautetut ohjeet",
       "deprecation": "Mukautetut ohjeet on tarkoitus poistaa käytöstä. Siirrä nämä ohjeet koodivarastosi REVIEW.md-tiedostoon.",
-      "placeholder": "esim. noudata virheenkäsittelykäytäntöjämme…"
+      "placeholder": "esim. noudata virheenkäsittelykäytäntöjämme…",
+      "clearTitle": "Poistetaanko mukautetut ohjeet?",
+      "clearMessage": "Tyhjän kentän tallentaminen poistaa tälle koodikatselmoijalle tallennetut mukautetut ohjeet."
     },
     "repos": {
       "unavailable": "Koodivarastot eivät ole käytettävissä. Viimeistele Bitbucketin käyttöönotto osoitteessa kilo.ai.",
@@ -1450,7 +1452,7 @@
       "fixSettings": "Korjaa asetukset",
       "couldNotLoad": "Katselmointia ei voitu ladata.",
       "couldNotGetLatest": "Uusimpia tietoja ei voitu hakea.",
-      "byline": "{{repo}} #{{number}}, tekijä {{author}}",
+      "byline": "#{{number}}, tekijä {{author}}",
       "noFindings": "Havaintoja ei ole.",
       "findingsUnavailable": "Tulokset eivät ole saatavilla, koska tämä katselmointi epäonnistui.",
       "findingsInProgress": "Tämä katselmointi on vielä kesken. Havainnot näkyvät tässä, kun se valmistuu.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Katselmointityyli",
       "focusAreas": "Painopisteet",
       "allAreas": "Kaikki osa-alueet",
-      "customInstructions": "Mukautetut ohjeet",
       "set": "Määritetty",
+      "notSet": "Ei määritetty",
       "nSelected": "Valittu: {{displayCount}}",
       "proposedReviewMdGuidance": "Ehdotetut REVIEW.md-ohjeet"
     },

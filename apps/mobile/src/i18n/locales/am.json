@@ -1415,7 +1415,9 @@
     "instructions": {
       "title": "ብጁ መመሪያዎች",
       "deprecation": "ብጁ መመሪያዎችን የመጠቀም ባህሪ ከአገልግሎት ሊወጣ ታቅዷል። በምትኩ እነዚህን መመሪያዎች በማከማቻዎ ውስጥ ወዳለ REVIEW.md ፋይል ያዛውሩ።",
-      "placeholder": "ለምሳሌ፦ የስህተት አያያዝ መመሪያዎቻችን መከበራቸውን ያረጋግጡ…"
+      "placeholder": "ለምሳሌ፦ የስህተት አያያዝ መመሪያዎቻችን መከበራቸውን ያረጋግጡ…",
+      "clearTitle": "ብጁ መመሪያዎችን ማስወገድ ይፈልጋሉ?",
+      "clearMessage": "ባዶውን መስክ ማስቀመጥ ለዚህ ገምጋሚ የተከማቹትን ብጁ መመሪያዎች ይሰርዛል።"
     },
     "repos": {
       "unavailable": "ማከማቻዎች አይገኙም። በkilo.ai ላይ Bitbucketን ማዋቀር ያጠናቅቁ።",
@@ -1450,7 +1452,7 @@
       "fixSettings": "ቅንብሮችን አስተካክል",
       "couldNotLoad": "ግምገማውን መጫን አልተቻለም።",
       "couldNotGetLatest": "የቅርብ ጊዜ መረጃውን ማግኘት አልተቻለም።",
-      "byline": "{{repo}} #{{number}} በ{{author}}",
+      "byline": "#{{number}} በ{{author}}",
       "noFindings": "ምንም ግኝቶች የሉም።",
       "findingsUnavailable": "ይህ ግምገማ ስላልተሳካ ውጤቶች አይገኙም።",
       "findingsInProgress": "ይህ ግምገማ እስካሁን በሂደት ላይ ነው። ሲጠናቀቅ ግኝቶች እዚህ ይታያሉ።",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "የግምገማ ዘይቤ",
       "focusAreas": "የትኩረት መስኮች",
       "allAreas": "ሁሉም ዘርፎች",
-      "customInstructions": "ብጁ መመሪያዎች",
       "set": "ተዘጋጅቷል",
+      "notSet": "አልተዘጋጀም",
       "nSelected": "{{displayCount}} የተመረጡ",
       "proposedReviewMdGuidance": "ለREVIEW.md የቀረቡ መመሪያዎች"
     },

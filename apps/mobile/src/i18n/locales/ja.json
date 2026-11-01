@@ -889,7 +889,9 @@
     "instructions": {
       "title": "カスタム指示",
       "deprecation": "カスタム指示は廃止予定です。これらのガイドラインをリポジトリ内のREVIEW.mdファイルに移動してください。",
-      "placeholder": "例：エラー処理の規則に従っているか確認…"
+      "placeholder": "例：エラー処理の規則に従っているか確認…",
+      "clearTitle": "カスタム指示を削除しますか？",
+      "clearMessage": "空のフィールドを保存すると、このレビュアーに保存されているカスタム指示が削除されます。"
     },
     "repos": {
       "unavailable": "リポジトリを利用できません。kilo.aiでBitbucketのセットアップを完了してください。",
@@ -965,7 +967,7 @@
       "bitbucketError": "Bitbucketのセットアップを開けませんでした。もう一度お試しください。"
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · {{author}}",
+      "byline": "#{{number}} · {{author}}",
       "cancelMessage": "実行中のコードレビューを停止します。",
       "cancelReview": "レビューをキャンセル",
       "cancelTitle": "レビューをキャンセルしますか？",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "すべての領域",
-      "customInstructions": "カスタム指示",
       "focusAreas": "重点項目",
       "nSelected": "{{displayCount}}件選択中",
       "proposedReviewMdGuidance": "REVIEW.mdに記載する指針の提案",
       "reviewStyle": "レビュースタイル",
-      "set": "設定済み"
+      "set": "設定済み",
+      "notSet": "未設定"
     },
     "updateFailed": "レビュアーを更新できませんでした。",
     "configSaveFailed": "レビュー設定を保存できませんでした。",

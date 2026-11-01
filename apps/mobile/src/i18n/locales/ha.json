@@ -1415,7 +1415,9 @@
     "instructions": {
       "title": "Umarni na musamman",
       "deprecation": "Ana shirin daina amfani da umarnin musamman. Maimakon haka, mayar da waɗannan ƙa'idodin cikin fayil ɗin REVIEW.md a ma'ajiyarka.",
-      "placeholder": "misali, tabbatar da bin ƙa'idodinmu na sarrafa kurakurai…"
+      "placeholder": "misali, tabbatar da bin ƙa'idodinmu na sarrafa kurakurai…",
+      "clearTitle": "Cire umarni na musamman?",
+      "clearMessage": "Ajiye filin da babu komai ciki zai goge umarni na musamman da aka adana wa wannan mai dubawa."
     },
     "repos": {
       "unavailable": "Ba a iya samun ma'ajiyoyi. Kammala saitin Bitbucket a kilo.ai.",
@@ -1450,7 +1452,7 @@
       "fixSettings": "Gyara saituna",
       "couldNotLoad": "An kasa loda bitar.",
       "couldNotGetLatest": "An kasa samun sabbin bayanai.",
-      "byline": "{{repo}} #{{number}} daga {{author}}",
+      "byline": "#{{number}} daga {{author}}",
       "noFindings": "Ba a gano wata matsala ba.",
       "findingsUnavailable": "Babu sakamako saboda wannan bita ta gaza.",
       "findingsInProgress": "Wannan bitar na ci gaba har yanzu. Sakamakon zai bayyana a nan a lokacin da ta kammala.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Salon bita",
       "focusAreas": "Abubuwan da za a fi dubawa",
       "allAreas": "Duk fannoni",
-      "customInstructions": "Umarni na musamman",
       "set": "An saita",
+      "notSet": "Ba a saita ba",
       "nSelected": "An zaɓi {{displayCount}}",
       "proposedReviewMdGuidance": "Ƙa'idodin REVIEW.md da aka ba da shawara"
     },

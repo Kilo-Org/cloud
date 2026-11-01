@@ -1459,7 +1459,9 @@
     "instructions": {
       "title": "Vlastné pokyny",
       "deprecation": "Podpora vlastných pokynov sa plánuje ukončiť. Presuňte tieto pokyny do súboru REVIEW.md vo svojom repozitári.",
-      "placeholder": "napr. vyžadovať dodržiavanie našich pravidiel spracovania chýb…"
+      "placeholder": "napr. vyžadovať dodržiavanie našich pravidiel spracovania chýb…",
+      "clearTitle": "Odstrániť vlastné pokyny?",
+      "clearMessage": "Uloženie prázdneho poľa odstráni vlastné pokyny uložené pre tohto recenzenta."
     },
     "repos": {
       "unavailable": "Repozitáre nie sú dostupné. Dokončite nastavenie pripojenia k platforme Bitbucket na kilo.ai.",
@@ -1494,7 +1496,7 @@
       "fixSettings": "Opraviť nastavenia",
       "couldNotLoad": "Kontrolu sa nepodarilo načítať.",
       "couldNotGetLatest": "Najnovšie údaje sa nepodarilo načítať.",
-      "byline": "{{repo}} #{{number}} · autor: {{author}}",
+      "byline": "#{{number}} · autor: {{author}}",
       "noFindings": "Nenašli sa žiadne nálezy.",
       "findingsUnavailable": "Výsledky nie sú k dispozícii, pretože táto kontrola zlyhala.",
       "findingsInProgress": "Táto kontrola stále prebieha. Nálezy sa tu zobrazia po jej dokončení.",
@@ -1646,8 +1648,8 @@
       "reviewStyle": "Štýl kontroly",
       "focusAreas": "Oblasti zamerania",
       "allAreas": "Všetky oblasti",
-      "customInstructions": "Vlastné pokyny",
       "set": "Nastavené",
+      "notSet": "Nenastavené",
       "nSelected": "Vybrané: {{displayCount}}",
       "proposedReviewMdGuidance": "Navrhované pokyny do REVIEW.md"
     },

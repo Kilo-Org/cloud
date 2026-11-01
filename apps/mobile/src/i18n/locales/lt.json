@@ -1459,7 +1459,9 @@
     "instructions": {
       "title": "Individualios instrukcijos",
       "deprecation": "Pasirinktinių instrukcijų funkcijos planuojama atsisakyti. Perkelk šias gaires į saugyklos REVIEW.md failą.",
-      "placeholder": "pvz., tikrinti, ar laikomasi mūsų klaidų apdorojimo taisyklių…"
+      "placeholder": "pvz., tikrinti, ar laikomasi mūsų klaidų apdorojimo taisyklių…",
+      "clearTitle": "Pašalinti individualias instrukcijas?",
+      "clearMessage": "Išsaugojus tuščią lauką bus ištrintos šiam tikrintuvui saugomos individualios instrukcijos."
     },
     "repos": {
       "unavailable": "Saugyklos nepasiekiamos. Užbaik Bitbucket sąranką svetainėje kilo.ai.",
@@ -1494,7 +1496,7 @@
       "fixSettings": "Pataisyti nustatymus",
       "couldNotLoad": "Nepavyko įkelti peržiūros.",
       "couldNotGetLatest": "Nepavyko gauti naujausių duomenų.",
-      "byline": "{{repo}} #{{number}} · Autorius: {{author}}",
+      "byline": "#{{number}} · Autorius: {{author}}",
       "noFindings": "Radinių nerasta.",
       "findingsUnavailable": "Rezultatai nepasiekiami, nes ši peržiūra nepavyko.",
       "findingsInProgress": "Ši peržiūra vis dar vyksta. Radiniai čia atsiras jai pasibaigus.",
@@ -1646,8 +1648,8 @@
       "reviewStyle": "Peržiūros stilius",
       "focusAreas": "Peržiūros sritys",
       "allAreas": "Visos sritys",
-      "customInstructions": "Individualios instrukcijos",
       "set": "Nustatyta",
+      "notSet": "Nenustatyta",
       "nSelected": "Pasirinkta {{displayCount}}",
       "proposedReviewMdGuidance": "Siūlomos REVIEW.md gairės"
     },

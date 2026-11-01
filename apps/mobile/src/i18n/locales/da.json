@@ -1415,7 +1415,9 @@
     "instructions": {
       "title": "Brugerdefinerede instruktioner",
       "deprecation": "Brugerdefinerede instruktioner er planlagt til udfasning. Flyt i stedet retningslinjerne til en REVIEW.md-fil i dit kodelager.",
-      "placeholder": "f.eks. overhold vores regler for fejlhåndtering…"
+      "placeholder": "f.eks. overhold vores regler for fejlhåndtering…",
+      "clearTitle": "Fjern brugerdefinerede instruktioner?",
+      "clearMessage": "Når du gemmer et tomt felt, slettes de brugerdefinerede instruktioner, der er gemt for denne anmelder."
     },
     "repos": {
       "unavailable": "Kodelagrene er ikke tilgængelige. Afslut opsætningen af Bitbucket på kilo.ai.",
@@ -1450,7 +1452,7 @@
       "fixSettings": "Ret indstillinger",
       "couldNotLoad": "Gennemgangen kunne ikke indlæses.",
       "couldNotGetLatest": "De seneste oplysninger kunne ikke hentes.",
-      "byline": "{{repo}} #{{number}} af {{author}}",
+      "byline": "#{{number}} af {{author}}",
       "noFindings": "Der er ingen fund.",
       "findingsUnavailable": "Resultaterne er ikke tilgængelige, fordi denne gennemgang mislykkedes.",
       "findingsInProgress": "Denne gennemgang er stadig i gang. Fund vises her, når den er færdig.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Gennemgangsstil",
       "focusAreas": "Fokusområder",
       "allAreas": "Alle områder",
-      "customInstructions": "Brugerdefinerede instruktioner",
       "set": "Angivet",
+      "notSet": "Ikke angivet",
       "nSelected": "{{displayCount}} valgt",
       "proposedReviewMdGuidance": "Forslag til retningslinjer i REVIEW.md"
     },

@@ -1415,7 +1415,9 @@
     "instructions": {
       "title": "Mga sariling tagubilin",
       "deprecation": "Planong ihinto ang suporta sa mga pasadyang tagubilin. Ilipat na lang ang mga gabay na ito sa isang REVIEW.md file sa iyong repository.",
-      "placeholder": "hal. Ipatupad ang aming mga pamantayan sa paghawak ng error…"
+      "placeholder": "hal. Ipatupad ang aming mga pamantayan sa paghawak ng error…",
+      "clearTitle": "Alisin ang mga sariling tagubilin?",
+      "clearMessage": "Sa pag-save ng walang laman na field, mabubura ang mga sariling tagubilin na naka-imbak para sa reviewer na ito."
     },
     "repos": {
       "unavailable": "Hindi makuha ang mga repository. Tapusin ang setup ng Bitbucket sa kilo.ai.",
@@ -1450,7 +1452,7 @@
       "fixSettings": "Ayusin ang mga setting",
       "couldNotLoad": "Hindi ma-load ang pagsusuri.",
       "couldNotGetLatest": "Hindi makuha ang pinakabagong data.",
-      "byline": "{{repo}} #{{number}} ni {{author}}",
+      "byline": "#{{number}} ni {{author}}",
       "noFindings": "Walang natukoy na isyu.",
       "findingsUnavailable": "Hindi available ang mga resulta dahil nabigo ang pagsusuring ito.",
       "findingsInProgress": "Nagpapatuloy pa ang pagsusuri. Lalabas dito ang mga resulta kapag natapos na ito.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Estilo ng pagsusuri",
       "focusAreas": "Mga pagtutuunan",
       "allAreas": "Lahat ng aspeto",
-      "customInstructions": "Mga sariling tagubilin",
       "set": "Nakatakda",
+      "notSet": "Hindi nakatakda",
       "nSelected": "{{displayCount}} napili",
       "proposedReviewMdGuidance": "Iminungkahing gabay sa REVIEW.md"
     },

@@ -1415,7 +1415,9 @@
     "instructions": {
       "title": "Ntuziaka nkeonwe",
       "deprecation": "A na-eme atụmatụ ịkwụsị ntụziaka ahaziri iche. Kama iji ha ebe a, tinye ntụziaka ndị a na faịlụ REVIEW.md n'ebe nchekwa gị.",
-      "placeholder": "dịka: ịgbaso usoro anyị maka njikwa njehie…"
+      "placeholder": "dịka: ịgbaso usoro anyị maka njikwa njehie…",
+      "clearTitle": "Wepụ ntuziaka nkeonwe?",
+      "clearMessage": "Ịzọpụta oghere tọgbọrọ chakoo na-ehichapụ ntuziaka nkeonwe echekwara maka onye nyocha koodu a."
     },
     "repos": {
       "unavailable": "Ebe nchekwa adịghị — mechaa nhazi Bitbucket na kilo.ai.",
@@ -1450,7 +1452,7 @@
       "fixSettings": "Dozie ntọala",
       "couldNotLoad": "Enweghị ike ibudata nyocha.",
       "couldNotGetLatest": "Enweghị ike ịnweta nke kachasị ọhụrụ.",
-      "byline": "{{repo}} #{{number}} nke {{author}}",
+      "byline": "#{{number}} nke {{author}}",
       "noFindings": "Enweghị ihe achọpụtara.",
       "findingsUnavailable": "Nsonaazụ adịghị n'ihi na nyocha a kụrụ afọ n'ala.",
       "findingsInProgress": "Nyocha a ka na-aga n'ihu. Ihe achọpụtara ga-apụta ebe a mgbe ọ gwụchara.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Ụdị nyocha",
       "focusAreas": "Ihe a ga-elekwasị anya",
       "allAreas": "Akụkụ niile",
-      "customInstructions": "Ntuziaka nkeonwe",
       "set": "E debere",
+      "notSet": "E debeghị",
       "nSelected": "A họrọla {{displayCount}}",
       "proposedReviewMdGuidance": "Nduzi REVIEW.md atụrụ aro"
     },

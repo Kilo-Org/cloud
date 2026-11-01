@@ -6,7 +6,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { clearHomeWidgetData } from './home-widget-data';
-import { getLastGlanceableSnapshot } from './persist';
+import { getGlanceableSnapshotForSignedInScope, getLastGlanceableSnapshot } from './persist';
 import { withStatus } from './publisher';
 import { forEachSink, getGlanceableDelivery, guardSink } from './sink-registry';
 
@@ -155,7 +155,9 @@ export function confirmGlanceableOrgMembership(): void {
  * by the org fence when the org list errors: stale, not lost-org.
  */
 export function republishLastSnapshotStale(): void {
-  const previous = getLastGlanceableSnapshot();
+  // A restored record is drawn only for the scope signed in now: the surfaces
+  // never take another context's frame.
+  const previous = getGlanceableSnapshotForSignedInScope();
   if (previous === null) {
     return;
   }

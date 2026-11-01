@@ -1437,7 +1437,9 @@
     "instructions": {
       "title": "Prilagođene upute",
       "deprecation": "Planirano je ukidanje prilagođenih uputa. Premjesti ove smjernice u datoteku REVIEW.md u svom repozitoriju.",
-      "placeholder": "npr. obavezna primjena naših pravila za obradu grešaka…"
+      "placeholder": "npr. obavezna primjena naših pravila za obradu grešaka…",
+      "clearTitle": "Ukloniti prilagođene upute?",
+      "clearMessage": "Ako sačuvaš prazno polje, izbrisat ćeš prilagođene upute pohranjene za ovog recenzenta."
     },
     "repos": {
       "unavailable": "Repozitoriji nisu dostupni. Završi podešavanje Bitbucketa na kilo.ai.",
@@ -1472,7 +1474,7 @@
       "fixSettings": "Popravi postavke",
       "couldNotLoad": "Nije moguće učitati pregled.",
       "couldNotGetLatest": "Nije moguće dohvatiti najnovije podatke.",
-      "byline": "{{repo}} #{{number}} · Autor: {{author}}",
+      "byline": "#{{number}} · Autor: {{author}}",
       "noFindings": "Nema nalaza.",
       "findingsUnavailable": "Rezultati nisu dostupni jer ovaj pregled nije uspio.",
       "findingsInProgress": "Ovaj pregled je još u toku. Nalazi će se ovdje pojaviti kad završi.",
@@ -1624,8 +1626,8 @@
       "reviewStyle": "Stil pregleda",
       "focusAreas": "Područja pregleda",
       "allAreas": "Sva područja",
-      "customInstructions": "Prilagođene upute",
       "set": "Postavljeno",
+      "notSet": "Nije postavljeno",
       "nSelected": "{{displayCount}} odabrano",
       "proposedReviewMdGuidance": "Predložene smjernice za REVIEW.md"
     },

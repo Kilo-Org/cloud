@@ -1415,7 +1415,9 @@
     "instructions": {
       "title": "Maxsus ko‘rsatmalar",
       "deprecation": "Maxsus ko'rsatmalar funksiyasini bekor qilish rejalashtirilgan. Bu ko'rsatmalarni repozitoriyangizdagi REVIEW.md fayliga ko'chiring.",
-      "placeholder": "masalan, xatolarni qayta ishlash qoidalarimizga rioya qilinishini tekshiring…"
+      "placeholder": "masalan, xatolarni qayta ishlash qoidalarimizga rioya qilinishini tekshiring…",
+      "clearTitle": "Maxsus ko‘rsatmalar olib tashlansinmi?",
+      "clearMessage": "Bo'sh maydonni saqlash ushbu ko'rib chiquvchi uchun saqlangan maxsus ko'rsatmalarni o'chiradi."
     },
     "repos": {
       "unavailable": "Repozitoriyalar mavjud emas. Bitbucketni sozlashni kilo.ai saytida yakunlang.",
@@ -1450,7 +1452,7 @@
       "fixSettings": "Sozlamalarni tuzatish",
       "couldNotLoad": "Ko'rib chiqish ma'lumotlarini yuklab bo'lmadi.",
       "couldNotGetLatest": "Eng so'nggi ma'lumotlarni olib bo'lmadi.",
-      "byline": "{{repo}} #{{number}}, muallif: {{author}}",
+      "byline": "#{{number}}, muallif: {{author}}",
       "noFindings": "Muammolar topilmadi.",
       "findingsUnavailable": "Bu ko'rib chiqish muvaffaqiyatsiz tugagani uchun natijalar mavjud emas.",
       "findingsInProgress": "Bu ko'rib chiqish hali davom etmoqda. Tugagach, muammolar shu yerda paydo bo'ladi.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Ko‘rib chiqish uslubi",
       "focusAreas": "Asosiy yo‘nalishlar",
       "allAreas": "Barcha yo'nalishlar",
-      "customInstructions": "Maxsus ko‘rsatmalar",
       "set": "Belgilangan",
+      "notSet": "Belgilanmagan",
       "nSelected": "{{displayCount}} ta tanlangan",
       "proposedReviewMdGuidance": "Taklif etilgan REVIEW.md yo'riqnomasi"
     },

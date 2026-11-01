@@ -1601,45 +1601,89 @@ export async function checkExistingFork(
   }
 }
 
+// How many merges a head may stack before its branch content is treated as unknown.
+const mergeHeadWalkLimit = 10;
+
+export type MergeHeadContent =
+  | Readonly<{ kind: 'not_merge' }>
+  // The heads a review of the merge head can cover: every merge head on its first-parent chain, then
+  // the branch commit the chain ends on, which all of them carry.
+  | Readonly<{ kind: 'review_content'; shas: readonly string[] }>
+  // A merge that takes code from outside the base branch, or a chain that cannot be read.
+  | Readonly<{ kind: 'unreviewed_content' }>;
+
 /**
- * Checks whether a commit is a merge commit (has 2+ parents).
- * Used to skip code reviews triggered by "merge base into feature" pushes.
- * Returns false if the API call fails so the review proceeds (fail-open).
+ * Resolves what a synchronize head carries. A head that stacks merges of the
+ * base branch carries the branch commit its first-parent chain ends on, and each
+ * merge head on that chain carries the same content, so the chain names the
+ * heads a review of any of them covers. A merge whose second parent is not base
+ * content brings in code no branch review covers, and an unreadable chain is
+ * treated the same way, so both fall through to a review instead of a skip.
  */
-export async function isMergeCommit(
-  installationId: string,
-  owner: string,
-  repo: string,
-  commitSha: string,
-  appType: GitHubAppType = 'standard'
-): Promise<boolean> {
+export async function resolveMergeHeadContent(args: {
+  appType: GitHubAppType;
+  baseSha: string;
+  headSha: string;
+  installationId: string;
+  owner: string;
+  repo: string;
+}): Promise<MergeHeadContent> {
   try {
-    const tokenData = await generateGitHubInstallationToken(installationId, appType);
+    const tokenData = await generateGitHubInstallationToken(args.installationId, args.appType);
     const octokit = new Octokit({ auth: tokenData.token });
+    const shas: string[] = [];
+    let current = args.headSha;
 
-    const { data } = await octokit.git.getCommit({
-      owner,
-      repo,
-      commit_sha: commitSha,
+    for (let depth = 0; depth <= mergeHeadWalkLimit; depth += 1) {
+      // oxlint-disable-next-line no-await-in-loop -- Each parent names the next commit to read.
+      const { data } = await octokit.git.getCommit({
+        owner: args.owner,
+        repo: args.repo,
+        commit_sha: current,
+      });
+      const [firstParent, secondParent] = data.parents;
+      if (data.parents.length < 2) {
+        if (depth === 0) {
+          return { kind: 'not_merge' };
+        }
+        return { kind: 'review_content', shas: shas.concat(current) };
+      }
+      if (firstParent === undefined || secondParent === undefined) {
+        return { kind: 'unreviewed_content' };
+      }
+      // oxlint-disable-next-line no-await-in-loop -- The comparison decides whether this merge is base content.
+      const comparison = await octokit.repos.compareCommits({
+        owner: args.owner,
+        repo: args.repo,
+        base: args.baseSha,
+        head: secondParent.sha,
+      });
+      if (comparison.data.status !== 'behind' && comparison.data.status !== 'identical') {
+        logExceptInTest(
+          '[resolveMergeHeadContent] Merge takes content from outside the base branch',
+          {
+            owner: args.owner,
+            repo: args.repo,
+            sha: current.substring(0, 8),
+            secondParent: secondParent.sha.substring(0, 8),
+            status: comparison.data.status,
+          }
+        );
+        return { kind: 'unreviewed_content' };
+      }
+      shas.push(current);
+      current = firstParent.sha;
+    }
+
+    logExceptInTest('[resolveMergeHeadContent] Merge chain exceeds the walk limit', {
+      owner: args.owner,
+      repo: args.repo,
+      sha: args.headSha.substring(0, 8),
     });
-
-    const result = data.parents.length > 1;
-
-    logExceptInTest('[isMergeCommit] Checked commit parents', {
-      owner,
-      repo,
-      sha: commitSha.substring(0, 8),
-      parentCount: data.parents.length,
-      isMergeCommit: result,
-    });
-
-    return result;
+    return { kind: 'unreviewed_content' };
   } catch (error) {
-    logExceptInTest(
-      '[isMergeCommit] Failed to check commit parents, proceeding with review:',
-      error
-    );
-    return false;
+    logExceptInTest('[resolveMergeHeadContent] Failed to walk the merge chain:', error);
+    return { kind: 'unreviewed_content' };
   }
 }
 
@@ -1661,6 +1705,19 @@ type CheckRunOutput = {
   text?: string;
 };
 
+const checkRunConclusions: Readonly<Record<CheckRunConclusion, true>> = {
+  action_required: true,
+  cancelled: true,
+  failure: true,
+  neutral: true,
+  success: true,
+  timed_out: true,
+};
+
+function isCheckRunConclusion(value: string | null | undefined): value is CheckRunConclusion {
+  return value !== null && value !== undefined && Object.hasOwn(checkRunConclusions, value);
+}
+
 /**
  * Creates a GitHub Check Run on a commit.
  *
@@ -1678,18 +1735,24 @@ export async function createCheckRun(
   options: {
     detailsUrl?: string;
     output?: CheckRunOutput;
+    // Set for a head that is already decided, such as one that carries content a
+    // finished review covered: the run is created completed with that conclusion.
+    conclusion?: CheckRunConclusion;
   } = {},
   appType: GitHubAppType = 'standard'
 ): Promise<number> {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
+  const completed = options.conclusion !== undefined;
 
   const { data } = await octokit.checks.create({
     owner,
     repo,
     name: 'Kilo Code Review',
     head_sha: headSha,
-    status: 'queued',
+    status: completed ? 'completed' : 'queued',
+    ...(options.conclusion ? { conclusion: options.conclusion } : {}),
+    ...(completed ? { completed_at: new Date().toISOString() } : {}),
     ...(options.detailsUrl ? { details_url: options.detailsUrl } : {}),
     ...(options.output ? { output: options.output } : {}),
   });
@@ -1699,9 +1762,38 @@ export async function createCheckRun(
     repo,
     headSha: headSha.substring(0, 8),
     checkRunId: data.id,
+    conclusion: options.conclusion,
   });
 
   return data.id;
+}
+
+/**
+ * Reads the conclusion a check run finished with, so a later commit that
+ * carries the same reviewed content can be gated with the same verdict.
+ * Returns undefined when the run cannot be read or has no conclusion yet.
+ */
+export async function getCheckRunConclusion(
+  installationId: string,
+  owner: string,
+  repo: string,
+  checkRunId: number,
+  appType: GitHubAppType = 'standard'
+): Promise<CheckRunConclusion | undefined> {
+  try {
+    const tokenData = await generateGitHubInstallationToken(installationId, appType);
+    const octokit = new Octokit({ auth: tokenData.token });
+    const { data } = await octokit.checks.get({
+      owner,
+      repo,
+      check_run_id: checkRunId,
+    });
+    const conclusion = data.conclusion ?? undefined;
+    return isCheckRunConclusion(conclusion) ? conclusion : undefined;
+  } catch (error) {
+    logExceptInTest('[getCheckRunConclusion] Failed to read check run:', error);
+    return undefined;
+  }
 }
 
 /**

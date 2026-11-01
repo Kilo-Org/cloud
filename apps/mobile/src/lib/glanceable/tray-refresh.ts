@@ -27,7 +27,7 @@ import { getGlanceableSinks } from './sink-registry';
 export async function publishTrayOnce(ctx: GlanceablePublisherContext): Promise<void> {
   // One publisher per run: the binding wait below redraws it, and a
   // subscription would outlive the process in the module-level listener set.
-  const publisher = createGlanceablePublisher({ redrawOnAskBound: false });
+  const publisher = createGlanceablePublisher({ context: ctx, redrawOnAskBound: false });
   const { sessions } = await trpcClient.activeSessions.list.query(
     buildActiveSessionsTrayInput(ctx.organizationId)
   );

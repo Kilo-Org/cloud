@@ -1437,7 +1437,9 @@
     "instructions": {
       "title": "Instruccions personalitzades",
       "deprecation": "Està previst retirar les instruccions personalitzades. Trasllada aquestes pautes a un fitxer REVIEW.md del teu repositori.",
-      "placeholder": "p. ex., aplica les nostres convencions de gestió d'errors…"
+      "placeholder": "p. ex., aplica les nostres convencions de gestió d'errors…",
+      "clearTitle": "Vols eliminar les instruccions personalitzades?",
+      "clearMessage": "Si deses el camp buit, s'eliminaran les instruccions personalitzades emmagatzemades per a aquest revisor."
     },
     "repos": {
       "unavailable": "Els repositoris no estan disponibles. Acaba la configuració de Bitbucket a kilo.ai.",
@@ -1472,7 +1474,7 @@
       "fixSettings": "Corregeix la configuració",
       "couldNotLoad": "No s'ha pogut carregar la revisió.",
       "couldNotGetLatest": "No s'han pogut obtenir les dades més recents.",
-      "byline": "{{repo}} #{{number}} · Autor: {{author}}",
+      "byline": "#{{number}} · Autor: {{author}}",
       "noFindings": "No hi ha incidències.",
       "findingsUnavailable": "Els resultats no estan disponibles perquè aquesta revisió ha fallat.",
       "findingsInProgress": "Aquesta revisió encara està en curs. Les incidències apareixeran aquí quan finalitzi.",
@@ -1624,8 +1626,8 @@
       "reviewStyle": "Estil de revisió",
       "focusAreas": "Àrees de revisió",
       "allAreas": "Totes les àrees",
-      "customInstructions": "Instruccions personalitzades",
       "set": "Definit",
+      "notSet": "No definit",
       "nSelected": "{{displayCount}} àrees seleccionades",
       "proposedReviewMdGuidance": "Pautes proposades per a REVIEW.md"
     },

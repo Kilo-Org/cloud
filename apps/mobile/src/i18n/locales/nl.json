@@ -889,7 +889,9 @@
     "instructions": {
       "title": "Eigen instructies",
       "deprecation": "De functie voor aangepaste instructies wordt op termijn uitgefaseerd. Verplaats deze richtlijnen naar een REVIEW.md-bestand in je repository.",
-      "placeholder": "bijvoorbeeld: onze afspraken over foutafhandeling controleren…"
+      "placeholder": "bijvoorbeeld: onze afspraken over foutafhandeling controleren…",
+      "clearTitle": "Eigen instructies verwijderen?",
+      "clearMessage": "Door een leeg veld op te slaan worden de eigen instructies verwijderd die voor deze reviewer zijn opgeslagen."
     },
     "repos": {
       "unavailable": "De repositories zijn niet beschikbaar. Voltooi het instellen van Bitbucket op kilo.ai.",
@@ -965,7 +967,7 @@
       "bitbucketError": "Het instellen van Bitbucket kon niet worden geopend. Probeer het opnieuw."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} door {{author}}",
+      "byline": "#{{number}} door {{author}}",
       "cancelMessage": "Dit stopt de lopende codereview.",
       "cancelReview": "Review annuleren",
       "cancelTitle": "Review annuleren?",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "Alle aandachtspunten",
-      "customInstructions": "Eigen instructies",
       "focusAreas": "Aandachtspunten",
       "nSelected": "{{displayCount}} geselecteerd",
       "proposedReviewMdGuidance": "Voorgestelde REVIEW.md-richtlijnen",
       "reviewStyle": "Beoordelingsstijl",
-      "set": "Ingesteld"
+      "set": "Ingesteld",
+      "notSet": "Niet ingesteld"
     },
     "updateFailed": "De beoordelaar kon niet worden bijgewerkt.",
     "configSaveFailed": "De reviewinstellingen konden niet worden opgeslagen.",

@@ -1415,7 +1415,9 @@
     "instructions": {
       "title": "Qajeelfamoota dhuunfaa",
       "deprecation": "Qajeelfamoota dhuunfaa hojii ala gochuuf karoorfameera. Qajeelfamoota kana bakka isaanii faayila REVIEW.md kuusaa koodii kee keessa jirutti dabarsi.",
-      "placeholder": "fkn. Akkaataa dogoggora itti qabnu kabachiisuu…"
+      "placeholder": "fkn. Akkaataa dogoggora itti qabnu kabachiisuu…",
+      "clearTitle": "Qajeelfamoota dhuunfaa keessaa baasuu barbaaddaa?",
+      "clearMessage": "Bakka duwwaa olkaa'uun qajeelfamoota dhuunfaa qorataa kanaaf kuufaman ni balleessa."
     },
     "repos": {
       "unavailable": "Kuusaawwan koodii hin argaman — qophii Bitbucket kilo.ai irratti xumuri.",
@@ -1450,7 +1452,7 @@
       "fixSettings": "Qindaa'ina sirreessi",
       "couldNotLoad": "Sakatta'a fe'uun hin danda'amne.",
       "couldNotGetLatest": "Odeeffannoo ammaa argachuun hin danda'amne.",
-      "byline": "{{repo}} #{{number}} kan {{author}}",
+      "byline": "#{{number}} kan {{author}}",
       "noFindings": "Argamni hin jiru.",
       "findingsUnavailable": "Sakatta'i kun waan hin milkoofneef bu'aawwan hin argaman.",
       "findingsInProgress": "Sakatta'i kun hojjetaa jira. Yeroo xumuru argamni asitti mul'ata.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Haala sakatta'aa",
       "focusAreas": "Dhimmoota xiyyeeffannoo",
       "allAreas": "Kutaa hunda",
-      "customInstructions": "Qajeelfamoota dhuunfaa",
       "set": "Qindaa'e",
+      "notSet": "Hin qindaa'e",
       "nSelected": "{{displayCount}} filatamaniiru",
       "proposedReviewMdGuidance": "Qajeelfama REVIEW.md dhihaate"
     },

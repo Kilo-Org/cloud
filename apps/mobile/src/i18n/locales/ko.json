@@ -889,7 +889,9 @@
     "instructions": {
       "title": "사용자 지정 지침",
       "deprecation": "사용자 지정 지침 기능은 지원이 중단될 예정입니다. 이 지침을 저장소의 REVIEW.md 파일로 옮기세요.",
-      "placeholder": "예: 오류 처리 규칙 적용…"
+      "placeholder": "예: 오류 처리 규칙 적용…",
+      "clearTitle": "사용자 지정 지침을 제거하시겠습니까?",
+      "clearMessage": "빈 필드를 저장하면 이 검토자에 대해 저장된 사용자 지정 지침이 삭제됩니다."
     },
     "repos": {
       "unavailable": "저장소를 사용할 수 없습니다. kilo.ai에서 Bitbucket 설정을 완료하세요.",
@@ -965,7 +967,7 @@
       "bitbucketError": "Bitbucket 설정을 열 수 없습니다. 다시 시도하세요."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · {{author}}",
+      "byline": "#{{number}} · {{author}}",
       "cancelMessage": "진행 중인 코드 리뷰가 중지됩니다.",
       "cancelReview": "리뷰 취소",
       "cancelTitle": "리뷰를 취소할까요?",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "모든 영역",
-      "customInstructions": "사용자 지정 지침",
       "focusAreas": "중점 리뷰 항목",
       "nSelected": "{{displayCount}}개 선택됨",
       "proposedReviewMdGuidance": "제안된 REVIEW.md 지침",
       "reviewStyle": "리뷰 스타일",
-      "set": "설정됨"
+      "set": "설정됨",
+      "notSet": "설정 안 됨"
     },
     "updateFailed": "리뷰어를 업데이트하지 못했습니다.",
     "configSaveFailed": "리뷰 설정을 저장하지 못했습니다.",

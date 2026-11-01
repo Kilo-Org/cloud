@@ -1415,7 +1415,9 @@
     "instructions": {
       "title": "Sérsniðnar leiðbeiningar",
       "deprecation": "Fyrirhugað er að hætta stuðningi við sérsniðnar leiðbeiningar í stillingunum. Færðu þær í REVIEW.md-skrá í geymslunni þinni í staðinn.",
-      "placeholder": "t.d. fylgja reglum okkar um villumeðhöndlun…"
+      "placeholder": "t.d. fylgja reglum okkar um villumeðhöndlun…",
+      "clearTitle": "Fjarlægja sérsniðnar leiðbeiningar?",
+      "clearMessage": "Ef þú vistar tóman reit eyðast þær sérsniðnu leiðbeiningar sem geymdar eru fyrir þennan yfirferðaraðila."
     },
     "repos": {
       "unavailable": "Geymslur eru ekki tiltækar. Ljúktu uppsetningu Bitbucket á kilo.ai.",
@@ -1450,7 +1452,7 @@
       "fixSettings": "Laga stillingar",
       "couldNotLoad": "Ekki tókst að sækja yfirferðina.",
       "couldNotGetLatest": "Ekki tókst að sækja nýjustu gögnin.",
-      "byline": "{{repo}} #{{number}} eftir {{author}}",
+      "byline": "#{{number}} eftir {{author}}",
       "noFindings": "Engin frávik fundust.",
       "findingsUnavailable": "Niðurstöður eru ekki tiltækar þar sem þessi yfirferð mistókst.",
       "findingsInProgress": "Þessi yfirferð er enn í gangi. Frávik birtast hér þegar henni er lokið.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Rýnistíll",
       "focusAreas": "Áherslusvið",
       "allAreas": "Allir þættir",
-      "customInstructions": "Sérsniðnar leiðbeiningar",
       "set": "Stillt",
+      "notSet": "Ekki stillt",
       "nSelected": "Valið: {{displayCount}}",
       "proposedReviewMdGuidance": "Tillögur að leiðbeiningum í REVIEW.md"
     },

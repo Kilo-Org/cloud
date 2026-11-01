@@ -1415,7 +1415,9 @@
     "instructions": {
       "title": "Enstriksyon pèsonalize",
       "deprecation": "Nou prevwa sispann sipòte enstriksyon pèsonalize yo. Mete direktiv sa yo nan yon fichye REVIEW.md nan depo ou a pito.",
-      "placeholder": "pa egzanp: respekte règ nou yo pou jere erè…"
+      "placeholder": "pa egzanp: respekte règ nou yo pou jere erè…",
+      "clearTitle": "Retire enstriksyon pèsonalize yo?",
+      "clearMessage": "Anrejistre yon chan vid ap efase enstriksyon pèsonalize yo ki estoke pou revizè kòd sa a."
     },
     "repos": {
       "unavailable": "Depo yo pa disponib. Fini konfigirasyon Bitbucket la sou kilo.ai.",
@@ -1450,7 +1452,7 @@
       "fixSettings": "Ranje paramèt yo",
       "couldNotLoad": "Nou pa t ka chaje revizyon an.",
       "couldNotGetLatest": "Nou pa t ka jwenn dènye done yo.",
-      "byline": "{{repo}} #{{number}} pa {{author}}",
+      "byline": "#{{number}} pa {{author}}",
       "noFindings": "Pa gen okenn konsta.",
       "findingsUnavailable": "Rezilta yo pa disponib paske revizyon sa a echwe.",
       "findingsInProgress": "Revizyon sa a poko fini. Konsta yo ap parèt la a lè l fini.",
@@ -1602,8 +1604,8 @@
       "reviewStyle": "Estil revizyon",
       "focusAreas": "Aspè pou konsantre sou yo",
       "allAreas": "Tout domèn",
-      "customInstructions": "Enstriksyon pèsonalize",
       "set": "Konfigire",
+      "notSet": "Pa konfigire",
       "nSelected": "{{displayCount}} chwazi",
       "proposedReviewMdGuidance": "Direktiv ki pwopoze pou REVIEW.md"
     },

@@ -889,7 +889,9 @@
     "instructions": {
       "title": "Özel talimatlar",
       "deprecation": "Özel talimatlar özelliğinin kullanımdan kaldırılması planlanıyor. Bu yönergeleri depondaki bir REVIEW.md dosyasına taşı.",
-      "placeholder": "örn. Hata işleme kurallarımıza uy…"
+      "placeholder": "örn. Hata işleme kurallarımıza uy…",
+      "clearTitle": "Özel talimatlar kaldırılsın mı?",
+      "clearMessage": "Boş bir alanı kaydetmek, bu inceleyici için depolanan özel talimatları siler."
     },
     "repos": {
       "unavailable": "Depolara erişilemiyor. Bitbucket kurulumunu kilo.ai üzerinden tamamla.",
@@ -965,7 +967,7 @@
       "bitbucketError": "Bitbucket kurulumu açılamadı. Lütfen tekrar dene."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · Oluşturan: {{author}}",
+      "byline": "#{{number}} · Oluşturan: {{author}}",
       "cancelMessage": "Devam eden kod incelemesi durdurulacak.",
       "cancelReview": "İncelemeyi iptal et",
       "cancelTitle": "İnceleme iptal edilsin mi?",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "Tüm alanlar",
-      "customInstructions": "Özel talimatlar",
       "focusAreas": "Odak alanları",
       "nSelected": "{{displayCount}} seçili",
       "proposedReviewMdGuidance": "Önerilen REVIEW.md yönergeleri",
       "reviewStyle": "İnceleme stili",
-      "set": "Belirlendi"
+      "set": "Belirlendi",
+      "notSet": "Belirlenmedi"
     },
     "updateFailed": "Kod inceleyici güncellenemedi.",
     "configSaveFailed": "İnceleme ayarları kaydedilemedi.",

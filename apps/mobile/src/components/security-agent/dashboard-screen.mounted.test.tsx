@@ -309,7 +309,7 @@ vi.mock('@/components/security-agent/dashboard-sections', () => ({
     sectionsProps.props.push(props);
     return null;
   },
-  DashboardSectionsSkeleton: (props: { slaEnabled?: boolean }) => {
+  DashboardSectionsSkeleton: (props: { slaEnabled?: boolean; neverSynced?: boolean }) => {
     sectionsSkeletonProps.props.push(props);
     return null;
   },
@@ -1851,5 +1851,17 @@ describe('DashboardLoadingView frame', () => {
       )
     ).toHaveLength(4);
     expect(skeletons).toHaveLength(13);
+  });
+
+  // The frame used to end at the metric tiles, so the empty lower half read as
+  // a half-rendered screen and every card below pushed the page down when it
+  // arrived. The sections' own placeholders, at the shape the dashboard paints
+  // them, hold that height until the reads answer.
+  it('holds the sections below the tiles with the dashboard’s own placeholders', () => {
+    sectionsSkeletonProps.props = [];
+
+    renderElement(createElement(DashboardLoadingView, { scope: 'personal' }));
+
+    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, neverSynced: false }]);
   });
 });

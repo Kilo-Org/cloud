@@ -946,6 +946,14 @@ export function DashboardLoadingView({ scope }: Readonly<{ scope: string }>) {
           </IconButton>
         </View>
         <DashboardMetricTiles neverSynced={false} />
+        {/* The tiles are only the top of the page: the loaded dashboard keeps
+            reading below them, and the sections' cards land there. Without
+            their placeholders this frame ended at the tiles and the empty
+            lower half read as a half-rendered screen. The config has not
+            answered, so the shape is the one it defaults to (`slaEnabled` is
+            read the same way on the loaded screen) in a scope that has synced,
+            which is the shape most scopes give these cards. */}
+        <DashboardSectionsSkeleton slaEnabled neverSynced={false} />
       </TabScreenScrollView>
     </View>
   );

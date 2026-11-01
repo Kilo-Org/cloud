@@ -82,8 +82,9 @@ type VariableRowViewProps = Readonly<{
 /**
  * One variable row: the key in mono and the value. A secret never renders its
  * stored value — the server sends `***`, and the row shows the dot run instead.
- * When the caller passes `onToggleReveal`, the row offers a reveal control;
- * otherwise a secret stays masked.
+ * When the caller passes `onToggleReveal`, the row offers a reveal control that
+ * names the action it performs now: it reads "Reveal value" while the value is
+ * masked and "Hide value" while it is shown. Otherwise a secret stays masked.
  */
 export function VariableRowView({
   row,
@@ -95,6 +96,7 @@ export function VariableRowView({
 }: VariableRowViewProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const revealLabel = revealed ? t('profiles.secrets.hide') : t('profiles.secrets.reveal');
   return (
     <View className="min-h-14 flex-row items-center gap-1 rounded-lg bg-secondary pr-1 pl-3">
       <Pressable
@@ -138,8 +140,7 @@ export function VariableRowView({
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
-          accessibilityLabel={t('profiles.secrets.reveal')}
-          accessibilityState={{ selected: revealed }}
+          accessibilityLabel={revealLabel}
           onPress={onToggleReveal}
         >
           {revealed ? (
@@ -236,6 +237,9 @@ export function VariableEditForm({
   );
 
   const valuePlaceholder = valueFieldPlaceholder(t, isSecret, isNew);
+  // The reveal control names what pressing it does next: it hides the value it
+  // is showing, and reveals the one it is masking.
+  const revealLabel = revealed ? t('profiles.secrets.hide') : t('profiles.secrets.reveal');
   // An edit's key is stored, so only an add can collide with the profile's keys.
   const validate = (key: string, value: string): VariableInputError | null =>
     validateVariableInput({ key, value }, isNew ? existingKeys : [], { requireValue });
@@ -309,8 +313,7 @@ export function VariableEditForm({
             'flex-row items-center gap-2 self-start px-1 active:opacity-70'
           )}
           accessibilityRole="button"
-          accessibilityLabel={t('profiles.secrets.reveal')}
-          accessibilityState={{ selected: revealed }}
+          accessibilityLabel={revealLabel}
           onPress={() => {
             setRevealed(current => !current);
           }}
@@ -320,7 +323,7 @@ export function VariableEditForm({
           ) : (
             <Eye size={18} color={colors.mutedForeground} />
           )}
-          <Text className="text-sm text-muted-foreground">{t('profiles.secrets.reveal')}</Text>
+          <Text className="text-sm text-muted-foreground">{revealLabel}</Text>
         </Pressable>
       ) : null}
       <View
@@ -330,11 +333,21 @@ export function VariableEditForm({
         <Text className="flex-1 text-sm font-medium text-foreground">
           {t('profiles.secrets.markSecret')}
         </Text>
-        <Switch
-          value={isSecret}
-          accessibilityLabel={t('profiles.secrets.markSecret')}
-          onValueChange={setIsSecret}
-        />
+        {/* The native switch draws its 32dp track inside a box that reserves the
+            thumb's overhang, so the track ends about 12dp before the box does
+            and the row's 10.5dp padding leaves it 23dp from the row's edge,
+            twice the 13dp the lock glyph keeps from its opposite edge. Pulling
+            the box out by the padding itself lines the track's end up with the
+            glyph on both edges. The pull is on the END edge, so it must stay
+            logical: `marginInlineEnd` follows the writing direction, while a
+            hand-picked `-mr-3` lands on the title's side under RTL. */}
+        <View className="-me-3">
+          <Switch
+            value={isSecret}
+            accessibilityLabel={t('profiles.secrets.markSecret')}
+            onValueChange={setIsSecret}
+          />
+        </View>
       </View>
       <View className="flex-row gap-2">
         <Button variant="outline" className="flex-1" onPress={onCancel}>

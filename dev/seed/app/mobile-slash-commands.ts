@@ -126,6 +126,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     commandId: command.id,
     commandName: `/${COMMAND_NAME}`,
     templateCharacters: template.length,
-    deepLink: `kiloapp:///profiles/${profile.id}/slash-commands`,
+    deepLink: `kiloapp:///(app)/(tabs)/(3_profile)/profiles/${profile.id}/slash-commands`,
   };
 }

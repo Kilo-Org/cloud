@@ -112,8 +112,15 @@ type ProbeState = {
   open?: (url: string) => void;
 };
 
+// Each route shows its own text, as real screens do: a link that routes without
+// painting is only distinguishable from a real navigation when the text on glass
+// is what betrays it.
+function screenTextFor(route: string): string {
+  return `Screen ${route}`;
+}
+
 function probeState(language = 'en', persisted = 'en'): ProbeState {
-  return { language, persisted, route: '/', text: 'Title', languageCalls: [] };
+  return { language, persisted, route: '/', text: screenTextFor('/'), languageCalls: [] };
 }
 
 function fakeProbe(state: ProbeState): ProbeClient {
@@ -136,7 +143,7 @@ function fakeProbe(state: ProbeState): ProbeClient {
     },
     resetNavigation: async () => {
       state.route = '/';
-      state.text = 'Title';
+      state.text = screenTextFor('/');
     },
     lastOutcome: async () => 'openLink kiloapp://dead: failed (no route)',
     press: async () => 'not-found',
@@ -166,7 +173,7 @@ function fakeDevice(
   options: {
     failScreenshotFor?: string;
     routes?: Record<string, string>;
-    texts?: Record<string, string>;
+    texts?: Record<string, string | string[]>;
     languages?: Record<string, string>;
   } = {}
 ): Device {
@@ -174,7 +181,14 @@ function fakeDevice(
   state.open = url => {
     calls.push(`open:${url}`);
     state.route = options.routes?.[url] ?? `/${new URL(url).host}`;
-    state.text = options.texts?.[url] ?? 'Title';
+    // A text list models a router that reports the target route while the
+    // previous screen is still on glass; the last entry repeats.
+    const texts = options.texts?.[url];
+    const paints = Array.isArray(texts) ? texts : undefined;
+    const openCount = calls.filter(call => call === `open:${url}`).length;
+    const queued =
+      paints === undefined ? undefined : paints[Math.min(openCount - 1, paints.length - 1)];
+    state.text = queued ?? (typeof texts === 'string' ? texts : screenTextFor(state.route));
     state.language = options.languages?.[url] ?? state.language;
   };
   return {
@@ -318,6 +332,27 @@ test('runMatrix retries a link that leaves the screen unchanged and reports last
   );
 });
 
+test('runMatrix re-sends a link the router routed without painting the screen', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  // Right after a language reload the router can report the target route while
+  // the previous screen is still on glass; the re-send is what lands the cell.
+  const ctx = context(
+    fakeDevice(calls, state, {
+      routes: { 'kiloapp://stale': '/pr-review' },
+      texts: { 'kiloapp://stale': ['Screen /', 'Review inbox'] },
+    }),
+    fakeProbe(state)
+  );
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), [
+    { id: 'stale', link: 'kiloapp://stale' },
+  ]);
+
+  assert.equal(calls.filter(call => call === 'open:kiloapp://stale').length, 2);
+  assert.deepEqual(outcome.findings, []);
+  assert.equal(state.text, 'Review inbox');
+});
+
 test('runMatrix skips a target that switches the language and resets it for the next one', async () => {
   const calls: string[] = [];
   const state = probeState();
@@ -332,6 +367,33 @@ test('runMatrix skips a target that switches the language and resets it for the 
     [['warning', 'hindi', 'hindi switched the app language to hi; its rules were skipped']]
   );
   assert.deepEqual(state.languageCalls, ['system/en']);
+});
+
+test('runMatrix warms the target that has to reload the language back', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const languages = { 'kiloapp://hindi': 'hi' };
+  const ctx = context(fakeDevice(calls, state, { languages }), fakeProbe(state));
+  await runMatrix(ctx, matrixCells('android', 'base'), [
+    { id: 'hindi', link: 'kiloapp://hindi' },
+    ...HOME,
+  ]);
+
+  // The link switched the app language, so the NEXT target reloads the runtime
+  // and is cold at index 1 — it still pays its own warm open.
+  assert.equal(calls.filter(call => call === 'open:kiloapp://home').length, 2);
+});
+
+test('runMatrix warms a cell once after the language reload', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const ctx = context(fakeDevice(calls, state), fakeProbe(state));
+  await runMatrix(ctx, matrixCells('android', 'standard'), HOME);
+
+  // Three cells match the baseline language; the RTL cell reloads the runtime
+  // and pays one unmeasured warm open so its measured capture is the warm screen.
+  assert.equal(calls.filter(call => call === 'open:kiloapp://home').length, 5);
+  assert.deepEqual(state.languageCalls, ['ar/ar', 'system/en']);
 });
 
 test('waitForStableLayout waits for one quiet second', async () => {

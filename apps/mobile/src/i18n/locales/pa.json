@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "ਕੋਈ ਹਾਲੀਆ ਸਮੀਖਿਆ ਨਹੀਂ",
       "noRecentPrsDescription": "ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਉੱਤੇ ਲਿੰਕ ਪੇਸਟ ਕਰੋ — ਅਗਲੀ ਵਾਰ ਇਹ ਇੱਥੇ ਦਿਖਾਈ ਦੇਵੇਗੀ।",
-      "couldNotLoad": "ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
       "removeFromRecentsTitle": "ਹਾਲੀਆ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾਈਏ?",
       "removeFromRecentsMessage": "ਇਹ ਸਮੀਖਿਆ ਤੁਹਾਡੀ ਹਾਲੀਆ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾ ਦਿੱਤੀ ਜਾਵੇਗੀ।",
       "removeRecentAccessibility": "{{repo}} ਨੂੰ ਹਾਲੀਆ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾਓ",
@@ -834,7 +833,8 @@
     "liveUpdates": "ਲਾਈਵ ਅੱਪਡੇਟ",
     "liveUpdateSubtitle": "ਆਪਣੀਆਂ ਸੂਚਨਾਵਾਂ ਵਿੱਚ ਸਰਗਰਮ ਏਜੰਟ ਦਿਖਾਓ",
     "push": "ਪੁਸ਼ ਸੂਚਨਾਵਾਂ",
-    "onDescription": "ਇਸ ਡਿਵਾਈਸ ਲਈ ਪੁਸ਼ ਸੂਚਨਾਵਾਂ ਚਾਲੂ ਹਨ।",
+    "deviceTitle": "ਇਸ ਡਿਵਾਈਸ 'ਤੇ ਪੁਸ਼",
+    "onDescription": "ਚੇਤਾਵਨੀਆਂ ਹੇਠਾਂ ਦਿੱਤੀਆਂ ਸ਼੍ਰੇਣੀਆਂ ਅਨੁਸਾਰ ਆਉਂਦੀਆਂ ਹਨ।",
     "offDescription": "ਇਜਾਜ਼ਤ ਜਾਂ ਡਿਵਾਈਸ ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਬੰਦ ਹੈ।",
     "retryPermission": "ਸੂਚਨਾਵਾਂ ਦੀ ਇਜਾਜ਼ਤ ਮੁੜ ਜਾਂਚੋ",
     "enable": "ਸੂਚਨਾਵਾਂ ਚਾਲੂ ਕਰੋ",
@@ -1533,6 +1533,9 @@
       "offAction": "ਸਮੀਖਿਆ ਦੀ ਮੈਮੋਰੀ ਬੰਦ ਹੈ। ਇਸ ਨੂੰ ਚਾਲੂ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ ਵੈਧ URL ਦਰਜ ਕਰੋ।",
+      "mergeRequestUrl": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ URL",
+      "instructionsAtLimit": "ਹਦਾਇਤਾਂ {{max}} ਅੱਖਰਾਂ ਤੱਕ ਸੀਮਿਤ ਹਨ।",
       "title": "ਦਸਤੀ ਸਮੀਖਿਆ",
       "invalidUrl": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ ਵੈਧ URL ਦਰਜ ਕਰੋ।",
       "couldNotCheckProviderStatus": "ਪ੍ਰਦਾਤਾ ਦੀ ਸਥਿਤੀ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ।",
@@ -1786,6 +1789,7 @@
       "lastSynced": "ਆਖ਼ਰੀ ਵਾਰ ਸਿੰਕ ਕੀਤਾ: {{time}}",
       "manageRepositories": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਦਾ ਪ੍ਰਬੰਧ ਕਰੋ",
       "notYetSynced": "ਅਜੇ ਸਿੰਕ ਨਹੀਂ ਹੋਇਆ",
+      "priorityFindingsPending": "ਪਹਿਲੇ ਸਿੰਕ ਤੋਂ ਬਾਅਦ ਤਰਜੀਹ ਵਾਲੀਆਂ ਸਮੱਸਿਆਵਾਂ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
       "refreshFailed": "ਰਿਫਰੈਸ਼ ਨਹੀਂ ਹੋ ਸਕਿਆ — ਆਖ਼ਰੀ ਵਾਰ ਸਿੰਕ ਕੀਤਾ ਡੇਟਾ ਦਿਖਾਇਆ ਜਾ ਰਿਹਾ ਹੈ।",
       "settings": "ਸੈਟਿੰਗਾਂ",
       "syncNow": "ਹੁਣੇ ਸਿੰਕ ਕਰੋ",
@@ -1847,7 +1851,8 @@
     "findingDetails": {
       "supersededBy": "ਇਸ ਦੀ ਥਾਂ ਨਵੀਂ ਸਮੱਸਿਆ ਦਰਜ ਹੈ",
       "supersededByDescription": "ਸਥਿਤੀ, ਵਿਸ਼ਲੇਸ਼ਣ ਅਤੇ ਸੁਧਾਰ ਦੇ ਵੇਰਵੇ ਦੇਖਣ ਲਈ ਮੌਜੂਦਾ ਰਿਕਾਰਡ 'ਤੇ ਟੈਪ ਕਰੋ।",
-      "dismissedBecause": "ਖਾਰਜ ਕੀਤਾ ਗਿਆ: {{reason}}।",
+      "dismissedOn": "ਖਾਰਜ ਹੋਣ ਦੀ ਤਾਰੀਖ",
+      "supersededOn": "ਨਵੇਂ ਨਤੀਜੇ ਨਾਲ ਬਦਲੇ ਜਾਣ ਦੀ ਤਾਰੀਖ",
       "severityLabel": "{{severity}} ਗੰਭੀਰਤਾ",
       "package": "ਪੈਕੇਜ",
       "vulnerableVersions": "ਸੁਰੱਖਿਆ ਖਾਮੀ ਵਾਲੇ ਵਰਜਨ",
@@ -1864,11 +1869,6 @@
       "viewAdvisory": "GitHub 'ਤੇ ਸੁਰੱਖਿਆ ਸੂਚਨਾ ਦੇਖੋ",
       "statusOpen": "ਖੁੱਲ੍ਹੀ",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ਠੀਕ ਕਰਨਾ ਸ਼ੁਰੂ ਹੋ ਗਿਆ ਹੈ",
-      "reasonNoBandwidth": "ਸਮਾਂ ਜਾਂ ਸਰੋਤ ਉਪਲਬਧ ਨਹੀਂ ਹਨ",
-      "reasonTolerableRisk": "ਜੋਖਮ ਸਵੀਕਾਰਯੋਗ ਹੈ",
-      "reasonInaccurate": "ਜਾਂਚ ਦਾ ਨਤੀਜਾ ਸਹੀ ਨਹੀਂ",
-      "reasonNotUsed": "ਸੁਰੱਖਿਆ ਖਾਮੀ ਵਾਲਾ ਕੋਡ ਵਰਤਿਆ ਨਹੀਂ ਜਾਂਦਾ",
       "reasonAfterReview": "ਸਮੀਖਿਆ ਤੋਂ ਬਾਅਦ"
     },
     "settingsOverview": {
@@ -2105,7 +2105,6 @@
       "closedOn": "{{date}} ਨੂੰ {{status}}",
       "deadlineNotSet": "ਸਮਾਂ ਸੀਮਾ ਨਿਰਧਾਰਤ ਨਹੀਂ",
       "noSlaDeadline": "ਕੋਈ SLA ਸਮਾਂ ਸੀਮਾ ਨਹੀਂ",
-      "dueOn": "ਆਖ਼ਰੀ ਮਿਤੀ: {{date}}",
       "overdueNow": "ਮਿਆਦ ਲੰਘੀ",
       "overdue_one": "ਮਿਆਦ ਤੋਂ {{count}} ਦਿਨ ਵੱਧ",
       "overdue_other": "{{count}} ਦਿਨ ਦੀ ਦੇਰੀ",
@@ -3857,6 +3856,7 @@
       "markSecret": "ਗੁਪਤ ਵਜੋਂ ਮਾਰਕ ਕਰੋ",
       "masked": "ਲੁਕਿਆ ਹੋਇਆ ਮੁੱਲ",
       "reveal": "ਮੁੱਲ ਪ੍ਰਗਟ ਕਰੋ",
+      "hide": "ਮੁੱਲ ਲੁਕਾਓ",
       "newValuePlaceholder": "ਨਵਾਂ ਗੁਪਤ ਮੁੱਲ ਦਰਜ ਕਰੋ",
       "valuePlaceholder": "ਗੁਪਤ ਮੁੱਲ (ਐਨਕ੍ਰਿਪਟ ਕੀਤਾ)"
     },
@@ -3995,7 +3995,7 @@
       "emptyDescription": "ਇੱਕ ਰੇਪੋ ਲਈ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰਨ ਵੇਲੇ ਇੱਕ ਪ੍ਰੋਫਾਈਲ ਨੂੰ ਆਪਣੇ ਆਪ ਲਾਗੂ ਕਰਨ ਲਈ ਇੱਕ ਡਿਫੌਲਟ ਜੋੜੋ।",
       "repo": "ਰਿਪੋਜ਼ਟਰੀ ਚੁਣੋ...",
       "profile": "ਪ੍ਰੋਫਾਈਲ ਚੁਣੋ",
-      "remove": "ਅਨਬੰਧ",
+      "removeForRepo": "{{repo}} ਅਨਬੰਧ ਕਰੋ",
       "search": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਖੋਜੋ…",
       "addedToast": "\"{{repo}}\" ਲਈ ਪੂਰਵ-ਨਿਰਧਾਰਤ ਪ੍ਰੋਫਾਈਲ ਸੈੱਟ ਕੀਤਾ ਗਿਆ",
       "addFailed": "ਪੂਰਵ-ਨਿਰਧਾਰਤ ਪ੍ਰੋਫਾਈਲ ਸੈੱਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",

@@ -182,8 +182,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     organizationId: ORGANIZATION_ID,
     privateRepoFullName: REPOSITORIES[0].full_name,
     publicRepoFullName: REPOSITORIES[1].full_name,
-    securityAgentDeepLink: `kiloapp:///security-agent/${ORGANIZATION_ID}/settings/repositories`,
-    codeReviewerDeepLink: `kiloapp:///code-reviewer/${ORGANIZATION_ID}/github/repos`,
-    repoBindingsDeepLink: `kiloapp:///profile-management/repo-bindings?organizationId=${ORGANIZATION_ID}`,
+    securityAgentDeepLink: `kiloapp:///(app)/security-agent/${ORGANIZATION_ID}/settings/repositories`,
+    codeReviewerDeepLink: `kiloapp:///(app)/code-reviewer/${ORGANIZATION_ID}/github/repos`,
+    repoBindingsDeepLink: `kiloapp:///(app)/profile-management/repo-bindings?organizationId=${ORGANIZATION_ID}`,
   };
 }

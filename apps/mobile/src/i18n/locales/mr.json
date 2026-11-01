@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "अलीकडील पुनरावलोकने नाहीत",
       "noRecentPrsDescription": "पुनरावलोकन सुरू करण्यासाठी वर एक लिंक पेस्ट करा — पुढच्या वेळी ती येथे दिसेल.",
-      "couldNotLoad": "लोड करता आले नाही.",
       "removeFromRecentsTitle": "अलीकडील यादीतून काढायचे?",
       "removeFromRecentsMessage": "हे पुनरावलोकन तुमच्या अलीकडील यादीतून काढले जाईल.",
       "removeRecentAccessibility": "{{repo}} अलीकडील यादीतून काढा",
@@ -834,7 +833,8 @@
     "liveUpdates": "लाइव्ह अपडेट",
     "liveUpdateSubtitle": "तुमच्या सूचनांमध्ये सक्रिय एजंट दाखवा",
     "push": "पुश",
-    "onDescription": "या डिव्हाइससाठी पुश सूचना चालू आहेत.",
+    "deviceTitle": "या डिव्हाइसवर पुश",
+    "onDescription": "सूचना खालील श्रेणींनुसार येतात.",
     "offDescription": "परवानगी किंवा डिव्हाइस नोंदणी बंद आहे.",
     "retryPermission": "सूचनांची परवानगी तपासण्याचा पुन्हा प्रयत्न करा",
     "enable": "सूचना चालू करा",
@@ -1533,6 +1533,9 @@
       "offAction": "पुनरावलोकन मेमरी बंद आहे. ती चालू करा, नंतर पुन्हा प्रयत्न करा."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "मर्ज रिक्वेस्टचा वैध URL टाका.",
+      "mergeRequestUrl": "मर्ज रिक्वेस्टचा URL",
+      "instructionsAtLimit": "सूचना {{max}} अक्षरांपुरता मर्यादित आहे",
       "title": "मागणीनुसार पुनरावलोकन",
       "invalidUrl": "पुल रिक्वेस्टचा वैध URL टाका.",
       "couldNotCheckProviderStatus": "सेवा पुरवठादाराची स्थिती तपासता आली नाही.",
@@ -1783,6 +1786,7 @@
       "lastSynced": "शेवटचे सिंक: {{time}}",
       "manageRepositories": "रिपॉझिटरी व्यवस्थापित करा",
       "notYetSynced": "अद्याप सिंक केलेले नाही",
+      "priorityFindingsPending": "पहिल्या सिंकनंतर प्राधान्याचे निष्कर्ष दिसतील.",
       "refreshFailed": "रिफ्रेश करता आले नाही — शेवटच्या सिंकमधील डेटा दाखवत आहे.",
       "settings": "सेटिंग्ज",
       "syncNow": "आता सिंक करा",
@@ -1841,7 +1845,8 @@
     "findingDetails": {
       "supersededBy": "या निष्कर्षाची जागा नवीन निष्कर्षाने घेतली आहे",
       "supersededByDescription": "स्थिती, विश्लेषण आणि निराकरण पाहण्यासाठी सध्याची नोंद उघडण्याकरिता टॅप करा.",
-      "dismissedBecause": "फेटाळले. कारण: {{reason}}.",
+      "dismissedOn": "दुर्लक्षित केल्याचा दिनांक",
+      "supersededOn": "नव्या निष्कर्षाने बदलल्याचा दिनांक",
       "severityLabel": "{{severity}} तीव्रता",
       "package": "पॅकेज",
       "vulnerableVersions": "असुरक्षित आवृत्त्या",
@@ -1858,11 +1863,6 @@
       "viewAdvisory": "GitHub वर सुरक्षा सूचना पाहा",
       "statusOpen": "उघडा",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "दुरुस्ती आधीच सुरू आहे",
-      "reasonNoBandwidth": "कामासाठी वेळ उपलब्ध नाही",
-      "reasonTolerableRisk": "जोखीम स्वीकारण्याजोगी आहे",
-      "reasonInaccurate": "निष्कर्ष अचूक नाही",
-      "reasonNotUsed": "असुरक्षित कोड वापरला जात नाही",
       "reasonAfterReview": "पुनरावलोकनानंतर"
     },
     "settingsOverview": {
@@ -2099,7 +2099,6 @@
       "closedOn": "{{date}} रोजी {{status}}",
       "deadlineNotSet": "मुदत निश्चित नाही",
       "noSlaDeadline": "SLA मुदत नाही",
-      "dueOn": "मुदत {{date}}",
       "overdueNow": "मुदत उलटली",
       "overdue_one": "मुदत उलटून {{count}} दिवस झाला",
       "overdue_other": "मुदत संपून {{count}} दिवस झाले",
@@ -3851,6 +3850,7 @@
       "markSecret": "गुप्त म्हणून चिन्हांकित करा",
       "masked": "लपलेले मूल्य",
       "reveal": "मूल्य प्रकट करा",
+      "hide": "मूल्य लपवा",
       "newValuePlaceholder": "नवीन गुप्त मूल्य प्रविष्ट करा",
       "valuePlaceholder": "गुप्त मूल्य (एन्क्रिप्ट केलेले)"
     },
@@ -3989,7 +3989,7 @@
       "emptyDescription": "रेपोसाठी सत्र सुरू करताना प्रोफाइल स्वयंचलितपणे लागू करण्यासाठी डीफॉल्ट जोडा.",
       "repo": "भांडार निवडा...",
       "profile": "प्रोफाइल निवडा",
-      "remove": "अनबाइंड करा",
+      "removeForRepo": "{{repo}} अनबाइंड करा",
       "search": "भांडार शोधा…",
       "addedToast": "\"{{repo}}\" साठी डीफॉल्ट प्रोफाइल सेट केले",
       "addFailed": "डीफॉल्ट प्रोफाइल सेट करू शकलो नाही",

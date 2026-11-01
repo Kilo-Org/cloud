@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "මෑත සමාලෝචන නොමැත",
       "noRecentPrsDescription": "සමාලෝචනයක් අරඹන්න ඉහත සබැඳියක් අලවා — ඊළඟ වරට මෙතැනින් පෙනේ.",
-      "couldNotLoad": "පූරණය කිරීමට නොහැකි විය.",
       "removeFromRecentsTitle": "මෑත ඉල්ලීම් ලැයිස්තුවෙන් ඉවත් කරන්නද?",
       "removeFromRecentsMessage": "මෙම සමාලෝචනය ඔබේ මෑත සමාලෝචන ලැයිස්තුවෙන් ඉවත් කෙරේ.",
       "removeRecentAccessibility": "මෑත ඉල්ලීම් ලැයිස්තුවෙන් {{repo}} ඉවත් කරන්න",
@@ -834,7 +833,8 @@
     "liveUpdates": "සජීවී යාවත්කාලීන",
     "liveUpdateSubtitle": "ඔබේ දැනුම්දීම්වල සක්‍රීය නියෝජිතයන් පෙන්වන්න",
     "push": "පුෂ් දැනුම්දීම්",
-    "onDescription": "මෙම උපාංගයේ පුෂ් දැනුම්දීම් සක්‍රීයයි.",
+    "deviceTitle": "මෙම උපාංගයේ පුෂ් දැනුම්දීම්",
+    "onDescription": "දැනුම්දීම් පහත වර්ග අනුව පැමිණේ.",
     "offDescription": "අවසරය හෝ උපාංග ලියාපදිංචිය අක්‍රීයයි.",
     "retryPermission": "දැනුම්දීම් අවසරය පරීක්ෂා කිරීමට නැවත උත්සාහ කරන්න",
     "enable": "දැනුම්දීම් සක්‍රීය කරන්න",
@@ -1533,6 +1533,9 @@
       "offAction": "සමාලෝචන මතකය අක්‍රීයයි. එය සක්‍රීය කර නැවත උත්සාහ කරන්න."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "වලංගු මර්ජ ඉල්ලීම URL එකක් ඇතුළත් කරන්න.",
+      "mergeRequestUrl": "මර්ජ ඉල්ලීම සඳහා URL",
+      "instructionsAtLimit": "උපදෙස් අක්ෂර {{max}}කට සීමා වේ",
       "title": "ඔබ විසින් ආරම්භ කරන සමාලෝචනය",
       "invalidUrl": "වලංගු PR URL එකක් ඇතුළත් කරන්න.",
       "couldNotCheckProviderStatus": "සැපයුම්කරුගේ තත්ත්වය පරීක්ෂා කළ නොහැකි විය.",
@@ -1786,6 +1789,7 @@
       "lastSynced": "අවසන් වරට සමමුහුර්ත කළේ {{time}}",
       "manageRepositories": "ගබඩා කළමනාකරණය කරන්න",
       "notYetSynced": "තවම සමමුහුර්ත කර නැත",
+      "priorityFindingsPending": "පළමු සමමුහුර්ත කිරීමෙන් පසු ප්‍රමුඛතා සොයාගැනීම් මෙහි දිස් වේ.",
       "refreshFailed": "නැවත පූරණය කළ නොහැකි විය. අවසන් වරට සමමුහුර්ත කළ දත්ත පෙන්වයි.",
       "settings": "සැකසුම්",
       "syncNow": "දැන් සමමුහුර්ත කරන්න",
@@ -1847,7 +1851,8 @@
     "findingDetails": {
       "supersededBy": "නව සොයාගැනීමකින් ප්‍රතිස්ථාපනය කර ඇත",
       "supersededByDescription": "තත්ත්වය, විශ්ලේෂණය සහ පිළියම් යෙදීම පිළිබඳ විස්තර බැලීමට වත්මන් වාර්තාව තට්ටු කර විවෘත කරන්න.",
-      "dismissedBecause": "ඉවතලා ඇත්තේ {{reason}} නිසාය.",
+      "dismissedOn": "ඉවතලා ඇති දිනය",
+      "supersededOn": "ප්‍රතිස්ථාපනය වී ඇති දිනය",
       "severityLabel": "බරපතළකම: {{severity}}",
       "package": "පැකේජය",
       "vulnerableVersions": "දුර්වලතා සහිත අනුවාද",
@@ -1864,11 +1869,6 @@
       "viewAdvisory": "GitHub හි ආරක්ෂක නිවේදනය බලන්න",
       "statusOpen": "විවෘත",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "නිවැරදි කිරීමක් දැනටමත් ආරම්භ වී ඇත",
-      "reasonNoBandwidth": "කාලය හෝ සම්පත් නැත",
-      "reasonTolerableRisk": "අවදානම පිළිගත හැකිය",
-      "reasonInaccurate": "හඳුනාගත් ගැටලුව නිවැරදි නොවේ",
-      "reasonNotUsed": "අනාරක්ෂිත කේතය භාවිත නොවේ",
       "reasonAfterReview": "සමාලෝචනයෙන් පසුව"
     },
     "settingsOverview": {
@@ -2105,7 +2105,6 @@
       "closedOn": "{{date}} දින {{status}}",
       "deadlineNotSet": "නියමිත කාලය සකසා නොමැත",
       "noSlaDeadline": "SLA අවසන් දිනයක් නැත",
-      "dueOn": "{{date}} දින නියමිතයි",
       "overdueNow": "ප්‍රමාදයි",
       "dueToday": "අද නියමිතයි",
       "dueTomorrow": "හෙට නියමිතයි",
@@ -3857,6 +3856,7 @@
       "markSecret": "රහසක් ලෙස සලකුණු කරන්න",
       "masked": "සැඟවුණු අගය",
       "reveal": "වටිනාකම හෙළි කරන්න",
+      "hide": "වටිනාකම සඟවන්න",
       "newValuePlaceholder": "නව රහස් අගයක් ඇතුළත් කරන්න",
       "valuePlaceholder": "රහස් අගය (සංකේතනය කළ)"
     },
@@ -3995,7 +3995,7 @@
       "emptyDescription": "repo සඳහා සැසි ආරම්භ කරන විට පැතිකඩක් ස්වයංක්‍රීයව යෙදීමට පෙරනිමියක් එක් කරන්න.",
       "repo": "ගබඩාව තෝරන්න...",
       "profile": "පැතිකඩ තෝරන්න",
-      "remove": "නොබැඳීම",
+      "removeForRepo": "{{repo}} බැඳීම ඉවත් කිරීම",
       "search": "ගබඩාවන් සොයන්න...",
       "addedToast": "\"{{repo}}\" සඳහා පෙරනිමි පැතිකඩ සකසා ඇත",
       "addFailed": "පෙරනිමි පැතිකඩ සැකසීමට නොහැකි විය",

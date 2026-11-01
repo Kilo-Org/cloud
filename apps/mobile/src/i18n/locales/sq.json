@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Asnjë rishikim i fundit",
       "noRecentPrsDescription": "Ngjit një lidhje më sipër për të filluar një rishikim — do të shfaqet këtu herën tjetër.",
-      "couldNotLoad": "Ngarkimi dështoi.",
       "removeFromRecentsTitle": "Të hiqet nga lista e fundit?",
       "removeFromRecentsMessage": "Ky rishikim do të hiqet nga lista jote e të fundmëve.",
       "removeRecentAccessibility": "Hiq {{repo}} nga lista e fundit",
@@ -834,7 +833,8 @@
     "liveUpdates": "Përditësimet në kohë reale",
     "liveUpdateSubtitle": "Shfaq agjentët aktivë në njoftimet e tua",
     "push": "Njoftimet e drejtpërdrejta",
-    "onDescription": "Njoftimet e drejtpërdrejta janë të aktivizuara për këtë pajisje.",
+    "deviceTitle": "Njoftimet e drejtpërdrejta në këtë pajisje",
+    "onDescription": "Sinjalizimet ndjekin kategoritë më poshtë.",
     "offDescription": "Leja për njoftime ose regjistrimi i pajisjes është i çaktivizuar.",
     "retryPermission": "Kontrollo përsëri lejen për njoftime",
     "enable": "Aktivizo njoftimet",
@@ -1533,6 +1533,9 @@
       "offAction": "Kujtesa e shqyrtimit është e çaktivizuar. Aktivizoje dhe pastaj provo përsëri."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "Shkruaj një URL të vlefshme për kërkesën e integrimit.",
+      "mergeRequestUrl": "URL-ja e kërkesës së integrimit",
+      "instructionsAtLimit": "Udhëzimet janë të kufizuara në {{max}} karaktere.",
       "title": "Shqyrtimi manual",
       "invalidUrl": "Shkruaj një URL të vlefshme për PR.",
       "couldNotCheckProviderStatus": "Nuk u kontrollua statusi i ofruesit.",
@@ -1783,6 +1786,7 @@
       "lastSynced": "Sinkronizimi i fundit: {{time}}",
       "manageRepositories": "Menaxho depot",
       "notYetSynced": "Ende pa u sinkronizuar",
+      "priorityFindingsPending": "Gjetjet me përparësi do të shfaqen pas sinkronizimit të parë.",
       "refreshFailed": "Nuk u rifreskua — po shfaqen të dhënat e sinkronizimit të fundit.",
       "settings": "Cilësimet",
       "syncNow": "Sinkronizo tani",
@@ -1841,7 +1845,8 @@
     "findingDetails": {
       "supersededBy": "E zëvendësuar nga një gjetje aktuale",
       "supersededByDescription": "Prek për të hapur regjistrimin aktual dhe për të parë statusin, analizën dhe korrigjimin.",
-      "dismissedBecause": "U hodh poshtë {{reason}}.",
+      "dismissedOn": "E hedhur poshtë më",
+      "supersededOn": "E zëvendësuar më",
       "severityLabel": "Niveli i rrezikut: {{severity}}",
       "package": "Paketa",
       "vulnerableVersions": "Versionet me cenueshmëri",
@@ -1858,11 +1863,6 @@
       "viewAdvisory": "Shiko njoftimin e sigurisë në GitHub",
       "statusOpen": "Hapur",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "rregullimi ka filluar tashmë",
-      "reasonNoBandwidth": "mungojnë burimet për ta trajtuar",
-      "reasonTolerableRisk": "rreziku është i pranueshëm",
-      "reasonInaccurate": "gjetja është e pasaktë",
-      "reasonNotUsed": "kodi me dobësi sigurie nuk përdoret",
       "reasonAfterReview": "pas shqyrtimit"
     },
     "settingsOverview": {
@@ -1922,7 +1922,7 @@
       "highDescription": "Rrezik për ekspozim të konsiderueshëm të të dhënave.",
       "mediumDescription": "Ndikim i kufizuar ose kushte specifike.",
       "lowDescription": "Ndikim minimal në siguri.",
-      "invalidDayCount": "shkruaj një numër të plotë ditësh nga 1 deri në 365.",
+      "invalidDayCount": "Shkruaj një numër të plotë ditësh nga 1 deri në 365.",
       "remediationDeadlineA11y": "Afati i korrigjimit në ditë për nivelin {{label}}",
       "enterWholeNumber": "Shkruaj një numër të plotë nga 1 deri në 365",
       "permissionNote": "Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund t'i ndryshojnë këto cilësime.",
@@ -2099,7 +2099,6 @@
       "closedOn": "{{status}} më {{date}}",
       "deadlineNotSet": "Afati nuk është caktuar",
       "noSlaDeadline": "Pa afat SLA",
-      "dueOn": "Afati më {{date}}",
       "overdueNow": "Me afat të kaluar",
       "overdue_one": "{{count}} ditë me vonesë",
       "overdue_other": "{{count}} ditë me vonesë",
@@ -2158,7 +2157,7 @@
       "generic": "Veprimi në radhë dështoi. Provoje përsëri veprimin."
     },
     "analysisMode": {
-      "auto": "Automatik",
+      "auto": "Automatike",
       "shallow": "Sipërfaqësore",
       "deep": "E thellë"
     }
@@ -3851,6 +3850,7 @@
       "markSecret": "Shënoni si sekret",
       "masked": "Vlera e fshehur",
       "reveal": "Zbuloni vlerën",
+      "hide": "Fshihni vlerën",
       "newValuePlaceholder": "Vendos një vlerë të re sekrete",
       "valuePlaceholder": "Vlerë sekrete (e kriptuar)"
     },
@@ -3989,7 +3989,7 @@
       "emptyDescription": "Shto një parazgjedhje për të aplikuar automatikisht një profil kur nis seancat për një depo.",
       "repo": "Zgjidhni depo…",
       "profile": "Zgjidhni profilin",
-      "remove": "Çlidhe",
+      "removeForRepo": "Çlidhe {{repo}}",
       "search": "Kërko në depo…",
       "addedToast": "Profili i parazgjedhur është caktuar për \"{{repo}}\"",
       "addFailed": "Profili i parazgjedhur nuk mund të caktohet",

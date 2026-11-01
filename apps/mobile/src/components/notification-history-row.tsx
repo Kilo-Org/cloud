@@ -33,7 +33,10 @@ export function HistoryRowView({
         <Text className="flex-1 text-sm font-medium" numberOfLines={2}>
           {copy.title}
         </Text>
-        <Text variant="muted" className="text-xs">
+        {/* The title's `text-sm` line box is 1.25rem tall; the time takes the
+            same height, so both first lines share one centre while a two-line
+            title keeps its own lines. */}
+        <Text variant="muted" className="text-xs leading-[1.25rem]">
           {timeAgo(parseTimestamp(row.createdAt), undefined, now)}
         </Text>
       </View>

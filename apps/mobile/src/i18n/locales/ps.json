@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "وروستۍ بیاکتنې نشته",
       "noRecentPrsDescription": "د بیاکتنې پیلولو لپاره پورته لینک ونښلوئ — بل ځل به دلته ښکاره شي.",
-      "couldNotLoad": "بار نه شو.",
       "removeFromRecentsTitle": "له وروستي لړلیک څخه لرې شي؟",
       "removeFromRecentsMessage": "دا بیاکتنه به ستاسو له وروستي لړلیک څخه لرې شي.",
       "removeRecentAccessibility": "{{repo}} له وروستي لړلیک څخه لرې کړئ",
@@ -834,7 +833,8 @@
     "liveUpdates": "ژوندي تازه معلومات",
     "liveUpdateSubtitle": "فعال ایجنټونه په خپلو خبرتیاوو کې وښیئ",
     "push": "پش خبرتیاوې",
-    "onDescription": "د دې وسیلې لپاره پش خبرتیاوې فعالې دي.",
+    "deviceTitle": "په دې وسیله پش خبرتیاوې",
+    "onDescription": "خبرتیاوې د لاندې کټګوریو له مخې دي.",
     "offDescription": "اجازه نه ده ورکړل شوې یا وسیله نه ده ثبت شوې.",
     "retryPermission": "د خبرتیاوو د اجازې د کتلو بیا هڅه وکړئ",
     "enable": "خبرتیاوې فعالې کړئ",
@@ -1533,6 +1533,9 @@
       "offAction": "د بیاکتنې حافظه غیرفعاله ده. فعاله یې کړئ، بیا هڅه وکړئ."
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "د یوځای کولو غوښتنې یو معتبر URL ولیکئ.",
+      "mergeRequestUrl": "د یوځای کولو غوښتنې پته (URL)",
+      "instructionsAtLimit": "لارښوونې تر {{max}} توري پورې محدودې دي.",
       "title": "لاسي بیاکتنه",
       "invalidUrl": "د PR یو معتبر URL ولیکئ.",
       "couldNotCheckProviderStatus": "د خدمت چمتو کوونکي حالت و نه کتل شو.",
@@ -1783,6 +1786,7 @@
       "lastSynced": "وروستی هممهاله کېدل: {{time}}",
       "manageRepositories": "ذخیرې مدیریت کړئ",
       "notYetSynced": "تر اوسه هممهاله شوي نه دي",
+      "priorityFindingsPending": "لومړیتوب لرونکې موندنې به د لومړي هممهاله کولو وروسته ښکاره شي۔",
       "refreshFailed": "معلومات تازه نه شول — وروستي هممهاله شوي معلومات ښودل کېږي.",
       "settings": "امستنې",
       "syncNow": "اوس هممهاله کړئ",
@@ -1841,7 +1845,8 @@
     "findingDetails": {
       "supersededBy": "اوسنۍ موندنه یې ځایناستې ده",
       "supersededByDescription": "د حالت، تحلیل او اصلاح د لیدلو لپاره پر اوسني ریکارډ ټک وکړئ.",
-      "dismissedBecause": "له پامه غورځول شوې ده، ځکه چې {{reason}}.",
+      "dismissedOn": "د پامه غورځولو نېټه",
+      "supersededOn": "د ځای نیولو نېټه",
       "severityLabel": "شدت: {{severity}}",
       "package": "بسته",
       "vulnerableVersions": "د امنیتي نیمګړتیا لرونکې نسخې",
@@ -1858,11 +1863,6 @@
       "viewAdvisory": "په GitHub کې امنیتي خبرتیا وګورئ",
       "statusOpen": "خلاص",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "سمون لا دمخه پیل شوی",
-      "reasonNoBandwidth": "کاري ظرفیت نشته",
-      "reasonTolerableRisk": "خطر د زغملو وړ دی",
-      "reasonInaccurate": "موندنه ناسمه ده",
-      "reasonNotUsed": "زیان منونکی کوډ نه کارول کېږي",
       "reasonAfterReview": "له بیاکتنې وروسته"
     },
     "settingsOverview": {
@@ -2099,7 +2099,6 @@
       "closedOn": "په {{date}} {{status}}",
       "deadlineNotSet": "وروستۍ نېټه نه ده ټاکل شوې",
       "noSlaDeadline": "د SLA وروستۍ نېټه نشته",
-      "dueOn": "وروستۍ نېټه: {{date}}",
       "overdueNow": "له مهلته تېر",
       "overdue_one": "{{count}} ورځ له مهلته تېر",
       "overdue_other": "{{count}} ورځې له ټاکلي وخت تېرې دي",
@@ -3851,6 +3850,7 @@
       "markSecret": "د پټ په توګه نښه کړئ",
       "masked": "پټ ارزښت",
       "reveal": "ارزښت څرګند کړئ",
+      "hide": "ارزښت پټ کړئ",
       "newValuePlaceholder": "نوی پټ ارزښت ولیکئ",
       "valuePlaceholder": "پټ ارزښت (کوډ شوی)"
     },
@@ -3989,7 +3989,7 @@
       "emptyDescription": "د ریپو لپاره ناستې پیل کولو پرمهال په اتوماتيک ډول پروفایل پلي کولو لپاره ډیفالټ اضافه کړئ.",
       "repo": "ذخیره غوره کړئ…",
       "profile": "پروفایل وټاکئ",
-      "remove": "تړل",
+      "removeForRepo": "{{repo}} نه تړل",
       "search": "ذخیره لټونه…",
       "addedToast": "ډیفالټ پروفایل د \"{{repo}}\" لپاره ټاکل شوی",
       "addFailed": "ډیفالټ پروفایل نشي تنظیمولی",

@@ -11,6 +11,7 @@ import { ContextControl } from '@/components/context-control';
 import { EmptyState } from '@/components/empty-state';
 import { PrLinkPlaceholder } from '@/components/pr-review/pr-link-placeholder';
 import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
+import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { selectRecentPrRowState } from '@/lib/pr-review/recent-pr-row-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -19,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { providerPrRefLabel, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import {
@@ -204,20 +205,36 @@ export function PrReviewEntryScreen() {
                 <DirectionalChevronRight size={16} color={colors.mutedForeground} />
               </Pressable>
               {rowState.failed ? (
-                <View className="flex-row items-center justify-between gap-3 border-t border-hair-soft px-3 py-2">
+                // The footer names the item that failed, not just "couldn't
+                // load": the row stands for one pull/merge request, so the
+                // provider's own noun says what to retry. The retry keeps the
+                // link treatment — a bordered control beside the card's plain
+                // lines read as a piece of another surface — while its own node
+                // still carries the state-action box, because `hitSlop` widens
+                // the touch region without enlarging the rect an audit reads.
+                <View className="flex-row items-center justify-between gap-3 border-t border-hair-soft px-3 py-1">
                   <Text variant="muted" className="min-w-0 flex-1 text-xs">
-                    {t('prReview.entry.couldNotLoad')}
+                    {t('common.couldNotOpen', {
+                      label: t(providerPrNounKey(entry.platform ?? 'github')),
+                    })}
                   </Text>
                   <Button
-                    size="sm"
-                    variant="outline"
-                    className={STATE_ACTION_CLASS}
+                    size="action"
+                    variant="link"
+                    className="px-0"
+                    hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}
                     onPress={() => {
                       handleRecentPress(entry);
                     }}
                     accessibilityLabel={t('common.retry')}
                   >
-                    <Text>{t('common.retry')}</Text>
+                    {/* The card's own ink, not the link accent: this retry sits
+                        in a footer under a row's plain lines, and the accent is
+                        the loudest colour the dark card can carry, so it read
+                        as a second primary action over the screen's own Open
+                        button. The link affordance (the press underline) and
+                        the action box stay. */}
+                    <Text className="text-foreground">{t('common.retry')}</Text>
                   </Button>
                 </View>
               ) : null}
@@ -229,7 +246,7 @@ export function PrReviewEntryScreen() {
   }
 
   const pasteBlock = (
-    <View className="gap-3">
+    <View className="gap-4">
       <View className="flex-row items-center gap-2">
         <View
           className="min-h-14 min-w-0 flex-1 flex-row items-center rounded-md border border-border bg-card"
@@ -287,6 +304,20 @@ export function PrReviewEntryScreen() {
           <ClipboardIcon size={18} color={colors.mutedForeground} />
         </Pressable>
       </View>
+      <Button
+        disabled={linkState !== 'valid'}
+        onPress={handleSubmit}
+        accessibilityLabel={t('prReview.entry.openAccessibility')}
+      >
+        <Text>{t('prReview.entry.open')}</Text>
+      </Button>
+      {/* The invalid-link notice is the field's own error, but its line sits
+          under the field's action, not between the field and Open: a line
+          there pushed Open 38.5 dp away from the field — nearly twice the
+          20.5 dp that separates the whole form from the unrelated INBOX
+          section — so the field and its button stopped reading as one group.
+          The line stays reserved (an invisible copy holds its height) so a
+          pasted non-PR link never shifts the form. */}
       <View>
         <Text
           className="text-sm opacity-0"
@@ -302,13 +333,6 @@ export function PrReviewEntryScreen() {
           />
         </View>
       </View>
-      <Button
-        disabled={linkState !== 'valid'}
-        onPress={handleSubmit}
-        accessibilityLabel={t('prReview.entry.openAccessibility')}
-      >
-        <Text>{t('prReview.entry.open')}</Text>
-      </Button>
     </View>
   );
 

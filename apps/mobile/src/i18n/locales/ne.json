@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "हालैका समीक्षाहरू छैनन्",
       "noRecentPrsDescription": "समीक्षा सुरु गर्न माथि लिङ्क टाँस्नुहोस् — यो अर्को पटक यहाँ देखिनेछ।",
-      "couldNotLoad": "लोड गर्न सकिएन।",
       "removeFromRecentsTitle": "हालैको सूचीबाट हटाउने?",
       "removeFromRecentsMessage": "यो समीक्षा तपाईंको हालैको सूचीबाट हटाइनेछ।",
       "removeRecentAccessibility": "{{repo}} लाई हालैको सूचीबाट हटाउनुहोस्",
@@ -834,7 +833,8 @@
     "liveUpdates": "लाइभ अद्यावधिकहरू",
     "liveUpdateSubtitle": "आफ्ना सूचनाहरूमा सक्रिय एजेन्टहरू देखाउनुहोस्",
     "push": "पुश सूचनाहरू",
-    "onDescription": "यो यन्त्रमा पुश सूचनाहरू चालू छन्।",
+    "deviceTitle": "यो यन्त्रमा पुश सूचनाहरू",
+    "onDescription": "तलका श्रेणीहरूअनुसार सूचनाहरू आउँछन्।",
     "offDescription": "अनुमति वा यन्त्र दर्ता बन्द छ।",
     "retryPermission": "सूचना अनुमति जाँच्न पुनः प्रयास गर्नुहोस्",
     "enable": "सूचनाहरू चालू गर्नुहोस्",
@@ -1533,6 +1533,9 @@
       "offAction": "समीक्षा मेमोरी बन्द छ। यसलाई चालु गर्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।"
     },
     "manualReview": {
+      "invalidMergeRequestUrl": "मर्ज रिक्वेस्टको मान्य URL लेख्नुहोस्।",
+      "mergeRequestUrl": "मर्ज रिक्वेस्टको URL",
+      "instructionsAtLimit": "निर्देशनहरू {{max}} अक्षरहरूमा सीमित छ",
       "title": "म्यानुअल समीक्षा",
       "invalidUrl": "पुल रिक्वेस्टको मान्य URL लेख्नुहोस्।",
       "couldNotCheckProviderStatus": "प्रदायकको स्थिति जाँच्न सकिएन।",
@@ -1783,6 +1786,7 @@
       "lastSynced": "पछिल्लो सिंक: {{time}}",
       "manageRepositories": "रिपोजिटरीहरू व्यवस्थापन गर्नुहोस्",
       "notYetSynced": "अहिलेसम्म सिंक भएको छैन",
+      "priorityFindingsPending": "पहिलो सिंक भएपछि प्राथमिकताका सुरक्षा समस्याहरू देखिनेछन्।",
       "refreshFailed": "रिफ्रेस गर्न सकिएन — पछिल्लो पटक सिंक भएको डेटा देखाइएको छ।",
       "settings": "सेटिङ",
       "syncNow": "अहिले सिंक गर्नुहोस्",
@@ -1841,7 +1845,8 @@
     "findingDetails": {
       "supersededBy": "हालको सुरक्षा समस्याले प्रतिस्थापन गरेको",
       "supersededByDescription": "स्थिति, विश्लेषण र सुधार हेर्न हालको अभिलेख खोल्न ट्याप गर्नुहोस्।",
-      "dismissedBecause": "{{reason}} खारेज गरियो।",
+      "dismissedOn": "खारेजी मिति",
+      "supersededOn": "प्रतिस्थापन मिति",
       "severityLabel": "गम्भीरता: {{severity}}",
       "package": "प्याकेज",
       "vulnerableVersions": "सुरक्षा कमजोरी भएका संस्करणहरू",
@@ -1858,11 +1863,6 @@
       "viewAdvisory": "GitHub मा सुरक्षा सूचना हेर्नुहोस्",
       "statusOpen": "खुला",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "सुधार सुरु भइसकेको छ",
-      "reasonNoBandwidth": "समय वा जनशक्ति छैन",
-      "reasonTolerableRisk": "जोखिम सहनयोग्य छ",
-      "reasonInaccurate": "भेटिएको समस्याको विवरण गलत छ",
-      "reasonNotUsed": "सुरक्षा कमजोरी भएको कोड प्रयोगमा छैन",
       "reasonAfterReview": "समीक्षापछि"
     },
     "settingsOverview": {
@@ -2099,7 +2099,6 @@
       "closedOn": "{{date}} मा {{status}}",
       "deadlineNotSet": "म्याद तोकिएको छैन",
       "noSlaDeadline": "SLA म्याद छैन",
-      "dueOn": "म्याद: {{date}}",
       "overdueNow": "म्याद नाघेको",
       "overdue_one": "म्याद नाघेको {{count}} दिन",
       "overdue_other": "म्याद नाघेको {{count}} दिन",
@@ -3851,6 +3850,7 @@
       "markSecret": "गोप्य रूपमा चिन्ह लगाउनुहोस्",
       "masked": "लुकेको मूल्य",
       "reveal": "मूल्य प्रकट गर्नुहोस्",
+      "hide": "मूल्य लुकाउनुहोस्",
       "newValuePlaceholder": "नयाँ गोप्य मान प्रविष्ट गर्नुहोस्",
       "valuePlaceholder": "गोप्य मान (इन्क्रिप्ट गरिएको)"
     },
@@ -3989,7 +3989,7 @@
       "emptyDescription": "रिपोको लागि सत्रहरू सुरु गर्दा स्वचालित रूपमा प्रोफाइल लागू गर्न पूर्वनिर्धारित थप्नुहोस्।",
       "repo": "भण्डार चयन गर्नुहोस्...",
       "profile": "प्रोफाइल चयन गर्नुहोस्",
-      "remove": "अनबाइन्ड गर्नुहोस्",
+      "removeForRepo": "{{repo}} अनबाइन्ड गर्नुहोस्",
       "search": "भण्डारहरू खोज्नुहोस्...",
       "addedToast": "\"{{repo}}\" को लागि पूर्वनिर्धारित प्रोफाइल सेट",
       "addFailed": "पूर्वनिर्धारित प्रोफाइल सेट गर्न सकिएन",

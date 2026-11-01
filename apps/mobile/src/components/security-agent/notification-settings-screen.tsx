@@ -203,12 +203,13 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
         className="flex-1"
-        // The personal scope has no section heading above its two switches, so
-        // the gap between the groups carries the break there. The organization
-        // scope keeps the standard gap, next to its headings. The permission
-        // note above the groups only renders for a scope that cannot manage,
-        // which the personal scope never is.
-        contentContainerClassName={cn('px-6 pt-4', personal ? 'gap-12' : 'gap-6')}
+        // The personal scope has no section heading between its two switches, so
+        // the gap between the groups has to match the space above the first one,
+        // or the larger break reads as a heading that went missing. The
+        // organization scope keeps the standard gap, next to its headings. The
+        // permission note above the groups only renders for a scope that cannot
+        // manage, which the personal scope never is.
+        contentContainerClassName={cn('px-6 pt-4', personal ? 'gap-4' : 'gap-6')}
       >
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">

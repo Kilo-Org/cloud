@@ -7,7 +7,7 @@
  * forwards every RPC method to one of these.
  *
  * `dolthub_upstream` is stored verbatim. Lookups are case-insensitive:
- * `findByOwnerRepo` lowercases both the input and the stored value via
+ * `findAllByOwnerRepo` lowercases both the input and the stored value via
  * SQL `lower()` before comparing. This matches DoltHub's own slug
  * casing rules.
  */
@@ -153,11 +153,20 @@ export function countAll(sql: SqlStorage): number {
   return CountResult.parse(rows[0]).cnt;
 }
 
-export function findByOwnerRepo(
+/**
+ * Return every wasteland registered under `<owner>/<repo>`.
+ *
+ * Several wastelands may legitimately share one upstream (see
+ * `docs/admin-mode.md`), so the lookup can match more than one row.
+ * The order is the primary key, never `created_at`: registration and
+ * backfill recency must not influence which claimant a caller is
+ * offered.
+ */
+export function findAllByOwnerRepo(
   sql: SqlStorage,
   owner: string,
   repo: string
-): WastelandRegistryRecord | null {
+): WastelandRegistryRecord[] {
   // Compose `<owner>/<repo>` and compare case-insensitively. DoltHub
   // slugs use lowercase by convention but stored values may have
   // mixed case from older flows; using `lower()` on both sides keeps
@@ -169,12 +178,10 @@ export function findByOwnerRepo(
       /* sql */ `
         SELECT * FROM ${wasteland_registry}
         WHERE lower(${wasteland_registry.dolthub_upstream}) = lower(?)
-        ORDER BY ${wasteland_registry.created_at} DESC
-        LIMIT 1
+        ORDER BY ${wasteland_registry.wasteland_id} ASC
       `,
       [target]
     ),
   ];
-  if (rows.length === 0) return null;
-  return WastelandRegistryRecord.parse(rows[0]);
+  return WastelandRegistryRecord.array().parse(rows);
 }

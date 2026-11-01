@@ -104,13 +104,28 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
         owner: string;
         repo: string;
       };
-      output: {
-        wastelandId: string;
-        ownerType: 'org' | 'user';
-        ownerUserId: string | null;
-        organizationId: string | null;
-        name: string;
-      } | null;
+      output:
+        | {
+            status: 'resolved';
+            wasteland: {
+              wastelandId: string;
+              ownerType: 'org' | 'user';
+              ownerUserId: string | null;
+              organizationId: string | null;
+              name: string;
+            };
+          }
+        | {
+            status: 'ambiguous';
+            candidates: {
+              wastelandId: string;
+              ownerType: 'org' | 'user';
+              ownerUserId: string | null;
+              organizationId: string | null;
+              name: string;
+            }[];
+          }
+        | null;
       meta: object;
     }>;
     deleteWasteland: import('@trpc/server').TRPCMutationProcedure<{
@@ -1017,13 +1032,28 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
             owner: string;
             repo: string;
           };
-          output: {
-            wastelandId: string;
-            ownerType: 'org' | 'user';
-            ownerUserId: string | null;
-            organizationId: string | null;
-            name: string;
-          } | null;
+          output:
+            | {
+                status: 'resolved';
+                wasteland: {
+                  wastelandId: string;
+                  ownerType: 'org' | 'user';
+                  ownerUserId: string | null;
+                  organizationId: string | null;
+                  name: string;
+                };
+              }
+            | {
+                status: 'ambiguous';
+                candidates: {
+                  wastelandId: string;
+                  ownerType: 'org' | 'user';
+                  ownerUserId: string | null;
+                  organizationId: string | null;
+                  name: string;
+                }[];
+              }
+            | null;
           meta: object;
         }>;
         deleteWasteland: import('@trpc/server').TRPCMutationProcedure<{

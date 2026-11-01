@@ -118,17 +118,23 @@ class FakeSqlStorage {
     }
 
     if (/^select \* from/i.test(trimmed)) {
-      // Order-by created_at DESC is honoured for findByOwnerRepo.
-      const sorted = [...this.rows].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
-
       if (/lower\(.*dolthub_upstream\)/i.test(trimmed)) {
+        // Mirrors `ORDER BY wasteland_registry.wasteland_id ASC`: the
+        // slug lookup is ordered by primary key, never by created_at.
         const [target] = bindings as [string];
-        const match = sorted.find(
-          r =>
-            r.dolthub_upstream !== null && r.dolthub_upstream.toLowerCase() === target.toLowerCase()
-        );
-        return new FakeCursor(match ? [match as unknown as Record<string, unknown>] : []);
+        const matches = this.rows
+          .filter(
+            r =>
+              r.dolthub_upstream !== null &&
+              r.dolthub_upstream.toLowerCase() === target.toLowerCase()
+          )
+          .sort((a, b) => (a.wasteland_id < b.wasteland_id ? -1 : 1));
+        return new FakeCursor(matches as unknown as Record<string, unknown>[]);
       }
+
+      // Plain `SELECT * ... ORDER BY created_at DESC` (listAll and the
+      // owner-scoped listings).
+      const sorted = [...this.rows].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
 
       if (/owner_type\s*=\s*'user'/i.test(trimmed)) {
         const [user_id] = bindings as [string];
@@ -184,13 +190,13 @@ describe('registry-ops', () => {
     });
   });
 
-  describe('register + findByOwnerRepo', () => {
+  describe('register + findAllByOwnerRepo', () => {
     it('finds a registered wasteland by owner/repo', () => {
       const sql = freshSql();
       registryOps.register(sql, input({ dolthub_upstream: 'octo/repo' }), '2025-01-01T00:00:00Z');
-      const found = registryOps.findByOwnerRepo(sql, 'octo', 'repo');
-      expect(found?.wasteland_id).toBe('wl-1');
-      expect(found?.dolthub_upstream).toBe('octo/repo');
+      const found = registryOps.findAllByOwnerRepo(sql, 'octo', 'repo');
+      expect(found.map(r => r.wasteland_id)).toEqual(['wl-1']);
+      expect(found[0]?.dolthub_upstream).toBe('octo/repo');
     });
 
     it('matches case-insensitively', () => {
@@ -200,20 +206,68 @@ describe('registry-ops', () => {
         input({ dolthub_upstream: 'OctoCat/Repo' }),
         '2025-01-01T00:00:00Z'
       );
-      expect(registryOps.findByOwnerRepo(sql, 'octocat', 'repo')?.wasteland_id).toBe('wl-1');
-      expect(registryOps.findByOwnerRepo(sql, 'OCTOCAT', 'REPO')?.wasteland_id).toBe('wl-1');
+      expect(registryOps.findAllByOwnerRepo(sql, 'octocat', 'repo').map(r => r.wasteland_id)).toEqual(
+        ['wl-1']
+      );
+      expect(registryOps.findAllByOwnerRepo(sql, 'OCTOCAT', 'REPO').map(r => r.wasteland_id)).toEqual(
+        ['wl-1']
+      );
     });
 
-    it('returns null for an unknown owner/repo', () => {
+    it('returns nothing for an unknown owner/repo', () => {
       const sql = freshSql();
       registryOps.register(sql, input({ dolthub_upstream: 'octo/repo' }), '2025-01-01T00:00:00Z');
-      expect(registryOps.findByOwnerRepo(sql, 'nope', 'missing')).toBeNull();
+      expect(registryOps.findAllByOwnerRepo(sql, 'nope', 'missing')).toEqual([]);
     });
 
     it('does not match wastelands without an upstream', () => {
       const sql = freshSql();
       registryOps.register(sql, input({ dolthub_upstream: null }), '2025-01-01T00:00:00Z');
-      expect(registryOps.findByOwnerRepo(sql, 'octo', 'repo')).toBeNull();
+      expect(registryOps.findAllByOwnerRepo(sql, 'octo', 'repo')).toEqual([]);
+    });
+
+    it('returns every claimant of a shared upstream in primary-key order', () => {
+      const sql = freshSql();
+      registryOps.register(
+        sql,
+        input({ wasteland_id: 'wl-b', owner_user_id: 'user-2' }),
+        '2025-06-01T00:00:00Z'
+      );
+      registryOps.register(
+        sql,
+        input({ wasteland_id: 'wl-a', owner_user_id: 'user-1' }),
+        '2025-01-01T00:00:00Z'
+      );
+
+      expect(registryOps.findAllByOwnerRepo(sql, 'octo', 'repo').map(r => r.wasteland_id)).toEqual([
+        'wl-a',
+        'wl-b',
+      ]);
+    });
+
+    it('keeps the order when a claimant is re-registered', () => {
+      const sql = freshSql();
+      registryOps.register(
+        sql,
+        input({ wasteland_id: 'wl-a', owner_user_id: 'user-1' }),
+        '2025-01-01T00:00:00Z'
+      );
+      registryOps.register(
+        sql,
+        input({ wasteland_id: 'wl-b', owner_user_id: 'user-2' }),
+        '2025-06-01T00:00:00Z'
+      );
+
+      registryOps.register(
+        sql,
+        input({ wasteland_id: 'wl-a', owner_user_id: 'user-1' }),
+        '2025-12-31T00:00:00Z'
+      );
+
+      expect(registryOps.findAllByOwnerRepo(sql, 'octo', 'repo').map(r => r.wasteland_id)).toEqual([
+        'wl-a',
+        'wl-b',
+      ]);
     });
   });
 
@@ -222,7 +276,7 @@ describe('registry-ops', () => {
       const sql = freshSql();
       registryOps.register(sql, input({ dolthub_upstream: 'octo/repo' }), '2025-01-01T00:00:00Z');
       registryOps.unregister(sql, 'wl-1');
-      expect(registryOps.findByOwnerRepo(sql, 'octo', 'repo')).toBeNull();
+      expect(registryOps.findAllByOwnerRepo(sql, 'octo', 'repo')).toEqual([]);
       expect(registryOps.countAll(sql)).toBe(0);
     });
   });
@@ -233,17 +287,17 @@ describe('registry-ops', () => {
       registryOps.register(sql, input({ dolthub_upstream: 'octo/old' }), '2025-01-01T00:00:00Z');
       registryOps.setDolthubUpstream(sql, 'wl-1', 'octo/new');
 
-      expect(registryOps.findByOwnerRepo(sql, 'octo', 'old')).toBeNull();
-      const next = registryOps.findByOwnerRepo(sql, 'octo', 'new');
-      expect(next?.wasteland_id).toBe('wl-1');
-      expect(next?.dolthub_upstream).toBe('octo/new');
+      expect(registryOps.findAllByOwnerRepo(sql, 'octo', 'old')).toEqual([]);
+      const next = registryOps.findAllByOwnerRepo(sql, 'octo', 'new');
+      expect(next.map(r => r.wasteland_id)).toEqual(['wl-1']);
+      expect(next[0]?.dolthub_upstream).toBe('octo/new');
     });
 
     it('clears the upstream when set to null', () => {
       const sql = freshSql();
       registryOps.register(sql, input({ dolthub_upstream: 'octo/repo' }), '2025-01-01T00:00:00Z');
       registryOps.setDolthubUpstream(sql, 'wl-1', null);
-      expect(registryOps.findByOwnerRepo(sql, 'octo', 'repo')).toBeNull();
+      expect(registryOps.findAllByOwnerRepo(sql, 'octo', 'repo')).toEqual([]);
       const all = registryOps.listAll(sql);
       expect(all).toHaveLength(1);
       expect(all[0]?.dolthub_upstream).toBeNull();

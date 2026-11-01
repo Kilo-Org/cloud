@@ -19,7 +19,7 @@ const LOG = '[WastelandRegistry.do]';
  * against the sub-module with a fake `SqlStorage`.
  *
  * `dolthub_upstream` is the `<owner>/<repo>` slug for the upstream
- * DoltHub repo. It powers `findByOwnerRepo` so the apps/web routes
+ * DoltHub repo. It powers `findAllByOwnerRepo` so the apps/web routes
  * `/wasteland/:owner/:repo` can resolve to a `wastelandId` without an
  * extra round-trip per UUID-keyed procedure call.
  */
@@ -107,13 +107,15 @@ export class WastelandRegistryDO extends DurableObject<Env> {
   }
 
   /**
-   * Look up a wasteland by its `<owner>/<repo>` upstream slug. Returns
-   * the registry record (including ownership fields) so callers can
-   * decide how to authorise the lookup. Comparison is case-insensitive.
+   * Look up every wasteland registered under a `<owner>/<repo>`
+   * upstream slug. Returns all matching registry records (including
+   * ownership fields) so the caller can decide which claimants it may
+   * access; a slug can legitimately have several (shared upstreams).
+   * Comparison is case-insensitive and the order is the primary key.
    */
-  async findByOwnerRepo(owner: string, repo: string): Promise<WastelandRegistryRecord | null> {
+  async findAllByOwnerRepo(owner: string, repo: string): Promise<WastelandRegistryRecord[]> {
     await this.ensureInitialized();
-    return registryOps.findByOwnerRepo(this.sql, owner, repo);
+    return registryOps.findAllByOwnerRepo(this.sql, owner, repo);
   }
 
   /**

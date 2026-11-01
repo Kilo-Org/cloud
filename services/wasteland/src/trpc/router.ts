@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { router, procedure, adminProcedure } from './init';
 import { resolveWastelandOwnership } from './ownership';
 import { resolveWasteland } from './resolve-wasteland';
+import type { ResolvedWasteland } from './resolve-wasteland';
 import { getWastelandDOStub, type WastelandMemberResult } from '../dos/Wasteland.do';
 import { getWastelandRegistryStub } from '../dos/WastelandRegistry.do';
 import { createUpstream as bootstrapCreateUpstream } from '../upstream-bootstrap/create-upstream';
@@ -248,6 +249,35 @@ async function requireOwnerAccess(env: Env, ctx: TRPCContext, wastelandId: strin
   }
 
   return ownership;
+}
+
+/**
+ * A wasteland reached through an `<owner>/<repo>` upstream address.
+ * Only ever populated with claimants the calling user may access.
+ */
+const ResolvedOwnerRepoWasteland = z.object({
+  wastelandId: z.string(),
+  ownerType: z.enum(['user', 'org']),
+  ownerUserId: z.string().nullable(),
+  organizationId: z.string().nullable(),
+  name: z.string(),
+});
+
+const ResolvedOwnerRepoOutput = z
+  .discriminatedUnion('status', [
+    z.object({ status: z.literal('resolved'), wasteland: ResolvedOwnerRepoWasteland }),
+    z.object({ status: z.literal('ambiguous'), candidates: z.array(ResolvedOwnerRepoWasteland) }),
+  ])
+  .nullable();
+
+function toResolvedOwnerRepo(wasteland: ResolvedWasteland) {
+  return {
+    wastelandId: wasteland.wastelandId,
+    ownerType: wasteland.ownerType,
+    ownerUserId: wasteland.ownerUserId,
+    organizationId: wasteland.organizationId,
+    name: wasteland.name,
+  };
 }
 
 export const wastelandRouter = router({
@@ -522,10 +552,16 @@ export const wastelandRouter = router({
     }),
 
   // Powers the `/wasteland/:owner/:repo` route family in apps/web.
-  // Tells you what wasteland (if any) is registered under that
-  // upstream slug. Auth is intentionally NOT enforced here — the caller
-  // either 404s on null or layers ownership checks when it forwards
-  // the resolved `wastelandId` to a UUID-keyed procedure.
+  // Tells you which wasteland (if any) the caller may reach through
+  // that upstream slug. Auth is intentionally NOT enforced here — the
+  // caller either treats null as "not connected" or layers ownership
+  // checks when it forwards a resolved `wastelandId` to a UUID-keyed
+  // procedure.
+  //
+  // A slug can have several claimants (shared upstreams), so the
+  // answer is derived from the caller's access, never from registration
+  // recency: one accessible claimant resolves, several are reported as
+  // ambiguous, and none (or only other tenants') answers null.
   //
   // Slug comparison is case-insensitive (DoltHub slug convention).
 
@@ -536,27 +572,22 @@ export const wastelandRouter = router({
         repo: z.string().min(1).max(64),
       })
     )
-    .output(
-      z
-        .object({
-          wastelandId: z.string(),
-          ownerType: z.enum(['user', 'org']),
-          ownerUserId: z.string().nullable(),
-          organizationId: z.string().nullable(),
-          name: z.string(),
-        })
-        .nullable()
-    )
+    .output(ResolvedOwnerRepoOutput)
     .query(async ({ ctx, input }) => {
-      const resolved = await resolveWasteland(ctx.env, input);
-      if (!resolved) return null;
-      return {
-        wastelandId: resolved.wastelandId,
-        ownerType: resolved.ownerType,
-        ownerUserId: resolved.ownerUserId,
-        organizationId: resolved.organizationId,
-        name: resolved.name,
-      };
+      const resolution = await resolveWasteland(
+        ctx.env,
+        {
+          userId: ctx.userId,
+          isAdmin: ctx.isAdmin,
+          orgMemberships: ctx.orgMemberships,
+        },
+        input
+      );
+      if (resolution.kind === 'none') return null;
+      if (resolution.kind === 'ambiguous') {
+        return { status: 'ambiguous', candidates: resolution.candidates.map(toResolvedOwnerRepo) };
+      }
+      return { status: 'resolved', wasteland: toResolvedOwnerRepo(resolution.wasteland) };
     }),
 
   deleteWasteland: procedure

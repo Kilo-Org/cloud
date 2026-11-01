@@ -16,6 +16,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { WastelandRepoProvider } from './WastelandRepoContext';
 import { RepoDashboardHeader } from './RepoDashboardHeader';
 import { NotConnectedShell } from './NotConnectedShell';
+import { AmbiguousUpstreamShell } from './AmbiguousUpstreamShell';
 
 type RepoLayoutShellProps = {
   owner: string;
@@ -32,9 +33,11 @@ type RepoLayoutShellProps = {
  * Flow:
  *   1. Loading: render a skeleton with no nav, so we don't flicker the
  *      tabs into a "not connected" state and back.
- *   2. Connected (resolveOwnerRepo returned an identity): render the
- *      dashboard header + nav + page content.
- *   3. Not connected (resolveOwnerRepo returned null): render the
+ *   2. Connected (resolveOwnerRepo resolved one wasteland this user can
+ *      access): render the dashboard header + nav + page content.
+ *   3. Ambiguous (several accessible wastelands share the upstream):
+ *      render `AmbiguousUpstreamShell` so the user picks one.
+ *   4. Not connected (resolveOwnerRepo returned null): render the
  *      `NotConnectedShell` — Connect CTA only, no nav.
  */
 export function RepoLayoutShell({ owner, repo, children }: RepoLayoutShellProps) {
@@ -76,16 +79,30 @@ function RepoLayoutShellInner({ owner, repo, children }: RepoLayoutShellProps) {
     return <NotConnectedShell owner={owner} repo={repo} />;
   }
 
+  if (resolved.status === 'ambiguous') {
+    return (
+      <AmbiguousUpstreamShell
+        owner={owner}
+        repo={repo}
+        candidates={resolved.candidates.map(candidate => ({
+          wastelandId: candidate.wastelandId,
+          name: candidate.name,
+        }))}
+      />
+    );
+  }
+
+  const wasteland = resolved.wasteland;
   return (
     <WastelandRepoProvider
       value={{
         owner,
         repo,
-        wastelandId: resolved.wastelandId,
-        ownerType: resolved.ownerType,
-        ownerUserId: resolved.ownerUserId,
-        organizationId: resolved.organizationId,
-        name: resolved.name,
+        wastelandId: wasteland.wastelandId,
+        ownerType: wasteland.ownerType,
+        ownerUserId: wasteland.ownerUserId,
+        organizationId: wasteland.organizationId,
+        name: wasteland.name,
       }}
     >
       <div className="flex h-full flex-col">

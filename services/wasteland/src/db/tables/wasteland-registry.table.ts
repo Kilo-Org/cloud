@@ -9,7 +9,8 @@ export const WastelandRegistryRecord = z.object({
   name: z.string(),
   // `<owner>/<repo>` slug stored verbatim (DoltHub slugs are
   // case-insensitive in practice; lookups normalise to lowercase
-  // before comparing — see findByOwnerRepo).
+  // before comparing — see findAllByOwnerRepo). Several wastelands may
+  // share one slug, so the lookup returns every match.
   dolthub_upstream: z.string().nullable(),
   created_at: z.string(),
 });

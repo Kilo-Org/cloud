@@ -55,6 +55,7 @@ import type {
   GitLabDiffContext,
 } from '../prompts/generate-prompt';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import { resolveReviewProviderIntegration } from '../provider-integration';
 import {
   getCodeReviewById,
   findPreviousCompletedReview,
@@ -392,9 +393,8 @@ export async function prepareReviewPayload(
     let repositorySize: string | null = null;
 
     if (outputMode === 'provider') {
-      const integration = await getIntegrationById(
-        requireProviderIntegrationId(review.platform_integration_id, reviewId)
-      );
+      requireProviderIntegrationId(review.platform_integration_id, reviewId);
+      const integration = await resolveReviewProviderIntegration(review, owner);
 
       if (!integration) {
         throw new Error(`Provider Code Reviewer job ${reviewId} integration is unavailable`);

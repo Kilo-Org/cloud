@@ -5,7 +5,8 @@ import { AI_ATTRIBUTION_AUDIENCE } from '@kilocode/worker-utils/internal-service
 import type { HonoContext } from '../ai-attribution.worker';
 import {
   authMiddleware,
-  createAuthMiddleware,
+  createIdentityMiddleware,
+  identityMiddleware,
   validateKiloToken,
   type AttributionIdentityCheck,
 } from './auth';
@@ -68,7 +69,8 @@ async function organizationToken(
 function buildApp(checkIdentity?: AttributionIdentityCheck) {
   let downstreamCalls = 0;
   const app = new Hono<HonoContext>();
-  app.use('*', checkIdentity ? createAuthMiddleware(checkIdentity) : authMiddleware);
+  app.use('*', authMiddleware);
+  app.use('*', checkIdentity ? createIdentityMiddleware(checkIdentity) : identityMiddleware);
   app.get('*', c => {
     downstreamCalls += 1;
     return c.json({

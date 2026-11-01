@@ -16,7 +16,7 @@ import {
 // Attribution writes from a token whose account or organization access stopped are best
 // retried once the dependency that decides it answers again.
 const ACCOUNT_CHECK_RETRY_AFTER_SECONDS = 5;
-const ACCOUNT_CHECK_STATEMENT_TIMEOUT_MS = 2_000;
+const ACCOUNT_CHECK_TIMEOUT_MS = 2_000;
 
 export type AttributionIdentityCheck = (
   env: HonoContext['Bindings'],
@@ -25,7 +25,10 @@ export type AttributionIdentityCheck = (
 
 const checkIdentityInDatabase: AttributionIdentityCheck = async (env, claims) => {
   const db = getWorkerDb(env.HYPERDRIVE.connectionString, {
-    statement_timeout: ACCOUNT_CHECK_STATEMENT_TIMEOUT_MS,
+    // Bound the connection as well as the statement: a database that stops accepting
+    // connections must reach the retryable answer instead of waiting on the pool.
+    connectionTimeoutMillis: ACCOUNT_CHECK_TIMEOUT_MS,
+    statement_timeout: ACCOUNT_CHECK_TIMEOUT_MS,
   });
   return findAttributionIdentityRefusal(db, claims);
 };
@@ -68,26 +71,46 @@ export async function validateKiloToken(
 }
 
 /**
- * Hono middleware for authenticating requests with Kilo API tokens. A valid token is not
- * enough: the identity it names must still act for the organization it names.
+ * Hono middleware for authenticating requests with Kilo API tokens. It sets the claimed
+ * identity on the context; the separate identity middleware decides whether that claim may
+ * act, so a route can charge its budgets before that lookup.
  */
-export function createAuthMiddleware(
+export const authMiddleware = createMiddleware<HonoContext>(async (c, next) => {
+  const result = await validateKiloToken(
+    c.req.header('Authorization') ?? null,
+    await c.env.NEXTAUTH_SECRET.get()
+  );
+
+  if (!result.success) {
+    logger.warn('Authentication failed', { error: result.error });
+    return c.json({ success: false, error: result.error }, 401);
+  }
+
+  c.set('user_id', result.kiloUserId);
+  c.set('token', result.token);
+  c.set('organization_id', result.organizationId);
+  c.set('organization_role', result.organizationRole);
+
+  logger.info('Request authenticated', {
+    userId: result.kiloUserId,
+    organizationId: result.organizationId,
+    organizationRole: result.organizationRole,
+  });
+
+  return next();
+});
+
+/**
+ * Hono middleware that admits a verified claim only while the identity it names still acts
+ * for the organization it names.
+ */
+export function createIdentityMiddleware(
   checkIdentity: AttributionIdentityCheck = checkIdentityInDatabase
 ): MiddlewareHandler<HonoContext> {
   return createMiddleware<HonoContext>(async (c, next) => {
-    const result = await validateKiloToken(
-      c.req.header('Authorization') ?? null,
-      await c.env.NEXTAUTH_SECRET.get()
-    );
-
-    if (!result.success) {
-      logger.warn('Authentication failed', { error: result.error });
-      return c.json({ success: false, error: result.error }, 401);
-    }
-
     const claims: AttributionIdentityClaims = {
-      kiloUserId: result.kiloUserId,
-      organizationId: result.organizationId,
+      kiloUserId: c.get('user_id'),
+      organizationId: c.get('organization_id'),
     };
 
     let refusal: AttributionIdentityRefusal | null;
@@ -108,19 +131,8 @@ export function createAuthMiddleware(
       return c.json({ success: false, error: 'Access denied' }, 403);
     }
 
-    c.set('user_id', result.kiloUserId);
-    c.set('token', result.token);
-    c.set('organization_id', result.organizationId);
-    c.set('organization_role', result.organizationRole);
-
-    logger.info('Request authenticated', {
-      userId: result.kiloUserId,
-      organizationId: result.organizationId,
-      organizationRole: result.organizationRole,
-    });
-
     return next();
   });
 }
 
-export const authMiddleware = createAuthMiddleware();
+export const identityMiddleware = createIdentityMiddleware();

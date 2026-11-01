@@ -1,5 +1,6 @@
 import {
   agent_environment_profile_agents,
+  agent_environment_profile_mcp_servers,
   agent_environment_profiles,
   kilocode_users,
 } from '@kilocode/db/schema';
@@ -50,16 +51,38 @@ const AGENTS = [
   },
 ] as const;
 
+/**
+ * The servers the profile carries. Both are remote, one enabled and one not, so
+ * the MCP servers screen shows the switch in both states and each row's summary
+ * paints without a command list.
+ */
+const MCP_SERVERS = [
+  {
+    name: 'design-system',
+    type: 'remote',
+    enabled: true,
+    config: { url: 'https://mcp.example.com/design-system' },
+  },
+  {
+    name: 'release-notes',
+    type: 'remote',
+    enabled: false,
+    config: { url: 'https://mcp.example.com/release-notes' },
+  },
+] as const;
+
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:agent-profile-fixture ${usage}`);
   console.log('');
   console.log('Creates a fake user and one personal agent environment profile whose agents');
   console.log('cover the profile Agents list: two whose slug only repeats the name, and one');
-  console.log('long row whose name and slug both need truncating. Re-running replaces the');
-  console.log('profile, its agents, and the user row.');
+  console.log('long row whose name and slug both need truncating. The profile also carries two');
+  console.log('remote MCP servers, one enabled and one not, for the MCP servers list. Re-running');
+  console.log('replaces the profile, its agents, its MCP servers, and the user row.');
   console.log('');
-  console.log('The deep link it prints opens the profile Agents screen in a dev build:');
+  console.log('The deep links it prints open the profile screens in a dev build:');
   console.log('  kiloapp:///(app)/profile-management/<profileId>/agents');
+  console.log('  kiloapp:///(app)/profile-management/<profileId>/mcp');
   console.log('');
   console.log('Example:');
   console.log('  pnpm dev:seed app:agent-profile-fixture design-gate@example.com');
@@ -143,14 +166,30 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     }))
   );
 
-  console.log('This fixture represents: the personal profile an owner manages agents on.');
-  console.log(`Deep link: kiloapp:///(app)/profile-management/${profile.id}/agents`);
+  await db.insert(agent_environment_profile_mcp_servers).values(
+    MCP_SERVERS.map(server => ({
+      profile_id: profile.id,
+      name: server.name,
+      type: server.type,
+      enabled: server.enabled,
+      config: server.config,
+    }))
+  );
+
+  const agentsLink = `kiloapp:///(app)/profile-management/${profile.id}/agents`;
+  const mcpLink = `kiloapp:///(app)/profile-management/${profile.id}/mcp`;
+  console.log('This fixture represents: the personal profile an owner manages agents and MCP');
+  console.log('servers on.');
+  console.log(`Deep link: ${agentsLink}`);
+  console.log(`Deep link: ${mcpLink}`);
 
   return {
     userId: USER_ID,
     email: trimmedEmail,
     profileId: profile.id,
     agentCount: AGENTS.length,
-    deepLink: `kiloapp:///(app)/profile-management/${profile.id}/agents`,
+    mcpServerCount: MCP_SERVERS.length,
+    deepLink: agentsLink,
+    mcpDeepLink: mcpLink,
   };
 }

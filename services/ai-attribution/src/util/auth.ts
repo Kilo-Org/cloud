@@ -1,10 +1,37 @@
 import { createMiddleware } from 'hono/factory';
+import type { MiddlewareHandler } from 'hono';
+import { getWorkerDb } from '@kilocode/db/client';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import { AI_ATTRIBUTION_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
 import { logger } from './logger';
 import type { HonoContext } from '../ai-attribution.worker';
 import { OrganizationJWTPayload } from '../schemas';
+import {
+  findAttributionIdentityRefusal,
+  type AttributionIdentityClaims,
+  type AttributionIdentityRefusal,
+} from './attribution-identity';
+
+// Attribution writes from a token whose account or organization access stopped are best
+// retried once the dependency that decides it answers again.
+const ACCOUNT_CHECK_RETRY_AFTER_SECONDS = 5;
+const ACCOUNT_CHECK_TIMEOUT_MS = 2_000;
+
+export type AttributionIdentityCheck = (
+  env: HonoContext['Bindings'],
+  claims: AttributionIdentityClaims
+) => Promise<AttributionIdentityRefusal | null>;
+
+const checkIdentityInDatabase: AttributionIdentityCheck = async (env, claims) => {
+  const db = getWorkerDb(env.HYPERDRIVE.connectionString, {
+    // Bound the connection as well as the statement: a database that stops accepting
+    // connections must reach the retryable answer instead of waiting on the pool.
+    connectionTimeoutMillis: ACCOUNT_CHECK_TIMEOUT_MS,
+    statement_timeout: ACCOUNT_CHECK_TIMEOUT_MS,
+  });
+  return findAttributionIdentityRefusal(db, claims);
+};
 
 /**
  * Validates a Kilo API JWT token, asserting it carries organization claims.
@@ -44,7 +71,9 @@ export async function validateKiloToken(
 }
 
 /**
- * Hono middleware for authenticating requests with Kilo API tokens
+ * Hono middleware for authenticating requests with Kilo API tokens. It sets the claimed
+ * identity on the context; the separate identity middleware decides whether that claim may
+ * act, so a route can charge its budgets before that lookup.
  */
 export const authMiddleware = createMiddleware<HonoContext>(async (c, next) => {
   const result = await validateKiloToken(
@@ -70,3 +99,40 @@ export const authMiddleware = createMiddleware<HonoContext>(async (c, next) => {
 
   return next();
 });
+
+/**
+ * Hono middleware that admits a verified claim only while the identity it names still acts
+ * for the organization it names.
+ */
+export function createIdentityMiddleware(
+  checkIdentity: AttributionIdentityCheck = checkIdentityInDatabase
+): MiddlewareHandler<HonoContext> {
+  return createMiddleware<HonoContext>(async (c, next) => {
+    const claims: AttributionIdentityClaims = {
+      kiloUserId: c.get('user_id'),
+      organizationId: c.get('organization_id'),
+    };
+
+    let refusal: AttributionIdentityRefusal | null;
+    try {
+      refusal = await checkIdentity(c.env, claims);
+    } catch (error) {
+      logger.error('Account check failed', {
+        ...claims,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return c.json({ success: false, error: 'Account checks are temporarily unavailable' }, 503, {
+        'retry-after': String(ACCOUNT_CHECK_RETRY_AFTER_SECONDS),
+      });
+    }
+
+    if (refusal !== null) {
+      logger.warn('Attribution identity refused', { ...claims, reason: refusal });
+      return c.json({ success: false, error: 'Access denied' }, 403);
+    }
+
+    return next();
+  });
+}
+
+export const identityMiddleware = createIdentityMiddleware();

@@ -29,6 +29,9 @@ const voice = vi.hoisted(() => ({
 const applyVoiceDraftToInput = vi.hoisted(() => vi.fn());
 
 vi.mock('react-native', () => ({
+  // The field renders the shared Input, whose alignment helper reads
+  // `I18nManager.isRTL` on every render.
+  I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',

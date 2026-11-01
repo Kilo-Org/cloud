@@ -212,9 +212,13 @@ function GitHubConnectGate({
               <PrReviewGateItemLine prRef={prRef} />
               <PrReviewContextLine />
               <Text variant="muted" className="text-center">
+                {/* The benefit line, not a second "Connect your GitHub account":
+                    the title and the CTA already name the action, and the item
+                    and scope lines above give the context. The reconnect arm's
+                    key states the cause only, for the same reason. */}
                 {revoked
                   ? t('prReview.connect.reconnectDescription')
-                  : t('prReview.connect.description')}
+                  : t('common.prReviewSubtitle')}
               </Text>
             </>
           }

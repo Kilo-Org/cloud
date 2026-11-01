@@ -22,7 +22,12 @@ const longRepository = 'iscekic/kilo-e2e-pr-review-sandbox-86773';
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function renderRow(props: { value: string; selectable?: boolean; valueDirection?: 'ltr' }) {
+function renderRow(props: {
+  value: string;
+  selectable?: boolean;
+  valueDirection?: 'ltr';
+  valueFace?: 'mono' | 'text' | 'numeric';
+}) {
   act(() => {
     const element = createElement(KvRow, { label: 'Repository', ...props });
     if (renderer) {
@@ -66,7 +71,7 @@ describe('KvRow mounted layout', () => {
   // Android's `selectable` routes the value through ReactTextView, which drops
   // the `maxLines` clamp on attach, so a clamped selectable value wrapped past
   // the one-line row height and painted a clipped second line (SPOT-DEFECT:
-  // the finding-details Repository row above the Manifest row).
+  // the finding-details Manifest row).
   it('leaves a selectable value unclamped so it wraps inside the row instead of clipping', () => {
     const text = valueText(renderRow({ value: longRepository, selectable: true }), longRepository);
     expect(text.props.selectable).toBe(true);
@@ -110,5 +115,29 @@ describe('KvRow mounted layout', () => {
     } finally {
       i18nManager.isRTL = false;
     }
+  });
+});
+
+describe('KvRow value faces', () => {
+  // An identifier belongs in the code face; a plain-language value or a
+  // timestamp beside a sans label does not, because the code face reads as code.
+  it('leaves an identifier in the mono face', () => {
+    const text = valueText(renderRow({ value: 'left-pad (npm)' }), 'left-pad (npm)');
+    expect(String(text.props.className)).toContain('font-mono-medium');
+  });
+
+  it('paints a plain-language value in the body face', () => {
+    const text = valueText(
+      renderRow({ value: 'No patch available', valueFace: 'text' }),
+      'No patch available'
+    );
+    expect(String(text.props.className)).not.toContain('font-mono-medium');
+    expect(String(text.props.className)).not.toContain('tabular-nums');
+  });
+
+  it('keeps tabular figures on a count in the body face', () => {
+    const text = valueText(renderRow({ value: '12', valueFace: 'numeric' }), '12');
+    expect(String(text.props.className)).not.toContain('font-mono-medium');
+    expect(String(text.props.className)).toContain('tabular-nums');
   });
 });

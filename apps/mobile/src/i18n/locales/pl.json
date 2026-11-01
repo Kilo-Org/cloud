@@ -69,6 +69,7 @@
     "organization": "Organizacja",
     "platform": "Platforma",
     "prReview": "Przegląd PR",
+    "prReviewSubtitle": "Przeglądaj PR na telefonie",
     "queued": "W kolejce",
     "remove": "Usuń",
     "repository": "Repozytorium",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "Automatyczne przeglądy PR",
     "securityAgentSubtitle": "Znajduj i usuwaj luki w zabezpieczeniach",
     "reviews": "Przeglądy kodu",
-    "prReviewSubtitle": "Przeglądaj PR na telefonie",
     "couldNotLoadOrganization": "Nie udało się wczytać organizacji.",
     "couldNotLoadOrganizationDescription": "Ustawienia organizacji i agentów będą dostępne po wczytaniu danych organizacji.",
     "linkedAccounts": "Połączone konta",
@@ -895,7 +895,9 @@
     "instructions": {
       "title": "Własne instrukcje",
       "deprecation": "Planowane jest wycofanie obsługi niestandardowych instrukcji. Przenieś te wytyczne do pliku REVIEW.md w swoim repozytorium.",
-      "placeholder": "np. sprawdzaj zgodność z naszymi zasadami obsługi błędów…"
+      "placeholder": "np. sprawdzaj zgodność z naszymi zasadami obsługi błędów…",
+      "clearTitle": "Usunąć własne instrukcje?",
+      "clearMessage": "Zapisanie pustego pola usuwa własne instrukcje zapisane dla tego recenzenta."
     },
     "repos": {
       "unavailable": "Repozytoria są niedostępne. Dokończ konfigurację Bitbucket na kilo.ai.",
@@ -971,7 +973,7 @@
       "bitbucketError": "Nie udało się otworzyć konfiguracji Bitbucket. Spróbuj ponownie."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · Autor: {{author}}",
+      "byline": "#{{number}} · Autor: {{author}}",
       "cancelMessage": "Spowoduje to zatrzymanie trwającego przeglądu kodu.",
       "cancelReview": "Anuluj przegląd",
       "cancelTitle": "Anulować przegląd?",
@@ -1086,12 +1088,12 @@
     },
     "overview": {
       "allAreas": "Wszystkie obszary",
-      "customInstructions": "Własne instrukcje",
       "focusAreas": "Obszary przeglądu",
       "nSelected": "Wybrano: {{displayCount}}",
       "proposedReviewMdGuidance": "Proponowane wytyczne do pliku REVIEW.md",
       "reviewStyle": "Styl przeglądu",
-      "set": "Ustawiono"
+      "set": "Ustawiono",
+      "notSet": "Nie ustawiono"
     },
     "updateFailed": "Nie udało się zaktualizować recenzenta kodu.",
     "configSaveFailed": "Nie udało się zapisać konfiguracji przeglądu.",
@@ -1303,7 +1305,6 @@
       "noOpenFindings": "Żadne otwarte problemy nie wymagają uwagi",
       "noRepositoryData": "Brak danych o repozytoriach",
       "noRepositoryDataDescription": "Priorytety repozytoriów pojawią się po zsynchronizowaniu problemów.",
-      "noSlaDeadline": "Brak przypisanego terminu SLA",
       "notExploitable": "Nie można wykorzystać w ataku",
       "notMeasured": "Nie zmierzono",
       "notYetSynced": "Jeszcze nie zsynchronizowano",
@@ -1375,7 +1376,6 @@
       "alreadyResolvedDescription": "Ten problem został już rozwiązany i nie można go odrzucić.",
       "cannotDismissDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą odrzucać problemy.",
       "cannotDismissTitle": "Nie można odrzucić tego problemu",
-      "commentAccessibility": "Komentarz do odrzucenia",
       "commentLabel": "Komentarz (opcjonalnie)",
       "commentPlaceholder": "Dodatkowe informacje o odrzuceniu…",
       "couldNotCheckPermissions": "Nie udało się sprawdzić uprawnień do odrzucania.",
@@ -1445,7 +1445,6 @@
       "newFindingSection": "Powiadomienia o nowych problemach",
       "newFindingSeverityLabel": "Minimalna krytyczność nowych problemów",
       "newFindingSubtitle": "Powiadomienie jest wysyłane przy synchronizacji każdego nowego problemu, także podczas pierwszej synchronizacji.",
-      "slaLeadTimeAccessibility": "Liczba dni przed terminem SLA, kiedy ma zostać wysłane ostrzeżenie",
       "slaLeadTimeError": "Wpisz całkowitą liczbę dni od 1 do 365.",
       "slaLeadTimeLabel": "Ostrzeżenie przed terminem SLA (dni)",
       "slaPersonalTitle": "Wysyłaj mi e-maile o ostrzeżeniach SLA",
@@ -1885,7 +1884,6 @@
       "advancedConfigDescription": "Dotyczy tej sesji. Zapisanie jako profil zachowuje go na następny raz.",
       "saveAsProfile": "Zapisz jako profil",
       "saveProfileDescription": "Zapisz bieżące zmienne środowiskowe i polecenia instalacyjne jako profil do wielokrotnego użytku.",
-      "profileSummary": "{{vars}} zmienne środowiskowe · {{commands}} polecenia konfiguracyjne",
       "profileSaved": "Profil „{{name}}” został zapisany",
       "organizationProfiles": "Profile organizacji",
       "personalProfiles": "Profile osobiste",
@@ -2778,10 +2776,8 @@
       "checkFailedTitleBitbucket": "Nie udało się sprawdzić połączenia z kontem Bitbucket.",
       "providerCheckFailedMessage": "Status połączenia będzie dostępny po wczytaniu danych.",
       "reconnectTitle": "Połącz ponownie konto GitHub",
-      "reconnectDescription": "Cofnięto dostęp do konta GitHub. Połącz je ponownie, aby nadal przeglądać PR na telefonie.",
-      "description": "Połącz konto GitHub, aby przeglądać PR na telefonie.",
-      "gitlabDescription": "Połącz konto GitLab, aby przeglądać merge requesty na telefonie.",
-      "bitbucketDescription": "Połącz Bitbucket z tą organizacją, aby przeglądać PR-y na telefonie.",
+      "reconnectDescription": "Cofnięto dostęp do konta GitHub.",
+      "gitlabDescription": "Przeglądaj merge requesty na telefonie",
       "bitbucketOrgOnlyDescription": "Przełącz konto powyżej na organizację, aby przeglądać jej PR-y na Bitbucketu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "To konto nie ma jeszcze żadnych organizacji. PR-y na Bitbucketu będzie można przeglądać po utworzeniu organizacji lub dołączeniu do niej.",
       "contextLine": "Dla {{organization}}",
@@ -3035,6 +3031,7 @@
     "installKiloGitHubApp": "Zainstaluj aplikację Kilo dla GitHub",
     "merge": {
       "merge": "Scalanie",
+      "mergeTitle": "Scalanie",
       "mergeNow": "Scal teraz",
       "mergePullRequest": "Scalanie PR",
       "mergeTermTitle": "Scalanie {{term}}",

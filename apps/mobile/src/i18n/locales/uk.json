@@ -69,6 +69,7 @@
     "organization": "Організація",
     "platform": "Платформа",
     "prReview": "Перевірка PR",
+    "prReviewSubtitle": "Перевірка запитів на злиття на мобільному пристрої",
     "queued": "У черзі",
     "remove": "Видалити",
     "repository": "Репозиторій",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "Автоматичні перевірки PR",
     "securityAgentSubtitle": "Пошук і усунення вразливостей",
     "reviews": "Перевірки",
-    "prReviewSubtitle": "Перевірка запитів на злиття на мобільному пристрої",
     "couldNotLoadOrganization": "Не вдалося завантажити організацію.",
     "couldNotLoadOrganizationDescription": "Налаштування організації та агентів будуть доступні після завантаження даних організації.",
     "linkedAccounts": "Підключені облікові записи",
@@ -895,7 +895,9 @@
     "instructions": {
       "title": "Власні інструкції",
       "deprecation": "Підтримку власних інструкцій планують припинити. Перенесіть ці настанови у файл REVIEW.md у своєму репозиторії.",
-      "placeholder": "наприклад: дотримуватися наших правил обробки помилок…"
+      "placeholder": "наприклад: дотримуватися наших правил обробки помилок…",
+      "clearTitle": "Видалити власні інструкції?",
+      "clearMessage": "Збереження порожнього поля видалить власні інструкції, збережені для цього рецензента."
     },
     "repos": {
       "unavailable": "Репозиторії недоступні — завершіть налаштування Bitbucket на kilo.ai.",
@@ -971,7 +973,7 @@
       "bitbucketError": "Не вдалося відкрити налаштування Bitbucket. Спробуйте ще раз."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} від {{author}}",
+      "byline": "#{{number}} від {{author}}",
       "cancelMessage": "Це зупинить поточну перевірку коду.",
       "cancelReview": "Скасувати перевірку",
       "cancelTitle": "Скасувати перевірку?",
@@ -1086,12 +1088,12 @@
     },
     "overview": {
       "allAreas": "Усі напрями",
-      "customInstructions": "Власні інструкції",
       "focusAreas": "Напрями перевірки",
       "nSelected": "Вибрано: {{displayCount}}",
       "proposedReviewMdGuidance": "Запропоновані настанови для REVIEW.md",
       "reviewStyle": "Стиль перевірки",
-      "set": "Встановлено"
+      "set": "Встановлено",
+      "notSet": "Не встановлено"
     },
     "updateFailed": "Не вдалося оновити налаштування перевірки коду.",
     "configSaveFailed": "Не вдалося зберегти налаштування перевірки.",
@@ -1303,7 +1305,6 @@
       "noOpenFindings": "Немає відкритих проблем, що потребують уваги",
       "noRepositoryData": "Даних про репозиторії ще немає",
       "noRepositoryDataDescription": "Пріоритети репозиторіїв з'являться після синхронізації проблем.",
-      "noSlaDeadline": "Термін за SLA не встановлено",
       "notExploitable": "Експлуатація неможлива",
       "notMeasured": "Не виміряно",
       "notYetSynced": "Ще не синхронізовано",
@@ -1375,7 +1376,6 @@
       "alreadyResolvedDescription": "Цю проблему вже закрито, тому відхилити її неможливо.",
       "cannotDismissDescription": "Відхиляти проблеми можуть лише власники організації, адміністратори та менеджери з оплати.",
       "cannotDismissTitle": "Неможливо відхилити цю проблему",
-      "commentAccessibility": "Коментар до відхилення",
       "commentLabel": "Коментар (необов'язково)",
       "commentPlaceholder": "Додаткові відомості про причину відхилення…",
       "couldNotCheckPermissions": "Не вдалося перевірити дозволи на відхилення.",
@@ -1445,7 +1445,6 @@
       "newFindingSection": "Сповіщення про нові проблеми",
       "newFindingSeverityLabel": "Мінімальна критичність нових проблем",
       "newFindingSubtitle": "Лист надсилається під час синхронізації кожної нової проблеми, зокрема й під час першої синхронізації.",
-      "slaLeadTimeAccessibility": "За скільки днів до терміну за SLA надсилати попередження",
       "slaLeadTimeError": "Введіть ціле число днів від 1 до 365.",
       "slaLeadTimeLabel": "Попереджати за стільки днів до терміну за SLA",
       "slaPersonalTitle": "Надсилати мені попередження щодо SLA поштою",
@@ -1885,7 +1884,6 @@
       "advancedConfigDescription": "Діє для цього сеансу. Збереження як профіль залишить його на наступний раз.",
       "saveAsProfile": "Зберегти як профіль",
       "saveProfileDescription": "Збережіть поточні змінні середовища та команди налаштування як багаторазовий профіль.",
-      "profileSummary": "{{vars}} змінні середовища · {{commands}} команди налаштування",
       "profileSaved": "Профіль \"{{name}}\" збережено",
       "organizationProfiles": "Профілі організації",
       "personalProfiles": "Персональні профілі",
@@ -2778,10 +2776,8 @@
       "checkFailedTitleBitbucket": "Не вдалося перевірити підключення до Bitbucket",
       "providerCheckFailedMessage": "Стан підключення недоступний, доки це завантажиться.",
       "reconnectTitle": "Підключити GitHub знову",
-      "reconnectDescription": "Доступ до GitHub відкликано. Підключіться знову, щоб і далі перевіряти запити на злиття в мобільному застосунку.",
-      "description": "Підключіть обліковий запис GitHub, щоб перевіряти запити на злиття в мобільному застосунку.",
-      "gitlabDescription": "Підключіть обліковий запис GitLab, щоб переглядати merge-запити з мобільного.",
-      "bitbucketDescription": "Підключіть Bitbucket до цієї організації, щоб переглядати запити на злиття з мобільного.",
+      "reconnectDescription": "Доступ до GitHub відкликано.",
+      "gitlabDescription": "Перевірка merge-запитів на мобільному пристрої",
       "bitbucketOrgOnlyDescription": "Перемкніть обліковий запис, вказаний вище, на організацію, щоб переглядати її запити на злиття в Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Цей обліковий запис ще не має організацій. Запити на злиття Bitbucket можна переглядати після того, як ви створите організацію або приєднаєтеся до неї.",
       "contextLine": "Для {{organization}}",
@@ -3035,6 +3031,7 @@
     "installKiloGitHubApp": "Установити застосунок Kilo для GitHub",
     "merge": {
       "merge": "Злиття",
+      "mergeTitle": "Злиття",
       "mergeNow": "Виконати злиття",
       "mergePullRequest": "Злиття запиту",
       "mergeTermTitle": "Злити {{term}}",

@@ -1104,6 +1104,14 @@ function footerRowItems(view: { renderer: ReactTestRenderer }) {
   return indicatorRowOf(view).children.filter(child => typeof child !== 'string');
 }
 
+/**
+ * The band a reserved header holds its text area's height with: a zero-width
+ * twin of the eyebrow and the title's line cap.
+ */
+function findReservedBand(header: ReactTestInstance) {
+  return header.findByProps({ className: 'w-0 overflow-hidden' });
+}
+
 function pressHeaderBack(renderer: ReactTestRenderer) {
   const { onPress } = renderer.root.findByProps({ accessibilityLabel: 'Go back' }).props as {
     onPress: () => void;
@@ -1129,9 +1137,9 @@ describe('SessionDetailContent display scope', () => {
       numberOfLines: SESSION_HEADER_TITLE_LINES,
       ellipsizeMode: 'tail',
     });
-    expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
-      'min-h-21'
-    );
+    // The header holds the session title's three lines in the band beside the
+    // heading, so a title that arrives late or wraps cannot move the body.
+    expect(findReservedBand(header).findByProps({ className: 'min-h-21' })).toBeDefined();
     expect(header.findAllByType(ContextControl)).toHaveLength(0);
     // The PR link shares the goal row now, so the header row holds no badge.
     expect(header.findAllByType('SessionPrBadge')).toHaveLength(0);
@@ -2606,9 +2614,9 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
       numberOfLines: SESSION_HEADER_TITLE_LINES,
       ellipsizeMode: 'tail',
     });
-    expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
-      'min-h-21'
-    );
+    // The header holds the session title's three lines in the band beside the
+    // heading, so a title that arrives late or wraps cannot move the body.
+    expect(findReservedBand(header).findByProps({ className: 'min-h-21' })).toBeDefined();
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
       hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']

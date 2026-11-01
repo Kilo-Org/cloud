@@ -69,6 +69,7 @@
     "organization": "المؤسسة",
     "platform": "المنصة",
     "prReview": "مراجعة PR",
+    "prReviewSubtitle": "مراجعة طلبات السحب على الجوال",
     "queued": "في قائمة الانتظار",
     "remove": "إزالة",
     "repository": "المستودع",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "مراجعات PR تلقائية",
     "securityAgentSubtitle": "اكتشاف الثغرات ومعالجتها",
     "reviews": "المراجعات",
-    "prReviewSubtitle": "مراجعة طلبات السحب على الجوال",
     "couldNotLoadOrganization": "تعذّر تحميل المؤسسة.",
     "couldNotLoadOrganizationDescription": "إعدادات المؤسسة والوكيل غير متاحة حتى يكتمل تحميل بيانات المؤسسة.",
     "linkedAccounts": "الحسابات المرتبطة",
@@ -901,7 +901,9 @@
     "instructions": {
       "title": "تعليمات مخصصة",
       "deprecation": "من المقرر إيقاف ميزة التعليمات المخصصة. انقل هذه الإرشادات إلى ملف REVIEW.md في مستودعك بدلًا منها.",
-      "placeholder": "مثال: الالتزام بقواعد معالجة الأخطاء المتبعة لدينا…"
+      "placeholder": "مثال: الالتزام بقواعد معالجة الأخطاء المتبعة لدينا…",
+      "clearTitle": "إزالة التعليمات المخصصة؟",
+      "clearMessage": "سيؤدي حفظ الحقل فارغًا إلى حذف التعليمات المخصصة المخزّنة لهذا المراجع."
     },
     "repos": {
       "unavailable": "المستودعات غير متاحة — أكمل إعداد Bitbucket على kilo.ai.",
@@ -977,7 +979,7 @@
       "bitbucketError": "تعذّر فتح صفحة إعداد Bitbucket. حاول مرة أخرى."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} بواسطة {{author}}",
+      "byline": "#{{number}} بواسطة {{author}}",
       "cancelMessage": "سيؤدي هذا إلى إيقاف مراجعة الشفرة الجارية.",
       "cancelReview": "إلغاء المراجعة",
       "cancelTitle": "إلغاء المراجعة؟",
@@ -1092,12 +1094,12 @@
     },
     "overview": {
       "allAreas": "جميع المجالات",
-      "customInstructions": "تعليمات مخصصة",
       "focusAreas": "مجالات التركيز",
       "nSelected": "{{displayCount}} محدد",
       "proposedReviewMdGuidance": "إرشادات REVIEW.md المقترحة",
       "reviewStyle": "أسلوب المراجعة",
-      "set": "محدّد"
+      "set": "محدّد",
+      "notSet": "غير محدّد"
     },
     "updateFailed": "تعذّر تحديث المراجع.",
     "configSaveFailed": "تعذّر حفظ إعدادات المراجعة.",
@@ -1313,7 +1315,6 @@
       "noOpenFindings": "لا توجد نتائج مفتوحة تستدعي الاهتمام",
       "noRepositoryData": "لا توجد بيانات للمستودعات بعد",
       "noRepositoryDataDescription": "ستظهر أولويات المستودعات بعد مزامنة النتائج.",
-      "noSlaDeadline": "لم يُحدَّد موعد نهائي حسب SLA",
       "notExploitable": "غير قابلة للاستغلال",
       "notMeasured": "غير مُقاس",
       "notYetSynced": "لم تتم المزامنة بعد",
@@ -1401,7 +1402,6 @@
       "alreadyResolvedDescription": "عولجت هذه النتيجة بالفعل، ولم يعد من الممكن استبعادها.",
       "cannotDismissDescription": "يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط استبعاد النتائج.",
       "cannotDismissTitle": "لا يمكن استبعاد هذه النتيجة",
-      "commentAccessibility": "تعليق الاستبعاد",
       "commentLabel": "التعليق (اختياري)",
       "commentPlaceholder": "تفاصيل إضافية عن سبب الاستبعاد…",
       "couldNotCheckPermissions": "تعذّر التحقق من صلاحيات الاستبعاد.",
@@ -1471,7 +1471,6 @@
       "newFindingSection": "إشعارات النتائج الجديدة",
       "newFindingSeverityLabel": "الحد الأدنى للخطورة لإشعارات النتائج الجديدة",
       "newFindingSubtitle": "يُرسل عند مزامنة نتيجة جديدة، بما في ذلك عند أول مزامنة.",
-      "slaLeadTimeAccessibility": "عدد الأيام قبل الموعد النهائي لإرسال تحذير SLA",
       "slaLeadTimeError": "أدخل عددًا صحيحًا من الأيام بين 1 و365.",
       "slaLeadTimeLabel": "وقت إرسال تحذير SLA قبل الموعد النهائي (بالأيام)",
       "slaPersonalTitle": "إشعاري بتحذيرات SLA عبر البريد الإلكتروني",
@@ -1921,7 +1920,6 @@
       "advancedConfigDescription": "يُطبق على هذه الجلسة. حفظه كملف شخصي يبقيه للمرة القادمة.",
       "saveAsProfile": "حفظ كملف شخصي",
       "saveProfileDescription": "احفظ متغيرات البيئة الحالية وأوامر الإعداد كملف شخصي قابل لإعادة الاستخدام.",
-      "profileSummary": "{{vars}} متغيرات البيئة · أوامر الإعداد {{commands}}",
       "profileSaved": "تم حفظ الملف الشخصي \"{{name}}\".",
       "organizationProfiles": "ملفات المؤسسة الشخصية",
       "personalProfiles": "الملفات الشخصية",
@@ -2846,10 +2844,8 @@
       "checkFailedTitleBitbucket": "تعذّر التحقق من ربط حساب Bitbucket.",
       "providerCheckFailedMessage": "حالة الاتصال غير متاحة حتى يتم تحميلها.",
       "reconnectTitle": "إعادة ربط GitHub",
-      "reconnectDescription": "أُلغي ربط حسابك على GitHub. أعد ربطه لمواصلة مراجعة طلبات السحب على الجوال.",
-      "description": "اربط حسابك على GitHub لمراجعة طلبات السحب على الجوال.",
-      "gitlabDescription": "اربط حسابك في GitLab لمراجعة طلبات الدمج على الجوال.",
-      "bitbucketDescription": "اربط Bitbucket بهذه المؤسسة لمراجعة طلبات السحب على الجوال.",
+      "reconnectDescription": "أُلغي ربط حسابك على GitHub.",
+      "gitlabDescription": "مراجعة طلبات الدمج على الجوال",
       "bitbucketOrgOnlyDescription": "بدّل الحساب أعلاه إلى مؤسسة لمراجعة طلبات السحب الخاصة بها على Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "لا توجد مؤسسات في هذا الحساب بعد. يمكنك مراجعة طلبات السحب على Bitbucket بعد إنشاء مؤسسة أو الانضمام إلى واحدة.",
       "contextLine": "للمؤسسة: {{organization}}",
@@ -3123,6 +3119,7 @@
     "installKiloGitHubApp": "تثبيت تطبيق Kilo على GitHub",
     "merge": {
       "merge": "دمج",
+      "mergeTitle": "دمج",
       "mergeNow": "دمج الآن",
       "mergePullRequest": "دمج طلب السحب",
       "mergeTermTitle": "دمج {{term}}",

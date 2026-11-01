@@ -69,6 +69,7 @@
     "organization": "Organisatie",
     "platform": "Codeplatform",
     "prReview": "PR-beoordeling",
+    "prReviewSubtitle": "PR's op je mobiel beoordelen",
     "queued": "In de wachtrij",
     "remove": "Verwijderen",
     "repository": "Coderepository",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "Automatische PR-beoordelingen",
     "securityAgentSubtitle": "Kwetsbaarheden vinden en verhelpen",
     "reviews": "Beoordelingen",
-    "prReviewSubtitle": "PR's op je mobiel beoordelen",
     "couldNotLoadOrganization": "De organisatie kon niet worden geladen.",
     "couldNotLoadOrganizationDescription": "De organisatie- en agentinstellingen zijn pas beschikbaar nadat de organisatie is geladen.",
     "linkedAccounts": "Gekoppelde accounts",
@@ -889,7 +889,9 @@
     "instructions": {
       "title": "Eigen instructies",
       "deprecation": "De functie voor aangepaste instructies wordt op termijn uitgefaseerd. Verplaats deze richtlijnen naar een REVIEW.md-bestand in je repository.",
-      "placeholder": "bijvoorbeeld: onze afspraken over foutafhandeling controleren…"
+      "placeholder": "bijvoorbeeld: onze afspraken over foutafhandeling controleren…",
+      "clearTitle": "Eigen instructies verwijderen?",
+      "clearMessage": "Door een leeg veld op te slaan worden de eigen instructies verwijderd die voor deze reviewer zijn opgeslagen."
     },
     "repos": {
       "unavailable": "De repositories zijn niet beschikbaar. Voltooi het instellen van Bitbucket op kilo.ai.",
@@ -965,7 +967,7 @@
       "bitbucketError": "Het instellen van Bitbucket kon niet worden geopend. Probeer het opnieuw."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} door {{author}}",
+      "byline": "#{{number}} door {{author}}",
       "cancelMessage": "Dit stopt de lopende codereview.",
       "cancelReview": "Review annuleren",
       "cancelTitle": "Review annuleren?",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "Alle aandachtspunten",
-      "customInstructions": "Eigen instructies",
       "focusAreas": "Aandachtspunten",
       "nSelected": "{{displayCount}} geselecteerd",
       "proposedReviewMdGuidance": "Voorgestelde REVIEW.md-richtlijnen",
       "reviewStyle": "Beoordelingsstijl",
-      "set": "Ingesteld"
+      "set": "Ingesteld",
+      "notSet": "Niet ingesteld"
     },
     "updateFailed": "De beoordelaar kon niet worden bijgewerkt.",
     "configSaveFailed": "De reviewinstellingen konden niet worden opgeslagen.",
@@ -1293,7 +1295,6 @@
       "noOpenFindings": "Geen open bevindingen die aandacht vragen",
       "noRepositoryData": "Nog geen repositorygegevens",
       "noRepositoryDataDescription": "De prioriteiten per repository verschijnen zodra de bevindingen zijn gesynchroniseerd.",
-      "noSlaDeadline": "Geen SLA-deadline ingesteld",
       "notExploitable": "Niet misbruikbaar",
       "notMeasured": "Niet gemeten",
       "notYetSynced": "Nog niet gesynchroniseerd",
@@ -1349,7 +1350,6 @@
       "alreadyResolvedDescription": "Deze bevinding is al opgelost en kan niet meer worden afgewezen.",
       "cannotDismissDescription": "Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen bevindingen afwijzen.",
       "cannotDismissTitle": "Deze bevinding kan niet worden afgewezen",
-      "commentAccessibility": "Toelichting bij de afwijzing",
       "commentLabel": "Opmerking (optioneel)",
       "commentPlaceholder": "Toelichting bij deze afwijzing…",
       "couldNotCheckPermissions": "Je rechten om bevindingen af te wijzen konden niet worden gecontroleerd.",
@@ -1419,7 +1419,6 @@
       "newFindingSection": "Meldingen over nieuwe bevindingen",
       "newFindingSeverityLabel": "Minimale ernst voor meldingen over nieuwe bevindingen",
       "newFindingSubtitle": "Je ontvangt een e-mail zodra een nieuwe bevinding wordt gesynchroniseerd, ook bij de eerste synchronisatie.",
-      "slaLeadTimeAccessibility": "Aantal dagen voor de SLA-deadline waarop je een waarschuwing ontvangt",
       "slaLeadTimeError": "Voer een geheel aantal dagen in tussen 1 en 365.",
       "slaLeadTimeLabel": "Dagen voor de SLA-deadline waarschuwen",
       "slaPersonalTitle": "E-mails met SLA-waarschuwingen ontvangen",
@@ -1849,7 +1848,6 @@
       "advancedConfigDescription": "Geldt voor deze sessie. Opslaan als profiel bewaart het voor de volgende keer.",
       "saveAsProfile": "Opslaan als profiel",
       "saveProfileDescription": "Sla de huidige omgevingsvariabelen en installatieopdrachten op als een herbruikbaar profiel.",
-      "profileSummary": "{{vars}} omgevingsvariabelen · {{commands}} installatieopdrachten",
       "profileSaved": "Profiel \"{{name}}\" opgeslagen",
       "organizationProfiles": "Organisatieprofielen",
       "personalProfiles": "Persoonlijke profielen",
@@ -2710,10 +2708,8 @@
       "checkFailedTitleBitbucket": "De Bitbucket-verbinding kon niet worden gecontroleerd.",
       "providerCheckFailedMessage": "De verbindingsstatus is pas beschikbaar zodra het laden is voltooid.",
       "reconnectTitle": "GitHub opnieuw verbinden",
-      "reconnectDescription": "De toegang tot je GitHub-account is ingetrokken. Maak opnieuw verbinding om PR's op je telefoon te blijven beoordelen.",
-      "description": "Koppel je GitHub-account om PR's op je telefoon te beoordelen.",
-      "gitlabDescription": "Koppel je GitLab-account om merge requests op je telefoon te beoordelen.",
-      "bitbucketDescription": "Koppel Bitbucket aan deze organisatie om PR's op je telefoon te beoordelen.",
+      "reconnectDescription": "De toegang tot je GitHub-account is ingetrokken.",
+      "gitlabDescription": "Merge requests op je mobiel beoordelen",
       "bitbucketOrgOnlyDescription": "Wissel het account hierboven naar een organisatie om diens Bitbucket-PR's te beoordelen.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Dit account heeft nog geen organisaties. Je kunt Bitbucket-PR's beoordelen zodra je een organisatie aanmaakt of er lid van wordt.",
       "contextLine": "Voor {{organization}}",
@@ -2947,6 +2943,7 @@
     "installKiloGitHubApp": "Kilo GitHub-app installeren",
     "merge": {
       "merge": "Samenvoegen",
+      "mergeTitle": "Samenvoegen",
       "mergeNow": "Nu samenvoegen",
       "mergePullRequest": "PR samenvoegen",
       "mergeTermTitle": "{{term}} samenvoegen",

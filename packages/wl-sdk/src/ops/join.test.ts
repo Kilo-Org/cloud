@@ -532,6 +532,34 @@ describe('join', () => {
     }
   });
 
+  it('fails closed when a non-success status accompanies the requested names', async () => {
+    // Reporting the requested owner and database is not evidence that
+    // the fork finished, so a stated pending or unrecognized status
+    // still ends the join before it hands back a handle to record.
+    for (const body of [
+      { status: 'Pending', owner_name: 'alice', database_name: 'wl' },
+      { status: 'Unexpected', owner_name: 'alice', database_name: 'wl' },
+    ]) {
+      const { fetch: f, calls } = makeFetch([{ status: 200, body }]);
+      const result = await join({
+        auth: { token: 't' },
+        upstream: { owner: 'hop', db: 'wl' },
+        dolthubOrg: 'alice',
+        rigHandle: 'alice-tools',
+        displayName: 'Alice tools',
+        ownerEmail: 'alice@example.com',
+        version: '0.1.0',
+        fetch: f,
+      });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe('upstream');
+      expect(calls.map(c => new URL(c.url).pathname.replace(/^.*\/api\/v1alpha1/, ''))).toEqual([
+        '/fork',
+      ]);
+    }
+  });
+
   it('accepts an org the caller already proved for its own record', async () => {
     // An org-based connection: the token belongs to member `bob`, the
     // fork and the registered row belong to org `acme`. The caller's

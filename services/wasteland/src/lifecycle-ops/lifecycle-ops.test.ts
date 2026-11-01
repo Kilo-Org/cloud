@@ -228,6 +228,8 @@ describe('joinViaSdk', () => {
       { status: 'Error', message: 'user has no access to this owner' },
       { status: 'Unexpected' },
       { status: 'Error', error: { message: 'denied' } },
+      { status: 'Pending', owner_name: 'alice', database_name: 'wl' },
+      { status: 'Unexpected', owner_name: 'alice', database_name: 'wl' },
     ]) {
       const { fetch, calls } = makeFetch([{ status: 200, body }]);
 

@@ -82,9 +82,10 @@ export type ForkDatabaseResult = {
   owner: string;
   db: string;
   /** True only when DoltHub confirmed the fork this call created —
-   *  synchronously by naming it or reporting a terminal success
-   *  status, or through a polled operation that completed. False when
-   *  DoltHub reported that the fork already existed. */
+   *  synchronously by reporting a terminal success status, or by naming
+   *  the fork when it states no status, or through a polled operation
+   *  that completed. False when DoltHub reported that the fork already
+   *  existed. */
   created: boolean;
 };
 
@@ -147,9 +148,10 @@ export async function createDatabase(opts: CreateDatabaseOptions): Promise<Creat
  * resolves with `created: false`.
  *
  * If DoltHub returns an `operation_name`, polls the `/fork` endpoint
- * until the operation completes. A response that neither names the
- * fork nor reports a terminal success status is an error, never
- * `created: true`.
+ * until the operation completes. A response that does not confirm the
+ * fork is an error, never `created: true`: a status the body states must
+ * be a terminal success, and a body that states no status must name the
+ * fork. Reported names never override a stated non-success status.
  */
 export async function forkDatabase(opts: ForkDatabaseOptions): Promise<ForkDatabaseResult> {
   const path = '/fork';
@@ -224,11 +226,19 @@ export async function forkDatabase(opts: ForkDatabaseOptions): Promise<ForkDatab
     const namesOther =
       (reportedOwner.length > 0 && reportedOwner.toLowerCase() !== opts.toOwner.toLowerCase()) ||
       (reportedDb.length > 0 && reportedDb.toLowerCase() !== targetDb.toLowerCase());
-    if (!parsed.success || namesOther || !(namesTarget || CONFIRMED_STATUS.test(statusField))) {
+    // A status the body states decides on its own: only a terminal
+    // success confirms the fork, and any other stated status — error,
+    // pending, running, queued, in progress, or one this client does not
+    // know — leaves it unconfirmed even when the body also names the
+    // target. Reporting the requested names is not evidence that the
+    // fork finished. Only a body that states no status at all may stand
+    // on the names it reports.
+    const confirmed = statusField.length > 0 ? CONFIRMED_STATUS.test(statusField) : namesTarget;
+    if (!parsed.success || namesOther || !confirmed) {
       throw new WlDoltHubError(
         `Fork ${opts.fromOwner}/${opts.fromDb} → ${opts.toOwner}/${targetDb} is unconfirmed: ${
           statusField.length > 0
-            ? `DoltHub reported "${statusField}" without confirming this fork`
+            ? `DoltHub reported "${statusField}", which does not confirm this fork`
             : 'the response does not describe this fork'
         }`,
         res.status,

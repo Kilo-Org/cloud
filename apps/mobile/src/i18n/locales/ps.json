@@ -2066,7 +2066,8 @@
       "actionBlocked": "د دې کړنې بشپړول ممکن نه وو. د بیا هڅې دمخه باید دا ستونزه حل شي.",
       "syncNoRepositories": "هیڅ زېرمتون د همغږۍ په حد کې نه دی. هغه زېرمتونونه وټاکئ چې امنیتي اجنټ یې څاري، بیا همغږي وکړئ.",
       "syncIntegrationInactive": "د امنیتي اجنټ لپاره GitHub اړیکه فعاله نه ده. د Kilo GitHub اپ بیا وصل کړئ، بیا همغږي وکړئ.",
-      "syncMissingPermission": "د Kilo GitHub اپ د زیانمنتیا خبرتیاوې لوستلای نشي. په GitHub کې هغه اجازه ورکړئ، بیا همغږي وکړئ."
+      "syncMissingPermission": "د Kilo GitHub اپ د زیانمنتیا خبرتیاوې لوستلای نشي. په GitHub کې هغه اجازه ورکړئ، بیا همغږي وکړئ.",
+      "configConflict": "د امنیتي اجنټ امستنې بل ځای کې بدلې شوې. وروستي امستنې وګورئ او بیا خوندي کړئ."
     },
     "analysisState": {
       "queued": "شننه په کتار کې ده",
@@ -2741,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "چمتو کوونکی {{id}}",
-      "modelId": "ماډل {{id}}",
       "unavailable": "نشته",
       "unavailableState": "نشته",
       "selectedState": "غوره شوی",
@@ -4151,7 +4151,8 @@
     "sources": "شواهد او اثار",
     "timezone": "د راپور وخت سیمه",
     "deviceTimezone": "د وسیلې وخت سیمه وکاروئ",
-    "timezoneHint": "IANA وخت سیمه، د بېلګې په توګه Europe/Berlin. د مهال وېش بدلونونه په راتلونکو راپورونو پلي کېږي.",
+    "timezoneHint": "IANA وخت سیمه، د بېلګې په توګه Europe/Berlin.",
+    "scheduleHint": "د مهال وېش بدلونونه په راتلونکو راپورونو پلي کېږي.",
     "nightStart": "د راپور مهال پیلېږي",
     "morningStart": "د راپور د چمتو کېدو وخت",
     "morningEnd": "د راپور د شتون د پای وخت",

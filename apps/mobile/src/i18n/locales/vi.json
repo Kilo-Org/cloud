@@ -1536,7 +1536,8 @@
       "actionBlocked": "Không thể hoàn tất hành động này. Bạn cần khắc phục sự cố trước khi thử lại.",
       "syncNoRepositories": "Không có kho lưu trữ nào trong phạm vi đồng bộ. Hãy chọn các kho lưu trữ mà Trợ lý bảo mật giám sát, rồi đồng bộ lại.",
       "syncIntegrationInactive": "Kết nối GitHub của Trợ lý bảo mật chưa hoạt động. Hãy kết nối lại Ứng dụng GitHub của Kilo, sau đó đồng bộ lại.",
-      "syncMissingPermission": "Kilo GitHub App không thể đọc cảnh báo lỗ hổng bảo mật. Cấp quyền đó trong GitHub, rồi đồng bộ lại."
+      "syncMissingPermission": "Kilo GitHub App không thể đọc cảnh báo lỗ hổng bảo mật. Cấp quyền đó trong GitHub, rồi đồng bộ lại.",
+      "configConflict": "Cài đặt của Trợ lý bảo mật đã bị thay đổi ở nơi khác. Hãy xem lại cài đặt mới nhất và lưu lại."
     },
     "analysisState": {
       "queued": "Đang chờ phân tích",
@@ -2211,7 +2212,6 @@
     },
     "modelSelector": {
       "provider": "Nhà cung cấp {{id}}",
-      "modelId": "Mô hình {{id}}",
       "unavailable": "Không khả dụng",
       "unavailableState": "không khả dụng",
       "selectedState": "đã chọn",
@@ -4151,7 +4151,8 @@
     "sources": "Bằng chứng và tạo phẩm",
     "timezone": "Múi giờ bản tin",
     "deviceTimezone": "Dùng múi giờ của thiết bị",
-    "timezoneHint": "Múi giờ IANA, ví dụ Europe/Berlin. Thay đổi lịch sẽ áp dụng cho các bản tin sau.",
+    "timezoneHint": "Múi giờ IANA, ví dụ Europe/Berlin.",
+    "scheduleHint": "Thay đổi lịch sẽ áp dụng cho các bản tin sau.",
     "nightStart": "Khung thời gian bản tin bắt đầu",
     "morningStart": "Bản tin sẵn sàng lúc",
     "morningEnd": "Bản tin có sẵn đến",

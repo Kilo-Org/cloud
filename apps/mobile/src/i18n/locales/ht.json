@@ -2066,7 +2066,8 @@
       "actionBlocked": "Pa t ka fini aksyon sa a. Fòk ou repare pwoblèm nan anvan ou ka eseye ankò.",
       "syncNoRepositories": "Pa gen okenn depo nan sijè senkronizasyon an. Chwazi depo Ajan sekirite siveye yo, epi senkronize ankò.",
       "syncIntegrationInactive": "Koneksyon GitHub pou Ajan sekirite a pa aktif. Rekonekte GitHub App Kilo a, epi senkronize ankò.",
-      "syncMissingPermission": "Kilo GitHub App pa ka li alèt vilnerabilite yo. Bay pèmisyon sa a nan GitHub, epi senkronize ankò."
+      "syncMissingPermission": "Kilo GitHub App pa ka li alèt vilnerabilite yo. Bay pèmisyon sa a nan GitHub, epi senkronize ankò.",
+      "configConflict": "Paramèt Ajan sekirite a chanje yon lòt kote. Revize paramèt ki pi resan yo epi anrejistre ankò."
     },
     "analysisState": {
       "queued": "Analiz nan ke",
@@ -2741,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Founisè {{id}}",
-      "modelId": "Modèl {{id}}",
       "unavailable": "Pa disponib",
       "unavailableState": "pa disponib",
       "selectedState": "chwazi",
@@ -4151,7 +4151,8 @@
     "sources": "Prèv ak atefak",
     "timezone": "Fizo orè rapò a",
     "deviceTimezone": "Sèvi ak fizo orè aparèy la",
-    "timezoneHint": "Fizo orè IANA, pa egzanp Europe/Berlin. Chanjman orè yo aplike pou rapò k ap vini yo.",
+    "timezoneHint": "Fizo orè IANA, pa egzanp Europe/Berlin.",
+    "scheduleHint": "Chanjman orè yo aplike pou rapò k ap vini yo.",
     "nightStart": "Fenèt rapò a kòmanse",
     "morningStart": "Rapò a pare a",
     "morningEnd": "Rapò a disponib jiska",

@@ -2066,7 +2066,8 @@
       "actionBlocked": "Imeshindikana kukamilisha kitendo hiki. Tatizo lazima litatuliwe kwanza.",
       "syncNoRepositories": "Hakuna hazina zilizo katika wigo wa usawazishaji. Chagua hazina ambazo Wakala wa usalama hufuatilia, kisha usawazishe tena.",
       "syncIntegrationInactive": "Muunganisho wa GitHub wa Wakala wa usalama haupo hai. Unganisha tena GitHub App ya Kilo, kisha usawazishe tena.",
-      "syncMissingPermission": "Kilo GitHub App haiwezi kusoma arifa za udhaifu. Toa ruhusa hiyo katika GitHub, kisha sinkronisha tena."
+      "syncMissingPermission": "Kilo GitHub App haiwezi kusoma arifa za udhaifu. Toa ruhusa hiyo katika GitHub, kisha sinkronisha tena.",
+      "configConflict": "Mipangilio ya Wakala wa usalama ilibadilishwa mahali pengine. Pitia mipangilio ya hivi punde na uhifadhi tena."
     },
     "analysisState": {
       "queued": "Uchambuzi uko kwenye foleni",
@@ -2741,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Mtoa huduma {{id}}",
-      "modelId": "Modeli {{id}}",
       "unavailable": "Haipatikani",
       "unavailableState": "haipatikani",
       "selectedState": "imechaguliwa",
@@ -4151,7 +4151,8 @@
     "sources": "Ushahidi na vielelezo",
     "timezone": "Saa za eneo za ripoti",
     "deviceTimezone": "Tumia saa za eneo za kifaa",
-    "timezoneHint": "Saa za eneo za IANA, kwa mfano Europe/Berlin. Mabadiliko ya ratiba yanatumika kwa ripoti zijazo.",
+    "timezoneHint": "Saa za eneo za IANA, kwa mfano Europe/Berlin.",
+    "scheduleHint": "Mabadiliko ya ratiba yanatumika kwa ripoti zijazo.",
     "nightStart": "Kipindi cha ripoti kinaanza",
     "morningStart": "Ripoti iko tayari saa",
     "morningEnd": "Ripoti inapatikana hadi",

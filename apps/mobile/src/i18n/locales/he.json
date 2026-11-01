@@ -1550,7 +1550,8 @@
       "actionBlocked": "לא ניתן להשלים את הפעולה הזו. יש לתקן את הבעיה לפני שניתן יהיה לנסות שוב.",
       "syncNoRepositories": "אין מאגרים בהיקף הסנכרון. יש לבחור את המאגרים שסוכן האבטחה עוקב אחריהם, ואז לסנכרן שוב.",
       "syncIntegrationInactive": "החיבור של GitHub עבור סוכן האבטחה אינו פעיל. יש לחבר מחדש את אפליקציית Kilo GitHub, ואז לסנכרן שוב.",
-      "syncMissingPermission": "אפליקציית Kilo GitHub אינה יכולה לקרוא vulnerability alerts. יש להעניק הרשאה זו ב-GitHub, ואז לסנכרן שוב."
+      "syncMissingPermission": "אפליקציית Kilo GitHub אינה יכולה לקרוא vulnerability alerts. יש להעניק הרשאה זו ב-GitHub, ואז לסנכרן שוב.",
+      "configConflict": "ההגדרות של סוכן האבטחה שונו במקום אחר. בדוק את ההגדרות העדכניות ושמור שוב."
     },
     "analysisState": {
       "queued": "הניתוח ממתין בתור",
@@ -2234,7 +2235,6 @@
     },
     "modelSelector": {
       "provider": "ספק {{id}}",
-      "modelId": "מודל {{id}}",
       "unavailable": "לא זמין",
       "unavailableState": "לא זמין",
       "selectedState": "נבחר",
@@ -4212,7 +4212,8 @@
     "sources": "ראיות ותוצרים",
     "timezone": "אזור זמן לדוח",
     "deviceTimezone": "שימוש באזור הזמן של המכשיר",
-    "timezoneHint": "אזור זמן IANA, לדוגמה Europe/Berlin. שינויים בלוח הזמנים יחולו על דוחות עתידיים.",
+    "timezoneHint": "אזור זמן IANA, לדוגמה Europe/Berlin.",
+    "scheduleHint": "שינויים בלוח הזמנים יחולו על דוחות עתידיים.",
     "nightStart": "תחילת חלון הדוח",
     "morningStart": "הדוח מוכן בשעה",
     "morningEnd": "הדוח זמין עד",

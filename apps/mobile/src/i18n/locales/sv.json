@@ -2066,7 +2066,8 @@
       "actionBlocked": "Det gick inte att slutföra den här åtgärden. Problemet måste åtgärdas innan du kan försöka igen.",
       "syncNoRepositories": "Inga kodarkiv finns i synkroniseringsomfånget. Välj de kodarkiv som Säkerhetsagenten övervakar och synkronisera igen.",
       "syncIntegrationInactive": "GitHub-anslutningen för Säkerhetsagenten är inte aktiv. Återanslut Kilos GitHub-app och synkronisera igen.",
-      "syncMissingPermission": "Kilos GitHub-app kan inte läsa sårbarhetsaviseringar. Bevilja behörigheten i GitHub och synkronisera igen."
+      "syncMissingPermission": "Kilos GitHub-app kan inte läsa sårbarhetsaviseringar. Bevilja behörigheten i GitHub och synkronisera igen.",
+      "configConflict": "Säkerhetsagentens inställningar ändrades någon annanstans. Granska de senaste inställningarna och spara igen."
     },
     "analysisState": {
       "queued": "Analys i kö",
@@ -2741,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Leverantör {{id}}",
-      "modelId": "Modell {{id}}",
       "unavailable": "Inte tillgänglig",
       "unavailableState": "inte tillgänglig",
       "selectedState": "vald",
@@ -4151,7 +4151,8 @@
     "sources": "Underlag och artefakter",
     "timezone": "Tidszon för rapport",
     "deviceTimezone": "Använd enhetens tidszon",
-    "timezoneHint": "IANA-tidszon, till exempel Europe/Berlin. Schemaändringar gäller kommande rapporter.",
+    "timezoneHint": "IANA-tidszon, till exempel Europe/Berlin.",
+    "scheduleHint": "Schemaändringar gäller kommande rapporter.",
     "nightStart": "Rapportperioden börjar",
     "morningStart": "Rapport klar",
     "morningEnd": "Rapport tillgänglig till",

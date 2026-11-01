@@ -2099,7 +2099,8 @@
       "actionBlocked": "No s'ha pogut completar aquesta acció. Cal resoldre el problema abans de poder tornar-ho a provar.",
       "syncNoRepositories": "No hi ha cap repositori a l'abast de la sincronització. Tria quins repositoris supervisa l'agent de seguretat i torna a sincronitzar.",
       "syncIntegrationInactive": "La connexió de GitHub per a l'agent de seguretat no està activa. Torna a connectar l'aplicació de GitHub de Kilo i torna a sincronitzar.",
-      "syncMissingPermission": "L'aplicació de GitHub de Kilo no pot llegir els avisos de vulnerabilitat. Concedeix aquest permís a GitHub i torna a sincronitzar."
+      "syncMissingPermission": "L'aplicació de GitHub de Kilo no pot llegir els avisos de vulnerabilitat. Concedeix aquest permís a GitHub i torna a sincronitzar.",
+      "configConflict": "La configuració de l'agent de seguretat s'ha canviat en un altre lloc. Revisa la configuració més recent i desa de nou."
     },
     "analysisState": {
       "queued": "Anàlisi en cua",
@@ -2783,7 +2784,6 @@
     },
     "modelSelector": {
       "provider": "Proveïdor {{id}}",
-      "modelId": "Model: {{id}}",
       "unavailable": "No disponible",
       "unavailableState": "no disponible",
       "selectedState": "seleccionat",
@@ -4212,7 +4212,8 @@
     "sources": "Proves i artefactes",
     "timezone": "Zona horària de l'informe",
     "deviceTimezone": "Usa la zona horària del dispositiu",
-    "timezoneHint": "Zona horària IANA, per exemple Europe/Berlin. Els canvis d'horari s'apliquen als informes futurs.",
+    "timezoneHint": "Zona horària IANA, per exemple Europe/Berlin.",
+    "scheduleHint": "Els canvis d'horari s'apliquen als informes futurs.",
     "nightStart": "Inici de la finestra de l'informe",
     "morningStart": "Informe a punt a les",
     "morningEnd": "Informe disponible fins a les",

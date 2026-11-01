@@ -2066,7 +2066,8 @@
       "actionBlocked": "Toimintoa ei voitu suorittaa loppuun. Ongelma on korjattava ensin.",
       "syncNoRepositories": "Synkronointilaajuudessa ei ole yhtään repositoriota. Valitse repositoriot, joita Tietoturva-agentti valvoo, ja synkronoi sitten uudelleen.",
       "syncIntegrationInactive": "Tietoturva-agentin GitHub-yhteys ei ole aktiivinen. Yhdistä Kilo GitHub App uudelleen ja synkronoi sitten uudelleen.",
-      "syncMissingPermission": "Kilo GitHub App ei voi lukea haavoittuvuushälytyksiä. Myönnä kyseinen käyttöoikeus GitHubissa ja synkronoi sitten uudelleen."
+      "syncMissingPermission": "Kilo GitHub App ei voi lukea haavoittuvuushälytyksiä. Myönnä kyseinen käyttöoikeus GitHubissa ja synkronoi sitten uudelleen.",
+      "configConflict": "Tietoturva-agentin asetuksia muutettiin muualla. Tarkista uusimmat asetukset ja tallenna uudelleen."
     },
     "analysisState": {
       "queued": "Analyysi jonossa",
@@ -2741,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Palveluntarjoaja {{id}}",
-      "modelId": "Malli {{id}}",
       "unavailable": "Ei saatavilla",
       "unavailableState": "ei saatavilla",
       "selectedState": "valittu",
@@ -4151,7 +4151,8 @@
     "sources": "Todisteet ja artefaktit",
     "timezone": "Katsauksen aikavyöhyke",
     "deviceTimezone": "Käytä laitteen aikavyöhykettä",
-    "timezoneHint": "IANA-aikavyöhyke, esimerkiksi Europe/Berlin. Aikataulumuutokset koskevat tulevia katsauksia.",
+    "timezoneHint": "IANA-aikavyöhyke, esimerkiksi Europe/Berlin.",
+    "scheduleHint": "Aikataulumuutokset koskevat tulevia katsauksia.",
     "nightStart": "Katsausikkuna alkaa",
     "morningStart": "Katsaus valmiina",
     "morningEnd": "Katsauksen saatavuus päättyy",

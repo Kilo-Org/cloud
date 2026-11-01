@@ -2165,7 +2165,8 @@
       "actionBlocked": "Níorbh fhéidir an gníomh seo a chríochnú. Caithfear an fhadhb a réiteach ar dtús.",
       "syncNoRepositories": "Níl aon stórtha i scóip an tsioncrónaithe. Roghnaigh na stórtha a ndéanann an Gníomhaire slándála monatóireacht orthu, ansin sioncrónaigh arís.",
       "syncIntegrationInactive": "Níl an nasc GitHub don Ghníomhaire slándála gníomhach. Athcheangail Aip GitHub Kilo, ansin sioncrónaigh arís.",
-      "syncMissingPermission": "Ní féidir le Aip GitHub Kilo foláirimh leochaileachta a léamh. Deonaigh an cead sin i GitHub, ansin sioncrónaigh arís."
+      "syncMissingPermission": "Ní féidir le Aip GitHub Kilo foláirimh leochaileachta a léamh. Deonaigh an cead sin i GitHub, ansin sioncrónaigh arís.",
+      "configConflict": "Athraíodh socruithe an Ghníomhaire slándála in áit eile. Déan athbhreithniú ar na socruithe is déanaí agus sábháil arís."
     },
     "analysisState": {
       "queued": "Anailís sa scuaine",
@@ -2867,7 +2868,6 @@
     },
     "modelSelector": {
       "provider": "Soláthraí {{id}}",
-      "modelId": "Samhail {{id}}",
       "unavailable": "Níl ar fáil",
       "unavailableState": "níl ar fáil",
       "selectedState": "roghnaithe",
@@ -4334,7 +4334,8 @@
     "sources": "Fianaise agus déantáin",
     "timezone": "Crios ama na tuarascála",
     "deviceTimezone": "Úsáid crios ama an ghléis",
-    "timezoneHint": "Crios ama IANA, mar shampla Europe/Berlin. Bainfidh athruithe sceidil le tuarascálacha amach anseo.",
+    "timezoneHint": "Crios ama IANA, mar shampla Europe/Berlin.",
+    "scheduleHint": "Bainfidh athruithe sceidil le tuarascálacha amach anseo.",
     "nightStart": "Tosaíonn an fhuinneog tuarascála",
     "morningStart": "Tuarascáil réidh ag",
     "morningEnd": "Tuarascáil ar fáil go dtí",

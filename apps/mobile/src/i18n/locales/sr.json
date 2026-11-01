@@ -2099,7 +2099,8 @@
       "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem mora biti rešen pre nego što pokušaš ponovo.",
       "syncNoRepositories": "Nijedan repozitorijum nije u opsegu sinhronizacije. Izaberite repozitorijume koje Bezbednosni agent nadgleda, pa ponovo sinhronizujte.",
       "syncIntegrationInactive": "GitHub veza za Bezbednosni agent nije aktivna. Ponovo povežite Kilo GitHub App, zatim ponovo sinhronizujte.",
-      "syncMissingPermission": "Kilo GitHub aplikacija ne može da čita upozorenja o ranjivostima. Dodeli to ovlašćenje na GitHub-u, pa sinhronizuj ponovo."
+      "syncMissingPermission": "Kilo GitHub aplikacija ne može da čita upozorenja o ranjivostima. Dodeli to ovlašćenje na GitHub-u, pa sinhronizuj ponovo.",
+      "configConflict": "Podešavanja Bezbednosnog agenta promenjena su na drugom mestu. Pregledaj najnovija podešavanja i ponovo sačuvaj."
     },
     "analysisState": {
       "queued": "Analiza u redu čekanja",
@@ -2783,7 +2784,6 @@
     },
     "modelSelector": {
       "provider": "Provajder {{id}}",
-      "modelId": "Model sa oznakom {{id}}",
       "unavailable": "Nedostupno",
       "unavailableState": "nedostupno",
       "selectedState": "izabrano",
@@ -4212,7 +4212,8 @@
     "sources": "Dokazi i artefakti",
     "timezone": "Vremenska zona izveštaja",
     "deviceTimezone": "Koristi vremensku zonu uređaja",
-    "timezoneHint": "IANA vremenska zona, na primer Europe/Berlin. Izmene rasporeda važe za buduće izveštaje.",
+    "timezoneHint": "IANA vremenska zona, na primer Europe/Berlin.",
+    "scheduleHint": "Izmene rasporeda važe za buduće izveštaje.",
     "nightStart": "Početak perioda izveštaja",
     "morningStart": "Izveštaj spreman u",
     "morningEnd": "Izveštaj dostupan do",

@@ -2066,7 +2066,8 @@
       "actionBlocked": "ଏହି କାର୍ଯ୍ୟଟି ସମ୍ପୂର୍ଣ୍ଣ କରିପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବା ପୂର୍ବରୁ ସମସ୍ୟାଟି ସମାଧାନ କରିବାକୁ ହେବ।",
       "syncNoRepositories": "ସିଙ୍କ୍ ପରିସରରେ କୌଣସି ରିପୋଜିଟୋରୀ ନାହିଁ। ସୁରକ୍ଷା ଏଜେଣ୍ଟ ଯେଉଁ ରିପୋଜିଟୋରୀଗୁଡ଼ିକୁ ନଜରରେ ରଖେ ସେଗୁଡ଼ିକୁ ବାଛନ୍ତୁ, ତାପରେ ପୁଣି ସିଙ୍କ୍ କରନ୍ତୁ।",
       "syncIntegrationInactive": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ ପାଇଁ GitHub ସଂଯୋଗ ସକ୍ରିୟ ନାହିଁ। Kilo GitHub App କୁ ପୁଣି ସଂଯୋଗ କରନ୍ତୁ, ତାପରେ ପୁଣି ସିଙ୍କ୍ କରନ୍ତୁ।",
-      "syncMissingPermission": "Kilo GitHub App vulnerability alerts ପଢ଼ିପାରିବ ନାହିଁ। GitHub ରେ ସେହି ଅନୁମତି ଦିଅନ୍ତୁ, ତାପରେ ପୁଣି ସିଙ୍କ୍ କରନ୍ତୁ।"
+      "syncMissingPermission": "Kilo GitHub App vulnerability alerts ପଢ଼ିପାରିବ ନାହିଁ। GitHub ରେ ସେହି ଅନୁମତି ଦିଅନ୍ତୁ, ତାପରେ ପୁଣି ସିଙ୍କ୍ କରନ୍ତୁ।",
+      "configConflict": "ସୁରକ୍ଷା ଏଜେଣ୍ଟର ସେଟିଂସ ଅନ୍ୟଠାରେ ବଦଳିଛି। ସାମ୍ପ୍ରତିକ ସେଟିଂସ ସମୀକ୍ଷା କରି ପୁଣି ସଂରକ୍ଷଣ କରନ୍ତୁ।"
     },
     "analysisState": {
       "queued": "ବିଶ୍ଳେଷଣ ଅପେକ୍ଷା ତାଲିକାରେ",
@@ -2741,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "ସେବା ପ୍ରଦାନକାରୀ {{id}}",
-      "modelId": "ମଡେଲ୍ {{id}}",
       "unavailable": "ଅନୁପଲବ୍ଧ",
       "unavailableState": "ଅନୁପଲବ୍ଧ",
       "selectedState": "ଚୟନ ହୋଇଛି",
@@ -4151,7 +4151,8 @@
     "sources": "ପ୍ରମାଣ ଓ ଆର୍ଟିଫ୍ୟାକ୍ଟ",
     "timezone": "ରିପୋର୍ଟ ସମୟ ଅଞ୍ଚଳ",
     "deviceTimezone": "ଡିଭାଇସର ସମୟ ଅଞ୍ଚଳ ବ୍ୟବହାର କରନ୍ତୁ",
-    "timezoneHint": "IANA ସମୟ ଅଞ୍ଚଳ, ଯେପରି Europe/Berlin। ସମୟସୂଚୀ ପରିବର୍ତ୍ତନ ଆଗାମୀ ରିପୋର୍ଟଗୁଡ଼ିକ ପାଇଁ ଲାଗୁ ହେବ।",
+    "timezoneHint": "IANA ସମୟ ଅଞ୍ଚଳ, ଯେପରି Europe/Berlin।",
+    "scheduleHint": "ସମୟସୂଚୀ ପରିବର୍ତ୍ତନ ଆଗାମୀ ରିପୋର୍ଟଗୁଡ଼ିକ ପାଇଁ ଲାଗୁ ହେବ।",
     "nightStart": "ରିପୋର୍ଟ ଅବଧି ଆରମ୍ଭ",
     "morningStart": "ରିପୋର୍ଟ ପ୍ରସ୍ତୁତ ସମୟ",
     "morningEnd": "ରିପୋର୍ଟ ଉପଲବ୍ଧ ପର୍ଯ୍ୟନ୍ତ",

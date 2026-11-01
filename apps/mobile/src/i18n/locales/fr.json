@@ -1524,7 +1524,8 @@
       "actionBlocked": "Impossible d'effectuer cette action. Le problème doit être résolu avant de pouvoir réessayer.",
       "syncNoRepositories": "Aucun dépôt ne fait partie du périmètre de synchronisation. Choisissez les dépôts que «Agent de sécurité» surveille, puis relancez la synchronisation.",
       "syncIntegrationInactive": "La connexion GitHub pour l'Agent de sécurité n'est pas active. Reconnectez Kilo GitHub App, puis relancez la synchronisation.",
-      "syncMissingPermission": "L'application GitHub de Kilo ne peut pas lire les alertes de vulnérabilité. Accordez cette autorisation dans GitHub, puis synchronisez à nouveau."
+      "syncMissingPermission": "L'application GitHub de Kilo ne peut pas lire les alertes de vulnérabilité. Accordez cette autorisation dans GitHub, puis synchronisez à nouveau.",
+      "configConflict": "Les paramètres de l'agent de sécurité ont été modifiés ailleurs. Vérifiez les paramètres les plus récents et enregistrez à nouveau."
     },
     "analysisState": {
       "queued": "Analyse en file d'attente",
@@ -2142,7 +2143,6 @@
     },
     "modelSelector": {
       "provider": "Fournisseur {{id}}",
-      "modelId": "Modèle {{id}}",
       "unavailable": "Indisponible",
       "unavailableState": "indisponible",
       "selectedState": "sélectionné",
@@ -4218,7 +4218,8 @@
     "sources": "Preuves et artefacts",
     "timezone": "Fuseau horaire du briefing",
     "deviceTimezone": "Utiliser le fuseau de l’appareil",
-    "timezoneHint": "Fuseau horaire IANA, par exemple Europe/Berlin. Les changements de programmation s’appliquent aux briefings à venir.",
+    "timezoneHint": "Fuseau horaire IANA, par exemple Europe/Berlin.",
+    "scheduleHint": "Les changements de programmation s’appliquent aux briefings à venir.",
     "nightStart": "Début de la fenêtre de briefing",
     "morningStart": "Briefing prêt à",
     "morningEnd": "Briefing disponible jusqu’à",

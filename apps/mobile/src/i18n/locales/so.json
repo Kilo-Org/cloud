@@ -2066,7 +2066,8 @@
       "actionBlocked": "Ficilkan lama dhammeeyi karin. Waa in dhibaatadan horay loo xalliyo.",
       "syncNoRepositories": "Ma jiro kayd-baakhaaro ku jira baaxadda is-waafajinta. Dooro kayd-baakhaarada uu Wakiilka amniga ilaaliyo, ka dibna mar kale is-waafaji.",
       "syncIntegrationInactive": "Isku xirka GitHub ee Wakiilka amniga ma firfircoona. Dib u xir Kilo GitHub App, ka dibna mar kale isku dubarid.",
-      "syncMissingPermission": "Kilo GitHub App ma akhrin karo digniinaha nuglaanta. Sii ogolaanshahaas gudaha GitHub, ka dibna mar kale isku-dhaji."
+      "syncMissingPermission": "Kilo GitHub App ma akhrin karo digniinaha nuglaanta. Sii ogolaanshahaas gudaha GitHub, ka dibna mar kale isku-dhaji.",
+      "configConflict": "Dejinta Wakiilka amniga ayaa meel kale laga beddelay. Dib u eeg dejinta ugu dambeysa oo mar kale kaydi."
     },
     "analysisState": {
       "queued": "Falanqaynta ayaa safan",
@@ -2741,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Bixiyaha {{id}}",
-      "modelId": "Moodeelka {{id}}",
       "unavailable": "Lama heli karo",
       "unavailableState": "lama heli karo",
       "selectedState": "la doortay",
@@ -4151,7 +4151,8 @@
     "sources": "Caddaymaha iyo waxyaabaha ka soo baxay shaqada",
     "timezone": "Aagga waqtiga warbixinta",
     "deviceTimezone": "Isticmaal aagga waqtiga qalabka",
-    "timezoneHint": "Aagga waqtiga IANA, tusaale Europe/Berlin. Isbeddellada jadwalka waxay khuseeyaan warbixinnada soo socda.",
+    "timezoneHint": "Aagga waqtiga IANA, tusaale Europe/Berlin.",
+    "scheduleHint": "Isbeddellada jadwalka waxay khuseeyaan warbixinnada soo socda.",
     "nightStart": "Muddada warbixinta waxay bilaabataa",
     "morningStart": "Warbixinta diyaar tahay",
     "morningEnd": "Warbixinta la heli karo ilaa",

@@ -2066,7 +2066,8 @@
       "actionBlocked": "Nem sikerült befejezni ezt a műveletet. A hibát előbb javítani kell.",
       "syncNoRepositories": "Egyetlen adattár sem esik a szinkronizálás hatókörébe. Válassza ki azokat az adattárakat, amelyeket a Biztonsági ügynök figyel, majd szinkronizáljon újra.",
       "syncIntegrationInactive": "A Biztonsági ügynök GitHub-kapcsolata nem aktív. Csatlakoztassa újra a Kilo GitHub App-ot, majd szinkronizáljon újra.",
-      "syncMissingPermission": "A Kilo GitHub-alkalmazás nem tudja olvasni a sebezhetőségi riasztásokat. Add meg ezt az engedélyt a GitHubbon, majd szinkronizálj újra."
+      "syncMissingPermission": "A Kilo GitHub-alkalmazás nem tudja olvasni a sebezhetőségi riasztásokat. Add meg ezt az engedélyt a GitHubbon, majd szinkronizálj újra.",
+      "configConflict": "A biztonsági ügynök beállításai máshol módosultak. Nézd át a legfrissebb beállításokat, és ments újra."
     },
     "analysisState": {
       "queued": "Elemzés várólistán",
@@ -2741,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Szolgáltató: {{id}}",
-      "modelId": "Modell: {{id}}",
       "unavailable": "Nem elérhető",
       "unavailableState": "nem elérhető",
       "selectedState": "kijelölve",
@@ -4151,7 +4151,8 @@
     "sources": "Bizonyítékok és artefaktumok",
     "timezone": "Jelentés időzónája",
     "deviceTimezone": "Eszköz időzónájának használata",
-    "timezoneHint": "IANA időzóna, például Europe/Berlin. Az ütemezés módosításai a következő jelentésekre érvényesek.",
+    "timezoneHint": "IANA időzóna, például Europe/Berlin.",
+    "scheduleHint": "Az ütemezés módosításai a következő jelentésekre érvényesek.",
     "nightStart": "Az időablak kezdete",
     "morningStart": "A jelentés elkészül",
     "morningEnd": "A jelentés elérhető eddig",

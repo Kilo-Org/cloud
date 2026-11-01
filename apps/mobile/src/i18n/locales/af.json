@@ -2066,7 +2066,8 @@
       "actionBlocked": "Hierdie aksie kon nie voltooi word nie. Die probleem moet eers reggemaak word voordat jy weer kan probeer.",
       "syncNoRepositories": "Geen bewaarplekke is in die sinkroniseringsomvang nie. Kies die bewaarplekke wat die Sekuriteitsagent monitor en sinkroniseer dan weer.",
       "syncIntegrationInactive": "Die GitHub-verbinding vir die Sekuriteitsagent is nie aktief nie. Herkoppel die Kilo GitHub-app en sinkroniseer dan weer.",
-      "syncMissingPermission": "Die Kilo GitHub-app kan nie kwesbaarheidswaarskuwings lees nie. Verleen daardie toestemming in GitHub en sinkroniseer dan weer."
+      "syncMissingPermission": "Die Kilo GitHub-app kan nie kwesbaarheidswaarskuwings lees nie. Verleen daardie toestemming in GitHub en sinkroniseer dan weer.",
+      "configConflict": "Die Sekuriteitsagent se instellings is elders verander. Hersien die nuutste instellings en stoor weer."
     },
     "analysisState": {
       "queued": "Ontleding in die tou",
@@ -2741,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Verskaffer {{id}}",
-      "modelId": "Model-ID: {{id}}",
       "unavailable": "Onbeskikbaar",
       "unavailableState": "onbeskikbaar",
       "selectedState": "gekies",
@@ -4151,7 +4151,8 @@
     "sources": "Bewyse en artefakte",
     "timezone": "Verslag-tydsone",
     "deviceTimezone": "Gebruik toestel-tydsone",
-    "timezoneHint": "IANA-tydsone, byvoorbeeld Europe/Berlin. Skedulewysigings geld vir toekomstige verslae.",
+    "timezoneHint": "IANA-tydsone, byvoorbeeld Europe/Berlin.",
+    "scheduleHint": "Skedulewysigings geld vir toekomstige verslae.",
     "nightStart": "Verslagvenster begin",
     "morningStart": "Verslag gereed om",
     "morningEnd": "Verslag beskikbaar tot",

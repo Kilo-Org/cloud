@@ -1550,7 +1550,8 @@
       "actionBlocked": "No se pudo completar esta acción. Hay que solucionar el problema antes de poder reintentarlo.",
       "syncNoRepositories": "No hay repositorios en el ámbito de sincronización. Elige qué repositorios supervisa el agente de seguridad y sincroniza de nuevo.",
       "syncIntegrationInactive": "La conexión de GitHub para el agente de seguridad no está activa. Vuelve a conectar la aplicación de Kilo en GitHub y sincroniza de nuevo.",
-      "syncMissingPermission": "La aplicación de Kilo en GitHub no puede leer las alertas de vulnerabilidades. Concede ese permiso en GitHub y sincroniza de nuevo."
+      "syncMissingPermission": "La aplicación de Kilo en GitHub no puede leer las alertas de vulnerabilidades. Concede ese permiso en GitHub y sincroniza de nuevo.",
+      "configConflict": "Los ajustes del agente de seguridad se cambiaron en otro lugar. Revisa los ajustes más recientes y guarda de nuevo."
     },
     "analysisState": {
       "queued": "Análisis en cola",
@@ -2234,7 +2235,6 @@
     },
     "modelSelector": {
       "provider": "Proveedor {{id}}",
-      "modelId": "Modelo {{id}}",
       "unavailable": "No disponible",
       "unavailableState": "no disponible",
       "selectedState": "seleccionado",
@@ -4212,7 +4212,8 @@
     "sources": "Evidencias y artefactos",
     "timezone": "Zona horaria del informe",
     "deviceTimezone": "Usar zona horaria del dispositivo",
-    "timezoneHint": "Zona horaria IANA, por ejemplo Europe/Berlin. Los cambios de horario se aplican a los próximos informes.",
+    "timezoneHint": "Zona horaria IANA, por ejemplo Europe/Berlin.",
+    "scheduleHint": "Los cambios de horario se aplican a los próximos informes.",
     "nightStart": "Inicio de la ventana del informe",
     "morningStart": "Informe listo a las",
     "morningEnd": "Informe disponible hasta",

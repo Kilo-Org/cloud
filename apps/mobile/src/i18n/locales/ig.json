@@ -2066,7 +2066,8 @@
       "actionBlocked": "Enweghị ike imecha omume a. A ghaghị idozi nsogbu a tupu ị nwee ike ịnwa ọzọ.",
       "syncNoRepositories": "Ọnweghị repository dị n'ime oke sync. Họrọ repositories ndị Onye enyemaka nchebe na-enyocha, wee sync ọzọ.",
       "syncIntegrationInactive": "Njikọ GitHub maka Onye enyemaka nchebe adịghị arụ ọrụ. Jikọọ Kilo GitHub App ọzọ, wee megharịa ọzọ.",
-      "syncMissingPermission": "Kilo GitHub App enweghị ike ịgụ vulnerability alerts. Nye ikike ahụ na GitHub, wee sync ọzọ."
+      "syncMissingPermission": "Kilo GitHub App enweghị ike ịgụ vulnerability alerts. Nye ikike ahụ na GitHub, wee sync ọzọ.",
+      "configConflict": "Agbanweela ntọala Onye enyemaka nchebe n'ebe ọzọ. Lelee ntọala kachasị ọhụrụ ma chekwaa ọzọ."
     },
     "analysisState": {
       "queued": "Nyocha dị n'ahịrị",
@@ -2741,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Onye na-enye ọrụ {{id}}",
-      "modelId": "Ihe nlereanya {{id}}",
       "unavailable": "Adịghị",
       "unavailableState": "adịghị",
       "selectedState": "ahọpụtara",
@@ -4151,7 +4151,8 @@
     "sources": "Ihe akaebe na ihe ndị e mepụtara",
     "timezone": "Mpaghara oge akụkọ",
     "deviceTimezone": "Jiri mpaghara oge ngwaọrụ",
-    "timezoneHint": "Mpaghara oge IANA, dịka Europe/Berlin. Mgbanwe usoro na-emetụta akụkọ ndị na-abịa.",
+    "timezoneHint": "Mpaghara oge IANA, dịka Europe/Berlin.",
+    "scheduleHint": "Mgbanwe usoro na-emetụta akụkọ ndị na-abịa.",
     "nightStart": "Oge akụkọ na-amalite",
     "morningStart": "Akụkọ dị njikere n'oge",
     "morningEnd": "Akụkọ dịnụ ruo",

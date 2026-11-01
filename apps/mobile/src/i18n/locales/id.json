@@ -1536,7 +1536,8 @@
       "actionBlocked": "Tindakan ini tidak dapat diselesaikan. Masalahnya harus diperbaiki terlebih dahulu sebelum mencoba lagi.",
       "syncNoRepositories": "Tidak ada repositori dalam cakupan sinkronisasi. Pilih repositori yang dipantau Agen keamanan, lalu sinkronkan lagi.",
       "syncIntegrationInactive": "Koneksi GitHub untuk Agen keamanan tidak aktif. Hubungkan ulang Aplikasi GitHub Kilo, lalu sinkronkan lagi.",
-      "syncMissingPermission": "Aplikasi GitHub Kilo tidak dapat membaca vulnerability alerts. Berikan izin tersebut di GitHub, lalu sinkronkan lagi."
+      "syncMissingPermission": "Aplikasi GitHub Kilo tidak dapat membaca vulnerability alerts. Berikan izin tersebut di GitHub, lalu sinkronkan lagi.",
+      "configConflict": "Pengaturan Agen keamanan diubah di tempat lain. Tinjau pengaturan terbaru dan simpan lagi."
     },
     "analysisState": {
       "queued": "Analisis dalam antrean",
@@ -2211,7 +2212,6 @@
     },
     "modelSelector": {
       "provider": "Penyedia {{id}}",
-      "modelId": "ID model: {{id}}",
       "unavailable": "Tidak tersedia",
       "unavailableState": "tidak tersedia",
       "selectedState": "dipilih",
@@ -4151,7 +4151,8 @@
     "sources": "Bukti dan artefak",
     "timezone": "Zona waktu laporan",
     "deviceTimezone": "Gunakan zona waktu perangkat",
-    "timezoneHint": "Zona waktu IANA, misalnya Europe/Berlin. Perubahan jadwal berlaku untuk laporan berikutnya.",
+    "timezoneHint": "Zona waktu IANA, misalnya Europe/Berlin.",
+    "scheduleHint": "Perubahan jadwal berlaku untuk laporan berikutnya.",
     "nightStart": "Periode laporan dimulai",
     "morningStart": "Laporan siap pada",
     "morningEnd": "Laporan tersedia hingga",

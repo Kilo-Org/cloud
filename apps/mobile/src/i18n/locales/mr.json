@@ -2066,7 +2066,8 @@
       "actionBlocked": "ही कृती पूर्ण करता आली नाही. पुन्हा प्रयत्न करण्यापूर्वी समस्या दुरुस्त करणे आवश्यक आहे.",
       "syncNoRepositories": "सिंक स्कोपमध्ये कोणतीही रिपॉझिटरी नाही. सुरक्षा एजंट कोणत्या रिपॉझिटरींवर लक्ष ठेवते त्या निवडा, नंतर पुन्हा सिंक करा.",
       "syncIntegrationInactive": "सुरक्षा एजंटसाठीचे GitHub कनेक्शन सक्रिय नाही. Kilo GitHub App पुन्हा कनेक्ट करा, नंतर पुन्हा सिंक करा.",
-      "syncMissingPermission": "Kilo GitHub ॲप vulnerability alerts वाचू शकत नाही. GitHub मध्ये ती परवानगी द्या, नंतर पुन्हा सिंक करा."
+      "syncMissingPermission": "Kilo GitHub ॲप vulnerability alerts वाचू शकत नाही. GitHub मध्ये ती परवानगी द्या, नंतर पुन्हा सिंक करा.",
+      "configConflict": "सुरक्षा एजंटची सेटिंग्ज इतरत्र बदलली आहेत. नवीनतम सेटिंग्ज तपासा आणि पुन्हा जतन करा."
     },
     "analysisState": {
       "queued": "विश्लेषण रांगेत",
@@ -2741,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "सेवा पुरवठादार {{id}}",
-      "modelId": "मॉडेल {{id}}",
       "unavailable": "अनुपलब्ध",
       "unavailableState": "अनुपलब्ध",
       "selectedState": "निवडलेले",
@@ -4151,7 +4151,8 @@
     "sources": "पुरावे आणि आर्टिफॅक्ट्स",
     "timezone": "आढावा वेळ क्षेत्र",
     "deviceTimezone": "डिव्हाइसचे वेळ क्षेत्र वापरा",
-    "timezoneHint": "IANA वेळ क्षेत्र, उदा. Europe/Berlin. वेळापत्रकातील बदल पुढील आढाव्यांना लागू होतात.",
+    "timezoneHint": "IANA वेळ क्षेत्र, उदा. Europe/Berlin.",
+    "scheduleHint": "वेळापत्रकातील बदल पुढील आढाव्यांना लागू होतात.",
     "nightStart": "आढावा कालावधी सुरू",
     "morningStart": "आढावा तयार होण्याची वेळ",
     "morningEnd": "आढावा उपलब्ध राहण्याची अंतिम वेळ",

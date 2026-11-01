@@ -2066,7 +2066,8 @@
       "actionBlocked": "Ba za a iya kammala wannan aikin ba. Dole a gyara matsalar kafin a sake gwadawa.",
       "syncNoRepositories": "Babu wata ma'ajiyar bayanai da ke cikin iyakar daidaitawa. Zaɓi ma'ajiyoyin bayanai da Wakilin tsaro ke sa ido a kansu, sannan a sake daidaitawa.",
       "syncIntegrationInactive": "Haɗin GitHub na Wakilin tsaro ba ya aiki. Sake haɗa Kilo GitHub App, sannan ka sake daidaitawa.",
-      "syncMissingPermission": "Kilo GitHub App ba ya iya karanta vulnerability alerts. Ba da wannan izni a GitHub, sannan ka sake daidaitawa."
+      "syncMissingPermission": "Kilo GitHub App ba ya iya karanta vulnerability alerts. Ba da wannan izni a GitHub, sannan ka sake daidaitawa.",
+      "configConflict": "An canza saitunan Wakilin tsaro a wani wuri. Duba sabbin saitunan sannan ka sake adanawa."
     },
     "analysisState": {
       "queued": "Nazarin yana layin jira",
@@ -2741,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Mai ba da sabis {{id}}",
-      "modelId": "Samfuri {{id}}",
       "unavailable": "Ba a samunsa ba",
       "unavailableState": "ba a samunsa ba",
       "selectedState": "an zaɓa",
@@ -4151,7 +4151,8 @@
     "sources": "Shaidu da kayayyaki",
     "timezone": "Yankin lokaci na rahoto",
     "deviceTimezone": "Yi amfani da yankin lokaci na na'ura",
-    "timezoneHint": "Yankin lokaci na IANA, misali Europe/Berlin. Canje-canjen jadawali za su shafi rahotanni masu zuwa.",
+    "timezoneHint": "Yankin lokaci na IANA, misali Europe/Berlin.",
+    "scheduleHint": "Canje-canjen jadawali za su shafi rahotanni masu zuwa.",
     "nightStart": "Farkon lokacin rahoto",
     "morningStart": "Rahoto yana shirye da ƙarfe",
     "morningEnd": "Rahoto yana samuwa har zuwa",

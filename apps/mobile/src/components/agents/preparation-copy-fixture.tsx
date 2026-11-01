@@ -1,8 +1,7 @@
 import { ScrollView, View } from 'react-native';
-import { useTranslation } from 'react-i18next';
 import { type PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 
-import { ScreenHeader } from '@/components/screen-header';
+import { useScreenInsets } from '@/lib/screen-insets';
 
 import { PreparationGroup } from './preparation-group';
 
@@ -13,6 +12,10 @@ import { PreparationGroup } from './preparation-group';
  * actually preparing, so this screen renders the real `PreparationGroup` from
  * snapshots shaped exactly like the ones `@kilocode/cloud-agent-sdk` emits. It
  * sends no requests.
+ *
+ * The screen draws no title of its own: each group already states its attempt's
+ * status, and in the app these rows sit under the session's header, not under
+ * the preparation status itself.
  */
 const ATTEMPTS: PreparationAttempt[] = [
   {
@@ -151,11 +154,10 @@ const ATTEMPTS: PreparationAttempt[] = [
 ];
 
 export function PreparationCopyFixture() {
-  const { t } = useTranslation();
+  const { top } = useScreenInsets();
 
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title={t('agentChat.preparation.preparingEnvironment')} />
+    <View className="flex-1 bg-background" style={{ paddingTop: top }}>
       <ScrollView contentContainerClassName="pb-8">
         {ATTEMPTS.map(attempt => (
           <PreparationGroup key={attempt.id} attempt={attempt} />

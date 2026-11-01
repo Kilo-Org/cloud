@@ -2156,7 +2156,7 @@
       "detailSetupCommandTimedOut": "انتهت مهلة أمر الإعداد {{index}}",
       "detailColdRestore": "استعادة باردة، تم تطبيق اللقطة، تمت استعادة {{applied}} من {{total}} ملفًا",
       "detailProgressPercent": "اكتمل {{percent}}%",
-      "detailRestoreIncompleteReport": "استعادة الجلسة غير مكتملة: لم يتم استعادة {{skipped}} من {{total}} ملفًا ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "لم يتم استعادة {{skipped}} من {{total}} ملفًا ({{reasons}}).",
       "detailRestoreIncompleteMissing": "المفقود: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} و{{omitted}} أخرى",
       "detailReasonPatchFailed": "لم يتم تطبيق الرقعة",

@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "Командата за настройка {{index}} изтече по време",
       "detailColdRestore": "Студено възстановяване, снимката е приложена, {{applied}} от {{total}} файла са възстановени",
       "detailProgressPercent": "{{percent}}% завършено",
-      "detailRestoreIncompleteReport": "Възстановяването на сесията е непълно: {{skipped}} от {{total}} файла не бяха възстановени ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} от {{total}} файла не бяха възстановени ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Липсват: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} и още {{omitted}}",
       "detailReasonPatchFailed": "кръпката не беше приложена",

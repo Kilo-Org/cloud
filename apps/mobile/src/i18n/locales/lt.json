@@ -2676,7 +2676,7 @@
       "detailSetupCommandTimedOut": "Baigėsi sąrankos komandos {{index}} laikas",
       "detailColdRestore": "Šaltis atkūrimas, momentinė kopija pritaikyta, atkurta {{applied}} iš {{total}} failų",
       "detailProgressPercent": "Atlikta {{percent}}%",
-      "detailRestoreIncompleteReport": "Sesijos atkūrimas neišsamus: {{skipped}} iš {{total}} failų neatkurta ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} iš {{total}} failų neatkurta ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Trūksta: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ir dar {{omitted}}",
       "detailReasonPatchFailed": "patch nepavyko pritaikyti",

@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "Ajajni qophii {{index}} yeroon dhaafe",
       "detailColdRestore": "Deebiinsa qorraa, snaapshottii hojiirra oole, faayiloota {{total}} keessaa {{applied}} deebi'an",
       "detailProgressPercent": "{{percent}}% xumurame",
-      "detailRestoreIncompleteReport": "Deebiinsa sessii guutuu miti: faayiloota {{total}} keessaa {{skipped}} hin deebi'amne ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "faayiloota {{total}} keessaa {{skipped}} hin deebi'amne ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Hin argamne: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} fi kan biraa {{omitted}}",
       "detailReasonPatchFailed": "paachiin hojiirra hin oole",

@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "Lokacin umarnin shiri na {{index}} ya ƙare",
       "detailColdRestore": "Sanyar da sanyi, an dawo da hoton yanayi, an mayar da fayiloli {{applied}} daga cikin {{total}}",
       "detailProgressPercent": "An kammala {{percent}}%",
-      "detailRestoreIncompleteReport": "Ba a kammala mayar da zaman aiki ba: ba a mayar da fayiloli {{skipped}} daga cikin {{total}} ba ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "ba a mayar da fayiloli {{skipped}} daga cikin {{total}} ba ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Rashawa: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} da ƙarin {{omitted}}",
       "detailReasonPatchFailed": "manhalar ba ta shiga aiki ba",

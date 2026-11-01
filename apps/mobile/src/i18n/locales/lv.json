@@ -2635,7 +2635,7 @@
       "detailSetupCommandTimedOut": "Sagatavošanas komandai {{index}} iestājās noilgums",
       "detailColdRestore": "Aukstā atjaunošana, moments piemērots, atjaunoti {{applied}} no {{total}} failiem",
       "detailProgressPercent": "{{percent}}% pabeigti",
-      "detailRestoreIncompleteReport": "Sesijas atjaunošana nepabeigta: {{skipped}} no {{total}} failiem netika atjaunoti ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} no {{total}} failiem netika atjaunoti ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Trūkst: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} un vēl {{omitted}}",
       "detailReasonPatchFailed": "iestākums netika piemērots",

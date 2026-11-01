@@ -2717,7 +2717,7 @@
       "detailSetupCommandTimedOut": "Il-kmand tat-tħejjija {{index}} skada ż-żmien",
       "detailColdRestore": "Irkupru kiesaħ, snapshot applikat, {{applied}} minn {{total}} fajls rkuprati",
       "detailProgressPercent": "{{percent}}% komplut",
-      "detailRestoreIncompleteReport": "Irkupru tas-sessjoni mhux komplut: {{skipped}} minn {{total}} fajls ma ġewx rkuprati ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} minn {{total}} fajls ma ġewx rkuprati ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Nieqes: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} u {{omitted}} oħrajn",
       "detailReasonPatchFailed": "il-patch ma applikatx",

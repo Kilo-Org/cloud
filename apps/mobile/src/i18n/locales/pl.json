@@ -2112,7 +2112,7 @@
       "detailSetupCommandTimedOut": "Upłynął limit czasu polecenia konfiguracyjnego {{index}}",
       "detailColdRestore": "Przywracanie na zimno, zastosowano migawkę, przywrócono {{applied}} z {{total}} plików",
       "detailProgressPercent": "Ukończono {{percent}}%",
-      "detailRestoreIncompleteReport": "Przywracanie sesji niekompletne: nie przywrócono {{skipped}} z {{total}} plików ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "nie przywrócono {{skipped}} z {{total}} plików ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Brakujące: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} i jeszcze {{omitted}}",
       "detailReasonPatchFailed": "łatka nie została zastosowana",

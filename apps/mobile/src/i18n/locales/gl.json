@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "O comando de configuración {{index}} esgotou o tempo de espera",
       "detailColdRestore": "Restauración en frío, aplicouse a instantánea, restauráronse {{applied}} de {{total}} ficheiros",
       "detailProgressPercent": "{{percent}}% completado",
-      "detailRestoreIncompleteReport": "Restauración da sesión incompleta: non se restauraron {{skipped}} de {{total}} ficheiros ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "non se restauraron {{skipped}} de {{total}} ficheiros ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Faltan: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} e {{omitted}} máis",
       "detailReasonPatchFailed": "o parche non se aplicou",

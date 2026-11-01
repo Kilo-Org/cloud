@@ -19,6 +19,8 @@ import {
   preparationStepLabel,
 } from './preparation-copy';
 import {
+  failedStageStep,
+  findRestoreIncompleteStep,
   incompleteRestoreText,
   preparationGroupExpandedByDefault,
 } from './preparation-group-state';
@@ -26,14 +28,21 @@ import {
 export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
   const { t } = useTranslation();
   const incompleteText = incompleteRestoreText(attempt);
-  const incomplete =
+  const incompleteReport =
     incompleteText === undefined ? undefined : preparationErrorText(incompleteText, t);
   const [expanded, setExpanded] = useState(() => preparationGroupExpandedByDefault(attempt));
   const colors = useThemeColors();
   useEffect(() => {
-    setExpanded(attempt.status !== 'completed' || incomplete !== undefined);
-  }, [attempt.id, attempt.status, incomplete]);
-  const title = incomplete ?? attemptTitle(attempt.status, t);
+    setExpanded(attempt.status !== 'completed' || incompleteReport !== undefined);
+  }, [attempt.id, attempt.status, incompleteReport]);
+  const title = groupTitle(attempt, incompleteReport !== undefined, t);
+  const alertText = groupAlertText(attempt, incompleteReport, t);
+  // The incomplete-restore step is the report the body already shows, so the
+  // group does not list it a second time under its own status name.
+  const steps =
+    incompleteReport === undefined
+      ? attempt.steps
+      : attempt.steps.filter(step => step.id !== findRestoreIncompleteStep(attempt)?.id);
   return (
     <View className="mx-4 my-2 overflow-hidden rounded-md border border-border bg-card">
       <Pressable
@@ -50,10 +59,11 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
         ) : (
           <DirectionalChevronRight size={16} color={colors.mutedForeground} />
         )}
-        <AttemptIcon status={attempt.status} incomplete={incomplete !== undefined} />
+        <AttemptIcon status={attempt.status} incomplete={incompleteReport !== undefined} />
         <Text
+          numberOfLines={1}
           className={
-            incomplete
+            incompleteReport
               ? 'min-w-0 flex-1 text-sm font-medium text-destructive'
               : 'min-w-0 flex-1 text-sm font-medium'
           }
@@ -63,12 +73,12 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
       </Pressable>
       {expanded && (
         <View className="gap-2 border-t border-border px-3 py-2">
-          {attempt.safeError && attempt.steps.length === 0 ? (
+          {alertText !== undefined ? (
             <Text selectable className="text-sm text-destructive">
-              {preparationErrorText(attempt.safeError, t)}
+              {alertText}
             </Text>
           ) : null}
-          {attempt.steps.map(step => (
+          {steps.map(step => (
             <PreparationStepRow key={step.id} step={step} />
           ))}
         </View>
@@ -97,12 +107,47 @@ function AttemptIcon({
   return <AlertCircle size={16} color={colors.destructive} />;
 }
 
-function attemptTitle(status: PreparationAttempt['status'], t: TFunction): string {
-  if (status === 'running') {
+/**
+ * The warning line the expanded body opens with: the restore report when the
+ * attempt carries one, otherwise the attempt's own failure sentence. An
+ * attempt with steps reports them instead, so its body stays a list.
+ */
+function groupAlertText(
+  attempt: PreparationAttempt,
+  incompleteReport: string | undefined,
+  t: TFunction
+): string | undefined {
+  if (incompleteReport !== undefined) {
+    return incompleteReport;
+  }
+  if (attempt.steps.length > 0 || attempt.safeError === undefined || attempt.safeError === '') {
+    return undefined;
+  }
+  return preparationErrorText(attempt.safeError, t);
+}
+
+/**
+ * A group's header line, kept short enough for one row: the restore status when
+ * the attempt carries one, otherwise the attempt's own state. A failed attempt
+ * names the stage that failed, or its cause when it has no stage, so two failed
+ * groups never read the same.
+ */
+function groupTitle(attempt: PreparationAttempt, incomplete: boolean, t: TFunction): string {
+  if (incomplete) {
+    return t('agentChat.preparation.stepRestoreIncomplete');
+  }
+  if (attempt.status === 'running') {
     return t('agentChat.preparation.preparingEnvironment');
   }
-  if (status === 'completed') {
+  if (attempt.status === 'completed') {
     return t('agentChat.preparation.preparationComplete');
+  }
+  const stage = failedStageStep(attempt);
+  if (stage !== undefined) {
+    return preparationStepLabel(stage, t);
+  }
+  if (attempt.safeError !== undefined && attempt.safeError !== '') {
+    return preparationErrorText(attempt.safeError, t);
   }
   return t('agentChat.preparation.preparationFailed');
 }
@@ -159,7 +204,10 @@ function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {
         {step.kind === 'setup_command' ? (
           <Terminal size={14} color={colors.mutedForeground} />
         ) : (
-          <AttemptIcon status={step.status} incomplete={false} />
+          <AttemptIcon
+            status={step.status}
+            incomplete={step.safeError !== undefined && step.safeError !== ''}
+          />
         )}
         <Text className="min-w-0 flex-1 text-sm" numberOfLines={1}>
           {label}

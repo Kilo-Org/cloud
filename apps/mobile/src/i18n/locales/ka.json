@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "გამართვის ბრძანება {{index}}-ის ვადა ამოიწურა",
       "detailColdRestore": "ცივი აღდგენა, სნეპშოტი გამოყენებულია, აღდგენილია {{total}} ფაილიდან {{applied}}",
       "detailProgressPercent": "დასრულებულია {{percent}}%",
-      "detailRestoreIncompleteReport": "სესიის აღდგენა არასრულია: {{total}} ფაილიდან {{skipped}} არ აღდგენილა ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{total}} ფაილიდან {{skipped}} არ აღდგენილა ({{reasons}}).",
       "detailRestoreIncompleteMissing": "აკლია: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} და კიდევ {{omitted}}",
       "detailReasonPatchFailed": "პაჩი არ გამოიყენებოდა",

@@ -2641,7 +2641,7 @@
       "detailSetupCommandTimedOut": "O comando de configuração {{index}} excedeu o tempo limite",
       "detailColdRestore": "Restauro a frio, snapshot aplicado, {{applied}} de {{total}} ficheiros restaurados",
       "detailProgressPercent": "{{percent}}% concluído",
-      "detailRestoreIncompleteReport": "Restauro da sessão incompleto: {{skipped}} de {{total}} ficheiros não foram restaurados ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} de {{total}} ficheiros não foram restaurados ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Em falta: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} e mais {{omitted}}",
       "detailReasonPatchFailed": "a correção não foi aplicada",

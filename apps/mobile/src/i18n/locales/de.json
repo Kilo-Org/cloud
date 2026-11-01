@@ -2068,7 +2068,7 @@
       "detailSetupCommandTimedOut": "Zeitüberschreitung bei Einrichtungsbefehl {{index}}",
       "detailColdRestore": "Kalt-Wiederherstellung, Snapshot angewendet, {{applied}} von {{total}} Dateien wiederhergestellt",
       "detailProgressPercent": "{{percent}}% abgeschlossen",
-      "detailRestoreIncompleteReport": "Sitzungswiederherstellung unvollständig: {{skipped}} von {{total}} Dateien wurden nicht wiederhergestellt ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} von {{total}} Dateien wurden nicht wiederhergestellt ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Fehlend: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} und {{omitted}} weitere",
       "detailReasonPatchFailed": "der Patch konnte nicht angewendet werden",

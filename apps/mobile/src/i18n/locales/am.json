@@ -2600,7 +2600,7 @@
       "detailSetupCommandTimedOut": "የማዋቀር ትዕዛዝ {{index}} ጊዜው አልፎበታል",
       "detailColdRestore": "Cold restore፣ snapshot ተተግብሯል፣ ከ{{total}} ፋይሎች {{applied}} ተመልሰዋል",
       "detailProgressPercent": "{{percent}}% ተጠናቋል",
-      "detailRestoreIncompleteReport": "የክፍለ-ጊዜ መመለስ ያልተጠናቀቀ ነው፦ ከ{{total}} ፋይሎች {{skipped}} አልተመለሱም ({{reasons}})።",
+      "detailRestoreIncompleteFiles": "ከ{{total}} ፋይሎች {{skipped}} አልተመለሱም ({{reasons}})።",
       "detailRestoreIncompleteMissing": "ጎድለዋል፦ {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} እና ተጨማሪ {{omitted}}",
       "detailReasonPatchFailed": "patch አልተተገበረም",

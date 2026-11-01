@@ -2068,7 +2068,7 @@
       "detailSetupCommandTimedOut": "セットアップコマンド {{index}} がタイムアウトしました",
       "detailColdRestore": "コールドリストア、スナップショットを適用、{{total}}ファイル中{{applied}}ファイルを復元",
       "detailProgressPercent": "{{percent}}% 完了",
-      "detailRestoreIncompleteReport": "セッションの復元が未完了です：{{total}}ファイル中{{skipped}}ファイルが復元されませんでした（{{reasons}}）。",
+      "detailRestoreIncompleteFiles": "{{total}}ファイル中{{skipped}}ファイルが復元されませんでした（{{reasons}}）。",
       "detailRestoreIncompleteMissing": "不足：{{paths}}",
       "detailRestoreIncompleteMore": "{{listed}}のほか{{omitted}}件",
       "detailReasonPatchFailed": "パッチが適用されなかったため",

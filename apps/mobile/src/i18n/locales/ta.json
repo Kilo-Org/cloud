@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "அமைவுக் கட்டளை {{index}} நேரம் முடிந்தது",
       "detailColdRestore": "குளிர் மீட்டமைப்பு, ஸ்னாப்ஷாட் பிரயோகிக்கப்பட்டது, {{total}} கோப்புகளில் {{applied}} மீட்டமைக்கப்பட்டன",
       "detailProgressPercent": "{{percent}}% முடிந்தது",
-      "detailRestoreIncompleteReport": "அமர்வு மீட்டமைப்பு முழுமையடையவில்லை: {{total}} கோப்புகளில் {{skipped}} மீட்டமைக்கப்படவில்லை ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{total}} கோப்புகளில் {{skipped}} மீட்டமைக்கப்படவில்லை ({{reasons}}).",
       "detailRestoreIncompleteMissing": "விடுபட்டவை: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} மற்றும் மேலும் {{omitted}}",
       "detailReasonPatchFailed": "பேட்ச் பிரயோகிக்கப்படவில்லை",

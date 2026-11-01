@@ -2112,7 +2112,7 @@
       "detailSetupCommandTimedOut": "Перевищено час очікування команди налаштування {{index}}",
       "detailColdRestore": "Холодне відновлення, знімок застосовано, відновлено {{applied}} з {{total}} файлів",
       "detailProgressPercent": "Виконано {{percent}}%",
-      "detailRestoreIncompleteReport": "Відновлення сесії неповне: не вдалося відновити {{skipped}} з {{total}} файлів ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "не вдалося відновити {{skipped}} з {{total}} файлів ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Відсутні: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} і ще {{omitted}}",
       "detailReasonPatchFailed": "патч не застосовано",

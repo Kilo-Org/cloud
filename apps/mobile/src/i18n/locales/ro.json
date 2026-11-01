@@ -2635,7 +2635,7 @@
       "detailSetupCommandTimedOut": "Comanda de configurare {{index}} a expirat",
       "detailColdRestore": "Restaurare la rece, snapshot aplicat, {{applied}} din {{total}} fișiere restaurate",
       "detailProgressPercent": "{{percent}}% finalizat",
-      "detailRestoreIncompleteReport": "Restaurarea sesiunii este incompletă: {{skipped}} din {{total}} fișiere nu au fost restaurate ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} din {{total}} fișiere nu au fost restaurate ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Lipsesc: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} și încă {{omitted}}",
       "detailReasonPatchFailed": "patch-ul nu s-a aplicat",

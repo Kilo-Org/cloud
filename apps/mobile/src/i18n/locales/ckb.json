@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "کاتی فەرمانی ئامادەکردنی {{index}} تەواو بوو",
       "detailColdRestore": "گەڕاندنەوەی سارد، سناپشۆت جێبەجێکرا، {{applied}} لە {{total}} فایل گەڕێنرانەوە",
       "detailProgressPercent": "{{percent}}% تەواو بوو",
-      "detailRestoreIncompleteReport": "گەڕاندنەوەی دانیشتن ناتەواو بوو: {{skipped}} لە {{total}} فایل نەگەڕێنرانەوە ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} لە {{total}} فایل نەگەڕێنرانەوە ({{reasons}}).",
       "detailRestoreIncompleteMissing": "ونن: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} و {{omitted}} زیاتر",
       "detailReasonPatchFailed": "پاتچەکە جێبەجێ نەکرا",

@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "{{index}} баптау пәрменінің уақыты бітті",
       "detailColdRestore": "Салқын қалпына келтіру, снапшот қолданылды, {{total}} файлдың {{applied}}-і қалпына келтірілді",
       "detailProgressPercent": "{{percent}}% аяқталды",
-      "detailRestoreIncompleteReport": "Сессияны қалпына келтіру аяқталмады: {{total}} файлдың {{skipped}}-і қалпына келтірілмеді ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{total}} файлдың {{skipped}}-і қалпына келтірілмеді ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Жетіспейді: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} және тағы {{omitted}}",
       "detailReasonPatchFailed": "патч қолданылмады",

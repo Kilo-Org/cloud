@@ -2600,7 +2600,7 @@
       "detailSetupCommandTimedOut": "Umyalo wokusetha {{index}} uphele isikhathi",
       "detailColdRestore": "Ukubuyisa okubandayo, isithombe-simo sisetshenzisiwe, {{applied}} kwengu-{{total}} amafayela abuyisiwe",
       "detailProgressPercent": "{{percent}}% kuqediwe",
-      "detailRestoreIncompleteReport": "Ukubuyiswa kweseshini akuphelele: {{skipped}} kwengu-{{total}} amafayela abuyiswanga ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} kwengu-{{total}} amafayela abuyiswanga ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Ayitholakali: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} kanye nokunye okungu-{{omitted}}",
       "detailReasonPatchFailed": "isiphuculo asizange sisebenze",

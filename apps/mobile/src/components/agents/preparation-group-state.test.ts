@@ -2,6 +2,7 @@ import { type PreparationAttempt, type PreparationStepSnapshot } from '@kilocode
 import { describe, expect, it } from 'vitest';
 
 import {
+  failedStageStep,
   findRestoreIncompleteStep,
   incompleteRestoreText,
   preparationGroupExpandedByDefault,
@@ -82,6 +83,28 @@ describe('incompleteRestoreText', () => {
       steps: [INCOMPLETE_STEP],
     });
     expect(incompleteRestoreText(candidate)).toBeUndefined();
+  });
+});
+
+describe('failedStageStep', () => {
+  it('names the phase that failed on a failed attempt', () => {
+    const failed = step({ id: 'boot', key: 'sandbox_boot', status: 'failed' });
+    const candidate = attempt({ status: 'failed', steps: [step({ id: 'setup' }), failed] });
+    expect(failedStageStep(candidate)).toBe(failed);
+  });
+
+  it('does not count the incomplete-restore report as a failed stage', () => {
+    const candidate = attempt({
+      status: 'failed',
+      safeError: 'preparation_timeout',
+      steps: [INCOMPLETE_STEP],
+    });
+    expect(failedStageStep(candidate)).toBeUndefined();
+  });
+
+  it('returns undefined unless the attempt itself failed', () => {
+    const candidate = attempt({ steps: [step({ status: 'failed' })] });
+    expect(failedStageStep(candidate)).toBeUndefined();
   });
 });
 

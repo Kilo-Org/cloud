@@ -2090,7 +2090,7 @@
       "detailSetupCommandTimedOut": "פקודת ההכנה {{index}} חרגה מהזמן",
       "detailColdRestore": "שחזור קר, תמונת מצב הוחלה, שוחזרו {{applied}} מתוך {{total}} קבצים",
       "detailProgressPercent": "{{percent}}% הושלם",
-      "detailRestoreIncompleteReport": "שחזור ההפעלה לא הושלם: {{skipped}} מתוך {{total}} קבצים לא שוחזרו ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} מתוך {{total}} קבצים לא שוחזרו ({{reasons}}).",
       "detailRestoreIncompleteMissing": "חסרים: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ועוד {{omitted}}",
       "detailReasonPatchFailed": "הטלאי לא הוחל",

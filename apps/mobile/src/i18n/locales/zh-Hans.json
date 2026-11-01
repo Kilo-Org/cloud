@@ -2068,7 +2068,7 @@
       "detailSetupCommandTimedOut": "初始化命令 {{index}} 超时",
       "detailColdRestore": "冷恢复，已应用快照，{{total}} 个文件中已恢复 {{applied}} 个",
       "detailProgressPercent": "{{percent}}% 完成",
-      "detailRestoreIncompleteReport": "会话恢复不完整：{{total}} 个文件中有 {{skipped}} 个未恢复（{{reasons}}）。",
+      "detailRestoreIncompleteFiles": "{{total}} 个文件中有 {{skipped}} 个未恢复（{{reasons}}）。",
       "detailRestoreIncompleteMissing": "缺失：{{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} 以及另外 {{omitted}} 个",
       "detailReasonPatchFailed": "补丁未能应用",

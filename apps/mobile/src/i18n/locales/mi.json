@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "Kua pau te wā o te whakahau whirihora {{index}}",
       "detailColdRestore": "Whakaora anō makariri, kua āpilitia te whakaahua, kua whakaora anō {{applied}} o {{total}} kōnae",
       "detailProgressPercent": "Kua oti {{percent}}%",
-      "detailRestoreIncompleteReport": "Kāore i oti te whakaora anō i te nohonga: kāore i whakaora anō {{skipped}} o {{total}} kōnae ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "kāore i whakaora anō {{skipped}} o {{total}} kōnae ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Ngaro: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} me {{omitted}} ētahi anō",
       "detailReasonPatchFailed": "kāore i āpilitia te pāika",

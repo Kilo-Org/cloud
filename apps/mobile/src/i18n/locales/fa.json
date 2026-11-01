@@ -2600,7 +2600,7 @@
       "detailSetupCommandTimedOut": "مهلت دستور راه‌اندازی {{index}} به پایان رسید",
       "detailColdRestore": "بازیابی سرد، اسنپ‌شات اعمال شد، {{applied}} از {{total}} فایل بازیابی شد",
       "detailProgressPercent": "{{percent}}٪ کامل شد",
-      "detailRestoreIncompleteReport": "بازیابی نشست ناقص بود: {{skipped}} از {{total}} فایل بازیابی نشدند ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} از {{total}} فایل بازیابی نشدند ({{reasons}}).",
       "detailRestoreIncompleteMissing": "موارد حذف‌شده: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} و {{omitted}} مورد دیگر",
       "detailReasonPatchFailed": "وصله اعمال نشد",

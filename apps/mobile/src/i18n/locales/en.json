@@ -2679,7 +2679,7 @@
       "detailSetupCommandTimedOut": "Setup command {{index}} timed out",
       "detailColdRestore": "Cold restore, snapshot applied, {{applied}} of {{total}} files restored",
       "detailProgressPercent": "{{percent}}% complete",
-      "detailRestoreIncompleteReport": "Session restore incomplete: {{skipped}} of {{total}} files were not restored ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} of {{total}} files were not restored ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Missing: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} and {{omitted}} more",
       "detailReasonPatchFailed": "the patch did not apply",

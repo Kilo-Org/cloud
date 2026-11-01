@@ -2068,7 +2068,7 @@
       "detailSetupCommandTimedOut": "設定命令 {{index}} 逾時",
       "detailColdRestore": "冷還原，已套用快照，已還原 {{applied}}／{{total}} 個檔案",
       "detailProgressPercent": "已完成 {{percent}}%",
-      "detailRestoreIncompleteReport": "工作階段還原未完成：{{total}} 個檔案中有 {{skipped}} 個未還原（{{reasons}}）。",
+      "detailRestoreIncompleteFiles": "{{total}} 個檔案中有 {{skipped}} 個未還原（{{reasons}}）。",
       "detailRestoreIncompleteMissing": "遺失：{{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} 及另外 {{omitted}} 個",
       "detailReasonPatchFailed": "修補程式未能套用",

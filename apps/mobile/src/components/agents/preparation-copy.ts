@@ -212,8 +212,9 @@ function resolvePreparationText(raw: string, t: TFunction): string | undefined {
 }
 
 /**
- * The wrapper's named report for a restore that left files behind, which also
- * titles the group: counts, why each file was skipped, and the paths.
+ * The wrapper's named report for a restore that left files behind: how many
+ * files were skipped, why, and the paths. The group header carries only the
+ * status, so this sentence reads as the report's body rather than a title.
  */
 function resolveRestoreReport(raw: string, t: TFunction): string | undefined {
   const match = RESTORE_REPORT_PATTERN.exec(raw);
@@ -227,7 +228,7 @@ function resolveRestoreReport(raw: string, t: TFunction): string | undefined {
       return key === undefined ? t('agentChat.preparation.detailReasonUnknown') : t(key);
     })
     .join(', ');
-  const summary = t('agentChat.preparation.detailRestoreIncompleteReport', {
+  const summary = t('agentChat.preparation.detailRestoreIncompleteFiles', {
     skipped: localizedNumber(match[1] ?? ''),
     total: localizedNumber(match[2] ?? ''),
     reasons,

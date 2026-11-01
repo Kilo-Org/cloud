@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "Iwu nhazi {{index}} agafela oge",
       "detailColdRestore": "Mweghachi oyi, a tinyere snapshot, e weghachiri {{applied}} n'ime {{total}} faịlụ",
       "detailProgressPercent": "{{percent}}% emechara",
-      "detailRestoreIncompleteReport": "Mweghachi oge ezughị ezu: a weghachighị {{skipped}} n'ime {{total}} faịlụ ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "a weghachighị {{skipped}} n'ime {{total}} faịlụ ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Na-efu: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} na {{omitted}} ọzọ",
       "detailReasonPatchFailed": "a tinyeghị patch ahụ",

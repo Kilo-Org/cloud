@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "ຄຳສັ່ງຕັ້ງຄ່າ {{index}} ໝົດເວລາ",
       "detailColdRestore": "ການກູ້ຄືນແບບ cold, ນຳໃຊ້ snapshot ແລ້ວ, ກູ້ຄືນໄດ້ {{applied}} ຈາກ {{total}} ໄຟລ໌",
       "detailProgressPercent": "{{percent}}% ສຳເລັດ",
-      "detailRestoreIncompleteReport": "ການກູ້ຄືນ session ບໍ່ສົມບູນ: ບໍ່ໄດ້ກູ້ຄືນ {{skipped}} ຈາກ {{total}} ໄຟລ໌ ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "ບໍ່ໄດ້ກູ້ຄືນ {{skipped}} ຈາກ {{total}} ໄຟລ໌ ({{reasons}}).",
       "detailRestoreIncompleteMissing": "ຂາດ: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ແລະອີກ {{omitted}} ອັນ",
       "detailReasonPatchFailed": "ແພັດບໍ່ສາມາດນຳໃຊ້ໄດ້",

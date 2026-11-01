@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "ពាក្យបញ្ជាដំឡើង {{index}} បានហួសពេលកំណត់",
       "detailColdRestore": "ការស្តារឡើងវិញប្រភេទ Cold បានអនុវត្ត snapshot ហើយបានស្តារ {{applied}} ក្នុងចំណោម {{total}} ឯកសារ",
       "detailProgressPercent": "បានបញ្ចប់ {{percent}}%",
-      "detailRestoreIncompleteReport": "ការស្តារសម័យកាលមិនបានបញ្ចប់៖ {{skipped}} ក្នុងចំណោម {{total}} ឯកសារមិនត្រូវបានស្តារឡើងវិញទេ ({{reasons}})។",
+      "detailRestoreIncompleteFiles": "{{skipped}} ក្នុងចំណោម {{total}} ឯកសារមិនត្រូវបានស្តារឡើងវិញទេ ({{reasons}})។",
       "detailRestoreIncompleteMissing": "បាត់បង់៖ {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} និង {{omitted}} ទៀត",
       "detailReasonPatchFailed": "Patch មិនត្រូវបានអនុវត្តទេ",

@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "ပြင်ဆင်သတ်မှတ်ရေးအမိန့် {{index}} အချိန်ကျော်လွန်ခဲ့သည်",
       "detailColdRestore": "ကိုးလ် ဆယ်တင်မှု၊ ဆနပ်ရှော့ အသုံးချပြီးပါပြီ၊ ဖိုင် {{total}} ခုအနက် {{applied}} ခု ပြန်လည်ဆယ်တင်ပြီးပါသည်",
       "detailProgressPercent": "{{percent}}% ပြီးမြောက်ပါပြီ",
-      "detailRestoreIncompleteReport": "ဆက်ရှင် ပြန်လည်ဆယ်တင်မှု မပြီးမြောက်သေးပါ: ဖိုင် {{total}} ခုအနက် {{skipped}} ခုကို ပြန်လည်ဆယ်တင်ခြင်း မပြုလုပ်နိုင်ခဲ့ပါ ({{reasons}})။",
+      "detailRestoreIncompleteFiles": "ဖိုင် {{total}} ခုအနက် {{skipped}} ခုကို ပြန်လည်ဆယ်တင်ခြင်း မပြုလုပ်နိုင်ခဲ့ပါ ({{reasons}})။",
       "detailRestoreIncompleteMissing": "ပျောက်ဆုံးနေသည်: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} နှင့် အခြား {{omitted}} ခု",
       "detailReasonPatchFailed": "ပက်ချ် အသုံးမချနိုင်ခဲ့ပါ",

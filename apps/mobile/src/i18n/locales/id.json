@@ -2068,7 +2068,7 @@
       "detailSetupCommandTimedOut": "Perintah penyiapan {{index}} habis waktu",
       "detailColdRestore": "Pemulihan dingin, snapshot diterapkan, {{applied}} dari {{total}} berkas dipulihkan",
       "detailProgressPercent": "{{percent}}% selesai",
-      "detailRestoreIncompleteReport": "Pemulihan sesi tidak lengkap: {{skipped}} dari {{total}} berkas tidak dipulihkan ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} dari {{total}} berkas tidak dipulihkan ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Tidak ditemukan: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} dan {{omitted}} lainnya",
       "detailReasonPatchFailed": "patch tidak dapat diterapkan",

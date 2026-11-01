@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "{{index}}. beállítási parancs időtúllépés miatt megszakadt",
       "detailColdRestore": "Hideg visszaállítás, pillanatkép alkalmazva, {{total}} fájlból {{applied}} helyreállítva",
       "detailProgressPercent": "{{percent}}% kész",
-      "detailRestoreIncompleteReport": "A munkamenet visszaállítása nem fejeződött be: {{total}} fájlból {{skipped}} nem lett visszaállítva ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{total}} fájlból {{skipped}} nem lett visszaállítva ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Hiányzó: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} és további {{omitted}}",
       "detailReasonPatchFailed": "a javítás nem alkalmazható",

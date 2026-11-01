@@ -2758,7 +2758,7 @@
       "detailSetupCommandTimedOut": "Gorchymyn gosod {{index}} wedi mynd dros ei amser",
       "detailColdRestore": "Adferiad oer, ciplun wedi'i gymhwyso, {{applied}} o {{total}} ffeil wedi'u hadfer",
       "detailProgressPercent": "{{percent}}% wedi'i gwblhau",
-      "detailRestoreIncompleteReport": "Adferiad y sesiwn yn anghyflawn: ni adferwyd {{skipped}} o {{total}} ffeil ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "ni adferwyd {{skipped}} o {{total}} ffeil ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Ar goll: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} a {{omitted}} arall",
       "detailReasonPatchFailed": "ni chymhwysodd y patch",

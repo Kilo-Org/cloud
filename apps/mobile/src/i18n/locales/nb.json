@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "Oppsettskommando {{index}} fikk tidsavbrudd",
       "detailColdRestore": "Kald gjenoppretting, snapshot anvendt, {{applied}} av {{total}} filer gjenopprettet",
       "detailProgressPercent": "{{percent}} % fullført",
-      "detailRestoreIncompleteReport": "Øktgjenoppretting ufullstendig: {{skipped}} av {{total}} filer ble ikke gjenopprettet ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} av {{total}} filer ble ikke gjenopprettet ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Mangler: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} og {{omitted}} til",
       "detailReasonPatchFailed": "patchen ble ikke anvendt",

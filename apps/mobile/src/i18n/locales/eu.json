@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "{{index}}. konfigurazio-komandoaren denbora-muga gainditu da",
       "detailColdRestore": "Berrezartze hotza, snapshot-a aplikatuta, {{total}} fitxategitatik {{applied}} berrezarri dira",
       "detailProgressPercent": "{{percent}}% osatuta",
-      "detailRestoreIncompleteReport": "Saioaren berrezartzea osatu gabe: {{total}} fitxategitatik {{skipped}} ez dira berrezarri ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{total}} fitxategitatik {{skipped}} ez dira berrezarri ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Falta dira: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} eta beste {{omitted}}",
       "detailReasonPatchFailed": "adabakia ezin izan da aplikatu",

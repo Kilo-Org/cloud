@@ -2058,7 +2058,7 @@
       "detailSetupCommandTimedOut": "Tempo scaduto per il comando di configurazione {{index}}",
       "detailColdRestore": "Ripristino a freddo, snapshot applicata, {{applied}} su {{total}} file ripristinati",
       "detailProgressPercent": "{{percent}}% completato",
-      "detailRestoreIncompleteReport": "Ripristino della sessione incompleto: {{skipped}} su {{total}} file non sono stati ripristinati ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} su {{total}} file non sono stati ripristinati ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Mancanti: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} e altri {{omitted}}",
       "detailReasonPatchFailed": "la patch non è stata applicata",

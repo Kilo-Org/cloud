@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "Бэлтгэх команд {{index}} хугацаанаас хэтэрлээ",
       "detailColdRestore": "Хүйтэн сэргээлт, Snapshot ашиглагдлаа, {{total}} файлаас {{applied}} нь сэргээгдлээ",
       "detailProgressPercent": "{{percent}}% дууссан",
-      "detailRestoreIncompleteReport": "Session сэргээлт бүрэн дуусаагүй: {{total}} файлаас {{skipped}} нь сэргээгдээгүй ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{total}} файлаас {{skipped}} нь сэргээгдээгүй ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Байхгүй: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} болон {{omitted}} нэмэлт",
       "detailReasonPatchFailed": "патч оруулагдсангүй",

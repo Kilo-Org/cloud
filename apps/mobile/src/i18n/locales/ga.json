@@ -2717,7 +2717,7 @@
       "detailSetupCommandTimedOut": "Chuaigh ordú socraithe {{index}} thar am",
       "detailColdRestore": "Athchóiriú fuar, snapshot i bhfeidhm, {{applied}} as {{total}} comhad athchóirithe",
       "detailProgressPercent": "{{percent}}% críochnaithe",
-      "detailRestoreIncompleteReport": "Athchóiriú seisiúin neamhiomlán: níor athchóiríodh {{skipped}} as {{total}} comhaid ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "níor athchóiríodh {{skipped}} as {{total}} comhaid ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Ar iarraidh: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} agus {{omitted}} eile",
       "detailReasonPatchFailed": "níor cuireadh an paiste i bhfeidhm",

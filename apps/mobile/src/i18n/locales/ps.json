@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "د چمتو کولو امر {{index}} وخت تېر شو",
       "detailColdRestore": "ساړه بیا راوړنه، سناپشاټ پلی شو، له {{total}} څخه {{applied}} فایلونه بېرته راوړل شول",
       "detailProgressPercent": "{{percent}}% بشپړ شو",
-      "detailRestoreIncompleteReport": "د غونډې بېرته راوړل بشپړ نه شو: له {{total}} څخه {{skipped}} فایلونه بېرته نه دي راوړل شول ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "له {{total}} څخه {{skipped}} فایلونه بېرته نه دي راوړل شول ({{reasons}}).",
       "detailRestoreIncompleteMissing": "ورک: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} او {{omitted}} نور",
       "detailReasonPatchFailed": "پېچ پلی نه شو",

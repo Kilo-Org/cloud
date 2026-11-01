@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "Opstelopdrag {{index}} se tyd het uitgeloop",
       "detailColdRestore": "Koue herstel, momentopname toegepas, {{applied}} van {{total}} lêers herstel",
       "detailProgressPercent": "{{percent}}% voltooi",
-      "detailRestoreIncompleteReport": "Sessieherstel onvolledig: {{skipped}} van {{total}} lêers is nie herstel nie ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} van {{total}} lêers is nie herstel nie ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Ontbreek: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} en nog {{omitted}} meer",
       "detailReasonPatchFailed": "die pleister is nie toegepas nie",

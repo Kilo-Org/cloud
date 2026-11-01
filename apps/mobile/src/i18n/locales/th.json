@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "คำสั่งตั้งค่า {{index}} หมดเวลา",
       "detailColdRestore": "กู้คืนแบบเย็น ใช้สแนปช็อตแล้ว กู้คืนไฟล์ {{applied}} จาก {{total}} ไฟล์",
       "detailProgressPercent": "เสร็จแล้ว {{percent}}%",
-      "detailRestoreIncompleteReport": "กู้คืนเซสชันไม่สมบูรณ์: ไม่ได้กู้คืนไฟล์ {{skipped}} จาก {{total}} ไฟล์ ({{reasons}})",
+      "detailRestoreIncompleteFiles": "ไม่ได้กู้คืนไฟล์ {{skipped}} จาก {{total}} ไฟล์ ({{reasons}})",
       "detailRestoreIncompleteMissing": "ไฟล์ที่หายไป: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} และอีก {{omitted}} รายการ",
       "detailReasonPatchFailed": "แพตช์ไม่ถูก apply",

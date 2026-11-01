@@ -15,6 +15,23 @@ export function findRestoreIncompleteStep(
 }
 
 /**
+ * The phase that failed, which names a failed group's header. The incomplete
+ * restore step is a report rather than a stage: an attempt that failed while
+ * carrying it still reads as a failed preparation, so the cause comes from
+ * another step or from the attempt's own error.
+ */
+export function failedStageStep(
+  attempt: PreparationAttempt
+): PreparationStepSnapshot | undefined {
+  if (attempt.status !== 'failed') {
+    return undefined;
+  }
+  return attempt.steps.find(
+    step => step.status === 'failed' && step.key !== RESTORE_INCOMPLETE_STEP_KEY
+  );
+}
+
+/**
  * The incomplete-restore text to show instead of the green "Preparation
  * complete" title, or undefined when the attempt carries no incomplete-restore
  * step. A terminal failure outranks it: the same attempt can be `failed` and

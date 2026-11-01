@@ -2600,7 +2600,7 @@
       "detailSetupCommandTimedOut": "સેટઅપ આદેશ {{index}} ટાઇમ આઉટ થયો",
       "detailColdRestore": "કોલ્ડ પુનઃસ્થાપન, સ્નેપશોટ લાગુ થયો, કુલ {{total}} ફાઇલોમાંથી {{applied}} પુનઃસ્થાપિત થઈ",
       "detailProgressPercent": "{{percent}}% પૂર્ણ",
-      "detailRestoreIncompleteReport": "સેશન પુનઃસ્થાપન અધૂરું: કુલ {{total}} ફાઇલોમાંથી {{skipped}} પુનઃસ્થાપિત થઈ નહીં ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "કુલ {{total}} ફાઇલોમાંથી {{skipped}} પુનઃસ્થાપિત થઈ નહીં ({{reasons}}).",
       "detailRestoreIncompleteMissing": "ખૂટે છે: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} અને {{omitted}} વધુ",
       "detailReasonPatchFailed": "પેચ લાગુ થઈ શક્યો નથી",

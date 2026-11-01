@@ -2600,7 +2600,7 @@
       "detailSetupCommandTimedOut": "සැකසුම් විධානය {{index}} කාලය ඉක්මවිය",
       "detailColdRestore": "සීතල ප්‍රතිසාධනය, ස්නැප්ෂොටය යෙදවිය, ගොනු {{total}} කින් {{applied}} ක් ප්‍රතිසාධනය විය",
       "detailProgressPercent": "{{percent}}% සම්පූර්ණයි",
-      "detailRestoreIncompleteReport": "සැසි ප්‍රතිසාධනය අසම්පූර්ණයි: ගොනු {{total}} කින් {{skipped}} ක් ප්‍රතිසාධනය කළේ නැත ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "ගොනු {{total}} කින් {{skipped}} ක් ප්‍රතිසාධනය කළේ නැත ({{reasons}}).",
       "detailRestoreIncompleteMissing": "නොමැති: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} සහ තව {{omitted}} ක්",
       "detailReasonPatchFailed": "පැච් එක යෙදවිය නොහැකි විය",

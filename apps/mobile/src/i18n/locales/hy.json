@@ -2600,7 +2600,7 @@
       "detailSetupCommandTimedOut": "Կարգավորման {{index}} հրամանի ժամանակը սպառվեց",
       "detailColdRestore": "Սառը վերականգնում, կիրառվել է սնապշոտ, վերականգնվել է {{total}} ֆայլից {{applied}}-ը",
       "detailProgressPercent": "{{percent}}% ավարտված է",
-      "detailRestoreIncompleteReport": "Սեսիայի վերականգնումն անավարտ է՝ {{total}} ֆայլից {{skipped}}-ը վերականգնված չեն ({{reasons}})։",
+      "detailRestoreIncompleteFiles": "{{total}} ֆայլից {{skipped}}-ը վերականգնված չեն ({{reasons}})։",
       "detailRestoreIncompleteMissing": "Բացակայում են՝ {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} և ևս {{omitted}}",
       "detailReasonPatchFailed": "patch-ը չկիրառվեց",

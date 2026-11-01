@@ -2600,7 +2600,7 @@
       "detailSetupCommandTimedOut": "ಸೆಟಪ್ ಆಜ್ಞೆ {{index}} ಅವಧಿ ಮೀರಿದೆ",
       "detailColdRestore": "ಕೋಲ್ಡ್ ರಿಸ್ಟೋರ್, ಸ್ನ್ಯಾಪ್‌ಶಾಟ್ ಅನ್ವಯಿಸಲಾಗಿದೆ, ಒಟ್ಟು {{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{applied}} ಫೈಲ್‌ಗಳನ್ನು ಮರುಸ್ಥಾಪಿಸಲಾಗಿದೆ",
       "detailProgressPercent": "{{percent}}% ಪೂರ್ಣಗೊಂಡಿದೆ",
-      "detailRestoreIncompleteReport": "ಸೆಷನ್ ಮರುಸ್ಥಾಪನೆ ಅಪೂರ್ಣ: ಒಟ್ಟು {{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{skipped}} ಫೈಲ್‌ಗಳನ್ನು ಮರುಸ್ಥಾಪಿಸಲಾಗಿಲ್ಲ ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "ಒಟ್ಟು {{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{skipped}} ಫೈಲ್‌ಗಳನ್ನು ಮರುಸ್ಥಾಪಿಸಲಾಗಿಲ್ಲ ({{reasons}}).",
       "detailRestoreIncompleteMissing": "ಕಾಣೆಯಾಗಿದೆ: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ಮತ್ತು {{omitted}} ಹೆಚ್ಚಿನವು",
       "detailReasonPatchFailed": "ಪ್ಯಾಚ್ ಅನ್ವಯವಾಗಲಿಲ್ಲ",

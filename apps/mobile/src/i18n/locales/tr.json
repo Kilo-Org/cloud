@@ -2068,7 +2068,7 @@
       "detailSetupCommandTimedOut": "Kurulum komutu {{index}} zaman aşımına uğradı",
       "detailColdRestore": "Soğuk geri yükleme, anlık görüntü uygulandı, {{total}} dosyadan {{applied}} tanesi geri yüklendi",
       "detailProgressPercent": "%{{percent}} tamamlandı",
-      "detailRestoreIncompleteReport": "Oturum geri yüklemesi tamamlanamadı: {{total}} dosyadan {{skipped}} tanesi geri yüklenmedi ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{total}} dosyadan {{skipped}} tanesi geri yüklenmedi ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Eksik: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ve {{omitted}} dosya daha",
       "detailReasonPatchFailed": "yama uygulanamadı",

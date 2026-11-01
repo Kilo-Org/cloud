@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "سیٹ اپ کمانڈ {{index}} کا وقت ختم ہو گیا",
       "detailColdRestore": "کول بحالی، اسنیپ شاٹ لاگو، {{total}} میں سے {{applied}} فائلیں بحال ہوئیں",
       "detailProgressPercent": "{{percent}}% مکمل",
-      "detailRestoreIncompleteReport": "سیشن بحالی نامکمل: {{total}} میں سے {{skipped}} فائلیں بحال نہیں ہوئیں ({{reasons}})۔",
+      "detailRestoreIncompleteFiles": "{{total}} میں سے {{skipped}} فائلیں بحال نہیں ہوئیں ({{reasons}})۔",
       "detailRestoreIncompleteMissing": "غیر موجود: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} اور {{omitted}} مزید",
       "detailReasonPatchFailed": "پیچ لاگو نہیں ہو سکا",

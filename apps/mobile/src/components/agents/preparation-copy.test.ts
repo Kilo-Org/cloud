@@ -141,7 +141,7 @@ describe('restore-incomplete report', () => {
         t
       )
     ).toBe(
-      'Session restore incomplete: 2 of 5 files were not restored (the patch did not apply, the file could not be written). Missing: a.ts, b.ts'
+      '2 of 5 files were not restored (the patch did not apply, the file could not be written). Missing: a.ts, b.ts'
     );
   });
 
@@ -152,7 +152,7 @@ describe('restore-incomplete report', () => {
         t
       )
     ).toBe(
-      'Session restore incomplete: 12 of 20 files were not restored (the path is outside the workspace). Missing: a.ts, b.ts and 10 more'
+      '12 of 20 files were not restored (the path is outside the workspace). Missing: a.ts, b.ts and 10 more'
     );
   });
 
@@ -162,7 +162,7 @@ describe('restore-incomplete report', () => {
         'Session restore incomplete: 1 of 5 files were not restored (binary file).',
         t
       )
-    ).toBe('Session restore incomplete: 1 of 5 files were not restored (an unknown reason).');
+    ).toBe('1 of 5 files were not restored (an unknown reason).');
   });
 });
 

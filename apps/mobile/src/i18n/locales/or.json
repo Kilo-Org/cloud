@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "ସେଟଅପ୍ କମାଣ୍ଡ {{index}}ର ସମୟ ସମାପ୍ତ ହେଲା",
       "detailColdRestore": "କୋଲ୍ଡ୍ ପୁନଃସ୍ଥାପନ, ସ୍ନାପସଟ୍ ପ୍ରୟୋଗ କରାଯାଇଛି, {{total}} ଫାଇଲ୍ ମଧ୍ୟରୁ {{applied}} ପୁନଃସ୍ଥାପିତ ହୋଇଛି",
       "detailProgressPercent": "{{percent}}% ସମ୍ପୂର୍ଣ୍ଣ",
-      "detailRestoreIncompleteReport": "ସେସନ୍ ପୁନଃସ୍ଥାପନ ଅସମ୍ପୂର୍ଣ୍ଣ: {{total}} ଫାଇଲ୍ ମଧ୍ୟରୁ {{skipped}} ପୁନଃସ୍ଥାପିତ ହୋଇନାହାଁନ୍ତି ({{reasons}})।",
+      "detailRestoreIncompleteFiles": "{{total}} ଫାଇଲ୍ ମଧ୍ୟରୁ {{skipped}} ପୁନଃସ୍ଥାପିତ ହୋଇନାହାଁନ୍ତି ({{reasons}})।",
       "detailRestoreIncompleteMissing": "ଅନୁପସ୍ଥିତ: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ଏବଂ ଆଉ {{omitted}}ଟି",
       "detailReasonPatchFailed": "ପ୍ୟାଚ୍ ପ୍ରୟୋଗ କରାଯାଇପାରିଲା ନାହିଁ",

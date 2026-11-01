@@ -2635,7 +2635,7 @@
       "detailSetupCommandTimedOut": "Naredbi za postavljanje {{index}} isteklo je vrijeme",
       "detailColdRestore": "Hladno vraćanje, snimka primijenjena, vraćeno {{applied}} od {{total}} datoteka",
       "detailProgressPercent": "{{percent}}% dovršeno",
-      "detailRestoreIncompleteReport": "Vraćanje sesije nije dovršeno: nije vraćeno {{skipped}} od {{total}} datoteka ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "nije vraćeno {{skipped}} od {{total}} datoteka ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Nedostaje: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} i još {{omitted}}",
       "detailReasonPatchFailed": "zakrpa nije primijenjena",

@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "Η εντολή ρύθμισης {{index}} ξεπέρασε το χρονικό όριο",
       "detailColdRestore": "Cold restore, εφαρμόστηκε στιγμιότυπο, επαναφέρθηκαν {{applied}} από {{total}} αρχεία",
       "detailProgressPercent": "Ολοκληρώθηκε {{percent}}%",
-      "detailRestoreIncompleteReport": "Η επαναφορά συνεδρίας δεν ολοκληρώθηκε: δεν επαναφέρθηκαν {{skipped}} από {{total}} αρχεία ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "δεν επαναφέρθηκαν {{skipped}} από {{total}} αρχεία ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Λείπουν: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} και άλλα {{omitted}}",
       "detailReasonPatchFailed": "το patch δεν εφαρμόστηκε",

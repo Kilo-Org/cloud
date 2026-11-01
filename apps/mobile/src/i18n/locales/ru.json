@@ -2112,7 +2112,7 @@
       "detailSetupCommandTimedOut": "Истекло время выполнения команды настройки {{index}}",
       "detailColdRestore": "Холодное восстановление, снимок применён, восстановлено файлов: {{applied}} из {{total}}",
       "detailProgressPercent": "Готово: {{percent}}%",
-      "detailRestoreIncompleteReport": "Восстановление сеанса не завершено: не восстановлено файлов: {{skipped}} из {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "не восстановлено файлов: {{skipped}} из {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Отсутствует: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} и ещё {{omitted}}",
       "detailReasonPatchFailed": "патч не был применён",

@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "Konfigurationskommando {{index}} fick timeout",
       "detailColdRestore": "Kall återställning, ögonblicksbild tillämpades, {{applied}} av {{total}} filer återställda",
       "detailProgressPercent": "{{percent}} % klart",
-      "detailRestoreIncompleteReport": "Sessionsåterställning ofullständig: {{skipped}} av {{total}} filer återställdes inte ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} av {{total}} filer återställdes inte ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Saknas: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} och {{omitted}} till",
       "detailReasonPatchFailed": "patchen kunde inte tillämpas",

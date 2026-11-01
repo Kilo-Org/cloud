@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "Командата за подготовка {{index}} истече",
       "detailColdRestore": "Студено обновување, снимката е применета, обновени се {{applied}} од {{total}} датотеки",
       "detailProgressPercent": "{{percent}}% завршено",
-      "detailRestoreIncompleteReport": "Обновувањето на сесијата е нецелосно: {{skipped}} од {{total}} датотеки не беа обновени ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} од {{total}} датотеки не беа обновени ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Недостасуваат: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} и уште {{omitted}}",
       "detailReasonPatchFailed": "патчот не беше применет",

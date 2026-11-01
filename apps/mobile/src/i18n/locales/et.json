@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "Seadistamiskäsk {{index}} aegus",
       "detailColdRestore": "Külm taastamine, hetktõmmis rakendatud, {{applied}}/{{total}} faili taastatud",
       "detailProgressPercent": "{{percent}}% valmis",
-      "detailRestoreIncompleteReport": "Seansi taastamine jäi ebatäielikuks: {{skipped}}/{{total}} faili ei taastatud ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}}/{{total}} faili ei taastatud ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Puudu: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ja veel {{omitted}}",
       "detailReasonPatchFailed": "patchi ei rakendatud",

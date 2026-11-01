@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "{{index}}-sozlash buyrug'i vaqti tugadi",
       "detailColdRestore": "Sovutib tiklash, snapshot qo'llanildi, {{total}} fayldan {{applied}} tasi tiklandi",
       "detailProgressPercent": "{{percent}}% bajarildi",
-      "detailRestoreIncompleteReport": "Sessiya tiklanishi tugallanmadi: {{total}} fayldan {{skipped}} tasi tiklanmadi ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{total}} fayldan {{skipped}} tasi tiklanmadi ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Yetishmayotgan: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} va yana {{omitted}} ta",
       "detailReasonPatchFailed": "patch qo'llanmadi",

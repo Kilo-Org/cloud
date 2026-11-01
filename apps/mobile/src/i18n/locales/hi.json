@@ -2047,7 +2047,7 @@
       "detailSetupCommandTimedOut": "सेटअप आदेश {{index}} का समय समाप्त हो गया",
       "detailColdRestore": "कोल्ड रिस्टोर, स्नैपशॉट लागू हुआ, {{total}} में से {{applied}} फ़ाइलें रिस्टोर हुईं",
       "detailProgressPercent": "{{percent}}% पूरा हुआ",
-      "detailRestoreIncompleteReport": "सेशन रिस्टोर अधूरा रहा: {{total}} में से {{skipped}} फ़ाइलें रिस्टोर नहीं हुईं ({{reasons}})।",
+      "detailRestoreIncompleteFiles": "{{total}} में से {{skipped}} फ़ाइलें रिस्टोर नहीं हुईं ({{reasons}})।",
       "detailRestoreIncompleteMissing": "गायब: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} और {{omitted}} और",
       "detailReasonPatchFailed": "पैच लागू नहीं हुआ",

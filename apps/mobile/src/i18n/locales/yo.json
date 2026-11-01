@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "Àṣẹ ìmúrasílẹ̀ {{index}} ti kọjá àkókò",
       "detailColdRestore": "Ìdápadà tutu, a lo àkópamọ́, a dá {{applied}} nínú {{total}} fáìlì padà",
       "detailProgressPercent": "{{percent}}% ti parí",
-      "detailRestoreIncompleteReport": "Ìdápadà ìpàdé kò pé: {{skipped}} nínú {{total}} fáìlì kò dá padà ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} nínú {{total}} fáìlì kò dá padà ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Ti sọnu: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} àti {{omitted}} míràn",
       "detailReasonPatchFailed": "a kò lè fi àfikún náà s'óri",

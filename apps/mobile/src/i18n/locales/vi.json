@@ -2068,7 +2068,7 @@
       "detailSetupCommandTimedOut": "Lệnh thiết lập {{index}} đã quá thời gian chờ",
       "detailColdRestore": "Khôi phục lạnh, đã áp dụng bản chụp nhanh, {{applied}} trong tổng số {{total}} tệp đã được khôi phục",
       "detailProgressPercent": "Hoàn thành {{percent}}%",
-      "detailRestoreIncompleteReport": "Khôi phục phiên chưa hoàn tất: {{skipped}} trong tổng số {{total}} tệp chưa được khôi phục ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} trong tổng số {{total}} tệp chưa được khôi phục ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Thiếu: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} và {{omitted}} mục khác",
       "detailReasonPatchFailed": "bản vá không áp dụng được",

@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "Amri ya usanidi {{index}} imeisha muda",
       "detailColdRestore": "Urejeshi wa baridi, snapshot imetumika, faili {{applied}} kati ya {{total}} zimerejeshwa",
       "detailProgressPercent": "{{percent}}% imekamilika",
-      "detailRestoreIncompleteReport": "Urejeshi wa kikao haujakamilika: faili {{skipped}} kati ya {{total}} hazikurejeshwa ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "faili {{skipped}} kati ya {{total}} hazikurejeshwa ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Zinazokosekana: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} na nyingine {{omitted}}",
       "detailReasonPatchFailed": "patch haikutumika",

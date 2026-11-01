@@ -2676,7 +2676,7 @@
       "detailSetupCommandTimedOut": "Príkazu na prípravu prostredia {{index}} vypršal časový limit",
       "detailColdRestore": "Studené obnovenie, snímka bola použitá, obnovených {{applied}} z {{total}} súborov",
       "detailProgressPercent": "Dokončené na {{percent}} %",
-      "detailRestoreIncompleteReport": "Obnovenie relácie je neúplné: {{skipped}} z {{total}} súborov nebolo obnovených ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} z {{total}} súborov nebolo obnovených ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Chýba: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} a ďalších {{omitted}}",
       "detailReasonPatchFailed": "záplata sa nepoužila",

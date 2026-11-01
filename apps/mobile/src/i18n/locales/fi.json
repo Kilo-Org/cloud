@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "Valmistelukomento {{index}} aikakatkesi",
       "detailColdRestore": "Kylmä palautus, tilannevedos otettu käyttöön, {{applied}} / {{total}} tiedostoa palautettu",
       "detailProgressPercent": "{{percent}} % valmis",
-      "detailRestoreIncompleteReport": "Istunnon palautus vaillinainen: {{skipped}} / {{total}} tiedostoa ei palautettu ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} / {{total}} tiedostoa ei palautettu ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Puuttuvat: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ja {{omitted}} lisää",
       "detailReasonPatchFailed": "muutosta ei voitu soveltaa",

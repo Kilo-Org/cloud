@@ -2676,7 +2676,7 @@
       "detailSetupCommandTimedOut": "Příkaz pro přípravu prostředí {{index}} vypršel",
       "detailColdRestore": "Studené obnovení, snímek byl použit, obnoveno {{applied}} z {{total}} souborů",
       "detailProgressPercent": "Dokončeno {{percent}} %",
-      "detailRestoreIncompleteReport": "Obnovení relace nebylo úplné: {{skipped}} z {{total}} souborů nebylo obnoveno ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} z {{total}} souborů nebylo obnoveno ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Chybí: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} a {{omitted}} dalších",
       "detailReasonPatchFailed": "patch se nepodařilo použít",

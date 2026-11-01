@@ -2068,7 +2068,7 @@
       "detailSetupCommandTimedOut": "설정 명령 {{index}} 시간 초과",
       "detailColdRestore": "콜드 복원, 스냅샷 적용됨, 전체 {{total}}개 중 {{applied}}개 파일 복원됨",
       "detailProgressPercent": "{{percent}}% 완료",
-      "detailRestoreIncompleteReport": "세션 복원이 완전하지 않습니다: 전체 {{total}}개 중 {{skipped}}개 파일이 복원되지 않았습니다({{reasons}}).",
+      "detailRestoreIncompleteFiles": "전체 {{total}}개 중 {{skipped}}개 파일이 복원되지 않았습니다({{reasons}}).",
       "detailRestoreIncompleteMissing": "누락됨: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} 외 {{omitted}}건 더 있음",
       "detailReasonPatchFailed": "패치가 적용되지 않음",

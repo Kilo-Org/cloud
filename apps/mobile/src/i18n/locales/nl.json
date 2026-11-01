@@ -2068,7 +2068,7 @@
       "detailSetupCommandTimedOut": "Time-out bij voorbereidingsopdracht {{index}}",
       "detailColdRestore": "Koude herstel, snapshot toegepast, {{applied}} van {{total}} bestanden hersteld",
       "detailProgressPercent": "{{percent}}% voltooid",
-      "detailRestoreIncompleteReport": "Sessieherstel onvolledig: {{skipped}} van {{total}} bestanden zijn niet hersteld ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} van {{total}} bestanden zijn niet hersteld ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Ontbrekend: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} en nog {{omitted}} meer",
       "detailReasonPatchFailed": "de patch kon niet worden toegepast",

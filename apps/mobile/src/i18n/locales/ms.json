@@ -2594,7 +2594,7 @@
       "detailSetupCommandTimedOut": "Arahan penyediaan {{index}} tamat masa",
       "detailColdRestore": "Pemulihan sejuk, snapshot digunakan, {{applied}} daripada {{total}} fail dipulihkan",
       "detailProgressPercent": "{{percent}}% selesai",
-      "detailRestoreIncompleteReport": "Pemulihan sesi tidak lengkap: {{skipped}} daripada {{total}} fail tidak dipulihkan ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} daripada {{total}} fail tidak dipulihkan ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Hilang: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} dan {{omitted}} lagi",
       "detailReasonPatchFailed": "patch tidak berjaya digunakan",

@@ -2676,7 +2676,7 @@
       "detailSetupCommandTimedOut": "Čas ukaza za pripravo {{index}} je potekel",
       "detailColdRestore": "Hladna obnovitev, posnetek uveljavljen, obnovljenih {{applied}} od {{total}} datotek",
       "detailProgressPercent": "{{percent}}% dokončano",
-      "detailRestoreIncompleteReport": "Obnovitev seje ni dokončana: {{skipped}} od {{total}} datotek ni bilo obnovljenih ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} od {{total}} datotek ni bilo obnovljenih ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Manjka: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} in še {{omitted}}",
       "detailReasonPatchFailed": "popravek se ni uveljavil",

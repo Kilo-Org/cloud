@@ -2600,7 +2600,7 @@
       "detailSetupCommandTimedOut": "ਸੈੱਟਅੱਪ ਕਮਾਂਡ {{index}} ਦਾ ਸਮਾਂ ਸਮਾਪਤ",
       "detailColdRestore": "ਕੋਲਡ ਰੀਸਟੋਰ, ਸਨੈਪਸ਼ਾਟ ਲਾਗੂ ਹੋਈ, {{total}} ਵਿੱਚੋਂ {{applied}} ਫਾਈਲਾਂ ਰੀਸਟੋਰ ਹੋਈਆਂ",
       "detailProgressPercent": "{{percent}}% ਪੂਰਾ",
-      "detailRestoreIncompleteReport": "ਸੈਸ਼ਨ ਰੀਸਟੋਰ ਅਧੂਰਾ: {{total}} ਵਿੱਚੋਂ {{skipped}} ਫਾਈਲਾਂ ਰੀਸਟੋਰ ਨਹੀਂ ਹੋਈਆਂ ({{reasons}})।",
+      "detailRestoreIncompleteFiles": "{{total}} ਵਿੱਚੋਂ {{skipped}} ਫਾਈਲਾਂ ਰੀਸਟੋਰ ਨਹੀਂ ਹੋਈਆਂ ({{reasons}})।",
       "detailRestoreIncompleteMissing": "ਗੁੰਮ: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ਅਤੇ {{omitted}} ਹੋਰ",
       "detailReasonPatchFailed": "ਪੈਚ ਲਾਗੂ ਨਹੀਂ ਹੋਈ",

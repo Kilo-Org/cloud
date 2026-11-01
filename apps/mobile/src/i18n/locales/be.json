@@ -2676,7 +2676,7 @@
       "detailSetupCommandTimedOut": "Каманда налады {{index}} перавысіла час выканання",
       "detailColdRestore": "Халоднае аднаўленне, здымак ужыты, адноўлена {{applied}} з {{total}} файлаў",
       "detailProgressPercent": "{{percent}}% выканана",
-      "detailRestoreIncompleteReport": "Аднаўленне сеансу няпоўнае: {{skipped}} з {{total}} файлаў не адноўлены ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} з {{total}} файлаў не адноўлены ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Адсутнічае: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} і яшчэ {{omitted}}",
       "detailReasonPatchFailed": "патч не ўжыўся",

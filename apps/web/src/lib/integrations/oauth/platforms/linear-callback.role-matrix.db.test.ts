@@ -5,6 +5,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilocode_users,
+  organization_memberships,
   organizations,
   provider_oauth_attempts,
   type Organization,
@@ -115,6 +116,9 @@ function redirectLocation(response: Response): { pathname: string; error: string
 
 afterEach(async () => {
   const userIds = Object.values(users).map(user => user.id);
+  await db
+    .delete(organization_memberships)
+    .where(eq(organization_memberships.organization_id, organization.id));
   await db.delete(organizations).where(eq(organizations.id, organization.id));
   await db.delete(kilocode_users).where(inArray(kilocode_users.id, userIds));
 });

@@ -34,6 +34,13 @@ import { openFindingLink } from '@/lib/security-agent-link';
 import { type SecurityAnalysisCapacityState } from '@/lib/security-analysis-capacity';
 import { cn } from '@/lib/utils';
 
+/**
+ * A finding card's own frame: the padding and the line rhythm the loading
+ * placeholder in `finding-row-skeleton.tsx` repeats, so the cards replace the
+ * placeholders in place.
+ */
+export const FINDING_ROW_FRAME_CLASS = 'gap-1.5 rounded-lg bg-secondary p-3';
+
 const SEVERITY_KEYS = {
   critical: 'common.critical',
   high: 'securityAgent.sla.high',
@@ -224,7 +231,7 @@ export function FindingRow({
       });
 
   return (
-    <View className="gap-1.5 rounded-lg bg-secondary p-3">
+    <View className={FINDING_ROW_FRAME_CLASS}>
       <Pressable
         className="gap-1.5 active:opacity-70"
         accessibilityRole="button"

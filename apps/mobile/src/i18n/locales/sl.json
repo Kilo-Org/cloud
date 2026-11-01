@@ -2446,7 +2446,7 @@
       "forkFilesUnchangedOnComputer": "Datoteke na tem računalniku se ne spremenijo.",
       "pickProfile": "Izberite profil",
       "noProfile": "Brez profila",
-      "defaultProfileResolvesTo": "trenutno: {{name}}",
+      "defaultProfileResolvesTo": "Trenutno: {{name}}",
       "defaultProfileResolvesToAccessibility": "Privzeti profil: {{name}}",
       "manageProfiles": "Upravljanje profilov",
       "noProfiles": "Še ni profilov. Ustvarite ga, če želite dodati spremenljivke okolja, strežnike MCP in veščine.",

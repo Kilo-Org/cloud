@@ -1844,7 +1844,7 @@
       "forkFilesUnchangedOnComputer": "Bestanden op deze computer worden niet gewijzigd.",
       "pickProfile": "Kies een profiel",
       "noProfile": "Geen profiel",
-      "defaultProfileResolvesTo": "verwijst naar {{name}}",
+      "defaultProfileResolvesTo": "Verwijst naar {{name}}",
       "defaultProfileResolvesToAccessibility": "Standaardprofiel: {{name}}",
       "manageProfiles": "Beheer profielen",
       "noProfiles": "Nog geen profielen. Maak er een om omgevingsvariabelen, MCP-servers en vaardigheden toe te voegen.",

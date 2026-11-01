@@ -1844,7 +1844,7 @@
       "forkFilesUnchangedOnComputer": "Die Dateien auf diesem Computer werden nicht geändert.",
       "pickProfile": "Wähle ein Profil",
       "noProfile": "Kein Profil",
-      "defaultProfileResolvesTo": "entspricht {{name}}",
+      "defaultProfileResolvesTo": "Entspricht {{name}}",
       "defaultProfileResolvesToAccessibility": "Standardprofil: {{name}}",
       "manageProfiles": "Profile verwalten",
       "noProfiles": "Noch keine Profile. Erstelle eins, um Umgebungsvariablen, MCP-Server und Fähigkeiten hinzuzufügen.",

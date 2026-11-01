@@ -2372,7 +2372,7 @@
       "forkFilesUnchangedOnComputer": "ამ კომპიუტერზე ფაილები არ შეიცვლება.",
       "pickProfile": "აირჩიეთ პროფილი",
       "noProfile": "პროფილი არ არის",
-      "defaultProfileResolvesTo": "ახლა {{name}}-ია",
+      "defaultProfileResolvesTo": "Ახლა {{name}}-ია",
       "defaultProfileResolvesToAccessibility": "ნაგულისხმევი პროფილი: {{name}}",
       "manageProfiles": "პროფილების მართვა",
       "noProfiles": "ჯერ არ არის პროფილები. შექმენით ერთი გარემოს ცვლადების, MCP სერვერების და უნარების დასამატებლად.",

@@ -2378,7 +2378,7 @@
       "forkFilesUnchangedOnComputer": "Hindi mababago ang mga file sa computer na ito.",
       "pickProfile": "Pumili ng profile",
       "noProfile": "Walang profile",
-      "defaultProfileResolvesTo": "kasalukuyang nakatakda sa {{name}}",
+      "defaultProfileResolvesTo": "Kasalukuyang nakatakda sa {{name}}",
       "defaultProfileResolvesToAccessibility": "Default na profile: {{name}}",
       "manageProfiles": "Pamahalaan ang mga profile",
       "noProfiles": "Wala pang mga profile. Gumawa ng isa upang magdagdag ng mga variable ng kapaligiran, mga server ng MCP, at mga kasanayan.",

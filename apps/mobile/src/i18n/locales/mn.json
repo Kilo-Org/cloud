@@ -2372,7 +2372,7 @@
       "forkFilesUnchangedOnComputer": "Энэ компьютер дээрх файлууд өөрчлөгдөхгүй.",
       "pickProfile": "Профайл сонгоно уу",
       "noProfile": "Профайл байхгүй",
-      "defaultProfileResolvesTo": "одоо {{name}} гэж тохируулагдсан",
+      "defaultProfileResolvesTo": "Одоо {{name}} гэж тохируулагдсан",
       "defaultProfileResolvesToAccessibility": "Өгөгдмөл профайл: {{name}}",
       "manageProfiles": "Профайлуудыг удирдах",
       "noProfiles": "Одоогоор профайл байхгүй байна. Орчны хувьсагч, MCP сервер, ур чадвар нэмэхийн тулд нэгийг үүсгэ.",

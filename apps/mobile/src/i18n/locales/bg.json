@@ -2372,7 +2372,7 @@
       "forkFilesUnchangedOnComputer": "Файловете на този компютър не се променят.",
       "pickProfile": "Изберете профил",
       "noProfile": "Няма профил",
-      "defaultProfileResolvesTo": "насочва към {{name}}",
+      "defaultProfileResolvesTo": "Насочва към {{name}}",
       "defaultProfileResolvesToAccessibility": "Профил по подразбиране: {{name}}",
       "manageProfiles": "Управление на профили",
       "noProfiles": "Все още няма профили. Създайте такъв, за да добавите променливи на средата, MCP сървъри и умения.",

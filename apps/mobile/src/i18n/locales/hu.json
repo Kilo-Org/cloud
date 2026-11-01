@@ -2372,7 +2372,7 @@
       "forkFilesUnchangedOnComputer": "A számítógépen lévő fájlok nem változnak.",
       "pickProfile": "Válassz egy profilt",
       "noProfile": "Nincs profil",
-      "defaultProfileResolvesTo": "jelenleg: {{name}}",
+      "defaultProfileResolvesTo": "Jelenleg: {{name}}",
       "defaultProfileResolvesToAccessibility": "Alapértelmezett profil: {{name}}",
       "manageProfiles": "Profilok kezelése",
       "noProfiles": "Még nincsenek profilok. Hozz létre egyet a környezeti változók, MCP-kiszolgálók és készségek hozzáadásához.",

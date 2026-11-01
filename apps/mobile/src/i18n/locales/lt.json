@@ -2446,7 +2446,7 @@
       "forkFilesUnchangedOnComputer": "Failai šiame kompiuteryje nekeičiami.",
       "pickProfile": "Pasirinkite profilį",
       "noProfile": "Nėra profilio",
-      "defaultProfileResolvesTo": "atitinka: {{name}}",
+      "defaultProfileResolvesTo": "Atitinka: {{name}}",
       "defaultProfileResolvesToAccessibility": "Numatytasis profilis: {{name}}",
       "manageProfiles": "Tvarkyti profilius",
       "noProfiles": "Dar nėra profilių. Sukurkite vieną, kad pridėtumėte aplinkos kintamuosius, MCP serverius ir įgūdžius.",

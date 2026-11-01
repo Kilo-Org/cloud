@@ -2409,7 +2409,7 @@
       "forkFilesUnchangedOnComputer": "Fajlovi na ovom računaru se ne menjaju.",
       "pickProfile": "Izaberite profil",
       "noProfile": "Nema profila",
-      "defaultProfileResolvesTo": "trenutno podešeno na {{name}}",
+      "defaultProfileResolvesTo": "Trenutno podešeno na {{name}}",
       "defaultProfileResolvesToAccessibility": "Podrazumevani profil: {{name}}",
       "manageProfiles": "Upravljajte profilima",
       "noProfiles": "Još nema profila. Napravite jedan da biste dodali promenljive okruženja, MCP servere i veštine.",

@@ -77,9 +77,6 @@ export function SheetHeader({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const insets = useScreenInsets();
-  // The window's own top inset, before `useScreenInsets` adds the landscape
-  // corner clearance: the detent cap (`useFormSheetDetents`) subtracts exactly
-  // this value, so it alone says where the sheet edge lands.
   const windowTopInset = useSafeAreaInsets().top;
   const resolvedDoneLabel = doneLabel ?? t('common.done');
   const resolvedCancelLabel = cancelLabel ?? t('common.cancel');
@@ -93,15 +90,19 @@ export function SheetHeader({
   // without branching on Platform.OS.
   const statusBarHeight = StatusBar.currentHeight ?? 0;
   const resolvedTopInset = insets.top > 0 ? insets.top : statusBarHeight;
-  // On Android the detent cap subtracts the window's top inset from the full
-  // detent, so a window that reports one settles the sheet edge at the status
-  // bar: reserving the inset again would only reserve a dead band above the
-  // title and drop it again once the sheet moved. Only a window with no top
-  // inset of its own reaches the window top, and there the header clears the
-  // status bar itself. The inset is known before the sheet mounts, so the
-  // first painted frame is already the settled one — a `measureInWindow` taken
-  // at mount reports the frame before the sheet presents and would flip the
-  // padding after the sheet landed (a 51.8 dp shift of the whole header).
+  // The inset the detent cap subtracts (`useFormSheetDetents`), derived from
+  // the same two inputs: the header and the cap must never disagree, or the
+  // header reserves clearance the sheet edge already provides.
+  const detentTopInset = windowTopInset > 0 ? windowTopInset : statusBarHeight;
+  // On Android the detent cap subtracts that inset from the full detent, so
+  // any non-zero value settles the sheet edge at it: reserving the inset
+  // again would only reserve a dead band above the title and drop it again
+  // once the sheet moved. Only a window with no top inset at all reaches the
+  // window top, and there the header clears the status bar itself. The value
+  // is known before the sheet mounts, so the first painted frame is already
+  // the settled one — a `measureInWindow` taken at mount reports the frame
+  // before the sheet presents and would flip the padding after the sheet
+  // landed (a 51.8 dp shift of the whole header).
   // On iOS the native sheet presents below the status bar, so the header
   // reserves no top clearance there — the window inset would only be a dead
   // band. SessionPageSheet presents below the status bar on iOS too, and the
@@ -111,7 +112,7 @@ export function SheetHeader({
   const dropsTopInset =
     topInset === 'ios-page-sheet' ||
     topInset === 'never' ||
-    (topInset === 'bottom-form-sheet' && (Platform.OS !== 'android' || windowTopInset > 0));
+    (topInset === 'bottom-form-sheet' && (Platform.OS !== 'android' || detentTopInset > 0));
   const topInsetHeight = dropsTopInset ? 0 : resolvedTopInset;
   const safeAreaStyle =
     topInsetHeight > 0 || insets.left > 0 || insets.right > 0

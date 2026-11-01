@@ -603,11 +603,11 @@ describe('SheetHeader', () => {
   });
 
   it.each(['ios', 'android'])(
-    'falls back to the status-bar height for a bottom formSheet while the top inset is unresolved (%s)',
+    'drops the top clearance for a bottom formSheet when only the status bar is known (%s)',
     async os => {
-      // A window with no top inset of its own leaves the sheet edge at the
-      // window top, so the status-bar height keeps the header below the icons.
-      // iOS keeps its dead-band rule: no clearance at all.
+      // The detent cap subtracts the same status-bar fallback, so the sheet
+      // edge already sits at it: padding again would be a dead band, and the
+      // later arrival of the real inset must not change that.
       rn.os = os;
       rn.statusHeight = 48;
       safeArea.top = 0;
@@ -619,11 +619,44 @@ describe('SheetHeader', () => {
       });
 
       const wrapper = findSafeAreaWrapper(renderer.root);
-      expect(wrapper.props.style).toEqual(os === 'android' ? { paddingTop: 48 } : undefined);
+      expect(wrapper.props.style).toBeUndefined();
 
       renderer.unmount();
     }
   );
+
+  it('keeps a bottom formSheet header still when the safe-area inset arrives late', async () => {
+    // Android can report top: 0 for the frame a sheet first lays out. The
+    // status-bar fallback keeps the decision on `drop` for both frames; a
+    // measurement-driven decision would drop the padding here instead and
+    // move the header by the inset.
+    rn.os = 'android';
+    rn.statusHeight = 48;
+    safeArea.top = 0;
+    const renderer = await mount({
+      title: 'Voice language',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+      topInset: 'bottom-form-sheet',
+    });
+    expect(findSafeAreaWrapper(renderer.root).props.style).toBeUndefined();
+
+    safeArea.top = 24;
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(
+        createElement(SheetHeader, {
+          title: 'Voice language',
+          onDone: () => undefined,
+          onCancel: () => undefined,
+          topInset: 'bottom-form-sheet',
+        })
+      );
+    });
+    expect(findSafeAreaWrapper(renderer.root).props.style).toBeUndefined();
+
+    renderer.unmount();
+  });
 
   it.each(['ios', 'android'])(
     'keeps landscape side insets for a bottom formSheet (%s)',
@@ -648,13 +681,13 @@ describe('SheetHeader', () => {
   );
 
   it.each(['ios', 'android'])(
-    'keeps the landscape corner clearance when the window reports no top inset (%s)',
+    'keeps the landscape corner clearance when no top inset is known at all (%s)',
     async os => {
       // A side status area leaves the top inset at zero beside rounded corners
-      // (#8042): the header keeps the corner clearance the landscape window
-      // needs, and on Android that is also where the sheet reaches the top.
+      // (#8042): with no top inset and no status-bar height the sheet reaches
+      // the window top, so the header keeps the corner clearance.
       rn.os = os;
-      rn.statusHeight = 48;
+      rn.statusHeight = 0;
       safeArea.top = 0;
       safeArea.left = 47;
       const renderer = await mount({

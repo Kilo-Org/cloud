@@ -279,17 +279,14 @@ export function localizedSecurityMarkerMessage(error: unknown): string | null {
  * of the sync wording that ends "then sync again".
  */
 function configMutationCopyKeyFor(error: unknown): string | null {
-  switch (readTrpcErrorField(error, 'upstreamCode')) {
-    case SECURITY_SYNC_PRECONDITION_CODES.missingPermission: {
-      return 'securityAgent.scopeEntry.reauthorizeDescription';
-    }
-    case SECURITY_CONFIG_CONFLICT_CODE: {
-      return 'securityAgent.mutations.configConflict';
-    }
-    default: {
-      return null;
-    }
+  const code = readTrpcErrorField(error, 'upstreamCode');
+  if (code === SECURITY_SYNC_PRECONDITION_CODES.missingPermission) {
+    return 'securityAgent.scopeEntry.reauthorizeDescription';
   }
+  if (code === SECURITY_CONFIG_CONFLICT_CODE) {
+    return 'securityAgent.mutations.configConflict';
+  }
+  return null;
 }
 
 /**

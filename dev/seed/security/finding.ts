@@ -101,7 +101,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     analysis: {
       triage: {
         needsSandboxAnalysis: true,
-        needsSandboxReasoning: 'The package is imported by the server bundle, so reachability needs a check.',
+        needsSandboxReasoning:
+          'The package is imported by the server bundle, so reachability needs a check.',
         suggestedAction: 'analyze_codebase',
         confidence: 'medium',
         triageAt: '2026-10-01T09:06:00.000Z',

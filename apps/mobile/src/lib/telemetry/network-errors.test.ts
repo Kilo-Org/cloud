@@ -675,10 +675,9 @@ describe('createNetworkErrorFetch', () => {
   });
 
   it('(i4) falls back to the URL remainder when the body names no procedure', async () => {
-    const response = Response.json(
-      [{ error: { data: { code: 'TIMEOUT', path: '' } } }],
-      { status: 207 }
-    );
+    const response = Response.json([{ error: { data: { code: 'TIMEOUT', path: '' } } }], {
+      status: 207,
+    });
     const wrapped = createNetworkErrorFetch(resolvingFetch(response), {
       source: 'trpc',
       isResponseError: status => status >= 400 || status === 207,

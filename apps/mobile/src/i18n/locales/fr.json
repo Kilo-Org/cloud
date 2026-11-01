@@ -4053,7 +4053,7 @@
       "emptyDescription": "Ajoutez une valeur par défaut pour appliquer automatiquement un profil lors du démarrage des sessions pour un dépôt.",
       "repo": "Sélectionnez le référentiel…",
       "profile": "Sélectionnez un profil",
-      "remove": "Délier",
+      "removeForRepo": "Délier {{repo}}",
       "search": "Rechercher des référentiels…",
       "addedToast": "Profil par défaut défini pour \"{{repo}}\"",
       "addFailed": "Impossible de définir le profil par défaut",

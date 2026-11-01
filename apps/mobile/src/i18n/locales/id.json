@@ -3990,7 +3990,7 @@
       "emptyDescription": "Tambahkan default untuk menerapkan profil secara otomatis saat memulai sesi untuk repo.",
       "repo": "Pilih repositori…",
       "profile": "Pilih profil",
-      "remove": "Memperlonggar",
+      "removeForRepo": "Lepaskan ikatan {{repo}}",
       "search": "Cari repositori…",
       "addedToast": "Profil default disetel untuk \"{{repo}}\"",
       "addFailed": "Tidak dapat menyetel profil default",

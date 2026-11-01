@@ -3990,7 +3990,7 @@
       "emptyDescription": "Ongeza chaguomsingi ili kutumia wasifu kiotomatiki unapoanzisha vipindi vya repo.",
       "repo": "Chagua hazina...",
       "profile": "Chagua wasifu",
-      "remove": "Tendua",
+      "removeForRepo": "Tendua {{repo}}",
       "search": "Tafuta hazina...",
       "addedToast": "Wasifu chaguomsingi umewekwa kwa ajili ya \"{{repo}}\"",
       "addFailed": "Haikuweza kuweka wasifu chaguomsingi",

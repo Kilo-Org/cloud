@@ -4053,7 +4053,7 @@
       "emptyDescription": "Adicione um padrão para aplicar automaticamente um perfil ao iniciar sessões de um repositório.",
       "repo": "Selecione o repositório…",
       "profile": "Selecione o perfil",
-      "remove": "Desvincular",
+      "removeForRepo": "Desvincular {{repo}}",
       "search": "Pesquisar repositórios…",
       "addedToast": "Perfil predefinido definido para \"{{repo}}\"",
       "addFailed": "Não foi possível definir o perfil predefinido",

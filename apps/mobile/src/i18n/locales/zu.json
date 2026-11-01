@@ -3996,7 +3996,7 @@
       "emptyDescription": "Engeza okuzenzakalelayo ukuze usebenzise ngokuzenzakalelayo iphrofayela lapho uqala izikhathi ze-repo.",
       "repo": "Khetha inqolobane...",
       "profile": "Khetha iphrofayela",
-      "remove": "Khipha",
+      "removeForRepo": "Khipha {{repo}}",
       "search": "Sesha amaqoqo...",
       "addedToast": "Iphrofayela ezenzakalelayo isethelwe \"{{repo}}\"",
       "addFailed": "Ayikwazanga ukusetha iphrofayela ezenzakalelayo",

@@ -4104,7 +4104,7 @@
       "emptyDescription": "Pridėkite numatytąjį nustatymą, kad profilis būtų automatiškai taikomas pradedant atpirkimo seansus.",
       "repo": "Pasirinkite saugyklą…",
       "profile": "Pasirinkite profilį",
-      "remove": "Atsieti",
+      "removeForRepo": "Atsieti {{repo}}",
       "search": "Ieškoti saugyklų…",
       "addedToast": "Numatytasis profilis nustatytas „{{repo}}“",
       "addFailed": "Nepavyko nustatyti numatytojo profilio",

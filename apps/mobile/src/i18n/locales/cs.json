@@ -4104,7 +4104,7 @@
       "emptyDescription": "Přidejte výchozí nastavení pro automatické použití profilu při zahájení relací pro repo.",
       "repo": "Vyberte úložiště…",
       "profile": "Vyberte profil",
-      "remove": "Zrušit vazbu",
+      "removeForRepo": "Zrušit vazbu {{repo}}",
       "search": "Prohledat úložiště…",
       "addedToast": "Výchozí profil nastavený pro „{{repo}}“",
       "addFailed": "Nepodařilo se nastavit výchozí profil",

@@ -3990,7 +3990,7 @@
       "emptyDescription": "Bættu við sjálfgefnu til að nota prófíl sjálfkrafa þegar þú byrjar lotur fyrir geymslu.",
       "repo": "Veldu geymslu…",
       "profile": "Veldu prófíl",
-      "remove": "Afbinda",
+      "removeForRepo": "Afbinda {{repo}}",
       "search": "Leita í geymslum...",
       "addedToast": "Sjálfgefið snið stillt fyrir „{{repo}}“",
       "addFailed": "Gat ekki stillt sjálfgefna prófíl",

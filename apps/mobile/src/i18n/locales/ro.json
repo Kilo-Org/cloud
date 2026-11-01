@@ -4047,7 +4047,7 @@
       "emptyDescription": "Adăugați o valoare prestabilită pentru a aplica automat un profil la pornirea sesiunilor pentru un depozit.",
       "repo": "Selectați depozitul...",
       "profile": "Selectați profilul",
-      "remove": "Desface",
+      "removeForRepo": "Desface {{repo}}",
       "search": "Căutați în depozite...",
       "addedToast": "Profil implicit setat pentru „{{repo}}”",
       "addFailed": "Nu s-a putut seta profilul implicit",

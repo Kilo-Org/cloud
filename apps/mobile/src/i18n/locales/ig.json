@@ -3990,7 +3990,7 @@
       "emptyDescription": "Tinye ndabara ka itinye profaịlụ na-akpaghị aka mgbe ịmalite nnọkọ maka repo.",
       "repo": "Họrọ ebe nchekwa…",
       "profile": "Họrọ profaịlụ",
-      "remove": "Kwụpụ",
+      "removeForRepo": "Kwụpụ {{repo}}",
       "search": "Chọọ ebe nchekwa…",
       "addedToast": "Profaịlụ ahaziri maka \"{{repo}}\"",
       "addFailed": "Enweghị ike ịtọ profaịlụ ndabere",

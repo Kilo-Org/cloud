@@ -3990,7 +3990,7 @@
       "emptyDescription": "Voeg een standaard toe om automatisch een profiel toe te passen bij het starten van sessies voor een opslagplaats.",
       "repo": "Selecteer opslagplaats…",
       "profile": "Selecteer profiel",
-      "remove": "Ontbinden",
+      "removeForRepo": "{{repo}} ontbinden",
       "search": "Zoek opslagplaatsen…",
       "addedToast": "Standaardprofiel ingesteld op \"{{repo}}\"",
       "addFailed": "Kan standaardprofiel niet instellen",

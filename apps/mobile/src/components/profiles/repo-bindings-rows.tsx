@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
-import { repoPlatformBadge } from '@/components/profiles/repo-bindings-model';
+import { repoPlatformBadge, repoPlatformLabelKey } from '@/components/profiles/repo-bindings-model';
+import { ProfileRowIdentity, profileRowLabel } from '@/components/profiles/profile-row-identity';
 import { ChevronDown, GitBranch, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -23,7 +24,7 @@ export function RepoBindingsSkeleton() {
   );
 }
 
-/** One binding row: repo full name, provider badge, profile name, remove. */
+/** One binding row: repo full name, profile name, provider badge, remove. */
 export function RepoBindingRow({
   repoFullName,
   platform,
@@ -39,24 +40,34 @@ export function RepoBindingRow({
 }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const providerLabel = t(repoPlatformLabelKey(platform));
   return (
     <View className="min-h-14 flex-row items-center gap-2 rounded-lg bg-secondary px-3 py-2">
       <GitBranch size={16} color={colors.mutedForeground} />
-      <View className="min-w-0 flex-1 gap-0.5">
-        <Text variant="mono" className="text-sm" numberOfLines={1}>
-          {repoFullName}
-        </Text>
-        <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-          {profileName}
-        </Text>
-      </View>
-      <Text className="rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+      {/* One identity element, first, in reading order: the row is announced as
+          "repository, profile, provider" before the control that removes it. The
+          badge repeats the provider, so it stays out of the accessibility tree. */}
+      <ProfileRowIdentity label={profileRowLabel(repoFullName, profileName, providerLabel)}>
+        <View className="gap-0.5">
+          <Text variant="mono" className="text-sm" numberOfLines={1}>
+            {repoFullName}
+          </Text>
+          <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+            {profileName}
+          </Text>
+        </View>
+      </ProfileRowIdentity>
+      <Text
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        className="rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground"
+      >
         {repoPlatformBadge(platform)}
       </Text>
       <Pressable
         className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
         accessibilityRole="button"
-        accessibilityLabel={t('profiles.repoBindings.remove')}
+        accessibilityLabel={t('profiles.repoBindings.removeForRepo', { repo: repoFullName })}
         disabled={isRemoving}
         onPress={onRemove}
       >

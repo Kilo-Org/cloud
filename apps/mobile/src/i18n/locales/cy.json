@@ -4218,7 +4218,7 @@
       "emptyDescription": "Ychwanegu rhagosodiad i gymhwyso proffil yn awtomatig wrth gychwyn sesiynau ar gyfer repo.",
       "repo": "Dewiswch ystorfa…",
       "profile": "Dewiswch broffil",
-      "remove": "Dadrwymo",
+      "removeForRepo": "Dadrwymo {{repo}}",
       "search": "Chwilio cadwrfeydd…",
       "addedToast": "Gosod proffil rhagosodedig ar gyfer \"{{repo}}\"",
       "addFailed": "Methu gosod y proffil rhagosodedig",

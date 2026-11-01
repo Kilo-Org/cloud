@@ -3990,7 +3990,7 @@
       "emptyDescription": "Engade un predeterminado para aplicar automaticamente un perfil ao iniciar sesións para un repositorio.",
       "repo": "Seleccionar repositorio...",
       "profile": "Seleccione o perfil",
-      "remove": "Desvincular",
+      "removeForRepo": "Desvincular {{repo}}",
       "search": "Buscar repositorios...",
       "addedToast": "Perfil predeterminado definido para \"{{repo}}\"",
       "addFailed": "Non se puido establecer o perfil predeterminado",

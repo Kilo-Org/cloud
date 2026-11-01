@@ -4056,7 +4056,7 @@
       "emptyDescription": "Add a default to automatically apply a profile when starting sessions for a repo.",
       "repo": "Select repository…",
       "profile": "Select profile",
-      "remove": "Unbind",
+      "removeForRepo": "Unbind {{repo}}",
       "search": "Search repositories…",
       "addedToast": "Default profile set for \"{{repo}}\"",
       "addFailed": "Couldn't set default profile",

@@ -3990,7 +3990,7 @@
       "emptyDescription": "Shto një parazgjedhje për të aplikuar automatikisht një profil kur nis seancat për një depo.",
       "repo": "Zgjidhni depo…",
       "profile": "Zgjidhni profilin",
-      "remove": "Çlidhe",
+      "removeForRepo": "Çlidhe {{repo}}",
       "search": "Kërko në depo…",
       "addedToast": "Profili i parazgjedhur është caktuar për \"{{repo}}\"",
       "addFailed": "Profili i parazgjedhur nuk mund të caktohet",

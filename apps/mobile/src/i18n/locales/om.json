@@ -3990,7 +3990,7 @@
       "emptyDescription": "Yeroo turtii repo'f jalqabdu ofumaan piroofaayilii hojii irra oolchuuf durtii dabali.",
       "repo": "Kuusaa filadhu...",
       "profile": "Profaayilii filadhu",
-      "remove": "Hidhaa hiikaa",
+      "removeForRepo": "Hidhaa {{repo}} hiikaa",
       "search": "Kuusaawwan barbaadi...",
       "addedToast": "Profaayilii durtii \"{{repo}}\" tiif saagame.",
       "addFailed": "Profaayilii durtii saaguu hin dandeenye",

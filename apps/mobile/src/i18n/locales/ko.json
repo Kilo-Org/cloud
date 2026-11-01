@@ -3990,7 +3990,7 @@
       "emptyDescription": "저장소에 대한 세션을 시작할 때 프로필을 자동으로 적용하려면 기본값을 추가하세요.",
       "repo": "저장소 선택…",
       "profile": "프로필 선택",
-      "remove": "바인딩 해제",
+      "removeForRepo": "{{repo}} 바인딩 해제",
       "search": "저장소 검색…",
       "addedToast": "\"{{repo}}\"에 대한 기본 프로필 세트",
       "addFailed": "기본 프로필을 설정할 수 없습니다.",

@@ -3990,7 +3990,7 @@
       "emptyDescription": "Tambahkan lalai untuk menggunakan profil secara automatik apabila memulakan sesi untuk repo.",
       "repo": "Pilih repositori…",
       "profile": "Pilih profil",
-      "remove": "Buka ikatan",
+      "removeForRepo": "Buka ikatan {{repo}}",
       "search": "Cari repositori…",
       "addedToast": "Profil lalai ditetapkan untuk \"{{repo}}\"",
       "addFailed": "Tidak dapat menetapkan profil lalai",

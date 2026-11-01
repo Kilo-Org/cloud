@@ -3990,7 +3990,7 @@
       "emptyDescription": "Ku dar default si toos ah u codso profile marka la bilaabayo fadhiyada repo.",
       "repo": "Dooro kaydka…",
       "profile": "Dooro astaanta",
-      "remove": "Ka fur",
+      "removeForRepo": "Ka fur {{repo}}",
       "search": "Raadi meelaha kaydka ah…",
       "addedToast": "Astaanta asalka ah waxaa loo dejiyay \"{{repo}}\"",
       "addFailed": "Waa la dejin kari waayay astaanta guud",

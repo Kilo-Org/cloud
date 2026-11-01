@@ -3990,7 +3990,7 @@
       "emptyDescription": "Legg til en standard for automatisk å bruke en profil når du starter økter for en repo.",
       "repo": "Velg depot...",
       "profile": "Velg profil",
-      "remove": "Avbind",
+      "removeForRepo": "Avbind «{{repo}}»",
       "search": "Søk i depoter...",
       "addedToast": "Standard profil satt for «{{repo}}»",
       "addFailed": "Kunne ikke angi standardprofil",

@@ -3990,7 +3990,7 @@
       "emptyDescription": "Ajoute yon default pou aplike otomatikman yon pwofil lè w kòmanse sesyon yo pou yon repo.",
       "repo": "Chwazi depo...",
       "profile": "Chwazi pwofil",
-      "remove": "Demare",
+      "removeForRepo": "Demare {{repo}}",
       "search": "Chèche depo...",
       "addedToast": "Default pwofil mete pou \"{{repo}}\"",
       "addFailed": "Pa t 'kapab mete pwofil default",

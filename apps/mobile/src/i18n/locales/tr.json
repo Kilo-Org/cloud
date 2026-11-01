@@ -3990,7 +3990,7 @@
       "emptyDescription": "Bir depo için oturum başlatırken bir profili otomatik olarak uygulamak için bir varsayılan ekleyin.",
       "repo": "Depoyu seçin…",
       "profile": "Profil seç",
-      "remove": "Bağlantıyı kaldır",
+      "removeForRepo": "{{repo}} bağlantısını kaldır",
       "search": "Depolarda ara…",
       "addedToast": "\"{{repo}}\" için varsayılan profil ayarlandı",
       "addFailed": "Varsayılan profil ayarlanamadı",

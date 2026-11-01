@@ -3990,7 +3990,7 @@
       "emptyDescription": "Gehitu lehenetsitako profil bat automatikoki aplikatzeko repositegi baterako saioak hastean.",
       "repo": "Hautatu biltegia…",
       "profile": "Hautatu profila",
-      "remove": "Askatu",
+      "removeForRepo": "Askatu {{repo}}",
       "search": "Bilatu biltegiak...",
       "addedToast": "\"{{repo}}\"-ren profil lehenetsia ezarri da",
       "addFailed": "Ezin izan da profil lehenetsia ezarri",

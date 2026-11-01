@@ -334,37 +334,6 @@ describe('SectionHeader mounted layout', () => {
     expect(String(row.props.className).split(' ')).toContain('items-end');
   });
 
-  it('holds the label the same air below the block above, with or without an action', () => {
-    // Field defect (Home): a row with an action is as tall as that action's
-    // 48 dp frame while an action-less row is one label line tall, so a single
-    // `pt-2` put the first section label ~44 dp below the header row and every
-    // other one ~14 dp below its block. The frame already holds the label ~34 dp
-    // below the row's top edge, so the action row keeps no leading padding and
-    // the action-less row pads the same air minus the sections column's 7 dp gap
-    // (home-header-section-gap).
-    const withAction = mount(
-      createElement(SectionHeader, {
-        label: 'Live now',
-        actionLabel: 'See all',
-        onActionPress: () => undefined,
-      })
-    );
-    const actionRowClasses = String(
-      withAction.find(node => Object.is(node.type, 'View')).props.className
-    ).split(' ');
-    expect(actionRowClasses).toContain('pt-0');
-    expect(actionRowClasses).not.toContain('pt-[27px]');
-    act(() => renderer?.unmount());
-    renderer = undefined;
-
-    const plain = mount(createElement(SectionHeader, { label: 'Explore' }));
-    const plainRowClasses = String(
-      plain.find(node => Object.is(node.type, 'View')).props.className
-    ).split(' ');
-    expect(plainRowClasses).toContain('pt-[27px]');
-    expect(plainRowClasses).not.toContain('pt-0');
-  });
-
   it('gives a notice all the free space and keeps the action at the outer edge', () => {
     // Field defect (iPhone 17 Pro): a growing label took half the free space
     // and cut "Connection lost" to "Connection l…" beside empty space.

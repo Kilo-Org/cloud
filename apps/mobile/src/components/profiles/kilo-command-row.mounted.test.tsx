@@ -170,4 +170,20 @@ describe('KiloCommandRowView template preview', () => {
     expect(positions.every(position => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
   });
+
+  it('paints the slash name and leaves the switch as the row stop that speaks it', () => {
+    const root = renderRow();
+
+    const nameLines = root.findAll(
+      node => Object.is(node.type, 'Text') && node.children.includes('/review')
+    );
+    expect(nameLines).toHaveLength(1);
+    expect(nameLines[0]?.props).toMatchObject({
+      accessible: false,
+      importantForAccessibility: 'no',
+    });
+
+    const [toggle] = root.findAll(node => Object.is(node.type, 'Switch'));
+    expect(toggle?.props.accessibilityLabel).toBe('review');
+  });
 });

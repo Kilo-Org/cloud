@@ -58,7 +58,7 @@ export function describeGuardrailsConfig(config: OrganizationGuardrailsConfig): 
     }
     return details.length > 0 ? `${id} (${details.join(', ')})` : id;
   });
-  const scope = config.scan_tool_results ? 'every input' : 'new user input only';
+  const scope = config.scan_tool_results ? 'every input' : 'conversation without tool results';
   return [
     `Updated AI guardrails: ${config.enabled ? 'enabled' : 'disabled'}`,
     `checking ${scope}`,

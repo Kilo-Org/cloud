@@ -5,7 +5,7 @@ import {
   type EnkryptGuardrailCall,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges';
 import {
-  scanTurnDelta,
+  scanRequest,
   type EnkryptGuardrailScan,
   type EnkryptGuardrailScanResult,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
@@ -25,7 +25,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect', () => 
   ...jest.requireActual<Record<string, unknown>>(
     '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect'
   ),
-  scanTurnDelta: jest.fn(),
+  scanRequest: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ENKRYPT_API_KEY: 'test-enkrypt-key',
@@ -33,7 +33,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 
 const mockedAfter = jest.mocked(after);
 const mockedRecordCharge = jest.mocked(recordEnkryptGuardrailCharge);
-const mockedScanTurnDelta = jest.mocked(scanTurnDelta);
+const mockedScanRequest = jest.mocked(scanRequest);
 
 const scan: EnkryptGuardrailScan = {
   sessionId: 'ses_guardrail',
@@ -64,7 +64,7 @@ async function runAfterTasks() {
 beforeEach(() => {
   mockedAfter.mockReset();
   mockedRecordCharge.mockReset().mockResolvedValue(undefined);
-  mockedScanTurnDelta.mockReset();
+  mockedScanRequest.mockReset();
 });
 
 afterEach(() => {
@@ -72,12 +72,24 @@ afterEach(() => {
 });
 
 describe('startEnkryptInputGuardrail', () => {
+  it('starts the request scan with a 30-second timeout', async () => {
+    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, charges: [] });
+
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan));
+    await guardrail.awaitVerdict();
+
+    expect(mockedScanRequest).toHaveBeenCalledWith(
+      scan,
+      expect.objectContaining({ timeoutMs: 30_000 })
+    );
+  });
+
   it('records the wait for the verdict on the final call of the request only', async () => {
     const result: EnkryptGuardrailScanResult = {
       verdict: { action: 'allow' },
       charges: [call({ decision: 'error', creditsCost: null }), call()],
     };
-    mockedScanTurnDelta.mockResolvedValue(result);
+    mockedScanRequest.mockResolvedValue(result);
     jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_237.4);
 
     const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan));
@@ -91,7 +103,7 @@ describe('startEnkryptInputGuardrail', () => {
   });
 
   it('records no added latency when the request never awaited the verdict', async () => {
-    mockedScanTurnDelta.mockResolvedValue({ verdict: { action: 'allow' }, charges: [call()] });
+    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, charges: [call()] });
 
     startEnkryptInputGuardrail(Promise.resolve(scan));
     await runAfterTasks();
@@ -105,7 +117,7 @@ describe('startEnkryptInputGuardrail', () => {
     expect(await guardrail.awaitVerdict()).toEqual({ action: 'skip' });
     await runAfterTasks();
 
-    expect(mockedScanTurnDelta).not.toHaveBeenCalled();
+    expect(mockedScanRequest).not.toHaveBeenCalled();
     expect(mockedRecordCharge).not.toHaveBeenCalled();
   });
 });

@@ -20,12 +20,12 @@ export const ENKRYPT_DETECT_URL = 'https://api.enkryptai.com/guardrails/detect';
  * Bounds every attempt together. The gateway awaits the scan just before the upstream request, so
  * this is the most latency an enabled organization's request can gain.
  */
-export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 3_000;
+export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 30_000;
 
 const MAX_ATTEMPTS = 2;
 
 /**
- * A larger turn is not sent to Enkrypt. It is never truncated: the model would still read the
+ * A larger request is not sent to Enkrypt. It is never truncated: the model would still read the
  * unscanned remainder, which is where an injected instruction in a large file read would sit.
  */
 export const ENKRYPT_MAX_SCAN_CHARACTERS = 500_000;
@@ -39,7 +39,7 @@ const MAX_BLOCK_MESSAGE_LENGTH = 500;
  */
 export const MAX_ENKRYPT_CREDITS_PER_CALL = 1_000;
 
-const TURN_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of new messages and tool results at once, so this request was not sent. Reduce the size of the latest tool output or message and retry.`;
+const REQUEST_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of conversation text at once, so this request was not sent. Reduce the size of the conversation or tool output and retry.`;
 
 const detectResponseSchema = z.object({
   summary: z.record(z.string(), z.unknown()),
@@ -230,12 +230,12 @@ function attemptDecision(
 }
 
 /**
- * Scans the turn delta once, retrying a single transient failure within the shared deadline, and
+ * Scans the request once, retrying a single transient failure within the shared deadline, and
  * maps the result to a verdict. Never throws. Returns one ledger charge per Enkrypt call, including
  * calls that failed, so a blocked or failed request is still accounted for. Any failure blocks the
- * request: an enabled guardrail never lets an unscanned turn reach the model.
+ * request: an enabled guardrail never lets an unscanned request reach the model.
  */
-export async function scanTurnDelta(
+export async function scanRequest(
   scan: EnkryptGuardrailScan,
   deps: EnkryptDetectDependencies
 ): Promise<EnkryptGuardrailScanResult> {
@@ -262,11 +262,10 @@ export async function scanTurnDelta(
   };
 
   if (text.length > ENKRYPT_MAX_SCAN_CHARACTERS) {
-    // Retrying cannot shrink the turn, so the rejection carries the reason.
     return failedVerdict([], logFields, {
-      error: 'turn_too_large',
+      error: 'request_too_large',
       latencyMs: 0,
-      closedVerdict: { action: 'block', message: TURN_TOO_LARGE_MESSAGE },
+      closedVerdict: { action: 'block', message: REQUEST_TOO_LARGE_MESSAGE },
     });
   }
 

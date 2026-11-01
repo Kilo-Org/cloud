@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import {
   ENKRYPT_DETECT_URL,
+  ENKRYPT_GUARDRAIL_TIMEOUT_MS,
   ENKRYPT_MAX_SCAN_CHARACTERS,
   MAX_ENKRYPT_CREDITS_PER_CALL,
-  scanTurnDelta,
+  scanRequest,
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
 } from './detect';
@@ -72,17 +73,17 @@ function fetchCalls(dependencies: EnkryptDetectDependencies) {
   return jest.mocked(dependencies.fetch).mock.calls as unknown as [string, RequestInit][];
 }
 
-describe('scanTurnDelta', () => {
+describe('scanRequest', () => {
   beforeEach(() => {
     mockedWarnExceptInTest.mockClear();
   });
 
-  it('sends the turn text, inline detectors, and only opaque ids to Enkrypt', async () => {
+  it('sends the request text, inline detectors, and only opaque ids to Enkrypt', async () => {
     const dependencies = deps(async () =>
       detectResponse({ summary: { injection_attack: 0, pii: 0 }, result_message: null })
     );
 
-    await scanTurnDelta(makeScan(), dependencies);
+    await scanRequest(makeScan(), dependencies);
 
     const [[url, init]] = fetchCalls(dependencies);
     expect(url).toBe(ENKRYPT_DETECT_URL);
@@ -102,7 +103,7 @@ describe('scanTurnDelta', () => {
     ['a negative', '-3', null],
     ['a non-numeric', 'abc', null],
   ])('records %s credits cost safely', async (_name, header, creditsCost) => {
-    const result = await scanTurnDelta(
+    const result = await scanRequest(
       makeScan(),
       deps(async () => detectResponse({ summary: {} }, { credits: header }))
     );
@@ -110,8 +111,8 @@ describe('scanTurnDelta', () => {
     expect(result.charges).toEqual([expect.objectContaining({ creditsCost })]);
   });
 
-  it('allows a clean turn and charges the reported credits', async () => {
-    const result = await scanTurnDelta(
+  it('allows a clean request and charges the reported credits', async () => {
+    const result = await scanRequest(
       makeScan(),
       deps(async () =>
         detectResponse(
@@ -137,7 +138,7 @@ describe('scanTurnDelta', () => {
   });
 
   it('blocks when a block-type detector fires and shows the Enkrypt block message', async () => {
-    const result = await scanTurnDelta(
+    const result = await scanRequest(
       makeScan(),
       deps(async () =>
         detectResponse(
@@ -161,7 +162,7 @@ describe('scanTurnDelta', () => {
   });
 
   it('uses a default reason when Enkrypt returns no block message', async () => {
-    const result = await scanTurnDelta(
+    const result = await scanRequest(
       makeScan(),
       deps(async () => detectResponse({ summary: { toxicity: ['insult'] }, result_message: null }))
     );
@@ -174,7 +175,7 @@ describe('scanTurnDelta', () => {
   });
 
   it('blocks a revise-type detector set to block without showing the redacted text', async () => {
-    const result = await scanTurnDelta(
+    const result = await scanRequest(
       makeScan(),
       deps(async () =>
         detectResponse({
@@ -196,8 +197,8 @@ describe('scanTurnDelta', () => {
     ['zero', 0],
     ['an empty list', []],
     ['false', false],
-  ])('allows a turn when a detector reports %s', async (_name, value) => {
-    const result = await scanTurnDelta(
+  ])('allows a request when a detector reports %s', async (_name, value) => {
+    const result = await scanRequest(
       makeScan(),
       deps(async () => detectResponse({ summary: { injection_attack: value, toxicity: value } }))
     );
@@ -255,7 +256,7 @@ describe('scanTurnDelta', () => {
           )
         );
 
-        const result = await scanTurnDelta(makeScan({ config: policyConfig }), dependencies);
+        const result = await scanRequest(makeScan({ config: policyConfig }), dependencies);
 
         expect(dependencies.fetch).toHaveBeenCalledTimes(1);
         expect(result.verdict).toEqual({ action: 'unavailable' });
@@ -279,7 +280,7 @@ describe('scanTurnDelta', () => {
   });
 
   it('ignores detections from detectors it does not know', async () => {
-    const result = await scanTurnDelta(
+    const result = await scanRequest(
       makeScan(),
       deps(async () => detectResponse({ summary: { system_prompt_similarity: 1 } }))
     );
@@ -287,10 +288,10 @@ describe('scanTurnDelta', () => {
     expect(result.verdict).toEqual({ action: 'allow' });
   });
 
-  it('rejects every turn without calling Enkrypt when the saved detectors are unreadable', async () => {
+  it('rejects every request without calling Enkrypt when the saved detectors are unreadable', async () => {
     const dependencies = deps(async () => detectResponse({ summary: {} }));
 
-    const result = await scanTurnDelta(
+    const result = await scanRequest(
       makeScan({ config: { scanToolResults: true, status: 'invalid' } }),
       dependencies
     );
@@ -299,8 +300,8 @@ describe('scanTurnDelta', () => {
     expect(dependencies.fetch).not.toHaveBeenCalled();
   });
 
-  it('allows a turn when only a revise-type detector set to log fires', async () => {
-    const result = await scanTurnDelta(
+  it('allows a request when only a revise-type detector set to log fires', async () => {
+    const result = await scanRequest(
       makeScan(),
       deps(async () =>
         detectResponse({
@@ -314,22 +315,22 @@ describe('scanTurnDelta', () => {
     expect(result.charges).toEqual([expect.objectContaining({ decision: 'allowed' })]);
   });
 
-  it('makes no call for an empty turn', async () => {
+  it('makes no call for an empty request', async () => {
     const dependencies = deps(async () => detectResponse({ summary: {} }));
 
-    const result = await scanTurnDelta(makeScan({ text: '' }), dependencies);
+    const result = await scanRequest(makeScan({ text: '' }), dependencies);
 
     expect(result).toEqual({ verdict: { action: 'allow' }, charges: [] });
     expect(dependencies.fetch).not.toHaveBeenCalled();
   });
 
-  describe('a turn above the scan limit', () => {
+  describe('a request above the scan limit', () => {
     const text = 'a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS + 1);
 
     it('is rejected with the reason, never truncated or sent', async () => {
       const dependencies = deps(async () => detectResponse({ summary: {} }));
 
-      const result = await scanTurnDelta(makeScan({ text }), dependencies);
+      const result = await scanRequest(makeScan({ text }), dependencies);
 
       expect(result).toEqual({
         verdict: {
@@ -337,6 +338,9 @@ describe('scanTurnDelta', () => {
           message: expect.stringContaining('cannot scan more than 500,000 characters'),
         },
         charges: [],
+      });
+      expect(result.verdict).toMatchObject({
+        message: expect.stringContaining('Reduce the size of the conversation or tool output'),
       });
       expect(dependencies.fetch).not.toHaveBeenCalled();
     });
@@ -349,7 +353,7 @@ describe('scanTurnDelta', () => {
     ];
     const dependencies = deps(async () => responses.shift() ?? Response.error());
 
-    const result = await scanTurnDelta(makeScan(), dependencies);
+    const result = await scanRequest(makeScan(), dependencies);
 
     expect(dependencies.fetch).toHaveBeenCalledTimes(2);
     expect(result.verdict).toEqual({ action: 'allow' });
@@ -359,10 +363,33 @@ describe('scanTurnDelta', () => {
     ]);
   });
 
+  it('shares a single 30-second deadline across retry attempts', async () => {
+    const timeout = jest.spyOn(AbortSignal, 'timeout');
+    const responses = [
+      detectResponse({ summary: {} }, { status: 502 }),
+      detectResponse({ summary: {} }),
+    ];
+    const dependencies = deps(async () => responses.shift() ?? Response.error(), {
+      timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,
+    });
+
+    try {
+      await scanRequest(makeScan(), dependencies);
+
+      expect(timeout).toHaveBeenCalledTimes(1);
+      expect(timeout).toHaveBeenCalledWith(30_000);
+      const calls = fetchCalls(dependencies);
+      expect(calls).toHaveLength(2);
+      expect(calls[0][1].signal).toBe(calls[1][1].signal);
+    } finally {
+      timeout.mockRestore();
+    }
+  });
+
   it('does not retry a rate-limited call', async () => {
     const dependencies = deps(async () => detectResponse({ summary: {} }, { status: 429 }));
 
-    const result = await scanTurnDelta(makeScan(), dependencies);
+    const result = await scanRequest(makeScan(), dependencies);
 
     expect(dependencies.fetch).toHaveBeenCalledTimes(1);
     expect(result.verdict).toEqual({ action: 'unavailable' });
@@ -380,7 +407,7 @@ describe('scanTurnDelta', () => {
     ];
 
     it.each(failures)('rejects the request on %s', async (_name, failure) => {
-      const result = await scanTurnDelta(makeScan(), deps(failure));
+      const result = await scanRequest(makeScan(), deps(failure));
 
       expect(result.verdict).toEqual({ action: 'unavailable' });
       expect(result.charges.every(charge => charge.decision === 'error')).toBe(true);
@@ -393,7 +420,7 @@ describe('scanTurnDelta', () => {
         });
       const dependencies = deps(hang, { timeoutMs: 20 });
 
-      const result = await scanTurnDelta(makeScan(), dependencies);
+      const result = await scanRequest(makeScan(), dependencies);
 
       expect(result.verdict).toEqual({ action: 'unavailable' });
       expect(dependencies.fetch).toHaveBeenCalledTimes(1);
@@ -405,7 +432,7 @@ describe('scanTurnDelta', () => {
         apiKey: undefined,
       });
 
-      const result = await scanTurnDelta(makeScan(), dependencies);
+      const result = await scanRequest(makeScan(), dependencies);
 
       expect(result).toEqual({ verdict: { action: 'unavailable' }, charges: [] });
       expect(dependencies.fetch).not.toHaveBeenCalled();

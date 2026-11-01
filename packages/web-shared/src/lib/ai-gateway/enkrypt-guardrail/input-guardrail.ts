@@ -8,7 +8,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges';
 import {
   ENKRYPT_GUARDRAIL_TIMEOUT_MS,
-  scanTurnDelta,
+  scanRequest,
   type EnkryptGuardrailScan,
   type EnkryptGuardrailScanResult,
   type EnkryptGuardrailVerdict,
@@ -38,7 +38,7 @@ export function startEnkryptInputGuardrail(
   const result = scan
     .then(resolved =>
       resolved
-        ? scanTurnDelta(resolved, {
+        ? scanRequest(resolved, {
             apiKey: ENKRYPT_API_KEY,
             fetch,
             timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,

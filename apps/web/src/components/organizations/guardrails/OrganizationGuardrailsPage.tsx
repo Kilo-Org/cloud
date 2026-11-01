@@ -38,16 +38,16 @@ import { RadioCardGroup } from './RadioCardGroup';
 
 const SCAN_SCOPE_OPTIONS = [
   {
-    value: 'new_user_input',
-    label: 'New user input only',
+    value: 'conversation_without_tool_results',
+    label: 'Conversation without tool results',
     description:
-      "Checks each new message a member sends, including attached files. Agent steps that only return tool results aren't checked. Fastest.",
+      'Checks the full conversation and system instructions on every request, including earlier user and assistant messages. Excludes tool results.',
   },
   {
     value: 'every_input',
     label: 'Every input',
     description:
-      'Also checks new tool results, such as file reads and command output, on every agent step. Strictest, but slower.',
+      'Also checks all tool results in the conversation, such as file reads and command output, on every request. Strictest, but slower.',
   },
 ] as const;
 
@@ -346,7 +346,7 @@ function GuardrailsSettingsCard({
           <RadioCardGroup
             legend="Inputs to check"
             options={SCAN_SCOPE_OPTIONS}
-            value={draft.scan_tool_results ? 'every_input' : 'new_user_input'}
+            value={draft.scan_tool_results ? 'every_input' : 'conversation_without_tool_results'}
             onChange={scope =>
               onChange(current => ({
                 ...current,

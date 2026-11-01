@@ -4064,7 +4064,7 @@
     "variablesTitle": "متغيرات البيئة",
     "addVariable": "إضافة متغير",
     "keyLabel": "مفتاح",
-    "keyTooLong": "يجب ألا يزيد المفتاح عن 256 حرفًا",
+    "keyTooLong": "يجب ألا يزيد المفتاح عن 128 حرفًا",
     "keyDuplicate": "هذا المفتاح موجود بالفعل في الملف الشخصي",
     "keyWillBeSavedAs": "سيُحفظ باسم {{key}}",
     "valueLabel": "قيمة",

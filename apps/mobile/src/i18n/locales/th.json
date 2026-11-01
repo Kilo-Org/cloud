@@ -3840,7 +3840,7 @@
     "variablesTitle": "ตัวแปรสภาพแวดล้อม",
     "addVariable": "เพิ่มตัวแปร",
     "keyLabel": "คีย์",
-    "keyTooLong": "คีย์ต้องมี 256 อักขระหรือน้อยกว่า",
+    "keyTooLong": "คีย์ต้องมี 128 อักขระหรือน้อยกว่า",
     "keyDuplicate": "คีย์นี้มีอยู่ในโปรไฟล์แล้ว",
     "keyWillBeSavedAs": "จะถูกบันทึกเป็น {{key}}",
     "valueLabel": "ค่า",

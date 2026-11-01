@@ -3840,7 +3840,7 @@
     "variablesTitle": "ماحولیاتی متغیرات",
     "addVariable": "متغیر شامل کریں۔",
     "keyLabel": "چابی",
-    "keyTooLong": "چابی 256 حروف یا اس سے کم ہونی چاہیے",
+    "keyTooLong": "چابی 128 حروف یا اس سے کم ہونی چاہیے",
     "keyDuplicate": "یہ چابی پہلے سے پروفائل میں موجود ہے",
     "keyWillBeSavedAs": "{{key}} کے طور پر محفوظ ہوگی",
     "valueLabel": "قدر",

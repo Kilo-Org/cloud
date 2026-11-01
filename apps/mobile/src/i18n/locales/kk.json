@@ -3840,7 +3840,7 @@
     "variablesTitle": "Қоршаған ортаның айнымалылары",
     "addVariable": "Айнымалыны қосыңыз",
     "keyLabel": "Кілт",
-    "keyTooLong": "Кілт 256 таңбадан аспауы керек",
+    "keyTooLong": "Кілт 128 таңбадан аспауы керек",
     "keyDuplicate": "Бұл кілт профильде бұрыннан бар",
     "keyWillBeSavedAs": "{{key}} ретінде сақталады",
     "valueLabel": "Мән",

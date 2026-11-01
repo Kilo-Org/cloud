@@ -3896,7 +3896,7 @@
     "variablesTitle": "Promenljive okruženja",
     "addVariable": "Dodaj promenljivu",
     "keyLabel": "Ključ",
-    "keyTooLong": "Ključ može imati najviše 256 znakova",
+    "keyTooLong": "Ključ može imati najviše 128 znakova",
     "keyDuplicate": "Ovaj ključ već postoji u profilu",
     "keyWillBeSavedAs": "Biće sačuvano kao {{key}}",
     "valueLabel": "Vrednost",

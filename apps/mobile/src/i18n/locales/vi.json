@@ -3840,7 +3840,7 @@
     "variablesTitle": "Biến môi trường",
     "addVariable": "Thêm biến",
     "keyLabel": "Chìa khóa",
-    "keyTooLong": "Khóa phải có 256 ký tự hoặc ít hơn",
+    "keyTooLong": "Khóa phải có 128 ký tự hoặc ít hơn",
     "keyDuplicate": "Khóa này đã tồn tại trong hồ sơ",
     "keyWillBeSavedAs": "Sẽ được lưu thành {{key}}",
     "valueLabel": "Giá trị",

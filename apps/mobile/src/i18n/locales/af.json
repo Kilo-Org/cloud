@@ -3840,7 +3840,7 @@
     "variablesTitle": "Omgewingsveranderlikes",
     "addVariable": "Voeg veranderlike by",
     "keyLabel": "Sleutel",
-    "keyTooLong": "Sleutel moet 256 karakters of minder wees",
+    "keyTooLong": "Sleutel moet 128 karakters of minder wees",
     "keyDuplicate": "Hierdie sleutel bestaan reeds in die profiel",
     "keyWillBeSavedAs": "Sal as {{key}} gestoor word",
     "valueLabel": "Waarde",

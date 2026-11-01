@@ -3896,7 +3896,7 @@
     "variablesTitle": "Variables d'entorn",
     "addVariable": "Afegeix variable",
     "keyLabel": "clau",
-    "keyTooLong": "La clau ha de tenir 256 caràcters o menys",
+    "keyTooLong": "La clau ha de tenir 128 caràcters o menys",
     "keyDuplicate": "Aquesta clau ja existeix al perfil",
     "keyWillBeSavedAs": "Es desarà com a {{key}}",
     "valueLabel": "Valor",

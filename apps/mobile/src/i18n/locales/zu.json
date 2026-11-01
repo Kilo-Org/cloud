@@ -3846,7 +3846,7 @@
     "variablesTitle": "Okuguquguqukayo kwemvelo",
     "addVariable": "Engeza okuguquguqukayo",
     "keyLabel": "Ukhiye",
-    "keyTooLong": "Ukhiye kufanele ube yizinhlamvu ezingu-256 noma ngaphansi",
+    "keyTooLong": "Ukhiye kufanele ube yizinhlamvu ezingu-128 noma ngaphansi",
     "keyDuplicate": "Lolu khi selukhona kuphrofayela",
     "keyWillBeSavedAs": "Kuzogcinwa njenge-{{key}}",
     "valueLabel": "Inani",

@@ -3840,7 +3840,7 @@
     "variablesTitle": "ପରିବେଶ ଭେରିଏବଲ୍।",
     "addVariable": "ଭେରିଏବଲ୍ ଆଡ୍ କରନ୍ତୁ।",
     "keyLabel": "ଚାବି",
-    "keyTooLong": "ଚାବି 256 ଅକ୍ଷର କିମ୍ବା କମ୍ ହେବା ଉଚିତ୍",
+    "keyTooLong": "ଚାବି 128 ଅକ୍ଷର କିମ୍ବା କମ୍ ହେବା ଉଚିତ୍",
     "keyDuplicate": "ଏହି ଚାବି ପୂର୍ବରୁ ପ୍ରୋଫାଇଲରେ ଅଛି",
     "keyWillBeSavedAs": "{{key}} ଭାବରେ ସଞ୍ଚୟ ହେବ",
     "valueLabel": "ମୂଲ୍ୟ",

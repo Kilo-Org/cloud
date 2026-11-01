@@ -3902,7 +3902,7 @@
     "variablesTitle": "Variables d'environnement",
     "addVariable": "Ajouter une variable",
     "keyLabel": "Clé",
-    "keyTooLong": "La clé doit contenir 256 caractères ou moins",
+    "keyTooLong": "La clé doit contenir 128 caractères ou moins",
     "keyDuplicate": "Cette clé existe déjà dans le profil",
     "keyWillBeSavedAs": "Sera enregistrée sous {{key}}",
     "valueLabel": "Valeur",

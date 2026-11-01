@@ -3840,7 +3840,7 @@
     "variablesTitle": "Varyab anviwònman an",
     "addVariable": "Ajoute varyab",
     "keyLabel": "Kle",
-    "keyTooLong": "Kle a dwe gen 256 karaktè oswa mwens",
+    "keyTooLong": "Kle a dwe gen 128 karaktè oswa mwens",
     "keyDuplicate": "Kle sa a deja egziste nan pwofil la",
     "keyWillBeSavedAs": "Ap sove kòm {{key}}",
     "valueLabel": "Valè",

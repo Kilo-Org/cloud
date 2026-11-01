@@ -3840,7 +3840,7 @@
     "variablesTitle": "ຕົວແປສະພາບແວດລ້ອມ",
     "addVariable": "ເພີ່ມຕົວແປ",
     "keyLabel": "ກະແຈ",
-    "keyTooLong": "ກະແຈຕ້ອງມີ 256 ຕົວອັກສອນ ຫຼື ໜ້ອຍກວ່າ",
+    "keyTooLong": "ກະແຈຕ້ອງມີ 128 ຕົວອັກສອນ ຫຼື ໜ້ອຍກວ່າ",
     "keyDuplicate": "ກະແຈນີ້ມີຢູ່ໃນໂປຣໄຟລ໌ແລ້ວ",
     "keyWillBeSavedAs": "ຈະຖືກບັນທຶກເປັນ {{key}}",
     "valueLabel": "ມູນຄ່າ",

@@ -3840,7 +3840,7 @@
     "variablesTitle": "Környezeti változók",
     "addVariable": "Változó hozzáadása",
     "keyLabel": "Kulcs",
-    "keyTooLong": "A kulcs legfeljebb 256 karakter lehet",
+    "keyTooLong": "A kulcs legfeljebb 128 karakter lehet",
     "keyDuplicate": "Ez a kulcs már létezik a profilban",
     "keyWillBeSavedAs": "{{key}} néven lesz elmentve",
     "valueLabel": "Érték",

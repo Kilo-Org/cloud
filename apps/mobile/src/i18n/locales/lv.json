@@ -3896,7 +3896,7 @@
     "variablesTitle": "Vides mainīgie",
     "addVariable": "Pievienot mainīgo",
     "keyLabel": "Atslēga",
-    "keyTooLong": "Atslēgai jābūt 256 rakstzīmēm vai mazāk",
+    "keyTooLong": "Atslēgai jābūt 128 rakstzīmēm vai mazāk",
     "keyDuplicate": "Šī atslēga jau ir profilā",
     "keyWillBeSavedAs": "Tiks saglabāts kā {{key}}",
     "valueLabel": "Vērtība",

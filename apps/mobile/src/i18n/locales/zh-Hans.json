@@ -3840,7 +3840,7 @@
     "variablesTitle": "环境变量",
     "addVariable": "添加变量",
     "keyLabel": "键",
-    "keyTooLong": "键不能超过 256 个字符",
+    "keyTooLong": "键不能超过 128 个字符",
     "keyDuplicate": "此键已存在于配置文件中",
     "keyWillBeSavedAs": "将保存为 {{key}}",
     "valueLabel": "值",

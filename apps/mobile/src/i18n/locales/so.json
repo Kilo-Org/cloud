@@ -3840,7 +3840,7 @@
     "variablesTitle": "Doorsoomayaasha deegaanka",
     "addVariable": "Ku dar doorsoome",
     "keyLabel": "Furaha",
-    "keyTooLong": "Furaha waa inuu ahaadaa 256 xaraf ama ka yar",
+    "keyTooLong": "Furaha waa inuu ahaadaa 128 xaraf ama ka yar",
     "keyDuplicate": "Furahan hore ayuu ugu jiraa borofiilka",
     "keyWillBeSavedAs": "Waxaa lagu kaydin doonaa {{key}}",
     "valueLabel": "Qiimaha",

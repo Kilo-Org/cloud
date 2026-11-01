@@ -3896,7 +3896,7 @@
     "variablesTitle": "Variabili d'ambiente",
     "addVariable": "Aggiungi variabile",
     "keyLabel": "Chiave",
-    "keyTooLong": "La chiave deve contenere 256 caratteri o meno",
+    "keyTooLong": "La chiave deve contenere 128 caratteri o meno",
     "keyDuplicate": "Questa chiave esiste già nel profilo",
     "keyWillBeSavedAs": "Verrà salvata come {{key}}",
     "valueLabel": "Valore",

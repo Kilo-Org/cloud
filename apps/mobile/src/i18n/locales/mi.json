@@ -3840,7 +3840,7 @@
     "variablesTitle": "Taurangi taiao",
     "addVariable": "Tāpiri taurangi",
     "keyLabel": "Kī",
-    "keyTooLong": "Kia 256 pūāhua iti iho rānei te kī",
+    "keyTooLong": "Kia 128 pūāhua iti iho rānei te kī",
     "keyDuplicate": "Kua noho kē tēnei kī i te kōtaha",
     "keyWillBeSavedAs": "Ka penapenatia hei {{key}}",
     "valueLabel": "Uara",

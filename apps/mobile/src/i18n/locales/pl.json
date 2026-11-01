@@ -3952,7 +3952,7 @@
     "variablesTitle": "Zmienne środowiskowe",
     "addVariable": "Dodaj zmienną",
     "keyLabel": "Klawisz",
-    "keyTooLong": "Klucz może mieć maksymalnie 256 znaków",
+    "keyTooLong": "Klucz może mieć maksymalnie 128 znaków",
     "keyDuplicate": "Ten klucz już istnieje w profilu",
     "keyWillBeSavedAs": "Zostanie zapisany jako {{key}}",
     "valueLabel": "Wartość",

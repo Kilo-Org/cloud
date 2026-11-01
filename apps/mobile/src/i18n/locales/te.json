@@ -3840,7 +3840,7 @@
     "variablesTitle": "పర్యావరణ వేరియబుల్స్",
     "addVariable": "వేరియబుల్ జోడించండి",
     "keyLabel": "కీ",
-    "keyTooLong": "కీ 256 అక్షరాలు లేదా తక్కువ ఉండాలి",
+    "keyTooLong": "కీ 128 అక్షరాలు లేదా తక్కువ ఉండాలి",
     "keyDuplicate": "ఈ కీ ఇప్పటికే ప్రొఫైల్లో ఉంది",
     "keyWillBeSavedAs": "{{key}} గా సేవ్ చేయబడుతుంది",
     "valueLabel": "విలువ",

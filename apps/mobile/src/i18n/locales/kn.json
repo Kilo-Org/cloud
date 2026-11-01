@@ -3846,7 +3846,7 @@
     "variablesTitle": "ಪರಿಸರ ಅಸ್ಥಿರ",
     "addVariable": "ವೇರಿಯಬಲ್ ಸೇರಿಸಿ",
     "keyLabel": "ಕೀ",
-    "keyTooLong": "ಕೀಲಿಯು 256 ಅಕ್ಷರಗಳು ಅಥವಾ ಕಡಿಮೆ ಇರಬೇಕು",
+    "keyTooLong": "ಕೀಲಿಯು 128 ಅಕ್ಷರಗಳು ಅಥವಾ ಕಡಿಮೆ ಇರಬೇಕು",
     "keyDuplicate": "ಈ ಕೀಲಿಯು ಈಗಾಗಲೇ ಪ್ರೊಫೈಲ್ನಲ್ಲಿದೆ",
     "keyWillBeSavedAs": "{{key}} ಎಂದು ಉಳಿಸಲಾಗುತ್ತದೆ",
     "valueLabel": "ಮೌಲ್ಯ",

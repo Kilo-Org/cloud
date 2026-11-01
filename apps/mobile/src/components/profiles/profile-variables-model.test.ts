@@ -39,6 +39,11 @@ describe('savedVariableKey', () => {
     expect(savedVariableKey('a.b-c')).toBe('A_B_C');
     expect(savedVariableKey('API_KEY')).toBe('API_KEY');
   });
+
+  it('leads a digit-initial key with an underscore', () => {
+    expect(savedVariableKey('1var')).toBe('_1VAR');
+    expect(savedVariableKey('2024-report')).toBe('_2024_REPORT');
+  });
 });
 
 describe('variableKeyPreview', () => {
@@ -47,6 +52,7 @@ describe('variableKeyPreview', () => {
     // the key the saved row will carry.
     expect(variableKeyPreview('API_की')).toBe('API___');
     expect(variableKeyPreview('api key')).toBe('API_KEY');
+    expect(variableKeyPreview('1var')).toBe('_1VAR');
   });
 
   it('stays silent for a key that saves unchanged or a blank field', () => {
@@ -58,9 +64,9 @@ describe('variableKeyPreview', () => {
 });
 
 describe('validateVariableInput', () => {
-  it('accepts a non-empty key within the 1..256 bound', () => {
+  it('accepts a non-empty key within the 1..128 bound', () => {
     expect(validateVariableInput({ key: 'API_KEY', value: 'x' })).toBeNull();
-    expect(validateVariableInput({ key: 'a'.repeat(256), value: 'x' })).toBeNull();
+    expect(validateVariableInput({ key: 'a'.repeat(128), value: 'x' })).toBeNull();
   });
 
   it('requires a value only when the caller asks for it', () => {
@@ -82,7 +88,7 @@ describe('validateVariableInput', () => {
   it('keeps the key rules ahead of the value rule', () => {
     expect(validateVariableInput({ key: '', value: '' }, [], { requireValue: true })).toBe('empty');
     expect(
-      validateVariableInput({ key: 'a'.repeat(257), value: '' }, [], { requireValue: true })
+      validateVariableInput({ key: 'a'.repeat(129), value: '' }, [], { requireValue: true })
     ).toBe('too-long');
     expect(
       validateVariableInput({ key: 'foo-bar', value: '' }, ['FOO_BAR'], { requireValue: true })
@@ -94,8 +100,8 @@ describe('validateVariableInput', () => {
     expect(validateVariableInput({ key: '   ', value: 'x' })).toBe('empty');
   });
 
-  it('reports a key longer than 256 characters', () => {
-    expect(validateVariableInput({ key: 'a'.repeat(257), value: 'x' })).toBe('too-long');
+  it('reports a key longer than 128 characters', () => {
+    expect(validateVariableInput({ key: 'a'.repeat(129), value: 'x' })).toBe('too-long');
   });
 
   it('reports a key that cleans onto an existing stored key', () => {

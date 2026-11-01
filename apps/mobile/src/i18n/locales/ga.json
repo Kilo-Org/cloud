@@ -4008,7 +4008,7 @@
     "variablesTitle": "Athróga timpeallachta",
     "addVariable": "Cuir athróg leis",
     "keyLabel": "eochair",
-    "keyTooLong": "Caithfidh an eochair a bheith 256 carachtar nó níos lú",
+    "keyTooLong": "Caithfidh an eochair a bheith 128 carachtar nó níos lú",
     "keyDuplicate": "Tá an eochair seo ann cheana sa phróifíl",
     "keyWillBeSavedAs": "Sábhálfar mar {{key}}",
     "valueLabel": "Luach",

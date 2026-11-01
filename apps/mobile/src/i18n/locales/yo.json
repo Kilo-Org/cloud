@@ -3840,7 +3840,7 @@
     "variablesTitle": "Awọn oniyipada ayika",
     "addVariable": "Fi oniyipada kun",
     "keyLabel": "Bọtini",
-    "keyTooLong": "Bọtini gbọdọ̀ jẹ́ 256 àmì tàbí kéré sí i",
+    "keyTooLong": "Bọtini gbọdọ̀ jẹ́ 128 àmì tàbí kéré sí i",
     "keyDuplicate": "Bọtini yii ti wà tẹ́lẹ̀ nínú profaili",
     "keyWillBeSavedAs": "Yóò fi pamọ́ sí {{key}}",
     "valueLabel": "Iye",

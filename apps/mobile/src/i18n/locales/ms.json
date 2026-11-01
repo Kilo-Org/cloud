@@ -3840,7 +3840,7 @@
     "variablesTitle": "Pembolehubah persekitaran",
     "addVariable": "Tambah pembolehubah",
     "keyLabel": "kunci",
-    "keyTooLong": "Kunci mestilah 256 aksara atau kurang",
+    "keyTooLong": "Kunci mestilah 128 aksara atau kurang",
     "keyDuplicate": "Kunci ini sudah ada dalam profil",
     "keyWillBeSavedAs": "Akan disimpan sebagai {{key}}",
     "valueLabel": "Nilai",

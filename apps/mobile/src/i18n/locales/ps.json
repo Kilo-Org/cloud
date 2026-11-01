@@ -3840,7 +3840,7 @@
     "variablesTitle": "د چاپیریال تغیرات",
     "addVariable": "متغیر اضافه کړئ",
     "keyLabel": "کلید",
-    "keyTooLong": "کلید باید 256 توري یا لږ وي",
+    "keyTooLong": "کلید باید 128 توري یا لږ وي",
     "keyDuplicate": "دا کلید دمخه په پروفایل کې شته",
     "keyWillBeSavedAs": "د {{key}} په توګه به خوندي شي",
     "valueLabel": "ارزښت",

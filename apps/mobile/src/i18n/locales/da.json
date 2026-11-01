@@ -3840,7 +3840,7 @@
     "variablesTitle": "Miljøvariabler",
     "addVariable": "Tilføj variabel",
     "keyLabel": "Nøgle",
-    "keyTooLong": "Nøglen må højst være 256 tegn",
+    "keyTooLong": "Nøglen må højst være 128 tegn",
     "keyDuplicate": "Denne nøgle findes allerede i profilen",
     "keyWillBeSavedAs": "Gemmes som {{key}}",
     "valueLabel": "Værdi",

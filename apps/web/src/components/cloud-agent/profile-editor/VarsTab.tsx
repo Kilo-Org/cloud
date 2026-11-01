@@ -37,7 +37,10 @@ const makeDraft = (partial?: Partial<DraftVar>): DraftVar => ({
   ...partial,
 });
 
-const cleanKey = (raw: string) => raw.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+const cleanKey = (raw: string) => {
+  const cleaned = raw.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+  return /^\d/.test(cleaned) ? `_${cleaned}` : cleaned;
+};
 
 export function VarsTab({
   profileId,

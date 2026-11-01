@@ -3840,7 +3840,7 @@
     "variablesTitle": "Variabel lingkungan",
     "addVariable": "Tambahkan variabel",
     "keyLabel": "Kunci",
-    "keyTooLong": "Kunci harus 256 karakter atau kurang",
+    "keyTooLong": "Kunci harus 128 karakter atau kurang",
     "keyDuplicate": "Kunci ini sudah ada di profil",
     "keyWillBeSavedAs": "Akan disimpan sebagai {{key}}",
     "valueLabel": "Nilai",

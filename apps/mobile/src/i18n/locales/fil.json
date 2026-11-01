@@ -3846,7 +3846,7 @@
     "variablesTitle": "Mga variable ng kapaligiran",
     "addVariable": "Magdagdag ng variable",
     "keyLabel": "Susi",
-    "keyTooLong": "Ang susi ay dapat 256 na character o mas kaunti",
+    "keyTooLong": "Ang susi ay dapat 128 na character o mas kaunti",
     "keyDuplicate": "Umiiral na ang key na ito sa profile",
     "keyWillBeSavedAs": "Ise-save bilang {{key}}",
     "valueLabel": "Halaga",

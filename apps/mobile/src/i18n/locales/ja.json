@@ -3840,7 +3840,7 @@
     "variablesTitle": "環境変数",
     "addVariable": "変数の追加",
     "keyLabel": "鍵",
-    "keyTooLong": "キーは256文字以内で入力してください",
+    "keyTooLong": "キーは128文字以内で入力してください",
     "keyDuplicate": "このキーはすでにプロフィールに存在します",
     "keyWillBeSavedAs": "{{key}}として保存されます",
     "valueLabel": "価値",

@@ -17,6 +17,7 @@ import {
   bindProfileToRepo,
   MASKED_SECRET_VALUE,
   MAX_PROFILE_KILO_COMMANDS,
+  MAX_PROFILE_VARS,
 } from '@kilocode/cloud-agent-profile';
 import type { User, Organization } from '@kilocode/db/schema';
 
@@ -726,6 +727,90 @@ describe('Agent Profiles Router', () => {
 
         expect(result.vars[0].value).toBe('***');
         expect(result.vars[0].isSecret).toBe(true);
+      });
+
+      test('should reject a new key outside the key contract', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'Key Contract Test',
+        });
+
+        await expect(
+          caller.agentProfiles.setVar({
+            profileId,
+            key: 'api key',
+            value: 'value',
+            isSecret: false,
+          })
+        ).rejects.toThrow('Invalid environment variable key');
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.vars).toHaveLength(0);
+      });
+
+      test('should reject a reserved key', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'Reserved Key Test',
+        });
+
+        await expect(
+          caller.agentProfiles.setVar({
+            profileId,
+            key: 'KILO_PROFILE',
+            value: 'value',
+            isSecret: false,
+          })
+        ).rejects.toThrow('Reserved environment variable key');
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.vars).toHaveLength(0);
+      });
+
+      test('should reject a new key at the profile cap and keep stored keys writable', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'Var Cap Test',
+        });
+
+        await db.insert(agent_environment_profile_vars).values(
+          Array.from({ length: MAX_PROFILE_VARS }, (_, index) => ({
+            profile_id: profileId,
+            key: `VAR_${String(index)}`,
+            value: 'value',
+            is_secret: false,
+          }))
+        );
+
+        await expect(
+          caller.agentProfiles.setVar({
+            profileId,
+            key: 'OVER_CAP',
+            value: 'value',
+            isSecret: false,
+          })
+        ).rejects.toThrow(`Profiles are limited to ${String(MAX_PROFILE_VARS)} variables`);
+
+        const stored = await db
+          .select({ key: agent_environment_profile_vars.key })
+          .from(agent_environment_profile_vars)
+          .where(eq(agent_environment_profile_vars.profile_id, profileId));
+        expect(stored).toHaveLength(MAX_PROFILE_VARS);
+        expect(stored.some(row => row.key === 'OVER_CAP')).toBe(false);
+
+        await caller.agentProfiles.setVar({
+          profileId,
+          key: 'VAR_0',
+          value: 'rotated',
+          isSecret: false,
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.vars).toHaveLength(MAX_PROFILE_VARS);
+        expect(result.vars.find(variable => variable.key === 'VAR_0')?.value).toBe('rotated');
       });
     });
 

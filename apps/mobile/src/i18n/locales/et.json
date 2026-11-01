@@ -3840,7 +3840,7 @@
     "variablesTitle": "Keskkonnamuutujad",
     "addVariable": "Lisa muutuja",
     "keyLabel": "Võti",
-    "keyTooLong": "Võti võib olla kuni 256 tähemärki",
+    "keyTooLong": "Võti võib olla kuni 128 tähemärki",
     "keyDuplicate": "See võti on profiilis juba olemas",
     "keyWillBeSavedAs": "Salvestatakse kui {{key}}",
     "valueLabel": "Väärtus",

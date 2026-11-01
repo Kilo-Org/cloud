@@ -3846,7 +3846,7 @@
     "variablesTitle": "የአካባቢ ተለዋዋጮች",
     "addVariable": "ተለዋዋጭ ያክሉ",
     "keyLabel": "ቁልፍ",
-    "keyTooLong": "ቁልፉ 256 ቁምፊዎች ወይም ከዚያ ያነሰ መሆን አለበት",
+    "keyTooLong": "ቁልፉ 128 ቁምፊዎች ወይም ከዚያ ያነሰ መሆን አለበት",
     "keyDuplicate": "ይህ ቁልፍ አስቀድሞ በመገለጫው ውስጥ አለ",
     "keyWillBeSavedAs": "እንደ {{key}} ይቀመጣል",
     "valueLabel": "ዋጋ",

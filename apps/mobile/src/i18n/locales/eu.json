@@ -3840,7 +3840,7 @@
     "variablesTitle": "Inguruko aldagaiak",
     "addVariable": "Gehitu aldagaia",
     "keyLabel": "Gakoa",
-    "keyTooLong": "Gakoak 256 karaktere edo gutxiago izan behar ditu",
+    "keyTooLong": "Gakoak 128 karaktere edo gutxiago izan behar ditu",
     "keyDuplicate": "Gako hau jada badago profilean",
     "keyWillBeSavedAs": "{{key}} gisa gordeko da",
     "valueLabel": "Balioa",

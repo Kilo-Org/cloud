@@ -3840,7 +3840,7 @@
     "variablesTitle": "Umhverfisbreytur",
     "addVariable": "Bæta við breytu",
     "keyLabel": "Lykill",
-    "keyTooLong": "Lykillinn má vera að hámarki 256 stafir",
+    "keyTooLong": "Lykillinn má vera að hámarki 128 stafir",
     "keyDuplicate": "Þessi lykill er þegar til í prófílnum",
     "keyWillBeSavedAs": "Verður vistað sem {{key}}",
     "valueLabel": "Gildi",

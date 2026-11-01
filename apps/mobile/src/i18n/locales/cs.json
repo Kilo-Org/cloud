@@ -3952,7 +3952,7 @@
     "variablesTitle": "Proměnné prostředí",
     "addVariable": "Přidat proměnnou",
     "keyLabel": "Klíč",
-    "keyTooLong": "Klíč musí mít 256 znaků nebo méně",
+    "keyTooLong": "Klíč musí mít 128 znaků nebo méně",
     "keyDuplicate": "Tento klíč už v profilu existuje",
     "keyWillBeSavedAs": "Bude uložen jako {{key}}",
     "valueLabel": "Hodnota",

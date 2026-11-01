@@ -3907,7 +3907,7 @@
     "variablesTitle": "Environment variables",
     "addVariable": "Add variable",
     "keyLabel": "Key",
-    "keyTooLong": "Key must be 256 characters or fewer",
+    "keyTooLong": "Key must be 128 characters or fewer",
     "keyDuplicate": "This key already exists in the profile",
     "keyWillBeSavedAs": "Will be saved as {{key}}",
     "valueLabel": "Value",

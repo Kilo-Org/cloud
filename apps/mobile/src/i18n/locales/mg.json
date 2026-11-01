@@ -3846,7 +3846,7 @@
     "variablesTitle": "Tontolo iainana miovaova",
     "addVariable": "Ampio miovaova",
     "keyLabel": "Fanalahidy",
-    "keyTooLong": "Tokony tsy mihoatra ny 256 tarehintsoratra ny fanalahidy",
+    "keyTooLong": "Tokony tsy mihoatra ny 128 tarehintsoratra ny fanalahidy",
     "keyDuplicate": "Efa ao amin'ny profil ity fanalahidy ity",
     "keyWillBeSavedAs": "Voatahiry ho {{key}}",
     "valueLabel": "Sanda",

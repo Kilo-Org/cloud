@@ -3840,7 +3840,7 @@
     "variablesTitle": "Jijjiiramoota naannoo",
     "addVariable": "Jijjiiramaa itti dabali",
     "keyLabel": "Furtuu",
-    "keyTooLong": "Furtuun 256 arfii ykn isaa gadi ta'uu qaba",
+    "keyTooLong": "Furtuun 128 arfii ykn isaa gadi ta'uu qaba",
     "keyDuplicate": "Furtuun kun duraanuu piroofaayilii keessa jira",
     "keyWillBeSavedAs": "{{key}}tti olkaa'ama",
     "valueLabel": "Gatii",

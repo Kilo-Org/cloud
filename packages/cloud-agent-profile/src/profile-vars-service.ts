@@ -1,10 +1,17 @@
 import type { WorkerDb } from '@kilocode/db';
-import { agent_environment_profile_vars } from '@kilocode/db/schema';
+import { agent_environment_profile_vars, agent_environment_profiles } from '@kilocode/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { encryptWithPublicKey } from '@kilocode/encryption';
 import type { ProfileOwner, ProfileVarResponse } from './types';
 import { verifyProfileOwnership } from './profile-utils';
+import { ENVIRONMENT_LIMITS, assertValidEnvironmentKey } from './environment-contracts';
+
+/**
+ * A profile's variable cap, shared with the repository-environment variable cap
+ * so a profile contributes no more rows than one environment may hold.
+ */
+export const MAX_PROFILE_VARS = ENVIRONMENT_LIMITS.MAX_VARS;
 
 /**
  * Encrypt a value using the agent env vars public key (base64-encoded).
@@ -25,6 +32,9 @@ function encryptValue(publicKeyBase64: string, value: string): string {
 /**
  * Set or update an environment variable for a profile.
  * If isSecret is true, the value is encrypted before storage.
+ *
+ * The key contract and the per-profile cap apply to a key the profile does not
+ * hold yet; an existing key stays updatable at and above the cap.
  */
 export async function setVar(
   db: WorkerDb,
@@ -39,22 +49,47 @@ export async function setVar(
 
   const storedValue = isSecret ? encryptValue(publicKeyBase64, value) : value;
 
-  await db
-    .insert(agent_environment_profile_vars)
-    .values({
-      profile_id: profileId,
-      key,
-      value: storedValue,
-      is_secret: isSecret,
-    })
-    .onConflictDoUpdate({
-      target: [agent_environment_profile_vars.profile_id, agent_environment_profile_vars.key],
-      set: {
+  await db.transaction(async tx => {
+    // Lock the owning profile row so the existence check, the cap count and the
+    // write are one serialized unit, keeping concurrent sets within the cap.
+    await tx
+      .select({ id: agent_environment_profiles.id })
+      .from(agent_environment_profiles)
+      .where(eq(agent_environment_profiles.id, profileId))
+      .for('update');
+
+    const heldKeys = await tx
+      .select({ key: agent_environment_profile_vars.key })
+      .from(agent_environment_profile_vars)
+      .where(eq(agent_environment_profile_vars.profile_id, profileId));
+
+    if (!heldKeys.some(row => row.key === key)) {
+      assertValidEnvironmentKey(key);
+      if (heldKeys.length >= MAX_PROFILE_VARS) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: `Profiles are limited to ${MAX_PROFILE_VARS} variables`,
+        });
+      }
+    }
+
+    await tx
+      .insert(agent_environment_profile_vars)
+      .values({
+        profile_id: profileId,
+        key,
         value: storedValue,
         is_secret: isSecret,
-        updated_at: new Date().toISOString(),
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: [agent_environment_profile_vars.profile_id, agent_environment_profile_vars.key],
+        set: {
+          value: storedValue,
+          is_secret: isSecret,
+          updated_at: new Date().toISOString(),
+        },
+      });
+  });
 }
 
 /**
@@ -147,45 +182,4 @@ export async function getVarsForSession(db: WorkerDb, profileId: string): Promis
     value: v.value,
     isSecret: v.isSecret,
   }));
-}
-
-/**
- * Bulk set variables for a profile.
- * Useful for importing or updating multiple vars at once.
- */
-export async function setVars(
-  db: WorkerDb,
-  publicKeyBase64: string,
-  profileId: string,
-  vars: Array<{ key: string; value: string; isSecret: boolean }>,
-  owner: ProfileOwner
-): Promise<void> {
-  await verifyProfileOwnership(db, profileId, owner);
-
-  if (vars.length === 0) {
-    return;
-  }
-
-  const values = vars.map(v => ({
-    profile_id: profileId,
-    key: v.key,
-    value: v.isSecret ? encryptValue(publicKeyBase64, v.value) : v.value,
-    is_secret: v.isSecret,
-  }));
-
-  await db.transaction(async tx => {
-    for (const val of values) {
-      await tx
-        .insert(agent_environment_profile_vars)
-        .values(val)
-        .onConflictDoUpdate({
-          target: [agent_environment_profile_vars.profile_id, agent_environment_profile_vars.key],
-          set: {
-            value: val.value,
-            is_secret: val.is_secret,
-            updated_at: new Date().toISOString(),
-          },
-        });
-    }
-  });
 }

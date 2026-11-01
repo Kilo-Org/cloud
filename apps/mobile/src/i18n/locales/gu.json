@@ -3846,7 +3846,7 @@
     "variablesTitle": "પર્યાવરણ ચલો",
     "addVariable": "ચલ ઉમેરો",
     "keyLabel": "કી",
-    "keyTooLong": "કી 256 અક્ષરો કે તેથી ઓછા હોવી જોઈએ",
+    "keyTooLong": "કી 128 અક્ષરો કે તેથી ઓછા હોવી જોઈએ",
     "keyDuplicate": "આ કી પ્રોફાઇલમાં પહેલેથી અસ્તિત્વમાં છે",
     "keyWillBeSavedAs": "{{key}} તરીકે સાચવવામાં આવશે",
     "valueLabel": "મૂલ્ય",

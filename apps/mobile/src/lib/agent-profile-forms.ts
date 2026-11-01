@@ -15,8 +15,12 @@ const PROFILE_NAME_MAX_LENGTH = 100;
 /** Server bound: `ProfileDescriptionSchema`'s `z.string().max(500)`. */
 const PROFILE_DESCRIPTION_MAX_LENGTH = 500;
 
-/** Server bound: `VarSchema`'s `z.string().min(1).max(256)`. */
-export const VARIABLE_KEY_MAX_LENGTH = 256;
+/**
+ * Server bound: the profile variable key contract, mirrored from
+ * `ENVIRONMENT_LIMITS.MAX_KEY_LENGTH` in
+ * `packages/cloud-agent-profile/src/environment-contracts.ts`.
+ */
+export const VARIABLE_KEY_MAX_LENGTH = 128;
 
 /**
  * Server bound: the inline session layer's env-var values. The prepare-session
@@ -155,14 +159,16 @@ export function validateSkillInput(input: { name: string; content: string }): Sk
 
 /**
  * Normalize a typed environment variable key to the shape the server stores:
- * upper case, with anything outside `A-Z0-9_` replaced by `_`. Matches the web
- * editor's `cleanKey`.
+ * upper case, with anything outside `A-Z0-9_` replaced by `_`, and a leading
+ * `_` when the result would start with a digit, so the stored key satisfies the
+ * server's key contract. Matches the web editor's `cleanKey`.
  */
 export function cleanVariableKey(value: string): string {
-  return value.toUpperCase().replaceAll(/[^A-Z0-9_]/g, '_');
+  const cleaned = value.toUpperCase().replaceAll(/[^A-Z0-9_]/g, '_');
+  return /^\d/.test(cleaned) ? `_${cleaned}` : cleaned;
 }
 
-/** A key is valid when its trimmed length is within the server's 1..256 bound. */
+/** A key is valid when its trimmed length is within the server's 1..128 bound. */
 export function isValidVariableKey(value: string): boolean {
   const trimmed = value.trim();
   return trimmed.length > 0 && trimmed.length <= VARIABLE_KEY_MAX_LENGTH;

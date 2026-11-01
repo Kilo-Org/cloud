@@ -3840,7 +3840,7 @@
     "variablesTitle": "អថេរបរិស្ថាន",
     "addVariable": "បន្ថែមអថេរ",
     "keyLabel": "សោ",
-    "keyTooLong": "សោត្រូវតែមាន 256 តួអក្សរ ឬតិចជាងនេះ",
+    "keyTooLong": "សោត្រូវតែមាន 128 តួអក្សរ ឬតិចជាងនេះ",
     "keyDuplicate": "សោនេះមានរួចហើយនៅក្នុងកម្រងព័ត៌មាន",
     "keyWillBeSavedAs": "នឹងត្រូវរក្សាទុកជា {{key}}",
     "valueLabel": "តម្លៃ",

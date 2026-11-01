@@ -3952,7 +3952,7 @@
     "variablesTitle": "Premenné prostredia",
     "addVariable": "Pridať premennú",
     "keyLabel": "kľúč",
-    "keyTooLong": "Kľúč môže mať maximálne 256 znakov",
+    "keyTooLong": "Kľúč môže mať maximálne 128 znakov",
     "keyDuplicate": "Tento kľúč už v profile existuje",
     "keyWillBeSavedAs": "Uloží sa ako {{key}}",
     "valueLabel": "Hodnota",

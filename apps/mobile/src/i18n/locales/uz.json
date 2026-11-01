@@ -3840,7 +3840,7 @@
     "variablesTitle": "Atrof-muhit o'zgaruvchilari",
     "addVariable": "O'zgaruvchini qo'shish",
     "keyLabel": "Kalit",
-    "keyTooLong": "Kalit 256 ta belgi yoki undan kam bo'lishi kerak",
+    "keyTooLong": "Kalit 128 ta belgi yoki undan kam bo'lishi kerak",
     "keyDuplicate": "Bu kalit profilda allaqachon mavjud",
     "keyWillBeSavedAs": "{{key}} sifatida saqlanadi",
     "valueLabel": "Qiymat",

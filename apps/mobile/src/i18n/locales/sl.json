@@ -3952,7 +3952,7 @@
     "variablesTitle": "Spremenljivke okolja",
     "addVariable": "Dodajte spremenljivko",
     "keyLabel": "Ključ",
-    "keyTooLong": "Ključ ima lahko največ 256 znakov",
+    "keyTooLong": "Ključ ima lahko največ 128 znakov",
     "keyDuplicate": "Ta ključ že obstaja v profilu",
     "keyWillBeSavedAs": "Shranjeno bo kot {{key}}",
     "valueLabel": "Vrednost",

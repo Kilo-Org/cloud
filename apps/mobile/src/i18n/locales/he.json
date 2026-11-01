@@ -3896,7 +3896,7 @@
     "variablesTitle": "משתני סביבה",
     "addVariable": "הוסף משתנה",
     "keyLabel": "מַפְתֵחַ",
-    "keyTooLong": "המפתח חייב להכיל 256 תווים או פחות",
+    "keyTooLong": "המפתח חייב להכיל 128 תווים או פחות",
     "keyDuplicate": "המפתח הזה כבר קיים בפרופיל",
     "keyWillBeSavedAs": "יישמר כ-{{key}}",
     "valueLabel": "עֵרֶך",

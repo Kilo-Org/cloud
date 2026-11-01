@@ -3896,7 +3896,7 @@
     "variablesTitle": "Variables ambientales",
     "addVariable": "Agregar variable",
     "keyLabel": "Llave",
-    "keyTooLong": "La clave debe tener 256 caracteres o menos",
+    "keyTooLong": "La clave debe tener 128 caracteres o menos",
     "keyDuplicate": "Esta clave ya existe en el perfil",
     "keyWillBeSavedAs": "Se guardará como {{key}}",
     "valueLabel": "Valor",

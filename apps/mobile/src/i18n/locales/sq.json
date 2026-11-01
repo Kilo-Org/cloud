@@ -3840,7 +3840,7 @@
     "variablesTitle": "Variablat e mjedisit",
     "addVariable": "Shto variabël",
     "keyLabel": "Çelësi",
-    "keyTooLong": "Çelësi duhet të ketë 256 karaktere ose më pak",
+    "keyTooLong": "Çelësi duhet të ketë 128 karaktere ose më pak",
     "keyDuplicate": "Ky çelës ekziston tashmë në profil",
     "keyWillBeSavedAs": "Do të ruhet si {{key}}",
     "valueLabel": "Vlera",

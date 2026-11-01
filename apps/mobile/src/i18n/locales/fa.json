@@ -3846,7 +3846,7 @@
     "variablesTitle": "متغیرهای محیطی",
     "addVariable": "متغیر اضافه کنید",
     "keyLabel": "کلید",
-    "keyTooLong": "کلید باید 256 نویسه یا کمتر باشد",
+    "keyTooLong": "کلید باید 128 نویسه یا کمتر باشد",
     "keyDuplicate": "این کلید از قبل در نمایه وجود دارد",
     "keyWillBeSavedAs": "به‌صورت {{key}} ذخیره خواهد شد",
     "valueLabel": "ارزش",

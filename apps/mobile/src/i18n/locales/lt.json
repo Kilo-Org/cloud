@@ -3952,7 +3952,7 @@
     "variablesTitle": "Aplinkos kintamieji",
     "addVariable": "Pridėti kintamąjį",
     "keyLabel": "Raktas",
-    "keyTooLong": "Raktas gali būti ne ilgesnis kaip 256 simboliai",
+    "keyTooLong": "Raktas gali būti ne ilgesnis kaip 128 simboliai",
     "keyDuplicate": "Šis raktas jau yra profilyje",
     "keyWillBeSavedAs": "Bus išsaugota kaip {{key}}",
     "valueLabel": "Vertė",

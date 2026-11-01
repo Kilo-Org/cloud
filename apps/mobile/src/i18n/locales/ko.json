@@ -3840,7 +3840,7 @@
     "variablesTitle": "환경변수",
     "addVariable": "변수 추가",
     "keyLabel": "열쇠",
-    "keyTooLong": "키는 256자 이하여야 합니다",
+    "keyTooLong": "키는 128자 이하여야 합니다",
     "keyDuplicate": "이 키는 이미 프로필에 있습니다.",
     "keyWillBeSavedAs": "{{key}}(으)로 저장됩니다",
     "valueLabel": "값",

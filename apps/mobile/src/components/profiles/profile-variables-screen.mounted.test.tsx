@@ -262,11 +262,11 @@ describe('ProfileVariablesScreen', () => {
     expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
     expect(findField(renderer.root, 'Key').props.error).toBe('required');
 
-    changeText(renderer.root, 'Key', 'a'.repeat(257));
+    changeText(renderer.root, 'Key', 'a'.repeat(129));
     pressButton(renderer.root, 'Save');
 
     expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
-    expect(findField(renderer.root, 'Key').props.error).toBe('Key must be 256 characters or fewer');
+    expect(findField(renderer.root, 'Key').props.error).toBe('Key must be 128 characters or fewer');
 
     unmount();
   });

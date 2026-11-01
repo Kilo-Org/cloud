@@ -3840,7 +3840,7 @@
     "variablesTitle": "वातावरण चर",
     "addVariable": "चर थप्नुहोस्",
     "keyLabel": "कुञ्जी",
-    "keyTooLong": "कुञ्जी 256 अक्षर वा कम हुनुपर्छ",
+    "keyTooLong": "कुञ्जी 128 अक्षर वा कम हुनुपर्छ",
     "keyDuplicate": "यो कुञ्जी पहिले नै प्रोफाइलमा छ",
     "keyWillBeSavedAs": "{{key}} को रूपमा सुरक्षित गरिनेछ",
     "valueLabel": "मूल्य",

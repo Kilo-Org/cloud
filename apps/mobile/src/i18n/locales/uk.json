@@ -3952,7 +3952,7 @@
     "variablesTitle": "Змінні середовища",
     "addVariable": "Додайте змінну",
     "keyLabel": "ключ",
-    "keyTooLong": "Ключ має містити не більше 256 символів",
+    "keyTooLong": "Ключ має містити не більше 128 символів",
     "keyDuplicate": "Цей ключ уже існує в профілі",
     "keyWillBeSavedAs": "Буде збережено як {{key}}",
     "valueLabel": "Значення",

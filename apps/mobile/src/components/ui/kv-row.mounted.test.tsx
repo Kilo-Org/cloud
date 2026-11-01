@@ -90,26 +90,15 @@ describe('KvRow mounted layout', () => {
     expect(text.props.style).toEqual({ direction: 'ltr', writingDirection: 'ltr' });
   });
 
-  // The mirrored row puts the value on the physical left, so its own alignment
-  // has to follow or a wrapped value hangs back toward the label.
-  it('keeps a left-to-right value on the row outer edge in a right-to-left interface', () => {
+  it('keeps that run left-to-right in a right-to-left interface', () => {
     i18nManager.isRTL = true;
     try {
       const text = valueText(renderRow({ value: '< 6.13.0', valueDirection: 'ltr' }), '< 6.13.0');
 
       expect(valueStyle(text)).toMatchObject({ direction: 'ltr', writingDirection: 'ltr' });
-      expect(text.props.className).toContain('text-left');
-      expect(text.props.className).not.toContain('text-right');
     } finally {
       i18nManager.isRTL = false;
     }
-  });
-
-  it('keeps a left-to-right value on the right edge in a left-to-right interface', () => {
-    const text = valueText(renderRow({ value: '< 6.13.0', valueDirection: 'ltr' }), '< 6.13.0');
-
-    expect(text.props.className).toContain('text-right');
-    expect(text.props.className).not.toContain('text-left');
   });
 
   it('leaves a row without the direction in the interface direction', () => {
@@ -118,7 +107,6 @@ describe('KvRow mounted layout', () => {
       const text = valueText(renderRow({ value: 'لا يوجد تصحيح متاح' }), 'لا يوجد تصحيح متاح');
 
       expect(valueStyle(text).writingDirection).toBe('rtl');
-      expect(text.props.className).toContain('text-right');
     } finally {
       i18nManager.isRTL = false;
     }

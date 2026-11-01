@@ -1,5 +1,5 @@
 import { type LucideIcon } from '@/components/ui/icons';
-import { I18nManager, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -39,10 +39,7 @@ type KvRowProps = {
    * Render the value as a left-to-right run whatever the interface direction is.
    * A version, a version range and a CVE or GHSA id are written left to right,
    * so the bidi algorithm otherwise reverses a range in a right-to-left locale:
-   * `< 6.13.0` paints as `6.13.0 >`, which inverts its meaning. Such a value
-   * also keeps the row's outer edge — the left side in a right-to-left
-   * interface, where the mirrored row puts the value — so a value that wraps
-   * starts under its own first line instead of hanging back toward the label.
+   * `< 6.13.0` paints as `6.13.0 >`, which inverts its meaning.
    */
   valueDirection?: 'ltr';
 };
@@ -84,10 +81,6 @@ export function KvRow({
   // row). Clamp the values that can hold it; a selectable value wraps inside
   // the row and the row grows to fit it, so no glyph is cut off.
   const valueLineLimit = selectable ? undefined : 1;
-  // A left-to-right value keeps the row's outer edge. The mirrored row already
-  // puts it on the physical left in a right-to-left interface, so `text-right`
-  // alone would pull a wrapped value back toward the label.
-  const valueAlignment = valueDirection === 'ltr' && I18nManager.isRTL ? 'text-left' : 'text-right';
   return (
     <View
       className={cn(
@@ -110,8 +103,7 @@ export function KvRow({
         ellipsizeMode={valueLineLimit ? 'middle' : undefined}
         style={valueDirection === 'ltr' ? LTR_TEXT_DIRECTION : undefined}
         className={cn(
-          'min-w-0 shrink text-[13px]',
-          valueAlignment,
+          'min-w-0 shrink text-right text-[13px]',
           valueNumeric && 'tabular-nums',
           VALUE_TONE[valueTone],
           valueClassName

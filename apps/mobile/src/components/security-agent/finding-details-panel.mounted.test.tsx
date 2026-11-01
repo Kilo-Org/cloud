@@ -356,8 +356,11 @@ describe('FindingDetailsPanel identifier values', () => {
     mocks.supersedingFindingId = null;
   });
 
-  function rowValueDirection(label: string): unknown {
-    return mocks.kvRows.find(row => row.label === label)?.valueDirection;
+  /** The captured row for a label; fails the test when the panel did not draw it. */
+  function identifierRow(label: string): Record<string, unknown> {
+    const row = mocks.kvRows.find(candidate => candidate.label === label);
+    expect(row, `the panel draws the ${label} row`).toBeDefined();
+    return row as Record<string, unknown>;
   }
 
   // A version range's `<` is neutral, so every row that carries a technical
@@ -376,16 +379,21 @@ describe('FindingDetailsPanel identifier values', () => {
       'securityAgent.findingDetails.manifest',
       'securityAgent.findingDetails.sourceId',
     ]) {
-      expect(rowValueDirection(label)).toBe('ltr');
+      expect(identifierRow(label).valueDirection).toBe('ltr');
     }
   });
 
   // The absence of a version renders as translated copy, which keeps the
-  // interface's own direction.
+  // interface's own direction. Both rows still render, so a regression that
+  // hides them when the value is absent fails here instead of passing.
   it('keeps the translated absence of a version in the interface direction', () => {
     renderPanel(findingFixture({ vulnerable_version_range: null, patched_version: null }));
 
-    expect(rowValueDirection('securityAgent.findingDetails.vulnerableVersions')).toBeUndefined();
-    expect(rowValueDirection('securityAgent.findingDetails.patchedVersion')).toBeUndefined();
+    expect(
+      identifierRow('securityAgent.findingDetails.vulnerableVersions').valueDirection
+    ).toBeUndefined();
+    expect(
+      identifierRow('securityAgent.findingDetails.patchedVersion').valueDirection
+    ).toBeUndefined();
   });
 });

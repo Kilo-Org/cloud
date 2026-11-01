@@ -472,12 +472,34 @@ describe('FindingAnalysisPanel identifier values', () => {
     kvRows.props = [];
   });
 
+  /** The captured Model row; fails the test when the panel did not draw it. */
+  function modelRow(): { label: string; valueDirection: string | undefined } {
+    const row = kvRows.props.find(candidate => candidate.label === i18n.t('common.model'));
+    expect(row, 'the panel draws the Model row').toBeDefined();
+    return row as { label: string; valueDirection: string | undefined };
+  }
+
   it('isolates the analysed model left-to-right', () => {
     renderPanel(analysisFixture({ status: 'completed', analysis: staleAnalysis() }));
 
-    expect(kvRows.props.find(row => row.label === i18n.t('common.model'))?.valueDirection).toBe(
-      'ltr'
+    expect(modelRow().valueDirection).toBe('ltr');
+  });
+
+  // The stored analysis can name the model without the sandbox result that
+  // usually carries it; that value is still an identifier.
+  it('isolates a model named only by the analysis record', () => {
+    renderPanel(
+      analysisFixture({
+        status: 'completed',
+        analysis: {
+          sandboxAnalysis: { ...staleAnalysis().sandboxAnalysis, modelUsed: undefined },
+          analysisModel: 'kilo-auto/balanced',
+        },
+      })
     );
+
+    expect(modelRow()).toMatchObject({ valueDirection: 'ltr' });
+    expect(kvRows.values.get(i18n.t('common.model'))).toBe('kilo-auto/balanced');
   });
 
   it('keeps the unrecorded model copy in the interface direction', () => {
@@ -490,9 +512,10 @@ describe('FindingAnalysisPanel identifier values', () => {
       })
     );
 
-    expect(
-      kvRows.props.find(row => row.label === i18n.t('common.model'))?.valueDirection
-    ).toBeUndefined();
+    expect(modelRow().valueDirection).toBeUndefined();
+    expect(kvRows.values.get(i18n.t('common.model'))).toBe(
+      i18n.t('securityAgent.analysis.notRecorded')
+    );
   });
 
   // A path's leading separator is neutral, so an RTL paragraph would move it
@@ -503,6 +526,7 @@ describe('FindingAnalysisPanel identifier values', () => {
     const [location] = tree.root.findAll(
       node => Object.is(node.type, 'Text') && node.props.children === 'src/a.ts'
     );
+    expect(location, 'the panel draws the located path').toBeDefined();
     expect(location?.props.style).toMatchObject({ direction: 'ltr', writingDirection: 'ltr' });
   });
 });

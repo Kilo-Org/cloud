@@ -450,8 +450,13 @@ describe('FindingRemediationPanel stored payload tolerance', () => {
   it('isolates the model slug and branch name left-to-right', () => {
     renderPanel(analysisFixture({ remediationAttempts: [attempt] }));
 
-    expect(kvRows.rows.find(row => row.label === 'Model')?.valueDirection).toBe('ltr');
-    expect(kvRows.rows.find(row => row.label === 'Branch')?.valueDirection).toBe('ltr');
-    expect(kvRows.rows.find(row => row.label === 'Started by')?.valueDirection).toBeUndefined();
+    for (const label of ['Model', 'Branch']) {
+      const row = kvRows.rows.find(candidate => candidate.label === label);
+      expect(row, `the panel draws the ${label} row`).toBeDefined();
+      expect(row?.valueDirection).toBe('ltr');
+    }
+    const origin = kvRows.rows.find(row => row.label === 'Started by');
+    expect(origin, 'the panel draws the origin row').toBeDefined();
+    expect(origin?.valueDirection).toBeUndefined();
   });
 });

@@ -396,7 +396,7 @@ export function ScreenHeader({
         accessibilityRole="button"
         accessibilityLabel={title}
         accessibilityHint={titlePressHint}
-        className="active:opacity-70"
+        className="min-h-[48px] justify-center active:opacity-70"
       >
         {titleText}
       </Pressable>
@@ -440,10 +440,9 @@ export function ScreenHeader({
   // The twin lays out with the same eyebrow style and the same cap box as the
   // visible title, so the band follows the font scale, and it needs no measured
   // height and no line-height constant.
-  const showBandEyebrow = Boolean(eyebrow) || reserveEyebrow;
   const reservedTitleBand = reserveTitleSpace ? (
-    <View className="w-0 overflow-hidden" importantForAccessibility="no-hide-descendants">
-      {showBandEyebrow ? <Eyebrow className="mb-0.5">{blankEyebrow}</Eyebrow> : null}
+    <View className="w-0 overflow-hidden" aria-hidden>
+      {eyebrow || reserveEyebrow ? <Eyebrow className="mb-0.5">{blankEyebrow}</Eyebrow> : null}
       <View className={reservedTitleHeightClass(size, titleLines)} />
     </View>
   ) : null;

@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -141,7 +142,7 @@ const integrationDetailRegistry = {
     title: 'DoltHub Integration',
     userSubtitle: 'Connect your DoltHub account to query versioned data',
     organizationSubtitle: organizationName => `Manage DoltHub integration for ${organizationName}`,
-    render: async ({ organizationId, search }) => {
+    render: async ({ organizationId, search, role }) => {
       const { DoltHubIntegrationDetails } =
         await import('@/components/integrations/DoltHubIntegrationDetails');
       return (
@@ -149,6 +150,7 @@ const integrationDetailRegistry = {
           organizationId={organizationId}
           success={search.success === 'installed'}
           error={search.error}
+          canManage={!role || canManageOrganizationBilling(role)}
         />
       );
     },

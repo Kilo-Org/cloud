@@ -13,6 +13,7 @@ import { View } from 'react-native';
 
 import { PrReviewCapabilityBanner } from '@/components/pr-review/pr-review-capability-banner';
 import { TerminalChip } from '@/components/pr-review/merge/pr-merge-section-parts';
+import { providerPrMergeTitles } from '@/components/pr-review/merge/pr-merge-titles';
 import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
 import { Button } from '@/components/ui/button';
@@ -40,9 +41,7 @@ export function PrMergeSectionProvider({ prRef, state }: PrMergeSectionProviderP
   }
 
   const autoMerge = providerPrCapabilities(prRef.platform).autoMerge;
-  const mergeLabel = t('prReview.merge.mergeTermTitle', {
-    term: t(providerPrNounKey(prRef.platform)),
-  });
+  const mergeLabel = providerPrMergeTitles(t, prRef.platform).action;
 
   return (
     <View className="gap-2">

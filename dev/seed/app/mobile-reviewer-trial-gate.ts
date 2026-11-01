@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  agent_configs,
   kilocode_users,
   organization_memberships,
   organizations,
@@ -19,6 +20,10 @@ export const usage = '<fake-email>';
  * with `FORBIDDEN` / `Organization trial has expired.` — the state a mobile
  * settings save has to explain, whether it writes the code-reviewer config or
  * the Security Agent's (SLA, notifications, automation, enable toggle).
+ *
+ * The Security Agent is seeded enabled for the same reason: its option screens
+ * render only for an enabled agent, and every save they offer is refused by the
+ * trial gate.
  */
 const ORGANIZATION_ID = 'd4f3b5c1-0000-4000-8000-6a7b8c9d0e01';
 
@@ -117,6 +122,24 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       github_connection_role: 'workflow',
     })
     .onConflictDoNothing();
+
+  // Every Security Agent option screen (SLA, notifications, automation, models,
+  // repositories) redirects to the settings overview unless the stored config is
+  // enabled, so the fixture's links can only reach those screens with this row.
+  // Deleted first so a re-run restores the enabled state after a manual save.
+  await db.delete(agent_configs).where(eq(agent_configs.owned_by_organization_id, ORGANIZATION_ID));
+  await db.insert(agent_configs).values({
+    owned_by_organization_id: ORGANIZATION_ID,
+    agent_type: 'security_scan',
+    platform: 'github',
+    is_enabled: true,
+    config_revision: 1,
+    config: {
+      repository_selection_mode: 'all',
+      auto_sync_enabled: true,
+    },
+    created_by: userId,
+  });
 
   console.log('This fixture represents: an organization whose trial ended, seen by its owner.');
   console.log('Supported saves are refused with the trial sentence; reads still work.');

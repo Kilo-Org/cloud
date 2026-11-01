@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   restorePersistedGlanceable: vi.fn().mockResolvedValue(undefined),
   getItemAsync: vi.fn<(key: string) => Promise<string | null>>(),
   restoreFollowedSessionCards: vi.fn(),
+  reportSecureStoreFailure: vi.fn(),
 }));
 
 const KEYCHAIN_LOCKED = new Error('keychain unavailable');
@@ -35,6 +36,9 @@ vi.mock('./ios-sink', () => ({
 }));
 vi.mock('./session-follow', () => ({
   restoreFollowedSessionCards: mocks.restoreFollowedSessionCards,
+}));
+vi.mock('@/lib/telemetry/secure-store-events', () => ({
+  reportSecureStoreFailure: mocks.reportSecureStoreFailure,
 }));
 
 const { adoptPushStartedActivity, restoreStoredSessionCards } = await import('./adopt-activity');
@@ -153,6 +157,18 @@ describe('adoptPushStartedActivity', () => {
     await adoptPushStartedActivity();
     expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({ kind: 'unreadable' });
     expect(mocks.adoptNativeActivity).not.toHaveBeenCalled();
+  });
+
+  it('files one report for a keychain read that failed', async () => {
+    mocks.getItemAsync.mockRejectedValue(KEYCHAIN_LOCKED);
+
+    await adoptPushStartedActivity();
+
+    // The guarded keychain module files the report for a read failure. Filing a
+    // second one here would surface one failure as two issues, on every launch
+    // and foreground.
+    expect(mocks.reportSecureStoreFailure).toHaveBeenCalledTimes(1);
+    expect(mocks.reportSecureStoreFailure.mock.calls[0]?.[0]).toBe('read');
   });
 
   it('reads no account and no organization selection as unreadable', async () => {

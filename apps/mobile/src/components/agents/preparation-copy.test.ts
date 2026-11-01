@@ -167,14 +167,21 @@ describe('splitFailureSentence', () => {
     });
   });
 
-  it('splits the two-sentence failure copy in every catalog', () => {
-    for (const tag of SUPPORTED_LANGUAGES) {
-      const fixed = i18n.getFixedT(tag);
-      for (const code of ['container_limit_reached', 'credential_upgrade_required'] as const) {
-        const sentence = splitFailureSentence(preparationErrorText(code, fixed));
-        expect(sentence.title.length, `${tag} ${code} has no headline`).toBeGreaterThan(0);
-        expect(sentence.detail, `${tag} ${code} lost its second sentence`).toBeTruthy();
-      }
+  // A catalog loads on `changeLanguage`, not on `getFixedT`, so each tag is
+  // activated by its own case before its sentence stops are the ones under test.
+  it.each(SUPPORTED_LANGUAGES)('splits the two-sentence failure copy in %s', async tag => {
+    await i18n.changeLanguage(tag);
+    for (const [code, key] of [
+      ['container_limit_reached', 'agentChat.preparation.errorContainerLimitReached'],
+      ['credential_upgrade_required', 'agentChat.preparation.errorCredentialUpgradeRequired'],
+    ] as const) {
+      const catalogValue = i18n.getResource(tag, 'translation', key);
+      expect(catalogValue, `${tag} did not load its own catalog`).toBeTypeOf('string');
+      const text = preparationErrorText(code, i18n.t);
+      expect(text, `${tag} ${code} is not its catalog value`).toBe(catalogValue);
+      const sentence = splitFailureSentence(text);
+      expect(sentence.title.length, `${tag} ${code} has no headline`).toBeGreaterThan(0);
+      expect(sentence.detail, `${tag} ${code} lost its second sentence`).toBeTruthy();
     }
   });
 });

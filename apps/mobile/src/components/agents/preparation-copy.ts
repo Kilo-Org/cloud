@@ -122,7 +122,7 @@ const GIT_PROGRESS_PATTERN = /(\d{1,3})%$/u;
  * Indic, Arabic-script, Armenian, Ethiopic, Myanmar, Khmer and CJK catalogs,
  * which stand on their own.
  */
-const SENTENCE_STOPS = '।॥۔؟։።፧။၊។៕。．！？';
+const SENTENCE_STOPS = '।॥۔؟։።፧။។៕。．！？';
 const SENTENCE_BREAK_PATTERN = new RegExp(
   `^([\\s\\S]*?(?:[.!?](?=\\s)|[${SENTENCE_STOPS}]))\\s*([\\s\\S]+)$`,
   'u'

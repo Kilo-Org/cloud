@@ -24,7 +24,7 @@
     "required": "nõutav",
     "error": "viga: {{error}}",
     "back": "Tagasi",
-    "somethingWentWrong": "Midagi läks valesti.",
+    "somethingWentWrong": "Midagi läks valesti",
     "actionNotRecorded": "Seda toimingut ei õnnestunud salvestada. Proovi hiljem uuesti.",
     "couldNotOpen": "Avamine ebaõnnestus: {{label}}.",
     "link": "veebilink",
@@ -89,7 +89,7 @@
     "connect": "Ühenda",
     "connectBitbucket": "Ühenda Bitbucket",
     "connectGitlab": "Ühenda GitLab",
-    "connectProvider": "Teenusepakkuja ühendamine",
+    "connectProvider": "Ühenda teenusepakkuja",
     "contentTruncated": "Sisu kärbitud",
     "copyLink": "Kopeeri link",
     "couldNotLoadOrganizations": "Organisatsioone ei õnnestunud laadida.",
@@ -111,7 +111,7 @@
     "newSession": "Uus seanss",
     "noKiloclawInstances": "KiloClaw'i eksemplare pole",
     "noModelsAvailable": "Mudeleid pole saadaval",
-    "notFound": "Ei leitud.",
+    "notFound": "Ei leitud",
     "online": "Võrgus",
     "open": "Ava {{name}}",
     "openPullRequest": "Ava tõmbetaotlus",
@@ -132,7 +132,7 @@
     "retryLoadingMore": "Proovi lisaandmeid uuesti laadida",
     "reviewPr": "Vaata PR-i üle",
     "role": "Roll",
-    "searchModels": "Mudeli otsing",
+    "searchModels": "Otsi mudeleid…",
     "selectedRepositories": "Valitud hoidlad",
     "selectRepositories": "Vali hoidlad",
     "sendMessage": "Saada sõnum",
@@ -173,7 +173,7 @@
     "openSignInPageInBrowser": "Ava sisselogimisleht brauseris",
     "copySignInLink": "Kopeeri sisselogimislink",
     "cancelSignIn": "Tühista sisselogimine",
-    "startingSignIn": "Sisselogimise alustamine...",
+    "startingSignIn": "Sisselogimise alustamine…",
     "organizationUsesSso": "Sinu organisatsioon kasutab ühtset sisselogimist.",
     "continueWithSso": "Jätka SSO-ga",
     "useDifferentEmail": "Kasuta teist e-posti aadressi",
@@ -1023,14 +1023,14 @@
     },
     "typingIndicator": {
       "someone": "Keegi",
-      "typing_one": "{{name}} kirjutab...",
-      "typing": "{{names}} kirjutavad...",
-      "typing_other": "{{names}} kirjutavad..."
+      "typing_one": "{{name}} kirjutab…",
+      "typing": "{{names}} kirjutavad…",
+      "typing_other": "{{names}} kirjutavad…"
     },
     "botStatus": {
       "offline": "Võrguühenduseta",
-      "loadingUser": "Kasutaja laadimine...",
-      "waitingForStatus": "Oodatakse boti olekut...",
+      "loadingUser": "Kasutaja laadimine…",
+      "waitingForStatus": "Oodatakse boti olekut…",
       "offlineMessage": "Bot on võrguühenduseta. Kui ühendus taastub, jätkub sõnumivahetus."
     },
     "errors": {
@@ -1479,7 +1479,7 @@
       "transcriptRetry": "Ülevaatuse vestluslogi ei õnnestunud laadida.",
       "transcriptWaiting": "Oodatakse ülevaatuse vestluslogi.",
       "agentIdle": "Agent ootab",
-      "agentWorking": "Agent töötab...",
+      "agentWorking": "Agent töötab…",
       "anErrorOccurred": "Tekkis viga",
       "errorWithMessage": "Tekkis viga: {{message}}.",
       "executionStarted": "Täitmine on alanud",
@@ -1588,7 +1588,7 @@
       "configureProvider": "Seadista teenusepakkuja"
     },
     "platformList": {
-      "checking": "Kontrollimine...",
+      "checking": "Kontrollimine…",
       "statusUnavailable": "Olek pole saadaval",
       "platforms": "Platvormid",
       "activity": "Tegevus"
@@ -2475,7 +2475,7 @@
       "noMatches": "Vasteid pole",
       "noRepositories": "Saadaolevaid hoidlaid pole",
       "noRepositoriesDescription": "Sinu kontoga pole ühendatud ühtegi hoidlat.",
-      "loading": "Laadimine...",
+      "loading": "Laadimine…",
       "accessibility": "Hoidla: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2785,8 +2785,8 @@
       "pasteFromClipboard": "Kleebi lõikelaualt",
       "stopGenerating": "Lõpeta genereerimine",
       "selectModelBeforeSending": "Enne saatmist vali mudel.",
-      "preparingPlaceholder": "Keskkonna seadistamine...",
-      "finalizingPlaceholder": "Lõpetamine...",
+      "preparingPlaceholder": "Keskkonna seadistamine…",
+      "finalizingPlaceholder": "Lõpetamine…",
       "sessionLoadFailed": "Seanssi ei saanud laadida. Proovi esmalt uuesti.",
       "cannotReceiveFiles": "See seanss ei saa faile vastu võtta. Sõnumi saatmiseks eemalda manused.",
       "couldNotAttachFiles": "Failide lisamine ebaõnnestus. Uuesti proovimiseks puuduta saatmisnuppu.",
@@ -2971,7 +2971,7 @@
   },
   "home": {
     "couldNotLoadSessions": "Seansse ei õnnestunud laadida.",
-    "couldNotLoadActiveSessions": "Aktiivseid seansse ei õnnestunud laadida.",
+    "couldNotLoadActiveSessions": "Aktiivseid seansse ei õnnestunud laadida",
     "agentSessions": "Praegu käimas",
     "newCodingTask": "Uus programmeerimisülesanne",
     "newTaskFromPicture": "Uus ülesanne pildist",
@@ -3018,7 +3018,7 @@
     "scheduled": "AJASTATUD"
   },
   "voiceInput": {
-    "listening": "Kuulamine...",
+    "listening": "Kuulamine…",
     "onlineTitle": "Kõnet töödeldakse veebis",
     "onlineMessage": "See seade ei saa kõnet ilma võrguühenduseta tekstiks teisendada. Sinu salvestus saadetakse teenusepakkujale {{provider}}, kes teisendab selle tekstiks. Kilo ei säilita helisalvestist.",
     "allow": "Luba",
@@ -3040,7 +3040,7 @@
     "useOnlineTranscription": "Luba veebipõhine transkriptsioon",
     "offlineModelDownloadScheduled": "Võrguühenduseta kõnefailid laaditakse taustal alla. Proovi häälsisestust hiljem uuesti.",
     "listeningStopped": "Kuulamine peatus.",
-    "transcribing": "Kõnetuvastus...",
+    "transcribing": "Kõnetuvastus…",
     "gatewayUnreachable": "Ühendust Kilo Gatewayga ei õnnestunud saada. Kontrolli ühendust ja proovi uuesti.",
     "gatewayTimeout": "Kõnetuvastus võttis liiga palju aega. Proovi uuesti.",
     "gatewayModelUnavailable": "Seda kõnetuvastuse mudelit pole saadaval. Vali Eelistustes mõni teine.",
@@ -3184,7 +3184,7 @@
     "who": "Kellele"
   },
   "feedback": {
-    "noEmailApp": "E-posti rakendust pole saadaval. Meiega saad ühendust aadressil {{email}}.",
+    "noEmailApp": "E-posti rakendust pole saadaval. Meiega saad ühendust aadressil {{email}}",
     "couldNotOpenStore": "Poodi ei õnnestunud avada.",
     "emailSubject": "mobiilirakenduse tagasiside",
     "neutralTitle": "Hinda Kilo rakendust",
@@ -3418,7 +3418,7 @@
     "newestSession": "Uusim: {{title}}",
     "noneWaiting": "Ükski agent ei oota",
     "newAgent": "Uus agent",
-    "approving": "Kinnitamisel...",
+    "approving": "Kinnitamisel…",
     "couldNotApprove": "Kinnitamine ebaõnnestus",
     "channelName": "Aktiivsed agendid",
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente.",
@@ -3441,9 +3441,9 @@
       "searching": "Veebiotsing",
       "thinking": "Läbimõtlemine"
     },
-    "planOf": "viiest",
-    "filesChanged": "muudetud failid",
-    "finishedIn": "Valmis",
+    "planOf": "/",
+    "filesChanged": "muudetud faili",
+    "finishedIn": "Kestis",
     "noActivityFor": "Tegevuseta",
     "prOpened": "Pull request avatud",
     "permissionWants": "Soovib käivitada",
@@ -3451,7 +3451,7 @@
       "provider": "Peatatud: teenusepakkuja viga",
       "tool": "Peatatud: tööriista viga",
       "cancelled": "Peatatud: tühistatud",
-      "other": "PEATATUD"
+      "other": "Peatatud"
     }
   },
   "transcriptionModel": {
@@ -3939,7 +3939,7 @@
       "topPPlaceholder": "nt 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Minu agent",
-      "promptPlaceholder": "Sa oled...",
+      "promptPlaceholder": "Sa oled…",
       "tools": "Tööriistad",
       "visibility": "Nähtavus",
       "visibilityPrimary": "Esmane — kuvatakse valijas",

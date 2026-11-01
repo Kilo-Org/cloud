@@ -69,6 +69,7 @@
     "organization": "组织",
     "platform": "平台",
     "prReview": "PR 审查",
+    "prReviewSubtitle": "在手机上审查拉取请求",
     "queued": "排队中",
     "remove": "移除",
     "repository": "仓库",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "自动 PR 审查",
     "securityAgentSubtitle": "查找并修复漏洞",
     "reviews": "审查",
-    "prReviewSubtitle": "在手机上审查拉取请求",
     "couldNotLoadOrganization": "无法加载组织。",
     "couldNotLoadOrganizationDescription": "加载完成前，无法使用组织和智能体设置。",
     "linkedAccounts": "已关联账户",
@@ -889,7 +889,9 @@
     "instructions": {
       "title": "自定义说明",
       "deprecation": "自定义说明功能计划停用。请将这些准则移至仓库中的 REVIEW.md 文件。",
-      "placeholder": "例如：遵循我们的错误处理规范…"
+      "placeholder": "例如：遵循我们的错误处理规范…",
+      "clearTitle": "移除自定义说明？",
+      "clearMessage": "保存空字段将删除为此审查者存储的自定义说明。"
     },
     "repos": {
       "unavailable": "仓库暂不可用。请在 kilo.ai 上完成 Bitbucket 配置。",
@@ -965,7 +967,7 @@
       "bitbucketError": "无法打开 Bitbucket 配置页面。请重试。"
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}}，作者 {{author}}",
+      "byline": "#{{number}}，作者 {{author}}",
       "cancelMessage": "这将停止正在进行的代码审查。",
       "cancelReview": "取消审查",
       "cancelTitle": "取消审查？",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "所有方面",
-      "customInstructions": "自定义说明",
       "focusAreas": "审查重点",
       "nSelected": "已选 {{displayCount}} 项",
       "proposedReviewMdGuidance": "REVIEW.md 审查准则建议",
       "reviewStyle": "审查风格",
-      "set": "已设置"
+      "set": "已设置",
+      "notSet": "未设置"
     },
     "updateFailed": "更新代码审查器失败。",
     "configSaveFailed": "保存审查配置失败。",
@@ -1293,7 +1295,6 @@
       "noOpenFindings": "暂无需要关注的未解决安全问题",
       "noRepositoryData": "暂无仓库数据",
       "noRepositoryDataDescription": "同步安全问题后，这里将显示各仓库的处理优先级。",
-      "noSlaDeadline": "未设置 SLA 截止时间",
       "notExploitable": "不可利用",
       "notMeasured": "尚未统计",
       "notYetSynced": "尚未同步",
@@ -2710,10 +2711,8 @@
       "checkFailedTitleBitbucket": "无法检查 Bitbucket 连接",
       "providerCheckFailedMessage": "加载完成前无法获取连接状态。",
       "reconnectTitle": "重新连接 GitHub",
-      "reconnectDescription": "你的 GitHub 连接授权已被撤销。请重新连接，继续在手机上审查拉取请求。",
-      "description": "连接你的 GitHub 账户，即可在手机上审查拉取请求。",
-      "gitlabDescription": "连接你的 GitLab 账户，即可在手机上审查合并请求。",
-      "bitbucketDescription": "将 Bitbucket 连接到此组织，以便在手机上审查拉取请求。",
+      "reconnectDescription": "你的 GitHub 连接授权已被撤销。",
+      "gitlabDescription": "在手机上审查合并请求",
       "bitbucketOrgOnlyDescription": "将上方的账户切换为某个组织，以便审查其 Bitbucket 拉取请求。",
       "bitbucketOrgOnlyNoOrganizationDescription": "此账户尚未加入任何组织。创建或加入组织后，即可审查 Bitbucket 拉取请求。",
       "contextLine": "适用于 {{organization}}",
@@ -2947,6 +2946,7 @@
     "installKiloGitHubApp": "安装 Kilo GitHub 应用",
     "merge": {
       "merge": "合并",
+      "mergeTitle": "合并",
       "mergeNow": "立即合并",
       "mergePullRequest": "合并拉取请求",
       "mergeTermTitle": "合并{{term}}",

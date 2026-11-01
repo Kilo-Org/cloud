@@ -69,6 +69,7 @@
     "organization": "Organización",
     "platform": "Plataforma",
     "prReview": "Revisión de PR",
+    "prReviewSubtitle": "Revisar solicitudes de incorporación de cambios en el móvil",
     "queued": "En cola",
     "remove": "Eliminar",
     "repository": "Repositorio",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "Revisiones automáticas de PR",
     "securityAgentSubtitle": "Encontrar y corregir vulnerabilidades",
     "reviews": "Revisiones",
-    "prReviewSubtitle": "Revisar solicitudes de incorporación de cambios en el móvil",
     "couldNotLoadOrganization": "No se pudo cargar la organización.",
     "couldNotLoadOrganizationDescription": "Los ajustes de la organización y de los agentes no estarán disponibles hasta que se cargue la organización.",
     "linkedAccounts": "Cuentas vinculadas",
@@ -892,7 +892,9 @@
     "instructions": {
       "title": "Instrucciones personalizadas",
       "deprecation": "Está previsto retirar las instrucciones personalizadas. Traslada estas directrices a un archivo REVIEW.md de tu repositorio.",
-      "placeholder": "p. ej., aplicar nuestras convenciones de gestión de errores…"
+      "placeholder": "p. ej., aplicar nuestras convenciones de gestión de errores…",
+      "clearTitle": "¿Eliminar las instrucciones personalizadas?",
+      "clearMessage": "Si guardas un campo vacío, se eliminarán las instrucciones personalizadas almacenadas para este revisor."
     },
     "repos": {
       "unavailable": "Los repositorios no están disponibles. Completa la configuración de Bitbucket en kilo.ai.",
@@ -968,7 +970,7 @@
       "bitbucketError": "No se pudo abrir la configuración de Bitbucket. Inténtalo de nuevo."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} por {{author}}",
+      "byline": "#{{number}} por {{author}}",
       "cancelMessage": "Se detendrá la revisión de código en curso.",
       "cancelReview": "Cancelar revisión",
       "cancelTitle": "¿Cancelar la revisión?",
@@ -1083,12 +1085,12 @@
     },
     "overview": {
       "allAreas": "Todas las áreas",
-      "customInstructions": "Instrucciones personalizadas",
       "focusAreas": "Aspectos de la revisión",
       "nSelected": "{{displayCount}} seleccionados",
       "proposedReviewMdGuidance": "Directrices propuestas para REVIEW.md",
       "reviewStyle": "Estilo de revisión",
-      "set": "Configurado"
+      "set": "Configurado",
+      "notSet": "Sin configurar"
     },
     "updateFailed": "No se pudo actualizar el revisor.",
     "configSaveFailed": "No se pudo guardar la configuración de revisión.",
@@ -1298,7 +1300,6 @@
       "noOpenFindings": "Ningún hallazgo abierto necesita atención",
       "noRepositoryData": "Aún no hay datos del repositorio",
       "noRepositoryDataDescription": "Las prioridades del repositorio aparecerán después de sincronizar los hallazgos.",
-      "noSlaDeadline": "Sin plazo del SLA asignado",
       "notExploitable": "No explotable",
       "notMeasured": "Sin medir",
       "notYetSynced": "Aún no sincronizado",
@@ -2744,10 +2745,8 @@
       "checkFailedTitleBitbucket": "No se pudo comprobar la conexión con Bitbucket.",
       "providerCheckFailedMessage": "No se puede consultar el estado de la conexión hasta que termine la carga.",
       "reconnectTitle": "Volver a conectar GitHub",
-      "reconnectDescription": "Se revocó tu conexión con GitHub. Vuelve a conectar tu cuenta para seguir revisando PR en el móvil.",
-      "description": "Conecta tu cuenta de GitHub para revisar PR en el móvil.",
-      "gitlabDescription": "Conecta tu cuenta de GitLab para revisar merge requests en el móvil.",
-      "bitbucketDescription": "Conecta Bitbucket a esta organización para revisar PR en el móvil.",
+      "reconnectDescription": "Se revocó tu conexión con GitHub.",
+      "gitlabDescription": "Revisar merge requests en el móvil",
       "bitbucketOrgOnlyDescription": "Cambia la cuenta de arriba a una organización para revisar sus PR en Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta cuenta todavía no tiene organizaciones. Podrás revisar los PR de Bitbucket cuando crees una organización o te unas a una.",
       "contextLine": "Para {{organization}}",
@@ -2991,6 +2990,7 @@
     "installKiloGitHubApp": "Instalar la aplicación de Kilo para GitHub",
     "merge": {
       "merge": "Fusión",
+      "mergeTitle": "Fusión",
       "mergeNow": "Fusionar ahora",
       "mergePullRequest": "Fusionar PR",
       "mergeTermTitle": "Fusionar {{term}}",

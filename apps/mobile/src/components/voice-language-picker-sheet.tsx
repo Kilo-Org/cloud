@@ -18,6 +18,7 @@ import { languageRows } from '@/i18n/language-rows';
 import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import {
   reconcileVoiceInputLanguageTag,
   voiceInputLanguageDisplayName,
@@ -136,8 +137,7 @@ function VoiceLanguageList({
       contentContainerStyle={listContentContainerStyle}
       data={filtered}
       keyExtractor={option => option.tag ?? 'automatic'}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="on-drag"
+      {...SEARCHABLE_PICKER_LIST_PROPS}
       ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
       renderItem={({ item, index }) => (
         <ChoiceRow
@@ -244,6 +244,7 @@ export function VoiceLanguagePickerSheet() {
 
   const onSelect = useCallback(
     (tag: string | null) => {
+      dismissSearchPickerKeyboard();
       writeVoiceInputLanguage(tag);
       router.back();
     },

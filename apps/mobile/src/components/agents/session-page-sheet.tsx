@@ -17,6 +17,11 @@ type SessionPageSheetProps = {
   /**
    * Asked before Android Back closes the sheet, so a form with unsaved edits can
    * confirm first. Return false to keep the sheet open.
+   *
+   * A sheet that asks keeps the drag off, whatever `dismissible` says: the
+   * native sheet has already left the screen by the time it asks, so a refused
+   * request can neither put it back nor keep its draft, and the reader answers
+   * Keep editing to an empty sheet.
    */
   onRequestDismiss?: () => boolean;
   /**
@@ -37,7 +42,9 @@ type SessionPageSheetProps = {
  * The swipe and the iOS backdrop tap are off by default, because a full-window
  * sheet holds a form's whole scroll view and the native sheet claims every
  * downward drag that starts over it. A surface that shows data and holds no
- * edits passes `dismissible`, and then the drag is the same way out as Done.
+ * edits passes `dismissible`, and then the drag is the same way out as Done. A
+ * surface that asks through `onRequestDismiss` keeps the drag off, because the
+ * drag has already taken the native sheet down when the question is answered.
  *
  * It is a native sheet at the full detent, so it stacks above the session
  * screen and above another native sheet. The sheet owns the whole window, so a
@@ -59,6 +66,10 @@ export function SessionPageSheet({
   const colors = useThemeColors();
   // Android expands the sheet over the status bar; iOS presents it below.
   const sheetTopInset = Platform.OS === 'ios' ? 0 : insets.top;
+  // The guard answers after the native sheet was asked, and a drag has already
+  // taken it off the screen by then, so a draggable sheet that asks can only
+  // answer Keep editing into an empty window. The question outranks the drag.
+  const dragDismisses = dismissible && onRequestDismiss === undefined;
 
   return (
     <Sheet
@@ -66,7 +77,7 @@ export function SessionPageSheet({
       onClose={onClose}
       onDismiss={onDismiss}
       onRequestDismiss={onRequestDismiss}
-      dismissGestures={dismissible}
+      dismissGestures={dragDismisses}
       snapPoints={SHEET_SNAP_POINTS}
       showHandle={false}
       background={colors.background}

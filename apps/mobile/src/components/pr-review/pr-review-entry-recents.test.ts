@@ -20,6 +20,7 @@ import {
   textValues,
 } from './pr-review-entry-screen-test-utils';
 import { recentPrKey } from '@/lib/pr-review/recent-prs';
+import { PrReviewRecentsPending } from './pr-review-recents-pending';
 import { type ConfirmDialogRequest } from '@/components/ui/dialog';
 
 const SAME_TRIPLE = { owner: 'acme', repo: 'api', number: 7, lastOpenedAt: 1_700_000_000_000 };
@@ -167,11 +168,20 @@ describe('recents identity across providers', () => {
     );
   });
 
-  it('the recents load renders into an indicator while pending', () => {
-    // getRecentPrs is still in flight on the first call: the body is the
-    // spinner, never a blank that would jump the layout on arrival.
+  it('the recents load renders one row-shaped card while pending', () => {
+    // getRecentPrs is still in flight on the first call: the body is a card
+    // with a recent row's own shape, never a blank or a bare spinner that
+    // would read as a clipped fragment and jump the section on arrival.
     store.set('pr-review-recents', JSON.stringify([{ ...SAME_TRIPLE, title: 'X' }]));
     const tree = render();
-    expect(findAll(tree, 'ActivityIndicator').length).toBeGreaterThan(0);
+    expect(findAll(tree, PrReviewRecentsPending)).toHaveLength(1);
+    // The loaded rows wait for the read: no row is drawn beside the card.
+    expect(findAll(tree, 'View').filter(p => p.props?.testID === 'recent-row')).toHaveLength(0);
+
+    // eslint-disable-next-line new-cap -- called as a plain function, like the screen harness
+    const card = PrReviewRecentsPending();
+    const frame = find(card, 'View', p => p.accessibilityRole === 'progressbar');
+    expect(propsOf(frame).accessibilityLabel).toBe('Loading…');
+    expect(findAll(frame, 'Skeleton')).toHaveLength(4);
   });
 });

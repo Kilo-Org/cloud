@@ -26,6 +26,7 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileAgents: () => h.query,
+  useAgentProfileOverview: () => ({ data: { name: 'Team profile' } }),
   useAgentProfileSectionMutations: () => h.mutations,
 }));
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({

@@ -2290,6 +2290,9 @@ importers:
 
   services/ai-attribution:
     dependencies:
+      '@kilocode/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

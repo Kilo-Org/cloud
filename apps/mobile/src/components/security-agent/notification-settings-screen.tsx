@@ -134,7 +134,11 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
       ? slaNotificationWarningDays
       : (baseline?.slaNotificationWarningDays ?? slaNotificationWarningDays),
   };
-  const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
+  // Same split as the SLA screen: the save payload falls back to the saved
+  // lead time, while the back guard reads the draft the user can see so an
+  // invalid-only edit is not silently classified as clean.
+  const draft = slaNotificationsEnabled ? { ...patch, slaNotificationWarningDays } : patch;
+  const dirty = baseline !== null && getSettingsDirtyState(baseline, draft, valid) !== 'clean';
   useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
   const handleSave = async () => {
@@ -145,7 +149,12 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
     dirty,
     valid,
-    onSave: handleSave,
+    // These screens never ask a destructive question of their own: a save
+    // here always persists.
+    onSave: async () => {
+      await handleSave();
+      return 'saved';
+    },
   });
 
   const severityOptions = NOTIFICATION_SEVERITY_OPTIONS.map(option => ({

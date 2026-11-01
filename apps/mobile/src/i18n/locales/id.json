@@ -69,6 +69,7 @@
     "organization": "Organisasi",
     "platform": "Layanan repositori",
     "prReview": "Tinjauan PR",
+    "prReviewSubtitle": "Tinjau PR di perangkat seluler",
     "queued": "Dalam antrean",
     "remove": "Hapus",
     "repository": "Repositori",
@@ -209,7 +210,6 @@
     "codeReviewerSubtitle": "Tinjauan PR otomatis",
     "securityAgentSubtitle": "Temukan dan perbaiki kerentanan",
     "reviews": "Tinjauan",
-    "prReviewSubtitle": "Tinjau PR di perangkat seluler",
     "couldNotLoadOrganization": "Tidak dapat memuat organisasi.",
     "couldNotLoadOrganizationDescription": "Pengaturan organisasi dan agen tidak tersedia sampai data organisasi selesai dimuat.",
     "linkedAccounts": "Akun tertaut",
@@ -889,7 +889,9 @@
     "instructions": {
       "title": "Instruksi kustom",
       "deprecation": "Fitur instruksi khusus akan dihentikan. Pindahkan panduan ini ke berkas REVIEW.md di repositorimu.",
-      "placeholder": "contoh: Terapkan aturan penanganan kesalahan kami…"
+      "placeholder": "contoh: Terapkan aturan penanganan kesalahan kami…",
+      "clearTitle": "Hapus instruksi kustom?",
+      "clearMessage": "Menyimpan kolom yang kosong akan menghapus instruksi kustom yang tersimpan untuk peninjau ini."
     },
     "repos": {
       "unavailable": "Repositori tidak tersedia — selesaikan penyiapan Bitbucket di kilo.ai.",
@@ -965,7 +967,7 @@
       "bitbucketError": "Tidak dapat membuka penyiapan Bitbucket. Coba lagi."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} oleh {{author}}",
+      "byline": "#{{number}} oleh {{author}}",
       "cancelMessage": "Ini akan menghentikan tinjauan kode yang sedang berjalan.",
       "cancelReview": "Batalkan tinjauan",
       "cancelTitle": "Batalkan tinjauan?",
@@ -1080,12 +1082,12 @@
     },
     "overview": {
       "allAreas": "Semua area",
-      "customInstructions": "Instruksi kustom",
       "focusAreas": "Area fokus",
       "nSelected": "{{displayCount}} dipilih",
       "proposedReviewMdGuidance": "Panduan REVIEW.md yang diusulkan",
       "reviewStyle": "Gaya tinjauan",
-      "set": "Sudah diatur"
+      "set": "Sudah diatur",
+      "notSet": "Belum diatur"
     },
     "updateFailed": "Gagal memperbarui peninjau.",
     "configSaveFailed": "Gagal menyimpan konfigurasi tinjauan.",
@@ -1293,7 +1295,6 @@
       "noOpenFindings": "Tidak ada temuan terbuka yang perlu ditangani",
       "noRepositoryData": "Belum ada data repositori",
       "noRepositoryDataDescription": "Prioritas repositori akan muncul setelah temuan disinkronkan.",
-      "noSlaDeadline": "Tidak ada tenggat SLA yang ditetapkan",
       "notExploitable": "Tidak dapat dieksploitasi",
       "notMeasured": "Belum diukur",
       "notYetSynced": "Belum disinkronkan",
@@ -2710,10 +2711,8 @@
       "checkFailedTitleBitbucket": "Tidak dapat memeriksa koneksi Bitbucket.",
       "providerCheckFailedMessage": "Status koneksi tidak tersedia hingga bagian ini termuat.",
       "reconnectTitle": "Hubungkan ulang GitHub",
-      "reconnectDescription": "Akses ke akun GitHub kamu telah dicabut. Hubungkan ulang untuk terus meninjau PR di ponsel.",
-      "description": "Hubungkan akun GitHub kamu untuk meninjau PR di ponsel.",
-      "gitlabDescription": "Hubungkan akun GitLab kamu untuk meninjau merge request di ponsel.",
-      "bitbucketDescription": "Hubungkan Bitbucket ke organisasi ini untuk meninjau PR di ponsel.",
+      "reconnectDescription": "Akses ke akun GitHub kamu telah dicabut.",
+      "gitlabDescription": "Tinjau merge request di perangkat seluler",
       "bitbucketOrgOnlyDescription": "Ganti akun di atas ke sebuah organisasi untuk meninjau PR Bitbucket-nya.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akun ini belum memiliki organisasi. PR Bitbucket dapat ditinjau setelah Anda membuat atau bergabung dengan organisasi.",
       "contextLine": "Untuk {{organization}}",
@@ -2947,6 +2946,7 @@
     "installKiloGitHubApp": "Pasang aplikasi Kilo untuk GitHub",
     "merge": {
       "merge": "Penggabungan",
+      "mergeTitle": "Penggabungan",
       "mergeNow": "Gabungkan sekarang",
       "mergePullRequest": "Gabungkan PR",
       "mergeTermTitle": "Gabungkan {{term}}",

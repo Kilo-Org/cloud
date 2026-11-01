@@ -16,11 +16,15 @@ const turn = { type: 'prompt', prompt: 'Fix the login form validation' } as cons
 function setup() {
   const run = vi.fn().mockResolvedValue({ response: 'Fix login form validation' });
   const persist = vi.fn().mockResolvedValue({ applied: true });
+  const eligible = vi.fn().mockResolvedValue(true);
   const env = {
     AI: { run },
-    SESSION_INGEST: { setGeneratedTitleForCloudAgent: persist },
+    SESSION_INGEST: {
+      setGeneratedTitleForCloudAgent: persist,
+      canGenerateTitleForCloudAgent: eligible,
+    },
   } as unknown as Pick<Env, 'AI' | 'SESSION_INGEST'>;
-  return { env, run, persist };
+  return { env, run, persist, eligible };
 }
 
 afterEach(() => {
@@ -29,6 +33,39 @@ afterEach(() => {
 });
 
 describe('generateSessionTitle', () => {
+  it('checks workspace eligibility before sending the first message to the model', async () => {
+    const { env, run, persist, eligible } = setup();
+    eligible.mockResolvedValue(false);
+    await generateSessionTitle(env, metadata, turn);
+    expect(eligible).toHaveBeenCalledExactlyOnceWith({
+      sessionId: metadata.auth.kiloSessionId,
+      kiloUserId: metadata.identity.userId,
+      cloudAgentSessionId: metadata.identity.sessionId,
+    });
+    expect(run).not.toHaveBeenCalled();
+    expect(persist).not.toHaveBeenCalled();
+  });
+
+  it('skips inference when workspace eligibility cannot be checked', async () => {
+    const { env, run, persist, eligible } = setup();
+    eligible.mockRejectedValue(new Error('unavailable'));
+    await expect(generateSessionTitle(env, metadata, turn)).resolves.toBeUndefined();
+    expect(run).not.toHaveBeenCalled();
+    expect(persist).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith('Session title eligibility check failed');
+  });
+
+  it('bounds a stalled workspace eligibility check without starting inference', async () => {
+    vi.useFakeTimers();
+    const { env, run, persist, eligible } = setup();
+    eligible.mockReturnValue(new Promise(() => {}));
+    const task = generateSessionTitle(env, metadata, turn);
+    await vi.advanceTimersByTimeAsync(5000);
+    await expect(task).resolves.toBeUndefined();
+    expect(run).not.toHaveBeenCalled();
+    expect(persist).not.toHaveBeenCalled();
+  });
+
   it('uses a small model and persists a normalized title for the owning session', async () => {
     const { env, run, persist } = setup();
     run.mockResolvedValue({ response: ' "Fix login\n form validation" ' });

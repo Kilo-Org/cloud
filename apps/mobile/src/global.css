@@ -144,7 +144,9 @@
     --accent-foreground: #1a1a10;
     --primary: #ffdd00;
     --primary-foreground: #1a1a10;
-    /* Dark counterpart of the disabled primary fill; near-black ink clears 4.5:1. */
+    /* Dark counterpart of the disabled primary fill; near-black ink clears 4.5:1.
+     * The fill stays neutral and muted: a tinted fill reads as a second brand
+     * colour and competes with the enabled #ffdd00 it replaces. */
     --primary-disabled: #8a8680;
     --destructive: #f28b7a;
     --destructive-foreground: #1a1a10;

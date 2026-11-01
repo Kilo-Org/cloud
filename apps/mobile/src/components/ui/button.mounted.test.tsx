@@ -323,8 +323,11 @@ describe('Button native target contract', () => {
     expect(classes).toContain('bg-primary');
     expect(classes).not.toContain('bg-primary-disabled');
     expect(classes).not.toContain('opacity-50');
+    // A busy non-primary control has only its indicator to show, so it must not
+    // dim either: half opacity leaves an icon-only button looking empty on dark.
+    const outlined = renderButton({ variant: 'outline', size: 'icon', loading: true });
+    expect((outlined.props.className as string).split(' ')).not.toContain('opacity-50');
   });
-
   it('centers the label so a wrapped label stays under its own lines', () => {
     // Android can paint a wrapped label even when the layout reports one line;
     // centered text keeps the wrapped lines aligned under each other instead

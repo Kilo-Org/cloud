@@ -215,6 +215,15 @@ describe('disabled primary fill contrast (WCAG AA text)', () => {
     const ratio = contrastRatio(darkColors.primaryForeground, darkColors.primaryDisabled);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
+
+  it('dark theme: the disabled fill stays distinguishable from the enabled brand fill', () => {
+    // The disabled fill is a neutral grey that must read as a superseded
+    // control next to the enabled brand fill, not as a second brand colour
+    // (2.69:1 between the two fills), or a disabled Start would look tappable
+    // and an enabled one would lose its emphasis.
+    const separation = contrastRatio(darkColors.primary, darkColors.primaryDisabled);
+    expect(separation).toBeGreaterThanOrEqual(1.5);
+  });
 });
 
 describe('warn foreground token contrast (WCAG AA text)', () => {

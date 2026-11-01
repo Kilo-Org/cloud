@@ -2066,7 +2066,8 @@
       "actionBlocked": "Handlingen kunne ikke gennemføres. Problemet skal løses, før du kan prøve igen.",
       "syncNoRepositories": "Der er ingen kodelagre i synkroniseringsomfanget. Vælg de kodelagre, som Sikkerhedsagenten overvåger, og synkroniser derefter igen.",
       "syncIntegrationInactive": "GitHub-forbindelsen for Sikkerhedsagenten er ikke aktiv. Genopret forbindelsen til Kilos GitHub-app, og synkroniser derefter igen.",
-      "syncMissingPermission": "Kilos GitHub-app kan ikke læse sårbarhedsadvarsler. Giv den tilladelse i GitHub, og synkroniser derefter igen."
+      "syncMissingPermission": "Kilos GitHub-app kan ikke læse sårbarhedsadvarsler. Giv den tilladelse i GitHub, og synkroniser derefter igen.",
+      "configConflict": "Sikkerhedsagentens indstillinger er ændret et andet sted. Gennemgå de nyeste indstillinger, og gem igen."
     },
     "analysisState": {
       "queued": "Analyse i kø",

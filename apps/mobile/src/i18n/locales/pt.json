@@ -2105,7 +2105,8 @@
       "actionBlocked": "Não foi possível concluir esta ação. O problema tem de ser resolvido antes de tentares novamente.",
       "syncNoRepositories": "Nenhum repositório está no escopo de sincronização. Escolha os repositórios que o Agente de segurança monitora e sincronize novamente.",
       "syncIntegrationInactive": "A conexão com o GitHub do Agente de segurança não está ativa. Reconecte o GitHub App do Kilo e sincronize novamente.",
-      "syncMissingPermission": "A aplicação do Kilo no GitHub não consegue ler os alertas de vulnerabilidade. Concede essa permissão no GitHub e sincroniza novamente."
+      "syncMissingPermission": "A aplicação do Kilo no GitHub não consegue ler os alertas de vulnerabilidade. Concede essa permissão no GitHub e sincroniza novamente.",
+      "configConflict": "As definições do agente de segurança foram alteradas noutro local. Revê as definições mais recentes e guarda novamente."
     },
     "analysisState": {
       "queued": "Análise na fila",

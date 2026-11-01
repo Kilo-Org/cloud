@@ -2066,7 +2066,8 @@
       "actionBlocked": "ดำเนินการนี้ให้เสร็จสมบูรณ์ไม่ได้ ต้องแก้ไขปัญหาก่อนจึงจะลองใหม่ได้",
       "syncNoRepositories": "ไม่มีรีโพซิทอรีใดอยู่ในขอบเขตการซิงค์ โปรดเลือก repositories ที่เอเจนต์ความปลอดภัยตรวจสอบ แล้วซิงค์อีกครั้ง",
       "syncIntegrationInactive": "การเชื่อมต่อ GitHub สำหรับเอเจนต์ความปลอดภัยยังไม่เปิดใช้งาน เชื่อมต่อ Kilo GitHub App ใหม่อีกครั้ง แล้วซิงค์อีกครั้ง",
-      "syncMissingPermission": "Kilo GitHub App อ่าน vulnerability alerts ไม่ได้ ให้สิทธิ์นั้นใน GitHub แล้วซิงก์อีกครั้ง"
+      "syncMissingPermission": "Kilo GitHub App อ่าน vulnerability alerts ไม่ได้ ให้สิทธิ์นั้นใน GitHub แล้วซิงก์อีกครั้ง",
+      "configConflict": "การตั้งค่าของเอเจนต์ความปลอดภัยถูกเปลี่ยนที่อื่น ตรวจสอบการตั้งค่าล่าสุดแล้วบันทึกอีกครั้ง"
     },
     "analysisState": {
       "queued": "รอคิววิเคราะห์",

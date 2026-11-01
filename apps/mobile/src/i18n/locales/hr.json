@@ -2099,7 +2099,8 @@
       "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem je potrebno riješiti prije ponovnog pokušaja.",
       "syncNoRepositories": "Nijedan repozitorij nije u opsegu sinkronizacije. Odaberite repozitorije koje Sigurnosni agent nadzire, zatim ponovno sinkronizirajte.",
       "syncIntegrationInactive": "Veza s GitHubom za Sigurnosni agent nije aktivna. Ponovno povežite Kilo GitHub App, zatim ponovno sinkronizirajte.",
-      "syncMissingPermission": "Kilo GitHub App ne može čitati vulnerability alerts. Dodijeli to dopuštenje u GitHubu, pa ponovno sinkroniziraj."
+      "syncMissingPermission": "Kilo GitHub App ne može čitati vulnerability alerts. Dodijeli to dopuštenje u GitHubu, pa ponovno sinkroniziraj.",
+      "configConflict": "Postavke Sigurnosnog agenta promijenjene su negdje drugdje. Pregledaj najnovije postavke i ponovno spremi."
     },
     "analysisState": {
       "queued": "Analiza u redu čekanja",

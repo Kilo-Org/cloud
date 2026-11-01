@@ -1536,7 +1536,8 @@
       "actionBlocked": "Deze actie kon niet worden voltooid. Het probleem moet eerst worden opgelost.",
       "syncNoRepositories": "Geen repositories in het synchronisatiebereik. Kies de repositories die de Beveiligingsagent bewaakt en synchroniseer daarna opnieuw.",
       "syncIntegrationInactive": "De GitHub-koppeling voor de Beveiligingsagent is niet actief. Verbind de Kilo GitHub-app opnieuw en synchroniseer daarna opnieuw.",
-      "syncMissingPermission": "De Kilo GitHub-app kan geen kwetsbaarheidsalerts lezen. Verleen die machtiging in GitHub en synchroniseer daarna opnieuw."
+      "syncMissingPermission": "De Kilo GitHub-app kan geen kwetsbaarheidsalerts lezen. Verleen die machtiging in GitHub en synchroniseer daarna opnieuw.",
+      "configConflict": "De instellingen van de Beveiligingsagent zijn elders gewijzigd. Controleer de nieuwste instellingen en sla opnieuw op."
     },
     "analysisState": {
       "queued": "Analyse in de wachtrij",

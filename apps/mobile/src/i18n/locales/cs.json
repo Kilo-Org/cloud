@@ -2132,7 +2132,8 @@
       "actionBlocked": "Tuto akci se nepodařilo dokončit. Problém je nutné nejprve vyřešit, teprve pak můžete akci zopakovat.",
       "syncNoRepositories": "V rozsahu synchronizace nejsou žádné repozitáře. Vyberte repozitáře, které má bezpečnostní agent sledovat, a pak synchronizujte znovu.",
       "syncIntegrationInactive": "Připojení GitHubu pro bezpečnostního agenta není aktivní. Znovu připojte aplikaci Kilo na GitHubu a pak synchronizujte znovu.",
-      "syncMissingPermission": "Aplikace Kilo na GitHubu nemůže číst upozornění na zranitelnosti. Udělte jí toto oprávnění na GitHubu a pak synchronizujte znovu."
+      "syncMissingPermission": "Aplikace Kilo na GitHubu nemůže číst upozornění na zranitelnosti. Udělte jí toto oprávnění na GitHubu a pak synchronizujte znovu.",
+      "configConflict": "Nastavení bezpečnostního agenta bylo změněno jinde. Zkontrolujte nejnovější nastavení a znovu uložte."
     },
     "analysisState": {
       "queued": "Analýza ve frontě",

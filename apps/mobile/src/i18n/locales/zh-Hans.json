@@ -1536,7 +1536,8 @@
       "actionBlocked": "无法完成此操作。必须先修复此问题，才能重试。",
       "syncNoRepositories": "同步范围内没有仓库。请选择安全智能体要监控的仓库，然后再次同步。",
       "syncIntegrationInactive": "安全智能体的 GitHub 连接未激活。请重新连接 Kilo GitHub App，然后再次同步。",
-      "syncMissingPermission": "Kilo GitHub App 无法读取 vulnerability alerts。请在 GitHub 中授予该权限，然后重新同步。"
+      "syncMissingPermission": "Kilo GitHub App 无法读取 vulnerability alerts。请在 GitHub 中授予该权限，然后重新同步。",
+      "configConflict": "安全智能体的设置已在其他地方更改。请查看最新设置并重新保存。"
     },
     "analysisState": {
       "queued": "分析排队中",

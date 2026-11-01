@@ -2066,7 +2066,8 @@
       "actionBlocked": "Tarkaanfa kana xumuruu hin dandeenye. Rakkoon kana duraan furuu qaba.",
       "syncNoRepositories": "Kuusaawwan koodii tokkollee daangaa syncii keessa hin jiran. Kuusaawwan koodii Eejentii nageenyaa hordofu filadhu, sana booda irra deebi'ii sync godhi.",
       "syncIntegrationInactive": "Walitti hidhinni GitHub Eejentii nageenyaaf hin hojjetu. Appii GitHub Kilo irra deebi'ii walitti hidhi, sana booda irra deebi'ii sync godhi.",
-      "syncMissingPermission": "Appiin GitHub Kilo vulnerability alerts dubbisuu hin danda'u. Hayyama sana GitHub keessatti kenni, sana booda irra deebi'ii sync godhi."
+      "syncMissingPermission": "Appiin GitHub Kilo vulnerability alerts dubbisuu hin danda'u. Hayyama sana GitHub keessatti kenni, sana booda irra deebi'ii sync godhi.",
+      "configConflict": "Qindaa'inni Eejantii nageenyaa bakka biraatti jijjiirame. Qindaa'ina haaraa ilaaliitii irra deebi'ii kuusi."
     },
     "analysisState": {
       "queued": "Xiinxalli dabaree eeggachaa jira",

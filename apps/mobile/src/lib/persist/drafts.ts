@@ -20,12 +20,14 @@ import * as encryptedKv from '@/lib/persist/encrypted-kv';
  * over 64 KB are skipped (never written partially); a scope holds at most
  * 100 entries, evicting the oldest `updated_at` above the cap.
  *
- * A corrupt or unreadable stored value loads as null (start empty) and is
- * reported to Sentry with no toast: there is no user action that re-reads a
- * draft, so the failure is structurally non-retryable and the composer is
- * already usable empty. Callers pass a shape validator, so a valid-JSON value
- * that does not match its contract (e.g. a number where composer text is
- * expected) is treated as corrupt and discarded the same way.
+ * A corrupt or unreadable stored value loads as null (start empty), is
+ * reported to Sentry with no toast, and is then removed. Every composer mount
+ * re-reads its draft (`useFencedDraftLoad`), so an entry this build can never
+ * load would otherwise be read, byte-counted and reported again on each mount
+ * for the life of the install; removing it makes one entry one event and every
+ * later mount start from an absent key. Callers pass a shape validator, so a
+ * valid-JSON value that does not match its contract (e.g. a number where
+ * composer text is expected) is treated as corrupt and removed the same way.
  *
  * Every asynchronous write (debounced timer, flush, clear) is caught at this
  * boundary: a storage failure is reported to Sentry and swallowed, so the
@@ -242,9 +244,10 @@ function reportDraftFailure(
  * Loads one draft. Returns the parsed JSON value, or null when the key is
  * absent, the value is corrupt/unreadable, the value exceeds the 64 KB cap,
  * or the parsed value fails the caller's shape validator — all but the absent
- * case load as empty and report corruption to Sentry. The value shape is the
- * caller's contract: composer text stores a JSON string, and pending-review
- * stores a JSON `PendingReviewItem[]`.
+ * case load as empty, report corruption to Sentry once, and remove the entry
+ * so the next mount reads nothing. The value shape is the caller's contract:
+ * composer text stores a JSON string, and pending-review stores a JSON
+ * `PendingReviewItem[]`.
  */
 export async function loadDraft<T>(
   userId: string,
@@ -254,8 +257,11 @@ export async function loadDraft<T>(
   if (!userId) {
     return null;
   }
+  // Held outside the try so a failure after the read can drop the exact entry
+  // it could not load; a failed read leaves nothing to drop.
+  let raw: string | null = null;
   try {
-    const raw = await encryptedKv.getItem(draftScope(userId), entityKey);
+    raw = await encryptedKv.getItem(draftScope(userId), entityKey);
     if (raw === null) {
       return null;
     }
@@ -265,6 +271,7 @@ export async function loadDraft<T>(
         'read',
         'draft-read-size-limit'
       );
+      await clearDraftIfStill(userId, entityKey, raw);
       return null;
     }
     const parsed: unknown = JSON.parse(raw);
@@ -274,11 +281,15 @@ export async function loadDraft<T>(
         'read',
         'draft-read-shape-mismatch'
       );
+      await clearDraftIfStill(userId, entityKey, raw);
       return null;
     }
     return parsed;
   } catch (error) {
     reportDraftFailure(error, 'read');
+    if (raw !== null) {
+      await clearDraftIfStill(userId, entityKey, raw);
+    }
     return null;
   }
 }
@@ -447,7 +458,9 @@ export async function clearDraft(userId: string, entityKey: string): Promise<boo
  * is registered after a newer write sees the newer value and skips, and a
  * clear registered before leaves the newer write intact. Remove failures are
  * reported to Sentry and swallowed. Used by the pending share id, where
- * clearing an older id must never delete a just-written id.
+ * clearing an older id must never delete a just-written id, and by
+ * {@link loadDraft}, which drops a value it could not load only while that
+ * value is still the stored one.
  */
 export async function clearDraftIfStill(
   userId: string,

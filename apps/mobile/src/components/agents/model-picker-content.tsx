@@ -23,10 +23,7 @@ import {
   type ModelPickerRow,
 } from '@/lib/model-picker-rows';
 import { commitModelPickerSelection, resolveModelPickerSelection } from '@/lib/picker-bridge';
-import {
-  dismissSearchPickerKeyboard,
-  SEARCHABLE_PICKER_LIST_PROPS,
-} from '@/lib/picker-list';
+import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { parseParam } from '@/lib/route-params';
 import { modelPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 

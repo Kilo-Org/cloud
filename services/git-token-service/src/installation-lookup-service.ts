@@ -549,6 +549,13 @@ export class InstallationLookupService {
    * Resolves an active workflow integration that belongs to `owner`: a
    * personal integration of `owner.userId`, or, with `owner.orgId`, an
    * organization integration of an org that `owner.userId` belongs to.
+   *
+   * This lookup backs the id-based mint RPC and keeps the stored workflow role:
+   * its caller already holds the integration id it authorized. Every product
+   * path that resolves an organization's installation — the Security Agent
+   * operations and the repository-scoped mint — uses
+   * `assertActiveAssociationForInstallation` or the authorized-installations
+   * query, which follow the shared organization workflow connection definition.
    */
   async findActiveAssociationById(
     integrationId: string,

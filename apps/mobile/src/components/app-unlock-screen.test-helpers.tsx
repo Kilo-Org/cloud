@@ -477,7 +477,8 @@ const SCENE_NAVIGATION = {
 
 export function unlockScene(children: ReactElement, layout = appUnlockScreenLayout) {
   const props = { children, navigation: SCENE_NAVIGATION };
-  return layout(props as Parameters<typeof appUnlockScreenLayout>[0]);
+  // The harness supplies the props these layouts read, not the whole scene.
+  return layout(props as unknown as Parameters<typeof appUnlockScreenLayout>[0]);
 }
 
 export function nestedUnlockScenes(children: ReactElement) {

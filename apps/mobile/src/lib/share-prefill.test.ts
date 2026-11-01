@@ -231,7 +231,7 @@ describe('applySharePrefill', () => {
     const clearCalls: number[] = [];
     const deliveredCalls: number[] = [];
 
-    await applySharePrefill({
+    const delivered = await applySharePrefill({
       shareId: id,
       input,
       maxLength: 4000,
@@ -245,6 +245,7 @@ describe('applySharePrefill', () => {
       },
     });
 
+    expect(delivered).toBe(false);
     expect(changeCalls).toEqual(['keep me']);
     expect(nativeCalls).toEqual([{ text: 'keep me' }]);
     // Nothing was delivered, so neither the delivery signal nor the param clear
@@ -254,13 +255,14 @@ describe('applySharePrefill', () => {
     // The files are back under the same id, so the retry re-delivers them.
     expect(peekSharePayload(id)).not.toBeNull();
 
-    // The retry — the composer's own Retry remounting the route — delivers the
-    // same files this time.
+    // The retry — the composer's own Retry — delivers the same files, and does
+    // not put the text back over whatever the person typed after the failure.
     changeCalls.length = 0;
+    nativeCalls.length = 0;
     const retried = vi.fn<() => Promise<void>>(async () => {
       await Promise.resolve();
     });
-    await applySharePrefill({
+    const retryDelivered = await applySharePrefill({
       shareId: id,
       input,
       maxLength: 4000,
@@ -272,8 +274,12 @@ describe('applySharePrefill', () => {
       onDelivered: () => {
         deliveredCalls.push(1);
       },
+      applyText: false,
     });
+    expect(retryDelivered).toBe(true);
     expect(retried).toHaveBeenCalledExactlyOnceWith([{ name: 'bad.png', uri: 'file:///bad.png' }]);
+    expect(changeCalls).toEqual([]);
+    expect(nativeCalls).toEqual([]);
     expect(deliveredCalls).toEqual([1]);
     expect(clearCalls).toEqual([1]);
   });

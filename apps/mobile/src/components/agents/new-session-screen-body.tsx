@@ -108,7 +108,7 @@ import {
   shouldRestorePersistedRunOn,
 } from '@/lib/run-on-destination';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
-import { peekSharePayload } from '@/lib/share-payload';
+import { clearSharePayload, peekSharePayload } from '@/lib/share-payload';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
@@ -920,10 +920,14 @@ export function NewSessionScreenBody() {
       }
     }
     promptRef.current = '';
+    // A staged payload a failed delivery put back is abandoned with the draft.
+    if (shareId !== undefined) {
+      clearSharePayload(shareId);
+    }
     // Release only after the discard is committed (clearDraft succeeded): a
     // failed clear keeps the composer mounted, so the uploads stay recoverable.
     attachments.releaseUnclaimedUploads();
-  }, [attachments, promptRef, repositoryDraftKey, userId]);
+  }, [attachments, promptRef, repositoryDraftKey, shareId, userId]);
 
   // "Save as to-do" keeps the leave the confirm intercepted until a list is
   // picked; saving then discards the draft and replays that leave.

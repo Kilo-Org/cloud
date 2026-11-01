@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { QueryError } from '@/components/query-error';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
+import { clearSharePayload } from '@/lib/share-payload';
 import { cn } from '@/lib/utils';
 
 type Props = {
@@ -28,6 +29,8 @@ export function NewSessionErrorScreen({ onRetry }: Props) {
   const router = useRouter();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ shareId?: string | string[] }>();
+  const routeShareId = Array.isArray(params.shareId) ? params.shareId[0] : params.shareId;
 
   return (
     <View className="flex-1 bg-background">
@@ -43,6 +46,11 @@ export function NewSessionErrorScreen({ onRetry }: Props) {
           accessibilityRole="button"
           accessibilityLabel={t('common.back')}
           onPress={() => {
+            // Leaving abandons whatever a failed delivery put back in the store:
+            // the route is popped, so nothing could deliver it again.
+            if (routeShareId !== undefined && routeShareId !== '') {
+              clearSharePayload(routeShareId);
+            }
             if (router.canGoBack()) {
               router.back();
               return;

@@ -19,8 +19,14 @@ const state = vi.hoisted(() => ({
     back: vi.fn(),
     replace: vi.fn(),
   },
+  params: { shareId: undefined as string | undefined },
+  clearSharePayload: vi.fn(),
 }));
-vi.mock('expo-router', () => ({ useRouter: () => state.router }));
+vi.mock('expo-router', () => ({
+  useRouter: () => state.router,
+  useLocalSearchParams: () => state.params,
+}));
+vi.mock('@/lib/share-payload', () => ({ clearSharePayload: state.clearSharePayload }));
 vi.mock('@sentry/react-native', () => ({
   wrapExpoRouterErrorBoundary: (boundary: unknown) => boundary,
 }));
@@ -75,6 +81,8 @@ beforeEach(() => {
   state.router.canGoBack.mockReset().mockReturnValue(true);
   state.router.back.mockReset();
   state.router.replace.mockReset();
+  state.params = { shareId: undefined };
+  state.clearSharePayload.mockReset();
 });
 
 describe('NewSessionScreen account gate', () => {
@@ -210,6 +218,23 @@ describe('NewSessionScreen route error boundary', () => {
     pressBack(renderer);
     expect(state.router.back).toHaveBeenCalledTimes(1);
     expect(state.router.replace).not.toHaveBeenCalled();
+    // Nothing was staged under a share id, so leaving clears nothing.
+    expect(state.clearSharePayload).not.toHaveBeenCalled();
+    unmount(renderer);
+  });
+
+  it('drops the staged payload when the failure screen is left', async () => {
+    state.params = { shareId: 'share-1' };
+    const renderer = await renderErrorBoundary();
+    // Retry keeps the payload: it is what the retry delivers.
+    const retry = renderer.root.findByType('QueryError' as never).props.onRetry as () => void;
+    act(() => {
+      retry();
+    });
+    expect(state.clearSharePayload).not.toHaveBeenCalled();
+
+    pressBack(renderer);
+    expect(state.clearSharePayload).toHaveBeenCalledExactlyOnceWith('share-1');
     unmount(renderer);
   });
 

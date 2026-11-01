@@ -262,10 +262,15 @@ describe('DashboardSectionsSkeleton', () => {
   // for the cards the same owner renders: one per card, in the card's own
   // frame, holding the loaded line boxes. A hand-sized bar instead made the
   // loading state taller than the content that replaced it.
-  function renderSkeleton(slaEnabled: boolean): TestRenderer.ReactTestRenderer {
+  function renderSkeleton(
+    slaEnabled: boolean,
+    neverSynced = false
+  ): TestRenderer.ReactTestRenderer {
     const slot: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
     act(() => {
-      slot.current = TestRenderer.create(<DashboardSectionsSkeleton slaEnabled={slaEnabled} />);
+      slot.current = TestRenderer.create(
+        <DashboardSectionsSkeleton slaEnabled={slaEnabled} neverSynced={neverSynced} />
+      );
     });
     const renderer = slot.current;
     if (!renderer) {
@@ -312,6 +317,30 @@ describe('DashboardSectionsSkeleton', () => {
 
     expect(placeholders.every(card => copy(card).length === 0)).toBe(true);
     expect(placeholders.every(card => card.findAllByType('Skeleton').length > 0)).toBe(true);
+  });
+
+  it('draws the Act-first placeholder at the height of the card a never-synced scope loads', () => {
+    // Before the first sync that card holds one line of pending copy instead of
+    // a title over its repository, so the placeholder that has the read's
+    // answer draws that single line and does not lose a second one when the
+    // cards replace it.
+    const placeholderLines = (neverSynced: boolean) => {
+      const card = cards(renderSkeleton(true, neverSynced).root)[0];
+      if (!card) {
+        throw new Error('priority placeholder not found');
+      }
+      return card.findAllByType('Skeleton').length;
+    };
+    const loadedLines = (neverSynced: boolean) => {
+      const card = cards(renderSections({ slaEnabled: true, neverSynced }).root)[0];
+      if (!card) {
+        throw new Error('priority card not found');
+      }
+      return copy(card).length;
+    };
+
+    expect(placeholderLines(true)).toBe(loadedLines(true));
+    expect(placeholderLines(false)).toBe(placeholderLines(true) + 1);
   });
 
   it('grows the risk placeholder by the row the loaded card gains with SLA tracking', () => {

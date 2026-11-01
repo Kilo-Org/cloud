@@ -84,7 +84,9 @@ const STAT_TILE_CLASS = 'w-[47%] gap-1 rounded-lg bg-secondary p-3';
 // deadlines. Each bar is the loaded line's own box at the app's default text
 // size — the `text-xs` label, the `text-xl` value and the `text-[11px]` detail
 // — so the tile's height comes out the same and the loaded cards replace the
-// placeholders without moving anything below them.
+// placeholders without moving anything below them. The detail bar is the one
+// line the loaded tile may not carry, so it is drawn only for the scope shape
+// that carries it.
 const STAT_TILE_PLACEHOLDERS = [0, 1, 2, 3] as const;
 const STAT_LABEL_LINE_CLASS = 'h-4 rounded';
 const STAT_VALUE_LINE_CLASS = 'h-7 rounded';
@@ -618,7 +620,15 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             resolved, which moves the whole dashboard. The section cards join it
             for the same reason — they render below the tiles only once both
             reads settle — so their placeholders keep the page's height until
-            then instead of letting the cards push it down. */}
+            then instead of letting the cards push it down. The placeholder
+            takes that shape as soon as the read has answered it: a scope that
+            has never synced replaces these tiles with two-line ones and its
+            Act-first card with a single line, so laying out the synced shape
+            over it would move everything below by a line whenever the stats
+            read outlasts the sync-status read. While the read is still pending
+            the detail line stays, because that is the shape three of the four
+            tiles carry in a scope that has synced and the one a synced scope's
+            first paint must not lose. */}
         {dashboardStats.isPending || lastSync.isPending ? (
           <View className="gap-4">
             <View className="flex-row flex-wrap gap-3">
@@ -627,11 +637,25 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                   {/* The loaded card's own line boxes: label, value, detail. */}
                   <Skeleton className={cn('w-2/3', STAT_LABEL_LINE_CLASS)} />
                   <Skeleton className={cn('w-1/2', STAT_VALUE_LINE_CLASS)} />
-                  <Skeleton className={cn('w-full', STAT_DETAIL_LINE_CLASS)} />
+                  {neverSynced ? null : (
+                    <Skeleton className={cn('w-full', STAT_DETAIL_LINE_CLASS)} />
+                  )}
                 </View>
               ))}
             </View>
-            <DashboardSectionsSkeleton slaEnabled={slaEnabled} />
+            {neverSynced && slaEnabled ? (
+              // The Manage repositories link renders whenever SLA tracking is
+              // on and nothing carries a deadline. Before the first sync that
+              // is certain, so the placeholder holds the link's own inline
+              // box and the sections below keep their place when the link
+              // arrives. Once the tiles are measured the link needs a
+              // measured total, which the placeholder cannot read, so a scope
+              // that has synced keeps it out of the loading state.
+              <View className="flex-row items-center gap-4">
+                <Skeleton className={cn('w-32', INLINE_LINK_BOX_CLASS)} />
+              </View>
+            ) : null}
+            <DashboardSectionsSkeleton slaEnabled={slaEnabled} neverSynced={neverSynced} />
           </View>
         ) : (
           <View className="flex-row flex-wrap gap-3">

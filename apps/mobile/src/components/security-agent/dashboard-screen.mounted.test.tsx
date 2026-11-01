@@ -156,7 +156,7 @@ const sectionsProps = vi.hoisted(() => ({
 // Captures the sections placeholder's props, so a test can assert the loading
 // state stands in for the cards the same owner renders.
 const sectionsSkeletonProps = vi.hoisted(() => ({
-  props: [] as { slaEnabled?: boolean }[],
+  props: [] as { slaEnabled?: boolean; neverSynced?: boolean }[],
 }));
 
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
@@ -1338,11 +1338,15 @@ describe('DashboardScreen pending stats', () => {
   beforeEach(() => {
     lastSync.isPending = false;
     lastSync.data = undefined;
+    config.data = { slaEnabled: true };
     sectionsProps.props = [];
     sectionsSkeletonProps.props = [];
   });
 
-  /** The line boxes the loading state paints: three per metric tile. */
+  /**
+   * The line boxes the loading state paints: three per metric tile, or two
+   * once the sync-status read has said the tiles carry no detail line.
+   */
   function skeletonBars(root: I): I[] {
     return root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton');
   }
@@ -1431,8 +1435,65 @@ describe('DashboardScreen pending stats', () => {
     expect(renderedTexts(root.root)).not.toContain(
       i18n.t('securityAgent.dashboardMetrics.openFindings')
     );
-    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true }]);
+    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, neverSynced: false }]);
     expect(sectionsProps.props).toHaveLength(0);
+  });
+
+  it('paints the tiles and the link a never-synced scope loads once that read has answered', () => {
+    // The tiles wait for the sync-status read, and a scope that has never
+    // synced drops their detail line and shows the Manage repositories link
+    // under them. When the stats read outlasts that read, the placeholder
+    // already knows both shapes and must hold them: a three-line placeholder
+    // and a missing link moved every card below when the reads resolved.
+    dashboardStats.isPending = true;
+    dashboardStats.data = undefined;
+    lastSync.isPending = false;
+    lastSync.data = { lastSyncTime: null };
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+    const bars = skeletonBars(root.root);
+
+    expect(tileFrames(root.root)).toHaveLength(4);
+    // Four two-line tiles, then the link's own box.
+    expect(bars).toHaveLength(9);
+    expect(bars.at(-1)?.props.className).toContain('min-h-[28px]');
+    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, neverSynced: true }]);
+    expect(sectionsProps.props).toHaveLength(0);
+  });
+
+  it('keeps the link out of the placeholder while SLA tracking is off', () => {
+    // The link is the empty state's way to the repositories, and a scope
+    // without SLA tracking has no deadline column to explain: the loaded
+    // screen does not draw it either.
+    config.data = { slaEnabled: false };
+    dashboardStats.isPending = true;
+    dashboardStats.data = undefined;
+    lastSync.isPending = false;
+    lastSync.data = { lastSyncTime: null };
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+
+    expect(skeletonBars(root.root)).toHaveLength(8);
+  });
+
+  it('loads a never-synced scope without the detail line the placeholder dropped', () => {
+    dashboardStats.isPending = false;
+    dashboardStats.data = resolvedData;
+    lastSync.isPending = false;
+    lastSync.data = { lastSyncTime: null };
+    sharedMetrics.build.mockReturnValue(
+      ['openFindings', 'exploitable', 'needsReview', 'analysisIncomplete'].map(id =>
+        Object.assign(dashboardMetric(id), { label: id })
+      )
+    );
+
+    const root = renderScreen();
+
+    expect(skeletonBars(root.root)).toHaveLength(0);
+    expect(tileFrames(root.root)).toHaveLength(4);
+    expect(sectionsProps.props.at(-1)?.neverSynced).toBe(true);
   });
 
   it('renders the sections only after the sync-status read settles', () => {

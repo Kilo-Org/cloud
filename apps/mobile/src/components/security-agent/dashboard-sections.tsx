@@ -406,10 +406,18 @@ function SectionCardSkeleton({ rows }: Readonly<{ rows: readonly SkeletonRow[] }
  * The repository card cannot know how many repositories the scope covers, so
  * it stands in with a few two-line rows.
  */
-export function DashboardSectionsSkeleton({ slaEnabled }: Readonly<{ slaEnabled: boolean }>) {
+export function DashboardSectionsSkeleton({
+  slaEnabled,
+  neverSynced = false,
+}: Readonly<{ slaEnabled: boolean; neverSynced?: boolean }>) {
   return (
     <>
-      <SectionCardSkeleton rows={[2]} />
+      {/* The Act-first card is the one section whose shape the sync-status read
+          decides on its own: before the first sync it holds a single line of
+          pending copy instead of a title over its repository, so the
+          placeholder drops that second line once the read has settled to that
+          scope. Without the answer the synced shape (the common one) stays. */}
+      <SectionCardSkeleton rows={neverSynced ? [1] : [2]} />
       {slaEnabled ? null : <SectionCardSkeleton rows={[1, 1, 1, 1]} />}
       <SectionCardSkeleton rows={slaEnabled ? [1, 1, 1, 1, 1] : [1, 1, 1, 1]} />
       <SectionCardSkeleton rows={[2, 2, 2]} />

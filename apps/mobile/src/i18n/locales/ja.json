@@ -1845,7 +1845,6 @@
       "pickProfile": "プロフィールを選択してください",
       "noProfile": "プロフィールなし",
       "manageProfiles": "プロフィールの管理",
-      "noProfiles": "まだプロフィールはありません。環境変数、MCP サーバー、スキルを追加するために作成します。",
       "advancedConfig": "高度な構成",
       "advancedConfigDescription": "このセッションに適用されます。プロフィールとして保存すると、次回も使えます。",
       "saveAsProfile": "プロフィールとして保存",

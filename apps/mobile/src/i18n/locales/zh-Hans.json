@@ -1845,7 +1845,6 @@
       "pickProfile": "选择配置文件",
       "noProfile": "没有配置文件",
       "manageProfiles": "管理配置文件",
-      "noProfiles": "还没有配置文件。创建一个以添加环境变量、MCP 服务器和技能。",
       "advancedConfig": "高级配置",
       "advancedConfigDescription": "仅对本次会话生效。另存为配置文件可供下次使用。",
       "saveAsProfile": "另存为配置文件",

@@ -2373,7 +2373,6 @@
       "pickProfile": "Välj en profil",
       "noProfile": "Ingen profil",
       "manageProfiles": "Hantera profiler",
-      "noProfiles": "Inga profiler än. Skapa en för att lägga till miljövariabler, MCP-servrar och färdigheter.",
       "advancedConfig": "Avancerad konfiguration",
       "advancedConfigDescription": "Gäller för den här sessionen. Sparas den som profil finns den kvar nästa gång.",
       "saveAsProfile": "Spara som profil",

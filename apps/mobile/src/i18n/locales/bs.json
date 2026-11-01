@@ -2410,7 +2410,6 @@
       "pickProfile": "Odaberite profil",
       "noProfile": "Nema profila",
       "manageProfiles": "Upravljajte profilima",
-      "noProfiles": "Još nema profila. Napravite jedan za dodavanje varijabli okruženja, MCP servera i vještina.",
       "advancedConfig": "Napredna konfiguracija",
       "advancedConfigDescription": "Vrijedi za ovu sesiju. Čuvanje kao profil zadržava ga za sljedeći put.",
       "saveAsProfile": "Sačuvaj kao profil",

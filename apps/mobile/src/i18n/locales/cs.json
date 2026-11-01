@@ -2447,7 +2447,6 @@
       "pickProfile": "Vyberte profil",
       "noProfile": "Žádný profil",
       "manageProfiles": "Správa profilů",
-      "noProfiles": "Zatím žádné profily. Vytvořte jeden a přidejte proměnné prostředí, servery MCP a dovednosti.",
       "advancedConfig": "Pokročilá konfigurace",
       "advancedConfigDescription": "Platí pro toto sezení. Uložením jako profil zůstane i pro příště.",
       "saveAsProfile": "Uložit jako profil",

@@ -1845,7 +1845,6 @@
       "pickProfile": "Chọn một hồ sơ",
       "noProfile": "Không có hồ sơ",
       "manageProfiles": "Quản lý hồ sơ",
-      "noProfiles": "Chưa có hồ sơ nào. Tạo một cái để thêm các biến môi trường, máy chủ MCP và kỹ năng.",
       "advancedConfig": "Cấu hình nâng cao",
       "advancedConfigDescription": "Áp dụng cho phiên này. Lưu làm hồ sơ sẽ giữ lại cho lần sau.",
       "saveAsProfile": "Lưu làm hồ sơ",

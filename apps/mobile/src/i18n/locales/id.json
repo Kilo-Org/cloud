@@ -1845,7 +1845,6 @@
       "pickProfile": "Pilih profil",
       "noProfile": "Tidak ada profil",
       "manageProfiles": "Kelola profil",
-      "noProfiles": "Belum ada profil. Buat satu untuk menambahkan variabel lingkungan, server MCP, dan keterampilan.",
       "advancedConfig": "Konfigurasi Lanjutan",
       "advancedConfigDescription": "Berlaku untuk sesi ini. Menyimpannya sebagai profil akan menyimpannya untuk lain kali.",
       "saveAsProfile": "Simpan sebagai Profil",

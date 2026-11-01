@@ -2416,7 +2416,6 @@
       "pickProfile": "Escolha um perfil",
       "noProfile": "Sem perfil",
       "manageProfiles": "Gerir perfis",
-      "noProfiles": "Ainda não há perfis. Crie um para adicionar variáveis de ambiente, servidores MCP e competências.",
       "advancedConfig": "Configuração avançada",
       "advancedConfigDescription": "Aplica-se a esta sessão. Guardar como perfil mantém-no para a próxima vez.",
       "saveAsProfile": "Guardar como perfil",

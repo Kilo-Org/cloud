@@ -2373,7 +2373,6 @@
       "pickProfile": "Válassz egy profilt",
       "noProfile": "Nincs profil",
       "manageProfiles": "Profilok kezelése",
-      "noProfiles": "Még nincsenek profilok. Hozz létre egyet a környezeti változók, MCP-kiszolgálók és készségek hozzáadásához.",
       "advancedConfig": "Speciális konfiguráció",
       "advancedConfigDescription": "Erre a munkamenetre érvényes. Profilként mentve a következő alkalomra is megmarad.",
       "saveAsProfile": "Mentés profilként",

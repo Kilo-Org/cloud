@@ -2410,7 +2410,6 @@
       "pickProfile": "Tria un perfil",
       "noProfile": "Sense perfil",
       "manageProfiles": "Gestionar perfils",
-      "noProfiles": "Encara no hi ha perfils. Creeu-ne un per afegir variables d'entorn, servidors MCP i habilitats.",
       "advancedConfig": "Configuració avançada",
       "advancedConfigDescription": "S’aplica a aquesta sessió. Desar-ho com a perfil ho conserva per a la propera vegada.",
       "saveAsProfile": "Desa com a perfil",

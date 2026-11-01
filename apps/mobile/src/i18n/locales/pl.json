@@ -1881,7 +1881,6 @@
       "pickProfile": "Wybierz profil",
       "noProfile": "Brak profilu",
       "manageProfiles": "Zarządzaj profilami",
-      "noProfiles": "Nie ma jeszcze profili. Utwórz go, aby dodać zmienne środowiskowe, serwery MCP i umiejętności.",
       "advancedConfig": "Zaawansowana konfiguracja",
       "advancedConfigDescription": "Dotyczy tej sesji. Zapisanie jako profil zachowuje go na następny raz.",
       "saveAsProfile": "Zapisz jako profil",

@@ -2379,7 +2379,6 @@
       "pickProfile": "Pumili ng profile",
       "noProfile": "Walang profile",
       "manageProfiles": "Pamahalaan ang mga profile",
-      "noProfiles": "Wala pang mga profile. Gumawa ng isa upang magdagdag ng mga variable ng kapaligiran, mga server ng MCP, at mga kasanayan.",
       "advancedConfig": "Advanced na kompigurasyon",
       "advancedConfigDescription": "Nalalapat sa session na ito. Ang pag-save bilang profile ay nagpapanatili nito para sa susunod.",
       "saveAsProfile": "I-save bilang Profile",

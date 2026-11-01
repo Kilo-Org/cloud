@@ -2447,7 +2447,6 @@
       "pickProfile": "Izberite profil",
       "noProfile": "Brez profila",
       "manageProfiles": "Upravljanje profilov",
-      "noProfiles": "Še ni profilov. Ustvarite ga, če želite dodati spremenljivke okolja, strežnike MCP in veščine.",
       "advancedConfig": "Napredna konfiguracija",
       "advancedConfigDescription": "Velja za to sejo. Če ga shranite kot profil, ostane za naslednjič.",
       "saveAsProfile": "Shrani kot profil",

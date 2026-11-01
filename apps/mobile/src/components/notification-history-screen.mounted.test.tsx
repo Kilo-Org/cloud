@@ -27,6 +27,7 @@ type PreferencesFixture = { capabilities: Record<string, { available: boolean }>
 type GateFixture = {
   loading: boolean;
   settled: boolean;
+  answered: boolean;
   permissionGranted: boolean;
   pushEnabled: boolean;
 };
@@ -36,6 +37,7 @@ const state = vi.hoisted(() => {
   const gate: GateFixture = {
     loading: false,
     settled: true,
+    answered: true,
     permissionGranted: true,
     pushEnabled: true,
   };
@@ -250,7 +252,13 @@ beforeEach(() => {
   state.historyError = undefined;
   state.preferencesError = undefined;
   state.preferences = { capabilities: {} };
-  state.gate = { loading: false, settled: true, permissionGranted: true, pushEnabled: true };
+  state.gate = {
+    loading: false,
+    settled: true,
+    answered: true,
+    permissionGranted: true,
+    pushEnabled: true,
+  };
   state.historyInputs = [];
   state.historyOptions = [];
   state.pageSize = undefined;
@@ -337,7 +345,13 @@ describe('NotificationHistoryScreen', () => {
   });
 
   it('shows the settings banner while the push gate is closed and still loads the list', async () => {
-    state.gate = { loading: false, settled: true, permissionGranted: false, pushEnabled: false };
+    state.gate = {
+      loading: false,
+      settled: true,
+      answered: true,
+      permissionGranted: false,
+      pushEnabled: false,
+    };
     state.rows = [row()];
     await mount();
 
@@ -353,7 +367,13 @@ describe('NotificationHistoryScreen', () => {
     // The push banner sits above the filters and the list. A banner that
     // mounted after either of them had settled would move them by its height,
     // so nothing under it renders while its gate is still answering.
-    state.gate = { loading: true, settled: false, permissionGranted: false, pushEnabled: false };
+    state.gate = {
+      loading: true,
+      settled: false,
+      answered: false,
+      permissionGranted: false,
+      pushEnabled: false,
+    };
     state.rows = [row()];
     let settle: (() => void) | undefined = undefined;
     function Harness() {
@@ -386,13 +406,37 @@ describe('NotificationHistoryScreen', () => {
     expect(withText(byType('Button'), 'All')).toBeUndefined();
     expect(byType('Cell')).toHaveLength(0);
 
-    state.gate = { loading: false, settled: true, permissionGranted: false, pushEnabled: false };
+    state.gate = {
+      loading: false,
+      settled: true,
+      answered: true,
+      permissionGranted: false,
+      pushEnabled: false,
+    };
     act(() => {
       settle?.();
     });
     await waitFor(() => byType('Cell').length === 1);
     expect(withText(byType('Button'), 'Notification settings')).toBeDefined();
     expect(withText(byType('Button'), 'All')).toBeDefined();
+  });
+
+  it('claims nothing about pushes when the gate could not answer', async () => {
+    // A failed read is not an answer: the banner may not tell the user their
+    // pushes are off, and the rows still render.
+    state.gate = {
+      loading: false,
+      settled: true,
+      answered: false,
+      permissionGranted: true,
+      pushEnabled: false,
+    };
+    state.rows = [row()];
+    await mount();
+
+    const texts = byType('Text').map(node => node.props.children);
+    expect(texts).not.toContain('Notification settings');
+    expect(byType('Cell')).toHaveLength(1);
   });
 
   it('shows no banner while push reaches the device', async () => {

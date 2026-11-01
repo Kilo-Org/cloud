@@ -18,6 +18,12 @@ export type NotificationMasterGate = Readonly<{
   loading: boolean;
   /** Every input answered, including by failing. */
   settled: boolean;
+  /**
+   * Every input answered with data rather than failing. A surface may only
+   * claim pushes are off when this is true: a read that failed leaves the
+   * answer unknown.
+   */
+  answered: boolean;
   /** The OS allows this app to post notifications. */
   permissionGranted: boolean;
   /** OS permission granted and this device's token is registered on the account. */
@@ -76,6 +82,9 @@ export function useNotificationMasterGate(): NotificationMasterGate {
   return {
     loading: !settled,
     settled,
+    answered:
+      permission.isSuccess &&
+      (!permissionGranted || (pushTokens.isSuccess && deviceToken.isSuccess)),
     permissionGranted,
     pushEnabled: permissionGranted && serverRegistered,
   };

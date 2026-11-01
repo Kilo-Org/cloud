@@ -211,7 +211,7 @@ export function NotificationHistoryScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('notifications.history.title')} showBackButton />
       <View className="flex-1">
-        {gate.settled && !gate.pushEnabled ? (
+        {gate.settled && gate.answered && !gate.pushEnabled ? (
           <View className="mx-4 mb-3 gap-2 rounded-lg border border-border bg-card p-3">
             <View className="flex-row items-center gap-2">
               <BellOff size={16} color={colors.mutedForeground} />

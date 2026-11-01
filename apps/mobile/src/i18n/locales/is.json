@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Veitandi {{id}}",
-      "modelId": "Líkan {{id}}",
       "unavailable": "Ekki tiltækt",
       "unavailableState": "ekki tiltækt",
       "selectedState": "valið",
@@ -4152,7 +4151,8 @@
     "sources": "Gögn og afurðir",
     "timezone": "Tímabelti yfirlits",
     "deviceTimezone": "Nota tímabelti tækis",
-    "timezoneHint": "IANA tímabelti, til dæmis Europe/Berlin. Breytingar á tímaáætlun gilda fyrir komandi yfirlit.",
+    "timezoneHint": "IANA tímabelti, til dæmis Europe/Berlin.",
+    "scheduleHint": "Breytingar á tímaáætlun gilda fyrir komandi yfirlit.",
     "nightStart": "Yfirlitsgluggi hefst",
     "morningStart": "Yfirlit tilbúið klukkan",
     "morningEnd": "Yfirlit tiltækt til",

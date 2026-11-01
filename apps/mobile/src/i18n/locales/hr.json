@@ -2784,7 +2784,6 @@
     },
     "modelSelector": {
       "provider": "Pružatelj {{id}}",
-      "modelId": "Model: {{id}}",
       "unavailable": "Nedostupan",
       "unavailableState": "nedostupan",
       "selectedState": "odabrano",
@@ -4213,7 +4212,8 @@
     "sources": "Dokazi i artefakti",
     "timezone": "Vremenska zona izvješća",
     "deviceTimezone": "Koristi vremensku zonu uređaja",
-    "timezoneHint": "IANA vremenska zona, npr. Europe/Berlin. Promjene rasporeda vrijede za buduća izvješća.",
+    "timezoneHint": "IANA vremenska zona, npr. Europe/Berlin.",
+    "scheduleHint": "Promjene rasporeda vrijede za buduća izvješća.",
     "nightStart": "Početak prozora izvješća",
     "morningStart": "Izvješće spremno u",
     "morningEnd": "Izvješće dostupno do",

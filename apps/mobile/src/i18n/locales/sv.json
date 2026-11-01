@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Leverantör {{id}}",
-      "modelId": "Modell {{id}}",
       "unavailable": "Inte tillgänglig",
       "unavailableState": "inte tillgänglig",
       "selectedState": "vald",
@@ -4152,7 +4151,8 @@
     "sources": "Underlag och artefakter",
     "timezone": "Tidszon för rapport",
     "deviceTimezone": "Använd enhetens tidszon",
-    "timezoneHint": "IANA-tidszon, till exempel Europe/Berlin. Schemaändringar gäller kommande rapporter.",
+    "timezoneHint": "IANA-tidszon, till exempel Europe/Berlin.",
+    "scheduleHint": "Schemaändringar gäller kommande rapporter.",
     "nightStart": "Rapportperioden börjar",
     "morningStart": "Rapport klar",
     "morningEnd": "Rapport tillgänglig till",

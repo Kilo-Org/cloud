@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "{{id}} провайдері",
-      "modelId": "{{id}} моделі",
       "unavailable": "Қолжетімсіз",
       "unavailableState": "қолжетімсіз",
       "selectedState": "таңдалған",
@@ -4152,7 +4151,8 @@
     "sources": "Дәлелдер мен артефактілер",
     "timezone": "Шолу уақыт белдеуі",
     "deviceTimezone": "Құрылғы уақыт белдеуін пайдалану",
-    "timezoneHint": "IANA уақыт белдеуі, мысалы Europe/Berlin. Кесте өзгерістері келесі шолуларға қолданылады.",
+    "timezoneHint": "IANA уақыт белдеуі, мысалы Europe/Berlin.",
+    "scheduleHint": "Кесте өзгерістері келесі шолуларға қолданылады.",
     "nightStart": "Шолу терезесі басталады",
     "morningStart": "Шолу дайын болады",
     "morningEnd": "Шолу осы уақытқа дейін қолжетімді",

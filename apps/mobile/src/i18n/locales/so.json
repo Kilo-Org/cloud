@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Bixiyaha {{id}}",
-      "modelId": "Moodeelka {{id}}",
       "unavailable": "Lama heli karo",
       "unavailableState": "lama heli karo",
       "selectedState": "la doortay",
@@ -4152,7 +4151,8 @@
     "sources": "Caddaymaha iyo waxyaabaha ka soo baxay shaqada",
     "timezone": "Aagga waqtiga warbixinta",
     "deviceTimezone": "Isticmaal aagga waqtiga qalabka",
-    "timezoneHint": "Aagga waqtiga IANA, tusaale Europe/Berlin. Isbeddellada jadwalka waxay khuseeyaan warbixinnada soo socda.",
+    "timezoneHint": "Aagga waqtiga IANA, tusaale Europe/Berlin.",
+    "scheduleHint": "Isbeddellada jadwalka waxay khuseeyaan warbixinnada soo socda.",
     "nightStart": "Muddada warbixinta waxay bilaabataa",
     "morningStart": "Warbixinta diyaar tahay",
     "morningEnd": "Warbixinta la heli karo ilaa",

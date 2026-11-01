@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "دابینکەر: {{id}}",
-      "modelId": "مۆدێل: {{id}}",
       "unavailable": "بەردەست نییە",
       "unavailableState": "بەردەست نییە",
       "selectedState": "هەڵبژێردراو",
@@ -4152,7 +4151,8 @@
     "sources": "بەڵگە و بەرهەمەکان",
     "timezone": "ناوچەی کاتیی ڕاپۆرت",
     "deviceTimezone": "ناوچەی کاتیی ئامێر بەکاربهێنە",
-    "timezoneHint": "ناوچەی کاتیی IANA، بۆ نموونە Europe/Berlin. گۆڕانکارییەکانی خشتە لە ڕاپۆرتەکانی داهاتوو جێبەجێ دەبن.",
+    "timezoneHint": "ناوچەی کاتیی IANA، بۆ نموونە Europe/Berlin.",
+    "scheduleHint": "گۆڕانکارییەکانی خشتە لە ڕاپۆرتەکانی داهاتوو جێبەجێ دەبن.",
     "nightStart": "دەستپێکی ماوەی ڕاپۆرت",
     "morningStart": "ڕاپۆرت ئامادە دەبێت لە",
     "morningEnd": "ڕاپۆرت بەردەستە تا",

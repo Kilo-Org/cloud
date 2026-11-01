@@ -2212,7 +2212,6 @@
     },
     "modelSelector": {
       "provider": "Aanbieder {{id}}",
-      "modelId": "Model: {{id}}",
       "unavailable": "Niet beschikbaar",
       "unavailableState": "niet beschikbaar",
       "selectedState": "geselecteerd",
@@ -4152,7 +4151,8 @@
     "sources": "Bewijs en artefacten",
     "timezone": "Tijdzone briefing",
     "deviceTimezone": "Tijdzone van apparaat gebruiken",
-    "timezoneHint": "IANA-tijdzone, bijvoorbeeld Europe/Berlin. Schemawijzigingen gelden voor toekomstige briefings.",
+    "timezoneHint": "IANA-tijdzone, bijvoorbeeld Europe/Berlin.",
+    "scheduleHint": "Schemawijzigingen gelden voor toekomstige briefings.",
     "nightStart": "Briefingvenster begint",
     "morningStart": "Briefing gereed om",
     "morningEnd": "Briefing beschikbaar tot",

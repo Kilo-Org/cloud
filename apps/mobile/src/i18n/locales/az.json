@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Təminatçı {{id}}",
-      "modelId": "{{id}} modeli",
       "unavailable": "Mövcud deyil",
       "unavailableState": "mövcud deyil",
       "selectedState": "seçilib",
@@ -4152,7 +4151,8 @@
     "sources": "Sübutlar və artefaktlar",
     "timezone": "Hesabat saat qurşağı",
     "deviceTimezone": "Cihazın saat qurşağından istifadə et",
-    "timezoneHint": "IANA saat qurşağı, məsələn Europe/Berlin. Cədvəl dəyişiklikləri gələcək hesabatlara tətbiq olunur.",
+    "timezoneHint": "IANA saat qurşağı, məsələn Europe/Berlin.",
+    "scheduleHint": "Cədvəl dəyişiklikləri gələcək hesabatlara tətbiq olunur.",
     "nightStart": "Hesabat pəncərəsi başlayır",
     "morningStart": "Hesabatın hazır olduğu vaxt",
     "morningEnd": "Hesabatın mövcud olduğu son vaxt",

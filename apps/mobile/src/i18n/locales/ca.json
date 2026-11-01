@@ -2784,7 +2784,6 @@
     },
     "modelSelector": {
       "provider": "Proveïdor {{id}}",
-      "modelId": "Model: {{id}}",
       "unavailable": "No disponible",
       "unavailableState": "no disponible",
       "selectedState": "seleccionat",
@@ -4213,7 +4212,8 @@
     "sources": "Proves i artefactes",
     "timezone": "Zona horària de l'informe",
     "deviceTimezone": "Usa la zona horària del dispositiu",
-    "timezoneHint": "Zona horària IANA, per exemple Europe/Berlin. Els canvis d'horari s'apliquen als informes futurs.",
+    "timezoneHint": "Zona horària IANA, per exemple Europe/Berlin.",
+    "scheduleHint": "Els canvis d'horari s'apliquen als informes futurs.",
     "nightStart": "Inici de la finestra de l'informe",
     "morningStart": "Informe a punt a les",
     "morningEnd": "Informe disponible fins a les",

@@ -2258,7 +2258,6 @@
     },
     "modelSelector": {
       "provider": "Постачальник {{id}}",
-      "modelId": "Модель {{id}}",
       "unavailable": "Недоступна",
       "unavailableState": "недоступна",
       "selectedState": "вибрано",
@@ -4274,7 +4273,8 @@
     "sources": "Докази та артефакти",
     "timezone": "Часовий пояс звіту",
     "deviceTimezone": "Часовий пояс пристрою",
-    "timezoneHint": "Часовий пояс IANA, наприклад Europe/Berlin. Зміни розкладу діятимуть з наступних звітів.",
+    "timezoneHint": "Часовий пояс IANA, наприклад Europe/Berlin.",
+    "scheduleHint": "Зміни розкладу діятимуть з наступних звітів.",
     "nightStart": "Початок періоду звіту",
     "morningStart": "Звіт готовий о",
     "morningEnd": "Звіт доступний до",

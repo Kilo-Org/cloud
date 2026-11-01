@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Szolgáltató: {{id}}",
-      "modelId": "Modell: {{id}}",
       "unavailable": "Nem elérhető",
       "unavailableState": "nem elérhető",
       "selectedState": "kijelölve",
@@ -4152,7 +4151,8 @@
     "sources": "Bizonyítékok és artefaktumok",
     "timezone": "Jelentés időzónája",
     "deviceTimezone": "Eszköz időzónájának használata",
-    "timezoneHint": "IANA időzóna, például Europe/Berlin. Az ütemezés módosításai a következő jelentésekre érvényesek.",
+    "timezoneHint": "IANA időzóna, például Europe/Berlin.",
+    "scheduleHint": "Az ütemezés módosításai a következő jelentésekre érvényesek.",
     "nightStart": "Az időablak kezdete",
     "morningStart": "A jelentés elkészül",
     "morningEnd": "A jelentés elérhető eddig",

@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Verskaffer {{id}}",
-      "modelId": "Model-ID: {{id}}",
       "unavailable": "Onbeskikbaar",
       "unavailableState": "onbeskikbaar",
       "selectedState": "gekies",
@@ -4152,7 +4151,8 @@
     "sources": "Bewyse en artefakte",
     "timezone": "Verslag-tydsone",
     "deviceTimezone": "Gebruik toestel-tydsone",
-    "timezoneHint": "IANA-tydsone, byvoorbeeld Europe/Berlin. Skedulewysigings geld vir toekomstige verslae.",
+    "timezoneHint": "IANA-tydsone, byvoorbeeld Europe/Berlin.",
+    "scheduleHint": "Skedulewysigings geld vir toekomstige verslae.",
     "nightStart": "Verslagvenster begin",
     "morningStart": "Verslag gereed om",
     "morningEnd": "Verslag beskikbaar tot",

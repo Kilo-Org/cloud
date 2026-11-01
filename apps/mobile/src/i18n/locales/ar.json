@@ -2304,7 +2304,6 @@
     },
     "modelSelector": {
       "provider": "المزود {{id}}",
-      "modelId": "النموذج {{id}}",
       "unavailable": "غير متاح",
       "unavailableState": "غير متاح",
       "selectedState": "محدد",
@@ -4396,7 +4395,8 @@
     "sources": "الأدلة والمخرجات",
     "timezone": "المنطقة الزمنية للتقرير",
     "deviceTimezone": "استخدام المنطقة الزمنية للجهاز",
-    "timezoneHint": "منطقة زمنية وفق IANA، مثل Europe/Berlin. تُطبّق تغييرات الجدول على التقارير القادمة.",
+    "timezoneHint": "منطقة زمنية وفق IANA، مثل Europe/Berlin.",
+    "scheduleHint": "تُطبّق تغييرات الجدول على التقارير القادمة.",
     "nightStart": "بداية نافذة التقرير",
     "morningStart": "جاهزية التقرير عند",
     "morningEnd": "التقرير متاح حتى",

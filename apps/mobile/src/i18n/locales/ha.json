@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Mai ba da sabis {{id}}",
-      "modelId": "Samfuri {{id}}",
       "unavailable": "Ba a samunsa ba",
       "unavailableState": "ba a samunsa ba",
       "selectedState": "an zaɓa",
@@ -4152,7 +4151,8 @@
     "sources": "Shaidu da kayayyaki",
     "timezone": "Yankin lokaci na rahoto",
     "deviceTimezone": "Yi amfani da yankin lokaci na na'ura",
-    "timezoneHint": "Yankin lokaci na IANA, misali Europe/Berlin. Canje-canjen jadawali za su shafi rahotanni masu zuwa.",
+    "timezoneHint": "Yankin lokaci na IANA, misali Europe/Berlin.",
+    "scheduleHint": "Canje-canjen jadawali za su shafi rahotanni masu zuwa.",
     "nightStart": "Farkon lokacin rahoto",
     "morningStart": "Rahoto yana shirye da ƙarfe",
     "morningEnd": "Rahoto yana samuwa har zuwa",

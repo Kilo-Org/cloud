@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Provayder: {{id}}",
-      "modelId": "Model: {{id}}",
       "unavailable": "Mavjud emas",
       "unavailableState": "mavjud emas",
       "selectedState": "tanlangan",
@@ -4152,7 +4151,8 @@
     "sources": "Dalillar va artefaktlar",
     "timezone": "Brifing vaqt mintaqasi",
     "deviceTimezone": "Qurilma vaqt mintaqasidan foydalanish",
-    "timezoneHint": "IANA vaqt mintaqasi, masalan Europe/Berlin. Jadval o‘zgarishlari keyingi brifinglarga qo‘llanadi.",
+    "timezoneHint": "IANA vaqt mintaqasi, masalan Europe/Berlin.",
+    "scheduleHint": "Jadval o‘zgarishlari keyingi brifinglarga qo‘llanadi.",
     "nightStart": "Brifing davri boshlanishi",
     "morningStart": "Brifing tayyor bo‘ladigan vaqt",
     "morningEnd": "Brifing mavjud bo‘ladigan oxirgi vaqt",

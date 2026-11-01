@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Давател {{id}}",
-      "modelId": "Модел {{id}}",
       "unavailable": "Недостапен",
       "unavailableState": "недостапен",
       "selectedState": "избран",
@@ -4152,7 +4151,8 @@
     "sources": "Докази и артефакти",
     "timezone": "Временска зона на извештајот",
     "deviceTimezone": "Користи ја временската зона на уредот",
-    "timezoneHint": "IANA временска зона, на пример Europe/Berlin. Промените на распоредот важат за идните извештаи.",
+    "timezoneHint": "IANA временска зона, на пример Europe/Berlin.",
+    "scheduleHint": "Промените на распоредот важат за идните извештаи.",
     "nightStart": "Почеток на периодот на извештајот",
     "morningStart": "Извештајот е готов во",
     "morningEnd": "Извештајот е достапен до",

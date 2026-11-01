@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Pakkuja {{id}}",
-      "modelId": "Mudel {{id}}",
       "unavailable": "Pole saadaval",
       "unavailableState": "pole saadaval",
       "selectedState": "valitud",
@@ -4152,7 +4151,8 @@
     "sources": "Tõendid ja artefaktid",
     "timezone": "Ülevaate ajavöönd",
     "deviceTimezone": "Kasuta seadme ajavööndit",
-    "timezoneHint": "IANA ajavöönd, näiteks Europe/Berlin. Ajakava muudatused kehtivad tulevastele ülevaadetele.",
+    "timezoneHint": "IANA ajavöönd, näiteks Europe/Berlin.",
+    "scheduleHint": "Ajakava muudatused kehtivad tulevastele ülevaadetele.",
     "nightStart": "Ülevaatevahemik algab",
     "morningStart": "Ülevaade valmis kell",
     "morningEnd": "Ülevaade saadaval kuni",

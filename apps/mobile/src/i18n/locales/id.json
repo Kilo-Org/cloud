@@ -2212,7 +2212,6 @@
     },
     "modelSelector": {
       "provider": "Penyedia {{id}}",
-      "modelId": "ID model: {{id}}",
       "unavailable": "Tidak tersedia",
       "unavailableState": "tidak tersedia",
       "selectedState": "dipilih",
@@ -4152,7 +4151,8 @@
     "sources": "Bukti dan artefak",
     "timezone": "Zona waktu laporan",
     "deviceTimezone": "Gunakan zona waktu perangkat",
-    "timezoneHint": "Zona waktu IANA, misalnya Europe/Berlin. Perubahan jadwal berlaku untuk laporan berikutnya.",
+    "timezoneHint": "Zona waktu IANA, misalnya Europe/Berlin.",
+    "scheduleHint": "Perubahan jadwal berlaku untuk laporan berikutnya.",
     "nightStart": "Periode laporan dimulai",
     "morningStart": "Laporan siap pada",
     "morningEnd": "Laporan tersedia hingga",

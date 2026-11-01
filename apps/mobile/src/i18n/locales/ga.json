@@ -2868,7 +2868,6 @@
     },
     "modelSelector": {
       "provider": "Soláthraí {{id}}",
-      "modelId": "Samhail {{id}}",
       "unavailable": "Níl ar fáil",
       "unavailableState": "níl ar fáil",
       "selectedState": "roghnaithe",
@@ -4335,7 +4334,8 @@
     "sources": "Fianaise agus déantáin",
     "timezone": "Crios ama na tuarascála",
     "deviceTimezone": "Úsáid crios ama an ghléis",
-    "timezoneHint": "Crios ama IANA, mar shampla Europe/Berlin. Bainfidh athruithe sceidil le tuarascálacha amach anseo.",
+    "timezoneHint": "Crios ama IANA, mar shampla Europe/Berlin.",
+    "scheduleHint": "Bainfidh athruithe sceidil le tuarascálacha amach anseo.",
     "nightStart": "Tosaíonn an fhuinneog tuarascála",
     "morningStart": "Tuarascáil réidh ag",
     "morningEnd": "Tuarascáil ar fáil go dtí",

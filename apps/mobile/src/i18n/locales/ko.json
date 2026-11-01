@@ -2212,7 +2212,6 @@
     },
     "modelSelector": {
       "provider": "제공업체 {{id}}",
-      "modelId": "모델 {{id}}",
       "unavailable": "사용할 수 없음",
       "unavailableState": "사용할 수 없음",
       "selectedState": "선택됨",
@@ -4152,7 +4151,8 @@
     "sources": "근거 및 아티팩트",
     "timezone": "브리핑 시간대",
     "deviceTimezone": "기기 시간대 사용",
-    "timezoneHint": "IANA 시간대(예: Europe/Berlin). 일정 변경은 향후 브리핑에 적용됩니다.",
+    "timezoneHint": "IANA 시간대(예: Europe/Berlin).",
+    "scheduleHint": "일정 변경은 향후 브리핑에 적용됩니다.",
     "nightStart": "브리핑 기간 시작",
     "morningStart": "브리핑 준비 완료 시각",
     "morningEnd": "브리핑 제공 종료 시각",

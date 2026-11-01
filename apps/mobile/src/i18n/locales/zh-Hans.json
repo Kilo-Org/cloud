@@ -2212,7 +2212,6 @@
     },
     "modelSelector": {
       "provider": "提供商 {{id}}",
-      "modelId": "模型 {{id}}",
       "unavailable": "不可用",
       "unavailableState": "不可用",
       "selectedState": "已选中",
@@ -4152,7 +4151,8 @@
     "sources": "证据与产物",
     "timezone": "简报时区",
     "deviceTimezone": "使用设备时区",
-    "timezoneHint": "IANA 时区，例如 Europe/Berlin。日程更改将从之后的简报生效。",
+    "timezoneHint": "IANA 时区，例如 Europe/Berlin。",
+    "scheduleHint": "日程更改将从之后的简报生效。",
     "nightStart": "简报时段开始",
     "morningStart": "简报就绪时间",
     "morningEnd": "简报可用至",

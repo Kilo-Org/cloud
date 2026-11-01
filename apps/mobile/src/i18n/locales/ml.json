@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "ദാതാവ് {{id}}",
-      "modelId": "മോഡൽ {{id}}",
       "unavailable": "ലഭ്യമല്ല",
       "unavailableState": "ലഭ്യമല്ല",
       "selectedState": "തിരഞ്ഞെടുത്തത്",
@@ -4152,7 +4151,8 @@
     "sources": "തെളിവുകളും ആർട്ടിഫാക്റ്റുകളും",
     "timezone": "ബ്രീഫിംഗ് സമയ മേഖല",
     "deviceTimezone": "ഉപകരണത്തിന്റെ സമയ മേഖല ഉപയോഗിക്കുക",
-    "timezoneHint": "IANA സമയ മേഖല, ഉദാഹരണത്തിന് Europe/Berlin. ഷെഡ്യൂൾ മാറ്റങ്ങൾ വരും ബ്രീഫിംഗുകളിൽ ബാധകമാകും.",
+    "timezoneHint": "IANA സമയ മേഖല, ഉദാഹരണത്തിന് Europe/Berlin.",
+    "scheduleHint": "ഷെഡ്യൂൾ മാറ്റങ്ങൾ വരും ബ്രീഫിംഗുകളിൽ ബാധകമാകും.",
     "nightStart": "ബ്രീഫിംഗ് കാലയളവിന്റെ ആരംഭം",
     "morningStart": "ബ്രീഫിംഗ് തയ്യാറാകുന്ന സമയം",
     "morningEnd": "ബ്രീഫിംഗ് ലഭ്യമായിരിക്കുന്നത് വരെ",

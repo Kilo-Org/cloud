@@ -2212,7 +2212,6 @@
     },
     "modelSelector": {
       "provider": "Nhà cung cấp {{id}}",
-      "modelId": "Mô hình {{id}}",
       "unavailable": "Không khả dụng",
       "unavailableState": "không khả dụng",
       "selectedState": "đã chọn",
@@ -4152,7 +4151,8 @@
     "sources": "Bằng chứng và tạo phẩm",
     "timezone": "Múi giờ bản tin",
     "deviceTimezone": "Dùng múi giờ của thiết bị",
-    "timezoneHint": "Múi giờ IANA, ví dụ Europe/Berlin. Thay đổi lịch sẽ áp dụng cho các bản tin sau.",
+    "timezoneHint": "Múi giờ IANA, ví dụ Europe/Berlin.",
+    "scheduleHint": "Thay đổi lịch sẽ áp dụng cho các bản tin sau.",
     "nightStart": "Khung thời gian bản tin bắt đầu",
     "morningStart": "Bản tin sẵn sàng lúc",
     "morningEnd": "Bản tin có sẵn đến",

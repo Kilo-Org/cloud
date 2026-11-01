@@ -23,7 +23,8 @@
     "sources": "Evidence and artifacts",
     "timezone": "Brief time zone",
     "deviceTimezone": "Use device time zone",
-    "timezoneHint": "IANA time zone, for example Europe/Berlin. Schedule changes apply to future briefs.",
+    "timezoneHint": "IANA time zone, for example Europe/Berlin.",
+    "scheduleHint": "Schedule changes apply to future briefs.",
     "nightStart": "Brief window starts",
     "morningStart": "Brief ready at",
     "morningEnd": "Brief available until",
@@ -2827,7 +2828,6 @@
     },
     "modelSelector": {
       "provider": "Provider {{id}}",
-      "modelId": "Model {{id}}",
       "unavailable": "Unavailable",
       "unavailableState": "unavailable",
       "selectedState": "selected",

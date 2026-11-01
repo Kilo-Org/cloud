@@ -2784,7 +2784,6 @@
     },
     "modelSelector": {
       "provider": "Pakalpojumu sniedzējs {{id}}",
-      "modelId": "Modelis {{id}}",
       "unavailable": "Nav pieejams",
       "unavailableState": "nav pieejams",
       "selectedState": "izvēlēts",
@@ -4213,7 +4212,8 @@
     "sources": "Pierādījumi un artefakti",
     "timezone": "Atskaites laika josla",
     "deviceTimezone": "Izmantot ierīces laika joslu",
-    "timezoneHint": "IANA laika josla, piemēram, Europe/Berlin. Grafika izmaiņas attiecas uz nākamajām atskaitēm.",
+    "timezoneHint": "IANA laika josla, piemēram, Europe/Berlin.",
+    "scheduleHint": "Grafika izmaiņas attiecas uz nākamajām atskaitēm.",
     "nightStart": "Atskaites periods sākas",
     "morningStart": "Atskaite gatava",
     "morningEnd": "Atskaite pieejama līdz",

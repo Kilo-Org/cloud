@@ -2826,7 +2826,6 @@
     },
     "modelSelector": {
       "provider": "Teikėjas {{id}}",
-      "modelId": "Modelis {{id}}",
       "unavailable": "Nepasiekiama",
       "unavailableState": "nepasiekiama",
       "selectedState": "pasirinkta",
@@ -4274,7 +4273,8 @@
     "sources": "Įrodymai ir artefaktai",
     "timezone": "Suvestinės laiko juosta",
     "deviceTimezone": "Naudoti įrenginio laiko juostą",
-    "timezoneHint": "IANA laiko juosta, pvz., Europe/Berlin. Grafiko pakeitimai taikomi būsimoms suvestinėms.",
+    "timezoneHint": "IANA laiko juosta, pvz., Europe/Berlin.",
+    "scheduleHint": "Grafiko pakeitimai taikomi būsimoms suvestinėms.",
     "nightStart": "Suvestinės laikotarpis prasideda",
     "morningStart": "Suvestinė paruošta",
     "morningEnd": "Suvestinė galima iki",

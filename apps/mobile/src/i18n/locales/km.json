@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "អ្នកផ្តល់សេវា {{id}}",
-      "modelId": "ម៉ូដែល {{id}}",
       "unavailable": "មិនអាចប្រើបាន",
       "unavailableState": "មិនអាចប្រើបាន",
       "selectedState": "បានជ្រើសរើស",
@@ -4152,7 +4151,8 @@
     "sources": "ភស្តុតាង និងលទ្ធផលការងារ",
     "timezone": "ល្វែងម៉ោងរបាយការណ៍",
     "deviceTimezone": "ប្រើល្វែងម៉ោងឧបករណ៍",
-    "timezoneHint": "ល្វែងម៉ោង IANA ឧទាហរណ៍ Europe/Berlin។ ការផ្លាស់ប្តូរកាលវិភាគអនុវត្តចំពោះរបាយការណ៍អនាគត។",
+    "timezoneHint": "ល្វែងម៉ោង IANA ឧទាហរណ៍ Europe/Berlin។",
+    "scheduleHint": "ការផ្លាស់ប្តូរកាលវិភាគអនុវត្តចំពោះរបាយការណ៍អនាគត។",
     "nightStart": "រយៈពេលរបាយការណ៍ចាប់ផ្តើម",
     "morningStart": "របាយការណ៍រួចរាល់នៅ",
     "morningEnd": "របាយការណ៍អាចប្រើបានរហូតដល់",

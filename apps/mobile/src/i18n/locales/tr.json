@@ -2212,7 +2212,6 @@
     },
     "modelSelector": {
       "provider": "Sağlayıcı {{id}}",
-      "modelId": "Model kimliği: {{id}}",
       "unavailable": "Kullanılamıyor",
       "unavailableState": "kullanılamıyor",
       "selectedState": "seçili",
@@ -4152,7 +4151,8 @@
     "sources": "Kanıtlar ve çıktılar",
     "timezone": "Rapor saat dilimi",
     "deviceTimezone": "Cihaz saat dilimini kullan",
-    "timezoneHint": "IANA saat dilimi, örneğin Europe/Berlin. Program değişiklikleri sonraki raporlar için geçerlidir.",
+    "timezoneHint": "IANA saat dilimi, örneğin Europe/Berlin.",
+    "scheduleHint": "Program değişiklikleri sonraki raporlar için geçerlidir.",
     "nightStart": "Rapor aralığı başlangıcı",
     "morningStart": "Rapor hazır olma saati",
     "morningEnd": "Raporun kullanılabileceği son saat",

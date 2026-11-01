@@ -2748,7 +2748,6 @@
     },
     "modelSelector": {
       "provider": "ਪ੍ਰਦਾਤਾ {{id}}",
-      "modelId": "ਮਾਡਲ {{id}}",
       "unavailable": "ਉਪਲਬਧ ਨਹੀਂ",
       "unavailableState": "ਉਪਲਬਧ ਨਹੀਂ",
       "selectedState": "ਚੁਣਿਆ ਗਿਆ",
@@ -4158,7 +4157,8 @@
     "sources": "ਸਬੂਤ ਅਤੇ ਆਰਟੀਫੈਕਟ",
     "timezone": "ਬ੍ਰੀਫਿੰਗ ਸਮਾਂ ਖੇਤਰ",
     "deviceTimezone": "ਡਿਵਾਈਸ ਦਾ ਸਮਾਂ ਖੇਤਰ ਵਰਤੋ",
-    "timezoneHint": "IANA ਸਮਾਂ ਖੇਤਰ, ਜਿਵੇਂ Europe/Berlin। ਸਮਾਂ-ਸੂਚੀ ਦੀਆਂ ਤਬਦੀਲੀਆਂ ਅਗਲੀਆਂ ਬ੍ਰੀਫਿੰਗਾਂ 'ਤੇ ਲਾਗੂ ਹੋਣਗੀਆਂ।",
+    "timezoneHint": "IANA ਸਮਾਂ ਖੇਤਰ, ਜਿਵੇਂ Europe/Berlin।",
+    "scheduleHint": "ਸਮਾਂ-ਸੂਚੀ ਦੀਆਂ ਤਬਦੀਲੀਆਂ ਅਗਲੀਆਂ ਬ੍ਰੀਫਿੰਗਾਂ 'ਤੇ ਲਾਗੂ ਹੋਣਗੀਆਂ।",
     "nightStart": "ਬ੍ਰੀਫਿੰਗ ਦੀ ਮਿਆਦ ਸ਼ੁਰੂ",
     "morningStart": "ਬ੍ਰੀਫਿੰਗ ਤਿਆਰ ਹੋਣ ਦਾ ਸਮਾਂ",
     "morningEnd": "ਬ੍ਰੀਫਿੰਗ ਉਪਲਬਧ ਰਹਿਣ ਦਾ ਅੰਤਿਮ ਸਮਾਂ",

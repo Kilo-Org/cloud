@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Udbyder {{id}}",
-      "modelId": "Model-id: {{id}}",
       "unavailable": "Utilgængelig",
       "unavailableState": "utilgængelig",
       "selectedState": "valgt",
@@ -4152,7 +4151,8 @@
     "sources": "Dokumentation og artefakter",
     "timezone": "Tidszone for briefing",
     "deviceTimezone": "Brug enhedens tidszone",
-    "timezoneHint": "IANA-tidszone, for eksempel Europe/Berlin. Ændringer i tidsplanen gælder fremtidige briefinger.",
+    "timezoneHint": "IANA-tidszone, for eksempel Europe/Berlin.",
+    "scheduleHint": "Ændringer i tidsplanen gælder fremtidige briefinger.",
     "nightStart": "Briefingvinduet starter",
     "morningStart": "Briefing klar klokken",
     "morningEnd": "Briefing tilgængelig indtil",

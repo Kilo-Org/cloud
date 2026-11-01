@@ -1162,9 +1162,12 @@ export async function completeStoreKiloPassPurchase(params: {
     });
   }
   // The purchase is committed, so the client is told success either way. The
-  // row must still end terminal: `reconcile_pending` makes its lease immediately
-  // claimable, so the next same-key retry finishes the ledger row and emits
-  // `purchase_settled` — the same recovery the failed-effect branch above uses.
+  // row must still end terminal: a row this attempt admitted becomes
+  // `reconcile_pending` with an immediately claimable lease, so the next
+  // same-key retry finishes the ledger row and emits `purchase_settled` — the
+  // same recovery the failed-effect branch above uses. A row that was already
+  // reconciling keeps the lease this attempt claimed, so its retry waits that
+  // lease out instead.
   try {
     await markReconcilePending(ledgerHandle, { rowId: admission.row.id });
   } catch (markError) {

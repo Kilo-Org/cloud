@@ -19,12 +19,16 @@
  *
  * Ownership checks for the procedures that consume the resolved
  * `wastelandId` stay where they are (`resolveWastelandOwnership`); this
- * module only answers "which claimant is this caller's?".
+ * module only answers "which claimant is this caller's?". Both read the
+ * same rule from `./access`, so the chooser and the procedures cannot
+ * disagree about who reaches a wasteland.
  *
  * The pure entry point `resolveWastelandWith` lives here so unit
  * tests can exercise it without transitively pulling the
  * `cloudflare:workers` import that the DO stub helper requires.
  */
+
+import { canAccessWasteland, type WastelandViewer } from './access';
 
 export type ResolvedWasteland = {
   wastelandId: string;
@@ -39,17 +43,6 @@ export type WastelandResolution =
   | { kind: 'resolved'; wasteland: ResolvedWasteland }
   | { kind: 'ambiguous'; candidates: ResolvedWasteland[] }
   | { kind: 'none' };
-
-/**
- * Who is asking. Mirrors the fields `resolveWastelandOwnership` reads
- * from the tRPC context, so registry-level filtering and DO-level
- * ownership agree on what "my wasteland" means.
- */
-export type WastelandViewer = {
-  userId: string;
-  isAdmin: boolean;
-  orgMemberships: ReadonlyArray<{ orgId: string; role: string }>;
-};
 
 /**
  * Minimal contract of the registry stub we need. Defined as a type
@@ -85,7 +78,7 @@ export async function resolveWastelandWith(
     // null upstream (e.g. a concurrent clear). Such a row cannot answer
     // the address, so skip it instead of failing the whole lookup.
     if (row.dolthub_upstream === null) continue;
-    if (!canAccess(row, viewer)) continue;
+    if (!canAccessWasteland(row, viewer)) continue;
     accessible.push({
       wastelandId: row.wasteland_id,
       ownerType: row.owner_type,
@@ -101,26 +94,6 @@ export async function resolveWastelandWith(
     return { kind: 'resolved', wasteland: accessible[0] };
   }
   return { kind: 'ambiguous', candidates: accessible };
-}
-
-/**
- * Same rules as `resolveWastelandOwnership`: an admin reaches every
- * wasteland, a user-owned wasteland belongs to its owner, and an
- * org-owned one is reachable by any member except a billing manager.
- */
-function canAccess(
-  row: {
-    owner_type: 'user' | 'org';
-    owner_user_id: string | null;
-    organization_id: string | null;
-  },
-  viewer: WastelandViewer
-): boolean {
-  if (viewer.isAdmin) return true;
-  if (row.owner_type === 'user') return row.owner_user_id === viewer.userId;
-  if (row.organization_id === null) return false;
-  const membership = viewer.orgMemberships.find(m => m.orgId === row.organization_id);
-  return membership !== undefined && membership.role !== 'billing_manager';
 }
 
 /**

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resolveWastelandWith, type WastelandViewer } from './resolve-wasteland';
+import { resolveWastelandWith } from './resolve-wasteland';
+import type { WastelandViewer } from './access';
 
 type Row = {
   wasteland_id: string;

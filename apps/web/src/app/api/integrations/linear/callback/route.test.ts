@@ -790,6 +790,19 @@ describe('GET /api/integrations/linear/callback bot-link flow', () => {
     expect(mockedRevokeLinearToken).toHaveBeenCalledWith('lin_user_tok', 'access_token');
   });
 
+  test('refuses to move an existing Linear mapping to another Kilo account', async () => {
+    mockedLinkKiloUser.mockResolvedValueOnce('conflict');
+
+    const response = await callLinearCallback(
+      makeRequest('/api/integrations/linear/callback?code=abc&state=signed-bot-link')
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.text()).resolves.toContain('already linked to a different Kilo account');
+    // The proof tokens are still dropped.
+    expect(mockedRevokeLinearToken).toHaveBeenCalledWith('lin_user_tok', 'access_token');
+  });
+
   test('also revokes the refresh token if Linear returned one', async () => {
     mockedExchangeLinearOAuthCode.mockResolvedValue({
       accessToken: 'lin_user_tok',

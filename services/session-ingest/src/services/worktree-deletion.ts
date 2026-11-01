@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import {
   cli_sessions_v2,
+  cloud_agent_pr_watch_activity,
+  cloud_agent_pr_watches,
   cloud_agent_worktrees,
   type CloudAgentWorktree,
 } from '@kilocode/db/schema';
@@ -347,6 +349,36 @@ async function beginWorktreeDeletionOn(
     .where(eq(cloud_agent_worktrees.worktree_id, params.worktreeId))
     .returning();
   if (!updated) throw new Error(WORKTREE_DELETING);
+  const finishedWatches = await tx
+    .update(cloud_agent_pr_watches)
+    .set({
+      status: 'finished',
+      lifecycle_reason: 'source_worktree_deleted',
+      generation: sql`${cloud_agent_pr_watches.generation} + 1`,
+      projection: sql`jsonb_set(jsonb_set(${cloud_agent_pr_watches.projection}, '{pending}', '[]'::jsonb), '{needsAttention}', 'false'::jsonb)`,
+      updated_at: new Date().toISOString(),
+    })
+    .where(
+      and(
+        eq(cloud_agent_pr_watches.worktree_id, params.worktreeId),
+        eq(cloud_agent_pr_watches.kilo_user_id, params.kiloUserId),
+        params.organizationId
+          ? eq(cloud_agent_pr_watches.organization_id, params.organizationId)
+          : isNull(cloud_agent_pr_watches.organization_id),
+        sql`${cloud_agent_pr_watches.status} != 'finished'`
+      )
+    )
+    .returning();
+  if (finishedWatches.length) {
+    await tx.insert(cloud_agent_pr_watch_activity).values(
+      finishedWatches.map(watch => ({
+        watch_id: watch.id,
+        generation: watch.generation,
+        kind: 'finished',
+        reason: 'source_worktree_deleted',
+      }))
+    );
+  }
   return deletionState(updated);
 }
 

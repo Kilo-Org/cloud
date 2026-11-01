@@ -55,6 +55,10 @@
       "schedule": "45 3 * * *"
     },
     {
+      "path": "/api/cron/cleanup-pr-watches",
+      "schedule": "15 4 * * *"
+    },
+    {
       "path": "/api/cron/kilo-pass-yearly-monthly-base",
       "schedule": "0 * * * *"
     },

@@ -2258,7 +2258,6 @@
     },
     "modelSelector": {
       "provider": "Провайдер {{id}}",
-      "modelId": "Модель {{id}}",
       "unavailable": "Недоступно",
       "unavailableState": "недоступно",
       "selectedState": "выбрано",

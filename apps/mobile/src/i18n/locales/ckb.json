@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "دابینکەر: {{id}}",
-      "modelId": "مۆدێل: {{id}}",
       "unavailable": "بەردەست نییە",
       "unavailableState": "بەردەست نییە",
       "selectedState": "هەڵبژێردراو",

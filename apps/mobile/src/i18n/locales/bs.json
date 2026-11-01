@@ -2784,7 +2784,6 @@
     },
     "modelSelector": {
       "provider": "Pružalac usluge {{id}}",
-      "modelId": "Identifikator modela: {{id}}",
       "unavailable": "Nedostupno",
       "unavailableState": "nedostupno",
       "selectedState": "odabrano",

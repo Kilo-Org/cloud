@@ -2748,7 +2748,6 @@
     },
     "modelSelector": {
       "provider": "සැපයුම්කරු {{id}}",
-      "modelId": "මාදිලිය {{id}}",
       "unavailable": "ලබා ගත නොහැක",
       "unavailableState": "ලබා ගත නොහැක",
       "selectedState": "තෝරා ඇත",

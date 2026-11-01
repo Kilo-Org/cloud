@@ -2748,7 +2748,6 @@
     },
     "modelSelector": {
       "provider": "ارائه‌دهنده {{id}}",
-      "modelId": "مدل {{id}}",
       "unavailable": "در دسترس نیست",
       "unavailableState": "در دسترس نیست",
       "selectedState": "انتخاب‌شده",

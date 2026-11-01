@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Founisè {{id}}",
-      "modelId": "Modèl {{id}}",
       "unavailable": "Pa disponib",
       "unavailableState": "pa disponib",
       "selectedState": "chwazi",

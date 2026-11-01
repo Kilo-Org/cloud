@@ -2784,7 +2784,6 @@
     },
     "modelSelector": {
       "provider": "Furnizor {{id}}",
-      "modelId": "Modelul {{id}}",
       "unavailable": "Indisponibil",
       "unavailableState": "indisponibil",
       "selectedState": "selectat",

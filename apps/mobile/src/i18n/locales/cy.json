@@ -2910,7 +2910,6 @@
     },
     "modelSelector": {
       "provider": "Darparwr {{id}}",
-      "modelId": "Y model {{id}}",
       "unavailable": "Ddim ar gael",
       "unavailableState": "ddim ar gael",
       "selectedState": "wedi'i ddewis",

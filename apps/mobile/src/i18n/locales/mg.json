@@ -2748,7 +2748,6 @@
     },
     "modelSelector": {
       "provider": "Mpamatsy {{id}}",
-      "modelId": "Modely {{id}}",
       "unavailable": "Tsy azo ampiasaina",
       "unavailableState": "tsy azo ampiasaina",
       "selectedState": "voafidy",

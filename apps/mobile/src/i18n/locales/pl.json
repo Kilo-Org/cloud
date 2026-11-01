@@ -2258,7 +2258,6 @@
     },
     "modelSelector": {
       "provider": "Dostawca {{id}}",
-      "modelId": "Model AI: {{id}}",
       "unavailable": "Niedostępny",
       "unavailableState": "niedostępny",
       "selectedState": "wybrany",

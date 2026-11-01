@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "პროვაიდერი {{id}}",
-      "modelId": "მოდელი {{id}}",
       "unavailable": "მიუწვდომელია",
       "unavailableState": "მიუწვდომელია",
       "selectedState": "არჩეულია",

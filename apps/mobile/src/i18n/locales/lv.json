@@ -2784,7 +2784,6 @@
     },
     "modelSelector": {
       "provider": "Pakalpojumu sniedzējs {{id}}",
-      "modelId": "Modelis {{id}}",
       "unavailable": "Nav pieejams",
       "unavailableState": "nav pieejams",
       "selectedState": "izvēlēts",

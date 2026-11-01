@@ -2826,7 +2826,6 @@
     },
     "modelSelector": {
       "provider": "Poskytovateľ {{id}}",
-      "modelId": "Identifikátor modelu: {{id}}",
       "unavailable": "Nedostupný",
       "unavailableState": "nedostupný",
       "selectedState": "vybraný",

@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Bixiyaha {{id}}",
-      "modelId": "Moodeelka {{id}}",
       "unavailable": "Lama heli karo",
       "unavailableState": "lama heli karo",
       "selectedState": "la doortay",

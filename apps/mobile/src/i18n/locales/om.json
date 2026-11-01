@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Dhiyeessaa {{id}}",
-      "modelId": "Moodela {{id}}",
       "unavailable": "Hin argamu",
       "unavailableState": "hin argamu",
       "selectedState": "filatame",

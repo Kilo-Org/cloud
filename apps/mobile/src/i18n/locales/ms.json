@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Penyedia {{id}}",
-      "modelId": "Model AI {{id}}",
       "unavailable": "Tidak tersedia",
       "unavailableState": "tidak tersedia",
       "selectedState": "dipilih",

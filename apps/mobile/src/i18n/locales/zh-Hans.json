@@ -2212,7 +2212,6 @@
     },
     "modelSelector": {
       "provider": "提供商 {{id}}",
-      "modelId": "模型 {{id}}",
       "unavailable": "不可用",
       "unavailableState": "不可用",
       "selectedState": "已选中",

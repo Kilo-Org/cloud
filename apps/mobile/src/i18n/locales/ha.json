@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Mai ba da sabis {{id}}",
-      "modelId": "Samfuri {{id}}",
       "unavailable": "Ba a samunsa ba",
       "unavailableState": "ba a samunsa ba",
       "selectedState": "an zaɓa",

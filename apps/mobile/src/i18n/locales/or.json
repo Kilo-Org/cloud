@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "ସେବା ପ୍ରଦାନକାରୀ {{id}}",
-      "modelId": "ମଡେଲ୍ {{id}}",
       "unavailable": "ଅନୁପଲବ୍ଧ",
       "unavailableState": "ଅନୁପଲବ୍ଧ",
       "selectedState": "ଚୟନ ହୋଇଛି",

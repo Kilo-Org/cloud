@@ -2748,7 +2748,6 @@
     },
     "modelSelector": {
       "provider": "પ્રદાતા {{id}}",
-      "modelId": "મોડલ {{id}}",
       "unavailable": "ઉપલબ્ધ નથી",
       "unavailableState": "ઉપલબ્ધ નથી",
       "selectedState": "પસંદ કરેલ",

@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Udbyder {{id}}",
-      "modelId": "Model-id: {{id}}",
       "unavailable": "Utilgængelig",
       "unavailableState": "utilgængelig",
       "selectedState": "valgt",

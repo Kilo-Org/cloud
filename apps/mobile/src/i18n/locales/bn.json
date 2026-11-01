@@ -2748,7 +2748,6 @@
     },
     "modelSelector": {
       "provider": "প্রোভাইডার {{id}}",
-      "modelId": "মডেল {{id}}",
       "unavailable": "পাওয়া যাচ্ছে না",
       "unavailableState": "পাওয়া যাচ্ছে না",
       "selectedState": "নির্বাচিত",

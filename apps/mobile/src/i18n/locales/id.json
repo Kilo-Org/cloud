@@ -2212,7 +2212,6 @@
     },
     "modelSelector": {
       "provider": "Penyedia {{id}}",
-      "modelId": "ID model: {{id}}",
       "unavailable": "Tidak tersedia",
       "unavailableState": "tidak tersedia",
       "selectedState": "dipilih",

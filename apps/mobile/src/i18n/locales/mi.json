@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Kaiwhakarato {{id}}",
-      "modelId": "Tauira {{id}}",
       "unavailable": "Kāore e wātea ana",
       "unavailableState": "kāore e wātea ana",
       "selectedState": "kua kōwhiria",

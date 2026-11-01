@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Ofruesi {{id}}",
-      "modelId": "Modeli {{id}}",
       "unavailable": "I padisponueshëm",
       "unavailableState": "i padisponueshëm",
       "selectedState": "i zgjedhur",

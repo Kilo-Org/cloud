@@ -2748,7 +2748,6 @@
     },
     "modelSelector": {
       "provider": "Մատակարար {{id}}",
-      "modelId": "Մոդել {{id}}",
       "unavailable": "Անհասանելի",
       "unavailableState": "անհասանելի",
       "selectedState": "ընտրված",

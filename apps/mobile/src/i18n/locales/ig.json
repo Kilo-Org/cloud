@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Onye na-enye ọrụ {{id}}",
-      "modelId": "Ihe nlereanya {{id}}",
       "unavailable": "Adịghị",
       "unavailableState": "adịghị",
       "selectedState": "ahọpụtara",

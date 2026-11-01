@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "सेवा पुरवठादार {{id}}",
-      "modelId": "मॉडेल {{id}}",
       "unavailable": "अनुपलब्ध",
       "unavailableState": "अनुपलब्ध",
       "selectedState": "निवडलेले",

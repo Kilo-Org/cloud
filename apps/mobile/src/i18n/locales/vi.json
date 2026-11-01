@@ -2212,7 +2212,6 @@
     },
     "modelSelector": {
       "provider": "Nhà cung cấp {{id}}",
-      "modelId": "Mô hình {{id}}",
       "unavailable": "Không khả dụng",
       "unavailableState": "không khả dụng",
       "selectedState": "đã chọn",

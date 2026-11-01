@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "ဝန်ဆောင်မှုပေးသူ {{id}}",
-      "modelId": "မော်ဒယ် {{id}}",
       "unavailable": "အသုံးမပြုနိုင်",
       "unavailableState": "အသုံးမပြုနိုင်",
       "selectedState": "ရွေးချယ်ထားသည်",

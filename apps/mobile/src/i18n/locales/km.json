@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "អ្នកផ្តល់សេវា {{id}}",
-      "modelId": "ម៉ូដែល {{id}}",
       "unavailable": "មិនអាចប្រើបាន",
       "unavailableState": "មិនអាចប្រើបាន",
       "selectedState": "បានជ្រើសរើស",

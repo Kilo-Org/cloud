@@ -2868,7 +2868,6 @@
     },
     "modelSelector": {
       "provider": "Fornitur {{id}}",
-      "modelId": "Mudell {{id}}",
       "unavailable": "Mhux disponibbli",
       "unavailableState": "mhux disponibbli",
       "selectedState": "magħżul",

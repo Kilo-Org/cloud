@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Verskaffer {{id}}",
-      "modelId": "Model-ID: {{id}}",
       "unavailable": "Onbeskikbaar",
       "unavailableState": "onbeskikbaar",
       "selectedState": "gekies",

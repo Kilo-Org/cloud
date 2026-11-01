@@ -2742,7 +2742,6 @@
     },
     "modelSelector": {
       "provider": "Szolgáltató: {{id}}",
-      "modelId": "Modell: {{id}}",
       "unavailable": "Nem elérhető",
       "unavailableState": "nem elérhető",
       "selectedState": "kijelölve",

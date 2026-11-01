@@ -43,7 +43,7 @@ function resolveRouting(
 }
 
 export function buildDirectProvider(
-  id: 'custom',
+  id: 'custom' | 'custom-public',
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>,
   upstream: CustomLlmApiConfig,
   auth: DirectUpstreamAuth

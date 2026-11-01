@@ -144,6 +144,62 @@ describe('leaderboard Snowflake database and schema', () => {
   });
 });
 
+describe('public custom model leaderboard usage', () => {
+  test.each([
+    {
+      loadRoute: () => import('../leaderboard-model-usage/route'),
+      providerFilter: "mu.provider != 'custom'",
+      rows: [['2026-11-01', 'acme/deleted-public-model', 'code', '12000000']],
+      expected: [
+        {
+          usageDate: '2026-11-01',
+          model: 'acme/deleted-public-model',
+          mode: 'code',
+          tokens: 12_000_000,
+        },
+      ],
+    },
+    {
+      loadRoute: () => import('../leaderboard-model-provider-usage/route'),
+      providerFilter: "mu.provider not in ('custom', 'direct-byok')",
+      rows: [['acme/deleted-public-model', 'acme', '0', '12000000', '10000000', '0', '100', '0']],
+      expected: [
+        {
+          model: 'deleted-public-model',
+          provider: 'Acme',
+          sumTokens: 12_000_000,
+          costPerRequest: 0,
+          costPerMillionTokens: 0,
+          cacheRatio: 0,
+          errorRate: 0,
+          percentageOfModel: 100,
+        },
+      ],
+    },
+  ])('returns public usage without consulting the custom model catalog ($providerFilter)', async ({
+    loadRoute,
+    providerFilter,
+    rows,
+    expected,
+  }) => {
+    await jest.isolateModulesAsync(async () => {
+      const snowflake = await import('@/lib/snowflake');
+      jest.mocked(snowflake.resolveSnowflakeConfig).mockReturnValue(FAKE_CONFIG);
+      const executeStatement = jest.mocked(snowflake.executeSnowflakeStatement);
+      executeStatement.mockReset().mockResolvedValue(rows);
+      const { GET } = await loadRoute();
+
+      const response = await GET();
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(expected);
+      expect(executeStatement).toHaveBeenCalledWith(
+        expect.objectContaining({ statement: expect.stringContaining(providerFilter) })
+      );
+    });
+  });
+});
+
 describe('OPTIONS /api/public/leaderboard-provider-race', () => {
   test('returns 204 with CORS headers', async () => {
     const { OPTIONS } = await import('./route');

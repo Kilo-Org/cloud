@@ -127,7 +127,7 @@ type BYOKKeyRow = Omit<
 > & { settings: unknown };
 
 /**
- * Catalog mode decides whether organization model policies apply to the key, so on organization
+ * Catalog mode decides whether organization model and provider policies apply to the key, so on organization
  * keys only the roles that edit those policies may change it.
  */
 function canChangeCatalogMode(organizationRole: OrganizationRole | null) {

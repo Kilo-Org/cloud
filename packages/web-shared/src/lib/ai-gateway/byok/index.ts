@@ -304,21 +304,19 @@ export async function addUserByokAvailability(
 const NO_ALLOWED_PROVIDERS: ReadonlySet<string> = new Set();
 
 /**
- * Whether an inference provider key among `enabledProviderIds` serves `modelId` although the
- * organization provider allow-list admits none of its providers, as `getProvider` routes it: a
- * direct BYOK key in catalog mode (`directByokCatalogModelIds`), or a provider key sent through
- * Vercel whose provider the allow-list cannot name (see `isVercelUserByokProviderAllowed`).
+ * Whether a provider key among `enabledProviderIds` serves `modelId` through Vercel although the
+ * organization provider allow-list admits none of its providers, as `getProvider` routes it: only
+ * a key whose provider the allow-list cannot name counts (see `isVercelUserByokProviderAllowed`).
  * Gateway keys leave the choice of provider to the gateway, so they do not count, and neither does
- * any key for an id a custom LLM owns, which `getProvider` serves first.
+ * any key for an id a custom LLM owns, which `getProvider` serves first. Catalog-mode direct BYOK
+ * keys are decided per provider instead (see `getAllowedDirectByokCatalogModelIds`).
  * Catalog passes call this once per model, so it reads the lookup without writing a record.
  */
 export async function hasInferenceProviderUserByokForModel(
   modelId: string,
-  enabledProviderIds: readonly UserByokProviderId[],
-  directByokCatalogModelIds: ReadonlySet<string>
+  enabledProviderIds: readonly UserByokProviderId[]
 ): Promise<boolean> {
   if (await isCustomLlm(modelId)) return false;
-  if (directByokCatalogModelIds.has(modelId)) return true;
   if (isKiloExclusiveModel(modelId) || enabledProviderIds.every(isGatewayUserByokProviderId)) {
     return false;
   }

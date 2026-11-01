@@ -285,7 +285,8 @@ const providerPolicyVercelProviderIds: ReadonlySet<string> = new Set(
  * `allowedProviders` holds the OpenRouter provider slugs the policy allows for the model, or is
  * undefined when the policy does not restrict providers. A key whose provider has no OpenRouter
  * slug cannot be named on the provider policy screen, so the allow-list does not apply to it.
- * Other keys, such as direct BYOK and gateway keys, are not affected.
+ * Gateway keys are not affected, and catalog-mode direct BYOK keys are decided per provider
+ * instead (see `isModelAllowedForProviderKey`).
  */
 export function isVercelUserByokProviderAllowed(
   providerId: string,

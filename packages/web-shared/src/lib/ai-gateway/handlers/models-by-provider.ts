@@ -6,6 +6,7 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import { getSnapshotModelVariantId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { getModelsByProviderSnapshot } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-snapshot.server';
 import {
+  isModelAllowedForProviderKey,
   isModelRouteAllowed,
   resolveOrganizationMemberModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
@@ -44,10 +45,14 @@ export async function handleModelsByProviderRequest() {
       for (const model of provider.models) {
         // Evaluate the variant this provider actually serves (e.g. `x/y:free`),
         // not the collapsed slug, so a provider that only offers the free
-        // variant is judged on that variant's routes.
-        if (await isModelRouteAllowed(policy, getSnapshotModelVariantId(model), provider.slug)) {
-          models.push(model);
-        }
+        // variant is judged on that variant's routes. A BYOK-only provider is
+        // only ever the organization's own catalog-mode key, judged as routing
+        // judges that key.
+        const modelId = getSnapshotModelVariantId(model);
+        const allowed = provider.byokOnly
+          ? await isModelAllowedForProviderKey(policy, modelId, provider.slug)
+          : await isModelRouteAllowed(policy, modelId, provider.slug);
+        if (allowed) models.push(model);
       }
       if (models.length > 0) providers.push({ ...provider, models });
     }

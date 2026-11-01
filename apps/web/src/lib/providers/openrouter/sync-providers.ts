@@ -43,6 +43,7 @@ import {
   type CustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { buildPublicCustomLlmSnapshotModels } from '@/lib/providers/openrouter/public-custom-llm-snapshot';
+import { injectDirectByokProviders } from '@/lib/providers/openrouter/inject-direct-byok-providers';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -296,7 +297,9 @@ async function syncProviders(params: {
   }
 
   // Sort providers by name
-  const sortedProviders = allProviders.sort((a, b) => a.name.localeCompare(b.name));
+  const sortedProviders = (await injectDirectByokProviders(allProviders)).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
 
   // Calculate total models across all providers
   const totalModels = sortedProviders.reduce((sum, provider) => sum + provider.models.length, 0);

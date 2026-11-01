@@ -2276,8 +2276,12 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
 
     test.each([
       ['requested/alias', 'requested/alias'],
+      ['typesafe/jev-1.13', 'typesafe/jev-1.13'],
+      ['nvidia/nemotron-3-super-120b-a12b', 'nvidia/nemotron-3-super-120b-a12b'],
       ['~auto', 'upstream-model'],
       ['openrouter/auto', 'upstream-model'],
+      ['typesafe/jev-router', 'upstream-model'],
+      ['nvidia/switchyard', 'upstream-model'],
     ])('handles requested model %s', async (requestedModel, expectedModel) => {
       const { payload } = await rewriteUsageFixture(
         shape,

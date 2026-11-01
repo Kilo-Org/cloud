@@ -1296,6 +1296,7 @@
       "notExploitable": "दुरुपयोग संभव नहीं",
       "notMeasured": "मापा नहीं गया",
       "notYetSynced": "अभी सिंक नहीं हुआ",
+      "priorityFindingsPending": "प्राथमिकता वाली समस्याएँ पहले सिंक के बाद दिखाई देंगी।",
       "refreshFailed": "रीफ़्रेश नहीं हो सका — आखिरी बार सिंक किया गया डेटा दिखाया जा रहा है।",
       "repoSummary": "{{open}} अनसुलझी · {{critical}} अति गंभीर · {{high}} उच्च",
       "repositoryActionPlan": "रिपॉज़िटरी के लिए कार्ययोजना",

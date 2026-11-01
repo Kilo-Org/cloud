@@ -1802,6 +1802,7 @@
       "lastSynced": "Zadnja sinkronizacija: {{time}}",
       "manageRepositories": "Upravljaj repozitorijima",
       "notYetSynced": "Još nije sinkronizirano",
+      "priorityFindingsPending": "Prioritetni nalazi pojavit će se nakon prve sinkronizacije.",
       "refreshFailed": "Osvježavanje nije uspjelo — prikazuju se zadnji sinkronizirani podaci.",
       "settings": "Postavke",
       "syncNow": "Sinkroniziraj sada",

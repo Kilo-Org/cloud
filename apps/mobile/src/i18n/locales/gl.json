@@ -1779,6 +1779,7 @@
       "lastSynced": "Última sincronización: {{time}}",
       "manageRepositories": "Xestionar repositorios",
       "notYetSynced": "Aínda non sincronizado",
+      "priorityFindingsPending": "Os achados prioritarios aparecerán despois da primeira sincronización.",
       "refreshFailed": "Non se puido actualizar: móstranse os últimos datos sincronizados.",
       "settings": "Axustes",
       "syncNow": "Sincronizar agora",

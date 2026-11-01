@@ -1779,6 +1779,7 @@
       "lastSynced": "ซิงค์ล่าสุด {{time}}",
       "manageRepositories": "จัดการคลังโค้ด",
       "notYetSynced": "ยังไม่ซิงค์",
+      "priorityFindingsPending": "ข้อค้นพบตามลำดับความสำคัญจะแสดงหลังซิงค์ครั้งแรก",
       "refreshFailed": "รีเฟรชไม่สำเร็จ ขณะนี้แสดงข้อมูลที่ซิงค์ไว้ล่าสุด",
       "settings": "การตั้งค่า",
       "syncNow": "ซิงค์ตอนนี้",

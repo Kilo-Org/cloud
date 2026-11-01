@@ -1296,6 +1296,7 @@
       "notExploitable": "Nicht ausnutzbar",
       "notMeasured": "Nicht gemessen",
       "notYetSynced": "Noch nicht synchronisiert",
+      "priorityFindingsPending": "Prioritäre Befunde erscheinen nach der ersten Synchronisierung.",
       "refreshFailed": "Die Daten konnten nicht aktualisiert werden. Angezeigt werden die zuletzt synchronisierten Daten.",
       "repoSummary": "{{open}} offen · {{critical}} kritisch · {{high}} hoch",
       "repositoryActionPlan": "Maßnahmenplan für Repositories",

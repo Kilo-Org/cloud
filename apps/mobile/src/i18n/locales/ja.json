@@ -1296,6 +1296,7 @@
       "notExploitable": "悪用不可",
       "notMeasured": "未測定",
       "notYetSynced": "未同期",
+      "priorityFindingsPending": "最初の同期後に、優先度の高い検出結果が表示されます。",
       "refreshFailed": "更新できませんでした。最後に同期したデータを表示しています。",
       "repoSummary": "未解決{{open}}件・重大{{critical}}件・高{{high}}件",
       "repositoryActionPlan": "リポジトリの対応計画",

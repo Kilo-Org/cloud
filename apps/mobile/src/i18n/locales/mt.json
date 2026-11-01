@@ -1848,6 +1848,7 @@
       "lastSynced": "L-aħħar sinkronizzazzjoni: {{time}}",
       "manageRepositories": "Immaniġġja r-repożitorji",
       "notYetSynced": "Għadu mhux sinkronizzat",
+      "priorityFindingsPending": "Is-sejbiet ta' prijorità se jidhru wara l-ewwel sinkronizzazzjoni.",
       "refreshFailed": "Ma setgħetx tiġi aġġornata d-dejta. Qed tintwera d-dejta tal-aħħar sinkronizzazzjoni.",
       "settings": "Issettjar",
       "syncNow": "Sinkronizza issa",

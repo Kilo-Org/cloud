@@ -1802,6 +1802,7 @@
       "lastSynced": "Pēdējo reizi sinhronizēts {{time}}",
       "manageRepositories": "Pārvaldīt repozitorijus",
       "notYetSynced": "Vēl nav sinhronizēts",
+      "priorityFindingsPending": "Prioritārie konstatējumi būs redzami pēc pirmās sinhronizēšanas.",
       "refreshFailed": "Neizdevās atsvaidzināt datus. Tiek rādīti pēdējās sinhronizācijas dati.",
       "settings": "Iestatījumi",
       "syncNow": "Sinhronizēt tagad",

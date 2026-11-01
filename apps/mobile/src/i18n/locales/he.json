@@ -1301,6 +1301,7 @@
       "notExploitable": "לא ניתן לניצול",
       "notMeasured": "לא נמדד",
       "notYetSynced": "עדיין לא סונכרן",
+      "priorityFindingsPending": "ממצאי העדיפות יופיעו לאחר הסנכרון הראשון.",
       "refreshFailed": "לא ניתן לרענן את הנתונים. מוצגים הנתונים מהסנכרון האחרון.",
       "repoSummary": "{{open}} פתוחים · {{critical}} בחומרה קריטית · {{high}} בחומרה גבוהה",
       "repositoryActionPlan": "תוכנית פעולה למאגר",

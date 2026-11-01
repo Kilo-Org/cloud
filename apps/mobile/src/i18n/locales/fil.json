@@ -1779,6 +1779,7 @@
       "lastSynced": "Huling na-sync {{time}}",
       "manageRepositories": "Pamahalaan ang mga repository",
       "notYetSynced": "Hindi pa na-sync",
+      "priorityFindingsPending": "Lalabas ang mga natukoy na isyung dapat unahin pagkatapos ng unang sync",
       "refreshFailed": "Hindi ma-refresh — ipinapakita ang huling na-sync na data.",
       "settings": "Mga setting",
       "syncNow": "I-sync ngayon",

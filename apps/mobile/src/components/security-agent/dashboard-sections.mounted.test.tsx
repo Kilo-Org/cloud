@@ -140,12 +140,12 @@ describe('DashboardSections priority card', () => {
   it('reports no measurement while the scope has never synced', () => {
     const card = priorityCard(renderSections({ neverSynced: true }));
 
-    // The filter above the sections states the not-yet-synced status once, so
-    // the card carries the same dash as every other unmeasured count instead
-    // of repeating it; the all-clear copy and its green check belong to a
-    // measured report.
+    // The card is a content section, so it explains what it will hold instead
+    // of showing the lone dash a measurement row shows or repeating the status
+    // the filter above states. The all-clear copy and its green check belong to
+    // a measured report, and nothing here opens.
     expect(copy(card)).toContain('securityAgent.dashboard.actFirst');
-    expect(copy(card)).toContain('—');
+    expect(copy(card)).toContain('securityAgent.dashboard.priorityFindingsPending');
     expect(copy(card)).not.toContain('securityAgent.dashboard.notYetSynced');
     expect(copy(card)).not.toContain('securityAgent.dashboard.noOpenFindings');
     expect(card.findAllByType('ShieldCheck')).toHaveLength(0);

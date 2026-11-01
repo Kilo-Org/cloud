@@ -1779,6 +1779,7 @@
       "lastSynced": "Utoljára szinkronizálva: {{time}}",
       "manageRepositories": "Adattárak kezelése",
       "notYetSynced": "Még nincs szinkronizálva",
+      "priorityFindingsPending": "A fontosság szerint rangsorolt találatok az első szinkronizálás után jelennek meg.",
       "refreshFailed": "Nem sikerült a frissítés. Az utolsó szinkronizálás adatai láthatók.",
       "settings": "Beállítások",
       "syncNow": "Szinkronizálás most",

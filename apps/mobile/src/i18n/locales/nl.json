@@ -1296,6 +1296,7 @@
       "notExploitable": "Niet misbruikbaar",
       "notMeasured": "Niet gemeten",
       "notYetSynced": "Nog niet gesynchroniseerd",
+      "priorityFindingsPending": "De prioritaire bevindingen verschijnen na de eerste synchronisatie.",
       "refreshFailed": "Vernieuwen is mislukt. Je ziet de laatst gesynchroniseerde gegevens.",
       "repoSummary": "{{open}} open · {{critical}} kritiek · {{high}} hoog",
       "repositoryActionPlan": "Actieplan per repository",

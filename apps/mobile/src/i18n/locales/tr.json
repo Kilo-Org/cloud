@@ -1296,6 +1296,7 @@
       "notExploitable": "İstismar edilemez",
       "notMeasured": "Ölçülmedi",
       "notYetSynced": "Henüz eşitlenmedi",
+      "priorityFindingsPending": "Öncelikli bulgular ilk eşitlemeden sonra görünür.",
       "refreshFailed": "Veriler yenilenemedi. Son eşitlenen veriler gösteriliyor.",
       "repoSummary": "{{open}} açık · {{critical}} kritik · {{high}} yüksek",
       "repositoryActionPlan": "Depo işlem planı",

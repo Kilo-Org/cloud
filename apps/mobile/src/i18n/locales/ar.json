@@ -1316,6 +1316,7 @@
       "notExploitable": "غير قابلة للاستغلال",
       "notMeasured": "غير مُقاس",
       "notYetSynced": "لم تتم المزامنة بعد",
+      "priorityFindingsPending": "ستظهر نتائج الأولويات بعد أول مزامنة.",
       "refreshFailed": "تعذّر التحديث. تُعرض بيانات آخر مزامنة.",
       "repoSummary": "{{open}} مفتوحة · {{critical}} حرجة · {{high}} عالية الخطورة",
       "repositoryActionPlan": "خطة عمل المستودع",

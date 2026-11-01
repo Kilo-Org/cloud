@@ -102,15 +102,15 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
   // A scope that has never synced has found nothing yet because nothing ran,
   // not because the codebase is clean: the green check and the all-clear line
   // read as a verified result. The filter above already states that nothing
-  // has synced, so the card carries the same dash every other unmeasured count
-  // on this dashboard shows, and opens nothing.
+  // has synced, so this card explains what it will hold instead of repeating
+  // the status, and it opens nothing: a lone dash left a content section
+  // looking broken.
   if (neverSynced) {
-    const unmeasured = UNMEASURED_VALUE;
     return (
       <SectionCard title={t('securityAgent.dashboard.actFirst')}>
         <View className="py-3">
-          <Text variant="mono" className="text-[13px] text-muted-foreground">
-            {unmeasured}
+          <Text variant="muted" className="text-sm">
+            {t('securityAgent.dashboard.priorityFindingsPending')}
           </Text>
         </View>
       </SectionCard>

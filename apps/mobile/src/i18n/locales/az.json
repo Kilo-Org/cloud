@@ -1779,6 +1779,7 @@
       "lastSynced": "Son sinxronlaşdırma: {{time}}",
       "manageRepositories": "Repozitoriyaları idarə et",
       "notYetSynced": "Hələ sinxronlaşdırılmayıb",
+      "priorityFindingsPending": "İlk sinxronlaşdırmadan sonra prioritet tapıntıları görünəcək.",
       "refreshFailed": "Məlumatları yeniləmək mümkün olmadı. Son sinxronlaşdırılmış məlumatlar göstərilir.",
       "settings": "Parametrlər",
       "syncNow": "İndi sinxronlaşdır",

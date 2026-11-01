@@ -1779,6 +1779,7 @@
       "lastSynced": "Sinkronizimi i fundit: {{time}}",
       "manageRepositories": "Menaxho depot",
       "notYetSynced": "Ende pa u sinkronizuar",
+      "priorityFindingsPending": "Gjetjet me përparësi do të shfaqen pas sinkronizimit të parë.",
       "refreshFailed": "Nuk u rifreskua — po shfaqen të dhënat e sinkronizimit të fundit.",
       "settings": "Cilësimet",
       "syncNow": "Sinkronizo tani",

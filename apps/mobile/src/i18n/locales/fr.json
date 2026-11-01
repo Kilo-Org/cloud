@@ -1269,6 +1269,7 @@
       "notExploitable": "Non exploitable",
       "notMeasured": "Non mesuré",
       "notYetSynced": "Pas encore synchronisé",
+      "priorityFindingsPending": "Les signalements prioritaires apparaîtront après la première synchronisation.",
       "refreshFailed": "Impossible d'actualiser les données. Les dernières données synchronisées restent affichées.",
       "repoSummary": "{{open}} ouverts · {{critical}} critiques · {{high}} de gravité élevée",
       "repositoryActionPlan": "Plan d'action par dépôt",

@@ -1779,6 +1779,7 @@
       "lastSynced": "Oxirgi sinxronlash: {{time}}",
       "manageRepositories": "Repozitoriyalarni boshqarish",
       "notYetSynced": "Hali sinxronlanmagan",
+      "priorityFindingsPending": "Birinchi sinxronlashdan so'ng ustuvor muammolar ko'rsatiladi.",
       "refreshFailed": "Yangilash imkoni bo'lmadi — oxirgi sinxronlangan ma'lumotlar ko'rsatilmoqda.",
       "settings": "Sozlamalar",
       "syncNow": "Hozir sinxronlash",

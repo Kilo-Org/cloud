@@ -1779,6 +1779,7 @@
       "lastSynced": "Samstillt síðast {{time}}",
       "manageRepositories": "Stjórna geymslum",
       "notYetSynced": "Ekki samstillt ennþá",
+      "priorityFindingsPending": "Forgangsfrávik birtast eftir fyrstu samstillingu.",
       "refreshFailed": "Ekki tókst að endurnýja gögnin. Gögn úr síðustu samstillingu eru sýnd.",
       "settings": "Stillingar",
       "syncNow": "Samstilla núna",

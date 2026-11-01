@@ -1779,6 +1779,7 @@
       "lastSynced": "Kali terakhir disegerakkan: {{time}}",
       "manageRepositories": "Urus repositori",
       "notYetSynced": "Belum disegerakkan",
+      "priorityFindingsPending": "Penemuan keutamaan akan muncul selepas penyegerakan pertama.",
       "refreshFailed": "Tidak dapat memuat semula data. Data daripada penyegerakan terakhir dipaparkan.",
       "settings": "Tetapan",
       "syncNow": "Segerakkan sekarang",

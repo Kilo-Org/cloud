@@ -191,6 +191,18 @@ export function ensureSelectedCustomOption(
   return [...custom, { value: selected, label: selected, description: '' }];
 }
 
+export function filterSessionCustomModeOptions(
+  options: CustomModeOption[],
+  runtimeAgents: SessionConfig['runtimeAgents']
+): CustomModeOption[] {
+  const excludedSlugs = new Set(
+    (runtimeAgents ?? [])
+      .filter(agent => agent.disable || agent.hidden || agent.mode === 'subagent')
+      .map(agent => agent.slug)
+  );
+  return options.filter(option => !excludedSlugs.has(option.value));
+}
+
 /**
  * Get mode and model from various sources with debug info.
  *

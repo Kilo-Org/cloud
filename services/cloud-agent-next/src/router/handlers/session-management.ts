@@ -503,6 +503,9 @@ export function createSessionManagementHandlers() {
             runtimeAgents: metadataProfile.runtimeAgents?.map(agent => ({
               slug: agent.slug,
               name: agent.name,
+              mode: agent.config.mode,
+              hidden: agent.config.hidden,
+              disable: agent.config.disable,
               model: agent.config.model ?? undefined,
               variant: agent.config.variant,
             })),

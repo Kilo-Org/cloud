@@ -1166,6 +1166,9 @@ export const GetSessionOutput = z.object({
       z.object({
         slug: z.string(),
         name: z.string(),
+        mode: z.enum(['primary', 'subagent', 'all']).optional(),
+        hidden: z.boolean().optional(),
+        disable: z.boolean().optional(),
         /** Optional model override so the chat UI can lock its model picker. */
         model: z.string().optional(),
         /** Optional thinking-effort variant override so the chat UI can lock its variant picker. */
@@ -1174,7 +1177,7 @@ export const GetSessionOutput = z.object({
     )
     .optional()
     .describe(
-      'Custom agents available on this session (slug + name, plus optional model and thinking-effort overrides)'
+      'Custom agents installed on this session, including picker visibility and model overrides'
     ),
 
   execution: ExecutionStatusSchema,

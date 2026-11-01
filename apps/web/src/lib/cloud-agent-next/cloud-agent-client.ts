@@ -16,7 +16,11 @@ import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { parseCustomerBillingFailure, type PreparationAttempt } from '@kilocode/cloud-agent-sdk';
+import {
+  parseCustomerBillingFailure,
+  type PreparationAttempt,
+  type SessionConfig,
+} from '@kilocode/cloud-agent-sdk';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import {
   getWorktreeChangesOutputSchema,
@@ -359,13 +363,8 @@ export type GetSessionOutput = {
   upstreamBranch?: string;
   branchName?: string;
 
-  /** Custom agents stored on this session (slug + name, plus optional model and thinking-effort overrides). */
-  runtimeAgents?: Array<{
-    slug: string;
-    name: string;
-    model?: string;
-    variant?: string;
-  }>;
+  /** Installed custom agents, including picker visibility and model overrides. */
+  runtimeAgents?: SessionConfig['runtimeAgents'];
 
   execution: ExecutionStatus;
 

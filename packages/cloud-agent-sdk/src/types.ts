@@ -353,11 +353,14 @@ export type SessionConfig = {
   model: string;
   providerID?: string | null | undefined;
   variant?: string | null | undefined;
-  /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
+  /** Installed custom agents, including picker visibility and model overrides. */
   runtimeAgents?:
     | Array<{
         slug: string;
         name: string;
+        mode?: 'primary' | 'subagent' | 'all' | undefined;
+        hidden?: boolean | undefined;
+        disable?: boolean | undefined;
         model?: string | undefined;
         variant?: string | undefined;
       }>

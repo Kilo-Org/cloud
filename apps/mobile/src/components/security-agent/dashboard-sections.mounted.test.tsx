@@ -2,8 +2,8 @@
 // "All repositories". Before the first sync nothing has been measured, so the
 // priority card must not report the empty result as a clean codebase: the
 // green check and the all-clear line gave a never-synced organization a
-// verified look. The neutral state carries the screen's own not-yet-synced
-// line instead, and opens nothing.
+// verified look. The card explains what it will hold instead, and opens
+// nothing.
 
 import { type ComponentProps } from 'react';
 import { act, TestRenderer } from '@/test/renderer';

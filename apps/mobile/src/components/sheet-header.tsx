@@ -18,10 +18,11 @@ import { useScreenInsets } from '@/lib/screen-insets';
  *   there — the window inset would only be a dead band above the header.
  *   On Android `sheetShouldOverflowTopInset` (useFormSheetScreenOptions)
  *   lets the sheet surface reach the top of the window, and the detent cap
- *   keeps a sheet with a window top inset below the status bar. So the header
- *   reserves the inset (and its landscape cutout padding) only while the
- *   window has no top inset of its own — the sheet edge is then at the window
- *   top and the status bar sits over it.
+ *   (`useFormSheetDetents`) subtracts the window's own top inset from the
+ *   full detent, so a window that reports one always settles the sheet edge
+ *   at the status bar and the header reserves nothing. Only a window with no
+ *   top inset of its own leaves the sheet edge at the window top, where the
+ *   header must clear the status bar (and landscape cutout padding) itself.
  * - 'ios-page-sheet': the SessionPageSheet surface owns the top of the window
  *   on both platforms, so the header reserves no top clearance — the native
  *   iOS pageSheet presents below the status bar, and the Android full-window
@@ -89,20 +90,29 @@ export function SheetHeader({
   // without branching on Platform.OS.
   const statusBarHeight = StatusBar.currentHeight ?? 0;
   const resolvedTopInset = insets.top > 0 ? insets.top : statusBarHeight;
-  // On Android a bottom formSheet surface reaches the window top only when the
-  // window has no top inset of its own; every detent the cap
-  // (`useFormSheetDetents`) allows otherwise already places the sheet edge
-  // below the status bar, so reserving the inset there would only put a dead
-  // band above the title. The window inset answers that before the sheet
-  // mounts, which is what keeps the first painted frame right: a measurement
-  // taken at mount reports the frame before the sheet presents, so acting on
-  // it would reserve the inset and then drop it once the detent lands.
-  // Read the window's own inset rather than `useScreenInsets`, which floors a
-  // side status area to 24.
+  // The inset the detent cap subtracts (`useFormSheetDetents`), derived from
+  // the same two inputs: the header and the cap must never disagree, or the
+  // header reserves clearance the sheet edge already provides.
+  const detentTopInset = windowTopInset > 0 ? windowTopInset : statusBarHeight;
+  // On Android the detent cap subtracts that inset from the full detent, so
+  // any non-zero value settles the sheet edge at it: reserving the inset
+  // again would only reserve a dead band above the title and drop it again
+  // once the sheet moved. Only a window with no top inset at all reaches the
+  // window top, and there the header clears the status bar itself. The value
+  // is known before the sheet mounts, so the first painted frame is already
+  // the settled one — a `measureInWindow` taken at mount reports the frame
+  // before the sheet presents and would flip the padding after the sheet
+  // landed (a 51.8 dp shift of the whole header).
+  // On iOS the native sheet presents below the status bar, so the header
+  // reserves no top clearance there — the window inset would only be a dead
+  // band. SessionPageSheet presents below the status bar on iOS too, and the
+  // Android full-window Modal pads its own top inset — either way its header
+  // reserves nothing. 'never' marks half-detent-only sheets that can never
+  // reach the window top.
   const dropsTopInset =
     topInset === 'ios-page-sheet' ||
     topInset === 'never' ||
-    (topInset === 'bottom-form-sheet' && (Platform.OS !== 'android' || windowTopInset > 0));
+    (topInset === 'bottom-form-sheet' && (Platform.OS !== 'android' || detentTopInset > 0));
   const topInsetHeight = dropsTopInset ? 0 : resolvedTopInset;
   const safeAreaStyle =
     topInsetHeight > 0 || insets.left > 0 || insets.right > 0

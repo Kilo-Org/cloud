@@ -69,7 +69,7 @@ test('clipped: scroll content and absolute children are not clipped', () => {
   );
 });
 
-test('clipped: a transformed parent frame is compared in one space', () => {
+test('clipped: a transformed parent frame is compared in the transform-free space', () => {
   // A natively presented formSheet reports its screen at the window origin and
   // its content translated by the detent; only the transform-free frames say
   // whether the content is actually cut.
@@ -107,6 +107,26 @@ test('clipped: real overflow still reports with transform-free frames', () => {
     },
   ]);
   assert.equal(findings[0]?.measured, 100);
+});
+
+test('clipped: a transformed parent keeps its own padding in the transform-free space', () => {
+  const findings = run('clipped', [
+    {
+      parent: 0,
+      tag: 'View',
+      rect: [0, 60, 400, 200],
+      layoutRect: [0, 0, 400, 200],
+      style: { paddingHorizontal: 16 },
+    },
+    {
+      parent: 1,
+      tag: 'Paragraph',
+      rect: [0, 60, 400, 20],
+      layoutRect: [0, 0, 400, 20],
+      text: 'x',
+    },
+  ]);
+  assert.equal(findings[0]?.measured, 16);
 });
 
 test('cut-off: past the window edge, tolerance, horizontal scroll', () => {

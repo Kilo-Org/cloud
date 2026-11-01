@@ -15,6 +15,15 @@ import {
   platform_integrations,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import {
+  markOrganizationFeatureAdoptionCompleted,
+  mutateOrganizationSettings,
+  updateOrganizationSettings,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import {
+  resolveFeatureAdoption,
+  resolveFeatureAdoptionCompletion,
+} from '@/lib/organizations/feature-adoption';
 import type { User, Organization } from '@kilocode/db/schema';
 
 // Test users and organization will be created dynamically
@@ -132,6 +141,229 @@ describe('organizations usage details trpc router', () => {
           organizationId: testOrganization.id,
         })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+  });
+
+  describe('feature adoption completion', () => {
+    let completionOrg: Organization;
+
+    beforeEach(async () => {
+      completionOrg = await createOrganization('Completion Organization', regularUser.id);
+      await addUserToOrganization(completionOrg.id, memberUser.id, 'member');
+      await db
+        .update(organizations)
+        .set({ plan: 'enterprise', settings: { recommendations_digest_enabled: true } })
+        .where(eq(organizations.id, completionOrg.id));
+    });
+
+    afterEach(async () => {
+      await Promise.all([
+        db
+          .delete(platform_integrations)
+          .where(eq(platform_integrations.owned_by_organization_id, completionOrg.id)),
+        db
+          .delete(agent_configs)
+          .where(eq(agent_configs.owned_by_organization_id, completionOrg.id)),
+        db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.organization_id, completionOrg.id)),
+      ]);
+    });
+
+    async function readSettings() {
+      const [row] = await db
+        .select({ plan: organizations.plan, settings: organizations.settings })
+        .from(organizations)
+        .where(eq(organizations.id, completionOrg.id));
+      return row;
+    }
+
+    async function adoptAllFeatures() {
+      await db.insert(platform_integrations).values([
+        {
+          owned_by_organization_id: completionOrg.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: `github-${crypto.randomUUID()}`,
+          platform_account_login: 'test-github-org',
+          repository_access: 'all',
+          integration_status: 'active',
+        },
+        {
+          owned_by_organization_id: completionOrg.id,
+          platform: 'slack',
+          integration_type: 'app',
+          platform_installation_id: `slack-${crypto.randomUUID()}`,
+          platform_account_login: 'test-slack-workspace',
+          repository_access: 'all',
+          integration_status: 'active',
+        },
+      ]);
+      await db.insert(agent_configs).values([
+        {
+          owned_by_organization_id: completionOrg.id,
+          agent_type: 'code_review',
+          platform: 'github',
+          is_enabled: true,
+          created_by: regularUser.id,
+          config: { review_style: 'balanced', focus_areas: ['security'], model_slug: 'test-model' },
+        },
+        {
+          owned_by_organization_id: completionOrg.id,
+          agent_type: 'security_scan',
+          platform: 'github',
+          is_enabled: true,
+          created_by: regularUser.id,
+          config: {},
+        },
+      ]);
+      await db.insert(cli_sessions_v2).values({
+        session_id: `completion-${crypto.randomUUID()}`,
+        kilo_user_id: regularUser.id,
+        organization_id: completionOrg.id,
+        cloud_agent_session_id: `cloud-${crypto.randomUUID()}`,
+      });
+    }
+
+    it('does not mark an org whose checks are not all adopted', async () => {
+      const before = await readSettings();
+      const caller = await createCallerForUser(memberUser.id);
+      await caller.organizations.usageDetails.getFeatureAdoption({
+        organizationId: completionOrg.id,
+      });
+
+      expect(
+        await resolveFeatureAdoptionCompletion({
+          organizationId: completionOrg.id,
+          plan: before.plan,
+          settings: before.settings,
+        })
+      ).toBe(false);
+      const after = await readSettings();
+      expect(after.settings.feature_adoption_completed_at).toBeUndefined();
+    });
+
+    it('marks completion once from the getFeatureAdoption procedure and keeps other settings', async () => {
+      await adoptAllFeatures();
+      const caller = await createCallerForUser(memberUser.id);
+
+      const result = await caller.organizations.usageDetails.getFeatureAdoption({
+        organizationId: completionOrg.id,
+      });
+      expect(result.checks.every(check => check.adopted)).toBe(true);
+
+      const marked = await readSettings();
+      const completedAt = marked.settings.feature_adoption_completed_at;
+      expect(typeof completedAt).toBe('string');
+      expect(marked.settings.recommendations_digest_enabled).toBe(true);
+
+      await markOrganizationFeatureAdoptionCompleted(completionOrg.id, new Date('2030-01-01'));
+      await caller.organizations.usageDetails.getRecommendations({
+        organizationId: completionOrg.id,
+      });
+      const afterRepeat = await readSettings();
+      expect(afterRepeat.settings.feature_adoption_completed_at).toBe(completedAt);
+    });
+
+    it('marks completion from the getRecommendations procedure', async () => {
+      await adoptAllFeatures();
+      const caller = await createCallerForUser(memberUser.id);
+
+      await caller.organizations.usageDetails.getRecommendations({
+        organizationId: completionOrg.id,
+      });
+
+      const marked = await readSettings();
+      expect(typeof marked.settings.feature_adoption_completed_at).toBe('string');
+    });
+
+    it('stays complete after a feature is later disabled', async () => {
+      await adoptAllFeatures();
+      const initial = await readSettings();
+      expect(
+        await resolveFeatureAdoptionCompletion({
+          organizationId: completionOrg.id,
+          plan: initial.plan,
+          settings: initial.settings,
+        })
+      ).toBe(true);
+
+      await db
+        .update(agent_configs)
+        .set({ is_enabled: false })
+        .where(eq(agent_configs.owned_by_organization_id, completionOrg.id));
+      const caller = await createCallerForUser(memberUser.id);
+      const result = await caller.organizations.usageDetails.getFeatureAdoption({
+        organizationId: completionOrg.id,
+      });
+      expect(result.checks.find(check => check.key === 'code-reviewer')?.adopted).toBe(false);
+
+      const regressed = await readSettings();
+      expect(
+        await resolveFeatureAdoptionCompletion({
+          organizationId: completionOrg.id,
+          plan: regressed.plan,
+          settings: regressed.settings,
+        })
+      ).toBe(true);
+    });
+
+    it('keeps the completion mark when a writer saves stale whole settings', async () => {
+      const stale = await readSettings();
+      await markOrganizationFeatureAdoptionCompleted(completionOrg.id, new Date('2030-01-01'));
+
+      const updated = await updateOrganizationSettings(completionOrg.id, {
+        ...stale.settings,
+        projects_ui_enabled: true,
+      });
+      expect(updated.feature_adoption_completed_at).toBe('2030-01-01T00:00:00.000Z');
+
+      await mutateOrganizationSettings(completionOrg.id, () => ({
+        recommendations_digest_enabled: false,
+      }));
+
+      const after = await readSettings();
+      expect(after.settings.feature_adoption_completed_at).toBe('2030-01-01T00:00:00.000Z');
+      expect(after.settings.projects_ui_enabled).toBeUndefined();
+      expect(after.settings.recommendations_digest_enabled).toBe(false);
+    });
+
+    it('returns evaluated checks only when completion was not already recorded', async () => {
+      const incomplete = await readSettings();
+      const evaluated = await resolveFeatureAdoption({
+        organizationId: completionOrg.id,
+        plan: incomplete.plan,
+        settings: incomplete.settings,
+      });
+      expect(evaluated.complete).toBe(false);
+      expect(evaluated.checks).toHaveLength(5);
+
+      await markOrganizationFeatureAdoptionCompleted(completionOrg.id);
+      const marked = await readSettings();
+      expect(
+        await resolveFeatureAdoption({
+          organizationId: completionOrg.id,
+          plan: marked.plan,
+          settings: marked.settings,
+        })
+      ).toEqual({ complete: true, checks: null });
+    });
+
+    it('never marks a non-enterprise org', async () => {
+      await adoptAllFeatures();
+      await db
+        .update(organizations)
+        .set({ plan: 'teams' })
+        .where(eq(organizations.id, completionOrg.id));
+      const current = await readSettings();
+
+      expect(
+        await resolveFeatureAdoptionCompletion({
+          organizationId: completionOrg.id,
+          plan: current.plan,
+          settings: current.settings,
+        })
+      ).toBe(false);
+      const after = await readSettings();
+      expect(after.settings.feature_adoption_completed_at).toBeUndefined();
     });
   });
 

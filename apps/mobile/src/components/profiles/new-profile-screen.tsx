@@ -159,10 +159,7 @@ export function NewProfileScreen({
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
-        <ProfileNameField
-          error={nameField.error}
-          onChangeText={nameField.handleChangeText}
-        />
+        <ProfileNameField error={nameField.error} onChangeText={nameField.handleChangeText} />
         <ProfileDescriptionField
           error={descriptionError ?? undefined}
           onChangeText={value => {

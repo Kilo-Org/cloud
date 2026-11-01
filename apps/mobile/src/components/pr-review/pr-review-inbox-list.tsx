@@ -47,12 +47,13 @@ type InboxItem = ProviderInboxRow;
  * same section-to-section relation, so they share one token instead of each
  * picking its own.
  */
-export const PR_REVIEW_SECTION_BREAK = { padding: 'pt-6' } as const;
+const PR_REVIEW_SECTION_BREAK = { padding: 'pt-6' } as const;
 
 type PrReviewInboxListProps = {
   /**
-   * The "Paste a PR link" block, rendered above the Inbox eyebrow. It owns the
-   * section break under itself, so the eyebrow follows it directly.
+   * The "Paste a PR link" block, rendered above the Inbox eyebrow and ending
+   * in its own reserved link-error slot. The list applies the section break
+   * above the eyebrow, so the paste block does not carry one.
    */
   header: ReactNode;
   /** The recents body, rendered below the pagination footer. */

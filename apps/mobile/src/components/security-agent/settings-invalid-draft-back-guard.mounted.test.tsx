@@ -1,11 +1,11 @@
 // Regression for back navigation on a Security Agent settings draft whose only
 // change is invalid. The save payload carries the saved value in place of an
 // invalid day, and the dirty check used to read that same payload: the screen
-// therefore classified as clean, `usePreventRemove` stayed disabled, and
-// Back left the screen with no "Unsaved changes" confirmation, dropping the
-// typed text. The guard has to read the draft the user can see.
+// therefore classified as clean, `usePreventRemove` stayed disabled, and Back
+// left the screen with no "Unsaved changes" confirmation, dropping the typed
+// text. The guard has to read the draft the user can see.
 
-import { type ComponentType, createElement, type ReactNode, useState } from 'react';
+import { type ComponentType, createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -20,17 +20,9 @@ const config = vi.hoisted(() => ({
   isError: false,
   refetch: vi.fn(),
 }));
-const capability = vi.hoisted(() => ({ canManage: true }));
 const save = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
 const trackInteraction = vi.hoisted(() => ({ mutate: vi.fn() }));
-const router = vi.hoisted(() => ({
-  replaced: [] as unknown[],
-  replace: (href: unknown) => {
-    router.replaced.push(href);
-  },
-  back: vi.fn(),
-  push: vi.fn(),
-}));
+const router = vi.hoisted(() => ({ replace: vi.fn(), back: vi.fn(), push: vi.fn() }));
 const navigation = vi.hoisted(() => ({ dispatch: vi.fn(), goBack: vi.fn() }));
 const preventRemove = vi.hoisted(() => ({
   enabled: false,
@@ -38,17 +30,8 @@ const preventRemove = vi.hoisted(() => ({
     | ((options: { data: { action: unknown }; repeat: () => void }) => void)
     | undefined,
 }));
-// The child controls record their props on render so the test drives a real
-// edit through the screen's own onValueChange/onChangeText props, not a
-// fabricated dirty flag.
-const toggleRows = vi.hoisted(() => ({
-  rows: [] as {
-    title: string;
-    value: boolean;
-    disabled: boolean;
-    onValueChange: (value: boolean) => void;
-  }[],
-}));
+// The day inputs record their props on render so the test drives a real edit
+// through the screen's own onChangeText, not a fabricated dirty flag.
 const inputs = vi.hoisted(() => ({
   fields: [] as {
     accessibilityLabel?: string;
@@ -69,11 +52,7 @@ const confirmDialog = vi.hoisted(() => ({
 // The guard is under test end to end: this suite keeps the real
 // useSettingsBackGuard / useConfirmDialog and the real getSettingsDirtyState,
 // and stubs only the native surfaces they render through.
-vi.mock('react-native', () => ({
-  View: 'View',
-  Alert: { alert: vi.fn() },
-  Pressable: (props: { children?: ReactNode }): ReactNode => props.children ?? null,
-}));
+vi.mock('react-native', () => ({ View: 'View', Alert: { alert: vi.fn() } }));
 vi.mock('expo-router', () => ({
   useRouter: () => router,
   useNavigation: () => navigation,
@@ -87,7 +66,7 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
-  useSecurityAgentCapability: () => capability,
+  useSecurityAgentCapability: () => ({ canManage: true }),
   useSecurityAgentConfig: () => config,
   useSaveSecurityAgentConfig: () => save,
   useTrackSecurityAgentInteraction: () => trackInteraction,
@@ -145,95 +124,47 @@ vi.mock('@/components/security-agent/settings-pill-group', () => ({ PillGroup: '
 vi.mock('@/components/security-agent/settings-save-button', () => ({
   SettingsSaveButton: 'SettingsSaveButton',
 }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({
-  ToggleRow: (props: {
-    title: string;
-    value: boolean;
-    disabled: boolean;
-    onValueChange: (value: boolean) => void;
-  }) => {
-    toggleRows.rows.push(props);
-    return null;
-  },
-}));
+vi.mock('@/components/security-agent/settings-toggle-row', () => ({ ToggleRow: 'ToggleRow' }));
 
-type ScreenComponent = ComponentType<{ scope: string }>;
+const mounted: TestRenderer.ReactTestRenderer[] = [];
 
-let invalidate: () => void = () => undefined;
-
-// Re-renders the mounted screen the way a fresh config from the query would:
-// a real parent render, not a remount, so the screen's local draft survives.
-function Harness({ Screen }: Readonly<{ Screen: ScreenComponent }>) {
-  const [, setVersion] = useState(0);
-  invalidate = () => {
-    setVersion(version => version + 1);
-  };
-  return createElement(Screen, { scope: 'personal' });
-}
-
-function enabledConfig() {
-  return {
-    isEnabled: true,
-    triageModelSlug: 'vendor/triage',
-    analysisModelSlug: 'vendor/analysis',
-    remediationModelSlug: 'vendor/remediation',
-    analysisMode: 'auto',
-    autoAnalysisEnabled: false,
-    autoAnalysisMinSeverity: 'all',
-    autoAnalysisIncludeExisting: false,
-    autoRemediationEnabled: false,
-    autoRemediationMinSeverity: 'all',
-    autoRemediationIncludeExisting: false,
-    autoRemediationRequireApproval: true,
-    autoDismissEnabled: false,
-    autoDismissConfidenceThreshold: 'high',
-    newFindingNotificationsEnabled: false,
-    newFindingNotificationMinSeverity: 'low',
-    slaNotificationsEnabled: false,
-    slaNotificationMinSeverity: 'low',
-    slaNotificationWarningDays: 7,
-    slaEnabled: true,
-    slaCriticalDays: 3,
-    slaHighDays: 7,
-    slaMediumDays: 14,
-    slaLowDays: 30,
-  };
-}
-
-function findToggle(title: string) {
-  const row = toggleRows.rows.find(candidate => candidate.title === title);
-  if (!row) {
-    throw new Error(`toggle row not found: ${title}`);
-  }
-  return row;
-}
-
-function field(label: string) {
-  const input = inputs.fields.find(candidate => candidate.accessibilityLabel === label);
-  if (!input?.onChangeText) {
-    throw new Error(`input not found: ${label}`);
-  }
-  return input;
-}
-
-const CRITICAL_FIELD = i18n.t('securityAgent.sla.remediationDeadlineA11y', {
-  label: i18n.t('common.critical'),
-});
-const LEAD_TIME_FIELD = i18n.t('securityAgent.notifications.slaLeadTimeAccessibility');
-
-const mounts: TestRenderer.ReactTestRenderer[] = [];
-
-function mount(Screen: ScreenComponent) {
+function mount(Screen: ComponentType<{ scope: string }>) {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(Harness, { Screen }));
+    ref.current = TestRenderer.create(createElement(Screen, { scope: 'personal' }));
   });
   const renderer = ref.current;
   if (!renderer) {
     throw new Error('renderer was not created');
   }
-  mounts.push(renderer);
+  mounted.push(renderer);
   return renderer;
+}
+
+// SLA tracking and its warning notifications start enabled, so a typed day is
+// the only change any case makes.
+const configData = {
+  isEnabled: true,
+  newFindingNotificationsEnabled: false,
+  newFindingNotificationMinSeverity: 'low',
+  slaNotificationsEnabled: true,
+  slaNotificationMinSeverity: 'low',
+  slaNotificationWarningDays: 7,
+  slaEnabled: true,
+  slaCriticalDays: 3,
+  slaHighDays: 7,
+  slaMediumDays: 14,
+  slaLowDays: 30,
+};
+
+function field(accessibilityLabel: string) {
+  const input = inputs.fields.find(
+    candidate => candidate.accessibilityLabel === accessibilityLabel
+  );
+  if (!input?.onChangeText) {
+    throw new Error(`input not found: ${accessibilityLabel}`);
+  }
+  return input;
 }
 
 function confirmationCount(renderer: TestRenderer.ReactTestRenderer) {
@@ -257,41 +188,39 @@ beforeEach(() => {
   config.data = null;
   config.isLoading = false;
   config.isError = false;
-  capability.canManage = true;
   save.isPending = false;
   save.mutateAsync.mockReset();
   save.mutateAsync.mockResolvedValue({});
-  trackInteraction.mutate.mockClear();
-  router.replaced = [];
-  router.back.mockReset();
-  router.push.mockReset();
-  navigation.dispatch.mockReset();
+  router.replace.mockReset();
   navigation.goBack.mockReset();
   preventRemove.enabled = false;
   preventRemove.handler = undefined;
-  toggleRows.rows = [];
   inputs.fields = [];
   confirmDialog.current = null;
-  invalidate = () => undefined;
 });
 
 afterEach(() => {
-  for (const renderer of mounts) {
+  for (const renderer of mounted) {
     act(() => {
       renderer.unmount();
     });
   }
-  mounts.length = 0;
+  mounted.length = 0;
 });
 
-describe('SLA settings back guard', () => {
-  it('offers discard and keep editing for a draft whose only change is invalid', () => {
-    config.data = enabledConfig();
+describe('a settings draft whose only change is invalid', () => {
+  const criticalField = i18n.t('securityAgent.sla.remediationDeadlineA11y', {
+    label: i18n.t('common.critical'),
+  });
+  const leadTimeField = i18n.t('securityAgent.notifications.slaLeadTimeAccessibility');
+
+  it('confirms Back on the SLA screen and offers discard or keep editing', () => {
+    config.data = configData;
     const renderer = mount(SlaSettingsScreen);
     expect(preventRemove.enabled).toBe(false);
 
     act(() => {
-      field(CRITICAL_FIELD).onChangeText?.('366');
+      field(criticalField).onChangeText?.('366');
     });
     expect(preventRemove.enabled).toBe(true);
 
@@ -313,12 +242,12 @@ describe('SLA settings back guard', () => {
     expect(navigation.goBack).not.toHaveBeenCalled();
   });
 
-  it('offers save for a valid edit and lets a clean screen leave untouched', () => {
-    config.data = enabledConfig();
+  it('still offers Save for a valid edit and lets the restored draft leave untouched', () => {
+    config.data = configData;
     const renderer = mount(SlaSettingsScreen);
 
     act(() => {
-      field(CRITICAL_FIELD).onChangeText?.('5');
+      field(criticalField).onChangeText?.('5');
     });
     requestLeave();
     expect(confirmDialog.current?.extraAction?.label).toBe(
@@ -330,46 +259,34 @@ describe('SLA settings back guard', () => {
 
     // Back to the saved value: the screen is clean again and Back is free.
     act(() => {
-      field(CRITICAL_FIELD).onChangeText?.('3');
+      field(criticalField).onChangeText?.('3');
     });
     expect(preventRemove.enabled).toBe(false);
     expect(confirmationCount(renderer)).toBe(0);
   });
-});
 
-describe('Notification settings back guard', () => {
-  // Baseline already has SLA notifications on, so the typed lead time is the
-  // only change and nothing else can make the screen dirty.
-  function slaNotificationsOn() {
-    return { ...enabledConfig(), slaNotificationsEnabled: true };
-  }
-
-  it('offers discard and keep editing for an invalid-only lead time', () => {
-    config.data = slaNotificationsOn();
+  it('confirms Back on the notifications screen for an invalid-only lead time', () => {
+    config.data = configData;
     const renderer = mount(NotificationSettingsScreen);
     expect(preventRemove.enabled).toBe(false);
 
     act(() => {
-      field(LEAD_TIME_FIELD).onChangeText?.('366');
+      field(leadTimeField).onChangeText?.('366');
     });
     expect(preventRemove.enabled).toBe(true);
 
     requestLeave();
     expect(confirmationCount(renderer)).toBe(1);
-    const dialog = confirmDialog.current;
-    if (!dialog) {
-      throw new Error('the leave confirmation was not rendered');
-    }
-    expect(dialog.confirmLabel).toBe(i18n.t('common.discard'));
-    expect(dialog.extraAction).toBeUndefined();
+    expect(confirmDialog.current?.confirmLabel).toBe(i18n.t('common.discard'));
+    expect(confirmDialog.current?.extraAction).toBeUndefined();
   });
 
-  it('offers save for a valid lead time', () => {
-    config.data = slaNotificationsOn();
+  it('offers Save on the notifications screen for a valid lead time', () => {
+    config.data = configData;
     mount(NotificationSettingsScreen);
 
     act(() => {
-      field(LEAD_TIME_FIELD).onChangeText?.('10');
+      field(leadTimeField).onChangeText?.('10');
     });
     requestLeave();
     expect(confirmDialog.current?.extraAction?.label).toBe(

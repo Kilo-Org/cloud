@@ -193,6 +193,23 @@ describe('useRepairSecurityAgentScopeStack', () => {
     expect(harness.resets).toHaveLength(1);
   });
 
+  it('stops listening when the screen leaves the Stack', () => {
+    const harness = createNavigation({
+      index: 1,
+      routes: [
+        { name: 'index', key: 'dashboard' },
+        { name: 'settings/notifications', key: 'notifications' },
+      ],
+    });
+    const renderer = mount(harness, 'personal');
+
+    expect(harness.listenerCount()).toBe(1);
+    act(() => {
+      renderer.unmount();
+    });
+    expect(harness.listenerCount()).toBe(0);
+  });
+
   it('does nothing without a valid segment to name the dashboard', () => {
     const harness = createNavigation({
       index: 0,

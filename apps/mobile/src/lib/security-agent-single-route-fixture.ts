@@ -12,7 +12,8 @@
  * The only entry point is `+native-intent.tsx`, behind `__DEV__`.
  */
 
-const FIXTURE_PATH = /(?:^|\/)dev\/security-agent-single-route-fixture\/([^/?#]+)(?:\/([^?#]*))?/;
+const FIXTURE_PATH =
+  /(?:^|\/)dev\/security-agent-single-route-fixture\/([^/?#]+)(?:\/([^?#]*))?(?:[?#].*)?$/;
 
 /**
  * The dev route that mounts the fixture, or null when the path is not this

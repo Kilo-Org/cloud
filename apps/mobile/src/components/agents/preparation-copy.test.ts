@@ -5,6 +5,7 @@ import { i18n } from '@/i18n';
 
 import {
   preparationDetailText,
+  preparationErrorHeadline,
   preparationErrorText,
   preparationStepLabel,
 } from './preparation-copy';
@@ -130,6 +131,34 @@ describe('preparationErrorText', () => {
 
   it('falls back to the attempt failure title for an unknown value', () => {
     expect(preparationErrorText('clone failed', t)).toBe('Preparation failed');
+  });
+});
+
+describe('preparationErrorHeadline', () => {
+  it('splits a two-sentence cause into what failed and what to do', () => {
+    expect(preparationErrorHeadline('container_limit_reached', t)).toEqual({
+      title: 'Container limit reached.',
+      detail: 'Stop an existing container before starting another.',
+    });
+    expect(preparationErrorHeadline('credential_upgrade_required', t)).toEqual({
+      title: 'This session is missing a required credential upgrade.',
+      detail: 'Start a new session to continue.',
+    });
+  });
+
+  it('keeps a one-sentence cause whole', () => {
+    expect(preparationErrorHeadline('preparation_timeout', t)).toEqual({
+      title: 'Environment preparation timed out',
+    });
+  });
+
+  it('breaks at the active catalog sentence stop, including a CJK one', async () => {
+    await i18n.changeLanguage('ja');
+    expect(preparationErrorHeadline('container_limit_reached', t)).toEqual({
+      title: 'コンテナの上限に達しました。',
+      detail: '別のコンテナを開始する前に、既存のコンテナを停止してください。',
+    });
+    await i18n.changeLanguage('en');
   });
 });
 

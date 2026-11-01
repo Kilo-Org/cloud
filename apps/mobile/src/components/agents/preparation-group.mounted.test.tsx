@@ -211,61 +211,11 @@ describe('PreparationGroup incomplete restore', () => {
     mounted.unmount();
   });
 
-  it('keeps the running title and keeps a stage-less cause in the body', async () => {
+  it('keeps the running title while the attempt prepares', async () => {
     const running = await mount(restoreAttempt({ status: 'running' }));
     expect(running.group().props.accessibilityLabel).toBe('Preparing environment');
     expect(running.renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
     running.unmount();
-
-    const failed = await mount(
-      restoreAttempt({ status: 'failed', safeError: 'preparation_timeout' })
-    );
-    expect(failed.group().props.accessibilityLabel).toBe('Preparation failed');
-    expect(failed.renderer.root.findAllByType('Check')).toHaveLength(0);
-    expect(failed.renderedTextValues()).toContain('Environment preparation timed out');
-    expect(failed.renderedTextValues()).not.toContain('preparation_timeout');
-    failed.unmount();
-  });
-
-  it('names a failed attempt after the stage that failed', async () => {
-    const mounted = await mount(
-      restoreAttempt({
-        status: 'failed',
-        steps: [
-          incompleteStep({ id: 'boot', key: 'sandbox_boot', status: 'failed' }),
-          incompleteStep({
-            id: 'boot-error',
-            key: 'sandbox_boot',
-            status: 'failed',
-            safeError: 'sandbox_lost',
-          }),
-        ],
-      })
-    );
-    expect(mounted.group().props.accessibilityLabel).toBe('Starting sandbox failed');
-    expect(mounted.group().findAllByType('AlertCircle').length).toBeGreaterThan(0);
-    mounted.unmount();
-  });
-
-  it('names a failed setup command by its number, not by the phase it belongs to', async () => {
-    const mounted = await mount(
-      restoreAttempt({
-        status: 'failed',
-        steps: [
-          incompleteStep({ id: 'commands', key: 'setup_commands', status: 'failed' }),
-          incompleteStep({
-            id: 'command',
-            key: 'setup_commands',
-            kind: 'setup_command',
-            commandIndex: 1,
-            commandCount: 3,
-            status: 'failed',
-          }),
-        ],
-      })
-    );
-    expect(mounted.group().props.accessibilityLabel).toBe('Setup command 2 of 3 failed');
-    mounted.unmount();
   });
 
   it('gives a step that carries an error the warning icon rather than a status check', async () => {

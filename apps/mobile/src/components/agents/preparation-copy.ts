@@ -115,6 +115,7 @@ const SETUP_COMMAND_FAILED_PATTERN = /^Setup command (\d+) failed$/u;
 const SETUP_COMMAND_TIMED_OUT_PATTERN = /^Setup command (\d+) timed out$/u;
 const COLD_RESTORE_PATTERN = /^Cold restore, snapshot applied, (\d+)\/(\d+) files restored$/u;
 const GIT_PROGRESS_PATTERN = /(\d{1,3})%$/u;
+const SENTENCE_BREAK_PATTERN = /^([\s\S]*?[.!?](?=\s)|[\s\S]*?[。．！？])\s*([\s\S]+)$/u;
 
 /**
  * Looks up a possibly-unknown key in a literal dictionary without widening its
@@ -157,6 +158,29 @@ export function preparationDetailText(detail: string, t: TFunction): string {
  */
 export function preparationErrorText(error: string, t: TFunction): string {
   return resolvePreparationText(error, t) ?? t('agentChat.preparation.preparationFailed');
+}
+
+/** A failure's one-line headline, and the sentence that continues it. */
+type FailureHeadline = {
+  title: string;
+  detail?: string;
+};
+
+/**
+ * A localized failure cut after its first sentence: the first sentence is what
+ * failed, the second what to do about it. A group with no failed stage titles
+ * itself with the first, because that is the only thing that tells two
+ * stage-less failures apart, and keeps the rest in the body. Latin punctuation
+ * only breaks before whitespace, so `1.5` never splits a sentence, and the CJK
+ * stops break on their own. A one-sentence cause yields no body text.
+ */
+export function preparationErrorHeadline(error: string, t: TFunction): FailureHeadline {
+  const text = preparationErrorText(error, t);
+  const sentence = SENTENCE_BREAK_PATTERN.exec(text);
+  if (sentence === null) {
+    return { title: text };
+  }
+  return { title: sentence[1] ?? text, detail: sentence[2] };
 }
 
 function resolvePreparationText(raw: string, t: TFunction): string | undefined {

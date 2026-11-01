@@ -195,11 +195,17 @@ it('renders the shared empty state with its settings action when no context is e
   const mounted = mountBriefings([]);
   const emptyState = mounted.root.findByType('EmptyState' as ElementType);
   expect(emptyState.props.title).toBe('agentBriefing.noEnabledContexts');
-  expect(emptyState.props.description).toBe('agentBriefing.emptyHint');
+  // Nothing is scheduled here, so the empty-window hint would be a wrong claim;
+  // the filter hint stays on screen instead.
+  expect(emptyState.props.description).toBeUndefined();
   expect(emptyState.props.icon).toBe('Newspaper');
   // Pull to refresh moved with the body: the state owns the gesture now.
   expect((emptyState.props.refreshControl as ReactElement).type).toBe('RefreshControl');
   expect(mounted.root.findAllByType('FlashList' as ElementType)).toHaveLength(0);
+  const texts = mounted.root
+    .findAllByType('Text' as ElementType)
+    .map(node => String(node.props.children));
+  expect(texts).toContain('agentBriefing.allContexts');
   // The empty state's own button is the only settings entry point while it shows.
   const header = mounted.root.findByType('ScreenHeader' as ElementType);
   expect(header.findAllByType('Button' as ElementType)).toHaveLength(0);

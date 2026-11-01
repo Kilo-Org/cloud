@@ -86,6 +86,14 @@ export function BriefingListScreen() {
   // The empty state's own button is the settings entry point while it is on screen,
   // so the header carries the action only in the states that button does not cover.
   const emptySettingsAction = noEnabledContexts === true && listEmpty;
+  // The hint explains an empty list of an enabled brief. With no context enabled
+  // the list is empty for a different reason, and the settings action is that
+  // reason's way out, so claiming a scheduled brief would have activity here
+  // would be wrong.
+  const emptyDescription =
+    listEmpty && !emptySettingsAction
+      ? t(history ? 'agentBriefing.historyHint' : 'agentBriefing.emptyHint')
+      : undefined;
   const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />;
   let footer = <View className="h-8" />;
   if (query.isFetchNextPageError) {
@@ -130,13 +138,13 @@ export function BriefingListScreen() {
           organizations={memberships.data?.filter(org => access.canRead(org.organizationId)) ?? []}
           onSelectOrganization={setOrganizationId}
         />
-        {/* The empty state carries the hint while it is on screen, so the same
-            sentence is not printed twice on one screen. */}
-        {listEmpty ? null : (
+        {/* The empty state carries the hint when it prints one, so the same
+            sentence is not shown twice on one screen. */}
+        {emptyDescription === undefined ? (
           <Text className="text-xs text-muted-foreground">
             {t(history ? 'agentBriefing.historyHint' : 'agentBriefing.allContexts')}
           </Text>
-        )}
+        ) : null}
         {offline || (query.isError && reports.length > 0) ? (
           <Text className="text-xs text-muted-foreground">
             {t(offline ? 'agentBriefing.offline' : 'agentBriefing.cached')}
@@ -164,7 +172,7 @@ export function BriefingListScreen() {
         <EmptyState
           icon={Newspaper}
           title={t(emptyLabel)}
-          description={t(history ? 'agentBriefing.historyHint' : 'agentBriefing.emptyHint')}
+          description={emptyDescription}
           refreshControl={refreshControl}
           action={
             emptySettingsAction ? (

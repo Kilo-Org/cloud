@@ -21,7 +21,7 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
 
   return (
     <View>
-      <SectionHeader label={t('home.explore')} />
+      <SectionHeader label={t('home.explore')} reserveLabelAir />
       <View className="mx-4 gap-2">
         {contextReady && (
           <>

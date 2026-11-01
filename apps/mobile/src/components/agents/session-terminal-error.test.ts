@@ -269,7 +269,7 @@ describe('resolveSessionTerminalError', () => {
         title: "Couldn't load this session",
         message: 'Connection trouble. Please retry in a moment.',
         retryable: true,
-        retryWith: 'connection',
+        retryWith: 'session',
         detail: 'Agent connection lost',
       });
     }

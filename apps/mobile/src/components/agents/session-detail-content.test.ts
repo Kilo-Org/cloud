@@ -2054,6 +2054,14 @@ describe('session detail slow load', () => {
     // naming the same thing beside the card.
     expect(indicatorNodes(view)).toHaveLength(0);
     expect(composerProps(view).sendDisabledReason).toBeNull();
+    // The session's own transport dropped, so its Retry reopens the session;
+    // the shared leg is not the cause here.
+    const switchSession = vi.spyOn(view.manager, 'switchSession').mockResolvedValue(undefined);
+    act(() => {
+      (error.onRetry as () => void)();
+    });
+    expect(switchSession).toHaveBeenCalledWith(ROOT_ID);
+    expect(connectionHealth.retryConnection).not.toHaveBeenCalled();
   });
 
   it('resolves a lost transport whose indicator carries no error type', async () => {

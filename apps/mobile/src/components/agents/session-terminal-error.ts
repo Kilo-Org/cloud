@@ -195,17 +195,21 @@ const CONNECTION_LOST_CODE: SdkStatusMessageCode = 'agent-connection-lost';
 
 /**
  * The reader's copy and retryability for a lost agent transport. The body
- * states it once, behind the same Retry the reconstructing open uses, so a
- * session that lost its connection never reads as an unexplained loading
- * state.
+ * states it once, behind the Retry its own cause can recover from: a session
+ * whose own transport dropped reopens, while the shared app-wide leg needs its
+ * spent reconnect budget reset instead — reopening over that dead socket would
+ * land on the same card.
  */
-function connectionLostFailure(detail: string): SessionTerminalError {
+function connectionLostFailure(
+  detail: string,
+  retryWith: SessionTerminalError['retryWith']
+): SessionTerminalError {
   return {
     variant: 'server',
     title: i18n.t('agentChat.session.couldNotLoadThisSession'),
     message: i18n.t('agentChat.session.connectionTrouble'),
     retryable: true,
-    retryWith: 'connection',
+    retryWith,
     detail,
   };
 }
@@ -417,10 +421,10 @@ export function resolveSessionTerminalError(input: {
   // that kept the skeleton beside it would show a loading state and a failure
   // in the same frame.
   if (input.statusIndicator?.code === CONNECTION_LOST_CODE) {
-    return connectionLostFailure(input.statusIndicator.message);
+    return connectionLostFailure(input.statusIndicator.message, 'session');
   }
   if (input.connectionLost === true) {
-    return connectionLostFailure('');
+    return connectionLostFailure('', 'connection');
   }
   if (input.statusIndicator?.type === 'error') {
     const detail = input.statusIndicator.message;

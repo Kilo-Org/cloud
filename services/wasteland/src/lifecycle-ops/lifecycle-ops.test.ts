@@ -169,4 +169,65 @@ describe('joinViaSdk', () => {
     expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
     expect(calls.some(c => c.url.includes('/pulls'))).toBe(false);
   });
+
+  it('re-joins a connection made under an org whose proof the credential already holds', async () => {
+    const { fetch, calls } = makeFetch([
+      { status: 200, body: { message: 'database already exists' } },
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [{ handle: 'acme-tools', dolthub_org: 'acme' }],
+        },
+      },
+    ]);
+
+    const ctx = {
+      ...baseCtx,
+      forkOrg: 'acme',
+      rigHandle: 'acme-tools',
+      ownerEmail: 'bob@example.com',
+      orgProven: true,
+    };
+    const result = await joinViaSdk(ctx, fetch);
+
+    expect(result.alreadyJoined).toBe(true);
+    expect(result.registrationPullId).toBeNull();
+    expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
+    expect(calls.some(c => c.url.includes('/pulls'))).toBe(false);
+    expect(calls.some(c => c.url.includes('/user'))).toBe(false);
+  });
+
+  it('refuses an org-based re-join until a verified flow records the org', async () => {
+    const { fetch, calls } = makeFetch([
+      { status: 200, body: { message: 'database already exists' } },
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [{ handle: 'acme-tools', dolthub_org: 'acme' }],
+        },
+      },
+      { status: 200, body: { status: 'Success', username: 'bob' } },
+    ]);
+
+    const ctx = { ...baseCtx, forkOrg: 'acme', rigHandle: 'acme-tools' };
+    await expect(joinViaSdk(ctx, fetch)).rejects.toMatchObject({
+      name: 'WantedBoardOpError',
+      code: 'PRECONDITION_FAILED',
+    });
+    expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
+  });
+
+  it('reports an unrecognised fork response as an upstream failure', async () => {
+    const { fetch, calls } = makeFetch([
+      { status: 200, body: { status: 'Error', message: 'user has no access to this owner' } },
+    ]);
+
+    await expect(joinViaSdk(baseCtx, fetch)).rejects.toMatchObject({
+      name: 'WantedBoardOpError',
+      code: 'UPSTREAM_ERROR',
+    });
+    expect(calls).toHaveLength(1);
+  });
 });

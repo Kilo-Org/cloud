@@ -181,8 +181,34 @@ export async function forkDatabase(opts: ForkDatabaseOptions): Promise<ForkDatab
     return { owner: opts.toOwner, db: targetDb, created: false };
   }
 
+  // DoltHub answers some failures with a 2xx `{status: 'Error'}` body.
+  // `created` certifies that this token made the fork, so an error
+  // envelope can never resolve as a new fork.
+  const statusField = parsed.success ? (parsed.data.status ?? '').trim() : '';
+  const errorField = parsed.success ? (parsed.data.error ?? '').trim() : '';
+  if (/^error$/i.test(statusField) || errorField.length > 0) {
+    throw new WlDoltHubError(
+      `Fork ${opts.fromOwner}/${opts.fromDb} → ${opts.toOwner}/${targetDb} failed: ${
+        message || errorField || 'DoltHub reported an error'
+      }`,
+      res.status,
+      res.json ?? res.text,
+      url
+    );
+  }
+
   const operationName = parsed.success ? parsed.data.operation_name : undefined;
   if (!operationName) {
+    // An operation that was accepted but cannot be followed leaves the
+    // fork unconfirmed, so it is not a success either.
+    if (/^(pending|running|queued|in.?progress)$/i.test(statusField)) {
+      throw new WlDoltHubError(
+        `Fork ${opts.fromOwner}/${opts.fromDb} → ${opts.toOwner}/${targetDb} is unconfirmed: DoltHub reported "${statusField}" without an operation to follow`,
+        res.status,
+        res.json ?? res.text,
+        url
+      );
+    }
     return { owner: opts.toOwner, db: targetDb, created: true };
   }
 

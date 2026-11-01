@@ -6,7 +6,7 @@
 /* eslint-disable @typescript-eslint/await-thenable -- DO RPC stubs return Rpc.Promisified which is thenable at runtime */
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
-import { rigHandleFormatError } from '@kilocode/wl-sdk';
+import { isSameDolthubOrg, rigHandleFormatError } from '@kilocode/wl-sdk';
 import { router, procedure, adminProcedure } from './init';
 import { resolveWastelandOwnership } from './ownership';
 import { resolveWasteland } from './resolve-wasteland';
@@ -424,15 +424,16 @@ export const wastelandRouter = router({
 
       await doStub.updateConfig({ dolthub_upstream: input.upstream });
 
-      // The bootstrap just created the upstream and registered `handle` as
-      // its first rig under the caller's own org, so this is a verified
-      // identity for the credential. It is also the only way the create
-      // flow gets a rig handle now that `storeCredential` does not take one.
+      // The bootstrap wrote to `result.upstreamOwner`'s repository, so
+      // that is the org DoltHub proved for this token. The credential's
+      // rig handle is the caller's identity, and its org has to be that
+      // same proven org; when it is not, the credential keeps no handle
+      // and a flow that proves the org (the join) sets one later.
       await doStub.storeCredential({
         userId: ctx.userId,
         encryptedToken: credential.encrypted_token,
         dolthubOrg,
-        rigHandle: handle,
+        rigHandle: isSameDolthubOrg(result.upstreamOwner, dolthubOrg) ? handle : undefined,
         isUpstreamAdmin: credential.is_upstream_admin,
       });
 
@@ -791,7 +792,7 @@ export const wastelandRouter = router({
   // written: the handle is the caller's identity inside the wasteland, so
   // only a flow that proved ownership (joinWasteland, or createUpstream
   // for an upstream the caller just created) sets it. Re-storing
-  // credentials keeps whatever handle the row already carries.
+  // credentials keeps the stored handle while the org is unchanged.
   storeCredential: procedure
     .input(
       z.object({

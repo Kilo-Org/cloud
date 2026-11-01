@@ -1,3 +1,4 @@
+import { isSameDolthubOrg } from '@kilocode/wl-sdk';
 import { query } from '../../util/query.util';
 import {
   createTableWastelandCredentials,
@@ -35,10 +36,13 @@ export function storeCredential(
   const isAdmin = input.isUpstreamAdmin ? 1 : 0;
   // Only a verified flow (join, createUpstream) may set the handle. A
   // caller that does not supply one — a reconnect that swaps the token
-  // or org — keeps whatever handle the row already carries, so identity
-  // is never dropped by re-storing credentials.
+  // — keeps the stored handle while it still belongs to the same org,
+  // because that handle was proved against that org. An org change
+  // drops it instead of carrying an identity over to another org; it
+  // stays null until a verified flow sets it.
   const existing = input.rigHandle === undefined ? getCredential(sql, wastelandId, userId) : null;
-  const rigHandle = input.rigHandle ?? existing?.rig_handle ?? null;
+  const keepsHandle = existing !== null && isSameDolthubOrg(existing.dolthub_org, input.dolthubOrg);
+  const rigHandle = input.rigHandle ?? (keepsHandle ? existing.rig_handle : null);
   query(
     sql,
     /* sql */ `
@@ -63,6 +67,27 @@ export function storeCredential(
     is_upstream_admin: input.isUpstreamAdmin === true,
     connected_at: timestamp,
   };
+}
+
+/**
+ * Whether a stored credential already proves `org` for its user.
+ *
+ * A rig handle is written only by flows that proved the org through a
+ * DoltHub write — a join (fork created under the org, or a
+ * registration write into its fork), or a `createUpstream` bootstrap
+ * that wrote to that org's repository — and `storeCredential` drops the
+ * handle when the org changes. So a handle recorded together with this
+ * same org stands for that proof.
+ */
+export function credentialProvesOrg(
+  credential: WastelandCredentialResult | null,
+  org: string
+): boolean {
+  return (
+    credential !== null &&
+    credential.rig_handle !== null &&
+    isSameDolthubOrg(credential.dolthub_org, org)
+  );
 }
 
 export function getCredential(

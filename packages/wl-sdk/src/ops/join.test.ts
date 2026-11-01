@@ -475,4 +475,96 @@ describe('join', () => {
     expect(result.error.code).toBe('precondition');
     expect(calls).toHaveLength(0);
   });
+
+  it('fails closed when the fork response is an error body', async () => {
+    // A 2xx body that reports an error must not count as a fork this
+    // call created, because that is the ownership proof for a handle
+    // the join hands back without a write.
+    const responses: MockResponse[] = [
+      { status: 200, body: { status: 'Error', message: 'user has no access to this owner' } },
+    ];
+    const { fetch: f, calls } = makeFetch(responses);
+    const result = await join({
+      auth: { token: 't' },
+      upstream: { owner: 'hop', db: 'wl' },
+      dolthubOrg: 'alice',
+      rigHandle: 'alice-tools',
+      displayName: 'Alice tools',
+      ownerEmail: 'alice@example.com',
+      version: '0.1.0',
+      fetch: f,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('upstream');
+    expect(calls.map(c => new URL(c.url).pathname.replace(/^.*\/api\/v1alpha1/, ''))).toEqual([
+      '/fork',
+    ]);
+  });
+
+  it('accepts an org the caller already proved for its own record', async () => {
+    // An org-based connection: the token belongs to member `bob`, the
+    // fork and the registered row belong to org `acme`. The caller's
+    // record carries a handle for `acme`, so the earlier proof stands
+    // and no `/user` lookup is needed.
+    const responses: MockResponse[] = [
+      { status: 400, body: { error: 'fork already exists under acme' } },
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [{ handle: 'acme-tools', dolthub_org: 'acme' }],
+        },
+      },
+    ];
+    const { fetch: f, calls } = makeFetch(responses);
+    const result = await join({
+      auth: { token: 't' },
+      upstream: { owner: 'hop', db: 'wl' },
+      dolthubOrg: 'acme',
+      rigHandle: 'acme-tools',
+      displayName: 'Acme tools',
+      ownerEmail: 'bob@example.com',
+      version: '0.1.0',
+      orgProven: true,
+      fetch: f,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.forkCreated).toBe(false);
+    expect(result.data.registrationPullId).toBe('');
+    expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
+    expect(calls.some(c => c.url.includes('/pulls'))).toBe(false);
+    expect(calls.some(c => c.url.includes('/user'))).toBe(false);
+  });
+
+  it('still refuses a handle from another org when the caller proved its own', async () => {
+    const responses: MockResponse[] = [
+      { status: 400, body: { error: 'fork already exists under acme' } },
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [{ handle: 'bob-tools', dolthub_org: 'bob' }],
+        },
+      },
+    ];
+    const { fetch: f, calls } = makeFetch(responses);
+    const result = await join({
+      auth: { token: 't' },
+      upstream: { owner: 'hop', db: 'wl' },
+      dolthubOrg: 'acme',
+      rigHandle: 'bob-tools',
+      displayName: 'Bob tools',
+      ownerEmail: 'bob@example.com',
+      version: '0.1.0',
+      orgProven: true,
+      fetch: f,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('precondition');
+    expect(result.error.message).toContain('registered to another DoltHub org');
+    expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
+  });
 });

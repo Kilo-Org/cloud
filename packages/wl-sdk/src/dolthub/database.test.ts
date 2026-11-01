@@ -161,4 +161,49 @@ describe('forkDatabase', () => {
       })
     ).rejects.toBeInstanceOf(WlDoltHubError);
   });
+
+  it('throws when a 2xx body reports an error', async () => {
+    const { fetch: fakeFetch } = makeFetch([
+      { status: 200, body: { status: 'Error', message: 'user does not have access to me' } },
+    ]);
+    await expect(
+      forkDatabase({
+        auth: { token: 't' },
+        fromOwner: 'upstream',
+        fromDb: 'wl',
+        toOwner: 'me',
+        sleep: noSleep,
+        fetch: fakeFetch,
+      })
+    ).rejects.toBeInstanceOf(WlDoltHubError);
+  });
+
+  it('treats a 2xx "already exists" error body as idempotent', async () => {
+    const { fetch: fakeFetch } = makeFetch([
+      { status: 200, body: { status: 'Error', message: 'database already exists' } },
+    ]);
+    const result = await forkDatabase({
+      auth: { token: 't' },
+      fromOwner: 'upstream',
+      fromDb: 'wl',
+      toOwner: 'me',
+      sleep: noSleep,
+      fetch: fakeFetch,
+    });
+    expect(result.created).toBe(false);
+  });
+
+  it('refuses a 2xx pending fork that carries no operation to follow', async () => {
+    const { fetch: fakeFetch } = makeFetch([{ status: 200, body: { status: 'Pending' } }]);
+    await expect(
+      forkDatabase({
+        auth: { token: 't' },
+        fromOwner: 'upstream',
+        fromDb: 'wl',
+        toOwner: 'me',
+        sleep: noSleep,
+        fetch: fakeFetch,
+      })
+    ).rejects.toBeInstanceOf(WlDoltHubError);
+  });
 });

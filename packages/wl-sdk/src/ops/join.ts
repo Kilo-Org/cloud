@@ -13,10 +13,14 @@
  *      which `forkDatabase` resolves as `created: false`.
  *   2. If the rig is already present on upstream `main`, return without
  *      creating a registration branch or PR — but only when the
- *      registered row's `dolthub_org` is the caller's own org. A handle
- *      registered to another org is refused (`precondition`) and an
- *      unreadable `rigs` table is an upstream error, so the caller can
- *      never adopt a rig identity they do not own.
+ *      registered row's `dolthub_org` is the caller's own org and
+ *      DoltHub backs that org for this caller: the fork was just
+ *      created under it, it is the username behind the token, or
+ *      `orgProven` records an org an earlier authorized write
+ *      established. A handle registered to another org is refused
+ *      (`precondition`) and an unreadable `rigs` table is an upstream
+ *      error, so the caller can never adopt a rig identity they do not
+ *      own.
  *   3. If an open registration PR already exists for this rig, return
  *      it without writing another registration commit.
  *   4. Run the registration INSERT through the DoltHub write API,
@@ -64,6 +68,17 @@ export type JoinOptions = {
   registrationWriteInitialBackoffMs?: number;
   /** Inject sleep for tests. */
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * Set only by a caller that holds a server-side record proving this
+   * token's account may act for `dolthubOrg`: the org was established
+   * for this identity by an earlier DoltHub-authorized write (a fork
+   * created under it, a registration write into its fork, or a
+   * repository created under it). Without it, a success path that hands
+   * the caller a rig identity must re-prove the org on every call,
+   * which a DoltHub org (as opposed to the token's own username) can
+   * never satisfy through the API.
+   */
+  orgProven?: boolean;
   fetch?: typeof fetch;
   hooks?: DoltFetchHooks;
 };
@@ -322,12 +337,14 @@ type TokenOwner = { status: 'resolved'; username: string } | { status: 'unknown'
  * Decide whether DoltHub backs the claimed org for this token, for a
  * success path that hands the caller a rig identity without another
  * DoltHub-authorized write. A fork the join just created under the org
- * is proof in itself; otherwise the org must be the username the token
- * belongs to. Returns the error to report, or null when the org is
- * backed.
+ * is proof in itself; so is an org the caller's own record already
+ * established through an earlier authorized write. Otherwise the org
+ * must be the username the token belongs to. Returns the error to
+ * report, or null when the org is backed.
  */
 async function orgProofError(opts: JoinOptions, forkCreated: boolean): Promise<WlError | null> {
   if (forkCreated) return null;
+  if (opts.orgProven === true) return null;
   const owner = await resolveTokenOwner(opts);
   if (owner.status === 'unknown') {
     return new WlError(

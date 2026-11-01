@@ -16,6 +16,7 @@
 
 import { WantedBoardOpError } from '../wanted-board/errors';
 import { rigHandleFormatError } from '@kilocode/wl-sdk';
+import { credentialProvesOrg } from '../dos/wasteland/credentials';
 import { getWastelandDOStub } from '../dos/Wasteland.do';
 import { deriveEncryptionKey, encryptToken, decryptToken } from '../util/crypto.util';
 import { resolveSecret } from '../util/secret.util';
@@ -80,6 +81,14 @@ async function loadContext(
     );
   }
 
+  // A credential that carries a rig handle for this same org is an
+  // identity an earlier DoltHub-authorized write established, so a
+  // re-join may reuse that proof — the only way a connection made under
+  // a DoltHub org, whose token belongs to a member username, can join
+  // again once its fork exists. The fresh-username path needs none:
+  // there the org is the token's own account.
+  const orgProven = fresh.status !== 'ok' && credentialProvesOrg(credential, dolthubOrg);
+
   // The handle becomes the caller's identity once the join persists it:
   // validate the format here so a malformed value never reaches the
   // registration DML or a credential row.
@@ -139,6 +148,7 @@ async function loadContext(
     ownerEmail,
     token,
     tokenSource: 'stored',
+    orgProven,
   };
 }
 

@@ -59,7 +59,7 @@ function printUsage(): void {
   console.log('profile, its agents, and the user row.');
   console.log('');
   console.log('The deep link it prints opens the profile Agents screen in a dev build:');
-  console.log('  kiloapp:///profile-management/<profileId>/agents');
+  console.log('  kiloapp:///(app)/profile-management/<profileId>/agents');
   console.log('');
   console.log('Example:');
   console.log('  pnpm dev:seed app:agent-profile-fixture design-gate@example.com');
@@ -144,13 +144,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   );
 
   console.log('This fixture represents: the personal profile an owner manages agents on.');
-  console.log(`Deep link: kiloapp:///profile-management/${profile.id}/agents`);
+  console.log(`Deep link: kiloapp:///(app)/profile-management/${profile.id}/agents`);
 
   return {
     userId: USER_ID,
     email: trimmedEmail,
     profileId: profile.id,
     agentCount: AGENTS.length,
-    deepLink: `kiloapp:///profile-management/${profile.id}/agents`,
+    deepLink: `kiloapp:///(app)/profile-management/${profile.id}/agents`,
   };
 }

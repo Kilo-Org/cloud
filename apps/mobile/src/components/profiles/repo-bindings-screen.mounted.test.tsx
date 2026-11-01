@@ -69,6 +69,7 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
 vi.mock('react-native', () => ({
+  Keyboard: { dismiss: () => undefined },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',

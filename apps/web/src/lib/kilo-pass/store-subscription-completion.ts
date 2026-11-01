@@ -16,6 +16,7 @@ import { captureException } from '@sentry/nextjs';
 import { PURCHASE_SETTLED_EVENT } from '@kilocode/app-shared/analytics';
 import {
   admitOperation,
+  isTerminalOperationStatus,
   markReconcilePending,
   settleOperation,
   type OutboxEventInput,
@@ -1137,18 +1138,40 @@ export async function completeStoreKiloPassPurchase(params: {
     throw error;
   }
 
+  let settleError: unknown = null;
   try {
-    await settleOperation(ledgerHandle, {
+    const settled = await settleOperation(ledgerHandle, {
       rowId: admission.row.id,
       status: 'completed',
       outcomeCode: 'ok',
       canonicalResult: result as unknown as Record<string, unknown>,
       outboxEvent: purchaseSettledOutboxEvent({ distinctId, outcome: 'completed', startedAt }),
     });
-  } catch (settleError) {
+    // A second settle is a no-op, so a terminal or missing row here means the
+    // bookkeeping is already finished.
+    if (settled.settled || !settled.row || isTerminalOperationStatus(settled.row.status)) {
+      return result;
+    }
+  } catch (error) {
+    settleError = error;
+  }
+
+  if (settleError) {
     captureException(settleError, {
       tags: { area: 'kilo-pass', operation: 'complete-store-purchase-settle' },
     });
+  }
+  // The purchase is committed, so the client is told success either way. The
+  // row must still end terminal: `reconcile_pending` makes its lease immediately
+  // claimable, so the next same-key retry finishes the ledger row and emits
+  // `purchase_settled` — the same recovery the failed-effect branch above uses.
+  try {
+    await markReconcilePending(ledgerHandle, { rowId: admission.row.id });
+  } catch (markError) {
+    console.error(
+      'Failed to mark completed purchase operation ledger row reconcile-pending',
+      markError
+    );
   }
 
   return result;

@@ -2,6 +2,7 @@ import { PERSONAL_SECURITY_SCOPE } from '@kilocode/app-shared/security-agent';
 import { type Href } from 'expo-router';
 
 import { type ProfileOwnerChoice } from '@/components/profiles/profile-owner-model';
+import { openedFromQuery, type ProfileExternalOpener } from '@/lib/profile-route-stack';
 
 type ProfileOrganization = { organizationId: string };
 
@@ -39,6 +40,74 @@ const PROFILE_LIST_ROUTE_NAMES = {
   app: 'profile-management/index',
   profileTab: 'profiles/index',
 } as const;
+
+/**
+ * The route names of the profile screens below the list, per Stack, keyed the
+ * way the route files are named. A Stack's navigation state names a screen by
+ * its file path below the layout that declares it, so these are the strings a
+ * repair compares against (`profile-route-stack.ts`).
+ */
+const PROFILE_SCREEN_ROUTE_NAMES = {
+  app: {
+    new: 'profile-management/new',
+    repoBindings: 'profile-management/repo-bindings',
+    overview: 'profile-management/[profileId]/index',
+    sections: {
+      agents: 'profile-management/[profileId]/agents',
+      commands: 'profile-management/[profileId]/commands',
+      mcp: 'profile-management/[profileId]/mcp',
+      skills: 'profile-management/[profileId]/skills',
+      'slash-commands': 'profile-management/[profileId]/slash-commands',
+      variables: 'profile-management/[profileId]/variables',
+    },
+  },
+  profileTab: {
+    new: 'profiles/new',
+    repoBindings: 'profiles/repo-bindings',
+    overview: 'profiles/[profileId]/index',
+    sections: {
+      agents: 'profiles/[profileId]/agents',
+      commands: 'profiles/[profileId]/commands',
+      mcp: 'profiles/[profileId]/mcp',
+      skills: 'profiles/[profileId]/skills',
+      'slash-commands': 'profiles/[profileId]/slash-commands',
+      variables: 'profiles/[profileId]/variables',
+    },
+  },
+} as const;
+
+/** One of the profile editor's section screens. */
+export type ProfileSectionName = keyof (typeof PROFILE_SCREEN_ROUTE_NAMES)['app']['sections'];
+
+/** The route name the profile overview registers under in the given Stack. */
+export function getProfileOverviewRouteName(stack: ProfileManagementStack = 'profileTab'): string {
+  return PROFILE_SCREEN_ROUTE_NAMES[stack].overview;
+}
+
+/** The route name a profile section registers under in the given Stack. */
+export function getProfileSectionRouteName(
+  section: ProfileSectionName,
+  stack: ProfileManagementStack = 'profileTab'
+): string {
+  return PROFILE_SCREEN_ROUTE_NAMES[stack].sections[section];
+}
+
+/**
+ * Every route name of the profile tree in the given Stack. The layouts read
+ * this to register the same screen options on each of them.
+ */
+export function getProfileRouteNames(
+  stack: ProfileManagementStack = 'profileTab'
+): readonly string[] {
+  const names = PROFILE_SCREEN_ROUTE_NAMES[stack];
+  return [
+    PROFILE_LIST_ROUTE_NAMES[stack],
+    names.new,
+    names.repoBindings,
+    names.overview,
+    ...Object.values(names.sections),
+  ];
+}
 
 export function getProfileAgentScope(
   selectedOrganizationId: string | null,
@@ -83,9 +152,17 @@ export function getPrReviewEntryPath(): Href {
  * Profile context carried by a profile route. Org-owned profiles travel with
  * their `organizationId`; a personal profile has none, exactly like the tRPC
  * `agentProfiles.*` inputs.
+ *
+ * A screen opened on purpose from outside the profile tree also carries its
+ * opener (`profile-route-stack.ts`), which keeps Back with that screen instead
+ * of building the profiles list beneath it.
  */
-function profileContextQuery(organizationId?: string): string {
-  return organizationId ? `?organizationId=${encodeURIComponent(organizationId)}` : '';
+function profileContextQuery(organizationId?: string, openedFrom?: ProfileExternalOpener): string {
+  const parts = [
+    organizationId === undefined ? '' : `organizationId=${encodeURIComponent(organizationId)}`,
+    openedFrom === undefined ? '' : openedFromQuery(openedFrom),
+  ].filter(part => part.length > 0);
+  return parts.length === 0 ? '' : `?${parts.join('&')}`;
 }
 
 /** The Manage Profiles entry on the Profile tab. */
@@ -98,12 +175,24 @@ export function getProfilesRouteName(stack: ProfileManagementStack = 'profileTab
   return PROFILE_LIST_ROUTE_NAMES[stack];
 }
 
+/** Where the repo-to-profile defaults screen is opened from. */
+export type RepoBindingsPathOptions = {
+  organizationId?: string;
+  stack?: ProfileManagementStack;
+  /**
+   * The outside screen that deliberately opened it: the new-session composer
+   * passes `composer`, so Back returns to the form that asked.
+   */
+  openedFrom?: ProfileExternalOpener;
+};
+
 /** The repo-to-profile default bindings screen. */
-export function getRepoBindingsPath(
-  organizationId?: string,
-  stack: ProfileManagementStack = 'profileTab'
-): Href {
-  return `${PROFILE_ROOTS[stack]}/repo-bindings${profileContextQuery(organizationId)}` as Href;
+export function getRepoBindingsPath(options: RepoBindingsPathOptions = {}): Href {
+  const stack = options.stack ?? 'profileTab';
+  return `${PROFILE_ROOTS[stack]}/repo-bindings${profileContextQuery(
+    options.organizationId,
+    options.openedFrom
+  )}` as Href;
 }
 
 /** What the create screen does after it saves, besides opening the new profile. */
@@ -124,6 +213,12 @@ export type NewProfilePathOptions = {
    * the profile in the organization whose list it showed.
    */
   organizationId?: string;
+  /**
+   * The outside screen that opened this form, when the caller was opened from
+   * one: the form then returns to it on `back` and does not build the profiles
+   * list beneath itself.
+   */
+  openedFrom?: ProfileExternalOpener;
 };
 
 /** The profile editor's create screen. */
@@ -137,19 +232,34 @@ export function getNewProfilePath(
     options.organizationId === undefined
       ? ''
       : `organizationId=${encodeURIComponent(options.organizationId)}`,
+    options.openedFrom === undefined ? '' : openedFromQuery(options.openedFrom),
   ]
     .filter(part => part.length > 0)
     .join('&');
   return `${PROFILE_ROOTS[stack]}/new${query.length > 0 ? `?${query}` : ''}` as Href;
 }
 
-/** The profile editor's Overview tab (the profile's own route). */
+/**
+ * The profile editor's Overview tab (the profile's own route). An agent session
+ * opens it with `openedFrom: 'session'`, so Back returns to the session whose
+ * profile chip opened it.
+ */
+/** Where the overview route is opened from, when it is not the profile list. */
+export type ProfileOverviewPathOptions = {
+  /** The organization that owns the profile. */
+  organizationId?: string;
+  /** The Stack the overview joins. */
+  stack?: ProfileManagementStack;
+  /** The outside screen that deliberately opened it. */
+  openedFrom?: ProfileExternalOpener;
+};
+
 export function getProfileOverviewPath(
   profileId: string,
-  organizationId?: string,
-  stack: ProfileManagementStack = 'profileTab'
+  options: ProfileOverviewPathOptions = {}
 ): Href {
-  return `${PROFILE_ROOTS[stack]}/${profileId}${profileContextQuery(organizationId)}` as Href;
+  const stack = options.stack ?? 'profileTab';
+  return `${PROFILE_ROOTS[stack]}/${profileId}${profileContextQuery(options.organizationId, options.openedFrom)}` as Href;
 }
 
 /** The profile editor's Variables tab. */

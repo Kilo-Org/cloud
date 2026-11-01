@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Oxirgi ko‘rib chiqishlar yo‘q",
       "noRecentPrsDescription": "Ko‘rib chiqishni boshlash uchun yuqoriga havolani joylashtiring — keyingi safar u shu yerda ko‘rinadi.",
-      "couldNotLoad": "Yuklab bo'lmadi.",
       "removeFromRecentsTitle": "Oxirgilar ro'yxatidan olib tashlansinmi?",
       "removeFromRecentsMessage": "Bu ko‘rib chiqish oxirgilar ro‘yxatidan olib tashlanadi.",
       "removeRecentAccessibility": "{{repo}}ni oxirgilar ro'yxatidan olib tashlash",
@@ -834,7 +833,8 @@
     "liveUpdates": "Jonli yangilanishlar",
     "liveUpdateSubtitle": "Faol agentlarni bildirishnomalaringizda ko'rsatish",
     "push": "Bildirishnomalar",
-    "onDescription": "Bu qurilmada bildirishnomalar yoqilgan.",
+    "deviceTitle": "Bu qurilmada push-bildirishnomalar",
+    "onDescription": "Ogohlantirishlar quyidagi toifalar bo'yicha yuboriladi.",
     "offDescription": "Bildirishnomalarga ruxsat berilmagan yoki qurilma ularni olish uchun ro'yxatdan o'tmagan.",
     "retryPermission": "Bildirishnomalarga ruxsatni qayta tekshirish",
     "enable": "Bildirishnomalarni yoqish",
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Xavf darajasi: yuqoridan pastga",
       "sortSeverityAsc": "Xavf darajasi: pastdan yuqoriga",
       "sortSlaDue": "SLA muddati",
-      "overdueOnly": "Faqat muddati o'tganlar"
+      "overdueOnly": "Faqat muddati o'tganlar",
+      "noRepositories": "Hozircha hech qanday repozitoriy sinxronlanmagan yoki tanlanmagan. Ularni «Xavfsizlik agenti» sozlamalarida tanlang."
     },
     "automation": {
       "title": "Avtomatlashtirish",
@@ -1783,6 +1784,7 @@
       "lastSynced": "Oxirgi sinxronlash: {{time}}",
       "manageRepositories": "Repozitoriyalarni boshqarish",
       "notYetSynced": "Hali sinxronlanmagan",
+      "priorityFindingsPending": "Birinchi sinxronlashdan so'ng ustuvor muammolar ko'rsatiladi.",
       "refreshFailed": "Yangilash imkoni bo'lmadi — oxirgi sinxronlangan ma'lumotlar ko'rsatilmoqda.",
       "settings": "Sozlamalar",
       "syncNow": "Hozir sinxronlash",
@@ -1841,7 +1843,8 @@
     "findingDetails": {
       "supersededBy": "O'rniga dolzarb muammo qayd etilgan",
       "supersededByDescription": "Holat, tahlil va tuzatish ma'lumotlarini ko'rish uchun dolzarb yozuvni bosing.",
-      "dismissedBecause": "Rad etish sababi: {{reason}}.",
+      "dismissedOn": "E’tiborsiz qoldirilgan sana",
+      "supersededOn": "Almashtirilgan sana",
       "severityLabel": "Xavf darajasi: {{severity}}",
       "package": "Paket",
       "vulnerableVersions": "Zaiflik mavjud versiyalar",
@@ -1858,11 +1861,6 @@
       "viewAdvisory": "GitHubda xavfsizlik xabarnomasini ko'rish",
       "statusOpen": "Ochiq",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "tuzatish allaqachon boshlangan",
-      "reasonNoBandwidth": "vaqt va resurs yetarli emas",
-      "reasonTolerableRisk": "xavf maqbul darajada",
-      "reasonInaccurate": "muammo noto‘g‘ri aniqlangan",
-      "reasonNotUsed": "zaiflik bor kod ishlatilmaydi",
       "reasonAfterReview": "ko'rib chiqilgach"
     },
     "settingsOverview": {
@@ -1922,7 +1920,7 @@
       "highDescription": "Muhim ma'lumotlarning oshkor bo'lish xavfi.",
       "mediumDescription": "Cheklangan ta'sir yoki muayyan shartlar.",
       "lowDescription": "Xavfsizlikka juda kam ta'sir.",
-      "invalidDayCount": "kunlar soni 1 dan 365 gacha bo'lgan butun son bo'lishi kerak.",
+      "invalidDayCount": "Kunlar soni 1 dan 365 gacha bo'lgan butun son bo'lishi kerak.",
       "remediationDeadlineA11y": "{{label}} darajasidagi muammoni tuzatish muddati, kun hisobida",
       "enterWholeNumber": "1 Dan 365 gacha bo‘lgan butun sonni kiriting",
       "permissionNote": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari bu sozlamalarni o'zgartira oladi.",
@@ -2062,7 +2060,10 @@
       "settleFailed": "Amal bajarildi, ammo natijani qayd etishimiz mumkin bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "replayFailed": "Bu amal tugallanmadi. Iltimos, qayta urinib ko'ring.",
       "actionFailed": "Bu amalni tugallab bo'lmadi. Iltimos, qayta urinib ko'ring.",
-      "actionBlocked": "Bu amalni tugallab bo'lmadi. Muammoni avval hal qilish kerak."
+      "actionBlocked": "Bu amalni tugallab bo'lmadi. Muammoni avval hal qilish kerak.",
+      "syncNoRepositories": "Sinxronlash doirasida hech qanday repozitoriy yo'q. «Xavfsizlik agenti» kuzatadigan repozitoriylarni tanlang, so'ngra qayta sinxronlang.",
+      "syncIntegrationInactive": "«Xavfsizlik agenti»ning GitHub ulanishi faol emas. Kilo GitHub App’ni qayta ulang, so‘ng qaytadan sinxronlang.",
+      "syncMissingPermission": "Kilo GitHub App zaiflik ogohlantirishlarini o'qiy olmaydi. GitHubda shu ruxsatni bering, so'ng yana sinxronlang."
     },
     "analysisState": {
       "queued": "Tahlil navbatda",
@@ -2096,7 +2097,6 @@
       "closedOn": "{{date}}: {{status}}",
       "deadlineNotSet": "Muddat belgilanmagan",
       "noSlaDeadline": "SLA muddati belgilanmagan",
-      "dueOn": "Muddati: {{date}}",
       "overdueNow": "Muddati o'tgan",
       "overdue_one": "Muddati {{count}} kun o'tgan",
       "overdue_other": "{{count}} kun kechikdi",
@@ -3848,6 +3848,7 @@
       "markSecret": "Sir sifatida belgilang",
       "masked": "Yashirin qiymat",
       "reveal": "Qiymatni oshkor qilish",
+      "hide": "Qiymatni yashirish",
       "newValuePlaceholder": "Yangi maxfiy qiymatni kiriting",
       "valuePlaceholder": "Maxfiy qiymat (shifrlangan)"
     },

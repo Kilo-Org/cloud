@@ -616,7 +616,6 @@
     "entry": {
       "noRecentPrs": "Nema nedavnih pregleda",
       "noRecentPrsDescription": "Da započnete pregled, zalijepite povezanicu gore — sljedeći put će se pojaviti ovdje.",
-      "couldNotLoad": "Učitavanje nije uspjelo.",
       "removeFromRecentsTitle": "Ukloniti iz nedavnih zahtjeva?",
       "removeFromRecentsMessage": "Ovaj pregled će biti uklonjen iz nedavnih.",
       "removeRecentAccessibility": "Ukloni {{repo}} iz nedavnih zahtjeva",
@@ -853,7 +852,8 @@
     "liveUpdates": "Ažuriranja uživo",
     "liveUpdateSubtitle": "Prikaži aktivne agente u obavijestima",
     "push": "Obavijesti aplikacije",
-    "onDescription": "Obavijesti aplikacije su uključene na ovom uređaju.",
+    "deviceTitle": "Push obavijesti na ovom uređaju",
+    "onDescription": "Upozorenja prate kategorije ispod.",
     "offDescription": "Obavijesti nisu dozvoljene ili uređaj nije registrovan za njih.",
     "retryPermission": "Pokušaj ponovo provjeriti dozvolu za obavijesti",
     "enable": "Uključi obavijesti",
@@ -1702,7 +1702,8 @@
       "sortSeverityDesc": "Ozbiljnost: od visoke do niske",
       "sortSeverityAsc": "Ozbiljnost: od niske do visoke",
       "sortSlaDue": "Rok prema SLA-u",
-      "overdueOnly": "Samo s prekoračenim rokom"
+      "overdueOnly": "Samo s prekoračenim rokom",
+      "noRepositories": "Još nema sinhronizovanih ili odabranih repozitorija. Odaberite ih u postavkama Sigurnosnog agenta."
     },
     "automation": {
       "title": "Automatizacija",
@@ -1809,6 +1810,7 @@
       "lastSynced": "Posljednja sinhronizacija: {{time}}",
       "manageRepositories": "Upravljaj repozitorijima",
       "notYetSynced": "Još nije sinhronizirano",
+      "priorityFindingsPending": "Prioritetni nalazi pojavit će se nakon prve sinhronizacije.",
       "refreshFailed": "Osvježavanje nije uspjelo. Prikazuju se posljednji sinhronizirani podaci.",
       "settings": "Postavke",
       "syncNow": "Sinhroniziraj sada",
@@ -1872,7 +1874,8 @@
     "findingDetails": {
       "supersededBy": "Zamijenjen aktuelnim nalazom",
       "supersededByDescription": "Dodirni za prikaz aktuelnog zapisa sa statusom, analizom i otklanjanjem.",
-      "dismissedBecause": "Nalaz je odbačen {{reason}}.",
+      "dismissedOn": "Datum odbacivanja",
+      "supersededOn": "Datum zamjene",
       "severityLabel": "Ozbiljnost: {{severity}}",
       "package": "Paket",
       "vulnerableVersions": "Ranjive verzije",
@@ -1889,11 +1892,6 @@
       "viewAdvisory": "Pogledaj sigurnosnu obavijest na GitHubu",
       "statusOpen": "Otvoreno",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "ispravka je već u toku",
-      "reasonNoBandwidth": "nema slobodnih kapaciteta",
-      "reasonTolerableRisk": "rizik je prihvatljiv",
-      "reasonInaccurate": "nalaz je netačan",
-      "reasonNotUsed": "ranjivi kod se ne koristi",
       "reasonAfterReview": "nakon pregleda"
     },
     "settingsOverview": {
@@ -1954,7 +1952,7 @@
       "highDescription": "Moguće ozbiljno curenje podataka.",
       "mediumDescription": "Ograničen utjecaj ili posebni uslovi.",
       "lowDescription": "Minimalan utjecaj na sigurnost.",
-      "invalidDayCount": "unesi cijeli broj dana od 1 do 365.",
+      "invalidDayCount": "Unesi cijeli broj dana od 1 do 365.",
       "remediationDeadlineA11y": "Rok za otklanjanje u danima: {{label}}",
       "enterWholeNumber": "Unesi cijeli broj od 1 do 365",
       "permissionNote": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu mijenjati ove postavke.",
@@ -2095,7 +2093,10 @@
       "settleFailed": "Radnja je izvršena, ali nismo mogli zabilježiti rezultat. Pokušaj ponovo.",
       "replayFailed": "Ova radnja nije dovršena. Pokušaj ponovo.",
       "actionFailed": "Nije moguće dovršiti ovu radnju. Pokušaj ponovo.",
-      "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem se mora riješiti prije ponovnog pokušaja."
+      "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem se mora riješiti prije ponovnog pokušaja.",
+      "syncNoRepositories": "Nijedan repozitorij nije u obuhvatu sinhronizacije. Odaberite repozitorije koje Sigurnosni agent nadzire, pa ponovo sinhronizujte.",
+      "syncIntegrationInactive": "Veza s GitHubom za Sigurnosnog agenta nije aktivna. Ponovo povežite Kilo GitHub App, pa ponovo sinhronizirajte.",
+      "syncMissingPermission": "Kilo GitHub App ne može čitati vulnerability alerts. Dodijeli to dopuštenje u GitHubu, zatim ponovo sinhronizuj."
     },
     "analysisState": {
       "queued": "Analiza u redu čekanja",
@@ -2129,7 +2130,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Rok nije postavljen",
       "noSlaDeadline": "Nema roka prema SLA-u",
-      "dueOn": "Rok: {{date}}",
       "overdueNow": "Rok prekoračen",
       "overdue_one": "{{count}} dan zakašnjenja",
       "overdue_few": "{{count}} dana zakašnjenja",
@@ -3904,6 +3904,7 @@
       "markSecret": "Označi kao tajnu",
       "masked": "Skrivena vrijednost",
       "reveal": "Otkrijte vrijednost",
+      "hide": "Sakrijte vrijednost",
       "newValuePlaceholder": "Unesite novu tajnu vrijednost",
       "valuePlaceholder": "Tajna vrijednost (šifrovana)"
     },

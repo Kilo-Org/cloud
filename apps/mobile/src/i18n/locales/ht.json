@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Pa gen revizyon resan",
       "noRecentPrsDescription": "Kole yon lyen pi wo a pou kòmanse yon revizyon — l ap parèt isit la pwochen fwa a.",
-      "couldNotLoad": "Pa t ka chaje.",
       "removeFromRecentsTitle": "Retire nan lis PR resan yo?",
       "removeFromRecentsMessage": "Revizyon sa a ap retire nan lis resan ou yo.",
       "removeRecentAccessibility": "Retire {{repo}} nan lis PR resan yo",
@@ -834,7 +833,8 @@
     "liveUpdates": "Mizajou an dirèk",
     "liveUpdateSubtitle": "Montre ajan aktif yo nan notifikasyon ou yo",
     "push": "Notifikasyon otomatik",
-    "onDescription": "Notifikasyon otomatik yo aktive sou aparèy sa a.",
+    "deviceTitle": "Notifikasyon sou aparèy sa a",
+    "onDescription": "Alèt yo depann de kategori ki anba yo.",
     "offDescription": "Pèmisyon an oswa enskripsyon aparèy la dezaktive.",
     "retryPermission": "Eseye tcheke pèmisyon notifikasyon yo ankò",
     "enable": "Aktive notifikasyon",
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Gravite: soti pi wo rive pi ba",
       "sortSeverityAsc": "Gravite: soti pi ba rive pi wo",
       "sortSlaDue": "Dat limit SLA",
-      "overdueOnly": "An reta sèlman"
+      "overdueOnly": "An reta sèlman",
+      "noRepositories": "Poko gen okenn depo ki senkronize oswa chwazi. Chwazi yo nan paramèt Ajan sekirite."
     },
     "automation": {
       "title": "Otomatizasyon",
@@ -1783,6 +1784,7 @@
       "lastSynced": "Dènye senkronizasyon: {{time}}",
       "manageRepositories": "Jere depo yo",
       "notYetSynced": "Poko senkronize",
+      "priorityFindingsPending": "Konsta priyorite yo ap parèt apre premye senkronizasyon an.",
       "refreshFailed": "Nou pa t ka rafrechi done yo. N ap montre done ki te senkronize dènye fwa yo.",
       "settings": "Paramèt",
       "syncNow": "Senkronize kounye a",
@@ -1841,7 +1843,8 @@
     "findingDetails": {
       "supersededBy": "Yon konsta aktyèl ranplase li",
       "supersededByDescription": "Peze pou ouvri dosye aktyèl la epi wè estati, analiz ak koreksyon yo.",
-      "dismissedBecause": "Yo rejte li paske {{reason}}.",
+      "dismissedOn": "Rejte sou",
+      "supersededOn": "Ranplase sou",
       "severityLabel": "Gravite {{severity}}",
       "package": "Pakè",
       "vulnerableVersions": "Vèsyon vilnerab",
@@ -1858,11 +1861,6 @@
       "viewAdvisory": "Gade avi sekirite a sou GitHub",
       "statusOpen": "Louvri",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "koreksyon an deja kòmanse",
-      "reasonNoBandwidth": "pa gen resous disponib",
-      "reasonTolerableRisk": "ris la akseptab",
-      "reasonInaccurate": "pwoblèm detekte a pa egzak",
-      "reasonNotUsed": "kòd vilnerab la pa itilize",
       "reasonAfterReview": "apre revizyon"
     },
     "settingsOverview": {
@@ -1922,7 +1920,7 @@
       "highDescription": "Risk pou yon gwo kantite done ekspoze.",
       "mediumDescription": "Enpak limite oswa kondisyon espesifik.",
       "lowDescription": "Enpak minimòm sou sekirite.",
-      "invalidDayCount": "antre ant 1 ak 365 jou, ak yon nonb antye sèlman.",
+      "invalidDayCount": "Antre ant 1 ak 365 jou, ak yon nonb antye sèlman.",
       "remediationDeadlineA11y": "Delè koreksyon pou gravite {{label}}, an jou",
       "enterWholeNumber": "Antre yon nonb antye ant 1 ak 365",
       "permissionNote": "Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka chanje paramèt sa yo.",
@@ -2062,7 +2060,10 @@
       "settleFailed": "Aksyon an fini, men nou pa t ka anrejistre rezilta a. Tanpri eseye ankò.",
       "replayFailed": "Aksyon sa a pa fini. Tanpri eseye ankò.",
       "actionFailed": "Pa t ka fini aksyon sa a. Tanpri eseye ankò.",
-      "actionBlocked": "Pa t ka fini aksyon sa a. Fòk ou repare pwoblèm nan anvan ou ka eseye ankò."
+      "actionBlocked": "Pa t ka fini aksyon sa a. Fòk ou repare pwoblèm nan anvan ou ka eseye ankò.",
+      "syncNoRepositories": "Pa gen okenn depo nan sijè senkronizasyon an. Chwazi depo Ajan sekirite siveye yo, epi senkronize ankò.",
+      "syncIntegrationInactive": "Koneksyon GitHub pou Ajan sekirite a pa aktif. Rekonekte GitHub App Kilo a, epi senkronize ankò.",
+      "syncMissingPermission": "Kilo GitHub App pa ka li alèt vilnerabilite yo. Bay pèmisyon sa a nan GitHub, epi senkronize ankò."
     },
     "analysisState": {
       "queued": "Analiz nan ke",
@@ -2096,7 +2097,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Dat limit pa fikse",
       "noSlaDeadline": "Pa gen dat limit SLA",
-      "dueOn": "Dat limit: {{date}}",
       "overdueNow": "An reta",
       "overdue_one": "{{count}} jou an reta",
       "overdue_other": "{{count}} jou an reta",
@@ -3848,6 +3848,7 @@
       "markSecret": "Make kòm sekrè",
       "masked": "Valè kache",
       "reveal": "Revele valè",
+      "hide": "Kache valè",
       "newValuePlaceholder": "Antre yon nouvo valè sekrè",
       "valuePlaceholder": "Valè sekrè (chifre)"
     },

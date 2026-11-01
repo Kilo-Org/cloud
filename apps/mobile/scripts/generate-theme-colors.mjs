@@ -28,6 +28,8 @@ export const TOKEN_KEYS = [
   ['destructiveSolidForeground', '--destructive-solid-foreground'],
   ['border', '--border'],
   ['card', '--card'],
+  ['selection', '--selection'],
+  ['selectionForeground', '--selection-foreground'],
   ['ink2', '--ink2'],
   ['mutedSoft', '--muted-soft'],
   ['hairSoft', '--hair-soft'],

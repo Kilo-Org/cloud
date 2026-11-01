@@ -78,6 +78,10 @@ export function BriefingListScreen() {
       );
   const loading = query.isPending && !offline;
   const failure = !loading && query.isError && reports.length === 0;
+  // The empty state's own button is the settings entry point while it is on screen,
+  // so the header carries the action only in the states that button does not cover.
+  const emptySettingsAction =
+    noEnabledContexts === true && !loading && !failure && reports.length === 0;
   let footer = <View className="h-8" />;
   if (query.isFetchNextPageError) {
     footer = (
@@ -100,15 +104,17 @@ export function BriefingListScreen() {
         showBackButton
         backFallback={'/(app)/(tabs)/(0_home)' as Href}
         headerRight={
-          <Button
-            variant="ghost"
-            size="sm"
-            onPress={() => {
-              router.push(`${BRIEFING_PATH}/settings` as Href);
-            }}
-          >
-            <Text>{t('agentBriefing.settings')}</Text>
-          </Button>
+          emptySettingsAction ? undefined : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onPress={() => {
+                router.push(`${BRIEFING_PATH}/settings` as Href);
+              }}
+            >
+              <Text>{t('agentBriefing.settings')}</Text>
+            </Button>
+          )
         }
       />
       <View className="gap-3 px-4 pb-3">
@@ -180,7 +186,7 @@ export function BriefingListScreen() {
           ListEmptyComponent={
             <View className="gap-2 p-8">
               <Text className="text-center">{t(emptyLabel)}</Text>
-              {noEnabledContexts ? (
+              {emptySettingsAction ? (
                 <Button
                   onPress={() => {
                     router.push(`${BRIEFING_PATH}/settings` as Href);

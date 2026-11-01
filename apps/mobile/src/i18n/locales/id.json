@@ -305,7 +305,8 @@
     "liveUpdates": "Pembaruan langsung",
     "liveUpdateSubtitle": "Tampilkan agen aktif di notifikasimu",
     "push": "Notifikasi perangkat",
-    "onDescription": "Notifikasi aktif untuk perangkat ini.",
+    "deviceTitle": "Push di perangkat ini",
+    "onDescription": "Peringatan mengikuti kategori di bawah.",
     "offDescription": "Notifikasi belum diizinkan atau perangkat belum terdaftar.",
     "retryPermission": "Coba periksa ulang izin notifikasi",
     "enable": "Aktifkan notifikasi",
@@ -1151,7 +1152,8 @@
       "sortSeverityDesc": "Keparahan: tertinggi ke terendah",
       "sortSlaDue": "Tanggal jatuh tempo SLA",
       "statusIgnored": "Diabaikan",
-      "statusOpen": "Terbuka"
+      "statusOpen": "Terbuka",
+      "noRepositories": "Belum ada repositori yang disinkronkan atau dipilih. Pilih repositori di setelan Agen keamanan."
     },
     "analysis": {
       "analyzeRepository": "Analisis repositori",
@@ -1293,6 +1295,7 @@
       "notExploitable": "Tidak dapat dieksploitasi",
       "notMeasured": "Belum diukur",
       "notYetSynced": "Belum disinkronkan",
+      "priorityFindingsPending": "Temuan prioritas akan muncul setelah sinkronisasi pertama.",
       "refreshFailed": "Tidak dapat memuat ulang data. Data dari sinkronisasi terakhir ditampilkan.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "{{displayCount}} terbuka",
@@ -1367,7 +1370,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Terdeteksi",
-      "dismissedBecause": "Diabaikan karena {{reason}}.",
+      "dismissedOn": "Diabaikan pada",
+      "supersededOn": "Digantikan pada",
       "ghsa": "GHSA",
       "manifest": "Manifes",
       "noPatchAvailable": "Belum ada perbaikan",
@@ -1384,11 +1388,6 @@
       "vulnerableVersions": "Versi rentan",
       "statusOpen": "Terbuka",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "perbaikan sudah dimulai",
-      "reasonNoBandwidth": "tidak ada kapasitas untuk menangani",
-      "reasonTolerableRisk": "risikonya dapat diterima",
-      "reasonInaccurate": "temuannya tidak akurat",
-      "reasonNotUsed": "kode yang rentan tidak digunakan",
       "reasonAfterReview": "setelah ditinjau"
     },
     "findingList": {
@@ -1503,7 +1502,7 @@
       "enterWholeNumber": "Masukkan bilangan bulat antara 1 dan 365",
       "high": "Tinggi",
       "highDescription": "Berpotensi menyebabkan kebocoran data yang signifikan.",
-      "invalidDayCount": "jumlah hari harus berupa bilangan bulat dari 1 hingga 365.",
+      "invalidDayCount": "Jumlah hari harus berupa bilangan bulat dari 1 hingga 365.",
       "low": "Rendah",
       "lowDescription": "Dampak terhadap keamanan minimal.",
       "medium": "Sedang",
@@ -1533,7 +1532,10 @@
       "settleFailed": "Tindakan telah selesai, tetapi kami tidak dapat mencatat hasilnya. Coba lagi.",
       "replayFailed": "Tindakan ini tidak selesai. Coba lagi.",
       "actionFailed": "Tindakan ini tidak dapat diselesaikan. Coba lagi.",
-      "actionBlocked": "Tindakan ini tidak dapat diselesaikan. Masalahnya harus diperbaiki terlebih dahulu sebelum mencoba lagi."
+      "actionBlocked": "Tindakan ini tidak dapat diselesaikan. Masalahnya harus diperbaiki terlebih dahulu sebelum mencoba lagi.",
+      "syncNoRepositories": "Tidak ada repositori dalam cakupan sinkronisasi. Pilih repositori yang dipantau Agen keamanan, lalu sinkronkan lagi.",
+      "syncIntegrationInactive": "Koneksi GitHub untuk Agen keamanan tidak aktif. Hubungkan ulang Aplikasi GitHub Kilo, lalu sinkronkan lagi.",
+      "syncMissingPermission": "Aplikasi GitHub Kilo tidak dapat membaca vulnerability alerts. Berikan izin tersebut di GitHub, lalu sinkronkan lagi."
     },
     "analysisState": {
       "queued": "Analisis dalam antrean",
@@ -1567,7 +1569,6 @@
       "closedOn": "{{status}} pada {{date}}",
       "deadlineNotSet": "Tenggat belum ditetapkan",
       "noSlaDeadline": "Tidak ada tenggat SLA",
-      "dueOn": "Jatuh tempo {{date}}",
       "overdueNow": "Terlambat",
       "overdue_other": "Terlambat {{count}} hari",
       "dueToday": "Jatuh tempo hari ini",
@@ -2827,7 +2828,6 @@
     "entry": {
       "noRecentPrs": "Belum ada riwayat tinjauan",
       "noRecentPrsDescription": "Tempel tautan di atas untuk mulai meninjau — akan muncul di sini saat kamu kembali.",
-      "couldNotLoad": "Tidak dapat memuat data.",
       "removeFromRecentsTitle": "Hapus dari riwayat?",
       "removeFromRecentsMessage": "Tinjauan ini akan dihapus dari riwayatmu.",
       "removeRecentAccessibility": "Hapus {{repo}} dari riwayat",
@@ -3848,6 +3848,7 @@
       "markSecret": "Tandai sebagai rahasia",
       "masked": "Nilai tersembunyi",
       "reveal": "Mengungkapkan nilai",
+      "hide": "Sembunyikan nilai",
       "newValuePlaceholder": "Masukkan nilai rahasia baru",
       "valuePlaceholder": "Nilai rahasia (terenkripsi)"
     },

@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Son baxış yoxdur",
       "noRecentPrsDescription": "Kod baxışına başlamaq üçün yuxarıya keçid yapışdır — növbəti dəfə burada görünəcək.",
-      "couldNotLoad": "Yükləmək mümkün olmadı.",
       "removeFromRecentsTitle": "Son baxılanlardan silinsin?",
       "removeFromRecentsMessage": "Bu baxış son baxılanlar siyahısından silinəcək.",
       "removeRecentAccessibility": "{{repo}} repozitoriyasını son baxılanlardan sil",
@@ -834,7 +833,8 @@
     "liveUpdates": "Canlı yeniləmələr",
     "liveUpdateSubtitle": "Aktiv agentləri bildirişlərində göstər",
     "push": "Ani bildirişlər",
-    "onDescription": "Bu cihazda ani bildirişlər aktivdir.",
+    "deviceTitle": "Bu cihazda ani bildirişlər",
+    "onDescription": "Xəbərdarlıqlar aşağıdakı kateqoriyalara uyğun gəlir.",
     "offDescription": "Bildiriş icazəsi verilməyib və ya cihaz qeydiyyatı deaktivdir.",
     "retryPermission": "Bildiriş icazəsini yenidən yoxla",
     "enable": "Bildirişləri aktivləşdir",
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Ciddilik: yüksəkdən aşağıya",
       "sortSeverityAsc": "Ciddilik: aşağıdan yüksəyə",
       "sortSlaDue": "SLA üzrə son tarix",
-      "overdueOnly": "Yalnız gecikənlər"
+      "overdueOnly": "Yalnız gecikənlər",
+      "noRepositories": "Hələ heç bir repozitoriya sinxronlaşdırılmayıb və ya seçilməyib. Onları Təhlükəsizlik agentinin parametrlərində seç."
     },
     "automation": {
       "title": "Avtomatlaşdırma",
@@ -1783,6 +1784,7 @@
       "lastSynced": "Son sinxronlaşdırma: {{time}}",
       "manageRepositories": "Repozitoriyaları idarə et",
       "notYetSynced": "Hələ sinxronlaşdırılmayıb",
+      "priorityFindingsPending": "İlk sinxronlaşdırmadan sonra prioritet tapıntıları görünəcək.",
       "refreshFailed": "Məlumatları yeniləmək mümkün olmadı. Son sinxronlaşdırılmış məlumatlar göstərilir.",
       "settings": "Parametrlər",
       "syncNow": "İndi sinxronlaşdır",
@@ -1841,7 +1843,8 @@
     "findingDetails": {
       "supersededBy": "Cari tapıntı ilə əvəz edilib",
       "supersededByDescription": "Cari qeydin statusuna, təhlilinə və düzəlişinə baxmaq üçün toxun.",
-      "dismissedBecause": "Rədd edilib: {{reason}}.",
+      "dismissedOn": "Rədd edilmə tarixi",
+      "supersededOn": "Əvəz edilmə tarixi",
       "severityLabel": "Ciddilik dərəcəsi: {{severity}}",
       "package": "Paket",
       "vulnerableVersions": "Boşluq olan versiyalar",
@@ -1858,11 +1861,6 @@
       "viewAdvisory": "GitHub-da təhlükəsizlik bildirişinə bax",
       "statusOpen": "Açıq",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "düzəlişə artıq başlanıb",
-      "reasonNoBandwidth": "vaxt və resurs yoxdur",
-      "reasonTolerableRisk": "risk məqbuldur",
-      "reasonInaccurate": "problem səhv müəyyən edilib",
-      "reasonNotUsed": "boşluq olan koddan istifadə edilmir",
       "reasonAfterReview": "yoxlamadan sonra"
     },
     "settingsOverview": {
@@ -1922,7 +1920,7 @@
       "highDescription": "Ciddi məlumat sızması ehtimalı.",
       "mediumDescription": "Məhdud təsir və ya xüsusi şərtlər.",
       "lowDescription": "Təhlükəsizliyə minimal təsir.",
-      "invalidDayCount": "gün sayını 1–365 aralığında tam ədədlə göstər.",
+      "invalidDayCount": "Gün sayını 1–365 aralığında tam ədədlə göstər.",
       "remediationDeadlineA11y": "{{label}} üçün düzəliş müddəti, günlə",
       "enterWholeNumber": "1-Dən 365-ə qədər tam ədəd daxil et",
       "permissionNote": "Bu parametrləri yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri dəyişə bilər.",
@@ -2062,7 +2060,10 @@
       "settleFailed": "İş tamamlandı, lakin nəticəni qeyd edə bilmədik. Yenidən cəhd et.",
       "replayFailed": "Bu iş tamamlanmadı. Yenidən cəhd et.",
       "actionFailed": "Bu işi tamamlamaq mümkün olmadı. Yenidən cəhd et.",
-      "actionBlocked": "Bu işi tamamlamaq mümkün olmadı. Problemi həll etmədən yenidən cəhd etmək olmaz."
+      "actionBlocked": "Bu işi tamamlamaq mümkün olmadı. Problemi həll etmədən yenidən cəhd etmək olmaz.",
+      "syncNoRepositories": "Sinxronizasiya əhatəsində repozitoriya yoxdur. Təhlükəsizlik agentinin izlədiyi repozitoriyaları seç, sonra yenidən sinxronlaşdır.",
+      "syncIntegrationInactive": "Təhlükəsizlik agenti üçün GitHub bağlantısı aktiv deyil. Kilo GitHub tətbiqini yenidən qoş, sonra yenidən sinxronlaşdır.",
+      "syncMissingPermission": "Kilo GitHub tətbiqi zəiflik xəbərdarlıqlarını oxuya bilmir. Həmin icazəni GitHub-da ver, sonra yenidən sinxronlaşdır."
     },
     "analysisState": {
       "queued": "Təhlil növbəyə alınıb",
@@ -2096,7 +2097,6 @@
       "closedOn": "{{date}} — {{status}}",
       "deadlineNotSet": "Müddət təyin edilməyib",
       "noSlaDeadline": "SLA müddəti yoxdur",
-      "dueOn": "{{date}} tarixində bitir",
       "overdueNow": "Gecikib",
       "overdue_one": "{{count}} gün gecikib",
       "overdue_other": "{{count}} gün gecikib",
@@ -3848,6 +3848,7 @@
       "markSecret": "Gizli olaraq qeyd edin",
       "masked": "Gizli dəyər",
       "reveal": "Dəyəri aşkar etmək",
+      "hide": "Dəyəri gizlətmək",
       "newValuePlaceholder": "Yeni gizli dəyər daxil edin",
       "valuePlaceholder": "Gizli dəyər (şifrələnmiş)"
     },

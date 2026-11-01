@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Ma jiraan dib-u-eegisyo dhowaan la sameeyay",
       "noRecentPrsDescription": "Kor ku dheji xiriiriye si aad u bilowdo dib-u-eegis — marka xigta halkan ayuu ka soo muuqan doonaa.",
-      "couldNotLoad": "Lama soo rari karin.",
       "removeFromRecentsTitle": "Ma laga saaraa kuwii dhowaan la isticmaalay?",
       "removeFromRecentsMessage": "Dib-u-eegistan waxaa laga saari doonaa liiska kuwii aad dhowaan isticmaashay.",
       "removeRecentAccessibility": "Ka saar {{repo}} liiska kuwii dhowaan la isticmaalay",
@@ -834,7 +833,8 @@
     "liveUpdates": "Cusboonaysiinta tooska ah",
     "liveUpdateSubtitle": "Ku muuji wakiillada firfircoon ogeysiisyadaada",
     "push": "Ogeysiisyada la soo diro",
-    "onDescription": "Ogeysiisyada la soo diro waa u daaran yihiin aaladdan.",
+    "deviceTitle": "Ogeysiisyada la soo diro ee aaladdan",
+    "onDescription": "Digniinaha waxay raacaan qaybaha hoos ku qoran.",
     "offDescription": "Oggolaanshaha ama diiwaangelinta aaladda waa dansan yahay.",
     "retryPermission": "Mar kale hubi oggolaanshaha ogeysiisyada",
     "enable": "Daar ogeysiisyada",
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Heerka halista: sare ilaa hoose",
       "sortSeverityAsc": "Heerka halista: hoose ilaa sare",
       "sortSlaDue": "Taariikhda kama dambaysta ah ee SLA",
-      "overdueOnly": "Kuwa waqtigoodu dhaafay oo keliya"
+      "overdueOnly": "Kuwa waqtigoodu dhaafay oo keliya",
+      "noRepositories": "Weli lama isku-dubbaridin ama lama dooran wax repository-yo ah. Ku dooro dejinta Wakiilka amniga."
     },
     "automation": {
       "title": "Otomaatigayn",
@@ -1783,6 +1784,7 @@
       "lastSynced": "Markii ugu dambaysay ee la isku waafajiyay: {{time}}",
       "manageRepositories": "Maamul kaydadka",
       "notYetSynced": "Weli lama isku waafajin",
+      "priorityFindingsPending": "Natiijooyinka mudnaanta waxay soo muuqan doonaan kadib isku waafajintii ugu horreysay.",
       "refreshFailed": "Lama cusboonaysiin karin. Waxaa la muujinayaa xogtii ugu dambaysay ee la isku waafajiyay.",
       "settings": "Dejinta",
       "syncNow": "Hadda isku waafaji",
@@ -1841,7 +1843,8 @@
     "findingDetails": {
       "supersededBy": "Waxaa beddelay natiijo hadda jirta",
       "supersededByDescription": "Taabo si aad u furto diiwaanka hadda jira oo aad u aragto xaaladda, falanqaynta iyo hagaajinta.",
-      "dismissedBecause": "Waa la iska dhaafay sababtoo ah {{reason}}.",
+      "dismissedOn": "Taariikhda la iska dhaafay",
+      "supersededOn": "Taariikhda la beddelay",
       "severityLabel": "Heerka halista: {{severity}}",
       "package": "Xirmo",
       "vulnerableVersions": "Noocyo nugul",
@@ -1858,11 +1861,6 @@
       "viewAdvisory": "GitHub ka eeg ogeysiiska amniga",
       "statusOpen": "Furan",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "hagaajin ayaa mar hore bilaabatay",
-      "reasonNoBandwidth": "awood shaqo lama hayo",
-      "reasonTolerableRisk": "khatarta waa loo dulqaadan karaa",
-      "reasonInaccurate": "natiijadu sax ma aha",
-      "reasonNotUsed": "koodhka nugul lama isticmaalo",
       "reasonAfterReview": "dib-u-eegis ka dib"
     },
     "settingsOverview": {
@@ -1922,7 +1920,7 @@
       "highDescription": "Xog badan ayaa halis ugu jirta inay bannaanka u baxdo.",
       "mediumDescription": "Saamayn xaddidan ama xaalado gaar ah.",
       "lowDescription": "Saamayn amni oo aad u yar.",
-      "invalidDayCount": "geli 1 ilaa 365 maalmood, adigoo isticmaalaya tirooyin dhan oo keliya.",
+      "invalidDayCount": "Geli 1 ilaa 365 maalmood, adigoo isticmaalaya tirooyin dhan oo keliya.",
       "remediationDeadlineA11y": "Muddada hagaajinta ee {{label}}, oo maalmo ah",
       "enterWholeNumber": "Geli tiro dhan oo u dhaxaysa 1 iyo 365",
       "permissionNote": "Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa beddeli kara dejintan.",
@@ -2062,7 +2060,10 @@
       "settleFailed": "Ficilka waa la dhammeeyay, laakiin ma awoodin inaan galmeeyno natiijada. Fadlan mar kale isku day.",
       "replayFailed": "Ficilkan lama dhammeeyn. Fadlan mar kale isku day.",
       "actionFailed": "Ficilkan lama dhammeeyi karin. Fadlan mar kale isku day.",
-      "actionBlocked": "Ficilkan lama dhammeeyi karin. Waa in dhibaatadan horay loo xalliyo."
+      "actionBlocked": "Ficilkan lama dhammeeyi karin. Waa in dhibaatadan horay loo xalliyo.",
+      "syncNoRepositories": "Ma jiro kayd-baakhaaro ku jira baaxadda is-waafajinta. Dooro kayd-baakhaarada uu Wakiilka amniga ilaaliyo, ka dibna mar kale is-waafaji.",
+      "syncIntegrationInactive": "Isku xirka GitHub ee Wakiilka amniga ma firfircoona. Dib u xir Kilo GitHub App, ka dibna mar kale isku dubarid.",
+      "syncMissingPermission": "Kilo GitHub App ma akhrin karo digniinaha nuglaanta. Sii ogolaanshahaas gudaha GitHub, ka dibna mar kale isku-dhaji."
     },
     "analysisState": {
       "queued": "Falanqaynta ayaa safan",
@@ -2096,7 +2097,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Waqtiga kama-dambaysta ah lama dejin",
       "noSlaDeadline": "Ma jiro waqti kama-dambays ah oo SLA ah",
-      "dueOn": "Waqtigu wuxuu dhammaanayaa {{date}}",
       "overdueNow": "Waqtigii dhaafay",
       "overdue_one": "Waqtigii dhaafay {{count}} maalin",
       "overdue_other": "{{count}} maalmood ayaa muddadii laga gudbay",
@@ -3848,6 +3848,7 @@
       "markSecret": "Ku calaamadee sir",
       "masked": "Qiimaha qarsoon",
       "reveal": "Muujinta qiimaha",
+      "hide": "Qarinta qiimaha",
       "newValuePlaceholder": "Geli qiime sir ah oo cusub",
       "valuePlaceholder": "Qiime sir ah (la sireeyay)"
     },

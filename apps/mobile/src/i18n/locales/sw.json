@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Hakuna ukaguzi wa hivi karibuni",
       "noRecentPrsDescription": "Bandika kiungo hapo juu kuanza ukaguzi — kitaonekana hapa mara ijayo.",
-      "couldNotLoad": "Imeshindikana kupakia.",
       "removeFromRecentsTitle": "Ungependa kuondoa kwenye orodha ya hivi karibuni?",
       "removeFromRecentsMessage": "Ukaguzi huu utaondolewa kwenye orodha yako ya hivi karibuni.",
       "removeRecentAccessibility": "Ondoa {{repo}} kwenye orodha ya hivi karibuni",
@@ -834,7 +833,8 @@
     "liveUpdates": "Masasisho ya moja kwa moja",
     "liveUpdateSubtitle": "Onyesha mawakala wanaofanya kazi kwenye arifa zako",
     "push": "Arifa zinazotumwa",
-    "onDescription": "Arifa zinazotumwa zimewashwa kwenye kifaa hiki.",
+    "deviceTitle": "Arifa zinazotumwa kwenye kifaa hiki",
+    "onDescription": "Arifa hutegemea kategoria zilizo hapa chini.",
     "offDescription": "Ruhusa ya arifa au usajili wa kifaa haujawezeshwa.",
     "retryPermission": "Jaribu tena kuangalia ruhusa ya arifa",
     "enable": "Washa arifa",
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Ukali: juu hadi chini",
       "sortSeverityAsc": "Ukali: chini hadi juu",
       "sortSlaDue": "Tarehe ya mwisho ya SLA",
-      "overdueOnly": "Yaliyochelewa tu"
+      "overdueOnly": "Yaliyochelewa tu",
+      "noRepositories": "Hakuna hazina zilizosawazishwa au kuchaguliwa bado. Zichague katika mipangilio ya Wakala wa usalama."
     },
     "automation": {
       "title": "Uendeshaji wa kiotomatiki",
@@ -1783,6 +1784,7 @@
       "lastSynced": "Ilisawazishwa mwisho {{time}}",
       "manageRepositories": "Simamia hazina",
       "notYetSynced": "Haijasawazishwa bado",
+      "priorityFindingsPending": "Vipaumbele vitaonekana baada ya usawazishaji wa kwanza.",
       "refreshFailed": "Imeshindikana kuonyesha upya data — data iliyosawazishwa mara ya mwisho ndiyo inayoonyeshwa.",
       "settings": "Mipangilio",
       "syncNow": "Sawazisha sasa",
@@ -1841,7 +1843,8 @@
     "findingDetails": {
       "supersededBy": "Nafasi yake imechukuliwa na tatizo la sasa",
       "supersededByDescription": "Gusa ili ufungue rekodi ya sasa na uone hali, uchambuzi na urekebishaji.",
-      "dismissedBecause": "Limeondolewa kwa sababu {{reason}}.",
+      "dismissedOn": "Tarehe ya kupuuzwa",
+      "supersededOn": "Tarehe ya kubadilishwa na nyingine",
       "severityLabel": "Ukali wa {{severity}}",
       "package": "Kifurushi",
       "vulnerableVersions": "Matoleo hatarishi",
@@ -1858,11 +1861,6 @@
       "viewAdvisory": "Tazama taarifa ya usalama kwenye GitHub",
       "statusOpen": "Wazi",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "marekebisho yameanza",
-      "reasonNoBandwidth": "hakuna muda wa kushughulikia",
-      "reasonTolerableRisk": "hatari inaweza kuvumiliwa",
-      "reasonInaccurate": "matokeo si sahihi",
-      "reasonNotUsed": "msimbo wenye udhaifu hautumiki",
       "reasonAfterReview": "baada ya ukaguzi"
     },
     "settingsOverview": {
@@ -1922,7 +1920,7 @@
       "highDescription": "Data inaweza kufichuliwa kwa kiwango kikubwa.",
       "mediumDescription": "Athari ndogo au masharti mahususi.",
       "lowDescription": "Athari ndogo sana kwa usalama.",
-      "invalidDayCount": "weka siku 1–365 kwa nambari nzima tu.",
+      "invalidDayCount": "Weka siku 1–365 kwa nambari nzima tu.",
       "remediationDeadlineA11y": "Muda wa mwisho wa urekebishaji wa {{label}} kwa siku",
       "enterWholeNumber": "Ingiza nambari kamili kati ya 1 na 365",
       "permissionNote": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kubadilisha mipangilio hii.",
@@ -2062,7 +2060,10 @@
       "settleFailed": "Kitendo kimekamilika, lakini hatukuweza kurekodi matokeo yake. Tafadhali jaribu tena.",
       "replayFailed": "Kitendo hiki hakikukamilika. Tafadhali jaribu tena.",
       "actionFailed": "Imeshindikana kukamilisha kitendo hiki. Tafadhali jaribu tena.",
-      "actionBlocked": "Imeshindikana kukamilisha kitendo hiki. Tatizo lazima litatuliwe kwanza."
+      "actionBlocked": "Imeshindikana kukamilisha kitendo hiki. Tatizo lazima litatuliwe kwanza.",
+      "syncNoRepositories": "Hakuna hazina zilizo katika wigo wa usawazishaji. Chagua hazina ambazo Wakala wa usalama hufuatilia, kisha usawazishe tena.",
+      "syncIntegrationInactive": "Muunganisho wa GitHub wa Wakala wa usalama haupo hai. Unganisha tena GitHub App ya Kilo, kisha usawazishe tena.",
+      "syncMissingPermission": "Kilo GitHub App haiwezi kusoma arifa za udhaifu. Toa ruhusa hiyo katika GitHub, kisha sinkronisha tena."
     },
     "analysisState": {
       "queued": "Uchambuzi uko kwenye foleni",
@@ -2096,7 +2097,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Muda wa mwisho haujawekwa",
       "noSlaDeadline": "Hakuna muda wa mwisho wa SLA",
-      "dueOn": "Muda unaisha {{date}}",
       "overdueNow": "Muda umepita",
       "overdue_one": "Muda umepita kwa siku {{count}}",
       "overdue_other": "Imechelewa kwa siku {{count}}",
@@ -3848,6 +3848,7 @@
       "markSecret": "Weka alama kuwa siri",
       "masked": "Thamani iliyofichwa",
       "reveal": "Onyesha thamani",
+      "hide": "Ficha thamani",
       "newValuePlaceholder": "Weka thamani mpya ya siri",
       "valuePlaceholder": "Thamani ya siri (imesimbwa)"
     },

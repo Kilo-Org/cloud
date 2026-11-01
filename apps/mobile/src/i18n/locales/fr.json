@@ -311,7 +311,8 @@
     "liveUpdates": "Mises à jour en direct",
     "liveUpdateSubtitle": "Afficher les agents actifs dans vos notifications",
     "push": "Notifications à distance",
-    "onDescription": "Les notifications à distance sont activées sur cet appareil.",
+    "deviceTitle": "Notifications sur cet appareil",
+    "onDescription": "Les alertes dépendent des catégories ci-dessous.",
     "offDescription": "Les notifications ne sont pas autorisées ou l'appareil n'est pas enregistré pour les recevoir.",
     "retryPermission": "Vérifier à nouveau l'autorisation des notifications",
     "enable": "Activer les notifications",
@@ -1122,7 +1123,8 @@
       "sortSeverityDesc": "Gravité : de la plus élevée à la plus faible",
       "sortSlaDue": "Échéance du SLA",
       "statusIgnored": "Ignoré",
-      "statusOpen": "Ouvert"
+      "statusOpen": "Ouvert",
+      "noRepositories": "Aucun dépôt n'est encore synchronisé ni sélectionné. Choisissez-les dans les paramètres de l'Agent de sécurité."
     },
     "analysis": {
       "analyzeRepository": "Analyser le dépôt",
@@ -1266,6 +1268,7 @@
       "notExploitable": "Non exploitable",
       "notMeasured": "Non mesuré",
       "notYetSynced": "Pas encore synchronisé",
+      "priorityFindingsPending": "Les signalements prioritaires apparaîtront après la première synchronisation.",
       "refreshFailed": "Impossible d'actualiser les données. Les dernières données synchronisées restent affichées.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "{{displayCount}} ouverts",
@@ -1354,7 +1357,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Détecté",
-      "dismissedBecause": "Ce signalement a été exclu : {{reason}}.",
+      "dismissedOn": "Ignoré le",
+      "supersededOn": "Remplacé le",
       "ghsa": "GHSA",
       "manifest": "Manifeste",
       "noPatchAvailable": "Aucun correctif disponible",
@@ -1371,11 +1375,6 @@
       "vulnerableVersions": "Versions vulnérables",
       "statusOpen": "Ouvert",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "correction déjà en cours",
-      "reasonNoBandwidth": "manque de ressources disponibles",
-      "reasonTolerableRisk": "risque acceptable",
-      "reasonInaccurate": "problème mal identifié",
-      "reasonNotUsed": "code vulnérable non utilisé",
       "reasonAfterReview": "après examen"
     },
     "findingList": {
@@ -1491,7 +1490,7 @@
       "enterWholeNumber": "Saisissez un nombre entier entre 1 et 365",
       "high": "Élevé",
       "highDescription": "Risque important d'exposition de données.",
-      "invalidDayCount": "saisissez un nombre entier de jours entre 1 et 365.",
+      "invalidDayCount": "Saisissez un nombre entier de jours entre 1 et 365.",
       "low": "Faible",
       "lowDescription": "Impact minimal sur la sécurité.",
       "medium": "Moyen",
@@ -1521,7 +1520,10 @@
       "settleFailed": "L'action a été effectuée, mais nous n'avons pas pu enregistrer le résultat. Réessayez.",
       "replayFailed": "Cette action n'a pas abouti. Réessayez.",
       "actionFailed": "Impossible d'effectuer cette action. Réessayez.",
-      "actionBlocked": "Impossible d'effectuer cette action. Le problème doit être résolu avant de pouvoir réessayer."
+      "actionBlocked": "Impossible d'effectuer cette action. Le problème doit être résolu avant de pouvoir réessayer.",
+      "syncNoRepositories": "Aucun dépôt ne fait partie du périmètre de synchronisation. Choisissez les dépôts que «Agent de sécurité» surveille, puis relancez la synchronisation.",
+      "syncIntegrationInactive": "La connexion GitHub pour l'Agent de sécurité n'est pas active. Reconnectez Kilo GitHub App, puis relancez la synchronisation.",
+      "syncMissingPermission": "L'application GitHub de Kilo ne peut pas lire les alertes de vulnérabilité. Accordez cette autorisation dans GitHub, puis synchronisez à nouveau."
     },
     "analysisState": {
       "queued": "Analyse en file d'attente",
@@ -1555,7 +1557,6 @@
       "closedOn": "{{status}} le {{date}}",
       "deadlineNotSet": "Aucune échéance définie",
       "noSlaDeadline": "Aucune échéance de SLA",
-      "dueOn": "Échéance le {{date}}",
       "overdueNow": "En retard",
       "overdue_one": "{{count}} jour de retard",
       "overdue_many": "{{count}} jours de retard",
@@ -2870,7 +2871,6 @@
     "entry": {
       "noRecentPrs": "Aucune revue récente",
       "noRecentPrsDescription": "Collez un lien ci-dessus pour démarrer une revue — elle apparaîtra ici la prochaine fois.",
-      "couldNotLoad": "Le chargement est impossible.",
       "removeFromRecentsTitle": "Retirer des éléments récents ?",
       "removeFromRecentsMessage": "Cette revue sera retirée de vos éléments récents.",
       "removeRecentAccessibility": "Retirer {{repo}} des éléments récents",
@@ -3910,6 +3910,7 @@
       "markSecret": "Marquer comme secret",
       "masked": "Valeur cachée",
       "reveal": "Révéler la valeur",
+      "hide": "Masquer la valeur",
       "newValuePlaceholder": "Saisir une nouvelle valeur secrète",
       "valuePlaceholder": "Valeur secrète (chiffrée)"
     },

@@ -305,7 +305,8 @@
     "liveUpdates": "ライブアップデート",
     "liveUpdateSubtitle": "通知に稼働中のエージェントを表示",
     "push": "プッシュ通知",
-    "onDescription": "このデバイスではプッシュ通知がオンです。",
+    "deviceTitle": "このデバイスのプッシュ通知",
+    "onDescription": "通知は下のカテゴリに従います。",
     "offDescription": "通知が許可されていないか、このデバイスの通知登録が無効になっています。",
     "retryPermission": "通知権限の確認を再試行",
     "enable": "通知を有効にする",
@@ -1151,7 +1152,8 @@
       "sortSeverityDesc": "重大度：高い順",
       "sortSlaDue": "SLA期限",
       "statusIgnored": "無視済み",
-      "statusOpen": "オープン"
+      "statusOpen": "オープン",
+      "noRepositories": "リポジトリはまだ同期も選択もされていません。セキュリティエージェントの設定で選択してください。"
     },
     "analysis": {
       "analyzeRepository": "リポジトリを分析",
@@ -1293,6 +1295,7 @@
       "notExploitable": "悪用不可",
       "notMeasured": "未測定",
       "notYetSynced": "未同期",
+      "priorityFindingsPending": "最初の同期後に、優先度の高い検出結果が表示されます。",
       "refreshFailed": "更新できませんでした。最後に同期したデータを表示しています。",
       "repoSummary": "{{open}}・{{critical}}・{{high}}",
       "repoSummaryOpen": "未解決{{displayCount}}件",
@@ -1367,7 +1370,8 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "検出日時",
-      "dismissedBecause": "却下しました（理由：{{reason}}）。",
+      "dismissedOn": "却下日",
+      "supersededOn": "置き換え日",
       "ghsa": "GHSA",
       "manifest": "マニフェスト",
       "noPatchAvailable": "利用可能なパッチなし",
@@ -1384,11 +1388,6 @@
       "vulnerableVersions": "脆弱性のあるバージョン",
       "statusOpen": "オープン",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "修正に着手済み",
-      "reasonNoBandwidth": "対応する余裕なし",
-      "reasonTolerableRisk": "リスクは許容範囲",
-      "reasonInaccurate": "検出事項が不正確",
-      "reasonNotUsed": "脆弱なコードは未使用",
       "reasonAfterReview": "確認の結果"
     },
     "findingList": {
@@ -1533,7 +1532,10 @@
       "settleFailed": "操作は完了しましたが、結果を記録できませんでした。もう一度お試しください。",
       "replayFailed": "この操作は完了しませんでした。もう一度お試しください。",
       "actionFailed": "この操作を完了できませんでした。もう一度お試しください。",
-      "actionBlocked": "この操作を完了できませんでした。再試行するには、まず問題を解決する必要があります。"
+      "actionBlocked": "この操作を完了できませんでした。再試行するには、まず問題を解決する必要があります。",
+      "syncNoRepositories": "同期対象にリポジトリがありません。セキュリティエージェントが監視するリポジトリを選択してから、もう一度同期してください。",
+      "syncIntegrationInactive": "セキュリティエージェントの GitHub 接続が有効になっていません。Kilo GitHub App を再接続してから、もう一度同期してください。",
+      "syncMissingPermission": "Kilo GitHub App は vulnerability alerts を読み取れません。GitHub でその権限を付与してから、もう一度同期してください。"
     },
     "analysisState": {
       "queued": "分析の順番待ち",
@@ -1567,7 +1569,6 @@
       "closedOn": "{{date}}：{{status}}",
       "deadlineNotSet": "期限未設定",
       "noSlaDeadline": "SLA期限なし",
-      "dueOn": "期限：{{date}}",
       "overdueNow": "期限超過",
       "overdue_other": "{{count}}日超過",
       "dueToday": "今日が期限",
@@ -2827,7 +2828,6 @@
     "entry": {
       "noRecentPrs": "最近のレビューはありません",
       "noRecentPrsDescription": "上にリンクを貼り付けてレビューを始めると、次からはここに表示されます。",
-      "couldNotLoad": "読み込めませんでした。",
       "removeFromRecentsTitle": "最近の履歴から削除しますか？",
       "removeFromRecentsMessage": "このレビューは最近の履歴から削除されます。",
       "removeRecentAccessibility": "{{repo}}を最近の履歴から削除",
@@ -3848,6 +3848,7 @@
       "markSecret": "シークレットとしてマークする",
       "masked": "隠された値",
       "reveal": "値を明らかにする",
+      "hide": "値を隠す",
       "newValuePlaceholder": "新しいシークレット値を入力",
       "valuePlaceholder": "シークレット値（暗号化）"
     },

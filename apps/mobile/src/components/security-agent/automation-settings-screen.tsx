@@ -199,6 +199,12 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     // Keep a dirty draft and its controls usable if the redirect is cancelled.
     return <>{dialog}</>;
   }
+  // The draft hydrates from the config in an effect; painting the body first
+  // would show the default toggles and then push every control below them down
+  // when their pickers appear.
+  if (baseline === null) {
+    return <AutomationSettingsSkeleton />;
+  }
 
   return (
     <View className="flex-1 bg-background">

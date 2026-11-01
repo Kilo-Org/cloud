@@ -627,7 +627,6 @@
     "entry": {
       "noRecentPrs": "Žiadne nedávne recenzie",
       "noRecentPrsDescription": "Ak chcete začať recenziu, vložte vyššie odkaz — nabudúce sa zobrazí tu.",
-      "couldNotLoad": "Nepodarilo sa načítať.",
       "removeFromRecentsTitle": "Odstrániť z nedávnych žiadostí?",
       "removeFromRecentsMessage": "Táto recenzia sa odstráni z nedávnych.",
       "removeRecentAccessibility": "Odstrániť {{repo}} zo zoznamu nedávnych žiadostí",
@@ -872,7 +871,8 @@
     "liveUpdates": "Priebežné aktualizácie",
     "liveUpdateSubtitle": "Zobrazovať aktívnych agentov v upozorneniach",
     "push": "Upozornenia aplikácie",
-    "onDescription": "Upozornenia aplikácie sú na tomto zariadení zapnuté.",
+    "deviceTitle": "Push upozornenia na tomto zariadení",
+    "onDescription": "Upozornenia sa riadia kategóriami nižšie.",
     "offDescription": "Upozornenia nie sú povolené alebo zariadenie nie je zaregistrované.",
     "retryPermission": "Skúsiť znova skontrolovať povolenie upozornení",
     "enable": "Zapnúť upozornenia",
@@ -1724,7 +1724,8 @@
       "sortSeverityDesc": "Závažnosť: od najvyššej",
       "sortSeverityAsc": "Závažnosť: od najnižšej",
       "sortSlaDue": "Termín SLA",
-      "overdueOnly": "Iba po termíne"
+      "overdueOnly": "Iba po termíne",
+      "noRepositories": "Zatiaľ nie sú synchronizované ani vybrané žiadne repozitáre. Vyberte ich v nastaveniach Bezpečnostného agenta."
     },
     "automation": {
       "title": "Automatizácia",
@@ -1835,6 +1836,7 @@
       "lastSynced": "Naposledy synchronizované {{time}}",
       "manageRepositories": "Spravovať repozitáre",
       "notYetSynced": "Zatiaľ nesynchronizované",
+      "priorityFindingsPending": "Priority nálezov sa zobrazia po prvej synchronizácii.",
       "refreshFailed": "Obnovenie zlyhalo — zobrazujú sa posledné synchronizované údaje.",
       "settings": "Nastavenia",
       "syncNow": "Synchronizovať teraz",
@@ -1903,7 +1905,8 @@
     "findingDetails": {
       "supersededBy": "Nahradené aktuálnym nálezom",
       "supersededByDescription": "Klepnutím otvoríte aktuálny záznam s údajmi o stave, analýze a náprave.",
-      "dismissedBecause": "Dôvod zamietnutia: {{reason}}.",
+      "dismissedOn": "Ignorované dňa",
+      "supersededOn": "Nahradené dňa",
       "severityLabel": "Závažnosť: {{severity}}",
       "package": "Balík",
       "vulnerableVersions": "Zraniteľné verzie",
@@ -1920,11 +1923,6 @@
       "viewAdvisory": "Zobraziť bezpečnostné upozornenie na platforme GitHub",
       "statusOpen": "Otvorené",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "oprava sa už začala",
-      "reasonNoBandwidth": "nie je voľná kapacita",
-      "reasonTolerableRisk": "riziko je prijateľné",
-      "reasonInaccurate": "zistenie je nepresné",
-      "reasonNotUsed": "zraniteľný kód sa nepoužíva",
       "reasonAfterReview": "po preskúmaní"
     },
     "settingsOverview": {
@@ -1986,7 +1984,7 @@
       "highDescription": "Možný závažný únik údajov.",
       "mediumDescription": "Obmedzený dosah alebo osobitné podmienky zneužitia.",
       "lowDescription": "Minimálny vplyv na bezpečnosť.",
-      "invalidDayCount": "zadajte počet dní od 1 do 365 ako celé číslo.",
+      "invalidDayCount": "Zadajte počet dní od 1 do 365 ako celé číslo.",
       "remediationDeadlineA11y": "Lehota na nápravu v dňoch, závažnosť: {{label}}",
       "enterWholeNumber": "Zadaj celé číslo od 1 do 365",
       "permissionNote": "Tieto nastavenia môžu meniť iba vlastníci organizácie, správcovia a správcovia fakturácie.",
@@ -2128,7 +2126,10 @@
       "settleFailed": "Akcia sa vykonala, ale nepodarilo sa nám zaznamenať výsledok. Skúste to znova.",
       "replayFailed": "Táto akcia sa nevykonala. Skúste to znova.",
       "actionFailed": "Túto akciu sa nepodarilo dokončiť. Skúste to znova.",
-      "actionBlocked": "Túto akciu sa nepodarilo dokončiť. Problém je potrebné najprv vyriešiť."
+      "actionBlocked": "Túto akciu sa nepodarilo dokončiť. Problém je potrebné najprv vyriešiť.",
+      "syncNoRepositories": "V rozsahu synchronizácie nie sú žiadne repozitáre. Vyberte repozitáre, ktoré Bezpečnostný agent monitoruje, a potom znova synchronizujte.",
+      "syncIntegrationInactive": "Pripojenie GitHub pre Bezpečnostného agenta nie je aktívne. Znovu pripojte Kilo GitHub App a potom znova synchronizujte.",
+      "syncMissingPermission": "Aplikácia Kilo na GitHube nemôže čítať upozornenia na zraniteľnosti. Udeľte toto povolenie na GitHube a potom znova synchronizujte."
     },
     "analysisState": {
       "queued": "Analýza čaká v poradí",
@@ -2162,7 +2163,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Termín nie je nastavený",
       "noSlaDeadline": "Bez termínu SLA",
-      "dueOn": "Termín: {{date}}",
       "overdueNow": "Po termíne",
       "dueToday": "Termín dnes",
       "dueTomorrow": "Termín zajtra",
@@ -3960,6 +3960,7 @@
       "markSecret": "Označiť ako tajné",
       "masked": "Skrytá hodnota",
       "reveal": "Odhaliť hodnotu",
+      "hide": "Skryť hodnotu",
       "newValuePlaceholder": "Zadajte novú tajnú hodnotu",
       "valuePlaceholder": "Tajná hodnota (šifrovaná)"
     },

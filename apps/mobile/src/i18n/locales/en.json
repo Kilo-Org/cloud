@@ -671,7 +671,6 @@
     "entry": {
       "noRecentPrs": "No recent reviews",
       "noRecentPrsDescription": "Paste a link above to start a review — it'll show up here next time.",
-      "couldNotLoad": "Couldn't load",
       "removeFromRecentsTitle": "Remove from recents?",
       "removeFromRecentsMessage": "This review will be removed from your recents.",
       "removeRecentAccessibility": "Remove {{repo}} from recents",
@@ -900,7 +899,8 @@
     "liveUpdates": "Live Updates",
     "liveUpdateSubtitle": "Show active agents in your notifications",
     "push": "Push",
-    "onDescription": "Push notifications are on for this device.",
+    "deviceTitle": "Push on this device",
+    "onDescription": "Alerts follow the categories below.",
     "offDescription": "Permission or device registration is off.",
     "retryPermission": "Retry checking notification permission",
     "enable": "Enable notifications",
@@ -1746,7 +1746,8 @@
       "sortSeverityDesc": "Severity: high to low",
       "sortSeverityAsc": "Severity: low to high",
       "sortSlaDue": "SLA due date",
-      "overdueOnly": "Overdue only"
+      "overdueOnly": "Overdue only",
+      "noRepositories": "No repositories are synced or selected yet. Choose them in Security Agent settings."
     },
     "automation": {
       "title": "Automation",
@@ -1853,6 +1854,7 @@
       "lastSynced": "Last synced {{time}}",
       "manageRepositories": "Manage repositories",
       "notYetSynced": "Not yet synced",
+      "priorityFindingsPending": "Priority findings will appear after the first sync.",
       "refreshFailed": "Could not refresh — showing last synced data.",
       "settings": "Settings",
       "syncNow": "Sync now",
@@ -1907,7 +1909,8 @@
     "findingDetails": {
       "supersededBy": "Superseded by a current finding",
       "supersededByDescription": "Tap to open the current record for status, analysis, and remediation.",
-      "dismissedBecause": "Dismissed because {{reason}}.",
+      "dismissedOn": "Dismissed on",
+      "supersededOn": "Superseded on",
       "severityLabel": "{{severity}} severity",
       "package": "Package",
       "vulnerableVersions": "Vulnerable versions",
@@ -1924,11 +1927,6 @@
       "viewAdvisory": "View advisory on GitHub",
       "statusOpen": "Open",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "a fix has already started",
-      "reasonNoBandwidth": "no bandwidth is available",
-      "reasonTolerableRisk": "the risk is tolerable",
-      "reasonInaccurate": "the finding is inaccurate",
-      "reasonNotUsed": "vulnerable code is not used",
       "reasonAfterReview": "after review"
     },
     "settingsOverview": {
@@ -2127,6 +2125,9 @@
       "ambiguous": "Couldn't confirm — check the security review before retrying.",
       "settleFailed": "The action completed, but we could not record the result. Please try again.",
       "replayFailed": "This action did not complete. Please try again.",
+      "syncNoRepositories": "No repositories are in the sync scope. Choose the repositories Security Agent monitors, then sync again.",
+      "syncIntegrationInactive": "The GitHub connection for Security Agent is not active. Reconnect the Kilo GitHub App, then sync again.",
+      "syncMissingPermission": "The Kilo GitHub App cannot read vulnerability alerts. Grant that permission in GitHub, then sync again.",
       "actionFailed": "Could not complete this action. Please try again.",
       "actionBlocked": "Could not complete this action. The problem needs fixing before you can retry."
     },
@@ -2162,7 +2163,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Deadline not set",
       "noSlaDeadline": "No SLA deadline",
-      "dueOn": "Due {{date}}",
       "overdueNow": "Overdue",
       "overdue_one": "{{count}} day overdue",
       "overdue_other": "{{count}} days overdue",
@@ -3914,6 +3914,7 @@
       "markSecret": "Mark as secret",
       "masked": "Hidden value",
       "reveal": "Reveal value",
+      "hide": "Hide value",
       "newValuePlaceholder": "Enter new secret value",
       "valuePlaceholder": "Secret value (encrypted)"
     },

@@ -605,7 +605,6 @@
     "entry": {
       "noRecentPrs": "Babu bitutu na baya-bayan nan",
       "noRecentPrsDescription": "Manna mahaɗi a sama don fara bita — zai bayyana a nan a karo na gaba.",
-      "couldNotLoad": "Ba a iya lodawa ba.",
       "removeFromRecentsTitle": "A cire daga jerin na kwanan nan?",
       "removeFromRecentsMessage": "Za a cire wannan bita daga na baya-bayan nan.",
       "removeRecentAccessibility": "Cire {{repo}} daga jerin na kwanan nan",
@@ -834,7 +833,8 @@
     "liveUpdates": "Sabuntawa kai tsaye",
     "liveUpdateSubtitle": "Nuna wakilai masu aiki a cikin sanarwarka",
     "push": "Sanarwar turawa",
-    "onDescription": "An kunna sanarwar turawa a wannan na'ura.",
+    "deviceTitle": "Sanarwar turawa a wannan na'ura",
+    "onDescription": "Faɗakarwa tana bin rukunonin da ke ƙasa.",
     "offDescription": "An kashe izinin sanarwa ko rajistar na'urar.",
     "retryPermission": "Sake gwada duba izinin sanarwa",
     "enable": "Kunna sanarwa",
@@ -1680,7 +1680,8 @@
       "sortSeverityDesc": "Tsanani: daga babba zuwa ƙarami",
       "sortSeverityAsc": "Tsanani: daga ƙarami zuwa babba",
       "sortSlaDue": "Ranar cikar wa'adin SLA",
-      "overdueOnly": "Waɗanda wa'adinsu ya wuce kawai"
+      "overdueOnly": "Waɗanda wa'adinsu ya wuce kawai",
+      "noRepositories": "Babu rumbun ajiya da aka daidaita ko aka zaɓa tukuna. Zaɓe su a cikin saitin Wakilin tsaro."
     },
     "automation": {
       "title": "Aiki na atomatik",
@@ -1783,6 +1784,7 @@
       "lastSynced": "An daidaita a ƙarshe {{time}}",
       "manageRepositories": "Sarrafa ma'ajiyoyi",
       "notYetSynced": "Har yanzu ba a daidaita ba",
+      "priorityFindingsPending": "Abubuwan da za a fara yi daga cikin matsalolin da aka gano za su bayyana bayan an yi daidaitawa ta farko.",
       "refreshFailed": "An kasa sabuntawa — ana nuna bayanan da aka daidaita a ƙarshe.",
       "settings": "Saituna",
       "syncNow": "Daidaita yanzu",
@@ -1841,7 +1843,8 @@
     "findingDetails": {
       "supersededBy": "Wata matsalar da aka gano a yanzu ta maye gurbinta",
       "supersededByDescription": "Danna don buɗe bayanan matsalar ta yanzu ka ga halinta, nazarinta da gyaranta.",
-      "dismissedBecause": "An yi watsi da ita domin {{reason}}.",
+      "dismissedOn": "An yi watsi da shi a ranar",
+      "supersededOn": "An maye gurbinsa a ranar",
       "severityLabel": "Tsanani: {{severity}}",
       "package": "Kunshi",
       "vulnerableVersions": "Sigogin da ke da raunin tsaro",
@@ -1858,11 +1861,6 @@
       "viewAdvisory": "Duba sanarwar tsaro a GitHub",
       "statusOpen": "Buɗe",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "an riga an fara gyara",
-      "reasonNoBandwidth": "babu damar yin aikin",
-      "reasonTolerableRisk": "ana iya jure haɗarin",
-      "reasonInaccurate": "sakamakon binciken bai yi daidai ba",
-      "reasonNotUsed": "ba a amfani da lambar shirin da ke da rauni",
       "reasonAfterReview": "bayan bita"
     },
     "settingsOverview": {
@@ -1922,7 +1920,7 @@
       "highDescription": "Akwai yiwuwar fallasa muhimman bayanai.",
       "mediumDescription": "Tasiri mai iyaka ko sharuɗɗa na musamman.",
       "lowDescription": "Ƙaramin tasiri kan tsaro.",
-      "invalidDayCount": "shigar da kwanaki 1–365, da lambobi cikakku kawai.",
+      "invalidDayCount": "Shigar da kwanaki 1–365, da lambobi cikakku kawai.",
       "remediationDeadlineA11y": "Wa'adin gyaran {{label}} a kwanaki",
       "enterWholeNumber": "Shigar da cikakkiyar lamba tsakanin 1 da 365",
       "permissionNote": "Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya canza waɗannan saitunan.",
@@ -2062,7 +2060,10 @@
       "settleFailed": "An kammala aikin, amma ba mu iya rubuta sakamakon ba. Sake gwadawa.",
       "replayFailed": "Wannan aikin bai kammala ba. Sake gwadawa.",
       "actionFailed": "Ba za a iya kammala wannan aikin ba. Sake gwadawa.",
-      "actionBlocked": "Ba za a iya kammala wannan aikin ba. Dole a gyara matsalar kafin a sake gwadawa."
+      "actionBlocked": "Ba za a iya kammala wannan aikin ba. Dole a gyara matsalar kafin a sake gwadawa.",
+      "syncNoRepositories": "Babu wata ma'ajiyar bayanai da ke cikin iyakar daidaitawa. Zaɓi ma'ajiyoyin bayanai da Wakilin tsaro ke sa ido a kansu, sannan a sake daidaitawa.",
+      "syncIntegrationInactive": "Haɗin GitHub na Wakilin tsaro ba ya aiki. Sake haɗa Kilo GitHub App, sannan ka sake daidaitawa.",
+      "syncMissingPermission": "Kilo GitHub App ba ya iya karanta vulnerability alerts. Ba da wannan izni a GitHub, sannan ka sake daidaitawa."
     },
     "analysisState": {
       "queued": "Nazarin yana layin jira",
@@ -2096,7 +2097,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Ba a saita wa'adi ba",
       "noSlaDeadline": "Babu wa'adin SLA",
-      "dueOn": "Wa'adi zai cika {{date}}",
       "overdueNow": "Wa'adi ya wuce",
       "overdue_one": "Wa'adin ya wuce da kwana {{count}}",
       "overdue_other": "An wuce wa'adi da kwanaki {{count}}",
@@ -3848,6 +3848,7 @@
       "markSecret": "Yi alama a matsayin sirri",
       "masked": "Ƙimar ɓoye",
       "reveal": "Bayyana darajar",
+      "hide": "Ɓoye darajar",
       "newValuePlaceholder": "Shigar da sabuwar ƙimar sirri",
       "valuePlaceholder": "Ƙimar sirri (an ɓoye)"
     },

@@ -299,8 +299,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     timezone,
     localDate,
     reportId: personal.id,
-    deepLink: `kiloapp://agent-briefing/${personal.id}`,
-    listDeepLink: 'kiloapp://agent-briefing',
+    deepLink: `kiloapp:///(app)/agent-briefing/${personal.id}`,
+    listDeepLink: 'kiloapp:///(app)/agent-briefing',
     organizationReportId: options.organizationId ? (organization?.id ?? null) : null,
     blockedSessionId: stableSessionId(userId, 'checkout'),
   };

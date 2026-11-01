@@ -616,7 +616,6 @@
     "entry": {
       "noRecentPrs": "Nav nesenu pārskatu",
       "noRecentPrsDescription": "Ielīmē saiti augšā, lai sāktu pārskatīšanu — nākamreiz tā būs redzama šeit.",
-      "couldNotLoad": "Neizdevās ielādēt.",
       "removeFromRecentsTitle": "Noņemt no nesen atvērtajiem?",
       "removeFromRecentsMessage": "Šī pārskatīšana tiks noņemta no nesenajiem vienumiem.",
       "removeRecentAccessibility": "Noņemt {{repo}} no nesen atvērtajiem",
@@ -853,7 +852,8 @@
     "liveUpdates": "Atjauninājumi reāllaikā",
     "liveUpdateSubtitle": "Rādīt aktīvos aģentus paziņojumos",
     "push": "Pašpiegādes paziņojumi",
-    "onDescription": "Šajā ierīcē ir ieslēgti pašpiegādes paziņojumi.",
+    "deviceTitle": "Paziņojumi šajā ierīcē",
+    "onDescription": "Paziņojumi atbilst zemāk esošajām kategorijām.",
     "offDescription": "Nav piešķirta atļauja vai ierīce nav reģistrēta paziņojumu saņemšanai.",
     "retryPermission": "Mēģināt pārbaudīt paziņojumu atļauju vēlreiz",
     "enable": "Iespējot paziņojumus",
@@ -1702,7 +1702,8 @@
       "sortSeverityDesc": "Smaguma pakāpe: no augstākās līdz zemākajai",
       "sortSeverityAsc": "Smaguma pakāpe: no zemākās līdz augstākajai",
       "sortSlaDue": "SLA termiņš",
-      "overdueOnly": "Tikai nokavētie"
+      "overdueOnly": "Tikai nokavētie",
+      "noRepositories": "Vēl nav sinhronizēta vai atlasīta neviena repozitorija. Izvēlieties tās Drošības aģenta iestatījumos."
     },
     "automation": {
       "title": "Automatizācija",
@@ -1809,6 +1810,7 @@
       "lastSynced": "Pēdējo reizi sinhronizēts {{time}}",
       "manageRepositories": "Pārvaldīt repozitorijus",
       "notYetSynced": "Vēl nav sinhronizēts",
+      "priorityFindingsPending": "Prioritārie konstatējumi būs redzami pēc pirmās sinhronizēšanas.",
       "refreshFailed": "Neizdevās atsvaidzināt datus. Tiek rādīti pēdējās sinhronizācijas dati.",
       "settings": "Iestatījumi",
       "syncNow": "Sinhronizēt tagad",
@@ -1872,7 +1874,8 @@
     "findingDetails": {
       "supersededBy": "Aizstāts ar aktuālu konstatējumu",
       "supersededByDescription": "Pieskaries, lai atvērtu aktuālo ierakstu un skatītu statusu, analīzi un labošanas informāciju.",
-      "dismissedBecause": "Noraidīts: {{reason}}.",
+      "dismissedOn": "Noraidīšanas datums",
+      "supersededOn": "Aizstāšanas datums",
       "severityLabel": "Smaguma pakāpe: {{severity}}",
       "package": "Pakete",
       "vulnerableVersions": "Ievainojamās versijas",
@@ -1889,11 +1892,6 @@
       "viewAdvisory": "Skatīt drošības paziņojumu vietnē GitHub",
       "statusOpen": "Atvērts",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "labošana jau ir sākta",
-      "reasonNoBandwidth": "trūkst laika vai resursu",
-      "reasonTolerableRisk": "risks ir pieņemams",
-      "reasonInaccurate": "konstatējums ir neprecīzs",
-      "reasonNotUsed": "ievainojamais kods netiek izmantots",
       "reasonAfterReview": "pēc pārskatīšanas"
     },
     "settingsOverview": {
@@ -1954,7 +1952,7 @@
       "highDescription": "Iespējama būtiska datu noplūde.",
       "mediumDescription": "Ierobežota ietekme vai īpaši nosacījumi.",
       "lowDescription": "Minimāla ietekme uz drošību.",
-      "invalidDayCount": "norādi no 1 līdz 365 dienām, izmantojot tikai veselus skaitļus.",
+      "invalidDayCount": "Norādi no 1 līdz 365 dienām, izmantojot tikai veselus skaitļus.",
       "remediationDeadlineA11y": "Labošanas termiņš dienās; smaguma pakāpe: {{label}}",
       "enterWholeNumber": "Ievadi veselu skaitli no 1 līdz 365",
       "permissionNote": "Tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki var mainīt šos iestatījumus.",
@@ -2095,7 +2093,10 @@
       "settleFailed": "Darbība tika pabeigta, bet mēs nevarējām reģistrēt rezultātu. Lūdzu, mēģini vēlreiz.",
       "replayFailed": "Šī darbība netika pabeigta. Lūdzu, mēģini vēlreiz.",
       "actionFailed": "Neizdevās pabeigt šo darbību. Lūdzu, mēģini vēlreiz.",
-      "actionBlocked": "Neizdevās pabeigt šo darbību. Vispirms jāatrisina problēma, lai varētu mēģināt vēlreiz."
+      "actionBlocked": "Neizdevās pabeigt šo darbību. Vispirms jāatrisina problēma, lai varētu mēģināt vēlreiz.",
+      "syncNoRepositories": "Sinhronizācijas tvērumā nav neviena repozitorija. Izvēlieties repozitorijus, kurus pārrauga Drošības aģents, un pēc tam sinhronizējiet vēlreiz.",
+      "syncIntegrationInactive": "Drošības aģenta GitHub savienojums nav aktīvs. Atkārtoti pievienojiet Kilo GitHub App un pēc tam sinhronizējiet vēlreiz.",
+      "syncMissingPermission": "Kilo GitHub lietotne nevar lasīt ievainojamību brīdinājumus. Piešķir šo atļauju GitHub un pēc tam sinhronizē vēlreiz."
     },
     "analysisState": {
       "queued": "Analīze rindā",
@@ -2129,7 +2130,6 @@
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Termiņš nav noteikts",
       "noSlaDeadline": "Nav SLA termiņa",
-      "dueOn": "Termiņš {{date}}",
       "overdueNow": "Nokavēts",
       "overdue_zero": "Nokavēts par {{count}} dienām",
       "overdue_one": "Nokavēts par {{count}} dienu",
@@ -3904,6 +3904,7 @@
       "markSecret": "Atzīmēt kā noslēpumu",
       "masked": "Slēptā vērtība",
       "reveal": "Atklāj vērtību",
+      "hide": "Paslēpt vērtību",
       "newValuePlaceholder": "Ievadiet jaunu slepenu vērtību",
       "valuePlaceholder": "Slepena vērtība (šifrēta)"
     },

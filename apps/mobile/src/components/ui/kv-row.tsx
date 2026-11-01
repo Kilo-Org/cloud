@@ -39,7 +39,10 @@ type KvRowProps = {
    * Render the value as a left-to-right run whatever the interface direction is.
    * A version, a version range and a CVE or GHSA id are written left to right,
    * so the bidi algorithm otherwise reverses a range in a right-to-left locale:
-   * `< 6.13.0` paints as `6.13.0 >`, which inverts its meaning.
+   * `< 6.13.0` paints as `6.13.0 >`, which inverts its meaning. Such a value
+   * also keeps the row's outer edge — the left side in a right-to-left
+   * interface, where the mirrored row puts the value — so a value that wraps
+   * starts under its own first line instead of hanging back toward the label.
    */
   valueDirection?: 'ltr';
 };

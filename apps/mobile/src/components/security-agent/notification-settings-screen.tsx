@@ -228,13 +228,17 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
               onValueChange={setNewFindingNotificationsEnabled}
             />
             {newFindingNotificationsEnabled && (
-              <PillGroup
-                label={t('securityAgent.notifications.newFindingSeverityLabel')}
-                options={severityOptions}
-                value={newFindingNotificationMinSeverity}
-                disabled={!canManage}
-                onChange={setNewFindingNotificationMinSeverity}
-              />
+              // The revealed field steps in from the toggle that owns it, so it
+              // reads as part of this section instead of a second heading.
+              <View className="ps-3">
+                <PillGroup
+                  label={t('securityAgent.notifications.newFindingSeverityLabel')}
+                  options={severityOptions}
+                  value={newFindingNotificationMinSeverity}
+                  disabled={!canManage}
+                  onChange={setNewFindingNotificationMinSeverity}
+                />
+              </View>
             )}
           </View>
         </View>
@@ -267,7 +271,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
               onValueChange={setSlaNotificationsEnabled}
             />
             {slaNotificationsEnabled && (
-              <>
+              <View className="gap-2 ps-3">
                 <PillGroup
                   label={t('securityAgent.notifications.slaSeverityLabel')}
                   options={severityOptions}
@@ -308,7 +312,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                     </Text>
                   )}
                 </View>
-              </>
+              </View>
             )}
           </View>
         </View>

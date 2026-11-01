@@ -232,7 +232,9 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
               onValueChange={setAutoAnalysisEnabled}
             />
             {autoAnalysisEnabled && (
-              <>
+              // The revealed fields step in from the toggle that owns them, so
+              // they read as part of this section instead of peer headings.
+              <View className="gap-2 ps-3">
                 <PillGroup
                   label={t('securityAgent.automation.minimumSeverity')}
                   options={minSeverityOptions}
@@ -247,7 +249,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
                   disabled={!canManage}
                   onValueChange={setAutoAnalysisIncludeExisting}
                 />
-              </>
+              </View>
             )}
           </View>
         </View>
@@ -265,7 +267,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
               onValueChange={handleAutoRemediationToggle}
             />
             {autoRemediationEnabled && (
-              <>
+              <View className="gap-2 ps-3">
                 <PillGroup
                   label={t('securityAgent.automation.minimumSeverity')}
                   options={minSeverityOptions}
@@ -289,7 +291,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
                   disabled={!canManage}
                   onValueChange={setAutoRemediationRequireApproval}
                 />
-              </>
+              </View>
             )}
           </View>
         </View>
@@ -307,13 +309,15 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
               onValueChange={setAutoDismissEnabled}
             />
             {autoDismissEnabled && (
-              <PillGroup
-                label={t('securityAgent.automation.confidenceThreshold')}
-                options={confidenceOptions}
-                value={autoDismissConfidenceThreshold}
-                disabled={!canManage}
-                onChange={setAutoDismissConfidenceThreshold}
-              />
+              <View className="ps-3">
+                <PillGroup
+                  label={t('securityAgent.automation.confidenceThreshold')}
+                  options={confidenceOptions}
+                  value={autoDismissConfidenceThreshold}
+                  disabled={!canManage}
+                  onChange={setAutoDismissConfidenceThreshold}
+                />
+              </View>
             )}
           </View>
         </View>

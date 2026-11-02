@@ -162,12 +162,20 @@ export async function evaluateSupportAccess(params: {
 }
 
 export async function isLiveOrganization(organizationId: string): Promise<boolean> {
+  const state = await organizationState(organizationId);
+  return state === 'live';
+}
+
+export async function organizationState(
+  organizationId: string
+): Promise<'missing' | 'deleted' | 'live'> {
   const [organization] = await db
-    .select({ id: organizations.id })
+    .select({ deletedAt: organizations.deleted_at })
     .from(organizations)
-    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+    .where(eq(organizations.id, organizationId))
     .limit(1);
-  return organization !== undefined;
+  if (!organization) return 'missing';
+  return organization.deletedAt === null ? 'live' : 'deleted';
 }
 
 /**

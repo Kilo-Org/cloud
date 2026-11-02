@@ -33,6 +33,7 @@ import {
   evaluateSupportAccess,
   isLiveOrganization,
   latestSupportGrantStatus,
+  organizationState,
   recordSupportWriteUse,
 } from '@kilocode/web-shared/lib/admin/support-access-resolver';
 import { TRPCError } from '@trpc/server';
@@ -262,15 +263,23 @@ export async function resolveOrganizationAccess(
     membershipObserved = false;
     rows = [];
   }
+  const mode: SupportAccessMode = getSupportAccessMode();
+  const isAdmin = ctx.user.is_admin;
   const role = allowedRole(rows, options.roles);
-  if (role) {
+  if (role && !(isAdmin && mode !== 'enforce')) {
     return { kind: 'member', role };
   }
 
-  if (!options.skipOrganizationLiveness && !(await isLiveOrganization(organizationId))) {
+  if (!isAdmin) {
+    if (rows.length === 0 && (await organizationState(organizationId)) === 'deleted') {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+    }
     throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Organization not found',
+      code: 'UNAUTHORIZED',
+      message:
+        rows.length > 0
+          ? 'You do not have the required organizational role to access this feature'
+          : 'You do not have access to this organization',
     });
   }
 
@@ -282,12 +291,30 @@ export async function resolveOrganizationAccess(
     });
   }
 
-  const isAdmin = ctx.user.is_admin;
-  if (!isAdmin) {
+  if (!options.skipOrganizationLiveness && !(await isLiveOrganization(organizationId))) {
     throw new TRPCError({
-      code: 'UNAUTHORIZED',
-      message: 'You do not have access to this organization',
+      code: 'NOT_FOUND',
+      message: 'Organization not found',
     });
+  }
+
+  if (rows.length > 0) {
+    if (mode === 'enforce') {
+      // Enforce uses the real role; a support grant cannot elevate over an
+      // existing membership.
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'You do not have the required organizational role to access this feature',
+      });
+    }
+    await recordKiloAdminElevation(ctx, {
+      reason: options.auditReason ?? 'organization_access',
+      target: organizationTarget(organizationId),
+      membershipRole: allowedRole(rows),
+      wouldPassWithoutAdmin: false,
+      supportDecision: 'deny_actor_permission',
+    });
+    return { kind: 'legacy_admin', role: 'owner', wouldBe: 'deny_actor_permission' };
   }
 
   const { surface, key } = supportKeyFor(ctx, options);
@@ -301,7 +328,6 @@ export async function resolveOrganizationAccess(
     key,
     supportActionId,
   });
-  const mode: SupportAccessMode = getSupportAccessMode();
   const membershipRole = membershipObserved ? allowedRole(rows) : null;
   const wouldPassWithoutAdmin = membershipObserved ? role !== null : null;
   const elevationReason = options.auditReason ?? 'organization_access';

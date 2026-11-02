@@ -65,6 +65,7 @@ describe('AdminAssurance', () => {
       canViewSessions: false,
       canManageCredits: true,
       canExportApiRequestLogs: false,
+      canRequestSupportOrgAccess: false,
     });
     expect(actor.action.actionClass).toBe('sensitive_write');
     expect(actor.action.inventoryId).toBe('x');

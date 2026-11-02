@@ -824,7 +824,7 @@
       "shareMergeRequest": "اشتراک‌گذاری درخواست ادغام",
       "viewOnProvider": "مشاهده در {{provider}}",
       "mergeRequestUnavailable": "درخواست ادغام در دسترس نیست",
-      "unavailableDescription": "ممکن است حذف شده باشد، یا شاید دسترسی به آن نداشته باشید.",
+      "unavailableDescription": "ممکن است حذف شده باشد، یا شاید به آن دسترسی نداشته باشید.",
       "accessDeniedMergeRequest": "اجازهٔ مشاهدهٔ این درخواست ادغام را ندارید.",
       "couldNotLoadMergeRequest": "بارگذاری درخواست ادغام ممکن نشد.",
       "discussionAccessDenied": "اجازهٔ مشاهدهٔ گفت‌وگوی این درخواست ادغام را ندارید.",

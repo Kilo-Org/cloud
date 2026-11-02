@@ -824,7 +824,7 @@
       "shareMergeRequest": "Partekatu merge-eskaera",
       "viewOnProvider": "Ikusi {{provider}}(e)n",
       "mergeRequestUnavailable": "Merge-eskaera ez dago eskuragarri",
-      "unavailableDescription": "Baliteke ezabatuta egotea, edo agian ez duzu sarbiderik.",
+      "unavailableDescription": "Baliteke ezabatuta egotea edo agian ez duzu sarbiderik.",
       "accessDeniedMergeRequest": "Ez duzu baimenik merge-eskaera hau ikusteko.",
       "couldNotLoadMergeRequest": "Ezin izan da merge-eskaera kargatu.",
       "discussionAccessDenied": "Ez duzu baimenik merge-eskaera honen eztabaida ikusteko.",

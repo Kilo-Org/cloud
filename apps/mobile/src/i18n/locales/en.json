@@ -891,7 +891,7 @@
       "shareMergeRequest": "Share merge request",
       "viewOnProvider": "View on {{provider}}",
       "mergeRequestUnavailable": "Merge request unavailable",
-      "unavailableDescription": "It may have been deleted, or you may not have access to it.",
+      "unavailableDescription": "It may be deleted, or you may lack access.",
       "accessDeniedMergeRequest": "You don't have permission to view this merge request.",
       "couldNotLoadMergeRequest": "Could not load merge request",
       "discussionAccessDenied": "You don't have permission to view this merge request's discussion.",

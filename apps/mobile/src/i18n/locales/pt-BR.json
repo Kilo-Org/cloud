@@ -3235,7 +3235,7 @@
       "shareMergeRequest": "Compartilhar merge request",
       "viewOnProvider": "Ver no {{provider}}",
       "mergeRequestUnavailable": "Merge request indisponível",
-      "unavailableDescription": "Ele pode ter sido excluído, ou você não tem acesso a ele.",
+      "unavailableDescription": "Ele pode ter sido excluído, ou você pode não ter acesso.",
       "accessDeniedMergeRequest": "Você não tem permissão para ver este merge request.",
       "couldNotLoadMergeRequest": "Não foi possível carregar o merge request.",
       "discussionAccessDenied": "Você não tem permissão para ver a discussão deste merge request.",

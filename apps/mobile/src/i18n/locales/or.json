@@ -824,7 +824,7 @@
       "shareMergeRequest": "ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ସେୟାର କରନ୍ତୁ",
       "viewOnProvider": "{{provider}}ରେ ଦେଖନ୍ତୁ",
       "mergeRequestUnavailable": "ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ଉପଲବ୍ଧ ନାହିଁ",
-      "unavailableDescription": "ଏହା ଡିଲିଟ୍ କରାଯାଇଥିବ, କିମ୍ବା ଆପଣଙ୍କୁ ଏହାର ଆକ୍ସେସ୍ ମିଳିବ ନାହିଁ।",
+      "unavailableDescription": "ଏହା ଡିଲିଟ୍ ହୋଇଥାଇପାରେ, କିମ୍ବା ଆପଣଙ୍କର ଏହାର ଆକ୍ସେସ୍ ନ ଥାଇପାରେ।",
       "accessDeniedMergeRequest": "ଏହି ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ଦେଖିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
       "couldNotLoadMergeRequest": "ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "discussionAccessDenied": "ଏହି ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ର ଆଲୋଚନା ଦେଖିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",

@@ -3278,7 +3278,7 @@
       "shareMergeRequest": "Udostępnij merge request",
       "viewOnProvider": "Zobacz w {{provider}}",
       "mergeRequestUnavailable": "Merge request niedostępny",
-      "unavailableDescription": "Mógł zostać usunięty albo nie masz do niego dostępu.",
+      "unavailableDescription": "Mógł zostać usunięty albo możesz nie mieć do niego dostępu.",
       "accessDeniedMergeRequest": "Nie masz uprawnień do wyświetlenia tego merge request.",
       "couldNotLoadMergeRequest": "Nie udało się wczytać merge request.",
       "discussionAccessDenied": "Nie masz uprawnień do wyświetlenia dyskusji w tym merge request.",

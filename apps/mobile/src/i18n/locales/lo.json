@@ -824,7 +824,7 @@
       "shareMergeRequest": "ແບ່ງປັນ merge request",
       "viewOnProvider": "ເບິ່ງເທິງ {{provider}}",
       "mergeRequestUnavailable": "ບໍ່ສາມາດເປີດ merge request",
-      "unavailableDescription": "ມັນອາດຖືກລຶບໄປແລ້ວ ຫຼື ທ່ານອາດບໍ່ມີສິດເຂົ້າເຖິງ",
+      "unavailableDescription": "ມັນອາດຖືກລຶບ ຫຼື ທ່ານອາດບໍ່ມີສິດເຂົ້າເຖິງ",
       "accessDeniedMergeRequest": "ທ່ານບໍ່ມີສິດເບິ່ງ merge request ນີ້.",
       "couldNotLoadMergeRequest": "ບໍ່ສາມາດໂຫຼດ merge request ໄດ້.",
       "discussionAccessDenied": "ທ່ານບໍ່ມີສິດເບິ່ງການສົນທະນາຂອງ merge request ນີ້.",

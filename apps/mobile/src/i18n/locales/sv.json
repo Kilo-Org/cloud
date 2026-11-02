@@ -824,7 +824,7 @@
       "shareMergeRequest": "Dela merge request",
       "viewOnProvider": "Visa på {{provider}}",
       "mergeRequestUnavailable": "Merge requesten är inte tillgänglig",
-      "unavailableDescription": "Den kan ha tagits bort, eller så har du inte åtkomst.",
+      "unavailableDescription": "Den kan ha tagits bort, eller så kan du sakna åtkomst.",
       "accessDeniedMergeRequest": "Du har inte behörighet att se den här merge requesten.",
       "couldNotLoadMergeRequest": "Kunde inte läsa in merge requesten",
       "discussionAccessDenied": "Du har inte behörighet att se diskussionen för den här merge requesten.",

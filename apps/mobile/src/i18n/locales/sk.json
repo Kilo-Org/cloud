@@ -862,7 +862,7 @@
       "shareMergeRequest": "Zdieľať merge request",
       "viewOnProvider": "Zobraziť v {{provider}}",
       "mergeRequestUnavailable": "Merge request nie je dostupný",
-      "unavailableDescription": "Bol možná odstránený, alebo k nemu nemáš prístup.",
+      "unavailableDescription": "Možno bol odstránený, alebo k nemu nemáš prístup.",
       "accessDeniedMergeRequest": "Nemáš oprávnenie zobraziť tento merge request.",
       "couldNotLoadMergeRequest": "Merge request sa nepodarilo načítať.",
       "discussionAccessDenied": "Nemáš oprávnenie zobraziť diskusiu k tomuto merge request.",

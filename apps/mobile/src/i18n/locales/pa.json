@@ -824,7 +824,7 @@
       "shareMergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਸਾਂਝੀ ਕਰੋ",
       "viewOnProvider": "{{provider}} ਉੱਤੇ ਵੇਖੋ",
       "mergeRequestUnavailable": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ",
-      "unavailableDescription": "ਹੋ ਸਕਦਾ ਹੈ ਇਹ ਹਟਾ ਦਿੱਤੀ ਗਈ ਹੋਵੇ, ਜਾਂ ਤੁਹਾਡੇ ਕੋਲ ਇਸ ਦੀ ਪਹੁੰਚ ਨਾ ਹੋਵੇ।",
+      "unavailableDescription": "ਹੋ ਸਕਦਾ ਹੈ ਇਹ ਹਟਾ ਦਿੱਤੀ ਗਈ ਹੋਵੇ ਜਾਂ ਤੁਹਾਡੇ ਕੋਲ ਪਹੁੰਚ ਨਾ ਹੋਵੇ।",
       "accessDeniedMergeRequest": "ਤੁਹਾਨੂੰ ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਨੂੰ ਵੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "couldNotLoadMergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ।",
       "discussionAccessDenied": "ਤੁਹਾਨੂੰ ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦੀ ਚਰਚਾ ਵੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",

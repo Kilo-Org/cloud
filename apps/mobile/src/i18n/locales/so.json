@@ -824,7 +824,7 @@
       "shareMergeRequest": "La wadaag merge request-ka",
       "viewOnProvider": "Kasoo eeg {{provider}}",
       "mergeRequestUnavailable": "Merge request-ka lama heli karo",
-      "unavailableDescription": "Waa laga yaabaa in la tirtiray, ama inadan helin ogolaansho.",
+      "unavailableDescription": "Waa laga yaabaa in la tirtiray, ama in aanad helin ogolaansho.",
       "accessDeniedMergeRequest": "Ma haysatid oggolaansho aad ku aragto merge request-kan.",
       "couldNotLoadMergeRequest": "Merge request-ka lama soo rari karin.",
       "discussionAccessDenied": "Ma haysatid oggolaansho aad ku aragto doodda merge request-kan.",

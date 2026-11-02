@@ -843,7 +843,7 @@
       "shareMergeRequest": "Podijeli merge request",
       "viewOnProvider": "Pogledaj na {{provider}}",
       "mergeRequestUnavailable": "Merge request nije dostupan",
-      "unavailableDescription": "Možda je obrisan ili nemaš pristup njemu.",
+      "unavailableDescription": "Možda je obrisan ili možda nemaš pristup njemu.",
       "accessDeniedMergeRequest": "Nemaš dozvolu za pregled ovog merge requesta.",
       "couldNotLoadMergeRequest": "Učitavanje merge requesta nije uspjelo.",
       "discussionAccessDenied": "Nemaš dozvolu za pregled rasprave o ovom merge requestu.",

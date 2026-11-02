@@ -824,7 +824,7 @@
       "shareMergeRequest": "Merge sorğusunu paylaş",
       "viewOnProvider": "{{provider}} üzərində bax",
       "mergeRequestUnavailable": "Merge sorğusu əlçatan deyil",
-      "unavailableDescription": "Silinmiş ola bilər, yaxud ona giriş icazən olmaya bilər.",
+      "unavailableDescription": "Silinmiş ola bilər və ya ona giriş icazən olmaya bilər.",
       "accessDeniedMergeRequest": "Bu merge sorğusuna baxmaq icazən yoxdur.",
       "couldNotLoadMergeRequest": "Merge sorğusunu yükləmək mümkün olmadı.",
       "discussionAccessDenied": "Bu merge sorğusunun müzakirəsinə baxmaq icazən yoxdur.",

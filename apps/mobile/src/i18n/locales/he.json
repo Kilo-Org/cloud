@@ -3229,7 +3229,7 @@
       "shareMergeRequest": "שיתוף בקשת המיזוג",
       "viewOnProvider": "הצגה ב-{{provider}}",
       "mergeRequestUnavailable": "בקשת המיזוג אינה זמינה",
-      "unavailableDescription": "ייתכן שנמחק, או שייתכן שאין לך גישה אליו.",
+      "unavailableDescription": "ייתכן שנמחק, או שאין לך גישה אליו.",
       "accessDeniedMergeRequest": "אין לך הרשאה לצפות בבקשת המיזוג הזו.",
       "couldNotLoadMergeRequest": "לא ניתן היה לטעון את בקשת המיזוג.",
       "discussionAccessDenied": "אין לך הרשאה לצפות בדיון של בקשת המיזוג הזו.",

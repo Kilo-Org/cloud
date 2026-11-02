@@ -3376,7 +3376,7 @@
       "shareMergeRequest": "مشاركة طلب الدمج",
       "viewOnProvider": "عرض على {{provider}}",
       "mergeRequestUnavailable": "طلب الدمج غير متاح",
-      "unavailableDescription": "ربما تم حذفه، أو ربما لا تملك صلاحية الوصول إليه.",
+      "unavailableDescription": "ربما حُذف، أو ربما لا تملك صلاحية الوصول إليه.",
       "accessDeniedMergeRequest": "ليست لديك صلاحية لعرض طلب الدمج هذا.",
       "couldNotLoadMergeRequest": "تعذّر تحميل طلب الدمج.",
       "discussionAccessDenied": "ليست لديك صلاحية لعرض مناقشة طلب الدمج هذا.",

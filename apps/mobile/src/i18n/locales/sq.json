@@ -824,7 +824,7 @@
       "shareMergeRequest": "Ndaj kërkesën e integrimit",
       "viewOnProvider": "Shih te {{provider}}",
       "mergeRequestUnavailable": "Kërkesa e integrimit nuk është e disponueshme",
-      "unavailableDescription": "Mbase është fshirë, ose mbase nuk ke akses për të.",
+      "unavailableDescription": "Mbase është fshirë, ose mbase nuk ke akses.",
       "accessDeniedMergeRequest": "Nuk ke leje për ta parë këtë kërkesë integrimi.",
       "couldNotLoadMergeRequest": "Nuk u ngarkua kërkesa e integrimit.",
       "discussionAccessDenied": "Nuk ke leje për ta parë diskutimin e kësaj kërkeze integrimi.",

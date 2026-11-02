@@ -862,7 +862,7 @@
       "shareMergeRequest": "Bendrinti merge request",
       "viewOnProvider": "Peržiūrėti {{provider}}",
       "mergeRequestUnavailable": "Merge request nepasiekiamas",
-      "unavailableDescription": "Galbūt jis buvo ištrintas, arba neturi prieigos prie jo.",
+      "unavailableDescription": "Galbūt jis buvo ištrintas, arba neturi prieigos.",
       "accessDeniedMergeRequest": "Neturi teisės peržiūrėti šio merge request.",
       "couldNotLoadMergeRequest": "Nepavyko įkelti merge request.",
       "discussionAccessDenied": "Neturi teisės peržiūrėti šio merge request diskusijos.",

@@ -824,7 +824,7 @@
       "shareMergeRequest": "د یوځای کولو غوښتنه شریک کړئ",
       "viewOnProvider": "په {{provider}} کې وګورئ",
       "mergeRequestUnavailable": "د یوځای کولو غوښتنه نشته",
-      "unavailableDescription": "کېدای شي لرې شوی وي، یا تاسو ورسره لاسرسی نه لرئ.",
+      "unavailableDescription": "کېدای شي لرې شوی وي، یا تاسو ورسره لاسرسی ونه لرئ.",
       "accessDeniedMergeRequest": "تاسو د دې د یوځای کولو غوښتنه د لیدلو اجازه نه لرئ.",
       "couldNotLoadMergeRequest": "د یوځای کولو غوښتنه بار نه شو.",
       "discussionAccessDenied": "تاسو د دې د یوځای کولو غوښتنه د بحث د لیدلو اجازه نه لرئ.",

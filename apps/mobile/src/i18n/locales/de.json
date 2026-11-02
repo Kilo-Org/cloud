@@ -3180,7 +3180,7 @@
       "shareMergeRequest": "Merge-Request teilen",
       "viewOnProvider": "Auf {{provider}} ansehen",
       "mergeRequestUnavailable": "Merge-Request nicht verfügbar",
-      "unavailableDescription": "Möglicherweise wurde er gelöscht, oder du hast keinen Zugriff darauf.",
+      "unavailableDescription": "Möglicherweise wurde er gelöscht, oder du hast keinen Zugriff.",
       "accessDeniedMergeRequest": "Du hast keine Berechtigung, diesen Merge-Request anzusehen.",
       "couldNotLoadMergeRequest": "Der Merge-Request konnte nicht geladen werden.",
       "discussionAccessDenied": "Du hast keine Berechtigung, die Diskussion zu diesem Merge-Request anzusehen.",

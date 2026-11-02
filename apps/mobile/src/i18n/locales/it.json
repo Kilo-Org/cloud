@@ -3229,7 +3229,7 @@
       "shareMergeRequest": "Condividi il merge request",
       "viewOnProvider": "Visualizza su {{provider}}",
       "mergeRequestUnavailable": "Merge request non disponibile",
-      "unavailableDescription": "Potrebbe essere stato eliminato, oppure non hai accesso.",
+      "unavailableDescription": "Potrebbe essere stato eliminato, oppure potresti non avere accesso.",
       "accessDeniedMergeRequest": "Non hai il permesso di visualizzare questo merge request.",
       "couldNotLoadMergeRequest": "Impossibile caricare il merge request.",
       "discussionAccessDenied": "Non hai il permesso di visualizzare la discussione di questo merge request.",

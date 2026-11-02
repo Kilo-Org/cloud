@@ -3180,7 +3180,7 @@
       "shareMergeRequest": "Birleştirme isteğini paylaş",
       "viewOnProvider": "{{provider}} üzerinde görüntüle",
       "mergeRequestUnavailable": "Birleştirme isteği kullanılamıyor",
-      "unavailableDescription": "Silinmiş olabilir veya buna erişim izinlerin olmayabilir.",
+      "unavailableDescription": "Silinmiş olabilir veya erişim izinlerin olmayabilir.",
       "accessDeniedMergeRequest": "Bu birleştirme isteğini görüntüleme iznin yok.",
       "couldNotLoadMergeRequest": "Birleştirme isteği yüklenemedi.",
       "discussionAccessDenied": "Bu birleştirme isteğinin tartışmasını görüntüleme iznin yok.",

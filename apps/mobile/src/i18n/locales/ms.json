@@ -824,7 +824,7 @@
       "shareMergeRequest": "Kongsi permintaan gabungan",
       "viewOnProvider": "Lihat pada {{provider}}",
       "mergeRequestUnavailable": "Permintaan gabungan tidak tersedia",
-      "unavailableDescription": "Ia mungkin telah dipadamkan, atau anda tiada akses kepadanya.",
+      "unavailableDescription": "Ia mungkin telah dipadamkan, atau anda mungkin tiada akses kepadanya.",
       "accessDeniedMergeRequest": "Anda tidak mempunyai kebenaran untuk melihat permintaan gabungan ini.",
       "couldNotLoadMergeRequest": "Tidak dapat memuatkan permintaan gabungan.",
       "discussionAccessDenied": "Anda tidak mempunyai kebenaran untuk melihat perbincangan permintaan gabungan ini.",

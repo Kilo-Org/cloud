@@ -824,7 +824,7 @@
       "shareMergeRequest": "Κοινοποίηση αιτήματος συγχώνευσης",
       "viewOnProvider": "Προβολή σε {{provider}}",
       "mergeRequestUnavailable": "Μη διαθέσιμο αίτημα συγχώνευσης",
-      "unavailableDescription": "Μπορεί να έχει διαγραφεί, ή μπορεί να μην έχεις πρόσβαση σε αυτό.",
+      "unavailableDescription": "Μπορεί να έχει διαγραφεί ή να μην έχεις πρόσβαση σε αυτό.",
       "accessDeniedMergeRequest": "Δεν έχεις δικαίωμα προβολής αυτού του αιτήματος συγχώνευσης.",
       "couldNotLoadMergeRequest": "Δεν ήταν δυνατή η φόρτωση του αιτήματος συγχώνευσης",
       "discussionAccessDenied": "Δεν έχεις δικαίωμα προβολής της συζήτησης αυτού του αιτήματος συγχώνευσης.",

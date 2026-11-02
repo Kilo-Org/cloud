@@ -824,7 +824,7 @@
       "shareMergeRequest": "Deel merge request",
       "viewOnProvider": "Bekyk op {{provider}}",
       "mergeRequestUnavailable": "Merge request onbeskikbaar",
-      "unavailableDescription": "Dit is dalk uitgevee, of jy het nie toegang daartoe nie.",
+      "unavailableDescription": "Dit is dalk uitgevee, of jy het moontlik nie toegang daartoe nie.",
       "accessDeniedMergeRequest": "Jy het nie toestemming om hierdie merge request te bekyk nie.",
       "couldNotLoadMergeRequest": "Kon nie die merge request laai nie.",
       "discussionAccessDenied": "Jy het nie toestemming om hierdie merge request se bespreking te bekyk nie.",

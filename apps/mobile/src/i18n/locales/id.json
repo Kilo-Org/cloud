@@ -3180,7 +3180,7 @@
       "shareMergeRequest": "Bagikan merge request",
       "viewOnProvider": "Lihat di {{provider}}",
       "mergeRequestUnavailable": "Merge request tidak tersedia",
-      "unavailableDescription": "Mungkin sudah dihapus, atau kamu tidak punya akses ke sana.",
+      "unavailableDescription": "Mungkin sudah dihapus, atau kamu tidak punya akses.",
       "accessDeniedMergeRequest": "Kamu tidak memiliki izin untuk melihat merge request ini.",
       "couldNotLoadMergeRequest": "Tidak dapat memuat merge request.",
       "discussionAccessDenied": "Kamu tidak memiliki izin untuk melihat diskusi merge request ini.",

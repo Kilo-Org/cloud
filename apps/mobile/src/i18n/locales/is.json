@@ -824,7 +824,7 @@
       "shareMergeRequest": "Deila merge request",
       "viewOnProvider": "Skoða á {{provider}}",
       "mergeRequestUnavailable": "Merge request ekki tiltæk",
-      "unavailableDescription": "Hún gæti hafa verið fjarlægð, eða þú hefur ekki aðgang að henni.",
+      "unavailableDescription": "Hún gæti hafa verið fjarlægð, eða þú gætir skort aðgang.",
       "accessDeniedMergeRequest": "Þú hefur ekki heimild til að skoða þessa merge request.",
       "couldNotLoadMergeRequest": "Ekki tókst að hlaða merge request.",
       "discussionAccessDenied": "Þú hefur ekki heimild til að skoða umræðuna um þessa merge request.",

@@ -824,7 +824,7 @@
       "shareMergeRequest": "Del merge request",
       "viewOnProvider": "Vis på {{provider}}",
       "mergeRequestUnavailable": "Merge request er utilgjengelig",
-      "unavailableDescription": "Den kan ha blitt slettet, eller du har ikke tilgang til den.",
+      "unavailableDescription": "Den kan være slettet, eller du kan mangle tilgang.",
       "accessDeniedMergeRequest": "Du har ikke tilgang til å se denne merge request.",
       "couldNotLoadMergeRequest": "Kunne ikke laste inn merge request.",
       "discussionAccessDenied": "Du har ikke tilgang til diskusjonen om denne merge request.",

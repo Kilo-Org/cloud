@@ -824,7 +824,7 @@
       "shareMergeRequest": "মার্জ রিকোয়েস্ট শেয়ার করুন",
       "viewOnProvider": "{{provider}}-এ দেখুন",
       "mergeRequestUnavailable": "মার্জ রিকোয়েস্ট পাওয়া যাচ্ছে না",
-      "unavailableDescription": "সম্ভবত এটি মুছে ফেলা হয়েছে, অথবা আপনার এর অ্যাক্সেস নেই।",
+      "unavailableDescription": "এটি মুছে ফেলা হতে পারে, অথবা আপনার অ্যাক্সেস নাও থাকতে পারে।",
       "accessDeniedMergeRequest": "এই মার্জ রিকোয়েস্ট দেখার অনুমতি আপনার নেই।",
       "couldNotLoadMergeRequest": "মার্জ রিকোয়েস্ট লোড করা যায়নি।",
       "discussionAccessDenied": "এই মার্জ রিকোয়েস্ট-এর আলোচনা দেখার অনুমতি আপনার নেই।",

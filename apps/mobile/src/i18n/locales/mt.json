@@ -881,7 +881,7 @@
       "shareMergeRequest": "Aqsam il-merge request",
       "viewOnProvider": "Ara fuq {{provider}}",
       "mergeRequestUnavailable": "Il-merge request mhux disponibbli",
-      "unavailableDescription": "Fori ġiet imħassra, jew fori m'għandekx aċċess għaliha.",
+      "unavailableDescription": "Jista' jkun li ġiet imħassra, jew li m'għandekx aċċess għaliha.",
       "accessDeniedMergeRequest": "M'għandekx permess biex tara dan il-merge request.",
       "couldNotLoadMergeRequest": "Ma setgħax jitgħabba l-merge request.",
       "discussionAccessDenied": "M'għandekx permess biex tara d-diskussjoni ta' dan il-merge request.",

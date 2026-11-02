@@ -3180,7 +3180,7 @@
       "shareMergeRequest": "Merge request delen",
       "viewOnProvider": "Bekijken op {{provider}}",
       "mergeRequestUnavailable": "Merge request niet beschikbaar",
-      "unavailableDescription": "Mogelijk is deze verwijderd, of heb je geen toegang.",
+      "unavailableDescription": "Mogelijk is deze verwijderd of heb je geen toegang.",
       "accessDeniedMergeRequest": "Je hebt geen toestemming om deze merge request te bekijken.",
       "couldNotLoadMergeRequest": "De merge request kon niet worden geladen.",
       "discussionAccessDenied": "Je hebt geen toestemming om de discussie van deze merge request te bekijken.",

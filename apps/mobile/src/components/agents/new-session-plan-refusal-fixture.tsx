@@ -70,6 +70,8 @@ export function NewSessionPlanRefusalFixture() {
         showInstanceDisconnectedNote={false}
         folderPath=""
         onChangeFolderPath={noop}
+        isCloneEntry={false}
+        autoFocusPrompt={false}
         groups={[]}
         isRetrying={false}
         onChangeRepo={noop}

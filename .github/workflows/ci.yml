@@ -451,18 +451,9 @@ jobs:
         if: matrix.group == 'trpc'
         uses: ./.github/actions/trpc-declarations
 
-      - name: Cache compiler plugins
+      - name: Restore or build the harness SDK
         if: matrix.group == 'trpc' && contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
-
-      - name: Build harness SDK
-        if: matrix.group == 'trpc' && contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')
-        run: pnpm --filter @kilocode/harness-sdk run build
+        uses: ./.github/actions/harness-sdk-build
 
       - name: Lint
         env:

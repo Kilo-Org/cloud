@@ -105,19 +105,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache compiler plugins
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
-
       - name: Restore or build tRPC declarations
         uses: ./.github/actions/trpc-declarations
 
-      - name: Build harness SDK
-        run: pnpm --filter @kilocode/harness-sdk run build
+      - name: Restore or build the harness SDK
+        uses: ./.github/actions/harness-sdk-build
 
       - name: Typecheck
         run: pnpm --filter kilo-app run typecheck
@@ -149,19 +141,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache compiler plugins
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
-
       - name: Restore or build tRPC declarations
         uses: ./.github/actions/trpc-declarations
 
-      - name: Build harness SDK
-        run: pnpm --filter @kilocode/harness-sdk run build
+      - name: Restore or build the harness SDK
+        uses: ./.github/actions/harness-sdk-build
 
       - name: Lint
         run: pnpm --filter kilo-app run lint
@@ -253,16 +237,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache compiler plugins
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
-
-      - name: Build harness SDK
-        run: pnpm --filter @kilocode/harness-sdk run build
+      - name: Restore or build the harness SDK
+        uses: ./.github/actions/harness-sdk-build
 
       - name: Check unused exports
         run: pnpm --filter kilo-app run check:unused
@@ -306,18 +282,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache compiler plugins
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
-
       # The tests import the harness SDK build at run time. The tRPC build
       # holds only type declarations, which Vitest does not read.
-      - name: Build harness SDK
-        run: pnpm --filter @kilocode/harness-sdk run build
+      - name: Restore or build the harness SDK
+        uses: ./.github/actions/harness-sdk-build
 
       - name: Test
         run: pnpm --filter kilo-app run test --shard=${{ matrix.shard }}/8

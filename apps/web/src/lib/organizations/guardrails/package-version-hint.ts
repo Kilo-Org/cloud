@@ -3,7 +3,8 @@ import type { McpPackageEcosystem } from './mcp-identity';
 // A hint is offered only for a whole version, never for a distribution tag. npm semver separates a
 // prerelease with `-`; PEP 440 also allows a marker directly after the release segment.
 const NPM_VERSION = /^v?(\d+(?:\.\d+)*(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?)$/;
-const PYPI_VERSION = /^v?(\d+(?:\.\d+)*(?:(?:a|b|rc|post|dev)\d*|[-.][0-9A-Za-z][0-9A-Za-z.-]*)*)$/i;
+const PYPI_VERSION =
+  /^v?(\d+(?:\.\d+)*(?:(?:a|b|rc|post|dev)\d*|[-.][0-9A-Za-z][0-9A-Za-z.-]*)*)$/i;
 
 /**
  * The version to offer as a minimum for a package, or null when the value is not a whole version.

@@ -1,7 +1,6 @@
 import { normalizePackageIdentifier, type McpPackageEcosystem } from './mcp-identity';
 import { packageVersionHint } from './package-version-hint';
 
-
 export type LauncherParseResult =
   | {
       eligible: true;
@@ -21,7 +20,6 @@ const NPX_FLAGS = new Set(['-y', '--yes']);
 function ineligible(reason: string): LauncherParseResult {
   return { eligible: false, reason };
 }
-
 
 function parseNpmSpec(spec: string): LauncherParseResult {
   const match = NPM_SPEC.exec(spec);

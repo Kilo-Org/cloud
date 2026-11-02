@@ -373,8 +373,11 @@ describe('Organization hub billing card while its data loads', () => {
     const hub = await renderHub();
     expect(bellRow(hub.renderer)?.props.subtitle).toBe(i18n.t('common.off'));
     expect(bellRow(hub.renderer)?.props.subtitlePlaceholder).toBeUndefined();
-    // A settled row's name is the text it shows, so no name is passed.
-    expect(bellRow(hub.renderer)?.props.accessibilityLabel).toBeUndefined();
+    // The name is set in every state, so the node it produces changes with the
+    // state instead of keeping the name it had while the value loaded.
+    expect(bellRow(hub.renderer)?.props.accessibilityLabel).toBe(
+      `${i18n.t('organization.lowBalanceAlert.title')}. ${i18n.t('common.off')}`
+    );
     expect(kiloPassQuery.enabled.at(-1)).toBe(true);
     hub.unmount();
 
@@ -391,6 +394,16 @@ describe('Organization hub billing card while its data loads', () => {
       `${i18n.t('organization.lowBalanceAlert.title')}. ${i18n.t('common.loading')}`
     );
     loading.unmount();
+
+    // A failed membership read names the failure and the retry the row shows,
+    // so the name never disagrees with the row it describes.
+    membersQuery.isError = true;
+    const failed = await renderHub();
+    expect(bellRow(failed.renderer)?.props.accessibilityLabel).toBe(
+      `${i18n.t('organization.lowBalanceAlert.title')}. ${i18n.t('common.somethingWentWrong')}. ${i18n.t('common.retry')}`
+    );
+    failed.unmount();
+    membersQuery.isError = false;
 
     // A list payload persisted before the parent link existed is unknown, not a
     // child, so the row is still there from the first frame.

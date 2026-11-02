@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "ແປບົດສະຫຼຸບເຄື່ອງມື",
     "toolSummaryTranslationSubtitle": "ສົ່ງບົດສະຫຼຸບເຄື່ອງມືແຕ່ລະອັນໄປຫາຕົວແບບເພື່ອແປມັນເປັນພາສາແອັບຂອງທ່ານ. ຖ້າການແປລົ້ມເຫຼວ ຕົ້ນສະບັບຈະຖືກສະແດງ.",
     "toolSummaryTranslationModelUnavailableNotice": "ໂມເດວນີ້ບໍ່ໄດ້ສະເໜີອີກຕໍ່ໄປ. ແຕະ $t(common.model) ເພື່ອເລືອກອັນອື່ນ.",
+    "translateSummaries": "ແປບົດສະຫຼຸບ",
     "autoExpandThinkingInactiveSubtitle": "ບໍ່ມີຜົນເມື່ອເຊື່ອງລາຍລະອຽດການຄິດ."
   },
   "prReview": {

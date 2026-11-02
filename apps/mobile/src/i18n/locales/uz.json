@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Vosita xulosalarini tarjima qilish",
     "toolSummaryTranslationSubtitle": "Har bir vosita xulosasini ilova tilingizga tarjima qilish uchun modelga yuboring. Tarjima muvaffaqiyatsiz bo'lsa, asl nusxa ko'rsatiladi.",
     "toolSummaryTranslationModelUnavailableNotice": "Bu model endi taklif etilmaydi. Boshqasini tanlash uchun $t(common.model) ga teging.",
+    "translateSummaries": "Xulosalarni tarjima qilish",
     "autoExpandThinkingInactiveSubtitle": "Fikrlash tafsilotlari yashirilganda hech qanday ta'sir ko'rsatmaydi."
   },
   "prReview": {

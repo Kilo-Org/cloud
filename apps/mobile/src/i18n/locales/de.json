@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Werkzeugzusammenfassungen übersetzen",
     "toolSummaryTranslationSubtitle": "Sende jede Werkzeugzusammenfassung an ein Modell, um sie in deine App-Sprache zu übersetzen. Wenn die Übersetzung fehlschlägt, wird das Original angezeigt.",
     "toolSummaryTranslationModelUnavailableNotice": "Dieses Modell wird nicht mehr angeboten. Tippe auf $t(common.model), um ein anderes zu wählen.",
+    "translateSummaries": "Zusammenfassungen übersetzen",
     "autoExpandThinkingInactiveSubtitle": "Keine Auswirkung, solange Denkdetails ausgeblendet sind."
   },
   "notifications": {

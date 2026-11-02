@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "ကိရိယာ အကျဉ်းချုပ်များကို ဘာသာပြန်ပါ",
     "toolSummaryTranslationSubtitle": "ကိရိယာ အကျဉ်းချုပ် တစ်ခုချင်းစီကို သင့်အက်ပ်၏ ဘာသာစကားသို့ ဘာသာပြန်ရန် မော်ဒယ်တစ်ခုသို့ ပို့ပါ။ ဘာသာပြန်မှု မအောင်မြင်ပါက မူရင်းကို ပြသပါမည်။",
     "toolSummaryTranslationModelUnavailableNotice": "ဤမော်ဒယ်ကို ပေးအပ်ခြင်း မရှိတော့ပါ။ အခြားတစ်ခု ရွေးချယ်ရန် $t(common.model) ကို နှိပ်ပါ။",
+    "translateSummaries": "အကျဉ်းချုပ်များကို ဘာသာပြန်ပါ",
     "autoExpandThinkingInactiveSubtitle": "စဉ်းစားချက်အသေးစိတ်ကို ဖျောက်ထားသည့်အခါ သက်ရောက်မှု မရှိပါ။"
   },
   "prReview": {

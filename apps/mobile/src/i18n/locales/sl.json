@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Prevedi povzetke orodij",
     "toolSummaryTranslationSubtitle": "Pošlji vsak povzetek orodja modelu, da ga prevede v jezik tvoje aplikacije. Če prevajanje ne uspe, se prikaže izvirnik.",
     "toolSummaryTranslationModelUnavailableNotice": "Ta model se ne ponuja več. Dotaknite se $t(common.model) in izberite drugega.",
+    "translateSummaries": "Prevedi povzetke",
     "autoExpandThinkingInactiveSubtitle": "Nima učinka, ko so podrobnosti razmišljanja skrite."
   },
   "prReview": {

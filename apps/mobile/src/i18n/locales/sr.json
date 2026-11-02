@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Prevedi rezimee alata",
     "toolSummaryTranslationSubtitle": "Pošalji svaki rezime alatke modelu da ga prevede na jezik tvoje aplikacije. Ako prevod ne uspe, prikazuje se original.",
     "toolSummaryTranslationModelUnavailableNotice": "Ovaj model se više ne nudi. Dodirni $t(common.model) da izabereš drugi.",
+    "translateSummaries": "Prevedi rezimee",
     "autoExpandThinkingInactiveSubtitle": "Nema efekta dok su detalji razmišljanja sakriveni."
   },
   "prReview": {

@@ -2378,6 +2378,7 @@
     "toolSummaryTranslation": "Traduire les résumés d'outils",
     "toolSummaryTranslationSubtitle": "Envoyez chaque résumé d'outil à un modèle pour le traduire dans la langue de votre application. L'original s'affiche si la traduction échoue.",
     "toolSummaryTranslationModelUnavailableNotice": "Ce modèle n'est plus proposé. Touchez $t(common.model) pour en choisir un autre.",
+    "translateSummaries": "Traduire les résumés",
     "autoExpandThinkingInactiveSubtitle": "Aucun effet tant que les détails de la réflexion sont masqués."
   },
   "addCredits": {

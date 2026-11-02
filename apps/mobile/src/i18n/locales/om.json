@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Hiiki cuunfaa meeshaalee",
     "toolSummaryTranslationSubtitle": "Cuunfaa meeshaa tokkoon tokkoon isaa gara moodelaatti ergi akka inni afaan appii keetiitti hiiku. Yoo hiikkaan hin milkoofne kan jalqabaa ni mul'ata.",
     "toolSummaryTranslationModelUnavailableNotice": "Moodeeli kun hin dhiyaatu. Kan biraa filachuuf $t(common.model) tuqi.",
+    "translateSummaries": "Hiiki cuunfaa",
     "autoExpandThinkingInactiveSubtitle": "Bal'ina xiinxala dhokatee yeroo jiru dhiibbaa hin qabu."
   },
   "prReview": {

@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "ترجمة ملخصات الأدوات",
     "toolSummaryTranslationSubtitle": "أرسل كل ملخص أداة إلى نموذج لترجمته إلى لغة تطبيقك. يظهر النص الأصلي إذا فشلت الترجمة.",
     "toolSummaryTranslationModelUnavailableNotice": "لم يعد هذا النموذج معروضًا. اضغط على $t(common.model) لاختيار نموذج آخر.",
+    "translateSummaries": "ترجمة الملخصات",
     "autoExpandThinkingInactiveSubtitle": "لا تأثير عندما تكون تفاصيل التفكير مخفية."
   },
   "notifications": {

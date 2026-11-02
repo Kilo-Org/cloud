@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "وەرگێڕانی کورتەکانی ئامرازەکان",
     "toolSummaryTranslationSubtitle": "هەر کورتەیەکی ئامراز بۆ مۆدێلێک بنێرە بۆ ئەوەی وەریگێڕێتە سەر زمانی ئەپەکەت. ئەگەر وەرگێڕانەکە سەرنەکەوێت، ڕەسەنەکە پیشان دەدرێت.",
     "toolSummaryTranslationModelUnavailableNotice": "ئەم مۆدێلە چیتر پێشکەش ناکرێت. دەست بدە بە $t(common.model) بۆ هەڵبژاردنی یەکی تر.",
+    "translateSummaries": "وەرگێڕانی کورتەکان",
     "autoExpandThinkingInactiveSubtitle": "کاتێک وردەکارییەکانی بیرکردنەوە شاردراونەتەوە، هیچ کاریگەرییەکی نییە."
   },
   "prReview": {

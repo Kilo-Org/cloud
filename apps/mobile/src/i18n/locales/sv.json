@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Översätt verktygssammanfattningar",
     "toolSummaryTranslationSubtitle": "Skicka varje verktygssammanfattning till en modell för att översätta den till appens språk. Originalet visas om översättningen misslyckas.",
     "toolSummaryTranslationModelUnavailableNotice": "Den här modellen erbjuds inte längre. Tryck på $t(common.model) för att välja en annan.",
+    "translateSummaries": "Översätt sammanfattningar",
     "autoExpandThinkingInactiveSubtitle": "Ingen effekt när information om resonemang är dold."
   },
   "prReview": {

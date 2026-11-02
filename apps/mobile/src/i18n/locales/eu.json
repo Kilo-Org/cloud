@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Itzuli tresnen laburpenak",
     "toolSummaryTranslationSubtitle": "Bidali tresna-laburpen bakoitza eredu batera zure aplikazioaren hizkuntzara itzultzeko. Jatorrizkoa erakutsiko da itzulpenak huts eginez gero.",
     "toolSummaryTranslationModelUnavailableNotice": "Eredu hau jada ez da eskaintzen. Sakatu $t(common.model) beste bat hautatzeko.",
+    "translateSummaries": "Itzuli laburpenak",
     "autoExpandThinkingInactiveSubtitle": "Ez du eraginik pentsamenduaren xehetasunak ezkutatuta dauden bitartean."
   },
   "prReview": {

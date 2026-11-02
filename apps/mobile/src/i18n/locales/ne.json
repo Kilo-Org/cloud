@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "उपकरण सारांश अनुवाद गर्नुहोस्",
     "toolSummaryTranslationSubtitle": "प्रत्येक उपकरण सारांशलाई तपाईंको एपको भाषामा अनुवाद गर्न मोडेलमा पठाउनुहोस्। अनुवाद असफल भएमा मूल देखाइन्छ।",
     "toolSummaryTranslationModelUnavailableNotice": "यो मोडेल अब उपलब्ध छैन। अर्को छान्न $t(common.model) मा ट्याप गर्नुहोस्।",
+    "translateSummaries": "सारांश अनुवाद गर्नुहोस्",
     "autoExpandThinkingInactiveSubtitle": "सोचको विवरण लुकाइएको बेला कुनै प्रभाव हुँदैन।"
   },
   "prReview": {

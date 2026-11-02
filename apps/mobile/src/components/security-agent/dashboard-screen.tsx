@@ -375,19 +375,27 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const syncBlocked = syncFailure !== null && !isSecuritySyncRetryable(syncFailure);
   const syncDisabled = triggerSync.isPending || syncBlocked;
   const syncRetryable = syncFailure !== null && isSecuritySyncRetryable(syncFailure);
+  // A member cannot change repository policy: the repositories screen disables
+  // every mode row for them, so a control that opens it sends them to a page
+  // they cannot act on. Only the resolved role proves that state — the personal
+  // scope is always `allowed`, and an unresolved role keeps the manager path
+  // until it settles rather than telling a real manager they cannot manage.
+  const repositoryPolicyReadOnly = capability.status === 'denied';
   // A precondition's fix is applied outside this screen, so the row offers that
   // action instead of a Retry that would fail the same way: the in-app
   // repository picker when nothing is in the sync scope, the GitHub App page
   // when the connection itself is what blocks the sync.
   let syncAction: { label: string; pending: boolean; handlePress: () => void } | null = null;
   if (syncPrecondition === 'noRepositories') {
-    syncAction = {
-      label: t('securityAgent.dashboard.manageRepositories'),
-      pending: false,
-      handlePress: () => {
-        pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
-      },
-    };
+    if (!repositoryPolicyReadOnly) {
+      syncAction = {
+        label: t('securityAgent.dashboard.manageRepositories'),
+        pending: false,
+        handlePress: () => {
+          pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
+        },
+      };
+    }
   } else if (syncPrecondition !== null) {
     syncAction = {
       label: t('securityAgent.repositories.manageAccess'),
@@ -409,6 +417,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
       },
     };
   }
+  // The empty-scope sentence ends "then sync again" and says to choose the
+  // repositories, which is a step only a manager can take. A member reads who
+  // can connect them instead.
+  const syncFailureMessage =
+    syncPrecondition === 'noRepositories' && repositoryPolicyReadOnly
+      ? t('securityAgent.mutations.syncNoRepositoriesNoManage')
+      : syncFailure?.message;
 
   // One submit path for every control that starts a sync — the header button,
   // the empty-state action, the retry beside the failure copy, and a
@@ -564,7 +579,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 triggerSync.isPending ? 'text-warn' : 'text-destructive'
               )}
             >
-              {syncFailure.message}
+              {syncFailureMessage}
             </Text>
             {syncAction ? (
               <Button
@@ -643,9 +658,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 </View>
               ))}
             </View>
-            {neverSynced && slaEnabled ? (
+            {neverSynced && slaEnabled && !repositoryPolicyReadOnly ? (
               // The Manage repositories link renders whenever SLA tracking is
-              // on and nothing carries a deadline. Before the first sync that
+              // on, nothing carries a deadline, and the reader may change the
+              // repository policy. Before the first sync that
               // is certain, so the placeholder holds the link's own inline
               // box and the sections below keep their place when the link
               // arrives. Once the tiles are measured the link needs a
@@ -682,7 +698,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           </View>
         )}
 
-        {slaEnabled && data && data.sla.overall.total === 0 ? (
+        {slaEnabled && data && data.sla.overall.total === 0 && !repositoryPolicyReadOnly ? (
           <View className="flex-row items-center gap-4">
             {/* The refresh control in the filter row above is this screen's one
                 sync affordance; a second "Sync findings" link here repeated it

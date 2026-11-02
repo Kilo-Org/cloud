@@ -496,6 +496,7 @@ describe('DashboardScreen sync control terminal states', () => {
     repositories.data = [];
     repositories.refetch.mockClear();
     capability.canManage = false;
+    capability.status = 'allowed';
     dismissFailures.failures = [];
     dismissFailures.clear.mockClear();
     dismissFailures.refresh.mockClear();
@@ -691,6 +692,55 @@ describe('DashboardScreen sync control terminal states', () => {
 
     expect(router.push).toHaveBeenCalledWith('/security/personal/settings/repositories');
     expect(manageAccess.handlePress).not.toHaveBeenCalled();
+  });
+
+  // A member cannot change repository policy: the repositories screen disables
+  // every mode row for them. The rejection must name who can connect
+  // repositories instead of telling them to choose, and offer nothing to press.
+  it('names who can connect repositories for a reader who cannot change them', () => {
+    capability.status = 'denied';
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_no_repositories');
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.mutations.syncNoRepositoriesNoManage')
+    );
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.mutations.syncNoRepositories')
+    );
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+    expect(syncFailureActions(root.root)).toHaveLength(0);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  // The SLA card's repositories link is the dashboard's other route into the
+  // same screen, so a reader who cannot change the policy loses it too.
+  it('leaves the SLA card repository link off for a reader who cannot change them', () => {
+    capability.status = 'denied';
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+  });
+
+  // The role read decides the sentence. Before it settles the manager copy
+  // stays, because telling a real manager they cannot manage would be wrong.
+  it('keeps the manager sentence while the role read is unresolved', () => {
+    capability.status = 'loading';
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_no_repositories');
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.mutations.syncNoRepositories')
+    );
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
   });
 
   it('names a broken GitHub connection and hands the reader to the GitHub App page', () => {

@@ -146,7 +146,13 @@ export function SettingsOverviewScreen({
     displayCount: formatNumber(data.selectedRepositoryIds.length, i18n.language),
   });
   if (data.repositorySelectionMode === 'all') {
-    repoCountLabel = t('common.allRepositories');
+    // "All repositories" is a claim about the GitHub App grant, so a settled
+    // empty grant must not make it: the repositories screen already answers
+    // this state with its own no-repositories empty state, and the two
+    // readings sit one tap apart.
+    repoCountLabel = repositoriesSettledEmpty
+      ? t('securityAgent.repositories.noRepositories')
+      : t('common.allRepositories');
   }
   const automationEnabledCount = [
     data.autoAnalysisEnabled,

@@ -105,7 +105,8 @@ export async function sendUpstreamAttempt({
   }
 
   if (
-    (providerContext.provider.type === 'openrouter' || providerContext.provider.type === 'vercel') &&
+    (providerContext.provider.type === 'openrouter' ||
+      providerContext.provider.type === 'vercel') &&
     !isKiloExclusiveModel(requestedModel) &&
     !(await isValidOpenRouterModelId(requestedModel))
   ) {

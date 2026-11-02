@@ -31,6 +31,7 @@ const Pressable = 'Pressable' as ElementType;
 const Check = 'Check' as ElementType;
 const View = 'View' as ElementType;
 const ScrollView = 'ScrollView' as ElementType;
+const Text = 'Text' as ElementType;
 const AXE = ['Personal', 'Acme Corp', 'Cancel'];
 const mounted: { unmount: () => void }[] = [];
 
@@ -142,6 +143,20 @@ describe('ContextPickerSheet', () => {
     expect(cancel.props.accessibilityState).toBeUndefined();
     expect(String(cancel.parent?.props.className)).toContain('border-t');
     expect(cancel.parent?.parent?.props.style).toEqual({ paddingBottom: 24 });
+  });
+
+  it('keeps the end of a label that does not fit its row', async () => {
+    const renderer = await mount();
+
+    // Sibling memberships share their leading words, so a row that cuts its
+    // label cuts the middle: the tail is the only part naming the account.
+    const labels = renderer.root.findAll(
+      node => node.type === Text && node.props.numberOfLines === 1
+    );
+    expect(labels).toHaveLength(2);
+    for (const label of labels) {
+      expect(label.props.ellipsizeMode).toBe('middle');
+    }
   });
 
   it('checks nothing when the stored account is not in the list', async () => {

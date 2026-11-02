@@ -192,7 +192,9 @@ export function ContextControl({
         field ? 'flex-1 text-base text-foreground' : 'shrink text-sm text-muted-foreground'
       )}
       numberOfLines={1}
-      ellipsizeMode="tail"
+      // Memberships of one workspace share their leading words, so the tail is
+      // what tells them apart: cutting it drops the account's own name.
+      ellipsizeMode="middle"
     >
       {label}
     </Text>

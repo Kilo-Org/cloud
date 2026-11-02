@@ -293,6 +293,9 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(texts(ui)).toContain(label);
     expect(picker(ui).props.accessibilityLabel).toBe(label);
     expect(picker(ui).findByType(Text).props.numberOfLines).toBe(1);
+    // Memberships of one workspace share their leading words; the label keeps
+    // its tail, which is the part that names the account.
+    expect(picker(ui).findByType(Text).props.ellipsizeMode).toBe('middle');
     expect(picker(ui).props.accessibilityRole).toBe('button');
     expect(picker(ui).props.accessibilityState).toEqual({ busy: false, disabled: false });
     expect(picker(ui).findAllByType('ActivityIndicator' as ElementType)).toHaveLength(0);

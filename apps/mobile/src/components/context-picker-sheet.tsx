@@ -133,7 +133,9 @@ function ContextPickerSheetBody({
                 <View className="w-[16px] items-center">
                   {index === currentIndex && <Check size={16} color={colors.primary} />}
                 </View>
-                <Text className="min-w-0 flex-1 text-sm" numberOfLines={1}>
+                {/* The tail, not the leading words, tells sibling memberships
+                    apart, so a label cut at the row's width keeps its own name. */}
+                <Text className="min-w-0 flex-1 text-sm" numberOfLines={1} ellipsizeMode="middle">
                   {label}
                 </Text>
               </Pressable>

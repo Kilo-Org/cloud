@@ -38,6 +38,8 @@ export const TOKEN_KEYS = [
   ['ringTrack', '--ring-track'],
   ['accentSoft', '--accent-soft'],
   ['accentSoftForeground', '--accent-soft-foreground'],
+  ['accentSoftTint', '--accent-soft-tint'],
+  ['accentSoftTintForeground', '--accent-soft-tint-foreground'],
   ['good', '--good'],
   ['warn', '--warn'],
   ['warnForeground', '--warn-foreground'],

@@ -2,9 +2,8 @@
 import { createRequire } from 'node:module';
 import tailwindcss from '@tailwindcss/postcss';
 import postcss from 'postcss';
-import { createElement, type ReactElement, useState } from 'react';
+import { createElement, type ElementType, type ReactElement, useState } from 'react';
 import { Text as NativeText, Pressable, View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -18,16 +17,13 @@ import {
 import { Text } from './text';
 
 vi.mock('react-native', () => ({
-  ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   Text: 'Text',
   View: 'View',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
-vi.mock('@/components/ui/activity-indicator', () => ({
-  ActivityIndicator: 'ActivityIndicator',
-}));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     foreground: '#123456',
@@ -57,6 +53,10 @@ function render(element: ReactElement) {
 
 const busyWrappers = (node: TestRenderer.ReactTestInstance) =>
   node.findAll(n => `${n.props.className ?? ''}`.startsWith(BUTTON_BUSY_LABEL_CLASS));
+
+/** The busy mark is the shared indicator, drawn over its own track. */
+const BusyMark = 'ActivityIndicator' as ElementType;
+const busyMarks = (node: TestRenderer.ReactTestInstance) => node.findAllByType(BusyMark);
 
 function renderButton({
   children = createElement(Text, null, 'Retry'),
@@ -158,7 +158,7 @@ describe('Button native target contract', () => {
         disabled: true,
         busy: true,
       });
-      expect(button.findByType(ActivityIndicator).props.size).toBe('small');
+      expect(busyMarks(button)[0]?.props.size).toBe('small');
 
       const ready = renderButton({
         variant,
@@ -168,7 +168,7 @@ describe('Button native target contract', () => {
       expect(ready).toBe(button);
       expect(ready.findByType(NativeText)).toBe(label);
       expect(label.children).toEqual(['Retry']);
-      expect(ready.findAllByType(ActivityIndicator)).toHaveLength(0);
+      expect(busyMarks(ready)).toHaveLength(0);
       expect(ready.props.disabled).toBe(false);
       expect(ready.props.accessibilityState).toEqual({
         selected: true,
@@ -224,19 +224,20 @@ describe('Button native target contract', () => {
     expect(wrappers).toHaveLength(1);
     expect(wrappers[0]?.props.accessibilityElementsHidden).toBe(true);
     expect(wrappers[0]?.props.importantForAccessibility).toBe('no-hide-descendants');
-    // The spinner is out of flow, so it adds no width of its own and sits on
-    // the button's centre rather than beside the label.
-    const spinner = button.findByType(ActivityIndicator);
-    expect(spinner.props.size).toBe('small');
-    expect(spinner.parent?.props.className).toBe(BUTTON_BUSY_OVERLAY_CLASS);
+    // The mark is out of flow, so it adds no width of its own and sits on the
+    // button's centre rather than beside the label.
+    const spinner = busyMarks(button)[0];
+    expect(spinner?.props.size).toBe('small');
+    const overlay = button.find(n => n.props.className === BUTTON_BUSY_OVERLAY_CLASS);
+    expect(overlay.findAllByType(BusyMark)).toHaveLength(1);
     const overlayStyles = await compiledStyles(BUTTON_BUSY_OVERLAY_CLASS);
     expect(overlayStyles).toContainEqual(expect.objectContaining({ position: 'absolute' }));
 
     // The wrapper and the label are the same elements once loading ends; only
-    // the opacity, the accessibility hiding and the indicator change.
+    // the opacity, the accessibility hiding and the mark change.
     const ready = renderButton({ loading: false });
     expect(ready.findByType(NativeText)).toBe(label);
-    expect(ready.findAllByType(ActivityIndicator)).toHaveLength(0);
+    expect(busyMarks(ready)).toHaveLength(0);
     expect(busyWrappers(ready)).toHaveLength(1);
     expect(busyWrappers(ready)[0]?.props.className).not.toContain('opacity-0');
   });
@@ -287,7 +288,7 @@ describe('Button native target contract', () => {
     const button = renderButton({ disabled: true, loading: false });
     expect(button.props.disabled).toBe(true);
     expect(button.props.accessibilityState).toEqual({ disabled: true, busy: false });
-    expect(button.findAllByType(ActivityIndicator)).toHaveLength(0);
+    expect(busyMarks(button)).toHaveLength(0);
     expect(button.findByType(NativeText).children).toEqual(['Retry']);
   });
 
@@ -358,7 +359,7 @@ describe('Button native target contract', () => {
     }
     const button = render(createElement(Action));
     expect(button.props.disabled).toBe(false);
-    expect(button.findAllByType(ActivityIndicator)).toHaveLength(0);
+    expect(busyMarks(button)).toHaveLength(0);
     expect(button.findByType(NativeText).children).toEqual(['Start']);
     act(() => {
       (button.props.onPress as () => void)();

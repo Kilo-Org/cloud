@@ -1,5 +1,5 @@
 {
-  "id": "f88f6f95-91fa-4eb5-a1bd-ff45436e2deb",
+  "id": "704d1452-61a4-44cb-914a-07bd75ae0e34",
   "prevId": "db10bcc9-5736-4ad7-ae56-7eac8bc3c911",
   "version": "7",
   "dialect": "postgresql",
@@ -5221,12 +5221,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "manual_operation_key": {
-          "name": "manual_operation_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "review_type": {
           "name": "review_type",
           "type": "text",
@@ -5512,50 +5506,6 @@
           "isUnique": true,
           "where": "\"cloud_agent_code_reviews\".\"platform_integration_id\" IS NOT NULL\n        AND \"cloud_agent_code_reviews\".\"status\" IN ('pending', 'queued', 'running')\n        AND (\"cloud_agent_code_reviews\".\"manual_config\" IS NULL OR \"cloud_agent_code_reviews\".\"manual_config\"->>'outputMode' = 'provider')",
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_user_manual_operation_key": {
-          "name": "UQ_cloud_agent_code_reviews_user_manual_operation_key",
-          "columns": [
-            {
-              "expression": "owned_by_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "manual_operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"owned_by_user_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"manual_operation_key\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_org_manual_operation_key": {
-          "name": "UQ_cloud_agent_code_reviews_org_manual_operation_key",
-          "columns": [
-            {
-              "expression": "owned_by_organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "manual_operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"owned_by_organization_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"manual_operation_key\" IS NOT NULL",
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -22299,6 +22249,13 @@
           "notNull": true,
           "default": false
         },
+        "can_export_api_request_logs": {
+          "name": "can_export_api_request_logs",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "total_microdollars_acquired": {
           "name": "total_microdollars_acquired",
           "type": "bigint",
@@ -22652,6 +22609,10 @@
         "kilocode_users_can_manage_credits_requires_admin_check": {
           "name": "kilocode_users_can_manage_credits_requires_admin_check",
           "value": "NOT \"kilocode_users\".\"can_manage_credits\" OR \"kilocode_users\".\"is_admin\""
+        },
+        "kilocode_users_can_export_api_request_logs_requires_admin_check": {
+          "name": "kilocode_users_can_export_api_request_logs_requires_admin_check",
+          "value": "NOT \"kilocode_users\".\"can_export_api_request_logs\" OR \"kilocode_users\".\"is_admin\""
         }
       },
       "isRLSEnabled": false

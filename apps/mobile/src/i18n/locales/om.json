@@ -442,7 +442,6 @@
         "rebase": "Bu'uura jijjiiruu"
       },
       "terminal": {
-        "alreadyMerged": "Duraan walitti makameera",
         "closed": "Gaaffiin walitti makuu kun cufameera",
         "closedMergeRequest": "Gaaffiin walitti makuu kun cufameera"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Gamaaggamni barbaachisu hin jiru",
         "requiredReviewsDetail": "Mirkaneessi gamaaggamtoota barbaachisan irraa argamuu qabu hin jiru ykn eegamaa jira.",
         "failingChecksTitle": "Qorannoowwan barbaachisoo hin milkoofne",
-        "failingChecksDetail": "Qorannoowwan haalaa barbaachisoo ta'an hin milkoofne.",
         "unstableTitle": "Qorannoowwan tokko tokko hin milkoofne",
         "unstableDetail": "Qorannoowwan dirqama hin taane hin milkoofne. Isaan walitti makuu hin dhorkan.",
         "draftTitle": "Wixinee gaaffii walitti makuu",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Walqunnamtii Bitbucket sakatta'uun hin danda'amne.",
       "providerCheckFailedMessage": "Kun fe'amuun isaa dura haalli walqunnamtii hin argamu.",
       "reconnectTitle": "GitHub irra deebi'ii walqabsiisi",
+      "reconnectTitleGitLab": "GitLab irra deebi'ii walqabsiisi",
+      "reconnectTitleBitbucket": "Bitbucket irra deebi'ii walqabsiisi",
       "reconnectDescription": "Hayyamni walqunnamtii GitHub kee haqameera.",
       "gitlabDescription": "Gaaffiiwwan walitti makuu mobaayilaan sakatta'i",
       "gitlabInstanceMismatchTitle": "Walqunnamtiin GitLab instance biraaf ta'e",
@@ -1614,6 +1614,8 @@
       "set": "Qindaa'e",
       "notSet": "Hin qindaa'e",
       "nSelected": "{{displayCount}} filatamaniiru",
+      "nSelected_one": "{{displayCount}} filatamaniiru",
+      "nSelected_other": "{{displayCount}} filatamaniiru",
       "proposedReviewMdGuidance": "Qajeelfama REVIEW.md dhihaate"
     },
     "decision": {
@@ -2606,9 +2608,9 @@
       "detailRetryingClone": "Kopishii irra deebi'ee yaalaa jira (yaalii {{total}} keessaa {{attempt}})",
       "detailSetupCommandFailed": "Ajajni qophii {{index}} hin milkoofne",
       "detailSetupCommandTimedOut": "Ajajni qophii {{index}} yeroon dhaafe",
-      "detailColdRestore": "Deebiinsa qorraa, snaapshottii hojiirra oole, faayiloota {{total}} keessaa {{applied}} deebi'an",
+      "detailColdRestore": "Deebiinsa qorraa, snaapshottii hojiirra oole, faayiloota deebi'an: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% xumurame",
-      "detailRestoreIncompleteReport": "Deebiinsa sessii guutuu miti: faayiloota {{total}} keessaa {{skipped}} hin deebi'amne ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Deebiinsa sessii guutuu miti, faayiloota hin deebi'amne: {{skipped}} / {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Hin argamne: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} fi kan biraa {{omitted}}",
       "detailReasonPatchFailed": "paachiin hojiirra hin oole",

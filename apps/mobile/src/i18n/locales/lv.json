@@ -449,7 +449,6 @@
         "rebase": "Pārbāzēšana"
       },
       "terminal": {
-        "alreadyMerged": "Jau apvienots",
         "closed": "Izmaiņu pieprasījums ir slēgts",
         "closedMergeRequest": "Šis merge request ir slēgts"
       },
@@ -466,7 +465,6 @@
         "requiredReviewsTitle": "Trūkst obligāto vērtējumu",
         "requiredReviewsDetail": "Vēl nav saņemti apstiprinājumi no visiem obligātajiem pārskatītājiem.",
         "failingChecksTitle": "Nesekmīgas obligātās pārbaudes",
-        "failingChecksDetail": "Obligātās statusa pārbaudes ir nesekmīgas.",
         "unstableTitle": "Dažas pārbaudes ir nesekmīgas",
         "unstableDetail": "Neobligātās pārbaudes ir nesekmīgas. Tās netraucēs apvienošanu.",
         "draftTitle": "Izmaiņu pieprasījuma melnraksts",
@@ -696,6 +694,8 @@
       "checkFailedTitleBitbucket": "Neizdevās pārbaudīt Bitbucket savienojumu.",
       "providerCheckFailedMessage": "Savienojuma statuss būs pieejams pēc ielādes.",
       "reconnectTitle": "Atkārtoti savienot GitHub",
+      "reconnectTitleGitLab": "Atkārtoti savienot GitLab",
+      "reconnectTitleBitbucket": "Atkārtoti savienot Bitbucket",
       "reconnectDescription": "Tavam GitHub savienojumam ir atsaukta piekļuve.",
       "gitlabDescription": "Pārbaudīt merge requests mobilajā ierīcē",
       "gitlabInstanceMismatchTitle": "GitLab savienojums ir paredzēts citai instancei",
@@ -1636,6 +1636,9 @@
       "set": "Iestatīts",
       "notSet": "Nav iestatīts",
       "nSelected": "Atlasīts: {{displayCount}}",
+      "nSelected_one": "Atlasīts: {{displayCount}}",
+      "nSelected_other": "Atlasīts: {{displayCount}}",
+      "nSelected_zero": "Atlasīts: {{displayCount}}",
       "proposedReviewMdGuidance": "Ieteiktie REVIEW.md norādījumi"
     },
     "decision": {
@@ -2647,9 +2650,9 @@
       "detailRetryingClone": "Mēģina klonēt vēlreiz ({{attempt}}. mēģinājums no {{total}})",
       "detailSetupCommandFailed": "Sagatavošanas komanda {{index}} neizdevās",
       "detailSetupCommandTimedOut": "Sagatavošanas komandai {{index}} iestājās noilgums",
-      "detailColdRestore": "Aukstā atjaunošana, moments piemērots, atjaunoti {{applied}} no {{total}} failiem",
+      "detailColdRestore": "Aukstā atjaunošana, moments piemērots, atjaunotie faili: {{applied}} no {{total}}",
       "detailProgressPercent": "{{percent}}% pabeigti",
-      "detailRestoreIncompleteReport": "Sesijas atjaunošana nepabeigta: {{skipped}} no {{total}} failiem netika atjaunoti ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Sesijas atjaunošana nepabeigta, neizdevās atjaunot failus: {{skipped}} no {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Trūkst: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} un vēl {{omitted}}",
       "detailReasonPatchFailed": "iestākums netika piemērots",

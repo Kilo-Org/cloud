@@ -509,7 +509,6 @@
         "rebase": "Rebase"
       },
       "terminal": {
-        "alreadyMerged": "Already merged",
         "closed": "This pull request is closed",
         "closedMergeRequest": "This merge request is closed"
       },
@@ -526,7 +525,6 @@
         "requiredReviewsTitle": "Required reviews missing",
         "requiredReviewsDetail": "Approvals from the required reviewers are missing or pending.",
         "failingChecksTitle": "Failing required checks",
-        "failingChecksDetail": "Required status checks are failing.",
         "unstableTitle": "Some checks are failing",
         "unstableDetail": "Non-required checks are failing. They will not block the merge.",
         "draftTitle": "Draft pull request",
@@ -748,6 +746,8 @@
       "checkFailedTitleBitbucket": "Could not check Bitbucket connection",
       "providerCheckFailedMessage": "Connection status is unavailable until this loads.",
       "reconnectTitle": "Reconnect GitHub",
+      "reconnectTitleGitLab": "Reconnect GitLab",
+      "reconnectTitleBitbucket": "Reconnect Bitbucket",
       "reconnectDescription": "Your GitHub connection was revoked.",
       "gitlabDescription": "Review merge requests on mobile",
       "gitlabInstanceMismatchTitle": "GitLab connection is for another instance",
@@ -1680,7 +1680,9 @@
       "allAreas": "All areas",
       "set": "Set",
       "notSet": "Not set",
+      "nSelected_one": "{{displayCount}} selected",
       "nSelected": "{{displayCount}} selected",
+      "nSelected_other": "{{displayCount}} selected",
       "proposedReviewMdGuidance": "Proposed REVIEW.md guidance"
     },
     "decision": {

@@ -442,7 +442,6 @@
         "rebase": "Ombasering"
       },
       "terminal": {
-        "alreadyMerged": "Allerede flettet",
         "closed": "Denne PR-en er lukket",
         "closedMergeRequest": "Denne merge request-en er lukket"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Påkrevde kodegjennomganger mangler",
         "requiredReviewsDetail": "Godkjenninger fra de påkrevde kodegranskerne mangler eller avventes.",
         "failingChecksTitle": "Påkrevde sjekker feiler",
-        "failingChecksDetail": "Påkrevde statussjekker feiler.",
         "unstableTitle": "Noen sjekker feiler",
         "unstableDetail": "Valgfrie sjekker feiler. De blokkerer ikke flettingen.",
         "draftTitle": "PR-utkast",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Kunne ikke sjekke Bitbucket-tilkoblingen.",
       "providerCheckFailedMessage": "Tilkoblingsstatusen er ikke tilgjengelig før innlastingen er fullført.",
       "reconnectTitle": "Koble til GitHub på nytt",
+      "reconnectTitleGitLab": "Koble til GitLab på nytt",
+      "reconnectTitleBitbucket": "Koble til Bitbucket på nytt",
       "reconnectDescription": "Tilgangen til GitHub-kontoen din er trukket tilbake.",
       "gitlabDescription": "Gå gjennom merge requests på mobilen",
       "gitlabInstanceMismatchTitle": "GitLab-tilkoblingen er for en annen instans",
@@ -1614,6 +1614,8 @@
       "set": "Angitt",
       "notSet": "Ikke angitt",
       "nSelected": "{{displayCount}} valgt",
+      "nSelected_one": "{{displayCount}} valgt",
+      "nSelected_other": "{{displayCount}} valgt",
       "proposedReviewMdGuidance": "Forslag til retningslinjer i REVIEW.md"
     },
     "decision": {
@@ -2606,9 +2608,9 @@
       "detailRetryingClone": "Prøver kloning på nytt (forsøk {{attempt}} av {{total}})",
       "detailSetupCommandFailed": "Oppsettskommando {{index}} mislyktes",
       "detailSetupCommandTimedOut": "Oppsettskommando {{index}} fikk tidsavbrudd",
-      "detailColdRestore": "Kald gjenoppretting, snapshot anvendt, {{applied}} av {{total}} filer gjenopprettet",
+      "detailColdRestore": "Kald gjenoppretting, snapshot anvendt, gjenopprettede filer: {{applied}} av {{total}}",
       "detailProgressPercent": "{{percent}} % fullført",
-      "detailRestoreIncompleteReport": "Øktgjenoppretting ufullstendig: {{skipped}} av {{total}} filer ble ikke gjenopprettet ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Øktgjenoppretting ufullstendig, filer som ikke ble gjenopprettet: {{skipped}} av {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Mangler: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} og {{omitted}} til",
       "detailReasonPatchFailed": "patchen ble ikke anvendt",

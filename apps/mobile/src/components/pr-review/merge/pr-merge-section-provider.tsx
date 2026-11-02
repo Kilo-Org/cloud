@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { PrReviewCapabilityBanner } from '@/components/pr-review/pr-review-capability-banner';
-import { TerminalChip } from '@/components/pr-review/merge/pr-merge-section-parts';
+import { ClosedChip } from '@/components/pr-review/merge/pr-merge-section-parts';
 import { providerPrMergeTitles } from '@/components/pr-review/merge/pr-merge-titles';
 import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
@@ -35,9 +35,14 @@ export function PrMergeSectionProvider({ prRef, state }: PrMergeSectionProviderP
   const { t } = useTranslation();
 
   if (state !== 'open') {
+    // A merged review needs no section: the state chip and the merged-by line
+    // already say it merged. Only a closed one gets its own sentence.
+    if (state === 'merged') {
+      return null;
+    }
     // Provider wording (s6): a closed GitLab merge request says "merge
     // request"; Bitbucket keeps "pull request" — that is its own noun.
-    return <TerminalChip state={state} nounKey={providerPrNounKey(prRef.platform)} />;
+    return <ClosedChip nounKey={providerPrNounKey(prRef.platform)} />;
   }
 
   const autoMerge = providerPrCapabilities(prRef.platform).autoMerge;
@@ -45,9 +50,6 @@ export function PrMergeSectionProvider({ prRef, state }: PrMergeSectionProviderP
 
   return (
     <View className="gap-2">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('prReview.merge.mergeTitle')}
-      </Text>
       <Button
         onPress={() => {
           router.push(providerPrSheetHref(prRef, 'merge', { mode: 'merge' }));

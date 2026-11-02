@@ -1084,6 +1084,8 @@
     "overview": {
       "allAreas": "모든 영역",
       "nSelected": "{{displayCount}}개 선택됨",
+      "nSelected_one": "{{displayCount}}개 선택됨",
+      "nSelected_other": "{{displayCount}}개 선택됨",
       "proposedReviewMdGuidance": "제안된 REVIEW.md 지침",
       "set": "설정됨",
       "notSet": "설정 안 됨"
@@ -2714,6 +2716,8 @@
       "checkFailedTitleBitbucket": "Bitbucket 연결을 확인하지 못했습니다.",
       "providerCheckFailedMessage": "로드될 때까지 연결 상태를 사용할 수 없습니다.",
       "reconnectTitle": "GitHub 다시 연결",
+      "reconnectTitleGitLab": "GitLab 다시 연결",
+      "reconnectTitleBitbucket": "Bitbucket 다시 연결",
       "reconnectDescription": "GitHub 연결이 해제되었습니다.",
       "gitlabDescription": "모바일에서 머지 요청 리뷰",
       "gitlabInstanceMismatchTitle": "GitLab 연결이 다른 인스턴스용입니다",
@@ -2993,7 +2997,6 @@
         "squash": "스쿼시"
       },
       "terminal": {
-        "alreadyMerged": "이미 병합됨",
         "closed": "풀 리퀘스트 닫힘",
         "closedMergeRequest": "머지 요청 닫힘"
       },
@@ -3010,7 +3013,6 @@
         "requiredReviewsTitle": "필수 리뷰 미완료",
         "requiredReviewsDetail": "필수 리뷰어의 승인이 없거나 대기 중입니다.",
         "failingChecksTitle": "필수 검사 실패",
-        "failingChecksDetail": "필수 상태 검사가 실패했습니다.",
         "unstableTitle": "일부 검사 실패",
         "unstableDetail": "필수가 아닌 검사가 실패했습니다. 병합은 진행할 수 있습니다.",
         "draftTitle": "초안 풀 리퀘스트",

@@ -442,7 +442,6 @@
         "rebase": "Ümberbaseerimine"
       },
       "terminal": {
-        "alreadyMerged": "Juba ühendatud",
         "closed": "See tõmbetaotlus on suletud",
         "closedMergeRequest": "See liitmistaotlus on suletud"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Nõutud ülevaatused puuduvad",
         "requiredReviewsDetail": "Nõutud ülevaatajate kinnitused puuduvad või on ootel.",
         "failingChecksTitle": "Nõutud kontrollid ebaõnnestusid",
-        "failingChecksDetail": "Nõutud olekukontrollid ebaõnnestusid.",
         "unstableTitle": "Mõned kontrollid ebaõnnestusid",
         "unstableDetail": "Valikulised kontrollid ebaõnnestusid. Need ei takista ühendamist.",
         "draftTitle": "Tõmbetaotluse mustand",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucketi ühendust ei õnnestunud kontrollida.",
       "providerCheckFailedMessage": "Ühenduse olekut saab näha alles pärast laadimise lõppu.",
       "reconnectTitle": "Ühenda GitHub uuesti",
+      "reconnectTitleGitLab": "Ühenda GitLab uuesti",
+      "reconnectTitleBitbucket": "Ühenda Bitbucket uuesti",
       "reconnectDescription": "Sinu GitHubi ühendus on tühistatud.",
       "gitlabDescription": "Vaata liitmistaotlused mobiilis üle",
       "gitlabInstanceMismatchTitle": "GitLabi ühendus on teise instantsi jaoks",
@@ -1614,6 +1614,8 @@
       "set": "Määratud",
       "notSet": "Pole määratud",
       "nSelected": "Valitud {{displayCount}}",
+      "nSelected_one": "Valitud {{displayCount}}",
+      "nSelected_other": "Valitud {{displayCount}}",
       "proposedReviewMdGuidance": "Soovitatud REVIEW.md-juhised"
     },
     "decision": {
@@ -2606,9 +2608,9 @@
       "detailRetryingClone": "Kloonimise korduskatse (katse {{attempt}}/{{total}})",
       "detailSetupCommandFailed": "Seadistamiskäsk {{index}} ebaõnnestus",
       "detailSetupCommandTimedOut": "Seadistamiskäsk {{index}} aegus",
-      "detailColdRestore": "Külm taastamine, hetktõmmis rakendatud, {{applied}}/{{total}} faili taastatud",
+      "detailColdRestore": "Külm taastamine, hetktõmmis rakendatud, taastatud failid: {{applied}}/{{total}}",
       "detailProgressPercent": "{{percent}}% valmis",
-      "detailRestoreIncompleteReport": "Seansi taastamine jäi ebatäielikuks: {{skipped}}/{{total}} faili ei taastatud ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Seansi taastamine jäi ebatäielikuks, taastamata failid: {{skipped}}/{{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Puuduvad: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ja veel {{omitted}}",
       "detailReasonPatchFailed": "patchi ei rakendatud",

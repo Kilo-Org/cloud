@@ -442,7 +442,6 @@
         "rebase": "ரீபேஸ்"
       },
       "terminal": {
-        "alreadyMerged": "ஏற்கனவே இணைக்கப்பட்டது",
         "closed": "இந்த இணைப்புக் கோரிக்கை மூடப்பட்டது",
         "closedMergeRequest": "இந்த இணைப்புக் கோரிக்கை மூடப்பட்டது"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "கட்டாய மதிப்பாய்வுகள் இல்லை",
         "requiredReviewsDetail": "ஒப்புதல் அளிக்க வேண்டிய மதிப்பாய்வாளர்களின் ஒப்புதல்கள் இல்லை அல்லது நிலுவையில் உள்ளன.",
         "failingChecksTitle": "தோல்வியடையும் கட்டாயச் சோதனைகள்",
-        "failingChecksDetail": "கட்டாய நிலைச் சோதனைகள் தோல்வியடைகின்றன.",
         "unstableTitle": "சில சோதனைகள் தோல்வியடைகின்றன",
         "unstableDetail": "கட்டாயமில்லாத சோதனைகள் தோல்வியடைகின்றன. அவை இணைப்பைத் தடுக்காது.",
         "draftTitle": "வரைவு PR",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket இணைப்பைச் சரிபார்க்க முடியவில்லை.",
       "providerCheckFailedMessage": "இது ஏற்றும் வரை இணைப்பு நிலை கிடைக்காது.",
       "reconnectTitle": "GitHub உடன் மீண்டும் இணைக்கவும்",
+      "reconnectTitleGitLab": "GitLab உடன் மீண்டும் இணைக்கவும்",
+      "reconnectTitleBitbucket": "Bitbucket உடன் மீண்டும் இணைக்கவும்",
       "reconnectDescription": "உங்கள் GitHub இணைப்பு ரத்து செய்யப்பட்டது.",
       "gitlabDescription": "மொபைலில் இணைப்புக் கோரிக்கைகளை மதிப்பாய்வு செய்யவும்",
       "gitlabInstanceMismatchTitle": "GitLab இணைப்பு வேறொரு இன்ஸ்டன்ஸிற்கானது",
@@ -1614,6 +1614,8 @@
       "set": "அமைக்கப்பட்டது",
       "notSet": "அமைக்கப்படவில்லை",
       "nSelected": "தேர்ந்தெடுத்தவை: {{displayCount}}",
+      "nSelected_one": "தேர்ந்தெடுத்தவை: {{displayCount}}",
+      "nSelected_other": "தேர்ந்தெடுத்தவை: {{displayCount}}",
       "proposedReviewMdGuidance": "முன்மொழியப்பட்ட REVIEW.md வழிகாட்டுதல்"
     },
     "decision": {
@@ -2606,9 +2608,9 @@
       "detailRetryingClone": "க்ளோன் மீண்டும் முயற்சிக்கப்படுகிறது (முயற்சி {{attempt}} / {{total}})",
       "detailSetupCommandFailed": "அமைவுக் கட்டளை {{index}} தோல்வியடைந்தது",
       "detailSetupCommandTimedOut": "அமைவுக் கட்டளை {{index}} நேரம் முடிந்தது",
-      "detailColdRestore": "குளிர் மீட்டமைப்பு, ஸ்னாப்ஷாட் பிரயோகிக்கப்பட்டது, {{total}} கோப்புகளில் {{applied}} மீட்டமைக்கப்பட்டன",
+      "detailColdRestore": "குளிர் மீட்டமைப்பு, ஸ்னாப்ஷாட் பிரயோகிக்கப்பட்டது, மீட்டமைக்கப்பட்ட கோப்புகள்: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% முடிந்தது",
-      "detailRestoreIncompleteReport": "அமர்வு மீட்டமைப்பு முழுமையடையவில்லை: {{total}} கோப்புகளில் {{skipped}} மீட்டமைக்கப்படவில்லை ({{reasons}}).",
+      "detailRestoreIncompleteReport": "அமர்வு மீட்டமைப்பு முழுமையடையவில்லை — மீட்டமைக்கப்படாத கோப்புகள்: {{skipped}} / {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "விடுபட்டவை: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} மற்றும் மேலும் {{omitted}}",
       "detailReasonPatchFailed": "பேட்ச் பிரயோகிக்கப்படவில்லை",

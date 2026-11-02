@@ -442,7 +442,6 @@
         "rebase": "රීබේස්"
       },
       "terminal": {
-        "alreadyMerged": "දැනටමත් ඒකාබද්ධ කර ඇත",
         "closed": "මෙම පුල් ඉල්ලීම වසා ඇත",
         "closedMergeRequest": "මෙම මර්ජ ඉල්ලීම වසා ඇත"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "අවශ්‍ය සමාලෝචන නොමැත",
         "requiredReviewsDetail": "අවශ්‍ය සමාලෝචකයන්ගේ අනුමැති ලැබී නොමැත හෝ තවමත් ලැබීමට නියමිතයි.",
         "failingChecksTitle": "අසමත් වන අනිවාර්ය පරීක්ෂණ",
-        "failingChecksDetail": "අනිවාර්ය තත්ත්ව පරීක්ෂණ අසමත් වෙමින් පවතී.",
         "unstableTitle": "සමහර පරීක්ෂණ අසමත් වෙමින් පවතී",
         "unstableDetail": "අනිවාර්ය නොවන පරීක්ෂණ අසමත් වෙමින් පවතී. ඒවා ඒකාබද්ධ කිරීම අවහිර නොකරයි.",
         "draftTitle": "කෙටුම්පත් PR",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket සම්බන්ධතාවය පරීක්ෂා කිරීමට නොහැකි විය.",
       "providerCheckFailedMessage": "මෙය පූරණය වන තුරු සම්බන්ධතා තත්ත්වය ලබා ගත නොහැක.",
       "reconnectTitle": "GitHub නැවත සම්බන්ධ කරන්න",
+      "reconnectTitleGitLab": "GitLab නැවත සම්බන්ධ කරන්න",
+      "reconnectTitleBitbucket": "Bitbucket නැවත සම්බන්ධ කරන්න",
       "reconnectDescription": "ඔබේ GitHub සම්බන්ධතාවය අවලංගු කර ඇත.",
       "gitlabDescription": "ජංගම දුරකථනයෙන් මර්ජ ඉල්ලීම් සමාලෝචනය කරන්න",
       "gitlabInstanceMismatchTitle": "GitLab සම්බන්ධතාව වෙනත් ඉන්ස්ටන්ස් එකක් සඳහා වේ",
@@ -1614,6 +1614,8 @@
       "set": "සකසා ඇත",
       "notSet": "සකසා නැත",
       "nSelected": "{{displayCount}} ක් තෝරා ඇත",
+      "nSelected_one": "{{displayCount}} ක් තෝරා ඇත",
+      "nSelected_other": "{{displayCount}} ක් තෝරා ඇත",
       "proposedReviewMdGuidance": "යෝජිත REVIEW.md මාර්ගෝපදේශ"
     },
     "decision": {
@@ -2612,9 +2614,9 @@
       "detailRetryingClone": "ක්ලෝන කිරීම නැවත උත්සාහ කරමින් (උත්සාහය {{total}} න් {{attempt}})",
       "detailSetupCommandFailed": "සැකසුම් විධානය {{index}} අසාර්ථක විය",
       "detailSetupCommandTimedOut": "සැකසුම් විධානය {{index}} කාලය ඉක්මවිය",
-      "detailColdRestore": "සීතල ප්‍රතිසාධනය, ස්නැප්ෂොටය යෙදවිය, ගොනු {{total}} කින් {{applied}} ක් ප්‍රතිසාධනය විය",
+      "detailColdRestore": "සීතල ප්‍රතිසාධනය, ස්නැප්ෂොටය යෙදවිය — ප්‍රතිසාධනය කළ ගොනු: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% සම්පූර්ණයි",
-      "detailRestoreIncompleteReport": "සැසි ප්‍රතිසාධනය අසම්පූර්ණයි: ගොනු {{total}} කින් {{skipped}} ක් ප්‍රතිසාධනය කළේ නැත ({{reasons}}).",
+      "detailRestoreIncompleteReport": "සැසි ප්‍රතිසාධනය අසම්පූර්ණයි — ප්‍රතිසාධනය නොකළ ගොනු: {{skipped}} / {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "නොමැති: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} සහ තව {{omitted}} ක්",
       "detailReasonPatchFailed": "පැච් එක යෙදවිය නොහැකි විය",

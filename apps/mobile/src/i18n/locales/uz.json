@@ -442,7 +442,6 @@
         "rebase": "Asosni almashtirish"
       },
       "terminal": {
-        "alreadyMerged": "Allaqachon birlashtirilgan",
         "closed": "Bu PR yopilgan",
         "closedMergeRequest": "Bu merge so‘rovi yopilgan"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Majburiy ko'rib chiqishlar yetishmayapti",
         "requiredReviewsDetail": "Belgilangan tekshiruvchilar hali tasdiqlamagan yoki ularning tasdig'i kutilmoqda.",
         "failingChecksTitle": "Majburiy tekshiruvlar o'tmadi",
-        "failingChecksDetail": "Majburiy holat tekshiruvlari xato bilan yakunlanmoqda.",
         "unstableTitle": "Ayrim tekshiruvlar o'tmadi",
         "unstableDetail": "Majburiy bo'lmagan tekshiruvlar xato bilan yakunlanmoqda. Ular birlashtirishga to'sqinlik qilmaydi.",
         "draftTitle": "Qoralama PR",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket ulanishini tekshirib bo'lmadi.",
       "providerCheckFailedMessage": "Yuklanmaguncha ulanish holati mavjud emas.",
       "reconnectTitle": "GitHubga qayta ulanish",
+      "reconnectTitleGitLab": "GitLabga qayta ulanish",
+      "reconnectTitleBitbucket": "Bitbucketga qayta ulanish",
       "reconnectDescription": "GitHub ulanishingiz bekor qilingan.",
       "gitlabDescription": "Merge so‘rovlari tekshiruvlarini mobil qurilmada bajarish",
       "gitlabInstanceMismatchTitle": "GitLab ulanishi boshqa instansiya uchun",
@@ -1614,6 +1614,8 @@
       "set": "Belgilangan",
       "notSet": "Belgilanmagan",
       "nSelected": "{{displayCount}} ta tanlangan",
+      "nSelected_one": "{{displayCount}} ta tanlangan",
+      "nSelected_other": "{{displayCount}} ta tanlangan",
       "proposedReviewMdGuidance": "Taklif etilgan REVIEW.md yo'riqnomasi"
     },
     "decision": {

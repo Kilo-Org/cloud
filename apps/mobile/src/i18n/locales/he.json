@@ -1087,6 +1087,9 @@
     "overview": {
       "allAreas": "כל התחומים",
       "nSelected": "{{displayCount}} נבחרו",
+      "nSelected_one": "{{displayCount}} נבחרו",
+      "nSelected_other": "{{displayCount}} נבחרו",
+      "nSelected_two": "{{displayCount}} נבחרו",
       "proposedReviewMdGuidance": "הנחיות מוצעות לקובץ REVIEW.md",
       "set": "הוגדר",
       "notSet": "לא הוגדר"
@@ -2094,9 +2097,9 @@
       "detailRetryingClone": "משבט שוב (ניסיון {{attempt}} מתוך {{total}})",
       "detailSetupCommandFailed": "פקודת ההכנה {{index}} נכשלה",
       "detailSetupCommandTimedOut": "פקודת ההכנה {{index}} חרגה מהזמן",
-      "detailColdRestore": "שחזור קר, תמונת מצב הוחלה, שוחזרו {{applied}} מתוך {{total}} קבצים",
+      "detailColdRestore": "שחזור קר, תמונת מצב הוחלה, שחזור קבצים: {{applied}} מתוך {{total}}",
       "detailProgressPercent": "{{percent}}% הושלם",
-      "detailRestoreIncompleteReport": "שחזור ההפעלה לא הושלם: {{skipped}} מתוך {{total}} קבצים לא שוחזרו ({{reasons}}).",
+      "detailRestoreIncompleteReport": "שחזור ההפעלה לא הושלם, קבצים ללא שחזור: {{skipped}} מתוך {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "חסרים: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ועוד {{omitted}}",
       "detailReasonPatchFailed": "הטלאי לא הוחל",
@@ -2748,6 +2751,8 @@
       "checkFailedTitleBitbucket": "לא ניתן היה לבדוק את החיבור ל-Bitbucket.",
       "providerCheckFailedMessage": "מצב החיבור אינו זמין עד לסיום הטעימה.",
       "reconnectTitle": "חיבור מחדש ל-GitHub",
+      "reconnectTitleGitLab": "חיבור מחדש ל-GitLab",
+      "reconnectTitleBitbucket": "חיבור מחדש ל-Bitbucket",
       "reconnectDescription": "החיבור שלך ל-GitHub בוטל.",
       "gitlabDescription": "סקירת בקשות מיזוג בנייד",
       "gitlabInstanceMismatchTitle": "חיבור GitLab מיועד למופע אחר",
@@ -3037,7 +3042,6 @@
         "squash": "איחוד קומיטים"
       },
       "terminal": {
-        "alreadyMerged": "כבר מוזגה",
         "closed": "בקשת המשיכה הזו סגורה",
         "closedMergeRequest": "בקשת המיזוג הזו סגורה"
       },
@@ -3054,7 +3058,6 @@
         "requiredReviewsTitle": "חסרות סקירות נדרשות",
         "requiredReviewsDetail": "חסרים אישורים מהסוקרים הנדרשים, או שעדיין ממתינים להם.",
         "failingChecksTitle": "בדיקות חובה נכשלו",
-        "failingChecksDetail": "בדיקות הסטטוס הנדרשות נכשלו.",
         "unstableTitle": "חלק מהבדיקות נכשלו",
         "unstableDetail": "בדיקות שאינן חובה נכשלו. הן לא יחסמו את המיזוג.",
         "draftTitle": "טיוטת PR",

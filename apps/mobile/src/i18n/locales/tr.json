@@ -1084,6 +1084,8 @@
     "overview": {
       "allAreas": "Tüm alanlar",
       "nSelected": "{{displayCount}} seçili",
+      "nSelected_one": "{{displayCount}} seçili",
+      "nSelected_other": "{{displayCount}} seçili",
       "proposedReviewMdGuidance": "Önerilen REVIEW.md yönergeleri",
       "set": "Belirlendi",
       "notSet": "Belirlenmedi"
@@ -2714,6 +2716,8 @@
       "checkFailedTitleBitbucket": "Bitbucket bağlantısı kontrol edilemedi.",
       "providerCheckFailedMessage": "Bağlantı durumu, yüklenene kadar kullanılamıyor.",
       "reconnectTitle": "GitHub'a yeniden bağlan",
+      "reconnectTitleGitLab": "GitLab'a yeniden bağlan",
+      "reconnectTitleBitbucket": "Bitbucket'a yeniden bağlan",
       "reconnectDescription": "GitHub bağlantının izni kaldırıldı.",
       "gitlabDescription": "Birleştirme isteklerini mobilde incele",
       "gitlabInstanceMismatchTitle": "GitLab bağlantısı başka bir örneğe ait",
@@ -2993,7 +2997,6 @@
         "squash": "Sıkıştırma"
       },
       "terminal": {
-        "alreadyMerged": "Zaten birleştirildi",
         "closed": "Bu çekme isteği kapalı",
         "closedMergeRequest": "Bu birleştirme isteği kapalı"
       },
@@ -3010,7 +3013,6 @@
         "requiredReviewsTitle": "Gerekli incelemeler eksik",
         "requiredReviewsDetail": "Gerekli incelemelerin onayları eksik veya henüz verilmedi.",
         "failingChecksTitle": "Başarısız olan gerekli kontroller",
-        "failingChecksDetail": "Gerekli durum kontrolleri başarısız.",
         "unstableTitle": "Bazı kontroller başarısız",
         "unstableDetail": "Gerekli olmayan kontroller başarısız. Bunlar birleştirmeyi engellemez.",
         "draftTitle": "Taslak çekme isteği",

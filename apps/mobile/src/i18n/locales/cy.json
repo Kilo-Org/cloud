@@ -470,7 +470,6 @@
         "rebase": "Ailsylfaenu"
       },
       "terminal": {
-        "alreadyMerged": "Eisoes wedi'i gyfuno",
         "closed": "Mae'r cais tynnu hwn ar gau",
         "closedMergeRequest": "Mae'r cais uno hwn ar gau"
       },
@@ -487,7 +486,6 @@
         "requiredReviewsTitle": "Adolygiadau gofynnol ar goll",
         "requiredReviewsDetail": "Mae cymeradwyaeth yr adolygwyr gofynnol ar goll neu'n dal i gael ei disgwyl.",
         "failingChecksTitle": "Gwiriadau gofynnol yn methu",
-        "failingChecksDetail": "Mae gwiriadau statws gofynnol yn methu.",
         "unstableTitle": "Mae rhai gwiriadau yn methu",
         "unstableDetail": "Mae rhai gwiriadau dewisol yn methu. Ni fyddant yn atal y cyfuno.",
         "draftTitle": "Cais tynnu drafft",
@@ -741,6 +739,8 @@
       "checkFailedTitleBitbucket": "Ni lwyddwyd i wirio'r cysylltiad Bitbucket.",
       "providerCheckFailedMessage": "Nid yw statws y cysylltiad ar gael nes iddo lwytho.",
       "reconnectTitle": "Ailgysylltu â GitHub",
+      "reconnectTitleGitLab": "Ailgysylltu â GitLab",
+      "reconnectTitleBitbucket": "Ailgysylltu â Bitbucket",
       "reconnectDescription": "Dirymwyd eich cysylltiad GitHub.",
       "gitlabDescription": "Adolygu ceisiadau uno ar ffôn",
       "gitlabInstanceMismatchTitle": "Mae cysylltiad GitLab ar gyfer enghraifft arall",
@@ -1702,6 +1702,12 @@
       "set": "Wedi'i osod",
       "notSet": "Heb ei osod",
       "nSelected": "{{displayCount}} wedi'u dewis",
+      "nSelected_one": "{{displayCount}} wedi'u dewis",
+      "nSelected_other": "{{displayCount}} wedi'u dewis",
+      "nSelected_few": "{{displayCount}} wedi'u dewis",
+      "nSelected_many": "{{displayCount}} wedi'u dewis",
+      "nSelected_two": "{{displayCount}} wedi'u dewis",
+      "nSelected_zero": "{{displayCount}} wedi'u dewis",
       "proposedReviewMdGuidance": "Canllawiau arfaethedig ar gyfer REVIEW.md"
     },
     "decision": {
@@ -2770,9 +2776,9 @@
       "detailRetryingClone": "Yn ailgeisio clonio (ymgais {{attempt}} o {{total}})",
       "detailSetupCommandFailed": "Methodd gorchymyn gosod {{index}}",
       "detailSetupCommandTimedOut": "Gorchymyn gosod {{index}} wedi mynd dros ei amser",
-      "detailColdRestore": "Adferiad oer, ciplun wedi'i gymhwyso, {{applied}} o {{total}} ffeil wedi'u hadfer",
+      "detailColdRestore": "Adferiad oer, ciplun wedi'i gymhwyso, ffeiliau wedi'u hadfer: {{applied}} o {{total}}",
       "detailProgressPercent": "{{percent}}% wedi'i gwblhau",
-      "detailRestoreIncompleteReport": "Adferiad y sesiwn yn anghyflawn: ni adferwyd {{skipped}} o {{total}} ffeil ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Adferiad y sesiwn yn anghyflawn — nid adferwyd ffeiliau: {{skipped}} o {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Ar goll: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} a {{omitted}} arall",
       "detailReasonPatchFailed": "ni chymhwysodd y patch",

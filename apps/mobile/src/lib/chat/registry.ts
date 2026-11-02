@@ -694,9 +694,22 @@ const openReason = (error: unknown): string =>
 export async function retryChat(sessionId: string, displaced?: Displaced): Promise<void> {
   if (displaced !== undefined) {
     const current = snapshotOf(sessionId).sessionId;
-    const kept = snapshotOf(current).displaced.filter(one => one.id !== displaced.id);
+    const held = snapshotOf(current).displaced;
+    /* A second press of the same bubble finds it gone: the first press is
+       already asking it, and asking it twice would leave two copies. */
+    if (!held.includes(displaced)) {
+      return;
+    }
+    const kept = held.filter(one => one !== displaced);
     change(current, { displaced: kept });
-    await rememberKept(current, kept);
+    /* The write can fail on a storage that is full or already shut. What is
+       drawn is the list in memory, and the next write carries it; the question
+       itself is written to the slot by the ask below either way. */
+    try {
+      await rememberKept(current, kept);
+    } catch {
+      /* The kept list stays as it is on screen, without its asked entry. */
+    }
     await say(
       current,
       { text: displaced.text, images: displaced.images },

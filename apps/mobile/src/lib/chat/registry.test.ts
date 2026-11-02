@@ -1075,6 +1075,27 @@ describe('a question a later send took the slot from', () => {
     expect(snapshotOf(opened).asked).toBeNull();
   });
 
+  it('is asked once when its Retry is pressed twice', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const kept = snapshotOf(opened).displaced[0];
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    asked.length = 0;
+
+    await retryChat(opened, kept);
+    // The second press holds the entry the first one took away.
+    await retryChat(opened, kept);
+    await settled();
+
+    expect(asked.map(one => one.text)).toEqual(['first']);
+  });
+
   it('is still named for the question that opened the chat after it is asked again', async () => {
     creditsFailureFor = 's1';
     await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });

@@ -642,6 +642,43 @@ describe('watch PR observation projection', () => {
     expect(projection(uncertain).evidence).toEqual(projection(existing).evidence);
   });
 
+  it.each(['submitted', 'edited', 'dismissed'] as const)(
+    'does not make identical legacy %s evidence ambiguous when a replay adds action metadata',
+    action => {
+      const state = action === 'dismissed' ? 'dismissed' : 'changes_requested';
+      const existing = project(watch(), feedback({ key: 'review:9', action, state }));
+      const replay = project(existing, review(action, { state, updated_at: earlier }));
+      expect(projection(replay).ambiguous).toBe(false);
+      expect(replay).toBe(existing);
+      expect(projection(replay).evidence[0]).not.toHaveProperty('reviewAction');
+    }
+  );
+
+  it('does not infer legacy edit ordering after an identical submission replay', () => {
+    const existing = project(
+      watch(),
+      feedback({ key: 'review:9', action: 'submitted', state: 'changes_requested' })
+    );
+    const replay = project(existing, review('submitted'));
+    const uncertain = project(replay, review('edited', { body: 'Unordered edit' }));
+    expect(projection(uncertain).ambiguous).toBe(true);
+    expect(projection(uncertain).evidence).toEqual(projection(existing).evidence);
+    expect(uncertain.pending_revision).toBe(existing.pending_revision);
+  });
+
+  it('retains known provenance on identical legacy replay and enriches causally newer evidence', () => {
+    const known = project(watch(), review('submitted'));
+    const legacy = feedback({ key: 'review:9', action: 'submitted', state: 'changes_requested' });
+    expect(project(known, legacy)).toBe(known);
+    const existing = project(watch(), legacy);
+    const newer = project(existing, review('edited', { updated_at: later }));
+    expect(projection(newer)).toMatchObject({
+      ambiguous: false,
+      evidence: [{ reviewAction: 'edited', updatedAt: later }],
+    });
+    expect(project(newer, legacy)).toBe(newer);
+  });
+
   it('keeps edits of dismissed reviews removed', () => {
     const dismissed = project(watch(), review('dismissed', { state: 'DISMISSED' }));
     const edit = review('edited', {

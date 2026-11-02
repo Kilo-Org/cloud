@@ -356,6 +356,12 @@ function compareEvidence(next: Evidence, previous: Evidence): number | null {
   if (JSON.stringify(next) === JSON.stringify(previous)) return 0;
   if (next.kind === 'feedback' && next.key.startsWith('review:')) {
     if (next.actorId !== previous.actorId || next.sha !== previous.sha) return null;
+    if (
+      (!next.reviewAction || !previous.reviewAction) &&
+      JSON.stringify({ ...next, reviewAction: undefined }) ===
+        JSON.stringify({ ...previous, reviewAction: undefined })
+    )
+      return 0;
     if (next.state === 'dismissed' && previous.state !== 'dismissed') return 1;
     if (previous.state === 'dismissed' && next.state !== 'dismissed') return -1;
     if (

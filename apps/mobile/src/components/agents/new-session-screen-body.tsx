@@ -72,6 +72,7 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useInstanceModelCatalog } from '@/lib/hooks/use-instance-model-catalog';
 import { useLaunchFolder } from '@/lib/hooks/use-launch-folder';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { usePersistedRunOnDestination } from '@/lib/hooks/use-persisted-run-on-destination';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
@@ -100,6 +101,7 @@ import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { profilePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
+import { remoteStartPlanRefusal } from '@/lib/remote-spawn-admission';
 import {
   PRESELECT_CLOUD_RUN_ON,
   PRESELECT_COMPUTER_RUN_ON,
@@ -1012,6 +1014,20 @@ export function NewSessionScreenBody() {
   );
 
   const isRemoteTargetSelected = runOnInstance !== null || computerTargetSelected;
+  // The organization subscription gate's own verdict for a remote start under
+  // the selected account. `organizations.list` carries the predicate the
+  // server middleware classifies with, so the form reads the verdict instead
+  // of re-deriving a plan. Read while rendering, before the press: a lapsed
+  // organization never looks startable, its explanation sits under the
+  // composer, and Start keeps the disabled style until the plan (or the
+  // account) changes. A personal start, an unsettled list, and a list without
+  // the organization stay allowed — the app never blocks a start on a verdict
+  // it does not have.
+  const planRefusal = remoteStartPlanRefusal({
+    isRemoteTargetSelected,
+    organizationId,
+    organizations: useOrganizationsList().data,
+  });
   // The composer only takes focus on arrival when the form already has its
   // repository. Focusing raises the keyboard, which shrinks the scroll frame past
   // the repository picker, Changes, Environment and Advanced Configuration while
@@ -1104,7 +1120,10 @@ export function NewSessionScreenBody() {
     });
   }
 
-  const isStartDisabled = resolveStartDisabled();
+  // A lapsed organization plan blocks Start exactly like a missing
+  // precondition does: the explanation is already on screen, so the button
+  // must not keep the primary fill over it.
+  const isStartDisabled = resolveStartDisabled() || planRefusal !== null;
 
   // The repository section's own settle state, separated from the repository
   // count exactly as the extension separates provider connect from repo count.
@@ -1198,6 +1217,12 @@ export function NewSessionScreenBody() {
   } else if (startBlockedReasonKey === 'enter-prompt-or-file') {
     startBlockedReason = t('agentChat.newSession.enterPromptOrFileToStart');
   }
+
+  // The plan explanation already says why Start cannot run, and nothing the
+  // user types or connects would re-enable it, so the footer names no second
+  // blocker while it is shown.
+  const footerStartBlockedReason = planRefusal === null ? startBlockedReason : null;
+  const footerStartBlockedAction = planRefusal === null ? startBlockedAction : null;
 
   const handleStartSession = useCallback(() => {
     if (isCloneEntry) {
@@ -1366,11 +1391,12 @@ export function NewSessionScreenBody() {
         onAutoCommitChange={setAutoCommit}
         isStartDisabled={isStartDisabled}
         isSpawningRemote={remoteSpawn.isSpawningRemote}
-        startBlockedReason={startBlockedReason}
-        startBlockedAction={startBlockedAction}
+        startBlockedReason={footerStartBlockedReason}
+        startBlockedAction={footerStartBlockedAction}
         onStartSession={handleStartSession}
         cloudCreateError={cloudCreateError}
         onRetryCloudCreate={handleStartSession}
+        planRefusal={planRefusal}
         remoteSpawnFailure={remoteSpawn.remoteSpawnFailure}
         onRetryRemoteSpawn={handleStartSession}
       />

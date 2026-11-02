@@ -14,7 +14,7 @@ import { useHeaderBack } from '@/lib/hooks/use-header-back';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { offlineHeaderReservation } from '@/lib/offline-banner-state';
 import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { HEADER_TITLE_TARGET_CLASS, ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /**
@@ -126,6 +126,14 @@ type ScreenHeaderProps = {
    * text, so it scales with the font size the way the real line does.
    */
   reserveSubtitle?: boolean;
+  /**
+   * What the reserved subtitle line paints while the caller's text is not
+   * available yet, such as a placeholder bar the size of the name to come. It
+   * is drawn over the reserved text, which still holds the line's height, so
+   * neither the placeholder nor the arriving text moves the body. The caller
+   * supplies the node, so the header itself pulls in no loading surface.
+   */
+  subtitlePlaceholder?: React.ReactNode;
   /**
    * Cap the eyebrow to this many lines, overriding the header's default single
    * line. When set the eyebrow ellipsizes in the middle: the repo name is the
@@ -280,6 +288,7 @@ export function ScreenHeader({
   titleNumberOfLines = 1,
   subtitle,
   reserveSubtitle = false,
+  subtitlePlaceholder,
   eyebrowNumberOfLines,
   reserveTitleSpace = false,
   eyebrow,
@@ -419,7 +428,7 @@ export function ScreenHeader({
         accessibilityRole="button"
         accessibilityLabel={title}
         accessibilityHint={titlePressHint}
-        className="min-h-[48px] justify-center active:opacity-70"
+        className={cn(HEADER_TITLE_TARGET_CLASS, 'justify-center active:opacity-70')}
       >
         {titleText}
       </Pressable>
@@ -447,22 +456,37 @@ export function ScreenHeader({
         </Eyebrow>
       ) : null}
       {titleNode}
-      {subtitle || reserveSubtitle ? (
-        <Text
-          variant="muted"
-          className={cn('mt-0.5', centerTitle && 'text-center', !subtitle && 'opacity-0')}
-          // One line: the subtitle is context for the title, so it truncates at
-          // its tail instead of taking a second line and moving the body. The
-          // reserved copy is a no-break space in the same style, so the height
-          // it holds is the height the name will take.
-          numberOfLines={1}
-          ellipsizeMode="tail"
-          accessible={Boolean(subtitle)}
-          accessibilityElementsHidden={!subtitle}
-          importantForAccessibility={subtitle ? 'auto' : 'no-hide-descendants'}
-        >
-          {subtitle ?? '\u00A0'}
-        </Text>
+      {subtitle || reserveSubtitle || subtitlePlaceholder ? (
+        <View className={cn('mt-0.5', centerTitle && 'items-center')}>
+          {subtitle === undefined && subtitlePlaceholder ? (
+            // The reserved text below still holds the line's height, so the
+            // placeholder is painted over it rather than sizing the slot.
+            <View
+              className={cn(
+                'absolute inset-0 justify-center',
+                centerTitle ? 'items-center' : 'items-start'
+              )}
+              pointerEvents="none"
+            >
+              {subtitlePlaceholder}
+            </View>
+          ) : null}
+          <Text
+            variant="muted"
+            className={cn(centerTitle && 'text-center', !subtitle && 'opacity-0')}
+            // One line: the subtitle is context for the title, so it truncates at
+            // its tail instead of taking a second line and moving the body. The
+            // reserved copy is a no-break space in the same style, so the height
+            // it holds is the height the name will take.
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            accessible={Boolean(subtitle)}
+            accessibilityElementsHidden={!subtitle}
+            importantForAccessibility={subtitle ? 'auto' : 'no-hide-descendants'}
+          >
+            {subtitle ?? '\u00A0'}
+          </Text>
+        </View>
       ) : null}
     </View>
   );

@@ -260,11 +260,23 @@ async function renderBubbleWithHandlers(
   return MessageBubble.type({ message, ...props });
 }
 
-function assistantMessageWithError(id: string, errorName: string): StoredMessage {
+function assistantMessageWithText(id: string): StoredMessage {
   const message = assistantMessage(id);
+  message.parts = [
+    { id: `${id}-text`, sessionID: 'ses_1', messageID: id, type: 'text', text: 'answer' },
+  ];
+  return message;
+}
+
+function assistantMessageWithError(
+  id: string,
+  errorName: string,
+  options: { content?: boolean } = {}
+): StoredMessage {
+  const message = options.content === false ? assistantMessage(id) : assistantMessageWithText(id);
   (message.info as { error?: { name: string; data: unknown } }).error = {
     name: errorName,
-    data: { message: 'raw' },
+    data: { message: 'raw', isRetryable: true },
   };
   return message;
 }
@@ -299,6 +311,50 @@ describe('MessageBubble failure footer', () => {
     );
     expect(copy).not.toBeNull();
     expect(copy?.props.accessibilityRole).toBe('button');
+  });
+
+  it('end-aligns a failed user row’s footer under its bubble and leaves an assistant row’s on its leading edge', async () => {
+    const userTree = await renderBubbleWithHandlers(userMessage('m-align-user'), {
+      deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
+    const assistantTree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-align-asst', 'APIError'),
+      { onRetryMessage: vi.fn<(message: StoredMessage) => void>() }
+    );
+
+    const userFooter = footerOf(userTree);
+    expect(String(userFooter?.props.className)).toBe('gap-1 px-4 py-1 items-end');
+    // The title and the detail line end-align with the bubble's trailing edge,
+    // so a wrapped line does not fall back to the leading edge, and each keeps
+    // its own size and colour. The action row is unchanged: the column places it.
+    expect(classNamesIn(userFooter?.props.children)).toEqual(
+      expect.arrayContaining([
+        'text-sm text-destructive text-right',
+        'text-xs text-muted-foreground text-right',
+        'flex-row gap-2',
+      ])
+    );
+
+    // An assistant row's footer keeps its existing leading layout.
+    const assistantFooter = footerOf(assistantTree);
+    expect(String(assistantFooter?.props.className)).toBe('gap-1 px-4 py-1');
+    expect(
+      classNamesIn(assistantFooter?.props.children).filter(name =>
+        name.split(' ').includes('text-right')
+      )
+    ).toEqual([]);
+
+    // No start/end text class: NativeWind drops `text-align: end`, and RN
+    // already resolves `text-right` against the interface direction.
+    const footerClasses = [
+      ...classNamesIn(userFooter?.props.children),
+      ...classNamesIn(assistantFooter?.props.children),
+      String(userFooter?.props.className),
+      String(assistantFooter?.props.className),
+    ];
+    expect(footerClasses.filter(name => /\btext-(start|end)\b/.test(name))).toEqual([]);
   });
 
   it('renders only the failure footer when the user text sanitizes to empty', async () => {
@@ -350,6 +406,16 @@ describe('MessageBubble failure footer', () => {
     expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
   });
 
+  it('renders no pressable host for an assistant row with nothing to show', async () => {
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-empty', 'APIError', { content: false }),
+      { onRetryMessage: vi.fn<(message: StoredMessage) => void>() }
+    );
+
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(findElementByType(tree, 'Pressable', () => true)).toBeNull();
+  });
+
   it('states a generic assistant failure once, without a detail line repeating the title', async () => {
     const tree = await renderBubbleWithHandlers(
       assistantMessageWithError('m-asst-laconic', 'APIError'),
@@ -386,7 +452,9 @@ describe('MessageBubble failure footer', () => {
 
     // The footer container is a plain View: no accessible, no role, no label,
     // so Retry and Copy stay individually focusable.
-    const footer = findElementByType(tree, 'View', p => p.className === 'gap-1 px-4 py-1');
+    const footer = findElementByType(tree, 'View', p =>
+      String(p.className).startsWith('gap-1 px-4 py-1')
+    );
     expect(footer).not.toBeNull();
     expect(footer?.props.accessible).toBeUndefined();
     expect(footer?.props.accessibilityRole).toBeUndefined();
@@ -779,7 +847,7 @@ describe('MessageBubble assistant treatment', () => {
 describe('MessageBubble in-bubble text selection context', () => {
   it('wraps the assistant parts view in InMessageBubbleContext.Provider with value true', async () => {
     const { InMessageBubbleContext } = await import('./bubble-text-selection-context');
-    const tree = await renderBubble(assistantMessage('m6'));
+    const tree = await renderBubble(assistantMessageWithText('m6'));
 
     const provider = findProvider(tree, InMessageBubbleContext.Provider);
     expect(provider).not.toBeNull();
@@ -799,7 +867,7 @@ describe('MessageBubble in-bubble text selection context', () => {
 describe('MessageBubble part-row long-press context', () => {
   it('mounts the message long-press provider on the assistant parts when the details sheet is wired', async () => {
     const onLongPressDetails = vi.fn<(m: StoredMessage) => void>();
-    const message = assistantMessage('m-long-press');
+    const message = assistantMessageWithText('m-long-press');
     const tree = await renderBubbleWithHandlers(message, { onLongPressDetails });
 
     const { MessageLongPressProvider } = await import('./message-long-press-context');
@@ -810,7 +878,7 @@ describe('MessageBubble part-row long-press context', () => {
   });
 
   it('keeps assistant part rows tap-only when no details sheet is wired', async () => {
-    const tree = await renderBubble(assistantMessage('m-long-press-plain'));
+    const tree = await renderBubble(assistantMessageWithText('m-long-press-plain'));
 
     const { MessageLongPressProvider } = await import('./message-long-press-context');
     const provider = findElementByTypeFn(tree, MessageLongPressProvider);
@@ -825,7 +893,7 @@ describe('MessageBubble row rhythm', () => {
   // user wrapper carries the same py-1, so user/assistant boundaries keep the
   // rhythm. One value, three class assertions.
   it('applies the uniform row-rhythm class contract', async () => {
-    const assistantTree = await renderBubble(assistantMessage('rhythm-a'));
+    const assistantTree = await renderBubble(assistantMessageWithText('rhythm-a'));
     const parts = findElementByType(assistantTree, 'View', p => p.className === 'gap-2');
     expect(parts).not.toBeNull();
 
@@ -1058,6 +1126,24 @@ function findElementByLabel(
     return findElementByLabel(children, label);
   }
   return null;
+}
+
+/** The failed row's footer container, found by its own spacing classes. */
+function footerOf(tree: unknown): { type: string; props: Record<string, unknown> } | null {
+  return findElementByType(tree, 'View', p => String(p.className).startsWith('gap-1 px-4 py-1'));
+}
+
+/** Every className in an unrendered element tree, in document order. */
+function classNamesIn(node: unknown): string[] {
+  if (Array.isArray(node)) {
+    return node.flatMap(child => classNamesIn(child));
+  }
+  if (node == null || typeof node !== 'object') {
+    return [];
+  }
+  const element = node as { props?: { className?: unknown; children?: unknown } };
+  const own = typeof element.props?.className === 'string' ? [element.props.className] : [];
+  return [...own, ...classNamesIn(element.props?.children)];
 }
 
 function findProvider(

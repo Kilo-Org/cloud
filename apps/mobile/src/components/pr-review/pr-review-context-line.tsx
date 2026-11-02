@@ -35,6 +35,7 @@ import { cn } from '@/lib/utils';
 export function PrReviewContextLine({
   instanceHint,
   className,
+  hugContent = false,
 }: Readonly<{
   instanceHint?: string;
   /**
@@ -43,6 +44,15 @@ export function PrReviewContextLine({
    * text line; the arm that puts it above its explanation needs none.
    */
   className?: string;
+  /**
+   * Render the plain-text form at its own height instead of the row frame. The
+   * connect gate's action block passes this so the caption sits a small gap
+   * above the CTA: with the row frame's slack the caption text floats a
+   * further half-frame away and reads as a stray line rather than the label of
+   * the button under it. The switchable pill keeps its frame either way,
+   * because that form is a control.
+   */
+  hugContent?: boolean;
 }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -117,7 +127,9 @@ export function PrReviewContextLine({
           </View>
         </Pressable>
       ) : (
-        <View className={cn(ROW_TARGET_CLASS, 'max-w-full justify-center px-2')}>{line}</View>
+        <View className={cn('max-w-full justify-center px-2', !hugContent && ROW_TARGET_CLASS)}>
+          {line}
+        </View>
       )}
       {statusMessage ? (
         <AccessibleStatus message={statusMessage} className="text-center text-xs" tone="error" />

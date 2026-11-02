@@ -16,6 +16,7 @@ import {
 import { ProfileMetadataForm } from '@/components/profiles/profile-metadata-form';
 import { ProfileOverviewSkeleton } from '@/components/profiles/profile-overview-skeleton';
 import { ProfileRepoPinsSection } from '@/components/profiles/profile-repo-pins-section';
+import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -34,6 +35,7 @@ import {
   Trash2,
 } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileMutations, useAgentProfileOverview } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
@@ -106,6 +108,10 @@ export function ProfileOverviewScreen({
   const { update, deleteProfile, setAsDefault, clearDefault } =
     useAgentProfileMutations(organizationId);
   const canManage = useCanManageOrganizationProfiles(organizationId);
+  // Unsaved name or description edits ask before the route goes, the way the
+  // profile form sheets do. A read-only viewer cannot edit the form, so the
+  // guard stays off for them.
+  const metadataGuard = useMetadataLeaveGuard({ enabled: canManage });
 
   const profile = profileQuery.data;
   const isOrgOwned = organizationId !== undefined;
@@ -148,6 +154,9 @@ export function ProfileOverviewScreen({
     try {
       await deleteProfile.mutateAsync({ profileId });
       toast.success(t('profiles.deletedToast', { name: profileName }));
+      // The profile is gone, so there is nothing left to keep: the pop must not
+      // ask about edits to it.
+      metadataGuard.markClean();
       // Back during the delete already left this profile; a second pop would
       // remove the profiles list beneath it.
       popWhenFocused();
@@ -179,9 +188,21 @@ export function ProfileOverviewScreen({
           session whose profile chip opened it); `backFallback` still lands on
           Profiles when the app has no history, as a cold deep link does. The
           profile name is user prose, not a UI label, so it keeps a second line
-          for a natural break. */}
+          for a natural break.
+
+          A read that has not answered yet shows a title-shaped bar in the
+          title's own slot. The header used to read the generic Profiles title
+          until the name arrived, so the heading changed text under the reader
+          for no reason of theirs; the bar keeps the slot's shape and the name
+          replaces it in place. The bar is the header's label, so a screen
+          reader still hears which screen this is. */}
       <ScreenHeader
         title={profile?.name ?? t('profiles.title')}
+        titleContent={
+          profile === undefined && errorView === null ? (
+            <Skeleton className="h-5 w-40 rounded" />
+          ) : undefined
+        }
         titleNumberOfLines={2}
         backFallback={getProfilesPath()}
       />
@@ -221,6 +242,7 @@ export function ProfileOverviewScreen({
               profile={profile}
               isSaving={update.isPending}
               onSave={saveMetadata}
+              onDirtyChange={metadataGuard.handleDirtyChange}
               disabled={!canManage}
             />
 
@@ -284,6 +306,7 @@ export function ProfileOverviewScreen({
       </TabScreenScrollView>
 
       {dialog}
+      {metadataGuard.dialog}
     </View>
   );
 }

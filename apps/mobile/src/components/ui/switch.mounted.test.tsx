@@ -179,21 +179,24 @@ describe('Switch', () => {
     expect(props.thumbColor).toBe(lightColors.mutedForeground);
   });
 
-  it('keeps the disabled pair readable and off the brand accent in dark mode', () => {
+  it('keeps the disabled pair off the brand accent in dark mode', () => {
     native.os = 'android';
     native.scheme = 'dark';
     const on = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     const off = nativeProps(renderSwitch({ disabled: true, value: false }).root);
-    // The muted pair measured 2.2:1 on the row and 1.07:1 for the on grip in
-    // dark, so a disabled control nearly vanished beside an enabled one.
     expect(on.trackColor).toEqual({
-      false: darkColors.mutedForeground,
-      true: darkColors.mutedForeground,
+      false: darkColors.mutedSoft,
+      true: darkColors.primaryDisabled,
     });
-    expect(on.thumbColor).toBe(darkColors.foreground);
-    expect(off.trackColor).toEqual(on.trackColor);
-    expect(off.thumbColor).toBe(darkColors.foreground);
+    // The disabled on grip is the mid neutral, never the scheme's on ink. A
+    // light grip on the muted fill reads as a working control, and dark's
+    // `primaryForeground` is the card's own near-black: on the thumb's
+    // overhanging arc it is 1.1:1 with the row and the pill loses its right end.
+    expect(on.thumbColor).toBe(darkColors.mutedSoft);
+    expect(on.thumbColor).not.toBe(darkColors.selectionForeground);
     expect(on.thumbColor).not.toBe(darkColors.primaryForeground);
+    expect(off.trackColor).toEqual(on.trackColor);
+    expect(off.thumbColor).toBe(darkColors.mutedForeground);
     expect(on.trackColor?.true).not.toBe(darkColors.primary);
   });
 

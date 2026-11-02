@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button';
 import { LockableContainer } from '@/components/organizations/LockableContainer';
 import { Info } from 'lucide-react';
 import type { ModelRow } from '@/components/organizations/providers-and-models/providersAndModels.types';
+import { ByokOnlyTag } from '@/components/organizations/providers-and-models/PolicyPills';
+
+const NO_PROVIDERS: ReadonlySet<string> = new Set();
 
 export function ModelsTab({
   isLoading,
@@ -15,6 +18,7 @@ export function ModelsTab({
   allowedModelIds,
   availableModelCount,
   enabledProviderSlugs,
+  byokOnlyProviderSlugs = NO_PROVIDERS,
   filteredModelRows,
   onToggleModelAllowed,
   onOpenModelDetails,
@@ -31,6 +35,8 @@ export function ModelsTab({
   /** Length of `listAvailableModels` for the saved settings; null while it loads, omitted to hide. */
   availableModelCount?: number | null;
   enabledProviderSlugs: ReadonlySet<string>;
+  /** Enabled providers among these only serve the organization's own keys. */
+  byokOnlyProviderSlugs?: ReadonlySet<string>;
   filteredModelRows: ReadonlyArray<ModelRow>;
   onToggleModelAllowed: (modelId: string, nextAllowed: boolean) => void;
   onOpenModelDetails: (modelId: string) => void;
@@ -81,9 +87,13 @@ export function ModelsTab({
                 const checked = allowedModelIds.has(row.modelId);
                 const providerCount = row.providerSlugs.length;
                 const providerLabel = providerCount === 1 ? 'provider' : 'providers';
-                const enabledProviderCount = row.providerSlugs.filter(slug =>
+                const enabledProviders = row.providerSlugs.filter(slug =>
                   enabledProviderSlugs.has(slug)
-                ).length;
+                );
+                const enabledProviderCount = enabledProviders.length;
+                const enabledByokOnly =
+                  enabledProviderCount > 0 &&
+                  enabledProviders.every(slug => byokOnlyProviderSlugs.has(slug));
                 const enabledProviderEmoji = enabledProviderCount === 0 ? '⚠️' : '✅';
                 const unavailable = Boolean(row.unavailableReason);
                 return (
@@ -141,6 +151,9 @@ export function ModelsTab({
                             </>
                           ) : null}
                         </span>
+                        {scope === 'organization' && checked ? (
+                          <ByokOnlyTag value={enabledByokOnly} />
+                        ) : null}
                       </div>
                     </div>
                   </label>

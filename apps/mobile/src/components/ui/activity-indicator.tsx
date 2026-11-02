@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { Loader2 } from '@/components/ui/icons';
 import {
   type ActivityIndicatorProps,
@@ -26,6 +28,7 @@ export function ActivityIndicator({
   ...props
 }: Readonly<ActivityIndicatorProps>) {
   const { reducedMotion } = useMotionPolicy();
+  const { t } = useTranslation();
   const dimension = indicatorDimension(size);
 
   if (!reducedMotion) {
@@ -47,9 +50,23 @@ export function ActivityIndicator({
     );
   }
 
+  // A stopped indicator that hides itself leaves the accessibility tree in the
+  // native branch; the glyph below keeps its box as a transparent marker so
+  // nothing shifts, so hide this wrapper's node instead.
+  const hiddenFromA11y = !animating && hidesWhenStopped;
+
   return (
     <View
       {...props}
+      // Reduced motion changes the animation, not the information: the static
+      // marker takes the progress semantics the platform control presents, so a
+      // wait that relies on this component still reports itself to a reader.
+      accessible={!hiddenFromA11y && (props.accessible ?? true)}
+      accessibilityRole={props.accessibilityRole ?? 'progressbar'}
+      accessibilityLabel={props.accessibilityLabel ?? t('common.loading')}
+      accessibilityState={{ ...props.accessibilityState, busy: animating }}
+      accessibilityElementsHidden={hiddenFromA11y}
+      importantForAccessibility={hiddenFromA11y ? 'no-hide-descendants' : 'auto'}
       className="items-center justify-center"
       // The static glyph stands in for the native indicator, so the wrapper
       // owns the indicator's box: pinned to the same dimension the native
@@ -59,7 +76,7 @@ export function ActivityIndicator({
       // eslint-disable-next-line react-native/no-inline-styles -- a numeric size cannot be a compiled class
       style={[style, { width: dimension, height: dimension }]}
     >
-      <Loader2 size={dimension} color={!animating && hidesWhenStopped ? 'transparent' : color} />
+      <Loader2 size={dimension} color={hiddenFromA11y ? 'transparent' : color} />
     </View>
   );
 }

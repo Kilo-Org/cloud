@@ -219,7 +219,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('securityAgent.notifications.newFindingSection')}
           </Text>
-          <View className="gap-2">
+          <View className="gap-3">
             <ToggleRow
               title={
                 personal
@@ -258,7 +258,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('securityAgent.notifications.slaSection')}
           </Text>
-          <View className="gap-2">
+          <View className="gap-3">
             <ToggleRow
               title={
                 personal

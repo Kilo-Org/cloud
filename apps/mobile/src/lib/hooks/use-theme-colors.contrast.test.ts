@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one contrast guard per shipped surface shares this file's colour-math helpers. */
 import { describe, expect, it, vi } from 'vitest';
 
 import { ROW_PALETTE } from '@/lib/agent-color';
@@ -342,62 +343,99 @@ describe('idle composer control and ring track contrast (non-text)', () => {
 });
 
 describe('disabled switch pair contrast (non-text)', () => {
-  // The shared switch paints these pairs for a disabled control on Android, in
-  // place of the brand on-track. iOS keeps the brand pair and fades it itself.
-  // The switch sits on a `secondary` row, so its tracks are measured over that.
-  //
-  // Light keeps a third neutral, so its pair stays a step apart from the
-  // enabled one and from itself: `primary-disabled` under the white grip for
-  // the on position, `muted-soft` with the mid neutral grip for the off one.
-  // Light has no fourth neutral — `control-idle` equals `secondary` there — so
-  // the disabled off track is the same neutral as the enabled off track, and
-  // only its grip dims.
-  //
-  // Dark has no mid neutral either, and its old pair was unreadable: the
-  // `muted-soft` off track measured 2.2:1 on the row, the grip 2.1:1 on that
-  // track, and the on position's near-black grip 1.07:1 on the row, so the
-  // control nearly vanished. It paints the enabled neutral tones instead — the
-  // `muted-foreground` track and the `foreground` grip, in both positions — and
-  // the olive `selection` the enabled on track keeps is the accent a disabled
-  // one drops.
+  // The shared switch paints this pair for a disabled control on Android, in
+  // place of the brand on-track: `primary-disabled` under a grip that sits
+  // below it in strength for the on position, `muted-soft` with the mid neutral
+  // grip for the off one. iOS keeps the brand pair and fades it itself. The
+  // switch sits on a `secondary` row, so its tracks are measured over that. The
+  // floors are perception floors: the pair has to read as a control and the two
+  // positions have to stay apart. Light has no third neutral for the off track
+  // — `control-idle` equals `secondary` there — so the disabled off track is
+  // the same neutral as the enabled off track, and only its grip dims.
+  const MIN_VISIBLE_SURFACE_RATIO = 1.6;
+  // [theme, palette, the grip the switch paints on the on track]. The on grip
+  // is the one colour a disabled pair cannot share with its enabled one: the
+  // scheme's on ink is what marks a control that still works.
+  const themes = [
+    ['light', lightColors, lightColors.primaryForeground],
+    ['dark', darkColors, darkColors.mutedSoft],
+  ] as const;
+
+  it('every theme: the disabled off track reads on the row surface', () => {
+    for (const [themeName, colors] of themes) {
+      expect(
+        contrastRatio(colors.mutedSoft, colors.secondary),
+        `muted-soft vs secondary (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    }
+  });
+
+  it('every theme: the disabled on track stays apart from the disabled off track', () => {
+    for (const [themeName, colors] of themes) {
+      expect(
+        contrastRatio(colors.primaryDisabled, colors.mutedSoft),
+        `primary-disabled vs muted-soft (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    }
+  });
+
+  it('every theme: the disabled off grip reads on its own track', () => {
+    for (const [themeName, colors] of themes) {
+      expect(
+        contrastRatio(colors.mutedForeground, colors.mutedSoft),
+        `muted-foreground vs muted-soft (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    }
+  });
+
+  it('every theme: the disabled on grip reads on its own track', () => {
+    for (const [themeName, colors, onGrip] of themes) {
+      expect(
+        contrastRatio(onGrip, colors.primaryDisabled),
+        `on grip vs primary-disabled (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    }
+  });
+
+  // Regression: the disabled on grip once fell back to `primaryForeground` in
+  // both schemes, which dark defines as the near-black card colour. Android's
+  // thumb is wider than the track, so its outer arc lands on the row itself —
+  // 1.1:1 there, and the dark scheme draws no shadow to outline it, so what
+  // remained of the pill read as a blank grey bar. The dark grip is the mid
+  // neutral instead: darker than its fill, and still a visible step off the
+  // near-black row its arc sits on.
+  it('dark theme: the disabled on grip reads on the row its arc overhangs', () => {
+    expect(
+      contrastRatio(darkColors.mutedSoft, darkColors.secondary),
+      'muted-soft vs secondary (dark)'
+    ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+  });
+});
+
+// The `secondary` button variant paints `--secondary-fill`. It used to paint
+// `--secondary`, which is also the dark card an `outline` control paints, so in
+// the dark scheme a filled action and the outlined control beside it (the
+// discard-draft sheet's Save as to-do and Keep editing) rendered one colour.
+describe('filled neutral action contrast (non-text)', () => {
   const MIN_VISIBLE_SURFACE_RATIO = 1.6;
 
-  it('light: the disabled tracks and grip stay a visible step apart', () => {
-    expect(
-      contrastRatio(lightColors.mutedSoft, lightColors.secondary),
-      'muted-soft vs secondary'
-    ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
-    expect(
-      contrastRatio(lightColors.primaryDisabled, lightColors.mutedSoft),
-      'primary-disabled vs muted-soft'
-    ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
-    expect(
-      contrastRatio(lightColors.mutedForeground, lightColors.mutedSoft),
-      'muted-foreground vs muted-soft'
-    ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+  it('dark theme: the filled action reads on the card and apart from the outlined fill', () => {
+    for (const surface of [darkColors.card, darkColors.secondary]) {
+      expect(contrastRatio(darkColors.secondaryFill, surface)).toBeGreaterThanOrEqual(
+        MIN_VISIBLE_SURFACE_RATIO
+      );
+    }
   });
 
-  it('dark: the disabled track reads on the row and holds its grip', () => {
-    expect(
-      contrastRatio(darkColors.mutedForeground, darkColors.secondary),
-      'muted-foreground vs secondary'
-    ).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
-    expect(
-      contrastRatio(darkColors.foreground, darkColors.mutedForeground),
-      'foreground vs muted-foreground'
-    ).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
+  it('light theme: the filled action keeps the surface it has always painted', () => {
+    expect(lightColors.secondaryFill).toBe(lightColors.secondary);
   });
 
-  it('dark: the grip the light pair uses would vanish on the row', () => {
-    // `primary-foreground` is the light grip; in dark it is near-black, which
-    // is why the dark disabled pair takes the `foreground` grip instead.
-    expect(
-      contrastRatio(darkColors.primaryForeground, darkColors.secondary),
-      'primary-foreground vs secondary'
-    ).toBeLessThan(MIN_VISIBLE_SURFACE_RATIO);
-    expect(
-      contrastRatio(lightColors.primaryForeground, lightColors.primaryDisabled),
-      'primary-foreground vs primary-disabled (light)'
-    ).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  it('every theme: the filled action label clears 4.5:1 on its own fill', () => {
+    for (const colors of [lightColors, darkColors]) {
+      expect(
+        contrastRatio(colors.secondaryForeground, colors.secondaryFill)
+      ).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+    }
   });
 });

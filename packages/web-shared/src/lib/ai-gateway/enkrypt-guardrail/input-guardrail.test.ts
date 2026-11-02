@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { after } from 'next/server';
 import {
-  recordEnkryptGuardrailCharge,
+  recordEnkryptUsage,
   type EnkryptGuardrailCall,
-} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges';
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import {
-  scanTurnDelta,
+  scanRequest,
   type EnkryptGuardrailScan,
   type EnkryptGuardrailScanResult,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
@@ -15,25 +15,26 @@ jest.mock('next/server', () => ({
   ...jest.requireActual<Record<string, unknown>>('next/server'),
   after: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage', () => ({
   ...jest.requireActual<Record<string, unknown>>(
-    '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges'
+    '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage'
   ),
-  recordEnkryptGuardrailCharge: jest.fn(),
+  recordEnkryptUsage: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect', () => ({
   ...jest.requireActual<Record<string, unknown>>(
     '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect'
   ),
-  scanTurnDelta: jest.fn(),
+  scanRequest: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ENKRYPT_API_KEY: 'test-enkrypt-key',
 }));
 
 const mockedAfter = jest.mocked(after);
-const mockedRecordCharge = jest.mocked(recordEnkryptGuardrailCharge);
-const mockedScanTurnDelta = jest.mocked(scanTurnDelta);
+const mockedRecordUsage = jest.mocked(recordEnkryptUsage);
+const mockedScanRequest = jest.mocked(scanRequest);
+const signal = new AbortController().signal;
 
 const scan: EnkryptGuardrailScan = {
   sessionId: 'ses_guardrail',
@@ -63,8 +64,8 @@ async function runAfterTasks() {
 
 beforeEach(() => {
   mockedAfter.mockReset();
-  mockedRecordCharge.mockReset().mockResolvedValue(undefined);
-  mockedScanTurnDelta.mockReset();
+  mockedRecordUsage.mockReset().mockResolvedValue(undefined);
+  mockedScanRequest.mockReset();
 });
 
 afterEach(() => {
@@ -72,40 +73,70 @@ afterEach(() => {
 });
 
 describe('startEnkryptInputGuardrail', () => {
+  it.each(['preparation', 'detection'])(
+    'fails closed when scan %s throws unexpectedly',
+    async stage => {
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      const error = new RangeError('Maximum call stack size exceeded');
+      mockedScanRequest.mockRejectedValue(error);
+
+      const guardrail = startEnkryptInputGuardrail(
+        stage === 'preparation' ? Promise.reject(error) : Promise.resolve(scan),
+        signal
+      );
+
+      expect(await guardrail.awaitVerdict()).toEqual({ action: 'unavailable', reason: 'failed' });
+      await runAfterTasks();
+      expect(mockedRecordUsage).not.toHaveBeenCalled();
+    }
+  );
+
+  it('starts the request scan with a 30-second timeout', async () => {
+    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, usageRecords: [] });
+
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan), signal);
+    await guardrail.awaitVerdict();
+
+    expect(mockedScanRequest).toHaveBeenCalledWith(
+      scan,
+      expect.objectContaining({ timeoutMs: 30_000, signal })
+    );
+  });
+
   it('records the wait for the verdict on the final call of the request only', async () => {
     const result: EnkryptGuardrailScanResult = {
       verdict: { action: 'allow' },
-      charges: [call({ decision: 'error', creditsCost: null }), call()],
+      usageRecords: [call({ decision: 'error', creditsCost: null }), call()],
     };
-    mockedScanTurnDelta.mockResolvedValue(result);
+    mockedScanRequest.mockResolvedValue(result);
     jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_237.4);
 
-    const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan));
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan), signal);
     expect(await guardrail.awaitVerdict()).toEqual({ action: 'allow' });
     await runAfterTasks();
 
-    expect(mockedRecordCharge.mock.calls).toEqual([
+    expect(mockedRecordUsage.mock.calls).toEqual([
       [{ ...call({ decision: 'error', creditsCost: null }), addedLatencyMs: null }],
       [{ ...call(), addedLatencyMs: 237 }],
     ]);
   });
 
   it('records no added latency when the request never awaited the verdict', async () => {
-    mockedScanTurnDelta.mockResolvedValue({ verdict: { action: 'allow' }, charges: [call()] });
+    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, usageRecords: [call()] });
 
-    startEnkryptInputGuardrail(Promise.resolve(scan));
+    startEnkryptInputGuardrail(Promise.resolve(scan), signal);
     await runAfterTasks();
 
-    expect(mockedRecordCharge.mock.calls).toEqual([[{ ...call(), addedLatencyMs: null }]]);
+    expect(mockedRecordUsage.mock.calls).toEqual([[{ ...call(), addedLatencyMs: null }]]);
   });
 
   it('skips the scan and records nothing without a guardrail', async () => {
-    const guardrail = startEnkryptInputGuardrail(Promise.resolve(null));
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(null), signal);
 
     expect(await guardrail.awaitVerdict()).toEqual({ action: 'skip' });
     await runAfterTasks();
 
-    expect(mockedScanTurnDelta).not.toHaveBeenCalled();
-    expect(mockedRecordCharge).not.toHaveBeenCalled();
+    expect(mockedScanRequest).not.toHaveBeenCalled();
+    expect(mockedRecordUsage).not.toHaveBeenCalled();
   });
 });

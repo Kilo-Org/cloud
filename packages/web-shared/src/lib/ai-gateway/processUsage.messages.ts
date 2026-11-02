@@ -2,7 +2,7 @@ import type { EventSourceMessage } from 'eventsource-parser';
 import { captureException, captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { sentryRootSpan } from '../getRootSpan';
-import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type {
   JustTheCostsUsageStats,
   MicrodollarUsageStats,
@@ -82,7 +82,7 @@ export function processMessagesApiUsage(
   usage: MessagesApiUsage | null | undefined,
   providerMetadata: VercelProviderMetaData | null | undefined,
   coreProps: NotYetCostedUsageStats,
-  provider: ProviderId
+  provider: ProviderType
 ): JustTheCostsUsageStats {
   const cacheHitTokens = usage?.cache_read_input_tokens ?? 0;
   const cacheWriteTokens = usage?.cache_creation_input_tokens ?? 0;
@@ -103,7 +103,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
   stream: ReadableStream<Uint8Array>,
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
-  provider: ProviderId,
+  provider: ProviderType,
   statusCode: number,
   usesUserCredentials: boolean,
   requestStartedAt?: number
@@ -244,7 +244,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
 export function parseMessagesMicrodollarUsageFromString(
   fullResponse: string,
   statusCode: number,
-  provider: ProviderId
+  provider: ProviderType
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as
     | (Anthropic.Messages.Message & MaybeHasVercelProviderMetadata & MaybeHasOpenRouterProvider)

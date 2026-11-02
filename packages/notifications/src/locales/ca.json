@@ -9,6 +9,7 @@
       "lowBalance": "El teu saldo necessita atenció",
       "spendAlert": "La teva despesa necessita atenció",
       "securityFinding": "Una troballa de seguretat necessita atenció",
+      "securityUpdate": "Una comprovació de seguretat té una actualització",
       "activeAgentsGlanceable": "Els agents actius tenen una actualització"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Una troballa de seguretat necessita atenció"
+      "body": "Una comprovació de seguretat té una actualització"
     }
   },
   "instanceLifecycle": {

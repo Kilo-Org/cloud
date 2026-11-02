@@ -87,6 +87,7 @@ export const VercelUserByokInferenceProviderIdSchema = z.enum([
   'anthropic',
   'azure',
   'bedrock',
+  'cohere',
   'deepseek',
   'fireworks',
   'gmicloud',
@@ -160,6 +161,7 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.anthropic]: 'anthropic/claude-haiku-4.5',
   [VercelUserByokInferenceProviderIdSchema.enum.azure]: 'openai/gpt-5.4-nano',
   [VercelUserByokInferenceProviderIdSchema.enum.bedrock]: 'anthropic/claude-haiku-4.5',
+  [VercelUserByokInferenceProviderIdSchema.enum.cohere]: 'cohere/command-a',
   [VercelUserByokInferenceProviderIdSchema.enum.deepseek]: 'deepseek/deepseek-v3.2',
   [VercelUserByokInferenceProviderIdSchema.enum.fireworks]: 'openai/gpt-oss-20b',
   [VercelUserByokInferenceProviderIdSchema.enum.gmicloud]: 'zai/glm-5.3-flash',
@@ -212,7 +214,6 @@ export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'bytedance',
   'cerebras',
   'claudeaws',
-  'cohere',
   'crusoe',
   'deepinfra',
   'digitalocean',
@@ -285,7 +286,8 @@ const providerPolicyVercelProviderIds: ReadonlySet<string> = new Set(
  * `allowedProviders` holds the OpenRouter provider slugs the policy allows for the model, or is
  * undefined when the policy does not restrict providers. A key whose provider has no OpenRouter
  * slug cannot be named on the provider policy screen, so the allow-list does not apply to it.
- * Other keys, such as direct BYOK and gateway keys, are not affected.
+ * Gateway keys are not affected, and catalog-mode direct BYOK keys are decided per provider
+ * instead (see `isModelAllowedForProviderKey`).
  */
 export function isVercelUserByokProviderAllowed(
   providerId: string,

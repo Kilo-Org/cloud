@@ -16,6 +16,8 @@ import { createSessionWorktreeHandlers } from './router/handlers/session-worktre
 import { createHostedWorkspaceMutationHandlers } from './router/handlers/hosted-workspace-mutations.js';
 import { deleteWorktree } from './router/handlers/worktree-deletion.js';
 import { createSessionWorktreeChangesHandlers } from './router/handlers/session-worktree-changes.js';
+import { createSessionEgressAuditHandlers } from './router/handlers/session-egress-audit.js';
+import { listChildSessions } from './router/handlers/list-child-sessions.js';
 import { getSandboxSelectionOptions } from './router/handlers/sandbox-selection.js';
 import { getPreviewOptions } from './router/handlers/preview-options.js';
 import { listHostedSessions } from './router/handlers/hosted-session-list.js';
@@ -37,6 +39,7 @@ export const appRouter = router({
   getSandboxSelectionOptions,
   getPreviewOptions,
   listHostedSessions,
+  listChildSessions,
   listHostedWorkspaces,
   getHostedWorkspace,
   getHostedWorkspaceStatus,
@@ -55,6 +58,7 @@ export const appRouter = router({
   ...createSessionWorktreeHandlers(),
   ...createHostedWorkspaceMutationHandlers(),
   ...createSessionWorktreeChangesHandlers(),
+  ...createSessionEgressAuditHandlers(),
 });
 
 export type AppRouter = typeof appRouter;

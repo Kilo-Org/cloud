@@ -7,10 +7,13 @@ import {
   classifyCloudAgentFailure,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { describe, expect, it } from 'vitest';
-import { assistantErrorDetail } from '../shared/assistant-failure.js';
+import { assistantErrorDetail, missingAgentSlug } from '../shared/assistant-failure.js';
 import type { AssistantMessage } from '@kilocode/sdk/v2';
 import { sdkAssistantErrorSchema } from '@kilocode/session-ingest-contracts';
-import { projectSafeSdkAssistantError } from '../shared/assistant-failure.js';
+import {
+  projectSafeSdkAssistantError,
+  projectSafeSessionError,
+} from '../shared/assistant-failure.js';
 import {
   SAFE_FAILURE_MESSAGE_MAX_LENGTH,
   SafeFailureProjectionSchema,
@@ -26,6 +29,54 @@ import {
 const NESTED_PROVIDER_TIMEOUT_BODY = '{"type":"error","error":{"type":"timeout","code":504}}';
 
 describe('projectSafeAssistantError', () => {
+  it('preserves a specific missing-agent failure without exposing the CLI agent list', () => {
+    const error = {
+      name: 'UnknownError',
+      data: {
+        message: 'Agent not found: "foreman". Available agents: code, private-agent-name',
+      },
+    };
+    const message = 'Agent "foreman" was not found in the repository or profile';
+    expect(classifyAssistantFailure(error)).toMatchObject({
+      reason: 'invalid_request',
+      safeMessage: message,
+    });
+    expect(projectSafeAssistantError(error)).toBe(message);
+    expect(projectSafeAssistantError(message)).toBe(message);
+    expect(classifyAssistantFailure(message)).toEqual(classifyAssistantFailure(error));
+    expect(projectSafeSessionError(error, undefined)).toBe(message);
+    expect(projectSafeSdkAssistantError(error)).toEqual({
+      name: 'UnknownError',
+      data: { message },
+    });
+    expect(projectSafeAssistantError(projectSafeSdkAssistantError(error))).toBe(message);
+    expect(projectSafeAssistantError(`[BYOK] ${message}`)).toBe(`[BYOK] ${message}`);
+    expect(
+      projectSafeAssistantError({ name: 'UnknownError', data: { message: 'opaque failure' } })
+    ).toBe('Assistant request failed');
+  });
+
+  it.each(['a', 'a'.repeat(50)])('preserves a bounded missing-agent slug: %s', slug => {
+    const error = `Agent not found: "${slug}". Available agents: private-agent-name`;
+    const message = `Agent "${slug}" was not found in the repository or profile`;
+    expect(missingAgentSlug(error)).toBe(slug);
+    expect(projectSafeAssistantError(error)).toBe(message);
+    expect(projectSafeSessionError(message, undefined)).toBe(message);
+    expect(projectSafeAssistantError(message)).not.toContain('private-agent-name');
+  });
+
+  it.each(['', 'Foreman', 'fore_man', 'a'.repeat(51), 'foreman\npoison'])(
+    'does not expose a malformed or oversized missing-agent slug: %j',
+    slug => {
+      const raw = `Agent not found: "${slug}". Available agents: private-agent-name`;
+      const canonical = `Agent "${slug}" was not found in the repository or profile`;
+      for (const error of [raw, canonical]) {
+        expect(missingAgentSlug(error)).toBeUndefined();
+        expect(projectSafeAssistantError(error)).toBe('Assistant request failed');
+      }
+    }
+  );
+
   it.each([
     [
       'string',

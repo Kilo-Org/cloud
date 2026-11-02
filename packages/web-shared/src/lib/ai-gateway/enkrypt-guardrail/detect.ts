@@ -4,7 +4,7 @@ import type {
   EnkryptGuardrailApiKind,
   EnkryptGuardrailDecision,
 } from '@kilocode/db/schema-types';
-import type { EnkryptGuardrailCall } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges';
+import type { EnkryptGuardrailCall } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import {
   ENKRYPT_DETECTOR_TYPES,
   ENKRYPT_SUMMARY_DETECTORS,
@@ -20,12 +20,12 @@ export const ENKRYPT_DETECT_URL = 'https://api.enkryptai.com/guardrails/detect';
  * Bounds every attempt together. The gateway awaits the scan just before the upstream request, so
  * this is the most latency an enabled organization's request can gain.
  */
-export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 3_000;
+export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 30_000;
 
 const MAX_ATTEMPTS = 2;
 
 /**
- * A larger turn is not sent to Enkrypt. It is never truncated: the model would still read the
+ * A larger request is not sent to Enkrypt. It is never truncated: the model would still read the
  * unscanned remainder, which is where an injected instruction in a large file read would sit.
  */
 export const ENKRYPT_MAX_SCAN_CHARACTERS = 500_000;
@@ -39,7 +39,7 @@ const MAX_BLOCK_MESSAGE_LENGTH = 500;
  */
 export const MAX_ENKRYPT_CREDITS_PER_CALL = 1_000;
 
-const TURN_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of new messages and tool results at once, so this request was not sent. Reduce the size of the latest tool output or message and retry.`;
+const REQUEST_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of conversation text at once, so this request was not sent. Compact or prune earlier conversation history, reduce tool output or tool definitions, or start a new session, then retry. Retrying the unchanged request will not help.`;
 
 const detectResponseSchema = z.object({
   summary: z.record(z.string(), z.unknown()),
@@ -56,23 +56,40 @@ export type EnkryptGuardrailScan = {
   config: EnkryptInputGuardrailConfig;
 };
 
-/** `skip`: the organization has no guardrail, so nothing was scanned. */
+/**
+ * `skip`: the organization has no guardrail, so nothing was scanned. An unavailable guardrail's
+ * `reason` is `transient` when an automatic retry could succeed, and `timeout` when the scan ran out
+ * of time, which a long conversation makes likely to recur.
+ */
 export type EnkryptGuardrailVerdict =
   | { action: 'skip' }
   | { action: 'allow' }
   | { action: 'block'; message: string }
-  | { action: 'unavailable' };
+  | { action: 'unavailable'; reason: EnkryptUnavailableReason };
+
+export type EnkryptUnavailableReason = 'transient' | 'timeout' | 'failed';
 
 export type EnkryptGuardrailScanResult = {
   verdict: EnkryptGuardrailVerdict;
-  charges: EnkryptGuardrailCall[];
+  usageRecords: EnkryptGuardrailCall[];
 };
 
 export type EnkryptDetectDependencies = {
   apiKey: string | undefined;
   fetch: typeof fetch;
   timeoutMs: number;
+  signal: AbortSignal;
 };
+
+type DetectError =
+  | 'client_aborted'
+  | 'timeout'
+  | 'network'
+  | 'invalid_response'
+  | `http_${number}`
+  | `detector_error:${string}`;
+
+type ScanError = DetectError | 'invalid_config' | 'missing_api_key' | 'request_too_large';
 
 type DetectAttempt =
   | {
@@ -81,7 +98,7 @@ type DetectAttempt =
       resultMessage: string | null;
       creditsCost: number | null;
     }
-  | { kind: 'failed'; error: string; retryable: boolean; creditsCost: number | null };
+  | { kind: 'failed'; error: DetectError; retryable: boolean; creditsCost: number | null };
 
 function hasFired(value: unknown): boolean {
   if (typeof value === 'number') return value > 0;
@@ -132,8 +149,10 @@ function parseCreditsCost(response: Response): number | null {
   return value;
 }
 
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError');
+/** The scan signal combines the client's disconnect signal with the shared deadline. */
+function abortError(signal: AbortSignal, deps: EnkryptDetectDependencies): DetectError | null {
+  if (deps.signal.aborted) return 'client_aborted';
+  return signal.aborted ? 'timeout' : null;
 }
 
 async function detectOnce(
@@ -149,9 +168,10 @@ async function detectOnce(
       body,
       signal,
     });
-  } catch (error) {
-    return isAbortError(error)
-      ? { kind: 'failed', error: 'timeout', retryable: false, creditsCost: null }
+  } catch {
+    const aborted = abortError(signal, deps);
+    return aborted
+      ? { kind: 'failed', error: aborted, retryable: false, creditsCost: null }
       : { kind: 'failed', error: 'network', retryable: true, creditsCost: null };
   }
   const creditsCost = parseCreditsCost(response);
@@ -168,10 +188,10 @@ async function detectOnce(
   let json: unknown;
   try {
     json = await response.json();
-  } catch (error) {
+  } catch {
     return {
       kind: 'failed',
-      error: isAbortError(error) ? 'timeout' : 'invalid_response',
+      error: abortError(signal, deps) ?? 'invalid_response',
       retryable: false,
       creditsCost,
     };
@@ -230,17 +250,17 @@ function attemptDecision(
 }
 
 /**
- * Scans the turn delta once, retrying a single transient failure within the shared deadline, and
- * maps the result to a verdict. Never throws. Returns one ledger charge per Enkrypt call, including
+ * Scans the request once, retrying a single transient failure within the shared deadline, and
+ * maps the result to a verdict. Never throws. Returns one usage record per Enkrypt call, including
  * calls that failed, so a blocked or failed request is still accounted for. Any failure blocks the
- * request: an enabled guardrail never lets an unscanned turn reach the model.
+ * request: an enabled guardrail never lets an unscanned request reach the model.
  */
-export async function scanTurnDelta(
+export async function scanRequest(
   scan: EnkryptGuardrailScan,
   deps: EnkryptDetectDependencies
 ): Promise<EnkryptGuardrailScanResult> {
   const { text, config } = scan;
-  if (text.length === 0) return { verdict: { action: 'allow' }, charges: [] };
+  if (text.length === 0) return { verdict: { action: 'allow' }, usageRecords: [] };
 
   const baseLogFields = {
     organization_id: scan.organizationId,
@@ -261,12 +281,15 @@ export async function scanTurnDelta(
     detectors_blocking: config.blockingDetectors,
   };
 
+  if (deps.signal.aborted) {
+    return failedVerdict([], logFields, { error: 'client_aborted', latencyMs: 0 });
+  }
+
   if (text.length > ENKRYPT_MAX_SCAN_CHARACTERS) {
-    // Retrying cannot shrink the turn, so the rejection carries the reason.
     return failedVerdict([], logFields, {
-      error: 'turn_too_large',
+      error: 'request_too_large',
       latencyMs: 0,
-      closedVerdict: { action: 'block', message: TURN_TOO_LARGE_MESSAGE },
+      closedVerdict: { action: 'block', message: REQUEST_TOO_LARGE_MESSAGE },
     });
   }
 
@@ -280,7 +303,7 @@ export async function scanTurnDelta(
     detectors: config.detectors,
     user_metadata: { organization_id: scan.organizationId },
   });
-  const signal = AbortSignal.timeout(deps.timeoutMs);
+  const signal = AbortSignal.any([deps.signal, AbortSignal.timeout(deps.timeoutMs)]);
   const startedAt = performance.now();
   const attempts: DetectAttempt[] = [];
   let attempt: DetectAttempt;
@@ -295,7 +318,7 @@ export async function scanTurnDelta(
   );
   const latencyMs = Math.round(performance.now() - startedAt);
 
-  const charges = attempts.map((each): EnkryptGuardrailCall => ({
+  const usageRecords = attempts.map((each): EnkryptGuardrailCall => ({
     organizationId: scan.organizationId,
     kiloUserId: scan.kiloUserId,
     sessionId: scan.sessionId,
@@ -305,7 +328,7 @@ export async function scanTurnDelta(
   }));
 
   if (attempt.kind === 'failed') {
-    return failedVerdict(charges, logFields, { error: attempt.error, latencyMs });
+    return failedVerdict(usageRecords, logFields, { error: attempt.error, latencyMs });
   }
 
   const blocking = blockingDetectors(attempt.firedDetectors, config);
@@ -314,38 +337,64 @@ export async function scanTurnDelta(
     detectors_fired: attempt.firedDetectors,
     latency_ms: latencyMs,
     attempts: attempts.length,
-    credits_cost: totalCredits(charges),
+    credits_cost: totalCredits(usageRecords),
   };
   if (blocking.length === 0) {
     console.debug('[enkrypt-guardrail] decision', { ...decided, decision: 'allowed' });
-    return { verdict: { action: 'allow' }, charges };
+    return { verdict: { action: 'allow' }, usageRecords };
   }
   console.debug('[enkrypt-guardrail] decision', { ...decided, decision: 'blocked' });
   return {
     verdict: { action: 'block', message: guardrailBlockMessage(blocking, attempt.resultMessage) },
-    charges,
+    usageRecords,
   };
 }
 
-function totalCredits(charges: EnkryptGuardrailCall[]): number | null {
-  const costs = charges.flatMap(charge =>
-    charge.creditsCost === null ? [] : [charge.creditsCost]
+function totalCredits(usageRecords: EnkryptGuardrailCall[]): number | null {
+  const costs = usageRecords.flatMap(usageRecord =>
+    usageRecord.creditsCost === null ? [] : [usageRecord.creditsCost]
   );
   return costs.length === 0 ? null : costs.reduce((sum, cost) => sum + cost, 0);
 }
 
+function unavailableReason(error: ScanError): EnkryptUnavailableReason {
+  if (error === 'timeout') return 'timeout';
+  const transient = error === 'network' || error === 'http_429' || /^http_5\d\d$/.test(error);
+  return transient ? 'transient' : 'failed';
+}
+
+/**
+ * A client disconnect is not an Enkrypt failure: it is logged at debug level, and only calls that
+ * reported a cost are charged, so cancelled requests do not inflate the guardrail error rate.
+ */
 function failedVerdict(
-  charges: EnkryptGuardrailCall[],
+  usageRecords: EnkryptGuardrailCall[],
   logFields: Record<string, unknown>,
-  failure: { error: string; latencyMs: number; closedVerdict?: EnkryptGuardrailVerdict }
+  failure: {
+    error: ScanError;
+    latencyMs: number;
+    closedVerdict?: EnkryptGuardrailVerdict;
+  }
 ): EnkryptGuardrailScanResult {
-  warnExceptInTest('[enkrypt-guardrail] decision', {
+  const clientAborted = failure.error === 'client_aborted';
+  const recordedUsageRecords = clientAborted
+    ? usageRecords.filter(usageRecord => usageRecord.creditsCost !== null)
+    : usageRecords;
+  const fields = {
     ...logFields,
-    decision: 'error_fail_closed',
+    decision: clientAborted ? 'client_aborted' : 'error_fail_closed',
     error: failure.error,
     latency_ms: failure.latencyMs,
-    attempts: charges.length,
-    credits_cost: totalCredits(charges),
-  });
-  return { verdict: failure.closedVerdict ?? { action: 'unavailable' }, charges };
+    attempts: usageRecords.length,
+    credits_cost: totalCredits(usageRecords),
+  };
+  if (clientAborted) console.debug('[enkrypt-guardrail] decision', fields);
+  else warnExceptInTest('[enkrypt-guardrail] decision', fields);
+  return {
+    verdict: failure.closedVerdict ?? {
+      action: 'unavailable',
+      reason: unavailableReason(failure.error),
+    },
+    usageRecords: recordedUsageRecords,
+  };
 }

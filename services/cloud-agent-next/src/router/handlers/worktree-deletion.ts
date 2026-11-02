@@ -7,6 +7,8 @@ import {
   cloudAgentChildSessionLineageSchema,
   sessionIdSchema,
   WORKTREE_RUNTIME_HISTORY_UNAVAILABLE,
+  WORKTREE_UNREGISTERED_CHILD_SESSIONS,
+  WORKTREE_CHILD_LINEAGE_CONFLICT,
   type CloudAgentWorktreeDeletionParams,
   type RecordCloudAgentWorktreeCleanupParams,
 } from '@kilocode/session-ingest-contracts';
@@ -20,7 +22,6 @@ import {
 } from '../../shared/sandbox-control-protocol';
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics';
 import { withDORetry } from '../../utils/do-retry';
-import { getWorktreeWorkspacePath } from '../../workspace';
 import type { TRPCContext } from '../../types';
 import { protectedProcedure } from '../auth';
 
@@ -109,7 +110,6 @@ export async function deleteWorktreeResources(
       };
     }
     const runtimeLocations = [...state.runtimeLocations];
-    const directories = new Set<string>();
     const childSessions: NonNullable<RecordCloudAgentWorktreeCleanupParams['childSessions']> = [];
     setStage('collect_sessions');
     const discoveries = await mapDeletionRoots(state.manifest.sessions, async session => {
@@ -128,14 +128,11 @@ export async function deleteWorktreeResources(
       );
       const location = cloudAgentWorktreeLocationSchema.nullable().parse(rawBegin.location);
       const children = z.array(cloudAgentChildSessionLineageSchema).parse(rawBegin.children);
-      return { cloudAgentSessionId, location, children, directory: rawBegin.directory };
+      return { cloudAgentSessionId, location, children };
     });
     for (const discovery of discoveries) {
       if (!discovery) continue;
-      const { cloudAgentSessionId, location, children, directory } = discovery;
-      if (typeof directory === 'string' && directory.length > 0) {
-        directories.add(directory);
-      }
+      const { cloudAgentSessionId, location, children } = discovery;
       childSessions.push(...children.map(child => ({ ...child, cloudAgentSessionId })));
       if (
         location &&
@@ -146,24 +143,17 @@ export async function deleteWorktreeResources(
         runtimeLocations.push(location);
       }
     }
-    const recordDirectories =
-      directories.size > 0
-        ? [...directories]
-        : [getWorktreeWorkspacePath(params.organizationId, ctx.userId, params.worktreeId)];
     setStage('runtime_history');
     locationCount = runtimeLocations.length;
     if (runtimeLocations.length === 0) throw new Error(WORKTREE_RUNTIME_HISTORY_UNAVAILABLE);
     setStage('record_manifest');
-    for (const directory of recordDirectories) {
-      state = cloudAgentWorktreeDeletionStateSchema.parse(
-        await ctx.env.SESSION_INGEST.recordCloudAgentWorktreeCleanup({
-          ...params,
-          runtimeLocations,
-          directory,
-          ...(childSessions.length > 0 ? { childSessions } : {}),
-        })
-      );
-    }
+    state = cloudAgentWorktreeDeletionStateSchema.parse(
+      await ctx.env.SESSION_INGEST.recordCloudAgentWorktreeCleanup({
+        ...params,
+        runtimeLocations,
+        ...(childSessions.length > 0 ? { childSessions } : {}),
+      })
+    );
     sessionCount = state.manifest.sessions.length;
     locationCount = state.runtimeLocations.length;
     for (const location of state.runtimeLocations) {
@@ -206,16 +196,13 @@ export async function deleteWorktreeResources(
         );
       }
       setStage('record_cleanup');
-      for (const directory of recordDirectories) {
-        state = cloudAgentWorktreeDeletionStateSchema.parse(
-          await ctx.env.SESSION_INGEST.recordCloudAgentWorktreeCleanup({
-            ...params,
-            directory,
-            sessionIds: cleanup.sessionIds,
-            completedRuntimeLocation: location,
-          })
-        );
-      }
+      state = cloudAgentWorktreeDeletionStateSchema.parse(
+        await ctx.env.SESSION_INGEST.recordCloudAgentWorktreeCleanup({
+          ...params,
+          sessionIds: cleanup.sessionIds,
+          completedRuntimeLocation: location,
+        })
+      );
       sessionCount = state.manifest.sessions.length;
       locationCount = state.runtimeLocations.length;
     }
@@ -251,7 +238,7 @@ export async function deleteWorktreeResources(
       retryable = false;
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'Worktree runtime history is unavailable; recovery is required',
+        message: 'Worktree runtime location is missing',
         cause: { error: 'WORKTREE_RUNTIME_HISTORY_UNAVAILABLE', retryable: false },
       });
     }
@@ -260,6 +247,26 @@ export async function deleteWorktreeResources(
       errorCode = 'FORBIDDEN';
       retryable = false;
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Worktree access denied' });
+    }
+    if (error instanceof Error && error.message.includes(WORKTREE_UNREGISTERED_CHILD_SESSIONS)) {
+      outcome = 'rejected';
+      errorCode = 'WORKTREE_UNREGISTERED_CHILD_SESSIONS';
+      retryable = false;
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Worktree has child sessions without registered workspace ownership',
+        cause: { error: errorCode, retryable: false },
+      });
+    }
+    if (error instanceof Error && error.message.includes(WORKTREE_CHILD_LINEAGE_CONFLICT)) {
+      outcome = 'rejected';
+      errorCode = 'WORKTREE_CHILD_LINEAGE_CONFLICT';
+      retryable = false;
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Worktree child session ownership or lineage conflicts with persisted state',
+        cause: { error: errorCode, retryable: false },
+      });
     }
     outcome = 'pending';
     errorCode = 'WORKTREE_DELETION_PENDING';

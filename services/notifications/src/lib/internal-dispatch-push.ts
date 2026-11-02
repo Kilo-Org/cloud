@@ -154,7 +154,8 @@ function buildDispatchInput(userId: string, input: InternalDispatchRequest): Dis
     }
     case 'security_lifecycle':
       // Lifecycle events carry no finding title/severity, so the full-preview
-      // copy matches the generic preview copy in `push-presentation.ts`.
+      // copy matches the generic preview copy in `push-copy.ts`: a status
+      // update, never the "finding needs attention" body.
       return {
         userId,
         presenceContext: null,
@@ -162,7 +163,7 @@ function buildDispatchInput(userId: string, input: InternalDispatchRequest): Dis
         badge: null,
         push: {
           title: 'Kilo',
-          body: 'A security finding needs attention',
+          body: 'A security check has an update',
           i18nKey: 'internal.securityLifecycle',
           data: {
             type: 'security_lifecycle',

@@ -323,6 +323,36 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
   });
 
+  it('sends a refused organization connect back to its BYOK card', async () => {
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: 'existing-user',
+      targetProvider: 'openai',
+      organizationId: SHARED_SERVICES_ORGANIZATION_ID,
+      chatGptScope: 'shared_services',
+    } as never);
+    await setSessionCookie('other-user');
+
+    const result = await signIn({
+      user: { id: 'x', email: 'org-mismatch@example.com', name: 'Org Mismatch', image: '' },
+      account: {
+        provider: 'openai',
+        providerAccountId: 'openai-account',
+        type: 'oauth',
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+        scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
+      },
+      profile: { sub: 'openai-org-mismatch-sub', email: 'org-mismatch@example.com' },
+    } as never);
+
+    // The organization's BYOK card reads `openai_error`, so a refused
+    // organization connect returns there, like the shared-services re-check.
+    expect(result).toBe(
+      `/organizations/${SHARED_SERVICES_ORGANIZATION_ID}/byok?openai_error=LINKING-FAILED`
+    );
+    expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+  });
+
   it('carries the linking session organization onto the profile for an OpenAI connection', async () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
       existingUserId: 'existing-user',

@@ -1017,6 +1017,15 @@ export const authOptions: NextAuthOptions = {
           const linkingPrincipal = await getUserFromSession();
           if (linkingPrincipal?.id !== linkingSession.existingUserId) {
             warnInSentry('SECURITY: Account link refused: the session does not match the link');
+            // An organization-scoped connect starts on the organization's BYOK
+            // card, which reads `openai_error`; return the refusal there the
+            // same way the shared-services re-check below does.
+            if (account.provider === 'openai' && linkingSession.organizationId) {
+              return openAiChatGptConnectFailureUrl(
+                linkingSession.organizationId,
+                'LINKING-FAILED'
+              );
+            }
             return redirectUrlForCode('LINKING-FAILED');
           }
         }

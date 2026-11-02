@@ -369,6 +369,33 @@ describe('useTextHeight long-draft measurement', () => {
     renderer.unmount();
   });
 
+  it('measures the live draft again when the cap grows under a frozen measurement', async () => {
+    // A keyboard closing raises the cap with no text change at all. The frozen
+    // content height no longer fills it, so without a re-measure the caller
+    // publishes that shorter height — the composer stays at the keyboard-era
+    // size and only jumps once the next keystroke lands.
+    const renderer = await mount();
+    layoutMirror(renderer, 20);
+    const draft = 'x'.repeat(200);
+    expect(typeText(draft)).toBe(1);
+    layoutMirror(renderer, 100);
+    expect(published.height).toBe(124);
+    expect(typeText(`${draft}y`)).toBe(0);
+
+    cap = 200;
+    await act(async () => {
+      renderer.update(createElement(Harness));
+      await Promise.resolve();
+    });
+    // The mirror holds the live draft again, so the next layout measures it and
+    // the draft may grow into the taller cap.
+    expect(published.maxHeight).toBe(200);
+    expect(findMirrorText(renderer)).toBe(`${draft}y`);
+    layoutMirror(renderer, 160);
+    expect(published.height).toBe(184);
+    renderer.unmount();
+  });
+
   it('measures an append again when the cap it was clamped to changes', async () => {
     // A keyboard closing raises the cap, so the frozen measurement no longer
     // stands in for the draft: the composer must be able to grow again.

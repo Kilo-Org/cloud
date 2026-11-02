@@ -226,8 +226,9 @@ export function useTextHeight({
    * caller renders — re-measuring it would lay the whole draft out again on
    * every keystroke, work that grows with the draft's length while the result
    * cannot change. Any other edit (a delete that cuts into the measured text, a
-   * replacement, a cleared draft) or a new cap measures the exact new text, so
-   * the mirror is never stale in a way the caller can see.
+   * replacement, a cleared draft) measures the exact new text, and a move of the
+   * wrapping or the cap re-measures the frozen draft through the effect below,
+   * so the mirror is never stale in a way the caller can see.
    */
   function changeKeepsPublishedHeight(nextText: string): boolean {
     const mirroredText = mirrorTextRef.current;
@@ -238,26 +239,34 @@ export function useTextHeight({
     );
   }
 
-  // The wrapping the frozen measurement was taken under. A rotation, a font
-  // scale change, or any other move of the width, font or line box re-wraps the
-  // draft, so a measurement taken under the old one no longer describes it — and
-  // a change of the text is not what moves these, so `setText` cannot notice.
-  // Measure the live draft again whenever one of them moves while the mirror is
-  // frozen.
+  // The geometry the frozen measurement was taken under: the width, font and
+  // line box re-wrap the draft, so a measurement taken under the old one no
+  // longer describes it — and a change of the text is not what moves these, so
+  // `setText` cannot notice. The cap matters too: a keyboard close or a window
+  // that grows raises it with no text change at all, and the frozen content
+  // height then stops filling the cap, so the caller would publish that shorter
+  // height instead of the taller cap until the next keystroke. Measure the live
+  // draft again when either one leaves the frozen measurement behind.
   const wrappingKey = `${measurementWidth}|${scaledFontSize}|${scaledLineHeight}|${verticalPadding}`;
   const measuredWrappingKeyRef = useRef(wrappingKey);
   useEffect(() => {
-    if (measuredWrappingKeyRef.current === wrappingKey) {
-      return;
+    const wrappingMoved = measuredWrappingKeyRef.current !== wrappingKey;
+    if (wrappingMoved) {
+      measuredWrappingKeyRef.current = wrappingKey;
     }
-    measuredWrappingKeyRef.current = wrappingKey;
     const draft = draftTextRef.current;
     if (draft === '' || mirrorTextRef.current === draft) {
       return;
     }
+    // The frozen prefix stands in for the draft only while it still fills the
+    // published cap; a cap that grew past its measured content re-opens the
+    // room the draft may grow into.
+    if (!wrappingMoved && contentHeight >= effectiveMaxHeight) {
+      return;
+    }
     mirrorTextRef.current = draft;
     setMeasuredText(draft);
-  }, [wrappingKey]);
+  }, [wrappingKey, contentHeight, effectiveMaxHeight]);
 
   function reset() {
     draftTextRef.current = '';

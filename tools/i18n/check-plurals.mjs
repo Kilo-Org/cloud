@@ -85,10 +85,6 @@ export const NO_AGREEMENT = new Map([
     'bare count before a severity adjective: "{{displayCount}} Critical" has no inflected word',
   ],
   [
-    'securityAgent.analysis.whereFound',
-    'bare count in parentheses: "Where this was found ({{displayCount}})"',
-  ],
-  [
     'securityAgent.remediation.attemptHistory',
     'bare count in parentheses: "Attempt history ({{displayCount}})"',
   ],

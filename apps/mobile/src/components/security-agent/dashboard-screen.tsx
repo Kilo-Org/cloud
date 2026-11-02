@@ -23,6 +23,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import {
   DashboardSections,
   DashboardSectionsSkeleton,
+  type SectionAction,
 } from '@/components/security-agent/dashboard-sections';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
@@ -418,7 +419,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // action instead of a Retry that would fail the same way: the in-app
   // repository picker when nothing is in the sync scope, the GitHub App page
   // when the connection itself is what blocks the sync.
-  let syncAction: { label: string; pending: boolean; handlePress: () => void } | null = null;
+  let syncAction: SectionAction | null = null;
   if (syncPrecondition === 'noRepositories') {
     if (!repositoryPolicyReadOnly) {
       syncAction = {
@@ -457,6 +458,29 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     syncPrecondition === 'noRepositories' && repositoryPolicyReadOnly
       ? t('securityAgent.mutations.syncNoRepositoriesNoManage')
       : syncFailure?.message;
+
+  // A grant that holds nothing blocks every scan, so the repository card's
+  // empty state carries the step out of it. A manager opens the repository
+  // settings; a member cannot change the policy there, so they are handed to
+  // the GitHub App page where the grant itself is widened — the same control
+  // the repositories screen offers them for this exact state. A role read that
+  // has not settled keeps the manager path, as the rejection above does.
+  let emptyGrantAction: SectionAction | null = null;
+  if (repositoryScopeEmpty && !repositoryPolicyReadOnly) {
+    emptyGrantAction = {
+      label: t('securityAgent.dashboard.manageRepositories'),
+      pending: false,
+      handlePress: () => {
+        pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
+      },
+    };
+  } else if (repositoryScopeEmpty && manageAccess) {
+    emptyGrantAction = {
+      label: t('securityAgent.repositories.manageAccess'),
+      pending: manageAccess.pending,
+      handlePress: manageAccess.handlePress,
+    };
+  }
 
   // One submit path for every control that starts a sync — the header button,
   // the empty-state action, the retry beside the failure copy, and a
@@ -691,7 +715,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 </View>
               ))}
             </View>
-            {neverSynced && slaEnabled && !repositoryPolicyReadOnly ? (
+            {neverSynced && slaEnabled && !repositoryPolicyReadOnly && !repositoryScopeEmpty ? (
               // The Manage repositories link renders whenever SLA tracking is
               // on, nothing carries a deadline, and the reader may change the
               // repository policy. Before the first sync that
@@ -731,7 +755,14 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           </View>
         )}
 
-        {slaEnabled && data && data.sla.overall.total === 0 && !repositoryPolicyReadOnly ? (
+        {slaEnabled &&
+        data &&
+        data.sla.overall.total === 0 &&
+        !repositoryPolicyReadOnly &&
+        // An empty grant is the reason this empty state has no deadline to
+        // show, and the repository card below carries its step out. This link
+        // would repeat that same destination from further away.
+        !repositoryScopeEmpty ? (
           <View className="flex-row items-center gap-4">
             {/* The refresh control in the filter row above is this screen's one
                 sync affordance; a second "Sync findings" link here repeated it
@@ -779,6 +810,8 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             slaEnabled={slaEnabled}
             repoFullName={repoFullName}
             neverSynced={neverSynced}
+            emptyGrant={repositoryScopeEmpty}
+            emptyGrantAction={emptyGrantAction}
           />
         ) : null}
       </TabScreenScrollView>

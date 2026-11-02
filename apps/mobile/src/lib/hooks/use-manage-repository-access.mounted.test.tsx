@@ -317,4 +317,44 @@ describe('useManageRepositoryAccess', () => {
     expect(mocks.launch).not.toHaveBeenCalled();
     expect(requireHook(resultRef).pending).toBe(false);
   });
+
+  // The organization's mint is narrower than the screens that offer this
+  // control: a member is refused with UNAUTHORIZED, and an installation that
+  // cannot take another one with FORBIDDEN. Neither can mint a token, and the
+  // page works without one — so the tap opens it rather than answering nothing
+  // in the one state that needs a route to it.
+  for (const code of ['UNAUTHORIZED', 'FORBIDDEN']) {
+    it(`opens the settings page without a token when the organization's mint is refused with ${code}`, async () => {
+      mocks.mintInstallState.mockRejectedValue({ data: { code } });
+      const onReturn = vi.fn<(opened: boolean) => void>();
+      const resultRef = mountHook('org_123', 'github', { onReturn });
+
+      await act(() => {
+        requireHook(resultRef).handlePress();
+      });
+
+      await vi.waitFor(() => {
+        expect(onReturn).toHaveBeenCalledWith(true);
+      });
+      expect(mocks.launch).toHaveBeenCalledWith('https://app.example.com/org_123');
+      expect(mocks.toastError).not.toHaveBeenCalled();
+    });
+  }
+
+  // A personal scope has no page-level fallback to reach: the page mints its
+  // own state for a signed-in user, and a personal mint failure still has to be
+  // reported.
+  it('still reports a refused personal mint', async () => {
+    mocks.mintInstallState.mockRejectedValue({ data: { code: 'UNAUTHORIZED' } });
+    const resultRef = mountHook('personal', 'github');
+
+    await act(() => {
+      requireHook(resultRef).handlePress();
+    });
+
+    await vi.waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith('prReview.couldNotOpenGitHubAppSettings');
+    });
+    expect(mocks.launch).not.toHaveBeenCalled();
+  });
 });

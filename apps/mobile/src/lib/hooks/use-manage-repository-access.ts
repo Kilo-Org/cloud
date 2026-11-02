@@ -131,12 +131,16 @@ export function useManageRepositoryAccess(
         const opened = await openSettings(getGitHubIntegrationUrl(WEB_BASE_URL, orgScope, token));
         return opened;
       } catch (error) {
-        // A non-multi-installation organization that already has an active
-        // GitHub App connection rejects the mint, so a pre-minted token cannot
-        // exist. The settings page still works without one: it mints its own
-        // state for the signed-in web user.
+        // An organization's mint needs `OWNER`/`ADMIN` and refuses everyone else
+        // with `UNAUTHORIZED`; a non-multi-installation organization that
+        // already has an active GitHub App connection is refused with
+        // `FORBIDDEN`. Neither can mint a token, and the settings page still
+        // works without one: it mints its own state for the signed-in web user.
+        // Both therefore hand the reader to that page instead of an error
+        // toast, which would leave the control inert in exactly the state that
+        // needs a route to it.
         const code = readTrpcErrorField(error, 'code');
-        if (code === 'FORBIDDEN' && orgScope) {
+        if (orgScope && (code === 'FORBIDDEN' || code === 'UNAUTHORIZED')) {
           const opened = await openSettings(getGitHubIntegrationUrl(WEB_BASE_URL, orgScope));
           return opened;
         }

@@ -271,7 +271,6 @@ export class TriggerDO extends DurableObject<Env> {
 
     await this.ctx.storage.put('config', config);
 
-    // Set initial alarm for scheduled triggers
     if (config.activationMode === 'scheduled' && config.cronExpression) {
       await this.scheduleNextAlarm(config);
     }
@@ -442,10 +441,8 @@ export class TriggerDO extends DurableObject<Env> {
 
     await this.ctx.storage.put('config', updatedConfig);
 
-    // Alarm lifecycle for scheduled triggers
     if (updatedConfig.activationMode === 'scheduled') {
       if (!updatedConfig.isActive) {
-        // Deactivated — clear alarm, retry flag, and stale next-run display
         await this.ctx.storage.deleteAlarm();
         await this.ctx.storage.delete('alarmRetry');
         updatedConfig.nextScheduledAt = null;
@@ -664,7 +661,6 @@ export class TriggerDO extends DurableObject<Env> {
       })
       .run();
 
-    // Delete overflow rows, preserving in-progress requests
     this.db.run(sql`
       DELETE FROM ${requestsTable}
       WHERE ${requestsTable.id} IN (

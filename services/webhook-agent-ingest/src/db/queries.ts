@@ -130,7 +130,6 @@ export async function ensureBotUserForOrg(db: WorkerDb, orgId: string): Promise<
   const botId = generateBotUserId(orgId);
   const botEmail = generateBotUserEmail(orgId);
 
-  // Try to find existing bot user
   const existingRows = await db
     .select({
       id: kilocode_users.id,
@@ -156,7 +155,6 @@ export async function ensureBotUserForOrg(db: WorkerDb, orgId: string): Promise<
       };
     }
 
-    // Edge case: existing bot has NULL api_token_pepper — generate one
     const newPepper = generateApiTokenPepper();
     await db
       .update(kilocode_users)
@@ -171,7 +169,6 @@ export async function ensureBotUserForOrg(db: WorkerDb, orgId: string): Promise<
     };
   }
 
-  // Create new bot user
   const apiTokenPepper = generateApiTokenPepper();
   const stripeCustomerId = generateBotStripeCustomerId();
 

@@ -118,7 +118,6 @@ export class TokenMintingService {
     }
 
     if (params.userId) {
-      // Personal trigger - mint token for the real user
       logger.info('Token minting: lookup personal user', { userId: params.userId });
       const user = await findUserForToken(db, params.userId);
 
@@ -148,7 +147,6 @@ export class TokenMintingService {
         isBot: false,
       };
     } else if (params.orgId) {
-      // Org trigger - mint token for the webhook bot user
       logger.info('Token minting: checking org exists', { orgId: params.orgId });
       const orgExists = await organizationExists(db, params.orgId);
       if (!orgExists) {

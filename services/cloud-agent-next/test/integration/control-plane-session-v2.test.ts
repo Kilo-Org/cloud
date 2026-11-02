@@ -2053,9 +2053,6 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
           type: 'session.prompt',
           payload: { messageId: 'new-B' },
         });
-        expect(
-          await sessionStub.tryUpdate({ callbackTarget: { url: 'https://callback.test/hook' } })
-        ).toEqual({ success: true });
         wrapperB.send({
           type: 'session.outcome',
           sessionId,
@@ -2077,6 +2074,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         expect(reports.find(report => report.run.messageId === 'new-B')?.run.status).toBe(
           'completed'
         );
+        expect(callbacks).toHaveLength(1);
         expect(callbacks.at(-1)?.payload).toMatchObject({
           messageId: 'new-B',
           status: 'completed',

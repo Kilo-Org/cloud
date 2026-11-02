@@ -571,6 +571,65 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     }
   );
 
+  it('keeps the callback armed while steering messages wait for preparation', async () => {
+    const { sessionId, stub, peer } = await setup('session:parent');
+    peer.prepareView = peer.view('preparing');
+    const captured = await installCapturedQueues(stub);
+    await stub.send(promptPayload('initial'));
+    await stub.send(promptPayload('steering'));
+    expect(await messageStatus(stub, 'initial')).toBe('queued');
+    expect(await messageStatus(stub, 'steering')).toBe('queued');
+    expect(captured.callbacks).toHaveLength(0);
+    expect((await stub.getMetadata())?.callback?.target.url).toBe('session:parent');
+    peer.prepareView = peer.view('ready');
+    await stub.onRoute(peer.view('ready'));
+    await waitFor(async () => expect(await messageStatus(stub, 'steering')).toBe('running'));
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: 'steering' });
+    await flush(stub);
+    expect(captured.callbacks).toHaveLength(1);
+    expect(captured.callbacks[0]?.payload.messageId).toBe('steering');
+    expect((await stub.getMetadata())?.callback).toBeUndefined();
+  });
+
+  it('delivers the old failure callback if the incoming steering message cannot be persisted', async () => {
+    const { stub, peer } = await setup('session:parent');
+    peer.prepareView = peer.view('preparing');
+    const captured = await installCapturedQueues(stub);
+    await stub.send(promptPayload('initial'));
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'workspace_setup_failed',
+    };
+    await runInDurableObject(stub, async instance => {
+      const writer = instance as unknown as {
+        persistMessages(messages: readonly { messageId: string }[]): Promise<void>;
+      };
+      const persist = writer.persistMessages.bind(instance);
+      const spy = vi.spyOn(writer, 'persistMessages').mockImplementation(messages => {
+        if (messages.some(message => message.messageId === 'steering')) {
+          throw new Error('Admission write failed');
+        }
+        return persist(messages);
+      });
+      try {
+        await expect(instance.send(promptPayload('steering'))).rejects.toThrow(
+          'Admission write failed'
+        );
+      } finally {
+        spy.mockRestore();
+      }
+    });
+    expect(await messageStatus(stub, 'initial')).toBe('failed');
+    expect(await messageStatus(stub, 'steering')).toBeNull();
+    expect(captured.callbacks).toHaveLength(1);
+    expect(captured.callbacks[0]?.payload).toMatchObject({
+      messageId: 'initial',
+      status: 'failed',
+    });
+    expect((await stub.getMetadata())?.callback).toBeUndefined();
+  });
+
   it('rolls back the callback job if consuming the stored target fails', async () => {
     const { sessionId, stub } = await setup('session:parent');
     const captured = await installCapturedQueues(stub);
@@ -663,6 +722,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     }
     expect(captured.callbacks).toHaveLength(1);
     expect(captured.callbacks[0]?.payload.status).toBe('failed');
+    expect((await stub.getMetadata())?.callback).toBeUndefined();
     expect(captured.callbacks[0]?.payload.clientError).toMatchObject({
       code: 'WORKSPACE_SETUP_FAILED',
       retryable: true,
@@ -688,6 +748,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     }
     expect(captured.callbacks).toHaveLength(1);
     expect(captured.callbacks[0]?.payload.status).toBe('interrupted');
+    expect((await stub.getMetadata())?.callback).toBeUndefined();
     expect(captured.callbacks[0]?.payload.clientError).toMatchObject({
       code: 'USER_INTERRUPT',
       retryable: false,

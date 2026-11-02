@@ -609,6 +609,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private readonly reportOutbox: ReportOutbox;
   /** Terminal callback outbox (plan B5); one job per drained batch. */
   private readonly messageCallbacks: MessageCallbacks;
+  private admissionDeferredCallback:
+    | { changed: SessionMessage[]; facts?: ControlPlaneReportFacts }
+    | undefined;
   /** Worktree-changes projection from the shared event log (plan B10). */
   private readonly worktreeChanges: ControlPlaneWorktreeChanges;
   /** Terminal records and the browser/wrapper bridge (plan B10). */
@@ -1492,22 +1495,34 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     let reduction = queueMessage(this.messages, parsed, now);
     if (reduction.rejected === 'queue-full') return 'queue-full';
     const pass = this.transportPass();
-    if (
-      reduction.changed.length > 0 &&
-      this.route.state === 'preparing' &&
-      this.messages.some(message => message.state === 'queued')
-    ) {
-      const view = await this.readSandboxView(pass);
-      if (view?.state === 'failed' && view.attemptId === this.currentAttemptId()) {
-        await this.applyView(view, pass);
-        reduction = queueMessage(this.messages, parsed, now);
+    try {
+      if (
+        reduction.changed.length > 0 &&
+        this.route.state === 'preparing' &&
+        this.messages.some(message => message.state === 'queued')
+      ) {
+        const view = await this.readSandboxView(pass);
+        if (view?.state === 'failed' && view.attemptId === this.currentAttemptId()) {
+          // The incoming message joins the batch before its callback can drain.
+          this.admissionDeferredCallback = { changed: [] };
+          await this.applyView(view, pass);
+          reduction = queueMessage(this.messages, parsed, now);
+        }
       }
-    }
-    if (reduction.changed.length > 0) {
-      this.messages = reduction.messages;
-      await this.persistMessages(reduction.changed);
-      for (const message of reduction.changed) this.emitQueued(message);
-      this.ensureReportAnchor(reduction.changed[0]);
+      if (reduction.changed.length > 0) {
+        await this.persistMessages(reduction.changed);
+        this.messages = reduction.messages;
+        for (const message of reduction.changed) this.emitQueued(message);
+        this.ensureReportAnchor(reduction.changed[0]);
+      }
+    } finally {
+      const deferred = this.admissionDeferredCallback;
+      this.admissionDeferredCallback = undefined;
+      if (deferred && !this.messages.some(message => message.messageId === parsed.messageId)) {
+        this.persistBatchCallback(deferred.changed, deferred.facts);
+        await this.repairOutboxes();
+        await this.armAlarm();
+      }
     }
     await this.armAlarm();
     if (!this.messages.some(message => message.state === 'queued')) return 'ok';
@@ -3191,6 +3206,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     changed: readonly SessionMessage[],
     facts?: ControlPlaneReportFacts
   ): void {
+    if (this.admissionDeferredCallback !== undefined) {
+      this.admissionDeferredCallback.changed.push(...changed);
+      this.admissionDeferredCallback.facts = facts;
+      return;
+    }
     try {
       const newlyTerminal = new Set(
         changed

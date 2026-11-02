@@ -19,6 +19,7 @@ import {
   DENSE_ROW_FRAME_DP,
   DENSE_ROW_HIT_SLOP,
   DENSE_ROW_HIT_SLOP_DP,
+  HEADER_TITLE_TARGET_CLASS,
   ICON_TARGET_BOX_CLASS,
   ICON_TARGET_DP,
   INLINE_LINK_BOX_CLASS,
@@ -149,6 +150,17 @@ describe('shared tap-target geometry', () => {
     // without moving the rect an audit reads, so the floor has to be the row's
     // own class.
     const height = await compiledDp(ROW_TARGET_CLASS, 'minHeight');
+    expect(height).toBe(ICON_TARGET_DP);
+    expect(height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+  });
+
+  it('renders a screen header title control on its own 48dp node', async () => {
+    // The regression this guards: a header title composed of its own content
+    // (the chat title's rename pressable) reported its text line's 24.8dp as
+    // its own rect, and `hitSlop` never lifts the rect a control-size audit
+    // reads. The header row is already 48dp tall, so the frame grows only the
+    // control's own node.
+    const height = await compiledDp(HEADER_TITLE_TARGET_CLASS, 'minHeight');
     expect(height).toBe(ICON_TARGET_DP);
     expect(height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
   });

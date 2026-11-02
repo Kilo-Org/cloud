@@ -342,10 +342,6 @@ export type SessionSnapshotPage = {
   preparationAttempts?: readonly PreparationAttempt[];
 };
 
-/**
- * A caller-cached transcript page plus the rows the transcript draws from
- * service state, so a cached repaint matches the live transcript's layout.
- */
 export type SessionConfig = {
   sessionId: CloudAgentSessionId | KiloSessionId;
   repository: string;
@@ -364,6 +360,10 @@ export type SessionConfig = {
     | undefined;
 };
 
+/**
+ * A caller-cached transcript page plus the rows the transcript draws from
+ * service state, so a cached repaint matches the live transcript's layout.
+ */
 export type CachedSessionSnapshotPage = SessionSnapshotPage & {
   commits?: readonly SessionCommit[];
   /** A Cloud Agent session's last settings, shown on reopen until its metadata loads. */

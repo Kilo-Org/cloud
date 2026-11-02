@@ -18,7 +18,7 @@ import {
   userMessage,
 } from './message-bubble-test-utils';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 
 /** React compares hook dependencies one position at a time with `Object.is`. */
@@ -77,8 +77,8 @@ vi.mock('react-i18next', async importOriginal => {
   return {
     ...actual,
     useTranslation: () => {
-      const i18n = actual.getI18n();
-      return { t: i18n.t.bind(i18n), i18n };
+      const instance = actual.getI18n();
+      return { t: instance.t.bind(instance), i18n: instance };
     },
   };
 });
@@ -396,6 +396,35 @@ describe('MessageBubble failure footer', () => {
     const title = findElementByLabel(tree, 'Failed to deliver. Retry available.');
     expect(title).not.toBeNull();
     expect(title?.props.children).toBe('Failed to deliver');
+  });
+
+  it('names a German failure row with one full stop, keeping the title line as translated', async () => {
+    await i18n.changeLanguage('de');
+    try {
+      const tree = await renderBubbleWithHandlers(userMessage('m-a11y-de'), {
+        deliveryState: { status: 'failed', error: 'nope', reason: 'interrupted' },
+        onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      });
+
+      // The title already ends its own sentence in German, so the label must not
+      // add a second stop before the retry line.
+      expect(
+        findElementByLabel(
+          tree,
+          'Die Zustellung ist fehlgeschlagen. Du kannst es erneut versuchen.'
+        )
+      ).not.toBeNull();
+      expect(
+        findElementByLabel(
+          tree,
+          'Die Zustellung ist fehlgeschlagen.. Du kannst es erneut versuchen.'
+        )
+      ).toBeNull();
+      // The visible line is the catalog's title, unchanged.
+      expect(findText(tree, text => text === 'Die Zustellung ist fehlgeschlagen.')).toBe(true);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it('presses Retry to retry the failed message and Copy to composer to restore the user text', async () => {

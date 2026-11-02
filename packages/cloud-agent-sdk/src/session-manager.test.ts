@@ -6275,7 +6275,7 @@ describe('createSessionManager', () => {
       expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
     });
 
-    it('does not suppress Aborted from a stale session after switchSession', async () => {
+    it('ignores Aborted from a superseded session after switchSession', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
       await mgr.switchSession(kiloId('ses-1'));
@@ -6290,7 +6290,9 @@ describe('createSessionManager', () => {
 
       firstSessionOnError?.('Aborted');
 
-      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
+      // The retired open no longer owns the transcript or its error state, so
+      // its Aborted never reaches the active session's errorAtom.
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
 
       await interruptPromise;
     });
@@ -6334,14 +6336,15 @@ describe('createSessionManager', () => {
       await mgr.interrupt();
 
       sessionAOnError?.('Aborted');
-      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
+      // A retired open's Aborted is dropped, so B's armed guard is untouched.
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
 
-      mgr.clearError();
       mockSessionCallbacks.onError?.('Aborted');
+      // B's own guard is still armed: its Aborted is the one that is suppressed.
       expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
     });
 
-    it('clears the abort guard on destroy so late Aborted is not suppressed', async () => {
+    it('clears the abort guard on destroy so a fresh open is not suppressed', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
       await mgr.switchSession(kiloId('ses-1'));
@@ -6355,10 +6358,16 @@ describe('createSessionManager', () => {
       mgr.destroy();
 
       firstSessionOnError?.('Aborted');
-
-      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
+      // The destroyed open is inert: neither its Aborted nor its interrupt
+      // guard can reach the store.
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
 
       await interruptPromise;
+
+      await mgr.switchSession(kiloId('ses-2'));
+      mockSessionCallbacks.onError?.('Aborted');
+      // No leaked guard suppresses the fresh open's own Aborted.
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
     });
 
     it('suppresses Aborted emitted after interrupt settles so errorAtom stays clear', async () => {
@@ -8051,6 +8060,99 @@ describe('createSessionManager', () => {
       expect(fetchSnapshotPage).not.toHaveBeenCalled();
     });
 
+    it('rehydrates a child whose page was already ready before the clear', async () => {
+      const childMessage = createStoredMessage('msg-child-cleared', 'child-cleared', 'assistant');
+      const childPart = stubTextPart({
+        id: 'part-child-cleared',
+        sessionID: 'child-cleared',
+        messageID: childMessage.info.id,
+        text: 'Child history',
+      });
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({
+          kiloSessionId: 'child-cleared',
+          messages: [{ info: childMessage.info, parts: [childPart] }],
+        })
+      );
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+      const childRows = () =>
+        atomValue<(childSessionId: string) => StoredMessage[]>(
+          config.store,
+          mgr.atoms.childMessages
+        );
+      const hydrationState = () =>
+        atomValue<(childSessionId: string) => { status: string }>(
+          config.store,
+          mgr.atoms.childSessionHydrationState
+        );
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-cleared'));
+
+      expect(childRows()('child-cleared')).toHaveLength(1);
+      expect(hydrationState()('child-cleared')).toEqual(
+        expect.objectContaining({ status: 'ready' })
+      );
+
+      mgr.clearTranscript();
+
+      // The cleared storage holds no child rows, so the child cannot stay ready:
+      // the next open must hydrate instead of trusting a pre-clear page.
+      expect(childRows()('child-cleared')).toEqual([]);
+      expect(hydrationState()('child-cleared')).toEqual({ status: 'idle' });
+
+      fetchSnapshotPage.mockClear();
+      await mgr.hydrateChildSession(kiloId('child-cleared'));
+
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(1);
+      expect(fetchSnapshotPage).toHaveBeenCalledWith(kiloId('child-cleared'), {});
+      expect(childRows()('child-cleared')).toHaveLength(1);
+      expect(hydrationState()('child-cleared')).toEqual(
+        expect.objectContaining({ status: 'ready' })
+      );
+      mgr.destroy();
+    });
+
+    it('drops a child page that was in flight when the transcript was cleared', async () => {
+      const page = deferred<SessionSnapshotPageOutcome>();
+      const childMessage = createStoredMessage('msg-child-inflight', 'child-inflight', 'assistant');
+      const fetchSnapshotPage = createPageFetchMock(() => page.promise);
+      // The root open's own page read settles first, so the deferred promise
+      // belongs to the child hydration alone.
+      fetchSnapshotPage.mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-root' }));
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      const hydration = mgr.hydrateChildSession(kiloId('child-inflight'));
+
+      mgr.clearTranscript();
+      page.resolve(
+        makePage({
+          kiloSessionId: 'child-inflight',
+          messages: [{ info: childMessage.info, parts: [] }],
+        })
+      );
+      await hydration;
+
+      // Replaying the pre-clear page would put rows back into the cleared
+      // transcript, so the stale request must land nowhere, not even an error.
+      expect(
+        atomValue<(childSessionId: string) => StoredMessage[]>(
+          config.store,
+          mgr.atoms.childMessages
+        )('child-inflight')
+      ).toEqual([]);
+      expect(
+        atomValue<(childSessionId: string) => { status: string }>(
+          config.store,
+          mgr.atoms.childSessionHydrationState
+        )('child-inflight')
+      ).toEqual({ status: 'idle' });
+      mgr.destroy();
+    });
+
     it('empties restored preparation and commit rows and the next written page has none', async () => {
       const attempt: PreparationAttempt = {
         id: 'prep-1',
@@ -8661,6 +8763,69 @@ describe('createSessionManager', () => {
         refresh: 'idle',
         commands: [{ name: 'new', hints: [] }],
       });
+    });
+  });
+
+  describe('superseded open callbacks', () => {
+    it('drops every callback of a retired open once another session is active', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      const retired = { ...mockSessionCallbacks };
+
+      await mgr.switchSession(kiloId('ses-2'));
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertMessage(createStoredMessage('msg-ses-2', 'ses-2', 'assistant').info);
+
+      const observed = () => ({
+        messageIds: atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(
+          row => row.info.id
+        ),
+        error: atomValue<string | null>(config.store, mgr.atoms.error),
+        isLoading: atomValue<boolean>(config.store, mgr.atoms.isLoading),
+        sessionType: atomValue<string | null>(config.store, mgr.atoms.sessionType),
+        observedModel: atomValue(config.store, mgr.atoms.observedModel),
+        pendingQuestions: atomValue<readonly unknown[]>(config.store, mgr.atoms.pendingQuestions),
+        pendingPermissions: atomValue<readonly unknown[]>(
+          config.store,
+          mgr.atoms.pendingPermissions
+        ),
+        activeSuggestion: atomValue(config.store, mgr.atoms.activeSuggestion),
+        childError: atomValue<(childSessionId: string) => string | null>(
+          config.store,
+          mgr.atoms.childSessionError
+        )('child-retired'),
+      });
+      const before = observed();
+      // eslint-disable-next-line no-console
+      console.log('DEBUG', JSON.stringify({ storageRows: latestStorage.getMessageIds(), before }));
+      expect(before.messageIds).toEqual(['msg-ses-2']);
+
+      retired.onSessionCreated?.({ id: 'ses-retired-root' });
+      retired.onSessionUpdated?.({
+        id: 'ses-retired-root',
+        model: { providerID: 'retired', id: 'retired-model' },
+      });
+      retired.onError?.('Connection to agent lost');
+      retired.onMessageFailed?.('msg-retired', { status: 'failed', reason: 'exhausted' });
+      retired.onChildSessionError?.('child-retired', 'Retired child failed');
+      retired.onQuestionAsked?.('req-retired', [
+        { question: 'Retired question?', header: 'q', options: [] },
+      ]);
+      retired.onPermissionAsked?.('perm-retired', 'write', ['*.ts'], {}, []);
+      retired.onSuggestionAsked?.('sug-retired', 'Retired suggestion', []);
+      retired.onResolved?.({ type: 'read-only', kiloSessionId: kiloId('ses-1') });
+
+      // A retired root id would filter the active transcript away, and its
+      // error, model, type and pending cards would land on the wrong session.
+      expect(observed()).toEqual(before);
+
+      // The live open is still wired: the fence silences retired opens only.
+      mockSessionCallbacks.onError?.('Connection to agent lost');
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe(
+        'Connection to agent lost'
+      );
+      mgr.destroy();
     });
   });
 

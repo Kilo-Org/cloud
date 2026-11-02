@@ -178,11 +178,6 @@ export function buildAssistantMessageItem(params: {
   completedAt: number;
   cost: number;
   tokens: FixtureTokens;
-  /** The assistant failure a real CLI stores on the message (`sdkAssistantErrorSchema`). */
-  error?: {
-    name: 'APIError';
-    data: { message: string; statusCode?: number; isRetryable: boolean };
-  };
 }): SessionIngestItem {
   return {
     type: 'message',
@@ -199,7 +194,6 @@ export function buildAssistantMessageItem(params: {
       path: { cwd: FIXTURE_DIRECTORY, root: FIXTURE_DIRECTORY },
       cost: params.cost,
       tokens: params.tokens,
-      ...(params.error === undefined ? {} : { error: params.error }),
     },
   };
 }

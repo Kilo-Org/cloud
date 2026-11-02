@@ -1,5 +1,6 @@
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { asMessages } from '@/lib/chat/turns';
@@ -8,9 +9,9 @@ import { MessageBubble } from './message-bubble';
 import { PartDetailSheetHost } from './part-detail-sheet-host';
 import { SessionContextMetrics } from './session-context-metrics';
 
-// Development-only visual fixture: kiloapp:///dev/transcript-style-fixture.
+// Development-only visual fixture, opened through the development fixture path.
 // Uses the Quick Chat adapter and the shared transcript renderer; sends no requests.
-const messages = asMessages({
+const turns = asMessages({
   sessionId: 'transcript-style-fixture',
   asked: null,
   askedImages: [],
@@ -56,8 +57,48 @@ const messages = asMessages({
         },
       ],
     },
+    {
+      id: 'hello-there',
+      sessionId: 'transcript-style-fixture',
+      role: 'user',
+      parts: [{ id: 'hello-there-text', kind: 'text', body: 'Hello there' }],
+    },
   ],
 });
+
+/**
+ * The turn the provider refused: a contentless assistant row carrying the
+ * gateway's retryable verdict, which is what the transcript shows after a
+ * transient upstream failure. Retry is wired so the row draws its one
+ * recovery action; the fixture never sends anything.
+ */
+const failedAnswer: StoredMessage = {
+  info: {
+    id: 'failed-answer',
+    sessionID: 'transcript-style-fixture',
+    role: 'assistant',
+    time: { created: 0, completed: 0 },
+    parentID: 'hello-there',
+    modelID: 'fixture',
+    providerID: 'fixture',
+    mode: 'code',
+    agent: 'build',
+    path: { cwd: '/workspace', root: '/workspace' },
+    cost: 0,
+    tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    error: {
+      name: 'APIError',
+      data: {
+        message: 'Upstream provider returned HTTP 500',
+        statusCode: 500,
+        isRetryable: true,
+      },
+    },
+  },
+  parts: [],
+};
+
+const messages = [...turns, failedAnswer];
 
 export function TranscriptStyleFixture() {
   const { t } = useTranslation();
@@ -82,7 +123,7 @@ export function TranscriptStyleFixture() {
       />
       <PartDetailSheetHost messages={messages}>
         {messages.map(message => (
-          <MessageBubble key={message.info.id} message={message} />
+          <MessageBubble key={message.info.id} message={message} onRetryMessage={() => {}} />
         ))}
       </PartDetailSheetHost>
     </View>

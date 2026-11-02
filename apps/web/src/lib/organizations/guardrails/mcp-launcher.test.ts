@@ -28,6 +28,12 @@ describe('parseLauncherCommand', () => {
     [['uvx', '--from', 'mcp-server-foo', 'foo-cmd'], 'pypi', 'mcp-server-foo', null],
     [['uvx', '--from=mcp-server-foo>=1.2', 'foo-cmd'], 'pypi', 'mcp-server-foo', '1.2'],
     [['uvx', '--from=mcp-server-foo==1.2.0rc1', 'foo-cmd'], 'pypi', 'mcp-server-foo', '1.2.0rc1'],
+    [
+      ['uvx', '--from=mcp-server-foo==1.2.0rc1.post1', 'foo-cmd'],
+      'pypi',
+      'mcp-server-foo',
+      '1.2.0rc1.post1',
+    ],
     [['uvx', '--from=mcp-server-foo==1.2.*', 'foo-cmd'], 'pypi', 'mcp-server-foo', null],
     [['uv', 'tool', 'run', 'pkg'], 'pypi', 'pkg', null],
   ])('parses %j', (argv, ecosystem, identifier, versionHint) => {

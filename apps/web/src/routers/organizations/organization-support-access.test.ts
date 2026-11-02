@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
-import { eq } from 'drizzle-orm';
 import { support_access_grants } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { setSupportAccessModeForTest } from '@kilocode/web-shared/lib/admin/support-access';

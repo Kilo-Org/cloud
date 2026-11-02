@@ -21,8 +21,6 @@ import z from 'zod';
 
 const warnInSentry = sentryLogger('org_auth', 'warning');
 
-const rolePriority = ['owner', 'admin', 'billing_manager', 'member'] satisfies OrganizationRole[];
-
 type UserWithRole = User & {
   readonly role: OrganizationRole;
 };
@@ -37,17 +35,6 @@ type DataOrNextError<T> = CustomResult<
   { data: T; nextResponse?: never },
   { data?: never; nextResponse: NextResponse<{ error: string }> }
 >;
-
-function allowedRole(
-  rows: { role: OrganizationRole }[],
-  roles?: OrganizationRole[]
-): OrganizationRole | null {
-  const allowedRoles = roles && roles.length > 0 ? roles : rolePriority;
-  return (
-    rolePriority.find(role => allowedRoles.includes(role) && rows.some(row => row.role === role)) ??
-    null
-  );
-}
 
 export async function getAuthorizedOrgContext(
   id: Organization['id'],

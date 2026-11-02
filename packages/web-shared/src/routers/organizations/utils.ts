@@ -48,21 +48,6 @@ export const OrganizationIdInputSchema = z.object({
   organizationId: z.uuid(),
 });
 
-/**
- * A soft-deleted organization is reported as missing rather than as an
- * authorization failure. Existing callers rely on NOT_FOUND for an
- * organization that no longer exists, while a live organization the caller
- * cannot access stays UNAUTHORIZED.
- */
-async function isSoftDeletedOrganization(organizationId: Organization['id']): Promise<boolean> {
-  const [organization] = await db
-    .select({ deletedAt: organizations.deleted_at })
-    .from(organizations)
-    .where(eq(organizations.id, organizationId))
-    .limit(1);
-  return organization?.deletedAt != null;
-}
-
 const rolePriority = ['owner', 'admin', 'billing_manager', 'member'] satisfies OrganizationRole[];
 
 function allowedRole(

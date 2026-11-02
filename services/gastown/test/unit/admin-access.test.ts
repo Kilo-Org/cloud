@@ -26,6 +26,27 @@ describe('adminAuditMiddleware', () => {
       const userId = c.req.header('X-Test-User-Id') ?? 'unknown';
       c.set('kiloIsAdmin', isAdmin);
       c.set('kiloUserId', userId);
+      if (isAdmin || capability) {
+        c.set('workerAdminDecision', {
+          action: 'rest:GET /api/towns/:townId/config',
+          target: { kind: 'town', id: c.req.param('townId') ?? 'town-1' },
+          decision: capability
+            ? {
+                allowed: true,
+                source: 'capability',
+                wouldDeny: false,
+                jti: 'jti-1',
+                reason: 'granted',
+              }
+            : {
+                allowed: true,
+                source: 'legacy',
+                wouldDeny: false,
+                jti: null,
+                reason: 'honored',
+              },
+        });
+      }
       c.set(
         'workerAdmin',
         capability

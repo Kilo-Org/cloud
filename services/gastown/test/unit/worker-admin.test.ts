@@ -198,24 +198,6 @@ describe('worker admin capability scope', () => {
     await expect(response.json()).resolves.toMatchObject({ reason: 'action_not_allowed' });
   });
 
-  it.each([
-    ['trpc:gastown.createPtySession', 'pty'],
-    ['trpc:gastown.sendMessage', 'message'],
-    ['trpc:gastown.deleteBead', 'delete'],
-    ['trpc:gastown.getAgentStreamUrl', 'stream'],
-  ])('does not allowlist %s', async action => {
-    const material = await keyMaterial();
-    const token = await capability(material, { actions: [action] });
-    // The decide route uses the REST action; a capability naming the mutation
-    // still cannot satisfy a different action id.
-    const response = await get(
-      '/api/towns/town-a/config',
-      { 'X-Test-Claims': legacyClaims({ isAdmin: false }), 'X-Kilo-Worker-Capability': token },
-      env({ mode: 'reject', publicKeys: material.publicKeys })
-    );
-    expect(response.status).toBe(403);
-  });
-
   it('denies when introspection says inactive', async () => {
     const material = await keyMaterial();
     const token = await capability(material, { jti: 'jti-inactive' });

@@ -895,8 +895,8 @@ const townRouteAuthMiddleware = every(
   kiloAuthMiddleware,
   resolveWorkerAdminMiddleware,
   gastownRouteAccessMiddleware,
-  adminAuditMiddleware,
-  townAuthMiddleware
+  townAuthMiddleware,
+  adminAuditMiddleware
 );
 app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {
   const path = c.req.path;

@@ -93,7 +93,8 @@ test('renderReport lists the summary table and one line per finding', () => {
     renderReport(
       { platform: 'ios', device: 'u', matrix: 'base', startedAt: 'S', finishedAt: 'F' },
       [],
-      []
+      [],
+      fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-empty-'))
     ),
     /No findings\./
   );
@@ -134,7 +135,8 @@ test('collapseFindings merges list-row repeats and keeps every box', () => {
   const report = renderReport(
     { platform: 'android', device: 'd', matrix: 'base', startedAt: 'S', finishedAt: 'F' },
     [],
-    groups
+    groups,
+    fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-collapse-'))
   );
   assert.ok(report.includes('1. **warning** `touch-target` ×12 · base · sessions'));
   assert.ok(report.includes('2. **warning** `touch-target` · base'));

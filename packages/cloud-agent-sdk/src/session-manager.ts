@@ -3180,12 +3180,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * begins (or the manager is destroyed) `switchGeneration` moves, and every
    * callback of the retired open becomes inert: a late delivery cannot rewrite
    * the active session's root-id filter, error state, capabilities, remote
-   * catalog, pending requests or child errors.
+   * catalog, pending requests or child errors. Both the input and the result
+   * are typed with every key required, so a callback added to the transport
+   * contract fails to compile until it is listed here and therefore fenced.
    */
   function fenceOpenSessionCallbacks(
     expectedGeneration: number,
     handlers: OpenSessionHandlers
-  ): OpenSessionCallbacks {
+  ): OpenSessionHandlers {
     const fence =
       <A extends unknown[], R>(handler: (...args: A) => R) =>
       (...args: A): R | undefined => {

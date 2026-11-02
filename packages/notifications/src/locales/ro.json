@@ -9,6 +9,7 @@
       "lowBalance": "Soldul tău necesită atenție",
       "spendAlert": "Cheltuiala ta necesită atenție",
       "securityFinding": "O constatare de securitate necesită atenție",
+      "securityUpdate": "O verificare de securitate are o actualizare",
       "activeAgentsGlanceable": "Agenții activi au o actualizare"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "O constatare de securitate necesită atenție"
+      "body": "O verificare de securitate are o actualizare"
     }
   },
   "instanceLifecycle": {

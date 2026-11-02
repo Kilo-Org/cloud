@@ -127,30 +127,6 @@ describe('ConfigureRow mounted layout', () => {
   });
 });
 
-describe('ConfigureRow subtitle placeholder', () => {
-  it('reports the row busy and prints no subtitle text while the value loads', () => {
-    act(() => {
-      renderer = TestRenderer.create(
-        createElement(ConfigureRow, {
-          icon: Globe,
-          title: 'Low balance alert',
-          subtitlePlaceholder: createElement('Placeholder'),
-          onPress: () => undefined,
-        })
-      );
-    });
-    if (!renderer) {
-      throw new Error('Missing ConfigureRow renderer');
-    }
-
-    const pressable = renderer.root.findByType('Pressable');
-    expect(pressable.props.accessibilityState).toMatchObject({ busy: true });
-    const texts = renderer.root.findAllByType('Text');
-    expect(texts).toHaveLength(1);
-    expect(texts[0]?.props.children).toBe('Low balance alert');
-  });
-});
-
 describe('ConfigureRow icon tile', () => {
   it.each(ACCOUNT_ROW_TITLES)('gives the %s account row the shared neutral tile', title => {
     const row = tileOf(renderRow({ title }));

@@ -243,6 +243,9 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                 subtitlePlaceholder={
                   lowBalanceLoading ? <Skeleton className="mt-0.5 h-4 w-12 rounded" /> : undefined
                 }
+                accessibilityLabel={
+                  lowBalanceLoading ? t('organization.lowBalanceAlert.title') : undefined
+                }
                 trailing={
                   lowBalanceUnavailable ? (
                     <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>

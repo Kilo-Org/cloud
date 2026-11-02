@@ -140,9 +140,6 @@ export function ConfigureRow({
       </Text>
     );
   }
-  // A placeholder carries no text, so the row reports itself busy instead of
-  // going quiet: a reader hears that the value is still coming.
-  const busy = subtitlePlaceholder != null && !subtitle;
 
   const textBlock = (
     <View className={cn('min-w-0', stack ? 'w-full' : 'flex-1')}>
@@ -153,7 +150,7 @@ export function ConfigureRow({
 
   const inner = (
     <View
-      accessibilityState={{ disabled: Boolean(disabled), busy }}
+      accessibilityState={{ disabled: Boolean(disabled) }}
       className={cn(
         stack ? 'gap-2 py-3' : 'flex-row items-center gap-3 py-3',
         !last && 'border-b-[0.5px] border-hair-soft',
@@ -186,7 +183,7 @@ export function ConfigureRow({
         disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
-        accessibilityState={{ disabled: Boolean(disabled), busy }}
+        accessibilityState={{ disabled: Boolean(disabled) }}
         className={cn(!disabled && 'active:opacity-70')}
       >
         {inner}

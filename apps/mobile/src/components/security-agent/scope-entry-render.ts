@@ -91,9 +91,7 @@ export function selectScopeEntryView({
  * owner could be asked to connect.
  */
 export function isInstallStateRefusal(error: unknown): boolean {
-  return (
-    readTrpcErrorField(error, 'code') === 'UNAUTHORIZED' && !isUnauthorizedTrpcError(error)
-  );
+  return readTrpcErrorField(error, 'code') === 'UNAUTHORIZED' && !isUnauthorizedTrpcError(error);
 }
 
 /** The cause-named description the failure screen shows, or null for the variant's own copy. */

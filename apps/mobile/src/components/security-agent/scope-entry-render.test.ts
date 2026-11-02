@@ -141,9 +141,7 @@ describe('isInstallStateRefusal', () => {
     // `createTRPCContext` answers UNAUTHORIZED with `data.authRequired` when the
     // session is invalid or missing. The app signs out on it; it is not the
     // organization-role decision, and a personal scope has no owner to ask.
-    expect(isInstallStateRefusal(serverError('UNAUTHORIZED', { authRequired: true }))).toBe(
-      false
-    );
+    expect(isInstallStateRefusal(serverError('UNAUTHORIZED', { authRequired: true }))).toBe(false);
   });
 
   it('keeps every other failure retryable', () => {

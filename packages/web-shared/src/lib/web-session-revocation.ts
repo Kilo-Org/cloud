@@ -2,6 +2,7 @@ import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, type User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import { revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
 
 export function isWebSessionCurrent(
   sessionPepper: string | null | undefined,
@@ -18,4 +19,9 @@ export async function revokeWebSessions(
     .update(kilocode_users)
     .set({ web_session_pepper: randomUUID() })
     .where(eq(kilocode_users.id, kiloUserId));
+
+  // Every proof is bound to a session that is now invalid. Revoking in the
+  // same write keeps a concurrent guard from reading a live proof after the
+  // pepper changed.
+  await revokeStepUpProofs(kiloUserId, 'session_revoked', fromDb);
 }

@@ -1,10 +1,17 @@
+import { buildOpaqueScopeKey } from '@kilocode/app-shared/glanceable-agents-snapshot';
+
 import { recordSelectedAsk, subscribeAskBound } from './ask-binding';
 import { getTerminalBlankEpoch, isGlanceableOrgLost } from './cleanup';
 import { getLastGlanceableSnapshot } from './persist';
-import { GlanceablePublisher } from './publisher';
+import { GlanceablePublisher, type GlanceablePublisherContext } from './publisher';
 import { getGlanceableSinks } from './sink-registry';
 
 export type CreateGlanceablePublisherOptions = {
+  /**
+   * The signed-in context the publisher draws for. The persisted record is
+   * adopted only when its scope key is this one.
+   */
+  context: GlanceablePublisherContext;
   /**
    * The session whose ask the post-answer refresh ended. Its tray row can still
    * read permission/question while the control plane's status sync lands, so
@@ -23,6 +30,27 @@ export type CreateGlanceablePublisherOptions = {
 };
 
 /**
+ * The restored record, split into what a publisher may adopt and the revision
+ * it must not go below.
+ *
+ * A record is adopted only when its scope key is the one `context` derives,
+ * the same fence `applyHomeWidgetResponse` and `replayVerifiedSnapshot` apply
+ * to a remote snapshot. Any record still raises the revision floor: every sink
+ * drops a frame at or below the revision it last applied, so the first frame of
+ * this scope must outrank the one the surfaces already hold.
+ */
+function restoredSnapshotFor(context: GlanceablePublisherContext) {
+  const restored = getLastGlanceableSnapshot();
+  if (restored === null) {
+    return { initial: null, initialRevision: 0 };
+  }
+  if (restored.scopeKey !== buildOpaqueScopeKey(context)) {
+    return { initial: null, initialRevision: restored.revision };
+  }
+  return { initial: restored, initialRevision: restored.revision };
+}
+
+/**
  * The one wiring of the glanceable publisher: the registered sinks, the
  * persisted revision seed, the terminal-blank and lost-org fences, and the
  * waiting-ask record with the request it is bound to (see `ask-binding.ts`).
@@ -30,11 +58,13 @@ export type CreateGlanceablePublisherOptions = {
  * neither can drift from the other's options.
  */
 export function createGlanceablePublisher(
-  options: CreateGlanceablePublisherOptions = {}
+  options: CreateGlanceablePublisherOptions
 ): GlanceablePublisher {
+  const { initial, initialRevision } = restoredSnapshotFor(options.context);
   return new GlanceablePublisher({
     sinks: getGlanceableSinks(),
-    initial: getLastGlanceableSnapshot(),
+    initial,
+    initialRevision,
     terminalBlankEpoch: getTerminalBlankEpoch,
     orgLost: isGlanceableOrgLost,
     onWaitingAskChange: recordSelectedAsk,

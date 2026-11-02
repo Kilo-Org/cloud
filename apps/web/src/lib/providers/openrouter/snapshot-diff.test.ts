@@ -6,12 +6,13 @@ import type {
 import { computeSnapshotDiff } from '@/lib/providers/openrouter/snapshot-diff';
 
 function buildSnapshot(
-  providers: Array<{ slug: string; models: string[] }>
+  providers: Array<{ slug: string; models: string[]; byokOnly?: true }>
 ): NormalizedOpenRouterResponse {
-  const mapped: NormalizedProvider[] = providers.map(({ slug, models }) => ({
+  const mapped: NormalizedProvider[] = providers.map(({ slug, models, byokOnly }) => ({
     name: slug,
     displayName: slug,
     slug,
+    byokOnly,
     dataPolicy: { training: false, retainsPrompts: false, canPublish: false },
     models: models.map(modelSlug => ({
       slug: modelSlug,
@@ -84,6 +85,19 @@ describe('computeSnapshotDiff', () => {
 
     expect(diff.addedByProvider.get('xyz-corp')).toEqual(['xyz-corp/bar', 'xyz-corp/foo']);
     expect(diff.addedByProvider.has('z-ai')).toBe(false);
+  });
+
+  test('ignores BYOK-only providers, which Kilo never routes to', () => {
+    const oldSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
+    const newSnapshot = buildSnapshot([
+      { slug: 'z-ai', models: ['z-ai/glm-5'] },
+      { slug: 'synthetic', models: ['z-ai/glm-5'], byokOnly: true },
+    ]);
+
+    const diff = computeSnapshotDiff(oldSnapshot, newSnapshot);
+
+    expect(diff.addedByProvider.size).toBe(0);
+    expect(diff.newModelProvidersIndex.get('z-ai/glm-5')).toEqual(new Set(['z-ai']));
   });
 
   test('detects model removed from catalog', () => {

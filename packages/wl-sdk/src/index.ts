@@ -60,6 +60,8 @@ export { listMyBranches, discardBranch } from './ops/workshop';
 export type { ListMyBranchesOptions, DiscardBranchOptions, MyBranchEntry } from './ops/workshop';
 export { readBranchHead, assertForkMainCurrent } from './ops/state';
 
+export { RIG_HANDLE_MAX_LENGTH, isSameDolthubOrg, rigHandleFormatError } from './ops/rig-handle';
+
 // region ops — types and errors
 export { WlError } from './ops/types';
 export type {

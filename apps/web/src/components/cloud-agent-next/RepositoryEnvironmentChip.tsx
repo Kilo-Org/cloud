@@ -21,11 +21,6 @@ type RepositoryEnvironmentChipProps = {
   selectedProfileId?: string | null;
 };
 
-/**
- * Shows the environment that new sessions in the selected repository use. There
- * is no choice to make: the server applies it from the repository. Managers open
- * it here to edit it, or set one up when the repository has none.
- */
 export function RepositoryEnvironmentChip({
   organizationId,
   repository,
@@ -54,42 +49,35 @@ export function RepositoryEnvironmentChip({
 
   return (
     <>
-      {canManage ? (
-        <button
-          type="button"
-          className={cn(chipClassName, interactiveClassName)}
-          aria-label={environment ? 'Edit environment' : 'Set up environment'}
-          title={
-            environment
+      <button
+        type="button"
+        className={cn(chipClassName, interactiveClassName)}
+        aria-label={
+          environment ? (canManage ? 'Edit environment' : 'View environment') : 'Set up environment'
+        }
+        title={
+          environment
+            ? canManage
               ? 'Edit environment'
-              : 'Save setup commands, variables, secrets, and a sandbox size for this repository.'
-          }
-          onClick={() => setDialogOpen(true)}
-        >
-          {label}
-        </button>
-      ) : (
-        <span
-          className={chipClassName}
-          title="New sessions in this repository use this environment. Organization owners and admins can edit it."
-        >
-          {label}
-        </span>
-      )}
-      {canManage && (
-        <EnvironmentDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          organizationId={organizationId}
-          repository={repository}
-          repositoryLabel={repositoryLabel}
-          environmentId={environment?.id ?? null}
-          selectedProfileId={selectedProfileId}
-          canManage={canManage}
-          onSaved={() => setDialogOpen(false)}
-          onDeleted={() => setDialogOpen(false)}
-        />
-      )}
+              : 'View environment'
+            : 'Save setup commands, variables, secrets, and a sandbox size for this repository.'
+        }
+        onClick={() => setDialogOpen(true)}
+      >
+        {label}
+      </button>
+      <EnvironmentDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        organizationId={organizationId}
+        repository={repository}
+        repositoryLabel={repositoryLabel}
+        environmentId={environment?.id ?? null}
+        selectedProfileId={selectedProfileId}
+        canManage={canManage}
+        onSaved={() => setDialogOpen(false)}
+        onDeleted={() => setDialogOpen(false)}
+      />
     </>
   );
 }

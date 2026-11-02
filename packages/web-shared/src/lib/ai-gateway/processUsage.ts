@@ -8,7 +8,11 @@ import {
   USAGE_QUEUE_SFO_CONFIG,
   USAGE_QUEUE_FRA_CONFIG,
 } from '@kilocode/web-shared/lib/config.server';
-import { enqueueUsage, type UsageEnqueueOutcome } from './usage-publisher';
+import {
+  enqueueUsage,
+  getUsagePublisherExecutionRegion,
+  type UsageEnqueueOutcome,
+} from './usage-publisher';
 import { isFraUsageQueueSelected, isSfoUsageQueueSelected } from './usage-queue-policy';
 import {
   describeDatabaseError,
@@ -44,7 +48,7 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import type { Provider, ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { Provider, ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
@@ -380,7 +384,10 @@ async function logMicrodollarUsageWithTransport(
   if (transport === 'queue') {
     const outcome = await enqueueUsageWithinLifetime(payload);
     if (outcome.kind === 'accepted') {
-      console.info('usage accounting queued', { usageId: core.id });
+      console.info('usage accounting queued', {
+        usageId: core.id,
+        execution_region: getUsagePublisherExecutionRegion(),
+      });
       return { status: 'queued', usageId: core.id, createdAt: core.created_at };
     }
     if (outcome.reason === 'publisher_not_configured') {
@@ -388,6 +395,7 @@ async function logMicrodollarUsageWithTransport(
       reportPublisherNotConfigured(core.id);
       console.warn('usage accounting queue publisher not configured', {
         usageId: core.id,
+        execution_region: getUsagePublisherExecutionRegion(),
         fallback: 'direct',
       });
       return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
@@ -397,6 +405,7 @@ async function logMicrodollarUsageWithTransport(
       // Nothing was published, so the direct write cannot duplicate it.
       console.warn('usage accounting queue unavailable without a request lifetime', {
         usageId: core.id,
+        execution_region: getUsagePublisherExecutionRegion(),
         reason: outcome.reason,
         fallback: 'direct',
       });
@@ -404,6 +413,7 @@ async function logMicrodollarUsageWithTransport(
     }
     console.error('usage accounting publication failed', {
       usageId: core.id,
+      execution_region: getUsagePublisherExecutionRegion(),
       reason: outcome.reason,
     });
     return null;
@@ -1244,7 +1254,7 @@ export function countAndStoreUsage(
 export function processOpenRouterUsage(
   usage: OpenRouterUsage | null | undefined,
   coreProps: NotYetCostedUsageStats,
-  provider: ProviderId,
+  provider: ProviderType,
   vercelProviderMetadata?: VercelProviderMetaData | null
 ): JustTheCostsUsageStats {
   // usage may be null when there's no response (e.g. error), so default to empty object
@@ -1274,7 +1284,7 @@ export async function parseMicrodollarUsageFromStream(
   stream: ReadableStream<Uint8Array>,
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
-  provider: ProviderId,
+  provider: ProviderType,
   statusCode: number,
   usesUserCredentials: boolean,
   requestStartedAt?: number
@@ -1405,7 +1415,7 @@ export function parseMicrodollarUsageFromString(
   fullResponse: string,
   kiloUserId: string,
   statusCode: number,
-  provider: ProviderId
+  provider: ProviderType
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as
     | (OpenAI.Chat.Completions.ChatCompletion &
@@ -1554,7 +1564,8 @@ export async function processTokenData(
 
   if (
     !usageStats.model || // fallback for failure cases
-    usageContext.provider === 'custom' // custom LLMs do not reveal their upstream model
+    usageContext.provider === 'custom' ||
+    usageContext.provider === 'custom-public' // custom LLMs do not reveal their upstream model
   ) {
     usageStats.model = usageContext.requested_model;
   }
@@ -1659,7 +1670,7 @@ function getGenerationLookupProvider(
         ? VERCEL_AI_GATEWAY
         : undefined;
   const provider =
-    gatewayProvider && servingProvider?.id === gatewayProvider.id
+    gatewayProvider && servingProvider?.type === gatewayProvider.type
       ? servingProvider
       : gatewayProvider;
   const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
@@ -1689,7 +1700,7 @@ export const mapToUsageStats = (
   { data }: OpenRouterGeneration,
   responseContent: string,
   kiloUserId: string,
-  provider: ProviderId
+  provider: ProviderType
 ): MicrodollarUsageStats => {
   let llmCostUsd;
   let nonInferenceCost_mUsd: number | undefined;

@@ -17,6 +17,10 @@ import { collectAccessibilityLabels, collectText } from './review-memory-screen.
 vi.mock('@/components/code-reviewer/review-memory-proposal-sheet', () => ({
   ReviewMemoryProposalSheet: 'ReviewMemoryProposalSheet',
 }));
+// The screen reads route focus to close the proposal sheet when the route is
+// left, and the sheet's own suite owns that behavior; the state contract below
+// only needs the hook to exist.
+vi.mock('expo-router', () => ({ useFocusEffect: () => undefined }));
 
 const summary = vi.hoisted(() => ({
   isPending: false,
@@ -140,6 +144,7 @@ vi.mock('react-native', () => ({
   },
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
   Pressable: (props: {
     children?: unknown;

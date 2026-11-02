@@ -1,13 +1,16 @@
+/* eslint-disable max-lines -- the row's disclosure contracts (badges, dimming, trailing columns, provider line) share one native mock harness. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TestRenderer } from '@/test/renderer';
 
+import { CHIP_FRAME_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import {
   BYOK_MODEL_LABEL,
   freeModelDataLabel,
   freeModelFreeLabel,
 } from '@/lib/free-model-data-disclosure';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { modelPickerSlot } from '@/lib/route-registry';
 import { i18n } from '@/i18n';
 
 import {
@@ -15,6 +18,7 @@ import {
   cliCatalogOption,
   countWithAccessibilityLabel,
   isInstance,
+  radioChoices,
   renderRow,
   renderSelector,
   rowContainer,
@@ -149,6 +153,52 @@ describe('ModelPickerOptionRow free badge', () => {
   );
 });
 
+describe('ModelPickerOptionRow unavailable row', () => {
+  // The row dimmed itself with a row-level opacity, which multiplied the
+  // reasons it carries: the `unavailable` line and the metadata fell to about
+  // 2:1 on the picker surface. The name carries the dim now.
+  const nameClass = (renderer: TestRenderer.ReactTestRenderer, text: string) =>
+    renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === text
+    )[0]?.props.className;
+
+  it('dims the name and keeps the reason at full contrast', () => {
+    const renderer = renderRow(
+      cliCatalogOption({ unavailable: true, name: 'Minimax M2.5', displayId: 'minimax/m2.5' })
+    );
+
+    expect(String(rowContainer(renderer).props.className)).not.toContain('opacity-50');
+    expect(nameClass(renderer, 'Minimax M2.5')).toContain('text-muted-foreground');
+    expect(nameClass(renderer, i18n.t('agentChat.modelSelector.unavailable'))).toBe(
+      'mt-1 text-xs text-muted-foreground'
+    );
+  });
+
+  it('keeps an available row name at full contrast', () => {
+    const renderer = renderRow(cliCatalogOption({ name: 'Minimax M2.5' }));
+
+    expect(nameClass(renderer, 'Minimax M2.5')).toBe('text-base text-foreground');
+  });
+
+  it('dims the selected check and leaves the badge copy readable', () => {
+    const renderer = renderRow(
+      cliCatalogOption({ unavailable: true, hasUserByokAvailable: true, name: 'Minimax M2.5' }),
+      { selected: true }
+    );
+
+    // A container opacity would re-multiply the badge copy, which is the
+    // defect this change removes; only the non-text check carries the dim.
+    const views = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'View'
+    );
+    expect(views.some(node => String(node.props.className).includes('opacity-50'))).toBe(false);
+    expect(checkAccessories(renderer)).toEqual([{ color: '#6F6A61', size: 18 }]);
+  });
+});
+
 describe('Auto model labels', () => {
   // The backend names Kilo's own Auto models in English ("Auto Efficient"),
   // which no catalog translates; the chip and the picker row must show the
@@ -233,6 +283,57 @@ describe('ModelPickerOptionRow trailing alignment', () => {
   });
 });
 
+// A provider section's header already names the provider, so its rows drop the
+// line that repeats it. Rows in FAVORITES, recommended and all-models have no
+// provider header above them and keep the line. Every row shows the bare model
+// id under its name: the row name and the sheet title already say it is a model.
+describe('ModelPickerOptionRow provider and model id lines', () => {
+  const providerOption = cliCatalogOption({
+    displayId: 'anthropic-model-00',
+    modelRef: { providerID: 'anthropic', modelID: 'anthropic-model-00' },
+    provider: { id: 'anthropic', name: 'Anthropic' },
+  });
+  const providerLine = i18n.t('agentChat.modelSelector.provider', { id: 'anthropic' });
+  const modelIdLine = 'anthropic-model-00';
+
+  it('omits the provider line under a provider section and keeps the model id', () => {
+    const texts = textStrings(renderRow(providerOption, { showProvider: false }).root);
+
+    expect(texts).not.toContain(providerLine);
+    expect(texts).toContain(modelIdLine);
+  });
+
+  it('keeps the provider line where no section names the provider', () => {
+    const texts = textStrings(renderRow(providerOption, { showProvider: true }).root);
+
+    expect(texts).toContain(providerLine);
+    expect(texts).toContain(modelIdLine);
+  });
+
+  it('renders the id line as the bare id, with no label in front of it', () => {
+    for (const showProvider of [false, true]) {
+      const idLines = textStrings(renderRow(providerOption, { showProvider }).root).filter(text =>
+        text.includes(modelIdLine)
+      );
+
+      expect(idLines).toEqual([modelIdLine]);
+    }
+  });
+
+  // The visible line is the duplicate, not the fact: a screen reader that lands
+  // on a row without the header still hears the provider.
+  it('names the provider in the accessibility label either way', () => {
+    const labelTextsOf = (showProvider: boolean) =>
+      renderRow(providerOption, { showProvider })
+        .root.findAll(node => typeof node.props.accessibilityLabel === 'string')
+        .map(node => node.props.accessibilityLabel as string);
+    const expected = 'Anthropic, Minimax M2.5, and anthropic-model-00';
+
+    expect(labelTextsOf(false)).toContain(expected);
+    expect(labelTextsOf(true)).toContain(expected);
+  });
+});
+
 // Kilo's auto models arrive from the gateway with an English product name
 // ("Auto Efficient"), which was the one English word left on the Arabic
 // new-session screen. The name must come from the catalogs instead, in both
@@ -296,6 +397,61 @@ describe('openModelPicker sheet anchoring', () => {
   });
 });
 
+// The row only offers a thinking effort where the picker's caller keeps one. A
+// chip under a caller that stores only the model id closes the sheet and drops
+// the pick, so those callers get a plain model row instead.
+describe('ModelPickerOptionRow thinking effort availability', () => {
+  const effortOptions = cliCatalogOption({ variants: ['low', 'high'] });
+
+  it('offers one chip per effort on the selected multi-variant row a caller can keep', () => {
+    const renderer = renderRow(effortOptions, { selected: true });
+
+    expect(radioChoices(renderer)).toHaveLength(2);
+  });
+
+  it('leaves the chips out when the picker caller keeps no variant', () => {
+    const renderer = renderRow(effortOptions, { selected: true, acceptsVariant: false });
+
+    expect(radioChoices(renderer)).toHaveLength(0);
+  });
+});
+
+describe('ModelSelector picker effort availability', () => {
+  it('opens the picker as a model-only selection when its caller keeps no variant', () => {
+    const option = cliCatalogOption({ variants: ['low', 'high'] });
+    const renderer = renderSelector({
+      value: option.id,
+      options: [option],
+      acceptsVariant: false,
+    });
+    const [chip] = renderer.root.findAllByType('Pressable');
+    if (!chip) {
+      throw new Error('model chip not found');
+    }
+
+    TestRenderer.act(() => {
+      (chip.props as { onPress?: () => void }).onPress?.();
+    });
+
+    expect(modelPickerSlot.get('unscoped')?.acceptsVariant).toBe(false);
+  });
+
+  it('opens the picker with the effort kept when its caller stores a variant', () => {
+    const option = cliCatalogOption({ variants: ['low', 'high'] });
+    const renderer = renderSelector({ value: option.id, options: [option] });
+    const [chip] = renderer.root.findAllByType('Pressable');
+    if (!chip) {
+      throw new Error('model chip not found');
+    }
+
+    TestRenderer.act(() => {
+      (chip.props as { onPress?: () => void }).onPress?.();
+    });
+
+    expect(modelPickerSlot.get('unscoped')?.acceptsVariant).toBe(true);
+  });
+});
+
 describe('ModelSelector loading chip', () => {
   it('labels the chip while the catalog loads instead of rendering a blank skeleton', () => {
     const renderer = renderSelector({ isLoading: true });
@@ -330,5 +486,31 @@ describe('ModelSelector loading chip', () => {
     const renderer = renderSelector({ value: option.id, options: [option] });
 
     expect(textStrings(renderer.root)).toContain(option.name);
+  });
+});
+
+// The chip's own node is its visual surface (28.3pt on device), so the touch
+// region has to come from hit slop, and only from the vertical axis: the chip
+// on the same line and the paste button beside it each own the space next to
+// it.
+describe('ModelSelector pill touch target', () => {
+  it('reaches the design target from its own frame plus vertical hit slop', () => {
+    const option = cliCatalogOption();
+    const renderer = renderSelector({ value: option.id, options: [option] });
+
+    const pill = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+    )[0];
+    if (pill === undefined) {
+      throw new Error('model pill not found');
+    }
+    const slop = pill.props.hitSlop as { top?: number; bottom?: number };
+    const reach = CHIP_FRAME_DP + (slop.top ?? 0) + (slop.bottom ?? 0);
+
+    expect(reach).toBeGreaterThan(TOUCH_TARGET_DP);
+    expect(slop).not.toHaveProperty('left');
+    expect(slop).not.toHaveProperty('right');
+
+    renderer.unmount();
   });
 });

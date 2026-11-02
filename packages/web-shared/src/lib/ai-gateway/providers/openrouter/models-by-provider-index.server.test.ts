@@ -95,6 +95,25 @@ describe('getSnapshotModelVariantId', () => {
   });
 });
 
+describe('buildModelIdToProviderSlugsIndex', () => {
+  it('leaves out BYOK-only providers', () => {
+    const snapshot = makeSnapshot();
+    snapshot.providers.push({
+      name: 'Synthetic',
+      displayName: 'Synthetic',
+      slug: 'synthetic',
+      dataPolicy: { training: false, retainsPrompts: false, canPublish: false },
+      byokOnly: true,
+      models: [snapshotModel(MODEL, 'standard'), snapshotModel('only/byok', 'standard')],
+    });
+
+    const index = buildModelIdToProviderSlugsIndex(snapshot);
+
+    expect(index.get(MODEL)).toEqual(new Set(['deepinfra', 'coreweave', 'nvidia']));
+    expect(index.has('only/byok')).toBe(false);
+  });
+});
+
 describe('buildDataCollectionRequiredModelIds', () => {
   function provider(slug: string, training: boolean, models: OpenRouterModel[]) {
     return {
@@ -130,6 +149,19 @@ describe('buildDataCollectionRequiredModelIds', () => {
     expect(buildDataCollectionRequiredModelIds(snapshot)).toEqual(
       new Set(['meta/muse-spark-1.3-contributor', FREE_MODEL])
     );
+  });
+
+  it('ignores BYOK-only providers, which Kilo never routes to', () => {
+    const snapshot = makeSnapshot();
+    snapshot.providers = [
+      provider('trains', true, [snapshotModel('mixed/model', 'standard')]),
+      {
+        ...provider('synthetic', false, [snapshotModel('mixed/model', 'standard')]),
+        byokOnly: true,
+      },
+    ];
+
+    expect(buildDataCollectionRequiredModelIds(snapshot)).toEqual(new Set(['mixed/model']));
   });
 
   it('keys standard and free variants separately', () => {

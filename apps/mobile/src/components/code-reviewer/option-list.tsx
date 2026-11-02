@@ -13,6 +13,7 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { reviewerSaveFailure, type ReviewerSaveFailure } from '@/lib/code-reviewer-save-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePopWhenFocused } from '@/lib/navigation/pop-when-focused';
+import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
 import { cn } from '@/lib/utils';
 
 type OptionListProps<T extends string, TSaveResult> = {
@@ -74,7 +75,7 @@ export function OptionList<T extends string, TSaveResult>({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} />
+      <ScreenHeader title={title} backFallback={CODE_REVIEWER_HOME_PATH} />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <RadioGroup label={title}>
           {options.map(option => (

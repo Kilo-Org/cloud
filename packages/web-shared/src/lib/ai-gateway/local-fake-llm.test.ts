@@ -117,7 +117,7 @@ describe('local fake deterministic model', () => {
     const env = replaceEnv({ NODE_ENV: 'development', FAKE_LLM_URL: 'http://localhost:8811/' });
     const provider = getLocalFakeLlmProvider();
     expect(provider).toMatchObject({
-      id: 'custom',
+      type: 'custom',
       apiUrl: 'http://localhost:8811/api/openrouter',
       apiKey: 'local-fake-llm',
     });
@@ -130,7 +130,7 @@ describe('local fake deterministic model', () => {
 
     const env = replaceEnv({ NODE_ENV: 'development', FAKE_LLM_URL: 'http://localhost:8811/' });
     expect(getLocalFakeTranscriptionProvider()).toMatchObject({
-      id: 'openrouter',
+      type: 'openrouter',
       apiUrl: 'http://localhost:8811/api/openrouter',
       apiKey: 'local-fake-llm',
     });

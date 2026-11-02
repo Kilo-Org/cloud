@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted case per sheet state: dismissal, name fill, refused save, and save failure */
 import { createElement, type ReactNode, type Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -5,6 +6,7 @@ import { SkillFormSheet } from '@/components/profiles/skill-form-sheet';
 import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
   onClose: vi.fn(),
@@ -23,6 +25,7 @@ vi.mock('react-native', async () => {
     useImperativeHandle,
   } = await import('react');
   return {
+    Platform: { OS: 'ios' },
     View: 'View',
     ScrollView: forwardRef(function ScrollViewStub(
       props: { children?: ReactNode },
@@ -141,11 +144,16 @@ function nameField(root: ReactTestInstance): ReactTestInstance {
 }
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
-function mountSheet(skill: { name: string; rawMarkdown: string } | null = null) {
+function mountSheet(
+  skill: { name: string; rawMarkdown: string } | null = null,
+  options: { saveFailure?: string | null; saveFailureTone?: 'error' | 'warn' } = {}
+) {
   return renderWithProviders(
     createElement(SkillFormSheet, {
       skill,
       isSaving: false,
+      saveFailure: options.saveFailure ?? null,
+      saveFailureTone: options.saveFailureTone,
       onClose: () => {
         h.onClose();
       },
@@ -156,9 +164,19 @@ function mountSheet(skill: { name: string; rawMarkdown: string } | null = null) 
   );
 }
 
+/** The block the sheet puts above its fields, which carries a save failure's line. */
+function statusBlock(root: ReactTestInstance): ReactTestInstance {
+  const [block] = findOne(root, 'ScrollView').children;
+  if (block === undefined || typeof block === 'string') {
+    throw new TypeError('the sheet rendered no status block above its fields');
+  }
+  return block;
+}
+
 describe('SkillFormSheet dismissal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
   });
 
   it('closes an untouched sheet without asking', async () => {
@@ -201,6 +219,7 @@ describe('SkillFormSheet dismissal', () => {
 describe('SkillFormSheet name fill', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
   });
 
   it('fills the name from frontmatter and clears the empty-name error', async () => {
@@ -265,6 +284,7 @@ describe('SkillFormSheet name fill', () => {
 describe('SkillFormSheet refused save', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
   });
 
   it('scrolls to the name field when the name is missing', async () => {
@@ -306,6 +326,99 @@ describe('SkillFormSheet refused save', () => {
 
     expect(h.scrollTo).not.toHaveBeenCalled();
     expect(h.onSave).toHaveBeenCalledWith({ name: 'my-skill', rawMarkdown: 'Body' });
+
+    unmount();
+  });
+});
+
+describe('SkillFormSheet save failure', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+  });
+
+  it('shows the refused save above the fields and keeps the typed input', async () => {
+    const { renderer, unmount } = await mountSheet(null, {
+      saveFailure: i18n.t('profiles.skillSaveFailed'),
+    });
+
+    expect(findAll(statusBlock(renderer.root), 'Text').map(node => node.props.children)).toEqual([
+      i18n.t('profiles.skillSaveFailed'),
+    ]);
+    expect(findOne(renderer.root, 'SheetHeader').props.doneDisabled).toBe(false);
+
+    unmount();
+  });
+
+  it('scrolls the failure block into view once it lays out', async () => {
+    const { renderer, unmount } = await mountSheet(null, {
+      saveFailure: i18n.t('profiles.skillSaveFailed'),
+    });
+
+    const onLayout = statusBlock(renderer.root).props.onLayout as ContainerLayout | undefined;
+    if (typeof onLayout !== 'function') {
+      throw new TypeError('the status block has no layout handler');
+    }
+    act(() => {
+      onLayout({ nativeEvent: { layout: { y: 150 } } });
+    });
+
+    expect(h.scrollTo).toHaveBeenCalledWith({ y: 138, animated: true });
+
+    unmount();
+  });
+
+  it('paints an expected limit as a warning and a refusal as an error', async () => {
+    const limit = await mountSheet(null, {
+      saveFailure: i18n.t('profiles.skillLimitReached', { max: 50 }),
+      saveFailureTone: 'warn',
+    });
+    expect(String(findAll(statusBlock(limit.renderer.root), 'Text')[0]?.props.className)).toContain(
+      'text-warn'
+    );
+    limit.unmount();
+
+    const refusal = await mountSheet(null, {
+      saveFailure: i18n.t('profiles.skillSaveFailed'),
+    });
+    expect(
+      String(findAll(statusBlock(refusal.renderer.root), 'Text')[0]?.props.className)
+    ).toContain('text-destructive');
+    refusal.unmount();
+  });
+
+  it('scrolls back to a failure that stayed on screen when Save is pressed again', async () => {
+    const { renderer, unmount } = await mountSheet(null, {
+      saveFailure: i18n.t('profiles.skillSaveFailed'),
+    });
+    const onLayout = statusBlock(renderer.root).props.onLayout as ContainerLayout | undefined;
+    if (typeof onLayout !== 'function') {
+      throw new TypeError('the status block has no layout handler');
+    }
+    act(() => {
+      onLayout({ nativeEvent: { layout: { y: 150 } } });
+    });
+    h.scrollTo.mockClear();
+
+    changeText(renderer.root, 'Skill name', 'my-skill');
+    changeText(renderer.root, 'Skill content', 'Body');
+    pressDone(renderer.root);
+
+    expect(h.scrollTo).toHaveBeenCalledWith({ y: 138, animated: true });
+    expect(h.onSave).toHaveBeenCalledWith({ name: 'my-skill', rawMarkdown: 'Body' });
+
+    unmount();
+  });
+
+  it('renders no block and does not scroll when no save failed', async () => {
+    const { renderer, unmount } = await mountSheet();
+
+    const [first] = findOne(renderer.root, 'ScrollView').children;
+    if (first === undefined || typeof first === 'string') {
+      throw new TypeError('the sheet rendered no content child');
+    }
+    expect(first.type).toBe('Text');
+    expect(h.scrollTo).not.toHaveBeenCalled();
 
     unmount();
   });

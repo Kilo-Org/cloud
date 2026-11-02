@@ -20,7 +20,6 @@ import { useInvokeWebhookTrigger } from '@/components/webhook-triggers';
 import type { GitHubRepository } from '@/components/webhook-triggers/types';
 import type { RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
-import type { AgentMode } from '@/components/cloud-agent/types';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Webhook, ExternalLink, RefreshCw } from 'lucide-react';
@@ -131,7 +130,7 @@ export function EditWebhookTriggerContent({
       cronExpression: triggerData.cronExpression,
       cronTimezone: triggerData.cronTimezone,
       githubRepo: triggerData.githubRepo ?? '',
-      mode: (triggerData.mode ?? 'code') as AgentMode,
+      mode: triggerData.mode ?? 'code',
       model: triggerData.model ?? '',
       variant: triggerData.variant ?? undefined,
       sandboxAllocation: triggerData.sandboxAllocation ?? undefined,

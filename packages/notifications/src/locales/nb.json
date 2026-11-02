@@ -9,6 +9,7 @@
       "lowBalance": "Saldoen din krever oppmerksomhet",
       "spendAlert": "Forbruket ditt krever oppmerksomhet",
       "securityFinding": "Et sikkerhetsfunn krever oppmerksomhet",
+      "securityUpdate": "En sikkerhetssjekk har en oppdatering",
       "activeAgentsGlanceable": "Aktive agenter har en oppdatering"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Et sikkerhetsfunn krever oppmerksomhet"
+      "body": "En sikkerhetssjekk har en oppdatering"
     }
   },
   "instanceLifecycle": {

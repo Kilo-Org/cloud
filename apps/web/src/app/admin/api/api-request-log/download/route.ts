@@ -7,6 +7,7 @@ import archiver from 'archiver';
 import { Readable } from 'node:stream';
 import { getApiRequestLogBlob } from '@kilocode/web-shared/lib/r2/api-request-log';
 import { findUserByEmailCaseInsensitive } from '@/lib/user';
+import { canCurrentUserExportApiRequestLogs } from '@/lib/admin/admin-permissions';
 
 // Downloading all logs for a heavy user can take a while. Without a raised
 // maxDuration the Vercel function was killed mid-stream, producing a ZIP
@@ -223,9 +224,12 @@ export async function GET(request: NextRequest) {
   const startedAt = Date.now();
   await connection();
 
-  const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+  const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) {
     return authFailedResponse;
+  }
+  if (!user || !(await canCurrentUserExportApiRequestLogs(user.id))) {
+    return jsonError('API request log export access required', 403);
   }
 
   const searchParams = request.nextUrl.searchParams;

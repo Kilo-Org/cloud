@@ -73,6 +73,10 @@ async function importAdapter(): Promise<{
     kiloSessionId: KiloSessionId,
     options: { cursor?: string }
   ) => Promise<SessionSnapshotPageOutcome>;
+  readMobileSessionSnapshotPage: (
+    kiloSessionId: KiloSessionId,
+    options: { cursor?: string }
+  ) => Promise<{ outcome: SessionSnapshotPageOutcome; parentSessionId?: string | null }>;
 }> {
   const adapter = await import('@/components/agents/mobile-session-page-adapter');
   return adapter;
@@ -300,5 +304,56 @@ describe('fetchMobileSessionSnapshotPage', () => {
 
     expect(result).toMatchObject({ kind: 'success' });
     expect((result as Record<string, unknown>).watermarkEventId).toBeUndefined();
+  });
+
+  it('returns the parent session id the messages page carried, without folding it into info', async () => {
+    mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
+      kiloSessionId: 'ses_child',
+      history: historyPage({ nextCursor: null }),
+      parentSessionId: 'ses_parent',
+    });
+
+    const { readMobileSessionSnapshotPage } = await importAdapter();
+    const { outcome, parentSessionId } = await readMobileSessionSnapshotPage(
+      kiloSessionId('ses_child'),
+      {}
+    );
+
+    expect(parentSessionId).toBe('ses_parent');
+    // The transport replays `info` as `session.created`, where a parent id would
+    // make the opened session a child of itself in the SDK's bookkeeping.
+    expect(outcome).toMatchObject({ kind: 'success', info: { id: 'ses_child' } });
+    const replayedInfo = outcome.kind === 'success' ? outcome.info : {};
+    expect('parentID' in replayedInfo).toBe(false);
+  });
+
+  it('separates an answered root from a payload that cannot answer', async () => {
+    const { readMobileSessionSnapshotPage } = await importAdapter();
+
+    mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
+      kiloSessionId: 'ses_root',
+      history: null,
+      parentSessionId: null,
+    });
+    await expect(readMobileSessionSnapshotPage(kiloSessionId('ses_root'), {})).resolves.toEqual({
+      parentSessionId: null,
+      outcome: {
+        kind: 'success',
+        info: { id: 'ses_root' },
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+      },
+    });
+
+    // A server that predates the projection cannot answer it: the caller must
+    // keep its own fallback rather than read a missing field as "root".
+    mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
+      kiloSessionId: 'ses_old_server',
+      history: null,
+    });
+    const olderServer = await readMobileSessionSnapshotPage(kiloSessionId('ses_old_server'), {});
+    expect(olderServer.parentSessionId).toBeUndefined();
+    expect(olderServer.outcome).toMatchObject({ kind: 'success', info: { id: 'ses_old_server' } });
   });
 });

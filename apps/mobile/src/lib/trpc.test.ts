@@ -212,6 +212,53 @@ describe('getAuthHeaders', () => {
       expiresAtMs: newerExpiresAt,
     });
   });
+
+  it('sends the held token without touching the keychain while protected data is unavailable', async () => {
+    // `afterEach` resets the module registry, so the owner and the gate must be
+    // loaded from the same graph as `./trpc` inside the case.
+    const headers = await loadHeaders();
+    const { getActiveTokenSnapshot, setActiveToken } = await import('@/lib/auth/token-owner');
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    // The production precondition: a held owner with no expiry, then a lock.
+    setActiveToken('held-token', null);
+    setProtectedDataAvailable(false);
+    try {
+      await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer held-token' });
+      // The refused read never reaches the keychain, so the refusal cannot fail
+      // the request.
+      expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+      // An unknown expiry is not published as a known one.
+      expect(getActiveTokenSnapshot()).toMatchObject({ token: 'held-token', expiresAtMs: null });
+
+      // A later request behaves the same: the expiry is still unknown.
+      await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer held-token' });
+      expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+    } finally {
+      setProtectedDataAvailable(true);
+    }
+
+    // After unlock the expiry is read once and published into the same owner.
+    const storedExpiresAt = Date.now() + 3_600_000;
+    secureStoreMock.store.set('token-expires-at', String(storedExpiresAt));
+    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer held-token' });
+    expect(secureStoreMock.getItemAsync).toHaveBeenCalledWith('token-expires-at');
+    expect(getActiveTokenSnapshot()).toMatchObject({
+      token: 'held-token',
+      expiresAtMs: storedExpiresAt,
+    });
+  });
+
+  it('still fails the request when the cold expiry read fails for another reason', async () => {
+    const headers = await loadHeaders();
+    const { setActiveToken } = await import('@/lib/auth/token-owner');
+    setActiveToken('held-token', null);
+    secureStoreMock.getItemAsync.mockImplementationOnce(async () => {
+      await Promise.resolve();
+      throw new Error('keychain unavailable');
+    });
+
+    await expect(headers()).rejects.toThrow('keychain unavailable');
+  });
 });
 
 const mockFetch = vi.fn();
@@ -529,7 +576,7 @@ describe('latency wiring', () => {
   // tRPC's single `httpLink` leaves the body off a POST for a no-input call,
   // and the server's fetch adapter rejects that empty body with 400. The
   // shared fetch sends `{}` so an unbatched no-input query reaches its
-  // procedure, matching the batched `{"0":{"json":null}}` shape.
+  // procedure.
   it('sends an empty JSON object body when a POST has none', async () => {
     const { httpFetch } = await loadLatencyLinks();
     mockFetch.mockResolvedValue(new Response('ok', { status: 200 }));

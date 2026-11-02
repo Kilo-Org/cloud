@@ -250,6 +250,7 @@ export const CustomRouterBaseRouter = {
 export const CustomRouterMode = {
   CostPerAccuracy: 'cost_per_accuracy',
   BestAccuracy: 'best_accuracy',
+  Cheapest: 'cheapest',
 } as const;
 
 export const SCHEMA_CHECK_ENUMS = {
@@ -482,6 +483,7 @@ export const kilocode_users = pgTable(
     is_super_admin: boolean().default(false).notNull(),
     can_view_sessions: boolean().default(false).notNull(),
     can_manage_credits: boolean().default(false).notNull(),
+    can_export_api_request_logs: boolean().default(false).notNull(),
     total_microdollars_acquired: bigint({ mode: 'number' })
       .default(sql`'0'`)
       .notNull(),
@@ -552,6 +554,10 @@ export const kilocode_users = pgTable(
     check(
       'kilocode_users_can_manage_credits_requires_admin_check',
       sql`NOT ${table.can_manage_credits} OR ${table.is_admin}`
+    ),
+    check(
+      'kilocode_users_can_export_api_request_logs_requires_admin_check',
+      sql`NOT ${table.can_export_api_request_logs} OR ${table.is_admin}`
     ),
     uniqueIndex('UQ_kilocode_users_openrouter_upstream_safety_identifier')
       .on(table.openrouter_upstream_safety_identifier)
@@ -4779,6 +4785,68 @@ export const platform_oauth_credentials = pgTable(
 export type PlatformOAuthCredential = typeof platform_oauth_credentials.$inferSelect;
 export type NewPlatformOAuthCredential = typeof platform_oauth_credentials.$inferInsert;
 
+/**
+ * The lease a request holds while it exchanges a rotating OAuth refresh token
+ * with a provider. One row per credential: either a `platform_oauth_credentials`
+ * row (GitLab, Bitbucket) or a `user_github_app_tokens` row (GitHub user
+ * authorization), never both.
+ *
+ * Provider refresh tokens rotate: when two requests exchange the same token,
+ * one succeeds and the other is told `invalid_grant`, which looks exactly like a
+ * credential the user has to reconnect. A refresh attempt that receives that
+ * answer may only revoke the credential when no other exchange can be in
+ * flight, and that question cannot be answered from the credential row alone.
+ * Holding this lease is that answer: only the attempt that inserted or took over
+ * an expired lease talks to the provider, and every other attempt reports
+ * temporary unavailability without exchanging anything.
+ *
+ * `expires_at` and the takeover predicate use the database clock (`now()`), so
+ * clock skew between worker isolates cannot let a stale attempt act. The lease
+ * is released in the transaction that persists the outcome; `expires_at` only
+ * covers an attempt that dies mid-exchange.
+ *
+ * Deliberately a separate table rather than extra columns on
+ * `platform_oauth_credentials`: `GitLabOAuthCredentialRowSchema` in
+ * `packages/worker-utils/src/gitlab-credential.ts` is `.strict()` and
+ * `git-token-service` selects that whole row, so any column added to
+ * `platform_oauth_credentials` fails GitLab/GitHub/Bitbucket credential
+ * resolution closed.
+ *
+ * PII: there is no direct user FK, and both credential columns cascade, so
+ * `softDeleteUser` and integration deletion still remove the rows.
+ */
+export const oauth_refresh_exchange_leases = pgTable(
+  'oauth_refresh_exchange_leases',
+  {
+    id: idPrimaryKeyColumn,
+    platform_oauth_credential_id: uuid().references(() => platform_oauth_credentials.id, {
+      onDelete: 'cascade',
+    }),
+    user_github_app_token_id: uuid().references(() => user_github_app_tokens.id, {
+      onDelete: 'cascade',
+    }),
+    attempt_id: text().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_oauth_refresh_exchange_leases_platform_oauth_credential_id')
+      .on(table.platform_oauth_credential_id)
+      .where(isNotNull(table.platform_oauth_credential_id)),
+    uniqueIndex('UQ_oauth_refresh_exchange_leases_user_github_app_token_id')
+      .on(table.user_github_app_token_id)
+      .where(isNotNull(table.user_github_app_token_id)),
+    check(
+      'oauth_refresh_exchange_leases_owner_check',
+      sql`num_nonnulls(${table.platform_oauth_credential_id}, ${table.user_github_app_token_id}) = 1`
+    ),
+    check('oauth_refresh_exchange_leases_attempt_id_check', sql`${table.attempt_id} <> ''`),
+  ]
+);
+
+export type OAuthRefreshExchangeLease = typeof oauth_refresh_exchange_leases.$inferSelect;
+export type NewOAuthRefreshExchangeLease = typeof oauth_refresh_exchange_leases.$inferInsert;
+
 export const platform_access_token_credentials = pgTable(
   'platform_access_token_credentials',
   {
@@ -5992,12 +6060,12 @@ export const code_review_memory_proposals = pgTable(
     uniqueIndex('UQ_code_review_memory_proposals_org_active_scope')
       .on(table.owned_by_organization_id, table.platform, table.repo_full_name)
       .where(
-        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.status} IN ('open', 'edited', 'opening_change_request')`
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.status} IN ('open', 'edited', 'opening_change_request', 'change_request_failed')`
       ),
     uniqueIndex('UQ_code_review_memory_proposals_user_active_scope')
       .on(table.owned_by_user_id, table.platform, table.repo_full_name)
       .where(
-        sql`${table.owned_by_user_id} IS NOT NULL AND ${table.status} IN ('open', 'edited', 'opening_change_request')`
+        sql`${table.owned_by_user_id} IS NOT NULL AND ${table.status} IN ('open', 'edited', 'opening_change_request', 'change_request_failed')`
       ),
     check(
       'code_review_memory_proposals_owner_check',
@@ -6703,11 +6771,13 @@ export type CloudAgentSession = typeof cloud_agent_sessions.$inferSelect;
 export type NewCloudAgentSession = typeof cloud_agent_sessions.$inferInsert;
 
 /**
- * Pending-upload ledger for cloud agent attachments. A presign admits a row in
- * status 'pending'; send-time finalization flips the matching rows to 'linked'
- * in one transaction; a cron reaper deletes the R2 objects behind abandoned
- * 'pending' rows whose lease has expired and records them as 'reaped'.
- * kilo_user_id is text() because user IDs are not always UUIDs (OAuth users).
+ * Pending-upload ledger for cloud agent attachments. An uploader admits a row
+ * in status 'pending' before its R2 write (the presigned composer path and the
+ * Kilo Bot upload path); send-time finalization flips the matching rows to
+ * 'linked' in one transaction; a cron reaper deletes the R2 objects behind
+ * abandoned 'pending' rows whose lease has expired and records them as
+ * 'reaped'. kilo_user_id is text() because user IDs are not always UUIDs
+ * (OAuth users).
  */
 export const cloud_agent_pending_uploads = pgTable(
   'cloud_agent_pending_uploads',
@@ -10391,8 +10461,7 @@ export const exa_usage_log = pgTable(
 
 export type ExaUsageLog = typeof exa_usage_log.$inferSelect;
 
-// One row per Enkrypt guardrail detect call billed to an organization. Kept apart from
-// microdollar_usage so guardrail charges never alter inference usage records.
+// Retained only for migration tracking; application code uses enkrypt_usage.
 export const enkrypt_guardrail_charges = pgTable(
   'enkrypt_guardrail_charges',
   {
@@ -10407,9 +10476,6 @@ export const enkrypt_guardrail_charges = pgTable(
     decision: text().notNull().$type<EnkryptGuardrailDecision>(),
     enkrypt_credits_cost: real(),
     charged_microdollars: bigint({ mode: 'number' }).notNull(),
-    // How long the request waited for the guardrail verdict before its upstream call. Set only on
-    // the request's final call, so it is counted once per request; null on a retried call or when
-    // the request returned before awaiting the verdict.
     added_latency_ms: integer(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
@@ -10421,7 +10487,47 @@ export const enkrypt_guardrail_charges = pgTable(
   ]
 );
 
-export type EnkryptGuardrailCharge = typeof enkrypt_guardrail_charges.$inferSelect;
+export const enkrypt_usage_decision = pgTable(
+  'enkrypt_usage_decision',
+  {
+    decision_id: serial().notNull().primaryKey(),
+    decision: text().notNull().$type<EnkryptGuardrailDecision>(),
+  },
+  table => [uniqueIndex('UQ_enkrypt_usage_decision').on(table.decision)]
+);
+
+// Monthly created_at partitioning is defined in the migration; Drizzle cannot express it.
+export const enkrypt_usage = pgTable(
+  'enkrypt_usage',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`),
+    organization_id: uuid().notNull(),
+    kilo_user_id: text().notNull(),
+    session_id: text(),
+    api_kind_id: integer()
+      .notNull()
+      .references(() => api_kind.api_kind_id),
+    decision_id: integer()
+      .notNull()
+      .references(() => enkrypt_usage_decision.decision_id),
+    enkrypt_credits_cost: real(),
+    charged_microdollars: bigint({ mode: 'number' }).notNull(),
+    // How long the request waited for the guardrail verdict before its upstream call. Set only on
+    // the request's final call, so it is counted once per request; null on a retried call or when
+    // the request returned before awaiting the verdict.
+    added_latency_ms: integer(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.id, table.created_at] }),
+    index('IDX_enkrypt_usage_organization_created_at').on(table.organization_id, table.created_at),
+    index('IDX_enkrypt_usage_user_created_at').on(table.kilo_user_id, table.created_at),
+  ]
+);
+
+export type EnkryptUsage = typeof enkrypt_usage.$inferSelect;
 
 // ============ SECURITY ADVISOR SCANS ============
 // Per-scan usage tracking for the security advisor feature.

@@ -1229,6 +1229,22 @@ describe('a question a later send took the slot from', () => {
       effort: null,
       images: [],
     });
+
+    // The answer in front of it lands, so the retry is asked and becomes the slot's.
+    finish?.();
+    await settled();
+
+    expect(snapshotOf(opened).waiting).toEqual([]);
+    expect(await askedIn(opened)).toEqual({
+      text: 'first',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+    });
+    // Its kept copy went with the record that replaced it; the failure the ask
+    // pushed out of the slot took its place.
+    const keptAfter = await keptIn(opened);
+    expect(keptAfter.map(one => one.text)).toEqual(['second']);
   });
 
   it('opens again with what a later send kept', async () => {

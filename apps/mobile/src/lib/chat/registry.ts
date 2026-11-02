@@ -658,6 +658,17 @@ export async function say(
        stays unchanged until onto installs the session that actually moved. */
     change(current, { asked: text, askedImages: images, askedModel: model, askedEffort: effort });
     await rememberAsked(current, { text, model, effort, images });
+    /* The slot holds this question now, so a kept copy of it is one attempt
+       written twice: a retry that waited for the answer arriving before it, or
+       one whose list write was interrupted. The list written here drops it, and
+       an empty one still writes, because what is being dropped may be only in
+       storage. */
+    const keptNow = snapshotOf(current).displaced;
+    const keptNext = keptNow.filter(one => !sameAttempt(one, { text, images, model, effort }));
+    if (keptNext.length !== keptNow.length) {
+      change(current, { displaced: keptNext });
+    }
+    await rememberKept(current, keptNext);
     current = await ontoForUse(current, { model, effort }, held);
     const chat = chats.get(current);
     if (chat === undefined) {
@@ -735,15 +746,13 @@ export async function retryChat(sessionId: string, displaced?: Displaced): Promi
       { text: displaced.text, images: displaced.images },
       { model: displaced.model, effort: displaced.effort }
     );
-    /* The chat may have moved onto another session while it was asked, so both
-       writes name the session it is on now. */
+    /* The ask writes the slot's record itself, and with it trims the kept list.
+       One that failed before reaching that point left the kept entry written
+       down, which is the words' copy; if the slot does hold this question, the
+       record is written here too. A retry that found an answer still arriving
+       joined the waiting line, and its question waits in memory like every
+       queued one. */
     const at = snapshotOf(current);
-    /* A retry that found an answer still arriving joined the waiting line: the
-       slot then holds that answer's question, not this one, and a question that
-       waits is held in memory only, as every queued question is. Writing it
-       down there would put it over the record of the question being answered
-       and claim it was asked; the kept entry stays written down instead, so the
-       words survive a restart. */
     const slot =
       at.asked === null
         ? null
@@ -761,7 +770,6 @@ export async function retryChat(sessionId: string, displaced?: Displaced): Promi
           model: displaced.model,
           effort: displaced.effort,
         });
-        await rememberKept(at.sessionId, at.displaced);
       } catch {
         /* The kept entry stays written down, which is the words' copy. */
       }

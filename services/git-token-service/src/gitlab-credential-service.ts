@@ -162,6 +162,17 @@ export class GitLabCredentialService {
       ) {
         return { status: 'reconnect_required' };
       }
+      if (credential.provider_metadata.unusableReason !== undefined) {
+        return { status: 'reconnect_required' };
+      }
+      const authorizedAccountId = credential.provider_metadata.authorizedAccountId;
+      if (
+        authorizedAccountId !== undefined &&
+        parent.providerSubjectId !== undefined &&
+        authorizedAccountId !== parent.providerSubjectId
+      ) {
+        return { status: 'reconnect_required' };
+      }
 
       const decrypted = await this.crypto.decrypt({
         ciphertext: credential.token_encrypted,

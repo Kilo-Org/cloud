@@ -277,20 +277,6 @@ export function openRouterToVercelInferenceProviderId(providerId: string): strin
   return openRouterToVercelInferenceProviderMapping[normalizedProviderId] ?? normalizedProviderId;
 }
 
-const vercelToOpenRouterInferenceProviderMapping: Record<string, string | undefined> =
-  Object.fromEntries(
-    Object.entries(openRouterToVercelInferenceProviderMapping).flatMap(
-      ([openRouterProviderId, vercelProviderId]) =>
-        vercelProviderId ? [[vercelProviderId, openRouterProviderId]] : []
-    )
-  );
-
-/** The OpenRouter provider slug of a Vercel endpoint provider, for catalog provider lists. */
-export function vercelToOpenRouterInferenceProviderId(providerId: string): string {
-  const vercelProviderId = normalizeVercelInferenceProviderIdForRouting(providerId);
-  return vercelToOpenRouterInferenceProviderMapping[vercelProviderId] ?? vercelProviderId;
-}
-
 const providerPolicyVercelProviderIds: ReadonlySet<string> = new Set(
   OpenRouterInferenceProviderIdSchema.options.map(openRouterToVercelInferenceProviderId)
 );

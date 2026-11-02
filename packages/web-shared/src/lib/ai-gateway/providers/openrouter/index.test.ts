@@ -436,28 +436,34 @@ describe('auto models', () => {
 });
 
 describe('Vercel-only models', () => {
-  const vercelOnlyModel = buildModel({
-    id: 'vendor/vercel-only',
-    name: 'Vendor: Vercel Only',
-    mayTrainOnYourPrompts: false,
-  });
+  const vercelOnlyModel = buildModel({ id: 'vendor/vercel-only', name: 'Vendor: Vercel Only' });
 
   beforeEach(() => {
     global.fetch = jest.fn(() =>
       Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
     ) as unknown as typeof fetch;
+    jest.mocked(getVercelOnlyCatalogModels).mockResolvedValueOnce([vercelOnlyModel]);
     jest
-      .mocked(getVercelOnlyCatalogModels)
-      .mockResolvedValueOnce([
-        { model: vercelOnlyModel, inferenceProviderIds: ['amazon-bedrock', 'vendor'] },
-      ]);
+      .mocked(getProviderSlugsForModels)
+      .mockImplementation(
+        async ids =>
+          new Map(
+            ids.map(id => [
+              id,
+              new Set(id === vercelOnlyModel.id ? ['amazon-bedrock', 'vendor'] : []),
+            ])
+          )
+      );
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
+    jest
+      .mocked(getProviderSlugsForModels)
+      .mockImplementation(async ids => new Map(ids.map(id => [id, new Set<string>()])));
   });
 
-  it('lists them after the OpenRouter models with their Vercel providers', async () => {
+  it('lists them after the OpenRouter models with their snapshot providers', async () => {
     const models = await getEnhancedOpenRouterModels({ countryCode: null });
 
     expect(getVercelOnlyCatalogModels).toHaveBeenCalledWith({
@@ -469,7 +475,6 @@ describe('Vercel-only models', () => {
     expect(models.data.find(model => model.id === 'vendor/vercel-only')).toMatchObject({
       name: 'Vendor: Vercel Only',
       inference_provider_ids: ['amazon-bedrock', 'vendor'],
-      mayTrainOnYourPrompts: false,
       isFree: false,
     });
   });

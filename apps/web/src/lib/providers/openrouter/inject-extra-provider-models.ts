@@ -12,6 +12,11 @@ import type {
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import type { Endpoint, StoredModel } from '@kilocode/db/schema-types';
+import {
+  findVercelOnlyModels,
+  getVendorNamesByModelPrefix,
+  getVercelOnlyModelName,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
 
 type ProviderModelData = Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>;
 
@@ -117,10 +122,13 @@ const vercelOnlyProviderMetadata = new Map<string, VercelOnlyProviderMetadata>(
   })
 );
 
+/** Providers listed only because Vercel serves models through them. */
+const providersOnlyVercelLists = new WeakSet<OpenRouterProvider>();
+
 function createVercelOnlyProvider(providerId: string): OpenRouterProvider {
   const metadata = vercelOnlyProviderMetadata.get(providerId);
   const displayName = metadata?.displayName ?? toDisplayName(providerId);
-  return {
+  const provider: OpenRouterProvider = {
     name: displayName,
     displayName,
     slug: providerId,
@@ -138,13 +146,58 @@ function createVercelOnlyProvider(providerId: string): OpenRouterProvider {
       className: 'rounded-sm',
     },
   };
+  providersOnlyVercelLists.add(provider);
+  return provider;
+}
+
+function survivesNormalization(providerId: string, caller: string) {
+  if (providerId === normalizeInferenceProviderId(providerId)) return true;
+  console.warn(
+    '[%s] Skipping provider id that does not survive normalization: %s',
+    caller,
+    providerId
+  );
+  return false;
+}
+
+/**
+ * Lists `model` under a provider for one Vercel endpoint. Vercel reports per-endpoint ZDR and
+ * no-training guarantees; a missing guarantee is treated as training on and retaining prompts.
+ * Providers that only Vercel lists take the worst policy of their endpoints.
+ */
+function addVercelEndpointModel(
+  providerData: ProviderModelData[number],
+  model: OpenRouterModel,
+  endpoint: Endpoint
+) {
+  const training = endpoint.has_no_training !== true;
+  const retainsPrompts = endpoint.has_zdr !== true;
+  if (providersOnlyVercelLists.has(providerData.provider)) {
+    const { dataPolicy } = providerData.provider;
+    dataPolicy.training ||= training;
+    dataPolicy.retainsPrompts ||= retainsPrompts;
+  }
+
+  const existing = providerData.models.find(m => m.slug === model.slug);
+  if (existing?.endpoint) {
+    existing.endpoint.data_policy = {
+      training: existing.endpoint.data_policy?.training === true || training,
+      retainsPrompts: existing.endpoint.data_policy?.retainsPrompts === true || retainsPrompts,
+    };
+    return;
+  }
+
+  providerData.models.push(
+    toVercelEndpointModel(model, endpoint, providerData.provider.displayName, {
+      training,
+      retainsPrompts,
+    })
+  );
 }
 
 /**
  * Adds providers that serve snapshot models only through Vercel AI Gateway, so
- * the provider list covers every provider a routed request may reach. Vercel
- * reports per-endpoint ZDR and no-training guarantees; a missing guarantee is
- * treated as training on and retaining prompts.
+ * the provider list covers every provider a routed request may reach.
  */
 export function injectVercelOnlyProviders(
   vercelModels: Record<string, StoredModel>,
@@ -164,41 +217,14 @@ export function injectVercelOnlyProviders(
     for (const endpoint of vercelModel.endpoints) {
       const providerId = getVercelEndpointProviderId(endpoint);
       if (!providerId || knownVercelProviderIds.has(providerId)) continue;
-      if (providerId !== normalizeInferenceProviderId(providerId)) {
-        console.warn(
-          '[injectVercelOnlyProviders] Skipping provider id that does not survive normalization: %s',
-          providerId
-        );
-        continue;
-      }
+      if (!survivesNormalization(providerId, 'injectVercelOnlyProviders')) continue;
 
       let providerData = vercelOnlyProviders.get(providerId);
       if (!providerData) {
         providerData = { provider: createVercelOnlyProvider(providerId), models: [] };
         vercelOnlyProviders.set(providerId, providerData);
       }
-
-      const training = endpoint.has_no_training !== true;
-      const retainsPrompts = endpoint.has_zdr !== true;
-      const { dataPolicy } = providerData.provider;
-      dataPolicy.training ||= training;
-      dataPolicy.retainsPrompts ||= retainsPrompts;
-
-      const existing = providerData.models.find(m => m.slug === model.slug);
-      if (existing?.endpoint) {
-        existing.endpoint.data_policy = {
-          training: existing.endpoint.data_policy?.training === true || training,
-          retainsPrompts: existing.endpoint.data_policy?.retainsPrompts === true || retainsPrompts,
-        };
-        continue;
-      }
-
-      providerData.models.push(
-        toVercelEndpointModel(model, endpoint, providerData.provider.displayName, {
-          training,
-          retainsPrompts,
-        })
-      );
+      addVercelEndpointModel(providerData, model, endpoint);
     }
   }
 
@@ -209,5 +235,73 @@ export function injectVercelOnlyProviders(
       providerData.models.length
     );
     providerModelData.push(providerData);
+  }
+}
+
+/**
+ * Lists the chat models only Vercel AI Gateway serves under each provider of their Vercel
+ * endpoints, adding providers that OpenRouter does not list. Their catalog entries come from
+ * `getVercelOnlyCatalogModels`, which finds them the same way.
+ */
+export function injectVercelOnlyModels({
+  vercelModels,
+  openRouterCatalogModels,
+  openRouterModelIds,
+  providerModelData,
+  vercelModelIdOverrides,
+  updatedAt,
+}: {
+  vercelModels: Record<string, StoredModel>;
+  openRouterCatalogModels: readonly { id: string; name: string }[];
+  openRouterModelIds: Iterable<string>;
+  providerModelData: ProviderModelData;
+  vercelModelIdOverrides: VercelModelIdOverrides;
+  updatedAt: string;
+}) {
+  const vendorNames = getVendorNamesByModelPrefix(openRouterCatalogModels);
+  const vercelOnlyModels = findVercelOnlyModels({
+    openRouterModelIds,
+    vercelMetadata: vercelModels,
+    overrides: vercelModelIdOverrides,
+  });
+
+  for (const vercelOnlyModel of vercelOnlyModels) {
+    const { id, storedModel, catalog } = vercelOnlyModel;
+    const model: OpenRouterModel = {
+      slug: id,
+      name: getVercelOnlyModelName(vercelOnlyModel, vendorNames),
+      author: id.includes('/') ? id.slice(0, id.indexOf('/')) : 'Other',
+      description: catalog.description,
+      context_length: catalog.context_window,
+      input_modalities: catalog.modalities.input,
+      output_modalities: catalog.modalities.output,
+      group: 'Other',
+      updated_at: updatedAt,
+      endpoint: null,
+    };
+
+    for (const endpoint of storedModel.endpoints) {
+      const providerId = getVercelEndpointProviderId(endpoint);
+      if (!providerId) continue;
+      let providerData = providerModelData.find(
+        ({ provider }) => openRouterToVercelInferenceProviderId(provider.slug) === providerId
+      );
+      if (!providerData) {
+        if (!survivesNormalization(providerId, 'injectVercelOnlyModels')) continue;
+        providerData = { provider: createVercelOnlyProvider(providerId), models: [] };
+        providerModelData.push(providerData);
+      }
+      addVercelEndpointModel(providerData, model, {
+        ...endpoint,
+        pricing: endpoint.pricing ?? {
+          prompt: catalog.pricing.input,
+          completion: catalog.pricing.output,
+        },
+      });
+    }
+  }
+
+  if (vercelOnlyModels.length > 0) {
+    console.warn('[injectVercelOnlyModels] Adding %d Vercel-only models', vercelOnlyModels.length);
   }
 }

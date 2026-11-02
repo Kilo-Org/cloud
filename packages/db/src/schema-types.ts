@@ -3115,9 +3115,54 @@ export const EndpointsSchema = z.object({
   data: z.object({ endpoints: z.array(EndpointSchema) }),
 });
 
+/**
+ * The Vercel AI Gateway model list fields that describe a language model, so Kilo can list models
+ * that only Vercel serves. OpenRouter models do not have this shape.
+ */
+export const VercelCatalogSchema = z.object({
+  description: z.string().catch(''),
+  created: z.number(),
+  released: z.number().optional().catch(undefined),
+  context_window: z.number(),
+  max_tokens: z.number().optional().catch(undefined),
+  modalities: z.object({
+    input: z.array(z.string()),
+    output: z.array(z.string()),
+  }),
+  supported_parameters: z.array(z.string()).optional().catch(undefined),
+  pricing: z.object({
+    input: z.string(),
+    output: z.string(),
+    input_cache_read: z.string().optional().catch(undefined),
+    input_cache_write: z.string().optional().catch(undefined),
+  }),
+  /** Milliseconds since the epoch. */
+  deprecated_at: z
+    .number()
+    .int()
+    .min(0)
+    .max(Date.UTC(9999, 11, 31))
+    .nullable()
+    .optional()
+    .catch(undefined),
+  reasoning_options: z
+    .array(
+      z.object({
+        type: z.string(),
+        values: z.array(z.string()).optional().catch(undefined),
+      })
+    )
+    .optional()
+    .catch(undefined),
+});
+
+export type VercelCatalog = z.infer<typeof VercelCatalogSchema>;
+
 export const StoredModelSchema = ModelSchema.and(
   z.object({
     endpoints: z.array(EndpointSchema),
+    /** Set on Vercel language models only. */
+    catalog: VercelCatalogSchema.optional().catch(undefined),
   })
 );
 

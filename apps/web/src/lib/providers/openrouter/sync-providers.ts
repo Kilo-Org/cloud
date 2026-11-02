@@ -21,7 +21,8 @@ import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers
 import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-change-log';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@kilocode/db/schema-types';
-import { EndpointsSchema, ModelsSchema } from '@kilocode/db/schema-types';
+import { EndpointsSchema, ModelsSchema, VercelCatalogSchema } from '@kilocode/db/schema-types';
+import * as z from 'zod';
 import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import {
@@ -30,6 +31,7 @@ import {
 } from '@/lib/providers/openrouter/free-endpoint-data-policy';
 import {
   injectExtraProviderModels,
+  injectVercelOnlyModels,
   injectVercelOnlyProviders,
 } from '@/lib/providers/openrouter/inject-extra-provider-models';
 import { withWorstProviderDataPolicy } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
@@ -52,6 +54,10 @@ import { buildPublicCustomLlmSnapshotModels } from '@/lib/providers/openrouter/p
  */
 const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
 
+const CatalogsSchema = z.object({
+  data: z.array(VercelCatalogSchema.optional().catch(undefined)),
+});
+
 export async function fetchGatewayModels(gateway: Provider, modelsPath: string) {
   const headers = {
     ...ATTRIBUTION_HEADERS,
@@ -65,13 +71,15 @@ export async function fetchGatewayModels(gateway: Provider, modelsPath: string) 
   if (!modelsResponse.ok) {
     throw new Error(`Fetching models from ${gateway.id} failed: ${modelsResponse.status}`);
   }
-  const models = ModelsSchema.parse(await modelsResponse.json());
+  const body: unknown = await modelsResponse.json();
+  const models = ModelsSchema.parse(body);
+  const catalogs = CatalogsSchema.parse(body).data;
 
   const limit = pLimit(8);
   const result: Record<string, StoredModel> = {};
   const modelsWithoutEndpoints: string[] = [];
   await Promise.all(
-    models.data.map(model =>
+    models.data.map((model, index) =>
       limit(async () => {
         const endpointsResponse = await fetch(`${gateway.apiUrl}/models/${model.id}/endpoints`, {
           method: 'GET',
@@ -89,6 +97,7 @@ export async function fetchGatewayModels(gateway: Provider, modelsPath: string) 
         }
         const endpoints = EndpointsSchema.parse(await endpointsResponse.json());
         const { reasoning, ...modelMetadata } = model;
+        const catalog = model.type === 'language' ? catalogs[index] : undefined;
         result[model.id] = {
           ...modelMetadata,
           ...(reasoning && {
@@ -100,6 +109,7 @@ export async function fetchGatewayModels(gateway: Provider, modelsPath: string) 
             },
           }),
           endpoints: endpoints.data.endpoints,
+          ...(catalog && { catalog }),
         };
       })
     )
@@ -194,6 +204,17 @@ async function syncProviders(params: {
   const vercelModelIdOverrides = await getVercelModelIdOverrides();
   injectExtraProviderModels(vercelModels, providerModelData, vercelModelIdOverrides);
   injectVercelOnlyProviders(vercelModels, providerModelData, vercelModelIdOverrides);
+  injectVercelOnlyModels({
+    vercelModels,
+    openRouterCatalogModels,
+    openRouterModelIds: [
+      ...Object.keys(openRouterModels),
+      ...openRouterCatalogModels.map(model => model.id),
+    ],
+    providerModelData,
+    vercelModelIdOverrides,
+    updatedAt: new Date().toISOString(),
+  });
 
   const mappedExtraModels = buildPublicCustomLlmSnapshotModels(
     customLlms,

@@ -1,14 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import type { StoredModel } from '@kilocode/db/schema-types';
+import { beforeEach, describe, expect, it } from '@jest/globals';
+import type { StoredModel, VercelCatalog } from '@kilocode/db/schema-types';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { getVercelModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
 import { getVercelModelIdOverrides } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
-  findVercelOnlyModelIds,
+  findVercelOnlyModels,
   getVercelOnlyCatalogModels,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
-import { createMockResponse } from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
 import {
   kiloExclusiveModelFixture,
   useKiloExclusiveModel,
@@ -36,14 +35,35 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVerc
 
 useKiloExclusiveModel();
 
-const originalFetch = global.fetch;
+function catalog(overrides: Partial<VercelCatalog> = {}): VercelCatalog {
+  return {
+    description: 'A Vercel model',
+    created: 1_755_815_280,
+    released: 1_790_000_000,
+    context_window: 256_000,
+    max_tokens: 32_000,
+    modalities: { input: ['text', 'image'], output: ['text'] },
+    supported_parameters: ['max_tokens', 'tools', 'reasoning'],
+    pricing: { input: '0.0000004', output: '0.0000024', input_cache_read: '0.00000004' },
+    ...overrides,
+  };
+}
 
 function storedModel(
   id: string,
-  type: StoredModel['type'],
-  endpoints: StoredModel['endpoints'] = [{ provider_name: id.slice(0, id.indexOf('/')) }]
+  {
+    name = id.slice(id.indexOf('/') + 1),
+    type = 'language',
+    endpoints = [{ provider_name: id.slice(0, id.indexOf('/')) }],
+    catalog: modelCatalog = catalog(),
+  }: {
+    name?: string;
+    type?: StoredModel['type'];
+    endpoints?: StoredModel['endpoints'];
+    catalog?: VercelCatalog | null;
+  } = {}
 ): StoredModel {
-  return { id, name: id, type, endpoints };
+  return { id, name, type, endpoints, ...(modelCatalog && { catalog: modelCatalog }) };
 }
 
 function openRouterModel(id: string, name: string): OpenRouterModel {
@@ -59,134 +79,112 @@ function openRouterModel(id: string, name: string): OpenRouterModel {
   };
 }
 
-function vercelCatalogEntry(id: string, overrides: Record<string, unknown> = {}) {
-  return {
-    id,
-    object: 'model',
-    created: 1_755_815_280,
-    released: 1_790_000_000,
-    owned_by: id.slice(0, id.indexOf('/')),
-    name: id.slice(id.indexOf('/') + 1),
-    description: `${id} description`,
-    context_window: 256_000,
-    max_tokens: 32_000,
-    type: 'language',
-    modalities: { input: ['text', 'image'], output: ['text'] },
-    supported_parameters: ['max_tokens', 'tools', 'reasoning'],
-    pricing: { input: '0.0000004', output: '0.0000024', input_cache_read: '0.00000004' },
-    ...overrides,
-  };
-}
-
-const vercelMetadata: Record<string, StoredModel> = {
-  'alibaba/qwen3-max': storedModel('alibaba/qwen3-max', 'language'),
-  'alibaba/qwen3.5-flash': storedModel('alibaba/qwen3.5-flash', 'language', [
-    { provider_name: 'alibaba', has_no_training: true },
-    { provider_name: 'bedrock' },
-    { provider_name: 'vertexAnthropic' },
-  ]),
-  'openai/gpt-5-fast': storedModel('openai/gpt-5-fast', 'language'),
-  'openai/gpt-5-codex': storedModel('openai/gpt-5-codex', 'language'),
-  'openai/text-embedding-3-small': storedModel('openai/text-embedding-3-small', 'embedding'),
-  'meta/llama-4-scout': storedModel('meta/llama-4-scout', 'language'),
-  'quiverai/arrow-2-video': storedModel('quiverai/arrow-2-video', 'language'),
-  'anthropic/claude-opus-5-fast': storedModel('anthropic/claude-opus-5-fast', 'language'),
-  'reflection/beam-free': storedModel('reflection/beam-free', 'language'),
-};
-
-const vercelCatalog = [
-  vercelCatalogEntry('alibaba/qwen3-max'),
-  vercelCatalogEntry('alibaba/qwen3.5-flash', {
-    name: 'Qwen3.5 Flash',
-    released: 1_790_000_100,
-    supported_parameters: undefined,
-  }),
-  vercelCatalogEntry('openai/gpt-5-fast', {
-    name: 'GPT-5 (Fast)',
-    released: undefined,
-    pricing: { input: '0.0000025', output: '0.00002', input_cache_write: '0.000003' },
-    deprecated_at: Date.UTC(2027, 0, 15),
-  }),
-  vercelCatalogEntry('openai/gpt-5-codex'),
-  vercelCatalogEntry('openai/text-embedding-3-small', { type: 'embedding' }),
-  vercelCatalogEntry('quiverai/arrow-2-video', {
-    modalities: { input: ['text'], output: ['video'] },
-  }),
-  vercelCatalogEntry('anthropic/claude-opus-5-fast'),
-  vercelCatalogEntry('reflection/beam-free', { pricing: { input: '0', output: '0' } }),
-  { id: 'broken/model' },
-];
+const vercelMetadata: Record<string, StoredModel> = Object.fromEntries(
+  [
+    storedModel('alibaba/qwen3-max'),
+    storedModel('alibaba/qwen3.5-flash', {
+      name: 'Qwen3.5 Flash',
+      endpoints: [{ provider_name: 'alibaba' }, { provider_name: 'bedrock' }],
+      catalog: catalog({
+        released: 1_790_000_100,
+        reasoning_options: [
+          { type: 'budget_tokens' },
+          { type: 'effort', values: ['instant', 'low', 'high'] },
+        ],
+      }),
+    }),
+    storedModel('openai/gpt-5-fast', {
+      name: 'GPT-5 (Fast)',
+      catalog: catalog({
+        released: undefined,
+        pricing: { input: '0.0000025', output: '0.00002', input_cache_write: '0.000003' },
+        deprecated_at: Date.UTC(2027, 0, 15),
+        reasoning_options: [{ type: 'unknown' }],
+      }),
+    }),
+    storedModel('reflection/beam-free', {
+      name: 'Beam (Free)',
+      catalog: catalog({ released: 1_780_000_000, pricing: { input: '0', output: '0' } }),
+    }),
+    storedModel('openai/gpt-5-codex'),
+    storedModel('anthropic/claude-opus-5-fast'),
+    storedModel('openai/text-embedding-3-small', { type: 'embedding' }),
+    storedModel('quiverai/arrow-2-video', {
+      catalog: catalog({ modalities: { input: ['text'], output: ['video'] } }),
+    }),
+    storedModel('meta/llama-4-scout', { catalog: null }),
+  ].map(model => [model.id, model])
+);
 
 const openRouterModels = [
   openRouterModel('qwen/qwen3-max', 'Qwen: Qwen3 Max'),
   openRouterModel('openai/gpt-5', 'OpenAI: GPT-5'),
 ];
 
-describe('findVercelOnlyModelIds', () => {
-  it('keeps Vercel language models that no OpenRouter id maps to, under their reversed ids', () => {
-    expect(
-      findVercelOnlyModelIds({
-        openRouterModelIds: ['qwen/qwen3-max', 'openai/gpt-5'],
-        vercelMetadata,
-        overrides: new Map(),
-      })
-    ).toEqual(
-      new Map([
-        ['qwen/qwen3.5-flash', 'alibaba/qwen3.5-flash'],
-        ['openai/gpt-5-fast', 'openai/gpt-5-fast'],
-        ['openai/gpt-5-codex', 'openai/gpt-5-codex'],
-        ['meta/llama-4-scout', 'meta/llama-4-scout'],
-        ['quiverai/arrow-2-video', 'quiverai/arrow-2-video'],
-        ['anthropic/claude-opus-5-fast', 'anthropic/claude-opus-5-fast'],
-        ['reflection/beam-free', 'reflection/beam-free'],
-      ])
-    );
+function ids(models: { id: string }[]) {
+  return models.map(model => model.id);
+}
+
+describe('findVercelOnlyModels', () => {
+  it('keeps Vercel chat models that no OpenRouter id maps to, under their reversed ids', () => {
+    const models = findVercelOnlyModels({
+      openRouterModelIds: ['qwen/qwen3-max', 'openai/gpt-5'],
+      vercelMetadata,
+      overrides: new Map(),
+    });
+
+    expect(ids(models)).toEqual([
+      'qwen/qwen3.5-flash',
+      'openai/gpt-5-fast',
+      'reflection/beam-free',
+      'openai/gpt-5-codex',
+      'anthropic/claude-opus-5-fast',
+    ]);
+    expect(models[0]?.storedModel).toBe(vercelMetadata['alibaba/qwen3.5-flash']);
   });
 
   it('treats a Vercel model an override points to as covered', () => {
-    const ids = findVercelOnlyModelIds({
+    const models = findVercelOnlyModels({
       openRouterModelIds: ['openai/gpt-5-priority'],
       vercelMetadata,
       overrides: new Map([['openai/gpt-5-priority', 'openai/gpt-5-fast']]),
     });
 
-    expect(ids.has('openai/gpt-5-fast')).toBe(false);
-    expect(ids.has('openai/gpt-5-priority')).toBe(false);
+    expect(ids(models)).not.toContain('openai/gpt-5-fast');
+    expect(ids(models)).not.toContain('openai/gpt-5-priority');
   });
 
   it('lists a Vercel model under its override id when OpenRouter dropped that id', () => {
-    const ids = findVercelOnlyModelIds({
+    const models = findVercelOnlyModels({
       openRouterModelIds: [],
       vercelMetadata,
       overrides: new Map([['openai/gpt-5-priority', 'openai/gpt-5-fast']]),
     });
 
-    expect(ids.get('openai/gpt-5-priority')).toBe('openai/gpt-5-fast');
+    expect(ids(models)).toContain('openai/gpt-5-priority');
+    expect(ids(models)).not.toContain('openai/gpt-5-fast');
   });
 
   it('treats the internal id of a Kilo-exclusive model as covered', () => {
-    const ids = findVercelOnlyModelIds({
+    const models = findVercelOnlyModels({
       openRouterModelIds: [],
       vercelMetadata: {
-        [kiloExclusiveModelFixture.internal_id]: storedModel(
-          kiloExclusiveModelFixture.internal_id,
-          'language'
-        ),
+        [kiloExclusiveModelFixture.internal_id]: storedModel(kiloExclusiveModelFixture.internal_id),
       },
       overrides: new Map(),
     });
 
-    expect(ids.size).toBe(0);
+    expect(models).toEqual([]);
   });
 
   it('skips ids with uppercase letters, which the proxy cannot route', () => {
-    const ids = findVercelOnlyModelIds({
+    const models = findVercelOnlyModels({
       openRouterModelIds: [],
-      vercelMetadata: { 'vendor/Model-X': storedModel('vendor/Model-X', 'language') },
+      vercelMetadata: { 'vendor/Model-X': storedModel('vendor/Model-X') },
       overrides: new Map(),
     });
 
-    expect(ids.size).toBe(0);
+    expect(models).toEqual([]);
   });
 });
 
@@ -198,18 +196,81 @@ describe('getVercelOnlyCatalogModels', () => {
       vercelEnabled: true,
       vercelOptOutModels: new Set(['openai/gpt-5-codex']),
     });
-    // The module caches the catalog: the tests that expect no fetch run first, and every test
-    // serves the same response.
-    global.fetch = jest.fn(() =>
-      Promise.resolve(createMockResponse({ jsonData: { data: vercelCatalog } }))
-    ) as unknown as typeof fetch;
   });
 
-  afterEach(() => {
-    global.fetch = originalFetch;
+  it('builds catalog entries for routable Vercel-only chat models, newest first', async () => {
+    const models = await getVercelOnlyCatalogModels({
+      openRouterModels,
+      openRouterMetadata: {},
+    });
+
+    expect(ids(models)).toEqual([
+      'qwen/qwen3.5-flash',
+      'reflection/beam-free',
+      'openai/gpt-5-fast',
+    ]);
+    expect(models[0]).toEqual({
+      id: 'qwen/qwen3.5-flash',
+      name: 'Qwen: Qwen3.5 Flash',
+      created: 1_790_000_100,
+      description: 'A Vercel model',
+      architecture: {
+        input_modalities: ['text', 'image'],
+        output_modalities: ['text'],
+        tokenizer: 'Other',
+      },
+      top_provider: {
+        is_moderated: false,
+        context_length: 256_000,
+        max_completion_tokens: 32_000,
+      },
+      pricing: {
+        prompt: '0.0000004',
+        completion: '0.0000024',
+        input_cache_read: '0.00000004',
+      },
+      context_length: 256_000,
+      supported_parameters: ['max_tokens', 'tools', 'reasoning'],
+      expiration_date: undefined,
+      opencode: {
+        ai_sdk_provider: undefined,
+        reasoning_options: [{ type: 'toggle' }, { type: 'effort', values: ['low', 'high'] }],
+        variants: {
+          none: { reasoning: { enabled: false, effort: 'none' } },
+          low: { reasoning: { enabled: true, effort: 'low' } },
+          high: { reasoning: { enabled: true, effort: 'high' } },
+        },
+        prompt: undefined,
+      },
+    });
+    expect(models[1]).toMatchObject({
+      id: 'reflection/beam-free',
+      name: 'Beam (Free)',
+      pricing: { prompt: '0', completion: '0' },
+    });
+    expect(models[2]).toMatchObject({
+      id: 'openai/gpt-5-fast',
+      name: 'OpenAI: GPT-5 (Fast)',
+      created: 1_755_815_280,
+      pricing: { prompt: '0.0000025', completion: '0.00002', input_cache_write: '0.000003' },
+      expiration_date: '2027-01-15',
+      opencode: undefined,
+    });
   });
 
-  it('lists nothing and skips the Vercel catalog when Vercel routing is disabled', async () => {
+  it('keeps a Claude model when a provider other than Anthropic serves it', async () => {
+    jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({
+      'anthropic/claude-opus-5-fast': storedModel('anthropic/claude-opus-5-fast', {
+        endpoints: [{ provider_name: 'anthropic' }, { provider_name: 'bedrock' }],
+      }),
+    });
+
+    const models = await getVercelOnlyCatalogModels({ openRouterModels, openRouterMetadata: {} });
+
+    expect(ids(models)).toEqual(['anthropic/claude-opus-5-fast']);
+  });
+
+  it('lists nothing when Vercel routing is disabled', async () => {
     jest.mocked(getRuntimeGatewayRoutingConfig).mockResolvedValue({
       vercelEnabled: false,
       vercelOptOutModels: new Set(),
@@ -218,91 +279,16 @@ describe('getVercelOnlyCatalogModels', () => {
     await expect(
       getVercelOnlyCatalogModels({ openRouterModels, openRouterMetadata: {} })
     ).resolves.toEqual([]);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('skips the Vercel catalog when every Vercel model has an OpenRouter equivalent', async () => {
-    jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({
-      'alibaba/qwen3-max': vercelMetadata['alibaba/qwen3-max'],
-    });
-
-    await expect(
-      getVercelOnlyCatalogModels({ openRouterModels, openRouterMetadata: {} })
-    ).resolves.toEqual([]);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('builds catalog entries for routable, paid Vercel-only chat models, newest first', async () => {
-    const models = await getVercelOnlyCatalogModels({
-      openRouterModels,
-      openRouterMetadata: {},
-    });
-
-    expect(models).toEqual([
-      {
-        model: {
-          id: 'qwen/qwen3.5-flash',
-          name: 'Qwen: Qwen3.5 Flash',
-          created: 1_790_000_100,
-          description: 'alibaba/qwen3.5-flash description',
-          architecture: {
-            input_modalities: ['text', 'image'],
-            output_modalities: ['text'],
-            tokenizer: 'Other',
-          },
-          top_provider: {
-            is_moderated: false,
-            context_length: 256_000,
-            max_completion_tokens: 32_000,
-          },
-          pricing: {
-            prompt: '0.0000004',
-            completion: '0.0000024',
-            input_cache_read: '0.00000004',
-          },
-          context_length: 256_000,
-          supported_parameters: undefined,
-          expiration_date: undefined,
-          mayTrainOnYourPrompts: false,
-        },
-        inferenceProviderIds: ['alibaba', 'amazon-bedrock', 'google-vertex'],
-      },
-      {
-        model: expect.objectContaining({
-          id: 'openai/gpt-5-fast',
-          name: 'OpenAI: GPT-5 (Fast)',
-          created: 1_755_815_280,
-          pricing: { prompt: '0.0000025', completion: '0.00002', input_cache_write: '0.000003' },
-          supported_parameters: ['max_tokens', 'tools', 'reasoning'],
-          expiration_date: '2027-01-15',
-          mayTrainOnYourPrompts: true,
-        }),
-        inferenceProviderIds: ['openai'],
-      },
-    ]);
-  });
-
-  it('keeps a Claude model when a provider other than Anthropic serves it', async () => {
-    jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({
-      'anthropic/claude-opus-5-fast': storedModel('anthropic/claude-opus-5-fast', 'language', [
-        { provider_name: 'anthropic' },
-        { provider_name: 'bedrock' },
-      ]),
-    });
-
-    const models = await getVercelOnlyCatalogModels({ openRouterModels, openRouterMetadata: {} });
-
-    expect(models.map(({ model }) => model.id)).toEqual(['anthropic/claude-opus-5-fast']);
   });
 
   it('treats models in the stored OpenRouter metadata as covered', async () => {
     const models = await getVercelOnlyCatalogModels({
       openRouterModels,
       openRouterMetadata: {
-        'qwen/qwen3.5-flash': storedModel('qwen/qwen3.5-flash', undefined),
+        'qwen/qwen3.5-flash': { id: 'qwen/qwen3.5-flash', name: 'Qwen3.5 Flash', endpoints: [] },
       },
     });
 
-    expect(models.map(({ model }) => model.id)).toEqual(['openai/gpt-5-fast']);
+    expect(ids(models)).toEqual(['reflection/beam-free', 'openai/gpt-5-fast']);
   });
 });

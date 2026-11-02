@@ -1,6 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 import {
   injectExtraProviderModels,
+  injectVercelOnlyModels,
   injectVercelOnlyProviders,
 } from '@/lib/providers/openrouter/inject-extra-provider-models';
 import {
@@ -353,5 +354,96 @@ describe('injectVercelOnlyProviders', () => {
     injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
 
     expect(providerModelData).toHaveLength(2);
+  });
+});
+
+describe('injectVercelOnlyModels', () => {
+  const catalog = {
+    description: 'Qwen3.5 Flash description',
+    created: 1_790_000_000,
+    context_window: 1_000_000,
+    modalities: { input: ['text', 'image'], output: ['text'] },
+    pricing: { input: '0.0000001', output: '0.0000004' },
+  };
+
+  function providerModelData() {
+    return [
+      {
+        provider: provider('amazon-bedrock', 'Amazon Bedrock', {
+          training: false,
+          retainsPrompts: false,
+          canPublish: false,
+        }),
+        models: [] as OpenRouterModel[],
+      },
+    ];
+  }
+
+  test('lists a Vercel-only model under existing and new providers', () => {
+    const data = providerModelData();
+    const vercelModels: Record<string, StoredModel> = {
+      'alibaba/qwen3.5-flash': {
+        id: 'alibaba/qwen3.5-flash',
+        name: 'Qwen3.5 Flash',
+        type: 'language',
+        catalog,
+        endpoints: [
+          {
+            provider_name: 'bedrock',
+            context_length: 500_000,
+            pricing: { prompt: '0.0000002', completion: '0.0000008' },
+            has_zdr: true,
+            has_no_training: true,
+          },
+          { provider_name: 'alibaba' },
+        ],
+      },
+      'alibaba/qwen3-max': {
+        id: 'alibaba/qwen3-max',
+        name: 'Qwen3 Max',
+        type: 'language',
+        catalog,
+        endpoints: [{ provider_name: 'alibaba' }],
+      },
+    };
+
+    injectVercelOnlyModels({
+      vercelModels,
+      openRouterCatalogModels: [{ id: 'qwen/qwen3-max', name: 'Qwen: Qwen3 Max' }],
+      openRouterModelIds: ['qwen/qwen3-max'],
+      providerModelData: data,
+      vercelModelIdOverrides: new Map(),
+      updatedAt: '2026-11-02T00:00:00.000Z',
+    });
+
+    expect(data.map(({ provider }) => provider.slug)).toEqual(['amazon-bedrock', 'alibaba']);
+    expect(data[0]?.provider.dataPolicy).toEqual({
+      training: false,
+      retainsPrompts: false,
+      canPublish: false,
+    });
+    expect(data[0]?.models).toEqual([
+      {
+        slug: 'qwen/qwen3.5-flash',
+        name: 'Qwen: Qwen3.5 Flash',
+        author: 'qwen',
+        description: 'Qwen3.5 Flash description',
+        context_length: 500_000,
+        input_modalities: ['text', 'image'],
+        output_modalities: ['text'],
+        group: 'Other',
+        updated_at: '2026-11-02T00:00:00.000Z',
+        endpoint: {
+          provider_display_name: 'Amazon Bedrock',
+          is_free: false,
+          pricing: { prompt: '0.0000002', completion: '0.0000008' },
+          data_policy: { training: false, retainsPrompts: false },
+        },
+      },
+    ]);
+    expect(data[1]?.provider.dataPolicy).toMatchObject({ training: true, retainsPrompts: true });
+    expect(data[1]?.models.map(model => [model.slug, model.endpoint?.pricing])).toEqual([
+      ['qwen/qwen3.5-flash', { prompt: '0.0000001', completion: '0.0000004' }],
+    ]);
   });
 });

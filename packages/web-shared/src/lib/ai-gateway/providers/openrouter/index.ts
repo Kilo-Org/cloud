@@ -217,12 +217,6 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
     getVercelOnlyCatalogModels({ openRouterModels: models, openRouterMetadata: endpointsMetadata }),
     getTerminalBenchSummaries(),
   ]);
-  const vercelOnlyModels = vercelOnlyCatalogModels.filter(({ model }) =>
-    isListableGatewayModelId(model.id)
-  );
-  const vercelOnlyProviders = new Map(
-    vercelOnlyModels.map(({ model, inferenceProviderIds }) => [model.id, inferenceProviderIds])
-  );
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   const catalogModels = models
     .filter(
@@ -244,7 +238,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
         alias_target: aliasTarget,
       };
     })
-    .concat(vercelOnlyModels.map(({ model }) => model))
+    .concat(vercelOnlyCatalogModels.filter(model => isListableGatewayModelId(model.id)))
     .concat(
       kiloExclusiveModels
         .filter(m => !unavailableModelIds.has(m.public_id))
@@ -263,7 +257,6 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
       const preferredIndex = preferredModels.indexOf(model.id);
       const providerIds =
         publicCustomLlmProviders.get(model.id) ??
-        vercelOnlyProviders.get(model.id) ??
         indexedProviders.get(providerLookupId(model)) ??
         [];
       const inferenceProviderIds = [

@@ -1084,6 +1084,8 @@
     "overview": {
       "allAreas": "所有面向",
       "nSelected": "已選取 {{displayCount}} 項",
+      "nSelected_one": "已選取 {{displayCount}} 項",
+      "nSelected_other": "已選取 {{displayCount}} 項",
       "proposedReviewMdGuidance": "建議的 REVIEW.md 指引",
       "set": "已設定",
       "notSet": "未設定"
@@ -1311,6 +1313,7 @@
       "repoSummaryHigh_other": "{{displayCount}} 項高風險",
       "repositoryActionPlan": "存放庫處理計畫",
       "settings": "設定",
+      "syncing": "同步中…",
       "syncNow": "立即同步",
       "syncQueued": "已排入同步佇列",
       "syncStatusUnavailable": "無法取得同步狀態。",
@@ -2714,6 +2717,8 @@
       "checkFailedTitleBitbucket": "無法檢查 Bitbucket 連線。",
       "providerCheckFailedMessage": "載入完成前無法取得連線狀態。",
       "reconnectTitle": "重新連線至 GitHub",
+      "reconnectTitleGitLab": "重新連線至 GitLab",
+      "reconnectTitleBitbucket": "重新連線至 Bitbucket",
       "reconnectDescription": "你的 GitHub 連線授權已撤銷。",
       "gitlabDescription": "在行動裝置上審查合併請求",
       "gitlabInstanceMismatchTitle": "GitLab 連線屬於另一個執行個體",

@@ -1084,6 +1084,8 @@
     "overview": {
       "allAreas": "Tất cả nội dung",
       "nSelected": "Đã chọn {{displayCount}}",
+      "nSelected_one": "Đã chọn {{displayCount}}",
+      "nSelected_other": "Đã chọn {{displayCount}}",
       "proposedReviewMdGuidance": "Hướng dẫn đề xuất cho REVIEW.md",
       "set": "Đã thiết lập",
       "notSet": "Chưa thiết lập"
@@ -1311,6 +1313,7 @@
       "repoSummaryHigh_other": "{{displayCount}} cao",
       "repositoryActionPlan": "Kế hoạch xử lý cho từng kho lưu trữ",
       "settings": "Cài đặt",
+      "syncing": "Đang đồng bộ…",
       "syncNow": "Đồng bộ ngay",
       "syncQueued": "Đã đưa yêu cầu đồng bộ vào hàng đợi",
       "syncStatusUnavailable": "Không thể lấy trạng thái đồng bộ.",
@@ -2714,6 +2717,8 @@
       "checkFailedTitleBitbucket": "Không thể kiểm tra kết nối Bitbucket.",
       "providerCheckFailedMessage": "Trạng thái kết nối chưa khả dụng cho đến khi tải xong.",
       "reconnectTitle": "Kết nối lại GitHub",
+      "reconnectTitleGitLab": "Kết nối lại GitLab",
+      "reconnectTitleBitbucket": "Kết nối lại Bitbucket",
       "reconnectDescription": "Quyền kết nối với GitHub của bạn đã bị thu hồi.",
       "gitlabDescription": "Rà soát merge request trên điện thoại",
       "gitlabInstanceMismatchTitle": "Kết nối GitLab dành cho một máy chủ khác",

@@ -1135,8 +1135,13 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       // surviving workspace this allocation already stamped (a wrapper restart
       // after the stamp but before import). An unstamped repository is a partial
       // preparation, not proof of recovery, so it keeps ingest restoration.
+      // A continued session clones the source transcript but must not let
+      // historical ingest files overwrite the pushed branch, which is the source
+      // of truth. `spec.continuation` is the server-only marker for that case;
+      // transcript import still runs for the message history.
       const restoreFilesFor = (): boolean =>
         spec.sessionSnapshot === undefined &&
+        spec.continuation !== true &&
         !(replacementWorkspace && localRecoveryApplied) &&
         !(recovery !== undefined && workspace === 'same');
       // One owner for runtime profile, runtime start and session resolution, shared

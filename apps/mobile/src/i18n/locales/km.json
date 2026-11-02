@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "មិនអាចពិនិត្យការតភ្ជាប់ Bitbucket បានទេ។",
       "providerCheckFailedMessage": "ស្ថានភាពការតភ្ជាប់មិនអាចប្រើបានទេរហូតដល់បានផ្ទុករួច។",
       "reconnectTitle": "ភ្ជាប់ GitHub ឡើងវិញ",
+      "reconnectTitleGitLab": "ភ្ជាប់ GitLab ឡើងវិញ",
+      "reconnectTitleBitbucket": "ភ្ជាប់ Bitbucket ឡើងវិញ",
       "reconnectDescription": "ការអនុញ្ញាតឱ្យភ្ជាប់ GitHub របស់អ្នកត្រូវបានដកហូត។",
       "gitlabDescription": "ពិនិត្យសំណើបញ្ចូលនៅលើទូរស័ព្ទ",
       "gitlabInstanceMismatchTitle": "ការតភ្ជាប់ GitLab គឺសម្រាប់អង្គភាពផ្សេងទៀត",
@@ -1614,6 +1616,8 @@
       "set": "បានកំណត់",
       "notSet": "មិនបានកំណត់",
       "nSelected": "បានជ្រើសរើស {{displayCount}}",
+      "nSelected_one": "បានជ្រើសរើស {{displayCount}}",
+      "nSelected_other": "បានជ្រើសរើស {{displayCount}}",
       "proposedReviewMdGuidance": "ការណែនាំ REVIEW.md ដែលបានស្នើ"
     },
     "decision": {
@@ -1795,6 +1799,7 @@
       "priorityFindingsPending": "បញ្ហាអាទិភាពដែលរកឃើញនឹងបង្ហាញឡើងបន្ទាប់ពីធ្វើសមកាលកម្មលើកដំបូង។",
       "refreshFailed": "មិនអាចផ្ទុកទិន្នន័យឡើងវិញបានទេ។ កំពុងបង្ហាញទិន្នន័យពីការធ្វើសមកាលកម្មចុងក្រោយ។",
       "settings": "ការកំណត់",
+      "syncing": "កំពុងធ្វើសមកាលកម្ម…",
       "syncNow": "ធ្វើសមកាលកម្មឥឡូវនេះ",
       "syncQueued": "បានដាក់ការធ្វើសមកាលកម្មក្នុងជួររង់ចាំ",
       "syncStatusUnavailable": "មិនអាចមើលស្ថានភាពសមកាលកម្មបានទេ។",

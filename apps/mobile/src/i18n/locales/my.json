@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Bitbucket ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
       "providerCheckFailedMessage": "၎င်းတိုင် လိုက်ဒ်မဖြစ်မီ ချိတ်ဆက်မှုအခြေအနေ မရရှိနိုင်ပါ။",
       "reconnectTitle": "GitHub ပြန်ချိတ်ဆက်ခြင်း",
+      "reconnectTitleGitLab": "GitLab ပြန်ချိတ်ဆက်ခြင်း",
+      "reconnectTitleBitbucket": "Bitbucket ပြန်ချိတ်ဆက်ခြင်း",
       "reconnectDescription": "သင့် GitHub ချိတ်ဆက်ခွင့်ကို ရုပ်သိမ်းထားပါသည်။",
       "gitlabDescription": "မိုဘိုင်းတွင် merge request များကို သုံးသပ်ပါ",
       "gitlabInstanceMismatchTitle": "GitLab ချိတ်ဆက်မှုသည် အခြား instance တစ်ခုအတွက် ဖြစ်သည်",
@@ -1614,6 +1616,8 @@
       "set": "သတ်မှတ်ထား",
       "notSet": "သတ်မှတ်ထားခြင်း မရှိ",
       "nSelected": "{{displayCount}} ခု ရွေးထား",
+      "nSelected_one": "{{displayCount}} ခု ရွေးထား",
+      "nSelected_other": "{{displayCount}} ခု ရွေးထား",
       "proposedReviewMdGuidance": "အဆိုပြုထားသော REVIEW.md လမ်းညွှန်ချက်များ"
     },
     "decision": {
@@ -1795,6 +1799,7 @@
       "priorityFindingsPending": "ပထမဆုံး ထပ်တူပြုပြီးနောက် ဦးစားပေး တွေ့ရှိချက်များ ပေါ်လာမည်။",
       "refreshFailed": "ဒေတာအသစ်ကို ရယူ၍ မရပါ။ နောက်ဆုံး ထပ်တူပြုထားသော ဒေတာကို ပြထားသည်။",
       "settings": "ဆက်တင်များ",
+      "syncing": "ထပ်တူပြုနေသည်…",
       "syncNow": "ယခု ထပ်တူပြုပါ",
       "syncQueued": "ထပ်တူပြုရန် အလှည့်စောင့်စာရင်းထဲ ထည့်ထားသည်။",
       "syncStatusUnavailable": "ထပ်တူပြုမှုအခြေအနေကို ရယူ၍ မရပါ။",

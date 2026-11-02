@@ -331,6 +331,7 @@ export function assertSessionOperationIdentity(
       | 'create_cloud'
       | 'create_worktree_chat'
       | 'create_workspace_session'
+      | 'continue_workspace_session'
       | 'delete_workspace_session';
     organizationId?: string | null;
     resourceKey?: string | null;
@@ -556,6 +557,54 @@ function deriveCanonicalRepositoryUrl(repository: SessionRepositoryRequest): str
   return normalizeGitUrl(repository.url);
 }
 
+/**
+ * The one complete Session Ingest ownership request for a create. Fresh
+ * allocation and both resume windows call this so every window sends the same
+ * fields (clone source, title, organization, platform, git URL, resolved
+ * profile id, and the worktree id plus location when the allocation has a
+ * worktree). A continuation first session is a clone-only create that also
+ * carries a worktree, so the resume path must include the worktree fields the
+ * clone resume previously omitted.
+ */
+function ownershipRequestForCreate(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  allocation: {
+    cloudAgentSessionId: string;
+    kiloSessionId: string;
+    sandboxId: SandboxId;
+    sandboxProvider: SessionRegistrationResult['sandboxProvider'];
+    worktreeId?: CloudAgentWorktreeId;
+  }
+): CreateSessionForCloudAgentParams {
+  const worktreeId = allocation.worktreeId;
+  return {
+    sessionId: allocation.kiloSessionId,
+    kiloUserId: ctx.userId,
+    cloudAgentSessionId: allocation.cloudAgentSessionId,
+    organizationId: input.options?.kilocodeOrganizationId,
+    createdOnPlatform: input.options?.createdOnPlatform ?? 'cloud-agent',
+    title: input.ownershipTitle ?? `New session - ${new Date().toISOString()}`,
+    gitUrl: deriveCanonicalRepositoryUrl(input.repository),
+    profileId: input.profile?.resolvedProfileId,
+    // Always present (undefined when there is no clone), matching the previous
+    // ingest request shape.
+    cloneFromKiloSessionId: input.clone?.cloneFromKiloSessionId,
+    ...(input.clone?.cloneUpToMessageId
+      ? { cloneUpToMessageId: input.clone.cloneUpToMessageId }
+      : {}),
+    ...(worktreeId ? { cloudAgentWorktreeId: worktreeId } : {}),
+    ...(worktreeId
+      ? {
+          cloudAgentWorktreeLocation: {
+            sandboxId: allocation.sandboxId,
+            provider: allocation.sandboxProvider,
+          },
+        }
+      : {}),
+  };
+}
+
 function computeCredentialContainment(
   sessionId: string,
   input: SessionRegistrationInput,
@@ -596,19 +645,31 @@ export function isTrustedWorktreeCreateOrigin(
   );
 }
 
-function isEligibleFirstWorktreeSession(
+export function isEligibleFirstWorktreeSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext
 ): boolean {
+  if (input.options?.operationKey === undefined || ctx.botId !== undefined) {
+    return false;
+  }
+  // A continuation first session is a clone-only create placed in the
+  // workspace worktree. The marker is server-only: only the continuation
+  // handler sets it, so mobile and web clone creates stay standalone.
+  if (input.options?.workspaceContinuation === true) {
+    return (
+      input.options.clientProvenance === 'agent-manager' &&
+      input.options.createdOnPlatform === 'cloud-agent-web' &&
+      input.initialTurn === undefined &&
+      input.clone !== undefined
+    );
+  }
   return (
     isTrustedWorktreeCreateOrigin(
       input.options?.clientProvenance,
       input.options?.createdOnPlatform
     ) &&
-    input.options?.operationKey !== undefined &&
     input.initialTurn !== undefined &&
-    input.clone === undefined &&
-    ctx.botId === undefined
+    input.clone === undefined
   );
 }
 
@@ -853,7 +914,6 @@ async function allocateNewSession(
   const worktreeId = ledger?.worktreeEnabled
     ? cloudAgentWorktreeIdSchema.parse(`worktree_${cloudAgentSessionId.slice('workspace_'.length)}`)
     : undefined;
-  const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
   const runtimeAuthorization = await issueSessionRuntimeAuthorization(
     input,
     ctx,
@@ -993,29 +1053,19 @@ async function allocateNewSession(
   });
   logger.info('Creating new session ownership row');
 
-  const defaultTitle = `New session - ${new Date().toISOString()}`;
-  const canonicalRepositoryUrl = deriveCanonicalRepositoryUrl(input.repository);
   const cloneFromKiloSessionId = input.clone?.cloneFromKiloSessionId;
   let ingestResult: CreateSessionForCloudAgentResult | undefined;
   try {
-    ingestResult = await createIngestOwnershipRow(ctx.env, {
-      sessionId: kiloSessionId,
-      kiloUserId: ctx.userId,
-      cloudAgentSessionId,
-      organizationId: input.options?.kilocodeOrganizationId,
-      createdOnPlatform,
-      title: defaultTitle,
-      gitUrl: canonicalRepositoryUrl,
-      profileId: input.profile?.resolvedProfileId,
-      cloneFromKiloSessionId: input.clone?.cloneFromKiloSessionId,
-      ...(input.clone?.cloneUpToMessageId
-        ? { cloneUpToMessageId: input.clone.cloneUpToMessageId }
-        : {}),
-      ...(worktreeId ? { cloudAgentWorktreeId: worktreeId } : {}),
-      ...(worktreeId
-        ? { cloudAgentWorktreeLocation: { sandboxId, provider: sandboxProvider } }
-        : {}),
-    });
+    ingestResult = await createIngestOwnershipRow(
+      ctx.env,
+      ownershipRequestForCreate(input, ctx, {
+        cloudAgentSessionId,
+        kiloSessionId,
+        sandboxId,
+        sandboxProvider,
+        ...(worktreeId ? { worktreeId } : {}),
+      })
+    );
   } catch (error) {
     await recordPostSetupFailure(() =>
       recordCloudAgentSessionFailure(
@@ -1295,6 +1345,8 @@ function buildSessionRegistrationCommand(
             : {}),
         }
       : undefined,
+    // Server-only continuation marker, set only by the continuation handler.
+    continuation: input.options?.workspaceContinuation === true ? true : undefined,
     ...(allocation.initialTurn
       ? {
           message: {
@@ -2366,26 +2418,13 @@ async function resumeCloneCreate(
 
   const allocation = rebuildRecordedSessionAllocation(input, ctx, row, options);
   const hooks = await buildLedgerHooks(input, ctx, options, db, row, 'takeover');
-  const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
-  const defaultTitle = `New session - ${new Date().toISOString()}`;
-  const canonicalRepositoryUrl = deriveCanonicalRepositoryUrl(input.repository);
 
   let ingestResult: CreateSessionForCloudAgentResult | undefined;
   try {
-    ingestResult = await createIngestOwnershipRow(ctx.env, {
-      sessionId: ids.kiloSessionId,
-      kiloUserId: ctx.userId,
-      cloudAgentSessionId: ids.cloudAgentSessionId,
-      organizationId: input.options?.kilocodeOrganizationId,
-      createdOnPlatform,
-      title: defaultTitle,
-      gitUrl: canonicalRepositoryUrl,
-      profileId: input.profile?.resolvedProfileId,
-      cloneFromKiloSessionId: input.clone?.cloneFromKiloSessionId,
-      ...(input.clone?.cloneUpToMessageId
-        ? { cloneUpToMessageId: input.clone.cloneUpToMessageId }
-        : {}),
-    });
+    ingestResult = await createIngestOwnershipRow(
+      ctx.env,
+      ownershipRequestForCreate(input, ctx, allocation)
+    );
   } catch (error) {
     await recordPostSetupFailure(() =>
       recordCloudAgentSessionFailure(
@@ -2429,31 +2468,7 @@ async function resumeCloneCreate(
     await hooks.onTransportFailure();
     throw creationInProgressError();
   }
-  // `ready` continues.
-
-  allocation.runtimeAuthorization = await issueSessionRuntimeAuthorization(
-    input,
-    ctx,
-    allocation.cloudAgentSessionId,
-    allocation.initialTurn
-  );
-  const billingOrigin = { billingOrigin: options.billingOrigin };
-  if (input.initialTurn === undefined) {
-    const result = await registerAllocatedSession(input, ctx, billingOrigin, allocation, hooks);
-    return { ...result, replayed: true };
-  }
-  const result = await registerAndAdmitInitialTurn(input, ctx, billingOrigin, allocation, hooks);
-  return {
-    cloudAgentSessionId: result.cloudAgentSessionId,
-    kiloSessionId: result.kiloSessionId,
-    ...(options.includeInitialMessage
-      ? {
-          messageId: result.admission.messageId,
-          delivery: result.admission.compatibilityDelivery,
-        }
-      : {}),
-    replayed: true,
-  };
+  return resumeAllocatedSession(input, ctx, options, allocation, hooks);
 }
 
 async function resumeFirstWorktreeCreate(
@@ -2474,21 +2489,10 @@ async function resumeFirstWorktreeCreate(
   if (!ownershipExists) {
     let ingestResult: CreateSessionForCloudAgentResult | undefined;
     try {
-      ingestResult = await createIngestOwnershipRow(ctx.env, {
-        sessionId: allocation.kiloSessionId,
-        kiloUserId: ctx.userId,
-        cloudAgentSessionId: allocation.cloudAgentSessionId,
-        organizationId: input.options?.kilocodeOrganizationId,
-        createdOnPlatform: input.options?.createdOnPlatform ?? 'cloud-agent',
-        title: `New session - ${new Date().toISOString()}`,
-        gitUrl: deriveCanonicalRepositoryUrl(input.repository),
-        profileId: input.profile?.resolvedProfileId,
-        cloudAgentWorktreeId: worktreeId,
-        cloudAgentWorktreeLocation: {
-          sandboxId: allocation.sandboxId,
-          provider: allocation.sandboxProvider,
-        },
-      });
+      ingestResult = await createIngestOwnershipRow(
+        ctx.env,
+        ownershipRequestForCreate(input, ctx, allocation)
+      );
     } catch (error) {
       await recordPostSetupFailure(() =>
         recordCloudAgentSessionFailure(
@@ -2513,19 +2517,28 @@ async function resumeFirstWorktreeCreate(
     }
   }
 
+  return resumeAllocatedSession(input, ctx, options, allocation, hooks);
+}
+
+async function resumeAllocatedSession(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  options: SessionLedgerCreateOptions,
+  allocation: NewSessionAllocation,
+  hooks: SessionCreationLedgerHooks
+): Promise<LedgerSessionCreateResult> {
   allocation.runtimeAuthorization = await issueSessionRuntimeAuthorization(
     input,
     ctx,
     allocation.cloudAgentSessionId,
     allocation.initialTurn
   );
-  const result = await registerAndAdmitInitialTurn(
-    input,
-    ctx,
-    { billingOrigin: options.billingOrigin },
-    allocation,
-    hooks
-  );
+  const billingOrigin = { billingOrigin: options.billingOrigin };
+  if (input.initialTurn === undefined) {
+    const result = await registerAllocatedSession(input, ctx, billingOrigin, allocation, hooks);
+    return { ...result, replayed: true };
+  }
+  const result = await registerAndAdmitInitialTurn(input, ctx, billingOrigin, allocation, hooks);
   return {
     cloudAgentSessionId: result.cloudAgentSessionId,
     kiloSessionId: result.kiloSessionId,

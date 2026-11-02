@@ -1084,6 +1084,8 @@
     "overview": {
       "allAreas": "Semua area",
       "nSelected": "{{displayCount}} dipilih",
+      "nSelected_one": "{{displayCount}} dipilih",
+      "nSelected_other": "{{displayCount}} dipilih",
       "proposedReviewMdGuidance": "Panduan REVIEW.md yang diusulkan",
       "set": "Sudah diatur",
       "notSet": "Belum diatur"
@@ -1311,6 +1313,7 @@
       "repoSummaryHigh_other": "{{displayCount}} tinggi",
       "repositoryActionPlan": "Rencana tindakan repositori",
       "settings": "Pengaturan",
+      "syncing": "Menyinkronkan…",
       "syncNow": "Sinkronkan sekarang",
       "syncQueued": "Sinkronisasi diantrekan",
       "syncStatusUnavailable": "Status sinkronisasi tidak tersedia.",
@@ -2714,6 +2717,8 @@
       "checkFailedTitleBitbucket": "Tidak dapat memeriksa koneksi Bitbucket.",
       "providerCheckFailedMessage": "Status koneksi tidak tersedia hingga bagian ini termuat.",
       "reconnectTitle": "Hubungkan ulang GitHub",
+      "reconnectTitleGitLab": "Hubungkan ulang GitLab",
+      "reconnectTitleBitbucket": "Hubungkan ulang Bitbucket",
       "reconnectDescription": "Akses ke akun GitHub kamu telah dicabut.",
       "gitlabDescription": "Tinjau merge request di perangkat seluler",
       "gitlabInstanceMismatchTitle": "Koneksi GitLab untuk instance lain",

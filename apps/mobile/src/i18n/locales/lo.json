@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "ບໍ່ສາມາດກວດສອບການເຊື່ອມຕໍ່ Bitbucket ໄດ້.",
       "providerCheckFailedMessage": "ສະຖານະການເຊື່ອມຕໍ່ຈະບໍ່ພ້ອມໃຊ້ຈົນກວ່າຈະໂຫຼດເສັຣຈ",
       "reconnectTitle": "ເຊື່ອມຕໍ່ GitHub ໃໝ່",
+      "reconnectTitleGitLab": "ເຊື່ອມຕໍ່ GitLab ໃໝ່",
+      "reconnectTitleBitbucket": "ເຊື່ອມຕໍ່ Bitbucket ໃໝ່",
       "reconnectDescription": "ສິດການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານຖືກຖອນແລ້ວ.",
       "gitlabDescription": "ກວດສອບ merge request ໃນມືຖື",
       "gitlabInstanceMismatchTitle": "ການເຊື່ອມຕໍ່ GitLab ແມ່ນສຳລັບ instance ອື່ນ",
@@ -1614,6 +1616,8 @@
       "set": "ຕັ້ງຄ່າແລ້ວ",
       "notSet": "ບໍ່ໄດ້ຕັ້ງຄ່າ",
       "nSelected": "ເລືອກແລ້ວ {{displayCount}} ລາຍການ",
+      "nSelected_one": "ເລືອກແລ້ວ {{displayCount}} ລາຍການ",
+      "nSelected_other": "ເລືອກແລ້ວ {{displayCount}} ລາຍການ",
       "proposedReviewMdGuidance": "ຄຳແນະນຳທີ່ສະເໜີສຳລັບ REVIEW.md"
     },
     "decision": {
@@ -1795,6 +1799,7 @@
       "priorityFindingsPending": "ບັນຫາທີ່ກວດພົບຕາມລຳດັບຄວາມສຳຄັນຈະປາກົດຫຼັງຈາກຊິງຂໍ້ມູນຄັ້ງທຳອິດ.",
       "refreshFailed": "ບໍ່ສາມາດໂຫຼດຂໍ້ມູນໃໝ່ໄດ້ — ກຳລັງສະແດງຂໍ້ມູນທີ່ຊິງໄວ້ຄັ້ງລ່າສຸດ.",
       "settings": "ການຕັ້ງຄ່າ",
+      "syncing": "ກຳລັງຊິງຂໍ້ມູນ…",
       "syncNow": "ຊິງຂໍ້ມູນຕອນນີ້",
       "syncQueued": "ເພີ່ມການຊິງຂໍ້ມູນໃສ່ຄິວແລ້ວ",
       "syncStatusUnavailable": "ບໍ່ສາມາດເບິ່ງສະຖານະການຊິງຂໍ້ມູນໄດ້.",

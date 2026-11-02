@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Enweghị ike ịlele njikọ Bitbucket.",
       "providerCheckFailedMessage": "Ọnọdụ njikọ agaghị adị ruo mgbe nke a budatara.",
       "reconnectTitle": "Jikọtaghachi GitHub",
+      "reconnectTitleGitLab": "Jikọtaghachi GitLab",
+      "reconnectTitleBitbucket": "Jikọtaghachi Bitbucket",
       "reconnectDescription": "Akagbuola njikọ GitHub gị.",
       "gitlabDescription": "Nyochaa arịrịọ njikọta na ekwentị",
       "gitlabInstanceMismatchTitle": "Njikọ GitLab bụ nke nrụnye ọzọ",
@@ -1614,6 +1616,8 @@
       "set": "E debere",
       "notSet": "E debeghị",
       "nSelected": "A họrọla {{displayCount}}",
+      "nSelected_one": "A họrọla {{displayCount}}",
+      "nSelected_other": "A họrọla {{displayCount}}",
       "proposedReviewMdGuidance": "Nduzi REVIEW.md atụrụ aro"
     },
     "decision": {
@@ -1795,6 +1799,7 @@
       "priorityFindingsPending": "Ihe achọpụtara ndị a ga-ebu ụzọ mee ga-apụta mgbe e mekọrịtachara data oge mbụ.",
       "refreshFailed": "Enweghị ike ime ka data dị ọhụrụ. A na-egosi data sitere na mmekọrịta ikpeazụ.",
       "settings": "Ntọala",
+      "syncing": "Na-emekọrịta data…",
       "syncNow": "Mekọrịta data ugbu a",
       "syncQueued": "E tinyela mmekọrịta data n'ahịrị nchere",
       "syncStatusUnavailable": "Enweghị ike ịnweta ọnọdụ mmekọrịta data.",

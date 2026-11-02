@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Pa t ka tcheke koneksyon Bitbucket la.",
       "providerCheckFailedMessage": "Estati koneksyon an pa disponib jiskaske li chaje.",
       "reconnectTitle": "Rekonekte GitHub",
+      "reconnectTitleGitLab": "Rekonekte GitLab",
+      "reconnectTitleBitbucket": "Rekonekte Bitbucket",
       "reconnectDescription": "Yo revoke koneksyon GitHub ou a.",
       "gitlabDescription": "Revize merge request yo sou mobil",
       "gitlabInstanceMismatchTitle": "Koneksyon GitLab la se pou yon lòt enstans",
@@ -1614,6 +1616,8 @@
       "set": "Konfigire",
       "notSet": "Pa konfigire",
       "nSelected": "{{displayCount}} chwazi",
+      "nSelected_one": "{{displayCount}} chwazi",
+      "nSelected_other": "{{displayCount}} chwazi",
       "proposedReviewMdGuidance": "Direktiv ki pwopoze pou REVIEW.md"
     },
     "decision": {
@@ -1795,6 +1799,7 @@
       "priorityFindingsPending": "Konsta priyorite yo ap parèt apre premye senkronizasyon an.",
       "refreshFailed": "Nou pa t ka rafrechi done yo. N ap montre done ki te senkronize dènye fwa yo.",
       "settings": "Paramèt",
+      "syncing": "N ap senkronize…",
       "syncNow": "Senkronize kounye a",
       "syncQueued": "Senkronizasyon nan lis datant",
       "syncStatusUnavailable": "Estati senkronizasyon an pa disponib.",

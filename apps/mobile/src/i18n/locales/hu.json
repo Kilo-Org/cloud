@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Nem sikerült ellenőrizni a Bitbucket-kapcsolatot",
       "providerCheckFailedMessage": "A kapcsolódási állapot csak a betöltés után érhető el.",
       "reconnectTitle": "Újracsatlakozás a GitHubhoz",
+      "reconnectTitleGitLab": "Újracsatlakozás a GitLabhoz",
+      "reconnectTitleBitbucket": "Újracsatlakozás a Bitbuckethoz",
       "reconnectDescription": "Visszavonták a GitHub-kapcsolatod engedélyét.",
       "gitlabDescription": "Merge requestek ellenőrzése mobilon",
       "gitlabInstanceMismatchTitle": "A GitLab-kapcsolat egy másik példányhoz tartozik",
@@ -1614,6 +1616,8 @@
       "set": "Beállítva",
       "notSet": "Nincs beállítva",
       "nSelected": "{{displayCount}} kijelölve",
+      "nSelected_one": "{{displayCount}} kijelölve",
+      "nSelected_other": "{{displayCount}} kijelölve",
       "proposedReviewMdGuidance": "Javasolt útmutatás a REVIEW.md fájlhoz"
     },
     "decision": {
@@ -1795,6 +1799,7 @@
       "priorityFindingsPending": "A fontosság szerint rangsorolt találatok az első szinkronizálás után jelennek meg.",
       "refreshFailed": "Nem sikerült a frissítés. Az utolsó szinkronizálás adatai láthatók.",
       "settings": "Beállítások",
+      "syncing": "Szinkronizálás folyamatban…",
       "syncNow": "Szinkronizálás most",
       "syncQueued": "Szinkronizálás sorba állítva",
       "syncStatusUnavailable": "A szinkronizálás állapota nem érhető el.",

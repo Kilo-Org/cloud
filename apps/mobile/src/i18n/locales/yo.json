@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "A kò lè ṣàyẹ̀wò àsopọ̀ Bitbucket.",
       "providerCheckFailedMessage": "Ipò ìsopọ̀ kò wà títí èyí yóò fi gbé wọlé.",
       "reconnectTitle": "Àtúnsopọ̀ GitHub",
+      "reconnectTitleGitLab": "Àtúnsopọ̀ GitLab",
+      "reconnectTitleBitbucket": "Àtúnsopọ̀ Bitbucket",
       "reconnectDescription": "A ti fagilé àsopọ̀ GitHub rẹ.",
       "gitlabDescription": "Ṣe àtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan lórí fóònù",
       "gitlabInstanceMismatchTitle": "Ìsopọ̀ GitLab jẹ́ fún ẹ̀yà mìíràn",
@@ -1614,6 +1616,8 @@
       "set": "A ti ṣètò rẹ̀",
       "notSet": "A kò ṣètò",
       "nSelected": "{{displayCount}} tí a yàn",
+      "nSelected_one": "{{displayCount}} tí a yàn",
+      "nSelected_other": "{{displayCount}} tí a yàn",
       "proposedReviewMdGuidance": "Ìtọ́sọ́nà REVIEW.md tí a dábàá"
     },
     "decision": {
@@ -1795,6 +1799,7 @@
       "priorityFindingsPending": "Àwọn àbùkù pàtàkì yóò hàn lẹ́yìn tí a bá ti mú wọn ṣiṣẹ́pọ̀ lẹ́kẹ̀kọ̀",
       "refreshFailed": "A kò lè sọ dátà di tuntun — dátà ìmúṣiṣẹ́pọ̀ tó kẹ́yìn ni a ń fi hàn.",
       "settings": "Àwọn ètò",
+      "syncing": "Ń mú ṣiṣẹ́pọ̀…",
       "syncNow": "Mú ṣiṣẹ́pọ̀ báyìí",
       "syncQueued": "Ìmúṣiṣẹ́pọ̀ wà ní ìlà ìdúró",
       "syncStatusUnavailable": "A kò lè rí ipò ìmúṣiṣẹ́pọ̀.",

@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Kāore i taea te tirotiro i te hononga Bitbucket.",
       "providerCheckFailedMessage": "Kāore e wātea te tūnga hononga kia uta ra ano.",
       "reconnectTitle": "Hono anō ki GitHub",
+      "reconnectTitleGitLab": "Hono anō ki GitLab",
+      "reconnectTitleBitbucket": "Hono anō ki Bitbucket",
       "reconnectDescription": "Kua whakakorea tō hononga GitHub.",
       "gitlabDescription": "Arotakengia ngā tono whakakotahi mā te pūrere pūkoro",
       "gitlabInstanceMismatchTitle": "Ko te hononga GitLab mō tētahi atu wāhanga",
@@ -1614,6 +1616,8 @@
       "set": "Kua whakaritea",
       "notSet": "Kāore i whakaritea",
       "nSelected": "{{displayCount}} kua kōwhiria",
+      "nSelected_one": "{{displayCount}} kua kōwhiria",
+      "nSelected_other": "{{displayCount}} kua kōwhiria",
       "proposedReviewMdGuidance": "Ngā aratohu REVIEW.md e tūtohutia ana"
     },
     "decision": {
@@ -1795,6 +1799,7 @@
       "priorityFindingsPending": "Ka puta ngā kitenga matua i muri i te tukutahi tuatahi.",
       "refreshFailed": "Kāore i taea te tāmata — e whakaaturia ana ngā raraunga i tukutahitia whakamutungatia.",
       "settings": "Ngā tautuhinga",
+      "syncing": "E tukutahi ana…",
       "syncNow": "Tukutahitia ināianei",
       "syncQueued": "Kua tāpirihia te tukutahi ki te tūtira.",
       "syncStatusUnavailable": "Kāore e wātea ana te tūnga tukutahi.",

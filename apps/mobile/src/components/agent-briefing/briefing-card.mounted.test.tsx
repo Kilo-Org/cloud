@@ -136,10 +136,11 @@ describe('BriefingCard in the Home card frame', () => {
 });
 
 /**
- * The frame keeps the taller card's height, so the shorter one has slack under
- * it. Only the device can measure that, so these pin the layout ownership the
- * measurement depends on: the embedded card fills its layer and the divider
- * pushes the summary row to the card's bottom edge.
+ * The frame keeps the taller card's height, so the shorter one has slack to place.
+ * Only the device can measure where it lands, so these pin the layout ownership the
+ * measurement depends on: the embedded card fills its layer, its counts keep their
+ * own padding above the divider, and the summary row absorbs the reserved height
+ * with its content centered.
  */
 describe('BriefingCard layout ownership', () => {
   function renderCard(embedded: boolean): ReactTestRenderer {
@@ -161,15 +162,22 @@ describe('BriefingCard layout ownership', () => {
       .map(view => String(view.props.className));
   }
 
-  it('fills the layer it is drawn in and pins the divider to the card bottom', () => {
+  function summaryRowClasses(classes: string[]): string[] {
+    return classes.filter(
+      name => name.includes('flex-row items-center gap-2') && name.includes('px-4 py-3')
+    );
+  }
+
+  it('fills the layer it is drawn in and lets the summary row hold its height', () => {
     const classes = classNames(renderCard(true));
     expect(classes[0]).toContain('grow');
-    expect(classes.filter(name => name.includes('h-px'))).toEqual([
-      expect.stringContaining('mt-auto'),
-    ]);
+    expect(classes.filter(name => name.includes('h-px'))).toEqual(['h-px bg-border']);
+    expect(summaryRowClasses(classes)).toEqual([expect.stringContaining('flex-1')]);
   });
 
   it('keeps its intrinsic height outside the frame', () => {
-    expect(classNames(renderCard(false))[0]).not.toContain('grow');
+    const classes = classNames(renderCard(false));
+    expect(classes[0]).not.toContain('grow');
+    expect(summaryRowClasses(classes)).toEqual([expect.not.stringContaining('flex-1')]);
   });
 });

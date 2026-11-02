@@ -10,10 +10,13 @@ import type {
   SessionFinalization,
 } from '../execution/types.js';
 import type { SessionRepositoryRequest } from './session-requests.js';
+import { withStackedWorkspaceInstruction } from './stacked-workspace-instruction.js';
 
 export type GroupedRegisterSessionInput = {
   allowSubagentSessions?: boolean;
   parentCloudAgentSessionId?: string;
+  /** Parent worktree for a stacked workspace; persisted on the workspace. */
+  parentWorktreeId?: NonNullable<SessionMetadata['workspace']>['parentWorktreeId'];
   identity: SessionMetadata['identity'];
   auth: SessionMetadata['auth'];
   runtimeAuthorizationSeal?: string;
@@ -36,6 +39,7 @@ export type GroupedRegisterSessionInput = {
     | 'sandboxId'
     | 'sandboxRoute'
     | 'sandboxKind'
+    | 'parentWorktreeId'
     | 'sandboxProvider'
     | 'sandboxProviderBinding'
     | 'shallow'
@@ -72,6 +76,8 @@ function repositoryMetadataFromRegistrationInput(
           ? { pullRequestNumber: repository.pullRequestNumber }
           : {}),
         upstreamBranch: repository.branch,
+        ...(repository.baseBranch === undefined ? {} : { baseBranch: repository.baseBranch }),
+        ...(repository.baseSha === undefined ? {} : { baseSha: repository.baseSha }),
       };
     case 'gitlab':
       return {
@@ -79,6 +85,8 @@ function repositoryMetadataFromRegistrationInput(
         url: repository.url,
         platform: 'gitlab',
         upstreamBranch: repository.branch,
+        ...(repository.baseBranch === undefined ? {} : { baseBranch: repository.baseBranch }),
+        ...(repository.baseSha === undefined ? {} : { baseSha: repository.baseSha }),
       };
     case 'bitbucket':
       return {
@@ -89,6 +97,8 @@ function repositoryMetadataFromRegistrationInput(
         repositoryUuid: repository.repositoryUuid,
         bitbucketIntegrationId: repository.bitbucketIntegrationId,
         upstreamBranch: repository.branch,
+        ...(repository.baseBranch === undefined ? {} : { baseBranch: repository.baseBranch }),
+        ...(repository.baseSha === undefined ? {} : { baseSha: repository.baseSha }),
       };
     case 'git':
       return {
@@ -96,6 +106,8 @@ function repositoryMetadataFromRegistrationInput(
         url: repository.url,
         token: repository.token,
         upstreamBranch: repository.branch,
+        ...(repository.baseBranch === undefined ? {} : { baseBranch: repository.baseBranch }),
+        ...(repository.baseSha === undefined ? {} : { baseSha: repository.baseSha }),
       };
   }
 
@@ -185,6 +197,12 @@ export async function buildSessionMetadataFromRegistration(
   }
 
   const initialMessage = initialMessageFromRegistration(input.message);
+  const branchName = repository?.upstreamBranch ?? `kilo/${generateBranchSlug()}`;
+  const appendSystemPrompt = withStackedWorkspaceInstruction(
+    input.agent.appendSystemPrompt,
+    repository?.baseBranch,
+    branchName
+  );
   const metadata: SessionMetadata = {
     metadataSchemaVersion: 2,
     allowSubagentSessions: input.allowSubagentSessions ?? false,
@@ -200,7 +218,7 @@ export async function buildSessionMetadataFromRegistration(
       mode: input.agent.mode,
       model: input.agent.model,
       variant: input.agent.variant,
-      appendSystemPrompt: input.agent.appendSystemPrompt,
+      appendSystemPrompt,
     },
     finalization: input.finalization,
     profile: input.profile,
@@ -208,8 +226,9 @@ export async function buildSessionMetadataFromRegistration(
     callback: input.callback,
     workspace: {
       ...input.workspace,
+      ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
       sandboxProvider: input.workspace?.sandboxProvider ?? 'cloudflare',
-      branchName: repository?.upstreamBranch ?? `kilo/${generateBranchSlug()}`,
+      branchName,
     },
     lifecycle: {
       version: now,

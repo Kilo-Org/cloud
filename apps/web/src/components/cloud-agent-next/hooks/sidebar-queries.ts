@@ -11,6 +11,7 @@ import {
  */
 
 export const SIDEBAR_LIST_LIMIT = 200;
+export const SIDEBAR_WORKSPACE_PAGE_LIMIT = 200;
 export const DEFAULT_SIDEBAR_PLATFORM_FILTER = ['cloud-agent'];
 const WORKTREE_DETAILS_BATCH_SIZE = 200;
 
@@ -53,7 +54,7 @@ export function sidebarListInput({
   return {
     updatedSince,
     limit: SIDEBAR_LIST_LIMIT,
-    orderBy: 'updated_at' as const,
+    orderBy: 'activity' as const,
     organizationId,
     createdOnPlatform,
     gitUrl,
@@ -61,20 +62,26 @@ export function sidebarListInput({
   };
 }
 
-/** The latest session of a worktree in a folder, which may be older than the list. */
-export function sidebarFolderListInput(
-  worktreeId: CloudAgentWorktreeId,
-  { organizationId, createdOnPlatform, gitUrl }: SidebarFilters
-) {
+/** Workspace rows are loaded independently of the 5-day chat window. */
+export function sidebarWorkspaceListInput({
+  organizationId,
+  createdOnPlatform,
+  gitUrl,
+  search,
+}: SidebarFilters & { search?: string }) {
   return {
-    worktreeId,
-    limit: 1,
-    orderBy: 'updated_at' as const,
-    organizationId,
+    organizationId: organizationId ?? null,
     createdOnPlatform,
     gitUrl,
-    fetchReviewDecision: true,
+    search: search?.trim() || undefined,
+    limit: SIDEBAR_WORKSPACE_PAGE_LIMIT,
   };
+}
+
+export function sidebarWorkspacePreferencesInput({
+  organizationId,
+}: Pick<SidebarFilters, 'organizationId'>) {
+  return { organizationId: organizationId ?? null };
 }
 
 /** The folders list is cached per user, so another user's folders never show. */

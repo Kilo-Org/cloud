@@ -9,8 +9,19 @@ import {
   type SessionGitSummaryResult,
   type WorktreeSnapshotCapture,
 } from '../../../src/shared/worktree-changes-wire.js';
-import { collectWorktreeChanges, collectWorktreeSnapshot } from '../control/worktree-changes.js';
+import {
+  collectWorktreeChanges,
+  collectWorktreeSnapshot,
+  type WorktreeCaptureGitEnvironment,
+} from '../control/worktree-changes.js';
+import {
+  createWorktreeGitExecutor,
+  refreshChangesRemotes,
+  WorktreeGitError,
+} from '../control/worktree-git-operations.js';
 import { runDirectoryOperation } from '../control/worktree-operations.js';
+import { managedGitHubPreparationGitArgs } from './repository-preparation.js';
+import type { PreparedGitContext } from './worktree-git.js';
 
 /**
  * Handles the Sandbox DO's worktree-change requests inside the control-plane
@@ -20,19 +31,29 @@ import { runDirectoryOperation } from '../control/worktree-operations.js';
  * for one directory are fenced against a concurrent delete (`runDirectoryOperation`
  * registers pending work and rejects while the directory is deleting; it is not
  * a serializer), and the result is validated before it is reported.
+ *
+ * Before capturing, the remote refs the panel compares are refreshed with the
+ * prepared route environment. A not-yet-pushed own branch is skipped, a missing
+ * base falls back to the default branch with a notice, and any other fetch
+ * failure is reported as retryable rather than as an unchanged snapshot.
  */
 export type ControlPlaneWorktreeChangesDeps = {
   emit: (frame: ControlPlaneWrapperFrame) => void;
   /** The preparation manager's readiness for a session route (spec §7). */
   isPrepared: (sessionId: string) => boolean;
+  /** The prepared route environment and spec, or null while not attached. */
+  gitContext?: (sessionId: string) => PreparedGitContext | null;
+  refreshRemotes?: typeof refreshChangesRemotes;
   log?: (message: string) => void;
   captureSnapshot?: (
     directory: string,
-    payload: SessionGitSummaryPayload
+    payload: SessionGitSummaryPayload,
+    environment?: WorktreeCaptureGitEnvironment
   ) => Promise<WorktreeSnapshotCapture>;
   captureChanges?: (
     directory: string,
-    payload: SessionGitSummaryPayload
+    payload: SessionGitSummaryPayload,
+    environment?: WorktreeCaptureGitEnvironment
   ) => Promise<SessionGitSummaryResult>;
 };
 
@@ -40,11 +61,30 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function environmentFor(
+  context: PreparedGitContext | null
+): WorktreeCaptureGitEnvironment | undefined {
+  if (context === null) return undefined;
+  return {
+    env: context.env,
+    ...(context.spec === undefined
+      ? {}
+      : { configArgs: managedGitHubPreparationGitArgs(context.spec, 'fetch') }),
+  };
+}
+
 export function createControlPlaneWorktreeChanges(deps: ControlPlaneWorktreeChangesDeps): {
   handle(frame: ControlPlaneWorktreeRequestFrame): Promise<void>;
 } {
-  const captureSnapshot = deps.captureSnapshot ?? collectWorktreeSnapshot;
-  const captureChanges = deps.captureChanges ?? collectWorktreeChanges;
+  const captureSnapshot =
+    deps.captureSnapshot ??
+    ((directory, payload, environment) =>
+      collectWorktreeSnapshot(directory, payload, undefined, undefined, environment));
+  const captureChanges =
+    deps.captureChanges ??
+    ((directory, payload, environment) =>
+      collectWorktreeChanges(directory, payload, undefined, undefined, environment));
+  const refreshRemotes = deps.refreshRemotes ?? refreshChangesRemotes;
 
   function fail(
     requestId: string,
@@ -63,20 +103,63 @@ export function createControlPlaneWorktreeChanges(deps: ControlPlaneWorktreeChan
     }
     try {
       await runDirectoryOperation(session.directory, async () => {
+        const context = deps.gitContext?.(session.sessionId) ?? null;
+        const environment = environmentFor(context);
+        let effectivePayload = payload;
+        let baseRefFallback: { requested: string; used: string } | undefined;
+        let remoteDivergence: { ahead: number; behind: number } | undefined;
+        if (context !== null) {
+          const executor = createWorktreeGitExecutor({
+            directory: context.directory,
+            env: context.env,
+            ...(context.spec === undefined
+              ? {}
+              : { configArgs: managedGitHubPreparationGitArgs(context.spec, 'fetch') }),
+          });
+          const refreshed = await refreshRemotes(executor, {
+            ...(payload.baseRef === undefined ? {} : { baseRef: payload.baseRef }),
+          });
+          if (refreshed.request.baseRef !== undefined) {
+            effectivePayload = { ...payload, baseRef: refreshed.request.baseRef };
+          }
+          baseRefFallback = refreshed.baseRefFallback;
+          remoteDivergence = refreshed.remoteDivergence;
+        }
         const captured =
           frame.type === 'worktree.snapshot'
-            ? await captureSnapshot(session.directory, payload)
-            : await captureChanges(session.directory, payload);
+            ? await captureSnapshot(session.directory, effectivePayload, environment)
+            : await captureChanges(session.directory, effectivePayload, environment);
         if (frame.type === 'worktree.snapshot') {
-          const parsed = worktreeSnapshotCaptureSchema.safeParse(captured);
-          if (!parsed.success || !resultMatches(parsed.data.summary, payload)) {
+          const snapshot = captured as WorktreeSnapshotCapture;
+          const enriched: WorktreeSnapshotCapture = {
+            ...snapshot,
+            summary: {
+              ...snapshot.summary,
+              comparison: {
+                ...snapshot.summary.comparison,
+                ...(baseRefFallback === undefined ? {} : { baseRefFallback }),
+              },
+              ...(remoteDivergence === undefined ? {} : { remoteDivergence }),
+            },
+          };
+          const parsed = worktreeSnapshotCaptureSchema.safeParse(enriched);
+          if (!parsed.success || !resultMatches(parsed.data.summary, effectivePayload)) {
             deps.emit(fail(requestId, 'protocol_error', 'Invalid worktree result', false));
             return;
           }
           deps.emit({ type: 'worktree.result', requestId, ok: true, result: parsed.data });
         } else {
-          const parsed = sessionGitSummaryResultSchema.safeParse(captured);
-          if (!parsed.success || !resultMatches(parsed.data, payload)) {
+          const summary = captured as SessionGitSummaryResult;
+          const enriched: SessionGitSummaryResult = {
+            ...summary,
+            comparison: {
+              ...summary.comparison,
+              ...(baseRefFallback === undefined ? {} : { baseRefFallback }),
+            },
+            ...(remoteDivergence === undefined ? {} : { remoteDivergence }),
+          };
+          const parsed = sessionGitSummaryResultSchema.safeParse(enriched);
+          if (!parsed.success || !resultMatches(parsed.data, effectivePayload)) {
             deps.emit(fail(requestId, 'protocol_error', 'Invalid worktree result', false));
             return;
           }
@@ -86,6 +169,11 @@ export function createControlPlaneWorktreeChanges(deps: ControlPlaneWorktreeChan
     } catch (error) {
       if (messageOf(error) === 'worktree_deleting') {
         deps.emit(fail(requestId, 'not_ready', 'Session directory is not attached', false));
+        return;
+      }
+      if (error instanceof WorktreeGitError) {
+        deps.log?.(`worktree capture refresh failed: ${messageOf(error)}`);
+        deps.emit(fail(requestId, error.code, messageOf(error).slice(0, 4096), error.retryable));
         return;
       }
       deps.log?.(`worktree capture failed: ${messageOf(error)}`);

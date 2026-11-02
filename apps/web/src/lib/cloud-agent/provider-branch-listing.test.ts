@@ -1,17 +1,25 @@
 import { describe, expect, it, beforeEach } from '@jest/globals';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { GitLabBranchesFetchError } from '@/lib/integrations/platforms/gitlab/adapter';
-import { listProviderRepositoryBranches } from './provider-branch-listing';
+import { getProviderBranchHead, listProviderRepositoryBranches } from './provider-branch-listing';
 
 const mockGetIntegrationForOwner = jest.fn();
 const mockGetIntegrationsByOrganization = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
 const mockFetchGitLabBranches = jest.fn();
 const mockListGitHubBranches = jest.fn();
+const mockGetGitHubIntegrationById = jest.fn();
+const mockFetchGitHubBranchHead = jest.fn();
+const mockFetchGitLabBranchHead = jest.fn();
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   getIntegrationForOwner: (...args: unknown[]) => mockGetIntegrationForOwner(...args),
   getIntegrationsByOrganization: (...args: unknown[]) => mockGetIntegrationsByOrganization(...args),
+  getGitHubIntegrationById: (...args: unknown[]) => mockGetGitHubIntegrationById(...args),
+}));
+
+jest.mock('@/lib/cloud-agent/github-branch-ops', () => ({
+  fetchGitHubBranchHead: (...args: unknown[]) => mockFetchGitHubBranchHead(...args),
 }));
 
 jest.mock('@/lib/integrations/github-apps-service', () => ({
@@ -25,6 +33,7 @@ jest.mock('@/lib/integrations/gitlab-service', () => ({
 jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   ...jest.requireActual('@/lib/integrations/platforms/gitlab/adapter'),
   fetchGitLabBranches: (...args: unknown[]) => mockFetchGitLabBranches(...args),
+  fetchGitLabBranchHead: (...args: unknown[]) => mockFetchGitLabBranchHead(...args),
 }));
 
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
@@ -427,5 +436,77 @@ describe('listProviderRepositoryBranches (organization github installations)', (
       truncated: false,
     });
     expect(mockListGitHubBranches).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('getProviderBranchHead', () => {
+  const githubIntegration = {
+    ...integrationRow,
+    id: 'intg_github_exact',
+    platform: 'github',
+    platform_installation_id: 'install_1',
+    github_app_type: 'standard',
+    suspended_at: null,
+    auth_invalid_at: null,
+    github_disconnected_at: null,
+    repositories: [{ id: 1, name: 'repo', full_name: 'acme/repo', private: true }],
+  } as unknown as PlatformIntegration;
+
+  it('uses the exact supplied integration instead of reselecting by repository', async () => {
+    mockGetGitHubIntegrationById.mockResolvedValue(githubIntegration);
+    mockFetchGitHubBranchHead.mockResolvedValue({ sha: 'a'.repeat(40) });
+
+    await expect(
+      getProviderBranchHead({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'acme/repo',
+        branch: 'feat',
+        githubIntegrationId: 'intg_github_exact',
+      })
+    ).resolves.toEqual({ sha: 'a'.repeat(40) });
+
+    expect(mockGetGitHubIntegrationById).toHaveBeenCalledWith(
+      { type: 'user', id: 'user_1' },
+      'intg_github_exact'
+    );
+    expect(mockGetIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockFetchGitHubBranchHead).toHaveBeenCalledWith(
+      expect.objectContaining({
+        installationId: 'install_1',
+        expectedIntegrationId: 'intg_github_exact',
+        branch: 'feat',
+        purpose: 'agent',
+      })
+    );
+  });
+
+  it('returns the explicit missing state for an unpushed branch', async () => {
+    mockGetGitHubIntegrationById.mockResolvedValue(githubIntegration);
+    mockFetchGitHubBranchHead.mockResolvedValue(null);
+
+    await expect(
+      getProviderBranchHead({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'acme/repo',
+        branch: 'feat',
+        githubIntegrationId: 'intg_github_exact',
+      })
+    ).resolves.toEqual({ missing: true });
+  });
+
+  it('maps a missing GitLab branch to missing rather than a provider default', async () => {
+    mockFetchGitLabBranchHead.mockResolvedValue(null);
+    mockGetValidGitLabToken.mockResolvedValue('glpat-mock-token');
+
+    await expect(
+      getProviderBranchHead({
+        platform: 'gitlab',
+        userId: 'user_1',
+        repositoryFullName: 'group/repo',
+        branch: 'feat',
+      })
+    ).resolves.toEqual({ missing: true });
   });
 });

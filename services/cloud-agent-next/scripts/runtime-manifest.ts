@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 
 import {
   CONTROL_PLANE_SUPERVISOR,
+  GH_STACK_INSTALL_PATH,
   GIT_CREDENTIAL_HELPER,
   RUNTIME_DISTRIBUTION,
   RUNTIME_REQUIRED_BINARIES,
@@ -187,6 +188,7 @@ export function runtimeVerificationScript(artifacts: readonly RuntimeArtifact[])
     `test "$(pnpm --version)" = ${shellQuote(RUNTIME_DISTRIBUTION.pnpm)}`,
     exactVersionCheck('glab', RUNTIME_DISTRIBUTION.glab),
     exactVersionCheck('gh', RUNTIME_DISTRIBUTION.gh),
+    `test "$(sha256sum ${shellQuote(GH_STACK_INSTALL_PATH)} | cut -d' ' -f1)" = ${shellQuote(RUNTIME_DISTRIBUTION.ghStackSha256)}`,
     `case "$(node --version)" in v${RUNTIME_DISTRIBUTION.nodeMajor}.*) ;; *) echo "unexpected node" >&2; exit 1 ;; esac`,
   ];
   const presence = RUNTIME_REQUIRED_BINARIES.map(binary => `command -v ${binary} >/dev/null`);

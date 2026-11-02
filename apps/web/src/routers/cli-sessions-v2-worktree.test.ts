@@ -665,6 +665,13 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
         [WORKTREE_ID]: {
           name: null,
           defaultTitle: ownershipRow.title,
+          branch: null,
+          folderId: null,
+          sidebarPosition: null,
+          parentWorktreeId: null,
+          baseBranch: null,
+          baseSha: null,
+          createdAt: new Date(ownershipRow.created_at).toISOString(),
           prSession: null,
           sessions: [
             {
@@ -1070,6 +1077,13 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
       [WORKTREE_ID]: {
         name: null,
         defaultTitle: ownershipRow.title,
+        branch: null,
+        folderId: null,
+        sidebarPosition: null,
+        parentWorktreeId: null,
+        baseBranch: null,
+        baseSha: null,
+        createdAt: new Date(ownershipRow.created_at).toISOString(),
         prSession: null,
         sessions: [
           {
@@ -1352,6 +1366,7 @@ describe('cliSessionsV2 worktree PR projection', () => {
         'latest_run_terminal_at',
         'created_at',
         'updated_at',
+        'last_activity_at',
         'version',
         'total_cost_microdollars',
         'associatedPr',

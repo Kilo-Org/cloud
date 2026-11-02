@@ -48,6 +48,9 @@ export const WORKSPACE_FAILURE_SUBTYPES = [
   'git_pack_corrupt',
   'git_checkout_conflict',
   'git_branch_missing',
+  'base_branch_changed',
+  'base_branch_missing',
+  'base_branch_stale',
   'sandbox_storage_full',
   'kilo_import_timeout',
   'kilo_import_failed',
@@ -233,6 +236,9 @@ function classifyWorkspaceFailure(
       return classified('user', 'source_control_authentication');
     case 'git_checkout_conflict':
     case 'git_branch_missing':
+    case 'base_branch_changed':
+    case 'base_branch_missing':
+    case 'base_branch_stale':
       return classified('user', 'source_control_configuration');
     case 'setup_command_timeout':
       return classified('user', 'setup_command_timeout');

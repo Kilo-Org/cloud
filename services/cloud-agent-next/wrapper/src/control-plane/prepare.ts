@@ -29,7 +29,7 @@ import {
   type ProcessOutputStream,
   type ProcessSpawn,
 } from '../utils.js';
-import { WrapperBootstrapError } from '../bootstrap-error.js';
+import { WrapperBootstrapError, workspaceBootstrapError } from '../bootstrap-error.js';
 import { formatGitResultFailure, gitOperationError, type GitRouteClass } from '../git-errors.js';
 import {
   credentialFreeGitUrl,
@@ -78,6 +78,26 @@ const STEP_RETRY_ATTEMPTS = 2;
 const RELEASE_CLEANUP_MAX_DEPTH = 8;
 const RELEASE_CLEANUP_MAX_NODES = 64;
 const RELEASE_CLEANUP_DEADLINE_MS = 10_000;
+
+/**
+ * A recorded base that is no longer an ancestor of `origin/<baseBranch>`.
+ * A fresh create can be retried (the web router resolves a new SHA); a rebuilt
+ * workspace keeps its recorded base, so retrying would loop on the same stale
+ * SHA. Exported for the focused retryability test.
+ */
+export function stackedBaseMismatchError(
+  baseBranch: string,
+  stale: boolean
+): WrapperBootstrapError {
+  return workspaceBootstrapError(
+    stale ? 'base_branch_stale' : 'base_branch_changed',
+    stale
+      ? `Base branch \`${baseBranch}\` no longer contains this workspace's recorded base; recreate the stacked workspace`
+      : `Base branch \`${baseBranch}\` changed while the workspace was starting; try again`,
+    undefined,
+    !stale
+  );
+}
 const RELEASE_CLEANUP_ATTEMPTS = 2;
 
 export type PrepareRuntimePort = {
@@ -543,7 +563,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     });
     if (!spec.git) return;
     onCheckout();
-    await checkoutWorkspace(spec, directory, env, redact, signal);
+    await checkoutWorkspace(spec, directory, env, redact, signal, false);
   }
 
   /**
@@ -555,7 +575,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     directory: string,
     env: Record<string, string>,
     redact: (text: string) => string,
-    signal: AbortSignal
+    signal: AbortSignal,
+    restoring: boolean
   ): Promise<void> {
     emitProgress(spec.sessionId, 'checkout');
     const gitRoute: GitRouteClass = spec.git?.token ? 'managed' : 'direct';
@@ -591,6 +612,70 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       });
     } else {
       let checkoutArgs = ['checkout', '-B', branch, `origin/${branch}`];
+      /**
+       * Creates a stacked working branch from exactly the recorded base SHA.
+       * `--no-track` is required: without it the new branch tracks
+       * `origin/<baseBranch>` and the first auto-commit would push to the parent.
+       */
+      const stackedCheckoutTarget = async (): Promise<string> => {
+        const baseBranch = spec.baseBranch as string;
+        emitProgress(spec.sessionId, 'checkout', `Fetching base branch ${baseBranch}...`);
+        const fetched = await runNetworkGit(
+          [
+            ...managedGitHubPreparationGitArgs(spec, 'fetch'),
+            'fetch',
+            '--no-tags',
+            'origin',
+            baseBranch,
+          ],
+          { cwd: directory, env, inheritEnv: false, signal },
+          redact,
+          signal
+        );
+        signal.throwIfAborted();
+        if (fetched.exitCode !== 0) {
+          const missing =
+            /couldn't find remote ref|remote ref does not exist|could not find remote ref/i.test(
+              `${fetched.stderr}\n${fetched.stdout}`
+            );
+          if (missing) {
+            throw workspaceBootstrapError(
+              'base_branch_missing',
+              `Base branch \`${baseBranch}\` has not been pushed`,
+              formatGitResultFailure(fetched, 'git fetch failed', redact),
+              false
+            );
+          }
+          throw gitOperationError(fetched, 'checkout', redact, gitRoute);
+        }
+        const baseRef = `refs/remotes/origin/${baseBranch}`;
+        const exists = await runBranchGit(['show-ref', '--verify', '--quiet', baseRef]);
+        signal.throwIfAborted();
+        if (exists.exitCode !== 0) {
+          if (exists.exitCode !== 1) {
+            throw gitOperationError(exists, 'checkout', redact, gitRoute);
+          }
+          throw workspaceBootstrapError(
+            'base_branch_missing',
+            `Base branch \`${baseBranch}\` has not been pushed`,
+            undefined,
+            false
+          );
+        }
+        if (spec.baseSha === undefined) return baseRef;
+        const ancestor = await runBranchGit(['merge-base', '--is-ancestor', spec.baseSha, baseRef]);
+        signal.throwIfAborted();
+        if (ancestor.exitCode === 0) return spec.baseSha;
+        if (ancestor.exitCode === 1) {
+          // A rebuilt workspace keeps its recorded base; a retry cannot
+          // re-resolve it, so a rewritten base is a terminal stale-base error.
+          throw stackedBaseMismatchError(
+            baseBranch,
+            restoring || spec.worktreeRecovery !== undefined
+          );
+        }
+        throw gitOperationError(ancestor, 'checkout', redact, gitRoute);
+      };
       if (!spec.branch || spec.branchMode === 'working') {
         const existingBranch = await runBranchGit([
           'show-ref',
@@ -628,12 +713,13 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               retryable: true,
             });
           }
-          checkoutArgs = [
-            'checkout',
-            '-b',
-            branch,
-            ...(remoteBranch.exitCode === 0 ? ['--track', `origin/${branch}`] : []),
-          ];
+          if (remoteBranch.exitCode === 0) {
+            checkoutArgs = ['checkout', '-b', branch, '--track', `origin/${branch}`];
+          } else if (spec.baseBranch !== undefined) {
+            checkoutArgs = ['checkout', '-b', branch, '--no-track', await stackedCheckoutTarget()];
+          } else {
+            checkoutArgs = ['checkout', '-b', branch];
+          }
         }
       }
       const checked = await runBranchGit(['checkout', '--progress', ...checkoutArgs.slice(1)], {
@@ -643,6 +729,30 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       });
       signal.throwIfAborted();
       if (checked.exitCode !== 0) throw gitOperationError(checked, 'checkout', redact, gitRoute);
+    }
+    // Seed the durable last-known own-branch ref so a later branch operation can
+    // verify its force-push lease without assuming the remote matches HEAD.
+    if (spec.git && !isSyntheticReviewRef(branch)) {
+      const remoteRef = `refs/remotes/origin/${branch}`;
+      const resolved = await runBranchGit([
+        'rev-parse',
+        '--verify',
+        '--quiet',
+        `${remoteRef}^{commit}`,
+      ]);
+      if (
+        resolved.exitCode === 0 &&
+        /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(resolved.stdout.trim())
+      ) {
+        const ancestor = await runBranchGit(['merge-base', '--is-ancestor', remoteRef, 'HEAD']);
+        if (ancestor.exitCode === 0) {
+          await runBranchGit([
+            'update-ref',
+            `refs/kilo/last-known-remote/${branch}`,
+            resolved.stdout.trim(),
+          ]);
+        }
+      }
     }
     await configureGitAuthor(
       directory,
@@ -684,10 +794,21 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               : runGit(args, { cwd: directory, env, inheritEnv: false, signal }),
         });
         setStep('checkout');
-        await checkoutWorkspace(spec, directory, env, redact, signal);
+        await checkoutWorkspace(spec, directory, env, redact, signal, true);
       });
       return true;
     } catch (error) {
+      // A base-branch failure cannot be fixed by falling back to a fresh clone:
+      // the clone checks out the same base. Surface it so the caller can retry
+      // (changed) or stop with a terminal stale/missing base.
+      if (
+        error instanceof WrapperBootstrapError &&
+        (error.subtype === 'base_branch_changed' ||
+          error.subtype === 'base_branch_missing' ||
+          error.subtype === 'base_branch_stale')
+      ) {
+        throw error;
+      }
       log(
         `control-plane adopt failed, cloning session=${spec.sessionId} error=${
           error instanceof Error ? redact(error.message) : 'unknown'

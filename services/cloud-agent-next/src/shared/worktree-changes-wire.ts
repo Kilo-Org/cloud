@@ -76,6 +76,20 @@ const baseRefSchema = z
 
 const worktreeChangesScopeSchema = z.enum(['uncommitted', 'against-base-branch']);
 
+const worktreeChangesBaseRefFallbackSchema = z
+  .object({
+    requested: baseRefSchema,
+    used: baseRefSchema,
+  })
+  .strict();
+
+const worktreeChangesRemoteDivergenceSchema = z
+  .object({
+    ahead: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    behind: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  })
+  .strict();
+
 export function worktreeFileIdentity(file: {
   path: string;
   scope?: z.infer<typeof worktreeChangesScopeSchema>;
@@ -111,8 +125,10 @@ export const sessionGitSummaryResultSchema = z
         baseRef: baseRefSchema,
         mergeBase: commitSchema,
         head: commitSchema,
+        baseRefFallback: worktreeChangesBaseRefFallbackSchema.optional(),
       })
       .strict(),
+    remoteDivergence: worktreeChangesRemoteDivergenceSchema.optional(),
     files: z.array(worktreeChangesFileSchema).max(MAX_WORKTREE_CHANGES_FILES),
     truncated: z.boolean(),
   })

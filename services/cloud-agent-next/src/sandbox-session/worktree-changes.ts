@@ -114,7 +114,7 @@ export function worktreeChangesContext(
       type: repository.type,
       source: repository.type === 'github' ? repository.repo : repository.url,
     },
-    baseRef: worktreeChangesBaseRef(repository.upstreamBranch),
+    baseRef: worktreeChangesBaseRef(repository.baseBranch),
   };
 }
 
@@ -277,11 +277,17 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
         if (!parsed.success) return { status: 'failed', snapshot };
         captured = parsed.data;
       }
+      const fallback = captured.summary.comparison.baseRefFallback;
+      const comparisonBaseMatches =
+        context.baseRef === undefined ||
+        captured.summary.comparison.baseRef === context.baseRef ||
+        (fallback?.requested === context.baseRef &&
+          captured.summary.comparison.baseRef === fallback.used);
       if (
         captured.summary.revision !== requestedRevision ||
         new Set(captured.summary.files.map(worktreeFileIdentity)).size !==
           captured.summary.files.length ||
-        (context.baseRef !== undefined && captured.summary.comparison.baseRef !== context.baseRef)
+        !comparisonBaseMatches
       ) {
         return { status: 'failed', snapshot };
       }

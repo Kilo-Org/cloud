@@ -6349,6 +6349,9 @@ export const cloud_agent_workspace_folders = pgTable(
     name: text().notNull(),
     color: text().$type<WorkspaceFolderColor>().notNull().default(WorkspaceFolderColor.Default),
     position: integer().notNull(),
+    kind: text().$type<'manual' | 'smart'>().notNull().default('manual'),
+    smart_preset: text().$type<'needs_you' | 'in_review' | 'done'>(),
+    sort_mode: text().$type<'manual' | 'created' | 'activity'>().notNull().default('manual'),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -6368,6 +6371,18 @@ export const cloud_agent_workspace_folders = pgTable(
       sql`char_length(btrim(${table.name})) BETWEEN 1 AND 200 AND ${table.name} = btrim(${table.name})`
     ),
     check('cloud_agent_workspace_folders_position_check', sql`${table.position} >= 0`),
+    check('cloud_agent_workspace_folders_kind_check', sql`${table.kind} IN ('manual', 'smart')`),
+    check(
+      'cloud_agent_workspace_folders_smart_preset_check',
+      sql`(${table.kind} = 'manual' AND ${table.smart_preset} IS NULL) OR (${table.kind} = 'smart' AND ${table.smart_preset} IS NOT NULL AND ${table.smart_preset} IN ('needs_you', 'in_review', 'done'))`
+    ),
+    check(
+      'cloud_agent_workspace_folders_sort_mode_check',
+      sql`${table.sort_mode} IN ('manual', 'created', 'activity')`
+    ),
+    uniqueIndex('UQ_cloud_agent_workspace_folders_smart_preset')
+      .on(table.kilo_user_id, sql`coalesce(${table.organization_id}::text, '')`, table.smart_preset)
+      .where(sql`${table.kind} = 'smart'`),
   ]
 );
 
@@ -6380,6 +6395,12 @@ export const cloud_agent_worktrees = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'restrict' }),
     organization_id: uuid().references(() => organizations.id, { onDelete: 'restrict' }),
     folder_id: uuid().references(() => cloud_agent_workspace_folders.id, { onDelete: 'set null' }),
+    parent_worktree_id: text().references((): AnyPgColumn => cloud_agent_worktrees.worktree_id, {
+      onDelete: 'set null',
+    }),
+    base_branch: text(),
+    base_sha: text(),
+    sidebar_position: text(),
     name: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -6403,6 +6424,7 @@ export const cloud_agent_worktrees = pgTable(
     index('IDX_cloud_agent_worktrees_folder_id')
       .on(table.folder_id)
       .where(isNotNull(table.folder_id)),
+    index('IDX_cloud_agent_worktrees_parent_worktree_id').on(table.parent_worktree_id),
     check(
       'cloud_agent_worktrees_deletion_check',
       sql`${table.deletion_completed_at} IS NULL OR (${table.deletion_started_at} IS NOT NULL AND ${table.name} IS NULL AND ${table.deletion_manifest} IS NULL AND ${table.runtime_locations} = '[]'::jsonb)`
@@ -6411,6 +6433,32 @@ export const cloud_agent_worktrees = pgTable(
 );
 
 export type CloudAgentWorktree = typeof cloud_agent_worktrees.$inferSelect;
+
+export const cloud_agent_sidebar_preferences = pgTable(
+  'cloud_agent_sidebar_preferences',
+  {
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    workspace_order: text().$type<'manual' | 'created' | 'activity'>().notNull().default('manual'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cloud_agent_sidebar_preferences_owner_scope').on(
+      table.kilo_user_id,
+      sql`coalesce(${table.organization_id}::text, '')`
+    ),
+    check(
+      'cloud_agent_sidebar_preferences_workspace_order_check',
+      sql`${table.workspace_order} IN ('manual', 'created', 'activity')`
+    ),
+  ]
+);
 
 export const cli_sessions_v2 = pgTable(
   'cli_sessions_v2',
@@ -6492,6 +6540,9 @@ export const cli_sessions_v2 = pgTable(
       .where(isNotNull(table.cloud_agent_session_id)),
     index('IDX_cli_sessions_v2_organization_id').on(table.organization_id),
     index('IDX_cli_sessions_v2_user_updated').on(table.kilo_user_id, table.updated_at),
+    index('IDX_cli_sessions_v2_user_activity')
+      .on(table.kilo_user_id, sql`coalesce(${table.last_activity_at}, ${table.created_at})`)
+      .concurrently(),
     index('IDX_cli_sessions_v2_briefing_activity')
       .on(
         table.kilo_user_id,
@@ -6956,6 +7007,10 @@ export const github_branch_pull_requests = pgTable(
     pr_title: text(),
     pr_head_sha: text(),
     pr_review_decision: text(),
+    pr_base_ref: text(),
+    stack_number: integer(),
+    stack_position: integer(),
+    stack_size: integer(),
     review_decision_pending: boolean().notNull().default(false),
     review_decision_fetching_at: timestamp({ withTimezone: true, mode: 'string' }),
     pr_last_synced_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),

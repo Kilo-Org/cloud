@@ -9,6 +9,7 @@ import { codeIndexingRouter } from '@/routers/code-indexing/code-indexing-router
 import { cliSessionsRouter } from '@/routers/cli-sessions-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
 import { workspaceFoldersRouter } from '@/routers/workspace-folders-router';
+import { cloudAgentSidebarPreferencesRouter } from '@/routers/cloud-agent-sidebar-preferences-router';
 import { todosRouter } from '@/routers/todos-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
@@ -61,6 +62,7 @@ export const rootRouter = createTRPCRouter({
   cliSessions: cliSessionsRouter,
   cliSessionsV2: cliSessionsV2Router,
   workspaceFolders: workspaceFoldersRouter,
+  cloudAgentSidebarPreferences: cloudAgentSidebarPreferencesRouter,
   todos: todosRouter,
   githubApps: githubAppsRouter,
   gitlab: gitlabRouter,

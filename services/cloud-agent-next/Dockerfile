@@ -15,6 +15,8 @@ ARG BUN_VERSION="1.4.4"
 ARG PNPM_VERSION="12.14.0"
 ARG GLAB_VERSION="1.124.0"
 ARG GH_VERSION="2.102.0"
+ARG GH_STACK_VERSION="0.3.0"
+ARG GH_STACK_SHA256="957e822cfa7e435cd84a297cd96c419b58e51e3ac58be249762c24bd9e45099b"
 
 RUN set -eux; \
 	apt-get update; \
@@ -42,6 +44,15 @@ RUN wget -nv -O /tmp/gh.tar.gz "https://github.com/cli/cli/releases/download/v${
 	&& tar -xzf /tmp/gh.tar.gz -C /tmp \
 	&& install -m 0755 "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" /usr/local/bin/gh \
 	&& rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64"
+
+# gh-stack is baked into the image because a runtime `gh extension install`
+# fails under the sandbox's git-token containment. The runtime HOME is per
+# worktree and starts empty, so the control-plane wrapper symlinks this
+# directory into $XDG_DATA_HOME/gh/extensions at preparation time.
+RUN wget -nv -O /tmp/gh-stack "https://github.com/github/gh-stack/releases/download/v${GH_STACK_VERSION}/linux-amd64" \
+	&& echo "${GH_STACK_SHA256}  /tmp/gh-stack" | sha256sum -c - \
+	&& install -D -m 0755 /tmp/gh-stack /usr/local/lib/gh-extensions/gh-stack/gh-stack \
+	&& rm /tmp/gh-stack
 
 # Install GitLab CLI (glab) - download official .deb from GitLab releases.
 # Version 1.82.0+ is required so OAuth2 access tokens sent via GITLAB_TOKEN are

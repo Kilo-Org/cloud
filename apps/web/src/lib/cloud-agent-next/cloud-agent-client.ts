@@ -28,6 +28,7 @@ import {
   type WorktreeFileQuery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { SendMessagePayload } from './types.js';
+import type { WorktreeBranchOperationResult } from '@kilocode/worker-utils/cloud-agent-worktree-operations';
 import {
   baseGetMessageResultNextOutputSchema,
   workerPreviewOptionsSchema,
@@ -140,6 +141,12 @@ type PrepareSessionSharedFields = {
   /** Custom agents materialized from the merged profile stack. */
   runtimeAgents?: RuntimeAgentInput[];
   upstreamBranch?: string;
+  /** Start a new branch from this base instead of the repository default. */
+  baseBranch?: string;
+  /** Resolved commit for `baseBranch`; never accepted from a browser. */
+  baseSha?: string;
+  /** The parent worktree when this session starts from another worktree. */
+  parentWorktreeId?: string;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   /** Custom text to append to the system prompt (required when mode is 'custom') */
@@ -308,6 +315,30 @@ export type GetSessionInput = {
   cloudAgentSessionId: string;
 };
 
+/** Input for syncWorktreeBranch; the base and fork boundary are resolved server-side. */
+export type SyncWorktreeBranchInput = {
+  cloudAgentSessionId: string;
+  baseBranch?: string;
+  upstreamSha?: string;
+};
+
+/** Input for restackWorktreeBranch; the target base and upstream are resolved server-side. */
+export type RestackWorktreeBranchInput = {
+  cloudAgentSessionId: string;
+  baseBranch?: string;
+  upstreamSha?: string;
+};
+
+/** Adopts a persisted worktree base into a sibling session's DO metadata. */
+export type AdoptWorktreeBaseInput = {
+  cloudAgentSessionId: string;
+  expectedWorktreeId: string;
+  baseBranch: string;
+  baseSha: string;
+};
+
+export type AdoptWorktreeBaseOutput = { success: true };
+
 /** Interactions a cloud-agent session currently waits on. */
 export type GetPendingInteractionsOutput = {
   questions: unknown[];
@@ -351,6 +382,13 @@ export type GetSessionOutput = {
   githubRepo?: string;
   gitUrl?: string;
   platform?: 'github' | 'gitlab' | 'bitbucket';
+  /** The exact GitHub connection this session's repository was prepared with. */
+  githubIntegrationId?: string;
+  /** Bitbucket repository identity copied from the session's preparation input. */
+  bitbucketWorkspaceUuid?: string;
+  bitbucketRepositoryUuid?: string;
+  /** GitLab project path copied from the session's preparation input. */
+  gitlabProject?: string;
 
   prompt?: string;
   mode?: AgentMode;
@@ -620,6 +658,15 @@ type CloudAgentNextTRPCClient = {
   };
   getWorktreeFile: {
     query: (input: GetWorktreeFileInput) => Promise<unknown>;
+  };
+  syncWorktreeBranch: {
+    mutate: (input: SyncWorktreeBranchInput) => Promise<WorktreeBranchOperationResult>;
+  };
+  restackWorktreeBranch: {
+    mutate: (input: RestackWorktreeBranchInput) => Promise<WorktreeBranchOperationResult>;
+  };
+  adoptWorktreeBase: {
+    mutate: (input: AdoptWorktreeBaseInput) => Promise<AdoptWorktreeBaseOutput>;
   };
   getSandboxSelectionOptions: {
     query: (input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>;
@@ -936,6 +983,20 @@ export class CloudAgentNextClient {
       throw new Error('Saved worktree file does not match the query');
     }
     return result;
+  }
+
+  async syncWorktreeBranch(input: SyncWorktreeBranchInput): Promise<WorktreeBranchOperationResult> {
+    return await this.client.syncWorktreeBranch.mutate(input);
+  }
+
+  async restackWorktreeBranch(
+    input: RestackWorktreeBranchInput
+  ): Promise<WorktreeBranchOperationResult> {
+    return await this.client.restackWorktreeBranch.mutate(input);
+  }
+
+  async adoptWorktreeBase(input: AdoptWorktreeBaseInput): Promise<AdoptWorktreeBaseOutput> {
+    return await this.client.adoptWorktreeBase.mutate(input);
   }
 
   async createWorktreeChat(input: CreateWorktreeChatInput): Promise<CreateWorktreeChatOutput> {

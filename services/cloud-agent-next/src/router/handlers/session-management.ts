@@ -45,16 +45,30 @@ function publicRepositoryFields(metadata: CloudAgentSessionState): {
   githubRepo?: string;
   gitUrl?: string;
   platform?: 'github' | 'gitlab' | 'bitbucket';
+  githubIntegrationId?: string;
+  bitbucketWorkspaceUuid?: string;
+  bitbucketRepositoryUuid?: string;
 } {
   const repository = metadata.repository;
   if (!repository) return {};
   switch (repository.type) {
     case 'github':
-      return { githubRepo: repository.repo, platform: repository.platform ?? 'github' };
+      return {
+        githubRepo: repository.repo,
+        platform: repository.platform ?? 'github',
+        ...(repository.githubIntegrationId === undefined
+          ? {}
+          : { githubIntegrationId: repository.githubIntegrationId }),
+      };
     case 'gitlab':
       return { gitUrl: repository.url, platform: 'gitlab' };
     case 'bitbucket':
-      return { gitUrl: repository.url, platform: 'bitbucket' };
+      return {
+        gitUrl: repository.url,
+        platform: 'bitbucket',
+        bitbucketWorkspaceUuid: repository.workspaceUuid,
+        bitbucketRepositoryUuid: repository.repositoryUuid,
+      };
     case 'git':
       return { gitUrl: repository.url, platform: repository.platform };
   }

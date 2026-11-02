@@ -1,4 +1,8 @@
-import { selectedRuntimeCli } from '../../../src/shared/runtime-distribution.js';
+import {
+  GH_STACK_EXTENSION_NAME,
+  GH_STACK_EXTENSIONS_ROOT,
+  selectedRuntimeCli,
+} from '../../../src/shared/runtime-distribution.js';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import fsp from 'node:fs/promises';
@@ -541,6 +545,19 @@ export async function prepareKiloFilesystem(
     await fsp.writeFile(path.join(authDirectory, 'auth.json'), env.KILO_AUTH_CONTENT ?? '', {
       mode: 0o600,
     });
+    // `gh` looks for extensions under `$XDG_DATA_HOME/gh/extensions`, while the
+    // runtime HOME is per worktree and starts empty. Expose the image-baked
+    // gh-stack extension through that path. An existing link (or an upgrade the
+    // agent installed) is left untouched.
+    const extensionsDirectory = path.join(dataHome, 'gh', 'extensions');
+    await fsp.mkdir(extensionsDirectory, { recursive: true });
+    const ghStackLink = path.join(extensionsDirectory, GH_STACK_EXTENSION_NAME);
+    try {
+      await fsp.lstat(ghStackLink);
+    } catch {
+      const ghStackSource = path.join(GH_STACK_EXTENSIONS_ROOT, GH_STACK_EXTENSION_NAME);
+      await fsp.symlink(ghStackSource, ghStackLink, 'dir');
+    }
   }
   const runtimeDir = env.XDG_RUNTIME_DIR;
   if (runtimeDir !== undefined && runtimeDir.length > 0) {

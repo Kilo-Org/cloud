@@ -78,6 +78,10 @@ const WORKSPACE_FAILURE_MESSAGES = {
   git_pack_corrupt: 'Repository data is corrupt',
   git_checkout_conflict: 'Repository checkout conflict',
   git_branch_missing: 'Requested repository branch was not found',
+  base_branch_changed: 'Base branch changed while the workspace was starting',
+  base_branch_missing: 'Base branch has not been pushed',
+  base_branch_stale:
+    'Base branch no longer contains this workspace’s recorded base; recreate the stacked workspace',
   sandbox_storage_full: 'Workspace setup failed: sandbox storage full',
   kilo_import_timeout: 'Session import timed out',
   kilo_import_failed: 'Session import failed',

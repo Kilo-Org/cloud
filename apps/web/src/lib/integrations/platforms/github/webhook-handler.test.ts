@@ -16,6 +16,8 @@ const mockGetIntegrationForOrganization = jest.fn();
 const mockLogWebhookEvent = jest.fn();
 const mockUpdateWebhookEvent = jest.fn();
 const mockHandlePullRequest = jest.fn();
+const mockUpsertCliSessionPullRequestsFromWebhook = jest.fn();
+const mockLinkStackedPullRequestsFromWebhook = jest.fn();
 const mockHandleGitHubReviewCommentReply = jest.fn();
 const mockHandleInstallationTargetRenamed = jest.fn();
 const mockRevokeStoredGitHubUserAuthorization = jest.fn();
@@ -89,8 +91,11 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
     mockHandleInstallationTargetRenamed(payload, appType),
   handlePullRequest: (payload: unknown, platformIntegration: unknown) =>
     mockHandlePullRequest(payload, platformIntegration),
-  upsertCliSessionPullRequestsFromWebhook: jest.fn(),
+  upsertCliSessionPullRequestsFromWebhook: (payload: unknown, owner: unknown) =>
+    mockUpsertCliSessionPullRequestsFromWebhook(payload, owner),
   upsertCliSessionPullRequestReviewFromWebhook: jest.fn(),
+  linkStackedPullRequestsFromWebhook: (input: unknown) =>
+    mockLinkStackedPullRequestsFromWebhook(input),
 }));
 
 jest.mock('@/lib/integrations/db/github-installations', () => ({
@@ -254,6 +259,8 @@ describe('handleGitHubWebhook', () => {
     mockLogWebhookEvent.mockResolvedValue({ id: 'we_1', isDuplicate: false });
     mockUpdateWebhookEvent.mockResolvedValue(undefined);
     mockHandlePullRequest.mockResolvedValue(Response.json({ message: 'review queued' }));
+    mockUpsertCliSessionPullRequestsFromWebhook.mockResolvedValue(1);
+    mockLinkStackedPullRequestsFromWebhook.mockResolvedValue(undefined);
     mockHandleGitHubReviewCommentReply.mockResolvedValue({
       recorded: false,
       reason: 'not-review-comment-reply',
@@ -333,6 +340,31 @@ describe('handleGitHubWebhook', () => {
       'standard',
       'pi_github'
     );
+  });
+
+  it('runs the PR cache upsert and stack linking after a stacked delivery', async () => {
+    const payload = pullRequestPayload({
+      action: 'stacked',
+      stack: { number: 3, position: 2, size: 2 },
+    });
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    await waitForAfterTask();
+    expect(mockUpsertCliSessionPullRequestsFromWebhook).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'stacked' }),
+      { kind: 'organization', organizationId: 'org_1' }
+    );
+    expect(mockLinkStackedPullRequestsFromWebhook).toHaveBeenCalledWith({
+      payload: expect.objectContaining({ action: 'stacked' }),
+      owner: { kind: 'organization', organizationId: 'org_1' },
+      installationId: '98765',
+      appType: 'standard',
+    });
   });
 
   it('routes installation_target renamed events through authoritative login synchronization', async () => {

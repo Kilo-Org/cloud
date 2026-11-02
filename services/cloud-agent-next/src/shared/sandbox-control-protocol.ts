@@ -174,6 +174,13 @@ export const sessionAttachPayloadSchema = z
     directory: z.string().min(1).max(1024).optional(),
     branch: z.string().min(1).max(256).optional(),
     branchMode: z.literal('working').optional(),
+    /** Stacked workspace base: the branch the working branch starts from. */
+    baseBranch: z.string().min(1).max(256).optional(),
+    /** The resolved commit the working branch starts from. */
+    baseSha: z
+      .string()
+      .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
+      .optional(),
     kilo: z
       .object({
         scopeId: z.string().min(1).max(256),

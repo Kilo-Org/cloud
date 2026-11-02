@@ -7,10 +7,13 @@ import { useRouter } from 'next/navigation';
 import { useAtom, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
+import { useFeatureFlagEnabled } from 'posthog-js/react';
+import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import {
   AlertCircle,
   Brain,
   FolderGit2,
+  GitBranch,
   Lock,
   RefreshCw,
   Send,
@@ -18,9 +21,11 @@ import {
   Check,
   Paperclip,
   Upload,
+  X,
 } from 'lucide-react';
 import { startOfDay, subDays } from 'date-fns';
 import { useTRPC } from '@/lib/trpc/utils';
+import { useStackedWorkspaceSource } from './hooks/useStackedWorkspaceSource';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -123,6 +128,8 @@ import {
   shouldIncludeBitbucketRepositoryRefresh,
 } from '@/components/cloud-agent-next/repository-refresh';
 import { RepositoryProviderOnboardingPanel } from './RepositoryProviderOnboardingPanel';
+import { stackedWorkspaceTargetAtom } from './store/stacked-workspace-atoms';
+import { CLOUD_AGENT_STACKED_WORKSPACES_FLAG } from './feature-flags';
 
 type Repository = {
   id: string | number;
@@ -222,6 +229,23 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     string | undefined
   >();
   const [selectedPlatform, setSelectedPlatform] = useState<RepositoryPlatform>('github');
+  const stackedWorkspacesEnabled = useFeatureFlagEnabled(CLOUD_AGENT_STACKED_WORKSPACES_FLAG);
+  const [stackedWorkspaceTarget, setStackedWorkspaceTarget] = useAtom(stackedWorkspaceTargetAtom);
+  const stackedTarget =
+    stackedWorkspacesEnabled &&
+    stackedWorkspaceTarget &&
+    (stackedWorkspaceTarget.organizationId ?? null) === (organizationId ?? null)
+      ? stackedWorkspaceTarget
+      : null;
+  const parsedStackedWorktreeId = stackedTarget
+    ? cloudAgentWorktreeIdSchema.safeParse(stackedTarget.worktreeId)
+    : null;
+  const stackedSourceQuery = useStackedWorkspaceSource({
+    worktreeId: stackedTarget?.worktreeId,
+    organizationId,
+    enabled: Boolean(stackedTarget),
+  });
+  const stackedSource = stackedSourceQuery.data;
   const [mode, setMode] = useState<AgentMode>('code');
   const [model, setModel] = useState<string>('');
   const [variant, setVariant] = useState<string | undefined>(undefined);
@@ -574,6 +598,54 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     },
     [organizationId]
   );
+
+  useEffect(() => {
+    if (!stackedWorkspaceTarget) return;
+    if ((stackedWorkspaceTarget.organizationId ?? null) !== (organizationId ?? null)) {
+      setStackedWorkspaceTarget(null);
+    }
+  }, [organizationId, setStackedWorkspaceTarget, stackedWorkspaceTarget]);
+
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      queueMicrotask(() => {
+        if (!mountedRef.current) setStackedWorkspaceTarget(null);
+      });
+    };
+  }, [setStackedWorkspaceTarget]);
+
+  useEffect(() => {
+    if (!stackedSource) return;
+    const provider = stackedSource.providerInput;
+    if (stackedSource.platform === 'git') {
+      setPublicRepoUrl(provider.publicRepoUrl ?? stackedSource.gitUrl);
+      setSelectedRepo(stackedSource.repository);
+      setSelectedGitHubIntegrationId(undefined);
+      return;
+    }
+    setPublicRepoUrl('');
+    setShowRepositoryRequiredMessage(false);
+    if (stackedSource.platform === 'bitbucket') {
+      setSelectedPlatform('bitbucket');
+      setSelectedRepo(provider.bitbucketRepo?.fullName ?? stackedSource.repository);
+      setSelectedGitHubIntegrationId(undefined);
+      return;
+    }
+    if (stackedSource.platform === 'gitlab') {
+      setSelectedPlatform('gitlab');
+      setSelectedRepo(provider.gitlabProject ?? stackedSource.repository);
+      setSelectedGitHubIntegrationId(undefined);
+      return;
+    }
+    setSelectedPlatform('github');
+    setSelectedRepo(provider.githubRepo ?? stackedSource.repository);
+    setSelectedGitHubIntegrationId(
+      stackedSource.githubIntegrationId ?? provider.githubIntegrationId ?? undefined
+    );
+  }, [stackedSource]);
 
   // Auto-select repo from saved preference, recent session, or the only
   // available repository, in that priority order.
@@ -979,6 +1051,9 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
 
   const bitbucketRepo = useMemo(() => {
     if (!organizationId || selectedPlatform !== 'bitbucket') return undefined;
+    if (stackedSource?.platform === 'bitbucket') {
+      return stackedSource.providerInput.bitbucketRepo ?? undefined;
+    }
     const repository = unifiedRepositories.find(
       repository => repository.fullName === selectedRepo && repository.platform === 'bitbucket'
     );
@@ -990,7 +1065,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       workspaceUuid: repository.workspaceUuid,
       repositoryUuid: repository.id,
     };
-  }, [organizationId, selectedPlatform, selectedRepo, unifiedRepositories]);
+  }, [organizationId, selectedPlatform, selectedRepo, stackedSource, unifiedRepositories]);
 
   const environmentRepository = useMemo<EnvironmentRepository | undefined>(() => {
     if (hasPublicRepo || !selectedRepo) return undefined;
@@ -1055,6 +1130,9 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     !isPromptTooLong &&
     !publicRepoUrlError &&
     model.length > 0 &&
+    (!stackedTarget ||
+      (Boolean(stackedSource) &&
+        (stackedSource?.platform === 'git' ? hasPublicRepo : selectedRepo.length > 0))) &&
     (!hasInsufficientBalance || limitedAccessModelIsAllowed) &&
     !attachmentUpload.hasUploadingAttachments;
 
@@ -1080,6 +1158,25 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       guard.end();
       return;
     }
+    if (stackedTarget && !stackedSource) {
+      toast.error('Cannot load the repository of the workspace you are stacking on.', {
+        description: 'Open that workspace again, or start a normal session instead.',
+      });
+      guard.end();
+      return;
+    }
+    if (stackedTarget && stackedSourceQuery.isError) {
+      toast.error('That workspace is no longer available to stack on.');
+      setStackedWorkspaceTarget(null);
+      guard.end();
+      return;
+    }
+    if (parsedStackedWorktreeId && !parsedStackedWorktreeId.success) {
+      toast.error('That workspace is no longer available to stack on.');
+      setStackedWorkspaceTarget(null);
+      guard.end();
+      return;
+    }
     if (
       !hasPublicRepo &&
       organizationId &&
@@ -1099,7 +1196,14 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     const submittedPrompt = prompt.trim();
     const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
     const initialMessageId = generateMessageId();
-    const sessionInput = { ...creationInput, initialMessageId };
+    const stackedInput =
+      stackedTarget && parsedStackedWorktreeId?.success
+        ? {
+            baseBranch: stackedSource?.branch ?? stackedTarget.branch,
+            stackOnWorktreeId: parsedStackedWorktreeId.data,
+          }
+        : {};
+    const sessionInput = { ...creationInput, initialMessageId, ...stackedInput };
     const request: LocalSessionRequest = organizationId
       ? {
           kind: 'new-organization-session',
@@ -1167,6 +1271,9 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     selectedPlatform,
     selectedRepo,
     selectedGitHubIntegrationId,
+    stackedTarget,
+    stackedSource,
+    stackedSourceQuery.isError,
     trimmedPublicRepoUrl,
   ]);
 
@@ -1537,157 +1644,188 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Repo and its environment — bottom left */}
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
-            <Popover open={repoPopoverOpen} onOpenChange={setRepoPopoverOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    'text-muted-foreground hover:text-foreground inline-flex min-w-0 cursor-pointer items-center gap-1 text-sm',
-                    selectedRepo && 'text-foreground'
-                  )}
-                >
-                  <FolderGit2 className="h-3.5 w-3.5" />
-                  <span className="max-w-[min(16rem,50vw)] truncate">
-                    {(hasPublicRepo ? trimmedPublicRepoUrl : '') || selectedRepo || 'Repository'}
-                  </span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[min(20rem,calc(100vw-2rem))] p-0" align="start">
-                {isPublicRepoDevEnabled && (
-                  <div className="space-y-2 border-b p-3">
-                    <label
-                      htmlFor="new-session-public-repo-url"
-                      className="text-muted-foreground text-xs font-medium"
-                    >
-                      Public repository URL
-                    </label>
-                    <Input
-                      id="new-session-public-repo-url"
-                      type="url"
-                      inputMode="url"
-                      spellCheck={false}
-                      autoComplete="off"
-                      placeholder="https://github.com/owner/repo.git"
-                      value={publicRepoUrl}
-                      onChange={event => {
-                        setPublicRepoUrl(event.target.value);
-                        setShowRepositoryRequiredMessage(false);
-                      }}
-                      aria-invalid={publicRepoUrlError ? true : undefined}
-                      aria-describedby={
-                        publicRepoUrlError
-                          ? 'new-session-public-repo-error'
-                          : 'new-session-public-repo-help'
-                      }
-                    />
-                    {publicRepoUrlError ? (
-                      <p id="new-session-public-repo-error" className="text-xs text-red-400">
-                        {publicRepoUrlError}
-                      </p>
-                    ) : (
-                      <p
-                        id="new-session-public-repo-help"
-                        className="text-muted-foreground text-xs"
+            {stackedTarget ? (
+              <span
+                className="text-foreground inline-flex min-w-0 items-center gap-1 text-sm"
+                title={
+                  stackedSource
+                    ? stackedSource.repository
+                    : 'Loading the repository of the workspace you are stacking on…'
+                }
+              >
+                <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="max-w-[min(16rem,50vw)] truncate">
+                  {stackedSource?.repository ?? stackedTarget.repository}
+                </span>
+              </span>
+            ) : (
+              <Popover open={repoPopoverOpen} onOpenChange={setRepoPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      'text-muted-foreground hover:text-foreground inline-flex min-w-0 cursor-pointer items-center gap-1 text-sm',
+                      selectedRepo && 'text-foreground'
+                    )}
+                  >
+                    <FolderGit2 className="h-3.5 w-3.5" />
+                    <span className="max-w-[min(16rem,50vw)] truncate">
+                      {(hasPublicRepo ? trimmedPublicRepoUrl : '') || selectedRepo || 'Repository'}
+                    </span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[min(20rem,calc(100vw-2rem))] p-0" align="start">
+                  {isPublicRepoDevEnabled && (
+                    <div className="space-y-2 border-b p-3">
+                      <label
+                        htmlFor="new-session-public-repo-url"
+                        className="text-muted-foreground text-xs font-medium"
                       >
-                        Local dev only. Clones a public repository without a source-control
-                        integration.
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {isLoadingRepos ? (
-                  <div className="text-muted-foreground p-4 text-center text-sm">
-                    Loading repositories...
-                  </div>
-                ) : repoError ? (
-                  <div className="p-4 text-center text-sm text-red-400">
-                    Failed to load repositories
-                  </div>
-                ) : unifiedRepositories.length === 0 ? (
-                  <div className="text-muted-foreground space-y-2 p-4 text-center text-sm">
-                    <p>No repositories found</p>
-                    {organizationId && bitbucketRepoData?.status === 'temporarily_unavailable' && (
-                      <p>The Bitbucket repository cache is temporarily unavailable.</p>
-                    )}
-                    {organizationId &&
-                      bitbucketIntegrationHref &&
-                      bitbucketRepoData?.status &&
-                      bitbucketRepoData.status !== 'available' &&
-                      bitbucketRepoData.status !== 'temporarily_unavailable' && (
-                        <Link
-                          href={bitbucketIntegrationHref}
-                          className="text-link hover:text-link-hover underline underline-offset-4"
+                        Public repository URL
+                      </label>
+                      <Input
+                        id="new-session-public-repo-url"
+                        type="url"
+                        inputMode="url"
+                        spellCheck={false}
+                        autoComplete="off"
+                        placeholder="https://github.com/owner/repo.git"
+                        value={publicRepoUrl}
+                        onChange={event => {
+                          setPublicRepoUrl(event.target.value);
+                          setShowRepositoryRequiredMessage(false);
+                        }}
+                        aria-invalid={publicRepoUrlError ? true : undefined}
+                        aria-describedby={
+                          publicRepoUrlError
+                            ? 'new-session-public-repo-error'
+                            : 'new-session-public-repo-help'
+                        }
+                      />
+                      {publicRepoUrlError ? (
+                        <p id="new-session-public-repo-error" className="text-xs text-red-400">
+                          {publicRepoUrlError}
+                        </p>
+                      ) : (
+                        <p
+                          id="new-session-public-repo-help"
+                          className="text-muted-foreground text-xs"
                         >
-                          {bitbucketRepoData.status === 'reconnect_required' ||
-                          bitbucketRepoData.status === 'insufficient_permissions'
-                            ? 'Replace the Bitbucket token'
-                            : bitbucketRepoData.status === 'invalid_request'
-                              ? 'Review the Bitbucket connection'
-                              : 'Connect Bitbucket'}
-                        </Link>
+                          Local dev only. Clones a public repository without a source-control
+                          integration.
+                        </p>
                       )}
-                    <UIButton
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => void refreshRepositories()}
-                      disabled={isRefreshingRepos}
-                      className="mx-auto"
-                    >
-                      <RefreshCw className={cn('size-3.5', isRefreshingRepos && 'animate-spin')} />
-                      {isRefreshingRepos ? 'Refreshing repositories...' : 'Refresh repositories'}
-                    </UIButton>
-                  </div>
-                ) : (
-                  <UICommand>
-                    <div className="flex items-center border-b pr-2 [&_[cmdk-input-wrapper]]:flex-1 [&_[cmdk-input-wrapper]]:border-b-0">
-                      <CommandInput placeholder="Search repositories..." />
-                      <button
-                        type="button"
-                        onClick={() => void refreshRepositories()}
-                        disabled={isRefreshingRepos}
-                        className="text-muted-foreground hover:text-foreground shrink-0 rounded-sm p-1 disabled:opacity-50"
-                        aria-label="Refresh repositories"
-                        title="Refresh repositories"
-                      >
-                        <RefreshCw
-                          className={cn('h-3.5 w-3.5', isRefreshingRepos && 'animate-spin')}
-                        />
-                      </button>
                     </div>
-                    {(bitbucketRepoData?.status === 'reconnect_required' ||
-                      bitbucketRepoData?.status === 'insufficient_permissions') &&
-                      bitbucketIntegrationHref && (
-                        <div className="border-b px-3 py-2 text-xs">
+                  )}
+
+                  {isLoadingRepos ? (
+                    <div className="text-muted-foreground p-4 text-center text-sm">
+                      Loading repositories...
+                    </div>
+                  ) : repoError ? (
+                    <div className="p-4 text-center text-sm text-red-400">
+                      Failed to load repositories
+                    </div>
+                  ) : unifiedRepositories.length === 0 ? (
+                    <div className="text-muted-foreground space-y-2 p-4 text-center text-sm">
+                      <p>No repositories found</p>
+                      {organizationId &&
+                        bitbucketRepoData?.status === 'temporarily_unavailable' && (
+                          <p>The Bitbucket repository cache is temporarily unavailable.</p>
+                        )}
+                      {organizationId &&
+                        bitbucketIntegrationHref &&
+                        bitbucketRepoData?.status &&
+                        bitbucketRepoData.status !== 'available' &&
+                        bitbucketRepoData.status !== 'temporarily_unavailable' && (
                           <Link
                             href={bitbucketIntegrationHref}
                             className="text-link hover:text-link-hover underline underline-offset-4"
                           >
-                            Replace the Bitbucket token to list repositories
+                            {bitbucketRepoData.status === 'reconnect_required' ||
+                            bitbucketRepoData.status === 'insufficient_permissions'
+                              ? 'Replace the Bitbucket token'
+                              : bitbucketRepoData.status === 'invalid_request'
+                                ? 'Review the Bitbucket connection'
+                                : 'Connect Bitbucket'}
                           </Link>
-                        </div>
-                      )}
-                    <CommandEmpty>No repositories match your search</CommandEmpty>
-                    <CommandList className="max-h-64 overflow-auto">
-                      {recentRepos.length > 0 && (
-                        <CommandGroup heading="Recently used">
-                          {recentRepos.map(repo => (
-                            <RepoCommandItem
-                              key={`recent-${repositoryKey(repo)}`}
-                              repo={repo}
-                              isSelected={isSelectedRepository(repo)}
-                              onSelect={handleRepoPillSelect}
-                            />
-                          ))}
-                        </CommandGroup>
-                      )}
-                      {hasMultiplePlatforms || hasMultipleGitHubAccounts ? (
-                        <>
-                          {Object.entries(githubRepoGroups).map(([accountLogin, repositories]) =>
-                            repositories?.length ? (
-                              <CommandGroup key={accountLogin} heading={accountLogin}>
-                                {repositories.map(repo => (
+                        )}
+                      <UIButton
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void refreshRepositories()}
+                        disabled={isRefreshingRepos}
+                        className="mx-auto"
+                      >
+                        <RefreshCw
+                          className={cn('size-3.5', isRefreshingRepos && 'animate-spin')}
+                        />
+                        {isRefreshingRepos ? 'Refreshing repositories...' : 'Refresh repositories'}
+                      </UIButton>
+                    </div>
+                  ) : (
+                    <UICommand>
+                      <div className="flex items-center border-b pr-2 [&_[cmdk-input-wrapper]]:flex-1 [&_[cmdk-input-wrapper]]:border-b-0">
+                        <CommandInput placeholder="Search repositories..." />
+                        <button
+                          type="button"
+                          onClick={() => void refreshRepositories()}
+                          disabled={isRefreshingRepos}
+                          className="text-muted-foreground hover:text-foreground shrink-0 rounded-sm p-1 disabled:opacity-50"
+                          aria-label="Refresh repositories"
+                          title="Refresh repositories"
+                        >
+                          <RefreshCw
+                            className={cn('h-3.5 w-3.5', isRefreshingRepos && 'animate-spin')}
+                          />
+                        </button>
+                      </div>
+                      {(bitbucketRepoData?.status === 'reconnect_required' ||
+                        bitbucketRepoData?.status === 'insufficient_permissions') &&
+                        bitbucketIntegrationHref && (
+                          <div className="border-b px-3 py-2 text-xs">
+                            <Link
+                              href={bitbucketIntegrationHref}
+                              className="text-link hover:text-link-hover underline underline-offset-4"
+                            >
+                              Replace the Bitbucket token to list repositories
+                            </Link>
+                          </div>
+                        )}
+                      <CommandEmpty>No repositories match your search</CommandEmpty>
+                      <CommandList className="max-h-64 overflow-auto">
+                        {recentRepos.length > 0 && (
+                          <CommandGroup heading="Recently used">
+                            {recentRepos.map(repo => (
+                              <RepoCommandItem
+                                key={`recent-${repositoryKey(repo)}`}
+                                repo={repo}
+                                isSelected={isSelectedRepository(repo)}
+                                onSelect={handleRepoPillSelect}
+                              />
+                            ))}
+                          </CommandGroup>
+                        )}
+                        {hasMultiplePlatforms || hasMultipleGitHubAccounts ? (
+                          <>
+                            {Object.entries(githubRepoGroups).map(([accountLogin, repositories]) =>
+                              repositories?.length ? (
+                                <CommandGroup key={accountLogin} heading={accountLogin}>
+                                  {repositories.map(repo => (
+                                    <RepoCommandItem
+                                      key={repositoryKey(repo)}
+                                      repo={repo}
+                                      isSelected={isSelectedRepository(repo)}
+                                      onSelect={handleRepoPillSelect}
+                                    />
+                                  ))}
+                                </CommandGroup>
+                              ) : null
+                            )}
+                            {gitlabRepos.length > 0 && (
+                              <CommandGroup heading="GitLab">
+                                {gitlabRepos.map(repo => (
                                   <RepoCommandItem
                                     key={repositoryKey(repo)}
                                     repo={repo}
@@ -1696,62 +1834,80 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                                   />
                                 ))}
                               </CommandGroup>
-                            ) : null
-                          )}
-                          {gitlabRepos.length > 0 && (
-                            <CommandGroup heading="GitLab">
-                              {gitlabRepos.map(repo => (
-                                <RepoCommandItem
-                                  key={repositoryKey(repo)}
-                                  repo={repo}
-                                  isSelected={isSelectedRepository(repo)}
-                                  onSelect={handleRepoPillSelect}
-                                />
-                              ))}
-                            </CommandGroup>
-                          )}
-                          {bitbucketRepos.length > 0 && (
-                            <CommandGroup heading="Bitbucket">
-                              {bitbucketRepos.map(repo => (
-                                <RepoCommandItem
-                                  key={repositoryKey(repo)}
-                                  repo={repo}
-                                  isSelected={isSelectedRepository(repo)}
-                                  onSelect={handleRepoPillSelect}
-                                />
-                              ))}
-                            </CommandGroup>
-                          )}
-                          {otherRepos.length > 0 && (
-                            <CommandGroup heading="Other">
-                              {otherRepos.map(repo => (
-                                <RepoCommandItem
-                                  key={repositoryKey(repo)}
-                                  repo={repo}
-                                  isSelected={isSelectedRepository(repo)}
-                                  onSelect={handleRepoPillSelect}
-                                />
-                              ))}
-                            </CommandGroup>
-                          )}
-                        </>
-                      ) : (
-                        <CommandGroup>
-                          {filteredUnifiedRepos.map(repo => (
-                            <RepoCommandItem
-                              key={repositoryKey(repo)}
-                              repo={repo}
-                              isSelected={isSelectedRepository(repo)}
-                              onSelect={handleRepoPillSelect}
-                            />
-                          ))}
-                        </CommandGroup>
-                      )}
-                    </CommandList>
-                  </UICommand>
-                )}
-              </PopoverContent>
-            </Popover>
+                            )}
+                            {bitbucketRepos.length > 0 && (
+                              <CommandGroup heading="Bitbucket">
+                                {bitbucketRepos.map(repo => (
+                                  <RepoCommandItem
+                                    key={repositoryKey(repo)}
+                                    repo={repo}
+                                    isSelected={isSelectedRepository(repo)}
+                                    onSelect={handleRepoPillSelect}
+                                  />
+                                ))}
+                              </CommandGroup>
+                            )}
+                            {otherRepos.length > 0 && (
+                              <CommandGroup heading="Other">
+                                {otherRepos.map(repo => (
+                                  <RepoCommandItem
+                                    key={repositoryKey(repo)}
+                                    repo={repo}
+                                    isSelected={isSelectedRepository(repo)}
+                                    onSelect={handleRepoPillSelect}
+                                  />
+                                ))}
+                              </CommandGroup>
+                            )}
+                          </>
+                        ) : (
+                          <CommandGroup>
+                            {filteredUnifiedRepos.map(repo => (
+                              <RepoCommandItem
+                                key={repositoryKey(repo)}
+                                repo={repo}
+                                isSelected={isSelectedRepository(repo)}
+                                onSelect={handleRepoPillSelect}
+                              />
+                            ))}
+                          </CommandGroup>
+                        )}
+                      </CommandList>
+                    </UICommand>
+                  )}
+                </PopoverContent>
+              </Popover>
+            )}
+            {stackedTarget && (
+              <Badge variant="secondary" className="gap-1.5 py-0.5 font-normal">
+                <GitBranch className="h-3 w-3 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 truncate">
+                  Stacked on{' '}
+                  <code className="font-mono">{stackedSource?.branch ?? stackedTarget.branch}</code>
+                  {stackedTarget.prNumber !== null ? ` (#${stackedTarget.prNumber})` : ''}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setStackedWorkspaceTarget(null)}
+                  aria-label="Remove stacked workspace"
+                  title="Remove stacked workspace"
+                  className="hover:bg-muted focus-visible:ring-ring -mr-1 rounded-sm p-0.5 focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  <X className="h-3 w-3" aria-hidden="true" />
+                </button>
+              </Badge>
+            )}
+            {stackedTarget && !stackedSource && stackedSourceQuery.isError && (
+              <p className="text-destructive basis-full text-xs" role="status">
+                This workspace is being deleted or no longer exists. Remove the stack target and
+                start a normal session.
+              </p>
+            )}
+            {stackedTarget && !stackedSource && stackedSourceQuery.isPending && (
+              <p className="text-muted-foreground basis-full text-xs" role="status">
+                Loading the stacked workspace repository…
+              </p>
+            )}
             <RepositoryEnvironmentChip
               organizationId={organizationId}
               repository={environmentRepository}

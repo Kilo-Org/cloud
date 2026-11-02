@@ -184,6 +184,11 @@ export function buildWorktreeKiloEnvironment(
         }
       : {}),
     KILO_DISABLE_AUTOUPDATE: 'true',
+    // Backstop for a layout change or a non-symlinked gh-stack install: the
+    // agent's terminals are real TTYs, so `gh` and gh-stack would otherwise run
+    // their update checks and call the GitHub API with the session token.
+    GH_NO_EXTENSION_UPDATE_NOTIFIER: '1',
+    GH_STACK_NO_UPDATE_NOTIFIER: '1',
     KILO_DISABLE_CODEBASE_INDEXING: 'vscode-no-workspace',
     KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'false',
     KILO_DEBUG_SESSION_INGEST: '1',

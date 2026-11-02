@@ -22,7 +22,11 @@ import {
   Plus,
   FolderInput,
   FolderPlus,
+  ChevronDown,
+  ChevronRight,
+  Layers,
 } from 'lucide-react';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import {
@@ -37,8 +41,11 @@ import {
   getSidebarWorktreeActivity,
   getSidebarWorktreeLabel,
   getSidebarWorktreePrSession,
+  getStoredSessionActivityTime,
   groupSidebarSessionsByDate,
   type SidebarForegroundSessionStatus,
+  type SidebarSortPins,
+  type SidebarWorktreeActivity,
   type SidebarWorktreeDetails,
   type SidebarWorktreeGroup,
 } from './hooks/useSidebarSessions';
@@ -61,9 +68,23 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { WorkspaceFolder } from '@/lib/cloud-agent/workspace-folders';
 import type { WorkspaceFolderController } from './hooks/useWorkspaceFolders';
+import { useStackedWorkspaceSource } from './hooks/useStackedWorkspaceSource';
 import { WorkspaceFolderSection } from './WorkspaceFolderSection';
 import { WorkspaceFolderDialog } from './WorkspaceFolderDialog';
 import { SidebarListSkeleton } from './SidebarListSkeleton';
+import { stackedWorkspaceTargetAtom } from './store/stacked-workspace-atoms';
+import { worktreeRemoteBranchChangedAtom } from './store/remote-branch-atoms';
+import { getMostUrgentStackStatus, type StackUrgency } from './workspace-stacks';
+import {
+  getPositionBetween,
+  groupWorkspaceGroupsByDestination,
+  isValidPositionKey,
+  sortSmartFolderGroups,
+  sortWorkspaceGroups,
+  type SidebarWorkspaceGroup,
+  type SidebarWorkspaceRow,
+  type WorkspaceOrder,
+} from './sidebar-ordering';
 import {
   getWorkspaceFolderColor,
   getWorkspaceFolderDropAction,
@@ -96,6 +117,11 @@ type ChatSidebarProps = {
   isLoading?: boolean;
   worktreeDetails?: Record<string, SidebarWorktreeDetails>;
   loadingWorktreeIds?: readonly string[];
+  /** Phase 4 workspace rows, already grouped into stacks by the hook. */
+  workspaceGroups?: SidebarWorktreeGroup[];
+  workspaceOrder?: WorkspaceOrder;
+  workspaceRowsTruncated?: boolean;
+  stackedWorkspacesEnabled?: boolean;
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
   onDeleteWorktree?: (worktreeId: string) => void;
   deletingWorktreeIds?: readonly string[];
@@ -122,6 +148,55 @@ type WorktreeFolderControls = {
   onDragStart: (event: DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
 };
+
+function stackUrgencyStatus(urgency: StackUrgency): string | null {
+  if (urgency === 'attention') return 'question';
+  if (urgency === 'running') return 'busy';
+  if (urgency === 'failed') return 'failed';
+  return null;
+}
+
+function sidebarWorkspaceRow(
+  group: SidebarWorktreeGroup,
+  activity: SidebarWorktreeActivity,
+  sortPins: SidebarSortPins
+): SidebarWorkspaceRow {
+  const prSession = getSidebarWorktreePrSession(group);
+  return {
+    worktreeId: group.worktreeId,
+    createdAt: group.details?.createdAt ?? group.latestSession.createdAt,
+    lastActivityAt: new Date(
+      Math.max(
+        ...group.sessions.map(
+          session => sortPins.get(session.sessionId) ?? getStoredSessionActivityTime(session)
+        )
+      )
+    ).toISOString(),
+    sidebarPosition: group.details?.sidebarPosition ?? null,
+    folderId: group.details?.folderId ?? null,
+    parentWorktreeId: group.details?.parentWorktreeId ?? null,
+    prState: prSession?.associatedPr?.state ?? null,
+    status: activity.status,
+    statusUpdatedAt: activity.statusUpdatedAt,
+    hasPendingQuestion: activity.status === 'question' || activity.status === 'permission',
+    lastTurnFailed: activity.status === 'failed' || activity.status === 'system_interrupted',
+  };
+}
+
+function sidebarWorkspaceGroup(
+  group: SidebarWorktreeGroup,
+  activities: ReadonlyMap<string, SidebarWorktreeActivity>,
+  sortPins: SidebarSortPins
+): SidebarWorkspaceGroup {
+  const activity = (item: SidebarWorktreeGroup) =>
+    activities.get(item.worktreeId) ?? { status: null, statusUpdatedAt: null, isLive: false };
+  return {
+    root: sidebarWorkspaceRow(group, activity(group), sortPins),
+    layers: (group.stackLayers ?? []).map(layer =>
+      sidebarWorkspaceRow(layer, activity(layer), sortPins)
+    ),
+  };
+}
 
 const SessionRow = memo(function SessionRow({
   session,
@@ -302,11 +377,19 @@ function WorktreeGroupRow({
   onCreateWorktreeChat,
   onRenameWorktree,
   onDeleteWorktree,
+  onNewStackedWorkspace,
+  stackedWorkspacesEnabled,
+  organizationId,
   isDeleting,
   isLoadingDetails,
   activeSessionStatuses,
   foregroundSession,
   folderControls,
+  isStackLayer = false,
+  remoteBranchChanged = false,
+  onRowDragOver,
+  onRowDrop,
+  dropPlacement = null,
 }: {
   group: SidebarWorktreeGroup;
   currentSessionId?: string;
@@ -315,11 +398,22 @@ function WorktreeGroupRow({
   onCreateWorktreeChat?: (sourceKiloSessionId: string) => void;
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
   onDeleteWorktree?: (worktreeId: string) => void;
+  onNewStackedWorkspace?: (
+    group: SidebarWorktreeGroup,
+    source?: { branch: string; repository: string } | null
+  ) => void;
+  stackedWorkspacesEnabled?: boolean;
+  organizationId?: string | null;
   isDeleting: boolean;
   isLoadingDetails: boolean;
   activeSessionStatuses: ReadonlyMap<string, string>;
   foregroundSession?: SidebarForegroundSessionStatus | null;
   folderControls?: WorktreeFolderControls;
+  isStackLayer?: boolean;
+  remoteBranchChanged?: boolean;
+  onRowDragOver?: (event: DragEvent<HTMLDivElement>, worktreeId: string) => void;
+  onRowDrop?: (event: DragEvent<HTMLDivElement>, worktreeId: string) => void;
+  dropPlacement?: 'before' | 'after' | null;
 }) {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -327,6 +421,7 @@ function WorktreeGroupRow({
   const [editName, setEditName] = useState('');
   const [renameError, setRenameError] = useState<string | null>(null);
   const [isSavingRename, setIsSavingRename] = useState(false);
+  const [stackExpanded, setStackExpanded] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
   const openButtonRef = useRef<HTMLButtonElement>(null);
   const editingRef = useRef(false);
@@ -342,14 +437,52 @@ function WorktreeGroupRow({
     group.details?.sessions,
     foregroundSession
   );
+  const stackLayers = stackedWorkspacesEnabled ? (group.stackLayers ?? []) : [];
+  const stackSize = stackLayers.length + 1;
+  const stackUrgency = getMostUrgentStackStatus(
+    stackLayers.map(
+      layer =>
+        getSidebarWorktreeActivity(
+          layer.sessions,
+          activeSessionStatuses,
+          layer.details?.sessions,
+          foregroundSession
+        ).status
+    )
+  );
   const shouldReplaceTime = activity.isLive || activity.status !== null;
   const hasActions = Boolean(
-    onCreateWorktreeChat || onRenameWorktree || onDeleteWorktree || folderControls
+    onCreateWorktreeChat ||
+    onRenameWorktree ||
+    onDeleteWorktree ||
+    folderControls ||
+    (stackedWorkspacesEnabled && onNewStackedWorkspace)
   );
   const isActive =
     selectedWorktreeId === group.worktreeId ||
     group.sessions.some(session => session.sessionId === currentSessionId);
   const showActions = hasActions && (hovered || menuOpen);
+  const stackedBranch = group.details?.branch ?? group.latestSession.branch ?? null;
+  const stackedSource = useStackedWorkspaceSource({
+    worktreeId: group.worktreeId,
+    organizationId,
+    enabled: Boolean(stackedWorkspacesEnabled && menuOpen && onNewStackedWorkspace),
+  });
+  const sourceBranch = stackedSource.source?.branch ?? stackedBranch;
+  const canStack =
+    Boolean(sourceBranch) &&
+    !isDeleting &&
+    !stackedSource.isPending &&
+    stackedSource.source?.basePushed !== false;
+  const stackDisabledReason = stackedSource.isPending
+    ? 'Checking whether the branch is pushed…'
+    : !sourceBranch
+      ? 'Push this workspace branch first; it will be pushed after the next successful turn, or enable auto-commit.'
+      : isDeleting
+        ? 'This workspace is being deleted.'
+        : stackedSource.source?.basePushed === false
+          ? `Push \`${sourceBranch}\` first; it will be pushed after the next successful turn, or enable auto-commit`
+          : undefined;
 
   useEffect(() => {
     if (isEditing) {
@@ -397,14 +530,22 @@ function WorktreeGroupRow({
   return (
     <div
       data-worktree-id={group.worktreeId}
-      draggable={Boolean(folderControls && !folderControls.disabled && !isEditing && !isDeleting)}
-      onDragStart={folderControls?.onDragStart}
-      onDragEnd={folderControls?.onDragEnd}
+      data-stack-depth={isStackLayer ? 1 : 0}
+      draggable={Boolean(
+        !isStackLayer && folderControls && !folderControls.disabled && !isEditing && !isDeleting
+      )}
+      onDragStart={isStackLayer ? undefined : folderControls?.onDragStart}
+      onDragEnd={isStackLayer ? undefined : folderControls?.onDragEnd}
+      onDragOver={onRowDragOver ? event => onRowDragOver(event, group.worktreeId) : undefined}
+      onDrop={onRowDrop ? event => onRowDrop(event, group.worktreeId) : undefined}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       aria-busy={isDeleting || isSavingRename || undefined}
       className={cn(
         'hover:bg-accent rounded-lg text-sm transition-colors',
+        isStackLayer && 'border-border/60 ml-3 border-l pl-1',
+        dropPlacement === 'before' && 'border-primary border-t-2',
+        dropPlacement === 'after' && 'border-primary border-b-2',
         isDeleting && 'cursor-wait opacity-60',
         folderControls?.isDragging && 'opacity-50',
         isActive && 'bg-accent font-medium'
@@ -481,7 +622,41 @@ function WorktreeGroupRow({
                 </TooltipContent>
               )}
             </Tooltip>
+            {stackLayers.length > 0 && (
+              <button
+                type="button"
+                aria-expanded={stackExpanded}
+                aria-label={`${stackExpanded ? 'Collapse' : 'Expand'} stack of ${stackSize} workspaces`}
+                onClick={event => {
+                  event.stopPropagation();
+                  setStackExpanded(open => !open);
+                }}
+                className="text-muted-foreground hover:bg-muted focus-visible:ring-ring flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-[11px] tabular-nums focus-visible:ring-2 focus-visible:outline-none"
+              >
+                {stackExpanded ? (
+                  <ChevronDown className="size-3" aria-hidden="true" />
+                ) : (
+                  <ChevronRight className="size-3" aria-hidden="true" />
+                )}
+                <span>stack · {stackSize}</span>
+                {!stackExpanded && stackUrgency !== 'idle' && (
+                  <SessionStatusIndicator
+                    status={stackUrgencyStatus(stackUrgency)}
+                    statusUpdatedAt={null}
+                  />
+                )}
+              </button>
+            )}
             {prSession && <SessionPrIndicator session={prSession} />}
+            {remoteBranchChanged && (
+              <span
+                role="status"
+                title="The remote branch has commits this worktree lacks. Sync from Branch operations."
+                className="shrink-0 rounded-sm border border-amber-500/40 px-1 py-0.5 text-[10px] text-amber-700 dark:text-amber-400"
+              >
+                Remote changed
+              </span>
+            )}
             <span className="group/session-actions relative flex w-6 shrink-0 justify-end [@media(any-pointer:coarse)]:w-auto [@media(hover:none)]:w-auto">
               {isDeleting ? (
                 <LoaderCircle
@@ -509,7 +684,10 @@ function WorktreeGroupRow({
                     showActions && 'invisible'
                   )}
                 >
-                  <TimeAgo timestamp={group.latestSession.updatedAt} compact />
+                  <TimeAgo
+                    timestamp={group.latestSession.lastActivityAt ?? group.latestSession.createdAt}
+                    compact
+                  />
                 </span>
               )}
               {!isDeleting && hasActions && (
@@ -543,6 +721,28 @@ function WorktreeGroupRow({
                           <Plus className="h-4 w-4" />
                           New chat
                         </DropdownMenuItem>
+                      )}
+                      {stackedWorkspacesEnabled && onNewStackedWorkspace && (
+                        <Tooltip delayDuration={300}>
+                          <TooltipTrigger asChild>
+                            <span tabIndex={canStack ? -1 : 0} className="block">
+                              <DropdownMenuItem
+                                disabled={!canStack}
+                                onSelect={() =>
+                                  onNewStackedWorkspace(group, stackedSource.source ?? null)
+                                }
+                              >
+                                <Layers className="h-4 w-4" />
+                                New stacked workspace
+                              </DropdownMenuItem>
+                            </span>
+                          </TooltipTrigger>
+                          {stackDisabledReason && (
+                            <TooltipContent side="left" className="max-w-xs break-words">
+                              {stackDisabledReason}
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
                       )}
                       {onRenameWorktree && (
                         <DropdownMenuItem
@@ -616,6 +816,28 @@ function WorktreeGroupRow({
           {renameError}
         </p>
       )}
+      {stackExpanded &&
+        stackLayers.map(layer => (
+          <WorktreeGroupRow
+            key={layer.worktreeId}
+            group={layer}
+            currentSessionId={currentSessionId}
+            selectedWorktreeId={selectedWorktreeId}
+            onOpenSession={onOpenSession}
+            onCreateWorktreeChat={onCreateWorktreeChat}
+            onRenameWorktree={onRenameWorktree}
+            onDeleteWorktree={onDeleteWorktree}
+            onNewStackedWorkspace={onNewStackedWorkspace}
+            stackedWorkspacesEnabled={stackedWorkspacesEnabled}
+            organizationId={organizationId}
+            isDeleting={false}
+            isLoadingDetails={false}
+            activeSessionStatuses={activeSessionStatuses}
+            foregroundSession={foregroundSession}
+            remoteBranchChanged={remoteBranchChanged}
+            isStackLayer
+          />
+        ))}
     </div>
   );
 }
@@ -667,6 +889,10 @@ export function ChatSidebar({
   isLoading = false,
   worktreeDetails = {},
   loadingWorktreeIds = [],
+  workspaceGroups,
+  workspaceOrder = 'manual',
+  workspaceRowsTruncated = false,
+  stackedWorkspacesEnabled = false,
   onRenameWorktree,
   onDeleteWorktree,
   deletingWorktreeIds = [],
@@ -738,6 +964,26 @@ export function ChatSidebar({
     router.push(basePath);
     onMobileSheetOpenChange?.(false);
   }, [router, basePath, onMobileSheetOpenChange]);
+
+  const setStackedWorkspaceTarget = useSetAtom(stackedWorkspaceTargetAtom);
+  const remoteBranchChangedByWorktree = useAtomValue(worktreeRemoteBranchChangedAtom);
+  const handleNewStackedWorkspace = useCallback(
+    (group: SidebarWorktreeGroup, source?: { branch: string; repository: string } | null) => {
+      const branch = source?.branch ?? group.details?.branch ?? group.latestSession.branch ?? null;
+      if (!branch) return;
+      const prSession = getSidebarWorktreePrSession(group);
+      setStackedWorkspaceTarget({
+        worktreeId: group.worktreeId,
+        branch,
+        repository: source?.repository || prSession?.repository || group.latestSession.repository,
+        prNumber: prSession?.associatedPr?.number ?? null,
+        organizationId: organizationId ?? null,
+      });
+      router.push(basePath);
+      onMobileSheetOpenChange?.(false);
+    },
+    [basePath, onMobileSheetOpenChange, organizationId, router, setStackedWorkspaceTarget]
+  );
 
   const handleSessionClick = useCallback(
     (sessionId: string) => {
@@ -818,7 +1064,11 @@ export function ChatSidebar({
     [sessions, worktreeDetails, sortPins]
   );
   const { folderGroups, ungrouped } = useMemo(
-    () => groupWorkspacesByFolder(dateGroups, workspaceFolders?.folders ?? []),
+    () =>
+      groupWorkspacesByFolder(
+        dateGroups,
+        (workspaceFolders?.folders ?? []).filter(folder => folder.kind !== 'smart')
+      ),
     [dateGroups, workspaceFolders?.folders]
   );
   const folderWorkspaceIds = useMemo(
@@ -833,9 +1083,206 @@ export function ChatSidebar({
     [dateGroups]
   );
 
+  const workspaceRowsEnabled = Boolean(stackedWorkspacesEnabled && workspaceGroups);
+
+  const workspaceActivities = useMemo(() => {
+    const activities = new Map<string, SidebarWorktreeActivity>();
+    for (const group of workspaceGroups ?? []) {
+      activities.set(
+        group.worktreeId,
+        getSidebarWorktreeActivity(
+          group.sessions,
+          activeSessionStatuses,
+          group.details?.sessions,
+          foregroundSession
+        )
+      );
+      for (const layer of group.stackLayers ?? []) {
+        activities.set(
+          layer.worktreeId,
+          getSidebarWorktreeActivity(
+            layer.sessions,
+            activeSessionStatuses,
+            layer.details?.sessions,
+            foregroundSession
+          )
+        );
+      }
+    }
+    return activities;
+  }, [activeSessionStatuses, foregroundSession, workspaceGroups]);
+
+  const workspaceGroupsById = useMemo(
+    () => new Map((workspaceGroups ?? []).map(group => [group.worktreeId, group])),
+    [workspaceGroups]
+  );
+  const orderedWorkspaceGroups = useMemo(
+    () =>
+      workspaceRowsEnabled
+        ? sortWorkspaceGroups(
+            (workspaceGroups ?? []).map(group =>
+              sidebarWorkspaceGroup(group, workspaceActivities, sortPins)
+            ),
+            workspaceOrder
+          )
+        : [],
+    [sortPins, workspaceActivities, workspaceGroups, workspaceOrder, workspaceRowsEnabled]
+  );
+  const workspaceDestinations = useMemo(
+    () =>
+      groupWorkspaceGroupsByDestination(orderedWorkspaceGroups, workspaceFolders?.folders ?? []),
+    [orderedWorkspaceGroups, workspaceFolders?.folders]
+  );
+  const phase4FolderSections = useMemo(
+    () =>
+      (workspaceFolders?.folders ?? []).map(folder => {
+        if (folder.kind === 'smart' && folder.smartPreset) {
+          const groups = sortSmartFolderGroups(
+            workspaceDestinations.smart.get(folder.smartPreset) ?? [],
+            folder.smartPreset,
+            folder.sortMode
+          );
+          return { folder, groups };
+        }
+        const groups = sortWorkspaceGroups(
+          workspaceDestinations.manual.get(folder.id) ?? [],
+          folder.sortMode
+        );
+        return { folder, groups };
+      }),
+    [workspaceDestinations, workspaceFolders?.folders]
+  );
+  const phase4Ungrouped = workspaceDestinations.unfiled;
+  const phase4SessionGroups = useMemo(
+    () =>
+      dateGroups.flatMap(group => {
+        const items = group.items.filter(item => item.type === 'session');
+        return items.length > 0 ? [{ ...group, items }] : [];
+      }),
+    [dateGroups]
+  );
+  const workspaceRootIds = useMemo(
+    () => new Set(orderedWorkspaceGroups.map(group => group.root.worktreeId)),
+    [orderedWorkspaceGroups]
+  );
+  const workspaceContainerIds = useMemo(() => {
+    if (!workspaceRowsEnabled) return folderWorkspaceIds;
+    return new Set([...folderWorkspaceIds, ...workspaceRootIds]);
+  }, [folderWorkspaceIds, workspaceRootIds, workspaceRowsEnabled]);
+  const [rowDropTarget, setRowDropTarget] = useState<{
+    worktreeId: string;
+    placement: 'before' | 'after';
+  } | null>(null);
+
+  const workspaceGroupsInContainer = useCallback(
+    (folderId: string | null): SidebarWorkspaceGroup[] => {
+      if (folderId === null) return phase4Ungrouped;
+      const folder = workspaceFolders?.folders.find(candidate => candidate.id === folderId);
+      if (!folder) return phase4Ungrouped;
+      if (folder.kind === 'smart' && folder.smartPreset) {
+        return workspaceDestinations.smart.get(folder.smartPreset) ?? [];
+      }
+      return workspaceDestinations.manual.get(folder.id) ?? [];
+    },
+    [phase4Ungrouped, workspaceDestinations, workspaceFolders?.folders]
+  );
+
+  const rowDropPlacement = useCallback((event: DragEvent<HTMLDivElement>): 'before' | 'after' => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+  }, []);
+
+  const rowDragOver = useCallback(
+    (event: DragEvent<HTMLDivElement>, worktreeId: string) => {
+      if (!workspaceRowsEnabled || dragItem?.type !== 'worktree' || dragItem.id === worktreeId) {
+        return;
+      }
+      const dragged = orderedWorkspaceGroups.find(group => group.root.worktreeId === dragItem.id);
+      const target = orderedWorkspaceGroups.find(group => group.root.worktreeId === worktreeId);
+      if (!dragged || !target) return;
+      const targetFolderId = target.root.folderId ?? null;
+      const draggedFolderId = dragged.root.folderId ?? null;
+      if (targetFolderId !== draggedFolderId) return;
+      const folder = targetFolderId
+        ? workspaceFolders?.folders.find(candidate => candidate.id === targetFolderId)
+        : undefined;
+      if (folder?.kind === 'smart') return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.dataTransfer.dropEffect = 'move';
+      setRowDropTarget({ worktreeId, placement: rowDropPlacement(event) });
+    },
+    [
+      dragItem,
+      orderedWorkspaceGroups,
+      rowDropPlacement,
+      workspaceFolders?.folders,
+      workspaceRowsEnabled,
+    ]
+  );
+
+  const rowDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>, worktreeId: string) => {
+      if (!workspaceRowsEnabled || dragItem?.type !== 'worktree') {
+        setRowDropTarget(null);
+        return;
+      }
+      const draggedId = dragItem.id;
+      const target = orderedWorkspaceGroups.find(group => group.root.worktreeId === worktreeId);
+      const placement = rowDropPlacement(event);
+      setRowDropTarget(null);
+      if (!target || draggedId === worktreeId) return;
+      const folderId = target.root.folderId ?? null;
+      const folder = folderId
+        ? workspaceFolders?.folders.find(candidate => candidate.id === folderId)
+        : undefined;
+      if (folder?.kind === 'smart') return;
+      const dragged = orderedWorkspaceGroups.find(group => group.root.worktreeId === draggedId);
+      if (!dragged) return;
+      const container = workspaceGroupsInContainer(folderId).filter(
+        group => group.root.worktreeId !== draggedId
+      );
+      const targetIndex = container.findIndex(group => group.root.worktreeId === worktreeId);
+      if (targetIndex < 0) return;
+      const insertIndex = targetIndex + (placement === 'after' ? 1 : 0);
+      const desired = [...container];
+      desired.splice(insertIndex, 0, dragged);
+      const previous = desired[insertIndex - 1]?.root.sidebarPosition ?? null;
+      const next = desired[insertIndex + 1]?.root.sidebarPosition ?? null;
+      const needsRebalance =
+        desired.some(group => !isValidPositionKey(group.root.sidebarPosition)) ||
+        (previous !== null && next !== null && previous >= next);
+      event.preventDefault();
+      event.stopPropagation();
+      if (needsRebalance) {
+        void workspaceFolders?.initializeWorktreePositions(
+          desired.map(group => group.root.worktreeId),
+          folderId
+        );
+      } else {
+        void workspaceFolders?.moveWorktree(
+          draggedId,
+          folderId,
+          getPositionBetween(previous, next)
+        );
+      }
+      setDragItem(null);
+      setDropTarget(null);
+    },
+    [
+      dragItem,
+      orderedWorkspaceGroups,
+      rowDropPlacement,
+      workspaceFolders,
+      workspaceGroupsInContainer,
+      workspaceRowsEnabled,
+    ]
+  );
+
   const clearDrag = () => {
     setDragItem(null);
     setDropTarget(null);
+    setRowDropTarget(null);
   };
 
   const startDrag = (event: DragEvent<HTMLDivElement>, item: WorkspaceFolderDragItem) => {
@@ -875,7 +1322,7 @@ export function ChatSidebar({
         dragItem,
         target,
         workspaceFolders?.folders ?? [],
-        folderWorkspaceIds
+        workspaceContainerIds
       )
     ) {
       setDropTarget(null);
@@ -914,7 +1361,7 @@ export function ChatSidebar({
           dragItem,
           target,
           workspaceFolders?.folders ?? [],
-          folderWorkspaceIds
+          workspaceContainerIds
         )
       : null;
     clearDrag();
@@ -937,7 +1384,7 @@ export function ChatSidebar({
       { type: 'folder', id: folderId },
       { type: 'folder', id: neighbor.id, placement: direction === 'up' ? 'before' : 'after' },
       workspaceFolders.folders,
-      folderWorkspaceIds
+      workspaceContainerIds
     );
     if (action?.type === 'reorder-folders') void workspaceFolders.reorderFolders(action.folderIds);
   };
@@ -953,14 +1400,25 @@ export function ChatSidebar({
       onCreateWorktreeChat={onCreateWorktreeChat}
       onRenameWorktree={onRenameWorktree}
       onDeleteWorktree={onDeleteWorktree}
+      onNewStackedWorkspace={handleNewStackedWorkspace}
+      stackedWorkspacesEnabled={stackedWorkspacesEnabled}
+      organizationId={organizationId}
       isDeleting={deletingWorktreeIds.includes(group.worktreeId)}
       activeSessionStatuses={activeSessionStatuses}
       foregroundSession={foregroundSession}
+      onRowDragOver={rowDragOver}
+      onRowDrop={rowDrop}
+      remoteBranchChanged={Boolean(remoteBranchChangedByWorktree[group.worktreeId])}
+      dropPlacement={
+        rowDropTarget?.worktreeId === group.worktreeId ? rowDropTarget.placement : null
+      }
       folderControls={
-        workspaceFolders && isFolderWorkspace(group)
+        workspaceFolders && (isFolderWorkspace(group) || workspaceRowsEnabled)
           ? {
               folders: workspaceFolders.folders,
-              folderId: getWorkspaceFolderId(workspaceFolders.folders, group.worktreeId),
+              folderId:
+                (workspaceRowsEnabled ? group.details?.folderId : null) ??
+                getWorkspaceFolderId(workspaceFolders.folders, group.worktreeId),
               disabled: !canEditFolders,
               isDragging: dragItem?.type === 'worktree' && dragItem.id === group.worktreeId,
               onMove: folderId => void moveWorktree(group.worktreeId, folderId),
@@ -971,6 +1429,11 @@ export function ChatSidebar({
       }
     />
   );
+
+  const renderWorkspaceGroup = (group: SidebarWorkspaceGroup) => {
+    const root = workspaceGroupsById.get(group.root.worktreeId);
+    return root ? renderWorktree(root) : null;
+  };
 
   const renderSession = useCallback(
     (session: StoredSession) => (
@@ -1190,43 +1653,84 @@ export function ChatSidebar({
         )}
         {isLoading || workspaceFolders?.isFirstLoadPending ? (
           <SidebarListSkeleton />
-        ) : sessions.length === 0 && liveOnlySessions.length === 0 && folderGroups.length === 0 ? (
+        ) : sessions.length === 0 &&
+          liveOnlySessions.length === 0 &&
+          folderGroups.length === 0 &&
+          orderedWorkspaceGroups.length === 0 ? (
           <div className="text-muted-foreground py-8 text-center text-sm">No sessions yet</div>
         ) : (
           <>
-            {workspaceFolders &&
-              folderGroups.map(({ folder, worktrees }, index) => (
-                <WorkspaceFolderSection
-                  key={folder.id}
-                  folder={folder}
-                  controller={workspaceFolders}
-                  isFirst={index === 0}
-                  isLast={index === folderGroups.length - 1}
-                  isDragging={dragItem?.type === 'folder' && dragItem.id === folder.id}
-                  dropPlacement={
-                    dropTarget?.type === 'folder' && dropTarget.id === folder.id
-                      ? dragItem?.type === 'worktree'
-                        ? 'inside'
-                        : dropTarget.placement
-                      : null
-                  }
-                  visibleCount={worktrees.length}
-                  onEdit={() => setFolderEditor(folder)}
-                  onDelete={() => {
-                    void workspaceFolders.deleteFolder(folder.id).then(deleted => {
-                      if (deleted) setShouldFocusNewFolder(true);
-                    });
-                  }}
-                  onMove={direction => moveFolder(folder.id, direction)}
-                  onDragStart={event => startDrag(event, { type: 'folder', id: folder.id })}
-                  onDragEnd={clearDrag}
-                  onDragOver={event => dragOver(event, folderTarget(event, folder.id))}
-                  onDragLeave={dragLeave}
-                  onDrop={event => drop(event, folderTarget(event, folder.id))}
-                >
-                  {worktrees.map(renderWorktree)}
-                </WorkspaceFolderSection>
-              ))}
+            {workspaceRowsEnabled && workspaceFolders
+              ? phase4FolderSections.map(({ folder, groups }, index) => (
+                  <WorkspaceFolderSection
+                    key={folder.id}
+                    folder={folder}
+                    controller={workspaceFolders}
+                    isFirst={index === 0}
+                    isLast={index === phase4FolderSections.length - 1}
+                    isDragging={dragItem?.type === 'folder' && dragItem.id === folder.id}
+                    dropPlacement={
+                      dropTarget?.type === 'folder' && dropTarget.id === folder.id
+                        ? dragItem?.type === 'worktree'
+                          ? 'inside'
+                          : dropTarget.placement
+                        : null
+                    }
+                    visibleCount={groups.length}
+                    totalCount={folder.kind === 'smart' ? groups.length : folder.worktreeIds.length}
+                    onEdit={() => setFolderEditor(folder)}
+                    onDelete={() => {
+                      void workspaceFolders.deleteFolder(folder.id).then(deleted => {
+                        if (deleted) setShouldFocusNewFolder(true);
+                      });
+                    }}
+                    onMove={direction => moveFolder(folder.id, direction)}
+                    onSortModeChange={sortMode =>
+                      void workspaceFolders.setFolderSortMode(folder.id, sortMode)
+                    }
+                    onDragStart={event => startDrag(event, { type: 'folder', id: folder.id })}
+                    onDragEnd={clearDrag}
+                    onDragOver={event => dragOver(event, folderTarget(event, folder.id))}
+                    onDragLeave={dragLeave}
+                    onDrop={event => drop(event, folderTarget(event, folder.id))}
+                  >
+                    {groups.map(renderWorkspaceGroup)}
+                  </WorkspaceFolderSection>
+                ))
+              : workspaceFolders &&
+                folderGroups.map(({ folder, worktrees }, index) => (
+                  <WorkspaceFolderSection
+                    key={folder.id}
+                    folder={folder}
+                    controller={workspaceFolders}
+                    isFirst={index === 0}
+                    isLast={index === folderGroups.length - 1}
+                    isDragging={dragItem?.type === 'folder' && dragItem.id === folder.id}
+                    dropPlacement={
+                      dropTarget?.type === 'folder' && dropTarget.id === folder.id
+                        ? dragItem?.type === 'worktree'
+                          ? 'inside'
+                          : dropTarget.placement
+                        : null
+                    }
+                    visibleCount={worktrees.length}
+                    totalCount={folder.worktreeIds.length}
+                    onEdit={() => setFolderEditor(folder)}
+                    onDelete={() => {
+                      void workspaceFolders.deleteFolder(folder.id).then(deleted => {
+                        if (deleted) setShouldFocusNewFolder(true);
+                      });
+                    }}
+                    onMove={direction => moveFolder(folder.id, direction)}
+                    onDragStart={event => startDrag(event, { type: 'folder', id: folder.id })}
+                    onDragEnd={clearDrag}
+                    onDragOver={event => dragOver(event, folderTarget(event, folder.id))}
+                    onDragLeave={dragLeave}
+                    onDrop={event => drop(event, folderTarget(event, folder.id))}
+                  >
+                    {worktrees.map(renderWorktree)}
+                  </WorkspaceFolderSection>
+                ))}
 
             {/* Live-only sessions (not in stored list) */}
             {liveOnlySessions.length > 0 && (
@@ -1276,33 +1780,70 @@ export function ChatSidebar({
               onDrop={event => drop(event, { type: 'ungrouped' })}
               className={cn(
                 'rounded-md',
-                folderGroups.length > 0 && 'min-h-16',
+                (workspaceRowsEnabled ? phase4FolderSections.length : folderGroups.length) > 0 &&
+                  'min-h-16',
                 dropTarget?.type === 'ungrouped' && 'bg-accent/50 ring-ring ring-1'
               )}
             >
-              {folderGroups.length > 0 && (
-                <div className="text-muted-foreground px-2 pt-3 pb-1 text-[11px] font-semibold tracking-wider uppercase">
-                  Ungrouped
-                </div>
-              )}
-              {folderGroups.length > 0 && ungrouped.length === 0 && (
-                <p className="text-muted-foreground px-3 py-3 text-xs">Drop workspaces here</p>
-              )}
-              {ungrouped.map((group, groupIdx) => (
-                <div key={group.label}>
-                  <div
-                    className={cn(
-                      'text-muted-foreground px-2 pb-1 text-[11px] font-semibold tracking-wider uppercase',
-                      groupIdx === 0 && liveOnlySessions.length === 0 ? 'pt-2' : 'pt-4'
-                    )}
-                  >
-                    {group.label}
-                  </div>
-                  {group.items.map(item =>
-                    item.type === 'session' ? renderSession(item.session) : renderWorktree(item)
+              {workspaceRowsEnabled ? (
+                <>
+                  {(phase4FolderSections.length > 0 || phase4Ungrouped.length > 0) && (
+                    <div className="text-muted-foreground px-2 pt-3 pb-1 text-[11px] font-semibold tracking-wider uppercase">
+                      {phase4FolderSections.length > 0 ? 'Ungrouped' : 'Workspaces'}
+                    </div>
                   )}
-                </div>
-              ))}
+                  {phase4FolderSections.length > 0 && phase4Ungrouped.length === 0 && (
+                    <p className="text-muted-foreground px-3 py-3 text-xs">Drop workspaces here</p>
+                  )}
+                  {phase4Ungrouped.map(renderWorkspaceGroup)}
+                  {workspaceRowsTruncated && (
+                    <p className="text-muted-foreground px-3 py-2 text-xs">
+                      Showing the first 200 open workspaces. Use search to find older ones.
+                    </p>
+                  )}
+                  {phase4SessionGroups.map((group, groupIdx) => (
+                    <div key={group.label}>
+                      <div
+                        className={cn(
+                          'text-muted-foreground px-2 pb-1 text-[11px] font-semibold tracking-wider uppercase',
+                          groupIdx === 0 ? 'pt-4' : 'pt-3'
+                        )}
+                      >
+                        {group.label}
+                      </div>
+                      {group.items.map(item =>
+                        item.type === 'session' ? renderSession(item.session) : null
+                      )}
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  {folderGroups.length > 0 && (
+                    <div className="text-muted-foreground px-2 pt-3 pb-1 text-[11px] font-semibold tracking-wider uppercase">
+                      Ungrouped
+                    </div>
+                  )}
+                  {folderGroups.length > 0 && ungrouped.length === 0 && (
+                    <p className="text-muted-foreground px-3 py-3 text-xs">Drop workspaces here</p>
+                  )}
+                  {ungrouped.map((group, groupIdx) => (
+                    <div key={group.label}>
+                      <div
+                        className={cn(
+                          'text-muted-foreground px-2 pb-1 text-[11px] font-semibold tracking-wider uppercase',
+                          groupIdx === 0 && liveOnlySessions.length === 0 ? 'pt-2' : 'pt-4'
+                        )}
+                      >
+                        {group.label}
+                      </div>
+                      {group.items.map(item =>
+                        item.type === 'session' ? renderSession(item.session) : renderWorktree(item)
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           </>
         )}

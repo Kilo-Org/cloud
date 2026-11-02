@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { RUNTIME_DISTRIBUTION } from '../src/shared/runtime-distribution.js';
 import {
   CONTROL_PLANE_SUPERVISOR,
+  GH_STACK_INSTALL_PATH,
   GIT_CREDENTIAL_HELPER,
   WRAPPER_BUNDLES,
 } from '../src/shared/runtime-distribution.js';
@@ -885,6 +886,17 @@ async function installBuilder(config: ProviderConfig, sessionId: string): Promis
       ].join('\n'),
     },
     {
+      label: `install gh-stack ${versions.ghStack}`,
+      script: [
+        `GH_STACK_VERSION=${shellQuote(versions.ghStack)}`,
+        `GH_STACK_SHA256=${shellQuote(versions.ghStackSha256)}`,
+        'curl -fsSL "https://github.com/github/gh-stack/releases/download/v${GH_STACK_VERSION}/linux-amd64" -o /tmp/gh-stack',
+        'echo "${GH_STACK_SHA256}  /tmp/gh-stack" | sha256sum -c -',
+        `sudo install -D -m 0755 /tmp/gh-stack ${shellQuote(GH_STACK_INSTALL_PATH)}`,
+        'rm -f /tmp/gh-stack',
+      ].join('\n'),
+    },
+    {
       label: `install pnpm ${versions.pnpm}`,
       script: `sudo npm install -g ${shellQuote(`pnpm@${versions.pnpm}`)}`,
     },
@@ -903,6 +915,7 @@ async function installBuilder(config: ProviderConfig, sessionId: string): Promis
         'curl --version >/dev/null',
         'git --version >/dev/null',
         exactVersionCheck('gh', versions.gh),
+        `test "$(sha256sum ${shellQuote(GH_STACK_INSTALL_PATH)} | cut -d' ' -f1)" = ${shellQuote(versions.ghStackSha256)}`,
         exactVersionCheck('glab', versions.glab),
         'command -v rg >/dev/null',
         'git-lfs version >/dev/null',

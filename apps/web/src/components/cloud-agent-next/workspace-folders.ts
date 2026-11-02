@@ -101,6 +101,13 @@ export function getWorkspaceFolderDropAction(
     : { type: 'reorder-folders', folderIds: reordered };
 }
 
+export function getInitializedSmartDoneFoldersStorageKey(
+  userId: string,
+  organizationId?: string
+): string {
+  return `cloud-workspace-folders:smart-done:${encodeURIComponent(userId)}:${organizationId ? `org:${encodeURIComponent(organizationId)}` : 'personal'}`;
+}
+
 export function getCollapsedWorkspaceFoldersStorageKey(
   userId: string,
   organizationId?: string

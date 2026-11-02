@@ -39,9 +39,33 @@ function makeGroup(worktreeId: string, cloudId = `workspace_${folderA}`): Sideba
 
 function makeFolders(): WorkspaceFolder[] {
   return [
-    { id: folderA, name: 'Product', color: 'blue', worktreeIds: [worktreeA, hiddenWorktree] },
-    { id: folderB, name: 'Research', color: 'purple', worktreeIds: [] },
-    { id: folderC, name: 'Backlog', color: 'default', worktreeIds: [] },
+    {
+      id: folderA,
+      name: 'Product',
+      color: 'blue',
+      kind: 'manual',
+      smartPreset: null,
+      sortMode: 'manual',
+      worktreeIds: [worktreeA, hiddenWorktree],
+    },
+    {
+      id: folderB,
+      name: 'Research',
+      color: 'purple',
+      kind: 'manual',
+      smartPreset: null,
+      sortMode: 'manual',
+      worktreeIds: [],
+    },
+    {
+      id: folderC,
+      name: 'Backlog',
+      color: 'default',
+      kind: 'manual',
+      smartPreset: null,
+      sortMode: 'manual',
+      worktreeIds: [],
+    },
   ];
 }
 

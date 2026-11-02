@@ -177,6 +177,7 @@ import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
   CONTROL_PLANE_PROTOCOL_VERSION,
   CONTROL_PLANE_REQUEST_TIMEOUT_MS,
+  CONTROL_PLANE_WORKTREE_GIT_TIMEOUT_MS,
   controlPlaneAnswerPayloadSchema,
   controlPlaneDeliverPayloadSchema,
   controlPlaneKiloRequestInputSchema,
@@ -210,6 +211,10 @@ import {
   type ControlPlaneWrapperFrame,
   type WorkspaceConfig,
 } from '../../shared/control-plane-protocol.js';
+import {
+  controlPlaneWorktreeGitInputSchema,
+  type ControlPlaneWorktreeGitInput,
+} from '../../shared/worktree-git-operations.js';
 import {
   CONTROL_PLANE_TIMERS,
   resolveControlPlaneTimers,
@@ -377,6 +382,7 @@ const wrapperSocketAttachmentSchema = z.object({
   heartbeatAck: z.literal(true).optional(),
   redactsNamedSecrets: z.literal(true).optional(),
   installsSkillsSh: z.literal(true).optional(),
+  worktreeGit: z.literal(true).optional(),
   workspaceConfiguration: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
   billingCheckedAt: z.number().finite().nonnegative().optional(),
@@ -1299,6 +1305,33 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
+   * Session DO -> Sandbox DO. Forwards one Sync/Restack request to the wrapper
+   * and returns its shared `worktreeBranchOperationResult`. The reply budget is
+   * the longer git-operation bound (fetch + rebase + push), not the 30s
+   * capture bound: these operations force-push with a lease, so a premature
+   * timeout would report failure for work that then completes.
+   */
+  async worktreeGit(input: ControlPlaneWorktreeGitInput): Promise<ControlPlaneControlResult> {
+    await this.initialized;
+    const parsed = controlPlaneWorktreeGitInputSchema.parse(input);
+    const handoff = await this.enqueue(() => this.beginWorktreeGit(parsed));
+    return 'error' in handoff ? handoff.error : handoff.promise;
+  }
+
+  private async beginWorktreeGit(
+    input: ControlPlaneWorktreeGitInput
+  ): Promise<ControlRequestHandoff> {
+    const requestId = crypto.randomUUID();
+    const frame: ControlPlaneWrapperFrame = {
+      type: 'worktree.git',
+      requestId,
+      session: input.session,
+      payload: input.payload,
+    };
+    return this.beginWrapperControlRequest(frame, CONTROL_PLANE_WORKTREE_GIT_TIMEOUT_MS);
+  }
+
+  /**
    * Session DO -> Sandbox DO (spec §10). Forwards exactly one terminal
    * create/resize/close/connect request to the wrapper and returns its result.
    * Like worktree captures, only the bind/pending/write happen under the serial
@@ -1382,6 +1415,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const socket = this.boundWrapperSocket(state);
     if (socket === null) {
       return { error: controlRequestFailure('not_ready', 'Wrapper is not connected', true) };
+    }
+    if (frame.type === 'worktree.git' && this.readAttachment(socket)?.worktreeGit !== true) {
+      return {
+        error: controlRequestFailure(
+          'wrapper_upgrade_required',
+          'This sandbox must restart with an updated runtime before using Sync or Restack.',
+          false
+        ),
+      };
     }
     if (this.pendingControlRequests.size >= MAX_PENDING_CONTROL_REQUESTS) {
       return {
@@ -4880,6 +4922,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
         ...(frame.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
         ...(frame.installsSkillsSh ? { installsSkillsSh: true } : {}),
+        ...(frame.worktreeGit ? { worktreeGit: true } : {}),
         ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
       });
       // Welcome first, then route effects: a re-prepared route resends

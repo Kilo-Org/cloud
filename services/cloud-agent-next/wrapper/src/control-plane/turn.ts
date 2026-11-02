@@ -24,6 +24,7 @@ import {
   type CondenseResult,
 } from '../condense-on-complete.js';
 import { childFromSessionCreated, eventKiloSessionId } from '../control/feed.js';
+import { isDirectoryRewriteActive } from '../control/worktree-operations.js';
 import type { KiloFeedEvent } from './kilo-event-feed.js';
 import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
 import { materializeMessageAttachments } from '../session-bootstrap.js';
@@ -275,6 +276,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
     }) => summarizeWithTimeout({ ...input, directory: input.directory }));
 
   const routes = new Map<string, TurnRoute>();
+  const routeSpecs = new Map<string, ControlPlaneRouteSpec>();
   const turns = new Map<string, Turn>();
   const turnByKiloSession = new Map<string, string>();
   const childRoots = new Map<string, string>();
@@ -702,11 +704,17 @@ export function createTurnManager(deps: TurnManagerDeps) {
       turn.inbox.push(pending);
       return;
     }
+    // A branch rewrite owns the checkout: park the prompt until it finishes.
+    if (isDirectoryRewriteActive(route.directory)) {
+      turn.inbox.push(pending);
+      return;
+    }
     chainSubmit(turn, pending);
   }
 
   function drainInbox(turn: Turn): void {
     if (turn.inbox.length === 0) return;
+    if (isDirectoryRewriteActive(turn.route.directory)) return;
     const state = queueState(turn.route);
     if (state === 'queue') return;
     if (state === 'unavailable') {
@@ -1129,6 +1137,26 @@ export function createTurnManager(deps: TurnManagerDeps) {
   return {
     canRestartRuntime,
 
+    /** True while any live turn (including a sibling) uses this directory. */
+    hasActiveTurnInDirectory(directory: string): boolean {
+      for (const turn of turns.values()) {
+        if (turn.route.directory === directory) return true;
+      }
+      return false;
+    },
+
+    /** The registered route spec, used for managed git args and the expected branch. */
+    routeSpec(sessionId: string): ControlPlaneRouteSpec | undefined {
+      return routeSpecs.get(sessionId);
+    },
+
+    /** Admission resumes after a branch rewrite releases the directory. */
+    resumeDirectory(directory: string): void {
+      for (const turn of turns.values()) {
+        if (turn.route.directory === directory) drainInbox(turn);
+      }
+    },
+
     credentialsInstalled(runtimeKeyValue: string): void {
       maybeApplyPendingCredentials(runtimeKeyValue);
     },
@@ -1150,6 +1178,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         automaticQuestions: existing?.automaticQuestions ?? new Set(),
       };
       routes.set(spec.sessionId, route);
+      routeSpecs.set(spec.sessionId, spec);
       turnByKiloSession.set(spec.kiloSessionId, spec.sessionId);
     },
 
@@ -1162,6 +1191,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         }
       }
       routes.delete(sessionId);
+      routeSpecs.delete(sessionId);
       turns.get(sessionId)?.publication?.dispose();
       turns.delete(sessionId);
       stopTickIfIdle();

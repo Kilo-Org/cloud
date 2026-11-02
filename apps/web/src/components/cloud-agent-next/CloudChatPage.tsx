@@ -13,6 +13,7 @@ import {
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { ArrowDown, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,8 @@ import { useCloudAgent, useManager } from './CloudAgentProvider';
 import { useWorktreeChatCreation, useWorktreeChatTabs } from './CloudSidebarLayout';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
+import { CLOUD_AGENT_STACKED_WORKSPACES_FLAG } from './feature-flags';
+import { useChatStackInfo } from './useChatStackInfo';
 import {
   getWorkspaceControlSession,
   getWorktreeBranch,
@@ -1743,6 +1746,29 @@ export default function CloudChatPage({
   );
 
   // Feedback context carries the session the server resolved for this route.
+  const stackedWorkspacesEnabled = useFeatureFlagEnabled(CLOUD_AGENT_STACKED_WORKSPACES_FLAG);
+  const headerRepository = workspaceControlSession?.repository ?? sessionConfig?.repository ?? '';
+  const headerBranch = workspaceControlSession
+    ? (workspaceControlSession.branch ?? undefined)
+    : fetchedSessionData?.isPreparingAsync &&
+        cloudStatus?.type !== 'ready' &&
+        !preparationAttempts.some(attempt => attempt.status === 'completed')
+      ? undefined
+      : (sessionBranch ?? undefined);
+  const headerGitUrl = workspaceControlSession ? undefined : fetchedSessionData?.gitUrl;
+  const [stackRefreshToken, setStackRefreshToken] = useState(0);
+  const chatStackInfo = useChatStackInfo({
+    enabled: Boolean(stackedWorkspacesEnabled),
+    userId: currentUserId,
+    currentWorktreeId: selectedWorktreeId,
+    cloudAgentSessionId: workspaceCloudSessionId ?? '',
+    organizationId,
+    repository: headerRepository,
+    branch: headerBranch,
+    gitUrl: fetchedSessionData?.gitUrl,
+    refreshToken: stackRefreshToken,
+    openSession,
+  });
   const sessionActions = (
     <ChatHeader
       currentUserId={currentUserId}
@@ -1758,17 +1784,9 @@ export default function CloudChatPage({
           : workspaceControlSession?.sessionId
       }
       organizationId={organizationId}
-      repository={workspaceControlSession?.repository ?? sessionConfig?.repository ?? ''}
-      branch={
-        workspaceControlSession
-          ? (workspaceControlSession.branch ?? undefined)
-          : fetchedSessionData?.isPreparingAsync &&
-              cloudStatus?.type !== 'ready' &&
-              !preparationAttempts.some(attempt => attempt.status === 'completed')
-            ? undefined
-            : (sessionBranch ?? undefined)
-      }
-      gitUrl={workspaceControlSession ? undefined : fetchedSessionData?.gitUrl}
+      repository={headerRepository}
+      branch={headerBranch}
+      gitUrl={headerGitUrl}
       model={workspaceControlSession?.model ?? sessionConfig?.model}
       modelDisplayName={workspaceControlSession ? undefined : modelDisplayName}
       getSessionCostBreakdown={
@@ -1799,6 +1817,9 @@ export default function CloudChatPage({
         Boolean(workspaceControlSession) ||
         (!isReadOnly && Boolean(fetchedSessionData?.cloudAgentSessionId))
       }
+      stack={chatStackInfo}
+      onSendStackInstruction={handleSendMessage}
+      onStackOperationCompleted={() => setStackRefreshToken(token => token + 1)}
       sandboxStatusEligible={isSandboxStatusEligible({
         currentUserId,
         sessionId: workspaceCloudSessionId,

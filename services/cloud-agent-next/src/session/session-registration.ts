@@ -557,6 +557,22 @@ function deriveCanonicalRepositoryUrl(repository: SessionRepositoryRequest): str
   return normalizeGitUrl(repository.url);
 }
 
+/**
+ * Stacked-workspace fields written on the worktree's first session-ingest
+ * ownership row. Later rows for the same worktree never overwrite them.
+ */
+function stackedOwnershipFields(
+  input: SessionRegistrationInput
+): Pick<CreateSessionForCloudAgentParams, 'parentWorktreeId' | 'baseBranch' | 'baseSha'> {
+  return {
+    ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
+    ...(input.repository?.baseBranch === undefined
+      ? {}
+      : { baseBranch: input.repository.baseBranch }),
+    ...(input.repository?.baseSha === undefined ? {} : { baseSha: input.repository.baseSha }),
+  };
+}
+
 function computeCredentialContainment(
   sessionId: string,
   input: SessionRegistrationInput,
@@ -956,6 +972,7 @@ async function allocateNewSession(
       createdOnPlatform,
       title: defaultTitle,
       gitUrl: canonicalRepositoryUrl,
+      ...stackedOwnershipFields(input),
       profileId: input.profile?.resolvedProfileId,
       cloneFromKiloSessionId: input.clone?.cloneFromKiloSessionId,
       ...(input.clone?.cloneUpToMessageId
@@ -1222,6 +1239,7 @@ function buildSessionRegistrationCommand(
       isPolicyBearingAuthToken(ctx.authToken) &&
       ctx.botId === undefined,
     parentCloudAgentSessionId: input.parentCloudAgentSessionId,
+    ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
     identity: {
       sessionId: allocation.cloudAgentSessionId,
       userId: ctx.userId,
@@ -2294,6 +2312,7 @@ async function resumeCloneCreate(
       createdOnPlatform,
       title: defaultTitle,
       gitUrl: canonicalRepositoryUrl,
+      ...stackedOwnershipFields(input),
       profileId: input.profile?.resolvedProfileId,
       cloneFromKiloSessionId: input.clone?.cloneFromKiloSessionId,
       ...(input.clone?.cloneUpToMessageId
@@ -2396,6 +2415,7 @@ async function resumeFirstWorktreeCreate(
         createdOnPlatform: input.options?.createdOnPlatform ?? 'cloud-agent',
         title: `New session - ${new Date().toISOString()}`,
         gitUrl: deriveCanonicalRepositoryUrl(input.repository),
+        ...stackedOwnershipFields(input),
         profileId: input.profile?.resolvedProfileId,
         cloudAgentWorktreeId: worktreeId,
         cloudAgentWorktreeLocation: {

@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SLASH_COMMANDS_SOURCE } from './shared/default-slash-commands.generated.js';
 import { KILO_CLI_VERSION } from './shared/kilo-cli-version.js';
 import {
+  GH_STACK_INSTALL_PATH,
   GIT_CREDENTIAL_HELPER,
   RUNTIME_DISTRIBUTION,
   WRAPPER_BUNDLES,
@@ -71,6 +72,10 @@ describe('runtime distribution packaging', () => {
     expect(RUNTIME_DISTRIBUTION.pnpm).toBe('12.14.0');
     expect(RUNTIME_DISTRIBUTION.glab).toBe('1.124.0');
     expect(RUNTIME_DISTRIBUTION.gh).toBe('2.103.3');
+    expect(RUNTIME_DISTRIBUTION.ghStack).toBe('0.3.0');
+    expect(RUNTIME_DISTRIBUTION.ghStackSha256).toBe(
+      '957e822cfa7e435cd84a297cd96c419b58e51e3ac58be249762c24bd9e45099b'
+    );
     expect(RUNTIME_DISTRIBUTION.nodeMajor).toBe('24');
   });
 
@@ -129,6 +134,26 @@ describe('runtime distribution packaging', () => {
     );
     for (const file of dockerfiles) {
       expect(readServiceFile(`../${file}`)).toContain('ARG GH_VERSION="2.102.0"');
+    }
+  });
+
+  it('installs the pinned gh-stack extension in every sandbox image', () => {
+    const images = [
+      'Dockerfile',
+      'Dockerfile.dev',
+      'Dockerfile.containers',
+      'Dockerfile.containers.runtime-free',
+      'Dockerfile.dind',
+    ];
+    for (const file of images) {
+      const dockerfile = readServiceFile(`../${file}`);
+      expect(dockerfile).toContain(`ARG GH_STACK_VERSION="${RUNTIME_DISTRIBUTION.ghStack}"`);
+      expect(dockerfile).toContain(`ARG GH_STACK_SHA256="${RUNTIME_DISTRIBUTION.ghStackSha256}"`);
+      expect(dockerfile).toContain(
+        'https://github.com/github/gh-stack/releases/download/v${GH_STACK_VERSION}/linux-amd64'
+      );
+      expect(dockerfile).toContain('echo "${GH_STACK_SHA256}  /tmp/gh-stack" | sha256sum -c -');
+      expect(dockerfile).toContain(GH_STACK_INSTALL_PATH);
     }
   });
 

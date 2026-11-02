@@ -14,8 +14,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RenameModal } from './rename-modal';
 
+// The dialog's text ownership differs by platform: Android needs the typed text
+// as the field's `value` (its native input re-applies the committed props text),
+// iOS keeps the uncontrolled `defaultValue` seed because this app never
+// controls text with `value` plus state there. The mock exposes a mutable OS so
+// a test can mount either.
+const platform = vi.hoisted((): { os: 'android' | 'ios' } => ({ os: 'ios' }));
+
 vi.mock('react-native', () => ({
-  Platform: { OS: 'ios' },
+  Platform: {
+    get OS() {
+      return platform.os;
+    },
+  },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
@@ -45,6 +56,7 @@ const LONG_GOAL =
 const mounted: TestRenderer.ReactTestRenderer[] = [];
 
 beforeEach(() => {
+  platform.os = 'ios';
   for (const renderer of mounted.splice(0)) {
     renderer.unmount();
   }
@@ -111,7 +123,7 @@ describe('RenameModal field wrapping', () => {
     // scrolling horizontally and hiding the start of the value.
     expect(props.multiline).toBe(true);
     expect(props.textAlignVertical).toBe('top');
-    expect(props.value).toBe(LONG_GOAL);
+    expect(props.value ?? props.defaultValue).toBe(LONG_GOAL);
   });
 
   it('keeps the rename field single-line', () => {
@@ -121,6 +133,12 @@ describe('RenameModal field wrapping', () => {
 });
 
 describe('RenameModal typed value', () => {
+  // Android's text input applies the committed props text on every commit of
+  // this dialog, so there the typed text has to be the field's `value`.
+  beforeEach(() => {
+    platform.os = 'android';
+  });
+
   it('keeps the typed name when the caller writes and rolls back its data', () => {
     const overrides: MountOverrides = { initialValue: 'Old name' };
     const renderer = mount(false, overrides);
@@ -173,6 +191,45 @@ describe('RenameModal typed value', () => {
     });
     expect(onSave).toHaveBeenNthCalledWith(2, 'Neue Organisation');
     expect(onClose).toHaveBeenCalledOnce();
+  });
+});
+
+describe('RenameModal typed value on iOS', () => {
+  it('keeps the seed as the only props text and retries the typed name', async () => {
+    const overrides: MountOverrides = {
+      initialValue: 'Old name',
+      onSave: vi
+        .fn<(name: string) => Promise<void>>()
+        .mockRejectedValueOnce(new Error('Rename refused'))
+        .mockResolvedValueOnce(undefined),
+    };
+    const renderer = mount(false, overrides);
+    // This app never controls text with `value` plus state on iOS
+    // (apps/mobile/CLAUDE.md): the field stays uncontrolled and its props text
+    // is the value the dialog opened with, whatever the caller's data does.
+    expect(fieldProps(renderer).value).toBeUndefined();
+    expect(fieldProps(renderer).defaultValue).toBe('Old name');
+
+    act(() => {
+      fieldProps(renderer).onChangeText?.('Neue Organisation');
+    });
+    act(() => {
+      renderer.update(modalElement('Neue Organisation', false, overrides));
+    });
+    act(() => {
+      renderer.update(modalElement('Old name', false, overrides));
+    });
+    expect(fieldProps(renderer).defaultValue).toBe('Old name');
+
+    await act(async () => {
+      fieldProps(renderer).onSubmitEditing?.();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fieldProps(renderer).onSubmitEditing?.();
+      await Promise.resolve();
+    });
+    expect(overrides.onSave).toHaveBeenNthCalledWith(2, 'Neue Organisation');
   });
 });
 

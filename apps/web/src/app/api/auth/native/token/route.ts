@@ -483,9 +483,8 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
       // ── Step 4.5: Key ownership check BEFORE code commit ─────────────
       // For assertion (existing key) and attestation (keyId already bound to
-      // another user): enforce → refuse without consuming the code so a
-      // legitimate retry remains possible. Report → log, skip persistence,
-      // and issue credentials.
+      // another user): refuse without consuming the code so a legitimate retry
+      // remains possible.
       if (
         admissionVerification.existingKeyUserId &&
         admissionVerification.existingKeyUserId !== result.user.id

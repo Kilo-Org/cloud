@@ -1104,19 +1104,20 @@ describe('CreditsCard balance row', () => {
     return String(balance.props.className).split(' ');
   }
 
-  /** The row holding the text block and the controls: the card's only `min-w-0 flex-row items-start` box. */
-  function balanceRow(renderer: ReactTestRenderer): ReactTestInstance {
-    return renderer.root.find(node =>
-      String(node.props.className).includes('min-w-0 flex-row items-start gap-1')
+  /** The amount-and-note column of the one-row layout. */
+  function wideTextColumn(renderer: ReactTestRenderer): ReactTestInstance {
+    return renderer.root.find(
+      node =>
+        Object.is(node.type, 'View') && String(node.props.className) === 'min-w-0 flex-1 gap-1'
     );
   }
 
-  /** The amount-and-note column: the card's only `min-w-0 flex-1 gap-1` box. */
-  function textBlock(renderer: ReactTestRenderer): ReactTestInstance {
+  /** The amount row of the stacked layout: the amount and the hide/show toggle. */
+  function amountRow(renderer: ReactTestRenderer): ReactTestInstance {
     return renderer.root.find(
       node =>
         Object.is(node.type, 'View') &&
-        String(node.props.className).includes('min-w-0 flex-1 gap-1')
+        String(node.props.className) === 'min-w-0 flex-1 flex-row items-center gap-1'
     );
   }
 
@@ -1147,40 +1148,40 @@ describe('CreditsCard balance row', () => {
     return mounted;
   }
 
-  it('keeps the note in the amount column on a wide card, with the purchase action in its own row', async () => {
+  it('keeps the note in the amount column on a wide card, with the purchase action in its own column', async () => {
     const { renderer, unmount } = await mountAtCardWidth(383);
 
     // The note shares the amount's column, which gives it the same tight gap
-    // under the amount as the wide layout always had.
-    expect(renders(textBlock(renderer), 'No expiring credits.')).toBe(true);
-    // The purchase action sits outside the balance row on a wide card.
-    expect(renders(balanceRow(renderer), 'ADD_CREDITS_BUTTON')).toBe(false);
+    // under the amount as the wide layout always had; the visibility toggle is
+    // that column's sibling, and the purchase action keeps its own column.
+    const column = wideTextColumn(renderer);
+    expect(renders(column, 'No expiring credits.')).toBe(true);
+    expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
+    expect(renders(cardBox(renderer), 'ADD_CREDITS_BUTTON')).toBe(true);
     unmount();
   });
 
   it.each<[string, number]>([
     // The standard matrix's compact cell (360 dp screen) and a 390 dp screen:
-    // the one-row layout wrapped the sentence to three lines there, so the
-    // controls move beside the text block instead of below it.
+    // in the one-row layout the note's column there wrapped the sentence to
+    // three lines, so both stack instead.
     ['the compact cell', 332],
     ['a 390 dp screen', 362],
-  ])(
-    'keeps the note in the amount column and the controls beside it on %s',
-    async (_name, width) => {
-      const { renderer, unmount } = await mountAtCardWidth(width);
+  ])('gives the note its own row under the amount on %s', async (_name, width) => {
+    const { renderer, unmount } = await mountAtCardWidth(width);
 
-      const classes = balanceClasses(renderer);
-      expect(classes).toContain('items-stretch');
-      expect(classes).not.toContain('flex-row');
-      // The note stays directly under the amount, in the same column, and the
-      // visibility toggle and the purchase action sit beside that column rather
-      // than on a row of their own above the note.
-      const block = textBlock(renderer);
-      expect(renders(block, 'No expiring credits.')).toBe(true);
-      expect(renders(block, 'ADD_CREDITS_BUTTON')).toBe(false);
-      const row = balanceRow(renderer);
-      expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(true);
-      unmount();
-    }
-  );
+    const classes = balanceClasses(renderer);
+    expect(classes).toContain('items-stretch');
+    expect(classes).not.toContain('flex-row');
+    // Row 1 is the amount and the toggle; the note follows it at the card's
+    // full width and the purchase action takes the row below the note, so the
+    // amount keeps the tight gap under it that the wide cells show.
+    const row = amountRow(renderer);
+    expect(renders(row, 'No expiring credits.')).toBe(false);
+    expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(false);
+    const card = cardBox(renderer);
+    expect(renders(card, 'No expiring credits.')).toBe(true);
+    expect(renders(card, 'ADD_CREDITS_BUTTON')).toBe(true);
+    unmount();
+  });
 });

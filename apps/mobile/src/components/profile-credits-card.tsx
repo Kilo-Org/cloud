@@ -42,13 +42,12 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const { width } = useWindowDimensions();
   const fontScale = useLiveFontScale();
   const [availableWidth, setAvailableWidth] = useState<number | null>(null);
-  // Stack the balance row unless the expiry note keeps its two lines beside the
+  // Stack the balance unless the expiry note keeps its two lines beside the
   // amount, the visibility toggle and the purchase action. Measured on the
-  // standard matrix's compact cell (Android, 2026-11-02): the note needs about
-  // 226 dp of column for two lines, and the one-row layout's siblings take about
-  // 158 dp of the card, so it holds from 370 dp of card in scaled text units,
-  // using the card's width rather than the display's. Below that the controls
-  // move beside the amount-and-note column instead of below it.
+  // standard matrix's compact cell (Android, 2026-11-02): the note needs 226 dp
+  // of column for two lines and the one-row siblings take 158 dp of the card,
+  // so it holds from 370 scaled card dp. Below that the note takes a row of its
+  // own at the card's full width.
   const stackBalance = availableWidth === null || availableWidth / fontScale < 370;
   // Below NARROW_LAYOUT_WIDTH the account picker's 65% share leaves the
   // "CREDITS" eyebrow too little room for one word and Android breaks it
@@ -165,9 +164,8 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const selectedOrgRole = orgs?.find(o => o.organizationId === selectedOrgId)?.role;
   const canManageOrgBilling = selectedOrgId != null && isMoneyRole(selectedOrgRole);
 
-  // The expiry note's slot: under the amount, in the amount's own column, in
-  // both layouts. No entrance fade — the caption holds a row of this block, so
-  // a fade that paints it late leaves that row empty.
+  // The expiry note's slot: under the amount. No entrance fade — the caption
+  // holds a row of this block, so a fade that paints it late leaves it empty.
   const expirySlot = (
     <>
       {creditsFailed && (
@@ -186,25 +184,18 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     </>
   );
 
-  // The amount and the expiry note share one column and one gap, so the note
-  // sits directly under the amount at the same spacing on every card width. A
-  // note on its own row below the control row read as detached from the amount
-  // on a compact card (design review, 2026-11-02).
-  const amountBlock = (
-    <View className="min-w-0 flex-1 gap-1">
-      {/* `grow-0`: a horizontal ScrollView defaults to `flexGrow: 1`, so in a
-          stacked card it would take the control column's spare height and push
-          the note away from the amount. */}
-      <ScrollView horizontal className="min-w-0 shrink-0 grow-0">
-        <Text
-          className="text-2xl font-bold tabular-nums"
-          accessibilityLabel={hideBalance ? t('profile.balanceHidden') : balanceText}
-        >
-          {hideBalance ? HIDDEN_BALANCE : balanceText}
-        </Text>
-      </ScrollView>
-      {expirySlot}
-    </View>
+  // `shrink-0 grow-0` keeps the amount at its text height: a horizontal
+  // ScrollView defaults to `flexGrow: 1`, so inside a column it would take the
+  // spare height and push the note away from the amount.
+  const amountLine = (
+    <ScrollView horizontal className="min-w-0 shrink-0 grow-0">
+      <Text
+        className="text-2xl font-bold tabular-nums"
+        accessibilityLabel={hideBalance ? t('profile.balanceHidden') : balanceText}
+      >
+        {hideBalance ? HIDDEN_BALANCE : balanceText}
+      </Text>
+    </ScrollView>
   );
 
   const visibilityToggle = (
@@ -341,24 +332,35 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           )}
         >
           <Animated.View
-            className={cn('min-w-0 flex-row items-start gap-1', !stackBalance && 'flex-1')}
+            className={cn('min-w-0', stackBalance ? 'gap-1' : 'flex-1 flex-row items-center gap-1')}
             layout={LinearTransition.duration(200)}
           >
-            {amountBlock}
-            {/* A compact card keeps the note directly under the amount and
-                moves both controls beside that column: the note keeps its two
-                lines and the amount keeps the card's wide-cell spacing. */}
-            {stackBalance ? (
-              <View className="shrink-0 items-center gap-1">
-                {visibilityToggle}
-                {addCreditsAction}
-              </View>
-            ) : (
-              visibilityToggle
-            )}
+            {/* Row 1 holds the amount, and the toggle on a stacked card. Its
+                48 dp box carries `-my-[10px]`, so it reaches its touch target
+                without adding height: the row ends at the amount's own line and
+                the note below keeps the wide cells' 3.4 dp gap. On a wide card
+                the toggle is the row's sibling and the note stays in the
+                amount's column. */}
+            <View
+              className={cn(
+                'min-w-0 flex-1',
+                stackBalance ? 'flex-row items-center gap-1' : 'gap-1'
+              )}
+            >
+              {amountLine}
+              {stackBalance ? (
+                <View className="shrink-0 -my-[10px]">{visibilityToggle}</View>
+              ) : (
+                expirySlot
+              )}
+            </View>
+            {stackBalance ? expirySlot : visibilityToggle}
           </Animated.View>
-          {!stackBalance && (
-            <View className="max-w-full flex-row flex-wrap items-center gap-2">
+          {/* The purchase action keeps the card's trailing end in both
+              layouts: the trailing column on a wide card, its own row below
+              the note on a stacked one. */}
+          {addCreditsAction !== null && (
+            <View className="max-w-full flex-row flex-wrap items-center justify-end gap-2">
               {addCreditsAction}
             </View>
           )}

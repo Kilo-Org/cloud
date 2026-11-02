@@ -123,6 +123,7 @@ type EditorState = {
   mode: 'create' | 'edit';
   publicId: string;
   wasPublic: boolean;
+  wasPriced: boolean;
   credentialsJson: string;
   definitionJson: string;
   validationError: string | null;
@@ -169,8 +170,8 @@ type CopyInput = {
   internal_id: string | undefined;
 };
 
-/** A save that makes a custom LLM public, which needs confirmation. */
-type PendingChange = { priced: boolean } & (
+/** A save that makes a custom LLM public, or starts charging for a public one, which needs confirmation. */
+type PendingChange = { priced: boolean; alreadyPublic: boolean } & (
   | { kind: 'upsert'; input: UpsertInput }
   | { kind: 'copy'; input: CopyInput }
 );
@@ -180,6 +181,7 @@ const initialEditorState: EditorState = {
   mode: 'create',
   publicId: '',
   wasPublic: false,
+  wasPriced: false,
   credentialsJson: JSON.stringify(INITIAL_CREDENTIALS, null, 2),
   definitionJson: JSON.stringify(INITIAL_DEFINITION, null, 2),
   validationError: null,
@@ -200,6 +202,7 @@ export function CustomLlmsContent() {
       mode: 'create',
       publicId: '',
       wasPublic: false,
+      wasPriced: false,
       credentialsJson: JSON.stringify(INITIAL_CREDENTIALS, null, 2),
       definitionJson: JSON.stringify(INITIAL_DEFINITION, null, 2),
       validationError: null,
@@ -212,6 +215,7 @@ export function CustomLlmsContent() {
       mode: 'edit',
       publicId,
       wasPublic: definition.public !== undefined,
+      wasPriced: definition.pricing !== undefined,
       credentialsJson: '',
       definitionJson: JSON.stringify(definition, null, 2),
       validationError: null,
@@ -322,7 +326,7 @@ export function CustomLlmsContent() {
       internal_id: internalId || undefined,
     };
     if (copy.sourceIsPublic) {
-      setPendingChange({ kind: 'copy', input, priced: copy.sourceIsPriced });
+      setPendingChange({ kind: 'copy', input, priced: copy.sourceIsPriced, alreadyPublic: false });
       return;
     }
     await submitCopy(input);
@@ -397,8 +401,10 @@ export function CustomLlmsContent() {
       definition: defResult.data,
       credentials: parsedCredentials,
     };
-    if (input.definition.public !== undefined && !editor.wasPublic) {
-      setPendingChange({ kind: 'upsert', input, priced: input.definition.pricing !== undefined });
+    const priced = input.definition.pricing !== undefined;
+    const startsCharging = editor.wasPublic && priced && !editor.wasPriced;
+    if (input.definition.public !== undefined && (!editor.wasPublic || startsCharging)) {
+      setPendingChange({ kind: 'upsert', input, priced, alreadyPublic: editor.wasPublic });
       return;
     }
     await submitUpsert(input);
@@ -643,8 +649,9 @@ export function CustomLlmsContent() {
                 Custom LLMs are free for users unless the definition sets <code>pricing</code>, a
                 list of tiers in the same format as a custom pricing entry&apos;s{' '}
                 <code>pricing</code>. Priced custom LLMs bill users like other paid models and are
-                not available to signed-out users. To make the model available to every user,
-                replace <code>organization_ids</code> and <code>group_ids</code> with{' '}
+                not available to signed-out users. To make the model available to every user, or
+                every signed-in user when it sets <code>pricing</code>, replace{' '}
+                <code>organization_ids</code> and <code>group_ids</code> with{' '}
                 <code>
                   &quot;public&quot;: {'{'} &quot;inference_providers&quot;: [&quot;acme&quot;],
                   &quot;description&quot;: &quot;…&quot; {'}'}
@@ -683,10 +690,20 @@ export function CustomLlmsContent() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Make this custom LLM public?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {pendingChange?.alreadyPublic
+                ? 'Start charging for this public custom LLM?'
+                : 'Make this custom LLM public?'}
+            </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="flex flex-col gap-2">
-                {pendingChange?.priced ? (
+                {pendingChange?.alreadyPublic ? (
+                  <p>
+                    Signed-in Kilo users will be billed for{' '}
+                    <code className="font-mono">{pendingChange.input.public_id}</code> at the
+                    definition&apos;s pricing. Signed-out users will no longer be able to use it.
+                  </p>
+                ) : pendingChange?.priced ? (
                   <p>
                     Every signed-in Kilo user will be able to use{' '}
                     <code className="font-mono">{pendingChange.input.public_id}</code> at the
@@ -708,7 +725,9 @@ export function CustomLlmsContent() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmPendingChange}>Make public</AlertDialogAction>
+            <AlertDialogAction onClick={confirmPendingChange}>
+              {pendingChange?.alreadyPublic ? 'Start charging' : 'Make public'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

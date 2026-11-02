@@ -164,6 +164,32 @@ export function compactControlTargetDp(): number {
 }
 
 /**
+ * The frame the composer's model and mode chips render at `px-3 py-1.5` with
+ * `text-sm`, in pt: NativeWind's rem is 14pt here, so the 17.5pt line box plus
+ * 2 × 5.25pt of padding. Measured at 28.3pt on device. It clears the
+ * {@link MIN_TAP_TARGET_DP} floor a control-size audit accepts, so the chip
+ * keeps its compact shape and its slop carries the touch region instead.
+ */
+export const CHIP_FRAME_DP = 28.3;
+
+/**
+ * Per-side vertical `hitSlop` of a {@link CHIP_FRAME_DP} chip:
+ * `28.3 + 8 + 8 = 44.3pt`, past `DESIGN.md:364`'s 44pt target. Vertical only:
+ * the chip's own padding and chevron already make it wider than
+ * {@link TOUCH_TARGET_DP}, and a horizontal reach would run into the mode chip
+ * beside it in `chat-toolbar.tsx` and into the paste button's own slop. The
+ * composer toolbar row's `py-2.5` (8.75pt) is taller than this slop, so the
+ * reach stays inside the row and reaches no neighbour's control.
+ */
+export const CHIP_HIT_SLOP_DP = 8;
+
+/** The `hitSlop` a {@link CHIP_FRAME_DP} chip renders, as {@link CHIP_HIT_SLOP_DP}. */
+export const CHIP_HIT_SLOP = {
+  top: CHIP_HIT_SLOP_DP,
+  bottom: CHIP_HIT_SLOP_DP,
+} as const;
+
+/**
  * The box a text-only action renders so its own node carries the platform's
  * minimum touch target: `DESIGN.md:364`'s 44pt on iOS and
  * {@link ICON_TARGET_DP}'s 48dp on Android. The agents history link is one such

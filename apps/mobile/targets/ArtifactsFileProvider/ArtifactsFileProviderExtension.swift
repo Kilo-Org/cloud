@@ -291,6 +291,7 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
   let contentType: UTType
   let documentSize: NSNumber?
   let contentModificationDate: Date?
+
   /**
    The version the framework compares: the mirrored file's size and
    modification date as the content version, stamped as the metadata version.

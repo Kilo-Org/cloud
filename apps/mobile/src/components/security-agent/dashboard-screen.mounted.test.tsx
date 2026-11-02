@@ -49,9 +49,11 @@ const triggerSync = vi.hoisted(() => ({
   isError: false,
   error: null as Error | null,
 }));
-const config = vi.hoisted(() => ({
-  data: { slaEnabled: true },
-}));
+const config = vi.hoisted(
+  (): { data: { slaEnabled: boolean; repositorySelectionMode?: string } } => ({
+    data: { slaEnabled: true },
+  })
+);
 const dashboardStats = vi.hoisted(() => ({
   isLoading: false,
   isPending: false,
@@ -931,6 +933,39 @@ describe('DashboardScreen repository filter sheet', () => {
     const filter = findFilterControl(root.root);
 
     expect(filter.props.disabled).toBe(true);
+  });
+
+  // The settings overview names a settled empty grant "No repositories", and
+  // this row labels the same scope one tap away: claiming every repository here
+  // would contradict the row above it and send the reader looking for scans
+  // that cannot run.
+  it('names a settled empty grant instead of claiming every repository', () => {
+    config.data = { slaEnabled: true, repositorySelectionMode: 'all' };
+    const root = renderScreen('org_123');
+    const filter = findFilterControl(root.root);
+
+    expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.repositories.noRepositories'));
+    expect(renderedTexts(root.root)).not.toContain(i18n.t('common.allRepositories'));
+    // Nothing in scope leaves no filter to open: its only option would be the
+    // scope it cannot offer.
+    expect(filter.props.disabled).toBe(true);
+  });
+
+  it('keeps the every-repository label while the grant read has not settled', () => {
+    config.data = { slaEnabled: true, repositorySelectionMode: 'all' };
+    repositories.isLoading = true;
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(i18n.t('common.allRepositories'));
+  });
+
+  it('keeps the every-repository label while the grant holds repositories', () => {
+    config.data = { slaEnabled: true, repositorySelectionMode: 'all' };
+    repositories.data = [{ fullName: 'kilo/repo' }];
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(i18n.t('common.allRepositories'));
+    expect(findFilterControl(root.root).props.disabled).toBe(false);
   });
 
   it('renders a retryable card for a failed repositories fetch and retries on tap', () => {

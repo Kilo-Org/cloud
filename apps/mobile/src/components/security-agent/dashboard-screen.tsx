@@ -367,6 +367,18 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // only" option list. A failed fetch is recoverable: the retry card below and
   // pull-to-refresh both refetch the repositories query.
   const repoFilterUnavailable = repositories.isLoading || repositories.isError;
+  // "All repositories" is a claim about the GitHub App grant, and the settings
+  // overview refuses to make it for a settled empty grant. This row names the
+  // same scope one tap apart, so it reads the same way when the grant holds
+  // nothing; a read still in flight or a failed one proves neither state.
+  const repositoryScopeEmpty =
+    config.data?.repositorySelectionMode === 'all' &&
+    repositories.data?.length === 0 &&
+    !repoFilterUnavailable;
+  // A scope with nothing in it leaves nothing to filter, so the sheet — whose
+  // only option would be "All repositories" — stays shut for the same reason
+  // the loading and failed cases keep it shut.
+  const repoFilterOff = repoFilterUnavailable || repositoryScopeEmpty;
 
   // A non-retryable sync outcome ended the intent, so both sync controls
   // disable and the inline copy below explains the state.
@@ -442,7 +454,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   };
 
   const openRepoFilter = () => {
-    if (repoFilterUnavailable) {
+    if (repoFilterOff) {
       return;
     }
     const repoNames = getSecurityRepositoriesInScope(repositories.data ?? [], config.data).map(
@@ -518,18 +530,21 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               the lines where they already sat. */}
           <Pressable
             onPress={openRepoFilter}
-            disabled={repoFilterUnavailable}
+            disabled={repoFilterOff}
             className={cn(
               ROW_TARGET_CLASS,
               'flex-1 justify-center active:opacity-70',
-              repoFilterUnavailable && 'opacity-50'
+              repoFilterOff && 'opacity-50'
             )}
             accessibilityRole="button"
             accessibilityLabel={t('securityAgent.dashboard.filterByRepository')}
-            accessibilityState={{ disabled: repoFilterUnavailable }}
+            accessibilityState={{ disabled: repoFilterOff }}
           >
             <Text className="text-sm font-medium" numberOfLines={1}>
-              {repoFullName ?? t('common.allRepositories')}
+              {repoFullName ??
+                (repositoryScopeEmpty
+                  ? t('securityAgent.repositories.noRepositories')
+                  : t('common.allRepositories'))}
             </Text>
             <Text variant="muted" className="text-xs">
               {lastSyncLabel}

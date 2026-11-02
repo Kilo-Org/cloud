@@ -342,45 +342,62 @@ describe('idle composer control and ring track contrast (non-text)', () => {
 });
 
 describe('disabled switch pair contrast (non-text)', () => {
-  // The shared switch paints this pair for a disabled control on Android, in
-  // place of the brand on-track: `primary-disabled` under the regular grip for
+  // The shared switch paints these pairs for a disabled control on Android, in
+  // place of the brand on-track. iOS keeps the brand pair and fades it itself.
+  // The switch sits on a `secondary` row, so its tracks are measured over that.
+  //
+  // Light keeps a third neutral, so its pair stays a step apart from the
+  // enabled one and from itself: `primary-disabled` under the white grip for
   // the on position, `muted-soft` with the mid neutral grip for the off one.
-  // iOS keeps the brand pair and fades it itself. The switch sits on a
-  // `secondary` row, so its tracks are measured over that. The floors are
-  // perception floors: the pair has to read as a control and the two positions
-  // have to stay apart. Light has no third neutral for the off track —
-  // `control-idle` equals `secondary` there — so the disabled off track is the
-  // same neutral as the enabled off track, and only its grip dims.
+  // Light has no fourth neutral — `control-idle` equals `secondary` there — so
+  // the disabled off track is the same neutral as the enabled off track, and
+  // only its grip dims.
+  //
+  // Dark has no mid neutral either, and its old pair was unreadable: the
+  // `muted-soft` off track measured 2.2:1 on the row, the grip 2.1:1 on that
+  // track, and the on position's near-black grip 1.07:1 on the row, so the
+  // control nearly vanished. It paints the enabled neutral tones instead — the
+  // `muted-foreground` track and the `foreground` grip, in both positions — and
+  // the olive `selection` the enabled on track keeps is the accent a disabled
+  // one drops.
   const MIN_VISIBLE_SURFACE_RATIO = 1.6;
-  const themes = [
-    ['light', lightColors],
-    ['dark', darkColors],
-  ] as const;
 
-  it('every theme: the disabled off track reads on the row surface', () => {
-    for (const [themeName, colors] of themes) {
-      expect(
-        contrastRatio(colors.mutedSoft, colors.secondary),
-        `muted-soft vs secondary (${themeName})`
-      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
-    }
+  it('light: the disabled tracks and grip stay a visible step apart', () => {
+    expect(
+      contrastRatio(lightColors.mutedSoft, lightColors.secondary),
+      'muted-soft vs secondary'
+    ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    expect(
+      contrastRatio(lightColors.primaryDisabled, lightColors.mutedSoft),
+      'primary-disabled vs muted-soft'
+    ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    expect(
+      contrastRatio(lightColors.mutedForeground, lightColors.mutedSoft),
+      'muted-foreground vs muted-soft'
+    ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
   });
 
-  it('every theme: the disabled on track stays apart from the disabled off track', () => {
-    for (const [themeName, colors] of themes) {
-      expect(
-        contrastRatio(colors.primaryDisabled, colors.mutedSoft),
-        `primary-disabled vs muted-soft (${themeName})`
-      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
-    }
+  it('dark: the disabled track reads on the row and holds its grip', () => {
+    expect(
+      contrastRatio(darkColors.mutedForeground, darkColors.secondary),
+      'muted-foreground vs secondary'
+    ).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
+    expect(
+      contrastRatio(darkColors.foreground, darkColors.mutedForeground),
+      'foreground vs muted-foreground'
+    ).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
   });
 
-  it('every theme: the disabled off grip reads on its own track', () => {
-    for (const [themeName, colors] of themes) {
-      expect(
-        contrastRatio(colors.mutedForeground, colors.mutedSoft),
-        `muted-foreground vs muted-soft (${themeName})`
-      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
-    }
+  it('dark: the grip the light pair uses would vanish on the row', () => {
+    // `primary-foreground` is the light grip; in dark it is near-black, which
+    // is why the dark disabled pair takes the `foreground` grip instead.
+    expect(
+      contrastRatio(darkColors.primaryForeground, darkColors.secondary),
+      'primary-foreground vs secondary'
+    ).toBeLessThan(MIN_VISIBLE_SURFACE_RATIO);
+    expect(
+      contrastRatio(lightColors.primaryForeground, lightColors.primaryDisabled),
+      'primary-foreground vs primary-disabled (light)'
+    ).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
 });

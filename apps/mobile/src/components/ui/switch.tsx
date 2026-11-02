@@ -44,7 +44,11 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * enabled pair uses for the neutral tones: the `mutedForeground` track (4.5:1
  * on the row) and the `foreground` grip (3.2:1 on the track) in both positions.
  * The accent's absence — grey instead of the olive `selection` — still says the
- * control cannot be changed, and the grip's side still says on or off.
+ * control cannot be changed, and the grip's side still says on or off. The price
+ * is that dark's disabled off position paints exactly like its enabled off one:
+ * the palette has no third mid neutral, so an off-position disabled switch there
+ * is signalled by its row and the screen's read-only state rather than by its
+ * own track. Light keeps the step, because it has the neutral to keep it.
  *
  * iOS is left alone: UIKit fades a disabled `UISwitch` itself, so painting the
  * muted pair there would dim the control twice. Android is the platform that

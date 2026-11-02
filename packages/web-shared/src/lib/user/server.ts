@@ -98,6 +98,7 @@ export const sessionAuthOptions = {
       session.isAdmin = castToken.isAdmin || false; // Ensure isAdmin is always defined
       session.kiloUserId = castToken.kiloUserId;
       session.webSessionPepper = castToken.webSessionPepper ?? castToken.pepper ?? null;
+      session.webSessionId = castToken.webSessionId;
       session.isNewUser = castToken.isNewUser || false;
       session.authProvider = castToken.authProvider;
       session.authenticatedAt = castToken.authenticatedAt;
@@ -179,6 +180,8 @@ type GetAuthResponse =
       tokenSource?: undefined;
       deviceSessionId?: undefined;
       cloudAgentAuthority?: undefined;
+      webSessionId?: undefined;
+      webSessionPepper?: undefined;
     }
   | {
       user: User;
@@ -191,6 +194,10 @@ type GetAuthResponse =
       tokenSource?: string;
       deviceSessionId?: string;
       cloudAgentAuthority?: CloudAgentAuthority;
+      /** Server-only per-session id for MFA step-up; never sent to the browser. */
+      webSessionId?: string;
+      /** Server-only pepper the session was minted with, for primary re-reads. */
+      webSessionPepper?: string | null;
     };
 
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
@@ -464,7 +471,11 @@ async function resolveUserFromSession(
     session.isNewUser,
     undefined,
     undefined,
-    fromDb
+    fromDb,
+    undefined,
+    undefined,
+    undefined,
+    { id: session.webSessionId, pepper: session.webSessionPepper }
   );
 }
 
@@ -524,7 +535,8 @@ async function validateUserAuthorization(
   fromDb: typeof db = db,
   botId?: string,
   tokenSource?: string,
-  deviceSessionId?: string
+  deviceSessionId?: string,
+  webSession?: { id?: string; pepper?: string | null }
 ): Promise<GetAuthResponse> {
   if (!user) {
     return authError(401, 'User not found', kiloUserId);
@@ -576,6 +588,8 @@ async function validateUserAuthorization(
     botId,
     tokenSource,
     deviceSessionId,
+    webSessionId: webSession?.id,
+    webSessionPepper: webSession?.pepper,
   };
 }
 

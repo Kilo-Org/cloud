@@ -31,6 +31,7 @@ import {
 import { secondsInDay } from 'date-fns/constants';
 import type { AdapterUser } from 'next-auth/adapters';
 import assert from 'node:assert';
+import { randomBytes } from 'node:crypto';
 import type { User } from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
@@ -961,6 +962,20 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     ...sessionAuthOptions.callbacks,
+    // `webSessionId` is the server-side binding for MFA step-up proofs. Server
+    // reads use `sessionAuthOptions` and see it; the browser-facing
+    // `/api/auth/session` response must never expose it.
+    async session({ session, token, user, trigger, newSession }) {
+      const result = await sessionAuthOptions.callbacks!.session!({
+        session,
+        token,
+        user,
+        trigger,
+        newSession,
+      });
+      if (result) delete (result as { webSessionId?: string }).webSessionId;
+      return result;
+    },
     // NOTE(bmc): Errors thrown from this function have their messages sent to the client.
     // Realistically the entire thing should be wrapped in a try/catch and handle errors appropriately.
     // any string returned from here is a redirect URL and returning "true" is considered a successful login.
@@ -1305,6 +1320,10 @@ export const authOptions: NextAuthOptions = {
         token.iat = Math.floor(Date.now() / 1000);
         token.isNewUser = (profile as ExtendedProfile)?.isNewUser || false;
         token.webSessionPepper = existingUser.web_session_pepper;
+        // Minted only on sign-in. NextAuth re-encodes the JWT on every session
+        // read (`trigger` absent), and that path returns the token unchanged, so
+        // one browser session keeps one id for its whole life.
+        token.webSessionId = randomBytes(32).toString('base64url');
         token.isAdmin = existingUser.is_admin;
         token.authProvider = accountInfo.provider;
         token.authenticatedAt = token.iat;

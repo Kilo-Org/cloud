@@ -65,6 +65,13 @@ export type TRPCContext = {
    */
   credential?: PrivilegedCredentialKind;
   internalApiUse?: boolean;
+  /**
+   * Server-only identifiers for the browser session that authenticated this
+   * request. Absent for bearer credentials and for legacy session cookies that
+   * predate the `webSessionId` claim.
+   */
+  webSessionId?: string;
+  webSessionPepper?: string | null;
   ip?: string | null;
   // Procedure path and type, injected into the context by `baseProcedure` so
   // that `is_admin` elevation sites *inside* a resolver (which only receive
@@ -102,20 +109,27 @@ export type CreateTRPCContextOpts = {
 export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<TRPCContext> => {
   const headersList = opts?.req?.headers ?? (await headers());
   const startedAt = performance.now();
-  const { user, deviceSessionId, tokenSource, cloudAgentAuthority, internalApiUse } =
-    await withControlPlaneBudget({
-      path: controlPlanePathFromInfo(opts?.info),
-      type: controlPlaneTypeFromInfo(opts?.info),
-      headersList,
-      next: () =>
-        getUserFromAuth({
-          adminOnly: false,
-          requestHeaders: headersList,
-          requestPathname: opts?.req ? new URL(opts.req.url).pathname : undefined,
-        }),
-      startedAt,
-      surface: 'context',
-    });
+  const {
+    user,
+    deviceSessionId,
+    tokenSource,
+    cloudAgentAuthority,
+    internalApiUse,
+    webSessionId,
+    webSessionPepper,
+  } = await withControlPlaneBudget({
+    path: controlPlanePathFromInfo(opts?.info),
+    type: controlPlaneTypeFromInfo(opts?.info),
+    headersList,
+    next: () =>
+      getUserFromAuth({
+        adminOnly: false,
+        requestHeaders: headersList,
+        requestPathname: opts?.req ? new URL(opts.req.url).pathname : undefined,
+      }),
+    startedAt,
+    surface: 'context',
+  });
   if (!user) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',
@@ -141,6 +155,8 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
     }),
     internalApiUse,
     tokenSource: tokenSource ?? null,
+    webSessionId,
+    webSessionPepper: webSessionPepper ?? null,
     ip: clientIpFromHeaders(headersList),
     headersList,
     controlPlaneStartedAt: isMobileClient(headersList) ? startedAt : undefined,

@@ -879,6 +879,34 @@ describe('credential issuance authentication guards', () => {
     expect(mockGetServerSession).toHaveBeenCalledWith(sessionAuthOptions);
   });
 
+  test('threads the server-only webSessionId and pepper from the session claim', async () => {
+    const user = await insertTestUser({ web_session_pepper: 'current-web-session-pepper' });
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: user.id,
+      webSessionPepper: 'current-web-session-pepper',
+      webSessionId: 'per-session-id',
+    });
+
+    const result = await getUserFromSessionForCredentialIssuance();
+
+    expect(result.user?.id).toBe(user.id);
+    expect(result.webSessionId).toBe('per-session-id');
+    expect(result.webSessionPepper).toBe('current-web-session-pepper');
+  });
+
+  test('a bearer credential carries no webSessionId', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'generic-bearer-pepper' });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user?.id).toBe(user.id);
+    expect(result.webSessionId).toBeUndefined();
+  });
+
   test('returns 401 when the session read throws on malformed cookies', async () => {
     mockHeaders.mockResolvedValue(new Headers());
     mockGetServerSession.mockRejectedValue(new TypeError('argument name is invalid'));

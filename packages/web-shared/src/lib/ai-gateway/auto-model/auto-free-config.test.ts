@@ -13,6 +13,12 @@ import {
   readConfiguredAutoFreeModels,
 } from './auto-free-config';
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/free-vercel-models', () => ({
+  isFreeVercelModel: jest.fn(async (model: string) =>
+    ['reflection/beam-free', 'anthropic/claude-beam-free'].includes(model)
+  ),
+}));
+
 beforeEach(async () => {
   await cleanupDbForTest();
 });
@@ -55,8 +61,11 @@ describe('isAutoFreeEligibleModelId', () => {
     ['anthropic/claude-sonnet-4:free', false],
     ['openai/gpt-oss-120b:free', true],
     ['openai/gpt-5:free', false],
-  ])('%s -> %s', (model, expected) => {
-    expect(isAutoFreeEligibleModelId(model, undefined)).toBe(expected);
+    ['reflection/beam-free', true],
+    ['anthropic/claude-beam-free', false],
+    ['vendor/paid-free', false],
+  ])('%s -> %s', async (model, expected) => {
+    expect(await isAutoFreeEligibleModelId(model, undefined)).toBe(expected);
   });
 
   function customLlm(definition: CustomLlmDefinition): CustomLlm {
@@ -94,13 +103,13 @@ describe('isAutoFreeEligibleModelId', () => {
       publicCustomLlmDefinition(['acme'], { country_deny_list: [] }),
       true,
     ],
-  ])('%s', (_name, definition, expected) => {
-    expect(isAutoFreeEligibleModelId('acme/model', customLlm(definition))).toBe(expected);
+  ])('%s', async (_name, definition, expected) => {
+    expect(await isAutoFreeEligibleModelId('acme/model', customLlm(definition))).toBe(expected);
   });
 });
 
 describe('getIneligibleAutoFreeModelIds', () => {
-  it('accepts public custom LLMs and rejects private ones', () => {
+  it('accepts public custom LLMs and rejects private ones', async () => {
     const customLlms: CustomLlm[] = [
       {
         public_id: 'Acme/Public-Free',
@@ -115,7 +124,7 @@ describe('getIneligibleAutoFreeModelIds', () => {
     ];
 
     expect(
-      getIneligibleAutoFreeModelIds(
+      await getIneligibleAutoFreeModelIds(
         {
           models: ['acme/public-free', 'acme/private-free', 'provider/paid-model'].map(model => ({
             model,

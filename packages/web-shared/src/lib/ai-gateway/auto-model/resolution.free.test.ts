@@ -3,6 +3,7 @@ import { getAutoFreeCandidates } from './resolution';
 import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getConfiguredAutoFreeModels } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
+import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
 import type * as AutoFreeConfigModule from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
@@ -26,6 +27,14 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
   getOpenRouterModelsFromDatabase: jest.fn(),
 }));
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/free-vercel-models', () => ({
+  isFreeVercelModel: jest.fn(async (model: string) => model === 'reflection/beam-free'),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/routing-config', () => ({
+  getRuntimeGatewayRoutingConfig: jest.fn(),
+}));
+
 function configure(models: string[]) {
   jest
     .mocked(getConfiguredAutoFreeModels)
@@ -34,6 +43,9 @@ function configure(models: string[]) {
 
 describe('getAutoFreeCandidates', () => {
   beforeEach(() => {
+    jest
+      .mocked(getRuntimeGatewayRoutingConfig)
+      .mockResolvedValue({ vercelEnabled: true, vercelOptOutModels: new Set() });
     jest.mocked(getOpenRouterModelsFromDatabase).mockResolvedValue(new Set(['test/present:free']));
     configure([gemma_4_26b_a4b_it_free_model.public_id, 'test/present:free', 'test/absent:free']);
   });
@@ -46,6 +58,25 @@ describe('getAutoFreeCandidates', () => {
       );
     }
   );
+
+  it('includes free Vercel-only models while Kilo routes them to Vercel', async () => {
+    configure(['test/present:free', 'reflection/beam-free']);
+    expect(await getAutoFreeCandidates('chat_completions')).toEqual([
+      'reflection/beam-free',
+      'test/present:free',
+    ]);
+
+    jest
+      .mocked(getRuntimeGatewayRoutingConfig)
+      .mockResolvedValue({ vercelEnabled: false, vercelOptOutModels: new Set() });
+    expect(await getAutoFreeCandidates('chat_completions')).toEqual(['test/present:free']);
+
+    jest.mocked(getRuntimeGatewayRoutingConfig).mockResolvedValue({
+      vercelEnabled: true,
+      vercelOptOutModels: new Set(['reflection/beam-free']),
+    });
+    expect(await getAutoFreeCandidates('chat_completions')).toEqual(['test/present:free']);
+  });
 
   it('skips configured models that are not free or need a non-default AI SDK provider', async () => {
     jest

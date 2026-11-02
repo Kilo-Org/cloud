@@ -42,6 +42,8 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
+import { isFreeVercelModel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/free-vercel-models';
 import { getCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { getCustomLlmApiKinds } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/api-kinds';
 import {
@@ -76,9 +78,10 @@ type ResolveAutoModelParams = {
  * configured, the configuration is invalid, or no configured model is eligible.
  *
  * Other free models are only eligible when they appear in the OpenRouter
- * models cache. Kilo-exclusive models are always eligible. Public custom LLMs
- * are eligible when they serve the current `apiKind`; when `apiKind` is null no
- * API-kind filtering is applied.
+ * models cache, or when they are free Vercel-only models and Kilo currently
+ * routes them to Vercel. Kilo-exclusive models are always eligible. Public
+ * custom LLMs are eligible when they serve the current `apiKind`; when
+ * `apiKind` is null no API-kind filtering is applied.
  */
 async function getEligibleAutoFreeModels(
   apiKind: GatewayRequest['kind'] | null
@@ -86,18 +89,27 @@ async function getEligibleAutoFreeModels(
   const configuredModels = await getConfiguredAutoFreeModels();
   if (!configuredModels) return [AUTO_FREE_FALLBACK_MODEL];
 
-  const [openRouterModels, customLlmsById] = await Promise.all([
+  const [openRouterModels, customLlmsById, routingConfig] = await Promise.all([
     getOpenRouterModelsFromDatabase(),
     getCustomLlmsById(),
+    getRuntimeGatewayRoutingConfig(),
   ]);
-  const eligibleModels = configuredModels.filter(({ model }) => {
+  const isEligible = async (model: string) => {
     const customLlm = customLlmsById.get(model.toLowerCase());
-    if (!isAutoFreeEligibleModelId(model, customLlm)) return false;
+    if (!(await isAutoFreeEligibleModelId(model, customLlm))) return false;
     if (customLlm) {
       return apiKind === null || getCustomLlmApiKinds(customLlm.definition).includes(apiKind);
     }
-    return isKiloExclusiveModel(model) || openRouterModels.has(model);
-  });
+    return (
+      isKiloExclusiveModel(model) ||
+      openRouterModels.has(model) ||
+      (routingConfig.vercelEnabled &&
+        !routingConfig.vercelOptOutModels.has(model) &&
+        (await isFreeVercelModel(model)))
+    );
+  };
+  const eligible = await Promise.all(configuredModels.map(({ model }) => isEligible(model)));
+  const eligibleModels = configuredModels.filter((_model, index) => eligible[index]);
   return eligibleModels.length > 0 ? eligibleModels : [AUTO_FREE_FALLBACK_MODEL];
 }
 

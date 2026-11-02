@@ -1,7 +1,7 @@
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isKiloAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeGatewayModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   isPublicCustomLlm,
   type CustomLlm,
@@ -28,10 +28,10 @@ export const AUTO_FREE_FALLBACK_CONFIG: AutoFreeConfig = { models: [AUTO_FREE_FA
  * candidate only when it is public, unrestricted by country, and serves Chat
  * Completions.
  */
-export function isAutoFreeEligibleModelId(
+export async function isAutoFreeEligibleModelId(
   model: string,
   customLlm: CustomLlm | undefined
-): boolean {
+): Promise<boolean> {
   if (isKiloAutoModel(model)) {
     return false;
   }
@@ -42,19 +42,21 @@ export function isAutoFreeEligibleModelId(
       getCustomLlmApiKinds(customLlm.definition).includes('chat_completions')
     );
   }
-  return isFreeModelExcludingCustomLlms(model) && getAiSdkProvider(model, null) === undefined;
+  return getAiSdkProvider(model, null) === undefined && (await isFreeGatewayModel(model));
 }
 
-export function getIneligibleAutoFreeModelIds(
+export async function getIneligibleAutoFreeModelIds(
   config: AutoFreeConfig,
   customLlms: ReadonlyArray<CustomLlm>
-): string[] {
+): Promise<string[]> {
   const customLlmsById = new Map(
     customLlms.map(customLlm => [customLlm.public_id.toLowerCase(), customLlm])
   );
-  return config.models
-    .map(({ model }) => model)
-    .filter(model => !isAutoFreeEligibleModelId(model, customLlmsById.get(model.toLowerCase())));
+  const models = config.models.map(({ model }) => model);
+  const eligible = await Promise.all(
+    models.map(model => isAutoFreeEligibleModelId(model, customLlmsById.get(model.toLowerCase())))
+  );
+  return models.filter((_model, index) => !eligible[index]);
 }
 
 /** Returns the configured auto-free models, or null when none are stored or the stored value is invalid. */

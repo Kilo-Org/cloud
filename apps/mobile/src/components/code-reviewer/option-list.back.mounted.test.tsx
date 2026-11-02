@@ -258,10 +258,10 @@ describe('OptionList hardware Back during a save', () => {
     expect(routerBack).not.toHaveBeenCalled();
   });
 
-  it('does not remember a Back the app shell spends', async () => {
+  it('does not keep the mark of a Back the app shell spends', async () => {
     // A screen above dismissed itself, so its window is open. A press now is
     // spent by the app shell, not applied here: this screen stays focused and
-    // mounted, so remembering it would suppress every later dismissal.
+    // mounted, so leaving its mark set would suppress every later dismissal.
     armLeaveSettle(now);
     const gate = Promise.withResolvers<boolean>();
     const renderer = await mount(() => gate.promise);

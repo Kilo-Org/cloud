@@ -61,6 +61,18 @@ export const STATE_ACTION_CLASS = 'min-h-[48px]';
 export const ROW_TARGET_CLASS = 'min-h-[48px]';
 
 /**
+ * The frame a screen header's titled control renders on its own pressable
+ * node — the pressable title and a header title composed of its own content.
+ * A title sized by its text reports that line's height (`text-lg` is 24.8dp),
+ * and `hitSlop` widens the touch region without moving the rect a control-size
+ * audit reads, so the floor has to be the control's own class. 48 keeps the
+ * measured box on Android's button minimum and clears iOS's 44pt on the same
+ * node; the header row is already this tall, so the header height does not
+ * change.
+ */
+export const HEADER_TITLE_TARGET_CLASS = 'min-h-[48px]';
+
+/**
  * The box a profile row's identity block renders: the item's name and what
  * qualifies it, declared first in the row. It spans {@link ICON_TARGET_DP}, the
  * height of the controls beside it, so its frame is the row's leading top
@@ -114,6 +126,16 @@ export const COMPACT_CONTROL_BOX_CLASS = 'h-[32px] w-[32px] items-center justify
  * `DESIGN.md:364`'s 44pt rather than landing on it.
  */
 export const COMPACT_CONTROL_HIT_SLOP_DP = 8;
+
+/**
+ * Per-side `hitSlop` of the shared `Button`'s compact size (`sm`), whose
+ * `min-h-[36px]` frame stays the visual height. 5, not 4: a 36dp frame at
+ * density 420 renders 35.81dp, and 4 per side then lands on 43.81dp — under
+ * `DESIGN.md:364`'s 44pt, not on it. 36 + 5 + 5 = 46pt keeps a margin on both
+ * axes without the extra band two buttons on a `gap-2` row would each claim at
+ * 6 per side.
+ */
+export const COMPACT_BUTTON_HIT_SLOP = { top: 5, bottom: 5, left: 5, right: 5 } as const;
 
 /**
  * The frame a compact `h-11` control renders, in pt. NativeWind's rem is 14pt
@@ -287,6 +309,31 @@ export const INLINE_LINK_LINE_GAP_CLASS = 'gap-y-[7px]';
  */
 export const INLINE_LINK_ROW_MARGIN_DP = 5;
 export const INLINE_LINK_ROW_CLASS = 'my-[5px] gap-y-[7px]';
+
+/**
+ * The box a text action renders at the end of a line of copy — the code
+ * reviewer's sync line is its snapshot's age with Refresh at the line's end.
+ *
+ * `sm` draws a 36dp frame, and the line it shares with the copy is one text
+ * line tall (14dp at `text-xs`). A frame that cancels its own layout height and
+ * floats over the line reaches `(36 - 14) / 2 = 11dp` past it, which is more
+ * than the 7dp gap the line keeps above it: the frame then covers the last
+ * 1.9dp of the copy above, and a box collides with a line it does not own. The
+ * 28dp box is the audit floor ({@link MIN_TAP_TARGET_DP}) and reaches
+ * `(28 - 14) / 2 = 7dp` past the line, which that gap absorbs. The vertical
+ * slop carries the rest of the 44pt target, as {@link INLINE_LINK_BOX_CLASS}
+ * does for prose; it is 9dp rather than the inline link's 8dp because a
+ * `min-h-[28px]` box measures 27.8dp on Android, and 8dp a side would then
+ * land a fifth of a dp short of 44. The horizontal side is 5dp for the same
+ * reason: a call site keeps a 36dp minimum width for a short label in another
+ * locale, and that floor can lay out at about 35.81dp, so 4dp a side reached
+ * 43.81dp. 36 + 5 + 5 = 46dp holds the reach past 44 whatever the pixel
+ * rounding does.
+ */
+export const LINE_ACTION_BOX_CLASS = 'min-h-[28px] -my-[7px]';
+
+/** The `hitSlop` {@link LINE_ACTION_BOX_CLASS} renders, reaching past 44dp each way. */
+export const LINE_ACTION_HIT_SLOP = { top: 9, bottom: 9, left: 5, right: 5 } as const;
 
 /**
  * The class an inline-link connector carries so the two links' facing reaches do

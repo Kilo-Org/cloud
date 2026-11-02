@@ -1522,7 +1522,13 @@ describe.each([true, false])('SessionDetailScreen header return with history=%s'
     // cannot re-wrap when the real session name swaps in.
     expect(propOf(title, 'numberOfLines')).toBe(SESSION_HEADER_TITLE_LINES);
     expect(propOf(title, 'ellipsizeMode')).toBe('tail');
-    expect(title.parent?.props.className).toContain('min-h-21');
+    // The header holds that cap in the band beside the heading, so the title
+    // keeps its own height and cannot move the body when it swaps in.
+    expect(
+      header.findByProps({ className: 'w-0 overflow-hidden' }).findByProps({
+        className: 'min-h-21',
+      })
+    ).toBeDefined();
     const back = findByType(header, 'Pressable').find(
       node => propOf(node, 'accessibilityLabel') === 'Go back'
     );

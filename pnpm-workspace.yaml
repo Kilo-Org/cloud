@@ -150,6 +150,8 @@ overrides:
   # An entry added or changed here names a reviewed version: an exact pin for the
   # version the lockfile carries, or a range that also states its upper bound, so
   # the entry moves only through a reviewed change to this file and the lockfile.
+  # A 'catalog:' entry takes that package's catalog pin, which sits in this same
+  # file, so it obeys the same rule.
   # esbuild below keeps a floor without an upper bound; see its own note.
   glob: 13.0.6
   google-auth-library: 10.6.2
@@ -190,7 +192,7 @@ overrides:
   ip-address: 10.7.1
   image-size@^1: npm:image-size-next@1.2.2
   image-size@^2: npm:image-size-next@2.1.1
-  drizzle-orm: 0.45.2
+  drizzle-orm: 'catalog:'
   lodash-es: 4.18.1
   '@xmldom/xmldom': 0.8.15
   qs: 6.16.1
@@ -199,7 +201,7 @@ overrides:
   # Nothing in the tree depends on serialize-javascript today; the spec stays for a
   # future dependent, bounded to the reviewed major.
   serialize-javascript: '>=7.0.3 <8'
-  hono: 4.13.13
+  hono: 'catalog:'
   '@modelcontextprotocol/sdk@1.29.0': 1.32.1
   '@modelcontextprotocol/sdk@1.32.1>@hono/node-server': 2.0.10
   # @simplewebauthn/server's ASN.1 parser must come from the same

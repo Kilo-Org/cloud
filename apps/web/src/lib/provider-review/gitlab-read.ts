@@ -47,6 +47,14 @@ import { requestGitLabJson, requestGitLabText } from './gitlab-http';
 
 const GITLAB_PAGE_SIZE = 50;
 /**
+ * How many provider pages one inbox load may read while the pages it has seen
+ * hold no row inside the integration's repository set. Each read is a full
+ * page, so the bound caps a load at a few pages' worth of latency instead of
+ * letting one request walk a large out-of-scope queue; the continuation names
+ * the next unread page, so nothing is skipped.
+ */
+const INBOX_PAGE_READS_PER_LOAD = 5;
+/**
  * The diff-page bound for the summary's change counts: GitLab caps a merge
  * request's diff collection at the project's `diff_max_files` setting (1000
  * files by default), so 20 pages of 50 fold every diff GitLab will report
@@ -450,9 +458,25 @@ function classifyInboxError(error: unknown, owner: GitLabReviewOwner): GitLabRev
 }
 
 /**
- * Open merge requests awaiting the acting user's review. Each item carries
- * platform, project path, and the connected instance origin, so the list can
- * never navigate into a different provider's repo.
+ * Open merge requests awaiting the acting user's review, limited to the
+ * integration's cached repositories. Each item carries platform, project path,
+ * and the connected instance origin, so the list can never navigate into a
+ * different provider's repo.
+ *
+ * The cached repository set is the boundary the rest of this layer enforces —
+ * authorizeProject matches a full project path against it before any request —
+ * so a row from any other project is dropped before its DTO is built: it could
+ * not be opened through Kilo, and the connection's queue outside that set is
+ * not this inbox's contents. A project matches by full path, case-insensitively,
+ * exactly as authorizeProject compares it.
+ *
+ * A page whose rows are all outside the set is not an answer on its own: the
+ * list has nothing to show and nothing to scroll, so one load continues onto the
+ * next provider page until a row lands inside the set, bounded by
+ * INBOX_PAGE_READS_PER_LOAD. The continuation names the next unread page, so a
+ * load that stopped at the bound still resumes where it left off. A connection
+ * with no cached repository name can list nothing, and asks the provider for
+ * nothing.
  */
 export async function listInbox(
   owner: GitLabReviewOwner,
@@ -461,54 +485,74 @@ export async function listInbox(
 ): Promise<ProviderPrInboxPage> {
   try {
     const access = await authorizeOwner(owner, instanceHint);
+    const allowedProjectPaths = new Set(
+      access.repositoryFullNames.map(projectPath => projectPath.toLowerCase())
+    );
+    // Released the credential first, so a broken connection still reports
+    // reconnect instead of a quietly empty list.
+    if (allowedProjectPaths.size === 0) return { items: [], nextCursor: null };
     const me = await fetchGitLabUser(access.accessToken, access.instanceUrl);
     const identity = `gitlab-inbox:${owner.type === 'user' ? owner.userId : `${owner.organizationId}:${owner.userId}`}`;
-    const page = decodePageCursor(cursor, identity);
-    const mergeRequests = await requestGitLabJson<GitLabMergeRequestDetail[]>(
-      access,
-      '/api/v4/merge_requests',
-      {
-        query: {
-          state: 'opened',
-          // Without a scope the API defaults to `created_by_me` — authored
-          // merge requests, not review requests. `reviews_for_me` selects the
-          // merge requests where the acting user is the reviewer;
-          // reviewer_username keeps that filter on versions that predate the
-          // scope value. reviewer_username is supported on gitlab.com and on
-          // self-managed GitLab since 10.x — older than the versions we
-          // advertise.
-          scope: 'reviews_for_me',
-          reviewer_username: me.username,
-          per_page: GITLAB_PAGE_SIZE,
-          page,
-        },
-      }
-    );
+    const firstPage = decodePageCursor(cursor, identity);
     const items: ProviderPrInboxItem[] = [];
-    for (const mr of mergeRequests) {
-      const ref = inboxRefFrom(mr, access.instanceUrl);
-      if (!ref) continue;
-      // The adapter's author type omits `avatar_url`, but the list API
-      // returns it; narrow instead of asserting the field into existence.
-      const avatarUrl =
-        mr.author && 'avatar_url' in mr.author && typeof mr.author.avatar_url === 'string'
-          ? mr.author.avatar_url
-          : null;
-      items.push({
-        ref,
-        title: mr.title,
-        author: mr.author
-          ? {
-              login: mr.author.username,
-              avatarUrl,
-            }
-          : null,
-        state: mapMergeRequestState(mr.state),
-        draft: isDraftMr(mr),
-        updatedAt: mr.updated_at ?? '',
-      });
+    // The continuation is built from the LAST page actually read, so the walk
+    // bound never skips a page: either the load found a row and the reader
+    // continues after it, or the provider collection ended.
+    let lastPage = firstPage;
+    let lastPageLength = 0;
+    for (let offset = 0; offset < INBOX_PAGE_READS_PER_LOAD; offset += 1) {
+      const page = firstPage + offset;
+      const mergeRequests = await requestGitLabJson<GitLabMergeRequestDetail[]>(
+        access,
+        '/api/v4/merge_requests',
+        {
+          query: {
+            state: 'opened',
+            // Without a scope the API defaults to `created_by_me` — authored
+            // merge requests, not review requests. `reviews_for_me` selects the
+            // merge requests where the acting user is the reviewer;
+            // reviewer_username keeps that filter on versions that predate the
+            // scope value. reviewer_username is supported on gitlab.com and on
+            // self-managed GitLab since 10.x — older than the versions we
+            // advertise.
+            scope: 'reviews_for_me',
+            reviewer_username: me.username,
+            per_page: GITLAB_PAGE_SIZE,
+            page,
+          },
+        }
+      );
+      lastPage = page;
+      lastPageLength = mergeRequests.length;
+      for (const mr of mergeRequests) {
+        const ref = inboxRefFrom(mr, access.instanceUrl);
+        if (ref?.platform !== 'gitlab') continue;
+        if (!allowedProjectPaths.has(ref.projectPath.toLowerCase())) continue;
+        // The adapter's author type omits `avatar_url`, but the list API
+        // returns it; narrow instead of asserting the field into existence.
+        const avatarUrl =
+          mr.author && 'avatar_url' in mr.author && typeof mr.author.avatar_url === 'string'
+            ? mr.author.avatar_url
+            : null;
+        items.push({
+          ref,
+          title: mr.title,
+          author: mr.author
+            ? {
+                login: mr.author.username,
+                avatarUrl,
+              }
+            : null,
+          state: mapMergeRequestState(mr.state),
+          draft: isDraftMr(mr),
+          updatedAt: mr.updated_at ?? '',
+        });
+      }
+      // A row inside the set answers this load. A short provider page is the
+      // end of the collection, so there is no further page to walk onto.
+      if (items.length > 0 || mergeRequests.length < GITLAB_PAGE_SIZE) break;
     }
-    return { items, nextCursor: cursorForPage(identity, page, mergeRequests.length) };
+    return { items, nextCursor: cursorForPage(identity, lastPage, lastPageLength) };
   } catch (error) {
     throw classifyInboxError(error, owner);
   }

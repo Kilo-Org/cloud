@@ -251,6 +251,7 @@ export function ModelPickerOptionRow({
   selected,
   selectedVariant,
   isFavorite,
+  showProvider,
   onSelectModel,
   onSelectVariant,
   onToggleFavorite,
@@ -259,6 +260,12 @@ export function ModelPickerOptionRow({
   selected: boolean;
   selectedVariant: string;
   isFavorite: boolean;
+  /**
+   * Whether the row shows its provider line. The list turns it off inside a
+   * provider section, whose header already names the provider; the row's
+   * accessibility label keeps the name either way.
+   */
+  showProvider: boolean;
   onSelectModel: (option: SessionModelOption) => void;
   onSelectVariant: (variant: string) => void;
   onToggleFavorite: (option: SessionModelOption) => void;
@@ -301,7 +308,7 @@ export function ModelPickerOptionRow({
   // it.
   return (
     <View className="border-b border-border">
-      <View className={cn('flex-row items-center gap-3 pr-4', option.unavailable && 'opacity-50')}>
+      <View className="flex-row items-center gap-3 pr-4">
         <Pressable
           className="min-h-9 flex-1 flex-row items-center py-3 pl-4 active:bg-secondary"
           onPress={() => {
@@ -313,17 +320,25 @@ export function ModelPickerOptionRow({
           accessibilityState={{ disabled: option.unavailable, selected }}
         >
           <View className="flex-1">
-            <Text className="text-base text-foreground">{name}</Text>
-            {option.modelRef ? (
+            {/* The disabled cue is the name's muted token, not a row opacity:
+             * the metadata below and the `unavailable` line stay readable,
+             * which a row-level 50% opacity took below 4.5:1. */}
+            <Text
+              className={cn(
+                'text-base',
+                option.unavailable ? 'text-muted-foreground' : 'text-foreground'
+              )}
+            >
+              {name}
+            </Text>
+            {option.modelRef && showProvider ? (
               <Text selectable className="font-mono text-xs text-muted-foreground">
                 {t('agentChat.modelSelector.provider', { id: option.modelRef.providerID })}
               </Text>
             ) : null}
             {option.displayId ? (
               <Text selectable className="font-mono text-xs text-muted-foreground">
-                {option.modelRef
-                  ? t('agentChat.modelSelector.modelId', { id: option.displayId })
-                  : option.displayId}
+                {option.displayId}
               </Text>
             ) : null}
             {costLabel ? <Text className="text-xs text-muted-foreground">{costLabel}</Text> : null}
@@ -333,6 +348,9 @@ export function ModelPickerOptionRow({
               </Text>
             ) : null}
             {showFreeBadge || byok || collectsData || tools || images ? (
+              // The badges state facts about the model, not an affordance, so
+              // an unavailable row leaves their copy at full contrast: the
+              // row's cue is its muted name and the `unavailable` line.
               <View className="mt-1 flex-row items-center gap-1 self-start">
                 {showFreeBadge ? (
                   <View className="rounded-full bg-good px-2 py-0.5">
@@ -362,7 +380,9 @@ export function ModelPickerOptionRow({
           </View>
         </Pressable>
         <View className="w-[18px] items-center justify-center">
-          {selected ? <Check size={18} color={colors.primary} /> : null}
+          {selected ? (
+            <Check size={18} color={option.unavailable ? colors.mutedForeground : colors.primary} />
+          ) : null}
         </View>
         <Pressable
           onPress={() => {

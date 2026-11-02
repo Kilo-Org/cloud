@@ -15,6 +15,7 @@ jest.mock('./dos/AttributionTracker.do', () => ({
   AttributionTrackerDO: class {},
   getAttributionTrackerDO: () => ({ trackAttribution }),
 }));
+const identityChecks = jest.fn(async (_c: unknown, next: () => Promise<void>) => next());
 jest.mock('./util/auth', () => ({
   authMiddleware: async (c: { set: (k: string, v: string) => void }, next: () => Promise<void>) => {
     c.set('user_id', USER_ID);
@@ -23,6 +24,7 @@ jest.mock('./util/auth', () => ({
     c.set('organization_role', 'owner');
     return next();
   },
+  identityMiddleware: (c: unknown, next: () => Promise<void>) => identityChecks(c, next),
 }));
 jest.mock('./util/admin-auth', () => ({
   adminAuthMiddleware: async (_c: unknown, next: () => Promise<void>) => next(),
@@ -282,6 +284,7 @@ describe('attribution tracking request validation', () => {
 
   beforeEach(() => {
     trackAttribution.mockClear().mockReturnValue({ id: 1 });
+    identityChecks.mockClear();
     orgLimit.mockClear().mockResolvedValue({ success: true });
     userLimit.mockClear().mockResolvedValue({ success: true });
   });
@@ -359,6 +362,7 @@ describe('attribution tracking request validation', () => {
     });
 
     expect(response.status).toBe(200);
+    expect(identityChecks).toHaveBeenCalledTimes(1);
     expect(trackAttribution).toHaveBeenCalledTimes(1);
     expect(trackAttribution).toHaveBeenCalledWith({
       ...validPayload(),
@@ -390,6 +394,7 @@ describe('attribution tracking request validation', () => {
     });
 
     expect(response.status).toBe(429);
+    expect(identityChecks).not.toHaveBeenCalled();
     expect(trackAttribution).not.toHaveBeenCalled();
   });
 
@@ -403,6 +408,7 @@ describe('attribution tracking request validation', () => {
     });
 
     expect(response.status).toBe(429);
+    expect(identityChecks).not.toHaveBeenCalled();
     expect(trackAttribution).not.toHaveBeenCalled();
   });
 
@@ -420,6 +426,7 @@ describe('attribution tracking request validation', () => {
     });
 
     expect(response.status).toBe(429);
+    expect(identityChecks).not.toHaveBeenCalled();
     expect(trackAttribution).not.toHaveBeenCalled();
   });
 });

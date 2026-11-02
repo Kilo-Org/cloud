@@ -7,13 +7,13 @@ import { FlashList } from '@shopify/flash-list';
 import { act, type ComponentProps, createElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { FindingListScreen } from './finding-list-screen';
+import { FindingRowSkeleton } from './finding-row-skeleton';
 
 type FindingFixture = {
   id: string;
@@ -100,7 +100,10 @@ vi.mock('@/components/picker-sheet', () => ({ PickerSheet: 'PickerSheet' }));
 vi.mock('@/components/security-agent/finding-filter-modal', () => ({
   FindingFilterModal: 'FindingFilterModal',
 }));
-vi.mock('@/components/security-agent/finding-row', () => ({ FindingRow: 'FindingRow' }));
+vi.mock('@/components/security-agent/finding-row', () => ({
+  FindingRow: 'FindingRow',
+  FINDING_ROW_FRAME_CLASS: 'frame',
+}));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -257,7 +260,7 @@ describe('Security Agent list surfaces', () => {
     findings.isFetching = true;
     findings.fetchStatus = 'fetching';
     const root = await mount();
-    expect(root.findAllByType(Skeleton)).toHaveLength(3);
+    expect(root.findAllByType(FindingRowSkeleton)).toHaveLength(3);
     expect(root.findAllByType(EmptyState)).toHaveLength(0);
     expect(root.findAllByType(QueryError)).toHaveLength(0);
   });
@@ -272,7 +275,7 @@ describe('Security Agent list surfaces', () => {
     const root = await mount();
 
     expect(root.findAllByType(EmptyState)).toHaveLength(0);
-    expect(root.findAllByType(Skeleton)).toHaveLength(0);
+    expect(root.findAllByType(FindingRowSkeleton)).toHaveLength(0);
     const error = root.findByType(QueryError);
     expect(error.props.variant).toBe('offline');
     expect(error.props.message).toBe('securityAgent.findingList.couldNotLoad');
@@ -287,7 +290,7 @@ describe('Security Agent list surfaces', () => {
     findings.fetchStatus = 'paused';
     const root = await mount();
 
-    expect(root.findAllByType(Skeleton)).toHaveLength(3);
+    expect(root.findAllByType(FindingRowSkeleton)).toHaveLength(3);
     expect(root.findAllByType(EmptyState)).toHaveLength(0);
     expect(root.findAllByType(QueryError)).toHaveLength(0);
   });

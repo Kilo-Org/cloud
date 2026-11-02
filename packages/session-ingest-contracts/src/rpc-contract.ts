@@ -141,18 +141,18 @@ export type CanDestroyCloudAgentWorktreeSandboxResult = z.infer<
   typeof canDestroyCloudAgentWorktreeSandboxResultSchema
 >;
 
-export const messageIdSchema = z
-  .string()
-  .startsWith('msg')
-  .refine(id => !id.includes('/') && !id.includes('\u0000'), {
-    message: 'message IDs must not contain / or U+0000',
-  });
-export const partIdSchema = z
-  .string()
-  .startsWith('prt')
-  .refine(id => !id.includes('/') && !id.includes('\u0000'), {
-    message: 'part IDs must not contain / or U+0000',
-  });
+// Message and part ids become storage and item identities, so both refuse `/`
+// and U+0000.
+function createIdSchema(prefix: string, label: string) {
+  return z
+    .string()
+    .startsWith(prefix)
+    .refine(id => !id.includes('/') && !id.includes('\u0000'), {
+      message: `${label} must not contain / or U+0000`,
+    });
+}
+export const messageIdSchema = createIdSchema('msg', 'message IDs');
+export const partIdSchema = createIdSchema('prt', 'part IDs');
 const sdkMetadataSchema = z.record(z.string(), z.unknown());
 
 export const createSessionForCloudAgentSchema = z.object({

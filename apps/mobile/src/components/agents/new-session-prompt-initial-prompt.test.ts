@@ -186,11 +186,15 @@ vi.mock('@/lib/agent-attachments/use-clipboard-paste', () => ({
   },
 }));
 
-vi.mock('@/lib/share-prefill', () => ({
-  useSharePrefill: () => {
-    // no-op hook
+const sharePrefillControl = vi.hoisted(() => ({
+  current: null as null | {
+    failed: boolean;
+    retry: () => void;
+    dismiss: () => void;
   },
 }));
+
+vi.mock('@/lib/share-prefill', () => ({ useSharePrefill: () => sharePrefillControl.current }));
 
 vi.mock('@/lib/voice-input/use-voice-input', () => ({
   useVoiceInput: () => ({
@@ -321,11 +325,48 @@ function defaultProps() {
 
 describe('NewSessionPrompt initialPrompt seed', () => {
   beforeEach(() => {
+    sharePrefillControl.current = {
+      failed: false,
+      retry: vi.fn<() => void>(),
+      dismiss: vi.fn<() => void>(),
+    };
     voiceInputAvailable.current = false;
     returnSendsMessage.current = false;
     layoutDirection.isRTL = false;
     dimensions.current = { fontScale: 1, height: 800, scale: 1, width: 400 };
     textHeightOptions.current = null;
+  });
+
+  it('shows the prefill failure row with retry and discard only when delivery failed', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+    const failedControl = {
+      failed: true,
+      retry: vi.fn<() => void>(),
+      dismiss: vi.fn<() => void>(),
+    };
+    sharePrefillControl.current = failedControl;
+
+    const { SharePrefillFailure } = await import('./share-prefill-failure');
+
+    // eslint-disable-next-line new-cap -- called as plain function, matching repo test convention
+    const failed = NewSessionPrompt({ ...defaultProps(), shareId: 'share-1' });
+    const row = findElementByType(failed, SharePrefillFailure);
+    if (!row) {
+      throw new Error('prefill failure row did not render');
+    }
+    (row.onRetry as () => void)();
+    (row.onDismiss as () => void)();
+    expect(failedControl.retry).toHaveBeenCalledTimes(1);
+    expect(failedControl.dismiss).toHaveBeenCalledTimes(1);
+
+    sharePrefillControl.current = {
+      failed: false,
+      retry: vi.fn<() => void>(),
+      dismiss: vi.fn<() => void>(),
+    };
+    // eslint-disable-next-line new-cap -- called as plain function, matching repo test convention
+    const delivered = NewSessionPrompt({ ...defaultProps(), shareId: 'share-1' });
+    expect(findElementByType(delivered, SharePrefillFailure)).toBeNull();
   });
 
   it.each(TEXT_DIRECTIONS)(

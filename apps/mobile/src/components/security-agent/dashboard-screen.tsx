@@ -20,7 +20,10 @@ import { QueryError } from '@/components/query-error';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { Button } from '@/components/ui/button';
 import { ScreenHeader } from '@/components/screen-header';
-import { DashboardSections } from '@/components/security-agent/dashboard-sections';
+import {
+  DashboardSections,
+  DashboardSectionsSkeleton,
+} from '@/components/security-agent/dashboard-sections';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { severityCountPhrase } from '@/components/security-agent/severity-count-phrase';
@@ -70,6 +73,24 @@ const METRIC_TONE_CLASS = {
   warning: 'text-warn',
   neutral: 'text-muted-foreground',
 } satisfies Record<DashboardMetricTone, string>;
+
+/**
+ * The metric tile's frame, shared with its placeholder so the loading state
+ * cannot drift from the rendered card.
+ */
+const STAT_TILE_CLASS = 'w-[47%] gap-1 rounded-lg bg-secondary p-3';
+
+// One placeholder per tile: the metrics fill four of them with or without SLA
+// deadlines. Each bar is the loaded line's own box at the app's default text
+// size — the `text-xs` label, the `text-xl` value and the `text-[11px]` detail
+// — so the tile's height comes out the same and the loaded cards replace the
+// placeholders without moving anything below them. The detail bar is the one
+// line the loaded tile may not carry, so it is drawn only for the scope shape
+// that carries it.
+const STAT_TILE_PLACEHOLDERS = [0, 1, 2, 3] as const;
+const STAT_LABEL_LINE_CLASS = 'h-4 rounded';
+const STAT_VALUE_LINE_CLASS = 'h-7 rounded';
+const STAT_DETAIL_LINE_CLASS = 'h-[15px] rounded';
 
 export function buildLocalizedMetrics(
   data: DashboardStats,
@@ -186,15 +207,16 @@ export function buildLocalizedMetrics(
   // Before the first sync nothing has been measured, so every tile read a zero
   // count and, under it, a line that described the zeros as a clean report
   // ("All open findings tracked", "No findings have an SLA deadline yet").
-  // A dash in the numeric slot and the screen's own not-yet-synced line state
-  // the measurement is simply absent.
+  // The filter row above already states that nothing has synced, so a dash in
+  // the numeric slot carries the measurement's absence and the tile keeps no
+  // detail line to repeat the status.
   if (!neverSynced) {
     return localized;
   }
   return localized.map(metric =>
     Object.assign(metric, {
       value: UNMEASURED_VALUE,
-      detail: i18n.t('securityAgent.dashboard.notYetSynced'),
+      detail: '',
       tone: 'neutral' as const,
     })
   );
@@ -592,18 +614,53 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
         {/* `isPending` rather than `isLoading`: a NetInfo-paused read is pending
             without fetching, and it must show this skeleton instead of an empty
-            metrics row. */}
-        {dashboardStats.isPending ? (
-          <View className="flex-row flex-wrap gap-3">
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
+            metrics row. The sync-status read joins it because `neverSynced`
+            decides whether a tile carries a detail line: a tile that rendered
+            the measured shape first would shrink by a line the moment the read
+            resolved, which moves the whole dashboard. The section cards join it
+            for the same reason — they render below the tiles only once both
+            reads settle — so their placeholders keep the page's height until
+            then instead of letting the cards push it down. The placeholder
+            takes that shape as soon as the read has answered it: a scope that
+            has never synced replaces these tiles with two-line ones and its
+            Act-first card with a single line, so laying out the synced shape
+            over it would move everything below by a line whenever the stats
+            read outlasts the sync-status read. While the read is still pending
+            the detail line stays, because that is the shape three of the four
+            tiles carry in a scope that has synced and the one a synced scope's
+            first paint must not lose. */}
+        {dashboardStats.isPending || lastSync.isPending ? (
+          <View className="gap-4">
+            <View className="flex-row flex-wrap gap-3">
+              {STAT_TILE_PLACEHOLDERS.map(placeholder => (
+                <View key={placeholder} className={STAT_TILE_CLASS}>
+                  {/* The loaded card's own line boxes: label, value, detail. */}
+                  <Skeleton className={cn('w-2/3', STAT_LABEL_LINE_CLASS)} />
+                  <Skeleton className={cn('w-1/2', STAT_VALUE_LINE_CLASS)} />
+                  {neverSynced ? null : (
+                    <Skeleton className={cn('w-full', STAT_DETAIL_LINE_CLASS)} />
+                  )}
+                </View>
+              ))}
+            </View>
+            {neverSynced && slaEnabled ? (
+              // The Manage repositories link renders whenever SLA tracking is
+              // on and nothing carries a deadline. Before the first sync that
+              // is certain, so the placeholder holds the link's own inline
+              // box and the sections below keep their place when the link
+              // arrives. Once the tiles are measured the link needs a
+              // measured total, which the placeholder cannot read, so a scope
+              // that has synced keeps it out of the loading state.
+              <View className="flex-row items-center gap-4">
+                <Skeleton className={cn('w-32', INLINE_LINK_BOX_CLASS)} />
+              </View>
+            ) : null}
+            <DashboardSectionsSkeleton slaEnabled={slaEnabled} neverSynced={neverSynced} />
           </View>
         ) : (
           <View className="flex-row flex-wrap gap-3">
             {metrics.map(metric => (
-              <View key={metric.label} className="w-[47%] gap-1 rounded-lg bg-secondary p-3">
+              <View key={metric.label} className={STAT_TILE_CLASS}>
                 <Text variant="muted" className="text-xs">
                   {metric.label}
                 </Text>
@@ -615,9 +672,11 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 >
                   {metric.value}
                 </Text>
-                <Text variant="muted" className="text-[11px]">
-                  {metric.detail}
-                </Text>
+                {metric.detail ? (
+                  <Text variant="muted" className="text-[11px]">
+                    {metric.detail}
+                  </Text>
+                ) : null}
               </View>
             ))}
           </View>
@@ -661,7 +720,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           />
         ) : null}
 
-        {data ? (
+        {/* The Act first card's body depends on `neverSynced` too, so it waits
+            for the sync-status read rather than swapping one shape for the
+            other once the read resolves. */}
+        {data && !lastSync.isPending ? (
           <DashboardSections
             scope={scope}
             data={data}

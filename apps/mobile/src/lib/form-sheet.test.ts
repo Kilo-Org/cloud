@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useFormSheetDetents, useFormSheetScreenOptions } from '@/lib/form-sheet';
+import {
+  sheetHeaderTopClearance,
+  type SheetHeaderTopInset,
+  useFormSheetDetents,
+  useFormSheetScreenOptions,
+  useSheetHeaderTopClearance,
+} from '@/lib/form-sheet';
 
 const mocks = vi.hoisted(() => {
   const platform = { OS: 'android' as string };
@@ -102,5 +108,87 @@ describe('useFormSheetScreenOptions', () => {
       sheetShouldOverflowTopInset: true,
       contentStyle: { backgroundColor: '#101010' },
     });
+  });
+});
+
+describe('sheetHeaderTopClearance', () => {
+  const clearance = (
+    topInset: SheetHeaderTopInset,
+    platform: string,
+    insets: { screen?: number; window?: number; statusBar?: number } = {}
+  ) =>
+    sheetHeaderTopClearance({
+      topInset,
+      platform,
+      screenTopInset: insets.screen ?? 0,
+      windowTopInset: insets.window ?? 0,
+      statusBarHeight: insets.statusBar ?? 0,
+    });
+
+  it('clears the status bar on every platform for a surface that owns the window top', () => {
+    expect(clearance('always', 'android', { screen: 51.81, window: 51.81, statusBar: 51.81 })).toBe(
+      51.81
+    );
+    expect(clearance('always', 'ios', { screen: 59, window: 59 })).toBe(59);
+  });
+
+  it('falls back to the status-bar height while the window inset is unresolved', () => {
+    expect(clearance('always', 'android', { statusBar: 51.81 })).toBe(51.81);
+    // The Android surface reaches the window top, so the resolution of the
+    // window inset must not change the reserve the first frame already had —
+    // that change is the 51.8 dp header shift.
+    expect(clearance('android-window-top', 'android', { statusBar: 51.81 })).toBe(51.81);
+    expect(
+      clearance('android-window-top', 'android', { screen: 51.81, window: 51.81, statusBar: 51.81 })
+    ).toBe(51.81);
+  });
+
+  it('reserves nothing over the iOS sheet that presents below the status bar', () => {
+    const ios = { screen: 59, window: 59 };
+
+    expect(clearance('android-window-top', 'ios', ios)).toBe(0);
+    expect(clearance('bottom-form-sheet', 'ios', ios)).toBe(0);
+    expect(clearance('ios-page-sheet', 'ios', ios)).toBe(0);
+    expect(clearance('never', 'ios', ios)).toBe(0);
+  });
+
+  it('leaves the detent-capped Android sheet edge to clear the status bar', () => {
+    expect(
+      clearance('bottom-form-sheet', 'android', {
+        screen: 51.81,
+        window: 51.81,
+        statusBar: 51.81,
+      })
+    ).toBe(0);
+    // A window with no inset of its own leaves the sheet edge at the window
+    // top, where the header clears the status bar and the landscape corner.
+    expect(clearance('bottom-form-sheet', 'android')).toBe(0);
+    expect(clearance('bottom-form-sheet', 'android', { screen: 24 })).toBe(24);
+  });
+
+  it('reserves nothing for a sheet that never reaches the window top', () => {
+    const android = { screen: 51.81, window: 51.81, statusBar: 51.81 };
+
+    expect(clearance('never', 'android', android)).toBe(0);
+    expect(clearance('ios-page-sheet', 'android', android)).toBe(0);
+  });
+});
+
+describe('useSheetHeaderTopClearance', () => {
+  beforeEach(() => {
+    mocks.platform.OS = 'android';
+    mocks.insets.top = 0;
+    mocks.statusBar.currentHeight = null;
+    vi.clearAllMocks();
+  });
+
+  it('keeps the first frame settled while the window inset is still unresolved', () => {
+    mocks.statusBar.currentHeight = 51.81;
+
+    expect(useSheetHeaderTopClearance('android-window-top')).toBe(51.81);
+
+    mocks.insets.top = 51.81;
+
+    expect(useSheetHeaderTopClearance('android-window-top')).toBe(51.81);
   });
 });

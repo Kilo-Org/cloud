@@ -44,9 +44,11 @@
   --radius: 0.625rem;
 
   /* Selected-state fill of an in-page tab pill, and its label. The fill is the
-   * accent at the luminance its own label carries: the muted olive in both
-   * themes, because the dark accent (#ffdd00) as a full pill glares on the dark
-   * page and pulls focus from the panel the tab selects. */
+   * accent at the luminance its own label carries: the light primary's olive,
+   * because the dark accent (#ffdd00) as a full pill glares on the dark page
+   * and pulls focus from the panel the tab selects. The dark theme keeps the
+   * hue and lifts its value so the fill still stands off the near-black page
+   * (see the dark block). */
   --selection: #4f5a10;
   --selection-foreground: #ffffff;
 
@@ -167,9 +169,14 @@
     --ring: #ffdd00;
     --radius: 0.625rem;
 
-    /* The muted olive on the dark page: the dark accent (#ffdd00) as a full
-     * pill glares and pulls focus from the panel the tab selects. */
-    --selection: #4f5a10;
+    /* The dark page lifts the same olive hue: the dark accent (#ffdd00) as a
+     * full pill glares and pulls focus from the panel the tab selects, but the
+     * light olive (#4f5a10) itself stands only 2.6:1 off `--background` and
+     * 2.2:1 off `--secondary`, under the 3:1 WCAG asks of a selected-state
+     * fill. This value keeps the light olive's hue (h~69) at 3.6:1 off the
+     * page and 3.1:1 off `--secondary` while `--selection-foreground` stays
+     * 4.7:1 on it. */
+    --selection: #647214;
     --selection-foreground: #f2f0eb;
 
     /* Focus-only tokens */

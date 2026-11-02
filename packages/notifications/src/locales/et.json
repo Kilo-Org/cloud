@@ -3,7 +3,7 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Sinu agendi seansil on uuendus",
-      "chatMessage": "Teil on uus sõnum",
+      "chatMessage": "Sul on uus sõnum",
       "instanceLifecycle": "Sinu eksemplaril on uuendus",
       "scheduledAction": "Planeeritud toimingul on uuendus",
       "lowBalance": "Sinu saldo vajab tähelepanu",
@@ -49,15 +49,15 @@
     },
     "securityFindingNew": {
       "title": "Uus turbetuvastus ({{severity}})",
-      "body": "{{findingTitle}} saidis {{repoFullName}}"
+      "body": "{{findingTitle}} hoidlas {{repoFullName}}"
     },
     "securityFindingSlaWarning": {
       "title": "SLA hoiatus",
-      "body": "{{findingTitle}} saidis {{repoFullName}}"
+      "body": "{{findingTitle}} hoidlas {{repoFullName}}"
     },
     "securityFindingSlaBreach": {
       "title": "SLA rikkumine",
-      "body": "{{findingTitle}} saidis {{repoFullName}}"
+      "body": "{{findingTitle}} hoidlas {{repoFullName}}"
     },
     "securityLifecycle": {
       "title": "Kilo",

@@ -13,8 +13,8 @@ import {
   type KiloCommandSource,
   type KiloCommandUpdatePayload,
 } from '@/components/profiles/profile-kilo-commands-model';
+import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -275,7 +275,11 @@ export function ProfileKiloCommandsScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profiles.slashCommands.title')} />
+      <ProfileSectionHeader
+        profileId={profileId}
+        organizationId={organizationId}
+        title={t('profiles.slashCommands.title')}
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"

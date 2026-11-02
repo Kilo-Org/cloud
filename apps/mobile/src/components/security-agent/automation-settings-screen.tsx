@@ -179,7 +179,12 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
     dirty,
     valid,
-    onSave: handleSave,
+    // These screens never ask a destructive question of their own: a save
+    // here always persists.
+    onSave: async () => {
+      await handleSave();
+      return 'saved';
+    },
   });
 
   if (config.isError && !config.data) {
@@ -229,91 +234,99 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('securityAgent.automation.autoAnalysis')}
           </Text>
-          <ToggleRow
-            title={t('securityAgent.automation.enableAutoAnalysis')}
-            subtitle={t('securityAgent.automation.enableAutoAnalysisSubtitle')}
-            value={autoAnalysisEnabled}
-            disabled={!canManage}
-            onValueChange={setAutoAnalysisEnabled}
-          />
-          {autoAnalysisEnabled && (
-            <>
-              <PillGroup
-                label={t('securityAgent.automation.minimumSeverity')}
-                options={minSeverityOptions}
-                value={autoAnalysisMinSeverity}
-                disabled={!canManage}
-                onChange={setAutoAnalysisMinSeverity}
-              />
-              <ToggleRow
-                title={t('securityAgent.automation.includeExistingFindings')}
-                subtitle={t('securityAgent.automation.includeExistingFindingsAnalysisSubtitle')}
-                value={autoAnalysisIncludeExisting}
-                disabled={!canManage}
-                onValueChange={setAutoAnalysisIncludeExisting}
-              />
-            </>
-          )}
+          <View className="gap-2">
+            <ToggleRow
+              title={t('securityAgent.automation.enableAutoAnalysis')}
+              subtitle={t('securityAgent.automation.enableAutoAnalysisSubtitle')}
+              value={autoAnalysisEnabled}
+              disabled={!canManage}
+              onValueChange={setAutoAnalysisEnabled}
+            />
+            {autoAnalysisEnabled && (
+              <>
+                <PillGroup
+                  label={t('securityAgent.automation.minimumSeverity')}
+                  options={minSeverityOptions}
+                  value={autoAnalysisMinSeverity}
+                  disabled={!canManage}
+                  onChange={setAutoAnalysisMinSeverity}
+                />
+                <ToggleRow
+                  title={t('securityAgent.automation.includeExistingFindings')}
+                  subtitle={t('securityAgent.automation.includeExistingFindingsAnalysisSubtitle')}
+                  value={autoAnalysisIncludeExisting}
+                  disabled={!canManage}
+                  onValueChange={setAutoAnalysisIncludeExisting}
+                />
+              </>
+            )}
+          </View>
         </View>
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('securityAgent.automation.autoRemediation')}
           </Text>
-          <ToggleRow
-            title={t('securityAgent.automation.enableAutoRemediation')}
-            subtitle={t('securityAgent.automation.enableAutoRemediationSubtitle')}
-            value={autoRemediationEnabled}
-            disabled={!canManage}
-            onValueChange={handleAutoRemediationToggle}
-          />
-          {autoRemediationEnabled && (
-            <>
-              <PillGroup
-                label={t('securityAgent.automation.minimumSeverity')}
-                options={minSeverityOptions}
-                value={autoRemediationMinSeverity}
-                disabled={!canManage}
-                onChange={setAutoRemediationMinSeverity}
-              />
-              <ToggleRow
-                title={t('securityAgent.automation.includeExistingFindings')}
-                subtitle={t('securityAgent.automation.includeExistingFindingsRemediationSubtitle')}
-                value={autoRemediationIncludeExisting}
-                disabled={!canManage}
-                onValueChange={setAutoRemediationIncludeExisting}
-              />
-              <ToggleRow
-                title={t('securityAgent.automation.requireApproval')}
-                subtitle={t('securityAgent.automation.requireApprovalSubtitle')}
-                value={autoRemediationRequireApproval}
-                disabled={!canManage}
-                onValueChange={setAutoRemediationRequireApproval}
-              />
-            </>
-          )}
+          <View className="gap-2">
+            <ToggleRow
+              title={t('securityAgent.automation.enableAutoRemediation')}
+              subtitle={t('securityAgent.automation.enableAutoRemediationSubtitle')}
+              value={autoRemediationEnabled}
+              disabled={!canManage}
+              onValueChange={handleAutoRemediationToggle}
+            />
+            {autoRemediationEnabled && (
+              <>
+                <PillGroup
+                  label={t('securityAgent.automation.minimumSeverity')}
+                  options={minSeverityOptions}
+                  value={autoRemediationMinSeverity}
+                  disabled={!canManage}
+                  onChange={setAutoRemediationMinSeverity}
+                />
+                <ToggleRow
+                  title={t('securityAgent.automation.includeExistingFindings')}
+                  subtitle={t(
+                    'securityAgent.automation.includeExistingFindingsRemediationSubtitle'
+                  )}
+                  value={autoRemediationIncludeExisting}
+                  disabled={!canManage}
+                  onValueChange={setAutoRemediationIncludeExisting}
+                />
+                <ToggleRow
+                  title={t('securityAgent.automation.requireApproval')}
+                  subtitle={t('securityAgent.automation.requireApprovalSubtitle')}
+                  value={autoRemediationRequireApproval}
+                  disabled={!canManage}
+                  onValueChange={setAutoRemediationRequireApproval}
+                />
+              </>
+            )}
+          </View>
         </View>
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('securityAgent.automation.autoDismiss')}
           </Text>
-          <ToggleRow
-            title={t('securityAgent.automation.enableAutoDismiss')}
-            subtitle={t('securityAgent.automation.enableAutoDismissSubtitle')}
-            value={autoDismissEnabled}
-            disabled={!canManage}
-            onValueChange={setAutoDismissEnabled}
-          />
-          {autoDismissEnabled && (
-            <PillGroup
-              label={t('securityAgent.automation.confidenceThreshold')}
-              options={confidenceOptions}
-              value={autoDismissConfidenceThreshold}
+          <View className="gap-2">
+            <ToggleRow
+              title={t('securityAgent.automation.enableAutoDismiss')}
+              subtitle={t('securityAgent.automation.enableAutoDismissSubtitle')}
+              value={autoDismissEnabled}
               disabled={!canManage}
-              onChange={setAutoDismissConfidenceThreshold}
+              onValueChange={setAutoDismissEnabled}
             />
-          )}
+            {autoDismissEnabled && (
+              <PillGroup
+                label={t('securityAgent.automation.confidenceThreshold')}
+                options={confidenceOptions}
+                value={autoDismissConfidenceThreshold}
+                disabled={!canManage}
+                onChange={setAutoDismissConfidenceThreshold}
+              />
+            )}
+          </View>
         </View>
 
         {!canManage && (

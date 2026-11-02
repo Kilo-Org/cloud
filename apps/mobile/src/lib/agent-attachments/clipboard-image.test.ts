@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   decodedBase64ByteLength,
   hasClipboardImage,
+  hasClipboardText,
   hasClipboardUrl,
   parseClipboardImageData,
   readClipboardImageFile,
@@ -57,12 +58,14 @@ vi.mock('expo-file-system', () => ({
 
 const clipboardMock = vi.hoisted(() => ({
   hasImageAsync: vi.fn(),
+  hasStringAsync: vi.fn(),
   hasUrlAsync: vi.fn(),
   getImageAsync: vi.fn(),
 }));
 
 vi.mock('expo-clipboard', () => ({
   hasImageAsync: clipboardMock.hasImageAsync,
+  hasStringAsync: clipboardMock.hasStringAsync,
   hasUrlAsync: clipboardMock.hasUrlAsync,
   getImageAsync: clipboardMock.getImageAsync,
 }));
@@ -158,6 +161,18 @@ describe('hasClipboardUrl', () => {
   it('returns false when hasUrlAsync rejects', async () => {
     clipboardMock.hasUrlAsync.mockRejectedValue(new Error('denied'));
     await expect(hasClipboardUrl()).resolves.toBe(false);
+  });
+});
+
+describe('hasClipboardText', () => {
+  it('returns true when hasStringAsync resolves true', async () => {
+    clipboardMock.hasStringAsync.mockResolvedValue(true);
+    await expect(hasClipboardText()).resolves.toBe(true);
+  });
+
+  it('returns false when hasStringAsync rejects', async () => {
+    clipboardMock.hasStringAsync.mockRejectedValue(new Error('unavailable'));
+    await expect(hasClipboardText()).resolves.toBe(false);
   });
 });
 

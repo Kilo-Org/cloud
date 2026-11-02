@@ -7,6 +7,7 @@ import postcss from 'postcss';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
 
 import {
+  COMPACT_BUTTON_HIT_SLOP,
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP_DP,
   COMPACT_H11_FRAME_DP,
@@ -18,6 +19,7 @@ import {
   DENSE_ROW_FRAME_DP,
   DENSE_ROW_HIT_SLOP,
   DENSE_ROW_HIT_SLOP_DP,
+  HEADER_TITLE_TARGET_CLASS,
   ICON_TARGET_BOX_CLASS,
   ICON_TARGET_DP,
   INLINE_LINK_BOX_CLASS,
@@ -152,12 +154,39 @@ describe('shared tap-target geometry', () => {
     expect(height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
   });
 
+  it('renders a screen header title control on its own 48dp node', async () => {
+    // The regression this guards: a header title composed of its own content
+    // (the chat title's rename pressable) reported its text line's 24.8dp as
+    // its own rect, and `hitSlop` never lifts the rect a control-size audit
+    // reads. The header row is already 48dp tall, so the frame grows only the
+    // control's own node.
+    const height = await compiledDp(HEADER_TITLE_TARGET_CLASS, 'minHeight');
+    expect(height).toBe(ICON_TARGET_DP);
+    expect(height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+  });
+
   it('reaches the design touch target with the compact box plus its slop', () => {
     expect(tapTargetReachDp(32, 8)).toBe(48);
     expect(tapTargetReachDp(32, COMPACT_CONTROL_HIT_SLOP_DP)).toBe(48);
     expect(tapTargetReachDp(32, COMPACT_CONTROL_HIT_SLOP_DP)).toBeGreaterThanOrEqual(
       TOUCH_TARGET_DP
     );
+  });
+
+  it('carries the compact button frame past the design target with its slop', () => {
+    // The regression this guards: the 36dp `sm` frame renders 35.81dp at
+    // density 420, so 4 per side measured 43.81dp — under `DESIGN.md`'s 44pt.
+    expect(COMPACT_BUTTON_HIT_SLOP.top).toBe(5);
+    expect(COMPACT_BUTTON_HIT_SLOP.top).toBe(COMPACT_BUTTON_HIT_SLOP.bottom);
+    expect(COMPACT_BUTTON_HIT_SLOP.left).toBe(COMPACT_BUTTON_HIT_SLOP.top);
+    expect(COMPACT_BUTTON_HIT_SLOP.right).toBe(COMPACT_BUTTON_HIT_SLOP.top);
+    const measuredFrameDp = 35.81;
+    expect(
+      measuredFrameDp + COMPACT_BUTTON_HIT_SLOP.top + COMPACT_BUTTON_HIT_SLOP.bottom
+    ).toBeGreaterThan(TOUCH_TARGET_DP);
+    expect(
+      measuredFrameDp + COMPACT_BUTTON_HIT_SLOP.left + COMPACT_BUTTON_HIT_SLOP.right
+    ).toBeGreaterThan(TOUCH_TARGET_DP);
   });
 
   it('keeps the measured h-11 frame at or above the audit floor and reaches the design target', () => {

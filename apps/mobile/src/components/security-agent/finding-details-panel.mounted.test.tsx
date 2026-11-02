@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted harness covers the panel's advisory routing, chip row, dismissal copy, dates block and identifier rows */
 // The details panel's advisory control uses the same link route as the other
 // finding surfaces: a supported review link navigates in-app, everything else
 // goes through the shared external-link helper.
@@ -345,5 +346,114 @@ describe('FindingDetailsPanel dates block', () => {
       'securityAgent.findingDetails.detected',
       'common.updated',
     ]);
+  });
+});
+
+describe('FindingDetailsPanel identifier values', () => {
+  beforeEach(() => {
+    mocks.kvRows.length = 0;
+    mocks.deadlineState = { kind: 'no-deadline' };
+    mocks.supersedingFindingId = null;
+  });
+
+  /** The captured row for a label; fails the test when the panel did not draw it. */
+  function identifierRow(label: string): Record<string, unknown> {
+    const row = mocks.kvRows.find(candidate => candidate.label === label);
+    expect(row, `the panel draws the ${label} row`).toBeDefined();
+    return row as Record<string, unknown>;
+  }
+
+  // A version range's `<` is neutral, so every row that carries a technical
+  // token names its own base direction; the labels beside them keep the
+  // interface direction. The repository is not one of them: the screen header
+  // already names it, so this card does not draw a row for it.
+  it('names the left-to-right direction of every identifier row', () => {
+    renderPanel(findingFixture());
+
+    for (const label of [
+      'securityAgent.findingDetails.package',
+      'securityAgent.findingDetails.vulnerableVersions',
+      'securityAgent.findingDetails.patchedVersion',
+      'securityAgent.findingDetails.cve',
+      'securityAgent.findingDetails.ghsa',
+      'securityAgent.findingDetails.manifest',
+      'securityAgent.findingDetails.sourceId',
+    ]) {
+      expect(identifierRow(label).valueDirection).toBe('ltr');
+    }
+  });
+
+  // The header eyebrow directly above the card already names the repository,
+  // so the details list does not repeat it in a row of its own.
+  it('leaves the repository to the header eyebrow', () => {
+    renderPanel(findingFixture());
+
+    expect(mocks.kvRows.map(row => row.label)).not.toContain('common.repository');
+    for (const label of [
+      'securityAgent.findingDetails.package',
+      'securityAgent.findingDetails.manifest',
+    ]) {
+      identifierRow(label);
+    }
+  });
+
+  // The absence of a version renders as translated copy, which keeps the
+  // interface's own direction. Both rows still render, so a regression that
+  // hides them when the value is absent fails here instead of passing.
+  it('keeps the translated absence of a version in the interface direction', () => {
+    renderPanel(findingFixture({ vulnerable_version_range: null, patched_version: null }));
+
+    expect(
+      identifierRow('securityAgent.findingDetails.vulnerableVersions').valueDirection
+    ).toBeUndefined();
+    expect(
+      identifierRow('securityAgent.findingDetails.patchedVersion').valueDirection
+    ).toBeUndefined();
+  });
+});
+
+describe('FindingDetailsPanel facts card divider', () => {
+  // The card's rows decide which one suppresses the hairline under it. Without
+  // the manifest, or without an advisory id, the card still has to end cleanly
+  // on whatever row it draws last.
+  const FACT_LABELS: Record<string, true> = {
+    'securityAgent.findingDetails.package': true,
+    'securityAgent.findingDetails.vulnerableVersions': true,
+    'securityAgent.findingDetails.patchedVersion': true,
+    'securityAgent.findingDetails.cve': true,
+    'securityAgent.findingDetails.ghsa': true,
+    'securityAgent.findingDetails.manifest': true,
+  };
+
+  beforeEach(() => {
+    mocks.kvRows.length = 0;
+    mocks.deadlineState = { kind: 'no-deadline' };
+    mocks.supersedingFindingId = null;
+  });
+
+  it.each([
+    { name: 'manifest row', overrides: {}, lastLabel: 'securityAgent.findingDetails.manifest' },
+    {
+      name: 'ghsa row',
+      overrides: { manifest_path: null },
+      lastLabel: 'securityAgent.findingDetails.ghsa',
+    },
+    {
+      name: 'cve row',
+      overrides: { manifest_path: null, ghsa_id: null },
+      lastLabel: 'securityAgent.findingDetails.cve',
+    },
+    {
+      name: 'patched-version row',
+      overrides: { manifest_path: null, ghsa_id: null, cve_id: null },
+      lastLabel: 'securityAgent.findingDetails.patchedVersion',
+    },
+  ])('ends the card on the $name', ({ overrides, lastLabel }) => {
+    renderPanel(findingFixture(overrides));
+
+    const rows = mocks.kvRows.filter(row => FACT_LABELS[row.label as string]);
+    expect(rows.at(-1)?.label).toBe(lastLabel);
+    expect(rows.filter(row => row.last === true)).toHaveLength(1);
+    expect(rows.at(-1)?.last).toBe(true);
   });
 });

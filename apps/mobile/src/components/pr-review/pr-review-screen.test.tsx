@@ -623,7 +623,7 @@ describe('PrReviewScreen Overview scrolling', () => {
       node: element,
       type: 'DetailScreenScrollView',
       prop: 'contentContainerClassName',
-      value: 'gap-5 px-4',
+      value: 'gap-5 px-4 pt-3',
     });
   }
 

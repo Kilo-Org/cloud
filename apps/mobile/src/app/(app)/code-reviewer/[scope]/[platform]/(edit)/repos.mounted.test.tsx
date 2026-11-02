@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { act } from '@/test/renderer';
+import { enteringAncestors } from '@/components/code-reviewer/entering-animation.test-helpers';
 import ReposRoute from './repos';
 import {
   renderWithProviders,
@@ -455,6 +456,24 @@ describe('repository picker config read states', () => {
     );
 
     expect(state.queryErrorProps).toHaveLength(0);
+    unmount();
+  });
+
+  it('paints the repository rows with no entering animation above them', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(
+      () => renderer.root.findAll(node => String(node.type) === 'RepoToggleRow').length === 2
+    );
+
+    // A Reanimated entering animation carries `initialValues: { opacity: 0 }`,
+    // so a row mounted under one stays invisible whenever that entrance is
+    // cancelled or overwritten, under a painted header with no explanation.
+    const row = renderer.root.findAll(node => String(node.type) === 'RepoToggleRow')[0];
+    if (!row) {
+      throw new Error('the repository rows were not rendered');
+    }
+    expect(enteringAncestors(row)).toEqual([]);
     unmount();
   });
 });

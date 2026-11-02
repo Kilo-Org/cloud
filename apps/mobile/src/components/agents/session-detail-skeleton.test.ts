@@ -4,12 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { SessionReadOnlyFooterPlaceholder } from './session-detail-skeleton';
 
 // Vitest hoists these above the component import, which is what keeps the real
-// skeleton, blur bar and reanimated out of this suite.
+// skeleton and blur bar out of this suite.
 vi.mock('react-native', () => ({ View: 'View' }));
-vi.mock('react-native-reanimated', () => ({
-  default: { View: 'AnimatedView' },
-  FadeOut: { duration: () => ({}) },
-}));
 vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 

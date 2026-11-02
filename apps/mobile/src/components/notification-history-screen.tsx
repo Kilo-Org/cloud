@@ -118,7 +118,14 @@ export function NotificationHistoryScreen() {
   const items = flatItems;
   const hasListContent = items.length > 0 || query.isFetchNextPageError;
   // A query that is disabled never leaves `pending`; only a signed-in read can.
-  const loading = authToken != null && query.isPending && !query.isError;
+  // The push banner and the filter chips both sit above the list, so the list
+  // waits for the same reads they do: a row that settles first is pushed down
+  // by whichever of them mounts later. The banner is the late one: it mounts
+  // when the push gate answers, its height follows the copy and the wrap, so
+  // nothing can reserve it in advance.
+  const gatePending = authToken != null && !gate.settled;
+  const bodyPending = authToken != null && (gatePending || preferences.isPending);
+  const loading = authToken != null && !query.isError && (bodyPending || query.isPending);
   const failure = !loading && query.isError && !hasListContent;
 
   const openRow = useCallback(
@@ -204,7 +211,7 @@ export function NotificationHistoryScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('notifications.history.title')} showBackButton />
       <View className="flex-1">
-        {gate.settled && !gate.pushEnabled ? (
+        {gate.settled && gate.answered && !gate.pushEnabled ? (
           <View className="mx-4 mb-3 gap-2 rounded-lg border border-border bg-card p-3">
             <View className="flex-row items-center gap-2">
               <BellOff size={16} color={colors.mutedForeground} />
@@ -222,7 +229,7 @@ export function NotificationHistoryScreen() {
           </View>
         ) : null}
 
-        {preferences.isPending && authToken != null ? (
+        {bodyPending ? (
           <View className="mx-4 mb-3 flex-row gap-2">
             <Skeleton className="h-8 w-16 rounded-full" />
             <Skeleton className="h-8 w-24 rounded-full" />

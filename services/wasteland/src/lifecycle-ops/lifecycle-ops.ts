@@ -7,13 +7,16 @@
  *  1. Resolves DoltHub auth + fork coordinates via the local
  *     `loadContext` helper.
  *  2. Calls the matching `*ViaSdk` inner function.
- *  3. Persists the resolved `rig_handle` (and DoltHub username) onto
+ *  3. Persists the verified `rig_handle` (and DoltHub username) onto
  *     the wasteland's stored credential so subsequent ops resolve the
- *     same handle the join PR was opened under.
+ *     same handle the join PR was opened under. The handle is only
+ *     written after the SDK join proved the caller owns it.
  *  4. Emits a billing meter event.
  */
 
 import { WantedBoardOpError } from '../wanted-board/errors';
+import { rigHandleFormatError } from '@kilocode/wl-sdk';
+import { credentialProvesOrg } from '../dos/wasteland/credentials';
 import { getWastelandDOStub } from '../dos/Wasteland.do';
 import { deriveEncryptionKey, encryptToken, decryptToken } from '../util/crypto.util';
 import { resolveSecret } from '../util/secret.util';
@@ -78,9 +81,21 @@ async function loadContext(
     );
   }
 
+  // A credential whose recorded proof covers this same org already
+  // established it with a DoltHub write, so a re-join may reuse that
+  // proof — the only way a connection made under a DoltHub org, whose
+  // token belongs to a member username, can join again once its fork
+  // exists. The fresh-username path needs none: there the org is the
+  // token's own account.
+  const orgProven = fresh.status !== 'ok' && credentialProvesOrg(credential, dolthubOrg);
+
+  // The handle becomes the caller's identity once the join persists it:
+  // validate the format here so a malformed value never reaches the
+  // registration DML or a credential row.
   const trimmedHandle = input.rigHandle.trim();
-  if (trimmedHandle.length === 0) {
-    throw new WantedBoardOpError('Rig handle is required', 'PRECONDITION_FAILED');
+  const handleError = rigHandleFormatError(trimmedHandle);
+  if (handleError !== null) {
+    throw new WantedBoardOpError(handleError, 'PRECONDITION_FAILED');
   }
 
   const displayName = input.rigDisplayName?.trim() || trimmedHandle;
@@ -133,6 +148,7 @@ async function loadContext(
     ownerEmail,
     token,
     tokenSource: 'stored',
+    orgProven,
   };
 }
 
@@ -205,6 +221,11 @@ async function persistCredential(
     encryptedToken,
     dolthubOrg: ctx.forkOrg,
     rigHandle,
+    // A successful join established this org with DoltHub: the fork was
+    // created under it, the registration write landed in its fork, or
+    // the credential already carried that proof. Record it so later
+    // joins can reuse it, and so nothing trusts a handle alone.
+    provenOrg: ctx.forkOrg,
     isUpstreamAdmin: existing?.is_upstream_admin ?? false,
   });
 }

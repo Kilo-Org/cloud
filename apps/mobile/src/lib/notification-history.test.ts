@@ -21,8 +21,8 @@ describe('notificationHistoryCopy', () => {
       'de'
     );
 
-    expect(copy.title).toBe('Warnung bei niedrigem Guthaben');
-    expect(copy.body).toBe('Das Guthaben von Acme fiel unter $5');
+    expect(copy.headline).toBe('Warnung bei niedrigem Guthaben');
+    expect(copy.detail).toBe('Das Guthaben von Acme fiel unter $5');
   });
 
   it('renders English copy for a locale the push catalog does not carry', () => {
@@ -32,8 +32,8 @@ describe('notificationHistoryCopy', () => {
     );
 
     expect(copy).toEqual({
-      title: 'Low balance alert',
-      body: 'Acme balance fell below $5',
+      headline: 'Low balance alert',
+      detail: 'Acme balance fell below $5',
     });
   });
 
@@ -48,7 +48,7 @@ describe('notificationHistoryCopy', () => {
       'de'
     );
 
-    expect(copy).toEqual({ title: 'Stored title', body: 'Stored body' });
+    expect(copy).toEqual({ headline: 'Stored title', detail: 'Stored body' });
   });
 
   it('uses the stored copy for a push that carried no catalog key', () => {
@@ -57,7 +57,61 @@ describe('notificationHistoryCopy', () => {
       'de'
     );
 
-    expect(copy).toEqual({ title: 'Raw title', body: 'Raw body' });
+    expect(copy).toEqual({ headline: 'Raw title', detail: 'Raw body' });
+  });
+
+  it('leads with the message when the catalog title is only the app name', () => {
+    const copy = notificationHistoryCopy(
+      {
+        i18nKey: 'internal.securityLifecycle',
+        i18nParams: null,
+        title: 'Kilo',
+        body: 'A security finding needs attention',
+      },
+      'en'
+    );
+
+    expect(copy).toEqual({ headline: 'A security finding needs attention', detail: null });
+  });
+
+  it('matches the app name of the row language, not the English one', () => {
+    const copy = notificationHistoryCopy(
+      {
+        i18nKey: 'internal.securityLifecycle',
+        i18nParams: null,
+        title: 'I-Kilo',
+        body: 'Okutholakele kokuphepha kudinga ukunakwa',
+      },
+      'zu'
+    );
+
+    expect(copy).toEqual({
+      headline: 'Okutholakele kokuphepha kudinga ukunakwa',
+      detail: null,
+    });
+  });
+
+  it('leads with the message of a stored copy that only names the app', () => {
+    const copy = notificationHistoryCopy(
+      { i18nKey: null, i18nParams: null, title: 'Kilo', body: 'New message' },
+      'en'
+    );
+
+    expect(copy).toEqual({ headline: 'New message', detail: null });
+  });
+
+  it('keeps the title of a session the user named after the app', () => {
+    const copy = notificationHistoryCopy(
+      {
+        i18nKey: 'cloudAgentSession.completed',
+        i18nParams: { sessionTitle: 'Kilo' },
+        title: 'Kilo',
+        body: 'Task completed',
+      },
+      'en'
+    );
+
+    expect(copy).toEqual({ headline: 'Kilo', detail: 'Task completed' });
   });
 });
 

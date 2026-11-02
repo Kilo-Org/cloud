@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { NextRequest } from 'next/server';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { createOAuthState } from '@/lib/integrations/oauth-state';
@@ -64,6 +65,8 @@ const mockedExchangeDiscordCode = jest.mocked(exchangeDiscordCode);
 const mockedUpsertDiscordInstallation = jest.mocked(upsertDiscordInstallation);
 const mockedConsumeProviderOAuthAttempt = jest.mocked(consumeProviderOAuthAttempt);
 const mockedWithWorkspaceInstallationLock = jest.mocked(withWorkspaceInstallationLock);
+const mockedCaptureMessage = jest.mocked(captureMessage);
+const mockedCaptureException = jest.mocked(captureException);
 
 const GUILD_ID = '123456789012345678';
 
@@ -85,6 +88,28 @@ function expectRedirectLocation(response: Response, expectedPathWithQuery: strin
 
 function callDiscordCallback(request: NextRequest) {
   return handleDiscordOAuthCallback(request);
+}
+
+function makeCallbackRequest(query: string) {
+  return new NextRequest(`http://localhost:3000/api/integrations/discord/callback?${query}`);
+}
+
+/** Every captured diagnostic carries the shared callback context and nothing raw. */
+function expectRedactedDiagnostic(state: string, code?: string) {
+  const calls = [...mockedCaptureMessage.mock.calls, ...mockedCaptureException.mock.calls];
+  expect(calls).toHaveLength(1);
+  const context = calls[0]![1] as { extra?: Record<string, unknown> };
+  expect(context.extra).toEqual(
+    expect.objectContaining({
+      hasState: true,
+      stateHash: expect.stringMatching(/^[0-9a-f]{8}$/),
+    })
+  );
+  expect(context.extra).not.toHaveProperty('state');
+  expect(context.extra).not.toHaveProperty('code');
+  const serialized = JSON.stringify(context);
+  expect(serialized).not.toContain(state);
+  if (code) expect(serialized).not.toContain(code);
 }
 
 describe('handleDiscordOAuthCallback', () => {
@@ -274,5 +299,64 @@ describe('handleDiscordOAuthCallback', () => {
     expect(mockedConsumeProviderOAuthAttempt).toHaveBeenCalledTimes(1);
     expect(mockedExchangeDiscordCode).not.toHaveBeenCalled();
     expect(mockedUpsertDiscordInstallation).not.toHaveBeenCalled();
+  });
+
+  test('reports a provider error with the shared callback context', async () => {
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+      provider: 'discord',
+      purpose: 'provider_install',
+    });
+
+    const response = await callDiscordCallback(
+      makeCallbackRequest(`error=access_denied&state=${encodeURIComponent(state)}`)
+    );
+
+    expectRedirectLocation(response, '/integrations/discord?error=access_denied');
+    expectRedactedDiagnostic(state);
+    expect(mockedCaptureMessage.mock.calls[0]![1]).toEqual(
+      expect.objectContaining({ extra: expect.objectContaining({ error: 'access_denied' }) })
+    );
+  });
+
+  test('reports a missing code with the shared callback context', async () => {
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+      provider: 'discord',
+      purpose: 'provider_install',
+    });
+
+    const response = await callDiscordCallback(
+      makeCallbackRequest(`state=${encodeURIComponent(state)}`)
+    );
+
+    expectRedirectLocation(response, '/integrations/discord?error=missing_code');
+    expectRedactedDiagnostic(state);
+  });
+
+  test('reports a rejected state signature with the shared callback context', async () => {
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+      provider: 'discord',
+      purpose: 'provider_install',
+    });
+    const tampered = `${state.slice(0, -1)}${state.endsWith('A') ? 'B' : 'A'}`;
+
+    const response = await callDiscordCallback(
+      makeCallbackRequest(`code=authorization-code&state=${encodeURIComponent(tampered)}`)
+    );
+
+    expectRedirectLocation(response, '/integrations?error=invalid_state');
+    expectRedactedDiagnostic(tampered, 'authorization-code');
+  });
+
+  test('reports an installation failure with the shared callback context', async () => {
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+      provider: 'discord',
+      purpose: 'provider_install',
+    });
+    mockedExchangeDiscordCode.mockRejectedValue(new Error('discord exchange failed'));
+
+    const response = await callDiscordCallback(makeRequest(state));
+
+    expectRedirectLocation(response, '/integrations/discord?error=installation_failed');
+    expectRedactedDiagnostic(state, 'authorization-code');
   });
 });

@@ -7,6 +7,7 @@ import { i18n } from '@/i18n';
 import { AdvancedConfigPanel } from './advanced-config-panel';
 import { type ProfileSelectorProfile } from './profile-selector-model';
 import { MAX_SETUP_COMMANDS } from '@/components/profiles/profile-commands-model';
+import { SelectableText } from '@/components/ui/selectable-text';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
@@ -131,11 +132,15 @@ function listState(overrides: Partial<ListState> = {}): ListState {
 function ControlledPanel({
   organizationId,
   initialSelectedProfileId,
+  initialCommands = [],
+  disabled = false,
   onSelectProfile,
   onRequestReveal,
 }: {
   organizationId?: string;
   initialSelectedProfileId?: string | null;
+  initialCommands?: string[];
+  disabled?: boolean;
   onSelectProfile?: (id: string | null) => void;
   onRequestReveal?: (contentOffset: number) => void;
 }) {
@@ -145,9 +150,10 @@ function ControlledPanel({
   // The panel's manual env vars/commands are the session's state now, so the
   // harness owns them the way the new-session body does.
   const [manualVars, setManualVars] = useState<VariableEdit[]>([]);
-  const [manualCommands, setManualCommands] = useState<string[]>([]);
+  const [manualCommands, setManualCommands] = useState<string[]>(initialCommands);
   return createElement(AdvancedConfigPanel, {
     organizationId,
+    disabled,
     selectedProfileId,
     onSelectProfile: id => {
       onSelectProfile?.(id);
@@ -167,6 +173,8 @@ function mount(
     mocks?: Mutations;
     organizationId?: string;
     selectedProfileId?: string | null;
+    initialCommands?: string[];
+    disabled?: boolean;
     onSelectProfile?: (id: string | null) => void;
     onRequestReveal?: (contentOffset: number) => void;
   } = {}
@@ -178,6 +186,8 @@ function mount(
     ref.current = TestRenderer.create(
       createElement(ControlledPanel, {
         organizationId: options.organizationId,
+        disabled: options.disabled,
+        initialCommands: options.initialCommands,
         initialSelectedProfileId: options.selectedProfileId,
         onSelectProfile: options.onSelectProfile,
         onRequestReveal: options.onRequestReveal,
@@ -447,7 +457,7 @@ describe('AdvancedConfigPanel', () => {
     addVariable(renderer, 'API_KEY', 'abc');
 
     expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
-    expect(texts(renderer)).toContain('1 environment variables · 0 setup commands');
+    expect(texts(renderer)).toContain('1 var');
   });
 
   it('accepts an empty value in the session draft, matching prepare-session', () => {
@@ -460,7 +470,7 @@ describe('AdvancedConfigPanel', () => {
     expect(
       renderer.root.findAllByType('FormField' as never).filter(node => node.props.label === 'Value')
     ).toHaveLength(0);
-    expect(texts(renderer)).toContain('1 environment variables · 0 setup commands');
+    expect(texts(renderer)).toContain('1 var');
   });
 
   it('starts an abandoned session variable empty the next time the form opens', () => {
@@ -489,15 +499,20 @@ describe('AdvancedConfigPanel', () => {
     // kind, not the action, and no control carries it.
     expect(byLabel(renderer, 'Secret')).toBeUndefined();
     const reveal = byLabel(renderer, 'Reveal value');
-    expect(reveal?.props.accessibilityState).toMatchObject({ selected: false });
+    // The name carries the state, so the control reports no separate
+    // selection a reader would hear as "Reveal value, selected".
+    expect(reveal?.props.accessibilityState).toBeUndefined();
     expect(texts(renderer)).not.toContain('s3cretdraft');
 
     press(reveal);
 
     expect(texts(renderer)).toContain('s3cretdraft');
-    expect(byLabel(renderer, 'Reveal value')?.props.accessibilityState).toMatchObject({
-      selected: true,
-    });
+    // The same control now hides the value it is showing.
+    expect(byLabel(renderer, 'Reveal value')).toBeUndefined();
+    press(byLabel(renderer, 'Hide value'));
+
+    expect(texts(renderer)).not.toContain('s3cretdraft');
+    expect(byLabel(renderer, 'Reveal value')).toBeDefined();
   });
 
   it('caps manual setup commands at the server list and row bounds', () => {
@@ -520,6 +535,21 @@ describe('AdvancedConfigPanel', () => {
     // A 21st row is refused even if the disabled control is pressed.
     press(buttonByText(renderer, 'Add command'));
     expect(commandFields()).toHaveLength(MAX_SETUP_COMMANDS);
+  });
+
+  it('keeps a busy command row a dimmed field instead of read-only text', () => {
+    const renderer = mount({ disabled: true, initialCommands: ['pnpm install'] });
+    press(byLabel(renderer, 'Advanced Configuration'));
+
+    const row = field(renderer, 'Command 1');
+    expect(row.props.disabled).toBe(true);
+    expect(row.props.defaultValue).toBe('pnpm install');
+
+    // A busy row is still the same field, so starting a session never reflows
+    // the editor into a read-only value.
+    expect(renderer.root.findAllByType(SelectableText)).toHaveLength(0);
+
+    renderer.unmount();
   });
 
   it('counts the characters left on a setup command and names the bound', () => {
@@ -560,7 +590,7 @@ describe('AdvancedConfigPanel', () => {
     const renderer = mount({ selectedProfileId: 'backend' });
     press(byLabel(renderer, 'Advanced Configuration'));
 
-    expect(texts(renderer)).toContain('3 environment variables · 1 setup commands');
+    expect(texts(renderer)).toContain('3 vars · 1 setup cmd');
   });
 
   it('saves the manual config in the web order and selects the new profile', async () => {
@@ -613,7 +643,7 @@ describe('AdvancedConfigPanel', () => {
     // setup commands to the inline ones, so a kept draft would run them twice.
     expect(texts(renderer)).not.toContain('API_KEY');
     expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
-    expect(texts(renderer)).toContain('1 environment variables · 1 setup commands');
+    expect(texts(renderer)).toContain('1 var · 1 setup cmd');
   });
 
   it('keeps the save sheet open and the typed name when the save fails', async () => {

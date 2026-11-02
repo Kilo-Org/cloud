@@ -28311,13 +28311,13 @@
   "personalReviewAgent.getGitHubStatus": {
     "path": "personalReviewAgent.getGitHubStatus",
     "kind": "query",
-    "summary": "Check whether the current user's personal GitHub integration is connected and active, returning account login, repo access scope, install date, and validity.",
+    "summary": "Check whether the current user's personal GitHub integration is connected and active, returning account login, repo access scope, and install date.",
     "inputSchema": {},
     "tags": [
       "personalreviewagent",
       "getgithubstatus"
     ],
-    "searchBlob": "personalReviewAgent.getGitHubStatus Check whether the current user's personal GitHub integration is connected and active, returning account login, repo access scope, install date, and validity. personalreviewagent getgithubstatus"
+    "searchBlob": "personalReviewAgent.getGitHubStatus Check whether the current user's personal GitHub integration is connected and active, returning account login, repo access scope, and install date. personalreviewagent getgithubstatus"
   },
   "personalReviewAgent.getGitLabStatus": {
     "path": "personalReviewAgent.getGitLabStatus",

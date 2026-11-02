@@ -6,7 +6,7 @@ import {
   SessionReadOnlyFooterPlaceholder,
 } from './session-detail-skeleton';
 
-const platform = vi.hoisted(() => ({ os: 'android' }));
+const platform = vi.hoisted(() => ({ os: 'android', fontScale: 1 }));
 
 // Vitest hoists these above the component import, which is what keeps the real
 // skeleton and blur bar out of this suite.
@@ -17,6 +17,7 @@ vi.mock('react-native', () => ({
       return platform.os;
     },
   },
+  useWindowDimensions: () => ({ fontScale: platform.fontScale }),
 }));
 vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -87,8 +88,9 @@ describe('SessionReadOnlyFooterPlaceholder', () => {
 // replaces it — the slot moved the transcript when it resolved. The controls
 // keep ChatComposerInputRow's CONTROL_HIT_TARGET: 48 on Android, 44 on iOS.
 describe('SessionComposerSkeleton', () => {
-  function skeletonBars(platformOs: 'android' | 'ios'): string[] {
+  function skeletonBars(platformOs: 'android' | 'ios', fontScale = 1): string[] {
     platform.os = platformOs;
+    platform.fontScale = fontScale;
     // eslint-disable-next-line new-cap
     const root = SessionComposerSkeleton() as React.ReactElement;
     const bars: string[] = [];
@@ -100,6 +102,20 @@ describe('SessionComposerSkeleton', () => {
     return bars;
   }
 
+  function fieldBoxHeight(fontScale: number): number {
+    platform.fontScale = fontScale;
+    // eslint-disable-next-line new-cap
+    const root = SessionComposerSkeleton() as React.ReactElement;
+    const heights: number[] = [];
+    walk(root, el => {
+      const style = (el.props as { style?: { height?: number } }).style;
+      if (style?.height !== undefined) {
+        heights.push(style.height);
+      }
+    });
+    return heights[0] ?? -1;
+  }
+
   it('stands the row on the composer field and both controls', () => {
     for (const [platformOs, control] of [
       ['android', 'h-[48px] w-[48px]'],
@@ -108,7 +124,7 @@ describe('SessionComposerSkeleton', () => {
       const bars = skeletonBars(platformOs);
       expect(bars).toHaveLength(3);
       const [field = [], voice = [], send = []] = bars.map(className => className.split(/\s+/));
-      expect(field).toEqual(expect.arrayContaining(['h-[44px]', 'flex-1', 'rounded-[20px]']));
+      expect(field).toEqual(expect.arrayContaining(['h-full', 'w-full', 'rounded-[20px]']));
       for (const trailing of [voice, send]) {
         expect(trailing).toEqual(expect.arrayContaining(control.split(' ')));
         expect(trailing).toContain('ms-3');
@@ -120,5 +136,12 @@ describe('SessionComposerSkeleton', () => {
         expect(tokens.filter(token => /^w-\d+$/.test(token))).toEqual([]);
       }
     }
+  });
+
+  it('keeps the field on the composer font-scaled height', () => {
+    // ChatComposer: the input's line box times the system font scale, plus its
+    // own vertical padding. The slot must follow it or the row clips its text.
+    expect(fieldBoxHeight(1)).toBe(44);
+    expect(fieldBoxHeight(1.3)).toBeCloseTo(20 * 1.3 + 24);
   });
 });

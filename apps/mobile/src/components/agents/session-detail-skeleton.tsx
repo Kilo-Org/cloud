@@ -1,4 +1,4 @@
-import { Platform, View } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -79,6 +79,10 @@ export function SessionReadOnlyFooterPlaceholder() {
   );
 }
 
+/** ChatComposer's input line box and vertical padding, in points. */
+const COMPOSER_FIELD_LINE = 20;
+const COMPOSER_FIELD_PADDING = 24;
+
 /**
  * Holds the composer's place while the session loads: the route paints it
  * before the session's metadata arrives, and the session screen paints it while
@@ -86,20 +90,30 @@ export function SessionReadOnlyFooterPlaceholder() {
  * composer pops in on resolve and shoves the transcript up by its own height.
  *
  * Geometry follows ChatComposer's input row: a BlurBar wrapping the row's
- * `p-2.5 px-3`, the field's own 44 pt box at `rounded-[20px]`, and the two
- * trailing controls at `CONTROL_HIT_TARGET`'s 48 pt on Android and 44 pt on
- * iOS — `ms-3` is the row's COMPOSER_CONTROL_GAP_CLASS, repeated here because
- * the row module owns it. Sizes are written in points, not scale steps: this
- * app's rem is 14 pt, so `h-11` paints 38.5 pt and would leave the slot 6 pt
- * short of the composer that replaces it.
+ * `p-2.5 px-3`, the field's own box at `rounded-[20px]` and the two trailing
+ * controls at `CONTROL_HIT_TARGET`'s 48 pt on Android and 44 pt on iOS — `ms-3`
+ * is the row's COMPOSER_CONTROL_GAP_CLASS, repeated here because the row module
+ * owns it.
+ *
+ * Sizes are written in points, not scale steps: this app's rem is 14 pt, so
+ * `h-11` paints 38.5 pt and would leave the slot 6 pt short of the composer that
+ * replaces it. The field keeps the composer's own height rule — its line's box
+ * plus the input's vertical padding, both times the system font scale — so the
+ * chip neither clips its own row nor leaves a gap at any text size.
  */
 export function SessionComposerSkeleton() {
+  const { fontScale } = useWindowDimensions();
   const control = Platform.OS === 'android' ? 'h-[48px] w-[48px]' : 'h-[44px] w-[44px]';
   return (
     <BlurBar>
       <View className="p-2.5 px-3">
         <View className="flex-row items-center">
-          <Skeleton className="h-[44px] flex-1 rounded-[20px]" />
+          <View
+            className="flex-1 justify-center"
+            style={{ height: COMPOSER_FIELD_LINE * fontScale + COMPOSER_FIELD_PADDING }}
+          >
+            <Skeleton className="h-full w-full rounded-[20px]" />
+          </View>
           <Skeleton className={`ms-3 rounded-full ${control}`} />
           <Skeleton className={`ms-3 rounded-full ${control}`} />
         </View>

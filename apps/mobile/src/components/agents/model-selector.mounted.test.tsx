@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TestRenderer } from '@/test/renderer';
 
+import { CHIP_FRAME_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import {
   BYOK_MODEL_LABEL,
   freeModelDataLabel,
@@ -428,5 +429,31 @@ describe('ModelSelector loading chip', () => {
     const renderer = renderSelector({ value: option.id, options: [option] });
 
     expect(textStrings(renderer.root)).toContain(option.name);
+  });
+});
+
+// The chip's own node is its visual surface (28.3pt on device), so the touch
+// region has to come from hit slop, and only from the vertical axis: the chip
+// on the same line and the paste button beside it each own the space next to
+// it.
+describe('ModelSelector pill touch target', () => {
+  it('reaches the design target from its own frame plus vertical hit slop', () => {
+    const option = cliCatalogOption();
+    const renderer = renderSelector({ value: option.id, options: [option] });
+
+    const pill = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+    )[0];
+    if (pill === undefined) {
+      throw new Error('model pill not found');
+    }
+    const slop = pill.props.hitSlop as { top?: number; bottom?: number };
+    const reach = CHIP_FRAME_DP + (slop.top ?? 0) + (slop.bottom ?? 0);
+
+    expect(reach).toBeGreaterThan(TOUCH_TARGET_DP);
+    expect(slop).not.toHaveProperty('left');
+    expect(slop).not.toHaveProperty('right');
+
+    renderer.unmount();
   });
 });

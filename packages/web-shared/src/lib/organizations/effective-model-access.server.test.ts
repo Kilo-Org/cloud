@@ -11,6 +11,7 @@ import {
   allowsInferenceProviderUserByok,
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
+  isModelAllowedForProviderKey,
 } from './effective-model-access.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
 import { VIRTUAL_PROVIDER } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
@@ -633,6 +634,86 @@ describe('effective organization model access', () => {
         decision: { allowed: false, denialSource: 'organization_model' },
         allowsByok: false,
       });
+    });
+  });
+
+  describe('isModelAllowedForProviderKey', () => {
+    const baseline: Partial<OrganizationGroupPolicyContext> = {
+      defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+    };
+
+    const googleLookup = async (modelId: string) =>
+      modelId === 'google/gemini' ? new Set(['google']) : currentSnapshotLookup(modelId);
+
+    function allowed(
+      overrides: Partial<OrganizationGroupPolicyContext>,
+      modelId: string,
+      providerSlug: string
+    ) {
+      return isModelAllowedForProviderKey(
+        evaluateEffectiveModelAccessPolicy(context(overrides)),
+        modelId,
+        providerSlug,
+        googleLookup
+      );
+    }
+
+    it('checks the provider allow-list against the key provider instead of the snapshot providers', async () => {
+      await expect(allowed(baseline, 'google/gemini', 'anthropic')).resolves.toBe(true);
+      await expect(allowed(baseline, 'anthropic/claude', 'z-ai')).resolves.toBe(false);
+    });
+
+    it('keeps denying models missing from the current snapshot', async () => {
+      await expect(allowed(baseline, 'unknown/model', 'anthropic')).resolves.toBe(false);
+    });
+
+    it('keeps the organization model deny list', async () => {
+      await expect(allowed(baseline, 'openai/o3', 'openai')).resolves.toBe(false);
+    });
+
+    it('admits a key provider that a selected grant names', async () => {
+      const grant: Partial<OrganizationGroupPolicyContext> = {
+        groupPolicies: [
+          [
+            {
+              type: 'model_access',
+              data: { mode: 'selected', model_allow_list: [], provider_allow_list: ['synthetic'] },
+            },
+          ],
+        ],
+      };
+
+      await expect(allowed(grant, 'google/gemini', 'synthetic')).resolves.toBe(true);
+      await expect(allowed(grant, 'google/gemini', 'z-ai')).resolves.toBe(false);
+    });
+
+    it('admits any key provider for a model a selected grant names', async () => {
+      const grant: Partial<OrganizationGroupPolicyContext> = {
+        groupPolicies: [
+          [
+            {
+              type: 'model_access',
+              data: {
+                mode: 'selected',
+                model_allow_list: ['anthropic/claude'],
+                provider_allow_list: [],
+              },
+            },
+          ],
+        ],
+      };
+
+      await expect(allowed(grant, 'anthropic/claude', 'z-ai')).resolves.toBe(true);
+    });
+
+    it('does not restrict key providers outside Enterprise', async () => {
+      await expect(
+        allowed(
+          { organization: { ...context().organization, plan: 'teams' } },
+          'anthropic/claude',
+          'z-ai'
+        )
+      ).resolves.toBe(true);
     });
   });
 

@@ -85,7 +85,7 @@ describe('bounded spending provider enforcement', () => {
       response: jsonResponse(200, { ok: true }),
     } as never);
     return sendUpstreamAttempt({
-      providerContext: { provider: { id: providerId }, userByok } as never,
+      providerContext: { provider: { type: providerId }, userByok } as never,
       requestedModel: model.id,
       request: {
         kind: 'chat_completions',
@@ -139,7 +139,7 @@ describe('bounded spending provider enforcement', () => {
     } as never);
 
     const result = await sendUpstreamAttempt({
-      providerContext: { provider: { id: 'openrouter' }, userByok: null } as never,
+      providerContext: { provider: { type: 'openrouter' }, userByok: null } as never,
       requestedModel: model.id,
       request: request as never,
       fraudHeaders: {} as never,
@@ -194,7 +194,7 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
     jest.mocked(upstreamRequest).mockResolvedValue({ type: 'success', response } as never);
     return sendUpstreamAttempt({
       providerContext: {
-        provider: { id: 'openai-chatgpt', chatGptOwner: owner },
+        provider: { type: 'openai-chatgpt', chatGptOwner: owner },
         userByok: null,
       } as never,
       requestedModel: 'openai/gpt-6.1-sol',

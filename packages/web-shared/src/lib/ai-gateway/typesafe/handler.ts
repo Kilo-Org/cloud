@@ -224,7 +224,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
       isStreaming: false,
       userByok: false,
       mode: mode || undefined,
-      provider: OPENROUTER.id,
+      provider: OPENROUTER.type,
       inferenceProvider: inferenceProvider || undefined,
       requestedModel,
       resolvedModel: normalizeModelId(requestedModel),
@@ -365,7 +365,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
         );
         return;
       }
-      const reconciled = mapToUsageStats(generation, '', user.id, OPENROUTER.id);
+      const reconciled = mapToUsageStats(generation, '', user.id, OPENROUTER.type);
       await logMicrodollarUsageAndReportToBouncer(
         {
           ...reconciled,

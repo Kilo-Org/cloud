@@ -137,6 +137,7 @@ export function resolveAwsBedrockUpstream(
 
 export default {
   id: 'bedrock-byok',
+  openrouter_inference_provider_id: 'amazon-bedrock',
   models_dev_id: 'amazon-bedrock',
   transformRequest(context) {
     if (context.request.kind === 'messages') {

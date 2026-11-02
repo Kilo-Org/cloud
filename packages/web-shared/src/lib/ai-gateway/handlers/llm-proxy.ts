@@ -25,7 +25,9 @@ import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/provide
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import {
   createDirectByokReferenceResolver,
+  findDirectByokProvider,
   getDirectByokModel,
+  getDirectByokPolicyProviderId,
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { byokOwner, isInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -159,6 +161,7 @@ import {
   allowsInferenceProviderUserByok,
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
+  isModelAllowedForProviderKey,
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
@@ -175,7 +178,7 @@ import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { startEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
 import { enkryptGuardrailRejectionResponse } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/responses';
 import { resolveEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
-import { extractTurnDeltaText } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/turn-delta';
+import { extractRequestText } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -427,12 +430,13 @@ export async function handleLlmProxyRequest(
         kiloUserId: auth.user.id,
         apiKind: requestBodyParsed.kind,
         clientRequestId,
-        text: extractTurnDeltaText(requestBodyParsed, {
+        text: extractRequestText(requestBodyParsed, {
           includeToolResults: config.scanToolResults,
         }),
         config,
       };
-    })
+    }),
+    request.signal
   );
 
   const logClientDisconnect = () => {
@@ -911,6 +915,18 @@ export async function handleLlmProxyRequest(
 
   const accessCheckResolver = createAccessCheckResolver(effectiveModelIdLowerCased);
 
+  async function isDirectByokProviderAllowed(policyProviderId: string): Promise<boolean> {
+    const groupPolicy = await organizationGroupPolicyPromise;
+    return (
+      !groupPolicy ||
+      (await isModelAllowedForProviderKey(
+        groupPolicy,
+        effectiveModelIdLowerCased,
+        policyProviderId
+      ))
+    );
+  }
+
   async function resolveIsNonTrialEnterprise(): Promise<boolean> {
     if (!organizationId) return false;
     const { plan } = await balanceAndSettingsPromise;
@@ -933,6 +949,7 @@ export async function handleLlmProxyRequest(
     getRoutingProviderConfig: async () =>
       (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
     getAllowedProviders: accessCheckResolver.getAllowedProviders,
+    isDirectByokProviderAllowed,
     kiloIgnoredProviders: ignoredProviders,
   });
   if (providerResult.kind === 'chatgpt-reconnect') {
@@ -962,7 +979,7 @@ export async function handleLlmProxyRequest(
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
     try {
       const directByokTarget = await getDirectByokModel(routingTarget);
-      if (directByokTarget.provider && effectiveProviderContext.provider.id !== 'direct-byok') {
+      if (directByokTarget.provider && effectiveProviderContext.provider.type !== 'direct-byok') {
         return organizationAutoConfigurationResponse(
           `Organization Auto route target '${routingTarget}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`
         );
@@ -978,7 +995,7 @@ export async function handleLlmProxyRequest(
     return apiKindNotSupportedResponse(
       requestBodyParsed.kind,
       effectiveProviderContext.provider.supportedChatApis,
-      effectiveProviderContext.provider.id === 'direct-byok'
+      effectiveProviderContext.provider.type === 'direct-byok'
         ? effectiveProviderContext.userByok?.[0]?.providerId
         : undefined
     );
@@ -1026,20 +1043,34 @@ export async function handleLlmProxyRequest(
       groupProvidersAllowed,
     } = await accessCheckResolver.get();
 
-    const modelAllowed = isInferenceProviderUserByok(effectiveProviderContext.userByok)
-      ? groupModelAllowedForInferenceProviderUserByok
-      : groupModelAllowed;
-    if (!modelAllowed) {
-      return isAutoRoutedRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
-    }
-    if (!groupProvidersAllowed) return modelNotAllowedResponse();
-    if (
-      effectiveProviderContext.provider.id === 'vercel' &&
-      effectiveProviderContext.userByok?.some(
-        byok => !isVercelUserByokProviderAllowed(byok.providerId, allowedProviders)
-      )
-    ) {
-      return modelNotAllowedResponse();
+    if (effectiveProviderContext.provider.type === 'direct-byok') {
+      // A catalog-mode direct BYOK key is the request's only route, so the policy is checked
+      // against the key's provider alone. Routing already skips keys it rejects.
+      const directByokProvider = findDirectByokProvider(
+        effectiveProviderContext.userByok?.[0]?.providerId ?? ''
+      );
+      if (
+        !directByokProvider ||
+        !(await isDirectByokProviderAllowed(getDirectByokPolicyProviderId(directByokProvider)))
+      ) {
+        return isAutoRoutedRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
+      }
+    } else {
+      const modelAllowed = isInferenceProviderUserByok(effectiveProviderContext.userByok)
+        ? groupModelAllowedForInferenceProviderUserByok
+        : groupModelAllowed;
+      if (!modelAllowed) {
+        return isAutoRoutedRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
+      }
+      if (!groupProvidersAllowed) return modelNotAllowedResponse();
+      if (
+        effectiveProviderContext.provider.type === 'vercel' &&
+        effectiveProviderContext.userByok?.some(
+          byok => !isVercelUserByokProviderAllowed(byok.providerId, allowedProviders)
+        )
+      ) {
+        return modelNotAllowedResponse();
+      }
     }
 
     if (effectiveProviderConfig) {
@@ -1047,14 +1078,14 @@ export async function handleLlmProxyRequest(
     }
   }
 
-  console.debug(`Routing request to ${effectiveProviderContext.provider.id}`);
+  console.debug(`Routing request to ${effectiveProviderContext.provider.type}`);
 
   // Extract properties for usage context after final provider selection.
   const promptInfo = extractPromptInfo(requestBodyParsed);
   const usageContext: MicrodollarUsageContext = {
     api_kind: requestBodyParsed.kind,
     kiloUserId: user.id,
-    provider: effectiveProviderContext.provider.id,
+    provider: effectiveProviderContext.provider.type,
     requested_model: effectiveModelIdLowerCased,
     is_free: effectiveProviderContext.isFree,
     custom_llm_pricing: customLlm?.definition.pricing ?? null,
@@ -1165,10 +1196,12 @@ export async function handleLlmProxyRequest(
     guardrailVerdict
   );
   if (guardrailRejection) {
+    // The disconnect was already logged; nobody reads this rejection.
+    if (request.signal.aborted) return guardrailRejection;
     await logUnrewrittenResponse({
       response: guardrailRejection.clone(),
       model: effectiveModelIdLowerCased,
-      providerId: effectiveProviderContext.provider.id,
+      providerId: effectiveProviderContext.provider.type,
       logging: requestLogging,
       error: { guardrail_rejection: guardrailVerdict.action },
     });
@@ -1212,7 +1245,7 @@ export async function handleLlmProxyRequest(
       isStreaming: requestBodyParsed.body.stream === true,
       userByok: !!effectiveProviderContext.userByok,
       mode: modeHeader || undefined,
-      provider: effectiveProviderContext.provider.id,
+      provider: effectiveProviderContext.provider.type,
       requestedModel: requestedModelLowerCased,
       resolvedModel: normalizeModelId(effectiveModelIdLowerCased),
       toolsAvailable,
@@ -1231,7 +1264,7 @@ export async function handleLlmProxyRequest(
 
   const upstreamErrorResponse = await applyUpstreamErrorPolicy({
     response,
-    providerId: effectiveProviderContext.provider.id,
+    providerId: effectiveProviderContext.provider.type,
     isUserByok: !!effectiveProviderContext.userByok,
     user,
     request: requestBodyParsed.body,
@@ -1279,7 +1312,7 @@ export async function handleLlmProxyRequest(
 
   {
     const errorResponse = await makeErrorReadable({
-      providerId: effectiveProviderContext.provider.id,
+      provider: effectiveProviderContext.provider.type,
       requestedModel: effectiveModelIdLowerCased,
       request: requestBodyParsed,
       response,
@@ -1289,7 +1322,7 @@ export async function handleLlmProxyRequest(
       await logUnrewrittenResponse({
         response,
         model: effectiveModelIdLowerCased,
-        providerId: effectiveProviderContext.provider.id,
+        providerId: effectiveProviderContext.provider.type,
         logging: requestLogging,
         error: null,
       });
@@ -1300,7 +1333,7 @@ export async function handleLlmProxyRequest(
   return await rewriteModelResponse({
     response,
     model: effectiveModelIdLowerCased,
-    providerId: effectiveProviderContext.provider.id,
+    providerId: effectiveProviderContext.provider.type,
     kind: requestBodyParsed.kind,
     isFree: usageContext.is_free,
     userByok: usageContext.user_byok,

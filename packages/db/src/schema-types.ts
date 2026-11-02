@@ -1286,8 +1286,8 @@ export const ENKRYPT_DETECTOR_IDS = [
 ] as const satisfies readonly EnkryptDetectorId[];
 
 /**
- * Blocking Enkrypt AI input scan of each gateway chat turn. Flagged turns are always blocked, and
- * so is every turn while Enkrypt is unavailable. Without `detectors` the gateway applies Kilo
+ * Blocking Enkrypt AI input scan of each gateway chat request. Flagged requests are always
+ * blocked, and so is every request while Enkrypt is unavailable. Without `detectors` the gateway applies Kilo
  * Default. `scan_tool_results` defaults to true so organizations enabled before it existed keep
  * scanning tool results.
  *
@@ -2396,6 +2396,11 @@ export const NormalizedProvider = z.object({
       className: z.string().optional(),
     })
     .optional(),
+  /**
+   * Set on a direct BYOK provider that only serves an organization's own keys in catalog mode.
+   * Provider allow-lists can name it, but Kilo's own routes never use it.
+   */
+  byokOnly: z.literal(true).optional(),
   models: z.array(OpenRouterModel),
 });
 

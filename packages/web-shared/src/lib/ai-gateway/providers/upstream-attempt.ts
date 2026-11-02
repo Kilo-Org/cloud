@@ -91,7 +91,7 @@ export async function sendUpstreamAttempt({
       request.body,
       costLimit.availableBalanceMicrodollars,
       {
-        id: providerContext.provider.id,
+        id: providerContext.provider.type,
         userFunded: providerContext.userByok !== null,
       }
     );
@@ -103,7 +103,7 @@ export async function sendUpstreamAttempt({
     if (decision.providerConfig) request.body.provider = decision.providerConfig;
   }
 
-  if (providerContext.provider.id === 'openrouter') {
+  if (providerContext.provider.type === 'openrouter') {
     const transformedModel = request.body.model;
     if (!transformedModel || !(await isValidOpenRouterModelId(transformedModel))) {
       return { type: 'invalid-openrouter-model' };
@@ -123,7 +123,7 @@ export async function sendUpstreamAttempt({
   });
   if (result.type === 'error') return result;
 
-  if (providerContext.provider.id === OPENAI_CHATGPT_PROVIDER_ID) {
+  if (providerContext.provider.type === OPENAI_CHATGPT_PROVIDER_ID) {
     const owner = providerContext.provider.chatGptOwner;
     await syncChatGptUsageLimit(result.response, owner);
     await recordChatGptNotEligible(

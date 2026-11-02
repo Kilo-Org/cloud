@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
 import { Text } from '@/components/ui/text';
+import { CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { formatList } from '@/lib/format';
 import {
@@ -207,6 +208,9 @@ export function ModelSelector({
     <Pressable
       onPress={handlePress}
       disabled={effectivelyDisabled}
+      // The chip's own 27.81pt frame is the visual; the vertical slop carries
+      // its touch region past the 44pt design target without growing the row.
+      hitSlop={CHIP_HIT_SLOP}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: effectivelyDisabled }}

@@ -16,6 +16,7 @@ import { RepositorySearchField } from '@/components/code-reviewer/repository-sea
 import { EmptyState } from '@/components/empty-state';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { SearchX } from '@/components/ui/icons';
+import { SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
 
 /** A repository as the three providers' cached snapshots describe it. */
@@ -93,17 +94,25 @@ export function RepositoryRowsList({
   }, [deferredSearch]);
 
   const renderRow = useCallback(
-    ({ item }: { item: RepositoryRow }) => (
-      <RepoToggleRow
-        repo={item}
-        selected={selectedIds.includes(item.id)}
-        disabled={disabled}
-        className="border-b-[0.5px] border-hair-soft"
-        onPress={() => {
-          onToggle(item.id);
-        }}
-      />
-    ),
+    ({ item }: { item: RepositoryRow | undefined }) => {
+      // FlashList can ask for an index past the end of a shorter rows array
+      // React discarded with a deferred render; the row is then undefined. The
+      // model picker carries the same guard for the same reason.
+      if (!item) {
+        return null;
+      }
+      return (
+        <RepoToggleRow
+          repo={item}
+          selected={selectedIds.includes(item.id)}
+          disabled={disabled}
+          className="border-b-[0.5px] border-hair-soft"
+          onPress={() => {
+            onToggle(item.id);
+          }}
+        />
+      );
+    },
     [selectedIds, disabled, onToggle]
   );
 
@@ -125,7 +134,9 @@ export function RepositoryRowsList({
         ref={listRef}
         style={LIST_STYLE}
         data={visibleRows}
-        keyExtractor={repositoryKey}
+        keyExtractor={(item: RepositoryRow | undefined, index) =>
+          item ? repositoryKey(item) : String(index)
+        }
         renderItem={renderRow}
         contentContainerStyle={LIST_CONTENT_STYLE}
         ListHeaderComponent={
@@ -137,7 +148,7 @@ export function RepositoryRowsList({
         ListEmptyComponent={noMatchState}
         ListFooterComponent={footer}
         refreshControl={refreshControl}
-        keyboardShouldPersistTaps="handled"
+        {...SEARCHABLE_PICKER_LIST_PROPS}
       />
     </View>
   );

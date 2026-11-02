@@ -39,13 +39,16 @@ const REPOSITORIES = [
   },
 ];
 
-/** The provider's owner split of a large account: a few owners, many names. */
+/**
+ * The provider's owner split of a large account: a few owners, many names. The
+ * owner cycle is deliberately not a divisor of the name cycle below, so a name
+ * stem repeats under different owners instead of circling back to the same one.
+ */
 const LONG_LIST_OWNERS = [
   'picker-lab',
   'picker-lab-platform',
   'picker-lab-mobile',
   'long-list-lab',
-  'long-list-lab-archive',
 ];
 
 const LONG_LIST_WORDS = [
@@ -125,7 +128,12 @@ function parseCount(flags: string[]): number | null {
   for (let index = 0; index < flags.length; index += 1) {
     const flag = flags[index];
     if (flag === '--count') {
-      raw = flags[index + 1] ?? null;
+      const value = flags[index + 1];
+      if (value === undefined) {
+        printUsage();
+        throw new Error('--count needs a number of repositories.');
+      }
+      raw = value;
       index += 1;
       continue;
     }
@@ -279,14 +287,19 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   console.log(
     'No installation token is minted and no provider request is made: the pickers read the seeded snapshot.'
   );
+  // The names a follow-up command can use come from the snapshot that was
+  // seeded, not from the two-row default: with a long snapshot the constants
+  // above are not inserted at all.
+  const seededPrivate = repositories.find(repository => repository.private);
+  const seededPublic = repositories.find(repository => !repository.private);
   return {
     email,
     userId,
     organizationId: ORGANIZATION_ID,
     repositoryCount: repositories.length,
     selectedCount: selectedRepositoryIds.length,
-    privateRepoFullName: REPOSITORIES[0].full_name,
-    publicRepoFullName: REPOSITORIES[1].full_name,
+    privateRepoFullName: seededPrivate?.full_name ?? null,
+    publicRepoFullName: seededPublic?.full_name ?? null,
     securityAgentDeepLink: `kiloapp:///(app)/security-agent/${ORGANIZATION_ID}/settings/repositories`,
     codeReviewerDeepLink: `kiloapp:///(app)/code-reviewer/${ORGANIZATION_ID}/github/repos`,
     repoBindingsDeepLink: `kiloapp:///(app)/profile-management/repo-bindings?organizationId=${ORGANIZATION_ID}`,

@@ -92,6 +92,7 @@ exist as an org-scoped mirror under `organizations`, for example
 - `securityAuditLog`
 - `slack`
 - `spendAlerts`
+- `stepUp`
 - `todos`
 - `unifiedSessions`
 - `usageAnalytics`

@@ -8,6 +8,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -172,9 +173,10 @@ export function PrRefsRow({
         {headRepoFullName && isCrossRepo ? `${headRepoFullName}:` : ''}
         {headRef}
       </Text>
-      <Text variant="muted" className="shrink-0 text-sm">
-        ←
-      </Text>
+      {/* The flow reads "head ← base": a mirrored arrow icon sized to the
+          13 px ref text, so its ink centers on the row instead of sitting on
+          the baseline of a text glyph. */}
+      <DirectionalArrowLeft size={13} color={colors.mutedForeground} />
       <Text
         variant="mono"
         className="max-w-1/2 shrink-0 text-[13px]"

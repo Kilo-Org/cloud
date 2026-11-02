@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { mergeBlockedReasonIcon } from '@/components/pr-review/merge/pr-merge-icons';
+import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
 import {
   type MergeBlockedReason,
   type PrOverviewDto,
@@ -52,9 +53,7 @@ export function TerminalChip({
   const label = t(terminalLabelKey(state, nounKey));
   return (
     <View className="gap-2">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('prReview.merge.mergeTitle')}
-      </Text>
+      <PrReviewSectionLabel label={t('prReview.merge.mergeTitle')} />
       <View className="rounded-lg bg-secondary p-4">
         <Text className="text-sm text-muted-foreground">{label}</Text>
       </View>
@@ -139,9 +138,7 @@ export function BlockedPanel({
   const { t } = useTranslation();
   return (
     <View className="gap-2">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('prReview.merge.blockedTitle')}
-      </Text>
+      <PrReviewSectionLabel label={t('prReview.merge.blockedTitle')} />
       <View className="overflow-hidden rounded-lg bg-secondary">
         {reasons.map(reason => (
           <BlockedReasonRow key={reason.id} reason={reason} />

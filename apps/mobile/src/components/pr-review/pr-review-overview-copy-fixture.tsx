@@ -1,9 +1,14 @@
 // In a development build, the PR review copy fixture mounts the real overview
-// against isolated fake reads, so the Review section, the reviewers block and
-// the provider error states can be read in the app's selected language without
-// a forge connection. Every read is answered below over the usual tRPC
-// boundary; writes are rejected before any mutation function runs.
+// against isolated fake reads, so the Review section, the reviewers block, the
+// merge section in each of its states and the provider error states can be read
+// in the app's selected language without a forge connection. Every read is
+// answered below over the usual tRPC boundary; writes are rejected before any
+// mutation function runs.
 
+import {
+  type ProviderPrChecksResult,
+  type ProviderPrSummary,
+} from '@kilocode/app-shared/provider-review';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createTRPCClient, httpLink } from '@trpc/client';
@@ -18,8 +23,18 @@ type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
 export type PrReviewOverviewFixtureSurface =
   | 'overview'
+  | 'overview-blocked'
+  | 'overview-merged'
+  | 'merge-request'
   | 'merge-request-missing'
   | 'merge-request-error';
+
+/** The surfaces the overview reads under a provider (GitLab) scope. */
+const PROVIDER_SURFACES: readonly PrReviewOverviewFixtureSurface[] = [
+  'merge-request',
+  'merge-request-missing',
+  'merge-request-error',
+];
 
 const headSha = '0123456789abcdef0123456789abcdef01234567';
 const triple = { owner: 'sample', repo: 'review-copy', number: 1 } as const;
@@ -85,6 +100,68 @@ const reviewChecksFixture = {
   rollup: { total: 1, success: 1, failure: 0, pending: 0, skipped: 0 },
 } satisfies RouterOutputs['githubPrReview']['listChecks'];
 
+/** The overview a review decision holds back: the merge section's blocked arm. */
+const blockedOverviewFixture: RouterOutputs['githubPrReview']['getPullRequest'] = {
+  ...reviewOverviewFixture,
+  mergeableState: 'blocked',
+  reviewDecision: 'CHANGES_REQUESTED',
+};
+
+/** The overview of an already-merged PR: the merge section's terminal arm. */
+const mergedOverviewFixture: RouterOutputs['githubPrReview']['getPullRequest'] = {
+  ...reviewOverviewFixture,
+  state: 'merged',
+  mergeableState: 'unknown',
+  mergedAt: '2026-01-03T00:00:00.000Z',
+  mergedBy: { login: 'ada', avatarUrl: null },
+};
+
+function githubOverviewFixture(
+  surface: PrReviewOverviewFixtureSurface
+): RouterOutputs['githubPrReview']['getPullRequest'] {
+  if (surface === 'overview-blocked') {
+    return blockedOverviewFixture;
+  }
+  if (surface === 'overview-merged') {
+    return mergedOverviewFixture;
+  }
+  return reviewOverviewFixture;
+}
+
+/**
+ * The GitLab merge request the provider surfaces read: the same review the
+ * overview fixture renders, in the shape the provider read layer returns, so
+ * the provider arm goes through its real normalizer.
+ */
+const mergeRequestSummary = {
+  ref: { platform: 'gitlab', projectPath: 'sample/review-copy', mrIid: 1 },
+  title: 'Review copy',
+  body: 'Sample merge request.',
+  author: { login: 'ada', avatarUrl: null },
+  state: 'open',
+  draft: false,
+  headRef: 'review-copy',
+  baseRef: 'main',
+  headSha,
+  changedFiles: 2,
+  additions: 3,
+  deletions: 1,
+  webUrl: 'https://gitlab.example.com/sample/review-copy/-/merge_requests/1',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-02T00:00:00.000Z',
+} satisfies ProviderPrSummary;
+
+const providerChecksFixture = {
+  checks: [
+    {
+      name: 'Pipeline',
+      status: 'success',
+      conclusion: 'success',
+      detailsUrl: null,
+    },
+  ],
+} satisfies ProviderPrChecksResult;
+
 function fixtureResponse(data: unknown): Response {
   // eslint-disable-next-line unicorn/prefer-response-static-json -- React Native's fetch polyfill has no static Response.json.
   return new Response(JSON.stringify({ result: { data } }), {
@@ -120,15 +197,21 @@ function createFixtureClient(surface: PrReviewOverviewFixtureSurface) {
             throw new Error('Review overview fixture does not allow writes');
           }
           if (url.includes('/githubPrReview.getPullRequest')) {
-            return fixtureResponse(reviewOverviewFixture);
+            return fixtureResponse(githubOverviewFixture(surface));
           }
           if (url.includes('/githubPrReview.listChecks')) {
             return fixtureResponse(reviewChecksFixture);
           }
           if (url.includes('/providerReview.getPullRequest')) {
+            if (surface === 'merge-request') {
+              return fixtureResponse(mergeRequestSummary);
+            }
             return surface === 'merge-request-missing'
               ? providerErrorResponse('NOT_FOUND', 404)
               : providerErrorResponse('INTERNAL_SERVER_ERROR', 500);
+          }
+          if (url.includes('/providerReview.listChecks')) {
+            return fixtureResponse(providerChecksFixture);
           }
           throw new Error('Read not provided by the review overview fixture');
         },
@@ -160,10 +243,10 @@ export function PrReviewOverviewCopyFixture({
   return (
     <QueryClientProvider client={queryClient}>
       <TRPCProvider trpcClient={client} queryClient={queryClient}>
-        {surface === 'overview' ? (
-          body
-        ) : (
+        {PROVIDER_SURFACES.some(candidate => candidate === surface) ? (
           <ProviderPrScopeProvider value={gitlabScope}>{body}</ProviderPrScopeProvider>
+        ) : (
+          body
         )}
       </TRPCProvider>
     </QueryClientProvider>

@@ -2,6 +2,7 @@ import { selectionHaptic } from '@/lib/haptics';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
+import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
@@ -25,9 +26,7 @@ export function MethodPicker({
   const { t } = useTranslation();
   return (
     <View className="gap-1.5">
-      <Text className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-        {t('prReview.merge.methodLabel')}
-      </Text>
+      <PrReviewSectionLabel label={t('prReview.merge.methodLabel')} />
       <RadioGroup label={t('prReview.merge.methodLabel')} className="flex-row flex-wrap gap-2">
         {methodOptions.map(option => {
           const active = method === option.value;

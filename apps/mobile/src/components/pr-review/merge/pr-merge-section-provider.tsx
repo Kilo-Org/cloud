@@ -16,6 +16,7 @@ import { TerminalChip } from '@/components/pr-review/merge/pr-merge-section-part
 import { providerPrMergeTitles } from '@/components/pr-review/merge/pr-merge-titles';
 import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
+import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
 import { Button } from '@/components/ui/button';
 import { GitMerge } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -45,9 +46,7 @@ export function PrMergeSectionProvider({ prRef, state }: PrMergeSectionProviderP
 
   return (
     <View className="gap-2">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('prReview.merge.mergeTitle')}
-      </Text>
+      <PrReviewSectionLabel label={t('prReview.merge.mergeTitle')} />
       <Button
         onPress={() => {
           router.push(providerPrSheetHref(prRef, 'merge', { mode: 'merge' }));

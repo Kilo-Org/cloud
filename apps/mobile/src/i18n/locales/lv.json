@@ -2257,6 +2257,7 @@
       "cannotCompleteTitle": "Nevar pabeigt instalēšanu",
       "notAdminMessage": "Šo GitHub kontu var pievienot tikai tā administrators. Lūdz organizācijas administratoram instalēt Kilo.",
       "alreadyClaimedMessage": "Šī GitHub instalācija jau ir savienota ar citu Kilo kontu. Vispirms atvieno to šajā kontā.",
+      "installationUnavailableMessage": "Šī GitHub App instalācija ir apturēta vai vairs nav pieejama. Atjauno to vai pārinstalē GitHub vidē, pēc tam sāc no jauna.",
       "didNotCompleteTitle": "Instalēšana netika pabeigta",
       "didNotCompleteMessage": "GitHub lietotnes instalēšana netika pabeigta. Mēģini vēlreiz lietotnē."
     },

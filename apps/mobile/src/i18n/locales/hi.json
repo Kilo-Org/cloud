@@ -1696,6 +1696,7 @@
       "cannotCompleteTitle": "इंस्टॉलेशन पूरा नहीं किया जा सकता",
       "notAdminMessage": "केवल उस खाते का GitHub एडमिन ही इसे कनेक्ट कर सकता है। Kilo इंस्टॉल करने के लिए संगठन के एडमिन से कहें।",
       "alreadyClaimedMessage": "वह GitHub इंस्टॉलेशन पहले से किसी दूसरे Kilo खाते से कनेक्ट है। पहले वहाँ इसे डिस्कनेक्ट करें।",
+      "installationUnavailableMessage": "यह GitHub App इंस्टॉलेशन सस्पेंड है या अब उपलब्ध नहीं है। इसे GitHub में रीस्टोर करें या फिर से इंस्टॉल करें, फिर दोबारा शुरू करें।",
       "didNotCompleteTitle": "इंस्टॉलेशन पूरा नहीं हुआ",
       "didNotCompleteMessage": "GitHub ऐप का इंस्टॉलेशन पूरा नहीं हुआ। ऐप से फिर से कोशिश करें।"
     },

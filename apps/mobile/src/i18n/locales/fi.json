@@ -2220,6 +2220,7 @@
       "cannotCompleteTitle": "Asennusta ei voi suorittaa loppuun",
       "notAdminMessage": "Vain kyseisen GitHub-tilin ylläpitäjä voi yhdistää sen. Pyydä organisaation ylläpitäjää asentamaan Kilo.",
       "alreadyClaimedMessage": "Kyseinen GitHub-asennus on jo yhdistetty toiseen Kilo-tiliin. Katkaise yhteys sieltä ensin.",
+      "installationUnavailableMessage": "Tämä GitHub App -asennus on keskeytetty tai ei ole enää saatavilla. Palauta asennus tai asenna se uudelleen GitHubissa ja aloita sitten uudelleen.",
       "didNotCompleteTitle": "Asennus ei valmistunut",
       "didNotCompleteMessage": "GitHub-sovelluksen asennus jäi kesken. Yritä uudelleen sovelluksesta."
     },

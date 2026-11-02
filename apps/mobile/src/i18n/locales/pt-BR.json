@@ -1682,6 +1682,7 @@
       "cannotCompleteTitle": "Não foi possível concluir a instalação",
       "notAdminMessage": "Somente um administrador do GitHub dessa conta pode conectá-la. Peça a um administrador da organização para instalar o Kilo.",
       "alreadyClaimedMessage": "Essa instalação do GitHub já está conectada a outra conta do Kilo. Desconecte-a lá primeiro.",
+      "installationUnavailableMessage": "Esta instalação do GitHub App está suspensa ou não está mais disponível. Restaure-a ou reinstale-a no GitHub e comece novamente.",
       "didNotCompleteTitle": "A instalação não foi concluída",
       "didNotCompleteMessage": "A instalação do aplicativo para GitHub não foi concluída. Tente novamente pelo app."
     },

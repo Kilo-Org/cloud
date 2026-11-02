@@ -2220,6 +2220,7 @@
       "cannotCompleteTitle": "A kò lè parí ìfìsórí",
       "notAdminMessage": "Alábòójútó GitHub ti àkọọ́lẹ̀ yẹn nìkan ló lè so ó pọ̀. Béèrè lọ́wọ́ alábòójútó àjọ láti fi Kilo sórí rẹ̀.",
       "alreadyClaimedMessage": "Ìfìsórí GitHub yẹn ti sopọ̀ mọ́ àkọọ́lẹ̀ Kilo mìíràn tẹ́lẹ̀. Kọ́kọ́ gé àsopọ̀ rẹ̀ níbẹ̀.",
+      "installationUnavailableMessage": "Ìfìsórí GitHub App yìí ti daduro tàbí kò sí mọ́. Mú un padà bọ̀ sípò tàbí tún un ṣe ìfìsórí ní GitHub, kí o sì tún bẹ̀rẹ̀.",
       "didNotCompleteTitle": "Ìfìsórí kò parí",
       "didNotCompleteMessage": "A kò parí ìfìsórí ìṣàfilọ́lẹ̀ GitHub náà. Tún gbìyànjú láti inú ìṣàfilọ́lẹ̀."
     },

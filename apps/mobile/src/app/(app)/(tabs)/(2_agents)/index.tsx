@@ -80,6 +80,13 @@ export function buildGitHubInstallOutcomeAlert(
           buttons: [{ text: i18n.t('common.back') }],
         };
       }
+      if (result.code === 'installation_unavailable') {
+        return {
+          title: i18n.t('agents.githubInstall.cannotCompleteTitle'),
+          message: i18n.t('agents.githubInstall.installationUnavailableMessage'),
+          buttons: [{ text: i18n.t('common.back') }],
+        };
+      }
       return {
         title: i18n.t('agents.githubInstall.didNotCompleteTitle'),
         message: i18n.t('agents.githubInstall.didNotCompleteMessage'),

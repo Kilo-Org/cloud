@@ -1690,6 +1690,7 @@
       "cannotCompleteTitle": "インストールを完了できません",
       "notAdminMessage": "接続できるのは、そのGitHubアカウントの管理者だけです。組織の管理者にKiloのインストールを依頼してください。",
       "alreadyClaimedMessage": "インストール済みのGitHub Appは、すでに別のKiloアカウントに接続されています。先にそのアカウントで接続を解除してください。",
+      "installationUnavailableMessage": "このGitHub Appのインストールは停止されているか、利用できなくなっています。GitHubで復元または再インストールしてから、もう一度やり直してください。",
       "didNotCompleteTitle": "インストールが完了しませんでした",
       "didNotCompleteMessage": "GitHub Appのインストールが完了しませんでした。アプリからもう一度お試しください。"
     },

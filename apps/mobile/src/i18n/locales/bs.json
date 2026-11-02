@@ -2257,6 +2257,7 @@
       "cannotCompleteTitle": "Instalacija se ne može dovršiti",
       "notAdminMessage": "Samo administrator tog računa na GitHubu može ga povezati. Zamoli administratora organizacije da instalira Kilo.",
       "alreadyClaimedMessage": "Ta instalacija aplikacije za GitHub već je povezana s drugim Kilo računom. Prvo je tamo odspoji.",
+      "installationUnavailableMessage": "Ova instalacija GitHub App je suspendovana ili više nije dostupna. Obnovi je ili ponovo instaliraj na GitHubu, pa počni ponovo.",
       "didNotCompleteTitle": "Instalacija nije dovršena",
       "didNotCompleteMessage": "Instalacija aplikacije za GitHub nije dovršena. Pokušaj ponovo iz aplikacije."
     },

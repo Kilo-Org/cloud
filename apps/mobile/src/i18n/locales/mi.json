@@ -2220,6 +2220,7 @@
       "cannotCompleteTitle": "Kāore e taea te whakaoti i te tāutatanga",
       "notAdminMessage": "Mā tētahi kaiwhakahaere GitHub o taua pūkete anake e hono taua pūkete. Tonoa tētahi kaiwhakahaere o te whakahaere kia tāuta i a Kilo.",
       "alreadyClaimedMessage": "Kua hono kē taua tāutanga GitHub ki tētahi atu pūkete Kilo. Motuhia taua hononga i reira i te tuatahi.",
+      "installationUnavailableMessage": "Kua whakatārewa, kua kore rānei e wātea tēnei tāutatanga o te taupānga GitHub. Whakaorihia, tāutahia anō rānei i roto i a GitHub, kātahi ka tīmata anō.",
       "didNotCompleteTitle": "Kāore i oti te tāutatanga",
       "didNotCompleteMessage": "Kāore i oti te tāuta i te taupānga GitHub. Whakamātau anō i te taupānga."
     },

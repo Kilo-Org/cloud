@@ -2220,6 +2220,7 @@
       "cannotCompleteTitle": "A telepítés nem fejezhető be",
       "notAdminMessage": "Csak a fiók GitHub-adminisztrátora csatlakoztathatja a fiókot. Kérd meg a szervezet egyik adminisztrátorát, hogy telepítse a Kilo alkalmazást.",
       "alreadyClaimedMessage": "Ez a GitHub-telepítés már egy másik Kilo-fiókhoz kapcsolódik. Először válaszd le ott.",
+      "installationUnavailableMessage": "Ez a GitHub App-telepítés fel van függesztve, vagy már nem érhető el. Állítsd vissza vagy telepítsd újra a GitHubon, majd kezdd újra.",
       "didNotCompleteTitle": "A telepítés nem fejeződött be",
       "didNotCompleteMessage": "A GitHub-alkalmazás telepítése nem fejeződött be. Próbáld újra az alkalmazásból."
     },

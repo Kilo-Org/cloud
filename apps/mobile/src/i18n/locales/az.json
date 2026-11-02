@@ -2220,6 +2220,7 @@
       "cannotCompleteTitle": "Quraşdırmanı tamamlamaq mümkün deyil",
       "notAdminMessage": "Hesabı yalnız həmin hesabın GitHub inzibatçısı qoşa bilər. Təşkilatın inzibatçısından Kilo-nu quraşdırmasını istə.",
       "alreadyClaimedMessage": "Həmin GitHub quraşdırması artıq başqa Kilo hesabına qoşulub. Əvvəlcə oradakı bağlantını kəs.",
+      "installationUnavailableMessage": "Bu GitHub App quraşdırması dayandırılıb və ya artıq mövcud deyil. Onu GitHub-da bərpa et və ya yenidən quraşdır, sonra yenidən başla.",
       "didNotCompleteTitle": "Quraşdırma tamamlanmadı",
       "didNotCompleteMessage": "GitHub tətbiqinin quraşdırılması tamamlanmadı. Tətbiqdən yenidən cəhd et."
     },

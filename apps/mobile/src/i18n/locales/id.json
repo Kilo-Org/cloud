@@ -1690,6 +1690,7 @@
       "cannotCompleteTitle": "Tidak dapat menyelesaikan pemasangan",
       "notAdminMessage": "Hanya admin GitHub dari akun tersebut yang dapat menghubungkannya. Minta admin organisasi untuk memasang Kilo.",
       "alreadyClaimedMessage": "Instalasi aplikasi GitHub tersebut sudah terhubung ke akun Kilo lain. Putuskan koneksinya dari akun tersebut terlebih dahulu.",
+      "installationUnavailableMessage": "Instalasi GitHub App ini ditangguhkan atau tidak lagi tersedia. Pulihkan atau pasang ulang di GitHub, lalu mulai lagi.",
       "didNotCompleteTitle": "Pemasangan tidak selesai",
       "didNotCompleteMessage": "Pemasangan aplikasi GitHub belum selesai. Coba lagi dari aplikasi."
     },

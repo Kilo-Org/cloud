@@ -2220,6 +2220,7 @@
       "cannotCompleteTitle": "Imeshindikana kukamilisha usakinishaji",
       "notAdminMessage": "Ni msimamizi wa GitHub wa akaunti hiyo pekee anayeweza kuiunganisha. Mwombe msimamizi wa shirika asakinishe Kilo.",
       "alreadyClaimedMessage": "Usakinishaji huo wa GitHub tayari umeunganishwa na akaunti nyingine ya Kilo. Katisha muunganisho kwenye akaunti hiyo kwanza.",
+      "installationUnavailableMessage": "Usakinishaji huu wa GitHub App umesimamishwa au haupatikani tena. Urejeshe au usakinishe upya kwenye GitHub, kisha anza tena.",
       "didNotCompleteTitle": "Usakinishaji haukukamilika",
       "didNotCompleteMessage": "Usakinishaji wa programu ya GitHub haukukamilika. Jaribu tena kwenye programu."
     },

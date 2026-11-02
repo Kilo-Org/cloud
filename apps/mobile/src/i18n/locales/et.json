@@ -2220,6 +2220,7 @@
       "cannotCompleteTitle": "Installimist ei saa lõpule viia",
       "notAdminMessage": "Selle konto saab ühendada ainult selle GitHubi administraator. Palu organisatsiooni administraatoril Kilo installida.",
       "alreadyClaimedMessage": "See GitHubi rakenduse paigaldus on juba seotud teise Kilo kontoga. Katkesta esmalt ühendus sellel kontol.",
+      "installationUnavailableMessage": "See GitHubi rakenduse paigaldus on peatatud või pole enam saadaval. Taasta või paigalda see GitHubis uuesti, seejärel alusta uuesti.",
       "didNotCompleteTitle": "Installimine jäi pooleli",
       "didNotCompleteMessage": "GitHubi rakenduse installimine jäi pooleli. Proovi rakenduses uuesti."
     },

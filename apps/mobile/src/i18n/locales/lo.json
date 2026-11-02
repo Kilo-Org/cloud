@@ -2220,6 +2220,7 @@
       "cannotCompleteTitle": "ບໍ່ສາມາດຕິດຕັ້ງໃຫ້ສຳເລັດໄດ້",
       "notAdminMessage": "ມີພຽງຜູ້ດູແລ GitHub ຂອງບັນຊີນັ້ນທີ່ເຊື່ອມຕໍ່ບັນຊີໄດ້. ຂໍໃຫ້ຜູ້ດູແລອົງກອນຕິດຕັ້ງ Kilo.",
       "alreadyClaimedMessage": "ການຕິດຕັ້ງ GitHub ນັ້ນເຊື່ອມຕໍ່ກັບບັນຊີ Kilo ອື່ນແລ້ວ. ຕັດການເຊື່ອມຕໍ່ຈາກບັນຊີນັ້ນກ່ອນ.",
+      "installationUnavailableMessage": "ການຕິດຕັ້ງ GitHub App ນີ້ຖືກໂຈະ ຫຼື ບໍ່ມີໃຫ້ໃຊ້ອີກແລ້ວ. ກູ້ຄືນ ຫຼື ຕິດຕັ້ງຄືນໃໝ່ໃນ GitHub ແລ້ວເລີ່ມອີກຄັ້ງ.",
       "didNotCompleteTitle": "ການຕິດຕັ້ງບໍ່ສຳເລັດ",
       "didNotCompleteMessage": "ການຕິດຕັ້ງແອັບ GitHub ຍັງບໍ່ສຳເລັດ. ລອງອີກຄັ້ງຈາກແອັບ."
     },

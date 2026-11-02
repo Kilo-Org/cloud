@@ -2331,6 +2331,7 @@
       "cannotCompleteTitle": "Ma tistax titlesta l-installazzjoni",
       "notAdminMessage": "Amministratur ta' GitHub biss jista' jikkonnettja dak il-kont. Itlob lil amministratur tal-organizzazzjoni biex jinstalla Kilo.",
       "alreadyClaimedMessage": "Dik l-installazzjoni ta' GitHub diġà hija konnessa ma' kont ieħor ta' Kilo. Skonnettjaha hemm l-ewwel.",
+      "installationUnavailableMessage": "Din l-installazzjoni tal-GitHub App hija sospiża jew m'għadhiex disponibbli. Irrestawraha jew installaha mill-ġdid fi GitHub, imbagħad erġa' ibda.",
       "didNotCompleteTitle": "L-installazzjoni ma tlestietx",
       "didNotCompleteMessage": "L-installazzjoni tal-app ta' GitHub ma tlestietx. Erġa' pprova mill-app."
     },

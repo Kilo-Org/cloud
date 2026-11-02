@@ -2220,6 +2220,7 @@
       "cannotCompleteTitle": "نصب نه شي بشپړېدای",
       "notAdminMessage": "یوازې د هغه حساب د GitHub مدیر یې نښلولی شي. د سازمان له یوه مدیر څخه وغواړئ چې Kilo نصب کړي.",
       "alreadyClaimedMessage": "د GitHub دا نصب لا دمخه له بل Kilo حساب سره نښلول شوی دی. لومړی هلته یې اړیکه پرې کړئ.",
+      "installationUnavailableMessage": "د GitHub App دا نصب ځنډول شوی یا نور شتون نلري. په GitHub کې یې بحال یا بیا نصب کړئ، بیا بیا پیل کړئ.",
       "didNotCompleteTitle": "نصب بشپړ نه شو",
       "didNotCompleteMessage": "د GitHub اپلیکیشن نصب بشپړ نه شو. له اپلیکیشن څخه بیا هڅه وکړئ."
     },

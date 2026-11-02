@@ -2226,6 +2226,7 @@
       "cannotCompleteTitle": "Tsy afaka mamita ny fametrahana",
       "notAdminMessage": "Ny mpitantana an'io kaonty io ao amin'ny GitHub ihany no afaka mampifandray azy. Angataho ny mpitantana ny fikambanana hametraka ny Kilo.",
       "alreadyClaimedMessage": "Efa mifandray amin'ny kaonty Kilo hafa io fametrahana GitHub io. Tapaho any aloha ny fifandraisana.",
+      "installationUnavailableMessage": "Ity fametrahana GitHub App ity dia naato na tsy misy intsony. Avereno na apetraho indray ao amin'ny GitHub izy, dia atombohy indray.",
       "didNotCompleteTitle": "Tsy vita ny fametrahana",
       "didNotCompleteMessage": "Tsy vita ny fametrahana ny rindranasa GitHub. Andramo indray ao amin'ny rindranasa."
     },

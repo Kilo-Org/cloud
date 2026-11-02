@@ -2226,6 +2226,7 @@
       "cannotCompleteTitle": "መጫኑን ማጠናቀቅ አይቻልም",
       "notAdminMessage": "የዚያ መለያ የGitHub አስተዳዳሪ ብቻ መለያውን ማገናኘት ይችላል። Kiloን እንዲጭን የድርጅቱን አስተዳዳሪ ጠይቅ።",
       "alreadyClaimedMessage": "ያ የGitHub መተግበሪያ ጭነት አስቀድሞ ከሌላ የKilo መለያ ጋር ተገናኝቷል። በመጀመሪያ ከዚያ መለያ ግንኙነቱን አቋርጥ።",
+      "installationUnavailableMessage": "ይህ የGitHub መተግበሪያ ጭነት ታግዷል ወይም ከእንግዲህ አይገኝም። በGitHub ውስጥ መልሰው አስተካክለው ወይም እንደገና ጫነው፣ ከዚያ እንደገና ጀምር።",
       "didNotCompleteTitle": "መጫኑ አልተጠናቀቀም",
       "didNotCompleteMessage": "የGitHub መተግበሪያው ጭነት አልተጠናቀቀም። ከመተግበሪያው እንደገና ሞክር።"
     },

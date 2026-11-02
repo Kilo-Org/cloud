@@ -2220,6 +2220,7 @@
       "cannotCompleteTitle": "O'rnatishni yakunlab bo'lmaydi",
       "notAdminMessage": "Bu hisobni faqat GitHub administratori ulay oladi. Tashkilot administratoridan Kiloni o'rnatishni so'rang.",
       "alreadyClaimedMessage": "Bu o'rnatilgan GitHub ilovasi allaqachon boshqa Kilo hisobiga ulangan. Avval o'sha hisobdagi ulanishni uzing.",
+      "installationUnavailableMessage": "Ushbu GitHub App o'rnatilishi to'xtatib qo'yilgan yoki endi mavjud emas. Uni GitHub'da tiklang yoki qayta o'rnating, so'ngra qaytadan boshlang.",
       "didNotCompleteTitle": "O'rnatish yakunlanmadi",
       "didNotCompleteMessage": "GitHub ilovasini o'rnatish yakunlanmadi. Ilovadan qayta urinib ko'ring."
     },

@@ -2257,6 +2257,7 @@
       "cannotCompleteTitle": "Instalarea nu poate fi finalizată",
       "notAdminMessage": "Doar un administrator GitHub al acelui cont îl poate conecta. Cere unui administrator al organizației să instaleze Kilo.",
       "alreadyClaimedMessage": "Acea instalare GitHub este deja conectată la un alt cont Kilo. Deconecteaz-o mai întâi acolo.",
+      "installationUnavailableMessage": "Această instalare GitHub App este suspendată sau nu mai este disponibilă. Restaureaz-o sau reinstaleaz-o în GitHub, apoi începe din nou.",
       "didNotCompleteTitle": "Instalarea nu s-a finalizat",
       "didNotCompleteMessage": "Instalarea aplicației pentru GitHub nu a fost finalizată. Încearcă din nou din aplicație."
     },

@@ -209,6 +209,7 @@ describe('buildGitHubInstallOutcomeAlert (C13 outcome states)', () => {
       'install_state_user_mismatch',
       'not_installation_admin',
       'installation_already_claimed',
+      'installation_unavailable',
     ] as const) {
       const alert = buildGitHubInstallOutcomeAlert({ kind: 'error', code }, () => undefined);
       expect(alert?.buttons).toEqual([{ text: 'Back' }]);
@@ -226,6 +227,14 @@ describe('buildGitHubInstallOutcomeAlert (C13 outcome states)', () => {
         () => undefined
       )?.title
     ).toBe('Cannot complete installation');
+    expect(
+      buildGitHubInstallOutcomeAlert(
+        { kind: 'error', code: 'installation_unavailable' },
+        () => undefined
+      )?.message
+    ).toBe(
+      'This GitHub App installation is suspended or no longer available. Restore or reinstall it in GitHub, then start again.'
+    );
   });
 });
 

@@ -2220,6 +2220,7 @@
       "cannotCompleteTitle": "Enweghị ike imecha ntinye",
       "notAdminMessage": "Naanị onye nchịkwa GitHub nke akaụntụ ahụ nwere ike ijikọ ya. Rịọ onye nchịkwa òtù ka ọ tinye Kilo.",
       "alreadyClaimedMessage": "Ejikọlarị ntinye GitHub ahụ na akaụntụ Kilo ọzọ. Buru ụzọ kwụsị njikọ ya n'ebe ahụ.",
+      "installationUnavailableMessage": "Akwụsịtụrụ ntinye GitHub App a ma ọ bụ na ọ dịghịzi. Weghachite ma ọ bụ tinyeghachi ya na GitHub, wee malite ọzọ.",
       "didNotCompleteTitle": "Ntinye agwụchaghị",
       "didNotCompleteMessage": "Emechaghị ntinye ngwa GitHub. Nwaa ọzọ site na ngwa a."
     },

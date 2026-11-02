@@ -2226,6 +2226,7 @@
       "cannotCompleteTitle": "ਸਥਾਪਨਾ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ",
       "notAdminMessage": "ਉਸ ਖਾਤੇ ਦਾ GitHub ਪ੍ਰਸ਼ਾਸਕ ਹੀ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦਾ ਹੈ। ਸੰਸਥਾ ਦੇ ਪ੍ਰਸ਼ਾਸਕ ਨੂੰ Kilo ਸਥਾਪਿਤ ਕਰਨ ਲਈ ਕਹੋ।",
       "alreadyClaimedMessage": "ਉਹ GitHub ਸਥਾਪਨਾ ਪਹਿਲਾਂ ਹੀ ਕਿਸੇ ਹੋਰ Kilo ਖਾਤੇ ਨਾਲ ਕਨੈਕਟ ਹੈ। ਪਹਿਲਾਂ ਉੱਥੇ ਇਸਨੂੰ ਡਿਸਕਨੈਕਟ ਕਰੋ।",
+      "installationUnavailableMessage": "ਇਹ GitHub App ਸਥਾਪਨਾ ਮੁਅੱਤਲ ਹੈ ਜਾਂ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਇਸਨੂੰ GitHub ਵਿੱਚ ਬਹਾਲ ਕਰੋ ਜਾਂ ਦੁਬਾਰਾ ਸਥਾਪਿਤ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਸ਼ੁਰੂ ਕਰੋ।",
       "didNotCompleteTitle": "ਸਥਾਪਨਾ ਪੂਰੀ ਨਹੀਂ ਹੋਈ",
       "didNotCompleteMessage": "GitHub ਐਪ ਦੀ ਸਥਾਪਨਾ ਪੂਰੀ ਨਹੀਂ ਹੋਈ। ਐਪ ਤੋਂ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },

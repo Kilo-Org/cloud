@@ -1708,6 +1708,7 @@
       "cannotCompleteTitle": "לא ניתן להשלים את ההתקנה",
       "notAdminMessage": "רק מנהל GitHub של החשבון הזה יכול לחבר אותו. בקש ממנהל הארגון להתקין את Kilo.",
       "alreadyClaimedMessage": "התקנת GitHub הזו כבר מחוברת לחשבון Kilo אחר. נתק אותה שם קודם.",
+      "installationUnavailableMessage": "התקנת GitHub App הזו מושהית או אינה זמינה יותר. שחזר או התקן אותה מחדש ב-GitHub, ואז התחל שוב.",
       "didNotCompleteTitle": "ההתקנה לא הושלמה",
       "didNotCompleteMessage": "התקנת אפליקציית GitHub לא הושלמה. נסה שוב מהאפליקציה."
     },

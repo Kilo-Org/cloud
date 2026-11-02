@@ -2294,6 +2294,7 @@
       "cannotCompleteTitle": "Nepavyksta užbaigti diegimo",
       "notAdminMessage": "Tik tos GitHub paskyros administratorius gali ją prijungti. Paprašyk organizacijos administratoriaus įdiegti Kilo.",
       "alreadyClaimedMessage": "Ši įdiegta GitHub programėlė jau susieta su kita Kilo paskyra. Pirmiausia atjunk ją toje paskyroje.",
+      "installationUnavailableMessage": "Šis GitHub App diegimas sustabdytas arba nebepasiekiamas. Atkurk jį arba įdiek iš naujo GitHub, tada pradėk iš naujo.",
       "didNotCompleteTitle": "Diegimas neužbaigtas",
       "didNotCompleteMessage": "GitHub programėlės diegimas neužbaigtas. Bandyk dar kartą programėlėje."
     },

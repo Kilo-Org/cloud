@@ -2,14 +2,19 @@ import { createMiddleware } from 'hono/factory';
 import type { GastownEnv } from '../gastown.worker';
 import { getTownDOStub } from '../dos/Town.do';
 import { resError } from '../util/res.util';
+import { getWorkerAdmin, restActionForRequest } from './worker-admin.middleware';
 
 /**
  * For user-facing /api/towns/:townId/* routes, verifies the caller is
  * authorized: personal owner match OR org member of the owning org
  * (checked via JWT claims, no DB round-trip).
  *
+ * Admin support access is granted only when the per-request worker admin
+ * authority allows the concrete action and town target. Legacy `isAdmin`
+ * claims still grant in honor/observe mode; capabilities grant across towns.
+ *
  * Falls back gracefully for legacy towns without owner_type (treated as personal).
- * Must run AFTER kiloAuthMiddleware (which sets kiloOrgMemberships).
+ * Must run AFTER kiloAuthMiddleware and resolveWorkerAdminMiddleware.
  */
 export const townAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) => {
   const townId = c.req.param('townId');
@@ -17,8 +22,11 @@ export const townAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =
   const userId = c.get('kiloUserId');
   if (!userId) return c.json(resError('Authentication required'), 401);
 
-  // Admins bypass ownership checks
-  if (c.get('kiloIsAdmin')) return next();
+  const authority = getWorkerAdmin(c);
+  if (!authority) return c.json(resError('Internal server error'), 500);
+  const action = restActionForRequest(c) ?? `rest:${c.req.method} ${c.req.path}`;
+  const decision = await authority.decide(action, { kind: 'town', id: townId });
+  if (decision.allowed) return next();
 
   const townStub = getTownDOStub(c.env, townId);
   let config;

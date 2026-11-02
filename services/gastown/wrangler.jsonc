@@ -72,6 +72,9 @@
     "CF_ACCESS_TEAM": "engineering-e11",
     "CF_ACCESS_AUD": "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be",
     "KILO_API_URL": "https://api.kilo.ai",
+    "KILO_INTERNAL_API_URL": "https://api.kilo.ai",
+    "LEGACY_ADMIN_CLAIM_MODE": "honor",
+    "WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS": "",
     "GASTOWN_API_URL": "https://gastown.kiloapps.io",
     "WASTELAND_API_URL": "https://wasteland.kiloapps.io",
     "GASTOWN_BILLING_ENABLED": "true",
@@ -126,6 +129,11 @@
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "NEXTAUTH_SECRET",
     },
+    {
+      "binding": "INTERNAL_API_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "INTERNAL_API_SECRET_PROD",
+    },
   ],
 
   "env": {
@@ -140,6 +148,9 @@
         // Desktop VM host gateway IP directly so containers can reach
         // the host's dev servers.
         "KILO_API_URL": "http://192.168.65.254:3000",
+        "KILO_INTERNAL_API_URL": "http://localhost:3000",
+        "LEGACY_ADMIN_CLAIM_MODE": "honor",
+        "WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS": "",
         "GASTOWN_API_URL": "http://192.168.65.254:8803",
         "WASTELAND_API_URL": "http://192.168.65.254:8788",
         "GASTOWN_BILLING_ENABLED": "true",
@@ -208,6 +219,11 @@
           "binding": "NEXTAUTH_SECRET",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
           "secret_name": "NEXTAUTH_SECRET_DEV",
+        },
+        {
+          "binding": "INTERNAL_API_SECRET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "INTERNAL_API_SECRET_DEV",
         },
       ],
     },

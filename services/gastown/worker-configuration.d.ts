@@ -8,11 +8,15 @@ interface __BaseEnv_Env {
 	GASTOWN_AE: AnalyticsEngineDataset;
 	GASTOWN_JWT_SECRET: SecretsStoreSecret;
 	NEXTAUTH_SECRET: SecretsStoreSecret;
+	INTERNAL_API_SECRET: SecretsStoreSecret;
 	AI: Ai;
 	ENVIRONMENT: "development" | "production";
 	CF_ACCESS_TEAM: "engineering-e11";
 	CF_ACCESS_AUD: "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be";
 	KILO_API_URL: "http://192.168.65.254:3000" | "https://api.kilo.ai";
+	KILO_INTERNAL_API_URL: "http://localhost:3000" | "https://api.kilo.ai";
+	LEGACY_ADMIN_CLAIM_MODE: "honor" | "observe" | "reject";
+	WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS: string;
 	GASTOWN_API_URL: "http://192.168.65.254:8803" | "https://gastown.kiloapps.io";
 	WASTELAND_API_URL: "http://192.168.65.254:8788" | "https://wasteland.kiloapps.io";
 	GASTOWN_BILLING_ENABLED: "false" | "true";
@@ -87,11 +91,15 @@ declare namespace Cloudflare {
 		GASTOWN_AE: AnalyticsEngineDataset;
 		GASTOWN_JWT_SECRET: SecretsStoreSecret;
 		NEXTAUTH_SECRET: SecretsStoreSecret;
+		INTERNAL_API_SECRET: SecretsStoreSecret;
 		AI: Ai;
 		ENVIRONMENT: "development";
 		CF_ACCESS_TEAM: "engineering-e11";
 		CF_ACCESS_AUD: "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be";
 		KILO_API_URL: "http://192.168.65.254:3000";
+		KILO_INTERNAL_API_URL: "http://localhost:3000";
+		LEGACY_ADMIN_CLAIM_MODE: "honor" | "observe" | "reject";
+		WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS: string;
 		GASTOWN_API_URL: "http://192.168.65.254:8803";
 		WASTELAND_API_URL: "http://192.168.65.254:8788";
 		GASTOWN_BILLING_ENABLED: "false" | "true";
@@ -113,5 +121,5 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "ENVIRONMENT" | "CF_ACCESS_TEAM" | "CF_ACCESS_AUD" | "KILO_API_URL" | "GASTOWN_API_URL" | "WASTELAND_API_URL" | "GASTOWN_BILLING_ENABLED" | "NEXT_PUBLIC_POSTHOG_KEY">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "ENVIRONMENT" | "CF_ACCESS_TEAM" | "CF_ACCESS_AUD" | "KILO_API_URL" | "KILO_INTERNAL_API_URL" | "LEGACY_ADMIN_CLAIM_MODE" | "WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS" | "GASTOWN_API_URL" | "WASTELAND_API_URL" | "GASTOWN_BILLING_ENABLED" | "NEXT_PUBLIC_POSTHOG_KEY">> {}
 }

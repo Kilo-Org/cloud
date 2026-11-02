@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Bitbucket-yhteyttä ei voitu tarkistaa",
       "providerCheckFailedMessage": "Yhteyden tila näkyy vasta latauksen valmistuttua.",
       "reconnectTitle": "Yhdistä GitHub uudelleen",
+      "reconnectTitleGitLab": "Yhdistä GitLab uudelleen",
+      "reconnectTitleBitbucket": "Yhdistä Bitbucket uudelleen",
       "reconnectDescription": "GitHub-yhteytesi käyttöoikeus on peruttu.",
       "gitlabDescription": "Katselmoi yhdistämispyyntöjä mobiililaitteella",
       "gitlabInstanceMismatchTitle": "GitLab-yhteys kuuluu toiselle instanssille",

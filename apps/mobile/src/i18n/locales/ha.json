@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Ba a iya duba haɗin Bitbucket ba.",
       "providerCheckFailedMessage": "Ba a samun yanayin haɗi har sai wannan ya lodu.",
       "reconnectTitle": "Sake haɗa GitHub",
+      "reconnectTitleGitLab": "Sake haɗa GitLab",
+      "reconnectTitleBitbucket": "Sake haɗa Bitbucket",
       "reconnectDescription": "An soke haɗinka na GitHub.",
       "gitlabDescription": "Yi bitar buƙatun haɗawa a waya",
       "gitlabInstanceMismatchTitle": "Haɗawar GitLab ta wani misali ce",

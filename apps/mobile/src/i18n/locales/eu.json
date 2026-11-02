@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Ezin izan da Bitbucket-ekiko konexioa egiaztatu.",
       "providerCheckFailedMessage": "Konexio-egoera ez dago eskuragarri kargatu arte.",
       "reconnectTitle": "Konektatu GitHub berriro",
+      "reconnectTitleGitLab": "Konektatu GitLab berriro",
+      "reconnectTitleBitbucket": "Konektatu Bitbucket berriro",
       "reconnectDescription": "GitHub-ekiko konexioa baliogabetu da.",
       "gitlabDescription": "Berrikusi merge-eskaerak mugikorrean",
       "gitlabInstanceMismatchTitle": "GitLab konexioa beste instantzia baterako da",

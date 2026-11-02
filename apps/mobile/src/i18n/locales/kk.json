@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Bitbucket қосылымын тексеру мүмкін болмады.",
       "providerCheckFailedMessage": "Жүктелгенше қосылым күйі қолжетімсіз.",
       "reconnectTitle": "GitHub-қа қайта қосылу",
+      "reconnectTitleGitLab": "GitLab-қа қайта қосылу",
+      "reconnectTitleBitbucket": "Bitbucket-қа қайта қосылу",
       "reconnectDescription": "GitHub қосылымына берілген рұқсат қайтарып алынды.",
       "gitlabDescription": "Біріктіру сұрауларын мобильді құрылғыда тексеру",
       "gitlabInstanceMismatchTitle": "GitLab қосылымы басқа инстанцияға арналған",

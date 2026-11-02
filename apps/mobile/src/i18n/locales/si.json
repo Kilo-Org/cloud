@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Bitbucket සම්බන්ධතාවය පරීක්ෂා කිරීමට නොහැකි විය.",
       "providerCheckFailedMessage": "මෙය පූරණය වන තුරු සම්බන්ධතා තත්ත්වය ලබා ගත නොහැක.",
       "reconnectTitle": "GitHub නැවත සම්බන්ධ කරන්න",
+      "reconnectTitleGitLab": "GitLab නැවත සම්බන්ධ කරන්න",
+      "reconnectTitleBitbucket": "Bitbucket නැවත සම්බන්ධ කරන්න",
       "reconnectDescription": "ඔබේ GitHub සම්බන්ධතාවය අවලංගු කර ඇත.",
       "gitlabDescription": "ජංගම දුරකථනයෙන් මර්ජ ඉල්ලීම් සමාලෝචනය කරන්න",
       "gitlabInstanceMismatchTitle": "GitLab සම්බන්ධතාව වෙනත් ඉන්ස්ටන්ස් එකක් සඳහා වේ",

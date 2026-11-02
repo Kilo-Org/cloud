@@ -711,6 +711,8 @@
       "checkFailedTitleBitbucket": "Povezave z Bitbucketom ni bilo mogoče preveriti.",
       "providerCheckFailedMessage": "Stanje povezave bo na voljo po končanem nalaganju.",
       "reconnectTitle": "Ponovna povezava z GitHubom",
+      "reconnectTitleGitLab": "Ponovna povezava z GitLabom",
+      "reconnectTitleBitbucket": "Ponovna povezava z Bitbucketom",
       "reconnectDescription": "Tvoja povezava z GitHubom je bila preklicana.",
       "gitlabDescription": "Preglej merge requeste na mobilni napravi",
       "gitlabInstanceMismatchTitle": "Povezava z GitLabom je za drugo instanco",

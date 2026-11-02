@@ -711,6 +711,8 @@
       "checkFailedTitleBitbucket": "Připojení ke Bitbucketu se nepodařilo ověřit.",
       "providerCheckFailedMessage": "Stav připojení bude dostupný až po načtení.",
       "reconnectTitle": "Znovu připojit GitHub",
+      "reconnectTitleGitLab": "Znovu připojit GitLab",
+      "reconnectTitleBitbucket": "Znovu připojit Bitbucket",
       "reconnectDescription": "Oprávnění pro připojení ke GitHubu bylo zrušeno.",
       "gitlabDescription": "Kontrolovat merge requesty na mobilu",
       "gitlabInstanceMismatchTitle": "Připojení ke GitLabu je pro jinou instanci",

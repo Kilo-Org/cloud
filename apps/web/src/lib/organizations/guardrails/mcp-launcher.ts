@@ -21,11 +21,13 @@ function ineligible(reason: string): LauncherParseResult {
   return { eligible: false, reason };
 }
 
-// npm reads a suffix such as `1.x`, `1.2.x` or `x` as a range over versions and refuses to use one
-// as a dist-tag name, so a wildcard in the release segments is neither a version nor a tag.
+const NPM_WILDCARD_SUFFIX = /^v*(?:\d+|[xX*])(?:\.(?:\d+|[xX*])){0,2}$/;
+
+// npm reads a version-shaped wildcard such as `1.x`, `1.2.x`, `v1.x` or `x` as a range over versions
+// and refuses to use one as a dist-tag name. A wildcard anywhere else, as in `release.x`, leaves an
+// ordinary tag, so only the version-shaped form is a range here.
 function isNpmRange(suffix: string): boolean {
-  const release = suffix.replace(/^v/, '').split(/[-+]/, 1)[0];
-  return release.split('.').some(segment => segment === 'x' || segment === 'X' || segment === '*');
+  return NPM_WILDCARD_SUFFIX.test(suffix) && /[xX*]/.test(suffix);
 }
 
 function parseNpmSpec(spec: string): LauncherParseResult {

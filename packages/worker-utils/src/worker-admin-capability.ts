@@ -340,7 +340,9 @@ export type WorkerAdminDecisionFailureReason =
   | 'session_revoked'
   | 'expired'
   | 'validation_unavailable'
-  | 'legacy_claim_rejected';
+  | 'legacy_claim_rejected'
+  | 'legacy_claim_missing_exp'
+  | 'legacy_claim_lifetime_rejected';
 
 export type WorkerAdminDecision =
   | {
@@ -612,6 +614,22 @@ export async function createWorkerAdminAuthority(
 
   function decideLegacy(): WorkerAdminDecision {
     if (!legacyClaim) {
+      if (params.legacyClaimRejection === 'missing_exp') {
+        return {
+          allowed: false,
+          source: 'legacy',
+          status: 401,
+          reason: 'legacy_claim_missing_exp',
+        };
+      }
+      if (params.legacyClaimRejection === 'lifetime_exceeded') {
+        return {
+          allowed: false,
+          source: 'legacy',
+          status: 401,
+          reason: 'legacy_claim_lifetime_rejected',
+        };
+      }
       return { allowed: false, source: 'none', status: 403, reason: 'legacy_claim_rejected' };
     }
     if (params.mode === 'reject') {

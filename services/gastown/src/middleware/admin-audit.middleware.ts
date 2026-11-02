@@ -12,7 +12,13 @@ import { emitWorkerAdminDecision, restActionForRequest } from './worker-admin.mi
 export const adminAuditMiddleware = createMiddleware<GastownEnv>(async (c, next) => {
   const authority = c.get('workerAdmin');
   if (!authority) return next();
-  if (!authority.legacyClaim && !authority.hasCapability && authority.capabilityError === null) {
+  const claimedAdmin = c.get('kiloTokenClaims')?.isAdmin === true;
+  if (
+    !authority.legacyClaim &&
+    !authority.hasCapability &&
+    authority.capabilityError === null &&
+    !claimedAdmin
+  ) {
     return next();
   }
 

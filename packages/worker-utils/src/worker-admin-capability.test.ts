@@ -300,6 +300,25 @@ describe('worker admin authority', () => {
     });
   });
 
+  it('names the hardened-out legacy claim reason', async () => {
+    const authority = await createWorkerAdminAuthority({
+      mode: 'honor',
+      audience: GASTOWN_ADMIN_AUDIENCE,
+      identity,
+      legacyClaim: false,
+      legacyClaimRejection: 'lifetime_exceeded',
+      capabilityToken: null,
+      jwks: null,
+      introspect: activeIntrospect,
+      now: () => NOW * 1000,
+    });
+    await expect(authority.decide('trpc:gastown.getTown', townTarget)).resolves.toMatchObject({
+      allowed: false,
+      status: 401,
+      reason: 'legacy_claim_lifetime_rejected',
+    });
+  });
+
   it('marks observe-mode legacy grants as would-deny', async () => {
     const authority = await createWorkerAdminAuthority({
       mode: 'observe',

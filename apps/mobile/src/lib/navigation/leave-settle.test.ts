@@ -2,7 +2,7 @@
 // screen's own dismissal overlap. Each ends on the event that settles it, so
 // neither depends on a device's speed nor outlives the leave it describes.
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   armLeaveSettle,
@@ -10,6 +10,7 @@ import {
   clearAcceptedBack,
   endLeaveSettle,
   insideLeaveSettle,
+  LEAVE_SETTLE_BACKSTOP_MS,
   noteAcceptedBack,
   resetLeaveSettle,
 } from '@/lib/navigation/leave-settle';
@@ -41,11 +42,36 @@ describe('leave settle window', () => {
     expect(insideLeaveSettle()).toBe(true);
   });
 
-  it('holds no matter how far the clock moves', () => {
+  it('holds while the revealed scene has not finished appearing', () => {
     armLeaveSettle();
-    // No clock: a slow device or a raised animation scale only lengthens the
-    // interval, and the revealed scene still has not finished appearing.
+    // A slow device or a raised animation scale only lengthens the interval,
+    // and the scene has not reported its transition end yet.
     expect(insideLeaveSettle()).toBe(true);
+  });
+
+  describe('with the backstop', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('drops the window when the transition end never arrives', () => {
+      armLeaveSettle();
+      vi.advanceTimersByTime(LEAVE_SETTLE_BACKSTOP_MS - 1);
+      expect(insideLeaveSettle()).toBe(true);
+      vi.advanceTimersByTime(1);
+      expect(insideLeaveSettle()).toBe(false);
+    });
+
+    it('keeps the leave’s own end instead of the backstop when the event arrives first', () => {
+      armLeaveSettle();
+      endLeaveSettle();
+      vi.advanceTimersByTime(LEAVE_SETTLE_BACKSTOP_MS * 2);
+      expect(insideLeaveSettle()).toBe(false);
+    });
   });
 });
 

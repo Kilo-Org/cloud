@@ -49,12 +49,8 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({
-  ChoiceRow: (props: {
-    label: string;
-    busy: boolean;
-    disabled: boolean;
-    onPress: () => void;
-  }) => createElement('View', props),
+  ChoiceRow: (props: { label: string; busy: boolean; disabled: boolean; onPress: () => void }) =>
+    createElement('View', props),
 }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: ({ children }: { children?: ReactNode }): ReactNode => children,

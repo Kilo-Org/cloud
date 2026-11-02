@@ -19,6 +19,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { resetLeaveSettle } from '@/lib/navigation/leave-settle';
 import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 import { OptionList } from './option-list';
 
@@ -170,6 +171,7 @@ async function press(pressable: () => void): Promise<void> {
 }
 
 beforeEach(() => {
+  resetLeaveSettle();
   routerBack.mockReset();
   focus.focused = true;
 });

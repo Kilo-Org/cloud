@@ -2781,9 +2781,9 @@ export const CustomLlmInferenceProviderSlugSchema = z
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a lowercase provider slug such as "acme-ai"');
 
 /**
- * Makes a custom LLM available to every user, including anonymous ones. Like
- * every custom LLM it is free; unlike private ones it is subject to
- * organization provider allow lists.
+ * Makes a custom LLM available to every user, including anonymous ones when it
+ * is free. Unlike private ones it is subject to organization provider allow
+ * lists.
  */
 export const CustomLlmPublicSchema = z.object({
   /** Provider slugs the upstream may serve this model from. They are listed in
@@ -2801,6 +2801,43 @@ export const VercelCountryCodeSchema = z
   .string()
   .regex(/^[A-Z]{2}$/, 'must be an uppercase two-letter country code such as "US"');
 
+const PricePerMillionSchema = z.number().finite().nonnegative();
+
+const CustomPricingTierSchema = z.object({
+  start_context_length: z.number().int().nonnegative(),
+  pricing: z.object({
+    prompt_per_million: PricePerMillionSchema,
+    completion_per_million: PricePerMillionSchema,
+    input_cache_read_per_million: PricePerMillionSchema.nullable(),
+    input_cache_write_per_million: PricePerMillionSchema.nullable(),
+  }),
+});
+
+export const CustomPricingTiersSchema = z
+  .tuple([CustomPricingTierSchema], CustomPricingTierSchema)
+  .superRefine((tiers, ctx) => {
+    if (tiers[0].start_context_length !== 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'The first pricing tier must start at context length 0',
+        path: [0, 'start_context_length'],
+      });
+    }
+    let previousStart = tiers[0].start_context_length;
+    for (const [index, { start_context_length }] of tiers.entries()) {
+      if (index > 0 && start_context_length <= previousStart) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Pricing tiers must be ordered by ascending start context length',
+          path: [index, 'start_context_length'],
+        });
+      }
+      previousStart = start_context_length;
+    }
+  });
+
+export type CustomPricingTiers = z.infer<typeof CustomPricingTiersSchema>;
+
 export const CustomLlmDefinitionSchema = z
   .object({
     ...CustomLlmMetadataSchema.shape,
@@ -2813,6 +2850,8 @@ export const CustomLlmDefinitionSchema = z
     /** Hidden from model lists and refused by the gateway for requests from these countries.
      * A request without a known country is not restricted. */
     country_deny_list: z.array(VercelCountryCodeSchema).optional(),
+    /** What Kilo bills users, in the custom pricing tier format. Without it the model is free. */
+    pricing: CustomPricingTiersSchema.optional(),
   })
   .superRefine((definition, ctx) => {
     const clientApiKind = getCustomLlmClientApiKind(definition.opencode_settings?.ai_sdk_provider);
@@ -2985,40 +3024,9 @@ export type PreferredProviderOrderConfig = z.infer<typeof PreferredProviderOrder
 
 export const CUSTOM_PRICING_MAX_MODELS = 500;
 
-const PricePerMillionSchema = z.number().finite().nonnegative();
-
-const CustomPricingTierSchema = z.object({
-  start_context_length: z.number().int().nonnegative(),
-  pricing: z.object({
-    prompt_per_million: PricePerMillionSchema,
-    completion_per_million: PricePerMillionSchema,
-    input_cache_read_per_million: PricePerMillionSchema.nullable(),
-    input_cache_write_per_million: PricePerMillionSchema.nullable(),
-  }),
-});
-
 export const CustomPricingSchema = z.object({
   model: GatewayModelIdSchema,
-  pricing: z.tuple([CustomPricingTierSchema], CustomPricingTierSchema).superRefine((tiers, ctx) => {
-    if (tiers[0].start_context_length !== 0) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'The first pricing tier must start at context length 0',
-        path: [0, 'start_context_length'],
-      });
-    }
-    let previousStart = tiers[0].start_context_length;
-    for (const [index, { start_context_length }] of tiers.entries()) {
-      if (index > 0 && start_context_length <= previousStart) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Pricing tiers must be ordered by ascending start context length',
-          path: [index, 'start_context_length'],
-        });
-      }
-      previousStart = start_context_length;
-    }
-  }),
+  pricing: CustomPricingTiersSchema,
   /** Human-readable discount shown in the model name; never used in calculations. */
   discountPercentage: z.number().gt(0).lte(100).optional(),
   /** Only use this pricing when the upstream response does not report a market cost. */

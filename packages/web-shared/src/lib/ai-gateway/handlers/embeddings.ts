@@ -251,6 +251,7 @@ export async function handleEmbeddingsRequest(
     provider: provider.type,
     requested_model: requestedModelLowerCased,
     is_free: isFree,
+    custom_llm_pricing: null,
     promptInfo,
     max_tokens: null,
     has_middle_out_transform: null,

@@ -126,6 +126,21 @@ export const tags = {
 
 const TRANSPARENT_COLORS = /^(transparent|#0000|#00000000|rgba\(.*,\s*0(\.0+)?\))$/i;
 
+/**
+ * Owners whose content a native dialog or sheet hosts. The platform positions
+ * that surface inside the window, so the frames React Native reports for the
+ * content start at the surface's own origin, not at the window's — which is why
+ * a rule that compares a frame against the window's insets must skip them.
+ */
+const PRESENTED_SURFACE_OWNERS: Record<string, true> = { PresentedContent: true };
+
+/** True when a native dialog or sheet hosts the node's content. */
+export function insidePresentedSurface(node: LayoutNode): boolean {
+  return [node, ...ancestors(node)].some(candidate =>
+    (candidate.probe.owners ?? []).some(owner => PRESENTED_SURFACE_OWNERS[owner] === true)
+  );
+}
+
 function visibleContainer(style: ProbeNode['style']): boolean {
   const background = style?.backgroundColor;
   const filled =

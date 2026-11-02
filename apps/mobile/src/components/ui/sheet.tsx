@@ -34,8 +34,8 @@ function detentHeight(snapPoint: string | number, windowHeight: number): number 
 }
 
 /**
- * The height a detent sheet may give its content on Android, or null to leave
- * the content as it is.
+ * The height a two-detent sheet may give its content on Android, or null to
+ * leave the content as it is.
  *
  * Android builds a detent sheet's content host at the height of its own window
  * rather than at the detent's height (`fitToContents` is off whenever
@@ -53,7 +53,10 @@ function detentContentHeight(
   windowHeight: number,
   showHandle: boolean
 ): number | null {
-  if (Platform.OS !== 'android' || !snapPoints?.length) {
+  // A single snap point is not a detent range: the library renders that sheet
+  // fully expanded (`skipPartiallyExpanded`), so bounding its content to the
+  // point would leave its own content short of the frame it draws.
+  if (Platform.OS !== 'android' || !snapPoints || snapPoints.length < 2) {
     return null;
   }
   const smallestDetent = Math.min(

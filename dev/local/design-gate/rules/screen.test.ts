@@ -254,6 +254,29 @@ test('safe-area: text under the top and bottom insets, tolerance', () => {
   assert.deepEqual(run('safe-area', [{ parent: 0, tag: 'View', rect: [0, 0, 400, 100] }], env), []);
 });
 
+test('safe-area: a natively presented surface is measured from its own origin', () => {
+  const env = { safeArea: { top: 24, right: 0, bottom: 30, left: 0 } };
+  // A bottom sheet's content host starts partway down the window and the
+  // platform positions it; inside that surface every frame starts at the
+  // surface's origin, so the window's top inset never describes it.
+  const presented: ProbeNode[] = [
+    { parent: 0, tag: 'RNHostView', rect: [0, 600, 400, 200], owners: ['RNHostView'] },
+    { parent: 1, tag: 'View', rect: [0, 600, 400, 200], owners: ['View', 'PresentedContent'] },
+    { parent: 2, tag: 'Paragraph', rect: [0, 0, 400, 20], text: 'Select account' },
+  ];
+  assert.deepEqual(run('safe-area', presented, env), []);
+
+  // The same frame outside a presented surface still reports the inset.
+  assert.equal(
+    run(
+      'safe-area',
+      [{ parent: 0, tag: 'Paragraph', rect: [0, 0, 400, 20], text: 'Select account' }],
+      env
+    )[0]?.measured,
+    20
+  );
+});
+
 test('touch-target: allows 0.5 dp of pixel-snapping rounding', () => {
   const pressable = (size: number): ProbeNode => ({
     parent: 0,

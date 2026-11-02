@@ -236,6 +236,16 @@ describe('Sheet', () => {
     expect(frame?.props.style).toBeUndefined();
   });
 
+  it('leaves a single-detent sheet unbounded, because it renders fully expanded', async () => {
+    windowSize.os = 'android';
+    const { renderer } = await mount({ snapPoints: ['60%'] });
+
+    // The library skips the partial state for one snap point, so the sheet draws
+    // full height: bounding its content to 60% would leave it short of its frame.
+    const frame = renderer.root.findAllByProps({ testID: 'sheet-content' })[0]?.parent;
+    expect(frame?.props.style).toBeUndefined();
+  });
+
   it('leaves a detent sheet unbounded where the platform sizes content to the detent', async () => {
     const { renderer } = await mount({ snapPoints: ['50%', '90%'] });
 

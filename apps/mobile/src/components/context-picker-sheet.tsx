@@ -117,8 +117,9 @@ function ContextPickerSheetBody({
               >
                 {/* Every account row holds the same blank gutter so the
                       labels line up; only the current account paints a check
-                      in it. */}
-                <View className="w-4 items-center">
+                      in it. The gutter is the check's own 16 dp — the app's rem
+                      is 14, so `w-4` would clip the icon. */}
+                <View className="w-[16px] items-center">
                   {index === currentIndex && <Check size={16} color={colors.primary} />}
                 </View>
                 <Text className="min-w-0 flex-1 text-sm" numberOfLines={1}>

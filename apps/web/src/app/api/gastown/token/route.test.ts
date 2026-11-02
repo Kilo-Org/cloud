@@ -40,6 +40,7 @@ jest.mock('@/lib/worker-admin/capability-issuer', () => ({
 
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { recordKiloAdminElevationForRequest } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { isWorkerAdminLegacyClaimIssuanceEnabled } from '@kilocode/web-shared/lib/config.server';
 import { requireWorkerAdminActor, WorkerAdminActorError } from '@/lib/worker-admin/actor-guard';
 import { issueWorkerAdminCapability } from '@/lib/worker-admin/capability-issuer';
@@ -72,6 +73,26 @@ describe('POST /api/gastown/token', () => {
       { expiresIn: 3600 }
     );
     expect(issueWorkerAdminCapability).not.toHaveBeenCalled();
+    expect(recordKiloAdminElevationForRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'service_token_mint' })
+    );
+  });
+
+  it('does not record a legacy elevation when a capability body is sent', async () => {
+    jest.mocked(requireWorkerAdminActor).mockResolvedValue({
+      actor: { assurance: { userId: 'user-1' } },
+      sessionBinding: { apiTokenPepper: 'pepper-1', webSessionPepper: null },
+    } as never);
+    jest.mocked(issueWorkerAdminCapability).mockResolvedValue({
+      capability: 'capability-token',
+      capabilityExpiresAt: '2026-01-01T00:05:00.000Z',
+      jti: 'jti-1',
+      actions: ['trpc:gastown.getTown'],
+    });
+    await POST(request({ adminCapability: { target: { kind: 'town', id: 'town-1' } } }));
+    expect(recordKiloAdminElevationForRequest).not.toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'service_token_mint' })
+    );
   });
 
   it('stops issuing the legacy admin claim when the flag is off', async () => {
@@ -124,6 +145,9 @@ describe('POST /api/gastown/token', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ token: 'identity-token' });
     expect(requireWorkerAdminActor).not.toHaveBeenCalled();
+    expect(recordKiloAdminElevationForRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'service_token_mint' })
+    );
   });
 
   it('rejects a malformed capability request', async () => {

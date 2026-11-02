@@ -87,6 +87,56 @@ describe('browserCapabilityHeader', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('reuses a target capability and only widens it for new actions', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            capability: 'cap-1',
+            capabilityExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            capability: 'cap-2',
+            capabilityExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+          }),
+          { status: 200 }
+        )
+      );
+
+    await expect(
+      browserCapabilityHeader(params([{ path: 'gastown.getTown', input: { townId: 'town-4' } }]))
+    ).resolves.toBe('cap-1');
+    await expect(
+      browserCapabilityHeader(
+        params([
+          { path: 'gastown.getTown', input: { townId: 'town-4' } },
+          { path: 'gastown.getRig', input: { townId: 'town-4', rigId: 'rig-1' } },
+        ])
+      )
+    ).resolves.toBe('cap-2');
+    await expect(
+      browserCapabilityHeader(params([{ path: 'gastown.getTown', input: { townId: 'town-4' } }]))
+    ).resolves.toBe('cap-2');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body as string).adminCapability.actions).toEqual([
+      'trpc:gastown.getRig',
+      'trpc:gastown.getTown',
+    ]);
+  });
+
+  it('swallows network failures and does not break the main request', async () => {
+    fetchMock.mockRejectedValue(new Error('offline'));
+    const request = params([{ path: 'gastown.getTown', input: { townId: 'town-5' } }]);
+    await expect(browserCapabilityHeader(request)).resolves.toBeNull();
+    await expect(browserCapabilityHeader(request)).resolves.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('negative-caches issuance failures so polling does not retry each time', async () => {
     fetchMock.mockResolvedValue(new Response('{}', { status: 403 }));
     const request = params([{ path: 'gastown.getTown', input: { townId: 'town-3' } }]);

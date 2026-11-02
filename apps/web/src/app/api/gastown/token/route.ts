@@ -85,12 +85,14 @@ export async function POST(request: Request) {
         target: { kind: 'service', id: 'gastown' },
         inventoryId: 'rest.gastownToken',
       });
+      if (actor.actor.assurance.userId !== user.id) {
+        return NextResponse.json(
+          { error: 'Worker admin capabilities require the same authenticated user' },
+          { status: 403 }
+        );
+      }
       const issued = await issueWorkerAdminCapability({
-        user: {
-          ...user,
-          id: actor.actor.assurance.userId,
-          api_token_pepper: actor.sessionBinding.apiTokenPepper,
-        },
+        user: { ...user, api_token_pepper: actor.sessionBinding.apiTokenPepper },
         audience: GASTOWN_ADMIN_AUDIENCE,
         target,
         actions,

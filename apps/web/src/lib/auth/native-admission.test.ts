@@ -415,15 +415,18 @@ describe('issueAdmissionChallenge', () => {
     );
   });
 
-  test('reports an errored limiter answer once per interval and still issues challenges', async () => {
+  test('refuses a challenge when the rule is not configured and reports it once per interval', async () => {
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
 
-    const first = await issueAdmissionChallenge(makeRequest(), '127.0.0.1');
-    const second = await issueAdmissionChallenge(makeRequest(), '127.0.0.1');
+    await expect(issueAdmissionChallenge(makeRequest(), '127.0.0.1')).rejects.toThrow(
+      ChallengeRateLimitError
+    );
+    await expect(issueAdmissionChallenge(makeRequest(), '127.0.0.1')).rejects.toThrow(
+      ChallengeRateLimitError
+    );
 
-    expect(first.challenge).not.toBe(second.challenge);
     expect(mockCheckRateLimit).toHaveBeenCalledTimes(2);
-    expect(db.insert).toHaveBeenCalledTimes(2);
+    expect(db.insert).not.toHaveBeenCalled();
     expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
     expect(mockCaptureMessage).toHaveBeenCalledWith(
       "Firewall rate limit 'native-admission-challenge' is not configured",

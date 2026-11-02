@@ -141,6 +141,7 @@ ordinary local startup does not require this credential.
 - `CALLBACK_TOKEN_SECRET` - Secret for signing callback tokens. Required for local development. `[SECRET]`
 - `INTERNAL_SECRET` - Alias/fallback for `INTERNAL_API_SECRET`; used in KiloClaw E2E scripts (`services/kiloclaw/e2e/`). `[SECRET]`
 - Sign-in code email rate limits are Vercel Firewall rules configured in the project's firewall configuration, not environment variables. `magic-link-email` counts sends per normalized address; `sign-in-code-email-ip` counts sends per caller address. `apps/web/src/lib/auth/email-signin-eligibility.ts` reports a rule that is not configured to Sentry at most once a minute, so both rules belong in that configuration.
+- Native admission rate limiting is a Vercel Firewall rule configured in the project's firewall configuration, not an environment variable. `native-admission-challenge` counts challenge issuance per caller address at `POST /api/auth/native/admission-challenge`; it belongs in that configuration, because `apps/web/src/lib/auth/native-admission.ts` reports an unconfigured rule to Sentry at most once a minute and refuses the request.
 
 ### Social OAuth Clients
 

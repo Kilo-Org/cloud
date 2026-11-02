@@ -1130,6 +1130,47 @@ describe('a question a later send took the slot from', () => {
     expect(snapshotOf(opened).asked).toBe('second');
   });
 
+  it('opens with one bubble for a retry that was interrupted between its two records', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('interrupted', place);
+    /* The slot holds the question and the kept list still holds it too: the
+       process died after the slot wrote its record, before the list dropped
+       the entry. It is one attempt and must be drawn once. */
+    const question = {
+      text: 'the question asked again',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+    };
+    storedQuestions.set(`chat-asked-target:interrupted`, JSON.stringify(question));
+    storedQuestions.set(
+      'chat-kept-questions:interrupted',
+      JSON.stringify([
+        { id: 1, ...question, afterTurns: 0, outcome: 'failed' },
+        {
+          id: 2,
+          text: 'the failure it was slid above',
+          model: 'kilo/one',
+          effort: null,
+          images: [],
+          afterTurns: 0,
+          outcome: 'failed',
+        },
+      ])
+    );
+
+    await enterChat(place, 'interrupted');
+    await settled();
+
+    const held = snapshotOf('interrupted');
+    expect(held.displaced.map(one => one.text)).toEqual(['the failure it was slid above']);
+    expect(asMessages(held).map(one => one.info.id)).toEqual([
+      'interrupted:displaced:2',
+      'interrupted:asked',
+    ]);
+  });
+
   it('opens again with what a later send kept', async () => {
     creditsFailureFor = 's1';
     await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });

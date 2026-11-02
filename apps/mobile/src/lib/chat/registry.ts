@@ -40,6 +40,7 @@ import { ensureRemoteMcp } from './remote-mcp';
 import { type ChatPlace } from './scope';
 import { questionSearches } from './web-search-budget';
 import {
+  type Asked,
   askedIn,
   forgetAsked,
   keptIn,
@@ -498,7 +499,9 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
       askedEffort: asked?.effort ?? null,
-      displaced: kept,
+      /* A kept question that repeats the slot's is one attempt: see
+         `sameAttempt`. */
+      displaced: asked === null ? kept : kept.filter(one => !sameAttempt(one, asked)),
       status: 'idle',
       failed: null,
       failureKey: null,
@@ -530,7 +533,9 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       asked: asked?.text ?? null,
       askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
-      displaced: kept,
+      /* A kept question that repeats the slot's is one attempt: see
+         `sameAttempt`. */
+      displaced: asked === null ? kept : kept.filter(one => !sameAttempt(one, asked)),
       record: recordOfChat(database, sessionId),
       askedEffort: asked?.effort ?? null,
     });
@@ -542,6 +547,20 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
     await runtime.runPromise(Scope.close(scope, Exit.void));
     throw error;
   }
+}
+
+/**
+ * Whether a kept question and the slot's question are one attempt: a retry that
+ * was interrupted after the slot wrote its record and before the kept list
+ * dropped it leaves both, and one question is drawn once.
+ */
+function sameAttempt(kept: Displaced, asked: Asked): boolean {
+  return (
+    kept.text === asked.text &&
+    kept.model === asked.model &&
+    kept.effort === asked.effort &&
+    kept.images.length === asked.images.length
+  );
 }
 
 /**
@@ -700,21 +719,26 @@ export async function retryChat(sessionId: string, displaced?: Displaced): Promi
     if (!held.includes(displaced)) {
       return;
     }
-    const kept = held.filter(one => one !== displaced);
-    change(current, { displaced: kept });
-    /* The write can fail on a storage that is full or already shut. What is
-       drawn is the list in memory, and the next write carries it; the question
-       itself is written to the slot by the ask below either way. */
-    try {
-      await rememberKept(current, kept);
-    } catch {
-      /* The kept list stays as it is on screen, without its asked entry. */
-    }
+    /* Off the screen before it is asked, so there is no second bubble while the
+       answer is on its way. What is written down is trimmed after the ask has
+       recorded the question in the slot, so a record of it always exists: the
+       kept one first, then the slot's. */
+    change(current, {
+      displaced: held.filter(one => one !== displaced),
+    });
     await say(
       current,
       { text: displaced.text, images: displaced.images },
       { model: displaced.model, effort: displaced.effort }
     );
+    /* The write can fail on a storage that is full or already shut. The list in
+       memory is what is drawn, and the next write of it carries the trim; until
+       then a reopen drops the entry that repeats the slot's question. */
+    try {
+      await rememberKept(current, snapshotOf(current).displaced);
+    } catch {
+      /* The kept list in memory is already without the question. */
+    }
     return;
   }
   const { sessionId: current, asked, askedImages, askedModel, askedEffort } = snapshotOf(sessionId);

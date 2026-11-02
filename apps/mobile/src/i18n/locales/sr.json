@@ -3110,7 +3110,7 @@
     "newSessionOn": "Nova sesija na {{name}}",
     "noMatchingSessions": "Nema odgovarajućih sesija.",
     "onlyFirstFilesAttached": "Biće priloženo samo prvih {{displayCount}} datoteka.",
-    "staleMessage": "Ovaj sadržaj više nije dostupan za deljenje.",
+    "staleMessage": "Pošalji ponovo iz aplikacije iz koje si ga delio.",
     "staleTitle": "Deljenje nije dostupno",
     "retryableMessage": "Nije moguće učitati tvoje sesije.",
     "emptyMessage": "Još nema sesija — pokreni novu da pošalješ ovaj sadržaj.",

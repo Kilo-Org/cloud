@@ -3068,7 +3068,7 @@
     "newSessionOn": "Iseshini entsha ku-{{name}}",
     "noMatchingSessions": "Azikho iziseshini ezihambisanayo.",
     "onlyFirstFilesAttached": "Amafayela okuqala angu-{{displayCount}} kuphela azonamathiselwa.",
-    "staleMessage": "Lokhu kwabelana akusatholakali.",
+    "staleMessage": "Thumela futhi kusuka kuhlelo lokusebenza owabelane ngalo.",
     "staleTitle": "Ukwabelana akutholakali",
     "retryableMessage": "Asikwazanga ukulayisha iziseshini zakho.",
     "emptyMessage": "Azikho iziseshini okwamanje — qala entsha ukuze uthumele lokhu.",

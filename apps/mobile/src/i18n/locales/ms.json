@@ -3062,7 +3062,7 @@
     "newSessionOn": "Sesi baharu pada {{name}}",
     "noMatchingSessions": "Tiada sesi yang sepadan.",
     "onlyFirstFilesAttached": "Hanya {{displayCount}} fail pertama akan dilampirkan.",
-    "staleMessage": "Perkongsian ini tidak lagi tersedia.",
+    "staleMessage": "Hantar semula daripada aplikasi yang anda gunakan untuk berkongsi.",
     "staleTitle": "Perkongsian tidak tersedia",
     "retryableMessage": "Tidak dapat memuatkan sesi anda.",
     "emptyMessage": "Belum ada sesi. Mulakan sesi baharu untuk menghantar kandungan ini.",

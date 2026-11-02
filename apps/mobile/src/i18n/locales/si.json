@@ -3068,7 +3068,7 @@
     "newSessionOn": "{{name}} හි නව සැසියක්",
     "noMatchingSessions": "ගැළපෙන සැසි නොමැත.",
     "onlyFirstFilesAttached": "පළමු ගොනු {{displayCount}} ක් පමණක් අමුණනු ඇත.",
-    "staleMessage": "මෙම බෙදාගැනීම තවදුරටත් ලබා ගත නොහැක.",
+    "staleMessage": "ඔබ බෙදාගත් යෙදුමෙන් එය නැවත යවන්න.",
     "staleTitle": "බෙදාගැනීම ලබා ගත නොහැක",
     "retryableMessage": "ඔබේ සැසි පූරණය කිරීමට නොහැකි විය.",
     "emptyMessage": "තවමත් සැසි නොමැත — මෙය යැවීමට නව සැසියක් ආරම්භ කරන්න.",

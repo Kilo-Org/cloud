@@ -3158,7 +3158,7 @@
     "newSessionOn": "Nová relace na {{name}}",
     "noMatchingSessions": "Žádné relace neodpovídají hledání.",
     "onlyFirstFilesAttached": "Připojí se jen soubory ze začátku seznamu ({{displayCount}}).",
-    "staleMessage": "Tento sdílený obsah už není dostupný.",
+    "staleMessage": "Odešli to znovu z aplikace, ze které jsi to sdílel.",
     "staleTitle": "Sdílení není dostupné",
     "retryableMessage": "Tvé relace se nepodařilo načíst.",
     "emptyMessage": "Zatím nemáš žádné relace. Začni novou a odešli do ní tento obsah.",

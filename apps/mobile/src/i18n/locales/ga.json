@@ -3206,7 +3206,7 @@
     "newSessionOn": "Seisiún nua ar {{name}}",
     "noMatchingSessions": "Níl aon seisiún ag teacht leis an gcuardach.",
     "onlyFirstFilesAttached": "Ní cheanglófar ach na chéad {{displayCount}} chomhad.",
-    "staleMessage": "Níl an t-ábhar comhroinnte seo ar fáil a thuilleadh.",
+    "staleMessage": "Seol arís ón aip ar chomhroinn tú é.",
     "staleTitle": "Comhroinnt dodhéanta",
     "retryableMessage": "Níorbh fhéidir do sheisiúin a lódáil.",
     "emptyMessage": "Níl aon seisiún ann fós — tosaigh ceann nua chun é seo a sheoladh.",

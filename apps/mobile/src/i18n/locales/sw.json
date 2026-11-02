@@ -3062,7 +3062,7 @@
     "newSessionOn": "Kikao kipya kwenye {{name}}",
     "noMatchingSessions": "Hakuna vikao vinavyolingana.",
     "onlyFirstFilesAttached": "Faili {{displayCount}} za kwanza pekee zitaambatishwa.",
-    "staleMessage": "Maudhui haya yaliyoshirikiwa hayapatikani tena.",
+    "staleMessage": "Itume tena kutoka kwenye programu uliyoshiriki.",
     "staleTitle": "Kushiriki hakupatikani",
     "retryableMessage": "Imeshindikana kupakia vikao vyako.",
     "emptyMessage": "Bado hakuna vikao — anzisha kikao kipya ili utume maudhui haya.",

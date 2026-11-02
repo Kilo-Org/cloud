@@ -3062,7 +3062,7 @@
     "newSessionOn": "{{name}} मा नयाँ सत्र",
     "noMatchingSessions": "मिल्ने कुनै सत्र छैन।",
     "onlyFirstFilesAttached": "सुरुका {{displayCount}} फाइल मात्र संलग्न गरिनेछन्।",
-    "staleMessage": "सेयर गरिएको यो सामग्री अब उपलब्ध छैन।",
+    "staleMessage": "जुन एपबाट सेयर गर्नुभयो, त्यसैबाट फेरि पठाउनुहोस्।",
     "staleTitle": "सेयर उपलब्ध छैन",
     "retryableMessage": "तपाईंका सत्रहरू लोड गर्न सकिएन।",
     "emptyMessage": "अहिलेसम्म कुनै सत्र छैन — यो पठाउन नयाँ सत्र सुरु गर्नुहोस्।",

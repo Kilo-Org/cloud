@@ -2589,7 +2589,7 @@
     "newSessionOn": "Nowa sesja na {{name}}",
     "noMatchingSessions": "Nie znaleziono pasujących sesji.",
     "onlyFirstFilesAttached": "Zostaną dołączone tylko początkowe pliki. Ich liczba: {{displayCount}}.",
-    "staleMessage": "Udostępniana treść nie jest już dostępna.",
+    "staleMessage": "Wyślij tę treść ponownie z aplikacji, w której ją udostępniono.",
     "staleTitle": "Nie można udostępnić",
     "retryableMessage": "Nie udało się wczytać twoich sesji.",
     "emptyMessage": "Nie masz jeszcze sesji. Rozpocznij nową, aby wysłać tę treść.",

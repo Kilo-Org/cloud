@@ -2531,7 +2531,7 @@
     "newSessionOn": "{{name}}의 새 세션",
     "noMatchingSessions": "일치하는 세션이 없습니다.",
     "onlyFirstFilesAttached": "처음 {{displayCount}}개의 파일만 첨부됩니다.",
-    "staleMessage": "이 공유 항목은 더 이상 사용할 수 없습니다.",
+    "staleMessage": "공유한 앱에서 다시 보내세요.",
     "staleTitle": "공유할 수 없음",
     "retryableMessage": "세션을 불러오지 못했습니다.",
     "emptyMessage": "아직 세션이 없습니다. 이 내용을 보내려면 새 세션을 시작하세요.",

@@ -2496,7 +2496,7 @@
     "newSessionOn": "Nouvelle session sur {{name}}",
     "noMatchingSessions": "Aucune session correspondante.",
     "onlyFirstFilesAttached": "Seuls les {{displayCount}} premiers fichiers seront joints.",
-    "staleMessage": "Ce partage n'est plus disponible.",
+    "staleMessage": "Envoyez-le à nouveau depuis l'app où vous l'avez partagé.",
     "staleTitle": "Partage indisponible",
     "retryableMessage": "Impossible de charger vos sessions.",
     "emptyMessage": "Aucune session pour le moment — démarrez-en une nouvelle pour envoyer ceci.",

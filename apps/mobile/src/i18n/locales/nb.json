@@ -3062,7 +3062,7 @@
     "newSessionOn": "Ny økt på {{name}}",
     "noMatchingSessions": "Ingen økter passer til søket.",
     "onlyFirstFilesAttached": "Bare de første {{displayCount}} filene legges ved.",
-    "staleMessage": "Denne delingen er ikke lenger tilgjengelig.",
+    "staleMessage": "Send det på nytt fra appen du delte fra.",
     "staleTitle": "Deling utilgjengelig",
     "retryableMessage": "Kunne ikke laste inn øktene dine.",
     "emptyMessage": "Ingen økter ennå — start en ny for å sende dette.",

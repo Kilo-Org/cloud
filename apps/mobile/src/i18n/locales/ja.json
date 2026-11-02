@@ -2531,7 +2531,7 @@
     "newSessionOn": "{{name}}の新しいセッション",
     "noMatchingSessions": "一致するセッションはありません。",
     "onlyFirstFilesAttached": "最初の{{displayCount}}件のファイルのみが添付されます。",
-    "staleMessage": "この共有コンテンツは利用できなくなりました。",
+    "staleMessage": "共有元のアプリからもう一度送信してください。",
     "staleTitle": "共有は利用できません",
     "retryableMessage": "セッションを読み込めませんでした。",
     "emptyMessage": "セッションがまだありません。送信するには新しいセッションを開始してください。",

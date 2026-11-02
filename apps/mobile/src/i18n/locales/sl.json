@@ -3158,7 +3158,7 @@
     "newSessionOn": "Nova seja na {{name}}",
     "noMatchingSessions": "Ni ujemajočih sej.",
     "onlyFirstFilesAttached": "Priloženih bo samo prvih {{displayCount}} datotek.",
-    "staleMessage": "Ta vsebina za deljenje ni več na voljo.",
+    "staleMessage": "Pošlji znova iz aplikacije, iz katere si jo delil.",
     "staleTitle": "Deljenje ni mogoče",
     "retryableMessage": "Tvojih sej ni bilo mogoče naložiti.",
     "emptyMessage": "Sej še ni. Začni novo sejo, da pošlješ to vsebino.",

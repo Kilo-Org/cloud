@@ -2537,7 +2537,7 @@
     "newSessionOn": "{{name}} पर नया सत्र",
     "noMatchingSessions": "कोई सत्र मेल नहीं खाता।",
     "onlyFirstFilesAttached": "केवल पहली {{displayCount}} फ़ाइलें संलग्न की जाएँगी।",
-    "staleMessage": "साझा की गई यह सामग्री अब उपलब्ध नहीं है।",
+    "staleMessage": "जिस ऐप से आपने साझा किया, उससे इसे फिर से भेजें।",
     "staleTitle": "साझाकरण अनुपलब्ध",
     "retryableMessage": "आपके सत्र लोड नहीं हो सके।",
     "emptyMessage": "अभी कोई सत्र नहीं है — इसे भेजने के लिए नया सत्र शुरू करें।",

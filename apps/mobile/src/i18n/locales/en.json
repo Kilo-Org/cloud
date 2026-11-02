@@ -3144,7 +3144,7 @@
     "onlyFirstFilesAttached_one": "Only the first {{displayCount}} file will be attached.",
     "onlyFirstFilesAttached": "Only the first {{displayCount}} files will be attached.",
     "onlyFirstFilesAttached_other": "Only the first {{displayCount}} files will be attached.",
-    "staleMessage": "This share is no longer available.",
+    "staleMessage": "Send it again from the app you shared from.",
     "staleTitle": "Share unavailable",
     "retryableMessage": "Couldn't load your sessions.",
     "emptyMessage": "No sessions yet — start a new one to send this.",

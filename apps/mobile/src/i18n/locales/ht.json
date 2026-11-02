@@ -3062,7 +3062,7 @@
     "newSessionOn": "Nouvo sesyon sou {{name}}",
     "noMatchingSessions": "Pa gen sesyon ki koresponn.",
     "onlyFirstFilesAttached": "Se sèlman premye {{displayCount}} fichye yo k ap tache.",
-    "staleMessage": "Kontni pou pataje a pa disponib ankò.",
+    "staleMessage": "Voye l ankò nan aplikasyon ou te pataje a.",
     "staleTitle": "Pataj pa disponib",
     "retryableMessage": "Pa t ka chaje sesyon ou yo.",
     "emptyMessage": "Poko gen sesyon — kòmanse yon nouvo sesyon pou voye sa a.",

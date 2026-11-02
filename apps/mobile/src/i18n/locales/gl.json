@@ -3062,7 +3062,7 @@
     "newSessionOn": "Nova sesión en {{name}}",
     "noMatchingSessions": "Non hai sesións que coincidan.",
     "onlyFirstFilesAttached": "Só se anexarán os primeiros {{displayCount}} ficheiros.",
-    "staleMessage": "Este contido compartido xa non está dispoñible.",
+    "staleMessage": "Envíao de novo desde a aplicación onde o compartes.",
     "staleTitle": "Compartición non dispoñible",
     "retryableMessage": "Non se puideron cargar as túas sesións.",
     "emptyMessage": "Aínda non hai sesións — inicia unha nova para enviar isto.",

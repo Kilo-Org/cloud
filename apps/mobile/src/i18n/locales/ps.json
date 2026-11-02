@@ -3062,7 +3062,7 @@
     "newSessionOn": "په {{name}} کې نوې ناسته",
     "noMatchingSessions": "هېڅ ناسته سمون نه خوري.",
     "onlyFirstFilesAttached": "یوازې لومړني {{displayCount}} فایلونه به ضمیمه شي.",
-    "staleMessage": "دا شریکه شوې منځپانګه نور نشته.",
+    "staleMessage": "له هغه اپلیکیشن څخه چې تاسو ترې شریک کړی و، بیا یې ولېږئ.",
     "staleTitle": "شریکول نشته",
     "retryableMessage": "ستاسو ناستې بار نه شوې.",
     "emptyMessage": "تر اوسه هېڅ ناسته نشته — د دې د لېږلو لپاره نوې ناسته پیل کړئ.",

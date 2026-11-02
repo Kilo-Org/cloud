@@ -2531,7 +2531,7 @@
     "newSessionOn": "{{name}} 上的新工作階段",
     "noMatchingSessions": "沒有相符的工作階段。",
     "onlyFirstFilesAttached": "只會附加前 {{displayCount}} 個檔案。",
-    "staleMessage": "此分享內容已無法使用。",
+    "staleMessage": "請從你分享時使用的應用程式重新傳送。",
     "staleTitle": "無法分享",
     "retryableMessage": "無法載入你的工作階段。",
     "emptyMessage": "目前沒有工作階段。建立新工作階段即可傳送此內容。",

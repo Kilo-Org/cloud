@@ -2531,7 +2531,7 @@
     "newSessionOn": "Sesi baru di {{name}}",
     "noMatchingSessions": "Tidak ada sesi yang cocok.",
     "onlyFirstFilesAttached": "Hanya {{displayCount}} file pertama yang akan dilampirkan.",
-    "staleMessage": "Konten yang dibagikan ini sudah tidak tersedia.",
+    "staleMessage": "Kirim lagi dari aplikasi tempat kamu membagikannya.",
     "staleTitle": "Berbagi tidak tersedia",
     "retryableMessage": "Tidak dapat memuat sesimu.",
     "emptyMessage": "Belum ada sesi. Mulai sesi baru untuk mengirim konten ini.",

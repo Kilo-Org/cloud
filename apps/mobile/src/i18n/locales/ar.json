@@ -2647,7 +2647,7 @@
     "newSessionOn": "جلسة جديدة على {{name}}",
     "noMatchingSessions": "لا توجد جلسات مطابقة.",
     "onlyFirstFilesAttached": "ستُرفق الملفات الأولى فقط، وعددها {{displayCount}}.",
-    "staleMessage": "لم تعد هذه المشاركة متاحة.",
+    "staleMessage": "أرسله مرة أخرى من التطبيق الذي شاركت منه.",
     "staleTitle": "المشاركة غير متاحة",
     "retryableMessage": "تعذّر تحميل جلساتك.",
     "emptyMessage": "لا توجد جلسات بعد. ابدأ جلسة جديدة لإرسال هذا المحتوى.",

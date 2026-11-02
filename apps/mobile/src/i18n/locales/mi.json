@@ -3062,7 +3062,7 @@
     "newSessionOn": "Wātū hou i {{name}}",
     "noMatchingSessions": "Kāore he wātū e hāngai ana.",
     "onlyFirstFilesAttached": "Ka whakapirihia ngā kōnae {{displayCount}} tuatahi anake.",
-    "staleMessage": "Kāore tēnei tohatoha e wātea ana ināianei.",
+    "staleMessage": "Tukuna anō i tēnei mai i te taupānga i tohaina ai.",
     "staleTitle": "Kāore te tohatoha e wātea ana",
     "retryableMessage": "Kāore i taea te uta i ō wātū.",
     "emptyMessage": "Kāore anō he wātū — tīmataria he wātū hou hei tuku i tēnei.",

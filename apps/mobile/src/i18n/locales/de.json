@@ -2531,7 +2531,7 @@
     "newSessionOn": "Neue Sitzung auf {{name}}",
     "noMatchingSessions": "Es wurden keine passenden Sitzungen gefunden.",
     "onlyFirstFilesAttached": "Nur die ersten {{displayCount}} Dateien werden angehängt.",
-    "staleMessage": "Dieser geteilte Inhalt ist nicht mehr verfügbar.",
+    "staleMessage": "Sende es erneut aus der App, aus der du geteilt hast.",
     "staleTitle": "Teilen nicht verfügbar",
     "retryableMessage": "Deine Sitzungen konnten nicht geladen werden.",
     "emptyMessage": "Es gibt noch keine Sitzungen. Starte eine neue, um diesen Inhalt zu senden.",

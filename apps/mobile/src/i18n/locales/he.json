@@ -2560,7 +2560,7 @@
     "newSessionOn": "שיחה חדשה ב-{{name}}",
     "noMatchingSessions": "אין שיחות תואמות.",
     "onlyFirstFilesAttached": "רק {{displayCount}} הקבצים הראשונים יצורפו.",
-    "staleMessage": "השיתוף הזה אינו זמין עוד.",
+    "staleMessage": "שלח שוב מהאפליקציה שממנה שיתפת.",
     "staleTitle": "השיתוף אינו זמין",
     "retryableMessage": "לא ניתן היה לטעון את השיחות שלך.",
     "emptyMessage": "אין עדיין שיחות — התחל שיחה חדשה כדי לשלוח את התוכן הזה.",

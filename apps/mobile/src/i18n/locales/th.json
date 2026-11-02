@@ -3062,7 +3062,7 @@
     "newSessionOn": "เซสชันใหม่บน {{name}}",
     "noMatchingSessions": "ไม่มีเซสชันที่ตรงกัน",
     "onlyFirstFilesAttached": "จะแนบเฉพาะ {{displayCount}} ไฟล์แรกเท่านั้น",
-    "staleMessage": "เนื้อหาที่แชร์นี้ใช้ไม่ได้แล้ว",
+    "staleMessage": "ส่งอีกครั้งจากแอปที่คุณแชร์มา",
     "staleTitle": "ไม่สามารถแชร์ได้",
     "retryableMessage": "โหลดเซสชันของคุณไม่สำเร็จ",
     "emptyMessage": "ยังไม่มีเซสชัน เริ่มเซสชันใหม่เพื่อส่งเนื้อหานี้",

@@ -3110,7 +3110,7 @@
     "newSessionOn": "Jauna sesija vidē {{name}}",
     "noMatchingSessions": "Nav atbilstošu sesiju.",
     "onlyFirstFilesAttached": "Tiks pievienoti tikai pirmie {{displayCount}} faili.",
-    "staleMessage": "Kopīgotais saturs vairs nav pieejams.",
+    "staleMessage": "Nosūti to vēlreiz no lietotnes, no kuras kopīgoji.",
     "staleTitle": "Kopīgošana nav pieejama",
     "retryableMessage": "Neizdevās ielādēt tavas sesijas.",
     "emptyMessage": "Vēl nav sesiju — sāc jaunu, lai nosūtītu šo saturu.",

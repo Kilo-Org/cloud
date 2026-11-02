@@ -98,8 +98,11 @@ export function BriefingCard({
   return (
     <View
       className={cn(
-        'justify-between overflow-hidden rounded-2xl border border-border bg-card',
-        embedded && 'rounded-none border-0 bg-transparent'
+        'overflow-hidden rounded-2xl border border-border bg-card',
+        // `grow` lets the frame's taller layer stretch the card, so no slack is left
+        // below it; the divider's `mt-auto` keeps the summary row on the card's
+        // bottom edge, where the live card's newest-session block sits.
+        embedded && 'grow rounded-none border-0 bg-transparent'
       )}
     >
       <CardControl
@@ -111,7 +114,7 @@ export function BriefingCard({
       >
         <BriefingScorecard report={report} />
       </CardControl>
-      <View className="h-px bg-border" />
+      <View className="mt-auto h-px bg-border" />
       <View className="min-h-[68px] flex-row items-center gap-2 px-4 py-3">
         <CardControl
           accessibilityRole="button"

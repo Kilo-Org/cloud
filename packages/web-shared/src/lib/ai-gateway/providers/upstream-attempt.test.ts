@@ -8,6 +8,7 @@ jest.mock('./gateway-models-cache', () => ({
   ...jest.requireActual('./gateway-models-cache'),
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
   getOpenRouterModelsFromDatabase: jest.fn(),
+  isValidOpenRouterModelId: jest.fn(),
 }));
 jest.mock('./openrouter', () => ({
   ...jest.requireActual('./openrouter'),
@@ -25,6 +26,8 @@ import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/t
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
 import { OPENAI_ON_BEHALF_OF_TOKEN_HEADER } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import {
   getOpenAiChatGptStoredConnection,
   saveOpenAiChatGptConnection,
@@ -34,6 +37,7 @@ import { applyProviderSpecificLogic } from './apply-provider-specific-logic';
 import {
   getOpenRouterModelsFromDatabase,
   getOpenRouterModelsMetadataFromDatabase,
+  isValidOpenRouterModelId,
 } from './gateway-models-cache';
 import { getRawOpenRouterModels } from './openrouter';
 import { getPreferredProviderOrderConfig } from './preferred-provider-order-config';
@@ -71,6 +75,7 @@ describe('bounded spending provider enforcement', () => {
   beforeEach(() => {
     jest.mocked(applyProviderSpecificLogic).mockResolvedValue(undefined);
     jest.mocked(upstreamRequest).mockClear();
+    jest.mocked(isValidOpenRouterModelId).mockResolvedValue(true);
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({ [model.id]: model });
     jest.mocked(getOpenRouterModelsFromDatabase).mockResolvedValue(new Set([model.id]));
     jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [catalogEntry] });
@@ -159,6 +164,188 @@ describe('bounded spending provider enforcement', () => {
       max_price: { prompt: 0.1, completion: 0.2, request: 0 },
     });
   });
+});
+describe('upstream model catalog validation', () => {
+  type AttemptInput = Parameters<typeof sendUpstreamAttempt>[0];
+  const exclusiveModel = gemma_4_26b_a4b_it_free_model;
+  const canonicalModels = new Set([
+    'qwen/qwen3-coder',
+    'z-ai/glm-5',
+    'mistralai/mistral-small',
+    'x-ai/grok-4',
+    'bytedance-seed/seed-2.0',
+    'openai/gpt-4o',
+    '~deepseek/deepseek-pro-latest',
+    exclusiveModel.internal_id,
+  ]);
+
+  beforeEach(() => {
+    jest.mocked(isValidOpenRouterModelId).mockReset();
+    jest
+      .mocked(isValidOpenRouterModelId)
+      .mockImplementation(async model => canonicalModels.has(model));
+    jest.mocked(applyProviderSpecificLogic).mockReset();
+    jest.mocked(upstreamRequest).mockReset();
+    jest.mocked(upstreamRequest).mockResolvedValue({
+      type: 'success',
+      response: jsonResponse(200, { ok: true }),
+    });
+  });
+
+  function attempt({
+    providerId = 'vercel',
+    requestedModel,
+    wireModel,
+    kind = 'chat_completions',
+    userByok = null,
+  }: {
+    providerId?: AttemptInput['providerContext']['provider']['type'];
+    requestedModel: string;
+    wireModel: string;
+    kind?: AttemptInput['request']['kind'];
+    userByok?: BYOKResult[] | null;
+  }) {
+    const request: AttemptInput['request'] =
+      kind === 'responses'
+        ? { kind, body: { model: requestedModel, input: 'Evidence' } }
+        : {
+            kind,
+            body: {
+              model: requestedModel,
+              messages: [{ role: 'user', content: 'Evidence' }],
+              max_tokens: 64,
+            },
+          };
+    jest
+      .mocked(applyProviderSpecificLogic)
+      .mockImplementation(async (_provider, _model, request) => {
+        request.body.model = wireModel;
+      });
+    return sendUpstreamAttempt({
+      providerContext: {
+        provider: { type: providerId },
+        userByok,
+      } as AttemptInput['providerContext'],
+      requestedModel,
+      request,
+      fraudHeaders: EmptyFraudDetectionHeaders,
+      userId: 'test-user',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: false,
+      search: '',
+      method: 'POST',
+    });
+  }
+
+  describe.each(['chat_completions', 'responses', 'messages'] as const)('%s', kind => {
+    describe.each(['openrouter', 'vercel'] as const)('%s', providerId => {
+      const byokProviderId = providerId === 'vercel' ? 'vercel-ai-gateway' : providerId;
+
+      it.each([false, true])('blocks an invalid catalog ID (BYOK: %s)', async byok => {
+        const result = await attempt({
+          providerId,
+          requestedModel: providerId === 'vercel' ? 'qwen/not-in-catalog' : 'qwen/qwen3-coder',
+          wireModel: 'alibaba/not-in-catalog',
+          kind,
+          userByok: byok ? [{ providerId: byokProviderId, decryptedAPIKey: 'test-key' }] : null,
+        });
+
+        expect(result).toEqual({ type: 'invalid-openrouter-model' });
+        expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([
+          [providerId === 'vercel' ? 'qwen/not-in-catalog' : 'alibaba/not-in-catalog'],
+        ]);
+        expect(upstreamRequest).not.toHaveBeenCalled();
+      });
+
+      it.each([false, true])('sends a valid catalog ID (BYOK: %s)', async byok => {
+        const result = await attempt({
+          providerId,
+          requestedModel: providerId === 'vercel' ? 'qwen/qwen3-coder' : 'not-in-catalog',
+          wireModel: providerId === 'vercel' ? 'alibaba/qwen3-coder' : 'qwen/qwen3-coder',
+          kind,
+          userByok: byok ? [{ providerId: byokProviderId, decryptedAPIKey: 'test-key' }] : null,
+        });
+
+        expect(result.type).toBe('success');
+        expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([['qwen/qwen3-coder']]);
+        expect(upstreamRequest).toHaveBeenCalledTimes(1);
+        expect(upstreamRequest).toHaveBeenCalledWith(
+          expect.objectContaining({
+            chatApi: kind,
+            body: expect.objectContaining({
+              model: providerId === 'vercel' ? 'alibaba/qwen3-coder' : 'qwen/qwen3-coder',
+            }),
+          })
+        );
+      });
+    });
+  });
+
+  it.each([
+    ['z-ai/glm-5', 'zai/glm-5'],
+    ['mistralai/mistral-small', 'mistral/mistral-small'],
+    ['x-ai/grok-4', 'spacexai/grok-4'],
+    ['bytedance-seed/seed-2.0', 'bytedance/seed-2.0'],
+    ['openai/gpt-4o', 'override/custom-deployment'],
+    ['~deepseek/deepseek-pro-latest', 'deepseek/deepseek-v4-pro-0813'],
+    [exclusiveModel.public_id, exclusiveModel.internal_id],
+  ])('validates %s before sending Vercel wire ID %s', async (requestedModel, wireModel) => {
+    const result = await attempt({ requestedModel, wireModel });
+
+    expect(result.type).toBe('success');
+    expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([
+      [requestedModel === exclusiveModel.public_id ? exclusiveModel.internal_id : requestedModel],
+    ]);
+    expect(upstreamRequest).toHaveBeenCalledTimes(1);
+    expect(upstreamRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ body: expect.objectContaining({ model: wireModel }) })
+    );
+  });
+
+  it('blocks an invalid Vercel canonical ID even when overridden to a valid catalog ID', async () => {
+    const result = await attempt({
+      requestedModel: 'qwen/not-in-catalog',
+      wireModel: 'openai/gpt-4o',
+    });
+
+    expect(result).toEqual({ type: 'invalid-openrouter-model' });
+    expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([['qwen/not-in-catalog']]);
+    expect(upstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('blocks a Kilo-exclusive Vercel model when its backing ID is absent from the catalog', async () => {
+    jest
+      .mocked(isValidOpenRouterModelId)
+      .mockImplementation(async model => model === exclusiveModel.public_id);
+
+    const result = await attempt({
+      requestedModel: exclusiveModel.public_id,
+      wireModel: exclusiveModel.internal_id,
+    });
+
+    expect(result).toEqual({ type: 'invalid-openrouter-model' });
+    expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([
+      [exclusiveModel.internal_id],
+    ]);
+    expect(upstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it.each(['direct-byok', 'mistral', 'inception', 'custom', 'custom-public', 'dev-tools'] as const)(
+    'does not validate %s models against the OpenRouter catalog',
+    async providerId => {
+      const result = await attempt({
+        providerId,
+        requestedModel: 'not-in-catalog',
+        wireModel: 'provider-specific-model',
+      });
+
+      expect(result.type).toBe('success');
+      expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
+      expect(upstreamRequest).toHaveBeenCalledTimes(1);
+    }
+  );
 });
 describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => {
   let owner: OpenAiChatGptOwner;

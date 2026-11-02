@@ -1520,21 +1520,31 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     );
   });
 
-  it('returns 404 when the OpenRouter model id is unknown', async () => {
-    mockedIsValidOpenRouterModelId.mockResolvedValue(false);
+  it.each(['openrouter', 'vercel'] as const)(
+    'returns 404 when the %s model id is unknown',
+    async providerType => {
+      mockedIsValidOpenRouterModelId.mockResolvedValue(false);
+      mockedGetProvider.mockResolvedValue({
+        kind: 'provider',
+        provider: { ...provider, type: providerType },
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('not-a-real-model')) as never
-    );
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody('not-a-real-model')) as never
+      );
 
-    expect(response.status).toBe(404);
-    expect(await response.json()).toMatchObject({
-      error_type: 'model_not_found',
-      message: expect.stringContaining("The requested model 'not-a-real-model' does not exist."),
-    });
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({
+        error_type: 'model_not_found',
+        message: expect.stringContaining("The requested model 'not-a-real-model' does not exist."),
+      });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([
     'google/gemma-4-26b-a4b-it:free',

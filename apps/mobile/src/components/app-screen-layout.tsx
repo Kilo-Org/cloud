@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 import { NativeStateSurface, type ScreenLayoutProps } from '@/components/centered-state-surface';
+import { endLeaveSettle } from '@/lib/navigation/leave-settle';
 
 /**
  * Hides every covered `(app)` stack scene from screen readers.
@@ -62,6 +63,32 @@ function CoveredScreenA11yGate({
 }
 
 /**
+ * Ends the settle window a dismissal opened when this scene's own appearance
+ * finishes.
+ *
+ * A screen that dismisses itself pops the route that revealed this scene, so
+ * the transition that brings this scene in is the one that carried that screen
+ * away, and its end is the end of that leave. That end is the only trustworthy
+ * signal: a wall-clock span would have to guess the JavaScript commit plus the
+ * platform transition, and a loaded device lengthens both.
+ */
+function SettledLeaveEndsWithThisScene({
+  navigation,
+}: {
+  navigation: ScreenLayoutProps['navigation'];
+}): null {
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('transitionEnd', event => {
+      if (!event.data.closing) {
+        endLeaveSettle();
+      }
+    });
+    return unsubscribe;
+  }, [navigation]);
+  return null;
+}
+
+/**
  * The gate on its own, for a nested Stack whose scene already sits inside the
  * root `(app)` scene: the tab and section stacks push sibling routes over each
  * other in exactly the same way, and their scenes must leave the accessibility
@@ -69,7 +96,14 @@ function CoveredScreenA11yGate({
  * these stacks must not wrap a second `NativeStateSurface` around theirs.
  */
 export function appSceneLayout({ navigation, children }: ScreenLayoutProps): ReactElement {
-  return <CoveredScreenA11yGate navigation={navigation}>{children}</CoveredScreenA11yGate>;
+  return (
+    <CoveredScreenA11yGate navigation={navigation}>
+      <>
+        <SettledLeaveEndsWithThisScene navigation={navigation} />
+        {children}
+      </>
+    </CoveredScreenA11yGate>
+  );
 }
 
 /**
@@ -80,7 +114,10 @@ export function appSceneLayout({ navigation, children }: ScreenLayoutProps): Rea
 export function appSurfaceSceneLayout(props: ScreenLayoutProps): ReactElement {
   return (
     <CoveredScreenA11yGate navigation={props.navigation}>
-      <NativeStateSurface {...props} />
+      <>
+        <SettledLeaveEndsWithThisScene navigation={props.navigation} />
+        <NativeStateSurface {...props} />
+      </>
     </CoveredScreenA11yGate>
   );
 }
@@ -90,7 +127,10 @@ export function appSurfaceSceneLayout(props: ScreenLayoutProps): ReactElement {
 export function appScreenLayout({ navigation, ...props }: ScreenLayoutProps): ReactElement {
   return (
     <CoveredScreenA11yGate navigation={navigation}>
-      {appUnlockScreenLayout({ navigation, ...props })}
+      <>
+        <SettledLeaveEndsWithThisScene navigation={navigation} />
+        {appUnlockScreenLayout({ navigation, ...props })}
+      </>
     </CoveredScreenA11yGate>
   );
 }

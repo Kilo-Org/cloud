@@ -436,9 +436,13 @@ describe('NewSessionConfigureForm', () => {
     });
     // The footer keeps only the start-blocked reason (its own component): the
     // refusal must not take height from the form a second time. The pinned
-    // footer is the KeyboardAvoidingView's second child, after the scroll body.
+    // footer is the KeyboardAvoidingView's second child, after the scroll body,
+    // and it must be found for the negative assertion to mean anything.
     const lift = findElementByType(element, 'KeyboardAvoidingView');
-    const footer = (lift?.children as Node[] | undefined)?.[1];
+    const footer = (lift?.children as Node[] | undefined)?.[1] as Node | undefined;
+    expect(lift).not.toBeNull();
+    expect(footer).toBeDefined();
+    expect(findElementByType(footer, 'NewSessionStartButton')).not.toBeNull();
     expect(findElementByComponent(footer, AccessibleStatus)).toBeNull();
   });
 

@@ -1218,6 +1218,12 @@ export function NewSessionScreenBody() {
     startBlockedReason = t('agentChat.newSession.enterPromptOrFileToStart');
   }
 
+  // The plan explanation already says why Start cannot run, and nothing the
+  // user types or connects would re-enable it, so the footer names no second
+  // blocker while it is shown.
+  const footerStartBlockedReason = planRefusal === null ? startBlockedReason : null;
+  const footerStartBlockedAction = planRefusal === null ? startBlockedAction : null;
+
   const handleStartSession = useCallback(() => {
     if (isCloneEntry) {
       if (runOnInstance !== null) {
@@ -1385,8 +1391,8 @@ export function NewSessionScreenBody() {
         onAutoCommitChange={setAutoCommit}
         isStartDisabled={isStartDisabled}
         isSpawningRemote={remoteSpawn.isSpawningRemote}
-        startBlockedReason={startBlockedReason}
-        startBlockedAction={startBlockedAction}
+        startBlockedReason={footerStartBlockedReason}
+        startBlockedAction={footerStartBlockedAction}
         onStartSession={handleStartSession}
         cloudCreateError={cloudCreateError}
         onRetryCloudCreate={handleStartSession}

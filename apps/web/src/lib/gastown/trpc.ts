@@ -14,6 +14,7 @@ import { createTRPCContext } from '@trpc/tanstack-react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { WrappedGastownRouter } from '@/lib/gastown/types/router';
 import { GASTOWN_URL } from '@/lib/service-urls';
+import { browserCapabilityHeader } from '@/lib/worker-admin/browser-capability';
 
 // ── Type exports ──────────────────────────────────────────────────────────
 // Re-export the router type so frontend components can extract output types
@@ -70,9 +71,23 @@ export function gastownWsUrl(relativePath: string): string {
 
 const gastownTrpcUrl = `${GASTOWN_URL}/trpc`;
 
-const headers = async () => {
+const headers = async (
+  opts:
+    | { op: { path: string; input: unknown } }
+    | { opList: ReadonlyArray<{ path: string; input: unknown }> }
+) => {
+  const operations = 'opList' in opts ? opts.opList : [opts.op];
   const token = await getToken();
-  return { Authorization: `Bearer ${token}` };
+  const capability = await browserCapabilityHeader({
+    audience: 'gastown-admin',
+    operations,
+    getIdentityToken: getToken,
+    tokenEndpoint: '/api/gastown/token',
+  });
+  return {
+    Authorization: `Bearer ${token}`,
+    ...(capability ? { 'X-Kilo-Worker-Capability': capability } : {}),
+  };
 };
 
 export function createGastownTRPCClient() {

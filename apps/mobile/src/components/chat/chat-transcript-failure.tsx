@@ -39,26 +39,35 @@ export function ChatTranscriptFailure({
   const unavailable = failureKey === CHAT_UNAVAILABLE_KEY;
 
   return (
-    <QueryError
-      // The chat is gone in the first case and failed in the second, so the
-      // title says which of the two the person is looking at.
-      variant={unavailable ? 'not-found' : 'neutral'}
-      title={unavailable ? undefined : t('common.somethingWentWrong')}
-      // A generic failure's own copy is that same title, so it is not printed
-      // again below it: the neutral description carries the retry invitation.
-      message={failureKey === 'common.somethingWentWrong' ? undefined : t(failureKey)}
-      action={
-        <View className="flex-row flex-wrap items-center justify-center gap-3">
-          {retryable ? (
-            <Button variant="outline" className={STATE_ACTION_CLASS} onPress={onRetry}>
-              <Text>{t('common.retry')}</Text>
+    // Centred in the area the state occupies. The shared measured centring
+    // centres against the whole window, which a chat's transcript area is not:
+    // it sits between the header and the composer, so a measured state lands
+    // half that difference away from where it first drew and jumps when the
+    // measurement arrives.
+    <View className="flex-1 justify-center">
+      <QueryError
+        placement="static"
+        className="w-full"
+        // The chat is gone in the first case and failed in the second, so the
+        // title says which of the two the person is looking at.
+        variant={unavailable ? 'not-found' : 'neutral'}
+        title={unavailable ? undefined : t('common.somethingWentWrong')}
+        // A generic failure's own copy is that same title, so it is not printed
+        // again below it: the neutral description carries the retry invitation.
+        message={failureKey === 'common.somethingWentWrong' ? undefined : t(failureKey)}
+        action={
+          <View className="flex-row flex-wrap items-center justify-center gap-3">
+            {retryable ? (
+              <Button variant="outline" className={STATE_ACTION_CLASS} onPress={onRetry}>
+                <Text>{t('common.retry')}</Text>
+              </Button>
+            ) : null}
+            <Button variant="ghost" className={STATE_ACTION_CLASS} onPress={onBack}>
+              <Text>{t('common.back')}</Text>
             </Button>
-          ) : null}
-          <Button variant="ghost" className={STATE_ACTION_CLASS} onPress={onBack}>
-            <Text>{t('common.back')}</Text>
-          </Button>
-        </View>
-      }
-    />
+          </View>
+        }
+      />
+    </View>
   );
 }

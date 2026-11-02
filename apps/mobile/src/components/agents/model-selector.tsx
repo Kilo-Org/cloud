@@ -40,6 +40,8 @@ type ModelSelectorProps = {
   value: string;
   variant: string;
   options: (ModelOption | SessionModelOption)[];
+  /** Whether this chip's `onSelect` stores the picked thinking effort. */
+  acceptsVariant: boolean;
   onSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
   disabled?: boolean;
   isLoading?: boolean;
@@ -138,6 +140,7 @@ export function ModelSelector({
   value,
   variant,
   options,
+  acceptsVariant,
   onSelect,
   disabled = false,
   isLoading = false,
@@ -208,8 +211,7 @@ export function ModelSelector({
       options: pickerOptions,
       value,
       variant,
-      // The composer's selection carries its effort into the session.
-      acceptsVariant: true,
+      acceptsVariant,
       onSelect,
       selectionScope: selectionContext,
     });

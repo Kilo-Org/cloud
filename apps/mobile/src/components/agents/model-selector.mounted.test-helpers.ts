@@ -51,6 +51,7 @@ export function renderSelector(
     value: string;
     variant: string;
     options: SessionModelOption[];
+    acceptsVariant: boolean;
     isLoading: boolean;
   }> = {}
 ): TestRenderer.ReactTestRenderer {
@@ -61,6 +62,7 @@ export function renderSelector(
         value: overrides.value ?? '',
         variant: overrides.variant ?? '',
         options: overrides.options ?? [],
+        acceptsVariant: overrides.acceptsVariant ?? true,
         isLoading: overrides.isLoading ?? false,
         onSelect: vi.fn<(modelId: string, variant: string) => void>(),
       })

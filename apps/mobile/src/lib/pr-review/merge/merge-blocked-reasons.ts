@@ -54,11 +54,18 @@ export type MergeBlockedReasonsArgs = {
   reviewDecision: PrOverviewDto['reviewDecision'];
   /**
    * How many check runs the Checks card counts as failed — the `failure`
-   * rollup of the same `listChecks` read that card renders. A blocked PR
-   * names failing checks only when that number is non-zero, so the panel and
-   * the card above it cannot contradict each other.
+   * rollup of the same `listChecks` read that card renders, or `null` when
+   * that read has no answer (still in flight, or failed). A blocked PR names
+   * failing checks only when that number is non-zero, so the panel and the
+   * card above it cannot contradict each other.
    */
-  failedCheckCount: number;
+  failedCheckCount: number | null;
+  /**
+   * True while that read is still in flight. Nothing about checks is claimed
+   * then, so the panel neither paints a cause a later answer replaces nor
+   * appends a row the Checks card has not shown.
+   */
+  isChecksReadPending: boolean;
   allowUpdateBranch: boolean;
 };
 
@@ -207,18 +214,22 @@ export function getMergeBlockedReasons(args: MergeBlockedReasonsArgs): MergeBloc
       // `blocked` names a branch-protection gate, not which one. Each row
       // below is read off its own data: the review decision for reviews, and
       // the Checks card's own failed-run count for checks, so a PR whose only
-      // check passed never claims a failing check.
+      // check passed never claims a failing check. While that read is still
+      // unanswered nothing is claimed about checks — neither a failing-checks
+      // row nor a fallback that a later answer would replace.
       if (
         args.reviewDecision === 'REVIEW_REQUIRED' ||
         args.reviewDecision === 'CHANGES_REQUESTED'
       ) {
         push(requiredReviewsReason());
       }
-      if (args.failedCheckCount > 0) {
-        push(failingChecksReason());
-      }
-      if (reasons.length === 0) {
-        push(genericBlockedReason(args.mergeableState));
+      if (!args.isChecksReadPending) {
+        if (args.failedCheckCount !== null && args.failedCheckCount > 0) {
+          push(failingChecksReason());
+        }
+        if (reasons.length === 0) {
+          push(genericBlockedReason(args.mergeableState));
+        }
       }
       break;
     }

@@ -81,7 +81,7 @@ vi.mock('@/lib/pr-review/merge/use-pr-merge-mutations', () => ({
 // This suite asserts the action buttons' variants; the blocked panel's rows
 // have their own selector tests.
 vi.mock('@/lib/pr-review/merge/use-merge-blocked-reasons', () => ({
-  useMergeBlockedReasons: () => [],
+  useMergeBlockedReasons: () => ({ reasons: [], isChecksPending: false }),
 }));
 
 vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'ScrollView' }));

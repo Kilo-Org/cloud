@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the mergeability selector, the blocked-row selectors and the allowed-method list share one pure module. */
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -16,6 +17,7 @@ function repo(overrides: Partial<MergeBlockedReasonsArgs> = {}): MergeBlockedRea
     mergeableState: 'blocked',
     reviewDecision: 'REVIEW_REQUIRED',
     failedCheckCount: 0,
+    isChecksReadPending: false,
     allowUpdateBranch: true,
     ...overrides,
   };
@@ -139,6 +141,43 @@ describe('getMergeBlockedReasons', () => {
     expect(reasons[0]?.id).toBe('unknown-state');
     expect(reasons[0]?.title).toBe('This pull request is not mergeable yet');
     expect(reasons[0]?.detail).toContain('blocked');
+  });
+
+  it('claims nothing about checks while their read is in flight', () => {
+    const pendingApproved = getMergeBlockedReasons(
+      repo({
+        mergeable: false,
+        mergeableState: 'blocked',
+        reviewDecision: 'APPROVED',
+        failedCheckCount: null,
+        isChecksReadPending: true,
+      })
+    );
+    expect(pendingApproved).toEqual([]);
+
+    const pendingRequired = getMergeBlockedReasons(
+      repo({
+        mergeable: false,
+        mergeableState: 'blocked',
+        reviewDecision: 'REVIEW_REQUIRED',
+        failedCheckCount: null,
+        isChecksReadPending: true,
+      })
+    );
+    expect(pendingRequired.map(r => r.id)).toEqual(['required-reviews']);
+  });
+
+  it('falls back to the reported state when the checks read failed', () => {
+    const reasons = getMergeBlockedReasons(
+      repo({
+        mergeable: false,
+        mergeableState: 'blocked',
+        reviewDecision: 'APPROVED',
+        failedCheckCount: null,
+        isChecksReadPending: false,
+      })
+    );
+    expect(reasons.map(r => r.id)).toEqual(['unknown-state']);
   });
 
   it('reports behind as a branch-out-of-date reason with a rebase/update CTA', () => {

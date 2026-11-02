@@ -11,7 +11,10 @@ import '@/i18n';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { PrMergeSection } from './pr-merge-section';
-import { type PrOverviewDto } from '@/lib/pr-review/merge/merge-blocked-reasons';
+import {
+  type MergeBlockedReason,
+  type PrOverviewDto,
+} from '@/lib/pr-review/merge/merge-blocked-reasons';
 
 const routerPush = vi.fn();
 
@@ -39,9 +42,14 @@ vi.mock('@/lib/pr-review/merge/use-pr-merge-mutations', () => ({
   useDisableAutoMergeMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 // The poll suite owns the timer, not the reasons: the panel's rows come from
-// their own selector tests and the end-to-end run.
+// their own selector tests and the end-to-end run. The model is mutable so a
+// test can put the checks read back in flight.
+const reasonsModel = vi.hoisted(() => ({
+  reasons: [] as MergeBlockedReason[],
+  isChecksPending: false,
+}));
 vi.mock('@/lib/pr-review/merge/use-merge-blocked-reasons', () => ({
-  useMergeBlockedReasons: () => [],
+  useMergeBlockedReasons: () => reasonsModel,
 }));
 vi.mock('@/components/pr-review/merge/pr-merge-section-parts', () => ({
   AutoMergeEnabledBanner: 'AutoMergeEnabledBanner',
@@ -199,6 +207,38 @@ describe('PrMergeSection mergeability poll', () => {
 
     advance(POLL_INTERVAL_MS * (POLL_MAX_TICKS + 5));
     expect(onRefetch).toHaveBeenCalledOnce();
+  });
+
+  it('holds the blocked panel until the checks read answers', () => {
+    const onRefetch = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const blocked = overview({
+      mergeable: false,
+      mergeableState: 'blocked',
+      reviewDecision: 'APPROVED',
+    });
+    reasonsModel.isChecksPending = true;
+    reasonsModel.reasons = [];
+    act(() => {
+      renderer = TestRenderer.create(sectionElement(blocked, onRefetch));
+    });
+    const mounted = renderer;
+    if (!mounted) {
+      throw new Error('the merge section did not mount');
+    }
+    // Nothing is claimed while the read is unanswered.
+    expect(countOf(mounted, 'MergeabilityCheckingRow')).toBe(1);
+    expect(countOf(mounted, 'BlockedPanel')).toBe(0);
+
+    reasonsModel.isChecksPending = false;
+    reasonsModel.reasons = [
+      { id: 'failing-checks', iconKind: 'failing-checks', severity: 'destructive', title: 'x' },
+    ];
+    act(() => {
+      mounted.update(sectionElement(blocked, onRefetch));
+    });
+    expect(countOf(mounted, 'MergeabilityCheckingRow')).toBe(0);
+    expect(countOf(mounted, 'BlockedPanel')).toBe(1);
+    reasonsModel.reasons = [];
   });
 
   it('renders the closed sentence and nothing for a merged review', () => {

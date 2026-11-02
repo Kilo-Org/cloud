@@ -94,7 +94,11 @@ export function PrMergeSection({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const status = getMergeabilityStatus(overview);
-  const reasons = useMergeBlockedReasons(overview, { owner, repo, number: overview.number });
+  const { reasons, isChecksPending } = useMergeBlockedReasons(overview, {
+    owner,
+    repo,
+    number: overview.number,
+  });
 
   // Bounded polling for the brief window after GitHub queues a
   // mergeability re-check. Poll on a fixed interval up to N ticks, then
@@ -220,6 +224,12 @@ export function PrMergeSection({
 
   // Blocked.
   if (status === 'blocked') {
+    // The panel's checks row is read from `listChecks`; until that answers the
+    // section holds the panel, so it never paints a cause the read replaces
+    // and never appends a row after the first paint.
+    if (isChecksPending) {
+      return <MergeabilityCheckingRow />;
+    }
     return (
       <View className="gap-3">
         <BlockedPanel

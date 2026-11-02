@@ -366,10 +366,11 @@ function compareEvidence(next: Evidence, previous: Evidence): number | null {
     if (previous.state === 'dismissed' && next.state !== 'dismissed') return -1;
     if (
       next.state === previous.state &&
-      ['approved', 'changes_requested', 'commented'].includes(next.state)
+      ['approved', 'changes_requested', 'commented', 'dismissed'].includes(next.state)
     ) {
-      if (next.reviewAction === 'edited' && previous.reviewAction === 'submitted') return 1;
-      if (next.reviewAction === 'submitted' && previous.reviewAction === 'edited') return -1;
+      const precedingAction = next.state === 'dismissed' ? 'dismissed' : 'submitted';
+      if (next.reviewAction === 'edited' && previous.reviewAction === precedingAction) return 1;
+      if (next.reviewAction === precedingAction && previous.reviewAction === 'edited') return -1;
     }
   }
   if (next.kind === 'check') {

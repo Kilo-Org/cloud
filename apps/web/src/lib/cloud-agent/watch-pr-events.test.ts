@@ -679,35 +679,59 @@ describe('watch PR observation projection', () => {
     expect(project(newer, legacy)).toBe(newer);
   });
 
-  it('keeps edits of dismissed reviews removed', () => {
-    const dismissed = project(watch(), review('dismissed', { state: 'DISMISSED' }));
-    const edit = review('edited', {
-      state: 'DISMISSED',
-      body: 'Edited dismissed review',
-      updated_at: later,
-    });
-    for (const state of [watch(), dismissed]) {
-      const edited = project(state, edit);
-      expect(projection(edited).pending).toEqual([]);
-      expect(projection(edited).evidence[0]?.removed).toBe(true);
+  it.each([undefined, later])(
+    'keeps edits of dismissed reviews removed without ambiguity (updated_at: %s)',
+    updated_at => {
+      const dismissal = review('dismissed', { state: 'DISMISSED' });
+      const dismissed = project(watch(), dismissal);
+      const edit = review('edited', {
+        state: 'DISMISSED',
+        body: 'Edited dismissed review',
+        updated_at,
+      });
+      for (const state of [dismissed, watch()]) {
+        const edited = project(state, edit);
+        expect(projection(edited)).toMatchObject({
+          ambiguous: false,
+          needsAttention: false,
+          pending: [],
+          evidence: [{ body: 'Edited dismissed review', removed: true, reviewAction: 'edited' }],
+        });
+        expect(project(edited, dismissal)).toBe(edited);
+      }
     }
-  });
+  );
 
   it.each([false, true])(
     'does not guess ordering between untimestamped edits (reversed: %s)',
     reversed => {
-      const edits = [
-        review('edited', { body: 'First edit' }),
-        review('edited', { body: 'Second edit' }),
-      ];
-      if (reversed) edits.reverse();
-      const first = project(watch(), edits[0]);
-      const uncertain = project(first, edits[1]);
-      expect(projection(uncertain)).toMatchObject({ ambiguous: true, needsAttention: true });
-      expect(projection(uncertain).evidence).toEqual(projection(first).evidence);
-      expect(uncertain.pending_revision).toBe(first.pending_revision);
+      for (const state of ['CHANGES_REQUESTED', 'DISMISSED']) {
+        const edits = [
+          review('edited', { state, body: 'First edit' }),
+          review('edited', { state, body: 'Second edit' }),
+        ];
+        if (reversed) edits.reverse();
+        const first = project(watch(), edits[0]);
+        const uncertain = project(first, edits[1]);
+        expect(projection(uncertain)).toMatchObject({ ambiguous: true, needsAttention: true });
+        expect(projection(uncertain).evidence).toEqual(projection(first).evidence);
+        expect(uncertain.pending_revision).toBe(first.pending_revision);
+      }
     }
   );
+
+  it('does not infer edit ordering for dismissed evidence without action provenance', () => {
+    const existing = project(
+      watch(),
+      feedback({ key: 'review:9', action: 'dismissed', state: 'dismissed', updatedAt: null })
+    );
+    const uncertain = project(
+      existing,
+      review('edited', { state: 'DISMISSED', body: 'Unordered dismissed review edit' })
+    );
+    expect(projection(uncertain)).toMatchObject({ ambiguous: true, needsAttention: true });
+    expect(projection(uncertain).evidence).toEqual(projection(existing).evidence);
+  });
 
   it('does not mistake draft edits for revisions after submission', () => {
     const submitted = project(watch(), review('submitted'));

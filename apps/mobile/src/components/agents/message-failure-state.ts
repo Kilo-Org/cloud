@@ -43,8 +43,9 @@ export const NON_RETRYABLE_ASSISTANT_ERRORS: readonly string[] = [
  * Whether the gateway itself marked the failure terminal. An `APIError` carries
  * the retryability it decided (a billing refusal, a rejected credential), so a
  * Retry on it only spends another round trip on the same refusal. Only an
- * `APIError` can be terminal this way; every other error name keeps the
- * name-based rule below.
+ * explicit `false` is terminal: a session written before the field existed has
+ * no value, and unknown retryability keeps the row's only recovery action
+ * rather than silently removing it.
  */
 function assistantErrorMarkedNonRetryable(
   error: Extract<MessageInfo, { role: 'assistant' }>['error']
@@ -52,7 +53,7 @@ function assistantErrorMarkedNonRetryable(
   if (error?.name !== 'APIError') {
     return false;
   }
-  return !error.data.isRetryable;
+  return Object.is(error.data.isRetryable, false);
 }
 
 /**

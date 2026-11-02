@@ -26,7 +26,7 @@ function assistantInfo(errorName: string): MessageInfo {
     // Deliberately carries raw provider text; the helper must never surface it.
     error: {
       name: errorName,
-      data: { message: 'RAW_PROVIDER_TEXT', isRetryable: true },
+      data: { message: 'RAW_PROVIDER_TEXT' },
     } as unknown as AssistantError,
     parentID: 'u1',
     modelID: 'anthropic/claude-sonnet-4',
@@ -178,6 +178,16 @@ describe('selectMessageFailure', () => {
         name: 'APIError',
         data: { message: 'RAW_PROVIDER_TEXT', isRetryable: true },
       };
+
+      expect(selectMessageFailure({ info })?.canRetry).toBe(true);
+    });
+
+    it('keeps Retry for a session written before the retryability flag existed', () => {
+      const info = assistantInfo('APIError') as Extract<MessageInfo, { role: 'assistant' }>;
+      info.error = {
+        name: 'APIError',
+        data: { message: 'RAW_PROVIDER_TEXT' },
+      } as unknown as AssistantError;
 
       expect(selectMessageFailure({ info })?.canRetry).toBe(true);
     });

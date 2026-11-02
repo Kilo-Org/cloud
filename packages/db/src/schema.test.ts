@@ -204,9 +204,34 @@ describe('cloud agent stacked workspace schema', () => {
   });
 });
 
-it('migration 0324 backfills old owners and folders to activity while new rows default to manual', async () => {
+it('migration 0323 preserves retry safety around its concurrent activity index', () => {
   const migration = fs.readFileSync(
-    path.join(__dirname, 'migrations/0324_cloud_agent_stacked_workspaces.sql'),
+    path.join(__dirname, 'migrations/0323_cloud_agent_stacked_workspaces.sql'),
+    'utf8'
+  );
+  const statements = migration.split('--> statement-breakpoint').map(statement => statement.trim());
+  const concurrentIndex =
+    'CREATE INDEX CONCURRENTLY "IDX_cli_sessions_v2_user_activity" ON "cli_sessions_v2" USING btree ("kilo_user_id",coalesce("last_activity_at", "created_at"));';
+  const indexPosition = statements.indexOf(concurrentIndex);
+  expect(statements.slice(indexPosition - 3, indexPosition + 3)).toEqual([
+    'COMMIT;',
+    'SET statement_timeout = 0;',
+    'DROP INDEX CONCURRENTLY IF EXISTS "IDX_cli_sessions_v2_user_activity";',
+    concurrentIndex,
+    'RESET statement_timeout;',
+    'BEGIN;',
+  ]);
+  expect(statements[0]).toContain(
+    "IF to_regclass('public.cloud_agent_sidebar_preferences') IS NULL THEN"
+  );
+  expect(statements[0]).toContain('CREATE TABLE "cloud_agent_sidebar_preferences"');
+  expect(statements[0]).toContain('ADD COLUMN "base_sha" text;');
+  expect(statements[0]).toMatch(/END IF;\s*END \$\$;$/);
+});
+
+it('migration 0323 backfills old owners and folders to activity while new rows default to manual', async () => {
+  const migration = fs.readFileSync(
+    path.join(__dirname, 'migrations/0323_cloud_agent_stacked_workspaces.sql'),
     'utf8'
   );
   const backfills = migration

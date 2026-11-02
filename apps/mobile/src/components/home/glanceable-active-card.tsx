@@ -147,7 +147,6 @@ export function GlanceableActiveCard({
       {newestSession !== null && newestTitle !== null && newestKind !== null ? (
         <CardControl
           key={newestSession.id}
-          className="flex-1"
           onPress={() => {
             onPressSession(newestSession);
           }}

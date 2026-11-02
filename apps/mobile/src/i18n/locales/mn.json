@@ -1616,6 +1616,8 @@
       "set": "Тохируулсан",
       "notSet": "Тохируулаагүй",
       "nSelected": "{{displayCount}} сонгогдсон",
+      "nSelected_one": "{{displayCount}} сонгогдсон",
+      "nSelected_other": "{{displayCount}} сонгогдсон",
       "proposedReviewMdGuidance": "Санал болгосон REVIEW.md зөвлөмж"
     },
     "decision": {

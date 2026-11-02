@@ -1090,6 +1090,10 @@
     "overview": {
       "allAreas": "Все области",
       "nSelected": "Выбрано: {{displayCount}}",
+      "nSelected_one": "Выбрано: {{displayCount}}",
+      "nSelected_other": "Выбрано: {{displayCount}}",
+      "nSelected_few": "Выбрано: {{displayCount}}",
+      "nSelected_many": "Выбрано: {{displayCount}}",
       "proposedReviewMdGuidance": "Предложения для REVIEW.md",
       "set": "Задано",
       "notSet": "Не задано"
@@ -2116,9 +2120,9 @@
       "detailRetryingClone": "Повторное клонирование (попытка {{attempt}} из {{total}})",
       "detailSetupCommandFailed": "Не удалось выполнить команду настройки {{index}}",
       "detailSetupCommandTimedOut": "Истекло время выполнения команды настройки {{index}}",
-      "detailColdRestore": "Холодное восстановление, снимок применён, восстановлено файлов: {{applied}} из {{total}}",
+      "detailColdRestore": "Холодное восстановление, снимок применён, количество восстановленных файлов: {{applied}} из {{total}}",
       "detailProgressPercent": "Готово: {{percent}}%",
-      "detailRestoreIncompleteReport": "Восстановление сеанса не завершено: не восстановлено файлов: {{skipped}} из {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Восстановление сеанса не завершено — количество невосстановленных файлов: {{skipped}} из {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Отсутствует: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} и ещё {{omitted}}",
       "detailReasonPatchFailed": "патч не был применён",

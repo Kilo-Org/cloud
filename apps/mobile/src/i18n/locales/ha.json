@@ -1616,6 +1616,8 @@
       "set": "An saita",
       "notSet": "Ba a saita ba",
       "nSelected": "An zaɓi {{displayCount}}",
+      "nSelected_one": "An zaɓi {{displayCount}}",
+      "nSelected_other": "An zaɓi {{displayCount}}",
       "proposedReviewMdGuidance": "Ƙa'idodin REVIEW.md da aka ba da shawara"
     },
     "decision": {
@@ -2608,9 +2610,9 @@
       "detailRetryingClone": "Ana sake gwada kwafawa (gwaji na {{attempt}} daga cikin {{total}})",
       "detailSetupCommandFailed": "Umarnin shiri na {{index}} ya kasa aiki",
       "detailSetupCommandTimedOut": "Lokacin umarnin shiri na {{index}} ya ƙare",
-      "detailColdRestore": "Sanyar da sanyi, an dawo da hoton yanayi, an mayar da fayiloli {{applied}} daga cikin {{total}}",
+      "detailColdRestore": "Sanyar da sanyi, an dawo da hoton yanayi, an mayar da fayiloli: {{applied}} daga cikin {{total}}",
       "detailProgressPercent": "An kammala {{percent}}%",
-      "detailRestoreIncompleteReport": "Ba a kammala mayar da zaman aiki ba: ba a mayar da fayiloli {{skipped}} daga cikin {{total}} ba ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Ba a kammala mayar da zaman aiki ba — ba a mayar da fayiloli ba: {{skipped}} daga cikin {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Rashawa: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} da ƙarin {{omitted}}",
       "detailReasonPatchFailed": "manhalar ba ta shiga aiki ba",

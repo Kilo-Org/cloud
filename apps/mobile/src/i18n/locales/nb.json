@@ -1616,6 +1616,8 @@
       "set": "Angitt",
       "notSet": "Ikke angitt",
       "nSelected": "{{displayCount}} valgt",
+      "nSelected_one": "{{displayCount}} valgt",
+      "nSelected_other": "{{displayCount}} valgt",
       "proposedReviewMdGuidance": "Forslag til retningslinjer i REVIEW.md"
     },
     "decision": {
@@ -2608,9 +2610,9 @@
       "detailRetryingClone": "Prøver kloning på nytt (forsøk {{attempt}} av {{total}})",
       "detailSetupCommandFailed": "Oppsettskommando {{index}} mislyktes",
       "detailSetupCommandTimedOut": "Oppsettskommando {{index}} fikk tidsavbrudd",
-      "detailColdRestore": "Kald gjenoppretting, snapshot anvendt, {{applied}} av {{total}} filer gjenopprettet",
+      "detailColdRestore": "Kald gjenoppretting, snapshot anvendt, gjenopprettede filer: {{applied}} av {{total}}",
       "detailProgressPercent": "{{percent}} % fullført",
-      "detailRestoreIncompleteReport": "Øktgjenoppretting ufullstendig: {{skipped}} av {{total}} filer ble ikke gjenopprettet ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Øktgjenoppretting ufullstendig, filer som ikke ble gjenopprettet: {{skipped}} av {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Mangler: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} og {{omitted}} til",
       "detailReasonPatchFailed": "patchen ble ikke anvendt",

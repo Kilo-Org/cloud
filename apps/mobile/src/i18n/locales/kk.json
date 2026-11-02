@@ -1616,6 +1616,8 @@
       "set": "Белгіленген",
       "notSet": "Белгіленбеген",
       "nSelected": "{{displayCount}} таңдалды",
+      "nSelected_one": "{{displayCount}} таңдалды",
+      "nSelected_other": "{{displayCount}} таңдалды",
       "proposedReviewMdGuidance": "REVIEW.md файлына ұсынылған нұсқаулар"
     },
     "decision": {
@@ -2608,9 +2610,9 @@
       "detailRetryingClone": "Клондауды қайта талаптану ({{total}} әрекеттің {{attempt}}-і)",
       "detailSetupCommandFailed": "{{index}} баптау пәрмені сәтсіз аяқталды",
       "detailSetupCommandTimedOut": "{{index}} баптау пәрменінің уақыты бітті",
-      "detailColdRestore": "Салқын қалпына келтіру, снапшот қолданылды, {{total}} файлдың {{applied}}-і қалпына келтірілді",
+      "detailColdRestore": "Салқын қалпына келтіру, снапшот қолданылды, қалпына келтірілген файлдар: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% аяқталды",
-      "detailRestoreIncompleteReport": "Сессияны қалпына келтіру аяқталмады: {{total}} файлдың {{skipped}}-і қалпына келтірілмеді ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Сессияны қалпына келтіру аяқталмады — қалпына келтірілмеген файлдар: {{skipped}} / {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Жетіспейді: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} және тағы {{omitted}}",
       "detailReasonPatchFailed": "патч қолданылмады",

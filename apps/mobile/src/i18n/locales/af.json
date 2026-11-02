@@ -1616,6 +1616,8 @@
       "set": "Ingestel",
       "notSet": "Nie ingestel nie",
       "nSelected": "{{displayCount}} gekies",
+      "nSelected_one": "{{displayCount}} gekies",
+      "nSelected_other": "{{displayCount}} gekies",
       "proposedReviewMdGuidance": "Voorgestelde REVIEW.md-riglyne"
     },
     "decision": {
@@ -2608,9 +2610,9 @@
       "detailRetryingClone": "Probeer kloon weer (poging {{attempt}} van {{total}})",
       "detailSetupCommandFailed": "Opstelopdrag {{index}} het misluk",
       "detailSetupCommandTimedOut": "Opstelopdrag {{index}} se tyd het uitgeloop",
-      "detailColdRestore": "Koue herstel, momentopname toegepas, {{applied}} van {{total}} lêers herstel",
+      "detailColdRestore": "Koue herstel, momentopname toegepas, herstelde lêers: {{applied}} van {{total}}",
       "detailProgressPercent": "{{percent}}% voltooi",
-      "detailRestoreIncompleteReport": "Sessieherstel onvolledig: {{skipped}} van {{total}} lêers is nie herstel nie ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Sessieherstel onvolledig, nie-herstelde lêers: {{skipped}} van {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Ontbreek: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} en nog {{omitted}} meer",
       "detailReasonPatchFailed": "die pleister is nie toegepas nie",

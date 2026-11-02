@@ -1616,6 +1616,8 @@
       "set": "Սահմանված է",
       "notSet": "Սահմանված չէ",
       "nSelected": "Ընտրված է {{displayCount}}",
+      "nSelected_one": "Ընտրված է {{displayCount}}",
+      "nSelected_other": "Ընտրված է {{displayCount}}",
       "proposedReviewMdGuidance": "Առաջարկվող հրահանգներ REVIEW.md-ի համար"
     },
     "decision": {
@@ -2614,9 +2616,9 @@
       "detailRetryingClone": "Կլոնավորման կրկնակի փորձ (փորձ {{attempt}}-ը {{total}}-ից)",
       "detailSetupCommandFailed": "Կարգավորման {{index}} հրամանը ձախողվեց",
       "detailSetupCommandTimedOut": "Կարգավորման {{index}} հրամանի ժամանակը սպառվեց",
-      "detailColdRestore": "Սառը վերականգնում, կիրառվել է սնապշոտ, վերականգնվել է {{total}} ֆայլից {{applied}}-ը",
+      "detailColdRestore": "Սառը վերականգնում, սնապշոտը կիրառված է, վերականգնված ֆայլեր՝ {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% ավարտված է",
-      "detailRestoreIncompleteReport": "Սեսիայի վերականգնումն անավարտ է՝ {{total}} ֆայլից {{skipped}}-ը վերականգնված չեն ({{reasons}})։",
+      "detailRestoreIncompleteReport": "Սեսիայի վերականգնումն անավարտ է․ չվերականգնված ֆայլեր՝ {{skipped}} / {{total}} ({{reasons}})։",
       "detailRestoreIncompleteMissing": "Բացակայում են՝ {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} և ևս {{omitted}}",
       "detailReasonPatchFailed": "patch-ը չկիրառվեց",

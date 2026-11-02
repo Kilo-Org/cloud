@@ -1616,6 +1616,8 @@
       "set": "Kua whakaritea",
       "notSet": "Kāore i whakaritea",
       "nSelected": "{{displayCount}} kua kōwhiria",
+      "nSelected_one": "{{displayCount}} kua kōwhiria",
+      "nSelected_other": "{{displayCount}} kua kōwhiria",
       "proposedReviewMdGuidance": "Ngā aratohu REVIEW.md e tūtohutia ana"
     },
     "decision": {

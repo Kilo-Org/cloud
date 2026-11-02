@@ -1660,6 +1660,10 @@
       "set": "Nustatyta",
       "notSet": "Nenustatyta",
       "nSelected": "Pasirinkta {{displayCount}}",
+      "nSelected_one": "Pasirinkta {{displayCount}}",
+      "nSelected_other": "Pasirinkta {{displayCount}}",
+      "nSelected_few": "Pasirinkta {{displayCount}}",
+      "nSelected_many": "Pasirinkta {{displayCount}}",
       "proposedReviewMdGuidance": "Siūlomos REVIEW.md gairės"
     },
     "decision": {
@@ -2690,9 +2694,9 @@
       "detailRetryingClone": "Klonavimas kartojamas ({{attempt}} bandymas iš {{total}})",
       "detailSetupCommandFailed": "Sąrankos komanda {{index}} nepavyko",
       "detailSetupCommandTimedOut": "Baigėsi sąrankos komandos {{index}} laikas",
-      "detailColdRestore": "Šaltis atkūrimas, momentinė kopija pritaikyta, atkurta {{applied}} iš {{total}} failų",
+      "detailColdRestore": "Šaltis atkūrimas, momentinė kopija pritaikyta, atkurti failai: {{applied}} iš {{total}}",
       "detailProgressPercent": "Atlikta {{percent}}%",
-      "detailRestoreIncompleteReport": "Sesijos atkūrimas neišsamus: {{skipped}} iš {{total}} failų neatkurta ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Sesijos atkūrimas neišsamus, neatkurti failai: {{skipped}} iš {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Trūksta: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ir dar {{omitted}}",
       "detailReasonPatchFailed": "patch nepavyko pritaikyti",

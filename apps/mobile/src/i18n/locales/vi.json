@@ -1084,6 +1084,8 @@
     "overview": {
       "allAreas": "Tất cả nội dung",
       "nSelected": "Đã chọn {{displayCount}}",
+      "nSelected_one": "Đã chọn {{displayCount}}",
+      "nSelected_other": "Đã chọn {{displayCount}}",
       "proposedReviewMdGuidance": "Hướng dẫn đề xuất cho REVIEW.md",
       "set": "Đã thiết lập",
       "notSet": "Chưa thiết lập"

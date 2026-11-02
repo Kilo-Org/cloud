@@ -1616,6 +1616,8 @@
       "set": "Qindaa'e",
       "notSet": "Hin qindaa'e",
       "nSelected": "{{displayCount}} filatamaniiru",
+      "nSelected_one": "{{displayCount}} filatamaniiru",
+      "nSelected_other": "{{displayCount}} filatamaniiru",
       "proposedReviewMdGuidance": "Qajeelfama REVIEW.md dhihaate"
     },
     "decision": {
@@ -2608,9 +2610,9 @@
       "detailRetryingClone": "Kopishii irra deebi'ee yaalaa jira (yaalii {{total}} keessaa {{attempt}})",
       "detailSetupCommandFailed": "Ajajni qophii {{index}} hin milkoofne",
       "detailSetupCommandTimedOut": "Ajajni qophii {{index}} yeroon dhaafe",
-      "detailColdRestore": "Deebiinsa qorraa, snaapshottii hojiirra oole, faayiloota {{total}} keessaa {{applied}} deebi'an",
+      "detailColdRestore": "Deebiinsa qorraa, snaapshottii hojiirra oole, faayiloota deebi'an: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% xumurame",
-      "detailRestoreIncompleteReport": "Deebiinsa sessii guutuu miti: faayiloota {{total}} keessaa {{skipped}} hin deebi'amne ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Deebiinsa sessii guutuu miti, faayiloota hin deebi'amne: {{skipped}} / {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Hin argamne: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} fi kan biraa {{omitted}}",
       "detailReasonPatchFailed": "paachiin hojiirra hin oole",

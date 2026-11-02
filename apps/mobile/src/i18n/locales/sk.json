@@ -1660,6 +1660,10 @@
       "set": "Nastavené",
       "notSet": "Nenastavené",
       "nSelected": "Vybrané: {{displayCount}}",
+      "nSelected_one": "Vybrané: {{displayCount}}",
+      "nSelected_other": "Vybrané: {{displayCount}}",
+      "nSelected_few": "Vybrané: {{displayCount}}",
+      "nSelected_many": "Vybrané: {{displayCount}}",
       "proposedReviewMdGuidance": "Navrhované pokyny do REVIEW.md"
     },
     "decision": {
@@ -2690,9 +2694,9 @@
       "detailRetryingClone": "Opakuje sa klonovanie (pokus {{attempt}} z {{total}})",
       "detailSetupCommandFailed": "Príkaz na prípravu prostredia {{index}} zlyhal",
       "detailSetupCommandTimedOut": "Príkazu na prípravu prostredia {{index}} vypršal časový limit",
-      "detailColdRestore": "Studené obnovenie, snímka bola použitá, obnovených {{applied}} z {{total}} súborov",
+      "detailColdRestore": "Studené obnovenie, snímka bola použitá, obnovené súbory: {{applied}} z {{total}}",
       "detailProgressPercent": "Dokončené na {{percent}} %",
-      "detailRestoreIncompleteReport": "Obnovenie relácie je neúplné: {{skipped}} z {{total}} súborov nebolo obnovených ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Obnovenie relácie je neúplné, neobnovené súbory: {{skipped}} z {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Chýba: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} a ďalších {{omitted}}",
       "detailReasonPatchFailed": "záplata sa nepoužila",

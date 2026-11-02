@@ -1616,6 +1616,8 @@
       "set": "സജ്ജമാക്കി",
       "notSet": "സജ്ജമാക്കിയിട്ടില്ല",
       "nSelected": "{{displayCount}} തിരഞ്ഞെടുത്തു",
+      "nSelected_one": "{{displayCount}} തിരഞ്ഞെടുത്തു",
+      "nSelected_other": "{{displayCount}} തിരഞ്ഞെടുത്തു",
       "proposedReviewMdGuidance": "REVIEW.md-നായി മുന്നോട്ടുവച്ച മാർഗ്ഗനിർദ്ദേശങ്ങൾ"
     },
     "decision": {
@@ -2608,9 +2610,9 @@
       "detailRetryingClone": "ക്ലോൺ വീണ്ടും ശ്രമിക്കുന്നു ({{total}}-ൽ {{attempt}} ശ്രമം)",
       "detailSetupCommandFailed": "സജ്ജീകരണ കമാൻഡ് {{index}} പരാജയപ്പെട്ടു",
       "detailSetupCommandTimedOut": "സജ്ജീകരണ കമാൻഡ് {{index}} കാലഹരണപ്പെട്ടു",
-      "detailColdRestore": "കോൾഡ് പുനഃസ്ഥാപനം, സ്നാപ്ഷോട്ട് പ്രയോഗിച്ചു, {{total}} ഫയലുകളിൽ {{applied}} പുനഃസ്ഥാപിച്ചു",
+      "detailColdRestore": "കോൾഡ് പുനഃസ്ഥാപനം, സ്നാപ്ഷോട്ട് പ്രയോഗിച്ചു, പുനഃസ്ഥാപിച്ച ഫയലുകൾ: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% പൂർത്തിയായി",
-      "detailRestoreIncompleteReport": "സെഷൻ പുനഃസ്ഥാപനം പൂർത്തിയായില്ല: {{total}} ഫയലുകളിൽ {{skipped}} പുനഃസ്ഥാപിച്ചില്ല ({{reasons}}).",
+      "detailRestoreIncompleteReport": "സെഷൻ പുനഃസ്ഥാപനം പൂർത്തിയായില്ല — പുനഃസ്ഥാപിക്കാത്ത ഫയലുകൾ: {{skipped}} / {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "കാണുന്നില്ല: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}}, കൂടാതെ {{omitted}} കൂടുതൽ",
       "detailReasonPatchFailed": "പാച്ച് പ്രയോഗിക്കാനായില്ല",

@@ -1054,6 +1054,9 @@
     "overview": {
       "allAreas": "Tous les domaines",
       "nSelected": "{{displayCount}} sélectionnés",
+      "nSelected_one": "{{displayCount}} sélectionnés",
+      "nSelected_other": "{{displayCount}} sélectionnés",
+      "nSelected_many": "{{displayCount}} sélectionnés",
       "proposedReviewMdGuidance": "Consignes proposées pour REVIEW.md",
       "set": "Défini",
       "notSet": "Non défini"
@@ -1999,9 +2002,9 @@
       "detailRetryingClone": "Nouvelle tentative de clonage (tentative {{attempt}} sur {{total}})",
       "detailSetupCommandFailed": "Échec de la commande de configuration {{index}}",
       "detailSetupCommandTimedOut": "Délai dépassé pour la commande de configuration {{index}}",
-      "detailColdRestore": "Restauration à froid, instantané appliqué, {{applied}} fichiers sur {{total}} restaurés",
+      "detailColdRestore": "Restauration à froid, instantané appliqué, fichiers restaurés : {{applied}} sur {{total}}",
       "detailProgressPercent": "{{percent}}% terminé",
-      "detailRestoreIncompleteReport": "Restauration de session incomplète : {{skipped}} fichiers sur {{total}} n'ont pas été restaurés ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Restauration de session incomplète — fichiers non restaurés : {{skipped}} sur {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Fichiers manquants : {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} et {{omitted}} autres",
       "detailReasonPatchFailed": "le correctif n'a pas pu être appliqué",

@@ -1616,6 +1616,8 @@
       "set": "Imewekwa",
       "notSet": "Haijawekwa",
       "nSelected": "{{displayCount}} zimechaguliwa",
+      "nSelected_one": "{{displayCount}} zimechaguliwa",
+      "nSelected_other": "{{displayCount}} zimechaguliwa",
       "proposedReviewMdGuidance": "Mwongozo uliopendekezwa wa REVIEW.md"
     },
     "decision": {
@@ -2608,9 +2610,9 @@
       "detailRetryingClone": "Inajaribu kunakili tena (jaribio la {{attempt}} kati ya {{total}})",
       "detailSetupCommandFailed": "Amri ya usanidi {{index}} imeshindikana",
       "detailSetupCommandTimedOut": "Amri ya usanidi {{index}} imeisha muda",
-      "detailColdRestore": "Urejeshi wa baridi, snapshot imetumika, faili {{applied}} kati ya {{total}} zimerejeshwa",
+      "detailColdRestore": "Urejeshi wa baridi, snapshot imetumika, urejeshi wa faili: {{applied}} kati ya {{total}}",
       "detailProgressPercent": "{{percent}}% imekamilika",
-      "detailRestoreIncompleteReport": "Urejeshi wa kikao haujakamilika: faili {{skipped}} kati ya {{total}} hazikurejeshwa ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Urejeshi wa kikao haujakamilika — faili bila urejeshi: {{skipped}} kati ya {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Zinazokosekana: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} na nyingine {{omitted}}",
       "detailReasonPatchFailed": "patch haikutumika",

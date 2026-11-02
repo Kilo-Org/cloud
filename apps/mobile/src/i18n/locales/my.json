@@ -1616,6 +1616,8 @@
       "set": "သတ်မှတ်ထား",
       "notSet": "သတ်မှတ်ထားခြင်း မရှိ",
       "nSelected": "{{displayCount}} ခု ရွေးထား",
+      "nSelected_one": "{{displayCount}} ခု ရွေးထား",
+      "nSelected_other": "{{displayCount}} ခု ရွေးထား",
       "proposedReviewMdGuidance": "အဆိုပြုထားသော REVIEW.md လမ်းညွှန်ချက်များ"
     },
     "decision": {

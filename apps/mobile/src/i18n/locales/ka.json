@@ -1616,6 +1616,8 @@
       "set": "მითითებულია",
       "notSet": "არ არის მითითებული",
       "nSelected": "არჩეულია {{displayCount}}",
+      "nSelected_one": "არჩეულია {{displayCount}}",
+      "nSelected_other": "არჩეულია {{displayCount}}",
       "proposedReviewMdGuidance": "შემოთავაზებული მითითებები REVIEW.md-ისთვის"
     },
     "decision": {
@@ -2610,7 +2612,7 @@
       "detailSetupCommandTimedOut": "გამართვის ბრძანება {{index}}-ის ვადა ამოიწურა",
       "detailColdRestore": "ცივი აღდგენა, სნეპშოტი გამოყენებულია, აღდგენილია {{total}} ფაილიდან {{applied}}",
       "detailProgressPercent": "დასრულებულია {{percent}}%",
-      "detailRestoreIncompleteReport": "სესიის აღდგენა არასრულია: {{total}} ფაილიდან {{skipped}} არ აღდგენილა ({{reasons}}).",
+      "detailRestoreIncompleteReport": "სესიის აღდგენა არასრულია: არააღდგენილი ფაილები — {{total}}-დან {{skipped}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "აკლია: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} და კიდევ {{omitted}}",
       "detailReasonPatchFailed": "პაჩი არ გამოიყენებოდა",

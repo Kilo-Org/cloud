@@ -1616,6 +1616,8 @@
       "set": "A ti ṣètò rẹ̀",
       "notSet": "A kò ṣètò",
       "nSelected": "{{displayCount}} tí a yàn",
+      "nSelected_one": "{{displayCount}} tí a yàn",
+      "nSelected_other": "{{displayCount}} tí a yàn",
       "proposedReviewMdGuidance": "Ìtọ́sọ́nà REVIEW.md tí a dábàá"
     },
     "decision": {

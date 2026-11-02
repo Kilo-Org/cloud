@@ -1638,6 +1638,9 @@
       "set": "Postavljeno",
       "notSet": "Nije postavljeno",
       "nSelected": "{{displayCount}} odabrano",
+      "nSelected_one": "{{displayCount}} odabrano",
+      "nSelected_other": "{{displayCount}} odabrano",
+      "nSelected_few": "{{displayCount}} odabrano",
       "proposedReviewMdGuidance": "Predložene smjernice za REVIEW.md"
     },
     "decision": {
@@ -2649,9 +2652,9 @@
       "detailRetryingClone": "Ponovni pokušaj kloniranja (pokušaj {{attempt}} od {{total}})",
       "detailSetupCommandFailed": "Naredba za postavljanje {{index}} nije uspjela",
       "detailSetupCommandTimedOut": "Naredbi za postavljanje {{index}} isteklo je vrijeme",
-      "detailColdRestore": "Hladno vraćanje, snimka primijenjena, vraćeno {{applied}} od {{total}} datoteka",
+      "detailColdRestore": "Hladno vraćanje, snimka primijenjena, vraćene datoteke: {{applied}} od {{total}}",
       "detailProgressPercent": "{{percent}}% dovršeno",
-      "detailRestoreIncompleteReport": "Vraćanje sesije nije dovršeno: nije vraćeno {{skipped}} od {{total}} datoteka ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Vraćanje sesije nije dovršeno – nisu vraćene datoteke: {{skipped}} od {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Nedostaje: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} i još {{omitted}}",
       "detailReasonPatchFailed": "zakrpa nije primijenjena",

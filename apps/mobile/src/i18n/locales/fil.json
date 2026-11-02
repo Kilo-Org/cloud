@@ -1616,6 +1616,8 @@
       "set": "Nakatakda",
       "notSet": "Hindi nakatakda",
       "nSelected": "{{displayCount}} napili",
+      "nSelected_one": "{{displayCount}} napili",
+      "nSelected_other": "{{displayCount}} napili",
       "proposedReviewMdGuidance": "Iminungkahing gabay sa REVIEW.md"
     },
     "decision": {
@@ -2614,9 +2616,9 @@
       "detailRetryingClone": "Sumusubok ulit i-clone (pagsubok {{attempt}} sa {{total}})",
       "detailSetupCommandFailed": "Nabigo ang utos sa paghahanda {{index}}",
       "detailSetupCommandTimedOut": "Nag-time out ang utos sa paghahanda {{index}}",
-      "detailColdRestore": "Cold restore, nailapat ang snapshot, {{applied}} sa {{total}} files ang nabalik",
+      "detailColdRestore": "Cold restore, nailapat ang snapshot, nabalik na files: {{applied}} sa {{total}}",
       "detailProgressPercent": "{{percent}}% kumpleto",
-      "detailRestoreIncompleteReport": "Hindi kumpleto ang pagbabalik ng session: {{skipped}} sa {{total}} files ang hindi naibalik ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Hindi kumpleto ang pagbabalik ng session, hindi naibalik na files: {{skipped}} sa {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Nawawala: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} at {{omitted}} pa",
       "detailReasonPatchFailed": "hindi naaplay ang patch",

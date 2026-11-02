@@ -1054,6 +1054,9 @@
     "overview": {
       "allAreas": "Tutte le aree",
       "nSelected": "Selezionati: {{displayCount}}",
+      "nSelected_one": "Selezionati: {{displayCount}}",
+      "nSelected_other": "Selezionati: {{displayCount}}",
+      "nSelected_many": "Selezionati: {{displayCount}}",
       "proposedReviewMdGuidance": "Indicazioni proposte per REVIEW.md",
       "set": "Configurato",
       "notSet": "Non configurato"
@@ -2061,9 +2064,9 @@
       "detailRetryingClone": "Nuovo tentativo di clone (tentativo {{attempt}} su {{total}})",
       "detailSetupCommandFailed": "Comando di configurazione {{index}} non riuscito",
       "detailSetupCommandTimedOut": "Tempo scaduto per il comando di configurazione {{index}}",
-      "detailColdRestore": "Ripristino a freddo, snapshot applicata, {{applied}} su {{total}} file ripristinati",
+      "detailColdRestore": "Ripristino a freddo, snapshot applicata, file ripristinati: {{applied}} su {{total}}",
       "detailProgressPercent": "{{percent}}% completato",
-      "detailRestoreIncompleteReport": "Ripristino della sessione incompleto: {{skipped}} su {{total}} file non sono stati ripristinati ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Ripristino della sessione incompleto — file non ripristinati: {{skipped}} su {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Mancanti: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} e altri {{omitted}}",
       "detailReasonPatchFailed": "la patch non è stata applicata",

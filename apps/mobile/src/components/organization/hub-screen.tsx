@@ -75,11 +75,16 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   // knows from its first frame whether this org has a Kilo Pass row instead of
   // adding one a request later and pushing the rows under it down. A device
   // that persisted the list before that field existed hydrates an entry
-  // without it; the membership payload stands in for that entry only, because
-  // the list wins as soon as it carries the field.
+  // without it, so the membership payload fills the gap in both directions: a
+  // parent id from either payload makes this a child, because only an admin
+  // change moves an organization under a parent after creation and that id is
+  // never the stale side. With no id reported, a `null` from either payload
+  // confirms a top-level organization; two unknown links stay unknown.
   const listParentLink = org?.parentOrganizationId;
-  const parentLink =
-    listParentLink === undefined ? orgWithMembers.data?.parent_organization_id : listParentLink;
+  const membershipParentLink = orgWithMembers.data?.parent_organization_id;
+  const reportedParentLink = listParentLink ?? membershipParentLink;
+  const topLevelConfirmed = listParentLink === null || membershipParentLink === null;
+  const parentLink = reportedParentLink ?? (topLevelConfirmed ? null : undefined);
   // An unknown link keeps the row: it renders in its loading state instead of
   // appearing once a payload lands. Only a known child organization, which
   // carries its parent's id, has no Kilo Pass row.

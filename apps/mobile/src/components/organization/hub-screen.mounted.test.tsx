@@ -408,5 +408,24 @@ describe('Organization hub billing card while its data loads', () => {
     expect(cachedChild.renderer.root.findAllByType('KiloPassIcon')).toEqual([]);
     expect(kiloPassQuery.enabled.at(-1)).toBe(false);
     cachedChild.unmount();
+
+    // A list entry that persisted "top-level" before the organization was moved
+    // under a parent loses to the membership payload's parent id, instead of
+    // summoning the parent-only summary until the list refetches.
+    boundary.parentOrganizationId = null;
+    membersQuery.data = { parent_organization_id: 'org-parent', settings: {} };
+    const movedChild = await renderHub();
+    expect(movedChild.renderer.root.findAllByType('KiloPassIcon')).toEqual([]);
+    expect(kiloPassQuery.enabled.at(-1)).toBe(false);
+    movedChild.unmount();
+
+    // A `null` from the membership payload alone confirms a top-level entry
+    // whose list entry predates the field, so its row settles without a refetch.
+    boundary.parentOrganizationId = undefined;
+    membersQuery.data = { parent_organization_id: null, settings: {} };
+    const settled = await renderHub();
+    expect(settled.renderer.root.findAllByType('KiloPassIcon')).not.toEqual([]);
+    expect(kiloPassQuery.enabled.at(-1)).toBe(true);
+    settled.unmount();
   });
 });

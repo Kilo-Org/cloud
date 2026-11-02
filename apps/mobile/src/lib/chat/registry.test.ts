@@ -1389,6 +1389,49 @@ describe('a question a later send took the slot from', () => {
     expect(await askedIn('answered')).toBeNull();
   });
 
+  it('does not fold a later attempt that repeats an earlier answered question', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('repeat', place);
+    /* The first "hi" was answered long before; the second, said after two turns,
+       failed and was asked again when the app stopped. */
+    const words = {
+      text: 'hi',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+      afterTurns: 2,
+      outcome: 'failed' as const,
+    };
+    storedHistory = [
+      {
+        id: 'trn_13',
+        sessionId: 'repeat',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: 'hi' }],
+      },
+      {
+        id: 'trn_14',
+        sessionId: 'repeat',
+        role: 'assistant',
+        parts: [{ id: 'p2', kind: 'text', body: 'the earlier answer' }],
+      },
+    ];
+    storedQuestions.set('chat-asked-target:repeat', JSON.stringify({ ...words, from: 'a' }));
+    storedQuestions.set('chat-kept-questions:repeat', JSON.stringify([{ id: 'a', ...words }]));
+
+    await enterChat(place, 'repeat');
+    await settled();
+
+    // The earlier answer is not this attempt's answer: the bubble and its Retry stay.
+    const held = snapshotOf('repeat');
+    expect(held.asked).toBe('hi');
+    expect(held.askedFrom).toBe('a');
+    expect(held.displaced.map(one => one.id)).toEqual(['a']);
+    const written = await keptIn('repeat');
+    expect(written.map(one => one.id)).toEqual(['a']);
+  });
+
   it('drops the kept record a stored answer already answered', async () => {
     storedHistory = [];
     await releaseChat(opened);

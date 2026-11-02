@@ -482,6 +482,34 @@ async function openOrMissing<E>(
   throw failure instanceof Error ? failure : new Error(Cause.pretty(exit.cause).slice(0, 300));
 }
 
+/**
+ * Reads the two records of a chat's unanswered questions and folds the ones the
+ * conversation has already answered, writing that away.
+ *
+ * The kept list is written before the slot's record goes, the same order an
+ * answer clears them in: a refused write leaves both records, and the next open
+ * folds them again. Dropping the slot first would lose the only record that
+ * names the kept one.
+ */
+async function openRecords(sessionId: string, turns: readonly Turn[]) {
+  const [stored, written] = await Promise.all([askedIn(sessionId), keptIn(sessionId)]);
+  const folded = settledRecords(turns, stored, written);
+  if (folded.asked !== stored || folded.kept !== written) {
+    try {
+      if (folded.kept !== written) {
+        await replaceKept(sessionId, folded.kept);
+      }
+      if (folded.asked === null) {
+        await forgetAsked(sessionId);
+      }
+    } catch {
+      /* The records stay as they were; the open still draws them folded, and the
+         next open repairs them. */
+    }
+  }
+  return folded;
+}
+
 async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
   /* The row is what says whose chat this is. It is read on the same handle the
      rest of the open reads, before the session, its servers or its history are
@@ -510,8 +538,11 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
     const current = await onto(place, sessionId, {
       tools: await chatToolNames(organizationIdOf(place.org), sessionId, storedModel ?? ''),
     });
+    const moved = chats.get(current);
+    const history =
+      moved === undefined ? [] : await runtime.runPromise(moved.handle.history).catch(() => []);
+    const { asked, kept } = await openRecords(current, history);
     const database = await open();
-    const [asked, kept] = await Promise.all([askedIn(current), keptIn(current)]);
     change(current, {
       model: modelOfSession(database, current) ?? '',
       effort: effortOfSession(database, current),
@@ -534,24 +565,10 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
   const { handle, scope } = opened;
   try {
     const turns = await runtime.runPromise(handle.history);
-    const [stored, written] = await Promise.all([askedIn(sessionId), keptIn(sessionId)]);
     /* A question asked again can leave either of its two records behind when a
-       write is refused; the stored turns say which of them the conversation has
+       write was refused; the stored turns say which of them the conversation has
        already answered. */
-    const { asked, kept } = settledRecords(turns, stored, written);
-    if (asked !== stored || kept !== written) {
-      try {
-        if (asked === null) {
-          await forgetAsked(sessionId);
-        }
-        if (kept !== written) {
-          await replaceKept(sessionId, kept);
-        }
-      } catch {
-        /* The records stay as they were; the open below already draws them as
-           the conversation holds them. */
-      }
-    }
+    const { asked, kept } = await openRecords(sessionId, turns);
     const database = await open();
     chats.set(sessionId, {
       handle,
@@ -1003,34 +1020,60 @@ function withoutAnswered(
  * slot's, and the kept one its bubble is drawn from. When the answer lands the
  * kept record goes first and the slot's second, so a write that was refused — or
  * a process that stopped between them — can leave either record behind. A stored
- * user turn with that question's words is what says the answer landed, so both
+ * turn with that question's words is what says the answer landed, so both of its
  * records are stale and the open drops them rather than drawing a failed bubble
  * beside the answer.
+ *
+ * The match is anchored rather than made by words alone: the kept record says
+ * how many turns came before the question was said, so only a turn at or after
+ * that count can be its answer. Without the kept record — a write that dropped
+ * it while the slot's stayed — only the newest user turn counts, because the
+ * answer to a question asked again is the newest exchange.
  */
 function settledRecords(turns: readonly Turn[], asked: Asked | null, kept: readonly Displaced[]) {
   const from = asked?.from;
-  if (from == null) {
+  if (asked == null || from == null) {
     return { asked, kept };
   }
-  const askedText = asked?.text ?? '';
-  const answered = turns.some(
-    turn => turn.role === 'user' && turnText(turn) === askedText && askedText !== ''
-  );
   const named = kept.find(one => one.id === from);
-  if (named === undefined) {
-    /* Its kept bubble is gone while the slot still names it: the answer landed
-       before the slot's own record was cleared. */
-    return answered ? { asked: null, kept } : { asked, kept };
-  }
+  const anchor = named?.afterTurns ?? 0;
+  const answeredAt = turns.findIndex(
+    (turn, index) => index >= anchor && says(turn, { text: asked.text, images: asked.images })
+  );
+  const answered = answeredAt !== -1 && (named !== undefined || answeredAt === lastUserTurn(turns));
   if (!answered) {
     return { asked, kept };
   }
-  return { asked: null, kept: kept.filter(one => one.id !== from) };
+  return {
+    asked: null,
+    kept: named === undefined ? kept : kept.filter(one => one.id !== from),
+  };
 }
 
-/** What a stored turn says, which is how one of them is matched to a question. */
-function turnText(turn: Turn): string {
-  return turn.parts.flatMap(part => (part.kind === 'text' ? [part.body] : [])).join('');
+/** Where the newest question the conversation holds sits, or -1 when it holds none. */
+function lastUserTurn(turns: readonly Turn[]): number {
+  for (let index = turns.length - 1; index >= 0; index -= 1) {
+    if (turns[index]?.role === 'user') {
+      return index;
+    }
+  }
+  return -1;
+}
+
+/** Whether a stored turn is that question: the same words and the same pictures. */
+function says(turn: Turn, question: Question): boolean {
+  if (turn.role !== 'user') {
+    return false;
+  }
+  const text = turn.parts.flatMap(part => (part.kind === 'text' ? [part.body] : [])).join('');
+  if (text !== question.text) {
+    return false;
+  }
+  const pictures = turn.parts.flatMap(part =>
+    part.kind === 'image' ? [`${part.media}:${part.body}`] : []
+  );
+  const asked = question.images.map(image => `${image.media}:${image.data}`);
+  return pictures.length === asked.length && pictures.every((one, index) => one === asked[index]);
 }
 
 /**

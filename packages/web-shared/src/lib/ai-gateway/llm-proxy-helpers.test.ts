@@ -20,12 +20,17 @@ jest.mock('next/server', () => ({
 const mockedLogMicrodollarUsage = jest.fn(
   async (_stats: MicrodollarUsageStats, _ctx: MicrodollarUsageContext) => null
 );
+const mockedProcessTokenData = jest.fn(
+  async (_stats: MicrodollarUsageStats | null, _ctx: MicrodollarUsageContext) => {}
+);
 jest.mock('./processUsage', () => ({
   ...(jest.requireActual('./processUsage') as Record<string, unknown>),
   logMicrodollarUsageAndReportToBouncer: (
     stats: MicrodollarUsageStats,
     ctx: MicrodollarUsageContext
   ) => mockedLogMicrodollarUsage(stats, ctx),
+  processTokenData: (stats: MicrodollarUsageStats | null, ctx: MicrodollarUsageContext) =>
+    mockedProcessTokenData(stats, ctx),
 }));
 
 jest.mock('@sentry/nextjs', () => ({
@@ -49,6 +54,7 @@ import {
   countAndStoreEditUsage,
   countAndStoreFimUsage,
   countAndStoreEmbeddingUsage,
+  countAndStoreTranscriptionUsage,
   extractEditPromptInfo,
   extractEmbeddingPromptInfo,
   extractHeaderAndLimitLength,
@@ -622,20 +628,94 @@ describe('countAndStoreFimUsage', () => {
     expect(stats.market_cost).toBe(325);
   });
 
-  it('reports a JSON response it cannot parse instead of rejecting', async () => {
+  it('reports a malformed successful response instead of rejecting', async () => {
     jest.mocked(captureException).mockClear();
-    const response = new Response(JSON.stringify({ error: { message: 'rate limited' } }), {
-      status: 429,
-    });
+    const response = new Response('not JSON');
 
-    countAndStoreFimUsage(response, makeUsageContext({ status_code: 429 }), undefined);
+    countAndStoreFimUsage(response, makeUsageContext(), undefined);
     await waitForUsageWrite();
 
-    expect(captureException).toHaveBeenCalledWith(expect.any(TypeError), {
+    expect(captureException).toHaveBeenCalledWith(expect.any(SyntaxError), {
       tags: { source: 'fim_usage_processing' },
-      extra: { statusCode: 429 },
+      extra: { statusCode: 200 },
     });
     expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { error: { code: 429, message: 'rate limited' }, userByok: false, captured: false },
+    { error: { code: 503, message: 'overloaded' }, userByok: false, captured: false },
+    { error: { type: 'server_error', message: 'failed' }, userByok: false, captured: false },
+    { error: { code: 401, message: 'invalid key' }, userByok: false, captured: true },
+    { error: { type: 'billing_error', message: 'no credit' }, userByok: false, captured: true },
+    { error: { code: 401, message: 'invalid key' }, userByok: true, captured: false },
+    { error: { type: 'billing_error', message: 'no credit' }, userByok: true, captured: false },
+  ])('filters upstream FIM stream errors: %j', async ({ error, userByok, captured }) => {
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      countAndStoreFimUsage(
+        new Response(`data: ${JSON.stringify({ error })}\n\ndata: [DONE]\n\n`),
+        makeUsageContext({ isStreaming: true, user_byok: userByok }),
+        undefined
+      );
+      await waitForUsageWrite();
+
+      expect(captureException).toHaveBeenCalledTimes(captured ? 1 : 0);
+      expect(warn).toHaveBeenCalledTimes(captured ? 0 : 1);
+      expect(captureMessage).not.toHaveBeenCalled();
+      expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ hasError: true, cost_mUsd: 0, status_code: error.code ?? 200 }),
+        expect.anything()
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('preserves partial usage when an upstream FIM stream fails', async () => {
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+    countAndStoreFimUsage(
+      new Response(
+        'data: {"id":"fim-partial","model":"mercury-edit-2","choices":[{"text":"partial"}],"usage":{"prompt_tokens":1000,"completion_tokens":100,"total_tokens":1100}}\n\n' +
+          'data: {"error":{"code":503,"message":"overloaded"}}\n\n'
+      ),
+      makeUsageContext({ isStreaming: true }),
+      undefined
+    );
+    await waitForUsageWrite();
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hasError: true,
+        messageId: 'fim-partial',
+        responseContent: 'partial',
+        inputTokens: 1000,
+        outputTokens: 100,
+        cost_mUsd: 325,
+        status_code: 503,
+      }),
+      expect.anything()
+    );
+    expect(captureException).not.toHaveBeenCalled();
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('still reports a successful FIM stream without usage', async () => {
+    jest.mocked(captureMessage).mockClear();
+    countAndStoreFimUsage(
+      new Response('data: {"model":"mercury-edit-2","choices":[]}\n\n'),
+      makeUsageContext({ isStreaming: true }),
+      undefined
+    );
+    await waitForUsageWrite();
+
+    expect(captureMessage).toHaveBeenCalledWith(
+      'SUSPICIOUS: No usage info in FIM stream',
+      expect.anything()
+    );
   });
 
   describe('response timing', () => {
@@ -731,6 +811,96 @@ describe('countAndStoreFimUsage', () => {
       });
       expect(captureMessage).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe.each<{
+  apiKind: MicrodollarUsageContext['api_kind'];
+  countUsage: typeof countAndStoreFimUsage;
+}>([
+  { apiKind: 'fim_completions', countUsage: countAndStoreFimUsage },
+  { apiKind: 'edit_completions', countUsage: countAndStoreEditUsage },
+  { apiKind: 'embeddings', countUsage: countAndStoreEmbeddingUsage },
+  { apiKind: 'audio_transcriptions', countUsage: countAndStoreTranscriptionUsage },
+])('$apiKind upstream error accounting', ({ apiKind, countUsage }) => {
+  beforeEach(() => {
+    mockedLogMicrodollarUsage.mockClear();
+    mockedProcessTokenData.mockClear();
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+  });
+
+  it.each([400, 401, 402, 403, 429, 502])(
+    'does not re-report HTTP %i error bodies',
+    async status => {
+      const context = {
+        ...createMockUsageContext('user-id', 'user@example.com', 0),
+        api_kind: apiKind,
+        provider: 'inception',
+        status_code: status,
+      } satisfies MicrodollarUsageContext;
+
+      for (const body of [
+        JSON.stringify({ error: { message: 'rejected' } }),
+        '',
+        '<html>error</html>',
+      ]) {
+        countUsage(new Response(body, { status }), context, undefined);
+        await waitForUsageWrite();
+      }
+
+      const storeUsage =
+        apiKind === 'audio_transcriptions' ? mockedProcessTokenData : mockedLogMicrodollarUsage;
+      expect(storeUsage).toHaveBeenCalledTimes(3);
+      expect(storeUsage).toHaveBeenLastCalledWith(
+        expect.objectContaining({ hasError: true, cost_mUsd: 0, status_code: status }),
+        context
+      );
+      expect(captureException).not.toHaveBeenCalled();
+      expect(captureMessage).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['missing', 'unreadable'])('does not re-report a %s HTTP error body', async kind => {
+    const body =
+      kind === 'missing'
+        ? null
+        : new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.error(new Error('upstream disconnected'));
+            },
+          });
+    countUsage(
+      new Response(body, { status: 429 }),
+      {
+        ...createMockUsageContext('user-id', 'user@example.com', 0),
+        api_kind: apiKind,
+        status_code: 429,
+      },
+      undefined
+    );
+    await waitForUsageWrite();
+
+    expect(captureException).not.toHaveBeenCalled();
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('still reports a malformed successful response', async () => {
+    countUsage(
+      new Response('not JSON'),
+      {
+        ...createMockUsageContext('user-id', 'user@example.com', 0),
+        api_kind: apiKind,
+        status_code: 200,
+      },
+      undefined
+    );
+    await waitForUsageWrite();
+
+    expect(captureMessage).toHaveBeenCalledWith(
+      expect.stringContaining('SUSPICIOUS:'),
+      expect.anything()
+    );
   });
 });
 

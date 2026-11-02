@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import type { User } from '@kilocode/db/schema';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -18,6 +20,11 @@ import {
 } from '@kilocode/web-shared/lib/bouncer/client';
 import { after } from 'next/server';
 
+jest.mock('@sentry/nextjs', () => ({
+  ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INCEPTION_API_KEY: 'system-inception-key',
   MISTRAL_API_KEY: 'system-mistral-key',
@@ -33,6 +40,13 @@ jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/ai-gateway/is-free-model') as Record<
+    string,
+    unknown
+  >),
+  isFreeModel: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   resolveOrganizationMemberModelDecision: jest.fn().mockResolvedValue({
     decision: { allowed: true },
@@ -142,6 +156,10 @@ function makeUpstreamResponse() {
   );
 }
 
+function makeUpstreamErrorResponse(status: number) {
+  return Response.json({ error: { message: 'Upstream request failed' } }, { status });
+}
+
 async function flushAfter() {
   await new Promise(resolve => setImmediate(resolve));
 }
@@ -151,6 +169,7 @@ describe('POST /api/fim/completions', () => {
     jest.resetAllMocks();
     globalThis.fetch = mockedFetch;
     mockedLogMicrodollarUsage.mockResolvedValue(null);
+    jest.mocked(isFreeModel).mockResolvedValue(false);
     mockedDecide.mockResolvedValue(null);
     mockedReleaseDecideLease.mockResolvedValue(undefined);
     mockedResolveOrganizationMemberModelDecision.mockResolvedValue({
@@ -215,6 +234,95 @@ describe('POST /api/fim/completions', () => {
       error_type: ProxyErrorType.insufficient_credits,
     });
     expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it.each([400, 401, 403, 404, 422, 429])(
+    'passes upstream %s through without Sentry',
+    async status => {
+      setOrganizationAuth();
+      mockedFetch.mockResolvedValue(makeUpstreamErrorResponse(status));
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+      expect(response.status).toBe(status);
+      expect(await response.json()).toEqual({ error: { message: 'Upstream request failed' } });
+      await flushAfter();
+      expect(captureMessage).not.toHaveBeenCalled();
+      expect(captureException).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([500, 503])('reports upstream %s to Sentry and preserves the response', async status => {
+    setOrganizationAuth();
+    mockedFetch.mockResolvedValue(makeUpstreamErrorResponse(status));
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual({ error: { message: 'Upstream request failed' } });
+    await flushAfter();
+    expect(captureMessage).toHaveBeenCalledWith(
+      `inception returned error ${status}`,
+      expect.objectContaining({ extra: expect.objectContaining({ status }) })
+    );
+  });
+
+  it.each([null, [], [{ providerId: 'mistral', decryptedAPIKey: 'unused-key' }]])(
+    'masks a platform-funded 402 with BYOK entries %j and preserves upstream accounting',
+    async byokEntries => {
+      setOrganizationAuth();
+      mockedGetBYOKforOrganization.mockResolvedValue(byokEntries as never);
+      mockedFetch.mockResolvedValue(makeUpstreamErrorResponse(402));
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({
+        error_type: ProxyErrorType.temporarily_unavailable,
+      });
+      await flushAfter();
+      expect(captureMessage).toHaveBeenCalledWith(
+        'inception returned 402 Payment Required',
+        expect.objectContaining({ extra: expect.objectContaining({ status: 402 }) })
+      );
+      expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ status_code: 402, hasError: true, cost_mUsd: 0 }),
+        expect.objectContaining({ status_code: 402, user_byok: false })
+      );
+      expect(emitApiMetricsForResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: 402, userByok: false }),
+        expect.any(Response),
+        expect.any(Number)
+      );
+    }
+  );
+
+  it.each([
+    ['inception/mercury-edit-2', 'inception'],
+    ['mistralai/codestral-2508', 'codestral'],
+    ['mistralai/codestral-2508', 'mistral'],
+  ])('passes a BYOK 402 through for %s using %s without Sentry', async (model, providerId) => {
+    setOrganizationAuth();
+    mockedGetBYOKforOrganization.mockResolvedValue([
+      { providerId, decryptedAPIKey: 'user-supplied-key' },
+    ] as never);
+    mockedFetch.mockResolvedValue(makeUpstreamErrorResponse(402));
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(makeRequest(model) as never);
+
+    expect(response.status).toBe(402);
+    expect(await response.json()).toEqual({ error: { message: 'Upstream request failed' } });
+    await flushAfter();
+    expect(captureMessage).not.toHaveBeenCalled();
+    expect(captureException).not.toHaveBeenCalled();
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ status_code: 402, hasError: true, cost_mUsd: 0 }),
+      expect.objectContaining({ status_code: 402, user_byok: true })
+    );
   });
 
   it('rejects an exhausted balance for other FIM models', async () => {

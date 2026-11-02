@@ -1,6 +1,16 @@
 import 'server-only';
 
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  isWorkerAdminCapabilityIssuanceEnabled,
+  isWorkerAdminLegacyClaimIssuanceEnabled,
+} from '@kilocode/web-shared/lib/config.server';
+import {
+  GASTOWN_ADMIN_AUDIENCE,
+  matchWorkerAdminRestAction,
+  type WorkerAdminTarget,
+} from '@kilocode/worker-utils/worker-admin-capability';
+import { issueWorkerAdminCapability } from '@/lib/worker-admin/capability-issuer';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
@@ -229,15 +239,37 @@ const AdminAuditLogRecord = z.object({
 
 // ── Gastown HTTP client ───────────────────────────────────────────────────────
 
-/**
- * Build auth headers for server-side calls to the Gastown worker.
- * Uses the admin user's Kilo JWT (isAdmin: true, gastownAccess: true)
- * plus CF Access service token headers for production.
- */
-function buildAdminHeaders(adminUser: User): Record<string, string> {
+function targetForWorkerPath(path: string): WorkerAdminTarget | null {
+  const town = /^\/api\/towns\/([^/]+)/.exec(path);
+  if (town?.[1]) return { kind: 'town', id: town[1] };
+  const user = /^\/api\/users\/([^/]+)/.exec(path);
+  if (user?.[1]) return { kind: 'user', id: user[1] };
+  return null;
+}
+
+function targetForWorkerInput(input: unknown): WorkerAdminTarget | null {
+  if (typeof input === 'object' && input !== null) {
+    if ('townId' in input && typeof input.townId === 'string') {
+      return { kind: 'town', id: input.townId };
+    }
+    if ('wastelandId' in input && typeof input.wastelandId === 'string') {
+      return { kind: 'wasteland', id: input.wastelandId };
+    }
+  }
+  return null;
+}
+
+async function buildAdminHeaders(
+  adminUser: User,
+  params?: { action: string | null; target: WorkerAdminTarget | null }
+): Promise<Record<string, string>> {
+  const legacyIssuance = isWorkerAdminLegacyClaimIssuanceEnabled();
   const token = generateApiToken(
     adminUser,
-    { isAdmin: true, gastownAccess: true },
+    {
+      ...(legacyIssuance ? { isAdmin: true } : {}),
+      gastownAccess: true,
+    },
     { expiresIn: 60 } // 1-minute lifetime — server-side only
   );
 
@@ -246,12 +278,42 @@ function buildAdminHeaders(adminUser: User): Record<string, string> {
     'Content-Type': 'application/json',
   };
 
+  if (
+    !legacyIssuance &&
+    isWorkerAdminCapabilityIssuanceEnabled() &&
+    params?.action &&
+    params.target
+  ) {
+    const issued = await issueWorkerAdminCapability({
+      user: adminUser,
+      audience: GASTOWN_ADMIN_AUDIENCE,
+      target: params.target,
+      actions: [params.action],
+      ttlSeconds: 60,
+    });
+    headers['X-Kilo-Worker-Capability'] = issued.capability;
+  }
+
   if (GASTOWN_CF_ACCESS_CLIENT_ID && GASTOWN_CF_ACCESS_CLIENT_SECRET) {
     headers['CF-Access-Client-Id'] = GASTOWN_CF_ACCESS_CLIENT_ID;
     headers['CF-Access-Client-Secret'] = GASTOWN_CF_ACCESS_CLIENT_SECRET;
   }
 
   return headers;
+}
+
+function workerRestParams(method: 'GET' | 'PATCH', path: string) {
+  return {
+    action: matchWorkerAdminRestAction(GASTOWN_ADMIN_AUDIENCE, method, path),
+    target: targetForWorkerPath(path),
+  };
+}
+
+function workerTrpcParams(procedure: string, input: unknown) {
+  return {
+    action: `trpc:${procedure}`,
+    target: targetForWorkerInput(input) ?? { kind: 'service', id: 'gastown' },
+  };
 }
 
 const GastownApiResponseSchema = z.union([
@@ -274,7 +336,7 @@ async function gastownGet<T>(adminUser: User, path: string, schema: z.ZodType<T>
   const baseUrl = requireGastownUrl();
   const response = await fetch(`${baseUrl}${path}`, {
     method: 'GET',
-    headers: buildAdminHeaders(adminUser),
+    headers: await buildAdminHeaders(adminUser, workerRestParams('GET', path)),
   });
 
   if (!response.ok) {
@@ -302,7 +364,7 @@ async function gastownPatch<T>(
   const baseUrl = requireGastownUrl();
   const response = await fetch(`${baseUrl}${path}`, {
     method: 'PATCH',
-    headers: buildAdminHeaders(adminUser),
+    headers: await buildAdminHeaders(adminUser, workerRestParams('PATCH', path)),
     body: JSON.stringify(body),
   });
 
@@ -334,7 +396,7 @@ async function gastownTrpcGet<T>(
   schema: z.ZodType<T>
 ): Promise<T | null> {
   const baseUrl = requireGastownUrl();
-  const headers = buildAdminHeaders(adminUser);
+  const headers = await buildAdminHeaders(adminUser, workerTrpcParams(procedure, input));
   const url = `${baseUrl}/trpc/${procedure}?input=${encodeURIComponent(JSON.stringify(input))}`;
   const response = await fetch(url, { headers });
   if (!response.ok) {
@@ -360,7 +422,7 @@ async function gastownTrpcMutate<T>(
   schema: z.ZodType<T>
 ): Promise<T | null> {
   const baseUrl = requireGastownUrl();
-  const headers = buildAdminHeaders(adminUser);
+  const headers = await buildAdminHeaders(adminUser, workerTrpcParams(procedure, input));
   const url = `${baseUrl}/trpc/${procedure}`;
   const response = await fetch(url, {
     method: 'POST',

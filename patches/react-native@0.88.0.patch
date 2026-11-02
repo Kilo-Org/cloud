@@ -1,3 +1,7 @@
+# iOS-only sources: Libraries/Text/TextInput/Multiline/RCTUITextView.mm. That file is
+# compiled only into the iOS app (see buildReactNativeFromSource in
+# apps/mobile/app.config.ts); Android links the published AAR. pnpm applies these lines
+# as a comment above the diff it patches.
 diff --git a/Libraries/Text/TextInput/Multiline/RCTUITextView.mm b/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
 --- a/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
 +++ b/Libraries/Text/TextInput/Multiline/RCTUITextView.mm

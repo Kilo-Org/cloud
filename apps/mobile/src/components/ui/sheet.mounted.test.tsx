@@ -324,21 +324,18 @@ describe('Sheet', () => {
 
   // Until the native sheet's own window takes touch, the app window still owns
   // it: the hold is what keeps a tap made while the sheet opens off the screen
-  // and the tab bar behind it.
-  it('holds the app window touch while it opens and until it unmounts', async () => {
+  // and the tab bar behind it. Every presentation arms its own hold, because a
+  // reopened sheet is a new window with the same opening window.
+  it('holds the app window touch while it is presented and re-arms on every presentation', async () => {
     const { renderer, queryClient } = await mount();
 
     expect(isSheetTouchHeld()).toBe(true);
 
     await updateSheet(renderer, queryClient, { visible: false });
-    expect(isSheetTouchHeld()).toBe(true);
-
-    await act(async () => {
-      nativeSheet.dismiss();
-      await Promise.resolve();
-    });
-
     expect(isSheetTouchHeld()).toBe(false);
+
+    await updateSheet(renderer, queryClient, { visible: true });
+    expect(isSheetTouchHeld()).toBe(true);
   });
 
   it('takes no app window touch while it is closed', async () => {

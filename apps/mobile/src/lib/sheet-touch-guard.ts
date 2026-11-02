@@ -5,10 +5,11 @@ import { useLayoutEffect } from 'react';
  *
  * Measured on the Android emulator: a tap ~320 ms after the open request still
  * reached the tab bar behind the sheet, one at ~500 ms reached the sheet. The
- * bound is the same order as the tab-switch settle's own fallback
- * (`TAB_SWITCH_INPUT_FALLBACK_MS`), well past the measured handover.
+ * bound is that handover plus a margin for a slower device; until it ends the
+ * sheet is still sliding in, so keeping it short also keeps the sheet's own
+ * controls from being unreachable for long after they are visible.
  */
-export const SHEET_TOUCH_HOLD_MS = 1200;
+export const SHEET_TOUCH_HOLD_MS = 800;
 
 /**
  * Whether a native sheet has been asked for but its own window does not take
@@ -52,7 +53,7 @@ export function isSheetTouchHeld(): boolean {
   return holds > 0;
 }
 
-/** Holds the gate while the calling sheet opens. */
-export function useSheetTouchHold(): void {
-  useLayoutEffect(() => holdSheetTouch(), []);
+/** Holds the gate for as long as the caller's sheet is presented. */
+export function useSheetTouchHold(presented: boolean): void {
+  useLayoutEffect(() => (presented ? holdSheetTouch() : undefined), [presented]);
 }

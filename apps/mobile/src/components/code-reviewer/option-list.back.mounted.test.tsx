@@ -11,7 +11,7 @@ import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { resetLeaveSettle } from '@/lib/navigation/leave-settle';
+import { BACK_COMMIT_MS, resetLeaveSettle } from '@/lib/navigation/leave-settle';
 import { LeaveSettleMount } from '@/lib/navigation/leave-settle-mount';
 import { OptionList } from './option-list';
 
@@ -191,6 +191,35 @@ describe('OptionList hardware Back during a save', () => {
 
     expect(backPress.press()).toBe(false);
     expect(routerBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('suppresses a save that resolves while the accepted Back is still committing', async () => {
+    const gate = Promise.withResolvers<boolean>();
+    const renderer = await mount(() => gate.promise);
+    await press(row(renderer, 'All'));
+
+    // The navigator has not committed the pop yet, so the route still reports
+    // itself focused; only the Back this screen just accepted keeps the save
+    // from dispatching a competing pop.
+    expect(backPress.press()).toBe(false);
+    expect(focus.focused).toBe(true);
+    await settleSave(gate);
+
+    expect(routerBack).not.toHaveBeenCalled();
+  });
+
+  it('stops suppressing once the accepted Back has had time to commit', async () => {
+    const gate = Promise.withResolvers<boolean>();
+    const renderer = await mount(() => gate.promise);
+    await press(row(renderer, 'All'));
+    expect(backPress.press()).toBe(false);
+
+    // Let the navigation commit, as it does within the measured turnaround.
+    now += BACK_COMMIT_MS;
+    focus.focused = false;
+    await settleSave(gate);
+
+    expect(routerBack).not.toHaveBeenCalled();
   });
 
   it('leaves Back to the navigator while this screen never started leaving', async () => {

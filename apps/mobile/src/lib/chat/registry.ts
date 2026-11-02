@@ -47,6 +47,7 @@ import {
   keptIn,
   migrateAsked,
   moveQuestions,
+  nextKeptId,
   rememberAsked,
   rememberFirstQuestion,
   sameQuestion,
@@ -566,17 +567,24 @@ async function keepAsked(sessionId: string): Promise<void> {
   if (held.asked === null || held.status !== 'idle') {
     return;
   }
-  /* The entry is written first, and the one it answers with is what the chat
-     draws: its identifier comes from the written list, so a question waiting in
-     the queue that only storage knows about keeps its own. */
-  const stored = await addKept(sessionId, {
+  /* The bubble goes on screen first, so a refused write cannot take it away
+     from the reader, and the identifier comes from the written list so it
+     cannot land on a question only storage knows about. */
+  const next = {
     text: held.asked,
     images: held.askedImages,
     model: held.askedModel ?? held.model,
     effort: held.askedEffort,
     afterTurns: held.turns.length,
-    outcome: held.failureKey === null ? 'stopped' : 'failed',
-  });
+    outcome: held.failureKey === null ? ('stopped' as const) : ('failed' as const),
+  };
+  /* The list is read for the identifier, so it cannot land on a question only
+     storage knows about; a list that cannot be read is answered from memory and
+     a later write carries the entry. */
+  const id = await nextKeptId(sessionId).catch(
+    () => Math.max(0, ...held.displaced.map(one => one.id)) + 1
+  );
+  const stored: Displaced = { id, ...next };
   change(sessionId, {
     displaced: [...snapshotOf(sessionId).displaced, stored],
     asked: null,
@@ -584,6 +592,12 @@ async function keepAsked(sessionId: string): Promise<void> {
     askedModel: null,
     askedEffort: null,
   });
+  try {
+    await addKept(sessionId, stored);
+  } catch {
+    /* The bubble is on screen with its Retry; the next write of the list
+       carries it, and until then it lives for this session only. */
+  }
 }
 
 /**

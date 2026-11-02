@@ -108,23 +108,26 @@ export function sameQuestion(one: Question & ChatTarget, other: Question & ChatT
 }
 
 /**
- * Adds a kept question to the ones already written down and answers with the
- * entry it wrote. It reads the list first, because a question can have a copy
- * here that nothing in memory knows about: a retry waiting in the queue is held
- * in memory alone, and only this entry would survive a restart. The identifier
- * is taken from the same read, so it cannot land on one of those copies.
+ * The identifier a question written next takes. It comes from the written list,
+ * which may hold a question nothing in memory knows about — a retry waiting in
+ * the queue — so the one chosen cannot land on that copy.
  */
-export async function addKept(
-  sessionId: string,
-  question: Omit<Displaced, 'id'>
-): Promise<Displaced> {
+export async function nextKeptId(sessionId: string): Promise<number> {
   const kept = await keptIn(sessionId);
-  const stored: Displaced = {
-    id: Math.max(0, ...kept.map(one => one.id)) + 1,
-    ...question,
-  };
-  await writeKept(sessionId, [...kept.filter(one => !sameQuestion(one, question)), stored]);
-  return stored;
+  return Math.max(0, ...kept.map(one => one.id)) + 1;
+}
+
+/**
+ * Adds a question to the written list under the identifier it carries.
+ *
+ * It reads first and appends, rather than rewriting a list built in memory: a
+ * question can have a copy here that memory cannot see, and only this entry
+ * would survive a restart. Two questions with the same words are two attempts,
+ * so nothing is folded into an existing entry.
+ */
+export async function addKept(sessionId: string, question: Displaced): Promise<void> {
+  const kept = await keptIn(sessionId);
+  await writeKept(sessionId, [...kept, question]);
 }
 
 /**

@@ -444,6 +444,15 @@ describe('issueAdmissionChallenge', () => {
     expect(mockCaptureMessage).not.toHaveBeenCalled();
   });
 
+  test('refuses any limiter answer that does not permit the caller', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'blocked' });
+
+    await expect(issueAdmissionChallenge(makeRequest(), '127.0.0.1')).rejects.toThrow(
+      ChallengeRateLimitError
+    );
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
   test('propagates a limiter failure instead of issuing a challenge', async () => {
     mockCheckRateLimit.mockRejectedValue(
       new Error("Unexpected rate-limit API response status 'native-admission-challenge': 500")

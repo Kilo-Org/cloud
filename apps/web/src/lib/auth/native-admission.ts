@@ -119,9 +119,10 @@ const CHALLENGE_RATE_LIMIT_ID = 'native-admission-challenge';
  *
  * Uses the shared `@vercel/firewall` check per client IP, matching the email
  * sign-in rate-limit pattern. Only an answer that permits the caller issues a
- * challenge: a limited caller is refused, and so is a check against a rule that
- * is not configured. The unconfigured rule is reported through the shared
- * throttled reporter, so it stays visible without one report per request.
+ * challenge: a limited caller is refused, and so is any answer that carries an
+ * error, including a rule that is not configured. The unconfigured rule is
+ * reported through the shared throttled reporter, so it stays visible without
+ * one report per request.
  */
 export async function issueAdmissionChallenge(
   request: NextRequest,
@@ -141,8 +142,8 @@ export async function issueAdmissionChallenge(
   }
 
   // Only an answer that permits the caller issues a challenge: a limited
-  // caller and a check against a rule that is not configured both refuse here.
-  if (rateLimited || error === 'not-found') {
+  // caller and an answer that carries an error both refuse here.
+  if (rateLimited || error) {
     throw new ChallengeRateLimitError();
   }
 

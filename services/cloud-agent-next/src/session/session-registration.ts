@@ -2468,31 +2468,7 @@ async function resumeCloneCreate(
     await hooks.onTransportFailure();
     throw creationInProgressError();
   }
-  // `ready` continues.
-
-  allocation.runtimeAuthorization = await issueSessionRuntimeAuthorization(
-    input,
-    ctx,
-    allocation.cloudAgentSessionId,
-    allocation.initialTurn
-  );
-  const billingOrigin = { billingOrigin: options.billingOrigin };
-  if (input.initialTurn === undefined) {
-    const result = await registerAllocatedSession(input, ctx, billingOrigin, allocation, hooks);
-    return { ...result, replayed: true };
-  }
-  const result = await registerAndAdmitInitialTurn(input, ctx, billingOrigin, allocation, hooks);
-  return {
-    cloudAgentSessionId: result.cloudAgentSessionId,
-    kiloSessionId: result.kiloSessionId,
-    ...(options.includeInitialMessage
-      ? {
-          messageId: result.admission.messageId,
-          delivery: result.admission.compatibilityDelivery,
-        }
-      : {}),
-    replayed: true,
-  };
+  return resumeAllocatedSession(input, ctx, options, allocation, hooks);
 }
 
 async function resumeFirstWorktreeCreate(
@@ -2541,6 +2517,16 @@ async function resumeFirstWorktreeCreate(
     }
   }
 
+  return resumeAllocatedSession(input, ctx, options, allocation, hooks);
+}
+
+async function resumeAllocatedSession(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  options: SessionLedgerCreateOptions,
+  allocation: NewSessionAllocation,
+  hooks: SessionCreationLedgerHooks
+): Promise<LedgerSessionCreateResult> {
   allocation.runtimeAuthorization = await issueSessionRuntimeAuthorization(
     input,
     ctx,
@@ -2548,9 +2534,6 @@ async function resumeFirstWorktreeCreate(
     allocation.initialTurn
   );
   const billingOrigin = { billingOrigin: options.billingOrigin };
-  // A clone-only continuation first session has no initial turn: register
-  // through `registerAllocatedSession`. Never call `registerAndAdmitInitialTurn`
-  // for it (it throws without a turn).
   if (input.initialTurn === undefined) {
     const result = await registerAllocatedSession(input, ctx, billingOrigin, allocation, hooks);
     return { ...result, replayed: true };

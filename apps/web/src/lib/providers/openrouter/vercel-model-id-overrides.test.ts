@@ -152,6 +152,15 @@ describe('buildVercelModelIdOverrides', () => {
     ).toEqual([]);
   });
 
+  it('rejects a models.dev catalog without the expected provider entries', () => {
+    expect(() => build({ openrouter: { models: {} } }, [], [])).toThrow(
+      /missing a valid vercel provider entry/
+    );
+    expect(() => build({ vercel: { models: {} } }, [], [])).toThrow(
+      /missing a valid openrouter provider entry/
+    );
+  });
+
   it('maps every hardcoded legacy OpenRouter alias that needs an override', () => {
     const overrides = build(catalog({ openrouter: [], vercel: [] }), [], []);
 

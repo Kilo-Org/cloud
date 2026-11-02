@@ -34,11 +34,14 @@ function compareByOpenRouterModelId(a: VercelModelIdOverride, b: VercelModelIdOv
 
 function indexIdsByCanonicalId(
   entry: unknown,
+  providerId: string,
   availableModelIds: ReadonlySet<string>
 ): ReadonlyMap<string, string> {
   const index = new Map<string, string>();
   const provider = ModelsDevProviderSchema.safeParse(entry);
-  if (!provider.success) return index;
+  if (!provider.success) {
+    throw new Error(`models.dev catalog is missing a valid ${providerId} provider entry`);
+  }
 
   for (const model of Object.values(provider.data.models)) {
     if (!model.canonical_model_id) continue;
@@ -60,10 +63,12 @@ export function buildVercelModelIdOverrides(params: {
   const { modelsDevCatalog, openrouterModelIds, vercelModelIds } = params;
   const openrouterByCanonicalId = indexIdsByCanonicalId(
     modelsDevCatalog[MODELS_DEV_OPENROUTER_PROVIDER],
+    MODELS_DEV_OPENROUTER_PROVIDER,
     openrouterModelIds
   );
   const vercelByCanonicalId = indexIdsByCanonicalId(
     modelsDevCatalog[MODELS_DEV_VERCEL_PROVIDER],
+    MODELS_DEV_VERCEL_PROVIDER,
     vercelModelIds
   );
 
@@ -92,7 +97,10 @@ export function buildVercelModelIdOverrides(params: {
   }
   generatedOverrides.sort(compareByOpenRouterModelId);
 
-  const generatedCapacity = VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT - legacyOverrides.length;
+  const generatedCapacity = Math.max(
+    0,
+    VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT - legacyOverrides.length
+  );
   if (generatedOverrides.length > generatedCapacity) {
     console.warn(
       `[vercel-model-id-overrides] dropping ${generatedOverrides.length - generatedCapacity} overrides beyond the ${VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT} limit`

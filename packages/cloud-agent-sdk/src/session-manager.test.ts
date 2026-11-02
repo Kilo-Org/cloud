@@ -1129,9 +1129,11 @@ describe('createSessionManager', () => {
       it('keeps the composer model picks through a same-session retry', async () => {
         let metadataReads = 0;
         const config = createMockConfig({
+          // The retry fails the same way the first open did, so the preserved
+          // state is what the user is looking at.
           fetchSession: jest.fn(async (id: KiloSessionId) => {
             metadataReads += 1;
-            if (metadataReads === 1) throw new Error('offline');
+            if (metadataReads <= 2) throw new Error('offline');
             return { ...defaultFetchedSession, kiloSessionId: id };
           }),
           readCachedSnapshotPage: jest.fn().mockResolvedValue(cachedPage('ses-1', ['cached'])),
@@ -1151,6 +1153,15 @@ describe('createSessionManager', () => {
         expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(1);
         mgr.setRemoteModelOverride(remoteOverride);
         mgr.setCloudAgentModelOverride(cloudAgentOverride);
+        config.store.set(mgr.atoms.sessionConfig, {
+          sessionId: cloudAgentId('agent-1'),
+          repository: 'test/repo',
+          model: 'gpt-5',
+          providerID: 'openai',
+          mode: 'architect',
+          variant: 'high',
+        });
+        const sessionConfig = config.store.get(mgr.atoms.sessionConfig);
 
         const retry = mgr.switchSession(kiloId('ses-1'));
         // The retry runs the preserve path: the rows stay, and the picks belong
@@ -1167,17 +1178,102 @@ describe('createSessionManager', () => {
         expect(atomValue(config.store, mgr.atoms.cloudAgentModelOverride)).toEqual(
           cloudAgentOverride
         );
+        // The web composer's own selection lives in the session config, so it
+        // has to survive with the picks the retry keeps.
+        expect(config.store.get(mgr.atoms.sessionConfig)).toEqual(sessionConfig);
+
+        // A later retry that succeeds applies the session's stored metadata,
+        // and the picks the user set still stand.
+        expect(await mgr.switchSession(kiloId('ses-1'))).toBeUndefined();
+        expect(config.store.get(mgr.atoms.sessionConfig)).toEqual(
+          expect.objectContaining({ model: defaultFetchedSession.model })
+        );
+        expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toEqual(remoteOverride);
+        expect(atomValue(config.store, mgr.atoms.cloudAgentModelOverride)).toEqual(
+          cloudAgentOverride
+        );
+
+        // The retried session's CLI is rediscovered after the open, so the
+        // pick must also survive that attach and the catalog it brings.
+        mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+        mockSessionCallbacks.onRemoteModelStateChange?.({
+          ownerConnectionId: null,
+          protocol: 'unknown',
+          refresh: 'idle',
+        });
+        mockSessionCallbacks.onRemoteModelStateChange?.({
+          ownerConnectionId: 'owner-after-retry',
+          protocol: 'unknown',
+          refresh: 'loading',
+        });
+        expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toEqual(remoteOverride);
+        mockSessionCallbacks.onRemoteModelStateChange?.({
+          ownerConnectionId: 'owner-after-retry',
+          protocol: 'v1',
+          catalog: {
+            protocolVersion: 1,
+            providers: [
+              {
+                id: 'anthropic',
+                name: 'Anthropic',
+                models: [
+                  {
+                    id: 'claude-sonnet-4',
+                    name: 'Claude Sonnet 4',
+                    variants: ['high'],
+                    capabilities: { attachment: true, reasoning: true },
+                    limits: { context: 200_000, output: 64_000 },
+                  },
+                ],
+              },
+            ],
+            truncated: false,
+          },
+          refresh: 'idle',
+        });
+        expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toEqual(remoteOverride);
+
+        // A catalog that does not offer the pick drops it.
+        mockSessionCallbacks.onRemoteModelStateChange?.({
+          ownerConnectionId: 'owner-after-retry',
+          protocol: 'v1',
+          catalog: {
+            protocolVersion: 1,
+            providers: [
+              {
+                id: 'anthropic',
+                name: 'Anthropic',
+                models: [
+                  {
+                    id: 'claude-opus-4',
+                    name: 'Claude Opus 4',
+                    variants: [],
+                    capabilities: { attachment: true, reasoning: true },
+                    limits: { context: 200_000, output: 64_000 },
+                  },
+                ],
+              },
+            ],
+            truncated: false,
+          },
+          refresh: 'idle',
+        });
+        expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toBeNull();
 
         // A real switch still drops them: they never apply to another session.
         await mgr.switchSession(kiloId('ses-2'));
         expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toBeNull();
         expect(atomValue(config.store, mgr.atoms.cloudAgentModelOverride)).toBeNull();
+        expect(config.store.get(mgr.atoms.sessionConfig)).toEqual(
+          expect.objectContaining({ model: defaultFetchedSession.model })
+        );
 
         mgr.setRemoteModelOverride(remoteOverride);
         mgr.setCloudAgentModelOverride(cloudAgentOverride);
         mgr.destroy();
         expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toBeNull();
         expect(atomValue(config.store, mgr.atoms.cloudAgentModelOverride)).toBeNull();
+        expect(config.store.get(mgr.atoms.sessionConfig)).toBeNull();
       });
 
       it('never advertises a refresh without a cached-page reader', async () => {

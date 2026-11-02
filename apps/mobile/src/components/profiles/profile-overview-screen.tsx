@@ -35,6 +35,7 @@ import {
   Trash2,
 } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileMutations, useAgentProfileOverview } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
@@ -187,9 +188,21 @@ export function ProfileOverviewScreen({
           session whose profile chip opened it); `backFallback` still lands on
           Profiles when the app has no history, as a cold deep link does. The
           profile name is user prose, not a UI label, so it keeps a second line
-          for a natural break. */}
+          for a natural break.
+
+          A read that has not answered yet shows a title-shaped bar in the
+          title's own slot. The header used to read the generic Profiles title
+          until the name arrived, so the heading changed text under the reader
+          for no reason of theirs; the bar keeps the slot's shape and the name
+          replaces it in place. The bar is the header's label, so a screen
+          reader still hears which screen this is. */}
       <ScreenHeader
         title={profile?.name ?? t('profiles.title')}
+        titleContent={
+          profile === undefined && errorView === null ? (
+            <Skeleton className="h-5 w-40 rounded" />
+          ) : undefined
+        }
         titleNumberOfLines={2}
         backFallback={getProfilesPath()}
       />

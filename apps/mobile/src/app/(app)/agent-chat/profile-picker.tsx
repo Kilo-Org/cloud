@@ -54,6 +54,7 @@ export default function ProfilePickerScreen() {
   return (
     <ProfilePickerSheet
       candidates={picker.candidates}
+      isOrganizationContext={bridge.organizationId !== undefined}
       hasProfiles={allProfiles.length > 0}
       selectedOverrideProfileId={bridge.selectedOverrideProfileId}
       // A default exists, so clearing the override is not "no profile": the

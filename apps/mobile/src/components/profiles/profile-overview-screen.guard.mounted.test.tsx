@@ -67,7 +67,7 @@ vi.mock('expo-router', () => ({
   },
   useRouter: () => ({ back: h.back, push: h.push, replace: h.replace }),
 }));
-vi.mock('@/lib/navigation/pop-when-focused', () => ({ usePopWhenFocused: () => h.back }));
+vi.mock('@/lib/navigation/pop-once', () => ({ usePopOnce: () => h.back }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     agentProfiles: {

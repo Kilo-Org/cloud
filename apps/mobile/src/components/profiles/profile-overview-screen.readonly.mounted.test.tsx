@@ -76,6 +76,7 @@ vi.mock('@/lib/profile-agent-navigation', () => ({
     `/profiles/${id}/agents${org ? `?org=${org}` : ''}`,
 }));
 vi.mock('react-native', () => ({
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
   Platform: { OS: 'ios' },
   useWindowDimensions: () => ({ width: 402, height: 874, fontScale: 1 }),
   View: 'View',

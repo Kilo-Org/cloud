@@ -115,20 +115,36 @@ function listAccessibleOrgIds(memberships: JwtOrgMembership[]): string[] {
   return memberships.filter(m => m.role !== 'billing_manager').map(m => m.orgId);
 }
 
+type WorkerAdminTargetInput = {
+  kind: 'town' | 'user' | 'wasteland' | 'service';
+  id: string;
+};
+
+async function decideWorkerAdmin(ctx: TRPCContext, target: WorkerAdminTargetInput) {
+  return ctx.workerAdmin.decide(`trpc:${ctx.procedurePath}`, target);
+}
+
+function reportWorkerAdminDecision(
+  ctx: TRPCContext,
+  target: WorkerAdminTargetInput,
+  decision: Awaited<ReturnType<typeof decideWorkerAdmin>>
+): void {
+  if (!ctx.workerAdmin.takeDecisionReport(`trpc:${ctx.procedurePath}`, target)) return;
+  emitWorkerAdminDecision(ctx.env, decision, {
+    action: `trpc:${ctx.procedurePath}`,
+    userId: ctx.userId || null,
+    townId: target.kind === 'town' ? target.id : null,
+    jti: decision.allowed ? decision.jti : null,
+    delivery: 'trpc',
+  });
+}
+
 async function workerAdminAllows(
   ctx: TRPCContext,
-  target: { kind: 'town' | 'user' | 'wasteland' | 'service'; id: string }
+  target: WorkerAdminTargetInput
 ): Promise<boolean> {
-  const decision = await ctx.workerAdmin.decide(`trpc:${ctx.procedurePath}`, target);
-  if (ctx.workerAdmin.takeDecisionReport(`trpc:${ctx.procedurePath}`, target)) {
-    emitWorkerAdminDecision(ctx.env, decision, {
-      action: `trpc:${ctx.procedurePath}`,
-      userId: ctx.userId || null,
-      townId: target.kind === 'town' ? target.id : null,
-      jti: decision.allowed ? decision.jti : null,
-      delivery: 'trpc',
-    });
-  }
+  const decision = await decideWorkerAdmin(ctx, target);
+  reportWorkerAdminDecision(ctx, target, decision);
   if (!decision.allowed && decision.status === 503) {
     throw new TRPCError({
       code: 'SERVICE_UNAVAILABLE',
@@ -332,7 +348,15 @@ async function verifyRigOwnership(env: Env, ctx: TRPCContext, rigId: string, tow
 
   // Admin bypass: resolve the real owner from TownDO config so we can
   // look up the rig in their DO.
-  if (townIdHint && (await workerAdminAllows(ctx, { kind: 'town', id: townIdHint }))) {
+  const adminTarget = townIdHint ? { kind: 'town' as const, id: townIdHint } : null;
+  const adminDecision = adminTarget ? await decideWorkerAdmin(ctx, adminTarget) : null;
+  if (adminDecision && !adminDecision.allowed && adminDecision.status === 503) {
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Admin capability validation unavailable',
+    });
+  }
+  if (townIdHint && adminTarget && adminDecision?.allowed) {
     const townStub = getTownDOStub(env, townIdHint);
     let config;
     try {
@@ -351,10 +375,21 @@ async function verifyRigOwnership(env: Env, ctx: TRPCContext, rigId: string, tow
       // The bypass names one town; a rig from another town of the same owner
       // must not become reachable through it.
       if (ownerRig.town_id !== townIdHint) {
+        reportWorkerAdminDecision(ctx, adminTarget, {
+          allowed: false,
+          source: adminDecision.source,
+          status: 403,
+          reason: 'target_mismatch',
+        });
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Rig not found' });
       }
+      reportWorkerAdminDecision(ctx, adminTarget, adminDecision);
       return ownerRig;
     }
+  }
+
+  if (adminTarget && adminDecision && !adminDecision.allowed) {
+    reportWorkerAdminDecision(ctx, adminTarget, adminDecision);
   }
 
   throw new TRPCError({ code: 'NOT_FOUND', message: 'Rig not found' });

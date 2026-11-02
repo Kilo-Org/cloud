@@ -1,9 +1,5 @@
 import type { KiloAuthVariables } from '@kilocode/worker-utils/kilo-auth-middleware';
-import type {
-  WorkerAdminAuthority,
-  WorkerAdminDecision,
-  WorkerAdminTarget,
-} from '@kilocode/worker-utils/worker-admin-capability';
+import type { WorkerAdminAuthority } from '@kilocode/worker-utils/worker-admin-capability';
 import type { Context } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { extractBearerToken } from '@kilocode/worker-utils';
@@ -25,11 +21,6 @@ export type AuthVariables = KiloAuthVariables & {
   kiloControlToken: string;
   kiloUsesModernToken: boolean;
   workerAdmin: WorkerAdminAuthority;
-  workerAdminDecision?: {
-    decision: WorkerAdminDecision;
-    action: string;
-    target: WorkerAdminTarget;
-  };
   requestStartTime: number;
   orgId?: string;
   orgRole?: string;

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createWorkerAdminAuthority,
   workerAdminBindingDigest,
+  type WorkerAdminTarget,
 } from '@kilocode/worker-utils/worker-admin-capability';
 
 const getTownConfig = vi.fn();
@@ -11,7 +12,12 @@ const getPersonalRig = vi.fn();
 const getOrgRig = vi.fn();
 
 vi.mock('../../src/dos/Town.do', () => ({
-  getTownDOStub: () => ({ getTownConfig }),
+  getTownDOStub: () => ({
+    getTownConfig,
+    listAgents: async () => [],
+    listBeads: async () => [],
+    getRigAsync: async () => null,
+  }),
 }));
 vi.mock('../../src/dos/TownContainer.do', () => ({
   getTownContainerStub: () => ({ fetch: vi.fn() }),
@@ -37,7 +43,10 @@ const NOW = Math.floor(Date.now() / 1000);
 const CALLER = 'caller-1';
 const TOWN = '00000000-0000-4000-8000-000000000001';
 
-async function authorityFor(actions: string[]) {
+async function authorityFor(
+  actions: string[],
+  target: WorkerAdminTarget = { kind: 'town', id: TOWN }
+) {
   const { privateKey, publicKey } = await generateKeyPair('ES256', { extractable: true });
   const publicJwk = { ...(await exportJWK(publicKey)), kid: 'kid-1', alg: 'ES256', use: 'sig' };
   const token = await new SignJWT({
@@ -49,7 +58,7 @@ async function authorityFor(actions: string[]) {
     nbf: NOW,
     exp: NOW + 300,
     jti: `jti-${actions.join('-')}`,
-    cap: { v: 1, actions, targets: [{ kind: 'town', id: TOWN }] },
+    cap: { v: 1, actions, targets: [target] },
     bnd: {
       pep: await workerAdminBindingDigest('pepper-1'),
       wsp: await workerAdminBindingDigest(''),
@@ -163,6 +172,30 @@ describe('real gastown procedures respect the capability action allowlist', () =
     });
     await expect(caller(authority).gastown.getRig({ rigId, townId: TOWN })).rejects.toMatchObject({
       code: 'NOT_FOUND',
+    });
+  });
+
+  it('positive control: an allowlisted rig in the named town is returned', async () => {
+    const rigId = '00000000-0000-4000-8000-000000000014';
+    getTownConfig.mockResolvedValue({
+      owner_type: 'org',
+      organization_id: 'org-2',
+      owner_user_id: null,
+      name: 'Foreign town',
+    });
+    getOrgRig.mockResolvedValue({
+      id: rigId,
+      town_id: TOWN,
+      name: 'rig',
+      git_url: 'https://example.test/r.git',
+      default_branch: 'main',
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    });
+    const authority = await authorityFor(['trpc:gastown.getRig']);
+    await expect(caller(authority).gastown.getRig({ rigId, townId: TOWN })).resolves.toMatchObject({
+      id: rigId,
+      town_id: TOWN,
     });
   });
 

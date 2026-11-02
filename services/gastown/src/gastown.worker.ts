@@ -143,7 +143,6 @@ import {
   gastownAccessMiddleware,
   gastownRouteAccessMiddleware,
 } from './middleware/gastown-access.middleware';
-import { adminAuditMiddleware } from './middleware/admin-audit.middleware';
 import { resolveWorkerAdminMiddleware } from './middleware/worker-admin.middleware';
 import { timingMiddleware, instrumented } from './middleware/analytics.middleware';
 import { useWorkersLogger } from 'workers-tagged-logger';
@@ -895,8 +894,7 @@ const townRouteAuthMiddleware = every(
   kiloAuthMiddleware,
   resolveWorkerAdminMiddleware,
   gastownRouteAccessMiddleware,
-  townAuthMiddleware,
-  adminAuditMiddleware
+  townAuthMiddleware
 );
 app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {
   const path = c.req.path;

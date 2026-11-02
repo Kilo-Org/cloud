@@ -624,17 +624,20 @@ export async function getOrCreateProjectAccessToken(
   let storedCredential = await getStoredProjectCredential(integration.id, projectIdStr);
   const integratingAccountId = readGitLabAccountId(integration);
 
+  if (integratingAccountId === null) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: GITLAB_RECONNECT_REQUIRED_MESSAGE,
+    });
+  }
+
   if (storedCredential?.unusable) {
     logExceptInTest('[getOrCreateProjectAccessToken] Stored token is not usable', {
       projectId,
       tokenId: storedCredential.tokenId,
     });
     storedCredential = null;
-  } else if (
-    storedCredential &&
-    integratingAccountId !== null &&
-    storedCredential.authorizedAccountId !== integratingAccountId
-  ) {
+  } else if (storedCredential && storedCredential.authorizedAccountId !== integratingAccountId) {
     const userToken = await getValidGitLabToken(integration, actor);
     await retireStoredProjectCredential({
       integrationId: integration.id,
@@ -826,10 +829,13 @@ async function updateStoredProjectAccessToken(
   const metadata = integration.metadata as GitLabIntegrationMetadata | null;
   const providerBaseUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
   const authorizedAccountId = readGitLabAccountId(integration);
+  if (authorizedAccountId === null) {
+    throw new Error('GitLab integration has no connected account');
+  }
   const providerMetadata = GitLabProjectAccessTokenMetadataSchema.parse({
     providerCredentialId: String(providerToken.id),
     expiresOn: providerToken.expires_at,
-    ...(authorizedAccountId === null ? {} : { authorizedAccountId }),
+    authorizedAccountId,
   });
   const validatedAt = new Date().toISOString();
 

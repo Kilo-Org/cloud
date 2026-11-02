@@ -285,6 +285,7 @@ describe('GitLabCredentialService', () => {
           ownedByUserId: 'user-1',
           ownedByOrganizationId: null,
           providerBaseUrl: 'https://gitlab.example.com',
+          providerSubjectId: '123',
         },
         credential: {
           id: 'project-credential-1',
@@ -298,6 +299,7 @@ describe('GitLabCredentialService', () => {
           provider_metadata: {
             providerCredentialId: '314',
             expiresOn: '2027-07-13',
+            authorizedAccountId: '123',
           },
           provider_scopes: null,
           provider_verified_at: null,
@@ -332,6 +334,7 @@ describe('GitLabCredentialService', () => {
   it.each([
     ['a second account', { authorizedAccountId: '456' }],
     ['an unusable row', { unusableReason: 'account-changed' }],
+    ['no recorded account', {}],
   ] as const)(
     'serves only a project credential recorded for the connected account: %s',
     async (_description, recordedMetadata) => {

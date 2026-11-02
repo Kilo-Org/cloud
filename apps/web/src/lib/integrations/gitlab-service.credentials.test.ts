@@ -1253,6 +1253,31 @@ describe('GitLab encrypted credential persistence', () => {
     expect(updatedIntegration.metadata).not.toHaveProperty('project_tokens');
   });
 
+  it('requires a connected account before serving a project credential', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    await db
+      .update(platform_integrations)
+      .set({ platform_account_id: null, platform_installation_id: null })
+      .where(eq(platform_integrations.id, connected.integration.id));
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+
+    await expect(
+      getOrCreateProjectAccessToken(integration, 42, { userId: user.id })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+    expect(mockFetchGitLabCredential).not.toHaveBeenCalled();
+    expect(mockCreateProjectAccessToken).not.toHaveBeenCalled();
+  });
+
   it('reuses a project credential recorded for the connected GitLab account', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(

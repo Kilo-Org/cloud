@@ -165,11 +165,9 @@ export class GitLabCredentialService {
       if (credential.provider_metadata.unusableReason !== undefined) {
         return { status: 'reconnect_required' };
       }
-      const authorizedAccountId = credential.provider_metadata.authorizedAccountId;
       if (
-        authorizedAccountId !== undefined &&
-        parent.providerSubjectId !== undefined &&
-        authorizedAccountId !== parent.providerSubjectId
+        credential.provider_metadata.authorizedAccountId === undefined ||
+        credential.provider_metadata.authorizedAccountId !== parent.providerSubjectId
       ) {
         return { status: 'reconnect_required' };
       }

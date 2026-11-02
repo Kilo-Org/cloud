@@ -330,10 +330,10 @@ describe('GitLabCredentialService', () => {
   });
 
   it.each([
-    ['a different account', { authorizedAccountId: '456' }],
+    ['a second account', { authorizedAccountId: '456' }],
     ['an unusable row', { unusableReason: 'account-changed' }],
   ] as const)(
-    'refuses a project credential recorded for %s',
+    'serves only a project credential recorded for the connected account: %s',
     async (_description, recordedMetadata) => {
       const fixture = encryptedProjectTokenFixture();
       const store: GitLabCredentialStore = {

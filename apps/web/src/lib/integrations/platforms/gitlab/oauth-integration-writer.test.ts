@@ -257,7 +257,7 @@ describe('GitLab OAuth integration writer', () => {
     expect(updatedIntegration.metadata).not.toHaveProperty('refresh_token');
   });
 
-  it('retires stored project credentials on an OAuth connect that establishes a different account', async () => {
+  it('binds project credentials to the connected account on an OAuth connect', async () => {
     const user = await insertTestUser();
     const providerBaseUrl = 'https://gitlab.example.com/root';
     const [integration] = await db
@@ -324,7 +324,7 @@ describe('GitLab OAuth integration writer', () => {
     expect(updatedIntegration.metadata).toEqual(expect.objectContaining({ project_tokens: {} }));
   });
 
-  it('records a project credential as unusable when revocation is refused', async () => {
+  it('marks the stored project credential unusable', async () => {
     const user = await insertTestUser();
     const providerBaseUrl = 'https://gitlab.example.com/root';
     const [integration] = await db

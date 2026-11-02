@@ -1362,7 +1362,7 @@ describe('GitLab encrypted credential persistence', () => {
     ]);
   });
 
-  it('retires project credentials on a PAT connect that establishes a different account', async () => {
+  it('binds project credentials to the connected account on a PAT connect', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(
       { type: 'user', id: user.id },
@@ -1430,7 +1430,7 @@ describe('GitLab encrypted credential persistence', () => {
     );
   });
 
-  it('records a project credential as unusable when revocation is refused', async () => {
+  it('marks the stored project credential unusable', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(
       { type: 'user', id: user.id },

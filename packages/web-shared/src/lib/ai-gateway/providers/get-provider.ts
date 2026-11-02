@@ -136,7 +136,7 @@ async function directByokProviderResult(
   return {
     kind: 'provider',
     provider: {
-      id: 'direct-byok',
+      type: 'direct-byok',
       ...upstream,
       async transformRequest(context) {
         context.request.body.model = directByokModel.id;

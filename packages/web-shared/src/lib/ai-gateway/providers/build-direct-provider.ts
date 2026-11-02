@@ -43,13 +43,13 @@ function resolveRouting(
 }
 
 export function buildDirectProvider(
-  id: 'custom' | 'custom-public',
+  type: 'custom' | 'custom-public',
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>,
   upstream: CustomLlmApiConfig,
   auth: DirectUpstreamAuth
 ): Provider {
   return {
-    id,
+    type,
     ...resolveRouting(upstream, auth),
     apiUrlOverrides: {},
     disableUrlSuffix: upstream.disable_url_suffix ?? false,

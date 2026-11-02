@@ -400,8 +400,8 @@ const openRouterErrorResponseSchema = z.object({
   metadata: z.unknown().optional(),
 });
 
-async function providerNotAllowedResponse(providerId: ProviderType, response: Response) {
-  if (providerId !== 'openrouter' || response.status !== 404) return undefined;
+async function providerNotAllowedResponse(provider: ProviderType, response: Response) {
+  if (provider !== 'openrouter' || response.status !== 404) return undefined;
 
   let body: unknown;
   try {
@@ -428,13 +428,13 @@ async function providerNotAllowedResponse(providerId: ProviderType, response: Re
 }
 
 export async function makeErrorReadable({
-  providerId,
+  provider,
   requestedModel,
   request,
   response,
   userByokProviderIds,
 }: {
-  providerId: ProviderType;
+  provider: ProviderType;
   requestedModel: string;
   request: GatewayRequest;
   response: Response;
@@ -452,7 +452,7 @@ export async function makeErrorReadable({
       ? undefined
       : specificByokErrorMessage(response.status, userByokProviderIds);
   if (specificByokMessage === undefined) {
-    const providerErrorResponse = await providerNotAllowedResponse(providerId, response);
+    const providerErrorResponse = await providerNotAllowedResponse(provider, response);
     if (providerErrorResponse) return providerErrorResponse;
 
     const overflowResponse = await detectContextOverflow({ requestedModel, request, response });

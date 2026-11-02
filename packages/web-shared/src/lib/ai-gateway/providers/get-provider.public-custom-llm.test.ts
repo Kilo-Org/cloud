@@ -118,7 +118,7 @@ describe('getProvider with public custom LLMs', () => {
     ] as const) {
       await expect(
         getProvider({ ...providerInput(model, caller, organizationId), countryCode })
-      ).resolves.toMatchObject({ kind: 'provider', provider: { id: providerId } });
+      ).resolves.toMatchObject({ kind: 'provider', provider: { type: providerId } });
     }
   });
 
@@ -135,7 +135,7 @@ describe('getProvider with public custom LLMs', () => {
     expect(result).toMatchObject({
       kind: 'provider',
       provider: {
-        id: 'custom-public',
+        type: 'custom-public',
         apiUrl: 'https://upstream.example.com/v1',
         apiKey: 'sk-upstream',
       },
@@ -159,7 +159,7 @@ describe('getProvider with public custom LLMs', () => {
     );
 
     expect(result.kind).toBe('provider');
-    expect(['openrouter', 'vercel']).toContain(result.kind === 'provider' && result.provider.id);
+    expect(['openrouter', 'vercel']).toContain(result.kind === 'provider' && result.provider.type);
   });
 
   test('keeps a private custom LLM to its grantees, exempt from policy checks', async () => {
@@ -167,7 +167,7 @@ describe('getProvider with public custom LLMs', () => {
       getProvider(providerInput('acme/private-model', user, ORG_ID))
     ).resolves.toMatchObject({
       kind: 'provider',
-      provider: { id: 'custom' },
+      provider: { type: 'custom' },
       bypassAccessCheck: true,
     });
     await expect(

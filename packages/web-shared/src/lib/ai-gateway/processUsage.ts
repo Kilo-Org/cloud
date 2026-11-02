@@ -1670,7 +1670,7 @@ function getGenerationLookupProvider(
         ? VERCEL_AI_GATEWAY
         : undefined;
   const provider =
-    gatewayProvider && servingProvider?.id === gatewayProvider.id
+    gatewayProvider && servingProvider?.type === gatewayProvider.type
       ? servingProvider
       : gatewayProvider;
   const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;

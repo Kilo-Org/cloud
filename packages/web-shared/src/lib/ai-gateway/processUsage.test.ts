@@ -1705,7 +1705,7 @@ describe('logMicrodollarUsage', () => {
 
         expect(fetchGeneration).toHaveBeenCalledWith(
           'gen-stt-123',
-          expect.objectContaining({ id: 'openrouter', apiKey: expectedApiKey })
+          expect.objectContaining({ type: 'openrouter', apiKey: expectedApiKey })
         );
       }
     );

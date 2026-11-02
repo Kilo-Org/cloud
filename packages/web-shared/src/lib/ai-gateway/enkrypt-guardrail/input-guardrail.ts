@@ -51,7 +51,7 @@ export function startEnkryptInputGuardrail(
       console.error('[enkrypt-guardrail] scan failed unexpectedly; request rejected', {
         error: error instanceof Error ? error.message : String(error),
       });
-      return { verdict: { action: 'unavailable', retryable: false }, charges: [] };
+      return { verdict: { action: 'unavailable', reason: 'failed' }, charges: [] };
     });
   let addedLatencyMs: number | null = null;
   after(async () => {

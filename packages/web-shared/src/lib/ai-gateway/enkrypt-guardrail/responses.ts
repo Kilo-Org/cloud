@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server';
-import type { EnkryptGuardrailVerdict } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
+import type {
+  EnkryptGuardrailVerdict,
+  EnkryptUnavailableReason,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 
-const GUARDRAIL_UNAVAILABLE_MESSAGE =
-  "Your organization's Enkrypt AI guardrail could not check this request, so it was not sent. Please retry.";
+const UNAVAILABLE_MESSAGES: Record<EnkryptUnavailableReason, string> = {
+  transient:
+    "Your organization's Enkrypt AI guardrail could not check this request, so it was not sent. Please retry.",
+  timeout:
+    "Your organization's Enkrypt AI guardrail did not finish checking this request in time, so it was not sent. Longer conversations take longer to check: compact or prune earlier conversation history, or start a new session, then retry.",
+  failed:
+    "Your organization's Enkrypt AI guardrail could not check this request, so it was not sent. Try again later.",
+};
 
 /**
  * Error bodies in each API's native shape, so the OpenAI, OpenRouter, and Anthropic SDKs used by
@@ -62,7 +71,7 @@ export function enkryptGuardrailRejectionResponse(
     apiErrorBody(
       kind,
       {
-        message: GUARDRAIL_UNAVAILABLE_MESSAGE,
+        message: UNAVAILABLE_MESSAGES[verdict.reason],
         openAiType: 'server_error',
         openAiCode: ProxyErrorType.guardrail_unavailable,
         anthropicType: 'api_error',
@@ -71,7 +80,8 @@ export function enkryptGuardrailRejectionResponse(
     ),
     {
       status: 503,
-      headers: verdict.retryable ? { 'retry-after': '1' } : { 'x-should-retry': 'false' },
+      headers:
+        verdict.reason === 'transient' ? { 'retry-after': '1' } : { 'x-should-retry': 'false' },
     }
   );
 }

@@ -57,14 +57,17 @@ export type EnkryptGuardrailScan = {
 };
 
 /**
- * `skip`: the organization has no guardrail, so nothing was scanned. `retryable` is false when an
- * immediate automatic retry would most likely fail the same way.
+ * `skip`: the organization has no guardrail, so nothing was scanned. An unavailable guardrail's
+ * `reason` is `transient` when an automatic retry could succeed, and `timeout` when the scan ran out
+ * of time, which a long conversation makes likely to recur.
  */
 export type EnkryptGuardrailVerdict =
   | { action: 'skip' }
   | { action: 'allow' }
   | { action: 'block'; message: string }
-  | { action: 'unavailable'; retryable: boolean };
+  | { action: 'unavailable'; reason: EnkryptUnavailableReason };
+
+export type EnkryptUnavailableReason = 'transient' | 'timeout' | 'failed';
 
 export type EnkryptGuardrailScanResult = {
   verdict: EnkryptGuardrailVerdict;
@@ -354,12 +357,10 @@ function totalCredits(charges: EnkryptGuardrailCall[]): number | null {
   return costs.length === 0 ? null : costs.reduce((sum, cost) => sum + cost, 0);
 }
 
-/**
- * Whether a later automatic retry by the client could succeed. A timed-out scan already waited the
- * full deadline, and the other failures would repeat on the same request.
- */
-function isTransient(error: ScanError): boolean {
-  return error === 'network' || error === 'http_429' || /^http_5\d\d$/.test(error);
+function unavailableReason(error: ScanError): EnkryptUnavailableReason {
+  if (error === 'timeout') return 'timeout';
+  const transient = error === 'network' || error === 'http_429' || /^http_5\d\d$/.test(error);
+  return transient ? 'transient' : 'failed';
 }
 
 /**
@@ -390,7 +391,7 @@ function failedVerdict(
   return {
     verdict: failure.closedVerdict ?? {
       action: 'unavailable',
-      retryable: isTransient(failure.error),
+      reason: unavailableReason(failure.error),
     },
     charges: recorded,
   };

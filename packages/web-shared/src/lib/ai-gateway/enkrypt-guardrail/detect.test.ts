@@ -7,6 +7,7 @@ import {
   scanRequest,
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
+  type EnkryptUnavailableReason,
 } from './detect';
 
 const mockedWarnExceptInTest = jest.fn();
@@ -265,7 +266,7 @@ describe('scanRequest', () => {
         const result = await scanRequest(makeScan({ config: policyConfig }), dependencies);
 
         expect(dependencies.fetch).toHaveBeenCalledTimes(1);
-        expect(result.verdict).toEqual({ action: 'unavailable', retryable: false });
+        expect(result.verdict).toEqual({ action: 'unavailable', reason: 'failed' });
         expect(result.charges).toEqual([
           expect.objectContaining({ decision: 'error', creditsCost: 4 }),
         ]);
@@ -302,7 +303,7 @@ describe('scanRequest', () => {
       dependencies
     );
 
-    expect(result).toEqual({ verdict: { action: 'unavailable', retryable: false }, charges: [] });
+    expect(result).toEqual({ verdict: { action: 'unavailable', reason: 'failed' }, charges: [] });
     expect(dependencies.fetch).not.toHaveBeenCalled();
   });
 
@@ -405,7 +406,7 @@ describe('scanRequest', () => {
 
       const result = await scanRequest(makeScan(), dependencies);
 
-      expect(result).toEqual({ verdict: { action: 'unavailable', retryable: false }, charges: [] });
+      expect(result).toEqual({ verdict: { action: 'unavailable', reason: 'failed' }, charges: [] });
       expect(dependencies.fetch).not.toHaveBeenCalled();
       expect(mockedWarnExceptInTest).not.toHaveBeenCalled();
       expect(console.debug).toHaveBeenCalledWith(
@@ -435,7 +436,7 @@ describe('scanRequest', () => {
 
         const result = await scanRequest(makeScan(), dependencies);
 
-        expect(result.verdict).toEqual({ action: 'unavailable', retryable: false });
+        expect(result.verdict).toEqual({ action: 'unavailable', reason: 'failed' });
         expect(dependencies.fetch).toHaveBeenCalledTimes(1);
         expect(fetchCalls(dependencies)[0][1].signal?.aborted).toBe(true);
         expect(fetchCalls(dependencies)[0][1].signal?.reason).toBe(controller.signal.reason);
@@ -470,7 +471,7 @@ describe('scanRequest', () => {
 
       const result = await scanRequest(makeScan(), dependencies);
 
-      expect(result.verdict).toEqual({ action: 'unavailable', retryable: false });
+      expect(result.verdict).toEqual({ action: 'unavailable', reason: 'failed' });
       expect(dependencies.fetch).toHaveBeenCalledTimes(1);
       expect(result.charges).toEqual([
         expect.objectContaining({ decision: 'error', creditsCost: 3 }),
@@ -488,29 +489,29 @@ describe('scanRequest', () => {
     const result = await scanRequest(makeScan(), dependencies);
 
     expect(dependencies.fetch).toHaveBeenCalledTimes(1);
-    expect(result.verdict).toEqual({ action: 'unavailable', retryable: true });
+    expect(result.verdict).toEqual({ action: 'unavailable', reason: 'transient' });
   });
 
   describe('when Enkrypt is unavailable', () => {
-    const failures: [string, () => Promise<Response>, boolean][] = [
+    const failures: [string, () => Promise<Response>, EnkryptUnavailableReason][] = [
       [
         'a persistent server error',
         async () => detectResponse({ summary: {} }, { status: 503 }),
-        true,
+        'transient',
       ],
-      ['a network error', async () => Promise.reject(new TypeError('fetch failed')), true],
-      ['a client error', async () => detectResponse({ summary: {} }, { status: 402 }), false],
+      ['a network error', async () => Promise.reject(new TypeError('fetch failed')), 'transient'],
+      ['a client error', async () => detectResponse({ summary: {} }, { status: 402 }), 'failed'],
       [
         'an invalid response',
         async () => new Response('not json', { headers: { 'content-type': 'application/json' } }),
-        false,
+        'failed',
       ],
     ];
 
-    it.each(failures)('rejects the request on %s', async (_name, failure, retryable) => {
+    it.each(failures)('rejects the request on %s', async (_name, failure, reason) => {
       const result = await scanRequest(makeScan(), deps(failure));
 
-      expect(result.verdict).toEqual({ action: 'unavailable', retryable });
+      expect(result.verdict).toEqual({ action: 'unavailable', reason });
       expect(result.charges.every(charge => charge.decision === 'error')).toBe(true);
     });
 
@@ -523,7 +524,7 @@ describe('scanRequest', () => {
 
       const result = await scanRequest(makeScan(), dependencies);
 
-      expect(result.verdict).toEqual({ action: 'unavailable', retryable: false });
+      expect(result.verdict).toEqual({ action: 'unavailable', reason: 'timeout' });
       expect(dependencies.fetch).toHaveBeenCalledTimes(1);
       expect(result.charges).toEqual([expect.objectContaining({ decision: 'error' })]);
       expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
@@ -539,7 +540,7 @@ describe('scanRequest', () => {
 
       const result = await scanRequest(makeScan(), dependencies);
 
-      expect(result).toEqual({ verdict: { action: 'unavailable', retryable: false }, charges: [] });
+      expect(result).toEqual({ verdict: { action: 'unavailable', reason: 'failed' }, charges: [] });
       expect(dependencies.fetch).not.toHaveBeenCalled();
     });
   });

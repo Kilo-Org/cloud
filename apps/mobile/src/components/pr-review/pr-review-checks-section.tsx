@@ -375,6 +375,14 @@ export function PrReviewChecksSection({
     );
   }
 
+  // The total strip earns its place only where no other row states it. With a
+  // single status group the group's own label is the card total, so the strip
+  // printed the same number twice ("1 check" over "1 passed", design review at
+  // the PR review overview fixture). Two or more groups have no single row
+  // carrying the total, and a listing the server cut needs the `+` to say its
+  // counts are lower bounds.
+  const showTotal = groups.length > 1 || Boolean(data?.truncated);
+
   // i18n-dup-ok: 'prReview.checks.checksCount_other' repeats the bare
   // 'prReview.checks.checksCount' by i18next convention — the bare key is the
   // plural fallback that must carry the `other` copy, so the family is one key
@@ -383,14 +391,16 @@ export function PrReviewChecksSection({
     <View className="gap-2">
       <PrReviewSectionLabel label={t('prReview.checks.title')} />
       <View key={CONTENT_CARD_KEY} className="overflow-hidden rounded-lg bg-secondary">
-        <View className="border-b-[0.5px] border-hair-soft px-4 py-2">
-          <Text variant="muted" className="text-xs">
-            {t('prReview.checks.checksCount', {
-              count: runList.length,
-              displayCount,
-            })}
-          </Text>
-        </View>
+        {showTotal ? (
+          <View className="border-b-[0.5px] border-hair-soft px-4 py-2">
+            <Text variant="muted" className="text-xs">
+              {t('prReview.checks.checksCount', {
+                count: runList.length,
+                displayCount,
+              })}
+            </Text>
+          </View>
+        ) : null}
         {groups.map((group, groupIndex) => (
           <PrReviewChecksStatusRow
             key={group.status}

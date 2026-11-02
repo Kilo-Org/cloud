@@ -208,18 +208,19 @@ describe('OptionList hardware Back during a save', () => {
     expect(routerBack).not.toHaveBeenCalled();
   });
 
-  it('stops suppressing once the accepted Back has had time to commit', async () => {
+  it('still dismisses a save that resolves after the accepted Back was cancelled', async () => {
     const gate = Promise.withResolvers<boolean>();
     const renderer = await mount(() => gate.promise);
     await press(row(renderer, 'All'));
-    expect(backPress.press()).toBe(false);
 
-    // Let the navigation commit, as it does within the measured turnaround.
+    // A Back this screen accepts, then the leave is cancelled (a guard asking
+    // about unsaved edits, answered Keep editing): the route stays focused and
+    // mounted. The mark must not outlive that press.
+    expect(backPress.press()).toBe(false);
     now += BACK_COMMIT_MS;
-    focus.focused = false;
     await settleSave(gate);
 
-    expect(routerBack).not.toHaveBeenCalled();
+    expect(routerBack).toHaveBeenCalledTimes(1);
   });
 
   it('leaves Back to the navigator while this screen never started leaving', async () => {

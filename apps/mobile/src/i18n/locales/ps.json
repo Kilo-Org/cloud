@@ -1695,7 +1695,7 @@
       "outcomeTriageComplete": "لومړنۍ ارزونه بشپړه شوه",
       "sortSeverityDesc": "شدت: له لوړ څخه ټیټ ته",
       "sortSeverityAsc": "شدت: له ټیټ څخه لوړ ته",
-      "sortSlaDue": "د SLA وروستۍ نېټه",
+      "sortSlaDue": "د SLA مهلت",
       "overdueOnly": "یوازې له مهلته تېرې",
       "noRepositories": "تر اوسه هیڅ زېرمتون همغږي شوی یا ټاکل شوی نه دی. هغه په امنیتي اجنټ تنظیماتو کې وټاکئ."
     },
@@ -1722,8 +1722,8 @@
       "enableAutoRemediationConfirmMessage": "امنیتي اجنټ به د هغو موندنو د اصلاح لپاره په اتوماتیک ډول PR پرانیزي چې اړین شرایط پوره کوي او ناوړه ګټه ترې اخیستل کېدای شي.",
       "enable": "فعال کړئ",
       "queued_one": "{{displayCount}} موجوده موندنه د تحلیل لپاره په کتار کې واچول شوه.",
-      "queued": "{{displayCount}} شته موندنې د شننې کتار ته ورزیاتې شوې.",
-      "queued_other": "{{displayCount}} شته موندنې د شننې کتار ته ورزیاتې شوې.",
+      "queued": "{{displayCount}} موجودې موندنې د تحلیل لپاره په کتار کې واچول شوې.",
+      "queued_other": "{{displayCount}} موجودې موندنې د تحلیل لپاره په کتار کې واچول شوې.",
       "severityCriticalOnly": "یوازې بحراني",
       "severityHighAndAbove": "لوړ او پورته",
       "severityMediumAndAbove": "منځنی او پورته",
@@ -1734,15 +1734,15 @@
     },
     "analysis": {
       "couldNotLoad": "تحلیل بار نه شو.",
-      "noAnalysisYet": "تر اوسه شننه نشته",
-      "noAnalysisYetDescription": "د جزئیاتو له ټب څخه شننه پیل کړئ.",
+      "noAnalysisYet": "تر اوسه تحلیل نشته",
+      "noAnalysisYetDescription": "د جزئیاتو له ټب څخه تحلیل پیل کړئ.",
       "restartTitle": "دا تحلیل بیا پیل شي؟",
       "restartMessage": "امنیتي اجنټ به د روانې اجرا پایلې ته انتظار ودروي او نوی تحلیل به په کتار کې واچوي. د روانې اجرا هره پایله به له پامه وغورځول شي.",
       "keepWaiting": "انتظار ته دوام ورکړئ",
       "restartAnalysis": "تحلیل بیا پیل کړئ",
-      "retryAnalysis": "شننه بیا پیل کړئ",
+      "retryAnalysis": "د تحلیل بیا هڅه وکړئ",
       "analyzeRepository": "زېرمتون تحلیل کړئ",
-      "rerunAnalysis": "شننه بیا وکړئ",
+      "rerunAnalysis": "تحلیل بیا وکړئ",
       "capacityFull": "د تحلیل ظرفیت ډک دی. انتظار وکړئ چې یو فعال تحلیل پای ته ورسي.",
       "couldNotCheckCapacity": "د تحلیل ظرفیت و نه کتل شو.",
       "watchInCloudAgent": "په کلاوډ اجنټ کې وګورئ",
@@ -1751,7 +1751,7 @@
       "triageReasoning": "د لومړنۍ ارزونې دلیلونه",
       "exploitable": "د ناوړه ګټې اخیستنې وړ",
       "notRecorded": "ثبت شوی نه دی",
-      "analyzed": "شنل شوی",
+      "analyzed": "تحلیل شوی",
       "exploitabilityReasoning": "د ناوړه ګټې اخیستنې د امکان دلیلونه",
       "suggestedFix": "وړاندیز شوی حل",
       "whereFound": "د موندلو ځایونه ({{displayCount}})",
@@ -1765,7 +1765,7 @@
         "dismiss": "رد کړئ",
         "manualReview": "لاسي بیاکتنه",
         "monitor": "څارنه وکړئ",
-        "openPr": "پل ریکویسټ پرانیزه"
+        "openPr": "پل ریکویسټ پرانیزئ"
       }
     },
     "dashboard": {
@@ -1776,11 +1776,11 @@
       "codebaseRisk": "د کوډ خطر",
       "repositoryActionPlan": "د زېرمتون د اقداماتو پلان",
       "noOpenFindings": "هېڅ پرانیستې موندنه پاملرنې ته اړتیا نه لري",
-      "deadlineToday": "نن وروستۍ نېټه ده",
+      "deadlineToday": "نن مهلت دی",
       "daysOverdue": "{{displayCount}} ورځې له مهلته تېرې",
       "confirmedExploitable": "د ناوړه ګټې اخیستنې وړتیا یې تایید شوې",
       "needsEvidenceReview": "د شواهدو بیاکتنې ته اړتیا لري",
-      "analysisNotComplete": "شننه بشپړه نه ده",
+      "analysisNotComplete": "تحلیل بشپړ نه دی",
       "noImmediateAction": "سمدستي اقدام نشته",
       "notExploitable": "د ناوړه ګټې اخیستنې وړ نه دی",
       "needsYourReview": "ستاسو بیاکتنې ته اړتیا لري",
@@ -1820,7 +1820,7 @@
       "analysisIncompleteDetail": "د پروژې خطر لا تر اوسه نامعلوم دی",
       "slaCompliance": "د SLA رعایت",
       "withinDeadlineDetail": "له {{total}} څخه {{within}} د مهلت دننه",
-      "noDeadlineData": "تر اوسه د هېڅ موندنې لپاره د SLA وروستۍ نېټه نه ده ټاکل شوې",
+      "noDeadlineData": "تر اوسه د هېڅ موندنې لپاره د SLA مهلت نه دی ټاکل شوی",
       "deadlinePassed": "مهلت تېر شوی",
       "deadlinePassedDetail": "{{critical}}، {{high}}",
       "deadlinePassedDetailWithMediumLow": "{{critical}}، {{high}}، {{mediumLow}}",
@@ -1837,7 +1837,7 @@
       "dueThisWeekDetail": "له دې څخه {{exploitable}} موندنو کې د ناوړه ګټې اخیستنې امکان تایید شوی",
       "dueThisWeekDetail_one": "له دې څخه {{exploitable}} موندنې کې د ناوړه ګټې اخیستنې امکان تایید شوی",
       "dueThisWeekDetail_other": "له دې څخه {{exploitable}} موندنو کې د ناوړه ګټې اخیستنې امکان تایید شوی",
-      "noDeadline": "وروستۍ نېټه نشته",
+      "noDeadline": "مهلت نشته",
       "reviewSlaAssignment": "د SLA ټاکنه بیا وګورئ",
       "allOpenFindingsTracked": "ټولې پرانیستې موندنې څارل کېږي"
     },
@@ -1873,7 +1873,7 @@
       "ghsa": "GHSA",
       "manifest": "مانیفست",
       "detected": "موندل شوی",
-      "slaDeadline": "د SLA وروستۍ نېټه",
+      "slaDeadline": "د SLA مهلت",
       "sourceRecord": "د سرچینې ریکارډ",
       "source": "سرچینه",
       "sourceId": "د سرچینې ID",
@@ -1922,7 +1922,7 @@
       "unavailable": "د دې موندنې لپاره اصلاح نشته."
     },
     "analysisSettings": {
-      "title": "ماډلونه او شننه",
+      "title": "ماډلونه او تحلیل",
       "couldNotLoad": "د تحلیل ترتیبات بار نه شول.",
       "depth": "د تحلیل ژوروالی",
       "triageModel": "د لومړنۍ ارزونې ماډل",
@@ -1944,7 +1944,7 @@
       "enterWholeNumber": "له 1 څخه تر 365 پورې یو صحیح عدد ولیکئ",
       "permissionNote": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ترتیبات بدل کړي.",
       "enableTracking": "د SLA تعقیب فعال کړئ",
-      "enableTrackingSubtitle": "د موندنې د شدت له مخې د اصلاح وروستۍ نېټې وټاکئ.",
+      "enableTrackingSubtitle": "د موندنې د شدت له مخې د اصلاح مهلتونه وټاکئ.",
       "deadlinesHeading": "د اصلاح مهلتونه (ورځې)"
     },
     "findingDetail": {
@@ -2032,11 +2032,11 @@
       "newFindingSeverityLabel": "د نوې موندنې لږ تر لږه شدت",
       "newFindingSubtitle": "هر ځل چې نوې موندنه همغږي شي، خبرتیا لېږل کېږي، د لومړي ځل همغږي کېدو پر مهال هم.",
       "slaLeadTimeError": "د ورځو شمېر له 1 تر 365 پورې یو صحیح عدد ولیکئ.",
-      "slaLeadTimeLabel": "د SLA تر وروستۍ نېټې مخکې خبرداری (ورځې)",
+      "slaLeadTimeLabel": "د SLA تر مهلت مخکې خبرداری (ورځې)",
       "slaPersonalTitle": "د SLA د خبرداریو په اړه برېښنالیک راواستوئ",
       "slaSection": "د SLA د خبرداری خبرتیا",
       "slaSeverityLabel": "د SLA د خبرتیا لږ تر لږه شدت",
-      "slaSubtitle": "خبرتیا مخکې له مخکې لېږل کېږي او هغه مهال هم چې د موندنو د SLA وروستۍ نېټه رانږدې شي یا تېره شي."
+      "slaSubtitle": "خبرتیا مخکې له مخکې لېږل کېږي او هغه مهال هم چې د موندنو د SLA مهلت رانږدې شي یا تېر شي."
     },
     "repositories": {
       "couldNotLoad": "د زېرمتون ترتیبات بار نه شول.",
@@ -2086,11 +2086,11 @@
       "configConflict": "د امنیتي اجنټ امستنې بل ځای کې بدلې شوې. وروستي امستنې وګورئ او بیا خوندي کړئ."
     },
     "analysisState": {
-      "queued": "شننه په کتار کې ده",
+      "queued": "تحلیل په کتار کې دی",
       "queuedDescription": "د تحلیل لپاره د ظرفیت خالي کېدو ته انتظار کېږي.",
-      "analyzing": "شننه روانه ده",
+      "analyzing": "تحلیل روان دی",
       "analyzingDescription": "کتل کېږي چې ایا د اپ کوډ اغېزمنې ځانګړنې ته لاسرسی لري.",
-      "failed": "شننه ناکامه شوه",
+      "failed": "تحلیل ناکام شو",
       "failedDescription": "امنیتي اجنټ تحلیل بشپړ نه کړ.",
       "extractionFailedDescription": "تخنیکي راپور په جوړښت لرونکې پایله بدل نه شو.",
       "exploitableDescription": "د اپ کوډ اغېزمنې ځانګړنې ته لاسرسی لري.",
@@ -2106,7 +2106,7 @@
       "analysisRequiredTitle": "د کوډ تحلیل اړین دی",
       "analysisRequiredDescription": "لومړنۍ ارزونه وړاندیز کوي چې د اقدام په اړه تر پرېکړې مخکې زېرمتون تحلیل شي.",
       "completedDescription": "تحلیل بشپړ شو، خو کومه ځانګړې پایله ثبت نه شوه.",
-      "notAnalyzed": "نه دی شنل شوی",
+      "notAnalyzed": "نه دی تحلیل شوی",
       "notAnalyzedDescription": "د دې موندنې لپاره تر اوسه د کوډ تحلیل نه دی شوی."
     },
     "deadline": {
@@ -2115,16 +2115,16 @@
       "resolutionRecorded": "حل ثبت شو",
       "superseded": "ځای یې بلې نیولی",
       "closedOn": "په {{date}} {{status}}",
-      "deadlineNotSet": "وروستۍ نېټه نه ده ټاکل شوې",
-      "noSlaDeadline": "د SLA وروستۍ نېټه نشته",
+      "deadlineNotSet": "مهلت نه دی ټاکل شوی",
+      "noSlaDeadline": "د SLA مهلت نشته",
       "overdueNow": "له مهلته تېر",
       "overdue_one": "{{count}} ورځ له مهلته تېر",
-      "overdue_other": "{{count}} ورځې له ټاکلي وخت تېرې دي",
-      "dueToday": "نن وروستۍ نېټه ده",
-      "dueTomorrow": "سبا وروستۍ نېټه ده",
+      "overdue_other": "{{count}} ورځې له مهلته تېرې دي",
+      "dueToday": "نن مهلت دی",
+      "dueTomorrow": "سبا مهلت دی",
       "dueInDays_one": "{{count}} ورځ مهلت پاتې دی",
       "dueInDays_other": "{{count}} ورځې مهلت پاتې دی",
-      "overdue": "{{count}} ورځې له ټاکلي وخت تېرې دي",
+      "overdue": "{{count}} ورځې له مهلته تېرې دي",
       "dueInDays": "{{count}} ورځې مهلت پاتې دی"
     },
     "remediationStatus": {

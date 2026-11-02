@@ -1741,6 +1741,13 @@ describe('cli-sessions-router', () => {
     });
 
     afterEach(async () => {
+      const { copyBlobs } = await import('@/lib/r2/cli-sessions');
+      jest.mocked(copyBlobs).mockReset().mockResolvedValue({
+        api_conversation_history_blob_url: 'sessions/new-id/api_conversation_history.json',
+        task_metadata_blob_url: 'sessions/new-id/task_metadata.json',
+        ui_messages_blob_url: 'sessions/new-id/ui_messages.json',
+        git_state_blob_url: 'sessions/new-id/git_state.json',
+      });
       await db.delete(cliSessions).where(eq(cliSessions.session_id, shareSessionId));
       await db.delete(sharedCliSessions).where(eq(sharedCliSessions.session_id, shareSessionId));
     });

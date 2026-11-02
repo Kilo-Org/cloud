@@ -1758,7 +1758,7 @@
         "dismiss": "رد کړئ",
         "manualReview": "لاسي بیاکتنه",
         "monitor": "څارنه وکړئ",
-        "openPr": "پول ریکوئسټ پرانیزه"
+        "openPr": "پل ریکویسټ پرانیزه"
       }
     },
     "dashboard": {
@@ -2011,7 +2011,7 @@
         "remediationCancelled": "لغوه شو",
         "remediationFailed": "اصلاح ناکام شو",
         "remediationNoChangesNeeded": "بدلونونو ته اړتیا نشته",
-        "remediationPrOpened": "پول ریکوئسټ پرانیستل شو",
+        "remediationPrOpened": "پل ریکویسټ پرانیستل شو",
         "remediationQueued": "د اصلاح غوښتنه وشوه"
       }
     },

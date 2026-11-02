@@ -726,6 +726,8 @@
       "checkFailedTitleBitbucket": "Níorbh fhéidir an nasc Bitbucket a sheiceáil.",
       "providerCheckFailedMessage": "Níl stádas an naisc ar fáil go dtí go mbeidh sé lódáilte.",
       "reconnectTitle": "Athnasc GitHub",
+      "reconnectTitleGitLab": "Athnasc GitLab",
+      "reconnectTitleBitbucket": "Athnasc Bitbucket",
       "reconnectDescription": "Cúlghaireadh do nasc GitHub.",
       "gitlabDescription": "Athbhreithnigh iarratais chumaisc ar fhón",
       "gitlabInstanceMismatchTitle": "Baineann nasc GitLab le hásc eile",

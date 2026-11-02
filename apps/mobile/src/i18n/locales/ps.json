@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "د Bitbucket اړیکه ونه کتل شوه.",
       "providerCheckFailedMessage": "تر څو چې دا نه وي بار شوی، د اړیکې حالت شتون نلري.",
       "reconnectTitle": "GitHub بیا ونښلئ",
+      "reconnectTitleGitLab": "GitLab بیا ونښلئ",
+      "reconnectTitleBitbucket": "Bitbucket بیا ونښلئ",
       "reconnectDescription": "ستاسو د GitHub اړیکه لغوه شوې ده.",
       "gitlabDescription": "په موبایل کې د یوځای کولو د غوښتنو بیاکتنه وکړئ",
       "gitlabInstanceMismatchTitle": "د GitLab نښلون د بلې بېلګې لپاره دی",

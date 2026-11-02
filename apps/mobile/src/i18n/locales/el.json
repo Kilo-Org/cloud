@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Δεν ήταν δυνατός ο έλεγχος της σύνδεσης με το Bitbucket.",
       "providerCheckFailedMessage": "Η κατάσταση σύνδεσης δεν είναι διαθέσιμη έως ότου φορτωθεί.",
       "reconnectTitle": "Επανασύνδεση με το GitHub",
+      "reconnectTitleGitLab": "Επανασύνδεση με το GitLab",
+      "reconnectTitleBitbucket": "Επανασύνδεση με το Bitbucket",
       "reconnectDescription": "Η σύνδεσή σου με το GitHub ανακλήθηκε.",
       "gitlabDescription": "Έλεγχος αιτημάτων συγχώνευσης στο κινητό",
       "gitlabInstanceMismatchTitle": "Η σύνδεση με το GitLab αφορά άλλη εγκατάσταση",

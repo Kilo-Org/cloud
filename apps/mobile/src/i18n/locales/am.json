@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "የBitbucket ግንኙነቱን መፈተሽ አልተቻለም።",
       "providerCheckFailedMessage": "ይህ እስኪጫን ድረስ የግንኙነት ሁኔታ አይገኝም።",
       "reconnectTitle": "GitHubን እንደገና ማገናኘት",
+      "reconnectTitleGitLab": "GitLabን እንደገና ማገናኘት",
+      "reconnectTitleBitbucket": "Bitbucketን እንደገና ማገናኘት",
       "reconnectDescription": "የGitHub ግንኙነትህ ፈቃድ ተሰርዟል።",
       "gitlabDescription": "የማዋሃድ ጥያቄዎችን በሞባይል ይገምግሙ",
       "gitlabInstanceMismatchTitle": "የGitLab ግንኙነት ለሌላ ኢንስታንስ ነው",

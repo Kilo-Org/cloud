@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Walqunnamtii Bitbucket sakatta'uun hin danda'amne.",
       "providerCheckFailedMessage": "Kun fe'amuun isaa dura haalli walqunnamtii hin argamu.",
       "reconnectTitle": "GitHub irra deebi'ii walqabsiisi",
+      "reconnectTitleGitLab": "GitLab irra deebi'ii walqabsiisi",
+      "reconnectTitleBitbucket": "Bitbucket irra deebi'ii walqabsiisi",
       "reconnectDescription": "Hayyamni walqunnamtii GitHub kee haqameera.",
       "gitlabDescription": "Gaaffiiwwan walitti makuu mobaayilaan sakatta'i",
       "gitlabInstanceMismatchTitle": "Walqunnamtiin GitLab instance biraaf ta'e",

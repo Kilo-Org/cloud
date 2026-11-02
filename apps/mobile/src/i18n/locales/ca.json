@@ -696,6 +696,8 @@
       "checkFailedTitleBitbucket": "No s'ha pogut comprovar la connexió amb Bitbucket.",
       "providerCheckFailedMessage": "L'estat de la connexió no està disponible fins que es carregui.",
       "reconnectTitle": "Torna a connectar GitHub",
+      "reconnectTitleGitLab": "Torna a connectar GitLab",
+      "reconnectTitleBitbucket": "Torna a connectar Bitbucket",
       "reconnectDescription": "S'ha revocat la teva connexió amb GitHub.",
       "gitlabDescription": "Revisa les sol·licituds de fusió al mòbil",
       "gitlabInstanceMismatchTitle": "La connexió de GitLab és per a una altra instància",

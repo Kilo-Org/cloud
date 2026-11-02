@@ -2714,6 +2714,8 @@
       "checkFailedTitleBitbucket": "Tidak dapat memeriksa koneksi Bitbucket.",
       "providerCheckFailedMessage": "Status koneksi tidak tersedia hingga bagian ini termuat.",
       "reconnectTitle": "Hubungkan ulang GitHub",
+      "reconnectTitleGitLab": "Hubungkan ulang GitLab",
+      "reconnectTitleBitbucket": "Hubungkan ulang Bitbucket",
       "reconnectDescription": "Akses ke akun GitHub kamu telah dicabut.",
       "gitlabDescription": "Tinjau merge request di perangkat seluler",
       "gitlabInstanceMismatchTitle": "Koneksi GitLab untuk instance lain",

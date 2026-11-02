@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "ບໍ່ສາມາດກວດສອບການເຊື່ອມຕໍ່ Bitbucket ໄດ້.",
       "providerCheckFailedMessage": "ສະຖານະການເຊື່ອມຕໍ່ຈະບໍ່ພ້ອມໃຊ້ຈົນກວ່າຈະໂຫຼດເສັຣຈ",
       "reconnectTitle": "ເຊື່ອມຕໍ່ GitHub ໃໝ່",
+      "reconnectTitleGitLab": "ເຊື່ອມຕໍ່ GitLab ໃໝ່",
+      "reconnectTitleBitbucket": "ເຊື່ອມຕໍ່ Bitbucket ໃໝ່",
       "reconnectDescription": "ສິດການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານຖືກຖອນແລ້ວ.",
       "gitlabDescription": "ກວດສອບ merge request ໃນມືຖື",
       "gitlabInstanceMismatchTitle": "ການເຊື່ອມຕໍ່ GitLab ແມ່ນສຳລັບ instance ອື່ນ",

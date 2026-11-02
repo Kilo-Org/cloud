@@ -726,6 +726,8 @@
       "checkFailedTitleBitbucket": "Ma setgħetx tiġi ċċekkjata l-konnessjoni ma' Bitbucket.",
       "providerCheckFailedMessage": "L-istat tal-konnessjoni mhux disponibbli sakemm jitgħabba.",
       "reconnectTitle": "Erġa' kkonnetta GitHub",
+      "reconnectTitleGitLab": "Erġa' kkonnetta GitLab",
+      "reconnectTitleBitbucket": "Erġa' kkonnetta Bitbucket",
       "reconnectDescription": "L-aċċess tiegħek għal GitHub ġie revokat.",
       "gitlabDescription": "Irrevedi l-merge requests fuq il-mowbajl",
       "gitlabInstanceMismatchTitle": "Il-konnessjoni ta' GitLab hija għal istanza oħra",

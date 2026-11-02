@@ -696,6 +696,8 @@
       "checkFailedTitleBitbucket": "Não foi possível verificar a ligação ao Bitbucket.",
       "providerCheckFailedMessage": "O estado da ligação só fica disponível quando o carregamento terminar.",
       "reconnectTitle": "Voltar a ligar o GitHub",
+      "reconnectTitleGitLab": "Voltar a ligar o GitLab",
+      "reconnectTitleBitbucket": "Voltar a ligar o Bitbucket",
       "reconnectDescription": "A tua ligação ao GitHub foi revogada.",
       "gitlabDescription": "Rever merge requests no telemóvel",
       "gitlabInstanceMismatchTitle": "A ligação ao GitLab é de outra instância",

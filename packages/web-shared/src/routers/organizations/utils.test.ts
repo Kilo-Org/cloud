@@ -492,6 +492,42 @@ describe('mode-aware support organization access', () => {
     expect(event).toMatchObject({ supportDecision: 'support_grant' });
   });
 
+  function failGrantLookupQueries() {
+    const originalSelect = db.select.bind(db);
+    return jest.spyOn(db, 'select').mockImplementation((...args) => {
+      const builder = originalSelect(...args);
+      return new Proxy(builder, {
+        get(target, property, receiver) {
+          if (property === 'from') {
+            return (table: Parameters<typeof target.from>[0]) => {
+              if (table === support_access_grants) {
+                throw new Error('grant lookup failed');
+              }
+              return target.from(table);
+            };
+          }
+          const value = Reflect.get(target, property, receiver);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    });
+  }
+
+  test('observe keeps the legacy owner when the grant lookup fails', async () => {
+    setSupportAccessModeForTest('observe');
+    const { organization, admin } = await orgAndAdmin();
+    const selectSpy = failGrantLookupQueries();
+    try {
+      await expect(ensureOrganizationAccess(readCtx(admin), organization.id)).resolves.toBe(
+        'owner'
+      );
+    } finally {
+      selectSpy.mockRestore();
+    }
+    const event = events.find(event => event.kind === 'kilo_admin_elevation');
+    expect(event).toMatchObject({ supportDecision: null, supportGrantId: null });
+  });
+
   test('observe records a non-allowlisted grant as a denial without changing access', async () => {
     setSupportAccessModeForTest('observe');
     const { organization, admin } = await orgAndAdmin();

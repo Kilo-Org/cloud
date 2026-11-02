@@ -135,6 +135,51 @@ describe('getAuthorizedOrgContext', () => {
       });
     });
 
+    test('observe continues as legacy owner when the grant lookup fails', async () => {
+      setSupportAccessModeForTest('observe');
+      const adminUser = await insertTestUser({
+        is_admin: true,
+        can_request_support_org_access: true,
+      });
+      const events: AdminAccessEvent[] = [];
+      setAdminAccessSinkForTest(event => events.push(event));
+      const originalSelect = db.select.bind(db);
+      const selectSpy = jest.spyOn(db, 'select').mockImplementation((...args) => {
+        const builder = originalSelect(...args);
+        return new Proxy(builder, {
+          get(target, property, receiver) {
+            if (property === 'from') {
+              return (table: Parameters<typeof target.from>[0]) => {
+                if (table === support_access_grants) {
+                  throw new Error('grant lookup failed');
+                }
+                return target.from(table);
+              };
+            }
+            const value = Reflect.get(target, property, receiver);
+            return typeof value === 'function' ? value.bind(target) : value;
+          },
+        });
+      });
+      try {
+        const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+          getUserFromAuthOverride: async () => ({ user: adminUser, authFailedResponse: null }),
+          supportKey: '/api/organizations/[id]/defaults',
+        });
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.user.role).toBe('owner');
+          expect(result.data.access.kind).toBe('legacy_admin');
+        }
+      } finally {
+        selectSpy.mockRestore();
+        setAdminAccessSinkForTest(null);
+      }
+      expect(events.find(event => event.kind === 'kilo_admin_elevation')).toMatchObject({
+        supportDecision: null,
+      });
+    });
+
     test('records the elevation before returning 404 for a missing organization', async () => {
       const adminUser = await insertTestUser({ is_admin: true });
       const events: AdminAccessEvent[] = [];

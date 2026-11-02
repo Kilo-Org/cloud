@@ -32,6 +32,7 @@ import {
 } from '@kilocode/web-shared/lib/admin/support-access';
 import {
   evaluateSupportAccess,
+  evaluateSupportAccessForObserve,
   isLiveOrganization,
   latestSupportGrantStatus,
   organizationState,
@@ -361,15 +362,26 @@ export async function resolveOrganizationAccess(
 
   const { surface, key } = supportKeyFor(ctx, options);
   const supportActionId = supportActionIdFor(ctx, options, key);
-  const evaluation = await evaluateSupportAccess({
-    actorKiloUserId: ctx.user.id,
-    organizationId,
-    requiredActionClass: requiredActionClassFor(ctx, options),
-    roles: options.roles,
-    surface,
-    key,
-    supportActionId,
-  });
+  const evaluation =
+    mode === 'observe'
+      ? await evaluateSupportAccessForObserve({
+          actorKiloUserId: ctx.user.id,
+          organizationId,
+          requiredActionClass: requiredActionClassFor(ctx, options),
+          roles: options.roles,
+          surface,
+          key,
+          supportActionId,
+        })
+      : await evaluateSupportAccess({
+          actorKiloUserId: ctx.user.id,
+          organizationId,
+          requiredActionClass: requiredActionClassFor(ctx, options),
+          roles: options.roles,
+          surface,
+          key,
+          supportActionId,
+        });
   const membershipRole = membershipObserved ? effectiveMembershipRole(rows) : null;
   const wouldPassWithoutAdmin = membershipObserved ? role !== null : null;
   const elevationReason = options.auditReason ?? 'organization_access';

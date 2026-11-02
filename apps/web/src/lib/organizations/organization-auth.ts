@@ -19,7 +19,7 @@ import {
   observeMembershipRole,
   resolveOrganizationAccess,
 } from '@kilocode/web-shared/routers/organizations/utils';
-import { evaluateSupportAccess } from '@kilocode/web-shared/lib/admin/support-access-resolver';
+import { evaluateSupportAccessForObserve } from '@kilocode/web-shared/lib/admin/support-access-resolver';
 import { getSupportAccessMode } from '@kilocode/web-shared/lib/admin/support-access';
 import {
   findSupportAllowEntry,
@@ -111,7 +111,7 @@ export async function getAuthorizedOrgContext(
     );
     const evaluation =
       mode === 'observe'
-        ? await evaluateSupportAccess({
+        ? await evaluateSupportAccessForObserve({
             actorKiloUserId: user.id,
             organizationId,
             requiredActionClass:

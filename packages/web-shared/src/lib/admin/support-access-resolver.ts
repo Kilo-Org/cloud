@@ -9,6 +9,7 @@ import {
   type SupportAccessActionClass,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { findPrivilegedInventoryEntry } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import {
   findSupportAllowEntry,
@@ -19,6 +20,8 @@ import {
   type SupportDecision,
   type SupportSurface,
 } from '@kilocode/web-shared/lib/admin/support-access';
+
+const warnObserveFailure = sentryLogger('support_access_observe', 'warning');
 
 export type SupportResolution = {
   access: SupportContext | null;
@@ -164,6 +167,29 @@ export async function evaluateSupportAccess(params: {
     decision: 'support_grant',
     grantId: grant.id,
   };
+}
+
+/**
+ * Observe mode must never change an admin's outcome. If the would-be support
+ * measurement cannot be read (missing table, DB error), record no decision and
+ * let the legacy path continue. The report is sanitized: no query params,
+ * organization id, or user id are logged.
+ */
+export async function evaluateSupportAccessForObserve(params: {
+  actorKiloUserId: string;
+  organizationId: string;
+  requiredActionClass: SupportAccessActionClass;
+  roles: readonly string[] | undefined;
+  surface: SupportSurface;
+  key: string | null;
+  supportActionId: string | null;
+}): Promise<SupportResolution> {
+  try {
+    return await evaluateSupportAccess(params);
+  } catch {
+    warnObserveFailure('Support access observation failed; continuing with legacy access');
+    return { access: null, decision: null, grantId: null };
+  }
 }
 
 export async function isLiveOrganization(organizationId: string): Promise<boolean> {

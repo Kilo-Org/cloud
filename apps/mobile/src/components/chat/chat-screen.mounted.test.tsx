@@ -706,7 +706,9 @@ describe('a chat that settled without a transcript', () => {
 
     const [failure] = emptyStatesOf(tree);
     expect(failure?.title).toBe(i18n.t('common.somethingWentWrong'));
-    expect(descriptionMessageOf(failure ?? {})).toBe(i18n.t('common.somethingWentWrong'));
+    /* The title already says it, so the state does not repeat the sentence;
+       the neutral description carries the retry invitation instead. */
+    expect(descriptionMessageOf(failure ?? {})).toBe(i18n.t('queryError.neutralDescription'));
     /* A balance caused nothing here, so no Add credits joins the two ways out. */
     const action = await mountAction(tree);
     expect(buttonLabels(action.renderer)).toEqual([i18n.t('common.retry'), i18n.t('common.back')]);

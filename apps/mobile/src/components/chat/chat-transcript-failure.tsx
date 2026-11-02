@@ -44,7 +44,9 @@ export function ChatTranscriptFailure({
       // title says which of the two the person is looking at.
       variant={unavailable ? 'not-found' : 'neutral'}
       title={unavailable ? undefined : t('common.somethingWentWrong')}
-      message={t(failureKey)}
+      // A generic failure's own copy is that same title, so it is not printed
+      // again below it: the neutral description carries the retry invitation.
+      message={failureKey === 'common.somethingWentWrong' ? undefined : t(failureKey)}
       action={
         <View className="flex-row flex-wrap items-center justify-center gap-3">
           {retryable ? (

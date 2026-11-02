@@ -2832,7 +2832,7 @@ export function SessionDetailContent({
     return (
       // No entrance animation: the transcript body must paint on its own, not
       // after a `FadeIn` (which starts at `opacity: 0`) completes. The
-      // skeleton's `exiting` crossfade still carries the swap visually.
+      // skeleton is swapped for the rows in one commit, so it needs none.
       <View className="flex-1">
         <SessionMessageList
           sessionId={sessionId}

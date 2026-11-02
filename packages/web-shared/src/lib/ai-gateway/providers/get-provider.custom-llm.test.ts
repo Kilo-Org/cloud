@@ -69,7 +69,7 @@ describe('getProvider custom LLM credentials', () => {
       bypassAccessCheck: true,
       isFree: true,
       provider: {
-        id: 'custom',
+        type: 'custom',
         apiUrl: 'https://llm.example.com/v1/chat/completions',
         disableUrlSuffix: true,
         apiKey: 'proxy-secret',

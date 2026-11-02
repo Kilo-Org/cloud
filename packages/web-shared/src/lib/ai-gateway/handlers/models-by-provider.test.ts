@@ -138,6 +138,34 @@ describe('handleModelsByProviderRequest', () => {
     expect(mockProviderLookup).not.toHaveBeenCalledWith('free/model');
   });
 
+  test('judges a BYOK-only provider as a key for that provider alone', async () => {
+    mockFetchSnapshot.mockResolvedValue({
+      providers: [
+        { slug: 'synthetic', byokOnly: true, models: [model('routed/model'), model('open/model')] },
+        { slug: 'opencode-go', byokOnly: true, models: [model('routed/model')] },
+      ],
+      total_providers: 2,
+      total_models: 3,
+    });
+    mockResolvePolicy.mockImplementation(async () => ({
+      ...policy,
+      memberGrant: { ...policy.memberGrant, providerAllowList: ['synthetic'] },
+    }));
+    mockGetUserFromAuth.mockResolvedValue({ user: { id: 'user-1' }, organizationId: 'org-1' });
+    const { handleModelsByProviderRequest } = await loadHandler();
+
+    const response = await handleModelsByProviderRequest();
+
+    // `routed/model` is not served by `synthetic` in the Kilo route index; the key's provider decides.
+    await expect(response.json()).resolves.toEqual({
+      providers: [
+        { slug: 'synthetic', byokOnly: true, models: [model('routed/model'), model('open/model')] },
+      ],
+      total_providers: 1,
+      total_models: 2,
+    });
+  });
+
   test('reads the catalog snapshot once across repeated requests', async () => {
     mockGetUserFromAuth.mockRejectedValue(new Error('unauthenticated'));
     const { handleModelsByProviderRequest } = await loadHandler();

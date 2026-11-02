@@ -6,7 +6,11 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { eq } from 'drizzle-orm';
-import type { CustomLlmDefinition, StoredModel } from '@kilocode/db/schema-types';
+import type {
+  CustomLlmDefinition,
+  CustomPricingTiers,
+  StoredModel,
+} from '@kilocode/db/schema-types';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
@@ -280,6 +284,65 @@ describe('adminCustomLlmRouter', () => {
       const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
       const decrypted = JSON.parse(decryptApiKey(row.encrypted_api_key!, BYOK_ENCRYPTION_KEY));
       expect(decrypted.api_key).toBe('sk-rotated-secret');
+    });
+  });
+
+  describe('pricing', () => {
+    const credentials = { type: 'api_key', api_key: 'sk-pricing-secret' } as const;
+    const pricingTiers: CustomPricingTiers = [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 2,
+          completion_per_million: 8,
+          input_cache_read_per_million: 0.5,
+          input_cache_write_per_million: null,
+        },
+      },
+      {
+        start_context_length: 128_000,
+        pricing: {
+          prompt_per_million: 4,
+          completion_per_million: 16,
+          input_cache_read_per_million: null,
+          input_cache_write_per_million: null,
+        },
+      },
+    ];
+
+    it('stores a custom LLM with valid pricing tiers', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const publicId = 'kilo-internal/test-model-priced';
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: publicId,
+        definition: { ...validDefinition, pricing: pricingTiers },
+        credentials,
+      });
+
+      expect(result.definition.pricing).toEqual(pricingTiers);
+
+      const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
+      expect(row?.definition.pricing).toEqual(pricingTiers);
+    });
+
+    it('rejects pricing whose first tier does not start at context length 0', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const publicId = 'kilo-internal/test-model-bad-pricing';
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: publicId,
+          definition: {
+            ...validDefinition,
+            pricing: [{ ...pricingTiers[0], start_context_length: 1000 }],
+          },
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+      const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
+      expect(row).toBeUndefined();
     });
   });
 

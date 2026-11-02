@@ -1,5 +1,6 @@
 import type { NormalizedOpenRouterResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { getKiloRouteProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
 export type SnapshotDiff = {
   /** providerSlug -> sorted list of normalized model ids newly offered by that provider */
@@ -12,11 +13,15 @@ export type SnapshotDiff = {
   newModelProvidersIndex: Map<string, Set<string>>;
 };
 
+/**
+ * Only providers Kilo routes to count: a BYOK-only provider serves just the organization's own
+ * catalog-mode keys, so its models are not a change in what the organization can use through Kilo.
+ */
 function buildModelProvidersIndex(
   snapshot: NormalizedOpenRouterResponse
 ): Map<string, Set<string>> {
   const index = new Map<string, Set<string>>();
-  for (const provider of snapshot.providers) {
+  for (const provider of getKiloRouteProviders(snapshot)) {
     for (const model of provider.models) {
       const normalizedModelId = normalizeModelId(model.slug);
       const existing = index.get(normalizedModelId);

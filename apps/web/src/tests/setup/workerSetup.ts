@@ -13,6 +13,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import {
   provisionComputeUsageChargePartitions,
+  provisionEnkryptUsagePartitions,
   provisionExaUsageLogPartitions,
 } from '@/lib/usage-partitions';
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
@@ -77,6 +78,14 @@ beforeAll(async () => {
       const [{ name, error }] = chargePartitionErrors;
       throw new Error(
         `Failed to create compute usage charge partition ${name}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    const { errors: enkryptPartitionErrors } = await provisionEnkryptUsagePartitions(testDb);
+    if (enkryptPartitionErrors.length > 0) {
+      const [{ name, error }] = enkryptPartitionErrors;
+      throw new Error(
+        `Failed to create Enkrypt usage partition ${name}: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   } finally {

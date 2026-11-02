@@ -9,6 +9,7 @@
       "lowBalance": "O teu saldo precisa atención",
       "spendAlert": "O teu gasto precisa atención",
       "securityFinding": "Un achado de seguridade precisa atención",
+      "securityUpdate": "Unha comprobación de seguridade ten unha actualización",
       "activeAgentsGlanceable": "Os axentes activos teñen unha actualización"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Un achado de seguridade precisa atención"
+      "body": "Unha comprobación de seguridade ten unha actualización"
     }
   },
   "instanceLifecycle": {

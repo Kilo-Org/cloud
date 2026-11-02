@@ -866,7 +866,6 @@ export async function acceptOrganizationInvite(
         return failureResult('Invitation is no longer valid');
       }
 
-      // Add user to organization
       await tx.insert(organization_memberships).values({
         organization_id: invitation.organization_id,
         kilo_user_id: userId,

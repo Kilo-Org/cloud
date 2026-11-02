@@ -7,7 +7,7 @@ import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { AddCreditsButton, AddCreditsRow } from '@/components/add-credits-row';
 import { useContextPicker } from '@/components/context-control';
@@ -271,24 +271,23 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
                   {hideBalance ? HIDDEN_BALANCE : balanceText}
                 </Text>
               </ScrollView>
+              {/* One line, swapped without an entrance fade: the caption holds
+                  the second row of this block, so a fade that paints it late
+                  leaves the reserved row empty under the amount. */}
               {creditsFailed && (
                 <Text className="text-xs text-muted-foreground">
                   {t('credits.expiryUnavailable')}
                 </Text>
               )}
               {!creditsFailed && creditsPending && (
-                <Animated.View exiting={FadeOut.duration(150)}>
-                  <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
-                </Animated.View>
+                <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
               )}
               {!creditsFailed && !creditsPending && (
-                <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
-                  <CreditExpiryNote
-                    creditBlocks={creditData.creditBlocks}
-                    hiddenAmount={hideBalance ? HIDDEN_BALANCE : undefined}
-                    emptyMessage={t('credits.noExpiringCredits')}
-                  />
-                </Animated.View>
+                <CreditExpiryNote
+                  creditBlocks={creditData.creditBlocks}
+                  hiddenAmount={hideBalance ? HIDDEN_BALANCE : undefined}
+                  emptyMessage={t('credits.noExpiringCredits')}
+                />
               )}
             </View>
             <Pressable

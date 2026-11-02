@@ -483,6 +483,7 @@ export const kilocode_users = pgTable(
     is_super_admin: boolean().default(false).notNull(),
     can_view_sessions: boolean().default(false).notNull(),
     can_manage_credits: boolean().default(false).notNull(),
+    can_export_api_request_logs: boolean().default(false).notNull(),
     total_microdollars_acquired: bigint({ mode: 'number' })
       .default(sql`'0'`)
       .notNull(),
@@ -553,6 +554,10 @@ export const kilocode_users = pgTable(
     check(
       'kilocode_users_can_manage_credits_requires_admin_check',
       sql`NOT ${table.can_manage_credits} OR ${table.is_admin}`
+    ),
+    check(
+      'kilocode_users_can_export_api_request_logs_requires_admin_check',
+      sql`NOT ${table.can_export_api_request_logs} OR ${table.is_admin}`
     ),
     uniqueIndex('UQ_kilocode_users_openrouter_upstream_safety_identifier')
       .on(table.openrouter_upstream_safety_identifier)
@@ -10456,8 +10461,7 @@ export const exa_usage_log = pgTable(
 
 export type ExaUsageLog = typeof exa_usage_log.$inferSelect;
 
-// One row per Enkrypt guardrail detect call billed to an organization. Kept apart from
-// microdollar_usage so guardrail charges never alter inference usage records.
+// Retained only for migration tracking; application code uses enkrypt_usage.
 export const enkrypt_guardrail_charges = pgTable(
   'enkrypt_guardrail_charges',
   {
@@ -10472,9 +10476,6 @@ export const enkrypt_guardrail_charges = pgTable(
     decision: text().notNull().$type<EnkryptGuardrailDecision>(),
     enkrypt_credits_cost: real(),
     charged_microdollars: bigint({ mode: 'number' }).notNull(),
-    // How long the request waited for the guardrail verdict before its upstream call. Set only on
-    // the request's final call, so it is counted once per request; null on a retried call or when
-    // the request returned before awaiting the verdict.
     added_latency_ms: integer(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
@@ -10486,7 +10487,47 @@ export const enkrypt_guardrail_charges = pgTable(
   ]
 );
 
-export type EnkryptGuardrailCharge = typeof enkrypt_guardrail_charges.$inferSelect;
+export const enkrypt_usage_decision = pgTable(
+  'enkrypt_usage_decision',
+  {
+    decision_id: serial().notNull().primaryKey(),
+    decision: text().notNull().$type<EnkryptGuardrailDecision>(),
+  },
+  table => [uniqueIndex('UQ_enkrypt_usage_decision').on(table.decision)]
+);
+
+// Monthly created_at partitioning is defined in the migration; Drizzle cannot express it.
+export const enkrypt_usage = pgTable(
+  'enkrypt_usage',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`),
+    organization_id: uuid().notNull(),
+    kilo_user_id: text().notNull(),
+    session_id: text(),
+    api_kind_id: integer()
+      .notNull()
+      .references(() => api_kind.api_kind_id),
+    decision_id: integer()
+      .notNull()
+      .references(() => enkrypt_usage_decision.decision_id),
+    enkrypt_credits_cost: real(),
+    charged_microdollars: bigint({ mode: 'number' }).notNull(),
+    // How long the request waited for the guardrail verdict before its upstream call. Set only on
+    // the request's final call, so it is counted once per request; null on a retried call or when
+    // the request returned before awaiting the verdict.
+    added_latency_ms: integer(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.id, table.created_at] }),
+    index('IDX_enkrypt_usage_organization_created_at').on(table.organization_id, table.created_at),
+    index('IDX_enkrypt_usage_user_created_at').on(table.kilo_user_id, table.created_at),
+  ]
+);
+
+export type EnkryptUsage = typeof enkrypt_usage.$inferSelect;
 
 // ============ SECURITY ADVISOR SCANS ============
 // Per-scan usage tracking for the security advisor feature.

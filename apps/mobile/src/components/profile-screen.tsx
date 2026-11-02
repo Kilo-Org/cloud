@@ -137,7 +137,6 @@ export function ProfileScreen() {
   const { openPicker, picker } = useContextPicker(orgs);
   const selectedOrg = orgs?.find(org => org.organizationId === organizationId);
   const orgRole = selectedOrg?.role;
-  const orgName = selectedOrg?.organizationName;
   // The Organization section stays on Profile in every credit-account context:
   // a Personal context still offers the account picker when the account has
   // memberships, so organization management is not gated behind the credits
@@ -176,7 +175,6 @@ export function ProfileScreen() {
         title={
           orgRole === 'member' ? t('profile.viewOrganization') : t('profile.manageOrganization')
         }
-        subtitle={orgName}
         hue="lime"
         className="rounded-lg bg-secondary px-3"
         disabled={!orgRole}

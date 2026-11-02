@@ -14,6 +14,8 @@ import { parseKiloWebPath } from '@kilocode/app-shared/universal-links';
 
 import { isPlausibleKiloSessionId } from './session-id-shape';
 import {
+  APP_SCHEME,
+  canonicalSystemSearchId,
   deeplinkPathFromHref,
   INDEXED_LINK_PREFIXES,
   SESSION_HREF_PREFIX,
@@ -101,4 +103,53 @@ export function opensAppRoutePath(path: string): boolean {
   }
   const root = withoutLeadingSlash.split('/')[0];
   return root !== undefined && APP_ROUTE_ROOTS.includes(root);
+}
+
+/** The group whose screens the signed-in shell owns. */
+const SHELL_GROUP = '(app)';
+
+/** A link's own path, with its query kept, for the forms that carry one. */
+function appHref(path: string): string | null {
+  if (path.startsWith('/')) {
+    return path;
+  }
+  if (!path.startsWith(APP_SCHEME)) {
+    return null;
+  }
+  const rest = path.slice(APP_SCHEME.length);
+  return rest.startsWith('/') ? rest : `/${rest}`;
+}
+
+/**
+ * The href of a link that opens a screen inside the signed-in shell, or null
+ * for every other link.
+ *
+ * Such a link carries the route with its group segment (`kiloapp:///(app)/…`,
+ * the form dev, E2E and fixture links use) and must reach the navigator through
+ * the pending deep-link slot, not expo-router's linking resolver: only the
+ * slot's `withAnchor` navigation inserts each Stack's layout anchor beneath the
+ * target, so Back returns to the tab's own root and the tab shows that root
+ * instead of the linked screen. Everything else keeps its own path — an
+ * auth-group or root-level link opens a route the shell gates own, and a
+ * group-stripped system-search link belongs to the slot the search tap filled.
+ */
+export function shellRouteHref(path: string): string | null {
+  const href = appHref(path);
+  if (href === null) {
+    return null;
+  }
+  const pathname = pathnameOf(href);
+  if (pathname === null) {
+    return null;
+  }
+  if (pathname !== `/${SHELL_GROUP}` && !pathname.startsWith(`/${SHELL_GROUP}/`)) {
+    return null;
+  }
+  if (!opensDestination(pathname)) {
+    return null;
+  }
+  // A search result indexed before its family moved names its old route. It is
+  // still a search tap and not a link handed to the app, so the search slot
+  // keeps it.
+  return canonicalSystemSearchId(pathname) === pathname ? href : null;
 }

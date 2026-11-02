@@ -18,7 +18,7 @@ import {
   userMessage,
 } from './message-bubble-test-utils';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 
 /** React compares hook dependencies one position at a time with `Object.is`. */
@@ -77,8 +77,8 @@ vi.mock('react-i18next', async importOriginal => {
   return {
     ...actual,
     useTranslation: () => {
-      const i18n = actual.getI18n();
-      return { t: i18n.t.bind(i18n), i18n };
+      const instance = actual.getI18n();
+      return { t: instance.t.bind(instance), i18n: instance };
     },
   };
 });
@@ -301,6 +301,50 @@ describe('MessageBubble failure footer', () => {
     expect(copy?.props.accessibilityRole).toBe('button');
   });
 
+  it('end-aligns a failed user row’s footer under its bubble and leaves an assistant row’s on its leading edge', async () => {
+    const userTree = await renderBubbleWithHandlers(userMessage('m-align-user'), {
+      deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
+    const assistantTree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-align-asst', 'APIError'),
+      { onRetryMessage: vi.fn<(message: StoredMessage) => void>() }
+    );
+
+    const userFooter = footerOf(userTree);
+    expect(String(userFooter?.props.className)).toBe('gap-1 px-4 py-1 items-end');
+    // The title and the detail line end-align with the bubble's trailing edge,
+    // so a wrapped line does not fall back to the leading edge, and each keeps
+    // its own size and colour. The action row is unchanged: the column places it.
+    expect(classNamesIn(userFooter?.props.children)).toEqual(
+      expect.arrayContaining([
+        'text-sm text-destructive text-right',
+        'text-xs text-muted-foreground text-right',
+        'flex-row gap-2',
+      ])
+    );
+
+    // An assistant row's footer keeps its existing leading layout.
+    const assistantFooter = footerOf(assistantTree);
+    expect(String(assistantFooter?.props.className)).toBe('gap-1 px-4 py-1');
+    expect(
+      classNamesIn(assistantFooter?.props.children).filter(name =>
+        name.split(' ').includes('text-right')
+      )
+    ).toEqual([]);
+
+    // No start/end text class: NativeWind drops `text-align: end`, and RN
+    // already resolves `text-right` against the interface direction.
+    const footerClasses = [
+      ...classNamesIn(userFooter?.props.children),
+      ...classNamesIn(assistantFooter?.props.children),
+      String(userFooter?.props.className),
+      String(assistantFooter?.props.className),
+    ];
+    expect(footerClasses.filter(name => /\btext-(start|end)\b/.test(name))).toEqual([]);
+  });
+
   it('renders only the failure footer when the user text sanitizes to empty', async () => {
     const actual = await vi.importActual<typeof PartTypes>('./part-types');
     const { isTextPart } = await import('./part-types');
@@ -386,7 +430,9 @@ describe('MessageBubble failure footer', () => {
 
     // The footer container is a plain View: no accessible, no role, no label,
     // so Retry and Copy stay individually focusable.
-    const footer = findElementByType(tree, 'View', p => p.className === 'gap-1 px-4 py-1');
+    const footer = findElementByType(tree, 'View', p =>
+      String(p.className).startsWith('gap-1 px-4 py-1')
+    );
     expect(footer).not.toBeNull();
     expect(footer?.props.accessible).toBeUndefined();
     expect(footer?.props.accessibilityRole).toBeUndefined();
@@ -396,6 +442,35 @@ describe('MessageBubble failure footer', () => {
     const title = findElementByLabel(tree, 'Failed to deliver. Retry available.');
     expect(title).not.toBeNull();
     expect(title?.props.children).toBe('Failed to deliver');
+  });
+
+  it('names a German failure row with one full stop, keeping the title line as translated', async () => {
+    await i18n.changeLanguage('de');
+    try {
+      const tree = await renderBubbleWithHandlers(userMessage('m-a11y-de'), {
+        deliveryState: { status: 'failed', error: 'nope', reason: 'interrupted' },
+        onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      });
+
+      // The title already ends its own sentence in German, so the label must not
+      // add a second stop before the retry line.
+      expect(
+        findElementByLabel(
+          tree,
+          'Die Zustellung ist fehlgeschlagen. Du kannst es erneut versuchen.'
+        )
+      ).not.toBeNull();
+      expect(
+        findElementByLabel(
+          tree,
+          'Die Zustellung ist fehlgeschlagen.. Du kannst es erneut versuchen.'
+        )
+      ).toBeNull();
+      // The visible line is the catalog's title, unchanged.
+      expect(findText(tree, text => text === 'Die Zustellung ist fehlgeschlagen.')).toBe(true);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it('presses Retry to retry the failed message and Copy to composer to restore the user text', async () => {
@@ -1029,6 +1104,24 @@ function findElementByLabel(
     return findElementByLabel(children, label);
   }
   return null;
+}
+
+/** The failed row's footer container, found by its own spacing classes. */
+function footerOf(tree: unknown): { type: string; props: Record<string, unknown> } | null {
+  return findElementByType(tree, 'View', p => String(p.className).startsWith('gap-1 px-4 py-1'));
+}
+
+/** Every className in an unrendered element tree, in document order. */
+function classNamesIn(node: unknown): string[] {
+  if (Array.isArray(node)) {
+    return node.flatMap(child => classNamesIn(child));
+  }
+  if (node == null || typeof node !== 'object') {
+    return [];
+  }
+  const element = node as { props?: { className?: unknown; children?: unknown } };
+  const own = typeof element.props?.className === 'string' ? [element.props.className] : [];
+  return [...own, ...classNamesIn(element.props?.children)];
 }
 
 function findProvider(

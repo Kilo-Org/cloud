@@ -483,8 +483,8 @@ describe('genericPushContentForPushData', () => {
     }
   });
 
-  it('returns the security lifecycle copy for the security_lifecycle variant', () => {
-    const parsed = pushDataSchema.parse({
+  it('gives each security payload type its own body', () => {
+    const lifecycle = pushDataSchema.parse({
       type: 'security_lifecycle',
       event: 'remediation_failed',
       findingId: 'f1',
@@ -492,9 +492,19 @@ describe('genericPushContentForPushData', () => {
       remediationId: 'r1',
       prUrl: 'https://github.com/org/repo/pull/1',
     });
-    expect(genericPushContentForPushData(parsed)).toEqual({
+    const finding = pushDataSchema.parse({
+      type: 'security_finding',
+      findingId: 'f1',
+      scope: 'org',
+    });
+
+    expect(genericPushContentForPushData(finding)).toEqual({
       title: 'Kilo',
       body: 'A security finding needs attention',
+    });
+    expect(genericPushContentForPushData(lifecycle)).toEqual({
+      title: 'Kilo',
+      body: 'A security check has an update',
     });
   });
 

@@ -5,21 +5,44 @@ import { AppSidebar } from './components/AppSidebar';
 import { Toaster } from '@/components/ui/sonner';
 import { BuildInfo } from '@/app/admin/components/BuildInfo';
 import { AppShellSkipLink } from '@/components/AppShellSkipLink';
-import { AdminStepUpStatus } from '@/components/admin/step-up/AdminStepUpStatus';
 import { StepUpProvider } from '@/components/admin/step-up/StepUpProvider';
-import { isAdminStepUpUiVisible } from '@/lib/admin/step-up-ui';
+import { AdminStepUpInterstitial } from '@/components/admin/step-up/AdminStepUpInterstitial';
+import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
+import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
+import { stepUpErrorCodeForState } from '@kilocode/web-shared/lib/admin/step-up-guard';
+import type { StepUpRequirement } from '@/components/admin/step-up/step-up-error';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user: currentUser } = await getUserFromAuth({
+  const auth = await getUserFromAuth({
     adminOnly: true,
     stepUpSurface: 'server-component',
+    skipStepUpGuard: true,
   });
+  const currentUser = auth.user;
 
   if (!currentUser) {
     return <UnauthorizedPage />;
   }
 
-  const showStepUp = await isAdminStepUpUiVisible(currentUser);
+  let stepUpRequirement: StepUpRequirement | null = null;
+  if (isAdminStepUpEnabled()) {
+    if (auth.credential !== 'session') {
+      stepUpRequirement = { code: 'BEARER_NOT_ALLOWED' };
+    } else {
+      try {
+        const evaluation = await evaluateStepUp({
+          userId: currentUser.id,
+          webSessionId: auth.webSessionId,
+          actionClass: 'platform_read',
+        });
+        if (evaluation.state.status !== 'fresh') {
+          stepUpRequirement = { code: stepUpErrorCodeForState(evaluation.state) };
+        }
+      } catch {
+        stepUpRequirement = { code: 'STEP_UP_UNAVAILABLE' };
+      }
+    }
+  }
 
   return (
     <div className="flex min-h-screen">
@@ -31,10 +54,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </AppSidebar>
         <SidebarInset>
           <StepUpProvider>
-            <AdminStepUpStatus visible={showStepUp} />
-            <main id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col">
-              {children}
-            </main>
+            {stepUpRequirement ? (
+              <AdminStepUpInterstitial requirement={stepUpRequirement} />
+            ) : (
+              <main id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col">
+                {children}
+              </main>
+            )}
           </StepUpProvider>
         </SidebarInset>
       </SidebarProvider>

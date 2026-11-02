@@ -47,6 +47,7 @@ describe('step-up dialog copy', () => {
       'SESSION_UNBOUND',
       'BEARER_NOT_ALLOWED',
       'REAUTH_REQUIRED',
+      'STEP_UP_UNAVAILABLE',
     ] as const) {
       expect(stepUpDialogTitle({ code })).not.toHaveLength(0);
       expect(stepUpDialogDescription({ code })).not.toHaveLength(0);

@@ -1,52 +1,39 @@
 'use client';
 
-import React from 'react';
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { stepUpRequirementFromError, type StepUpRequirement } from './step-up-error';
-import { runWithStepUp } from './step-up-ceremony';
+import { registerStepUpHandler } from '@/lib/trpc/step-up-link';
+import { type StepUpRequirement } from './step-up-error';
 import { StepUpRequestQueue } from './step-up-requests';
 import { StepUpDialog } from './StepUpDialog';
 
-type StepUpContextValue = {
-  /**
-   * Run an operation, and if it refuses with a step-up contract, verify once
-   * and retry the same operation. A second refusal is returned to the caller.
-   */
-  withStepUp: <T>(operation: () => Promise<T>) => Promise<T>;
-  /** Open the dialog without a pending operation ("Verify now"). */
-  requestStepUp: () => Promise<boolean>;
-};
-
-const StepUpContext = createContext<StepUpContextValue | null>(null);
-
-export function useStepUp(): StepUpContextValue {
-  const value = useContext(StepUpContext);
-  if (!value) throw new Error('useStepUp must be used inside StepUpProvider');
-  return value;
-}
-
+/**
+ * Owns the single verification dialog for the admin app. The tRPC link asks
+ * this provider to verify, then retries the refused operation once.
+ */
 export function StepUpProvider({ children }: { children: ReactNode }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [requirement, setRequirement] = useState<StepUpRequirement | null>(null);
   const queue = useRef(new StepUpRequestQueue());
 
-  const requestStepUp = useCallback(
-    (nextRequirement: StepUpRequirement = { code: 'MFA_REQUIRED' }) => {
-      const pending = queue.current.begin();
-      setRequirement(nextRequirement);
-      return pending;
-    },
-    []
-  );
+  const requestStepUp = useCallback((nextRequirement: StepUpRequirement) => {
+    const pending = queue.current.begin();
+    setRequirement(nextRequirement);
+    return pending;
+  }, []);
 
   const settle = useCallback((verified: boolean) => {
     setRequirement(null);
     queue.current.settle(verified);
   }, []);
+
+  useEffect(() => {
+    registerStepUpHandler(next => requestStepUp(next));
+    return () => registerStepUpHandler(null);
+  }, [requestStepUp]);
 
   const onVerified = useCallback(() => {
     void queryClient.invalidateQueries({
@@ -55,23 +42,8 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
     settle(true);
   }, [queryClient, settle, trpc]);
 
-  const withStepUp = useCallback(
-    async <T,>(operation: () => Promise<T>): Promise<T> => {
-      return runWithStepUp(operation, requestStepUp, stepUpRequirementFromError);
-    },
-    [requestStepUp]
-  );
-
-  const value = useMemo(
-    () => ({
-      withStepUp,
-      requestStepUp: () => requestStepUp(),
-    }),
-    [requestStepUp, withStepUp]
-  );
-
   return (
-    <StepUpContext.Provider value={value}>
+    <>
       {children}
       <StepUpDialog
         open={requirement !== null}
@@ -79,6 +51,6 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
         onVerified={onVerified}
         onCancel={() => settle(false)}
       />
-    </StepUpContext.Provider>
+    </>
   );
 }

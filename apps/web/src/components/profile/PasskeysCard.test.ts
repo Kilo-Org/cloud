@@ -292,18 +292,6 @@ describe('PasskeysCard', () => {
     expect(hasButton(mounted.container, 'Add a passkey')).toBe(true);
   });
 
-  it('shows the admin enrollment note only when the server enables it', () => {
-    mockQueryResult.data = { passkeys: [] };
-    mounted = mountCard({ showAdminStepUpNote: true });
-
-    expect(mounted.container.textContent).toContain('Admin passkeys: adding or replacing one');
-
-    mounted.cleanup();
-    mounted = undefined;
-    mounted = mountCard();
-    expect(mounted.container.textContent).not.toContain('Admin passkeys: adding or replacing one');
-  });
-
   it('lists a passkey with its name and the date it was added', () => {
     mockQueryResult.data = { passkeys: [ROW] };
     mounted = mountCard();

@@ -1,5 +1,5 @@
 import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser';
-import { StepUpCancelledError, type StepUpRequirement } from './step-up-error';
+
 
 export type StepUpOptions =
   | { ok: true; challengeId: string; options: PublicKeyCredentialRequestOptionsJSON }
@@ -45,25 +45,4 @@ export async function runStepUpCeremony(deps: StepUpCeremonyDeps): Promise<StepU
   return (await deps.submitAssertion(options.challengeId, assertion))
     ? { ok: true }
     : { ok: false };
-}
-
-/**
- * Run one operation, and if it refuses with a step-up requirement, verify and
- * retry that operation exactly once. A second refusal is returned to the
- * caller. A cancelled verification rejects without retrying.
- */
-export async function runWithStepUp<T>(
-  operation: () => Promise<T>,
-  requestStepUp: (requirement: StepUpRequirement) => Promise<boolean>,
-  requirementFromError: (error: unknown) => StepUpRequirement | null
-): Promise<T> {
-  try {
-    return await operation();
-  } catch (error) {
-    const requirement = requirementFromError(error);
-    if (!requirement) throw error;
-    const verified = await requestStepUp(requirement);
-    if (!verified) throw new StepUpCancelledError();
-    return await operation();
-  }
 }

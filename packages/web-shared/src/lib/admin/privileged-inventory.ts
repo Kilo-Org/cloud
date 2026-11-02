@@ -157,13 +157,6 @@ const trpcEntries: PrivilegedInventoryEntry[] = [
     read: 'platform_read',
     target: 'none',
   },
-  {
-    id: 'trpc.stepUp.revokeCurrent',
-    surface: 'trpc',
-    route: 'stepUp.revokeCurrent',
-    write: 'platform_write',
-    target: 'none',
-  },
   adminEntry('trpc.organizations', 'organizations.*', support),
   adminEntry('trpc.organizations.admin', 'organizations.admin.*', support),
   adminEntry('trpc.organizations.sso', 'organizations.sso.*', support),
@@ -628,13 +621,6 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     actionClass: 'sensitive_write',
     surface: 'rest',
     occurrences: 3,
-  },
-  {
-    id: 'internal.lib.admin.stepUpUi',
-    file: 'apps/web/src/lib/admin/step-up-ui.ts',
-    actionClass: 'platform_read',
-    surface: 'server-component',
-    occurrences: 2,
   },
   {
     id: 'internal.lib.admin.requirePrivilegedActor',

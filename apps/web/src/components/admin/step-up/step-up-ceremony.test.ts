@@ -1,6 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { StepUpCancelledError } from './step-up-error';
-import { runStepUpCeremony, runWithStepUp } from './step-up-ceremony';
+import { runStepUpCeremony } from './step-up-ceremony';
 import { StepUpRequestQueue } from './step-up-requests';
 
 describe('runStepUpCeremony', () => {
@@ -84,51 +83,6 @@ describe('runStepUpCeremony', () => {
     });
 
     expect(result).toEqual({ ok: false, code: 'SESSION_UNBOUND' });
-  });
-});
-
-describe('runWithStepUp', () => {
-  const requirement = { code: 'MFA_REQUIRED' as const };
-
-  it('retries the operation exactly once after verification', async () => {
-    const operation = jest
-      .fn<() => Promise<string>>()
-      .mockRejectedValueOnce({ data: { stepUp: requirement } })
-      .mockResolvedValueOnce('done');
-    const requestStepUp = jest.fn(async () => true);
-
-    await expect(
-      runWithStepUp(
-        operation,
-        requestStepUp,
-        error => (error as { data?: { stepUp?: typeof requirement } }).data?.stepUp ?? null
-      )
-    ).resolves.toBe('done');
-    expect(operation).toHaveBeenCalledTimes(2);
-  });
-
-  it('does not retry when the dialog is cancelled', async () => {
-    const operation = jest.fn<() => Promise<string>>().mockRejectedValue({
-      data: { stepUp: requirement },
-    });
-
-    await expect(
-      runWithStepUp(
-        operation,
-        async () => false,
-        error => (error as { data?: { stepUp?: typeof requirement } }).data?.stepUp ?? null
-      )
-    ).rejects.toBeInstanceOf(StepUpCancelledError);
-    expect(operation).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not retry an error without a step-up requirement', async () => {
-    const operation = jest.fn<() => Promise<string>>().mockRejectedValue(new Error('boom'));
-    const requestStepUp = jest.fn(async () => true);
-
-    await expect(runWithStepUp(operation, requestStepUp, () => null)).rejects.toThrow('boom');
-    expect(operation).toHaveBeenCalledTimes(1);
-    expect(requestStepUp).not.toHaveBeenCalled();
   });
 });
 

@@ -137,7 +137,7 @@ function passkeyLabel(passkey: PasskeySummary): string {
  * A failed request keeps whatever the list already showed — including a row
  * whose removal failed — and reports the failure inline beside a working retry.
  */
-export function PasskeysCard({ showAdminStepUpNote = false }: { showAdminStepUpNote?: boolean }) {
+export function PasskeysCard() {
   const trpc = useTRPC();
   const passkeysQuery = useQuery(trpc.user.getPasskeys.queryOptions());
 
@@ -228,12 +228,6 @@ export function PasskeysCard({ showAdminStepUpNote = false }: { showAdminStepUpN
             <span className="font-medium">Passkeys</span>
           </div>
 
-          {showAdminStepUpNote ? (
-            <p className="text-sm text-muted-foreground">
-              Admin passkeys: adding or replacing one may ask you to sign in again or verify with an
-              existing passkey.
-            </p>
-          ) : null}
 
           {passkeysQuery.isLoading ? (
             // Sized like the rows it replaces, so loading→content does not move

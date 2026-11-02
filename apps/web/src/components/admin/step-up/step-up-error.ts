@@ -21,6 +21,7 @@ const STEP_UP_CODES = new Set<string>([
   'SESSION_UNBOUND',
   'BEARER_NOT_ALLOWED',
   'REAUTH_REQUIRED',
+  'STEP_UP_UNAVAILABLE',
 ]);
 
 /**
@@ -58,6 +59,8 @@ export function stepUpDialogTitle(requirement: StepUpRequirement): string {
       return 'Use a browser session';
     case 'REAUTH_REQUIRED':
       return 'Verify your sign-in';
+    case 'STEP_UP_UNAVAILABLE':
+      return 'Verification is temporarily unavailable';
     case 'MFA_EXPIRED':
       return 'Your verification expired';
     case 'MFA_REQUIRED':
@@ -75,6 +78,8 @@ export function stepUpDialogDescription(requirement: StepUpRequirement): string 
       return 'API tokens cannot complete MFA. Use the Kilo web console with a browser session.';
     case 'REAUTH_REQUIRED':
       return 'Sign in again before adding another passkey. Signing out signs you out of every browser.';
+    case 'STEP_UP_UNAVAILABLE':
+      return 'MFA verification could not be checked. Try again in a moment. If it keeps failing, contact support.';
     case 'MFA_EXPIRED':
       return 'Confirm it is you with your passkey to continue.';
     case 'MFA_REQUIRED':

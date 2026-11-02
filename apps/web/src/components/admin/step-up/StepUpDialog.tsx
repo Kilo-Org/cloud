@@ -83,11 +83,13 @@ export function StepUpDialog({
   requirement,
   onVerified,
   onCancel,
+  dismissible = true,
 }: {
   open: boolean;
   requirement: StepUpRequirement | null;
   onVerified: () => void;
   onCancel: () => void;
+  dismissible?: boolean;
 }) {
   const trpc = useTRPC();
   const [isRunning, setIsRunning] = useState(false);
@@ -159,7 +161,7 @@ export function StepUpDialog({
     <Dialog
       open={open}
       onOpenChange={next => {
-        if (!next && !isRunning) onCancel();
+        if (!next && !isRunning && dismissible) onCancel();
       }}
     >
       <DialogContent>
@@ -204,9 +206,11 @@ export function StepUpDialog({
               )}
             </Button>
           )}
-          <Button variant="outline" onClick={onCancel} disabled={isRunning}>
-            Cancel
-          </Button>
+          {dismissible ? (
+            <Button variant="outline" onClick={onCancel} disabled={isRunning}>
+              Cancel
+            </Button>
+          ) : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>
